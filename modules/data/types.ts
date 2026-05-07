@@ -30,14 +30,6 @@ export type TagValueLookup = Record<string, boolean>;
  */
 export type TagKeyValueLookup = Record<string, TagValueLookup>;
 
-
-/** 2D vector as [x, y], typically [longitude, latitude] in WGS84 for geographic coordinates */
-export type Vec2 = [number, number];
-/** 3D vector as [x, y, z] */
-export type Vec3 = [number, number, number];
-/** 4D vector as [x, y, z, w], also used for bounding boxes [minX, minY, maxX, maxY] */
-export type Vec4 = [number, number, number, number];
-
 /** Entity type discriminator */
 export type EntityType = 'node' | 'way' | 'relation';
 

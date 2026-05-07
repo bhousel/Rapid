@@ -4,7 +4,7 @@ import { GlowFilter } from 'pixi-filters';
 import { AbstractPixiFeature } from './AbstractPixiFeature.ts';
 import { DashLine } from './lib/DashLine.ts';
 import { getLineSegments, lineToPoly, type LineToPolyResult } from './helpers.ts';
-import { REF_Z, screenToScaledWorld } from '../lib/worldScaled.ts';
+import { WORLD_ZOOM } from '@rapid-sdk/math';
 
 import type { AbstractPixiLayer } from './AbstractPixiLayer.ts';
 import type { DashLineOptions } from './lib/DashLine.ts';
@@ -38,7 +38,7 @@ export class PixiFeatureLine extends AbstractPixiFeature {
 
   /** Buffer polygon data for hit testing and halo */
   private _bufferdata: LineToPolyResult | null;
-  /** Source geometry for the worldScaled render path */
+  /** Source geometry for the world render path */
   private _worldSource: GeometryPart | null;
 
   /**
@@ -90,10 +90,10 @@ export class PixiFeatureLine extends AbstractPixiFeature {
 
 
   /**
-   * Sets the source GeometryPart for the worldScaled render path.
-   * The feature will be drawn using `source.worldScaled` coordinates,
+   * Sets the source GeometryPart for the world render path.
+   * The feature will be drawn using `source.world` coordinates,
    * bypassing the per-frame world→screen reprojection done by the normal path.
-   * @param source - A GeometryPart whose `worldScaled` data is populated
+   * @param source - A GeometryPart whose `world` data is populated
    */
   setWorldCoords(source: GeometryPart): void {
     this._worldSource = source;
@@ -279,9 +279,9 @@ export class PixiFeatureLine extends AbstractPixiFeature {
 
 
   /**
-   * Line update path that draws from pre-scaled world coordinates (worldScaled, REF_Z=16).
-   * The feature's container sits inside a group with scale `2^(zoom - REF_Z)`, so vertex
-   * coordinates in worldScaled space map directly to screen pixels without per-frame reprojection.
+   * Line update path that draws from world coordinates (WORLD_ZOOM=16).
+   * The feature's container sits inside a group with scale `2^(zoom - WORLD_ZOOM)`, so vertex
+   * coordinates in world space map directly to screen pixels without per-frame reprojection.
    * @param viewport - Pixi viewport to use for rendering
    * @param zoom - Effective zoom to use for rendering
    */
@@ -290,9 +290,9 @@ export class PixiFeatureLine extends AbstractPixiFeature {
     const isWireframe = !!map?.wireframeMode;
     const container = this.container;
     const source = this._worldSource;
-    const worldScaled = source?.worldScaled;
+    const world = source?.world;
 
-    if (!worldScaled || source?.type !== 'LineString') {
+    if (!world || source?.type !== 'LineString') {
       this.lod = 0;
       this.visible = false;
       this.geom.dirty = false;
@@ -300,7 +300,7 @@ export class PixiFeatureLine extends AbstractPixiFeature {
       return;
     }
 
-    const points = worldScaled.coords as Vec2[];
+    const points = world.coords as Vec2[];
     if (!points.length) {
       this.lod = 0;
       this.visible = false;
@@ -309,11 +309,11 @@ export class PixiFeatureLine extends AbstractPixiFeature {
       return;
     }
 
-    // Position container anchor-relative in worldScaled space.
-    // The group's scale (2^(zoom - REF_Z)) converts these local units to screen pixels.
-    const anchor = worldScaled.anchor;
-    const scaledOrigin = screenToScaledWorld(viewport, [0, 0]);
-    container.position.set(anchor[0] - scaledOrigin[0], anchor[1] - scaledOrigin[1]);
+    // Position container anchor-relative in world space.
+    // The group's scale (2^(zoom - WORLD_ZOOM)) converts these local units to screen pixels.
+    const anchor = world.anchor!;
+    const worldOrigin = viewport.screenToWorld([0, 0]) as Vec2;
+    container.position.set(anchor[0] - worldOrigin[0], anchor[1] - worldOrigin[1]);
 
     const lineMarkers = container.getChildByLabel('lineMarkers');
     if (lineMarkers) {
@@ -409,14 +409,14 @@ export class PixiFeatureLine extends AbstractPixiFeature {
 
 
   /**
-   * Draws a worldScaled-coordinate line graphic.
-   * Points are in worldScaled space (world × 2^REF_Z); vertices are drawn anchor-relative
+   * Draws a world-coordinate line graphic.
+   * Points are in world space (z16); vertices are drawn anchor-relative
    * so that local coordinates stay small and float32-safe.
-   * Stroke widths are expressed in worldScaled local units: `px × 2^(REF_Z - zoom)`.
+   * Stroke widths are expressed in world local units: `px × 2^(WORLD_ZOOM - zoom)`.
    * @param which - Style part to draw ('casing' or 'stroke')
    * @param graphic - PIXI graphics object to update
-   * @param points - WorldScaled coordinate points (z16 space)
-   * @param anchor - WorldScaled anchor (pre-computed extent center from worldScaled.anchor)
+   * @param points - World coordinate points (z16 space)
+   * @param anchor - World anchor (pre-computed extent center from world.anchor)
    * @param zoom - Effective zoom to use for rendering
    * @param isWireframe - Whether wireframe mode is active
    */
@@ -449,8 +449,8 @@ export class PixiFeatureLine extends AbstractPixiFeature {
       width = 1;
     }
 
-    // Convert pixel width to worldScaled local units
-    const localWidth = width * Math.pow(2, REF_Z - zoom);
+    // Convert pixel width to world local units
+    const localWidth = width * 2 ** (WORLD_ZOOM - zoom);
 
     let g: PIXI.Graphics | DashLine = graphic.clear();
     if (partStyle?.opacity === 0) return;  // remove completely
@@ -465,7 +465,7 @@ export class PixiFeatureLine extends AbstractPixiFeature {
     };
 
     if (partStyle.dash) {
-      strokeStyle.dash = partStyle.dash.map(d => d * Math.pow(2, REF_Z - zoom));
+      strokeStyle.dash = partStyle.dash.map(d => d * 2 ** (WORLD_ZOOM - zoom));
       g = new DashLine(this.gfx, graphic, strokeStyle);
       drawAnchorRelative(points, g);
     } else {

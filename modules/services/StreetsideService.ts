@@ -10,7 +10,6 @@ import { utilQsString } from '@rapid-sdk/util';
 import { AbstractSystem } from '../core/AbstractSystem.ts';
 import { MarkerData, GeoJSONData } from '../data/index.ts';
 import { uiIcon } from '../ui/icon.js';
-import { wgs84ToScaledWorld } from '../lib/worldScaled.ts';
 
 import type { Context } from '../Context.ts';
 import type { D3EnterSelection, D3Selection } from 'd3-selection';
@@ -761,7 +760,7 @@ export class StreetsideService extends AbstractSystem {
 
     const extent = new Extent();
     for (const loc of poly) {
-      extent.extendSelf(wgs84ToScaledWorld(viewport, loc));
+      extent.extendSelf(viewport.wgs84ToWorld(loc));
     }
 
     // find nearest other bubble in the search polygon

@@ -2,6 +2,11 @@
 
 Non-obvious choices where "why did we do it this way?" isn't captured in the code.
 
+## World Coordinate System (render_worldcoord)
+
+- **Use SDK-native z16 world coordinates as the canonical world space** — We removed Rapid's temporary `worldScaled` bridge and now rely on `@rapid-sdk/math` world coordinates directly (`WORLD_ZOOM = 16`, world range `0..16,777,216`). This avoids duplicate geometry caches and keeps rendering/spatial math aligned with SDK primitives.
+- **Keep world-coordinate grouping in PixiScene** — Feature groups continue using a single zoom-dependent group transform (`scale = 2^(zoom - WORLD_ZOOM)`) so features can stay in world-coordinate local geometry without per-vertex reprojection each frame.
+
 ## NsiService
 
 - **`NsiTreeProperties` removed from imports** — NSI v7 exports this type but we use `NsiTreesJSON['trees']` directly for the `trees` cache property, making the standalone type import unused.

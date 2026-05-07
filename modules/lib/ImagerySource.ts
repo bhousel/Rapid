@@ -4,8 +4,8 @@ import { utilAesDecrypt, utilQsString, utilStringQs, utilSafeString } from '@rap
 
 import { utilDateString } from '../util/date.ts';
 
+import type { Vec2 } from '@rapid-sdk/math';
 import type { Context } from '../Context.ts';
-import type { Vec2 } from '../lib/types.ts';
 
 // Cast utilAesDecrypt to allow optional key parameter (matches runtime behavior)
 const aesDecrypt = utilAesDecrypt as (cipherText: string | undefined, key?: number[]) => string;
@@ -314,8 +314,8 @@ export class ImagerySource {
    * @param zoom - the current zoom
    */
   nudge(delta: Vec2, zoom: number): void {
-    this.offset[0] += delta[0] / Math.pow(2, zoom);
-    this.offset[1] += delta[1] / Math.pow(2, zoom);
+    this.offset[0] += delta[0] / 2 ** zoom;
+    this.offset[1] += delta[1] / 2 ** zoom;
   }
 
 
@@ -330,7 +330,7 @@ export class ImagerySource {
     if (result === '') return result;   // source 'none'
 
     function _tileToProjectedCoords(proj: string, x: number, y: number, z: number): { x: number; y: number } {
-      const zoomSize = Math.pow(2, z);
+      const zoomSize = 2 ** z;
       const lon = x / zoomSize * TAU - Math.PI;
       const lat = Math.atan(Math.sinh(Math.PI * (1 - 2 * y / zoomSize)));
       let mercCoords;
@@ -410,7 +410,7 @@ export class ImagerySource {
         .replace('{x}', String(coord[0]))
         .replace('{y}', String(coord[1]))
         // TMS-flipped y coordinate
-        .replace(/\{[t-]y\}/, String(Math.pow(2, coord[2]) - coord[1] - 1))
+        .replace(/\{[t-]y\}/, String(2 ** coord[2] - coord[1] - 1))
         .replace(/\{z(oom)?\}/, String(coord[2]))
         // only fetch retina tiles for retina screens
         .replace(/\{@2x\}|\{r\}/, isRetina ? '@2x' : '');
@@ -635,8 +635,8 @@ export class ImagerySourceEsri extends ImagerySource {
 
     // calculate url z/y/x from the lat/long of the center of the map
     const z = 20;
-    const x = (Math.floor((loc[0] + 180) / 360 * Math.pow(2, z)));
-    const y = (Math.floor((1 - Math.log(Math.tan(loc[1] * DEG2RAD) + 1 / Math.cos(loc[1] * DEG2RAD)) / Math.PI) / 2 * Math.pow(2, z)));
+    const x = (Math.floor((loc[0] + 180) / 360 * 2 ** z));
+    const y = (Math.floor((1 - Math.log(Math.tan(loc[1] * DEG2RAD) + 1 / Math.cos(loc[1] * DEG2RAD)) / Math.PI) / 2 * 2 ** z));
 
     // fetch an 8x8 grid to leverage cache
     const tilemapUrl = dummyUrl.replace(/tile\/[0-9]+\/[0-9]+\/[0-9]+\?blankTile=false/, 'tilemap') + '/' + z + '/' + y + '/' + x + '/8/8';

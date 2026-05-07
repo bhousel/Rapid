@@ -179,7 +179,7 @@ export function actionOrthogonalize(
           // move interesting points to the nearest edge..
           const choice = vecProject(point.coord, bestCoords);
           if (choice) {
-            loc = viewport.unproject(choice.target);
+            loc = viewport.unproject(choice.point);
             graph.replace(node.move(vecInterp(node.loc!, loc, t)));
           }
         }

@@ -13,7 +13,7 @@ import type { Context } from '../Context.ts';
 import type { ImagerySourceProps } from '../lib/ImagerySource.ts';
 import type { OneOrMore } from '../util/iterable.ts';
 import type { PixiLayerBackgroundTiles } from '../pixi/PixiLayerBackgroundTiles.ts';
-import type { Vec2, Vec4 } from '../data/types.ts';
+import type { Vec2, Vec4 } from '@rapid-sdk/math';
 
 
 /**

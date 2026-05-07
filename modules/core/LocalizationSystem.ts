@@ -8,7 +8,8 @@ import { utilExtractValues } from '../util/string.ts';
 import type { D3Selection } from 'd3-selection';
 import type { Context } from '../Context.ts';
 import type { Graph } from '../lib/Graph.ts';
-import type { OsmEntity, OsmTags, Vec2 } from '../data/index.ts';
+import type { OsmEntity, OsmTags } from '../data/index.ts';
+import type { Vec2 } from '@rapid-sdk/math';
 
 
 /** Information about a language */

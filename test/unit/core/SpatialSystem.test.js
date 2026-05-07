@@ -88,9 +88,14 @@ describe('SpatialSystem', () => {
     // Helper to create mock tile
     function createMockTile(tileID, locWgs84) {
       const tiler = new Rapid.sdk.Tiler();
-      // Create a tile at the given location by using a 1px viewport
-      const [x, y] = context.viewport.wgs84ToWorld(locWgs84);
-      const v = new Rapid.sdk.Viewport({ x: -x, y: -y, z: 14 }, [1, 1]);
+      // Create a tile at the given location by using a small viewport.
+      // The SDK's worldToScreen formula is: screen = (world - WORLD_HALF) * scale + [tx, ty]
+      // With z=WORLD_ZOOM=16, scale=1. For screen [0,0] to map to [wx, wy]:
+      //   tx = -(wx - WORLD_HALF), ty = -(wy - WORLD_HALF)
+      const [wx, wy] = context.viewport.wgs84ToWorld(locWgs84);
+      const tx = -(wx - Rapid.sdk.WORLD_HALF);
+      const ty = -(wy - Rapid.sdk.WORLD_HALF);
+      const v = new Rapid.sdk.Viewport({ x: tx, y: ty, z: 16 }, [256, 256]);
       const tiles = tiler.getTiles(v).tiles;
       return tiles.length > 0 ? tiles[0] : null;
     }
@@ -529,7 +534,7 @@ describe('SpatialSystem', () => {
 
         _spatial.addTiles(datasetID, tile);
         // Check if tile actually covers the location by using a location from the tile extent
-        const extent = tile.tileExtent;
+        const extent = tile.worldExtent;
         const testLoc = context.viewport.worldToWgs84([extent.min[0], extent.min[1]]);
         assert.isTrue(_spatial.hasTileAtLoc(datasetID, testLoc));
       });

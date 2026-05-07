@@ -183,11 +183,13 @@ describe('GeometryPart', () => {
       assert.deepEqual(part.orig.coords, [0, 0]);
       assert.deepEqual(part.orig.extent, new Rapid.sdk.Extent([0, 0], [0, 0]));
 
+      // World coords are z16 (WORLD_ZOOM=16): [0,0] lon/lat maps to [WORLD_HALF, WORLD_HALF]
+      const WORLD_HALF = Rapid.sdk.WORLD_HALF;
       assert.isObject(part.world);
-      assert.deepEqual(part.world.coords, [128, 128]);
-      assert.deepEqual(part.world.extent, new Rapid.sdk.Extent([128, 128], [128, 128]));
-      assert.deepEqual(part.world.centroid, [128, 128]);
-      assert.deepEqual(part.world.poi, [128, 128]);
+      assert.deepEqual(part.world.coords, [WORLD_HALF, WORLD_HALF]);
+      assert.deepEqual(part.world.extent, new Rapid.sdk.Extent([WORLD_HALF, WORLD_HALF], [WORLD_HALF, WORLD_HALF]));
+      assert.deepEqual(part.world.centroid, [WORLD_HALF, WORLD_HALF]);
+      assert.deepEqual(part.world.poi, [WORLD_HALF, WORLD_HALF]);
     });
 
     it('skips calculations if no original data', () => {

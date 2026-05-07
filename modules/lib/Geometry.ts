@@ -27,10 +27,8 @@ export class Geometry {
   parts: GeometryPart[];
   /** Original data, in WGS84 coordinates ([0,0] is Null Island) */
   orig: GeometryOrigData | null;
-  /** Projected data, in world coordinates ([0,0] is the top left corner of a 256x256 Web Mercator world) */
+  /** Projected data, in world coordinates (z16, range 0..16,777,216) */
   world: GeometryWorldData | null;
-  /** Projected data, in worldScaled coordinates (world × 2^16, range 0..16,777,216) */
-  worldScaled: GeometryWorldData | null;
 
   /**
    * @constructor
@@ -41,7 +39,6 @@ export class Geometry {
     this.parts = [];
     this.orig = null;
     this.world = null;
-    this.worldScaled = null;
   }
 
 
@@ -61,7 +58,6 @@ export class Geometry {
   reset(): void {
     this.orig = null;
     this.world = null;
-    this.worldScaled = null;
 
     for (const part of this.parts) {
       part.reset();
@@ -77,7 +73,7 @@ export class Geometry {
    */
   clone(): Geometry {
     const copy = new Geometry(this.context);
-    for (const obj of ['orig', 'world', 'worldScaled'] as const) {
+    for (const obj of ['orig', 'world'] as const) {
       const src = this[obj];
       if (!src) continue;
 
@@ -121,25 +117,22 @@ export class Geometry {
 
     const origExtent = new Extent();
     const worldExtent = new Extent();
-    const worldScaledExtent = new Extent();
     let isValid = false;
 
     for (const geojsonPart of geojsonParts) {
       const part = new GeometryPart(this.context);
       part.setData(geojsonPart);
-      if (!part.orig || !part.world || !part.worldScaled) continue;  // if the GeometryPart was invalid, skip it
+      if (!part.orig || !part.world) continue;  // if the GeometryPart was invalid, skip it
 
       this.parts.push(part);
       origExtent.extendSelf(part.orig.extent);
       worldExtent.extendSelf(part.world.extent);
-      worldScaledExtent.extendSelf(part.worldScaled.extent);
       isValid = true;
     }
 
     if (isValid) {   // At least one part was found to be valid
-      this.orig        = { extent: origExtent };
-      this.world       = { extent: worldExtent };
-      this.worldScaled = { extent: worldScaledExtent };
+      this.orig  = { extent: origExtent };
+      this.world = { extent: worldExtent };
     }
   }
 

@@ -3,7 +3,6 @@ import { GlowFilter } from 'pixi-filters';
 
 import { AbstractPixiFeature } from './AbstractPixiFeature.ts';
 import { DashLine } from './lib/DashLine.ts';
-import { scaledWorldToScreen } from '../lib/worldScaled.ts';
 
 import type { AbstractPixiLayer } from './AbstractPixiLayer.ts';
 import type { DashLineOptions } from './lib/DashLine.ts';
@@ -40,7 +39,7 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
   private _viewfieldName: string | null;
   /** Set true to use a circular halo and hit area */
   private _isCircular: boolean;
-  /** Source geometry for the worldScaled render path */
+  /** Source geometry for the world render path */
   private _worldSource: GeometryPart | null;
 
   /**
@@ -102,8 +101,8 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
 
 
   /**
-   * Sets the source GeometryPart for the worldScaled render path.
-   * @param source - A GeometryPart whose `worldScaled` data is populated
+   * Sets the source GeometryPart for the world render path.
+   * @param source - A GeometryPart whose `world` data is populated
    */
   setWorldCoords(source: GeometryPart): void {
     this._worldSource = source;
@@ -131,22 +130,22 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
 
 
   /**
-   * Point update path that positions from pre-scaled world coordinates (worldScaled, REF_Z=16).
+   * Point update path that positions from world coordinates (WORLD_ZOOM=16).
    * Skips `geom.update()` on the common path (style unchanged); only reprojects when style is dirty.
    * @param viewport - Pixi viewport to use for rendering
    * @param zoom - Effective zoom to use for rendering
    */
   updateWorld(viewport: Viewport, zoom: number): void {
-    const worldScaled = this._worldSource?.worldScaled;
-    if (!worldScaled) {
+    const world = this._worldSource?.world;
+    if (!world) {
       this.visible = false;
       this.geom.dirty = false;
       this._styleDirty = false;
       return;
     }
 
-    // Position from worldScaled anchor — no full geometry reprojection needed.
-    const screenPos = scaledWorldToScreen(viewport, worldScaled.anchor) as Vec2;
+    // Position from world anchor — no full geometry reprojection needed.
+    const screenPos = viewport.worldToScreen(world.anchor!) as Vec2;
     this.container.position.set(screenPos[0], screenPos[1]);
     this.container.zIndex = screenPos[1];
 

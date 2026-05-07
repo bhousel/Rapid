@@ -2,17 +2,13 @@ import { Extent, geomGetSmallestSurroundingRectangle, vecInterp } from '@rapid-s
 import { polygonArea, polygonCentroid, polygonHull } from 'd3-polygon';
 import polylabel from '@mapbox/polylabel';
 
-import { buildWorldScaled } from './worldScaled.ts';
-
+import type { Vec2 } from '@rapid-sdk/math';
 import type { Context } from '../Context.ts';
 import type {
   GeometryPartOrigData,
   GeometryPartWorldData,
-  GeometryPartWorldScaledData,
   SingularGeometry,
-  SingularGeometryType,
-  SSRData,
-  Vec2
+  SingularGeometryType
 } from './types.ts';
 
 // Re-export for convenience
@@ -29,32 +25,24 @@ export type { SingularGeometry, SingularGeometryType };
  * The geometry data should be passed to `setData()` as a GeoJSON geometry object.
  *
  * Properties you can access:
- *   `orig.geojson`   Original GeoJSON Geometry data (in WGS84 lon/lat)
- *   `orig.coords`    Original coordinate data (in WGS84 lon/lat)
- *   `orig.extent`    Original Extent bounding box (in WGS84 lon/lat)
- *   `world.coords`            Projected coordinate data (world z0, range 0..256)
- *   `world.extent`            Projected Extent
- *   `world.outer`             Projected outer ring, Array of coordinate pairs [ [x,y], [x,y], … ]
- *   `world.hull`              Projected convex hull, Array of coordinate pairs [ [x,y], [x,y], … ]
- *   `world.centroid`          Projected centroid, [x, y]
- *   `world.poi`               Projected pole of inaccessability, [x, y]
- *   `world.ssr`               Projected smallest surrounding rectangle data (angle, poly)
- *   `worldScaled.coords`      Scaled world coordinate data (z16, range 0..16,777,216)
- *   `worldScaled.extent`      Scaled world Extent
- *   `worldScaled.anchor`      Pre-computed extent center in scaled world space
- *   `worldScaled.outer`       Scaled outer ring
- *   `worldScaled.centroid`    Scaled centroid
- *   `worldScaled.poi`         Scaled pole of inaccessability
- *   `worldScaled.ssr`         Scaled smallest surrounding rectangle data
+ *   `orig.geojson`     Original GeoJSON Geometry data (in WGS84 lon/lat)
+ *   `orig.coords`      Original coordinate data (in WGS84 lon/lat)
+ *   `orig.extent`      Original Extent bounding box (in WGS84 lon/lat)
+ *   `world.coords`     Projected coordinate data (world z16, range 0..16,777,216)
+ *   `world.extent`     Projected Extent
+ *   `world.anchor`     Pre-computed extent center, used for per-feature container positioning
+ *   `world.outer`      Projected outer ring, Array of coordinate pairs [ [x,y], [x,y], … ]
+ *   `world.hull`       Projected convex hull, Array of coordinate pairs [ [x,y], [x,y], … ]
+ *   `world.centroid`   Projected centroid, [x, y]
+ *   `world.poi`        Projected pole of inaccessability, [x, y]
+ *   `world.ssr`        Projected smallest surrounding rectangle data
  */
 export class GeometryPart {
   context: Context;
   /** Original data, in WGS84 coordinates ([0,0] is Null Island) */
   orig: GeometryPartOrigData | null;
-  /** Projected data, in world coordinates ([0,0] is the top left corner of a 256x256 Web Mercator world, range 0..256) */
+  /** Projected data, in world coordinates (z16, range 0..16,777,216) */
   world: GeometryPartWorldData | null;
-  /** Scaled world coordinates (world × 2^16, range 0..16,777,216). Used by the Pixi render pipeline. */
-  worldScaled: GeometryPartWorldScaledData | null;
 
   /**
    * @constructor
@@ -64,7 +52,6 @@ export class GeometryPart {
     this.context = context;
     this.orig = null;
     this.world = null;
-    this.worldScaled = null;
   }
 
 
@@ -84,7 +71,6 @@ export class GeometryPart {
   reset(): void {
     this.orig = null;
     this.world = null;
-    this.worldScaled = null;
   }
 
 
@@ -95,7 +81,7 @@ export class GeometryPart {
   clone(): GeometryPart {
     const copy = new GeometryPart(this.context);
 
-    for (const obj of ['orig', 'world', 'worldScaled'] as const) {
+    for (const obj of ['orig', 'world'] as const) {
       const src = this[obj];
       if (!src) continue;
 
@@ -109,10 +95,8 @@ export class GeometryPart {
       }
       if (obj === 'orig') {
         copy.orig = dst as unknown as GeometryPartOrigData;
-      } else if (obj === 'world') {
-        copy.world = dst as unknown as GeometryPartWorldData;
       } else {
-        copy.worldScaled = dst as unknown as GeometryPartWorldScaledData;
+        copy.world = dst as unknown as GeometryPartWorldData;
       }
     }
 
@@ -181,10 +165,10 @@ export class GeometryPart {
       this.world = {
         coords,
         extent: new Extent(coords),
+        anchor: coords,
         centroid: coords,
         poi: coords
       };
-      this.worldScaled = buildWorldScaled(this.world, 'Point');
       return;
     }
 
@@ -257,12 +241,12 @@ export class GeometryPart {
 
       // Smallest Surrounding Rectangle
       if (world.hull) {
-        world.ssr = geomGetSmallestSurroundingRectangle(world.hull) as SSRData;
+        world.ssr = geomGetSmallestSurroundingRectangle(world.hull) ?? undefined;
       }
     }
 
+    world.anchor = worldExtent.center() as Vec2;
     this.world = world;
-    this.worldScaled = buildWorldScaled(world, type!);
   }
 
 }

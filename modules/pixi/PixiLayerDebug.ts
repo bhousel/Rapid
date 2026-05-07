@@ -83,7 +83,7 @@ export class PixiLayerDebug extends AbstractPixiLayer {
         if (!part.world) continue;  // invalid?
 
         const extent = part.world.extent;
-        const poi = part.worldScaled?.poi;  // Pole of Inaccessability (worldScaled coordinates for rbush query)
+        const poi = part.world?.poi;  // Pole of Inaccessability (world coordinates for rbush query)
         const outer = extent.polygon();
 
         // bounding box
@@ -96,7 +96,7 @@ export class PixiLayerDebug extends AbstractPixiLayer {
 
           feature.v = version;
           const source = { type: 'Polygon', world: { extent: extent, coords: [ outer ] } };
-          feature.setCoords(source as GeometryPart);
+          feature.setCoords(source as unknown as GeometryPart);
 
           // Start with default style, and apply adjustments
           // set style = red if collides, green if not

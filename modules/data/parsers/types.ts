@@ -1,4 +1,5 @@
-import type { OsmTags, Vec2 } from '../types.ts';
+import type { OsmTags } from '../types.ts';
+import type { Vec2 } from '@rapid-sdk/math';
 
 
 /** Supported types that can be parsed from OSM data */

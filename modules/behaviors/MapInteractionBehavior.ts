@@ -220,8 +220,8 @@ export class MapInteractionBehavior extends AbstractBehavior {
 
     const z1 = t.z;
     const z2 = numClamp(z1 + (isShiftDown ? 1 : -1), MIN_Z, MAX_Z);
-    const k1 = Math.pow(2, z1);
-    const k2 = Math.pow(2, z2);
+    const k1 = 2 ** z1;
+    const k2 = 2 ** z2;
 
     // convert mouse coord to transform origin (was: d3 `transform.invert`)
     const x1 = (x - t.x) / k1;
@@ -514,8 +514,8 @@ export class MapInteractionBehavior extends AbstractBehavior {
 //worldcoordinates
     const z1 = t.z;
     const z2 = numClamp(z1 - (dy / 500), MIN_Z, MAX_Z);
-    const k1 = Math.pow(2, z1);
-    const k2 = Math.pow(2, z2);
+    const k1 = 2 ** z1;
+    const k2 = 2 ** z2;
 
     // convert mouse coord to transform origin (was: d3 `transform.invert`)
     const x1 = (x - t.x) / k1;

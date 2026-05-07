@@ -4,10 +4,9 @@ import whichPolygon from 'which-polygon';
 import { AbstractSystem } from './AbstractSystem.ts';
 import { GeoJSONData } from '../data/GeoJSONData.ts';
 
-import type { Extent } from '@rapid-sdk/math';
+import type { Extent, Vec2, Vec4 } from '@rapid-sdk/math';
 import type { HasLocationSet, HasLocationSetID } from '@rapideditor/location-conflation';
 import type { Context } from '../Context.ts';
-import type { Vec2, Vec4 } from '../data/types.ts';
 
 /**
  * A blocked region definition.

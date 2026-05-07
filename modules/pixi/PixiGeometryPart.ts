@@ -2,8 +2,8 @@ import { Extent } from '@rapid-sdk/math';
 import { GeometryPart } from '../lib/GeometryPart.ts';
 
 import type { Context } from '../Context.ts';
-import type { GeometryPartWorldData, SingularGeometry, SingularGeometryType, SSRData } from '../lib/types.ts';
-import type { Viewport, Vec2 } from '@rapid-sdk/math';
+import type { GeometryPartWorldData, SingularGeometry, SingularGeometryType } from '../lib/types.ts';
+import type { SurroundingRectangle, Viewport, Vec2 } from '@rapid-sdk/math';
 
 
 
@@ -17,8 +17,8 @@ export interface PixiGeometryPartScreenData {
   extent?: Extent;
   /** Screen centroid */
   centroid?: Vec2;
-  /** Smallest surrounding rectangle data (angle, poly) */
-  ssr?: SSRData;
+  /** Smallest surrounding rectangle data */
+  ssr?: SurroundingRectangle;
   /** Width of projected shape, in pixels */
   width?: number;
   /** Height of projected shape, in pixels */
@@ -162,7 +162,7 @@ export class PixiGeometryPart {
     // Calculate ssr if possible
     if (world.ssr) {
       screen.ssr = {
-        poly: world.ssr.poly.map(coord => viewport.worldToScreen(coord)),
+        polygon: world.ssr.polygon.map(coord => viewport.worldToScreen(coord)) as typeof world.ssr.polygon,
         angle: world.ssr.angle
       };
     }

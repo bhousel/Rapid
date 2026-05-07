@@ -199,7 +199,7 @@ export class PixiLayerBackgroundTiles extends AbstractPixiLayer {
     const z = t.z - (log2ts - 8);   // adjust zoom for tile sizes not 256px (log2(256) = 8)
 
     // Apply imagery offset (in pixels) to the source container
-    const offset = vecScale(source.offset, Math.pow(2, z));
+    const offset = vecScale(source.offset, 2 ** z);
     sourceContainer.position.set(offset[0], offset[1]);
 
     // Determine tiles needed to cover the view at the zoom we want,
@@ -311,9 +311,9 @@ export class PixiLayerBackgroundTiles extends AbstractPixiLayer {
       }
 
       if (keepTile) {   // Tile may be visible - update position and scale
-        const [x, y] = viewport.worldToScreen(tile.tileExtent.min);  // left top
+        const [x, y] = viewport.worldToScreen(tile.worldExtent.min);  // left top
         tile.sprite!.position.set(x, y);
-        const size = tileSize * Math.pow(2, z - tile.xyz[2]);
+        const size = tileSize * 2 ** (z - tile.xyz[2]);
         tile.sprite!.width = size;
         tile.sprite!.height = size;
 

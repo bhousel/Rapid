@@ -20,7 +20,7 @@ import { PixiLayerRapid } from './PixiLayerRapid.js';
 import { PixiLayerRapidOverlay } from './PixiLayerRapidOverlay.js';
 import { PixiLayerStreetsidePhotos } from './PixiLayerStreetsidePhotos.ts';
 import { PixiLayerGeoScribble } from './PixiLayerGeoScribble.js';
-import { REF_Z } from '../lib/worldScaled.ts';
+import { WORLD_ZOOM } from '@rapid-sdk/math';
 import { utilIterable, type OneOrMore } from '../util/iterable.ts';
 
 import type { AbstractPixiFeature } from './AbstractPixiFeature.ts';
@@ -181,13 +181,13 @@ export class PixiScene extends EventEmitter {
 
 
   /**
-   * Updates the transform for groups that draw in scaled world coordinates (worldScaled, REF_Z=16).
+   * Updates the transform for groups that draw in world coordinates (WORLD_ZOOM=16).
    *
-   * Features in these groups store vertex positions in worldScaled space (world × 2^REF_Z).
-   * The group scale `2^(z - REF_Z)` converts those local units back to screen pixels GPU-side,
+   * Features in these groups store vertex positions in world space (z16).
+   * The group scale `2^(z - WORLD_ZOOM)` converts those local units back to screen pixels GPU-side,
    * eliminating per-frame world→screen reprojection for every vertex.
    *
-   * Each feature's container.position is set to `(anchor - worldOrigin) × 2^REF_Z` so that
+   * Each feature's container.position is set to `anchor - worldOrigin` so that
    * vertex coordinates remain small (anchor-relative) and float32-safe.
    *
    * @param viewport - Pixi viewport to use for rendering
@@ -196,7 +196,7 @@ export class PixiScene extends EventEmitter {
     const streetview2 = this.groups.get('streetview2');
     if (!streetview2) return;
 
-    const scale = Math.pow(2, viewport.transform.z - REF_Z);
+    const scale = 2 ** (viewport.transform.z - WORLD_ZOOM);
     streetview2.position.set(0, 0);
     streetview2.scale.set(scale, scale);
   }

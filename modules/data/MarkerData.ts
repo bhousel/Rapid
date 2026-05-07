@@ -1,7 +1,7 @@
 import { AbstractData, AbstractDataProps } from './AbstractData.ts';
 import type { Context } from '../Context.ts';
 import type { GeoJSONObject } from '../lib/types.ts';
-import type { Vec2 } from './types.ts';
+import type { Vec2 } from '@rapid-sdk/math';
 
 
 /**

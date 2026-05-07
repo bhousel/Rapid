@@ -12,10 +12,11 @@ import type { Context } from '../Context.ts';
 import type { FieldProps } from '../lib/Field.ts';
 import type { Graph } from '../lib/Graph.ts';
 import type { OneOrMore } from '../util/iterable.ts';
-import type { OsmEntity, OsmNode, OsmTags, TagKeyValueLookup, Vec2 } from '../data/types.ts';
+import type { OsmEntity, OsmNode, OsmTags, TagKeyValueLookup } from '../data/types.ts';
 import type { PresetProps } from '../lib/Preset.ts';
 import type { RulesetProps } from '../lib/Ruleset.ts';
 import type { VariableProps, VariableValue } from '../lib/Variable.ts';
+import type { Vec2 } from '@rapid-sdk/math';
 
 // Make very sure this resolves to Rapid's `package.json`
 // If you mess up the `../`s, the resolver may import another random package.json from somewhere else.

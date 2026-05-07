@@ -1,7 +1,8 @@
 import { selection } from 'd3-selection';
 import {
   DEG2RAD, RAD2DEG, TAU, Extent, geoMetersToLon,
-  numClamp, numWrap, vecRotate, vecSubtract
+  numClamp, numWrap, vecRotate, vecSubtract,
+  WORLD_HALF, WORLD_ZOOM
 } from '@rapid-sdk/math';
 
 import { AbstractSystem } from './AbstractSystem.ts';
@@ -554,9 +555,11 @@ export class MapSystem extends AbstractSystem {
     const world = view.wgs84ToWorld(loc2);
 
     // convert that coordinate back to screen coordinate at z2
-    const k2 = Math.pow(2, z2);
-    const x2 = -((world[0]-128) * k2) + center[0];
-    const y2 = -((world[1]-128) * k2) + center[1];
+    // worldToScreen formula: screen = (world - WORLD_HALF) * 2^(z - WORLD_ZOOM) + [tx, ty]
+    // For center to land on `world`: tx = center - (world - WORLD_HALF) * k2 / 2^WORLD_ZOOM
+    const k2 = 2 ** z2;
+    const x2 = -((world[0] - WORLD_HALF) * k2 / 2 ** WORLD_ZOOM) + center[0];
+    const y2 = -((world[1] - WORLD_HALF) * k2 / 2 ** WORLD_ZOOM) + center[1];
 
     return this.transform({ x: x2, y: y2, z: z2, r: r2 }, duration) as this;
   }
@@ -595,9 +598,11 @@ export class MapSystem extends AbstractSystem {
 
     const world = view.wgs84ToWorld(loc2);
     // convert that coordinate back to screen coordinate at z2
-    const k2 = Math.pow(2, z2);
-    const x2 = -((world[0]-128) * k2) + center[0];
-    const y2 = -((world[1]-128) * k2) + center[1];
+    // worldToScreen formula: screen = (world - WORLD_HALF) * 2^(z - WORLD_ZOOM) + [tx, ty]
+    // For center to land on `world`: tx = center - (world - WORLD_HALF) * k2 / 2^WORLD_ZOOM
+    const k2 = 2 ** z2;
+    const x2 = -((world[0] - WORLD_HALF) * k2 / 2 ** WORLD_ZOOM) + center[0];
+    const y2 = -((world[1] - WORLD_HALF) * k2 / 2 ** WORLD_ZOOM) + center[1];
 
     return this.setTransformAsync({ x: x2, y: y2, z: z2, r: r2 }, duration);
   }

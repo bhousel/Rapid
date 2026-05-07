@@ -1,6 +1,6 @@
 import { vecEqual, vecNormalizedDot } from '@rapid-sdk/math';
 
-import type { Vec2 } from '../data/types.ts';
+import type { Vec2 } from '@rapid-sdk/math';
 
 
 /** Point with coordinate for orthogonalization */

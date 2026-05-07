@@ -350,7 +350,7 @@ export class VectorTileService extends AbstractSystem {
       const url = source.template
         .replace('{x}', x.toString())
         .replace('{y}', y.toString())
-        .replace(/\{[t-]y\}/, (Math.pow(2, z) - y - 1).toString())  // TMS-flipped y coordinate
+        .replace(/\{[t-]y\}/, (2 ** z - y - 1).toString())  // TMS-flipped y coordinate
         .replace(/\{z(oom)?\}/, z.toString())
         .replace(/\{switch:([^}]+)\}/, function(s: string, r: string) {
           const subdomains = r.split(',');

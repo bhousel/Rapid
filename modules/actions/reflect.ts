@@ -37,10 +37,10 @@ export function actionReflect(reflectIDs: EntityID[], viewport: Viewport): Refle
     // Choose line pq = axis of symmetry.
     // The shape's surrounding rectangle has 2 axes of symmetry.
     // Reflect across the longer axis by default.
-    const p1: Vec2 = [(ssr.poly[0][0] + ssr.poly[1][0]) / 2, (ssr.poly[0][1] + ssr.poly[1][1]) / 2 ];
-    const q1: Vec2 = [(ssr.poly[2][0] + ssr.poly[3][0]) / 2, (ssr.poly[2][1] + ssr.poly[3][1]) / 2 ];
-    const p2: Vec2 = [(ssr.poly[3][0] + ssr.poly[4][0]) / 2, (ssr.poly[3][1] + ssr.poly[4][1]) / 2 ];
-    const q2: Vec2 = [(ssr.poly[1][0] + ssr.poly[2][0]) / 2, (ssr.poly[1][1] + ssr.poly[2][1]) / 2 ];
+    const p1: Vec2 = [(ssr.polygon[0][0] + ssr.polygon[1][0]) / 2, (ssr.polygon[0][1] + ssr.polygon[1][1]) / 2 ];
+    const q1: Vec2 = [(ssr.polygon[2][0] + ssr.polygon[3][0]) / 2, (ssr.polygon[2][1] + ssr.polygon[3][1]) / 2 ];
+    const p2: Vec2 = [(ssr.polygon[3][0] + ssr.polygon[4][0]) / 2, (ssr.polygon[3][1] + ssr.polygon[4][1]) / 2 ];
+    const q2: Vec2 = [(ssr.polygon[1][0] + ssr.polygon[2][0]) / 2, (ssr.polygon[1][1] + ssr.polygon[2][1]) / 2 ];
     let p: Vec2;
     let q: Vec2;
 

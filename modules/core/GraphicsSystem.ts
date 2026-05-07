@@ -462,7 +462,7 @@ export class GraphicsSystem extends AbstractSystem {
 //      const scale = tCurr.k / tPrev.k;
 
 // todo fix: this does not work correctly with the worldcoordinate changes
-      const scale = Math.pow(2, tCurr.z) / Math.pow(2, tPrev.z);
+      const scale = 2 ** (tCurr.z - tPrev.z);
       let dx = (currxy[0] / scale - prevxy[0]) * scale;
       let dy = (currxy[1] / scale - prevxy[1]) * scale;
       const dr = tCurr.r - tPrev.r;

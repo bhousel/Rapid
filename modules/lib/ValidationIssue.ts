@@ -1,11 +1,11 @@
 import { Extent } from '@rapid-sdk/math';
+import { utilTotalExtent } from '../util/util.ts';
+import { ValidationFix } from './ValidationFix.ts';
 
 import type { Context } from '../Context.ts';
 import type { D3Selection } from 'd3-selection';
-import type { Vec2 } from '../data/types.ts';
+import type { Vec2 } from '@rapid-sdk/math';
 import type { Graph } from './Graph.js';
-import { ValidationFix } from './ValidationFix.ts';
-import { utilTotalExtent } from '../util/util.ts';
 
 
 /** Severity level for validation issues */

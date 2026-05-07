@@ -3,8 +3,9 @@ import { Extent } from '@rapid-sdk/math';
 import type { D3Selection } from 'd3-selection';
 import type { Context } from '../Context.ts';
 import type { OsmEntity, OsmRelation } from '../data/types.ts';
-import type { Vec2 } from '../lib/types.ts';
 import type { Graph } from '../lib/Graph.ts';
+import type { Vec2 } from '@rapid-sdk/math';
+
 
 /** GeoJSON input - either a Feature or FeatureCollection */
 type GeoJSONInput = GeoJSON.Feature | GeoJSON.FeatureCollection;

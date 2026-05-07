@@ -1,11 +1,10 @@
 import * as PIXI from 'pixi.js';
 import { GlowFilter } from 'pixi-filters';
-import { vecEqual, vecLength } from '@rapid-sdk/math';
+import { WORLD_ZOOM, vecEqual, vecLength } from '@rapid-sdk/math';
 
 import { AbstractPixiFeature } from './AbstractPixiFeature.ts';
 import { DashLine } from './lib/DashLine.ts';
 import { lineToPoly, type LineToPolyResult } from './helpers.ts';
-import { REF_Z, screenToScaledWorld } from '../lib/worldScaled.ts';
 
 import type { AbstractPixiLayer } from './AbstractPixiLayer.ts';
 import type { DashLineOptions } from './lib/DashLine.ts';
@@ -61,7 +60,7 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
   private _bufferdata: LineToPolyResult | null;
   /** Vertex count for Rapid#1636 workaround */
   private _vertexCount: number;
-  /** Source geometry for the worldScaled render path */
+  /** Source geometry for the world-coordinate render path */
   private _worldSource: GeometryPart | null;
 
   /**
@@ -163,8 +162,8 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
 
 
   /**
-   * Sets the source GeometryPart for the worldScaled render path.
-   * @param source - A GeometryPart whose `worldScaled` data is populated
+   * Sets the source GeometryPart for the world-coordinate render path.
+   * @param source - A GeometryPart whose `world` data is populated
    */
   setWorldCoords(source: GeometryPart): void {
     this._worldSource = source;
@@ -205,7 +204,7 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
       this._ssrdata = null;
 
       // We use the SSR to approximate a low resolution polygon at low zooms
-      if (screen.ssr?.poly) {
+      if (screen.ssr?.polygon) {
         // Calculate axes of symmetry to determine width, height
         // The shape's surrounding rectangle has 2 axes of symmetry.
         //
@@ -218,7 +217,7 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
         //        \/ q1
         //        2
 
-        const poly = screen.ssr.poly;  // note: wound counterclockwise
+        const poly = screen.ssr.polygon;  // note: wound counterclockwise
         const p1: Vec2 = [(poly[0][0] + poly[1][0]) / 2, (poly[0][1] + poly[1][1]) / 2 ];
         const q1: Vec2 = [(poly[2][0] + poly[3][0]) / 2, (poly[2][1] + poly[3][1]) / 2 ];
         const p2: Vec2 = [(poly[3][0] + poly[0][0]) / 2, (poly[3][1] + poly[0][1]) / 2 ];
@@ -511,7 +510,7 @@ if (renderer.type === PIXI.RendererType.CANVAS) {
     // Debug SSR
     // this.debugSSR.clear();
     // if (this._ssrdata) {
-    //   const p = this._ssrdata.screenSSR.poly;
+    //   const p = this._ssrdata.screenSSR.polygon;
     //   const ssrflat = [
     //     p[0][0], p[0][1],
     //     p[1][0], p[1][1],
@@ -532,9 +531,9 @@ if (renderer.type === PIXI.RendererType.CANVAS) {
 
 
   /**
-   * Polygon update path that draws from pre-scaled world coordinates (worldScaled, REF_Z=16).
-   * The feature's container sits inside a group with scale `2^(zoom - REF_Z)`, so vertex
-   * coordinates in worldScaled space map directly to screen pixels without per-frame reprojection.
+   * Polygon update path that draws from world coordinates (WORLD_ZOOM=16).
+   * The feature's container sits inside a group with scale `2^(zoom - WORLD_ZOOM)`, so vertex
+   * coordinates in world space map directly to screen pixels without per-frame reprojection.
    * @param viewport - Pixi viewport to use for rendering
    * @param zoom - Effective zoom to use for rendering
    */
@@ -543,9 +542,9 @@ if (renderer.type === PIXI.RendererType.CANVAS) {
     const isWireframe = !!map?.wireframeMode;
     const container = this.container;
     const source = this._worldSource;
-    const worldScaled = source?.worldScaled;
+    const world = source?.world;
 
-    if (!worldScaled || source?.type !== 'Polygon') {
+    if (!world || source?.type !== 'Polygon') {
       this.lod = 0;
       this.visible = false;
       this.geom.dirty = false;
@@ -553,7 +552,7 @@ if (renderer.type === PIXI.RendererType.CANVAS) {
       return;
     }
 
-    const rings = worldScaled.coords as Vec2[][];
+    const rings = world.coords as Vec2[][];
     if (!rings.length || !rings[0].length) {
       this.lod = 0;
       this.visible = false;
@@ -562,11 +561,11 @@ if (renderer.type === PIXI.RendererType.CANVAS) {
       return;
     }
 
-    // Position container anchor-relative in worldScaled space.
-    // The group's scale (2^(zoom - REF_Z)) converts these local units to screen pixels.
-    const anchor = worldScaled.anchor;
-    const scaledOrigin = screenToScaledWorld(viewport, [0, 0]);
-    container.position.set(anchor[0] - scaledOrigin[0], anchor[1] - scaledOrigin[1]);
+    // Position container anchor-relative in world space.
+    // The group's scale (2^(zoom - WORLD_ZOOM)) converts these local units to screen pixels.
+    const anchor = world.anchor!;
+    const worldOrigin = viewport.screenToWorld([0, 0]) as Vec2;
+    container.position.set(anchor[0] - worldOrigin[0], anchor[1] - worldOrigin[1]);
 
     this.lod = 2;
     this.visible = true;
@@ -579,7 +578,7 @@ if (renderer.type === PIXI.RendererType.CANVAS) {
     const color = style.fill?.color ?? 0xaaaaaa;
     const opacity = style.fill?.opacity ?? 0.3;
     const lineWidth = isWireframe ? 1 : style.fill?.width || 2;
-    const localWidth = lineWidth * Math.pow(2, REF_Z - zoom);
+    const localWidth = lineWidth * 2 ** (WORLD_ZOOM - zoom);
 
     // STROKES
     const strokes = this.strokes!;

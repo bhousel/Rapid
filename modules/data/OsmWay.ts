@@ -6,8 +6,9 @@ import { osmLanes } from '../lib/lanes.ts';
 
 import type { Context } from '../Context.ts';
 import type { Graph } from '../lib/Graph.ts';
-import type { OsmNode, OsmTags, TagKeyValueLookup, Vec2 } from './types.ts';
+import type { OsmNode, OsmTags, TagKeyValueLookup } from './types.ts';
 import type { GeoJSONObject } from '../lib/types.ts';
+import type { Vec2 } from '@rapid-sdk/math';
 
 
 // Filter function to eliminate consecutive duplicates.

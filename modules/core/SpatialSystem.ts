@@ -2,7 +2,7 @@ import RBush, { type BBox } from 'rbush';
 
 import { Graph } from '../lib/Graph.ts';
 import { AbstractSystem } from './AbstractSystem.ts';
-import { REF_SCALE, scaledToWorld, visibleScaledExtent, wgs84ToScaledWorld } from '../lib/worldScaled.ts';
+import { WORLD_SCALE, WORLD_ZOOM } from '@rapid-sdk/math';
 import { type OneOrMore, utilIterable } from '../util/iterable.ts';
 
 import type { AbstractData } from '../data/AbstractData.ts';
@@ -177,7 +177,7 @@ export class SpatialSystem extends AbstractSystem {
       }
 
       // insert new..
-      const extent = data.geoms?.worldScaled?.extent;
+      const extent = data.geoms?.world?.extent;
       if (!extent) continue;
 
       const box = extent.bbox() as Box;
@@ -239,16 +239,10 @@ export class SpatialSystem extends AbstractSystem {
       if (cache.boxes.has(tileID)) continue;
 
       // insert new.. (we are assuming dataIDs will never look like tileIDs.)
-      const extent = tile.tileExtent;  // these are in world (z0) coordinates
+      const extent = tile.worldExtent;  // already in world (z16) coordinates
       if (!extent) continue;
 
-      const { minX, minY, maxX, maxY } = extent.bbox();
-      const box = {
-        minX: minX * REF_SCALE,
-        minY: minY * REF_SCALE,
-        maxX: maxX * REF_SCALE,
-        maxY: maxY * REF_SCALE,
-      } as Box;
+      const box = extent.bbox() as unknown as Box;
       box.datasetID = datasetID;
       box.boxID = tileID;
       box.contents = tile;
@@ -297,7 +291,8 @@ export class SpatialSystem extends AbstractSystem {
    */
   getVisibleData(datasetID: DatasetID): Box[] {
     const cache = this.getCache(datasetID);
-    return cache.dataRBush.search(visibleScaledExtent(this.context.viewport));
+    const viewport = this.context.viewport;
+    return cache.dataRBush.search(viewport.visibleWorldExtent().bbox());
   }
 
   /**
@@ -366,8 +361,8 @@ export class SpatialSystem extends AbstractSystem {
    */
   getDataAtLoc(datasetID: DatasetID, loc: Vec2): Box[] {
     const cache = this.getCache(datasetID);
-    const [x, y] = wgs84ToScaledWorld(this.context.viewport, loc);
-    const epsilon = 1e-7 * REF_SCALE;
+    const [x, y] = this.context.viewport.wgs84ToWorld(loc) as Vec2;
+    const epsilon = 1e-7 * 2 ** WORLD_ZOOM;
     const test = { minX: x - epsilon, minY: y - epsilon, maxX: x + epsilon, maxY: y + epsilon };
     return cache.dataRBush.search(test);
   }
@@ -379,9 +374,10 @@ export class SpatialSystem extends AbstractSystem {
    * @return `true` if data exists there, `false` if not
    */
   hasDataAtLoc(datasetID: DatasetID, loc: Vec2): boolean {
+    const viewport = this.context.viewport;
     const cache = this.getCache(datasetID);
-    const [x, y] = wgs84ToScaledWorld(this.context.viewport, loc);
-    const epsilon = 1e-7 * REF_SCALE;
+    const [x, y] = viewport.wgs84ToWorld(loc) as Vec2;
+    const epsilon = 1e-7 * 2 ** WORLD_ZOOM;
     const test = { minX: x - epsilon, minY: y - epsilon, maxX: x + epsilon, maxY: y + epsilon };
     return cache.dataRBush.collides(test);
   }
@@ -397,19 +393,19 @@ export class SpatialSystem extends AbstractSystem {
   preventCoincidentLoc(datasetID: DatasetID, loc: Vec2): Vec2 {
     const viewport = this.context.viewport;
     const cache = this.getCache(datasetID);
-    const [x, startY] = wgs84ToScaledWorld(viewport, loc);
+    const [x, startY] = viewport.wgs84ToWorld(loc) as Vec2;
     let y = startY;
-    const epsilon = 1e-7 * REF_SCALE;
+    const epsilon = 1e-7 * WORLD_SCALE;
 
     while (true) {
       const test = { minX: x - epsilon, minY: y - epsilon, maxX: x + epsilon, maxY: y + epsilon };
       const didCollide = cache.dataRBush.collides(test);
       if (!didCollide) {
-        return viewport.worldToWgs84(scaledToWorld([x, y]));
+        return viewport.worldToWgs84([x, y] as Vec2);
       } else {
-        // These are in worldScaled coordinates (world × 2^16), so we are moving `y` south:
-        // 6356752 (polar radius in meters) * 0.9 (because ±85°) / 256 px * this number / REF_SCALE = meters moved?
-        y += 0.00001 * REF_SCALE;   // roughly 0.22 meters?
+        // These are in world coordinates, so we are moving `y` south:
+        // 6356752 (polar radius in meters) * 0.9 (because ±85°) / 256 px * this number / WORLD_SCALE = meters moved?
+        y += 0.00001 * WORLD_SCALE;   // roughly 0.22 meters?
       }
     }
   }
@@ -440,7 +436,7 @@ export class SpatialSystem extends AbstractSystem {
   /**
    * Does a tile exist in the given search box?
    * @param datasetID - the cache to search
-   * @param box - the search box (worldScaled coordinates)
+    * @param box - the search box (world coordinates, z16)
    * @return `true` if something exists, `false` if not
    */
   hasTileAtBox(datasetID: DatasetID, box: BBox): boolean {
@@ -455,9 +451,10 @@ export class SpatialSystem extends AbstractSystem {
    * @return `true` if a tile has been loaded there, `false` if not
    */
   hasTileAtLoc(datasetID: DatasetID, loc: Vec2): boolean {
+    const viewport = this.context.viewport;
     const cache = this.getCache(datasetID);
-    const [x, y] = wgs84ToScaledWorld(this.context.viewport, loc);
-    const epsilon = 1e-7 * REF_SCALE;
+    const [x, y] = viewport.wgs84ToWorld(loc) as Vec2;
+    const epsilon = 1e-7 * WORLD_SCALE;
     const test = { minX: x - epsilon, minY: y - epsilon, maxX: x + epsilon, maxY: y + epsilon };
     return cache.tileRBush.collides(test);
   }
