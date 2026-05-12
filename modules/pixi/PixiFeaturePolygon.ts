@@ -520,24 +520,31 @@ if (renderer.type === PIXI.RendererType.CANVAS) {
 
   /**
    * Polygon update path that draws from world coordinates (WORLD_ZOOM=16).
-   * The feature's container sits inside a group with scale `2^(zoom - WORLD_ZOOM)`, so vertex
-   * coordinates in world space map directly to screen pixels without per-frame reprojection.
+   * The feature's container sits inside the `world` Pixi container which provides
+   * the position + scale mapping world coords -> screen. Vertices are pulled from
+   * `_geom.local.coords` (origin-relative cache) so we don't recompute the
+   * subtraction every frame.
    * @param viewport - Pixi viewport to use for rendering
    * @param zoom - Effective zoom to use for rendering
    */
   updateWorld(viewport: Viewport, zoom: number): void {
     if (!this._geom) return;  // wrong path?
 
-    const map = this.context.systems.map;
+    const context = this.context;
+    const storage = context.systems.storage;
+    const map = context.systems.map;
     const isWireframe = !!map?.wireframeMode;
+    const bearing = context.viewport.transform.rotation;
+    const textureManager = this.gfx.textureManager!;
     const container = this.container;
 
     const type = this._geom.type;
     const world = this._geom.world;
-    const rings = world?.coords as Vec2[][];
+    const local = this._geom.local;
+    const rings = local?.coords as Vec2[][];
 
     // Not a polygon, or no world coordinate data?
-    if (type !== 'Polygon' || !world || !rings?.length || !rings[0].length) {
+    if (type !== 'Polygon' || !world || !local || !rings?.length || !rings[0].length) {
       this.lod = 0;
       this.visible = false;
       this.geom.dirty = false;
@@ -545,79 +552,357 @@ if (renderer.type === PIXI.RendererType.CANVAS) {
       return;
     }
 
-    // The container lives under the `world` Pixi container (in GraphicsSystem),
-    // which provides the position + scale that maps world coords -> screen.
-    // So `container.position` is in world coordinates directly. We use the
-    // polygon's `origin` (extent center) as the anchor and draw each vertex
-    // origin-relative so local coords stay small and float32-safe.
+    // Position the container at the world origin (extent center). All vertices
+    // in `local.coords` are already relative to this origin.
     const origin = world.origin!;
     container.position.set(origin[0], origin[1]);
 
-    this.lod = 2;
-    this.visible = true;
-    this.lowRes!.visible = false;
-    this.fill!.visible = !isWireframe;
-    this.mask!.visible = false;  // no partial fill on this path
-    this.strokes!.visible = true;
+    // Compute screen-pixel width/height from the local extent.
+    // local.extent is in world units; multiply by worldScale to get screen pixels.
+    const worldScale = 2 ** (zoom - WORLD_ZOOM);
+    const localScale = 1 / worldScale;  // = 2^(WORLD_ZOOM - zoom)
+    const localExt = local.extent;
+    const localW = localExt.max[0] - localExt.min[0];
+    const localH = localExt.max[1] - localExt.min[1];
+    const w = localW * worldScale;
+    const h = localH * worldScale;
 
     const style = this._style;
     const color = style.fill?.color ?? 0xaaaaaa;
     const opacity = style.fill?.opacity ?? 0.3;
-    const lineWidth = isWireframe ? 1 : style.fill?.width || 2;
-    const localWidth = lineWidth * 2 ** (WORLD_ZOOM - zoom);
+    const pattern = style.fill?.pattern;
+    const dash = style.stroke?.dash ?? null;
 
-    // STROKES
+    const fillPreference = storage?.getItem('area-fill') ?? 'partial';
+    let doFullFill = (style.fill?.type ?? fillPreference) === 'full';
+
+    const lowRes = this.lowRes!;
+    const fill = this.fill!;
+    let mask = this.mask!;   // Rapid#1636, see below - we may need to replace the mask
+    const maskSource = this.maskSource!;
     const strokes = this.strokes!;
-    strokes.removeChildren();
-    strokes.eventMode = this._classes.has('drawing') ? 'none' : 'static';
 
-    const strokeStyle: PIXI.StrokeStyle = {
-      alpha: 1,
-      alignment: 0.5,
-      color: color,
-      width: localWidth,
-      cap: 'butt',
-      join: 'miter'
-    };
+    let texture = pattern && textureManager.getPatternTexture(pattern) || PIXI.Texture.WHITE;    // WHITE turns off the texture
+    const textureMatrix = new PIXI.Matrix().rotate(-bearing);  // keep patterns face up
+// bhousel update 5/27/22:
+// I've noticed that we can't use textures from a spritesheet for patterns,
+// and it would be nice to figure out why
 
-    for (let i = 0; i < rings.length; i++) {
-      const stroke = new PIXI.Graphics();
-      drawRing(rings[i], origin, stroke);
-      stroke.stroke(strokeStyle);
-      stroke.label = `stroke${i}`;
-      stroke.sortableChildren = false;
-      strokes.addChild(stroke);
+    // If this shape is so small that partial filling makes no sense, fill fully (faster?)
+    const cutoff = (2 * PARTIALFILLWIDTH) + 5;
+    if (w < cutoff || h < cutoff) {
+      doFullFill = true;
+    }
+    // If this shape is so small that texture filling makes no sense, skip it (faster?)
+    if (w < PARTIALFILLWIDTH || h < PARTIALFILLWIDTH) {
+      texture = PIXI.Texture.WHITE;
     }
 
-    // FILL (full fill only — no partial fill/mesh mask on this path)
-    if (this.fill!.visible && rings.length) {
-      this.fill!.eventMode = this._classes.has('drawing') ? 'none' : 'static';
-      this.fill!.clear();
-      const fillStyle: PIXI.FillStyle = { color, alpha: opacity };
-      for (let i = 0; i < rings.length; i++) {
-        drawRing(rings[i], origin, this.fill!);
-        if (i === 0) {
-          this.fill!.fill(fillStyle);
-        } else {
-          this.fill!.cut();
-        }
+    // Cull really tiny shapes
+    if (w < 4 && h < 4) {  // so tiny
+      this.lod = 0;
+      this.visible = false;
+      lowRes.visible = false;
+      fill.visible = false;
+      mask.visible = false;
+      strokes.visible = false;
+
+    // Very small, swap with lowRes sprite
+    } else if (local.ssr && (w < 20 && h < 20)) {
+      this.lod = 1;
+      this.visible = true;
+      lowRes.visible = true;
+      fill.visible = false;
+      mask.visible = false;
+      strokes.visible = false;
+
+      // SSR data is in local coords. The center is the midpoint of opposite midpoints.
+      // axis1 (p1->q1) is perpendicular to angle (the SSR's height direction)
+      // axis2 (p2->q2) is along angle (the SSR's width direction)
+      const poly = local.ssr.polygon;
+      const p1: Vec2 = [(poly[0][0] + poly[1][0]) / 2, (poly[0][1] + poly[1][1]) / 2];
+      const q1: Vec2 = [(poly[2][0] + poly[3][0]) / 2, (poly[2][1] + poly[3][1]) / 2];
+      const p2: Vec2 = [(poly[3][0] + poly[0][0]) / 2, (poly[3][1] + poly[0][1]) / 2];
+      const q2: Vec2 = [(poly[1][0] + poly[2][0]) / 2, (poly[1][1] + poly[2][1]) / 2];
+      const center: Vec2 = [(p1[0] + q1[0]) / 2, (p1[1] + q1[1]) / 2];
+
+      // Lengths in world units; the container's worldScale will convert to screen pixels.
+      const heightWorld = vecLength(p1, q1);
+      const widthWorld = vecLength(p2, q2);
+
+      // Decide shape: are any SSR corners on the outer ring?
+      // Use a small epsilon in world units (the legacy code used 0.1 screen px).
+      const EPSILON = 0.1 * localScale;
+      const outer = local.outer!;
+      let c0in: boolean | undefined;
+      let c1in: boolean | undefined;
+      let c2in: boolean | undefined;
+      let c3in: boolean | undefined;
+      for (const point of outer) {
+        if (!c0in) c0in = vecEqual(point, poly[0], EPSILON);
+        if (!c1in) c1in = vecEqual(point, poly[1], EPSILON);
+        if (!c2in) c2in = vecEqual(point, poly[2], EPSILON);
+        if (!c3in) c3in = vecEqual(point, poly[3], EPSILON);
+        if (c0in && c1in && c2in && c3in) break;
       }
+      const cornersInSSR = c0in || c1in || c2in || c3in;
+      const shapeType: 'square' | 'circle' = cornersInSSR ? 'square' : 'circle';
+
+      const filling = isWireframe ? '-unfilled' : '';
+      const textureName = `lowres${filling}-${shapeType}`;
+
+      lowRes.texture = textureManager.getTexture('symbol', textureName) || PIXI.Texture.WHITE;
+      lowRes.position.set(center[0], center[1]);
+      // Source sprite is 10x10. Container worldScale will scale it. To display
+      // at (widthWorld * worldScale) screen px, the sprite scale must be widthWorld/10.
+      lowRes.scale.set(widthWorld / 10, heightWorld / 10);
+      lowRes.rotation = local.ssr.angle;
+      lowRes.tint = color;
+
+    } else {
+      this.lod = 2;
+      this.visible = true;
+      lowRes.visible = false;
+      fill.visible = !isWireframe;
+      mask.visible = !isWireframe;
+      strokes.visible = true;
+    }
+
+    // Redraw the shapes
+    // Build flat number[] arrays per ring (in local coords) for poly() / lineToPoly()
+    const flatRings: number[][] = new Array(rings.length);
+    for (let i = 0; i < rings.length; i++) {
+      const ring = rings[i];
+      const flat = new Array(ring.length * 2);
+      for (let j = 0; j < ring.length; j++) {
+        flat[j * 2] = ring[j][0];
+        flat[j * 2 + 1] = ring[j][1];
+      }
+      flatRings[i] = flat;
     }
 
     this._bufferdata = null;
     container.hitArea = null;
+
+    // STROKES
+    strokes.removeChildren();
+    if (strokes.visible && flatRings.length) {
+      strokes.eventMode = this._classes.has('drawing') ? 'none' : 'static';  // Rapid#648
+
+      const lineWidth = isWireframe ? 1 : style.fill?.width || 2;
+      const localStrokeWidth = lineWidth * localScale;
+      const localBufWidth = (lineWidth + 10) * localScale;
+
+      const strokeStyle: StrokeStyleWithDash = {
+        alpha: 1,
+        alignment: 0.5,
+        color: color,
+        width: localStrokeWidth,
+        cap: 'butt',
+        join: 'miter'
+      };
+      const bufferStyle: PIXI.StrokeStyle = {
+        alpha: 1,
+        alignment: 0.5,
+        color: 0x000000,
+        width: localBufWidth,
+        cap: 'butt',
+        join: 'bevel'
+      };
+
+      for (let i = 0; i < flatRings.length; i++) {
+        const ring = flatRings[i];
+        const stroke = new PIXI.Graphics();
+
+        if (dash) {
+          strokeStyle.dash = dash.map(d => d * localScale);
+          const dl = new DashLine(this.gfx, stroke, strokeStyle);
+          dl.poly(ring);
+        } else {
+          stroke.poly(ring).stroke(strokeStyle);
+        }
+
+        const buffer = lineToPoly(ring, bufferStyle);
+        if (i === 0) {
+          this._bufferdata = buffer;  // save outer buffer for the hover halo + hit area
+        }
+
+        stroke.hitArea = new PIXI.Polygon(buffer.perimeter);
+        stroke.label = `stroke${i}`;
+        stroke.sortableChildren = false;
+        strokes.addChild(stroke);
+      }
+    }
+
+    // Container hit area uses the outer-ring buffer
+    if (this._bufferdata && !this._classes.has('drawing')) {
+      container.hitArea = new PIXI.Polygon(this._bufferdata.perimeter);
+    }
+
+    // FILL
+    if (fill.visible && flatRings.length) {
+      fill.eventMode = this._classes.has('drawing') ? 'none' : 'static';  // Rapid#648
+
+      const fillStyle: PIXI.FillStyle = {
+        color: color,
+        alpha: opacity,
+        texture: texture,
+        matrix: textureMatrix
+      };
+
+      fill.clear();
+      for (let i = 0; i < flatRings.length; i++) {
+        fill.poly(flatRings[i]);
+        if (i === 0) {
+          fill.fill(fillStyle);
+        } else {
+          fill.cut();
+        }
+      }
+
+      // bhousel 4/1/26: Meshes are not supported for the new experimental Pixi
+      // Canvas renderer yet.
+      const renderer = this.gfx!.pixi!.renderer;
+      if (renderer.type === PIXI.RendererType.CANVAS) {
+        doFullFill = true;
+      }
+
+      if (doFullFill) {
+        mask.visible = false;
+        fill.mask = null;
+
+      } else {  // partial fill
+        // Mask stroke width is also in world-local units.
+        const localMaskWidth = PARTIALFILLWIDTH * localScale;
+        const maskStyle: PIXI.StrokeStyle = {
+          alpha: 1,
+          color: 0xff0000,
+          width: localMaskWidth,
+          cap: 'butt',
+          join: 'bevel'
+        };
+
+        // Generate mask around the edges of the shape
+        maskSource.clear();
+        for (let i = 0; i < flatRings.length; i++) {
+          maskSource.poly(flatRings[i]);
+          if (i === 0) {               // outer
+            maskStyle.alignment = 1;   // left
+            maskSource.stroke(maskStyle);
+          } else {                     // holes
+            maskStyle.alignment = 0;   // right
+            maskSource.stroke(maskStyle);
+          }
+        }
+
+        // Compute the mask's geometry, then copy its attributes into the mesh's geometry
+        // This lets us use the Mesh as the mask and properly hit test against it.
+        const graphicsContext = maskSource.context;
+        const gpuContext = new PIXI.GpuGraphicsContext();
+        gpuContext.context = graphicsContext;
+        gpuContext.isBatchable = false;
+
+        PIXI.buildContextBatches(graphicsContext, gpuContext);
+
+        // Rapid#1636 - A very weird bug!! See note in legacy update() path.
+        const curr = gpuContext.geometryData.vertices.length;
+        const prev = this._vertexCount;
+        if (curr > 200 && prev <= 200 || curr <= 200 && prev > 200) {
+          this.container.removeChild(mask);
+          mask.destroy();
+
+          mask = new PIXI.Mesh({ geometry: new PIXI.MeshGeometry({}) });
+          mask.label = 'mask';
+          mask.eventMode = 'static';
+          this.container.addChild(mask);
+          this.mask = mask;
+        }
+        this._vertexCount = curr;
+
+        mask.geometry = new PIXI.MeshGeometry({
+          indices: new Uint32Array(gpuContext.geometryData.indices),
+          positions: new Float32Array(gpuContext.geometryData.vertices),
+          uvs: new Float32Array(gpuContext.geometryData.uvs)
+        });
+
+        mask.visible = true;
+        fill.mask = mask;
+      }
+    }
+
     this.geom.dirty = false;
     this._styleDirty = false;
-    this.updateHalo();
+    this.updateWorldHalo(zoom);
+  }
 
-    function drawRing(ring: Vec2[], origin: Vec2, g: PIXI.Graphics): void {
-      ring.forEach(([x, y], i) => {
-        if (i === 0) {
-          g.moveTo(x - origin[0], y - origin[1]);
-        } else {
-          g.lineTo(x - origin[0], y - origin[1]);
-        }
-      });
+
+  /**
+   * World-path halo. Draws the select halo as a child of the feature container
+   * so it inherits the same world position/scale as the rest of the feature.
+   * Widths and dash patterns are expressed in world-local units.
+   * @param zoom - Effective zoom (used to convert pixel widths to world-local widths)
+   */
+  updateWorldHalo(zoom: number): void {
+    const map = this.context.systems.map;
+    const wireframeMode = map?.wireframeMode;
+    const showHover = (this.visible && this._classes.has('hover'));
+    const showSelect = (this.visible && this._classes.has('select'));
+    const showHighlight = (this.visible && this._classes.has('highlight'));
+
+    // Hover/highlight glow — same as legacy
+    if (showHover) {
+      if (!this.container.filters) {
+        const glow = new GlowFilter({ distance: 15, outerStrength: 3, color: 0xffff00 });
+        glow.resolution = 2;
+        this.container.filters = [glow];
+      }
+    } else if (showHighlight) {
+      if (!this.container.filters) {
+        const glow = new GlowFilter({ distance: 15, outerStrength: 3, color: 0x7092ff });
+        glow.resolution = 2;
+        this.container.filters = [glow];
+      }
+    } else {
+      if (this.container.filters) {
+        this.container.filters = null!;
+      }
+    }
+
+    // Select dashed outline (in world-local space, parented to the feature container)
+    if (showSelect && this._bufferdata) {
+      if (!this.halo) {
+        this.halo = new PIXI.Graphics();
+        this.halo.label = `${this.id}-halo`;
+        (this.halo as PIXI.Graphics).eventMode = 'none';
+        this.container.addChild(this.halo);
+      } else if (this.halo.parent !== this.container) {
+        this.halo.parent?.removeChild(this.halo);
+        this.container.addChild(this.halo);
+      }
+
+      const localScale = 2 ** (WORLD_ZOOM - zoom);
+      const HALO_STYLE: StrokeStyleWithDash = {
+        alpha: 0.9,
+        dash: [6 * localScale, 3 * localScale],
+        width: 2 * localScale,
+        color: 0xffff00
+      };
+
+      const haloGraphics = this.halo as PIXI.Graphics;
+      haloGraphics.clear();
+      const dl = new DashLine(this.gfx, haloGraphics, HALO_STYLE);
+      if (this._bufferdata.outer) {
+        dl.poly(this._bufferdata.outer);
+      }
+      if (wireframeMode && this._bufferdata.inner) {
+        dl.poly(this._bufferdata.inner);
+      }
+
+    } else {
+      if (this.halo) {
+        this.halo.destroy();
+        this.halo = null;
+      }
     }
   }
 

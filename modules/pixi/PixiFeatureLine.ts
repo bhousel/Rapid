@@ -8,7 +8,6 @@ import { WORLD_ZOOM } from '@rapid-sdk/math';
 
 import type { AbstractPixiLayer } from './AbstractPixiLayer.ts';
 import type { DashLineOptions } from './lib/DashLine.ts';
-import type { GeometryPart } from '../lib/GeometryPart.ts';
 import type { Viewport, Vec2 } from '@rapid-sdk/math';
 
 const ONEWAY_SPACING = 35;
@@ -280,10 +279,11 @@ export class PixiFeatureLine extends AbstractPixiFeature {
 
     const type = this._geom.type;
     const world = this._geom.world;
-    const points = world?.coords as Vec2[];
+    const local = this._geom.local;
+    const points = local?.coords as Vec2[];
 
-    // Not a polygon, or no world coordinate data?
-    if (type !== 'LineString' || !world || !points?.length) {
+    // Not a line, or no world coordinate data?
+    if (type !== 'LineString' || !world || !local || !points?.length) {
       this.lod = 0;
       this.visible = false;
       this.geom.dirty = false;
@@ -293,9 +293,8 @@ export class PixiFeatureLine extends AbstractPixiFeature {
 
     // The container lives under the `world` Pixi container (in GraphicsSystem),
     // which provides the position + scale that maps world coords -> screen.
-    // So `container.position` is in world coordinates directly. We use the
-    // feature's `origin` (extent center) as the anchor and draw each vertex
-    // origin-relative so local coords stay small and float32-safe.
+    // Set container.position to the feature's world origin (extent center) and
+    // draw vertices using `local.coords` (already origin-relative).
     const origin = world.origin!;
     container.position.set(origin[0], origin[1]);
 
@@ -316,22 +315,56 @@ export class PixiFeatureLine extends AbstractPixiFeature {
       this.casing!.renderable = true;
     }
 
-    this._bufferdata = null;
-    container.hitArea = null;
+    // Buffer around line, used for hit area and halo.
+    // Build in world-local coords (origin-relative) so the polygon matches the
+    // container's local frame. Pixi composes the container transform when
+    // hit-testing, so we don't need to project to screen.
+    if (this.visible && !this._classes.has('drawing')) {  // Rapid#648 - If drawing, `hitArea = null`
+      const minwidth = 3;
+      let bufWidth = this._style.casing.width ?? 5;
+      if (zoom < 16) {
+        bufWidth -= 4;
+      } else if (zoom < 17) {
+        bufWidth -= 2;
+      }
+      if (bufWidth < minwidth) bufWidth = minwidth;
+      if (isWireframe) bufWidth = 1;
+
+      const localBufWidth = (bufWidth + 10) * 2 ** (WORLD_ZOOM - zoom);
+      const flatLocal: number[] = new Array(points.length * 2);
+      for (let i = 0; i < points.length; i++) {
+        flatLocal[i * 2]     = points[i][0];
+        flatLocal[i * 2 + 1] = points[i][1];
+      }
+      const bufferStyle: PIXI.StrokeStyle = {
+        alpha: 1,
+        alignment: 0.5,
+        color: 0x000000,
+        width: localBufWidth,
+        cap: 'butt',
+        join: 'bevel'
+      };
+      this._bufferdata = lineToPoly(flatLocal, bufferStyle);
+      container.hitArea = new PIXI.Polygon(this._bufferdata.perimeter);
+    } else {
+      this._bufferdata = null;
+      container.hitArea = null;
+    }
 
     if (this.casing!.renderable) {
-      this.updateWorldGraphic('casing', this.casing!, points, origin, zoom, isWireframe);
+      this.updateWorldGraphic('casing', this.casing!, points, zoom, isWireframe);
     } else {
       this.casing!.clear();
     }
     if (this.stroke!.renderable) {
-      this.updateWorldGraphic('stroke', this.stroke!, points, origin, zoom, isWireframe);
+      this.updateWorldGraphic('stroke', this.stroke!, points, zoom, isWireframe);
     } else {
       this.stroke!.clear();
     }
 
     this.geom.dirty = false;
     this._styleDirty = false;
+    this.updateWorldHalo(zoom);
   }
 
 
@@ -394,13 +427,13 @@ export class PixiFeatureLine extends AbstractPixiFeature {
 
   /**
    * Draws a world-coordinate line graphic.
-   * Points are in world space (z16); vertices are drawn origin-relative
-   * so that local coordinates stay small and float32-safe.
+   * Points are in container-local space (z16 world coords minus the feature's
+   * world origin) — i.e. `GeometryPart.local.coords`. They can be drawn directly
+   * without further translation.
    * Stroke widths are expressed in world local units: `px × 2^(WORLD_ZOOM - zoom)`.
    * @param which - Style part to draw ('casing' or 'stroke')
    * @param graphic - PIXI graphics object to update
-   * @param points - World coordinate points (z16 space)
-   * @param origin - World origin (pre-computed extent center from world.origin)
+   * @param points - Local coordinate points (origin-relative, from `local.coords`)
    * @param zoom - Effective zoom to use for rendering
    * @param isWireframe - Whether wireframe mode is active
    */
@@ -408,7 +441,6 @@ export class PixiFeatureLine extends AbstractPixiFeature {
     which: 'casing' | 'stroke',
     graphic: PIXI.Graphics,
     points: Vec2[],
-    origin: Vec2,
     zoom: number,
     isWireframe: boolean
   ): void {
@@ -434,7 +466,8 @@ export class PixiFeatureLine extends AbstractPixiFeature {
     }
 
     // Convert pixel width to world local units
-    const localWidth = width * 2 ** (WORLD_ZOOM - zoom);
+    const localScale = 2 ** (WORLD_ZOOM - zoom);
+    const localWidth = width * localScale;
 
     let g: PIXI.Graphics | DashLine = graphic.clear();
     if (partStyle?.opacity === 0) return;  // remove completely
@@ -449,7 +482,7 @@ export class PixiFeatureLine extends AbstractPixiFeature {
     };
 
     if (partStyle.dash) {
-      strokeStyle.dash = partStyle.dash.map(d => d * 2 ** (WORLD_ZOOM - zoom));
+      strokeStyle.dash = partStyle.dash.map(d => d * localScale);
       g = new DashLine(this.gfx, graphic, strokeStyle);
       drawLine(points, g);
     } else {
@@ -460,11 +493,79 @@ export class PixiFeatureLine extends AbstractPixiFeature {
     function drawLine(points: Vec2[], graphics: PIXI.Graphics | DashLine): void {
       points.forEach(([x, y], i) => {
         if (i === 0) {
-          graphics.moveTo(x - origin[0], y - origin[1]);
+          graphics.moveTo(x, y);
         } else {
-          graphics.lineTo(x - origin[0], y - origin[1]);
+          graphics.lineTo(x, y);
         }
       });
+    }
+  }
+
+
+  /**
+   * World-path halo. Draws the select halo as a child of the feature container
+   * so it inherits the same world position/scale as the rest of the feature.
+   * Widths and dash patterns are expressed in world-local units.
+   * @param zoom - Effective zoom (used to convert pixel widths to world-local widths)
+   */
+  updateWorldHalo(zoom: number): void {
+    const showHover = (this.visible && this._classes.has('hover'));
+    const showSelect = (this.visible && this._classes.has('select'));
+    const showHighlight = (this.visible && this._classes.has('highlight'));
+
+    // Hover/highlight glow — same as legacy
+    if (showHover) {
+      if (!this.container.filters) {
+        const glow = new GlowFilter({ distance: 15, outerStrength: 3, color: 0xffff00 });
+        glow.resolution = 2;
+        this.container.filters = [glow];
+      }
+    } else if (showHighlight) {
+      if (!this.container.filters) {
+        const glow = new GlowFilter({ distance: 15, outerStrength: 3, color: 0x7092ff });
+        glow.resolution = 2;
+        this.container.filters = [glow];
+      }
+    } else {
+      if (this.container.filters) {
+        this.container.filters = null!;
+      }
+    }
+
+    // Select dashed outline
+    if (showSelect && this._bufferdata) {
+      if (!this.halo) {
+        this.halo = new PIXI.Graphics();
+        this.halo.label = `${this.id}-halo`;
+        this.halo.eventMode = 'none';
+        this.container.addChild(this.halo);
+      } else if (this.halo.parent !== this.container) {
+        this.halo.parent?.removeChild(this.halo);
+        this.container.addChild(this.halo);
+      }
+
+      const localScale = 2 ** (WORLD_ZOOM - zoom);
+      const HALO_STYLE: StrokeStyleWithDash = {
+        alpha: 0.9,
+        dash: [6 * localScale, 3 * localScale],
+        width: 2 * localScale,
+        color: 0xffff00
+      };
+
+      (this.halo as PIXI.Graphics).clear();
+      const dl = new DashLine(this.gfx, this.halo as PIXI.Graphics, HALO_STYLE);
+      if (this._bufferdata.outer && this._bufferdata.inner) {   // closed line
+        dl.poly(this._bufferdata.outer);
+        dl.poly(this._bufferdata.inner);
+      } else {   // unclosed line
+        dl.poly(this._bufferdata.perimeter);
+      }
+
+    } else {
+      if (this.halo) {
+        this.halo.destroy();
+        this.halo = null;
+      }
     }
   }
 
