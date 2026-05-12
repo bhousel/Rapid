@@ -1,10 +1,8 @@
 import * as PIXI from 'pixi.js';
-import { GlowFilter } from 'pixi-filters';
-
-import { WORLD_ZOOM } from '@rapid-sdk/math';
-
 import { AbstractPixiFeature } from './AbstractPixiFeature.ts';
 import { DashLine } from './lib/DashLine.ts';
+import { GlowFilter } from 'pixi-filters';
+import { WORLD_ZOOM } from '@rapid-sdk/math';
 
 import type { AbstractPixiLayer } from './AbstractPixiLayer.ts';
 import type { DashLineOptions } from './lib/DashLine.ts';
@@ -127,10 +125,6 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
     if (!origin) return;
     const [x, y] = origin;
     this.container.position.set(x, y);
-
-    // The container's `position` is in world coords (under the `world` group),
-    // but its children (marker / icon / viewfields) should stay screen-sized.
-    // Counter-scale by 1 / worldScale to undo the parent `world` container's scale.
 
     // sort markers by latitude ascending
     // sort markers with viewfields above markers without viewfields

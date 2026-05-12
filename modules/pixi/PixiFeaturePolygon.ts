@@ -1,14 +1,12 @@
 import * as PIXI from 'pixi.js';
-import { GlowFilter } from 'pixi-filters';
-import { WORLD_ZOOM, vecEqual, vecLength } from '@rapid-sdk/math';
-
 import { AbstractPixiFeature } from './AbstractPixiFeature.ts';
 import { DashLine } from './lib/DashLine.ts';
+import { GlowFilter } from 'pixi-filters';
 import { lineToPoly, type LineToPolyResult } from './helpers.ts';
+import { WORLD_ZOOM, vecEqual, vecLength } from '@rapid-sdk/math';
 
 import type { AbstractPixiLayer } from './AbstractPixiLayer.ts';
 import type { DashLineOptions } from './lib/DashLine.ts';
-import type { GeometryPart } from '../lib/GeometryPart.ts';
 import type { Viewport, Vec2 } from '@rapid-sdk/math';
 
 const PARTIALFILLWIDTH = 32;

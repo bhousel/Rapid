@@ -1,6 +1,5 @@
 import * as PIXI from 'pixi.js';
 import { EventEmitter } from 'tseep';
-
 import { PixiLayerBackgroundTiles } from './PixiLayerBackgroundTiles.js';
 import { PixiLayerCustomData } from './PixiLayerCustomData.js';
 import { PixiLayerDebug } from './PixiLayerDebug.ts';
@@ -139,7 +138,7 @@ export class PixiScene extends EventEmitter {
         this.groups.set(groupID, container);
       }
       // EXPERIMENT: Some groups to render world coordinates directly:
-      if (['points','streetview','qa'].includes(groupID)) {
+      if (['debug-under', 'points', 'streetview', 'qa'].includes(groupID)) {
         if (!world.getChildByLabel(groupID)) {
           world.addChild(container);
         }

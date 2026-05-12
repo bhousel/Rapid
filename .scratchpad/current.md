@@ -10,7 +10,7 @@ native z16 world-coordinate rendering (`GeometryPart` / `.geometry = part` API).
 - `world.position` + `world.scale` math is correct (see decisions.md "Pixi World-Coord Rendering").
 - `PixiFeaturePoint.updateWorld`: renders, counter-scales sprites to screen size, counter-rotates bearing. Hit area and halo already work (they operate in local counter-scaled space).
 - `PixiFeatureLine.updateWorld` + `updateWorldGraphic`: renders strokes with world-local widths (`px × 2^(WORLD_ZOOM - zoom)`). Dash spacing pre-scaled the same way.
-- `PixiFeaturePolygon.updateWorld`: renders strokes + full fill. No partial fill / lowRes / SSR yet.
+- `PixiFeaturePolygon.updateWorld`: renders strokes + full fill + partial fill mask + lowRes sprite + SSR.
 - Groups `points`, `qa`, `streetview` placed under `world` container in PixiScene.
 - 12+ layer files migrated: KartaPhotos, KeepRight, MapRoulette, MapillaryDetections, MapillaryPhotos, MapillarySigns, OsmNotes, Osmose, StreetsidePhotos, CustomData, Osm, Rapid.
 - `PixiLayerLabels.render` early-returns (`return; // not yet`) — labels are invisible but don't crash.
@@ -18,14 +18,8 @@ native z16 world-coordinate rendering (`GeometryPart` / `.geometry = part` API).
 
 ### In progress / next steps
 
-**Step 1 — Hit areas + halo for world-path lines and polygons (UX blocker)**
-- Lines: compute `_bufferdata` from world-local coords using `lineToPoly()` with `localWidth`-style width (`(width + 10) * 2^(WORLD_ZOOM - zoom)`). Set `container.hitArea = new PIXI.Polygon(_bufferdata.perimeter)`. Halo DashLine uses same `_bufferdata`.
-- Polygons: same `_bufferdata` approach from outer ring world-local coords. Set hit area + halo.
-- Halo container: lives in the map-UI layer — decide whether to place it under `world` too (preferred, reuses world-local coords) or transform to origin space.
-
-**Step 2 — Polygon partial fill / mask / lowRes / SSR**
-- Inputs exist on `GeometryPart`: `local.ssr`, `local.coords`, `world.origin`. Port from `screen.*` to `local.*` with `localWidth` widths.
-- LowRes sprite: position in world coords, counter-scale like points.
+- ~~Step 1 (hit areas + halo): complete (`9d46afca3`)~~
+- ~~Step 2 (polygon partial fill / mask / lowRes / SSR + use local.coords): complete (`f1a5296f3`)~~
 
 **Step 3 — Inventory remaining `setCoords` callers, migrate remaining layer groups**
 - `basemap`, `labels`, `blocks`, `ui` groups still under `origin` (screen coords).

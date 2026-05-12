@@ -1,10 +1,11 @@
 import type { Viewport } from '@rapid-sdk/math';
 
 import { AbstractPixiLayer } from './AbstractPixiLayer.ts';
+import { GeometryPart } from '../lib/GeometryPart.ts';
 import { PixiFeaturePoint } from './PixiFeaturePoint.ts';
 import { PixiFeaturePolygon } from './PixiFeaturePolygon.ts';
+import { WORLD_ZOOM } from '@rapid-sdk/math';
 
-import type { GeometryPart } from '../lib/GeometryPart.ts';
 import type { OsmEntity } from '../data/OsmEntity.ts';
 import type { PixiScene } from './PixiScene.ts';
 import type { StyleProps } from '../lib/Style.ts';
@@ -65,9 +66,14 @@ export class PixiLayerDebug extends AbstractPixiLayer {
     } as Partial<StyleProps>;
 
 
+    // The container's `position` is in world coords (under the `world` group),
+    // Counter-scale by 1 / worldScale to undo the parent `world` container's scale.
     const parentContainer = this.scene.groups.get('debug-under')!;
-    const msData = spatial.getVisibleData('msBuildings').filter(hit => _isBuilding(hit.contents as OsmEntity));
+    const worldScale = 2 ** (viewport.transform.z - WORLD_ZOOM) || 1;
+    parentContainer.scale.set(1 / worldScale, 1 / worldScale);
 
+    // Gather visible Microsoft Buildings
+    const msData = spatial.getVisibleData('msBuildings').filter(hit => _isBuilding(hit.contents as OsmEntity));
     for (const hit of msData) {
       if (!spatial.hasTileAtBox('osm', hit)) continue;  // is osm data loaded here?
 
@@ -80,28 +86,28 @@ export class PixiLayerDebug extends AbstractPixiLayer {
 
       for (let i = 0; i < parts.length; i++) {
         const part = parts[i];
-        if (!part.world) continue;  // invalid?
+        if (!part.orig || !part.world) continue;  // invalid?
 
-        const extent = part.world.extent;
-        const poi = part.world?.poi;  // Pole of Inaccessability (world coordinates for rbush query)
-        const outer = extent.polygon();
+        const origExtent = part.orig.extent;
+        const worldPoi = part.world?.poi;  // Pole of Inaccessability (world coordinates for rbush query)
 
         // bounding box
-        const featureID = `${this.layerID}-${dataID}-${i}`;
-        let feature = this.features.get(featureID);
-        if (poi && !feature) {
-          feature = new PixiFeaturePolygon(this, featureID);
-          feature.allowInteraction = false;
-          feature.parentContainer = parentContainer;
+        const bboxFeatureID = `${this.layerID}-${dataID}-${i}`;
+        let bboxFeature = this.features.get(bboxFeatureID);
+        if (worldPoi && !bboxFeature) {
+          bboxFeature = new PixiFeaturePolygon(this, bboxFeatureID);
+          bboxFeature.allowInteraction = false;
+          bboxFeature.parentContainer = parentContainer;
+          bboxFeature.v = version;
 
-          feature.v = version;
-          const source = { type: 'Polygon', world: { extent: extent, coords: [ outer ] } };
-          feature.setCoords(source as unknown as GeometryPart);
+          const bboxGeometry = new GeometryPart(context);
+          bboxGeometry.setData({ type: 'Polygon', coordinates: [origExtent.polygon()] });
+          bboxFeature.geometry = bboxGeometry;
 
           // Start with default style, and apply adjustments
           // set style = red if collides, green if not
           const style = structuredClone(DEFAULTSTYLE);
-          const box = { minX: poi![0], minY: poi![1], maxX: poi![0], maxY: poi![1] };
+          const box = { minX: worldPoi![0], minY: worldPoi![1], maxX: worldPoi![0], maxY: worldPoi![1] };
           // does this test point hit an OSM building?
           const didHitBuilding = spatial.getDataAtBox('osm', box).some(hit => _isBuilding(hit.contents as OsmEntity));
 
@@ -111,33 +117,37 @@ export class PixiLayerDebug extends AbstractPixiLayer {
           } else {
             style.fill!.color = 0x00ff00;  // green
           }
-          feature.style = style;
+          bboxFeature.style = style;
         }
 
-        if (feature) {
+        if (bboxFeature) {
           // this.syncFeatureClasses(feature);
-          feature.update(viewport, zoom);
-          this.retainFeature(feature, frame);
+          bboxFeature.update(viewport, zoom);
+          this.retainFeature(bboxFeature, frame);
         }
 
         // visualize test point
-        if (poi) {
-          const poifeatureID = `${this.layerID}-${dataID}-${i}-poi`;
-          let poifeature = this.features.get(poifeatureID);
-          if (!poifeature) {
-            poifeature = new PixiFeaturePoint(this, poifeatureID);
-            poifeature.allowInteraction = false;
-            poifeature.parentContainer = parentContainer;
+        if (worldPoi) {
+          const origPoi = viewport.worldToWgs84(worldPoi);
 
-            poifeature.v = version;
-            const source = { type: 'Point', world: { coords: poi } };
-            poifeature.setCoords(source as GeometryPart);
-            poifeature.style = POISTYLE;
+          const poiFeatureID = `${this.layerID}-${dataID}-${i}-poi`;
+          let poiFeature = this.features.get(poiFeatureID);
+          if (!poiFeature) {
+            poiFeature = new PixiFeaturePoint(this, poiFeatureID);
+            poiFeature.allowInteraction = false;
+            poiFeature.parentContainer = parentContainer;
+            poiFeature.v = version;
+
+            const poiGeometry = new GeometryPart(context);
+            poiGeometry.setData({ type: 'Point', coordinates: origPoi });
+            poiFeature.geometry = poiGeometry;
+
+            poiFeature.style = POISTYLE;
           }
 
           // this.syncFeatureClasses(poifeature);
-          poifeature.update(viewport, zoom);
-          this.retainFeature(poifeature, frame);
+          poiFeature.update(viewport, zoom);
+          this.retainFeature(poiFeature, frame);
         }
       }
 

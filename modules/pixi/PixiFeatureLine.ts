@@ -1,8 +1,7 @@
 import * as PIXI from 'pixi.js';
-import { GlowFilter } from 'pixi-filters';
-
 import { AbstractPixiFeature } from './AbstractPixiFeature.ts';
 import { DashLine } from './lib/DashLine.ts';
+import { GlowFilter } from 'pixi-filters';
 import { getLineSegments, lineToPoly, type LineToPolyResult } from './helpers.ts';
 import { WORLD_ZOOM } from '@rapid-sdk/math';
 
