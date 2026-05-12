@@ -1,14 +1,12 @@
-import type { Viewport } from '@rapid-sdk/math';
-
 import { AbstractPixiLayer } from './AbstractPixiLayer.ts';
 import { GeometryPart } from '../lib/GeometryPart.ts';
 import { PixiFeaturePoint } from './PixiFeaturePoint.ts';
 import { PixiFeaturePolygon } from './PixiFeaturePolygon.ts';
-import { WORLD_ZOOM } from '@rapid-sdk/math';
 
 import type { OsmEntity } from '../data/OsmEntity.ts';
 import type { PixiScene } from './PixiScene.ts';
 import type { StyleProps } from '../lib/Style.ts';
+import type { Viewport } from '@rapid-sdk/math';
 
 
 /**
@@ -66,16 +64,12 @@ export class PixiLayerDebug extends AbstractPixiLayer {
     } as Partial<StyleProps>;
 
 
-    // The container's `position` is in world coords (under the `world` group),
-    // Counter-scale by 1 / worldScale to undo the parent `world` container's scale.
     const parentContainer = this.scene.groups.get('debug-under')!;
-    const worldScale = 2 ** (viewport.transform.z - WORLD_ZOOM) || 1;
-    parentContainer.scale.set(1 / worldScale, 1 / worldScale);
 
     // Gather visible Microsoft Buildings
     const msData = spatial.getVisibleData('msBuildings').filter(hit => _isBuilding(hit.contents as OsmEntity));
     for (const hit of msData) {
-      if (!spatial.hasTileAtBox('osm', hit)) continue;  // is osm data loaded here?
+      if (!spatial.hasTileAtBox('osm-data', hit)) continue;  // Is osm data loaded here?
 
       const data = hit.contents as OsmEntity;
       // if (data.type !== 'way') continue;  // consider ways only (not the nodes at the corners)

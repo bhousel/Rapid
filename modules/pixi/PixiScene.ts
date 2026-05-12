@@ -138,7 +138,7 @@ export class PixiScene extends EventEmitter {
         this.groups.set(groupID, container);
       }
       // EXPERIMENT: Some groups to render world coordinates directly:
-      if (['debug-under', 'points', 'streetview', 'qa'].includes(groupID)) {
+      if (['debug-under', 'points', 'streetview', 'qa', 'blocks'].includes(groupID)) {
         if (!world.getChildByLabel(groupID)) {
           world.addChild(container);
         }

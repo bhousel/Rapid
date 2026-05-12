@@ -83,12 +83,12 @@ export class PixiLayerEditBlocks extends AbstractPixiLayer {
     $$explanationRow
       .append('span')
       .attr('class', 'explanation-item')
-      .text((d: GeoJSONData) => d.props.text as string);
+      .text((d: GeoJSONData) => d.properties.text as string);
 
     $$explanationRow
       .append('a')
       .attr('target', '_blank')
-      .attr('href', (d: GeoJSONData) => d.props.url as string)
+      .attr('href', (d: GeoJSONData) => d.properties.url as string)
       .text(l10n?.t('rapid_menu.more_info') || 'More Info');
   }
 
@@ -121,14 +121,15 @@ export class PixiLayerEditBlocks extends AbstractPixiLayer {
 
         if (!feature) {
           feature = new PixiFeaturePolygon(this, featureID);
+          feature.allowInteraction = false;
           feature.style = blockStyle;
           feature.parentContainer = parentContainer;
           feature.container.cursor = 'not-allowed';
-          feature.setCoords(part);
+          feature.geometry = part;
           feature.setData(dataID, d);
         }
 
-        this.syncFeatureClasses(feature);
+        // this.syncFeatureClasses(feature);
         feature.update(viewport, zoom);
         this.retainFeature(feature, frame);
       }
