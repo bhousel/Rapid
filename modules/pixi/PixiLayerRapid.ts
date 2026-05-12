@@ -470,7 +470,7 @@ export class PixiLayerRapid extends AbstractPixiLayer {
         if (!part.world) continue;  // invalid?
 
         feature = new PixiFeaturePoint(this, featureID);
-        feature.setCoords(part);
+        feature.geometry = part;
         feature.parentContainer = parentContainer;
         (feature as any).rapidFeature = true;
         feature.setData(entity.id, entity);
@@ -508,7 +508,7 @@ export class PixiLayerRapid extends AbstractPixiLayer {
         if (!part.world) continue;  // invalid?
 
         feature = new PixiFeaturePoint(this, featureID);
-        feature.setCoords(part);
+        feature.geometry = part;
         feature.parentContainer = parentContainer;
         (feature as any).rapidFeature = true;
         feature.allowInteraction = false;   // vertices in this layer don't actually need to be interactive

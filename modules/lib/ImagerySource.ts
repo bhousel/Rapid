@@ -7,9 +7,6 @@ import { utilDateString } from '../util/date.ts';
 import type { Vec2 } from '@rapid-sdk/math';
 import type { Context } from '../Context.ts';
 
-// Cast utilAesDecrypt to allow optional key parameter (matches runtime behavior)
-const aesDecrypt = utilAesDecrypt as (cipherText: string | undefined, key?: number[]) => string;
-
 
 /** Supported Imagery Types */
 export type ImageryType = 'tms' | 'wms' | 'bing' | 'wayback';
@@ -144,7 +141,7 @@ export class ImagerySource {
 
     this.id = props.id;                         // For consistency, offer a `this.id` property.
     this.safeid = utilSafeString(props.id);     // For use in classes, element ids, css selectors
-    this._template = props.encrypted ? aesDecrypt(props.template) : (props.template ?? '');
+    this._template = props.encrypted ? utilAesDecrypt(props.template!) : (props.template ?? '');
 
     this._strings = new Map();    // Map<localeCode, Object> to store pre-localized text strings
     this._currLocaleCode = null;  // The current locale code

@@ -1,5 +1,4 @@
-import { DEG2RAD, numClamp, Vec2, vecLength, vecSubtract } from '@rapid-sdk/math';
-
+import { DEG2RAD, numClamp, vecLength, vecSubtract } from '@rapid-sdk/math';
 import { AbstractBehavior } from './AbstractBehavior.ts';
 import { OsmNode } from '../data/OsmNode.ts';
 
@@ -7,6 +6,7 @@ import type { Context } from '../Context.ts';
 import type { EventData } from './AbstractBehavior.ts';
 import type { FederatedPointerEvent } from 'pixi.js';
 import type { NormalizedWheelEvent } from '../pixi/PixiEvents.ts';
+import type { Vec2 } from '@rapid-sdk/math';
 
 const NEAR_TOLERANCE = 1;
 const FAR_TOLERANCE = 4;

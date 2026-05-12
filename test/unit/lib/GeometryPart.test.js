@@ -14,6 +14,7 @@ describe('GeometryPart', () => {
       assert.isNotOk(part.type);
       assert.isNull(part.orig);
       assert.isNull(part.world);
+      assert.isNull(part.local);
     });
   });
 
@@ -25,6 +26,7 @@ describe('GeometryPart', () => {
       assert.isNotOk(part.type);
       assert.isNull(part.orig);
       assert.isNull(part.world);
+      assert.isNull(part.local);
       assert.isNull(part.context);
     });
   });
@@ -37,6 +39,7 @@ describe('GeometryPart', () => {
       assert.isNotOk(part.type);
       assert.isNull(part.orig);
       assert.isNull(part.world);
+      assert.isNull(part.local);
     });
   });
 
@@ -192,15 +195,111 @@ describe('GeometryPart', () => {
       assert.deepEqual(part.world.poi, [WORLD_HALF, WORLD_HALF]);
     });
 
+    it('keeps tiny polygon centroid inside projected extent', () => {
+      const part = new Rapid.GeometryPart(context);
+      part.setData({
+        type: 'Polygon',
+        coordinates: [[
+          [-74.0000, 40.0000],
+          [-73.99985, 40.0000],
+          [-73.99985, 40.0001],
+          [-74.0000, 40.0001],
+          [-74.0000, 40.0000]
+        ]]
+      });
+
+      assert.isObject(part.world);
+      assert.isOk(part.world.centroid);
+      assert.isAtLeast(part.world.centroid[0], part.world.extent.min[0]);
+      assert.isAtMost(part.world.centroid[0], part.world.extent.max[0]);
+      assert.isAtLeast(part.world.centroid[1], part.world.extent.min[1]);
+      assert.isAtMost(part.world.centroid[1], part.world.extent.max[1]);
+    });
+
     it('skips calculations if no original data', () => {
       const part = new Rapid.GeometryPart(context);
       part.setData(sample.point.geometry);
       part.orig = null;
       part.world = null;
 
-      part.updateWorld();
+      part.update();
       assert.isNull(part.orig);
       assert.isNull(part.world);
+    });
+
+    it('computes local coordinate data', () => {
+      const part = new Rapid.GeometryPart(context);
+      part.setData(sample.point.geometry);
+
+      // For a point, local coords should be [0, 0] since origin is the point itself
+      assert.isObject(part.local);
+      assert.deepEqual(part.local.coords, [0, 0]);
+      assert.deepEqual(part.local.extent, new Rapid.sdk.Extent([0, 0], [0, 0]));
+      assert.deepEqual(part.local.centroid, [0, 0]);
+      assert.deepEqual(part.local.poi, [0, 0]);
+    });
+
+    it('local centroid is centered in local extent', () => {
+      const part = new Rapid.GeometryPart(context);
+      part.setData({
+        type: 'Polygon',
+        coordinates: [[
+          [-74.0000, 40.0000],
+          [-73.99985, 40.0000],
+          [-73.99985, 40.0001],
+          [-74.0000, 40.0001],
+          [-74.0000, 40.0000]
+        ]]
+      });
+
+      assert.isObject(part.local);
+      assert.isOk(part.local.centroid);
+      assert.isAtLeast(part.local.centroid[0], part.local.extent.min[0]);
+      assert.isAtMost(part.local.centroid[0], part.local.extent.max[0]);
+      assert.isAtLeast(part.local.centroid[1], part.local.extent.min[1]);
+      assert.isAtMost(part.local.centroid[1], part.local.extent.max[1]);
+    });
+
+    it('world centroid is centered in world extent (derived from local)', () => {
+      const part = new Rapid.GeometryPart(context);
+      part.setData({
+        type: 'Polygon',
+        coordinates: [[
+          [-74.0000, 40.0000],
+          [-73.99985, 40.0000],
+          [-73.99985, 40.0001],
+          [-74.0000, 40.0001],
+          [-74.0000, 40.0000]
+        ]]
+      });
+
+      assert.isObject(part.world);
+      assert.isOk(part.world.centroid);
+      assert.isAtLeast(part.world.centroid[0], part.world.extent.min[0]);
+      assert.isAtMost(part.world.centroid[0], part.world.extent.max[0]);
+      assert.isAtLeast(part.world.centroid[1], part.world.extent.min[1]);
+      assert.isAtMost(part.world.centroid[1], part.world.extent.max[1]);
+    });
+
+    it('clone includes local data', () => {
+      const part = new Rapid.GeometryPart(context);
+      part.setData({
+        type: 'Polygon',
+        coordinates: [[
+          [-74.0000, 40.0000],
+          [-73.99985, 40.0000],
+          [-73.99985, 40.0001],
+          [-74.0000, 40.0001],
+          [-74.0000, 40.0000]
+        ]]
+      });
+
+      const clone = part.clone();
+      assert.isObject(clone.local);
+      assert.notStrictEqual(clone.local, part.local);
+      assert.instanceOf(clone.local.extent, Rapid.sdk.Extent);
+      assert.notStrictEqual(clone.local.extent, part.local.extent);
+      assert.isOk(clone.local.extent.equals(part.local.extent));
     });
   });
 

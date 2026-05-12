@@ -1,4 +1,6 @@
-import { geomPolygonContainsPolygon, Vec2 } from '@rapid-sdk/math';
+import { geomPolygonContainsPolygon } from '@rapid-sdk/math';
+
+import type { Vec2 } from '@rapid-sdk/math';
 import { OsmRelation } from '../data/OsmRelation.ts';
 import { osmJoinWays } from '../lib/multipolygon.ts';
 import { utilArrayGroupBy, utilArrayIntersection, utilObjectOmit } from '@rapid-sdk/util';

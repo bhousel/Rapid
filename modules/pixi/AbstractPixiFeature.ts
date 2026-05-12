@@ -63,6 +63,8 @@ export class AbstractPixiFeature {
 
   /** Whether the Feature is allowed to be interactive */
   protected _allowInteraction: boolean;
+  /** PixiGeometryPart containing all the information about the geometry */
+  protected _geom: GeometryPart | null;
   /** Style object (contents depends on the Feature type) */
   protected _style: MinimalStyleProps;
   /** Whether the style needs to be reapplied */
@@ -108,6 +110,7 @@ export class AbstractPixiFeature {
     this.halo = null;
 
     this.geom = new PixiGeometryPart(this.context);
+    this._geom = null;
     this._style = deepMerge({}, styleDefaults);
     this._styleDirty = true;
     this._label = null;
@@ -151,6 +154,7 @@ export class AbstractPixiFeature {
 
     this.geom.destroy();
     this.geom = null!;
+    this._geom = null;
     this._style = null!;
     this._label = null;
 
@@ -201,7 +205,7 @@ export class AbstractPixiFeature {
    * @readonly
    */
   get type(): SingularGeometryType | undefined {
-    return this.geom.type;
+    return this._geom?.type;
   }
 
   /**
@@ -277,6 +281,18 @@ export class AbstractPixiFeature {
     // result: defaults ← props
     this._style = deepMerge({}, styleDefaults, props) as MinimalStyleProps;
     this._styleDirty = true;
+  }
+
+
+  /**
+   * @param val - a GeometryPart to render
+   */
+  get geometry(): GeometryPart | null {
+    return this._geom;
+  }
+  set geometry(val: GeometryPart) {
+    this._geom = val;
+    this.geom.dirty = true;
   }
 
 

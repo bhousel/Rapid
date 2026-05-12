@@ -2,7 +2,7 @@ import { select as d3_select } from 'd3-selection';
 
 import {
   DEG2RAD, Extent, Tiler, geoMetersToLat, geoMetersToLon,
-  geomRotatePoints, geomPointInPolygon, vecLength
+  geomRotate, geomPointInPolygon, vecLength
 } from '@rapid-sdk/math';
 
 import { utilQsString } from '@rapid-sdk/util';
@@ -15,7 +15,7 @@ import type { Context } from '../Context.ts';
 import type { D3EnterSelection, D3Selection } from 'd3-selection';
 import type { GeoJSONProps } from '../data/GeoJSONData.ts';
 import type { MarkerProps } from '../data/MarkerData.ts';
-import type { Tile, Vec2 } from '@rapid-sdk/math';
+import type { Quad, Tile, Vec2 } from '@rapid-sdk/math';
 
 
 /** Properties for Streetside bubble (photo) markers */
@@ -752,11 +752,11 @@ export class StreetsideService extends AbstractSystem {
       origin[1]
     ];
 
-    let poly: Vec2[] = [p1, p2, p3, p4, p1];
+    let poly: Quad = [p1, p2, p3, p4, p1];
 
     // rotate it to face forward/backward
     const angle = (stepBy === 1 ? ca : ca + 180) * DEG2RAD;
-    poly = geomRotatePoints(poly, -angle, origin);
+    poly = geomRotate(poly, -angle, origin);
 
     const extent = new Extent();
     for (const loc of poly) {

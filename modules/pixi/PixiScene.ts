@@ -20,7 +20,6 @@ import { PixiLayerRapid } from './PixiLayerRapid.js';
 import { PixiLayerRapidOverlay } from './PixiLayerRapidOverlay.js';
 import { PixiLayerStreetsidePhotos } from './PixiLayerStreetsidePhotos.ts';
 import { PixiLayerGeoScribble } from './PixiLayerGeoScribble.js';
-import { WORLD_ZOOM } from '@rapid-sdk/math';
 import { utilIterable, type OneOrMore } from '../util/iterable.ts';
 
 import type { AbstractPixiFeature } from './AbstractPixiFeature.ts';
@@ -68,9 +67,9 @@ export class PixiScene extends EventEmitter {
     this.gfx = gfx;
     this.context = gfx.context;
 
-    this.groups = new Map();     // Map<GroupID, PIXI.Container>
-    this.layers = new Map();     // Map<LayerID, Layer>
-    this.features = new Map();   // Map<FeatureID, Feature>
+    this.groups = new Map<GroupID, PIXI.Container>();
+    this.layers = new Map<LayerID, AbstractPixiLayer>();
+    this.features = new Map<FeatureID, AbstractPixiFeature>();
 
     // Ensure methods used as callbacks always have `this` bound correctly.
     this._layerChanged = this._layerChanged.bind(this);
@@ -114,15 +113,10 @@ export class PixiScene extends EventEmitter {
   reset(): void {
     const gfx = this.gfx;
     const origin = gfx.origin;
-    if (!origin) return;   // need the `origin` container to exist first
+    const world = gfx.world;
+    if (!origin || !world) return;   // need the `origin` container to exist first
 
-    // Remove any existing containers
-    for (const child of origin.children) {
-      origin.removeChild(child);
-      child.destroy({ children: true });  // recursive
-    }
-
-    // Create group containers, and add them to the origin..
+    // Ensure that Group Containers have been added to the `origin`.
     // Groups are pre-established Containers that the Layers can add
     // their Features to, so that the scene can be sorted reasonably.
     [
@@ -131,21 +125,32 @@ export class PixiScene extends EventEmitter {
       'basemap',      // Editable basemap (OSM/Rapid)
       'points',       // Editable points (OSM/Rapid)
       'streetview',   // Streetview imagery, sequences
-      'streetview2',  // Experimental world-coordinate streetview sequences
       'qa',           // Q/A items, issues, notes
       'labels',       // Text labels
       'blocks',       // Blocked out regions
       'ui'            // Misc UI draw above everything (select lasso, geocoding circle, debug shapes)
     ].forEach((groupID, i) => {
-      const container = new PIXI.Container();
-      container.label = groupID;
-      container.sortableChildren = true;
-      container.zIndex = i;
-      origin.addChild(container);
-      this.groups.set(groupID, container);
+      let container = this.groups.get(groupID);
+      if (!container) {
+        container = new PIXI.Container();
+        container.label = groupID;
+        container.sortableChildren = true;
+        container.zIndex = i;
+        this.groups.set(groupID, container);
+      }
+      // EXPERIMENT: Some groups to render world coordinates directly:
+      if (['points','streetview','qa'].includes(groupID)) {
+        if (!world.getChildByLabel(groupID)) {
+          world.addChild(container);
+        }
+      } else {
+        if (!origin.getChildByLabel(groupID)) {
+          origin.addChild(container);
+        }
+      }
     });
 
-    // Reset/setup each layer
+    // Reset/setup render layers.
     for (const layer of this.layers.values()) {
       layer.reset();
     }
@@ -171,34 +176,14 @@ export class PixiScene extends EventEmitter {
    * @param zoom - Effective zoom level to use for rendering
    */
   render(frame: number, viewport: Viewport, zoom: number): void {
-    this._updateWorldCoordinateGroups(viewport);
-
+    // Groups that live under `world` render in world coordinates;
+    // the `world` container (set up in `GraphicsSystem._app`) provides the position
+    // and scale that maps world coords -> screen coords. Group containers themselves
+    // need no extra transform.
     for (const layer of this.layers.values()) {
       layer.render(frame, viewport, zoom);
       layer.cull(frame);
     }
-  }
-
-
-  /**
-   * Updates the transform for groups that draw in world coordinates (WORLD_ZOOM=16).
-   *
-   * Features in these groups store vertex positions in world space (z16).
-   * The group scale `2^(z - WORLD_ZOOM)` converts those local units back to screen pixels GPU-side,
-   * eliminating per-frame world→screen reprojection for every vertex.
-   *
-   * Each feature's container.position is set to `anchor - worldOrigin` so that
-   * vertex coordinates remain small (anchor-relative) and float32-safe.
-   *
-   * @param viewport - Pixi viewport to use for rendering
-   */
-  private _updateWorldCoordinateGroups(viewport: Viewport): void {
-    const streetview2 = this.groups.get('streetview2');
-    if (!streetview2) return;
-
-    const scale = 2 ** (viewport.transform.z - WORLD_ZOOM);
-    streetview2.position.set(0, 0);
-    streetview2.scale.set(scale, scale);
   }
 
 

@@ -202,7 +202,7 @@ export class RotateMode extends AbstractMode {
       const degrees = (sY * dX) + (sX * dY);   // Degrees rotation to apply: + clockwise, - counterclockwise
       const SPEED = 0.3;
       const angle = degrees * DEG2RAD * SPEED;
-      editor.perform(actionRotate(this._entityIDs, pivotPoint, angle, context.viewport));
+      editor.perform(actionRotate(this._entityIDs, this._pivotWorld!, angle, context.viewport));
     }
     this._lastPoint = currPoint.slice() as Vec2;  // copy
 
@@ -211,7 +211,7 @@ export class RotateMode extends AbstractMode {
     // const currAngle = Math.atan2(currPoint[1] - pivotPoint[1], currPoint[0] - pivotPoint[0]);
     // if (this._lastAngle !== null) {
     //   const angle = currAngle - this._lastAngle;
-    //   editor.perform(actionRotate(entityIDs, pivotPoint, angle, context.viewport));
+    //   editor.perform(actionRotate(entityIDs, this._pivotWorld, angle, context.viewport));
     // }
     // this._lastAngle = currAngle;
 

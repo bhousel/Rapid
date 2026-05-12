@@ -2,10 +2,30 @@
 
 Non-obvious choices where "why did we do it this way?" isn't captured in the code.
 
+## Pixi World-Coord Rendering (render_worldcoord)
+
+- **Scene graph hierarchy**: `stage → origin → world → groups → features`. `stage` centers [0,0] at screen center for rotation. `origin` shifts back to top-left and absorbs panning offset (via Pixi's own `x/y`). `world` maps z16 world coordinates to screen pixels via `world.scale = 2^(pixiTransform.z - WORLD_ZOOM)` and `world.position = (pixiTransform.x - WORLD_HALF * scale, pixiTransform.y - WORLD_HALF * scale)`. All layers that render entity geometry live under `world`.
+- **Use `pixiTransform` not `mapTransform` for `world`** — Panning is absorbed by the `origin` container. `pixiTransform` already includes all pending panning deltas. `mapTransform` lags behind by one frame during drags. Using `pixiTransform` means small panning moves don't dirty `world` at all.
+- **`background` (tile imagery) stays under `origin`** — Tile textures are in screen space; there is no benefit to putting them under `world`. Only entity-geometry layers move.
+- **Container position = `world.origin` (extent center)** — Each feature's `container.position` is set to the extent center of its geometry in z16 world coordinates. All vertex drawing is then origin-relative. This keeps vertex magnitudes small (~thousands not ~8 million), making float32 drawing safe and d3-polygon numerics stable.
+- **Points: counter-scale + counter-rotate** — The `world` container scales geometry up with zoom. Point sprites are fixed-size in screen pixels. Fix: set `container.scale = baseScale / worldScale` and `container.rotation = -bearing`. This keeps child sprites screen-sized regardless of zoom/bearing. Halos and hit areas live in the counter-scaled local space, so they work unchanged.
+- **Lines + polygons: world-local stroke widths** — Instead of counter-scaling (which would shrink geometry), express stroke widths in world-local units: `localWidth = pixelWidth * 2^(WORLD_ZOOM - zoom)`. At render time the `world` container's scale inverts this back to screen pixels. Dash patterns and buffer widths use the same conversion.
+- **Hit areas are in container-local space** — `container.hitArea = new PIXI.Polygon(...)` coordinates must be in the container's local frame. For world-path features the local frame is world-local (origin-relative). `lineToPoly()` is called with world-local points and a world-local buffer width. Pixi composes the container transform when doing hit testing, so no extra projection is needed.
+- **Dual-path migration pattern**: `_geom !== null` → world path; else legacy screen path. Branch on `if (this._geom)` in feature `update()`. Legacy `geom` (PixiGeometryPart) is kept alive until all callers migrate. Final cleanup (Step 5) removes `geom`, `PixiGeometryPart`, all `setCoords` calls, and merges both paths.
+
 ## World Coordinate System (render_worldcoord)
 
 - **Use SDK-native z16 world coordinates as the canonical world space** — We removed Rapid's temporary `worldScaled` bridge and now rely on `@rapid-sdk/math` world coordinates directly (`WORLD_ZOOM = 16`, world range `0..16,777,216`). This avoids duplicate geometry caches and keeps rendering/spatial math aligned with SDK primitives.
 - **Keep world-coordinate grouping in PixiScene** — Feature groups continue using a single zoom-dependent group transform (`scale = 2^(zoom - WORLD_ZOOM)`) so features can stay in world-coordinate local geometry without per-vertex reprojection each frame.
+
+## World Coordinate Numerics
+
+- **World coordinates are safe for affine transforms, risky for shoelace-style derived metrics** — Rotation, translation, scaling in world space work correctly. But d3-polygon's centroid/area formulas involve cross-products (x₀*y₁ - x₁*y₀) where the products are ~1e13 and their differences are ~1e7, leading to catastrophic cancellation when accumulating ~1e14-magnitude terms. The final centroid can land far outside the polygon's hull.
+- **Compute d3-polygon metrics in a local translated frame** — For centroid and area, translate all points by subtracting the extent center (world.origin), compute the metric locally, then translate the result back. This keeps intermediate values small (~1e-6) and preserves precision. Example: centroid in world space landed outside the hull; same computation on translated points (offset by `world.origin`) placed centroid correctly inside.
+- **GeometryPart caches `.local` coordinates for numerical stability** — Each GeometryPart now stores three coordinate frames: (1) `.orig` in WGS84, (2) `.world` in z16 world coordinates, (3) `.local` relative to world origin. All d3-polygon computations (hull, centroid, area, ssr) happen on `.local` coordinates, then results are translated back to world space. This eliminates the need for the `stablePolygonCentroid()` workaround and enables future Pixi rendering optimization: local arrays can be rendered directly with Pixi container transforms (position at origin, no per-vertex reprojection).
+- **Hull and geometric tests are robust** — `polygonHull()` and orientation tests (like `cross(a,b,c)`) work correctly on large coordinates because they compare point membership (combinatorial) rather than accumulating cancelling terms.
+- **Area drifts less than centroid** — In a test case (0.00456% drift for area vs. >100% for centroid), but both use local frame for consistency and to avoid future surprises.
+- **References:** See [modules/lib/GeometryPart.ts](modules/lib/GeometryPart.ts) local frame computation and [test/unit/lib/GeometryPart.test.js](test/unit/lib/GeometryPart.test.js) tests for local/world coordinate correctness.
 
 ## NsiService
 

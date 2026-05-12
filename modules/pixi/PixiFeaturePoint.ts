@@ -1,12 +1,13 @@
 import * as PIXI from 'pixi.js';
 import { GlowFilter } from 'pixi-filters';
 
+import { WORLD_ZOOM } from '@rapid-sdk/math';
+
 import { AbstractPixiFeature } from './AbstractPixiFeature.ts';
 import { DashLine } from './lib/DashLine.ts';
 
 import type { AbstractPixiLayer } from './AbstractPixiLayer.ts';
 import type { DashLineOptions } from './lib/DashLine.ts';
-import type { GeometryPart } from '../lib/GeometryPart.ts';
 import type { Viewport, Vec2 } from '@rapid-sdk/math';
 
 /* Intersection type that includes both Pixi Stroke and DashLineOptions  */
@@ -16,7 +17,6 @@ type StrokeStyleWithDash = PIXI.StrokeStyle & DashLineOptions;
 /**
  *
  * Properties you can access:
- *   `geom`        PixiGeometryPart() class containing all the information about the geometry
  *   `style`       Object containing styling data
  *   `container`   PIXI.Container containing the display objects used to draw the point
  *   `marker`      PIXI.Sprite for the marker
@@ -39,8 +39,6 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
   private _viewfieldName: string | null;
   /** Set true to use a circular halo and hit area */
   private _isCircular: boolean;
-  /** Source geometry for the world render path */
-  private _worldSource: GeometryPart | null;
 
   /**
    * @constructor
@@ -52,9 +50,7 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
 
     this._viewfieldCount = 0;     // to watch for change in # of viewfield sprites
     this._viewfieldName = null;   // to watch for change in viewfield texture
-
-    this._isCircular = false;   // set true to use a circular halo and hit area
-    this._worldSource = null;
+    this._isCircular = false;     // set true to use a circular halo and hit area
 
     const marker = new PIXI.Sprite();
     marker.label = 'marker';
@@ -94,19 +90,7 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
       this.viewfields = null;
     }
 
-    this._worldSource = null;
-
     super.destroy();
-  }
-
-
-  /**
-   * Sets the source GeometryPart for the world render path.
-   * @param source - A GeometryPart whose `world` data is populated
-   */
-  setWorldCoords(source: GeometryPart): void {
-    this._worldSource = source;
-    this.geom.dirty = true;
   }
 
 
@@ -115,11 +99,6 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
    * @param zoom - Effective zoom to use for rendering
    */
   update(viewport: Viewport, zoom: number): void {
-    if (this._worldSource) {
-      this.updateWorld(viewport, zoom);
-      return;
-    }
-
     if (!this.dirty) return;  // nothing to do
 
     this.updateGeometry(viewport, zoom);
@@ -130,50 +109,28 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
 
 
   /**
-   * Point update path that positions from world coordinates (WORLD_ZOOM=16).
-   * Skips `geom.update()` on the common path (style unchanged); only reprojects when style is dirty.
    * @param viewport - Pixi viewport to use for rendering
    * @param zoom - Effective zoom to use for rendering
    */
-  updateWorld(viewport: Viewport, zoom: number): void {
-    const world = this._worldSource?.world;
-    if (!world) {
-      this.visible = false;
-      this.geom.dirty = false;
-      this._styleDirty = false;
-      return;
-    }
-
-    // Position from world anchor — no full geometry reprojection needed.
-    const screenPos = viewport.worldToScreen(world.anchor!) as Vec2;
-    this.container.position.set(screenPos[0], screenPos[1]);
-    this.container.zIndex = screenPos[1];
-
-    if (this._styleDirty) {
-      // updateStyle reads geom.screen for z-index; update geom so it has fresh screen coords.
-      this.geom.update(viewport);
-      this.updateStyle(viewport, zoom);
-    }
-    this.updateHitArea();
-    this.updateHalo();
-    this.geom.dirty = false;
-  }
-
-
-  /**
-   * @param viewport - Pixi viewport to use for rendering
-   * @param zoom - Effective zoom to use for rendering
-   */
-  updateGeometry(viewport: Viewport, zoom: number): void {
+  updateGeometry(viewport: Viewport, _zoom: number): void {
     if (!this.geom.dirty) return;
 
-    // Reproject
-    this.geom.update(viewport);
-    const screen = this.geom.screen;
-    if (!screen?.coords) return;  // can't render anything without screen coords
+    let origin: Vec2 | undefined;
+    if (this._geom) {  // GeometryPart path
+      origin = this._geom.world?.origin;
+    } else {           // PixiGeometryParth path
+      this.geom.update(viewport);
+      origin = this.geom.screen?.coords as Vec2 | undefined;
+    }
+    this.geom.dirty = false;
 
-    const [x, y] = screen.coords as Vec2;
+    if (!origin) return;
+    const [x, y] = origin;
     this.container.position.set(x, y);
+
+    // The container's `position` is in world coords (under the `world` group),
+    // but its children (marker / icon / viewfields) should stay screen-sized.
+    // Counter-scale by 1 / worldScale to undo the parent `world` container's scale.
 
     // sort markers by latitude ascending
     // sort markers with viewfields above markers without viewfields
@@ -189,9 +146,6 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
   updateStyle(viewport: Viewport, zoom: number): void {
     if (!this._styleDirty) return;
 
-    const screen = this.geom.screen;
-    if (!screen?.coords) return;  // can't render anything without screen coords
-
     const context = this.context;
     const map = context.systems.map!;
     const wireframeMode = map?.wireframeMode;
@@ -199,14 +153,27 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
     const style = this._style;
     const isPin = ['pin', 'boldPin', 'osmose'].includes(style.marker.image ?? '');
 
+    const container = this.container;
     const marker = this.marker!;
     const icon = this.icon!;
-    const z = (screen.coords as Vec2)[1];  // use y coord as the z-index
 
-    // Apply anti-rotation to keep the icons and markers facing up.
+    // Use y-coordinate as the z-index.
+    const z = container.position.y;
+
+    // If we are in a rotated frame, apply counter-rotation to keep the icons and markers facing up.
     // (However viewfields container _should_ include the bearing, and will below)
     const bearing = viewport.transform.rotation;
-    this.container.rotation = -bearing;
+    container.rotation = -bearing;
+
+    // If we are rendering world coordinates, apply counter-scale to get children back to screen coords.
+    // Scale down even more at lower zooms.
+    const baseScale = (zoom < 17 || wireframeMode) ? 0.8 : 1.0;
+    if (this._geom) {   // GeometryPart path
+      const worldScale = 2 ** (viewport.transform.z - WORLD_ZOOM) || 1;
+      container.scale.set(baseScale / worldScale, baseScale / worldScale);
+    } else {
+      container.scale.set(baseScale, baseScale);
+    }
 
     // Show marker, if any..
     if (style.marker.image) {
@@ -269,8 +236,7 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
       vfTexture = textureManager.getTexture('symbol', style.viewfield.image || '') || PIXI.Texture.WHITE;
 
       // Sort markers with viewfields above markers without viewfields
-      // this.container.zIndex = -latitude + 1000;
-      this.container.zIndex = z + 1000;
+      container.zIndex = z + 1000;
 
       // Ensure viewfield container exists
       if (!this.viewfields) {
@@ -279,7 +245,7 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
         this.viewfields.eventMode = 'none';
         this.viewfields.sortableChildren = false;
         this.viewfields.visible = true;
-        this.container.addChildAt(this.viewfields, 0);
+        container.addChildAt(this.viewfields, 0);
       }
 
       // if # of viewfields has changed, or if the texture name has changed, recreate them
@@ -293,7 +259,7 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
 
           // Make the active photo image pop out at the user
           if (this._classes.has('selectphoto') || this._classes.has('highlightphoto')) {
-            this.container.zIndex = 99000;
+            container.zIndex = 99000;
           }
 
           this.viewfields.addChild(vfSprite);
@@ -334,9 +300,8 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
     } else if (this.viewfields) {  // Had viewfields before and now should not
       this.viewfields.destroy({ children: true });
       this.viewfields = null;
-      // this.container.zIndex = -latitude;   // restore default marker sorting
-      this.container.zIndex = z;   // restore default marker sorting
       this._viewfieldCount = 0;
+      container.zIndex = z;   // restore default marker sorting
     }
 
 
@@ -351,7 +316,6 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
     } else if (zoom < 17 || wireframeMode) {  // Markers drawn but smaller
       this.lod = 1;  // simplified
       this.visible = true;
-      this.container.scale.set(0.8, 0.8);
       if (this.viewfields) {
         this.viewfields.renderable = false;
       }
@@ -366,7 +330,6 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
     } else {  // z >= 17 - Show the requested marker (circles OR pins)
       this.lod = 2;  // full
       this.visible = true;
-      this.container.scale.set(1, 1);
       if (this.viewfields) {
         this.viewfields.renderable = true;
       }

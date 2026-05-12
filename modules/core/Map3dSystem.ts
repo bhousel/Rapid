@@ -1,10 +1,11 @@
 import { select as d3_select } from 'd3-selection';
-import { RAD2DEG, numWrap, geomPolygonContainsPolygon, vecEqual, Vec2 } from '@rapid-sdk/math';
+import { RAD2DEG, numWrap, geomPolygonContainsPolygon, vecEqual } from '@rapid-sdk/math';
 import { Color } from 'pixi.js';
 
 import { AbstractSystem } from './AbstractSystem.ts';
 import { utilCmd } from '../util/cmd.ts';
 
+import type { Vec2 } from '@rapid-sdk/math';
 import type { Context } from '../Context.ts';
 import type { OsmEntity } from '../data/OsmEntity.ts';
 import type {

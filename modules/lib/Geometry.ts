@@ -2,12 +2,17 @@ import { Extent } from '@rapid-sdk/math';
 import { GeometryPart } from './GeometryPart.ts';
 
 import type { Context } from '../Context.ts';
-import type {
-  GeoJSONObject,
-  GeometryOrigData,
-  GeometryWorldData,
-  SingularGeometry
-} from './types.ts';
+import type { GeoJSONObject, SingularGeometry } from './types.ts';
+
+/** Original extent data in WGS84 for Geometry */
+export interface GeometryOrigData {
+  extent: Extent;
+}
+
+/** Projected extent data in world coordinates for Geometry */
+export interface GeometryWorldData {
+  extent: Extent;
+}
 
 
 /**

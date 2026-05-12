@@ -60,8 +60,6 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
   private _bufferdata: LineToPolyResult | null;
   /** Vertex count for Rapid#1636 workaround */
   private _vertexCount: number;
-  /** Source geometry for the world-coordinate render path */
-  private _worldSource: GeometryPart | null;
 
   /**
    * @constructor
@@ -74,7 +72,6 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
     this._ssrdata = null;
     this._bufferdata = null;
     this._vertexCount = 0;  // we will watch these for Rapid#1636
-    this._worldSource = null;
 
     const lowRes = new PIXI.Sprite();
     lowRes.label = 'lowRes';
@@ -155,19 +152,8 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
 
     this._ssrdata = null;
     this._bufferdata = null;
-    this._worldSource = null;
 
     super.destroy();
-  }
-
-
-  /**
-   * Sets the source GeometryPart for the world-coordinate render path.
-   * @param source - A GeometryPart whose `world` data is populated
-   */
-  setWorldCoords(source: GeometryPart): void {
-    this._worldSource = source;
-    this.geom.dirty = true;
   }
 
 
@@ -176,12 +162,14 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
    * @param zoom - Effective zoom to use for rendering
    */
   update(viewport: Viewport, zoom: number): void {
-    if (this._worldSource) {
+    if (!this.dirty) return;  // nothing to do
+
+    if (this._geom) {  // GeometryPart path
       this.updateWorld(viewport, zoom);
+      this.geom.dirty = false;
       return;
     }
-
-    if (!this.dirty) return;  // nothing to do
+    // else PixiGeometryPart path...
 
     const context = this.context;
     const storage = context.systems.storage;
@@ -538,13 +526,18 @@ if (renderer.type === PIXI.RendererType.CANVAS) {
    * @param zoom - Effective zoom to use for rendering
    */
   updateWorld(viewport: Viewport, zoom: number): void {
+    if (!this._geom) return;  // wrong path?
+
     const map = this.context.systems.map;
     const isWireframe = !!map?.wireframeMode;
     const container = this.container;
-    const source = this._worldSource;
-    const world = source?.world;
 
-    if (!world || source?.type !== 'Polygon') {
+    const type = this._geom.type;
+    const world = this._geom.world;
+    const rings = world?.coords as Vec2[][];
+
+    // Not a polygon, or no world coordinate data?
+    if (type !== 'Polygon' || !world || !rings?.length || !rings[0].length) {
       this.lod = 0;
       this.visible = false;
       this.geom.dirty = false;
@@ -552,20 +545,13 @@ if (renderer.type === PIXI.RendererType.CANVAS) {
       return;
     }
 
-    const rings = world.coords as Vec2[][];
-    if (!rings.length || !rings[0].length) {
-      this.lod = 0;
-      this.visible = false;
-      this.geom.dirty = false;
-      this._styleDirty = false;
-      return;
-    }
-
-    // Position container anchor-relative in world space.
-    // The group's scale (2^(zoom - WORLD_ZOOM)) converts these local units to screen pixels.
-    const anchor = world.anchor!;
-    const worldOrigin = viewport.screenToWorld([0, 0]) as Vec2;
-    container.position.set(anchor[0] - worldOrigin[0], anchor[1] - worldOrigin[1]);
+    // The container lives under the `world` Pixi container (in GraphicsSystem),
+    // which provides the position + scale that maps world coords -> screen.
+    // So `container.position` is in world coordinates directly. We use the
+    // polygon's `origin` (extent center) as the anchor and draw each vertex
+    // origin-relative so local coords stay small and float32-safe.
+    const origin = world.origin!;
+    container.position.set(origin[0], origin[1]);
 
     this.lod = 2;
     this.visible = true;
@@ -596,7 +582,7 @@ if (renderer.type === PIXI.RendererType.CANVAS) {
 
     for (let i = 0; i < rings.length; i++) {
       const stroke = new PIXI.Graphics();
-      drawRingAnchorRelative(rings[i], anchor, stroke);
+      drawRing(rings[i], origin, stroke);
       stroke.stroke(strokeStyle);
       stroke.label = `stroke${i}`;
       stroke.sortableChildren = false;
@@ -609,7 +595,7 @@ if (renderer.type === PIXI.RendererType.CANVAS) {
       this.fill!.clear();
       const fillStyle: PIXI.FillStyle = { color, alpha: opacity };
       for (let i = 0; i < rings.length; i++) {
-        drawRingAnchorRelative(rings[i], anchor, this.fill!);
+        drawRing(rings[i], origin, this.fill!);
         if (i === 0) {
           this.fill!.fill(fillStyle);
         } else {
@@ -624,12 +610,12 @@ if (renderer.type === PIXI.RendererType.CANVAS) {
     this._styleDirty = false;
     this.updateHalo();
 
-    function drawRingAnchorRelative(ring: Vec2[], anchor: Vec2, g: PIXI.Graphics): void {
+    function drawRing(ring: Vec2[], origin: Vec2, g: PIXI.Graphics): void {
       ring.forEach(([x, y], i) => {
         if (i === 0) {
-          g.moveTo(x - anchor[0], y - anchor[1]);
+          g.moveTo(x - origin[0], y - origin[1]);
         } else {
-          g.lineTo(x - anchor[0], y - anchor[1]);
+          g.lineTo(x - origin[0], y - origin[1]);
         }
       });
     }

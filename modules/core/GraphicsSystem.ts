@@ -1,5 +1,5 @@
 import * as PIXI from 'pixi.js';
-import { TAU, Viewport, numWrap, vecEqual, vecLength, vecRotate, vecScale, vecSubtract } from '@rapid-sdk/math';
+import { TAU, WORLD_HALF, WORLD_ZOOM, Viewport, numWrap, vecEqual, vecLength, vecRotate, vecScale, vecSubtract } from '@rapid-sdk/math';
 
 import { AbstractSystem } from './AbstractSystem.ts';
 import { PixiEvents } from '../pixi/PixiEvents.ts';
@@ -60,6 +60,7 @@ export class GraphicsSystem extends AbstractSystem {
   pixi: PIXI.Application | null;
   stage: PIXI.Container | null;
   origin: PIXI.Container | null;
+  world: PIXI.Container | null;
   scene: PixiScene | null;
   eventManager: PixiEvents | null;
   textureManager: PixiTextures | null;
@@ -97,6 +98,7 @@ export class GraphicsSystem extends AbstractSystem {
     this.pixi = null;
     this.stage = null;
     this.origin = null;
+    this.world = null;
     this.scene = null;
     this.eventManager = null;
     this.textureManager = null;
@@ -462,7 +464,7 @@ export class GraphicsSystem extends AbstractSystem {
 //      const scale = tCurr.k / tPrev.k;
 
 // todo fix: this does not work correctly with the worldcoordinate changes
-      const scale = 2 ** (tCurr.z - tPrev.z);
+      const scale = Math.pow(2, tCurr.z) / Math.pow(2, tPrev.z);
       let dx = (currxy[0] / scale - prevxy[0]) * scale;
       let dy = (currxy[1] / scale - prevxy[1]) * scale;
       const dr = tCurr.r - tPrev.r;
@@ -513,7 +515,7 @@ export class GraphicsSystem extends AbstractSystem {
     if (pixiTransform.z !== mapTransform.z || dist > 100000) {
       offset = [0,0];
       pixiViewport.transform = mapTransform;   // reset (sync pixi = map)
-      this.scene!.dirtyScene();                 // all geometry must be reprojected
+      this.scene!.dirtyScene();                // all geometry must be reprojected
     } else {
       offset = vecSubtract(pixiXY, mapXY);
     }
@@ -533,7 +535,24 @@ export class GraphicsSystem extends AbstractSystem {
     // The `origin` returns `[0,0]` back to the `[top,left]` coordinate of the viewport,
     // so `project/unproject` continues to work.
     // This also includes the `offset`, which includes any panning that the user has done.
-    this.origin!.position.set(-offset[0] - mapCenter[0], -offset[1] - mapCenter[1]);
+    this.origin!.position.set(
+      -offset[0] - mapCenter[0],
+      -offset[1] - mapCenter[1]
+    );
+
+    // The `world` container renders its children directly in world coordinates
+    // (Mercator pre-scaled to z=WORLD_ZOOM, range 0..WORLD_SIZE).
+    // Match the same math used by `projWorldToScreen` in @rapid-sdk/math:
+    //   screen = (worldXY - WORLD_HALF) * scale + transform.translation
+    // We use the pixi viewport transform (not the map transform) here because the
+    // `origin` container already accounts for the pan delta between them. That way,
+    // small pans don't require touching `world` at all — they're absorbed by `origin`.
+    const worldScale = Math.pow(2, pixiTransform.z - WORLD_ZOOM);
+    this.world!.position.set(
+      pixiTransform.x - WORLD_HALF * worldScale,
+      pixiTransform.y - WORLD_HALF * worldScale
+    );
+    this.world!.scale.set(worldScale, worldScale);
 
     // Let's go!
     const effectiveZoom = map.effectiveZoom();
@@ -779,6 +798,17 @@ export class GraphicsSystem extends AbstractSystem {
     origin.eventMode = 'passive';
     stage.addChild(origin);
     this.origin = origin;
+
+    // EXPERIMENT: An alternate `origin` that renders directly in world coordinates.
+    // Here we want `[0,0]` positioned to the top left corner of a z16 mercator world.
+    const world = new PIXI.Container();
+    world.label = 'world';
+    world.sortableChildren = true;
+    world.eventMode = 'passive';
+    world.zIndex = 99;  // TODO: this is temporary
+    origin.addChild(world);
+    this.world = world;
+
 
     // The Pixi Application comes with its own ticker that just calls `render()`,
     // and we don't want to ever use it.  Disable it.

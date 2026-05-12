@@ -425,7 +425,7 @@ behaviors.available.set('drag', DragBehavior);
 
 Example:
 ```typescript
-import { geomRotatePoints, geomViewportNudge, vecAdd } from '@rapid-sdk/math';
+import { geomRotate, geomViewportNudge, vecAdd } from '@rapid-sdk/math';
 import { utilArrayGroupBy, utilArrayUniq } from '@rapid-sdk/util';
 import { actionAddMidpoint } from '../actions/add_midpoint.ts';
 

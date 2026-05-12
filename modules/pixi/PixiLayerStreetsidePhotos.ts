@@ -226,8 +226,8 @@ export class PixiLayerStreetsidePhotos extends AbstractPixiLayer {
       // If sequence has changed, update data and coordinates.
       if (feature.v !== version) {
         feature.v = version;
+        feature.geometry = part;
         feature.setData(dataID, d);
-        feature.setCoords(part);
         feature.clearChildData(dataID);
         feature.addChildData(dataID, d.props.bubbleIDs as string);
       }
@@ -251,7 +251,7 @@ export class PixiLayerStreetsidePhotos extends AbstractPixiLayer {
       if (!feature) {
         feature = new PixiFeaturePoint(this, featureID);
         feature.parentContainer = parentContainer;
-        feature.setCoords(part);
+        feature.geometry = part;
         feature.setData(dataID, d);
       }
 

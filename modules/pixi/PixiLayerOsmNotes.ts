@@ -95,7 +95,7 @@ export class PixiLayerOsmNotes extends AbstractPixiLayer {
       // If data has changed, replace it..
       if (feature.v !== version) {
         feature.v = version;
-        feature.setCoords(part);
+        feature.geometry = part;
         feature.setData(dataID, d);
       }
 

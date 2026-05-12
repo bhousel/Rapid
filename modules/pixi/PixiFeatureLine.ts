@@ -38,8 +38,6 @@ export class PixiFeatureLine extends AbstractPixiFeature {
 
   /** Buffer polygon data for hit testing and halo */
   private _bufferdata: LineToPolyResult | null;
-  /** Source geometry for the world render path */
-  private _worldSource: GeometryPart | null;
 
   /**
    * @constructor
@@ -50,7 +48,6 @@ export class PixiFeatureLine extends AbstractPixiFeature {
     super(layer, featureID);
 
     this._bufferdata = null;
-    this._worldSource = null;
 
     const casing = new PIXI.Graphics();
     casing.label = 'casing';
@@ -83,21 +80,8 @@ export class PixiFeatureLine extends AbstractPixiFeature {
     }
 
     this._bufferdata = null;
-    this._worldSource = null;
 
     super.destroy();
-  }
-
-
-  /**
-   * Sets the source GeometryPart for the world render path.
-   * The feature will be drawn using `source.world` coordinates,
-   * bypassing the per-frame world→screen reprojection done by the normal path.
-   * @param source - A GeometryPart whose `world` data is populated
-   */
-  setWorldCoords(source: GeometryPart): void {
-    this._worldSource = source;
-    this.geom.dirty = true;
   }
 
 
@@ -106,12 +90,14 @@ export class PixiFeatureLine extends AbstractPixiFeature {
    * @param zoom - Effective zoom to use for rendering
    */
   update(viewport: Viewport, zoom: number): void {
-    if (this._worldSource) {
+    if (!this.dirty) return;  // nothing to do
+
+    if (this._geom) {  // GeometryPart path
       this.updateWorld(viewport, zoom);
+      this.geom.dirty = false;
       return;
     }
-
-    if (!this.dirty) return;  // nothing to do
+    // else PixiGeometryPart path...
 
     const map = this.context.systems.map;
     const isWireframe = !!map?.wireframeMode;
@@ -286,13 +272,18 @@ export class PixiFeatureLine extends AbstractPixiFeature {
    * @param zoom - Effective zoom to use for rendering
    */
   updateWorld(viewport: Viewport, zoom: number): void {
+    if (!this._geom) return;  // wrong path?
+
     const map = this.context.systems.map;
     const isWireframe = !!map?.wireframeMode;
     const container = this.container;
-    const source = this._worldSource;
-    const world = source?.world;
 
-    if (!world || source?.type !== 'LineString') {
+    const type = this._geom.type;
+    const world = this._geom.world;
+    const points = world?.coords as Vec2[];
+
+    // Not a polygon, or no world coordinate data?
+    if (type !== 'LineString' || !world || !points?.length) {
       this.lod = 0;
       this.visible = false;
       this.geom.dirty = false;
@@ -300,20 +291,13 @@ export class PixiFeatureLine extends AbstractPixiFeature {
       return;
     }
 
-    const points = world.coords as Vec2[];
-    if (!points.length) {
-      this.lod = 0;
-      this.visible = false;
-      this.geom.dirty = false;
-      this._styleDirty = false;
-      return;
-    }
-
-    // Position container anchor-relative in world space.
-    // The group's scale (2^(zoom - WORLD_ZOOM)) converts these local units to screen pixels.
-    const anchor = world.anchor!;
-    const worldOrigin = viewport.screenToWorld([0, 0]) as Vec2;
-    container.position.set(anchor[0] - worldOrigin[0], anchor[1] - worldOrigin[1]);
+    // The container lives under the `world` Pixi container (in GraphicsSystem),
+    // which provides the position + scale that maps world coords -> screen.
+    // So `container.position` is in world coordinates directly. We use the
+    // feature's `origin` (extent center) as the anchor and draw each vertex
+    // origin-relative so local coords stay small and float32-safe.
+    const origin = world.origin!;
+    container.position.set(origin[0], origin[1]);
 
     const lineMarkers = container.getChildByLabel('lineMarkers');
     if (lineMarkers) {
@@ -336,12 +320,12 @@ export class PixiFeatureLine extends AbstractPixiFeature {
     container.hitArea = null;
 
     if (this.casing!.renderable) {
-      this.updateWorldGraphic('casing', this.casing!, points, anchor, zoom, isWireframe);
+      this.updateWorldGraphic('casing', this.casing!, points, origin, zoom, isWireframe);
     } else {
       this.casing!.clear();
     }
     if (this.stroke!.renderable) {
-      this.updateWorldGraphic('stroke', this.stroke!, points, anchor, zoom, isWireframe);
+      this.updateWorldGraphic('stroke', this.stroke!, points, origin, zoom, isWireframe);
     } else {
       this.stroke!.clear();
     }
@@ -410,13 +394,13 @@ export class PixiFeatureLine extends AbstractPixiFeature {
 
   /**
    * Draws a world-coordinate line graphic.
-   * Points are in world space (z16); vertices are drawn anchor-relative
+   * Points are in world space (z16); vertices are drawn origin-relative
    * so that local coordinates stay small and float32-safe.
    * Stroke widths are expressed in world local units: `px × 2^(WORLD_ZOOM - zoom)`.
    * @param which - Style part to draw ('casing' or 'stroke')
    * @param graphic - PIXI graphics object to update
    * @param points - World coordinate points (z16 space)
-   * @param anchor - World anchor (pre-computed extent center from world.anchor)
+   * @param origin - World origin (pre-computed extent center from world.origin)
    * @param zoom - Effective zoom to use for rendering
    * @param isWireframe - Whether wireframe mode is active
    */
@@ -424,7 +408,7 @@ export class PixiFeatureLine extends AbstractPixiFeature {
     which: 'casing' | 'stroke',
     graphic: PIXI.Graphics,
     points: Vec2[],
-    anchor: Vec2,
+    origin: Vec2,
     zoom: number,
     isWireframe: boolean
   ): void {
@@ -467,18 +451,18 @@ export class PixiFeatureLine extends AbstractPixiFeature {
     if (partStyle.dash) {
       strokeStyle.dash = partStyle.dash.map(d => d * 2 ** (WORLD_ZOOM - zoom));
       g = new DashLine(this.gfx, graphic, strokeStyle);
-      drawAnchorRelative(points, g);
+      drawLine(points, g);
     } else {
-      drawAnchorRelative(points, g as PIXI.Graphics);
+      drawLine(points, g as PIXI.Graphics);
       (g as PIXI.Graphics).stroke(strokeStyle);
     }
 
-    function drawAnchorRelative(points: Vec2[], graphics: PIXI.Graphics | DashLine): void {
+    function drawLine(points: Vec2[], graphics: PIXI.Graphics | DashLine): void {
       points.forEach(([x, y], i) => {
         if (i === 0) {
-          graphics.moveTo(x - anchor[0], y - anchor[1]);
+          graphics.moveTo(x - origin[0], y - origin[1]);
         } else {
-          graphics.lineTo(x - anchor[0], y - anchor[1]);
+          graphics.lineTo(x - origin[0], y - origin[1]);
         }
       });
     }

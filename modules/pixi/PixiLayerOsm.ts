@@ -395,7 +395,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
           if (poiFeature.v !== version) {
             poiFeature.v = version;
             const source = { type: 'Point', world: { coords: part.world.poi } };
-            poiFeature.setCoords(source as any);
+            poiFeature.geometry = source as any;
             poiFeature.setData(entityID, entity);
           }
 
@@ -625,7 +625,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
       if (feature.v !== version) {
         feature.v = version;
         const part = node.geoms.parts[0];
-        feature.setCoords(part);
+        feature.geometry = part;
         feature.setData(nodeID, node);
       }
 
@@ -704,7 +704,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
       if (feature.v !== version) {
         feature.v = version;
         const part = node.geoms.parts[0];
-        feature.setCoords(part);
+        feature.geometry = part;
         feature.setData(nodeID, node);
       }
 

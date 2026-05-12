@@ -2,7 +2,8 @@ import { Extent } from '@rapid-sdk/math';
 import { GeometryPart } from '../lib/GeometryPart.ts';
 
 import type { Context } from '../Context.ts';
-import type { GeometryPartWorldData, SingularGeometry, SingularGeometryType } from '../lib/types.ts';
+import type { SingularGeometry, SingularGeometryType } from '../lib/types.ts';
+import type { GeometryPartWorldData } from '../lib/GeometryPart.ts';
 import type { SurroundingRectangle, Viewport, Vec2 } from '@rapid-sdk/math';
 
 

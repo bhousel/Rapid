@@ -43,6 +43,7 @@ Things that went wrong once and shouldn't go wrong again.
 
 ## Runtime
 
+- **d3-polygon centroid is numerically unstable for small features at large coordinates** — The shoelace formula accumulates x*y cross-products (~1e13), subtracts pairs (~1e7 difference), and accumulates centroid terms (~1e14 magnitude). For z16 world coordinates and small geometry, this causes catastrophic cancellation and produces centroids far outside the geometry bounds. Fix: translate points to center them near origin before calling d3-polygon functions, then translate results back. See GeometryPart.ts `stablePolygonCentroid()` for the pattern.
 - **Mark features dirty when styles change** — `immediateRedraw()` alone doesn't work. Call `gfx.scene.dirtyScene()` before redraw so features re-fetch their style.
 - **PIXI color formats** — CSS hex `"#FF6600"` and numeric `0xFF6600` work. String `"0xFF6600"` may also work (unverified).
 - **TaginfoService `_clean()` strips `debounce` from params** — When migrating `doRequest = params.debounce ? debouncedVersion : directVersion`, capture `shouldDebounce` BEFORE calling `_clean()`. The same pattern applies to OsmWikibaseService.

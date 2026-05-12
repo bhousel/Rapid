@@ -1,6 +1,6 @@
 import * as PIXI from 'pixi.js';
 import RBush from 'rbush';
-import { HALF_PI, TAU, numWrap, vecAdd, vecAngle, vecScale, vecSubtract, geomRotatePoints } from '@rapid-sdk/math';
+import { HALF_PI, TAU, numWrap, vecAdd, vecAngle, vecScale, vecSubtract, geomRotate } from '@rapid-sdk/math';
 
 import { AbstractPixiLayer } from './AbstractPixiLayer.ts';
 import { getLineSegments, getDebugBBox, lineToPoly } from './helpers.ts';
@@ -304,6 +304,8 @@ export class PixiLayerLabels extends AbstractPixiLayer {
    * @param zoom - Effective zoom level to use for rendering
    */
   render(frame: number, viewport: Viewport, zoom: number): void {
+    return;  // not yet
+
     if (!this.enabled || zoom < MINZOOM) {
       this.labelContainer!.visible = false;
       this.debugContainer!.visible = false;
@@ -992,9 +994,9 @@ export class PixiLayerLabels extends AbstractPixiLayer {
       // longer than the label needs to be, which can cause stretching of small labels.
       // Here we will scale the points down to the desired label width.
       let scaledCoords = ropeCoords.map(coord => vecSubtract(coord, ropeOrigin));  // to local coords
-      scaledCoords = geomRotatePoints(scaledCoords, -angle, [0,0]);          // rotate to x axis
+      scaledCoords = geomRotate(scaledCoords, -angle, [0,0]);          // rotate to x axis
       scaledCoords = scaledCoords.map(([x,y]) => [x * scaleX, y]);           // apply `scaleX`
-      scaledCoords = geomRotatePoints(scaledCoords, angle, [0,0]);           // rotate back
+      scaledCoords = geomRotate(scaledCoords, angle, [0,0]);           // rotate back
       scaledCoords = scaledCoords.map(coord => vecAdd(coord, ropeOrigin));   // back to global coords
 
       const style = feature.style as any;

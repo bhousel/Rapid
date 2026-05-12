@@ -1,6 +1,6 @@
 import { select as d3_select } from 'd3-selection';
-import { DEG2RAD, vecRotate } from '@rapid-sdk/math';
-import { utilArrayIdentical, utilGetAllNodes } from '@rapid-sdk/util';
+import { DEG2RAD, vecAdd, vecRotate, vecScale } from '@rapid-sdk/math';
+import { utilArrayIdentical } from '@rapid-sdk/util';
 
 import { AbstractMode } from './AbstractMode.ts';
 import { actionDeleteRelation } from '../actions/delete_relation.ts';
@@ -10,7 +10,7 @@ import { utilCmd, utilKeybinding, utilTotalExtent } from '../util/index.ts';
 
 import type { Context } from '../Context.ts';
 import type { EventData } from '../behaviors/AbstractBehavior.ts';
-import type { Extent } from '@rapid-sdk/math';
+import type { Extent, Vec2 } from '@rapid-sdk/math';
 import type { OsmEntity } from '../data/OsmEntity.ts';
 import type { OsmNode } from '../data/OsmNode.ts';
 import type { OsmRelation } from '../data/OsmRelation.ts';
@@ -293,24 +293,27 @@ export class SelectOsmMode extends AbstractMode {
       }
 
       if (delta) {
-        // pivot around average center of selected entities
-        const nodes = utilGetAllNodes(selectedIDs, graph) as OsmNode[];
-        const points = nodes.map(node => node.loc ? viewport.project(node.loc) : null).filter(Boolean) as [number, number][];
+        // Average the centroids of the selected features.
+        let sum: Vec2 = [0, 0];
+        let count = 0;
+        for (const entityID of selectedIDs) {
+          const entity = graph.hasEntity(entityID);
+          if (!entity) continue;
 
-        if (points.length < 2) {
-          return;  // no reason to rotate a single point
+          for (const part of entity.geoms.parts) {
+            const centroid = part.world?.centroid;
+            if (!centroid) continue;
+            sum = vecAdd(sum, centroid);
+            count++;
+          }
         }
 
-        // Average the projected points
-        let sumX = 0, sumY = 0;
-        for (const [x, y] of points) {
-          sumX += x;
-          sumY += y;
-        }
-        const centroid: [number, number] = [sumX / points.length, sumY / points.length];
+        if (!count) return;
+
+        const pivot = vecScale(sum, 1 / count);
 
         operation = Operations.operationRotate(context, selectedIDs);
-        action = actionRotate(selectedIDs, centroid, delta, viewport);
+        action = actionRotate(selectedIDs, pivot, delta, viewport);
       }
 
     // move

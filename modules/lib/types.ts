@@ -4,8 +4,6 @@
  * @module
  */
 
-import type { Extent, SurroundingRectangle, Vec2 } from '@rapid-sdk/math';
-
 
 // ============================================================================
 // GeoJSON Types
@@ -33,39 +31,3 @@ export type GeoJSONObject =
   | GeoJSON.Feature<GeoJSON.Geometry | null>
   | GeoJSON.FeatureCollection<GeoJSON.Geometry | null>
   | GeoJSON.Geometry;
-
-
-// ============================================================================
-// Geometry / GeometryPart
-// ============================================================================
-
-/** Original coordinate data in WGS84 for GeometryPart */
-export interface GeometryPartOrigData {
-  geojson: SingularGeometry;
-  coords: GeoJSON.Position | GeoJSON.Position[] | GeoJSON.Position[][];
-  extent: Extent;
-}
-
-/** Projected coordinate data in world coordinates for GeometryPart */
-export interface GeometryPartWorldData {
-  coords: Vec2 | Vec2[] | Vec2[][];
-  extent: Extent;
-  /** Pre-computed anchor = extent center, used for per-feature container positioning */
-  anchor?: Vec2;
-  outer?: Vec2[];
-  hull?: Vec2[];
-  centroid?: Vec2;
-  poi?: Vec2;
-  area?: number;
-  ssr?: SurroundingRectangle;
-}
-
-/** Original extent data in WGS84 for Geometry */
-export interface GeometryOrigData {
-  extent: Extent;
-}
-
-/** Projected extent data in world coordinates for Geometry */
-export interface GeometryWorldData {
-  extent: Extent;
-}
