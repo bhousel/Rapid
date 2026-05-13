@@ -268,6 +268,7 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
     const strokes = this.strokes!;
 
     let texture = pattern && textureManager.getPatternTexture(pattern) || PIXI.Texture.WHITE;    // WHITE turns off the texture
+    // textureSpace:'global' tiles the pattern at consistent world-space density rather than stretching it per shape.
     const textureMatrix = new PIXI.Matrix().rotate(-bearing);  // keep patterns face up
 // bhousel update 5/27/22:
 // I've noticed that we can't use textures from a spritesheet for patterns,
@@ -399,8 +400,9 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
       const fillStyle: PIXI.FillStyle = {
         color: color,
         alpha: opacity,
-        texture: texture, // Optional: include only if texture is used
-        matrix: textureMatrix // Optional: include only if texture is used
+        texture: texture,
+        matrix: textureMatrix,
+        textureSpace: 'global'
       };
 
       fill.clear();
@@ -581,8 +583,9 @@ if (renderer.type === PIXI.RendererType.CANVAS) {
     const strokes = this.strokes!;
 
     let texture = pattern && textureManager.getPatternTexture(pattern) || PIXI.Texture.WHITE;    // WHITE turns off the texture
-    // Scale by worldScale so pattern UVs match screen-pixel density (local coords are 1/worldScale of screen pixels)
-    const textureMatrix = new PIXI.Matrix().scale(worldScale, worldScale).rotate(-bearing);  // keep patterns face up
+    // textureSpace:'global' tiles the pattern at consistent world-space density rather than stretching it per shape.
+    // Scale by localScale (1/worldScale) so that 1 UV cycle = 1 pattern tile = natural screen-pixel density.
+    const textureMatrix = new PIXI.Matrix().scale(localScale, localScale).rotate(-bearing);  // keep patterns face up
 
 // bhousel update 5/27/22:
 // I've noticed that we can't use textures from a spritesheet for patterns,
@@ -753,7 +756,8 @@ if (renderer.type === PIXI.RendererType.CANVAS) {
         color: color,
         alpha: opacity,
         texture: texture,
-        matrix: textureMatrix
+        matrix: textureMatrix,
+        textureSpace: 'global'
       };
 
       fill.clear();
