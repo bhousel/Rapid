@@ -6,7 +6,6 @@ import { AbstractPixiLayer } from './AbstractPixiLayer.ts';
 import { getLineSegments, getDebugBBox, lineToPoly } from './helpers.ts';
 
 import type { AbstractPixiFeature } from './AbstractPixiFeature.ts';
-import type { PixiGeometryPartScreenData } from './PixiGeometryPart.ts';
 import type { PixiFeatureLine } from './PixiFeatureLine.ts';
 import type { PixiFeaturePoint } from './PixiFeaturePoint.ts';
 import type { PixiFeaturePolygon } from './PixiFeaturePolygon.ts';
@@ -304,8 +303,6 @@ export class PixiLayerLabels extends AbstractPixiLayer {
    * @param zoom - Effective zoom level to use for rendering
    */
   render(frame: number, viewport: Viewport, zoom: number): void {
-    return;  // not yet
-
     if (!this.enabled || zoom < MINZOOM) {
       this.labelContainer!.visible = false;
       this.debugContainer!.visible = false;
@@ -555,7 +552,8 @@ export class PixiLayerLabels extends AbstractPixiLayer {
    * @param features - The features to place point labels on
    */
   labelPoints(features: PixiFeaturePoint[]): void {
-    features.sort((a, b) => (a.geom as any).screen.coords[1] - (b.geom as any).screen.coords[1]);
+    // Sort by container y-position (north-to-south in world coords) for stable placement priority.
+    features.sort((a, b) => a.container.position.y - b.container.position.y);
 
     for (const feature of features) {
       const featureID = feature.id;
@@ -605,20 +603,34 @@ export class PixiLayerLabels extends AbstractPixiLayer {
 
     features.sort((a, b) => level(b) - level(a));
 
+    const temp = new PIXI.Point();
+    const labelOffset = this._labelOffset;
+
     for (const feature of features) {
       const featureID = feature.id;
-      const screen = feature.geom.screen as PixiGeometryPartScreenData | null;
+      const localCoords = feature.geometry?.local?.coords as Vec2[] | undefined;
 
       if (this._labeled.has(featureID)) continue;  // processed it already
       this._labeled.add(featureID);
 
       if (!feature.label) continue;   // no label needed
-      if (!screen?.coords) continue;   // no points
+      if (!localCoords || localCoords.length < 2) continue;   // no points
       if (!feature.container.visible || !feature.container.renderable) continue; // not visible
-      if ((screen.width ?? 0) < 40 && (screen.height ?? 0) < 40) continue;    // too small
+
+      const fBounds = feature.container.getBounds().rectangle;
+      if (fBounds.width < 40 && fBounds.height < 40) continue;    // too small
+
+      // Project line vertices from feature-local space to label space
+      // (= global screen minus labelOffset).
+      const labelCoords: Vec2[] = new Array(localCoords.length);
+      for (let i = 0; i < localCoords.length; i++) {
+        const p = localCoords[i];
+        feature.container.toGlobal({ x: p[0], y: p[1] }, temp);
+        labelCoords[i] = [temp.x - labelOffset.x, temp.y - labelOffset.y];
+      }
 
       const labelObj = this.getLabelSprite(feature.label, 'normal');
-      this.placeRopeLabel(feature, labelObj, screen.coords as Vec2[]);
+      this.placeRopeLabel(feature, labelObj, labelCoords);
     }
   }
 
@@ -629,19 +641,34 @@ export class PixiLayerLabels extends AbstractPixiLayer {
    * @param features - The features to place point labels on
    */
   labelPolygons(features: PixiFeaturePolygon[]): void {
+    const temp = new PIXI.Point();
+    const labelOffset = this._labelOffset;
+
     for (const feature of features) {
       const featureID = feature.id;
-      const screen = feature.geom.screen as PixiGeometryPartScreenData | null;
+      const outer = feature.geometry?.local?.outer;
 
       if (this._labeled.has(featureID)) continue;  // processed it already
       this._labeled.add(featureID);
 
       if (!feature.label) continue;      // no label needed
-      if (!screen?.flatCoords) continue;  // no points
+      if (!outer || outer.length < 3) continue;  // no outer ring
       if (!feature.container.visible || !feature.container.renderable) continue;  // not visible
-      if ((screen.width ?? 0) < 600 && (screen.height ?? 0) < 600) continue;  // too small
+
+      const fBounds = feature.container.getBounds().rectangle;
+      if (fBounds.width < 600 && fBounds.height < 600) continue;  // too small
 
       const labelObj = this.getLabelSprite(feature.label, 'italic');
+
+      // Project the outer ring from feature-local space to label space (= global screen minus labelOffset)
+      // as a flat array, which is what `lineToPoly` expects.
+      const flatOuter: number[] = new Array(outer.length * 2);
+      for (let i = 0; i < outer.length; i++) {
+        const p = outer[i];
+        feature.container.toGlobal({ x: p[0], y: p[1] }, temp);
+        flatOuter[i * 2]     = temp.x - labelOffset.x;
+        flatOuter[i * 2 + 1] = temp.y - labelOffset.y;
+      }
 
       // someday: precompute line buffer in geometry class maybe?
       const hitStyle = {
@@ -652,8 +679,7 @@ export class PixiLayerLabels extends AbstractPixiLayer {
         join: 'bevel',
         cap: 'butt'
       };
-      const outerRing = screen.flatCoords[0] as number[];
-      const bufferdata = lineToPoly(outerRing, hitStyle);
+      const bufferdata = lineToPoly(flatOuter, hitStyle);
       if (!bufferdata.inner) continue;
       const coords: Vec2[] = new Array(bufferdata.inner.length / 2);  // un-flatten :(
       for (let i = 0; i < bufferdata.inner.length / 2; ++i) {
@@ -829,10 +855,10 @@ export class PixiLayerLabels extends AbstractPixiLayer {
    *  then add the labels in spaces along the line wherever they fit.
    * @param feature - The feature to place rope labels on
    * @param labelObj - A PIXI.Sprite to use as the label
-   * @param screenCoords - The coordinates to place a rope on (these are coords relative to 'origin' container)
+   * @param coords - The coordinates to place a rope on, in label space (= global screen minus labelOffset)
    */
-  placeRopeLabel(feature: AbstractPixiFeature, labelObj: PIXI.Sprite, screenCoords: Vec2[]): void {
-    if (!feature || !labelObj || !screenCoords) return;
+  placeRopeLabel(feature: AbstractPixiFeature, labelObj: PIXI.Sprite, coords: Vec2[]): void {
+    if (!feature || !labelObj || !coords) return;
     if (!feature.container.visible || !feature.container.renderable) return;
 
     const showDebug = this.context.getDebug('label');
@@ -856,15 +882,6 @@ export class PixiLayerLabels extends AbstractPixiLayer {
     const scaleX = lWidth / ((numBoxes-1) * boxsize);
     // We'll break long chains into smaller regions and center a label within each region
     const maxChainLength = numBoxes + 15;
-
-    // Convert from screen coords to global coords..
-    const origin = this.gfx.origin!;
-    const labelOffset = this._labelOffset;
-    const temp = new PIXI.Point();
-    const coords: Vec2[] = screenCoords.map(([x, y]): Vec2 => {
-      origin.toGlobal({x: x, y: y}, temp);
-      return [temp.x - labelOffset.x, temp.y - labelOffset.y];
-    });
 
     // Cover the line in bounding boxes
     const segments = getLineSegments(coords, boxsize);
