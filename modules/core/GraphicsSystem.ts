@@ -547,7 +547,7 @@ export class GraphicsSystem extends AbstractSystem {
     // We use the pixi viewport transform (not the map transform) here because the
     // `origin` container already accounts for the pan delta between them. That way,
     // small pans don't require touching `world` at all — they're absorbed by `origin`.
-    const worldScale = Math.pow(2, pixiTransform.z - WORLD_ZOOM);
+    const worldScale = 2 ** (pixiTransform.z - WORLD_ZOOM);
     this.world!.position.set(
       pixiTransform.x - WORLD_HALF * worldScale,
       pixiTransform.y - WORLD_HALF * worldScale
@@ -796,6 +796,7 @@ export class GraphicsSystem extends AbstractSystem {
     origin.label = 'origin';
     origin.sortableChildren = true;
     origin.eventMode = 'passive';
+    origin.zIndex = 99;  // TODO: this is temporary
     stage.addChild(origin);
     this.origin = origin;
 
@@ -805,7 +806,6 @@ export class GraphicsSystem extends AbstractSystem {
     world.label = 'world';
     world.sortableChildren = true;
     world.eventMode = 'passive';
-    world.zIndex = 99;  // TODO: this is temporary
     origin.addChild(world);
     this.world = world;
 

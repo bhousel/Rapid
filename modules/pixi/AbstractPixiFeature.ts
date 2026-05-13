@@ -183,9 +183,10 @@ export class AbstractPixiFeature {
   /**
    * Every Feature should have an `updateHalo()` function that redraws any hover or select styling.
    * Override in a subclass with needed logic.
+   * @param zoom - Effective zoom to use for rendering. Omit to signal "hide/destroy the halo only".
    * @abstract
    */
-  updateHalo(): void {
+  updateHalo(zoom?: number): void {
   }
 
 

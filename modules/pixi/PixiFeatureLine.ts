@@ -464,16 +464,15 @@ export class PixiFeatureLine extends AbstractPixiFeature {
       width = 1;
     }
 
-    // Convert pixel width to world local units
-    const localScale = 2 ** (WORLD_ZOOM - zoom);
-    const localWidth = width * localScale;
+    // Convert screen pixel values to world units
+    const scale = 2 ** (WORLD_ZOOM - zoom);
 
     let g: PIXI.Graphics | DashLine = graphic.clear();
     if (partStyle?.opacity === 0) return;  // remove completely
 
     const strokeStyle: StrokeStyleWithDash = {
       color: partStyle.color,
-      width: localWidth,
+      width: width * scale,
       alpha: partStyle.opacity ?? 1.0,
       join: partStyle.join,
       cap:  partStyle.cap,
@@ -481,8 +480,15 @@ export class PixiFeatureLine extends AbstractPixiFeature {
     };
 
     if (partStyle.dash) {
-      strokeStyle.dash = partStyle.dash.map(d => d * localScale);
-      g = new DashLine(this.gfx, graphic, strokeStyle);
+      // DashLine handles the scale conversion internally for dash sizes and width,
+      // so pass unscaled values + the `scale` option (single source of truth).
+      const dashOptions: StrokeStyleWithDash & { scale: number } = {
+        ...strokeStyle,
+        width: width,
+        dash: partStyle.dash,
+        scale: scale
+      };
+      g = new DashLine(this.gfx, graphic, dashOptions);
       drawLine(points, g);
     } else {
       drawLine(points, g as PIXI.Graphics);
@@ -505,7 +511,7 @@ export class PixiFeatureLine extends AbstractPixiFeature {
    * World-path halo. Draws the select halo as a child of the feature container
    * so it inherits the same world position/scale as the rest of the feature.
    * Widths and dash patterns are expressed in world-local units.
-   * @param zoom - Effective zoom (used to convert pixel widths to world-local widths)
+   * @param zoom - Effective zoom to use for rendering
    */
   updateWorldHalo(zoom: number): void {
     const showHover = (this.visible && this._classes.has('hover'));
@@ -533,21 +539,31 @@ export class PixiFeatureLine extends AbstractPixiFeature {
 
     // Select dashed outline
     if (showSelect && this._bufferdata) {
+      const haloContainer = (this.scene as any).layers.get('map-ui').halo;
       if (!this.halo) {
         this.halo = new PIXI.Graphics();
         this.halo.label = `${this.id}-halo`;
         this.halo.eventMode = 'none';
-        this.container.addChild(this.halo);
-      } else if (this.halo.parent !== this.container) {
+        haloContainer.addChild(this.halo);
+      } else if (this.halo.parent !== haloContainer) {
         this.halo.parent?.removeChild(this.halo);
-        this.container.addChild(this.halo);
+        haloContainer.addChild(this.halo);
       }
 
-      const localScale = 2 ** (WORLD_ZOOM - zoom);
+      // `_bufferdata` was built from `local.coords` (origin-relative). Mirror the
+      // feature container's transform onto the halo so the polys align under
+      // `map-ui.halo` (which sits at world origin).
+      this.halo.position.copyFrom(this.container.position);
+      this.halo.rotation = this.container.rotation;
+
+      // Convert screen pixel values to world units
+      const scale = 2 ** (WORLD_ZOOM - zoom);
+
       const HALO_STYLE: StrokeStyleWithDash = {
         alpha: 0.9,
-        dash: [6 * localScale, 3 * localScale],
-        width: 2 * localScale,
+        dash: [6, 3],
+        width: 2,
+        scale: scale,
         color: 0xffff00
       };
 

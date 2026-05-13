@@ -512,7 +512,7 @@ if (renderer.type === PIXI.RendererType.CANVAS) {
 
     this._styleDirty = false;
 
-    this.updateHalo();
+    this.updateHalo(zoom);
   }
 
 
@@ -713,8 +713,14 @@ if (renderer.type === PIXI.RendererType.CANVAS) {
         const stroke = new PIXI.Graphics();
 
         if (dash) {
-          strokeStyle.dash = dash.map(d => d * localScale);
-          const dl = new DashLine(this.gfx, stroke, strokeStyle);
+          // DashLine handles scale conversion internally; pass unscaled dash/width + scale option.
+          const dashOptions: StrokeStyleWithDash = {
+            ...strokeStyle,
+            width: lineWidth,
+            dash: dash,
+            scale: localScale
+          };
+          const dl = new DashLine(this.gfx, stroke, dashOptions);
           dl.poly(ring);
         } else {
           stroke.poly(ring).stroke(strokeStyle);
@@ -881,8 +887,9 @@ if (renderer.type === PIXI.RendererType.CANVAS) {
       const localScale = 2 ** (WORLD_ZOOM - zoom);
       const HALO_STYLE: StrokeStyleWithDash = {
         alpha: 0.9,
-        dash: [6 * localScale, 3 * localScale],
-        width: 2 * localScale,
+        dash: [6, 3],
+        width: 2,
+        scale: localScale,
         color: 0xffff00
       };
 
@@ -907,8 +914,16 @@ if (renderer.type === PIXI.RendererType.CANVAS) {
 
   /**
    * Show/Hide halo (expects `this._bufferdata` to be already set up by `update()`)
+   * @param zoom - Effective zoom to use for rendering. Omit to destroy the halo without redrawing.
    */
-  updateHalo(): void {
+  updateHalo(zoom?: number): void {
+    if (zoom === undefined) {
+      if (this.halo) {
+        this.halo.destroy();
+        this.halo = null;
+      }
+      return;
+    }
     const map = this.context.systems.map;
     const wireframeMode = map?.wireframeMode;
     const showHover = (this.visible && this._classes.has('hover'));
@@ -943,10 +958,14 @@ if (renderer.type === PIXI.RendererType.CANVAS) {
         haloContainer.addChild(this.halo);
       }
 
+      // Convert screen pixel values to world units
+      const scale = 2 ** (WORLD_ZOOM - zoom);
+
       const HALO_STYLE = {
         alpha: 0.9,
         dash: [6, 3],
-        width: 2,   // px
+        width: 2,
+        scale: scale,
         color: 0xffff00
       };
 

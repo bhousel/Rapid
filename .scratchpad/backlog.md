@@ -2,6 +2,11 @@
 
 Items planned but not yet started.
 
+## DashLine performance
+- Restore the texture-based DashLine path (currently disabled — `useTexture: false`). Pixi v8 broke the original `textureSpace: 'global'` matrix handling. Drawing per-segment via `lineTo` is far slower than a single stroke with a tiling dash texture.
+- Once textures work again, store dash-pattern textures in an atlas (one slot per `dash.toString() + width + scale` cache key). Avoids per-line texture swaps and reduces draw-call count for dashed renders (halos, lasso, casing dashes).
+- Also fix the existing `_getTexture` cache key, which only keys on `dash.toString()` — it should include width and scale (or be regenerated alongside the atlas migration).
+
 ## Deferred styling work
 - Move PixiLayerRapid's hardcoded styles into the style asset file (colors are currently dynamic from `dataset.color`)
 - Have PixiLayerRapid call `styleMatch()` with a dataset/scope ID

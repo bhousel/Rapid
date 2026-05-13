@@ -102,7 +102,7 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
     this.updateGeometry(viewport, zoom);
     this.updateStyle(viewport, zoom);
     this.updateHitArea();
-    this.updateHalo();
+    this.updateHalo(zoom);
   }
 
 
@@ -390,8 +390,16 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
 
   /**
    * Show/Hide halo (requires `this.container.hitArea` to be already set up by `updateHitArea` as a supported shape)
+   * @param zoom - Effective zoom to use for rendering. Omit to destroy the halo without redrawing.
    */
-  updateHalo(): void {
+  updateHalo(zoom?: number): void {
+    if (zoom === undefined) {
+      if (this.halo) {
+        this.halo.destroy();
+        this.halo = null;
+      }
+      return;
+    }
     const showHover = (this.visible && this._classes.has('hover'));
     const showSelect = (this.visible && this._classes.has('select') && !(this as any).virtual);
     const showHighlight = (this.visible && this._classes.has('highlight'));
@@ -424,10 +432,14 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
         haloContainer.addChild(this.halo);
       }
 
-      const HALO_STYLE: StrokeStyleWithDash = {
+      // Convert screen pixel values to world units
+      const scale = 2 ** (WORLD_ZOOM - zoom);
+
+      const HALO_STYLE: StrokeStyleWithDash & { scale: number } = {
         alpha: 0.9,
         dash: [6, 3],
-        width: 2,   // px
+        width: 2,
+        scale: scale,
         color: 0xffff00
       };
 
@@ -436,9 +448,9 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
       const shape = this.container.hitArea;
       const dl = new DashLine(this.gfx, this.halo as PIXI.Graphics, HALO_STYLE);
       if (shape instanceof PIXI.Circle) {
-        dl.circle(shape.x, shape.y, shape.radius, 20);
+        dl.circle(shape.x * scale, shape.y * scale, shape.radius * scale, 20);
       } else if (shape instanceof PIXI.Rectangle) {
-        dl.rect(shape.x, shape.y, shape.width, shape.height);
+        dl.rect(shape.x * scale, shape.y * scale, shape.width * scale, shape.height * scale);
       }
 
       this.halo.position = this.container.position;

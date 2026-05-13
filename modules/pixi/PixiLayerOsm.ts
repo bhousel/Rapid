@@ -1,16 +1,16 @@
 import * as PIXI from 'pixi.js';
-import { vecAngle, vecLength, vecInterp } from '@rapid-sdk/math';
-
 import { AbstractPixiLayer } from './AbstractPixiLayer.ts';
+import { GeometryPart } from '../lib/GeometryPart.ts';
 import { PixiFeatureLine } from './PixiFeatureLine.ts';
 import { PixiFeaturePoint } from './PixiFeaturePoint.ts';
 import { PixiFeaturePolygon } from './PixiFeaturePolygon.ts';
+import { vecAngle, vecLength, vecInterp } from '@rapid-sdk/math';
 
-import type { Vec2, Viewport } from '@rapid-sdk/math';
-import type { OsmEntity, OsmNode, OsmRelationMember, OsmTags } from '../data/types.ts';
 import type { MatchedStyle } from '../core/StyleSystem.ts';
+import type { OsmEntity, OsmNode, OsmRelationMember, OsmTags } from '../data/types.ts';
 import type { PixiLayerMapUI } from './PixiLayerMapUI.ts';
 import type { PixiScene } from './PixiScene.ts';
+import type { Vec2, Viewport } from '@rapid-sdk/math';
 
 
 /** Minimum zoom level where OSM data is rendered */
@@ -848,8 +848,10 @@ export class PixiLayerOsm extends AbstractPixiLayer {
       const v = _midpointVersion(midpoint);
       if (feature.v !== v) {
         feature.v = v;
-        const source = { type: 'Point', world: { coords: midpoint.world } };
-        feature.setCoords(source as any);
+
+        const geometry = new GeometryPart(context);
+        geometry.setData({ type: 'Point', coordinates: midpoint.loc });
+        feature.geometry = geometry;
 
         // Remember to apply rotation - it needs to go on the marker,
         // because the container automatically rotates to be face up.

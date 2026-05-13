@@ -15,7 +15,17 @@ export interface DashLineOptions {
   color?: number;
   /** Alpha/opacity of the dashed line */
   alpha?: number;
-  /** Scale factor for the dash pattern */
+  /**
+   * Scale factor applied to dash sizes, line width, and the minimum-segment
+   * threshold. Pass `1` when drawing in screen-pixel coordinates (the default).
+   *
+   * When the caller draws into a Pixi container whose world transform makes
+   * 1 caller-unit cover many screen pixels (e.g. world-coord rendering where
+   * 1 unit at WORLD_ZOOM = 16 covers `2 ** (zoom - 16)` screen pixels), pass
+   * the inverse: `scale = 2 ** (WORLD_ZOOM - zoom)`. This keeps dash widths
+   * and the per-segment skip threshold expressed in screen pixels even when
+   * geometry is in world units.
+   */
   scale?: number;
   /** Whether to use texture-based rendering */
   useTexture?: boolean;
@@ -146,7 +156,9 @@ export class DashLine {
     }
     let [x0, y0] = [this.cursor.x, this.cursor.y];   // the start position of the cursor
     const length = vecLength([x0, y0] as Vec2, [x, y] as Vec2);
-    if (length < 1) {
+    // Skip sub-screen-pixel segments. `this.scale` converts screen px into the
+    // caller's drawing-coord units, so `< this.scale` == "shorter than 1 screen px".
+    if (length < this.scale) {
       this.lineLength! += length;  // advance length, but don't draw anything (these tiny lengths add up)
       return this;
     }
@@ -202,7 +214,7 @@ export class DashLine {
 
       // Advance the line
       let remaining = length;
-      while (remaining > 1) {   // stop if we are within 1 pixel
+      while (remaining > this.scale) {   // stop if we are within 1 screen pixel of the end
         const dashSize = (this.dash[dashIndex] * this.scale) - dashStart;
         const dist = (remaining > dashSize) ? dashSize : remaining;
 

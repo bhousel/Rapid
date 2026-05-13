@@ -4,7 +4,7 @@ import { utilAesDecrypt, utilQsString, utilStringQs, utilSafeString } from '@rap
 
 import { utilDateString } from '../util/date.ts';
 
-import type { Vec2 } from '@rapid-sdk/math';
+import type { Vec2, Vec3 } from '@rapid-sdk/math';
 import type { Context } from '../Context.ts';
 
 
@@ -63,13 +63,13 @@ export interface ImagerySourceProps {
   /** String ID for localized description */
   descriptionStringID?: string;
   /** Tile opacity (0-1) */
-  alpha?: number;
+  alpha: number;
   /** Size of tiles in pixels */
-  tileSize?: number;
+  tileSize: number;
   /** [minZoom, maxZoom] for this imagery */
-  zoomExtent?: [number, number];
+  zoomExtent: [number, number];
   /** Zoom range for the imagery source */
-  zoomRange?: number;
+  zoomRange: number;
   /** Feature defining the coverage area */
   feature?: GeoJSON.Feature;
   /** Icon url for the source */
@@ -87,7 +87,7 @@ export interface ImagerySourceProps {
   /** Projection used (e.g., 'EPSG:3857', 'EPSG:4326') */
   projection?: string;
   /** Whether the imagery is blocked */
-  isBlocked?: boolean;
+  isBlocked: boolean;
   /** Extra properties are allowed */
   [key: string]: unknown;
 }
@@ -321,7 +321,7 @@ export class ImagerySource {
    * @param coord - Tile coordinate as [x,y,z]
    * @return The url to fetch imagery (empty string if no imagery, for example 'none' source)
    */
-  url(coord: [number, number, number]): string {
+  url(coord: Vec3): string {
     const urlTemplate = this.template;
     let result = urlTemplate;
     if (result === '') return result;   // source 'none'

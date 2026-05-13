@@ -475,12 +475,22 @@ export class MapSystem extends AbstractSystem {
 
 
   /**
-   * Gets the current [lon,lat] location of the pointer
+   * Gets the current [lon,lat] location of the pointer in WGS84 coordinates.
    * (or center of map if there is no readily available pointer coordinate)
-   * @return  [lon,lat] location of pointer (or center of the map)
+   * @return  [lon,lat] WGS84 coordinate of pointer (or center of the map)
    */
   mouseLoc(): Vec2 {
     return this.context.viewport.unproject(this.mouse());
+  }
+
+
+  /**
+   * Gets the current [x,y] location of the pointer in world coordinates.
+   * (or center of map if there is no readily available pointer coordinate)
+   * @return  [x,y] world coordinate of pointer (or center of the map)
+   */
+  mouseWorld(): Vec2 {
+    return this.context.viewport.screenToWorld(this.mouse());
   }
 
 

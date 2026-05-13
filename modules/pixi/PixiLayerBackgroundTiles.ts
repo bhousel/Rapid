@@ -1,11 +1,10 @@
 import * as PIXI from 'pixi.js';
-import { interpolateNumber } from 'd3-interpolate';
-import { AdjustmentFilter, ConvolutionFilter } from 'pixi-filters';
-import { Tiler, vecScale } from '@rapid-sdk/math';
-
 import { AbstractPixiLayer } from './AbstractPixiLayer.ts';
-import { ImagerySource } from '../lib/ImagerySource.ts';
+import { AdjustmentFilter, ConvolutionFilter } from 'pixi-filters';
+import { interpolateNumber } from 'd3-interpolate';
+import { Tiler, vecScale, WORLD_ZOOM } from '@rapid-sdk/math';
 
+import type { ImagerySource } from '../lib/ImagerySource.ts';
 import type { PixiScene } from './PixiScene.ts';
 import type { Tile, Viewport } from '@rapid-sdk/math';
 
@@ -56,7 +55,7 @@ export class PixiLayerBackgroundTiles extends AbstractPixiLayer {
   /** Convolution filter applied when sharpness > 1 */
   convolutionFilter: ConvolutionFilter | null;
 
-  private _tileMaps: Map<string, Map<string, CachedTile>>;
+  private _tileMaps: Map<ImagerySourceID, Map<TileID, CachedTile>>;
   private _failed: Set<string>;
   private _tiler: Tiler;
 
@@ -80,7 +79,7 @@ export class PixiLayerBackgroundTiles extends AbstractPixiLayer {
       sharpness: 1,
     };
 
-    this._tileMaps = new Map();    // Map<sourceID, Map<TileID, tile>>
+    this._tileMaps = new Map();    // Map<ImagerySourceID, Map<TileID, Tile>>
     this._failed = new Set();      // Set<failed tileURLs>
     this._tiler = new Tiler();
   }
@@ -103,6 +102,7 @@ export class PixiLayerBackgroundTiles extends AbstractPixiLayer {
 
 
   /**
+   * Render all of the base and overlay imagery sources in the current view.
    * @param frame - Integer frame being rendered
    * @param viewport - Pixi viewport to use for rendering
    * @param zoom - Effective zoom level to use for rendering
@@ -112,21 +112,21 @@ export class PixiLayerBackgroundTiles extends AbstractPixiLayer {
     if (!imagery) return;
 
     const groupContainer = this.scene.groups.get('background')!;
+    const showSources = new Map<ImagerySourceID, ImagerySource>();
 
-    // Collect tile sources - baselayer and overlays
-    const showSources = new Map<string, any>();   // Map<sourceID, source>
-
+    // Gather the base ImagerySource
     const base = imagery.baseLayerSource() as ImagerySource | null;
     const baseID = base?.key;   // note: use `key` here - for Wayback it will include the date
     if (base && baseID && baseID !== 'none') {
       showSources.set(baseID, base);
     }
 
+    // Gather the overlay ImagerySources
     for (const overlay of imagery.overlayLayerSources()) {
       showSources.set(overlay.id, overlay);
     }
 
-    // Render each tile source (iterates in insertion order, base then overlays)
+    // Render each imagery source (iterates in insertion order, base then overlays)
     let index = 0;
     for (const [sourceID, source] of showSources) {
       const sourceContainer = this.getSourceContainer(sourceID);
@@ -139,7 +139,7 @@ export class PixiLayerBackgroundTiles extends AbstractPixiLayer {
 
       let tileMap = this._tileMaps.get(sourceID);
       if (!tileMap) {
-        tileMap = new Map();   // Map<TileID, Tile>
+        tileMap = new Map<TileID, CachedTile>();
         this._tileMaps.set(sourceID, tileMap);
       }
 
@@ -149,7 +149,7 @@ export class PixiLayerBackgroundTiles extends AbstractPixiLayer {
 
     // Remove any sourceContainers and data not needed anymore
     // Doing this in 2 passes to avoid affecting `.children` while iterating over it.
-    const toDestroy = new Set<string>();
+    const toDestroy = new Set<ImagerySourceID>();
     for (const sourceContainer of groupContainer.children) {
       const sourceID = sourceContainer.label;
       if (!showSources.has(sourceID)) {
@@ -164,16 +164,23 @@ export class PixiLayerBackgroundTiles extends AbstractPixiLayer {
 
 
   /**
+   * Render a single ImagerySource layer.
    * @param timestamp - Timestamp in milliseconds
    * @param viewport - Pixi viewport to use for rendering
-   * @param source - Imagery source Object
+   * @param source - ImagerySource Object
    * @param sourceContainer - PIXI.Container to render the tiles to
    * @param tileMap - Tiles needed for this tile source
    */
-  renderSource(timestamp: number, viewport: Viewport, source: any, sourceContainer: PIXI.Container, tileMap: Map<string, CachedTile>): void {
+  renderSource(
+    timestamp: number,
+    viewport: Viewport,
+    source: ImagerySource,
+    sourceContainer: PIXI.Container,
+    tileMap: Map<TileID, CachedTile>
+  ): void {
     const context = this.context;
     const textureManager = this.gfx.textureManager!;
-    const osm = context.services.osm as any;
+    const osm = context.services.osm;
     const t = viewport.transform.props;
     const sourceID = source.key;   // note: use `key` here, for Wayback it will include the date
 
@@ -198,8 +205,10 @@ export class PixiLayerBackgroundTiles extends AbstractPixiLayer {
     const log2ts = Math.log2(tileSize);
     const z = t.z - (log2ts - 8);   // adjust zoom for tile sizes not 256px (log2(256) = 8)
 
-    // Apply imagery offset (in pixels) to the source container
-    const offset = vecScale(source.offset, 2 ** z);
+    // Apply imagery offset to the source container.
+    // `source.offset` is in screen pixels at zoom 0, so converting to world
+    // units (z = WORLD_ZOOM) means scaling by `2 ** WORLD_ZOOM`.
+    const offset = vecScale(source.offset, 2 ** WORLD_ZOOM);
     sourceContainer.position.set(offset[0], offset[1]);
 
     // Determine tiles needed to cover the view at the zoom we want,
@@ -310,14 +319,20 @@ export class PixiLayerBackgroundTiles extends AbstractPixiLayer {
         keepTile = (timestamp - tile.timestamp < 3000);  // 3 sec
       }
 
-      if (keepTile) {   // Tile may be visible - update position and scale
-        const [x, y] = viewport.worldToScreen(tile.worldExtent.min);  // left top
-        tile.sprite!.position.set(x, y);
-        const size = tileSize * 2 ** (z - tile.xyz[2]);
+      if (keepTile) {   // Tile may be visible
+        // Update Tile position and scale
+        // Background container draws in world coordinates.
+        const [wx, wy] = tile.worldExtent.min;  // left top, world coords
+        const tileScale = 2 ** (WORLD_ZOOM - tile.xyz[2]);
+        const size = tileSize * tileScale;
+        tile.sprite!.position.set(wx, wy);
         tile.sprite!.width = size;
         tile.sprite!.height = size;
 
+        // Optionally, draw the tile debug grid and text.
+        // Debug container lives on `map-ui` also in world coordinates.
         if (showDebug && debugContainer && !source.props.overlay) {
+
           // Display debug tile info
           if (!tile.debug) {
             tile.debug = new PIXI.Graphics();
@@ -327,6 +342,7 @@ export class PixiLayerBackgroundTiles extends AbstractPixiLayer {
           }
 
           if (!tile.text) {
+            // BitmapText fontSize is fixed at creation.
             tile.text = new PIXI.BitmapText({
               text: tileID,
               style: {
@@ -341,12 +357,17 @@ export class PixiLayerBackgroundTiles extends AbstractPixiLayer {
             debugContainer.addChild(tile.text);
           }
 
-          tile.debug.position.set(x, y - size);         // left, top
-          tile.text.position.set(x + 2, y - size + 2);  // left, top
+          // Need to apply viewport scale the stroke widths and text.
+          // Note that we use the viewport zoom here, not the tile zoom.
+          const viewportScale = 2 ** (WORLD_ZOOM - t.z);
+          const padding = 2 * viewportScale;
+          tile.debug.position.set(wx, wy);                     // left, top
+          tile.text.position.set(wx + padding, wy + padding);  // left, top, padded
+          tile.text.scale.set(viewportScale, viewportScale);
           tile.debug
             .clear()
             .rect(0, 0, size, size)
-            .stroke({ width: 2, color: DEBUGCOLOR });
+            .stroke({ width: 2 * viewportScale, color: DEBUGCOLOR });
         }
 
       } else {   // tile not needed, can destroy it
@@ -427,7 +448,7 @@ export class PixiLayerBackgroundTiles extends AbstractPixiLayer {
 
 
   /**
-   * Gets a PIXI.Container to hold the tiles for the given sourceID, creating one if needed
+   * Gets a PIXI.Container to hold the tiles for the given sourceID, creating one if needed.
    * @param sourceID - the sourceID get a container for
    * @return A PIXI.Container to render tiles into
    */

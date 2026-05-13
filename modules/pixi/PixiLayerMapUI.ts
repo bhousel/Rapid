@@ -1,9 +1,10 @@
 import * as PIXI from 'pixi.js';
-import { geoMetersToLon, vecEqual, type Viewport, type Vec2 } from '@rapid-sdk/math';
-
 import { AbstractPixiLayer } from './AbstractPixiLayer.ts';
 import { DashLine } from './lib/DashLine.ts';
+import { geoMetersToLon, vecEqual, WORLD_ZOOM } from '@rapid-sdk/math';
+
 import type { PixiScene } from './PixiScene.ts';
+import type { Viewport, Vec2 } from '@rapid-sdk/math';
 
 
 /**
@@ -198,9 +199,10 @@ export class PixiLayerMapUI extends AbstractPixiLayer {
 
     const container = this.lasso;
     if (!container) return;
+
     const line = this._lassoLine;
     const fill = this._lassoFill;
-    const data = this._lassoData;
+    const data = this._lassoData;  // lasso coords currently supplied in WGS84 from `LassoBehavior.ts`
 
     if (line && fill && Array.isArray(data) && data.length > 1) {  // should show lasso
       container.visible = true;
@@ -216,20 +218,24 @@ export class PixiLayerMapUI extends AbstractPixiLayer {
         coords.push(start);
       }
 
-      const flatCoords = coords.map(coord => viewport.project(coord)).flat();
+      const flatCoords = coords.map(coord => viewport.wgs84ToWorld(coord)).flat();
+
+      // Convert screen pixel values to world units
+      const scale = 2 ** (WORLD_ZOOM - viewport.transform.z);
 
       // line
       const lineStyle = {
         alpha: 0.7,
         dash: [6, 3],
         width: 1,
+        scale: scale,
         color: 0xffffff
       };
       line.clear();
       new DashLine(this.gfx, line, lineStyle).poly(flatCoords);
 
       // fill
-      const fillStyle = { opacity: 0.5, color: 0xaaaaaa };
+      const fillStyle = { alpha: 0.5, color: 0xaaaaaa };
       fill.clear().poly(flatCoords).fill(fillStyle);
 
     } else {  // no lasso data
@@ -261,18 +267,22 @@ export class PixiLayerMapUI extends AbstractPixiLayer {
 
       const d = this.geolocationData;
       const coord: Vec2 = [d.longitude, d.latitude];
-      const [x, y] = viewport.project(coord);
+      const [x, y] = viewport.wgs84ToWorld(coord);
+
+      // Convert screen pixel values to world units
+      const zoom = viewport.transform.zoom;
+      const scale = 2 ** (WORLD_ZOOM - zoom);
 
       // Calculate the radius of the accuracy aura (convert meters -> pixels)
       const dLon = geoMetersToLon(d.accuracy, coord[1]);  // coord[1] = at this latitude
       const edge: Vec2 = [d.longitude + dLon, d.latitude];
-      const x2 = viewport.project(edge)[0];
-      const r = Math.max(Math.abs(x2 - x), 15);
+      const x2 = viewport.wgs84ToWorld(edge)[0];
+      const r = Math.max(Math.abs(x2 - x), 15) * scale;
       const BLUE = 0xe60ff;
 
       const aura = new PIXI.Graphics()
         .circle(x, y, r)
-        .fill({ color: BLUE, alpha: 0.4 });
+        .fill({ alpha: 0.4, color: BLUE });
       aura.label = 'aura';
       container.addChild(aura);
 
@@ -288,9 +298,9 @@ export class PixiLayerMapUI extends AbstractPixiLayer {
       }
 
       const position = new PIXI.Graphics()
-        .circle(x, y, 6.5)
-        .stroke({ width: 1.5, color: 0xffffff, alpha: 1.0 })
-        .fill({ color: BLUE, alpha: 1.0 });
+        .circle(x, y, 6.5 * scale)
+        .stroke({ alpha: 1.0, width: 1.5 * scale, color: 0xffffff })
+        .fill({ alpha: 1.0, color: BLUE });
       position.label = 'position';
       container.addChild(position);
 
