@@ -275,6 +275,9 @@ export class PixiFeatureLine extends AbstractPixiFeature {
     const map = this.context.systems.map;
     const isWireframe = !!map?.wireframeMode;
     const container = this.container;
+    const style = this._style;
+    const textureManager = this.gfx.textureManager!;
+    const localScale = 2 ** (WORLD_ZOOM - zoom);
 
     const type = this._geom.type;
     const world = this._geom.world;
@@ -297,12 +300,6 @@ export class PixiFeatureLine extends AbstractPixiFeature {
     const origin = world.origin!;
     container.position.set(origin[0], origin[1]);
 
-    const lineMarkers = container.getChildByLabel('lineMarkers');
-    if (lineMarkers) {
-      container.removeChild(lineMarkers);
-      lineMarkers.destroy({ children: true });
-    }
-
     this.visible = true;
     this.stroke!.renderable = true;
 
@@ -312,6 +309,66 @@ export class PixiFeatureLine extends AbstractPixiFeature {
     } else {
       this.lod = 2;
       this.casing!.renderable = true;
+    }
+
+    // Update line markers (oneway arrows, sided markers)
+    const showMarkers = (zoom >= 16);
+    const lineMarkerTextureID = style.lineMarker.image;
+    const sideMarkerTextureID = style.sidedMarker.image;
+    let lineMarkers = container.getChildByLabel('lineMarkers');
+
+    if (showMarkers && (lineMarkerTextureID || sideMarkerTextureID)) {
+      // Create line marker container, if necessary
+      if (!lineMarkers) {
+        lineMarkers = new PIXI.Container();
+        lineMarkers.label = 'lineMarkers';
+        lineMarkers.eventMode = 'none';
+        lineMarkers.sortableChildren = false;
+        container.addChild(lineMarkers);
+      }
+      lineMarkers.removeChildren();
+
+      // Show line markers (e.g. oneway arrows)
+      if (lineMarkerTextureID) {
+        const lineMarkerTexture = textureManager.getTexture('symbol', lineMarkerTextureID) || PIXI.Texture.WHITE;
+        const segments = getLineSegments(points, ONEWAY_SPACING * localScale, false, true);  /* sided = false, limited = true */
+        segments.forEach(segment => {
+          segment.coords.forEach(([x, y]) => {
+            const sprite = new PIXI.Sprite(lineMarkerTexture);
+            sprite.eventMode = 'none';
+            sprite.sortableChildren = false;
+            sprite.anchor.set(0.5, 0.5); // middle, middle
+            sprite.position.set(x, y);
+            sprite.rotation = segment.angle;
+            sprite.scale.set(localScale, localScale);
+            sprite.tint = style.lineMarker.color ?? 0x000000;
+            lineMarkers!.addChild(sprite);
+          });
+        });
+      }
+
+      // Show side markers (e.g. sided triangles)
+      if (sideMarkerTextureID) {
+        const sideMarkerTexture = textureManager.getTexture('symbol', sideMarkerTextureID) || PIXI.Texture.WHITE;
+        const segments = getLineSegments(points, SIDED_SPACING * localScale, true, true);  /* sided = true, limited = true */
+        segments.forEach(segment => {
+          segment.coords.forEach(([x, y]) => {
+            const sprite = new PIXI.Sprite(sideMarkerTexture);
+            sprite.eventMode = 'none';
+            sprite.sortableChildren = false;
+            sprite.anchor.set(0.5, 0.5); // middle, middle
+            sprite.position.set(x, y);
+            sprite.rotation = segment.angle;
+            sprite.scale.set(localScale, localScale);
+            sprite.tint = style.stroke.color ?? 0xcccccc;
+            lineMarkers!.addChild(sprite);
+          });
+        });
+      }
+
+    } else if (lineMarkers) {  // No line markers, remove if it exists
+      container.removeChild(lineMarkers);
+      lineMarkers.destroy({ children: true });
     }
 
     // Buffer around line, used for hit area and halo.

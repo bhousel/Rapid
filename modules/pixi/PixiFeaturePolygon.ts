@@ -581,7 +581,8 @@ if (renderer.type === PIXI.RendererType.CANVAS) {
     const strokes = this.strokes!;
 
     let texture = pattern && textureManager.getPatternTexture(pattern) || PIXI.Texture.WHITE;    // WHITE turns off the texture
-    const textureMatrix = new PIXI.Matrix().rotate(-bearing);  // keep patterns face up
+    // Scale by worldScale so pattern UVs match screen-pixel density (local coords are 1/worldScale of screen pixels)
+    const textureMatrix = new PIXI.Matrix().scale(worldScale, worldScale).rotate(-bearing);  // keep patterns face up
 // bhousel update 5/27/22:
 // I've noticed that we can't use textures from a spritesheet for patterns,
 // and it would be nice to figure out why
