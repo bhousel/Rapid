@@ -251,8 +251,17 @@ export class DashLine {
       }
     }
 
-    // Pixi v8: call `stroke()` after issuing draw instructions
-    this.graphics.stroke(this.strokeStyle);
+    // Pixi v8: call `stroke()` after issuing draw instructions.
+    // For texture mode, clone the matrix so each segment's instruction holds an
+    // independent snapshot.  Without this, all instructions share the same Matrix
+    // instance (Pixi stores styles by shallow reference — see "TODO copy fill style!"
+    // in GraphicsContext.stroke()), so every segment would render with the last
+    // segment's transform.
+    if (this.useTexture) {
+      this.graphics.stroke({ ...this.strokeStyle, matrix: this.strokeStyle.matrix!.clone() });
+    } else {
+      this.graphics.stroke(this.strokeStyle);
+    }
 
     return this;
   }
