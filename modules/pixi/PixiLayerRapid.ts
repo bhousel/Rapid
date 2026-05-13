@@ -351,7 +351,7 @@ export class PixiLayerRapid extends AbstractPixiLayer {
           if (!part.world) continue;  // invalid?
 
           feature = new PixiFeaturePolygon(this, featureID);
-          feature.setCoords(part);
+          feature.geometry = part;
           const area = part.world.extent.area();
           feature.container.zIndex = -area;      // sort by area descending (small things above big things)
 
@@ -395,7 +395,7 @@ export class PixiLayerRapid extends AbstractPixiLayer {
           if (!part.world) continue;  // invalid?
 
           feature = new PixiFeatureLine(this, featureID);
-          feature.setCoords(part);
+          feature.geometry = part;
           feature.parentContainer = parentContainer;
           (feature as any).rapidFeature = true;
           feature.setData(entity.id, entity);

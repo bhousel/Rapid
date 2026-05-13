@@ -184,7 +184,7 @@ export class PixiLayerGeoScribble extends AbstractPixiLayer {
         if (feature.v !== version) {
           feature.v = version;
           feature.label = (d.properties.text as string) || null;
-          feature.setCoords(part);
+          feature.geometry = part;
           feature.setData(dataID, d);
         }
 
@@ -240,7 +240,7 @@ export class PixiLayerGeoScribble extends AbstractPixiLayer {
         if (feature.v !== version) {
           feature.v = version;
           feature.label = (d.properties.text as string) || null;
-          feature.setCoords(part);
+          feature.geometry = part;
           feature.setData(dataID, d);
         }
 

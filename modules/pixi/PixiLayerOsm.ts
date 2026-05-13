@@ -341,7 +341,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
         // If data has changed.. Replace data and parent-child links.
         if (feature.v !== version) {
           feature.v = version;
-          feature.setCoords(part);
+          feature.geometry = part;
           const area = part.world.extent.area();
           feature.container.zIndex = -area;      // sort by area descending (small things above big things)
 
@@ -498,7 +498,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
           // If data has changed.. Replace data and parent-child links.
           if (feature.v !== version) {
             feature.v = version;
-            feature.setCoords(part);
+            feature.geometry = part;
             feature.parentContainer = levelContainer;    // Change layer stacking if necessary
             feature.container.zIndex = zindex;
 

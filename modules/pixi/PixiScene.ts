@@ -138,7 +138,7 @@ export class PixiScene extends EventEmitter {
         this.groups.set(groupID, container);
       }
       // EXPERIMENT: Some groups to render world coordinates directly:
-      if (!['basemap', 'labels'].includes(groupID)) {
+      if (groupID !== 'labels') {
         if (!world.getChildByLabel(groupID)) {
           world.addChild(container);
         }

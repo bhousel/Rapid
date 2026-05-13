@@ -243,7 +243,7 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
         if (feature.v !== version) {
           feature.v = version;
           feature.label = l10n.displayName(d.properties as Record<string, string>);
-          feature.setCoords(part);
+          feature.geometry = part;
           feature.setData(dataID, d);
         }
 
@@ -300,7 +300,7 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
         if (feature.v !== version) {
           feature.v = version;
           feature.label = l10n.displayName(d.properties as Record<string, string>);
-          feature.setCoords(part);
+          feature.geometry = part;
           feature.setData(dataID, d);
         }
 
