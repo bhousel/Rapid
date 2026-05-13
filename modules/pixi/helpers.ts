@@ -312,15 +312,20 @@ export function lineToPoly(flatPoints: number[], lineStyle: LineStyle = {}): Lin
  *   d --- c        { coords: [<,<,<,<], angle: PI    }]
  * ```
  *
- * @param   points    - Array of [x,y] coordinates that make up the line.
- * @param   spacing   - Distance between segments in pixels (arrows, sided arrows, etc)
- * @param   isSided   - If applying a 'sided' style to the line, arrows will be drawn perpendicular to the line segments.
- * @param   isLimited - Whether to limit the number (temporary, see below)
+ * @param   points      - Array of [x,y] coordinates that make up the line.
+ * @param   spacing     - Distance between segments (in the same units as `points`)
+ * @param   isSided     - If applying a 'sided' style to the line, arrows will be drawn perpendicular to the line segments.
+ * @param   isLimited   - Whether to limit the number (temporary, see below)
+ * @param   sidedOffset - Perpendicular offset used for sided markers (in the same units as `points`). Default 7.
  * @return  Array of segment Objects in the format { coords: Array<Vec2>, angle: number }
  */
-export function getLineSegments(points: Vec2[], spacing: number, isSided: boolean = false, isLimited: boolean = false): LineSegment[] {
-  const SIDEDOFFSET = 7;
-
+export function getLineSegments(
+  points: Vec2[],
+  spacing: number,
+  isSided: boolean = false,
+  isLimited: boolean = false,
+  sidedOffset: number = 7
+): LineSegment[] {
   let offset = spacing;
   let a: Vec2 | undefined;
 
@@ -331,15 +336,26 @@ export function getLineSegments(points: Vec2[], spacing: number, isSided: boolea
 
       if (span >= 0) {
         const heading = vecAngle(a, b);
-        const dx = spacing * Math.cos(heading);
-        const dy = spacing * Math.sin(heading);
+
+        // temporary, see https://github.com/facebook/Rapid/issues/544
+        // If we would generate more than 100 markers on this segment, widen the spacing
+        // so exactly 100 fit instead.  Use a segment-local variable so the adjusted
+        // spacing doesn't bleed into subsequent point-pairs on the same line.
+        // Note: when the condition holds, span/100 >= spacing > 0 (no risk of zero-step).
+        let segSpacing = spacing;
+        if (isLimited && (span >= spacing * 100)) {
+          segSpacing = span / 100;
+        }
+
+        const dx = segSpacing * Math.cos(heading);
+        const dy = segSpacing * Math.sin(heading);
 
         let sided_dx = 0;
         let sided_dy = 0;
         // For 'sided' segments, we want to offset the arrows so that they are not centered on the line segment's path
         if (isSided) {
-          sided_dx = SIDEDOFFSET * Math.cos(heading + Math.PI / 2);
-          sided_dy = SIDEDOFFSET * Math.sin(heading + Math.PI / 2);
+          sided_dx = sidedOffset * Math.cos(heading + Math.PI / 2);
+          sided_dy = sidedOffset * Math.sin(heading + Math.PI / 2);
         }
 
         let p: Vec2 = [
@@ -347,19 +363,10 @@ export function getLineSegments(points: Vec2[], spacing: number, isSided: boolea
           a[1] + offset * Math.sin(heading) + sided_dy
         ];
 
-        // generate coordinates between `a` and `b`, spaced `spacing` apart
+        // generate coordinates between `a` and `b`, spaced `segSpacing` apart
         const coords: Vec2[] = [a, p];
 
-// temporary, see https://github.com/facebook/Rapid/issues/544
-// If we are going to generate more than 100 line segments,
-// cap it at 100 so we're not adding thousands of oneway arrows.
-if (isLimited && (span >= spacing * 100)) {
-  const newSpacing = Math.floor(span / 100);
-  // console.log(`skipped calculating ${Math.floor(span / spacing) - 100} segments.`);
-  spacing = newSpacing;
-}
-
-        for (span -= spacing; span >= 0; span -= spacing) {
+        for (span -= segSpacing; span >= 0; span -= segSpacing) {
           p = vecAdd(p, [dx, dy]);
           coords.push(p);
         }

@@ -394,8 +394,11 @@ export class PixiLayerOsm extends AbstractPixiLayer {
 
           if (poiFeature.v !== version) {
             poiFeature.v = version;
-            const source = { type: 'Point', world: { coords: part.world.poi } };
-            poiFeature.geometry = source as any;
+
+            const poiGeometry = new GeometryPart(context);
+            const coord = viewport.worldToWgs84(part.world.poi);
+            poiGeometry.setData({ type: 'Point', coordinates: coord });
+            poiFeature.geometry = poiGeometry;
             poiFeature.setData(entityID, entity);
           }
 

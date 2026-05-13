@@ -350,7 +350,7 @@ export class PixiFeatureLine extends AbstractPixiFeature {
       // Show side markers (e.g. sided triangles)
       if (sideMarkerTextureID) {
         const sideMarkerTexture = textureManager.getTexture('symbol', sideMarkerTextureID) || PIXI.Texture.WHITE;
-        const segments = getLineSegments(points, SIDED_SPACING * localScale, true, true);  /* sided = true, limited = true */
+        const segments = getLineSegments(points, SIDED_SPACING * localScale, true, true, 7 * localScale);  /* sided = true, limited = true */
         segments.forEach(segment => {
           segment.coords.forEach(([x, y]) => {
             const sprite = new PIXI.Sprite(sideMarkerTexture);

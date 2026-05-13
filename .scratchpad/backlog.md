@@ -7,6 +7,12 @@ Items planned but not yet started.
 - Once textures work again, store dash-pattern textures in an atlas (one slot per `dash.toString() + width + scale` cache key). Avoids per-line texture swaps and reduces draw-call count for dashed renders (halos, lasso, casing dashes).
 - Also fix the existing `_getTexture` cache key, which only keys on `dash.toString()` — it should include width and scale (or be regenerated alongside the atlas migration).
 
+## Line marker placement (oneway arrows, sided markers)
+- Today `getLineSegments` regenerates marker positions per-frame in the feature's update path, with an arbitrary 100-marker cap (`Rapid#544`) to keep long lines from spawning thousands of sprites.
+- Better approach (mirrors the label system): compute marker placement once in stable world coordinates, store as a list of `{worldCoord, angle}` records on the feature, and emit sprites only for the subset whose world position intersects the viewport. The cap goes away naturally — a 100km road only emits sprites for the ~few-dozen markers actually on screen.
+- Spacing should be expressed in world units derived from a target screen-px spacing at a reference zoom, so density stays visually consistent.
+- Sprite lifecycle would mirror PixiLayerLabels' RBush+renderObjects pattern: reuse sprites, destroy when scrolled offscreen, repopulate when scrolled back in.
+
 ## Deferred styling work
 - Move PixiLayerRapid's hardcoded styles into the style asset file (colors are currently dynamic from `dataset.color`)
 - Have PixiLayerRapid call `styleMatch()` with a dataset/scope ID
