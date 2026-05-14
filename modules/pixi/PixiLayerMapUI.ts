@@ -71,8 +71,9 @@ export class PixiLayerMapUI extends AbstractPixiLayer {
 
     const groupContainer = this.scene.groups.get('ui')!;
 
-    // Remove any existing containers
-    for (const child of groupContainer.children) {
+    // Remove any existing containers.
+    // Note: iterate over a snapshot - `removeChild` splices `children` mid-iteration.
+    for (const child of [...groupContainer.children]) {
       groupContainer.removeChild(child);
       child.destroy({ children: true });  // recursive
     }

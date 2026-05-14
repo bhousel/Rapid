@@ -56,7 +56,7 @@ const dashLineOptionsDefault: ResolvedDashLineOptions = {
   color: 0xffffff,
   alpha: 1,
   scale: 1,
-  useTexture: false, //true,
+  useTexture: true,
   alignment: 0.5
 };
 
@@ -84,6 +84,15 @@ export class DashLine {
   useTexture: boolean;
   /** The texture used for texture-based dashing */
   activeTexture: PIXI.Texture | null;
+  /**
+   * Pixel dimensions of `activeTexture`. The dash content covers the full texture
+   * (drawn into a `dashSize × width` region then scaled up via `ctx.scale`), but
+   * the texture itself is padded to `nextPow2` so WebGL1 can use REPEAT wrap. The
+   * per-segment matrix in `lineTo()` uses these to compensate, so one full texture
+   * cycle maps to exactly `dashSize * userScale` local units regardless of padding.
+   */
+  texW: number;
+  texH: number;
   /** Stroke style configuration */
   strokeStyle: PIXI.StrokeStyle;
 
@@ -111,17 +120,25 @@ export class DashLine {
 
     if (this.useTexture) {
       this.activeTexture = this._getTexture(resolvedOptions, this.dashSize);
+      this.texW = this.activeTexture?.source.width ?? this.dashSize;
+      this.texH = this.activeTexture?.source.height ?? Math.ceil(resolvedOptions.width);
       this.strokeStyle = {
         alignment: resolvedOptions.alignment,
         alpha: resolvedOptions.alpha,
         color: resolvedOptions.color,
         matrix: new PIXI.Matrix(),
         texture: this.activeTexture!,
+        // 'global' here doesn't mean worldTransform — it just tells Pixi to normalize
+        // UV by texture.source.width/height (per-pixel), rather than stretching the
+        // texture to fit each stroked shape's bounding box (which 'local' does, and
+        // which would make dash length depend on segment length).
         textureSpace: 'global',
         width: resolvedOptions.width * resolvedOptions.scale
       };
     } else {
       this.activeTexture = null;
+      this.texW = 0;
+      this.texH = 0;
       this.strokeStyle = {
         alignment: resolvedOptions.alignment,
         alpha: resolvedOptions.alpha,
@@ -177,14 +194,24 @@ export class DashLine {
         this.graphics.lineTo(x, y);
       }
 
-      // set texture matrix
+      // Set texture matrix. The matrix maps texture-pixel coords → local coords;
+      // Pixi inverts it and normalizes by texture.source.{width,height} (because
+      // textureSpace is 'global'). The texture is pow2-padded but content fills
+      // the full canvas, so we compensate per-axis: one full texW must cover
+      // `dashSize * userScale` local units along the line, and one full texH must
+      // cover `width * userScale` perpendicular.
+      //
+      // Composition order matters: scale BEFORE rotate so the texture-x axis ends
+      // up parallel to the line direction. (Rotate-then-non-uniform-scale would
+      // tilt the texture axes off the line direction.)
       const m = this.strokeStyle.matrix!;
       m.identity();
+      m.scale(
+        this.dashSize * this.scale / this.texW,
+        this.options.width * this.scale / this.texH
+      );
       if (angle) {
         m.rotate(angle);
-      }
-      if (this.scale !== 1) {
-        m.scale(this.scale, this.scale);
       }
       const textureStart = -this.lineLength!;
       m.translate(
@@ -462,7 +489,12 @@ export class DashLine {
       return dashTextureCache[key];
     }
 
-    // For WebGL1 support, this canvas should have power of 2 dimensions.
+    // Pow2 padding is required for WebGL1 REPEAT wrap. The dash pattern is drawn
+    // into a `dashSize × width` region then scaled up via `ctx.scale` to fill the
+    // full pow2 canvas, so the content occupies the entire texture (no blank
+    // padding pixels). The per-segment matrix in `lineTo()` compensates for the
+    // pow2 dimensions so that one full texture cycle maps to exactly
+    // `dashSize * userScale` local units, regardless of padding.
     const canvas = document.createElement('canvas');
     const drawWidth = dashSize;
     const drawHeight = Math.ceil(options.width);

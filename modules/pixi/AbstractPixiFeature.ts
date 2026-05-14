@@ -148,7 +148,7 @@ export class AbstractPixiFeature {
     this.context = null!;
 
     if (this.halo) {
-      this.halo.destroy();
+      this.halo.destroy({ children: true });
       this.halo = null;
     }
 

@@ -6,6 +6,7 @@ import { WORLD_ZOOM } from '@rapid-sdk/math';
 
 import type { AbstractPixiLayer } from './AbstractPixiLayer.ts';
 import type { DashLineOptions } from './lib/DashLine.ts';
+import type { PixiLayerMapUI } from './PixiLayerMapUI.ts';
 import type { Viewport, Vec2 } from '@rapid-sdk/math';
 
 /* Intersection type that includes both Pixi Stroke and DashLineOptions  */
@@ -163,7 +164,7 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
     // Scale down even more at lower zooms.
     const baseScale = (zoom < 17 || wireframeMode) ? 0.8 : 1.0;
     if (this._geom) {   // GeometryPart path
-      const worldScale = 2 ** (viewport.transform.z - WORLD_ZOOM) || 1;
+      const worldScale = 2 ** (zoom - WORLD_ZOOM) || 1;
       container.scale.set(baseScale / worldScale, baseScale / worldScale);
     } else {
       container.scale.set(baseScale, baseScale);
@@ -400,6 +401,7 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
       }
       return;
     }
+
     const showHover = (this.visible && this._classes.has('hover'));
     const showSelect = (this.visible && this._classes.has('select') && !(this as any).virtual);
     const showHighlight = (this.visible && this._classes.has('highlight'));
@@ -425,21 +427,33 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
 
     // Select
     if (showSelect) {
+      const mapui = this.scene.layers.get('map-ui') as PixiLayerMapUI;
+      const haloParent = mapui.halo;
+      if (!haloParent) return;
+
       if (!this.halo) {
         this.halo = new PIXI.Graphics();
         this.halo.label = `${this.id}-halo`;
-        const haloContainer = (this.scene as any).layers.get('map-ui').halo;
-        haloContainer.addChild(this.halo);
+        this.halo.eventMode = 'none';
+        haloParent.addChild(this.halo);
+      } else if (this.halo.parent !== haloParent) {
+        this.halo.parent?.removeChild(this.halo);
+        haloParent.addChild(this.halo);
       }
 
-      // Convert screen pixel values to world units
-      const scale = 2 ** (WORLD_ZOOM - zoom);
+      // Have the halo transform mimic the container transform.
+      // This means that the halo is drawn in _screen_ coordinates.
+      this.halo.position = this.container.position;
+      this.halo.rotation = this.container.rotation;
+      this.halo.scale = this.container.scale;
 
-      const HALO_STYLE: StrokeStyleWithDash & { scale: number } = {
+      // The halo Graphics has scale = container.scale (1/worldScale), and its parent
+      // chain includes the world container (worldScale), so the net scale is 1 — halo-local
+      // units are screen pixels. DashLine scale defaults to 1 (screen-pixel coords).
+      const HALO_STYLE: StrokeStyleWithDash = {
         alpha: 0.9,
         dash: [6, 3],
         width: 2,
-        scale: scale,
         color: 0xffff00
       };
 
@@ -447,14 +461,12 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
 
       const shape = this.container.hitArea;
       const dl = new DashLine(this.gfx, this.halo as PIXI.Graphics, HALO_STYLE);
-      if (shape instanceof PIXI.Circle) {
-        dl.circle(shape.x * scale, shape.y * scale, shape.radius * scale, 20);
-      } else if (shape instanceof PIXI.Rectangle) {
-        dl.rect(shape.x * scale, shape.y * scale, shape.width * scale, shape.height * scale);
-      }
 
-      this.halo.position = this.container.position;
-      this.halo.rotation = this.container.rotation;
+      if (shape instanceof PIXI.Circle) {
+        dl.circle(shape.x, shape.y, shape.radius, 20);
+      } else if (shape instanceof PIXI.Rectangle) {
+        dl.rect(shape.x, shape.y, shape.width, shape.height);
+      }
 
     } else {
       if (this.halo) {

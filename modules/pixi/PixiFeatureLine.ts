@@ -7,6 +7,7 @@ import { WORLD_ZOOM } from '@rapid-sdk/math';
 
 import type { AbstractPixiLayer } from './AbstractPixiLayer.ts';
 import type { DashLineOptions } from './lib/DashLine.ts';
+import type { PixiLayerMapUI } from './PixiLayerMapUI.ts';
 import type { Viewport, Vec2 } from '@rapid-sdk/math';
 
 const ONEWAY_SPACING = 35;
@@ -575,7 +576,7 @@ export class PixiFeatureLine extends AbstractPixiFeature {
     const showSelect = (this.visible && this._classes.has('select'));
     const showHighlight = (this.visible && this._classes.has('highlight'));
 
-    // Hover/highlight glow — same as legacy
+    // Hover
     if (showHover) {
       if (!this.container.filters) {
         const glow = new GlowFilter({ distance: 15, outerStrength: 3, color: 0xffff00 });
@@ -594,37 +595,39 @@ export class PixiFeatureLine extends AbstractPixiFeature {
       }
     }
 
-    // Select dashed outline
+    // Select
     if (showSelect && this._bufferdata) {
-      const haloContainer = (this.scene as any).layers.get('map-ui').halo;
+      const mapui = this.scene.layers.get('map-ui') as PixiLayerMapUI;
+      const haloParent = mapui.halo;
+      if (!haloParent) return;
+
       if (!this.halo) {
         this.halo = new PIXI.Graphics();
         this.halo.label = `${this.id}-halo`;
         this.halo.eventMode = 'none';
-        haloContainer.addChild(this.halo);
-      } else if (this.halo.parent !== haloContainer) {
+        haloParent.addChild(this.halo);
+      } else if (this.halo.parent !== haloParent) {
         this.halo.parent?.removeChild(this.halo);
-        haloContainer.addChild(this.halo);
+        haloParent.addChild(this.halo);
       }
 
-      // `_bufferdata` was built from `local.coords` (origin-relative). Mirror the
-      // feature container's transform onto the halo so the polys align under
-      // `map-ui.halo` (which sits at world origin).
-      this.halo.position.copyFrom(this.container.position);
+      // Have the halo transform mimic the container transform.
+      // This means that the halo is drawn in _world_ coordinates.
+      this.halo.position = this.container.position;
       this.halo.rotation = this.container.rotation;
+      this.halo.scale = this.container.scale;
 
-      // Convert screen pixel values to world units
-      const scale = 2 ** (WORLD_ZOOM - zoom);
-
+      const localScale = 2 ** (WORLD_ZOOM - zoom);
       const HALO_STYLE: StrokeStyleWithDash = {
         alpha: 0.9,
         dash: [6, 3],
         width: 2,
-        scale: scale,
+        scale: localScale,
         color: 0xffff00
       };
 
       (this.halo as PIXI.Graphics).clear();
+
       const dl = new DashLine(this.gfx, this.halo as PIXI.Graphics, HALO_STYLE);
       if (this._bufferdata.outer && this._bufferdata.inner) {   // closed line
         dl.poly(this._bufferdata.outer);

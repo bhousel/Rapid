@@ -7,6 +7,7 @@ import { WORLD_ZOOM, vecEqual, vecLength } from '@rapid-sdk/math';
 
 import type { AbstractPixiLayer } from './AbstractPixiLayer.ts';
 import type { DashLineOptions } from './lib/DashLine.ts';
+import type { PixiLayerMapUI } from './PixiLayerMapUI.ts';
 import type { Viewport, Vec2 } from '@rapid-sdk/math';
 
 const PARTIALFILLWIDTH = 32;
@@ -859,7 +860,7 @@ if (renderer.type === PIXI.RendererType.CANVAS) {
     const showSelect = (this.visible && this._classes.has('select'));
     const showHighlight = (this.visible && this._classes.has('highlight'));
 
-    // Hover/highlight glow — same as legacy
+    // Hover
     if (showHover) {
       if (!this.container.filters) {
         const glow = new GlowFilter({ distance: 15, outerStrength: 3, color: 0xffff00 });
@@ -878,17 +879,27 @@ if (renderer.type === PIXI.RendererType.CANVAS) {
       }
     }
 
-    // Select dashed outline (in world-local space, parented to the feature container)
+    // Select
     if (showSelect && this._bufferdata) {
+      const mapui = this.scene.layers.get('map-ui') as PixiLayerMapUI;
+      const haloParent = mapui.halo;
+      if (!haloParent) return;
+
       if (!this.halo) {
         this.halo = new PIXI.Graphics();
         this.halo.label = `${this.id}-halo`;
         (this.halo as PIXI.Graphics).eventMode = 'none';
-        this.container.addChild(this.halo);
+        haloParent.addChild(this.halo);
       } else if (this.halo.parent !== this.container) {
         this.halo.parent?.removeChild(this.halo);
-        this.container.addChild(this.halo);
+        haloParent.addChild(this.halo);
       }
+
+      // Have the halo transform mimic the container transform.
+      // This means that the halo is drawn in _world_ coordinates.
+      this.halo.position = this.container.position;
+      this.halo.rotation = this.container.rotation;
+      this.halo.scale = this.container.scale;
 
       const localScale = 2 ** (WORLD_ZOOM - zoom);
       const HALO_STYLE: StrokeStyleWithDash = {
@@ -899,9 +910,9 @@ if (renderer.type === PIXI.RendererType.CANVAS) {
         color: 0xffff00
       };
 
-      const haloGraphics = this.halo as PIXI.Graphics;
-      haloGraphics.clear();
-      const dl = new DashLine(this.gfx, haloGraphics, HALO_STYLE);
+      (this.halo as PIXI.Graphics).clear();
+
+      const dl = new DashLine(this.gfx, this.halo as PIXI.Graphics, HALO_STYLE);
       if (this._bufferdata.outer) {
         dl.poly(this._bufferdata.outer);
       }
@@ -957,10 +968,16 @@ if (renderer.type === PIXI.RendererType.CANVAS) {
 
     // Select
     if (showSelect) {
+      const mapui = this.scene.layers.get('map-ui') as PixiLayerMapUI;
+      const haloContainer = mapui.halo;
+      if (!haloContainer) return;
+
       if (!this.halo) {
         this.halo = new PIXI.Graphics();
         this.halo.label = `${this.id}-halo`;
-        const haloContainer = (this.scene.layers.get('map-ui') as any).halo;
+        haloContainer.addChild(this.halo);
+      } else if (this.halo.parent !== haloContainer) {
+        this.halo.parent?.removeChild(this.halo);
         haloContainer.addChild(this.halo);
       }
 
