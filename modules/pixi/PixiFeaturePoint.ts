@@ -7,7 +7,7 @@ import { WORLD_ZOOM } from '@rapid-sdk/math';
 import type { AbstractPixiLayer } from './AbstractPixiLayer.ts';
 import type { DashLineOptions } from './lib/DashLine.ts';
 import type { PixiLayerMapUI } from './PixiLayerMapUI.ts';
-import type { Viewport, Vec2 } from '@rapid-sdk/math';
+import type { Viewport } from '@rapid-sdk/math';
 
 /* Intersection type that includes both Pixi Stroke and DashLineOptions  */
 type StrokeStyleWithDash = PIXI.StrokeStyle & DashLineOptions;
@@ -16,8 +16,6 @@ type StrokeStyleWithDash = PIXI.StrokeStyle & DashLineOptions;
 /**
  *
  * Properties you can access:
- *   `style`       Object containing styling data
- *   `container`   PIXI.Container containing the display objects used to draw the point
  *   `marker`      PIXI.Sprite for the marker
  *   `icon`        PIXI.Sprite for the icon
  *   `viewfields`  PIXI.Container containing the viewfields (or null if none)
@@ -38,6 +36,7 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
   private _viewfieldName: string | null;
   /** Set true to use a circular halo and hit area */
   private _isCircular: boolean;
+
 
   /**
    * @constructor
@@ -99,29 +98,31 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
   update(viewport: Viewport): void {
     if (!this.dirty) return;  // nothing to do
 
-    this.updateGeometry(viewport);
+    this.updateGeometry();
     this.updateStyle(viewport);
     this.updateHitArea();
-    this.updateHalo(viewport);
+    this.updateHalo();
   }
 
 
   /**
    * @param viewport - Pixi viewport to use for rendering
    */
-  updateGeometry(viewport: Viewport): void {
-    if (!this.geom.dirty) return;
+  updateGeometry(): void {
+    if (!this._geomDirty) return;
 
-    let origin: Vec2 | undefined;
-    if (this._geom) {  // GeometryPart path
-      origin = this._geom.world?.origin;
-    } else {           // PixiGeometryParth path
-      this.geom.update(viewport);
-      origin = this.geom.screen?.coords as Vec2 | undefined;
+    const type = this._geom?.type;
+    const world = this._geom?.world;
+    const origin = world?.origin;
+
+    // Not a Point, or no GeometryPart data?
+    if (type !== 'Point' || !world || !origin) {
+      this.lod = 0;
+      this.visible = false;
+      this._geomDirty = false;
+      return;
     }
-    this.geom.dirty = false;
 
-    if (!origin) return;
     const [x, y] = origin;
     this.container.position.set(x, y);
 
@@ -129,6 +130,7 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
     // sort markers with viewfields above markers without viewfields
     const z = y;  // use y coord as the z-index
     this.container.zIndex = (this._viewfieldCount > 0) ? (z + 1000) : z;
+    this._geomDirty = false;
   }
 
 
@@ -390,9 +392,8 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
 
   /**
    * Show/Hide halo (requires `this.container.hitArea` to be already set up by `updateHitArea` as a supported shape)
-   * @param viewport - Pixi viewport to use for rendering
    */
-  updateHalo(viewport: Viewport): void {
+  updateHalo(): void {
     const showHover = (this.visible && this._classes.has('hover'));
     const showSelect = (this.visible && this._classes.has('select') && !(this as any).virtual);
     const showHighlight = (this.visible && this._classes.has('highlight'));
@@ -432,7 +433,7 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
         haloParent.addChild(this.halo);
       }
 
-      // Have the halo transform mimic the container transform.
+      // Make the halo transform mimic the container transform.
       // The container is scaled so that children are drawn in _screen_ coordinates.
       // This means that the halo is drawn in _screen_ coordinates.
       this.halo.position = this.container.position;

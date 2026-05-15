@@ -31,7 +31,6 @@ Rapid uses Pixi.js for hardware-accelerated 2D rendering. The rendering is organ
 | `PixiFeatureLine.ts` | Renders line features (roads, paths, etc.) |
 | `PixiFeaturePoint.ts` | Renders point features (POIs, nodes, etc.) |
 | `PixiFeaturePolygon.ts` | Renders polygon features (buildings, areas, etc.) |
-| `PixiGeometryPart.ts` | Renders individual geometry parts |
 
 ### Layers
 

@@ -1,6 +1,5 @@
 import * as PIXI from 'pixi.js';
 import { merge as deepMerge } from 'lodash-es';
-import { PixiGeometryPart } from './PixiGeometryPart.ts';
 import { styleDefaults } from '../lib/Style.ts';
 
 import type { AbstractPixiLayer } from './AbstractPixiLayer.ts';
@@ -27,7 +26,7 @@ export interface FeatureContainer extends PIXI.Container {
  *   `type`                 String describing what kind of Feature this is ('Point', 'LineString', 'Polygon')
  *   `container`            PIXI.Container() that contains all the graphics needed to draw the Feature
  *   `parentContainer`      PIXI.Container() for the parent - this Feature's container will be added to it.
- *   `geom`                 PixiGeometryPart() class containing all the information about the geometry
+ *   `geom`                 GeometryPart() class containing all the information about the geometry
  *   `style`                Object containing style info
  *   `label`                String containing the Feature's label (if any)
  *   `data`                 Data bound to this Feature (like `__data__` from the D3.js days)
@@ -58,13 +57,13 @@ export class AbstractPixiFeature {
   lod: number;
   /** A PIXI.Container that contains the graphics for the Feature's halo (if it has one) */
   halo: PIXI.Container | null;
-  /** PixiGeometryPart containing all the information about the geometry */
-  geom: PixiGeometryPart;
 
   /** Whether the Feature is allowed to be interactive */
   protected _allowInteraction: boolean;
-  /** PixiGeometryPart containing all the information about the geometry */
+  /** GeometryPart containing all the information about the geometry */
   protected _geom: GeometryPart | null;
+  /** Whether the geometry needs to be recalculated */
+  protected _geomDirty: boolean;
   /** Style object (contents depends on the Feature type) */
   protected _style: MinimalStyleProps;
   /** Whether the style needs to be reapplied */
@@ -109,8 +108,8 @@ export class AbstractPixiFeature {
     this.lod = 2;   // full detail
     this.halo = null;
 
-    this.geom = new PixiGeometryPart(this.context);
     this._geom = null;
+    this._geomDirty = true;
     this._style = deepMerge({}, styleDefaults);
     this._styleDirty = true;
     this._label = null;
@@ -152,8 +151,6 @@ export class AbstractPixiFeature {
       this.halo = null;
     }
 
-    this.geom.destroy();
-    this.geom = null!;
     this._geom = null;
     this._style = null!;
     this._label = null;
@@ -164,18 +161,16 @@ export class AbstractPixiFeature {
 
 
   /**
-   * Every Feature should have an `update()` function that redraws the Feature at the given viewport and zoom.
+   * Every Feature should have an `update()` function that redraws the Feature using the given viewport.
    * When the Feature is updated, its `dirty` flags should be set to `false`.
-   * Override in a subclass with needed logic. It will be passed:
+   * Override in a subclass with needed logic.
    * @param viewport - Pixi viewport to use for rendering
    * @abstract
    */
   update(viewport: Viewport): void {
-    if (!this.dirty) return;  // nothing to do
-
-    this.geom.update(viewport);
+    if (!this.dirty) return;   // nothing to do
+    this._geomDirty = false;
     this._styleDirty = false;
-    // The labeling code will decide what to do with the `_labelDirty` flag
   }
 
 
@@ -245,10 +240,10 @@ export class AbstractPixiFeature {
    */
   get dirty(): boolean {
     // The labeling code will decide what to do with the `_labelDirty` flag
-    return this.geom.dirty || this._styleDirty;
+    return this._geomDirty || this._styleDirty;
   }
   set dirty(val: boolean) {
-    this.geom.dirty = val;
+    this._geomDirty = val;
     this._styleDirty = val;
     this._labelDirty = val;
   }
@@ -283,16 +278,18 @@ export class AbstractPixiFeature {
     this._styleDirty = true;
   }
 
-
   /**
    * @param val - a GeometryPart to render
    */
+  get geom(): GeometryPart | null {
+    return this._geom;
+  }
   get geometry(): GeometryPart | null {
     return this._geom;
   }
   set geometry(val: GeometryPart) {
     this._geom = val;
-    this.geom.dirty = true;
+    this._geomDirty = true;
   }
 
 
@@ -387,14 +384,6 @@ export class AbstractPixiFeature {
     this._data = data;
     this.layer.bindData(this.id, dataID);
     this.dirty = true;
-  }
-
-  /**
-   * This sets the coordinate data to be rendered.
-   * @param source - A GeometryPart, or something that can be turned into one.
-   */
-  setCoords(source: GeometryPart | GeoJSON.Geometry): void {
-    this.geom.setData(source);
   }
 
   /**

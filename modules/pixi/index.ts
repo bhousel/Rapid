@@ -9,7 +9,6 @@ export { PixiEvents } from './PixiEvents.ts';
 export { PixiFeatureLine } from './PixiFeatureLine.ts';
 export { PixiFeaturePoint } from './PixiFeaturePoint.ts';
 export { PixiFeaturePolygon } from './PixiFeaturePolygon.ts';
-export { PixiGeometryPart } from './PixiGeometryPart.ts';
 export { PixiScene } from './PixiScene.ts';
 export { PixiTextures } from './PixiTextures.ts';
 

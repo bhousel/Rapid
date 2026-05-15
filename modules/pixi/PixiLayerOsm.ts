@@ -4,7 +4,7 @@ import { GeometryPart } from '../lib/GeometryPart.ts';
 import { PixiFeatureLine } from './PixiFeatureLine.ts';
 import { PixiFeaturePoint } from './PixiFeaturePoint.ts';
 import { PixiFeaturePolygon } from './PixiFeaturePolygon.ts';
-import { vecAngle, vecLength, vecInterp } from '@rapid-sdk/math';
+import { vecAngle, vecLength, vecInterp, WORLD_ZOOM } from '@rapid-sdk/math';
 
 import type { MatchedStyle } from '../core/StyleSystem.ts';
 import type { OsmEntity, OsmNode, OsmRelationMember, OsmTags } from '../data/types.ts';
@@ -234,20 +234,15 @@ export class PixiLayerOsm extends AbstractPixiLayer {
       const entity = graph.hasEntity(dataID);
       if (entity?.type === 'node') continue;  // ways, relations only
 
-      const renderedFeatureIDs = this._dataHasFeature.get(dataID) ?? new Set();
-      let tooSmall = false;
-      for (const featureID of renderedFeatureIDs) {
-        const geom = this.features.get(featureID)?.geom;
-        if (!geom || geom.type === 'Point') continue;  // lines, polygons only (i.e. ignore virtual poi if any)
-        const screen = geom.screen;
-        const w = screen?.width ?? 0;
-        const h = screen?.height ?? 0;
-        if (w < 25 && h < 25) {
-          tooSmall = true;
-          break;
-        }
-      }
-      if (tooSmall) {
+      const extent = entity?.geoms?.world?.extent;
+      if (!extent) continue;
+
+      // Determine dimensions in screen pixels
+      const worldScale = 2 ** (viewZoom - WORLD_ZOOM) || 1;
+      const w = Math.abs(extent.max[0] - extent.min[0]) * worldScale;
+      const h = Math.abs(extent.max[1] - extent.min[1]) * worldScale;
+
+      if (w < 25 && h < 25) {   // too small, skip this
         dataIDs.delete(dataID);
       }
     }
