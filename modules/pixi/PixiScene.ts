@@ -172,15 +172,14 @@ export class PixiScene extends EventEmitter {
    *
    * @param frame - Integer frame being rendered
    * @param viewport - Pixi viewport to use for rendering
-   * @param zoom - Effective zoom level to use for rendering
    */
-  render(frame: number, viewport: Viewport, zoom: number): void {
+  render(frame: number, viewport: Viewport): void {
     // Groups that live under `world` render in world coordinates;
     // the `world` container (set up in `GraphicsSystem._app`) provides the position
     // and scale that maps world coords -> screen coords. Group containers themselves
     // need no extra transform.
     for (const layer of this.layers.values()) {
-      layer.render(frame, viewport, zoom);
+      layer.render(frame, viewport);
       layer.cull(frame);
     }
   }

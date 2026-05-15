@@ -95,23 +95,21 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
 
   /**
    * @param viewport - Pixi viewport to use for rendering
-   * @param zoom - Effective zoom to use for rendering
    */
-  update(viewport: Viewport, zoom: number): void {
+  update(viewport: Viewport): void {
     if (!this.dirty) return;  // nothing to do
 
-    this.updateGeometry(viewport, zoom);
-    this.updateStyle(viewport, zoom);
+    this.updateGeometry(viewport);
+    this.updateStyle(viewport);
     this.updateHitArea();
-    this.updateHalo(zoom);
+    this.updateHalo(viewport);
   }
 
 
   /**
    * @param viewport - Pixi viewport to use for rendering
-   * @param zoom - Effective zoom to use for rendering
    */
-  updateGeometry(viewport: Viewport, _zoom: number): void {
+  updateGeometry(viewport: Viewport): void {
     if (!this.geom.dirty) return;
 
     let origin: Vec2 | undefined;
@@ -136,13 +134,14 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
 
   /**
    * @param viewport - Pixi viewport to use for rendering
-   * @param zoom - Effective zoom to use for rendering
    */
-  updateStyle(viewport: Viewport, zoom: number): void {
+  updateStyle(viewport: Viewport): void {
     if (!this._styleDirty) return;
 
     const context = this.context;
-    const map = context.systems.map!;
+    const map = context.systems.map;
+    const viewZoom = viewport.transform.zoom;
+    const styleZoom = map?.effectiveZoom() ?? viewZoom;
     const wireframeMode = map?.wireframeMode;
     const textureManager = this.gfx.textureManager!;
     const style = this._style;
@@ -162,9 +161,9 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
 
     // If we are rendering world coordinates, apply counter-scale to get children back to screen coords.
     // Scale down even more at lower zooms.
-    const baseScale = (zoom < 17 || wireframeMode) ? 0.8 : 1.0;
+    const baseScale = (styleZoom < 17 || wireframeMode) ? 0.8 : 1.0;
     if (this._geom) {   // GeometryPart path
-      const worldScale = 2 ** (zoom - WORLD_ZOOM) || 1;
+      const worldScale = 2 ** (viewZoom - WORLD_ZOOM) || 1;
       container.scale.set(baseScale / worldScale, baseScale / worldScale);
     } else {
       container.scale.set(baseScale, baseScale);
@@ -304,11 +303,11 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
     // Apply effectiveZoom style adjustments
     // This is where we adjust the actual texture and anchor properties
     //
-    if (zoom < 16) {  // Hide container and everything under it
+    if (styleZoom < 16) {  // Hide container and everything under it
       this.lod = 0;   // off
       this.visible = false;
 
-    } else if (zoom < 17 || wireframeMode) {  // Markers drawn but smaller
+    } else if (styleZoom < 17 || wireframeMode) {  // Markers drawn but smaller
       this.lod = 1;  // simplified
       this.visible = true;
       if (this.viewfields) {
@@ -391,17 +390,9 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
 
   /**
    * Show/Hide halo (requires `this.container.hitArea` to be already set up by `updateHitArea` as a supported shape)
-   * @param zoom - Effective zoom to use for rendering. Omit to destroy the halo without redrawing.
+   * @param viewport - Pixi viewport to use for rendering
    */
-  updateHalo(zoom?: number): void {
-    if (zoom === undefined) {
-      if (this.halo) {
-        this.halo.destroy();
-        this.halo = null;
-      }
-      return;
-    }
-
+  updateHalo(viewport: Viewport): void {
     const showHover = (this.visible && this._classes.has('hover'));
     const showSelect = (this.visible && this._classes.has('select') && !(this as any).virtual);
     const showHighlight = (this.visible && this._classes.has('highlight'));
@@ -442,14 +433,12 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
       }
 
       // Have the halo transform mimic the container transform.
+      // The container is scaled so that children are drawn in _screen_ coordinates.
       // This means that the halo is drawn in _screen_ coordinates.
       this.halo.position = this.container.position;
       this.halo.rotation = this.container.rotation;
       this.halo.scale = this.container.scale;
 
-      // The halo Graphics has scale = container.scale (1/worldScale), and its parent
-      // chain includes the world container (worldScale), so the net scale is 1 — halo-local
-      // units are screen pixels. DashLine scale defaults to 1 (screen-pixel coords).
       const HALO_STYLE: StrokeStyleWithDash = {
         alpha: 0.9,
         dash: [6, 3],

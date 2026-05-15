@@ -98,15 +98,16 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
    * Render the GeoJSONData custom data
    * @param frame - Integer frame being rendered
    * @param viewport - Pixi viewport to use for rendering
-   * @param zoom - Effective zoom level to use for rendering
    */
-  render(frame: number, viewport: Viewport, zoom: number): void {
+  render(frame: number, viewport: Viewport): void {
     if (!this.enabled || !(this.hasData())) return;
 
     const vtService = this.context.services.vectortile as any;
+    const viewZoom = viewport.transform.zoom;
+
     let geoData: GeoJSONData[];
     if (this._template && vtService) {   // fetch data from vector tile service
-      if (zoom >= 13) {  // avoid firing off too many API requests
+      if (viewZoom >= 13) {  // avoid firing off too many API requests
         vtService.loadTiles(this._template);
       }
       geoData = vtService.getData(this._template);
@@ -119,14 +120,14 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
     const lines = geoData.filter(d => d.geoms.parts.some(part => part.type === 'LineString'));
     const points = geoData.filter(d => d.geoms.parts.some(part => part.type === 'Point'));
 
-    this.renderPolygons(frame, viewport, zoom, polygons);
-    this.renderLines(frame, viewport, zoom, lines);
-    this.renderPoints(frame, viewport, zoom, points);
+    this.renderPolygons(frame, viewport, polygons);
+    this.renderLines(frame, viewport, lines);
+    this.renderPoints(frame, viewport, points);
 
 //    // Now render any extras, like gridlines in square bounding boxes or arbitrary WKT polygons/multipolys.
 //    const gridLines = this.createGridLines(lines);
 //    const gridStyle = { stroke: { width: 0.5, color: 0x0ffff, opacity: 0.5, cap: 'round' }} as LineStyle;
-//    this.renderGridLines(frame, viewport, zoom, gridLines, gridStyle);
+//    this.renderGridLines(frame, viewport, gridLines, gridStyle);
   }
 
 //
@@ -201,10 +202,9 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
   /**
    * @param frame - Integer frame being rendered
    * @param viewport - Pixi viewport to use for rendering
-   * @param zoom - Effective zoom to use for rendering
    * @param polygons - Array of polygon data
    */
-  renderPolygons(frame: number, viewport: Viewport, zoom: number, polygons: GeoJSONData[]): void {
+  renderPolygons(frame: number, viewport: Viewport, polygons: GeoJSONData[]): void {
     const l10n = this.context.systems.l10n!;
     const parentContainer = this.scene.groups.get('basemap')!;
 
@@ -248,7 +248,7 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
         }
 
         this.syncFeatureClasses(feature);
-        feature.update(viewport, zoom);
+        feature.update(viewport);
         this.retainFeature(feature, frame);
       }
     }
@@ -258,11 +258,10 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
   /**
    * @param frame - Integer frame being rendered
    * @param viewport - Pixi viewport to use for rendering
-   * @param zoom - Effective zoom to use for rendering
    * @param lines - Array of line data
    * @param styleOverride - Custom style
    */
-  renderLines(frame: number, viewport: Viewport, zoom: number, lines: GeoJSONData[], styleOverride?: Partial<MatchedStyle>): void {
+  renderLines(frame: number, viewport: Viewport, lines: GeoJSONData[], styleOverride?: Partial<MatchedStyle>): void {
     const l10n = this.context.systems.l10n!;
     const parentContainer = this.scene.groups.get('basemap')!;
 
@@ -305,7 +304,7 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
         }
 
         this.syncFeatureClasses(feature);
-        feature.update(viewport, zoom);
+        feature.update(viewport);
         this.retainFeature(feature, frame);
       }
     }
@@ -317,11 +316,10 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
 //   * Render grid lines from raw GeoJSONData features (not wrapped GeoJSONData class instances)
 //   * @param frame - Integer frame being rendered
 //   * @param viewport - Pixi viewport to use for rendering
-//   * @param zoom - Effective zoom to use for rendering
 //   * @param features - Array of GeoJSONData Feature objects
 //   * @param lineStyle - The line style to use
 //   */
-//  renderGridLines(frame: number, viewport: Viewport, zoom: number, features: GeoJSON.Feature[], lineStyle: LineStyle): void {
+//  renderGridLines(frame: number, viewport: Viewport, features: GeoJSON.Feature[], lineStyle: LineStyle): void {
 //    const parentContainer = this.scene.groups.get('basemap')!;
 //
 //    for (const d of features) {
@@ -348,7 +346,7 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
 //      (feature as any).setCoords({ world: geometry.coordinates });
 //
 //      this.syncFeatureClasses(feature);
-//      feature.update(viewport, zoom);
+//      feature.update(viewport);
 //      this.retainFeature(feature, frame);
 //    }
 //  }
@@ -357,10 +355,9 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
   /**
    * @param frame - Integer frame being rendered
    * @param viewport - Pixi viewport to use for rendering
-   * @param zoom - Effective zoom to use for rendering
    * @param points - Array of point data
    */
-  renderPoints(frame: number, viewport: Viewport, zoom: number, points: GeoJSONData[]): void {
+  renderPoints(frame: number, viewport: Viewport, points: GeoJSONData[]): void {
     const l10n = this.context.systems.l10n!;
     const parentContainer = this.scene.groups.get('points')!;
 
@@ -404,7 +401,7 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
         }
 
         this.syncFeatureClasses(feature);
-        feature.update(viewport, zoom);
+        feature.update(viewport);
         this.retainFeature(feature, frame);
       }
     }

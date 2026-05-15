@@ -61,9 +61,8 @@ export class PixiLayerRapidOverlay extends AbstractPixiLayer {
    * Render the GeoJSON custom data
    * @param  frame    -  Integer frame being rendered
    * @param  viewport -  Pixi viewport to use for rendering
-   * @param  zoom     -  Effective zoom level to use for rendering
    */
-  render(frame: number, viewport: Viewport, zoom: number): void {
+  render(frame: number, viewport: Viewport): void {
 return; // not yet
     if (!this.enabled || !(this.hasData())) return;
 
@@ -71,6 +70,7 @@ return; // not yet
     const rapid = this.context.systems.rapid!;
     const datasets = rapid.datasets;
     const parentContainer = this.overlaysContainer!;
+    const viewZoom = viewport.transform.zoom;
 
     // Extremely inefficient but we're not drawing anything else at this zoom
     parentContainer.removeChildren();
@@ -80,12 +80,12 @@ return; // not yet
         const customColor = new PIXI.Color(dataset.color);
         const overlay = dataset.overlay as any;  // this code is dead (see return above), overlay type may change
         if (vtService) {
-          if ((zoom >= overlay.minZoom ) && (zoom <= overlay.maxZoom)) {  // avoid firing off too many API requests
+          if ((viewZoom >= overlay.minZoom ) && (viewZoom <= overlay.maxZoom)) {  // avoid firing off too many API requests
             vtService!.loadTiles(overlay.url);
           }
           const overlayData = vtService!.getData(overlay.url).map((d: any) => d.geojson);
           const points = overlayData.filter((d: any) => d.geometry.type === 'Point' || d.geometry.type === 'MultiPoint');
-          this.renderPoints(frame, viewport, zoom, points, customColor);
+          this.renderPoints(frame, viewport, points, customColor);
         }
       }
     }
@@ -95,11 +95,10 @@ return; // not yet
   /**
    * @param  frame    -  Integer frame being rendered
    * @param  viewport -  Pixi viewport to use for rendering
-   * @param  zoom     -  Effective zoom level to use for rendering
    * @param  points   -  Array of feature data
    * @param  color    -  The color to use
    */
-  renderPoints(frame: number, viewport: Viewport, zoom: number, points: any[], color: PIXI.Color): void {
+  renderPoints(frame: number, viewport: Viewport, points: any[], color: PIXI.Color): void {
     const parentContainer = this.overlaysContainer!;
     for (const d of points) {
       const coords = (d.geometry.type === 'Point') ? [d.geometry.coordinates]

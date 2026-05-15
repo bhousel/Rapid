@@ -49,21 +49,20 @@ export class PixiLayerEditBlocks extends AbstractPixiLayer {
    * Render any edit blocking polygons that are visible in the viewport
    * @param frame - Integer frame being rendered
    * @param viewport - Pixi viewport to use for rendering
-   * @param _zoom - Effective zoom level (unused, we use real zoom from context viewport)
    */
-  render(frame: number, viewport: Viewport, _zoom: number): void {
+  render(frame: number, viewport: Viewport): void {
     const context = this.context;
     const l10n = context.systems.l10n;
     const locations = context.systems.locations;
     const mapViewport = context.viewport;  // context viewport !== pixi viewport (they are offset)
-    const zoom = mapViewport.transform.zoom;   // use real zoom for this, not "effective" zoom
+    const viewZoom = mapViewport.transform.zoom;
 
     if (!locations) return;   // Need a LocationSystem for this to work.
 
     let blocks: GeoJSONData[] = [];
-    if (zoom >= MINZOOM) {
+    if (viewZoom >= MINZOOM) {
       blocks = locations.getBlocks(mapViewport.visibleExtent());
-      this.renderEditBlocks(frame, viewport, zoom, blocks);
+      this.renderEditBlocks(frame, viewport, blocks);
     }
 
     // setup the explanation
@@ -96,10 +95,9 @@ export class PixiLayerEditBlocks extends AbstractPixiLayer {
   /**
    * @param frame - Integer frame being rendered
    * @param viewport - Pixi viewport to use for rendering
-   * @param zoom - Effective zoom to use for rendering
    * @param blocks - Array of block data visible in the view
    */
-  renderEditBlocks(frame: number, viewport: Viewport, zoom: number, blocks: GeoJSONData[]): void {
+  renderEditBlocks(frame: number, viewport: Viewport, blocks: GeoJSONData[]): void {
     const parentContainer = this.scene.groups.get('blocks')!;
     if (!parentContainer) return;
 
@@ -130,7 +128,7 @@ export class PixiLayerEditBlocks extends AbstractPixiLayer {
         }
 
         // this.syncFeatureClasses(feature);
-        feature.update(viewport, zoom);
+        feature.update(viewport);
         this.retainFeature(feature, frame);
       }
     }

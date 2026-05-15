@@ -68,9 +68,8 @@ export class PixiLayerOsmNotes extends AbstractPixiLayer {
   /**
    * @param  frame    -  Integer frame being rendered
    * @param  viewport -  Pixi viewport to use for rendering
-   * @param  zoom     -  Effective zoom level to use for rendering
    */
-  renderMarkers(frame: number, viewport: Viewport, zoom: number): void {
+  renderMarkers(frame: number, viewport: Viewport): void {
     const osm = this.context.services.osm;
     if (!osm?.started) return;
 
@@ -122,7 +121,7 @@ export class PixiLayerOsmNotes extends AbstractPixiLayer {
         feature.style = style;
       }
 
-      feature.update(viewport, zoom);
+      feature.update(viewport);
       this.retainFeature(feature, frame);
     }
   }
@@ -132,14 +131,14 @@ export class PixiLayerOsmNotes extends AbstractPixiLayer {
    * Render any data we have, and schedule fetching more of it to cover the view
    * @param  frame    -  Integer frame being rendered
    * @param  viewport -  Pixi viewport to use for rendering
-   * @param  zoom     -  Effective zoom level to use for rendering
    */
-  render(frame: number, viewport: Viewport, zoom: number): void {
+  render(frame: number, viewport: Viewport): void {
     const osm = this.context.services.osm;
-    if (!this.enabled || !osm?.started || zoom < MINZOOM) return;
+    const viewZoom = viewport.transform.zoom;
+    if (!this.enabled || !osm?.started || viewZoom < MINZOOM) return;
 
     osm.loadNotes();
-    this.renderMarkers(frame, viewport, zoom);
+    this.renderMarkers(frame, viewport);
   }
 
 }

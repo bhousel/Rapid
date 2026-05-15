@@ -1,11 +1,6 @@
 import { selection } from 'd3-selection';
-import {
-  DEG2RAD, RAD2DEG, TAU, Extent, geoMetersToLon,
-  numClamp, numWrap, vecRotate, vecSubtract,
-  WORLD_HALF, WORLD_ZOOM
-} from '@rapid-sdk/math';
-
 import { AbstractSystem } from './AbstractSystem.ts';
+import { DEG2RAD, RAD2DEG, TAU, Extent, numClamp, numWrap, vecRotate, vecSubtract, WORLD_HALF, WORLD_ZOOM } from '@rapid-sdk/math';
 import { MarkerData } from '../data/MarkerData.ts';
 import { utilTotalExtent } from '../util/util.ts';
 
@@ -797,9 +792,9 @@ export class MapSystem extends AbstractSystem {
     const viewport = this.context.viewport;
     const lat = viewport.centerLoc()[1];
     const z = viewport.transform.zoom;
-    const atLatitude = geoMetersToLon(1, lat);
-    const atEquator = geoMetersToLon(1, 0);
-    const extraZoom = Math.log(atLatitude / atEquator) / Math.LN2;
+    // geoMetersToLon(1, lat) ∝ 1/cos(lat), so the ratio to equator (cos=1) is just sec(lat).
+    // extraZoom = log2(1 / cos(lat)) = -log2(cos(lat))
+    const extraZoom = -Math.log2(Math.cos(lat * DEG2RAD));
     return Math.min(z + extraZoom, MAX_Z);
   }
 

@@ -96,9 +96,8 @@ export class PixiLayerGeoScribble extends AbstractPixiLayer {
    * Render the geojson custom data
    * @param frame - Integer frame being rendered
    * @param viewport - Pixi viewport to use for rendering
-   * @param zoom - Effective zoom level to use for rendering
    */
-  render(frame: number, viewport: Viewport, zoom: number): void {
+  render(frame: number, viewport: Viewport): void {
     if (!this.enabled) return;
 
     const service = this.context.services.geoscribble;
@@ -112,8 +111,8 @@ export class PixiLayerGeoScribble extends AbstractPixiLayer {
     const lines = geoData.filter(d => d.geoms.parts.some(part => part.type === 'LineString'));
     const points = geoData.filter(d => d.geoms.parts.some(part => part.type === 'Point'));
 
-    this.renderLines(frame, viewport, zoom, lines);
-    this.renderPoints(frame, viewport, zoom, points);
+    this.renderLines(frame, viewport, lines);
+    this.renderPoints(frame, viewport, points);
   }
 
 
@@ -148,10 +147,9 @@ export class PixiLayerGeoScribble extends AbstractPixiLayer {
   /**
    * @param frame - Integer frame being rendered
    * @param viewport - Pixi viewport to use for rendering
-   * @param zoom - Effective zoom to use for rendering
    * @param lines - Array of line data
    */
-  renderLines(frame: number, viewport: Viewport, zoom: number, lines: GeoJSONData[]): void {
+  renderLines(frame: number, viewport: Viewport, lines: GeoJSONData[]): void {
     const parentContainer = this.scribblesContainer;
 
     for (const d of lines) {
@@ -189,7 +187,7 @@ export class PixiLayerGeoScribble extends AbstractPixiLayer {
         }
 
         this.syncFeatureClasses(feature);
-        feature.update(viewport, zoom);
+        feature.update(viewport);
         this.retainFeature(feature, frame);
       }
     }
@@ -199,10 +197,9 @@ export class PixiLayerGeoScribble extends AbstractPixiLayer {
   /**
    * @param frame - Integer frame being rendered
    * @param viewport - Pixi viewport to use for rendering
-   * @param zoom - Effective zoom to use for rendering
    * @param points - Array of point data
    */
-  renderPoints(frame: number, viewport: Viewport, zoom: number, points: GeoJSONData[]): void {
+  renderPoints(frame: number, viewport: Viewport, points: GeoJSONData[]): void {
     const parentContainer = this.scribblesContainer;
 
     const pointStyle: Partial<MatchedStyle> = {
@@ -245,7 +242,7 @@ export class PixiLayerGeoScribble extends AbstractPixiLayer {
         }
 
         this.syncFeatureClasses(feature);
-        feature.update(viewport, zoom);
+        feature.update(viewport);
         this.retainFeature(feature, frame);
       }
     }

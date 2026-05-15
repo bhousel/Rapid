@@ -41,9 +41,8 @@ export class PixiLayerDebug extends AbstractPixiLayer {
    * Render any data we have for this layer
    * @param frame - Integer frame being rendered
    * @param viewport - Pixi viewport to use for rendering
-   * @param zoom - Effective zoom level to use for rendering
    */
-  render(frame: number, viewport: Viewport, zoom: number): void {
+  render(frame: number, viewport: Viewport): void {
     if (!this.enabled) return;
 
     function _isBuilding(entity: OsmEntity): boolean {
@@ -116,7 +115,7 @@ export class PixiLayerDebug extends AbstractPixiLayer {
 
         if (bboxFeature) {
           // this.syncFeatureClasses(feature);
-          bboxFeature.update(viewport, zoom);
+          bboxFeature.update(viewport);
           this.retainFeature(bboxFeature, frame);
         }
 
@@ -140,7 +139,7 @@ export class PixiLayerDebug extends AbstractPixiLayer {
           }
 
           // this.syncFeatureClasses(poifeature);
-          poiFeature.update(viewport, zoom);
+          poiFeature.update(viewport);
           this.retainFeature(poiFeature, frame);
         }
       }

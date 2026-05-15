@@ -168,10 +168,9 @@ export class AbstractPixiFeature {
    * When the Feature is updated, its `dirty` flags should be set to `false`.
    * Override in a subclass with needed logic. It will be passed:
    * @param viewport - Pixi viewport to use for rendering
-   * @param zoom - Effective zoom to use for rendering
    * @abstract
    */
-  update(viewport: Viewport, zoom: number): void {
+  update(viewport: Viewport): void {
     if (!this.dirty) return;  // nothing to do
 
     this.geom.update(viewport);
@@ -183,10 +182,10 @@ export class AbstractPixiFeature {
   /**
    * Every Feature should have an `updateHalo()` function that redraws any hover or select styling.
    * Override in a subclass with needed logic.
-   * @param zoom - Effective zoom to use for rendering. Omit to signal "hide/destroy the halo only".
+   * @param viewport - Pixi viewport to use for rendering
    * @abstract
    */
-  updateHalo(zoom?: number): void {
+  updateHalo(viewport: Viewport): void {
   }
 
 
@@ -235,7 +234,7 @@ export class AbstractPixiFeature {
   set visible(val: boolean) {
     if (val === this.container.visible) return;  // no change
     this.container.visible = val;
-    this.updateHalo();
+    if (this.halo) this.halo.visible = val;
     this._labelDirty = true;
   }
 

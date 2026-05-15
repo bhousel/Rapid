@@ -180,12 +180,12 @@ export class PixiLayerOsm extends AbstractPixiLayer {
    * Render any data we have, and schedule fetching more of it to cover the view
    * @param frame - Integer frame being rendered
    * @param viewport - Pixi viewport to use for rendering
-   * @param zoom - Effective zoom level to use for rendering
    */
-  render(frame: number, viewport: Viewport, zoom: number): void {
+  render(frame: number, viewport: Viewport): void {
     const context = this.context;
     const osm = context.services.osm;
-    if (!this.enabled || !osm?.started || zoom < MINZOOM) return;
+    const viewZoom = viewport.transform.zoom;
+    if (!this.enabled || !osm?.started || viewZoom < MINZOOM) return;
 
     const editor = context.systems.editor!;
     const filters = context.systems.filters!;
@@ -216,9 +216,9 @@ export class PixiLayerOsm extends AbstractPixiLayer {
       }
     }
 
-    this.renderPolygons(frame, viewport, zoom, data);
-    this.renderLines(frame, viewport, zoom, data);
-    this.renderPoints(frame, viewport, zoom, data);
+    this.renderPolygons(frame, viewport, data);
+    this.renderLines(frame, viewport, data);
+    this.renderPoints(frame, viewport, data);
 
     // At this point, all the visible linear features have been accounted for,
     // and parent-child data links have been established.
@@ -273,10 +273,10 @@ export class PixiLayerOsm extends AbstractPixiLayer {
       this.getSelfAndSiblings(interestingID, related.siblingIDs);
     }
 
-    this.renderVertices(frame, viewport, zoom, data, related);
+    this.renderVertices(frame, viewport, data, related);
 
     if (context.mode?.id === 'select-osm') {
-      this.renderMidpoints(frame, viewport, zoom, data, related);
+      this.renderMidpoints(frame, viewport, data, related);
     }
   }
 
@@ -284,10 +284,9 @@ export class PixiLayerOsm extends AbstractPixiLayer {
   /**
    * @param frame - Integer frame being rendered
    * @param viewport - Pixi viewport to use for rendering
-   * @param zoom - Effective zoom level to use for rendering
    * @param data - Visible OSM data to render, sorted by type
    */
-  renderPolygons(frame: number, viewport: Viewport, zoom: number, data: OsmData): void {
+  renderPolygons(frame: number, viewport: Viewport, data: OsmData): void {
     const context = this.context;
     const graph = context.systems.editor!.staging.graph;
     const filters = context.systems.filters!;
@@ -379,7 +378,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
           }
         }
 
-        feature.update(viewport, zoom);
+        feature.update(viewport);
         this.retainFeature(feature, frame);
 
         // Same as above, but for the virtual POI, if any
@@ -433,7 +432,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
             poiFeature.label = feature.label;
           }
 
-          poiFeature.update(viewport, zoom);
+          poiFeature.update(viewport);
           this.retainFeature(poiFeature, frame);
         }
 
@@ -445,10 +444,9 @@ export class PixiLayerOsm extends AbstractPixiLayer {
   /**
    * @param frame - Integer frame being rendered
    * @param viewport - Pixi viewport to use for rendering
-   * @param zoom - Effective zoom level to use for rendering
    * @param data - Visible OSM data to render, sorted by type
    */
-  renderLines(frame: number, viewport: Viewport, zoom: number, data: OsmData): void {
+  renderLines(frame: number, viewport: Viewport, data: OsmData): void {
     const context = this.context;
     const graph = context.systems.editor!.staging.graph;
     const l10n = context.systems.l10n!;
@@ -561,7 +559,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
             feature.label = l10n.displayName(entity.tags);
           }
 
-          feature.update(viewport, zoom);
+          feature.update(viewport);
           this.retainFeature(feature, frame);
         }
       }
@@ -573,15 +571,18 @@ export class PixiLayerOsm extends AbstractPixiLayer {
   /**
    * @param frame - Integer frame being rendered
    * @param viewport - Pixi viewport to use for rendering
-   * @param zoom - Effective zoom level to use for rendering
    * @param data - Visible OSM data to render, sorted by type
    * @param related - Collections of related OSM IDs
    */
-  renderVertices(frame: number, viewport: Viewport, zoom: number, data: OsmData, related: RelatedIDs): void {
+  renderVertices(frame: number, viewport: Viewport, data: OsmData, related: RelatedIDs): void {
     const context = this.context;
     const graph = context.systems.editor!.staging.graph;
     const l10n = context.systems.l10n!;
+    const map = context.systems.map;
     const styles = context.systems.styles!;
+
+    const viewZoom = viewport.transform.zoom;
+    const styleZoom = map?.effectiveZoom() ?? viewZoom;
 
     // Vertices related to the selection/hover should be drawn above everything
     const mapUiLayer = this.scene.layers.get('map-ui') as PixiLayerMapUI;
@@ -601,7 +602,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
     for (const [nodeID, node] of entities) {
       let parentContainer: PIXI.Container | null = null;
 
-      if (zoom >= 16 && isInterestingVertex(node) ) {  // minor importance
+      if (styleZoom >= 16 && isInterestingVertex(node) ) {  // minor importance
         parentContainer = pointsContainer;
       }
       if (isRelatedVertex(nodeID)) {   // major importance
@@ -666,7 +667,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
         feature.label = l10n.displayName(node.tags);
       }
 
-      feature.update(viewport, zoom);
+      feature.update(viewport);
       this.retainFeature(feature, frame);
     }
   }
@@ -675,10 +676,9 @@ export class PixiLayerOsm extends AbstractPixiLayer {
   /**
    * @param frame - Integer frame being rendered
    * @param viewport - Pixi viewport to use for rendering
-   * @param zoom - Effective zoom level to use for rendering
    * @param data - Visible OSM data to render, sorted by type
    */
-  renderPoints(frame: number, viewport: Viewport, zoom: number, data: OsmData): void {
+  renderPoints(frame: number, viewport: Viewport, data: OsmData): void {
     const context = this.context;
     const graph = context.systems.editor!.staging.graph;
     const l10n = context.systems.l10n!;
@@ -743,7 +743,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
         feature.label = l10n.displayName(node.tags);
       }
 
-      feature.update(viewport, zoom);
+      feature.update(viewport);
       this.retainFeature(feature, frame);
     }
   }
@@ -752,11 +752,10 @@ export class PixiLayerOsm extends AbstractPixiLayer {
   /**
    * @param frame - Integer frame being rendered
    * @param viewport - Pixi viewport to use for rendering
-   * @param zoom - Effective zoom level to use for rendering
    * @param data - Visible OSM data to render, sorted by type
    * @param related - Collections of related OSM IDs
    */
-  renderMidpoints(frame: number, viewport: Viewport, zoom: number, data: OsmData, related: RelatedIDs): void {
+  renderMidpoints(frame: number, viewport: Viewport, data: OsmData, related: RelatedIDs): void {
     const MIN_MIDPOINT_DIST = 40;   // distance in pixels
     const context = this.context;
     const graph = context.systems.editor!.staging.graph;
@@ -865,7 +864,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
       }
 
       this.syncFeatureClasses(feature);
-      feature.update(viewport, zoom);
+      feature.update(viewport);
       this.retainFeature(feature, frame);
     }
   }

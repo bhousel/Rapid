@@ -169,9 +169,8 @@ export class PixiLayerMapUI extends AbstractPixiLayer {
    * Render any of the child containers for UI that should float over the map.
    * @param frame - Integer frame being rendered
    * @param viewport - Pixi viewport to use for rendering
-   * @param zoom - Effective zoom level to use for rendering
    */
-  render(frame: number, viewport: Viewport, zoom: number): void {
+  render(frame: number, viewport: Viewport): void {
     // redraw if zoom changes - note: use true zoom here, not "effective" zoom.
     const z = viewport.transform.zoom;
     if (z !== this._oldz) {
@@ -271,8 +270,8 @@ export class PixiLayerMapUI extends AbstractPixiLayer {
       const [x, y] = viewport.wgs84ToWorld(coord);
 
       // Convert screen pixel values to world units
-      const zoom = viewport.transform.zoom;
-      const scale = 2 ** (WORLD_ZOOM - zoom);
+      const viewZoom = viewport.transform.zoom;
+      const scale = 2 ** (WORLD_ZOOM - viewZoom);
 
       // Calculate the radius of the accuracy aura (convert meters -> pixels)
       const dLon = geoMetersToLon(d.accuracy, coord[1]);  // coord[1] = at this latitude

@@ -158,13 +158,12 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
 
   /**
    * @param viewport - Pixi viewport to use for rendering
-   * @param zoom - Effective zoom to use for rendering
    */
-  update(viewport: Viewport, zoom: number): void {
+  update(viewport: Viewport): void {
     if (!this.dirty) return;  // nothing to do
 
     if (this._geom) {  // GeometryPart path
-      this.updateWorld(viewport, zoom);
+      this.updateWorld(viewport);
       this.geom.dirty = false;
       return;
     }
@@ -515,7 +514,7 @@ if (renderer.type === PIXI.RendererType.CANVAS) {
 
     this._styleDirty = false;
 
-    this.updateHalo(zoom);
+    this.updateHalo(viewport);
   }
 
 
@@ -526,14 +525,14 @@ if (renderer.type === PIXI.RendererType.CANVAS) {
    * `_geom.local.coords` (origin-relative cache) so we don't recompute the
    * subtraction every frame.
    * @param viewport - Pixi viewport to use for rendering
-   * @param zoom - Effective zoom to use for rendering
    */
-  updateWorld(viewport: Viewport, zoom: number): void {
+  updateWorld(viewport: Viewport): void {
     if (!this._geom) return;  // wrong path?
 
     const context = this.context;
     const storage = context.systems.storage;
     const map = context.systems.map;
+    const viewZoom = viewport.transform.zoom;
     const isWireframe = !!map?.wireframeMode;
     const bearing = context.viewport.transform.rotation;
     const textureManager = this.gfx.textureManager!;
@@ -560,8 +559,8 @@ if (renderer.type === PIXI.RendererType.CANVAS) {
 
     // Compute screen-pixel width/height from the local extent.
     // local.extent is in world units; multiply by worldScale to get screen pixels.
-    const worldScale = 2 ** (zoom - WORLD_ZOOM);
-    const localScale = 1 / worldScale;  // = 2^(WORLD_ZOOM - zoom)
+    const worldScale = 2 ** (viewZoom - WORLD_ZOOM);
+    const localScale = 1 / worldScale;  // or, 2^(WORLD_ZOOM - viewZoom)
     const localExt = local.extent;
     const localW = localExt.max[0] - localExt.min[0];
     const localH = localExt.max[1] - localExt.min[1];
@@ -843,7 +842,7 @@ if (renderer.type === PIXI.RendererType.CANVAS) {
 
     this.geom.dirty = false;
     this._styleDirty = false;
-    this.updateWorldHalo(zoom);
+    this.updateWorldHalo(viewport);
   }
 
 
@@ -851,10 +850,11 @@ if (renderer.type === PIXI.RendererType.CANVAS) {
    * World-path halo. Draws the select halo as a child of the feature container
    * so it inherits the same world position/scale as the rest of the feature.
    * Widths and dash patterns are expressed in world-local units.
-   * @param zoom - Effective zoom (used to convert pixel widths to world-local widths)
+   * @param viewport - Pixi viewport to use for rendering
    */
-  updateWorldHalo(zoom: number): void {
+  updateWorldHalo(viewport: Viewport): void {
     const map = this.context.systems.map;
+    const viewZoom = viewport.transform.zoom;
     const wireframeMode = map?.wireframeMode;
     const showHover = (this.visible && this._classes.has('hover'));
     const showSelect = (this.visible && this._classes.has('select'));
@@ -901,7 +901,7 @@ if (renderer.type === PIXI.RendererType.CANVAS) {
       this.halo.rotation = this.container.rotation;
       this.halo.scale = this.container.scale;
 
-      const localScale = 2 ** (WORLD_ZOOM - zoom);
+      const localScale = 2 ** (WORLD_ZOOM - viewZoom);
       const HALO_STYLE: StrokeStyleWithDash = {
         alpha: 0.9,
         dash: [6, 3],
@@ -931,16 +931,9 @@ if (renderer.type === PIXI.RendererType.CANVAS) {
 
   /**
    * Show/Hide halo (expects `this._bufferdata` to be already set up by `update()`)
-   * @param zoom - Effective zoom to use for rendering. Omit to destroy the halo without redrawing.
+   * @param viewport - Pixi viewport to use for rendering
    */
-  updateHalo(zoom?: number): void {
-    if (zoom === undefined) {
-      if (this.halo) {
-        this.halo.destroy();
-        this.halo = null;
-      }
-      return;
-    }
+  updateHalo(viewport: Viewport): void {
     const map = this.context.systems.map;
     const wireframeMode = map?.wireframeMode;
     const showHover = (this.visible && this._classes.has('hover'));
@@ -981,14 +974,10 @@ if (renderer.type === PIXI.RendererType.CANVAS) {
         haloContainer.addChild(this.halo);
       }
 
-      // Convert screen pixel values to world units
-      const scale = 2 ** (WORLD_ZOOM - zoom);
-
       const HALO_STYLE = {
         alpha: 0.9,
         dash: [6, 3],
         width: 2,
-        scale: scale,
         color: 0xffff00
       };
 

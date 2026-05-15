@@ -14,8 +14,11 @@ native z16 world-coordinate rendering (`GeometryPart` / `.geometry = part` API).
 - Groups `points`, `qa`, `streetview`, `basemap`, `blocks`, `debug`, `ui` placed under `world` container in PixiScene.
 - All layer files migrated: KartaPhotos, KeepRight, MapRoulette, MapillaryDetections, MapillaryPhotos, MapillarySigns, OsmNotes, Osmose, StreetsidePhotos, CustomData, Osm, Rapid, EditBlocks, Debug, Labels, MapUI, and remaining.
 - `PixiLayerLabels` fully migrated to world-coord geometry (step 4): label positions computed in world space, rope labels use world-local coords, zoom/rotation invalidation guard kept.
-- DashLine made scale-aware: `scale` option converts local-coord widths/dashes to screen pixels. Line/Polygon halos use `scale: localScale`; Point halos use `useTexture: false` for exact CSS-pixel dash sizes (bypasses `textureSpace: 'global'` matrix complexity).
-- 3066 tests pass, `bun tsc --noEmit` clean, build green.
+- DashLine made scale-aware: `scale` option converts local-coord widths/dashes to screen pixels. Line/Polygon halos use `scale: localScale`; Point halos use default `scale: 1` (container already counter-scaled).
+- Zoom usage clarified: `viewZoom = viewport.transform.zoom` for scale chain math; `styleZoom = map?.effectiveZoom() ?? viewZoom` for LOD/styling thresholds. Every layer and feature file now uses the correct zoom for each purpose.
+- `MapSystem.effectiveZoom()` simplified: replaced redundant `geoMetersToLon(1,lat)/geoMetersToLon(1,0)` ratio with direct `extraZoom = -log2(cos(lat * DEG2RAD))`; `geoMetersToLon` removed from the import.
+- ~~Step 5 halo fixes committed as `ba78d87d2`~~
+- `bun tsc --noEmit` clean.
 
 ### In progress / next steps
 
@@ -23,12 +26,7 @@ native z16 world-coordinate rendering (`GeometryPart` / `.geometry = part` API).
 - ~~Step 2 (polygon partial fill / mask / lowRes / SSR + use local.coords): complete (`f1a5296f3`)~~
 - ~~Step 3 (migrate basemap + remaining setCoords callers): complete (`bdfa56684`)~~
 - ~~Step 4 (PixiLayerLabels world-coord geometry): complete (`b3f5c4417`)~~
-
-**Pending commit — halo fixes (uncommitted)**
-- `PixiLayerMapUI.reset()`: iterate `[...children]` snapshot (live array was being spliced during iteration).
-- `AbstractPixiFeature.destroy()`: `halo.destroy({ children: true })` (children were leaking).
-- `PixiFeatureLine` / `PixiFeaturePolygon` halos: typed `haloParent` access, `scale: localScale` in `HALO_STYLE`.
-- `DashLine.ts`: fix `textureSpace` to `'global'`, store the pow2-padded texture dimensions on the instance (`texW`, `texH`), and use them to non-uniformly scale the per-segment matrix so one full cycle covers exactly `dashSize * userScale` local units along the line and `width * userScale` perpendicular — regardless of pow2 padding, container transform, or segment length. (Pow2 padding kept for WebGL1 REPEAT-wrap support.) Matrix composition reordered to scale-then-rotate (non-uniform scale requires this to keep the texture-x axis aligned with the line direction).
+- ~~Halo dash fixes + zoom type cleanup: complete (`ba78d87d2`)~~
 
 **Step 5 — Delete PixiGeometryPart (the payoff)**
 - Remove `PixiGeometryPart`, `geom` field from `AbstractPixiFeature`, all `setCoords` callers and `geom.screen.*` reads.
@@ -39,4 +37,5 @@ native z16 world-coordinate rendering (`GeometryPart` / `.geometry = part` API).
 - `_geom` (GeometryPart) is the new path; `geom` (PixiGeometryPart) is the legacy path. Branch on `if (this._geom)` in feature `update()` methods.
 - `container.position` is set to `world.origin` (extent center in z16 world coords). All vertex drawing is origin-relative (small local numbers).
 - `viewport` param in `updateWorld()` is currently unused — left for signature symmetry with legacy path; will drop in Step 5.
+- **Zoom naming convention**: `viewZoom = viewport.transform.zoom` (scale math); `styleZoom = map?.effectiveZoom() ?? viewZoom` (LOD/styling). `PixiFeaturePolygon` has no LOD thresholds, so it uses only `viewZoom` — that's intentional.
 

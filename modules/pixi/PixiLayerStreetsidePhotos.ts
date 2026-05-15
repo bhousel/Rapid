@@ -191,9 +191,8 @@ export class PixiLayerStreetsidePhotos extends AbstractPixiLayer {
   /**
    * @param frame - Integer frame being rendered
    * @param viewport - Pixi viewport to use for rendering
-   * @param zoom - Effective zoom level to use for rendering
    */
-  renderMarkers(frame: number, viewport: Viewport, zoom: number): void {
+  renderMarkers(frame: number, viewport: Viewport): void {
     const streetside = this.context.services.streetside;
     if (!streetside?.started) return;
 
@@ -233,7 +232,7 @@ export class PixiLayerStreetsidePhotos extends AbstractPixiLayer {
       }
 
       this.syncFeatureClasses(feature);
-      feature.update(viewport, zoom);
+      feature.update(viewport);
       this.retainFeature(feature, frame);
     }
 
@@ -290,7 +289,7 @@ export class PixiLayerStreetsidePhotos extends AbstractPixiLayer {
         feature.style = style;
       }
 
-      feature.update(viewport, zoom);
+      feature.update(viewport);
       this.retainFeature(feature, frame);
     }
   }
@@ -300,14 +299,14 @@ export class PixiLayerStreetsidePhotos extends AbstractPixiLayer {
    * Render any data we have, and schedule fetching more of it to cover the view
    * @param frame - Integer frame being rendered
    * @param viewport - Pixi viewport to use for rendering
-   * @param zoom - Effective zoom level to use for rendering
    */
-  render(frame: number, viewport: Viewport, zoom: number): void {
+  render(frame: number, viewport: Viewport): void {
     const streetside = this.context.services.streetside;
-    if (!this.enabled || !streetside?.started || zoom < MINZOOM) return;
+    const viewZoom = viewport.transform.zoom;
+    if (!this.enabled || !streetside?.started || viewZoom < MINZOOM) return;
 
     streetside.loadTiles();
-    this.renderMarkers(frame, viewport, zoom);
+    this.renderMarkers(frame, viewport);
   }
 
 }

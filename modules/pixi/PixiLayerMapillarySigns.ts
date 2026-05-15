@@ -93,9 +93,8 @@ export class PixiLayerMapillarySigns extends AbstractPixiLayer {
   /**
    * @param  frame     Integer frame being rendered
    * @param  viewport  Pixi viewport to use for rendering
-   * @param  zoom      Effective zoom to use for rendering
    */
-  renderMarkers(frame: number, viewport: Viewport, zoom: number): void {
+  renderMarkers(frame: number, viewport: Viewport): void {
     const context = this.context;
     const mapillary = context.services.mapillary;
     if (!mapillary?.started) return;
@@ -140,7 +139,7 @@ export class PixiLayerMapillarySigns extends AbstractPixiLayer {
       }
 
       this.syncFeatureClasses(feature);
-      feature.update(viewport, zoom);
+      feature.update(viewport);
       this.retainFeature(feature, frame);
     }
   }
@@ -150,14 +149,14 @@ export class PixiLayerMapillarySigns extends AbstractPixiLayer {
    * Render any data we have, and schedule fetching more of it to cover the view
    * @param  frame    -  Integer frame being rendered
    * @param  viewport -  Pixi viewport to use for rendering
-   * @param  zoom     -  Effective zoom level to use for rendering
    */
-  render(frame: number, viewport: Viewport, zoom: number): void {
+  render(frame: number, viewport: Viewport): void {
     const mapillary = this.context.services.mapillary;
-    if (!this.enabled || !mapillary?.started || zoom < MINZOOM) return;
+    const viewZoom = viewport.transform.zoom;
+    if (!this.enabled || !mapillary?.started || viewZoom < MINZOOM) return;
 
     mapillary.loadTiles('signs');
-    this.renderMarkers(frame, viewport, zoom);
+    this.renderMarkers(frame, viewport);
   }
 
 }

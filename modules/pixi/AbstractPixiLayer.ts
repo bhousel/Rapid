@@ -153,10 +153,9 @@ export class AbstractPixiLayer {
    * Override in a subclass with needed logic. It will be passed:
    * @param frame - Integer frame being rendered
    * @param viewport - Pixi viewport to use for rendering
-   * @param zoom - Effective zoom to use for rendering
    * @abstract
    */
-  render(frame?: number, viewport?: Viewport, zoom?: number): void {
+  render(frame?: number, viewport?: Viewport): void {
   }
 
 

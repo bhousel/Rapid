@@ -69,11 +69,11 @@ export class PixiLayerOsmose extends AbstractPixiLayer {
    * Render any data we have, and schedule fetching more of it to cover the view
    * @param  frame    -  Integer frame being rendered
    * @param  viewport -  Pixi viewport to use for rendering
-   * @param  zoom     -  Effective zoom level to use for rendering
    */
-  render(frame: number, viewport: Viewport, zoom: number): void {
+  render(frame: number, viewport: Viewport): void {
     const osmose = this.context.services.osmose;
-    if (!this.enabled || !osmose?.started || zoom < MINZOOM) return;
+    const viewZoom = viewport.transform.zoom;
+    if (!this.enabled || !osmose?.started || viewZoom < MINZOOM) return;
 
     // Fetch new data, if needed..
     osmose.loadTiles();
@@ -104,7 +104,7 @@ export class PixiLayerOsmose extends AbstractPixiLayer {
       }
 
       this.syncFeatureClasses(feature);
-      feature.update(viewport, zoom);
+      feature.update(viewport);
       if (!(feature as any)._isCircular) {  // offset the icon to fit better in the "osmose" pin
         feature.icon?.position.set(0, -17);
       }

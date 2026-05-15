@@ -86,19 +86,20 @@ export class PixiFeatureLine extends AbstractPixiFeature {
 
   /**
    * @param viewport - Pixi viewport to use for rendering
-   * @param zoom - Effective zoom to use for rendering
    */
-  update(viewport: Viewport, zoom: number): void {
+  update(viewport: Viewport): void {
     if (!this.dirty) return;  // nothing to do
 
     if (this._geom) {  // GeometryPart path
-      this.updateWorld(viewport, zoom);
+      this.updateWorld(viewport);
       this.geom.dirty = false;
       return;
     }
     // else PixiGeometryPart path...
 
     const map = this.context.systems.map;
+    const viewZoom = viewport.transform.zoom;
+    const styleZoom = map?.effectiveZoom() ?? viewZoom;
     const isWireframe = !!map?.wireframeMode;
     const textureManager = this.gfx.textureManager!;
     const container = this.container;
@@ -123,7 +124,6 @@ export class PixiFeatureLine extends AbstractPixiFeature {
       screen = geom.screen;
       if (!screen) return;  // can't render anything without screen coords
 
-      // Apply effectiveZoom style adjustments
       let showMarkers: boolean;
 
       // Cull really tiny shapes
@@ -138,7 +138,7 @@ export class PixiFeatureLine extends AbstractPixiFeature {
         this.visible = true;
         this.stroke!.renderable = true;
 
-        if (zoom < 16) {
+        if (styleZoom < 16) {
           this.lod = 1;  // simplified
           this.casing!.renderable = false;
           showMarkers = false;
@@ -219,10 +219,10 @@ export class PixiFeatureLine extends AbstractPixiFeature {
         const minwidth = 3;
         let width = style.casing.width ?? 5;
 
-        // Apply effectiveZoom style adjustments
-        if (zoom < 16) {
+        // Narrow at lower zooms
+        if (styleZoom < 16) {
           width -= 4;
-        } else if (zoom < 17) {
+        } else if (styleZoom < 17) {
           width -= 2;
         }
         if (width < minwidth) {
@@ -253,32 +253,33 @@ export class PixiFeatureLine extends AbstractPixiFeature {
 
 
     if (this.casing!.renderable) {
-      this.updateGraphic('casing', this.casing!, screen!.coords as Vec2[], zoom, isWireframe);
+      this.updateGraphic('casing', this.casing!, screen!.coords as Vec2[], styleZoom, isWireframe);
     }
     if (this.stroke!.renderable) {
-      this.updateGraphic('stroke', this.stroke!, screen!.coords as Vec2[], zoom, isWireframe);
+      this.updateGraphic('stroke', this.stroke!, screen!.coords as Vec2[], styleZoom, isWireframe);
     }
 
-    this.updateHalo();
+    this.updateHalo(viewport);
   }
 
 
   /**
    * Line update path that draws from world coordinates (WORLD_ZOOM=16).
-   * The feature's container sits inside a group with scale `2^(zoom - WORLD_ZOOM)`, so vertex
+   * The feature's container sits inside a group with scale `2^(viewZoom - WORLD_ZOOM)`, so vertex
    * coordinates in world space map directly to screen pixels without per-frame reprojection.
    * @param viewport - Pixi viewport to use for rendering
-   * @param zoom - Effective zoom to use for rendering
    */
-  updateWorld(viewport: Viewport, zoom: number): void {
+  updateWorld(viewport: Viewport): void {
     if (!this._geom) return;  // wrong path?
 
     const map = this.context.systems.map;
+    const viewZoom = viewport.transform.zoom;
+    const styleZoom = map?.effectiveZoom() ?? viewZoom;
     const isWireframe = !!map?.wireframeMode;
     const container = this.container;
     const style = this._style;
     const textureManager = this.gfx.textureManager!;
-    const localScale = 2 ** (WORLD_ZOOM - zoom);
+    const localScale = 2 ** (WORLD_ZOOM - viewZoom);
 
     const type = this._geom.type;
     const world = this._geom.world;
@@ -304,7 +305,7 @@ export class PixiFeatureLine extends AbstractPixiFeature {
     this.visible = true;
     this.stroke!.renderable = true;
 
-    if (zoom < 16) {
+    if (styleZoom < 16) {
       this.lod = 1;
       this.casing!.renderable = false;
     } else {
@@ -313,7 +314,7 @@ export class PixiFeatureLine extends AbstractPixiFeature {
     }
 
     // Update line markers (oneway arrows, sided markers)
-    const showMarkers = (zoom >= 16);
+    const showMarkers = (styleZoom >= 16);
     const lineMarkerTextureID = style.lineMarker.image;
     const sideMarkerTextureID = style.sidedMarker.image;
     let lineMarkers = container.getChildByLabel('lineMarkers');
@@ -379,15 +380,15 @@ export class PixiFeatureLine extends AbstractPixiFeature {
     if (this.visible && !this._classes.has('drawing')) {  // Rapid#648 - If drawing, `hitArea = null`
       const minwidth = 3;
       let bufWidth = this._style.casing.width ?? 5;
-      if (zoom < 16) {
+      if (styleZoom < 16) {
         bufWidth -= 4;
-      } else if (zoom < 17) {
+      } else if (styleZoom < 17) {
         bufWidth -= 2;
       }
       if (bufWidth < minwidth) bufWidth = minwidth;
       if (isWireframe) bufWidth = 1;
 
-      const localBufWidth = (bufWidth + 10) * 2 ** (WORLD_ZOOM - zoom);
+      const localBufWidth = (bufWidth + 10) * localScale;
       const flatLocal: number[] = new Array(points.length * 2);
       for (let i = 0; i < points.length; i++) {
         flatLocal[i * 2]     = points[i][0];
@@ -409,25 +410,31 @@ export class PixiFeatureLine extends AbstractPixiFeature {
     }
 
     if (this.casing!.renderable) {
-      this.updateWorldGraphic('casing', this.casing!, points, zoom, isWireframe);
+      this.updateWorldGraphic('casing', this.casing!, points, styleZoom, viewZoom, isWireframe);
     } else {
       this.casing!.clear();
     }
     if (this.stroke!.renderable) {
-      this.updateWorldGraphic('stroke', this.stroke!, points, zoom, isWireframe);
+      this.updateWorldGraphic('stroke', this.stroke!, points, styleZoom, viewZoom, isWireframe);
     } else {
       this.stroke!.clear();
     }
 
     this.geom.dirty = false;
     this._styleDirty = false;
-    this.updateWorldHalo(zoom);
+    this.updateWorldHalo(viewport);
   }
 
 
   /**
    */
-  updateGraphic(which: 'casing' | 'stroke', graphic: PIXI.Graphics, points: Vec2[], zoom: number, isWireframe: boolean): void {
+  updateGraphic(
+    which: 'casing' | 'stroke',
+    graphic: PIXI.Graphics,
+    points: Vec2[],
+    styleZoom: number,
+    isWireframe: boolean
+  ): void {
     const style = this._style;
     const partStyle = style[which];
     if (!partStyle) return;
@@ -435,10 +442,10 @@ export class PixiFeatureLine extends AbstractPixiFeature {
     const minwidth = which === 'casing' ? 3 : 2;
     let width = partStyle.width || 3;
 
-    // Apply effectiveZoom style adjustments
-    if (zoom < 16) {
+    // Narrow at lower zooms
+    if (styleZoom < 16) {
       width -= 4;
-    } else if (zoom < 17) {
+    } else if (styleZoom < 17) {
       width -= 2;
     }
     if (width < minwidth) {
@@ -487,18 +494,20 @@ export class PixiFeatureLine extends AbstractPixiFeature {
    * Points are in container-local space (z16 world coords minus the feature's
    * world origin) — i.e. `GeometryPart.local.coords`. They can be drawn directly
    * without further translation.
-   * Stroke widths are expressed in world local units: `px × 2^(WORLD_ZOOM - zoom)`.
+   * Stroke widths are expressed in world local units: `px × 2^(WORLD_ZOOM - viewZoom)`.
    * @param which - Style part to draw ('casing' or 'stroke')
    * @param graphic - PIXI graphics object to update
    * @param points - Local coordinate points (origin-relative, from `local.coords`)
-   * @param zoom - Effective zoom to use for rendering
+   * @param styleZoom - Effective zoom, used for styling
+   * @param viewZoom - Viewport zoom, used for scaling
    * @param isWireframe - Whether wireframe mode is active
    */
   updateWorldGraphic(
     which: 'casing' | 'stroke',
     graphic: PIXI.Graphics,
     points: Vec2[],
-    zoom: number,
+    styleZoom: number,
+    viewZoom: number,
     isWireframe: boolean
   ): void {
     const style = this._style;
@@ -508,10 +517,10 @@ export class PixiFeatureLine extends AbstractPixiFeature {
     const minwidth = which === 'casing' ? 3 : 2;
     let width = partStyle.width || 3;
 
-    // Apply effectiveZoom style adjustments
-    if (zoom < 16) {
+    // Narrow at lower zooms
+    if (styleZoom < 16) {
       width -= 4;
-    } else if (zoom < 17) {
+    } else if (styleZoom < 17) {
       width -= 2;
     }
     if (width < minwidth) {
@@ -523,7 +532,7 @@ export class PixiFeatureLine extends AbstractPixiFeature {
     }
 
     // Convert screen pixel values to world units
-    const scale = 2 ** (WORLD_ZOOM - zoom);
+    const scale = 2 ** (WORLD_ZOOM - viewZoom);
 
     let g: PIXI.Graphics | DashLine = graphic.clear();
     if (partStyle?.opacity === 0) return;  // remove completely
@@ -540,7 +549,7 @@ export class PixiFeatureLine extends AbstractPixiFeature {
     if (partStyle.dash) {
       // DashLine handles the scale conversion internally for dash sizes and width,
       // so pass unscaled values + the `scale` option (single source of truth).
-      const dashOptions: StrokeStyleWithDash & { scale: number } = {
+      const dashOptions: StrokeStyleWithDash = {
         ...strokeStyle,
         width: width,
         dash: partStyle.dash,
@@ -566,12 +575,10 @@ export class PixiFeatureLine extends AbstractPixiFeature {
 
 
   /**
-   * World-path halo. Draws the select halo as a child of the feature container
-   * so it inherits the same world position/scale as the rest of the feature.
-   * Widths and dash patterns are expressed in world-local units.
-   * @param zoom - Effective zoom to use for rendering
+   * Show/Hide halo (expects `this._bufferdata` to be already set up by `update()`)
+   * @param viewport - Pixi viewport to use for rendering
    */
-  updateWorldHalo(zoom: number): void {
+  updateWorldHalo(viewport: Viewport): void {
     const showHover = (this.visible && this._classes.has('hover'));
     const showSelect = (this.visible && this._classes.has('select'));
     const showHighlight = (this.visible && this._classes.has('highlight'));
@@ -617,7 +624,7 @@ export class PixiFeatureLine extends AbstractPixiFeature {
       this.halo.rotation = this.container.rotation;
       this.halo.scale = this.container.scale;
 
-      const localScale = 2 ** (WORLD_ZOOM - zoom);
+      const localScale = 2 ** (WORLD_ZOOM - viewport.transform.zoom);
       const HALO_STYLE: StrokeStyleWithDash = {
         alpha: 0.9,
         dash: [6, 3],
@@ -647,8 +654,9 @@ export class PixiFeatureLine extends AbstractPixiFeature {
 
   /**
    * Show/Hide halo (expects `this._bufferdata` to be already set up by `update()`)
+   * @param viewport - Pixi viewport to use for rendering
    */
-  updateHalo(): void {
+  updateHalo(viewport: Viewport): void {
     const showHover = (this.visible && this._classes.has('hover'));
     const showSelect = (this.visible && this._classes.has('select'));
     const showHighlight = (this.visible && this._classes.has('highlight'));

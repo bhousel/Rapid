@@ -555,8 +555,7 @@ export class GraphicsSystem extends AbstractSystem {
     this.world!.scale.set(worldScale, worldScale);
 
     // Let's go!
-    const effectiveZoom = map.effectiveZoom();
-    this.scene!.render(this._frame, pixiViewport, effectiveZoom);
+    this.scene!.render(this._frame, pixiViewport);
     // this._renderDebug();
 
     this._appPending = false;

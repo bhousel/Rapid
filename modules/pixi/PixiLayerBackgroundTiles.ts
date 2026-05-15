@@ -105,7 +105,6 @@ export class PixiLayerBackgroundTiles extends AbstractPixiLayer {
    * Render all of the base and overlay imagery sources in the current view.
    * @param frame - Integer frame being rendered
    * @param viewport - Pixi viewport to use for rendering
-   * @param zoom - Effective zoom level to use for rendering
    */
   render(frame: number, viewport: Viewport): void {
     const imagery = this.context.systems.imagery;

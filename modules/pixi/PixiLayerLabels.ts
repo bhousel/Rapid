@@ -300,10 +300,10 @@ export class PixiLayerLabels extends AbstractPixiLayer {
    *
    * @param frame - Integer frame being rendered
    * @param viewport - Pixi viewport to use for rendering
-   * @param zoom - Effective zoom level to use for rendering
    */
-  render(frame: number, viewport: Viewport, zoom: number): void {
-    if (!this.enabled || zoom < MINZOOM) {
+  render(frame: number, viewport: Viewport): void {
+    const viewZoom = viewport.transform.zoom;
+    if (!this.enabled || viewZoom < MINZOOM) {
       this.labelContainer!.visible = false;
       this.debugContainer!.visible = false;
       return;
