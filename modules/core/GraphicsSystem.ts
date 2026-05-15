@@ -37,7 +37,7 @@ interface TransformEase {
  *   `overlay`        The sibling `div` overlay, offsets the supersurface transform
  *   `pixi`           PIXI.Application() created to render to the canvas
  *   `stage`          PIXI.Container() that lives at the root of this scene
- *   `origin`         PIXI.Container() that lives beneath the stage, used to set origin to [0,0]
+ *   `origin`         PIXI.Container() that lives beneath the stage; maps world coordinates to screen
  *   `scene`          PixiScene manages the layers and features in the scene
  *   `eventManager`   PixiEvents manages the events that other code might want to listen for
  *   `textureManager` PixiTextures manages the textures
@@ -60,7 +60,6 @@ export class GraphicsSystem extends AbstractSystem {
   pixi: PIXI.Application | null;
   stage: PIXI.Container | null;
   origin: PIXI.Container | null;
-  world: PIXI.Container | null;
   scene: PixiScene | null;
   eventManager: PixiEvents | null;
   textureManager: PixiTextures | null;
@@ -98,7 +97,6 @@ export class GraphicsSystem extends AbstractSystem {
     this.pixi = null;
     this.stage = null;
     this.origin = null;
-    this.world = null;
     this.scene = null;
     this.eventManager = null;
     this.textureManager = null;
@@ -532,27 +530,19 @@ export class GraphicsSystem extends AbstractSystem {
     this.stage!.position.set(mapCenter[0], mapCenter[1]);
     this.stage!.rotation = mapTransform.r;
 
-    // The `origin` returns `[0,0]` back to the `[top,left]` coordinate of the viewport,
-    // so `project/unproject` continues to work.
-    // This also includes the `offset`, which includes any panning that the user has done.
-    this.origin!.position.set(
-      -offset[0] - mapCenter[0],
-      -offset[1] - mapCenter[1]
-    );
-
-    // The `world` container renders its children directly in world coordinates
+    // The `origin` container renders its children directly in world coordinates
     // (Mercator pre-scaled to z=WORLD_ZOOM, range 0..WORLD_SIZE).
     // Match the same math used by `projWorldToScreen` in @rapid-sdk/math:
     //   screen = (worldXY - WORLD_HALF) * scale + transform.translation
     // We use the pixi viewport transform (not the map transform) here because the
-    // `origin` container already accounts for the pan delta between them. That way,
-    // small pans don't require touching `world` at all — they're absorbed by `origin`.
+    // `offset` already accounts for the pan delta between them. That way,
+    // small pans don't change `origin.scale` at all — they're absorbed by `origin.position`.
     const worldScale = 2 ** (pixiTransform.z - WORLD_ZOOM);
-    this.world!.position.set(
-      pixiTransform.x - WORLD_HALF * worldScale,
-      pixiTransform.y - WORLD_HALF * worldScale
+    this.origin!.position.set(
+      -offset[0] - mapCenter[0] + pixiTransform.x - WORLD_HALF * worldScale,
+      -offset[1] - mapCenter[1] + pixiTransform.y - WORLD_HALF * worldScale
     );
-    this.world!.scale.set(worldScale, worldScale);
+    this.origin!.scale.set(worldScale, worldScale);
 
     // Let's go!
     this.scene!.render(this._frame, pixiViewport);
@@ -788,25 +778,15 @@ export class GraphicsSystem extends AbstractSystem {
     stage.hitArea = new PIXI.Rectangle(-10000000, -10000000, 20000000, 20000000);
     this.stage = stage;
 
-    // The `origin` returns `[0,0]` back to the `[top,left]` coordinate of the viewport,
-    // so `project/unproject` continues to work.
-    // This also includes the `offset` which includes any panning that the user has done.
+    // The `origin` container renders its children directly in world coordinates
+    // (Mercator pre-scaled to z=WORLD_ZOOM, range 0..WORLD_SIZE).
+    // Its position and scale are set each frame in `_app()` to map world coords → screen coords.
     const origin = new PIXI.Container();
     origin.label = 'origin';
     origin.sortableChildren = true;
     origin.eventMode = 'passive';
-    origin.zIndex = 99;  // TODO: this is temporary
     stage.addChild(origin);
     this.origin = origin;
-
-    // EXPERIMENT: An alternate `origin` that renders directly in world coordinates.
-    // Here we want `[0,0]` positioned to the top left corner of a z16 mercator world.
-    const world = new PIXI.Container();
-    world.label = 'world';
-    world.sortableChildren = true;
-    world.eventMode = 'passive';
-    origin.addChild(world);
-    this.world = world;
 
 
     // The Pixi Application comes with its own ticker that just calls `render()`,

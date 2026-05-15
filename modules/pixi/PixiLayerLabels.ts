@@ -1,6 +1,6 @@
 import * as PIXI from 'pixi.js';
 import RBush from 'rbush';
-import { HALF_PI, TAU, numWrap, vecAdd, vecAngle, vecScale, vecSubtract, geomRotate } from '@rapid-sdk/math';
+import { HALF_PI, TAU, WORLD_HALF, numWrap, vecAdd, vecAngle, vecScale, vecSubtract, geomRotate } from '@rapid-sdk/math';
 
 import { AbstractPixiLayer } from './AbstractPixiLayer.ts';
 import { getLineSegments, getDebugBBox, lineToPoly } from './helpers.ts';
@@ -327,23 +327,43 @@ export class PixiLayerLabels extends AbstractPixiLayer {
 
     // The label container should be kept unrotated so that it stays screen-up not north-up.
     // We need to counter the effects of the 'stage' and 'origin' containers that we are underneath.
-    const stage = this.gfx.stage!.position;
-    const origin = this.gfx.origin!.position;
+    const stage = this.gfx.stage!;
+    const origin = this.gfx.origin!;
     const bearing = viewport.transform.rotation;
+    const worldScale = origin.scale.x;
 
-    // Determine the difference between the global/screen coordinate system (where [0,0] is top left)
-    // and the `origin` coordinate system (which can be panned around or be under a rotation).
-    // We need to save this labelOffset for use elsewhere, it is the basis for having a consistent coordinate
-    // system to track labels to place and objects to avoid. (we apply it to values we get from `getBounds`)
+    // Compute `labelOffset` — the screen-space anchor we subtract from feature positions
+    // before caching them in the rbush. The key invariant is that `labelOffset` must change
+    // by exactly the pan delta on each frame, so `featureScreen − labelOffset` is invariant
+    // under panning (and the cached rbush coords stay valid as the user pans around).
+    //
+    // `origin.toGlobal(P_local)` gives us that invariance automatically for any constant P_local
+    // (since only `origin.position` changes during pan, and it adds the same delta regardless
+    // of P_local). The naive choice P_local = (0, 0) is world-coord [0,0] — far from the
+    // viewport at high zooms, producing huge labelOffset values that cause GPU float32
+    // precision loss in MeshRope vertex math (visible as distorted rope label text).
+    //
+    // Instead, pick P_local so it maps near the viewport: subtract off the constant
+    // `(pixiT - WORLD_HALF*ws)` term that origin.position carries for world→screen scaling.
+    // The `viewport` passed in here is the pixi viewport (see GraphicsSystem._app).
     const labelOffset = this._labelOffset;
-    this.gfx.origin!.toGlobal({ x: 0, y: 0 }, labelOffset);
+    const pixiT = viewport.transform.translation;
+    origin.toGlobal({
+      x: WORLD_HALF - pixiT[0] / worldScale,
+      y: WORLD_HALF - pixiT[1] / worldScale
+    }, labelOffset);
 
+    // Position the labels group to render in screen space.
+    // `origin` now carries both the pan offset and world-scale transforms,
+    // so we must undo its full transform to get back to screen-space rendering.
     const groupContainer = this.scene.groups.get('labels')!;
-    groupContainer.position.set(-origin.x, -origin.y);     // undo origin - [0,0] is now center
-    groupContainer.rotation = -bearing;                    // undo rotation
+    const groupPos = origin.toLocal(stage.position);
+    groupContainer.position.copyFrom(groupPos);
+    groupContainer.scale.set(1 / worldScale, 1 / worldScale);  // undo world scale
+    groupContainer.rotation = -bearing;                         // undo stage rotation
 
     const labelOriginContainer = this.labelOriginContainer!;
-    labelOriginContainer.position.set(-stage.x + labelOffset.x, -stage.y + labelOffset.y);  // replace origin
+    labelOriginContainer.position.set(-stage.position.x + labelOffset.x, -stage.position.y + labelOffset.y);
 
     // Collect features to avoid.
     this.gatherAvoids();

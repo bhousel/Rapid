@@ -112,8 +112,7 @@ export class PixiScene extends EventEmitter {
   reset(): void {
     const gfx = this.gfx;
     const origin = gfx.origin;
-    const world = gfx.world;
-    if (!origin || !world) return;   // need the `origin` container to exist first
+    if (!origin) return;   // need the `origin` container to exist first
 
     // Ensure that Group Containers have been added to the `origin`.
     // Groups are pre-established Containers that the Layers can add
@@ -137,15 +136,8 @@ export class PixiScene extends EventEmitter {
         container.zIndex = i;
         this.groups.set(groupID, container);
       }
-      // EXPERIMENT: Some groups to render world coordinates directly:
-      if (groupID !== 'labels') {
-        if (!world.getChildByLabel(groupID)) {
-          world.addChild(container);
-        }
-      } else {
-        if (!origin.getChildByLabel(groupID)) {
-          origin.addChild(container);
-        }
+      if (!origin.getChildByLabel(groupID)) {
+        origin.addChild(container);
       }
     });
 
@@ -174,10 +166,10 @@ export class PixiScene extends EventEmitter {
    * @param viewport - Pixi viewport to use for rendering
    */
   render(frame: number, viewport: Viewport): void {
-    // Groups that live under `world` render in world coordinates;
-    // the `world` container (set up in `GraphicsSystem._app`) provides the position
-    // and scale that maps world coords -> screen coords. Group containers themselves
-    // need no extra transform.
+    // Groups that live under `origin` render in world coordinates;
+    // the `origin` container (set up in `GraphicsSystem._app`) provides the position
+    // and scale that maps world coords → screen coords. Group containers themselves
+    // need no extra transform (except the `labels` group which renders in screen space).
     for (const layer of this.layers.values()) {
       layer.render(frame, viewport);
       layer.cull(frame);
