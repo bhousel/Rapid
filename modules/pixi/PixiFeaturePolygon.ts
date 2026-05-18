@@ -294,6 +294,7 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
 
     // Redraw the shapes
     // Build flat number[] arrays per ring (in local coords) for poly() / lineToPoly()
+    this._bufferdata = null;
     const flatRings: number[][] = new Array(rings.length);
     for (let i = 0; i < rings.length; i++) {
       const ring = rings[i];
@@ -305,8 +306,6 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
       flatRings[i] = flat;
     }
 
-    this._bufferdata = null;
-    container.hitArea = null;
 
     // STROKES
     strokes.removeChildren();
@@ -314,22 +313,19 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
       strokes.eventMode = this._classes.has('drawing') ? 'none' : 'static';  // Rapid#648
 
       const lineWidth = isWireframe ? 1 : style.fill?.width || 2;
-      const localStrokeWidth = lineWidth * localScale;
-      const localBufWidth = (lineWidth + 10) * localScale;
-
       const strokeStyle: StrokeStyleWithDash = {
         alpha: 1,
-        alignment: 0.5,
+        alignment: 0.5,   // middle of line
         color: color,
-        width: localStrokeWidth,
+        width: lineWidth * localScale,
         cap: 'butt',
         join: 'miter'
       };
       const bufferStyle: PIXI.StrokeStyle = {
         alpha: 1,
-        alignment: 0.5,
+        alignment: 0.5,   // middle of line
         color: 0x000000,
-        width: localBufWidth,
+        width: (lineWidth + 10) * localScale,
         cap: 'butt',
         join: 'bevel'
       };
@@ -353,7 +349,7 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
 
         const buffer = lineToPoly(ring, bufferStyle);
         if (i === 0) {
-          this._bufferdata = buffer;  // save outer buffer for the hover halo + hit area
+          this._bufferdata = buffer;  // save outer buffer for the hover halo.
         }
 
         stroke.hitArea = new PIXI.Polygon(buffer.perimeter);
@@ -361,11 +357,6 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
         stroke.sortableChildren = false;
         strokes.addChild(stroke);
       }
-    }
-
-    // Container hit area uses the outer-ring buffer
-    if (this._bufferdata && !this._classes.has('drawing')) {
-      container.hitArea = new PIXI.Polygon(this._bufferdata.perimeter);
     }
 
     // FILL
@@ -402,12 +393,10 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
         fill.mask = null;
 
       } else {  // partial fill
-        // Mask stroke width is also in world-local units.
-        const localMaskWidth = PARTIALFILLWIDTH * localScale;
         const maskStyle: PIXI.StrokeStyle = {
           alpha: 1,
           color: 0xff0000,
-          width: localMaskWidth,
+          width: PARTIALFILLWIDTH * localScale,
           cap: 'butt',
           join: 'bevel'
         };
@@ -442,6 +431,25 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
 
         mask.visible = true;
         fill.mask = mask;
+      }
+    }
+
+    // Debug SSR
+    if (this.debugSSR) {
+      this.debugSSR.clear();
+      const p = local.ssr?.polygon;
+      if (p) {
+        const ssrflat = [
+          p[0][0], p[0][1],
+          p[1][0], p[1][1],
+          p[2][0], p[2][1],
+          p[3][0], p[3][1],
+          p[0][0], p[0][1]
+        ];
+
+        this.debugSSR
+          .poly(ssrflat, true)
+          .stroke({ width: 2 * localScale, color: 0x00ff00 });
       }
     }
 
