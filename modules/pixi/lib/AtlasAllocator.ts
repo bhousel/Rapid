@@ -1,5 +1,4 @@
 import * as PIXI from 'pixi.js';
-import { numClamp } from '@rapid-sdk/math';
 
 import { GuilloteneAllocator, type AllocatedRect } from './GuilloteneAllocator.ts';
 
@@ -19,11 +18,32 @@ export interface AtlasOptions {
   useCanvas?: boolean;
 }
 
+/** A pixel source the atlas knows how to upload directly to the GPU. */
+export type AtlasItemSource = ImageData | HTMLCanvasElement | ImageBitmap | HTMLImageElement;
+
 /** Item stored in the atlas slab */
 export interface AtlasItem {
+  /** The texture unique id (comes from Pixi) */
   uid: number;
+  /** A Pixi.Texture allocated from the atlas source */
   texture: AtlasTexture | null;
-  imageData: ImageData | null;
+  /**
+   * The pixel source for this item.  Uploaded directly to the GPU via
+   * `texSubImage2D` (WebGL) or `copyExternalImageToTexture` (WebGPU).
+   */
+  source: AtlasItemSource | null;
+  /**
+   * True if `source` already includes a 1px edge-replicated padding ring
+   * (i.e. source dimensions are `bin.width` x `bin.height`, not the frame size).
+   * Tile imagery sets this so neighbor textures don't bleed across rect boundaries
+   * under bilinear sampling.  See https://github.com/facebook/Rapid/issues/1650
+   *
+   * If false, the source is exactly the frame size and is uploaded at the inner
+   * bin position, leaving a 1px transparent ring around it.  That's fine for
+   * symbols / text / icons, which already fade to transparent at their edges.
+   */
+  padded: boolean;
+  /** False initially, True after the texture has been uploaded to the GPU */
   uploaded: boolean;
 }
 
@@ -60,24 +80,37 @@ export class AtlasAllocator {
 
   /**
    * Allocates the given asset, returning a `PIXI.Texture`, or throwing if it could not be done.
-   * @param imageData - The asset to pack in the atlas, must be of type ImageData
+   *
+   * The source is uploaded directly to the GPU at draw time — no intermediate
+   * pixel readback is performed by the atlas.
+   *
+   * @param source - The pixel source to pack (ImageData, canvas, bitmap, or image)
+   * @param width - Inner texture width (the dimensions a sprite using this texture will report)
+   * @param height - Inner texture height
+   * @param padded - If true, `source` is already `width+2` x `height+2` with a 1px
+   *   edge-replicated ring, and the atlas will upload it covering the full bin.
+   *   If false, `source` is exactly `width` x `height` and is uploaded at the
+   *   inner bin position (1px transparent ring around it).
    * @param textureOptions - optional options to pass to Pixi when creating the texture.
    * @return The issued texture
-   * @throws If asset type is unrecognized, or dimensions will not fit on a slab
+   * @throws If dimensions will not fit on a slab
    */
-  allocate(imageData: ImageData, textureOptions?: PIXI.TextureOptions): AtlasTexture {
-    if (!(imageData instanceof ImageData)) {
-      throw new Error('Unsupported asset type - convert it to ImageData first');
-    }
-
-    const texture = this._allocateTexture(imageData.width, imageData.height, textureOptions);
+  allocate(
+    source: AtlasItemSource,
+    width: number,
+    height: number,
+    padded: boolean,
+    textureOptions?: PIXI.TextureOptions
+  ): AtlasTexture {
+    const texture = this._allocateTexture(width, height, textureOptions);
     const uid = texture.uid;
     const slab = texture.source as AtlasSource;
 
     const item: AtlasItem = {
       uid: uid,
       texture: texture,
-      imageData: imageData,
+      source: source,
+      padded: padded,
       uploaded: false
     };
 
@@ -114,7 +147,7 @@ export class AtlasAllocator {
     }
 
     item.texture?.destroy(false);
-    item.imageData = null;
+    item.source = null;
     item.texture = null;
     slab._items.delete(uid);
 
@@ -242,51 +275,33 @@ export class AtlasSource extends PIXI.TextureSource<PIXI.BufferSourceOptions> {
 
 
   /**
-   * Returns padded pixel data for an atlas item.
-   * Duplicates the 1px edge to avoid color bleeding into neighbor textures.
-   * Shared by the GL/GPU upload handlers and the canvas blit path.
-   * @param item - The atlas item to build pixels for
-   * @return Uint8Array of RGBA pixel data including 1px padding
+   * Returns the inner-frame position to upload an item at.
+   * - padded: upload at outer bin (source includes the 1px ring)
+   * - !padded: upload at inner bin (offset by 1px; ring stays transparent)
+   * @param item - The atlas item
+   * @return [x, y] upload position in slab coordinates
    */
-  _getItemPixels(item: AtlasItem): Uint8Array {
+  _uploadOffset(item: AtlasItem): [number, number] {
     const bin = item.texture!.__bin!;
-    const { width: w, height: h } = bin;
-    const { data: src, width: srcW, height: srcH } = item.imageData!;
-
-    const pixels = new Uint8Array(w * h * 4);
-
-    for (let dstY = 0; dstY < h; dstY++) {
-      const srcY = numClamp(dstY - 1, 0, srcH - 1);
-
-      for (let dstX = 0; dstX < w; dstX++) {
-        const srcX = numClamp(dstX - 1, 0, srcW - 1);
-        const s = ((srcY * srcW) + srcX) * 4;
-        const d = ((dstY * w) + dstX) * 4;
-        pixels[d] = src[s];
-        pixels[d + 1] = src[s + 1];
-        pixels[d + 2] = src[s + 2];
-        pixels[d + 3] = src[s + 3];
-      }
-    }
-    return pixels;
+    return item.padded ? [bin.x, bin.y] : [bin.x + 1, bin.y + 1];
   }
 
 
   /**
-   * Blit an item's pixels onto the backing canvas (canvas renderer only).
+   * Blit an item's source onto the backing canvas (canvas renderer only).
    * This is a no-op if the slab is not canvas-backed.
    * @param item - The atlas item to blit
    */
   _blitItemToCanvas(item: AtlasItem): void {
     if (!this._canvasCtx) return;
+    if (!item.source) return;
 
-    const bin = item.texture!.__bin!;
-    const { x, y, width: w, height: h } = bin;
-    const pixels = this._getItemPixels(item);
-
-    // Cast needed because TypeScript thinks buffer could be SharedArrayBuffer
-    const imageData = new ImageData(new Uint8ClampedArray(pixels.buffer) as Uint8ClampedArray<ArrayBuffer>, w, h);
-    this._canvasCtx.putImageData(imageData, x, y);
+    const [x, y] = this._uploadOffset(item);
+    if (item.source instanceof ImageData) {
+      this._canvasCtx.putImageData(item.source, x, y);
+    } else {
+      this._canvasCtx.drawImage(item.source, x, y);
+    }
 
     item.uploaded = true;
   }
@@ -346,12 +361,10 @@ const glUploadAtlasResource: GLUploadHandler = {
 
     // Upload all atlas items.
     for (const item of slab._items.values()) {
-      if (item.uploaded) continue;
+      if (item.uploaded || !item.source) continue;
 
-      const bin = item.texture!.__bin!;
-      const pixels = slab._getItemPixels(item);
-
-      gl.texSubImage2D(target, 0, bin.x, bin.y, bin.width, bin.height, format, type, pixels);
+      const [x, y] = slab._uploadOffset(item);
+      gl.texSubImage2D(target, 0, x, y, format, type, item.source);
 
       item.uploaded = true;
     }
@@ -366,16 +379,18 @@ const gpuUploadAtlasResource: GPUUploadHandler = {
     // const premultipliedAlpha = slab.alphaMode === 'premultiply-alpha-on-upload';
 
     for (const item of slab._items.values()) {
-      if (item.uploaded) continue;
+      if (item.uploaded || !item.source) continue;
 
-      const bin = item.texture!.__bin!;
-      const pixels = slab._getItemPixels(item) as Uint8Array<ArrayBuffer>;
+      const [x, y] = slab._uploadOffset(item);
+      const src = item.source;
+      const w = (src instanceof HTMLImageElement) ? src.naturalWidth : src.width;
+      const h = (src instanceof HTMLImageElement) ? src.naturalHeight : src.height;
 
-      const destination = { origin: { x: bin.x, y: bin.y }, texture: gpuTexture };
-      const layout = { bytesPerRow: pixels.byteLength / bin.height };
-      const size = { width: bin.width, height: bin.height };
-
-      gpu.device.queue.writeTexture(destination, pixels, layout, size);
+      gpu.device.queue.copyExternalImageToTexture(
+        { source: src },
+        { texture: gpuTexture, origin: { x: x, y: y } },
+        { width: w, height: h }
+      );
 
       item.uploaded = true;
     }

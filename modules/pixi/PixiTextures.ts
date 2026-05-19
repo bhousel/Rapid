@@ -215,8 +215,21 @@ export class PixiTextures {
 
 
   /**
-   * This packs an asset into one of the atlases and tracks it in the textureData map
-   * The asset must be one of:  ImageData | Uint8ClampedArray | HTMLCanvasElement | HTMLImageElement
+   * This packs an asset into one of the atlases and tracks it in the textureData map.
+   *
+   * The asset must be one of:  `ImageData | Uint8ClampedArray | HTMLCanvasElement | HTMLImageElement | ImageBitmap`
+   *
+   * For non-ImageData sources (canvas, bitmap, image) the asset is handed directly
+   * to the atlas allocator and uploaded to the GPU via `texSubImage2D` - no
+   * intermediate `getImageData` readback happens.  Callers may safely `bitmap.close()`
+   * after this returns: the atlas keeps its own reference to whatever it needs for upload.
+   *
+   * For the **tile** atlas only, the asset is first drawn onto a slightly oversized
+   * canvas with edge-replicated padding so that neighbor tiles don't bleed across
+   * each other's rect boundaries under bilinear sampling (see issue Rapid#1650).
+   * Symbols / text / icons don't need this - they already fade to transparent at
+   * their edges - so they're uploaded as-is with a 1px transparent ring.
+   *
    * @param atlasID - One of 'symbol', 'text', or 'tile'
    * @param textureID - e.g. 'boldPin', 'Main Street-normal', 'Bing-0,1,2'
    * @param width - width in pixels
@@ -231,7 +244,7 @@ export class PixiTextures {
     textureID: TextureID,
     width: number,
     height: number,
-    asset: ImageData | Uint8ClampedArray | HTMLCanvasElement | HTMLImageElement,
+    asset: ImageData | Uint8ClampedArray | HTMLCanvasElement | HTMLImageElement | ImageBitmap,
     textureOptions?: PIXI.TextureOptions
   ): PIXI.Texture | null {
 
@@ -250,34 +263,36 @@ export class PixiTextures {
       return tdata.texture;
     }
 
-    // To simplify the atlas code, get everything into an `ImageData` before packing
-    let imageData: ImageData;
+    // Normalize the asset to something the atlas allocator can upload directly.
+    // `ImageData` and `Uint8ClampedArray` are CPU pixel buffers - the allocator
+    // can hand them to `texSubImage2D` as-is.
+    // Canvas / image / bitmap sources are uploaded directly to the GPU.
+    let source: ImageData | HTMLCanvasElement | HTMLImageElement | ImageBitmap;
+    let padded = false;
+
     if (asset instanceof ImageData) {
-      imageData = asset;
+      source = asset;
 
     } else if (asset instanceof Uint8ClampedArray) {
       // Cast needed because TypeScript thinks buffer could be SharedArrayBuffer
-      imageData = new ImageData(asset as Uint8ClampedArray<ArrayBuffer>, width, height);
+      source = new ImageData(asset as Uint8ClampedArray<ArrayBuffer>, width, height);
 
-    } else if (asset instanceof HTMLCanvasElement) {
-      // note that the canvas dimensions may be larger than the passed-in dimensions
-      const ctx = asset.getContext('2d')!;
-      imageData = ctx.getImageData(0, 0, width, height);  // not the canvas width/height
-
-    } else if (asset instanceof HTMLImageElement) {
-      const [w, h] = [asset.naturalWidth, asset.naturalHeight];
-      const canvas = document.createElement('canvas');
-      canvas.width = w;
-      canvas.height = h;
-      const ctx = canvas.getContext('2d')!;
-      ctx.drawImage(asset, 0, 0);
-      imageData = ctx.getImageData(0, 0, w, h);
+    } else if (asset instanceof HTMLCanvasElement || asset instanceof HTMLImageElement ||
+               (typeof ImageBitmap !== 'undefined' && asset instanceof ImageBitmap)) {
+      // Tiles need edge replication to avoid seams between adjacent tiles.
+      // For other atlases the 1px ring stays transparent, which is fine for icons/text.
+      if (atlasID === 'tile') {
+        source = this._fromEdgePaddedCanvas(asset, width, height);
+        padded = true;
+      } else {
+        source = asset;
+      }
 
     } else {
       return null;  // some other format?
     }
 
-    const texture = atlas.allocate(imageData, textureOptions);
+    const texture = atlas.allocate(source, width, height, padded, textureOptions);
     if (!texture) {
       throw new Error(`Couldn't allocate texture ${key}`);
     }
@@ -287,6 +302,31 @@ export class PixiTextures {
     this._textureData.set(key, { texture: texture, refcount: 1 });
 
     return texture;
+  }
+
+
+  /**
+   * Builds a `(width + 2) x (height + 2)` canvas with the source drawn in the center
+   * and a 1px edge-replicated ring around it.
+   *
+   * Used for tile imagery to prevent color bleed between neighboring atlas entries
+   * under bilinear sampling (see issue Rapid#1650).  We use a two-pass `drawImage`:
+   * first stretched to fill the ring (which puts approximately-edge colors in the
+   * border pixels), then redrawn at the correct scale to keep the interior pixel-perfect.
+   *
+   * @param source - The source to pad
+   * @param w - Inner width (the source's native size)
+   * @param h - Inner height
+   * @return A new canvas of size `(w+2) x (h+2)` with the padded image
+   */
+  private _fromEdgePaddedCanvas(source: CanvasImageSource, w: number, h: number): HTMLCanvasElement {
+    const canvas = document.createElement('canvas');
+    canvas.width = w + 2;
+    canvas.height = h + 2;
+    const ctx = canvas.getContext('2d')!;
+    ctx.drawImage(source, 0, 0, w + 2, h + 2);  // stretched: approximates edge colors in the ring
+    ctx.drawImage(source, 1, 1, w, h);          // pixel-perfect center, overdraws the stretched copy
+    return canvas;
   }
 
 

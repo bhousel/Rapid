@@ -21,7 +21,6 @@ interface FilterSettings {
 interface CachedTile extends Tile {
   url: string;
   sprite: PIXI.Sprite | null;
-  image: HTMLImageElement | null;
   loaded: boolean;
   timestamp: number;
   debug: PIXI.Graphics | null;
@@ -248,7 +247,6 @@ export class PixiLayerBackgroundTiles extends AbstractPixiLayer {
             ...tile,
             url: url,
             sprite: null,
-            image: null,
             loaded: false,
             timestamp: timestamp,
             debug: null,
@@ -275,32 +273,33 @@ export class PixiLayerBackgroundTiles extends AbstractPixiLayer {
       tile.sprite = sprite;
       tileMap.set(tileID, tile);
 
-      // Start loading the image
-      const image = new Image();
-      image.crossOrigin = 'anonymous';
-      image.src = tile.url;
-      tile.image = image;
-      tile.loaded = false;
-
-      // After the image loads, allocate space for it in the texture atlas
-      image.onload = () => {
-        this._failed.delete(tile.url);
-        if (!tile.sprite || !tile.image) return;  // it's possible that the tile isn't needed anymore and got pruned
-
-        const w = tile.image.naturalWidth;
-        const h = tile.image.naturalHeight;
-        tile.sprite.texture = textureManager.allocate('tile', tile.sprite.label, w, h, tile.image) || PIXI.Texture.EMPTY;
-
-        tile.loaded = true;
-        tile.image = null;  // reference to `image` is held by the atlas, we can null it
-        this.gfx.deferredRedraw();
-      };
-
-      image.onerror = () => {
-        tile.image = null;
-        this._failed.add(tile.url);
-        this.gfx.deferredRedraw();
-      };
+      // Start loading the image.
+      // Use `fetch` + `createImageBitmap` so the PNG/JPEG decode happens off the
+      // main thread (browser-internal worker).  The bitmap is already decoded by
+      // the time we hand it to the atlas, which only has to upload pixels.
+      fetch(tile.url, { mode: 'cors' })
+        .then(response => {
+          if (!response.ok) throw new Error(`HTTP ${response.status}`);
+          return response.blob();
+        })
+        .then(blob => createImageBitmap(blob))
+        .then(bitmap => {
+          this._failed.delete(tile.url);
+          if (!tile.sprite) {   // tile was destroyed while we were loading
+            bitmap.close();
+            return;
+          }
+          const w = bitmap.width;
+          const h = bitmap.height;
+          tile.sprite.texture = textureManager.allocate('tile', tile.sprite.label, w, h, bitmap) || PIXI.Texture.EMPTY;
+          bitmap.close();   // atlas keeps its own copy; release the decoded bytes
+          tile.loaded = true;
+          this.gfx.deferredRedraw();
+        })
+        .catch(() => {
+          this._failed.add(tile.url);
+          this.gfx.deferredRedraw();
+        });
     }
 
     // Update or remove the existing tiles
@@ -439,7 +438,6 @@ export class PixiLayerBackgroundTiles extends AbstractPixiLayer {
       tile.text.destroy();
     }
 
-    tile.image = null;
     tile.sprite = null;
     tile.debug = null;
     tile.text = null;
