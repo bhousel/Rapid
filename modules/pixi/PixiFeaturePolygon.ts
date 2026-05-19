@@ -92,12 +92,12 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
     this.container.addChild(lowRes, fill, strokes, mask);
 
     // Debug surrounding rectangle
-    const debugSurround = new PIXI.Graphics();
-    debugSurround.label = 'surround';
-    debugSurround.eventMode = 'none';
-    debugSurround.sortableChildren = false;
-    this.debugSurround = debugSurround;
-    this.container.addChild(debugSurround);
+    // const debugSurround = new PIXI.Graphics();
+    // debugSurround.label = 'surround';
+    // debugSurround.eventMode = 'none';
+    // debugSurround.sortableChildren = false;
+    // this.debugSurround = debugSurround;
+    // this.container.addChild(debugSurround);
   }
 
 
