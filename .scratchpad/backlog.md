@@ -2,6 +2,11 @@
 
 Items planned but not yet started.
 
+## Labels refactor (follow-ups to step 1 in current.md)
+- **Step 2**: introduce a `PixiFeatureLabel` managed-feature class so labels participate in the normal feature lifecycle (style match, dirty tracking, world-coord geometry) instead of being a snowflake inside `PixiLayerLabels`.
+- **Step 3**: move text rasterization onto an `OffscreenCanvas` worker. Worker does canvas-2D text draw → `ImageData` → `postMessage({ImageData}, [imageData.data.buffer])` (transferable). Main thread feeds `PixiTextures.allocate(textureID, imageData, width, height)` directly — bypasses BOTH the nested `renderer.generateTexture()` AND the `readPixels` stall. Font loading: worker needs the same fonts; use `FontFace` API + transferable `ArrayBuffer`.
+- **Step 4**: same fix in `PixiFeaturePolygon.ts` ~lines 417–430. Currently uses `new PIXI.GpuGraphicsContext()` + `PIXI.buildContextBatches()` round-trip to extract polygon geometry; this is the same nested-renderer anti-pattern. Replace with a direct earcut tessellation call (earcut is already a Pixi dependency).
+
 ## DashLine performance
 - Restore the texture-based DashLine path (currently disabled — `useTexture: false`). Pixi v8 broke the original `textureSpace: 'global'` matrix handling. Drawing per-segment via `lineTo` is far slower than a single stroke with a tiling dash texture.
 - Once textures work again, store dash-pattern textures in an atlas (one slot per `dash.toString() + width + scale` cache key). Avoids per-line texture swaps and reduces draw-call count for dashed renders (halos, lasso, casing dashes).

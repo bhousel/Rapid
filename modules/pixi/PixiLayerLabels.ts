@@ -34,10 +34,24 @@ const TEXTSTYLE_ITALIC: PIXI.TextStyleOptions = {
 };
 
 
+/** A measured label: dimensions decoupled from rasterization. */
+interface MeasuredLabel {
+  str: string;
+  style: 'normal' | 'italic';
+  width: number;   // texture frame width (includes padding)
+  height: number;  // texture frame height (includes padding)
+  /** Present only for ASCII point labels (BitmapText) — the display object is built inline. */
+  bitmapText?: PIXI.BitmapText;
+}
+
 /** Properties for text labels (used on points) */
 interface TextLabelProps {
   str: string;
-  labelObj: PIXI.Sprite | PIXI.Text | PIXI.BitmapText;
+  style: 'normal' | 'italic';
+  width: number;
+  height: number;
+  /** Present for the ASCII point-label path; absent for the Sprite path (texture is looked up at render time). */
+  bitmapText?: PIXI.BitmapText;
   x: number;
   y: number;
   tint: number;
@@ -46,8 +60,10 @@ interface TextLabelProps {
 /** Properties for rope labels (used on lines and polygons) */
 interface RopeLabelProps {
   str: string;
+  style: 'normal' | 'italic';
+  width: number;
+  height: number;
   coords: number[][];
-  labelObj: PIXI.Sprite | PIXI.Text;
   tint: number;
 }
 
@@ -118,6 +134,10 @@ export class PixiLayerLabels extends AbstractPixiLayer {
   private _boxes: Map<string, LabelBox>;
   private _featureHasBoxes: Map<FeatureID, Set<string>>;
   private _textureIDs: Map<string, TextureID>;
+  /** Queue of label rasterization requests to process OUTSIDE the layer's render(). */
+  private _pendingRasters: Map<TextureID, { str: string; style: 'normal' | 'italic' }>;
+  /** True while a microtask is scheduled to drain `_pendingRasters`. */
+  private _rasterDrainScheduled: boolean;
   private _tPrev: { x: number; y: number; z: number; r: number };
   private _labelOffset: PIXI.Point;
   private _textStyleNormal: PIXI.TextStyle;
@@ -159,6 +179,10 @@ export class PixiLayerLabels extends AbstractPixiLayer {
     // Keep track of textures that we've allocated
     this._textureIDs = new Map();  // Map<string, TextureID>
 
+    // Deferred label rasterization queue (see _measureLabel / _getOrQueueLabelTexture).
+    this._pendingRasters = new Map();   // Map<TextureID, { str, style }>
+    this._rasterDrainScheduled = false;
+
     // We reset the labeling when scale or rotation change
     this._tPrev = { x: 0, y: 0, z: 1, r: 0 };
 
@@ -194,6 +218,11 @@ export class PixiLayerLabels extends AbstractPixiLayer {
     this._objects.clear();
     this._boxes.clear();
     this._featureHasBoxes.clear();
+    this._pendingRasters.clear();
+    if (this._rasterDrainScheduled) {
+      this.context.systems.scheduler?.cancel('labels-raster-drain');
+      this._rasterDrainScheduled = false;
+    }
 
     // Items in this layer don't actually need to be interactive
     const groupContainer = this.scene.groups.get('labels')!;
@@ -407,41 +436,135 @@ export class PixiLayerLabels extends AbstractPixiLayer {
    * @param str - String for the label
    * @param style - 'normal' or 'italic'
    */
-  getLabelSprite(str: string, style: 'normal' | 'italic' = 'normal'): PIXI.Sprite {
-    const textureID = `${str}-${style}`;
+  /**
+   * Pick the padding to use for a label.
+   * Combining marks (diacritics, Zalgo text) need extra room so glyphs don't get clipped.
+   * Both measurement and rasterization must agree on this value.
+   * @param str - The label text
+   * @return Padding in CSS pixels
+   */
+  private _getLabelPadding(str: string): number {
+    const marks = str.match(/\p{M}/gu);  // unicode combining marks
+    if (!marks) return 0;
+    if (marks.length > 20) return 50;    // Zalgo text
+    if (marks.length > 0)  return 10;    // a few ascenders/descenders
+    return 0;
+  }
+
+
+  /**
+   * Pick a `PIXI.TextStyle` for a (str, style) pair, applying combining-mark padding if needed.
+   * @param str - The label text
+   * @param style - 'normal' or 'italic'
+   * @return A TextStyle ready to pass to CanvasTextMetrics.measureText / PIXI.Text
+   */
+  private _getTextStyle(str: string, style: 'normal' | 'italic'): PIXI.TextStyle {
+    const pad = this._getLabelPadding(str);
+    if (pad) {  // need a one-off style with extra padding
+      const opts = Object.assign({}, (style === 'normal' ? TEXTSTYLE_NORMAL : TEXTSTYLE_ITALIC), { padding: pad });
+      return new PIXI.TextStyle(opts);
+    }
+    return (style === 'normal' ? this._textStyleNormal : this._textStyleItalic);
+  }
+
+
+  /**
+   * Measure a label without rasterizing it.
+   *
+   * Uses `PIXI.CanvasTextMetrics.measureText` (pure CPU canvas2D measurement, internally cached)
+   * to compute the size of the label texture frame that *would* be allocated for this string.
+   * This is what `Sprite.getLocalBounds()` would report after rasterization.
+   *
+   * Decoupling sizing from rasterization lets us do placement math during the layer's render()
+   * without triggering `renderer.generateTexture()` (which would recursively call `renderer.render()`
+   * and corrupt batcher state — see lessons.md "Pixi v8 renderer is NOT re-entrant").
+   *
+   * @param str - The label text
+   * @param style - 'normal' or 'italic'
+   * @return Frame width/height in CSS pixels, padded the same way the texture will be
+   */
+  measureLabel(str: string, style: 'normal' | 'italic' = 'normal'): MeasuredLabel {
+    const textStyle = this._getTextStyle(str, style);
+    const metrics = PIXI.CanvasTextMetrics.measureText(str, textStyle);
+    const pad = this._getLabelPadding(str);
+    // Texture frame is `ceil(measured + pad*2)` — see node_modules/pixi.js/lib/scene/text/canvas/CanvasTextGenerator.mjs
+    const width = Math.ceil(metrics.width + pad * 2);
+    const height = Math.ceil(metrics.height + pad * 2);
+    return { str, style, width, height };
+  }
+
+
+  /**
+   * Look up an existing label texture, or queue a rasterization request.
+   *
+   * Returns `null` if the texture isn't allocated yet. The caller should skip rendering this
+   * label this frame; the scheduler will drain the queue after frame callbacks complete
+   * (outside of render()) and trigger a redraw to pick the texture up on the next frame.
+   *
+   * @param str - The label text
+   * @param style - 'normal' or 'italic'
+   * @return The texture if already allocated, otherwise `null` (and a request is queued)
+   */
+  private _getOrQueueLabelTexture(str: string, style: 'normal' | 'italic'): PIXI.Texture | null {
+    const textureID: TextureID = `${str}-${style}`;
     const textureManager = this.gfx.textureManager!;
+    const existing = textureManager.getTexture('text', textureID);
+    if (existing) return existing;
+    if (!this._pendingRasters.has(textureID)) {
+      this._pendingRasters.set(textureID, { str, style });
+      this._scheduleRasterDrain();
+    }
+    return null;
+  }
 
-    let texture = textureManager.getTexture('text', textureID);
-    if (!texture) {
-      // Add some extra padding if we detect unicode combining marks in the text - see Rapid#653
-      let pad = 0;
-      const marks = str.match(/\p{M}/gu);        // add /u to get a unicode-aware regex
-      if (marks && marks.length > 0)  pad = 10;  // Text with a few ascenders/descenders?
-      if (marks && marks.length > 20) pad = 50;  // Zalgotext?
 
-      let textStyle;
-      if (pad) {   // make a new style
-        const opts = Object.assign({}, (style === 'normal' ? TEXTSTYLE_NORMAL : TEXTSTYLE_ITALIC), { padding: pad });
-        textStyle = new PIXI.TextStyle(opts);
-      } else {     // use a cached style
-        textStyle = (style === 'normal' ? this._textStyleNormal : this._textStyleItalic);
-      }
+  /**
+   * Schedule a task to drain `_pendingRasters` outside of the current render path.
+   * `SchedulerSystem.schedule()` queues the task to run during `_drainQueues()`, which
+   * fires AFTER all per-frame callbacks (including layer rendering) complete.  That means
+   * any `renderer.generateTexture()` call inside the drain is a TOP-LEVEL render call,
+   * not nested inside another `renderer.render()` pass — see lessons.md
+   * "Pixi v8 renderer is NOT re-entrant".
+   *
+   * The `_rasterDrainScheduled` flag dedups within a frame so we don't enqueue N drain
+   * tasks when N labels are queued.
+   */
+  private _scheduleRasterDrain(): void {
+    if (this._rasterDrainScheduled) return;
+    this._rasterDrainScheduled = true;
+    const scheduler = this.context.systems.scheduler!;
+    scheduler.schedule(() => this._drainPendingRasters(), {
+      priority: 'normal',
+      workID: 'labels-raster-drain'
+    });
+  }
 
+
+  /**
+   * Rasterize queued labels into the text atlas.
+   * Called from the scheduler's drain phase, NOT from render() — see `_scheduleRasterDrain`.
+   */
+  private _drainPendingRasters(): void {
+    this._rasterDrainScheduled = false;
+    if (!this._pendingRasters.size) return;
+    if (!this.gfx?.textureManager) return;  // layer was reset
+
+    const textureManager = this.gfx.textureManager;
+    for (const [textureID, { str, style }] of this._pendingRasters) {
+      const textStyle = this._getTextStyle(str, style);
       const textOptions: PIXI.CanvasTextOptions = {
         text: str,
         resolution: 2,
         style: textStyle,
         textureStyle: { scaleMode: 'nearest' }
       };
-
-      texture = textureManager.createTexture('text', textureID, new PIXI.Text(textOptions));
+      textureManager.createTexture('text', textureID, new PIXI.Text(textOptions));
       this._textureIDs.set(str, textureID);
     }
+    this._pendingRasters.clear();
 
-    const sprite = new PIXI.Sprite({ texture: texture || PIXI.Texture.EMPTY });
-    sprite.label = str;
-    sprite.anchor.set(0.5, 0.5);   // middle, middle
-    return sprite;
+    // Wake the scene so newly-rasterized labels appear on the next frame.
+    this.gfx.immediateRedraw();
   }
 
 
@@ -583,25 +706,32 @@ export class PixiLayerLabels extends AbstractPixiLayer {
 
       if (!feature.label) continue;  // no label needed
 
-      let labelObj;
+      let measured: MeasuredLabel;
       if (/^[\x20-\x7E]*$/.test(feature.label)) {   // is it in the printable ASCII range?
-        labelObj = new PIXI.BitmapText({
+        // ASCII-only labels use BitmapText (no atlas texture needed).
+        const bitmapText = new PIXI.BitmapText({
           text: feature.label,
           style: {
             fontFamily: 'label-normal',
             fontSize: 12
           }
         });
-        labelObj.label = feature.label;
-        labelObj.anchor.set(0.5, 0.5);   // middle, middle
+        bitmapText.label = feature.label;
+        bitmapText.anchor.set(0.5, 0.5);   // middle, middle
+        const bRect = bitmapText.getLocalBounds();
+        measured = {
+          str: feature.label,
+          style: 'normal',
+          width: bRect.width,
+          height: bRect.height,
+          bitmapText: bitmapText
+        };
 
       } else {
-        labelObj = this.getLabelSprite(feature.label, 'normal');
+        measured = this.measureLabel(feature.label, 'normal');
       }
 
-      if (labelObj) {
-        this.placeTextLabel(feature, labelObj);
-      }
+      this.placeTextLabel(feature, measured);
     }
   }
 
@@ -649,8 +779,8 @@ export class PixiLayerLabels extends AbstractPixiLayer {
         labelCoords[i] = [temp.x - labelOffset.x, temp.y - labelOffset.y];
       }
 
-      const labelObj = this.getLabelSprite(feature.label, 'normal');
-      this.placeRopeLabel(feature, labelObj, labelCoords);
+      const measured = this.measureLabel(feature.label, 'normal');
+      this.placeRopeLabel(feature, measured, labelCoords);
     }
   }
 
@@ -678,7 +808,7 @@ export class PixiLayerLabels extends AbstractPixiLayer {
       const fBounds = feature.container.getBounds().rectangle;
       if (fBounds.width < 600 && fBounds.height < 600) continue;  // too small
 
-      const labelObj = this.getLabelSprite(feature.label, 'italic');
+      const measured = this.measureLabel(feature.label, 'italic');
 
       // Project the outer ring from feature-local space to label space (= global screen minus labelOffset)
       // as a flat array, which is what `lineToPoly` expects.
@@ -706,7 +836,7 @@ export class PixiLayerLabels extends AbstractPixiLayer {
         coords[i] = [ bufferdata.inner[(i * 2)], bufferdata.inner[(i * 2) + 1] ];
       }
 
-      this.placeRopeLabel(feature, labelObj, coords);
+      this.placeRopeLabel(feature, measured, coords);
     }
   }
 
@@ -716,9 +846,9 @@ export class PixiLayerLabels extends AbstractPixiLayer {
    * We generate several placement regions around the marker,
    *  try them until we find one that doesn't collide with something.
    * @param feature - The feature to place point labels on
-   * @param labelObj - a PIXI.Sprite, PIXI.Text, or PIXI.BitmapText to use as the label
+   * @param measured - The label measurement (size + str/style + optional bitmapText)
    */
-  placeTextLabel(feature: AbstractPixiFeature, labelObj: PIXI.Sprite | PIXI.Text | PIXI.BitmapText): void {
+  placeTextLabel(feature: AbstractPixiFeature, measured: MeasuredLabel): void {
     if (!feature) return;
 
     const showDebug = this.context.getDebug('label');
@@ -748,11 +878,10 @@ export class PixiLayerLabels extends AbstractPixiLayer {
     // `l` = label, these bounds are in "local" coordinates to the label,
     // 0,0 is the center of the label
     // (padY -1, because for some reason, calculated height seems higher than necessary)
-    const lRect = labelObj.getLocalBounds().clone().pad(0, -1);
+    const lWidth = measured.width;
+    const lHeight = measured.height - 2;  // .pad(0, -1) equivalent: shrink height by 1 on each side
     const some = 5;
     const more = 10;
-    const lWidth = lRect.width;
-    const lHeight = lRect.height;
     const lWidthHalf = lWidth * 0.5;
     const lHeightHalf = lHeight * 0.5;
 
@@ -831,8 +960,11 @@ export class PixiLayerLabels extends AbstractPixiLayer {
 //        picked = placementID;
         const style = feature.style as any;
         const label = new Label(featureID, 'text', {
-          str: feature.label!,
-          labelObj: labelObj,
+          str: measured.str,
+          style: measured.style,
+          width: measured.width,
+          height: measured.height,
+          bitmapText: measured.bitmapText,
           x: x,
           y: y,
           tint: style?.label?.color ?? 0xeeeeee
@@ -874,11 +1006,11 @@ export class PixiLayerLabels extends AbstractPixiLayer {
    * We generate chains of bounding boxes along the line,
    *  then add the labels in spaces along the line wherever they fit.
    * @param feature - The feature to place rope labels on
-   * @param labelObj - A PIXI.Sprite to use as the label
+   * @param measured - The label measurement (size + str/style)
    * @param coords - The coordinates to place a rope on, in label space (= global screen minus labelOffset)
    */
-  placeRopeLabel(feature: AbstractPixiFeature, labelObj: PIXI.Sprite, coords: Vec2[]): void {
-    if (!feature || !labelObj || !coords) return;
+  placeRopeLabel(feature: AbstractPixiFeature, measured: MeasuredLabel, coords: Vec2[]): void {
+    if (!feature || !measured || !coords) return;
     if (!feature.container.visible || !feature.container.renderable) return;
 
     const showDebug = this.context.getDebug('label');
@@ -886,9 +1018,8 @@ export class PixiLayerLabels extends AbstractPixiLayer {
 
     // `l` = label, these bounds are in "local" coordinates to the label,
     // 0,0 is the center of the label
-    const lRect = labelObj.getLocalBounds();
-    const lWidth = lRect.width;
-    const lHeight = lRect.height;
+    const lWidth = measured.width;
+    const lHeight = measured.height;
     const BENDLIMIT = Math.PI / 8;
 
     // The size of the collision test bounding boxes, in pixels.
@@ -1038,9 +1169,11 @@ export class PixiLayerLabels extends AbstractPixiLayer {
 
       const style = feature.style as any;
       const label = new Label(labelID, 'rope', {
-        str: feature.label!,
+        str: measured.str,
+        style: measured.style,
+        width: measured.width,
+        height: measured.height,
         coords: scaledCoords,
-        labelObj: labelObj,
         tint: style?.label?.color ?? 0xeeeeee
       });
       this._labels.set(labelID, label);
@@ -1053,9 +1186,6 @@ export class PixiLayerLabels extends AbstractPixiLayer {
     if (showDebug && debugBoxes.length) {
       this._debugRBush.load(debugBoxes);
     }
-
-    // we can destroy the sprite now, it's texture will remain on the rope?
-    // sprite.destroy();
   }
 
 
@@ -1101,7 +1231,22 @@ const isCanvas = (renderer.type === PIXI.RendererType.CANVAS);
 
       if (label.type === 'text') {
         const textProps = props as TextLabelProps;
-        const labelObj = textProps.labelObj;  // a PIXI.Sprite, PIXI.Text, or PIXI.BitmapText
+        let labelObj: PIXI.Container;
+
+        if (textProps.bitmapText) {
+          // ASCII point label: BitmapText was built during placement.
+          labelObj = textProps.bitmapText;
+        } else {
+          // Sprite point label: look up the texture (queued during placement).
+          // If it's not ready yet, skip this frame — the queue drain will fire a redraw.
+          const texture = this._getOrQueueLabelTexture(textProps.str, textProps.style);
+          if (!texture) continue;
+          const sprite = new PIXI.Sprite({ texture });
+          sprite.label = textProps.str;
+          sprite.anchor.set(0.5, 0.5);
+          labelObj = sprite;
+        }
+
         labelObj.tint = textProps.tint || 0xffffff;
         labelObj.position.set(textProps.x, textProps.y);
 
@@ -1111,9 +1256,14 @@ const isCanvas = (renderer.type === PIXI.RendererType.CANVAS);
 
       } else if (label.type === 'rope' && !isCanvas) {
         const ropeProps = props as RopeLabelProps;
-        const labelObj = ropeProps.labelObj as PIXI.Sprite;  // a PIXI.Sprite
+        // Look up the texture (queued during placement). Skip this frame if it's not ready yet —
+        // the queue drain will rasterize and fire a redraw, and the rope will appear next frame.
+        // (See current.md "Labels refactor" / lessons.md "Pixi v8 renderer is NOT re-entrant".)
+        const texture = this._getOrQueueLabelTexture(ropeProps.str, ropeProps.style);
+        if (!texture) continue;
+
         const points = ropeProps.coords.map(([x,y]) => new PIXI.Point(x, y));
-        const rope = new PIXI.MeshRope({ texture: labelObj.texture, points: points });
+        const rope = new PIXI.MeshRope({ texture, points });
         rope.label = labelID;
         rope.autoUpdate = false;
         rope.sortableChildren = false;

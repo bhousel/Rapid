@@ -1,39 +1,28 @@
 # Current Work
 
-## Branch: `render_worldcoord`
+## Labels refactor (rope-label garbling + perf)
 
-Partial migration from legacy screen-coord rendering (`PixiGeometryPart` / `setCoords()`) to
-native z16 world-coordinate rendering (`GeometryPart` / `.geometry = part` API).
+### The bug
+Rope labels (`PIXI.MeshRope`) sometimes appear garbled when they first enter the scene — wrong texture content, smeared glyphs, incorrect UVs. Self-heals on the next clean frame (any redraw — hover, pan, etc.).
 
-### Completed so far
-- `world` Pixi container added to GraphicsSystem scene graph; `stage → origin → world → groups → features`.
-- `world.position` + `world.scale` math is correct (see decisions.md "Pixi World-Coord Rendering").
-- `PixiFeaturePoint.updateWorld`: renders, counter-scales sprites to screen size, counter-rotates bearing. Hit area and halo already work (they operate in local counter-scaled space).
-- `PixiFeatureLine.updateWorld` + `updateWorldGraphic`: renders strokes with world-local widths (`px × 2^(WORLD_ZOOM - zoom)`). Dash spacing pre-scaled the same way.
-- `PixiFeaturePolygon.updateWorld`: renders strokes + full fill + partial fill mask + lowRes sprite + SSR.
-- Groups `points`, `qa`, `streetview`, `basemap`, `blocks`, `debug`, `ui` placed under `world` container in PixiScene.
-- All layer files migrated: KartaPhotos, KeepRight, MapRoulette, MapillaryDetections, MapillaryPhotos, MapillarySigns, OsmNotes, Osmose, StreetsidePhotos, CustomData, Osm, Rapid, EditBlocks, Debug, Labels, MapUI, and remaining.
-- `PixiLayerLabels` fully migrated to world-coord geometry (step 4): label positions computed in world space, rope labels use world-local coords, zoom/rotation invalidation guard kept.
-- DashLine made scale-aware: `scale` option converts local-coord widths/dashes to screen pixels. Line/Polygon halos use `scale: localScale`; Point halos use default `scale: 1` (container already counter-scaled).
-- Zoom usage clarified: `viewZoom = viewport.transform.zoom` for scale chain math; `styleZoom = map?.effectiveZoom() ?? viewZoom` for LOD/styling thresholds. Every layer and feature file now uses the correct zoom for each purpose.
-- `MapSystem.effectiveZoom()` simplified: replaced redundant `geoMetersToLon(1,lat)/geoMetersToLon(1,0)` ratio with direct `extraZoom = -log2(cos(lat * DEG2RAD))`; `geoMetersToLon` removed from the import.
-- ~~Step 5 halo fixes committed as `ba78d87d2`~~
-- `bun tsc --noEmit` clean.
+### Root cause
+`PixiLayerLabels.getLabelSprite()` calls `gfx.textureManager.createTexture('text', id, new PIXI.Text(...))` synchronously during the labels layer's `render()`. That path runs `renderer.generateTexture()` + `renderer.texture.getPixels()`, which **recursively calls `this._renderer.render(...)`**. Pixi v8's renderer is not re-entrant — shared batcher / renderPipes / renderTarget state gets corrupted when render() is invoked from inside another render(). Timing-dependent, so intermittent, and self-heals next frame.
 
-### Status: COMPLETE ✅
+Secondary issue: each new label = 1 `generateTexture` (nested GPU render) + 1 `readPixels` (full pipeline flush, CPU↔GPU sync stall). N new labels per frame = N stalls. Flame chart shows ~116ms frames dominated by back-to-back `readPixels` inside `labelLines`.
 
-All steps of the `render_worldcoord` migration are done:
+### Plan (4 steps, user-approved)
+1. **Step 1 (in progress)** — Decouple measurement from rasterization in `PixiLayerLabels.ts`. Use `PIXI.CanvasTextMetrics.measureText(str, style)` for sizing without rasterizing. Queue texture creations and drain them OUTSIDE `render()` via `SchedulerSystem.schedule()` (workID `labels-raster-drain`, normal priority) — the scheduler’s `_drainQueues()` runs AFTER all per-frame callbacks complete, so any `renderer.generateTexture()` call there is top-level, not nested inside a layer render. `renderObjects()` skips rope/sprite labels whose texture isn’t ready yet — they pop in one frame later (user OK with this). BitmapText path for ASCII point labels unchanged.
+2. **Step 2** — Introduce a `PixiFeatureLabel` managed-feature class so labels participate in the normal feature lifecycle.
+3. **Step 3** — Move text rasterization onto an `OffscreenCanvas` worker. Transfer `ImageData` back, feed `PixiTextures.allocate()` directly — bypasses both the nested render AND the readPixels stall.
+4. **Step 4** — Apply the same fix to `PixiFeaturePolygon.ts:417-430` (`PIXI.GpuGraphicsContext` + `PIXI.buildContextBatches` round-trip — same anti-pattern). Replace with direct earcut tessellation.
 
-- ~~Step 1 (hit areas + halo): complete (`9d46afca3`)~~
-- ~~Step 2 (polygon partial fill / mask / lowRes / SSR + use local.coords): complete (`f1a5296f3`)~~
-- ~~Step 3 (migrate basemap + remaining setCoords callers): complete (`bdfa56684`)~~
-- ~~Step 4 (PixiLayerLabels world-coord geometry): complete (`b3f5c4417`)~~
-- ~~Halo dash fixes + zoom type cleanup: complete (`ba78d87d2`)~~
-- ~~Step 5 (delete PixiGeometryPart, collapse dual paths): complete (`f12bb91e1`)~~
+### Step 1 implementation notes
+- Texture frame includes padding: `width = ceil(measured.width + padding*2)`, height likewise. Read padding via `style._getFinalPadding()`.
+- `placeRopeLabel` / `placeTextLabel` receive a measured `{ str, style, width, height, bitmapText? }` instead of a Sprite.
+- `Label.props` stores `str` + `style` (+ `bitmapText` for ASCII point labels). Texture is looked up at render time.
+- After draining the rasterization queue, call `gfx.immediateRedraw()` so the next frame picks up new textures.
 
-### Key notes
-- All feature classes now use a single `update(viewport)` path backed by `GeometryPart` (world coords).
-- `container.position` is set to `world.origin`; vertex arrays are origin-relative (`local.coords`).
-- **Zoom naming convention**: `viewZoom = viewport.transform.zoom` (scale math); `styleZoom = map?.effectiveZoom() ?? viewZoom` (LOD/styling).
-- `PixiFeaturePolygon` uses only `viewZoom` (no LOD thresholds) — intentional.
+---
+
+## Previous: `render_worldcoord` migration — COMPLETE ✅ (see completed.md / decisions.md)
 
