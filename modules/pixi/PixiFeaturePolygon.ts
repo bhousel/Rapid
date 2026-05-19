@@ -37,8 +37,8 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
   maskSource: PIXI.Graphics | null;
   /** Container for stroke graphics */
   strokes: PIXI.Container | null;
-  /** Debug SSR graphics (optional) */
-  debugSSR?: PIXI.Graphics | null;
+  /** Debug surrounding rectangle graphics (optional) */
+  debugSurround?: PIXI.Graphics | null;
 
   /** Buffer polygon data for hit testing and halo */
   private _bufferdata: LineToPolyResult | null;
@@ -91,13 +91,13 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
 
     this.container.addChild(lowRes, fill, strokes, mask);
 
-    // Debug SSR
-    // const debugSSR = new PIXI.Graphics();
-    // debugSSR.label = 'ssr';
-    // debugSSR.eventMode = 'none';
-    // debugSSR.sortableChildren = false;
-    // this.debugSSR = debugSSR;
-    // this.container.addChild(debugSSR);
+    // Debug surrounding rectangle
+    const debugSurround = new PIXI.Graphics();
+    debugSurround.label = 'surround';
+    debugSurround.eventMode = 'none';
+    debugSurround.sortableChildren = false;
+    this.debugSurround = debugSurround;
+    this.container.addChild(debugSurround);
   }
 
 
@@ -126,9 +126,9 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
       this.strokes.destroy({ children: true });
       this.strokes = null;
     }
-    if (this.debugSSR) {
-      this.debugSSR.destroy();
-      this.debugSSR = null;
+    if (this.debugSurround) {
+      this.debugSurround.destroy();
+      this.debugSurround = null;
     }
 
     this._bufferdata = null;
@@ -232,7 +232,7 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
       strokes.visible = false;
 
     // Very small, swap with lowRes sprite
-    } else if (local.ssr && (w < 20 && h < 20)) {
+    } else if (local.surround && (w < 20 && h < 20)) {
       this.lod = 1;
       this.visible = true;
       lowRes.visible = true;
@@ -240,10 +240,10 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
       mask.visible = false;
       strokes.visible = false;
 
-      // SSR data is in local coords. The center is the midpoint of opposite midpoints.
-      // axis1 (p1->q1) is perpendicular to angle (the SSR's height direction)
-      // axis2 (p2->q2) is along angle (the SSR's width direction)
-      const poly = local.ssr.polygon;
+      // Surrounding rectangle data is in local coords. The center is the midpoint of opposite midpoints.
+      // axis1 (p1->q1) is perpendicular to angle (the rect's height direction)
+      // axis2 (p2->q2) is along angle (the rect's width direction)
+      const poly = local.surround.polygon;
       const p1: Vec2 = [(poly[0][0] + poly[1][0]) / 2, (poly[0][1] + poly[1][1]) / 2];
       const q1: Vec2 = [(poly[2][0] + poly[3][0]) / 2, (poly[2][1] + poly[3][1]) / 2];
       const p2: Vec2 = [(poly[3][0] + poly[0][0]) / 2, (poly[3][1] + poly[0][1]) / 2];
@@ -254,7 +254,7 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
       const heightWorld = vecLength(p1, q1);
       const widthWorld = vecLength(p2, q2);
 
-      // Decide shape: are any SSR corners on the outer ring?
+      // Decide shape: are any surrounding rectangle corners on the outer ring?
       // Use a small epsilon in world units (the legacy code used 0.1 screen px).
       const EPSILON = 0.1 * localScale;
       const outer = local.outer!;
@@ -269,8 +269,8 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
         if (!c3in) c3in = vecEqual(point, poly[3], EPSILON);
         if (c0in && c1in && c2in && c3in) break;
       }
-      const cornersInSSR = c0in || c1in || c2in || c3in;
-      const shapeType: 'square' | 'circle' = cornersInSSR ? 'square' : 'circle';
+      const cornersInSR = c0in || c1in || c2in || c3in;
+      const shapeType: 'square' | 'circle' = cornersInSR ? 'square' : 'circle';
 
       const filling = isWireframe ? '-unfilled' : '';
       const textureName = `lowres${filling}-${shapeType}`;
@@ -280,7 +280,7 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
       // Source sprite is 10x10. Container worldScale will scale it. To display
       // at (widthWorld * worldScale) screen px, the sprite scale must be widthWorld/10.
       lowRes.scale.set(widthWorld / 10, heightWorld / 10);
-      lowRes.rotation = local.ssr.angle;
+      lowRes.rotation = local.surround.angle;
       lowRes.tint = color;
 
     } else {
@@ -434,12 +434,12 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
       }
     }
 
-    // Debug SSR
-    if (this.debugSSR) {
-      this.debugSSR.clear();
-      const p = local.ssr?.polygon;
+    // Debug surrounding rectangle
+    if (this.debugSurround) {
+      this.debugSurround.clear();
+      const p = local.surround?.polygon;
       if (p) {
-        const ssrflat = [
+        const surroundFlat = [
           p[0][0], p[0][1],
           p[1][0], p[1][1],
           p[2][0], p[2][1],
@@ -447,8 +447,8 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
           p[0][0], p[0][1]
         ];
 
-        this.debugSSR
-          .poly(ssrflat, true)
+        this.debugSurround
+          .poly(surroundFlat, true)
           .stroke({ width: 2 * localScale, color: 0x00ff00 });
       }
     }

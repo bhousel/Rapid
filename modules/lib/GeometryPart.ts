@@ -1,4 +1,4 @@
-import { Extent, geomGetSmallestSurroundingRectangle, vecInterp } from '@rapid-sdk/math';
+import { Extent, geomGetDominantSurroundingRectangle, vecInterp } from '@rapid-sdk/math';
 import { polygonArea, polygonCentroid, polygonHull } from 'd3-polygon';
 import polylabel from '@mapbox/polylabel';
 
@@ -24,7 +24,7 @@ export interface GeometryPartWorldData {
   centroid?: Vec2;
   poi?: Vec2;
   area?: number;
-  ssr?: SurroundingRectangle;
+  surround?: SurroundingRectangle;
 }
 
 /** Local coordinate data (relative to origin) for GeometryPart */
@@ -36,7 +36,7 @@ export interface GeometryPartLocalData {
   centroid?: Vec2;
   poi?: Vec2;
   area?: number;
-  ssr?: SurroundingRectangle;
+  surround?: SurroundingRectangle;
 }
 
 
@@ -60,14 +60,14 @@ export interface GeometryPartLocalData {
  *   `world.hull`       Computed convex hull, Array of coordinate pairs [ [x,y], [x,y], … ]
  *   `world.centroid`   Computed centroid, [x, y]
  *   `world.poi`        Computed pole of inaccessability, [x, y]
- *   `world.ssr`        Computed smallest surrounding rectangle data
+ *   `world.surround`   Computed surrounding rectangle
  *   `local.coords`     Local coordinate data (relative to origin, small numbers)
  *   `local.extent`     Local Extent bounding box (relative to origin)
  *   `local.outer`      Local outer ring, Array of coordinate pairs [ [x,y], [x,y], … ]
  *   `local.hull`       Local convex hull, Array of coordinate pairs [ [x,y], [x,y], … ]
  *   `local.centroid`   Local centroid, [x, y]
  *   `local.poi`        Local pole of inaccessability, [x, y]
- *   `local.ssr`        Local smallest surrounding rectangle data
+ *   `local.surround`   Local surrounding rectangle
  */
 export class GeometryPart {
   context: Context;
@@ -275,7 +275,7 @@ export class GeometryPart {
       outer: localRings[0]
     };
 
-    // Calculate hull, centroid, poi, ssr if possible
+    // Calculate hull, centroid, poi, surrounding rectangle if possible
     if (world.outer!.length === 0) {          // no coordinates? - shouldn't happen
       // no-op
 
@@ -327,14 +327,15 @@ export class GeometryPart {
         world.poi = [local.poi[0] + worldOrigin[0], local.poi[1] + worldOrigin[1]];
       }
 
-      // Smallest Surrounding Rectangle (compute in local space)
-      if (local.hull) {
-        local.ssr = geomGetSmallestSurroundingRectangle(local.hull) ?? undefined;
+      // Dominant Surrounding Rectangle (compute in local space)
+      if (local.outer) {
+        local.surround = geomGetDominantSurroundingRectangle(local.outer) ?? undefined;
+
         // Convert back to world space
-        if (local.ssr) {
-          world.ssr = {
-            polygon: local.ssr.polygon.map(coord => [coord[0] + worldOrigin[0], coord[1] + worldOrigin[1]]) as typeof local.ssr.polygon,
-            angle: local.ssr.angle
+        if (local.surround) {
+          world.surround = {
+            polygon: local.surround.polygon.map(coord => [coord[0] + worldOrigin[0], coord[1] + worldOrigin[1]]) as typeof local.surround.polygon,
+            angle: local.surround.angle
           };
         }
       }

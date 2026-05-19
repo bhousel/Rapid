@@ -1,4 +1,4 @@
-import { geomGetSmallestSurroundingRectangle, Vec2, vecDot, vecInterp, vecLength, Viewport } from '@rapid-sdk/math';
+import { geomGetDominantSurroundingRectangle, Vec2, vecDot, vecInterp, vecLength, Viewport } from '@rapid-sdk/math';
 
 import type { Action } from './types.ts';
 import type { Graph } from '../lib/Graph.ts';
@@ -7,7 +7,7 @@ import type { OsmNode } from '../data/OsmNode.ts';
 
 /**
  * Aligns selected nodes along their common axis of symmetry.
- * Projects nodes onto the long axis of the smallest surrounding rectangle.
+ * Projects nodes onto the long axis of the dominant surrounding rectangle.
  *
  * @param   nodeIDs   - Array of EntityIDs of nodes to straighten
  * @param   viewport  - The Viewport for coordinate conversion
@@ -21,8 +21,8 @@ export function actionStraightenNodes(nodeIDs: EntityID[], viewport: Viewport): 
 
   // returns the endpoints of the long axis of symmetry of the `points` bounding rect
   function getEndpoints(points: Vec2[]): [Vec2, Vec2] {
-    const ssr = geomGetSmallestSurroundingRectangle(points);
-    if (!ssr) {
+    const surround = geomGetDominantSurroundingRectangle(points);
+    if (!surround) {
       // fallback: use first and last points
       return [points[0], points[points.length - 1]];
     }
@@ -30,10 +30,10 @@ export function actionStraightenNodes(nodeIDs: EntityID[], viewport: Viewport): 
     // Choose line pq = axis of symmetry.
     // The shape's surrounding rectangle has 2 axes of symmetry.
     // Snap points to the long axis
-    const p1: Vec2 = [(ssr.polygon[0][0] + ssr.polygon[1][0]) / 2, (ssr.polygon[0][1] + ssr.polygon[1][1]) / 2 ];
-    const q1: Vec2 = [(ssr.polygon[2][0] + ssr.polygon[3][0]) / 2, (ssr.polygon[2][1] + ssr.polygon[3][1]) / 2 ];
-    const p2: Vec2 = [(ssr.polygon[3][0] + ssr.polygon[4][0]) / 2, (ssr.polygon[3][1] + ssr.polygon[4][1]) / 2 ];
-    const q2: Vec2 = [(ssr.polygon[1][0] + ssr.polygon[2][0]) / 2, (ssr.polygon[1][1] + ssr.polygon[2][1]) / 2 ];
+    const p1: Vec2 = [(surround.polygon[0][0] + surround.polygon[1][0]) / 2, (surround.polygon[0][1] + surround.polygon[1][1]) / 2 ];
+    const q1: Vec2 = [(surround.polygon[2][0] + surround.polygon[3][0]) / 2, (surround.polygon[2][1] + surround.polygon[3][1]) / 2 ];
+    const p2: Vec2 = [(surround.polygon[3][0] + surround.polygon[4][0]) / 2, (surround.polygon[3][1] + surround.polygon[4][1]) / 2 ];
+    const q2: Vec2 = [(surround.polygon[1][0] + surround.polygon[2][0]) / 2, (surround.polygon[1][1] + surround.polygon[2][1]) / 2 ];
 
     const isLong = (vecLength(p1, q1) > vecLength(p2, q2));
     return isLong ? [p1, q1] : [p2, q2];

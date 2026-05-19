@@ -1,4 +1,4 @@
-import { geomGetSmallestSurroundingRectangle, vecInterp, vecLength } from '@rapid-sdk/math';
+import { geomGetDominantSurroundingRectangle, vecInterp, vecLength } from '@rapid-sdk/math';
 import { utilGetAllNodes } from '@rapid-sdk/util';
 
 import type { Action } from './types.ts';
@@ -31,16 +31,16 @@ export function actionReflect(reflectIDs: EntityID[], viewport: Viewport): Refle
 
     const nodes = utilGetAllNodes(reflectIDs, graph) as OsmNode[];
     const points = nodes.map(n => viewport.project(n.loc!));
-    const ssr = geomGetSmallestSurroundingRectangle(points);
-    if (!ssr) return graph;
+    const surround = geomGetDominantSurroundingRectangle(points);
+    if (!surround) return graph;
 
     // Choose line pq = axis of symmetry.
     // The shape's surrounding rectangle has 2 axes of symmetry.
     // Reflect across the longer axis by default.
-    const p1: Vec2 = [(ssr.polygon[0][0] + ssr.polygon[1][0]) / 2, (ssr.polygon[0][1] + ssr.polygon[1][1]) / 2 ];
-    const q1: Vec2 = [(ssr.polygon[2][0] + ssr.polygon[3][0]) / 2, (ssr.polygon[2][1] + ssr.polygon[3][1]) / 2 ];
-    const p2: Vec2 = [(ssr.polygon[3][0] + ssr.polygon[4][0]) / 2, (ssr.polygon[3][1] + ssr.polygon[4][1]) / 2 ];
-    const q2: Vec2 = [(ssr.polygon[1][0] + ssr.polygon[2][0]) / 2, (ssr.polygon[1][1] + ssr.polygon[2][1]) / 2 ];
+    const p1: Vec2 = [(surround.polygon[0][0] + surround.polygon[1][0]) / 2, (surround.polygon[0][1] + surround.polygon[1][1]) / 2 ];
+    const q1: Vec2 = [(surround.polygon[2][0] + surround.polygon[3][0]) / 2, (surround.polygon[2][1] + surround.polygon[3][1]) / 2 ];
+    const p2: Vec2 = [(surround.polygon[3][0] + surround.polygon[4][0]) / 2, (surround.polygon[3][1] + surround.polygon[4][1]) / 2 ];
+    const q2: Vec2 = [(surround.polygon[1][0] + surround.polygon[2][0]) / 2, (surround.polygon[1][1] + surround.polygon[2][1]) / 2 ];
     let p: Vec2;
     let q: Vec2;
 
