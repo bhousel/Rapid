@@ -1,4 +1,4 @@
-import { geomGetDominantSurroundingRectangle, Vec2, vecDot, vecInterp, vecLength, Viewport } from '@rapid-sdk/math';
+import { geomGetSmallestSurroundingRectangle, Vec2, vecDot, vecInterp, vecLength, Viewport } from '@rapid-sdk/math';
 
 import type { Action } from './types.ts';
 import type { Graph } from '../lib/Graph.ts';
@@ -7,7 +7,7 @@ import type { OsmNode } from '../data/OsmNode.ts';
 
 /**
  * Aligns selected nodes along their common axis of symmetry.
- * Projects nodes onto the long axis of the dominant surrounding rectangle.
+ * Projects nodes onto the long axis of the smallest surrounding rectangle.
  *
  * @param   nodeIDs   - Array of EntityIDs of nodes to straighten
  * @param   viewport  - The Viewport for coordinate conversion
@@ -21,7 +21,7 @@ export function actionStraightenNodes(nodeIDs: EntityID[], viewport: Viewport): 
 
   // returns the endpoints of the long axis of symmetry of the `points` bounding rect
   function getEndpoints(points: Vec2[]): [Vec2, Vec2] {
-    const surround = geomGetDominantSurroundingRectangle(points);
+    const surround = geomGetSmallestSurroundingRectangle(points);
     if (!surround) {
       // fallback: use first and last points
       return [points[0], points[points.length - 1]];
