@@ -3,6 +3,7 @@ import RBush from 'rbush';
 import { HALF_PI, TAU, WORLD_HALF, numWrap, vecAdd, vecAngle, vecScale, vecSubtract, geomRotate } from '@rapid-sdk/math';
 
 import { AbstractPixiLayer } from './AbstractPixiLayer.ts';
+import { PixiFeatureLabel } from './PixiFeatureLabel.ts';
 import { getLineSegments, getDebugBBox, lineToPoly } from './helpers.ts';
 
 import type { AbstractPixiFeature } from './AbstractPixiFeature.ts';
@@ -11,6 +12,7 @@ import type { PixiFeaturePoint } from './PixiFeaturePoint.ts';
 import type { PixiFeaturePolygon } from './PixiFeaturePolygon.ts';
 import type { PixiLayerMapUI } from './PixiLayerMapUI.ts';
 import type { PixiScene } from './PixiScene.ts';
+import type { LabelProps, TextLabelProps, RopeLabelProps } from './PixiFeatureLabel.ts';
 import type { Vec2, Viewport } from '@rapid-sdk/math';
 
 
@@ -33,6 +35,8 @@ const TEXTSTYLE_ITALIC: PIXI.TextStyleOptions = {
   stroke: { color: 0xffffff, width: 3, join: 'round' }
 };
 
+/** Convenience type */
+type BoxID = string;
 
 /** A measured label: dimensions decoupled from rasterization. */
 interface MeasuredLabel {
@@ -44,33 +48,10 @@ interface MeasuredLabel {
   bitmapText?: PIXI.BitmapText;
 }
 
-/** Properties for text labels (used on points) */
-interface TextLabelProps {
-  str: string;
-  style: 'normal' | 'italic';
-  width: number;
-  height: number;
-  /** Present for the ASCII point-label path; absent for the Sprite path (texture is looked up at render time). */
-  bitmapText?: PIXI.BitmapText;
-  x: number;
-  y: number;
-  tint: number;
-}
-
-/** Properties for rope labels (used on lines and polygons) */
-interface RopeLabelProps {
-  str: string;
-  style: 'normal' | 'italic';
-  width: number;
-  height: number;
-  coords: number[][];
-  tint: number;
-}
-
 /** Box used in RBush for collision detection */
 interface LabelBox {
   type: 'label' | 'avoid' | 'debug';
-  id: string;
+  id: BoxID;
   featureID: FeatureID;
   labelID?: LabelID | null;
   objectID?: string | null;
@@ -80,6 +61,7 @@ interface LabelBox {
   maxX: number;
   maxY: number;
 }
+
 
 /** Type for placement IDs */
 type PlacementID =
@@ -98,26 +80,6 @@ interface ChainLink {
 
 
 /**
- *  These 'Labels' are placeholders for where a label can go.
- *  The display objects are added to the scene lazily only after the user
- *  has scrolled the placement box into view - see `renderObjects()`
- */
-class Label {
-  id: LabelID;
-  type: 'text' | 'rope';
-  props: TextLabelProps | RopeLabelProps;
-  objectID: string | null;
-
-  constructor(id: LabelID, type: 'text' | 'rope', props: TextLabelProps | RopeLabelProps) {
-    this.id = id;
-    this.type = type;
-    this.props = props;
-    this.objectID = null;  // A Pixi DisplayObject
-  }
-}
-
-
-/**
  * @class
  */
 export class PixiLayerLabels extends AbstractPixiLayer {
@@ -125,23 +87,37 @@ export class PixiLayerLabels extends AbstractPixiLayer {
   debugContainer: PIXI.Container | null;
   labelContainer: PIXI.Container | null;
 
+  /** Labeling spatial index - contains boxes covering placed labels and regions to avoid */
   private _labelRBush: RBush<LabelBox>;
+  /** Debugging spatial index - contains boxes covering all tested regions */
   private _debugRBush: RBush<LabelBox>;
+
+  /** FeatureIDs that we are avoiding (e.g. map pins, vertices, junctions) */
   private _avoided: Set<FeatureID>;
+  /** FeatureIDs that have been labeled (points, roads, etc) - note that point features can be both avoided and labeled */
   private _labeled: Set<FeatureID>;
-  private _labels: Map<LabelID, Label>;
-  private _objects: Map<string, PIXI.Container>;
-  private _boxes: Map<string, LabelBox>;
-  private _featureHasBoxes: Map<FeatureID, Set<string>>;
+
+  /** Mapping of a BoxID to a Box, as indexed by RBush */
+  private _boxes: Map<BoxID, LabelBox>;
+
+  /** Mapping of a FeatureID to the boxes that cover it */
+  private _featureBoxes: Map<FeatureID, Set<BoxID>>;
+  /** Mapping of a text string (e.g. "Main Street") to generated texture */
   private _textureIDs: Map<string, TextureID>;
-  /** Queue of label rasterization requests to process OUTSIDE the layer's render(). */
+  /** Storage for label placeholders - they will be added to the scene lazily */
+  private _placeholders: Map<LabelID, LabelProps>;
+  /** Mapping of Pixi object id to PIXI.Sprite */
+  private _debugSprites: Map<string, PIXI.Sprite>;
+
   private _pendingRasters: Map<TextureID, { str: string; style: 'normal' | 'italic' }>;
-  /** True while a microtask is scheduled to drain `_pendingRasters`. */
   private _rasterDrainScheduled: boolean;
   private _tPrev: { x: number; y: number; z: number; r: number };
+
+  /** Tracks the difference between the top left corner of the screen and the parent "origin" container */
   private _labelOffset: PIXI.Point;
   private _textStyleNormal: PIXI.TextStyle;
   private _textStyleItalic: PIXI.TextStyle;
+
 
   /**
    * @constructor
@@ -160,21 +136,23 @@ export class PixiLayerLabels extends AbstractPixiLayer {
     this._labelRBush = new RBush();  // label placement
     this._debugRBush = new RBush();  // debug sprites
 
-    // Keep track of the features we have processed
+    // Keep track of the labelable features we have processed
     this._avoided = new Set();   // Set<FeatureID>
     this._labeled = new Set();   // Set<FeatureID>
 
-    // Label objects are placeholders for where a label can go.
-    // After working out the placement math, we don't automatically make display objects,
-    // since many of the objects would get placed far offscreen.
-    this._labels = new Map();    // Map<LabelID, Label Object>
+    // Label placeholders — store the placement props for every possible label.
+    // Each one is materialized into a `PixiFeatureLabel` lazily on first visibility
+    // (see `renderLabels()`), to avoid creating display objects for the many labels
+    // that are placed far off-screen.
+    this._placeholders = new Map();    // Map<LabelID, LabelProps>
 
-    // Pixi Display Objects - may include Sprite, Rope, Text, BitmapText, etc.
-    this._objects = new Map();   // Map<objectID, Display Object>
+    // Pixi Display Objects for debug bbox sprites.
+    // (Label display objects live on their owning `PixiFeatureLabel` features.)
+    this._debugSprites = new Map();   // Map<objectID, PIXI.Sprite>
 
     // Boxes are objects for working with RBush.
-    this._boxes = new Map();            // Map<boxID, box>
-    this._featureHasBoxes = new Map();  // Map<FeatureID, Set<boxID>>
+    this._boxes = new Map();         // Map<BoxID, LabelBox>
+    this._featureBoxes = new Map();  // Map<FeatureID, Set<BoxID>>
 
     // Keep track of textures that we've allocated
     this._textureIDs = new Map();  // Map<string, TextureID>
@@ -206,7 +184,7 @@ export class PixiLayerLabels extends AbstractPixiLayer {
     super.reset();
 
     // Destroy any Pixi display objects that we created.
-    for (const object of this._objects.values()) {
+    for (const object of this._debugSprites.values()) {
       object.destroy();
     }
 
@@ -214,10 +192,10 @@ export class PixiLayerLabels extends AbstractPixiLayer {
     this._debugRBush.clear();
     this._avoided.clear();
     this._labeled.clear();
-    this._labels.clear();
-    this._objects.clear();
+    this._placeholders.clear();
+    this._debugSprites.clear();
     this._boxes.clear();
-    this._featureHasBoxes.clear();
+    this._featureBoxes.clear();
     this._pendingRasters.clear();
     if (this._rasterDrainScheduled) {
       this.context.systems.scheduler?.cancel('labels-raster-drain');
@@ -271,11 +249,11 @@ export class PixiLayerLabels extends AbstractPixiLayer {
     this._labeled.delete(featureID);
 
     const labelIDs = new Set<LabelID>();
-    const objectIDs = new Set<string>();
+    const debugObjectIDs = new Set<string>();
 
-    // Gather `labelIDs` and `objectIDs` from the boxes
-    // Then remove the boxes.
-    const boxIDs = this._featureHasBoxes.get(featureID) || [];
+    // Gather `labelIDs` from the label boxes, `objectIDs` from the debug boxes.
+    // Then remove the boxes from the RBushes and our box cache.
+    const boxIDs = this._featureBoxes.get(featureID) || [];
     for (const boxID of boxIDs) {
       const box = this._boxes.get(boxID);
       if (box) {
@@ -284,39 +262,38 @@ export class PixiLayerLabels extends AbstractPixiLayer {
         }
         if (box.type === 'debug') {
           this._debugRBush.remove(box);
+          if (box.objectID) {
+            debugObjectIDs.add(box.objectID);
+          }
         }
         if (box.labelID) {
           labelIDs.add(box.labelID);
         }
-        if (box.objectID)  {
-          objectIDs.add(box.objectID);
-        }
       }
       this._boxes.delete(boxID);
     }
-    this._featureHasBoxes.delete(featureID);
+    this._featureBoxes.delete(featureID);
 
 
-    // Gather `objectIDs` from the labels.
-    // Then remove the labels.
+    // Destroy any materialized label features, then forget the placeholders.
+    // `feature.destroy()` removes from this layer's `features` cache, the scene's
+    // `features` cache, and the `labelContainer` (if parented).
     for (const labelID of labelIDs) {
-      const label = this._labels.get(labelID);
-      if (label) {
-        if (label.objectID) {
-          objectIDs.add(label.objectID);
-        }
+      const labelFeature = this.features.get(labelID) as PixiFeatureLabel | undefined;
+      if (labelFeature) {
+        labelFeature.destroy();
       }
-      this._labels.delete(labelID);
+      this._placeholders.delete(labelID);
     }
 
-    // Fianlly, remove Pixi Display Objects
-    // (they automatically remove from parent containers)
-    for (const objectID of objectIDs) {
-      const object = this._objects.get(objectID);
+    // Destroy debug sprites that were tied to the boxes.
+    // (They automatically remove from parent containers.)
+    for (const objectID of debugObjectIDs) {
+      const object = this._debugSprites.get(objectID);
       if (object) {
         object.destroy();
       }
-      this._objects.delete(objectID);
+      this._debugSprites.delete(objectID);
     }
   }
 
@@ -338,7 +315,7 @@ export class PixiLayerLabels extends AbstractPixiLayer {
       return;
     }
 
-    // Reset labels
+    // Reset stale labels, as needed
     const tPrev = this._tPrev;
     const tCurr = viewport.transform.props;
     if (tCurr.z !== tPrev.z || tCurr.r !== tPrev.r) {  // zoom or rotation changed
@@ -420,7 +397,7 @@ export class PixiLayerLabels extends AbstractPixiLayer {
     this.labelPolygons(polygons);
 
     this.labelContainer!.visible = true;
-    this.renderObjects();
+    this.renderLabels(frame, viewport);
 
     const showDebug = this.context.getDebug('label');
     if (showDebug) {
@@ -433,10 +410,6 @@ export class PixiLayerLabels extends AbstractPixiLayer {
 
 
   /**
-   * @param str - String for the label
-   * @param style - 'normal' or 'italic'
-   */
-  /**
    * Pick the padding to use for a label.
    * Combining marks (diacritics, Zalgo text) need extra room so glyphs don't get clipped.
    * Both measurement and rasterization must agree on this value.
@@ -444,10 +417,10 @@ export class PixiLayerLabels extends AbstractPixiLayer {
    * @return Padding in CSS pixels
    */
   private _getLabelPadding(str: string): number {
-    const marks = str.match(/\p{M}/gu);  // unicode combining marks
+    const marks = str.match(/\p{M}/gu);  // count unicode combining marks
     if (!marks) return 0;
-    if (marks.length > 20) return 50;    // Zalgo text
-    if (marks.length > 0)  return 10;    // a few ascenders/descenders
+    if (marks.length > 20) return 50;    // Zalgo text?
+    if (marks.length > 0)  return 10;    // a few ascenders/descenders?
     return 0;
   }
 
@@ -497,15 +470,19 @@ export class PixiLayerLabels extends AbstractPixiLayer {
   /**
    * Look up an existing label texture, or queue a rasterization request.
    *
-   * Returns `null` if the texture isn't allocated yet. The caller should skip rendering this
-   * label this frame; the scheduler will drain the queue after frame callbacks complete
-   * (outside of render()) and trigger a redraw to pick the texture up on the next frame.
+   * Public so `PixiFeatureLabel.update()` can resolve its own texture without
+   * the layer reaching into feature internals.
+   *
+   * Returns `null` if the texture isn't allocated yet. The caller should leave
+   * itself dirty and try again next frame; the scheduler will drain the queue
+   * after frame callbacks complete (outside of render()) and trigger a redraw
+   * so the texture is picked up on the next frame.
    *
    * @param str - The label text
    * @param style - 'normal' or 'italic'
    * @return The texture if already allocated, otherwise `null` (and a request is queued)
    */
-  private _getOrQueueLabelTexture(str: string, style: 'normal' | 'italic'): PIXI.Texture | null {
+  resolveLabelTexture(str: string, style: 'normal' | 'italic'): PIXI.Texture | null {
     const textureID: TextureID = `${str}-${style}`;
     const textureManager = this.gfx.textureManager!;
     const existing = textureManager.getTexture('text', textureID);
@@ -531,6 +508,7 @@ export class PixiLayerLabels extends AbstractPixiLayer {
    */
   private _scheduleRasterDrain(): void {
     if (this._rasterDrainScheduled) return;
+
     this._rasterDrainScheduled = true;
     const scheduler = this.context.systems.scheduler!;
     scheduler.schedule(() => this._drainPendingRasters(), {
@@ -645,8 +623,7 @@ export class PixiLayerLabels extends AbstractPixiLayer {
       // If there is already a label where this avoid box is, we will need to redo that label.
       // This is somewhat common that a label will be placed somewhere, then as more map loads,
       // we learn that some of those junctions become important and we need to avoid them.
-      const hits = this._labelRBush.search(avoidBox);
-      for (const hit of hits) {
+      for (const hit of this._labelRBush.search(avoidBox)) {
         if (hit.type === 'label' && hit.featureID) {
           this.resetFeature(hit.featureID);
         }
@@ -681,10 +658,10 @@ export class PixiLayerLabels extends AbstractPixiLayer {
 
     this._boxes.set(boxID, box);
 
-    let featureBoxIDs = this._featureHasBoxes.get(featureID);
+    let featureBoxIDs = this._featureBoxes.get(featureID);
     if (!featureBoxIDs) {
       featureBoxIDs = new Set();
-      this._featureHasBoxes.set(featureID, featureBoxIDs);
+      this._featureBoxes.set(featureID, featureBoxIDs);
     }
     featureBoxIDs.add(boxID);
   }
@@ -942,11 +919,14 @@ export class PixiLayerLabels extends AbstractPixiLayer {
     for (const placementID of attempts) {
       const [x, y] = placements[placementID];
       const EPSILON = 0.01;
+      // Use a label-specific ID so the label feature doesn't collide with the source
+      // feature in `scene.features` (which is keyed by `feature.id`).
+      const labelID: LabelID = `${featureID}-label`;
       const labelBox: LabelBox = {
         type: 'label',
         id: `${featureID}-${placementID}`,
         featureID: featureID,
-        labelID: featureID,
+        labelID: labelID,
         minX: x - lWidthHalf + EPSILON,
         minY: y - lHeightHalf + EPSILON,
         maxX: x + lWidthHalf - EPSILON,
@@ -954,12 +934,14 @@ export class PixiLayerLabels extends AbstractPixiLayer {
       };
 
       // If we can render the label in this box..
-      // Create a new Label placeholder, and insert the box
-      // into the rbush so nothing else gets placed there.
+      // Store the placeholder props, and insert the box into the rbush so
+      // nothing else gets placed there.  The PixiFeatureLabel itself is
+      // created lazily in renderObjects() the first time this label is in view.
       if (!this._labelRBush.collides(labelBox)) {
 //        picked = placementID;
         const style = feature.style as any;
-        const label = new Label(featureID, 'text', {
+        const props: TextLabelProps = {
+          kind: 'text',
           str: measured.str,
           style: measured.style,
           width: measured.width,
@@ -968,9 +950,8 @@ export class PixiLayerLabels extends AbstractPixiLayer {
           x: x,
           y: y,
           tint: style?.label?.color ?? 0xeeeeee
-        });
-
-        this._labels.set(featureID, label);
+        };
+        this._placeholders.set(labelID, props);
 
         this._cacheBox(labelBox);
         this._labelRBush.insert(labelBox);
@@ -1168,15 +1149,16 @@ export class PixiLayerLabels extends AbstractPixiLayer {
       scaledCoords = scaledCoords.map(coord => vecAdd(coord, ropeOrigin));   // back to global coords
 
       const style = feature.style as any;
-      const label = new Label(labelID, 'rope', {
+      const props: RopeLabelProps = {
+        kind: 'rope',
         str: measured.str,
         style: measured.style,
         width: measured.width,
         height: measured.height,
         coords: scaledCoords,
         tint: style?.label?.color ?? 0xeeeeee
-      });
-      this._labels.set(labelID, label);
+      };
+      this._placeholders.set(labelID, props);
     });
 
     // Bulk insert any boxes we collected..
@@ -1190,13 +1172,19 @@ export class PixiLayerLabels extends AbstractPixiLayer {
 
 
   /**
-   * This renders any of the Label objects in the view
+   * Materialize Label features for the placeholders currently in view, then update them.
+   * Follows the standard managed-feature pattern used by other layers (see `PixiLayerKeepRight.render`):
+   * look up the feature by ID, create one if missing, call `update()` and `retainFeature()`.
+   * Off-screen labels are automatically destroyed by `AbstractPixiLayer.cull()` (after 20 frames).
+   * Their placeholders remain in `_labels` so they can be rebuilt if they scroll back into view.
+   * @param frame - Integer frame being rendered
+   * @param viewport - Pixi viewport to use for rendering
    */
-  renderObjects(): void {
-// bhousel 4/1/26:  MeshRope is not supported for
-// the new experimental Pixi Canvas renderer yet.
-const renderer = this.gfx!.pixi!.renderer;
-const isCanvas = (renderer.type === PIXI.RendererType.CANVAS);
+  renderLabels(frame: number, viewport: Viewport): void {
+    // bhousel 4/1/26:  MeshRope is not supported for
+    // the new experimental Pixi Canvas renderer yet.
+    const renderer = this.gfx!.pixi!.renderer;
+    const isCanvas = (renderer.type === PIXI.RendererType.CANVAS);
 
     // Get the display bounds in screen/global coordinates
     const screen = this.gfx.pixi!.screen;
@@ -1209,70 +1197,34 @@ const isCanvas = (renderer.type === PIXI.RendererType.CANVAS);
     };
 
     // Collect Labels in view
+    // Note that a single label may have many covering boxes inserted into the rbush.
     const labelIDs = new Set<LabelID>();
     const seenTextures = new Set<string>();
-    const hits = this._labelRBush.search(screenBounds);
-    for (const box of hits) {
-      if (box.labelID) {
+    for (const box of this._labelRBush.search(screenBounds)) {
+      if (box.labelID) {    // a real label (not an avoid)
         labelIDs.add(box.labelID);
       }
     }
 
-    // Create and add Labels to the scene, if needed
+    // Materialize / update each visible Label feature.
+    const parentContainer = this.labelContainer!;
     for (const labelID of labelIDs) {
-      const label = this._labels.get(labelID);
-      if (!label) continue;         // unknown labelID - shouldn't happen?
+      const props = this._placeholders.get(labelID);
+      if (!props) continue;                              // unknown labelID - shouldn't happen?
+      if (props.kind === 'rope' && isCanvas) continue;   // canvas renderer can't do MeshRope
 
-      const props = label.props;
       seenTextures.add(props.str);
 
-      if (label.objectID) continue;   // The label was created already
-      const objectID = labelID;
-
-      if (label.type === 'text') {
-        const textProps = props as TextLabelProps;
-        let labelObj: PIXI.Container;
-
-        if (textProps.bitmapText) {
-          // ASCII point label: BitmapText was built during placement.
-          labelObj = textProps.bitmapText;
-        } else {
-          // Sprite point label: look up the texture (queued during placement).
-          // If it's not ready yet, skip this frame — the queue drain will fire a redraw.
-          const texture = this._getOrQueueLabelTexture(textProps.str, textProps.style);
-          if (!texture) continue;
-          const sprite = new PIXI.Sprite({ texture });
-          sprite.label = textProps.str;
-          sprite.anchor.set(0.5, 0.5);
-          labelObj = sprite;
-        }
-
-        labelObj.tint = textProps.tint || 0xffffff;
-        labelObj.position.set(textProps.x, textProps.y);
-
-        this._objects.set(objectID, labelObj);
-        label.objectID = objectID;
-        this.labelContainer!.addChild(labelObj);
-
-      } else if (label.type === 'rope' && !isCanvas) {
-        const ropeProps = props as RopeLabelProps;
-        // Look up the texture (queued during placement). Skip this frame if it's not ready yet —
-        // the queue drain will rasterize and fire a redraw, and the rope will appear next frame.
-        // (See current.md "Labels refactor" / lessons.md "Pixi v8 renderer is NOT re-entrant".)
-        const texture = this._getOrQueueLabelTexture(ropeProps.str, ropeProps.style);
-        if (!texture) continue;
-
-        const points = ropeProps.coords.map(([x,y]) => new PIXI.Point(x, y));
-        const rope = new PIXI.MeshRope({ texture, points });
-        rope.label = labelID;
-        rope.autoUpdate = false;
-        rope.sortableChildren = false;
-        rope.tint = ropeProps.tint || 0xffffff;
-
-        this._objects.set(objectID, rope);
-        label.objectID = objectID;
-        this.labelContainer!.addChild(rope);
+      let feature = this.features.get(labelID) as PixiFeatureLabel | undefined;
+      if (!feature) {
+        feature = new PixiFeatureLabel(this, labelID);
+        feature.parentContainer = parentContainer;
+        feature.props = props;
       }
+
+      // this.syncFeatureClasses(feature);  // not needed at this time
+      feature.update(viewport);
+      this.retainFeature(feature, frame);
     }
 
     // Cleanup label textures not visible in the scene anymore.
@@ -1309,7 +1261,7 @@ const isCanvas = (renderer.type === PIXI.RendererType.CANVAS);
         const objectID = box.id;
         const sprite = getDebugBBox(box.minX, box.minY, box.maxX - box.minX, box.maxY - box.minY, tint, 0.65, objectID);
 
-        this._objects.set(objectID, sprite);
+        this._debugSprites.set(objectID, sprite);
         box.objectID = objectID;
         this.debugContainer!.addChild(sprite);
       }
