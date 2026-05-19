@@ -157,7 +157,7 @@ export class PixiLayerLabels extends AbstractPixiLayer {
     // Keep track of textures that we've allocated
     this._textureIDs = new Map();  // Map<string, TextureID>
 
-    // Deferred label rasterization queue (see _measureLabel / _getOrQueueLabelTexture).
+    // Deferred label rasterization queue (see measureLabel / resolveLabelTexture).
     this._pendingRasters = new Map();   // Map<TextureID, { str, style }>
     this._rasterDrainScheduled = false;
 

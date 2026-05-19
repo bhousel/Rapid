@@ -292,7 +292,7 @@ export class PixiLayerBackgroundTiles extends AbstractPixiLayer {
           const w = bitmap.width;
           const h = bitmap.height;
           tile.sprite.texture = textureManager.allocate('tile', tile.sprite.label, w, h, bitmap) || PIXI.Texture.EMPTY;
-          bitmap.close();   // atlas keeps its own copy; release the decoded bytes
+          bitmap.close();   // tile atlas copied it into an edge-padded canvas
           tile.loaded = true;
           this.gfx.deferredRedraw();
         })

@@ -64,7 +64,7 @@ export type LabelProps = TextLabelProps | RopeLabelProps;
  *   3. `update()` looks up the label texture (or queues it) and adds the
  *      display object as a child of `container` once ready.
  *   4. When the placeholder scrolls out of view, `AbstractPixiLayer.cull()`
- *      eventually destroys the feature; the placeholder remains in `_labels`
+ *      eventually destroys the feature; the placeholder remains in `_placeholders`
  *      and can rebuild a feature if it comes back into view.
  *
  * Labels do not participate in hit testing and do not draw halos.

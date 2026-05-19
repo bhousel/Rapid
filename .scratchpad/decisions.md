@@ -148,15 +148,22 @@ Used when a class resolves references (`var()`, locale strings) in its props:
 - **No backward compat for old `initAsync()`** — It now only inits (doesn't start). Simple consumers use `context.run()`. v3 breaking change.
 - **`prepareAsync()` → `initAsync()` → `startAsync()`** — Each phase chains the previous. All idempotent. `run()` is a convenience that chains everything.
 
+## Pixi Labels and Atlas Textures
+
+- **Measure labels during render, rasterize after render** — `PixiLayerLabels` uses `PIXI.CanvasTextMetrics.measureText()` for placement math inside `render()`, then queues texture creation through `SchedulerSystem.schedule()` so `renderer.generateTexture()` runs in the scheduler drain phase after all frame callbacks complete. This fixes Pixi v8 renderer re-entry corruption while preserving the existing Pixi.Text rasterizer for now.
+- **Labels are managed features, placement data is not** — `PixiLayerLabels` owns RBush placement and stores `LabelProps` placeholders. `PixiFeatureLabel` is created lazily only for visible placeholders and owns the actual `Sprite` / `BitmapText` / `MeshRope` display object. Off-screen culling destroys display objects without losing placement records.
+- **Atlas items store uploadable sources, not just ImageData** — `AtlasAllocator` accepts `ImageData`, `HTMLCanvasElement`, `HTMLImageElement`, and `ImageBitmap`. WebGL uploads use the 7-arg `texSubImage2D` DOM-source overload, WebGPU uses `copyExternalImageToTexture`, and the canvas renderer blits the same source into its backing canvas. This avoids the previous `drawImage` → `getImageData` readback for images, bitmaps, and canvases.
+- **Tile-only edge replication** — The atlas still reserves a 1px ring around every texture frame, but only tile imagery needs that ring filled with edge-replicated pixels to prevent seams under bilinear sampling. `PixiTextures._fromEdgePaddedCanvas()` builds a `(w+2) x (h+2)` source for tile atlas entries with two `drawImage` passes. Symbol/text/icon entries upload at the inner frame position and leave the reserved ring transparent.
+
 ## Canvas Renderer Atlas Support
 
 - **Canvas renderer bypasses the upload pipeline** — Pixi's canvas renderer has no `_uploads` map. It reads `TextureSource.resource` directly via `canvasUtils.getCanvasSource()` at draw time. If `resource` is falsy, it returns `null` and nothing draws.
 - **Canvas-backed `AtlasSource` as the fix** — When `useCanvas: true`, `AtlasSource` creates an `HTMLCanvasElement` matching the slab size and sets it as `this.resource`. The canvas renderer's `getCanvasSource()` returns this directly — zero copies, zero conversions (not PMA, no resize needed).
-- **Blit at allocation time, not upload time** — Because there's no upload hook for canvas, `_blitItemToCanvas()` is called in `AtlasAllocator.allocate()` right after the item is added. For GL/GPU, upload handlers still fire lazily at render time as before.
-- **`_getItemPixels()` shared across all three render paths** — Extracted the padded-pixel-copy loop (1px edge duplication) from the GL and GPU upload handlers into `AtlasSource._getItemPixels()`. This eliminates duplicated code and ensures all renderers produce identical atlas content.
+- **Blit direct sources at allocation time, not upload time** — Because there's no upload hook for canvas, `_blitItemToCanvas()` is called in `AtlasAllocator.allocate()` right after the item is added. It uses `putImageData()` for `ImageData` and `drawImage()` for canvas/image/bitmap sources, with the same padded-vs-inner offset used by GL/GPU.
+- **No JS padded-pixel buffer** — The old `_getItemPixels()` loop is gone. Edge replication happens only when `PixiTextures` builds a padded tile canvas; other atlas entries upload directly and leave their reserved ring transparent.
 - **Canvas overhead only when needed** — The `useCanvas` option is only set to `true` when `RendererType.CANVAS` is detected. GL/GPU paths don't create backing canvases, avoiding the extra ~16MB per 2048×2048 slab.
 - **`(this as any).resource = canvas`** — Type mismatch: `AtlasSource extends TextureSource<BufferSourceOptions>` where the generic expects a TypedArray resource, but the canvas renderer needs an `HTMLCanvasElement`. The `as any` cast is intentional — the canvas renderer inspects `resource` dynamically, not via generic type constraints.
-- **No clear-on-free** — Freed atlas regions aren't cleared on the backing canvas, matching the GL/GPU behavior (they just `texSubImage2D` / `writeTexture` over freed space when it's reallocated).
+- **No clear-on-free** — Freed atlas regions aren't cleared on the backing canvas, matching the GL/GPU behavior (they overwrite freed space with `texSubImage2D` / `copyExternalImageToTexture` when it is reallocated).
 
 ## Style Resolution
 

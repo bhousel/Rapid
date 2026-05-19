@@ -172,7 +172,8 @@ export class AtlasAllocator {
    * @throws When dimensions are too large to fit on a slab
    */
   private _allocateTexture(width: number, height: number, textureOptions?: PIXI.TextureOptions): AtlasTexture {
-    // We'll always include an extra pixel of padding to avoid color bleeding into neighbor texture.
+    // Reserve a 1px ring around every texture frame.  Tile imagery fills this with
+    // edge-replicated pixels; symbol/text/icon sources leave it transparent.
     const padding = 1;
 
     // Cannot allocate a texture larger than the slab size.
@@ -205,7 +206,8 @@ export class AtlasAllocator {
    * @return The issued texture, if successful; otherwise, `null`.
    */
   private _issueTexture(slab: AtlasSource, width: number, height: number, textureOptions?: PIXI.TextureOptions): AtlasTexture | null {
-    // We'll always include an extra pixel of padding to avoid color bleeding into neighbor texture.
+    // Reserve a 1px ring around every texture frame.  Tile imagery fills this with
+    // edge-replicated pixels; symbol/text/icon sources leave it transparent.
     const padding = 1;
 
     const bin = slab._binPacker.allocate(width + (2 * padding), height + (2 * padding));

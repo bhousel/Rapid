@@ -219,10 +219,11 @@ export class PixiTextures {
    *
    * The asset must be one of:  `ImageData | Uint8ClampedArray | HTMLCanvasElement | HTMLImageElement | ImageBitmap`
    *
-   * For non-ImageData sources (canvas, bitmap, image) the asset is handed directly
-   * to the atlas allocator and uploaded to the GPU via `texSubImage2D` - no
-   * intermediate `getImageData` readback happens.  Callers may safely `bitmap.close()`
-   * after this returns: the atlas keeps its own reference to whatever it needs for upload.
+    * For non-ImageData sources (canvas, bitmap, image) the asset is handed directly
+    * to the atlas allocator and uploaded to the GPU via `texSubImage2D` - no
+    * intermediate `getImageData` readback happens.  Non-tile `ImageBitmap` callers
+    * must keep the bitmap alive until upload; tile bitmaps are copied into the
+    * edge-padded canvas before this method returns.
    *
    * For the **tile** atlas only, the asset is first drawn onto a slightly oversized
    * canvas with edge-replicated padding so that neighbor tiles don't bleed across

@@ -2,10 +2,10 @@
 
 Items planned but not yet started.
 
-## Labels refactor (follow-ups to step 1 in current.md)
-- **Step 2**: introduce a `PixiFeatureLabel` managed-feature class so labels participate in the normal feature lifecycle (style match, dirty tracking, world-coord geometry) instead of being a snowflake inside `PixiLayerLabels`.
-- **Step 3**: move text rasterization onto an `OffscreenCanvas` worker. Worker does canvas-2D text draw → `ImageData` → `postMessage({ImageData}, [imageData.data.buffer])` (transferable). Main thread feeds `PixiTextures.allocate(textureID, imageData, width, height)` directly — bypasses BOTH the nested `renderer.generateTexture()` AND the `readPixels` stall. Font loading: worker needs the same fonts; use `FontFace` API + transferable `ArrayBuffer`.
-- **Step 4**: same fix in `PixiFeaturePolygon.ts` ~lines 417–430. Currently uses `new PIXI.GpuGraphicsContext()` + `PIXI.buildContextBatches()` round-trip to extract polygon geometry; this is the same nested-renderer anti-pattern. Replace with a direct earcut tessellation call (earcut is already a Pixi dependency).
+## Pixi rendering follow-ups
+- **Text rasterization without Pixi.Text**: move text drawing onto an `OffscreenCanvas` worker, or bypass `Pixi.Text` with main-thread canvas2D rasterization first. Main thread can feed the resulting `HTMLCanvasElement`, `ImageBitmap`, or `ImageData` to `PixiTextures.allocate('text', ...)`, avoiding both nested `renderer.generateTexture()` and `readPixels`. Worker font loading needs the same fonts; use `FontFace` API + transferable `ArrayBuffer`.
+- **Direct mesh generation for polygons / lines**: replace the `PIXI.GpuGraphicsContext` + `PIXI.buildContextBatches()` round-trip in `PixiFeaturePolygon.ts` with direct `earcut` tessellation, or consider a shared mesh-generator path for polygons and lines. Meshes are batchable, so this could reduce draw calls while avoiding renderer-internal geometry extraction.
+- **Tile padding off-thread if measurable**: `_fromEdgePaddedCanvas()` does two canvas draws per tile on the main thread. If profiles show it matters, build the edge-padded tile source on a worker `OffscreenCanvas` and transfer an `ImageBitmap` back; GPU upload still stays with the Pixi renderer unless the renderer itself moves off-thread.
 
 ## DashLine performance
 - Restore the texture-based DashLine path (currently disabled — `useTexture: false`). Pixi v8 broke the original `textureSpace: 'global'` matrix handling. Drawing per-segment via `lineTo` is far slower than a single stroke with a tiling dash texture.
