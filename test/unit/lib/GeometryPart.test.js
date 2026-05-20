@@ -66,6 +66,13 @@ describe('GeometryPart', () => {
       assert.instanceOf(clone.world.extent, Rapid.sdk.Extent);
       assert.notStrictEqual(clone.world.extent, part.world.extent);
       assert.isOk(clone.world.extent.equals(part.world.extent));
+
+      // local
+      assert.isObject(clone.local);
+      assert.notStrictEqual(clone.local, part.local);
+      assert.instanceOf(clone.local.extent, Rapid.sdk.Extent);
+      assert.notStrictEqual(clone.local.extent, part.local.extent);
+      assert.isOk(clone.local.extent.equals(part.local.extent));
     });
 
     it('doesn\'t error on missing data', () => {
@@ -177,7 +184,7 @@ describe('GeometryPart', () => {
     });
   });
 
-  describe('updateWorld', () => {
+  describe('update', () => {
     it('calculates world coordinate data', () => {
       const part = new Rapid.GeometryPart(context);
       part.setData(sample.point.geometry);
@@ -279,27 +286,6 @@ describe('GeometryPart', () => {
       assert.isAtMost(part.world.centroid[0], part.world.extent.max[0]);
       assert.isAtLeast(part.world.centroid[1], part.world.extent.min[1]);
       assert.isAtMost(part.world.centroid[1], part.world.extent.max[1]);
-    });
-
-    it('clone includes local data', () => {
-      const part = new Rapid.GeometryPart(context);
-      part.setData({
-        type: 'Polygon',
-        coordinates: [[
-          [-74.0000, 40.0000],
-          [-73.99985, 40.0000],
-          [-73.99985, 40.0001],
-          [-74.0000, 40.0001],
-          [-74.0000, 40.0000]
-        ]]
-      });
-
-      const clone = part.clone();
-      assert.isObject(clone.local);
-      assert.notStrictEqual(clone.local, part.local);
-      assert.instanceOf(clone.local.extent, Rapid.sdk.Extent);
-      assert.notStrictEqual(clone.local.extent, part.local.extent);
-      assert.isOk(clone.local.extent.equals(part.local.extent));
     });
   });
 

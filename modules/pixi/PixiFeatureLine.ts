@@ -102,9 +102,10 @@ export class PixiFeatureLine extends AbstractPixiFeature {
     const world = this._geom?.world;
     const local = this._geom?.local;
     const points = local?.coords as Vec2[];
+    const flat = local?.flat as number[][];
 
     // Not a LineString, or no GeometryPart data?
-    if (type !== 'LineString' || !world || !local || !points?.length) {
+    if (type !== 'LineString' || !world || !local || !points?.length || flat?.length !== 1 || !flat[0].length) {
       this.lod = 0;
       this.visible = false;
       this._geomDirty = false;
@@ -206,11 +207,6 @@ export class PixiFeatureLine extends AbstractPixiFeature {
       if (isWireframe) bufWidth = 1;
 
       const localBufWidth = (bufWidth + 10) * localScale;
-      const flatLocal: number[] = new Array(points.length * 2);
-      for (let i = 0; i < points.length; i++) {
-        flatLocal[i * 2]     = points[i][0];
-        flatLocal[i * 2 + 1] = points[i][1];
-      }
       const bufferStyle: PIXI.StrokeStyle = {
         alpha: 1,
         alignment: 0.5,
@@ -219,7 +215,7 @@ export class PixiFeatureLine extends AbstractPixiFeature {
         cap: 'butt',
         join: 'bevel'
       };
-      this._bufferdata = lineToPoly(flatLocal, bufferStyle);
+      this._bufferdata = lineToPoly(flat[0], bufferStyle);
       container.hitArea = new PIXI.Polygon(this._bufferdata.perimeter);
     } else {
       this._bufferdata = null;

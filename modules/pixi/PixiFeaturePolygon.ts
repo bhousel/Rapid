@@ -153,10 +153,10 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
     const type = this._geom?.type;
     const world = this._geom?.world;
     const local = this._geom?.local;
-    const rings = local?.coords as Vec2[][];
+    const flat = local?.flat as number[][];
 
     // Not a Polygon, or no GeometryPart data?
-    if (type !== 'Polygon' || !world || !local || !rings?.length || !rings[0].length) {
+    if (type !== 'Polygon' || !world || !local || !flat?.length || !flat[0].length) {
       this.lod = 0;
       this.visible = false;
       this._geomDirty = false;
@@ -181,12 +181,12 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
     // Compute screen-pixel width/height from the local extent.
     // local.extent is in world units; multiply by worldScale to get screen pixels.
     const worldScale = 2 ** (viewZoom - WORLD_ZOOM);
-    const localScale = 1 / worldScale;  // or, 2^(WORLD_ZOOM - viewZoom)
+    const localScale = 1 / worldScale;  // or, 2 ** (WORLD_ZOOM - viewZoom)
     const localExt = local.extent;
     const localW = localExt.max[0] - localExt.min[0];
     const localH = localExt.max[1] - localExt.min[1];
-    const w = localW * worldScale;
-    const h = localH * worldScale;
+    const screenW = localW * worldScale;
+    const screenH = localH * worldScale;
 
     const style = this._style;
     const color = style.fill?.color ?? 0xaaaaaa;
@@ -214,16 +214,16 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
 
     // If this shape is so small that partial filling makes no sense, fill fully (faster?)
     const cutoff = (2 * PARTIALFILLWIDTH) + 5;
-    if (w < cutoff || h < cutoff) {
+    if (screenW < cutoff || screenH < cutoff) {
       doFullFill = true;
     }
-    // If this shape is so small that texture filling makes no sense, skip it (faster?)
-    if (w < PARTIALFILLWIDTH || h < PARTIALFILLWIDTH) {
+    // If this shape is so small that applying a pattern makes no sense, skip it (faster?)
+    if (screenW < PARTIALFILLWIDTH || screenH < PARTIALFILLWIDTH) {
       texture = PIXI.Texture.WHITE;
     }
 
     // Cull really tiny shapes
-    if (w < 4 && h < 4) {  // so tiny
+    if (screenW < 4 && screenH < 4) {  // so tiny
       this.lod = 0;
       this.visible = false;
       lowRes.visible = false;
@@ -232,7 +232,7 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
       strokes.visible = false;
 
     // Very small, swap with lowRes sprite
-    } else if (local.surround && (w < 20 && h < 20)) {
+    } else if (local.surround && (screenW < 20 && screenH < 20)) {
       this.lod = 1;
       this.visible = true;
       lowRes.visible = true;
@@ -293,23 +293,10 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
     }
 
     // Redraw the shapes
-    // Build flat number[] arrays per ring (in local coords) for poly() / lineToPoly()
-    this._bufferdata = null;
-    const flatRings: number[][] = new Array(rings.length);
-    for (let i = 0; i < rings.length; i++) {
-      const ring = rings[i];
-      const flat = new Array(ring.length * 2);
-      for (let j = 0; j < ring.length; j++) {
-        flat[j * 2] = ring[j][0];
-        flat[j * 2 + 1] = ring[j][1];
-      }
-      flatRings[i] = flat;
-    }
-
 
     // STROKES
     strokes.removeChildren();
-    if (strokes.visible && flatRings.length) {
+    if (strokes.visible) {
       strokes.eventMode = this._classes.has('drawing') ? 'none' : 'static';  // Rapid#648
 
       const lineWidth = isWireframe ? 1 : style.fill?.width || 2;
@@ -330,8 +317,8 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
         join: 'bevel'
       };
 
-      for (let i = 0; i < flatRings.length; i++) {
-        const ring = flatRings[i];
+      for (let i = 0; i < flat.length; i++) {
+        const ring = flat[i];
         const stroke = new PIXI.Graphics();
 
         if (dash) {
@@ -360,7 +347,7 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
     }
 
     // FILL
-    if (fill.visible && flatRings.length) {
+    if (fill.visible) {
       fill.eventMode = this._classes.has('drawing') ? 'none' : 'static';  // Rapid#648
 
       const fillStyle: PIXI.FillStyle = {
@@ -372,8 +359,8 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
       };
 
       fill.clear();
-      for (let i = 0; i < flatRings.length; i++) {
-        fill.poly(flatRings[i]);
+      for (let i = 0; i < flat.length; i++) {
+        fill.poly(flat[i]);
         if (i === 0) {
           fill.fill(fillStyle);
         } else {
@@ -403,8 +390,8 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
 
         // Generate mask around the edges of the shape
         maskSource.clear();
-        for (let i = 0; i < flatRings.length; i++) {
-          maskSource.poly(flatRings[i]);
+        for (let i = 0; i < flat.length; i++) {
+          maskSource.poly(flat[i]);
           if (i === 0) {               // outer
             maskStyle.alignment = 1;   // left
             maskSource.stroke(maskStyle);
