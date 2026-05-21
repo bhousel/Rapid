@@ -31,7 +31,7 @@ export function operationReflect(context, selectedIDs, axis = 'long') {
 
   let operation = function() {
     const annotation = operation.annotation();
-    const action = actionReflect(selectedIDs, context.viewport)
+    const action = actionReflect(selectedIDs)
       .useLongAxis(Boolean(axis === 'long'));
 
     editor

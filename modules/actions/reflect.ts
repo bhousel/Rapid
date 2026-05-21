@@ -1,10 +1,10 @@
-import { geomGetDominantSurroundingRectangle, vecInterp, vecLength } from '@rapid-sdk/math';
+import { geomGetDominantSurroundingRectangle, geomReflect, projWorldToWgs84, vecAdd, vecInterp, vecSubtract } from '@rapid-sdk/math';
 import { utilGetAllNodes } from '@rapid-sdk/util';
 
 import type { Action } from './types.ts';
 import type { Graph } from '../lib/Graph.ts';
 import type { OsmNode } from '../data/OsmNode.ts';
-import type { Vec2, Viewport } from '@rapid-sdk/math';
+import type { Vec2 } from '@rapid-sdk/math';
 
 
 /** Interface for reflect action with useLongAxis setter/getter */
@@ -15,13 +15,11 @@ export interface ReflectAction extends Action {
 
 
 /**
- * Reflects the given area around its axis of symmetry.
- *
- * @param   reflectIDs  - Array of EntityIDs to reflect
- * @param   viewport    - The Viewport for coordinate conversion
+ * Reflects the given EntityIDs around their shared axis of symmetry.
+ * @param   entityIDs  - Array of EntityIDs to reflect
  * @return  A ReflectAction that reflects the entities in the graph
  */
-export function actionReflect(reflectIDs: EntityID[], viewport: Viewport): ReflectAction {
+export function actionReflect(entityIDs: EntityID[]): ReflectAction {
   let _useLongAxis = true;
 
 
@@ -29,49 +27,39 @@ export function actionReflect(reflectIDs: EntityID[], viewport: Viewport): Refle
     if (t === null || !isFinite(t!)) t = 1;
     t = Math.min(Math.max(+t!, 0), 1);
 
-    const nodes = utilGetAllNodes(reflectIDs, graph) as OsmNode[];
-    const points = nodes.map(n => viewport.project(n.loc!));
+    const collection = utilGetAllNodes(entityIDs, graph) as OsmNode[];
+    const nodes: OsmNode[] = [];
+    const points: Vec2[] = [];
+    let origin: Vec2 | undefined;
+
+     // Gather all the nodes and their world coordinates, choose a local origin for floating point stability
+    for (const node of collection) {
+      const coord = node.geoms.parts[0].world?.coords as Vec2;  // A node should have a single world coord
+      if (!coord)  continue;
+      if (!origin) origin = coord;
+      nodes.push(node);
+      points.push(vecSubtract(coord, origin));  // world -> local
+    }
+    if (!origin || !points.length) return graph;
+
+    // Generate a surrounding rectangle
     const surround = geomGetDominantSurroundingRectangle(points);
     if (!surround) return graph;
 
-    // Choose line pq = axis of symmetry.
-    // The shape's surrounding rectangle has 2 axes of symmetry.
-    // Reflect across the longer axis by default.
-    const p1: Vec2 = [(surround.polygon[0][0] + surround.polygon[1][0]) / 2, (surround.polygon[0][1] + surround.polygon[1][1]) / 2 ];
-    const q1: Vec2 = [(surround.polygon[2][0] + surround.polygon[3][0]) / 2, (surround.polygon[2][1] + surround.polygon[3][1]) / 2 ];
-    const p2: Vec2 = [(surround.polygon[3][0] + surround.polygon[4][0]) / 2, (surround.polygon[3][1] + surround.polygon[4][1]) / 2 ];
-    const q2: Vec2 = [(surround.polygon[1][0] + surround.polygon[2][0]) / 2, (surround.polygon[1][1] + surround.polygon[2][1]) / 2 ];
-    let p: Vec2;
-    let q: Vec2;
+    // Reflect the points
+    const reflected = geomReflect(points, (_useLongAxis ? surround.longAxis : surround.shortAxis));
 
-    const isLong = (vecLength(p1, q1) > vecLength(p2, q2));
-    if ((_useLongAxis && isLong) || (!_useLongAxis && !isLong)) {
-      p = p1;
-      q = q1;
-    } else {
-      p = p2;
-      q = q2;
-    }
-
-    // reflect c across pq
-    // http://math.stackexchange.com/questions/65503/point-reflection-over-a-line
-    const dx = q[0] - p[0];
-    const dy = q[1] - p[1];
-    const a = (dx * dx - dy * dy) / (dx * dx + dy * dy);
-    const b = 2 * dx * dy / (dx * dx + dy * dy);
-
-    for (let node of nodes) {
-      const c = viewport.project(node.loc!);
-      const c2: Vec2 = [
-        a * (c[0] - p[0]) + b * (c[1] - p[1]) + p[0],
-        b * (c[0] - p[0]) - a * (c[1] - p[1]) + p[1]
-      ];
-      const loc2 = viewport.unproject(c2);
+    // Update the nodes
+    for (let i = 0; i < nodes.length; i++) {
+      let node = nodes[i];
+      const coord = vecAdd(reflected[i], origin);  // local -> world
+      const loc2 = projWorldToWgs84(coord);
       node = node.move(vecInterp(node.loc!, loc2, t));
       graph.replace(node);
     }
 
     return graph.commit();
+
   }) as ReflectAction;
 
 

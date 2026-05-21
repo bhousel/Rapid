@@ -3,12 +3,12 @@ import { AbstractPixiFeature } from './AbstractPixiFeature.ts';
 import { DashLine } from './lib/DashLine.ts';
 import { GlowFilter } from 'pixi-filters';
 import { lineToPoly, type LineToPolyResult } from './helpers.ts';
-import { WORLD_ZOOM, vecEqual, vecLength } from '@rapid-sdk/math';
+import { WORLD_ZOOM, vecEqual } from '@rapid-sdk/math';
 
 import type { AbstractPixiLayer } from './AbstractPixiLayer.ts';
 import type { DashLineOptions } from './lib/DashLine.ts';
 import type { PixiLayerMapUI } from './PixiLayerMapUI.ts';
-import type { Viewport, Vec2 } from '@rapid-sdk/math';
+import type { Viewport } from '@rapid-sdk/math';
 
 const PARTIALFILLWIDTH = 32;
 
@@ -92,12 +92,12 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
     this.container.addChild(lowRes, fill, strokes, mask);
 
     // Debug surrounding rectangle
-    // const debugSurround = new PIXI.Graphics();
-    // debugSurround.label = 'surround';
-    // debugSurround.eventMode = 'none';
-    // debugSurround.sortableChildren = false;
-    // this.debugSurround = debugSurround;
-    // this.container.addChild(debugSurround);
+    const debugSurround = new PIXI.Graphics();
+    debugSurround.label = 'surround';
+    debugSurround.eventMode = 'none';
+    debugSurround.sortableChildren = false;
+    this.debugSurround = debugSurround;
+    this.container.addChild(debugSurround);
   }
 
 
@@ -182,9 +182,7 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
     // local.extent is in world units; multiply by worldScale to get screen pixels.
     const worldScale = 2 ** (viewZoom - WORLD_ZOOM);
     const localScale = 1 / worldScale;  // or, 2 ** (WORLD_ZOOM - viewZoom)
-    const localExt = local.extent;
-    const localW = localExt.max[0] - localExt.min[0];
-    const localH = localExt.max[1] - localExt.min[1];
+    const [localW, localH] = local.extent.dimensions();
     const screenW = localW * worldScale;
     const screenH = localH * worldScale;
 
@@ -240,21 +238,14 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
       mask.visible = false;
       strokes.visible = false;
 
-      // Surrounding rectangle data is in local coords. The center is the midpoint of opposite midpoints.
-      // axis1 (p1->q1) is perpendicular to angle (the rect's height direction)
-      // axis2 (p2->q2) is along angle (the rect's width direction)
-      const poly = local.surround.polygon;
-      const p1: Vec2 = [(poly[0][0] + poly[1][0]) / 2, (poly[0][1] + poly[1][1]) / 2];
-      const q1: Vec2 = [(poly[2][0] + poly[3][0]) / 2, (poly[2][1] + poly[3][1]) / 2];
-      const p2: Vec2 = [(poly[3][0] + poly[0][0]) / 2, (poly[3][1] + poly[0][1]) / 2];
-      const q2: Vec2 = [(poly[1][0] + poly[2][0]) / 2, (poly[1][1] + poly[2][1]) / 2];
-      const center: Vec2 = [(p1[0] + q1[0]) / 2, (p1[1] + q1[1]) / 2];
+      // Use surrounding rectangle data in local coords.
+      // (Scale of parent container will apply to it)
+      const srPolygon = local.surround.polygon;
+      const [srWidth, srHeight] = local.surround.dimensions;
+      const [srX, srY] = local.surround.centroid;
 
-      // Lengths in world units; the container's worldScale will convert to screen pixels.
-      const heightWorld = vecLength(p1, q1);
-      const widthWorld = vecLength(p2, q2);
-
-      // Decide shape: are any surrounding rectangle corners on the outer ring?
+      // (LowRes shape selection / line simplification could really go in GeometryPart)
+      // Choose a lowRes shape: are any surrounding rectangle corners on the outer ring?
       // Use a small epsilon in world units (the legacy code used 0.1 screen px).
       const EPSILON = 0.1 * localScale;
       const outer = local.outer!;
@@ -263,10 +254,10 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
       let c2in: boolean | undefined;
       let c3in: boolean | undefined;
       for (const point of outer) {
-        if (!c0in) c0in = vecEqual(point, poly[0], EPSILON);
-        if (!c1in) c1in = vecEqual(point, poly[1], EPSILON);
-        if (!c2in) c2in = vecEqual(point, poly[2], EPSILON);
-        if (!c3in) c3in = vecEqual(point, poly[3], EPSILON);
+        if (!c0in) c0in = vecEqual(point, srPolygon[0], EPSILON);
+        if (!c1in) c1in = vecEqual(point, srPolygon[1], EPSILON);
+        if (!c2in) c2in = vecEqual(point, srPolygon[2], EPSILON);
+        if (!c3in) c3in = vecEqual(point, srPolygon[3], EPSILON);
         if (c0in && c1in && c2in && c3in) break;
       }
       const cornersInSR = c0in || c1in || c2in || c3in;
@@ -276,10 +267,8 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
       const textureName = `lowres${filling}-${shapeType}`;
 
       lowRes.texture = textureManager.getTexture('symbol', textureName) || PIXI.Texture.WHITE;
-      lowRes.position.set(center[0], center[1]);
-      // Source sprite is 10x10. Container worldScale will scale it. To display
-      // at (widthWorld * worldScale) screen px, the sprite scale must be widthWorld/10.
-      lowRes.scale.set(widthWorld / 10, heightWorld / 10);
+      lowRes.position.set(srX, srY);
+      lowRes.scale.set(srWidth / 10, srHeight / 10);   // the sprites are 10px x 10px
       lowRes.rotation = local.surround.angle;
       lowRes.tint = color;
 

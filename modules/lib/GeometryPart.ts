@@ -1,4 +1,4 @@
-import { Extent, geomGetDominantSurroundingRectangle, projWgs84ToWorld, vecInterp } from '@rapid-sdk/math';
+import { Extent, geomGetDominantSurroundingRectangle, geomToOrigin, projWgs84ToWorld, vecAdd, vecInterp } from '@rapid-sdk/math';
 import { polygonArea, polygonCentroid, polygonHull } from 'd3-polygon';
 import polylabel from '@mapbox/polylabel';
 
@@ -286,68 +286,77 @@ export class GeometryPart {
 
     //
     // Computed data...
+    // Prefer to perform the computations in local space to reduce floating point errors.
+    // Then translate local coodinates back to world space with `vecAdd` or `geomToOrigin`.
     //
-    // Calculate hull, centroid, poi, surrounding rectangle if possible
+
     if (world.outer!.length === 0) {          // no coordinates? - shouldn't happen
       // no-op
 
     } else if (world.outer!.length === 1) {   // single coordinate? - wrong but can happen
-      world.centroid = world.outer![0];
-      world.poi = world.centroid;
       local.centroid = local.outer![0];
       local.poi = local.centroid;
+      local.area = 0;
+      world.centroid = world.outer![0];
+      world.poi = world.centroid;
+      world.area = 0;
 
     } else if (world.outer!.length === 2) {   // 2 coordinate line
-      world.centroid = vecInterp(world.outer![0], world.outer![1], 0.5);  // average the 2 points
-      world.poi = world.centroid;
       local.centroid = vecInterp(local.outer![0], local.outer![1], 0.5);  // average the 2 points
       local.poi = local.centroid;
+      local.area = 0;
+      world.centroid = vecAdd(local.centroid, worldOrigin);
+      world.poi = world.centroid;
+      world.area = 0;
 
     } else {   // > 2 coordinates...
-
-      // check area/winding?
       world.area = polygonArea(world.outer!);
       local.area = polygonArea(local.outer!);
+      // fix area/winding?
       // if (world.area < 0) {
       //   world.area *= -1;
       //   world.outer.reverse();
       // }
 
       // Convex Hull
-      world.hull = polygonHull(world.outer!) as Vec2[] | undefined;
       local.hull = polygonHull(local.outer!) as Vec2[] | undefined;
+      if (local.hull) {
+        world.hull = geomToOrigin(local.hull, worldOrigin);
+      }
 
-      // Centroid (compute in local space for numerical stability)
+      // Centroid
       if (local.hull) {
         if (local.hull.length === 2) {
           local.centroid = vecInterp(local.hull[0], local.hull[1], 0.5);  // average the 2 points
         } else {
           local.centroid = polygonCentroid(local.hull) as Vec2;
         }
-        // Convert back to world space
         if (local.centroid) {
-          world.centroid = [local.centroid[0] + worldOrigin[0], local.centroid[1] + worldOrigin[1]];
+          world.centroid = vecAdd(local.centroid, worldOrigin);
         }
       }
 
-      // Pole of Inaccessability (for polygons, compute in local space for numerical stability)
+      // Pole of Inaccessability
       if (type === 'LineString') {
-        world.poi = world.centroid;
         local.poi = local.centroid;
+        world.poi = world.centroid;
       } else {
         local.poi = polylabel(local.coords as Vec2[][]) as Vec2;   // it expects outer + rings
-        world.poi = [local.poi[0] + worldOrigin[0], local.poi[1] + worldOrigin[1]];
+        world.poi = vecAdd(local.poi, worldOrigin);
       }
 
-      // Dominant Surrounding Rectangle (compute in local space)
+      // Surrounding Rectangle
       if (local.outer) {
         local.surround = geomGetDominantSurroundingRectangle(local.outer) ?? undefined;
 
-        // Convert back to world space
         if (local.surround) {
           world.surround = {
-            polygon: local.surround.polygon.map(coord => [coord[0] + worldOrigin[0], coord[1] + worldOrigin[1]]) as typeof local.surround.polygon,
-            angle: local.surround.angle
+            polygon:     geomToOrigin(local.surround.polygon, worldOrigin),
+            angle:       local.surround.angle,
+            centroid:    vecAdd(local.surround.centroid, worldOrigin),
+            dimensions:  local.surround.dimensions.slice() as Vec2,   // copy, dimensions are the same
+            shortAxis:   geomToOrigin(local.surround.shortAxis, worldOrigin),
+            longAxis:    geomToOrigin(local.surround.longAxis, worldOrigin)
           };
         }
       }
