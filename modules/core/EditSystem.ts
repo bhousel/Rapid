@@ -427,10 +427,12 @@ export class EditSystem extends AbstractSystem {
         .ease(d3_easeLinear)
         .tween('edit.tween', () => {
           return (t: number) => {
-            if (t < 1) {
-              this._replaceStaging();
-              this._perform([action], t);
-              this._emitChanges();
+            this._replaceStaging();
+            this._perform([action], t);
+            this._emitChanges();
+            if (t === 1) {  // mark as finished
+              this._inTransition = false;
+              resolve();
             }
           };
         })
@@ -441,11 +443,13 @@ export class EditSystem extends AbstractSystem {
           this._emitChanges();
         })
         .on('end interrupt', () => {
-          this._replaceStaging();
-          this._perform([action], 1);
-          this._emitChanges();
-          this._inTransition = false;
-          resolve();
+          if (this._inTransaction) {
+            this._replaceStaging();
+            this._perform([action], 1);
+            this._emitChanges();
+            this._inTransition = false;
+            resolve();
+          }
         });
     });
   }
