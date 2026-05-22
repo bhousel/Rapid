@@ -163,9 +163,19 @@ export function actionJoin(ids: EntityID[], options: JoinOptions = {}): JoinActi
       return 'not_eligible';
     }
 
-    const joined: JoinedWaysResult = osmJoinWays(ids.map((id: EntityID) => graph.entity(id) as OsmWay), graph);
-    if (joined.length > 1) {
+    const ways = ids.map((id: EntityID) => graph.entity(id) as OsmWay);
+    const sequences: JoinedWaysResult = osmJoinWays(ways, graph);
+    if (sequences.length > 1) {
       return 'not_adjacent';
+    }
+    const joined = sequences[0];
+
+    // We might need to reverse some of these ways before joining them.  iD#4688
+    // `joined.actions` property will contain any actions we need to apply.
+    // Make copy of the graph to avoid affecting the caller's graph.
+    graph = graph.snapshot();
+    for (const fn of sequences.actions) {
+      graph = fn(graph);
     }
 
     let i: number;
@@ -200,7 +210,7 @@ export function actionJoin(ids: EntityID[], options: JoinOptions = {}): JoinActi
         // Check if intersections are just nodes lying on top of
         // each other/the line, as opposed to crossing it
         const common = utilArrayIntersection(
-          joined[0].nodes.map((n: OsmNode) => n.loc!.toString()),
+          joined.nodes.map((n: OsmNode) => n.loc!.toString()),
           intersections.map((n: Vec2) => n.toString())
         );
         if (common.length !== intersections.length) {
@@ -209,12 +219,12 @@ export function actionJoin(ids: EntityID[], options: JoinOptions = {}): JoinActi
       }
     }
 
-    const nodeIDs: EntityID[] = joined[0].nodes.map((n: OsmNode) => n.id).slice(1, -1);
+    const nodeIDs: EntityID[] = joined.nodes.map((n: OsmNode) => n.id).slice(1, -1);
     let relation: OsmRelation | undefined;
     const tags: OsmTags = {};
     let conflicting = false;
 
-    joined[0].forEach((item) => {
+    joined.forEach((item) => {
       const way: OsmWay = graph.entity(item.id) as OsmWay;
       const parents: OsmRelation[] = graph.parentRelations(way);
       parents.forEach((parent: OsmRelation) => {
