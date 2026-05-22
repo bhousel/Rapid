@@ -1,11 +1,9 @@
-import {
-  geomGetSmallestSurroundingRectangle, projWorldToWgs84, Vec2,
-  vecAdd, vecDot, vecInterp, vecLength, vecSubtract
-} from '@rapid-sdk/math';
+import { geomGetSmallestSurroundingRectangle, projWorldToWgs84, vecAdd, vecInterp, vecProject, vecSubtract } from '@rapid-sdk/math';
 
 import type { Action } from './types.ts';
 import type { Graph } from '../lib/Graph.ts';
 import type { OsmNode } from '../data/OsmNode.ts';
+import type { Vec2 } from '@rapid-sdk/math';
 
 
 /**
@@ -16,12 +14,13 @@ import type { OsmNode } from '../data/OsmNode.ts';
  */
 export function actionStraightenNodes(nodeIDs: EntityID[]): Action {
 
-  function positionAlongWay(a: Vec2, o: Vec2, b: Vec2): number {
-    return vecDot(a, b, o) / vecDot(b, b, o);
-  }
-
-  // returns the endpoints of the long axis of symmetry of the `points` bounding rect
-  function getEndpoints(points: Vec2[]): [Vec2, Vec2] {
+  /**
+   * Returns a target line to snap the points to.
+   * We use the long axis of the smallest surrounding rectangle.
+   * @param    points - The points to consider
+   * @returns  Target line, defined as [startPoint, endPoint]
+   */
+  function getTargetLine(points: Vec2[]): [Vec2, Vec2] {
     const surround = geomGetSmallestSurroundingRectangle(points);
     if (surround) {
       return surround.longAxis;
@@ -53,16 +52,14 @@ export function actionStraightenNodes(nodeIDs: EntityID[]): Action {
     }
     if (!origin || !points.length) return graph;
 
-
-    const [startPoint, endPoint] = getEndpoints(points);
-
-    // Move points onto the line connecting the endpoints
+    // Move points onto the target line.
+    const line = getTargetLine(points);
     for (let i = 0; i < points.length; i++) {
+      const closest = vecProject(points[i], line);
+      if (!closest) continue;
+
       const node = nodes[i];
-      const point = points[i];
-      const u = positionAlongWay(point, startPoint, endPoint);
-      const final = vecInterp(startPoint, endPoint, u);
-      const coord = vecAdd(final, origin);  // local -> world
+      const coord = vecAdd(closest.point, origin);  // local -> world
       const loc2 = projWorldToWgs84(coord);
       graph.replace(node.move(vecInterp(node.loc!, loc2, t)));
     }
@@ -87,20 +84,20 @@ export function actionStraightenNodes(nodeIDs: EntityID[]): Action {
     }
     if (!origin || !points.length) return 'straight_enough';
 
-    const [startPoint, endPoint] = getEndpoints(points);
+    const line = getTargetLine(points);
     let maxDistance = 0;
 
+    // Move points onto the line connecting the endpoints
     for (const point of points) {
-      const u = positionAlongWay(point, startPoint, endPoint);
-      const p = vecInterp(startPoint, endPoint, u);
-      const dist = vecLength(p, point);
+      const closest = vecProject(point, line);
+      if (!closest) continue;
 
-      if (!isNaN(dist) && dist > maxDistance) {
-        maxDistance = dist;
+      if (closest.distance > maxDistance) {
+        maxDistance = closest.distance;
       }
     }
 
-    if (maxDistance < 0.0001) {
+    if (maxDistance < 0.0001) {   // in world units
       return 'straight_enough';
     }
     return false;
