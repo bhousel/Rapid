@@ -79,7 +79,7 @@ describe('SpatialSystem', () => {
     // Helper to create mock data
     function createMockData(dataID, locWgs84, extentSize = 0.001) {
       const data = new Rapid.AbstractData(context, { id: dataID });
-      const [x, y] = context.viewport.wgs84ToWorld(locWgs84);
+      const [x, y] = Rapid.sdk.projWgs84ToWorld(locWgs84);
       const extent = new Rapid.sdk.Extent([x - extentSize, y - extentSize], [x + extentSize, y + extentSize]);
       data.geoms.world = { extent };
       return data;
@@ -92,7 +92,7 @@ describe('SpatialSystem', () => {
       // The SDK's worldToScreen formula is: screen = (world - WORLD_HALF) * scale + [tx, ty]
       // With z=WORLD_ZOOM=16, scale=1. For screen [0,0] to map to [wx, wy]:
       //   tx = -(wx - WORLD_HALF), ty = -(wy - WORLD_HALF)
-      const [wx, wy] = context.viewport.wgs84ToWorld(locWgs84);
+      const [wx, wy] = Rapid.sdk.projWgs84ToWorld(locWgs84);
       const tx = -(wx - Rapid.sdk.WORLD_HALF);
       const ty = -(wy - Rapid.sdk.WORLD_HALF);
       const v = new Rapid.sdk.Viewport({ x: tx, y: ty, z: 16 }, [256, 256]);
@@ -292,7 +292,7 @@ describe('SpatialSystem', () => {
         const data = createMockData('data1', [10, 0]);
         _spatial.addData(datasetID, data);
 
-        const [x, y] = context.viewport.wgs84ToWorld([10, 0]);
+        const [x, y] = Rapid.sdk.projWgs84ToWorld([10, 0]);
         const box = { minX: x - 0.01, minY: y - 0.01, maxX: x + 0.01, maxY: y + 0.01 };
         const results = _spatial.getDataAtBox(datasetID, box);
 
@@ -318,7 +318,7 @@ describe('SpatialSystem', () => {
         const data = createMockData('data1', [10, 0]);
         _spatial.addData(datasetID, data);
 
-        const [x, y] = context.viewport.wgs84ToWorld([10, 0]);
+        const [x, y] = Rapid.sdk.projWgs84ToWorld([10, 0]);
         const box = { minX: x - 0.01, minY: y - 0.01, maxX: x + 0.01, maxY: y + 0.01 };
         assert.isTrue(_spatial.hasDataAtBox(datasetID, box));
       });
@@ -509,7 +509,7 @@ describe('SpatialSystem', () => {
 
         _spatial.addTiles(datasetID, tile);
 
-        const [x, y] = context.viewport.wgs84ToWorld([10, 0]);
+        const [x, y] = Rapid.sdk.projWgs84ToWorld([10, 0]);
         const box = { minX: x - 1000, minY: y - 1000, maxX: x + 1000, maxY: y + 1000 };
         assert.isTrue(_spatial.hasTileAtBox(datasetID, box));
       });
@@ -535,7 +535,7 @@ describe('SpatialSystem', () => {
         _spatial.addTiles(datasetID, tile);
         // Check if tile actually covers the location by using a location from the tile extent
         const extent = tile.worldExtent;
-        const testLoc = context.viewport.worldToWgs84([extent.min[0], extent.min[1]]);
+        const testLoc = Rapid.sdk.projWorldToWgs84([extent.min[0], extent.min[1]]);
         assert.isTrue(_spatial.hasTileAtLoc(datasetID, testLoc));
       });
 

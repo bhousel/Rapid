@@ -12,10 +12,9 @@ export interface CopyEntitiesAction extends Action {
 /**
  * Creates copies of entities from one graph to another.
  * The copies mapping can be retrieved via the `copies()` method.
- *
  * @param   entityIDs  - Array of EntityIDs to copy
  * @param   fromGraph  - The source Graph containing the entities
- * @return  A CopyEntitiesAction that copies entities to the target graph
+ * @return  An Action function that copies entities to the target graph
  */
 export function actionCopyEntities(entityIDs: EntityID[], fromGraph: Graph): CopyEntitiesAction {
   const _copies: Record<EntityID, OsmEntity> = {};

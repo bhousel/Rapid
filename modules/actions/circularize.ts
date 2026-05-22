@@ -1,4 +1,4 @@
-import { DEG2RAD, vecAngle, vecInterp, vecLength, vecLengthSquare } from '@rapid-sdk/math';
+import { DEG2RAD, projWorldToWgs84, vecAngle, vecInterp, vecLength, vecLengthSquare } from '@rapid-sdk/math';
 import { median } from 'd3-array';
 import { OsmNode } from '../data/OsmNode.ts';
 import { utilArrayUniq } from '@rapid-sdk/util';
@@ -10,12 +10,11 @@ import type { Vec2, Viewport } from '@rapid-sdk/math';
 
 
 /**
- * Circularizes a closed way to form a circle.
- *
+ * Circularizes a given closed way.
  * @param   wayID       - EntityID of the way to circularize
  * @param   viewport    - The Viewport for coordinate conversion
  * @param   maxDegrees  - Maximum angle between adjacent nodes (default: 20)
- * @return  An Action that circularizes the way
+ * @return  An Action function that circularizes the given way
  */
 export function actionCircularize(wayID: EntityID, viewport: Viewport, maxDegrees: number = 20): Action {
   const maxAngle = maxDegrees * DEG2RAD;
@@ -23,6 +22,7 @@ export function actionCircularize(wayID: EntityID, viewport: Viewport, maxDegree
   const action = ((graph: Graph, t?: number): Graph => {
     if (t === null || !isFinite(t!)) t = 1;
     t = Math.min(Math.max(+t!, 0), 1);
+    if (t === 0) return graph;
 
     let way = graph.entity(wayID) as OsmWay;
 
@@ -279,7 +279,7 @@ export function actionCircularize(wayID: EntityID, viewport: Viewport, maxDegree
       // move interior nodes to the surface of the convex hull..
       for (let j = 1; j < indexRange; j++) {
         const point = vecInterp(hull[i], hull[i+1], j / indexRange);
-        const node = nodes[(j + startIndex) % nodes.length].move(viewport.worldToWgs84(point));
+        const node = nodes[(j + startIndex) % nodes.length].move(projWorldToWgs84(point));
         graph.replace(node);
       }
     }

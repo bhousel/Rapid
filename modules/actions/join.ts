@@ -40,12 +40,11 @@ interface GroupedGeometries {
  * Joins ways at their shared end nodes.
  * Sided ways (coastlines, cliffs, kerbs) are processed first to establish order.
  * The oldest existing way is preserved, and others are merged into it.
- *
  * This is the inverse of `actionSplit`.
  *
  * @param   ids      - Array of EntityIDs of ways to join
  * @param   options  - Optional JoinOptions
- * @return  A JoinAction that joins the ways
+ * @return  An Action function that joins the ways
  */
 export function actionJoin(ids: EntityID[], options: JoinOptions = {}): JoinAction {
 

@@ -34,7 +34,7 @@ export function operationStraighten(context, selectedIDs) {
     // straighten selected nodes
     if (ways.length === 0 && nodes.length > 2) {
       geometry = 'point';
-      return actionStraightenNodes(nodeIDs, context.viewport);
+      return actionStraightenNodes(nodeIDs);
 
     // straighten selected ways (possibly between range of 2 selected nodes)
     } else if (ways.length > 0 && (nodes.length === 0 || nodes.length === 2)) {

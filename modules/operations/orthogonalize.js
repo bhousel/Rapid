@@ -10,7 +10,6 @@ export function operationOrthogonalize(context, selectedIDs) {
   const graph = editor.staging.graph;
   const l10n = context.systems.l10n;
   const storage = context.systems.storage;
-  const viewport = context.viewport;
 
   const entities = selectedIDs.map(entityID => graph.hasEntity(entityID)).filter(Boolean);
   const isNew = entities.every(entity => entity.isNew());
@@ -29,7 +28,7 @@ export function operationOrthogonalize(context, selectedIDs) {
     if (entity.type === 'way' && new Set(entity.nodes).size > 2) {
       if (_type && _type !== 'feature') return null;
       _type = 'feature';
-      return actionOrthogonalize(entity.id, context.viewport);
+      return actionOrthogonalize(entity.id);
 
     // square a single vertex
     } else if (geometry === 'vertex') {
@@ -39,7 +38,7 @@ export function operationOrthogonalize(context, selectedIDs) {
       if (parents.length === 1) {
         const way = parents[0];
         if (way.nodes.indexOf(entity.id) !== -1) {
-          return actionOrthogonalize(way.id, context.viewport, entity.id);
+          return actionOrthogonalize(way.id, entity.id);
         }
       }
     }
@@ -96,7 +95,7 @@ export function operationOrthogonalize(context, selectedIDs) {
     // If the selection is not 80% contained in view
     function tooLarge() {
       const allowLargeEdits = storage.getItem('rapid-internal-feature.allowLargeEdits') === 'true';
-      return !allowLargeEdits && extent.percentContainedIn(viewport.visibleExtent()) < 0.8;
+      return !allowLargeEdits && extent.percentContainedIn(context.viewport.visibleExtent()) < 0.8;
     }
 
     // If fhe selection spans tiles that haven't been downloaded yet

@@ -9,7 +9,7 @@ import type { OsmWay } from '../data/OsmWay.ts';
 /**
  * Deletes a way and removes it from all parent relations.
  * Also deletes child nodes that are no longer needed.
- * If doDeleteDegenerate is true, also deletes any relations that
+ * If `doDeleteDegenerate` is true, also deletes any relations that
  * become degenerate as a result.
  *
  * @param   wayID              - EntityID of the way to delete

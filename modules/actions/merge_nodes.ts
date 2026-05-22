@@ -15,7 +15,7 @@ import type { Vec2 } from '@rapid-sdk/math';
  *
  * @param   nodeIDs  - Array of EntityIDs of nodes to merge
  * @param   loc      - Optional target location [lon, lat]
- * @return  An Action that merges the nodes
+ * @return  An Action function that merges the nodes
  */
 export function actionMergeNodes(nodeIDs: EntityID[], loc?: Vec2): Action {
 

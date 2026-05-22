@@ -33,21 +33,24 @@ type OnewayReplacements = Record<string, string>;
 type CompassReplacements = Record<string, string>;
 
 
-/*
-Order the nodes of a way in reverse order and reverse any direction dependent tags
-other than `oneway`. (We assume that correcting a backwards oneway is the primary
-reason for reversing a way.)
-
-In addition, numeric-valued `incline` tags are negated.
-
-References:
-    http://wiki.openstreetmap.org/wiki/Forward_%26_backward,_left_%26_right
-    http://wiki.openstreetmap.org/wiki/Key:direction#Steps
-    http://wiki.openstreetmap.org/wiki/Key:incline
-    http://wiki.openstreetmap.org/wiki/Route#Members
-    http://josm.openstreetmap.de/browser/josm/trunk/src/org/openstreetmap/josm/corrector/ReverseWayTagCorrector.java
-    http://wiki.openstreetmap.org/wiki/Tag:highway%3Dstop
-    http://wiki.openstreetmap.org/wiki/Key:traffic_sign#On_a_way_or_area
+/**
+ * Order the nodes of a way in reverse order and reverse any direction dependent tags
+ * other than `oneway`. (We assume that correcting a backwards oneway is the primary
+ * reason for reversing a way.)
+ *
+ * In addition, numeric-valued `incline` tags are negated.
+ *
+ * References:
+ *     http://wiki.openstreetmap.org/wiki/Forward_%26_backward,_left_%26_right
+ *     http://wiki.openstreetmap.org/wiki/Key:direction#Steps
+ *     http://wiki.openstreetmap.org/wiki/Key:incline
+ *     http://wiki.openstreetmap.org/wiki/Route#Members
+ *     http://josm.openstreetmap.de/browser/josm/trunk/src/org/openstreetmap/josm/corrector/ReverseWayTagCorrector.java
+ *     http://wiki.openstreetmap.org/wiki/Tag:highway%3Dstop
+ *     http://wiki.openstreetmap.org/wiki/Key:traffic_sign#On_a_way_or_area
+ * @param   entityID  - The EntityID to reverse
+ * @param   options - reverse options
+ * @return  An Action function that reverses the given Entity
 */
 export function actionReverse(entityID: EntityID, options?: ReverseOptions): ReverseAction {
   const ignoreKey = /^.*(_|:)?(description|name|note|website|ref|source|comment|watch|attribution)(_|:)?/;

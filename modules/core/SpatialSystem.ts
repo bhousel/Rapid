@@ -1,11 +1,11 @@
-import RBush, { type BBox } from 'rbush';
-
-import { Graph } from '../lib/Graph.ts';
 import { AbstractSystem } from './AbstractSystem.ts';
-import { WORLD_SCALE, WORLD_ZOOM } from '@rapid-sdk/math';
+import { Graph } from '../lib/Graph.ts';
+import { projWgs84ToWorld, projWorldToWgs84, WORLD_SCALE, WORLD_ZOOM } from '@rapid-sdk/math';
+import RBush from 'rbush';
 import { type OneOrMore, utilIterable } from '../util/iterable.ts';
 
 import type { AbstractData } from '../data/AbstractData.ts';
+import type { BBox } from 'rbush';
 import type { Context } from '../Context.ts';
 import type { Tile, Vec2 } from '@rapid-sdk/math';
 
@@ -361,7 +361,7 @@ export class SpatialSystem extends AbstractSystem {
    */
   getDataAtLoc(datasetID: DatasetID, loc: Vec2): Box[] {
     const cache = this.getCache(datasetID);
-    const [x, y] = this.context.viewport.wgs84ToWorld(loc) as Vec2;
+    const [x, y] = projWgs84ToWorld(loc) as Vec2;
     const epsilon = 1e-7 * 2 ** WORLD_ZOOM;
     const test = { minX: x - epsilon, minY: y - epsilon, maxX: x + epsilon, maxY: y + epsilon };
     return cache.dataRBush.search(test);
@@ -374,9 +374,8 @@ export class SpatialSystem extends AbstractSystem {
    * @return `true` if data exists there, `false` if not
    */
   hasDataAtLoc(datasetID: DatasetID, loc: Vec2): boolean {
-    const viewport = this.context.viewport;
     const cache = this.getCache(datasetID);
-    const [x, y] = viewport.wgs84ToWorld(loc) as Vec2;
+    const [x, y] = projWgs84ToWorld(loc) as Vec2;
     const epsilon = 1e-7 * 2 ** WORLD_ZOOM;
     const test = { minX: x - epsilon, minY: y - epsilon, maxX: x + epsilon, maxY: y + epsilon };
     return cache.dataRBush.collides(test);
@@ -391,9 +390,8 @@ export class SpatialSystem extends AbstractSystem {
    * @return Adjusted [lon,lat] coordinate
    */
   preventCoincidentLoc(datasetID: DatasetID, loc: Vec2): Vec2 {
-    const viewport = this.context.viewport;
     const cache = this.getCache(datasetID);
-    const [x, startY] = viewport.wgs84ToWorld(loc) as Vec2;
+    const [x, startY] = projWgs84ToWorld(loc) as Vec2;
     let y = startY;
     const epsilon = 1e-7 * WORLD_SCALE;
 
@@ -401,7 +399,7 @@ export class SpatialSystem extends AbstractSystem {
       const test = { minX: x - epsilon, minY: y - epsilon, maxX: x + epsilon, maxY: y + epsilon };
       const didCollide = cache.dataRBush.collides(test);
       if (!didCollide) {
-        return viewport.worldToWgs84([x, y] as Vec2);
+        return projWorldToWgs84([x, y] as Vec2);
       } else {
         // These are in world coordinates, so we are moving `y` south:
         // 6356752 (polar radius in meters) * 0.9 (because ±85°) / 256 px * this number / WORLD_SCALE = meters moved?
@@ -451,9 +449,8 @@ export class SpatialSystem extends AbstractSystem {
    * @return `true` if a tile has been loaded there, `false` if not
    */
   hasTileAtLoc(datasetID: DatasetID, loc: Vec2): boolean {
-    const viewport = this.context.viewport;
     const cache = this.getCache(datasetID);
-    const [x, y] = viewport.wgs84ToWorld(loc) as Vec2;
+    const [x, y] = projWgs84ToWorld(loc) as Vec2;
     const epsilon = 1e-7 * WORLD_SCALE;
     const test = { minX: x - epsilon, minY: y - epsilon, maxX: x + epsilon, maxY: y + epsilon };
     return cache.tileRBush.collides(test);

@@ -5,9 +5,9 @@ import type { OsmTags } from '../data/types.ts';
 
 /**
  * Changes the tags on an entity.
- * @param entityID - The ID of the entity to modify
- * @param tags - The new tags to set
- * @return Action that replaces the entity's tags
+ * @param   entityID - The ID of the entity to modify
+ * @param   tags - The new tags to set
+ * @return  An Action function that replaces the entity's tags
  */
 export function actionChangeTags(entityID: EntityID, tags: OsmTags): Action {
   return (graph: Graph): Graph => {

@@ -6,11 +6,6 @@ import * as Rapid from '../../../modules/headless.js';
 describe('actionOrthogonalize', () => {
   const context = new Rapid.MockContext();
 
-  const viewport = {
-    project: val => val,
-    unproject: val => val
-  };
-
   describe('closed paths', () => {
     it('orthogonalizes a perfect quad', () => {
       //    d --- c
@@ -24,7 +19,7 @@ describe('actionOrthogonalize', () => {
         new Rapid.OsmWay(context, { id: '-', nodes: ['a', 'b', 'c', 'd', 'a'] })
       ]);
       const graph = new Rapid.Graph(base);
-      const result = Rapid.actionOrthogonalize('-', viewport)(graph);
+      const result = Rapid.actionOrthogonalize('-')(graph);
       assert.instanceOf(result, Rapid.Graph);
       assert.lengthOf(result.entity('-').nodes, 5);
     });
@@ -42,7 +37,7 @@ describe('actionOrthogonalize', () => {
       ]);
 
       const graph = new Rapid.Graph(base);
-      const result = Rapid.actionOrthogonalize('-', viewport)(graph);
+      const result = Rapid.actionOrthogonalize('-')(graph);
       assert.instanceOf(result, Rapid.Graph);
       assert.lengthOf(result.entity('-').nodes, 5);
     });
@@ -60,7 +55,7 @@ describe('actionOrthogonalize', () => {
       ]);
 
       const graph = new Rapid.Graph(base);
-      const result = Rapid.actionOrthogonalize('-', viewport)(graph);
+      const result = Rapid.actionOrthogonalize('-')(graph);
       assert.instanceOf(result, Rapid.Graph);
       assert.lengthOf(result.entity('-').nodes, 4);
     });
@@ -79,7 +74,7 @@ describe('actionOrthogonalize', () => {
       ]);
 
       const graph = new Rapid.Graph(base);
-      const result = Rapid.actionOrthogonalize('-', viewport)(graph);
+      const result = Rapid.actionOrthogonalize('-')(graph);
       assert.instanceOf(result, Rapid.Graph);
       assert.isUndefined(result.hasEntity('d'));
     });
@@ -98,7 +93,7 @@ describe('actionOrthogonalize', () => {
       ]);
 
       const graph = new Rapid.Graph(base);
-      const result = Rapid.actionOrthogonalize('-', viewport)(graph);
+      const result = Rapid.actionOrthogonalize('-')(graph);
       assert.instanceOf(result, Rapid.Graph);
       assert.lengthOf(result.entity('-').nodes, 6);
       assert.isOk(result.hasEntity('d'));
@@ -121,7 +116,7 @@ describe('actionOrthogonalize', () => {
       ]);
 
       const graph = new Rapid.Graph(base);
-      const result = Rapid.actionOrthogonalize('-', viewport)(graph);
+      const result = Rapid.actionOrthogonalize('-')(graph);
       assert.instanceOf(result, Rapid.Graph);
       const diff = new Rapid.Difference(base, result);
       assert.hasAllKeys(diff.changes, ['a', 'b', 'c', 'f']);  // not d, e
@@ -145,7 +140,7 @@ describe('actionOrthogonalize', () => {
       ]);
 
       const graph = new Rapid.Graph(base);
-      const result = Rapid.actionOrthogonalize('-', viewport)(graph);
+      const result = Rapid.actionOrthogonalize('-')(graph);
       assert.instanceOf(result, Rapid.Graph);
       const diff = new Rapid.Difference(base, result);
       assert.doesNotHaveAnyKeys(diff.changes, ['d']);  // d not changed
@@ -153,7 +148,6 @@ describe('actionOrthogonalize', () => {
     });
 
     it('preserves the shape of skinny quads', () => {
-      const viewport = new Rapid.sdk.Viewport();
       const tests = [
         [
           [-77.0339864831478, 38.8616391227204],
@@ -179,7 +173,7 @@ describe('actionOrthogonalize', () => {
         ]);
         const graph = new Rapid.Graph(base);
         const initialWidth = Rapid.sdk.geoSphericalDistance(graph.entity('a').loc, graph.entity('b').loc);
-        const result = Rapid.actionOrthogonalize('-', viewport)(graph);
+        const result = Rapid.actionOrthogonalize('-')(graph);
         assert.instanceOf(result, Rapid.Graph);
         const finalWidth = Rapid.sdk.geoSphericalDistance(result.entity('a').loc, result.entity('b').loc);
         assert.isOk(finalWidth / initialWidth >= 0.90 && finalWidth / initialWidth <= 1.10);
@@ -202,7 +196,7 @@ describe('actionOrthogonalize', () => {
       ]);
 
       const graph = new Rapid.Graph(base);
-      const result = Rapid.actionOrthogonalize('-', viewport)(graph);
+      const result = Rapid.actionOrthogonalize('-')(graph);
       assert.instanceOf(result, Rapid.Graph);
       assert.deepEqual(result.entity('-').nodes.length, 4);
     });
@@ -220,7 +214,7 @@ describe('actionOrthogonalize', () => {
       ]);
 
       const graph = new Rapid.Graph(base);
-      const result = Rapid.actionOrthogonalize('-', viewport)(graph);
+      const result = Rapid.actionOrthogonalize('-')(graph);
       assert.instanceOf(result, Rapid.Graph);
       assert.deepEqual(result.entity('-').nodes.length, 4);
     });
@@ -238,7 +232,7 @@ describe('actionOrthogonalize', () => {
       ]);
 
       const graph = new Rapid.Graph(base);
-      const result = Rapid.actionOrthogonalize('-', viewport)(graph);
+      const result = Rapid.actionOrthogonalize('-')(graph);
       assert.instanceOf(result, Rapid.Graph);
       assert.deepEqual(result.entity('-').nodes.length, 3);
     });
@@ -257,7 +251,7 @@ describe('actionOrthogonalize', () => {
       ]);
 
       const graph = new Rapid.Graph(base);
-      const result = Rapid.actionOrthogonalize('-', viewport)(graph);
+      const result = Rapid.actionOrthogonalize('-')(graph);
       assert.instanceOf(result, Rapid.Graph);
       assert.strictEqual(result.hasEntity('d'), undefined);
     });
@@ -276,7 +270,7 @@ describe('actionOrthogonalize', () => {
       ]);
 
       const graph = new Rapid.Graph(base);
-      const result = Rapid.actionOrthogonalize('-', viewport)(graph);
+      const result = Rapid.actionOrthogonalize('-')(graph);
       assert.instanceOf(result, Rapid.Graph);
       assert.deepEqual(result.entity('-').nodes.length, 5);
       assert.isOk(result.hasEntity('d'));
@@ -299,7 +293,7 @@ describe('actionOrthogonalize', () => {
       ]);
 
       const graph = new Rapid.Graph(base);
-      const result = Rapid.actionOrthogonalize('-', viewport)(graph);
+      const result = Rapid.actionOrthogonalize('-')(graph);
       assert.instanceOf(result, Rapid.Graph);
       const diff = new Rapid.Difference(base, result);
       assert.hasAllKeys(diff.changes, ['b', 'c']);
@@ -319,7 +313,7 @@ describe('actionOrthogonalize', () => {
       ]);
 
       const graph = new Rapid.Graph(base);
-      const result = Rapid.actionOrthogonalize('-', viewport)(graph);
+      const result = Rapid.actionOrthogonalize('-')(graph);
       assert.instanceOf(result, Rapid.Graph);
       const diff = new Rapid.Difference(base, result);
       assert.doesNotHaveAnyKeys(diff.changes, ['d']);  // d not changed
@@ -342,7 +336,7 @@ describe('actionOrthogonalize', () => {
       ]);
 
       const graph = new Rapid.Graph(base);
-      const result = Rapid.actionOrthogonalize('-', viewport, 'b')(graph);
+      const result = Rapid.actionOrthogonalize('-', 'b')(graph);
       assert.instanceOf(result, Rapid.Graph);
       const diff = new Rapid.Difference(base, result);
       assert.hasAllKeys(diff.changes, ['b']);  // only b
@@ -361,7 +355,7 @@ describe('actionOrthogonalize', () => {
       ]);
 
       const graph = new Rapid.Graph(base);
-      const result = Rapid.actionOrthogonalize('-', viewport, 'b')(graph);
+      const result = Rapid.actionOrthogonalize('-', 'b')(graph);
       assert.instanceOf(result, Rapid.Graph);
       const diff = new Rapid.Difference(base, result);
       assert.hasAllKeys(diff.changes, ['b']);  // only b
@@ -380,7 +374,7 @@ describe('actionOrthogonalize', () => {
       ]);
 
       const graph = new Rapid.Graph(base);
-      const result = Rapid.actionOrthogonalize('-', viewport, 'b')(graph);
+      const result = Rapid.actionOrthogonalize('-', 'b')(graph);
       assert.instanceOf(result, Rapid.Graph);
       const diff = new Rapid.Difference(base, result);
       assert.hasAllKeys(diff.changes, ['b']);  // only b
@@ -399,11 +393,28 @@ describe('actionOrthogonalize', () => {
       ]);
 
       const graph = new Rapid.Graph(base);
-      const result = Rapid.actionOrthogonalize('-', viewport, 'b')(graph);
+      const result = Rapid.actionOrthogonalize('-', 'b')(graph);
       assert.instanceOf(result, Rapid.Graph);
       const diff = new Rapid.Difference(base, result);
       assert.hasAllKeys(diff.changes, ['b']);  // only b
     });
+  });
+
+  it('removes the nonsquare tag, if present', () => {
+    //    d --- c
+    //    |     |
+    //    a --- b
+    const base = new Rapid.Graph(context, [
+      new Rapid.OsmNode(context, { id: 'a', loc: [0, 0] }),
+      new Rapid.OsmNode(context, { id: 'b', loc: [2, 0] }),
+      new Rapid.OsmNode(context, { id: 'c', loc: [2, 2] }),
+      new Rapid.OsmNode(context, { id: 'd', loc: [0, 2] }),
+      new Rapid.OsmWay(context, { id: '-', nodes: ['a', 'b', 'c', 'd', 'a'], tags: { nonsquare: 'yes' } })
+    ]);
+    const graph = new Rapid.Graph(base);
+    const result = Rapid.actionOrthogonalize('-')(graph);
+    assert.instanceOf(result, Rapid.Graph);
+    assert.doesNotHaveAllKeys(result.entity('-').tags, ['nonsquare']);
   });
 
 
@@ -423,7 +434,7 @@ describe('actionOrthogonalize', () => {
         ]);
 
         const graph = new Rapid.Graph(base);
-        const result = Rapid.actionOrthogonalize('-', viewport).disabled(graph);
+        const result = Rapid.actionOrthogonalize('-').disabled(graph);
         assert.strictEqual(result, 'square_enough');
       });
 
@@ -440,7 +451,7 @@ describe('actionOrthogonalize', () => {
         ]);
 
         const graph = new Rapid.Graph(base);
-        const result = Rapid.actionOrthogonalize('-', viewport).disabled(graph);
+        const result = Rapid.actionOrthogonalize('-').disabled(graph);
         assert.isFalse(result);
       });
 
@@ -457,7 +468,7 @@ describe('actionOrthogonalize', () => {
         ]);
 
         const graph = new Rapid.Graph(base);
-        const result = Rapid.actionOrthogonalize('-', viewport).disabled(graph);
+        const result = Rapid.actionOrthogonalize('-').disabled(graph);
         assert.isFalse(result);
       });
 
@@ -475,7 +486,7 @@ describe('actionOrthogonalize', () => {
         ]);
 
         const graph = new Rapid.Graph(base);
-        const result = Rapid.actionOrthogonalize('-', viewport).disabled(graph);
+        const result = Rapid.actionOrthogonalize('-').disabled(graph);
         assert.isFalse(result);
       });
 
@@ -496,7 +507,7 @@ describe('actionOrthogonalize', () => {
         ]);
 
         const graph = new Rapid.Graph(base);
-        const result = Rapid.actionOrthogonalize('-', viewport).disabled(graph);
+        const result = Rapid.actionOrthogonalize('-').disabled(graph);
         assert.strictEqual(result, 'not_squarish');
       });
 
@@ -518,7 +529,7 @@ describe('actionOrthogonalize', () => {
         ]);
 
         const graph = new Rapid.Graph(base);
-        const result = Rapid.actionOrthogonalize('-', viewport).disabled(graph);
+        const result = Rapid.actionOrthogonalize('-').disabled(graph);
         assert.isFalse(result);
       });
     });
@@ -538,7 +549,7 @@ describe('actionOrthogonalize', () => {
         ]);
 
         const graph = new Rapid.Graph(base);
-        const result = Rapid.actionOrthogonalize('-', viewport).disabled(graph);
+        const result = Rapid.actionOrthogonalize('-').disabled(graph);
         assert.strictEqual(result, 'square_enough');
       });
 
@@ -555,7 +566,7 @@ describe('actionOrthogonalize', () => {
         ]);
 
         const graph = new Rapid.Graph(base);
-        const result = Rapid.actionOrthogonalize('-', viewport).disabled(graph);
+        const result = Rapid.actionOrthogonalize('-').disabled(graph);
         assert.isFalse(result);
       });
 
@@ -572,7 +583,7 @@ describe('actionOrthogonalize', () => {
         ]);
 
         const graph = new Rapid.Graph(base);
-        const result = Rapid.actionOrthogonalize('-', viewport).disabled(graph);
+        const result = Rapid.actionOrthogonalize('-').disabled(graph);
         assert.isFalse(result);
       });
 
@@ -590,7 +601,7 @@ describe('actionOrthogonalize', () => {
         ]);
 
         const graph = new Rapid.Graph(base);
-        const result = Rapid.actionOrthogonalize('-', viewport).disabled(graph);
+        const result = Rapid.actionOrthogonalize('-').disabled(graph);
         assert.isFalse(result);
       });
 
@@ -611,7 +622,7 @@ describe('actionOrthogonalize', () => {
         ]);
 
         const graph = new Rapid.Graph(base);
-        const result = Rapid.actionOrthogonalize('-', viewport).disabled(graph);
+        const result = Rapid.actionOrthogonalize('-').disabled(graph);
         assert.strictEqual(result, 'not_squarish');
       });
 
@@ -629,7 +640,7 @@ describe('actionOrthogonalize', () => {
         ]);
 
         const graph = new Rapid.Graph(base);
-        const result = Rapid.actionOrthogonalize('-', viewport).disabled(graph);
+        const result = Rapid.actionOrthogonalize('-').disabled(graph);
         assert.isFalse(result);
       });
     });
@@ -649,7 +660,7 @@ describe('actionOrthogonalize', () => {
         ]);
 
         const graph = new Rapid.Graph(base);
-        const result = Rapid.actionOrthogonalize('-', viewport, 'b').disabled(graph);
+        const result = Rapid.actionOrthogonalize('-', 'b').disabled(graph);
         assert.strictEqual(result, 'square_enough');
       });
 
@@ -666,7 +677,7 @@ describe('actionOrthogonalize', () => {
         ]);
 
         const graph = new Rapid.Graph(base);
-        const result = Rapid.actionOrthogonalize('-', viewport, 'b').disabled(graph);
+        const result = Rapid.actionOrthogonalize('-', 'b').disabled(graph);
         assert.isFalse(result);
       });
 
@@ -683,7 +694,7 @@ describe('actionOrthogonalize', () => {
         ]);
 
         const graph = new Rapid.Graph(base);
-        const result = Rapid.actionOrthogonalize('-', viewport, 'b').disabled(graph);
+        const result = Rapid.actionOrthogonalize('-', 'b').disabled(graph);
         assert.isFalse(result);
       });
 
@@ -704,7 +715,7 @@ describe('actionOrthogonalize', () => {
         ]);
 
         const graph = new Rapid.Graph(base);
-        const result = Rapid.actionOrthogonalize('-', viewport, 'b').disabled(graph);
+        const result = Rapid.actionOrthogonalize('-', 'b').disabled(graph);
         assert.strictEqual(result, 'not_squarish');
       });
     });
@@ -734,13 +745,14 @@ describe('actionOrthogonalize', () => {
       ]);
 
       const graph = new Rapid.Graph(base);
-      const result = Rapid.actionOrthogonalize('-', viewport)(graph, 0);
+      const result = Rapid.actionOrthogonalize('-')(graph, 0);
       assert.instanceOf(result, Rapid.Graph);
       assert.deepEqual(result.entity('-').nodes, ['a', 'b', 'c', 'd', 'e', 'f', 'a']);
-      assert.isOk(Math.abs(result.entity('b').loc[0] - 1) < 1e-6);
-      assert.isOk(Math.abs(result.entity('b').loc[1] - 0.01) < 1e-6);
-      assert.isOk(Math.abs(result.entity('c').loc[0] - 2) < 1e-6);
-      assert.isOk(Math.abs(result.entity('c').loc[1] + 0.01) < 1e-6);
+
+      const b = result.entity('b').loc;
+      assert.deepEqual(b, [1, 0.01]);
+      const c = result.entity('c').loc;
+      assert.deepEqual(c, [2, -0.01]);
     });
 
     it('orthogonalize at t = 0.5', () => {
@@ -755,13 +767,17 @@ describe('actionOrthogonalize', () => {
       ]);
 
       const graph = new Rapid.Graph(base);
-      const result = Rapid.actionOrthogonalize('-', viewport)(graph, 0.5);
+      const result = Rapid.actionOrthogonalize('-')(graph, 0.5);
       assert.instanceOf(result, Rapid.Graph);
       assert.deepEqual(result.entity('-').nodes, ['a', 'b', 'c', 'd', 'e', 'f', 'a']);
-      assert.isOk(Math.abs(result.entity('b').loc[0] - 1) < 1e-3);
-      assert.isOk(Math.abs(result.entity('b').loc[1] - 0.005) < 1e-3);
-      assert.isOk(Math.abs(result.entity('c').loc[0] - 2) < 1e-3);
-      assert.isOk(Math.abs(result.entity('c').loc[1] + 0.005) < 1e-3);
+
+      const b = result.entity('b').loc;
+      assert.closeTo(b[0], 1, 1e-3);
+      assert.closeTo(b[1], 0.005, 1e-3);
+
+      const c = result.entity('c').loc;
+      assert.closeTo(c[0], 2, 1e-3);
+      assert.closeTo(c[1], -0.005, 1e-3);
     });
 
     it('orthogonalize at t = 1', () => {
@@ -776,11 +792,14 @@ describe('actionOrthogonalize', () => {
       ]);
 
       const graph = new Rapid.Graph(base);
-      const result = Rapid.actionOrthogonalize('-', viewport)(graph, 1);
+      const result = Rapid.actionOrthogonalize('-')(graph, 1);
       assert.instanceOf(result, Rapid.Graph);
       assert.deepEqual(result.entity('-').nodes, ['a', 'b', 'd', 'e', 'f', 'a']);
-      assert.isOk(Math.abs(result.entity('b').loc[0] - 1) < 2e-3);
-      assert.isOk(Math.abs(result.entity('b').loc[1]) < 2e-3);
+
+      const b = result.entity('b').loc;
+      assert.closeTo(b[0], 1, 1e-3);
+      assert.closeTo(b[1], 0, 1e-3);
+
       assert.isUndefined(result.hasEntity('c'));
     });
   });

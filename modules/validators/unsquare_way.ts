@@ -95,7 +95,7 @@ export function validateUnsquareWay(context: Context): ValidatorFunction {
     // don't allow autosquaring features linked to wikidata
     if (!entity.tags.wikidata) {
       // important to use the same `degreeThreshold` as for detection:
-      const action = actionOrthogonalize(entity.id, context.viewport, undefined, degreeThreshold);
+      const action = actionOrthogonalize(entity.id, undefined, degreeThreshold);
       const annotation = l10n.t('operations.orthogonalize.annotation.feature', { n: 1 });
       autoArgs = [ action, annotation ];
     }
@@ -123,7 +123,7 @@ export function validateUnsquareWay(context: Context): ValidatorFunction {
             onClick: function(this: any) {
               const entityID = this.issue.entityIds[0];
               // important to use the same `degreeThreshold` as for detection:
-              const action = actionOrthogonalize(entityID, context.viewport, undefined, degreeThreshold);
+              const action = actionOrthogonalize(entityID, undefined, degreeThreshold);
               const annotation = l10n.t('operations.orthogonalize.annotation.feature', { n: 1 });
 
               editor

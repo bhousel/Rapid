@@ -14,7 +14,7 @@ import type { OsmWay } from '../data/OsmWay.ts';
  *
  * @param   selectedIDs  - Array of EntityIDs (ways and optionally nodes) to straighten
  * @param   viewport     - The Viewport for coordinate conversion
- * @return  An Action that straightens the ways
+ * @return  An Action function that straightens the given ways
  */
 export function actionStraightenWay(selectedIDs: EntityID[], viewport: Viewport): Action {
 
@@ -83,7 +83,7 @@ export function actionStraightenWay(selectedIDs: EntityID[], viewport: Viewport)
   }
 
 
-  function shouldKeepNode(node: OsmNode, graph: Graph): boolean {
+  function isInteresting(node: OsmNode, graph: Graph): boolean {
     return graph.parentWays(node).length > 1 ||
       graph.parentRelations(node).length > 0 ||
       node.hasInterestingTags();
@@ -93,6 +93,7 @@ export function actionStraightenWay(selectedIDs: EntityID[], viewport: Viewport)
   const action: Action = ((graph: Graph, t?: number): Graph => {
     if (t === null || !isFinite(t!)) t = 1;
     t = Math.min(Math.max(+t!, 0), 1);
+    if (t === 0) return graph;
 
     const nodes: OsmNode[] = allNodes(graph);
     const points: Vec2[] = nodes.map(n => viewport.project(n.loc!));
@@ -104,7 +105,7 @@ export function actionStraightenWay(selectedIDs: EntityID[], viewport: Viewport)
       const node = nodes[i];
       const point = points[i];
 
-      if (t < 1 || shouldKeepNode(node, graph)) {
+      if (t < 1 || isInteresting(node, graph)) {
         const u = positionAlongWay(point, startPoint, endPoint);
         const p = vecInterp(startPoint, endPoint, u);
         const loc2 = viewport.unproject(p);
@@ -152,7 +153,7 @@ export function actionStraightenWay(selectedIDs: EntityID[], viewport: Viewport)
     }
 
     const keepingAllNodes = nodes.every((node: OsmNode, i: number) => {
-      return i === 0 || i === nodes.length - 1 || shouldKeepNode(node, graph);
+      return i === 0 || i === nodes.length - 1 || isInteresting(node, graph);
     });
 
     // Allow straightening even if already straight in order to remove extraneous nodes

@@ -1,9 +1,9 @@
+import { projWorldToWgs84 } from '@rapid-sdk/math';
 import { OsmNode } from '../data/OsmNode.ts';
 
 import type { Action } from './types.ts';
 import type { EntityType, OsmRelation, OsmTags, OsmWay } from '../data/types.ts';
 import type { Graph } from '../lib/Graph.ts';
-import type { Viewport } from '@rapid-sdk/math';
 
 
 /** Interface for extract action with getExtractedNodeID method */
@@ -13,15 +13,14 @@ export interface ExtractAction extends Action {
 
 
 /**
- * Extracts a point of interest from a node, way, or relation.
+ * Extracts a point of interest (POI) node from a node, way, or relation.
  * For nodes, creates a replacement node and detaches the original.
  * For ways/relations, extracts tags to a new point at the centroid.
  *
  * @param   entityID  - EntityID of the entity to extract from
- * @param   viewport  - The Viewport for coordinate conversion
- * @return  An ExtractAction
+ * @return  An Action function that extracts a new POI node from another entity
  */
-export function actionExtract(entityID: EntityID, viewport: Viewport): ExtractAction {
+export function actionExtract(entityID: EntityID): ExtractAction {
   let _extractedNodeID: EntityID | undefined;
 
   const action = ((graph: Graph): Graph => {
@@ -59,7 +58,7 @@ export function actionExtract(entityID: EntityID, viewport: Viewport): ExtractAc
     const poi = entity.geoms.parts[0]?.world?.poi;  // Pole of Inaccessability (in world coords)
     if (!poi) return graph;
 
-    const extractLoc = viewport.worldToWgs84(poi);
+    const extractLoc = projWorldToWgs84(poi);
 
     const indoorAreaValues: Record<string, boolean> = {
       area: true,

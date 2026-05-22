@@ -10,7 +10,7 @@ import type { Graph } from '../lib/Graph.ts';
  * Otherwise reverts the entity to its base state.
  *
  * @param   entityID  - EntityID of the entity to revert
- * @return  An Action function that reverts the entity in the graph
+ * @return  An Action function that reverts the entity to its original state.
  */
 export function actionRevert(entityID: EntityID): Action {
   return (graph: Graph): Graph => {

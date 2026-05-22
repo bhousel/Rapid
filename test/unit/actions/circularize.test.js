@@ -352,7 +352,7 @@ describe('actionCircularize', () => {
       const graph = new Rapid.Graph(base);
       const result = Rapid.actionCircularize('-', viewport)(graph, 0);
       assert.isFalse(isCircular('-', result));
-      assert.lengthOf(result.entity('-').nodes, 20);
+      assert.deepEqual(result.entity('-').nodes, ['a', 'b', 'c', 'd', 'a']);  // nothing done yet
       assert.isOk(closeTo(area('-', result), -4));
     });
 

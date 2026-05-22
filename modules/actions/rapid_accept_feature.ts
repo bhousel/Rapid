@@ -14,12 +14,11 @@ interface ConnectionPoint {
 
 
 /**
- * Accepts a feature from an external graph (AI suggestions) into the main graph.
+ * Accepts a Rapid feature from an external graph into the main graph.
  * Handles nodes, ways, and relations, including connection points to existing ways.
- *
  * @param   entityID  - EntityID of the entity to accept from the external graph
- * @param   extGraph  - The external Graph containing the AI-suggested features
- * @return  An Action that adds the feature to the main graph
+ * @param   extGraph  - The external Graph containing the Rapid features
+ * @return  An Action function that adds the given Rapid feature to the main graph
  */
 export function actionRapidAcceptFeature(entityID: EntityID, extGraph: Graph): Action {
 

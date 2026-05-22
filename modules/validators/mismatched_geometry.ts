@@ -408,7 +408,7 @@ export function validateMismatchedGeometry(context: Context): ValidatorFunction 
     if (!context.hasHiddenConnections(entityID)) {
       extractOnClick = function(this: any) {
         const entityID = this.issue.entityIds[0];
-        const action = actionExtract(entityID, context.viewport);
+        const action = actionExtract(entityID);
         editor.perform(action);
         editor.commit({
           annotation: l10n.t('operations.extract.annotation', { n: 1 }),

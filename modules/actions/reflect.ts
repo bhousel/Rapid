@@ -17,7 +17,7 @@ export interface ReflectAction extends Action {
 /**
  * Reflects the given EntityIDs around their shared axis of symmetry.
  * @param   entityIDs  - Array of EntityIDs to reflect
- * @return  A ReflectAction that reflects the entities in the graph
+ * @return  An Action function that reflects the given entities
  */
 export function actionReflect(entityIDs: EntityID[]): ReflectAction {
   let _useLongAxis = true;
@@ -26,6 +26,7 @@ export function actionReflect(entityIDs: EntityID[]): ReflectAction {
   const action = ((graph: Graph, t?: number): Graph => {
     if (t === null || !isFinite(t!)) t = 1;
     t = Math.min(Math.max(+t!, 0), 1);
+    if (t === 0) return graph;
 
     const collection = utilGetAllNodes(entityIDs, graph) as OsmNode[];
     const nodes: OsmNode[] = [];
@@ -52,9 +53,9 @@ export function actionReflect(entityIDs: EntityID[]): ReflectAction {
     // Update the nodes
     for (let i = 0; i < nodes.length; i++) {
       let node = nodes[i];
-      const coord = vecAdd(reflected[i], origin);  // local -> world
-      const loc2 = projWorldToWgs84(coord);
-      node = node.move(vecInterp(node.loc!, loc2, t));
+      const final = vecInterp(points[i], reflected[i], t);
+      const coord = vecAdd(final, origin);  // local -> world
+      node = node.move(projWorldToWgs84(coord));
       graph.replace(node);
     }
 

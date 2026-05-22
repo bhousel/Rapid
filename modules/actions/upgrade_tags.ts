@@ -37,7 +37,7 @@ import type { OsmTags } from '../data/types.ts';
  * @param   entityID     - EntityID of the entity to upgrade tags on
  * @param   oldTags      - Tags to match and remove
  * @param   replaceTags  - Optional tags to replace with
- * @return  An Action function that upgrades tags in the graph
+ * @return  An Action function that performs the tag upgrades
  */
 export function actionUpgradeTags(entityID: EntityID, oldTags: OsmTags, replaceTags?: OsmTags): Action {
 

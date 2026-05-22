@@ -2,7 +2,7 @@ import { select as d3_select } from 'd3-selection';
 
 import {
   DEG2RAD, Extent, Tiler, geoMetersToLat, geoMetersToLon,
-  geomRotate, geomPointInPolygon, vecLength
+  geomRotate, geomPointInPolygon, projWgs84ToWorld, vecLength
 } from '@rapid-sdk/math';
 
 import { utilQsString } from '@rapid-sdk/util';
@@ -720,7 +720,6 @@ export class StreetsideService extends AbstractSystem {
     const context = this.context;
     const photos = context.systems.photos!;
     const spatial = context.systems.spatial!;
-    const viewport = context.viewport;
 
     const currBubbleID = photos.currPhotoID;
     const selected = spatial.getData<StreetsideBubble>('streetside-images', currBubbleID);
@@ -760,7 +759,7 @@ export class StreetsideService extends AbstractSystem {
 
     const extent = new Extent();
     for (const loc of poly) {
-      extent.extendSelf(viewport.wgs84ToWorld(loc));
+      extent.extendSelf(projWgs84ToWorld(loc));
     }
 
     // find nearest other bubble in the search polygon

@@ -12,7 +12,7 @@ describe('actionScale', () => {
       new Rapid.OsmNode(context, { id: 'b', loc: [1, 0] })
     ]);
     const graph = new Rapid.Graph(base);
-    const origin = [0, 0];
+    const origin = Rapid.sdk.projWgs84ToWorld([0, 0]);
     const scale = 2;
 
     const result = Rapid.actionScale(['a', 'b'], origin, scale)(graph);
@@ -39,7 +39,7 @@ describe('actionScale', () => {
         new Rapid.OsmNode(context, { id: 'b', loc: [1, 0] })
       ]);
       const graph = new Rapid.Graph(base);
-      const origin = [0, 0];
+      const origin = Rapid.sdk.projWgs84ToWorld([0, 0]);
       const scale = 2;
 
       const result = Rapid.actionScale(['a', 'b'], origin, scale)(graph, 0);
@@ -57,7 +57,7 @@ describe('actionScale', () => {
         new Rapid.OsmNode(context, { id: 'b', loc: [1, 0] })
       ]);
       const graph = new Rapid.Graph(base);
-      const origin = [0, 0];
+      const origin = Rapid.sdk.projWgs84ToWorld([0, 0]);
       const scale = 2;
 
       const result = Rapid.actionScale(['a', 'b'], origin, scale)(graph, 0.5);
@@ -77,7 +77,7 @@ describe('actionScale', () => {
         new Rapid.OsmNode(context, { id: 'b', loc: [1, 0] })
       ]);
       const graph = new Rapid.Graph(base);
-      const origin = [0, 0];
+      const origin = Rapid.sdk.projWgs84ToWorld([0, 0]);
       const scale = 2;
 
       const result = Rapid.actionScale(['a', 'b'], origin, scale)(graph, 1);

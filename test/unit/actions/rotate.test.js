@@ -15,19 +15,19 @@ describe('actionRotate', () => {
     const nodeB = new Rapid.OsmNode(context, { id: 'b', loc: [1, 0] });
     const base = new Rapid.Graph(context, [nodeA, nodeB]);
     const graph = new Rapid.Graph(base);
-    const pivot = context.viewport.wgs84ToWorld([0, 0]);
-    const start = context.viewport.wgs84ToWorld(nodeB.loc);
+    const pivot = Rapid.sdk.projWgs84ToWorld([0, 0]);
+    const start = Rapid.sdk.projWgs84ToWorld(nodeB.loc);
     const dx = start[0] - pivot[0];
     const angle = Math.PI / 2;  // 90 degrees in radians
 
-    const result = Rapid.actionRotate(['a', 'b'], pivot, angle, context.viewport)(graph);
+    const result = Rapid.actionRotate(['a', 'b'], pivot, angle)(graph);
     assert.instanceOf(result, Rapid.Graph);
 
     const resultA = result.hasEntity('a');
     const resultB = result.hasEntity('b');
     assert.instanceOf(resultA, Rapid.OsmNode);
     assert.instanceOf(resultB, Rapid.OsmNode);
-    const resultBWorld = context.viewport.wgs84ToWorld(resultB.loc);
+    const resultBWorld = Rapid.sdk.projWgs84ToWorld(resultB.loc);
 
     assert.isTrue(closeTo(resultA.loc[0], 0));
     assert.isTrue(closeTo(resultA.loc[1], 0));

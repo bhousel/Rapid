@@ -39,7 +39,7 @@ export interface MergeRemoteChangesAction extends Action {
  *
  * @param   id       - EntityID of the entity to merge
  * @param   options  - Merge options including local/remote graphs and strategy
- * @return  A MergeRemoteChangesAction that merges changes and tracks conflicts
+ * @return  An Action function that merges changes and tracks conflicts
  */
 export function actionMergeRemoteChanges(id: EntityID, options: MergeRemoteChangesOptions): MergeRemoteChangesAction {
   const localGraph = options.localGraph;

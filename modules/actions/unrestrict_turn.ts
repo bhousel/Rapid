@@ -12,7 +12,7 @@ import type { Turn } from '../lib/intersection.ts';
  * see lib/intersection.ts, pathToTurn()
  *
  * @param   turn  - Turn object with restrictionID of the relation to delete
- * @return  An Action function that deletes the restriction from the graph
+ * @return  An Action function that deletes the given turn restriction
  */
 export function actionUnrestrictTurn(turn: Turn): Action {
   return (graph: Graph): Graph => actionDeleteRelation(turn.restrictionID!)(graph);

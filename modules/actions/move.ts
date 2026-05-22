@@ -53,12 +53,11 @@ export interface MoveAction extends Action {
 
 /**
  * Moves the specified entities by the given delta.
- *
  * @param   moveIDs   - Array of EntityIDs to move
  * @param   tryDelta  - The delta [dx, dy] to move by
  * @param   viewport  - The Viewport for coordinate conversion
  * @param   cache     - Optional cache object for efficiency across multiple calls
- * @return  A MoveAction that moves the entities in the graph
+ * @return  A Action function that moves the given entities
  */
 export function actionMove(
   moveIDs: EntityID[],

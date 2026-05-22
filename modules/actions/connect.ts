@@ -12,14 +12,11 @@ import type { OsmWay } from '../data/OsmWay.ts';
 
 /**
  * Connects the ways at the given nodes.
- *
  * First choose a node to be the survivor, with preference given to an existing (not new) node.
  * Tags and relation memberships of non-surviving nodes are merged to the survivor.
- *
  * This is the inverse of `actionDisconnect`.
- *
  * @param   nodeIDs  - Array of EntityIDs of nodes to connect
- * @return  An Action that connects the nodes
+ * @return  An Action function that connects the nodes
  */
 export function actionConnect(nodeIDs: EntityID[]): Action {
   const action = ((graph: Graph): Graph => {

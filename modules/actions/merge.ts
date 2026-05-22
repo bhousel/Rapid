@@ -19,9 +19,8 @@ interface GeometryGroups {
 
 /**
  * Merges point features onto a single way or area.
- *
  * @param   entityIDs  - Array of EntityIDs to merge
- * @return  An Action that merges the entities
+ * @return  An Action function that merges the entities
  */
 export function actionMerge(entityIDs: EntityID[]): Action {
 

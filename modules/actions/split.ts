@@ -37,12 +37,11 @@ export interface SplitAction extends Action {
  * Splits a way at the given node(s).
  * For closed ways, finds a partner node to split the area naturally.
  * Optionally, split only specific ways if multiple share the node.
- *
  * This is the inverse of `actionJoin`.
  *
  * @param   nodeIDs    - EntityID or array of EntityIDs of nodes to split at
  * @param   newWayIDs  - Optional IDs to assign to new ways (for testing)
- * @return  A SplitAction that splits the way(s)
+ * @return  An Action function that splits the way(s)
  */
 export function actionSplit(nodeIDs: EntityID | EntityID[], newWayIDs?: EntityID[]): SplitAction {
   // accept single ID for backwards-compatibility

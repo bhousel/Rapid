@@ -7,9 +7,7 @@ import type { Graph } from '../lib/Graph.ts';
 
 
 /**
- * Deletes multiple entities by dispatching to the appropriate delete action
- * based on entity type.
- *
+ * Deletes multiple entities by dispatching to the appropriate delete action based on entity type.
  * @param   entityIDs          - Array of EntityIDs to delete
  * @param   doDeleteDegenerate - Whether to delete degenerate parents (default: true)
  * @return  An Action function that deletes the entities from the graph

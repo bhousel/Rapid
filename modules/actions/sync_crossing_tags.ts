@@ -18,7 +18,7 @@ import type { OsmNode, OsmTags, OsmWay } from '../data/types.ts';
  *  - by the `ambiguous_crossing_tags` validator to detect issues, or make fixes
  *
  *  @param  entityID  - The Entity with the tags that should be checked
- *  @return The Action function, accepts a Graph and returns a modified Graph
+ *  @return An Action function that performs the crossing tag cleanups
  */
 export function actionSyncCrossingTags(entityID: EntityID): Action {
 

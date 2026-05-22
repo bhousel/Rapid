@@ -6,9 +6,9 @@ import type { OsmEntity, OsmTags } from '../data/types.ts';
 
 /**
  * Removes specified tags from entities that were modified or created.
- * @param difference - The Difference object containing modified/created entities
- * @param discardTags - Object with tag keys to discard (values are ignored, just checking key existence)
- * @return Action that removes the specified tags
+ * @param   difference - The Difference object containing modified/created entities
+ * @param   discardTags - Object with tag keys to discard (values are ignored, just checking key existence)
+ * @return  An Action function that removes the specified tags
  */
 export function actionDiscardTags(difference: Difference, discardTags: Record<string, unknown> = {}): Action {
   return (graph: Graph): Graph => {

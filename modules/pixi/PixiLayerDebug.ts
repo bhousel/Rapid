@@ -2,6 +2,7 @@ import { AbstractPixiLayer } from './AbstractPixiLayer.ts';
 import { GeometryPart } from '../lib/GeometryPart.ts';
 import { PixiFeaturePoint } from './PixiFeaturePoint.ts';
 import { PixiFeaturePolygon } from './PixiFeaturePolygon.ts';
+import { projWorldToWgs84 } from '@rapid-sdk/math';
 
 import type { OsmEntity } from '../data/OsmEntity.ts';
 import type { PixiScene } from './PixiScene.ts';
@@ -121,8 +122,6 @@ export class PixiLayerDebug extends AbstractPixiLayer {
 
         // visualize test point
         if (worldPoi) {
-          const origPoi = viewport.worldToWgs84(worldPoi);
-
           const poiFeatureID = `${this.layerID}-${dataID}-${i}-poi`;
           let poiFeature = this.features.get(poiFeatureID);
           if (!poiFeature) {
@@ -132,7 +131,7 @@ export class PixiLayerDebug extends AbstractPixiLayer {
             poiFeature.v = version;
 
             const poiGeometry = new GeometryPart(context);
-            poiGeometry.setData({ type: 'Point', coordinates: origPoi });
+            poiGeometry.setData({ type: 'Point', coordinates: projWorldToWgs84(worldPoi) });
             poiFeature.geometry = poiGeometry;
 
             poiFeature.style = POISTYLE;

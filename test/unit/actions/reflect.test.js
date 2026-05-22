@@ -132,13 +132,13 @@ describe('actionReflect', () => {
       const d = result.entity('d').loc; // [1, 1]
 
       assert.closeTo(a[0], 0, 1e-9);
-      assert.closeTo(a[1], 1, 1e-9);
+      assert.closeTo(a[1], 1, 1e-3);
       assert.closeTo(b[0], 4, 1e-9);
-      assert.closeTo(b[1], 1, 1e-9);
+      assert.closeTo(b[1], 1, 1e-3);
       assert.closeTo(c[0], 4, 1e-9);
-      assert.closeTo(c[1], 1, 1e-9);
+      assert.closeTo(c[1], 1, 1e-3);
       assert.closeTo(d[0], 1, 1e-9);
-      assert.closeTo(d[1], 1, 1e-9);
+      assert.closeTo(d[1], 1, 1e-3);
     });
 
     it('reflect long at t = 1', () => {

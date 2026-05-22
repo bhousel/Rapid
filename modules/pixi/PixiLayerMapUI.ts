@@ -1,7 +1,7 @@
 import * as PIXI from 'pixi.js';
 import { AbstractPixiLayer } from './AbstractPixiLayer.ts';
 import { DashLine } from './lib/DashLine.ts';
-import { geoMetersToLon, vecEqual, WORLD_ZOOM } from '@rapid-sdk/math';
+import { geoMetersToLon, projWgs84ToWorld, vecEqual, WORLD_ZOOM } from '@rapid-sdk/math';
 
 import type { PixiScene } from './PixiScene.ts';
 import type { Viewport, Vec2 } from '@rapid-sdk/math';
@@ -218,7 +218,7 @@ export class PixiLayerMapUI extends AbstractPixiLayer {
         coords.push(start);
       }
 
-      const flatCoords = coords.map(coord => viewport.wgs84ToWorld(coord)).flat();
+      const flatCoords = coords.map(coord => projWgs84ToWorld(coord)).flat();
 
       // Convert screen pixel values to world units
       const scale = 2 ** (WORLD_ZOOM - viewport.transform.z);
@@ -267,7 +267,7 @@ export class PixiLayerMapUI extends AbstractPixiLayer {
 
       const d = this.geolocationData;
       const coord: Vec2 = [d.longitude, d.latitude];
-      const [x, y] = viewport.wgs84ToWorld(coord);
+      const [x, y] = projWgs84ToWorld(coord);
 
       // Convert screen pixel values to world units
       const viewZoom = viewport.transform.zoom;
@@ -276,7 +276,7 @@ export class PixiLayerMapUI extends AbstractPixiLayer {
       // Calculate the radius of the accuracy aura (convert meters -> pixels)
       const dLon = geoMetersToLon(d.accuracy, coord[1]);  // coord[1] = at this latitude
       const edge: Vec2 = [d.longitude + dLon, d.latitude];
-      const x2 = viewport.wgs84ToWorld(edge)[0];
+      const x2 = projWgs84ToWorld(edge)[0];
       const r = Math.max(Math.abs(x2 - x), 15) * scale;
       const BLUE = 0xe60ff;
 

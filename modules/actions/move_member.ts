@@ -8,7 +8,7 @@ import type { OsmRelation } from '../data/OsmRelation.ts';
  * @param relationID - The ID of the relation to modify
  * @param fromIndex - The current index of the member
  * @param toIndex - The destination index for the member
- * @return Action that reorders the relation member
+ * @return Action function that reorders the relation member
  */
 export function actionMoveMember(relationID: EntityID, fromIndex: number, toIndex: number): Action {
   return (graph: Graph): Graph => {

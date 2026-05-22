@@ -21,7 +21,7 @@ import type { Turn } from '../lib/intersection.ts';
  * @param   turn            - Turn object describing the turn to restrict
  * @param   restrictionType - The type of restriction (e.g. 'no_left_turn')
  * @param   restrictionID   - Optional ID for the new relation (for testing)
- * @return  An Action function that creates the restriction in the graph
+ * @return  An Action function that creates the given turn restriction
  */
 export function actionRestrictTurn(turn: Turn, restrictionType: string, restrictionID?: EntityID): Action {
 

@@ -9,9 +9,8 @@ import type { OsmRelation } from '../data/OsmRelation.ts';
 /**
  * Deletes a relation and removes it from all parent relations.
  * Also deletes child members that are no longer needed.
- * If doDeleteDegenerate is true, also deletes any relations that
+ * If `doDeleteDegenerate` is true, also deletes any relations that
  * become degenerate as a result.
- *
  * @param   relationID           - EntityID of the relation to delete
  * @param   doDeleteDegenerate   - Whether to delete degenerate parents (default: true)
  * @param   allowUntaggedMembers - Whether to preserve untagged members (default: false)

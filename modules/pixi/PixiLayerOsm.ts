@@ -4,7 +4,7 @@ import { GeometryPart } from '../lib/GeometryPart.ts';
 import { PixiFeatureLine } from './PixiFeatureLine.ts';
 import { PixiFeaturePoint } from './PixiFeaturePoint.ts';
 import { PixiFeaturePolygon } from './PixiFeaturePolygon.ts';
-import { vecAngle, vecLength, vecInterp, WORLD_ZOOM } from '@rapid-sdk/math';
+import { projWorldToWgs84, vecAngle, vecLength, vecInterp, WORLD_ZOOM } from '@rapid-sdk/math';
 
 import type { MatchedStyle } from '../core/StyleSystem.ts';
 import type { OsmEntity, OsmNode, OsmRelationMember, OsmTags } from '../data/types.ts';
@@ -390,8 +390,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
             poiFeature.v = version;
 
             const poiGeometry = new GeometryPart(context);
-            const coord = viewport.worldToWgs84(part.world.poi);
-            poiGeometry.setData({ type: 'Point', coordinates: coord });
+            poiGeometry.setData({ type: 'Point', coordinates: projWorldToWgs84(part.world.poi) });
             poiFeature.geometry = poiGeometry;
             poiFeature.setData(entityID, entity);
           }
@@ -813,15 +812,14 @@ export class PixiLayerOsm extends AbstractPixiLayer {
         const point = vecInterp(a.point, b.point, 0.5);
         const rot = vecAngle(a.point, b.point) + viewport.transform.rotation;
         const world = viewport.screenToWorld(point);
-        const loc = viewport.worldToWgs84(world);  // store as wgs84 lon/lat
         const midpoint: MidpointData = {
           type: 'midpoint',
           id: midpointID,
           a: a,
           b: b,
           way: way,
-          world: world as Vec2,
-          loc: loc as Vec2,
+          world: world,
+          loc: projWorldToWgs84(world),
           rot: rot
         };
 

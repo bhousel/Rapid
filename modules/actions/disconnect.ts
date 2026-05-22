@@ -30,7 +30,7 @@ export interface DisconnectAction extends Action {
  *
  * @param   nodeID     - EntityID of the node to disconnect
  * @param   newNodeID  - Optional EntityID for the new node
- * @return  A DisconnectAction
+ * @return  An Action function that disconnects the given ways
  */
 export function actionDisconnect(nodeID: EntityID, newNodeID?: EntityID): DisconnectAction {
   let _wayIDs: EntityID[] | undefined;

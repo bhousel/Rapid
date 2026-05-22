@@ -8,9 +8,8 @@ import type { OsmNode } from '../data/OsmNode.ts';
 
 /**
  * Deletes a node and removes it from all parent ways and relations.
- * If doDeleteDegenerate is true, also deletes any ways or relations that
+ * If `doDeleteDegenerate` is true, also deletes any ways or relations that
  * become degenerate as a result.
- *
  * @param   nodeID             - EntityID of the node to delete
  * @param   doDeleteDegenerate - Whether to delete degenerate parents (default: true)
  * @return  An Action function that deletes the node from the graph

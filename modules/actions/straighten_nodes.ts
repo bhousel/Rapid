@@ -1,4 +1,7 @@
-import { geomGetSmallestSurroundingRectangle, Vec2, vecDot, vecInterp, vecLength, Viewport } from '@rapid-sdk/math';
+import {
+  geomGetSmallestSurroundingRectangle, projWorldToWgs84, Vec2,
+  vecAdd, vecDot, vecInterp, vecLength, vecSubtract
+} from '@rapid-sdk/math';
 
 import type { Action } from './types.ts';
 import type { Graph } from '../lib/Graph.ts';
@@ -8,12 +11,10 @@ import type { OsmNode } from '../data/OsmNode.ts';
 /**
  * Aligns selected nodes along their common axis of symmetry.
  * Projects nodes onto the long axis of the smallest surrounding rectangle.
- *
  * @param   nodeIDs   - Array of EntityIDs of nodes to straighten
- * @param   viewport  - The Viewport for coordinate conversion
- * @return  An Action that straightens the nodes
+ * @return  An Action function that straightens the given nodes
  */
-export function actionStraightenNodes(nodeIDs: EntityID[], viewport: Viewport): Action {
+export function actionStraightenNodes(nodeIDs: EntityID[]): Action {
 
   function positionAlongWay(a: Vec2, o: Vec2, b: Vec2): number {
     return vecDot(a, b, o) / vecDot(b, b, o);
@@ -33,20 +34,36 @@ export function actionStraightenNodes(nodeIDs: EntityID[], viewport: Viewport): 
   const action: Action = ((graph: Graph, t?: number): Graph => {
     if (t === null || !isFinite(t!)) t = 1;
     t = Math.min(Math.max(+t!, 0), 1);
+    if (t === 0) return graph;
 
-    const nodes: OsmNode[] = nodeIDs.map(id => graph.entity(id) as OsmNode);
-    const points: Vec2[] = nodes.map(n => viewport.project(n.loc!));
-    const endpoints = getEndpoints(points);
-    const startPoint: Vec2 = endpoints[0];
-    const endPoint: Vec2 = endpoints[1];
+    const nodes: OsmNode[] = [];
+    const points: Vec2[] = [];
+    let origin: Vec2 | undefined;
+
+    // Gather all the nodes and their world coordinates, choose a local origin for floating point stability
+    for (const nodeID of nodeIDs) {
+      const node = graph.hasEntity(nodeID) as OsmNode;
+      if (!node) continue;
+
+      const coord = node.geoms.parts[0].world?.coords as Vec2;  // A node should have a single world coord
+      if (!coord) continue;
+      if (!origin) origin = coord;
+      nodes.push(node);
+      points.push(vecSubtract(coord, origin));  // world -> local
+    }
+    if (!origin || !points.length) return graph;
+
+
+    const [startPoint, endPoint] = getEndpoints(points);
 
     // Move points onto the line connecting the endpoints
     for (let i = 0; i < points.length; i++) {
       const node = nodes[i];
       const point = points[i];
       const u = positionAlongWay(point, startPoint, endPoint);
-      const point2 = vecInterp(startPoint, endPoint, u);
-      const loc2 = viewport.unproject(point2);
+      const final = vecInterp(startPoint, endPoint, u);
+      const coord = vecAdd(final, origin);  // local -> world
+      const loc2 = projWorldToWgs84(coord);
       graph.replace(node.move(vecInterp(node.loc!, loc2, t)));
     }
 
@@ -55,11 +72,22 @@ export function actionStraightenNodes(nodeIDs: EntityID[], viewport: Viewport): 
 
 
   action.disabled = function(graph: Graph): string | false {
-    const nodes: OsmNode[] = nodeIDs.map(id => graph.entity(id) as OsmNode);
-    const points: Vec2[] = nodes.map(n => viewport.project(n.loc!));
-    const endpoints = getEndpoints(points);
-    const startPoint: Vec2 = endpoints[0];
-    const endPoint: Vec2 = endpoints[1];
+    const points: Vec2[] = [];
+    let origin: Vec2 | undefined;
+
+     // Gather all the nodes and their world coordinates, choose a local origin for floating point stability
+    for (const nodeID of nodeIDs) {
+      const node = graph.hasEntity(nodeID) as OsmNode;
+      if (!node) continue;
+
+      const coord = node.geoms.parts[0].world?.coords as Vec2;  // A node should have a single world coord
+      if (!coord)  continue;
+      if (!origin) origin = coord;
+      points.push(vecSubtract(coord, origin));  // world -> local
+    }
+    if (!origin || !points.length) return 'straight_enough';
+
+    const [startPoint, endPoint] = getEndpoints(points);
     let maxDistance = 0;
 
     for (const point of points) {

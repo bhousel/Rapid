@@ -313,7 +313,7 @@ export class SelectOsmMode extends AbstractMode {
         const pivot = vecScale(sum, 1 / count);
 
         operation = Operations.operationRotate(context, selectedIDs);
-        action = actionRotate(selectedIDs, pivot, delta, viewport);
+        action = actionRotate(selectedIDs, pivot, delta);
       }
 
     // move
