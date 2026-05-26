@@ -1,22 +1,29 @@
-import { DEG2RAD, projWorldToWgs84, vecAngle, vecInterp, vecLength, vecLengthSquare } from '@rapid-sdk/math';
-import { median } from 'd3-array';
+import { DEG2RAD, TAU, projWorldToWgs84, vecAdd, vecAngle, vecInterp, vecLength, vecLengthSquare, vecSubtract } from '@rapid-sdk/math';
 import { OsmNode } from '../data/OsmNode.ts';
 import { utilArrayUniq } from '@rapid-sdk/util';
 
 import type { Action } from './types.ts';
 import type { Graph } from '../lib/Graph.ts';
 import type { OsmWay } from '../data/OsmWay.ts';
-import type { Vec2, Viewport } from '@rapid-sdk/math';
+import type { Vec2 } from '@rapid-sdk/math';
 
 
 /**
  * Circularizes a given closed way.
+ *
+ * The algorithm parameterizes the original boundary by arc length: each
+ * original node gets a fraction t in [0, 1) of the way around the circle,
+ * proportional to how far along the input perimeter it sits.  Because node
+ * order on the circle is determined by boundary order (not by angle from the
+ * centroid), arbitrarily concave inputs can't produce a self-intersecting
+ * result.  Extra in-between nodes are then inserted into each arc so no two
+ * adjacent nodes span more than `maxDegrees`.
+ *
  * @param   wayID       - EntityID of the way to circularize
- * @param   viewport    - The Viewport for coordinate conversion
  * @param   maxDegrees  - Maximum angle between adjacent nodes (default: 20)
  * @return  An Action function that circularizes the given way
  */
-export function actionCircularize(wayID: EntityID, viewport: Viewport, maxDegrees: number = 20): Action {
+export function actionCircularize(wayID: EntityID, maxDegrees: number = 20): Action {
   const maxAngle = maxDegrees * DEG2RAD;
 
   const action = ((graph: Graph, t?: number): Graph => {
@@ -26,183 +33,128 @@ export function actionCircularize(wayID: EntityID, viewport: Viewport, maxDegree
 
     let way = graph.entity(wayID) as OsmWay;
 
-    const origNodes = new Map<EntityID, OsmNode>();
-    for (const node of graph.childNodes(way)) {
-      origNodes.set(node.id, node);
+    // The way already has a world-space centroid precomputed; use it as the
+    // local origin so the math stays away from huge EPSG:3857 magnitudes.
+    const origin = way.geoms.parts[0]?.world?.centroid;
+    if (!origin) return graph;
+
+    // Gather the unique original nodes with their world coords (in local space).
+    // Also pick out the "interesting" subset (members of other ways, members of
+    // relations, or tagged) - the radius is biased toward these so the circle
+    // stays close to nodes that other features depend on.
+    const origNodes: OsmNode[] = [];
+    const origPoints: Vec2[] = [];
+    const interesting: Vec2[] = [];
+
+    for (const node of utilArrayUniq(graph.childNodes(way))) {
+      const coord = node.geoms.parts[0].world?.coords as Vec2 | undefined;
+      if (!coord) continue;
+      const point = vecSubtract(coord, origin);  // world -> local
+      origNodes.push(node);
+      origPoints.push(point);
+      if (isInteresting(node, graph)) {
+        interesting.push(point);
+      }
     }
+    const n = origNodes.length;
+    if (n < 3) return graph;
 
-    // Before starting, make sure the shape is convex. see iD#2194
-    // What we probably really want to do is return a collection
-    //  of where the nodes want to move to, rather than moving them.
-    if (!way.isConvex(graph)) {
-      graph = _makeConvex(graph);
-      way = graph.entity(wayID) as OsmWay;
+    // Target radius: median distance from centroid, preferring interesting
+    // points when there are any.
+    const radius = median(interesting.length ? interesting : origPoints);
+    if (!radius) return graph;
+
+    // Winding direction: +1 = CCW, -1 = CW (in y-up math space).
+    const sign = way.geoms.parts[0]?.local?.winding ?? 1;
+
+    // Arc-length parameterize the original boundary: cumulativeDist[i] is the distance
+    // walked from origPoints[0] to origPoints[i].  This is the key idea — node
+    // order on the circle is determined by boundary order, not by angle from
+    // the centroid, which means arbitrarily concave shapes can't self-intersect.
+    const cumulativeDist: number[] = new Array(n);
+    cumulativeDist[0] = 0;
+    for (let i = 1; i < n; i++) {
+      cumulativeDist[i] = cumulativeDist[i - 1] + vecLength(origPoints[i - 1], origPoints[i]);
     }
+    const perimeter = cumulativeDist[n - 1] + vecLength(origPoints[n - 1], origPoints[0]);
+    if (!perimeter) return graph;
 
-    // we already have the shape projected to world coordinates..
-    // we can do less work here.
-    const geom = way.geoms.parts[0]?.world;
-    const centroidW = geom?.centroid;
-    if (!centroidW) return graph;
-    const centroid = viewport.worldToScreen(centroidW);
+    // Anchor node 0 at its original angle so the resulting circle's rotation
+    // roughly matches the input.
+    const theta0 = vecAngle([0, 0], origPoints[0]);
+    const angleAt = (i: number): number => theta0 + sign * (cumulativeDist[i] / perimeter) * TAU;
 
-    const nodes = utilArrayUniq(graph.childNodes(way));
-    let keyNodes = nodes.filter(n => graph.parentWays(n).length > 1);
-    const points = nodes.map(n => viewport.project(n.loc!));
-    let keyPoints = keyNodes.map(n => viewport.project(n.loc!));
-    const radius = median(points, p => vecLength(centroid, p))!;
-    const sign = geom.area! > 0 ? 1 : -1;
-    let i: number, j: number, k: number;
+    // Walk the original nodes, placing each on the circle and inserting any
+    // needed in-between nodes between it and the next.  Remember each inserted
+    // batch alongside the edge it belongs to, so we can mirror them into any
+    // shared ways below.
+    const newNodeIDs: EntityID[] = [];
+    const gaps: Array<{ a: OsmNode; b: OsmNode; ids: EntityID[] }> = [];
 
-    // we need at least two key nodes for the algorithm to work
-    if (!keyNodes.length) {
-      keyNodes = [nodes[0]];
-      keyPoints = [points[0]];
-    }
+    for (let i = 0; i < n; i++) {
+      const inext = (i + 1) % n;
 
-    if (keyNodes.length === 1) {
-      const index = nodes.indexOf(keyNodes[0]);
-      const oppositeIndex = Math.floor((index + nodes.length / 2) % nodes.length);
+      // Place this original node on the circle (transitioned by t).
+      const startAngle = angleAt(i);
+      const targetA: Vec2 = [Math.cos(startAngle) * radius, Math.sin(startAngle) * radius];
+      const movedA = origNodes[i].move(
+        projWorldToWgs84(vecAdd(vecInterp(origPoints[i], targetA, t), origin))
+      );
+      graph.replace(movedA);
+      newNodeIDs.push(movedA.id);
 
-      keyNodes.push(nodes[oppositeIndex]);
-      keyPoints.push(points[oppositeIndex]);
-    }
+      // How many in-between nodes does this arc need?  The arc spans `gap`
+      // radians in the winding direction; normalize to (0, TAU] so the wrap
+      // around the closing edge is handled by the same formula.
+      let gap = sign * (angleAt(inext) - startAngle);
+      while (gap <= 0) gap += TAU;
+      while (gap > TAU) gap -= TAU;
 
-    // key points and nodes are those connected to the ways,
-    // they are projected onto the circle, in between nodes are moved
-    // to constant intervals between key nodes, extra in between nodes are
-    // added if necessary.
-    for (i = 0; i < keyPoints.length; i++) {
-      const nextKeyNodeIndex = (i + 1) % keyNodes.length;
-      const startNode = keyNodes[i];
-      const endNode = keyNodes[nextKeyNodeIndex];
-      const startNodeIndex = nodes.indexOf(startNode);
-      const endNodeIndex = nodes.indexOf(endNode);
-      let numberNewPoints = -1;
-      let indexRange = endNodeIndex - startNodeIndex;
-      const nearNodes: Record<EntityID, number> = {};
-      const inBetweenNodes: EntityID[] = [];
-      let totalAngle: number;
-      let eachAngle: number;
-      let angle: number;
-      let loc: Vec2;
-      let node: OsmNode;
-      let origNode: OsmNode;
+      const numNew = Math.max(0, Math.ceil(gap / maxAngle) - 1);
+      const ids: EntityID[] = [];
 
-      if (indexRange < 0) {
-        indexRange += nodes.length;
+      for (let j = 1; j <= numNew; j++) {
+        const frac = j / (numNew + 1);
+        const a = startAngle + sign * gap * frac;
+        const targetNew: Vec2 = [Math.cos(a) * radius, Math.sin(a) * radius];
+        // For a smooth t=0..1 transition, treat each new node's "original"
+        // position as the linear interpolation between its bracketing nodes.
+        const origInterp = vecInterp(origPoints[i], origPoints[inext], frac);
+        const loc = projWorldToWgs84(vecAdd(vecInterp(origInterp, targetNew, t), origin));
+        const newNode = new OsmNode(way.context, { loc });
+        graph.replace(newNode);
+        newNodeIDs.push(newNode.id);
+        ids.push(newNode.id);
       }
 
-      // position this key node
-      const distance = vecLength(centroid, keyPoints[i]) || 1e-4;
-      keyPoints[i] = [
-        centroid[0] + (keyPoints[i][0] - centroid[0]) / distance * radius,
-        centroid[1] + (keyPoints[i][1] - centroid[1]) / distance * radius
-      ];
-      loc = viewport.unproject(keyPoints[i]);
-      node = keyNodes[i];
-      origNode = origNodes.get(node.id)!;
-      node = node.move(vecInterp(origNode.loc!, loc, t));
-      graph = graph.replace(node).commit();
-
-      // figure out the between delta angle we want to match to
-      const startAngle = Math.atan2(keyPoints[i][1] - centroid[1], keyPoints[i][0] - centroid[0]);
-      const endAngle = Math.atan2(keyPoints[nextKeyNodeIndex][1] - centroid[1], keyPoints[nextKeyNodeIndex][0] - centroid[0]);
-      totalAngle = endAngle - startAngle;
-
-      // detects looping around -pi/pi
-      if (totalAngle * sign > 0) {
-        totalAngle = -sign * (2 * Math.PI - Math.abs(totalAngle));
+      if (ids.length) {
+        gaps.push({ a: origNodes[i], b: origNodes[inext], ids });
       }
+    }
 
-      do {
-        numberNewPoints++;
-        eachAngle = totalAngle / (indexRange + numberNewPoints);
-      } while (Math.abs(eachAngle) > maxAngle);
-
-
-      // move existing nodes
-      for (j = 1; j < indexRange; j++) {
-        angle = startAngle + j * eachAngle;
-        loc = viewport.unproject([
-          centroid[0] + Math.cos(angle) * radius,
-          centroid[1] + Math.sin(angle) * radius
-        ]);
-
-        node = nodes[(j + startNodeIndex) % nodes.length];
-        origNode = origNodes.get(node.id)!;
-        nearNodes[node.id] = angle;
-
-        node = node.move(vecInterp(origNode.loc!, loc, t));
-        graph = graph.replace(node).commit();
-      }
-
-      // add new in between nodes if necessary
-      for (j = 0; j < numberNewPoints; j++) {
-        angle = startAngle + (indexRange + j) * eachAngle;
-        loc = viewport.unproject([
-          centroid[0] + Math.cos(angle) * radius,
-          centroid[1] + Math.sin(angle) * radius
-        ]);
-
-        // choose a nearnode to use as the original
-        let min = Infinity;
-        for (const nodeID in nearNodes) {
-          const nearAngle = nearNodes[nodeID];
-          const dist = Math.abs(nearAngle - angle);
-          if (dist < min) {
-            min = dist;
-            origNode = origNodes.get(nodeID)!;
-          }
+    // For each gap, mirror the inserted nodes into any other way that has the
+    // same pair as adjacent nodes.  Walk the shared way's node list directly
+    // to find the (a, b) edge - this is unambiguous about direction and wrap,
+    // unlike comparing lastIndexOf positions.
+    for (const { a, b, ids } of gaps) {
+      const parentWays = graph.parentWays(a);
+      for (let sharedWay of parentWays) {
+        if (sharedWay.id === way.id) continue;
+        const edge = findEdge(sharedWay, a.id, b.id);
+        if (!edge) continue;
+        const toInsert = edge.reversed ? ids.slice().reverse() : ids;
+        for (let k = 0; k < toInsert.length; k++) {
+          sharedWay = sharedWay.addNode(toInsert[k], edge.insertAt + k);
         }
-
-        node = new OsmNode(way.context, { loc: vecInterp(origNode!.loc!, loc, t) });
-        graph = graph.replace(node).commit();
-
-        nodes.splice(endNodeIndex + j, 0, node);
-        inBetweenNodes.push(node.id);
-      }
-
-      // Check for other ways that share these keyNodes..
-      // If keyNodes are adjacent in both ways,
-      // we can add inBetweenNodes to that shared way too..
-      if (indexRange === 1 && inBetweenNodes.length) {
-        const startIndex1 = way.nodes.lastIndexOf(startNode.id);
-        const endIndex1 = way.nodes.lastIndexOf(endNode.id);
-        let wayDirection1 = (endIndex1 - startIndex1);
-        if (wayDirection1 < -1) wayDirection1 = 1;
-
-        const parentWays = graph.parentWays(keyNodes[i]);
-        for (j = 0; j < parentWays.length; j++) {
-          let sharedWay = parentWays[j];
-          if (sharedWay === way) continue;
-
-          if (sharedWay.isAdjacent(startNode.id, endNode.id)) {
-            const startIndex2 = sharedWay.nodes.lastIndexOf(startNode.id);
-            const endIndex2 = sharedWay.nodes.lastIndexOf(endNode.id);
-            let wayDirection2 = (endIndex2 - startIndex2);
-            let insertAt = endIndex2;
-            if (wayDirection2 < -1) wayDirection2 = 1;
-
-            if (wayDirection1 !== wayDirection2) {
-              inBetweenNodes.reverse();
-              insertAt = startIndex2;
-            }
-            for (k = 0; k < inBetweenNodes.length; k++) {
-              sharedWay = sharedWay.addNode(inBetweenNodes[k], insertAt + k);
-            }
-            graph = graph.replace(sharedWay).commit();
-          }
-        }
+        graph.replace(sharedWay);
       }
     }
 
-    // update the way to have all the new nodes
-    const ids = nodes.map(n => n.id);
-    ids.push(ids[0]);
-
-    way = way.update({ nodes: ids });
-    return graph.replace(way).commit();
+    // Close the ring and replace the way.
+    newNodeIDs.push(newNodeIDs[0]);
+    way = way.update({ nodes: newNodeIDs });
+    graph.replace(way);
+    return graph.commit();
   }) as Action;
 
 
@@ -217,13 +169,13 @@ export function actionCircularize(wayID: EntityID, viewport: Viewport, maxDegree
       return 'not_closed';
     }
 
-    const radius = vecLengthSquare(centroid, points[0]);
+    const radiusSq = vecLengthSquare(centroid, points[0]);
 
     // compare distances between centroid and points
     for (const currPoint of hull) {
       const currDist = vecLengthSquare(currPoint, centroid);
-      const diff = Math.abs(currDist - radius);
-      if (diff > 0.05 * radius) {   // compare distances with epsilon-error (5%)
+      const diff = Math.abs(currDist - radiusSq);
+      if (diff > 0.05 * radiusSq) {   // compare distances with epsilon-error (5%)
         return false;
       }
     }
@@ -239,10 +191,10 @@ export function actionCircularize(wayID: EntityID, viewport: Viewport, maxDegree
         angle = -angle;
       }
       if (angle > Math.PI) {
-        angle = (2 * Math.PI - angle);
+        angle = (TAU - angle);
       }
 
-      if (angle > maxAngle + (Math.PI / 180)) {
+      if (angle > maxAngle + DEG2RAD) {
         return false;
       }
     }
@@ -251,41 +203,48 @@ export function actionCircularize(wayID: EntityID, viewport: Viewport, maxDegree
   };
 
 
-  action.transitionable = true;
-
+  function isInteresting(node: OsmNode, graph: Graph): boolean {
+    return graph.parentWays(node).length > 1 ||
+      graph.parentRelations(node).length > 0 ||
+      node.hasInterestingTags();
+  }
 
 
   /**
-   * This makes the given way convex.
-   * @param  graph  starting graph
-   * @return ending graph
+   * Find the directed edge (a -> b) in a way.  If the way has the pair in the
+   * opposite order, returns `reversed: true`.  `insertAt` is the position to
+   * insert new nodes that should sit between `a` and `b` in the way's
+   * own (a, b) order — caller should reverse the list of new nodes if needed.
    */
-  function _makeConvex(graph: Graph): Graph {
-    const way = graph.entity(wayID) as OsmWay;
-    const geom = way.geoms.parts[0]?.world;
-    const points = geom?.outer;
-    const hull = geom?.hull;
-    if (!points || !hull) return graph;
-
-    const nodes = utilArrayUniq(graph.childNodes(way));
-
-    for (let i = 0; i < hull.length - 1; i++) {
-      const startIndex = points.indexOf(hull[i]);
-      const endIndex = points.indexOf(hull[i+1]);
-      let indexRange = (endIndex - startIndex);
-      if (indexRange < 0) {
-        indexRange += nodes.length;
-      }
-      // move interior nodes to the surface of the convex hull..
-      for (let j = 1; j < indexRange; j++) {
-        const point = vecInterp(hull[i], hull[i+1], j / indexRange);
-        const node = nodes[(j + startIndex) % nodes.length].move(projWorldToWgs84(point));
-        graph.replace(node);
-      }
+  function findEdge(way: OsmWay, a: EntityID, b: EntityID): { insertAt: number; reversed: boolean } | null {
+    const nodes = way.nodes;
+    for (let i = 0; i < nodes.length - 1; i++) {
+      if (nodes[i] === a && nodes[i + 1] === b) return { insertAt: i + 1, reversed: false };
+      if (nodes[i] === b && nodes[i + 1] === a) return { insertAt: i + 1, reversed: true };
     }
-
-    return graph.commit();
+    return null;
   }
+
+
+  /**
+   * Returns the median distance of an array of coordinates.
+   * (i.e. the middle value when all distances are computed and sorted)
+   * @param    coords - the coordinates to check
+   * @returns  median distance
+   */
+  function median(coords: Vec2[]): number | undefined {
+    if (!coords.length) return undefined;
+
+    const sorted = coords.map(coord => vecLength(coord)).sort((a, b) => a - b);
+    const mid = Math.floor(sorted.length / 2);
+
+    return sorted.length % 2 !== 0
+      ? sorted[mid]                           // Odd length, use exact mid
+      : (sorted[mid - 1] + sorted[mid]) / 2;  // Even length, take average
+  };
+
+
+  action.transitionable = true;
 
 
   return action;

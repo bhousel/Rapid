@@ -1,5 +1,5 @@
 import { Extent, geomGetDominantSurroundingRectangle, geomToOrigin, projWgs84ToWorld, vecAdd, vecInterp } from '@rapid-sdk/math';
-import { polygonArea, polygonCentroid, polygonHull } from 'd3-polygon';
+import { polygonCentroid, polygonHull } from 'd3-polygon';
 import polylabel from '@mapbox/polylabel';
 
 import type { Context } from '../Context.ts';
@@ -33,8 +33,10 @@ export interface GeometryPartWorldData {
   centroid?: Vec2;
   /** Computed Pole of Inaccessability (useful for label placement) */
   poi?: Vec2;
-  /** Computed area */
+  /** Computed area (unsigned magnitude) */
   area?: number;
+  /** Winding direction of the outer ring: +1 = CCW, -1 = CW (in y-up math space) */
+  winding?: 1 | -1;
   /** Computed surrounding rectangle */
   surround?: SurroundingRectangle;
 }
@@ -55,8 +57,10 @@ export interface GeometryPartLocalData {
   centroid?: Vec2;
   /** Local Pole of Inaccessability (useful for label placement) */
   poi?: Vec2;
-  /** Local area */
+  /** Local area (unsigned magnitude) */
   area?: number;
+  /** Winding direction of the outer ring: +1 = CCW, -1 = CW (in y-up math space) */
+  winding?: 1 | -1;
   /** Local surrounding rectangle */
   surround?: SurroundingRectangle;
 }
@@ -310,13 +314,24 @@ export class GeometryPart {
       world.area = 0;
 
     } else {   // > 2 coordinates...
-      world.area = polygonArea(world.outer!);
-      local.area = polygonArea(local.outer!);
-      // fix area/winding?
-      // if (world.area < 0) {
-      //   world.area *= -1;
-      //   world.outer.reverse();
-      // }
+
+      // Area
+      // Shoelace formula on the outer ring: unsigned area + winding direction.
+      // Translation doesn't change area, so local.area === world.area.
+      // The sign convention is the mathematical y-up one: positive = CCW.
+      // (Note that d3-polygon's polygonArea() flips this for screen-space y-down,
+      // we avoid it so callers don't have to reason about coordinate handedness.)
+      const ring = local.outer!;
+      let s2 = 0;
+      for (let i = 0, m = ring.length; i < m; i++) {
+        const [x0, y0] = ring[i];
+        const [x1, y1] = ring[(i + 1) % m];
+        s2 += x0 * y1 - x1 * y0;
+      }
+      local.area = Math.abs(s2) / 2;
+      local.winding = s2 >= 0 ? 1 : -1;
+      world.area = local.area;
+      world.winding = local.winding;
 
       // Convex Hull
       local.hull = polygonHull(local.outer!) as Vec2[] | undefined;
