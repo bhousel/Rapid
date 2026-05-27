@@ -1,4 +1,4 @@
-import { vecSubtract } from '@rapid-sdk/math';
+import { projWgs84ToWorld, vecSubtract } from '@rapid-sdk/math';
 
 import { AbstractMode } from './AbstractMode.ts';
 import { actionMove } from '../actions/move.ts';
@@ -183,12 +183,12 @@ export class MoveMode extends AbstractMode {
       return;
     }
 
-    const startPoint = context.viewport.project(this._startLoc!);
-    const currPoint = context.viewport.project(currLoc);
+    const startPoint = projWgs84ToWorld(this._startLoc!);
+    const currPoint = projWgs84ToWorld(currLoc);
     const delta = vecSubtract(currPoint, startPoint);
 
     editor.revert();  // moves are relative to the start location, so revert before applying movement
-    editor.perform(actionMove(this._entityIDs, delta, context.viewport, this._movementCache!));
+    editor.perform(actionMove(this._entityIDs, delta, this._movementCache!));
     const graph = editor.staging.graph;  // after move
 
     // Update selected/active collections to contain the moved entities

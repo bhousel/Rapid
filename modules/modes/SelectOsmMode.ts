@@ -337,8 +337,11 @@ export class SelectOsmMode extends AbstractMode {
         if (t.r) {
           delta = vecRotate(delta, -t.r, [0, 0]);   // remove any rotation
         }
+        // Pixel delta -> world delta.  The scale factor is `2^z`.
+        const k = Math.pow(2, t.z);
+        const worldDelta: [number, number] = vecScale(delta, 1 / k) as [number, number];
         operation = Operations.operationMove(context, selectedIDs);
-        action = actionMove(selectedIDs, delta, viewport);
+        action = actionMove(selectedIDs, worldDelta);
       }
     }
 

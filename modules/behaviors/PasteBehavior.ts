@@ -1,4 +1,4 @@
-import { Extent, vecSubtract } from '@rapid-sdk/math';
+import { Extent, projWgs84ToWorld, vecSubtract } from '@rapid-sdk/math';
 
 import { AbstractBehavior } from './AbstractBehavior.ts';
 import { actionCopyEntities } from '../actions/copy_entities.ts';
@@ -130,13 +130,12 @@ export class PasteBehavior extends AbstractBehavior {
 
     // Move pasted features to where mouse pointer is..
     // (or center of map if there is no readily available pointer coordinate)
-    const viewport = context.viewport;
     const copyLoc = context.copyLoc;
-    const copyPoint = (copyLoc && viewport.project(copyLoc)) || viewport.project(extent.center());
-    const delta = vecSubtract(map.mouse(), copyPoint);
+    const copyWorld = projWgs84ToWorld(copyLoc ?? extent.center());
+    const delta = vecSubtract(map.mouseWorld(), copyWorld);
     const annotation = l10n.t('operations.paste.annotation', { n: newIDs.length });
 
-    editor.perform(actionMove(newIDs, delta, viewport));
+    editor.perform(actionMove(newIDs, delta));
     editor.commit({ annotation: annotation, selectedIDs: newIDs });
     editor.endTransaction();
 
