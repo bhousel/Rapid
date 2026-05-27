@@ -16,9 +16,9 @@ interface MoveIntersection {
   /** ID of the node at the intersection */
   nodeID: EntityID;
   /** ID of the way being moved */
-  movedId: EntityID;
+  movedID: EntityID;
   /** ID of the stationary way */
-  unmovedId: EntityID;
+  unmovedID: EntityID;
   /** Whether the node is an endpoint of the moved way */
   movedIsEP: boolean;
   /** Whether the node is an endpoint of the unmoved way */
@@ -164,12 +164,12 @@ export function actionMove(moveIDs: EntityID[], tryDelta: Vec2, cache?: Partial<
     function cacheIntersections(ids: EntityID[]): void {
       /**
        * Returns `true` when `id` is a non-closed-loop endpoint of `way`.
-       * @param way - the way to check
-       * @param id  - the node ID to test
+       * @param  way - the way to check
+       * @param  nodeID - the nodeID to test
        * @return whether the node is an endpoint
        */
-      function isEndpoint(way: OsmWay, id: EntityID): boolean {
-        return !way.isClosed() && !!way.affix(id);
+      function isEndpoint(way: OsmWay, nodeID: EntityID): boolean {
+        return !way.isClosed() && !!way.affix(nodeID);
       }
 
       for (const id of ids) {
@@ -195,8 +195,8 @@ export function actionMove(moveIDs: EntityID[], tryDelta: Vec2, cache?: Partial<
 
           _cache.intersections.push({
             nodeID: node.id,
-            movedId: moved.id,
-            unmovedId: unmoved.id,
+            movedID: moved.id,
+            unmovedID: unmoved.id,
             movedIsEP: isEndpoint(moved, node.id),
             unmovedIsEP: isEndpoint(unmoved, node.id)
           });
@@ -339,27 +339,14 @@ export function actionMove(moveIDs: EntityID[], tryDelta: Vec2, cache?: Partial<
     let prev: OsmNode | undefined;
     let curr: OsmNode;
 
-    /**
-     * Returns `true` when a node is "interesting" — shared by more than one way,
-     * a member of a relation, or carrying its own tags — and should not be silently removed.
-     * @param node  - the node to test
-     * @param graph - the current graph
-     * @return whether the node is interesting
-     */
-    function isInteresting(node: OsmNode, graph: Graph): boolean {
-      return graph.parentWays(node).length > 1 ||
-        graph.parentRelations(node).length > 0 ||
-        node.hasInterestingTags();
-    }
-
     for (const nodeID of way.nodes) {
       curr = graph.entity(nodeID) as OsmNode;
 
       if (prev && curr && vecEqual(nodeLocal(prev), nodeLocal(curr), epsilon)) {
-        if (!isInteresting(prev, graph)) {
+        if (!prev.isInteresting(graph)) {
           way = way.removeNode(prev.id);
           graph.replace(way).remove(prev);
-        } else if (!isInteresting(curr, graph)) {
+        } else if (!curr.isInteresting(graph)) {
           way = way.removeNode(curr.id);
           graph.replace(way).remove(curr);
         }
@@ -401,8 +388,8 @@ export function actionMove(moveIDs: EntityID[], tryDelta: Vec2, cache?: Partial<
    */
   function unZorroIntersection(intersection: MoveIntersection, graph: Graph): Graph {
     const vertex = graph.entity(intersection.nodeID) as OsmNode;
-    let way1 = graph.entity(intersection.movedId) as OsmWay;
-    let way2 = graph.entity(intersection.unmovedId) as OsmWay;
+    let way1 = graph.entity(intersection.movedID) as OsmWay;
+    let way2 = graph.entity(intersection.unmovedID) as OsmWay;
     const isEP1 = intersection.movedIsEP;
     const isEP2 = intersection.unmovedIsEP;
 
@@ -465,11 +452,11 @@ export function actionMove(moveIDs: EntityID[], tryDelta: Vec2, cache?: Partial<
    */
   function cleanupIntersections(graph: Graph): Graph {
     for (const obj of _cache.intersections) {
-      graph = replaceMovedVertex(obj.nodeID, obj.movedId, graph, _delta);
-      graph = replaceMovedVertex(obj.nodeID, obj.unmovedId, graph, null);
+      graph = replaceMovedVertex(obj.nodeID, obj.movedID, graph, _delta);
+      graph = replaceMovedVertex(obj.nodeID, obj.unmovedID, graph, null);
       graph = unZorroIntersection(obj, graph);
-      graph = removeDuplicateVertices(obj.movedId, graph);
-      graph = removeDuplicateVertices(obj.unmovedId, graph);
+      graph = removeDuplicateVertices(obj.movedID, graph);
+      graph = removeDuplicateVertices(obj.unmovedID, graph);
     }
 
     return graph;
@@ -493,9 +480,9 @@ export function actionMove(moveIDs: EntityID[], tryDelta: Vec2, cache?: Partial<
       const delta = _delta;  // local copy so the closure below doesn't capture the outer `let`
       const start = nodeLocal(node);
       const end = vecAdd(start, delta);
-      const movedNodes = graph.childNodes(graph.entity(obj.movedId) as OsmWay);
+      const movedNodes = graph.childNodes(graph.entity(obj.movedID) as OsmWay);
       const movedPath = movedNodes.map(n => vecAdd(nodeLocal(n), delta));
-      const unmovedNodes = graph.childNodes(graph.entity(obj.unmovedId) as OsmWay);
+      const unmovedNodes = graph.childNodes(graph.entity(obj.unmovedID) as OsmWay);
       const unmovedPath = unmovedNodes.map(nodeLocal);
       const hits = geomPathIntersections(movedPath, unmovedPath);
 

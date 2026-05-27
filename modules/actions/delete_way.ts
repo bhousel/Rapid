@@ -46,6 +46,15 @@ export function actionDeleteWay(wayID: EntityID, doDeleteDegenerate: boolean = t
   };
 
 
+  /**
+   * Decides whether a node that was part of the deleted way can itself be deleted.
+   * A node is kept if it is still referenced by another way or relation, or if it
+   * carries a schema-matched point preset. A vertex-only preset or a node with no
+   * interesting tags is safe to remove.
+   * @param   node  - The node to check
+   * @param   graph - The current graph
+   * @return  `true` if the node can be safely deleted
+   */
   function canDeleteNode(node: OsmNode, graph: Graph): boolean {
     // Don't delete nodes still attached to ways or relations
     if (graph.parentWays(node).length || graph.parentRelations(node).length) return false;

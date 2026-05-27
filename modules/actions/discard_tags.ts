@@ -17,6 +17,11 @@ export function actionDiscardTags(difference: Difference, discardTags: Record<st
     return graph.commit();
 
 
+    /**
+     * Removes discardable and empty-valued tags from one entity and writes the
+     * updated entity back into the graph.
+     * @param   entity - The entity whose tags should be cleaned
+     */
     function checkTags(entity: OsmEntity): void {
       const keys = Object.keys(entity.tags);
       let didDiscard = false;

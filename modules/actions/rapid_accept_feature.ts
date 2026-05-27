@@ -1,5 +1,5 @@
 import { OsmNode, OsmRelation, OsmWay } from '../data/index.ts';
-import { Vec2, vecInterp } from '@rapid-sdk/math';
+import { Vec2, vecEqual, vecInterp } from '@rapid-sdk/math';
 
 import type { Action } from './types.ts';
 import type { Graph } from '../lib/Graph.ts';
@@ -38,8 +38,13 @@ export function actionRapidAcceptFeature(entityID: EntityID, extGraph: Graph): A
 
 
     // These functions each accept the external entities, returning the replacement
-    // NOTE - these functions will update `graph` closure variable
+    // NOTE - these functions operate on the `graph` closure variable
 
+    /**
+     * Copies an external node into the working graph, stripping Rapid metadata tags.
+     * @param   extNode - The external node to accept
+     * @return  The new node added to the graph
+     */
     function acceptNode(extNode: OsmNode): OsmNode {
       const node = new OsmNode(extNode);   // copy node before modifying
       removeMetadata(node);
@@ -49,6 +54,14 @@ export function actionRapidAcceptFeature(entityID: EntityID, extGraph: Graph): A
     }
 
 
+    /**
+     * Copies an external way and all of its nodes into the working graph.
+     * Handles `conn` tags (connection snapping to an existing way) and `dupe`
+     * tags (reuse of an existing node instead of creating a duplicate).
+     * Strips Rapid metadata tags from the way and its nodes.
+     * @param   extWay - The external way to accept
+     * @return  The new way added to the graph
+     */
     function acceptWay(extWay: OsmWay): OsmWay {
       let way = new OsmWay(extWay);   // copy way before modifying
       removeMetadata(way);
@@ -58,13 +71,12 @@ export function actionRapidAcceptFeature(entityID: EntityID, extGraph: Graph): A
         let node = new OsmNode(extGraph.entity(nodeID) as OsmNode);   // copy node before modifying
         const connTag = node.tags.conn;
         const conn: string[] | undefined = connTag ? connTag.split(',') : undefined;
-        const dupeId: string | undefined = node.tags.dupe;
+        const dupeID: string | undefined = node.tags.dupe;
         removeMetadata(node);
 
-        if (dupeId && graph.hasEntity(dupeId) && !locationChanged((graph.entity(dupeId) as OsmNode).loc!, node.loc!)) {
-          node = graph.entity(dupeId) as OsmNode;   // keep original node with dupeId
-//        } else if (graph.hasEntity(node.id) && locationChanged(graph.entity(node.id).loc, node.loc)) {
-//          node = new OsmNode(node.context, { loc: node.loc });     // replace (unnecessary copy of node?)
+        const dupe = (dupeID && graph.hasEntity(dupeID)) as OsmNode | undefined;
+        if (dupe && vecEqual(dupe.loc!, node.loc!)) {
+          node = dupe;   // prefer the original node identified by dupeID
         }
 
         if (conn && graph.hasEntity(conn[0])) {
@@ -75,7 +87,7 @@ export function actionRapidAcceptFeature(entityID: EntityID, extGraph: Graph): A
 
           if (targetWay && nodeA && nodeB) {
             const result = findConnectionPoint(graph, node, targetWay, nodeA, nodeB);
-            if (result && !locationChanged(result.interpLoc, node.loc!)) {
+            if (result && vecEqual(result.interpLoc, node.loc!)) {
               // Create a new node with updated loc since loc is readonly
               node = node.update({ loc: result.interpLoc });
               graph.replace(targetWay.addNode(node.id, result.insertIdx));
@@ -93,6 +105,13 @@ export function actionRapidAcceptFeature(entityID: EntityID, extGraph: Graph): A
     }
 
 
+    /**
+     * Recursively copies an external relation and all of its member entities
+     * into the working graph.  Uses `seenRelations` to avoid infinite loops
+     * when member relations are circular.
+     * @param   extRelation - The external relation to accept
+     * @return  The new relation added to the graph
+     */
     function acceptRelation(extRelation: OsmRelation): OsmRelation {
       const seen = seenRelations.get(extRelation.id);
       if (seen) return seen;
@@ -126,10 +145,28 @@ export function actionRapidAcceptFeature(entityID: EntityID, extGraph: Graph): A
   };
 
 
+  /**
+   * Finds the correct position and interpolated location to insert `newNode`
+   * onto `targetWay` between `nodeA` and `nodeB`, preserving the existing
+   * segment angle.  Returns `null` if the invariants required for a clean
+   * insertion cannot be met (e.g. A/B out of order, wrong sort direction).
+   * @param   graph     - The current graph
+   * @param   newNode   - The node to be inserted
+   * @param   targetWay - The way to insert the node into
+   * @param   nodeA     - The node immediately before the insertion segment
+   * @param   nodeB     - The node immediately after the insertion segment
+   * @return  `{ insertIdx, interpLoc }` describing where to insert, or `null`
+   */
   // Find the place to newNode on targetWay between nodeA and nodeB if it does
   // not alter the existing segment's angle much. There may be other nodes
   // between A and B from user edit or other automatic connections.
-  function findConnectionPoint(graph: Graph, newNode: OsmNode, targetWay: OsmWay, nodeA: OsmNode, nodeB: OsmNode): ConnectionPoint | null {
+  function findConnectionPoint(
+    graph: Graph,
+    newNode: OsmNode,
+    targetWay: OsmWay,
+    nodeA: OsmNode,
+    nodeB: OsmNode
+  ): ConnectionPoint | null {
     const locA = nodeA.loc!;
     const locB = nodeB.loc!;
     const sortByLon = Math.abs(locA[0] - locB[0]) > Math.abs(locA[1] - locB[1]);
@@ -173,12 +210,10 @@ export function actionRapidAcceptFeature(entityID: EntityID, extGraph: Graph): A
   }
 
 
-  function locationChanged(loc1: Vec2, loc2: Vec2): boolean {
-    return Math.abs(loc1[0] - loc2[0]) > 2e-5
-      || Math.abs(loc1[1] - loc2[1]) > 2e-5;
-  }
-
-
+  /**
+   * Deletes all Rapid-specific metadata from an entity's props and tags in place.
+   * @param   entity - The entity to strip metadata from (mutated in place)
+   */
   // Removes the metadata directly, this is kind of hacky
   function removeMetadata(entity: OsmEntity): void {
     const props = entity.props as Record<string, unknown>;

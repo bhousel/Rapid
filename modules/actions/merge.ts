@@ -24,6 +24,12 @@ interface GeometryGroups {
  */
 export function actionMerge(entityIDs: EntityID[]): Action {
 
+  /**
+   * Groups the selected entities by geometry type so the action can identify
+   * which entities are points to be absorbed and which is the target way/area.
+   * @param   graph - The current graph
+   * @return  Object keyed by geometry type with arrays of matching entities
+   */
   function groupEntitiesByGeometry(graph: Graph): GeometryGroups {
     const entities = entityIDs.map(id => graph.entity(id));
     const grouped = utilArrayGroupBy(entities, entity => entity.geometry(graph));
@@ -83,6 +89,14 @@ export function actionMerge(entityIDs: EntityID[]): Action {
   }) as Action;
 
 
+  /**
+   * Returns a reason string if the merge operation cannot be performed,
+   * or `false` if it is allowed.
+   * @param   graph - The current graph
+   * @return  `'not_eligible'` if the selection does not contain exactly one area or line
+   *          combined with one or more points, or if any relation is selected;
+   *          `false` if the action is enabled
+   */
   action.disabled = function(graph: Graph): string | false {
     const geometries = groupEntitiesByGeometry(graph);
     if (geometries.point.length === 0 ||

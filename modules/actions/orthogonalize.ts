@@ -177,7 +177,7 @@ export function actionOrthogonalize(
 
         node = graph.entity(point.id) as OsmNode;
 
-        if (t === 1 && !isInteresting(node, graph)) {
+        if (t === 1 && !node.isInteresting(graph)) {
           graph = actionDeleteNode(node.id)(graph);
         } else {
           const closest = vecProject(point.coord, movedCoords);
@@ -193,12 +193,16 @@ export function actionOrthogonalize(
     return graph.commit();
 
 
-    function isInteresting(node: OsmNode, graph: Graph): boolean {
-      return graph.parentWays(node).length > 1 ||
-        graph.parentRelations(node).length > 0 ||
-        node.hasInterestingTags();
-    }
-
+    /**
+     * Computes the motion vector that moves vertex `i` toward a right angle
+     * with its two neighbours.  Returns `[0, 0]` for endpoints of open ways,
+     * self-intersecting nodes, or vertices whose angle is already close enough
+     * to orthogonal.
+     * @param   point - The vertex to move, with `coord` in local-origin world units
+     * @param   i     - Index of the vertex in `arr`
+     * @param   arr   - Full ordered array of vertices
+     * @return  Motion vector in local-origin world units
+     */
     function calcMotion(point: OrthoPoint, i: number, arr: OrthoPoint[]): Vec2 {
       // don't try to move the endpoints of a non-closed way.
       if (!isClosed && (i === 0 || i === arr.length - 1)) return [0, 0];
@@ -257,6 +261,15 @@ export function actionOrthogonalize(
   }
 
 
+  /**
+   * Returns a reason string if the orthogonalize operation cannot be performed,
+   * or `false` if it is allowed.
+   * @param   graph - The current graph
+   * @return  `'end_vertex'` if a single vertex is at an end of the way and has no two neighbors;
+   *          `'not_squarish'` if the geometry cannot be made square;
+   *          `'square_enough'` if all angles are already within the squareness tolerance;
+   *          `false` if the action is enabled
+   */
   action.disabled = function(graph: Graph): string | false {
     let way = graph.entity(wayID) as OsmWay;
     const g: Graph = new Graph(graph);    // make a copy

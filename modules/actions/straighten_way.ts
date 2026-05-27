@@ -17,6 +17,14 @@ import type { Vec2 } from '@rapid-sdk/math';
  */
 export function actionStraightenWay(selectedIDs: EntityID[]): Action {
 
+  /**
+   * Returns all selected ways as a single ordered array of nodes by joining them
+   * with `osmJoinWays`.  If exactly two nodes are also selected, only the nodes
+   * between those two endpoints are returned.
+   * Returns an empty array if the selected ways are disjoint.
+   * @param   graph - The current graph
+   * @return  Ordered array of nodes spanning the selected segment
+   */
   // Return all selected ways as a continuous, ordered array of nodes
   function allNodes(graph: Graph): OsmNode[] {
     const selectedWays: OsmWay[] = [];
@@ -50,13 +58,6 @@ export function actionStraightenWay(selectedIDs: EntityID[]): Action {
   }
 
 
-  function isInteresting(node: OsmNode, graph: Graph): boolean {
-    return graph.parentWays(node).length > 1 ||
-      graph.parentRelations(node).length > 0 ||
-      node.hasInterestingTags();
-  }
-
-
   const action: Action = ((graph: Graph, t?: number): Graph => {
     if (t === null || !isFinite(t!)) t = 1;
     t = Math.min(Math.max(+t!, 0), 1);
@@ -84,7 +85,7 @@ export function actionStraightenWay(selectedIDs: EntityID[]): Action {
       const node = nodes[i];
       const point = points[i];
 
-      if (t === 1 && !isInteresting(node, graph)) {
+      if (t === 1 && !node.isInteresting(graph)) {
         toDelete.add(node);
       } else {
         const closest = vecProject(point, line);
@@ -104,6 +105,16 @@ export function actionStraightenWay(selectedIDs: EntityID[]): Action {
   }) as Action;
 
 
+  /**
+   * Returns a reason string if the straighten-way operation cannot be performed,
+   * or `false` if it is allowed.
+   * @param   graph - The current graph
+   * @return  `'straight_enough'` if the way is already straight and no uninteresting nodes
+   *          would be removed;
+   *          `'too_bendy'` if any interior node deviates more than 20% of the total endpoint
+   *          distance from the straight line;
+   *          `false` if the action is enabled
+   */
   action.disabled = function(graph: Graph): string | false {
     const collection = allNodes(graph);
     const nodes: OsmNode[] = [];
@@ -137,7 +148,7 @@ export function actionStraightenWay(selectedIDs: EntityID[]): Action {
       const node = nodes[i];
       const point = points[i];
 
-      if (!isInteresting(node, graph)) {
+      if (!node.isInteresting(graph)) {
         keepAllNodes = false;
       }
       const closest = vecProject(point, line);

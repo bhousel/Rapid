@@ -2,6 +2,8 @@
 
 Reverse-chronological one-liners. Details live in git history — these are just breadcrumbs.
 
+- **`actionMove` world-space rewrite, JSDoc, and U-shape bug fix** (May 2026) — Removed `viewport` parameter; all geometry now computed in world coordinates with a local origin (matching `actionRotate`, `actionReflect`, `actionScale`, `actionOrthogonalize`, `actionCircularize`). `limitDelta` uses `vecProject` for edge picking. Added `nodeOriginalLocal` helper used in `replaceMovedVertex`'s angle test to fix a bug where moving a U-shaped driveway connected to a straight road at both endpoints inserted spurious shape-preserving vertices (root cause: angle test was reading post-move positions of shared endpoints). Full JSDoc on all 13 internal functions. 12 tests including a U-shape regression. Call sites updated: `MoveMode.ts`, `SelectOsmMode.ts`, `PasteBehavior.ts`, `paste.js`.
+- **JSDoc duplicate-title cleanup** (May 2026) — Removed 30 redundant first-line JSDoc titles that only repeated the documented class name, fixing IntelliSense noise in services, modes, and lib classes.
 - **Pixi atlas direct source uploads + tile-only edge padding** (May 2026) — `AtlasAllocator` stores `AtlasItemSource` (ImageData | HTMLCanvasElement | HTMLImageElement | ImageBitmap) and uploads directly via 7-arg `texSubImage2D` (WebGL) / `copyExternalImageToTexture` (WebGPU). JS `_getItemPixels` padding loop deleted. `padded` flag on `AtlasItem` distinguishes tile sources (pre-padded via `_fromEdgePaddedCanvas` two-pass drawImage) from symbol/text/icon sources (1px transparent ring, no replication needed). `PixiLayerBackgroundTiles` uses `fetch` + `createImageBitmap` for off-thread decode. Closes #1650.
 - **Pixi label rasterization + managed feature lifecycle** (May 2026) — Decoupled `PixiLayerLabels` texture creation from `render()` to fix re-entrant renderer corruption. New `PixiFeatureLabel` managed-feature class follows the canonical layer/feature pattern. Label textures queue and drain via `SchedulerSystem` outside the render loop.
 
@@ -42,4 +44,3 @@ Reverse-chronological one-liners. Details live in git history — these are just
 - **Scoped customization** (Feb 2026) — `_scopes: Map<ScopeID, ScopeData>` as sole source of truth in StyleSystem and SchemaSystem. `'*'` common scope for fallbacks.
 - **Dynamic styling fixes** (Feb 2026) — `dirtyScene()` before redraw, removed hardcoded marker styles, single `styleDefaults`.
 - **Services TS conversion** (Feb 2026) — All 19 service files converted. Generic `MarkerData<P>` / `GeoJSONData<P>` for typed props.
-- **JSDoc duplicate-title cleanup** (May 2026) — Removed 30 redundant first-line JSDoc titles that only repeated the documented class name, fixing IntelliSense noise in services, modes, and lib classes.

@@ -54,6 +54,14 @@ export function actionSplit(nodeIDs: EntityID | EntityID[], newWayIDs?: EntityID
   // The IDs of the ways actually created by running this action
   let _createdWayIDs: EntityID[] = [];
 
+  /**
+   * Returns the great-circle distance in metres between two nodes.
+   * Falls back to a small epsilon value if either node lacks a location.
+   * @param   graph - The current graph
+   * @param   nA    - EntityID of the first node
+   * @param   nB    - EntityID of the second node
+   * @return  Distance in metres, or a small epsilon if locations are unavailable
+   */
   function dist(graph: Graph, nA: EntityID, nB: EntityID): number {
     const locA = (graph.entity(nA) as OsmNode).loc;
     const locB = (graph.entity(nB) as OsmNode).loc;
@@ -61,16 +69,17 @@ export function actionSplit(nodeIDs: EntityID | EntityID[], newWayIDs?: EntityID
     return (locA && locB) ? geoSphericalDistance(locA, locB) : epsilon;
   }
 
-  // If the way is closed, we need to search for a partner node
-  // to split the way at.
-  //
-  // The following looks for a node that is both far away from
-  // the initial node in terms of way segment length and nearby
-  // in terms of beeline-distance. This assures that areas get
-  // split on the most "natural" points (independent of the number
-  // of nodes).
-  // For example: bone-shaped areas get split across their waist
-  // line, circles across the diameter.
+  /**
+   * For a closed way, finds the best partner index to split across from `idxA`.
+   * The "best" node is the one that maximizes `pathLength / beelineDistance`,
+   * which picks a split that is both far along the perimeter and close as the
+   * crow flies — e.g. splitting a bone shape at its waist or a circle at its
+   * diameter.
+   * @param   nodes - Node ID array (without the repeated closing node)
+   * @param   idxA  - Index of the split node in `nodes`
+   * @param   graph - The current graph
+   * @return  Index of the best partner node, or `undefined` if none found
+   */
   function splitArea(nodes: EntityID[], idxA: number, graph: Graph): number | undefined {
     const lengths = new Array<number>(nodes.length);
     let length: number;
@@ -78,6 +87,11 @@ export function actionSplit(nodeIDs: EntityID | EntityID[], newWayIDs?: EntityID
     let best = 0;
     let idxB: number | undefined;
 
+    /**
+     * Wraps an index to stay within `[0, nodes.length)` using modular arithmetic.
+     * @param   index - The raw index to wrap
+     * @return  Wrapped index in range `[0, nodes.length)`
+     */
     function wrap(index: number): number {
       return numWrap(index, 0, nodes.length);
     }
@@ -110,6 +124,12 @@ export function actionSplit(nodeIDs: EntityID | EntityID[], newWayIDs?: EntityID
   }
 
 
+  /**
+   * Computes the total great-circle path length along a sequence of nodes.
+   * @param   graph - The current graph
+   * @param   nodes - Ordered array of node EntityIDs
+   * @return  Total path length in metres
+   */
   function totalLengthBetweenNodes(graph: Graph, nodes: EntityID[]): number {
     let totalLength = 0;
     for (let i = 0; i < nodes.length - 1; i++) {
@@ -119,6 +139,19 @@ export function actionSplit(nodeIDs: EntityID | EntityID[], newWayIDs?: EntityID
   }
 
 
+  /**
+   * Splits a single way `wayA` at `nodeID`, creating `wayB` as the new way.
+   * For closed ways, `splitArea` picks the best partner index.  For open ways,
+   * the node's first occurrence after index 0 is used as the split point.
+   * Proportionally distributes `step_count` tags between the two halves.
+   * Updates all parent relations (turn restrictions, routes, multipolygons)
+   * to include both resulting ways at the correct positions.
+   * @param   graph    - The current graph
+   * @param   nodeID   - EntityID of the node to split at
+   * @param   wayA     - The way to split (retains its ID)
+   * @param   newWayId - Optional EntityID to assign to the new way
+   * @return  Updated graph
+   */
   function split(graph: Graph, nodeID: EntityID, wayA: OsmWay, newWayId: EntityID | undefined): Graph {
     let wayB = new OsmWay(wayA.context, { id: newWayId, tags: wayA.tags });   // `wayB` is the NEW way
     const origNodes: EntityID[] = wayA.nodes.slice();
@@ -322,6 +355,14 @@ export function actionSplit(nodeIDs: EntityID | EntityID[], newWayIDs?: EntityID
   };
 
 
+  /**
+   * Returns a reason string if the split operation cannot be performed,
+   * or `false` if it is allowed.
+   * @param   graph - The current graph
+   * @return  `'not_eligible'` if any split node has no candidate ways, or if the number of
+   *          candidate ways does not match the `limitWays` filter;
+   *          `false` if the action is enabled
+   */
   action.disabled = function(graph: Graph): string | false {
     for (const nodeID of nodeIDsArray) {
       const candidates = action.waysForNode(nodeID, graph);

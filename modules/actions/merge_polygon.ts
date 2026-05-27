@@ -37,6 +37,12 @@ interface MergePolygon extends Array<OsmRelationMember | OsmWay> {
  */
 export function actionMergePolygon(ids: EntityID[], newRelationID: EntityID): Action {
 
+  /**
+   * Categorizes the selected entities into closed ways, multipolygon relations,
+   * and anything else (treated as invalid input).
+   * @param   graph - The current graph
+   * @return  Object with `closedWay`, `multipolygon`, and `other` arrays
+   */
   function gatherEntityData(graph: Graph): EntityData {
     const entities = ids.map(id => graph.entity(id));
 
@@ -95,14 +101,34 @@ export function actionMergePolygon(ids: EntityID[], newRelationID: EntityID): Ac
       contained = contained.filter(isContained).map(filterContained);
     }
 
+    /**
+     * Returns `true` if the polygon at index `i` is contained by at least one
+     * other polygon (i.e. should be treated as an inner ring).
+     * @param   _d - Unused polygon value (array callback signature)
+     * @param   i  - Index into `contained`
+     * @return  `true` if any containment entry for row `i` is truthy
+     */
     function isContained(_d: unknown, i: number): boolean {
       return contained[i].some(Boolean);
     }
 
+    /**
+     * Filters one row of the `contained` matrix, keeping only the entries
+     * whose corresponding polygon is still in the unprocessed set (i.e. still
+     * considered "contained").
+     * @param   d - A row from the containment matrix
+     * @return  The same row with entries for already-extracted polygons removed
+     */
     function filterContained(d: (boolean | null)[]): (boolean | null)[] {
       return d.filter((_v: boolean | null, i: number) => isContained(null, i));
     }
 
+    /**
+     * Assigns outer or inner roles to polygons that are not contained by any
+     * remaining polygon, pushes them to `members`, and alternates the
+     * `outer`/`inner` flag for the next iteration.
+     * @param   polygons - Current list of unprocessed polygon sequences
+     */
     function extractUncontained(polygons: MergePolygon[]): void {
       polygons.forEach((d: MergePolygon, i: number) => {
         if (!isContained(d, i)) {
@@ -148,6 +174,16 @@ export function actionMergePolygon(ids: EntityID[], newRelationID: EntityID): Ac
   }) as Action;
 
 
+  /**
+   * Returns a reason string if the merge-polygon operation cannot be performed,
+   * or `false` if it is allowed.
+   * @param   graph - The current graph
+   * @return  `'not_eligible'` if the selection has non-polygon entities, fewer than two closed ways
+   *          or multipolygons, a redundant shared multipolygon already exists, or a way is already
+   *          a member of one of the selected multipolygons;
+   *          `'incomplete_relation'` if any selected multipolygon has undownloaded members;
+   *          `false` if the action is enabled
+   */
   action.disabled = function(graph: Graph): string | false {
     const entities = gatherEntityData(graph);
     if (entities.other.length > 0 ||

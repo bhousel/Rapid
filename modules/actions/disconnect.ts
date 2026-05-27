@@ -60,6 +60,14 @@ export function actionDisconnect(nodeID: EntityID, newNodeID?: EntityID): Discon
   }) as DisconnectAction;
 
 
+  /**
+   * Returns the list of way/index pairs where the node should be replaced by a
+   * new duplicate node in order to disconnect it from the other ways.
+   * If `limitWays` has been set, only those ways are included; all others keep
+   * the original node.
+   * @param   graph - The current graph
+   * @return  Array of connection descriptors (way ID and node index)
+   */
   action.connections = function(graph: Graph): DisconnectConnection[] {
     const candidates: DisconnectConnection[] = [];
     let keeping = false;
@@ -108,6 +116,14 @@ export function actionDisconnect(nodeID: EntityID, newNodeID?: EntityID): Discon
   };
 
 
+  /**
+   * Returns a reason string if the disconnect operation cannot be performed,
+   * or `false` if it is allowed.
+   * Disconnecting is disabled when there are no connections to split, or when
+   * the affected ways share a relation (which would be broken by the split).
+   * @param   graph - The current graph
+   * @return  A string key describing the problem, or `false` if enabled
+   */
   action.disabled = function(graph: Graph): string | false {
     const connections = action.connections(graph);
     if (connections.length === 0) return 'not_connected';
@@ -141,6 +157,13 @@ export function actionDisconnect(nodeID: EntityID, newNodeID?: EntityID): Discon
   };
 
 
+  /**
+   * Gets or sets the list of way IDs that the disconnect should be limited to.
+   * When called with no argument, returns the current filter.
+   * When called with an array, stores it and returns the action for chaining.
+   * @param   val - Optional array of way IDs to limit the disconnect to
+   * @return  Current way IDs when called as getter, or the action when called as setter
+   */
   action.limitWays = function(val?: EntityID[]): any {
     if (!arguments.length) return _wayIDs;
     _wayIDs = val;

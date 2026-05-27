@@ -52,6 +52,15 @@ export function actionMergeRemoteChanges(id: EntityID, options: MergeRemoteChang
   const _conflicts: string[] = [];
 
 
+  /**
+   * Merges the node location from the remote version into the target.
+   * With `'force_remote'` strategy the remote location always wins.
+   * With `'force_local'` or when locations are equal the target is unchanged.
+   * Otherwise a conflict is recorded and the target is left as-is.
+   * @param   remote - The remote version of the node
+   * @param   target - The local version of the node being built
+   * @return  Updated target node
+   */
   function mergeLocation(remote: OsmNode, target: OsmNode): OsmNode {
     const EPSILON = 1e-6;
     if (strategy === 'force_local' || vecEqual(target.loc!, remote.loc!, EPSILON)) {
@@ -68,6 +77,16 @@ export function actionMergeRemoteChanges(id: EntityID, options: MergeRemoteChang
   }
 
 
+  /**
+   * Three-way merges the node list of a way using diff3.
+   * Non-conflicting remote additions/removals are accepted automatically.
+   * True conflicts (changed independently on both sides) are recorded and the
+   * target's existing node list is preserved.
+   * @param   base   - The common ancestor version of the way
+   * @param   remote - The remote version of the way
+   * @param   target - The local version of the way being built
+   * @return  Updated target way
+   */
   function mergeNodes(base: OsmWay, remote: OsmWay, target: OsmWay): OsmWay {
     if (strategy === 'force_local' || deepEqual(target.nodes, remote.nodes)) {
       return target;
@@ -107,7 +126,26 @@ export function actionMergeRemoteChanges(id: EntityID, options: MergeRemoteChang
   }
 
 
+  /**
+   * Reconciles the child nodes of a way after a remote node-list merge.
+   * For nodes no longer referenced by `targetWay`, unused ones are queued for
+   * deletion.  For nodes that are still referenced, the best available version
+   * is determined according to the merge strategy and queued for replacement.
+   * @param   targetWay - The way whose child nodes are being reconciled
+   * @param   children  - Full list of node IDs from the pre-merge way
+   * @param   updates   - Accumulator for replacement nodes and IDs to delete
+   * @param   graph     - The current graph
+   * @return  The (unchanged) target way
+   */
   function mergeChildren(targetWay: OsmWay, children: EntityID[], updates: ChildUpdates, graph: Graph): OsmWay {
+    /**
+     * Returns `true` if `node` should be kept even though it is no longer
+     * referenced by `targetWay`: it has interesting tags, appears in another
+     * way, or belongs to a relation.
+     * @param   node      - The node to test
+     * @param   targetWay - The way being merged (excluded from the parent-way check)
+     * @return  `true` if the node is still in use
+     */
     function isUsed(node: OsmNode, targetWay: OsmWay): boolean {
       const hasInterestingParent = graph.parentWays(node).some((way: OsmWay) => way.id !== targetWay.id);
       return node.hasInterestingTags() || hasInterestingParent || graph.parentRelations(node).length > 0;
@@ -160,6 +198,13 @@ export function actionMergeRemoteChanges(id: EntityID, options: MergeRemoteChang
   }
 
 
+  /**
+   * Applies the queued child-node updates to the graph: replaces updated nodes
+   * and deletes nodes that are no longer needed.
+   * @param   updates - The accumulated replacements and node IDs to remove
+   * @param   graph   - The current graph
+   * @return  Updated graph
+   */
   function updateChildren(updates: ChildUpdates, graph: Graph): Graph {
     if (updates.replacements.length) {
       graph.replace(updates.replacements);
@@ -174,6 +219,15 @@ export function actionMergeRemoteChanges(id: EntityID, options: MergeRemoteChang
   }
 
 
+  /**
+   * Merges the member list of a relation from the remote version.
+   * With `'force_remote'` the remote list always wins; with `'force_local'` or
+   * when lists are identical the target is unchanged.  Divergent lists record a
+   * conflict and leave the target unchanged.
+   * @param   remote - The remote version of the relation
+   * @param   target - The local version of the relation being built
+   * @return  Updated target relation
+   */
   function mergeMembers(remote: OsmRelation, target: OsmRelation): OsmRelation {
     if (strategy === 'force_local' || deepEqual(target.members, remote.members)) {
       return target;
@@ -190,6 +244,16 @@ export function actionMergeRemoteChanges(id: EntityID, options: MergeRemoteChang
   }
 
 
+  /**
+   * Three-way merges the tags of an entity using diff3.  Remote-only changes
+   * are accepted automatically; local-only changes are kept; simultaneous
+   * independent changes on both sides are recorded as conflicts and the local
+   * value is preserved.
+   * @param   base   - The common ancestor version of the entity
+   * @param   remote - The remote version of the entity
+   * @param   target - The local version of the entity being built
+   * @return  Updated target entity
+   */
   function mergeTags(base: OsmEntity, remote: OsmEntity, target: OsmEntity): OsmEntity {
     if (strategy === 'force_local' || deepEqual(target.tags, remote.tags)) {
       return target;
@@ -292,6 +356,11 @@ export function actionMergeRemoteChanges(id: EntityID, options: MergeRemoteChang
   }) as MergeRemoteChangesAction;
 
 
+  /**
+   * Returns the list of human-readable conflict messages accumulated during the
+   * last run of this action.
+   * @return  Array of conflict description strings
+   */
   action.conflicts = function(): string[] {
     return _conflicts;
   };

@@ -1,10 +1,19 @@
-import { describe, it } from 'bun:test';
+import { beforeAll, describe, it } from 'bun:test';
 import { assert } from 'chai';
 import * as Rapid from '../../../modules/headless.js';
+import osmRulesets from '../../../data/osm_rulesets.json5';
 
 
 describe('actionDeleteWay', () => {
   const context = new Rapid.MockContext();
+  context.systems.schema = new Rapid.SchemaSystem(context);
+
+  beforeAll(() => {
+    const schema = context.systems.schema;
+    schema.requestedAssetIDs = '';
+    return schema.initAsync()
+      .then(() => schema.merge(osmRulesets));
+  });
 
   it('removes the way from the graph', () => {
     const w1 = new Rapid.OsmWay(context, {id: 'w1'});

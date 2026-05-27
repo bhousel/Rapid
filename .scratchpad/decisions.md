@@ -30,7 +30,25 @@ Non-obvious choices where "why did we do it this way?" isn't captured in the cod
 - **Area drifts less than centroid** — In a test case (0.00456% drift for area vs. >100% for centroid), but both use local frame for consistency and to avoid future surprises.
 - **References:** See [modules/lib/GeometryPart.ts](modules/lib/GeometryPart.ts) local frame computation and [test/unit/lib/GeometryPart.test.js](test/unit/lib/GeometryPart.test.js) tests for local/world coordinate correctness.
 
-## NsiService
+## actionMove: frame-of-reference in `replaceMovedVertex`
+
+`replaceMovedVertex` does two tests when deciding whether to insert a shape-preserving vertex on an unmoved way:
+
+1. **Angle test** — "Is the unmoved way nearly straight (≈180°) at this junction?" → uses `nodeOriginalLocal(prev/next)` (pre-move positions). Rationale: when a moved way connects to the unmoved way at _more than one_ shared endpoint (e.g. a U-shaped driveway), the "neighbouring" node on the unmoved way may itself be one of those shared endpoints — which has already shifted by the delta. Using its post-move position distorts the angle reading and can push a straight junction outside the ±5° window, triggering a bogus insertion. Original (pre-move) positions always reflect the unmoved way's actual geometry.
+
+2. **Path-length comparison** — "Which insertion order produces the shorter path?" → uses `nodeLocal(prev/next)` (current positions). Rationale: this is about the way's resulting geometry after insertion, so it should reason about where nodes are now.
+
+`nodeOriginalLocal(node)` returns `_cache.startLocal[node.id] ?? nodeLocal(node)` — for unmoved nodes the two are identical.
+
+## World-coordinate refactor for actions
+
+`actionMove` (and all the geometry-manipulation actions: rotate, reflect, scale, orthogonalize, circularize, straighten-nodes) now do all computation in **world coordinates with a local origin** for floating-point stability. The pattern:
+- Pick an origin (e.g. centroid of selected nodes in world space) and store it in `_cache.origin`.
+- Store each node's pre-move world position as `startLocal = worldPos - origin`.
+- Do all geometry math in local world space (small numbers, FP-stable).
+- At the end: `node.move(projWorldToWgs84(localPos + origin))`.
+
+Call sites pass a **world-space delta** (a `Vec2` difference of two `projWgs84ToWorld()` results), not a screen/viewport delta. This removes the `viewport` parameter that was previously required.
 
 - **`NsiTreeProperties` removed from imports** — NSI v7 exports this type but we use `NsiTreesJSON['trees']` directly for the `trees` cache property, making the standalone type import unused.
 - **`tags.wikipedia` qids lookup was dead code** — NSI used to cache both `wikidata QID → canonical QID` and `wikipedia URL → wikidata QID` in the replacements data. When we upgraded to NSI v7, which dropped wikipedia tracking, we removed the wp-caching loop in `_loadNsiDataAsync`. This made `this._nsi.qids?.get(tags.wikipedia)` in `upgradeTags` always return `undefined`. Removed the dead branch; `delete newTags.wikipedia` further down remains valid (strips bare `wikipedia=*` when a wikidata match is found).

@@ -52,7 +52,7 @@ export function actionCircularize(wayID: EntityID, maxDegrees: number = 20): Act
       const point = vecSubtract(coord, origin);  // world -> local
       origNodes.push(node);
       origPoints.push(point);
-      if (isInteresting(node, graph)) {
+      if (node.isInteresting(graph)) {
         interesting.push(point);
       }
     }
@@ -158,6 +158,13 @@ export function actionCircularize(wayID: EntityID, maxDegrees: number = 20): Act
   }) as Action;
 
 
+  /**
+   * Returns a reason string if the circularize operation cannot be performed,
+   * or `false` if it is allowed.
+   * @param   graph - The current graph
+   * @return  `'not_closed'` if the way is not a closed loop or its geometry is unavailable;
+   *          `false` if the action is enabled
+   */
   action.disabled = (graph: Graph): string | false => {
     const way = graph.entity(wayID) as OsmWay;
     const geom = way.geoms.parts[0]?.world;
@@ -201,13 +208,6 @@ export function actionCircularize(wayID: EntityID, maxDegrees: number = 20): Act
 
     return 'already_circular';
   };
-
-
-  function isInteresting(node: OsmNode, graph: Graph): boolean {
-    return graph.parentWays(node).length > 1 ||
-      graph.parentRelations(node).length > 0 ||
-      node.hasInterestingTags();
-  }
 
 
   /**

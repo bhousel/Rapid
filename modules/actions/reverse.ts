@@ -113,6 +113,12 @@ export function actionReverse(entityID: EntityID, options?: ReverseOptions): Rev
   };
 
 
+  /**
+   * Applies the key replacement table to swap directional suffixes such as
+   * `:right`/`:left` and `:forward`/`:backward`.
+   * @param   key - The tag key to transform
+   * @return  Transformed key, or the original key if no replacement matched
+   */
   function reverseKey(key: string): string {
     for (const replacement of keyReplacements) {
       if (replacement[0].test(key)) {
@@ -123,6 +129,17 @@ export function actionReverse(entityID: EntityID, options?: ReverseOptions): Rev
   }
 
 
+  /**
+   * Transforms a tag value to its directional opposite.
+   * Handles `left`/`right`, `forward`/`backward`, numeric `incline` negation,
+   * `oneway` values (when `reverseOneway` option is set), and absolute compass
+   * directions on `*direction` keys (when `includeAbsolute` is set).
+   * Keys matching `ignoreKey` (names, descriptions, refs, etc.) are passed through unchanged.
+   * @param   key             - The tag key (used to select the reversal strategy)
+   * @param   value           - The tag value to transform
+   * @param   includeAbsolute - When `true`, also reverse absolute compass bearings
+   * @return  Transformed value, or the original value if no replacement applied
+   */
   function reverseValue(key: string, value: string, includeAbsolute?: boolean): string {
     if (ignoreKey.test(key)) return value;
 
@@ -156,6 +173,13 @@ export function actionReverse(entityID: EntityID, options?: ReverseOptions): Rev
   }
 
 
+  /**
+   * Applies key and value reversal to all tags on the listed nodes, writing
+   * the updated nodes back into the graph.  Used to reverse direction-dependent
+   * tags on nodes that belong to the way being reversed.
+   * @param   graph   - The current graph (mutated in place)
+   * @param   nodeIDs - EntityIDs of the nodes whose tags should be reversed
+   */
   // Reverse the direction of tags attached to the nodes - iD#3076
   function reverseNodeTags(graph: Graph, nodeIDs: EntityID[]): void {
     for (const nodeID of nodeIDs) {
@@ -171,6 +195,13 @@ export function actionReverse(entityID: EntityID, options?: ReverseOptions): Rev
   }
 
 
+  /**
+   * Reverses the order of the way's nodes, transforms all direction-dependent
+   * tags (keys and values), updates any parent relation roles that reference
+   * forward/backward direction, and reverses directional tags on the way's nodes.
+   * @param   graph - The current graph (mutated in place)
+   * @param   way   - The way to reverse
+   */
   function reverseWay(graph: Graph, way: OsmWay): void {
     const nodes: EntityID[] = way.nodes.slice().reverse();
     const tags: OsmTags = {};
@@ -209,6 +240,14 @@ export function actionReverse(entityID: EntityID, options?: ReverseOptions): Rev
   };
 
 
+  /**
+   * Returns a reason string if the reverse operation cannot be performed,
+   * or `false` if it is allowed.
+   * @param   graph - The current graph
+   * @return  `'nondirectional_node'` if the entity is a node whose tags contain no directional
+   *          key or value that would be changed by reversing;
+   *          `false` if the action is enabled
+   */
   action.disabled = function(graph: Graph): string | false {
     const entity = graph.hasEntity(entityID);
     if (!entity || entity.type === 'way') return false;

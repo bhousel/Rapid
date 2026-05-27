@@ -268,7 +268,7 @@ describe('OsmNode', () => {
       assert.isFalse(n.isShared(graph));
     });
 
-    it('returns true a node with multiple parents', () => {
+    it('returns true for a node with multiple parents', () => {
       const n = new Rapid.OsmNode(context);
       const w1 = new Rapid.OsmWay(context, { nodes: [n.id] });
       const w2 = new Rapid.OsmWay(context, { nodes: [n.id] });
@@ -292,6 +292,43 @@ describe('OsmNode', () => {
       const w = new Rapid.OsmWay(context, { nodes: ['a', 'b', 'c', 'a'] });
       const graph = new Rapid.Graph(context, [a, b, c, w]);
       assert.isFalse(a.isShared(graph));
+    });
+  });
+
+
+  describe('isInteresting', () => {
+    it('returns false if no parent and no other interesting criteria', () => {
+      const n1 = new Rapid.OsmNode(context, { id: 'n1',  tags: { source: 'Bing' } });  // uninteresting tag
+      const graph = new Rapid.Graph(context, [n1]);
+      assert.isFalse(n1.isInteresting(graph));
+    });
+
+    it('returns false if single parent and no other interesting criteria', () => {
+      const n1 = new Rapid.OsmNode(context, { id: 'n1' });
+      const w1 = new Rapid.OsmWay(context, { id: 'w1', nodes: ['n1'] });
+      const graph = new Rapid.Graph(context, [n1, w1]);
+      assert.isFalse(n1.isInteresting(graph));
+    });
+
+    it('returns true for a node with multiple parents', () => {
+      const n1 = new Rapid.OsmNode(context, { id: 'n1' });
+      const w1 = new Rapid.OsmWay(context, { id: 'w1', nodes: ['n1'] });
+      const w2 = new Rapid.OsmWay(context, { id: 'w2', nodes: ['n1'] });
+      const graph = new Rapid.Graph(context, [n1, w1, w2]);
+      assert.isTrue(n1.isInteresting(graph));
+    });
+
+    it('returns true for a node in a relation', () => {
+      const n1 = new Rapid.OsmNode(context, { id: 'n1' });
+      const r1 = new Rapid.OsmRelation(context, { id: 'r1', members: [{ id: 'n1' }] });
+      const graph = new Rapid.Graph(context, [n1, r1]);
+      assert.isTrue(n1.isInteresting(graph));
+    });
+
+    it('returns true for a node with interesting tags', () => {
+      const n1 = new Rapid.OsmNode(context, { id: 'n1', tags: { amenity: 'cafe' } });
+      const graph = new Rapid.Graph(context, [n1]);
+      assert.isTrue(n1.isInteresting(graph));
     });
   });
 

@@ -60,6 +60,16 @@ export function actionConnect(nodeIDs: EntityID[]): Action {
   }) as Action;
 
 
+  /**
+   * Returns a reason string if the connect operation cannot be performed,
+   * or `false` if it is allowed.
+   * @param   graph - The current graph
+   * @return  `'relation'` if two or more of the nodes have conflicting roles in the same relation;
+   *          `'restriction'` if connecting the nodes would damage a turn restriction
+   *          (e.g. conflating from/via/to nodes, destroying a restriction member way,
+   *          or joining non-adjacent key nodes);
+   *          `false` if the action is enabled
+   */
   action.disabled = (graph: Graph): string | false => {
     if (!nodeIDs.length) return false;
 

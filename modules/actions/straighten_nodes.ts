@@ -68,6 +68,13 @@ export function actionStraightenNodes(nodeIDs: EntityID[]): Action {
   }) as Action;
 
 
+  /**
+   * Returns a reason string if the straighten-nodes operation cannot be performed,
+   * or `false` if it is allowed.
+   * @param   graph - The current graph
+   * @return  `'straight_enough'` if the selected nodes are already collinear within tolerance;
+   *          `false` if the action is enabled
+   */
   action.disabled = function(graph: Graph): string | false {
     const points: Vec2[] = [];
     let origin: Vec2 | undefined;

@@ -313,6 +313,23 @@ export class OsmNode extends OsmEntity {
   }
 
   /**
+     * Returns `true` when a node is "interesting":
+     *  - A Node shared by more than one parent way,
+     *  - A member of a relation, or
+     *  - Having interesting tags
+     * Uninteresting nodes can generally be removed when editing.
+   * @param graph - the Graph that holds the topology needed
+   * @returns `true` if this Node is interesting
+   */
+  isInteresting(graph: Graph): boolean {
+    return this.transient('isInteresting', () => {
+      return graph.parentWays(this).length > 1 ||
+        graph.parentRelations(this).length > 0 ||
+        this.hasInterestingTags();
+    });
+  }
+
+  /**
    * Returns an array of parent ways that intersect at this node.
    * Only linear parent ways with tagging for 'highway', 'railway', 'aeroway', 'waterway' are considered.
    * @param graph - the Graph that holds the topology needed

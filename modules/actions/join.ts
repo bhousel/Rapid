@@ -48,6 +48,11 @@ interface GroupedGeometries {
  */
 export function actionJoin(ids: EntityID[], options: JoinOptions = {}): JoinAction {
 
+  /**
+   * Groups the selected way entities by their geometry type.
+   * @param   graph - The current graph
+   * @return  Object with a `line` property containing all line-geometry ways
+   */
   function groupEntitiesByGeometry(graph: Graph): GroupedGeometries {
     const ways: OsmWay[] = ids.map(id => graph.entity(id) as OsmWay);
     const grouped = utilArrayGroupBy(ways, (way: OsmWay) => way.geometry(graph));
@@ -117,6 +122,12 @@ export function actionJoin(ids: EntityID[], options: JoinOptions = {}): JoinActi
     return graph.commit();
 
 
+    /**
+     * After joining, checks whether the survivor is a closed way that is the
+     * sole member of a multipolygon relation.  If so, folds the relation's tags
+     * onto the way and deletes the now-redundant relation, converting the feature
+     * to a basic area.
+     */
     function checkForSimpleMultipolygon(): void {
       if (!survivor.isClosed()) return;
 
@@ -149,6 +160,12 @@ export function actionJoin(ids: EntityID[], options: JoinOptions = {}): JoinActi
     }
   }) as JoinAction;
 
+  /**
+   * Returns the total number of nodes the joined way would have, accounting for
+   * the shared endpoint nodes that are removed during joining.
+   * @param   graph - The current graph
+   * @return  Expected node count of the resulting way
+   */
   // Returns the number of nodes the resultant way is expected to have
   action.resultingWayNodesLength = function(graph: Graph): number {
     return ids.reduce(function(count: number, id: EntityID): number {
@@ -157,6 +174,19 @@ export function actionJoin(ids: EntityID[], options: JoinOptions = {}): JoinActi
   };
 
 
+  /**
+   * Returns a reason string if the join operation cannot be performed,
+   * or `false` if it is allowed.
+   * @param   graph - The current graph
+   * @return  `'not_eligible'` if fewer than two ways are selected or any selected entity is not a line;
+   *          `'not_adjacent'` if the selected ways do not form a single connected sequence;
+   *          `'conflicting_relations'` if the ways belong to different sets of non-restriction parent relations;
+   *          `'paths_intersect'` if two ways cross each other at a non-shared node;
+   *          `'restriction'` if joining would damage a turn restriction;
+   *          `'connectivity'` if joining would damage a connectivity relation;
+   *          `'conflicting_tags'` if the ways have incompatible tag values;
+   *          `false` if the action is enabled
+   */
   action.disabled = function(graph: Graph): string | false {
     const geometries: GroupedGeometries = groupEntitiesByGeometry(graph);
     if (ids.length < 2 || ids.length !== geometries.line.length) {
@@ -184,6 +214,13 @@ export function actionJoin(ids: EntityID[], options: JoinOptions = {}): JoinActi
     // Restriction relations have different logic, below, which allows some cases
     // this prohibits, and prohibits some cases this allows.
     // Important: compare sorted parentIDs, not sorted parents, see iD#10089 et al
+    /**
+     * Returns the sorted IDs of non-restriction, non-connectivity parent
+     * relations for the given way.  Used to verify that all ways being joined
+     * share the same set of parent relations.
+     * @param   id - The EntityID of the way
+     * @return  Sorted array of parent relation EntityIDs
+     */
     function _sortedParentIDs(id: EntityID): EntityID[] {
       return graph.parentRelations(graph.entity(id) as OsmWay)
         .filter((rel: OsmRelation) => !rel.isRestriction() && !rel.isConnectivity())

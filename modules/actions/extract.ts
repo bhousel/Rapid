@@ -33,6 +33,14 @@ export function actionExtract(entityID: EntityID): ExtractAction {
   }) as ExtractAction;
 
 
+  /**
+   * Extracts a node from another node: creates a new replacement node that takes
+   * the original node's place in all parent ways and relations, leaving the
+   * original as a free-standing POI.
+   * @param   node  - The node to extract from
+   * @param   graph - The current graph
+   * @return  Updated graph
+   */
   function _extractFromNode(node: OsmNode, graph: Graph): Graph {
     _extractedNodeID = node.id;
 
@@ -50,6 +58,15 @@ export function actionExtract(entityID: EntityID): ExtractAction {
   }
 
 
+  /**
+   * Extracts a POI from a way or relation by copying its "interesting" tags to a
+   * new node placed at the entity's pre-calculated pole of inaccessibility.
+   * Tags that identify the building, indoor area, addresses, and a few others are retained on
+   * both the original entity and the new point.
+   * @param   entity - The way or relation to extract from
+   * @param   graph  - The current graph
+   * @return  Updated graph
+   */
   function _extractFromWayOrRelation(entity: OsmWay | OsmRelation, graph: Graph): Graph {
     const keysToCopyAndRetain = ['source', 'wheelchair'];
     const keysToRetain = ['area'];
@@ -106,6 +123,11 @@ export function actionExtract(entityID: EntityID): ExtractAction {
   }
 
 
+  /**
+   * Returns the EntityID of the node created by the most recent call to this
+   * action, or `undefined` if the action has not yet been run.
+   * @return  The extracted node's EntityID, or `undefined`
+   */
   action.getExtractedNodeID = function(): EntityID | undefined {
     return _extractedNodeID;
   };

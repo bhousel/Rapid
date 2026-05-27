@@ -14,6 +14,13 @@ export interface InsertPair {
   nodes: EntityID[];
 }
 
+/**
+ * An `IndexedMember` that may have been decorated with a `pair` property
+ * during way-member ordering.  The `pair` holds the two real members that
+ * replace a temporary "wTemp" way once ordering is complete.
+ */
+type PairedMember = IndexedMember & { pair?: OsmRelationMember[] };
+
 
 /**
  * Adds a member to a relation, with special handling for way members
@@ -21,7 +28,7 @@ export interface InsertPair {
  *
  * @param   relationID   - EntityID of the relation to add to
  * @param   member       - The member to add
- * @param   memberIndex  - Optional index position (or NaN to auto-determine)
+ * @param   memberIndex  - Optional index position (if missing, code will choose)
  * @param   insertPair   - Optional InsertPair for paired insertions (used by actionSplit)
  * @return  An Action function that adds the member to the graph
  */
@@ -52,23 +59,24 @@ export function actionAddMember(relationID: EntityID, member: OsmRelationMember,
   };
 
 
-  // Add a way member into the relation "wherever it makes sense".
-  // In this situation we were not supplied a memberIndex.
+  /**
+   * Adds a way member to the relation at the most sensible position by using
+   * `osmJoinWays` to determine how the existing members connect together.
+   * @param   relation - The relation to add the way to
+   * @param   graph    - The current graph
+   */
   function addWayMember(relation: OsmRelation, graph: Graph): void {
     let groups: Record<string, any[]>;
     let tempWay: OsmWay | undefined;
-    let item: any;
-    let i: number, j: number, k: number;
 
     // remove PTv2 stops and platforms before doing anything.
     const PTv2members: OsmRelationMember[] = [];
     const members: OsmRelationMember[] = [];
-    for (i = 0; i < relation.members.length; i++) {
-      const m = relation.members[i];
-      if (/stop|platform/.test(m.role || '')) {
-        PTv2members.push(m);
+    for (const member of relation.members) {
+      if (/stop|platform/.test(member.role || '')) {
+        PTv2members.push(member);
       } else {
-        members.push(m);
+        members.push(member);
       }
     }
     relation = relation.update({ members: members });
@@ -85,7 +93,7 @@ export function actionAddMember(relationID: EntityID, member: OsmRelationMember,
       // Replace the existing member with a temporary way,
       // so that `osmJoinWays` can treat the pair like a single way.
       tempWay = new OsmWay(relation.context, { id: 'wTemp', nodes: insertPair.nodes });
-      graph = graph.replace(tempWay);
+      graph.replace(tempWay);
       const tempMember: OsmRelationMember = { id: tempWay.id, type: 'way', role: member.role };
       const tempRelation = relation.replaceMember({ id: insertPair.originalID }, tempMember, true);
       groups = utilArrayGroupBy(tempRelation.members, 'type');
@@ -98,15 +106,15 @@ export function actionAddMember(relationID: EntityID, member: OsmRelationMember,
       groups.way.push(member);
     }
 
-    const indexedMembers: IndexedMember[] = withIndex(groups.way);
+    const indexedMembers: PairedMember[] = withIndex(groups.way);
     const joined = osmJoinWays(indexedMembers, graph);
 
     // `joined` might not contain all of the way members,
     // But will contain only the completed (downloaded) members
-    for (i = 0; i < joined.length; i++) {
-      const segment = joined[i] as any;
+    for (const segment of joined) {
       const nodes = segment.nodes.slice();
       const startIndex = segment[0].index;
+      let j: number, k: number;
 
       // j = array index in `members` where this segment starts
       for (j = 0; j < indexedMembers.length; j++) {
@@ -117,7 +125,7 @@ export function actionAddMember(relationID: EntityID, member: OsmRelationMember,
 
       // k = each member in segment
       for (k = 0; k < segment.length; k++) {
-        item = segment[k];
+        const item = segment[k];
         const way = graph.entity(item.id) as OsmWay;
 
         // If this is a paired item, generate members in correct order and role
@@ -152,8 +160,7 @@ export function actionAddMember(relationID: EntityID, member: OsmRelationMember,
 
     // Final pass: skip dead items, split pairs, remove index properties
     const wayMembers: OsmRelationMember[] = [];
-    for (i = 0; i < indexedMembers.length; i++) {
-      item = indexedMembers[i];
+    for (const item of indexedMembers) {
       if (item.index === -1) continue;
 
       if (item.pair) {
@@ -172,28 +179,30 @@ export function actionAddMember(relationID: EntityID, member: OsmRelationMember,
     graph.replace(relation.update({ members: newMembers }));
 
 
-    // `moveMember()` changes the `members` array in place by splicing
-    // the item with `.index = findIndex` to where it belongs,
-    // and marking the old position as "dead" with `.index = -1`
-    //
-    // j=5, k=0                jk
-    // segment                 5 4 7 6
-    // members       0 1 2 3 4 5 6 7 8 9        keep 5 in j+k
-    //
-    // j=5, k=1                j k
-    // segment                 5 4 7 6
-    // members       0 1 2 3 4 5 6 7 8 9        move 4 to j+k
-    // members       0 1 2 3 x 5 4 6 7 8 9      moved
-    //
-    // j=5, k=2                j   k
-    // segment                 5 4 7 6
-    // members       0 1 2 3 x 5 4 6 7 8 9      move 7 to j+k
-    // members       0 1 2 3 x 5 4 7 6 x 8 9    moved
-    //
-    // j=5, k=3                j     k
-    // segment                 5 4 7 6
-    // members       0 1 2 3 x 5 4 7 6 x 8 9    keep 6 in j+k
-    //
+    /**
+     * Changes the `members` array in place by splicing
+     * the item with `.index = findIndex` to where it belongs,
+     * and marking the old position as "dead" with `.index = -1`
+     * ```
+     * j=5, k=0                jk
+     * segment                 5 4 7 6
+     * members       0 1 2 3 4 5 6 7 8 9        keep 5 in j+k
+     *
+     * j=5, k=1                j k
+     * segment                 5 4 7 6
+     * members       0 1 2 3 4 5 6 7 8 9        move 4 to j+k
+     * members       0 1 2 3 x 5 4 6 7 8 9      moved
+     *
+     * j=5, k=2                j   k
+     * segment                 5 4 7 6
+     * members       0 1 2 3 x 5 4 6 7 8 9      move 7 to j+k
+     * members       0 1 2 3 x 5 4 7 6 x 8 9    moved
+     *
+     * j=5, k=3                j     k
+     * segment                 5 4 7 6
+     * members       0 1 2 3 x 5 4 7 6 x 8 9    keep 6 in j+k
+     * ```
+     */
     function moveMember(arr: IndexedMember[], findIndex: number, toIndex: number): void {
       let i: number;
       for (i = 0; i < arr.length; i++) {
@@ -209,8 +218,13 @@ export function actionAddMember(relationID: EntityID, member: OsmRelationMember,
     }
 
 
-    // This is the same as `Relation.indexedMembers`,
-    // Except we don't want to index all the members, only the ways
+    /**
+     * Shallow-copies each element of `arr` and attaches an `.index` property
+     * equal to its array position.  Equivalent to `Relation.indexedMembers`
+     * but scoped only to the way-member subset.
+     * @param   arr - Array of relation member objects
+     * @return  The same members with an added `.index` property
+     */
     function withIndex(arr: any[]): IndexedMember[] {
       const result = new Array(arr.length);
       for (let i = 0; i < arr.length; i++) {

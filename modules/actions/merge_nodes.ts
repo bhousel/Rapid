@@ -19,8 +19,13 @@ import type { Vec2 } from '@rapid-sdk/math';
  */
 export function actionMergeNodes(nodeIDs: EntityID[], loc?: Vec2): Action {
 
-  // If there are "interesting" nodes, average those only.
-  // Otherwise average whatever nodes we are passed.
+  /**
+   * Chooses the target location for the merged node.  If any of the nodes carry
+   * interesting tags, the average of only those nodes is returned.  Otherwise the
+   * average of all nodes is returned.  Returns `null` if there are no nodes.
+   * @param   graph - The current graph
+   * @return  Averaged [lon, lat] coordinate, or `null`
+   */
   function _chooseLoc(graph: Graph): Vec2 | null {
     if (!nodeIDs.length) return null;
 
@@ -68,6 +73,14 @@ export function actionMergeNodes(nodeIDs: EntityID[], loc?: Vec2): Action {
   }) as Action;
 
 
+  /**
+   * Returns a reason string if the merge-nodes operation cannot be performed,
+   * or `false` if it is allowed.
+   * Also delegates to `actionConnect.disabled`, which may return its own reason keys.
+   * @param   graph - The current graph
+   * @return  `'not_eligible'` if fewer than two nodes are selected or any selected ID is not a node;
+   *          `false` if the action is enabled
+   */
   action.disabled = function(graph: Graph): string | false {
     if (nodeIDs.length < 2) return 'not_eligible';
 

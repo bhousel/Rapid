@@ -11,7 +11,7 @@ import type { Action } from '../actions/types.ts';
 /**
  * A sequence of joined ways with their nodes.
  */
-export interface JoinedWaySequence extends Array<OsmRelationMember | OsmWay> {
+export interface JoinedWaySequence<T extends OsmRelationMember | OsmWay = OsmRelationMember | OsmWay> extends Array<T> {
   /** Ordered array of nodes after joining */
   nodes: OsmNode[];
 }
@@ -19,7 +19,7 @@ export interface JoinedWaySequence extends Array<OsmRelationMember | OsmWay> {
 /**
  * Result of osmJoinWays function.
  */
-export interface JoinedWaysResult extends Array<JoinedWaySequence> {
+export interface JoinedWaysResult<T extends OsmRelationMember | OsmWay = OsmRelationMember | OsmWay> extends Array<JoinedWaySequence<T>> {
   /** Actions to apply to reverse ways if needed */
   actions: Action[];
 }
@@ -55,21 +55,19 @@ export interface JoinedWaysResult extends Array<JoinedWaySequence> {
  * @param graph - The graph containing the entities
  * @returns Array of joined way sequences, each with a `nodes` property
  */
-export function osmJoinWays(toJoin: (OsmRelationMember | OsmWay)[], graph: Graph): JoinedWaysResult {
-  type JoinableItem = OsmRelationMember | OsmWay;
-
-  function resolve(member: JoinableItem): OsmNode[] {
+export function osmJoinWays<T extends OsmRelationMember | OsmWay>(toJoin: T[], graph: Graph): JoinedWaysResult<T> {
+  function resolve(member: T): OsmNode[] {
     return graph.childNodes(graph.entity(member.id) as OsmWay);
   }
 
-  function reverse(item: JoinableItem): JoinableItem {
+  function reverse(item: T): T {
     const action = actionReverse(item.id, { reverseOneway: true });
     sequences.actions.push(action);
-    return (item instanceof OsmWay) ? action(graph).entity(item.id) as OsmWay : item;
+    return (item instanceof OsmWay) ? action(graph).entity(item.id) as unknown as T : item;
   }
 
   // make a copy containing only the items to join
-  const items: JoinableItem[] = toJoin.filter((member): member is JoinableItem => {
+  const items: T[] = toJoin.filter((member): member is T => {
     return member.type === 'way' && graph.hasEntity(member.id) !== undefined;
   });
 
@@ -87,13 +85,13 @@ export function osmJoinWays(toJoin: (OsmRelationMember | OsmWay)[], graph: Graph
     }
   }
 
-  const sequences = [] as unknown as JoinedWaysResult;
+  const sequences = [] as unknown as JoinedWaysResult<T>;
   sequences.actions = [];
 
   while (items.length) {
     // start a new sequence
     let item = items.shift()!;
-    const currWays = [item] as unknown as JoinedWaySequence;
+    const currWays = [item] as unknown as JoinedWaySequence<T>;
     const currNodes: OsmNode[] = resolve(item).slice();
 
     // add to it
