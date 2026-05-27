@@ -91,13 +91,13 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
 
     this.container.addChild(lowRes, fill, strokes, mask);
 
-    // Debug surrounding rectangle
-    const debugSurround = new PIXI.Graphics();
-    debugSurround.label = 'surround';
-    debugSurround.eventMode = 'none';
-    debugSurround.sortableChildren = false;
-    this.debugSurround = debugSurround;
-    this.container.addChild(debugSurround);
+    // // Debug surrounding rectangle
+    // const debugSurround = new PIXI.Graphics();
+    // debugSurround.label = 'surround';
+    // debugSurround.eventMode = 'none';
+    // debugSurround.sortableChildren = false;
+    // this.debugSurround = debugSurround;
+    // this.container.addChild(debugSurround);
   }
 
 
@@ -415,16 +415,8 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
       this.debugSurround.clear();
       const p = local.surround?.polygon;
       if (p) {
-        const surroundFlat = [
-          p[0][0], p[0][1],
-          p[1][0], p[1][1],
-          p[2][0], p[2][1],
-          p[3][0], p[3][1],
-          p[0][0], p[0][1]
-        ];
-
         this.debugSurround
-          .poly(surroundFlat, true)
+          .poly(p.flat(), true)
           .stroke({ width: 2 * localScale, color: 0x00ff00 });
       }
     }
