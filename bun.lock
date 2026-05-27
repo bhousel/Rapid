@@ -11,8 +11,8 @@
         "@mapbox/sexagesimal": "^1.2.0",
         "@mapbox/vector-tile": "^2.0.4",
         "@openstreetmap/id-tagging-schema": "^6.16.0",
-        "@rapid-sdk/math": "file:///../rapid-sdk/packages/math",
-        "@rapid-sdk/util": "file:///../rapid-sdk/packages/util",
+        "@rapid-sdk/math": "1.0.0-pre.5",
+        "@rapid-sdk/util": "1.0.0-pre.5",
         "@rapideditor/country-coder": "^5.6.1",
         "@rapideditor/location-conflation": "^3.0.1",
         "@tmcw/togeojson": "^7.1.2",
@@ -172,9 +172,9 @@
 
     "@playwright/test": ["@playwright/test@1.59.1", "", { "dependencies": { "playwright": "1.59.1" }, "bin": { "playwright": "cli.js" } }, "sha512-PG6q63nQg5c9rIi4/Z5lR5IVF7yU5MqmKaPOe0HSc0O2cX1fPi96sUQu5j7eo4gKCkB2AnNGoWt7y4/Xx3Kcqg=="],
 
-    "@rapid-sdk/math": ["@rapid-sdk/math@file:../rapid-sdk/packages/math", { "dependencies": { "@types/d3-polygon": "^3.0.2", "@types/geojson": "^7946.0.16", "d3-polygon": "^3.0.1" } }],
+    "@rapid-sdk/math": ["@rapid-sdk/math@1.0.0-pre.5", "", { "dependencies": { "@rapid-sdk/util": "1.0.0-pre.5", "@types/d3-polygon": "^3.0.2", "@types/geojson": "^7946.0.16", "d3-polygon": "^3.0.1" } }, "sha512-a8qd31yu8eix81B4Dj3Z6XK/+agu8zKp+Lvv94iuCm1pRouXfLTYVOtotfPjbeDfNVBJ1FkByhryX/c3nR+rjw=="],
 
-    "@rapid-sdk/util": ["@rapid-sdk/util@file:../rapid-sdk/packages/util", { "dependencies": { "aes-js": "^3.1.2", "diacritics": "^1.3.0" } }],
+    "@rapid-sdk/util": ["@rapid-sdk/util@1.0.0-pre.5", "", { "dependencies": { "aes-js": "^3.1.2", "diacritics": "^1.3.0" } }, "sha512-AOlkKYShZBtFQodFD85/fRtPDwRgdhoGgvxvez/rJqNkNt/YeOrVTuY+BKl/rP2Opc3mAER2BmohZidwcCLmYA=="],
 
     "@rapideditor/country-coder": ["@rapideditor/country-coder@5.6.1", "", { "dependencies": { "which-polygon": "^2.2.1" } }, "sha512-/3xCpRIyhGv0lKxk26qNJgBWU6UnvE6SmOvE2GWE1CKu6pxcUVukECg6XVJLfmesYWyKHmaj1ZXtNOpz3lJkWg=="],
 
