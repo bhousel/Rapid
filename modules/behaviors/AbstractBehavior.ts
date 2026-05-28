@@ -4,16 +4,8 @@ import { vecRotate } from '@rapid-sdk/math';
 import type { Context } from '../Context.ts';
 import type { AbstractPixiFeature, FeatureContainer } from '../pixi/AbstractPixiFeature.ts';
 import type { AbstractPixiLayer } from '../pixi/AbstractPixiLayer.ts';
+import type { CoordData } from '../pixi/PixiEvents.ts';
 import type { Vec2 } from '@rapid-sdk/math';
-
-
-/** Coordinate pair for both screen and map space */
-export interface EventCoord {
-  /** Screen coordinates - [0,0] is top-left of the screen */
-  screen: Vec2;
-  /** Map coordinates - [0,0] is the origin of the viewport (rotation removed) */
-  map: Vec2;
-}
 
 
 /** Target information extracted from Pixi events */
@@ -44,7 +36,7 @@ export interface EventData {
   /** The original DOM event */
   originalEvent: Event;
   /** Coordinates in both screen and map space */
-  coord: EventCoord;
+  coord: CoordData;
   /** Event timestamp */
   time: number;
   /** Whether the event was cancelled */
@@ -150,37 +142,21 @@ export class AbstractBehavior extends EventEmitter {
    * @return Object containing data about the event and what was targeted
    */
   _getEventData(e: any): EventData {
-//    const result = {
-//      //      pointer event id                touch event id        default
-//      id: e.data.originalEvent.pointerId || e.data.pointerType || 'mouse',
-//      event: e,
-//      originalEvent: e.data.originalEvent,
-//      // mouse original events contain offsets, touch events contain 'layerX/Y'.
-//      coord: this._getEventCoord(e),
-//      time: e.data.originalEvent.timeStamp,
-//      isCancelled: false,
-//      target: null,
-//      feature: null,
-//      data: null,
-//    };
-
-    const coord: EventCoord = {
-      screen: [e.global.x, e.global.y],  // [0,0] is top,left of the screen
-      map: [e.global.x, e.global.y]      // [0,0] is the origin of the viewport (rotation removed)
-    };
-
     const context = this.context;
     const viewport = context.viewport;
     const r = viewport.transform.r;
-    if (r) {
-      coord.map = vecRotate(coord.screen, -r, viewport.center());  // remove rotation
-    }
+
+    // Gather coordinate data.
+    const coord: Partial<CoordData> = {};
+    coord.screen = [e.global.x, e.global.y] as Vec2;
+    coord.map = r ? vecRotate(coord.screen, -r, viewport.center()) : coord.screen;  // remove rotation
+    coord.world = viewport.screenToWorld(coord.map);
 
     const result: EventData = {
       id: e.pointerId ?? e.pointerType ?? 'unknown',
       event: e,
       originalEvent: e.originalEvent,
-      coord: coord,
+      coord: coord as CoordData,
       time: e.timeStamp,
       isCancelled: false,
       target: null

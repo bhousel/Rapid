@@ -485,7 +485,8 @@ export class MapSystem extends AbstractSystem {
    * @return  [x,y] world coordinate of pointer (or center of the map)
    */
   mouseWorld(): Vec2 {
-    return this.context.viewport.screenToWorld(this.mouse());
+    const gfx = this.context.systems.gfx;
+    return gfx?.eventManager?.coord?.world ?? this.context.viewport.screenToWorld(this.centerPoint());
   }
 
 

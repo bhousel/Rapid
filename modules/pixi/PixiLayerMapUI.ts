@@ -1,8 +1,9 @@
 import * as PIXI from 'pixi.js';
 import { AbstractPixiLayer } from './AbstractPixiLayer.ts';
 import { DashLine } from './lib/DashLine.ts';
-import { geoMetersToLon, projWgs84ToWorld, vecEqual, WORLD_ZOOM } from '@rapid-sdk/math';
+import { geoMetersToLon, projWgs84ToWorld, vecSubtract, WORLD_ZOOM } from '@rapid-sdk/math';
 
+import type { DashLineOptions } from './lib/DashLine.ts';
 import type { PixiScene } from './PixiScene.ts';
 import type { Viewport, Vec2 } from '@rapid-sdk/math';
 
@@ -197,34 +198,39 @@ export class PixiLayerMapUI extends AbstractPixiLayer {
   renderLasso(frame: number, viewport: Viewport): void {
     if (!this._lassoDirty) return;
 
-    const container = this.lasso;
-    if (!container) return;
+    const lasso = this.lasso;
+    if (!lasso) return;
 
     const line = this._lassoLine;
     const fill = this._lassoFill;
-    const data = this._lassoData;  // lasso coords currently supplied in WGS84 from `LassoBehavior.ts`
+    const data = this._lassoData;  // lasso world coords from `LassoBehavior.ts`
 
     if (line && fill && Array.isArray(data) && data.length > 1) {  // should show lasso
-      container.visible = true;
-      if (!container.children.length) {
-        container.addChild(line, fill);
+      lasso.visible = true;
+      if (!lasso.children.length) {
+        lasso.addChild(line, fill);
       }
 
-      // Make sure the lasso is closed
-      const coords = data.slice();  // shallow copy
-      const start = coords.at(0);
-      const end = coords.at(-1);
-      if (start && end && !vecEqual(start, end)) {
-        coords.push(start);
-      }
+      // Choose a local origin and generate flattened coordinate array.
+      const origin = data.at(0)!;
+      lasso.position.set(origin[0], origin[1]);
 
-      const flatCoords = coords.map(coord => projWgs84ToWorld(coord)).flat();
+      const flatCoords: number[] = new Array(data.length * 2 + 2);
+      for (let i = 0; i < data.length; i++) {
+        const [x, y] = vecSubtract(data[i], origin);  // world -> local
+        flatCoords[i * 2] = x;
+        flatCoords[i * 2 + 1] = y;
+      }
+      // close the shape (the first point is the local origin = 0,0)
+      flatCoords[data.length * 2] = 0;
+      flatCoords[data.length * 2 + 1] = 0;
+
 
       // Convert screen pixel values to world units
       const scale = 2 ** (WORLD_ZOOM - viewport.transform.z);
 
       // line
-      const lineStyle = {
+      const lineStyle: DashLineOptions = {
         alpha: 0.7,
         dash: [6, 3],
         width: 1,
@@ -235,13 +241,16 @@ export class PixiLayerMapUI extends AbstractPixiLayer {
       new DashLine(this.gfx, line, lineStyle).poly(flatCoords);
 
       // fill
-      const fillStyle = { alpha: 0.5, color: 0xaaaaaa };
+      const fillStyle: PIXI.FillStyle = {
+        alpha: 0.5,
+        color: 0xaaaaaa
+      };
       fill.clear().poly(flatCoords).fill(fillStyle);
 
     } else {  // no lasso data
-      container.visible = false;
-      if (container.children.length) {
-        container.removeChildren();
+      lasso.visible = false;
+      if (lasso.children.length) {
+        lasso.removeChildren();
       }
     }
 

@@ -1,10 +1,11 @@
 import * as PIXI from 'pixi.js';
 import { EventEmitter } from 'tseep';
-import { vecRotate, type Vec2 } from '@rapid-sdk/math';
+import { vecRotate } from '@rapid-sdk/math';
 import { utilDetect } from '../util/detect.ts';
 
 import type { Context } from '../Context.ts';
 import type { GraphicsSystem } from '../core/GraphicsSystem.ts';
+import type { Vec2 } from '@rapid-sdk/math';
 
 
 /** Coordinate data containing screen and map positions */
@@ -13,6 +14,8 @@ export interface CoordData {
   screen: Vec2;
   /** Map coordinates where [0,0] is the origin of the viewport (rotation removed) */
   map: Vec2;
+  /** World coordinate where [0,0] is world origin */
+  world: Vec2;
 }
 
 /** Extended WheelEvent with normalized delta values */
@@ -30,7 +33,7 @@ export interface NormalizedWheelEvent extends WheelEvent {
  *
  * Properties available:
  *   `enabled`              `true` if the event handlers are enabled, `false` if not.
- *   `coord`                `[x,y]` coordinates of the latest event (provided in "screen" and "map")
+ *   `coord`                `[x,y]` coordinates of the latest event (provided in "screen", "map", and "world")
  *   `pointerOverRenderer`  `true` if the pointer is over the renderer, `false` if not
  *   `modifierKeys`         Set containing the modifier keys that are currently down ('Alt', 'Control', 'Meta', 'Shift')
  *
@@ -72,7 +75,8 @@ export class PixiEvents extends EventEmitter {
     this.modifierKeys = new Set();
     this.coord = {
       screen: [0, 0],  // [0,0] is top,left of the screen
-      map: [0, 0]      // [0,0] is the origin of the viewport (rotation removed)
+      map: [0, 0],     // [0,0] is the origin of the viewport (rotation removed)
+      world: [0, 0]    // [0,0] is origin of the world coordinate (top left of world)
     };
 
     this._wheelDefault = utilDetect().os === 'mac' ? 'auto' : 'zoom';
@@ -265,16 +269,12 @@ export class PixiEvents extends EventEmitter {
    * @param y - The y coordinate
    */
   private _observeCoordinate(x: number, y: number): void {
-    this.coord = {
-      screen: [x, y],  // [0,0] is top,left of the screen
-      map: [x, y]      // [0,0] is the origin of the viewport (rotation removed)
-    };
-
     const viewport = this.context.viewport;
     const r = viewport.transform.r;
-    if (r) {
-      this.coord.map = vecRotate(this.coord.screen, -r, viewport.center());  // remove rotation
-    }
+
+    this.coord.screen = [x, y];
+    this.coord.map = r ? vecRotate(this.coord.screen, -r, viewport.center()) : this.coord.screen;
+    this.coord.world = viewport.screenToWorld(this.coord.map);
   }
 
 

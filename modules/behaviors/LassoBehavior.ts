@@ -1,12 +1,14 @@
-import { Extent, geomPointInPolygon } from '@rapid-sdk/math';
-import { utilArrayIntersection } from '@rapid-sdk/util';
-
 import { AbstractBehavior } from './AbstractBehavior.ts';
+import { Extent, geomPointInPolygon, vecLength } from '@rapid-sdk/math';
 
 import type { Context } from '../Context.ts';
+import type { EventData } from './AbstractBehavior.ts';
+import type { FederatedPointerEvent } from 'pixi.js';
 import type { OsmNode } from '../data/types.ts';
 import type { PixiLayerMapUI } from '../pixi/PixiLayerMapUI.ts';
 import type { Vec2 } from '@rapid-sdk/math';
+
+const MOVE_TOLERANCE = 2;
 
 
 /**
@@ -17,12 +19,16 @@ import type { Vec2 } from '@rapid-sdk/math';
  * and on completeion enters select mode with the OSM features selected.
  */
 export class LassoBehavior extends AbstractBehavior {
-  /** Whether the user is currently drawing a lasso */
-  private _lassoing: boolean;
-  /** The bounding extent of the lasso polygon */
+  /** EventData for the most recent pointerdown event */
+  lastDown: EventData | null;
+  /** EventData for the most recent pointermove event */
+  lastMove: EventData | null;
+
+  /** The bounding extent of the lasso polygon in world coordinates */
   private _extent: Extent | null;
-  /** The series of lat/lon coords recorded while lassoing */
+  /** Array of world coords recorded while lassoing */
   private _coords: Vec2[];
+
 
   /**
    * @constructor
@@ -32,10 +38,12 @@ export class LassoBehavior extends AbstractBehavior {
     super(context);
     this.id = 'lasso';
 
-    this._lassoing = false;
+    this.lastDown = null;
+    this.lastMove = null;
     this._extent = null;
-    this._coords = [];   // A series of lat/lon coords that we record while lassoing.
+    this._coords = [];   // Array of world coordindates that we record while lassoing.
 
+    this._pointercancel = this._pointercancel.bind(this);
     this._pointerdown = this._pointerdown.bind(this);
     this._pointermove = this._pointermove.bind(this);
     this._pointerup = this._pointerup.bind(this);
@@ -49,11 +57,13 @@ export class LassoBehavior extends AbstractBehavior {
     if (this._enabled) return;
     this._enabled = true;
 
-    this._lassoing = false;
+    this.lastDown = null;
+    this.lastMove = null;
     this._extent = null;
 
     const gfx = this.context.systems.gfx!;
     const eventManager = gfx.eventManager!;
+    eventManager.on('pointercancel', this._pointercancel);
     eventManager.on('pointerdown', this._pointerdown);
     eventManager.on('pointermove', this._pointermove);
     eventManager.on('pointerup', this._pointerup);
@@ -67,11 +77,13 @@ export class LassoBehavior extends AbstractBehavior {
     if (!this._enabled) return;
     this._enabled = false;
 
-    this._lassoing = false;
+    this.lastDown = null;
+    this.lastMove = null;
     this._extent = null;
 
     const gfx = this.context.systems.gfx!;
     const eventManager = gfx.eventManager!;
+    eventManager.off('pointercancel', this._pointercancel);
     eventManager.off('pointerdown', this._pointerdown);
     eventManager.off('pointermove', this._pointermove);
     eventManager.off('pointerup', this._pointerup);
@@ -79,74 +91,87 @@ export class LassoBehavior extends AbstractBehavior {
 
 
   /**
-   * Handler for pointerdown events.
+   * Handler for pointerdown events - starts the lasso.
    * @param  e - A Pixi FederatedPointerEvent
    */
-  _pointerdown(): void {
+  _pointerdown(e: FederatedPointerEvent): void {
+    if (this.lastDown) return;  // a pointer is already down
+
     // Ignore it if we are not over the canvas
     // (e.g. sidebar, out of browser window, over a button, toolbar, modal)
     const context = this.context;
     const gfx = context.systems.gfx!;
-    const map = context.systems.map!;
     const eventManager = gfx.eventManager!;
     if (!eventManager.pointerOverRenderer) return;
 
     const modifiers = eventManager.modifierKeys;
-    const drawLasso = modifiers.has('Shift');
-
-    if (drawLasso) {
-      this._lassoing = true;
-      const coord = map.mouseLoc();
+    if (modifiers.has('Shift')) {
+      const coord = eventManager.coord.world;
+      const down = this._getEventData(e);
+      this.lastDown = down;
       this._extent = new Extent(coord);
-      this._coords.push(coord);
+      this._coords = [coord, coord];
     }
   }
 
 
   /**
-   * Handler for pointermove events.
+   * Handler for pointermove events - continues the lasso.
    * @param  e - A Pixi FederatedPointerEvent
    */
-  _pointermove(): void {
-    if (!this._lassoing) return;
-
+  _pointermove(e: FederatedPointerEvent): void {
     const context = this.context;
     const gfx = context.systems.gfx!;
-    const map = context.systems.map!;
     const eventManager = gfx.eventManager!;
     if (!eventManager.pointerOverRenderer) return;
 
-    const coord = map.mouseLoc();
+    const move = this._getEventData(e);
+    const down = this.lastDown;
+    const modifiers = eventManager.modifierKeys;
 
-    // Update geometry and extent
-    this._extent = this._extent!.extend(new Extent(coord));
-    this._coords.push(coord);
+    if (modifiers.has('Shift') && down && down.id === move.id) {   // same pointer as down
+      const last = this.lastMove ?? this.lastDown!;
+      const dist = vecLength(last.coord.screen, move.coord.screen);  // distance in screen pixels
 
-    // Push the polygon data to the map UI for rendering.
-    const mapUILayer = gfx.scene!.layers.get('map-ui') as PixiLayerMapUI;
-    mapUILayer.lassoData = this._coords;
-    gfx.immediateRedraw();
+      if (dist >= MOVE_TOLERANCE) {  // if moved enough, record another point
+        this.lastMove = move;
+
+        // Update geometry and extent.
+        const coord = move.coord.world;
+        this._extent = this._extent!.extend(new Extent(coord));
+        this._coords.push(coord);
+
+        // Update the lasso data and schedule a redraw.
+        const mapUILayer = gfx.scene!.layers.get('map-ui') as PixiLayerMapUI;
+        mapUILayer.lassoData = this._coords;
+        gfx.immediateRedraw();
+      }
+    }
   }
 
 
   /**
-   * Handler for pointerup events.
+   * Handler for pointerup events - completes the lasso and selects the points inside it.
    * @param  e - A Pixi FederatedPointerEvent
    */
-  _pointerup(): void {
-    if (!this._lassoing) return;
-    this._lassoing = false;
+  _pointerup(e: FederatedPointerEvent): void {
+    const down = this.lastDown;
+    const up = this._getEventData(e);
+    if (!down || down.id !== up.id) return;  // not down, or different pointer
+
+    this.lastDown = null;  // prepare for the next `pointerdown`
 
     const context = this.context;
     const gfx = context.systems.gfx!;
 
+    // Clear the lasso and schedule a redraw.
     const mapUILayer = gfx.scene!.layers.get('map-ui') as PixiLayerMapUI;
+    mapUILayer.lassoData = null;
+    gfx.immediateRedraw();
 
     const ids = this._lassoed();
-    this._coords = [];
-    mapUILayer.lassoData = null;
-
     this._extent = null;
+    this._coords = [];
 
     if (ids.length) {
       this.context.enter('select-osm', { selection: { osm: ids }} );
@@ -155,17 +180,21 @@ export class LassoBehavior extends AbstractBehavior {
 
 
   /**
-   * After unprojecting from screen coordintes to wgs84 coordinates
-   * we need to fix min/max (in screen +y is down, in wgs84 +y is up)
-   * @param  a - First coordinate
-   * @param  b - Second coordinate
-   * @return  Normalized min/max coordinates
+   * Handler for pointercancel events.
    */
-  _normalize(a: Vec2, b: Vec2): [Vec2, Vec2] {
-    return [
-      [ Math.min(a[0], b[0]), Math.min(a[1], b[1]) ],
-      [ Math.max(a[0], b[0]), Math.max(a[1], b[1]) ]
-    ];
+  _pointercancel(): void {
+    this.lastDown = null;  // prepare for the next `pointerdown`
+
+    const context = this.context;
+    const gfx = context.systems.gfx!;
+
+    // Clear the lasso and schedule a redraw.
+    const mapUILayer = gfx.scene!.layers.get('map-ui') as PixiLayerMapUI;
+    mapUILayer.lassoData = null;
+    gfx.immediateRedraw();
+
+    this._extent = null;
+    this._coords = [];
   }
 
 
@@ -176,53 +205,31 @@ export class LassoBehavior extends AbstractBehavior {
   _lassoed(): EntityID[] {
     const context = this.context;
     const editor = context.systems.editor!;
-    const locations = context.systems.locations!;
     const filters = context.systems.filters!;
     const graph = editor.staging.graph;
+    const locations = context.systems.locations!;
+    const spatial = context.systems.spatial!;
+    const entityIDs: EntityID[] = [];
 
-    if (!this.context.editable()) return [];
+    if (!this.context.editable() || !this._extent || !this._coords.length) return [];
 
-    const polygonLocs = this._coords;
-    const intersects = editor
-      .intersects(this._extent!)
-      .filter(entity => {
-        if (entity.type !== 'node') return false;
-        const node = entity as OsmNode;
-        return (
-          geomPointInPolygon(node.loc!, polygonLocs) &&
-          !filters.isHidden(node, graph, node.geometry(graph) as any) &&
-          !locations.isBlockedAt(node.loc!)
-        );
-      }) as OsmNode[];
+    // Gather OsmNodes within the lasso.
+    const hits = spatial.getDataAtBox('osm', this._extent.bbox());
+    for (const hit of hits) {
+      const node = hit.contents as OsmNode;
+      if (node.type !== 'node') continue;
 
-    // sort the lassoed nodes as best we can  // bhousel - not sure why do this?
-    intersects.sort((node1, node2) => {
-      const parents1 = graph.parentWays(node1);
-      const parents2 = graph.parentWays(node2);
+      const coord = node.geoms.parts[0].world?.coords as Vec2;  // A node should have a single world coord
+      if (!coord) continue;
 
-      if (parents1.length && parents2.length) {  // both nodes are vertices
-        const sharedParents = utilArrayIntersection(parents1, parents2);
+      if (!geomPointInPolygon(coord, this._coords)) continue;
+      if (filters.isHidden(node, graph, node.geometry(graph))) continue;
+      if (locations.isBlockedAt(node.loc!)) continue;
 
-        // vertices are members of the same way; sort them in their listed order
-        if (sharedParents.length) {
-          const sharedParentNodes = sharedParents[0].nodes;
-          return sharedParentNodes.indexOf(node1.id) - sharedParentNodes.indexOf(node2.id);
+      entityIDs.push(node.id);
+    }
 
-        // vertices do not share a way; group them by their respective parent ways
-        } else {
-          return parseFloat(parents1[0].id.slice(1)) - parseFloat(parents2[0].id.slice(1));
-        }
-
-      // only one node is a vertex; sort standalone points before vertices
-      } else if (parents1.length || parents2.length) {
-        return parents1.length - parents2.length;
-      }
-
-      // both nodes are standalone points; sort left to right
-      return node1.loc![0] - node2.loc![0];
-    });
-
-    return intersects.map(entity => entity.id);
+    return entityIDs;
   }
 
 }

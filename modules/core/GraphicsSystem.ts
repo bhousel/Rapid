@@ -487,7 +487,6 @@ export class GraphicsSystem extends AbstractSystem {
     if (!this._started || this._paused) return;
 
     const context = this.context;
-    const map = context.systems.map!;
 
     // If the user is currently resizing, skip rendering until the size has settled
     if (context.container().classed('resizing')) return;
