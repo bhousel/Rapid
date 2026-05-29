@@ -16,6 +16,7 @@ import type { Graph } from '../lib/Graph.ts';
 import type { Midpoint } from '../actions/add_midpoint.ts';
 import type { OsmEntity, OsmNode, OsmTags, OsmWay } from '../data/types.ts';
 import type { ValidatorFunction, ValidatorResult } from './types.ts';
+import type { Vec2 } from '@rapid-sdk/math';
 
 
 /**
@@ -127,12 +128,12 @@ export function validateAlmostJunction(context: Context): ValidatorFunction {
           // When endpoints are close, just join if resulting small change in angle (iD#7201)
           const nearEndNodes = findNearbyEndNodes(endNode, crossWay, graph);
           if (nearEndNodes.length > 0) {
-            const collinear = findSmallJoinAngle(midNode, endNode, nearEndNodes);
-            if (collinear) {
-              editor.perform(actionMergeNodes([collinear.id, endNode.id], collinear.loc!));
+            const colinear = findSmallJoinAngle(midNode, endNode, nearEndNodes);
+            if (colinear) {
+              editor.perform(actionMergeNodes([colinear.id, endNode.id], colinear.loc!));
               editor.commit({
                 annotation: annotation,
-                selectedIDs: [collinear.id, endNode.id]
+                selectedIDs: [colinear.id, endNode.id]
               });
               return;
             }
@@ -277,24 +278,27 @@ export function validateAlmostJunction(context: Context): ValidatorFunction {
 
 
     /**
-     * Finds the endpoint most collinear with the mid→tip direction.
+     * Finds the endpoint most colinear with the mid→tip direction.
      * Used to determine if merging with a nearby endpoint is preferable to
      * adding a midpoint to the target edge.
      * @param midNode - The interior node of the extending edge
      * @param tipNode - The endpoint being extended
      * @param endNodes - Candidate nearby endpoints
-     * @returns The most collinear endpoint, or `null` if none within threshold
+     * @returns The most colinear endpoint, or `null` if none within threshold
      */
     function findSmallJoinAngle(midNode: OsmNode, tipNode: OsmNode, endNodes: OsmNode[]): OsmNode | null {
-      // Both nodes could be close, so want to join whichever is closest to collinear
+      // Both nodes could be close, so want to join whichever is closest to colinear
       let joinTo: OsmNode | undefined;
       let minAngle = Infinity;
 
-      // Checks midNode -> tipNode -> endNode for collinearity
-      endNodes.forEach(endNode => {
-        const mid = context.viewport.project(midNode.loc!);
-        const tip = context.viewport.project(tipNode.loc!);
-        const end = context.viewport.project(endNode.loc!);
+      // World coordinates of the nodes involved.
+      const mid = midNode.geoms.parts[0].world?.coords as Vec2;
+      const tip = tipNode.geoms.parts[0].world?.coords as Vec2;
+      if (!mid || !tip) return null;
+
+      for (const endNode of endNodes) {
+        const end = endNode.geoms.parts[0].world?.coords as Vec2;
+        if (!end)  continue;
 
         const a1 = vecAngle(mid, tip) + Math.PI;
         const a2 = vecAngle(mid, end) + Math.PI;
@@ -304,14 +308,11 @@ export function validateAlmostJunction(context: Context): ValidatorFunction {
           joinTo = endNode;
           minAngle = diff;
         }
-      });
+      }
 
-      /* Threshold set by considering right angle triangle
-      based on node joining threshold and extension distance */
-      if (minAngle <= SIG_ANGLE_TH) return joinTo ?? null;
-
-      return null;
+      return (minAngle <= SIG_ANGLE_TH) ? joinTo! : null;
     }
+
 
     /** Tests whether a tag value is defined and not `'no'`. */
     function hasTag(tags: OsmTags, key: string): boolean {

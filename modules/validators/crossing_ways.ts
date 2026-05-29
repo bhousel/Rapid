@@ -1,7 +1,6 @@
 import {
-  Extent, geoLatToMeters, geoLonToMeters, geoSphericalClosestPoint,
-  geoSphericalDistance, geoMetersToLat, geoMetersToLon, geomLineIntersection,
-  vecAngle, vecLength
+  Extent, geoSphericalClosestPoint, geoSphericalDistance, geomLineIntersection,
+  projWgs84ToWorld, projWorldToWgs84, vecAngle, vecLength, vecProject
 } from '@rapid-sdk/math';
 
 import { actionAddMidpoint, actionChangeTags, actionMergeNodes, actionSplit, actionSyncCrossingTags } from '../actions/index.ts';
@@ -48,7 +47,7 @@ export function validateCrossingWays(context: Context): ValidatorFunction {
   }
   /** Tests whether the given tags indicate an indoor feature. */
   function taggedAsIndoor(tags: OsmTags): boolean {
-    return !!hasTag(tags.indoor) || !!hasTag(tags.level) || tags.highway === 'corridor';
+    return hasTag(tags.indoor) || hasTag(tags.level) || tags.highway === 'corridor';
   }
 
   // lookups
@@ -102,10 +101,10 @@ export function validateCrossingWays(context: Context): ValidatorFunction {
 // note: using tree like this may be problematic - it may not reflect the graph we are validating.
 // update: it's probably ok, as `tree.waySegments` will reset the tree to the graph are using..
 // (although this will surely hurt performance)
-    const tree = context.systems.editor!.tree;
+    const tree = editor.tree;
 
     for (const way of waysToCheck(entity, graph)) {
-      for (const crossing of detectProblemCrossings(way, graph, tree)) {
+      for (const crossing of detectCandidateCrossings(way, graph, tree)) {
         result.issues.push(createIssue(crossing, graph));
       }
     }
@@ -260,6 +259,8 @@ export function validateCrossingWays(context: Context): ValidatorFunction {
   function getConnectionTags(entity1: OsmEntity, entity2: OsmEntity, graph: Graph): OsmTags | null {
     const type1 = getFeatureType(entity1, graph);
     const type2 = getFeatureType(entity2, graph);
+    if (!type1 || !type2) return null;
+
     const crossingType = [type1, type2].sort().join('-');  // a string like 'highway-highway'
 
     const geometry1 = entity1.geometry(graph);
@@ -360,7 +361,7 @@ export function validateCrossingWays(context: Context): ValidatorFunction {
    * @param tree - The spatial index tree
    * @returns Array of crossing details
    */
-  function detectProblemCrossings(way1: OsmWay, graph: Graph, tree: any): CrossingInfo[] {
+  function detectCandidateCrossings(way1: OsmWay, graph: Graph, tree: any): CrossingInfo[] {
     if (way1.type !== 'way') return [];
 
     const entity1 = getTaggedEntityForWay(way1, graph);
@@ -637,46 +638,51 @@ export function validateCrossingWays(context: Context): ValidatorFunction {
 
         const resultWayIDs: EntityID[] = [selectedWayID];
 
-        let edge: [EntityID, EntityID];
-        let crossedEdge: [EntityID, EntityID];
-        let crossedWayID: EntityID;
-
-        if (this.issue.entityIds[0] === selectedWayID) {
-          edge = this.issue.data.edges[0];
-          crossedEdge = this.issue.data.edges[1];
-          crossedWayID = this.issue.entityIds[1];
-        } else {
-          edge = this.issue.data.edges[1];
-          crossedEdge = this.issue.data.edges[0];
-          crossedWayID = this.issue.entityIds[0];
-        }
+        const selectedIsFirst = (this.issue.entityIds[0] === selectedWayID);
+        const edge = this.issue.data.edges[selectedIsFirst ? 0 : 1] as [EntityID, EntityID];
+        const crossedEdge = this.issue.data.edges[selectedIsFirst ? 1 : 0] as [EntityID, EntityID];
+        const crossedWayID = this.issue.entityIds[selectedIsFirst ? 1 : 0] as EntityID;
 
         const crossingLoc = this.issue.loc;
 
-        const viewport = context.viewport;
-
+        /**
+         * An Action that splits the crossed way around the crossed edge nodes,
+         * and tags the middle segment with appropriate "bridge" or "tunnel" tagging.
+         * @param   graph - input graph
+         * @return  graph - modified graph
+         */
         const actionAddStructure = (graph: Graph): Graph => {
-          const edgeNodes = [ graph.entity(edge[0]), graph.entity(edge[1]) ] as OsmNode[];
-          const crossedWay = graph.hasEntity(crossedWayID);
+          // Gather the entities involved.
+          const edgeNode0 = graph.hasEntity(edge[0]) as OsmNode;
+          const edgeNode1 = graph.hasEntity(edge[1]) as OsmNode;
+          const crossedNode0 = graph.hasEntity(crossedEdge[0]) as OsmNode;
+          const crossedNode1 = graph.hasEntity(crossedEdge[1]) as OsmNode;
 
-          // use the explicit width of the crossed feature as the structure length, if available
-          let structLengthMeters: number = (crossedWay && crossedWay.tags.width && parseFloat(crossedWay.tags.width)) || 0;
-          if (!structLengthMeters) {
-            // if no explicit width is set, approximate the width based on the tags
-            structLengthMeters = (crossedWay && (crossedWay as OsmWay).impliedLineWidthMeters()) || 0;
-          }
+          const crossedWay = graph.hasEntity(crossedWayID) as OsmWay;
+          if (!edgeNode0 || !edgeNode1 || !crossedNode0 || !crossedNode1 || !crossedWay) return graph;
+
+          // World coordinates of the nodes involved.
+          const edge0 = edgeNode0.geoms.parts[0].world?.coords as Vec2;
+          const edge1 = edgeNode1.geoms.parts[0].world?.coords as Vec2;
+          const crossed0 = crossedNode0.geoms.parts[0].world?.coords as Vec2;
+          const crossed1 = crossedNode1.geoms.parts[0].world?.coords as Vec2;
+          if (!edge0 || !edge1 || !crossed0 || !crossed1) return graph;
+
+
+          // Use 'width' tag of the crossed feature if available, otherwise use the implied width.
+          const explicitWidth = parseFloat(crossedWay.tags.width ?? '');
+          let structLengthMeters = Number.isFinite(explicitWidth) && explicitWidth > 0 ? explicitWidth :
+            (crossedWay.impliedLineWidthMeters() || 0);
           if (structLengthMeters) {
-            if (getFeatureType(crossedWay!, graph) === 'railway') {
-              // bridges over railways are generally much longer than the rail bed itself, compensate
-              structLengthMeters *= 2;
+            if (getFeatureType(crossedWay, graph) === 'railway') {  // bridges over railways..
+              structLengthMeters *= 2;   // generally much longer than the rail bed itself, compensate.
             }
-          } else {
-            // should ideally never land here since all rail/water/road tags should have an implied width
+          } else {  // Should ideally never land here, `impliedLineWidthMeters` should return something.
             structLengthMeters = 8;
           }
 
-          const a1 = vecAngle(viewport.project(edgeNodes[0].loc!), viewport.project(edgeNodes[1].loc!)) + Math.PI;
-          const a2 = vecAngle(viewport.project((graph.entity(crossedEdge[0]) as OsmNode).loc!), viewport.project((graph.entity(crossedEdge[1]) as OsmNode).loc!)) + Math.PI;
+          const a1 = vecAngle(edge0, edge1) + Math.PI;
+          const a2 = vecAngle(crossed0, crossed1) + Math.PI;
           let crossingAngle = Math.max(a1, a2) - Math.min(a1, a2);
           if (crossingAngle > Math.PI) crossingAngle -= Math.PI;
           // lengthen the structure to account for the angle of the crossing
@@ -688,48 +694,56 @@ export function validateCrossingWays(context: Context): ValidatorFunction {
           // clamp the length to a reasonable range
           structLengthMeters = Math.min(Math.max(structLengthMeters, 4), 50);
 
-          function geomToProj(geoPoint: Vec2): Vec2 {
-            return [
-              geoLonToMeters(geoPoint[0], geoPoint[1]),
-              geoLatToMeters(geoPoint[1])
-            ];
-          }
-          function projToGeom(projPoint: Vec2): Vec2 {
-            const lat = geoMetersToLat(projPoint[1]);
-            return [
-              geoMetersToLon(projPoint[0], lat),
-              lat
-            ];
-          }
+          const edgeWorldLength = vecLength(edge0, edge1);
+          if (!edgeWorldLength) return graph;
 
-          const projEdgeNode1 = geomToProj(edgeNodes[0].loc!);
-          const projEdgeNode2 = geomToProj(edgeNodes[1].loc!);
-          const projectedAngle = vecAngle(projEdgeNode1, projEdgeNode2);
+          const edgeWorldDirection: Vec2 = [
+            (edge1[0] - edge0[0]) / edgeWorldLength,
+            (edge1[1] - edge0[1]) / edgeWorldLength
+          ];
+          const worldUnitsPerSphericalMeter = edgeWorldLength /
+            geoSphericalDistance(edgeNode0.loc!, edgeNode1.loc!);
 
-          const projectedCrossingLoc = geomToProj(crossingLoc);
-          const linearToSphericalMetersRatio = vecLength(projEdgeNode1, projEdgeNode2) /
-              geoSphericalDistance(edgeNodes[0].loc!, edgeNodes[1].loc!);
+          const crossingWorld = projWgs84ToWorld(crossingLoc) as Vec2;
+          const projectedCrossing = vecProject(crossingWorld, [edge0, edge1]);
+          if (!projectedCrossing) return graph;
+          const projectedCrossingPoint = projectedCrossing.point;
 
-          function locSphericalDistanceFromCrossingLoc(angle: number, distanceMeters: number): Vec2 {
-            const lengthSphericalMeters = distanceMeters * linearToSphericalMetersRatio;
-            return projToGeom([
-              projectedCrossingLoc[0] + Math.cos(angle) * lengthSphericalMeters,
-              projectedCrossingLoc[1] + Math.sin(angle) * lengthSphericalMeters
-            ]);
+          function locDistanceFromCrossingLoc(directionSign: -1 | 1, distanceMeters: number): Vec2 {
+            const worldDistance = distanceMeters * worldUnitsPerSphericalMeter;
+            return projWorldToWgs84([
+              projectedCrossingPoint[0] + directionSign * edgeWorldDirection[0] * worldDistance,
+              projectedCrossingPoint[1] + directionSign * edgeWorldDirection[1] * worldDistance
+            ] as Vec2);
           }
 
-          const endpointLocGetter1 = function(lengthMeters: number): Vec2 {
-            return locSphericalDistanceFromCrossingLoc(projectedAngle, lengthMeters);
-          };
-          const endpointLocGetter2 = function(lengthMeters: number): Vec2 {
-            return locSphericalDistanceFromCrossingLoc(projectedAngle + Math.PI, lengthMeters);
-          };
+          const endpointLocGetter1 = (lengthMeters: number): Vec2 => locDistanceFromCrossingLoc(1, lengthMeters);
+          const endpointLocGetter2 = (lengthMeters: number): Vec2 => locDistanceFromCrossingLoc(-1, lengthMeters);
 
           // avoid creating very short edges from splitting too close to another node
           const minEdgeLengthMeters = 0.55;
 
+          function countIncidentEdges(node: OsmNode): number {
+            let edgeCount = 0;
+
+            for (const way of node.parentIntersectionWays(graph) as OsmWay[]) {
+              for (const nodeID of way.nodes) {
+                if (nodeID !== node.id) continue;
+
+                if ((node.id === way.first() && node.id !== way.last()) ||
+                  (node.id === way.last() && node.id !== way.first())) {
+                  edgeCount += 1;
+                } else {
+                  edgeCount += 2;
+                }
+              }
+            }
+
+            return edgeCount;
+          }
+
           // decide where to bound the structure along the way, splitting as necessary
-          function determineEndpoint(edge: [EntityID, EntityID], endNode: OsmNode, locGetter: (len: number) => Vec2): OsmNode {
+          function determineEndpoint(edgeToSplit: [EntityID, EntityID], endNode: OsmNode, locGetter: (len: number) => Vec2): OsmNode {
             let newNode: OsmNode | undefined;
             const idealLengthMeters = structLengthMeters / 2;
 
@@ -741,23 +755,10 @@ export function validateCrossingWays(context: Context): ValidatorFunction {
               // the loc that would result in the full expected length
               const idealNodeLoc = locGetter(idealLengthMeters);
               newNode = new OsmNode(context);
-              graph = actionAddMidpoint({ loc: idealNodeLoc, edge: edge } as Midpoint, newNode)(graph);
+              graph = actionAddMidpoint({ loc: idealNodeLoc, edge: edgeToSplit } as Midpoint, newNode)(graph);
 
             } else {
-              let edgeCount = 0;
-              (endNode.parentIntersectionWays(graph) as OsmWay[]).forEach(function(way: OsmWay) {
-                way.nodes.forEach(function(nodeID: EntityID) {
-                  if (nodeID === endNode.id) {
-                    if ((endNode.id === way.first() && endNode.id !== way.last()) ||
-                      (endNode.id === way.last() && endNode.id !== way.first())) {
-                      edgeCount += 1;
-                    } else {
-                      edgeCount += 2;
-                    }
-                  }
-                });
-              });
-
+              const edgeCount = countIncidentEdges(endNode);
               if (edgeCount >= 3) {
                 // the end node is a junction, try to leave a segment
                 // between it and the structure - iD#7202
@@ -765,7 +766,7 @@ export function validateCrossingWays(context: Context): ValidatorFunction {
                 if (insetLength > minEdgeLengthMeters) {
                   const insetNodeLoc = locGetter(insetLength);
                   newNode = new OsmNode(context);
-                  graph = actionAddMidpoint({ loc: insetNodeLoc, edge: edge } as Midpoint, newNode)(graph);
+                  graph = actionAddMidpoint({ loc: insetNodeLoc, edge: edgeToSplit } as Midpoint, newNode)(graph);
                 }
               }
             }
@@ -786,8 +787,8 @@ export function validateCrossingWays(context: Context): ValidatorFunction {
             return newNode;
           }
 
-          const structEndNode1 = determineEndpoint(edge, edgeNodes[1], endpointLocGetter1);
-          const structEndNode2 = determineEndpoint([edgeNodes[0].id, structEndNode1.id], edgeNodes[0], endpointLocGetter2);
+          const structEndNode1 = determineEndpoint(edge, edgeNode1, endpointLocGetter1);
+          const structEndNode2 = determineEndpoint([edgeNode0.id, structEndNode1.id], edgeNode0, endpointLocGetter2);
 
           const structureWay = resultWayIDs
             .map(id => graph.entity(id))
@@ -828,8 +829,8 @@ export function validateCrossingWays(context: Context): ValidatorFunction {
    * @returns A `[action, annotation]` tuple
    */
   function getConnectWaysAction(loc: Vec2, edges: [EntityID, EntityID][], crossingWayID: EntityID | null, tags: OsmTags): any[] {
-    const actionConnectCrossingWays = (graph: Graph): Graph => {
 
+    const actionConnectCrossingWays = (graph: Graph): Graph => {
       // Create a new candidate junction node which will be inserted at the connection location..
       const newNode = new OsmNode(context, { loc: loc, tags: tags });
       graph = graph.replace(newNode);
@@ -901,12 +902,12 @@ export function validateCrossingWays(context: Context): ValidatorFunction {
         const loc = this.issue.loc;
         const edges = this.issue.data.edges;
         const crossingWayID = this.issue.data.crossingWayID;
-        const result = getConnectWaysAction(loc, edges, crossingWayID, connectionTags);
+        const [action, annotation] = getConnectWaysAction(loc, edges, crossingWayID, connectionTags);
 
         // result contains [function, annotation]
-        editor.perform(result[0]);
+        editor.perform(action);
         editor.commit({
-          annotation: result[1],
+          annotation: annotation,
           selectedIDs: this.issue.entityIds
         });
       }
