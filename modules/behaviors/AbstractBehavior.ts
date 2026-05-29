@@ -2,6 +2,7 @@ import { EventEmitter } from 'tseep';
 import { vecRotate } from '@rapid-sdk/math';
 
 import type { Context } from '../Context.ts';
+import type { AbstractData } from '../data/AbstractData.ts';
 import type { AbstractPixiFeature, FeatureContainer } from '../pixi/AbstractPixiFeature.ts';
 import type { AbstractPixiLayer } from '../pixi/AbstractPixiLayer.ts';
 import type { CoordData } from '../pixi/PixiEvents.ts';
@@ -21,7 +22,7 @@ export interface EventTarget {
   /** The layer ID, or null */
   layerID: LayerID | null;
   /** The data associated with the feature */
-  data: unknown | null;
+  data: AbstractData | null;
   /** The data ID, or null */
   dataID: DataID | null;
 }

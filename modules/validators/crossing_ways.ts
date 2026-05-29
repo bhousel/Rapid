@@ -9,12 +9,13 @@ import { OsmNode } from '../data/OsmNode.ts';
 import { ValidationIssue } from '../lib/ValidationIssue.ts';
 import { ValidationFix } from '../lib/ValidationFix.ts';
 
-import type { Vec2 } from '@rapid-sdk/math';
 import type { Context } from '../Context.ts';
 import type { D3Selection } from 'd3-selection';
 import type { Graph } from '../lib/Graph.ts';
+import type { Midpoint } from '../actions/add_midpoint.ts';
 import type { OsmEntity, OsmRelation, OsmTags, OsmWay } from '../data/types.ts';
 import type { ValidatorFunction, ValidatorResult } from './types.ts';
+import type { Vec2 } from '@rapid-sdk/math';
 
 
 interface WayInfo {
@@ -636,7 +637,10 @@ export function validateCrossingWays(context: Context): ValidatorFunction {
 
         const resultWayIDs: EntityID[] = [selectedWayID];
 
-        let edge: EntityID[], crossedEdge: EntityID[], crossedWayID: EntityID;
+        let edge: [EntityID, EntityID];
+        let crossedEdge: [EntityID, EntityID];
+        let crossedWayID: EntityID;
+
         if (this.issue.entityIds[0] === selectedWayID) {
           edge = this.issue.data.edges[0];
           crossedEdge = this.issue.data.edges[1];
@@ -725,7 +729,7 @@ export function validateCrossingWays(context: Context): ValidatorFunction {
           const minEdgeLengthMeters = 0.55;
 
           // decide where to bound the structure along the way, splitting as necessary
-          function determineEndpoint(edge: EntityID[], endNode: OsmNode, locGetter: (len: number) => Vec2): OsmNode {
+          function determineEndpoint(edge: [EntityID, EntityID], endNode: OsmNode, locGetter: (len: number) => Vec2): OsmNode {
             let newNode: OsmNode | undefined;
             const idealLengthMeters = structLengthMeters / 2;
 
@@ -737,7 +741,7 @@ export function validateCrossingWays(context: Context): ValidatorFunction {
               // the loc that would result in the full expected length
               const idealNodeLoc = locGetter(idealLengthMeters);
               newNode = new OsmNode(context);
-              graph = actionAddMidpoint({ loc: idealNodeLoc, edge: edge as [EntityID, EntityID] }, newNode)(graph);
+              graph = actionAddMidpoint({ loc: idealNodeLoc, edge: edge } as Midpoint, newNode)(graph);
 
             } else {
               let edgeCount = 0;
@@ -757,12 +761,11 @@ export function validateCrossingWays(context: Context): ValidatorFunction {
               if (edgeCount >= 3) {
                 // the end node is a junction, try to leave a segment
                 // between it and the structure - iD#7202
-
                 const insetLength = crossingToEdgeEndDistance - minEdgeLengthMeters;
                 if (insetLength > minEdgeLengthMeters) {
                   const insetNodeLoc = locGetter(insetLength);
                   newNode = new OsmNode(context);
-                  graph = actionAddMidpoint({ loc: insetNodeLoc, edge: edge as [EntityID, EntityID] }, newNode)(graph);
+                  graph = actionAddMidpoint({ loc: insetNodeLoc, edge: edge } as Midpoint, newNode)(graph);
                 }
               }
             }
@@ -824,7 +827,7 @@ export function validateCrossingWays(context: Context): ValidatorFunction {
    * @param tags - Tags to assign to the new connection node
    * @returns A `[action, annotation]` tuple
    */
-  function getConnectWaysAction(loc: Vec2, edges: EntityID[][], crossingWayID: EntityID | null, tags: OsmTags): any[] {
+  function getConnectWaysAction(loc: Vec2, edges: [EntityID, EntityID][], crossingWayID: EntityID | null, tags: OsmTags): any[] {
     const actionConnectCrossingWays = (graph: Graph): Graph => {
 
       // Create a new candidate junction node which will be inserted at the connection location..
@@ -854,7 +857,7 @@ export function validateCrossingWays(context: Context): ValidatorFunction {
         }
 
         if (!canReuse) {
-          graph = actionAddMidpoint({ loc: loc as Vec2, edge: edge as [EntityID, EntityID] }, newNode)(graph);  // Insert the new node
+          graph = actionAddMidpoint({ loc, edge } as Midpoint, newNode)(graph);  // Insert the new node
         }
       }
 

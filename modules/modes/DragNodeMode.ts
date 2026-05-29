@@ -1,15 +1,15 @@
-import { vecAdd, vecRotate, vecSubtract } from '@rapid-sdk/math';
-import { utilArrayIntersection } from '@rapid-sdk/util';
-
 import { AbstractMode } from './AbstractMode.ts';
 import { actionAddMidpoint } from '../actions/add_midpoint.ts';
 import { actionConnect } from '../actions/connect.ts';
 import { actionMoveNode } from '../actions/move_node.ts';
 import { geoChooseEdge } from '../geo/geom.ts';
 import { OsmNode } from '../data/OsmNode.ts';
+import { vecAdd, vecRotate, vecSubtract } from '@rapid-sdk/math';
+import { utilArrayIntersection } from '@rapid-sdk/util';
 
 import type { Context } from '../Context.ts';
 import type { EventData } from '../behaviors/AbstractBehavior.ts';
+import type { Midpoint } from '../actions/add_midpoint.ts';
 import type { OsmEntity, OsmWay } from '../data/types.ts';
 import type { Vec2 } from '@rapid-sdk/math';
 
@@ -21,10 +21,7 @@ export interface DragNodeModeOptions {
   /** If set, drag the node for the given id */
   nodeID?: EntityID;
   /** If set, create a node from the given midpoint */
-  midpoint?: {
-    loc: Vec2;
-    edge: [EntityID, EntityID];
-  };
+  midpoint?: Midpoint;
 }
 
 

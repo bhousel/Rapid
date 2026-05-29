@@ -7,6 +7,7 @@ import { OsmNode } from '../data/OsmNode.ts';
 
 import type { Context } from '../Context.ts';
 import type { EventData } from '../behaviors/AbstractBehavior.ts';
+import type { Midpoint } from '../actions/add_midpoint.ts';
 import type { OsmTags, OsmWay } from '../data/types.ts';
 import type { Vec2 } from '@rapid-sdk/math';
 
@@ -149,7 +150,7 @@ export class AddPointMode extends AbstractMode {
     const l10n = context.systems.l10n!;
 
     const node = new OsmNode(context, { tags: this.defaultTags });
-    editor.perform(actionAddMidpoint({ loc: loc, edge: edge }, node));
+    editor.perform(actionAddMidpoint({ loc, edge } as Midpoint, node));
     editor.commit({ annotation: l10n.t('operations.add.annotation.vertex'), selectedIDs: [node.id] });
     context.enter('select-osm', { selection: { osm: [node.id] }, newFeature: true });
   }

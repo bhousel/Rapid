@@ -419,15 +419,15 @@ behaviors.available.set('drag', DragBehavior);
 - The `tsconfig.json` has `allowImportingTsExtensions: true`
 
 **Import organization order:**
-1. Regular `import` statements (sorted alphabetically by module path)
+1. Regular `import` statements (sorted alphabetically)
 2. Blank line
-3. `import type` statements (sorted alphabetically by module path)
+3. `import type` statements (sorted alphabetically)
 
 Example:
 ```typescript
+import { actionAddMidpoint } from '../actions/add_midpoint.ts';
 import { geomRotate, geomViewportNudge, vecAdd } from '@rapid-sdk/math';
 import { utilArrayGroupBy, utilArrayUniq } from '@rapid-sdk/util';
-import { actionAddMidpoint } from '../actions/add_midpoint.ts';
 
 import type { Action } from '../actions/types.ts';
 import type { Graph } from '../core/Graph.ts';

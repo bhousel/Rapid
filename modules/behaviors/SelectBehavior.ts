@@ -7,9 +7,11 @@ import { actionAddMidpoint } from '../actions/add_midpoint.ts';
 import { geoChooseEdge } from '../geo/geom.js';
 import { utilDetect } from '../util/detect.ts';
 
+import type { Context } from '../Context.ts';
 import type { EventData } from './AbstractBehavior.ts';
 import type { FederatedPointerEvent } from 'pixi.js';
-import type { Context } from '../Context.ts';
+import type { Midpoint } from '../actions/add_midpoint.ts';
+import type { Vec2 } from '@rapid-sdk/math';
 
 const NEAR_TOLERANCE = 4;
 const FAR_TOLERANCE = 12;
@@ -459,8 +461,9 @@ export class SelectBehavior extends AbstractBehavior {
     const isOSMWay = data instanceof OsmWay && !data.props.__fbid__;
     const isMidpoint = data?.type === 'midpoint';
 
-    let loc: any;
-    let edge: any;
+    let loc: Vec2 | undefined;
+    let edge: [EntityID, EntityID] | undefined;
+
     if (isOSMWay) {
       const graph = editor.staging.graph;
       const viewport = context.viewport;
@@ -476,7 +479,7 @@ export class SelectBehavior extends AbstractBehavior {
     }
 
     if (loc && edge) {
-      editor.perform(actionAddMidpoint({ loc: loc, edge: edge }, new OsmNode(context)));
+      editor.perform(actionAddMidpoint({ loc, edge } as Midpoint, new OsmNode(context)));
       editor.commit({
         annotation: l10n!.t('operations.add.annotation.vertex'),
         selectedIDs: context.selectedIDs()   // keep the parent way selected

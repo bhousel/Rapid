@@ -13,6 +13,7 @@ import { ValidationFix } from '../lib/ValidationFix.ts';
 import type { Context } from '../Context.ts';
 import type { D3Selection } from 'd3-selection';
 import type { Graph } from '../lib/Graph.ts';
+import type { Midpoint } from '../actions/add_midpoint.ts';
 import type { OsmEntity, OsmNode, OsmTags, OsmWay } from '../data/types.ts';
 import type { ValidatorFunction, ValidatorResult } from './types.ts';
 
@@ -140,19 +141,19 @@ export function validateAlmostJunction(context: Context): ValidatorFunction {
           const targetEdge = this.issue.data.edge;
           const crossLoc = this.issue.data.cross_loc;
           const edgeNodes = [ graph.entity(targetEdge[0]) as OsmNode, graph.entity(targetEdge[1]) as OsmNode ];
-          const points = edgeNodes.map((node: OsmNode) => node.loc!);
-          const closestPointInfo = geoSphericalClosestPoint(points, crossLoc) as any;
+          const points = edgeNodes.map(node => node.loc!);
+          const closest = geoSphericalClosestPoint(points, crossLoc);  // note: using wgs84, should change this
 
           // already a point nearby, just connect to that
-          if (closestPointInfo?.distance < WELD_TH_METERS) {
-            editor.perform(actionMergeNodes([ closestPointInfo.id, endNode.id ], closestPointInfo.loc));
+          if (closest && closest.distance < WELD_TH_METERS) {    // note: this will not be in meters
+            const node = edgeNodes[closest.index] as OsmNode;
+            editor.perform(actionMergeNodes([ node.id, endNode.id ], closest.point));
             editor.commit({
               annotation: annotation,
-              selectedIDs: [closestPointInfo.id, endNode.id]
+              selectedIDs: [node.id, endNode.id]
             });
-          // else add the end node to the edge way
-          } else {
-            editor.perform(actionAddMidpoint({ loc: crossLoc, edge: targetEdge }, endNode));
+          } else {   // create a midpoint on the target way
+            editor.perform(actionAddMidpoint({ loc: crossLoc, edge: targetEdge } as Midpoint, endNode));
             editor.commit({
               annotation: annotation,
               selectedIDs: [endNode.id]
@@ -324,7 +325,6 @@ export function validateAlmostJunction(context: Context): ValidatorFunction {
      * @returns `true` if the ways are compatible for connection
      */
     function canConnectWays(way: OsmWay, way2: OsmWay): boolean {
-
       // allow self-connections
       if (way.id === way2.id) return true;
 
@@ -335,12 +335,12 @@ export function validateAlmostJunction(context: Context): ValidatorFunction {
         !(hasTag(way.tags, 'tunnel') && hasTag(way2.tags, 'tunnel'))) return false;
 
       // must have equivalent layers and levels
-      const layer1 = way.tags.layer || '0',
-        layer2 = way2.tags.layer || '0';
+      const layer1 = way.tags.layer || '0';
+      const layer2 = way2.tags.layer || '0';
       if (layer1 !== layer2) return false;
 
-      const level1 = way.tags.level || '0',
-        level2 = way2.tags.level || '0';
+      const level1 = way.tags.level || '0';
+      const level2 = way2.tags.level || '0';
       if (level1 !== level2) return false;
 
       return true;
@@ -353,10 +353,10 @@ export function validateAlmostJunction(context: Context): ValidatorFunction {
      * @returns Connection info with edge and crossing location, or `null`
      */
     function canConnectByExtend(way: OsmWay, endNodeIdx: number): any | null {
-      const tipNid = way.nodes[endNodeIdx];  // the 'tip' node for extension point
-      const midNid = endNodeIdx === 0 ? way.nodes[1] : way.nodes[way.nodes.length - 2];  // the other node of the edge
-      const tipNode = graph.entity(tipNid) as OsmNode;
-      const midNode = graph.entity(midNid) as OsmNode;
+      const tipNodeID = way.nodes[endNodeIdx];  // the 'tip' node for extension point
+      const midNodeID = endNodeIdx === 0 ? way.nodes[1] : way.nodes[way.nodes.length - 2];  // the other node of the edge
+      const tipNode = graph.entity(tipNodeID) as OsmNode;
+      const midNode = graph.entity(midNodeID) as OsmNode;
       const lon = tipNode.loc![0];
       const lat = tipNode.loc![1];
       const lon_range = geoMetersToLon(EXTEND_TH_METERS, lat) / 2;
@@ -379,13 +379,11 @@ export function validateAlmostJunction(context: Context): ValidatorFunction {
         if (!isHighway(way2)) continue;
         if (!canConnectWays(way, way2)) continue;
 
-        const nAid = segmentInfo.nodes[0] as EntityID,
-          nBid = segmentInfo.nodes[1] as EntityID;
+        const edge: [EntityID, EntityID] = segmentInfo.nodes.slice(0, 2);
+        if (edge[0] === tipNodeID || edge[1] === tipNodeID) continue;
 
-        if (nAid === tipNid || nBid === tipNid) continue;
-
-        const nA = graph.entity(nAid) as OsmNode;
-        const nB = graph.entity(nBid) as OsmNode;
+        const nA = graph.entity(edge[0]) as OsmNode;
+        const nB = graph.entity(edge[1]) as OsmNode;
         const crossLoc = geomLineIntersection([tipNode.loc!, extTipLoc], [nA.loc!, nB.loc!]);
         if (crossLoc) {
           return {

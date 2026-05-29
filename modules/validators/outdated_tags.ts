@@ -7,6 +7,7 @@ import { Graph, ValidationIssue, ValidationFix } from '../lib/index.ts';
 
 import type { Context } from '../Context.ts';
 import type { D3Selection } from 'd3-selection';
+import type { NsiUpgradeResult } from '../services/NsiService.ts';
 import type { OsmEntity, OsmNode, OsmTags } from '../data/types.ts';
 import type { TagDiff } from '@rapid-sdk/util';
 import type { ValidatorFunction, ValidatorResult } from './types.ts';
@@ -124,7 +125,7 @@ export function validateOutdatedTags(context: Context): ValidatorFunction {
     // Attempt to match a canonical record in the name-suggestion-index.
     const nsi = context.services.nsi;
     let isWaitingForNsi = false;
-    let nsiResult: any;
+    let nsiResult: Nullable<NsiUpgradeResult>;
     if (nsi) {
       isWaitingForNsi = (nsi.status === 'loading');
       if (!isWaitingForNsi) {

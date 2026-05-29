@@ -8,12 +8,13 @@ import { actionMoveNode } from '../actions/move_node.ts';
 import { geoChooseEdge } from '../geo/geom.js';
 import { OsmNode, OsmWay } from '../data/index.ts';
 
+import type { Action } from '../actions/types.ts';
 import type { Context } from '../Context.ts';
 import type { EventData } from '../behaviors/AbstractBehavior.ts';
 import type { Graph } from '../lib/Graph.ts';
-import type { Vec2 } from '@rapid-sdk/math';
-import type { Action } from '../actions/types.ts';
+import type { Midpoint } from '../actions/add_midpoint.ts';
 import type { OsmTags } from '../data/types.ts';
+import type { Vec2 } from '@rapid-sdk/math';
 
 const DEBUG = false;
 
@@ -519,7 +520,7 @@ export class DrawAreaMode extends AbstractMode {
     const EPSILON = 1e-6;
     const context = this.context;
     const editor = context.systems.editor!;
-    const midpoint = { loc: loc, edge: edge };
+    const midpoint: Midpoint = { loc, edge };
 
     const graph = editor.staging.graph;
     let drawWay = this.drawWayID ? graph.hasEntity(this.drawWayID) as OsmWay | undefined : undefined;

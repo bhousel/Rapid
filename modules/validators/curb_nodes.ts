@@ -1,6 +1,5 @@
-import { geoLatToMeters, geoLonToMeters, geoMetersToLat, geoMetersToLon } from '@rapid-sdk/math';
-
 import { actionAddMidpoint, actionChangeTags, actionSplit} from '../actions/index.ts';
+import { geoLatToMeters, geoLonToMeters, geoMetersToLat, geoMetersToLon } from '@rapid-sdk/math';
 import { OsmNode } from '../data/OsmNode.ts';
 import { ValidationIssue } from '../lib/ValidationIssue.ts';
 import { ValidationFix } from '../lib/ValidationFix.ts';
@@ -9,6 +8,7 @@ import { uiIcon } from '../ui/icon.js';
 import type { Context } from '../Context.ts';
 import type { D3Selection } from 'd3-selection';
 import type { Graph } from '../lib/Graph.ts';
+import type { Midpoint } from '../actions/add_midpoint.ts';
 import type { OsmEntity, OsmTags, OsmWay } from '../data/types.ts';
 import type { ValidatorFunction, ValidatorResult } from './types.ts';
 
@@ -226,7 +226,7 @@ export function validateCurbNodes(context: Context): ValidatorFunction {
       visible: true
     });
     // Add the new node to the graph
-    editor.perform(actionAddMidpoint({ loc: newCurbNode.loc!, edge: [node.id, adjacentNode.id] }, newCurbNode));
+    editor.perform(actionAddMidpoint({ loc: newCurbNode.loc!, edge: [node.id, adjacentNode.id] } as Midpoint, newCurbNode));
 
     // Perform the split
     const splitAction = actionSplit([newCurbNode.id]);

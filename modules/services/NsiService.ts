@@ -1,6 +1,5 @@
-import { Matcher, buildIDPresets } from 'name-suggestion-index';
-
 import { AbstractSystem } from '../core/AbstractSystem.ts';
+import { Matcher, buildIDPresets } from 'name-suggestion-index';
 
 import type {
   DissolvedMap,
@@ -27,7 +26,7 @@ import type { Vec2 } from '@rapid-sdk/math';
  * NSI item with some additional runtime-added bookkeeping fields that NsiService attaches:
  *   `tkv` (the tree/key/value path) and `mainTag` (e.g. `brand:wikidata`).
  */
-interface NsiItem extends NsiOrigItem {
+export interface NsiItem extends NsiOrigItem {
   /** Tree/key/value path, e.g. `"brands/amenity/restaurant"` */
   tkv: NsiPath;
   /** The primary wikidata tag key, e.g. `"brand:wikidata"` */
@@ -35,7 +34,7 @@ interface NsiItem extends NsiOrigItem {
 }
 
 /** Result from `upgradeTags` when a match is found */
-interface UpgradeResult {
+export interface NsiUpgradeResult {
   /** The suggested tags the feature should have */
   newTags: OsmTags;
   /** The NSI item that was matched, or `null` if no item matched */
@@ -269,7 +268,7 @@ export class NsiService extends AbstractSystem {
    * @param loc - Location where this feature exists, as a [lon, lat]
    * @return The result, or `null` if no changes suggested
    */
-  upgradeTags(tags: OsmTags, loc: Vec2): UpgradeResult | null {
+  upgradeTags(tags: OsmTags, loc: Vec2): NsiUpgradeResult | null {
     const newTags: OsmTags = { ...tags };  // shallow copy
     const changed = this._applyWikidataReplacements(newTags);
 

@@ -14,6 +14,39 @@ import type { OsmEntity, OsmTags, OsmWay } from '../data/types.ts';
 import type { TagDiff } from '@rapid-sdk/util';
 import type { ValidatorFunction, ValidatorResult } from './types.ts';
 
+/**
+ * OSM tags object, but where the values or the object itself may be `null`.
+ * The code will treat a `null` value as a tag to be removed.
+ */
+type OsmNullableTags = Record<string, string | null> | null;
+
+/** A crossing choice, identified by the tags that are being set */
+interface CrossingChoice {
+  setTags: OsmNullableTags;
+}
+
+/** Crossing information, includes inferred type string and identifying tags */
+interface CrossingInfo {
+  /**
+   * Simplified type chosen by `inferCrossingType` after inspecting tags and dealing with `yes`/`no` values.
+   * Will be something meaningful like 'zebra'/'marked'/'unspecified' (but not something like `yes`/`no`)
+   */
+  type: string;
+  /**
+   * The tags that should be changed if the user picks this choice.
+   * Note that `null` values are allowed here, and will be treated as a tag to be removed.
+   */
+  tags: OsmNullableTags;
+}
+
+/** Crossing update details */
+interface CrossingUpdate {
+  /** Display name of the way being updated, usually a preset name like "Unmarked Crossing" */
+  name: string;
+  /** Details about the suggested tag diff to apply - may include additions, modifications, deletions */
+  tagDiff: TagDiff[];
+}
+
 
 /**
  * Factory that creates a validator for resolving ambiguities between
@@ -97,11 +130,10 @@ export function validateAmbiguousCrossingTags(context: Context): ValidatorFuncti
     const endWay = endGraph.hasEntity(wayID);
     if (!endWay) return [];   // shouldn't happen
 
-    // Choices being offered..
-    const choices = new Map<string, any>();  // Map<string, { setTags }>
-
+    // Choices being offered.
+    const choices = new Map<string, CrossingChoice>();
     // Details about the entities involved in this issue.
-    const updates = new Map<EntityID, any>();  // Map<EntityID, { preset name, tagDiff }>
+    const updates = new Map<EntityID, CrossingUpdate>();
 
     // The default choice is, basically:
     // - If the parent is a crossing, upgrade parent way tagging and make the child nodes match.
@@ -145,7 +177,7 @@ export function validateAmbiguousCrossingTags(context: Context): ValidatorFuncti
     if (updates.size > 1) {
       for (const update of updates.values()) {
         if (!update.tagDiff?.length) continue;
-        if (update.tagDiff.some((d: TagDiff) => d.type === '-')) {
+        if (update.tagDiff.some(d => d.type === '-')) {
           isTagUpgrade = false;
           break;
         }
@@ -179,14 +211,16 @@ export function validateAmbiguousCrossingTags(context: Context): ValidatorFuncti
      * @param t - The tags to analyze
      * @returns The crossing type and associated tags
      */
-    function inferCrossingType(t: OsmTags): { type: string; tags: Record<string, string | null> | null } {
+    function inferCrossingType(t: OsmTags): CrossingInfo {
       const markings = t['crossing:markings'] ?? '';
       const crossing = t.crossing ?? '';
 
       const isUnspecified = t.highway === 'crossing' || t.path === 'crossing' || t.footway === 'crossing' ||
         t.cycleway === 'crossing' || t.bridleway === 'crossing'  || t.pedestrian === 'crossing';
 
-      let type: string, tags: Record<string, string | null> | null;
+      let type: string;
+      let tags: OsmNullableTags;
+
       if (markings !== '' && markings !== 'yes' && markings !== 'no') {  // interesting values like 'lines', 'surface', etc
         type = markings;
         tags = { 'crossing:markings': markings };
@@ -217,9 +251,8 @@ export function validateAmbiguousCrossingTags(context: Context): ValidatorFuncti
     /**
      * Adds a choice to the `choices` Map if it isn't there already.
      * @param data - The crossing type and tags
-     * @returns The choice data
      */
-    function addChoice(data: { type: string; tags: Record<string, string | null> | null }): any {
+    function addChoice(data: CrossingInfo): void {
       const type = data.type;
       const tags = data.tags;
 
@@ -235,9 +268,8 @@ export function validateAmbiguousCrossingTags(context: Context): ValidatorFuncti
         // Merge tags into an existing choice, if it's a real type.
         // This is useful if we first added `crossing=zebra` and then
         // later want to include a better tag like 'crossing:markings=zebra'
-        choice.setTags = Object.assign(choice.setTags, tags);
+        choice.setTags = Object.assign(choice.setTags ?? {}, tags);
       }
-      return choice;
     }
 
 
@@ -276,7 +308,7 @@ export function validateAmbiguousCrossingTags(context: Context): ValidatorFuncti
      * @param setTags - Tags to set (or remove if value is `null`)
      * @returns A validation fix
      */
-    function makeConflictFix(title: string, wayID: EntityID, setTags: Record<string, string | null> | null): ValidationFix {
+    function makeConflictFix(title: string, wayID: EntityID, setTags: OsmNullableTags): ValidationFix {
       return new ValidationFix({
         title: title,
         onClick: () => {
@@ -285,7 +317,7 @@ export function validateAmbiguousCrossingTags(context: Context): ValidatorFuncti
           if (!way) return;
 
           if (setTags) {
-            const tags = { ...way.tags };  // shallow copy
+            const tags: OsmTags = { ...way.tags };  // shallow copy
             for (const [k, v] of Object.entries(setTags)) {
               if (v) {
                 tags[k] = v;
