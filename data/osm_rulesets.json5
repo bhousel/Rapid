@@ -2,29 +2,17 @@
 // Tag classification rulesets for OSM data.
 // These define which tag combinations belong to various categories
 // (e.g. "paved" surfaces, "routable" highways, "one-way" roads).
-//
-// Each ruleset uses include/exclude semantics:
-// A feature matches the ruleset if ANY `include` rule matches AND NO `exclude` rule matches.
-//
-// Rule format (PropMatcherProps):
-//   key     - the tag key to match (exact string, or regex pattern if keyOp is '~')
-//   keyOp   - key matching mode: '=' (default, exact match) or '~' (regex on key name)
-//   op      - comparison operator ('=', '!=', 'exists', '!exists', '~', '!~', 'in', '!in', '>', '>=', '<', '<=')
-//             defaults to '=' if value is a string, 'exists' if no value
-//   value   - the tag value to match (string, number, or string[] for 'in'/'!in')
 {
   assetID: "osm_rulesets",
   scopes: [{
     scope: "osm",
 
+    // "variables" hold reusable data that can be referenced elsewhere.
+    // See `Variable.ts` for details
     variables: {
-      // Named value lists for reuse by rulesets and other consumers.
-      // These can be referenced from PropMatcher rules via var() syntax,
-      // and accessed directly via scope.variables.get(id).
 
       // OSM lifecycle prefixes that can appear before a tag key (e.g. 'disused:railway').
-      // These indicate that the feature is no longer in active use but retains a trace
-      // of its former purpose.
+      // These indicate that the feature is not in active use.
       lifecycle_prefixes: [
         "abandoned", "construction", "demolished", "destroyed", "dismantled",
         "disused", "intermittent", "obliterated", "planned", "proposed",
@@ -32,14 +20,14 @@
       ],
 
       // ### HIGHWAY CLASSIFICATION
-      // Highway values for major roads (motor vehicles, classified roads)
+      // Highway values for major vehicular roads
       major_highway_values: [
         "motorway", "trunk", "primary", "secondary", "tertiary",
         "unclassified", "residential", "living_street", "road",
         "motorway_link", "trunk_link", "primary_link", "secondary_link", "tertiary_link"
       ],
 
-      // Highway values for minor roads (motor vehicles, service/access roads)
+      // Highway values for minor vehicular roads
       minor_highway_values: [
         "service", "track", "busway", "bus_guideway"
       ],
@@ -88,6 +76,10 @@
       ]
     },
 
+
+    // "rulesets" are groups of tag matching conditions with include/exclude semantics.
+    // A feature matches the ruleset if ANY `include` rule matches AND NO `exclude` rule matches.
+    // See `Ruleset.ts` for details
     rulesets: {
 
       // ### SURFACES
@@ -113,6 +105,8 @@
 
       // ### ONEWAYS
       // Tags that imply a way is one-way in the forward direction
+      // Note that excludes are used here for override, needed when tags combine, like:
+      // `junction=roundabout`+`oneway=no`
       oneway_forward: {
         include: [
           { key: "aerialway", op: "in", value: [
@@ -120,6 +114,7 @@
             "mixed_lift", "platter", "rope_tow", "t-bar", "zip_line"
           ]},
           { key: "conveying", value: "forward" },
+          { key: "flow_direction", value: "forward" },
           { key: "golf", value: "hole" },
           { key: "highway", value: "motorway" },
           { key: "junction", op: "in", value: ["circular", "roundabout"] },
@@ -136,7 +131,8 @@
           ]}
         ],
         exclude: [
-          { key: "oneway", op: "in", value: ["no", "0"] }
+          { key: "oneway", op: "in", value: ["no", "0", "unknown"] },
+          { key: "flow_direction", op: "in", value: ["no", "0", "unknown"] }
         ]
       },
 
@@ -144,10 +140,12 @@
       oneway_backward: {
         include: [
           { key: "conveying", value: "backward" },
+          { key: "flow_direction", value: "backward" },
           { key: "oneway", value: "-1" }
         ],
         exclude: [
-          { key: "oneway", op: "in", value: ["no", "0"] }
+          { key: "oneway", op: "in", value: ["no", "0", "unknown"] },
+          { key: "flow_direction", op: "in", value: ["no", "0", "unknown"] }
         ]
       },
 
@@ -155,10 +153,12 @@
       oneway_bidirectional: {
         include: [
           { key: "conveying", value: "reversible" },
-          { key: "oneway", op: "in", value: ["alternating", "reversible"] }
+          { key: "oneway", op: "in", value: ["alternating", "reversible"] },
+          { key: "flow_direction", value: "both" }
         ],
         exclude: [
-          { key: "oneway", op: "in", value: ["no", "0"] }
+          { key: "oneway", op: "in", value: ["no", "0", "unknown"] },
+          { key: "flow_direction", op: "in", value: ["no", "0", "unknown"] }
         ]
       },
 
@@ -196,22 +196,21 @@
         ]
       },
 
-
       // ### CONNECTIVITY
-      // Highway tags that we want to test for connectivity.
+      // Highway tags that we want to test for connectivity
       // This should only include the "standard" tags (does not include 'raceway', 'abandoned')
       connected_highway: {
         include: [
           { key: "highway", op: "in", value: "var(major_highway_values, minor_highway_values, path_highway_values)" }
         ]
       },
-      // Aeroway tags that we want to test for connectivity.
+      // Aeroway tags that we want to test for connectivity
       connected_aeroway: {
         include: [
           { key: "aeroway", op: "in", value: ["runway", "taxiway"] }
         ]
       },
-      // Railway tags that we want to test for connectivity.
+      // Railway tags that we want to test for connectivity
       connected_railway: {
         include: [
           { key: "railway", op: "in", value: [
@@ -220,7 +219,7 @@
           ]}
         ]
       },
-      // Waterway tags that we want to test for connectivity.
+      // Waterway tags that we want to test for connectivity
       connected_waterway: {
         include: [
           { key: "waterway", op: "in", value: [

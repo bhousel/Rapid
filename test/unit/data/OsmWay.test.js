@@ -460,85 +460,105 @@ describe('OsmWay', () => {
       assert.isFalse(way.isOneWay());
     });
 
-    it('returns false when the way has tag oneway=no', () => {
-      let way = new Rapid.OsmWay(context, { tags: { oneway: 'no' } });
-      assert.isFalse(way.isOneWay(), 'oneway no');
-      way = new Rapid.OsmWay(context, { tags: { oneway: '0' } });
-      assert.isFalse(way.isOneWay(), 'oneway 0');
-    });
-
-    it('returns true when the way has tag oneway=yes', () => {
+    it('returns true when the way has a tag in the oneway_forward list', () => {
+      // oneway
       let way = new Rapid.OsmWay(context, { tags: { oneway: 'yes' } });
-      assert.isTrue(way.isOneWay(), 'oneway yes');
+      assert.isTrue(way.isOneWay(), 'oneway=yes');
       way = new Rapid.OsmWay(context, { tags: { oneway: '1' } });
-      assert.isTrue(way.isOneWay(), 'oneway 1');
-      way = new Rapid.OsmWay(context, { tags: { oneway: '-1' } });
-      assert.isTrue(way.isOneWay(), 'oneway -1');
-    });
+      assert.isTrue(way.isOneWay(), 'oneway=1');
 
-    it('returns true when the way has tag oneway=reversible', () => {
-      const way = new Rapid.OsmWay(context, { tags: { oneway: 'reversible' } });
-      assert.isTrue(way.isOneWay(), 'oneway reversible');
-    });
-
-    it('returns true when the way has tag oneway=alternating', () => {
-      const way = new Rapid.OsmWay(context, { tags: { oneway: 'alternating' } });
-      assert.isTrue(way.isOneWay(), 'oneway alternating');
-    });
-
-    it('returns true when the way has implied oneway tag (waterway=river, waterway=stream, etc)', () => {
-      let way = new Rapid.OsmWay(context, { tags: { waterway: 'river' } });
-      assert.isTrue(way.isOneWay(), 'river');
+      // other tags
+      way = new Rapid.OsmWay(context, { tags: { waterway: 'river' } });
+      assert.isTrue(way.isOneWay(), 'waterway=river');
       way = new Rapid.OsmWay(context, { tags: { waterway: 'stream' } });
-      assert.isTrue(way.isOneWay(), 'stream');
+      assert.isTrue(way.isOneWay(), 'waterway=stream');
       way = new Rapid.OsmWay(context, { tags: { highway: 'motorway' } });
-      assert.isTrue(way.isOneWay(), 'motorway');
+      assert.isTrue(way.isOneWay(), 'highway=motorway');
       way = new Rapid.OsmWay(context, { tags: { junction: 'roundabout' } });
-      assert.isTrue(way.isOneWay(), 'roundabout');
+      assert.isTrue(way.isOneWay(), 'junction=roundabout');
       way = new Rapid.OsmWay(context, { tags: { junction: 'circular' } });
-      assert.isTrue(way.isOneWay(), 'circular');
+      assert.isTrue(way.isOneWay(), 'junction=circular');
+      way = new Rapid.OsmWay(context, { tags: { conveying: 'forward' } });
+      assert.isTrue(way.isOneWay(), 'conveying=forward');
+      way = new Rapid.OsmWay(context, { tags: { flow_direction: 'forward' } });
+      assert.isTrue(way.isOneWay(), 'flow_direction=forward');
+      way = new Rapid.OsmWay(context, { tags: { roller_coaster: 'track' } });
+      assert.isTrue(way.isOneWay(), 'roller_coaster=track');
+    });
+
+    it('returns true when the way has a tag in the oneway_backward list ', () => {
+      let way = new Rapid.OsmWay(context, { tags: { oneway: '-1' } });
+      assert.isTrue(way.isOneWay(), 'oneway=-1');
+      way = new Rapid.OsmWay(context, { tags: { conveying: 'backward' } });
+      assert.isTrue(way.isOneWay(), 'conveying=backward');
+      way = new Rapid.OsmWay(context, { tags: { flow_direction: 'backward' } });
+      assert.isTrue(way.isOneWay(), 'flow_direction=backward');
+    });
+
+    it('returns true when the way has a tag in the oneway_bidirectional list', () => {
+      let way = new Rapid.OsmWay(context, { tags: { oneway: 'alternating' } });
+      assert.isTrue(way.isOneWay(), 'oneway=alternating');
+      way = new Rapid.OsmWay(context, { tags: { oneway: 'reversible' } });
+      assert.isTrue(way.isOneWay(), 'oneway=reversible');
+      way = new Rapid.OsmWay(context, { tags: { conveying: 'reversible' } });
+      assert.isTrue(way.isOneWay(), 'conveying=reversible');
+      way = new Rapid.OsmWay(context, { tags: { flow_direction: 'both' } });
+      assert.isTrue(way.isOneWay(), 'flow_direction=both');
+    });
+
+    it('returns false when the way has a oneway excluded tag', () => {
+      let way = new Rapid.OsmWay(context, { tags: { oneway: 'no' } });
+      assert.isFalse(way.isOneWay(), 'oneway=no');
+      way = new Rapid.OsmWay(context, { tags: { oneway: '0' } });
+      assert.isFalse(way.isOneWay(), 'oneway=0');
+      way = new Rapid.OsmWay(context, { tags: { flow_direction: 'no' } });
+      assert.isFalse(way.isOneWay(), 'flow_direction=no');
+      way = new Rapid.OsmWay(context, { tags: { flow_direction: 'unknown' } });
+      assert.isFalse(way.isOneWay(), 'flow_direction=unknown');
     });
 
     it('returns false when the way does not have implied oneway tag', () => {
       let way = new Rapid.OsmWay(context, { tags: { highway: 'motorway_link' } });
-      assert.isFalse(way.isOneWay(), 'motorway_link');
+      assert.isFalse(way.isOneWay(), 'highway=motorway_link');
       way = new Rapid.OsmWay(context, { tags: { highway: 'trunk' } });
-      assert.isFalse(way.isOneWay(), 'trunk');
+      assert.isFalse(way.isOneWay(), 'highway=trunk');
       way = new Rapid.OsmWay(context, { tags: { highway: 'trunk_link' } });
-      assert.isFalse(way.isOneWay(), 'trunk_link');
+      assert.isFalse(way.isOneWay(), 'highway=trunk_link');
       way = new Rapid.OsmWay(context, { tags: { highway: 'primary' } });
-      assert.isFalse(way.isOneWay(), 'primary');
+      assert.isFalse(way.isOneWay(), 'highway=primary');
       way = new Rapid.OsmWay(context, { tags: { highway: 'primary_link' } });
-      assert.isFalse(way.isOneWay(), 'primary_link');
+      assert.isFalse(way.isOneWay(), 'highway=primary_link');
       way = new Rapid.OsmWay(context, { tags: { highway: 'secondary' } });
-      assert.isFalse(way.isOneWay(), 'secondary');
+      assert.isFalse(way.isOneWay(), 'highway=secondary');
       way = new Rapid.OsmWay(context, { tags: { highway: 'secondary_link' } });
-      assert.isFalse(way.isOneWay(), 'secondary_link');
+      assert.isFalse(way.isOneWay(), 'highway=secondary_link');
       way = new Rapid.OsmWay(context, { tags: { highway: 'tertiary' } });
-      assert.isFalse(way.isOneWay(), 'tertiary');
+      assert.isFalse(way.isOneWay(), 'highway=tertiary');
       way = new Rapid.OsmWay(context, { tags: { highway: 'tertiary_link' } });
-      assert.isFalse(way.isOneWay(), 'tertiary_link');
+      assert.isFalse(way.isOneWay(), 'highway=tertiary_link');
       way = new Rapid.OsmWay(context, { tags: { highway: 'unclassified' } });
-      assert.isFalse(way.isOneWay(), 'unclassified');
+      assert.isFalse(way.isOneWay(), 'highway=unclassified');
       way = new Rapid.OsmWay(context, { tags: { highway: 'residential' } });
-      assert.isFalse(way.isOneWay(), 'residential');
+      assert.isFalse(way.isOneWay(), 'highway=residential');
       way = new Rapid.OsmWay(context, { tags: { highway: 'living_street' } });
-      assert.isFalse(way.isOneWay(), 'living_street');
+      assert.isFalse(way.isOneWay(), 'highway=living_street');
       way = new Rapid.OsmWay(context, { tags: { highway: 'service' } });
-      assert.isFalse(way.isOneWay(), 'service');
+      assert.isFalse(way.isOneWay(), 'highway=service');
       way = new Rapid.OsmWay(context, { tags: { highway: 'track' } });
-      assert.isFalse(way.isOneWay(), 'track');
+      assert.isFalse(way.isOneWay(), 'highway=track');
       way = new Rapid.OsmWay(context, { tags: { highway: 'path' } });
-      assert.isFalse(way.isOneWay(), 'path');
+      assert.isFalse(way.isOneWay(), 'highway=path');
     });
 
-    it('returns false when oneway=no overrides implied oneway tag', () => {
+    it('returns false when an excluded tag overrides an included tag', () => {
       let way = new Rapid.OsmWay(context, { tags: { junction: 'roundabout', oneway: 'no' } });
-      assert.isFalse(way.isOneWay(), 'roundabout');
+      assert.isFalse(way.isOneWay(), 'junction=roundabout + oneway=no');
       way = new Rapid.OsmWay(context, { tags: { junction: 'circular', oneway: 'no' } });
-      assert.isFalse(way.isOneWay(), 'circular');
+      assert.isFalse(way.isOneWay(), 'junction=circular + oneway=no');
       way = new Rapid.OsmWay(context, { tags: { highway: 'motorway', oneway: 'no' } });
-      assert.isFalse(way.isOneWay(), 'motorway');
+      assert.isFalse(way.isOneWay(), 'highway=motorway + oneway=no');
+      way = new Rapid.OsmWay(context, { tags: { waterway: 'pressurized', flow_direction: 'unknown' } });
+      assert.isFalse(way.isOneWay(), 'waterway=pressurized + flow_direction=unknown');
     });
   });
 
