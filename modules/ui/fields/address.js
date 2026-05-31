@@ -1,10 +1,8 @@
 import { dispatch as d3_dispatch } from 'd3-dispatch';
 import { select as d3_select } from 'd3-selection';
-import { Extent, geoSphericalDistance } from '@rapid-sdk/math';
+import { Extent, projWgs84ToWorld, geoSphericalDistance, vecProject } from '@rapid-sdk/math';
 import { utilArrayUniqBy } from '@rapid-sdk/util';
 import { iso1A2Code } from '@rapideditor/country-coder';
-
-import { geoChooseEdge } from '../../geo/geom.js';
 import { uiCombobox } from '../combobox.js';
 import { utilGetSetValue, utilNoAuto, utilRebind } from '../../util/index.ts';
 
@@ -40,19 +38,24 @@ export function uiFieldAddress(context, uifield) {
 
   function getNearbyStreets() {
     const center = uifield.entityExtent.center();
+    const point = projWgs84ToWorld(center);
     const box = new Extent(center).padByMeters(200);
 
     const streets = editor.intersects(box)
       .filter(isAddressableStreet)
-      .map(d => {
-        const loc = context.viewport.project(center);
-        const choice = geoChooseEdge(editor.staging.graph.childNodes(d), loc, context.viewport);
+      .map(way => {
+        // A way will have LineString or Polygon geometry. We can use 'outer' to get these points.
+        const line = way.geoms.parts[0]?.world?.outer;
+        if (!line) return null;
+
+        const choice = vecProject(point, line);
         return {
-          title: d.tags.name,
-          value: d.tags.name,
+          title: way.tags.name,
+          value: way.tags.name,
           dist: choice.distance
         };
       })
+      .filter(Boolean)
       .sort((a, b) => a.dist - b.dist);
 
     return utilArrayUniqBy(streets, 'value');

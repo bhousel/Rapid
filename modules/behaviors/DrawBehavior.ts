@@ -293,7 +293,7 @@ export class DrawBehavior extends AbstractBehavior {
 //          const viewport = context.viewport;
 //          const choice = geoChooseEdge(graph.childNodes(target), eventData.coord.map, viewport, activeID);
 //
-//          const SNAP_DIST = 6;  // hack to avoid snap to fill, see #719
+//          const SNAP_DIST = 6;  // hack to avoid snap to fill, see Rapid#719
 //          if (choice && choice.distance < SNAP_DIST) {
 //            // We should not target parts of the way that are adjacent ot the active node
 //            // but we can target segments of the way that are >2 segments away.
@@ -354,7 +354,7 @@ export class DrawBehavior extends AbstractBehavior {
 //          const viewport = context.viewport;
 //          const choice = geoChooseEdge(graph.childNodes(target), eventData.coord.map, viewport, activeID);
 //
-//          const SNAP_DIST = 6;  // hack to avoid snap to fill, see #719
+//          const SNAP_DIST = 6;  // hack to avoid snap to fill, see Rapid#719
 //          if (choice && choice.distance < SNAP_DIST) {
 //            // We should not target parts of the way that are adjacent ot the active node
 //            // but we can target segments of the way that are >2 segments away.

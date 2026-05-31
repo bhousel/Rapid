@@ -2,7 +2,7 @@ import { AbstractMode } from './AbstractMode.ts';
 import { actionAddEntity } from '../actions/add_entity.ts';
 import { actionChangeTags } from '../actions/change_tags.ts';
 import { actionAddMidpoint } from '../actions/add_midpoint.ts';
-import { geoChooseEdge } from '../geo/geom.js';
+import { projWorldToWgs84, vecProject, WORLD_ZOOM } from '@rapid-sdk/math';
 import { OsmNode } from '../data/OsmNode.ts';
 
 import type { Context } from '../Context.ts';
@@ -93,8 +93,8 @@ export class AddPointMode extends AbstractMode {
     const graph = editor!.staging.graph;
     const locations = context.systems.locations;
     const viewport = context.viewport;
-    const point = eventData.coord.map;
-    const loc = viewport.unproject(point);
+    const point = eventData.coord.world;
+    const loc = projWorldToWgs84(point);
     if (locations?.isBlockedAt(loc)) return;   // editing is blocked here
 
     // Allow snapping only for OSM Entities in the actual graph (i.e. not Rapid features)
@@ -113,11 +113,17 @@ export class AddPointMode extends AbstractMode {
     // Snap to a way
     if (target && target.type === 'way') {
       const way = target as OsmWay;
-      const choice = geoChooseEdge(graph.childNodes(way), point, viewport);
+      // A way will have LineString or Polygon geometry. We can use 'outer' to get these points.
+      const line = way.geoms.parts[0]!.world!.outer as Vec2[];
+
+      const choice = vecProject(point, line);
+      const localScale = 2 ** (WORLD_ZOOM - viewport.transform.zoom);
       const SNAP_DIST = 6;  // hack to avoid snap to fill, see Rapid#719
-      if (choice && choice.distance < SNAP_DIST) {
+
+      if (choice && choice.distance < SNAP_DIST * localScale) {
+        const loc = projWorldToWgs84(choice.point);
         const edge: [EntityID, EntityID] = [way.nodes[choice.index - 1], way.nodes[choice.index]];
-        this._clickWay(choice.loc, edge);
+        this._clickWay(loc, edge);
         return;
       }
     }

@@ -1,11 +1,9 @@
-import { vecEqual, vecLength, vecRotate, vecSubtract } from '@rapid-sdk/math';
-
 import { AbstractMode } from './AbstractMode.ts';
 import { actionAddEntity } from '../actions/add_entity.ts';
 import { actionAddMidpoint } from '../actions/add_midpoint.ts';
 import { actionAddVertex } from '../actions/add_vertex.ts';
 import { actionMoveNode } from '../actions/move_node.ts';
-import { geoChooseEdge } from '../geo/geom.js';
+import { projWorldToWgs84, vecEqual, vecLength, vecProject, vecRotate, vecSubtract, WORLD_ZOOM } from '@rapid-sdk/math';
 import { OsmNode, OsmWay } from '../data/index.ts';
 
 import type { Action } from '../actions/types.ts';
@@ -65,8 +63,8 @@ export class DrawLineMode extends AbstractMode {
   private _insertIndex: number | undefined;
   /** The history index when we start drawing */
   private _editIndex: number | null;
-  /** Watch coordinates to determine if we have moved enough */
-  private _lastPoint: Vec2 | null;
+  /** Watch screen coordinates to determine if we have moved enough */
+  private _lastScreen: Vec2 | null;
   /**
    * To deal with undo/redo, we take snapshots on every commit, keyed to the stable graph.
    * If we ever find ourself in an edit where we can't retrieve this information, leave `DrawLineMode`.
@@ -91,7 +89,7 @@ export class DrawLineMode extends AbstractMode {
 
     this._insertIndex = undefined;
     this._editIndex = null;
-    this._lastPoint = null;
+    this._lastScreen = null;
     this._snapshots = new Map();
 
     // Make sure the event handlers have `this` bound correctly
@@ -145,7 +143,7 @@ export class DrawLineMode extends AbstractMode {
     this.lastNodeID = null;
     this.firstNodeID = null;
     this._insertIndex = undefined;
-    this._lastPoint = null;
+    this._lastScreen = null;
     this._selectedData.clear();
 
     eventManager.setCursor('crosshair');
@@ -249,7 +247,7 @@ export class DrawLineMode extends AbstractMode {
     this.firstNodeID = null;
     this._insertIndex = undefined;
     this._editIndex = null;
-    this._lastPoint = null;
+    this._lastScreen = null;
 
     this._selectedData.clear();
 
@@ -333,12 +331,13 @@ export class DrawLineMode extends AbstractMode {
     const editor = context.systems.editor!;
     const viewport = context.viewport;
 
-    const point = eventData.coord.map;
-    let loc = viewport.unproject(point);
+    const point = eventData.coord.world;
+    const screen = eventData.coord.screen;
+    let loc = projWorldToWgs84(point);
 
-    // How much has the pointer moved?
-    const dist = this._lastPoint ? vecLength(point, this._lastPoint) : 0;
-    this._lastPoint = point;
+    // How much has the pointer moved in screen coordinates?
+    const dist = this._lastScreen ? vecLength(screen, this._lastScreen) : 0;
+    this._lastScreen = screen;
 
     let graph = editor.staging.graph;
     let drawNode = this.drawNodeID ? graph.hasEntity(this.drawNodeID) : undefined;
@@ -373,10 +372,24 @@ export class DrawLineMode extends AbstractMode {
     // Snap to a way
     } else if (target?.type === 'way') {
       const way = target as OsmWay;
-      const edgeChoice = geoChooseEdge(graph.childNodes(way), point, viewport, drawNode.id);
+      // A way will have LineString or Polygon geometry. We can use 'outer' to get these points.
+      const line = way.geoms.parts[0]!.world!.outer as Vec2[];
+
+      // Exclude snapping to segments adjacent to the drawNode itself.
+      const skipSegments = new Set<number>();
+      for (let i = 0; i < way.nodes.length; i++) {
+        if (way.nodes[i] === this.drawNodeID) {
+          skipSegments.add(i);
+          skipSegments.add(i + i);
+        }
+      }
+
+      const choice = vecProject(point, line);
+      const localScale = 2 ** (WORLD_ZOOM - viewport.transform.zoom);
       const SNAP_DIST = 6;  // hack to avoid snap to fill, see Rapid#719
-      if (edgeChoice && edgeChoice.distance < SNAP_DIST) {
-        loc = edgeChoice.loc;
+
+      if (choice && !skipSegments.has(choice.index) && choice.distance < SNAP_DIST * localScale) {
+        loc = projWorldToWgs84(choice.point);
       }
     }
 
@@ -432,8 +445,8 @@ export class DrawLineMode extends AbstractMode {
     const locations = context.systems.locations;
     const viewport = context.viewport;
 
-    const point = eventData.coord.map;
-    let loc = viewport.unproject(point);
+    const point = eventData.coord.world;
+    let loc = projWorldToWgs84(point);
 
     if (locations?.isBlockedAt(loc)) return;   // editing is blocked here
 
@@ -441,7 +454,7 @@ export class DrawLineMode extends AbstractMode {
     eventManager.setCursor('crosshair');
 
     let graph = editor.staging.graph;
-    const drawNode = this.drawNodeID ? graph.hasEntity(this.drawNodeID) as OsmNode | undefined : undefined;
+    const drawNode = this.drawNodeID && graph.hasEntity(this.drawNodeID) as OsmNode | undefined;
 
     // Start transaction now - if we are making a draw node, we want it included.
     editor.beginTransaction();
@@ -470,11 +483,25 @@ export class DrawLineMode extends AbstractMode {
     // Snap to a way
     } else if (target?.type === 'way') {
       const way = target as OsmWay;
-      const edgeChoice = geoChooseEdge(graph.childNodes(way), point, viewport, this.drawNodeID ?? undefined);
+      // A way will have LineString or Polygon geometry. We can use 'outer' to get these points.
+      const line = way.geoms.parts[0]!.world!.outer as Vec2[];
+
+      // Exclude snapping to segments adjacent to the drawNode itself.
+      const skipSegments = new Set<number>();
+      for (let i = 0; i < way.nodes.length; i++) {
+        if (way.nodes[i] === this.drawNodeID) {
+          skipSegments.add(i);
+          skipSegments.add(i + i);
+        }
+      }
+
+      const choice = vecProject(point, line);
+      const localScale = 2 ** (WORLD_ZOOM - viewport.transform.zoom);
       const SNAP_DIST = 6;  // hack to avoid snap to fill, see Rapid#719
-      if (edgeChoice && edgeChoice.distance < SNAP_DIST) {
-        loc = edgeChoice.loc;
-        edge = [ way.nodes[edgeChoice.index - 1], way.nodes[edgeChoice.index] ];
+
+      if (choice && !skipSegments.has(choice.index) && choice.distance < SNAP_DIST * localScale) {
+        loc = projWorldToWgs84(choice.point);
+        edge = [way.nodes[choice.index - 1], way.nodes[choice.index]];
       }
     }
 

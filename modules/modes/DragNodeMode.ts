@@ -2,9 +2,8 @@ import { AbstractMode } from './AbstractMode.ts';
 import { actionAddMidpoint } from '../actions/add_midpoint.ts';
 import { actionConnect } from '../actions/connect.ts';
 import { actionMoveNode } from '../actions/move_node.ts';
-import { geoChooseEdge } from '../geo/geom.ts';
 import { OsmNode } from '../data/OsmNode.ts';
-import { vecAdd, vecRotate, vecSubtract } from '@rapid-sdk/math';
+import { projWorldToWgs84, vecAdd, vecProject, vecRotate, vecSubtract, WORLD_ZOOM } from '@rapid-sdk/math';
 import { utilArrayIntersection } from '@rapid-sdk/util';
 
 import type { Context } from '../Context.ts';
@@ -36,10 +35,8 @@ export class DragNodeMode extends AbstractMode {
   private _reselectIDs: EntityID[];
   /** Used to set the correct edit annotation */
   private _wasMidpoint: boolean;
-  /** Starting location of the node */
-  private _startLoc: Vec2 | null;
-  /** Location where user clicked to grab the node */
-  private _clickLoc: Vec2 | null;
+  /** Difference between where the pin is, and where on the pin the user clicked */
+  private _dragOffset: Vec2;
 
   /**
    * @constructor
@@ -53,8 +50,7 @@ export class DragNodeMode extends AbstractMode {
 
     this._reselectIDs = [];
     this._wasMidpoint = false;
-    this._startLoc = null;
-    this._clickLoc = null;
+    this._dragOffset = [0, 0];
 
     // Make sure the event handlers have `this` bound correctly
     this._move = this._move.bind(this);
@@ -82,31 +78,31 @@ export class DragNodeMode extends AbstractMode {
     const nodeID = options.nodeID;
 
     let graph = editor.staging.graph;
-    let entity: OsmNode | undefined;
+    let node: OsmNode | undefined;
 
     if (midpoint) {
       if (!graph.hasEntity(midpoint.edge[0])) return false;
       if (!graph.hasEntity(midpoint.edge[1])) return false;
-      entity = new OsmNode(context);
-      editor.perform(actionAddMidpoint(midpoint, entity));
-      graph = editor.staging.graph;                    // refresh with post-action graph
-      entity = graph.hasEntity(entity.id) as OsmNode;  // refresh with post-action entity
-      if (!entity) {  // somehow the midpoint did not convert to a node
+      node = new OsmNode(context);
+      editor.perform(actionAddMidpoint(midpoint, node));
+      graph = editor.staging.graph;                // refresh with post-action graph
+      node = graph.hasEntity(node.id) as OsmNode;  // refresh with post-action entity
+      if (!node) {  // somehow the midpoint did not convert to a node
         editor.revert();
         return false;
       }
       this._wasMidpoint = true;
 
     } else if (nodeID) {
-      entity = graph.hasEntity(nodeID) as OsmNode | undefined;
+      node = graph.hasEntity(nodeID) as OsmNode | undefined;
       this._wasMidpoint = false;
     }
 
-    if (!entity) return false;
+    if (!node) return false;
 
     if (!this._wasMidpoint) {
       // Bail out if the node is connected to something hidden.
-      const hasHidden = filters.hasHiddenConnections(entity, graph);
+      const hasHidden = filters.hasHiddenConnections(node, graph);
       if (hasHidden) {
         ui.Flash
           .duration(4000)
@@ -117,21 +113,19 @@ export class DragNodeMode extends AbstractMode {
     }
 
     this._active = true;
+    this.dragNode = node;
+    this._selectedData.set(node.id, node);
 
-    this.dragNode = entity;
-    this._startLoc = entity.loc!;
-    this._selectedData.set(entity.id, entity);
+    // Calculate dragOffset, to correct for where "on the pin" the user grabbed the target.
+    const startCoord = node.geoms.parts[0]!.world!.coords as Vec2;  // A node should have a single world coord
+    const clickCoord = context.behaviors.drag!.lastDown!.coord.world;
+    this._dragOffset = vecSubtract(startCoord, clickCoord);
 
     const layer = scene!.layers.get('osm')!;
     layer.setClass('drawing', this.dragNode.id);
     for (const parent of graph.parentWays(this.dragNode)) {
       layer.setClass('drawing', parent.id);
     }
-
-    // `_clickLoc` is used later to calculate a drag offset,
-    // to correct for where "on the pin" the user grabbed the target.
-    const point = context.behaviors.drag!.lastDown!.coord.map;
-    this._clickLoc = context.viewport.unproject(point);
 
     context.enableBehaviors(['hover', 'drag', 'mapNudge']);
     context.behaviors.mapNudge!.allow();
@@ -158,8 +152,7 @@ export class DragNodeMode extends AbstractMode {
     this.dragNode = null;
     this._reselectIDs = [];
     this._wasMidpoint = false;
-    this._startLoc = null;
-    this._clickLoc = null;
+    this._dragOffset = [0, 0];
 
     this._selectedData.clear();
 
@@ -212,7 +205,7 @@ export class DragNodeMode extends AbstractMode {
     const graph = editor.staging.graph;
     const locations = context.systems.locations;
     const viewport = context.viewport;
-    const point = eventData.coord!.map;
+    const point = eventData.coord.world;
 
     // Allow snapping only for OSM Entities in the actual graph (i.e. not Rapid features)
     const dataID = eventData?.target?.dataID;
@@ -224,12 +217,27 @@ export class DragNodeMode extends AbstractMode {
       const node = target as OsmNode;
       loc = node.loc!;
 
+    // Snap to a way
     } else if (target?.type === 'way') {
       const way = target as OsmWay;
-      const choice = geoChooseEdge(graph.childNodes(way), point, viewport, this.dragNode.id);
+      // A way will have LineString or Polygon geometry. We can use 'outer' to get these points.
+      const line = way.geoms.parts[0]!.world!.outer as Vec2[];
+
+      // If the dragNode belongs to the way, exclude snapping to adjacent segments.
+      const skipSegments = new Set<number>();
+      for (let i = 0; i < way.nodes.length; i++) {
+        if (way.nodes[i] === this.dragNode.id) {
+          skipSegments.add(i);
+          skipSegments.add(i + i);
+        }
+      }
+
+      const choice = vecProject(point, line);
+      const localScale = 2 ** (WORLD_ZOOM - viewport.transform.zoom);
       const SNAP_DIST = 6;  // hack to avoid snap to fill, see Rapid#719
-      if (choice && choice.distance < SNAP_DIST) {
-        loc = choice.loc;
+
+      if (choice && !skipSegments.has(choice.index) && choice.distance < SNAP_DIST * localScale) {
+        loc = projWorldToWgs84(choice.point);
       }
     }
 
@@ -237,13 +245,7 @@ export class DragNodeMode extends AbstractMode {
     if (!loc) {
       // The "drag offset" is the difference between where the user grabbed
       // the marker/pin and where the location of the node actually is.
-      // We calculate the drag offset each time because it's possible
-      // the user may have changed zooms while dragging..
-      const clickCoord = viewport.project(this._clickLoc!);
-      const startCoord = viewport.project(this._startLoc!);
-      const dragOffset = vecSubtract(startCoord, clickCoord);
-      const adjustedCoord = vecAdd(point, dragOffset);
-      loc = viewport.unproject(adjustedCoord);
+      loc = projWorldToWgs84(vecAdd(point, this._dragOffset));
     }
 
     if (locations?.isBlockedAt(loc)) {  // editing is blocked here
@@ -299,7 +301,7 @@ export class DragNodeMode extends AbstractMode {
     const editor = context.systems.editor!;
     const l10n = context.systems.l10n!;
     const viewport = context.viewport;
-    const point = eventData.coord!.map;
+    const point = eventData.coord!.world;
     const graph = editor.staging.graph;
 
     // Allow snapping only for OSM Entities in the actual graph (i.e. not Rapid features)
@@ -313,17 +315,28 @@ export class DragNodeMode extends AbstractMode {
       annotation = this._connectAnnotation(target);
 
     // Snap to a Way
-//    } else if (target?.type === 'way' && choice) {
-//      const edge = [ target.nodes[choice.index - 1], target.nodes[choice.index] ];
-//      editor.perform(actionAddMidpoint({ loc: choice.loc, edge: edge }, this.dragNode));
-//      annotation = this._connectAnnotation(target);
     } else if (target?.type === 'way') {
       const way = target as OsmWay;
-      const choice = geoChooseEdge(graph.childNodes(way), point, viewport, this.dragNode.id);
+      // A way will have LineString or Polygon geometry. We can use 'outer' to get these points.
+      const line = way.geoms.parts[0]!.world!.outer as Vec2[];
+
+      // If the dragNode belongs to the way, exclude snapping to adjacent segments.
+      const skipSegments = new Set<number>();
+      for (let i = 0; i < way.nodes.length; i++) {
+        if (way.nodes[i] === this.dragNode.id) {
+          skipSegments.add(i);
+          skipSegments.add(i + i);
+        }
+      }
+
+      const choice = vecProject(point, line);
+      const localScale = 2 ** (WORLD_ZOOM - viewport.transform.zoom);
       const SNAP_DIST = 6;  // hack to avoid snap to fill, see Rapid#719
-      if (choice && choice.distance < SNAP_DIST) {
+
+      if (choice && !skipSegments.has(choice.index) && choice.distance < SNAP_DIST * localScale) {
         const edge: [EntityID, EntityID] = [ way.nodes[choice.index - 1], way.nodes[choice.index] ];
-        editor.perform(actionAddMidpoint({ loc: choice.loc, edge: edge }, this.dragNode));
+        const loc = projWorldToWgs84(choice.point);
+        editor.perform(actionAddMidpoint({ loc, edge }, this.dragNode));
         annotation = this._connectAnnotation(way);
       } else {
         annotation = this._moveAnnotation();

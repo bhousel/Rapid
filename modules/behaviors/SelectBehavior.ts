@@ -1,10 +1,8 @@
-import { vecLength } from '@rapid-sdk/math';
-
 import { AbstractBehavior } from './AbstractBehavior.ts';
 import { MapInteractionBehavior } from './MapInteractionBehavior.ts';
 import { GeoJSONData, MarkerData, OsmEntity, OsmNode, OsmWay } from '../data/index.ts';
 import { actionAddMidpoint } from '../actions/add_midpoint.ts';
-import { geoChooseEdge } from '../geo/geom.js';
+import { projWorldToWgs84, vecLength, vecProject } from '@rapid-sdk/math';
 import { utilDetect } from '../util/detect.ts';
 
 import type { Context } from '../Context.ts';
@@ -417,6 +415,7 @@ export class SelectBehavior extends AbstractBehavior {
 
 
   /**
+   * Cancel any scheduled longpress handler
    */
   _cancelLongPress(): void {
     const scheduler = this.context.systems.scheduler!;
@@ -455,7 +454,7 @@ export class SelectBehavior extends AbstractBehavior {
     const editor = context.systems.editor!;
     const l10n = context.systems.l10n;
 
-    const point = this.lastUp.coord.map;
+    const point = this.lastUp.coord.world;
     const data: any = this.lastUp.target?.data;
 
     const isOSMWay = data instanceof OsmWay && !data.props.__fbid__;
@@ -465,12 +464,13 @@ export class SelectBehavior extends AbstractBehavior {
     let edge: [EntityID, EntityID] | undefined;
 
     if (isOSMWay) {
-      const graph = editor.staging.graph;
-      const viewport = context.viewport;
-      const choice = geoChooseEdge(graph.childNodes(data), point, viewport);
+      const way = data as OsmWay;
+      // A way will have LineString or Polygon geometry. We can use 'outer' to get these points.
+      const line = way.geoms.parts[0]!.world!.outer as Vec2[];
+      const choice = vecProject(point, line);
       if (choice) {
-        loc = choice.loc;
-        edge = [ data.nodes[choice.index - 1], data.nodes[choice.index] ];
+        loc = projWorldToWgs84(choice.point);
+        edge = [ way.nodes[choice.index - 1], way.nodes[choice.index] ];
       }
 
     } else if (isMidpoint) {
