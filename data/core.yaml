@@ -1886,7 +1886,7 @@ en:
       reference: "Redundant points in a way should be merged or moved apart."
       detached:
         message: "{feature} is too close to {feature2}"
-        reference: "Separate points should not share a location."
+        reference: Separate points should not share a location.
     duplicate_segments:
       title: Duplicate Segments
       tip: Find segments that are duplicated (same node endpoints)
@@ -1894,10 +1894,11 @@ en:
       reference: Redundant way segments should be merged or moved apart.
     curb_nodes:
       title: Curb Nodes
+      tip: Find crossings that are missing curb nodes
       message: "{feature} may be missing curb nodes."
-      footway-highway: "Footways crossing highways should have separately-mapped curb nodes."
+      footway-highway: Footways crossing highways should have separately-mapped curb nodes.
       reference:
-        text: "Crossing ways should have individual curb nodes (where appropriate). Use photo overlays to help determine curb type."
+        text: Crossing ways should have individual curb nodes (where appropriate). Use photo overlays to help determine curb type.
         link_alt_text: Curb Tagging Guidelines
         link_text: More info
         link_url: 'https://wiki.openstreetmap.org/wiki/Key:kerb#Values'
@@ -1912,7 +1913,7 @@ en:
     crossing_ways:
       title: Crossing Ways
       message: "{feature} crosses {feature2}"
-      tip: "Find features that incorrectly cross over one another"
+      tip: Find features that incorrectly cross over one another
       aeroway-aeroway:
         reference: Crossing aeroways should be connected.
       aeroway-building:

@@ -2315,6 +2315,7 @@
       },
       "curb_nodes": {
         "title": "Curb Nodes",
+        "tip": "Find crossings that are missing curb nodes",
         "message": "{feature} may be missing curb nodes.",
         "footway-highway": "Footways crossing highways should have separately-mapped curb nodes.",
         "reference": {
