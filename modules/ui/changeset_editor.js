@@ -73,17 +73,19 @@ export function uiChangesetEditor(context) {
             const osm = context.services.osm;
             if (osm) {
               osm.getUserChangesetsAsync()
-                .then(results => {
-                  // skip empty comments
-                  const comments = results.data.map(changeset => {
+                .then(changesets => {
+                  const data = [];
+                  const seen = new Set();
+                  for (const changeset of changesets) {
                     const comment = changeset?.tags?.comment;
-                    return comment ? { title: comment, value: comment } : null;
-                  }).filter(Boolean);
+                    if (!comment) continue;   // skip empty
+                    if (seen.has(comment)) continue;   // deduplicate
+                    seen.add(comment);
+                    data.push({ title: comment, value: comment });
+                  }
 
                   commentField
-                    .call(commentCombo
-                      .data(utilArrayUniqBy(comments, 'title'))
-                    );
+                    .call(commentCombo.data(data));
               });
             }
         }

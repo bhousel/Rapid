@@ -1150,12 +1150,10 @@ export class OsmService extends AbstractSystem {
     const requestID = `osm-changeset-close-${changeset.id}` as RequestID;
     const resource = this._apiroot + `/api/0.6/changeset/${changeset.id}/close`;
 
-    network.fetch<any>(resource, {
-      requestID,
-      method: 'PUT',
-      headers: { 'Content-Type': 'text/xml' },
-      mainThread: true
-    })
+    // Note that `changeset/#id/close` returns an empty document with `text/html` content type.
+    // We use `fetchRaw` here because otherwise `utilFetchResponse` will try handling it,
+    // and the xmldom parser will raise a "missing root element" error on the empty document.
+    network.fetchRaw(resource, { requestID, method: 'PUT' })
       .then((result: any) => errback(null, result))
       .catch((err: any) => {
         if (err.name === 'AbortError') return;  // ok
