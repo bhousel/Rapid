@@ -9,6 +9,7 @@ import type { D3Selection } from 'd3-selection';
 import type { Graph } from '../lib/Graph.ts';
 import type { OsmEntity, OsmWay } from '../data/types.ts';
 import type { ValidatorFunction, ValidatorResult } from './types.ts';
+import type { Vec2 } from '@rapid-sdk/math';
 
 
 /**
@@ -22,7 +23,7 @@ export function validateUnsquareWay(context: Context): ValidatorFunction {
   const type = 'unsquare_way' as ValidatorID;
   const editor = context.systems.editor!;
   const l10n = context.systems.l10n!;
-  const DEFAULT_DEG_THRESHOLD = 5;   // see also issues.js
+  const DEFAULT_DEG_THRESHOLD = 5;   // see also `ui/sections/validation_rules.js`
 
   // use looser epsilon for detection to reduce warnings of buildings that are essentially square already
   const epsilon = 0.05;
@@ -55,7 +56,11 @@ export function validateUnsquareWay(context: Context): ValidatorFunction {
 
     const way = entity as OsmWay;
     const isClosed = way.isClosed();
-    if (!isClosed) return result;        // this building has bigger problems
+    if (!isClosed) return result;   // this building has bigger problems
+
+    // A way will have LineString or Polygon geometry. We can use 'outer' to get these points.
+    const points = way.geoms.parts[0]?.local?.outer as Vec2[];
+    if (!points) return result;
 
     // don't flag ways with lots of nodes since they are likely detail-mapped
     const nodes = graph.childNodes(way).slice();    // shallow copy
@@ -88,7 +93,6 @@ export function validateUnsquareWay(context: Context): ValidatorFunction {
     const parsed = storedStr != null ? parseFloat(storedStr) : NaN;  // eslint-disable-line no-eq-null
     const degreeThreshold = isNaN(parsed) ? DEFAULT_DEG_THRESHOLD : parsed;
 
-    const points = nodes.map(node => context.viewport.project(node.loc!));
     if (!geoOrthoCanOrthogonalize(points, isClosed, epsilon, degreeThreshold, true)) return result;
 
     let autoArgs;

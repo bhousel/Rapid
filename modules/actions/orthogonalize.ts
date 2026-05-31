@@ -271,13 +271,13 @@ export function actionOrthogonalize(
    *          `false` if the action is enabled
    */
   action.disabled = function(graph: Graph): string | false {
+    graph = graph.snapshot();    // make a copy
     let way = graph.entity(wayID) as OsmWay;
-    const g: Graph = new Graph(graph);    // make a copy
     way = way.removeNode('');    // sanity check - remove any consecutive duplicates
-    g.replace(way);
+    graph.replace(way);
 
     const isClosed: boolean = way.isClosed();
-    let nodes: OsmNode[] = g.childNodes(way).slice();  // shallow copy
+    let nodes: OsmNode[] = graph.childNodes(way).slice();  // shallow copy
     if (isClosed) nodes.pop();
 
     let allowStraightAngles = false;

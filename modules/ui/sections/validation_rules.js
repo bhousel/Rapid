@@ -13,7 +13,7 @@ export function uiSectionValidationRules(context) {
 
   const MINSQUARE = 0;
   const MAXSQUARE = 20;
-  const DEFAULTSQUARE = 5;  // see also unsquare_way.js
+  const DEFAULTSQUARE = 5;  // see also `validators/unsquare_way.ts`
 
   const section = uiSection(context, 'issues-rules')
     .disclosureContent(renderDisclosureContent)

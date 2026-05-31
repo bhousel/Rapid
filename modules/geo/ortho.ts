@@ -1,4 +1,4 @@
-import { vecEqual, vecNormalizedDot } from '@rapid-sdk/math';
+import { DEG2RAD, RAD2DEG, vecEqual, vecNormalizedDot } from '@rapid-sdk/math';
 
 import type { Vec2 } from '@rapid-sdk/math';
 
@@ -67,8 +67,8 @@ export function geoOrthoCalcScore(points: OrthoPoint[], isClosed: boolean, epsil
   const last = isClosed ? points.length : points.length - 1;
   const coords = points.map(p => p.coord);
 
-  const lowerThreshold = Math.cos((90 - threshold) * Math.PI / 180);
-  const upperThreshold = Math.cos(threshold * Math.PI / 180);
+  const lowerThreshold = Math.cos((90 - threshold) * DEG2RAD);
+  const upperThreshold = Math.cos(threshold * DEG2RAD);
 
   for (let i = first; i < last; i++) {
     const a = coords[(i - 1 + coords.length) % coords.length];
@@ -103,7 +103,7 @@ export function geoOrthoMaxOffsetAngle(coords: Vec2[], isClosed: boolean, lessTh
     const b = coords[(i + 1) % coords.length];
     const normalizedDotP = geoOrthoNormalizedDotProduct(a, b, origin);
 
-    let angle = Math.acos(Math.abs(normalizedDotP)) * 180 / Math.PI;
+    let angle = Math.acos(Math.abs(normalizedDotP)) * RAD2DEG;
 
     if (angle > 45) angle = 90 - angle;
 
@@ -138,8 +138,8 @@ export function geoOrthoCanOrthogonalize(
   const first = isClosed ? 0 : 1;
   const last = isClosed ? coords.length : coords.length - 1;
 
-  const lowerThreshold = Math.cos((90 - threshold) * Math.PI / 180);
-  const upperThreshold = Math.cos(threshold * Math.PI / 180);
+  const lowerThreshold = Math.cos((90 - threshold) * DEG2RAD);
+  const upperThreshold = Math.cos(threshold * DEG2RAD);
 
   for (let i = first; i < last; i++) {
     const a = coords[(i - 1 + coords.length) % coords.length];
