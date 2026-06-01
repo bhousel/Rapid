@@ -1,11 +1,10 @@
-import { zoom as d3_zoom, zoomIdentity as d3_zoomIdentity } from 'd3-zoom';
-import { Tiler } from '@rapid-sdk/math';
-import { utilQsString } from '@rapid-sdk/util';
-
 import { AbstractSystem } from '../core/AbstractSystem.ts';
 import { MarkerData, GeoJSONData } from '../data/index.ts';
+import { Tiler } from '@rapid-sdk/math';
 import { uiIcon } from '../ui/icon.js';
+import { utilQsString } from '@rapid-sdk/util';
 import { utilSetTransform } from '../util/index.ts';
+import { zoom as d3_zoom, zoomIdentity as d3_zoomIdentity } from 'd3-zoom';
 
 import type { Context } from '../Context.ts';
 import type { D3EnterSelection, D3Selection } from 'd3-selection';
@@ -126,20 +125,20 @@ export type KartaviewSequence = GeoJSONData<KartaviewSequenceProps>;
 export class KartaviewService extends AbstractSystem {
 
   /** D3 zoom behavior controlling pan/zoom within the photo viewer */
-  _imgZoom: ZoomBehavior<Element, unknown>;
+  protected _imgZoom: ZoomBehavior<Element, unknown>;
   /** Internal cache for inflight requests and pagination state */
-  _cache: KartaviewCache;
+  protected _cache: KartaviewCache;
   /** Whether to display high-resolution images in the viewer */
-  _hires: boolean;
+  protected _hires: boolean;
   /** Tiler instance used to partition the viewport into tile requests */
-  _tiler: Tiler;
+  protected _tiler: Tiler;
 
 
   /**
    * @constructor
    * @param context - Global shared application context
    */
-  constructor(context: Context) {
+  public constructor(context: Context) {
     super(context);
     this.id = 'kartaview';
     this.requiredDependencies = new Set<SystemID>(['l10n', 'network', 'photos', 'spatial']);
@@ -167,7 +166,7 @@ export class KartaviewService extends AbstractSystem {
    * Called after all core objects have been constructed.
    * @return  Promise resolved when this component has completed initialization
    */
-  initAsync(): Promise<void> {
+  public initAsync(): Promise<void> {
     if (this._initPromise) return this._initPromise;
 
     return this._initPromise = super.initAsync()
@@ -179,7 +178,7 @@ export class KartaviewService extends AbstractSystem {
    * Called after all core objects have been initialized.
    * @return  Promise resolved when this component has completed startup
    */
-  startAsync(): Promise<void> {
+  public startAsync(): Promise<void> {
     if (this._startPromise) return this._startPromise;
 
     const context = this.context;
@@ -265,7 +264,7 @@ export class KartaviewService extends AbstractSystem {
    * Called after completing an edit session to reset any internal state
    * @return  Promise resolved when this component has completed resetting
    */
-  resetAsync(): Promise<void> {
+  public resetAsync(): Promise<void> {
     const context = this.context;
     const network = context.systems.network!;
     const spatial = context.systems.spatial!;
@@ -288,7 +287,7 @@ export class KartaviewService extends AbstractSystem {
    * Get already loaded image data that appears in the current map view
    * @return  Array of image data
    */
-  getImages(): MarkerData[] {
+  public getImages(): MarkerData[] {
     const spatial = this.context.systems.spatial!;
     return spatial.getVisibleData('kartaview-images').map(hit => hit.contents) as MarkerData[];
   }
@@ -298,7 +297,7 @@ export class KartaviewService extends AbstractSystem {
    * Get already loaded sequence data that appears in the current map view
    * @return  Array of sequence data
    */
-  getSequences(): GeoJSONData[] {
+  public getSequences(): GeoJSONData[] {
     const spatial = this.context.systems.spatial!;
     return spatial.getVisibleData('kartaview-sequences').map(hit => hit.contents) as GeoJSONData[];
   }
@@ -307,7 +306,7 @@ export class KartaviewService extends AbstractSystem {
   /**
    * Schedule any data requests needed to cover the current map view
    */
-  loadTiles(): void {
+  public loadTiles(): void {
     const cache = this._cache;
     const context = this.context;
     const network = context.systems.network!;
@@ -333,7 +332,7 @@ export class KartaviewService extends AbstractSystem {
   /**
    * Shows the photo viewer, and hides all other photo viewers
    */
-  showViewer(): void {
+  public showViewer(): void {
     const $viewer: D3Selection = this.context.container().select('.photoviewer')
       .classed('hide', false);
 
@@ -354,7 +353,7 @@ export class KartaviewService extends AbstractSystem {
   /**
    * Hides the photo viewer and clears the currently selected image
    */
-  hideViewer(): void {
+  public hideViewer(): void {
     const context = this.context;
     context.systems.photos!.selectPhoto(null);
 
@@ -374,7 +373,7 @@ export class KartaviewService extends AbstractSystem {
    * @param  imageID - the id of the image to select
    * @return  Promise that resolves to the image after it has been selected
    */
-  selectImageAsync(imageID: PhotoID | null): Promise<KartaviewImage | void> {
+  public selectImageAsync(imageID: PhotoID | null): Promise<KartaviewImage | void> {
     if (!imageID) {
       this._updatePhotoFooter(null);  // reset
       return Promise.resolve();  // do nothing
@@ -420,7 +419,7 @@ export class KartaviewService extends AbstractSystem {
    * Update the photo attribution section of the image viewer
    * @param  imageID - the new imageID
    */
-  _updatePhotoFooter(imageID: PhotoID | null): void {
+  protected _updatePhotoFooter(imageID: PhotoID | null): void {
     const context = this.context;
     const l10n = context.systems.l10n!;
     const photos = context.systems.photos!;
@@ -508,7 +507,7 @@ export class KartaviewService extends AbstractSystem {
    * @param  z - zoom level
    * @return  max pages of data to fetch
    */
-  _maxPageAtZoom(z: number): number {
+  protected _maxPageAtZoom(z: number): number {
     if (z < 15) return 2;
     if (z < 16) return 5;
     if (z < 17) return 10;
@@ -524,7 +523,7 @@ export class KartaviewService extends AbstractSystem {
    * @param  tile - tile object
    * @return  Promise resolved when there is nothing more to do
    */
-  _loadNextTilePageAsync(tile: KartaviewTile): Promise<void> {
+  protected _loadNextTilePageAsync(tile: KartaviewTile): Promise<void> {
     // preserve the original tile.id - we will add append a page number to tile.id
     tile.origID ??= tile.id;
 
@@ -636,7 +635,7 @@ export class KartaviewService extends AbstractSystem {
    * @param  imageID - the imageID to load
    * @return  Promise resolved with the image Object
    */
-  _loadImageAsync(imageID: PhotoID): Promise<KartaviewImage | void> {
+  protected _loadImageAsync(imageID: PhotoID): Promise<KartaviewImage | void> {
     const context = this.context;
     const gfx = context.systems.gfx;
     const network = context.systems.network!;
@@ -702,7 +701,7 @@ export class KartaviewService extends AbstractSystem {
    * The user can drag and zoom in on the image.
    * @param  d3_event
    */
-  _zoomPan(d3_event: any): void {
+  protected _zoomPan(d3_event: any): void {
     const t = d3_event.transform;
     const $container: D3Selection = this.context.container();
     const $imageWrap: D3Selection = $container.select('.photoviewer .osc-image-wrap');
@@ -718,7 +717,7 @@ export class KartaviewService extends AbstractSystem {
    * The user can press buttons to rotate the image if it has been recorded sideways.
    * @param  deg - degrees to rotate
    */
-  _rotate(deg: number): void {
+  protected _rotate(deg: number): void {
     const context = this.context;
     const photos = context.systems.photos!;
     const spatial = context.systems.spatial!;
@@ -754,7 +753,7 @@ export class KartaviewService extends AbstractSystem {
    * Handler for keydown events on the window, but only if the photo viewer is visible.
    * @param  e - A DOM KeyboardEvent
    */
-  _keydown(e: KeyboardEvent): void {
+  protected _keydown(e: KeyboardEvent): void {
     const context = this.context;
     const eventManager = context.systems.gfx?.eventManager;
     const photos = context.systems.photos!;
@@ -783,7 +782,7 @@ export class KartaviewService extends AbstractSystem {
    * Step forward/backward along the sequence in the viewer.
    * @param  stepBy - number to step by, either +1 or -1
    */
-  _step(stepBy: number): void {
+  protected _step(stepBy: number): void {
     const context = this.context;
     const photos = context.systems.photos!;
     const spatial = context.systems.spatial!;
@@ -809,7 +808,7 @@ export class KartaviewService extends AbstractSystem {
    * @param  source - the image properties
    * @return  The image
    */
-  _cacheImage(source: ImageSource): KartaviewImage {
+  protected _cacheImage(source: ImageSource): KartaviewImage {
     const context = this.context;
     const spatial = context.systems.spatial!;
     const imageID = source.id;
@@ -854,7 +853,7 @@ export class KartaviewService extends AbstractSystem {
    * @param  image - the image that belongs to this sequence
    * @return  The sequence
    */
-  _cacheSequence(image: KartaviewImage): KartaviewSequence {
+  protected _cacheSequence(image: KartaviewImage): KartaviewSequence {
     const context = this.context;
     const spatial = context.systems.spatial!;
     const sequenceID = image.props.sequenceID;

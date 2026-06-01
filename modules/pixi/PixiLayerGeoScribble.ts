@@ -1,5 +1,4 @@
 import * as PIXI from 'pixi.js';
-
 import { AbstractPixiLayer } from './AbstractPixiLayer.ts';
 import { PixiFeatureLine } from './PixiFeatureLine.ts';
 import { PixiFeaturePoint } from './PixiFeaturePoint.ts';
@@ -19,13 +18,13 @@ const CUSTOM_COLOR = 0x2eff2e;
  * @class
  */
 export class PixiLayerGeoScribble extends AbstractPixiLayer {
-  scribblesContainer: PIXI.Container | null;
+  public scribblesContainer: PIXI.Container | null;
 
   /**
    * @constructor
    * @param scene - The Scene that owns this Layer
    */
-  constructor(scene: PixiScene) {
+  public constructor(scene: PixiScene) {
     super(scene);
     this.id = 'geoscribble';
 
@@ -36,7 +35,7 @@ export class PixiLayerGeoScribble extends AbstractPixiLayer {
   /**
    * Whether the Layer's service exists
    */
-  get supported() {
+  public get supported() {
     return !!this.context.services.geoscribble;
   }
 
@@ -45,10 +44,10 @@ export class PixiLayerGeoScribble extends AbstractPixiLayer {
    * Whether the user has chosen to see the Layer
    * Make sure to start the service.
    */
-  get enabled() {
+  public get enabled() {
     return this._enabled;
   }
-  set enabled(val: boolean) {
+  public set enabled(val: boolean) {
     if (!this.supported) {
       val = false;
     }
@@ -69,7 +68,7 @@ export class PixiLayerGeoScribble extends AbstractPixiLayer {
   /**
    * Every Layer should have a reset function to replace any Pixi objects and internal state.
    */
-  reset() {
+  public reset() {
     super.reset();
 
     const groupContainer = this.scene.groups.get('basemap')!;
@@ -97,7 +96,7 @@ export class PixiLayerGeoScribble extends AbstractPixiLayer {
    * @param frame - Integer frame being rendered
    * @param viewport - Pixi viewport to use for rendering
    */
-  render(frame: number, viewport: Viewport): void {
+  public render(frame: number, viewport: Viewport): void {
     if (!this.enabled) return;
 
     const service = this.context.services.geoscribble;
@@ -125,7 +124,7 @@ export class PixiLayerGeoScribble extends AbstractPixiLayer {
    *          "wall", "fence", "power", "stream", "drain", etc.
    * @return  A style object that can be given to the pixi renderer
    */
-  getLineStyle(props: Record<string, unknown>): Partial<MatchedStyle> {
+  public getLineStyle(props: Record<string, unknown>): Partial<MatchedStyle> {
     const color = props.color ? new PIXI.Color(props.color as string).toNumber() : CUSTOM_COLOR;
     const isThin = props.thin;
     const isDashed = props.dashed;
@@ -149,7 +148,7 @@ export class PixiLayerGeoScribble extends AbstractPixiLayer {
    * @param viewport - Pixi viewport to use for rendering
    * @param lines - Array of line data
    */
-  renderLines(frame: number, viewport: Viewport, lines: GeoJSONData[]): void {
+  public renderLines(frame: number, viewport: Viewport, lines: GeoJSONData[]): void {
     const parentContainer = this.scribblesContainer;
 
     for (const d of lines) {
@@ -199,7 +198,7 @@ export class PixiLayerGeoScribble extends AbstractPixiLayer {
    * @param viewport - Pixi viewport to use for rendering
    * @param points - Array of point data
    */
-  renderPoints(frame: number, viewport: Viewport, points: GeoJSONData[]): void {
+  public renderPoints(frame: number, viewport: Viewport, points: GeoJSONData[]): void {
     const parentContainer = this.scribblesContainer;
 
     const pointStyle: Partial<MatchedStyle> = {

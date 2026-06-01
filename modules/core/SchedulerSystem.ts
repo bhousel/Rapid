@@ -138,53 +138,54 @@ const PRESSURE_RECOVER = {
  *   `pressure`  Fires when backpressure level changes
  */
 export class SchedulerSystem extends AbstractSystem {
-  // Game loop
+
   /** Registered frame callbacks, keyed by a string identifier */
-  private _frameCallbacks: Map<string, FrameCallback>;
+  protected _frameCallbacks: Map<string, FrameCallback>;
   /** The handle from `requestAnimationFrame`, or 0 if the loop is not running */
-  private _rafHandle: number;
+  protected _rafHandle: number;
   /** Timestamp of the previous frame (from the rAF callback), for computing deltaMS */
-  private _lastTimestamp: number;
+  protected _lastTimestamp: number;
   /** Milliseconds elapsed since the previous frame */
-  private _deltaMS: number;
+  protected _deltaMS: number;
   /** Target frame time in milliseconds — determines idle budget */
-  private _targetFrameTime: number;
+  protected _targetFrameTime: number;
 
   // Task queues (drained per-frame in priority order)
-  private _urgentQueue: QueuedTask[];
-  private _normalQueue: QueuedTask[];
-  private _idleQueue: QueuedTask[];
+  protected _urgentQueue: QueuedTask[];
+  protected _normalQueue: QueuedTask[];
+  protected _idleQueue: QueuedTask[];
 
   // workID-keyed timers (timeout, interval, debounce, throttle)
-  private _timers: Map<string, TimerEntry>;
+  protected _timers: Map<string, TimerEntry>;
 
   // Legacy handle-based timers (Phase 1 API — still used by existing callers)
   /** Active managed timeouts keyed by their setTimeout handle */
-  private _timeouts: Set<ReturnType<typeof setTimeout>>;
+  protected _timeouts: Set<ReturnType<typeof setTimeout>>;
   /** Active managed intervals keyed by their setInterval handle */
-  private _intervals: Set<ReturnType<typeof setInterval>>;
+  protected _intervals: Set<ReturnType<typeof setInterval>>;
 
   // Backpressure — frame timing metrics and pressure tracking
   /** EMA of total frame time (ms) */
-  private _avgFrameTime: number;
+  protected _avgFrameTime: number;
   /** EMA of frame callback time (ms) */
-  private _avgRenderTime: number;
+  protected _avgRenderTime: number;
   /** EMA of queue drain time (ms) */
-  private _avgIdleTime: number;
+  protected _avgIdleTime: number;
   /** Ring buffer: true if that frame exceeded the budget */
-  private _droppedFrameRing: boolean[];
+  protected _droppedFrameRing: boolean[];
   /** Write index into the ring buffer */
-  private _ringIndex: number;
+  protected _ringIndex: number;
   /** Cached count of `true` values in the ring buffer */
-  private _droppedCount: number;
+  protected _droppedCount: number;
   /** Current pressure level */
-  private _pressure: PressureLevel;
+  protected _pressure: PressureLevel;
+
 
   /**
    * @constructor
    * @param context - Global shared application context
    */
-  constructor(context: Context) {
+  public constructor(context: Context) {
     super(context);
     this.id = 'scheduler';
     // No required dependencies — this system should be available very early.
@@ -221,7 +222,7 @@ export class SchedulerSystem extends AbstractSystem {
    * Called after all core objects have been constructed.
    * @return Promise resolved when this component has completed initialization
    */
-  initAsync(): Promise<void> {
+  public initAsync(): Promise<void> {
     if (this._initPromise) return this._initPromise;
 
     return this._initPromise = super.initAsync()
@@ -240,7 +241,7 @@ export class SchedulerSystem extends AbstractSystem {
    * Called after all core objects have been initialized.
    * @return Promise resolved when this component has completed startup
    */
-  startAsync(): Promise<void> {
+  public startAsync(): Promise<void> {
     if (this._startPromise) return this._startPromise;
 
     return this._startPromise = super.startAsync()
@@ -256,7 +257,7 @@ export class SchedulerSystem extends AbstractSystem {
    * frame callbacks and the game loop — those are structural registrations.
    * @return Promise resolved when this component has completed resetting
    */
-  resetAsync(): Promise<void> {
+  public resetAsync(): Promise<void> {
     this.cancelAllIdleTasks();
     this.cancelAllTimers();
     this.cancelAllTimeouts();
@@ -296,7 +297,7 @@ export class SchedulerSystem extends AbstractSystem {
    * @return Promise resolved after the task completes, rejected if the
    *         task throws or is cancelled
    */
-  schedule(fn: () => void, opts?: ScheduleOptions): Promise<void> {
+  public schedule(fn: () => void, opts?: ScheduleOptions): Promise<void> {
     return new Promise<void>((resolve, reject) => {
       const task: QueuedTask = { workID: opts?.workID, fn, resolve, reject };
       const priority = opts?.priority ?? 'normal';
@@ -315,7 +316,7 @@ export class SchedulerSystem extends AbstractSystem {
    * @param fn - The function to execute during idle time
    * @return Promise resolved after the task completes
    */
-  scheduleIdleTask(fn: () => void): Promise<void> {
+  public scheduleIdleTask(fn: () => void): Promise<void> {
     return this.schedule(fn, { priority: 'idle' });
   }
 
@@ -324,7 +325,7 @@ export class SchedulerSystem extends AbstractSystem {
    * Cancels every outstanding queued task (urgent, normal, and idle)
    * and rejects their promises.  Useful during reset or teardown.
    */
-  cancelAllIdleTasks(): void {
+  public cancelAllIdleTasks(): void {
     const queues = [this._urgentQueue, this._normalQueue, this._idleQueue];
     for (const queue of queues) {
       for (const task of queue) {
@@ -340,7 +341,7 @@ export class SchedulerSystem extends AbstractSystem {
    * Useful for debugging and tests.
    * @readonly
    */
-  get numPending(): number {
+  public get numPending(): number {
     return this._urgentQueue.length + this._normalQueue.length + this._idleQueue.length;
   }
 
@@ -350,10 +351,10 @@ export class SchedulerSystem extends AbstractSystem {
    * of each frame only while `performance.now()` is below the deadline
    * (`frameStart + targetFrameTime`).  Defaults to ~16.7ms (60 fps).
    */
-  get targetFrameTime(): number {
+  public get targetFrameTime(): number {
     return this._targetFrameTime;
   }
-  set targetFrameTime(ms: number) {
+  public set targetFrameTime(ms: number) {
     this._targetFrameTime = Math.max(1, ms);
   }
 
@@ -382,7 +383,7 @@ export class SchedulerSystem extends AbstractSystem {
    * @param fn - The function to execute
    * @param opts - Timer options (`ms`, `priority`)
    */
-  setTimeout(workID: WorkID, fn: () => void, opts?: TimerOptions): void {
+  public setTimeout(workID: WorkID, fn: () => void, opts?: TimerOptions): void {
     this.cancel(workID);
 
     const ms = opts?.ms ?? 0;
@@ -411,7 +412,7 @@ export class SchedulerSystem extends AbstractSystem {
    * @param fn - The function to execute on each tick
    * @param opts - Timer options (`ms`, `priority`)
    */
-  setInterval(workID: WorkID, fn: () => void, opts?: TimerOptions): void {
+  public setInterval(workID: WorkID, fn: () => void, opts?: TimerOptions): void {
     this.cancel(workID);
 
     const ms = opts?.ms ?? 1000;
@@ -445,7 +446,7 @@ export class SchedulerSystem extends AbstractSystem {
    * @param fn - The function to execute after the quiet period
    * @param opts - Timer options (`ms`, `priority`, `leading`)
    */
-  debounce(workID: WorkID, fn: () => void, opts?: TimerOptions): void {
+  public debounce(workID: WorkID, fn: () => void, opts?: TimerOptions): void {
     const ms = opts?.ms ?? 250;
     const priority = opts?.priority ?? 'normal';
     const leading = opts?.leading ?? false;
@@ -506,7 +507,7 @@ export class SchedulerSystem extends AbstractSystem {
    * @param fn - The function to execute
    * @param opts - Timer options (`ms`, `priority`, `leading`)
    */
-  throttle(workID: WorkID, fn: () => void, opts?: TimerOptions): void {
+  public throttle(workID: WorkID, fn: () => void, opts?: TimerOptions): void {
     const ms = opts?.ms ?? 250;
     const priority = opts?.priority ?? 'normal';
     const leading = opts?.leading ?? true;
@@ -543,7 +544,7 @@ export class SchedulerSystem extends AbstractSystem {
    *
    * @param workID - The work identifier to cancel
    */
-  cancel(workID: WorkID): void {
+  public cancel(workID: WorkID): void {
     const entry = this._timers.get(workID);
     if (entry) {
       if (entry.handle !== null) {
@@ -563,7 +564,7 @@ export class SchedulerSystem extends AbstractSystem {
    * Cancels every outstanding workID-keyed timer and removes their
    * queued tasks.  Called automatically by `resetAsync()`.
    */
-  cancelAllTimers(): void {
+  public cancelAllTimers(): void {
     for (const entry of this._timers.values()) {
       if (entry.handle !== null) {
         if (entry.type === 'interval') {
@@ -582,7 +583,7 @@ export class SchedulerSystem extends AbstractSystem {
    * Useful for debugging and tests.
    * @readonly
    */
-  get numTimers(): number {
+  public get numTimers(): number {
     return this._timers.size;
   }
 
@@ -595,7 +596,7 @@ export class SchedulerSystem extends AbstractSystem {
    * @param ms - Delay in milliseconds (default 0)
    * @return A cancel function that clears the timeout
    */
-  scheduleTimeout(fn: () => void, ms: number = 0): CancelFn {
+  public scheduleTimeout(fn: () => void, ms: number = 0): CancelFn {
     let handle: ReturnType<typeof setTimeout> | null = null;
 
     handle = globalThis.setTimeout(() => {
@@ -619,7 +620,7 @@ export class SchedulerSystem extends AbstractSystem {
   /**
    * Cancels every outstanding managed timeout.
    */
-  cancelAllTimeouts(): void {
+  public cancelAllTimeouts(): void {
     for (const handle of this._timeouts) {
       globalThis.clearTimeout(handle);
     }
@@ -632,7 +633,7 @@ export class SchedulerSystem extends AbstractSystem {
    * Useful for debugging and tests.
    * @readonly
    */
-  get numTimeouts(): number {
+  public get numTimeouts(): number {
     return this._timeouts.size;
   }
 
@@ -645,7 +646,7 @@ export class SchedulerSystem extends AbstractSystem {
    * @param ms - Interval in milliseconds
    * @return A cancel function that clears the interval
    */
-  scheduleInterval(fn: () => void, ms: number): CancelFn {
+  public scheduleInterval(fn: () => void, ms: number): CancelFn {
     const handle = globalThis.setInterval(fn, ms);
     this._intervals.add(handle);
 
@@ -659,7 +660,7 @@ export class SchedulerSystem extends AbstractSystem {
   /**
    * Cancels every outstanding managed interval.
    */
-  cancelAllIntervals(): void {
+  public cancelAllIntervals(): void {
     for (const handle of this._intervals) {
       globalThis.clearInterval(handle);
     }
@@ -672,7 +673,7 @@ export class SchedulerSystem extends AbstractSystem {
    * Useful for debugging and tests.
    * @readonly
    */
-  get numIntervals(): number {
+  public get numIntervals(): number {
     return this._intervals.size;
   }
 
@@ -682,7 +683,7 @@ export class SchedulerSystem extends AbstractSystem {
    * Useful for frame-rate-independent calculations.
    * @readonly
    */
-  get deltaMS(): number {
+  public get deltaMS(): number {
     return this._deltaMS;
   }
 
@@ -693,7 +694,7 @@ export class SchedulerSystem extends AbstractSystem {
    * events when the level changes.
    * @readonly
    */
-  get pressure(): PressureLevel {
+  public get pressure(): PressureLevel {
     return this._pressure;
   }
 
@@ -703,7 +704,7 @@ export class SchedulerSystem extends AbstractSystem {
    * All time values are in milliseconds.
    * @readonly
    */
-  get metrics(): FrameMetrics {
+  public get metrics(): FrameMetrics {
     return {
       avgFrameTime: this._avgFrameTime,
       avgRenderTime: this._avgRenderTime,
@@ -722,7 +723,7 @@ export class SchedulerSystem extends AbstractSystem {
    * @param id - A unique string identifier (e.g. `'gfx'`)
    * @param fn - The callback to invoke each frame
    */
-  addFrameCallback(id: string, fn: FrameCallback): void {
+  public addFrameCallback(id: string, fn: FrameCallback): void {
     this._frameCallbacks.set(id, fn);
   }
 
@@ -732,7 +733,7 @@ export class SchedulerSystem extends AbstractSystem {
    *
    * @param id - The identifier passed to `addFrameCallback`
    */
-  removeFrameCallback(id: string): void {
+  public removeFrameCallback(id: string): void {
     this._frameCallbacks.delete(id);
   }
 
@@ -742,7 +743,7 @@ export class SchedulerSystem extends AbstractSystem {
    * Useful for debugging and tests.
    * @readonly
    */
-  get numFrameCallbacks(): number {
+  public get numFrameCallbacks(): number {
     return this._frameCallbacks.size;
   }
 
@@ -756,7 +757,7 @@ export class SchedulerSystem extends AbstractSystem {
    * @param priority - Which queue to use
    * @param workID - Optional workID for cancellation support
    */
-  private _enqueue(fn: () => void, priority: TaskPriority, workID?: WorkID): void {
+  protected _enqueue(fn: () => void, priority: TaskPriority, workID?: WorkID): void {
     const task: QueuedTask = {
       workID,
       fn,
@@ -781,7 +782,7 @@ export class SchedulerSystem extends AbstractSystem {
    *
    * @param workID - The work identifier to remove
    */
-  private _removeFromQueues(workID: WorkID): void {
+  protected _removeFromQueues(workID: WorkID): void {
     for (const queue of [this._urgentQueue, this._normalQueue, this._idleQueue]) {
       for (let i = queue.length - 1; i >= 0; i--) {
         if (queue[i].workID === workID) {
@@ -800,7 +801,7 @@ export class SchedulerSystem extends AbstractSystem {
    *
    * @param entry - The throttle TimerEntry
    */
-  private _throttleWindowExpired(entry: TimerEntry): void {
+  protected _throttleWindowExpired(entry: TimerEntry): void {
     if (entry.trailingFn) {
       const fn = entry.trailingFn;
       entry.trailingFn = null;
@@ -819,7 +820,7 @@ export class SchedulerSystem extends AbstractSystem {
   /**
    * Starts the `requestAnimationFrame` game loop if it isn't already running.
    */
-  private _startLoop(): void {
+  protected _startLoop(): void {
     if (!this._started) return;
     if (this._rafHandle) return;  // already running
     this._lastTimestamp = 0;
@@ -830,7 +831,7 @@ export class SchedulerSystem extends AbstractSystem {
   /**
    * Stops the `requestAnimationFrame` game loop.
    */
-  private _stopLoop(): void {
+  protected _stopLoop(): void {
     if (this._rafHandle) {
       globalThis.cancelAnimationFrame(this._rafHandle);
       this._rafHandle = 0;
@@ -846,7 +847,7 @@ export class SchedulerSystem extends AbstractSystem {
    *
    * @param timestamp - `DOMHighResTimeStamp` from `requestAnimationFrame`
    */
-  private _onFrame(timestamp: DOMHighResTimeStamp): void {
+  protected _onFrame(timestamp: DOMHighResTimeStamp): void {
     // Schedule next frame first (standard game loop pattern).
     // If something pauses us during a callback, _stopLoop will cancel it.
     this._rafHandle = globalThis.requestAnimationFrame((ts) => this._onFrame(ts));
@@ -894,7 +895,7 @@ export class SchedulerSystem extends AbstractSystem {
    *
    * @param deadline - Absolute `performance.now()` time to stay under
    */
-  private _drainQueues(deadline: number): void {
+  protected _drainQueues(deadline: number): void {
     // Urgent: always drain fully, regardless of budget
     this._drainQueue(this._urgentQueue, Infinity);
 
@@ -926,7 +927,7 @@ export class SchedulerSystem extends AbstractSystem {
    * @param deadline - Absolute `performance.now()` time to stay under
    *                   (pass `Infinity` to drain unconditionally)
    */
-  private _drainQueue(queue: QueuedTask[], deadline: number): void {
+  protected _drainQueue(queue: QueuedTask[], deadline: number): void {
     while (queue.length > 0) {
       if (deadline !== Infinity && performance.now() >= deadline) break;
       const task = queue.shift()!;
@@ -948,7 +949,7 @@ export class SchedulerSystem extends AbstractSystem {
    * @param renderTime - Frame callback time (ms)
    * @param idleTime - Queue drain time (ms)
    */
-  private _updateMetrics(frameTime: number, renderTime: number, idleTime: number): void {
+  protected _updateMetrics(frameTime: number, renderTime: number, idleTime: number): void {
     const alpha = EMA_ALPHA;
 
     // Bootstrap EMA on the first real frame
@@ -983,7 +984,7 @@ export class SchedulerSystem extends AbstractSystem {
    * emits a `'pressure'` event if it changed.  Uses separate escalation
    * and recovery thresholds to prevent oscillation.
    */
-  private _computePressure(): void {
+  protected _computePressure(): void {
     const ratio = this._droppedCount / PRESSURE_WINDOW;
     const prev = this._pressure;
     let next: PressureLevel;

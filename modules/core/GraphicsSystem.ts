@@ -1,15 +1,15 @@
 import * as PIXI from 'pixi.js';
-import { TAU, WORLD_HALF, WORLD_ZOOM, Viewport, numWrap, vecEqual, vecLength, vecRotate, vecScale, vecSubtract } from '@rapid-sdk/math';
-
 import { AbstractSystem } from './AbstractSystem.ts';
 import { PixiEvents } from '../pixi/PixiEvents.ts';
 import { PixiScene } from '../pixi/PixiScene.ts';
 import { PixiTextures } from '../pixi/PixiTextures.ts';
+import { TAU, WORLD_HALF, WORLD_ZOOM, Viewport, numWrap, vecEqual, vecLength, vecRotate, vecScale, vecSubtract } from '@rapid-sdk/math';
 import { utilSetTransform } from '../util/util.ts';
 
 import type { Context } from '../Context.ts';
 import type { D3Selection } from 'd3-selection';
 import type { TransformProps, Vec2 } from '@rapid-sdk/math';
+
 
 /** Throttled rendering milliseconds (for now) */
 const THROTTLE = 250;
@@ -49,38 +49,39 @@ interface TransformEase {
  *   `statuschange`    Fires on status changes, receives 'contextlost' or 'contextrestored'
  */
 export class GraphicsSystem extends AbstractSystem {
-  highQuality: boolean;
+  public highQuality: boolean;
 
   // DOM elements
-  supersurface: HTMLDivElement;
-  surface: HTMLCanvasElement;
-  overlay: HTMLDivElement;
+  public supersurface: HTMLDivElement;
+  public surface: HTMLCanvasElement;
+  public overlay: HTMLDivElement;
 
   // Pixi objects
-  pixi: PIXI.Application | null;
-  stage: PIXI.Container | null;
-  origin: PIXI.Container | null;
-  scene: PixiScene | null;
-  eventManager: PixiEvents | null;
-  textureManager: PixiTextures | null;
+  public pixi: PIXI.Application | null;
+  public stage: PIXI.Container | null;
+  public origin: PIXI.Container | null;
+  public scene: PixiScene | null;
+  public eventManager: PixiEvents | null;
+  public textureManager: PixiTextures | null;
 
   // Private properties
-  private _pixiViewport: Viewport | null;
-  private _prevTransform: TransformProps;
-  private _isTempTransformed: boolean;
-  private _transformEase: TransformEase | null;
-  private _frame: number;
-  private _timeToNextRender: number;
-  private _appPending: boolean;
-  private _drawPending: boolean;
-  private _isContextLost: boolean;
-  private _unpauseFn: (() => void) | null;
+  protected _pixiViewport: Viewport | null;
+  protected _prevTransform: TransformProps;
+  protected _isTempTransformed: boolean;
+  protected _transformEase: TransformEase | null;
+  protected _frame: number;
+  protected _timeToNextRender: number;
+  protected _appPending: boolean;
+  protected _drawPending: boolean;
+  protected _isContextLost: boolean;
+  protected _unpauseFn: (() => void) | null;
+
 
   /**
    * @constructor
    * @param  context - Global shared application context
    */
-  constructor(context: Context) {
+  public constructor(context: Context) {
     super(context);
 
     this.id = 'gfx';
@@ -174,7 +175,7 @@ export class GraphicsSystem extends AbstractSystem {
    * Called after all core objects have been constructed.
    * @return  Promise resolved when this component has completed initialization
    */
-  initAsync(): Promise<void> {
+  public initAsync(): Promise<void> {
     if (this._initPromise) return this._initPromise;
 
     const context = this.context;
@@ -194,7 +195,7 @@ export class GraphicsSystem extends AbstractSystem {
    * Called after all core objects have been initialized.
    * @return  Promise resolved when this component has completed startup
    */
-  startAsync(): Promise<void> {
+  public startAsync(): Promise<void> {
     if (this._startPromise) return this._startPromise;
 
     const context = this.context;
@@ -219,7 +220,7 @@ export class GraphicsSystem extends AbstractSystem {
    * Note that calling `resetAsync` schedules an "immediate" redraw (on the next available tick).
    * @return  Promise resolved when this component has completed resetting
    */
-  resetAsync(): Promise<void> {
+  public resetAsync(): Promise<void> {
     this.immediateRedraw();
     return Promise.resolve();
   }
@@ -232,7 +233,7 @@ export class GraphicsSystem extends AbstractSystem {
    *
    * @param deltaMS - Milliseconds elapsed since the previous frame
    */
-  _tick(deltaMS: number): void {
+  protected _tick(deltaMS: number): void {
     if (!this._started || this._paused) return;
 
     // console.log('FPS=' + (1000 / deltaMS).toFixed(1));
@@ -298,7 +299,7 @@ export class GraphicsSystem extends AbstractSystem {
    * This is intended for most situations where new data is streaming in, but we can
    * allow the changes to batch up over several animation frames before rendering.
    */
-  deferredRedraw(): void {
+  public deferredRedraw(): void {
     this._appPending = true;
   }
 
@@ -309,7 +310,7 @@ export class GraphicsSystem extends AbstractSystem {
    * This is intended for interactive situations where the user did a thing and we want
    * the map to update on the next available animation frame to show their change.
    */
-  immediateRedraw(): void {
+  public immediateRedraw(): void {
     this._timeToNextRender = 0;    // asap
     this._appPending = true;
   }
@@ -321,7 +322,7 @@ export class GraphicsSystem extends AbstractSystem {
    * @param   duration    Duration of the transition in milliseconds, defaults to 0ms (asap)
    * @return  Promise that resolves when the transform has finished changing
    */
-  setTransformAsync(t: TransformProps, duration: number = 0): Promise<TransformProps> {
+  public setTransformAsync(t: TransformProps, duration: number = 0): Promise<TransformProps> {
     const now = window.performance.now();
     const context = this.context;
     const viewport = context.viewport;
@@ -366,7 +367,7 @@ export class GraphicsSystem extends AbstractSystem {
    *  - if the transform has changed from the last drawn transform,
    *    apply the difference to the supersurface and overlay
    */
-  _tform(): void {
+  protected _tform(): void {
     // Between APP and DRAW we dont want to change the transform at all.
     // This shouldn't happen, but we check for it just in case.
     if (this._drawPending) return;
@@ -481,7 +482,7 @@ export class GraphicsSystem extends AbstractSystem {
    * The "Rapid" part of the drawing.
    * Where we set up the scene graph and tell Pixi what needs to be drawn.
    */
-  _app(): void {
+  protected _app(): void {
     // Wait for textures to be loaded before attempting rendering.
     if (!this.textureManager?.loaded) return;
     if (!this._started || this._paused) return;
@@ -556,7 +557,7 @@ export class GraphicsSystem extends AbstractSystem {
    * The "Pixi" part of the drawing.
    * Where it converts Pixi geometries into WebGL instructions.
    */
-  _draw(): void {
+  protected _draw(): void {
     // Resize Pixi canvas if needed..
     // It will clear the canvas, so do this immediately before we render.
     const pixiDims = this._pixiViewport!.dimensions;
@@ -606,7 +607,7 @@ export class GraphicsSystem extends AbstractSystem {
   /**
    * Render some debug shapes (usually commented out)
    */
-  _renderDebug(): void {
+  protected _renderDebug(): void {
 //      const context = this.context;
 //      const mapViewport = context.viewport;
 //      const origin = this.origin;
@@ -678,7 +679,7 @@ export class GraphicsSystem extends AbstractSystem {
    * Initializes the Pixi Application
    * @return  Promise resolved when this Pixi has completed initialization
    */
-  _initPixiAsync(): Promise<void> {
+  protected _initPixiAsync(): Promise<void> {
     if (this.pixi) return Promise.resolve();   // was done already?
 
     const context = this.context;
@@ -738,7 +739,7 @@ export class GraphicsSystem extends AbstractSystem {
    * Steps to run after Pixi has completed initialization.
    * Set up scene, events, textures, stage, etc.
    */
-  _afterPixiInit(): void {
+  protected _afterPixiInit(): void {
     if (this.stage) return;   // done already?
 
     // Watch for WebGL context loss on context canvas - Rapid#1658
@@ -821,7 +822,7 @@ export class GraphicsSystem extends AbstractSystem {
    * Returns `true` if the WebGLContext is currently lost.
    * @return `true` if the WebGLContext is current lost
    */
-  isContextLost(): boolean {
+  public isContextLost(): boolean {
     return this._isContextLost;
   }
 
@@ -829,7 +830,7 @@ export class GraphicsSystem extends AbstractSystem {
    * Handler for webglcontextlost events on the canvas.
    * @param  e  - The WebGLContextEvent
    */
-  _handleGLContextLost(e: Event): void {
+  protected _handleGLContextLost(e: Event): void {
     e.preventDefault();
 
     const context = this.context;
@@ -870,7 +871,7 @@ export class GraphicsSystem extends AbstractSystem {
    * Handler for webglcontextrestored events on the canvas.
    * @param  _e  - The WebGLContextEvent (unused)
    */
-  _handleGLContextRestored(_e: Event): void {
+  protected _handleGLContextRestored(_e: Event): void {
     const context = this.context;
     const scheduler = context.systems.scheduler!;
 
@@ -913,7 +914,7 @@ export class GraphicsSystem extends AbstractSystem {
    * To test, try:  `rapidContext.systems.gfx.testContextLoss()`
    *  and see whether Pixi can deal with it.
    */
-  _destroyPixi(): void {
+  protected _destroyPixi(): void {
     if (!this.pixi) return;   // already destroyed
 
     const renderer = this.pixi!.renderer as PIXI.WebGLRenderer;
@@ -945,7 +946,7 @@ export class GraphicsSystem extends AbstractSystem {
   /**
    * For testing, attempt to lose the WebGL context and get it back.
    */
-  testContextLoss(): void {
+  public testContextLoss(): void {
     if (!this.pixi) return;
 
     const renderer = this.pixi!.renderer as PIXI.WebGLRenderer;

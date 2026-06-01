@@ -1,8 +1,7 @@
-import { utilArrayUniq } from '@rapid-sdk/util';
-import MiniSearch from 'minisearch';
-
 import { AbstractSystem } from './AbstractSystem.ts';
 import { Category, Field, Preset, Ruleset, Variable } from '../lib/index.ts';
+import MiniSearch from 'minisearch';
+import { utilArrayUniq } from '@rapid-sdk/util';
 import { utilIterable } from '../util/iterable.ts';
 import { utilExtractValues, utilWildcardDelete } from '../util/string.ts';
 
@@ -17,6 +16,7 @@ import type { PresetProps } from '../lib/Preset.ts';
 import type { RulesetProps } from '../lib/Ruleset.ts';
 import type { VariableProps, VariableValue } from '../lib/Variable.ts';
 import type { Vec2 } from '@rapid-sdk/math';
+
 
 // Make very sure this resolves to Rapid's `package.json`
 // If you mess up the `../`s, the resolver may import another random package.json from somewhere else.
@@ -178,34 +178,35 @@ export interface DeprecationRule {
  *   `schemachange`    Fires on any change in the available schemas
  */
 export class SchemaSystem extends AbstractSystem {
+
   /** The supported geometry types */
-  readonly geometryTypes: Set<GeometryType>;
+  public readonly geometryTypes: Set<GeometryType>;
   /** The supported field types */
-  readonly fieldTypes: Set<FieldType>;
+  public readonly fieldTypes: Set<FieldType>;
 
   /** Set of presetIDs that the user can add (if `null`, all are normally addable) */
-  addablePresetIDs: Set<PresetID> | null;
+  public addablePresetIDs: Set<PresetID> | null;
 
   /** Default schema file assetIDs */
-  private _defaultAssetIDs: Set<AssetID>;
+  protected _defaultAssetIDs: Set<AssetID>;
   /** Currently loaded schema file assetIDs, maps to the version string that was loaded, if known */
-  private _loadedAssetIDs: Map<AssetID, string>;
+  protected _loadedAssetIDs: Map<AssetID, string>;
   /** Requested schema file assetIDs - optional, these can be different than the default files */
-  private _requestedAssetIDs: Set<AssetID> | null;
+  protected _requestedAssetIDs: Set<AssetID> | null;
 
-  private _recentIDs: PresetID[] | null;
+  protected _recentIDs: PresetID[] | null;
 
   /** Per-scope data */
-  private _scopes: Map<ScopeID, SchemaScope>;
+  protected _scopes: Map<ScopeID, SchemaScope>;
 
-  private _currLocaleCode: LocaleCode | null;
+  protected _currLocaleCode: LocaleCode | null;
 
 
   /**
    * @constructor
    * @param context - Global shared application context
    */
-  constructor(context: Context) {
+  public constructor(context: Context) {
     super(context);
     this.id = 'schema';
     this.optionalDependencies = new Set(['assets', 'gfx', 'l10n', 'locations', 'storage', 'urlhash']);
@@ -248,7 +249,7 @@ export class SchemaSystem extends AbstractSystem {
    * Called after all core objects have been constructed.
    * @return  Promise resolved when this component has completed initialization
    */
-  override initAsync(): Promise<void> {
+  public override initAsync(): Promise<void> {
     if (this._initPromise) return this._initPromise;
 
     const context = this.context;
@@ -296,7 +297,7 @@ export class SchemaSystem extends AbstractSystem {
    * Called after all core objects have been initialized.
    * @return  Promise resolved when this component has completed startup
    */
-  override startAsync(): Promise<void> {
+  public override startAsync(): Promise<void> {
     return super.startAsync();
   }
 
@@ -305,7 +306,7 @@ export class SchemaSystem extends AbstractSystem {
    * Called after completing an edit session to reset any internal state
    * @return  Promise resolved when this component has completed resetting
    */
-  override resetAsync(): Promise<void> {
+  public override resetAsync(): Promise<void> {
     // Note: We don't reset the SchemaSystem here.
     // This method is called when the user starts a new session.
     return Promise.resolve();
@@ -315,7 +316,7 @@ export class SchemaSystem extends AbstractSystem {
   /**
    * @return Promise fulfilled when the schema assets have been loaded
    */
-  loadSchemaAssetsAsync(): Promise<void> {
+  public loadSchemaAssetsAsync(): Promise<void> {
     const context = this.context;
     const assets = context.systems.assets;
     const gfx = context.systems.gfx;
@@ -400,7 +401,7 @@ export class SchemaSystem extends AbstractSystem {
    * This puts the SchemaSystem internal data back to its initial state.
    * i.e. nothing loaded, only fallback presets.
    */
-  resetAll(): void {
+  public resetAll(): void {
     const context = this.context;
 
     this._loadedAssetIDs.clear();
@@ -477,7 +478,7 @@ gfx?.scene?.reset();  // throw it all away
    * @return  Default assetIDs
    * @readonly
    */
-  get defaultAssetIDs(): Set<AssetID> {
+  public get defaultAssetIDs(): Set<AssetID> {
     return this._defaultAssetIDs;
   }
 
@@ -486,7 +487,7 @@ gfx?.scene?.reset();  // throw it all away
    * @return  Loaded assetIDs
    * @readonly
    */
-  get loadedAssetIDs(): Map<AssetID, string> {
+  public get loadedAssetIDs(): Map<AssetID, string> {
     return this._loadedAssetIDs;
   }
 
@@ -504,7 +505,7 @@ gfx?.scene?.reset();  // throw it all away
    *   and subsequent calls to `loadSchemaAssetsAsync` will use the `defaultAssetIDs` Set.
    * @param vals - A `string`, `Array<string>` or `Set<string>` of assetIDs to load (or `null` to disable)
    */
-  set requestedAssetIDs(vals: OneOrMore<AssetID> | null) {
+  public set requestedAssetIDs(vals: OneOrMore<AssetID> | null) {
     if (vals === null || vals === undefined) {
       this._requestedAssetIDs = null;
       return;
@@ -522,7 +523,7 @@ gfx?.scene?.reset();  // throw it all away
       }
     }
   }
-  get requestedAssetIDs(): Set<AssetID> | null {
+  public get requestedAssetIDs(): Set<AssetID> | null {
     return this._requestedAssetIDs;
   }
 
@@ -560,7 +561,7 @@ gfx?.scene?.reset();  // throw it all away
    * @param  input - schema data to merge into the SchemaSystem
    * @throws  Will throw if given data does not contain a `assetID`, or if the `assetID` has already been merged
    */
-  merge(input: SchemaInput): void {
+  public merge(input: SchemaInput): void {
     const context = this.context;
     const locations = context.systems.locations;
 
@@ -745,7 +746,7 @@ gfx?.scene?.reset();  // throw it all away
    * @param scopeID - ID of the scope to look up
    * @return The scope data
    */
-  getScope(scopeID: ScopeID): SchemaScope {
+  public getScope(scopeID: ScopeID): SchemaScope {
     let scope = this._scopes.get(scopeID);
     if (!scope) {
       // Doesn't exist yet - create.
@@ -802,7 +803,7 @@ gfx?.scene?.reset();  // throw it all away
    * @return  A Minisearch `SearchResult`, containing the score and information about the match
    * @throws  Will throw if the search index is not ready
    */
-  search(
+  public search(
     query: string = '',
     geometries: OneOrMore<GeometryType> = [],
     loc: Vec2 | null = null,
@@ -895,7 +896,7 @@ gfx?.scene?.reset();  // throw it all away
    * @param   graph   - the Graph containing this Entity
    * @return  Preset that best matches
    */
-  match(entity: OsmEntity, graph: Graph): Preset | null {
+  public match(entity: OsmEntity, graph: Graph): Preset | null {
     return entity.transient('presetMatch', () => {
       let geometry = entity.geometry(graph) as GeometryType;
       // Treat entities on addr:interpolation lines as points, not vertices - iD#3241
@@ -917,7 +918,7 @@ gfx?.scene?.reset();  // throw it all away
    * @param   scopeID - Scope to match in (defaults to 'osm')
    * @return  Preset that best matches
    */
-  matchTags(tags: OsmTags, geometry: GeometryType, loc?: Vec2, scopeID: ScopeID = 'osm'): Preset | null {
+  public matchTags(tags: OsmTags, geometry: GeometryType, loc?: Vec2, scopeID: ScopeID = 'osm'): Preset | null {
     const context = this.context;
     const locations = context.systems.locations;
 
@@ -980,7 +981,7 @@ gfx?.scene?.reset();  // throw it all away
    * @param   graph   - the Graph containing this Entity
    * @return  `true` if this entity can be a vertex, `false` if not
    */
-  allowsVertex(entity: OsmEntity, graph: Graph): boolean {
+  public allowsVertex(entity: OsmEntity, graph: Graph): boolean {
     if (entity.type !== 'node') return false;
     if (Object.keys(entity.tags).length === 0) return true;
 
@@ -1014,7 +1015,7 @@ gfx?.scene?.reset();  // throw it all away
    * @param   scopeID - Scope to query (defaults to 'osm')
    * @returns  areaKeys Object
    */
-  areaKeys(scopeID: ScopeID = 'osm'): TagKeyValueLookup {
+  public areaKeys(scopeID: ScopeID = 'osm'): TagKeyValueLookup {
     const scope = this.getScope(scopeID);
 
     // The ignore list is for keys that imply lines. (We always add `area=yes` for exceptions)
@@ -1060,7 +1061,7 @@ gfx?.scene?.reset();  // throw it all away
    * @param scopeID - Scope to query (defaults to 'osm')
    * @return The key with lifecycle prefix removed, or the original key
    */
-  removeLifecyclePrefix(key: string, scopeID: ScopeID = 'osm'): string {
+  public removeLifecyclePrefix(key: string, scopeID: ScopeID = 'osm'): string {
     const colonIndex = key.indexOf(':');
     if (colonIndex === -1) return key;
 
@@ -1082,7 +1083,7 @@ gfx?.scene?.reset();  // throw it all away
    * @param   scopeID - Scope to query (defaults to 'osm')
    * @return  Array of deprecation rules that match the given tags
    */
-  getDeprecatedTags(tags: OsmTags, scopeID: ScopeID = 'osm'): DeprecationRule[] {
+  public getDeprecatedTags(tags: OsmTags, scopeID: ScopeID = 'osm'): DeprecationRule[] {
     const scope = this.getScope(scopeID);
     const results: DeprecationRule[] = [];
 
@@ -1142,7 +1143,7 @@ gfx?.scene?.reset();  // throw it all away
    * @param   scopeID - Scope to query (defaults to 'osm')
    * @return  The fallback preset, or `undefined` if not found
    */
-  getFallback(geometry: GeometryType, scopeID: ScopeID = 'osm'): Preset | undefined {
+  public getFallback(geometry: GeometryType, scopeID: ScopeID = 'osm'): Preset | undefined {
     if (geometry === 'vertex') {
       geometry = 'point';
     }
@@ -1161,7 +1162,7 @@ gfx?.scene?.reset();  // throw it all away
    * @param   scopeID - Scope to query (defaults to 'osm')
    * @return  Array of Categories and Presets
    */
-  getDefaults(
+  public getDefaults(
     geometry: GeometryType,
     includeRecents: boolean = true,
     loc: Vec2 | null = null,
@@ -1230,7 +1231,7 @@ gfx?.scene?.reset();  // throw it all away
    * @param   scopeID - Scope to query (defaults to 'osm')
    * @return  An Array of recent presets
    */
-  getRecents(scopeID: ScopeID = 'osm'): Preset[] {
+  public getRecents(scopeID: ScopeID = 'osm'): Preset[] {
     const context = this.context;
     const storage = context.systems.storage;
     const scope = this.getScope(scopeID);
@@ -1263,7 +1264,7 @@ gfx?.scene?.reset();  // throw it all away
    * Prepends a preset to the recently used Presets array.
    * @param  preset - A preset to add
    */
-  setMostRecent(preset: Preset): void {
+  public setMostRecent(preset: Preset): void {
     if (!preset?.props?.searchable) return;
 
     const storage = this.context.systems.storage;
@@ -1283,7 +1284,7 @@ gfx?.scene?.reset();  // throw it all away
    * Tell the AssetSystem where to find the default schema files.
    * This is called during initAsync before loading the assets.
    */
-  private _registerDefaultAssets(): void {
+  protected _registerDefaultAssets(): void {
     const assets = this.context.systems.assets!;
 
     // Tell the AssetSystem what to load..
@@ -1335,7 +1336,7 @@ gfx?.scene?.reset();  // throw it all away
    * @param currParams - The current hash parameters
    * @param prevParams - The previous hash parameters
    */
-  private _hashChanged(currParams: Map<string, string>, prevParams: Map<string, string>): void {
+  protected _hashChanged(currParams: Map<string, string>, prevParams: Map<string, string>): void {
     // schema
     // AssetIDs to request, e.g. `schema=default,my_presets`
     const newSchema = currParams.get('schema');
@@ -1357,7 +1358,7 @@ gfx?.scene?.reset();  // throw it all away
    * These are cached, so switching back to an already-seen locale should be fast.
    * @param  localeCode - optional new locale code (fallback to getting it from LocalizationSystem, or en-US)
    */
-  private _localeChanged(localeCode?: string): void {
+  protected _localeChanged(localeCode?: string): void {
     const l10n = this.context.systems.l10n;
 
     // Ensure that we have a current locale code.
@@ -1385,7 +1386,7 @@ gfx?.scene?.reset();  // throw it all away
    * Prepares a MiniSearch index for the current locale code, per scope.
    * These are cached, so switching back to an already-seen locale should be fast.
    */
-  private _prepareSearchIndex(): void {
+  protected _prepareSearchIndex(): void {
     const l10n = this.context.systems.l10n;
 
     // Ensure that we have a current locale code.
@@ -1417,7 +1418,7 @@ gfx?.scene?.reset();  // throw it all away
    * This may be a bit slow, so consider making this async.
    * @param scope - The scope to rebuild the search index for
    */
-  private _rebuildSearchIndex(scope: SchemaScope): void {
+  protected _rebuildSearchIndex(scope: SchemaScope): void {
     if (!scope.currSearchIndex) {
       this._prepareSearchIndex();  // sets up currSearchIndex for all scopes
     }
@@ -1443,7 +1444,7 @@ gfx?.scene?.reset();  // throw it all away
    * (The new schema may have different presets with different strings)
    * This will trigger a redraw, and emit a 'schemachange' event.
    */
-  private _schemaChanged(): void {
+  protected _schemaChanged(): void {
     const context = this.context;
     const gfx = context.systems.gfx;
 

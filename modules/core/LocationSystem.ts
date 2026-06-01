@@ -1,12 +1,12 @@
+import { AbstractSystem } from './AbstractSystem.ts';
+import { GeoJSONData } from '../data/GeoJSONData.ts';
 import LocationConflation from '@rapideditor/location-conflation';
 import whichPolygon from 'which-polygon';
 
-import { AbstractSystem } from './AbstractSystem.ts';
-import { GeoJSONData } from '../data/GeoJSONData.ts';
-
+import type { Context } from '../Context.ts';
 import type { Extent, Vec2, Vec4 } from '@rapid-sdk/math';
 import type { HasLocationSet, HasLocationSetID } from '@rapideditor/location-conflation';
-import type { Context } from '../Context.ts';
+
 
 /**
  * A blocked region definition.
@@ -41,19 +41,20 @@ interface BlockedRegion extends HasLocationSet {
  *   `locationchange`  Fires on any change in the location index
  */
 export class LocationSystem extends AbstractSystem {
-  /** A location-conflation resolver (owns the locationSet registry + spatial index) */
-  private _resolver: LocationConflation;
 
-  /** A which-polygon index for blocked regions only */
-  private _wpblocks: ReturnType<typeof whichPolygon>;
   /** Map of locationSetID to resolved GeoJSONData for blocked regions */
-  private _blockFeatures: Map<LocationSetID, GeoJSONData>;
+  protected _blockFeatures: Map<LocationSetID, GeoJSONData>;
+  /** A location-conflation resolver (owns the locationSet registry + spatial index) */
+  protected _resolver: LocationConflation;
+  /** A which-polygon index for blocked regions only */
+  protected _wpblocks: ReturnType<typeof whichPolygon>;
+
 
   /**
    * @constructor
    * @param context - Global shared application context
    */
-  constructor(context: Context) {
+  public constructor(context: Context) {
     super(context);
     this.id = 'locations';
 
@@ -84,7 +85,7 @@ export class LocationSystem extends AbstractSystem {
    * Called after all core objects have been constructed.
    * @return  Promise resolved when this component has completed initialization
    */
-  initAsync(): Promise<void> {
+  public initAsync(): Promise<void> {
     return super.initAsync();
   }
 
@@ -93,7 +94,7 @@ export class LocationSystem extends AbstractSystem {
    * Called after all core objects have been initialized.
    * @return  Promise resolved when this component has completed startup
    */
-  startAsync(): Promise<void> {
+  public startAsync(): Promise<void> {
     return super.startAsync();
   }
 
@@ -102,7 +103,7 @@ export class LocationSystem extends AbstractSystem {
    * Called after completing an edit session to reset any internal state
    * @return  Promise resolved when this component has completed resetting
    */
-  resetAsync(): Promise<void> {
+  public resetAsync(): Promise<void> {
     return Promise.resolve();
   }
 
@@ -111,7 +112,7 @@ export class LocationSystem extends AbstractSystem {
    * Resolves a blocked region's locationSet into a GeoJSONData feature, assigning
    * `locationSetID` on the block in place. Returns `undefined` if resolution fails.
    */
-  private _resolveBlock(block: BlockedRegion): GeoJSONData | undefined {
+  protected _resolveBlock(block: BlockedRegion): GeoJSONData | undefined {
     try {
       const result = this._resolver.resolveLocationSet(block.locationSet);
       if (!result.feature.geometry.coordinates.length || !result.feature.properties?.area) {
@@ -138,7 +139,7 @@ export class LocationSystem extends AbstractSystem {
    * Exposed so other systems (e.g. NSI's `Matcher.buildLocationIndex`) can share
    * the same resolver/registry/spatial index.
    */
-  resolver(): LocationConflation {
+  public resolver(): LocationConflation {
     return this._resolver;
   }
 
@@ -150,7 +151,7 @@ export class LocationSystem extends AbstractSystem {
    *
    * @param fc - FeatureCollection-like Object containing custom locations
    */
-  mergeCustomGeoJSON(fc: GeoJSON.FeatureCollection): void {
+  public mergeCustomGeoJSON(fc: GeoJSON.FeatureCollection): void {
     this._resolver.addFeatures(fc);
   }
 
@@ -176,7 +177,7 @@ export class LocationSystem extends AbstractSystem {
    * @param objects - Objects to check - they should have `locationSet` property
    * @return Promise resolved with the objects (this function used to be slow/async, now it's faster and sync)
    */
-  mergeLocationSets(objects: HasLocationSet[]): Promise<HasLocationSetID[]> {
+  public mergeLocationSets(objects: HasLocationSet[]): Promise<HasLocationSetID[]> {
     if (!Array.isArray(objects)) return Promise.reject('nothing to do');
 
     const registered = this._resolver.registerLocationSets(objects);
@@ -202,7 +203,7 @@ export class LocationSystem extends AbstractSystem {
    * @param loc - `[lon,lat]` location to query, e.g. `[-74.4813, 40.7967]`
    * @return Result locationSetIDs valid at given location
    */
-  locationSetsAt(loc: Vec2): Map<LocationSetID, number> {
+  public locationSetsAt(loc: Vec2): Map<LocationSetID, number> {
     return this._resolver.locationSetsAt(loc);
   }
 
@@ -212,7 +213,7 @@ export class LocationSystem extends AbstractSystem {
    * @param loc - `[lon,lat]` location to query, e.g. `[-74.4813, 40.7967]`
    * @return `true` if a block exists there, `false` if not
    */
-  isBlockedAt(loc: Vec2): boolean {
+  public isBlockedAt(loc: Vec2): boolean {
     return !!this._wpblocks(loc);
   }
 
@@ -222,7 +223,7 @@ export class LocationSystem extends AbstractSystem {
    * @param extent - the extent to query
    * @return Array of GeoJSONData data objects
    */
-  getBlocks(extent: Extent): GeoJSONData[] {
+  public getBlocks(extent: Extent): GeoJSONData[] {
     const hits = this._wpblocks.bbox(extent.rectangle() as Vec4);
     const results = new Set<GeoJSONData>();
 

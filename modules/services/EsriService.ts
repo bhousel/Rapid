@@ -1,9 +1,8 @@
-import { Extent, Tiler } from '@rapid-sdk/math';
-import { utilQsString } from '@rapid-sdk/util';
-
 import { AbstractSystem } from '../core/AbstractSystem.ts';
+import { Extent, Tiler } from '@rapid-sdk/math';
 import { Graph, RapidDataset, Tree } from '../lib/index.ts';
 import { OsmNode, OsmRelation, OsmWay } from '../data/index.ts';
+import { utilQsString } from '@rapid-sdk/util';
 
 import type { Context } from '../Context.ts';
 import type { OsmEntity } from '../data/OsmEntity.ts';
@@ -108,18 +107,20 @@ interface EsriField {
  * @see https://developers.arcgis.com/rest/
  */
 export class EsriService extends AbstractSystem {
+
   /** Tiler instance configured for the Esri tile zoom level */
-  _tiler: Tiler;
+  protected _tiler: Tiler;
   /** Map of all known Esri datasets, keyed by DatasetID */
-  _datasets: Map<DatasetID, EsriDatasetEntry>;
+  protected _datasets: Map<DatasetID, EsriDatasetEntry>;
   /** Cached promise for the initial dataset catalog load, to avoid duplicate fetches */
-  _datasetsPromise: Promise<Map<DatasetID, EsriDatasetEntry>> | null;
+  protected _datasetsPromise: Promise<Map<DatasetID, EsriDatasetEntry>> | null;
+
 
   /**
    * @constructor
    * @param context - Global shared application context
    */
-  constructor(context: Context) {
+  public constructor(context: Context) {
     super(context);
     this.id = 'esri';
     this.requiredDependencies = new Set<SystemID>(['network', 'spatial']);
@@ -136,7 +137,7 @@ export class EsriService extends AbstractSystem {
    * Called after all core objects have been constructed.
    * @return Promise resolved when this component has completed initialization
    */
-  initAsync(): Promise<void> {
+  public initAsync(): Promise<void> {
     if (this._initPromise) return this._initPromise;
 
     return this._initPromise = super.initAsync()
@@ -150,7 +151,7 @@ export class EsriService extends AbstractSystem {
    * Called after all core objects have been initialized.
    * @return Promise resolved when this component has completed startup
    */
-  startAsync(): Promise<void> {
+  public startAsync(): Promise<void> {
     return super.startAsync();
   }
 
@@ -159,7 +160,7 @@ export class EsriService extends AbstractSystem {
    * Called after completing an edit session to reset any internal state
    * @return Promise resolved when this component has completed resetting
    */
-  resetAsync(): Promise<void> {
+  public resetAsync(): Promise<void> {
     const network = this.context.systems.network!;
 
     network.abortMatching(id => /^esri-/.test(id));
@@ -182,7 +183,7 @@ export class EsriService extends AbstractSystem {
    * Called by `RapidSystem` to get the datasets that this service provides.
    * @return The datasets this service provides
    */
-  getAvailableDatasets(): RapidDataset[] {
+  public getAvailableDatasets(): RapidDataset[] {
     // Convert the internal dataset objects into "Rapid" datasets for the catalog.
     // We expect them to be all loaded now because `_loadDatasetsAsync` is called by `initAsync`
     //  and `getAvailableDatasets` is called by RapidSystem's `startAsync`.
@@ -226,7 +227,7 @@ export class EsriService extends AbstractSystem {
    * @param datasetID - datasetID to get data for
    * @return Array of data (OSM Entities)
    */
-  getData(datasetID: DatasetID): OsmEntity[] {
+  public getData(datasetID: DatasetID): OsmEntity[] {
     const ds = this._datasets.get(datasetID);
     if (!ds || !ds.tree || !ds.graph) return [];
 
@@ -240,7 +241,7 @@ export class EsriService extends AbstractSystem {
    * @param datasetID - datasetID to get data for
    * @return The graph holding the data, or `undefined` if not found
    */
-  graph(datasetID: DatasetID): Graph | undefined {
+  public graph(datasetID: DatasetID): Graph | undefined {
     const ds = this._datasets.get(datasetID);
     return ds?.graph;
   }
@@ -254,7 +255,7 @@ export class EsriService extends AbstractSystem {
    * @param title - the title to consider
    * @return The same title in most cases, or the proper google buildings title if applicable.
    */
-  getDataUsed(title: string): string {
+  public getDataUsed(title: string): string {
     if (title.startsWith('Google Buildings for')) {
       return 'Google Open Buildings';
     } else {
@@ -268,7 +269,7 @@ export class EsriService extends AbstractSystem {
    * @param datasetID - datasetID to load tiles for
    * @throws Will throw if the datasetID is not found
    */
-  loadTiles(datasetID: DatasetID): void {
+  public loadTiles(datasetID: DatasetID): void {
     if (this._paused) return;
 
     const ds = this._datasets.get(datasetID);
@@ -323,7 +324,7 @@ export class EsriService extends AbstractSystem {
    * Loads all the available datasets from the Esri server
    * @return Promise resolved when all pages of datasets have been loaded
    */
-  _loadDatasetsAsync(): Promise<Map<DatasetID, EsriDatasetEntry>> {
+  protected _loadDatasetsAsync(): Promise<Map<DatasetID, EsriDatasetEntry>> {
     if (this._datasetsPromise) return this._datasetsPromise;
 
     const network = this.context.systems.network!;
@@ -356,7 +357,7 @@ export class EsriService extends AbstractSystem {
    * Add this dataset to the list of available datasets
    * @param ds - the dataset metadata from ArcGIS
    */
-  _parseDataset(ds: any): void {
+  protected _parseDataset(ds: any): void {
     if (this._datasets.has(ds.id)) return;  // unless we've seen it already
 
     this._datasets.set(ds.id, ds);
@@ -387,7 +388,7 @@ export class EsriService extends AbstractSystem {
    * @param ds - the dataset to load the schema information
    * @return Promise resolved with the layer data when the dataset schema has been loaded
    */
-  _loadDatasetLayerAsync(ds: EsriDatasetEntry): Promise<EsriLayer | void> {
+  protected _loadDatasetLayerAsync(ds: EsriDatasetEntry): Promise<EsriLayer | void> {
     if (!ds || !ds.url) {
       return Promise.reject(`No dataset`);
     } else if (ds.layer) {    // done already
@@ -429,7 +430,7 @@ export class EsriService extends AbstractSystem {
    * @param start - the starting page
    * @return the url to fetch the datasets
    */
-  _searchURL(start: number): string {
+  protected _searchURL(start: number): string {
     const params = {
       f: 'json',
       sortField: 'title',
@@ -453,7 +454,7 @@ export class EsriService extends AbstractSystem {
    * @param featureServerURL - The feature server URL
    * @return The url to fetch the layers
    */
-  _layerURL(featureServerURL: string): string {
+  protected _layerURL(featureServerURL: string): string {
     return `${featureServerURL}/layers?f=json`;
     // should return single layer(?)
     // .layers[0]
@@ -469,7 +470,7 @@ export class EsriService extends AbstractSystem {
    * @param page - what page of data to fetch (zero-based)
    * @return The url to fetch the data
    */
-  _tileURL(ds: EsriDatasetEntry, tile: Tile, page: number = 0): string {
+  protected _tileURL(ds: EsriDatasetEntry, tile: Tile, page: number = 0): string {
     const layerID = ds.layer!.id;
     const maxRecordCount = ds.layer!.maxRecordCount || 2000;
     const extent = tile.wgs84Extent;
@@ -494,7 +495,7 @@ export class EsriService extends AbstractSystem {
    * @param tile - the tile to fetch the data for
    * @param page - what page of data to fetch (zero-based)
    */
-  _loadTilePage(ds: EsriDatasetEntry, tile: Tile, page: number): void {
+  protected _loadTilePage(ds: EsriDatasetEntry, tile: Tile, page: number): void {
     const cache = ds.cache;
     const tileID = tile.id;
     if (cache.loaded.has(tileID)) return;
@@ -544,7 +545,7 @@ export class EsriService extends AbstractSystem {
    * @param geojson - the result GeoJSON data
    * @param callback - errback-style callback function to call with results
    */
-  _parseTile(ds: EsriDatasetEntry, tile: Tile, geojson: GeoJSON.FeatureCollection, callback: (err: any, results?: OsmEntity[]) => void): void {
+  protected _parseTile(ds: EsriDatasetEntry, tile: Tile, geojson: GeoJSON.FeatureCollection, callback: (err: any, results?: OsmEntity[]) => void): void {
     if (!geojson) return callback({ message: 'No GeoJSON', status: -1 });
 
     // Expect a FeatureCollection with `features` array
@@ -566,7 +567,7 @@ export class EsriService extends AbstractSystem {
    * @param feature - the GeoJSON feature that we fetched
    * @return An array of OSMEntities for that feature, or `null` if we skipped it
    */
-  _parseFeature(ds: EsriDatasetEntry, feature: GeoJSON.Feature): OsmEntity[] | null {
+  protected _parseFeature(ds: EsriDatasetEntry, feature: GeoJSON.Feature): OsmEntity[] | null {
     const context = this.context;
     const geom = feature.geometry;
     const properties = feature.properties;

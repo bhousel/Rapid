@@ -1,13 +1,12 @@
-import { Tiler } from '@rapid-sdk/math';
-
 import { AbstractSystem } from '../core/AbstractSystem.ts';
 import { Graph, RapidDataset, Tree } from '../lib/index.ts';
+import { Tiler } from '@rapid-sdk/math';
 import { OsmNode, OsmWay } from '../data/index.ts';
 
 import type { Context } from '../Context.ts';
+import type { Extent, Tile } from '@rapid-sdk/math';
 import type { OsmEntity } from '../data/OsmEntity.ts';
 import type { ParserResult, ParsedWay } from '../data/parsers/types.ts';
-import type { Extent, Tile } from '@rapid-sdk/math';
 
 
 /** Base URL for the MapWithAI vector tile API endpoint */
@@ -44,16 +43,17 @@ interface DatasetCache {
  * `MapWithAIService` connects to Meta's MapWithAI API to fetch data about Meta-hosted datasets.
  */
 export class MapWithAIService extends AbstractSystem {
+
   /** Tiler instance used to compute tile coverage for the current viewport */
-  _tiler: Tiler;
+  protected _tiler: Tiler;
   /** Map of dataset IDs to their DatasetCache objects */
-  _datasets: Map<DatasetID, DatasetCache>;
+  protected _datasets: Map<DatasetID, DatasetCache>;
 
   /**
    * @constructor
    * @param context - Global shared application context
    */
-  constructor(context: Context) {
+  public constructor(context: Context) {
     super(context);
     this.id = 'mapwithai';
     this.requiredDependencies = new Set<SystemID>(['network', 'spatial']);
@@ -68,7 +68,7 @@ export class MapWithAIService extends AbstractSystem {
    * Called after all core objects have been constructed.
    * @return Promise resolved when this component has completed initialization
    */
-  initAsync(): Promise<void> {
+  public initAsync(): Promise<void> {
     if (this._initPromise) return this._initPromise;
 
     const network = this.context.systems.network!;
@@ -90,7 +90,7 @@ export class MapWithAIService extends AbstractSystem {
    * Called after all core objects have been initialized.
    * @return Promise resolved when this component has completed startup
    */
-  startAsync(): Promise<void> {
+  public startAsync(): Promise<void> {
     return super.startAsync();
   }
 
@@ -99,7 +99,7 @@ export class MapWithAIService extends AbstractSystem {
    * Called after completing an edit session to reset any internal state
    * @return Promise resolved when this component has completed resetting
    */
-  resetAsync(): Promise<void> {
+  public resetAsync(): Promise<void> {
     const context = this.context;
     const network = context.systems.network!;
 
@@ -123,7 +123,7 @@ export class MapWithAIService extends AbstractSystem {
    * Called by `RapidSystem` to get the datasets that this service provides.
    * @return The datasets this service provides
    */
-  getAvailableDatasets(): RapidDataset[] {
+  public getAvailableDatasets(): RapidDataset[] {
     const context = this.context;
 
     const fbRoads = new RapidDataset(context, {
@@ -205,7 +205,7 @@ export class MapWithAIService extends AbstractSystem {
    * @param datasetID - the cache to get (or create)
    * @return dataset cache
    */
-  getDataset(datasetID: DatasetID): DatasetCache {
+  public getDataset(datasetID: DatasetID): DatasetCache {
     let ds = this._datasets.get(datasetID);
     if (!ds) {
       const graph = new Graph(this.context);
@@ -231,7 +231,7 @@ export class MapWithAIService extends AbstractSystem {
    * @param datasetID - datasetID to get data for
    * @return Array of data (OSM Entities)
    */
-  getData(datasetID: DatasetID): OsmEntity[] {
+  public getData(datasetID: DatasetID): OsmEntity[] {
     const ds = this._datasets.get(datasetID);
     if (!ds || !ds.tree || !ds.graph) return [];
 
@@ -244,7 +244,7 @@ export class MapWithAIService extends AbstractSystem {
    * Schedule any data requests needed to cover the current map view
    * @param datasetID - datasetID to load tiles for
    */
-  loadTiles(datasetID: DatasetID): void {
+  public loadTiles(datasetID: DatasetID): void {
     if (this._paused) return;
 
     const context = this.context;
@@ -273,7 +273,7 @@ export class MapWithAIService extends AbstractSystem {
    * @param ds - the dataset info
    * @param tile - a tile object
    */
-  loadTile(ds: DatasetCache, tile: Tile): void {
+  public loadTile(ds: DatasetCache, tile: Tile): void {
     if (!ds || this._paused) return;
 
     const context = this.context;
@@ -315,7 +315,7 @@ export class MapWithAIService extends AbstractSystem {
    * @param ds - the dataset info
    * @param tile - a tile object
    */
-  _gotTile(results: ParserResult, ds: DatasetCache, tile: Tile): void {
+  protected _gotTile(results: ParserResult, ds: DatasetCache, tile: Tile): void {
     if (!results) return;  // ignore empty responses
 
     const context = this.context;
@@ -393,7 +393,7 @@ export class MapWithAIService extends AbstractSystem {
    * @param datasetID - dataset to get the graph for
    * @return the dataset's Graph
    */
-  graph(datasetID: DatasetID): Graph {
+  public graph(datasetID: DatasetID): Graph {
     const ds = this.getDataset(datasetID);  // create caches, if needed
     return ds.graph;
   }
@@ -405,7 +405,7 @@ export class MapWithAIService extends AbstractSystem {
    * @param datasetID - dataset to merge into
    * @param entities - entities to merge
    */
-  merge(datasetID: DatasetID, entities: OsmEntity[]): void {
+  public merge(datasetID: DatasetID, entities: OsmEntity[]): void {
     const ds = this.getDataset(datasetID);  // create caches, if needed
     ds.graph.rebase(entities);
     ds.tree.rebase(entities);
@@ -418,7 +418,7 @@ export class MapWithAIService extends AbstractSystem {
    * @param extent - geographic extent of the tile
    * @return the fully-qualified API URL
    */
-  _tileURL(dataset: DatasetCache, extent: Extent): string {
+  protected _tileURL(dataset: DatasetCache, extent: Extent): string {
     const context = this.context;
     const rapid = context.systems.rapid;
     const urlhash = context.systems.urlhash;
@@ -483,7 +483,7 @@ export class MapWithAIService extends AbstractSystem {
    * Call this sometimes to reassemble ways that were split by the server.
    * @param ds - the dataset info
    */
-  _connectSplitWays(ds: DatasetCache): OsmWay[] {
+  protected _connectSplitWays(ds: DatasetCache): OsmWay[] {
     const context = this.context;
     const graph = ds.graph;
     const results: OsmWay[] = [];

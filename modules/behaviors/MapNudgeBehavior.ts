@@ -1,5 +1,5 @@
-import { numClamp, vecScale } from '@rapid-sdk/math';
 import { AbstractBehavior } from './AbstractBehavior.ts';
+import { numClamp, vecScale } from '@rapid-sdk/math';
 
 import type { FederatedPointerEvent } from 'pixi.js';
 import type { Vec2 } from '@rapid-sdk/math';
@@ -19,16 +19,18 @@ const MAP_NUDGE_INTERVAL = 16;
  *   `nudge`    Fires when the map nudges - receives the [x,y] amount panned in pixels
  */
 export class MapNudgeBehavior extends AbstractBehavior {
+
   /** The current nudge amount [x, y] to pan each interval */
-  private _nudge: Vec2;
+  protected _nudge: Vec2;
   /** The interval ID for the nudge timer */
-  private _intervalID: ReturnType<typeof setInterval> | null;
+  protected _intervalID: ReturnType<typeof setInterval> | null;
+
 
   /**
    * @constructor
    * @param  context - Global shared application context
    */
-  constructor(context: Context) {
+  public constructor(context: Context) {
     super(context);
     this.id = 'mapNudge';
 
@@ -44,7 +46,7 @@ export class MapNudgeBehavior extends AbstractBehavior {
   /**
    * Bind event handlers
    */
-  enable(): void {
+  public enable(): void {
     if (this._enabled) return;
 
     this._nudge = [0, 0];
@@ -65,7 +67,7 @@ export class MapNudgeBehavior extends AbstractBehavior {
    * This is because: the "Add Line" "Add Area" buttons are in the top toolbar, and if
    * the user clicks one of those, we don't want the map to immediately start nudging up.
    */
-  allow(): void {
+  public allow(): void {
     this._enabled = true;
   }
 
@@ -73,7 +75,7 @@ export class MapNudgeBehavior extends AbstractBehavior {
   /**
    * Unbind event handlers
    */
-  disable(): void {
+  public disable(): void {
     this._enabled = false;
 
     const gfx = this.context.systems.gfx!;
@@ -91,7 +93,7 @@ export class MapNudgeBehavior extends AbstractBehavior {
    * Handler for pointermove events.
    * @param  e - A Pixi FederatedPointerEvent
    */
-  _pointermove(e: FederatedPointerEvent): void {
+  protected _pointermove(e: FederatedPointerEvent): void {
     if (!this._enabled) return;
 
     const context = this.context;
@@ -133,7 +135,7 @@ export class MapNudgeBehavior extends AbstractBehavior {
   /**
    * Called by the `setInterval` handler to pan the map.
    */
-  _doNudge(): void {
+  protected _doNudge(): void {
     if (!this._enabled) return;
 
     const map = this.context.systems.map!;

@@ -61,14 +61,16 @@ interface SpatialCache {
  *  - Various rbushes scattered around the service code
  */
 export class SpatialSystem extends AbstractSystem {
+
   /** Map of datasetID to SpatialCache */
-  private _caches: Map<DatasetID, SpatialCache>;
+  protected _caches: Map<DatasetID, SpatialCache>;
+
 
   /**
    * @constructor
    * @param context - Global shared application context
    */
-  constructor(context: Context) {
+  public constructor(context: Context) {
     super(context);
     this.id = 'spatial';
 
@@ -80,7 +82,7 @@ export class SpatialSystem extends AbstractSystem {
    * Called after all core objects have been constructed.
    * @return Promise resolved when this component has completed initialization
    */
-  initAsync(): Promise<void> {
+  public initAsync(): Promise<void> {
     return super.initAsync();
   }
 
@@ -89,7 +91,7 @@ export class SpatialSystem extends AbstractSystem {
    * Called after all core objects have been initialized.
    * @return Promise resolved when this component has completed startup
    */
-  startAsync(): Promise<void> {
+  public startAsync(): Promise<void> {
     return super.startAsync();
   }
 
@@ -98,7 +100,7 @@ export class SpatialSystem extends AbstractSystem {
    * Called after completing an edit session to reset any internal state
    * @return Promise resolved when this component has completed resetting
    */
-  resetAsync(): Promise<void> {
+  public resetAsync(): Promise<void> {
     for (const datasetID of this._caches.keys()) {
       this.clearCache(datasetID);
     }
@@ -112,7 +114,7 @@ export class SpatialSystem extends AbstractSystem {
    * @param datasetID - the cache to get (or create)
    * @return cache data
    */
-  getCache(datasetID: DatasetID): SpatialCache {
+  public getCache(datasetID: DatasetID): SpatialCache {
     let cache = this._caches.get(datasetID);
     if (!cache) {
       cache = {
@@ -133,7 +135,7 @@ export class SpatialSystem extends AbstractSystem {
    * Clear (remove all items from) the given cache
    * @param datasetID - the cache to clear
    */
-  clearCache(datasetID: DatasetID): void {
+  public clearCache(datasetID: DatasetID): void {
     const cache = this.getCache(datasetID);
     cache.graph = new Graph(this.context);
     cache.boxes.clear();
@@ -150,7 +152,7 @@ export class SpatialSystem extends AbstractSystem {
    * @param datasetID - the cache to insert into
    * @param items - items to add
    */
-  addData(datasetID: DatasetID, items: OneOrMore<AbstractData>): void {
+  public addData(datasetID: DatasetID, items: OneOrMore<AbstractData>): void {
     this.replaceData(datasetID, items);
   }
 
@@ -160,7 +162,7 @@ export class SpatialSystem extends AbstractSystem {
    * @param datasetID - the cache to insert into
    * @param items - items to replace
    */
-  replaceData(datasetID: DatasetID, items: OneOrMore<AbstractData>): void {
+  public replaceData(datasetID: DatasetID, items: OneOrMore<AbstractData>): void {
     const cache = this.getCache(datasetID);
 
     const toInsert: Box[] = [];
@@ -204,7 +206,7 @@ export class SpatialSystem extends AbstractSystem {
    * @param datasetID - the cache to remove from
    * @param itemsOrIDs - items to remove
    */
-  removeData(datasetID: DatasetID, itemsOrIDs: OneOrMore<AbstractData | DataID>): void {
+  public removeData(datasetID: DatasetID, itemsOrIDs: OneOrMore<AbstractData | DataID>): void {
     const cache = this.getCache(datasetID);
 
     for (const item of utilIterable(itemsOrIDs)) {
@@ -227,7 +229,7 @@ export class SpatialSystem extends AbstractSystem {
    * @param datasetID - the cache to insert into
    * @param items - tiles to insert
    */
-  addTiles(datasetID: DatasetID, items: OneOrMore<Tile>): void {
+  public addTiles(datasetID: DatasetID, items: OneOrMore<Tile>): void {
     const cache = this.getCache(datasetID);
 
     const toInsert: Box[] = [];
@@ -266,7 +268,7 @@ export class SpatialSystem extends AbstractSystem {
    * @param datasetID - the cache to remove from
    * @param itemsOrIDs - items to remove
    */
-  removeTiles(datasetID: DatasetID, itemsOrIDs: OneOrMore<Tile | TileID>): void {
+  public removeTiles(datasetID: DatasetID, itemsOrIDs: OneOrMore<Tile | TileID>): void {
     const cache = this.getCache(datasetID);
 
     for (const item of utilIterable(itemsOrIDs)) {
@@ -289,7 +291,7 @@ export class SpatialSystem extends AbstractSystem {
    * @param datasetID - the cache to search
    * @return Array of boxes in the current map view
    */
-  getVisibleData(datasetID: DatasetID): Box[] {
+  public getVisibleData(datasetID: DatasetID): Box[] {
     const cache = this.getCache(datasetID);
     const viewport = this.context.viewport;
     return cache.dataRBush.search(viewport.visibleWorldExtent().bbox());
@@ -300,7 +302,7 @@ export class SpatialSystem extends AbstractSystem {
    * This would only really be used for debugging purposes, it might return a lot.
    * @return Array of boxes in the current map view
    */
-  getAllVisibleData(): Box[] {
+  public getAllVisibleData(): Box[] {
     const results: Box[] = [];
     for (const datasetID of this._caches.keys()) {
       results.push(...this.getVisibleData(datasetID));
@@ -314,7 +316,7 @@ export class SpatialSystem extends AbstractSystem {
    * @param dataID - the dataID to lookup
    * @return The data if found, or `undefined` if not found
    */
-  getData<T extends AbstractData = AbstractData>(datasetID: Nullable<DatasetID>, dataID: Nullable<DataID>): T | undefined {
+  public getData<T extends AbstractData = AbstractData>(datasetID: Nullable<DatasetID>, dataID: Nullable<DataID>): T | undefined {
     if (!datasetID || !dataID) return undefined;
     const cache = this.getCache(datasetID);
     return cache.data.get(dataID) as T | undefined;
@@ -326,7 +328,7 @@ export class SpatialSystem extends AbstractSystem {
    * @param dataID - the dataID to lookup
    * @return `true` if data exists, `false` if not
    */
-  hasData(datasetID: DatasetID, dataID: DataID): boolean {
+  public hasData(datasetID: DatasetID, dataID: DataID): boolean {
     const cache = this.getCache(datasetID);
     return cache.data.has(dataID);
   }
@@ -337,7 +339,7 @@ export class SpatialSystem extends AbstractSystem {
    * @param box - the search box (make sure to use world coordinates here)
    * @return Array of boxes in the given search box
    */
-  getDataAtBox(datasetID: DatasetID, box: BBox): Box[] {
+  public getDataAtBox(datasetID: DatasetID, box: BBox): Box[] {
     const cache = this.getCache(datasetID);
     return cache.dataRBush.search(box);
   }
@@ -348,7 +350,7 @@ export class SpatialSystem extends AbstractSystem {
    * @param box - the search box (make sure to use world coordinates here)
    * @return `true` if something exists, `false` if not
    */
-  hasDataAtBox(datasetID: DatasetID, box: BBox): boolean {
+  public hasDataAtBox(datasetID: DatasetID, box: BBox): boolean {
     const cache = this.getCache(datasetID);
     return cache.dataRBush.collides(box);
   }
@@ -359,7 +361,7 @@ export class SpatialSystem extends AbstractSystem {
    * @param loc - the search location (WGS84 [lon,lat])
    * @return Array of boxes at the given location
    */
-  getDataAtLoc(datasetID: DatasetID, loc: Vec2): Box[] {
+  public getDataAtLoc(datasetID: DatasetID, loc: Vec2): Box[] {
     const cache = this.getCache(datasetID);
     const [x, y] = projWgs84ToWorld(loc) as Vec2;
     const epsilon = 1e-7 * 2 ** WORLD_ZOOM;
@@ -373,7 +375,7 @@ export class SpatialSystem extends AbstractSystem {
    * @param loc - the search location (WGS84 [lon,lat])
    * @return `true` if data exists there, `false` if not
    */
-  hasDataAtLoc(datasetID: DatasetID, loc: Vec2): boolean {
+  public hasDataAtLoc(datasetID: DatasetID, loc: Vec2): boolean {
     const cache = this.getCache(datasetID);
     const [x, y] = projWgs84ToWorld(loc) as Vec2;
     const epsilon = 1e-7 * 2 ** WORLD_ZOOM;
@@ -389,7 +391,7 @@ export class SpatialSystem extends AbstractSystem {
    * @param loc - the search location (WGS84 [lon,lat])
    * @return Adjusted [lon,lat] coordinate
    */
-  preventCoincidentLoc(datasetID: DatasetID, loc: Vec2): Vec2 {
+  public preventCoincidentLoc(datasetID: DatasetID, loc: Vec2): Vec2 {
     const cache = this.getCache(datasetID);
     const [x, startY] = projWgs84ToWorld(loc) as Vec2;
     let y = startY;
@@ -415,7 +417,7 @@ export class SpatialSystem extends AbstractSystem {
    * @param tileID - the tileID to lookup
    * @return The tile if found, or `undefined` if not found
    */
-  getTile(datasetID: DatasetID, tileID: TileID): Tile | undefined {
+  public getTile(datasetID: DatasetID, tileID: TileID): Tile | undefined {
     const cache = this.getCache(datasetID);
     return cache.tiles.get(tileID);
   }
@@ -426,7 +428,7 @@ export class SpatialSystem extends AbstractSystem {
    * @param tileID - the tileID to lookup
    * @return `true` if the tile is loaded, `false` if not
    */
-  hasTile(datasetID: DatasetID, tileID: TileID): boolean {
+  public hasTile(datasetID: DatasetID, tileID: TileID): boolean {
     const cache = this.getCache(datasetID);
     return cache.tiles.has(tileID);
   }
@@ -437,7 +439,7 @@ export class SpatialSystem extends AbstractSystem {
     * @param box - the search box (world coordinates, z16)
    * @return `true` if something exists, `false` if not
    */
-  hasTileAtBox(datasetID: DatasetID, box: BBox): boolean {
+  public hasTileAtBox(datasetID: DatasetID, box: BBox): boolean {
     const cache = this.getCache(datasetID);
     return cache.tileRBush.collides(box);
   }
@@ -448,7 +450,7 @@ export class SpatialSystem extends AbstractSystem {
    * @param loc - the search location (WGS84 [lon,lat])
    * @return `true` if a tile has been loaded there, `false` if not
    */
-  hasTileAtLoc(datasetID: DatasetID, loc: Vec2): boolean {
+  public hasTileAtLoc(datasetID: DatasetID, loc: Vec2): boolean {
     const cache = this.getCache(datasetID);
     const [x, y] = projWgs84ToWorld(loc) as Vec2;
     const epsilon = 1e-7 * WORLD_SCALE;

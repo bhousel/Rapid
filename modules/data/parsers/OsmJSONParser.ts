@@ -67,13 +67,13 @@ import type {
  *  'bounds'         (returned with the `/map` API call)
  */
 export class OsmJSONParser {
-  _seen: Set<string>;
-  types: Set<ParserDataType>;
+  protected _seen: Set<string>;
+  public types: Set<ParserDataType>;
 
   /**
    * @constructor
    */
-  constructor() {
+  public constructor() {
     this._seen = new Set();   // Set<string>  (unique identifers)
 
     this._parseNode = this._parseNode.bind(this);
@@ -98,7 +98,7 @@ export class OsmJSONParser {
   /**
    * Call reset to clear the caches.
    */
-  reset(): void {
+  public reset(): void {
     this._seen.clear();
   }
 
@@ -110,7 +110,7 @@ export class OsmJSONParser {
    * @return  Result object containing the information parsed
    * @throws  Will throw if nothing could be parsed, or errors found
    */
-  parse(content: Record<string, unknown> | string, options: Partial<ParserOptions> = {}): ParserResult {
+  public parse(content: Record<string, unknown> | string, options: Partial<ParserOptions> = {}): ParserResult {
     if (!content)  {
       throw new Error('No content');
     }
@@ -298,7 +298,7 @@ export class OsmJSONParser {
    * @param   id  - the OSM nodeID (e.g. 'n1')
    * @return  Object of parsed properties
    */
-  _parseNode(obj: any, id: string): ParsedNode {
+  protected _parseNode(obj: any, id: string): ParsedNode {
     const props: any = {
       type: 'node',
       id: id,
@@ -321,7 +321,7 @@ export class OsmJSONParser {
    * @param   id  - the OSM wayID (e.g. 'w1')
    * @return  Object of parsed properties
    */
-  _parseWay(obj: any, id: string): ParsedWay {
+  protected _parseWay(obj: any, id: string): ParsedWay {
     const props: any = {
       type: 'way',
       id: id,
@@ -341,7 +341,7 @@ export class OsmJSONParser {
    * @param   id  - the OSM relationID (e.g. 'r1')
    * @return  Object of parsed properties
    */
-  _parseRelation(obj: any, id: string): ParsedRelation {
+  protected _parseRelation(obj: any, id: string): ParsedRelation {
     const props: any = {
       type: 'relation',
       id: id,
@@ -367,7 +367,7 @@ export class OsmJSONParser {
    * @param   id  - the OSM changesetID (e.g. 'c1')
    * @return  Object of parsed properties
    */
-  _parseChangeset(obj: any, id: string): ParsedChangeset {
+  protected _parseChangeset(obj: any, id: string): ParsedChangeset {
     const props: any = {
       type: 'changeset',
       id: id,
@@ -389,7 +389,7 @@ export class OsmJSONParser {
    * @param   obj - the source object
    * @return  Object of parsed properties
    */
-  _parseNote(obj: any): ParsedNote {
+  protected _parseNote(obj: any): ParsedNote {
     const props: any = {
       type: 'note',
       loc: obj.geometry.coordinates
@@ -410,7 +410,7 @@ export class OsmJSONParser {
    * @param   comments - Array of source comments
    * @return  Array of parsed comments
    */
-  _parseComments(comments: any[]): ParsedComment[] {
+  protected _parseComments(comments: any[]): ParsedComment[] {
     return comments.map(obj => {
       const props: any = {
         visible: obj.visible ?? true
@@ -427,7 +427,7 @@ export class OsmJSONParser {
    * @param   id  - the user ID (e.g. 'user1')
    * @return  Object of parsed properties
    */
-  _parseUser(obj: any, id: string): ParsedUser {
+  protected _parseUser(obj: any, id: string): ParsedUser {
     const props: any = { type: 'user' };
     copyProps(props, obj);
 
@@ -444,7 +444,7 @@ export class OsmJSONParser {
    * @param   obj - the source object
    * @return  Object of parsed properties
    */
-  _parseUserBlock(obj: any): ParsedUserBlock {
+  protected _parseUserBlock(obj: any): ParsedUserBlock {
     const props: any = { type: 'user_block' };
     copyProps(props, obj);
 
@@ -461,7 +461,7 @@ export class OsmJSONParser {
    * @param   obj - the source object
    * @return  Object of parsed properties
    */
-  _parsePreferences(obj: any): ParsedPreferences {
+  protected _parsePreferences(obj: any): ParsedPreferences {
     const props: ParsedPreferences = {
       type: 'preferences',
       preferences: obj
@@ -476,7 +476,7 @@ export class OsmJSONParser {
    * @param   obj - the source object
    * @return  Object of parsed properties
    */
-  _parseApi(obj: any): ParsedApi {
+  protected _parseApi(obj: any): ParsedApi {
     const props: any = { type: 'api' };
     copyProps(props, obj);
     return props as ParsedApi;
@@ -488,7 +488,7 @@ export class OsmJSONParser {
    * @param   obj - the source object
    * @return  Object of parsed properties
    */
-  _parsePolicy(obj: any): ParsedPolicy {
+  protected _parsePolicy(obj: any): ParsedPolicy {
     const props: ParsedPolicy = { type: 'policy' };
 
     const blacklist = obj?.imagery?.blacklist;
@@ -516,7 +516,7 @@ export class OsmJSONParser {
    * @param   obj - the source object
    * @return  Object of parsed properties
    */
-  _parseBounds(obj: any): ParsedBounds {
+  protected _parseBounds(obj: any): ParsedBounds {
     return Object.assign({ type: 'bounds' } as ParsedBounds, obj);
   }
 

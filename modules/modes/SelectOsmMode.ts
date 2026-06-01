@@ -1,12 +1,11 @@
-import { select as d3_select } from 'd3-selection';
-import { DEG2RAD, vecAdd, vecRotate, vecScale } from '@rapid-sdk/math';
-import { utilArrayIdentical } from '@rapid-sdk/util';
-
+import * as Operations from '../operations/index.js';
 import { AbstractMode } from './AbstractMode.ts';
 import { actionDeleteRelation } from '../actions/delete_relation.ts';
 import { actionMove, actionRotate } from '../actions/index.ts';
-import * as Operations from '../operations/index.js';
+import { DEG2RAD, vecAdd, vecRotate, vecScale } from '@rapid-sdk/math';
+import { select as d3_select } from 'd3-selection';
 import { utilCmd, utilKeybinding, utilTotalExtent } from '../util/index.ts';
+import { utilArrayIdentical } from '@rapid-sdk/util';
 
 import type { Context } from '../Context.ts';
 import type { EventData } from '../behaviors/AbstractBehavior.ts';
@@ -37,28 +36,30 @@ export interface SelectOsmModeOptions {
  * attempt at updating the legacy osm-only select mode for now.
  */
 export class SelectOsmMode extends AbstractMode {
+
   /** Keybinding handler for this mode */
-  keybinding: Keybinding | null;
+  public keybinding: Keybinding | null;
   /** The total extent of selected features */
-  extent: Extent | null;
+  public extent: Extent | null;
 
   /** Whether this is a newly created feature */
-  private _newFeature: boolean;
+  protected _newFeature: boolean;
   /**
    * `_focusedParentID` is used when we visit a vertex with multiple
    * parents, and we want to remember which parent line we started on.
    */
-  private _focusedParentID: EntityID | null;
+  protected _focusedParentID: EntityID | null;
   /** If we have a single thing selected, keep track of it here */
-  private _singularDatum: OsmEntity | null;
+  protected _singularDatum: OsmEntity | null;
   /** Previous selection, used by arrow key handler */
-  private _lastSelectedIDs: EntityID[];
+  protected _lastSelectedIDs: EntityID[];
+
 
   /**
    * @constructor
    * @param  context - Global shared application context
    */
-  constructor(context: Context) {
+  public constructor(context: Context) {
     super(context);
     this.id = 'select-osm';
 
@@ -87,7 +88,7 @@ export class SelectOsmMode extends AbstractMode {
    * @param  options - Optional options object
    * @return `true` if the mode can be entered, `false` if not
    */
-  enter(options: SelectOsmModeOptions = {}): boolean {
+  public enter(options: SelectOsmModeOptions = {}): boolean {
     const context = this.context;
     const editor = context.systems.editor!;
     const filters = context.systems.filters!;
@@ -170,7 +171,7 @@ export class SelectOsmMode extends AbstractMode {
 
   /**
    */
-  exit(): void {
+  public exit(): void {
     if (!this._active) return;
     this._active = false;
 
@@ -242,7 +243,7 @@ export class SelectOsmMode extends AbstractMode {
    * Handler for keydown events on the window.
    * @param  e - A DOM KeyboardEvent
    */
-  private _keydown(e: KeyboardEvent): void {
+  protected _keydown(e: KeyboardEvent): void {
     const context = this.context;
     const editor = context.systems.editor!;
     const ui = context.systems.ui!;
@@ -391,7 +392,7 @@ export class SelectOsmMode extends AbstractMode {
    * the edit menu may be wrong and should be refreshed. Rapid#1311
    * @param  newIDs - entityIDs recently loaded from OSM
    */
-  private _merge(newIDs: Set<EntityID>): void {
+  protected _merge(newIDs: Set<EntityID>): void {
     if (!(newIDs instanceof Set)) return;
     const entityIDs = [...this._selectedData.keys()];
 
@@ -413,7 +414,7 @@ export class SelectOsmMode extends AbstractMode {
    *  Called whenever we have a need to reset the `operations` array.
    *  @param  entityIDs - the selected entityIDs
    */
-  private _setupOperations(entityIDs: EntityID[]): void {
+  protected _setupOperations(entityIDs: EntityID[]): void {
     const context = this.context;
     const ui = context.systems.ui!;
 
@@ -457,7 +458,7 @@ export class SelectOsmMode extends AbstractMode {
    *  When using keyboard navigation, try to stay with the previously focused parent way
    *  @param  entity - The entity we are checking for parent ways
    */
-  private _chooseParentWay(entity: OsmEntity | null): OsmWay | undefined {
+  protected _chooseParentWay(entity: OsmEntity | null): OsmWay | undefined {
     if (!entity) return undefined;
 
     const context = this.context;
@@ -488,7 +489,7 @@ export class SelectOsmMode extends AbstractMode {
   /**
    *  jump to the first vertex along a way
    */
-  private _firstVertex(d3_event: Event): void {
+  protected _firstVertex(d3_event: Event): void {
     d3_event.preventDefault();
 
     const way = this._chooseParentWay(this._singularDatum);
@@ -512,7 +513,7 @@ export class SelectOsmMode extends AbstractMode {
   /**
    *  jump to the first vertex along a way
    */
-  private _lastVertex(d3_event: Event): void {
+  protected _lastVertex(d3_event: Event): void {
     d3_event.preventDefault();
 
     const way = this._chooseParentWay(this._singularDatum);
@@ -536,7 +537,7 @@ export class SelectOsmMode extends AbstractMode {
   /**
    *  jump to the previous vertex
    */
-  private _previousVertex(d3_event: Event): void {
+  protected _previousVertex(d3_event: Event): void {
     d3_event.preventDefault();
 
     const entity = this._singularDatum;
@@ -574,7 +575,7 @@ export class SelectOsmMode extends AbstractMode {
   /**
    *  jump to the next vertex
    */
-  private _nextVertex(d3_event: Event): void {
+  protected _nextVertex(d3_event: Event): void {
     d3_event.preventDefault();
 
     const entity = this._singularDatum;
@@ -612,7 +613,7 @@ export class SelectOsmMode extends AbstractMode {
   /**
    *  If the user is at a junction, focus on a different parent way
    */
-  private _focusNextParent(d3_event: Event): void {
+  protected _focusNextParent(d3_event: Event): void {
     d3_event.preventDefault();
 
     const entity = this._singularDatum;
@@ -649,7 +650,7 @@ export class SelectOsmMode extends AbstractMode {
    * Select the parent ways of the currently selected nodes.
    * Triggered by Alt/Cmd/Ctrl + ArrowUp keyboard shortcut.
    */
-  private _selectParentWays(): void {
+  protected _selectParentWays(): void {
     const context = this.context;
     const editor = context.systems.editor!;
     const graph = editor.staging.graph;
@@ -676,7 +677,7 @@ export class SelectOsmMode extends AbstractMode {
    * Select the child nodes of the currently selected ways.
    * Triggered by Alt/Cmd/Ctrl + ArrowDown keyboard shortcut.
    */
-  private _selectChildNodes(): void {
+  protected _selectChildNodes(): void {
     const context = this.context;
     const childNodeIDs = new Set<EntityID>();
 
@@ -700,7 +701,7 @@ export class SelectOsmMode extends AbstractMode {
   /**
    * Changes the cursor styling based on what geometry is hovered
    */
-  private _hover(eventData: EventData): void {
+  protected _hover(eventData: EventData): void {
     const context = this.context;
     const editor = context.systems.editor!;
     const eventManager = context.systems.gfx!.eventManager!;

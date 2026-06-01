@@ -1,16 +1,17 @@
-import { select as d3_select } from 'd3-selection';
-import { vecLength } from '@rapid-sdk/math';
-
 import { AbstractBehavior } from './AbstractBehavior.ts';
 import { MarkerData, OsmNode } from '../data/index.ts';
+import { select as d3_select } from 'd3-selection';
 import { utilDetect } from '../util/detect.ts';
+import { vecLength } from '@rapid-sdk/math';
 
 import type { FederatedPointerEvent } from 'pixi.js';
 import type { Context } from '../Context.ts';
 import type { EventData, EventTarget } from './AbstractBehavior.ts';
 
+
 const NEAR_TOLERANCE = 1;
 const FAR_TOLERANCE = 4;
+
 
 /**
  * `DragBehavior` listens to pointer events and converts those into start/move/end drag events
@@ -28,18 +29,20 @@ const FAR_TOLERANCE = 4;
  *   `cancel`   Fires on pointercancel -or- pointerup outside, receives the cancel `eventData` Object
  */
 export class DragBehavior extends AbstractBehavior {
+
   /** Details about the feature being dragged, or null if not dragging */
-  dragTarget: EventTarget | null;
+  public dragTarget: EventTarget | null;
   /** EventData for the most recent pointerdown event */
-  lastDown: EventData | null;
+  public lastDown: EventData | null;
   /** EventData for the most recent pointermove event during drag */
-  lastMove: EventData | null;
+  public lastMove: EventData | null;
+
 
   /**
    * @constructor
    * @param  context - Global shared application context
    */
-  constructor(context: Context) {
+  public constructor(context: Context) {
     super(context);
     this.id = 'drag';
 
@@ -59,7 +62,7 @@ export class DragBehavior extends AbstractBehavior {
   /**
    * Bind event handlers
    */
-  enable(): void {
+  public enable(): void {
     if (this._enabled) return;
 
     this._enabled = true;
@@ -82,7 +85,7 @@ export class DragBehavior extends AbstractBehavior {
   /**
    * Unbind event handlers
    */
-  disable(): void {
+  public disable(): void {
     if (!this._enabled) return;
 
     // Something is currently dragging, so cancel the drag first.
@@ -118,7 +121,7 @@ export class DragBehavior extends AbstractBehavior {
    * if the user taps with multiple fingers. We lock in the first one in `lastDown`.
    * @param  e - A Pixi FederatedPointerEvent
    */
-  _pointerdown(e: FederatedPointerEvent): void {
+  protected _pointerdown(e: FederatedPointerEvent): void {
     if (this.lastDown) return;   // a pointer is already down
     if (e.pointerType === 'mouse' && e.button !== 0) return;   // drag with left button only (if a mouse)
 
@@ -143,7 +146,7 @@ export class DragBehavior extends AbstractBehavior {
    * Handler for pointermove events.
    * @param  e - A Pixi FederatedPointerEvent
    */
-  _pointermove(e: FederatedPointerEvent): void {
+  protected _pointermove(e: FederatedPointerEvent): void {
     const context = this.context;
     const editor = context.systems.editor!;
     const gfx = context.systems.gfx!;
@@ -233,7 +236,7 @@ export class DragBehavior extends AbstractBehavior {
    * Handler for pointerup events.
    * @param  e - A Pixi FederatedPointerEvent
    */
-  _pointerup(e: FederatedPointerEvent): void {
+  protected _pointerup(e: FederatedPointerEvent): void {
     const down = this.lastDown;
     const up = this._getEventData(e);
     if (!down || down.id !== up.id) return;   // not down, or different pointer
@@ -265,7 +268,7 @@ export class DragBehavior extends AbstractBehavior {
    * Handler for pointercancel events.
    * @param  e - A Pixi FederatedPointerEvent
    */
-  _pointercancel(e: FederatedPointerEvent): void {
+  protected _pointercancel(e: FederatedPointerEvent): void {
     const cancel = this._getEventData(e);
 
     // Here we can throw away the down data to prepare for another `pointerdown`.
@@ -285,7 +288,7 @@ export class DragBehavior extends AbstractBehavior {
   /**
    * @return  `true` if line snapping is disabled, `false` if line snapping is enabled.
    */
-  _snappingDisabled(): boolean {
+  protected _snappingDisabled(): boolean {
     // Ignore it if we are not over the canvas
     // (e.g. sidebar, out of browser window, over a button, toolbar, modal)
     const gfx = this.context.systems.gfx!;
@@ -303,7 +306,7 @@ export class DragBehavior extends AbstractBehavior {
    * Checks lastMove and emits a 'move' event if needed.
    * This may also be fired if we detect a change in the modifier keys.
    */
-  _doMove(): void {
+  protected _doMove(): void {
     if (!this._enabled || !this.lastMove) return;  // nothing to do
     const eventData: EventData = { ...this.lastMove };  // shallow copy
 

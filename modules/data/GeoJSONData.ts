@@ -29,7 +29,7 @@ export class GeoJSONData<P extends GeoJSONProps = GeoJSONProps> extends Abstract
   // The constructor accepts `Partial<P>` for flexibility (e.g. tests),
   // but access sites can trust that required properties exist.
   // `declare` emits no JavaScript — it only refines the type.
-  declare props: P;
+  public declare props: P;
 
   /**
    * @constructor
@@ -38,7 +38,7 @@ export class GeoJSONData<P extends GeoJSONProps = GeoJSONProps> extends Abstract
    * @param otherOrContext - copy another data element, or pass application context
    * @param props - Properties to assign to the data element
    */
-  constructor(otherOrContext: GeoJSONData<P> | Context, props: Partial<P> = {}) {
+  public constructor(otherOrContext: GeoJSONData<P> | Context, props: Partial<P> = {}) {
     super(otherOrContext, props);
 
     if (!this.props.id) {  // no ID provided - generate one
@@ -55,7 +55,7 @@ export class GeoJSONData<P extends GeoJSONProps = GeoJSONProps> extends Abstract
    * Forces a recomputation of the internal geometry data.
    * @returns this same data element
    */
-  updateGeometry(): this {
+  public updateGeometry(): this {
     this.geoms.setData(this.asGeoJSON());
     return this;
   }
@@ -64,7 +64,7 @@ export class GeoJSONData<P extends GeoJSONProps = GeoJSONProps> extends Abstract
    * We expect to find the original GeoJSON source in a `geojson` property.
    * @returns GeoJSON representation of this data element
    */
-  asGeoJSON(): GeoJSONObject {
+  public asGeoJSON(): GeoJSONObject {
     const geojson = this.props.geojson;
     if (geojson) {
       return Object.assign({}, geojson, { id: this.id });
@@ -84,7 +84,7 @@ export class GeoJSONData<P extends GeoJSONProps = GeoJSONProps> extends Abstract
    * For example 'keepright', 'maproulette', 'mapillary', etc.
    * @readonly
    */
-  get serviceID(): ServiceID {
+  public get serviceID(): ServiceID {
     return this.props.serviceID;
   }
 
@@ -92,7 +92,7 @@ export class GeoJSONData<P extends GeoJSONProps = GeoJSONProps> extends Abstract
    * Get the real GeoJSON properties.
    * @readonly
    */
-  get properties(): Record<string, unknown> {
+  public get properties(): Record<string, unknown> {
     const geojson = this.props.geojson;
     return (geojson as any)?.properties ?? {};
   }

@@ -1,6 +1,5 @@
-import { utilQsString } from '@rapid-sdk/util';
-
 import { AbstractSystem } from '../core/AbstractSystem.ts';
+import { utilQsString } from '@rapid-sdk/util';
 
 import type { Context } from '../Context.ts';
 
@@ -49,18 +48,18 @@ interface WikiInfo {
 export class OsmWikibaseService extends AbstractSystem {
 
   /** Base URL for the OSM Wikibase API */
-  apibase: string;
+  public apibase: string;
   /** Internal cache for Wikibase entity data, keyed by sitelink title */
-  _cache: Record<string, any>;
+  protected _cache: Record<string, any>;
   /** Cache of locale language codes to their Wikibase entity QIDs (or `false` if not found) */
-  _localeIDs: Record<string, string | false>;
+  protected _localeIDs: Record<string, string | false>;
 
 
   /**
    * @constructor
    * @param context - Global shared application context
    */
-  constructor(context: Context) {
+  public constructor(context: Context) {
     super(context);
     this.id = 'osmwikibase';
     this.requiredDependencies = new Set<SystemID>(['network']);
@@ -84,7 +83,7 @@ export class OsmWikibaseService extends AbstractSystem {
    * Called after all core objects have been constructed.
    * @return Promise resolved when this component has completed initialization
    */
-  initAsync(): Promise<void> {
+  public initAsync(): Promise<void> {
     return super.initAsync();
   }
 
@@ -93,7 +92,7 @@ export class OsmWikibaseService extends AbstractSystem {
    * Called after all core objects have been initialized.
    * @return Promise resolved when this component has completed startup
    */
-  startAsync(): Promise<void> {
+  public startAsync(): Promise<void> {
     return super.startAsync();
   }
 
@@ -102,7 +101,7 @@ export class OsmWikibaseService extends AbstractSystem {
    * Called after completing an edit session to reset any internal state
    * @return Promise resolved when this component has completed resetting
    */
-  resetAsync(): Promise<void> {
+  public resetAsync(): Promise<void> {
     const context = this.context;
     const network = context.systems.network!;
     const scheduler = context.systems.scheduler;
@@ -121,7 +120,7 @@ export class OsmWikibaseService extends AbstractSystem {
    * @param langCode - string e.g. 'fr' for French
    * @return The requested value, or undefined
    */
-  claimToValue(entity: any, property: string, langCode: string): string | undefined {
+  public claimToValue(entity: any, property: string, langCode: string): string | undefined {
     if (!entity.claims[property]) return undefined;
     const locale = this._localeIDs[langCode];
     let preferredPick, localePick;
@@ -154,7 +153,7 @@ export class OsmWikibaseService extends AbstractSystem {
    * @param property - string e.g. 'P31' for monolingual wiki page title
    * @return The requested object, or undefined
    */
-  monolingualClaimToValueObj(entity: any, property: string): Record<string, string> | undefined {
+  public monolingualClaimToValueObj(entity: any, property: string): Record<string, string> | undefined {
     if (!entity?.claims[property]) return undefined;
 
     return entity.claims[property].reduce(function(acc: Record<string, string>, obj: any) {
@@ -171,7 +170,7 @@ export class OsmWikibaseService extends AbstractSystem {
    * @param value
    * @return sitelink
    */
-  toSitelink(key: string, value?: string): string {
+  public toSitelink(key: string, value?: string): string {
     const result = value ? `Tag:${key}=${value}` : `Key:${key}`;
     return result.replace(/_/g, ' ').trim();
   }
@@ -189,7 +188,7 @@ export class OsmWikibaseService extends AbstractSystem {
    * @param params
    * @param callback - errback-style callback function to call with results
    */
-  getEntity(params: GetEntityParams, callback: WikibaseCallback): void {
+  public getEntity(params: GetEntityParams, callback: WikibaseCallback): void {
     const shouldDebounce = params.debounce;
     const rtypeSitelink: string | false = (params.key === 'type' && params.value) ? (`Relation:${params.value}`).replace(/_/g, ' ').trim() : false;
     const keySitelink: string | false = params.key ? this.toSitelink(params.key) : false;
@@ -325,7 +324,7 @@ export class OsmWikibaseService extends AbstractSystem {
    * @param params
    * @param callback - errback-style callback function to call with results
    */
-  getDocs(params: GetDocsParams, callback: WikibaseCallback): void {
+  public getDocs(params: GetDocsParams, callback: WikibaseCallback): void {
     // If `params.langCodes` not set, try to fetch docs in the user's language.
     const l10n = this.context.systems.l10n;
     const langCodes = l10n?.localeCodes || ['en-US', 'en'];
@@ -424,7 +423,7 @@ export class OsmWikibaseService extends AbstractSystem {
    * @param langCode
    * @param qid
    */
-  addLocale(langCode: string, qid: string | false): void {
+  public addLocale(langCode: string, qid: string | false): void {
     this._localeIDs[langCode] = qid;
   }
 
@@ -434,7 +433,7 @@ export class OsmWikibaseService extends AbstractSystem {
    * @param url - the URL to request
    * @param callback - errback-style callback function to call with results
    */
-  _request(url: string, callback: WikibaseCallback): void {
+  protected _request(url: string, callback: WikibaseCallback): void {
     const network = this.context.systems.network!;
 
     network.fetch<any>(url)

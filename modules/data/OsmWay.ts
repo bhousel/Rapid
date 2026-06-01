@@ -1,8 +1,7 @@
 import { Extent, vecCross } from '@rapid-sdk/math';
-import { utilArrayUniq } from '@rapid-sdk/util';
-
 import { OsmEntity, OsmEntityProps } from './OsmEntity.ts';
 import { osmLanes } from '../lib/lanes.ts';
+import { utilArrayUniq } from '@rapid-sdk/util';
 
 import type { Context } from '../Context.ts';
 import type { Graph } from '../lib/Graph.ts';
@@ -55,7 +54,7 @@ export class OsmWay extends OsmEntity {
    * @param otherOrContext - copy another data element, or pass application context
    * @param props - Properties to assign to the data element
    */
-  constructor(otherOrContext: OsmWay | Context, props: Partial<OsmWayProps> = {}) {
+  public constructor(otherOrContext: OsmWay | Context, props: Partial<OsmWayProps> = {}) {
     super(otherOrContext, props);
     this.props.type = 'way';
 
@@ -75,7 +74,7 @@ export class OsmWay extends OsmEntity {
    * get/set the nodes property
    * @readonly
    */
-  get nodes(): EntityID[] {
+  public get nodes(): EntityID[] {
     return (this.props as OsmWayProps).nodes;
   }
 
@@ -85,7 +84,7 @@ export class OsmWay extends OsmEntity {
    * @param graph - the Graph that holds the topology needed
    * @return GeoJSON representation of the OsmWay
    */
-  asGeoJSON(graph: Graph): GeoJSONObject {
+  public asGeoJSON(graph: Graph): GeoJSONObject {
     return this.transient('geojson', () => {
 
       let geometry: GeoJSON.Geometry | null = null;
@@ -127,7 +126,7 @@ export class OsmWay extends OsmEntity {
    * @param changesetID - optional changeset ID to include in the output
    * @return JXON representation of the OsmWay
    */
-  asJXON(changesetID?: string): Record<string, unknown> {
+  public asJXON(changesetID?: string): Record<string, unknown> {
     const result: any = {
       way: {
         '@id': this.osmId(),
@@ -156,7 +155,7 @@ export class OsmWay extends OsmEntity {
    * @param memo - An Object to store seen copies (to prevent circular/infinite copying)
    * @return a copy of this OsmWay
    */
-  copy(fromGraph: Graph, memo: Record<string, OsmEntity> = {}): OsmWay {
+  public copy(fromGraph: Graph, memo: Record<string, OsmEntity> = {}): OsmWay {
     if (memo[this.id]) {
       return memo[this.id] as OsmWay;
     }
@@ -181,7 +180,7 @@ export class OsmWay extends OsmEntity {
    * Returns the first nodeID in the node list.
    * @return The first nodeID in the node list, or `undefined` if no nodes.
    */
-  first(): EntityID | undefined {
+  public first(): EntityID | undefined {
     return this.nodes.at(0);
   }
 
@@ -189,7 +188,7 @@ export class OsmWay extends OsmEntity {
    * Returns the last nodeID in the node list.
    * @return The last nodeID in the node list, or `undefined` if no nodes.
    */
-  last(): EntityID | undefined {
+  public last(): EntityID | undefined {
     return this.nodes.at(-1);
   }
 
@@ -198,7 +197,7 @@ export class OsmWay extends OsmEntity {
    * @param nodeID - The nodeID to check
    * @return `true` if the nodeID is in the node list, `false` if not.
    */
-  contains(nodeID: EntityID): boolean {
+  public contains(nodeID: EntityID): boolean {
     return this.nodes.includes(nodeID);
   }
 
@@ -208,7 +207,7 @@ export class OsmWay extends OsmEntity {
    * @param nodeID - The nodeID to check
    * @return 'prefix', 'suffix' or `undefined`
    */
-  affix(nodeID: EntityID): 'prefix' | 'suffix' | undefined {
+  public affix(nodeID: EntityID): 'prefix' | 'suffix' | undefined {
     if (this.nodes.at(0) === nodeID) return 'prefix';
     if (this.nodes.at(-1) === nodeID) return 'suffix';
   }
@@ -219,7 +218,7 @@ export class OsmWay extends OsmEntity {
    * The numbers are currently clamped in the range of [-10..10].
    * @return A number that can be used for rendering layer
    */
-  layer(): number {
+  public layer(): number {
 // TODO - we should stop doing this, it's a holdover from when iD used SVG groups for this.
     // explicit layer tag, clamp between -10, 10..
     if (isFinite(+(this.tags.layer))) {
@@ -249,7 +248,7 @@ export class OsmWay extends OsmEntity {
    * (This does not look for an actual `width` tag, it looks at other tags to imply a width.)
    * @return A number that can be used for the width, in meters
    */
-  impliedLineWidthMeters(): number | null {
+  public impliedLineWidthMeters(): number | null {
     const averageWidths: Record<string, Record<string, number>> = {
       highway: { // width is for single lane
         motorway: 5, motorway_link: 5, trunk: 4.5, trunk_link: 4.5,
@@ -290,7 +289,7 @@ export class OsmWay extends OsmEntity {
    * Returns whether a line is oneway, given the tags present.
    * @return `true` if the tags suggest that this is a oneway, `false` if not.
    */
-  isOneWay(): boolean {
+  public isOneWay(): boolean {
     const context = this.context;
     const schema = context.systems.schema;
     const rulesets = schema?.getScope('osm')?.rulesets;
@@ -308,7 +307,7 @@ export class OsmWay extends OsmEntity {
    * (e.g. the right side of a `natural=cliff` is lower).
    * @return `true` if the tags suggest that the line is sided, `false` if not.
    */
-  isSided(): boolean {
+  public isSided(): boolean {
     const context = this.context;
     const schema = context.systems.schema;
     const rulesets = schema?.getScope('osm')?.rulesets;
@@ -330,7 +329,7 @@ export class OsmWay extends OsmEntity {
    * Returns lane information for the given way, given the tags present.
    * @return An object containing the lane details for this way
    */
-  lanes(): object | null {
+  public lanes(): object | null {
     return osmLanes(this);
   }
 
@@ -338,7 +337,7 @@ export class OsmWay extends OsmEntity {
    * A way is "closed" if the first and last nodeID is the same.
    * @return `true` if the way is closed, `false` if not
    */
-  isClosed(): boolean {
+  public isClosed(): boolean {
     return this.nodes.length > 1 && this.first() === this.last();
   }
 
@@ -347,7 +346,7 @@ export class OsmWay extends OsmEntity {
    * @param graph - the Graph that holds the topology needed
    * @return `true` if the way is a convex polygon, `false` if concave polygon, `null` if unclosed or degenerate
    */
-  isConvex(graph: Graph): boolean | null {
+  public isConvex(graph: Graph): boolean | null {
     if (!this.isClosed() || this.isDegenerate()) return null;
 
     const nodes = utilArrayUniq(graph.childNodes(this));
@@ -380,7 +379,7 @@ export class OsmWay extends OsmEntity {
    * @param tags - Tags to check (defaults to `this.tags`)
    * @return The tag that indicates the area, or `null`
    */
-  tagSuggestingArea(tags?: OsmTags): OsmTags | null {
+  public tagSuggestingArea(tags?: OsmTags): OsmTags | null {
     if (!tags) tags = this.tags;
     if (tags.area === 'yes') return { area: 'yes' };
     if (tags.area === 'no') return null;
@@ -418,7 +417,7 @@ export class OsmWay extends OsmEntity {
    * Returns whether this way is a closed area (polygon), given the tags present.
    * @return `true` if the tags suggest that the way is an area, `false` if not.
    */
-  isArea(): boolean {
+  public isArea(): boolean {
     if (this.tags.area === 'yes') return true;
     if (!this.isClosed() || this.tags.area === 'no') return false;
     return this.tagSuggestingArea() !== null;
@@ -428,7 +427,7 @@ export class OsmWay extends OsmEntity {
    * The way is "degenerate" if it is a line with <2 nodes or an area with <3 nodes.
    * @return `true` if the way is degenerate, `false` if not.
    */
-  isDegenerate(): boolean {
+  public isDegenerate(): boolean {
     return (new Set(this.nodes).size < (this.isClosed() ? 3 : 2));
   }
 
@@ -436,7 +435,7 @@ export class OsmWay extends OsmEntity {
    * Checks whether the given nodeIDs are adjacent in the node list.
    * @return `true` if the nodes are adjacent, `false` if not.
    */
-  isAdjacent(n1: EntityID, n2: EntityID): boolean {
+  public isAdjacent(n1: EntityID, n2: EntityID): boolean {
     for (let i = 0; i < this.nodes.length; i++) {
       if (this.nodes[i] === n1) {
         if (this.nodes[i - 1] === n2) return true;
@@ -451,7 +450,7 @@ export class OsmWay extends OsmEntity {
    * @param graph - the Graph that holds the topology needed
    * @return 'area' or 'line'
    */
-  geometry(graph: Graph): 'area' | 'line' {
+  public geometry(graph: Graph): 'area' | 'line' {
     return this.transient('geometry', () => {
       return this.isArea() ? 'area' : 'line';
     });
@@ -462,7 +461,7 @@ export class OsmWay extends OsmEntity {
    * @param graph - the Graph that holds the topology needed
    * @return Array of segment data
    */
-  segments(graph: Graph): Segment[] {
+  public segments(graph: Graph): Segment[] {
 
     function segmentExtent(this: Segment, graph: Graph): Extent | undefined {
       const n1 = graph.hasEntity(this.nodes[0]) as OsmNode;
@@ -492,7 +491,7 @@ export class OsmWay extends OsmEntity {
    * If this way is not closed, append the beginning node to the end of the nodelist to close it.
    * @return This Way, or a new Way that has a closed node list
    */
-  close(): OsmWay {
+  public close(): OsmWay {
     if (this.isClosed() || !this.nodes.length) return this;
 
     let nodes = this.nodes.slice();
@@ -505,7 +504,7 @@ export class OsmWay extends OsmEntity {
    * If this way is closed, remove any connector nodes from the end of the nodelist to unclose it.
    * @return This Way, or a new Way that has an unclosed node list
    */
-  unclose(): OsmWay {
+  public unclose(): OsmWay {
     if (!this.isClosed()) return this;
 
     const connector = this.first()!;
@@ -534,7 +533,7 @@ export class OsmWay extends OsmEntity {
    * @return A new Way copied from this Way, but with the updated node list
    * @throws Will throw if the given index is out of range 0..max
    */
-  addNode(nodeID: EntityID, index?: number): OsmWay {
+  public addNode(nodeID: EntityID, index?: number): OsmWay {
     let nodes = this.nodes.slice();
     const isClosed = this.isClosed();
     const max = isClosed ? nodes.length - 1 : nodes.length;
@@ -589,7 +588,7 @@ export class OsmWay extends OsmEntity {
    * @return A new Way copied from this Way, but with the updated node list
    * @throws Will throw if the given index is out of range 0..max
    */
-  updateNode(nodeID: EntityID, index: number): OsmWay {
+  public updateNode(nodeID: EntityID, index: number): OsmWay {
     let nodes = this.nodes.slice();
     const isClosed = this.isClosed();
     const max = nodes.length - 1;
@@ -639,7 +638,7 @@ export class OsmWay extends OsmEntity {
    * @param replacementID - the nodeID to replace it with
    * @return A new Way copied from this Way, but with the updated node list
    */
-  replaceNode(needleID: EntityID, replacementID: EntityID): OsmWay {
+  public replaceNode(needleID: EntityID, replacementID: EntityID): OsmWay {
     let nodes = this.nodes.slice();
     const isClosed = this.isClosed();
 
@@ -667,7 +666,7 @@ export class OsmWay extends OsmEntity {
    * @param nodeID - the nodeID to remove
    * @return A new Way copied from this Way, but with the updated node list
    */
-  removeNode(nodeID: EntityID): OsmWay {
+  public removeNode(nodeID: EntityID): OsmWay {
     const isClosed = this.isClosed();
     let nodes = this.nodes.slice();
 

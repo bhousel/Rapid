@@ -85,101 +85,101 @@ export interface Service {
  */
 export class Context extends EventEmitter {
   /** Application version string (semver format) */
-  version: string;
+  public version: string;
   /** Version number for the privacy/welcome screen */
-  privacyVersion: number;
+  public privacyVersion: number;
   /** Version number for the "what's new" screen */
-  whatsNewVersion: number;
+  public whatsNewVersion: number;
 
   /** The url for the main rapid.js bundle. */
-  scriptURL: string | null;
+  public scriptURL: string | null;
 
   /** Build identifier from CI/CD */
-  buildID: string;
+  public buildID: string;
   /** Git SHA from CI/CD */
-  buildSHA: string;
+  public buildSHA: string;
   /** Build date from CI/CD */
-  buildDate: string;
+  public buildDate: string;
 
   /** Maximum characters allowed for tag keys */
-  maxCharsForTagKey: number;
+  public maxCharsForTagKey: number;
   /** Maximum characters allowed for tag values */
-  maxCharsForTagValue: number;
+  public maxCharsForTagValue: number;
   /** Maximum characters allowed for relation roles */
-  maxCharsForRelationRole: number;
+  public maxCharsForRelationRole: number;
 
   /** Sequence counters for generating unique IDs */
-  sequences: Record<SequenceID, number>;
+  public sequences: Record<SequenceID, number>;
 
   /** Asset origin override ('latest' or 'local') */
-  assetOrigin: 'latest' | 'local' | null;
+  public assetOrigin: 'latest' | 'local' | null;
   /** Asset path override */
-  assetPath: string | null;
+  public assetPath: string | null;
   /** Asset file replacement map */
-  assetMap: Record<string, string> | null;
+  public assetMap: Record<string, string> | null;
 
   /** The map viewport (projection, pan, zoom) */
-  viewport: Viewport;
+  public viewport: Viewport;
   /** Whether we're in the intro walkthrough */
-  inIntro: boolean;
+  public inIntro: boolean;
   /** Container element (D3 selection) */
-  $container: D3Selection;
+  public $container: D3Selection;
 
   /** All initialized systems */
-  systems: Systems;
+  public systems: Systems;
   /** All initialized modes */
-  modes: Modes;
+  public modes: Modes;
   /** All initialized behaviors */
-  behaviors: Behaviors;
+  public behaviors: Behaviors;
   /** All initialized services */
-  services: Services;
+  public services: Services;
 
   /** Currently active mode */
-  private _currMode: AbstractMode | null;
+  protected _currMode: AbstractMode | null;
   /** Promise for prepare phase (construct + configure) */
-  private _preparePromise: Promise<void> | null;
+  protected _preparePromise: Promise<void> | null;
   /** Promise for init phase */
-  private _initPromise: Promise<void> | null;
+  protected _initPromise: Promise<void> | null;
   /** Promise for start phase */
-  private _startPromise: Promise<void> | null;
+  protected _startPromise: Promise<void> | null;
   /** Promise for reset */
-  private _resetPromise: Promise<void> | null;
+  protected _resetPromise: Promise<void> | null;
 
   /** Last pointer device type used */
-  lastPointerType: string;
+  public lastPointerType: string;
   /** Keybinding manager */
-  private _keybinding: Keybinding;
+  protected _keybinding: Keybinding;
 
   /** OAuth/preauth credentials */
-  private _preauth: PreauthOptions | null;
+  protected _preauth: PreauthOptions | null;
   /** API connections for source switcher */
-  private _apiConnections: ApiConnection[] | null;
+  protected _apiConnections: ApiConnection[] | null;
   /** Pre-configured locale codes */
-  private _prelocale: string | string[] | null;
+  protected _prelocale: string | string[] | null;
 
   /** Graph snapshot for copy operations */
-  private _copyGraph: Graph | null;
+  protected _copyGraph: Graph | null;
   /** Entity IDs for paste operations */
-  private _copyIDs: EntityID[];
+  protected _copyIDs: EntityID[];
   /** Location for paste operations */
-  private _copyLoc: Vec2 | null;
+  protected _copyLoc: Vec2 | null;
 
   /** Debug visualization flags */
-  private _debugFlags: DebugFlags;
+  protected _debugFlags: DebugFlags;
 
   /** Whether embedded mode is enabled */
-  private _embed: boolean | null;
+  protected _embed: boolean | null;
 
 
   /** Check if entity has hidden connections (set during init) */
-  hasHiddenConnections!: (entityID: EntityID) => boolean;
+  public hasHiddenConnections!: (entityID: EntityID) => boolean;
   /** Check if editing is allowed (set during init) */
-  editable!: () => boolean;
+  public editable!: () => boolean;
 
   /**
    * @constructor
    */
-  constructor() {
+  public constructor() {
     super();
 
     // this.version = '2.5.3';             // see https://semver.org/ for examples
@@ -276,7 +276,7 @@ export class Context extends EventEmitter {
    * and can be configured before calling `initAsync()`.
    * @return  Promise resolved when all components are constructed and configured
    */
-  prepareAsync(): Promise<void> {
+  public prepareAsync(): Promise<void> {
     if (this._preparePromise) return this._preparePromise;
 
     // Construct all the core classes
@@ -341,7 +341,7 @@ export class Context extends EventEmitter {
    * (e.g. `merge()` calls for schema, styles, imagery), but are not yet running.
    * @return  Promise resolved when all components are initialized
    */
-  initAsync(): Promise<void> {
+  public initAsync(): Promise<void> {
     if (this._initPromise) return this._initPromise;
 
     return this._initPromise = this.prepareAsync()
@@ -366,7 +366,7 @@ export class Context extends EventEmitter {
    * After this resolves, Rapid is fully running.
    * @return  Promise resolved when Rapid is running
    */
-  startAsync(): Promise<void> {
+  public startAsync(): Promise<void> {
     if (this._startPromise) return this._startPromise;
 
     return this._startPromise = this.initAsync()
@@ -386,7 +386,7 @@ export class Context extends EventEmitter {
    * but makes the intent clearer for simple use cases.
    * @return  Promise resolved when Rapid is fully running
    */
-  runAsync(): Promise<void> {
+  public runAsync(): Promise<void> {
     return this.startAsync();
   }
 
@@ -395,7 +395,7 @@ export class Context extends EventEmitter {
    * Call after completing an edit session to reset any internal state.
    * @return  Promise resolved when Rapid is finished resetting
    */
-  resetAsync(): Promise<void> {
+  public resetAsync(): Promise<void> {
     if (this._resetPromise) return this._resetPromise;
 
     const allSystems = Object.values(this.systems).filter(s => !!s);
@@ -414,7 +414,7 @@ export class Context extends EventEmitter {
    * (not a System yet, but should be one)
    * @return  The keybinding manager
    */
-  keybinding(): Keybinding {
+  public keybinding(): Keybinding {
     return this._keybinding;
   }
 
@@ -423,18 +423,18 @@ export class Context extends EventEmitter {
    * OAuth/authentication credentials for connecting to the OSM API.
    * Set this before calling `initAsync()` to use preauth credentials.
    */
-  get preauth(): PreauthOptions | null {
+  public get preauth(): PreauthOptions | null {
     return this._preauth;
   }
-  set preauth(options: PreauthOptions | null) {
+  public set preauth(options: PreauthOptions | null) {
     this._preauth = options ? { ...options } : null;  // copy and remember for init time
   }
 
   /**
    * Connection options for the source switcher (optional).
    */
-  get apiConnections(): ApiConnection[] | null     { return this._apiConnections; }
-  set apiConnections(arr: ApiConnection[] | null)  { this._apiConnections = arr; }
+  public get apiConnections(): ApiConnection[] | null     { return this._apiConnections; }
+  public set apiConnections(arr: ApiConnection[] | null)  { this._apiConnections = arr; }
 
 
 // TODO: For now, this must be set before init, and it will be passed
@@ -449,15 +449,15 @@ export class Context extends EventEmitter {
    * Must be set before `initAsync()` is called.
    * @deprecated  Set locale via urlhash param or LocalizationSystem instead
    */
-  get locale(): string | string[] | null     { return this._prelocale; }  // remember for init time
-  set locale(val: string | string[] | null)  { this._prelocale = val; }
+  public get locale(): string | string[] | null     { return this._prelocale; }  // remember for init time
+  public set locale(val: string | string[] | null)  { this._prelocale = val; }
 
 
   /**
    * Loads OSM tiles for the current viewport.
    * Will only load tiles if zoom level is sufficient and editing is enabled.
    */
-  loadTiles(): void {
+  public loadTiles(): void {
     const editor = this.systems.editor;
     const osm = this.services.osm as any;
     if (!osm || !this.editable()) return;
@@ -477,7 +477,7 @@ export class Context extends EventEmitter {
    * Loads the OSM tile containing the given location.
    * @param  loc  The [lon, lat] location to load tile for
    */
-  loadTileAtLoc(loc: Vec2): void {
+  public loadTileAtLoc(loc: Vec2): void {
     const editor = this.systems.editor;
     const osm = this.services.osm as any;
     if (!osm || !this.editable()) return;
@@ -495,7 +495,7 @@ export class Context extends EventEmitter {
    * @param  entityID  The entity ID to load (e.g. 'n123', 'w456', 'r789')
    * @return  Promise resolved when the entity is loaded
    */
-  loadEntityAsync(entityID: EntityID): Promise<void> {
+  public loadEntityAsync(entityID: EntityID): Promise<void> {
     const editor = this.systems.editor;
     const osm = this.services.osm as any;
     if (!osm) {
@@ -518,7 +518,7 @@ export class Context extends EventEmitter {
 
 
   // String length limits in Unicode characters, not JavaScript UTF-16 code units
-  private _cleanOsmString(val: unknown, maxChars: number): string {
+  protected _cleanOsmString(val: unknown, maxChars: number): string {
     // be lenient with input
     let str: string;
     if (val === undefined || val === null) {
@@ -543,7 +543,7 @@ export class Context extends EventEmitter {
    * @param  val  The value to clean
    * @return  Cleaned string, truncated to max allowed characters
    */
-  cleanTagKey(val: unknown): string {
+  public cleanTagKey(val: unknown): string {
     return this._cleanOsmString(val, this.maxCharsForTagKey);
   }
 
@@ -552,7 +552,7 @@ export class Context extends EventEmitter {
    * @param  val  The value to clean
    * @return  Cleaned string, truncated to max allowed characters
    */
-  cleanTagValue(val: unknown): string {
+  public cleanTagValue(val: unknown): string {
     return this._cleanOsmString(val, this.maxCharsForTagValue);
   }
 
@@ -561,7 +561,7 @@ export class Context extends EventEmitter {
    * @param  val  The value to clean
    * @return  Cleaned string, truncated to max allowed characters
    */
-  cleanRelationRole(val: unknown): string {
+  public cleanRelationRole(val: unknown): string {
     return this._cleanOsmString(val, this.maxCharsForRelationRole);
   }
 
@@ -571,7 +571,7 @@ export class Context extends EventEmitter {
    * Returns `null` until UiSystem.render initializes the map and enters browse mode.
    * @readonly
    */
-  get mode(): AbstractMode | null {
+  public get mode(): AbstractMode | null {
     return this._currMode;
   }
 
@@ -583,7 +583,7 @@ export class Context extends EventEmitter {
    * @param  options       Optional options passed to the new mode
    * @return  The mode that was entered
    */
-  enter(modeOrModeID: AbstractMode | ModeID, options?: object): AbstractMode {
+  public enter(modeOrModeID: AbstractMode | ModeID, options?: object): AbstractMode {
     const gfx = this.systems.gfx;
     const currMode = this._currMode;
     let newMode: AbstractMode | undefined;
@@ -624,7 +624,7 @@ export class Context extends EventEmitter {
    * Can contain multiple items of various types (e.g. OSM data, Rapid data, etc.)
    * @return  The current selected features as a `Map(datumID -> datum)`
    */
-  selectedData(): Map<DataID, any> {
+  public selectedData(): Map<DataID, any> {
     if (!this._currMode) return new Map();
     return this._currMode.selectedData || new Map();
   }
@@ -633,7 +633,7 @@ export class Context extends EventEmitter {
    * Returns just the IDs of the selected features.
    * @return  Array of selected entity IDs
    */
-  selectedIDs(): DataID[] {
+  public selectedIDs(): DataID[] {
     if (!this._currMode) return [];
     return this._currMode.selectedIDs || [];
   }
@@ -643,7 +643,7 @@ export class Context extends EventEmitter {
    * Enables the given behaviors, disabling all others.
    * @param  behaviorIDs  Single behavior ID or array of behavior IDs to enable
    */
-  enableBehaviors(behaviorIDs: OneOrMore<BehaviorID>): void {
+  public enableBehaviors(behaviorIDs: OneOrMore<BehaviorID>): void {
     const toEnable = new Set(utilIterable(behaviorIDs));
 
     for (const [behaviorID, behavior] of Object.entries(this.behaviors)) {
@@ -664,15 +664,15 @@ export class Context extends EventEmitter {
   /**
    * The graph snapshot used for copy/paste operations.
    */
-  get copyGraph(): Graph | null     { return this._copyGraph; }
-  set copyGraph(val: Graph | null)  { this._copyGraph = val; }
+  public get copyGraph(): Graph | null     { return this._copyGraph; }
+  public set copyGraph(val: Graph | null)  { this._copyGraph = val; }
 
   /**
    * Entity IDs that have been copied for paste operations.
    * Setting this also captures the current staging graph as `copyGraph`.
    */
-  get copyIDs(): EntityID[] { return this._copyIDs; }
-  set copyIDs(val: EntityID[]) {
+  public get copyIDs(): EntityID[] { return this._copyIDs; }
+  public set copyIDs(val: EntityID[]) {
     this._copyIDs = val;
     this._copyGraph = this.systems.editor!.staging.graph!;
   }
@@ -680,15 +680,15 @@ export class Context extends EventEmitter {
   /**
    * The [lon, lat] location where entities were copied from.
    */
-  get copyLoc(): Vec2 | null     { return this._copyLoc; }
-  set copyLoc(val: Vec2 | null)  { this._copyLoc = val; }
+  public get copyLoc(): Vec2 | null     { return this._copyLoc; }
+  public set copyLoc(val: Vec2 | null)  { this._copyLoc = val; }
 
 
   /**
    * Returns all debug flags.
    * @return  Object containing all debug flags
    */
-  debugFlags(): DebugFlags {
+  public debugFlags(): DebugFlags {
     return this._debugFlags;
   }
 
@@ -697,7 +697,7 @@ export class Context extends EventEmitter {
    * @param  flag  The debug flag name to check
    * @return  True if the flag is enabled
    */
-  getDebug(flag: string): boolean {
+  public getDebug(flag: string): boolean {
     return flag ? this._debugFlags[flag] ?? false : false;
   }
 
@@ -706,7 +706,7 @@ export class Context extends EventEmitter {
    * @param  flag  The debug flag name to set
    * @param  val   The value to set (defaults to true)
    */
-  setDebug(flag: string, val: boolean = true): void {
+  public setDebug(flag: string, val: boolean = true): void {
     this._debugFlags[flag] = val;
     const gfx = this.systems.gfx;
     if (gfx && gfx.scene) {
@@ -721,9 +721,9 @@ export class Context extends EventEmitter {
    * @param  val  Optional D3 selection to set as the container
    * @return  The container selection (if no argument), or `this` for chaining
    */
-  container(): D3Selection;
-  container(val: D3Selection): this;
-  container(val?: D3Selection): D3Selection | this {
+  public container(): D3Selection;
+  public container(val: D3Selection): this;
+  public container(val?: D3Selection): D3Selection | this {
     if (val === undefined) return this.$container;
     this.$container = val;
     this.$container.classed('ideditor', true);
@@ -733,10 +733,10 @@ export class Context extends EventEmitter {
   /**
    * The container DOM element.
    */
-  get containerNode(): Element | null {
+  public get containerNode(): Element | null {
     return this.$container.node();
   }
-  set containerNode(val: Element) {
+  public set containerNode(val: Element) {
     this.container(d3_select(val));
   }
 
@@ -745,7 +745,7 @@ export class Context extends EventEmitter {
    * @param  val  Optional boolean to set embedded mode
    * @return  The embed value (if no argument), or `this` for chaining
    */
-  embed(val?: boolean): boolean | null | this {
+  public embed(val?: boolean): boolean | null | this {
     if (val === undefined) return this._embed;
     this._embed = val;
     return this;
@@ -757,7 +757,7 @@ export class Context extends EventEmitter {
    * @param  sequenceID  Which sequence to get next number from (e.g. 'node', 'way', 'relation')
    * @return  The next number in the sequence
    */
-  next(sequenceID: SequenceID): number {
+  public next(sequenceID: SequenceID): number {
     const num = (this.sequences[sequenceID] || 0) + 1;
     return this.sequences[sequenceID] = num;
   }

@@ -39,16 +39,17 @@ interface DrawLineSnapshot {
  * In `DrawLineMode`, we are drawing a new line or continuing an existing line.
  */
 export class DrawLineMode extends AbstractMode {
+
   /** Default tags for new ways */
-  defaultTags: OsmTags;
+  public defaultTags: OsmTags;
   /** The draw way just contains the way that we are drawing */
-  drawWayID: EntityID | null;
+  public drawWayID: EntityID | null;
   /** The draw node is temporary and just follows the pointer */
-  drawNodeID: EntityID | null;
+  public drawNodeID: EntityID | null;
   /** The first real node in the draw way */
-  firstNodeID: EntityID | null;
+  public firstNodeID: EntityID | null;
   /** The last real node in the draw way (the draw node is after/before this one) */
-  lastNodeID: EntityID | null;
+  public lastNodeID: EntityID | null;
 
   // So for a draw way like:
   //
@@ -60,24 +61,25 @@ export class DrawLineMode extends AbstractMode {
   // A or C can be clicked on to finish the way
 
   /** _insertIndex determines where new nodes get added (see `OsmWay.addNode()`) `0` = beginning, `undefined` = end */
-  private _insertIndex: number | undefined;
+  protected _insertIndex: number | undefined;
   /** The history index when we start drawing */
-  private _editIndex: number | null;
+  protected _editIndex: number | null;
   /** Watch screen coordinates to determine if we have moved enough */
-  private _lastScreen: Vec2 | null;
+  protected _lastScreen: Vec2 | null;
   /**
    * To deal with undo/redo, we take snapshots on every commit, keyed to the stable graph.
    * If we ever find ourself in an edit where we can't retrieve this information, leave `DrawLineMode`.
    * This means we've undo/redoed into an edit where the user wasn't drawing lines.
    * It's kinda hack, but I dont know what else to do right now.
    */
-  private _snapshots: Map<Graph, DrawLineSnapshot>;
+  protected _snapshots: Map<Graph, DrawLineSnapshot>;
+
 
   /**
    * @constructor
    * @param  context - Global shared application context
    */
-  constructor(context: Context) {
+  public constructor(context: Context) {
     super(context);
     this.id = 'draw-line';
 
@@ -109,7 +111,7 @@ export class DrawLineMode extends AbstractMode {
    * @param  options - Optional options object
    * @return `true` if the mode can be entered, `false` if not
    */
-  enter(options: DrawLineModeOptions = {}): boolean {
+  public enter(options: DrawLineModeOptions = {}): boolean {
     const context = this.context;
     const editor = context.systems.editor!;
     const gfx = context.systems.gfx!;
@@ -190,7 +192,7 @@ export class DrawLineMode extends AbstractMode {
    * Exits the mode, cleaning up the draw state and reverting any incomplete work.
    * If the draw way is invalid or degenerate, rolls back to the state before drawing started.
    */
-  exit(): void {
+  public exit(): void {
     if (!this._active) return;
     this._active = false;
 
@@ -266,7 +268,7 @@ export class DrawLineMode extends AbstractMode {
    * Updates `selectedData` collection to include the draw way
    * Updates `drawing` class for items that need it
    */
-  private _refreshEntities(): void {
+  protected _refreshEntities(): void {
     const context = this.context;
     const editor = context.systems.editor!;
     const gfx = context.systems.gfx!;
@@ -305,7 +307,7 @@ export class DrawLineMode extends AbstractMode {
    * An annotation is a text associated with the edit, such as "Started a line".
    * @return String such as "Started a line", or undefined if the drawWay is incomplete
    */
-  private _getAnnotation(): string | undefined {
+  protected _getAnnotation(): string | undefined {
     const context = this.context;
     const editor = context.systems.editor!;
     const l10n = context.systems.l10n!;
@@ -324,7 +326,7 @@ export class DrawLineMode extends AbstractMode {
    * Move the draw node, or create one if needed.
    * @param eventData - Object containing data about the event and what was targeted
    */
-  private _move(eventData: EventData): void {
+  protected _move(eventData: EventData): void {
     if (!this.drawWayID) return;  // haven't started drawing yet
 
     const context = this.context;
@@ -405,7 +407,7 @@ export class DrawLineMode extends AbstractMode {
    * We want to move the drawing node opposite of the pixels panned to keep it in the same place.
    * @param nudge - [x,y] amount of map pan in pixels
    */
-  private _nudge(nudge: Vec2): void {
+  protected _nudge(nudge: Vec2): void {
     const context = this.context;
     const editor = context.systems.editor!;
     const locations = context.systems.locations;
@@ -438,7 +440,7 @@ export class DrawLineMode extends AbstractMode {
    * Process whatever the user clicked on.
    * @param eventData - Object containing data about the event and what was targeted
    */
-  private _click(eventData: EventData): void {
+  protected _click(eventData: EventData): void {
     const context = this.context;
     const editor = context.systems.editor!;
     const gfx = context.systems.gfx!;
@@ -522,7 +524,7 @@ export class DrawLineMode extends AbstractMode {
   /**
    * Clicked on nothing, create a node at given `loc`.
    */
-  private _clickLoc(loc: Vec2): void {
+  protected _clickLoc(loc: Vec2): void {
     const EPSILON = 1e-6;
     const context = this.context;
     const editor = context.systems.editor!;
@@ -587,7 +589,7 @@ export class DrawLineMode extends AbstractMode {
   /**
    * Clicked on an target way, add a midpoint along the `edge` at given `loc`.
    */
-  private _clickWay(loc: Vec2, edge: [EntityID, EntityID]): void {
+  protected _clickWay(loc: Vec2, edge: [EntityID, EntityID]): void {
     const EPSILON = 1e-6;
     const context = this.context;
     const editor = context.systems.editor!;
@@ -660,7 +662,7 @@ export class DrawLineMode extends AbstractMode {
   /**
    * Clicked on a target node, include that node in the line we are drawing.
    */
-  private _clickNode(loc: Vec2, targetNode: OsmNode): void {
+  protected _clickNode(loc: Vec2, targetNode: OsmNode): void {
     const EPSILON = 1e-6;
     const context = this.context;
     const editor = context.systems.editor!;
@@ -743,7 +745,7 @@ export class DrawLineMode extends AbstractMode {
    * @param  drawNode - The temporary draw node to remove
    * @return An action function that modifies the graph
    */
-  private _actionRemoveDrawNode(drawWay: OsmWay, drawNode: OsmNode): Action {
+  protected _actionRemoveDrawNode(drawWay: OsmWay, drawNode: OsmNode): Action {
     return (graph: Graph): Graph => {
       const way = graph.entity(drawWay.id) as OsmWay;
       return graph.replace(way.removeNode(drawNode.id)).remove(drawNode);
@@ -757,7 +759,7 @@ export class DrawLineMode extends AbstractMode {
    * @param  loc - Optional location for the node; defaults to current mouse location
    * @return The newly created draw node
    */
-  private _addDrawNode(loc?: Vec2): OsmNode {
+  protected _addDrawNode(loc?: Vec2): OsmNode {
     const context = this.context;
     const editor = context.systems.editor!;
     const map = context.systems.map!;
@@ -778,7 +780,7 @@ export class DrawLineMode extends AbstractMode {
    * Done drawing, select the draw way or return to browse mode.
    * Note that `exit()` will be called immediately after this to perform cleanup.
    */
-  private _finish(): void {
+  protected _finish(): void {
     const context = this.context;
     const editor = context.systems.editor!;
     const graph = editor.staging.graph;
@@ -800,7 +802,7 @@ export class DrawLineMode extends AbstractMode {
    * Cancel all drawing and return to browse mode.
    * Note that `exit()` will be called immediately after this to perform cleanup.
    */
-  private _cancel(): void {
+  protected _cancel(): void {
     if (DEBUG) {
       console.log(`DrawLineMode: _cancel`);  // eslint-disable-line no-console
     }
@@ -816,7 +818,7 @@ export class DrawLineMode extends AbstractMode {
    * If we ever find ourself in an edit where we can't retrieve this information, leave `DrawLineMode`.
    * This means we've undo/redoed into an edit where the user wasn't drawing the same line.
    */
-  private _takeSnapshot(firstNodeID: EntityID, lastNodeID: EntityID): void {
+  protected _takeSnapshot(firstNodeID: EntityID, lastNodeID: EntityID): void {
     const context = this.context;
     const editor = context.systems.editor!;
     const graph = editor.stable.graph;
@@ -838,7 +840,7 @@ export class DrawLineMode extends AbstractMode {
    * If we ever find ourself in an edit where we can't retrieve this information, leave `DrawLineMode`.
    * This means we've undo/redoed into an edit where the user wasn't drawing the same line.
    */
-  private _restoreSnapshot(): void {
+  protected _restoreSnapshot(): void {
     const context = this.context;
     const editor = context.systems.editor!;
     const graph = editor.stable.graph;
@@ -867,7 +869,7 @@ export class DrawLineMode extends AbstractMode {
   /**
    * Changes the cursor styling based on what geometry is hovered
    */
-  private _hover(eventData: EventData): void {
+  protected _hover(eventData: EventData): void {
     const context = this.context;
     const editor = context.systems.editor!;
     const gfx = context.systems.gfx!;

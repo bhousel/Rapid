@@ -27,30 +27,32 @@ const FAR_TOLERANCE = 12;
  *   `lastClick`    `eventData` Object for the most recent click event
  */
 export class SelectBehavior extends AbstractBehavior {
+
   /** EventData for the most recent pointerdown event */
-  lastDown: EventData | null;
+  public lastDown: EventData | null;
   /** EventData for the most recent pointerup event (used for double-click detection) */
-  lastUp: EventData | null;
+  public lastUp: EventData | null;
   /** EventData for the most recent pointermove event */
-  lastMove: EventData | null;
+  public lastMove: EventData | null;
   /** EventData for the most recent spacebar press (used for spacebar clicking) */
-  lastSpace: EventData | null;
+  public lastSpace: EventData | null;
   /** EventData for the most recent successful click event */
-  lastClick: EventData | null;
+  public lastClick: EventData | null;
   /** Set of entity IDs for multi-selection (Shift+click) */
-  private _multiSelection: Set<EntityID>;
+  protected _multiSelection: Set<EntityID>;
   /** Whether spacebar clicking is temporarily disabled */
-  private _spaceClickDisabled: boolean;
+  protected _spaceClickDisabled: boolean;
   /** Whether the context menu is currently shown */
-  private _showsMenu: boolean;
+  protected _showsMenu: boolean;
   /** Whether the MapRoulette menu is currently shown */
-  private _showsMapRouletteMenu: boolean;
+  protected _showsMapRouletteMenu: boolean;
+
 
   /**
    * @constructor
    * @param  context - Global shared application context
    */
-  constructor(context: Context) {
+  public constructor(context: Context) {
     super(context);
     this.id = 'select';
 
@@ -80,7 +82,7 @@ export class SelectBehavior extends AbstractBehavior {
   /**
    * Bind event handlers
    */
-  enable(): void {
+  public enable(): void {
     if (this._enabled) return;
 
     this._enabled = true;
@@ -109,7 +111,7 @@ export class SelectBehavior extends AbstractBehavior {
   /**
    * Unbind event handlers
    */
-  disable(): void {
+  public disable(): void {
     if (!this._enabled) return;
 
     this._enabled = false;
@@ -141,7 +143,7 @@ export class SelectBehavior extends AbstractBehavior {
    * Handler for keydown events on the window.
    * @param  e - A DOM KeyboardEvent
    */
-  _keydown(e: KeyboardEvent): void {
+  protected _keydown(e: KeyboardEvent): void {
     // if any key is pressed the user is probably doing something other than long-pressing
     this._cancelLongPress();
 
@@ -175,7 +177,7 @@ export class SelectBehavior extends AbstractBehavior {
    * Handler for keyup events on the window.
    * @param  e - A DOM KeyboardEvent
    */
-  _keyup(e: KeyboardEvent): void {
+  protected _keyup(e: KeyboardEvent): void {
     // After spacebar click, user must move pointer or lift spacebar to allow another spacebar click
     if (this._spaceClickDisabled && [' ', 'Spacebar'].includes(e.key)) {
       e.preventDefault();
@@ -190,7 +192,7 @@ export class SelectBehavior extends AbstractBehavior {
    * if the user taps with multiple fingers. We lock in the first one in `lastDown`.
    * @param  e - A Pixi FederatedPointerEvent
    */
-  _pointerdown(e: FederatedPointerEvent): void {
+  protected _pointerdown(e: FederatedPointerEvent): void {
     if (this.lastDown) return;  // a pointer is already down
 
     const context = this.context;
@@ -220,7 +222,7 @@ export class SelectBehavior extends AbstractBehavior {
    * Handler for pointermove events.
    * @param  e - A Pixi FederatedPointerEvent
    */
-  _pointermove(e: FederatedPointerEvent): void {
+  protected _pointermove(e: FederatedPointerEvent): void {
     const move = this._getEventData(e);
     this.lastMove = move;
 
@@ -247,7 +249,7 @@ export class SelectBehavior extends AbstractBehavior {
    * Handler for pointerup events.
    * @param  e - A Pixi FederatedPointerEvent
    */
-  _pointerup(e: FederatedPointerEvent): void {
+  protected _pointerup(e: FederatedPointerEvent): void {
     const down = this.lastDown;
     const up = this._getEventData(e);
     if (!down || down.id !== up.id) return;  // not down, or different pointer
@@ -292,7 +294,7 @@ export class SelectBehavior extends AbstractBehavior {
   /**
    * Handler for pointercancel events.
    */
-  _pointercancel(): void {
+  protected _pointercancel(): void {
     // Here we can throw away the down data to prepare for another `pointerdown`.
     // After pointercancel, there should be no more `pointermove` or `pointerup` events.
     this.lastDown = null;
@@ -303,7 +305,7 @@ export class SelectBehavior extends AbstractBehavior {
    * Handler for `keydown` events of the spacebar. We use these to simulate clicks.
    * Note that the spacebar will repeat, so we can get many of these.
    */
-  _spacebar(): void {
+  protected _spacebar(): void {
     if (this._spaceClickDisabled) return;
 
     // For spacebar clicks we will use the last move event as the trigger
@@ -322,7 +324,7 @@ export class SelectBehavior extends AbstractBehavior {
   /**
    * Once we have determined that the user has clicked, this is where we handle that click.
    */
-  _doSelect(): void {
+  protected _doSelect(): void {
     if (!this._enabled || !this.lastClick) return;  // nothing to do
 
     this._cancelLongPress();
@@ -417,7 +419,7 @@ export class SelectBehavior extends AbstractBehavior {
   /**
    * Cancel any scheduled longpress handler
    */
-  _cancelLongPress(): void {
+  protected _cancelLongPress(): void {
     const scheduler = this.context.systems.scheduler!;
 
     scheduler.cancel('longpress');
@@ -431,7 +433,7 @@ export class SelectBehavior extends AbstractBehavior {
    * If we're still down, treat it as a click + contextmenu.
    * @param  down - EventData Object for the original down event
    */
-  _doLongPress(down: EventData): void {
+  protected _doLongPress(down: EventData): void {
     if (this.lastDown === down && !down.isCancelled) {   // still down
       this.lastClick = down;    // We will accept this as a click
       down.isCancelled = true;  // cancel it so that we don't get *another* click when the user lifts up
@@ -447,7 +449,7 @@ export class SelectBehavior extends AbstractBehavior {
    * - If it's on a bare part of the way
    * - If they double clicked right on a midpoint.
    */
-  _doDoubleClick(): void {
+  protected _doDoubleClick(): void {
     if (!this._enabled || !this.lastUp) return;
 
     const context = this.context;
@@ -493,7 +495,7 @@ export class SelectBehavior extends AbstractBehavior {
    * We get into here from `_pointerup`, `_keydown`, or `_doLongPress`
    * Uses whatever is in `this.lastClick` as the target for the menu.
    */
-  _doContextMenu(): void {
+  protected _doContextMenu(): void {
     if (!this._enabled || !this.lastClick) return;  // nothing to do
 
     const context = this.context;

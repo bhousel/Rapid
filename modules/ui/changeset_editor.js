@@ -1,5 +1,4 @@
 import { dispatch as d3_dispatch } from 'd3-dispatch';
-import { utilArrayUniqBy } from '@rapid-sdk/util';
 
 import { uiIcon } from './icon.js';
 import { uiCombobox} from './combobox.js';

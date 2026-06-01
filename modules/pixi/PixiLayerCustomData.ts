@@ -1,11 +1,10 @@
-import { DOMParser } from '@xmldom/xmldom';
-import { Extent, type Viewport } from '@rapid-sdk/math';
-import { gpx, kml } from '@tmcw/togeojson';
-import { parse as wktParse } from 'wkt';
-
 import { AbstractPixiLayer } from './AbstractPixiLayer.ts';
+import { DOMParser } from '@xmldom/xmldom';
+import { Extent } from '@rapid-sdk/math';
 import { GeoJSONData } from '../data/GeoJSONData.ts';
 import { geojsonFeatures } from '../util/util.ts';
+import { gpx, kml } from '@tmcw/togeojson';
+import { parse as wktParse } from 'wkt';
 import { PixiFeatureLine } from './PixiFeatureLine.ts';
 import { PixiFeaturePoint } from './PixiFeaturePoint.ts';
 import { PixiFeaturePolygon } from './PixiFeaturePolygon.ts';
@@ -13,6 +12,7 @@ import { PixiFeaturePolygon } from './PixiFeaturePolygon.ts';
 import type { Document as XmlDocument } from '@xmldom/xmldom';
 import type { MatchedStyle } from '../core/StyleSystem.ts';
 import type { PixiScene } from './PixiScene.ts';
+import type { Viewport } from '@rapid-sdk/math';
 
 const CUSTOM_COLOR = 0x00ffff;
 
@@ -23,20 +23,20 @@ const CUSTOM_COLOR = 0x00ffff;
  * @class
  */
 export class PixiLayerCustomData extends AbstractPixiLayer {
-  private _dataUsed: string | null;
-  private _fileList: FileList | null;
-  private _fileReader: FileReader;
-  private _template: string | null;
-  private _wkt: string | null;
-  private _url: string | null;
-  private _geoData: GeoJSONData[] | null;
-  private _geoDataExtent: Extent | null;
+  protected _dataUsed: string | null;
+  protected _fileList: FileList | null;
+  protected _fileReader: FileReader;
+  protected _template: string | null;
+  protected _wkt: string | null;
+  protected _url: string | null;
+  protected _geoData: GeoJSONData[] | null;
+  protected _geoDataExtent: Extent | null;
 
   /**
    * @constructor
    * @param scene - The Scene that owns this Layer
    */
-  constructor(scene: PixiScene) {
+  public constructor(scene: PixiScene) {
     super(scene);
     this.id = 'custom-data';
 
@@ -87,7 +87,7 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
   /**
    * Every Layer should have a reset function to replace any Pixi objects and internal state.
    */
-  reset() {
+  public reset() {
     super.reset();
     // note: we don't need to call this._clear() to remove custom data here.
     // Custom data can persist through a reset of the graphics system.
@@ -99,7 +99,7 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
    * @param frame - Integer frame being rendered
    * @param viewport - Pixi viewport to use for rendering
    */
-  render(frame: number, viewport: Viewport): void {
+  public render(frame: number, viewport: Viewport): void {
     if (!this.enabled || !(this.hasData())) return;
 
     const vtService = this.context.services.vectortile as any;
@@ -204,7 +204,7 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
    * @param viewport - Pixi viewport to use for rendering
    * @param polygons - Array of polygon data
    */
-  renderPolygons(frame: number, viewport: Viewport, polygons: GeoJSONData[]): void {
+  public renderPolygons(frame: number, viewport: Viewport, polygons: GeoJSONData[]): void {
     const l10n = this.context.systems.l10n!;
     const parentContainer = this.scene.groups.get('basemap')!;
 
@@ -261,7 +261,7 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
    * @param lines - Array of line data
    * @param styleOverride - Custom style
    */
-  renderLines(frame: number, viewport: Viewport, lines: GeoJSONData[], styleOverride?: Partial<MatchedStyle>): void {
+  public renderLines(frame: number, viewport: Viewport, lines: GeoJSONData[], styleOverride?: Partial<MatchedStyle>): void {
     const l10n = this.context.systems.l10n!;
     const parentContainer = this.scene.groups.get('basemap')!;
 
@@ -357,7 +357,7 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
    * @param viewport - Pixi viewport to use for rendering
    * @param points - Array of point data
    */
-  renderPoints(frame: number, viewport: Viewport, points: GeoJSONData[]): void {
+  public renderPoints(frame: number, viewport: Viewport, points: GeoJSONData[]): void {
     const l10n = this.context.systems.l10n!;
     const parentContainer = this.scene.groups.get('points')!;
 
@@ -412,14 +412,14 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
    * Return true if there is custom data to display
    * @return `true` if there is a vector tile template or file data to display
    */
-  hasData(): boolean {
+  public hasData(): boolean {
     return !!(this._template || Array.isArray(this._geoData));
   }
 
   /**
    * @return Array of single element for the data layer currently enabled
    */
-  dataUsed(): string[] {
+  public dataUsed(): string[] {
     return this._dataUsed ? [ this._dataUsed ] : [];
   }
 
@@ -427,7 +427,7 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
   /**
    * Fits the map view to show the extent of the loaded file data
    */
-  fitZoom(): void {
+  public fitZoom(): void {
     const extent = this._geoDataExtent;
     if (!extent) return;
 
@@ -440,7 +440,7 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
    * This returns any FileList which we have stored
    * @return Files, or null if none
    */
-  getFileList(): FileList | null {
+  public getFileList(): FileList | null {
     return this._fileList;
   }
 
@@ -454,7 +454,7 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
    * https://developer.mozilla.org/en-US/docs/Web/API/FileReader
    * @param fileList - Files to process (only first one is used), or null to reset
    */
-  setFileList(fileList: FileList | null): void {
+  public setFileList(fileList: FileList | null): void {
     this._clear();
     this._fileList = fileList;
     this.scene.disableLayers(this.layerID);  // emits 'layerchange', so UI gets updated
@@ -477,7 +477,7 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
    * It decides whether the url looks like a single file to load or a vector tile template url.
    * @param url - The URL to load
    */
-  setUrl(url: string): void {
+  public setUrl(url: string): void {
     const network = this.context.systems.network!;
 
     this._clear();
@@ -514,7 +514,7 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
    *   - Protomaps .pmtiles single-file archive containing MVT
    * @param url - The URL template
    */
-  private _setUrlTemplate(url: string): void {
+  protected _setUrlTemplate(url: string): void {
     // Test source against OSM imagery blocklists..
     const osm = this.context.services.osm as any;
     if (osm) {
@@ -554,7 +554,7 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
    * @param data - The file data
    * @param extension - The file extension
    */
-  private _setFile(data: string | XmlDocument | GeoJSON.GeoJsonObject | null, extension: string | null | undefined): void {
+  protected _setFile(data: string | XmlDocument | GeoJSON.GeoJsonObject | null, extension: string | null | undefined): void {
     if (!data) return;
 
     const isString = (typeof data === 'string');
@@ -607,7 +607,7 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
    * @param name - A filename or url
    * @return The extension including the dot '.'
    */
-  private _getExtension(name: string): string | null {
+  protected _getExtension(name: string): string | null {
     if (!name) return null;
     const regex = /\.(gpx|kml|(geo)?json)$/i;
     const match = name.match(regex);
@@ -620,7 +620,7 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
    * @param currParams - The current hash parameters
    * @param prevParams - The previous hash parameters
    */
-  private _hashChanged(currParams: Map<string, string>, prevParams: Map<string, string>): void {
+  protected _hashChanged(currParams: Map<string, string>, prevParams: Map<string, string>): void {
     // 'data' (or 'gpx', legacy)
     const newData = currParams.get('data') || currParams.get('gpx');
     const oldData = prevParams.get('data') || prevParams.get('gpx');
@@ -645,7 +645,7 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
   /**
    * Push changes in custom data url to the urlhash
    */
-  private _updateHash(): void {
+  protected _updateHash(): void {
     const urlhash = this.context.systems.urlhash!;
 
     if (!this.enabled) return;
@@ -674,7 +674,7 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
    *   ((-1.5 1.3, -1.5 1.3, -1.5 1.3, -1.4 1.3, -1.5 1.3)))'
    * @returns a list containing polygons to draw as a custom shape, or null
    */
-  private _parseAsWkt(wktString: string): GeoJSON.Feature | null {
+  protected _parseAsWkt(wktString: string): GeoJSON.Feature | null {
     const parsedWkt = wktParse(wktString);
 
     // If it couldn't be parsed, or if it isn't a poly/multipoly, we can't render it.
@@ -694,7 +694,7 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
   /**
    * Clear state to prepare for new custom data
    */
-  private _clear(): void {
+  protected _clear(): void {
     this._dataUsed = null;
     this._fileList = null;
     this._template = null;

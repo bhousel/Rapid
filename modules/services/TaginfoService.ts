@@ -1,6 +1,5 @@
-import { utilObjectOmit, utilQsString } from '@rapid-sdk/util';
-
 import { AbstractSystem } from '../core/AbstractSystem.ts';
+import { utilObjectOmit, utilQsString } from '@rapid-sdk/util';
 
 import type { Context } from '../Context.ts';
 
@@ -91,15 +90,16 @@ type TaginfoCallback = (err: string | null, data?: any[]) => void;
 export class TaginfoService extends AbstractSystem {
 
   /** Cache of API responses keyed by request URL */
-  _cache: Record<string, any[]>;
+  protected _cache: Record<string, any[]>;
   /** Set of popular tag keys to exclude from value lookups (see iD#3955) */
-  _popularKeys: Record<string, boolean>;
+  protected _popularKeys: Record<string, boolean>;
+
 
   /**
    * @constructor
    * @param context - Global shared application context
    */
-  constructor(context: Context) {
+  public constructor(context: Context) {
     super(context);
     this.id = 'taginfo';
     this.requiredDependencies = new Set<SystemID>(['network']);
@@ -134,7 +134,7 @@ export class TaginfoService extends AbstractSystem {
    * Called after all core objects have been constructed.
    * @return Promise resolved when this component has completed initialization
    */
-  initAsync(): Promise<void> {
+  public initAsync(): Promise<void> {
     return super.initAsync();
   }
 
@@ -143,7 +143,7 @@ export class TaginfoService extends AbstractSystem {
    * Called after all core objects have been initialized.
    * @return Promise resolved when this component has completed startup
    */
-  startAsync(): Promise<void> {
+  public startAsync(): Promise<void> {
     if (this._startPromise) return this._startPromise;
 
     const l10n = this.context.systems.l10n;
@@ -186,7 +186,7 @@ export class TaginfoService extends AbstractSystem {
    * Called after completing an edit session to reset any internal state
    * @return Promise resolved when this component has completed resetting
    */
-  resetAsync(): Promise<void> {
+  public resetAsync(): Promise<void> {
     const context = this.context;
     const network = context.systems.network!;
     const scheduler = context.systems.scheduler;
@@ -202,7 +202,7 @@ export class TaginfoService extends AbstractSystem {
    * @param params
    * @param callback - errback-style callback function to call with results
    */
-  keys(params: TaginfoParams, callback: TaginfoCallback): void {
+  public keys(params: TaginfoParams, callback: TaginfoCallback): void {
     const context = this.context;
     const l10n = context.systems.l10n;
     const scheduler = context.systems.scheduler;
@@ -243,7 +243,7 @@ export class TaginfoService extends AbstractSystem {
    * @param params
    * @param callback - errback-style callback function to call with results
    */
-  multikeys(params: TaginfoParams, callback: TaginfoCallback): void {
+  public multikeys(params: TaginfoParams, callback: TaginfoCallback): void {
     const context = this.context;
     const l10n = context.systems.l10n;
     const scheduler = context.systems.scheduler;
@@ -285,7 +285,7 @@ export class TaginfoService extends AbstractSystem {
    * @param params
    * @param callback - errback-style callback function to call with results
    */
-  values(params: TaginfoParams, callback: TaginfoCallback): void {
+  public values(params: TaginfoParams, callback: TaginfoCallback): void {
     // Exclude popular keys from values lookups.. see iD#3955
     const key = params.key;
     if (key && this._popularKeys[key]) {
@@ -339,7 +339,7 @@ export class TaginfoService extends AbstractSystem {
    * @param params
    * @param callback - errback-style callback function to call with results
    */
-  roles(params: TaginfoParams, callback: TaginfoCallback): void {
+  public roles(params: TaginfoParams, callback: TaginfoCallback): void {
     const context = this.context;
     const l10n = context.systems.l10n;
     const scheduler = context.systems.scheduler;
@@ -381,7 +381,7 @@ export class TaginfoService extends AbstractSystem {
    * @param params
    * @param callback - errback-style callback function to call with results
    */
-  docs(params: TaginfoParams, callback: TaginfoCallback): void {
+  public docs(params: TaginfoParams, callback: TaginfoCallback): void {
     const context = this.context;
     const scheduler = context.systems.scheduler;
 
@@ -420,7 +420,7 @@ export class TaginfoService extends AbstractSystem {
    * @param o - Mapping from geometry type to parameter value
    * @return The modified params
    */
-  _sets(params: TaginfoParams, n: string, o: Record<string, string>): TaginfoParams {
+  protected _sets(params: TaginfoParams, n: string, o: Record<string, string>): TaginfoParams {
     if (params.geometry && o[params.geometry]) {
       params[n] = o[params.geometry];
     }
@@ -428,34 +428,34 @@ export class TaginfoService extends AbstractSystem {
   }
 
   /** Sets the `filter` parameter based on geometry type */
-  _setFilter(params: TaginfoParams): TaginfoParams {
+  protected _setFilter(params: TaginfoParams): TaginfoParams {
     return this._sets(params, 'filter', tag_filters);
   }
 
   /** Sets the `sortname` parameter based on geometry type for key/value queries */
-  _setSort(params: TaginfoParams): TaginfoParams {
+  protected _setSort(params: TaginfoParams): TaginfoParams {
     return this._sets(params, 'sortname', tag_sorts);
   }
 
   /** Sets the `sortname` parameter based on geometry type for relation member queries */
-  _setSortMembers(params: TaginfoParams): TaginfoParams {
+  protected _setSortMembers(params: TaginfoParams): TaginfoParams {
     return this._sets(params, 'sortname', tag_sort_members);
   }
 
   /** Removes internal-only parameters (`geometry`, `debounce`) before sending to the API */
-  _clean(params: TaginfoParams): TaginfoParams {
+  protected _clean(params: TaginfoParams): TaginfoParams {
     return utilObjectOmit(params, ['geometry', 'debounce']);
   }
 
 
   /** Returns a filter function that keeps keys with high usage count or wiki presence */
-  _filterKeys(type?: string): (d: any) => boolean {
+  protected _filterKeys(type?: string): (d: any) => boolean {
     const count_type = type ? 'count_' + type : 'count_all';
     return (d: any) => parseFloat(d[count_type]) > 2500 || d.in_wiki;
   }
 
   /** Returns a filter function that keeps keys matching the prefix without additional colons */
-  _filterMultikeys(prefix: string): (d: any) => boolean {
+  protected _filterMultikeys(prefix: string): (d: any) => boolean {
     return (d: any) => {
       // d.key begins with prefix, and d.key contains no additional ':'s
       const re = new RegExp('^' + prefix + '(.*)$');
@@ -465,7 +465,7 @@ export class TaginfoService extends AbstractSystem {
   }
 
   /** Returns a filter function that excludes values with punctuation, optionally uppercase, or zero fraction */
-  _filterValues(allowUpperCase: boolean): (d: any) => boolean {
+  protected _filterValues(allowUpperCase: boolean): (d: any) => boolean {
     return (d: any) => {
       if (d.value.match(/[;,]/) !== null) return false;  // exclude some punctuation
       if (!allowUpperCase && d.value.match(/[A-Z*]/) !== null) return false;  // exclude uppercase letters
@@ -474,7 +474,7 @@ export class TaginfoService extends AbstractSystem {
   }
 
   /** Returns a filter function that excludes empty roles, uppercase, and low-fraction roles */
-  _filterRoles(geometry: GeometryType | ''): (d: any) => boolean {
+  protected _filterRoles(geometry: GeometryType | ''): (d: any) => boolean {
     return (d: any) => {
       if (d.role === '') return false; // exclude empty role
       if (d.role.match(/[A-Z*;,]/) !== null) return false;  // exclude uppercase letters and some punctuation
@@ -484,7 +484,7 @@ export class TaginfoService extends AbstractSystem {
   }
 
   /** Maps a taginfo key datum to a TaginfoResult using the key as both value and title */
-  _valKey(d: any): TaginfoResult {
+  protected _valKey(d: any): TaginfoResult {
     return {
       value: d.key,
       title: d.key
@@ -493,7 +493,7 @@ export class TaginfoService extends AbstractSystem {
 
 
   /** Maps a taginfo value datum to a TaginfoResult, using the description as title if available */
-  _valKeyDescription(d: any): TaginfoResult {
+  protected _valKeyDescription(d: any): TaginfoResult {
     const obj: TaginfoResult = {
       value: d.value,
       title: d.description || d.value
@@ -506,7 +506,7 @@ export class TaginfoService extends AbstractSystem {
 
 
   /** Maps a taginfo role datum to a TaginfoResult using the role as both value and title */
-  _roleKey(d: any): TaginfoResult {
+  protected _roleKey(d: any): TaginfoResult {
     return {
       value: d.role,
       title: d.role
@@ -515,7 +515,7 @@ export class TaginfoService extends AbstractSystem {
 
 
   /** Sorts keys so that simple keys (without ':') appear before namespaced keys (with ':') */
-  _sortKeys(a: any, b: any): number {
+  protected _sortKeys(a: any, b: any): number {
     return (a.key.indexOf(':') === -1 && b.key.indexOf(':') !== -1) ? -1
       : (a.key.indexOf(':') !== -1 && b.key.indexOf(':') === -1) ? 1
       : 0;
@@ -531,7 +531,7 @@ export class TaginfoService extends AbstractSystem {
    * @param callback - Errback-style callback for the results
    * @param loaded - Internal callback invoked when the fetch completes
    */
-  _request(
+  protected _request(
     url: string,
     params: TaginfoParams,
     exactMatch: boolean,
@@ -562,7 +562,7 @@ export class TaginfoService extends AbstractSystem {
    * @param callback - Called with cached results if a hit is found
    * @return True if a cache hit was found and callback was invoked
    */
-  _checkCache(url: string, params: TaginfoParams, exactMatch: boolean, callback: TaginfoCallback): boolean {
+  protected _checkCache(url: string, params: TaginfoParams, exactMatch: boolean, callback: TaginfoCallback): boolean {
     const rp = params.rp ?? 25;
     let testQuery = params.query ?? '';
     let testUrl = url;

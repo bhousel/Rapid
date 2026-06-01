@@ -52,21 +52,23 @@ interface SummaryEntry {
  *  child and parent relationships.
  */
 export class Difference {
-  private _base: Graph | null;
-  private _head: Graph;
-  private _changes: Map<EntityID, DifferenceChange>;
-  private _summary: Map<EntityID, SummaryEntry> | null;
-  private _complete: Map<EntityID, OsmEntity | undefined> | null;
 
   /** Flags indicating what types of changes occurred */
-  didChange: DifferenceFlags;
+  public didChange: DifferenceFlags;
+
+  protected _base: Graph | null;
+  protected _head: Graph;
+  protected _changes: Map<EntityID, DifferenceChange>;
+  protected _summary: Map<EntityID, SummaryEntry> | null;
+  protected _complete: Map<EntityID, OsmEntity | undefined> | null;
+
 
   /**
    * @constructor
    * @param  base - Base Graph (null for fresh head graph)
    * @param  head - Head Graph
    */
-  constructor(base: Graph | null, head: Graph) {
+  public constructor(base: Graph | null, head: Graph) {
     this._base = base;
     this._head = head;
     this._changes = new Map();
@@ -135,7 +137,7 @@ export class Difference {
    * @readonly
    * @return  The change details
    */
-  get changes(): Map<EntityID, DifferenceChange> {
+  public get changes(): Map<EntityID, DifferenceChange> {
     return this._changes;
   }
 
@@ -143,7 +145,7 @@ export class Difference {
   /**
    * @return  Array of Entities modified
    */
-  modified(): OsmEntity[] {
+  public modified(): OsmEntity[] {
     const result: OsmEntity[] = [];
     for (const change of this._changes.values()) {
       if (change.base && change.head) {
@@ -157,7 +159,7 @@ export class Difference {
   /**
    * @return  Array of Entities created
    */
-  created(): OsmEntity[] {
+  public created(): OsmEntity[] {
     const result: OsmEntity[] = [];
     for (const change of this._changes.values()) {
       if (!change.base && change.head) {
@@ -171,7 +173,7 @@ export class Difference {
   /**
    * @return  Array of Entities deleted
    */
-  deleted(): OsmEntity[] {
+  public deleted(): OsmEntity[] {
     const result: OsmEntity[] = [];
     for (const change of this._changes.values()) {
       if (change.base && !change.head) {
@@ -202,7 +204,7 @@ export class Difference {
    * ```
    * @return  Returns a summary of changes
    */
-  summary(): Map<EntityID, SummaryEntry> {
+  public summary(): Map<EntityID, SummaryEntry> {
     if (this._summary) return this._summary;  // done already
 
     const base = this._base!;
@@ -251,7 +253,7 @@ export class Difference {
    * Recurses up to include all ancestor Entities in the result, parentWays and parentRelations.
    * @return  Returns the complete set of entities affected by the change
    */
-  complete(): Map<EntityID, OsmEntity | undefined> {
+  public complete(): Map<EntityID, OsmEntity | undefined> {
     if (this._complete) return this._complete;  // done already
 
     const head = this._head;

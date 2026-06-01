@@ -46,23 +46,23 @@ const sharpenMatrix = [
  */
 export class PixiLayerBackgroundTiles extends AbstractPixiLayer {
   /** Whether this is a minimap background layer */
-  isMinimap: boolean;
+  public isMinimap: boolean;
   /** Filter settings for brightness/contrast/saturation/sharpness */
-  filters: FilterSettings;
+  public filters: FilterSettings;
   /** Blur filter applied when sharpness < 1 */
-  blurFilter: PIXI.BlurFilter | null;
+  public blurFilter: PIXI.BlurFilter | null;
   /** Convolution filter applied when sharpness > 1 */
-  convolutionFilter: ConvolutionFilter | null;
+  public convolutionFilter: ConvolutionFilter | null;
 
-  private _tileMaps: Map<ImagerySourceID, Map<TileID, CachedTile>>;
-  private _failed: Set<string>;
-  private _tiler: Tiler;
+  protected _tileMaps: Map<ImagerySourceID, Map<TileID, CachedTile>>;
+  protected _failed: Set<string>;
+  protected _tiler: Tiler;
 
   /**
    * @constructor
    * @param scene - The Scene that owns this Layer
    */
-  constructor(scene: PixiScene) {
+  public constructor(scene: PixiScene) {
     super(scene);
     this.id = 'background';
     this.enabled = true;   // background imagery should be enabled by default
@@ -87,7 +87,7 @@ export class PixiLayerBackgroundTiles extends AbstractPixiLayer {
   /**
    * Every Layer should have a reset function to replace any Pixi objects and internal state.
    */
-  reset(): void {
+  public reset(): void {
     super.reset();
 
     // Items in this layer don't need to be interactive
@@ -105,7 +105,7 @@ export class PixiLayerBackgroundTiles extends AbstractPixiLayer {
    * @param frame - Integer frame being rendered
    * @param viewport - Pixi viewport to use for rendering
    */
-  render(frame: number, viewport: Viewport): void {
+  public render(frame: number, viewport: Viewport): void {
     const imagery = this.context.systems.imagery;
     if (!imagery) return;
 
@@ -169,7 +169,7 @@ export class PixiLayerBackgroundTiles extends AbstractPixiLayer {
    * @param sourceContainer - PIXI.Container to render the tiles to
    * @param tileMap - Tiles needed for this tile source
    */
-  renderSource(
+  public renderSource(
     timestamp: number,
     viewport: Viewport,
     source: ImagerySource,
@@ -379,7 +379,7 @@ export class PixiLayerBackgroundTiles extends AbstractPixiLayer {
   /**
    * Frees all the resources used by all sources
    */
-  destroyAll(): void {
+  public destroyAll(): void {
     const groupContainer = this.scene.groups.get('background')!;
 
     // Doing this in 2 passes to avoid affecting `.children` while iterating over it.
@@ -399,7 +399,7 @@ export class PixiLayerBackgroundTiles extends AbstractPixiLayer {
    * Frees all the resources used by a source
    * @param sourceID - the sourceID to free
    */
-  destroySource(sourceID: ImagerySourceID): void {
+  public destroySource(sourceID: ImagerySourceID): void {
     const tileMap = this._tileMaps.get(sourceID);
     if (tileMap) {
       for (const [tileID, tile] of tileMap) {
@@ -421,7 +421,7 @@ export class PixiLayerBackgroundTiles extends AbstractPixiLayer {
    * Frees all the resources used by a tile
    * @param tile - Tile object
    */
-  destroyTile(tile: CachedTile): void {
+  public destroyTile(tile: CachedTile): void {
     const textureManager = this.gfx.textureManager!;
 
     if (tile.sprite) {
@@ -449,7 +449,7 @@ export class PixiLayerBackgroundTiles extends AbstractPixiLayer {
    * @param sourceID - the sourceID get a container for
    * @return A PIXI.Container to render tiles into
    */
-  getSourceContainer(sourceID: ImagerySourceID): PIXI.Container {
+  public getSourceContainer(sourceID: ImagerySourceID): PIXI.Container {
     const groupContainer = this.scene.groups.get('background')!;
     let sourceContainer = groupContainer.getChildByLabel(sourceID);
     if (!sourceContainer) {
@@ -468,7 +468,7 @@ export class PixiLayerBackgroundTiles extends AbstractPixiLayer {
    * a sharpen/blur filter, depending on the UI slider settings.
    * @param sourceContainer - The PIXI.Container that contains the tiles
    */
-  applyFilters(sourceContainer: PIXI.Container): void {
+  public applyFilters(sourceContainer: PIXI.Container): void {
     const adjustmentFilter = new AdjustmentFilter({
       brightness: this.filters.brightness,
       contrast: this.filters.contrast,
@@ -507,28 +507,28 @@ export class PixiLayerBackgroundTiles extends AbstractPixiLayer {
   /**
    * @param val - the brightness value
    */
-  setBrightness(val: number): void {
+  public setBrightness(val: number): void {
     this.filters.brightness = val;
   }
 
   /**
    * @param val - the contrast value
    */
-  setContrast(val: number): void {
+  public setContrast(val: number): void {
     this.filters.contrast = val;
   }
 
   /**
    * @param val - the saturation value
    */
-  setSaturation(val: number): void {
+  public setSaturation(val: number): void {
     this.filters.saturation = val;
   }
 
   /**
    * @param val - the sharpness value
    */
-  setSharpness(val: number): void {
+  public setSharpness(val: number): void {
     this.filters.sharpness = val;
   }
 

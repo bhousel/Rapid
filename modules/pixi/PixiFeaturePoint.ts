@@ -24,18 +24,18 @@ type StrokeStyleWithDash = PIXI.StrokeStyle & DashLineOptions;
  */
 export class PixiFeaturePoint extends AbstractPixiFeature {
   /** PIXI.Sprite for the marker */
-  marker: PIXI.Sprite | null;
+  public marker: PIXI.Sprite | null;
   /** PIXI.Sprite for the icon */
-  icon: PIXI.Sprite | null;
+  public icon: PIXI.Sprite | null;
   /** PIXI.Container containing the viewfields (or null if none) */
-  viewfields: PIXI.Container | null;
+  public viewfields: PIXI.Container | null;
 
   /** Count of viewfield sprites (to detect changes) */
-  private _viewfieldCount: number;
+  protected _viewfieldCount: number;
   /** Name of viewfield texture (to detect changes) */
-  private _viewfieldName: string | null;
+  protected _viewfieldName: string | null;
   /** Set true to use a circular halo and hit area */
-  private _isCircular: boolean;
+  protected _isCircular: boolean;
 
 
   /**
@@ -43,7 +43,7 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
    * @param layer - The Layer that owns this Feature
    * @param featureID - Unique string to use for the name of this Feature
    */
-  constructor(layer: AbstractPixiLayer, featureID: FeatureID) {
+  public constructor(layer: AbstractPixiLayer, featureID: FeatureID) {
     super(layer, featureID);
 
     this._viewfieldCount = 0;     // to watch for change in # of viewfield sprites
@@ -74,7 +74,7 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
    * Every Feature should have a destroy function that frees all the resources
    * Do not use the Feature after calling `destroy()`.
    */
-  destroy(): void {
+  public destroy(): void {
     if (this.marker) {
       this.marker.destroy();
       this.marker = null;
@@ -95,7 +95,7 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
   /**
    * @param viewport - Pixi viewport to use for rendering
    */
-  update(viewport: Viewport): void {
+  public update(viewport: Viewport): void {
     if (!this.dirty) return;  // nothing to do
 
     this.updateGeometry();
@@ -108,7 +108,7 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
   /**
    * @param viewport - Pixi viewport to use for rendering
    */
-  updateGeometry(): void {
+  public updateGeometry(): void {
     if (!this._geomDirty) return;
 
     const type = this._geom?.type;
@@ -137,7 +137,7 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
   /**
    * @param viewport - Pixi viewport to use for rendering
    */
-  updateStyle(viewport: Viewport): void {
+  public updateStyle(viewport: Viewport): void {
     if (!this._styleDirty) return;
 
     const context = this.context;
@@ -352,7 +352,7 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
 
 
 // experiment
-  updateHitArea(): void {
+  public updateHitArea(): void {
     if (!this.visible) return;
 
     if (this._classes.has('drawing')) {  // Rapid#648 - If drawing, `hitArea = null`
@@ -393,7 +393,7 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
   /**
    * Show/Hide halo (requires `this.container.hitArea` to be already set up by `updateHitArea` as a supported shape)
    */
-  updateHalo(): void {
+  public updateHalo(): void {
     const showHover = (this.visible && this._classes.has('hover'));
     const showSelect = (this.visible && this._classes.has('select') && !(this as any).virtual);
     const showHighlight = (this.visible && this._classes.has('highlight'));

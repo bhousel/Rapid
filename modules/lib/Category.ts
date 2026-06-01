@@ -67,25 +67,27 @@ interface CategoryStrings {
  *   `presets`               `Array<Preset>` Presets in this Category
  */
 export class Category {
-  context: Context;
-  type = 'category' as const;
-  id: CategoryID;
-  safeid: string;
-  categoryID: CategoryID;
-  props: CategoryProps;
-  geometries: Set<GeometryType>;
-  presets: Preset[];
 
-  private _strings: Map<string, CategoryStrings>;
-  private _currLocaleCode: LocaleCode | null;
-  private _currStrings: CategoryStrings;
+  public context: Context;
+  public type = 'category' as const;
+  public id: CategoryID;
+  public safeid: string;
+  public categoryID: CategoryID;
+  public props: CategoryProps;
+  public geometries: Set<GeometryType>;
+  public presets: Preset[];
+
+  protected _strings: Map<string, CategoryStrings>;
+  protected _currLocaleCode: LocaleCode | null;
+  protected _currStrings: CategoryStrings;
+
 
   /**
    * @constructor
    * @param context - Global shared application context
    * @param props - Properties for this Category
    */
-  constructor(context: Context, props: Partial<CategoryProps> = {}) {
+  public constructor(context: Context, props: Partial<CategoryProps> = {}) {
     this.context = context;
     this.type = 'category';
 
@@ -119,7 +121,7 @@ export class Category {
    * This should happen whenever SchemaSystem merges in new data.
    * You must add the Category to the SchemaSystem and call `reset` before using the Category.
    */
-  reset(): void {
+  public reset(): void {
     const context = this.context;
     const l10n = context.systems.l10n;
     const schema = context.systems.schema;
@@ -147,7 +149,7 @@ export class Category {
    * This is done early because we want the strings indexed by the SchemaSystem for searching.
    * @param localeCode - the locale code to switch to (defaults to 'en-US')
    */
-  setLocale(localeCode: LocaleCode = 'en-US'): void {
+  public setLocale(localeCode: LocaleCode = 'en-US'): void {
     this._currLocaleCode = localeCode;
     if (this._strings.has(localeCode)) return;  // done already
 
@@ -194,7 +196,7 @@ export class Category {
    * @return  Localized name
    * @readonly
    */
-  get name(): string {
+  public get name(): string {
     return this._currStrings.name;
   }
 
@@ -204,7 +206,7 @@ export class Category {
    * @return  Localized aliases, always empty Array '[]' for Categories
    * @readonly
    */
-  get aliases(): string[] {
+  public get aliases(): string[] {
     return [];
   }
 
@@ -214,7 +216,7 @@ export class Category {
    * @return  Localized search terms, always empty Array '[]' for Categories
    * @readonly
    */
-  get terms(): string[] {
+  public get terms(): string[] {
     return [];
   }
 
@@ -222,7 +224,7 @@ export class Category {
    * Matchscore is used for ranking search results.  Always returns `-1` for Categories
    * @return  Always returns `-1` for Categories
    */
-  matchScore(): number {
+  public matchScore(): number {
     return -1;
   }
 
@@ -230,7 +232,7 @@ export class Category {
    * Is this a fallback preset?  Always returns `false` for Categories.
    * @return  Always returns `false` for Categories
    */
-  isFallback(): boolean {
+  public isFallback(): boolean {
     return false;
   }
 
@@ -240,7 +242,7 @@ export class Category {
    * (There are not builtin categories at this time, only the fallback presets are builtin).
    * @return  Returns `true` if this is a builtin Category, `false` if not
    */
-  isBuiltin(): boolean {
+  public isBuiltin(): boolean {
     return !this.props.assetID;
   }
 

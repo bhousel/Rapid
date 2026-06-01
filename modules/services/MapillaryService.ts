@@ -1,10 +1,9 @@
+import { AbstractSystem } from '../core/AbstractSystem.ts';
 import { select as d3_select } from 'd3-selection';
+import Protobuf from 'pbf';
+import { MarkerData, GeoJSONData } from '../data/index.ts';
 import { Tiler, geoSphericalDistance } from '@rapid-sdk/math';
 import { VectorTile } from '@mapbox/vector-tile';
-import Protobuf from 'pbf';
-
-import { AbstractSystem } from '../core/AbstractSystem.ts';
-import { MarkerData, GeoJSONData } from '../data/index.ts';
 
 import type { Context } from '../Context.ts';
 import type { D3EnterSelection, D3Selection } from 'd3-selection';
@@ -17,6 +16,7 @@ import type {
   ViewerBearingEvent, ViewerImageEvent, ViewerOptions, ViewerStateEvent
 } from 'mapillary-js';
 import type { Tile, Vec2 } from '@rapid-sdk/math';
+
 
 /** Mapillary API access token */
 const accessToken = 'MLY|3376030635833192|f13ab0bdf6b2f7b99e0d8bd5868e1d88';
@@ -137,7 +137,6 @@ interface SegmentationData {
   detectionID?: DetectionID;
 }
 
-
 /** Properties for Mapillary photo markers */
 export interface MapillaryImageProps extends MarkerProps {
   /** ID of the sequence this image belongs to */
@@ -199,23 +198,24 @@ export type MapillaryDetection = MarkerData<MapillaryDetectionProps>;
 export class MapillaryService extends AbstractSystem {
 
   /** Promise tracking the load state of mapillary-js assets */
-  _loadPromise: Promise<void> | null;
+  protected _loadPromise: Promise<void> | null;
   /** Internal cache for tile data, inflight requests, and segmentations */
-  _cache: MapillaryCache;
+  protected _cache: MapillaryCache;
   /** ID of the currently selected image in the viewer */
-  _selectedImageID: PhotoID | null;
+  protected _selectedImageID: PhotoID | null;
   /** The embedded Mapillary JS photo viewer instance */
-  _viewer: Viewer | null;
+  protected _viewer: Viewer | null;
   /** Current filter expression applied to the viewer */
-  _viewerFilter: FilterExpression;
+  protected _viewerFilter: FilterExpression;
   /** Tiler instance configured for Mapillary vector tile requests */
-  _tiler: Tiler;
+  protected _tiler: Tiler;
+
 
   /**
    * @constructor
    * @param context - Global shared application context
    */
-  constructor(context: Context) {
+  public constructor(context: Context) {
     super(context);
     this.id = 'mapillary';
     this.requiredDependencies = new Set<SystemID>(['l10n', 'network', 'photos', 'spatial']);
@@ -241,7 +241,7 @@ export class MapillaryService extends AbstractSystem {
    * Called after all core objects have been constructed.
    * @return  Promise resolved when this component has completed initialization
    */
-  initAsync(): Promise<void> {
+  public initAsync(): Promise<void> {
     if (this._initPromise) return this._initPromise;
 
     return this._initPromise = super.initAsync()
@@ -253,7 +253,7 @@ export class MapillaryService extends AbstractSystem {
    * Called after all core objects have been initialized.
    * @return  Promise resolved when this component has completed startup
    */
-  startAsync(): Promise<void> {
+  public startAsync(): Promise<void> {
     if (this._startPromise) return this._startPromise;
 
     const context = this.context;
@@ -299,7 +299,7 @@ export class MapillaryService extends AbstractSystem {
    * Called after completing an edit session to reset any internal state
    * @return  Promise resolved when this component has completed resetting
    */
-  resetAsync(): Promise<void> {
+  public resetAsync(): Promise<void> {
     const context = this.context;
     const network = context.systems.network!;
     const spatial = context.systems.spatial!;
@@ -322,12 +322,18 @@ export class MapillaryService extends AbstractSystem {
   }
 
 
+  /** Public accessor for the embedded Mapillary viewer instance. */
+  public get viewer(): Viewer | null {
+    return this._viewer;
+  }
+
+
   /**
    * Returns the url to view an image on Mapillary
    * @param  imageID - the imageID to link to
    * @return  The url
    */
-  imageURL(imageID: PhotoID): string {
+  public imageURL(imageID: PhotoID): string {
     const context = this.context;
     const gfx = context.systems.gfx;
 
@@ -351,7 +357,7 @@ export class MapillaryService extends AbstractSystem {
    * @param  imageID - imageID to get
    * @return  The image, or `undefined` if not found
    */
-  getImage(imageID: PhotoID): MapillaryImage | undefined {
+  public getImage(imageID: PhotoID): MapillaryImage | undefined {
     const spatial = this.context.systems.spatial!;
     return spatial.getData<MapillaryImage>('mapillary-images', imageID);
   }
@@ -362,7 +368,7 @@ export class MapillaryService extends AbstractSystem {
    * @param  sequenceID - sequenceID to get
    * @return  The sequence, or `undefined` if not found
    */
-  getSequence(sequenceID: SequenceID): GeoJSONData | undefined {
+  public getSequence(sequenceID: SequenceID): GeoJSONData | undefined {
     const spatial = this.context.systems.spatial!;
     return spatial.getData<GeoJSONData>('mapillary-sequences', sequenceID);
   }
@@ -373,7 +379,7 @@ export class MapillaryService extends AbstractSystem {
    * @param  detectionID - detectionID to get
    * @return  The detection, or `undefined` if not found
    */
-  getDetection(detectionID: DetectionID): MapillaryDetection | undefined {
+  public getDetection(detectionID: DetectionID): MapillaryDetection | undefined {
     const spatial = this.context.systems.spatial!;
     return spatial.getData<MapillaryDetection>('mapillary-detections', detectionID);
   }
@@ -384,7 +390,7 @@ export class MapillaryService extends AbstractSystem {
    * @param  datasetID - one of 'images', 'signs', or 'detections'
    * @return  Array of Markers
    */
-  getData(datasetID: MapillaryDatasetID): MarkerData[] {
+  public getData(datasetID: MapillaryDatasetID): MarkerData[] {
 
     const spatial = this.context.systems.spatial!;
 
@@ -405,7 +411,7 @@ export class MapillaryService extends AbstractSystem {
    * Get already loaded sequence data that appears in the current map view
    * @return  Array of GeoJSONData sequences
    */
-  getSequences(): GeoJSONData[] {
+  public getSequences(): GeoJSONData[] {
     const spatial = this.context.systems.spatial!;
     return spatial.getVisibleData('mapillary-sequences')
       .map(hit => hit.contents) as GeoJSONData[];
@@ -417,7 +423,7 @@ export class MapillaryService extends AbstractSystem {
    * @param  detectionType - the type of detection  (e.g. 'object--manhole')
    * @return  the presetID to use for this detection type (e.g. 'man_made/manhole')
    */
-  getDetectionPresetID(detectionType: string): PresetID | undefined {
+  public getDetectionPresetID(detectionType: string): PresetID | undefined {
     const lookup: Record<string, string> = {
       'construction--barrier--temporary':                  'highway/construction',          // Temporary Barrier
       'construction--flat--crosswalk-plain':               'highway/footway',               // Crosswalk - Plain
@@ -471,7 +477,7 @@ export class MapillaryService extends AbstractSystem {
    * Schedule any data requests needed to cover the current map view
    * @param  datasetID - one of 'images', 'signs', or 'detections'
    */
-  loadTiles(datasetID: MapillaryDatasetID): void {
+  public loadTiles(datasetID: MapillaryDatasetID): void {
     const context = this.context;
     const network = context.systems.network!;
     const viewport = context.viewport;
@@ -497,7 +503,7 @@ export class MapillaryService extends AbstractSystem {
    * Apply filters to the Mapillary viewer
    * The filters settings are stored in the PhotoSystem
    */
-  filterViewer(): FilterExpression {
+  public filterViewer(): FilterExpression {
     const photos = this.context.systems.photos!;
     const showsPano = photos.showsPanoramic();
     const showsFlat = photos.showsFlat();
@@ -524,13 +530,13 @@ export class MapillaryService extends AbstractSystem {
 
 
   /** Navigate the viewer to the next image in the sequence */
-  navigateForward(): void {
+  public navigateForward(): void {
     const mapillary = (window as any).mapillary;
     this._navigate(mapillary.NavigationDirection.Next);
   }
 
   /** Navigate the viewer to the previous image in the sequence */
-  navigateBackward(): void {
+  public navigateBackward(): void {
     const mapillary = (window as any).mapillary;
     this._navigate(mapillary.NavigationDirection.Prev);
   }
@@ -540,7 +546,7 @@ export class MapillaryService extends AbstractSystem {
    * Silently catches errors when the end of a sequence is reached.
    * @param  dir - The navigation direction (Next or Prev)
    */
-  _navigate(dir: NavigationDirection): void {
+  protected _navigate(dir: NavigationDirection): void {
     this._viewer?.moveDir(dir).catch(
       () => { // errs out if end of sequence reached, just don't print anything
       },
@@ -551,7 +557,7 @@ export class MapillaryService extends AbstractSystem {
   /**
    * Shows the photo viewer, and hides all other photo viewers
    */
-  showViewer(): void {
+  public showViewer(): void {
     const $viewer: D3Selection = this.context.container().select('.photoviewer')
       .classed('hide', false);
 
@@ -574,7 +580,7 @@ export class MapillaryService extends AbstractSystem {
   /**
    * Hides the photo viewer and clears the currently selected image
    */
-  hideViewer(): void {
+  public hideViewer(): void {
     const context = this.context;
     context.systems.photos!.selectPhoto(null);
 
@@ -600,7 +606,7 @@ export class MapillaryService extends AbstractSystem {
    * @param  imageID - the id of the image to select
    * @return Promise that resolves to the image after it has been selected
    */
-  selectImageAsync(imageID: PhotoID | null): Promise<MarkerData | void> {
+  public selectImageAsync(imageID: PhotoID | null): Promise<MarkerData | void> {
     this._clearSegmentations();
 
     if (!imageID) {
@@ -664,7 +670,7 @@ export class MapillaryService extends AbstractSystem {
    * @param  detectionID - the id of the detection to select
    * @return Promise that resolves to the detection after it has been selected
    */
-  selectDetectionAsync(detectionID: DetectionID | null): Promise<MarkerData | void> {
+  public selectDetectionAsync(detectionID: DetectionID | null): Promise<MarkerData | void> {
     this._clearSegmentations();
     if (!detectionID) {
       return Promise.resolve();  // do nothing
@@ -691,7 +697,7 @@ export class MapillaryService extends AbstractSystem {
    * Handler for keydown events on the window, but only if the photo viewer is visible.
    * @param  e - A DOM KeyboardEvent
    */
-  _keydown(e: KeyboardEvent): void {
+  protected _keydown(e: KeyboardEvent): void {
     const context = this.context;
     const eventManager = context.systems.gfx?.eventManager;
     const photos = context.systems.photos!;
@@ -722,7 +728,7 @@ export class MapillaryService extends AbstractSystem {
    * Update the photo attribution section of the image viewer
    * @param  imageID - the new imageID
    */
-  _updatePhotoFooter(imageID: PhotoID | null): void {
+  protected _updatePhotoFooter(imageID: PhotoID | null): void {
     const context = this.context;
     const l10n = context.systems.l10n!;
     const spatial = context.systems.spatial!;
@@ -768,7 +774,7 @@ export class MapillaryService extends AbstractSystem {
    * Determine whether segmentations should be shown in the mapillary viewer.
    * @return  `true` if they should be shown, `false` if not
    */
-  _shouldShowSegmentations(): boolean {
+  protected _shouldShowSegmentations(): boolean {
     const gfx = this.context.systems.gfx;
     if (!gfx?.scene) return false;
 
@@ -785,7 +791,7 @@ export class MapillaryService extends AbstractSystem {
   /**
    * Remove all segmentations (aka "tags") from Mapillary viewer.
    */
-  _clearSegmentations(): void {
+  protected _clearSegmentations(): void {
     if (!this._viewer) return;   // called too early?
     this._viewer.getComponent<TagComponent>('tag').removeAll();
   }
@@ -796,7 +802,7 @@ export class MapillaryService extends AbstractSystem {
    * Here we are create a tag for each segmentationID found in the current image.
    * @param  segmentationIDs - the segmentation ids to show
    */
-  _showSegmentations(segmentationIDs: Set<string>): void {
+  protected _showSegmentations(segmentationIDs: Set<string>): void {
     if (!this._viewer) return;  // called too early?
 
     this._clearSegmentations();
@@ -818,7 +824,7 @@ export class MapillaryService extends AbstractSystem {
    * Here we create a single tag for the given segmentation.
    * @param  segmentation - the segmentation to make a tag for
    */
-  _makeTag(segmentation: SegmentationData): OutlineTag | undefined {
+  protected _makeTag(segmentation: SegmentationData): OutlineTag | undefined {
     const valueParts = segmentation.value.split('--');
     if (!valueParts.length) return;
 
@@ -866,7 +872,7 @@ export class MapillaryService extends AbstractSystem {
    * @param  datasetID - one of 'images', 'signs', or 'detections'
    * @param  tile - a tile object
    */
-  _loadTile(datasetID: MapillaryDatasetID, tile: Tile): void {
+  protected _loadTile(datasetID: MapillaryDatasetID, tile: Tile): void {
     const context = this.context;
     const gfx = context.systems.gfx;
     const spatial = context.systems.spatial!;
@@ -926,7 +932,7 @@ export class MapillaryService extends AbstractSystem {
    * @see    https://www.mapillary.com/developer/api-documentation#vector-tiles
    * @param  results - parsed MVT features from the worker
    */
-  _gotTile(results: MVTFeatureResult[]): void {
+  protected _gotTile(results: MVTFeatureResult[]): void {
     const context = this.context;
     const spatial = context.systems.spatial!;
 
@@ -985,7 +991,7 @@ export class MapillaryService extends AbstractSystem {
    * @param  detectionID - the detection to load
    * @return  Promise settled with the detection details
    */
-  _loadDetectionAsync(detectionID: DetectionID): Promise<MapillaryDetection | void> {
+  protected _loadDetectionAsync(detectionID: DetectionID): Promise<MapillaryDetection | void> {
     const context = this.context;
     const gfx = context.systems.gfx;
     const network = context.systems.network!;
@@ -1041,7 +1047,7 @@ export class MapillaryService extends AbstractSystem {
    * @param  image - the image to get segmentation data for
    * @return  Promise settled with the segmentation details
    */
-  _loadImageSegmentationsAsync(image: MapillaryImage): Promise<Set<string> | void> {
+  protected _loadImageSegmentationsAsync(image: MapillaryImage): Promise<Set<string> | void> {
     if (image.props.segmentationIDs) {
       return Promise.resolve(image.props.segmentationIDs);
     }
@@ -1096,7 +1102,7 @@ export class MapillaryService extends AbstractSystem {
    * @param  detection - the detection to get segmentation data for
    * @return  Promise settled with the segmentation details
    */
-  _loadDetectionSegmentationsAsync(detection: MapillaryDetection): Promise<Set<string> | void> {
+  protected _loadDetectionSegmentationsAsync(detection: MapillaryDetection): Promise<Set<string> | void> {
     if (detection.props.segmentationIDs) {
       return Promise.resolve(detection.props.segmentationIDs);
     }
@@ -1146,7 +1152,7 @@ export class MapillaryService extends AbstractSystem {
    * Load the Mapillary JS and CSS files into the document head
    * @return Promise resolved when both files have been loaded
    */
-  _loadAssetsAsync(): Promise<void> {
+  protected _loadAssetsAsync(): Promise<void> {
     if (this._loadPromise) return this._loadPromise;
 
     const assets = this.context.systems.assets!;
@@ -1199,7 +1205,7 @@ export class MapillaryService extends AbstractSystem {
   /**
    * Initialize the embedded Mapillary JS photo viewer and wire up event listeners.
    */
-  _initViewer(): void {
+  protected _initViewer(): void {
     const mapillary = (window as any).mapillary;
     if (!mapillary) throw new Error('mapillary not loaded');
     if (!mapillary.isSupported()) throw new Error('mapillary not supported');
@@ -1282,7 +1288,7 @@ export class MapillaryService extends AbstractSystem {
    * @param  source - the image properties
    * @return  The image
    */
-  _cacheImage(source: ImageSource): MapillaryImage {
+  protected _cacheImage(source: ImageSource): MapillaryImage {
     const context = this.context;
     const spatial = context.systems.spatial!;
     const imageID = source.id;
@@ -1321,7 +1327,7 @@ export class MapillaryService extends AbstractSystem {
    * @param  source - the detection properties
    * @return  The detection
    */
-  _cacheDetection(source: DetectionSource): MapillaryDetection {
+  protected _cacheDetection(source: DetectionSource): MapillaryDetection {
     const context = this.context;
     const spatial = context.systems.spatial!;
     const detectionID = source.id;
@@ -1385,7 +1391,7 @@ export class MapillaryService extends AbstractSystem {
    * @param  source - the segmentation properties
    * @return  The segmentation data, or `null` if we are skipping it (see below)
    */
-  _cacheSegmentation(source: SegmentationSource): SegmentationData | null {
+  protected _cacheSegmentation(source: SegmentationSource): SegmentationData | null {
     const cache = this._cache.segmentations;
 
     // Note: not all segmentations are ones we can work with.

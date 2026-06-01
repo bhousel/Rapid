@@ -75,27 +75,28 @@ export class WorkerSystem extends AbstractSystem {
 
   // Worker pool
   /** URL to the worker script (set by host app via `workerURL` setter) */
-  private _workerURL: string | null;
+  protected _workerURL: string | null;
   /** Pool of spawned workers */
-  private _workers: Worker[];
+  protected _workers: Worker[];
   /** Maximum number of workers to spawn */
-  private _maxWorkers: number;
+  protected _maxWorkers: number;
   /** Round-robin index for dispatching tasks to workers */
-  private _workerIndex: number;
+  protected _workerIndex: number;
   /** Monotonically increasing request ID for correlating responses */
-  private _nextRequestID: number;
+  protected _nextRequestID: number;
   /** Pending requests awaiting worker responses, keyed by request ID */
-  private _pendingRequests: Map<number, PendingWorkerRequest>;
+  protected _pendingRequests: Map<number, PendingWorkerRequest>;
 
   // listener registry
   /** Registered listeners for worker/main-thread dispatch */
-  private _listeners: Map<ListenerID, Listener>;
+  protected _listeners: Map<ListenerID, Listener>;
+
 
   /**
    * @constructor
    * @param context - Global shared application context
    */
-  constructor(context: Context) {
+  public constructor(context: Context) {
     super(context);
     this.id = 'worker';
     this.requiredDependencies = new Set();
@@ -127,7 +128,7 @@ export class WorkerSystem extends AbstractSystem {
    * Called after all core objects have been constructed.
    * @return Promise resolved when this component has completed initialization
    */
-  initAsync(): Promise<void> {
+  public initAsync(): Promise<void> {
     if (this._initPromise) return this._initPromise;
     return this._initPromise = super.initAsync();
   }
@@ -137,7 +138,7 @@ export class WorkerSystem extends AbstractSystem {
    * Called after all core objects have been initialized.
    * @return Promise resolved when this component has completed startup
    */
-  startAsync(): Promise<void> {
+  public startAsync(): Promise<void> {
     if (this._startPromise) return this._startPromise;
     return this._startPromise = super.startAsync();
   }
@@ -147,7 +148,7 @@ export class WorkerSystem extends AbstractSystem {
    * Called after completing an edit session to reset any internal state.
    * @return Promise resolved when this component has completed resetting
    */
-  resetAsync(): Promise<void> {
+  public resetAsync(): Promise<void> {
     return Promise.resolve();
   }
 
@@ -170,10 +171,10 @@ export class WorkerSystem extends AbstractSystem {
    * location during `prepareAsync()`.  Override with a custom URL, or set
    * to `null` to disable worker offloading.
    */
-  get workerURL(): string | null {
+  public get workerURL(): string | null {
     return this._workerURL;
   }
-  set workerURL(url: string | null) {
+  public set workerURL(url: string | null) {
     this._workerURL = url;
   }
 
@@ -183,10 +184,10 @@ export class WorkerSystem extends AbstractSystem {
    * lazily, so setting this higher doesn't immediately spawn them.
    * Defaults to 2.
    */
-  get maxWorkers(): number {
+  public get maxWorkers(): number {
     return this._maxWorkers;
   }
-  set maxWorkers(n: number) {
+  public set maxWorkers(n: number) {
     this._maxWorkers = Math.max(1, n);
   }
 
@@ -195,7 +196,7 @@ export class WorkerSystem extends AbstractSystem {
    * Number of workers currently alive in the pool.
    * @readonly
    */
-  get numWorkers(): number {
+  public get numWorkers(): number {
     return this._workers.length;
   }
 
@@ -205,7 +206,7 @@ export class WorkerSystem extends AbstractSystem {
    * Useful for debugging and tests.
    * @readonly
    */
-  get numPendingRequests(): number {
+  public get numPendingRequests(): number {
     return this._pendingRequests.size;
   }
 
@@ -229,7 +230,7 @@ export class WorkerSystem extends AbstractSystem {
    * @return Promise resolved with the task result, or rejected on error
    * @throws Error if `workerURL` has not been set
    */
-  dispatch<T = unknown>(listenerID: ListenerID, data?: unknown, signal?: AbortSignal, options?: DispatchOptions): Promise<T> {
+  public dispatch<T = unknown>(listenerID: ListenerID, data?: unknown, signal?: AbortSignal, options?: DispatchOptions): Promise<T> {
     if (!this._workerURL) {
       return Promise.reject(new Error('WorkerSystem: workerURL not set'));
     }
@@ -283,7 +284,7 @@ export class WorkerSystem extends AbstractSystem {
    * Terminates all workers in the pool and rejects any pending
    * requests.  Called automatically by `resetAsync()`.
    */
-  terminateWorkers(): void {
+  public terminateWorkers(): void {
     for (const worker of this._workers) {
       worker.terminate();
     }
@@ -304,7 +305,7 @@ export class WorkerSystem extends AbstractSystem {
    * @param listenerID - The id of the listener function
    * @param listener - Listener function
    */
-  registerListener(listenerID: ListenerID, listener: Listener): void {
+  public registerListener(listenerID: ListenerID, listener: Listener): void {
     this._listeners.set(listenerID, listener);
   }
 
@@ -313,7 +314,7 @@ export class WorkerSystem extends AbstractSystem {
    * Removes a previously registered listener function.
    * @param listenerID - The id of the listener function
    */
-  unregisterListener(listenerID: ListenerID): void {
+  public unregisterListener(listenerID: ListenerID): void {
     this._listeners.delete(listenerID);
   }
 
@@ -323,7 +324,7 @@ export class WorkerSystem extends AbstractSystem {
    * @param listenerID - The id of the listener function
    * @return The listener function, or undefined if no such id exists
    */
-  getListener(listenerID: ListenerID): Listener | undefined {
+  public getListener(listenerID: ListenerID): Listener | undefined {
     return this._listeners.get(listenerID);
   }
 
@@ -332,7 +333,7 @@ export class WorkerSystem extends AbstractSystem {
    * Returns the next worker from the pool (round-robin), spawning
    * a new one if the pool isn't full yet.
    */
-  private _getOrSpawnWorker(): Worker {
+  protected _getOrSpawnWorker(): Worker {
     // Spawn if pool not full
     if (this._workers.length < this._maxWorkers) {
       const worker = this._spawnWorker();
@@ -349,7 +350,7 @@ export class WorkerSystem extends AbstractSystem {
   /**
    * Creates a new Worker and wires up message/error handlers.
    */
-  private _spawnWorker(): Worker {
+  protected _spawnWorker(): Worker {
     const scheduler = this.context.systems.scheduler;
     const worker = new Worker(this._workerURL!, { type: 'module' });
 

@@ -1,14 +1,14 @@
-import { scaleLinear, type ScaleLinear } from 'd3-scale';
-
 import { AbstractPixiLayer } from './AbstractPixiLayer.ts';
 import { PixiFeatureLine } from './PixiFeatureLine.ts';
 import { PixiFeaturePoint } from './PixiFeaturePoint.ts';
+import { scaleLinear, type ScaleLinear } from 'd3-scale';
 
 import type { GeoJSONData } from '../data/GeoJSONData.ts';
 import type { MarkerData } from '../data/MarkerData.ts';
 import type { MatchedStyle } from '../core/StyleSystem.ts';
 import type { PixiScene } from './PixiScene.ts';
 import type { Viewport } from '@rapid-sdk/math';
+
 
 const MINZOOM = 12;
 const MAPILLARY_GREEN = 0x05cb63;
@@ -33,14 +33,14 @@ const fovLengthInterp: ScaleLinear<number, number> = scaleLinear([90, 10], [0.7,
  * @class
  */
 export class PixiLayerMapillaryPhotos extends AbstractPixiLayer {
-  private _viewerBearing: number | null;
-  private _viewerFov: number;
+  protected _viewerBearing: number | null;
+  protected _viewerFov: number;
 
   /**
    * @constructor
    * @param scene - The Scene that owns this Layer
    */
-  constructor(scene: PixiScene) {
+  public constructor(scene: PixiScene) {
     super(scene);
     this.id = 'mapillary';
 
@@ -65,7 +65,7 @@ export class PixiLayerMapillaryPhotos extends AbstractPixiLayer {
   /**
    * Every Layer should have a reset function to replace any Pixi objects and internal state.
    */
-  reset() {
+  public reset() {
     super.reset();
   }
 
@@ -74,7 +74,7 @@ export class PixiLayerMapillaryPhotos extends AbstractPixiLayer {
    * Called whenever the viewer's compass bearing has changed (user pans around)
    * @param bearing - the new bearing value in degrees
    */
-  private _bearingchanged(bearing: number): void {
+  protected _bearingchanged(bearing: number): void {
     this._viewerBearing = bearing;
     this._dirtyCurrentPhoto();
   }
@@ -84,7 +84,7 @@ export class PixiLayerMapillaryPhotos extends AbstractPixiLayer {
    * Called whenever the viewer's field of view has changed (user zooms/unzooms)
    * @param fov - the new field of view value in degrees
    */
-  private _fovchanged(fov: number): void {
+  protected _fovchanged(fov: number): void {
     this._viewerFov = fov;
     this._dirtyCurrentPhoto();
   }
@@ -94,7 +94,7 @@ export class PixiLayerMapillaryPhotos extends AbstractPixiLayer {
    * If we are interacting with the viewer (zooming / panning),
    * dirty the current photo so its view cone gets redrawn
    */
-  private _dirtyCurrentPhoto(): void {
+  protected _dirtyCurrentPhoto(): void {
     const context = this.context;
     const gfx = context.systems.gfx!;
     const photos = context.systems.photos;
@@ -116,7 +116,7 @@ export class PixiLayerMapillaryPhotos extends AbstractPixiLayer {
   /**
    * Whether the Layer's service exists
    */
-  get supported() {
+  public get supported() {
     return !!this.context.services.mapillary;
   }
 
@@ -125,10 +125,10 @@ export class PixiLayerMapillaryPhotos extends AbstractPixiLayer {
    * Whether the user has chosen to see the Layer
    * Make sure to start the service first.
    */
-  get enabled() {
+  public get enabled() {
     return this._enabled;
   }
-  set enabled(val) {
+  public set enabled(val) {
     if (!this.supported) {
       val = false;
     }
@@ -150,7 +150,7 @@ export class PixiLayerMapillaryPhotos extends AbstractPixiLayer {
    * @param markers - all markers
    * @return markers with filtering applied
    */
-  filterMarkers(markers: MarkerData[]): MarkerData[] {
+  public filterMarkers(markers: MarkerData[]): MarkerData[] {
     const photos = this.context.systems.photos!;
     const fromDate = photos.fromDate;
     const fromTimestamp = fromDate && new Date(fromDate).getTime();
@@ -188,7 +188,7 @@ export class PixiLayerMapillaryPhotos extends AbstractPixiLayer {
    * @param sequences - all sequences
    * @return sequences with filtering applied
    */
-  filterSequences(sequences: GeoJSONData[]): GeoJSONData[] {
+  public filterSequences(sequences: GeoJSONData[]): GeoJSONData[] {
     const photos = this.context.systems.photos!;
     const fromDate = photos.fromDate;
     const fromTimestamp = fromDate && new Date(fromDate).getTime();
@@ -223,7 +223,7 @@ export class PixiLayerMapillaryPhotos extends AbstractPixiLayer {
    * @param frame - Integer frame being rendered
    * @param viewport - Pixi viewport to use for rendering
    */
-  renderMarkers(frame: number, viewport: Viewport): void {
+  public renderMarkers(frame: number, viewport: Viewport): void {
     const mapillary = this.context.services.mapillary;
     if (!mapillary?.started) return;
 
@@ -333,7 +333,7 @@ export class PixiLayerMapillaryPhotos extends AbstractPixiLayer {
    * @param frame - Integer frame being rendered
    * @param viewport - Pixi viewport to use for rendering
    */
-  render(frame: number, viewport: Viewport): void {
+  public render(frame: number, viewport: Viewport): void {
     const mapillary = this.context.services.mapillary;
     const viewZoom = viewport.transform.zoom;
     if (!this.enabled || !mapillary?.started || viewZoom < MINZOOM) return;

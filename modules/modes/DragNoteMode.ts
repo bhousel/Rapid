@@ -1,6 +1,5 @@
-import { vecAdd, vecRotate, vecSubtract } from '@rapid-sdk/math';
-
 import { AbstractMode } from './AbstractMode.ts';
+import { vecAdd, vecRotate, vecSubtract } from '@rapid-sdk/math';
 
 import type { Context } from '../Context.ts';
 import type { EventData } from '../behaviors/AbstractBehavior.ts';
@@ -20,18 +19,19 @@ interface DragNoteModeOptions {
  */
 export class DragNoteMode extends AbstractMode {
   /** The note (MarkerData) being dragged, or null if not dragging */
-  dragNote: MarkerData | null;
+  public dragNote: MarkerData | null;
 
   /** Starting location of the note before dragging */
-  private _startLoc: Vec2 | null;
+  protected _startLoc: Vec2 | null;
   /** Location where user clicked to grab the note (for drag offset calculation) */
-  private _clickLoc: Vec2 | null;
+  protected _clickLoc: Vec2 | null;
+
 
   /**
    * @constructor
    * @param  context - Global shared application context
    */
-  constructor(context: Context) {
+  public constructor(context: Context) {
     super(context);
     this.id = 'drag-note';
 
@@ -53,7 +53,7 @@ export class DragNoteMode extends AbstractMode {
    * @param  options - Optional object of options passed to the new mode
    * @return `true` if the mode can be entered, `false` if not
    */
-  enter(options: DragNoteModeOptions = {}): boolean {
+  public enter(options: DragNoteModeOptions = {}): boolean {
     const context = this.context;
     const osm = context.services.osm as any;
     if (!osm) return false;
@@ -90,7 +90,7 @@ export class DragNoteMode extends AbstractMode {
   /**
    * Exits the mode, clearing state and removing event listeners.
    */
-  exit(): void {
+  public exit(): void {
     if (!this._active) return;
     this._active = false;
 
@@ -114,7 +114,7 @@ export class DragNoteMode extends AbstractMode {
    * Move the dragging node
    * @param  eventData - Data received from the drag behavior
    */
-  private _move(eventData: EventData): void {
+  protected _move(eventData: EventData): void {
     if (!this.dragNote) return;
 
     const context = this.context;
@@ -154,7 +154,7 @@ export class DragNoteMode extends AbstractMode {
    * We want to move the dragging note opposite of the pixels panned to keep it in the same place.
    * @param  nudge - [x,y] amount of map pan in pixels
    */
-  private _nudge(nudge: Vec2): void {
+  protected _nudge(nudge: Vec2): void {
     if (!this.dragNote || !this.dragNote.loc) return;
 
     const context = this.context;
@@ -185,7 +185,7 @@ export class DragNoteMode extends AbstractMode {
    * Complete the drag and keep the note selected.
    * Note that `exit()` will be called immediately after this to perform cleanup.
    */
-  private _end(): void {
+  protected _end(): void {
     if (this.dragNote) {
       const selection = new Map().set(this.dragNote.id, this.dragNote);
       this.context.enter('select', { selection: selection });
@@ -199,7 +199,7 @@ export class DragNoteMode extends AbstractMode {
    * Return to browse mode
    * Note that `exit()` will be called immediately after this to perform cleanup.
    */
-  private _cancel(): void {
+  protected _cancel(): void {
     this.context.enter('browse');
   }
 }

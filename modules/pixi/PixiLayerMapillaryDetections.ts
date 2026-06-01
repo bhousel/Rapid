@@ -1,11 +1,10 @@
-import type { Viewport } from '@rapid-sdk/math';
-
 import { AbstractPixiLayer } from './AbstractPixiLayer.ts';
 import { PixiFeaturePoint } from './PixiFeaturePoint.ts';
 
-import type { MatchedStyle } from '../core/StyleSystem.ts';
 import type { MarkerData } from '../data/MarkerData.ts';
+import type { MatchedStyle } from '../core/StyleSystem.ts';
 import type { PixiScene } from './PixiScene.ts';
+import type { Viewport } from '@rapid-sdk/math';
 
 const MINZOOM = 12;
 const MAPILLARY_GREEN = 0x05cb63;
@@ -21,7 +20,7 @@ export class PixiLayerMapillaryDetections extends AbstractPixiLayer {
    * @constructor
    * @param  scene - The Scene that owns this Layer
    */
-  constructor(scene: PixiScene) {
+  public constructor(scene: PixiScene) {
     super(scene);
     this.id = 'mapillary-detections';
   }
@@ -30,7 +29,7 @@ export class PixiLayerMapillaryDetections extends AbstractPixiLayer {
   /**
    * Whether the Layer's service exists
    */
-  get supported() {
+  public get supported() {
     return !!this.context.services.mapillary;
   }
 
@@ -39,10 +38,10 @@ export class PixiLayerMapillaryDetections extends AbstractPixiLayer {
    * Whether the user has chosen to see the Layer
    * Make sure to start the service first.
    */
-  get enabled() {
+  public get enabled() {
     return this._enabled;
   }
-  set enabled(val) {
+  public set enabled(val) {
     if (!this.supported) {
       val = false;
     }
@@ -63,7 +62,7 @@ export class PixiLayerMapillaryDetections extends AbstractPixiLayer {
   /**
    * Every Layer should have a reset function to replace any Pixi objects and internal state.
    */
-  reset() {
+  public reset() {
     super.reset();
   }
 
@@ -72,7 +71,7 @@ export class PixiLayerMapillaryDetections extends AbstractPixiLayer {
    * @param  markers - all markers
    * @return markers with filtering applied
    */
-  filterMarkers(markers: MarkerData[]): MarkerData[] {
+  public filterMarkers(markers: MarkerData[]): MarkerData[] {
     const photos = this.context.systems.photos!;
     const fromDate = photos.fromDate;
     const fromTimestamp = fromDate && new Date(fromDate).getTime();
@@ -96,7 +95,7 @@ export class PixiLayerMapillaryDetections extends AbstractPixiLayer {
    * @param  frame    -  Integer frame being rendered
    * @param  viewport -  Pixi viewport to use for rendering
    */
-  renderMarkers(frame: number, viewport: Viewport): void {
+  public renderMarkers(frame: number, viewport: Viewport): void {
     const context = this.context;
     const schema = context.systems.schema!;
 
@@ -159,7 +158,7 @@ export class PixiLayerMapillaryDetections extends AbstractPixiLayer {
    * @param  frame    -  Integer frame being rendered
    * @param  viewport -  Pixi viewport to use for rendering
    */
-  render(frame: number, viewport: Viewport): void {
+  public render(frame: number, viewport: Viewport): void {
     const mapillary = this.context.services.mapillary;
     const viewZoom = viewport.transform.zoom;
     if (!this.enabled || !mapillary?.started || viewZoom < MINZOOM) return;

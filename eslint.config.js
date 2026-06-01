@@ -78,14 +78,14 @@ const rules = {
     // Stylistic (migrated from deprecated ESLint core rules)
     '@stylistic/arrow-spacing': 'warn',
     '@stylistic/block-spacing': ['warn', 'always'],
-    '@stylistic/brace-style': ['warn', '1tbs', { 'allowSingleLine': true }],
+    '@stylistic/brace-style': ['warn', '1tbs', { allowSingleLine: true }],
     '@stylistic/indent': ['off', 2],
     '@stylistic/keyword-spacing': 'error',
     '@stylistic/linebreak-style': ['error', 'unix'],
     '@stylistic/no-floating-decimal': 'error',
     '@stylistic/no-trailing-spaces': 'warn',
     '@stylistic/no-whitespace-before-property': 'warn',
-    '@stylistic/quotes': ['error', 'single', { 'allowTemplateLiterals': 'always' }],
+    '@stylistic/quotes': ['error', 'single', { allowTemplateLiterals: 'always' }],
     '@stylistic/semi': ['error', 'always'],
     '@stylistic/semi-spacing': 'error',
     '@stylistic/space-unary-ops': 'error',
@@ -95,9 +95,14 @@ const rules = {
     '@typescript-eslint/class-literal-property-style': 'off',
     '@typescript-eslint/no-empty-function': 'off',
     '@typescript-eslint/no-explicit-any': 'off',
-    '@typescript-eslint/no-inferrable-types': ['warn', { 'ignoreParameters': true }],
+    '@typescript-eslint/no-inferrable-types': ['warn', { ignoreParameters: true }],
     '@typescript-eslint/no-this-alias': 'warn',
-    '@typescript-eslint/no-unused-vars': ['warn', { 'vars': 'all', 'args': 'none', 'varsIgnorePattern': '^_', 'caughtErrors': 'none'  }],
+    '@typescript-eslint/no-unused-vars': ['warn', {
+      vars: 'all',
+      args: 'none',
+      varsIgnorePattern: '^_',
+      caughtErrors: 'none'
+    }],
 
     // Import
     'import/no-duplicates': ['warn', { 'prefer-inline': false }]
@@ -127,6 +132,31 @@ export default [
     files: ['modules/ui/**'],
     rules: {
       'no-useless-assignment': 'off'
+    }
+  }, {
+    files: [ '**/*.ts' ],
+    rules: {
+      '@typescript-eslint/explicit-member-accessibility': ['error', { accessibility: 'explicit' }],
+      '@typescript-eslint/naming-convention': ['error', {
+        selector: 'memberLike',
+        modifiers: ['protected'],
+        format: null,
+        leadingUnderscore: 'require'
+      }],
+      'no-restricted-syntax': ['error',
+        {
+          selector: `PropertyDefinition[accessibility='private']`,
+          message: 'Use protected instead of private for class properties.'
+        },
+        {
+          selector: `MethodDefinition[accessibility='private']`,
+          message: 'Use protected instead of private for class methods/accessors.'
+        },
+        {
+          selector: `TSParameterProperty[accessibility='private']`,
+          message: 'Use protected instead of private for parameter properties.'
+        }
+      ]
     }
   }, {
     files: [ 'scripts/**', 'test/unit/**' ],

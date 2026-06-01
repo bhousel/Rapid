@@ -1,7 +1,7 @@
-import { selection } from 'd3-selection';
 import { AbstractSystem } from './AbstractSystem.ts';
 import { DEG2RAD, RAD2DEG, TAU, Extent, numClamp, numWrap, vecRotate, vecSubtract, WORLD_HALF, WORLD_ZOOM } from '@rapid-sdk/math';
 import { MarkerData } from '../data/MarkerData.ts';
+import { selection } from 'd3-selection';
 import { utilTotalExtent } from '../util/util.ts';
 
 import type { Context } from '../Context.ts';
@@ -31,19 +31,21 @@ const MAX_Z = 24;
  *   `mapchange`  Fires on any change in map display options (wireframe/areafill, highlightedits)
  */
 export class MapSystem extends AbstractSystem {
-  readonly areaFillOptions: AreaFillMode[];
 
-  private _highlightEdits: boolean;
-  private _currFillMode: AreaFillMode;
-  private _toggleFillMode: AreaFillMode;
-  private _keys: string[] | null;
-  private $parent: D3Selection | null;
+  public readonly areaFillOptions: AreaFillMode[];
+
+  protected _highlightEdits: boolean;
+  protected _currFillMode: AreaFillMode;
+  protected _toggleFillMode: AreaFillMode;
+  protected _keys: string[] | null;
+  protected _$parent: D3Selection | null;
+
 
   /**
    * @constructor
    * @param  context - Global shared application context
    */
-  constructor(context: Context) {
+  public constructor(context: Context) {
     super(context);
     this.id = 'map';
     this.requiredDependencies = new Set(['editor', 'gfx']);
@@ -58,7 +60,7 @@ export class MapSystem extends AbstractSystem {
     this._keys = null;
 
     // D3 selections
-    this.$parent = null;
+    this._$parent = null;
 
     // Ensure methods used as callbacks always have `this` bound correctly.
     // (This is also necessary when using `d3-selection.call`)
@@ -73,7 +75,7 @@ export class MapSystem extends AbstractSystem {
    * Called after all core objects have been constructed.
    * @return  Promise resolved when this component has completed initialization
    */
-  initAsync(): Promise<void> {
+  public initAsync(): Promise<void> {
     if (this._initPromise) return this._initPromise;
 
     const context = this.context;
@@ -203,7 +205,7 @@ export class MapSystem extends AbstractSystem {
    * Called after all core objects have been initialized.
    * @return  Promise resolved when this component has completed startup
    */
-  startAsync(): Promise<void> {
+  public startAsync(): Promise<void> {
     return super.startAsync();
   }
 
@@ -212,7 +214,7 @@ export class MapSystem extends AbstractSystem {
    * Called after completing an edit session to reset any internal state
    * @return  Promise resolved when this component has completed resetting
    */
-  resetAsync(): Promise<void> {
+  public resetAsync(): Promise<void> {
     return Promise.resolve();
   }
 
@@ -222,9 +224,9 @@ export class MapSystem extends AbstractSystem {
    * (The parent selection is required the first time, but can be inferred on subsequent renders)
    * @param  $parent - A d3-selection to a HTMLElement that this component should render itself into
    */
-  render($parent: D3Selection | null = this.$parent): void {
+  public render($parent: D3Selection | null = this._$parent): void {
     if ($parent instanceof selection) {
-      this.$parent = $parent;
+      this._$parent = $parent;
     } else {
       return;   // no parent - called too early?
     }
@@ -275,7 +277,7 @@ export class MapSystem extends AbstractSystem {
   /**
    * This sets up the keybinding, replacing existing if needed
    */
-  _setupKeybinding(): void {
+  protected _setupKeybinding(): void {
     const context = this.context;
     const keybinding = context.keybinding();
     const l10n = context.systems.l10n;
@@ -307,7 +309,7 @@ export class MapSystem extends AbstractSystem {
    * @param  currParams - The current hash parameters
    * @param  prevParams - The previous hash parameters
    */
-  _hashChanged(currParams: Map<string, string>, prevParams: Map<string, string>): void {
+  protected _hashChanged(currParams: Map<string, string>, prevParams: Map<string, string>): void {
     const context = this.context;
     const scene = context.systems.gfx!.scene!;  // exists after init
 
@@ -389,7 +391,7 @@ export class MapSystem extends AbstractSystem {
    * Push changes in map state to the urlhash.
    * This gets called on 'draw', so fairly frequently
    */
-  _updateHash(): void {
+  protected _updateHash(): void {
     const context = this.context;
     const scene = context.systems.gfx!.scene!;
     const urlhash = context.systems.urlhash;
@@ -444,7 +446,7 @@ export class MapSystem extends AbstractSystem {
    * Returns the [x,y] pixel at the center of the viewport
    * @return  [x,y] pixel at the center of the viewport
    */
-  centerPoint(): Vec2 {
+  public centerPoint(): Vec2 {
     return this.context.viewport.center();
   }
 
@@ -453,7 +455,7 @@ export class MapSystem extends AbstractSystem {
    * Returns the current [lon,lat] location at the center of the viewport
    * @return  [lon,lat] location at the center of the viewport
    */
-  centerLoc(): Vec2 {
+  public centerLoc(): Vec2 {
     return this.context.viewport.centerLoc();
   }
 
@@ -463,7 +465,7 @@ export class MapSystem extends AbstractSystem {
    * (or center of map if there is no readily available pointer coordinate)
    * @return  [x,y] pixel location of pointer (or center of the map)
    */
-  mouse(): Vec2 {
+  public mouse(): Vec2 {
     const gfx = this.context.systems.gfx;
     return gfx?.eventManager?.coord?.map || this.centerPoint();
   }
@@ -474,7 +476,7 @@ export class MapSystem extends AbstractSystem {
    * (or center of map if there is no readily available pointer coordinate)
    * @return  [lon,lat] WGS84 coordinate of pointer (or center of the map)
    */
-  mouseLoc(): Vec2 {
+  public mouseLoc(): Vec2 {
     return this.context.viewport.unproject(this.mouse());
   }
 
@@ -484,7 +486,7 @@ export class MapSystem extends AbstractSystem {
    * (or center of map if there is no readily available pointer coordinate)
    * @return  [x,y] world coordinate of pointer (or center of the map)
    */
-  mouseWorld(): Vec2 {
+  public mouseWorld(): Vec2 {
     const gfx = this.context.systems.gfx;
     return gfx?.eventManager?.coord?.world ?? this.context.viewport.screenToWorld(this.centerPoint());
   }
@@ -498,7 +500,7 @@ export class MapSystem extends AbstractSystem {
    * @param  duration   Duration of the transition in milliseconds, defaults to 0ms (asap)
    * @return map transform -or- this
    */
-  transform(t2?: TransformProps, duration?: number): TransformProps | this {
+  public transform(t2?: TransformProps, duration?: number): TransformProps | this {
     if (t2 === undefined) {
       return this.context.viewport.transform.props;
     }
@@ -518,7 +520,7 @@ export class MapSystem extends AbstractSystem {
    * @param   duration  Duration of the transition in milliseconds, defaults to 0ms (asap)
    * @return  Promise that resolves when the transform has finished changing
    */
-  setTransformAsync(t2: TransformProps, duration: number = 0): Promise<TransformProps> {
+  public setTransformAsync(t2: TransformProps, duration: number = 0): Promise<TransformProps> {
     // Avoid tiny or out of bounds rotations
     t2.r = numWrap((+(t2.r || 0).toFixed(3)), 0, TAU);   // radians
 
@@ -535,7 +537,7 @@ export class MapSystem extends AbstractSystem {
    * @param  duration  Duration of the transition in milliseconds, defaults to 0ms (asap)
    * @return this
    */
-  setMapParams(loc2?: Vec2, z2?: number, r2?: number, duration: number = 0): this {
+  public setMapParams(loc2?: Vec2, z2?: number, r2?: number, duration: number = 0): this {
     const context = this.context;
     const view = context.viewport;
     const center = view.center();
@@ -579,7 +581,7 @@ export class MapSystem extends AbstractSystem {
    * @param  duration  Duration of the transition in milliseconds, defaults to 0ms (asap)
    * @return Promise that resolves when the transform has finished changing
    */
-  setMapParamsAsync(loc2?: Vec2, z2?: number, r2?: number, duration: number = 0): Promise<TransformProps> {
+  public setMapParamsAsync(loc2?: Vec2, z2?: number, r2?: number, duration: number = 0): Promise<TransformProps> {
     const context = this.context;
     const view = context.viewport;
     const center = view.center();
@@ -620,7 +622,7 @@ export class MapSystem extends AbstractSystem {
    * @param  duration  Duration of the transition in milliseconds, defaults to 0ms (asap)
    * @return map center -or- this
    */
-  center(loc2?: Vec2, duration?: number): Vec2 | this {
+  public center(loc2?: Vec2, duration?: number): Vec2 | this {
     if (loc2 === undefined) {
       return this.centerLoc();
     } else {
@@ -635,7 +637,7 @@ export class MapSystem extends AbstractSystem {
    * @param  duration  Duration of the transition in milliseconds, defaults to 0ms (asap)
    * @return map zoom -or- this
    */
-  zoom(z2?: number, duration?: number): number | this {
+  public zoom(z2?: number, duration?: number): number | this {
     if (z2 === undefined) {
       return this.context.viewport.transform.zoom;
     } else {
@@ -650,7 +652,7 @@ export class MapSystem extends AbstractSystem {
    * @param  duration  Duration of the transition in milliseconds, defaults to 0ms (asap)
    * @return this
    */
-  pan(delta: Vec2, duration: number = 0): this {
+  public pan(delta: Vec2, duration: number = 0): this {
     const t = this.context.viewport.transform;
     const [dx, dy] = vecRotate(delta, -t.r, [0, 0]);   // remove any rotation
     return this.transform({ x: t.x + dx, y: t.y + dy, z: t.z, r: t.r }, duration) as this;
@@ -663,7 +665,7 @@ export class MapSystem extends AbstractSystem {
    * @param  duration  Duration of the transition in milliseconds, defaults to 0ms (asap)
    * @return this
    */
-  fitEntities(entities: OsmEntity | OsmEntity[], duration: number = 0): this {
+  public fitEntities(entities: OsmEntity | OsmEntity[], duration: number = 0): this {
     let extent;
 
     const editor = this.context.systems.editor;
@@ -686,7 +688,7 @@ export class MapSystem extends AbstractSystem {
    * @param  entityID  - entityID to select
    * @param  fitEntity - Whether to force fit the map view to show the entity
    */
-  selectEntityID(entityID: EntityID, fitEntity: boolean = false): void {
+  public selectEntityID(entityID: EntityID, fitEntity: boolean = false): void {
     const context = this.context;
     const editor = context.systems.editor!;
     const scene = context.systems.gfx!.scene!;
@@ -735,7 +737,7 @@ export class MapSystem extends AbstractSystem {
    * Selects a note by ID, loading it first if needed
    * @param  noteID  - noteID to select
    */
-  selectNoteID(noteID: number | string): void {
+  public selectNoteID(noteID: number | string): void {
     const context = this.context;
     const osm = context.services.osm as any;
     const scene = context.systems.gfx!.scene!;
@@ -757,25 +759,25 @@ export class MapSystem extends AbstractSystem {
 
 
   // convenience methods for zooming in and out
-  _zoomIn(delta: number): this  { return this.setMapParams(undefined, ~~(this.zoom() as number) + delta, undefined, 250); }
-  _zoomOut(delta: number): this { return this.setMapParams(undefined, ~~(this.zoom() as number) - delta, undefined, 250); }
+  protected _zoomIn(delta: number): this  { return this.setMapParams(undefined, ~~(this.zoom() as number) + delta, undefined, 250); }
+  protected _zoomOut(delta: number): this { return this.setMapParams(undefined, ~~(this.zoom() as number) - delta, undefined, 250); }
 
-  zoomIn(): this        { return this._zoomIn(1); }
-  zoomInFurther(): this { return this._zoomIn(4); }
-  canZoomIn(): boolean  { return (this.zoom() as number) < MAX_Z; }
+  public zoomIn(): this        { return this._zoomIn(1); }
+  public zoomInFurther(): this { return this._zoomIn(4); }
+  public canZoomIn(): boolean  { return (this.zoom() as number) < MAX_Z; }
 
-  zoomOut(): this        { return this._zoomOut(1); }
-  zoomOutFurther(): this { return this._zoomOut(4); }
-  canZoomOut(): boolean  { return (this.zoom() as number) > MIN_Z; }
+  public zoomOut(): this        { return this._zoomOut(1); }
+  public zoomOutFurther(): this { return this._zoomOut(4); }
+  public canZoomOut(): boolean  { return (this.zoom() as number) > MIN_Z; }
 
-  centerZoom(loc2: Vec2, z2: number, duration: number = 0): this  { return this.setMapParams(loc2, z2, undefined, duration); }
+  public centerZoom(loc2: Vec2, z2: number, duration: number = 0): this  { return this.setMapParams(loc2, z2, undefined, duration); }
 
   // convenience methods for the above, but with easing
-  transformEase(t2: TransformProps, duration: number = 250): TransformProps | this  { return this.transform(t2, duration); }
-  centerZoomEase(loc2: Vec2, z2: number, duration: number = 250): this  { return this.setMapParams(loc2, z2, undefined, duration); }
-  centerEase(loc2: Vec2, duration: number = 250): this  { return this.setMapParams(loc2, undefined, undefined, duration); }
-  zoomEase(z2: number, duration: number = 250): this  { return this.setMapParams(undefined, z2, undefined, duration); }
-  fitEntitiesEase(entities: any | any[], duration: number = 250): this  { return this.fitEntities(entities, duration); }
+  public transformEase(t2: TransformProps, duration: number = 250): TransformProps | this  { return this.transform(t2, duration); }
+  public centerZoomEase(loc2: Vec2, z2: number, duration: number = 250): this  { return this.setMapParams(loc2, z2, undefined, duration); }
+  public centerEase(loc2: Vec2, duration: number = 250): this  { return this.setMapParams(loc2, undefined, undefined, duration); }
+  public zoomEase(z2: number, duration: number = 250): this  { return this.setMapParams(undefined, z2, undefined, duration); }
+  public fitEntitiesEase(entities: any | any[], duration: number = 250): this  { return this.fitEntities(entities, duration); }
 
 
   /**
@@ -789,7 +791,7 @@ export class MapSystem extends AbstractSystem {
    *
    * @return  effective zoom
    */
-  effectiveZoom(): number {
+  public effectiveZoom(): number {
     const viewport = this.context.viewport;
     const lat = viewport.centerLoc()[1];
     const z = viewport.transform.zoom;
@@ -805,7 +807,7 @@ export class MapSystem extends AbstractSystem {
    * @param  extent  Extent Object to fit the map to
    * @return map extent -or- this
    */
-  extent(extent?: Extent): Extent | this {
+  public extent(extent?: Extent): Extent | this {
     if (extent === undefined) {
       return this.context.viewport.visibleExtent();
     } else {
@@ -819,7 +821,7 @@ export class MapSystem extends AbstractSystem {
    * @param  extent  Extent Object to fit the map to
    * @return map extent -or- this
    */
-  trimmedExtent(extent?: Extent): Extent | this {
+  public trimmedExtent(extent?: Extent): Extent | this {
     if (extent === undefined) {
       const headerY = 72;
       const footerY = 30;
@@ -846,7 +848,7 @@ export class MapSystem extends AbstractSystem {
    * @param  dimensions  [width, height] to fit it in (defaults to viewport)
    * @return zoom
    */
-  extentZoom(extent: Extent, dimensions?: Vec2): number {
+  public extentZoom(extent: Extent, dimensions?: Vec2): number {
     const viewport = this.context.viewport;
     const [w, h] = dimensions || viewport.dimensions;
 
@@ -873,7 +875,7 @@ export class MapSystem extends AbstractSystem {
    * @param  extent  Extent Object to fit
    * @return zoom
    */
-  trimmedExtentZoom(extent: Extent): number {
+  public trimmedExtentZoom(extent: Extent): number {
 // Add 50px overscan experiment, see UISystem.js
 // Maybe find a nicer way to include overscan and view padding into places like this.
     const trimW = 140;
@@ -890,10 +892,10 @@ export class MapSystem extends AbstractSystem {
   /**
    * set/get whether to show edited features in a special style
    */
-  get highlightEdits(): boolean {
+  public get highlightEdits(): boolean {
     return this._highlightEdits;
   }
-  set highlightEdits(val: boolean) {
+  public set highlightEdits(val: boolean) {
     if (this._highlightEdits === val) return;  // no change
 
     this._highlightEdits = val;
@@ -908,10 +910,10 @@ export class MapSystem extends AbstractSystem {
   /**
    * set/get the area fill mode - one of 'full', 'partial' (default), or 'wireframe'
    */
-  get areaFillMode(): AreaFillMode {
+  public get areaFillMode(): AreaFillMode {
     return this._currFillMode;
   }
-  set areaFillMode(val: AreaFillMode) {
+  public set areaFillMode(val: AreaFillMode) {
     const context = this.context;
     const gfx = context.systems.gfx!;
     const storage = context.systems.storage;
@@ -936,10 +938,10 @@ export class MapSystem extends AbstractSystem {
   /**
    * set/get whether the area fill mode is set to 'wireframe'
    */
-  get wireframeMode(): boolean {
+  public get wireframeMode(): boolean {
     return this._currFillMode === 'wireframe';
   }
-  set wireframeMode(val: boolean) {
+  public set wireframeMode(val: boolean) {
     if (val) {
       if (this.areaFillMode !== 'wireframe') {
         this.areaFillMode = 'wireframe';

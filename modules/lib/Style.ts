@@ -205,20 +205,21 @@ export const styleDefaults: MinimalStyleProps = {
  */
 
 export class Style {
-  context: Context;
-  props: StyleProps;
+
+  public context: Context;
+  public props: StyleProps;
 
   /** Unique identifier */
-  readonly id: StyleID;
+  public readonly id: StyleID;
 
   /**
    * Resolved copy of props with var() references replaced by actual values.
    * `null` when no var() references have been resolved (or after reset).
    */
-  private _resolved: StyleProps | null;
+  protected _resolved: StyleProps | null;
 
   /** Whether this style's raw props contain any var() references. */
-  private _hasVarRefs: boolean;
+  protected _hasVarRefs: boolean;
 
 
   /**
@@ -226,7 +227,7 @@ export class Style {
    * @param props - Properties defining the visual style
    * @throws Error if `id` property is missing
    */
-  constructor(context: Context, props: Partial<StyleProps> = {}) {
+  public constructor(context: Context, props: Partial<StyleProps> = {}) {
     this.context = context;
 
     if (!props.id) {
@@ -245,44 +246,44 @@ export class Style {
    * Returns the resolved props (with var() references replaced), or the raw
    * props if no variables have been resolved.
    */
-  get resolved(): StyleProps {
+  public get resolved(): StyleProps {
     return this._resolved ?? this.props;
   }
 
   /** Fill style properties. */
-  get fill(): FillStyleProps | undefined {
+  public get fill(): FillStyleProps | undefined {
     return this.resolved.fill;
   }
   /** Casing style properties. */
-  get casing(): LineStyleProps | undefined {
+  public get casing(): LineStyleProps | undefined {
     return this.resolved.casing;
   }
   /** Stroke style properties. */
-  get stroke(): LineStyleProps | undefined {
+  public get stroke(): LineStyleProps | undefined {
     return this.resolved.stroke;
   }
   /** Marker style properties (point background shape). */
-  get marker(): PointStyleProps | undefined {
+  public get marker(): PointStyleProps | undefined {
     return this.resolved.marker;
   }
   /** Icon style properties (rendered inside marker). */
-  get icon(): PointStyleProps | undefined {
+  public get icon(): PointStyleProps | undefined {
     return this.resolved.icon;
   }
   /** Viewfield style properties */
-  get viewfield(): ViewfieldStyleProps | undefined {
+  public get viewfield(): ViewfieldStyleProps | undefined {
     return this.resolved.viewfield;
   }
   /** Line marker style properties (e.g. oneway arrows). */
-  get lineMarker(): PointStyleProps | undefined {
+  public get lineMarker(): PointStyleProps | undefined {
     return this.resolved.lineMarker;
   }
   /** Sided marker style properties (e.g. cliffs, retaining walls). */
-  get sidedMarker(): PointStyleProps | undefined {
+  public get sidedMarker(): PointStyleProps | undefined {
     return this.resolved.sidedMarker;
   }
   /** Label styling properties. */
-  get label(): LabelStyleProps | undefined {
+  public get label(): LabelStyleProps | undefined {
     return this.resolved.label;
   }
 
@@ -292,7 +293,7 @@ export class Style {
    * Layers: defaults ← fallbacks ← props (later values win).
    * @return  Resolved style properties
    */
-  resolvedStyle(userDefaults?: Style): MinimalStyleProps {
+  public resolvedStyle(userDefaults?: Style): MinimalStyleProps {
     // Look in several places for fallback color properties.
     // Only the matched style's own props are used here — userDefaults are applied as a
     // separate layer so they don't interfere with the cascade computation.
@@ -352,7 +353,7 @@ export class Style {
    * @param other - Another Style to merge with this one
    * @return A new Style with merged properties
    */
-  merge(other: Style): Style {
+  public merge(other: Style): Style {
     const merged = deepMerge({}, this.resolved, other.resolved) as StyleProps;
     merged.id = this.id;  // Keep original ID
     return new Style(this.context, merged);
@@ -364,7 +365,7 @@ export class Style {
    * @param newID - The new ID for the copy
    * @return A new Style with the new ID
    */
-  clone(newID?: StyleID): Style {
+  public clone(newID?: StyleID): Style {
     const cloned = structuredClone(this.props);
     if (newID) {
       cloned.id = newID;
@@ -380,7 +381,7 @@ export class Style {
    *
    * @param variables - Map of VariableID to Variable instances
    */
-  resolveVariables(variables: Map<VariableID, Variable>): void {
+  public resolveVariables(variables: Map<VariableID, Variable>): void {
     for (const [group, subProps] of Object.entries(this.props) as [keyof StyleProps, unknown][]) {
       if (!subProps || typeof subProps !== 'object') continue;
 
@@ -410,7 +411,7 @@ export class Style {
    * Discard the resolved copy so getters fall back to raw props.
    * Called before re-resolving when variables change (e.g. on style reload).
    */
-  reset(): void {
+  public reset(): void {
     this._resolved = null;
   }
 
@@ -418,7 +419,7 @@ export class Style {
   /**
    * Whether this style's raw props contain any `var()` references.
    */
-  get hasVarRefs(): boolean {
+  public get hasVarRefs(): boolean {
     return this._hasVarRefs;
   }
 
@@ -426,7 +427,7 @@ export class Style {
   /**
    * Convert to a JSON-serializable object.
    */
-  toJSON(): StyleProps {
+  public toJSON(): StyleProps {
     return structuredClone(this.props);
   }
 

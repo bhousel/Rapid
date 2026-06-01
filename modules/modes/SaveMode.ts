@@ -1,6 +1,5 @@
-import { select as d3_select } from 'd3-selection';
-
 import { AbstractMode } from './AbstractMode.ts';
+import { select as d3_select } from 'd3-selection';
 import { uiCommit } from '../ui/commit.js';
 import { uiConfirm } from '../ui/confirm.js';
 import { uiConflicts } from '../ui/conflicts.js';
@@ -19,26 +18,28 @@ const DEBUG = false;
  * In `SaveMode`, the user is ready to upload their changes.
  */
 export class SaveMode extends AbstractMode {
+
   /** Keybinding handler for this mode */
-  private _keybinding: Keybinding;
+  protected _keybinding: Keybinding;
   /** Current location string for success message */
-  private _location: string | null;
+  protected _location: string | null;
   /** UI component for conflicts */
-  private _uiConflicts: any;
+  protected _uiConflicts: any;
   /** UI component for commit */
-  private _uiCommit: any;
+  protected _uiCommit: any;
   /** UI component for success message */
-  private _uiSuccess: any;
+  protected _uiSuccess: any;
   /** UI component for save loading */
-  private _saveLoading: any;
+  protected _saveLoading: any;
   /** Whether the save was successful */
-  private _wasSuccessfulSave: boolean;
+  protected _wasSuccessfulSave: boolean;
+
 
   /**
    * @constructor
    * @param  context - Global shared application context
    */
-  constructor(context: Context) {
+  public constructor(context: Context) {
     super(context);
     this.id = 'save';
 
@@ -72,7 +73,7 @@ export class SaveMode extends AbstractMode {
    * Enters the mode.
    * @return  `true` if mode could be entered, `false` it not
    */
-  enter(): boolean {
+  public enter(): boolean {
     const context = this.context;
     const osm = context.services.osm as any;
     const ui = context.systems.ui!;
@@ -131,7 +132,7 @@ export class SaveMode extends AbstractMode {
    * Exits the mode, cleaning up event listeners and UI state.
    * If save was successful, leaves the success message in the sidebar.
    */
-  exit(): void {
+  public exit(): void {
     if (!this._active) return;
     this._active = false;
 
@@ -174,7 +175,7 @@ export class SaveMode extends AbstractMode {
   /**
    * Return to browse mode, canceling the save operation.
    */
-  private _cancel(): void {
+  protected _cancel(): void {
     this.context.enter('browse');
   }
 
@@ -185,7 +186,7 @@ export class SaveMode extends AbstractMode {
    * @param  num - Number of conflicts resolved so far
    * @param  total - Total number of conflicts to resolve
    */
-  private _progressChanged(num: number, total: number): void {
+  protected _progressChanged(num: number, total: number): void {
     const context = this.context;
     const l10n = context.systems.l10n!;
 
@@ -208,7 +209,7 @@ export class SaveMode extends AbstractMode {
    * @param  conflicts - Array of conflict objects describing the conflicts
    * @param  origChanges - The original changeset that caused the conflicts
    */
-  private _resultConflicts(conflicts: any[], origChanges: any): void {
+  protected _resultConflicts(conflicts: any[], origChanges: any): void {
     const context = this.context;
     const uploader = context.systems.uploader!;
 
@@ -250,7 +251,7 @@ export class SaveMode extends AbstractMode {
    * Displays an error dialog to the user.
    * @param  errors - Array of error objects with msg and details properties
    */
-  private _resultErrors(errors: any[]): void {
+  protected _resultErrors(errors: any[]): void {
     const context = this.context;
     const l10n = context.systems.l10n!;
 
@@ -273,7 +274,7 @@ export class SaveMode extends AbstractMode {
    * @param  $selection - The D3 selection to render errors into
    * @param  data - Array of error objects with msg and details properties
    */
-  private _addErrors($selection: D3Selection, data: any[]): void {
+  protected _addErrors($selection: D3Selection, data: any[]): void {
     const context = this.context;
     const l10n = context.systems.l10n!;
 
@@ -329,7 +330,7 @@ export class SaveMode extends AbstractMode {
    * Handler called when there are no changes to upload.
    * Resets the editor and returns to browse mode.
    */
-  private _resultNoChanges(): void {
+  protected _resultNoChanges(): void {
     const context = this.context;
     context.resetAsync()
       .then(() => context.enter('browse'));
@@ -341,7 +342,7 @@ export class SaveMode extends AbstractMode {
    * Shows the success screen and resets after a delay.
    * @param  changeset - The changeset object that was successfully uploaded
    */
-  private _resultSuccess(changeset: any): void {
+  protected _resultSuccess(changeset: any): void {
     const context = this.context;
     const ui = context.systems.ui!;
     const Sidebar = ui.Sidebar;
@@ -367,7 +368,7 @@ export class SaveMode extends AbstractMode {
    * At this point, a changeset is inflight and we need to block the UI
    * by disabling keybindings and showing a loading indicator.
    */
-  private _saveStarted(): void {
+  protected _saveStarted(): void {
     this._keybindingOff();
     this._showLoading();
   }
@@ -378,7 +379,7 @@ export class SaveMode extends AbstractMode {
    * At this point, the changeset is no longer inflight and we can unblock the UI.
    * Note: This may occur after an error condition.
    */
-  private _saveEnded(): void {
+  protected _saveEnded(): void {
     this._keybindingOn();
     this._hideLoading();
   }
@@ -387,7 +388,7 @@ export class SaveMode extends AbstractMode {
   /**
    * Block the UI by adding a spinner
    */
-  private _showLoading(): void {
+  protected _showLoading(): void {
     if (this._saveLoading) return;
 
     const context = this.context;
@@ -404,7 +405,7 @@ export class SaveMode extends AbstractMode {
   /**
    * Unlock the UI by removing the spinner
    */
-  private _hideLoading(): void {
+  protected _hideLoading(): void {
     if (!this._saveLoading) return;
 
     this._saveLoading.close();
@@ -415,7 +416,7 @@ export class SaveMode extends AbstractMode {
   /**
    * Enable keyboard shortcuts for the save mode (Escape to cancel).
    */
-  private _keybindingOn(): void {
+  protected _keybindingOn(): void {
     d3_select(document).call(this._keybinding.on('⎋', this._cancel, true));
   }
 
@@ -423,7 +424,7 @@ export class SaveMode extends AbstractMode {
   /**
    * Disable keyboard shortcuts for the save mode.
    */
-  private _keybindingOff(): void {
+  protected _keybindingOff(): void {
     d3_select(document).call(this._keybinding.unbind);
   }
 
@@ -432,7 +433,7 @@ export class SaveMode extends AbstractMode {
    * Reverse geocode current map location so we can display a message on
    * the success screen like "Thank you for editing around place, region."
    */
-  private _prepareForSuccess(): void {
+  protected _prepareForSuccess(): void {
     this._uiSuccess = uiSuccess(this.context);
     this._location = null;
 

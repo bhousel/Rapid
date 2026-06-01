@@ -18,19 +18,20 @@ import type { Context } from '../Context.ts';
  *   `selectedData`       `Map<DataID, AbstractData>` containing selected data
  */
 export class AbstractMode extends EventEmitter {
-  id: ModeID;
-  context: Context;
+  public id: ModeID;
+  public context: Context;
   // Operations are still untyped (modules/operations not yet converted)
-  operations: object[];
+  public operations: object[];
 
   protected _active: boolean;
   protected _selectedData: Map<DataID, AbstractData>;
+
 
   /**
    * @constructor
    * @param  context - Global shared application context
    */
-  constructor(context: Context) {
+  public constructor(context: Context) {
     super();
     this.id = '';
     this.context = context;
@@ -46,7 +47,7 @@ export class AbstractMode extends EventEmitter {
    * @param  options - Optional object of options passed to the mode
    * @return `true` if mode could be entered, `false` if not
    */
-  enter(options?: object): boolean {
+  public enter(options?: object): boolean {
     this._active = true;
     return true;
   }
@@ -55,7 +56,7 @@ export class AbstractMode extends EventEmitter {
   /**
    * Every mode should have a `exit` function to perform any necessary teardown tasks
    */
-  exit(): void {
+  public exit(): void {
     this._active = false;
   }
 
@@ -64,7 +65,7 @@ export class AbstractMode extends EventEmitter {
    * Unique string to identify this Mode.
    * @readonly
    */
-  get modeID(): ModeID {
+  public get modeID(): ModeID {
     return this.id;
   }
 
@@ -73,7 +74,7 @@ export class AbstractMode extends EventEmitter {
    * Whether the mode is active
    * @readonly
    */
-  get active(): boolean {
+  public get active(): boolean {
     return this._active;
   }
 
@@ -81,7 +82,7 @@ export class AbstractMode extends EventEmitter {
   /**
    * @readonly
    */
-  get selectedData(): Map<DataID, AbstractData> {
+  public get selectedData(): Map<DataID, AbstractData> {
     return this._selectedData;
   }
 
@@ -89,7 +90,7 @@ export class AbstractMode extends EventEmitter {
   /**
    * @readonly
    */
-  get selectedIDs(): DataID[] {
+  public get selectedIDs(): DataID[] {
     return Array.from(this._selectedData.keys());
   }
 

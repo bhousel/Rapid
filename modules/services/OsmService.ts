@@ -1,18 +1,17 @@
-import { Tiler, Viewport } from '@rapid-sdk/math';
-import { utilArrayChunk, utilArrayUniq, utilObjectOmit, utilQsString } from '@rapid-sdk/util';
-import { osmAuth } from 'osm-auth';
-
 import { AbstractSystem } from '../core/AbstractSystem.ts';
 import { JXON } from '../util/jxon.ts';
 import { OsmEntity, MarkerData } from '../data/index.ts';
+import { osmAuth } from 'osm-auth';
 import { osmServiceListeners } from './OsmService.worker.ts';
+import { Tiler, Viewport } from '@rapid-sdk/math';
+import { utilArrayChunk, utilArrayUniq, utilObjectOmit, utilQsString } from '@rapid-sdk/util';
 
-import type { Tile, Vec2 } from '@rapid-sdk/math';
 import type { Context } from '../Context.ts';
 import type { MarkerProps } from '../data/MarkerData.ts';
 import type { OsmChangeset, OsmChanges } from '../data/OsmChangeset.ts';
 import type { OsmFetchResult } from './OsmService.worker.ts';
 import type { ParserOptions, ParserResult, ParsedApi, ParsedData, ParsedPolicy } from '../data/parsers/types.ts';
+import type { Tile, Vec2 } from '@rapid-sdk/math';
 
 
 /** Properties specific to OSM note markers */
@@ -183,51 +182,52 @@ interface OsmAuthInstance {
  *   'authchange'
  */
 export class OsmService extends AbstractSystem {
+
   /** Whether to prefer JSON over XML when communicating with the OSM API */
-  preferJSON: boolean;
+  public preferJSON: boolean;
 
   /** Maximum number of nodes allowed in a single way (from API capabilities) */
-  _maxWayNodes: number;
+  protected _maxWayNodes: number;
   /** Regex patterns for imagery sources blocked by OSM policy */
-  _imageryBlocklists: RegExp[];
+  protected _imageryBlocklists: RegExp[];
   /** Base URL of the OSM website (e.g. 'https://www.openstreetmap.org') */
-  _wwwroot: string;
+  protected _wwwroot: string;
   /** Base URL of the OSM API (e.g. 'https://api.openstreetmap.org') */
-  _apiroot: string;
+  protected _apiroot: string;
   /** Cache for tile loading state */
-  _tileCache: TileCache;
+  protected _tileCache: TileCache;
   /** Cache for note loading state */
-  _noteCache: NoteCache;
+  protected _noteCache: NoteCache;
   /** Cache for user data */
-  _userCache: UserCache;
+  protected _userCache: UserCache;
   /** Changeset tracking state */
-  _changeset: ChangesetState;
+  protected _changeset: ChangesetState;
   /** Tiler used to compute which tiles to load for the current viewport */
-  _tiler: Tiler;
+  protected _tiler: Tiler;
   /** Incrementing ID that changes on connection reset (invalidates in-flight requests) */
-  _connectionID: number;
+  protected _connectionID: number;
   /** Zoom level at which map data tiles are loaded */
-  _tileZoom: number;
+  protected _tileZoom: number;
   /** Zoom level at which note tiles are loaded */
-  _noteZoom: number;
+  protected _noteZoom: number;
   /** Current API status string ('online', 'readonly', 'offline', 'error'), or null */
-  _apiStatus: string | null;
+  protected _apiStatus: string | null;
   /** Current rate limiting info, or null if not rate-limited */
-  _rateLimit: RateLimitInfo | null;
+  protected _rateLimit: RateLimitInfo | null;
   /** Cached list of the authenticated user's changesets, or null */
-  _userChangesets: any[] | null;
+  protected _userChangesets: any[] | null;
   /** Cached details of the authenticated user, or null */
-  _userDetails: any | null;
+  protected _userDetails: any | null;
   /** Cached preferences of the authenticated user, or null */
-  _userPreferences: any | null;
+  protected _userPreferences: any | null;
   /** The `osm-auth` instance used for OAuth2 authentication */
-  _oauth: OsmAuthInstance;
+  protected _oauth: OsmAuthInstance;
 
   /**
    * @constructor
    * @param context - Global shared application context
    */
-  constructor(context: Context) {
+  public constructor(context: Context) {
     super(context);
     this.id = 'osm';
     this.requiredDependencies = new Set<SystemID>(['network', 'spatial']);
@@ -331,7 +331,7 @@ export class OsmService extends AbstractSystem {
    * Called after all core objects have been constructed.
    * @return  Promise resolved when this component has completed initialization
    */
-  initAsync(): Promise<void> {
+  public initAsync(): Promise<void> {
     if (this._initPromise) return this._initPromise;
 
     const context = this.context;
@@ -355,7 +355,7 @@ export class OsmService extends AbstractSystem {
    * Called after all core objects have been initialized.
    * @return  Promise resolved when this component has completed startup
    */
-  startAsync(): Promise<void> {
+  public startAsync(): Promise<void> {
     return super.startAsync();
   }
 
@@ -364,7 +364,7 @@ export class OsmService extends AbstractSystem {
    * Called after completing an edit session to reset any internal state
    * @return  Promise resolved when this component has completed resetting
    */
-  resetAsync(): Promise<void> {
+  public resetAsync(): Promise<void> {
     this._connectionID++;
     this._apiStatus = null;
     this._rateLimit = null;
@@ -400,7 +400,7 @@ export class OsmService extends AbstractSystem {
    * Switch connection and credentials, and reset
    * @return  Promise resolved when this component has completed resetting
    */
-  switchAsync(newOptions: SwitchOptions): Promise<void> {
+  public switchAsync(newOptions: SwitchOptions): Promise<void> {
     const context = this.context;
     const gfx = context.systems.gfx;
 
@@ -421,34 +421,34 @@ export class OsmService extends AbstractSystem {
 
 
   /** The current connection ID (incremented on each reset to invalidate in-flight requests) */
-  get connectionID(): number {
+  public get connectionID(): number {
     return this._connectionID;
   }
 
   /** The base URL of the OSM website */
-  get wwwroot(): string {
+  public get wwwroot(): string {
     return this._wwwroot;
   }
 
   /** Regex patterns for imagery sources blocked by OSM policy */
-  get imageryBlocklists(): RegExp[] {
+  public get imageryBlocklists(): RegExp[] {
     return this._imageryBlocklists;
   }
 
   /** The maximum number of nodes a single way can have */
-  get maxWayNodes(): number {
+  public get maxWayNodes(): number {
     return this._maxWayNodes;
   }
 
 
   /** Returns the OSM website URL for a given changeset */
-  changesetURL(changesetID: string | number): string {
+  public changesetURL(changesetID: string | number): string {
     return `${this._wwwroot}/changeset/${changesetID}`;
   }
 
 
   /** Returns the OSM website URL for the changeset history view at a given location */
-  changesetsURL(center: Vec2, zoom: number): string {
+  public changesetsURL(center: Vec2, zoom: number): string {
     const precision = Math.max(0, Math.ceil(Math.log(zoom) / Math.LN2));
     return this._wwwroot + '/history#map=' +
       Math.floor(zoom) + '/' +
@@ -458,33 +458,33 @@ export class OsmService extends AbstractSystem {
 
 
   /** Returns the OSM website URL for a given entity */
-  entityURL(entity: OsmEntity): string {
+  public entityURL(entity: OsmEntity): string {
     const entityID = entity.osmId();
     return `${this._wwwroot}/${entity.type}/${entityID}`;
   }
 
 
   /** Returns the OSM website URL for the history of a given entity */
-  historyURL(entity: OsmEntity): string {
+  public historyURL(entity: OsmEntity): string {
     const entityID = entity.osmId();
     return `${this._wwwroot}/${entity.type}/${entityID}/history`;
   }
 
 
   /** Returns the OSM website URL for a given user's profile */
-  userURL(username: string): string {
+  public userURL(username: string): string {
     return `${this._wwwroot}/user/${username}`;
   }
 
 
   /** Returns the OSM website URL for a given note */
-  noteURL(note: MarkerData): string {
+  public noteURL(note: MarkerData): string {
     return `${this._wwwroot}/note/${note.id}`;
   }
 
 
   /** Returns the OSM website URL for reporting a given note */
-  noteReportURL(note: MarkerData): string {
+  public noteReportURL(note: MarkerData): string {
     return `${this._wwwroot}/reports/new?reportable_type=Note&reportable_id=${note.id}`;
   }
 
@@ -504,7 +504,7 @@ export class OsmService extends AbstractSystem {
    * @param   requestID - optional requestID for NetworkSystem tracking
    * @return  the RequestID used for this request
    */
-  loadFromAPI(path: string, callback: Errback | null, options: Partial<ParserOptions> = {}, requestID?: RequestID): RequestID {
+  public loadFromAPI(path: string, callback: Errback | null, options: Partial<ParserOptions> = {}, requestID?: RequestID): RequestID {
     const context = this.context;
     const network = context.systems.network!;
 
@@ -601,7 +601,7 @@ export class OsmService extends AbstractSystem {
    * @param   entityID - the entityID to load
    * @return  Promise resolved with the parsed api results
    */
-  loadEntityAsync(entityID: EntityID): Promise<ParserResult> {
+  public loadEntityAsync(entityID: EntityID): Promise<ParserResult> {
     const type = OsmEntity.type(entityID);    // 'node', 'way', 'relation'
     const osmID = OsmEntity.toOSM(entityID);
     const options = { skipSeen: false, filter: new Set(['node', 'way', 'relation']) };
@@ -629,7 +629,7 @@ export class OsmService extends AbstractSystem {
    * @param   version - version to load
    * @return  Promise resolved with the parsed api results
    */
-  loadEntityVersionAsync(entityID: EntityID, version: string | number): Promise<ParserResult> {
+  public loadEntityVersionAsync(entityID: EntityID, version: string | number): Promise<ParserResult> {
     const type = OsmEntity.type(entityID);    // 'node', 'way', 'relation'
     const osmID = OsmEntity.toOSM(entityID);
     const options = { skipSeen: false, filter: new Set(['node', 'way', 'relation']) };
@@ -656,7 +656,7 @@ export class OsmService extends AbstractSystem {
    * @param   entityID - the entityID to get parent relations
    * @return  Promise resolved with the parsed api results
    */
-  loadEntityRelationsAsync(entityID: EntityID): Promise<ParserResult> {
+  public loadEntityRelationsAsync(entityID: EntityID): Promise<ParserResult> {
     const type = OsmEntity.type(entityID);
     const osmID = OsmEntity.toOSM(entityID);
     const options = { skipSeen: false, filter: new Set(['relation']) };
@@ -683,7 +683,7 @@ export class OsmService extends AbstractSystem {
    * @param   entityIDs - the entityIDs to load
    * @return  Promise resolved with an Array of entity details
    */
-  loadMultipleAsync(entityIDs: EntityID[]): Promise<ParsedData[]> {
+  public loadMultipleAsync(entityIDs: EntityID[]): Promise<ParsedData[]> {
     const loaded: ParsedData[] = [];
     const toLoad: Record<string, Set<string>> = {};
 
@@ -731,7 +731,7 @@ export class OsmService extends AbstractSystem {
    * @param   userID - the userID to load
    * @return  Promise resolved with the user details
    */
-  loadUserAsync(userID: string | number): Promise<any> {
+  public loadUserAsync(userID: string | number): Promise<any> {
     const uid = userID.toString();
 
     // First, try to resolve to a cached result
@@ -774,7 +774,7 @@ export class OsmService extends AbstractSystem {
    * @param   userIDs - the userIDs to load
    * @return  Promise resolved with an Array of user details
    */
-  loadUsersAsync(userIDs: (string | number)[]): Promise<any[]> {
+  public loadUsersAsync(userIDs: (string | number)[]): Promise<any[]> {
     const loaded: any[] = [];
     const toLoad: string[] = [];
 
@@ -824,7 +824,7 @@ export class OsmService extends AbstractSystem {
    * GET /api/0.6/user/details
    * @return  Promise resolved with the current logged in user's details
    */
-  getUserDetailsAsync(): Promise<any> {
+  public getUserDetailsAsync(): Promise<any> {
     if (!this.authenticated()) {
       this._userDetails = null;
       return Promise.reject(new Error('Not logged in'));
@@ -857,7 +857,7 @@ export class OsmService extends AbstractSystem {
    * GET /api/0.6/user/preferences
    * @return  Promise resolved with the current logged in user's preferences
    */
-  getUserPreferencesAsync(): Promise<any> {
+  public getUserPreferencesAsync(): Promise<any> {
     if (!this.authenticated()) {
       this._userPreferences = null;
       return Promise.reject(new Error('Not logged in'));
@@ -893,7 +893,7 @@ export class OsmService extends AbstractSystem {
    * GET /api/0.6/changesets?user=#id
    * @return  Promise resolved with the current logged in user's previous changesets
    */
-  getUserChangesetsAsync(): Promise<any[]> {
+  public getUserChangesetsAsync(): Promise<any[]> {
     if (!this.authenticated()) {
       this._userChangesets = null;
       return Promise.reject(new Error('Not logged in'));
@@ -936,7 +936,7 @@ export class OsmService extends AbstractSystem {
    * see: https://wiki.openstreetmap.org/wiki/API_v0.6#Response
    * @return  Promise resolved with the API status information
    */
-  getCapabilitiesAsync(): Promise<CapabilitiesResult> {
+  public getCapabilitiesAsync(): Promise<CapabilitiesResult> {
     return new Promise((resolve, reject) => {
       const errback = (err: any, results?: ParserResult): void => {
         if (err?.message === 'Connection Switched') {  // If connection was just switched,
@@ -993,7 +993,7 @@ export class OsmService extends AbstractSystem {
    *   'error'     - unreachable / network issue
    *   'ratelimit' - rate limit detected
    */
-  reloadApiStatus(): void {
+  public reloadApiStatus(): void {
     const startStatus = this._apiStatus;
     this.getCapabilitiesAsync()
       .then(() => {
@@ -1007,7 +1007,7 @@ export class OsmService extends AbstractSystem {
   /**
    * Uses `throttle` to checking the API status too frequently
    */
-  deferredReloadApiStatus(): void {
+  public deferredReloadApiStatus(): void {
     const scheduler = this.context.systems.scheduler;
     if (scheduler) {
       scheduler.throttle('osm-reload-api-status', () => this.reloadApiStatus(), { ms: 500 });
@@ -1023,7 +1023,7 @@ export class OsmService extends AbstractSystem {
    * @param  changeset - the changeset to create
    * @param  callback - errback-style callback called with the updated changeset
    */
-  createChangeset(changeset: OsmChangeset, callback: Errback): void {
+  public createChangeset(changeset: OsmChangeset, callback: Errback): void {
     if (this._isChangesetInflight()) {
       return callback({ message: 'Changeset already inflight', status: -2 });
     } else if (!this.authenticated()) {
@@ -1075,7 +1075,7 @@ export class OsmService extends AbstractSystem {
    * @param  changes - the entity changes to upload
    * @param  callback - errback-style callback called when the upload completes
    */
-  uploadChangeset(changeset: OsmChangeset, changes: OsmChanges, callback: Errback): void {
+  public uploadChangeset(changeset: OsmChangeset, changes: OsmChanges, callback: Errback): void {
     if (this._isChangesetInflight()) {
       return callback({ message: 'Changeset already inflight', status: -2 });
     } else if (!this.authenticated()) {
@@ -1127,7 +1127,7 @@ export class OsmService extends AbstractSystem {
    * @param  changeset - the changeset to close
    * @param  callback - errback-style callback called when the close completes
    */
-  closeChangeset(changeset: OsmChangeset, callback: Errback): void {
+  public closeChangeset(changeset: OsmChangeset, callback: Errback): void {
     if (this._isChangesetInflight()) {
       return callback({ message: 'Changeset already inflight', status: -2 });
     } else if (!this.authenticated()) {
@@ -1174,7 +1174,7 @@ export class OsmService extends AbstractSystem {
    * @param  changes - the entity changes to upload
    * @param  callback - errback-style callback called when the full send cycle completes
    */
-  sendChangeset(changeset: OsmChangeset, changes: OsmChanges, callback: Errback): void {
+  public sendChangeset(changeset: OsmChangeset, changes: OsmChanges, callback: Errback): void {
     const cid = this._connectionID;
 
     this.createChangeset(changeset, (err: any, updated: OsmChangeset) => {
@@ -1208,7 +1208,7 @@ export class OsmService extends AbstractSystem {
    * GET /api/0.6/map?bbox=
    * @param  callback - optional errback-style callback called per-tile with results
    */
-  loadTiles(callback?: Errback | null): void {
+  public loadTiles(callback?: Errback | null): void {
     if (this._paused || this.getRateLimit()) {
       if (callback) callback(null, { data: [] });
       return;
@@ -1246,7 +1246,7 @@ export class OsmService extends AbstractSystem {
    * @param  seconds - seconds to impose the rate limit (default 10 sec)
    * @return rate limit info, or `null` if `seconds` is junk
    */
-  setRateLimit(seconds: number = 10): RateLimitInfo | null {
+  public setRateLimit(seconds: number = 10): RateLimitInfo | null {
     // If `seconds` makes no sense, just return the existing rate limit, if any..
     if (!Number.isFinite(seconds) || seconds <= 0) {
       return this._rateLimit;
@@ -1279,7 +1279,7 @@ export class OsmService extends AbstractSystem {
    * This will also cancel the rate limit if we detect that it has expired.
    * @return  rate limit info, or `null` if no current rate limit
    */
-  getRateLimit(): RateLimitInfo | null {
+  public getRateLimit(): RateLimitInfo | null {
     if (!this._rateLimit) return null;
 
     const now = Math.floor(Date.now() / 1000);  // epoch seconds
@@ -1312,7 +1312,7 @@ export class OsmService extends AbstractSystem {
    * @param  tile - the tile to load
    * @param  callback - optional errback-style callback called with the results
    */
-  loadTile(tile: Tile, callback?: Errback | null): void {
+  public loadTile(tile: Tile, callback?: Errback | null): void {
     if (this._paused || this.getRateLimit()) return;
 
     const context = this.context;
@@ -1362,7 +1362,7 @@ export class OsmService extends AbstractSystem {
    * @param   loc - the search location (WGS84 [lon,lat])
    * @return  `true` if data exists there, `false` if not
    */
-  isDataLoaded(loc: Vec2): boolean {
+  public isDataLoaded(loc: Vec2): boolean {
     const spatial = this.context.systems.spatial!;
     return spatial.hasTileAtLoc('osm-data', loc);
   }
@@ -1373,7 +1373,7 @@ export class OsmService extends AbstractSystem {
    * @param   loc - the search location (WGS84 [lon,lat])
    * @param   callback - errback-style callback function to call with results
    */
-  loadTileAtLoc(loc: Vec2, callback?: Errback | null): void {
+  public loadTileAtLoc(loc: Vec2, callback?: Errback | null): void {
     const context = this.context;
     const network = context.systems.network!;
     const spatial = context.systems.spatial!;
@@ -1411,7 +1411,7 @@ export class OsmService extends AbstractSystem {
    * Schedule any data requests needed to cover the current map view
    * @param  noteOptions - note options
    */
-  loadNotes(noteOptions?: NoteOptions): void {
+  public loadNotes(noteOptions?: NoteOptions): void {
     if (this._paused || this.getRateLimit()) return;
 
     const context = this.context;
@@ -1458,7 +1458,7 @@ export class OsmService extends AbstractSystem {
    * @param  tile - Tile data
    * @param  noteOptions - note options
    */
-  loadNotesTile(tile: Tile, noteOptions?: NoteOptions): void {
+  public loadNotesTile(tile: Tile, noteOptions?: NoteOptions): void {
     noteOptions = Object.assign({ limit: 10000, closed: 7 }, noteOptions);
 
     const context = this.context;
@@ -1492,7 +1492,7 @@ export class OsmService extends AbstractSystem {
    * @param   id - noteID to get
    * @return  Promise resolved with the note
    */
-  loadNoteAsync(id: string | number): Promise<OsmNote> {
+  public loadNoteAsync(id: string | number): Promise<OsmNote> {
     const context = this.context;
     const spatial = context.systems.spatial!;
     const gfx = context.systems.gfx;
@@ -1530,7 +1530,7 @@ export class OsmService extends AbstractSystem {
    * @param  note - the note to create (must have `loc` and `newComment`)
    * @param  callback - errback-style callback called with the created note
    */
-  postNoteCreate(note: OsmNote, callback: Errback): void {
+  public postNoteCreate(note: OsmNote, callback: Errback): void {
     const context = this.context;
     const gfx = context.systems.gfx;
     const network = context.systems.network!;
@@ -1591,7 +1591,7 @@ export class OsmService extends AbstractSystem {
    * @param  newStatus - the desired status ('open' or 'closed'), or unchanged for a comment
    * @param  callback - errback-style callback called with the updated note
    */
-  postNoteUpdate(note: OsmNote, newStatus: string, callback: Errback): void {
+  public postNoteUpdate(note: OsmNote, newStatus: string, callback: Errback): void {
     const context = this.context;
     const gfx = context.systems.gfx;
     const network = context.systems.network!;
@@ -1668,7 +1668,7 @@ export class OsmService extends AbstractSystem {
    * @param  obj - if provided, replaces the internal caches; if omitted, returns cloned caches
    * @return the cloned caches when getting, or `this` when setting
    */
-  caches(obj?: CachesObject): CachesObject | this {
+  public caches(obj?: CachesObject): CachesObject | this {
     function cloneCache(source: Record<string, any>): Record<string, any> {
       const target: Record<string, any> = {};
       for (const [k, v] of Object.entries(source)) {
@@ -1711,7 +1711,7 @@ export class OsmService extends AbstractSystem {
    * Emits an `authchange` event.
    * @return `this` for chaining
    */
-  logout(): this {
+  public logout(): this {
     const gfx = this.context.systems.gfx;
 
     this._rateLimit = null;
@@ -1727,7 +1727,7 @@ export class OsmService extends AbstractSystem {
 
 
   /** Returns whether the user is currently authenticated with the OSM API */
-  authenticated(): boolean {
+  public authenticated(): boolean {
     return this._oauth.authenticated();
   }
 
@@ -1738,7 +1738,7 @@ export class OsmService extends AbstractSystem {
    * then reloads the API status and emits an `authchange` event on success.
    * @param  callback - optional errback-style callback called with the auth result
    */
-  authenticate(callback?: Errback | null): void {
+  public authenticate(callback?: Errback | null): void {
     const context = this.context;
     const gfx = context.systems.gfx;
     const l10n = context.systems.l10n;
@@ -1777,7 +1777,7 @@ export class OsmService extends AbstractSystem {
 
 
   /** Returns all cached notes that are visible in the current viewport */
-  getNotes(): OsmNote[] {
+  public getNotes(): OsmNote[] {
     const spatial = this.context.systems.spatial!;
     return spatial.getVisibleData('osm-notes').map(hit => hit.contents) as OsmNote[];
   }
@@ -1788,7 +1788,7 @@ export class OsmService extends AbstractSystem {
    * @param   dataID
    * @return  the cached note
    */
-  getNote(dataID: string): OsmNote | undefined {
+  public getNote(dataID: string): OsmNote | undefined {
     const spatial = this.context.systems.spatial!;
     return spatial.getData<OsmNote>('osm-notes', dataID);
   }
@@ -1799,7 +1799,7 @@ export class OsmService extends AbstractSystem {
    * @param   item to replace
    * @return  the item, or `null` if it couldn't be replaced
    */
-  replaceNote(item: OsmNote): OsmNote | null {
+  public replaceNote(item: OsmNote): OsmNote | null {
     if (!(item instanceof MarkerData) || !item.id) return null;
 
     const spatial = this.context.systems.spatial!;
@@ -1812,7 +1812,7 @@ export class OsmService extends AbstractSystem {
    * Remove a single item from the cache
    * @param  item to remove
    */
-  removeNote(item: OsmNote): void {
+  public removeNote(item: OsmNote): void {
     if (!(item instanceof MarkerData) || !item.id) return;
 
     const spatial = this.context.systems.spatial!;
@@ -1825,19 +1825,19 @@ export class OsmService extends AbstractSystem {
    * Used to populate `closed:note` changeset tag
    * @return  Array of closed note ids
    */
-  getClosedIDs(): string[] {
+  public getClosedIDs(): string[] {
     return Object.keys(this._noteCache.closed).sort();
   }
 
 
   /** Emits the `authLoading` event (called when the auth popup opens) */
-  _authLoading(): void {
+  protected _authLoading(): void {
     this.emit('authLoading');
   }
 
 
   /** Emits the `authDone` event (called when the auth popup closes) */
-  _authDone(): void {
+  protected _authDone(): void {
     this.emit('authDone');
   }
 
@@ -1849,7 +1849,7 @@ export class OsmService extends AbstractSystem {
    *
    * Uses `oauth.getAccessToken()` — the public API added in osm-auth v3.2.0.
    */
-  _authInterceptor(url: string, init: RequestInit): RequestInit {
+  protected _authInterceptor(url: string, init: RequestInit): RequestInit {
     if (this._oauth.authenticated() && url.startsWith(this._apiroot)) {
       const accessToken = this._oauth.getAccessToken();
       if (accessToken) {
@@ -1862,7 +1862,7 @@ export class OsmService extends AbstractSystem {
 
 
   /** Returns true if any changeset operation (create/upload/close) is currently inflight */
-  _isChangesetInflight(): boolean {
+  protected _isChangesetInflight(): boolean {
     const network = this.context.systems.network!;
     return network.hasMatching(id => /^osm-changeset-/.test(id));
   }
@@ -1873,7 +1873,7 @@ export class OsmService extends AbstractSystem {
    * @param   source - the note properties
    * @return  The note
    */
-  _cacheNote(source: any): OsmNote {
+  protected _cacheNote(source: any): OsmNote {
     const context = this.context;
     const spatial = context.systems.spatial!;
     const noteID = source.id;
@@ -1910,7 +1910,7 @@ export class OsmService extends AbstractSystem {
    * @param  callback - the original errback to wrap
    * @return a wrapped errback with the additional checks
    */
-  _wrapcb(callback: Errback): Errback {
+  protected _wrapcb(callback: Errback): Errback {
     const cid = this._connectionID;
     return (err: any, results?: any): void => {
       if (err) {

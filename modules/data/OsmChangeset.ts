@@ -1,5 +1,5 @@
-import { OsmEntity, OsmEntityProps } from './OsmEntity.ts';
 import { GeoJSONObject } from '../lib/types.ts';
+import { OsmEntity, OsmEntityProps } from './OsmEntity.ts';
 
 import type { Context } from '../Context.ts';
 
@@ -39,7 +39,7 @@ export class OsmChangeset extends OsmEntity {
    * @param otherOrContext - copy another data element, or pass application context
    * @param props - Properties to assign to the data element
    */
-  constructor(otherOrContext: OsmChangeset | Context, props: Partial<OsmChangesetProps> = {}) {
+  public constructor(otherOrContext: OsmChangeset | Context, props: Partial<OsmChangesetProps> = {}) {
     super(otherOrContext as any, props);
     this.props.type = 'changeset';
 
@@ -56,7 +56,7 @@ export class OsmChangeset extends OsmEntity {
    * (This currently returns an unlocated Feature, but we could return a bounding box or something)
    * @return An empty object
    */
-  asGeoJSON(): GeoJSONObject {
+  public asGeoJSON(): GeoJSONObject {
     return {
       type: 'Feature',
       id: this.id,
@@ -70,7 +70,7 @@ export class OsmChangeset extends OsmEntity {
    * For OSM Entities, this is used to prepare an OSM changeset XML.
    * @return JXON representation of the OsmChangeset
    */
-  asJXON(): Record<string, unknown> {
+  public asJXON(): Record<string, unknown> {
     return {
       osm: {
         changeset: {
@@ -89,7 +89,7 @@ export class OsmChangeset extends OsmEntity {
    * @param graph - the Graph that holds the topology needed
    * @returns 'point', 'line', 'vertex', 'area, or 'relation' depending on the data type
    */
-  geometry(): GeometryType {
+  public geometry(): GeometryType {
     throw new Error(`Do not call 'geometry' on OsmChangeset`);
   }
 
@@ -97,7 +97,7 @@ export class OsmChangeset extends OsmEntity {
    * @see http://wiki.openstreetmap.org/wiki/OsmChange
    * @return JXON representation of an osmChange document
    */
-  osmChangeJXON(changes: OsmChanges): Record<string, unknown> {
+  public osmChangeJXON(changes: OsmChanges): Record<string, unknown> {
     const changesetID = this.props.id;
 
     function nest(arr: Record<string, any>[], order: string[]): Record<string, any[]> {

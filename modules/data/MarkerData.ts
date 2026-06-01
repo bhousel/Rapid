@@ -1,4 +1,5 @@
 import { AbstractData, AbstractDataProps } from './AbstractData.ts';
+
 import type { Context } from '../Context.ts';
 import type { GeoJSONObject } from '../lib/types.ts';
 import type { Vec2 } from '@rapid-sdk/math';
@@ -32,7 +33,7 @@ export class MarkerData<P extends MarkerProps = MarkerProps> extends AbstractDat
   // The constructor accepts `Partial<P>` for flexibility (e.g. tests),
   // but access sites can trust that required properties exist.
   // `declare` emits no JavaScript — it only refines the type.
-  declare props: P;
+  public declare props: P;
 
   /**
    * @constructor
@@ -41,7 +42,7 @@ export class MarkerData<P extends MarkerProps = MarkerProps> extends AbstractDat
    * @param otherOrContext - copy another data element, or pass application context
    * @param props - Properties to assign to the data element
    */
-  constructor(otherOrContext: MarkerData<P> | Context, props: Partial<P> = {}) {
+  public constructor(otherOrContext: MarkerData<P> | Context, props: Partial<P> = {}) {
     super(otherOrContext, props);
 
     if (!this.props.id) {  // no ID provided - generate one
@@ -58,7 +59,7 @@ export class MarkerData<P extends MarkerProps = MarkerProps> extends AbstractDat
    * Forces a recomputation of the internal geometry data.
    * @returns this same Marker
    */
-  updateGeometry(): this {
+  public updateGeometry(): this {
     this.geoms.setData(this.asGeoJSON());
     return this;
   }
@@ -68,7 +69,7 @@ export class MarkerData<P extends MarkerProps = MarkerProps> extends AbstractDat
    * Markers are represented by a Feature with a Point geometry.
    * @returns GeoJSON representation of the Marker
    */
-  asGeoJSON(): GeoJSONObject {
+  public asGeoJSON(): GeoJSONObject {
     let geometry: GeoJSON.Point | null = null;
 
     const coords = this.loc;
@@ -91,7 +92,7 @@ export class MarkerData<P extends MarkerProps = MarkerProps> extends AbstractDat
    * Markers should have a `loc` property to represent the location in WGS84 lat/lon
    * @readonly
    */
-  get loc(): Vec2 {
+  public get loc(): Vec2 {
     return this.props.loc;
   }
 
@@ -100,7 +101,7 @@ export class MarkerData<P extends MarkerProps = MarkerProps> extends AbstractDat
    * For example 'keepright', 'maproulette', 'mapillary', etc.
    * @readonly
    */
-  get serviceID(): ServiceID {
+  public get serviceID(): ServiceID {
     return this.props.serviceID;
   }
 
@@ -109,7 +110,7 @@ export class MarkerData<P extends MarkerProps = MarkerProps> extends AbstractDat
    * Instead we'll just set an isNew property for new markers.
    * @readonly
    */
-  get isNew(): boolean {
+  public get isNew(): boolean {
     return this.props.isNew ?? false;
   }
 

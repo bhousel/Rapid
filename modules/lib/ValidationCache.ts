@@ -1,22 +1,15 @@
 import RBush from 'rbush';
 
+import type { BBox } from 'rbush';
 import type { OsmEntity, OsmNode, OsmWay } from '../data/types.ts';
 import type { Graph } from './Graph.ts';
 import type { ValidationIssue } from './ValidationIssue.ts';
 
 
 /** Type for the spatial index box used in RBush */
-export interface RecheckBox {
+export interface RecheckBox extends BBox {
   /** Issue ID this box belongs to */
   issueID: IssueID;
-  /** Minimum X coordinate */
-  minX: number;
-  /** Minimum Y coordinate */
-  minY: number;
-  /** Maximum X coordinate */
-  maxX: number;
-  /** Maximum Y coordinate */
-  maxY: number;
 }
 
 
@@ -28,31 +21,31 @@ export interface RecheckBox {
  */
 export class ValidationCache {
   /** Identifier for this cache - 'base' or 'head' */
-  which: 'base' | 'head';
+  public which: 'base' | 'head';
   /** The graph being validated */
-  graph: Graph | null;
+  public graph: Graph | null;
   /** Queue of validation jobs to process */
-  queue: Array<(() => void)[]>;
+  public queue: Array<(() => void)[]>;
   /** Promise for the current queue processing */
-  queuePromise: Promise<void> | null;
+  public queuePromise: Promise<void> | null;
   /** Entity IDs that are currently queued for validation */
-  queuedEntityIDs: Set<EntityID>;
+  public queuedEntityIDs: Set<EntityID>;
   /** Entity IDs that returned provisional results and need revalidation */
-  provisionalEntityIDs: Set<EntityID>;
+  public provisionalEntityIDs: Set<EntityID>;
   /** Map of issue ID to ValidationIssue */
-  issues: Map<IssueID, ValidationIssue>;
+  public issues: Map<IssueID, ValidationIssue>;
   /** Map of entity ID to Set of issue IDs affecting that entity */
-  entityIssueIDs: Map<EntityID, Set<IssueID>>;
+  public entityIssueIDs: Map<EntityID, Set<IssueID>>;
   /** RBush spatial index for connectivity issues */
-  recheckRBush: RBush<RecheckBox>;
+  public recheckRBush: RBush<RecheckBox>;
   /** Map of issue ID to its spatial box */
-  recheckBoxes: Map<IssueID, RecheckBox>;
+  public recheckBoxes: Map<IssueID, RecheckBox>;
 
   /**
    * @constructor
    * @param which - 'base' or 'head' (to identify the cache)
    */
-  constructor(which: 'base' | 'head') {
+  public constructor(which: 'base' | 'head') {
     this.which = which;
     this.graph = null;
     this.queue = [];
@@ -74,7 +67,7 @@ export class ValidationCache {
    * Add an issue to the cache
    * @param issue - The ValidationIssue to cache
    */
-  cacheIssue(issue: ValidationIssue): void {
+  public cacheIssue(issue: ValidationIssue): void {
     if (this.issues.has(issue.id)) {
       this.uncacheIssue(issue);
     }
@@ -104,7 +97,7 @@ export class ValidationCache {
    * Remove an issue from the cache
    * @param issue - The ValidationIssue to remove
    */
-  uncacheIssue(issue: ValidationIssue): void {
+  public uncacheIssue(issue: ValidationIssue): void {
     const box = this.recheckBoxes.get(issue.id);
     if (box) {
       this.recheckRBush.remove(box);
@@ -128,7 +121,7 @@ export class ValidationCache {
    * Add multiple issues to the cache
    * @param issues - Array of ValidationIssues to cache
    */
-  cacheIssues(issues: ValidationIssue[] = []): void {
+  public cacheIssues(issues: ValidationIssue[] = []): void {
     for (const issue of issues) {
       this.cacheIssue(issue);
     }
@@ -139,7 +132,7 @@ export class ValidationCache {
    * Remove multiple issues from the cache
    * @param issues - Array of ValidationIssues to remove
    */
-  uncacheIssues(issues: ValidationIssue[] = []): void {
+  public uncacheIssues(issues: ValidationIssue[] = []): void {
     for (const issue of issues) {
       this.uncacheIssue(issue);
     }
@@ -150,7 +143,7 @@ export class ValidationCache {
    * Remove all issues of a specific type from the cache
    * @param type - The issue type to remove (e.g. 'unsquare_way')
    */
-  uncacheIssuesOfType(type: string): void {
+  public uncacheIssuesOfType(type: string): void {
     const issues = [...this.issues.values()];
     const issuesOfType = issues.filter(issue => issue.type === type);
     this.uncacheIssues(issuesOfType);
@@ -161,7 +154,7 @@ export class ValidationCache {
    * Remove a single entity and all its related issues from the caches
    * @param entityID - The entity ID to remove
    */
-  uncacheEntityID(entityID: EntityID): void {
+  public uncacheEntityID(entityID: EntityID): void {
     const issueIDs = this.entityIssueIDs.get(entityID) ?? [];
     for (const issueID of issueIDs) {
       const issue = this.issues.get(issueID);
@@ -184,7 +177,7 @@ export class ValidationCache {
    * @param entityIDs - Array or Set containing entityIDs
    * @return entityIDs related to the given entityIDs
    */
-  withAllRelatedEntities(entityIDs: Iterable<EntityID> = []): Set<EntityID> {
+  public withAllRelatedEntities(entityIDs: Iterable<EntityID> = []): Set<EntityID> {
     const graph = this.graph;
     const results = new Set<EntityID>(entityIDs);  // include original entityIDs
     if (!graph || !results.size) return results;   // nothing to do

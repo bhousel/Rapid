@@ -1,8 +1,8 @@
+import { AbstractSystem } from '../core/AbstractSystem.ts';
 import { utilQsString } from '@rapid-sdk/util';
 
-import { AbstractSystem } from '../core/AbstractSystem.ts';
-
 import type { Context } from '../Context.ts';
+
 
 /** Base URL template for the Wikipedia API — language code is substituted at call time */
 const WIKIPEDIA_API = 'https://en.wikipedia.org/w/api.php?';
@@ -14,11 +14,12 @@ const WIKIPEDIA_API = 'https://en.wikipedia.org/w/api.php?';
  */
 export class WikipediaService extends AbstractSystem {
 
+
   /**
    * @constructor
    * @param context - Global shared application context
    */
-  constructor(context: Context) {
+  public constructor(context: Context) {
     super(context);
     this.id = 'wikipedia';
     this.requiredDependencies = new Set<SystemID>(['network']);
@@ -29,7 +30,7 @@ export class WikipediaService extends AbstractSystem {
    * Called after all core objects have been constructed.
    * @return Promise resolved when this component has completed initialization
    */
-  initAsync(): Promise<void> {
+  public initAsync(): Promise<void> {
     return super.initAsync();
   }
 
@@ -38,7 +39,7 @@ export class WikipediaService extends AbstractSystem {
    * Called after all core objects have been initialized.
    * @return Promise resolved when this component has completed startup
    */
-  startAsync(): Promise<void> {
+  public startAsync(): Promise<void> {
     return super.startAsync();
   }
 
@@ -47,7 +48,7 @@ export class WikipediaService extends AbstractSystem {
    * Called after completing an edit session to reset any internal state
    * @return Promise resolved when this component has completed resetting
    */
-  resetAsync(): Promise<void> {
+  public resetAsync(): Promise<void> {
     return Promise.resolve();
   }
 
@@ -57,7 +58,7 @@ export class WikipediaService extends AbstractSystem {
    * @param query - string to search for
    * @param callback - errback-style callback function to call with results
    */
-  search(lang: string, query: string, callback: (err: any, results: string[]) => void): void {
+  public search(lang: string, query: string, callback: (err: any, results: string[]) => void): void {
     if (!query) {
       if (callback) callback('No Query', []);
       return;
@@ -99,7 +100,7 @@ export class WikipediaService extends AbstractSystem {
    * @param query - string to search for
    * @param callback - errback-style callback function to call with results
    */
-  suggestions(lang: string, query: string, callback: (err: any, results: string[]) => void): void {
+  public suggestions(lang: string, query: string, callback: (err: any, results: string[]) => void): void {
     if (!query) {
       if (callback) callback('', []);
       return;
@@ -137,7 +138,7 @@ export class WikipediaService extends AbstractSystem {
    * @param title - string to search for
    * @param callback - errback-style callback function to call with results
    */
-  translations(lang: string, title: string, callback: (err: any, translations?: Record<string, string>) => void): void {
+  public translations(lang: string, title: string, callback: (err: any, translations?: Record<string, string>) => void): void {
     if (!title) {
       if (callback) callback('No Title');
       return;

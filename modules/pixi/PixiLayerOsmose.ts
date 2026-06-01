@@ -1,10 +1,9 @@
-import type { Viewport } from '@rapid-sdk/math';
-
 import { AbstractPixiLayer } from './AbstractPixiLayer.ts';
 import { PixiFeaturePoint } from './PixiFeaturePoint.ts';
 
 import type { MatchedStyle } from '../core/StyleSystem.ts';
 import type { PixiScene } from './PixiScene.ts';
+import type { Viewport } from '@rapid-sdk/math';
 
 const MINZOOM = 12;
 
@@ -18,7 +17,7 @@ export class PixiLayerOsmose extends AbstractPixiLayer {
    * @constructor
    * @param  scene - The Scene that owns this Layer
    */
-  constructor(scene: PixiScene) {
+  public constructor(scene: PixiScene) {
     super(scene);
     this.id = 'osmose';
   }
@@ -27,7 +26,7 @@ export class PixiLayerOsmose extends AbstractPixiLayer {
   /**
    * Whether the Layer's service exists
    */
-  get supported() {
+  public get supported() {
     return !!this.context.services.osmose;
   }
 
@@ -36,10 +35,10 @@ export class PixiLayerOsmose extends AbstractPixiLayer {
    * Whether the user has chosen to see the Layer
    * Make sure to start the service first.
    */
-  get enabled() {
+  public get enabled() {
     return this._enabled;
   }
-  set enabled(val) {
+  public set enabled(val) {
     if (!this.supported) {
       val = false;
     }
@@ -60,7 +59,7 @@ export class PixiLayerOsmose extends AbstractPixiLayer {
   /**
    * Every Layer should have a reset function to replace any Pixi objects and internal state.
    */
-  reset() {
+  public reset() {
     super.reset();
   }
 
@@ -70,7 +69,7 @@ export class PixiLayerOsmose extends AbstractPixiLayer {
    * @param  frame    -  Integer frame being rendered
    * @param  viewport -  Pixi viewport to use for rendering
    */
-  render(frame: number, viewport: Viewport): void {
+  public render(frame: number, viewport: Viewport): void {
     const osmose = this.context.services.osmose;
     const viewZoom = viewport.transform.zoom;
     if (!this.enabled || !osmose?.started || viewZoom < MINZOOM) return;

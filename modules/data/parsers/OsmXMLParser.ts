@@ -67,13 +67,13 @@ import type { OsmTags } from '../types.ts';
  *  'bounds'         (returned with the `/map` API call)
  */
 export class OsmXMLParser {
-  _seen: Set<string>;
-  types: Set<ParserDataType>;
+  protected _seen: Set<string>;
+  public types: Set<ParserDataType>;
 
   /**
    * @constructor
    */
-  constructor() {
+  public constructor() {
     this._seen = new Set();   // Set<string>  (unique identifers)
 
     this._parseNode = this._parseNode.bind(this);
@@ -99,7 +99,7 @@ export class OsmXMLParser {
   /**
    * Call reset to clear the caches.
    */
-  reset(): void {
+  public reset(): void {
     this._seen.clear();
   }
 
@@ -111,7 +111,7 @@ export class OsmXMLParser {
    * @return  Result object containing the information parsed
    * @throws  Will throw if nothing could be parsed, or errors found
    */
-  parse(content: XmlDocument | string, options: Partial<ParserOptions> = {}): ParserResult {
+  public parse(content: XmlDocument | string, options: Partial<ParserOptions> = {}): ParserResult {
     if (!content)  {
       throw new Error('No content');
     }
@@ -226,7 +226,7 @@ export class OsmXMLParser {
    * @param   id  - the OSM nodeID (e.g. 'n1')
    * @return  Object of parsed properties
    */
-  _parseNode(xml: Element, id: string): ParsedNode {
+  protected _parseNode(xml: Element, id: string): ParsedNode {
     const attrs = getCleanAttributes(xml);
     const props: any = {
       type: 'node',
@@ -250,7 +250,7 @@ export class OsmXMLParser {
    * @param   id  - the OSM wayID (e.g. 'w1')
    * @return  Object of parsed properties
    */
-  _parseWay(xml: Element, id: string): ParsedWay {
+  protected _parseWay(xml: Element, id: string): ParsedWay {
     const attrs = getCleanAttributes(xml);
     const props: any = {
       type: 'way',
@@ -278,7 +278,7 @@ export class OsmXMLParser {
    * @param   id  - the OSM relationID (e.g. 'r1')
    * @return  Object of parsed properties
    */
-  _parseRelation(xml: Element, id: string): ParsedRelation {
+  protected _parseRelation(xml: Element, id: string): ParsedRelation {
     const attrs = getCleanAttributes(xml);
     const props: any = {
       type: 'relation',
@@ -315,7 +315,7 @@ export class OsmXMLParser {
    * @param   id  - the OSM changesetID (e.g. 'c1')
    * @return  Object of parsed properties
    */
-  _parseChangeset(xml: Element, id: string): ParsedChangeset {
+  protected _parseChangeset(xml: Element, id: string): ParsedChangeset {
     const attrs = getCleanAttributes(xml);
     const props: any = {
       type: 'changeset',
@@ -343,7 +343,7 @@ export class OsmXMLParser {
    * @param   xml - the DOM element
    * @return  Object of parsed properties
    */
-  _parseNote(xml: Element): ParsedNote {
+  protected _parseNote(xml: Element): ParsedNote {
     const attrs = getCleanAttributes(xml);
     const props: any = {
       type: 'note',
@@ -384,7 +384,7 @@ export class OsmXMLParser {
    * @param   xml - the DOM element
    * @return  Array of parsed comments
    */
-  _parseComments(xml: Element): ParsedComment[] {
+  protected _parseComments(xml: Element): ParsedComment[] {
     const results: ParsedComment[] = [];
 
     const comments = Array.from(xml.getElementsByTagName('comment'));
@@ -426,7 +426,7 @@ export class OsmXMLParser {
    * @param   xml - the DOM element
    * @return  Object of parsed properties
    */
-  _parseUser(xml: Element): ParsedUser {
+  protected _parseUser(xml: Element): ParsedUser {
     const props: any = { type: 'user' };
 
     const attrs = getCleanAttributes(xml);
@@ -511,7 +511,7 @@ export class OsmXMLParser {
    * @param   xml - the DOM element
    * @return  Object of parsed properties
    */
-  _parseUserBlock(xml: Element): ParsedUserBlock {
+  protected _parseUserBlock(xml: Element): ParsedUserBlock {
     const props: any = { type: 'user_block' };
 
     const attrs = getCleanAttributes(xml);
@@ -551,7 +551,7 @@ export class OsmXMLParser {
    * @param   xml - the DOM element
    * @return  Object of parsed properties
    */
-  _parsePreferences(xml: Element): ParsedPreferences {
+  protected _parsePreferences(xml: Element): ParsedPreferences {
     const props: ParsedPreferences = {
       type: 'preferences',
       preferences: {}
@@ -576,7 +576,7 @@ export class OsmXMLParser {
    * @param   xml - the DOM element
    * @return  Object of parsed properties
    */
-  _parseApi(xml: Element): ParsedApi {
+  protected _parseApi(xml: Element): ParsedApi {
     const props: any = { type: 'api' };
 
     for (const node of getChildNodes(xml)) {
@@ -593,7 +593,7 @@ export class OsmXMLParser {
    * @param   xml - the DOM element
    * @return  Object of parsed properties
    */
-  _parsePolicy(xml: Element): ParsedPolicy {
+  protected _parsePolicy(xml: Element): ParsedPolicy {
     const props: ParsedPolicy = { type: 'policy' };
 
     const imagery = xml.getElementsByTagName('imagery')[0];
@@ -621,7 +621,7 @@ export class OsmXMLParser {
    * @param   xml - the DOM element
    * @return  Object of parsed properties
    */
-  _parseBounds(xml: Element): ParsedBounds {
+  protected _parseBounds(xml: Element): ParsedBounds {
     return Object.assign({ type: 'bounds' } as ParsedBounds, getCleanAttributes(xml));
   }
 
@@ -631,7 +631,7 @@ export class OsmXMLParser {
    * @param   xml - the containing DOM element
    * @return  Object of tag k-v pairs
    */
-  _getTags(xml: Element): OsmTags {
+  protected _getTags(xml: Element): OsmTags {
     const elems = Array.from(xml.getElementsByTagName('tag'));
     const tags: OsmTags = {};
     for (const elem of elems) {

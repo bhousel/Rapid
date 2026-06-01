@@ -28,21 +28,23 @@ export interface DragNodeModeOptions {
  *  In `DragNodeMode` mode, the user has started dragging a point or vertex.
  */
 export class DragNodeMode extends AbstractMode {
+
   /** The node being dragged */
-  dragNode: OsmNode | null;
+  public dragNode: OsmNode | null;
 
   /** When finished dragging, restore the selected ids from before */
-  private _reselectIDs: EntityID[];
+  protected _reselectIDs: EntityID[];
   /** Used to set the correct edit annotation */
-  private _wasMidpoint: boolean;
+  protected _wasMidpoint: boolean;
   /** Difference between where the pin is, and where on the pin the user clicked */
-  private _dragOffset: Vec2;
+  protected _dragOffset: Vec2;
+
 
   /**
    * @constructor
    * @param  context - Global shared application context
    */
-  constructor(context: Context) {
+  public constructor(context: Context) {
     super(context);
     this.id = 'drag-node';
 
@@ -65,7 +67,7 @@ export class DragNodeMode extends AbstractMode {
    * @param  options - Optional options object
    * @return `true` if the mode can be entered, `false` if not
    */
-  enter(options: DragNodeModeOptions = {}): boolean {
+  public enter(options: DragNodeModeOptions = {}): boolean {
     const context = this.context;
     const editor = context.systems.editor!;
     const filters = context.systems.filters!;
@@ -145,7 +147,7 @@ export class DragNodeMode extends AbstractMode {
   /**
    * Exits the mode, clearing drawing classes and removing event listeners.
    */
-  exit(): void {
+  public exit(): void {
     if (!this._active) return;
     this._active = false;
 
@@ -175,7 +177,7 @@ export class DragNodeMode extends AbstractMode {
    *  Gets the latest version the drag node from the graph after any modifications.
    *  Updates `selectedData` collection to include the dragging node
    */
-  private _refreshEntities(): void {
+  protected _refreshEntities(): void {
     const context = this.context;
     const editor = context.systems.editor!;
     const graph = editor.staging.graph;
@@ -197,7 +199,7 @@ export class DragNodeMode extends AbstractMode {
    * Move the dragging node
    * @param  eventData - Data received from the drag behavior
    */
-  private _move(eventData: EventData): void {
+  protected _move(eventData: EventData): void {
     if (!this.dragNode) return;
 
     const context = this.context;
@@ -263,7 +265,7 @@ export class DragNodeMode extends AbstractMode {
    * We want to move the dragging node opposite of the pixels panned to keep it in the same place.
    * @param  nudge - [x,y] amount of map pan in pixels
    */
-  private _nudge(nudge: Vec2): void {
+  protected _nudge(nudge: Vec2): void {
     if (!this.dragNode) return;
 
     const context = this.context;
@@ -294,7 +296,7 @@ export class DragNodeMode extends AbstractMode {
    * This calls `commit` to finalize the staging edit.
    * @param  eventData - Data received from the drag behavior
    */
-  private _end(eventData: EventData): void {
+  protected _end(eventData: EventData): void {
     if (!this.dragNode) return;
 
     const context = this.context;
@@ -365,7 +367,7 @@ export class DragNodeMode extends AbstractMode {
    * Generate the annotation text for a move operation.
    * @return The localized annotation string, or undefined if dragNode is missing
    */
-  private _moveAnnotation(): string | undefined {
+  protected _moveAnnotation(): string | undefined {
     if (!this.dragNode) return undefined;
 
     const context = this.context;
@@ -384,7 +386,7 @@ export class DragNodeMode extends AbstractMode {
    * @param  target - The entity we are connecting the dragNode to
    * @return The localized annotation string, or undefined if dragNode/target is missing
    */
-  private _connectAnnotation(target: OsmEntity): string | undefined {
+  protected _connectAnnotation(target: OsmEntity): string | undefined {
     if (!this.dragNode || !target) return undefined;
 
     const context = this.context;
@@ -418,7 +420,7 @@ export class DragNodeMode extends AbstractMode {
    * @param  target - The entity we are considering snapping the node to
    * @return `true` if snapping is allowed, `false` otherwise
    */
-  private _canSnapToNode(target: OsmEntity): boolean {
+  protected _canSnapToNode(target: OsmEntity): boolean {
     if (!this.dragNode) return false;
 
     const context = this.context;
@@ -435,7 +437,7 @@ export class DragNodeMode extends AbstractMode {
    * Return to browse mode without doing anything
    * Note that `exit()` will be called immediately after this to perform cleanup.
    */
-  private _cancel(): void {
+  protected _cancel(): void {
     const context = this.context;
     const editor = context.systems.editor!;
 

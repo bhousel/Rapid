@@ -47,20 +47,22 @@ export interface GraphCache {
  *   `props`   Properties object
  */
 export class Graph {
-  id: GraphID;
-  context: Context;
-  props: GraphProps;
-  isBaseGraph: boolean;
-  previous: Graph | null;
-  base: GraphCache;
-  local: GraphCache;
+
+  public id: GraphID;
+  public context: Context;
+  public props: GraphProps;
+  public isBaseGraph: boolean;
+  public previous: Graph | null;
+  public base: GraphCache;
+  public local: GraphCache;
+
 
   /**
    * @constructor
    * @param  otherOrContext  - copy another Graph, or pass application context
    * @param  propsOrEntities - optional properties or base Entities to include in the graph.
    */
-  constructor(otherOrContext: Graph | Context, propsOrEntities: OsmEntity[] | Partial<GraphProps> = {}) {
+  public constructor(otherOrContext: Graph | Context, propsOrEntities: OsmEntity[] | Partial<GraphProps> = {}) {
     this.id = '';  // put this first so debug inspect shows it first
 
     // A Graph derived from a predecessor Graph
@@ -121,7 +123,7 @@ export class Graph {
    * Remove all saved state and free memory.
    * Do not use the Graph after calling `destroy()`.
    */
-  destroy(): void {
+  public destroy(): void {
     this.base = null!;
     this.local = null!;
     this.previous = null;
@@ -134,7 +136,7 @@ export class Graph {
    * Unique string to identify this Graph.
    * @readonly
    */
-  get graphID(): string {
+  public get graphID(): string {
     return this.id;
   }
 
@@ -142,7 +144,7 @@ export class Graph {
    * Internal version of the Graph, can be used to detect changes.
    * @readonly
    */
-  get v(): number {
+  public get v(): number {
     return this.props.v || 0;
   }
 
@@ -150,7 +152,7 @@ export class Graph {
    * The 'key' includes both the id and the version
    * @readonly
    */
-  get key(): string {
+  public get key(): string {
     return `${this.id}v${this.v}`;
   }
 
@@ -162,7 +164,7 @@ export class Graph {
    * @see Rapid@9ac2776a
    * @return   this Graph
    */
-  touch(): Graph {
+  public touch(): Graph {
     this.props.v = this.context.next('v');
     return this;
   }
@@ -173,7 +175,7 @@ export class Graph {
    * @param   entityID - The entityID to lookup
    * @return  OsmEntity from either local or base cache, or `undefined` if not found.
    */
-  hasEntity(entityID: EntityID): OsmEntity | undefined {
+  public hasEntity(entityID: EntityID): OsmEntity | undefined {
     const base = this.base.entities;
     const local = this.local.entities;
     return local.has(entityID) ? local.get(entityID) : base.get(entityID);
@@ -187,7 +189,7 @@ export class Graph {
    * @return  OsmEntity from either local or base cache
    * @throws  Will throw if the entity is not found
    */
-  entity(entityID: EntityID): OsmEntity {
+  public entity(entityID: EntityID): OsmEntity {
     const entity = this.hasEntity(entityID);
     if (!entity) {
       throw new Error(`OsmEntity ${entityID} not found`);
@@ -203,7 +205,7 @@ export class Graph {
    * @return  Array of parent Ways
    * @throws  Will throw if any parent Way is not found
    */
-  parentWays(entity: OsmEntity): OsmWay[] {
+  public parentWays(entity: OsmEntity): OsmWay[] {
     const base = this.base.parentWays;
     const local = this.local.parentWays;
     const parentIDs = local.get(entity.id) ?? base.get(entity.id) ?? new Set();
@@ -218,7 +220,7 @@ export class Graph {
    * @return  Array of parent Relations
    * @throws  Will throw if any parent Relation is not found
    */
-  parentRelations(entity: OsmEntity): OsmRelation[] {
+  public parentRelations(entity: OsmEntity): OsmRelation[] {
     const base = this.base.parentRels;
     const local = this.local.parentRels;
     const parentIDs = local.get(entity.id) ?? base.get(entity.id) ?? new Set();
@@ -232,7 +234,7 @@ export class Graph {
    * @param   entity - The OsmEntity to get childNodes for
    * @return  Array of child Nodes
    */
-  childNodes(entity: OsmWay): OsmNode[] {
+  public childNodes(entity: OsmWay): OsmNode[] {
     if (!entity.nodes) return [];  // not a way?
     return entity.nodes.map(nodeID => this.entity(nodeID) as OsmNode);
   }
@@ -244,7 +246,7 @@ export class Graph {
    * @return  this Graph
    * @throws  Will throw if called on a base graph
    */
-  replace(entities: OneOrMore<OsmEntity>): Graph {
+  public replace(entities: OneOrMore<OsmEntity>): Graph {
     if (this.isBaseGraph) {
       throw new Error(`Do not call 'replace' on a base graph`);
     }
@@ -268,7 +270,7 @@ export class Graph {
    * @return  this Graph
    * @throws  Will throw if called on a base graph
    */
-  remove(entities: OneOrMore<OsmEntity>): Graph {
+  public remove(entities: OneOrMore<OsmEntity>): Graph {
     if (this.isBaseGraph) {
       throw new Error(`Do not call 'remove' on a base graph`);
     }
@@ -292,7 +294,7 @@ export class Graph {
    * @return  this Graph
    * @throws  Will throw if called on a base graph
    */
-  revert(entityIDs: OneOrMore<EntityID>): Graph {
+  public revert(entityIDs: OneOrMore<EntityID>): Graph {
     if (this.isBaseGraph) {
       throw new Error(`Do not call 'revert' on a base graph`);
     }
@@ -313,7 +315,7 @@ export class Graph {
    * Updates any Entities affected by the work in progress
    * @return  this Graph
    */
-  commit(): Graph {
+  public commit(): Graph {
     // What changed between 'previous' and 'current'?
     const diff = new Difference(this.previous, this);
     const ids = [...diff.complete().keys()];
@@ -333,7 +335,7 @@ export class Graph {
    * (The `previous = null` helps avoid leaking memory, we don't need to reference the previous Graph).
    * @return  A new Graph
    */
-  snapshot(): Graph {
+  public snapshot(): Graph {
     const id = this.id + '-snapshot';
     const snapshot = new Graph(this, { id: id });
     snapshot.previous = null;
@@ -350,7 +352,7 @@ export class Graph {
    * @return  this Graph
    * @throws  Will throw if called on a base graph
    */
-  load(entities: Record<EntityID, OsmEntity | undefined> = {}): Graph {
+  public load(entities: Record<EntityID, OsmEntity | undefined> = {}): Graph {
     if (this.isBaseGraph) {
       throw new Error(`Do not call 'load' on a base graph`);
     }
@@ -388,7 +390,7 @@ export class Graph {
    * @param  force - If `true`, always update, if `false` skip Entities that we've seen already
    * @throws  Will throw if _not_ called on a base graph
    */
-  rebase(entities: OneOrMore<OsmEntity>, stack: Graph[] = [], force: boolean = false): void {
+  public rebase(entities: OneOrMore<OsmEntity>, stack: Graph[] = [], force: boolean = false): void {
 //    if (!this.isBaseGraph) {
 //      throw new Error(`Must call 'rebase' on a base graph`);
 //    }
@@ -434,7 +436,7 @@ export class Graph {
    * @param  current   - The current OsmEntity, may be undefined if delete
    * @param  caches    - which caches to update, defaults to the local caches
    */
-  _updateCaches(previous: OsmEntity | undefined, current: OsmEntity | undefined, caches?: GraphCache): void {
+  protected _updateCaches(previous: OsmEntity | undefined, current: OsmEntity | undefined, caches?: GraphCache): void {
     const base = this.base;
     const local = this.local;
     const which = caches ?? local;
@@ -489,7 +491,7 @@ export class Graph {
    * Check local `parentWays` and `parentRels` caches and make sure they are consistent
    *  with the data in the base caches.
    */
-  _updateRebased(restoreIDs: Set<EntityID> | EntityID[] = []): void {
+  protected _updateRebased(restoreIDs: Set<EntityID> | EntityID[] = []): void {
     const base = this.base;
     const local = this.local;
 
@@ -531,7 +533,7 @@ export class Graph {
    * Internal function, used to update OsmEntity geometries affected by recent graph changes.
    * This needs to be called after all `_updateCaches` calls have finished.
    */
-  _updateGeometries(entityIDs: Iterable<EntityID>): void {
+  protected _updateGeometries(entityIDs: Iterable<EntityID>): void {
     for (const entityID of entityIDs) {
       const entity = this.hasEntity(entityID);
       if (!entity) continue;                  // entity was deleted
@@ -544,7 +546,7 @@ export class Graph {
   /**
    * Internal function, compare function to sort nodes first.
    */
-  _nodesFirst(a: OsmEntity, b: OsmEntity): number {
+  protected _nodesFirst(a: OsmEntity, b: OsmEntity): number {
     const aIsNode = (a.type === 'node');
     const bIsNode = (b.type === 'node');
     return (aIsNode && !bIsNode) ? -1 : (!aIsNode && bIsNode) ? 1 : 0;

@@ -1,13 +1,12 @@
-import { geoMetersToOffset, geoOffsetToMeters } from '@rapid-sdk/math';
-import whichPolygon from 'which-polygon';
-
 import { AbstractSystem } from './AbstractSystem.ts';
+import { geoMetersToOffset, geoOffsetToMeters } from '@rapid-sdk/math';
 import {
   ImagerySource, ImagerySourceBing, ImagerySourceCustom,
   ImagerySourceEsri, ImagerySourceEsriWayback, ImagerySourceNone
 } from '../lib/ImagerySource.ts';
 import { utilExtractValues, utilWildcardDelete } from '../util/string.ts';
 import { utilIterable } from '../util/iterable.ts';
+import whichPolygon from 'which-polygon';
 
 import type { Context } from '../Context.ts';
 import type { ImagerySourceProps } from '../lib/ImagerySource.ts';
@@ -78,37 +77,38 @@ export interface ImageryScope {
  *   `imagerychange`   Fires on any change in imagery or display options
  */
 export class ImagerySystem extends AbstractSystem {
+
   /** Imagery geofences, keyed by ImagerySourceID (lowercase) */
-  features: Map<ImagerySourceID, GeoJSON.Feature>;
+  public features: Map<ImagerySourceID, GeoJSON.Feature>;
 
   /** Per-scope storage */
-  private _scopes: Map<ScopeID, ImageryScope>;
+  protected _scopes: Map<ScopeID, ImageryScope>;
 
   /** Default imagery file assetIDs */
-  private _defaultAssetIDs: Set<AssetID>;
+  protected _defaultAssetIDs: Set<AssetID>;
   /** Currently loaded imagery file assetIDs, maps to the version string that was loaded, if known */
-  private _loadedAssetIDs: Map<AssetID, string>;
+  protected _loadedAssetIDs: Map<AssetID, string>;
   /** Requested imagery file assetIDs - optional, these can be different than the default files */
-  private _requestedAssetIDs: Set<AssetID> | null;
+  protected _requestedAssetIDs: Set<AssetID> | null;
 
-  private _baseLayer: ImagerySource | null;
-  private _overlayLayers: Map<ImagerySourceID, ImagerySource>;
-  private _checkedBlocklists: string[];
-  private _isValid: boolean;  // todo, find a new way to check this, no d3 enter/update render anymore
-  private _whichPolygon: ReturnType<typeof whichPolygon> | null;
+  protected _baseLayer: ImagerySource | null;
+  protected _overlayLayers: Map<ImagerySourceID, ImagerySource>;
+  protected _checkedBlocklists: string[];
+  protected _isValid: boolean;  // todo, find a new way to check this, no d3 enter/update render anymore
+  protected _whichPolygon: ReturnType<typeof whichPolygon> | null;
 
-  private _brightness: number;
-  private _contrast: number;
-  private _saturation: number;
-  private _sharpness: number;
-  private _numGridSplits: number;
+  protected _brightness: number;
+  protected _contrast: number;
+  protected _saturation: number;
+  protected _sharpness: number;
+  protected _numGridSplits: number;
 
 
   /**
    * @constructor
    * @param context - Global shared application context
    */
-  constructor(context: Context) {
+  public constructor(context: Context) {
     super(context);
     this.id = 'imagery';
     this.requiredDependencies = new Set(['network']);
@@ -144,7 +144,7 @@ export class ImagerySystem extends AbstractSystem {
    * Called after all core objects have been constructed.
    * @return Promise resolved when this component has completed initialization
    */
-  initAsync(): Promise<void> {
+  public initAsync(): Promise<void> {
     if (this._initPromise) return this._initPromise;
 
     const context = this.context;
@@ -189,7 +189,7 @@ export class ImagerySystem extends AbstractSystem {
    * Called after all core objects have been initialized.
    * @return Promise resolved when this component has completed startup
    */
-  startAsync(): Promise<void> {
+  public startAsync(): Promise<void> {
     return super.startAsync();
   }
 
@@ -198,7 +198,7 @@ export class ImagerySystem extends AbstractSystem {
    * Called after completing an edit session to reset any internal state
    * @return Promise resolved when this component has completed resetting
    */
-  resetAsync(): Promise<void> {
+  public resetAsync(): Promise<void> {
     return Promise.resolve();
   }
 
@@ -206,7 +206,7 @@ export class ImagerySystem extends AbstractSystem {
   /**
    * @return Promise fulfilled when the imagery has been loaded
    */
-  loadImageryAssetsAsync(): Promise<void> {
+  public loadImageryAssetsAsync(): Promise<void> {
     const context = this.context;
     const assets = context.systems.assets;
 
@@ -256,7 +256,7 @@ export class ImagerySystem extends AbstractSystem {
   /**
    * This puts the ImagerySystem internal data back to its initial state, i.e. no imagery.
    */
-  resetAll(): void {
+  public resetAll(): void {
     const context = this.context;
     const storage = context.systems.storage;
 
@@ -290,7 +290,7 @@ export class ImagerySystem extends AbstractSystem {
    * @return  Aggregate map of all sources
    * @readonly
    */
-  get sources(): Map<ImagerySourceID, ImagerySource> {
+  public get sources(): Map<ImagerySourceID, ImagerySource> {
     const all = new Map<ImagerySourceID, ImagerySource>();
     for (const scope of this._scopes.values()) {
       for (const [id, source] of scope.sources) {
@@ -307,7 +307,7 @@ export class ImagerySystem extends AbstractSystem {
    * @param scopeID - ID of the scope to look up
    * @return The scope data
    */
-  getScope(scopeID: ScopeID): ImageryScope {
+  public getScope(scopeID: ScopeID): ImageryScope {
     let scope = this._scopes.get(scopeID);
     if (!scope) {
       scope = { sources: new Map() };
@@ -322,7 +322,7 @@ export class ImagerySystem extends AbstractSystem {
    * @return  Default assetIDs
    * @readonly
    */
-  get defaultAssetIDs(): Set<AssetID> {
+  public get defaultAssetIDs(): Set<AssetID> {
     return this._defaultAssetIDs;
   }
 
@@ -331,7 +331,7 @@ export class ImagerySystem extends AbstractSystem {
    * @return  Loaded assetIDs
    * @readonly
    */
-  get loadedAssetIDs(): Map<AssetID, string> {
+  public get loadedAssetIDs(): Map<AssetID, string> {
     return this._loadedAssetIDs;
   }
 
@@ -349,7 +349,7 @@ export class ImagerySystem extends AbstractSystem {
    *   and subsequent calls to `loadImageryAssetsAsync` will use the `defaultAssetIDs` Set.
    * @param vals - A `string`, `Array<string>` or `Set<string>` of assetIDs to load (or `null` to disable)
    */
-  set requestedAssetIDs(vals: OneOrMore<AssetID> | null) {
+  public set requestedAssetIDs(vals: OneOrMore<AssetID> | null) {
     if (vals === null || vals === undefined) {
       this._requestedAssetIDs = null;
       return;
@@ -367,7 +367,7 @@ export class ImagerySystem extends AbstractSystem {
       }
     }
   }
-  get requestedAssetIDs(): Set<AssetID> | null {
+  public get requestedAssetIDs(): Set<AssetID> | null {
     return this._requestedAssetIDs;
   }
 
@@ -396,7 +396,7 @@ export class ImagerySystem extends AbstractSystem {
    * @param input - imagery data to merge
    * @throws Will throw if given data does not contain an `assetID`, or if the `assetID` has already been merged
    */
-  merge(input: ImageryInput): void {
+  public merge(input: ImageryInput): void {
     const context = this.context;
     const wayback = context.services.wayback;
 
@@ -465,7 +465,7 @@ export class ImagerySystem extends AbstractSystem {
    * @param sourceID - a source id
    * @return The ImagerySource, or `undefined` if not found
    */
-  source(sourceID?: ImagerySourceID): ImagerySource | undefined {
+  public source(sourceID?: ImagerySourceID): ImagerySource | undefined {
     if (!sourceID) return undefined;
     return this._findSource(sourceID.toLowerCase());
   }
@@ -476,7 +476,7 @@ export class ImagerySystem extends AbstractSystem {
    * We return the English name of any active imagery layers, it will be included in the user's changeset.
    * @return Array of the names of imagery layers currently visible
    */
-  imageryUsed(): string[] {
+  public imageryUsed(): string[] {
     const results = new Set<string>();
 
     // Gather info about enabled base imagery
@@ -501,7 +501,7 @@ export class ImagerySystem extends AbstractSystem {
    * Returns array of known imagery sources that are valid at the given extent and zoom
    * @return Visible imagery sources
    */
-  visibleSources(): ImagerySource[] {
+  public visibleSources(): ImagerySource[] {
     if (!this.sources.size || !this._whichPolygon) return [];   // called too soon?
 
     const context = this.context;
@@ -545,7 +545,7 @@ export class ImagerySystem extends AbstractSystem {
    * @param source - optional ImagerySource to set as base layer
    * @return The current base layer source when getting, or `this` when setting
    */
-  baseLayerSource(source?: ImagerySource): ImagerySource | null | this {
+  public baseLayerSource(source?: ImagerySource): ImagerySource | null | this {
     if (!arguments.length) return this._baseLayer;
 
     // test source against OSM imagery blocklists..
@@ -582,7 +582,7 @@ export class ImagerySystem extends AbstractSystem {
    * this tries several options to pick an appropriate imagery to use.
    * @return The chosen default ImagerySource
    */
-  chooseDefaultSource(): ImagerySource {
+  public chooseDefaultSource(): ImagerySource {
     const context = this.context;
     const storage = context.systems.storage;
 
@@ -607,7 +607,7 @@ export class ImagerySystem extends AbstractSystem {
    * @param sourceID - The sourceID to get
    * @return The `ImagerySource` with the given ID, or `undefined` if not found
    */
-  getSourceByID(sourceID: ImagerySourceID = ''): ImagerySource | undefined {
+  public getSourceByID(sourceID: ImagerySourceID = ''): ImagerySource | undefined {
     if (/^EsriWayback/i.test(sourceID)) {   // ignore start date, if any
       sourceID = 'EsriWayback';
     }
@@ -620,7 +620,7 @@ export class ImagerySystem extends AbstractSystem {
    * This function will correctly handle IDs like `EsriWayback_<DATE>`.
    * @param sourceID - The sourceID to activate
    */
-  setSourceByID(sourceID: ImagerySourceID = ''): void {
+  public setSourceByID(sourceID: ImagerySourceID = ''): void {
     let date: string | undefined;
     const match = sourceID.match(/^EsriWayback\_?(.*)$/i);   // get start date, if any
     if (match) {
@@ -643,7 +643,7 @@ export class ImagerySystem extends AbstractSystem {
    * @param source - The imagery source to check
    * @return `true` if the source is currently visible
    */
-  showsLayer(source?: ImagerySource): boolean {
+  public showsLayer(source?: ImagerySource): boolean {
     const currSource = this._baseLayer;
     if (!source || !currSource) return false;
     return source.id === currSource.id || this._overlayLayers.has(source.id);
@@ -654,7 +654,7 @@ export class ImagerySystem extends AbstractSystem {
    * Returns the current overlay imagery sources
    * @return Array of overlay ImagerySource objects
    */
-  overlayLayerSources(): ImagerySource[] {
+  public overlayLayerSources(): ImagerySource[] {
     return [...this._overlayLayers.values()];
   }
 
@@ -663,7 +663,7 @@ export class ImagerySystem extends AbstractSystem {
    * Toggles an overlay layer on or off
    * @param source - The imagery source to toggle
    */
-  toggleOverlayLayer(source: ImagerySource): void {
+  public toggleOverlayLayer(source: ImagerySource): void {
     if (this._overlayLayers.has(source.id)) {
       this._overlayLayers.delete(source.id);
     } else {
@@ -678,7 +678,7 @@ export class ImagerySystem extends AbstractSystem {
    * ignoring the "locator overlay"
    * @param enableIDs - Iterable Set or Array of sourceIDs to enable
    */
-  enableOverlayLayers(enableIDs: Iterable<ImagerySourceID>): void {
+  public enableOverlayLayers(enableIDs: Iterable<ImagerySourceID>): void {
     for (const [sourceID, source] of this._overlayLayers) {
       if (source.isLocatorOverlay()) continue;  // ignore this one
       this._overlayLayers.delete(sourceID);     // remove all others
@@ -700,7 +700,7 @@ export class ImagerySystem extends AbstractSystem {
    * @param delta - pixels to nudge, as [dx, dy]
    * @param _zoom - the current zoom (unused, obtained from viewport)
    */
-  nudge(delta: Vec2, _zoom?: number): void {
+  public nudge(delta: Vec2, _zoom?: number): void {
     if (this._baseLayer) {
       const zoom = this.context.viewport.transform.zoom;
       this._baseLayer.nudge(delta, zoom);
@@ -712,14 +712,14 @@ export class ImagerySystem extends AbstractSystem {
   /**
    * Gets the current imagery offset in pixels [x, y]
    */
-  get offset(): Vec2 {
+  public get offset(): Vec2 {
     return this._baseLayer?.offset ?? [0, 0];
   }
 
   /**
    * Sets the imagery offset in pixels [x, y]
    */
-  set offset([setX, setY]: Vec2) {
+  public set offset([setX, setY]: Vec2) {
     const [currX, currY] = this._baseLayer?.offset ?? [0, 0];
     if (setX === currX && setY === currY) return;  // no change
 
@@ -732,14 +732,14 @@ export class ImagerySystem extends AbstractSystem {
   /**
    * Gets the current brightness value (default 1)
    */
-  get brightness(): number {
+  public get brightness(): number {
     return this._brightness;
   }
 
   /**
    * Sets the brightness value
    */
-  set brightness(val: number) {
+  public set brightness(val: number) {
     if (val === this._brightness) return;  // no change
     this._brightness = val;
 
@@ -752,14 +752,14 @@ export class ImagerySystem extends AbstractSystem {
   /**
    * Gets the current contrast value (default 1)
    */
-  get contrast(): number {
+  public get contrast(): number {
     return this._contrast;
   }
 
   /**
    * Sets the contrast value
    */
-  set contrast(val: number) {
+  public set contrast(val: number) {
     if (val === this._contrast) return;  // no change
     this._contrast = val;
 
@@ -772,14 +772,14 @@ export class ImagerySystem extends AbstractSystem {
   /**
    * Gets the current saturation value (default 1)
    */
-  get saturation(): number {
+  public get saturation(): number {
     return this._saturation;
   }
 
   /**
    * Sets the saturation value
    */
-  set saturation(val: number) {
+  public set saturation(val: number) {
     if (val === this._saturation) return;  // no change
     this._saturation = val;
 
@@ -792,14 +792,14 @@ export class ImagerySystem extends AbstractSystem {
   /**
    * Gets the current sharpness value (default 1)
    */
-  get sharpness(): number {
+  public get sharpness(): number {
     return this._sharpness;
   }
 
   /**
    * Sets the sharpness value
    */
-  set sharpness(val: number) {
+  public set sharpness(val: number) {
     if (val === this._sharpness) return;  // no change
     this._sharpness = val;
 
@@ -812,14 +812,14 @@ export class ImagerySystem extends AbstractSystem {
   /**
    * Gets the current number of grid splits (default 0)
    */
-  get numGridSplits(): number {
+  public get numGridSplits(): number {
     return this._numGridSplits;
   }
 
   /**
    * Sets the number of grid splits
    */
-  set numGridSplits(val: number) {
+  public set numGridSplits(val: number) {
     if (val === this._numGridSplits) return;  // no change
     this._numGridSplits = val;
     this._imageryChanged();
@@ -830,7 +830,7 @@ export class ImagerySystem extends AbstractSystem {
    * Reset all sources and rebuild the whichPolygon spatial index.
    * This should be called after merging new imagery data.
    */
-  private _rebuildIndex(): void {
+  protected _rebuildIndex(): void {
     // Reset and localize the ImagerySources
     for (const scope of this._scopes.values()) {
       for (const source of scope.sources.values()) {
@@ -855,7 +855,7 @@ export class ImagerySystem extends AbstractSystem {
    * @param currParams - The current hash parameters
    * @param prevParams - The previous hash parameters
    */
-  private _hashChanged(currParams: Map<string, string>, prevParams: Map<string, string>): void {
+  protected _hashChanged(currParams: Map<string, string>, prevParams: Map<string, string>): void {
     let loadPromise = Promise.resolve();
 
     // imagery
@@ -911,7 +911,7 @@ export class ImagerySystem extends AbstractSystem {
    * Called whenever the imagery changes.
    * This will update the urlhash, trigger a redraw, and emit an 'imagerychange' event.
    */
-  private _imageryChanged(): void {
+  protected _imageryChanged(): void {
     const context = this.context;
     const gfx = context.systems.gfx;
     const urlhash = context.systems.urlhash;
@@ -953,7 +953,7 @@ export class ImagerySystem extends AbstractSystem {
    * These are cached, so switching back to an already-seen locale should be fast.
    * @param localeCode - optional new locale code (fallback to getting it from LocalizationSystem, or en-US)
    */
-  private _localeChanged(localeCode?: string): void {
+  protected _localeChanged(localeCode?: string): void {
     const l10n = this.context.systems.l10n;
 
     // Ensure that we have a current locale code.
@@ -973,7 +973,7 @@ export class ImagerySystem extends AbstractSystem {
    * @param sourceKey - Lowercase source key to find
    * @return The ImagerySource, or `undefined` if not found in any scope
    */
-  private _findSource(sourceKey: ImagerySourceID): ImagerySource | undefined {
+  protected _findSource(sourceKey: ImagerySourceID): ImagerySource | undefined {
     for (const scope of this._scopes.values()) {
       const source = scope.sources.get(sourceKey);
       if (source) return source;

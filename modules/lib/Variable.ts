@@ -52,14 +52,15 @@ export interface VariableProps {
  * @module
  */
 export class Variable {
-  context: Context;
-  props: VariableProps;
+
+  public context: Context;
+  public props: VariableProps;
 
   /** Unique identifier */
-  readonly id: VariableID;
+  public readonly id: VariableID;
 
   /** Cached Set for O(1) lookups (compiled from array values) */
-  private _set: Set<string | number> | null;
+  protected _set: Set<string | number> | null;
 
 
   /**
@@ -69,7 +70,7 @@ export class Variable {
    * @throws Error if `id` property is missing
    * @throws Error if `value` property is missing
    */
-  constructor(context: Context, props: Partial<VariableProps> = {}) {
+  public constructor(context: Context, props: Partial<VariableProps> = {}) {
     this.context = context;
 
     if (!props.id) {
@@ -89,7 +90,7 @@ export class Variable {
   /**
    * The variable's value.
    */
-  get value(): VariableValue {
+  public get value(): VariableValue {
     return this.props.value;
   }
 
@@ -100,7 +101,7 @@ export class Variable {
    * The Set is cached after first creation.
    * @return Set of the variable's values
    */
-  asSet(): Set<string | number> {
+  public asSet(): Set<string | number> {
     if (this._set) return this._set;
 
     const val = this.props.value;
@@ -118,7 +119,7 @@ export class Variable {
    * For scalar values, returns a single-element array.
    * @return Array of the variable's values
    */
-  asArray(): string[] | number[] {
+  public asArray(): string[] | number[] {
     const val = this.props.value;
     if (Array.isArray(val)) return val;
     return [val] as string[] | number[];
@@ -128,7 +129,7 @@ export class Variable {
   /**
    * Convert to a JSON-serializable object.
    */
-  toJSON(): VariableProps {
+  public toJSON(): VariableProps {
     return structuredClone(this.props);
   }
 
@@ -136,7 +137,7 @@ export class Variable {
   /**
    * String representation for debugging.
    */
-  toString(): string {
+  public toString(): string {
     const val = this.props.value;
     if (Array.isArray(val)) {
       return `Variable(${this.id}, [${val.length} items])`;

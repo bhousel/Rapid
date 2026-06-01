@@ -2,8 +2,8 @@ import { AbstractMode } from './AbstractMode.ts';
 import { actionAddEntity } from '../actions/add_entity.ts';
 import { actionChangeTags } from '../actions/change_tags.ts';
 import { actionAddMidpoint } from '../actions/add_midpoint.ts';
-import { projWorldToWgs84, vecProject, WORLD_ZOOM } from '@rapid-sdk/math';
 import { OsmNode } from '../data/OsmNode.ts';
+import { projWorldToWgs84, vecProject, WORLD_ZOOM } from '@rapid-sdk/math';
 
 import type { Context } from '../Context.ts';
 import type { EventData } from '../behaviors/AbstractBehavior.ts';
@@ -18,13 +18,15 @@ const DEBUG = false;
  * In `AddPointMode`, we are waiting for the user to place a point somewhere
  */
 export class AddPointMode extends AbstractMode {
-  defaultTags: OsmTags;
+
+  public defaultTags: OsmTags;
+
 
   /**
    * @constructor
    * @param  context - Global shared application context
    */
-  constructor(context: Context) {
+  public constructor(context: Context) {
     super(context);
     this.id = 'add-point';
 
@@ -40,7 +42,7 @@ export class AddPointMode extends AbstractMode {
    * Enters the mode.
    * @return `true` if mode could be entered, `false` if not
    */
-  enter(): boolean {
+  public enter(): boolean {
     if (DEBUG) {
       console.log('AddPointMode: entering');  // eslint-disable-line no-console
     }
@@ -64,7 +66,7 @@ export class AddPointMode extends AbstractMode {
   /**
    * Exits the mode, removing event listeners and resetting cursor.
    */
-  exit(): void {
+  public exit(): void {
     if (!this._active) return;
     this._active = false;
 
@@ -87,7 +89,7 @@ export class AddPointMode extends AbstractMode {
   /**
    * Process whatever the user clicked on
    */
-  private _click(eventData: EventData): void {
+  protected _click(eventData: EventData): void {
     const context = this.context;
     const editor = context.systems.editor;
     const graph = editor!.staging.graph;
@@ -134,7 +136,7 @@ export class AddPointMode extends AbstractMode {
   /**
    * Clicked on nothing, create the point at given `loc`
    */
-  private _clickNothing(loc: Vec2): void {
+  protected _clickNothing(loc: Vec2): void {
     const context = this.context;
     const editor = context.systems.editor!;
     const l10n = context.systems.l10n!;
@@ -150,7 +152,7 @@ export class AddPointMode extends AbstractMode {
   /**
    * Clicked on an existing way, add a midpoint along the `edge` at given `loc`
    */
-  private _clickWay(loc: Vec2, edge: [EntityID, EntityID]): void {
+  protected _clickWay(loc: Vec2, edge: [EntityID, EntityID]): void {
     const context = this.context;
     const editor = context.systems.editor!;
     const l10n = context.systems.l10n!;
@@ -165,7 +167,7 @@ export class AddPointMode extends AbstractMode {
   /**
    * Clicked on an existing node, merge `defaultTags` into it, if any, then select the node
    */
-  private _clickNode(_loc: Vec2, node: OsmNode): void {
+  protected _clickNode(_loc: Vec2, node: OsmNode): void {
     const context = this.context;
     const editor = context.systems.editor!;
     const l10n = context.systems.l10n!;
@@ -189,7 +191,7 @@ export class AddPointMode extends AbstractMode {
   /**
    * Return to browse mode without doing anything
    */
-  private _cancel(): void {
+  protected _cancel(): void {
     this.context.enter('browse');
   }
 }

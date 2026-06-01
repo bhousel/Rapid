@@ -1,7 +1,6 @@
-import { projWgs84ToWorld, vecSubtract } from '@rapid-sdk/math';
-
 import { AbstractMode } from './AbstractMode.ts';
 import { actionMove } from '../actions/move.ts';
+import { projWgs84ToWorld, vecSubtract } from '@rapid-sdk/math';
 
 import type { Context } from '../Context.ts';
 import type { MoveCache } from '../actions/move.ts';
@@ -20,18 +19,20 @@ export interface MoveModeOptions {
  * In `MoveMode`, we are moving one or more map features.
  */
 export class MoveMode extends AbstractMode {
+
   /** Entity IDs being moved */
-  private _entityIDs: EntityID[];
+  protected _entityIDs: EntityID[];
   /** Starting location of the move operation */
-  private _startLoc: Vec2 | null;
+  protected _startLoc: Vec2 | null;
   /** Cache used by the move action */
-  private _movementCache: Partial<MoveCache> | null;
+  protected _movementCache: Partial<MoveCache> | null;
+
 
   /**
    * @constructor
    * @param  context - Global shared application context
    */
-  constructor(context: Context) {
+  public constructor(context: Context) {
     super(context);
     this.id = 'move';
 
@@ -52,7 +53,7 @@ export class MoveMode extends AbstractMode {
    * @param  options - Optional options object
    * @return `true` if the mode can be entered, `false` if not
    */
-  enter(options: MoveModeOptions = {}): boolean {
+  public enter(options: MoveModeOptions = {}): boolean {
     const context = this.context;
     const editor = context.systems.editor!;
     const gfx = context.systems.gfx!;
@@ -106,7 +107,7 @@ export class MoveMode extends AbstractMode {
    * Exits the mode, committing any pending move operation.
    * Removes event listeners and clears state.
    */
-  exit(): void {
+  public exit(): void {
     if (!this._active) return;
     this._active = false;
 
@@ -151,7 +152,7 @@ export class MoveMode extends AbstractMode {
    * Handles Enter to finish, Escape/Delete to cancel, and R to switch to rotate mode.
    * @param  e - A DOM KeyboardEvent
    */
-  private _keydown(e: KeyboardEvent): void {
+  protected _keydown(e: KeyboardEvent): void {
     if (['Enter'].includes(e.key)) {
       e.preventDefault();
       this._finish();
@@ -171,7 +172,7 @@ export class MoveMode extends AbstractMode {
    * Handler for pointermove events.
    * Calculates the delta from the start location and moves all selected entities.
    */
-  private _pointermove(): void {
+  protected _pointermove(): void {
     const context = this.context;
     const editor = context.systems.editor!;
     const locations = context.systems.locations;
@@ -202,7 +203,7 @@ export class MoveMode extends AbstractMode {
   /**
    * Return to select mode - `exit()` will finalize the work in progress.
    */
-  private _finish(): void {
+  protected _finish(): void {
     this.context.enter('select-osm', { selection: { osm: this._entityIDs }} );
   }
 
@@ -210,7 +211,7 @@ export class MoveMode extends AbstractMode {
   /**
    * Return to select mode without doing anything
    */
-  private _cancel(): void {
+  protected _cancel(): void {
     const context = this.context;
     const editor = context.systems.editor!;
 

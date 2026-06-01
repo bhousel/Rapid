@@ -1,11 +1,10 @@
-import { utilArrayUnion, utilArrayUniq } from '@rapid-sdk/util';
-
 import { AbstractSystem } from './AbstractSystem.ts';
 import { actionDiscardTags } from '../actions/discard_tags.ts';
 import { actionMergeRemoteChanges } from '../actions/merge_remote_changes.ts';
 import { actionRevert } from '../actions/revert.ts';
 import { createOsmEntity } from '../data/index.ts';
 import { Graph } from '../lib/Graph.ts';
+import { utilArrayUnion, utilArrayUniq } from '@rapid-sdk/util';
 
 import type { Context } from '../Context.ts';
 import type { OsmChangeset } from '../data/OsmChangeset.ts';
@@ -73,27 +72,29 @@ export interface UploadChanges {
  *   'resultSuccess'     // upload completed without errors
  */
 export class UploaderSystem extends AbstractSystem {
-  /** The current changeset being uploaded (created by uiCommit) */
-  changeset: OsmChangeset | null;
 
-  private _origChanges: UploadChanges | null;
-  private _discardTags: Record<string, boolean>;
-  private _isSaving: boolean;
+  /** The current changeset being uploaded (created by uiCommit) */
+  public changeset: OsmChangeset | null;
+
+  protected _origChanges: UploadChanges | null;
+  protected _discardTags: Record<string, boolean>;
+  protected _isSaving: boolean;
 
   // Variables for conflict checking
-  private _localGraph: Graph | null;
-  private _remoteGraph: Graph | null;
-  private _toCheckIDs: Set<EntityID>;
-  private _toLoadIDs: Set<EntityID>;
-  private _loadedIDs: Set<EntityID>;
-  private _conflicts: UploadConflict[];
-  private _errors: UploadError[];
+  protected _localGraph: Graph | null;
+  protected _remoteGraph: Graph | null;
+  protected _toCheckIDs: Set<EntityID>;
+  protected _toLoadIDs: Set<EntityID>;
+  protected _loadedIDs: Set<EntityID>;
+  protected _conflicts: UploadConflict[];
+  protected _errors: UploadError[];
+
 
   /**
    * @constructor
    * @param context - Global shared application context
    */
-  constructor(context: Context) {
+  public constructor(context: Context) {
     super(context);
     this.id = 'uploader';
     this.requiredDependencies = new Set(['editor', 'l10n']);
@@ -124,7 +125,7 @@ export class UploaderSystem extends AbstractSystem {
    * Called after all core objects have been constructed.
    * @return  Promise resolved when this component has completed initialization
    */
-  initAsync(): Promise<void> {
+  public initAsync(): Promise<void> {
     if (this._initPromise) return this._initPromise;
 
     const context = this.context;
@@ -154,7 +155,7 @@ export class UploaderSystem extends AbstractSystem {
    * Called after all core objects have been initialized.
    * @return  Promise resolved when this component has completed startup
    */
-  startAsync(): Promise<void> {
+  public startAsync(): Promise<void> {
     return super.startAsync();
   }
 
@@ -163,7 +164,7 @@ export class UploaderSystem extends AbstractSystem {
    * Called after completing an edit session to reset any internal state
    * @return  Promise resolved when this component has completed resetting
    */
-  resetAsync(): Promise<void> {
+  public resetAsync(): Promise<void> {
     this.changeset = null;
     return Promise.resolve();
   }
@@ -172,7 +173,7 @@ export class UploaderSystem extends AbstractSystem {
   /**
    * @return `true` if a save operation is in progress, `false` otherwise
    */
-  isSaving(): boolean {
+  public isSaving(): boolean {
     return this._isSaving;
   }
 
@@ -182,7 +183,7 @@ export class UploaderSystem extends AbstractSystem {
    * @param tryAgain - Whether this is a retry attempt after a conflict
    * @param checkConflicts - Whether to check for conflicts before uploading
    */
-  save(tryAgain?: boolean, checkConflicts?: boolean): void {
+  public save(tryAgain?: boolean, checkConflicts?: boolean): void {
     // Guard against accidentally entering save code twice - iD#4641
     if (this._isSaving && !tryAgain) return;
 
@@ -231,7 +232,7 @@ export class UploaderSystem extends AbstractSystem {
   /**
    * Start the conflict checking process before upload
    */
-  private _startConflictCheck(): void {
+  protected _startConflictCheck(): void {
     const context = this.context;
     const osm = context.services.osm as any;
     const editor = context.systems.editor!;
@@ -279,7 +280,7 @@ export class UploaderSystem extends AbstractSystem {
    * @param  err - Error returned by the `loadMultipleAsync` call
    * @param  results - Data returned by the `loadMultipleAsync` call
    */
-  private _loadedSome(err: any, results?: any): void {
+  protected _loadedSome(err: any, results?: any): void {
     if (this._errors.length) return;   // give up if there are errors
 
     const l10n = this.context.systems.l10n!;
@@ -343,7 +344,7 @@ export class UploaderSystem extends AbstractSystem {
   /**
    * Test everything in `_toCheckIDs` for conflicts
    */
-  private _detectConflicts(): void {
+  protected _detectConflicts(): void {
     const context = this.context;
     const l10n = context.systems.l10n!;
     const editor = context.systems.editor!;
@@ -435,7 +436,7 @@ export class UploaderSystem extends AbstractSystem {
    * This is called when we are ready to attempt a changeset upload.
    * If conflicts or errors exist, present them to the user instead.
    */
-  private _tryUpload(): void {
+  protected _tryUpload(): void {
     const context = this.context;
     const osm = context.services.osm as any;
     if (!osm) {
@@ -468,7 +469,7 @@ export class UploaderSystem extends AbstractSystem {
   /**
    * Callback for the changeset upload attempt
    */
-  private _uploadCallback(err: any, updatedChangeset?: any): void {
+  protected _uploadCallback(err: any, updatedChangeset?: any): void {
     if (updatedChangeset) {
       this.changeset = updatedChangeset;  // it may have a changeset id now
     }
@@ -494,7 +495,7 @@ export class UploaderSystem extends AbstractSystem {
   /**
    * Called when there were no changes to upload
    */
-  private _didResultInNoChanges(): void {
+  protected _didResultInNoChanges(): void {
     this.emit('resultNoChanges');
     this._endSave();
   }
@@ -503,7 +504,7 @@ export class UploaderSystem extends AbstractSystem {
   /**
    * Called when the upload failed due to errors
    */
-  private _didResultInErrors(): void {
+  protected _didResultInErrors(): void {
     // this.context.systems.editor.pop();
     const editor = this.context.systems.editor!;
     editor.revert();
@@ -515,7 +516,7 @@ export class UploaderSystem extends AbstractSystem {
   /**
    * Called when the upload failed due to data conflicts
    */
-  private _didResultInConflicts(): void {
+  protected _didResultInConflicts(): void {
     this._conflicts.sort((a, b) => b.id.localeCompare(a.id));
     this.emit('resultConflicts', this.changeset, this._conflicts, this._origChanges);
     this._endSave();
@@ -525,7 +526,7 @@ export class UploaderSystem extends AbstractSystem {
   /**
    * Called when the upload completed successfully
    */
-  private _didResultInSuccess(): void {
+  protected _didResultInSuccess(): void {
     this.emit('resultSuccess', this.changeset);
     this._endSave();
   }
@@ -534,7 +535,7 @@ export class UploaderSystem extends AbstractSystem {
   /**
    * Called to clean up after a save attempt
    */
-  private _endSave(): void {
+  protected _endSave(): void {
     this._isSaving = false;
     this.emit('saveEnded');
   }
@@ -543,7 +544,7 @@ export class UploaderSystem extends AbstractSystem {
   /**
    * Cancel the conflict resolution process and revert changes
    */
-  cancelConflictResolution(): void {
+  public cancelConflictResolution(): void {
     // this.context.systems.editor.pop();
     const editor = this.context.systems.editor!;
     editor.revert();
@@ -553,7 +554,7 @@ export class UploaderSystem extends AbstractSystem {
   /**
    * Process conflicts that have been resolved by the user and retry the upload
    */
-  processResolvedConflicts(): void {
+  public processResolvedConflicts(): void {
     const editor = this.context.systems.editor!;
 
     for (const conflict of this._conflicts) {

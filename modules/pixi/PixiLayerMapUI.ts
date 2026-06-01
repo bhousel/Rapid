@@ -21,25 +21,25 @@ import type { Viewport, Vec2 } from '@rapid-sdk/math';
  * @class
  */
 export class PixiLayerMapUI extends AbstractPixiLayer {
-  private _oldz: number;
-  private _geolocationData: GeolocationCoordinates | null;
-  private _geolocationDirty: boolean;
-  private _lassoData: Vec2[] | null;
-  private _lassoDirty: boolean;
-  private _lassoLine: PIXI.Graphics | null;
-  private _lassoFill: PIXI.Graphics | null;
+  protected _oldz: number;
+  protected _geolocationData: GeolocationCoordinates | null;
+  protected _geolocationDirty: boolean;
+  protected _lassoData: Vec2[] | null;
+  protected _lassoDirty: boolean;
+  protected _lassoLine: PIXI.Graphics | null;
+  protected _lassoFill: PIXI.Graphics | null;
 
-  geolocation: PIXI.Container | null;
-  tileDebug: PIXI.Container | null;
-  selected: PIXI.Container | null;
-  halo: PIXI.Container | null;
-  lasso: PIXI.Container | null;
+  public geolocation: PIXI.Container | null;
+  public tileDebug: PIXI.Container | null;
+  public selected: PIXI.Container | null;
+  public halo: PIXI.Container | null;
+  public lasso: PIXI.Container | null;
 
   /**
    * @constructor
    * @param scene - The Scene that owns this Layer
    */
-  constructor(scene: PixiScene) {
+  public constructor(scene: PixiScene) {
     super(scene);
     this.id = 'map-ui';
     this.enabled = true;   // this layer should always be enabled
@@ -65,7 +65,7 @@ export class PixiLayerMapUI extends AbstractPixiLayer {
   /**
    * Every Layer should have a reset function to replace any Pixi objects and internal state.
    */
-  reset(): void {
+  public reset(): void {
     super.reset();
 
     this._oldz = 0;
@@ -134,10 +134,10 @@ export class PixiLayerMapUI extends AbstractPixiLayer {
   /**
    * This layer should always be enabled - it contains important UI stuff
    */
-  get enabled(): boolean {
+  public get enabled(): boolean {
     return true;
   }
-  set enabled(val: boolean) {
+  public set enabled(val: boolean) {
     this._enabled = true;
   }
 
@@ -145,10 +145,10 @@ export class PixiLayerMapUI extends AbstractPixiLayer {
   /**
    * see:  https://developer.mozilla.org/en-US/docs/Web/API/GeolocationPosition
    */
-  get geolocationData(): GeolocationCoordinates | null {
+  public get geolocationData(): GeolocationCoordinates | null {
     return this._geolocationData;
   }
-  set geolocationData(val: GeolocationCoordinates | null) {
+  public set geolocationData(val: GeolocationCoordinates | null) {
     this._geolocationData = val;
     this._geolocationDirty = true;
   }
@@ -157,10 +157,10 @@ export class PixiLayerMapUI extends AbstractPixiLayer {
   /**
    * Pass an array of coordinate data that grows at the user draws the lasso
    */
-  get lassoData(): Vec2[] | null {
+  public get lassoData(): Vec2[] | null {
     return this._lassoData;
   }
-  set lassoData(val: Vec2[] | null) {
+  public set lassoData(val: Vec2[] | null) {
     this._lassoData = val;
     this._lassoDirty = true;
   }
@@ -171,7 +171,7 @@ export class PixiLayerMapUI extends AbstractPixiLayer {
    * @param frame - Integer frame being rendered
    * @param viewport - Pixi viewport to use for rendering
    */
-  render(frame: number, viewport: Viewport): void {
+  public render(frame: number, viewport: Viewport): void {
     // redraw if zoom changes - note: use true zoom here, not "effective" zoom.
     const z = viewport.transform.zoom;
     if (z !== this._oldz) {
@@ -195,7 +195,7 @@ export class PixiLayerMapUI extends AbstractPixiLayer {
    * @param frame - Integer frame being rendered
    * @param viewport - Pixi viewport to use for rendering
    */
-  renderLasso(frame: number, viewport: Viewport): void {
+  public renderLasso(frame: number, viewport: Viewport): void {
     if (!this._lassoDirty) return;
 
     const lasso = this.lasso;
@@ -263,7 +263,7 @@ export class PixiLayerMapUI extends AbstractPixiLayer {
    * @param frame - Integer frame being rendered
    * @param viewport - Pixi viewport to use for rendering
    */
-  renderGeolocation(frame: number, viewport: Viewport): void {
+  public renderGeolocation(frame: number, viewport: Viewport): void {
     if (!this._geolocationDirty) return;
 
     const container = this.geolocation;

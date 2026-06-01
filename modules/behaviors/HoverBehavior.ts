@@ -19,16 +19,18 @@ import type { MapInteractionBehavior } from './MapInteractionBehavior.ts';
  *   `hoverchange`  Fires whenever the hover target has changed, receives `eventData` Object
  */
 export class HoverBehavior extends AbstractBehavior {
+
   /** EventData for the most recent pointermove event */
-  lastMove: EventData | null;
+  public lastMove: EventData | null;
   /** Details about the feature being hovered, or null if nothing is hovered */
-  hoverTarget: EventTarget | null;
+  public hoverTarget: EventTarget | null;
+
 
   /**
    * @constructor
    * @param  context - Global shared application context
    */
-  constructor(context: Context) {
+  public constructor(context: Context) {
     super(context);
     this.id = 'hover';
 
@@ -44,7 +46,7 @@ export class HoverBehavior extends AbstractBehavior {
   /**
    * Bind event handlers
    */
-  enable(): void {
+  public enable(): void {
     if (this._enabled) return;
 
     this._enabled = true;
@@ -63,7 +65,7 @@ export class HoverBehavior extends AbstractBehavior {
   /**
    * Unbind event handlers
    */
-  disable(): void {
+  public disable(): void {
     if (!this._enabled) return;
 
     // Something is currently hovered, so un-hover it first.
@@ -90,7 +92,7 @@ export class HoverBehavior extends AbstractBehavior {
    * Handler for pointermove events.
    * @param  e - A Pixi FederatedPointerEvent
    */
-  _pointermove(e: FederatedPointerEvent): void {
+  protected _pointermove(e: FederatedPointerEvent): void {
     if (!this._enabled) return;
 
     this.lastMove = this._getEventData(e);
@@ -102,7 +104,7 @@ export class HoverBehavior extends AbstractBehavior {
    * Emits a 'hoverchange' event if needed
    * This may also be fired if we detect a change in the modifier keys.
    */
-  _doHover(): void {
+  protected _doHover(): void {
     if (!this._enabled || !this.lastMove) return;  // nothing to do
 
     const context = this.context;

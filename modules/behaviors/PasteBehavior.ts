@@ -1,8 +1,7 @@
-import { Extent, projWgs84ToWorld, vecSubtract } from '@rapid-sdk/math';
-
 import { AbstractBehavior } from './AbstractBehavior.ts';
 import { actionCopyEntities } from '../actions/copy_entities.ts';
 import { actionMove } from '../actions/move.ts';
+import { Extent, projWgs84ToWorld, vecSubtract } from '@rapid-sdk/math';
 import { utilDetect } from '../util/detect.ts';
 
 import type { Context } from '../Context.ts';
@@ -13,14 +12,16 @@ import type { OsmEntity } from '../data/OsmEntity.ts';
  * `PasteBehavior` listens for key event '⌘V' when pasting is allowed
  */
 export class PasteBehavior extends AbstractBehavior {
+
   /** Whether the user is on macOS (affects modifier key detection) */
-  private _isMacOS: boolean;
+  protected _isMacOS: boolean;
+
 
   /**
    * @constructor
    * @param  context - Global shared application context
    */
-  constructor(context: Context) {
+  public constructor(context: Context) {
     super(context);
     this.id = 'paste';
 
@@ -34,7 +35,7 @@ export class PasteBehavior extends AbstractBehavior {
   /**
    * Bind event handlers
    */
-  enable(): void {
+  public enable(): void {
     if (this._enabled) return;
     this._enabled = true;
 
@@ -47,7 +48,7 @@ export class PasteBehavior extends AbstractBehavior {
   /**
    * Unbind event handlers
    */
-  disable(): void {
+  public disable(): void {
     if (!this._enabled) return;
     this._enabled = false;
 
@@ -61,7 +62,7 @@ export class PasteBehavior extends AbstractBehavior {
    * Handler for keydown events on the window.
    * @param  e - A DOM KeyboardEvent
    */
-  _keydown(e: KeyboardEvent): void {
+  protected _keydown(e: KeyboardEvent): void {
     const isMacOS = this._isMacOS;
     const modifier = (isMacOS && e.metaKey) || (!isMacOS && e.ctrlKey);
     if (modifier && e.key === 'v') {
@@ -74,7 +75,7 @@ export class PasteBehavior extends AbstractBehavior {
    * Pastes copied features onto the map, if possible
    * @param  e - A DOM KeyboardEvent
    */
-  _doPaste(e: KeyboardEvent): void {
+  protected _doPaste(e: KeyboardEvent): void {
     const context = this.context;
     const editor = context.systems.editor!;
     const gfx = context.systems.gfx!;

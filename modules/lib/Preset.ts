@@ -1,5 +1,5 @@
-import { utilArrayUniq, utilObjectOmit, utilSafeString } from '@rapid-sdk/util';
 import diacritics from 'diacritics';
+import { utilArrayUniq, utilObjectOmit, utilSafeString } from '@rapid-sdk/util';
 import { utilGatherTokens } from '../util/string.ts';
 
 import type { Context } from '../Context.ts';
@@ -95,30 +95,32 @@ interface ResolvedFields {
  *   `geometries`           `Set<GeometryType>` Geometries that this Preset works with
  */
 export class Preset {
-  context: Context;
-  type = 'preset' as const;
-  id: PresetID;
-  safeid: string;
-  presetID: PresetID;
-  props: PresetProps;
-  geometries: Set<GeometryType>;
-  tags: OsmTags;
-  addTags: OsmTags;
-  removeTags: OsmTags;
-  searchable: boolean;
-  suggestion: boolean;
 
-  private _strings: Map<string, PresetStrings>;
-  private _currLocaleCode: LocaleCode | null;
-  private _currStrings: PresetStrings;
-  private _resolved: ResolvedFields;
+  public context: Context;
+  public type = 'preset' as const;
+  public id: PresetID;
+  public safeid: string;
+  public presetID: PresetID;
+  public props: PresetProps;
+  public geometries: Set<GeometryType>;
+  public tags: OsmTags;
+  public addTags: OsmTags;
+  public removeTags: OsmTags;
+  public searchable: boolean;
+  public suggestion: boolean;
+
+  protected _strings: Map<string, PresetStrings>;
+  protected _currLocaleCode: LocaleCode | null;
+  protected _currStrings: PresetStrings;
+  protected _resolved: ResolvedFields;
+
 
   /**
    * @constructor
    * @param context - Global shared application context
    * @param props - Properties for this Preset
    */
-  constructor(context: Context, props: Partial<PresetProps> = {}) {
+  public constructor(context: Context, props: Partial<PresetProps> = {}) {
     this.context = context;
     this.type = 'preset';
 
@@ -177,7 +179,7 @@ export class Preset {
    * This should happen whenever SchemaSystem merges in new data.
    * You must add the Preset to the SchemaSystem and call `reset` before using the Preset.
    */
-  reset(): void {
+  public reset(): void {
     const l10n = this.context.systems.l10n;
 
     this._resolved = { fields: null, moreFields: null };
@@ -194,7 +196,7 @@ export class Preset {
    * This is done early because we need the strings indexed by the SchemaSystem for searching.
    * @param localeCode - the locale code to switch to (defaults to 'en-US')
    */
-  setLocale(localeCode: LocaleCode = 'en-US'): void {
+  public setLocale(localeCode: LocaleCode = 'en-US'): void {
     this._currLocaleCode = localeCode;
     if (this._strings.has(localeCode)) return;  // done already
 
@@ -279,7 +281,7 @@ export class Preset {
    * @return Localized name
    * @readonly
    */
-  get name(): string {
+  public get name(): string {
     return this._currStrings.name;
   }
 
@@ -288,7 +290,7 @@ export class Preset {
    * @return Localized aliases
    * @readonly
    */
-  get aliases(): string[] {
+  public get aliases(): string[] {
     return this._currStrings.aliases;
   }
 
@@ -298,7 +300,7 @@ export class Preset {
    * @return Localized search terms
    * @readonly
    */
-  get terms(): string[] {
+  public get terms(): string[] {
     return this._currStrings.terms;
   }
 
@@ -306,7 +308,7 @@ export class Preset {
    * Returns the fields for this Preset.
    * @return The Fields for this preset
    */
-  fields(): Field[] {
+  public fields(): Field[] {
     return this._resolved.fields || (this._resolved.fields = this._resolveFields('fields'));
   }
 
@@ -315,7 +317,7 @@ export class Preset {
    *  if the user expands the "more fields" combobox.
    * @return The "more" Fields for this preset
    */
-  moreFields(): Field[] {
+  public moreFields(): Field[] {
     return this._resolved.moreFields || (this._resolved.moreFields = this._resolveFields('moreFields'));
   }
 
@@ -326,7 +328,7 @@ export class Preset {
    * @param matchTags - Tags to match
    * @return The match score
    */
-  matchScore(matchTags: OsmTags): number {
+  public matchScore(matchTags: OsmTags): number {
     const tags = this.tags;
     const seen: Record<string, boolean> = {};
     let score = 0;
@@ -360,7 +362,7 @@ export class Preset {
    * Rapid displays the preset name on a second line below the brand name.
    * @return Localized preset subtitle, or `null` if not applicable
    */
-  subtitle(): string | null {
+  public subtitle(): string | null {
     if (!this.props.suggestion) return null;
 
     const schema = this.context.systems.schema;
@@ -383,7 +385,7 @@ export class Preset {
    * The fallback presets are: 'point', 'line', 'area', 'relation'.
    * @return `true` if this is a fallback preset, `false` otherwise.
    */
-  isFallback(): boolean {
+  public isFallback(): boolean {
     return ['point', 'line', 'area', 'relation'].includes(this.id);
   }
 
@@ -393,7 +395,7 @@ export class Preset {
    * (At this time, only the fallback presets are builtin).
    * @return  Returns `true` if this is a builtin Preset, `false` if not
    */
-  isBuiltin(): boolean {
+  public isBuiltin(): boolean {
     return !this.props.assetID;
   }
 
@@ -405,7 +407,7 @@ export class Preset {
    *  falling back to the `key`/`value` pair of the first tag.
    * @return Data used to lookup reference information
    */
-  reference(): { qid?: string; key?: string; value?: string } {
+  public reference(): { qid?: string; key?: string; value?: string } {
     // Lookup documentation on Wikidata...
     const qid = (
       this.tags.wikidata ||
@@ -438,7 +440,7 @@ export class Preset {
    * @param skipFieldDefaults - `true` to ignore tags controlled by the Fields
    * @return The final tags for the Entity, after removal has happened.
    */
-  unsetTags(tags: OsmTags, geometry: GeometryType, ignoreKeys?: string[], skipFieldDefaults?: boolean): OsmTags {
+  public unsetTags(tags: OsmTags, geometry: GeometryType, ignoreKeys?: string[], skipFieldDefaults?: boolean): OsmTags {
     // allow manually keeping some tags
     const removeTags = ignoreKeys ? utilObjectOmit(this.removeTags, ignoreKeys) : this.removeTags;
     tags = utilObjectOmit(tags, Object.keys(removeTags));
@@ -463,7 +465,7 @@ export class Preset {
    * @param skipFieldDefaults - `true` to ignore tags controlled by the Fields
    * @return The final tags for the Entity, after adding has happened.
    */
-  setTags(tags: OsmTags, geometry: GeometryType, skipFieldDefaults?: boolean): OsmTags {
+  public setTags(tags: OsmTags, geometry: GeometryType, skipFieldDefaults?: boolean): OsmTags {
     const schema = this.context.systems.schema;
 
     const addTags = this.addTags;
@@ -522,7 +524,7 @@ export class Preset {
    * @param prop - the property to lookup
    * @return the Preset to get the name from (either this Preset or another Preset)
    */
-  private _resolveReference(prop: keyof PresetProps): Preset {
+  protected _resolveReference(prop: keyof PresetProps): Preset {
     const schema = this.context.systems.schema;
 
     const val = this.props[prop];
@@ -548,7 +550,7 @@ export class Preset {
    * @param prop - the property to lookup (either 'fields' or 'moreFields')
    * @return the resolved fields or moreFields
    */
-  private _resolveFields(prop: 'fields' | 'moreFields'): Field[] {
+  protected _resolveFields(prop: 'fields' | 'moreFields'): Field[] {
     const schema = this.context.systems.schema;
     const scope = schema?.getScope('osm');
     const commonScope = schema?.getScope('*');
@@ -605,7 +607,7 @@ export class Preset {
    * A simpler version of `utilGatherTokens` to gather 'terms' from suggestion presets
    * The `terms` is already an Array of strings that can function as search names.
    */
-  private _gatherSuggestionTerms(primary: Set<string>, alternate: Set<string>): void {
+  protected _gatherSuggestionTerms(primary: Set<string>, alternate: Set<string>): void {
     for (const s of this.props.terms) {
       if (!s || primary.has(s) || alternate.has(s)) continue;  // seen it before
       primary.add(s);
@@ -623,7 +625,7 @@ export class Preset {
   /**
    * A simpler version of `utilGatherTokens` to gather 'tags' from suggestion presets.
    */
-  private _gatherSuggestionTags(primary: Set<string>, alternate: Set<string>): void {
+  protected _gatherSuggestionTags(primary: Set<string>, alternate: Set<string>): void {
     for (const s of Object.values(this.props.tags)) {
       if (!s || primary.has(s) || alternate.has(s)) continue;  // seen it before
       alternate.add(s);

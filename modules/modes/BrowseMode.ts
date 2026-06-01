@@ -18,7 +18,7 @@ export class BrowseMode extends AbstractMode {
    * @constructor
    * @param  context - Global shared application context
    */
-  constructor(context: Context) {
+  public constructor(context: Context) {
     super(context);
     this.id = 'browse';
 
@@ -31,7 +31,7 @@ export class BrowseMode extends AbstractMode {
    * Enters the mode.
    * @return `true` if mode could be entered, `false` if not
    */
-  enter(): boolean {
+  public enter(): boolean {
     if (DEBUG) {
       console.log('BrowseMode: entering');  // eslint-disable-line no-console
     }
@@ -71,7 +71,7 @@ export class BrowseMode extends AbstractMode {
   /**
    * Exits the mode, clearing operations and removing event listeners.
    */
-  exit(): void {
+  public exit(): void {
     if (!this._active) return;
     this._active = false;
 
@@ -89,7 +89,7 @@ export class BrowseMode extends AbstractMode {
   /**
    * Changes the cursor styling based on what geometry is hovered
    */
-  private _hover(eventData: EventData): void {
+  protected _hover(eventData: EventData): void {
     const context = this.context;
     const editor = context.systems.editor;
     const graph = editor!.staging.graph;

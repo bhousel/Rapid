@@ -51,20 +51,20 @@ export interface NormalizedWheelEvent extends WheelEvent {
  *   `wheel`             Fires on supersurface.wheel, receives a DOM WheelEvent + some properties containing normalized wheel delta values
  */
 export class PixiEvents extends EventEmitter {
-  gfx: GraphicsSystem;
-  context: Context;
-  pointerOverRenderer: boolean;
-  modifierKeys: Set<string>;
-  coord: CoordData;
+  public gfx: GraphicsSystem;
+  public context: Context;
+  public pointerOverRenderer: boolean;
+  public modifierKeys: Set<string>;
+  public coord: CoordData;
 
-  private _enabled: boolean;
-  private _wheelDefault: 'auto' | 'zoom';
+  protected _enabled: boolean;
+  protected _wheelDefault: 'auto' | 'zoom';
 
   /**
    * @constructor
    * @param gfx - The GraphicsSystem that owns this event manager
    */
-  constructor(gfx: GraphicsSystem) {
+  public constructor(gfx: GraphicsSystem) {
     super();
     this._enabled = false;
 
@@ -101,7 +101,7 @@ export class PixiEvents extends EventEmitter {
    * Whether the events are enabled
    * @readonly
    */
-  get enabled(): boolean {
+  public get enabled(): boolean {
     return this._enabled;
   }
 
@@ -109,7 +109,7 @@ export class PixiEvents extends EventEmitter {
   /**
    * Bind event handlers
    */
-  enable(): void {
+  public enable(): void {
     if (this._enabled) return;
     this._enabled = true;
 
@@ -143,7 +143,7 @@ export class PixiEvents extends EventEmitter {
   /**
    * Unbind event handlers
    */
-  disable(): void {
+  public disable(): void {
     if (!this._enabled) return;
     this._enabled = false;
 
@@ -178,7 +178,7 @@ export class PixiEvents extends EventEmitter {
    * see: https://pixijs.download/release/docs/PIXI.EventSystem.html#setCursor
    * @param style - String for one of the given CSS cursor styles (pass 'inherit' to reset)
    */
-  setCursor(style: string): void {
+  public setCursor(style: string): void {
     // Pixi doesn't make this easy
     // On next pointerover event, the root event boundary will reset its perferred cursor
     // to whatever the .cursor property of the target is. (see EventBoundary.ts line 703)
@@ -234,7 +234,7 @@ export class PixiEvents extends EventEmitter {
    *
    * @param e - A Pixi FederatedPointerEvent or DOM KeyboardEvent
    */
-  private _observeModifierKeys(e: PIXI.FederatedPointerEvent | KeyboardEvent): void {
+  protected _observeModifierKeys(e: PIXI.FederatedPointerEvent | KeyboardEvent): void {
     const modifiers = this.modifierKeys;
     const toCheck = [
       'Alt',      // ALT key, on Mac: ⌥ (option)
@@ -268,7 +268,7 @@ export class PixiEvents extends EventEmitter {
    * @param x - The x coordinate
    * @param y - The y coordinate
    */
-  private _observeCoordinate(x: number, y: number): void {
+  protected _observeCoordinate(x: number, y: number): void {
     const viewport = this.context.viewport;
     const r = viewport.transform.r;
 
@@ -284,7 +284,7 @@ export class PixiEvents extends EventEmitter {
    * https://developer.mozilla.org/en-US/docs/Web/API/MouseEvent/buttons
    * @param e - A Pixi FederatedPointerEvent
    */
-  private _checkButtons(e: PIXI.FederatedPointerEvent): void {
+  protected _checkButtons(e: PIXI.FederatedPointerEvent): void {
     if (e.ctrlKey && utilDetect().os === 'mac') {
       if (e.button === 0) {   // left button
         e.button = 2;         // right button
@@ -300,7 +300,7 @@ export class PixiEvents extends EventEmitter {
    * Handler for keydown events on the window.
    * @param e - A DOM KeyboardEvent
    */
-  private _keydown(e: KeyboardEvent): void {
+  protected _keydown(e: KeyboardEvent): void {
     this._observeModifierKeys(e);
     this.emit('keydown', e);
   }
@@ -309,7 +309,7 @@ export class PixiEvents extends EventEmitter {
    * Handler for keyup events on the window.
    * @param e - A DOM KeyboardEvent
    */
-  private _keyup(e: KeyboardEvent): void {
+  protected _keyup(e: KeyboardEvent): void {
     this._observeModifierKeys(e);
     this.emit('keyup', e);
   }
@@ -318,7 +318,7 @@ export class PixiEvents extends EventEmitter {
    * Handler for pointerover events on the canvas.
    * @param e - A DOM PointerEvent
    */
-  private _pointerover(e: PointerEvent): void {
+  protected _pointerover(e: PointerEvent): void {
     this._observeModifierKeys(e as any);
     // Don't call `_checkButtons(e)` here.
     // The DOM PointerEvent button properties are readonly.
@@ -331,7 +331,7 @@ export class PixiEvents extends EventEmitter {
    * Handler for pointerout events on the canvas.
    * @param e - A DOM PointerEvent
    */
-  private _pointerout(e: PointerEvent): void {
+  protected _pointerout(e: PointerEvent): void {
     this._observeModifierKeys(e as any);
     // Don't call `_checkButtons(e)` here.
     // The DOM PointerEvent button properties are readonly.
@@ -344,7 +344,7 @@ export class PixiEvents extends EventEmitter {
    * Handler for pointerdown events on the stage.
    * @param e - A Pixi FederatedPointerEvent
    */
-  private _pointerdown(e: PIXI.FederatedPointerEvent): void {
+  protected _pointerdown(e: PIXI.FederatedPointerEvent): void {
     this._observeModifierKeys(e);
     this._observeCoordinate(e.global.x, e.global.y);
     this._checkButtons(e);
@@ -355,7 +355,7 @@ export class PixiEvents extends EventEmitter {
    * Handler for pointermove events on the stage.
    * @param e - A Pixi FederatedPointerEvent
    */
-  private _pointermove(e: PIXI.FederatedPointerEvent): void {
+  protected _pointermove(e: PIXI.FederatedPointerEvent): void {
     this._observeModifierKeys(e);
     this._observeCoordinate(e.global.x, e.global.y);
     this._checkButtons(e);
@@ -366,7 +366,7 @@ export class PixiEvents extends EventEmitter {
    * Handler for pointerup events on the stage.
    * @param e - A Pixi FederatedPointerEvent
    */
-  private _pointerup(e: PIXI.FederatedPointerEvent): void {
+  protected _pointerup(e: PIXI.FederatedPointerEvent): void {
     this._observeModifierKeys(e);
     this._observeCoordinate(e.global.x, e.global.y);
     this._checkButtons(e);
@@ -377,7 +377,7 @@ export class PixiEvents extends EventEmitter {
    * Handler for pointercancel events on the stage.
    * @param e - A Pixi FederatedPointerEvent
    */
-  private _pointercancel(e: PIXI.FederatedPointerEvent): void {
+  protected _pointercancel(e: PIXI.FederatedPointerEvent): void {
     this.emit('pointercancel', e);
   }
 
@@ -385,7 +385,7 @@ export class PixiEvents extends EventEmitter {
    * Handler for click events on the stage.
    * @param e - A Pixi FederatedPointerEvent
    */
-  private _click(e: PIXI.FederatedPointerEvent): void {
+  protected _click(e: PIXI.FederatedPointerEvent): void {
     // no need to _observeModifierKeys here, 'click' fires immediately after 'pointerup'
     this._checkButtons(e);
     this.emit('click', e);
@@ -396,7 +396,7 @@ export class PixiEvents extends EventEmitter {
    * Handler for wheel events on the supersurface.
    * @param e - A DOM WheelEvent
    */
-  private _wheel(e: WheelEvent): void {
+  protected _wheel(e: WheelEvent): void {
     e.preventDefault();             // don't scroll supersurface contents
     e.stopImmediatePropagation();   // don't scroll page contents either
 
@@ -487,7 +487,7 @@ export class PixiEvents extends EventEmitter {
    * @param e - A native DOM WheelEvent
    * @returns Normalized `[deltaX, deltaY]` in pixels
    */
-  private _normalizeWheelDelta(e: WheelEvent): Vec2 {
+  protected _normalizeWheelDelta(e: WheelEvent): Vec2 {
     let [dX, dY] = [e.deltaX, e.deltaY];  // raw delta values
 
     if (dY === 0 && e.shiftKey) {         // Some browsers treat skiftKey as horizontal scroll

@@ -1,8 +1,8 @@
+import { AbstractSystem } from '../core/AbstractSystem.ts';
 import { utilQsString } from '@rapid-sdk/util';
 
-import { AbstractSystem } from '../core/AbstractSystem.ts';
-
 import type { Context } from '../Context.ts';
+
 
 /** Base URL for the Wikidata MediaWiki API */
 const WIKIDATA_API = 'https://www.wikidata.org/w/api.php?';
@@ -17,14 +17,16 @@ type WikidataCache = Map<string, Record<string, any>>;
  * @see https://www.mediawiki.org/wiki/API:Main_page
  */
 export class WikidataService extends AbstractSystem {
+
   /** Cache of fetched Wikidata entities keyed by QID */
-  _cache: WikidataCache;
+  protected _cache: WikidataCache;
+
 
   /**
    * @constructor
    * @param context - Global shared application context
    */
-  constructor(context: Context) {
+  public constructor(context: Context) {
     super(context);
     this.id = 'wikidata';
     this.requiredDependencies = new Set<SystemID>(['network']);
@@ -38,7 +40,7 @@ export class WikidataService extends AbstractSystem {
    * Called after all core objects have been constructed.
    * @return Promise resolved when this component has completed initialization
    */
-  initAsync(): Promise<void> {
+  public initAsync(): Promise<void> {
     return super.initAsync();
   }
 
@@ -47,7 +49,7 @@ export class WikidataService extends AbstractSystem {
    * Called after all core objects have been initialized.
    * @return Promise resolved when this component has completed startup
    */
-  startAsync(): Promise<void> {
+  public startAsync(): Promise<void> {
     return super.startAsync();
   }
 
@@ -56,7 +58,7 @@ export class WikidataService extends AbstractSystem {
    * Called after completing an edit session to reset any internal state
    * @return Promise resolved when this component has completed resetting
    */
-  resetAsync(): Promise<void> {
+  public resetAsync(): Promise<void> {
     this._cache.clear();
     return Promise.resolve();
   }
@@ -67,7 +69,7 @@ export class WikidataService extends AbstractSystem {
    * @param query - string to search for
    * @param callback - errback-style callback function to call with results
    */
-  itemsForSearchQuery(query: string, callback: (err: any, result: Record<string, any>) => void): void {
+  public itemsForSearchQuery(query: string, callback: (err: any, result: Record<string, any>) => void): void {
     if (!query) {
       if (callback) callback('No query', {});
       return;
@@ -107,7 +109,7 @@ export class WikidataService extends AbstractSystem {
    * @param title - article title
    * @param callback - errback-style callback function to call with results
    */
-  itemsByTitle(lang: string, title: string, callback: (err: any, result: Record<string, any>) => void): void {
+  public itemsByTitle(lang: string, title: string, callback: (err: any, result: Record<string, any>) => void): void {
     if (!title) {
       if (callback) callback('No title', {});
       return;
@@ -140,7 +142,7 @@ export class WikidataService extends AbstractSystem {
 
   /**
    */
-  languagesToQuery(): string[] {
+  public languagesToQuery(): string[] {
     const l10n = this.context.systems.l10n;
     const localeCodes = l10n?.localeCodes || ['en'];
 
@@ -157,7 +159,7 @@ export class WikidataService extends AbstractSystem {
    * @param qid - qid to query
    * @param callback - errback-style callback function to call with results
    */
-  entityByQID(qid: string, callback: (err: any, result?: Record<string, any>) => void): void {
+  public entityByQID(qid: string, callback: (err: any, result?: Record<string, any>) => void): void {
     if (!qid) {
       callback('No qid', {});
       return;
@@ -216,7 +218,7 @@ export class WikidataService extends AbstractSystem {
    * @param params
    * @param callback - errback-style callback function to call with results
   */
-  getDocs(params: Record<string, any>, callback: (err: any, result?: Record<string, any>) => void): void {
+  public getDocs(params: Record<string, any>, callback: (err: any, result?: Record<string, any>) => void): void {
     const langs = this.languagesToQuery();
 
     this.entityByQID(params.qid, (err: any, entity: Record<string, any> | undefined) => {

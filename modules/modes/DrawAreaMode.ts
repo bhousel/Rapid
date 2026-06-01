@@ -30,22 +30,23 @@ interface DrawAreaSnapshot {
  * In `DrawAreaMode`, we are drawing a new area.
  */
 export class DrawAreaMode extends AbstractMode {
-  defaultTags: OsmTags;
-  drawWayID: EntityID | null;
-  drawNodeID: EntityID | null;
-  firstNodeID: EntityID | null;
-  lastNodeID: EntityID | null;
 
-  private _editIndex: number | null;
-  private _lastScreen: Vec2 | null;
-  private _snapshots: Map<Graph, DrawAreaSnapshot>;
+  public defaultTags: OsmTags;
+  public drawWayID: EntityID | null;
+  public drawNodeID: EntityID | null;
+  public firstNodeID: EntityID | null;
+  public lastNodeID: EntityID | null;
+
+  protected _editIndex: number | null;
+  protected _lastScreen: Vec2 | null;
+  protected _snapshots: Map<Graph, DrawAreaSnapshot>;
 
 
   /**
    * @constructor
    * @param context - Global shared application context
    */
-  constructor(context: Context) {
+  public constructor(context: Context) {
     super(context);
     this.id = 'draw-area';
 
@@ -94,7 +95,7 @@ export class DrawAreaMode extends AbstractMode {
    * Enters the mode.
    * @return `true` if mode could be entered, `false` it not
    */
-  enter(): boolean {
+  public enter(): boolean {
     if (DEBUG) {
       console.log('DrawAreaMode: entering'); // eslint-disable-line no-console
     }
@@ -145,7 +146,7 @@ export class DrawAreaMode extends AbstractMode {
    * Exits the mode, cleaning up the draw state and reverting any incomplete work.
    * If the draw way is invalid or degenerate, rolls back to the state before drawing started.
    */
-  exit(): void {
+  public exit(): void {
     if (!this._active) return;
     this._active = false;
 
@@ -220,7 +221,7 @@ export class DrawAreaMode extends AbstractMode {
    * Updates `selectedData` collection to include the draw way
    * Updates `drawing` class for items that need it
    */
-  private _refreshEntities(): void {
+  protected _refreshEntities(): void {
     const context = this.context;
     const editor = context.systems.editor!;
     const gfx = context.systems.gfx!;
@@ -258,7 +259,7 @@ export class DrawAreaMode extends AbstractMode {
    * An annotation is a text associated with the edit, such as "Started an area".
    * @return String such as "Started an area", or undefined if the drawWay is incomplete
    */
-  private _getAnnotation(): string | undefined {
+  protected _getAnnotation(): string | undefined {
     const context = this.context;
     const editor = context.systems.editor!;
     const l10n = context.systems.l10n!;
@@ -277,7 +278,7 @@ export class DrawAreaMode extends AbstractMode {
    * Move the draw node, or create one if needed.
    * @param eventData - Object containing data about the event and what was targeted
    */
-  private _move(eventData: EventData): void {
+  protected _move(eventData: EventData): void {
     if (!this.drawWayID) return;  // haven't started drawing yet
 
     const context = this.context;
@@ -358,7 +359,7 @@ export class DrawAreaMode extends AbstractMode {
    * We want to move the drawing node opposite of the pixels panned to keep it in the same place.
    * @param nudge - [x,y] amount of map pan in pixels
    */
-  private _nudge(nudge: Vec2): void {
+  protected _nudge(nudge: Vec2): void {
     const context = this.context;
     const editor = context.systems.editor!;
     const locations = context.systems.locations;
@@ -391,7 +392,7 @@ export class DrawAreaMode extends AbstractMode {
    * Process whatever the user clicked on.
    * @param eventData - Object containing data about the event and what was targeted
    */
-  private _click(eventData: EventData): void {
+  protected _click(eventData: EventData): void {
     const context = this.context;
     const editor = context.systems.editor!;
     const gfx = context.systems.gfx!;
@@ -475,7 +476,7 @@ export class DrawAreaMode extends AbstractMode {
   /**
    * Clicked on nothing, created a point at the given 'loc'.
    */
-  private _clickLoc(loc: Vec2): void {
+  protected _clickLoc(loc: Vec2): void {
     const EPSILON = 1e-6;
     const context = this.context;
     const editor = context.systems.editor!;
@@ -543,7 +544,7 @@ export class DrawAreaMode extends AbstractMode {
   /**
    * Clicked on an existing way, add a midpoint along the `edge` at given `loc` and start area from there
    */
-  private _clickWay(loc: Vec2, edge: [EntityID, EntityID]): void {
+  protected _clickWay(loc: Vec2, edge: [EntityID, EntityID]): void {
     const EPSILON = 1e-6;
     const context = this.context;
     const editor = context.systems.editor!;
@@ -617,7 +618,7 @@ export class DrawAreaMode extends AbstractMode {
   /**
    * Clicked on an existing node, include that node in the area we are drawing.
    */
-  private _clickNode(loc: Vec2, targetNode: OsmNode): void {
+  protected _clickNode(loc: Vec2, targetNode: OsmNode): void {
     const EPSILON = 1e-6;
     const context = this.context;
     const editor = context.systems.editor!;
@@ -698,7 +699,7 @@ export class DrawAreaMode extends AbstractMode {
    * @param  drawNode - The temporary draw node to remove
    * @return An action function that modifies the graph
    */
-  private _actionRemoveDrawNode(drawWay: OsmWay, drawNode: OsmNode): Action {
+  protected _actionRemoveDrawNode(drawWay: OsmWay, drawNode: OsmNode): Action {
     return (graph: Graph): Graph => {
       const way = graph.entity(drawWay.id) as OsmWay;
       return graph.replace(way.removeNode(drawNode.id)).remove(drawNode);
@@ -712,7 +713,7 @@ export class DrawAreaMode extends AbstractMode {
    * @param  loc - Optional location for the node; defaults to current mouse location
    * @return The newly created draw node
    */
-  private _addDrawNode(loc?: Vec2): OsmNode {
+  protected _addDrawNode(loc?: Vec2): OsmNode {
     const context = this.context;
     const editor = context.systems.editor!;
     const map = context.systems.map!;
@@ -733,7 +734,7 @@ export class DrawAreaMode extends AbstractMode {
    * Done drawing, select the draw way or return to browse mode.
    * Note that `exit()` will be called immediately after this to perform cleanup.
    */
-  private _finish(): void {
+  protected _finish(): void {
     const context = this.context;
     const editor = context.systems.editor!;
     const graph = editor.staging.graph;
@@ -754,7 +755,7 @@ export class DrawAreaMode extends AbstractMode {
    * Cancel all drawing and return to browse mode.
    * Note that `exit()` will be called immediately after this to perform cleanup.
    */
-  private _cancel(): void {
+  protected _cancel(): void {
     if (DEBUG) {
       console.log(`DrawAreaMode: _cancel`); // eslint-disable-line no-console
     }
@@ -770,7 +771,7 @@ export class DrawAreaMode extends AbstractMode {
    * If we ever find ourself in an edit where we can't retrieve this information, leave `DrawAreaMode`.
    * This means we've undo/redoed into an edit where the user wasn't drawing the same area.
    */
-  private _takeSnapshot(firstNodeID: EntityID, lastNodeID: EntityID): void {
+  protected _takeSnapshot(firstNodeID: EntityID, lastNodeID: EntityID): void {
     const context = this.context;
     const editor = context.systems.editor!;
     const graph = editor.stable.graph;
@@ -791,7 +792,7 @@ export class DrawAreaMode extends AbstractMode {
    * If we ever find ourself in an edit where we can't retrieve this information, leave `DrawAreaMode`.
    * This means we've undo/redoed into an edit where the user wasn't drawing the same area.
    */
-  private _restoreSnapshot(): void {
+  protected _restoreSnapshot(): void {
     const context = this.context;
     const editor = context.systems.editor!;
     const graph = editor.stable.graph;
@@ -820,7 +821,7 @@ export class DrawAreaMode extends AbstractMode {
   /**
    * Changes the cursor styling based on what geometry is hovered
    */
-  private _hover(eventData: EventData): void {
+  protected _hover(eventData: EventData): void {
     const context = this.context;
     const editor = context.systems.editor!;
     const gfx = context.systems.gfx!;

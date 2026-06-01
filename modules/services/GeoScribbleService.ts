@@ -1,8 +1,7 @@
-import { Tiler } from '@rapid-sdk/math';
-import { utilQsString } from '@rapid-sdk/util';
-
 import { AbstractSystem } from '../core/AbstractSystem.ts';
 import { GeoJSONData } from '../data/GeoJSONData.ts';
+import { Tiler } from '@rapid-sdk/math';
+import { utilQsString } from '@rapid-sdk/util';
 
 import type { Context } from '../Context.ts';
 import type { Tile } from '@rapid-sdk/math';
@@ -29,16 +28,18 @@ interface GeoScribbleCache {
  * @see https://github.com/Zverik/geoscribble
  */
 export class GeoScribbleService extends AbstractSystem {
+
   /** Internal cache holding in-flight requests and viewport version tracking */
-  _cache: GeoScribbleCache;
+  protected _cache: GeoScribbleCache;
   /** Tiler instance used to compute which tiles cover the current viewport */
-  _tiler: Tiler;
+  protected _tiler: Tiler;
+
 
   /**
    * @constructor
    * @param context - Global shared application context
    */
-  constructor(context: Context) {
+  public constructor(context: Context) {
     super(context);
     this.id = 'geoscribble';
     this.requiredDependencies = new Set<SystemID>(['network', 'spatial']);
@@ -54,7 +55,7 @@ export class GeoScribbleService extends AbstractSystem {
    * Called after all core objects have been constructed.
    * @return  Promise resolved when this component has completed initialization
    */
-  initAsync(): Promise<void> {
+  public initAsync(): Promise<void> {
     if (this._initPromise) return this._initPromise;
 
     return this._initPromise = super.initAsync()
@@ -66,7 +67,7 @@ export class GeoScribbleService extends AbstractSystem {
    * Called after all core objects have been initialized.
    * @return  Promise resolved when this component has completed startup
    */
-  startAsync(): Promise<void> {
+  public startAsync(): Promise<void> {
     return super.startAsync();
   }
 
@@ -75,7 +76,7 @@ export class GeoScribbleService extends AbstractSystem {
    * Called after completing an edit session to reset any internal state
    * @return  Promise resolved when this component has completed resetting
    */
-  resetAsync(): Promise<void> {
+  public resetAsync(): Promise<void> {
     const context = this.context;
     const network = context.systems.network!;
     const spatial = context.systems.spatial!;
@@ -95,7 +96,7 @@ export class GeoScribbleService extends AbstractSystem {
    * Get already loaded data that appears in the current map view
    * @return  Array of data
    */
-  getData(): any[] {
+  public getData(): any[] {
     const spatial = this.context.systems.spatial!;
     return spatial.getVisibleData('geoscribble').map(hit => hit.contents);
   }
@@ -104,7 +105,7 @@ export class GeoScribbleService extends AbstractSystem {
   /**
    * Schedule any data requests needed to cover the current map view
    */
-  loadTiles(): void {
+  public loadTiles(): void {
     const cache = this._cache;
     const context = this.context;
     const network = context.systems.network!;
@@ -146,7 +147,7 @@ export class GeoScribbleService extends AbstractSystem {
    * @param tile - Tile data
    * @param response - Response data
    */
-  _gotTile(tile: Tile, response: any): void {
+  protected _gotTile(tile: Tile, response: any): void {
     const context = this.context;
     const gfx = context.systems.gfx;
     const spatial = context.systems.spatial!;

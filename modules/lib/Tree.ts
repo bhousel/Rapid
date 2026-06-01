@@ -1,6 +1,5 @@
-//import RBush from 'rbush';
-
 import { Difference } from './Difference.ts';
+//import RBush from 'rbush';
 
 import type { Graph } from './Graph.ts';
 import type { OsmEntity } from '../data/OsmEntity.ts';
@@ -17,9 +16,10 @@ import type { OsmEntity } from '../data/OsmEntity.ts';
  * (Tree is not a good name for this thing)
  */
 export class Tree {
-  private _currentKey: string;
-  private _currentSnapshot: Graph;
-  private _cacheID: DatasetID;
+
+  protected _currentKey: string;
+  protected _currentSnapshot: Graph;
+  protected _cacheID: DatasetID;
 
 //  private _entityRBush: RBush;
 //  private _entityBoxes: Map<string, any>;
@@ -27,12 +27,13 @@ export class Tree {
 //  private _segmentRBush: RBush;
 //  private _segmentBoxes: Map<string, any>;
 
+
   /**
    * @constructor
    * @param graph - The "current" Graph of entities that this tree is tracking
    * @param cacheID - Identifier for the spatial cache
    */
-  constructor(graph: Graph, cacheID: DatasetID) {
+  public constructor(graph: Graph, cacheID: DatasetID) {
     this._currentKey = graph.key;
     this._currentSnapshot = graph.snapshot();
     this._cacheID = cacheID;
@@ -50,7 +51,7 @@ export class Tree {
    * Remove an Entity from all internal indexes.
    * @param entityID - The entity ID to remove
    */
-  private _removeEntity(entityID: EntityID): void {
+  protected _removeEntity(entityID: EntityID): void {
     const graph = this._currentSnapshot;
     const context = graph.context;
     const spatial = context.systems.spatial!;
@@ -80,7 +81,7 @@ export class Tree {
    * Add or update multiple Entities in the internal indexes.
    * @param toUpdate - Entities to load into the tree
    */
-  private _loadEntities(toUpdate: Map<EntityID, OsmEntity>): void {
+  protected _loadEntities(toUpdate: Map<EntityID, OsmEntity>): void {
     const graph = this._currentSnapshot;
     const context = graph.context;
     const spatial = context.systems.spatial!;
@@ -133,7 +134,7 @@ export class Tree {
    * @param toUpdate - gathered Entities that need updating
    * @param seen - to avoid infinite recursion
    */
-  private _includeParents(entity: OsmEntity, toUpdate: Map<EntityID, OsmEntity>, seen?: Set<EntityID>): void {
+  protected _includeParents(entity: OsmEntity, toUpdate: Map<EntityID, OsmEntity>, seen?: Set<EntityID>): void {
     const graph = this._currentSnapshot;
     const entityID = entity.id;
     if (!seen) seen = new Set();
@@ -164,7 +165,7 @@ export class Tree {
    * operations are needed to add/update/remove tracked entities.
    * @param graph - the Graph to set "current"
    */
-  private _setCurrentGraph(graph: Graph): void {
+  protected _setCurrentGraph(graph: Graph): void {
     if (graph.key === this._currentKey) return;
 
     // gather changes needed
@@ -207,7 +208,7 @@ export class Tree {
    * @param entities - entities to load into the Tree
    * @param force - If `true`, replace an Entity, even if we've seen it already
    */
-  rebase(entities: OsmEntity[], force?: boolean): void {
+  public rebase(entities: OsmEntity[], force?: boolean): void {
     const graph = this._currentSnapshot;
     const context = graph.context;
     const spatial = context.systems.spatial!;
@@ -245,7 +246,7 @@ export class Tree {
    * @param graph - The current graph
    * @return Entities with bounding boxes that intersect the given Extent
    */
-  intersects(extent: any, graph: Graph): OsmEntity[] {
+  public intersects(extent: any, graph: Graph): OsmEntity[] {
     this._setCurrentGraph(graph);
 
     const context = graph.context;
@@ -261,7 +262,7 @@ export class Tree {
    * @param graph - The current graph
    * @return Segments with bounding boxes that intersect the given Extent
    */
-  waySegments(extent: any, graph: Graph): any[] {
+  public waySegments(extent: any, graph: Graph): any[] {
     return [];  // not now
 //    this._setCurrentGraph(graph);
 //    return this._segmentRBush.search(extent.bbox()).map(sbox => sbox.segment);

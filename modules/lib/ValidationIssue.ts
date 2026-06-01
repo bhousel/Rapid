@@ -46,40 +46,42 @@ export interface ValidationIssueProps {
  * Each issue has a type, severity, affected entities, and possible fixes.
  */
 export class ValidationIssue {
-  context: Context;
+
+  public context: Context;
   /** Unique identifier for this issue */
-  id: string;
+  public id: string;
   /** Key suitable for use with d3.selection#data() */
-  key: string;
+  public key: string;
   /** Name of rule that created the issue */
-  type: string;
+  public type: string;
   /** Category of the issue within the type */
-  subtype: string | undefined;
+  public subtype: string | undefined;
   /** Severity level */
-  severity: ValidationSeverity;
+  public severity: ValidationSeverity;
   /** Array of IDs of entities involved in the issue */
-  entityIds: EntityID[];
+  public entityIds: EntityID[];
   /** [lon, lat] to zoom in on to see the issue */
-  loc: Vec2 | undefined;
+  public loc: Vec2 | undefined;
   /** Extra data for the fixes */
-  data: Record<string, unknown> | undefined;
+  public data: Record<string, unknown> | undefined;
   /** String to further differentiate the issue */
-  hash: string | undefined;
+  public hash: string | undefined;
   /** If this issue can be autofixed, supply the autofix args at issue creation */
-  autoArgs: unknown[] | undefined;
+  public autoArgs: unknown[] | undefined;
   /** Function returning localized string for the issue message */
-  message: () => string;
+  public message: () => string;
   /** Function to render reference information */
-  reference: ($selection: D3Selection) => void;
+  public reference: ($selection: D3Selection) => void;
   /** Function returning fixes for this issue */
-  dynamicFixes: (() => ValidationFix[]) | undefined;
+  public dynamicFixes: (() => ValidationFix[]) | undefined;
+
 
   /**
    * @constructor
    * @param context - Global shared application context
    * @param props - Properties for this ValidationIssue
    */
-  constructor(context: Context, props: Partial<ValidationIssueProps>) {
+  public constructor(context: Context, props: Partial<ValidationIssueProps>) {
     this.context = context;
 
     this.type = props.type ?? '';
@@ -106,7 +108,7 @@ export class ValidationIssue {
    * @param graph - The graph to look up entities in
    * @return The extent of the issue, or null if not determinable
    */
-  extent(graph: Graph): Extent | null {
+  public extent(graph: Graph): Extent | null {
     if (this.loc) {
       return new Extent(this.loc);
     }
@@ -121,7 +123,7 @@ export class ValidationIssue {
    * Returns the available fixes for this issue.
    * @return Array of ValidationFix objects
    */
-  fixes(): ValidationFix[] {
+  public fixes(): ValidationFix[] {
     // sometimes the fixes are generated dynamically
     // (bhousel - why is this?  so they can use the latest graph?)
     const fixes: ValidationFix[] = (typeof this.dynamicFixes === 'function') ? this.dynamicFixes() : [];
@@ -152,7 +154,7 @@ export class ValidationIssue {
    * A unique, deterministic string hash.
    * Issues with identical id values are considered identical.
    */
-  private _generateID(): string {
+  protected _generateID(): string {
     const parts: string[] = [this.type];
 
     if (this.hash) {   // subclasses can pass in their own differentiator
@@ -178,7 +180,7 @@ export class ValidationIssue {
    * An identifier suitable for use as the second argument to d3.selection#data().
    * (i.e. this should change whenever the data needs to be refreshed)
    */
-  private _generateKey(): string {
+  protected _generateKey(): string {
     return this.id + ':' + Date.now().toString();  // include time of creation
   }
 }

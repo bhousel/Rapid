@@ -1,10 +1,9 @@
-import { RAD2DEG, geoSphericalDistance, vecAngle } from '@rapid-sdk/math';
-import { utilArrayDifference, utilArrayUniq } from '@rapid-sdk/util';
-
 import { actionDeleteRelation } from '../actions/delete_relation.ts';
 import { actionReverse } from '../actions/reverse.ts';
 import { actionSplit } from '../actions/split.ts';
 import { Graph } from './Graph.ts';
+import { RAD2DEG, geoSphericalDistance, vecAngle } from '@rapid-sdk/math';
+import { utilArrayDifference, utilArrayUniq } from '@rapid-sdk/util';
 
 import type { Context } from '../Context.ts';
 import type { OsmEntity, OsmNode, OsmRelation, OsmWay } from '../data/types.ts';
@@ -62,27 +61,36 @@ export interface Intersection {
  * Properties are assigned directly to the instance for backward compatibility.
  */
 export class osmTurn implements Turn {
-  key!: string;
-  path!: EntityID[];
-  from!: TurnEndpoint;
-  via!: TurnVia;
-  to!: TurnEndpoint;
-  u!: boolean;
-  restrictionID?: string;
-  no?: boolean;
-  only?: boolean;
-  direct?: boolean;
+  public key!: string;
+  public path!: EntityID[];
+  public from!: TurnEndpoint;
+  public via!: TurnVia;
+  public to!: TurnEndpoint;
+  public u!: boolean;
+  public restrictionID?: string;
+  public no?: boolean;
+  public only?: boolean;
+  public direct?: boolean;
 
-  constructor(turn: Partial<Turn>) {
+  public constructor(turn: Partial<Turn>) {
     Object.assign(this, turn);
   }
 }
 
-
+/**
+ * An `osmIntersection` gathers all the details about a highway intersection, returning a
+ * data structure that encapsulates a graph, nodes, ways, possible paths through the intersection
+ * and any actions needed to normalize the intersection so that turn restrictions can be applied.
+ * @param    context
+ * @param    graph
+ * @param    startVertexID
+ * @param    maxDistance
+ * @returns   computed intersection data structure, or `null` if no intersection exists here
+ */
 export function osmIntersection(
   context: Context,
   graph: Graph,
-  startvertexID: EntityID,
+  startVertexID: EntityID,
   maxDistance: number = 30
 ): Intersection | null {
 
@@ -116,7 +124,7 @@ export function osmIntersection(
   }
 
 
-  const startNode = graph.entity(startvertexID) as OsmNode;
+  const startNode = graph.entity(startVertexID) as OsmNode;
   if (!startNode || !startNode.loc) return null;
 
   const checkVertices: OsmNode[] = [startNode];

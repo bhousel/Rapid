@@ -1,5 +1,4 @@
 import * as PIXI from 'pixi.js';
-
 import { AbstractPixiLayer } from './AbstractPixiLayer.ts';
 import { PixiFeatureLine } from './PixiFeatureLine.ts';
 import { PixiFeaturePoint } from './PixiFeaturePoint.ts';
@@ -33,7 +32,7 @@ export class PixiLayerRapid extends AbstractPixiLayer {
    * @constructor
    * @param scene - The Scene that owns this Layer
    */
-  constructor(scene: PixiScene) {
+  public constructor(scene: PixiScene) {
     super(scene);
     this.id = 'rapid';
     this._enabled = true;     // Rapid features should be enabled by default
@@ -119,7 +118,7 @@ export class PixiLayerRapid extends AbstractPixiLayer {
   /**
    * Whether the Layer's service exists
    */
-  get supported(): boolean {
+  public get supported(): boolean {
     // return true if any of these are installed
     const services = this.context.services;
     return !!(services.mapwithai || services.esri || services.overture);
@@ -130,10 +129,10 @@ export class PixiLayerRapid extends AbstractPixiLayer {
    * Whether the user has chosen to see the Layer
    * Make sure to start the services first.
    */
-  get enabled(): boolean {
+  public get enabled(): boolean {
     return this._enabled;
   }
-  set enabled(val: boolean) {
+  public set enabled(val: boolean) {
     if (!this.supported) {
       val = false;
     }
@@ -164,7 +163,7 @@ export class PixiLayerRapid extends AbstractPixiLayer {
   /**
    * Every Layer should have a reset function to replace any Pixi objects and internal state.
    */
-  reset(): void {
+  public reset(): void {
     super.reset();
 
     const groupContainer = this.scene.groups.get('basemap')!;
@@ -186,7 +185,7 @@ export class PixiLayerRapid extends AbstractPixiLayer {
    * @param frame - Integer frame being rendered
    * @param viewport - Pixi viewport to use for rendering
    */
-  render(frame: number, viewport: Viewport): void {
+  public render(frame: number, viewport: Viewport): void {
     const rapid = this.context.systems.rapid!;
     const viewZoom = viewport.transform.zoom;
     if (!this.enabled || !rapid.datasets.size || viewZoom < MINZOOM) return;
@@ -209,7 +208,7 @@ export class PixiLayerRapid extends AbstractPixiLayer {
    * @param frame - Integer frame being rendered
    * @param viewport - Pixi viewport to use for rendering
    */
-  renderDataset(dataset: any, frame: number, viewport: Viewport): void {
+  public renderDataset(dataset: any, frame: number, viewport: Viewport): void {
     const context = this.context;
     const rapid = context.systems.rapid!;
     const viewZoom = viewport.transform.zoom;
@@ -336,7 +335,7 @@ export class PixiLayerRapid extends AbstractPixiLayer {
 
   /**
    */
-  renderPolygons(
+  public renderPolygons(
     parentContainer: PIXI.Container, dataset: any, graph: any, frame: number, viewport: Viewport, data: RapidData): void {
     const color = new PIXI.Color(dataset.color);
     const l10n = this.context.systems.l10n!;
@@ -381,7 +380,7 @@ export class PixiLayerRapid extends AbstractPixiLayer {
 
   /**
    */
-  renderLines(parentContainer: PIXI.Container, dataset: any, graph: any, frame: number, viewport: Viewport, data: RapidData): void {
+  public renderLines(parentContainer: PIXI.Container, dataset: any, graph: any, frame: number, viewport: Viewport, data: RapidData): void {
     const color = new PIXI.Color(dataset.color);
     const l10n = this.context.systems.l10n!;
 
@@ -438,7 +437,7 @@ export class PixiLayerRapid extends AbstractPixiLayer {
 
   /**
    */
-  renderPoints(
+  public renderPoints(
     parentContainer: PIXI.Container,
     dataset: any,
     graph: any,

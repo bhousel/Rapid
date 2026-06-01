@@ -40,23 +40,23 @@ export interface FeatureContainer extends PIXI.Container {
  */
 export class AbstractPixiFeature {
   /** Unique string identifier for this Feature */
-  id: FeatureID;
+  public id: FeatureID;
   /** The Layer that owns this Feature */
-  layer: AbstractPixiLayer;
+  public layer: AbstractPixiLayer;
   /** The PixiScene that contains this Feature */
-  scene: PixiScene;
+  public scene: PixiScene;
   /** Reference to the GraphicsSystem */
-  gfx: GraphicsSystem;
+  public gfx: GraphicsSystem;
   /** Global shared application context */
-  context: Context;
+  public context: Context;
   /** PIXI.Container that contains all the graphics needed to draw the Feature */
-  container: FeatureContainer;
+  public container: FeatureContainer;
   /** Version of the Feature, can be used to detect changes */
-  v: number;
+  public v: number;
   /** Level of detail for the Feature last time it was styled (0 = off, 1 = simplified, 2 = full) */
-  lod: number;
+  public lod: number;
   /** A PIXI.Container that contains the graphics for the Feature's halo (if it has one) */
-  halo: PIXI.Container | null;
+  public halo: PIXI.Container | null;
 
   /** Whether the Feature is allowed to be interactive */
   protected _allowInteraction: boolean;
@@ -84,7 +84,7 @@ export class AbstractPixiFeature {
    * @param layer - The Layer that owns this Feature
    * @param featureID - Unique string to use for the identifier of this Feature
    */
-  constructor(layer: AbstractPixiLayer, featureID: FeatureID) {
+  public constructor(layer: AbstractPixiLayer, featureID: FeatureID) {
     this.id = featureID;  // put this first so debug inspect shows it first
 
     this.layer = layer;
@@ -130,7 +130,7 @@ export class AbstractPixiFeature {
    * Every Feature should have a destroy function that frees all the resources
    * Do not use the Feature after calling `destroy()`.
    */
-  destroy(): void {
+  public destroy(): void {
     this.layer.removeFeature(this);
     this.scene.removeFeature(this);
 
@@ -167,7 +167,7 @@ export class AbstractPixiFeature {
    * @param viewport - Pixi viewport to use for rendering
    * @abstract
    */
-  update(viewport: Viewport): void {
+  public update(viewport: Viewport): void {
     if (!this.dirty) return;   // nothing to do
     this._geomDirty = false;
     this._styleDirty = false;
@@ -180,7 +180,7 @@ export class AbstractPixiFeature {
    * @param viewport - Pixi viewport to use for rendering
    * @abstract
    */
-  updateHalo(viewport: Viewport): void {
+  public updateHalo(viewport: Viewport): void {
   }
 
 
@@ -189,7 +189,7 @@ export class AbstractPixiFeature {
    * @return This feature's unique id
    * @readonly
    */
-  get featureID(): FeatureID {
+  public get featureID(): FeatureID {
     return this.id;
   }
 
@@ -199,17 +199,17 @@ export class AbstractPixiFeature {
    * @return This feature's type, one of 'Point', 'LineString', or 'Polygon'
    * @readonly
    */
-  get type(): SingularGeometryType | undefined {
+  public get type(): SingularGeometryType | undefined {
     return this._geom?.type;
   }
 
   /**
    * @param val - container for the parent, this Feature's container will be added to it.
    */
-  get parentContainer(): PIXI.Container | null {
+  public get parentContainer(): PIXI.Container | null {
     return this.container.parent;
   }
-  set parentContainer(val: Nullable<PIXI.Container>) {
+  public set parentContainer(val: Nullable<PIXI.Container>) {
     const currParent = this.container.parent;
     if (val && val !== currParent) {   // put this feature under a different parent container
       val.addChild(this.container);
@@ -223,10 +223,10 @@ export class AbstractPixiFeature {
    * Whether the Feature is currently visible
    * @return `true` if the feature is currently visible
    */
-  get visible(): boolean {
+  public get visible(): boolean {
     return this.container.visible;
   }
-  set visible(val: boolean) {
+  public set visible(val: boolean) {
     if (val === this.container.visible) return;  // no change
     this.container.visible = val;
     if (this.halo) this.halo.visible = val;
@@ -238,11 +238,11 @@ export class AbstractPixiFeature {
    * Whether the Feature needs to be rebuilt
    * @return `true` if the feature needs to be rebuilt
    */
-  get dirty(): boolean {
+  public get dirty(): boolean {
     // The labeling code will decide what to do with the `_labelDirty` flag
     return this._geomDirty || this._styleDirty;
   }
-  set dirty(val: boolean) {
+  public set dirty(val: boolean) {
     this._geomDirty = val;
     this._styleDirty = val;
     this._labelDirty = val;
@@ -253,10 +253,10 @@ export class AbstractPixiFeature {
    * Whether the Feature is allowed to be interactive
    * @return `true` if the feature is currently interactive, `false` if not
    */
-  get allowInteraction(): boolean {
+  public get allowInteraction(): boolean {
     return this._allowInteraction;
   }
-  set allowInteraction(val: boolean) {
+  public set allowInteraction(val: boolean) {
     if (val === this._allowInteraction) return;  // no change
     this._allowInteraction = val;
 
@@ -269,10 +269,10 @@ export class AbstractPixiFeature {
   /**
    * @param props - Style properties object, see `Style.ts`
    */
-  get style(): MinimalStyleProps | null {
+  public get style(): MinimalStyleProps | null {
     return this._style;
   }
-  set style(props: Partial<StyleProps>) {
+  public set style(props: Partial<StyleProps>) {
     // result: defaults ← props
     this._style = deepMerge({}, styleDefaults, props) as MinimalStyleProps;
     this._styleDirty = true;
@@ -281,13 +281,13 @@ export class AbstractPixiFeature {
   /**
    * @param val - a GeometryPart to render
    */
-  get geom(): GeometryPart | null {
+  public get geom(): GeometryPart | null {
     return this._geom;
   }
-  get geometry(): GeometryPart | null {
+  public get geometry(): GeometryPart | null {
     return this._geom;
   }
-  set geometry(val: GeometryPart) {
+  public set geometry(val: GeometryPart) {
     this._geom = val;
     this._geomDirty = true;
   }
@@ -296,10 +296,10 @@ export class AbstractPixiFeature {
   /**
    * @param str - the label to use
    */
-  get label(): string | null {
+  public get label(): string | null {
     return this._label;
   }
-  set label(str: string | null) {
+  public set label(str: string | null) {
     if (str === this._label) return;  // no change
     this._label = str;
     this._labelDirty = true;
@@ -311,7 +311,7 @@ export class AbstractPixiFeature {
    * (because we need to know an id/key to identify the data by, and these can be anything)
    * @readonly
    */
-  get data(): unknown {
+  public get data(): unknown {
     return this._data;
   }
 
@@ -320,7 +320,7 @@ export class AbstractPixiFeature {
    * (because we need to know an id/key to identify the data by, and these can be anything)
    * @readonly
    */
-  get dataID(): DataID | null {
+  public get dataID(): DataID | null {
     return this._dataID;
   }
 
@@ -332,7 +332,7 @@ export class AbstractPixiFeature {
    * When changing the value of the class we'll also dirty the feature so that it gets redrawn on the next pass.
    * @param classID - the pseudoclass to set
    */
-  setClass(classID: ClassID): void {
+  public setClass(classID: ClassID): void {
     const hasClass = this._classes.has(classID);
     if (hasClass) return;  // nothing to do
 
@@ -349,7 +349,7 @@ export class AbstractPixiFeature {
    * When changing the value of the class we'll also dirty the feature so that it gets redrawn on the next pass.
    * @param classID - the pseudoclass to remove
    */
-  unsetClass(classID: ClassID): void {
+  public unsetClass(classID: ClassID): void {
     const hasClass = this._classes.has(classID);
     if (!hasClass) return;  // nothing to do
 
@@ -363,14 +363,14 @@ export class AbstractPixiFeature {
    * @param classID - the class to check
    * @return `true` if the feature has this class, `false` if not
    */
-  hasClass(classID: ClassID): boolean {
+  public hasClass(classID: ClassID): boolean {
     return this._classes.has(classID);
   }
 
   /**
    * Returns a read-only view of the feature's pseudoclasses
    */
-  get classes(): ReadonlySet<ClassID> {
+  public get classes(): ReadonlySet<ClassID> {
     return this._classes;
   }
 
@@ -379,7 +379,7 @@ export class AbstractPixiFeature {
    * @param dataID - Identifer for this data element (e.g. 'n123')
    * @param data - data to bind to the feature (e.g. an OSM Node)
    */
-  setData(dataID: DataID, data: unknown): void {
+  public setData(dataID: DataID, data: unknown): void {
     this._dataID = dataID;
     this._data = data;
     this.layer.bindData(this.id, dataID);
@@ -391,7 +391,7 @@ export class AbstractPixiFeature {
    * @param parentID - dataID of the parent (e.g. 'r123')
    * @param childID - dataID of the child (e.g. 'w123')
    */
-  addChildData(parentID: DataID, childID: DataID): void {
+  public addChildData(parentID: DataID, childID: DataID): void {
     this.layer.addChildData(parentID, childID);
     this.dirty = true;
   }
@@ -400,7 +400,7 @@ export class AbstractPixiFeature {
    * Removes all child dataIDs for the given parent dataID
    * @param parentID - dataID of the parent (e.g. 'r123')
    */
-  clearChildData(parentID: DataID): void {
+  public clearChildData(parentID: DataID): void {
     this.layer.clearChildData(parentID);
     this.dirty = true;
   }

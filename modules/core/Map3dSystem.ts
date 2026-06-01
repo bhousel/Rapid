@@ -1,8 +1,7 @@
-import { select as d3_select } from 'd3-selection';
-import { RAD2DEG, numWrap, geomPolygonContainsPolygon, vecEqual } from '@rapid-sdk/math';
-import { Color } from 'pixi.js';
-
 import { AbstractSystem } from './AbstractSystem.ts';
+import { Color } from 'pixi.js';
+import { RAD2DEG, numWrap, geomPolygonContainsPolygon, vecEqual } from '@rapid-sdk/math';
+import { select as d3_select } from 'd3-selection';
 import { utilCmd } from '../util/cmd.ts';
 
 import type { Vec2 } from '@rapid-sdk/math';
@@ -24,25 +23,26 @@ const SELECTION_COLOR = '#01d4fa';
  *  and maintains the map state and style specification.
  */
 export class Map3dSystem extends AbstractSystem {
-  /** The MapLibre map instance */
-  maplibre: MapLibreMap | null = null;
-  /** The DOM container ID for the 3D map */
-  readonly containerID: string = 'map3d_container';
 
-  private _loadPromise: Promise<void> | null = null;
-  private _keys: string[] | null = null;
+  /** The MapLibre map instance */
+  public maplibre: MapLibreMap | null = null;
+  /** The DOM container ID for the 3D map */
+  public readonly containerID: string = 'map3d_container';
+
+  protected _loadPromise: Promise<void> | null = null;
+  protected _keys: string[] | null = null;
 
   // The 3d Map will stay close to the main map, but with an offset zoom and rotation
-  private _zDiff = 3;     // by default, 3dmap will be at main zoom - 3
-  private _bDiff = 0;     // by default, 3dmap bearing will match main map bearing
-  private _lastv: number | null = null;
+  protected _zDiff = 3;     // by default, 3dmap will be at main zoom - 3
+  protected _bDiff = 0;     // by default, 3dmap bearing will match main map bearing
+  protected _lastv: number | null = null;
 
 
   /**
    * @constructor
    * @param context - Global shared application context
    */
-  constructor(context: Context) {
+  public constructor(context: Context) {
     super(context);
     this.id = 'map3d';
     this.autoStart = false;
@@ -70,7 +70,7 @@ export class Map3dSystem extends AbstractSystem {
    * Called after all core objects have been constructed.
    * @return  Promise resolved when this component has completed initialization
    */
-  initAsync(): Promise<void> {
+  public initAsync(): Promise<void> {
     if (this._initPromise) return this._initPromise;
 
     const context = this.context;
@@ -98,7 +98,7 @@ export class Map3dSystem extends AbstractSystem {
    * Called after all core objects have been initialized.
    * @return  Promise resolved when this component has completed startup
    */
-  startAsync(): Promise<void> {
+  public startAsync(): Promise<void> {
     if (this._startPromise) return this._startPromise;
 
     const context = this.context;
@@ -181,7 +181,7 @@ export class Map3dSystem extends AbstractSystem {
    * Called after completing an edit session to reset any internal state
    * @return  Promise resolved when this component has completed resetting
    */
-  resetAsync(): Promise<void> {
+  public resetAsync(): Promise<void> {
     this.context.systems.scheduler?.cancel('map3d-redraw');
     return Promise.resolve();
   }
@@ -191,12 +191,12 @@ export class Map3dSystem extends AbstractSystem {
    * For now, just store this state in the url hash
    * set/get whether the 3d viewer is visible
    */
-  get visible(): boolean {
+  public get visible(): boolean {
     const urlhash = this.context.systems.urlhash;
     return !!urlhash?.getParam('map3d');
   }
 
-  set visible(val: boolean) {
+  public set visible(val: boolean) {
     const context = this.context;
     const urlhash = context.systems.urlhash;
 
@@ -232,7 +232,7 @@ export class Map3dSystem extends AbstractSystem {
    * If visible, make invisible.  If invisible, make visible.
    * @param  e - triggering event (if any)
    */
-  toggle(e?: Event): void {
+  public toggle(e?: Event): void {
     if (e)  e.preventDefault();
     this.visible = !this.visible;
   }
@@ -241,7 +241,7 @@ export class Map3dSystem extends AbstractSystem {
   /**
    * This sets up the keybinding, replacing existing if needed
    */
-  private _setupKeybinding(): void {
+  protected _setupKeybinding(): void {
     const context = this.context;
     const keybinding = context.keybinding();
     const l10n = this.context.systems.l10n;
@@ -259,7 +259,7 @@ export class Map3dSystem extends AbstractSystem {
    * Load the MapLibre JS and CSS files into the document head
    * @return  Promise resolved when both files have been loaded
    */
-  private _loadMapLibreAsync(): Promise<void> {
+  protected _loadMapLibreAsync(): Promise<void> {
     if (this._loadPromise) return this._loadPromise;
 
     // Tell the AssetSystem what to load..
@@ -311,7 +311,7 @@ export class Map3dSystem extends AbstractSystem {
   /**
    * Redraw the 3d map
    */
-  redraw(): void {
+  public redraw(): void {
     if (!this.visible) return;
     this.updateViewport();
     this.updateData();
@@ -322,7 +322,7 @@ export class Map3dSystem extends AbstractSystem {
    * Redraw after a delay.
    * Uses `throttle` to avoid performing redraws too frequently.
    */
-  deferredRedraw(): void {
+  public deferredRedraw(): void {
     const scheduler = this.context.systems.scheduler;
     if (scheduler) {
       scheduler.throttle('map3d-redraw', () => this.redraw(), { ms: 50 });
@@ -335,7 +335,7 @@ export class Map3dSystem extends AbstractSystem {
   /**
    * Adjust the 3d map to follow the main map, applying any zoom and rotation offsets.
    */
-  updateViewport(): void {
+  public updateViewport(): void {
     const context = this.context;
     const maplibre = this.maplibre;
     const viewport = context.viewport;
@@ -363,7 +363,7 @@ export class Map3dSystem extends AbstractSystem {
    * @param currParams - The current hash parameters
    * @param prevParams - The previous hash parameters
    */
-  private _hashChanged(currParams: Map<string, string>, prevParams: Map<string, string>): void {
+  protected _hashChanged(currParams: Map<string, string>, prevParams: Map<string, string>): void {
     // map3d
     const newMap3d = currParams.get('map3d');
     const oldMap3d = prevParams.get('map3d');
@@ -382,7 +382,7 @@ export class Map3dSystem extends AbstractSystem {
    * Respond to changes in the 3d map, for example if the user interacts with it.
    * Update zoom and bearing offsets from main map, and recenter the main map if needed.
    */
-  private _map3dmoved(): void {
+  protected _map3dmoved(): void {
     const context = this.context;
     const maplibre = this.maplibre;
     const map = context.systems.map;
@@ -417,7 +417,7 @@ export class Map3dSystem extends AbstractSystem {
    * Collect features in view, filter them according to what we want to show,
    * then update the data in the 3d map.
    */
-  updateData(): void {
+  public updateData(): void {
     if (!this.visible) return;
     if (!this.maplibre) return;   // called too soon?
 
@@ -457,7 +457,7 @@ export class Map3dSystem extends AbstractSystem {
 
   /**
    */
-  private _updateBuildingData(entities: OsmEntity[]): void {
+  protected _updateBuildingData(entities: OsmEntity[]): void {
     const context = this.context;
     const editor = context.systems.editor;
     if (!editor) return;
@@ -522,7 +522,7 @@ export class Map3dSystem extends AbstractSystem {
 
   /**
    */
-  private _updateAreaData(entities: OsmEntity[]): void {
+  protected _updateAreaData(entities: OsmEntity[]): void {
     const context = this.context;
     const editor = context.systems.editor;
     if (!editor) return;
@@ -571,7 +571,7 @@ export class Map3dSystem extends AbstractSystem {
 
   /**
    */
-  private _updateRoadData(entities: OsmEntity[]): void {
+  protected _updateRoadData(entities: OsmEntity[]): void {
     const context = this.context;
     const editor = context.systems.editor;
     if (!editor) return;
@@ -623,7 +623,7 @@ export class Map3dSystem extends AbstractSystem {
    * Returns a maplibre layer style specification that appropriately styles 3D buildings using
    * data-driven styling for selected features. Features with no height data are drawn as flat polygons.
    */
-  private _getBuildingLayer(): LayerSpecification {
+  protected _getBuildingLayer(): LayerSpecification {
     return {
       id: 'building-layer',
       type: 'fill-extrusion',
@@ -648,7 +648,7 @@ export class Map3dSystem extends AbstractSystem {
   /**
    * Returns a maplibre layer style specification that appropriately styles areas.
    */
-  private _getAreaLayer(): LayerSpecification {
+  protected _getAreaLayer(): LayerSpecification {
     return {
       id: 'area-layer',
       type: 'fill',
@@ -666,7 +666,7 @@ export class Map3dSystem extends AbstractSystem {
   /**
    * Returns a maplibre layer style specification that widens the road casing to be just above the stroke.
    */
-  private _getRoadCasingLayer(): LayerSpecification {
+  protected _getRoadCasingLayer(): LayerSpecification {
     return {
       id: 'road-casing-layer',
       type: 'line',
@@ -688,7 +688,7 @@ export class Map3dSystem extends AbstractSystem {
    * Returns a maplibre layer style specification that appropriately styles a wide extra casing around any selected roads.
    * Also uses the same 'selected' color as the building layer.
    */
-  private _getRoadSelectedLayer(): LayerSpecification {
+  protected _getRoadSelectedLayer(): LayerSpecification {
     return {
       id: 'road-selected-layer',
       type: 'line',
@@ -711,7 +711,7 @@ export class Map3dSystem extends AbstractSystem {
    * Returns a maplibre layer style specification that appropriately styles the road stroke to be just thinner than the casing.
    * Also uses the same stroke color as the main OSM styling.
    */
-  private _getRoadStrokeLayer(): LayerSpecification {
+  protected _getRoadStrokeLayer(): LayerSpecification {
     return {
       id: 'road-stroke-layer',
       type: 'line',
@@ -742,7 +742,7 @@ export class Map3dSystem extends AbstractSystem {
    * Returns a line width interpolator, to scale the line width based on zoom.
    * @param  baseWidth - the base width in pixels
    */
-  private _getLineWidth(baseWidth: number): DataDrivenPropertyValueSpecification<number> {
+  protected _getLineWidth(baseWidth: number): DataDrivenPropertyValueSpecification<number> {
     return [
       'interpolate',
       ['exponential', 2],

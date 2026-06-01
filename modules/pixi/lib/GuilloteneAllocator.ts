@@ -53,23 +53,23 @@ export interface AllocatedRect extends PIXI.Rectangle {
  */
 class Area {
 
-  static makeArea(openOffset: number, closeOffset: number, orientation: AreaOrientation): number {
+  public static makeArea(openOffset: number, closeOffset: number, orientation: AreaOrientation): number {
     return openOffset | (closeOffset << 15) | (orientation << 30);
   }
 
-  static getOpenOffset(area: number): number {
+  public static getOpenOffset(area: number): number {
     return area & ((1 << 15) - 1);
   }
 
-  static getCloseOffset(area: number): number {
+  public static getCloseOffset(area: number): number {
     return (area >> 15) & ((1 << 15) - 1);
   }
 
-  static getOrientation(area: number): AreaOrientation {
+  public static getOrientation(area: number): AreaOrientation {
     return (area >> 30) & 1;
   }
 
-  static setOpenOffset(area: number, offset: number): number {
+  public static setOpenOffset(area: number, offset: number): number {
     return Area.makeArea(
       offset,
       Area.getCloseOffset(area),
@@ -77,7 +77,7 @@ class Area {
     );
   }
 
-  static setCloseOffset(area: number, offset: number): number {
+  public static setCloseOffset(area: number, offset: number): number {
     return Area.makeArea(
       Area.getOpenOffset(offset),
       offset,
@@ -89,12 +89,12 @@ class Area {
 
 
 export class GuilloteneAllocator {
-  private _tempRect: PIXI.Rectangle;
-  private _width: number;
-  private _height: number;
-  private _root: AreaNode;
+  protected _tempRect: PIXI.Rectangle;
+  protected _width: number;
+  protected _height: number;
+  protected _root: AreaNode;
 
-  constructor(width: number, height: number) {
+  public constructor(width: number, height: number) {
     this._tempRect = new PIXI.Rectangle();
     this._width = width;
     this._height = height;
@@ -116,7 +116,7 @@ export class GuilloteneAllocator {
    * @param height - The height required for the allocated area.
    * @return The rectangle frame of the area allocated, or null if allocation failed.
    */
-  allocate(width: number, height: number): AllocatedRect | null {
+  public allocate(width: number, height: number): AllocatedRect | null {
     const area = this.findArea(width, height);
     if (!area) return null;
 
@@ -138,18 +138,18 @@ export class GuilloteneAllocator {
    * {@link GuilloteneAllocator#allocate} included this pointer (the `__mem_area` property).
    * @param rect - The rectangle to free
    */
-  free(rect: AllocatedRect): void {
+  public free(rect: AllocatedRect): void {
     const area = rect.__mem_area;
     if (!area) return;
     area[2] = false;
     this._merge(area);
   }
 
-  get width(): number {
+  public get width(): number {
     return this._width;
   }
 
-  get height(): number {
+  public get height(): number {
     return this._height;
   }
 
@@ -158,7 +158,7 @@ export class GuilloteneAllocator {
    * @param node
    * @return The parent of `node`
    */
-  getParent(node: AreaNode): AreaNode | null {
+  public getParent(node: AreaNode): AreaNode | null {
     return node[0];
   }
 
@@ -167,7 +167,7 @@ export class GuilloteneAllocator {
    * @param node
    * @returns The area data for the node.
    */
-  getAreaField(node: AreaNode): number {
+  public getAreaField(node: AreaNode): number {
     return node[1];
   }
 
@@ -178,7 +178,7 @@ export class GuilloteneAllocator {
    * @param rect - An optional `Rectangle` instance to put the data in.
    * @return The rectangle covered by `node`.
    */
-  getFrame(node: AreaNode, rect?: PIXI.Rectangle): PIXI.Rectangle {
+  public getFrame(node: AreaNode, rect?: PIXI.Rectangle): PIXI.Rectangle {
     if (!rect) {
       rect = new PIXI.Rectangle();
     }
@@ -212,7 +212,7 @@ export class GuilloteneAllocator {
    * @param node
    * @return Whether the given node has any children.
    */
-  hasChildren(node: AreaNode): boolean {
+  public hasChildren(node: AreaNode): boolean {
     return (Array.isArray(node[2]) && (node[2].length !== 0));
   }
 
@@ -220,14 +220,14 @@ export class GuilloteneAllocator {
    * Returns the children of the passed node, if any.
    * @param node
    */
-  getChildren(node: AreaNode): AreaNode[] {
+  public getChildren(node: AreaNode): AreaNode[] {
     if (!Array.isArray(node[2])) {
       throw new Error('Children do not exist');
     }
     return node[2];
   }
 
-  addChild(parent: AreaNode, ...nodes: AreaNode[]): void {
+  public addChild(parent: AreaNode, ...nodes: AreaNode[]): void {
     parent[2] = Array.isArray(parent[2]) ? parent[2] : [];
     parent[2].push(...nodes);
   }
@@ -238,7 +238,7 @@ export class GuilloteneAllocator {
    * @param aw
    * @param ah
    */
-  findArea(aw: number, ah: number): AreaNode | null {
+  public findArea(aw: number, ah: number): AreaNode | null {
     return this.findAreaRecursive(this._root, aw, ah);
   }
 
@@ -247,7 +247,7 @@ export class GuilloteneAllocator {
    * @param aw
    * @param ah
    */
-  findAreaRecursive(node: AreaNode, aw: number, ah: number): AreaNode | null {
+  public findAreaRecursive(node: AreaNode, aw: number, ah: number): AreaNode | null {
     const frame = this.getFrame(node, this._tempRect);
     if (frame.width < aw || frame.height < ah) return null;
 
@@ -295,7 +295,7 @@ export class GuilloteneAllocator {
    * @param hole
    * @returns  the SplitOrientation value
    */
-  splitOrientation(host: PIXI.Rectangle, hole: PIXI.Rectangle): SplitOrientation {
+  public splitOrientation(host: PIXI.Rectangle, hole: PIXI.Rectangle): SplitOrientation {
     if (hole.width === host.width && hole.height === host.height) {
       return SplitOrientation.NONE;
     }
@@ -349,7 +349,7 @@ export class GuilloteneAllocator {
    * @param orientation - SplitOrientation value
    * @returns The area node
    */
-  split(area: AreaNode, areaFrame: PIXI.Rectangle, holeFrame: PIXI.Rectangle, orientation?: SplitOrientation): AreaNode {
+  public split(area: AreaNode, areaFrame: PIXI.Rectangle, holeFrame: PIXI.Rectangle, orientation?: SplitOrientation): AreaNode {
     if (orientation === undefined) {
       orientation = this.getParent(area) ? this.splitOrientation(areaFrame, holeFrame) : SplitOrientation.HOR;
     }
@@ -371,7 +371,7 @@ export class GuilloteneAllocator {
   }
 
 
-  private _splitPrimaryHorizontal(area: AreaNode, areaFrame: PIXI.Rectangle, holeFrame: PIXI.Rectangle): AreaNode {
+  protected _splitPrimaryHorizontal(area: AreaNode, areaFrame: PIXI.Rectangle, holeFrame: PIXI.Rectangle): AreaNode {
     const field = this.getAreaField(area);
     const axis = Area.getOrientation(field);
     const parent = this.getParent(area);
@@ -424,7 +424,7 @@ export class GuilloteneAllocator {
   }
 
 
-  private _splitPrimaryVertical(area: AreaNode, areaFrame: PIXI.Rectangle, holeFrame: PIXI.Rectangle): AreaNode {
+  protected _splitPrimaryVertical(area: AreaNode, areaFrame: PIXI.Rectangle, holeFrame: PIXI.Rectangle): AreaNode {
     const field = this.getAreaField(area);
     const axis = Area.getOrientation(field);
     const parent = this.getParent(area);
@@ -477,7 +477,7 @@ export class GuilloteneAllocator {
   }
 
 
-  private _merge(area: AreaNode): void {
+  protected _merge(area: AreaNode): void {
     if (this.hasChildren(area)) {
       throw new Error('Cannot merge a non-leaf node');
     }
@@ -510,7 +510,7 @@ export class GuilloteneAllocator {
   }
 
 
-  printState(area: AreaNode): void {
+  public printState(area: AreaNode): void {
     if (!this.hasChildren(area)) {
       console.log({ ...this.getFrame(area) }, area[2]);  // eslint-disable-line no-console
     } else {

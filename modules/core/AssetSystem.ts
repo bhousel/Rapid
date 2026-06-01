@@ -63,21 +63,22 @@ export interface BundleAssetSource {
  *   `origin`    'latest' or 'local' - the fallback origin when asset is not found in 'preferred'
  */
 export class AssetSystem extends AbstractSystem {
+
   /**
    * Map of string AssetID to AssetSource record of properties.
    * AssetIDs are string identifiers like 'address_formats', 'languages', 'oci_defaults'.
    */
-  sources: Record<AssetID, AssetSource>;
+  public sources: Record<AssetID, AssetSource>;
 
   /** Map of bundled assets - multiple files fetched together and returned as combined object */
-  bundles: Record<AssetID, BundleAssetSource>;
+  public bundles: Record<AssetID, BundleAssetSource>;
 
   /**
    * Fallback origin
    * The fallback origin (checked after 'preferred') must be set to 'local' or 'latest'.
    * (This must set before init, and should not be changed later)
    */
-  origin: 'latest' | 'local';
+  public origin: 'latest' | 'local';
 
   /**
    * Root folder path for assets, with trailing slash (e.g. 'dist/')
@@ -85,7 +86,7 @@ export class AssetSystem extends AbstractSystem {
    * If used, it should have a trailing slash, for example 'dist/'
    * (This must set before init, and should not be changed later)
    */
-  filePath: string;
+  public filePath: string;
 
   /**
    * Custom filename replacements, e.g. from Rails asset pipeline
@@ -101,17 +102,17 @@ export class AssetSystem extends AbstractSystem {
    * ```
    * (This must set before init, and should not be changed later)
    */
-  fileReplacements: Record<string, string>;
+  public fileReplacements: Record<string, string>;
 
   /** Cache of loaded asset data, keyed by asset identifier */
-  private _loaded: Record<AssetID, unknown>;
+  protected _loaded: Record<AssetID, unknown>;
 
 
   /**
    * @constructor
    * @param context - Global shared application context
    */
-  constructor(context: Context) {
+  public constructor(context: Context) {
     super(context);
     this.id = 'assets';
     this.requiredDependencies = new Set<SystemID>(['network']);
@@ -160,7 +161,7 @@ export class AssetSystem extends AbstractSystem {
    * Called after all core objects have been constructed.
    * @return  Promise resolved when this component has completed initialization
    */
-  initAsync(): Promise<void> {
+  public initAsync(): Promise<void> {
     if (this._initPromise) return this._initPromise;
 
     const context = this.context;
@@ -193,7 +194,7 @@ export class AssetSystem extends AbstractSystem {
    * Called after all core objects have been initialized.
    * @return  Promise resolved when this component has completed startup
    */
-  startAsync(): Promise<void> {
+  public startAsync(): Promise<void> {
     return super.startAsync();
   }
 
@@ -202,7 +203,7 @@ export class AssetSystem extends AbstractSystem {
    * Called after completing an edit session to reset any internal state
    * @return  Promise resolved when this component has completed resetting
    */
-  resetAsync(): Promise<void> {
+  public resetAsync(): Promise<void> {
     return super.resetAsync();
   }
 
@@ -214,7 +215,7 @@ export class AssetSystem extends AbstractSystem {
    * @param assetSource - source information
    * @throws Will throw if a reserved assetID is used.
    */
-  registerAsset(assetID: AssetID, source: AssetSource = {}): void {
+  public registerAsset(assetID: AssetID, source: AssetSource = {}): void {
     if (assetID === 'default') {
       throw new Error(`AssetSystem: assetID "${assetID}" is a reserved word`);
     }
@@ -229,7 +230,7 @@ export class AssetSystem extends AbstractSystem {
    * @param parts - Object mapping a BundlePartID to AssetSource for each part
    * @throws Will throw if a reserved assetID is used.
    */
-  registerBundleAsset(assetID: AssetID, parts: Record<BundlePartID, AssetSource>): void {
+  public registerBundleAsset(assetID: AssetID, parts: Record<BundlePartID, AssetSource>): void {
     if (assetID === 'default') {
       throw new Error(`AssetSystem: assetID "${assetID}" is a reserved word`);
     }
@@ -244,7 +245,7 @@ export class AssetSystem extends AbstractSystem {
    * @param val - asset path
    * @return The real URL pointing to that filename
    */
-  getFileURL(val: AssetPath): string {
+  public getFileURL(val: AssetPath): string {
     if (/^http(s)?:\/\//i.test(val)) return val;  // already a url
 
     const filename = `${this.filePath}${val}`;
@@ -259,7 +260,7 @@ export class AssetSystem extends AbstractSystem {
    * @return URL of the asset
    * @throws Will throw if the assetID is not found, or if an asset path can't be determined
    */
-  getAssetURL(assetID: AssetID): string {
+  public getAssetURL(assetID: AssetID): string {
     if (/^http(s)?:\/\//i.test(assetID)) return assetID;  // already a url
 
     const source = this.sources[assetID];
@@ -287,7 +288,7 @@ export class AssetSystem extends AbstractSystem {
    * @param assetID - identifier for the data, should be found in the asset map.
    * @return Promise resolved with the data
    */
-  loadAssetAsync(assetID: AssetID): Promise<unknown> {
+  public loadAssetAsync(assetID: AssetID): Promise<unknown> {
     if (this._loaded[assetID]) {
       return Promise.resolve(this._loaded[assetID]);
     }
@@ -328,7 +329,7 @@ export class AssetSystem extends AbstractSystem {
    * @param assetID - asset identifier for the bundle
    * @return Promise resolved with combined data object
    */
-  loadBundleAssetAsync(assetID: AssetID): Promise<Record<BundlePartID, unknown>> {
+  public loadBundleAssetAsync(assetID: AssetID): Promise<Record<BundlePartID, unknown>> {
     if (this._loaded[assetID]) {
       return Promise.resolve(this._loaded[assetID] as Record<BundlePartID, unknown>);
     }

@@ -9,17 +9,19 @@ import type { Keybinding } from '../util/keybinding.ts';
  * ("operations" are the things that go on the editing menu)
  */
 export class KeyOperationBehavior extends AbstractBehavior {
+
   /** The operation this behavior is associated with */
-  private _operation: any;
+  protected _operation: any;
   /** The keybinding handler for document-level key events */
-  private _keybinding: Keybinding | null;
+  protected _keybinding: Keybinding | null;
+
 
   /**
    * @constructor
    * @param  context - Global shared application context
    * @param  operation - The operation this behavior is associated with
    */
-  constructor(context: Context, operation: any) {
+  public constructor(context: Context, operation: any) {
     super(context);
     this.id = `key-${operation.id}`;
 
@@ -39,7 +41,7 @@ export class KeyOperationBehavior extends AbstractBehavior {
   /**
    * Bind event handlers
    */
-  enable(): void {
+  public enable(): void {
     if (this._enabled) return;
 
     const operation = this._operation;
@@ -53,7 +55,7 @@ export class KeyOperationBehavior extends AbstractBehavior {
   /**
    * Unbind event handlers
    */
-  disable(): void {
+  public disable(): void {
     if (!this._enabled) return;
     this._enabled = false;
 
@@ -68,7 +70,7 @@ export class KeyOperationBehavior extends AbstractBehavior {
    * Handles the keydown event
    * @param  e - A d3 keydown event
    */
-  _keydown(e: KeyboardEvent): void {
+  protected _keydown(e: KeyboardEvent): void {
     const context = this.context;
     const operation = this._operation;
     const ui = context.systems.ui!;

@@ -1,7 +1,6 @@
-import { Extent } from '@rapid-sdk/math';
-
 import { AbstractMode } from './AbstractMode.ts';
 import { AbstractData, GeoJSONData, MarkerData } from '../data/index.ts';
+import { Extent } from '@rapid-sdk/math';
 import { uiOsmoseEditor } from '../ui/osmose_editor.js';
 import { uiDataEditor } from '../ui/data_editor.js';
 import { uiDetectionInspector } from '../ui/detection_inspector.js';
@@ -28,14 +27,16 @@ export interface SelectModeOptions {
  * - We also can set up the "operations" allowed (right click edit menu)
  */
 export class SelectMode extends AbstractMode {
+
   /** The total extent of selected features */
-  extent: Extent | null;
+  public extent: Extent | null;
+
 
   /**
    * @constructor
    * @param  context - Global shared application context
    */
-  constructor(context: Context) {
+  public constructor(context: Context) {
     super(context);
     this.id = 'select';
 
@@ -48,7 +49,7 @@ export class SelectMode extends AbstractMode {
    * @param  options - Optional options object
    * @return `true` if mode could be entered, `false` it not
    */
-  enter(options: SelectModeOptions = {}): boolean {
+  public enter(options: SelectModeOptions = {}): boolean {
     const selection = options.selection;
     if (!(selection instanceof Map)) return false;
     if (!selection.size) return false;
@@ -210,7 +211,7 @@ export class SelectMode extends AbstractMode {
   /**
    * Exits the mode, clearing selection state and hiding sidebar.
    */
-  exit(): void {
+  public exit(): void {
     if (!this._active) return;
     this._active = false;
 

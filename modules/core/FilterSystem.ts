@@ -1,6 +1,5 @@
-import { /* utilArrayGroupBy,*/ utilArrayUnion } from '@rapid-sdk/util';
-
 import { AbstractSystem } from './AbstractSystem.ts';
+import { utilArrayUnion } from '@rapid-sdk/util';
 import { utilExtractValues } from '../util/string.ts';
 
 import type { Context } from '../Context.ts';
@@ -37,13 +36,17 @@ interface PresetLike {
  */
 class Filter {
   /** The match function that tests tags and geometry */
-  match: FilterMatchFn;
+  public match: FilterMatchFn;
   /** true = shown, false = hidden */
-  enabled: boolean;
+  public enabled: boolean;
   /** Number of objects currently filtered */
-  count: number;
+  public count: number;
 
-  constructor(fn: FilterMatchFn) {
+  /**
+   * @constructor
+   * @param  fn  The match function for this Filter
+   */
+  public constructor(fn: FilterMatchFn) {
     this.match = fn;
     this.enabled = true;
     this.count = 0;
@@ -61,19 +64,20 @@ class Filter {
  */
 export class FilterSystem extends AbstractSystem {
   /** Map of filterID to Filter */
-  private _filters: Map<FilterID, Filter>;
+  protected _filters: Map<FilterID, Filter>;
   /** Set of filterIDs to hide */
-  private _hidden: Set<FilterID>;
+  protected _hidden: Set<FilterID>;
   /** Set of entityIDs to force visible */
-  private _forceVisible: Set<EntityID>;
+  protected _forceVisible: Set<EntityID>;
   /** Cache of entity.key to matched filterIDs */
-  private _cache: Record<string, EntityCache>;
+  protected _cache: Record<string, EntityCache>;
+
 
   /**
    * @constructor
    * @param context - Global shared application context
    */
-  constructor(context: Context) {
+  public constructor(context: Context) {
     super(context);
     this.id = 'filters';
     this.requiredDependencies = new Set(['editor']);
@@ -112,7 +116,7 @@ export class FilterSystem extends AbstractSystem {
    * Called after all core objects have been constructed.
    * @return Promise resolved when this component has completed initialization
    */
-  initAsync(): Promise<void> {
+  public initAsync(): Promise<void> {
     if (this._initPromise) return this._initPromise;
 
     const context = this.context;
@@ -134,7 +138,7 @@ export class FilterSystem extends AbstractSystem {
    * Called after all core objects have been initialized.
    * @return Promise resolved when this component has completed startup
    */
-  startAsync(): Promise<void> {
+  public startAsync(): Promise<void> {
     if (this._startPromise) return this._startPromise;
 
     const context = this.context;
@@ -163,7 +167,7 @@ export class FilterSystem extends AbstractSystem {
    * Called after completing an edit session to reset any internal state
    * @return Promise resolved when this component has completed resetting
    */
-  resetAsync(): Promise<void> {
+  public resetAsync(): Promise<void> {
     this._cache = {};
     this._forceVisible.clear();
     return Promise.resolve();
@@ -172,7 +176,7 @@ export class FilterSystem extends AbstractSystem {
 
   /**
    */
-  get keys(): string[] {
+  public get keys(): string[] {
     return [...this._filters.keys()];
   }
 
@@ -180,7 +184,7 @@ export class FilterSystem extends AbstractSystem {
   /**
    * @return Set of hidden FilterIDs
    */
-  get hidden(): Set<FilterID> {
+  public get hidden(): Set<FilterID> {
     return this._hidden;
   }
 
@@ -189,7 +193,7 @@ export class FilterSystem extends AbstractSystem {
    * @param filterID - FilterID to check
    * @return true/false
    */
-  isEnabled(filterID: FilterID): boolean {
+  public isEnabled(filterID: FilterID): boolean {
     const filter = this._filters.get(filterID);
     return filter?.enabled ?? false;
   }
@@ -199,7 +203,7 @@ export class FilterSystem extends AbstractSystem {
    * Enables the given filter
    * @param filterID - FilterID to enable
    */
-  enable(filterID: FilterID): void {
+  public enable(filterID: FilterID): void {
     const filter = this._filters.get(filterID);
     if (filter && !filter.enabled) {
       filter.enabled = true;
@@ -211,7 +215,7 @@ export class FilterSystem extends AbstractSystem {
   /**
    * Enables all filters
    */
-  enableAll(): void {
+  public enableAll(): void {
     let didChange = false;
     for (const filter of this._filters.values()) {
       if (!filter.enabled) {
@@ -229,7 +233,7 @@ export class FilterSystem extends AbstractSystem {
    * Disables the given filter
    * @param filterID - FilterID to disable
    */
-  disable(filterID: FilterID): void {
+  public disable(filterID: FilterID): void {
     const filter = this._filters.get(filterID);
     if (filter?.enabled) {
       filter.enabled = false;
@@ -241,7 +245,7 @@ export class FilterSystem extends AbstractSystem {
   /**
    * Disables all filters
    */
-  disableAll(): void {
+  public disableAll(): void {
     let didChange = false;
     for (const filter of this._filters.values()) {
       if (filter.enabled) {
@@ -259,7 +263,7 @@ export class FilterSystem extends AbstractSystem {
    * Toggles the given filter between enabled/disabled states
    * @param filterID - Filter ID to toggle
    */
-  toggle(filterID: FilterID): void {
+  public toggle(filterID: FilterID): void {
     const filter = this._filters.get(filterID);
     if (!filter) return;
 
@@ -311,7 +315,7 @@ export class FilterSystem extends AbstractSystem {
    *  and how many entities in the scene are filtered.
    * @return  Result object
    */
-  getStats(): FilterStats {
+  public getStats(): FilterStats {
     const result: FilterStats = {};
     for (const [filterID, filter] of this._filters) {
       result[filterID] = {
@@ -327,7 +331,7 @@ export class FilterSystem extends AbstractSystem {
    * Clears the cache of entity matches for the given entities
    * @param entities - Entities to clear cache
    */
-  clear(entities: OsmEntity[]): void {
+  public clear(entities: OsmEntity[]): void {
     for (const entity of entities) {
       this.clearEntity(entity);
     }
@@ -338,7 +342,7 @@ export class FilterSystem extends AbstractSystem {
    * Clears the cache of entity matches for a single entity
    * @param entity - Entity to clear
    */
-  clearEntity(entity: OsmEntity): void {
+  public clearEntity(entity: OsmEntity): void {
     const ekey = entity.key;
     delete this._cache[ekey];
   }
@@ -351,7 +355,7 @@ export class FilterSystem extends AbstractSystem {
    * @param geometry - geometry of the Entity ('point', 'line', 'vertex', 'area', 'relation')
    * @return A Set containing the matched filterIDs
    */
-  getMatches(entity: OsmEntity, graph: Graph, geometry: GeometryType): Set<string> {
+  public getMatches(entity: OsmEntity, graph: Graph, geometry: GeometryType): Set<string> {
     // skip - vertexes are hidden based on whatever filters their parent ways have matched
     if (geometry === 'vertex') return new Set();
     // skip - most relations don't have a geometry worth checking
@@ -419,7 +423,7 @@ export class FilterSystem extends AbstractSystem {
    * @param geometry - geometry of the Entity ('point', 'line', 'vertex', 'area', 'relation')
    * @return An array of parent entities
    */
-  getParents(entity: OsmEntity, graph: Graph, geometry: GeometryType): OsmEntity[] {
+  public getParents(entity: OsmEntity, graph: Graph, geometry: GeometryType): OsmEntity[] {
     if (geometry === 'point') return [];
 
     const ekey = entity.key;
@@ -448,7 +452,7 @@ export class FilterSystem extends AbstractSystem {
    * @param geometry - geometry of the Preset ('point', 'line', 'vertex', 'area', 'relation')
    * @return The first `filterID` which causes the Preset to be hidden, or `null`
    */
-  isHiddenPreset(preset: PresetLike, geometry: GeometryType): FilterID | null {
+  public isHiddenPreset(preset: PresetLike, geometry: GeometryType): FilterID | null {
     if (!this._hidden.size) return null;
     if (!preset.tags) return null;
 
@@ -474,7 +478,7 @@ export class FilterSystem extends AbstractSystem {
    * @param geometry - geometry of the Entity ('point', 'line', 'vertex', 'area', 'relation')
    * @return The first `filterID` which causes the Entity to be hidden, or `null`
    */
-  isHiddenFeature(entity: OsmEntity, graph: Graph, geometry: GeometryType): FilterID | null {
+  public isHiddenFeature(entity: OsmEntity, graph: Graph, geometry: GeometryType): FilterID | null {
     if (!this._hidden.size) return null;
     if (!entity.version) return null;
     if (this._forceVisible.has(entity.id)) return null;
@@ -495,7 +499,7 @@ export class FilterSystem extends AbstractSystem {
    * @param graph - Graph
    * @return The first `filterID` which causes the Entity to be hidden, or `null`
    */
-  isHiddenVertex(entity: OsmEntity, graph: Graph): FilterID | null {
+  public isHiddenVertex(entity: OsmEntity, graph: Graph): FilterID | null {
     if (!this._hidden.size) return null;
     if (!entity.version) return null;
     if (this._forceVisible.has(entity.id)) return null;
@@ -519,7 +523,7 @@ export class FilterSystem extends AbstractSystem {
    * @param graph - Graph
    * @return true/false
    */
-  hasHiddenConnections(entity: OsmEntity, graph: Graph): boolean {
+  public hasHiddenConnections(entity: OsmEntity, graph: Graph): boolean {
     if (!this._hidden.size) return false;
 
     let childNodes: OsmEntity[];
@@ -549,7 +553,7 @@ export class FilterSystem extends AbstractSystem {
    * @param geometry - geometry of the Entity ('point', 'line', 'vertex', 'area', 'relation')
    * @return The first `filterID` which causes the Entity to be hidden, or `null`
    */
-  isHidden(entity: OsmEntity, graph: Graph, geometry: GeometryType): FilterID | null {
+  public isHidden(entity: OsmEntity, graph: Graph, geometry: GeometryType): FilterID | null {
     if (!this._hidden.size) return null;
     if (!entity.version) return null;
 
@@ -569,7 +573,7 @@ export class FilterSystem extends AbstractSystem {
    * @param graph - Graph
    * @return Array of non-hidden entities
    */
-  filterScene(entities: OsmEntity[], graph: Graph): OsmEntity[] {
+  public filterScene(entities: OsmEntity[], graph: Graph): OsmEntity[] {
     for (const filter of this._filters.values()) {
       filter.count = 0;
     }
@@ -602,7 +606,7 @@ export class FilterSystem extends AbstractSystem {
    * that might otherwise be hidden
    * @param entityIDs - Array of Entity ids
    */
-  forceVisible(entityIDs: EntityID[]): void {
+  public forceVisible(entityIDs: EntityID[]): void {
     this._forceVisible = new Set();
 
     const editor = this.context.systems.editor;
@@ -627,7 +631,7 @@ export class FilterSystem extends AbstractSystem {
    * @param currParams - The current hash parameters
    * @param prevParams - The previous hash parameters
    */
-  _hashChanged(currParams: Map<string, string>, prevParams: Map<string, string>): void {
+  protected _hashChanged(currParams: Map<string, string>, prevParams: Map<string, string>): void {
     // disable_features
     const newDisable = currParams.get('disable_features') || '';
     const oldDisable = prevParams.get('disable_features') || '';
@@ -658,7 +662,7 @@ export class FilterSystem extends AbstractSystem {
    * Used to push changes in state to the urlhash and the localStorage,
    *   then trigger a redraw, and emit a 'filterchange' event.
    */
-  _filterChanged(): void {
+  protected _filterChanged(): void {
     const context = this.context;
     const gfx = context.systems.gfx;
     const storage = context.systems.storage;
@@ -686,78 +690,78 @@ export class FilterSystem extends AbstractSystem {
 
   // matchers
 
-  _isPoint(tags: OsmTags, geometry?: GeometryType): boolean {
+  protected _isPoint(tags: OsmTags, geometry?: GeometryType): boolean {
     return geometry === 'point';
   }
 
-  _isTrafficRoad(tags: OsmTags): boolean {
+  protected _isTrafficRoad(tags: OsmTags): boolean {
     const schema = this.context.systems.schema;
     return !!schema?.getScope('osm')?.rulesets.get('major_vehicular')?.match(tags);
   }
 
-  _isServiceRoad(tags: OsmTags): boolean {
+  protected _isServiceRoad(tags: OsmTags): boolean {
     const schema = this.context.systems.schema;
     return !!schema?.getScope('osm')?.rulesets.get('minor_vehicular')?.match(tags);
   }
 
-  _isPath(tags: OsmTags): boolean {
+  protected _isPath(tags: OsmTags): boolean {
     const schema = this.context.systems.schema;
     return !!schema?.getScope('osm')?.rulesets.get('path_highway')?.match(tags);
   }
 
-  _isBuilding(tags: OsmTags): boolean {
+  protected _isBuilding(tags: OsmTags): boolean {
     const schema = this.context.systems.schema;
     return !!schema?.getScope('osm')?.rulesets.get('filter_building')?.match(tags) && !this._isPastFuture(tags);
   }
 
-  _isBuildingPart(tags: OsmTags): boolean {
+  protected _isBuildingPart(tags: OsmTags): boolean {
     const schema = this.context.systems.schema;
     return !!schema?.getScope('osm')?.rulesets.get('filter_building_part')?.match(tags);
   }
 
-  _isIndoor(tags: OsmTags): boolean {
+  protected _isIndoor(tags: OsmTags): boolean {
     const schema = this.context.systems.schema;
     return !!schema?.getScope('osm')?.rulesets.get('filter_indoor')?.match(tags);
   }
 
-  _isLanduse(tags: OsmTags, geometry?: GeometryType): boolean {
+  protected _isLanduse(tags: OsmTags, geometry?: GeometryType): boolean {
     if (geometry !== 'area') return false;
     const schema = this.context.systems.schema;
     return !!schema?.getScope('osm')?.rulesets.get('filter_landuse')?.match(tags) && !this._isPastFuture(tags);
   }
 
-  _isBoundary(tags: OsmTags): boolean {
+  protected _isBoundary(tags: OsmTags): boolean {
     const schema = this.context.systems.schema;
     return !!schema?.getScope('osm')?.rulesets.get('filter_boundary')?.match(tags);
   }
 
-  _isWater(tags: OsmTags): boolean {
+  protected _isWater(tags: OsmTags): boolean {
     const schema = this.context.systems.schema;
     return !!schema?.getScope('osm')?.rulesets.get('filter_water')?.match(tags) && !this._isPastFuture(tags);
   }
 
-  _isRail(tags: OsmTags): boolean {
+  protected _isRail(tags: OsmTags): boolean {
     const schema = this.context.systems.schema;
     return !!schema?.getScope('osm')?.rulesets.get('filter_rail')?.match(tags) && !this._isPastFuture(tags);
   }
 
-  _isPiste(tags: OsmTags): boolean {
+  protected _isPiste(tags: OsmTags): boolean {
     const schema = this.context.systems.schema;
     return !!schema?.getScope('osm')?.rulesets.get('filter_piste')?.match(tags);
   }
 
-  _isAerialway(tags: OsmTags): boolean {
+  protected _isAerialway(tags: OsmTags): boolean {
     const schema = this.context.systems.schema;
     return !!schema?.getScope('osm')?.rulesets.get('filter_aerialway')?.match(tags);
   }
 
-  _isPower(tags: OsmTags): boolean {
+  protected _isPower(tags: OsmTags): boolean {
     const schema = this.context.systems.schema;
     return !!schema?.getScope('osm')?.rulesets.get('filter_power')?.match(tags) && !this._isPastFuture(tags);
   }
 
   // contains a past/future tag, but not in active use as a road/path/cycleway/etc..
-  _isPastFuture(tags: OsmTags): boolean {
+  protected _isPastFuture(tags: OsmTags): boolean {
     const schema = this.context.systems.schema;
     const osmScope = schema?.getScope('osm');
     if (osmScope?.rulesets.get('connected_highway')?.match(tags)) return false;
@@ -783,7 +787,7 @@ export class FilterSystem extends AbstractSystem {
   // Lines or areas that don't match another feature filter.
   // IMPORTANT: The 'others' feature must be the last one defined,
   // so that code in getMatches can skip this test if someting else was matched.
-  _isOther(tags: OsmTags, geometry?: GeometryType): boolean {
+  protected _isOther(tags: OsmTags, geometry?: GeometryType): boolean {
     return (geometry === 'line' || geometry === 'area');
   }
 }

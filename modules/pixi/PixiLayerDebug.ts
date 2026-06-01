@@ -19,7 +19,7 @@ export class PixiLayerDebug extends AbstractPixiLayer {
    * @constructor
    * @param scene - The Scene that owns this Layer
    */
-  constructor(scene: PixiScene) {
+  public constructor(scene: PixiScene) {
     super(scene);
     this.id = 'debug';
     this.enabled = false;
@@ -29,7 +29,7 @@ export class PixiLayerDebug extends AbstractPixiLayer {
   /**
    * Every Layer should have a reset function to replace any Pixi objects and internal state.
    */
-  reset(): void {
+  public reset(): void {
     super.reset();
 
     // Items in this layer don't actually need to be interactive
@@ -43,7 +43,7 @@ export class PixiLayerDebug extends AbstractPixiLayer {
    * @param frame - Integer frame being rendered
    * @param viewport - Pixi viewport to use for rendering
    */
-  render(frame: number, viewport: Viewport): void {
+  public render(frame: number, viewport: Viewport): void {
     if (!this.enabled) return;
 
     function _isBuilding(entity: OsmEntity): boolean {

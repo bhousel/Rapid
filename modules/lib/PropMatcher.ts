@@ -114,28 +114,30 @@ export interface PropMatcherProps {
  *   `props` The full props object
  */
 export class PropMatcher {
-  props: PropMatcherProps;
+
+  public props: PropMatcherProps;
 
   /** The property key(s) to match (exact string, regex pattern string, or array of exact strings) */
-  readonly key: string | string[];
+  public readonly key: string | string[];
   /** Key matching mode: '=' for exact, '~' for regex, 'in' for list */
-  readonly keyOp: '=' | '~' | 'in';
+  public readonly keyOp: '=' | '~' | 'in';
   /** The comparison operator */
-  readonly op: PropMatcherOp;
+  public readonly op: PropMatcherOp;
   /** Cached RegExp for regex operations on key (when keyOp is '~') */
-  private _keyRegex: RegExp | null = null;
+  protected _keyRegex: RegExp | null = null;
   /** Cached Set for key-list lookups (when keyOp is 'in') */
-  private _keySet: Set<string> | null = null;
+  protected _keySet: Set<string> | null = null;
   /** Cached RegExp for regex operations on value */
-  private _valueRegex: RegExp | null = null;
+  protected _valueRegex: RegExp | null = null;
   /** Cached Set for value-list lookups (when op is 'in' or '!in') */
-  private _valueSet: Set<string> | null = null;
+  protected _valueSet: Set<string> | null = null;
   /** Raw var() reference string, if the value is a variable reference */
-  private _varRef: string | null = null;
+  protected _varRef: string | null = null;
   /** Resolved value after var() resolution — `null` means use raw props.value */
-  private _resolvedValue: string | number | string[] | RegExp | null = null;
+  protected _resolvedValue: string | number | string[] | RegExp | null = null;
   /** Whether to allow 'no' as a valid match for 'exists' and wildcard '*' ops */
-  private _allowNo: boolean;
+  protected _allowNo: boolean;
+
 
   /**
    * @constructor
@@ -143,7 +145,7 @@ export class PropMatcher {
    * @throws Error if `key` property is missing
    * @throws Error if regex pattern is invalid (for `~` or `!~` operators)
    */
-  constructor(props: PropMatcherProps) {
+  public constructor(props: PropMatcherProps) {
     // Validate and normalize the key
     const rawKey = props.key;
     if (rawKey instanceof RegExp) {
@@ -226,7 +228,7 @@ export class PropMatcher {
    * The value to compare against.
    * Returns the resolved value (after var() resolution) if available, otherwise the raw value.
    */
-  get value(): string | number | string[] | RegExp | undefined {
+  public get value(): string | number | string[] | RegExp | undefined {
     return this._resolvedValue ?? this.props.value;
   }
 
@@ -237,7 +239,7 @@ export class PropMatcher {
    * @param obj - The object with properties to test
    * @return `true` if the object matches, `false` otherwise
    */
-  matches(obj: Record<string, unknown>): boolean {
+  public matches(obj: Record<string, unknown>): boolean {
     if (!obj || typeof obj !== 'object') {
       // For 'exists'/'!exists' on null/undefined object
       return this.op === '!exists';
@@ -268,7 +270,7 @@ export class PropMatcher {
   /**
    * Test equality match.
    */
-  private _matchEquals(val: unknown): boolean {
+  protected _matchEquals(val: unknown): boolean {
     const expected = this.value;
 
     // Handle wildcard '*' - matches any truthy value
@@ -291,7 +293,7 @@ export class PropMatcher {
   /**
    * Test regex match.
    */
-  private _matchValueRegex(val: unknown): boolean {
+  protected _matchValueRegex(val: unknown): boolean {
     if (!this._valueRegex) return false;
     if (val === undefined || val === null) return false;
 
@@ -303,7 +305,7 @@ export class PropMatcher {
   /**
    * Test if value is in the precompiled Set.
    */
-  private _matchValueIn(val: unknown): boolean {
+  protected _matchValueIn(val: unknown): boolean {
     if (!this._valueSet) return false;
     if (val === undefined || val === null) return false;
 
@@ -315,7 +317,7 @@ export class PropMatcher {
   /**
    * Perform numeric comparison.
    */
-  private _compareValueNumeric(actualValue: unknown, compareFn: (a: number, b: number) => boolean): boolean {
+  protected _compareValueNumeric(actualValue: unknown, compareFn: (a: number, b: number) => boolean): boolean {
     const expected = this.value;
     if (typeof expected !== 'number') return false;
 
@@ -337,7 +339,7 @@ export class PropMatcher {
    * Apply a value-side check for a single actual value.
    * Handles all ops except 'exists' and '!exists' (which are handled by the caller).
    */
-  private _checkValueOp(val: unknown): boolean {
+  protected _checkValueOp(val: unknown): boolean {
     switch (this.op) {
       case '=':   return this._matchEquals(val);
       case '!=':  return !this._matchEquals(val);
@@ -359,7 +361,7 @@ export class PropMatcher {
    * against the pre-compiled key regex. For the first matching key, apply
    * the value check (op + value). For 'exists', just check that any key matches.
    */
-  private _matchKeyPattern(obj: Record<string, unknown>): boolean {
+  protected _matchKeyPattern(obj: Record<string, unknown>): boolean {
     const keyRegex = this._keyRegex!;
 
     // For '!exists', ALL keys must not match the pattern
@@ -394,7 +396,7 @@ export class PropMatcher {
    * For 'exists', returns true if any listed key exists. For '!exists',
    * returns true only if none of the listed keys exist.
    */
-  private _matchKeyList(obj: Record<string, unknown>): boolean {
+  protected _matchKeyList(obj: Record<string, unknown>): boolean {
     const keySet = this._keySet!;
 
     // For '!exists', ALL obj keys in our key set must have null/undefined values
@@ -428,7 +430,7 @@ export class PropMatcher {
    * @param input - PropMatcherProps, or shorthand formats
    * @return A new PropMatcher instance
    */
-  static from(input: PropMatcherProps | string): PropMatcher {
+  public static from(input: PropMatcherProps | string): PropMatcher {
     if (typeof input === 'string') {
       // Parse simple "key=value" format
       const eqIndex = input.indexOf('=');
@@ -454,7 +456,7 @@ export class PropMatcher {
    * @param obj - Object to test
    * @return `true` if all matchers match
    */
-  static matchAll(matchers: PropMatcher[], obj: Record<string, unknown>): boolean {
+  public static matchAll(matchers: PropMatcher[], obj: Record<string, unknown>): boolean {
     return matchers.every(m => m.matches(obj));
   }
 
@@ -467,7 +469,7 @@ export class PropMatcher {
    * @param obj - Object to test
    * @return `true` if any matcher matches
    */
-  static matchAny(matchers: PropMatcher[], obj: Record<string, unknown>): boolean {
+  public static matchAny(matchers: PropMatcher[], obj: Record<string, unknown>): boolean {
     return matchers.some(m => m.matches(obj));
   }
 
@@ -476,7 +478,7 @@ export class PropMatcher {
    * Whether this matcher has an unresolved `var()` reference.
    * @return `true` if the value contains a `var(...)` reference that hasn't been resolved
    */
-  get hasVarRef(): boolean {
+  public get hasVarRef(): boolean {
     return this._varRef !== null;
   }
 
@@ -489,7 +491,7 @@ export class PropMatcher {
    *
    * @param variables - Map of VariableID to Variable instances
    */
-  resolveVariables(variables: Map<VariableID, Variable>): void {
+  public resolveVariables(variables: Map<VariableID, Variable>): void {
     if (!this._varRef) return;
 
     const resolved = resolveVarRef(this._varRef, variables);
@@ -512,7 +514,7 @@ export class PropMatcher {
    * Called when variables change (e.g. on schema reload).
    * Only affects matchers that have var() references.
    */
-  reset(): void {
+  public reset(): void {
     if (!this._varRef) return;
     this._resolvedValue = null;
     this._valueSet = null;
@@ -523,7 +525,7 @@ export class PropMatcher {
   /**
    * Convert to a JSON-serializable object.
    */
-  toJSON(): PropMatcherProps {
+  public toJSON(): PropMatcherProps {
     const result: PropMatcherProps = { key: this.key };
 
     // Only include keyOp if it's not the inferred default
@@ -561,7 +563,7 @@ export class PropMatcher {
   /**
    * String representation for debugging.
    */
-  toString(): string {
+  public toString(): string {
     const value = this.value;
     let keyStr: string;
     if (this.keyOp === '~') {

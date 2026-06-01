@@ -102,24 +102,26 @@ interface FieldStrings {
  *   `geometries`          `Set<string>` Geometries that this Field works with
  */
 export class Field {
-  context: Context;
-  id: FieldID;
-  safeid: string;
-  fieldID: FieldID;
-  type: string;
-  props: FieldProps;
-  geometries: Set<GeometryType>;
 
-  private _strings: Map<string, FieldStrings>;
-  private _currLocaleCode: LocaleCode | null;
-  private _currStrings: FieldStrings;
+  public context: Context;
+  public id: FieldID;
+  public safeid: string;
+  public fieldID: FieldID;
+  public type: string;
+  public props: FieldProps;
+  public geometries: Set<GeometryType>;
+
+  protected _strings: Map<string, FieldStrings>;
+  protected _currLocaleCode: LocaleCode | null;
+  protected _currStrings: FieldStrings;
+
 
   /**
    * @constructor
    * @param context - Global shared application context
    * @param props - Properties for this Field
    */
-  constructor(context: Context, props: Partial<FieldProps> = {}) {
+  public constructor(context: Context, props: Partial<FieldProps> = {}) {
     this.context = context;
 
     if (!props.id) {
@@ -167,7 +169,7 @@ export class Field {
    * This should happen whenever SchemaSystem merges in new data.
    * You must add the Field to the SchemaSystem and call `reset` before using the Field.
    */
-  reset(): void {
+  public reset(): void {
     const l10n = this.context.systems.l10n;
 
     // Invalidate any cached string localizations and redo for the current locale.
@@ -183,7 +185,7 @@ export class Field {
    *  but it is worth pre-localizing them for performance.
    * @param localeCode - the locale code to switch to (defaults to 'en-US')
    */
-  setLocale(localeCode: LocaleCode = 'en-US'): void {
+  public setLocale(localeCode: LocaleCode = 'en-US'): void {
     this._currLocaleCode = localeCode;
     if (this._strings.has(localeCode)) return;  // done already
 
@@ -232,7 +234,7 @@ export class Field {
    * @return Localized name
    * @readonly
    */
-  get label(): string {
+  public get label(): string {
     return this._currStrings.label;
   }
 
@@ -241,7 +243,7 @@ export class Field {
    * @return Localized search terms
    * @readonly
    */
-  get terms(): string[] {
+  public get terms(): string[] {
     return this._currStrings.terms;
   }
 
@@ -250,7 +252,7 @@ export class Field {
    * @return Localized placeholder
    * @readonly
    */
-  get placeholder(): string {
+  public get placeholder(): string {
     return this._currStrings.placeholder;
   }
 
@@ -260,7 +262,7 @@ export class Field {
    * (There are not builtin fields at this time, only the fallback presets are builtin).
    * @return  Returns `true` if this is a builtin Field, `false` if not
    */
-  isBuiltin(): boolean {
+  public isBuiltin(): boolean {
     return !this.props.assetID;
   }
 
@@ -271,7 +273,7 @@ export class Field {
    * @param prop - the property to lookup
    * @return the Field to get the property from (either this Field or another Field)
    */
-  private _resolveReference(prop: keyof FieldProps): Field {
+  protected _resolveReference(prop: keyof FieldProps): Field {
     const schema = this.context.systems.schema;
 
     const val = this.props[prop];

@@ -1,7 +1,6 @@
+import { AbstractSystem } from './AbstractSystem.ts';
 import { gpx } from '@tmcw/togeojson';
 import { Extent } from '@rapid-sdk/math';
-
-import { AbstractSystem } from './AbstractSystem.ts';
 import { utilExtractValues } from '../util/string.ts';
 import { utilIterable } from '../util/iterable.ts';
 
@@ -35,26 +34,27 @@ const RAPID_COLORS: readonly string[] = [
  */
 export class RapidSystem extends AbstractSystem {
   /** Map<datasetID, RapidDataset> - all the datasets we know about */
-  readonly catalog = new Map<DatasetID, RapidDataset>();
+  public readonly catalog = new Map<DatasetID, RapidDataset>();
   /** Set<string> - all the dataset 'categories' we know about */
-  readonly categories = new Set<string>();
+  public readonly categories = new Set<string>();
   /** Set<dataID> - features accepted by the user */
-  readonly acceptIDs = new Set<DataID>();
+  public readonly acceptIDs = new Set<DataID>();
   /** Set<dataID> - features ignored by the user */
-  readonly ignoreIDs = new Set<DataID>();
+  public readonly ignoreIDs = new Set<DataID>();
 
-  private _addedDatasetIDs = new Set<DatasetID>();
-  private _enabledDatasetIDs = new Set<DatasetID>();
-  private _nextColorIndex = 2;  // see note in _datasetsChanged()
-  private _taskExtent: Extent | null = null;
-  private _isTaskBoundsRect: boolean | null = null;
-  private _hadPoweruser = false;
+  protected _addedDatasetIDs = new Set<DatasetID>();
+  protected _enabledDatasetIDs = new Set<DatasetID>();
+  protected _nextColorIndex = 2;  // see note in _datasetsChanged()
+  protected _taskExtent: Extent | null = null;
+  protected _isTaskBoundsRect: boolean | null = null;
+  protected _hadPoweruser = false;
+
 
   /**
    * @constructor
    * @param context - Global shared application context
    */
-  constructor(context: Context) {
+  public constructor(context: Context) {
     super(context);
     this.id = 'rapid';
     this.optionalDependencies = new Set(['editor', 'gfx', 'urlhash']);
@@ -70,7 +70,7 @@ export class RapidSystem extends AbstractSystem {
    * Called after all core objects have been constructed.
    * @return Promise resolved when this component has completed initialization
    */
-  initAsync(): Promise<void> {
+  public initAsync(): Promise<void> {
     if (this._initPromise) return this._initPromise;
 
     const context = this.context;
@@ -96,7 +96,7 @@ export class RapidSystem extends AbstractSystem {
    * Called after all core objects have been initialized.
    * @return Promise resolved when this component has completed startup
    */
-  startAsync(): Promise<void> {
+  public startAsync(): Promise<void> {
     if (this._startPromise) return this._startPromise;
 
     // We wait until startAsync to create the dataset catalog because the services need to be initialized.
@@ -145,7 +145,7 @@ export class RapidSystem extends AbstractSystem {
    * Called after completing an edit session to reset any internal state
    * @return Promise resolved when this component has completed resetting
    */
-  resetAsync(): Promise<void> {
+  public resetAsync(): Promise<void> {
     this.acceptIDs.clear();
     this.ignoreIDs.clear();
     return Promise.resolve();
@@ -156,7 +156,7 @@ export class RapidSystem extends AbstractSystem {
    * Add datasets to the menu.  (Does not set their checked 'enabled' state)
    * @param datasetIDs - datasetIDs to add
    */
-  addDatasets(datasetIDs: OneOrMore<string>): void {
+  public addDatasets(datasetIDs: OneOrMore<string>): void {
     for (const datasetID of utilIterable(datasetIDs)) {
       this._addedDatasetIDs.add(datasetID);
     }
@@ -168,7 +168,7 @@ export class RapidSystem extends AbstractSystem {
    * Remove datasets from the menu. (Also unchecks their 'enabled' state)
    * @param datasetIDs - datasetIDs to remove
    */
-  removeDatasets(datasetIDs: OneOrMore<string>): void {
+  public removeDatasets(datasetIDs: OneOrMore<string>): void {
     for (const datasetID of utilIterable(datasetIDs)) {
       this._addedDatasetIDs.delete(datasetID);
       this._enabledDatasetIDs.delete(datasetID);
@@ -181,7 +181,7 @@ export class RapidSystem extends AbstractSystem {
    * Checks the dataset as enabled. (Also ensures that the dataset is 'added' to the menu).
    * @param datasetIDs - datasetIDs to enable
    */
-  enableDatasets(datasetIDs: OneOrMore<string>): void {
+  public enableDatasets(datasetIDs: OneOrMore<string>): void {
     for (const datasetID of utilIterable(datasetIDs)) {
       this._addedDatasetIDs.add(datasetID);
       this._enabledDatasetIDs.add(datasetID);
@@ -194,7 +194,7 @@ export class RapidSystem extends AbstractSystem {
    * Unchecks the dataset as disabled. (Does not affect whether the dataset is 'added' to the menu)
    * @param datasetIDs - datasetIDs to disable
    */
-  disableDatasets(datasetIDs: OneOrMore<string>): void {
+  public disableDatasets(datasetIDs: OneOrMore<string>): void {
     for (const datasetID of utilIterable(datasetIDs)) {
       this._enabledDatasetIDs.delete(datasetID);
     }
@@ -206,7 +206,7 @@ export class RapidSystem extends AbstractSystem {
    * Toggles the given datasets enabled state, does not affect any other datasets.
    * @param datasetIDs - datasetIDs to toggle
    */
-  toggleDatasets(datasetIDs: OneOrMore<string>): void {
+  public toggleDatasets(datasetIDs: OneOrMore<string>): void {
     for (const datasetID of utilIterable(datasetIDs)) {
       this._addedDatasetIDs.add(datasetID);  // it needs to be added to the menu
       if (this._enabledDatasetIDs.has(datasetID)) {
@@ -222,7 +222,7 @@ export class RapidSystem extends AbstractSystem {
   /**
    * @return The currently added datasets
    */
-  get datasets(): Map<string, RapidDataset> {
+  public get datasets(): Map<string, RapidDataset> {
     const results = new Map<string, RapidDataset>();
     for (const datasetID of this._addedDatasetIDs) {
       const dataset = this.catalog.get(datasetID);
@@ -236,21 +236,21 @@ export class RapidSystem extends AbstractSystem {
   /**
    * @return Array of available colors for datasets
    */
-  get colors(): readonly string[] {
+  public get colors(): readonly string[] {
     return RAPID_COLORS;
   }
 
   /**
    * @return The current task extent, or null
    */
-  get taskExtent(): Extent | null {
+  public get taskExtent(): Extent | null {
     return this._taskExtent;
   }
 
   /**
    * @return true if the task bounds form a rectangle
    */
-  isTaskRectangular(): boolean {
+  public isTaskRectangular(): boolean {
     return (!!this._taskExtent && !!this._isTaskBoundsRect);
   }
 
@@ -259,7 +259,7 @@ export class RapidSystem extends AbstractSystem {
    * true if the user had poweruser mode at any point in their editing
    * @readonly
    */
-  get hadPoweruser(): boolean {
+  public get hadPoweruser(): boolean {
     return this._hadPoweruser;
   }
 
@@ -267,7 +267,7 @@ export class RapidSystem extends AbstractSystem {
   /**
    * @param gpxDomData - GPX DOM document
    */
-  setTaskExtentByGpxData(gpxDomData: Document): void {
+  public setTaskExtentByGpxData(gpxDomData: Document): void {
     const gj = gpx(gpxDomData);
     const lineStringCount = gj.features.reduce((accumulator, currentValue) =>  {
       return accumulator + (currentValue.geometry?.type === 'LineString' ? 1 : 0);
@@ -331,7 +331,7 @@ export class RapidSystem extends AbstractSystem {
    * This is called anytime the history changes, we recompute the accepted/ignored sets.
    * This can run on history change, undo, redo, or history restore.
    */
-  _stablechange(): void {
+  protected _stablechange(): void {
     const context = this.context;
     const editor = context.systems.editor;
     if (!editor) return;
@@ -362,7 +362,7 @@ export class RapidSystem extends AbstractSystem {
    * @param currParams - The current hash parameters
    * @param prevParams - The previous hash parameters
    */
-  _hashChanged(currParams: Map<string, string>, prevParams: Map<string, string>): void {
+  protected _hashChanged(currParams: Map<string, string>, prevParams: Map<string, string>): void {
     // poweruser
     // remember if the user had poweruser on at any point in their editing
     if (currParams.get('poweruser') === 'true') {
@@ -388,7 +388,7 @@ export class RapidSystem extends AbstractSystem {
    * Called whenever the datasets change.
    * This will update the urlhash, trigger a redraw, and emit a 'datasetchange' event.
    */
-  _datasetsChanged(): void {
+  protected _datasetsChanged(): void {
     const context = this.context;
     const gfx = context.systems.gfx;
     const urlhash = context.systems.urlhash;

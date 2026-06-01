@@ -32,15 +32,15 @@ interface PMTilesCatalog {
 export class OvertureService extends AbstractSystem {
 
   /** Parsed PMTiles catalog data from S3 */
-  pmTilesCatalog: PMTilesCatalog;
+  public pmTilesCatalog: PMTilesCatalog;
   /** The most recent release entry from the catalog */
-  latestRelease: any;
+  public latestRelease: any;
 
   /**
    * @constructor
    * @param context - Global shared application context
    */
-  constructor(context: Context) {
+  public constructor(context: Context) {
     super(context);
     this.id = 'overture';
     this.pmTilesCatalog = { releases: [] };
@@ -52,7 +52,7 @@ export class OvertureService extends AbstractSystem {
    * Load and parse the overture catalog data
    * @return  Promise resolved when the data has been loaded
    */
-  _loadS3CatalogAsync(): Promise<void> {
+  protected _loadS3CatalogAsync(): Promise<void> {
     return fetch(PMTILES_ROOT_URL + PMTILES_CATALOG_PATH)
       .then(utilFetchResponse)
       .then((json: PMTilesCatalog) => {
@@ -73,7 +73,7 @@ export class OvertureService extends AbstractSystem {
    * Called after all core objects have been constructed.
    * @return  Promise resolved when this component has completed initialization
    */
-  initAsync(): Promise<void> {
+  public initAsync(): Promise<void> {
     if (this._initPromise) return this._initPromise;
 
     const vtService = this.context.services.vectortile as VectorTileService;
@@ -88,7 +88,7 @@ export class OvertureService extends AbstractSystem {
    * Called after all core objects have been initialized.
    * @return  Promise resolved when this component has completed startup
    */
-  startAsync(): Promise<void> {
+  public startAsync(): Promise<void> {
     if (this._startPromise) return this._startPromise;
 
     const vtService = this.context.services.vectortile as VectorTileService;
@@ -103,7 +103,7 @@ export class OvertureService extends AbstractSystem {
    * Called by `RapidSystem` to get the datasets that this service provides.
    * @return  The datasets this service provides
    */
-  getAvailableDatasets(): RapidDataset[] {
+  public getAvailableDatasets(): RapidDataset[] {
     // just this one for now
     const places = new RapidDataset(this.context, {
       id: 'overture-places',
@@ -126,7 +126,7 @@ export class OvertureService extends AbstractSystem {
    * Use the vector tile service to schedule any data requests needed to cover the current map view
    * @param  datasetID - dataset to load tiles for
    */
-  loadTiles(datasetID: DatasetID): void {
+  public loadTiles(datasetID: DatasetID): void {
     const vtService = this.context.services.vectortile as VectorTileService;
 
     //TODO: Revisit the id-to-url mapping once we're done.
@@ -144,7 +144,7 @@ export class OvertureService extends AbstractSystem {
    * @param  datasetID - datasetID to get data for
    * @return Array of data
    */
-  getData(datasetID: DatasetID): GeoJSONData[] {
+  public getData(datasetID: DatasetID): GeoJSONData[] {
     const vtService = this.context.services.vectortile as VectorTileService;
 
     if (datasetID.includes('places')) {

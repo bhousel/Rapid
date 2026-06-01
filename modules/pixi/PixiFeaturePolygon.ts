@@ -2,11 +2,12 @@ import * as PIXI from 'pixi.js';
 import { AbstractPixiFeature } from './AbstractPixiFeature.ts';
 import { DashLine } from './lib/DashLine.ts';
 import { GlowFilter } from 'pixi-filters';
-import { lineToPoly, type LineToPolyResult } from './helpers.ts';
+import { lineToPoly } from './helpers.ts';
 import { WORLD_ZOOM, vecEqual } from '@rapid-sdk/math';
 
 import type { AbstractPixiLayer } from './AbstractPixiLayer.ts';
 import type { DashLineOptions } from './lib/DashLine.ts';
+import type { LineToPolyResult } from './helpers.ts';
 import type { PixiLayerMapUI } from './PixiLayerMapUI.ts';
 import type { Viewport } from '@rapid-sdk/math';
 
@@ -28,20 +29,20 @@ type StrokeStyleWithDash = PIXI.StrokeStyle & DashLineOptions;
  */
 export class PixiFeaturePolygon extends AbstractPixiFeature {
   /** PIXI.Sprite for low resolution representation */
-  lowRes: PIXI.Sprite | null;
+  public lowRes: PIXI.Sprite | null;
   /** PIXI.Graphics for the fill (below) */
-  fill: PIXI.Graphics | null;
+  public fill: PIXI.Graphics | null;
   /** PIXI.Mesh for the mask (applied to fill) */
-  mask: PIXI.Mesh | null;
+  public mask: PIXI.Mesh | null;
   /** Source graphics for generating mask geometry */
-  maskSource: PIXI.Graphics | null;
+  public maskSource: PIXI.Graphics | null;
   /** Container for stroke graphics */
-  strokes: PIXI.Container | null;
+  public strokes: PIXI.Container | null;
   /** Debug surrounding rectangle graphics (optional) */
-  debugSurround?: PIXI.Graphics | null;
+  public debugSurround?: PIXI.Graphics | null;
 
   /** Buffer polygon data for hit testing and halo */
-  private _bufferdata: LineToPolyResult | null;
+  protected _bufferdata: LineToPolyResult | null;
 
 
   /**
@@ -49,7 +50,7 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
    * @param layer - The Layer that owns this Feature
    * @param featureID - Unique string to use for the name of this Feature
    */
-  constructor(layer: AbstractPixiLayer, featureID: FeatureID) {
+  public constructor(layer: AbstractPixiLayer, featureID: FeatureID) {
     super(layer, featureID);
 
     this._bufferdata = null;
@@ -105,7 +106,7 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
    * Every Feature should have a destroy function that frees all the resources
    * Do not use the Feature after calling `destroy()`.
    */
-  destroy(): void {
+  public destroy(): void {
     if (this.lowRes) {
       this.lowRes.destroy();
       this.lowRes = null;
@@ -145,7 +146,7 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
    * subtraction every frame.
    * @param viewport - Pixi viewport to use for rendering
    */
-  update(viewport: Viewport): void {
+  public update(viewport: Viewport): void {
     if (!this._geom) return;  // wrong path?
 
     if (!this.dirty) return;  // nothing to do
@@ -430,7 +431,7 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
   /**
    * @param viewport - Pixi viewport to use for rendering
    */
-  updateHalo(viewport: Viewport): void {
+  public updateHalo(viewport: Viewport): void {
     const map = this.context.systems.map;
     const viewZoom = viewport.transform.zoom;
     const wireframeMode = map?.wireframeMode;

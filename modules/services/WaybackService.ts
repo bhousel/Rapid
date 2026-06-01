@@ -1,12 +1,12 @@
+import { AbstractSystem } from '../core/AbstractSystem.ts';
 import { Tiler, Viewport } from '@rapid-sdk/math';
 import { utilQsString } from '@rapid-sdk/util';
-
-import { AbstractSystem } from '../core/AbstractSystem.ts';
 import { utilDateString } from '../util/date.ts';
 
 import type { Context } from '../Context.ts';
 import type { DateLike } from '../util/date.ts';
 import type { Tile } from '@rapid-sdk/math';
+
 
 /** Base URL for the ArcGIS Wayback imagery production service */
 const WAYBACK_SERVICE_BASE_PROD = 'https://wayback.maptiles.arcgis.com/arcgis/rest/services/World_Imagery/MapServer';
@@ -82,26 +82,27 @@ interface WaybackCache {
 export class WaybackService extends AbstractSystem {
 
   /** All supported release dates, sorted ascending (YYYY-MM-DD strings) */
-  allDates: string[];
+  public allDates: string[];
   /** Lookup of releases keyed by release number */
-  byReleaseNumber: Map<string, WaybackRelease>;
+  public byReleaseNumber: Map<string, WaybackRelease>;
   /** Lookup of releases keyed by release date (YYYY-MM-DD) */
-  byReleaseDate: Map<string, WaybackRelease>;
+  public byReleaseDate: Map<string, WaybackRelease>;
 
   /** Tiler used to compute the center tile for the current viewport */
-  private _tiler: Tiler;
+  protected _tiler: Tiler;
   /** Internal cache for inflight tile requests */
-  private _cache: WaybackCache;
+  protected _cache: WaybackCache;
   /** Cached metadata results, keyed by `"tileID_YYYY-MM-DD"` */
-  private _metadata: Map<string, WaybackMetadata>;
+  protected _metadata: Map<string, WaybackMetadata>;
   /** Cached per-tile lists of release dates with detected imagery changes */
-  private _localDates: Map<TileID, string[]>;
+  protected _localDates: Map<TileID, string[]>;
+
 
   /**
    * @constructor
    * @param context - Global shared application context
    */
-  constructor(context: Context) {
+  public constructor(context: Context) {
     super(context);
     this.id = 'wayback';
     this.requiredDependencies = new Set<SystemID>(['assets', 'network' /*,'spatial'*/]);
@@ -122,7 +123,7 @@ export class WaybackService extends AbstractSystem {
    * Called after all core objects have been constructed.
    * @return Promise resolved when this component has completed initialization
    */
-  initAsync(): Promise<void> {
+  public initAsync(): Promise<void> {
     if (this._initPromise) return this._initPromise;
 
     const context = this.context;
@@ -189,7 +190,7 @@ export class WaybackService extends AbstractSystem {
    * Called after all core objects have been initialized.
    * @return Promise resolved when this component has completed startup
    */
-  startAsync(): Promise<void> {
+  public startAsync(): Promise<void> {
     return super.startAsync();
   }
 
@@ -198,7 +199,7 @@ export class WaybackService extends AbstractSystem {
    * Called after completing an edit session to reset any internal state
    * @return Promise resolved when this component has completed resetting
    */
-  resetAsync(): Promise<void> {
+  public resetAsync(): Promise<void> {
     const network = this.context.systems.network!;
     network.abortMatching(id => /^wayback-/.test(id));
 
@@ -219,7 +220,7 @@ export class WaybackService extends AbstractSystem {
    * @param val - Requested date, as YYYY-MM-DD
    * @return Closest supported date, as YYYY-MM-DD
    */
-  chooseClosestDate(val: Nullable<DateLike>): string {
+  public chooseClosestDate(val: Nullable<DateLike>): string {
     let chooseDate = this.allDates[0];  // start with earliest date
 
     const requestDate = utilDateString(val);
@@ -239,7 +240,7 @@ export class WaybackService extends AbstractSystem {
    * Return a Promise to get the list of wayback imagery dates that appear changed in the current view.
    * @return Promise resolved with an `Array<releaseDate>` for the current view
    */
-  getLocalDatesAsync(): Promise<string[] | void> {
+  public getLocalDatesAsync(): Promise<string[] | void> {
     const context = this.context;
     const network = context.systems.network!;
     // const spatial = context.systems.spatial;
@@ -311,7 +312,7 @@ export class WaybackService extends AbstractSystem {
    * @param tile - the Tile to check
    * @return Promise resolved with a `Map<releaseDate, release>` candidate releases for the given tile
    */
-  checkTilemapsAsync(tile: Tile): Promise<Map<string, WaybackRelease>> {
+  public checkTilemapsAsync(tile: Tile): Promise<Map<string, WaybackRelease>> {
     const latestDate = this.allDates.at(-1);
     const latestRelease = latestDate ? this.byReleaseDate.get(latestDate) : undefined;
     const [x, y, z] = tile.xyz;
@@ -377,7 +378,7 @@ export class WaybackService extends AbstractSystem {
    * @param tile - the Tile to check
    * @return Promise resolved with a `Map<releaseDate, release>` candidate releases for the given tile
    */
-  checkImagesAsync(releases: Map<string, WaybackRelease>, tile: Tile): Promise<Map<string, WaybackRelease>> {
+  public checkImagesAsync(releases: Map<string, WaybackRelease>, tile: Tile): Promise<Map<string, WaybackRelease>> {
     const dates = [...releases.keys()].sort();  // sort as strings ascending
     const [x, y, z] = tile.xyz;
     const network = this.context.systems.network!;
@@ -434,7 +435,7 @@ export class WaybackService extends AbstractSystem {
    * @param releaseDate - the releaseDate to check
    * @return Promise resolved with imagery metadata
    */
-  getMetadataAsync(tile: Tile, releaseDate: string): Promise<WaybackMetadata> {
+  public getMetadataAsync(tile: Tile, releaseDate: string): Promise<WaybackMetadata> {
     const [lon, lat] = tile.wgs84Extent.center();
     const z = tile.xyz[2];
     const layerID = getLayerID(z);

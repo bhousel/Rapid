@@ -33,14 +33,15 @@ type InternalStorage = Storage | MockStorage;
  * (The user's edit history should go there instead.)
  */
 export class StorageSystem extends AbstractSystem {
-  private _storage: InternalStorage;
-  private _mock: Map<string, string> | null;
+
+  protected _storage: InternalStorage;
+  protected _mock: Map<string, string> | null;
 
   /**
    * @constructor
    * @param context - Global shared application context
    */
-  constructor(context: Context) {
+  public constructor(context: Context) {
     super(context);
     this.id = 'storage';   // was: 'prefs'
 
@@ -71,7 +72,7 @@ export class StorageSystem extends AbstractSystem {
    * Called after all core objects have been constructed.
    * @return  Promise resolved when this component has completed initialization
    */
-  initAsync(): Promise<void> {
+  public initAsync(): Promise<void> {
     return super.initAsync();
   }
 
@@ -80,7 +81,7 @@ export class StorageSystem extends AbstractSystem {
    * Called after all core objects have been initialized.
    * @return  Promise resolved when this component has completed startup
    */
-  startAsync(): Promise<void> {
+  public startAsync(): Promise<void> {
     return super.startAsync();
   }
 
@@ -89,7 +90,7 @@ export class StorageSystem extends AbstractSystem {
    * Called after completing an edit session to reset any internal state
    * @return  Promise resolved when this component has completed resetting
    */
-  resetAsync(): Promise<void> {
+  public resetAsync(): Promise<void> {
     return Promise.resolve();
   }
 
@@ -98,7 +99,7 @@ export class StorageSystem extends AbstractSystem {
    * @param k - String key to check for existance
    * @return `true` if the key is set, `false` if not
    */
-  hasItem(k: string): boolean {
+  public hasItem(k: string): boolean {
     return !!this._storage.getItem(k);
   }
 
@@ -107,7 +108,7 @@ export class StorageSystem extends AbstractSystem {
    * @param k - String key to get the value for
    * @return The stored value, or `null` if not found
    */
-  getItem(k: string): string | null {
+  public getItem(k: string): string | null {
     return this._storage.getItem(k) ?? null;
   }
 
@@ -117,7 +118,7 @@ export class StorageSystem extends AbstractSystem {
    * @param v - String value to set
    * @return `true` if the write to `localStorage` succeeded, `false` if it failed
    */
-  setItem(k: string, v: string): boolean {
+  public setItem(k: string, v: string): boolean {
     try {
       this._storage.setItem(k, v);
       return !this._storage?.isMocked;
@@ -131,7 +132,7 @@ export class StorageSystem extends AbstractSystem {
   /**
    * @param k - String key to remove from storage
    */
-  removeItem(k: string): void {
+  public removeItem(k: string): void {
     this._storage.removeItem(k);
   }
 
@@ -139,7 +140,7 @@ export class StorageSystem extends AbstractSystem {
   /**
    * Clears all values from the storage
    */
-  clear(): void {
+  public clear(): void {
     this._storage.clear();
   }
 }

@@ -1,12 +1,11 @@
-import { easeLinear as d3_easeLinear } from 'd3-ease';
-import { select as d3_select } from 'd3-selection';
-import { Extent, geoScaleToZoom } from '@rapid-sdk/math';
-import { utilArrayGroupBy, utilObjectOmit, utilSessionMutex } from '@rapid-sdk/util';
-
 import { AbstractSystem } from './AbstractSystem.ts';
 import { Difference, Edit, Graph, Tree } from '../lib/index.ts';
+import { easeLinear as d3_easeLinear } from 'd3-ease';
+import { Extent, geoScaleToZoom } from '@rapid-sdk/math';
 import { OsmEntity as OsmEntityClass, createOsmEntity } from '../data/index.ts';
+import { select as d3_select } from 'd3-selection';
 import { uiLoading } from '../ui/loading.js';
+import { utilArrayGroupBy, utilObjectOmit, utilSessionMutex } from '@rapid-sdk/util';
 
 import type { Context } from '../Context.ts';
 import type { Action } from '../actions/types.ts';
@@ -159,32 +158,33 @@ interface EntityCopy {
  *   'backupstatuschange' - Fires when backup status changes, receives `true` if ok, `false` if failed
  */
 export class EditSystem extends AbstractSystem {
-  private _mutex: ReturnType<typeof utilSessionMutex>;
-  private _canRestoreBackup: boolean;
-  private _hasWorkInProgress: boolean;
 
-  private _history: Edit[];
-  private _index: number;
-  private _staging: Edit;
+  protected _mutex: ReturnType<typeof utilSessionMutex>;
+  protected _canRestoreBackup: boolean;
+  protected _hasWorkInProgress: boolean;
 
-  private _checkpoints: Map<CheckpointID, Checkpoint>;
-  private _inTransition: boolean;
-  private _inTransaction: boolean;
-  private _tree: Tree;
+  protected _history: Edit[];
+  protected _index: number;
+  protected _staging: Edit;
 
-  private _backupStatus: boolean;
-  private _stableKey: string | null;
-  private _stableSnapshot: Graph | null;
-  private _stagingKey: string | null;
-  private _stagingSnapshot: Graph | null;
-  private _fullDifference: Difference;
+  protected _checkpoints: Map<CheckpointID, Checkpoint>;
+  protected _inTransition: boolean;
+  protected _inTransaction: boolean;
+  protected _tree: Tree;
+
+  protected _backupStatus: boolean;
+  protected _stableKey: string | null;
+  protected _stableSnapshot: Graph | null;
+  protected _stagingKey: string | null;
+  protected _stagingSnapshot: Graph | null;
+  protected _fullDifference: Difference;
 
 
   /**
    * @constructor
    * @param context - Global shared application context
    */
-  constructor(context: Context) {
+  public constructor(context: Context) {
     super(context);
 
     this.id = 'editor';     // was 'history'
@@ -221,7 +221,7 @@ export class EditSystem extends AbstractSystem {
    * Called after all core objects have been constructed.
    * @return Promise resolved when this component has completed initialization
    */
-  initAsync(): Promise<void> {
+  public initAsync(): Promise<void> {
     if (this._initPromise) return this._initPromise;
 
     const context = this.context;
@@ -259,7 +259,7 @@ export class EditSystem extends AbstractSystem {
    * Called after all core objects have been initialized.
    * @return Promise resolved when this component has completed startup
    */
-  startAsync(): Promise<void> {
+  public startAsync(): Promise<void> {
     return super.startAsync();
   }
 
@@ -268,7 +268,7 @@ export class EditSystem extends AbstractSystem {
    * Called after completing an edit session to reset any internal state
    * @return Promise resolved when this component has completed resetting
    */
-  resetAsync(): Promise<void> {
+  public resetAsync(): Promise<void> {
     const prevIndex = this._index;
     this._reset();
 
@@ -285,7 +285,7 @@ export class EditSystem extends AbstractSystem {
   /**
    * Internal reset of all stored data
    */
-  private _reset(): void {
+  protected _reset(): void {
     d3_select(document).interrupt('editTransition');    // complete any transition already in progress
     this.context.systems.scheduler?.cancel('edit-backup');
 
@@ -320,7 +320,7 @@ export class EditSystem extends AbstractSystem {
    * It will not contain any actual user edits, sources, annotation.
    * @return The initial Edit containing the Base Graph
    */
-  get base(): Edit {
+  public get base(): Edit {
     return this._history[0];
   }
 
@@ -331,7 +331,7 @@ export class EditSystem extends AbstractSystem {
    * Note that "future" redo history can continue past the `stable` edit, if the user has undone.
    * @return The latest accepted Edit in the history
    */
-  get stable(): Edit {
+  public get stable(): Edit {
     return this._history[this._index];
   }
 
@@ -341,7 +341,7 @@ export class EditSystem extends AbstractSystem {
    * The `staging` edit has not been added to the history yet.
    * @return The `staging` work-in-progress Edit
    */
-  get staging(): Edit {
+  public get staging(): Edit {
     return this._staging;
   }
 
@@ -349,7 +349,7 @@ export class EditSystem extends AbstractSystem {
    * The tree is a spatial index that keeps itself in sync with the `staging` graph.
    * @return The Tree (spatial index)
    */
-  get tree(): Tree {
+  public get tree(): Tree {
     return this._tree;
   }
 
@@ -357,7 +357,7 @@ export class EditSystem extends AbstractSystem {
    * A shallow copy of the history.
    * @return A shallow copy of the history
    */
-  get history(): Edit[] {
+  public get history(): Edit[] {
     return this._history.slice();
   }
 
@@ -365,7 +365,7 @@ export class EditSystem extends AbstractSystem {
    * Index pointing to the current `stable` Edit
    * @return Index pointing to the current `stable` Edit
    */
-  get index(): number {
+  public get index(): number {
     return this._index;
   }
 
@@ -373,7 +373,7 @@ export class EditSystem extends AbstractSystem {
    * Is there work in progress in the `staging` edit?
    * @return `true` if there is work in progress in the `staging` edit.
    */
-  get hasWorkInProgress(): boolean {
+  public get hasWorkInProgress(): boolean {
     return this._hasWorkInProgress;
   }
 
@@ -387,7 +387,7 @@ export class EditSystem extends AbstractSystem {
    * @param args - Variable number of Action functions to peform
    * @return Difference between before and after of `staging` Edit
    */
-  perform(...args: Action[]): Difference | undefined {
+  public perform(...args: Action[]): Difference | undefined {
     d3_select(document).interrupt('editTransition');    // complete any transition already in progress
     this._perform(args, 1);
     return this._emitChanges();   // only one place in the code uses this return - split operation?
@@ -405,7 +405,7 @@ export class EditSystem extends AbstractSystem {
    * @param action - single Action function to perform
    * @return Promise fulfilled when the transition is completed
    */
-  performAsync(action: Action): Promise<void> {
+  public performAsync(action: Action): Promise<void> {
     d3_select(document).interrupt('editTransition');    // complete any transition already in progress
 
     if (typeof action !== 'function') {
@@ -459,7 +459,7 @@ export class EditSystem extends AbstractSystem {
    * This reverts the `staging` work-in-progress by replacing `staging` with a fresh copy of `stable`.
    * (It's more like what `git reset --hard` does, but we can't call it "reset")
    */
-  revert(): Difference | undefined {
+  public revert(): Difference | undefined {
     if (!this._hasWorkInProgress) return;
 
     d3_select(document).interrupt('editTransition');    // complete any transition already in progress
@@ -495,7 +495,7 @@ export class EditSystem extends AbstractSystem {
    *   Note that Rapid edits pass an Object as the annotation including more info about the edit.
    * @param options.selectedIDs - Array of selectedIDs
    */
-  commit(options: CommitOptions = {}): void {
+  public commit(options: CommitOptions = {}): void {
     d3_select(document).interrupt('editTransition');    // complete any transition already in progress
 
     const context = this.context;
@@ -548,7 +548,7 @@ export class EditSystem extends AbstractSystem {
    * @param options.selectedIDs - Array of selectedIDs
    * @throws Will throw if you try to append to the `base` edit
    */
-  commitAppend(options: CommitOptions = {}): void {
+  public commitAppend(options: CommitOptions = {}): void {
     d3_select(document).interrupt('editTransition');    // complete any transition already in progress
 
     const context = this.context;
@@ -593,7 +593,7 @@ export class EditSystem extends AbstractSystem {
    *                        \-->  EditN1
    *                             `staging` (WIP after Edit1)
    */
-  undo(): void {
+  public undo(): void {
     d3_select(document).interrupt('editTransition');    // complete any transition already in progress
 
     const prevIndex = this._index;
@@ -635,7 +635,7 @@ export class EditSystem extends AbstractSystem {
    *                                            \-->  EditN1
    *                                                 `staging` (WIP after Edit3)
    */
-  redo(): void {
+  public redo(): void {
     d3_select(document).interrupt('editTransition');    // complete any transition already in progress
 
     const prevIndex = this._index;
@@ -656,7 +656,7 @@ export class EditSystem extends AbstractSystem {
    * If the given checkpointID exists, it will be overwritten.
    * @param checkpointID - A string to identify the checkpoint
    */
-  setCheckpoint(checkpointID: CheckpointID): void {
+  public setCheckpoint(checkpointID: CheckpointID): void {
     if (!checkpointID) return;
     d3_select(document).interrupt('editTransition');    // complete any transition already in progress
 
@@ -673,7 +673,7 @@ export class EditSystem extends AbstractSystem {
    * Note that all work-in-progress in the `staging` Edit is lost when calling `restoreCheckpoint()`.
    * @param checkpointID - A string to identify the checkpoint
    */
-  restoreCheckpoint(checkpointID: CheckpointID): void {
+  public restoreCheckpoint(checkpointID: CheckpointID): void {
     if (!checkpointID) return;
     d3_select(document).interrupt('editTransition');    // complete any transition already in progress
 
@@ -695,7 +695,7 @@ export class EditSystem extends AbstractSystem {
    * This removes the checkpoint identified by the given checkpointID.
    * @param checkpointID - A string to identify the checkpoint
    */
-  deleteCheckpoint(checkpointID: CheckpointID): void {
+  public deleteCheckpoint(checkpointID: CheckpointID): void {
     if (!checkpointID) return;
     this._checkpoints.delete(checkpointID);
   }
@@ -714,7 +714,7 @@ export class EditSystem extends AbstractSystem {
    *  @param toMerge - Entities (or props) to merge into base graph (usually only the new ones)
    *  @param seenIDs - Optional set of all entity IDs on the tile (including previously seen ones)
    */
-  merge(toMerge: (OsmEntity | OsmEntityProps)[], seenIDs?: Set<EntityID>): void {
+  public merge(toMerge: (OsmEntity | OsmEntityProps)[], seenIDs?: Set<EntityID>): void {
     const context = this.context;
     const baseGraph = this.base.graph!;
     const stagingGraph = this.staging.graph!;
@@ -782,7 +782,7 @@ export class EditSystem extends AbstractSystem {
    * During a transaction, edits can be performed but no `change` events will be emitted.
    * This is to prevent other parts of the code from rendering/validating partial or incomplete edits.
    */
-  beginTransaction(): void {
+  public beginTransaction(): void {
     this._inTransaction = true;
   }
 
@@ -792,7 +792,7 @@ export class EditSystem extends AbstractSystem {
    * Any `stagingchange` and `stablechange` events will be emitted that cover
    *   the difference from the beginning -> end of the transaction.
    */
-  endTransaction(): Difference | undefined {
+  public endTransaction(): Difference | undefined {
     this._inTransaction = false;
     return this._emitChanges();
   }
@@ -801,7 +801,7 @@ export class EditSystem extends AbstractSystem {
   /**
    * @return The previous undo annotation, or `undefined` if none
    */
-  getUndoAnnotation(): string | undefined {
+  public getUndoAnnotation(): string | undefined {
     let i = this._index;
     while (i >= 0) {
       const edit = this._history[i];
@@ -814,7 +814,7 @@ export class EditSystem extends AbstractSystem {
   /**
    * @return The next redo annotation, or `undefined` if none
    */
-  getRedoAnnotation(): string | undefined {
+  public getRedoAnnotation(): string | undefined {
     let i = this._index + 1;
     while (i <= this._history.length - 1) {
       const edit = this._history[i];
@@ -829,7 +829,7 @@ export class EditSystem extends AbstractSystem {
    * @param extent - the extent to test
    * @return Entities intersecting the given Extent
    */
-  intersects(extent: Extent): OsmEntity[] {
+  public intersects(extent: Extent): OsmEntity[] {
     return this._tree.intersects(extent, this.staging.graph!);
   }
 
@@ -840,7 +840,7 @@ export class EditSystem extends AbstractSystem {
    *  and recomputed by the `_emitChanges` function only when `stable` changes.
    * @return The total changes made by the user during their edit session
    */
-  difference(): Difference {
+  public difference(): Difference {
     return this._fullDifference;
   }
 
@@ -851,7 +851,7 @@ export class EditSystem extends AbstractSystem {
    * @param action - Optional action to apply to the `stable` graph
    * @return Object containing `modified`, `created`, `deleted` summary of changes
    */
-  changes(action?: Action): ChangesSummary {
+  public changes(action?: Action): ChangesSummary {
     let difference = this._fullDifference;
 
     if (action) {
@@ -873,7 +873,7 @@ export class EditSystem extends AbstractSystem {
    * For example, we could perform a bunch of no-op edits and it would still return false.
    * @return `true` if the user has made any meaningful edits
    */
-  hasChanges(): boolean {
+  public hasChanges(): boolean {
     return this._fullDifference.changes.size > 0;
   }
 
@@ -883,7 +883,7 @@ export class EditSystem extends AbstractSystem {
    * This is called by `commit.js` when preparing the changeset before uploading.
    * @return Object of all sources used during the user's editing session
    */
-  sourcesUsed(): { imagery: Set<string>; photos: Set<string>; data: Set<string> } {
+  public sourcesUsed(): { imagery: Set<string>; photos: Set<string>; data: Set<string> } {
     const result: { imagery: Set<string>; photos: Set<string>; data: Set<string> } = {
       imagery: new Set(),
       photos:  new Set(),
@@ -920,7 +920,7 @@ export class EditSystem extends AbstractSystem {
    *
    * @returns The stringified walkthrough data
    */
-  toIntroGraph(): string {
+  public toIntroGraph(): string {
     const nextID: Record<string, number> = { n: 0, r: 0, w: 0 };
     const permIDs: Record<string, string> = {};
     const graph = this.stable.graph!;
@@ -1000,7 +1000,7 @@ export class EditSystem extends AbstractSystem {
    * Save the edit history to JSON.
    * @return A String containing the JSON, or `undefined` if nothing to save
    */
-  toJSON(): string | undefined {
+  public toJSON(): string | undefined {
     if (!this.hasChanges()) return;
 
     const OSM_PRECISION = 7;
@@ -1112,7 +1112,7 @@ export class EditSystem extends AbstractSystem {
    * @param json - Stringified JSON to parse
    * @return Promise resolved when the restore process is complete
    */
-  fromJSONAsync(json: string): Promise<void> {
+  public fromJSONAsync(json: string): Promise<void> {
     const context = this.context;
     const gfx = context.systems.gfx;
     const osm = context.services.osm as any;
@@ -1303,7 +1303,7 @@ export class EditSystem extends AbstractSystem {
    * Backup the user's edits to a JSON string in localStorage.
    * This code runs occasionally as the user edits.
    */
-  immediateBackup(): void {
+  public immediateBackup(): void {
     const context = this.context;
     if (context.inIntro) return;               // Don't backup edits made in the walkthrough
     if (context.mode?.id === 'save') return;   // Edits made in save mode may be conflict resolutions
@@ -1329,7 +1329,7 @@ export class EditSystem extends AbstractSystem {
    * Backup the user's edits after a delay.
    * Uses `debounce` to avoid performing backups too frequently.
    */
-  deferredBackup(): void {
+  public deferredBackup(): void {
     const scheduler = this.context.systems.scheduler;
     if (scheduler) {
       scheduler.debounce('edit-backup', () => this.immediateBackup(), { ms: 1000 });
@@ -1345,7 +1345,7 @@ export class EditSystem extends AbstractSystem {
    * @return `true` if there is a backup to restore
    * @readonly
    */
-  get canRestoreBackup(): boolean {
+  public get canRestoreBackup(): boolean {
     return this._canRestoreBackup;
   }
 
@@ -1355,7 +1355,7 @@ export class EditSystem extends AbstractSystem {
    * This happens when:
    * - The user chooses to "Restore my changes" from the restore screen
    */
-  restoreBackup(): void {
+  public restoreBackup(): void {
     this._canRestoreBackup = false;
 
     if (!this._mutex.locked()) return;  // another browser tab owns the history
@@ -1377,7 +1377,7 @@ export class EditSystem extends AbstractSystem {
    * - The user switches sources with the source switcher
    * - A changeset is inflight, we remove it to prevent the user from restoring duplicate edits
    */
-  clearBackup(): void {
+  public clearBackup(): void {
     this._canRestoreBackup = false;
     this.context.systems.scheduler?.cancel('edit-backup');
 
@@ -1398,7 +1398,7 @@ export class EditSystem extends AbstractSystem {
    * It uses `window.location.origin` avoid conflicts with other instances of Rapid.
    * @return The key used to store/retrieve backup edits in localStorage
    */
-  private _backupKey(): string {
+  protected _backupKey(): string {
     const key = globalThis?.location?.origin || 'headless';
     return `Rapid_${key}_saved_history`;
   }
@@ -1409,7 +1409,7 @@ export class EditSystem extends AbstractSystem {
    * @param annotation - Rapid edits may optionally use an annotation that includes the data source used
    * @return sources Object containing `imagery`, `photos`, `data` properties
    */
-  private _gatherSources(annotation: string | Record<string, unknown>): EditSources {
+  protected _gatherSources(annotation: string | Record<string, unknown>): EditSources {
     const context = this.context;
     const gfx = context.systems.gfx;
     const imagery = context.systems.imagery;
@@ -1451,7 +1451,7 @@ export class EditSystem extends AbstractSystem {
    * @param actions - Array of Action functions to perform
    * @param t - Eased time, should be in the range [0..1]
    */
-  private _perform(actions: Action[], t: number = 1): void {
+  protected _perform(actions: Action[], t: number = 1): void {
     // for now, call commit() before performing work.
     let graph = this._staging.graph!.commit();
     for (const fn of actions) {
@@ -1469,7 +1469,7 @@ export class EditSystem extends AbstractSystem {
    * This replaces the `staging` work-in-progress edit with a fresh copy of `stable`.
    * Rolls back the edits and emits no events.
    */
-  private _replaceStaging(): void {
+  protected _replaceStaging(): void {
     this._staging = new Edit({ graph: new Graph(this.stable.graph!) });
     this._hasWorkInProgress = false;
   }
@@ -1479,7 +1479,7 @@ export class EditSystem extends AbstractSystem {
    * Recalculate the differences and emit `stablechange` and `stagingchange` events.
    * @return Difference between before and after of `staging` Edit
    */
-  private _emitChanges(): Difference | undefined {
+  protected _emitChanges(): Difference | undefined {
     if (this._inTransaction) return;
 
     const baseGraph = this.base.graph!;

@@ -1,12 +1,11 @@
-import { vecLength } from '@rapid-sdk/math';
-
 import { AbstractBehavior } from './AbstractBehavior.ts';
 import { utilDetect } from '../util/detect.ts';
-// import { geoChooseEdge } from '../geo/geom.js';
+import { vecLength } from '@rapid-sdk/math';
 
 import type { FederatedPointerEvent } from 'pixi.js';
 import type { EventData } from './AbstractBehavior.ts';
 import type { Context } from '../Context.ts';
+
 
 const NEAR_TOLERANCE = 4;
 const FAR_TOLERANCE = 12;
@@ -30,31 +29,34 @@ const FAR_TOLERANCE = 12;
  *   `finish`    Fires if user presses return, enter, or escape
  */
 export class DrawBehavior extends AbstractBehavior {
+
   /** EventData for the most recent pointerdown event */
-  lastDown: EventData | null;
+  public lastDown: EventData | null;
   /** EventData for the most recent pointermove event */
-  lastMove: EventData | null;
+  public lastMove: EventData | null;
   /** EventData for the most recent spacebar press (used for spacebar clicking) */
-  lastSpace: EventData | null;
+  public lastSpace: EventData | null;
   /** EventData for the most recent successful click event */
-  lastClick: EventData | null;
+  public lastClick: EventData | null;
+
   /** Whether spacebar clicking is temporarily disabled */
-  private _spaceClickDisabled: boolean;
+  protected _spaceClickDisabled: boolean;
+
 
   /**
    * @constructor
    * @param  context - Global shared application context
    */
-  constructor(context: Context) {
+  public constructor(context: Context) {
     super(context);
     this.id = 'draw';
-
-    this._spaceClickDisabled = false;
 
     this.lastDown = null;
     this.lastMove = null;
     this.lastSpace = null;
     this.lastClick = null;
+
+    this._spaceClickDisabled = false;
 
     // Make sure the event handlers have `this` bound correctly
     this._doClick = this._doClick.bind(this);
@@ -71,7 +73,7 @@ export class DrawBehavior extends AbstractBehavior {
   /**
    * Bind event handlers
    */
-  enable(): void {
+  public enable(): void {
     if (this._enabled) return;
 
     this._enabled = true;
@@ -99,7 +101,7 @@ export class DrawBehavior extends AbstractBehavior {
   /**
    * Unbind event handlers
    */
-  disable(): void {
+  public disable(): void {
     if (!this._enabled) return;
 
     this._enabled = false;
@@ -128,7 +130,7 @@ export class DrawBehavior extends AbstractBehavior {
    * Handler for keydown events on the window.
    * @param  e - A DOM KeyboardEvent
    */
-  _keydown(e: KeyboardEvent): void {
+  protected _keydown(e: KeyboardEvent): void {
     if (['Enter', 'Escape', 'Esc'].includes(e.key)) {
       e.preventDefault();
       this.emit('finish');
@@ -150,7 +152,7 @@ export class DrawBehavior extends AbstractBehavior {
    * Handler for keyup events on the window.
    * @param  e - A DOM KeyboardEvent
    */
-  _keyup(e: KeyboardEvent): void {
+  protected _keyup(e: KeyboardEvent): void {
     // After spacebar click, user must move pointer or lift spacebar to allow another spacebar click
     if (this._spaceClickDisabled && [' ', 'Spacebar'].includes(e.key)) {
       e.preventDefault();
@@ -165,7 +167,7 @@ export class DrawBehavior extends AbstractBehavior {
    * if the user taps with multiple fingers. We lock in the first one in `lastDown`.
    * @param  e - A Pixi FederatedPointerEvent
    */
-  _pointerdown(e: FederatedPointerEvent): void {
+  protected _pointerdown(e: FederatedPointerEvent): void {
     if (this.lastDown) return;  // a pointer is already down
 
     const down = this._getEventData(e);
@@ -179,7 +181,7 @@ export class DrawBehavior extends AbstractBehavior {
    * Handler for pointermove events.
    * @param  e - A Pixi FederatedPointerEvent
    */
-  _pointermove(e: FederatedPointerEvent): void {
+  protected _pointermove(e: FederatedPointerEvent): void {
     const move = this._getEventData(e);
     this.lastMove = move;
 
@@ -208,7 +210,7 @@ export class DrawBehavior extends AbstractBehavior {
    * Handler for pointerup events.
    * @param  e - A Pixi FederatedPointerEvent
    */
-  _pointerup(e: FederatedPointerEvent): void {
+  protected _pointerup(e: FederatedPointerEvent): void {
     const down = this.lastDown;
     const up = this._getEventData(e);
     if (!down || down.id !== up.id) return;  // not down, or different pointer
@@ -228,7 +230,7 @@ export class DrawBehavior extends AbstractBehavior {
   /**
    * Handler for pointercancel events.
    */
-  _pointercancel(): void {
+  protected _pointercancel(): void {
     this.lastDown = null;  // prepare for the next `pointerdown`
   }
 
@@ -237,7 +239,7 @@ export class DrawBehavior extends AbstractBehavior {
    * Handler for `keydown` events of the spacebar. We use these to simulate clicks.
    * Note that the spacebar will repeat, so we can get many of these.
    */
-  _spacebar(): void {
+  protected _spacebar(): void {
     if (this._spaceClickDisabled) return;
 
     // For spacebar clicks we will use the last move event as the trigger
@@ -257,7 +259,7 @@ export class DrawBehavior extends AbstractBehavior {
    * Checks lastMove and emits a 'move' event if needed.
    * This may also be fired if we detect a change in the modifier keys.
    */
-  _doMove(): void {
+  protected _doMove(): void {
     if (!this._enabled || !this.lastMove) return;  // nothing to do
 
     // Ignore it if we are not over the canvas
@@ -318,7 +320,7 @@ export class DrawBehavior extends AbstractBehavior {
   /**
    * Checks lastClick and emits a 'click' event if needed
    */
-  _doClick(): void {
+  protected _doClick(): void {
     if (!this._enabled || !this.lastClick) return;  // nothing to do
 
     // Ignore it if we are not over the canvas

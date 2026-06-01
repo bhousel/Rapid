@@ -14,7 +14,7 @@ import type { Keybinding } from './util/keybinding.ts';
  * @class
  */
 export class MockSystem extends AbstractSystem {
-  constructor(context: Context) {
+  public constructor(context: Context) {
     super(context);
     this.id = 'mock';
   }
@@ -24,29 +24,29 @@ export class MockSystem extends AbstractSystem {
  * @class
  */
 export class MockContext {
-  viewport: Viewport;
-  systems: Systems;
-  services: Record<ServiceID, any>;
-  sequences: Record<SequenceID, number>;
-  private _keybinding: Keybinding;
+  public viewport: Viewport;
+  public systems: Systems;
+  public services: Record<ServiceID, any>;
+  public sequences: Record<SequenceID, number>;
+  protected _keybinding: Keybinding;
 
-  constructor() {
+  public constructor() {
     this.sequences = {};
     this.services = {};
     this.systems = {};
     this.viewport = new Viewport();
     this._keybinding = (new MockSystem(this as unknown as Context) as unknown as Keybinding);
   }
-  initAsync()   { return Promise.resolve(); }
-  startAsync()  { return Promise.resolve(); }
-  resetAsync()  { return Promise.resolve(); }
-  on()          { return this; }
-  off()         { return this; }
-  keybinding()  { return this._keybinding; }
-  container()   { return d3_select(null); }
-  cleanTagKey(val: string): string    { return val; };
-  cleanTagValue(val: string): string  { return val; };
-  next(which: SequenceID): number {
+  public initAsync()   { return Promise.resolve(); }
+  public startAsync()  { return Promise.resolve(); }
+  public resetAsync()  { return Promise.resolve(); }
+  public on()          { return this; }
+  public off()         { return this; }
+  public keybinding()  { return this._keybinding; }
+  public container()   { return d3_select(null); }
+  public cleanTagKey(val: string): string    { return val; };
+  public cleanTagValue(val: string): string  { return val; };
+  public next(which: SequenceID): number {
     const num = (this.sequences[which] || 0) + 1;
     return this.sequences[which] = num;
   }
@@ -57,17 +57,17 @@ export class MockContext {
  * @class
  */
 export class MockGfxSystem extends MockSystem {
-  scene: AbstractSystem;
+  public scene: AbstractSystem;
 
-  constructor(context: Context) {
+  public constructor(context: Context) {
     super(context);
     this.id = 'gfx';
     this.scene = new MockSystem(context);
     (this.scene as any).layers = new Map();
   }
-  deferredRedraw() {}
-  immediateRedraw() {}
-  setTransformAsync(t: TransformProps) {
+  public deferredRedraw() {}
+  public immediateRedraw() {}
+  public setTransformAsync(t: TransformProps) {
     this.context.viewport.transform = t;
     return Promise.resolve(t);
   }

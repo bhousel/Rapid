@@ -8,6 +8,7 @@ import type { MatchedStyle } from '../core/StyleSystem.ts';
 import type { PixiScene } from './PixiScene.ts';
 import type { Viewport } from '@rapid-sdk/math';
 
+
 const MINZOOM = 12;
 const KARTAVIEW_BLUE = 0x20c4ff;
 const SELECTED = 0xffee00;
@@ -32,7 +33,7 @@ export class PixiLayerKartaPhotos extends AbstractPixiLayer {
    * @constructor
    * @param scene - The Scene that owns this Layer
    */
-  constructor(scene: PixiScene) {
+  public constructor(scene: PixiScene) {
     super(scene);
     this.id = 'kartaview';
   }
@@ -41,7 +42,7 @@ export class PixiLayerKartaPhotos extends AbstractPixiLayer {
   /**
    * Whether the Layer's service exists
    */
-  get supported() {
+  public get supported() {
     return !!this.context.services.kartaview;
   }
 
@@ -50,10 +51,10 @@ export class PixiLayerKartaPhotos extends AbstractPixiLayer {
    * Whether the user has chosen to see the Layer
    * Make sure to start the service first.
    */
-  get enabled() {
+  public get enabled() {
     return this._enabled;
   }
-  set enabled(val) {
+  public set enabled(val) {
     if (!this.supported) {
       val = false;
     }
@@ -74,7 +75,7 @@ export class PixiLayerKartaPhotos extends AbstractPixiLayer {
   /**
    * Every Layer should have a reset function to replace any Pixi objects and internal state.
    */
-  reset() {
+  public reset() {
     super.reset();
   }
 
@@ -83,7 +84,7 @@ export class PixiLayerKartaPhotos extends AbstractPixiLayer {
    * @param markers - all markers
    * @return markers with filtering applied
    */
-  filterMarkers(markers: MarkerData[]): MarkerData[] {
+  public filterMarkers(markers: MarkerData[]): MarkerData[] {
     const photos = this.context.systems.photos!;
     const fromDate = photos.fromDate;
     const fromTimestamp = fromDate && new Date(fromDate).getTime();
@@ -120,7 +121,7 @@ export class PixiLayerKartaPhotos extends AbstractPixiLayer {
    * @param sequences - all sequences
    * @return sequences with filtering applied
    */
-  filterSequences(sequences: GeoJSONData[]): GeoJSONData[] {
+  public filterSequences(sequences: GeoJSONData[]): GeoJSONData[] {
     const photos = this.context.systems.photos!;
     const fromDate = photos.fromDate;
     const fromTimestamp = fromDate && new Date(fromDate).getTime();
@@ -158,7 +159,7 @@ export class PixiLayerKartaPhotos extends AbstractPixiLayer {
    * @param frame - Integer frame being rendered
    * @param viewport - Pixi viewport to use for rendering
    */
-  renderMarkers(frame: number, viewport: Viewport): void {
+  public renderMarkers(frame: number, viewport: Viewport): void {
     const kartaview = this.context.services.kartaview;
     if (!kartaview?.started) return;
 
@@ -263,7 +264,7 @@ export class PixiLayerKartaPhotos extends AbstractPixiLayer {
    * @param frame - Integer frame being rendered
    * @param viewport - Pixi viewport to use for rendering
    */
-  render(frame: number, viewport: Viewport): void {
+  public render(frame: number, viewport: Viewport): void {
     const kartaview = this.context.services.kartaview;
     const viewZoom = viewport.transform.zoom;
 

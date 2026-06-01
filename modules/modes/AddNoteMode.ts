@@ -17,7 +17,7 @@ export class AddNoteMode extends AbstractMode {
    * @constructor
    * @param  context - Global shared application context
    */
-  constructor(context: Context) {
+  public constructor(context: Context) {
     super(context);
     this.id = 'add-note';
 
@@ -31,7 +31,7 @@ export class AddNoteMode extends AbstractMode {
    * Enters the mode.
    * @return `true` if mode could be entered, `false` if not
    */
-  enter(): boolean {
+  public enter(): boolean {
     if (DEBUG) {
       console.log('AddNoteMode: entering');  // eslint-disable-line no-console
     }
@@ -52,7 +52,7 @@ export class AddNoteMode extends AbstractMode {
   /**
    * Exits the mode, removing event listeners from draw behavior.
    */
-  exit(): void {
+  public exit(): void {
     if (!this._active) return;
     this._active = false;
 
@@ -71,7 +71,7 @@ export class AddNoteMode extends AbstractMode {
   /**
    * Add a Note at the mouse click coords
    */
-  private _click(eventData: EventData): void {
+  protected _click(eventData: EventData): void {
     const context = this.context;
     const osm = context.services.osm as any;
     const viewport = context.viewport;
@@ -93,7 +93,7 @@ export class AddNoteMode extends AbstractMode {
   /**
    * Return to browse mode without doing anything
    */
-  private _cancel(): void {
+  protected _cancel(): void {
     this.context.enter('browse');
   }
 }

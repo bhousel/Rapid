@@ -106,6 +106,12 @@ This project has reusable Copilot prompt files in `.github/prompts/`. Your edito
 
 ## TypeScript Patterns
 
+### Class Member Visibility Conventions
+- Always add an explicit access modifier to class members (`public` or `protected`).
+- Do not use `private` for class members in this codebase; use `protected` instead.
+- Protected member names must be prefixed with `_`.
+- If outside code needs access to internal state, prefer exposing a `public` getter over directly reading a protected `_member`.
+
 ### File Conversion
 - Use `git mv` to rename `.js` → `.ts` (preserves git history)
 - Update barrel `index.js` to export from `.ts` file

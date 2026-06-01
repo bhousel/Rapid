@@ -77,20 +77,21 @@ export interface GeometryPartLocalData {
  *   `local`   Projected local coordinate data (relative to `world.origin`)
  */
 export class GeometryPart {
-  context: Context;
+
+  public context: Context;
   /** Original data, in WGS84 coordinates (longitude, latitude - [0,0] is Null Island) */
-  orig: GeometryPartOrigData | null;
+  public orig: GeometryPartOrigData | null;
   /** Projected data, in "world coordinates" (EPSG:3857, prescaled to z16, range 0..16,777,216) */
-  world: GeometryPartWorldData | null;
+  public world: GeometryPartWorldData | null;
   /** Local coordinate data (also EPSG:3857, but relative to `world.origin`) */
-  local: GeometryPartLocalData | null;
+  public local: GeometryPartLocalData | null;
 
 
   /**
    * @constructor
    * @param  context - Global shared application context
    */
-  constructor(context: Context) {
+  public constructor(context: Context) {
     this.context = context;
     this.orig = null;
     this.world = null;
@@ -102,7 +103,7 @@ export class GeometryPart {
    * Release memory.
    * Do not use the geometry part after calling `destroy()`.
    */
-  destroy(): void {
+  public destroy(): void {
     this.reset();
     this.context = null!;
   }
@@ -111,7 +112,7 @@ export class GeometryPart {
   /**
    * Remove all stored data
    */
-  reset(): void {
+  public reset(): void {
     this.orig = null;
     this.world = null;
     this.local = null;
@@ -122,7 +123,7 @@ export class GeometryPart {
    * Returns a clone of this GeometryPart object
    * @return  A new GeometryPart
    */
-  clone(): GeometryPart {
+  public clone(): GeometryPart {
     const copy = new GeometryPart(this.context);
 
     for (const obj of ['orig', 'world', 'local'] as const) {
@@ -155,7 +156,7 @@ export class GeometryPart {
    * @return  One of 'Point', 'LineString', 'Polygon'
    * @readonly
    */
-  get type(): SingularGeometryType | undefined {
+  public get type(): SingularGeometryType | undefined {
     return this.orig?.geojson?.type;
   }
 
@@ -165,7 +166,7 @@ export class GeometryPart {
    * If there is any existing data, it is first removed.
    * @param  geojson - GeoJSON geometry data
    */
-  setData(geojson: Partial<SingularGeometry> = {}): void {
+  public setData(geojson: Partial<SingularGeometry> = {}): void {
     this.reset();
 
     const type = geojson.type;
@@ -199,7 +200,7 @@ export class GeometryPart {
    * This converts original source data from WGS84 coordinates to world coordinates,
    * computing `world` and `local` caches and supporting geometry data structures.
    */
-  update(): void {
+  public update(): void {
     if (!this.orig || this.world) return;  // can't do it, or done already
 
     const origCoords = this.orig.coords;

@@ -1,5 +1,5 @@
-import { merge as deepMerge } from 'lodash-es';
 import { AbstractSystem } from './AbstractSystem.ts';
+import { merge as deepMerge } from 'lodash-es';
 import { Style, styleDefaults } from '../lib/Style.ts';
 import { StyleSelector } from '../lib/StyleSelector.ts';
 import { Variable } from '../lib/Variable.ts';
@@ -121,34 +121,35 @@ function getTag(tags: OsmTags, key: string): string | undefined {
  *   `stylechange`  Fires on any change in style
  */
 export class StyleSystem extends AbstractSystem {
+
   /** The supported style groups */
-  readonly styleGroups: Set<StyleGroup>;
+  public readonly styleGroups: Set<StyleGroup>;
 
   /** Protanopia color blindness simulation matrix */
-  protanopiaMatrix: number[];
+  public protanopiaMatrix: number[];
   /** Deuteranopia color blindness simulation matrix */
-  deuteranopiaMatrix: number[];
+  public deuteranopiaMatrix: number[];
   /** Tritanopia color blindness simulation matrix */
-  tritanopiaMatrix: number[];
+  public tritanopiaMatrix: number[];
 
   /** Per-scope storage */
-  private _scopes: Map<ScopeID, StyleScope>;
+  protected _scopes: Map<ScopeID, StyleScope>;
   /** List of supported pattern IDs (hardcoded, must match patterns loaded by PixiTextures) */
-  patternIDs: Set<string>;
+  public patternIDs: Set<string>;
 
   /** Default style file assetIDs */
-  private _defaultAssetIDs: Set<AssetID>;
+  protected _defaultAssetIDs: Set<AssetID>;
   /** Currently loaded style file assetIDs, maps to the version string that was loaded, if known */
-  private _loadedAssetIDs: Map<AssetID, string>;
+  protected _loadedAssetIDs: Map<AssetID, string>;
   /** Requested style file assetIDs - optional, these can be different than the default files */
-  private _requestedAssetIDs: Set<AssetID> | null;
+  protected _requestedAssetIDs: Set<AssetID> | null;
 
 
   /**
    * @constructor
    * @param context - Global shared application context
    */
-  constructor(context: Context) {
+  public constructor(context: Context) {
     super(context);
     this.id = 'styles';
     this.optionalDependencies = new Set(['assets', 'gfx', 'schema', 'urlhash']);
@@ -207,7 +208,7 @@ export class StyleSystem extends AbstractSystem {
    * Called after all core objects have been constructed.
    * @return Promise resolved when this component has completed initialization
    */
-  initAsync(): Promise<void> {
+  public initAsync(): Promise<void> {
     if (this._initPromise) return this._initPromise;
 
     const context = this.context;
@@ -242,7 +243,7 @@ export class StyleSystem extends AbstractSystem {
    * Called after all core objects have been initialized.
    * @return Promise resolved when this component has completed startup
    */
-  startAsync(): Promise<void> {
+  public startAsync(): Promise<void> {
     return super.startAsync();
   }
 
@@ -251,7 +252,7 @@ export class StyleSystem extends AbstractSystem {
    * Called after completing an edit session to reset any internal state
    * @return Promise resolved when this component has completed resetting
    */
-  resetAsync(): Promise<void> {
+  public resetAsync(): Promise<void> {
     return Promise.resolve();
   }
 
@@ -259,7 +260,7 @@ export class StyleSystem extends AbstractSystem {
   /**
    * @return Promise fulfilled when the style assets have been loaded
    */
-  loadStyleAssetsAsync(): Promise<void> {
+  public loadStyleAssetsAsync(): Promise<void> {
     const context = this.context;
     const assets = context.systems.assets;
     const gfx = context.systems.gfx;
@@ -315,7 +316,7 @@ export class StyleSystem extends AbstractSystem {
   /**
    * This puts the StyleSystem internal data back to its initial state, i.e. no styles.
    */
-  resetAll(): void {
+  public resetAll(): void {
     this._loadedAssetIDs.clear();
     this._scopes.clear();
 
@@ -328,7 +329,7 @@ export class StyleSystem extends AbstractSystem {
    * @return  Default assetIDs
    * @readonly
    */
-  get defaultAssetIDs(): Set<AssetID> {
+  public get defaultAssetIDs(): Set<AssetID> {
     return this._defaultAssetIDs;
   }
 
@@ -337,7 +338,7 @@ export class StyleSystem extends AbstractSystem {
    * @return  Loaded assetIDs
    * @readonly
    */
-  get loadedAssetIDs(): Map<AssetID, string> {
+  public get loadedAssetIDs(): Map<AssetID, string> {
     return this._loadedAssetIDs;
   }
 
@@ -355,7 +356,7 @@ export class StyleSystem extends AbstractSystem {
    *   and subsequent calls to `loadStyleAssetsAsync` will use the `defaultAssetIDs` Set.
    * @param vals - A `string`, `Array<string>` or `Set<string>` of assetIDs to load (or `null` to disable)
    */
-  set requestedAssetIDs(vals: OneOrMore<AssetID> | null) {
+  public set requestedAssetIDs(vals: OneOrMore<AssetID> | null) {
     if (vals === null || vals === undefined) {
       this._requestedAssetIDs = null;
       return;
@@ -373,7 +374,7 @@ export class StyleSystem extends AbstractSystem {
       }
     }
   }
-  get requestedAssetIDs(): Set<AssetID> | null {
+  public get requestedAssetIDs(): Set<AssetID> | null {
     return this._requestedAssetIDs;
   }
 
@@ -404,7 +405,7 @@ export class StyleSystem extends AbstractSystem {
    * @param input - style data to merge into the system
    * @throws Will throw if given data does not contain an `assetID`, or if the `assetID` has already been merged
    */
-  merge(input: StyleInput): void {
+  public merge(input: StyleInput): void {
     const context = this.context;
     const assetID = input.assetID;
     const assetVersion = input.assetVersion ?? 'unknown';
@@ -476,7 +477,7 @@ export class StyleSystem extends AbstractSystem {
    * @param currParams - The current hash parameters
    * @param prevParams - The previous hash parameters
    */
-  private _hashChanged(currParams: Map<string, string>, prevParams: Map<string, string>): void {
+  protected _hashChanged(currParams: Map<string, string>, prevParams: Map<string, string>): void {
     // style
     // AssetIDs to request, e.g. `style=default,my_presets`
     const newStyle = currParams.get('style');
@@ -498,7 +499,7 @@ export class StyleSystem extends AbstractSystem {
    * @param scopeID - ID of the scope to look up
    * @return The scope data
    */
-  getScope(scopeID: ScopeID): StyleScope {
+  public getScope(scopeID: ScopeID): StyleScope {
     let scope = this._scopes.get(scopeID);
     if (!scope) {
       scope = { variables: new Map(), styles: new Map(), selectors: new Map() };
@@ -514,7 +515,7 @@ export class StyleSystem extends AbstractSystem {
    * @param scopeID - Optional scope ID for scoped matching (defaults to 'osm')
    * @return Styling info for the given tags
    */
-  styleMatch(tags: OsmTags, geometry?: GeometryType, scopeID: ScopeID = 'osm'): MatchedStyle {
+  public styleMatch(tags: OsmTags, geometry?: GeometryType, scopeID: ScopeID = 'osm'): MatchedStyle {
     const context = this.context;
     const schema = context.systems.schema;
 
@@ -611,7 +612,7 @@ export class StyleSystem extends AbstractSystem {
    * @return True if a lifecycle tag is found
    * @see Rapid#1312, Rapid#1199, Rapid#791, Rapid#535
    */
-  private _hasLifecycleTag(tags: OsmTags, styleKey: string | undefined): boolean {
+  protected _hasLifecycleTag(tags: OsmTags, styleKey: string | undefined): boolean {
     const schema = this.context.systems.schema;
     const lifecyclePrefixes = schema?.getScope('osm')?.variables?.get('lifecycle_prefixes')?.asSet();
     if (!lifecyclePrefixes?.size) return false;
@@ -645,7 +646,7 @@ export class StyleSystem extends AbstractSystem {
    * @param result - The result object to mutate
    * @param tags - OSM tags
    */
-  private _applyStructureOverrides(result: MatchedStyle, tags: OsmTags): void {
+  protected _applyStructureOverrides(result: MatchedStyle, tags: OsmTags): void {
     const context = this.context;
     const schema = context.systems.schema;
 
@@ -700,7 +701,7 @@ export class StyleSystem extends AbstractSystem {
    * @param result - The result object to mutate
    * @param scopeStyles - The scoped styles map to look up LIFECYCLE style from
    */
-  private _applyLifecycleOverrides(result: MatchedStyle, scopeStyles: Map<StyleID, Style>): void {
+  protected _applyLifecycleOverrides(result: MatchedStyle, scopeStyles: Map<StyleID, Style>): void {
     const lifecycle = scopeStyles.get('LIFECYCLE');
     if (!lifecycle) return;
 
@@ -721,7 +722,7 @@ export class StyleSystem extends AbstractSystem {
    * @param result - The result object to validate
    * @param tags - OSM tags (to check for building exception)
    */
-  private _validateFillPattern(result: MatchedStyle, tags: OsmTags): void {
+  protected _validateFillPattern(result: MatchedStyle, tags: OsmTags): void {
     const building = getTag(tags, 'building');
     if (building) return;  // exception: don't apply patterns to buildings
 
@@ -737,7 +738,7 @@ export class StyleSystem extends AbstractSystem {
    * Resolves `var()` references in styles and selectors, then dirties all features
    * so they get re-styled, triggers a redraw, and emits a 'stylechange' event.
    */
-  private _styleChanged(): void {
+  protected _styleChanged(): void {
     const gfx = this.context.systems.gfx;
 
     // Resolve var() references in styles and selectors against scope variables

@@ -60,15 +60,17 @@ export interface EventData {
  *   `enabled`               `true` if the event handlers are enabled, `false` if not.
  */
 export class AbstractBehavior extends EventEmitter {
-  id: string;
-  context: Context;
+
+  public id: string;
+  public context: Context;
   protected _enabled: boolean;
+
 
   /**
    * @constructor
    * @param  context - Global shared application context
    */
-  constructor(context: Context) {
+  public constructor(context: Context) {
     super();
     this.id = '';
     this.context = context;
@@ -80,7 +82,7 @@ export class AbstractBehavior extends EventEmitter {
    * Every behavior should have an `enable` function
    * to setup whatever event handlers this behavior needs
    */
-  enable(): void {
+  public enable(): void {
     if (this._enabled) return;
     this._enabled = true;
   }
@@ -90,7 +92,7 @@ export class AbstractBehavior extends EventEmitter {
    * Every behavior should have a `disable` function
    * to teardown whatever event handlers this behavior needs
    */
-  disable(): void {
+  public disable(): void {
     if (!this._enabled) return;
     this._enabled = false;
   }
@@ -101,7 +103,7 @@ export class AbstractBehavior extends EventEmitter {
    * @return  The behavior identifier string (e.g. 'draw', 'hover')
    * @readonly
    */
-  get behaviorID(): string {
+  public get behaviorID(): string {
     return this.id;
   }
 
@@ -111,7 +113,7 @@ export class AbstractBehavior extends EventEmitter {
    * @return  `true` if enabled, `false` if not
    * @readonly
    */
-  get enabled(): boolean {
+  public get enabled(): boolean {
     return this._enabled;
   }
 
@@ -142,7 +144,7 @@ export class AbstractBehavior extends EventEmitter {
    * @param  e - A Pixi FederatedEvent (or something that looks like one)
    * @return Object containing data about the event and what was targeted
    */
-  _getEventData(e: any): EventData {
+  protected _getEventData(e: any): EventData {
     const context = this.context;
     const viewport = context.viewport;
     const r = viewport.transform.r;

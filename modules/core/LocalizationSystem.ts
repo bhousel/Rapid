@@ -1,6 +1,5 @@
-import { numClamp, numWrap } from '@rapid-sdk/math';
-
 import { AbstractSystem } from './AbstractSystem.ts';
+import { numClamp, numWrap } from '@rapid-sdk/math';
 import { utilDate } from '../util/date.ts';
 import { utilDetect } from '../util/detect.ts';
 import { utilExtractValues } from '../util/string.ts';
@@ -66,37 +65,38 @@ export interface AppendFunction {
  *   `localechange`    Fires on any change in the current locale
  */
 export class LocalizationSystem extends AbstractSystem {
+
   /** These are the different language packs that can be loaded */
-  private readonly _scopes: Set<string>;
+  protected readonly _scopes: Set<string>;
 
   /** All known language codes and their local name */
-  private _languages: Record<LanguageCode, LanguageInfo>;
+  protected _languages: Record<LanguageCode, LanguageInfo>;
   /** All supported locale codes */
-  private _locales: Record<LocaleCode, LocaleInfo>;
+  protected _locales: Record<LocaleCode, LocaleInfo>;
   /** Language codes per territory, sorted by population */
-  private _territoryLanguages: Record<string, LanguageCode[]>;
+  protected _territoryLanguages: Record<string, LanguageCode[]>;
 
   /** Preferred locale codes can be used to override the detected locale */
-  private _preferredLocaleCodes: LocaleCode[];
+  protected _preferredLocaleCodes: LocaleCode[];
 
   // Current locale state
-  private _currLocaleCode: LocaleCode;
-  private _currLocaleCodes: LocaleCode[];
-  private _currLanguageCode: LanguageCode;
-  private _currTextDirection: 'ltr' | 'rtl';
-  private _currIsMetric: boolean;
-  private _currLanguageNames: Record<LanguageCode, string>;
-  private _currScriptNames: Record<ScriptCode, string>;
+  protected _currLocaleCode: LocaleCode;
+  protected _currLocaleCodes: LocaleCode[];
+  protected _currLanguageCode: LanguageCode;
+  protected _currTextDirection: 'ltr' | 'rtl';
+  protected _currIsMetric: boolean;
+  protected _currLanguageNames: Record<LanguageCode, string>;
+  protected _currScriptNames: Record<ScriptCode, string>;
 
   /** Cache for loaded string data, organized by locale then scope */
-  private _strings: StringCache;
+  protected _strings: StringCache;
 
 
   /**
    * @constructor
    * @param context - Global shared application context
    */
-  constructor(context: Context) {
+  public constructor(context: Context) {
     super(context);
     this.id = 'l10n';
     this.optionalDependencies = new Set(['assets', 'gfx', 'schema', 'urlhash']);
@@ -187,49 +187,49 @@ export class LocalizationSystem extends AbstractSystem {
   /**
    * The current locale code (e.g. 'en-US', 'de', 'zh-CN')
    */
-  get localeCode(): LocaleCode {
+  public get localeCode(): LocaleCode {
     return this._currLocaleCode;
   }
 
   /**
    * Array of locale codes in priority order, with the current locale first followed by fallbacks
    */
-  get localeCodes(): LocaleCode[] {
+  public get localeCodes(): LocaleCode[] {
     return this._currLocaleCodes;
   }
 
   /**
    * The language portion of the current locale (e.g. 'en' from 'en-US')
    */
-  get languageCode(): LanguageCode {
+  public get languageCode(): LanguageCode {
     return this._currLanguageCode;
   }
 
   /**
    * The text direction for the current locale ('ltr' or 'rtl')
    */
-  get textDirection(): 'ltr' | 'rtl' {
+  public get textDirection(): 'ltr' | 'rtl' {
     return this._currTextDirection;
   }
 
   /**
    * Whether the current locale uses metric units (true for most locales, false for 'en-US')
    */
-  get isMetric(): boolean {
+  public get isMetric(): boolean {
     return this._currIsMetric;
   }
 
   /**
    * Map of language codes to their localized display names
    */
-  get languageNames(): Record<LanguageCode, string> {
+  public get languageNames(): Record<LanguageCode, string> {
     return this._currLanguageNames;
   }
 
   /**
    * Map of script codes to their localized display names
    */
-  get scriptNames(): Record<ScriptCode, string> {
+  public get scriptNames(): Record<ScriptCode, string> {
     return this._currScriptNames;
   }
 
@@ -237,7 +237,7 @@ export class LocalizationSystem extends AbstractSystem {
    * All known language codes and their info (native name, base, script).
    * This is used for language pickers in the UI.
    */
-  get languages(): Record<LanguageCode, LanguageInfo> {
+  public get languages(): Record<LanguageCode, LanguageInfo> {
     return this._languages;
   }
 
@@ -245,14 +245,14 @@ export class LocalizationSystem extends AbstractSystem {
    * Map of territory/country codes to arrays of language codes, sorted by population.
    * Used to suggest relevant languages based on geographic location.
    */
-  get territoryLanguages(): Record<string, LanguageCode[]> {
+  public get territoryLanguages(): Record<string, LanguageCode[]> {
     return this._territoryLanguages;
   }
 
   /**
    * Whether the current locale uses right-to-left text direction
    */
-  get isRTL(): boolean {
+  public get isRTL(): boolean {
     return this._currTextDirection === 'rtl';
   }
 
@@ -261,7 +261,7 @@ export class LocalizationSystem extends AbstractSystem {
    * If you're going to use this, you must call it before `initAsync` starts fetching data.
    * @param codes - Array or String of preferred locales
    */
-  set preferredLocaleCodes(codes: LocaleCode | LocaleCode[]) {
+  public set preferredLocaleCodes(codes: LocaleCode | LocaleCode[]) {
     if (typeof codes === 'string') {
       // Be generous and accept delimited strings as input
       this._preferredLocaleCodes = codes.split(/,|;| /gi).filter(Boolean);
@@ -269,7 +269,7 @@ export class LocalizationSystem extends AbstractSystem {
       this._preferredLocaleCodes = codes || [];
     }
   }
-  get preferredLocaleCodes(): LocaleCode[] {
+  public get preferredLocaleCodes(): LocaleCode[] {
     return this._preferredLocaleCodes;
   }
 
@@ -278,7 +278,7 @@ export class LocalizationSystem extends AbstractSystem {
    * Called after all core objects have been constructed.
    * @return Promise resolved after the files have been loaded
    */
-  initAsync(): Promise<void> {
+  public initAsync(): Promise<void> {
     if (this._initPromise) return this._initPromise;
 
     const context = this.context;
@@ -329,7 +329,7 @@ export class LocalizationSystem extends AbstractSystem {
    * Called after all core objects have been initialized.
    * @return Promise resolved when this component has completed startup
    */
-  startAsync(): Promise<void> {
+  public startAsync(): Promise<void> {
     return super.startAsync();
   }
 
@@ -338,7 +338,7 @@ export class LocalizationSystem extends AbstractSystem {
    * Called after completing an edit session to reset any internal state
    * @return Promise resolved when this component has completed resetting
    */
-  resetAsync(): Promise<void> {
+  public resetAsync(): Promise<void> {
     return Promise.resolve();
   }
 
@@ -347,7 +347,7 @@ export class LocalizationSystem extends AbstractSystem {
    * Returns a Promise to select the locale.
    * @return Promise resolved when the locale has been selected and strings loaded
    */
-  selectLocaleAsync(): Promise<void> {
+  public selectLocaleAsync(): Promise<void> {
     const context = this.context;
     const urlhash = context.systems.urlhash;
 
@@ -385,7 +385,7 @@ export class LocalizationSystem extends AbstractSystem {
    * @param locale - locale code to load
    * @return Promise resolved when all string loading has settled
    */
-  private _loadStringsAsync(locale: string): Promise<void | PromiseSettledResult<void>[]> {
+  protected _loadStringsAsync(locale: string): Promise<void | PromiseSettledResult<void>[]> {
     const context = this.context;
     const assets = context.systems.assets;
 
@@ -430,7 +430,7 @@ export class LocalizationSystem extends AbstractSystem {
    * @param currParams - The current hash parameters
    * @param prevParams - The previous hash parameters
    */
-  private _hashChanged(currParams: Map<string, string>, prevParams: Map<string, string>): void {
+  protected _hashChanged(currParams: Map<string, string>, prevParams: Map<string, string>): void {
     const context = this.context;
     const urlhash = context.systems.urlhash;
 
@@ -470,7 +470,7 @@ export class LocalizationSystem extends AbstractSystem {
    * @param locale - locale to use (defaults to currentLocale)
    * @return One of: `zero`, `one`, `two`, `few`, `many`, `other`
    */
-  pluralRule(num: number, locale: string = this._currLocaleCode): Intl.LDMLPluralRule {
+  public pluralRule(num: number, locale: string = this._currLocaleCode): Intl.LDMLPluralRule {
     // modern browsers have this functionality built-in
     const rules = 'Intl' in globalThis && Intl.PluralRules && new Intl.PluralRules(locale);
     if (rules) {
@@ -494,7 +494,7 @@ export class LocalizationSystem extends AbstractSystem {
    * @param searchLocales - locales to search (defaults to currentLocales)
    * @return result containing the localized string and chosen locale
    */
-  private _resolveString(
+  protected _resolveString(
     origStringID: StringID,
     replacements?: StringReplacements,
     searchLocales?: LocaleCode[]
@@ -618,7 +618,7 @@ export class LocalizationSystem extends AbstractSystem {
    * @param stringID - string identifier
    * @return true if the given string id will return a string
    */
-  hasTextForStringID(stringID: StringID): boolean {
+  public hasTextForStringID(stringID: StringID): boolean {
     return !!this._resolveString(stringID, { default: 'nothing found' }).locale;
   }
 
@@ -630,7 +630,7 @@ export class LocalizationSystem extends AbstractSystem {
    * @param locale        - locale to use (defaults to currentLocale)
    * @return the localized string
    */
-  t(stringID: StringID, replacements?: StringReplacements, locale?: string | string[]): string {
+  public t(stringID: StringID, replacements?: StringReplacements, locale?: string | string[]): string {
     let localeParam: string[] | undefined;
     if (typeof locale === 'string') localeParam = [locale];
     else if (Array.isArray(locale)) localeParam = locale;
@@ -647,7 +647,7 @@ export class LocalizationSystem extends AbstractSystem {
    * @param locale        - locale to use (defaults to currentLocale)
    * @return localized string wrapped in a HTML span, or empty string ''
    */
-  tHtml(stringID: StringID, replacements?: StringReplacements, locale?: string | string[]): string {
+  public tHtml(stringID: StringID, replacements?: StringReplacements, locale?: string | string[]): string {
     let localeParam: string[] | undefined;
     if (typeof locale === 'string') localeParam = [locale];
     else if (Array.isArray(locale)) localeParam = locale;
@@ -666,7 +666,7 @@ export class LocalizationSystem extends AbstractSystem {
    * @param locale        - locale to use (defaults to currentLocale)
    * @return Function that accepts a d3 selection and appends the localized text
    */
-  tAppend(stringID: StringID, replacements?: StringReplacements, locale?: string | string[]): AppendFunction {
+  public tAppend(stringID: StringID, replacements?: StringReplacements, locale?: string | string[]): AppendFunction {
     let localeParam: string[] | undefined;
     if (typeof locale === 'string') localeParam = [locale];
     else if (Array.isArray(locale)) localeParam = locale;
@@ -689,7 +689,7 @@ export class LocalizationSystem extends AbstractSystem {
    * @param localeCode - the locale code for the span
    * @return text wrapped in a HTML span
    */
-  htmlForLocalizedText(text: string, localeCode?: string | null): string {
+  public htmlForLocalizedText(text: string, localeCode?: string | null): string {
     return `<span class="localized-text" lang="${localeCode || 'unknown'}">${text}</span>`;
   }
 
@@ -700,7 +700,7 @@ export class LocalizationSystem extends AbstractSystem {
    * @param options - options object with optional `localOnly` property
    * @return the language string to display (e.g. "Deutsch (de)")
    */
-  languageName(code: LanguageCode, options?: { localOnly?: boolean }): string | null {
+  public languageName(code: LanguageCode, options?: { localOnly?: boolean }): string | null {
     if (this._currLanguageNames[code]) {      // name in locale language
       // e.g. "German"
       return this._currLanguageNames[code];
@@ -742,7 +742,7 @@ export class LocalizationSystem extends AbstractSystem {
    *   it being shown twice (see PR iD#8707#discussion_r712658175)
    * @return A name string suitable for display
    */
-  displayName(tags: OsmTags, hideNetwork?: boolean): string {
+  public displayName(tags: OsmTags, hideNetwork?: boolean): string {
     const code = this._currLanguageCode.toLowerCase();
 
     const route = tags.route;
@@ -817,7 +817,7 @@ export class LocalizationSystem extends AbstractSystem {
    * @param tags - OSM tags object
    * @return A name string suitable for display
    */
-  displayPOIName(tags: OsmTags): string {
+  public displayPOIName(tags: OsmTags): string {
     const code = this._currLanguageCode.toLowerCase();
     return tags[`name:${code}`] ?? tags.name ??
       tags[`brand:${code}`] ?? tags.brand ??
@@ -830,7 +830,7 @@ export class LocalizationSystem extends AbstractSystem {
    * @param entityID - OSM-like ID that starts with 'n', 'w', or 'r'
    * @return Localized string for 'Node', 'Way', or 'Relation'
    */
-  displayType(entityID: EntityID): string {
+  public displayType(entityID: EntityID): string {
     return ({
       n: this.t('inspector.node'),
       w: this.t('inspector.way'),
@@ -850,7 +850,7 @@ export class LocalizationSystem extends AbstractSystem {
    * @param verbose         - Whether to include both preset and feature name
    * @return A name string suitable for display
    */
-  displayLabel(entity: { id: EntityID; tags: OsmTags }, graphOrGeometry: Graph | string, verbose?: boolean): string {
+  public displayLabel(entity: { id: EntityID; tags: OsmTags }, graphOrGeometry: Graph | string, verbose?: boolean): string {
     const context = this.context;
     const schema = context.systems.schema;
 
@@ -884,7 +884,7 @@ export class LocalizationSystem extends AbstractSystem {
    * @param isImperial - true for U.S. customary units; false for metric
    * @return Text to display
    */
-  displayLength(meters: number, isImperial: boolean): string {
+  public displayLength(meters: number, isImperial: boolean): string {
     const locale = this._currLocaleCode;
     let n = meters * (isImperial ? 3.28084 : 1);
     let unit;
@@ -918,7 +918,7 @@ export class LocalizationSystem extends AbstractSystem {
    * @param isImperial - true for U.S. customary units; false for metric
    * @return Text to display
    */
-  displayArea(meters2: number, isImperial: boolean): string {
+  public displayArea(meters2: number, isImperial: boolean): string {
     const locale = this._currLocaleCode;
     const n = meters2 * (isImperial ? 10.7639111056 : 1);
     let n1: number;
@@ -978,7 +978,7 @@ export class LocalizationSystem extends AbstractSystem {
    * @param val - the Date-like value to display.
    * @return Text to display
    */
-  displayShortDate(val: string | number | Date): string {
+  public displayShortDate(val: string | number | Date): string {
     const d = utilDate(val);
     if (!d) return '';
 
@@ -992,7 +992,7 @@ export class LocalizationSystem extends AbstractSystem {
    * @param coord - longitude and latitude as [lon, lat]
    * @return Text to display
    */
-  dmsCoordinatePair(coord: Vec2): string {
+  public dmsCoordinatePair(coord: Vec2): string {
     return this.t('units.coordinate_pair', {
       latitude: this._displayCoordinate(numClamp(coord[1], -90, 90), 'north', 'south'),
       longitude: this._displayCoordinate(numWrap(coord[0], -180, 180), 'east', 'west')
@@ -1006,7 +1006,7 @@ export class LocalizationSystem extends AbstractSystem {
    * @param q - string to attempt to parse
    * @return The location formatted as `[lat,lon]`, or `null` it can't be parsed
    */
-  dmsMatcher(q: string): Vec2 | null {
+  public dmsMatcher(q: string): Vec2 | null {
     let match;
 
     // DD MM SS , DD MM SS  ex: 35 11 10.1 , 136 49 53.8
@@ -1041,7 +1041,7 @@ export class LocalizationSystem extends AbstractSystem {
    * @param coord - longitude and latitude as [lon, lat]
    * @return Text to display
    */
-  decimalCoordinatePair(coord: Vec2): string {
+  public decimalCoordinatePair(coord: Vec2): string {
     const OSM_PRECISION = 7;
     return this.t('units.coordinate_pair', {
       latitude: numClamp(coord[1], -90, 90).toFixed(OSM_PRECISION),
@@ -1057,7 +1057,7 @@ export class LocalizationSystem extends AbstractSystem {
    * @param neg - string to use for negative values (either 'south' or 'west')
    * @return Text to display
    */
-  private _displayCoordinate(deg: number, pos: string, neg: string): string {
+  protected _displayCoordinate(deg: number, pos: string, neg: string): string {
     const EPSILON = 0.01;
     const locale = this._currLocaleCode;
     const min = (Math.abs(deg) - Math.floor(Math.abs(deg))) * 60;
@@ -1101,7 +1101,7 @@ export class LocalizationSystem extends AbstractSystem {
    * @param requested - locale codes to consider, in priority order
    * @return The locales that we can actually support
    */
-  private _getSupportedLocales(requested: Iterable<LocaleCode>): LocaleCode[] {
+  protected _getSupportedLocales(requested: Iterable<LocaleCode>): LocaleCode[] {
     const results = new Set();
 
     for (const locale of requested) {
@@ -1142,7 +1142,7 @@ export class LocalizationSystem extends AbstractSystem {
    * This should happen after all locale files have been fetched.
    * This will trigger a redraw, and emit a 'localechange' event.
    */
-  private _localeChanged(): void {
+  protected _localeChanged(): void {
     const context = this.context;
     const gfx = context.systems.gfx;
     const urlhash = context.systems.urlhash;

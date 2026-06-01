@@ -1,5 +1,4 @@
 import * as PIXI from 'pixi.js';
-
 import { AbstractPixiFeature } from './AbstractPixiFeature.ts';
 
 import type { Viewport } from '@rapid-sdk/math';
@@ -77,12 +76,12 @@ export type LabelProps = TextLabelProps | RopeLabelProps;
  */
 export class PixiFeatureLabel extends AbstractPixiFeature {
   /** Narrow the inherited `layer` reference so we can call `resolveLabelTexture()`. */
-  declare layer: PixiLayerLabels;
+  public declare layer: PixiLayerLabels;
 
   /** The label content + placement.  Assigned by the layer after construction. */
-  props: LabelProps | null;
+  public props: LabelProps | null;
   /** The child display object — Sprite, BitmapText, or MeshRope (null until built) */
-  display: PIXI.Container | null;
+  public display: PIXI.Container | null;
 
 
   /**
@@ -90,7 +89,7 @@ export class PixiFeatureLabel extends AbstractPixiFeature {
    * @param layer - The `PixiLayerLabels` that owns this Feature
    * @param featureID - Unique string identifier for this label
    */
-  constructor(layer: PixiLayerLabels, featureID: FeatureID) {
+  public constructor(layer: PixiLayerLabels, featureID: FeatureID) {
     super(layer, featureID);
 
     // Labels don't emit pointer events and don't need halos.
@@ -110,7 +109,7 @@ export class PixiFeatureLabel extends AbstractPixiFeature {
    * Every Feature should have a destroy function that frees all the resources.
    * Do not use the Feature after calling `destroy()`.
    */
-  destroy(): void {
+  public destroy(): void {
     if (this.display) {
       this.display.destroy({ children: true });
       this.display = null;
@@ -126,7 +125,7 @@ export class PixiFeatureLabel extends AbstractPixiFeature {
    * the texture is not yet ready, so the layer will retry next frame.
    * @param viewport - Pixi viewport (unused — label placement is precomputed in layer space)
    */
-  update(_viewport: Viewport): void {
+  public update(_viewport: Viewport): void {
     if (!this._styleDirty || !this.props) return;
 
     if (this.props.kind === 'text') {
@@ -141,7 +140,7 @@ export class PixiFeatureLabel extends AbstractPixiFeature {
    * Labels don't show halos.
    * @override
    */
-  updateHalo(): void {
+  public updateHalo(): void {
   }
 
 
@@ -152,7 +151,7 @@ export class PixiFeatureLabel extends AbstractPixiFeature {
    *   - Other labels look up an atlas texture and wrap it in a `PIXI.Sprite`.
    *     If the texture isn't ready yet, leave `_styleDirty` set and retry next frame.
    */
-  private _updateText(props: TextLabelProps): void {
+  protected _updateText(props: TextLabelProps): void {
     if (!this.display) {
       if (props.bitmapText) {
         this.display = props.bitmapText;
@@ -178,7 +177,7 @@ export class PixiFeatureLabel extends AbstractPixiFeature {
    * Rope geometry doesn't change after placement, so we only build the
    * `MeshRope` once; subsequent updates just refresh the tint.
    */
-  private _updateRope(props: RopeLabelProps): void {
+  protected _updateRope(props: RopeLabelProps): void {
     if (!this.display) {
       const texture = this.layer.resolveLabelTexture(props.str, props.style);
       if (!texture) return;   // not ready — stay dirty

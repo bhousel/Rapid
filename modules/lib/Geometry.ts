@@ -4,6 +4,7 @@ import { GeometryPart } from './GeometryPart.ts';
 import type { Context } from '../Context.ts';
 import type { GeoJSONObject, SingularGeometry } from './types.ts';
 
+
 /** Original extent data in WGS84 for Geometry */
 export interface GeometryOrigData {
   extent: Extent;
@@ -27,19 +28,21 @@ export interface GeometryWorldData {
  *   `parts`          Array of GeometryParts
  */
 export class Geometry {
-  context: Context;
+
+  public context: Context;
   /** Array of GeometryPart elements */
-  parts: GeometryPart[];
+  public parts: GeometryPart[];
   /** Original data, in WGS84 coordinates ([0,0] is Null Island) */
-  orig: GeometryOrigData | null;
+  public orig: GeometryOrigData | null;
   /** Projected data, in world coordinates (z16, range 0..16,777,216) */
-  world: GeometryWorldData | null;
+  public world: GeometryWorldData | null;
+
 
   /**
    * @constructor
    * @param  context - Global shared application context
    */
-  constructor(context: Context) {
+  public constructor(context: Context) {
     this.context = context;
     this.parts = [];
     this.orig = null;
@@ -51,7 +54,7 @@ export class Geometry {
    * Release memory.
    * Do not use the geometry after calling `destroy()`.
    */
-  destroy(): void {
+  public destroy(): void {
     this.reset();
     this.context = null!;
   }
@@ -60,7 +63,7 @@ export class Geometry {
   /**
    * Remove all stored data
    */
-  reset(): void {
+  public reset(): void {
     this.orig = null;
     this.world = null;
 
@@ -76,7 +79,7 @@ export class Geometry {
    * It clones both the calculated extents as well as the GeometryParts in the collection.
    * @return  A new Geometry
    */
-  clone(): Geometry {
+  public clone(): Geometry {
     const copy = new Geometry(this.context);
     for (const obj of ['orig', 'world'] as const) {
       const src = this[obj];
@@ -114,7 +117,7 @@ export class Geometry {
    * If there is any existing data, it is first removed.
    * @param  geojson - source GeoJSON data
    */
-  setData(geojson: Partial<GeoJSONObject> = {}): void {
+  public setData(geojson: Partial<GeoJSONObject> = {}): void {
     this.reset();
 
     const geojsonParts = this._geojsonToParts(geojson as GeoJSONObject);
@@ -150,7 +153,7 @@ export class Geometry {
    * @param   depth - recursion depth
    * @return  An array of singular GeoJSON geometries
    */
-  private _geojsonToParts(
+  protected _geojsonToParts(
     geojson: GeoJSONObject | undefined,
     parts: SingularGeometry[] = [],
     depth: number = 0

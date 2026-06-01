@@ -5,11 +5,11 @@ import JSON5 from 'json5';
  * Pack up the parts of the response that we may need later for error handling.
  */
 export class FetchError extends Error {
-  status: number;
-  statusText: string;
-  response: Response;
+  public status: number;
+  public statusText: string;
+  public response: Response;
 
-  constructor(response: Response) {
+  public constructor(response: Response) {
     const message = response.status + ' ' + response.statusText;    // e.g. '404 Not Found'
     super(message);
 

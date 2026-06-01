@@ -1,18 +1,17 @@
 import * as PIXI from 'pixi.js';
-import RBush from 'rbush';
-import { HALF_PI, TAU, WORLD_HALF, numWrap, vecAdd, vecAngle, vecScale, vecSubtract, geomRotate } from '@rapid-sdk/math';
-
 import { AbstractPixiLayer } from './AbstractPixiLayer.ts';
+import { HALF_PI, TAU, WORLD_HALF, numWrap, vecAdd, vecAngle, vecScale, vecSubtract, geomRotate } from '@rapid-sdk/math';
 import { PixiFeatureLabel } from './PixiFeatureLabel.ts';
+import RBush from 'rbush';
 import { getLineSegments, getDebugBBox, lineToPoly } from './helpers.ts';
 
 import type { AbstractPixiFeature } from './AbstractPixiFeature.ts';
+import type { LabelProps, TextLabelProps, RopeLabelProps } from './PixiFeatureLabel.ts';
 import type { PixiFeatureLine } from './PixiFeatureLine.ts';
 import type { PixiFeaturePoint } from './PixiFeaturePoint.ts';
 import type { PixiFeaturePolygon } from './PixiFeaturePolygon.ts';
 import type { PixiLayerMapUI } from './PixiLayerMapUI.ts';
 import type { PixiScene } from './PixiScene.ts';
-import type { LabelProps, TextLabelProps, RopeLabelProps } from './PixiFeatureLabel.ts';
 import type { Vec2, Viewport } from '@rapid-sdk/math';
 
 
@@ -83,47 +82,47 @@ interface ChainLink {
  * @class
  */
 export class PixiLayerLabels extends AbstractPixiLayer {
-  labelOriginContainer: PIXI.Container | null;
-  debugContainer: PIXI.Container | null;
-  labelContainer: PIXI.Container | null;
+  public labelOriginContainer: PIXI.Container | null;
+  public debugContainer: PIXI.Container | null;
+  public labelContainer: PIXI.Container | null;
 
   /** Labeling spatial index - contains boxes covering placed labels and regions to avoid */
-  private _labelRBush: RBush<LabelBox>;
+  protected _labelRBush: RBush<LabelBox>;
   /** Debugging spatial index - contains boxes covering all tested regions */
-  private _debugRBush: RBush<LabelBox>;
+  protected _debugRBush: RBush<LabelBox>;
 
   /** FeatureIDs that we are avoiding (e.g. map pins, vertices, junctions) */
-  private _avoided: Set<FeatureID>;
+  protected _avoided: Set<FeatureID>;
   /** FeatureIDs that have been labeled (points, roads, etc) - note that point features can be both avoided and labeled */
-  private _labeled: Set<FeatureID>;
+  protected _labeled: Set<FeatureID>;
 
   /** Mapping of a BoxID to a Box, as indexed by RBush */
-  private _boxes: Map<BoxID, LabelBox>;
+  protected _boxes: Map<BoxID, LabelBox>;
 
   /** Mapping of a FeatureID to the boxes that cover it */
-  private _featureBoxes: Map<FeatureID, Set<BoxID>>;
+  protected _featureBoxes: Map<FeatureID, Set<BoxID>>;
   /** Mapping of a text string (e.g. "Main Street") to generated texture */
-  private _textureIDs: Map<string, TextureID>;
+  protected _textureIDs: Map<string, TextureID>;
   /** Storage for label placeholders - they will be added to the scene lazily */
-  private _placeholders: Map<LabelID, LabelProps>;
+  protected _placeholders: Map<LabelID, LabelProps>;
   /** Mapping of Pixi object id to PIXI.Sprite */
-  private _debugSprites: Map<string, PIXI.Sprite>;
+  protected _debugSprites: Map<string, PIXI.Sprite>;
 
-  private _pendingRasters: Map<TextureID, { str: string; style: 'normal' | 'italic' }>;
-  private _rasterDrainScheduled: boolean;
-  private _tPrev: { x: number; y: number; z: number; r: number };
+  protected _pendingRasters: Map<TextureID, { str: string; style: 'normal' | 'italic' }>;
+  protected _rasterDrainScheduled: boolean;
+  protected _tPrev: { x: number; y: number; z: number; r: number };
 
   /** Tracks the difference between the top left corner of the screen and the parent "origin" container */
-  private _labelOffset: PIXI.Point;
-  private _textStyleNormal: PIXI.TextStyle;
-  private _textStyleItalic: PIXI.TextStyle;
+  protected _labelOffset: PIXI.Point;
+  protected _textStyleNormal: PIXI.TextStyle;
+  protected _textStyleItalic: PIXI.TextStyle;
 
 
   /**
    * @constructor
    * @param scene - The Scene that owns this Layer
    */
-  constructor(scene: PixiScene) {
+  public constructor(scene: PixiScene) {
     super(scene);
     this.id = 'labels';
     this.enabled = true;   // labels should be enabled by default
@@ -180,7 +179,7 @@ export class PixiLayerLabels extends AbstractPixiLayer {
   /**
    * Every Layer should have a reset function to replace any Pixi objects and internal state.
    */
-  reset() {
+  public reset() {
     super.reset();
 
     // Destroy any Pixi display objects that we created.
@@ -244,7 +243,7 @@ export class PixiLayerLabels extends AbstractPixiLayer {
    * This will force the feature to be relabeled.
    * @param featureID - The feature ID to reset
    */
-  resetFeature(featureID: FeatureID): void {
+  public resetFeature(featureID: FeatureID): void {
     this._avoided.delete(featureID);
     this._labeled.delete(featureID);
 
@@ -307,7 +306,7 @@ export class PixiLayerLabels extends AbstractPixiLayer {
    * @param frame - Integer frame being rendered
    * @param viewport - Pixi viewport to use for rendering
    */
-  render(frame: number, viewport: Viewport): void {
+  public render(frame: number, viewport: Viewport): void {
     const viewZoom = viewport.transform.zoom;
     if (!this.enabled || viewZoom < MINZOOM) {
       this.labelContainer!.visible = false;
@@ -416,7 +415,7 @@ export class PixiLayerLabels extends AbstractPixiLayer {
    * @param str - The label text
    * @return Padding in CSS pixels
    */
-  private _getLabelPadding(str: string): number {
+  protected _getLabelPadding(str: string): number {
     const marks = str.match(/\p{M}/gu);  // count unicode combining marks
     if (!marks) return 0;
     if (marks.length > 20) return 50;    // Zalgo text?
@@ -431,7 +430,7 @@ export class PixiLayerLabels extends AbstractPixiLayer {
    * @param style - 'normal' or 'italic'
    * @return A TextStyle ready to pass to CanvasTextMetrics.measureText / PIXI.Text
    */
-  private _getTextStyle(str: string, style: 'normal' | 'italic'): PIXI.TextStyle {
+  protected _getTextStyle(str: string, style: 'normal' | 'italic'): PIXI.TextStyle {
     const pad = this._getLabelPadding(str);
     if (pad) {  // need a one-off style with extra padding
       const opts = Object.assign({}, (style === 'normal' ? TEXTSTYLE_NORMAL : TEXTSTYLE_ITALIC), { padding: pad });
@@ -456,7 +455,7 @@ export class PixiLayerLabels extends AbstractPixiLayer {
    * @param style - 'normal' or 'italic'
    * @return Frame width/height in CSS pixels, padded the same way the texture will be
    */
-  measureLabel(str: string, style: 'normal' | 'italic' = 'normal'): MeasuredLabel {
+  public measureLabel(str: string, style: 'normal' | 'italic' = 'normal'): MeasuredLabel {
     const textStyle = this._getTextStyle(str, style);
     const metrics = PIXI.CanvasTextMetrics.measureText(str, textStyle);
     const pad = this._getLabelPadding(str);
@@ -482,7 +481,7 @@ export class PixiLayerLabels extends AbstractPixiLayer {
    * @param style - 'normal' or 'italic'
    * @return The texture if already allocated, otherwise `null` (and a request is queued)
    */
-  resolveLabelTexture(str: string, style: 'normal' | 'italic'): PIXI.Texture | null {
+  public resolveLabelTexture(str: string, style: 'normal' | 'italic'): PIXI.Texture | null {
     const textureID: TextureID = `${str}-${style}`;
     const textureManager = this.gfx.textureManager!;
     const existing = textureManager.getTexture('text', textureID);
@@ -506,7 +505,7 @@ export class PixiLayerLabels extends AbstractPixiLayer {
    * The `_rasterDrainScheduled` flag dedups within a frame so we don't enqueue N drain
    * tasks when N labels are queued.
    */
-  private _scheduleRasterDrain(): void {
+  protected _scheduleRasterDrain(): void {
     if (this._rasterDrainScheduled) return;
 
     this._rasterDrainScheduled = true;
@@ -522,7 +521,7 @@ export class PixiLayerLabels extends AbstractPixiLayer {
    * Rasterize queued labels into the text atlas.
    * Called from the scheduler's drain phase, NOT from render() — see `_scheduleRasterDrain`.
    */
-  private _drainPendingRasters(): void {
+  protected _drainPendingRasters(): void {
     this._rasterDrainScheduled = false;
     if (!this._pendingRasters.size) return;
     if (!this.gfx?.textureManager) return;  // layer was reset
@@ -552,7 +551,7 @@ export class PixiLayerLabels extends AbstractPixiLayer {
    * If a new avoidance collides with an already placed label,
    *  destroy the label and flag the feature as labeldirty for relabeling
    */
-  gatherAvoids(): void {
+  public gatherAvoids(): void {
     const showDebug = this.context.getDebug('label');
 
     // Gather the containers that have avoidable stuff on them.
@@ -651,7 +650,7 @@ export class PixiLayerLabels extends AbstractPixiLayer {
    * The box should have `id` and `featureID` properties.
    * @param box - the box to cache
    */
-  _cacheBox(box: LabelBox): void {
+  protected _cacheBox(box: LabelBox): void {
     const boxID = box.id;
     const featureID = box.featureID;
     if (!boxID || !featureID) return;
@@ -671,7 +670,7 @@ export class PixiLayerLabels extends AbstractPixiLayer {
    * This calculates the placement, but does not actually add the label to the scene.
    * @param features - The features to place point labels on
    */
-  labelPoints(features: PixiFeaturePoint[]): void {
+  public labelPoints(features: PixiFeaturePoint[]): void {
     // Sort by container y-position (north-to-south in world coords) for stable placement priority.
     features.sort((a, b) => a.container.position.y - b.container.position.y);
 
@@ -718,7 +717,7 @@ export class PixiLayerLabels extends AbstractPixiLayer {
    * This calculates the placement, but does not actually add the rope label to the scene.
    * @param features - The features to place point labels on
    */
-  labelLines(features: PixiFeatureLine[]): void {
+  public labelLines(features: PixiFeatureLine[]): void {
     // This is hacky, but we can sort the line labels by their parent container name.
     // It might be a level container with a name like "1", "-1", or just a name like "lines"
     // If `parseInt` fails, just sort the label above everything.
@@ -767,7 +766,7 @@ export class PixiLayerLabels extends AbstractPixiLayer {
    * This calculates the placement, but does not actually add the rope label to the scene.
    * @param features - The features to place point labels on
    */
-  labelPolygons(features: PixiFeaturePolygon[]): void {
+  public labelPolygons(features: PixiFeaturePolygon[]): void {
     const temp = new PIXI.Point();
     const labelOffset = this._labelOffset;
 
@@ -825,7 +824,7 @@ export class PixiLayerLabels extends AbstractPixiLayer {
    * @param feature - The feature to place point labels on
    * @param measured - The label measurement (size + str/style + optional bitmapText)
    */
-  placeTextLabel(feature: AbstractPixiFeature, measured: MeasuredLabel): void {
+  public placeTextLabel(feature: AbstractPixiFeature, measured: MeasuredLabel): void {
     if (!feature) return;
 
     const showDebug = this.context.getDebug('label');
@@ -990,7 +989,7 @@ export class PixiLayerLabels extends AbstractPixiLayer {
    * @param measured - The label measurement (size + str/style)
    * @param coords - The coordinates to place a rope on, in label space (= global screen minus labelOffset)
    */
-  placeRopeLabel(feature: AbstractPixiFeature, measured: MeasuredLabel, coords: Vec2[]): void {
+  public placeRopeLabel(feature: AbstractPixiFeature, measured: MeasuredLabel, coords: Vec2[]): void {
     if (!feature || !measured || !coords) return;
     if (!feature.container.visible || !feature.container.renderable) return;
 
@@ -1180,7 +1179,7 @@ export class PixiLayerLabels extends AbstractPixiLayer {
    * @param frame - Integer frame being rendered
    * @param viewport - Pixi viewport to use for rendering
    */
-  renderLabels(frame: number, viewport: Viewport): void {
+  public renderLabels(frame: number, viewport: Viewport): void {
     // bhousel 4/1/26:  MeshRope is not supported for
     // the new experimental Pixi Canvas renderer yet.
     const renderer = this.gfx!.pixi!.renderer;
@@ -1242,7 +1241,7 @@ export class PixiLayerLabels extends AbstractPixiLayer {
   /**
    * This renders any of the debug sprites in the view
    */
-  renderDebug(): void {
+  public renderDebug(): void {
     // Get the display bounds in screen/global coordinates
     const screen = this.gfx.pixi!.screen;
     const labelOffset = this._labelOffset;

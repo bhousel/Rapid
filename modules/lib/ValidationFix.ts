@@ -23,26 +23,28 @@ export interface ValidationFixProps {
  * Each `ValidationIssue` can have multiple possible fixes that the user can choose from.
  */
 export class ValidationFix {
+
   /** Unique identifier for this fix (set by ValidationIssue.fixes()) */
-  id: string;
+  public id: string;
   /** Display title for this fix */
-  title: string;
+  public title: string;
   /** The function to run to apply the fix */
-  onClick: (() => void) | undefined;
+  public onClick: (() => void) | undefined;
   /** A string explaining why the fix is unavailable, if any */
-  disabledReason: string | undefined;
+  public disabledReason: string | undefined;
   /** Icon name for the fix (defaults to 'rapid-icon-wrench') */
-  icon: string | undefined;
+  public icon: string | undefined;
   /** Entity IDs used for hover-highlighting */
-  entityIds: EntityID[];
+  public entityIds: EntityID[];
   /** Reference back to the parent ValidationIssue (set by ValidationIssue.fixes()) */
-  issue: ValidationIssue | null;
+  public issue: ValidationIssue | null;
+
 
   /**
    * @constructor
    * @param props - Properties for this ValidationFix
    */
-  constructor(props: Partial<ValidationFixProps>) {
+  public constructor(props: Partial<ValidationFixProps>) {
     this.id = '';
     this.title = props.title ?? '';
     this.onClick = props.onClick;

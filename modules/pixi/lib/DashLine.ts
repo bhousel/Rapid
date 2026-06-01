@@ -63,27 +63,27 @@ const dashLineOptionsDefault: ResolvedDashLineOptions = {
 
 export class DashLine {
   /** Reference to the GraphicsSystem for texture caching */
-  gfx: any;
+  public gfx: any;
   /** Resolved options for this DashLine */
-  options: ResolvedDashLineOptions;
+  public options: ResolvedDashLineOptions;
   /** Current length of the line being drawn */
-  lineLength: number | null;
+  public lineLength: number | null;
   /** Current cursor position */
-  cursor: PIXI.Point;
+  public cursor: PIXI.Point;
   /** Starting point of the current path */
-  start: PIXI.Point | null;
+  public start: PIXI.Point | null;
   /** The Pixi graphics object to draw with */
-  graphics: PIXI.Graphics;
+  public graphics: PIXI.Graphics;
   /** The dash pattern */
-  dash: Dashes;
+  public dash: Dashes;
   /** Total size of one complete dash pattern cycle */
-  dashSize: number;
+  public dashSize: number;
   /** Scale factor for the dash pattern */
-  scale: number;
+  public scale: number;
   /** Whether to use texture-based rendering */
-  useTexture: boolean;
+  public useTexture: boolean;
   /** The texture used for texture-based dashing */
-  activeTexture: PIXI.Texture | null;
+  public activeTexture: PIXI.Texture | null;
   /**
    * Pixel dimensions of `activeTexture`. The dash content covers the full texture
    * (drawn into a `dashSize × width` region then scaled up via `ctx.scale`), but
@@ -91,10 +91,10 @@ export class DashLine {
    * per-segment matrix in `lineTo()` uses these to compensate, so one full texture
    * cycle maps to exactly `dashSize * userScale` local units regardless of padding.
    */
-  texW: number;
-  texH: number;
+  public texW: number;
+  public texH: number;
   /** Stroke style configuration */
-  strokeStyle: PIXI.StrokeStyle;
+  public strokeStyle: PIXI.StrokeStyle;
 
   /**
    * Create a DashLine
@@ -102,7 +102,7 @@ export class DashLine {
    * @param graphics - The Pixi graphics object to draw with a dashed-line style
    * @param options - DashLine configuration options
    */
-  constructor(gfx: any, graphics: PIXI.Graphics, options: DashLineOptions = {}) {
+  public constructor(gfx: any, graphics: PIXI.Graphics, options: DashLineOptions = {}) {
     this.gfx = gfx;
 
     const resolvedOptions = { ...dashLineOptionsDefault, ...options };
@@ -155,7 +155,7 @@ export class DashLine {
    * Move to a position to prepare to draw a line.
    * This is essentially our 'reset' function.
    */
-  moveTo(x: number, y: number): this {
+  public moveTo(x: number, y: number): this {
     this.lineLength = 0;
     this.cursor.set(x, y);
     this.start = new PIXI.Point(x, y);
@@ -167,7 +167,7 @@ export class DashLine {
   /**
    * Extend the line to given x,y coordinate
    */
-  lineTo(x: number, y: number, doClosePath?: boolean): this {
+  public lineTo(x: number, y: number, doClosePath?: boolean): this {
     if (this.lineLength === null) {  // lineTo() called before moveTo()?
       this.moveTo(0, 0);
     }
@@ -294,7 +294,7 @@ export class DashLine {
   }
 
 
-  closePath(): void {
+  public closePath(): void {
     this.lineTo(this.start!.x, this.start!.y, true);
   }
 
@@ -308,7 +308,7 @@ export class DashLine {
    * @param matrix - Optional transformation matrix
    * @return this
    */
-  circle(x: number, y: number, radius: number, points: number = 80, matrix: PIXI.Matrix | null = null): this {
+  public circle(x: number, y: number, radius: number, points: number = 80, matrix: PIXI.Matrix | null = null): this {
     const interval = (Math.PI * 2) / points;
     let angle = 0;
     const first = new PIXI.Point(x + Math.cos(angle) * radius, y + Math.sin(angle) * radius);
@@ -339,7 +339,7 @@ export class DashLine {
    * @param matrix - Optional transformation matrix
    * @return this
    */
-  ellipse(x: number, y: number, radiusX: number, radiusY: number, points: number = 80, matrix: PIXI.Matrix | null = null): this {
+  public ellipse(x: number, y: number, radiusX: number, radiusY: number, points: number = 80, matrix: PIXI.Matrix | null = null): this {
     const interval = (Math.PI * 2) / points;
     let first: { x: number; y: number } | undefined;
 
@@ -373,7 +373,7 @@ export class DashLine {
    * @param matrix - Optional transformation matrix
    * @return this
    */
-  poly(points: PIXI.Point[] | number[], matrix: PIXI.Matrix | null = null): this {
+  public poly(points: PIXI.Point[] | number[], matrix: PIXI.Matrix | null = null): this {
     const p = new PIXI.Point();
 
     if (typeof points[0] === 'number') {   // flat array of numbers
@@ -430,7 +430,7 @@ export class DashLine {
    * @param matrix - Optional transformation matrix
    * @return this
    */
-  rect(x: number, y: number, width: number, height: number, matrix: PIXI.Matrix | null = null): this {
+  public rect(x: number, y: number, width: number, height: number, matrix: PIXI.Matrix | null = null): this {
     if (matrix) {
       const p = new PIXI.Point();
 
@@ -477,7 +477,7 @@ export class DashLine {
    * @param dashSize - Total size of the dash pattern
    * @return The texture for the dash pattern, or null on error
    */
-  private _getTexture(options: ResolvedDashLineOptions, dashSize: number): PIXI.Texture | null {
+  protected _getTexture(options: ResolvedDashLineOptions, dashSize: number): PIXI.Texture | null {
     const dashTextureCache = this.gfx.textureManager?._dashTextureCache;
     if (!dashTextureCache) {    // called too early?
       console.error('No DashTextureCache found');   // eslint-disable-line no-console

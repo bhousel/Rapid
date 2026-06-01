@@ -1,7 +1,6 @@
 import { geoArea as d3_geoArea, geoMercatorRaw as d3_geoMercatorRaw } from 'd3-geo';
 import { DEG2RAD, RAD2DEG, TAU, geoSphericalDistance } from '@rapid-sdk/math';
 import { utilAesDecrypt, utilQsString, utilStringQs, utilSafeString } from '@rapid-sdk/util';
-
 import { utilDateString } from '../util/date.ts';
 
 import type { Vec2, Vec3 } from '@rapid-sdk/math';
@@ -102,25 +101,27 @@ export interface ImagerySourceProps {
  *   `props`                Properties object
  */
 export class ImagerySource {
-  context: Context;
-  props: ImagerySourceProps;
-  id: ImagerySourceID;
-  safeid: string;
-  imageryID: ImagerySourceID;
-  type: ImageryType | undefined;
-  offset: Vec2;
+
+  public context: Context;
+  public props: ImagerySourceProps;
+  public id: ImagerySourceID;
+  public safeid: string;
+  public imageryID: ImagerySourceID;
+  public type: ImageryType | undefined;
+  public offset: Vec2;
 
   protected _template: string;
   protected _strings: Map<string, ImagerySourceStrings>;
   protected _currLocaleCode: LocaleCode | null;
   protected _currStrings: Partial<ImagerySourceStrings>;
 
+
   /**
    * @constructor
    * @param context - Global shared application context
    * @param props - Object containing the properties for this ImagerySource
    */
-  constructor(context: Context, props: Partial<ImagerySourceProps> = {}) {
+  public constructor(context: Context, props: Partial<ImagerySourceProps> = {}) {
     this.context = context;
 
     if (!props.id) {
@@ -162,7 +163,7 @@ export class ImagerySource {
    * This should happen whenever ImagerySystem merges in new data.
    * You must add the ImagerySource to the ImagerySystem and call `reset` before using the ImagerySource.
    */
-  reset(): void {
+  public reset(): void {
     const l10n = this.context.systems.l10n;
 
     // Invalidate any cached string localizations and redo for the current locale.
@@ -176,7 +177,7 @@ export class ImagerySource {
    * This should happen whenever LocalizationSystem changes the locale.
    * @param localeCode - the locale code to switch to (defaults to 'en-US')
    */
-  setLocale(localeCode: LocaleCode = 'en-US'): void {
+  public setLocale(localeCode: LocaleCode = 'en-US'): void {
     this._currLocaleCode = localeCode;
     if (this._strings.has(localeCode)) return;  // done already
 
@@ -203,7 +204,7 @@ export class ImagerySource {
    * @return Localized name
    * @readonly
    */
-  get name(): string {
+  public get name(): string {
     return this._currStrings.name ?? '';
   }
 
@@ -212,7 +213,7 @@ export class ImagerySource {
    * @return Localized description
    * @readonly
    */
-  get description(): string {
+  public get description(): string {
     return this._currStrings.description ?? '';
   }
 
@@ -222,7 +223,7 @@ export class ImagerySource {
    * @return The key
    * @readonly
    */
-  get key(): string {
+  public get key(): string {
     return this.safeid;
   }
 
@@ -231,7 +232,7 @@ export class ImagerySource {
    * @return The imagery used string
    * @readonly
    */
-  get imageryUsed(): string | null {
+  public get imageryUsed(): string | null {
     return this._currStrings.name ?? null;
   }
 
@@ -240,7 +241,7 @@ export class ImagerySource {
    * @return The imagery URL template
    * @readonly
    */
-  get template(): string {
+  public get template(): string {
     return this._template;
   }
 
@@ -251,7 +252,7 @@ export class ImagerySource {
    * @return Area in steradians
    * @readonly
    */
-  get area(): number {
+  public get area(): number {
     if (!this.props.feature) return Number.MAX_VALUE;  // worldwide
     const area = d3_geoArea(this.props.feature as any);
     return isNaN(area) ? 0 : area;
@@ -261,7 +262,7 @@ export class ImagerySource {
    * Is the imagery valid at the given zoom?
    * @return `true` if the imagery is valid at the given zoom, `false` if not
    */
-  isValidZoom(z: number): boolean {
+  public isValidZoom(z: number): boolean {
     if (Number.isNaN(z)) return false;
     const [min, max] = this.props.zoomExtent!;
     return (z >= min) && (z <= max);
@@ -271,7 +272,7 @@ export class ImagerySource {
    * Is this source the "mapbox locator overlay"?
    * @return `true` if the imagery is the locator overlay, `false` if not
    */
-  isLocatorOverlay(): boolean {
+  public isLocatorOverlay(): boolean {
     return this.id === 'mapbox_locator_overlay';
   }
 
@@ -281,7 +282,7 @@ export class ImagerySource {
    * These include the 'none', 'custom' and possibly 'EsriWayback' sources.
    * @return `true` if the imagery is a builtin ImagerySource, `false` if not
    */
-  isBuiltin(): boolean {
+  public isBuiltin(): boolean {
     return !this.props.assetID;
   }
 
@@ -291,7 +292,7 @@ export class ImagerySource {
    * @param tile - The tile to get metadata for
    * @param callback - errback-style callback function to call with results
    */
-  getMetadata(tile: any, callback?: (err: string | null, metadata: any) => void): void {
+  public getMetadata(tile: any, callback?: (err: string | null, metadata: any) => void): void {
     const vintage: VintageRange = {
       start: utilDateString(this.props.startDate),
       end: utilDateString(this.props.endDate)
@@ -310,7 +311,7 @@ export class ImagerySource {
    * @param delta - pixels to nudge, as [dx, dy]
    * @param zoom - the current zoom
    */
-  nudge(delta: Vec2, zoom: number): void {
+  public nudge(delta: Vec2, zoom: number): void {
     this.offset[0] += delta[0] / 2 ** zoom;
     this.offset[1] += delta[1] / 2 ** zoom;
   }
@@ -321,7 +322,7 @@ export class ImagerySource {
    * @param coord - Tile coordinate as [x,y,z]
    * @return The url to fetch imagery (empty string if no imagery, for example 'none' source)
    */
-  url(coord: Vec3): string {
+  public url(coord: Vec3): string {
     const urlTemplate = this.template;
     let result = urlTemplate;
     if (result === '') return result;   // source 'none'
@@ -442,7 +443,7 @@ export class ImagerySource {
    * @param vintage - A VintageRange object with `start`, `end` strings
    * @return The string as a range
    */
-  _vintageRange(vintage: VintageRange): string | undefined {
+  protected _vintageRange(vintage: VintageRange): string | undefined {
     let s;
     if (vintage.start || vintage.end) {
       s = (vintage.start || '?');
@@ -464,7 +465,7 @@ export class ImagerySourceNone extends ImagerySource {
    * @constructor
    * @param context - Global shared application context
    */
-  constructor(context: Context) {
+  public constructor(context: Context) {
     super(context, {
       id: 'none',
       template: '',
@@ -479,7 +480,7 @@ export class ImagerySourceNone extends ImagerySource {
    * @return Always returns -1
    * @readonly
    */
-  get area(): number {
+  public get area(): number {
     return -1;  // sources in background pane are sorted by area
   }
 
@@ -488,7 +489,7 @@ export class ImagerySourceNone extends ImagerySource {
    * @return Always returns `null`
    * @readonly
    */
-  get imageryUsed(): null {
+  public get imageryUsed(): null {
     return null;
   }
 }
@@ -504,7 +505,7 @@ export class ImagerySourceCustom extends ImagerySource {
    * @param context - Global shared application context
    * @param template - the url teplate to use for this custom imagery
    */
-  constructor(context: Context, template: string = '') {
+  public constructor(context: Context, template: string = '') {
     super(context, {
       id: 'custom',
       template: template,
@@ -519,7 +520,7 @@ export class ImagerySourceCustom extends ImagerySource {
    * @return Always returns -2
    * @readonly
    */
-  get area(): number {
+  public get area(): number {
     return -2;  // sources in background pane are sorted by area
   }
 
@@ -530,7 +531,7 @@ export class ImagerySourceCustom extends ImagerySource {
    * @return The imagery used string
    * @readonly
    */
-  get imageryUsed(): string {
+  public get imageryUsed(): string {
     // Sanitize personal connection tokens - iD#6801
     let cleaned = this.template;
 
@@ -555,10 +556,10 @@ export class ImagerySourceCustom extends ImagerySource {
   }
 
   // only 'custom' imagery source allows the template to be changed
-  set template(val: string) {
+  public set template(val: string) {
     this._template = val;
   }
-  get template(): string {
+  public get template(): string {
     return this._template;
   }
 }
@@ -577,7 +578,7 @@ export class ImagerySourceBing extends ImagerySource {
    * @param context - Global shared application context
    * @param props - Object containing the properties for this ImagerySource
    */
-  constructor(context: Context, props: Partial<ImagerySourceProps> = {}) {
+  public constructor(context: Context, props: Partial<ImagerySourceProps> = {}) {
     super(context, props);
 
     // missing tile image strictness param (n=)
@@ -604,7 +605,7 @@ export class ImagerySourceEsri extends ImagerySource {
    * @param context - Global shared application context
    * @param props - Object containing the properties for this ImagerySource
    */
-  constructor(context: Context, props: Partial<ImagerySourceProps> = {}) {
+  public constructor(context: Context, props: Partial<ImagerySourceProps> = {}) {
     super(context, props);
 
     // In addition to using the tilemap at zoom level 20, overzoom real tiles
@@ -621,7 +622,7 @@ export class ImagerySourceEsri extends ImagerySource {
 
   // Use a tilemap service to set maximum zoom for Esri tiles dynamically
   // https://developers.arcgis.com/documentation/tiled-elevation-service/
-  fetchTilemap(loc: Vec2): void {
+  public fetchTilemap(loc: Vec2): void {
     // skip if we have already fetched a tilemap within 5km
     if (this._prevLoc && geoSphericalDistance(loc, this._prevLoc) < 5000) return;
     this._prevLoc = loc;
@@ -664,7 +665,7 @@ export class ImagerySourceEsri extends ImagerySource {
    * @param tile - The tile to get metadata for
    * @param callback - errback-style callback function to call with results
    */
-  override getMetadata(tile: any, callback?: (err: string | null, metadata?: any) => void): void {
+  public override getMetadata(tile: any, callback?: (err: string | null, metadata?: any) => void): void {
     const context = this.context;
     const l10n = context.systems.l10n;
     const network = this.context.systems.network!;
@@ -803,7 +804,7 @@ export class ImagerySourceEsriWayback extends ImagerySourceEsri {
    * @param context - Global shared application context
    * @param props - Object containing the properties for this ImagerySource
    */
-  constructor(context: Context, props: Partial<ImagerySourceProps> = {}) {
+  public constructor(context: Context, props: Partial<ImagerySourceProps> = {}) {
     super(context, props);
   }
 
@@ -813,7 +814,7 @@ export class ImagerySourceEsriWayback extends ImagerySourceEsri {
    * @return The key
    * @readonly
    */
-  override get key(): string {
+  public override get key(): string {
     let s = this.safeid;
     const date = this.date;
     if (date) {
@@ -823,7 +824,7 @@ export class ImagerySourceEsriWayback extends ImagerySourceEsri {
   }
 
   // Get the url template for the selected release
-  override get template(): string {
+  public override get template(): string {
     const wayback = (this.context.services as any).wayback;
     const release = wayback.byReleaseDate.get(this.date);
     return release?.template || this._template;
@@ -835,7 +836,7 @@ export class ImagerySourceEsriWayback extends ImagerySourceEsri {
    * @return The imagery used string
    * @readonly
    */
-  override get imageryUsed(): string {
+  public override get imageryUsed(): string {
     let s = this._currStrings.name ?? '';
     const date = this.date;
     if (date) {
@@ -850,7 +851,7 @@ export class ImagerySourceEsriWayback extends ImagerySourceEsri {
    * The date is stored in both `startDate` and `endDate` props.
    * @return The date string
    */
-  set date(val: string | undefined) {
+  public set date(val: string | undefined) {
     const wayback = this.context.services.wayback!;
     const chooseDate = wayback.chooseClosestDate(val);
 
@@ -858,7 +859,7 @@ export class ImagerySourceEsriWayback extends ImagerySourceEsri {
     this.props.endDate = chooseDate;
   }
 
-  get date(): string | undefined {
+  public get date(): string | undefined {
     return this.props.startDate;
   }
 
@@ -868,7 +869,7 @@ export class ImagerySourceEsriWayback extends ImagerySourceEsri {
    * @param tile - the tile to get metadata for
    * @param callback - errback-style callback function to call with results
    */
-  override getMetadata(tile: any, callback?: (err: any, metadata?: any) => void): void {
+  public override getMetadata(tile: any, callback?: (err: any, metadata?: any) => void): void {
     const context = this.context;
     const l10n = context.systems.l10n;
     const wayback = (context.services as any).wayback;

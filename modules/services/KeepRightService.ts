@@ -1,8 +1,7 @@
-import { Tiler } from '@rapid-sdk/math';
-import { utilQsString } from '@rapid-sdk/util';
-
 import { AbstractSystem } from '../core/AbstractSystem.ts';
 import { MarkerData } from '../data/MarkerData.ts';
+import { Tiler } from '@rapid-sdk/math';
+import { utilQsString } from '@rapid-sdk/util';
 
 import type { Context } from '../Context.ts';
 import type { MarkerProps } from '../data/MarkerData.ts';
@@ -116,18 +115,18 @@ interface KRData {
 export class KeepRightService extends AbstractSystem {
 
   /** Persistent KeepRight QA data (error templates and localization strings) loaded at startup */
-  _krData: KRData;
-
+  protected _krData: KRData;
   /** Internal cache for KeepRight data, spatial index, and request tracking */
-  _cache: KeepRightCache;
+  protected _cache: KeepRightCache;
   /** Tiler instance used to compute tile coverage for the current viewport */
-  _tiler: Tiler;
+  protected _tiler: Tiler;
+
 
   /**
    * @constructor
    * @param context - Global shared application context
    */
-  constructor(context: Context) {
+  public constructor(context: Context) {
     super(context);
     this.id = 'keepright';
     this.requiredDependencies = new Set<SystemID>(['assets', 'l10n', 'network', 'spatial']);
@@ -146,7 +145,7 @@ export class KeepRightService extends AbstractSystem {
    * Called after all core objects have been constructed.
    * @return Promise resolved when this component has completed initialization
    */
-  initAsync(): Promise<void> {
+  public initAsync(): Promise<void> {
     if (this._initPromise) return this._initPromise;
 
     return this._initPromise = super.initAsync()
@@ -158,7 +157,7 @@ export class KeepRightService extends AbstractSystem {
    * Called after all core objects have been initialized.
    * @return Promise resolved when this component has completed startup
    */
-  startAsync(): Promise<void> {
+  public startAsync(): Promise<void> {
     if (this._startPromise) return this._startPromise;
 
     const assets = this.context.systems.assets!;
@@ -174,7 +173,7 @@ export class KeepRightService extends AbstractSystem {
    * Called after completing an edit session to reset any internal state
    * @return Promise resolved when this component has completed resetting
    */
-  resetAsync(): Promise<void> {
+  public resetAsync(): Promise<void> {
     const context = this.context;
     const network = context.systems.network!;
     const spatial = context.systems.spatial!;
@@ -195,7 +194,7 @@ export class KeepRightService extends AbstractSystem {
    * Get already loaded data that appears in the current map view
    * @return Array of data
    */
-  getData(): MarkerData[] {
+  public getData(): MarkerData[] {
     const spatial = this.context.systems.spatial!;
     return spatial.getVisibleData('keepright').map(hit => hit.contents) as MarkerData[];
   }
@@ -205,7 +204,7 @@ export class KeepRightService extends AbstractSystem {
    * Schedule any data requests needed to cover the current map view.
    * KeepRight API:  http://osm.mueschelsoft.de/keepright/interfacing.php
    */
-  loadTiles(): void {
+  public loadTiles(): void {
     const context = this.context;
     const network = context.systems.network!;
     const spatial = context.systems.spatial!;
@@ -235,7 +234,7 @@ export class KeepRightService extends AbstractSystem {
    * Load a single tile of data.
    * @param tile - Tile data
    */
-  loadTile(tile: Tile): void {
+  public loadTile(tile: Tile): void {
     const context = this.context;
     const spatial = context.systems.spatial!;
     const network = context.systems.network!;
@@ -262,7 +261,7 @@ export class KeepRightService extends AbstractSystem {
    * @param tile - Tile data
    * @param response - Response data
    */
-  _gotTile(tile: Tile, response: any): void {
+  protected _gotTile(tile: Tile, response: any): void {
     const context = this.context;
     const gfx = context.systems.gfx;
     const spatial = context.systems.spatial!;
@@ -360,7 +359,7 @@ export class KeepRightService extends AbstractSystem {
    * @param item - the MarkerData item to update
    * @param callback - errback-style callback function to call with results
    */
-  postUpdate(item: MarkerData, callback: (err: any, item: MarkerData) => void): void {
+  public postUpdate(item: MarkerData, callback: (err: any, item: MarkerData) => void): void {
     const network = this.context.systems.network!;
     const dataID = item.id;
     const postKey = `keepright-post-${dataID}`;
@@ -409,7 +408,7 @@ export class KeepRightService extends AbstractSystem {
    * @param dataID - the data ID to look up
    * @return the cached item, or `undefined` if not found
    */
-  getError(dataID: DataID): KeepRightIssue | undefined {
+  public getError(dataID: DataID): KeepRightIssue | undefined {
     const spatial = this.context.systems.spatial!;
     return spatial.getData<KeepRightIssue>('keepright', dataID);
   }
@@ -420,7 +419,7 @@ export class KeepRightService extends AbstractSystem {
    * @param parentIssueType - the parent issue type key
    * @return hex color
    */
-  getColor(parentIssueType: string): number {
+  public getColor(parentIssueType: string): number {
     return KR_COLORS.get(parentIssueType) ?? 0xffffff;
   }
 
@@ -430,7 +429,7 @@ export class KeepRightService extends AbstractSystem {
    * @param item - MarkerData to replace
    * @return the item, or `null` if it couldn't be replaced
    */
-  replaceItem(item: MarkerData): MarkerData | null {
+  public replaceItem(item: MarkerData): MarkerData | null {
     if (!(item instanceof MarkerData) || !item.id) return null;
 
     const spatial = this.context.systems.spatial!;
@@ -443,7 +442,7 @@ export class KeepRightService extends AbstractSystem {
    * Remove a single item from the cache
    * @param item - MarkerData to remove
    */
-  removeItem(item: MarkerData): void {
+  public removeItem(item: MarkerData): void {
     if (!(item instanceof MarkerData) || !item.id) return;
 
     const spatial = this.context.systems.spatial!;
@@ -456,7 +455,7 @@ export class KeepRightService extends AbstractSystem {
    * @param item - the MarkerData item
    * @return the url
    */
-  issueURL(item: MarkerData): string {
+  public issueURL(item: MarkerData): string {
     return `${KEEPRIGHT_API}/report_map.php?schema=${item.props.schema}&error=${item.id}`;
   }
 
@@ -465,7 +464,7 @@ export class KeepRightService extends AbstractSystem {
    * Used to populate `closed:keepright` changeset tag
    * @return Array of closed item ids
    */
-  getClosedIDs(): string[] {
+  public getClosedIDs(): string[] {
     return Object.keys(this._cache.closed).sort();
   }
 
@@ -476,7 +475,7 @@ export class KeepRightService extends AbstractSystem {
    * @param props - Properties of the KeepRight issue
    * @return Map of replacement tokens, or `undefined` if the template is missing or unmatched
    */
-  _tokenReplacements(props: Record<string, any>): Record<string, string> | undefined {
+  protected _tokenReplacements(props: Record<string, any>): Record<string, string> | undefined {
     const l10n = this.context.systems.l10n!;
     const htmlRegex = new RegExp(/<\/[a-z][\s\S]*>/);
     const replacements: Record<string, string> = {};
@@ -533,7 +532,7 @@ export class KeepRightService extends AbstractSystem {
    * @param idType - The ID type code indicating how to interpret the capture
    * @return Parsed and linkified string
    */
-  _parseError(capture: string, idType: string): string {
+  protected _parseError(capture: string, idType: string): string {
     const l10n = this.context.systems.l10n!;
     const compare = capture.toLowerCase();
 

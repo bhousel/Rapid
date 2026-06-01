@@ -19,22 +19,23 @@ const MOVE_TOLERANCE = 2;
  * and on completeion enters select mode with the OSM features selected.
  */
 export class LassoBehavior extends AbstractBehavior {
+
   /** EventData for the most recent pointerdown event */
-  lastDown: EventData | null;
+  public lastDown: EventData | null;
   /** EventData for the most recent pointermove event */
-  lastMove: EventData | null;
+  public lastMove: EventData | null;
 
   /** The bounding extent of the lasso polygon in world coordinates */
-  private _extent: Extent | null;
+  protected _extent: Extent | null;
   /** Array of world coords recorded while lassoing */
-  private _coords: Vec2[];
+  protected _coords: Vec2[];
 
 
   /**
    * @constructor
    * @param  context - Global shared application context
    */
-  constructor(context: Context) {
+  public constructor(context: Context) {
     super(context);
     this.id = 'lasso';
 
@@ -53,7 +54,7 @@ export class LassoBehavior extends AbstractBehavior {
   /**
    * Bind event handlers
    */
-  enable(): void {
+  public enable(): void {
     if (this._enabled) return;
     this._enabled = true;
 
@@ -73,7 +74,7 @@ export class LassoBehavior extends AbstractBehavior {
   /**
    * Unbind event handlers
    */
-  disable(): void {
+  public disable(): void {
     if (!this._enabled) return;
     this._enabled = false;
 
@@ -94,7 +95,7 @@ export class LassoBehavior extends AbstractBehavior {
    * Handler for pointerdown events - starts the lasso.
    * @param  e - A Pixi FederatedPointerEvent
    */
-  _pointerdown(e: FederatedPointerEvent): void {
+  protected _pointerdown(e: FederatedPointerEvent): void {
     if (this.lastDown) return;  // a pointer is already down
 
     // Ignore it if we are not over the canvas
@@ -119,7 +120,7 @@ export class LassoBehavior extends AbstractBehavior {
    * Handler for pointermove events - continues the lasso.
    * @param  e - A Pixi FederatedPointerEvent
    */
-  _pointermove(e: FederatedPointerEvent): void {
+  protected _pointermove(e: FederatedPointerEvent): void {
     const context = this.context;
     const gfx = context.systems.gfx!;
     const eventManager = gfx.eventManager!;
@@ -154,7 +155,7 @@ export class LassoBehavior extends AbstractBehavior {
    * Handler for pointerup events - completes the lasso and selects the points inside it.
    * @param  e - A Pixi FederatedPointerEvent
    */
-  _pointerup(e: FederatedPointerEvent): void {
+  protected _pointerup(e: FederatedPointerEvent): void {
     const down = this.lastDown;
     const up = this._getEventData(e);
     if (!down || down.id !== up.id) return;  // not down, or different pointer
@@ -182,7 +183,7 @@ export class LassoBehavior extends AbstractBehavior {
   /**
    * Handler for pointercancel events.
    */
-  _pointercancel(): void {
+  protected _pointercancel(): void {
     this.lastDown = null;  // prepare for the next `pointerdown`
 
     const context = this.context;
@@ -202,7 +203,7 @@ export class LassoBehavior extends AbstractBehavior {
    * Returns array of entity IDs that are within the lasso polygon
    * @return  Array of entity IDs
    */
-  _lassoed(): EntityID[] {
+  protected _lassoed(): EntityID[] {
     const context = this.context;
     const editor = context.systems.editor!;
     const filters = context.systems.filters!;

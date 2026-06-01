@@ -51,18 +51,16 @@ export interface AtlasItem {
 /**
  * This texture allocator auto-manages the base-texture with an {@link AtlasSource}. You can also
  * pass a texture source to `allocate`, mimicing {@link Texture.from} functionality.
- *
- * @public
  */
 export class AtlasAllocator {
   /** Optional label for debugging */
-  label: string;
+  public label: string;
   /** Size of textures to create */
-  size: number;
+  public size: number;
   /** Array of texture slabs managed by this allocator */
-  slabs: AtlasSource[];
+  public slabs: AtlasSource[];
   /** Whether atlas sources should be backed by a canvas (for canvas renderer) */
-  private _useCanvas: boolean;
+  protected _useCanvas: boolean;
 
 
   /**
@@ -70,7 +68,7 @@ export class AtlasAllocator {
    * @constructor
    * @param options - options for the Atlas Allocator
    */
-  constructor(options: Partial<AtlasOptions> = {}) {
+  public constructor(options: Partial<AtlasOptions> = {}) {
     this.slabs = [];
     this.label = options.label ?? '';
     this.size = options.size ?? 2048;
@@ -95,7 +93,7 @@ export class AtlasAllocator {
    * @return The issued texture
    * @throws If dimensions will not fit on a slab
    */
-  allocate(
+  public allocate(
     source: AtlasItemSource,
     width: number,
     height: number,
@@ -114,8 +112,8 @@ export class AtlasAllocator {
       uploaded: false
     };
 
-    slab._items.set(uid, item);
-    slab._blitItemToCanvas(item);
+    slab.items.set(uid, item);
+    slab.blitItemToCanvas(item);
     slab.update();
 
     return texture;
@@ -127,7 +125,7 @@ export class AtlasAllocator {
    * @param texture - The texture to free
    * @throws If the texture was not found, or some other issue prevents it from freeing.
    */
-  free(texture: AtlasTexture): void {
+  public free(texture: AtlasTexture): void {
     const slab = this.slabs.find(slab => slab === texture.source) as AtlasSource | undefined;
     const uid = texture.uid;
 
@@ -139,9 +137,9 @@ export class AtlasAllocator {
     if (!bin) {
       throw new Error('Texture bin has been lost.');
     }
-    slab._binPacker.free(bin);
+    slab.binPacker.free(bin);
 
-    const item = slab._items.get(uid);
+    const item = slab.items.get(uid);
     if (!item) {
       throw new Error('Texture not found on slab.');
     }
@@ -149,13 +147,13 @@ export class AtlasAllocator {
     item.texture?.destroy(false);
     item.source = null;
     item.texture = null;
-    slab._items.delete(uid);
+    slab.items.delete(uid);
 
 //    // no items left, free the slab (unless it's the first slab)
-//    if (!slab._items.size && slab !== this.slabs[0]) {
+//    if (!slab.items.size && slab !== this.slabs[0]) {
 //      slab.destroy();
-//      slab._items = null;
-//      slab._binPacker = null;
+//      slab.items = null;
+//      slab.binPacker = null;
 //    }
   }
 
@@ -171,7 +169,7 @@ export class AtlasAllocator {
    * @return The allocated texture, if successful; otherwise, `null`.
    * @throws When dimensions are too large to fit on a slab
    */
-  private _allocateTexture(width: number, height: number, textureOptions?: PIXI.TextureOptions): AtlasTexture {
+  protected _allocateTexture(width: number, height: number, textureOptions?: PIXI.TextureOptions): AtlasTexture {
     // Reserve a 1px ring around every texture frame.  Tile imagery fills this with
     // edge-replicated pixels; symbol/text/icon sources leave it transparent.
     const padding = 1;
@@ -205,12 +203,12 @@ export class AtlasAllocator {
    * @param textureOptions - optional options to pass to Pixi when creating the texture.
    * @return The issued texture, if successful; otherwise, `null`.
    */
-  private _issueTexture(slab: AtlasSource, width: number, height: number, textureOptions?: PIXI.TextureOptions): AtlasTexture | null {
+  protected _issueTexture(slab: AtlasSource, width: number, height: number, textureOptions?: PIXI.TextureOptions): AtlasTexture | null {
     // Reserve a 1px ring around every texture frame.  Tile imagery fills this with
     // edge-replicated pixels; symbol/text/icon sources leave it transparent.
     const padding = 1;
 
-    const bin = slab._binPacker.allocate(width + (2 * padding), height + (2 * padding));
+    const bin = slab.binPacker.allocate(width + (2 * padding), height + (2 * padding));
     if (!bin) return null;
 
     const texture: AtlasTexture = new PIXI.Texture({
@@ -227,16 +225,15 @@ export class AtlasAllocator {
 
 
 /**
- * An {@code AtlasSource} is used by {@link AtlasAllocator} to manage texture sources.
- * @public
+ * An `AtlasSource` is used by {@link AtlasAllocator} to manage texture sources.
  */
 export class AtlasSource extends PIXI.TextureSource<PIXI.BufferSourceOptions> {
   /** Map of texture UID to AtlasItem */
-  _items: Map<number, AtlasItem>;
+  public items: Map<number, AtlasItem>;
   /** The bin packer for this slab */
-  _binPacker: GuilloteneAllocator;
+  public binPacker: GuilloteneAllocator;
   /** 2D context of the backing canvas, if canvas-backed (for canvas renderer) */
-  _canvasCtx: CanvasRenderingContext2D | null;
+  protected _canvasCtx: CanvasRenderingContext2D | null;
 
   /**
    * Creates a TextureSource for the textures in the atlas (aka a "slab")
@@ -244,7 +241,7 @@ export class AtlasSource extends PIXI.TextureSource<PIXI.BufferSourceOptions> {
    * @param size - the size of the textures to create
    * @param useCanvas - if true, create a backing canvas as the resource (for canvas renderer)
    */
-  constructor(label: string, size: number, useCanvas: boolean = false) {
+  public constructor(label: string, size: number, useCanvas: boolean = false) {
     super({
       antialias: false,
       autoGarbageCollect: false,
@@ -258,8 +255,8 @@ export class AtlasSource extends PIXI.TextureSource<PIXI.BufferSourceOptions> {
     });
     this.uploadMethodId = 'atlas';
 
-    this._items = new Map();
-    this._binPacker = new GuilloteneAllocator(size, size);
+    this.items = new Map();
+    this.binPacker = new GuilloteneAllocator(size, size);
 
     // For the canvas renderer, we need a backing canvas as the resource.
     // The canvas renderer reads `source.resource` directly via `canvasUtils.getCanvasSource()`
@@ -283,7 +280,7 @@ export class AtlasSource extends PIXI.TextureSource<PIXI.BufferSourceOptions> {
    * @param item - The atlas item
    * @return [x, y] upload position in slab coordinates
    */
-  _uploadOffset(item: AtlasItem): [number, number] {
+  public uploadOffset(item: AtlasItem): [number, number] {
     const bin = item.texture!.__bin!;
     return item.padded ? [bin.x, bin.y] : [bin.x + 1, bin.y + 1];
   }
@@ -294,11 +291,11 @@ export class AtlasSource extends PIXI.TextureSource<PIXI.BufferSourceOptions> {
    * This is a no-op if the slab is not canvas-backed.
    * @param item - The atlas item to blit
    */
-  _blitItemToCanvas(item: AtlasItem): void {
+  public blitItemToCanvas(item: AtlasItem): void {
     if (!this._canvasCtx) return;
     if (!item.source) return;
 
-    const [x, y] = this._uploadOffset(item);
+    const [x, y] = this.uploadOffset(item);
     if (item.source instanceof ImageData) {
       this._canvasCtx.putImageData(item.source, x, y);
     } else {
@@ -362,10 +359,10 @@ const glUploadAtlasResource: GLUploadHandler = {
     }
 
     // Upload all atlas items.
-    for (const item of slab._items.values()) {
+    for (const item of slab.items.values()) {
       if (item.uploaded || !item.source) continue;
 
-      const [x, y] = slab._uploadOffset(item);
+      const [x, y] = slab.uploadOffset(item);
       gl.texSubImage2D(target, 0, x, y, format, type, item.source);
 
       item.uploaded = true;
@@ -380,10 +377,10 @@ const gpuUploadAtlasResource: GPUUploadHandler = {
   upload(slab: AtlasSource, gpuTexture: GPUTexture, gpu: { device: GPUDevice }): void {
     // const premultipliedAlpha = slab.alphaMode === 'premultiply-alpha-on-upload';
 
-    for (const item of slab._items.values()) {
+    for (const item of slab.items.values()) {
       if (item.uploaded || !item.source) continue;
 
-      const [x, y] = slab._uploadOffset(item);
+      const [x, y] = slab.uploadOffset(item);
       const src = item.source;
       const w = (src instanceof HTMLImageElement) ? src.naturalWidth : src.width;
       const h = (src instanceof HTMLImageElement) ? src.naturalHeight : src.height;
@@ -403,7 +400,6 @@ const gpuUploadAtlasResource: GPUUploadHandler = {
 /**
  * Registers the upload handlers with the given Pixi renderer
  * @param renderer - The Pixi renderer to register handlers with
- * @public
  */
 export function registerAtlasUploader(renderer: PIXI.Renderer): void {
   const textureSystem = renderer.texture as any;  // Access internal _uploads map

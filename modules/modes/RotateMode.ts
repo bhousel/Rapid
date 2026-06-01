@@ -1,7 +1,6 @@
-import { DEG2RAD, vecAdd, vecScale, vecSubtract } from '@rapid-sdk/math';
-
 import { AbstractMode } from './AbstractMode.ts';
 import { actionRotate } from '../actions/rotate.ts';
+import { DEG2RAD, vecAdd, vecScale, vecSubtract } from '@rapid-sdk/math';
 
 import type { Context } from '../Context.ts';
 import type { OsmNode } from '../data/OsmNode.ts';
@@ -19,18 +18,20 @@ export interface RotateModeOptions {
  * In `RotateMode`, we are rotating one or more map features.
  */
 export class RotateMode extends AbstractMode {
+
   /** Entity IDs being rotated */
-  private _entityIDs: EntityID[];
+  protected _entityIDs: EntityID[];
   /** Last pointer position for calculating rotation delta */
-  private _lastPoint: Vec2 | null;
+  protected _lastPoint: Vec2 | null;
   /** Pivot location for rotation (in world coordinates) */
-  private _pivotWorld: Vec2 | null;
+  protected _pivotWorld: Vec2 | null;
+
 
   /**
    * @constructor
    * @param  context - Global shared application context
    */
-  constructor(context: Context) {
+  public constructor(context: Context) {
     super(context);
     this.id = 'rotate';
 
@@ -51,7 +52,7 @@ export class RotateMode extends AbstractMode {
    * @param  options - Optional options object
    * @return `true` if the mode can be entered, `false` if not
    */
-  enter(options: RotateModeOptions = {}): boolean {
+  public enter(options: RotateModeOptions = {}): boolean {
     const context = this.context;
     const editor = context.systems.editor!;
     const graph = editor.staging.graph;
@@ -102,7 +103,7 @@ export class RotateMode extends AbstractMode {
    * Exits the mode, committing any pending rotate operation.
    * Removes event listeners and clears state.
    */
-  exit(): void {
+  public exit(): void {
     if (!this._active) return;
     this._active = false;
 
@@ -146,7 +147,7 @@ export class RotateMode extends AbstractMode {
    * Handler for keydown events on the window.
    * @param  e - A DOM KeyboardEvent
    */
-  private _keydown(e: KeyboardEvent): void {
+  protected _keydown(e: KeyboardEvent): void {
     if (['Enter'].includes(e.key)) {
       e.preventDefault();
       this._finish();
@@ -167,7 +168,7 @@ export class RotateMode extends AbstractMode {
    * Converts pointer movement into rotation: moving left/right or up/down
    * rotates the shape clockwise or counterclockwise based on position relative to pivot.
    */
-  private _pointermove(): void {
+  protected _pointermove(): void {
     const context = this.context;
     const editor = context.systems.editor!;
     const eventManager = context.systems.gfx!.eventManager!;
@@ -232,7 +233,7 @@ export class RotateMode extends AbstractMode {
    * for a rotation UX than a true center-of-mass calculation.
    * @return  Array [x,y] world coordinate to pivot around
    */
-  private _calcPivot(): Vec2 {
+  protected _calcPivot(): Vec2 {
     const graph = this.context.systems.editor!.staging.graph;
     let sum: Vec2 = [0, 0];
     let count = 0;
@@ -256,7 +257,7 @@ export class RotateMode extends AbstractMode {
   /**
    * Return to select mode - `exit()` will finalize the work in progress.
    */
-  private _finish(): void {
+  protected _finish(): void {
     this.context.enter('select-osm', { selection: { osm: this._entityIDs }} );
   }
 
@@ -264,7 +265,7 @@ export class RotateMode extends AbstractMode {
   /**
    * Return to select mode without doing anything
    */
-  private _cancel(): void {
+  protected _cancel(): void {
     const context = this.context;
     const editor = context.systems.editor!;
 

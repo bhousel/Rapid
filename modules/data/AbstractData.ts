@@ -1,6 +1,6 @@
 import { Extent } from '@rapid-sdk/math';
-
 import { Geometry } from '../lib/Geometry.ts';
+
 import type { Context } from '../Context.ts';
 import type { GeoJSONObject } from '../lib/types.ts';
 import type { Graph } from '../lib/Graph.ts';
@@ -43,13 +43,13 @@ export interface AbstractDataProps {
  */
 export class AbstractData<P extends AbstractDataProps = AbstractDataProps> {
   /** Unique identifier for this data element */
-  id: string;
+  public id: string;
   /** Application context */
-  context: Context;
+  public context: Context;
   /** Geometry wrapper containing original and projected data */
-  geoms: Geometry;
+  public geoms: Geometry;
   /** Properties object */
-  props: Partial<P>;
+  public props: Partial<P>;
 
   /**
    * @constructor
@@ -58,7 +58,7 @@ export class AbstractData<P extends AbstractDataProps = AbstractDataProps> {
    * @param otherOrContext - copy another data element, or pass application context
    * @param props - Properties to assign to the data element
    */
-  constructor(otherOrContext: AbstractData<P> | Context, props: Partial<P> = {}) {
+  public constructor(otherOrContext: AbstractData<P> | Context, props: Partial<P> = {}) {
     this.id = '';  // put this first so debug inspect shows it first
 
     if (otherOrContext instanceof AbstractData) {  // copy other
@@ -86,7 +86,7 @@ export class AbstractData<P extends AbstractDataProps = AbstractDataProps> {
    * Do not use the data element after calling `destroy()`.
    * @abstract
    */
-  destroy(): void {
+  public destroy(): void {
     this.geoms.destroy();
     this.geoms = null!;
     this.props = null!;
@@ -101,7 +101,7 @@ export class AbstractData<P extends AbstractDataProps = AbstractDataProps> {
    * @param props - the updated properties
    * @returns a new data element
    */
-  update(props: Partial<P>): this {
+  public update(props: Partial<P>): this {
     const Type = this.constructor as DataConstructor<this>;
     return new Type(this, props).touch();
   }
@@ -113,7 +113,7 @@ export class AbstractData<P extends AbstractDataProps = AbstractDataProps> {
    * @returns this same data element
    * @abstract
    */
-  updateGeometry(_graph?: Graph): this {
+  public updateGeometry(_graph?: Graph): this {
     throw new Error(`Do not call 'updateGeometry' on AbstractData`);
   }
 
@@ -123,7 +123,7 @@ export class AbstractData<P extends AbstractDataProps = AbstractDataProps> {
    * @returns GeoJSON representation of the data element
    * @abstract
    */
-  asGeoJSON(_graph?: Graph): GeoJSONObject {
+  public asGeoJSON(_graph?: Graph): GeoJSONObject {
     throw new Error(`Do not call 'asGeoJSON' on AbstractData`);
   }
 
@@ -133,7 +133,7 @@ export class AbstractData<P extends AbstractDataProps = AbstractDataProps> {
    * (e.g. Called before geometry is ready, Way without nodes, Relation without members, etc.)
    * @returns Extent representing the data element's bounding box, or `undefined`
    */
-  extent(): Extent | undefined {
+  public extent(): Extent | undefined {
     return this.geoms?.orig?.extent;
   }
 
@@ -144,7 +144,7 @@ export class AbstractData<P extends AbstractDataProps = AbstractDataProps> {
    * @param other - the test extent
    * @returns `true` if it intersects, `false` if not
    */
-  intersects(other: Extent): boolean {
+  public intersects(other: Extent): boolean {
     const extent = this.geoms?.orig?.extent;
     return extent?.intersects(other) ?? false;
   }
@@ -157,7 +157,7 @@ export class AbstractData<P extends AbstractDataProps = AbstractDataProps> {
    * @see Rapid@9ac2776a
    * @returns this data element
    */
-  touch(): this {
+  public touch(): this {
     this.props.v = this.context.next('v');
     return this;
   }
@@ -168,7 +168,7 @@ export class AbstractData<P extends AbstractDataProps = AbstractDataProps> {
    *  'node', 'way', 'relation', but for other data may be unset.
    * @readonly
    */
-  get type(): string {
+  public get type(): string {
     return (this.props as Partial<AbstractDataProps>).type ?? '';
   }
 
@@ -176,7 +176,7 @@ export class AbstractData<P extends AbstractDataProps = AbstractDataProps> {
    * Unique string to identify this data element
    * @readonly
    */
-  get dataID(): string {
+  public get dataID(): string {
     return this.id;
   }
 
@@ -184,7 +184,7 @@ export class AbstractData<P extends AbstractDataProps = AbstractDataProps> {
    * Internal version of the data element, can be used to detect changes.
    * @readonly
    */
-  get v(): number {
+  public get v(): number {
     return (this.props as Partial<AbstractDataProps>).v || 0;
   }
 
@@ -192,7 +192,7 @@ export class AbstractData<P extends AbstractDataProps = AbstractDataProps> {
    * The 'key' includes both the id and the version
    * @readonly
    */
-  get key(): string {
+  public get key(): string {
     return `${this.id}v${this.v}`;
   }
 

@@ -10,6 +10,7 @@ import type { DashLineOptions } from './lib/DashLine.ts';
 import type { PixiLayerMapUI } from './PixiLayerMapUI.ts';
 import type { Viewport, Vec2 } from '@rapid-sdk/math';
 
+
 const ONEWAY_SPACING = 35;
 const SIDED_SPACING = 30;
 
@@ -27,19 +28,19 @@ type StrokeStyleWithDash = PIXI.StrokeStyle & DashLineOptions;
  */
 export class PixiFeatureLine extends AbstractPixiFeature {
   /** PIXI.Graphics for the casing (below) */
-  casing: PIXI.Graphics | null;
+  public casing: PIXI.Graphics | null;
   /** PIXI.Graphics for the stroke (above) */
-  stroke: PIXI.Graphics | null;
+  public stroke: PIXI.Graphics | null;
 
   /** Buffer polygon data for hit testing and halo */
-  private _bufferdata: LineToPolyResult | null;
+  protected _bufferdata: LineToPolyResult | null;
 
   /**
    * @constructor
    * @param layer - The Layer that owns this Feature
    * @param featureID - Unique string to use for the name of this Feature
    */
-  constructor(layer: AbstractPixiLayer, featureID: FeatureID) {
+  public constructor(layer: AbstractPixiLayer, featureID: FeatureID) {
     super(layer, featureID);
 
     this._bufferdata = null;
@@ -64,7 +65,7 @@ export class PixiFeatureLine extends AbstractPixiFeature {
    * Every Feature should have a destroy function that frees all the resources
    * Do not use the Feature after calling `destroy()`.
    */
-  destroy(): void {
+  public destroy(): void {
     if (this.casing) {
       this.casing.destroy();
       this.casing = null;
@@ -86,7 +87,7 @@ export class PixiFeatureLine extends AbstractPixiFeature {
    * coordinates in world space map directly to screen pixels without per-frame reprojection.
    * @param viewport - Pixi viewport to use for rendering
    */
-  update(viewport: Viewport): void {
+  public update(viewport: Viewport): void {
     if (!this.dirty) return;  // nothing to do
 
     const map = this.context.systems.map;
@@ -253,7 +254,7 @@ export class PixiFeatureLine extends AbstractPixiFeature {
    * @param viewZoom - Viewport zoom, used for scaling
    * @param isWireframe - Whether wireframe mode is active
    */
-  updateGraphic(
+  public updateGraphic(
     which: 'casing' | 'stroke',
     graphic: PIXI.Graphics,
     points: Vec2[],
@@ -329,7 +330,7 @@ export class PixiFeatureLine extends AbstractPixiFeature {
    * Show/Hide halo (expects `this._bufferdata` to be already set up by `update()`)
    * @param viewport - Pixi viewport to use for rendering
    */
-  updateHalo(viewport: Viewport): void {
+  public updateHalo(viewport: Viewport): void {
     const showHover = (this.visible && this._classes.has('hover'));
     const showSelect = (this.visible && this._classes.has('select'));
     const showHighlight = (this.visible && this._classes.has('highlight'));

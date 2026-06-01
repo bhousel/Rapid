@@ -1,6 +1,10 @@
 import { AbstractSystem } from '../core/AbstractSystem.ts';
 import { Matcher, buildIDPresets } from 'name-suggestion-index';
 
+import type { Context } from '../Context.ts';
+import type { PresetProps } from '../lib/Preset.ts';
+import type { Vec2 } from '@rapid-sdk/math';
+
 import type {
   DissolvedMap,
   IDPreset,
@@ -16,10 +20,6 @@ import type {
   NsiWikidataJSON,
   OsmTags
 } from 'name-suggestion-index';
-
-import type { Context } from '../Context.ts';
-import type { PresetProps } from '../lib/Preset.ts';
-import type { Vec2 } from '@rapid-sdk/math';
 
 
 /**
@@ -128,16 +128,16 @@ const notBranches = /(coop|express|wireless|factory|outlet)/i;
 export class NsiService extends AbstractSystem {
 
   /** Current loading status */
-  status: 'loading' | 'ok' | 'failed';
+  public status: 'loading' | 'ok' | 'failed';
 
   /** Internal NSI data cache */
-  _nsi: Partial<NsiServiceCache>;
+  protected _nsi: Partial<NsiServiceCache>;
 
   /**
    * @constructor
    * @param context - Global shared application context
    */
-  constructor(context: Context) {
+  public constructor(context: Context) {
     super(context);
     this.id = 'nsi';
     this.requiredDependencies = new Set<SystemID>(['assets', 'schema', 'locations']);
@@ -152,7 +152,7 @@ export class NsiService extends AbstractSystem {
    * Called after all core objects have been constructed.
    * @return Promise resolved when this component has completed initialization
    */
-  initAsync(): Promise<void> {
+  public initAsync(): Promise<void> {
     if (this._initPromise) return this._initPromise;
 
     const context = this.context;
@@ -201,7 +201,7 @@ export class NsiService extends AbstractSystem {
    * Called after all core objects have been initialized.
    * @return Promise resolved when this component has completed startup
    */
-  startAsync(): Promise<void> {
+  public startAsync(): Promise<void> {
     return super.startAsync()
       .then(() => this._loadNsiDataAsync())
       .then(() => this._generateNsiPresetsAsync())
@@ -218,7 +218,7 @@ export class NsiService extends AbstractSystem {
    * Called after completing an edit session to reset any internal state
    * @return Promise resolved when this component has completed resetting
    */
-  resetAsync(): Promise<void> {
+  public resetAsync(): Promise<void> {
     return Promise.resolve();
   }
 
@@ -228,7 +228,7 @@ export class NsiService extends AbstractSystem {
    * @param tags - Object containing the feature's OSM tags
    * @return `true` if it is generic, `false` if not
    */
-  isGenericName(tags: OsmTags): boolean {
+  public isGenericName(tags: OsmTags): boolean {
     const n = tags.name;
     if (!n) return false;
 
@@ -268,7 +268,7 @@ export class NsiService extends AbstractSystem {
    * @param loc - Location where this feature exists, as a [lon, lat]
    * @return The result, or `null` if no changes suggested
    */
-  upgradeTags(tags: OsmTags, loc: Vec2): NsiUpgradeResult | null {
+  public upgradeTags(tags: OsmTags, loc: Vec2): NsiUpgradeResult | null {
     const newTags: OsmTags = { ...tags };  // shallow copy
     const changed = this._applyWikidataReplacements(newTags);
 
@@ -371,7 +371,7 @@ export class NsiService extends AbstractSystem {
    * @param newTags - Mutable copy of the feature's OSM tags
    * @return `true` if any tag was changed or deleted
    */
-  _applyWikidataReplacements(newTags: OsmTags): boolean {
+  protected _applyWikidataReplacements(newTags: OsmTags): boolean {
     let changed = false;
     for (const osmkey of Object.keys(newTags)) {
       const matchTag = osmkey.match(/^(\w+:)?wikidata$/);
@@ -399,7 +399,7 @@ export class NsiService extends AbstractSystem {
    * @param newTags - The (possibly modified) tags of the feature being upgraded
    * @return The matched item and its ID, or `null` if no usable hit was found
    */
-  _selectMatchedItem(hits: MatchHit[], newTags: OsmTags): { itemID: string; item: NsiItem } | null {
+  protected _selectMatchedItem(hits: MatchHit[], newTags: OsmTags): { itemID: string; item: NsiItem } | null {
     for (const hit of hits) {
       const itemID = hit.itemID;
       if (!itemID) continue;
@@ -444,7 +444,7 @@ export class NsiService extends AbstractSystem {
    * @param loc - Location of the feature
    * @return `true` if the caller should bail out and return `null` (conflicting brand detected)
    */
-  _applyBranchSplit(tags: OsmTags, newTags: OsmTags, k: string, v: string, itemID: string, loc: Vec2): boolean {
+  protected _applyBranchSplit(tags: OsmTags, newTags: OsmTags, k: string, v: string, itemID: string, loc: Vec2): boolean {
     const origName = tags.name;
     const newName = newTags.name;
     if (!newName || !origName || newName === origName || newTags.branch) return false;
@@ -499,7 +499,7 @@ export class NsiService extends AbstractSystem {
    *
    * @return Promise fulfilled when the generated presets have been merged into Rapid.
    */
-  _generateNsiPresetsAsync(): Promise<void> {
+  protected _generateNsiPresetsAsync(): Promise<void> {
     const context = this.context;
     const assets = context.systems.assets!;
     const schema = context.systems.schema!;
@@ -547,7 +547,7 @@ export class NsiService extends AbstractSystem {
    * Loads the NSI-related assets.
    * @return Promise fulfilled when the other data have been downloaded and processed
    */
-  _loadNsiDataAsync(): Promise<void> {
+  protected _loadNsiDataAsync(): Promise<void> {
     const context = this.context;
     const assets = context.systems.assets!;
     const locations = context.systems.locations!;
@@ -641,7 +641,7 @@ export class NsiService extends AbstractSystem {
    * @param tags - Object containing the feature's OSM tags
    * @return Object containing the primary and alternate key/value pairs to test
    */
-  _gatherKVs(tags: OsmTags): KVGroups {
+  protected _gatherKVs(tags: OsmTags): KVGroups {
     const primary = new Set<string>();
     const alternate = new Set<string>();
 
@@ -686,7 +686,7 @@ export class NsiService extends AbstractSystem {
    * @param tags - Object containing the feature's OSM tags
    * @return The name of the tree if known, or 'unknown' for multiple, or `null` if no match
    */
-  _identifyTree(tags: OsmTags): string | null {
+  protected _identifyTree(tags: OsmTags): string | null {
     let unknown: string | undefined;
     let t: string | undefined;
 
@@ -728,7 +728,7 @@ export class NsiService extends AbstractSystem {
    * @param tags - Object containing the feature's OSM tags
    * @return Object containing the primary and alternate names to test
    */
-  _gatherNames(tags: OsmTags): NameGroups {
+  protected _gatherNames(tags: OsmTags): NameGroups {
     const empty: NameGroups = { primary: new Set(), alternate: new Set() };
     const primary = new Set<string>();
     const alternate = new Set<string>();
@@ -834,7 +834,7 @@ export class NsiService extends AbstractSystem {
    * @param tryNames - Object containing the primary and alternate names to test
    * @return Array of tuple objects, ordered by priority
    */
-  _gatherTuples(tryKVs: KVGroups, tryNames: NameGroups): KVNTuple[] {
+  protected _gatherTuples(tryKVs: KVGroups, tryNames: NameGroups): KVNTuple[] {
     const tuples: KVNTuple[] = [];
 
     const groups: Priority[] = ['primary', 'alternate'];

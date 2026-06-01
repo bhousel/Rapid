@@ -1,5 +1,4 @@
 import * as PIXI from 'pixi.js';
-
 import { AbstractPixiLayer } from './AbstractPixiLayer.ts';
 
 import type { Viewport } from '@rapid-sdk/math';
@@ -12,14 +11,14 @@ import type { PixiScene } from './PixiScene.ts';
  * @class
  */
 export class PixiLayerRapidOverlay extends AbstractPixiLayer {
-  _overlaysDefined: boolean | null;
-  overlaysContainer: PIXI.Container | null;
+  protected _overlaysDefined: boolean | null;
+  public overlaysContainer: PIXI.Container | null;
 
   /**
    * @constructor
    * @param  scene - The Scene that owns this Layer
    */
-  constructor(scene: PixiScene) {
+  public constructor(scene: PixiScene) {
     super(scene);
     this.id = 'rapidoverlay';
 
@@ -32,7 +31,7 @@ export class PixiLayerRapidOverlay extends AbstractPixiLayer {
   /**
    * Every Layer should have a reset function to replace any Pixi objects and internal state.
    */
-  reset(): void {
+  public reset(): void {
     super.reset();
 
     const groupContainer = this.scene.groups.get('basemap')!;
@@ -62,7 +61,7 @@ export class PixiLayerRapidOverlay extends AbstractPixiLayer {
    * @param  frame    -  Integer frame being rendered
    * @param  viewport -  Pixi viewport to use for rendering
    */
-  render(frame: number, viewport: Viewport): void {
+  public render(frame: number, viewport: Viewport): void {
 return; // not yet
     if (!this.enabled || !(this.hasData())) return;
 
@@ -98,7 +97,7 @@ return; // not yet
    * @param  points   -  Array of feature data
    * @param  color    -  The color to use
    */
-  renderPoints(frame: number, viewport: Viewport, points: any[], color: PIXI.Color): void {
+  public renderPoints(frame: number, viewport: Viewport, points: any[], color: PIXI.Color): void {
     const parentContainer = this.overlaysContainer!;
     for (const d of points) {
       const coords = (d.geometry.type === 'Point') ? [d.geometry.coordinates]
@@ -122,7 +121,7 @@ return; // not yet
    * Return true if there is any overlay endpoint URLs defined in the rapid datasets.
    * @return  `true` if there is a vector tile template or geojson to display
    */
-  hasData(): boolean {
+  public hasData(): boolean {
     if (this._overlaysDefined === null) {
       const rapid = this.context.systems.rapid!;
       const datasets = rapid.datasets;

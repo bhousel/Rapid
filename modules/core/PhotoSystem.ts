@@ -1,6 +1,5 @@
-import { Extent } from '@rapid-sdk/math';
-
 import { AbstractSystem } from './AbstractSystem.ts';
+import { Extent } from '@rapid-sdk/math';
 import { utilDate, utilDateString } from '../util/date.ts';
 import { utilExtractValues } from '../util/string.ts';
 import { utilIterable } from '../util/iterable.ts';
@@ -30,22 +29,23 @@ export type DateFilter = 'fromDate' | 'toDate';
  *   `photochange`   Fires on any change in selected photo, detection, or filtering options
  */
 export class PhotoSystem extends AbstractSystem {
-  private _currPhotoLayerID: PhotoLayerID | null = null;
-  private _currPhotoID: PhotoID | null = null;
-  private _currLayerID: LayerID | null = null;
-  private _currDetectionID: DetectionID | null = null;
 
-  private _filterPhotoTypes: Set<PhotoType>;
-  private _filterFromDate: string | null = null;
-  private _filterToDate: string | null = null;
-  private _filterUsernames: string[] | null = null;
+  protected _currPhotoLayerID: PhotoLayerID | null = null;
+  protected _currPhotoID: PhotoID | null = null;
+  protected _currLayerID: LayerID | null = null;
+  protected _currDetectionID: DetectionID | null = null;
+
+  protected _filterPhotoTypes: Set<PhotoType>;
+  protected _filterFromDate: string | null = null;
+  protected _filterToDate: string | null = null;
+  protected _filterUsernames: string[] | null = null;
 
 
   /**
    * @constructor
    * @param context - Global shared application context
    */
-  constructor(context: Context) {
+  public constructor(context: Context) {
     super(context);
     this.id = 'photos';
     this.optionalDependencies = new Set(['gfx', 'map', 'urlhash', 'ui']);
@@ -63,7 +63,7 @@ export class PhotoSystem extends AbstractSystem {
    * Called after all core objects have been constructed.
    * @return  Promise resolved when this component has completed initialization
    */
-  initAsync(): Promise<void> {
+  public initAsync(): Promise<void> {
     if (this._initPromise) return this._initPromise;
 
     const context = this.context;
@@ -90,7 +90,7 @@ export class PhotoSystem extends AbstractSystem {
    * Called after all core objects have been initialized.
    * @return  Promise resolved when this component has completed startup
    */
-  startAsync(): Promise<void> {
+  public startAsync(): Promise<void> {
     return super.startAsync();
   }
 
@@ -99,7 +99,7 @@ export class PhotoSystem extends AbstractSystem {
    * Called after completing an edit session to reset any internal state
    * @return  Promise resolved when this component has completed resetting
    */
-  resetAsync(): Promise<void> {
+  public resetAsync(): Promise<void> {
     return Promise.resolve();
   }
 
@@ -109,7 +109,7 @@ export class PhotoSystem extends AbstractSystem {
    * @param currParams - The current hash parameters
    * @param prevParams - The previous hash parameters
    */
-  private _hashChanged(currParams: Map<string, string>, prevParams: Map<string, string>): void {
+  protected _hashChanged(currParams: Map<string, string>, prevParams: Map<string, string>): void {
     const context = this.context;
     const gfx = context.systems.gfx;
     const scene = gfx?.scene;
@@ -182,7 +182,7 @@ export class PhotoSystem extends AbstractSystem {
   /**
    * Respond to any changes in the layers that are enabled
    */
-  private _layerChanged(): void {
+  protected _layerChanged(): void {
     const context = this.context;
     const gfx = context.systems.gfx;
     const scene = gfx?.scene;
@@ -227,7 +227,7 @@ export class PhotoSystem extends AbstractSystem {
    * Called whenever the photo changes.
    * This will update the urlhash, trigger a redraw, and emit a 'photochange' event.
    */
-  private _photoChanged(): void {
+  protected _photoChanged(): void {
     const context = this.context;
     const gfx = context.systems.gfx;
     const urlhash = context.systems.urlhash;
@@ -284,7 +284,7 @@ export class PhotoSystem extends AbstractSystem {
    * These strings will be included in the user's changeset as sources.
    * @return  Array of layers currently being used.
    */
-  photosUsed(): string[] {
+  public photosUsed(): string[] {
     // These are the English layer names that will appear in the changeset tag if the layer is used.
     const LAYERNAMES: Record<LayerID, string> = {
       'streetside': 'Bing Streetside',
@@ -311,7 +311,7 @@ export class PhotoSystem extends AbstractSystem {
    * @return  All available layerIDs
    * @readonly
    */
-  get layerIDs(): LayerID[] {
+  public get layerIDs(): LayerID[] {
     return ['streetside', 'mapillary', 'mapillary-detections', 'mapillary-signs', 'kartaview'];
   }
 
@@ -319,7 +319,7 @@ export class PhotoSystem extends AbstractSystem {
    * @return  All available photo layerIDs
    * @readonly
    */
-  get photoLayerIDs(): PhotoLayerID[] {
+  public get photoLayerIDs(): PhotoLayerID[] {
     return ['streetside', 'mapillary', 'kartaview'];
   }
 
@@ -327,7 +327,7 @@ export class PhotoSystem extends AbstractSystem {
    * @return  All available detection layerIDs
    * @readonly
    */
-  get LayerIDs(): LayerID[] {
+  public get LayerIDs(): LayerID[] {
     return ['mapillary-detections', 'mapillary-signs'];
   }
 
@@ -335,7 +335,7 @@ export class PhotoSystem extends AbstractSystem {
    * @return  All available photo types
    * @readonly
    */
-  get photoTypes(): PhotoType[] {
+  public get photoTypes(): PhotoType[] {
     return ['flat', 'panoramic'];
   }
 
@@ -343,7 +343,7 @@ export class PhotoSystem extends AbstractSystem {
    * @return  All available date filters
    * @readonly
    */
-  get dateFilters(): DateFilter[] {
+  public get dateFilters(): DateFilter[] {
     return ['fromDate', 'toDate'];
   }
 
@@ -351,7 +351,7 @@ export class PhotoSystem extends AbstractSystem {
    * @return  The from date filter value, as YYYY-MM-DD, or null if unset
    * @readonly
    */
-  get fromDate(): string | null {
+  public get fromDate(): string | null {
     return this._filterFromDate;
   }
 
@@ -359,7 +359,7 @@ export class PhotoSystem extends AbstractSystem {
    * @return  The to date filter value, as YYYY-MM-DD, or null if unset
    * @readonly
    */
-  get toDate(): string | null {
+  public get toDate(): string | null {
     return this._filterToDate;
   }
 
@@ -367,7 +367,7 @@ export class PhotoSystem extends AbstractSystem {
    * @return  The usernames filter value, or null if unset
    * @readonly
    */
-  get usernames(): string[] | null {
+  public get usernames(): string[] | null {
     return this._filterUsernames;
   }
 
@@ -375,7 +375,7 @@ export class PhotoSystem extends AbstractSystem {
    * @return  The current photo layerID
    * @readonly
    */
-  get currPhotoLayerID(): PhotoLayerID | null {
+  public get currPhotoLayerID(): PhotoLayerID | null {
     return this._currPhotoLayerID;
   }
 
@@ -383,7 +383,7 @@ export class PhotoSystem extends AbstractSystem {
    * @return  The current photoID
    * @readonly
    */
-  get currPhotoID(): string | null {
+  public get currPhotoID(): string | null {
     return this._currPhotoID;
   }
 
@@ -391,7 +391,7 @@ export class PhotoSystem extends AbstractSystem {
    * @return  The current detection layerID
    * @readonly
    */
-  get currLayerID(): LayerID | null {
+  public get currLayerID(): LayerID | null {
     return this._currLayerID;
   }
 
@@ -399,7 +399,7 @@ export class PhotoSystem extends AbstractSystem {
    * @return  The current detectionID
    * @readonly
    */
-  get currDetectionID(): string | null {
+  public get currDetectionID(): string | null {
     return this._currDetectionID;
   }
 
@@ -409,7 +409,7 @@ export class PhotoSystem extends AbstractSystem {
    * @param layerID - The layerID to select
    * @param photoID - The photoID to select
    */
-  selectPhoto(layerID: PhotoLayerID | null = null, photoID: PhotoID | null = null): void {
+  public selectPhoto(layerID: PhotoLayerID | null = null, photoID: PhotoID | null = null): void {
     const context = this.context;
     const map = context.systems.map;
     const gfx = context.systems.gfx;
@@ -460,7 +460,7 @@ export class PhotoSystem extends AbstractSystem {
    * @param layerID - The layerID to select
    * @param detectionID - The detectionID to select
    */
-  selectDetection(layerID: LayerID | null = null, detectionID: DetectionID | null = null): void {
+  public selectDetection(layerID: LayerID | null = null, detectionID: DetectionID | null = null): void {
     const context = this.context;
     const map = context.systems.map;
     const gfx = context.systems.gfx;
@@ -558,7 +558,7 @@ export class PhotoSystem extends AbstractSystem {
    * @param val - 'fromDate' or 'toDate'
    * @return  The from date or to date value, or `null` if unset
    */
-  dateFilterValue(val: DateFilter): string | null {
+  public dateFilterValue(val: DateFilter): string | null {
     if (val === 'fromDate') return this._filterFromDate;
     if (val === 'toDate') return this._filterToDate;
     return null;
@@ -570,7 +570,7 @@ export class PhotoSystem extends AbstractSystem {
    * @param type - 'fromDate' or 'toDate'
    * @param val - the value to set it to, should be in YYYY-MM-DD format
    */
-  setDateFilter(type: DateFilter, val: Nullable<string>): void {
+  public setDateFilter(type: DateFilter, val: Nullable<string>): void {
     const newValue = utilDateString(val) || null;
     const newDate = utilDate(val);
     let didChange = false;
@@ -605,7 +605,7 @@ export class PhotoSystem extends AbstractSystem {
    * Sets a username filter value
    * @param val - Username or Array or Set of usernames to filter by
    */
-  setUsernameFilter(val: OneOrMore<string>): void {
+  public setUsernameFilter(val: OneOrMore<string>): void {
     const usernames = [...utilIterable(val)];
     this._filterUsernames = usernames.length ? usernames : null;
     this._photoChanged();
@@ -616,7 +616,7 @@ export class PhotoSystem extends AbstractSystem {
    * Toggles a photo type display on/off
    * @param which - String phototype to toggle on/off ('flat', or 'panoramic')
    */
-  togglePhotoType(which: PhotoType): void {
+  public togglePhotoType(which: PhotoType): void {
     if (!this.photoTypes.includes(which)) return;
 
     if (this._filterPhotoTypes.has(which)) {
@@ -633,7 +633,7 @@ export class PhotoSystem extends AbstractSystem {
    * @param layerID - the layerID to check
    * @return  `true` if enabled, `false` if not
    */
-  isLayerEnabled(layerID: LayerID): boolean {
+  public isLayerEnabled(layerID: LayerID): boolean {
     const context = this.context;
     const gfx = context.systems.gfx;
     const layer = gfx?.scene?.layers?.get(layerID);
@@ -644,7 +644,7 @@ export class PhotoSystem extends AbstractSystem {
   /**
    * Show the photo viewer
    */
-  showViewer(): void {
+  public showViewer(): void {
     const context = this.context;
     const layerID = this._currPhotoLayerID;
     const photoID = this._currPhotoID;
@@ -658,7 +658,7 @@ export class PhotoSystem extends AbstractSystem {
   /**
    * Hide the photo viewer.  If the viewer was showing a photo, deselect the photo.
    */
-  hideViewer(): void {
+  public hideViewer(): void {
     for (const layerID of this.photoLayerIDs) {
       if (layerID === this._currPhotoLayerID) {
         this.selectPhoto();  // deselect
@@ -672,7 +672,7 @@ export class PhotoSystem extends AbstractSystem {
   /**
    * @return  `true` if showing, `false` if not
    */
-  isViewerShowing(): boolean {
+  public isViewerShowing(): boolean {
     // viewer exists and is not hidden
     const context = this.context;
     const $viewer: D3Selection = context.container().selectAll('.photoviewer');
@@ -680,23 +680,23 @@ export class PhotoSystem extends AbstractSystem {
   }
 
 
-  shouldFilterByDate(): boolean {
+  public shouldFilterByDate(): boolean {
     return !!this.isLayerEnabled('mapillary') || !!this.isLayerEnabled('kartaview') || !!this.isLayerEnabled('streetside');
   }
-  shouldFilterByPhotoType(): boolean {
+  public shouldFilterByPhotoType(): boolean {
     return !!this.isLayerEnabled('mapillary') || (!!this.isLayerEnabled('streetside') && !!this.isLayerEnabled('kartaview'));
   }
-  shouldFilterByUsername(): boolean {
+  public shouldFilterByUsername(): boolean {
     return !this.isLayerEnabled('mapillary') && !!this.isLayerEnabled('kartaview') && !this.isLayerEnabled('streetside');
   }
-  showsPhotoType(val: PhotoType): boolean {
+  public showsPhotoType(val: PhotoType): boolean {
     if (!this.shouldFilterByPhotoType()) return true;
     return this._filterPhotoTypes.has(val);
   }
-  showsFlat(): boolean {
+  public showsFlat(): boolean {
     return this.showsPhotoType('flat');
   }
-  showsPanoramic(): boolean {
+  public showsPanoramic(): boolean {
     return this.showsPhotoType('panoramic');
   }
 }

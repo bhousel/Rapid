@@ -19,7 +19,7 @@ export class PixiLayerEditBlocks extends AbstractPixiLayer {
    * @constructor
    * @param scene - The Scene that owns this Layer
    */
-  constructor(scene: PixiScene) {
+  public constructor(scene: PixiScene) {
     super(scene);
     this.id = 'edit-blocks';
     this.enabled = true;   // this layer should always be enabled
@@ -29,10 +29,10 @@ export class PixiLayerEditBlocks extends AbstractPixiLayer {
   /**
    * This layer should always be enabled
    */
-  get enabled(): boolean {
+  public get enabled(): boolean {
     return true;
   }
-  set enabled(val: boolean) {
+  public set enabled(val: boolean) {
     this._enabled = true;
   }
 
@@ -40,7 +40,7 @@ export class PixiLayerEditBlocks extends AbstractPixiLayer {
   /**
    * Every Layer should have a reset function to replace any Pixi objects and internal state.
    */
-  reset(): void {
+  public reset(): void {
     super.reset();
   }
 
@@ -50,7 +50,7 @@ export class PixiLayerEditBlocks extends AbstractPixiLayer {
    * @param frame - Integer frame being rendered
    * @param viewport - Pixi viewport to use for rendering
    */
-  render(frame: number, viewport: Viewport): void {
+  public render(frame: number, viewport: Viewport): void {
     const context = this.context;
     const l10n = context.systems.l10n;
     const locations = context.systems.locations;
@@ -97,7 +97,7 @@ export class PixiLayerEditBlocks extends AbstractPixiLayer {
    * @param viewport - Pixi viewport to use for rendering
    * @param blocks - Array of block data visible in the view
    */
-  renderEditBlocks(frame: number, viewport: Viewport, blocks: GeoJSONData[]): void {
+  public renderEditBlocks(frame: number, viewport: Viewport, blocks: GeoJSONData[]): void {
     const parentContainer = this.scene.groups.get('blocks')!;
     if (!parentContainer) return;
 

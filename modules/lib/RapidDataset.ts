@@ -63,39 +63,41 @@ export interface RapidDatasetProps {
  * and contain features like buildings, roads, addresses, etc.
  */
 export class RapidDataset {
-  context: Context;
-  id: DatasetID;
-  serviceID: ServiceID;
-  categories: Set<string>;
-  tags: Set<string>;
-  color: string;
-  dataUsed: string[];
-  extent: Extent | undefined;
-  overlay: boolean | undefined;
-  itemUrl: string;
-  licenseUrl: string;
-  thumbnailUrl: string;
-  added: boolean;
-  beta: boolean;
-  enabled: boolean;
-  featured: boolean;
-  filtered: boolean;
-  hidden: boolean;
-  conflated: boolean;
-  labelStringID: StringID | undefined;
-  descriptionStringID: StringID | undefined;
-  label: string;
-  description: string;
 
-  private _label: string | undefined;
-  private _description: string | undefined;
+  public context: Context;
+  public id: DatasetID;
+  public serviceID: ServiceID;
+  public categories: Set<string>;
+  public tags: Set<string>;
+  public color: string;
+  public dataUsed: string[];
+  public extent: Extent | undefined;
+  public overlay: boolean | undefined;
+  public itemUrl: string;
+  public licenseUrl: string;
+  public thumbnailUrl: string;
+  public added: boolean;
+  public beta: boolean;
+  public enabled: boolean;
+  public featured: boolean;
+  public filtered: boolean;
+  public hidden: boolean;
+  public conflated: boolean;
+  public labelStringID: StringID | undefined;
+  public descriptionStringID: StringID | undefined;
+  public label: string;
+  public description: string;
+
+  protected _label: string | undefined;
+  protected _description: string | undefined;
+
 
   /**
    * @constructor
    * @param context - Global shared application context
    * @param props - Properties for this RapidDataset
    */
-  constructor(context: Context, props: Partial<RapidDatasetProps>) {
+  public constructor(context: Context, props: Partial<RapidDatasetProps>) {
     this.context = context;
 
     this.id = props.id ?? '';
@@ -136,7 +138,7 @@ export class RapidDataset {
    * Choose a default thumbnail if we weren't supplied one.
    * @return URL for thumbnail image
    */
-  getThumbnail(): string {
+  public getThumbnail(): string {
     let type: string;
     if (this.categories.has('buildings'))     type = 'buildings';
     else if (this.categories.has('footways')) type = 'footways';
@@ -152,7 +154,7 @@ export class RapidDataset {
    * Attempt to localize the dataset name, fallback to 'label' or 'id'
    * @return Localized label string
    */
-  getLabel(): string {
+  public getLabel(): string {
     const l10n = this.context.systems.l10n;
     return (l10n && this.labelStringID) ? l10n.t(this.labelStringID) : (this._label || this.id);
   }
@@ -162,7 +164,7 @@ export class RapidDataset {
    * Attempt to localize the dataset description, fallback to empty string
    * @return Localized description string
    */
-  getDescription(): string {
+  public getDescription(): string {
     const l10n = this.context.systems.l10n;
     return (l10n && this.descriptionStringID) ? l10n.t(this.descriptionStringID) : (this._description || '');
   }

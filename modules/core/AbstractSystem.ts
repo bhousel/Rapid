@@ -61,33 +61,35 @@ import type { Context } from '../Context.ts';
  *   `resumed`    Fires when the system transitions from paused to unpaused
  */
 export class AbstractSystem extends EventEmitter {
+
   /** Identifier for the system (e.g. 'l10n') */
-  id: string;
+  public id: string;
   /** Global shared application context */
-  context: Context;
+  public context: Context;
   /** Dependencies that must be met before init */
-  requiredDependencies: Set<SystemID>;
+  public requiredDependencies: Set<SystemID>;
   /** Dependencies that are nice to have but not required */
-  optionalDependencies: Set<SystemID>;
+  public optionalDependencies: Set<SystemID>;
   /** True to start automatically when initializing the Context */
-  autoStart: boolean;
+  public autoStart: boolean;
 
   protected _initPromise: Promise<void> | null;
   protected _startPromise: Promise<void> | null;
   protected _started: boolean;
   protected _paused: boolean;
-  private _pauseCount: number;
+  protected _pauseCount: number;
+
 
   /**
    * @constructor
    * @param context - Global shared application context
    */
-  constructor(context: Context) {
+  public constructor(context: Context) {
     super();
     this.id = '';
     this.context = context;
-    this.requiredDependencies = new Set();
-    this.optionalDependencies = new Set();
+    this.requiredDependencies = new Set<SystemID>();
+    this.optionalDependencies = new Set<SystemID>();
     this.autoStart = true;
 
     this._initPromise = null;
@@ -103,7 +105,7 @@ export class AbstractSystem extends EventEmitter {
    * Unique string to identify this System.
    * @readonly
    */
-  get systemID(): string {
+  public get systemID(): string {
     return this.id;
   }
 
@@ -114,7 +116,7 @@ export class AbstractSystem extends EventEmitter {
    * They all just return `id` anyway.
    * @readonly
    */
-  get serviceID(): string {
+  public get serviceID(): string {
     return this.id;
   }
 
@@ -122,7 +124,7 @@ export class AbstractSystem extends EventEmitter {
   /**
    * @readonly
    */
-  get started(): boolean {
+  public get started(): boolean {
     return this._started;
   }
 
@@ -130,7 +132,7 @@ export class AbstractSystem extends EventEmitter {
   /**
    * @readonly
    */
-  get paused(): boolean {
+  public get paused(): boolean {
     return this._paused;
   }
 
@@ -141,7 +143,7 @@ export class AbstractSystem extends EventEmitter {
    * @return  Promise resolved when this component has completed initialization
    * @abstract
    */
-  initAsync(): Promise<void> {
+  public initAsync(): Promise<void> {
     if (this._initPromise) return this._initPromise;
 
     for (const requiredID of this.requiredDependencies) {
@@ -158,7 +160,7 @@ export class AbstractSystem extends EventEmitter {
    * @return  Promise resolved when this component has completed startup
    * @abstract
    */
-  startAsync(): Promise<void> {
+  public startAsync(): Promise<void> {
     if (this._startPromise) return this._startPromise;
 
     this._started = true;
@@ -171,7 +173,7 @@ export class AbstractSystem extends EventEmitter {
    * @return  Promise resolved when this component has completed resetting
    * @abstract
    */
-  resetAsync(): Promise<void> {
+  public resetAsync(): Promise<void> {
     return Promise.resolve();
   }
 
@@ -191,7 +193,7 @@ export class AbstractSystem extends EventEmitter {
    *
    * @return A release function that decrements the pause count
    */
-  pause(): () => void {
+  public pause(): () => void {
     this._pauseCount++;
     const wasPaused = this._paused;
     this._paused = true;
@@ -219,7 +221,7 @@ export class AbstractSystem extends EventEmitter {
    *
    * Emits `'resumed'` when transitioning from paused to unpaused.
    */
-  private _resume(): void {
+  protected _resume(): void {
     this._pauseCount = Math.max(0, this._pauseCount - 1);
     const wasPaused = this._paused;
     this._paused = this._pauseCount > 0;

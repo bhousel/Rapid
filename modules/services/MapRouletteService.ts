@@ -1,7 +1,6 @@
-import { Tiler } from '@rapid-sdk/math';
-
 import { AbstractSystem } from '../core/AbstractSystem.ts';
 import { MarkerData } from '../data/MarkerData.ts';
+import { Tiler } from '@rapid-sdk/math';
 import { utilExtractValues } from '../util/string.ts';
 
 import type { Context } from '../Context.ts';
@@ -105,23 +104,24 @@ interface MapRouletteCache {
  */
 export class MapRouletteService extends AbstractSystem {
 
-  /** Set of challenge IDs to filter tasks by (empty means show all visible) */
-  _challengeIDs: Set<string>;
-  /** Internal data cache for tasks, challenges, and request tracking */
-  _cache: MapRouletteCache;
-  /** Tiler instance for computing tile coverage at the configured zoom level */
-  _tiler: Tiler;
-
   /** Whether flying to nearby tasks is enabled */
-  nearbyTaskEnabled: boolean;
+  public nearbyTaskEnabled: boolean;
   /** The currently selected task */
-  currentTask: MapRouletteTask | null;
+  public currentTask: MapRouletteTask | null;
+
+  /** Set of challenge IDs to filter tasks by (empty means show all visible) */
+  protected _challengeIDs: Set<string>;
+  /** Internal data cache for tasks, challenges, and request tracking */
+  protected _cache: MapRouletteCache;
+  /** Tiler instance for computing tile coverage at the configured zoom level */
+  protected _tiler: Tiler;
+
 
   /**
    * @constructor
    * @param context - Global shared application context
    */
-  constructor(context: Context) {
+  public constructor(context: Context) {
     super(context);
     this.id = 'maproulette';
     this.requiredDependencies = new Set<SystemID>(['network', 'spatial']);
@@ -145,7 +145,7 @@ export class MapRouletteService extends AbstractSystem {
    * Called after all core objects have been constructed.
    * @return Promise resolved when this component has completed initialization
    */
-  initAsync(): Promise<void> {
+  public initAsync(): Promise<void> {
     if (this._initPromise) return this._initPromise;
 
     return this._initPromise = super.initAsync()
@@ -166,7 +166,7 @@ export class MapRouletteService extends AbstractSystem {
    * Called after all core objects have been initialized.
    * @return Promise resolved when this component has completed startup
    */
-  startAsync(): Promise<void> {
+  public startAsync(): Promise<void> {
     return super.startAsync();
   }
 
@@ -175,7 +175,7 @@ export class MapRouletteService extends AbstractSystem {
    * Called after completing an edit session to reset any internal state
    * @return Promise resolved when this component has completed resetting
    */
-  resetAsync(): Promise<void> {
+  public resetAsync(): Promise<void> {
     const context = this.context;
     const network = context.systems.network!;
     const spatial = context.systems.spatial!;
@@ -199,11 +199,11 @@ export class MapRouletteService extends AbstractSystem {
   /**
    * set/get the challengeIDs (as a string of comma-separated values)
    */
-  get challengeIDs(): string {
+  public get challengeIDs(): string {
     return [...this._challengeIDs].join(',');
   }
 
-  set challengeIDs(ids: string) {
+  public set challengeIDs(ids: string) {
     const str = ids.toString();
     const vals = str.split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
 
@@ -225,7 +225,7 @@ export class MapRouletteService extends AbstractSystem {
    * Get already loaded data that appears in the current map view
    * @return Array of data
    */
-  getData(): MapRouletteTask[] {
+  public getData(): MapRouletteTask[] {
     const spatial = this.context.systems.spatial!;
 
     return (spatial.getVisibleData('maproulette')
@@ -244,7 +244,7 @@ export class MapRouletteService extends AbstractSystem {
    * @param dataID
    * @return The task with that id, or `undefined` if not found
    */
-  getTask(dataID: DataID): MapRouletteTask | undefined {
+  public getTask(dataID: DataID): MapRouletteTask | undefined {
     const spatial = this.context.systems.spatial!;
     return spatial.getData<MapRouletteTask>('maproulette', dataID);
   }
@@ -254,7 +254,7 @@ export class MapRouletteService extends AbstractSystem {
    * @param challengeID
    * @return The challenge with that id, or `undefined` if not found
    */
-  getChallenge(challengeID: string): ChallengeData | undefined {
+  public getChallenge(challengeID: string): ChallengeData | undefined {
     return this._cache.challenges.get(challengeID);
   }
 
@@ -262,7 +262,7 @@ export class MapRouletteService extends AbstractSystem {
   /**
    * Schedule any data requests needed to cover the current map view
    */
-  loadTiles(): void {
+  public loadTiles(): void {
     if (this._paused) return;
 
     const context = this.context;
@@ -299,7 +299,7 @@ export class MapRouletteService extends AbstractSystem {
    * Load a single tile of data.
    * @param tile - Tile to load
    */
-  loadTile(tile: Tile): void {
+  public loadTile(tile: Tile): void {
     const context = this.context;
     const network = context.systems.network!;
     const spatial = context.systems.spatial!;
@@ -340,7 +340,7 @@ export class MapRouletteService extends AbstractSystem {
   /**
    * Schedule any data requests needed for challenges we are interested in
    */
-  loadChallenges(): void {
+  public loadChallenges(): void {
     if (this._paused) return;
 
     const context = this.context;
@@ -400,7 +400,7 @@ export class MapRouletteService extends AbstractSystem {
    * @param task
    * @return Promise resolved with the task
    */
-  loadTaskDetailAsync(task: MapRouletteTask): Promise<MapRouletteTask> {
+  public loadTaskDetailAsync(task: MapRouletteTask): Promise<MapRouletteTask> {
     if (task.props.description !== undefined) return Promise.resolve(task);  // already done
 
     const network = this.context.systems.network!;
@@ -424,7 +424,7 @@ export class MapRouletteService extends AbstractSystem {
    * @param task
    * @return Promise resolved when we've fetched the task details
    */
-  loadTaskFeaturesAsync(task: MapRouletteTask): Promise<MapRouletteTask> {
+  public loadTaskFeaturesAsync(task: MapRouletteTask): Promise<MapRouletteTask> {
     if (task.props.taskFeatures !== undefined) return Promise.resolve(task);  // already done
 
     const network = this.context.systems.network!;
@@ -442,7 +442,7 @@ export class MapRouletteService extends AbstractSystem {
    * @param task
    * @param callback
    */
-  postUpdate(task: MapRouletteTask, callback?: (err: string | null, task?: MapRouletteTask) => void): void {
+  public postUpdate(task: MapRouletteTask, callback?: (err: string | null, task?: MapRouletteTask) => void): void {
     const network = this.context.systems.network!;
     const taskID = task.id;
     const challengeID = task.props.parentId;
@@ -520,7 +520,7 @@ export class MapRouletteService extends AbstractSystem {
    * @param item - item to replace
    * @return the item, or `null` if it couldn't be replaced
    */
-  replaceItem(item: MapRouletteTask): MapRouletteTask | null {
+  public replaceItem(item: MapRouletteTask): MapRouletteTask | null {
     if (!(item instanceof MarkerData) || !item.id) return null;
 
     const spatial = this.context.systems.spatial!;
@@ -533,7 +533,7 @@ export class MapRouletteService extends AbstractSystem {
    * Remove a single item from the cache
    * @param item - item to remove
    */
-  removeItem(item: MapRouletteTask): void {
+  public removeItem(item: MapRouletteTask): void {
     if (!(item instanceof MarkerData) || !item.id) return;
 
     const spatial = this.context.systems.spatial!;
@@ -545,7 +545,7 @@ export class MapRouletteService extends AbstractSystem {
    * Get details about all tasks closed in this session
    * @return Array of closed task entries
    */
-  getClosed(): ClosedEntry[] {
+  public getClosed(): ClosedEntry[] {
     return this._cache.closed;
   }
 
@@ -554,7 +554,7 @@ export class MapRouletteService extends AbstractSystem {
    * Initiates the process to find and fly to a nearby task based on the current task's challenge ID and task ID.
    * @param task - The current task containing task details.
    */
-  flyToNearbyTask(task: MapRouletteTask): void {
+  public flyToNearbyTask(task: MapRouletteTask): void {
     if (!this.nearbyTaskEnabled) return;
     const challengeID = task.props.parentId as string;
     const taskID = task.id;
@@ -568,7 +568,7 @@ export class MapRouletteService extends AbstractSystem {
    * @param challengeID - The ID of the challenge.
    * @returns Promise resolving with challenge data.
    */
-  getChallengeDetails(challengeID: string): Promise<ChallengeData> {
+  public getChallengeDetails(challengeID: string): Promise<ChallengeData> {
 // Why is this different from what `loadChallenges()` does???
     const cachedChallenge = this._cache.challenges.get(challengeID);
     if (cachedChallenge) {
@@ -587,7 +587,7 @@ export class MapRouletteService extends AbstractSystem {
    * @param taskID - The ID of the current task.
    * @param zoom - Optional zoom level for the map.
    */
-  filterNearbyTasks(challengeID: string, taskID: string, zoom?: number): void {
+  public filterNearbyTasks(challengeID: string, taskID: string, zoom?: number): void {
     const nearbyTasksUrl = `${MAPROULETTE_API}/challenge/${challengeID}/tasksNearby/${taskID}?excludeSelfLocked=true&limit=1`;
     if (!taskID) return;
     const network = this.context.systems.network!;
@@ -628,7 +628,7 @@ export class MapRouletteService extends AbstractSystem {
    * Selects a task and updates the sidebar reflect the selection
    * @param task - The task to be selected
    */
-  selectAndDisplayTask(task: MapRouletteTask): void {
+  public selectAndDisplayTask(task: MapRouletteTask): void {
     if (!(task instanceof MarkerData)) return;
 
     this.currentTask = task;
@@ -642,7 +642,7 @@ export class MapRouletteService extends AbstractSystem {
    * @param task
    * @return the url
    */
-  itemURL(task: MapRouletteTask): string {
+  public itemURL(task: MapRouletteTask): string {
     const challengeID = task.props.parentId;
     return `https://maproulette.org/challenge/${challengeID}/task/${task.id}`;
   }
@@ -653,7 +653,7 @@ export class MapRouletteService extends AbstractSystem {
    * @param props - the task properties
    * @return The task
    */
-  _cacheTask(props: Record<string, any>): MapRouletteTask {
+  protected _cacheTask(props: Record<string, any>): MapRouletteTask {
     const context = this.context;
     const spatial = context.systems.spatial!;
 
@@ -691,7 +691,7 @@ export class MapRouletteService extends AbstractSystem {
    * @param currParams - The current hash parameters
    * @param prevParams - The previous hash parameters
    */
-  _hashChanged(currParams: Map<string, string>, prevParams: Map<string, string>): void {
+  protected _hashChanged(currParams: Map<string, string>, prevParams: Map<string, string>): void {
     const scene = this.context.systems.gfx?.scene;
     if (!scene) return;  // test environment?
 
@@ -731,7 +731,7 @@ export class MapRouletteService extends AbstractSystem {
   /**
    * Push changes in MapRoulette state to the urlhash
    */
-  _mapRouletteChanged(): void {
+  protected _mapRouletteChanged(): void {
     const context = this.context;
     const urlhash = context.systems.urlhash;
     const scene = context.systems.gfx?.scene;

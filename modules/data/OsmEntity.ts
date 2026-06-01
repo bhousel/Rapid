@@ -1,6 +1,5 @@
-import { utilArrayUnion, utilUnicodeCharsTruncated } from '@rapid-sdk/util';
-
 import { AbstractData, AbstractDataProps } from './AbstractData.ts';
+import { utilArrayUnion, utilUnicodeCharsTruncated } from '@rapid-sdk/util';
 
 import type { Context } from '../Context.ts';
 import type { GeoJSONObject } from '../lib/types.ts';
@@ -45,7 +44,7 @@ type TransientCache = Map<string, Map<string, unknown>>;
  */
 export class OsmEntity extends AbstractData<OsmEntityProps> {
   /** Cache for memoizing expensive calculations, shared between copies */
-  _transients: TransientCache;
+  protected _transients: TransientCache;
 
   /**
    * @constructor
@@ -54,7 +53,7 @@ export class OsmEntity extends AbstractData<OsmEntityProps> {
    * @param otherOrContext - copy another data element, or pass application context
    * @param props - Properties to assign to the data element
    */
-  constructor(otherOrContext: OsmEntity | Context, props: Partial<OsmEntityProps> = {}) {
+  public constructor(otherOrContext: OsmEntity | Context, props: Partial<OsmEntityProps> = {}) {
     super(otherOrContext, props);
 
     // "transients" are a cache where we memoize expensive calculations.
@@ -88,7 +87,7 @@ export class OsmEntity extends AbstractData<OsmEntityProps> {
    * Every data element should have a destroy function that frees all the resources
    * Do not use the data element after calling `destroy()`.
    */
-  destroy(): void {
+  public destroy(): void {
     super.destroy();
     this._transients = null!;
   }
@@ -101,7 +100,7 @@ export class OsmEntity extends AbstractData<OsmEntityProps> {
    * @param graph - the Graph that holds the topology needed
    * @returns this same OsmEntity
    */
-  updateGeometry(graph?: Graph): this {
+  public updateGeometry(graph?: Graph): this {
     // this.touch();
     this._transients.clear();
     this.geoms.setData(this.asGeoJSON(graph));
@@ -114,7 +113,7 @@ export class OsmEntity extends AbstractData<OsmEntityProps> {
    * @param _graph - optional param, used only for some OSM Entities
    * @returns GeoJSON representation of this data element
    */
-  asGeoJSON(_graph?: Graph): GeoJSONObject {
+  public asGeoJSON(_graph?: Graph): GeoJSONObject {
     return {
       type: 'Feature',
       id: this.id,
@@ -128,7 +127,7 @@ export class OsmEntity extends AbstractData<OsmEntityProps> {
    * For OSM Entities, this is used to serialize the Entity into the backup history.
    * @returns JSON representation of this data element
    */
-  asJSON(): Partial<OsmEntityProps> {
+  public asJSON(): Partial<OsmEntityProps> {
     return { ...this.props };
   }
 
@@ -138,7 +137,7 @@ export class OsmEntity extends AbstractData<OsmEntityProps> {
    * @param _changesetID - optional changeset ID to include in the output
    * @returns JXON representation of the OsmEntity
    */
-  asJXON(_changesetID?: string): Record<string, unknown> {
+  public asJXON(_changesetID?: string): Record<string, unknown> {
     throw new Error(`Do not call 'asJXON' on OSMEntity`);
   }
 
@@ -147,7 +146,7 @@ export class OsmEntity extends AbstractData<OsmEntityProps> {
    * @param graph - the Graph that holds the topology needed
    * @returns 'point', 'line', 'vertex', 'area, or 'relation' depending on the data type
    */
-  geometry(graph: Graph): GeometryType {
+  public geometry(graph: Graph): GeometryType {
     throw new Error(`Do not call 'geometry' on OsmEntity`);
   }
 
@@ -161,7 +160,7 @@ export class OsmEntity extends AbstractData<OsmEntityProps> {
    * @param memo - An Object to store seen copies (to prevent circular/infinite copying)
    * @returns a copy of this OsmEntity
    */
-  copy(_fromGraph: Graph, memo: Record<EntityID, OsmEntity> = {}): OsmEntity {
+  public copy(_fromGraph: Graph, memo: Record<EntityID, OsmEntity> = {}): OsmEntity {
     if (memo[this.id]) {
       return memo[this.id];
     }
@@ -178,7 +177,7 @@ export class OsmEntity extends AbstractData<OsmEntityProps> {
    * @param fn - Function that performs the computation
    * @returns The result of the function call
    */
-  transient<T>(k: string, fn: () => T): T {
+  public transient<T>(k: string, fn: () => T): T {
     const entityKey = this.key;
     let cache = this._transients.get(entityKey);
     if (!cache) {
@@ -199,7 +198,7 @@ export class OsmEntity extends AbstractData<OsmEntityProps> {
    * @see https://wiki.openstreetmap.org/wiki/Elements#Tag
    * @readonly
    */
-  get tags(): OsmTags {
+  public get tags(): OsmTags {
     return this.props.tags ?? {};
   }
 
@@ -208,10 +207,10 @@ export class OsmEntity extends AbstractData<OsmEntityProps> {
    * Objects with `visibility=false` are considered deleted.
    * @see https://wiki.openstreetmap.org/wiki/Elements#Common_attributes
    */
-  get visible(): boolean {
+  public get visible(): boolean {
     return this.props.visible ?? true;
   }
-  set visible(val: boolean) {
+  public set visible(val: boolean) {
     this.props.visible = val;
   }
 
@@ -221,10 +220,10 @@ export class OsmEntity extends AbstractData<OsmEntityProps> {
    *  otherwise the editing API will raise a conflict.
    * @see https://wiki.openstreetmap.org/wiki/Elements#Common_attributes
    */
-  get version(): number | undefined {
+  public get version(): number | undefined {
     return this.props.version;
   }
-  set version(val: number | undefined) {
+  public set version(val: number | undefined) {
     this.props.version = val!;
   }
 
@@ -234,7 +233,7 @@ export class OsmEntity extends AbstractData<OsmEntityProps> {
    * @param id - Entity ID (e.g. 'n123', 'w456', 'r789', 'c1')
    * @returns The entity type string
    */
-  static type(id: string): string | undefined {
+  public static type(id: string): string | undefined {
     const types: Record<string, string> = {
       'c': 'changeset', 'n': 'node', 'w': 'way', 'r': 'relation'
     };
@@ -247,7 +246,7 @@ export class OsmEntity extends AbstractData<OsmEntityProps> {
    * @param id - Numeric OSM ID
    * @returns Entity ID (e.g. 'n123')
    */
-  static fromOSM(type: string, id: string | number): EntityID {
+  public static fromOSM(type: string, id: string | number): EntityID {
     return type[0] + id;
   }
 
@@ -256,7 +255,7 @@ export class OsmEntity extends AbstractData<OsmEntityProps> {
    * @param id - Entity ID (e.g. 'n123')
    * @returns Numeric ID as string (e.g. '123')
    */
-  static toOSM(id: EntityID): string {
+  public static toOSM(id: EntityID): string {
     return id.slice(1);
   }
 
@@ -267,7 +266,7 @@ export class OsmEntity extends AbstractData<OsmEntityProps> {
    * @param b - Second entity
    * @returns Comparison result for sorting
    */
-  static creationOrder(a: OsmEntity, b: OsmEntity): number {
+  public static creationOrder(a: OsmEntity, b: OsmEntity): number {
     const aId = parseInt(OsmEntity.toOSM(a.id), 10);
     const bId = parseInt(OsmEntity.toOSM(b.id), 10);
 
@@ -280,7 +279,7 @@ export class OsmEntity extends AbstractData<OsmEntityProps> {
    * This returns just the numeric part of the entityID.
    * @returns The numeric OSM ID as a string
    */
-  osmId(): string {
+  public osmId(): string {
     return OsmEntity.toOSM(this.props.id ?? '');
   }
 
@@ -288,7 +287,7 @@ export class OsmEntity extends AbstractData<OsmEntityProps> {
    * By convention, negative numbers are used for new Entities, and positive numbers are used for existing entities.
    * @returns `true` if the Entity is new, `false` if the entity was downloaded from OSM.
    */
-  isNew(): boolean {
+  public isNew(): boolean {
     return parseInt(this.osmId(), 10) < 0;
   }
 
@@ -299,7 +298,7 @@ export class OsmEntity extends AbstractData<OsmEntityProps> {
    * @param tags - Tags to merge into this entity
    * @returns A new Entity copied from this Entity, but with the updated tags
    */
-  mergeTags(tags: OsmTags): this {
+  public mergeTags(tags: OsmTags): this {
     const merged: OsmTags = { ...this.props.tags };  // shallow copy
     let changed = false;
     for (const k in tags) {
@@ -331,7 +330,7 @@ export class OsmEntity extends AbstractData<OsmEntityProps> {
    * @param graph - the Graph that holds the topology needed
    * @returns `true` if this Entity has parent Relations, `false` if not
    */
-  hasParentRelations(graph: Graph): boolean {
+  public hasParentRelations(graph: Graph): boolean {
     return graph.parentRelations(this).length > 0;
   }
 
@@ -339,7 +338,7 @@ export class OsmEntity extends AbstractData<OsmEntityProps> {
    * Returns `true` if this Entity has tags other than `area=yes/no`.
    * @returns `true` if this Entity has non-geometry tags, `false` if not
    */
-  hasNonGeometryTags(): boolean {
+  public hasNonGeometryTags(): boolean {
     for (const k of Object.keys(this.tags)) {
       if (k !== 'area') return true;
     }
@@ -353,7 +352,7 @@ export class OsmEntity extends AbstractData<OsmEntityProps> {
    * @param key - The tag key to check
    * @returns `true` if the tag key is "interesting", `false` if it is metadata/uninteresting
    */
-  isInterestingTag(key: string): boolean {
+  public isInterestingTag(key: string): boolean {
     const context = this.context;
     const schema = context.systems.schema;
     const uninteresting = schema?.getScope('osm')?.rulesets?.get('uninteresting');
@@ -368,7 +367,7 @@ export class OsmEntity extends AbstractData<OsmEntityProps> {
    * (For example, `source`, `created_by`, etc).
    * @returns `true` if this Entity has "interesting" tags, `false` if not
    */
-  hasInterestingTags(): boolean {
+  public hasInterestingTags(): boolean {
     for (const k of Object.keys(this.tags)) {
       if (this.isInterestingTag(k)) return true;
     }
@@ -381,7 +380,7 @@ export class OsmEntity extends AbstractData<OsmEntityProps> {
    * @param _graph - the Graph that holds the topology needed
    * @returns `true` if this Entity is an intersection of parent highways, `false` if not
    */
-  isHighwayIntersection(_graph?: Graph): boolean {
+  public isHighwayIntersection(_graph?: Graph): boolean {
     return false;
   }
 
@@ -391,7 +390,7 @@ export class OsmEntity extends AbstractData<OsmEntityProps> {
    * @param _graph - the Graph that holds the topology needed
    * @returns `true` if this Entity is degenerate, `false` if not
    */
-  isDegenerate(_graph?: Graph): boolean {
+  public isDegenerate(_graph?: Graph): boolean {
     return true;
   }
 

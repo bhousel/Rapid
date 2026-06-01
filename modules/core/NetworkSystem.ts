@@ -1,6 +1,6 @@
 import { AbstractSystem } from './AbstractSystem.ts';
-import { utilFetchResponse } from '../util/fetch_response.ts';
 import { networkListeners } from './NetworkSystem.worker.ts';
+import { utilFetchResponse } from '../util/fetch_response.ts';
 
 import type { Context } from '../Context.ts';
 import type { DispatchOptions } from './WorkerSystem.ts';
@@ -121,24 +121,24 @@ const DEFAULT_MAX_INFLIGHT = 100;
 export class NetworkSystem extends AbstractSystem {
 
   /** All currently inflight requests, keyed by requestID */
-  private _inflight: Map<RequestID, InflightRequest>;
+  protected _inflight: Map<RequestID, InflightRequest>;
   /** FIFO queue for requests waiting on a concurrency slot */
-  private _queue: QueuedFetch[];
+  protected _queue: QueuedFetch[];
   /** Number of actively dispatched network requests (excludes queued) */
-  private _numActive: number;
+  protected _numActive: number;
   /** Default timeout in milliseconds */
-  private _defaultTimeout: number;
+  protected _defaultTimeout: number;
   /** Max concurrent active requests */
-  private _maxInflight: number;
+  protected _maxInflight: number;
   /** Registered request interceptors, applied before dispatch */
-  private _interceptors: RequestInterceptor[];
+  protected _interceptors: RequestInterceptor[];
 
 
   /**
    * @constructor
    * @param context - Global shared application context
    */
-  constructor(context: Context) {
+  public constructor(context: Context) {
     super(context);
     this.id = 'network';
     this.requiredDependencies = new Set();
@@ -157,7 +157,7 @@ export class NetworkSystem extends AbstractSystem {
    * Called after all core objects have been constructed.
    * @return Promise resolved when this component has completed initialization
    */
-  initAsync(): Promise<void> {
+  public initAsync(): Promise<void> {
     if (this._initPromise) return this._initPromise;
 
     const worker = this.context.systems.worker;
@@ -180,7 +180,7 @@ export class NetworkSystem extends AbstractSystem {
    * Called after all core objects have been initialized.
    * @return Promise resolved when this component has completed startup
    */
-  startAsync(): Promise<void> {
+  public startAsync(): Promise<void> {
     if (this._startPromise) return this._startPromise;
     this._started = true;
     return this._startPromise = Promise.resolve();
@@ -191,7 +191,7 @@ export class NetworkSystem extends AbstractSystem {
    * Aborts all inflight requests and clears the queue.
    * @return Promise resolved when this component has completed resetting
    */
-  resetAsync(): Promise<void> {
+  public resetAsync(): Promise<void> {
     const worker = this.context.systems.worker;
 
     this.abortAll();
@@ -208,10 +208,10 @@ export class NetworkSystem extends AbstractSystem {
   /**
    * Default timeout in milliseconds for new requests.
    */
-  get defaultTimeout(): number {
+  public get defaultTimeout(): number {
     return this._defaultTimeout;
   }
-  set defaultTimeout(ms: number) {
+  public set defaultTimeout(ms: number) {
     this._defaultTimeout = Math.max(0, ms);
   }
 
@@ -220,10 +220,10 @@ export class NetworkSystem extends AbstractSystem {
    * Maximum concurrent active requests.  Requests beyond this limit
    * are queued (FIFO).
    */
-  get maxInflight(): number {
+  public get maxInflight(): number {
     return this._maxInflight;
   }
-  set maxInflight(n: number) {
+  public set maxInflight(n: number) {
     this._maxInflight = Math.max(1, n);
   }
 
@@ -233,7 +233,7 @@ export class NetworkSystem extends AbstractSystem {
    * For diagnostics / tests.
    * @readonly
    */
-  get numInflight(): number {
+  public get numInflight(): number {
     return this._inflight.size;
   }
 
@@ -242,7 +242,7 @@ export class NetworkSystem extends AbstractSystem {
    * Number of actively dispatched network requests (excludes queued).
    * @readonly
    */
-  get numActive(): number {
+  public get numActive(): number {
     return this._numActive;
   }
 
@@ -251,7 +251,7 @@ export class NetworkSystem extends AbstractSystem {
    * Number of requests waiting in the concurrency queue.
    * @readonly
    */
-  get numQueued(): number {
+  public get numQueued(): number {
     return this._queue.length;
   }
 
@@ -261,7 +261,7 @@ export class NetworkSystem extends AbstractSystem {
    * (either active or queued).
    * @param requestID - The dedup/cancellation identifier
    */
-  isInflight(requestID: RequestID): boolean {
+  public isInflight(requestID: RequestID): boolean {
     return this._inflight.has(requestID);
   }
 
@@ -279,7 +279,7 @@ export class NetworkSystem extends AbstractSystem {
    * @param options - Fetch options + NetworkSystem extensions
    * @return The parsed response
    */
-  fetch<T = unknown>(url: string, options?: NetworkFetchOptions): Promise<T> {
+  public fetch<T = unknown>(url: string, options?: NetworkFetchOptions): Promise<T> {
     const method = (options?.method ?? 'GET').toUpperCase();
     const requestID = options?.requestID ?? `${method} ${url}`;
     const timeout = options?.timeout ?? this._defaultTimeout;
@@ -308,7 +308,7 @@ export class NetworkSystem extends AbstractSystem {
    * @param url - The URL to fetch
    * @param options - Fetch options + NetworkSystem extensions
    */
-  fetchRaw(url: string, options?: NetworkFetchOptions): Promise<Response> {
+  public fetchRaw(url: string, options?: NetworkFetchOptions): Promise<Response> {
     const method = (options?.method ?? 'GET').toUpperCase();
     const requestID = options?.requestID ?? `${method} ${url}`;
     const timeout = options?.timeout ?? this._defaultTimeout;
@@ -335,7 +335,7 @@ export class NetworkSystem extends AbstractSystem {
    * No-op if the requestID is not inflight.
    * @param requestID - The dedup/cancellation identifier
    */
-  abort(requestID: RequestID): void {
+  public abort(requestID: RequestID): void {
     const inflight = this._inflight.get(requestID);
     if (inflight) {
       inflight.controller.abort();
@@ -348,7 +348,7 @@ export class NetworkSystem extends AbstractSystem {
   /**
    * Aborts every inflight request and clears the queue.
    */
-  abortAll(): void {
+  public abortAll(): void {
     for (const [, inflight] of this._inflight) {
       inflight.controller.abort();
     }
@@ -364,7 +364,7 @@ export class NetworkSystem extends AbstractSystem {
    * Useful for viewport-based cleanup.
    * @param predicate - Function that returns true for requestIDs to abort
    */
-  abortMatching(predicate: (requestID: RequestID) => boolean): void {
+  public abortMatching(predicate: (requestID: RequestID) => boolean): void {
     for (const [requestID, inflight] of this._inflight) {
       if (predicate(requestID)) {
         inflight.controller.abort();
@@ -385,7 +385,7 @@ export class NetworkSystem extends AbstractSystem {
    * Useful for guards that need to check if any request in a category is active.
    * @param predicate - Function that returns true for matching requestIDs
    */
-  hasMatching(predicate: (requestID: RequestID) => boolean): boolean {
+  public hasMatching(predicate: (requestID: RequestID) => boolean): boolean {
     for (const requestID of this._inflight.keys()) {
       if (predicate(requestID)) return true;
     }
@@ -403,7 +403,7 @@ export class NetworkSystem extends AbstractSystem {
    *
    * @param interceptor - Receives (url, init) and returns a (possibly modified) init
    */
-  addRequestInterceptor(interceptor: RequestInterceptor): void {
+  public addRequestInterceptor(interceptor: RequestInterceptor): void {
     this._interceptors.push(interceptor);
   }
 
@@ -412,7 +412,7 @@ export class NetworkSystem extends AbstractSystem {
    * Removes a previously registered request interceptor.
    * @param interceptor - The same function reference passed to `addRequestInterceptor`
    */
-  removeRequestInterceptor(interceptor: RequestInterceptor): void {
+  public removeRequestInterceptor(interceptor: RequestInterceptor): void {
     const idx = this._interceptors.indexOf(interceptor);
     if (idx !== -1) {
       this._interceptors.splice(idx, 1);
@@ -433,7 +433,7 @@ export class NetworkSystem extends AbstractSystem {
    * so there is exactly one promise chain — no orphaned branches that
    * could produce unhandled rejections.
    */
-  private _trackAndDispatch<T>(
+  protected _trackAndDispatch<T>(
     requestID: RequestID,
     controller: AbortController,
     dispatch: () => Promise<T>,
@@ -497,7 +497,7 @@ export class NetworkSystem extends AbstractSystem {
    * Combines a manual AbortController signal with a timeout signal.
    * Returns the combined signal, or just the controller's signal if no timeout.
    */
-  private _createCombinedSignal(controller: AbortController, timeout: number): AbortSignal {
+  protected _createCombinedSignal(controller: AbortController, timeout: number): AbortSignal {
     if (timeout > 0) {
       return AbortSignal.any([controller.signal, AbortSignal.timeout(timeout)]);
     }
@@ -508,7 +508,7 @@ export class NetworkSystem extends AbstractSystem {
   /**
    * Dispatches queued requests as concurrency slots become available.
    */
-  private _drainQueue(): void {
+  protected _drainQueue(): void {
     while (this._queue.length > 0 && this._numActive < this._maxInflight) {
       const queued = this._queue.shift()!;
       // Skip if already aborted while waiting
@@ -521,7 +521,7 @@ export class NetworkSystem extends AbstractSystem {
   /**
    * Removes a queued request by requestID.
    */
-  private _removeFromQueue(requestID: RequestID): void {
+  protected _removeFromQueue(requestID: RequestID): void {
     const idx = this._queue.findIndex(q => q.requestID === requestID);
     if (idx !== -1) {
       this._queue.splice(idx, 1);
@@ -533,7 +533,7 @@ export class NetworkSystem extends AbstractSystem {
    * Runs all registered interceptors on the (url, init) pair.
    * Interceptors run in registration order; each receives the output of the previous.
    */
-  private _applyInterceptors(url: string, init: RequestInit): RequestInit {
+  protected _applyInterceptors(url: string, init: RequestInit): RequestInit {
     for (const interceptor of this._interceptors) {
       init = interceptor(url, init);
     }
@@ -556,7 +556,7 @@ export class NetworkSystem extends AbstractSystem {
    * because the worker script runs in a different path context and would
    * resolve relative URLs against its own location.
    */
-  private _dispatchFetch<T>(
+  protected _dispatchFetch<T>(
     url: string,
     signal: AbortSignal,
     options?: NetworkFetchOptions,
@@ -618,7 +618,7 @@ export class NetworkSystem extends AbstractSystem {
    *
    * Absolute URLs (http://, https://, data:, blob:) pass through unchanged.
    */
-  private _resolveURL(url: string): string {
+  protected _resolveURL(url: string): string {
     if (/^(https?|data|blob):/i.test(url)) return url;
     try {
       return new URL(url, globalThis.location?.href).href;
@@ -631,7 +631,7 @@ export class NetworkSystem extends AbstractSystem {
   /**
    * Builds a `RequestInit` from the options, excluding NetworkSystem-specific keys.
    */
-  private _buildInit(options?: NetworkFetchOptions, signal?: AbortSignal): RequestInit {
+  protected _buildInit(options?: NetworkFetchOptions, signal?: AbortSignal): RequestInit {
     if (!options) return signal ? { signal } : {};
 
     // Rename the NetworkSystem-specific keys - the rest becomes RequestInit

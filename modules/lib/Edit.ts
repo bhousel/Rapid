@@ -23,17 +23,19 @@ export interface EditProps {
  * An `Edit` encapsulates the state of a single edit.
  */
 export class Edit {
-  annotation: string | undefined;
-  graph: Graph;
-  selectedIDs: EntityID[] | undefined;
-  sources: Record<string, unknown>;
-  transform: TransformProps | undefined;
+
+  public annotation: string | undefined;
+  public graph: Graph;
+  public selectedIDs: EntityID[] | undefined;
+  public sources: Record<string, unknown>;
+  public transform: TransformProps | undefined;
+
 
   /**
    * @constructor
    * @param props - Properties to initialize the Edit
    */
-  constructor(props: Partial<EditProps> = {}) {
+  public constructor(props: Partial<EditProps> = {}) {
     if (!props.graph) {
       throw new Error(`Edit missing 'graph' property`);
     }

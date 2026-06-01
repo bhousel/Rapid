@@ -94,15 +94,15 @@ function hasWikidata(entity: OsmEntity): boolean {
  */
 export class PixiLayerOsm extends AbstractPixiLayer {
   /** Container for area/polygon features */
-  areaContainer: PIXI.Container | null;
+  public areaContainer: PIXI.Container | null;
   /** Container for line features */
-  lineContainer: PIXI.Container | null;
+  public lineContainer: PIXI.Container | null;
 
   /**
    * @constructor
    * @param scene - The Scene that owns this Layer
    */
-  constructor(scene: PixiScene) {
+  public constructor(scene: PixiScene) {
     super(scene);
     this.id = 'osm';
     this._enabled = true;   // OSM layers should be enabled by default
@@ -115,7 +115,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
   /**
    * Whether the Layer's service exists
    */
-  get supported(): boolean {
+  public get supported(): boolean {
     return !!this.context.services.osm;
   }
 
@@ -124,10 +124,10 @@ export class PixiLayerOsm extends AbstractPixiLayer {
    * Whether the user has chosen to see the Layer
    * Make sure to start the service first.
    */
-  get enabled(): boolean {
+  public get enabled(): boolean {
     return this._enabled;
   }
-  set enabled(val: boolean) {
+  public set enabled(val: boolean) {
     if (!this.supported) {
       val = false;
     }
@@ -148,7 +148,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
   /**
    * Every Layer should have a reset function to replace any Pixi objects and internal state.
    */
-  reset(): void {
+  public reset(): void {
     super.reset();
 
     const groupContainer = this.scene.groups.get('basemap')!;
@@ -181,7 +181,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
    * @param frame - Integer frame being rendered
    * @param viewport - Pixi viewport to use for rendering
    */
-  render(frame: number, viewport: Viewport): void {
+  public render(frame: number, viewport: Viewport): void {
     const context = this.context;
     const osm = context.services.osm;
     const viewZoom = viewport.transform.zoom;
@@ -281,7 +281,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
    * @param viewport - Pixi viewport to use for rendering
    * @param data - Visible OSM data to render, sorted by type
    */
-  renderPolygons(frame: number, viewport: Viewport, data: OsmData): void {
+  public renderPolygons(frame: number, viewport: Viewport, data: OsmData): void {
     const context = this.context;
     const graph = context.systems.editor!.staging.graph;
     const filters = context.systems.filters!;
@@ -440,7 +440,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
    * @param viewport - Pixi viewport to use for rendering
    * @param data - Visible OSM data to render, sorted by type
    */
-  renderLines(frame: number, viewport: Viewport, data: OsmData): void {
+  public renderLines(frame: number, viewport: Viewport, data: OsmData): void {
     const context = this.context;
     const graph = context.systems.editor!.staging.graph;
     const l10n = context.systems.l10n!;
@@ -568,7 +568,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
    * @param data - Visible OSM data to render, sorted by type
    * @param related - Collections of related OSM IDs
    */
-  renderVertices(frame: number, viewport: Viewport, data: OsmData, related: RelatedIDs): void {
+  public renderVertices(frame: number, viewport: Viewport, data: OsmData, related: RelatedIDs): void {
     const context = this.context;
     const graph = context.systems.editor!.staging.graph;
     const l10n = context.systems.l10n!;
@@ -672,7 +672,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
    * @param viewport - Pixi viewport to use for rendering
    * @param data - Visible OSM data to render, sorted by type
    */
-  renderPoints(frame: number, viewport: Viewport, data: OsmData): void {
+  public renderPoints(frame: number, viewport: Viewport, data: OsmData): void {
     const context = this.context;
     const graph = context.systems.editor!.staging.graph;
     const l10n = context.systems.l10n!;
@@ -749,7 +749,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
    * @param data - Visible OSM data to render, sorted by type
    * @param related - Collections of related OSM IDs
    */
-  renderMidpoints(frame: number, viewport: Viewport, data: OsmData, related: RelatedIDs): void {
+  public renderMidpoints(frame: number, viewport: Viewport, data: OsmData, related: RelatedIDs): void {
     const MIN_MIDPOINT_DIST = 40;   // distance in pixels
     const context = this.context;
     const graph = context.systems.editor!.staging.graph;

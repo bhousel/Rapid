@@ -29,20 +29,21 @@ type DashTextureCache = Record<string, PIXI.Texture>;
  *   `loaded`   `true` after the patterns have finished loading
  */
 export class PixiTextures {
-  gfx: GraphicsSystem;
-  context: Context;
-  loaded: boolean;
+  public gfx: GraphicsSystem;
+  public context: Context;
+  public loaded: boolean;
 
-  private _atlas: AtlasCollection | null;
-  private _textureData: Map<string, TextureData>;
-  private _svgIcons: Map<string, SVGSymbolElement | null>;
-  private _dashTextureCache: DashTextureCache;
+  protected _atlas: AtlasCollection | null;
+  protected _textureData: Map<string, TextureData>;
+  protected _svgIcons: Map<string, SVGSymbolElement | null>;
+  protected _dashTextureCache: DashTextureCache;
+
 
   /**
    * @constructor
    * @param gfx - The GraphicsSystem that owns the texture manager
    */
-  constructor(gfx: GraphicsSystem) {
+  public constructor(gfx: GraphicsSystem) {
     this.gfx = gfx;
     this.context = gfx.context;
 
@@ -87,7 +88,7 @@ export class PixiTextures {
   /**
    * Replace any Pixi objects and internal state.
    */
-  reset(): void {
+  public reset(): void {
     const gfx = this.gfx;
     if (!gfx.pixi) return;  // called too soon?
 
@@ -168,7 +169,7 @@ export class PixiTextures {
    * @param textureID - e.g. 'boldPin', 'Main Street-normal', 'Bing-0,1,2'
    * @returns The texture (or `null` if not found)
    */
-  getTexture(atlasID: AtlasID, textureID: TextureID): PIXI.Texture | null {
+  public getTexture(atlasID: AtlasID, textureID: TextureID): PIXI.Texture | null {
     const key = `${atlasID}-${textureID}`;
     const tdata = this._textureData.get(key);
 
@@ -190,7 +191,7 @@ export class PixiTextures {
    * @param textureID - e.g. 'bushes'
    * @returns The texture (or `undefined` if not found)
    */
-  getPatternTexture(textureID: TextureID): PIXI.Texture | undefined {
+  public getPatternTexture(textureID: TextureID): PIXI.Texture | undefined {
     const tdata = this._textureData.get(textureID);
     return tdata?.texture;
   }
@@ -201,7 +202,7 @@ export class PixiTextures {
    * @returns Texture for the specified atlas
    * @throws Throws if passed an invalid atlasID
    */
-  getDebugTexture(atlasID: AtlasID): PIXI.Texture | null {
+  public getDebugTexture(atlasID: AtlasID): PIXI.Texture | null {
     const atlas = this._atlas && this._atlas[atlasID];
     if (!atlas) {
       throw new Error(`Unknown atlasID "${atlasID}"`);
@@ -240,7 +241,7 @@ export class PixiTextures {
    * @returns The newly allocated texture (or `null` if it couldn't be packed)
    * @throws Throws if passed an invalid atlasID or if allocation failed for some other reason
    */
-  allocate(
+  public allocate(
     atlasID: AtlasID,
     textureID: TextureID,
     width: number,
@@ -320,7 +321,7 @@ export class PixiTextures {
    * @param h - Inner height
    * @return A new canvas of size `(w+2) x (h+2)` with the padded image
    */
-  private _fromEdgePaddedCanvas(source: CanvasImageSource, w: number, h: number): HTMLCanvasElement {
+  protected _fromEdgePaddedCanvas(source: CanvasImageSource, w: number, h: number): HTMLCanvasElement {
     const canvas = document.createElement('canvas');
     canvas.width = w + 2;
     canvas.height = h + 2;
@@ -337,7 +338,7 @@ export class PixiTextures {
    * @param textureID - e.g. 'boldPin', 'Main Street-normal', 'Bing-0,1,2'
    * @throws Throws if passed an invalid atlasID
    */
-  free(atlasID: AtlasID, textureID: TextureID): void {
+  public free(atlasID: AtlasID, textureID: TextureID): void {
     const atlas = this._atlas && this._atlas[atlasID];
     if (!atlas) {
       throw new Error(`Unknown atlasID "${atlasID}"`);
@@ -377,7 +378,7 @@ export class PixiTextures {
    * @returns A Texture allocated from the requested texture atlas
    * @throws Throws if passed an invalid atlasID
    */
-  createTexture(
+  public createTexture(
     atlasID: AtlasID,
     textureID: TextureID,
     container: PIXI.Container,
@@ -419,7 +420,7 @@ export class PixiTextures {
    * @param textureID - Icon identifier (e.g. 'temaki-school')
    * @param symbol - The SVG Symbol element for the icon
    */
-  registerSvgIcon(textureID: TextureID, symbol: SVGSymbolElement): void {
+  public registerSvgIcon(textureID: TextureID, symbol: SVGSymbolElement): void {
     this._svgIcons.set(textureID, symbol);
   }
 
@@ -427,7 +428,7 @@ export class PixiTextures {
   /**
    * @param textureID - Icon identifier (e.g. 'temaki-school')
    */
-  private _svgIconToTexture(textureID: TextureID): void {
+  protected _svgIconToTexture(textureID: TextureID): void {
     const symbol = this._svgIcons.get(textureID);
     if (!symbol) return;
 
@@ -504,7 +505,7 @@ export class PixiTextures {
    * For example, rather than drawing a pin, we draw a square with a pin texture on it.
    * This is much more performant than drawing the graphics.
    */
-  private _cacheGraphics(): void {
+  protected _cacheGraphics(): void {
 
     //
     // Viewfields

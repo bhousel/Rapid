@@ -1,6 +1,5 @@
-import { utilObjectOmit, utilQsString, utilStringQs } from '@rapid-sdk/util';
-
 import { AbstractSystem } from './AbstractSystem.ts';
+import { utilObjectOmit, utilQsString, utilStringQs } from '@rapid-sdk/util';
 
 import type { Context } from '../Context.ts';
 
@@ -50,28 +49,29 @@ let _document: DocumentLike;
  *   `resumed`      Fires when resumed (inherited) — syncs hash and title, emits `hashchange`
  */
 export class UrlHashSystem extends AbstractSystem {
+
   /** Whether to update the document title */
-  doUpdateTitle: boolean;
+  public doUpdateTitle: boolean;
   /** The base document title to use */
-  titleBase: string;
+  public titleBase: string;
 
   /** Initial URL hash parameters at startup */
-  private _initParams: Map<string, string>;
+  protected _initParams: Map<string, string>;
   /** Current URL hash parameters */
-  private _currParams: Map<string, string>;
+  protected _currParams: Map<string, string>;
   /** Cached window.location.hash */
-  private _currHash: string | null;
+  protected _currHash: string | null;
   /** Previous URL hash parameters */
-  private _prevParams: Map<string, string> | null;
+  protected _prevParams: Map<string, string> | null;
   /** Release token from initial pause(), called during init to unpause */
-  private _unpauseFn: (() => void) | null;
+  protected _unpauseFn: (() => void) | null;
 
 
   /**
    * @constructor
    * @param context - Global shared application context
    */
-  constructor(context: Context) {
+  public constructor(context: Context) {
     super(context);
     this.id = 'urlhash';
     this.optionalDependencies = new Set(['editor', 'l10n', 'map', 'scheduler']);
@@ -135,7 +135,7 @@ export class UrlHashSystem extends AbstractSystem {
    * Called after all core objects have been constructed.
    * @return  Promise resolved when this component has completed initialization
    */
-  initAsync(): Promise<void> {
+  public initAsync(): Promise<void> {
     if (this._initPromise) return this._initPromise;
 
     const context = this.context;
@@ -172,7 +172,7 @@ export class UrlHashSystem extends AbstractSystem {
    * Called after all core objects have been initialized.
    * @return  Promise resolved when this component has completed startup
    */
-  startAsync(): Promise<void> {
+  public startAsync(): Promise<void> {
     return super.startAsync()
       .then(() => {
         // A lot of things will start happening when urlhash emits its
@@ -191,7 +191,7 @@ export class UrlHashSystem extends AbstractSystem {
    * Called after completing an edit session to reset any internal state
    * @return  Promise resolved when this component has completed resetting
    */
-  resetAsync(): Promise<void> {
+  public resetAsync(): Promise<void> {
     return Promise.resolve();
   }
 
@@ -201,7 +201,7 @@ export class UrlHashSystem extends AbstractSystem {
    * This were the values that were present when Rapid initally started up.
    * @readonly
    */
-  get initialHashParams(): Map<string, string> {
+  public get initialHashParams(): Map<string, string> {
     return this._initParams;
   }
 
@@ -211,7 +211,7 @@ export class UrlHashSystem extends AbstractSystem {
    * @param k - The parameter key to get
    * @return The parameter's current value, or `undefined`
    */
-  getParam(k: string): string | undefined {
+  public getParam(k: string): string | undefined {
     return this._currParams.get(k);
   }
 
@@ -223,7 +223,7 @@ export class UrlHashSystem extends AbstractSystem {
    * @param k - The parameter key to set
    * @param v - The parameter value to set, pass `undefined` to delete the value
    */
-  setParam(k: string, v: Nullable<string>): void {
+  public setParam(k: string, v: Nullable<string>): void {
     if (typeof k !== 'string') return;
 
     if (v === undefined || v === null || v === 'undefined' || v === 'null') {
@@ -242,7 +242,7 @@ export class UrlHashSystem extends AbstractSystem {
    * Updates the hash (by calling `window.history.replaceState()`) to match _currParams;
    * This updates the URL hash without affecting the browser navigation stack.
    */
-  _updateHash(): void {
+  protected _updateHash(): void {
     if (!this._started || this._paused) return;
 
     // Remove some of the initial-only params that only clutter up the hash
@@ -259,7 +259,7 @@ export class UrlHashSystem extends AbstractSystem {
   /**
    * Uses `throttle` to avoid performing updates too frequently.
    */
-  _deferredUpdateHash(): void {
+  protected _deferredUpdateHash(): void {
     const scheduler = this.context.systems.scheduler;
     if (scheduler) {
       scheduler?.throttle('urlhash-update-hash', () => this._updateHash(), { ms: 500, leading: false });
@@ -272,7 +272,7 @@ export class UrlHashSystem extends AbstractSystem {
   /**
    * Updates the title of the tab (by setting `document.title`)
    */
-  _updateTitle(): void {
+  protected _updateTitle(): void {
     if (!this._started || this._paused) return;
     if (!this.doUpdateTitle) return;
 
@@ -321,7 +321,7 @@ export class UrlHashSystem extends AbstractSystem {
   /**
    * Uses `throttle` to avoid performing updates too frequently.
    */
-  _deferredUpdateTitle(): void {
+  protected _deferredUpdateTitle(): void {
     const scheduler = this.context.systems.scheduler;
     if (scheduler) {
       scheduler?.throttle('urlhash-update-title', () => this._updateTitle(), { ms: 500, leading: false });
@@ -335,7 +335,7 @@ export class UrlHashSystem extends AbstractSystem {
    * Called on hashchange event (user changes url manually), and when enabling the hash behavior
    * Receiving code will receive copies of both the current and previous parameters.
    */
-  _hashChanged(): void {
+  protected _hashChanged(): void {
     if (!this._started || this._paused) return;
 
     this._currHash = _window.location.hash;

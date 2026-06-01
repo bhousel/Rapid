@@ -4,6 +4,7 @@ import type { Context } from '../Context.ts';
 import type { PropMatcherProps } from './PropMatcher.ts';
 import type { Variable } from './Variable.ts';
 
+
 /**
  * A `StyleSelector` describes *when to apply a style*.
  * It contains matching conditions, references one or more `styleIDs`,
@@ -85,15 +86,15 @@ export interface FeatureMatchInfo {
  *   `props`     The full props object
  */
 export class StyleSelector {
-  context: Context;
-  props: StyleSelectorProps;
+  public context: Context;
+  public props: StyleSelectorProps;
 
   /** Unique identifier */
-  readonly id: StyleSelectorID;
+  public readonly id: StyleSelectorID;
   /** IDs of Styles to apply (merged in order, later styles override earlier) */
-  readonly styleIDs: StyleID[];
+  public readonly styleIDs: StyleID[];
   /** Cached PropMatcher instances */
-  private _tagMatchers: PropMatcher[] | null = null;
+  protected _tagMatchers: PropMatcher[] | null = null;
 
 
   /**
@@ -102,7 +103,7 @@ export class StyleSelector {
    * @throws Error if `id` property is missing
    * @throws Error if `styleIDs` property is missing or empty
    */
-  constructor(context: Context, props: Partial<StyleSelectorProps> = {}) {
+  public constructor(context: Context, props: Partial<StyleSelectorProps> = {}) {
     this.context = context;
 
     if (!props.id) {
@@ -123,7 +124,7 @@ export class StyleSelector {
    * Reset compiled caches so this selector can be re-resolved.
    * Called when variables change (e.g. on style reload).
    */
-  reset(): void {
+  public reset(): void {
     for (const matcher of this.tagMatchers) {
       matcher.reset();
     }
@@ -133,7 +134,7 @@ export class StyleSelector {
   /**
    * Get the match conditions.
    */
-  get match(): StyleMatchConditions {
+  public get match(): StyleMatchConditions {
     return this.props.match;
   }
 
@@ -142,14 +143,14 @@ export class StyleSelector {
    * Higher weight selectors are applied later and override lower weight selectors.
    * @return weight score
    */
-  get weight(): number {
+  public get weight(): number {
     return this.props.weight ?? 1;
   }
 
   /**
    * Get the tag matchers, lazily creating PropMatcher instances.
    */
-  get tagMatchers(): PropMatcher[] {
+  public get tagMatchers(): PropMatcher[] {
     if (this._tagMatchers === null) {
       this._tagMatchers = (this.props.match.tags ?? []).map(m => new PropMatcher(m));
     }
@@ -163,7 +164,7 @@ export class StyleSelector {
    * @param feature - Feature information to test
    * @return `true` if the selector matches the feature
    */
-  matches(feature: FeatureMatchInfo): boolean {
+  public matches(feature: FeatureMatchInfo): boolean {
     const { match } = this.props;
 
     // Check geometry condition
@@ -191,7 +192,7 @@ export class StyleSelector {
    * Delegates to each PropMatcher's `resolveVariables()`.
    * @param variables - Map of VariableID to Variable instances
    */
-  resolveVariables(variables: Map<VariableID, Variable>): void {
+  public resolveVariables(variables: Map<VariableID, Variable>): void {
     for (const matcher of this.tagMatchers) {
       matcher.resolveVariables(variables);
     }
@@ -204,7 +205,7 @@ export class StyleSelector {
    * @param other - Another StyleSelector
    * @return Negative if this weight is less, positive if greater, zero if equal
    */
-  compare(other: StyleSelector): number {
+  public compare(other: StyleSelector): number {
     return this.weight - other.weight;
   }
 
@@ -215,7 +216,7 @@ export class StyleSelector {
    * @param newID - The new ID for the copy
    * @return A new StyleSelector with the new ID
    */
-  clone(newID?: StyleSelectorID): StyleSelector {
+  public clone(newID?: StyleSelectorID): StyleSelector {
     const cloned = structuredClone(this.props);
     if (newID) {
       cloned.id = newID;
@@ -227,7 +228,7 @@ export class StyleSelector {
   /**
    * Convert to a JSON-serializable object.
    */
-  toJSON(): StyleSelectorProps {
+  public toJSON(): StyleSelectorProps {
     return structuredClone(this.props);
   }
 
@@ -239,7 +240,7 @@ export class StyleSelector {
    * @param feature - Feature to match
    * @return Array of matching selectors, sorted by weight ascending (lowest first, highest last)
    */
-  static findAll(selectors: Iterable<StyleSelector>, feature: FeatureMatchInfo): StyleSelector[] {
+  public static findAll(selectors: Iterable<StyleSelector>, feature: FeatureMatchInfo): StyleSelector[] {
     const matches: StyleSelector[] = [];
 
     for (const selector of selectors) {

@@ -76,17 +76,18 @@ export interface RulesetProps {
  *   `match(obj)` Test if the property set belongs to this ruleset
  */
 export class Ruleset {
-  context: Context;
-  props: RulesetProps;
+
+  public context: Context;
+  public props: RulesetProps;
 
   /** Unique identifier */
-  readonly id: RulesetID;
+  public readonly id: RulesetID;
 
   /** Compiled include matchers */
-  readonly include: PropMatcher[];
+  public readonly include: PropMatcher[];
 
   /** Compiled exclude matchers */
-  readonly exclude: PropMatcher[];
+  public readonly exclude: PropMatcher[];
 
 
   /**
@@ -95,7 +96,7 @@ export class Ruleset {
    * @param props - Properties defining the ruleset
    * @throws Error if `id` property is missing
    */
-  constructor(context: Context, props: Partial<RulesetProps> = {}) {
+  public constructor(context: Context, props: Partial<RulesetProps> = {}) {
     this.context = context;
 
     if (!props.id) {
@@ -120,7 +121,7 @@ export class Ruleset {
    * @param obj - Object with properties to test
    * @return `true` if any include matches and no exclude matches
    */
-  match(obj: Record<string, unknown>): boolean {
+  public match(obj: Record<string, unknown>): boolean {
     if (this.exclude.some(r => r.matches(obj))) return false;
     if (!this.include.some(r => r.matches(obj))) return false;
     return true;
@@ -136,7 +137,7 @@ export class Ruleset {
    * @param other - Another Ruleset to merge with
    * @return A new merged Ruleset
    */
-  merge(other: Ruleset): Ruleset {
+  public merge(other: Ruleset): Ruleset {
     const mergedInclude = [...this.props.include, ...other.props.include];
     const mergedExclude = [...(this.props.exclude ?? []), ...(other.props.exclude ?? [])];
     return new Ruleset(this.context, {
@@ -155,7 +156,7 @@ export class Ruleset {
    * @param newID - Optional new ID for the copy
    * @return A new Ruleset with copied properties
    */
-  clone(newID?: RulesetID): Ruleset {
+  public clone(newID?: RulesetID): Ruleset {
     const cloned = structuredClone(this.props);
     if (newID) {
       cloned.id = newID;
@@ -170,7 +171,7 @@ export class Ruleset {
    *
    * @param variables - Map of VariableID to Variable instances
    */
-  resolveVariables(variables: Map<VariableID, Variable>): void {
+  public resolveVariables(variables: Map<VariableID, Variable>): void {
     for (const matcher of this.include) {
       matcher.resolveVariables(variables);
     }
@@ -184,7 +185,7 @@ export class Ruleset {
    * Reset compiled caches on all matchers with var() references.
    * Called when variables change (e.g. on schema reload) so they can be re-resolved.
    */
-  reset(): void {
+  public reset(): void {
     for (const matcher of this.include) {
       matcher.reset();
     }
@@ -197,7 +198,7 @@ export class Ruleset {
   /**
    * Convert to a JSON-serializable object.
    */
-  toJSON(): RulesetProps {
+  public toJSON(): RulesetProps {
     const { exclude: _exclude, ...rest } = this.props;
     const result: RulesetProps = {
       ...rest,
@@ -213,7 +214,7 @@ export class Ruleset {
   /**
    * String representation for debugging.
    */
-  toString(): string {
+  public toString(): string {
     const parts = [`${this.include.length} include`];
     if (this.exclude.length) {
       parts.push(`${this.exclude.length} exclude`);
