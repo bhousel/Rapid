@@ -492,6 +492,10 @@ export class WaybackService extends AbstractSystem {
       });
 
 
+    /**
+     *
+     * @param zoom
+     */
     function getLayerID(zoom: number): number {
       const MAX_ZOOM = 23;
       const MIN_ZOOM = 10;

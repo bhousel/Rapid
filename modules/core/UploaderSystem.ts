@@ -76,17 +76,27 @@ export class UploaderSystem extends AbstractSystem {
   /** The current changeset being uploaded (created by uiCommit) */
   public changeset: OsmChangeset | null;
 
+  /** The original set of changes captured when an upload was initiated */
   protected _origChanges: UploadChanges | null;
+  /** Tag keys that should be stripped from entities before uploading */
   protected _discardTags: Record<string, boolean>;
+  /** Whether an upload is currently in progress */
   protected _isSaving: boolean;
 
   // Variables for conflict checking
+  /** Local graph snapshot taken at the start of the upload, used for conflict resolution */
   protected _localGraph: Graph | null;
+  /** Graph built from data fetched from the OSM API during conflict checking */
   protected _remoteGraph: Graph | null;
+  /** Entity IDs that need to be checked for server-side conflicts */
   protected _toCheckIDs: Set<EntityID>;
+  /** Entity IDs that still need to be fetched from the OSM API */
   protected _toLoadIDs: Set<EntityID>;
+  /** Entity IDs that have been successfully fetched from the OSM API */
   protected _loadedIDs: Set<EntityID>;
+  /** Conflicts discovered during the upload, each with choices for resolution */
   protected _conflicts: UploadConflict[];
+  /** Errors that occurred during the upload */
   protected _errors: UploadError[];
 
 
@@ -171,6 +181,7 @@ export class UploaderSystem extends AbstractSystem {
 
 
   /**
+   * Reports whether a save (upload) operation is currently in progress.
    * @return `true` if a save operation is in progress, `false` otherwise
    */
   public isSaving(): boolean {
@@ -410,14 +421,27 @@ export class UploaderSystem extends AbstractSystem {
     }
 
 
+    /**
+     *
+     * @param d
+     */
     function formatUser(d: string): string {
       return '<a href="' + osm.userURL(d) + '" target="_blank">' + d + '</a>';
     }
 
+    /**
+     *
+     * @param entity
+     */
     function entityName(entity: any): string {
       return l10n.displayName(entity.tags) || (l10n.displayType(entity.id) + ' ' + entity.id);
     }
 
+    /**
+     *
+     * @param local
+     * @param remote
+     */
     function sameVersions(local: any, remote: any): boolean {
       if (local.version !== remote.version) return false;
       if (local.type === 'way') {
@@ -468,6 +492,8 @@ export class UploaderSystem extends AbstractSystem {
 
   /**
    * Callback for the changeset upload attempt
+   * @param err
+   * @param updatedChangeset
    */
   protected _uploadCallback(err: any, updatedChangeset?: any): void {
     if (updatedChangeset) {

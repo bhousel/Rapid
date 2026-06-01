@@ -11,6 +11,12 @@ import type { Vec2 } from '@rapid-sdk/math';
 
 
 // Filter function to eliminate consecutive duplicates.
+/**
+ *
+ * @param node
+ * @param i
+ * @param arr
+ */
 function noRepeatNodes(node: EntityID, i: number, arr: EntityID[]): boolean {
   return i === 0 || node !== arr[i - 1];
 }
@@ -72,6 +78,7 @@ export class OsmWay extends OsmEntity {
 
   /**
    * get/set the nodes property
+   * @return  Ordered array of node `EntityID`s that form this way
    * @readonly
    */
   public get nodes(): EntityID[] {
@@ -433,6 +440,8 @@ export class OsmWay extends OsmEntity {
 
   /**
    * Checks whether the given nodeIDs are adjacent in the node list.
+   * @param n1
+   * @param n2
    * @return `true` if the nodes are adjacent, `false` if not.
    */
   public isAdjacent(n1: EntityID, n2: EntityID): boolean {
@@ -463,6 +472,10 @@ export class OsmWay extends OsmEntity {
    */
   public segments(graph: Graph): Segment[] {
 
+    /**
+     *
+     * @param graph
+     */
     function segmentExtent(this: Segment, graph: Graph): Extent | undefined {
       const n1 = graph.hasEntity(this.nodes[0]) as OsmNode;
       const n2 = graph.hasEntity(this.nodes[1]) as OsmNode;

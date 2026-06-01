@@ -61,8 +61,11 @@ export interface EventData {
  */
 export class AbstractBehavior extends EventEmitter {
 
+  /** Unique string identifier for this behavior (e.g. 'drag', 'draw', 'hover') */
   public id: string;
+  /** Global shared application context */
   public context: Context;
+  /** Whether this behavior's event handlers are currently active */
   protected _enabled: boolean;
 
 

@@ -29,6 +29,7 @@ export interface GeometryWorldData {
  */
 export class Geometry {
 
+  /** Global shared application context */
   public context: Context;
   /** Array of GeometryPart elements */
   public parts: GeometryPart[];

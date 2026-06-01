@@ -204,11 +204,16 @@ export class AbstractPixiFeature {
   }
 
   /**
-   * @param val - container for the parent, this Feature's container will be added to it.
+   * The parent PIXI container that this feature's container is attached to
+   * @return  Parent `PIXI.Container`, or `null` if not attached
    */
   public get parentContainer(): PIXI.Container | null {
     return this.container.parent;
   }
+  /**
+   * Setting a new parent container moves this feature's container to the new parent.
+   * @param val - New parent container, or `null` to detach from the current parent
+   */
   public set parentContainer(val: Nullable<PIXI.Container>) {
     const currParent = this.container.parent;
     if (val && val !== currParent) {   // put this feature under a different parent container
@@ -226,6 +231,10 @@ export class AbstractPixiFeature {
   public get visible(): boolean {
     return this.container.visible;
   }
+  /**
+   * Setting visibility also propagates to the halo and marks the label as dirty.
+   * @param val - `true` to show the feature, `false` to hide it
+   */
   public set visible(val: boolean) {
     if (val === this.container.visible) return;  // no change
     this.container.visible = val;
@@ -242,6 +251,10 @@ export class AbstractPixiFeature {
     // The labeling code will decide what to do with the `_labelDirty` flag
     return this._geomDirty || this._styleDirty;
   }
+  /**
+   * Setting dirty marks the geometry, style, and label as needing rebuild.
+   * @param val - `true` to mark all parts as dirty
+   */
   public set dirty(val: boolean) {
     this._geomDirty = val;
     this._styleDirty = val;
@@ -256,6 +269,10 @@ export class AbstractPixiFeature {
   public get allowInteraction(): boolean {
     return this._allowInteraction;
   }
+  /**
+   * Setting interactivity updates the Pixi container's `eventMode`.
+   * @param val - `true` to enable interaction, `false` to disable
+   */
   public set allowInteraction(val: boolean) {
     if (val === this._allowInteraction) return;  // no change
     this._allowInteraction = val;
@@ -267,11 +284,16 @@ export class AbstractPixiFeature {
 
 
   /**
-   * @param props - Style properties object, see `Style.ts`
+   * Current style properties for this feature
+   * @return  Current `MinimalStyleProps`, or `null` if not yet set
    */
   public get style(): MinimalStyleProps | null {
     return this._style;
   }
+  /**
+   * Merges the given style props with defaults and marks the style as dirty.
+   * @param props - Partial style properties to merge with defaults
+   */
   public set style(props: Partial<StyleProps>) {
     // result: defaults ← props
     this._style = deepMerge({}, styleDefaults, props) as MinimalStyleProps;
@@ -279,14 +301,23 @@ export class AbstractPixiFeature {
   }
 
   /**
-   * @param val - a GeometryPart to render
+   * The bound geometry part for this feature
+   * @return  Current `GeometryPart`, or `null` if none bound
    */
   public get geom(): GeometryPart | null {
     return this._geom;
   }
+  /**
+   * Alias for `geom`; returns the bound GeometryPart.
+   * @return  Current `GeometryPart`, or `null` if none bound
+   */
   public get geometry(): GeometryPart | null {
     return this._geom;
   }
+  /**
+   * Binds a new GeometryPart and marks the geometry as dirty.
+   * @param val - New `GeometryPart` to bind to this feature
+   */
   public set geometry(val: GeometryPart) {
     this._geom = val;
     this._geomDirty = true;
@@ -294,11 +325,16 @@ export class AbstractPixiFeature {
 
 
   /**
-   * @param str - the label to use
+   * The label string for this feature
+   * @return  Current label text, or `null` if none
    */
   public get label(): string | null {
     return this._label;
   }
+  /**
+   * Updating the label string marks the label as dirty so it is re-rasterized.
+   * @param str - New label text, or `null` to clear the label
+   */
   public set label(str: string | null) {
     if (str === this._label) return;  // no change
     this._label = str;
@@ -309,6 +345,7 @@ export class AbstractPixiFeature {
   /**
    * Getter only, use `setData()` to change it.
    * (because we need to know an id/key to identify the data by, and these can be anything)
+   * @return  The bound data element
    * @readonly
    */
   public get data(): unknown {
@@ -318,6 +355,7 @@ export class AbstractPixiFeature {
   /**
    * Getter only, use `setData()` to change it.
    * (because we need to know an id/key to identify the data by, and these can be anything)
+   * @return  The bound data element's ID, or `null` if none
    * @readonly
    */
   public get dataID(): DataID | null {
@@ -360,6 +398,7 @@ export class AbstractPixiFeature {
 
 
   /**
+   * Tests whether the feature has the given pseudoclass.
    * @param classID - the class to check
    * @return `true` if the feature has this class, `false` if not
    */
@@ -369,6 +408,7 @@ export class AbstractPixiFeature {
 
   /**
    * Returns a read-only view of the feature's pseudoclasses
+   * @return  Read-only set of active `ClassID`s
    */
   public get classes(): ReadonlySet<ClassID> {
     return this._classes;

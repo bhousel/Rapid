@@ -23,13 +23,21 @@ const CUSTOM_COLOR = 0x00ffff;
  * @class
  */
 export class PixiLayerCustomData extends AbstractPixiLayer {
+  /** Attribution string(s) for the currently loaded custom data */
   protected _dataUsed: string | null;
+  /** A FileList from a file picker, waiting to be processed */
   protected _fileList: FileList | null;
+  /** FileReader used to read user-selected files asynchronously */
   protected _fileReader: FileReader;
+  /** URL template string for a remote tile-based custom data source */
   protected _template: string | null;
+  /** Raw WKT string for a custom geometry loaded as text */
   protected _wkt: string | null;
+  /** URL of an externally hosted GeoJSON or GPX file to fetch and display */
   protected _url: string | null;
+  /** Parsed custom data features ready to render */
   protected _geoData: GeoJSONData[] | null;
+  /** Bounding extent of all loaded custom data features */
   protected _geoDataExtent: Extent | null;
 
   /**
@@ -57,6 +65,10 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
 
     // Setup event handlers..
     // drag and drop
+    /**
+     *
+     * @param d3_event
+     */
     function over(d3_event: DragEvent): void {
       d3_event.stopPropagation();
       d3_event.preventDefault();
@@ -200,6 +212,7 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
 
 
   /**
+   * Renders the custom-data polygon features for this frame.
    * @param frame - Integer frame being rendered
    * @param viewport - Pixi viewport to use for rendering
    * @param polygons - Array of polygon data
@@ -256,6 +269,7 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
 
 
   /**
+   * Renders the custom-data line features for this frame.
    * @param frame - Integer frame being rendered
    * @param viewport - Pixi viewport to use for rendering
    * @param lines - Array of line data
@@ -353,6 +367,7 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
 
 
   /**
+   * Renders the custom-data point features for this frame.
    * @param frame - Integer frame being rendered
    * @param viewport - Pixi viewport to use for rendering
    * @param points - Array of point data
@@ -417,6 +432,7 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
   }
 
   /**
+   * Reports which data source is currently in use by this layer.
    * @return Array of single element for the data layer currently enabled
    */
   public dataUsed(): string[] {
@@ -594,6 +610,10 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
       this.scene.enableLayers(this.layerID);  // emits 'layerchange', so UI gets updated
     }
 
+    /**
+     *
+     * @param text
+     */
     function _parseXML(text: string): XmlDocument {
       return (new DOMParser()).parseFromString(text.trimStart(), 'text/xml');
     }

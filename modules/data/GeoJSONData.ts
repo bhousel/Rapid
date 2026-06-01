@@ -29,6 +29,7 @@ export class GeoJSONData<P extends GeoJSONProps = GeoJSONProps> extends Abstract
   // The constructor accepts `Partial<P>` for flexibility (e.g. tests),
   // but access sites can trust that required properties exist.
   // `declare` emits no JavaScript — it only refines the type.
+  /** Narrows the inherited `Partial<P>` props to `P`; no JS is emitted — type-only. */
   public declare props: P;
 
   /**
@@ -82,6 +83,7 @@ export class GeoJSONData<P extends GeoJSONProps = GeoJSONProps> extends Abstract
   /**
    * GeoJSON may be associated with a 'serviceID' string.
    * For example 'keepright', 'maproulette', 'mapillary', etc.
+   * @return  The service that owns this data element
    * @readonly
    */
   public get serviceID(): ServiceID {
@@ -90,6 +92,7 @@ export class GeoJSONData<P extends GeoJSONProps = GeoJSONProps> extends Abstract
 
   /**
    * Get the real GeoJSON properties.
+   * @return  The GeoJSON feature's `properties` object, or an empty object
    * @readonly
    */
   public get properties(): Record<string, unknown> {

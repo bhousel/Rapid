@@ -52,6 +52,7 @@ export class OsmNode extends OsmEntity {
 
   /**
    * Geographic location in WGS84 [lon, lat]
+   * @return  `[lon, lat]` coordinate pair, or `undefined` if not set
    * @readonly
    */
   public get loc(): Vec2 | undefined {

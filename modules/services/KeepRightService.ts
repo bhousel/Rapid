@@ -578,19 +578,35 @@ export class KeepRightService extends AbstractSystem {
     return capture;
 
 
+    /**
+     *
+     * @param d
+     */
     function linkErrorObject(d: string): string {
       return `<a class="error_object_link">${d}</a>`;
     }
 
+    /**
+     *
+     * @param d
+     */
     function linkEntity(d: string): string {
       return `<a class="error_entity_link">${d}</a>`;
     }
 
+    /**
+     *
+     * @param d
+     */
     function linkURL(d: string): string {
       return `<a class="kr_external_link" target="_blank" href="${d}">${d}</a>`;
     }
 
     // arbitrary node list of form: #ID, #ID, #ID...
+    /**
+     *
+     * @param capture
+     */
     function parse211(capture: string): string {
       const newList: string[] = [];
 
@@ -604,6 +620,10 @@ export class KeepRightService extends AbstractSystem {
     }
 
     // arbitrary way list of form: #ID(layer),#ID(layer),#ID(layer)...
+    /**
+     *
+     * @param capture
+     */
     function parse231(capture: string): string {
       const newList: string[] = [];
 
@@ -622,6 +642,10 @@ export class KeepRightService extends AbstractSystem {
     }
 
     // arbitrary node/relation list of form: from node #ID,to relation #ID,to node #ID...
+    /**
+     *
+     * @param capture
+     */
     function parse294(capture: string): string {
       const newList: string[] = [];
       const items = capture.split(',');
@@ -641,6 +665,10 @@ export class KeepRightService extends AbstractSystem {
     }
 
     // may or may not include the string "(including the name 'name')"
+    /**
+     *
+     * @param capture
+     */
     function parse370(capture: string): string {
       if (!capture) return '';
 
@@ -652,6 +680,10 @@ export class KeepRightService extends AbstractSystem {
     }
 
     // arbitrary node list of form: #ID,#ID,#ID...
+    /**
+     *
+     * @param capture
+     */
     function parse20(capture: string): string {
       const newList: string[] = [];
       const items = capture.split(',');

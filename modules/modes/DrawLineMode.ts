@@ -523,6 +523,7 @@ export class DrawLineMode extends AbstractMode {
 
   /**
    * Clicked on nothing, create a node at given `loc`.
+   * @param loc
    */
   protected _clickLoc(loc: Vec2): void {
     const EPSILON = 1e-6;
@@ -588,6 +589,8 @@ export class DrawLineMode extends AbstractMode {
 
   /**
    * Clicked on an target way, add a midpoint along the `edge` at given `loc`.
+   * @param loc
+   * @param edge
    */
   protected _clickWay(loc: Vec2, edge: [EntityID, EntityID]): void {
     const EPSILON = 1e-6;
@@ -661,6 +664,8 @@ export class DrawLineMode extends AbstractMode {
 
   /**
    * Clicked on a target node, include that node in the line we are drawing.
+   * @param loc
+   * @param targetNode
    */
   protected _clickNode(loc: Vec2, targetNode: OsmNode): void {
     const EPSILON = 1e-6;
@@ -817,6 +822,8 @@ export class DrawLineMode extends AbstractMode {
    * To deal with undo/redo, we take snapshots of the drawing entityIDs after every commit, keyed to the stable graph.
    * If we ever find ourself in an edit where we can't retrieve this information, leave `DrawLineMode`.
    * This means we've undo/redoed into an edit where the user wasn't drawing the same line.
+   * @param firstNodeID
+   * @param lastNodeID
    */
   protected _takeSnapshot(firstNodeID: EntityID, lastNodeID: EntityID): void {
     const context = this.context;
@@ -868,6 +875,7 @@ export class DrawLineMode extends AbstractMode {
 
   /**
    * Changes the cursor styling based on what geometry is hovered
+   * @param eventData
    */
   protected _hover(eventData: EventData): void {
     const context = this.context;

@@ -640,6 +640,10 @@ export class EsriService extends AbstractSystem {
     return null;
 
     // no Multitypes for now (maybe not needed)
+    /**
+     *
+     * @param coords
+     */
     function parseCoordinates(coords: number[][]): EntityID[] {
       const nodelist: EntityID[] = [];
       for (const coord of coords) {
@@ -655,6 +659,10 @@ export class EsriService extends AbstractSystem {
       return nodelist;
     }
 
+    /**
+     *
+     * @param properties
+     */
     function parseTags(properties: Record<string, any>): OsmTags {
       const tags: Record<string, string> = {};
       for (const prop of Object.keys(properties)) {
@@ -676,6 +684,10 @@ export class EsriService extends AbstractSystem {
       return tags;
     }
 
+    /**
+     *
+     * @param val
+     */
     function clean(val: any): string | null {
       return val ? val.toString().trim() : null;
     }

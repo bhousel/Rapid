@@ -405,6 +405,12 @@ export class OsmWikibaseService extends AbstractSystem {
 
 
       // Helper method to get wiki info if a given language exists
+      /**
+       *
+       * @param wiki
+       * @param langCode
+       * @param tKey
+       */
       function getWikiInfo(wiki: Record<string, string> | undefined, langCode: string, tKey: string): WikiInfo | undefined {
         if (wiki && wiki[langCode]) {
           return {

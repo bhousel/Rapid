@@ -117,6 +117,7 @@ export class PixiLayerRapid extends AbstractPixiLayer {
 
   /**
    * Whether the Layer's service exists
+   * @return  `true` if at least one Rapid data service is registered
    */
   public get supported(): boolean {
     // return true if any of these are installed
@@ -128,10 +129,14 @@ export class PixiLayerRapid extends AbstractPixiLayer {
   /**
    * Whether the user has chosen to see the Layer
    * Make sure to start the services first.
+   * @return  `true` if the layer is enabled
    */
   public get enabled(): boolean {
     return this._enabled;
   }
+  /** Enables or disables this layer; starts all configured Rapid data services when enabling.
+   * @param val - `true` to enable the layer, `false` to disable it
+   */
   public set enabled(val: boolean) {
     if (!this.supported) {
       val = false;
@@ -334,6 +339,13 @@ export class PixiLayerRapid extends AbstractPixiLayer {
 
 
   /**
+   * Renders the Rapid dataset polygon features for this frame.
+   * @param parentContainer
+   * @param dataset
+   * @param graph
+   * @param frame
+   * @param viewport
+   * @param data
    */
   public renderPolygons(
     parentContainer: PIXI.Container, dataset: any, graph: any, frame: number, viewport: Viewport, data: RapidData): void {
@@ -379,6 +391,13 @@ export class PixiLayerRapid extends AbstractPixiLayer {
 
 
   /**
+   * Renders the Rapid dataset line features for this frame.
+   * @param parentContainer
+   * @param dataset
+   * @param graph
+   * @param frame
+   * @param viewport
+   * @param data
    */
   public renderLines(parentContainer: PIXI.Container, dataset: any, graph: any, frame: number, viewport: Viewport, data: RapidData): void {
     const color = new PIXI.Color(dataset.color);
@@ -436,6 +455,13 @@ export class PixiLayerRapid extends AbstractPixiLayer {
 
 
   /**
+   * Renders the Rapid dataset point features for this frame.
+   * @param parentContainer
+   * @param dataset
+   * @param graph
+   * @param frame
+   * @param viewport
+   * @param data
    */
   public renderPoints(
     parentContainer: PIXI.Container,

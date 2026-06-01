@@ -48,12 +48,19 @@ export interface GraphCache {
  */
 export class Graph {
 
+  /** Unique string identifier for this Graph */
   public id: GraphID;
+  /** Global shared application context */
   public context: Context;
+  /** Properties object (id, v) */
   public props: GraphProps;
+  /** Whether this is the initial base Graph (vs a derived/edited Graph) */
   public isBaseGraph: boolean;
+  /** The preceding Graph in the edit chain (null for the base Graph) */
   public previous: Graph | null;
+  /** Shared base cache for unedited entities (shared with all descendant Graphs) */
   public base: GraphCache;
+  /** Local (edited) entity cache, cloned from the predecessor Graph on construction */
   public local: GraphCache;
 
 
@@ -134,6 +141,7 @@ export class Graph {
 
   /**
    * Unique string to identify this Graph.
+   * @return  This graph's unique ID
    * @readonly
    */
   public get graphID(): string {
@@ -142,6 +150,7 @@ export class Graph {
 
   /**
    * Internal version of the Graph, can be used to detect changes.
+   * @return  Version counter
    * @readonly
    */
   public get v(): number {
@@ -150,6 +159,7 @@ export class Graph {
 
   /**
    * The 'key' includes both the id and the version
+   * @return  Combined `id + version` key string
    * @readonly
    */
   public get key(): string {
@@ -490,6 +500,7 @@ export class Graph {
    * Internal function, used to update a graph following a `rebase` (base graph has changed).
    * Check local `parentWays` and `parentRels` caches and make sure they are consistent
    *  with the data in the base caches.
+   * @param restoreIDs
    */
   protected _updateRebased(restoreIDs: Set<EntityID> | EntityID[] = []): void {
     const base = this.base;
@@ -532,6 +543,7 @@ export class Graph {
   /**
    * Internal function, used to update OsmEntity geometries affected by recent graph changes.
    * This needs to be called after all `_updateCaches` calls have finished.
+   * @param entityIDs
    */
   protected _updateGeometries(entityIDs: Iterable<EntityID>): void {
     for (const entityID of entityIDs) {
@@ -545,6 +557,9 @@ export class Graph {
 
   /**
    * Internal function, compare function to sort nodes first.
+   * @param a - First entity to compare
+   * @param b - Second entity to compare
+   * @return  Negative, zero, or positive per standard sort comparator semantics
    */
   protected _nodesFirst(a: OsmEntity, b: OsmEntity): number {
     const aIsNode = (a.type === 'node');

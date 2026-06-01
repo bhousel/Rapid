@@ -259,9 +259,9 @@ export class VectorTileService extends AbstractSystem {
         id:                 utilHashcode(template).toString(),
         displayName:        hostname,
         template:           template,
-        inflightPMTiles:    new Map(),   // Map<tileID, AbortController> (PMTiles only)
-        loaded:             new Map(),   // Map<tileID, Tile>
-        zoomCache:          new Map(),   // Map<zoom, Object zoomCache>
+        inflightPMTiles:    new Map(),   // Map<TileID, AbortController> (PMTiles only)
+        loaded:             new Map(),   // Map<TileID, Tile>
+        zoomCache:          new Map(),   // Map<number, Object zoomCache>
         lastv:              null         // viewport version last time we fetched data
       };
 
@@ -298,10 +298,10 @@ export class VectorTileService extends AbstractSystem {
 
     if (!cache) {
       cache = {
-        features: new Map(),   // Map<featureID, Object>
-        boxes:    new Map(),   // Map<featureID, RBush box>
-        toMerge:  new Map(),   // Map<edgeID, Map<prophash, Set<featureIDs>>>
-        didMerge: new Set(),   // Set<edgeID>
+        features: new Map(),   // Map<FeatureID, Object>
+        boxes:    new Map(),   // Map<FeatureID, RBush box>
+        toMerge:  new Map(),   // Map<EdgeID, Map<prophash, Set<featureIDs>>>
+        didMerge: new Set(),   // Set<EdgeID>
         rbush:    new RBush()
       };
 
@@ -313,8 +313,9 @@ export class VectorTileService extends AbstractSystem {
 
 
   /**
-   * @param  source
-   * @param  tile
+   * Fetches and parses a single vector tile, caching its features.
+   * @param  source - The vector tile source
+   * @param  tile - The tile to load
    * @return the fetch promise
    */
   protected _loadTileAsync(source: VTSource, tile: Tile): Promise<void> | undefined {
@@ -518,6 +519,7 @@ export class VectorTileService extends AbstractSystem {
 
   /**
    * Call this sometimes to merge polygons across tile edges
+   * @param source
    */
   protected _processMergeQueue(source: VTSource): void {
     for (const cache of source.zoomCache.values()) {
@@ -543,8 +545,9 @@ export class VectorTileService extends AbstractSystem {
 
 
   /**
-   * @param  cache
-   * @param  features
+   * Caches features and their bounding boxes into the given zoom cache and its spatial index.
+   * @param  cache - The zoom-level cache to populate
+   * @param  features - The features to cache
    */
   protected _cacheFeatures(cache: VTZoomCache, features: GeoJSONData[]): void {
     const boxes = [];
@@ -564,8 +567,9 @@ export class VectorTileService extends AbstractSystem {
 
 
   /**
-   * @param  cache
-   * @param  featureIDs
+   * Removes the given features (and their boxes) from the zoom cache and spatial index.
+   * @param  cache - The zoom-level cache to update
+   * @param  featureIDs - The IDs of the features to remove
    */
   protected _uncacheFeatureIDs(cache: VTZoomCache, featureIDs: Set<string>): void {
     for (const featureID of featureIDs) {
@@ -685,6 +689,7 @@ export class VectorTileService extends AbstractSystem {
 
 
   /**
+   * Computes the geographic extent covering a GeoJSON feature's geometry.
    * @param  geojson - a GeoJSONData Feature
    * @return the extent
    */

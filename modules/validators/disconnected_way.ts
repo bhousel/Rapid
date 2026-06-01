@@ -111,7 +111,10 @@ export function validateDisconnectedWay(context: Context): ValidatorFunction {
     }
 
 
-    /** Renders the issue reference text into the given selection. */
+    /**
+     * Renders the issue reference text into the given selection.
+     * @param $selection
+     */
     function showReference($selection: D3Selection): void {
       $selection.selectAll('.issue-reference')
         .data([0])
@@ -133,7 +136,10 @@ export function validateDisconnectedWay(context: Context): ValidatorFunction {
       const routingIsland = new Set<OsmEntity>();  // the interconnected routable features
       const waysToCheck: OsmWay[] = [];           // the queue of remaining routable ways to traverse
 
-      /** Queues parent ways of the node for traversal. */
+      /**
+       * Queues parent ways of the node for traversal.
+       * @param node
+       */
       function queueParentWays(node: OsmNode): void {
         for (const parentWay of graph.parentWays(node)) {
           if (!routingIsland.has(parentWay) && isRoutableWay(parentWay, false)) {

@@ -819,6 +819,11 @@ export class NsiService extends AbstractSystem {
       return { primary: primary, alternate: alternate };
     }
 
+    /**
+     *
+     * @param osmkey
+     * @param which
+     */
     function isNamelike(osmkey: string, which: Priority): boolean {
       if (osmkey === 'old_name') return false;
       return patterns[which].test(osmkey) && !notNames.test(osmkey);

@@ -141,6 +141,8 @@ export class WikidataService extends AbstractSystem {
 
 
   /**
+   * Returns the list of language codes to request from Wikidata, derived from the user's locales.
+   * @return  The language codes to query
    */
   public languagesToQuery(): string[] {
     const l10n = this.context.systems.l10n;
@@ -156,6 +158,7 @@ export class WikidataService extends AbstractSystem {
 
 
   /**
+   * Looks up a Wikidata entity by its QID and returns the result via the callback.
    * @param qid - qid to query
    * @param callback - errback-style callback function to call with results
    */

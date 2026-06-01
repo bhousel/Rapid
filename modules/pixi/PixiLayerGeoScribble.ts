@@ -18,6 +18,7 @@ const CUSTOM_COLOR = 0x2eff2e;
  * @class
  */
 export class PixiLayerGeoScribble extends AbstractPixiLayer {
+  /** The Pixi container holding all scribble feature containers */
   public scribblesContainer: PIXI.Container | null;
 
   /**
@@ -34,6 +35,7 @@ export class PixiLayerGeoScribble extends AbstractPixiLayer {
 
   /**
    * Whether the Layer's service exists
+   * @return  `true` if the GeoScribble service is registered
    */
   public get supported() {
     return !!this.context.services.geoscribble;
@@ -43,10 +45,14 @@ export class PixiLayerGeoScribble extends AbstractPixiLayer {
   /**
    * Whether the user has chosen to see the Layer
    * Make sure to start the service.
+   * @return  `true` if the layer is enabled
    */
   public get enabled() {
     return this._enabled;
   }
+  /** Enables or disables the layer; disabling forces `val` to false when not supported.
+   * @param val - `true` to enable the layer, `false` to disable it
+   */
   public set enabled(val: boolean) {
     if (!this.supported) {
       val = false;
@@ -144,6 +150,7 @@ export class PixiLayerGeoScribble extends AbstractPixiLayer {
 
 
   /**
+   * Renders the GeoScribble line features for this frame.
    * @param frame - Integer frame being rendered
    * @param viewport - Pixi viewport to use for rendering
    * @param lines - Array of line data
@@ -194,6 +201,7 @@ export class PixiLayerGeoScribble extends AbstractPixiLayer {
 
 
   /**
+   * Renders the GeoScribble point features for this frame.
    * @param frame - Integer frame being rendered
    * @param viewport - Pixi viewport to use for rendering
    * @param points - Array of point data

@@ -429,6 +429,7 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
 
 
   /**
+   * Updates the hover/select/highlight halo effect for this polygon.
    * @param viewport - Pixi viewport to use for rendering
    */
   public updateHalo(viewport: Viewport): void {

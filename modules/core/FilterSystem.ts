@@ -175,6 +175,8 @@ export class FilterSystem extends AbstractSystem {
 
 
   /**
+   * The IDs of all registered filters.
+   * @return Array of all registered filter IDs
    */
   public get keys(): string[] {
     return [...this._filters.keys()];
@@ -182,6 +184,7 @@ export class FilterSystem extends AbstractSystem {
 
 
   /**
+   * The set of filters that are currently hiding features from the map.
    * @return Set of hidden FilterIDs
    */
   public get hidden(): Set<FilterID> {
@@ -190,8 +193,9 @@ export class FilterSystem extends AbstractSystem {
 
 
   /**
+   * Whether the given filter is currently enabled.
    * @param filterID - FilterID to check
-   * @return true/false
+   * @return `true` if the filter is enabled, `false` otherwise
    */
   public isEnabled(filterID: FilterID): boolean {
     const filter = this._filters.get(filterID);
@@ -690,77 +694,154 @@ export class FilterSystem extends AbstractSystem {
 
   // matchers
 
+  /**
+   * Matches point features.
+   * @param tags - The feature's OSM tags
+   * @param geometry - The feature's resolved geometry type
+   * @return  `true` if the feature is a point
+   */
   protected _isPoint(tags: OsmTags, geometry?: GeometryType): boolean {
     return geometry === 'point';
   }
 
+  /**
+   * Matches major vehicular roads (the 'major_vehicular' ruleset).
+   * @param tags - The feature's OSM tags
+   * @return  `true` if the feature is a traffic road
+   */
   protected _isTrafficRoad(tags: OsmTags): boolean {
     const schema = this.context.systems.schema;
     return !!schema?.getScope('osm')?.rulesets.get('major_vehicular')?.match(tags);
   }
 
+  /**
+   * Matches minor/service roads (the 'minor_vehicular' ruleset).
+   * @param tags - The feature's OSM tags
+   * @return  `true` if the feature is a service road
+   */
   protected _isServiceRoad(tags: OsmTags): boolean {
     const schema = this.context.systems.schema;
     return !!schema?.getScope('osm')?.rulesets.get('minor_vehicular')?.match(tags);
   }
 
+  /**
+   * Matches paths and footways (the 'path_highway' ruleset).
+   * @param tags - The feature's OSM tags
+   * @return  `true` if the feature is a path
+   */
   protected _isPath(tags: OsmTags): boolean {
     const schema = this.context.systems.schema;
     return !!schema?.getScope('osm')?.rulesets.get('path_highway')?.match(tags);
   }
 
+  /**
+   * Matches buildings (the 'filter_building' ruleset), excluding past/future lifecycle features.
+   * @param tags - The feature's OSM tags
+   * @return  `true` if the feature is a building
+   */
   protected _isBuilding(tags: OsmTags): boolean {
     const schema = this.context.systems.schema;
     return !!schema?.getScope('osm')?.rulesets.get('filter_building')?.match(tags) && !this._isPastFuture(tags);
   }
 
+  /**
+   * Matches building parts (the 'filter_building_part' ruleset).
+   * @param tags - The feature's OSM tags
+   * @return  `true` if the feature is a building part
+   */
   protected _isBuildingPart(tags: OsmTags): boolean {
     const schema = this.context.systems.schema;
     return !!schema?.getScope('osm')?.rulesets.get('filter_building_part')?.match(tags);
   }
 
+  /**
+   * Matches indoor features (the 'filter_indoor' ruleset).
+   * @param tags - The feature's OSM tags
+   * @return  `true` if the feature is an indoor feature
+   */
   protected _isIndoor(tags: OsmTags): boolean {
     const schema = this.context.systems.schema;
     return !!schema?.getScope('osm')?.rulesets.get('filter_indoor')?.match(tags);
   }
 
+  /**
+   * Matches landuse areas (the 'filter_landuse' ruleset), excluding past/future lifecycle features.
+   * @param tags - The feature's OSM tags
+   * @param geometry - The feature's resolved geometry type
+   * @return  `true` if the feature is a landuse area
+   */
   protected _isLanduse(tags: OsmTags, geometry?: GeometryType): boolean {
     if (geometry !== 'area') return false;
     const schema = this.context.systems.schema;
     return !!schema?.getScope('osm')?.rulesets.get('filter_landuse')?.match(tags) && !this._isPastFuture(tags);
   }
 
+  /**
+   * Matches boundaries (the 'filter_boundary' ruleset).
+   * @param tags - The feature's OSM tags
+   * @return  `true` if the feature is a boundary
+   */
   protected _isBoundary(tags: OsmTags): boolean {
     const schema = this.context.systems.schema;
     return !!schema?.getScope('osm')?.rulesets.get('filter_boundary')?.match(tags);
   }
 
+  /**
+   * Matches water features (the 'filter_water' ruleset), excluding past/future lifecycle features.
+   * @param tags - The feature's OSM tags
+   * @return  `true` if the feature is a water feature
+   */
   protected _isWater(tags: OsmTags): boolean {
     const schema = this.context.systems.schema;
     return !!schema?.getScope('osm')?.rulesets.get('filter_water')?.match(tags) && !this._isPastFuture(tags);
   }
 
+  /**
+   * Matches railways (the 'filter_rail' ruleset), excluding past/future lifecycle features.
+   * @param tags - The feature's OSM tags
+   * @return  `true` if the feature is a railway
+   */
   protected _isRail(tags: OsmTags): boolean {
     const schema = this.context.systems.schema;
     return !!schema?.getScope('osm')?.rulesets.get('filter_rail')?.match(tags) && !this._isPastFuture(tags);
   }
 
+  /**
+   * Matches ski pistes (the 'filter_piste' ruleset).
+   * @param tags - The feature's OSM tags
+   * @return  `true` if the feature is a piste
+   */
   protected _isPiste(tags: OsmTags): boolean {
     const schema = this.context.systems.schema;
     return !!schema?.getScope('osm')?.rulesets.get('filter_piste')?.match(tags);
   }
 
+  /**
+   * Matches aerialways (the 'filter_aerialway' ruleset).
+   * @param tags - The feature's OSM tags
+   * @return  `true` if the feature is an aerialway
+   */
   protected _isAerialway(tags: OsmTags): boolean {
     const schema = this.context.systems.schema;
     return !!schema?.getScope('osm')?.rulesets.get('filter_aerialway')?.match(tags);
   }
 
+  /**
+   * Matches power infrastructure (the 'filter_power' ruleset), excluding past/future lifecycle features.
+   * @param tags - The feature's OSM tags
+   * @return  `true` if the feature is a power feature
+   */
   protected _isPower(tags: OsmTags): boolean {
     const schema = this.context.systems.schema;
     return !!schema?.getScope('osm')?.rulesets.get('filter_power')?.match(tags) && !this._isPastFuture(tags);
   }
 
   // contains a past/future tag, but not in active use as a road/path/cycleway/etc..
+  /**
+   * Matches features with a lifecycle (past/future) prefix that are not in active use.
+   * @param tags - The feature's OSM tags
+   * @return  `true` if the feature is a past/future lifecycle feature
+   */
   protected _isPastFuture(tags: OsmTags): boolean {
     const schema = this.context.systems.schema;
     const osmScope = schema?.getScope('osm');
@@ -787,6 +868,12 @@ export class FilterSystem extends AbstractSystem {
   // Lines or areas that don't match another feature filter.
   // IMPORTANT: The 'others' feature must be the last one defined,
   // so that code in getMatches can skip this test if someting else was matched.
+  /**
+   * Matches lines or areas that didn't match any other feature filter.
+   * @param tags - The feature's OSM tags
+   * @param geometry - The feature's resolved geometry type
+   * @return  `true` if the feature is an uncategorized line or area
+   */
   protected _isOther(tags: OsmTags, geometry?: GeometryType): boolean {
     return (geometry === 'line' || geometry === 'area');
   }

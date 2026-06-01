@@ -213,6 +213,7 @@ export class AssetSystem extends AbstractSystem {
    * Other systems and services should call this to track any assets that they need to load.
    * @param assetID - asset identifier
    * @param assetSource - source information
+   * @param source
    * @throws Will throw if a reserved assetID is used.
    */
   public registerAsset(assetID: AssetID, source: AssetSource = {}): void {
@@ -257,6 +258,7 @@ export class AssetSystem extends AbstractSystem {
    * Returns the URL for the given asset key.
    * Checks the 'preferred' origin first, then falls back to the current origin ('latest' or 'local').
    * @param key - identifier for the asset, should be found in the asset map.
+   * @param assetID
    * @return URL of the asset
    * @throws Will throw if the assetID is not found, or if an asset path can't be determined
    */

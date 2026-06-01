@@ -111,6 +111,8 @@ export class LocationSystem extends AbstractSystem {
   /**
    * Resolves a blocked region's locationSet into a GeoJSONData feature, assigning
    * `locationSetID` on the block in place. Returns `undefined` if resolution fails.
+   * @param block - The blocked region to resolve
+   * @return  The resolved feature, or `undefined` if resolution failed
    */
   protected _resolveBlock(block: BlockedRegion): GeoJSONData | undefined {
     try {
@@ -138,6 +140,7 @@ export class LocationSystem extends AbstractSystem {
    * The underlying `LocationConflation` instance.
    * Exposed so other systems (e.g. NSI's `Matcher.buildLocationIndex`) can share
    * the same resolver/registry/spatial index.
+   * @return  The shared `LocationConflation` resolver
    */
   public resolver(): LocationConflation {
     return this._resolver;

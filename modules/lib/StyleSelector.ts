@@ -86,7 +86,9 @@ export interface FeatureMatchInfo {
  *   `props`     The full props object
  */
 export class StyleSelector {
+  /** Global shared application context */
   public context: Context;
+  /** Full props object for this selector */
   public props: StyleSelectorProps;
 
   /** Unique identifier */
@@ -99,6 +101,7 @@ export class StyleSelector {
 
   /**
    * @constructor
+   * @param context
    * @param props - Properties defining the selector
    * @throws Error if `id` property is missing
    * @throws Error if `styleIDs` property is missing or empty
@@ -133,6 +136,7 @@ export class StyleSelector {
 
   /**
    * Get the match conditions.
+   * @return  `StyleMatchConditions` for this selector
    */
   public get match(): StyleMatchConditions {
     return this.props.match;
@@ -149,6 +153,7 @@ export class StyleSelector {
 
   /**
    * Get the tag matchers, lazily creating PropMatcher instances.
+   * @return  Array of `PropMatcher` instances for this selector's tag conditions
    */
   public get tagMatchers(): PropMatcher[] {
     if (this._tagMatchers === null) {
@@ -227,6 +232,7 @@ export class StyleSelector {
 
   /**
    * Convert to a JSON-serializable object.
+   * @return  The JSON-serializable representation of this selector
    */
   public toJSON(): StyleSelectorProps {
     return structuredClone(this.props);

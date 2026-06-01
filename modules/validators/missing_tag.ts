@@ -49,12 +49,18 @@ export function validateMissingTag(context: Context): ValidatorFunction {
   }
 
 
-  /** Tests whether the entity is a way with `highway=road` (unclassified road). */
+  /**
+   * Tests whether the entity is a way with `highway=road` (unclassified road).
+   * @param entity
+   */
   function isUnknownRoad(entity: OsmEntity): boolean {
     return entity.type === 'way' && entity.tags.highway === 'road';
   }
 
-  /** Tests whether the entity is a relation without a `type` tag. */
+  /**
+   * Tests whether the entity is a relation without a `type` tag.
+   * @param entity
+   */
   function isUntypedRelation(entity: OsmEntity): boolean {
     return entity.type === 'relation' && !entity.tags.type;
   }
@@ -156,7 +162,10 @@ export function validateMissingTag(context: Context): ValidatorFunction {
 
     return result;
 
-    /** Renders the issue reference text into the given selection. */
+    /**
+     * Renders the issue reference text into the given selection.
+     * @param $selection
+     */
     function showReference($selection: D3Selection): void {
       $selection.selectAll('.issue-reference')
         .data([0])

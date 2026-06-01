@@ -49,31 +49,51 @@ interface TransformEase {
  *   `statuschange`    Fires on status changes, receives 'contextlost' or 'contextrestored'
  */
 export class GraphicsSystem extends AbstractSystem {
+  /** Whether to render at full quality (may drop to false when performance degrades) */
   public highQuality: boolean;
 
   // DOM elements
+  /** Parent `<div>` that receives temporary CSS transforms between full redraws */
   public supersurface: HTMLDivElement;
+  /** `<canvas>` element that Pixi renders into */
   public surface: HTMLCanvasElement;
+  /** `<div>` overlay that counteracts the supersurface transform so DOM overlays stay in place */
   public overlay: HTMLDivElement;
 
   // Pixi objects
+  /** The Pixi application instance (WebGL or fallback renderer) */
   public pixi: PIXI.Application | null;
+  /** Root Pixi container that holds everything in the scene */
   public stage: PIXI.Container | null;
+  /** Pixi container that translates world coordinates into screen coordinates */
   public origin: PIXI.Container | null;
+  /** Manages the layers and features rendered in the Pixi scene */
   public scene: PixiScene | null;
+  /** Manages pointer/interaction events on the Pixi canvas */
   public eventManager: PixiEvents | null;
+  /** Manages sprite textures and the GPU atlas */
   public textureManager: PixiTextures | null;
 
   // Private properties
+  /** A copy of the context viewport as seen by Pixi, used to detect transform changes */
   protected _pixiViewport: Viewport | null;
+  /** The map transform at the time of the last full redraw (used to compute CSS pan offsets) */
   protected _prevTransform: TransformProps;
+  /** Whether a temporary CSS transform is currently applied to `supersurface` */
   protected _isTempTransformed: boolean;
+  /** Active animated transform transition, or null if none is in progress */
   protected _transformEase: TransformEase | null;
+  /** Monotonically incrementing frame counter */
   protected _frame: number;
+  /** Milliseconds until the next deferred redraw is due */
   protected _timeToNextRender: number;
+  /** Whether a Pixi app-level render has been requested but not yet executed */
   protected _appPending: boolean;
+  /** Whether a full scene-graph redraw has been requested but not yet executed */
   protected _drawPending: boolean;
+  /** Whether the WebGL context is currently lost */
   protected _isContextLost: boolean;
+  /** Callback that resumes the GraphicsSystem after a WebGL context restore */
   protected _unpauseFn: (() => void) | null;
 
 

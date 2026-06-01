@@ -61,6 +61,7 @@ const dashLineOptionsDefault: ResolvedDashLineOptions = {
 };
 
 
+/** Draws dashed lines on a Pixi `Graphics` object using a texture-based approach. */
 export class DashLine {
   /** Reference to the GraphicsSystem for texture caching */
   public gfx: any;
@@ -92,6 +93,7 @@ export class DashLine {
    * cycle maps to exactly `dashSize * userScale` local units regardless of padding.
    */
   public texW: number;
+  /** Height in pixels of the generated dash texture (equal to line width) */
   public texH: number;
   /** Stroke style configuration */
   public strokeStyle: PIXI.StrokeStyle;
@@ -154,6 +156,9 @@ export class DashLine {
   /**
    * Move to a position to prepare to draw a line.
    * This is essentially our 'reset' function.
+   * @param x - The x coordinate to move to
+   * @param y - The y coordinate to move to
+   * @return  This `DashLine` instance, for chaining
    */
   public moveTo(x: number, y: number): this {
     this.lineLength = 0;
@@ -166,6 +171,10 @@ export class DashLine {
 
   /**
    * Extend the line to given x,y coordinate
+   * @param x - The x coordinate to draw to
+   * @param y - The y coordinate to draw to
+   * @param doClosePath - Whether this segment closes the path
+   * @return  This `DashLine` instance, for chaining
    */
   public lineTo(x: number, y: number, doClosePath?: boolean): this {
     if (this.lineLength === null) {  // lineTo() called before moveTo()?
@@ -294,6 +303,7 @@ export class DashLine {
   }
 
 
+  /** Closes the current path back to its start point with a dash segment. */
   public closePath(): void {
     this.lineTo(this.start!.x, this.start!.y, true);
   }

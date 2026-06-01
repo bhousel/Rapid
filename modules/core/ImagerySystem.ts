@@ -91,16 +91,26 @@ export class ImagerySystem extends AbstractSystem {
   /** Requested imagery file assetIDs - optional, these can be different than the default files */
   protected _requestedAssetIDs: Set<AssetID> | null;
 
+  /** Currently active base (background) imagery source */
   protected _baseLayer: ImagerySource | null;
+  /** Active overlay imagery sources keyed by ImagerySourceID */
   protected _overlayLayers: Map<ImagerySourceID, ImagerySource>;
+  /** Blocklist URL patterns that have already been checked and applied */
   protected _checkedBlocklists: string[];
+  /** Whether the current base layer URL is valid (not blocked) */
   protected _isValid: boolean;  // todo, find a new way to check this, no d3 enter/update render anymore
+  /** Spatial index for matching a lat/lon to imagery coverage polygons */
   protected _whichPolygon: ReturnType<typeof whichPolygon> | null;
 
+  /** CSS filter brightness value (0–2, default 1) */
   protected _brightness: number;
+  /** CSS filter contrast value (0–2, default 1) */
   protected _contrast: number;
+  /** CSS filter saturation value (0–2, default 1) */
   protected _saturation: number;
+  /** CSS filter sharpness (actually an unsharp-mask) value (0–2, default 1) */
   protected _sharpness: number;
+  /** Number of grid splits to apply when splitting tiles for alignment correction */
   protected _numGridSplits: number;
 
 
@@ -204,6 +214,7 @@ export class ImagerySystem extends AbstractSystem {
 
 
   /**
+   * Loads the imagery source definitions from the assets system.
    * @return Promise fulfilled when the imagery has been loaded
    */
   public loadImageryAssetsAsync(): Promise<void> {
@@ -367,6 +378,9 @@ export class ImagerySystem extends AbstractSystem {
       }
     }
   }
+  /** Returns the currently requested imagery asset IDs, or null if using defaults.
+   * @return  The requested asset IDs, or `null` when using defaults
+   */
   public get requestedAssetIDs(): Set<AssetID> | null {
     return this._requestedAssetIDs;
   }
@@ -711,6 +725,7 @@ export class ImagerySystem extends AbstractSystem {
 
   /**
    * Gets the current imagery offset in pixels [x, y]
+   * @return  Current `[x, y]` pixel offset for the base imagery layer
    */
   public get offset(): Vec2 {
     return this._baseLayer?.offset ?? [0, 0];
@@ -718,6 +733,7 @@ export class ImagerySystem extends AbstractSystem {
 
   /**
    * Sets the imagery offset in pixels [x, y]
+   * @param val - `[x, y]` pixel offset to apply to the base imagery layer
    */
   public set offset([setX, setY]: Vec2) {
     const [currX, currY] = this._baseLayer?.offset ?? [0, 0];
@@ -731,6 +747,7 @@ export class ImagerySystem extends AbstractSystem {
 
   /**
    * Gets the current brightness value (default 1)
+   * @return  Current brightness multiplier (1 = normal)
    */
   public get brightness(): number {
     return this._brightness;
@@ -738,6 +755,7 @@ export class ImagerySystem extends AbstractSystem {
 
   /**
    * Sets the brightness value
+   * @param val - Brightness multiplier (1 = normal)
    */
   public set brightness(val: number) {
     if (val === this._brightness) return;  // no change
@@ -751,6 +769,7 @@ export class ImagerySystem extends AbstractSystem {
 
   /**
    * Gets the current contrast value (default 1)
+   * @return  Current contrast multiplier (1 = normal)
    */
   public get contrast(): number {
     return this._contrast;
@@ -758,6 +777,7 @@ export class ImagerySystem extends AbstractSystem {
 
   /**
    * Sets the contrast value
+   * @param val - Contrast multiplier (1 = normal)
    */
   public set contrast(val: number) {
     if (val === this._contrast) return;  // no change
@@ -771,6 +791,7 @@ export class ImagerySystem extends AbstractSystem {
 
   /**
    * Gets the current saturation value (default 1)
+   * @return  Current saturation multiplier (1 = normal)
    */
   public get saturation(): number {
     return this._saturation;
@@ -778,6 +799,7 @@ export class ImagerySystem extends AbstractSystem {
 
   /**
    * Sets the saturation value
+   * @param val - Saturation multiplier (1 = normal)
    */
   public set saturation(val: number) {
     if (val === this._saturation) return;  // no change
@@ -791,6 +813,7 @@ export class ImagerySystem extends AbstractSystem {
 
   /**
    * Gets the current sharpness value (default 1)
+   * @return  Current sharpness multiplier (1 = normal)
    */
   public get sharpness(): number {
     return this._sharpness;
@@ -798,6 +821,7 @@ export class ImagerySystem extends AbstractSystem {
 
   /**
    * Sets the sharpness value
+   * @param val - Sharpness multiplier (1 = normal)
    */
   public set sharpness(val: number) {
     if (val === this._sharpness) return;  // no change
@@ -811,6 +835,7 @@ export class ImagerySystem extends AbstractSystem {
 
   /**
    * Gets the current number of grid splits (default 0)
+   * @return  Current grid-split count (0 = no splits)
    */
   public get numGridSplits(): number {
     return this._numGridSplits;
@@ -818,6 +843,7 @@ export class ImagerySystem extends AbstractSystem {
 
   /**
    * Sets the number of grid splits
+   * @param val - Number of grid splits (0 = no splits)
    */
   public set numGridSplits(val: number) {
     if (val === this._numGridSplits) return;  // no change

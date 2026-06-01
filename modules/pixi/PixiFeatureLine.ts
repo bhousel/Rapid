@@ -314,6 +314,11 @@ export class PixiFeatureLine extends AbstractPixiFeature {
       (g as PIXI.Graphics).stroke(strokeStyle);
     }
 
+    /**
+     *
+     * @param points
+     * @param graphics
+     */
     function drawLine(points: Vec2[], graphics: PIXI.Graphics | DashLine): void {
       points.forEach(([x, y], i) => {
         if (i === 0) {

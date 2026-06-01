@@ -70,6 +70,7 @@ export class AddNoteMode extends AbstractMode {
 
   /**
    * Add a Note at the mouse click coords
+   * @param eventData
    */
   protected _click(eventData: EventData): void {
     const context = this.context;

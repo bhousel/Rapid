@@ -84,6 +84,8 @@ export async function fetchAndParse(data: unknown, signal: AbortSignal): Promise
 
 /**
  * Resets the long-lived parser instances.
+ * @param _data
+ * @param _signal
  * @listens `osmService:reset`
  */
 export function reset(_data: unknown, _signal: AbortSignal): void {

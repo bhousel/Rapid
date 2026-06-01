@@ -41,6 +41,7 @@ export class PixiLayerKartaPhotos extends AbstractPixiLayer {
 
   /**
    * Whether the Layer's service exists
+   * @return  `true` if the KartaView service is registered
    */
   public get supported() {
     return !!this.context.services.kartaview;
@@ -50,10 +51,14 @@ export class PixiLayerKartaPhotos extends AbstractPixiLayer {
   /**
    * Whether the user has chosen to see the Layer
    * Make sure to start the service first.
+   * @return  `true` if the layer is enabled
    */
   public get enabled() {
     return this._enabled;
   }
+  /** Enables or disables this layer; starts the KartaView service when enabling.
+   * @param val - `true` to enable the layer, `false` to disable it
+   */
   public set enabled(val) {
     if (!this.supported) {
       val = false;
@@ -81,6 +86,7 @@ export class PixiLayerKartaPhotos extends AbstractPixiLayer {
 
 
   /**
+   * Filters the photo markers by the current date range, username, and photo-type settings.
    * @param markers - all markers
    * @return markers with filtering applied
    */
@@ -156,6 +162,7 @@ export class PixiLayerKartaPhotos extends AbstractPixiLayer {
 
 
   /**
+   * Renders the KartaView photo markers and sequences for this frame.
    * @param frame - Integer frame being rendered
    * @param viewport - Pixi viewport to use for rendering
    */

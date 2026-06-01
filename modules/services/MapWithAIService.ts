@@ -464,9 +464,18 @@ export class MapWithAIService extends AbstractSystem {
 
 
     // This utilQsString does not sort the keys, because the MapWithAI service needs them to be ordered a certain way.
+    /**
+     *
+     * @param obj
+     * @param noencode
+     */
     function MWAIQsString(obj: Record<string, string | boolean>, noencode: boolean): string {
       // encode everything except special characters used in certain hash parameters:
       // "/" in map states, ":", ",", {" and "}" in background
+      /**
+       *
+       * @param s
+       */
       function softEncode(s: string): string {
         return encodeURIComponent(s).replace(/(%2F|%3A|%2C|%7B|%7D)/g, decodeURIComponent);
       }
@@ -482,6 +491,7 @@ export class MapWithAIService extends AbstractSystem {
   /**
    * Call this sometimes to reassemble ways that were split by the server.
    * @param ds - the dataset info
+   * @return  The reassembled ways
    */
   protected _connectSplitWays(ds: DatasetCache): OsmWay[] {
     const context = this.context;

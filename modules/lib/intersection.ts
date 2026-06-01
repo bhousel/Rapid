@@ -61,17 +61,31 @@ export interface Intersection {
  * Properties are assigned directly to the instance for backward compatibility.
  */
 export class osmTurn implements Turn {
+  /** Unique string key identifying this turn (e.g. 'n123>w456>n789') */
   public key!: string;
+  /** Ordered list of EntityIDs that form the path through the intersection */
   public path!: EntityID[];
+  /** The entry way/node at the start of this turn */
   public from!: TurnEndpoint;
+  /** The via node or way at the centre of this turn */
   public via!: TurnVia;
+  /** The exit way/node at the end of this turn */
   public to!: TurnEndpoint;
+  /** Whether this is a U-turn */
   public u!: boolean;
+  /** ID of an existing `restriction` relation constraining this turn, if any */
   public restrictionID?: string;
+  /** Whether a `no_*` restriction applies to this turn */
   public no?: boolean;
+  /** Whether an `only_*` restriction mandates this turn */
   public only?: boolean;
+  /** Whether this is a direct (non-via-way) turn */
   public direct?: boolean;
 
+  /**
+   *
+   * @param turn
+   */
   public constructor(turn: Partial<Turn>) {
     Object.assign(this, turn);
   }
@@ -95,10 +109,18 @@ export function osmIntersection(
 ): Intersection | null {
 
 
+  /**
+   *
+   * @param entity
+   */
   function memberOfRestriction(entity: OsmEntity): boolean {
     return graph.parentRelations(entity).some((r: OsmRelation) => r.isRestriction());
   }
 
+  /**
+   *
+   * @param way
+   */
   function isRoad(way: OsmWay): boolean {
     if (way.isArea() || way.isDegenerate()) return false;
     const roads: Record<string, boolean> = {
@@ -275,6 +297,11 @@ export function osmIntersection(
   // STEP 6:  Update the ways with some metadata that will be useful for
   // walking the intersection graph later and rendering turn arrows.
 
+  /**
+   *
+   * @param way
+   * @param vertexIDs
+   */
   function withMetadata(way: OsmWay, vertexIDs: EntityID[]): OsmWay {
     const __oneWay = way.isOneWay();
 
@@ -429,6 +456,13 @@ export function osmIntersection(
       }
 
       // traverse the intersection graph and find all the valid paths
+      /**
+       *
+       * @param entity
+       * @param currPath
+       * @param currRestrictions
+       * @param matchedRestriction
+       */
       function step(
         entity: OsmEntity,
         currPath?: EntityID[],
@@ -619,6 +653,10 @@ export function osmIntersection(
 
 
       // assumes path is alternating way-node-way of odd length
+      /**
+       *
+       * @param path
+       */
       function pathToTurn(path: EntityID[]): Turn | null {
         if (path.length < 3) return null;
         const fromWayID: EntityID = path[0];
@@ -664,6 +702,11 @@ export function osmIntersection(
         };
 
 
+        /**
+         *
+         * @param wayID
+         * @param affixId
+         */
         function adjacentNode(wayID: EntityID, affixId: EntityID): EntityID {
           const nodes = (vgraph.entity(wayID) as OsmWay).nodes;
           return affixId === nodes[0] ? nodes[1] : nodes[nodes.length - 2];
@@ -676,6 +719,11 @@ export function osmIntersection(
 }
 
 
+/**
+ *
+ * @param graph
+ * @param turn
+ */
 export function osmInferRestriction(graph: Graph, turn: Turn): string {
   const fromWay = graph.entity(turn.from.way) as OsmWay;
   const fromNode = graph.entity(turn.from.node) as OsmNode;

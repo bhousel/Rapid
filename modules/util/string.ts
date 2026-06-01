@@ -119,6 +119,8 @@ interface KeyedCollection {
 
 /**
  * Delete keys from a keyed collection (Map, Set, etc.) that match a wildcard pattern ('*' or '?').
+ * @param collection
+ * @param pattern
  */
 export function utilWildcardDelete(collection: KeyedCollection, pattern: string): void {
   if (typeof pattern !== 'string') return;

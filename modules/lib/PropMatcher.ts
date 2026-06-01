@@ -115,6 +115,7 @@ export interface PropMatcherProps {
  */
 export class PropMatcher {
 
+  /** Full props object for this matcher */
   public props: PropMatcherProps;
 
   /** The property key(s) to match (exact string, regex pattern string, or array of exact strings) */
@@ -227,6 +228,7 @@ export class PropMatcher {
   /**
    * The value to compare against.
    * Returns the resolved value (after var() resolution) if available, otherwise the raw value.
+   * @return  Resolved or raw comparison value
    */
   public get value(): string | number | string[] | RegExp | undefined {
     return this._resolvedValue ?? this.props.value;
@@ -269,6 +271,8 @@ export class PropMatcher {
 
   /**
    * Test equality match.
+   * @param val - The actual value to compare against this matcher's value
+   * @return  `true` if the value matches
    */
   protected _matchEquals(val: unknown): boolean {
     const expected = this.value;
@@ -292,6 +296,8 @@ export class PropMatcher {
 
   /**
    * Test regex match.
+   * @param val - The actual value to test against the compiled value regex
+   * @return  `true` if the value matches the regex
    */
   protected _matchValueRegex(val: unknown): boolean {
     if (!this._valueRegex) return false;
@@ -304,6 +310,8 @@ export class PropMatcher {
 
   /**
    * Test if value is in the precompiled Set.
+   * @param val - The actual value to test for set membership
+   * @return  `true` if the value is in the set
    */
   protected _matchValueIn(val: unknown): boolean {
     if (!this._valueSet) return false;
@@ -316,6 +324,9 @@ export class PropMatcher {
 
   /**
    * Perform numeric comparison.
+   * @param actualValue - The actual value (coerced to a number if it's a numeric string)
+   * @param compareFn - Comparison function applied as `compareFn(actual, expected)`
+   * @return  `true` if the comparison holds
    */
   protected _compareValueNumeric(actualValue: unknown, compareFn: (a: number, b: number) => boolean): boolean {
     const expected = this.value;
@@ -338,6 +349,8 @@ export class PropMatcher {
   /**
    * Apply a value-side check for a single actual value.
    * Handles all ops except 'exists' and '!exists' (which are handled by the caller).
+   * @param val - The actual value to check against this matcher's op and value
+   * @return  `true` if the value satisfies the operation
    */
   protected _checkValueOp(val: unknown): boolean {
     switch (this.op) {
@@ -360,6 +373,8 @@ export class PropMatcher {
    * Match by key pattern: iterate all keys of the object and test each
    * against the pre-compiled key regex. For the first matching key, apply
    * the value check (op + value). For 'exists', just check that any key matches.
+   * @param obj - The object (e.g. OSM tags) whose keys are tested
+   * @return  `true` if the key pattern and value check are satisfied
    */
   protected _matchKeyPattern(obj: Record<string, unknown>): boolean {
     const keyRegex = this._keyRegex!;
@@ -395,6 +410,8 @@ export class PropMatcher {
    * precompiled key Set for O(1) membership tests.
    * For 'exists', returns true if any listed key exists. For '!exists',
    * returns true only if none of the listed keys exist.
+   * @param obj - The object (e.g. OSM tags) whose keys are tested
+   * @return  `true` if the key list and value check are satisfied
    */
   protected _matchKeyList(obj: Record<string, unknown>): boolean {
     const keySet = this._keySet!;
@@ -524,6 +541,7 @@ export class PropMatcher {
 
   /**
    * Convert to a JSON-serializable object.
+   * @return  A plain object representation suitable for JSON serialization
    */
   public toJSON(): PropMatcherProps {
     const result: PropMatcherProps = { key: this.key };
@@ -562,6 +580,7 @@ export class PropMatcher {
 
   /**
    * String representation for debugging.
+   * @return  A human-readable string describing the matcher
    */
   public toString(): string {
     const value = this.value;

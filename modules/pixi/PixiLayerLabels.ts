@@ -82,8 +82,11 @@ interface ChainLink {
  * @class
  */
 export class PixiLayerLabels extends AbstractPixiLayer {
+  /** Container whose origin is pinned to the world origin (for stable text placement) */
   public labelOriginContainer: PIXI.Container | null;
+  /** Container for debug visualization sprites showing label bounding boxes */
   public debugContainer: PIXI.Container | null;
+  /** Container that holds all visible label features */
   public labelContainer: PIXI.Container | null;
 
   /** Labeling spatial index - contains boxes covering placed labels and regions to avoid */
@@ -108,13 +111,18 @@ export class PixiLayerLabels extends AbstractPixiLayer {
   /** Mapping of Pixi object id to PIXI.Sprite */
   protected _debugSprites: Map<string, PIXI.Sprite>;
 
+  /** Queue of label textures awaiting rasterization (drained lazily to avoid frame spikes) */
   protected _pendingRasters: Map<TextureID, { str: string; style: 'normal' | 'italic' }>;
+  /** Whether a raster-drain microtask has been scheduled for this frame */
   protected _rasterDrainScheduled: boolean;
+  /** Map transform at the last labeling pass; used to detect zoom/rotation changes that need a full relabel */
   protected _tPrev: { x: number; y: number; z: number; r: number };
 
   /** Tracks the difference between the top left corner of the screen and the parent "origin" container */
   protected _labelOffset: PIXI.Point;
+  /** Pixi TextStyle for normal-weight label text */
   protected _textStyleNormal: PIXI.TextStyle;
+  /** Pixi TextStyle for italic label text */
   protected _textStyleItalic: PIXI.TextStyle;
 
 
@@ -721,6 +729,10 @@ export class PixiLayerLabels extends AbstractPixiLayer {
     // This is hacky, but we can sort the line labels by their parent container name.
     // It might be a level container with a name like "1", "-1", or just a name like "lines"
     // If `parseInt` fails, just sort the label above everything.
+    /**
+     *
+     * @param feature
+     */
     function level(feature: PixiFeatureLine): number {
       const parentLabel = feature.container.parent?.label;
       const lvl = parseInt(parentLabel || '999', 10);

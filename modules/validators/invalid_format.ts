@@ -48,7 +48,10 @@ export function validateInvalidFormat(context: Context): ValidatorFunction {
     }
     */
 
-    /** Renders the email format issue reference text into the given selection. */
+    /**
+     * Renders the email format issue reference text into the given selection.
+     * @param $selection
+     */
     function showReferenceEmail($selection: D3Selection): void {
       $selection.selectAll('.issue-reference')
         .data([0])

@@ -22,6 +22,7 @@ import type { Vec2 } from '@rapid-sdk/math';
 /**
  * Factory that creates a validator to detect roads that can
  * be connected to other roads with a short extension
+ * @param context
  */
 export function validateAlmostJunction(context: Context): ValidatorFunction {
   const type = 'almost_junction' as ValidatorID;
@@ -36,13 +37,19 @@ export function validateAlmostJunction(context: Context): ValidatorFunction {
   // Comes from considering bounding case of perpendicular ways
   const SIG_ANGLE_TH = Math.atan(WELD_TH_METERS / EXTEND_TH_METERS);
 
-  /** Tests whether the entity is a routable highway. */
+  /**
+   * Tests whether the entity is a routable highway.
+   * @param entity
+   */
   function isHighway(entity: OsmEntity): boolean {
     if (entity.type !== 'way') return false;
     return !!schema!.getScope('osm').rulesets.get('connected_highway')?.match({ highway: entity.tags.highway });
   }
 
-  /** Tests whether the node is tagged as not continuing (noexit, entrance, or parking entrance). */
+  /**
+   * Tests whether the node is tagged as not continuing (noexit, entrance, or parking entrance).
+   * @param node
+   */
   function isTaggedAsNotContinuing(node: OsmNode): boolean {
     return node.tags.noexit === 'yes'
       || node.tags.amenity === 'parking_entrance'
@@ -185,7 +192,10 @@ export function validateAlmostJunction(context: Context): ValidatorFunction {
       return fixes;
     }
 
-    /** Renders the issue reference text into the given selection. */
+    /**
+     * Renders the issue reference text into the given selection.
+     * @param $selection
+     */
     function showReference($selection: D3Selection): void {
       $selection.selectAll('.issue-reference')
         .data([0])
@@ -314,7 +324,11 @@ export function validateAlmostJunction(context: Context): ValidatorFunction {
     }
 
 
-    /** Tests whether a tag value is defined and not `'no'`. */
+    /**
+     * Tests whether a tag value is defined and not `'no'`.
+     * @param tags
+     * @param key
+     */
     function hasTag(tags: OsmTags, key: string): boolean {
       return tags[key] !== undefined && tags[key] !== 'no';
     }

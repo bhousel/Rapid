@@ -56,10 +56,18 @@ export interface JoinedWaysResult<T extends OsmRelationMember | OsmWay = OsmRela
  * @returns Array of joined way sequences, each with a `nodes` property
  */
 export function osmJoinWays<T extends OsmRelationMember | OsmWay>(toJoin: T[], graph: Graph): JoinedWaysResult<T> {
+  /**
+   *
+   * @param member
+   */
   function resolve(member: T): OsmNode[] {
     return graph.childNodes(graph.entity(member.id) as OsmWay);
   }
 
+  /**
+   *
+   * @param item
+   */
   function reverse(item: T): T {
     const action = actionReverse(item.id, { reverseOneway: true });
     sequences.actions.push(action);

@@ -25,6 +25,7 @@ export class PixiLayerOsmNotes extends AbstractPixiLayer {
 
   /**
    * Whether the Layer's service exists
+   * @return  `true` if the OSM service is registered
    */
   public get supported() {
     return !!this.context.services.osm;
@@ -34,10 +35,14 @@ export class PixiLayerOsmNotes extends AbstractPixiLayer {
   /**
    * Whether the user has chosen to see the Layer
    * Make sure to start the service first.
+   * @return  `true` if the layer is enabled
    */
   public get enabled() {
     return this._enabled;
   }
+  /** Enables or disables this layer; starts the OSM service when enabling.
+   * @param val - `true` to enable the layer, `false` to disable it
+   */
   public set enabled(val) {
     if (!this.supported) {
       val = false;
@@ -65,6 +70,8 @@ export class PixiLayerOsmNotes extends AbstractPixiLayer {
 
 
   /**
+  /**
+   * Renders the OSM note markers for this frame.
    * @param  frame    -  Integer frame being rendered
    * @param  viewport -  Pixi viewport to use for rendering
    */

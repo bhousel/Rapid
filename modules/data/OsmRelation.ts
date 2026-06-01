@@ -74,6 +74,7 @@ export class OsmRelation extends OsmEntity {
 
   /**
    * get/set the members property
+   * @return  Array of relation member descriptors
    * @readonly
    */
   public get members(): OsmRelationMember[] {
@@ -351,7 +352,10 @@ export class OsmRelation extends OsmEntity {
    * with id `replacement.id`, type `replacement.type`, and the original role,
    * By default, adding a duplicate member (by id and role) is prevented.
    * @param needle - the member to find
+   * @param needle.id
    * @param replacement - the member to replace it with
+   * @param replacement.id
+   * @param replacement.type
    * @param keepDuplicates - `true` to preserve duplicate members
    * @return A new Relation copied from this Relation, but with the updated members list
    */
@@ -469,6 +473,10 @@ export class OsmRelation extends OsmEntity {
     outers = osmJoinWays(outers, graph);
     inners = osmJoinWays(inners, graph);
 
+    /**
+     *
+     * @param sequence
+     */
     function sequenceToLineString(sequence: any): Vec2[] {
       // close unclosed parts to ensure correct area rendering - iD#2945
       if (sequence.nodes.length > 2 && sequence.nodes.at(0) !== sequence.nodes.at(-1)) {
@@ -486,6 +494,10 @@ export class OsmRelation extends OsmEntity {
       return [d3_geoArea({ type: 'Polygon', coordinates: [o] }) > 2 * Math.PI ? o.reverse() : o];
     });
 
+    /**
+     *
+     * @param inner
+     */
     function findOuter(inner: Vec2[]): number | undefined {
       let o: number;
       let outer: Vec2[];

@@ -32,12 +32,18 @@ const MAX_Z = 24;
  */
 export class MapSystem extends AbstractSystem {
 
+  /** Available area-fill modes, in display order */
   public readonly areaFillOptions: AreaFillMode[];
 
+  /** Whether edited features are rendered with a highlight overlay */
   protected _highlightEdits: boolean;
+  /** The currently active area-fill mode ('wireframe', 'partial', or 'full') */
   protected _currFillMode: AreaFillMode;
+  /** The most-recently used non-wireframe fill mode, used when toggling out of wireframe */
   protected _toggleFillMode: AreaFillMode;
+  /** Keyboard shortcut strings for map operations (populated during startAsync) */
   protected _keys: string[] | null;
+  /** D3 selection of the parent container element that holds the map canvas */
   protected _$parent: D3Selection | null;
 
 
@@ -759,24 +765,90 @@ export class MapSystem extends AbstractSystem {
 
 
   // convenience methods for zooming in and out
+  /**
+   * Zooms in by the given number of zoom levels with a short ease.
+   * @param delta - Number of zoom levels to add
+   * @return  `this` for chaining
+   */
   protected _zoomIn(delta: number): this  { return this.setMapParams(undefined, ~~(this.zoom() as number) + delta, undefined, 250); }
+  /**
+   * Zooms out by the given number of zoom levels with a short ease.
+   * @param delta - Number of zoom levels to subtract
+   * @return  `this` for chaining
+   */
   protected _zoomOut(delta: number): this { return this.setMapParams(undefined, ~~(this.zoom() as number) - delta, undefined, 250); }
 
+  /** Zooms in by 1 zoom level with a short ease.
+   * @return  `this` for chaining
+   */
   public zoomIn(): this        { return this._zoomIn(1); }
+  /** Zooms in by 4 zoom levels with a short ease.
+   * @return  `this` for chaining
+   */
   public zoomInFurther(): this { return this._zoomIn(4); }
+  /** Returns `true` if the map can still zoom in (i.e. current zoom < MAX_Z).
+   * @return  `true` if the map can zoom in further
+   */
   public canZoomIn(): boolean  { return (this.zoom() as number) < MAX_Z; }
 
+  /** Zooms out by 1 zoom level with a short ease.
+   * @return  `this` for chaining
+   */
   public zoomOut(): this        { return this._zoomOut(1); }
+  /** Zooms out by 4 zoom levels with a short ease.
+   * @return  `this` for chaining
+   */
   public zoomOutFurther(): this { return this._zoomOut(4); }
+  /** Returns `true` if the map can still zoom out (i.e. current zoom > MIN_Z).
+   * @return  `true` if the map can zoom out further
+   */
   public canZoomOut(): boolean  { return (this.zoom() as number) > MIN_Z; }
 
+  /**
+   * Sets the map center and zoom (no easing).
+   * @param loc2 - Target center as `[lon, lat]`
+   * @param z2 - Target zoom level
+   * @param duration - Transition duration in milliseconds (default 0)
+   * @return  `this` for chaining
+   */
   public centerZoom(loc2: Vec2, z2: number, duration: number = 0): this  { return this.setMapParams(loc2, z2, undefined, duration); }
 
   // convenience methods for the above, but with easing
+  /**
+   * Eases the map to the given transform.
+   * @param t2 - Target transform properties
+   * @param duration - Transition duration in milliseconds (default 250)
+   * @return  The current transform, or `this` for chaining
+   */
   public transformEase(t2: TransformProps, duration: number = 250): TransformProps | this  { return this.transform(t2, duration); }
+  /**
+   * Eases the map to the given center and zoom.
+   * @param loc2 - Target center as `[lon, lat]`
+   * @param z2 - Target zoom level
+   * @param duration - Transition duration in milliseconds (default 250)
+   * @return  `this` for chaining
+   */
   public centerZoomEase(loc2: Vec2, z2: number, duration: number = 250): this  { return this.setMapParams(loc2, z2, undefined, duration); }
+  /**
+   * Eases the map to the given center, keeping the current zoom.
+   * @param loc2 - Target center as `[lon, lat]`
+   * @param duration - Transition duration in milliseconds (default 250)
+   * @return  `this` for chaining
+   */
   public centerEase(loc2: Vec2, duration: number = 250): this  { return this.setMapParams(loc2, undefined, undefined, duration); }
+  /**
+   * Eases the map to the given zoom, keeping the current center.
+   * @param z2 - Target zoom level
+   * @param duration - Transition duration in milliseconds (default 250)
+   * @return  `this` for chaining
+   */
   public zoomEase(z2: number, duration: number = 250): this  { return this.setMapParams(undefined, z2, undefined, duration); }
+  /**
+   * Eases the map to fit the given entities within the view.
+   * @param entities - A single entity or array of entities to fit
+   * @param duration - Transition duration in milliseconds (default 250)
+   * @return  `this` for chaining
+   */
   public fitEntitiesEase(entities: any | any[], duration: number = 250): this  { return this.fitEntities(entities, duration); }
 
 
@@ -891,10 +963,14 @@ export class MapSystem extends AbstractSystem {
 
   /**
    * set/get whether to show edited features in a special style
+   * @return  `true` if edited features are highlighted
    */
   public get highlightEdits(): boolean {
     return this._highlightEdits;
   }
+  /** Sets the `highlightEdits` flag and triggers a scene redraw.
+   * @param val - `true` to highlight edited features, `false` to use normal styling
+   */
   public set highlightEdits(val: boolean) {
     if (this._highlightEdits === val) return;  // no change
 
@@ -909,10 +985,14 @@ export class MapSystem extends AbstractSystem {
 
   /**
    * set/get the area fill mode - one of 'full', 'partial' (default), or 'wireframe'
+   * @return  Current area fill mode
    */
   public get areaFillMode(): AreaFillMode {
     return this._currFillMode;
   }
+  /** Sets the area fill mode ('full', 'partial', or 'wireframe') and persists it to storage.
+   * @param val - Desired fill mode: `'full'`, `'partial'`, or `'wireframe'`
+   */
   public set areaFillMode(val: AreaFillMode) {
     const context = this.context;
     const gfx = context.systems.gfx!;
@@ -937,10 +1017,14 @@ export class MapSystem extends AbstractSystem {
 
   /**
    * set/get whether the area fill mode is set to 'wireframe'
+   * @return  `true` if wireframe mode is active
    */
   public get wireframeMode(): boolean {
     return this._currFillMode === 'wireframe';
   }
+  /** Switches wireframe mode on/off (preserves last non-wireframe fill mode for toggle-back).
+   * @param val - `true` to enter wireframe mode, `false` to restore the previous fill mode
+   */
   public set wireframeMode(val: boolean) {
     if (val) {
       if (this.areaFillMode !== 'wireframe') {

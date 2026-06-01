@@ -51,13 +51,20 @@ export interface NormalizedWheelEvent extends WheelEvent {
  *   `wheel`             Fires on supersurface.wheel, receives a DOM WheelEvent + some properties containing normalized wheel delta values
  */
 export class PixiEvents extends EventEmitter {
+  /** Reference to the owning GraphicsSystem */
   public gfx: GraphicsSystem;
+  /** Global shared application context */
   public context: Context;
+  /** Whether the pointer is currently over the Pixi renderer canvas */
   public pointerOverRenderer: boolean;
+  /** Set of currently held modifier keys (e.g. 'Alt', 'Control', 'Meta', 'Shift') */
   public modifierKeys: Set<string>;
+  /** Most recently seen pointer coordinates in screen, map, and world space */
   public coord: CoordData;
 
+  /** Whether event dispatching is currently enabled */
   protected _enabled: boolean;
+  /** Default behavior for the mouse wheel: 'zoom' or 'auto' (let the browser decide) */
   protected _wheelDefault: 'auto' | 'zoom';
 
   /**
@@ -99,6 +106,7 @@ export class PixiEvents extends EventEmitter {
 
   /**
    * Whether the events are enabled
+   * @return  `true` if pointer and keyboard events are bound
    * @readonly
    */
   public get enabled(): boolean {

@@ -239,6 +239,10 @@ export class ValidationSystem extends AbstractSystem {
     }
     return result;
 
+    /**
+     *
+     * @param str
+     */
     function makeRegExp(str: string): RegExp {
       const escaped = str
         .replace(/[-\/\\^$+?.()|[\]{}]/g, '\\$&')   // escape all reserved chars except for the '*'
@@ -431,6 +435,7 @@ export class ValidationSystem extends AbstractSystem {
 
 
   /**
+   * Returns the icon name to display for a given issue severity.
    * @param severity - one of 'error', 'warning', 'suggestion', or 'resolved'
    * @return The name of the icon to use
    */
@@ -497,6 +502,7 @@ export class ValidationSystem extends AbstractSystem {
 
 
   /**
+   * Returns the IDs of all registered validators.
    * @return An Array containing all available validator IDs
    */
   public getValidatorIDs(): ValidatorID[] {
@@ -505,6 +511,7 @@ export class ValidationSystem extends AbstractSystem {
 
 
   /**
+   * Reports whether the given validator is currently enabled.
    * @param validatorID - The validatorID (e.g. 'crossing_ways')
    * @return true/false
    */

@@ -29,13 +29,20 @@ type DashTextureCache = Record<string, PIXI.Texture>;
  *   `loaded`   `true` after the patterns have finished loading
  */
 export class PixiTextures {
+  /** Reference to the owning GraphicsSystem */
   public gfx: GraphicsSystem;
+  /** Global shared application context */
   public context: Context;
+  /** Whether all pattern textures have been loaded and the manager is ready */
   public loaded: boolean;
 
+  /** The active texture atlas collection (small / medium / large bins) */
   protected _atlas: AtlasCollection | null;
+  /** All named textures keyed by a unique string (e.g. 'symbol-boldPin') */
   protected _textureData: Map<string, TextureData>;
+  /** SVG symbol elements (or null if failed) keyed by icon name (e.g. 'temaki-school') */
   protected _svgIcons: Map<string, SVGSymbolElement | null>;
+  /** Cached textures used by the DashLine plugin, keyed by dash pattern string */
   protected _dashTextureCache: DashTextureCache;
 
 
@@ -165,6 +172,7 @@ export class PixiTextures {
 
 
   /**
+   * Returns a cached texture by atlas and texture ID, converting SVG icons on demand.
    * @param atlasID - One of 'symbol', 'text', or 'tile'
    * @param textureID - e.g. 'boldPin', 'Main Street-normal', 'Bing-0,1,2'
    * @returns The texture (or `null` if not found)
@@ -198,6 +206,7 @@ export class PixiTextures {
 
 
   /**
+   * Returns a texture rendering the first slab of the given atlas, for debugging.
    * @param atlasID - One of 'symbol', 'text', or 'tile'
    * @returns Texture for the specified atlas
    * @throws Throws if passed an invalid atlasID
@@ -426,6 +435,7 @@ export class PixiTextures {
 
 
   /**
+   * Converts a registered SVG icon into a texture and caches it.
    * @param textureID - Icon identifier (e.g. 'temaki-school')
    */
   protected _svgIconToTexture(textureID: TextureID): void {

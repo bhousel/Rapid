@@ -54,6 +54,7 @@ export class WikipediaService extends AbstractSystem {
 
 
   /**
+   * Searches Wikipedia article titles matching a query and returns them via the callback.
    * @param lang - language code
    * @param query - string to search for
    * @param callback - errback-style callback function to call with results
@@ -96,6 +97,7 @@ export class WikipediaService extends AbstractSystem {
 
 
   /**
+   * Returns autocomplete suggestions for a Wikipedia search query via the callback.
    * @param lang - language code
    * @param query - string to search for
    * @param callback - errback-style callback function to call with results
@@ -134,6 +136,7 @@ export class WikipediaService extends AbstractSystem {
 
 
   /**
+   * Looks up the translations (langlinks) of a Wikipedia article via the callback.
    * @param lang - language code
    * @param title - string to search for
    * @param callback - errback-style callback function to call with results

@@ -26,6 +26,7 @@ export class PixiLayerMapillarySigns extends AbstractPixiLayer {
 
   /**
    * Whether the Layer's service exists
+   * @return  `true` if the Mapillary service is registered
    */
   public get supported() {
     return !!this.context.services.mapillary;
@@ -35,10 +36,14 @@ export class PixiLayerMapillarySigns extends AbstractPixiLayer {
   /**
    * Whether the user has chosen to see the Layer
    * Make sure to start the service first.
+   * @return  `true` if the layer is enabled
    */
   public get enabled() {
     return this._enabled;
   }
+  /** Enables or disables this layer; starts the Mapillary service when enabling.
+   * @param val - `true` to enable the layer, `false` to disable it
+   */
   public set enabled(val) {
     if (!this.supported) {
       val = false;
@@ -66,6 +71,8 @@ export class PixiLayerMapillarySigns extends AbstractPixiLayer {
 
 
   /**
+  /**
+   * Filters the sign markers by the current date range.
    * @param  markers - all markers
    * @return markers with filtering applied
    */
@@ -90,6 +97,7 @@ export class PixiLayerMapillarySigns extends AbstractPixiLayer {
 
 
   /**
+   * Renders the Mapillary traffic-sign markers for this frame.
    * @param  frame     Integer frame being rendered
    * @param  viewport  Pixi viewport to use for rendering
    */

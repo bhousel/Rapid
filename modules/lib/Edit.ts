@@ -24,10 +24,15 @@ export interface EditProps {
  */
 export class Edit {
 
+  /** Human-readable description of what was changed (used for undo/redo menu) */
   public annotation: string | undefined;
+  /** The Graph state after this edit was applied */
   public graph: Graph;
+  /** IDs of entities that were selected when this edit was committed */
   public selectedIDs: EntityID[] | undefined;
+  /** Imagery, photo, and data sources used to make this edit (shown in changeset comment) */
   public sources: Record<string, unknown>;
+  /** Map viewport transform at the time this edit was made */
   public transform: TransformProps | undefined;
 
 

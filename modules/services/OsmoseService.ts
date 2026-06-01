@@ -65,8 +65,11 @@ interface OsmoseIssueStrings {
 export class OsmoseService extends AbstractSystem {
 
   // persistent data - loaded at start
+  /** Map<itemType, hex color> mapping Osmose item type numbers to display colors */
   protected _osmoseColors: Map<number, number>;
+  /** Map<locale, issue strings> — lazily fetched localized strings for each issue type */
   protected _osmoseStrings: Map<string, Record<string, OsmoseIssueStrings>>;
+  /** Static Osmose data loaded at startup (icons and issue type list) */
   protected _osmoseData: OsmoseData;
 
   /** Internal cache for Osmose data, spatial index, and request tracking */
@@ -296,8 +299,9 @@ export class OsmoseService extends AbstractSystem {
 
 
   /**
-   * @param itemType
-   * @param locale
+   * Returns the localized display strings for a given Osmose issue type.
+   * @param itemType - The Osmose issue type
+   * @param locale - Optional locale code (defaults to the current locale)
    * @return stringdata
    */
   public getStrings(itemType: string, locale?: string): OsmoseIssueStrings {

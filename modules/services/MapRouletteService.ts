@@ -198,11 +198,15 @@ export class MapRouletteService extends AbstractSystem {
 
   /**
    * set/get the challengeIDs (as a string of comma-separated values)
+   * @return  Comma-separated string of active challenge IDs
    */
   public get challengeIDs(): string {
     return [...this._challengeIDs].join(',');
   }
 
+  /** Parses comma-separated challenge IDs (numeric), clears non-numeric values, and triggers a redraw.
+   * @param ids - Comma-separated string of numeric challenge IDs
+   */
   public set challengeIDs(ids: string) {
     const str = ids.toString();
     const vals = str.split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
@@ -241,7 +245,8 @@ export class MapRouletteService extends AbstractSystem {
 
 
   /**
-   * @param dataID
+   * Returns a cached MapRoulette task by ID.
+   * @param dataID - The task's data ID
    * @return The task with that id, or `undefined` if not found
    */
   public getTask(dataID: DataID): MapRouletteTask | undefined {
@@ -251,7 +256,8 @@ export class MapRouletteService extends AbstractSystem {
 
 
   /**
-   * @param challengeID
+   * Returns a cached MapRoulette challenge by ID.
+   * @param challengeID - The challenge ID
    * @return The challenge with that id, or `undefined` if not found
    */
   public getChallenge(challengeID: string): ChallengeData | undefined {
@@ -439,8 +445,9 @@ export class MapRouletteService extends AbstractSystem {
 
 
   /**
-   * @param task
-   * @param callback
+   * Posts a status update (and optional comment) for a MapRoulette task.
+   * @param task - The task to update
+   * @param callback - Optional errback invoked when the update completes
    */
   public postUpdate(task: MapRouletteTask, callback?: (err: string | null, task?: MapRouletteTask) => void): void {
     const network = this.context.systems.network!;

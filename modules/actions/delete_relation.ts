@@ -48,6 +48,11 @@ export function actionDeleteRelation(relationID: EntityID, doDeleteDegenerate: b
   };
 
 
+  /**
+   *
+   * @param entity
+   * @param graph
+   */
   function canDeleteEntity(entity: OsmEntity, graph: Graph): boolean {
     return !graph.parentWays(entity).length &&
       !graph.parentRelations(entity).length &&

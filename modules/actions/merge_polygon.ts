@@ -156,6 +156,10 @@ export function actionMergePolygon(ids: EntityID[], newRelationID: EntityID): Ac
     });
 
     entities.closedWay.forEach((way: OsmWay) => {
+      /**
+       *
+       * @param m
+       */
       function isThisOuter(m: OsmRelationMember): boolean {
         return m.id === way.id && m.role !== 'inner';
       }

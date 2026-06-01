@@ -322,7 +322,9 @@ export class MapillaryService extends AbstractSystem {
   }
 
 
-  /** Public accessor for the embedded Mapillary viewer instance. */
+  /** Public accessor for the embedded Mapillary viewer instance.
+   * @return  The Mapillary viewer, or `null` if not initialized
+   */
   public get viewer(): Viewer | null {
     return this._viewer;
   }
@@ -502,6 +504,7 @@ export class MapillaryService extends AbstractSystem {
   /**
    * Apply filters to the Mapillary viewer
    * The filters settings are stored in the PhotoSystem
+   * @return  The filter expression applied to the viewer
    */
   public filterViewer(): FilterExpression {
     const photos = this.context.systems.photos!;
@@ -823,6 +826,7 @@ export class MapillaryService extends AbstractSystem {
    * Segmentations are called "tags" in the Mapillary viewer.
    * Here we create a single tag for the given segmentation.
    * @param  segmentation - the segmentation to make a tag for
+   * @return  The created outline tag, or `undefined` if it can't be made
    */
   protected _makeTag(segmentation: SegmentationData): OutlineTag | undefined {
     const valueParts = segmentation.value.split('--');

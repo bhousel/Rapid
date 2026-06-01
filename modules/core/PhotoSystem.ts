@@ -30,14 +30,22 @@ export type DateFilter = 'fromDate' | 'toDate';
  */
 export class PhotoSystem extends AbstractSystem {
 
+  /** ID of the currently visible photo layer (e.g. 'mapillary', 'streetside') */
   protected _currPhotoLayerID: PhotoLayerID | null = null;
+  /** ID of the currently selected photo */
   protected _currPhotoID: PhotoID | null = null;
+  /** ID of the layer containing the currently selected detection */
   protected _currLayerID: LayerID | null = null;
+  /** ID of the currently selected detection */
   protected _currDetectionID: DetectionID | null = null;
 
+  /** Photo types currently shown (e.g. 'flat', 'panoramic') */
   protected _filterPhotoTypes: Set<PhotoType>;
+  /** Earliest capture date accepted by the date filter (ISO date string), or null for no lower bound */
   protected _filterFromDate: string | null = null;
+  /** Latest capture date accepted by the date filter (ISO date string), or null for no upper bound */
   protected _filterToDate: string | null = null;
+  /** Usernames to include in the photo filter, or null to show all users */
   protected _filterUsernames: string[] | null = null;
 
 
@@ -308,6 +316,7 @@ export class PhotoSystem extends AbstractSystem {
 
 
   /**
+   * The complete set of layerIDs managed by this system (photo and detection layers).
    * @return  All available layerIDs
    * @readonly
    */
@@ -316,6 +325,7 @@ export class PhotoSystem extends AbstractSystem {
   }
 
   /**
+   * The layerIDs that show street-level photos (excludes detection layers).
    * @return  All available photo layerIDs
    * @readonly
    */
@@ -324,6 +334,7 @@ export class PhotoSystem extends AbstractSystem {
   }
 
   /**
+   * The layerIDs that show detections (detected objects and traffic signs).
    * @return  All available detection layerIDs
    * @readonly
    */
@@ -332,6 +343,7 @@ export class PhotoSystem extends AbstractSystem {
   }
 
   /**
+   * The photo types that the type filter can toggle.
    * @return  All available photo types
    * @readonly
    */
@@ -340,6 +352,7 @@ export class PhotoSystem extends AbstractSystem {
   }
 
   /**
+   * The date filter keys supported by `setDateFilter` / `dateFilterValue`.
    * @return  All available date filters
    * @readonly
    */
@@ -348,6 +361,7 @@ export class PhotoSystem extends AbstractSystem {
   }
 
   /**
+   * The lower bound of the capture-date filter; photos captured before this date are hidden.
    * @return  The from date filter value, as YYYY-MM-DD, or null if unset
    * @readonly
    */
@@ -356,6 +370,7 @@ export class PhotoSystem extends AbstractSystem {
   }
 
   /**
+   * The upper bound of the capture-date filter; photos captured after this date are hidden.
    * @return  The to date filter value, as YYYY-MM-DD, or null if unset
    * @readonly
    */
@@ -364,6 +379,7 @@ export class PhotoSystem extends AbstractSystem {
   }
 
   /**
+   * The usernames used to filter photos; only photos from these users are shown.
    * @return  The usernames filter value, or null if unset
    * @readonly
    */
@@ -372,6 +388,7 @@ export class PhotoSystem extends AbstractSystem {
   }
 
   /**
+   * The layerID of the currently selected photo.
    * @return  The current photo layerID
    * @readonly
    */
@@ -380,6 +397,7 @@ export class PhotoSystem extends AbstractSystem {
   }
 
   /**
+   * The ID of the currently selected photo.
    * @return  The current photoID
    * @readonly
    */
@@ -388,6 +406,7 @@ export class PhotoSystem extends AbstractSystem {
   }
 
   /**
+   * The layerID of the currently selected detection.
    * @return  The current detection layerID
    * @readonly
    */
@@ -396,6 +415,7 @@ export class PhotoSystem extends AbstractSystem {
   }
 
   /**
+   * The ID of the currently selected detection.
    * @return  The current detectionID
    * @readonly
    */
@@ -670,6 +690,7 @@ export class PhotoSystem extends AbstractSystem {
 
 
   /**
+   * Whether the photo viewer is currently visible on screen.
    * @return  `true` if showing, `false` if not
    */
   public isViewerShowing(): boolean {
@@ -680,22 +701,42 @@ export class PhotoSystem extends AbstractSystem {
   }
 
 
+  /** Whether date filtering should be shown (at least one date-filterable layer is active).
+   * @return  `true` if the date filter UI should be shown
+   */
   public shouldFilterByDate(): boolean {
     return !!this.isLayerEnabled('mapillary') || !!this.isLayerEnabled('kartaview') || !!this.isLayerEnabled('streetside');
   }
+  /** Whether photo-type filtering should be shown (Mapillary, or both Streetside and KartaView are active).
+   * @return  `true` if the photo-type filter UI should be shown
+   */
   public shouldFilterByPhotoType(): boolean {
     return !!this.isLayerEnabled('mapillary') || (!!this.isLayerEnabled('streetside') && !!this.isLayerEnabled('kartaview'));
   }
+  /** Whether username filtering should be shown (only KartaView is active, not Mapillary or Streetside).
+   * @return  `true` if the username filter UI should be shown
+   */
   public shouldFilterByUsername(): boolean {
     return !this.isLayerEnabled('mapillary') && !!this.isLayerEnabled('kartaview') && !this.isLayerEnabled('streetside');
   }
+  /**
+   * Whether photos of the given type are currently shown (always true when type filtering is off).
+   * @param val - Photo type to test ('flat' or 'panoramic')
+   * @return  `true` if photos of this type should be shown
+   */
   public showsPhotoType(val: PhotoType): boolean {
     if (!this.shouldFilterByPhotoType()) return true;
     return this._filterPhotoTypes.has(val);
   }
+  /** Whether flat (non-panoramic) photos should be shown.
+   * @return  `true` if flat photos should be shown
+   */
   public showsFlat(): boolean {
     return this.showsPhotoType('flat');
   }
+  /** Whether panoramic (360°) photos should be shown.
+   * @return  `true` if panoramic photos should be shown
+   */
   public showsPanoramic(): boolean {
     return this.showsPhotoType('panoramic');
   }

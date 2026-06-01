@@ -67,7 +67,9 @@ import type {
  *  'bounds'         (returned with the `/map` API call)
  */
 export class OsmJSONParser {
+  /** Unique identifiers already seen by this parser instance (avoids duplicates) */
   protected _seen: Set<string>;
+  /** Accumulates the types of parsed data elements encountered (e.g. 'node', 'way', 'relation') */
   public types: Set<ParserDataType>;
 
   /**

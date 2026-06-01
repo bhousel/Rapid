@@ -28,10 +28,14 @@ export class PixiLayerEditBlocks extends AbstractPixiLayer {
 
   /**
    * This layer should always be enabled
+   * @return  Always `true` — this layer cannot be disabled
    */
   public get enabled(): boolean {
     return true;
   }
+  /** This layer is always enabled; the setter ignores the value and forces `_enabled = true`.
+   * @param val - Ignored; the layer is always forced to enabled
+   */
   public set enabled(val: boolean) {
     this._enabled = true;
   }
@@ -93,6 +97,8 @@ export class PixiLayerEditBlocks extends AbstractPixiLayer {
 
 
   /**
+  /**
+   * Renders the edit-block overlay polygons for this frame.
    * @param frame - Integer frame being rendered
    * @param viewport - Pixi viewport to use for rendering
    * @param blocks - Array of block data visible in the view

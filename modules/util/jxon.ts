@@ -14,7 +14,13 @@ type JxonObject = Record<string, any>;
  * Represents an empty XML node with null-like behavior.
  */
 class EmptyTree {
+  /** Returns the string 'null' — represents an empty/null XML node in serialized form
+   * @return  The string `'null'`
+   */
   public toString(): string { return 'null'; }
+  /** Returns `null` — makes the value null-like in comparisons
+   * @return  `null`
+   */
   public valueOf(): null { return null; }
 }
 
@@ -23,10 +29,15 @@ class EmptyTree {
  * Provides static methods for converting between XML and JavaScript objects.
  */
 export class JXON {
+  /** Property name used to store XML text content in the parsed object */
   protected static readonly _VALUE_PROP = 'keyValue';
+  /** Property name used to store XML attributes in the parsed object */
   protected static readonly _ATTRIBUTES_PROP = 'keyAttributes';
+  /** Prefix applied to each attribute name in the parsed object (e.g. '@id') */
   protected static readonly _ATTR_PREFIX = '@';
+  /** Regex that matches whitespace-only strings (represents null in XML) */
   protected static readonly _RE_IS_NULL = /^\s*$/;
+  /** Regex that matches boolean string literals ('true' or 'false', case-insensitive) */
   protected static readonly _RE_IS_BOOL = /^(?:true|false)$/i;
 
   /** Cache used during tree building */
@@ -35,6 +46,8 @@ export class JXON {
 
   /**
    * Parse text content into appropriate JavaScript type.
+   * @param sValue - The raw XML text content
+   * @return  The parsed value coerced to a suitable JavaScript type
    */
   protected static _parseText(sValue: string): ParsedValue {
     if (JXON._RE_IS_NULL.test(sValue)) { return null; }
@@ -47,6 +60,8 @@ export class JXON {
 
   /**
    * Wrap a value in an object if needed.
+   * @param vValue - The parsed value to wrap
+   * @return  An object representation of the value
    */
   protected static _objectify(vValue: ParsedValue): object {
     if (vValue === null) return new EmptyTree();
@@ -57,6 +72,11 @@ export class JXON {
 
   /**
    * Recursively create a JavaScript object tree from an XML element.
+   * @param oParentNode - The XML element to convert
+   * @param nVerb - Verbosity level controlling how much structure is produced
+   * @param bFreeze - Whether to freeze the resulting objects
+   * @param bNesteAttr - Whether to nest attributes under a separate property
+   * @return  The object tree (or a parsed scalar value for simple nodes)
    */
   protected static _createObjTree(
     oParentNode: Element,
@@ -148,6 +168,9 @@ export class JXON {
 
   /**
    * Recursively load a JavaScript object into an XML document.
+   * @param oXMLDoc
+   * @param oParentEl
+   * @param oParentObj
    */
   protected static _loadObjTree(
     oXMLDoc: Document,

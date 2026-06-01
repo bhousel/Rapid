@@ -46,6 +46,10 @@ export class PixiLayerDebug extends AbstractPixiLayer {
   public render(frame: number, viewport: Viewport): void {
     if (!this.enabled) return;
 
+    /**
+     *
+     * @param entity
+     */
     function _isBuilding(entity: OsmEntity): boolean {
       return entity.type === 'way' && (!!entity.tags.building && entity.tags.building !== 'no');
     }

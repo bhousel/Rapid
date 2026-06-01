@@ -202,6 +202,9 @@ export function actionAddMember(relationID: EntityID, member: OsmRelationMember,
      * segment                 5 4 7 6
      * members       0 1 2 3 x 5 4 7 6 x 8 9    keep 6 in j+k
      * ```
+     * @param arr
+     * @param findIndex
+     * @param toIndex
      */
     function moveMember(arr: IndexedMember[], findIndex: number, toIndex: number): void {
       let i: number;

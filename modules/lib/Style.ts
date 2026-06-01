@@ -204,9 +204,12 @@ export const styleDefaults: MinimalStyleProps = {
  *   `icon`        Icon style properties (rendered in marker)
  */
 
+/** Describes what a map feature should look like (fill, casing, stroke, markers, icons, labels). */
 export class Style {
 
+  /** Global shared application context */
   public context: Context;
+  /** Full props object for this style */
   public props: StyleProps;
 
   /** Unique identifier */
@@ -224,6 +227,7 @@ export class Style {
 
   /**
    * @constructor
+   * @param context
    * @param props - Properties defining the visual style
    * @throws Error if `id` property is missing
    */
@@ -245,44 +249,63 @@ export class Style {
   /**
    * Returns the resolved props (with var() references replaced), or the raw
    * props if no variables have been resolved.
+   * @return  Resolved (or raw) `StyleProps`
    */
   public get resolved(): StyleProps {
     return this._resolved ?? this.props;
   }
 
-  /** Fill style properties. */
+  /** Fill style properties.
+   * @return  Fill `FillStyleProps`, or `undefined` if not set
+   */
   public get fill(): FillStyleProps | undefined {
     return this.resolved.fill;
   }
-  /** Casing style properties. */
+  /** Casing style properties.
+   * @return  Casing `LineStyleProps`, or `undefined` if not set
+   */
   public get casing(): LineStyleProps | undefined {
     return this.resolved.casing;
   }
-  /** Stroke style properties. */
+  /** Stroke style properties.
+   * @return  Stroke `LineStyleProps`, or `undefined` if not set
+   */
   public get stroke(): LineStyleProps | undefined {
     return this.resolved.stroke;
   }
-  /** Marker style properties (point background shape). */
+  /** Marker style properties (point background shape).
+   * @return  Marker `PointStyleProps`, or `undefined` if not set
+   */
   public get marker(): PointStyleProps | undefined {
     return this.resolved.marker;
   }
-  /** Icon style properties (rendered inside marker). */
+  /** Icon style properties (rendered inside marker).
+   * @return  Icon `PointStyleProps`, or `undefined` if not set
+   */
   public get icon(): PointStyleProps | undefined {
     return this.resolved.icon;
   }
-  /** Viewfield style properties */
+  /** Viewfield style properties
+   * @return  Viewfield `ViewfieldStyleProps`, or `undefined` if not set
+   */
   public get viewfield(): ViewfieldStyleProps | undefined {
     return this.resolved.viewfield;
   }
-  /** Line marker style properties (e.g. oneway arrows). */
+  /** Line marker style properties (e.g. oneway arrows).
+   * @return  Line marker `PointStyleProps`, or `undefined` if not set
+   */
   public get lineMarker(): PointStyleProps | undefined {
     return this.resolved.lineMarker;
   }
-  /** Sided marker style properties (e.g. cliffs, retaining walls). */
+  /** Sided marker style properties (e.g. cliffs, retaining walls).
+   * @return  Sided marker `PointStyleProps`, or `undefined` if not set
+   */
   public get sidedMarker(): PointStyleProps | undefined {
     return this.resolved.sidedMarker;
   }
-  /** Label styling properties. */
+  /** Label styling properties.
+   * @return  Label `LabelStyleProps`, or `undefined` if not set
+   */
   public get label(): LabelStyleProps | undefined {
     return this.resolved.label;
   }
@@ -291,6 +314,7 @@ export class Style {
   /**
    * Get resolved style properties with defaults applied for all groups.
    * Layers: defaults ← fallbacks ← props (later values win).
+   * @param userDefaults
    * @return  Resolved style properties
    */
   public resolvedStyle(userDefaults?: Style): MinimalStyleProps {
@@ -418,6 +442,7 @@ export class Style {
 
   /**
    * Whether this style's raw props contain any `var()` references.
+   * @return  `true` if any prop value uses a `var()` reference
    */
   public get hasVarRefs(): boolean {
     return this._hasVarRefs;
@@ -426,6 +451,7 @@ export class Style {
 
   /**
    * Convert to a JSON-serializable object.
+   * @return  A deep clone of the style props suitable for JSON serialization
    */
   public toJSON(): StyleProps {
     return structuredClone(this.props);

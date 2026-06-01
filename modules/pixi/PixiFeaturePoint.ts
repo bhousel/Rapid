@@ -93,6 +93,7 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
 
 
   /**
+   * Updates geometry, style, hit area, and halo if the feature is dirty.
    * @param viewport - Pixi viewport to use for rendering
    */
   public update(viewport: Viewport): void {
@@ -106,6 +107,7 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
 
 
   /**
+   * Updates the container position and z-ordering from the point geometry.
    * @param viewport - Pixi viewport to use for rendering
    */
   public updateGeometry(): void {
@@ -135,6 +137,7 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
 
 
   /**
+   * Updates the marker, icon, and viewfield display sprites from the current style.
    * @param viewport - Pixi viewport to use for rendering
    */
   public updateStyle(viewport: Viewport): void {
@@ -352,6 +355,7 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
 
 
 // experiment
+  /** Recalculates the interactive hit area for this point feature based on its current bounds. */
   public updateHitArea(): void {
     if (!this.visible) return;
 

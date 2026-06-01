@@ -33,7 +33,9 @@ const fovLengthInterp: ScaleLinear<number, number> = scaleLinear([90, 10], [0.7,
  * @class
  */
 export class PixiLayerMapillaryPhotos extends AbstractPixiLayer {
+  /** Current bearing of the Mapillary street-level viewer (null when no photo is open) */
   protected _viewerBearing: number | null;
+  /** Current horizontal field-of-view of the Mapillary viewer in degrees */
   protected _viewerFov: number;
 
   /**
@@ -115,6 +117,7 @@ export class PixiLayerMapillaryPhotos extends AbstractPixiLayer {
 
   /**
    * Whether the Layer's service exists
+   * @return  `true` if the Mapillary service is registered
    */
   public get supported() {
     return !!this.context.services.mapillary;
@@ -124,10 +127,14 @@ export class PixiLayerMapillaryPhotos extends AbstractPixiLayer {
   /**
    * Whether the user has chosen to see the Layer
    * Make sure to start the service first.
+   * @return  `true` if the layer is enabled
    */
   public get enabled() {
     return this._enabled;
   }
+  /** Enables or disables this layer; disabling will set `val` to false even if `supported` is true.
+   * @param val - `true` to enable the layer, `false` to disable it
+   */
   public set enabled(val) {
     if (!this.supported) {
       val = false;
@@ -147,6 +154,8 @@ export class PixiLayerMapillaryPhotos extends AbstractPixiLayer {
 
 
   /**
+  /**
+   * Filters the photo markers by the current date range, username, and photo-type settings.
    * @param markers - all markers
    * @return markers with filtering applied
    */
@@ -220,6 +229,7 @@ export class PixiLayerMapillaryPhotos extends AbstractPixiLayer {
 
 
   /**
+   * Renders the Mapillary photo markers and sequences for this frame.
    * @param frame - Integer frame being rendered
    * @param viewport - Pixi viewport to use for rendering
    */

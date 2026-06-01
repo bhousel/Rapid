@@ -214,16 +214,32 @@ export function actionConnect(nodeIDs: EntityID[]): Action {
 
 
     // if a key node appears multiple times (indexOf !== lastIndexOf) it's a FROM-VIA or TO-VIA junction
+    /**
+     *
+     * @param n
+     * @param i
+     * @param arr
+     */
     function hasDuplicates(n: EntityID, i: number, arr: EntityID[]): boolean {
       return arr.indexOf(n) !== arr.lastIndexOf(n);
     }
 
+    /**
+     *
+     * @param froms
+     * @param tos
+     */
     function keyNodeFilter(froms: EntityID[], tos: EntityID[]): (n: EntityID) => boolean {
       return function(n: EntityID): boolean {
         return froms.indexOf(n) === -1 && tos.indexOf(n) === -1;
       };
     }
 
+    /**
+     *
+     * @param member
+     * @param collection
+     */
     function collectNodes(member: OsmRelationMember, collection: Record<string, EntityID[]>): void {
       const entity = graph.hasEntity(member.id);
       if (!entity) return;

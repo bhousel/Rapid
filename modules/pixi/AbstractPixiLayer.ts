@@ -119,6 +119,9 @@ export class AbstractPixiLayer {
   public get enabled(): boolean {
     return this._enabled;
   }
+  /** Enables or disables this layer; derived classes may override to perform additional work.
+   * @param val - `true` to enable the layer, `false` to disable it
+   */
   public set enabled(val: boolean) {
     if (val === this._enabled) return;  // no change
     this._enabled = val;

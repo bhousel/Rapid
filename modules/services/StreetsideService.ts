@@ -310,7 +310,9 @@ export class StreetsideService extends AbstractSystem {
   }
 
 
-  /** Public accessor for the embedded Streetside viewer instance. */
+  /** Public accessor for the embedded Streetside viewer instance.
+   * @return  The Streetside viewer instance
+   */
   public get viewer(): any {
     return this._viewer;
   }
@@ -410,6 +412,7 @@ export class StreetsideService extends AbstractSystem {
    * Note:  most code should call `PhotoSystem.selectPhoto(layerID, photoID)` instead.
    * That will manage the state of what the user clicked on, and then call this function.
    * @param imageID - the id of the image to select
+   * @param bubbleID
    * @return Promise that resolves to the image after it has been selected
    */
   public selectImageAsync(bubbleID: Nullable<PhotoID>): Promise<MarkerData | void> {
@@ -1011,7 +1014,10 @@ export class StreetsideService extends AbstractSystem {
 
 
   /**
+   * Fetches Bing Streetside imagery metadata for the tile's location.
    * https://learn.microsoft.com/en-us/bingmaps/rest-services/imagery/get-imagery-metadata
+   * @param tile - The tile to fetch metadata for
+   * @return  A promise for the metadata, or nothing if already fetched
    */
   protected _fetchMetadataAsync(tile: Tile): Promise<unknown> | void {
     const cache = this._cache;
@@ -1034,6 +1040,7 @@ export class StreetsideService extends AbstractSystem {
   /**
    * bubbles:   undocumented / unsupported API?
    * see Rapid#1305, iD#10100
+   * @param tile
    */
   protected _loadTileAsync(tile: Tile): Promise<void> {
     const network = this.context.systems.network!;
@@ -1114,6 +1121,7 @@ export class StreetsideService extends AbstractSystem {
   /**
    * Called when setting up the viewer, creates 6 canvas elements to load image data into,
    * so that it can be stitched together into a photosphere.
+   * @param $selection
    */
   protected _setupCanvas($selection: D3Selection): void {
     $selection.selectAll('#rapideditor-stitcher-canvases')

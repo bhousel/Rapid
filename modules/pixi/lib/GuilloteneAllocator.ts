@@ -53,22 +53,50 @@ export interface AllocatedRect extends PIXI.Rectangle {
  */
 class Area {
 
+  /**
+   * Packs the open offset, close offset, and orientation into a single bitfield.
+   * @param openOffset - The open (start) offset
+   * @param closeOffset - The close (end) offset
+   * @param orientation - The split orientation
+   * @return  The packed area bitfield
+   */
   public static makeArea(openOffset: number, closeOffset: number, orientation: AreaOrientation): number {
     return openOffset | (closeOffset << 15) | (orientation << 30);
   }
 
+  /**
+   * Extracts the open (start) offset from an area bitfield.
+   * @param area - The packed area bitfield
+   * @return  The open offset
+   */
   public static getOpenOffset(area: number): number {
     return area & ((1 << 15) - 1);
   }
 
+  /**
+   * Extracts the close (end) offset from an area bitfield.
+   * @param area - The packed area bitfield
+   * @return  The close offset
+   */
   public static getCloseOffset(area: number): number {
     return (area >> 15) & ((1 << 15) - 1);
   }
 
+  /**
+   * Extracts the split orientation from an area bitfield.
+   * @param area - The packed area bitfield
+   * @return  The split orientation
+   */
   public static getOrientation(area: number): AreaOrientation {
     return (area >> 30) & 1;
   }
 
+  /**
+   * Returns a new area bitfield with the open offset replaced.
+   * @param area - The packed area bitfield
+   * @param offset - The new open offset
+   * @return  The updated area bitfield
+   */
   public static setOpenOffset(area: number, offset: number): number {
     return Area.makeArea(
       offset,
@@ -77,6 +105,12 @@ class Area {
     );
   }
 
+  /**
+   * Returns a new area bitfield with the close offset replaced.
+   * @param area - The packed area bitfield
+   * @param offset - The new close offset
+   * @return  The updated area bitfield
+   */
   public static setCloseOffset(area: number, offset: number): number {
     return Area.makeArea(
       Area.getOpenOffset(offset),
@@ -88,12 +122,21 @@ class Area {
 
 
 
+/** Guillotine texture atlas allocator — splits free rectangular areas by bisection. */
 export class GuilloteneAllocator {
+  /** Reusable scratch rectangle to avoid per-allocation allocations */
   protected _tempRect: PIXI.Rectangle;
+  /** Total width of the managed texture region */
   protected _width: number;
+  /** Total height of the managed texture region */
   protected _height: number;
+  /** Root of the binary area tree */
   protected _root: AreaNode;
 
+  /**
+   * @param width
+   * @param height
+   */
   public constructor(width: number, height: number) {
     this._tempRect = new PIXI.Rectangle();
     this._width = width;
@@ -145,10 +188,16 @@ export class GuilloteneAllocator {
     this._merge(area);
   }
 
+  /** Width of the managed texture region.
+   * @return  Total width in pixels
+   */
   public get width(): number {
     return this._width;
   }
 
+  /** Height of the managed texture region.
+   * @return  Total height in pixels
+   */
   public get height(): number {
     return this._height;
   }
@@ -218,7 +267,9 @@ export class GuilloteneAllocator {
 
   /**
    * Returns the children of the passed node, if any.
-   * @param node
+   * @param node - The node whose children are needed
+   * @return  The child nodes
+   * @throws Error if the node has no children
    */
   public getChildren(node: AreaNode): AreaNode[] {
     if (!Array.isArray(node[2])) {
@@ -227,6 +278,11 @@ export class GuilloteneAllocator {
     return node[2];
   }
 
+  /**
+   * Appends one or more child nodes to the given parent node.
+   * @param parent - The parent node to add children to
+   * @param nodes - The child nodes to append
+   */
   public addChild(parent: AreaNode, ...nodes: AreaNode[]): void {
     parent[2] = Array.isArray(parent[2]) ? parent[2] : [];
     parent[2].push(...nodes);
@@ -235,17 +291,20 @@ export class GuilloteneAllocator {
 
   /**
    * Finds an area node with minimum width `aw` and minimum height `ah`.
-   * @param aw
-   * @param ah
+   * @param aw - The minimum required width
+   * @param ah - The minimum required height
+   * @return  A suitable area node, or `null` if none is available
    */
   public findArea(aw: number, ah: number): AreaNode | null {
     return this.findAreaRecursive(this._root, aw, ah);
   }
 
   /**
-   * @param node
-   * @param aw
-   * @param ah
+   * Recursively searches the subtree rooted at `node` for a free area of at least `aw` × `ah`.
+   * @param node - The subtree root to search
+   * @param aw - The minimum required width
+   * @param ah - The minimum required height
+   * @return  A suitable area node, or `null` if none is available
    */
   public findAreaRecursive(node: AreaNode, aw: number, ah: number): AreaNode | null {
     const frame = this.getFrame(node, this._tempRect);
@@ -371,6 +430,13 @@ export class GuilloteneAllocator {
   }
 
 
+  /**
+   * Splits a leaf area horizontally to carve out a hole, returning the node for the hole.
+   * @param area - The leaf area node to split
+   * @param areaFrame - The rectangle currently covered by `area`
+   * @param holeFrame - The rectangle to carve out
+   * @return  The area node covering the carved-out hole
+   */
   protected _splitPrimaryHorizontal(area: AreaNode, areaFrame: PIXI.Rectangle, holeFrame: PIXI.Rectangle): AreaNode {
     const field = this.getAreaField(area);
     const axis = Area.getOrientation(field);
@@ -424,6 +490,13 @@ export class GuilloteneAllocator {
   }
 
 
+  /**
+   * Splits a leaf area vertically to carve out a hole, returning the node for the hole.
+   * @param area - The leaf area node to split
+   * @param areaFrame - The rectangle currently covered by `area`
+   * @param holeFrame - The rectangle to carve out
+   * @return  The area node covering the carved-out hole
+   */
   protected _splitPrimaryVertical(area: AreaNode, areaFrame: PIXI.Rectangle, holeFrame: PIXI.Rectangle): AreaNode {
     const field = this.getAreaField(area);
     const axis = Area.getOrientation(field);
@@ -477,6 +550,11 @@ export class GuilloteneAllocator {
   }
 
 
+  /**
+   * Frees an area by merging it back into adjacent free siblings, collapsing the tree as needed.
+   * @param area - The leaf area node to merge
+   * @throws Error if called on a non-leaf node
+   */
   protected _merge(area: AreaNode): void {
     if (this.hasChildren(area)) {
       throw new Error('Cannot merge a non-leaf node');
@@ -510,6 +588,10 @@ export class GuilloteneAllocator {
   }
 
 
+  /**
+   * Recursively logs the frames of all leaf areas in the subtree for debugging.
+   * @param area - The subtree root to print
+   */
   public printState(area: AreaNode): void {
     if (!this.hasChildren(area)) {
       console.log({ ...this.getFrame(area) }, area[2]);  // eslint-disable-line no-console

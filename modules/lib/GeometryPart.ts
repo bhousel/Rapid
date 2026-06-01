@@ -78,6 +78,7 @@ export interface GeometryPartLocalData {
  */
 export class GeometryPart {
 
+  /** Global shared application context */
   public context: Context;
   /** Original data, in WGS84 coordinates (longitude, latitude - [0,0] is Null Island) */
   public orig: GeometryPartOrigData | null;

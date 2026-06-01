@@ -274,7 +274,10 @@ export function validateOutdatedTags(context: Context): ValidatorFunction {
     }
 
 
-    /** Renders the issue reference text and suggested tag changes. */
+    /**
+     * Renders the issue reference text and suggested tag changes.
+     * @param $selection
+     */
     function showUpgradeReference($selection: D3Selection): void {
       const enter = $selection.selectAll('.issue-reference')
         .data([0])

@@ -102,17 +102,28 @@ export interface ImagerySourceProps {
  */
 export class ImagerySource {
 
+  /** Global shared application context */
   public context: Context;
+  /** Full properties object (see `ImagerySourceProps`) */
   public props: ImagerySourceProps;
+  /** Unique identifier for this imagery source */
   public id: ImagerySourceID;
+  /** Version of `id` safe for use in CSS selectors and DOM element IDs */
   public safeid: string;
+  /** Alias for `id`; provided for consistency with other schema classes */
   public imageryID: ImagerySourceID;
+  /** Imagery type (e.g. 'tms', 'wms', 'bing', 'wayback') */
   public type: ImageryType | undefined;
+  /** Pixel offset `[dx, dy]` applied when this layer is displayed, to correct for misalignment */
   public offset: Vec2;
 
+  /** Tile URL template (decrypted if the props template was encrypted) */
   protected _template: string;
+  /** Pre-localized display strings keyed by locale code */
   protected _strings: Map<string, ImagerySourceStrings>;
+  /** The locale code in effect when `_currStrings` was last computed */
   protected _currLocaleCode: LocaleCode | null;
+  /** Display strings for the current locale (name, description) */
   protected _currStrings: Partial<ImagerySourceStrings>;
 
 
@@ -260,6 +271,7 @@ export class ImagerySource {
 
   /**
    * Is the imagery valid at the given zoom?
+   * @param z
    * @return `true` if the imagery is valid at the given zoom, `false` if not
    */
   public isValidZoom(z: number): boolean {
@@ -327,6 +339,13 @@ export class ImagerySource {
     let result = urlTemplate;
     if (result === '') return result;   // source 'none'
 
+    /**
+     *
+     * @param proj
+     * @param x
+     * @param y
+     * @param z
+     */
     function _tileToProjectedCoords(proj: string, x: number, y: number, z: number): { x: number; y: number } {
       const zoomSize = 2 ** z;
       const lon = x / zoomSize * TAU - Math.PI;
@@ -555,16 +574,19 @@ export class ImagerySourceCustom extends ImagerySource {
     return `Custom (${cleaned} )`;
   }
 
-  // only 'custom' imagery source allows the template to be changed
+  /** Sets the template URL string (only allowed on 'custom' imagery sources).
+   * @param val - Template URL string (may contain `{x}`, `{y}`, `{z}`, `{apikey}` placeholders)
+   */
   public set template(val: string) {
     this._template = val;
   }
+  /** Returns the template URL string for the custom imagery source.
+   * @return  Template URL string
+   */
   public get template(): string {
     return this._template;
   }
 }
-
-
 /**
  * A special imagery source for the Bing imagery source.
  * There should be more overrides in here, but they aren't currently working.
@@ -596,8 +618,11 @@ export class ImagerySourceBing extends ImagerySource {
  * Overrides the getMetadata function to get more imagery metadata.
  */
 export class ImagerySourceEsri extends ImagerySource {
+  /** Per-tile metadata cache keyed by tile URL */
   protected _cache: Record<string, any>;
+  /** Tracks which metadata requests are currently in-flight to avoid duplicates */
   protected _inflight: Record<string, boolean>;
+  /** Most recently queried location, used to skip redundant metadata requests */
   protected _prevLoc: Vec2 | null;
 
   /**
@@ -622,6 +647,10 @@ export class ImagerySourceEsri extends ImagerySource {
 
   // Use a tilemap service to set maximum zoom for Esri tiles dynamically
   // https://developers.arcgis.com/documentation/tiled-elevation-service/
+  /**
+   * Fetches an Esri tilemap to dynamically determine the maximum available zoom near a location.
+   * @param loc - The `[lon, lat]` location to probe
+   */
   public fetchTilemap(loc: Vec2): void {
     // skip if we have already fetched a tilemap within 5km
     if (this._prevLoc && geoSphericalDistance(loc, this._prevLoc) < 5000) return;
@@ -784,6 +813,10 @@ export class ImagerySourceEsri extends ImagerySource {
         });
     }
 
+    /**
+     *
+     * @param val
+     */
     function clean(val: any): string {
       return String(val).trim() || unknown;
     }
@@ -823,7 +856,7 @@ export class ImagerySourceEsriWayback extends ImagerySourceEsri {
     return s;
   }
 
-  // Get the url template for the selected release
+  /** Returns the URL template for the currently selected Wayback release date. */
   public override get template(): string {
     const wayback = (this.context.services as any).wayback;
     const release = wayback.byReleaseDate.get(this.date);
@@ -849,7 +882,7 @@ export class ImagerySourceEsriWayback extends ImagerySourceEsri {
    * Wayback imagery has a `date` getter/setter.
    * Pick the closest supported date from the Wayback archive, without going over.
    * The date is stored in both `startDate` and `endDate` props.
-   * @return The date string
+   * @param val - Desired date string; snapped to the closest available Wayback release
    */
   public set date(val: string | undefined) {
     const wayback = this.context.services.wayback!;
@@ -859,6 +892,9 @@ export class ImagerySourceEsriWayback extends ImagerySourceEsri {
     this.props.endDate = chooseDate;
   }
 
+  /** Returns the currently selected Wayback release date string (same as `startDate` prop).
+   * @return  Selected date string, or `undefined` if not set
+   */
   public get date(): string | undefined {
     return this.props.startDate;
   }
@@ -911,6 +947,10 @@ export class ImagerySourceEsriWayback extends ImagerySourceEsri {
           callback(null, metadata);
         }
 
+        /**
+         *
+         * @param val
+         */
         function clean(val: any): string {
           return String(val).trim() || unknown;
         }

@@ -196,6 +196,7 @@ export class OsmEntity extends AbstractData<OsmEntityProps> {
   /**
    * Tags are the `key=value` pairs of strings that assign meaning to an OSM element.
    * @see https://wiki.openstreetmap.org/wiki/Elements#Tag
+   * @return  This entity's tag object (empty object if none set)
    * @readonly
    */
   public get tags(): OsmTags {
@@ -206,23 +207,30 @@ export class OsmEntity extends AbstractData<OsmEntityProps> {
    * This is the OSM `visibility` attribute.
    * Objects with `visibility=false` are considered deleted.
    * @see https://wiki.openstreetmap.org/wiki/Elements#Common_attributes
+   * @return  `true` if the entity is visible (not deleted)
    */
   public get visible(): boolean {
     return this.props.visible ?? true;
   }
+  /** Sets the `visibility` attribute (false = deleted/hidden).
+   * @param val - `false` marks the entity as deleted/hidden
+   */
   public set visible(val: boolean) {
     this.props.visible = val;
   }
-
   /**
    * This is the OSM `version` attribute, used for conflict detection.
    * When updating an OSM object, its version must match the value on the server,
    *  otherwise the editing API will raise a conflict.
    * @see https://wiki.openstreetmap.org/wiki/Elements#Common_attributes
+   * @return  The OSM version number, or `undefined` if not yet saved
    */
   public get version(): number | undefined {
     return this.props.version;
   }
+  /** Sets the OSM `version` attribute (used for conflict detection on upload).
+   * @param val - Version number from the OSM server, or `undefined` for unsaved entities
+   */
   public set version(val: number | undefined) {
     this.props.version = val!;
   }

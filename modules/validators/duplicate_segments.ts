@@ -137,7 +137,10 @@ export function validateDuplicateSegments(context: Context): ValidatorFunction {
       });
 
 
-      /** Renders the issue reference text into the given selection. */
+      /**
+       * Renders the issue reference text into the given selection.
+       * @param $selection
+       */
       function showReference($selection: D3Selection): void {
         $selection.selectAll('.issue-reference')
           .data([0])

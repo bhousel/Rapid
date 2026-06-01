@@ -29,7 +29,10 @@ export function validateCloseNodes(context: Context): ValidatorFunction {
   const pointThresholdMeters = 0.2;
 
   // helpers
-  /** Tests whether a tag value is defined and not `'no'`. */
+  /**
+   * Tests whether a tag value is defined and not `'no'`.
+   * @param v
+   */
   function hasTag(v: string | undefined): boolean {
     return v !== undefined && v !== 'no';
   }
@@ -139,6 +142,12 @@ export function validateCloseNodes(context: Context): ValidatorFunction {
     function getIssuesForVertex(node: OsmNode, parentWays: OsmWay[]): ValidationIssue[] {
       const issues: ValidationIssue[] = [];
 
+      /**
+       *
+       * @param node1
+       * @param node2
+       * @param way
+       */
       function checkForCloseness(node1: OsmNode, node2: OsmNode, way: OsmWay): void {
         const issue = getWayIssueIfAny(node1, node2, way);
         if (issue) {
@@ -265,6 +274,10 @@ export function validateCloseNodes(context: Context): ValidatorFunction {
 
       return issues;
 
+      /**
+       *
+       * @param $selection
+       */
       function showReference($selection: D3Selection): void {
         $selection.selectAll('.issue-reference')
           .data([0])
@@ -351,6 +364,10 @@ export function validateCloseNodes(context: Context): ValidatorFunction {
         }
       });
 
+      /**
+       *
+       * @param $selection
+       */
       function showReference($selection: D3Selection): void {
         $selection.selectAll('.issue-reference')
           .data([0])

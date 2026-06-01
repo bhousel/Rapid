@@ -207,10 +207,14 @@ export class NetworkSystem extends AbstractSystem {
 
   /**
    * Default timeout in milliseconds for new requests.
+   * @return  Current default timeout in milliseconds
    */
   public get defaultTimeout(): number {
     return this._defaultTimeout;
   }
+  /** Sets the default request timeout in milliseconds (minimum 0 = no timeout).
+   * @param ms - Timeout in milliseconds; `0` disables the timeout
+   */
   public set defaultTimeout(ms: number) {
     this._defaultTimeout = Math.max(0, ms);
   }
@@ -219,10 +223,14 @@ export class NetworkSystem extends AbstractSystem {
   /**
    * Maximum concurrent active requests.  Requests beyond this limit
    * are queued (FIFO).
+   * @return  Maximum number of concurrent requests
    */
   public get maxInflight(): number {
     return this._maxInflight;
   }
+  /** Sets the maximum number of concurrent in-flight requests (minimum 1).
+   * @param n - Maximum concurrency; values below 1 are clamped to 1
+   */
   public set maxInflight(n: number) {
     this._maxInflight = Math.max(1, n);
   }
@@ -231,6 +239,7 @@ export class NetworkSystem extends AbstractSystem {
   /**
    * Total number of tracked requests (active + queued).
    * For diagnostics / tests.
+   * @return  Total tracked request count
    * @readonly
    */
   public get numInflight(): number {
@@ -240,6 +249,7 @@ export class NetworkSystem extends AbstractSystem {
 
   /**
    * Number of actively dispatched network requests (excludes queued).
+   * @return  Number of active requests
    * @readonly
    */
   public get numActive(): number {
@@ -249,6 +259,7 @@ export class NetworkSystem extends AbstractSystem {
 
   /**
    * Number of requests waiting in the concurrency queue.
+   * @return  Number of queued requests
    * @readonly
    */
   public get numQueued(): number {
@@ -260,6 +271,7 @@ export class NetworkSystem extends AbstractSystem {
    * Returns true if a request with the given requestID is currently tracked
    * (either active or queued).
    * @param requestID - The dedup/cancellation identifier
+   * @return  `true` if the request is currently inflight
    */
   public isInflight(requestID: RequestID): boolean {
     return this._inflight.has(requestID);
@@ -307,6 +319,7 @@ export class NetworkSystem extends AbstractSystem {
    *
    * @param url - The URL to fetch
    * @param options - Fetch options + NetworkSystem extensions
+   * @return  The raw `Response` object
    */
   public fetchRaw(url: string, options?: NetworkFetchOptions): Promise<Response> {
     const method = (options?.method ?? 'GET').toUpperCase();
@@ -384,6 +397,7 @@ export class NetworkSystem extends AbstractSystem {
    * Returns true if any inflight request matches the given predicate.
    * Useful for guards that need to check if any request in a category is active.
    * @param predicate - Function that returns true for matching requestIDs
+   * @return  `true` if at least one inflight request matches
    */
   public hasMatching(predicate: (requestID: RequestID) => boolean): boolean {
     for (const requestID of this._inflight.keys()) {
@@ -432,6 +446,10 @@ export class NetworkSystem extends AbstractSystem {
    * The `.finally()` cleanup is chained directly onto the returned promise
    * so there is exactly one promise chain — no orphaned branches that
    * could produce unhandled rejections.
+   * @param requestID - The dedup/cancellation identifier
+   * @param controller - The AbortController for this request
+   * @param dispatch - Callback that performs the actual fetch
+   * @return  A promise that resolves with the dispatched request's result
    */
   protected _trackAndDispatch<T>(
     requestID: RequestID,
@@ -496,6 +514,9 @@ export class NetworkSystem extends AbstractSystem {
   /**
    * Combines a manual AbortController signal with a timeout signal.
    * Returns the combined signal, or just the controller's signal if no timeout.
+   * @param controller - The manual AbortController
+   * @param timeout - Timeout in milliseconds; `0` means no timeout
+   * @return  The combined abort signal
    */
   protected _createCombinedSignal(controller: AbortController, timeout: number): AbortSignal {
     if (timeout > 0) {
@@ -520,6 +541,7 @@ export class NetworkSystem extends AbstractSystem {
 
   /**
    * Removes a queued request by requestID.
+   * @param requestID
    */
   protected _removeFromQueue(requestID: RequestID): void {
     const idx = this._queue.findIndex(q => q.requestID === requestID);
@@ -532,6 +554,9 @@ export class NetworkSystem extends AbstractSystem {
   /**
    * Runs all registered interceptors on the (url, init) pair.
    * Interceptors run in registration order; each receives the output of the previous.
+   * @param url - The request URL
+   * @param init - The `RequestInit` to transform
+   * @return  The final `RequestInit` after all interceptors have run
    */
   protected _applyInterceptors(url: string, init: RequestInit): RequestInit {
     for (const interceptor of this._interceptors) {
@@ -555,6 +580,10 @@ export class NetworkSystem extends AbstractSystem {
    * Relative URLs are resolved to absolute before dispatching to a worker,
    * because the worker script runs in a different path context and would
    * resolve relative URLs against its own location.
+   * @param url - The URL to fetch
+   * @param signal - The abort signal for this request
+   * @param options - Fetch options + NetworkSystem extensions
+   * @return  The parsed (or listener-produced) response
    */
   protected _dispatchFetch<T>(
     url: string,
@@ -617,6 +646,8 @@ export class NetworkSystem extends AbstractSystem {
    * the worker script's location.
    *
    * Absolute URLs (http://, https://, data:, blob:) pass through unchanged.
+   * @param url - The possibly-relative URL to resolve
+   * @return  The absolute URL
    */
   protected _resolveURL(url: string): string {
     if (/^(https?|data|blob):/i.test(url)) return url;
@@ -630,6 +661,9 @@ export class NetworkSystem extends AbstractSystem {
 
   /**
    * Builds a `RequestInit` from the options, excluding NetworkSystem-specific keys.
+   * @param options - Fetch options + NetworkSystem extensions
+   * @param signal - Optional abort signal to attach to the init
+   * @return  A plain `RequestInit` suitable for `fetch`
    */
   protected _buildInit(options?: NetworkFetchOptions, signal?: AbortSignal): RequestInit {
     if (!options) return signal ? { signal } : {};

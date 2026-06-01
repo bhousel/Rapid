@@ -31,14 +31,22 @@ interface DrawAreaSnapshot {
  */
 export class DrawAreaMode extends AbstractMode {
 
+  /** OSM tags applied to the area when drawing begins */
   public defaultTags: OsmTags;
+  /** Entity ID of the OSM way being drawn */
   public drawWayID: EntityID | null;
+  /** Entity ID of the temporary node that follows the pointer while drawing */
   public drawNodeID: EntityID | null;
+  /** Entity ID of the first node in the area (also the node that closes the ring) */
   public firstNodeID: EntityID | null;
+  /** Entity ID of the last committed node (directly before the draw node) */
   public lastNodeID: EntityID | null;
 
+  /** Edit history index when drawing started (used to bound undo during draw) */
   protected _editIndex: number | null;
+  /** Screen-space coordinates of the last pointer event (used to suppress micro-moves) */
   protected _lastScreen: Vec2 | null;
+  /** Snapshots of draw state keyed by stable Graph, for surviving undo/redo */
   protected _snapshots: Map<Graph, DrawAreaSnapshot>;
 
 
@@ -475,6 +483,7 @@ export class DrawAreaMode extends AbstractMode {
 
   /**
    * Clicked on nothing, created a point at the given 'loc'.
+   * @param loc
    */
   protected _clickLoc(loc: Vec2): void {
     const EPSILON = 1e-6;
@@ -543,6 +552,8 @@ export class DrawAreaMode extends AbstractMode {
 
   /**
    * Clicked on an existing way, add a midpoint along the `edge` at given `loc` and start area from there
+   * @param loc
+   * @param edge
    */
   protected _clickWay(loc: Vec2, edge: [EntityID, EntityID]): void {
     const EPSILON = 1e-6;
@@ -617,6 +628,8 @@ export class DrawAreaMode extends AbstractMode {
 
   /**
    * Clicked on an existing node, include that node in the area we are drawing.
+   * @param loc
+   * @param targetNode
    */
   protected _clickNode(loc: Vec2, targetNode: OsmNode): void {
     const EPSILON = 1e-6;
@@ -770,6 +783,8 @@ export class DrawAreaMode extends AbstractMode {
    * To deal with undo/redo, we take snapshots of the drawing entityIDs after every commit, keyed to the stable graph.
    * If we ever find ourself in an edit where we can't retrieve this information, leave `DrawAreaMode`.
    * This means we've undo/redoed into an edit where the user wasn't drawing the same area.
+   * @param firstNodeID
+   * @param lastNodeID
    */
   protected _takeSnapshot(firstNodeID: EntityID, lastNodeID: EntityID): void {
     const context = this.context;
@@ -820,6 +835,7 @@ export class DrawAreaMode extends AbstractMode {
 
   /**
    * Changes the cursor styling based on what geometry is hovered
+   * @param eventData
    */
   protected _hover(eventData: EventData): void {
     const context = this.context;

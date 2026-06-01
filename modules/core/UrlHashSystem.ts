@@ -199,6 +199,7 @@ export class UrlHashSystem extends AbstractSystem {
   /**
    * Get the initial urlhash parameters  (was: `context.initialHashParams`)
    * This were the values that were present when Rapid initally started up.
+   * @return  Map of parameter keys to their initial values
    * @readonly
    */
   public get initialHashParams(): Map<string, string> {

@@ -27,29 +27,49 @@ type DOMRectData = Pick<DOMRectReadOnly, 'x' | 'y' | 'width' | 'height' | 'top' 
 export class UiSystem extends AbstractSystem {
 
   // Private state
+  /** Last measured bounding rect of the map container */
   protected _mapRect: DOMRectData | null;
+  /** Map of element keys to their required widths, used for responsive toolbar overflow */
   protected _needWidth: Record<string, number>;
+  /** Debounce timer ID for resize events */
   protected _resizeTimeout: number | null;
+  /** Whether the MapRoulette context menu is currently open */
   protected _showsMapRouletteMenu: boolean;
 
   // Child UI components, created during initAsync
+  /** API status indicator component */
   public ApiStatus: any;
+  /** Authentication loading modal */
   public AuthModal: any;
+  /** SVG `<defs>` container for sprites and clip paths */
   public Defs: any;
+  /** Context menu shown when right-clicking map features */
   public EditMenu: any;
+  /** MapRoulette-specific context menu */
   public MapRouletteMenu: any;
+  /** Transient notification/flash overlay */
   public Flash: any;
+  /** Fullscreen toggle button and state manager */
   public Fullscreen: any;
+  /** Footer bar with attribution and zoom indicator */
   public MapFooter: any;
+  /** Top toolbar containing mode buttons and search */
   public MapToolbar: any;
+  /** Overlay panels drawn on top of the map (zoom controls, issue pins, etc.) */
   public Overmap: any;
+  /** Keyboard shortcut reference panel */
   public Shortcuts: any;
+  /** Right-side inspector / tag editor panel */
   public Sidebar: any;
 
   // References to components that live deeper in the tree
+  /** Info-card components displayed over the map (e.g. measurement, history) */
   public InfoCards: any;
+  /** Mini-map overview panel */
   public Minimap: any;
+  /** Photo viewer panel (Mapillary, Streetside, KartaView, etc.) */
   public PhotoViewer: any;
+  /** WebGL Spector debugging overlay */
   public Spector: any;
 
 
@@ -307,7 +327,7 @@ export class UiSystem extends AbstractSystem {
   }
 
 
-  /*
+  /**
    * Handler for resize events on the window.
    * Note that this can just be called with no event to recheck the dimensions.
    * @param  e - the resize event (if any)
@@ -466,7 +486,7 @@ dims = vecAdd(dims, [overscan * 2, overscan * 2]);
   }
 
 
-  /*
+  /**
    * This shows the contextual edit menu, called by the select behavior when the
    *  user right clicks, or long presses, or presses the menu key.
    * @param  anchorPoint - `[x,y]` screen coordinate where the menu should be anchored
@@ -512,6 +532,7 @@ dims = vecAdd(dims, [overscan * 2, overscan * 2]);
    * This just redraws the edit menu in place if it is already showing, used in
    * situations where its available operations may have changed, such as Rapid#1311
    */
+  /** Redraws the edit context menu in-place if it is already visible. */
   public redrawEditMenu(): void {
     const context = this.context;
     const gfx = context.systems.gfx!;
@@ -532,15 +553,17 @@ dims = vecAdd(dims, [overscan * 2, overscan * 2]);
   }
 
 
-  /*
-   * Remove any existing menu
-   */
+  /** Closes and removes the edit context menu. */
   public closeEditMenu(): void {
     this.EditMenu.close();
   }
 
 
-  // Method to show the MapRoulette context menu
+  /**
+   * Shows the MapRoulette contextual menu at the given anchor point.
+   * @param anchorPoint - `[x,y]` screen coordinate where the menu should be anchored
+   * @param triggerType - 'touch', 'pen', or 'rightclick' that triggered the menu
+   */
   public showMapRouletteMenu(anchorPoint: Vec2, triggerType: string): void {
     this.closeMapRouletteMenu(); // Close any existing menu
     const context = this.context;
@@ -557,9 +580,7 @@ dims = vecAdd(dims, [overscan * 2, overscan * 2]);
   }
 
 
-  /*
-   * Remove any existing menu
-   */
+  /** Closes and removes the MapRoulette task context menu. */
   public closeMapRouletteMenu(): void {
     this.MapRouletteMenu.close();
   }

@@ -51,10 +51,15 @@ import type { Viewport } from '@rapid-sdk/math';
  *   `layerchange`   Fires when layers are toggled from enabled/disabled
  */
 export class PixiScene extends EventEmitter {
+  /** Reference to the owning GraphicsSystem */
   public gfx: GraphicsSystem;
+  /** Global shared application context */
   public context: Context;
+  /** Top-level Pixi containers that group layers (e.g. 'basemap', 'points', 'ui') */
   public groups: Map<GroupID, PIXI.Container>;
+  /** All registered layers, keyed by LayerID */
   public layers: Map<LayerID, AbstractPixiLayer>;
+  /** All registered features, keyed by FeatureID */
   public features: Map<FeatureID, AbstractPixiFeature>;
 
 

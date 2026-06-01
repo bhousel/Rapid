@@ -124,6 +124,8 @@ export async function fetchAndParseMVT(data: unknown, signal: AbortSignal): Prom
  * Resets the long-lived parsers.
  * (They have internal "seen" state).
  * Called when the main thread resets its session.
+ * @param _data
+ * @param _signal
  * @listens `network:reset`
  */
 export function reset(_data: unknown, _signal: AbortSignal): void {

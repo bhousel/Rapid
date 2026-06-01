@@ -170,6 +170,7 @@ export class SelectOsmMode extends AbstractMode {
 
 
   /**
+   * Exits this mode, tearing down behaviors, listeners, and selection state.
    */
   public exit(): void {
     if (!this._active) return;
@@ -457,6 +458,7 @@ export class SelectOsmMode extends AbstractMode {
   /**
    *  When using keyboard navigation, try to stay with the previously focused parent way
    *  @param  entity - The entity we are checking for parent ways
+   *  @return  The chosen parent way, or `undefined` if there is none
    */
   protected _chooseParentWay(entity: OsmEntity | null): OsmWay | undefined {
     if (!entity) return undefined;
@@ -488,6 +490,7 @@ export class SelectOsmMode extends AbstractMode {
 
   /**
    *  jump to the first vertex along a way
+   * @param d3_event
    */
   protected _firstVertex(d3_event: Event): void {
     d3_event.preventDefault();
@@ -512,6 +515,7 @@ export class SelectOsmMode extends AbstractMode {
 
   /**
    *  jump to the first vertex along a way
+   * @param d3_event
    */
   protected _lastVertex(d3_event: Event): void {
     d3_event.preventDefault();
@@ -536,6 +540,7 @@ export class SelectOsmMode extends AbstractMode {
 
   /**
    *  jump to the previous vertex
+   * @param d3_event
    */
   protected _previousVertex(d3_event: Event): void {
     d3_event.preventDefault();
@@ -574,6 +579,7 @@ export class SelectOsmMode extends AbstractMode {
 
   /**
    *  jump to the next vertex
+   * @param d3_event
    */
   protected _nextVertex(d3_event: Event): void {
     d3_event.preventDefault();
@@ -612,6 +618,7 @@ export class SelectOsmMode extends AbstractMode {
 
   /**
    *  If the user is at a junction, focus on a different parent way
+   * @param d3_event
    */
   protected _focusNextParent(d3_event: Event): void {
     d3_event.preventDefault();
@@ -700,6 +707,7 @@ export class SelectOsmMode extends AbstractMode {
 
   /**
    * Changes the cursor styling based on what geometry is hovered
+   * @param eventData
    */
   protected _hover(eventData: EventData): void {
     const context = this.context;

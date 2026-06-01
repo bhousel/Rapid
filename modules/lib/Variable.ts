@@ -53,7 +53,9 @@ export interface VariableProps {
  */
 export class Variable {
 
+  /** Global shared application context */
   public context: Context;
+  /** Full props object for this variable */
   public props: VariableProps;
 
   /** Unique identifier */
@@ -89,6 +91,7 @@ export class Variable {
 
   /**
    * The variable's value.
+   * @return  This variable's current value
    */
   public get value(): VariableValue {
     return this.props.value;
@@ -128,6 +131,7 @@ export class Variable {
 
   /**
    * Convert to a JSON-serializable object.
+   * @return  The JSON-serializable representation of this variable
    */
   public toJSON(): VariableProps {
     return structuredClone(this.props);
@@ -136,6 +140,7 @@ export class Variable {
 
   /**
    * String representation for debugging.
+   * @return  A human-readable string describing the variable
    */
   public toString(): string {
     const val = this.props.value;

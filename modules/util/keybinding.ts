@@ -161,11 +161,19 @@ export function utilKeybinding(namespace: string): Keybinding {
   }
 
 
+  /**
+   *
+   * @param evt
+   */
   function capture(evt: KeyboardEvent): void {
     testBindings(evt, true);
   }
 
 
+  /**
+   *
+   * @param evt
+   */
   function bubble(evt: KeyboardEvent): void {
     const tagName = select(evt.target as Element).node()?.tagName;
     if (tagName === 'INPUT' || tagName === 'SELECT' || tagName === 'TEXTAREA') {
@@ -175,6 +183,10 @@ export function utilKeybinding(namespace: string): Keybinding {
   }
 
 
+  /**
+   *
+   * @param $selection
+   */
   function keybinding($selection?: D3Selection): Keybinding {
     const $sel = $selection ?? select(document);
     $sel.on('keydown.capture.' + namespace, capture as any, true);

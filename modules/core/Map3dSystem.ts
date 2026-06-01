@@ -29,12 +29,17 @@ export class Map3dSystem extends AbstractSystem {
   /** The DOM container ID for the 3D map */
   public readonly containerID: string = 'map3d_container';
 
+  /** Memoized promise for loading the MapLibre library */
   protected _loadPromise: Promise<void> | null = null;
+  /** Keyboard shortcut strings (populated during startAsync) */
   protected _keys: string[] | null = null;
 
   // The 3d Map will stay close to the main map, but with an offset zoom and rotation
+  /** Zoom offset: 3D map zoom = main map zoom − `_zDiff` */
   protected _zDiff = 3;     // by default, 3dmap will be at main zoom - 3
+  /** Bearing offset: 3D map bearing = main map bearing + `_bDiff` (degrees) */
   protected _bDiff = 0;     // by default, 3dmap bearing will match main map bearing
+  /** Version counter of the main map at the last 3D-map sync (used to debounce redraws) */
   protected _lastv: number | null = null;
 
 
@@ -190,12 +195,16 @@ export class Map3dSystem extends AbstractSystem {
   /**
    * For now, just store this state in the url hash
    * set/get whether the 3d viewer is visible
+   * @return  `true` if the 3D map viewer is currently visible
    */
   public get visible(): boolean {
     const urlhash = this.context.systems.urlhash;
     return !!urlhash?.getParam('map3d');
   }
 
+  /** Shows or hides the 3D map viewer and updates the URL hash accordingly.
+   * @param val - `true` to show the viewer, `false` to hide it
+   */
   public set visible(val: boolean) {
     const context = this.context;
     const urlhash = context.systems.urlhash;
@@ -456,6 +465,8 @@ export class Map3dSystem extends AbstractSystem {
 
 
   /**
+   * Rebuilds the GeoJSON source feeding the 3D building layer from the given entities.
+   * @param entities - OSM entities to consider for building extrusions
    */
   protected _updateBuildingData(entities: OsmEntity[]): void {
     const context = this.context;
@@ -521,6 +532,8 @@ export class Map3dSystem extends AbstractSystem {
 
 
   /**
+   * Rebuilds the GeoJSON source feeding the 3D area layer from the given entities.
+   * @param entities - OSM entities to consider for area fills
    */
   protected _updateAreaData(entities: OsmEntity[]): void {
     const context = this.context;
@@ -570,6 +583,8 @@ export class Map3dSystem extends AbstractSystem {
 
 
   /**
+   * Rebuilds the GeoJSON source feeding the 3D road layers from the given entities.
+   * @param entities - OSM entities to consider for road lines
    */
   protected _updateRoadData(entities: OsmEntity[]): void {
     const context = this.context;
@@ -622,6 +637,7 @@ export class Map3dSystem extends AbstractSystem {
   /**
    * Returns a maplibre layer style specification that appropriately styles 3D buildings using
    * data-driven styling for selected features. Features with no height data are drawn as flat polygons.
+   * @return  The maplibre fill-extrusion layer specification for buildings
    */
   protected _getBuildingLayer(): LayerSpecification {
     return {
@@ -647,6 +663,7 @@ export class Map3dSystem extends AbstractSystem {
 
   /**
    * Returns a maplibre layer style specification that appropriately styles areas.
+   * @return  The maplibre fill layer specification for areas
    */
   protected _getAreaLayer(): LayerSpecification {
     return {
@@ -665,6 +682,7 @@ export class Map3dSystem extends AbstractSystem {
 
   /**
    * Returns a maplibre layer style specification that widens the road casing to be just above the stroke.
+   * @return  The maplibre line layer specification for road casing
    */
   protected _getRoadCasingLayer(): LayerSpecification {
     return {
@@ -687,6 +705,7 @@ export class Map3dSystem extends AbstractSystem {
   /**
    * Returns a maplibre layer style specification that appropriately styles a wide extra casing around any selected roads.
    * Also uses the same 'selected' color as the building layer.
+   * @return  The maplibre line layer specification for selected roads
    */
   protected _getRoadSelectedLayer(): LayerSpecification {
     return {
@@ -710,6 +729,7 @@ export class Map3dSystem extends AbstractSystem {
   /**
    * Returns a maplibre layer style specification that appropriately styles the road stroke to be just thinner than the casing.
    * Also uses the same stroke color as the main OSM styling.
+   * @return  The maplibre line layer specification for road strokes
    */
   protected _getRoadStrokeLayer(): LayerSpecification {
     return {
@@ -741,6 +761,7 @@ export class Map3dSystem extends AbstractSystem {
   /**
    * Returns a line width interpolator, to scale the line width based on zoom.
    * @param  baseWidth - the base width in pixels
+   * @return  A data-driven line-width expression keyed on zoom and highway class
    */
   protected _getLineWidth(baseWidth: number): DataDrivenPropertyValueSpecification<number> {
     return [

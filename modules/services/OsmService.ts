@@ -398,6 +398,7 @@ export class OsmService extends AbstractSystem {
 
   /**
    * Switch connection and credentials, and reset
+   * @param newOptions
    * @return  Promise resolved when this component has completed resetting
    */
   public switchAsync(newOptions: SwitchOptions): Promise<void> {
@@ -420,34 +421,51 @@ export class OsmService extends AbstractSystem {
   }
 
 
-  /** The current connection ID (incremented on each reset to invalidate in-flight requests) */
+  /** The current connection ID (incremented on each reset to invalidate in-flight requests)
+   * @return  The current connection ID
+   */
   public get connectionID(): number {
     return this._connectionID;
   }
 
-  /** The base URL of the OSM website */
+  /** The base URL of the OSM website
+   * @return  Base URL string (e.g. `'https://www.openstreetmap.org'`)
+   */
   public get wwwroot(): string {
     return this._wwwroot;
   }
 
-  /** Regex patterns for imagery sources blocked by OSM policy */
+  /** Regex patterns for imagery sources blocked by OSM policy
+   * @return  Array of blocklist regex patterns
+   */
   public get imageryBlocklists(): RegExp[] {
     return this._imageryBlocklists;
   }
 
-  /** The maximum number of nodes a single way can have */
+  /** The maximum number of nodes a single way can have
+   * @return  Maximum node count per way
+   */
   public get maxWayNodes(): number {
     return this._maxWayNodes;
   }
 
 
-  /** Returns the OSM website URL for a given changeset */
+  /**
+   * Returns the OSM website URL for a given changeset
+   * @param changesetID - The changeset ID
+   * @return  The changeset page URL
+   */
   public changesetURL(changesetID: string | number): string {
     return `${this._wwwroot}/changeset/${changesetID}`;
   }
 
 
-  /** Returns the OSM website URL for the changeset history view at a given location */
+  /**
+   * Returns the OSM website URL for the changeset history view at a given location
+   * @param center - Map center as `[lon, lat]`
+   * @param zoom - Map zoom level
+   * @return  The changeset history URL
+   */
   public changesetsURL(center: Vec2, zoom: number): string {
     const precision = Math.max(0, Math.ceil(Math.log(zoom) / Math.LN2));
     return this._wwwroot + '/history#map=' +
@@ -457,33 +475,53 @@ export class OsmService extends AbstractSystem {
   }
 
 
-  /** Returns the OSM website URL for a given entity */
+  /**
+   * Returns the OSM website URL for a given entity
+   * @param entity - The OSM entity
+   * @return  The entity page URL
+   */
   public entityURL(entity: OsmEntity): string {
     const entityID = entity.osmId();
     return `${this._wwwroot}/${entity.type}/${entityID}`;
   }
 
 
-  /** Returns the OSM website URL for the history of a given entity */
+  /**
+   * Returns the OSM website URL for the history of a given entity
+   * @param entity - The OSM entity
+   * @return  The entity history page URL
+   */
   public historyURL(entity: OsmEntity): string {
     const entityID = entity.osmId();
     return `${this._wwwroot}/${entity.type}/${entityID}/history`;
   }
 
 
-  /** Returns the OSM website URL for a given user's profile */
+  /**
+   * Returns the OSM website URL for a given user's profile
+   * @param username - The OSM username
+   * @return  The user profile page URL
+   */
   public userURL(username: string): string {
     return `${this._wwwroot}/user/${username}`;
   }
 
 
-  /** Returns the OSM website URL for a given note */
+  /**
+   * Returns the OSM website URL for a given note
+   * @param note - The note marker data
+   * @return  The note page URL
+   */
   public noteURL(note: MarkerData): string {
     return `${this._wwwroot}/note/${note.id}`;
   }
 
 
-  /** Returns the OSM website URL for reporting a given note */
+  /**
+   * Returns the OSM website URL for reporting a given note
+   * @param note - The note marker data
+   * @return  The note report URL
+   */
   public noteReportURL(note: MarkerData): string {
     return `${this._wwwroot}/reports/new?reportable_type=Note&reportable_id=${note.id}`;
   }
@@ -1669,6 +1707,10 @@ export class OsmService extends AbstractSystem {
    * @return the cloned caches when getting, or `this` when setting
    */
   public caches(obj?: CachesObject): CachesObject | this {
+    /**
+     *
+     * @param source
+     */
     function cloneCache(source: Record<string, any>): Record<string, any> {
       const target: Record<string, any> = {};
       for (const [k, v] of Object.entries(source)) {
@@ -1726,7 +1768,9 @@ export class OsmService extends AbstractSystem {
   }
 
 
-  /** Returns whether the user is currently authenticated with the OSM API */
+  /** Returns whether the user is currently authenticated with the OSM API
+   * @return  `true` if the user is authenticated
+   */
   public authenticated(): boolean {
     return this._oauth.authenticated();
   }
@@ -1776,7 +1820,9 @@ export class OsmService extends AbstractSystem {
   }
 
 
-  /** Returns all cached notes that are visible in the current viewport */
+  /** Returns all cached notes that are visible in the current viewport
+   * @return  Array of visible OSM notes
+   */
   public getNotes(): OsmNote[] {
     const spatial = this.context.systems.spatial!;
     return spatial.getVisibleData('osm-notes').map(hit => hit.contents) as OsmNote[];
@@ -1848,6 +1894,9 @@ export class OsmService extends AbstractSystem {
    * (including web workers) receive the correct Authorization header.
    *
    * Uses `oauth.getAccessToken()` — the public API added in osm-auth v3.2.0.
+   * @param url - The outgoing request URL
+   * @param init - The request init to augment with an Authorization header
+   * @return  The (possibly augmented) request init
    */
   protected _authInterceptor(url: string, init: RequestInit): RequestInit {
     if (this._oauth.authenticated() && url.startsWith(this._apiroot)) {
@@ -1861,7 +1910,9 @@ export class OsmService extends AbstractSystem {
   }
 
 
-  /** Returns true if any changeset operation (create/upload/close) is currently inflight */
+  /** Returns true if any changeset operation (create/upload/close) is currently inflight
+   * @return  `true` if a changeset operation is inflight
+   */
   protected _isChangesetInflight(): boolean {
     const network = this.context.systems.network!;
     return network.hasMatching(id => /^osm-changeset-/.test(id));

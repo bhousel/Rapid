@@ -53,6 +53,7 @@ export function jsonpRequest(url: string, callback: JsonpCallback): JsonpRequest
     return request;
   }
 
+  /** Generates a random 15-character alphabetic string for a unique JSONP callback name. */
   function rand(): string {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
     let c = '';
@@ -61,6 +62,10 @@ export function jsonpRequest(url: string, callback: JsonpCallback): JsonpRequest
     return c;
   }
 
+  /**
+   *
+   * @param url
+   */
   function create(url: string): string {
     const e = url.match(/callback=(\w+)/);
     const c = e ? e[1] : rand();
@@ -72,6 +77,7 @@ export function jsonpRequest(url: string, callback: JsonpCallback): JsonpRequest
       finalize();
     };
 
+    /** Removes the callback from the global JSONP cache and deletes the script element. */
     function finalize(): void {
       delete jsonpCache[c];
       script.remove();

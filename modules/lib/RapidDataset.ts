@@ -64,31 +64,56 @@ export interface RapidDatasetProps {
  */
 export class RapidDataset {
 
+  /** Global shared application context */
   public context: Context;
+  /** Unique identifier for this dataset */
   public id: DatasetID;
+  /** Service providing this dataset (e.g. 'esri', 'mapwithai', 'overture') */
   public serviceID: ServiceID;
+  /** Categories this dataset belongs to (e.g. 'buildings', 'addresses') */
   public categories: Set<string>;
+  /** Tags/flags for this dataset (e.g. 'opendata') */
   public tags: Set<string>;
+  /** Display color for features from this dataset */
   public color: string;
+  /** Source attribution strings shown in the changeset */
   public dataUsed: string[];
+  /** Geographic bounding extent of this dataset, if known */
   public extent: Extent | undefined;
+  /** Whether this dataset is rendered as an overlay on top of the base map */
   public overlay: boolean | undefined;
+  /** URL for a landing page with more information about this dataset */
   public itemUrl: string;
+  /** URL for the license governing use of this dataset */
   public licenseUrl: string;
+  /** URL for a thumbnail image representing this dataset */
   public thumbnailUrl: string;
+  /** Whether this dataset has been added to the active dataset list by the user */
   public added: boolean;
+  /** Whether this dataset is in beta/preview status */
   public beta: boolean;
+  /** Whether the user has enabled this dataset for display */
   public enabled: boolean;
+  /** Whether this dataset is featured/promoted in the catalog */
   public featured: boolean;
+  /** Whether this dataset is currently hidden by an active catalog filter */
   public filtered: boolean;
+  /** Whether this dataset is hidden from the catalog (e.g. internal walkthrough data) */
   public hidden: boolean;
+  /** Whether this dataset uses conflation when merging features into the OSM graph */
   public conflated: boolean;
+  /** Localization string key for the dataset display name */
   public labelStringID: StringID | undefined;
+  /** Localization string key for the dataset description */
   public descriptionStringID: StringID | undefined;
+  /** Localized display label (updated whenever the locale changes) */
   public label: string;
+  /** Localized description text (updated whenever the locale changes) */
   public description: string;
 
+  /** Fallback label from props, used when no localized string is available */
   protected _label: string | undefined;
+  /** Fallback description from props, used when no localized string is available */
   protected _description: string | undefined;
 
 

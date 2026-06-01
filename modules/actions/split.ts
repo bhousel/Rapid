@@ -332,6 +332,10 @@ export function actionSplit(nodeIDs: EntityID | EntityID[], newWayIDs?: EntityID
     }
     return splittableParents;
 
+    /**
+     *
+     * @param parent
+     */
     function isSplittable(parent: OsmWay): boolean {
       // If the ways to split are specified, ignore everything else.
       if (_wayIDs && !_wayIDs.includes(parent.id)) return false;

@@ -126,6 +126,10 @@ export function validateSuspiciousName(context: Context): ValidatorFunction {
       }
     });
 
+    /**
+     *
+     * @param $selection
+     */
     function showReference($selection: D3Selection): void {
       $selection.selectAll('.issue-reference')
         .data([0])
@@ -184,6 +188,10 @@ export function validateSuspiciousName(context: Context): ValidatorFunction {
       }
     });
 
+    /**
+     *
+     * @param $selection
+     */
     function showReference($selection: D3Selection): void {
       $selection.selectAll('.issue-reference')
         .data([0])

@@ -25,6 +25,7 @@ export class PixiLayerOsmose extends AbstractPixiLayer {
 
   /**
    * Whether the Layer's service exists
+   * @return  `true` if the Osmose service is registered
    */
   public get supported() {
     return !!this.context.services.osmose;
@@ -34,10 +35,14 @@ export class PixiLayerOsmose extends AbstractPixiLayer {
   /**
    * Whether the user has chosen to see the Layer
    * Make sure to start the service first.
+   * @return  `true` if the layer is enabled
    */
   public get enabled() {
     return this._enabled;
   }
+  /** Enables or disables this layer; starts the Osmose service when enabling.
+   * @param val - `true` to enable the layer, `false` to disable it
+   */
   public set enabled(val) {
     if (!this.supported) {
       val = false;

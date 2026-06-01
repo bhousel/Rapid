@@ -18,17 +18,29 @@ type ValueAccessor = (this: Element, datum: unknown, index: number, groups: Arra
  * @returns The value (when getting) or the selection (when setting)
  */
 export function utilGetSetValue(selection: D3Selection, value?: Nullable<string | ValueAccessor>): string | D3Selection {
+  /**
+   *
+   * @param val
+   */
   function d3_selection_value(val: Nullable<string | ValueAccessor>): (this: ValueElement, datum: unknown, index: number, groups: ArrayLike<Element>) => void {
+    /** Deletes the `value` property from the element (sets to undefined/empty). */
     function valueNull(this: ValueElement): void {
       delete this.value;
     }
 
+    /** Sets the element's `value` property to the constant `val`, if it differs. */
     function valueConstant(this: ValueElement): void {
       if (this.value !== val) {
         this.value = val as string;
       }
     }
 
+    /**
+     *
+     * @param datum
+     * @param index
+     * @param groups
+     */
     function valueFunction(this: ValueElement, datum: unknown, index: number, groups: ArrayLike<Element>): void {
       const x = (val as ValueAccessor).call(this, datum, index, groups);
       if (x === null || x === undefined) {

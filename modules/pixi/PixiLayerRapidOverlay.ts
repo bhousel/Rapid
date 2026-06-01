@@ -11,7 +11,9 @@ import type { PixiScene } from './PixiScene.ts';
  * @class
  */
 export class PixiLayerRapidOverlay extends AbstractPixiLayer {
+  /** Whether overlays have been defined for the current dataset set (null = not yet checked) */
   protected _overlaysDefined: boolean | null;
+  /** The Pixi container holding all overlay feature containers */
   public overlaysContainer: PIXI.Container | null;
 
   /**
@@ -92,6 +94,7 @@ return; // not yet
 
 
   /**
+   * Renders the Rapid overlay point features for this frame.
    * @param  frame    -  Integer frame being rendered
    * @param  viewport -  Pixi viewport to use for rendering
    * @param  points   -  Array of feature data

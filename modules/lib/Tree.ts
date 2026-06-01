@@ -17,8 +17,11 @@ import type { OsmEntity } from '../data/OsmEntity.ts';
  */
 export class Tree {
 
+  /** Graph key (version string) of the last snapshot this tree was updated from */
   protected _currentKey: string;
+  /** Snapshot of the Graph at the last update (used to compute delta when re-syncing) */
   protected _currentSnapshot: Graph;
+  /** Dataset ID used when registering data with the SpatialSystem */
   protected _cacheID: DatasetID;
 
 //  private _entityRBush: RBush;

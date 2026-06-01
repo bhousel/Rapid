@@ -80,12 +80,19 @@ export class LocalizationSystem extends AbstractSystem {
   protected _preferredLocaleCodes: LocaleCode[];
 
   // Current locale state
+  /** The BCP47 code of the active locale (e.g. 'en-US', 'de') */
   protected _currLocaleCode: LocaleCode;
+  /** Active locale code followed by fallback codes (most specific first) */
   protected _currLocaleCodes: LocaleCode[];
+  /** Two-letter language code for the current locale (e.g. 'en', 'de') */
   protected _currLanguageCode: LanguageCode;
+  /** Text direction for the current locale: 'ltr' or 'rtl' */
   protected _currTextDirection: 'ltr' | 'rtl';
+  /** Whether the current locale uses metric measurement units */
   protected _currIsMetric: boolean;
+  /** Localized display names for all language codes in the current locale */
   protected _currLanguageNames: Record<LanguageCode, string>;
+  /** Localized display names for all script codes in the current locale */
   protected _currScriptNames: Record<ScriptCode, string>;
 
   /** Cache for loaded string data, organized by locale then scope */
@@ -186,6 +193,7 @@ export class LocalizationSystem extends AbstractSystem {
 
   /**
    * The current locale code (e.g. 'en-US', 'de', 'zh-CN')
+   * @return  Current locale code
    */
   public get localeCode(): LocaleCode {
     return this._currLocaleCode;
@@ -193,6 +201,7 @@ export class LocalizationSystem extends AbstractSystem {
 
   /**
    * Array of locale codes in priority order, with the current locale first followed by fallbacks
+   * @return  Priority-ordered array of locale codes
    */
   public get localeCodes(): LocaleCode[] {
     return this._currLocaleCodes;
@@ -200,6 +209,7 @@ export class LocalizationSystem extends AbstractSystem {
 
   /**
    * The language portion of the current locale (e.g. 'en' from 'en-US')
+   * @return  Language code (e.g. 'en', 'de', 'zh')
    */
   public get languageCode(): LanguageCode {
     return this._currLanguageCode;
@@ -207,6 +217,7 @@ export class LocalizationSystem extends AbstractSystem {
 
   /**
    * The text direction for the current locale ('ltr' or 'rtl')
+   * @return  `'ltr'` or `'rtl'`
    */
   public get textDirection(): 'ltr' | 'rtl' {
     return this._currTextDirection;
@@ -214,6 +225,7 @@ export class LocalizationSystem extends AbstractSystem {
 
   /**
    * Whether the current locale uses metric units (true for most locales, false for 'en-US')
+   * @return  `true` if the locale uses metric units
    */
   public get isMetric(): boolean {
     return this._currIsMetric;
@@ -221,6 +233,7 @@ export class LocalizationSystem extends AbstractSystem {
 
   /**
    * Map of language codes to their localized display names
+   * @return  Record mapping `LanguageCode` to display name string
    */
   public get languageNames(): Record<LanguageCode, string> {
     return this._currLanguageNames;
@@ -228,6 +241,7 @@ export class LocalizationSystem extends AbstractSystem {
 
   /**
    * Map of script codes to their localized display names
+   * @return  Record mapping `ScriptCode` to display name string
    */
   public get scriptNames(): Record<ScriptCode, string> {
     return this._currScriptNames;
@@ -236,6 +250,7 @@ export class LocalizationSystem extends AbstractSystem {
   /**
    * All known language codes and their info (native name, base, script).
    * This is used for language pickers in the UI.
+   * @return  Record mapping `LanguageCode` to `LanguageInfo`
    */
   public get languages(): Record<LanguageCode, LanguageInfo> {
     return this._languages;
@@ -244,6 +259,7 @@ export class LocalizationSystem extends AbstractSystem {
   /**
    * Map of territory/country codes to arrays of language codes, sorted by population.
    * Used to suggest relevant languages based on geographic location.
+   * @return  Record mapping territory code to sorted array of `LanguageCode`
    */
   public get territoryLanguages(): Record<string, LanguageCode[]> {
     return this._territoryLanguages;
@@ -251,6 +267,7 @@ export class LocalizationSystem extends AbstractSystem {
 
   /**
    * Whether the current locale uses right-to-left text direction
+   * @return  `true` if current locale is RTL
    */
   public get isRTL(): boolean {
     return this._currTextDirection === 'rtl';
@@ -269,6 +286,9 @@ export class LocalizationSystem extends AbstractSystem {
       this._preferredLocaleCodes = codes || [];
     }
   }
+  /** Returns the ordered list of user-preferred locale codes.
+   * @return  The ordered preferred locale codes
+   */
   public get preferredLocaleCodes(): LocaleCode[] {
     return this._preferredLocaleCodes;
   }
@@ -698,6 +718,7 @@ export class LocalizationSystem extends AbstractSystem {
    * Returns a display-ready string for a given language code
    * @param code    - the language code (e.g. 'de')
    * @param options - options object with optional `localOnly` property
+   * @param options.localOnly
    * @return the language string to display (e.g. "Deutsch (de)")
    */
   public languageName(code: LanguageCode, options?: { localOnly?: boolean }): string | null {
@@ -827,6 +848,7 @@ export class LocalizationSystem extends AbstractSystem {
 
 
   /**
+   * Returns the localized entity type name for an OSM-like ID.
    * @param entityID - OSM-like ID that starts with 'n', 'w', or 'r'
    * @return Localized string for 'Node', 'Way', or 'Relation'
    */
@@ -846,6 +868,8 @@ export class LocalizationSystem extends AbstractSystem {
    * If `verbose=true`, include both preset name and feature name.
    *   "Tertiary Road Main Street"
    * @param entity          - The entity to get the label for
+   * @param entity.id
+   * @param entity.tags
    * @param graphOrGeometry - Either a Graph or geometry string
    * @param verbose         - Whether to include both preset and feature name
    * @return A name string suitable for display

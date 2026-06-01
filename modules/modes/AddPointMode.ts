@@ -19,6 +19,7 @@ const DEBUG = false;
  */
 export class AddPointMode extends AbstractMode {
 
+  /** Tags to apply automatically when a new point is placed (e.g. from a preset selection) */
   public defaultTags: OsmTags;
 
 
@@ -88,6 +89,7 @@ export class AddPointMode extends AbstractMode {
 
   /**
    * Process whatever the user clicked on
+   * @param eventData
    */
   protected _click(eventData: EventData): void {
     const context = this.context;
@@ -135,6 +137,7 @@ export class AddPointMode extends AbstractMode {
 
   /**
    * Clicked on nothing, create the point at given `loc`
+   * @param loc
    */
   protected _clickNothing(loc: Vec2): void {
     const context = this.context;
@@ -151,6 +154,8 @@ export class AddPointMode extends AbstractMode {
 
   /**
    * Clicked on an existing way, add a midpoint along the `edge` at given `loc`
+   * @param loc
+   * @param edge
    */
   protected _clickWay(loc: Vec2, edge: [EntityID, EntityID]): void {
     const context = this.context;
@@ -166,6 +171,8 @@ export class AddPointMode extends AbstractMode {
 
   /**
    * Clicked on an existing node, merge `defaultTags` into it, if any, then select the node
+   * @param _loc
+   * @param node
    */
   protected _clickNode(_loc: Vec2, node: OsmNode): void {
     const context = this.context;

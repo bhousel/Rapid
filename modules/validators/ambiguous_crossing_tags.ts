@@ -352,7 +352,10 @@ export function validateAmbiguousCrossingTags(context: Context): ValidatorFuncti
     }
 
 
-    /** Renders the issue reference with tag diff tables for each affected entity. */
+    /**
+     * Renders the issue reference with tag diff tables for each affected entity.
+     * @param $selection
+     */
     function renderIssueReference(this: any, $selection: D3Selection): void {
       const data = this.data;
 

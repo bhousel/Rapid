@@ -21,18 +21,30 @@ import type { Viewport, Vec2 } from '@rapid-sdk/math';
  * @class
  */
 export class PixiLayerMapUI extends AbstractPixiLayer {
+  /** Zoom level at the last render, used to detect zoom changes that require redrawing */
   protected _oldz: number;
+  /** Most recently received geolocation coordinates, or null if unavailable */
   protected _geolocationData: GeolocationCoordinates | null;
+  /** Whether the geolocation display needs to be redrawn */
   protected _geolocationDirty: boolean;
+  /** Screen-space vertices of the lasso polygon currently being drawn, or null */
   protected _lassoData: Vec2[] | null;
+  /** Whether the lasso shape needs to be redrawn */
   protected _lassoDirty: boolean;
+  /** Graphics object for the lasso outline stroke */
   protected _lassoLine: PIXI.Graphics | null;
+  /** Graphics object for the lasso translucent fill */
   protected _lassoFill: PIXI.Graphics | null;
 
+  /** Container that holds the geolocation accuracy aura and position dot */
   public geolocation: PIXI.Container | null;
+  /** Container that holds the tile-boundary debugging grid */
   public tileDebug: PIXI.Container | null;
+  /** Container that holds selection ring/vertex graphics for selected features */
   public selected: PIXI.Container | null;
+  /** Container that holds the hover/select halo graphics */
   public halo: PIXI.Container | null;
+  /** Container that holds the lasso selection polygon graphics */
   public lasso: PIXI.Container | null;
 
   /**
@@ -133,10 +145,15 @@ export class PixiLayerMapUI extends AbstractPixiLayer {
 
   /**
    * This layer should always be enabled - it contains important UI stuff
+   * @return  Always `true` — this layer cannot be disabled
    */
   public get enabled(): boolean {
     return true;
   }
+  /**
+   * This layer should always be enabled - it contains important UI stuff
+   * @param val - Ignored; this layer is always forced enabled
+   */
   public set enabled(val: boolean) {
     this._enabled = true;
   }
@@ -144,10 +161,15 @@ export class PixiLayerMapUI extends AbstractPixiLayer {
 
   /**
    * see:  https://developer.mozilla.org/en-US/docs/Web/API/GeolocationPosition
+   * @return  Current geolocation coordinates, or `null` if unavailable
    */
   public get geolocationData(): GeolocationCoordinates | null {
     return this._geolocationData;
   }
+  /**
+   * Setting new geolocation data marks the geolocation display as dirty.
+   * @param val - New geolocation coordinates, or `null` to clear
+   */
   public set geolocationData(val: GeolocationCoordinates | null) {
     this._geolocationData = val;
     this._geolocationDirty = true;
@@ -156,10 +178,15 @@ export class PixiLayerMapUI extends AbstractPixiLayer {
 
   /**
    * Pass an array of coordinate data that grows at the user draws the lasso
+   * @return  Current lasso coordinate array, or `null` if no lasso is active
    */
   public get lassoData(): Vec2[] | null {
     return this._lassoData;
   }
+  /**
+   * Setting new lasso data marks the lasso display as dirty.
+   * @param val - New lasso coordinate array, or `null` to clear
+   */
   public set lassoData(val: Vec2[] | null) {
     this._lassoData = val;
     this._lassoDirty = true;

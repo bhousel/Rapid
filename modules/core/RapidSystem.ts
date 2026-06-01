@@ -42,11 +42,17 @@ export class RapidSystem extends AbstractSystem {
   /** Set<dataID> - features ignored by the user */
   public readonly ignoreIDs = new Set<DataID>();
 
+  /** IDs of datasets that have been added to the active list by the user */
   protected _addedDatasetIDs = new Set<DatasetID>();
+  /** IDs of datasets that the user has enabled for display */
   protected _enabledDatasetIDs = new Set<DatasetID>();
+  /** Index into `RAPID_COLORS` for the next auto-assigned dataset color */
   protected _nextColorIndex = 2;  // see note in _datasetsChanged()
+  /** Bounding extent of the current MapRoulette / task boundary, if any */
   protected _taskExtent: Extent | null = null;
+  /** Whether the task boundary is a simple rectangle (null = not yet determined) */
   protected _isTaskBoundsRect: boolean | null = null;
+  /** Whether the poweruser setting was active at the last dataset change check */
   protected _hadPoweruser = false;
 
 
@@ -220,6 +226,7 @@ export class RapidSystem extends AbstractSystem {
 
 
   /**
+   * The datasets currently added to the editing session.
    * @return The currently added datasets
    */
   public get datasets(): Map<string, RapidDataset> {
@@ -234,6 +241,7 @@ export class RapidSystem extends AbstractSystem {
   }
 
   /**
+   * The palette of colors available for distinguishing datasets.
    * @return Array of available colors for datasets
    */
   public get colors(): readonly string[] {
@@ -241,6 +249,7 @@ export class RapidSystem extends AbstractSystem {
   }
 
   /**
+   * The geographic extent of the current task (e.g. from a loaded GPX task boundary).
    * @return The current task extent, or null
    */
   public get taskExtent(): Extent | null {
@@ -248,6 +257,7 @@ export class RapidSystem extends AbstractSystem {
   }
 
   /**
+   * Whether the current task boundary forms a rectangle.
    * @return true if the task bounds form a rectangle
    */
   public isTaskRectangular(): boolean {
@@ -257,6 +267,7 @@ export class RapidSystem extends AbstractSystem {
 
   /**
    * true if the user had poweruser mode at any point in their editing
+   * @return  `true` if poweruser mode was activated at least once during this session
    * @readonly
    */
   public get hadPoweruser(): boolean {
@@ -265,6 +276,7 @@ export class RapidSystem extends AbstractSystem {
 
 
   /**
+   * Computes and stores the task extent from a parsed GPX document.
    * @param gpxDomData - GPX DOM document
    */
   public setTaskExtentByGpxData(gpxDomData: Document): void {
@@ -321,6 +333,12 @@ export class RapidSystem extends AbstractSystem {
       this.emit('taskchanged');
     }
 
+    /**
+     *
+     * @param value
+     * @param index
+     * @param self
+     */
     function distinct<T>(value: T, index: number, self: T[]): boolean {
       return self.indexOf(value) === index;
     }

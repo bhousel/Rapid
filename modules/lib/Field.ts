@@ -103,16 +103,26 @@ interface FieldStrings {
  */
 export class Field {
 
+  /** Global shared application context */
   public context: Context;
+  /** Unique identifier for this Field */
   public id: FieldID;
+  /** Version of `id` safe for use in CSS selectors and DOM element IDs */
   public safeid: string;
+  /** Alias for `id`; provided for consistency with other schema classes */
   public fieldID: FieldID;
+  /** Input type for this Field (e.g. 'text', 'combo', 'check', 'number') */
   public type: string;
+  /** Full properties object (see `FieldProps`) */
   public props: FieldProps;
+  /** Geometry types this Field is compatible with */
   public geometries: Set<GeometryType>;
 
+  /** Pre-localized display strings keyed by locale code */
   protected _strings: Map<string, FieldStrings>;
+  /** The locale code in effect when `_currStrings` was last computed */
   protected _currLocaleCode: LocaleCode | null;
+  /** Display strings for the current locale (label, terms, placeholder) */
   protected _currStrings: FieldStrings;
 
 

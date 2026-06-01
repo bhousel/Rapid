@@ -422,18 +422,28 @@ export class Context extends EventEmitter {
   /**
    * OAuth/authentication credentials for connecting to the OSM API.
    * Set this before calling `initAsync()` to use preauth credentials.
+   * @return  The OAuth/preauth credentials, or null if not set
    */
   public get preauth(): PreauthOptions | null {
     return this._preauth;
   }
+  /**
+   * Sets OAuth/preauth credentials; copies the object to prevent mutation.
+   * @param options - OAuth/preauth credentials, or null to clear
+   */
   public set preauth(options: PreauthOptions | null) {
     this._preauth = options ? { ...options } : null;  // copy and remember for init time
   }
 
   /**
    * Connection options for the source switcher (optional).
+   * @return  The available API connections, or null if not configured
    */
   public get apiConnections(): ApiConnection[] | null     { return this._apiConnections; }
+  /**
+   * Sets the API connections list for the source switcher.
+   * @param arr - Available API connections, or null to clear
+   */
   public set apiConnections(arr: ApiConnection[] | null)  { this._apiConnections = arr; }
 
 
@@ -447,9 +457,14 @@ export class Context extends EventEmitter {
   /**
    * A string or array of locale codes to prefer over the browser's settings.
    * Must be set before `initAsync()` is called.
+   * @return  The preferred locale code(s), or null if not set
    * @deprecated  Set locale via urlhash param or LocalizationSystem instead
    */
   public get locale(): string | string[] | null     { return this._prelocale; }  // remember for init time
+  /**
+   * Sets the preferred locale codes; must be called before `initAsync()`.
+   * @param val - Preferred locale code(s), or null to clear
+   */
   public set locale(val: string | string[] | null)  { this._prelocale = val; }
 
 
@@ -518,6 +533,13 @@ export class Context extends EventEmitter {
 
 
   // String length limits in Unicode characters, not JavaScript UTF-16 code units
+  /**
+   * Coerces a value to a trimmed, Unicode-normalized string clamped to a maximum length.
+   * Used to sanitize free-form OSM tag values before they are stored or uploaded.
+   * @param val - Raw value to clean (coerced to a string; `null`/`undefined` become '')
+   * @param maxChars - Maximum length in Unicode characters
+   * @return  The cleaned string
+   */
   protected _cleanOsmString(val: unknown, maxChars: number): string {
     // be lenient with input
     let str: string;
@@ -569,6 +591,7 @@ export class Context extends EventEmitter {
   /**
    * The current editing mode.
    * Returns `null` until UiSystem.render initializes the map and enters browse mode.
+   * @return  The active mode, or null if not yet initialized
    * @readonly
    */
   public get mode(): AbstractMode | null {
@@ -663,15 +686,25 @@ export class Context extends EventEmitter {
 
   /**
    * The graph snapshot used for copy/paste operations.
+   * @return  The graph snapshot, or null if nothing has been copied
    */
   public get copyGraph(): Graph | null     { return this._copyGraph; }
+  /**
+   * Sets the graph snapshot used for copy/paste operations.
+   * @param val - Graph snapshot to store, or null to clear
+   */
   public set copyGraph(val: Graph | null)  { this._copyGraph = val; }
 
   /**
    * Entity IDs that have been copied for paste operations.
    * Setting this also captures the current staging graph as `copyGraph`.
+   * @return  Array of copied entity IDs
    */
   public get copyIDs(): EntityID[] { return this._copyIDs; }
+  /**
+   * Sets the entity IDs to paste and captures the current staging graph as `copyGraph`.
+   * @param val - Array of entity IDs to paste
+   */
   public set copyIDs(val: EntityID[]) {
     this._copyIDs = val;
     this._copyGraph = this.systems.editor!.staging.graph!;
@@ -679,8 +712,13 @@ export class Context extends EventEmitter {
 
   /**
    * The [lon, lat] location where entities were copied from.
+   * @return  The copy origin, or null if not set
    */
   public get copyLoc(): Vec2 | null     { return this._copyLoc; }
+  /**
+   * Sets the [lon, lat] location from which entities were copied.
+   * @param val - [lon, lat] origin of the copied entities, or null to clear
+   */
   public set copyLoc(val: Vec2 | null)  { this._copyLoc = val; }
 
 
@@ -732,10 +770,15 @@ export class Context extends EventEmitter {
 
   /**
    * The container DOM element.
+   * @return  The container Element, or null if not set
    */
   public get containerNode(): Element | null {
     return this.$container.node();
   }
+  /**
+   * Sets the container from a raw DOM Element (wraps it in a D3 selection).
+   * @param val - DOM Element to use as the application container
+   */
   public set containerNode(val: Element) {
     this.container(d3_select(val));
   }

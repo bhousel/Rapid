@@ -56,10 +56,15 @@ export class Difference {
   /** Flags indicating what types of changes occurred */
   public didChange: DifferenceFlags;
 
+  /** The base Graph (before the edit), or null for a fresh graph */
   protected _base: Graph | null;
+  /** The head Graph (after the edit) */
   protected _head: Graph;
+  /** Map of EntityID to the before/after entity pair for each changed entity */
   protected _changes: Map<EntityID, DifferenceChange>;
+  /** Lazily computed summary of changes (created/modified/deleted), cached after first call */
   protected _summary: Map<EntityID, SummaryEntry> | null;
+  /** Lazily computed complete set of entities affected by the diff (including parents/children), cached after first call */
   protected _complete: Map<EntityID, OsmEntity | undefined> | null;
 
 
@@ -134,6 +139,7 @@ export class Difference {
 
 
   /**
+   * The map of per-entity changes captured by this difference.
    * @readonly
    * @return  The change details
    */
@@ -143,6 +149,7 @@ export class Difference {
 
 
   /**
+   * Returns the entities that exist in both base and head graphs (i.e. modified).
    * @return  Array of Entities modified
    */
   public modified(): OsmEntity[] {
@@ -157,6 +164,7 @@ export class Difference {
 
 
   /**
+   * Returns the entities that exist only in the head graph (i.e. created).
    * @return  Array of Entities created
    */
   public created(): OsmEntity[] {
@@ -171,6 +179,7 @@ export class Difference {
 
 
   /**
+   * Returns the entities that exist only in the base graph (i.e. deleted).
    * @return  Array of Entities deleted
    */
   public deleted(): OsmEntity[] {
@@ -292,6 +301,11 @@ export class Difference {
     return result;
 
 
+    /**
+     *
+     * @param parents
+     * @param result
+     */
     function _gatherParents(parents: Iterable<OsmEntity>, result: Map<EntityID, OsmEntity | undefined>): void {
       for (const parent of parents) {
         if (result.has(parent.id)) continue;

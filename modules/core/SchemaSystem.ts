@@ -194,11 +194,13 @@ export class SchemaSystem extends AbstractSystem {
   /** Requested schema file assetIDs - optional, these can be different than the default files */
   protected _requestedAssetIDs: Set<AssetID> | null;
 
+  /** Recently used PresetIDs, shown at the top of the preset list (null until first loaded) */
   protected _recentIDs: PresetID[] | null;
 
   /** Per-scope data */
   protected _scopes: Map<ScopeID, SchemaScope>;
 
+  /** Locale code used when the current search index was built (null means not yet built) */
   protected _currLocaleCode: LocaleCode | null;
 
 
@@ -314,6 +316,7 @@ export class SchemaSystem extends AbstractSystem {
 
 
   /**
+   * Loads the preset/field schema definitions from the assets system.
    * @return Promise fulfilled when the schema assets have been loaded
    */
   public loadSchemaAssetsAsync(): Promise<void> {
@@ -523,6 +526,9 @@ gfx?.scene?.reset();  // throw it all away
       }
     }
   }
+  /** Returns the currently requested schema asset IDs, or null if using defaults.
+   * @return  The requested asset IDs, or `null` when using defaults
+   */
   public get requestedAssetIDs(): Set<AssetID> | null {
     return this._requestedAssetIDs;
   }
@@ -977,6 +983,7 @@ gfx?.scene?.reset();  // throw it all away
 
 
   /**
+   * Tests whether the given entity is allowed to be rendered as a vertex.
    * @param   entity  - the Entity to test
    * @param   graph   - the Graph containing this Entity
    * @return  `true` if this entity can be a vertex, `false` if not

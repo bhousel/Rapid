@@ -33,6 +33,7 @@ export class MarkerData<P extends MarkerProps = MarkerProps> extends AbstractDat
   // The constructor accepts `Partial<P>` for flexibility (e.g. tests),
   // but access sites can trust that required properties exist.
   // `declare` emits no JavaScript — it only refines the type.
+  /** Narrows the inherited `Partial<P>` props to `P`; no JS is emitted — type-only. */
   public declare props: P;
 
   /**
@@ -90,6 +91,7 @@ export class MarkerData<P extends MarkerProps = MarkerProps> extends AbstractDat
 
   /**
    * Markers should have a `loc` property to represent the location in WGS84 lat/lon
+   * @return  `[lon, lat]` coordinate pair
    * @readonly
    */
   public get loc(): Vec2 {
@@ -99,6 +101,7 @@ export class MarkerData<P extends MarkerProps = MarkerProps> extends AbstractDat
   /**
    * Markers are usually associated with a 'serviceID' string.
    * For example 'keepright', 'maproulette', 'mapillary', etc.
+   * @return  The service that owns this marker
    * @readonly
    */
   public get serviceID(): ServiceID {
@@ -108,6 +111,7 @@ export class MarkerData<P extends MarkerProps = MarkerProps> extends AbstractDat
   /**
    * In the old QAItem class we had some OSM-like code to consider negative ids as new.
    * Instead we'll just set an isNew property for new markers.
+   * @return  `true` if this marker represents a newly created item
    * @readonly
    */
   public get isNew(): boolean {

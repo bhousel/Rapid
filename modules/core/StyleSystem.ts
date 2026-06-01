@@ -258,6 +258,7 @@ export class StyleSystem extends AbstractSystem {
 
 
   /**
+   * Loads the style definitions from the assets system.
    * @return Promise fulfilled when the style assets have been loaded
    */
   public loadStyleAssetsAsync(): Promise<void> {
@@ -374,6 +375,9 @@ export class StyleSystem extends AbstractSystem {
       }
     }
   }
+  /** Returns the currently requested style asset IDs, or null if using defaults.
+   * @return  The requested asset IDs, or `null` when using defaults
+   */
   public get requestedAssetIDs(): Set<AssetID> | null {
     return this._requestedAssetIDs;
   }
@@ -510,6 +514,7 @@ export class StyleSystem extends AbstractSystem {
 
 
   /**
+   * Resolves the display style for a set of OSM tags and optional geometry.
    * @param tags - OSM tags to match to a display style
    * @param geometry - Optional geometry type (if provided, will look up preset icon from SchemaSystem)
    * @param scopeID - Optional scope ID for scoped matching (defaults to 'osm')

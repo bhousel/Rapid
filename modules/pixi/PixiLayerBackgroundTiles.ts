@@ -54,8 +54,11 @@ export class PixiLayerBackgroundTiles extends AbstractPixiLayer {
   /** Convolution filter applied when sharpness > 1 */
   public convolutionFilter: ConvolutionFilter | null;
 
+  /** Active tile collections per imagery source, keyed by ImagerySourceID then TileID */
   protected _tileMaps: Map<ImagerySourceID, Map<TileID, CachedTile>>;
+  /** URLs of tiles that have failed to load (to avoid retrying them) */
   protected _failed: Set<string>;
+  /** Tiler used to compute which tiles cover the current viewport */
   protected _tiler: Tiler;
 
   /**
@@ -505,6 +508,7 @@ export class PixiLayerBackgroundTiles extends AbstractPixiLayer {
 
 
   /**
+   * Sets the brightness adjustment applied to background tiles.
    * @param val - the brightness value
    */
   public setBrightness(val: number): void {
@@ -512,6 +516,7 @@ export class PixiLayerBackgroundTiles extends AbstractPixiLayer {
   }
 
   /**
+   * Sets the contrast adjustment applied to background tiles.
    * @param val - the contrast value
    */
   public setContrast(val: number): void {
@@ -519,6 +524,7 @@ export class PixiLayerBackgroundTiles extends AbstractPixiLayer {
   }
 
   /**
+   * Sets the saturation adjustment applied to background tiles.
    * @param val - the saturation value
    */
   public setSaturation(val: number): void {
@@ -526,6 +532,7 @@ export class PixiLayerBackgroundTiles extends AbstractPixiLayer {
   }
 
   /**
+   * Sets the sharpness adjustment applied to background tiles.
    * @param val - the sharpness value
    */
   public setSharpness(val: number): void {

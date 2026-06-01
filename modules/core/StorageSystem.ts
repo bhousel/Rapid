@@ -34,7 +34,9 @@ type InternalStorage = Storage | MockStorage;
  */
 export class StorageSystem extends AbstractSystem {
 
+  /** The underlying localStorage wrapper (or fallback mock) */
   protected _storage: InternalStorage;
+  /** In-memory mock storage used when localStorage is unavailable */
   protected _mock: Map<string, string> | null;
 
   /**
@@ -96,6 +98,7 @@ export class StorageSystem extends AbstractSystem {
 
 
   /**
+   * Tests whether a key is present in storage.
    * @param k - String key to check for existance
    * @return `true` if the key is set, `false` if not
    */
@@ -105,6 +108,7 @@ export class StorageSystem extends AbstractSystem {
 
 
   /**
+   * Retrieves the value stored under a key.
    * @param k - String key to get the value for
    * @return The stored value, or `null` if not found
    */
@@ -114,6 +118,7 @@ export class StorageSystem extends AbstractSystem {
 
 
   /**
+   * Stores a value under a key, handling quota-exceeded errors gracefully.
    * @param k - String key to set the value for
    * @param v - String value to set
    * @return `true` if the write to `localStorage` succeeded, `false` if it failed
@@ -130,6 +135,7 @@ export class StorageSystem extends AbstractSystem {
 
 
   /**
+   * Removes a key and its value from storage.
    * @param k - String key to remove from storage
    */
   public removeItem(k: string): void {

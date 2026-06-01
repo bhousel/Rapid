@@ -47,6 +47,7 @@ export interface ValidationIssueProps {
  */
 export class ValidationIssue {
 
+  /** Global shared application context */
   public context: Context;
   /** Unique identifier for this issue */
   public id: string;
@@ -153,6 +154,7 @@ export class ValidationIssue {
   /**
    * A unique, deterministic string hash.
    * Issues with identical id values are considered identical.
+   * @return  The deterministic issue ID
    */
   protected _generateID(): string {
     const parts: string[] = [this.type];
@@ -179,6 +181,7 @@ export class ValidationIssue {
   /**
    * An identifier suitable for use as the second argument to d3.selection#data().
    * (i.e. this should change whenever the data needs to be refreshed)
+   * @return  A time-stamped key that changes on each generation
    */
   protected _generateKey(): string {
     return this.id + ':' + Date.now().toString();  // include time of creation

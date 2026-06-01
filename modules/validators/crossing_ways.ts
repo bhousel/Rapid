@@ -41,11 +41,17 @@ export function validateCrossingWays(context: Context): ValidatorFunction {
   const schema = context.systems.schema!;
 
 
-  /** Tests whether a tag value is defined and not `'no'`. */
+  /**
+   * Tests whether a tag value is defined and not `'no'`.
+   * @param v
+   */
   function hasTag(v: string | undefined): boolean {
     return v !== undefined && v !== 'no';
   }
-  /** Tests whether the given tags indicate an indoor feature. */
+  /**
+   * Tests whether the given tags indicate an indoor feature.
+   * @param tags
+   */
   function taggedAsIndoor(tags: OsmTags): boolean {
     return hasTag(tags.indoor) || hasTag(tags.level) || tags.highway === 'corridor';
   }
@@ -604,6 +610,10 @@ export function validateCrossingWays(context: Context): ValidatorFunction {
       }
     });
 
+    /**
+     *
+     * @param $selection
+     */
     function showReference($selection: D3Selection): void {
       $selection.selectAll('.issue-reference')
         .data([0])
@@ -709,6 +719,11 @@ export function validateCrossingWays(context: Context): ValidatorFunction {
           if (!projectedCrossing) return graph;
           const projectedCrossingPoint = projectedCrossing.point;
 
+          /**
+           *
+           * @param directionSign
+           * @param distanceMeters
+           */
           function locDistanceFromCrossingLoc(directionSign: -1 | 1, distanceMeters: number): Vec2 {
             const worldDistance = distanceMeters * worldUnitsPerSphericalMeter;
             return projWorldToWgs84([
@@ -723,6 +738,10 @@ export function validateCrossingWays(context: Context): ValidatorFunction {
           // avoid creating very short edges from splitting too close to another node
           const minEdgeLengthMeters = 0.55;
 
+          /**
+           *
+           * @param node
+           */
           function countIncidentEdges(node: OsmNode): number {
             let edgeCount = 0;
 
@@ -743,6 +762,12 @@ export function validateCrossingWays(context: Context): ValidatorFunction {
           }
 
           // decide where to bound the structure along the way, splitting as necessary
+          /**
+           *
+           * @param edgeToSplit
+           * @param endNode
+           * @param locGetter
+           */
           function determineEndpoint(edgeToSplit: [EntityID, EntityID], endNode: OsmNode, locGetter: (len: number) => Vec2): OsmNode {
             let newNode: OsmNode | undefined;
             const idealLengthMeters = structLengthMeters / 2;

@@ -187,6 +187,11 @@ export function osmLanes(entity: OsmWay): LanesInfo | null {
 }
 
 
+/**
+ *
+ * @param tags
+ * @param isOneWay
+ */
 function getLaneCount(tags: OsmTags, isOneWay: boolean): number {
   let count: number;
   if (tags.lanes) {
@@ -210,6 +215,10 @@ function getLaneCount(tags: OsmTags, isOneWay: boolean): number {
 }
 
 
+/**
+ *
+ * @param tags
+ */
 function parseMaxspeed(tags: OsmTags): number | undefined {
   const maxspeed = tags.maxspeed;
   if (!maxspeed) return;
@@ -221,6 +230,12 @@ function parseMaxspeed(tags: OsmTags): number | undefined {
 }
 
 
+/**
+ *
+ * @param tags
+ * @param isOneWay
+ * @param laneCount
+ */
 function parseLaneDirections(tags: OsmTags, isOneWay: boolean, laneCount: number): LaneDirections {
   let forward = parseInt(tags['lanes:forward'] ?? '', 10);
   let backward = parseInt(tags['lanes:backward'] ?? '', 10);
@@ -254,6 +269,10 @@ function parseLaneDirections(tags: OsmTags, isOneWay: boolean, laneCount: number
 }
 
 
+/**
+ *
+ * @param tag
+ */
 function parseTurnLanes(tag: string | undefined): TurnLaneValue[][] | undefined {
   if (!tag) return;
 
@@ -273,6 +292,11 @@ function parseTurnLanes(tag: string | undefined): TurnLaneValue[][] | undefined 
 }
 
 
+/**
+ *
+ * @param tag
+ * @param maxspeed
+ */
 function parseMaxspeedLanes(tag: string | undefined, maxspeed: number | undefined): (number | string | null)[] | undefined {
   if (!tag) return;
 
@@ -286,6 +310,10 @@ function parseMaxspeedLanes(tag: string | undefined, maxspeed: number | undefine
 }
 
 
+/**
+ *
+ * @param tag
+ */
 function parseMiscLanes(tag: string | undefined): MiscLaneValue[] | undefined {
   if (!tag) return;
 
@@ -301,6 +329,10 @@ function parseMiscLanes(tag: string | undefined): MiscLaneValue[] | undefined {
 }
 
 
+/**
+ *
+ * @param tag
+ */
 function parseBicycleWay(tag: string | undefined): BicyclewayLaneValue[] | undefined {
   if (!tag) return;
 
@@ -316,6 +348,15 @@ function parseBicycleWay(tag: string | undefined): BicyclewayLaneValue[] | undef
 }
 
 
+/**
+ *
+ * @param lanesObj
+ * @param lanesObj.forward
+ * @param lanesObj.backward
+ * @param lanesObj.unspecified
+ * @param data
+ * @param key
+ */
 function mapToLanesObj(
   lanesObj: { forward: LaneProperties[]; backward: LaneProperties[]; unspecified: LaneProperties[] },
   data: DirectionalLaneData<unknown>,

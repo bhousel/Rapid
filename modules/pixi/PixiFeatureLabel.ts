@@ -124,6 +124,7 @@ export class PixiFeatureLabel extends AbstractPixiFeature {
    * then keeps tint / position in sync on subsequent calls.  Stays dirty if
    * the texture is not yet ready, so the layer will retry next frame.
    * @param viewport - Pixi viewport (unused — label placement is precomputed in layer space)
+   * @param _viewport
    */
   public update(_viewport: Viewport): void {
     if (!this._styleDirty || !this.props) return;
@@ -150,6 +151,7 @@ export class PixiFeatureLabel extends AbstractPixiFeature {
    *   - ASCII point labels arrive with a pre-built `PIXI.BitmapText` — adopt it directly.
    *   - Other labels look up an atlas texture and wrap it in a `PIXI.Sprite`.
    *     If the texture isn't ready yet, leave `_styleDirty` set and retry next frame.
+   * @param props
    */
   protected _updateText(props: TextLabelProps): void {
     if (!this.display) {
@@ -176,6 +178,7 @@ export class PixiFeatureLabel extends AbstractPixiFeature {
    * Build / restyle a rope label.
    * Rope geometry doesn't change after placement, so we only build the
    * `MeshRope` once; subsequent updates just refresh the tint.
+   * @param props
    */
   protected _updateRope(props: RopeLabelProps): void {
     if (!this.display) {

@@ -199,7 +199,8 @@ export class TaginfoService extends AbstractSystem {
 
 
   /**
-   * @param params
+   * Looks up popular OSM keys matching the query and returns them via the callback.
+   * @param params - Taginfo query parameters
    * @param callback - errback-style callback function to call with results
    */
   public keys(params: TaginfoParams, callback: TaginfoCallback): void {
@@ -240,7 +241,8 @@ export class TaginfoService extends AbstractSystem {
 
 
   /**
-   * @param params
+   * Looks up keys matching a prefix (without additional colons) and returns them via the callback.
+   * @param params - Taginfo query parameters
    * @param callback - errback-style callback function to call with results
    */
   public multikeys(params: TaginfoParams, callback: TaginfoCallback): void {
@@ -282,7 +284,8 @@ export class TaginfoService extends AbstractSystem {
 
 
   /**
-   * @param params
+   * Looks up popular values for a given key and returns them via the callback.
+   * @param params - Taginfo query parameters (must include `key`)
    * @param callback - errback-style callback function to call with results
    */
   public values(params: TaginfoParams, callback: TaginfoCallback): void {
@@ -336,7 +339,8 @@ export class TaginfoService extends AbstractSystem {
 
 
   /**
-   * @param params
+   * Looks up relation member roles matching the query and returns them via the callback.
+   * @param params - Taginfo query parameters
    * @param callback - errback-style callback function to call with results
    */
   public roles(params: TaginfoParams, callback: TaginfoCallback): void {
@@ -378,7 +382,8 @@ export class TaginfoService extends AbstractSystem {
 
 
   /**
-   * @param params
+   * Looks up OSM wiki documentation pages for a key, tag, or relation type.
+   * @param params - Taginfo query parameters
    * @param callback - errback-style callback function to call with results
    */
   public docs(params: TaginfoParams, callback: TaginfoCallback): void {
@@ -427,34 +432,58 @@ export class TaginfoService extends AbstractSystem {
     return params;
   }
 
-  /** Sets the `filter` parameter based on geometry type */
+  /**
+   * Sets the `filter` parameter based on geometry type
+   * @param params - Taginfo query parameters
+   * @return  The parameters with `filter` set
+   */
   protected _setFilter(params: TaginfoParams): TaginfoParams {
     return this._sets(params, 'filter', tag_filters);
   }
 
-  /** Sets the `sortname` parameter based on geometry type for key/value queries */
+  /**
+   * Sets the `sortname` parameter based on geometry type for key/value queries
+   * @param params - Taginfo query parameters
+   * @return  The parameters with `sortname` set
+   */
   protected _setSort(params: TaginfoParams): TaginfoParams {
     return this._sets(params, 'sortname', tag_sorts);
   }
 
-  /** Sets the `sortname` parameter based on geometry type for relation member queries */
+  /**
+   * Sets the `sortname` parameter based on geometry type for relation member queries
+   * @param params - Taginfo query parameters
+   * @return  The parameters with `sortname` set
+   */
   protected _setSortMembers(params: TaginfoParams): TaginfoParams {
     return this._sets(params, 'sortname', tag_sort_members);
   }
 
-  /** Removes internal-only parameters (`geometry`, `debounce`) before sending to the API */
+  /**
+   * Removes internal-only parameters (`geometry`, `debounce`) before sending to the API
+   * @param params - Taginfo query parameters
+   * @return  The parameters with internal-only keys removed
+   */
   protected _clean(params: TaginfoParams): TaginfoParams {
     return utilObjectOmit(params, ['geometry', 'debounce']);
   }
 
 
-  /** Returns a filter function that keeps keys with high usage count or wiki presence */
+  /**
+   * Returns a filter function that keeps keys with high usage count or wiki presence
+   * @param type - Optional geometry type used to pick the count field
+   * @return  A predicate that keeps popular or documented keys
+   */
   protected _filterKeys(type?: string): (d: any) => boolean {
     const count_type = type ? 'count_' + type : 'count_all';
     return (d: any) => parseFloat(d[count_type]) > 2500 || d.in_wiki;
   }
 
-  /** Returns a filter function that keeps keys matching the prefix without additional colons */
+  /**
+   * Returns a filter function that keeps keys matching the prefix without additional colons
+   * @param prefix - The key prefix to match
+   * @return  A predicate that keeps matching keys
+   */
   protected _filterMultikeys(prefix: string): (d: any) => boolean {
     return (d: any) => {
       // d.key begins with prefix, and d.key contains no additional ':'s
@@ -464,7 +493,11 @@ export class TaginfoService extends AbstractSystem {
     };
   }
 
-  /** Returns a filter function that excludes values with punctuation, optionally uppercase, or zero fraction */
+  /**
+   * Returns a filter function that excludes values with punctuation, optionally uppercase, or zero fraction
+   * @param allowUpperCase - Whether uppercase values are permitted
+   * @return  A predicate that keeps acceptable values
+   */
   protected _filterValues(allowUpperCase: boolean): (d: any) => boolean {
     return (d: any) => {
       if (d.value.match(/[;,]/) !== null) return false;  // exclude some punctuation
@@ -473,7 +506,11 @@ export class TaginfoService extends AbstractSystem {
     };
   }
 
-  /** Returns a filter function that excludes empty roles, uppercase, and low-fraction roles */
+  /**
+   * Returns a filter function that excludes empty roles, uppercase, and low-fraction roles
+   * @param geometry - The geometry type to filter by, or '' for no geometry filter
+   * @return  A predicate that keeps acceptable roles
+   */
   protected _filterRoles(geometry: GeometryType | ''): (d: any) => boolean {
     return (d: any) => {
       if (d.role === '') return false; // exclude empty role
@@ -483,7 +520,11 @@ export class TaginfoService extends AbstractSystem {
     };
   }
 
-  /** Maps a taginfo key datum to a TaginfoResult using the key as both value and title */
+  /**
+   * Maps a taginfo key datum to a TaginfoResult using the key as both value and title
+   * @param d - The taginfo key datum
+   * @return  The mapped result
+   */
   protected _valKey(d: any): TaginfoResult {
     return {
       value: d.key,
@@ -492,7 +533,11 @@ export class TaginfoService extends AbstractSystem {
   }
 
 
-  /** Maps a taginfo value datum to a TaginfoResult, using the description as title if available */
+  /**
+   * Maps a taginfo value datum to a TaginfoResult, using the description as title if available
+   * @param d - The taginfo value datum
+   * @return  The mapped result
+   */
   protected _valKeyDescription(d: any): TaginfoResult {
     const obj: TaginfoResult = {
       value: d.value,
@@ -505,7 +550,11 @@ export class TaginfoService extends AbstractSystem {
   }
 
 
-  /** Maps a taginfo role datum to a TaginfoResult using the role as both value and title */
+  /**
+   * Maps a taginfo role datum to a TaginfoResult using the role as both value and title
+   * @param d - The taginfo role datum
+   * @return  The mapped result
+   */
   protected _roleKey(d: any): TaginfoResult {
     return {
       value: d.role,
@@ -514,7 +563,12 @@ export class TaginfoService extends AbstractSystem {
   }
 
 
-  /** Sorts keys so that simple keys (without ':') appear before namespaced keys (with ':') */
+  /**
+   * Sorts keys so that simple keys (without ':') appear before namespaced keys (with ':')
+   * @param a - First taginfo key datum
+   * @param b - Second taginfo key datum
+   * @return  Negative, zero, or positive per standard sort comparator semantics
+   */
   protected _sortKeys(a: any, b: any): number {
     return (a.key.indexOf(':') === -1 && b.key.indexOf(':') !== -1) ? -1
       : (a.key.indexOf(':') !== -1 && b.key.indexOf(':') === -1) ? 1

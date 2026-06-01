@@ -63,7 +63,7 @@ import type { Context } from '../Context.ts';
 export class AbstractSystem extends EventEmitter {
 
   /** Identifier for the system (e.g. 'l10n') */
-  public id: string;
+  public id: SystemID;
   /** Global shared application context */
   public context: Context;
   /** Dependencies that must be met before init */
@@ -73,10 +73,15 @@ export class AbstractSystem extends EventEmitter {
   /** True to start automatically when initializing the Context */
   public autoStart: boolean;
 
+  /** Memoized promise for `initAsync()` — ensures init runs at most once */
   protected _initPromise: Promise<void> | null;
+  /** Memoized promise for `startAsync()` — ensures start runs at most once */
   protected _startPromise: Promise<void> | null;
+  /** Whether `startAsync()` has completed successfully */
   protected _started: boolean;
+  /** Whether the system is currently paused (pause count > 0) */
   protected _paused: boolean;
+  /** Number of outstanding `pause()` calls; system resumes when this reaches zero */
   protected _pauseCount: number;
 
 
@@ -103,9 +108,10 @@ export class AbstractSystem extends EventEmitter {
 
   /**
    * Unique string to identify this System.
+   * @return  This system's unique ID
    * @readonly
    */
-  public get systemID(): string {
+  public get systemID(): SystemID {
     return this.id;
   }
 
@@ -114,14 +120,17 @@ export class AbstractSystem extends EventEmitter {
    * Because services also inherit from 'AbstractSystem',
    *  we will offer a convenience getter named `serviceID` too.
    * They all just return `id` anyway.
+   * @return  This service's unique ID (same as `systemID`)
    * @readonly
    */
-  public get serviceID(): string {
+  public get serviceID(): SystemID {
     return this.id;
   }
 
 
   /**
+   * Whether this system has completed `startAsync` and is running.
+   * @return  `true` if this system has been started
    * @readonly
    */
   public get started(): boolean {
@@ -130,6 +139,8 @@ export class AbstractSystem extends EventEmitter {
 
 
   /**
+   * Whether this system is currently paused (event handling and updates suspended).
+   * @return  `true` if this system is currently paused
    * @readonly
    */
   public get paused(): boolean {

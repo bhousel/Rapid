@@ -94,12 +94,20 @@ export class OsmChangeset extends OsmEntity {
   }
 
   /**
+   * Builds the JXON representation of an osmChange document for the given changes.
+   * @param changes - The created/modified/deleted entities to serialize
    * @see http://wiki.openstreetmap.org/wiki/OsmChange
    * @return JXON representation of an osmChange document
    */
   public osmChangeJXON(changes: OsmChanges): Record<string, unknown> {
     const changesetID = this.props.id;
 
+    /**
+     * Groups entities by type into ordered buckets.
+     * @param arr - The entities to group
+     * @param order - The ordered list of entity types
+     * @return  The entities grouped by type
+     */
     function nest(arr: Record<string, any>[], order: string[]): Record<string, any[]> {
       const groups: Record<string, any[]> = {};
       for (const item of arr) {
@@ -115,8 +123,16 @@ export class OsmChangeset extends OsmEntity {
     }
 
     // sort relations in a changeset by dependencies
+    /**
+     *
+     * @param changes
+     */
     function sort(changes: Record<string, any[]>): Record<string, any[]> {
       // find a referenced relation in the current changeset
+      /**
+       *
+       * @param item
+       */
       function resolve(item: any): any {
         return relations.find(relation => {
           return item.keyAttributes.type === 'relation' && item.keyAttributes.ref === relation['@id'];
@@ -124,6 +140,10 @@ export class OsmChangeset extends OsmEntity {
       }
 
       // a new item is an item that has not been already processed
+      /**
+       *
+       * @param item
+       */
       function isNew(item: any): boolean {
         return !sorted[ item['@id'] ] && !processing.find(proc => {
           return proc['@id'] === item['@id'];
@@ -157,6 +177,10 @@ export class OsmChangeset extends OsmEntity {
       return changes;
     }
 
+    /**
+     *
+     * @param entity
+     */
     function rep(entity: OsmEntity): Record<string, unknown> {
       return entity.asJXON(changesetID);
     }

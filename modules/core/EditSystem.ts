@@ -159,24 +159,40 @@ interface EntityCopy {
  */
 export class EditSystem extends AbstractSystem {
 
+  /** Session mutex to prevent concurrent editing across tabs */
   protected _mutex: ReturnType<typeof utilSessionMutex>;
+  /** Whether there is a backup available to restore from localStorage */
   protected _canRestoreBackup: boolean;
+  /** Whether there are unsaved edits relative to the last stable state */
   protected _hasWorkInProgress: boolean;
 
+  /** The stack of committed edits; `_history[0]` is always the `base` Edit */
   protected _history: Edit[];
+  /** Index into `_history` pointing to the current `stable` Edit */
   protected _index: number;
+  /** The work-in-progress Edit that accumulates changes before they are committed */
   protected _staging: Edit;
 
+  /** Named snapshots of `_history` and `_index` that can be restored */
   protected _checkpoints: Map<CheckpointID, Checkpoint>;
+  /** Whether an animated map transition is in progress (suppresses backup writes) */
   protected _inTransition: boolean;
+  /** Whether a transaction is open (suppresses intermediate change events) */
   protected _inTransaction: boolean;
+  /** R-tree spatial index for fast entity lookup by bounding box */
   protected _tree: Tree;
 
+  /** Whether the most recent localStorage backup succeeded */
   protected _backupStatus: boolean;
+  /** Cache key used to detect when `stable` has changed and a new backup is needed */
   protected _stableKey: string | null;
+  /** Snapshot of the stable Graph captured at the last `stablechange` event */
   protected _stableSnapshot: Graph | null;
+  /** Cache key used to detect when `staging` has changed */
   protected _stagingKey: string | null;
+  /** Snapshot of the staging Graph captured at the last `stagingchange` event */
   protected _stagingSnapshot: Graph | null;
+  /** Accumulated Difference across the entire open transaction (if any) */
   protected _fullDifference: Difference;
 
 
@@ -458,6 +474,7 @@ export class EditSystem extends AbstractSystem {
   /**
    * This reverts the `staging` work-in-progress by replacing `staging` with a fresh copy of `stable`.
    * (It's more like what `git reset --hard` does, but we can't call it "reset")
+   * @return  The difference produced by reverting, or `undefined` if there was no work in progress
    */
   public revert(): Difference | undefined {
     if (!this._hasWorkInProgress) return;
@@ -791,6 +808,7 @@ export class EditSystem extends AbstractSystem {
    * This marks the transaction as complete, and allows events to be emitted again.
    * Any `stagingchange` and `stablechange` events will be emitted that cover
    *   the difference from the beginning -> end of the transaction.
+   * @return  The accumulated difference for the transaction, or `undefined` if nothing changed
    */
   public endTransaction(): Difference | undefined {
     this._inTransaction = false;
@@ -799,6 +817,7 @@ export class EditSystem extends AbstractSystem {
 
 
   /**
+   * Finds the annotation describing the edit that would be undone next.
    * @return The previous undo annotation, or `undefined` if none
    */
   public getUndoAnnotation(): string | undefined {
@@ -812,6 +831,7 @@ export class EditSystem extends AbstractSystem {
 
 
   /**
+   * Finds the annotation describing the edit that would be redone next.
    * @return The next redo annotation, or `undefined` if none
    */
   public getRedoAnnotation(): string | undefined {
@@ -967,6 +987,10 @@ export class EditSystem extends AbstractSystem {
 
 
     // Return a simplified copy of the Entity to save space.
+    /**
+     *
+     * @param entity
+     */
     function _copyEntity(entity: OsmEntity): EntityCopy {
       const copy = utilObjectOmit(entity.asJSON(), ['type', 'user', 'v', 'version', 'visible']) as EntityCopy;
 
@@ -1079,6 +1103,10 @@ export class EditSystem extends AbstractSystem {
 
 
     // Return a simplified copy of the Entity to save space.
+    /**
+     *
+     * @param entity
+     */
     function _copyEntity(entity: OsmEntity): EntityCopy {
       // omit 'visible'
       const copy = utilObjectOmit(entity.asJSON(), ['type', 'visible']) as EntityCopy;

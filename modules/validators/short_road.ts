@@ -49,6 +49,9 @@ export function validateShortRoad(context: Context): ValidatorFunction {
   /**
    * Activates draw-line mode to continue drawing from the given vertex.
    * Also attempts to pas the map if the vertex is not visible.
+   * @param way
+   * @param vertex
+   * @param context
    */
   function continueDrawing(way: OsmWay, vertex: OsmNode, context: Context): void {
     if (!context.editable()) return;

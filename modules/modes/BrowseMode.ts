@@ -88,6 +88,7 @@ export class BrowseMode extends AbstractMode {
 
   /**
    * Changes the cursor styling based on what geometry is hovered
+   * @param eventData
    */
   protected _hover(eventData: EventData): void {
     const context = this.context;

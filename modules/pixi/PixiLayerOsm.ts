@@ -114,6 +114,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
 
   /**
    * Whether the Layer's service exists
+   * @return  `true` if the OSM service is registered
    */
   public get supported(): boolean {
     return !!this.context.services.osm;
@@ -123,10 +124,14 @@ export class PixiLayerOsm extends AbstractPixiLayer {
   /**
    * Whether the user has chosen to see the Layer
    * Make sure to start the service first.
+   * @return  `true` if the layer is enabled
    */
   public get enabled(): boolean {
     return this._enabled;
   }
+  /** Enables or disables this layer; starts the OSM service when enabling.
+   * @param val - `true` to enable the layer, `false` to disable it
+   */
   public set enabled(val: boolean) {
     if (!this.supported) {
       val = false;
@@ -277,6 +282,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
 
 
   /**
+   * Renders the visible OSM area (polygon) features for this frame.
    * @param frame - Integer frame being rendered
    * @param viewport - Pixi viewport to use for rendering
    * @param data - Visible OSM data to render, sorted by type
@@ -436,6 +442,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
 
 
   /**
+   * Renders the visible OSM line features for this frame.
    * @param frame - Integer frame being rendered
    * @param viewport - Pixi viewport to use for rendering
    * @param data - Visible OSM data to render, sorted by type
@@ -563,6 +570,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
 
 
   /**
+   * Renders the visible OSM vertices (way nodes) for this frame.
    * @param frame - Integer frame being rendered
    * @param viewport - Pixi viewport to use for rendering
    * @param data - Visible OSM data to render, sorted by type
@@ -668,6 +676,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
 
 
   /**
+   * Renders the visible OSM standalone point features for this frame.
    * @param frame - Integer frame being rendered
    * @param viewport - Pixi viewport to use for rendering
    * @param data - Visible OSM data to render, sorted by type
@@ -744,6 +753,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
 
 
   /**
+   * Renders the midpoint handles along visible OSM ways for this frame.
    * @param frame - Integer frame being rendered
    * @param viewport - Pixi viewport to use for rendering
    * @param data - Visible OSM data to render, sorted by type

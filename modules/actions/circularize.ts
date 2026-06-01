@@ -215,6 +215,9 @@ export function actionCircularize(wayID: EntityID, maxDegrees: number = 20): Act
    * opposite order, returns `reversed: true`.  `insertAt` is the position to
    * insert new nodes that should sit between `a` and `b` in the way's
    * own (a, b) order — caller should reverse the list of new nodes if needed.
+   * @param way
+   * @param a
+   * @param b
    */
   function findEdge(way: OsmWay, a: EntityID, b: EntityID): { insertAt: number; reversed: boolean } | null {
     const nodes = way.nodes;

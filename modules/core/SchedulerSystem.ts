@@ -151,11 +151,15 @@ export class SchedulerSystem extends AbstractSystem {
   protected _targetFrameTime: number;
 
   // Task queues (drained per-frame in priority order)
+  /** Highest-priority tasks that will run before rendering this frame */
   protected _urgentQueue: QueuedTask[];
+  /** Normal-priority tasks run after urgent work when time allows */
   protected _normalQueue: QueuedTask[];
+  /** Low-priority tasks run only during idle time at the end of a frame */
   protected _idleQueue: QueuedTask[];
 
   // workID-keyed timers (timeout, interval, debounce, throttle)
+  /** Named timers (timeout / interval / debounce / throttle) keyed by workID */
   protected _timers: Map<string, TimerEntry>;
 
   // Legacy handle-based timers (Phase 1 API — still used by existing callers)
@@ -339,6 +343,7 @@ export class SchedulerSystem extends AbstractSystem {
   /**
    * Total number of tasks waiting in all priority queues.
    * Useful for debugging and tests.
+   * @return  Total pending task count across urgent, normal, and idle queues
    * @readonly
    */
   public get numPending(): number {
@@ -350,10 +355,14 @@ export class SchedulerSystem extends AbstractSystem {
    * Target frame duration in milliseconds.  Tasks are drained at the end
    * of each frame only while `performance.now()` is below the deadline
    * (`frameStart + targetFrameTime`).  Defaults to ~16.7ms (60 fps).
+   * @return  Target frame budget in milliseconds
    */
   public get targetFrameTime(): number {
     return this._targetFrameTime;
   }
+  /** Sets the target frame time budget in milliseconds (minimum 1 ms).
+   * @param ms - Frame budget in milliseconds; values below 1 are clamped to 1
+   */
   public set targetFrameTime(ms: number) {
     this._targetFrameTime = Math.max(1, ms);
   }
@@ -581,6 +590,7 @@ export class SchedulerSystem extends AbstractSystem {
   /**
    * Number of active workID-keyed timers.
    * Useful for debugging and tests.
+   * @return  Count of active named timers
    * @readonly
    */
   public get numTimers(): number {
@@ -631,6 +641,7 @@ export class SchedulerSystem extends AbstractSystem {
   /**
    * Number of active managed timeouts.
    * Useful for debugging and tests.
+   * @return  Count of active managed timeouts
    * @readonly
    */
   public get numTimeouts(): number {
@@ -671,6 +682,7 @@ export class SchedulerSystem extends AbstractSystem {
   /**
    * Number of active managed intervals.
    * Useful for debugging and tests.
+   * @return  Count of active managed intervals
    * @readonly
    */
   public get numIntervals(): number {
@@ -681,6 +693,7 @@ export class SchedulerSystem extends AbstractSystem {
   /**
    * Milliseconds elapsed since the previous frame.
    * Useful for frame-rate-independent calculations.
+   * @return  Delta time in milliseconds
    * @readonly
    */
   public get deltaMS(): number {
@@ -692,6 +705,7 @@ export class SchedulerSystem extends AbstractSystem {
    * Current backpressure level.  The scheduler automatically adjusts
    * idle-queue draining based on this level and emits `'pressure'`
    * events when the level changes.
+   * @return  Current `PressureLevel`
    * @readonly
    */
   public get pressure(): PressureLevel {
@@ -702,6 +716,7 @@ export class SchedulerSystem extends AbstractSystem {
   /**
    * Snapshot of the current frame timing metrics.
    * All time values are in milliseconds.
+   * @return  `FrameMetrics` snapshot for the current frame
    * @readonly
    */
   public get metrics(): FrameMetrics {
@@ -741,6 +756,7 @@ export class SchedulerSystem extends AbstractSystem {
   /**
    * Number of registered frame callbacks.
    * Useful for debugging and tests.
+   * @return  Count of active frame callbacks
    * @readonly
    */
   public get numFrameCallbacks(): number {

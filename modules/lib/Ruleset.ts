@@ -77,15 +77,14 @@ export interface RulesetProps {
  */
 export class Ruleset {
 
+  /** Global shared application context */
   public context: Context;
+  /** Full props object for this ruleset */
   public props: RulesetProps;
-
   /** Unique identifier */
   public readonly id: RulesetID;
-
   /** Compiled include matchers */
   public readonly include: PropMatcher[];
-
   /** Compiled exclude matchers */
   public readonly exclude: PropMatcher[];
 
@@ -197,6 +196,7 @@ export class Ruleset {
 
   /**
    * Convert to a JSON-serializable object.
+   * @return  The JSON-serializable representation of this ruleset
    */
   public toJSON(): RulesetProps {
     const { exclude: _exclude, ...rest } = this.props;
@@ -213,6 +213,7 @@ export class Ruleset {
 
   /**
    * String representation for debugging.
+   * @return  A human-readable string describing the ruleset
    */
   public toString(): string {
     const parts = [`${this.include.length} include`];

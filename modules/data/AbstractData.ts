@@ -166,6 +166,7 @@ export class AbstractData<P extends AbstractDataProps = AbstractDataProps> {
    * A string describing what kind of data element this is (e.g. 'node', 'way', 'relation')
    * The meaning of this type is data-dependant.  For OSM data it will be something like
    *  'node', 'way', 'relation', but for other data may be unset.
+   * @return  Type string for this data element
    * @readonly
    */
   public get type(): string {
@@ -174,6 +175,7 @@ export class AbstractData<P extends AbstractDataProps = AbstractDataProps> {
 
   /**
    * Unique string to identify this data element
+   * @return  This data element's unique ID
    * @readonly
    */
   public get dataID(): string {
@@ -182,6 +184,7 @@ export class AbstractData<P extends AbstractDataProps = AbstractDataProps> {
 
   /**
    * Internal version of the data element, can be used to detect changes.
+   * @return  Version counter
    * @readonly
    */
   public get v(): number {
@@ -190,6 +193,7 @@ export class AbstractData<P extends AbstractDataProps = AbstractDataProps> {
 
   /**
    * The 'key' includes both the id and the version
+   * @return  Combined `id + version` key string
    * @readonly
    */
   public get key(): string {

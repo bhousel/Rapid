@@ -286,6 +286,8 @@ export class DragBehavior extends AbstractBehavior {
 
 
   /**
+   * Whether line snapping is currently suppressed, based on pointer location and modifier keys.
+   * Snapping is disabled when the pointer is off the canvas, or while Alt/Meta (or Control on non-Mac) is held.
    * @return  `true` if line snapping is disabled, `false` if line snapping is enabled.
    */
   protected _snappingDisabled(): boolean {

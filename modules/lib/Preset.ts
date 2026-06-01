@@ -96,22 +96,38 @@ interface ResolvedFields {
  */
 export class Preset {
 
+  /** Global shared application context */
   public context: Context;
+  /** Discriminator constant; always `'preset'` */
   public type = 'preset' as const;
+  /** Unique identifier for this Preset */
   public id: PresetID;
+  /** Version of `id` safe for use in CSS selectors and DOM element IDs */
   public safeid: string;
+  /** Alias for `id`; provided for consistency with other schema classes */
   public presetID: PresetID;
+  /** Full properties object (see `PresetProps`) */
   public props: PresetProps;
+  /** Geometry types this Preset is valid for */
   public geometries: Set<GeometryType>;
+  /** Tags used to identify this Preset on a feature */
   public tags: OsmTags;
+  /** Tags added to a feature when this Preset is applied */
   public addTags: OsmTags;
+  /** Tags removed from a feature when this Preset is removed */
   public removeTags: OsmTags;
+  /** Whether this Preset appears in search results */
   public searchable: boolean;
+  /** Whether this is a Name Suggestion Index (NSI) suggestion preset */
   public suggestion: boolean;
 
+  /** Pre-localized display strings keyed by locale code */
   protected _strings: Map<string, PresetStrings>;
+  /** The locale code in effect when `_currStrings` was last computed */
   protected _currLocaleCode: LocaleCode | null;
+  /** Display strings for the current locale (name, terms, aliases, search tokens) */
   protected _currStrings: PresetStrings;
+  /** Cached resolved `Field` instances; invalidated on `reset()` */
   protected _resolved: ResolvedFields;
 
 
@@ -606,6 +622,8 @@ export class Preset {
   /**
    * A simpler version of `utilGatherTokens` to gather 'terms' from suggestion presets
    * The `terms` is already an Array of strings that can function as search names.
+   * @param primary
+   * @param alternate
    */
   protected _gatherSuggestionTerms(primary: Set<string>, alternate: Set<string>): void {
     for (const s of this.props.terms) {
@@ -624,6 +642,8 @@ export class Preset {
 
   /**
    * A simpler version of `utilGatherTokens` to gather 'tags' from suggestion presets.
+   * @param primary
+   * @param alternate
    */
   protected _gatherSuggestionTags(primary: Set<string>, alternate: Set<string>): void {
     for (const s of Object.values(this.props.tags)) {

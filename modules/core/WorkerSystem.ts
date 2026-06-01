@@ -170,10 +170,14 @@ export class WorkerSystem extends AbstractSystem {
    * URL to the built worker script.  Auto-detected from the Rapid bundle
    * location during `prepareAsync()`.  Override with a custom URL, or set
    * to `null` to disable worker offloading.
+   * @return  Worker script URL, or `null` if workers are disabled
    */
   public get workerURL(): string | null {
     return this._workerURL;
   }
+  /** Sets the URL for the worker script; pass null to disable worker offloading.
+   * @param url - URL string for the worker script, or `null` to disable
+   */
   public set workerURL(url: string | null) {
     this._workerURL = url;
   }
@@ -183,10 +187,14 @@ export class WorkerSystem extends AbstractSystem {
    * Maximum number of workers in the pool.  Workers are spawned
    * lazily, so setting this higher doesn't immediately spawn them.
    * Defaults to 2.
+   * @return  Maximum worker pool size
    */
   public get maxWorkers(): number {
     return this._maxWorkers;
   }
+  /** Sets the maximum number of workers in the pool (minimum 1).
+   * @param n - Maximum pool size; values below 1 are clamped to 1
+   */
   public set maxWorkers(n: number) {
     this._maxWorkers = Math.max(1, n);
   }
@@ -194,6 +202,7 @@ export class WorkerSystem extends AbstractSystem {
 
   /**
    * Number of workers currently alive in the pool.
+   * @return  Current number of live workers
    * @readonly
    */
   public get numWorkers(): number {
@@ -204,6 +213,7 @@ export class WorkerSystem extends AbstractSystem {
   /**
    * Number of worker requests awaiting a response.
    * Useful for debugging and tests.
+   * @return  Count of pending worker requests
    * @readonly
    */
   public get numPendingRequests(): number {
@@ -332,6 +342,7 @@ export class WorkerSystem extends AbstractSystem {
   /**
    * Returns the next worker from the pool (round-robin), spawning
    * a new one if the pool isn't full yet.
+   * @return  The worker to use for the next request
    */
   protected _getOrSpawnWorker(): Worker {
     // Spawn if pool not full
@@ -349,6 +360,7 @@ export class WorkerSystem extends AbstractSystem {
 
   /**
    * Creates a new Worker and wires up message/error handlers.
+   * @return  The newly created worker
    */
   protected _spawnWorker(): Worker {
     const scheduler = this.context.systems.scheduler;
