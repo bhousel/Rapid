@@ -120,7 +120,7 @@ export type KartaviewSequence = GeoJSONData<KartaviewSequenceProps>;
  * allowing the user to zoom, pan, and rotate the photos.
  *
  * Events available:
- *   `imageChanged`
+ * - `imageChanged`
  */
 export class KartaviewService extends AbstractSystem {
 

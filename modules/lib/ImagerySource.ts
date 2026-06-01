@@ -95,10 +95,10 @@ export interface ImagerySourceProps {
 /**
  * An `ImagerySource` maintains the state of a single tiled imagery source.
  *
- * Properties you can access:
- *   `id` (or `imageryID`)  Unique string to identify this Field.
- *   `safeid`               The id, but safe for use in classes, DOM element ids, css selectors..
- *   `props`                Properties object
+ * Properties available:
+ * - `id` (or `imageryID`)  Unique string to identify this Field.
+ * - `safeid`               The id, but safe for use in classes, DOM element ids, css selectors..
+ * - `props`                Properties object
  */
 export class ImagerySource {
 

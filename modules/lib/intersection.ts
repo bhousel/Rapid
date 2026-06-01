@@ -57,7 +57,7 @@ export interface Intersection {
 
 
 /**
- * Class representing a turn through an intersection.
+ * This class representing a turn through an intersection.
  * Properties are assigned directly to the instance for backward compatibility.
  */
 export class osmTurn implements Turn {

@@ -74,10 +74,10 @@ interface WaybackCache {
  * The release numbers are numeric strings.  They are not in order and don't mean anything.
  * The release dates are YYYY-MM-DD strings.
  *
- * Properties you can access:
- *   `allDates`         `Array<releaseDate>` sorted ascending
- *   `byReleaseNumber`  `Map<releaseNumber, Object>`
- *   `byReleaseDate`    `Map<releaseDate, Object>`
+ * Properties available:
+ * - `allDates`         `Array<releaseDate>` sorted ascending
+ * - `byReleaseNumber`  `Map<releaseNumber, Object>`
+ * - `byReleaseDate`    `Map<releaseDate, Object>`
  */
 export class WaybackService extends AbstractSystem {
 

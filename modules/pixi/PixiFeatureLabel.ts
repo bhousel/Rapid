@@ -44,7 +44,7 @@ export type LabelProps = TextLabelProps | RopeLabelProps;
 
 
 /**
- * A self-contained label feature, managed by `PixiLayerLabels`.
+ * This class renders a Label feature.
  *
  * `PixiLayerLabels` is responsible for _placement_ (RBush math, collision
  * avoidance) and stores a `LabelProps` placeholder for every possible label.
@@ -68,11 +68,10 @@ export type LabelProps = TextLabelProps | RopeLabelProps;
  *
  * Labels do not participate in hit testing and do not draw halos.
  *
- * Properties you can access:
- *   `props`   The label content (text or rope) plus its placement
- *   `display` The child display object (Sprite, BitmapText, or MeshRope), or null until built
- *
- *   (also all properties inherited from `AbstractPixiFeature`)
+ * Properties available:
+ * - `props`   The label content (text or rope) plus its placement
+ * - `display` The child display object (Sprite, BitmapText, or MeshRope), or null until built
+ * - (also all properties inherited from `AbstractPixiFeature`)
  */
 export class PixiFeatureLabel extends AbstractPixiFeature {
   /** Narrow the inherited `layer` reference so we can call `resolveLabelTexture()`. */

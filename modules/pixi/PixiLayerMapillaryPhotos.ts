@@ -30,7 +30,7 @@ const fovLengthInterp: ScaleLinear<number, number> = scaleLinear([90, 10], [0.7,
 
 
 /**
- * @class
+ * This class renders the Mapillary map data - photo markers and traces.
  */
 export class PixiLayerMapillaryPhotos extends AbstractPixiLayer {
   /** Current bearing of the Mapillary street-level viewer (null when no photo is open) */

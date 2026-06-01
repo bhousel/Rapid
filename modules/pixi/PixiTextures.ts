@@ -25,10 +25,11 @@ type DashTextureCache = Record<string, PIXI.Texture>;
  * Each "atlas" manages its own store of "TextureSources" - real textures that upload to the GPU.
  * This helps pack them efficiently and avoids swapping textures frequently as WebGL draws the scene.
  *
- * Properties you can access:
- *   `loaded`   `true` after the patterns have finished loading
+ * Properties available:
+ * - `loaded`   `true` after the patterns have finished loading
  */
 export class PixiTextures {
+
   /** Reference to the owning GraphicsSystem */
   public gfx: GraphicsSystem;
   /** Global shared application context */

@@ -16,7 +16,7 @@ export interface MoveModeOptions {
 
 
 /**
- * In `MoveMode`, we are moving one or more map features.
+ * In `MoveMode`, the user is moving one or more map features.
  */
 export class MoveMode extends AbstractMode {
 

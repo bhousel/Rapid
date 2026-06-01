@@ -21,7 +21,7 @@ export interface SelectModeOptions {
 
 
 /**
- * In `SelectMode`, the user has selected one or more things.
+ * In `SelectMode`, the user has selected one or more (non-OSM) map features.
  * - `selectedData` contains the information about what is selected.
  * - The sidebar shows something depending on what the selection contains.
  * - We also can set up the "operations" allowed (right click edit menu)

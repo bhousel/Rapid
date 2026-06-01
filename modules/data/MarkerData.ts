@@ -23,9 +23,9 @@ export interface MarkerProps extends AbstractDataProps {
  * Markers are associated with a service where we fetched them from.
  * This used to be called "QAItem".
  *
- * Properties you can access:
- *   `geoms`   Geometry object (inherited from `AbstractData`)
- *   `props`   Properties object (inherited from `AbstractData`)
+ * Properties available:
+ * - `geoms`   Geometry object (inherited from `AbstractData`)
+ * - `props`   Properties object (inherited from `AbstractData`)
  */
 export class MarkerData<P extends MarkerProps = MarkerProps> extends AbstractData<P> {
 

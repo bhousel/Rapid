@@ -12,10 +12,9 @@ const CUSTOM_COLOR = 0x2eff2e;
 
 
 /**
- * This class contains any geo scribbles that should be 'drawn over' the map.
+ * This class renders "geoscribbles" that should be 'drawn over' the map.
  * Originally from the EveryDoor folks - reference: https://github.com/Zverik/every_door/issues/197
  * This data comes from API at https://geoscribble.osmz.ru/docs#/default/scribbles_scribbles_get.
- * @class
  */
 export class PixiLayerGeoScribble extends AbstractPixiLayer {
   /** The Pixi container holding all scribble feature containers */

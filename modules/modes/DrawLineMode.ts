@@ -36,7 +36,7 @@ interface DrawLineSnapshot {
 
 
 /**
- * In `DrawLineMode`, we are drawing a new line or continuing an existing line.
+ * In `DrawLineMode`, the user is drawing a new line or continuing an existing line.
  */
 export class DrawLineMode extends AbstractMode {
 

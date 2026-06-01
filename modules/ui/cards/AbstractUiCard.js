@@ -4,7 +4,7 @@
  *
  * `AbstractUiCard` is the base class from which all UI Cards inherit.
  *
- * Properties you can access:
+ * Properties available:
  *   `enabled`  `true` if the card is enabled, `false` if not.
  */
 export class AbstractUiCard {

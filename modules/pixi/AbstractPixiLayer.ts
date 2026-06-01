@@ -12,18 +12,18 @@ import type { Viewport } from '@rapid-sdk/math';
  *
  * Notes on identifiers:
  * All identifiers should be strings, to avoid JavaScript comparison surprises (e.g. `'0' !== 0`)
- *   `layerID`    A unique identifier for the layer, for example 'osm'
- *   `featureID`  A unique identifier for the feature, for example 'osm-w-123-fill'
- *   `dataID`     A feature may have data bound to it, for example OSM identifier like 'w-123'
- *   `classID`    A pseudoclass identifier like 'hover' or 'select'
+ * - `layerID`    A unique identifier for the layer, for example 'osm'
+ * - `featureID`  A unique identifier for the feature, for example 'osm-w-123-fill'
+ * - `dataID`     A feature may have data bound to it, for example OSM identifier like 'w-123'
+ * - `classID`    A pseudoclass identifier like 'hover' or 'select'
  *
- * Properties you can access:
- *   `id` (or `layerID`)  A unique identifier for the layer, for example 'osm'
- *   `supported`          Is this Layer supported? (i.e. do we even show it in lists?)
- *   `zIndex`             Where this Layer sits compared to other Layers
- *   `enabled`            Whether the the user has chosen to see the Layer
- *   `features`           `Map<featureID, Feature>` of all features on this Layer
- *   `retained`           `Map<featureID, Integer frame>` last seen
+ * Properties available:
+ * - `id` (or `layerID`)  A unique identifier for the layer, for example 'osm'
+ * - `supported`          Is this Layer supported? (i.e. do we even show it in lists?)
+ * - `zIndex`             Where this Layer sits compared to other Layers
+ * - `enabled`            Whether the the user has chosen to see the Layer
+ * - `features`           `Map<featureID, Feature>` of all features on this Layer
+ * - `retained`           `Map<featureID, Integer frame>` last seen
  */
 export class AbstractPixiLayer {
   /** Unique identifier for this Layer */

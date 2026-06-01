@@ -176,10 +176,10 @@ interface OsmAuthInstance {
  * @see https://wiki.openstreetmap.org/wiki/API
  *
  * Events available:
- *   'apistatuschange'
- *   'authLoading'
- *   'authDone'
- *   'authchange'
+ * - 'apistatuschange'
+ * - 'authLoading'
+ * - 'authDone'
+ * - 'authchange'
  */
 export class OsmService extends AbstractSystem {
 
@@ -222,6 +222,7 @@ export class OsmService extends AbstractSystem {
   protected _userPreferences: any | null;
   /** The `osm-auth` instance used for OAuth2 authentication */
   protected _oauth: OsmAuthInstance;
+
 
   /**
    * @constructor

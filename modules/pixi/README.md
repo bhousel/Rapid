@@ -1,6 +1,6 @@
 # Pixi
 
-Pixi.js rendering layer for the map. This module handles all WebGL-based rendering of map features, imagery, and UI elements.
+Pixi.js rendering layer for the map. This module handles rendering of map features, imagery, and UI elements.
 
 ## Overview
 

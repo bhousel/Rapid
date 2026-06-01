@@ -57,14 +57,14 @@ import type {
  * }
  *
  * The supported "types" include:
- *  'node', 'way', 'relation',    (sometimes called "elements")
- *  'changeset',
- *  'note',
- *  'user',
- *  'user_block',
- *  'preferences',
- *  'api', 'policy'  (returned from the `/capabilities` API call)
- *  'bounds'         (returned with the `/map` API call)
+ * - 'node', 'way', 'relation',    (sometimes called "elements")
+ * - 'changeset',
+ * - 'note',
+ * - 'user',
+ * - 'user_block',
+ * - 'preferences',
+ * - 'api', 'policy'  (returned from the `/capabilities` API call)
+ * - 'bounds'         (returned with the `/map` API call)
  */
 export class OsmJSONParser {
   /** Unique identifiers already seen by this parser instance (avoids duplicates) */

@@ -61,7 +61,9 @@ const dashLineOptionsDefault: ResolvedDashLineOptions = {
 };
 
 
-/** Draws dashed lines on a Pixi `Graphics` object using a texture-based approach. */
+/**
+ * This class draws dashed lines on a Pixi `Graphics` object.
+ */
 export class DashLine {
   /** Reference to the GraphicsSystem for texture caching */
   public gfx: any;

@@ -59,17 +59,17 @@ export interface UploadChanges {
  *  and dealing with any conflicts that might occur
  *
  * Events available:
- *   // Start and end events are dispatched exactly once each per legitimate outside call to `save`
- *   'saveStarted'        // dispatched as soon as a call to `save` has been deemed legitimate
- *   'saveEnded'          // dispatched after the result event has been dispatched
- *   'willAttemptUpload'  // dispatched before the actual upload call occurs, if it will
- *   'progressChanged'
+ * // Start and end events are dispatched exactly once each per legitimate outside call to `save`
+ * - 'saveStarted'        - dispatched as soon as a call to `save` has been deemed legitimate
+ * - 'saveEnded'          - dispatched after the result event has been dispatched
+ * - 'willAttemptUpload'  - dispatched before the actual upload call occurs, if it will
+ * - 'progressChanged'
  *
- *   // Each save results in one of these outcomes:
- *   'resultNoChanges'   // upload wasn't attempted since there were no edits
- *   'resultErrors'      // upload failed due to errors
- *   'resultConflicts'   // upload failed due to data conflicts
- *   'resultSuccess'     // upload completed without errors
+ * // Each save results in one of these outcomes:
+ * - 'resultNoChanges'   - upload wasn't attempted since there were no edits
+ * - 'resultErrors'      - upload failed due to errors
+ * - 'resultConflicts'   - upload failed due to data conflicts
+ * - 'resultSuccess'     - upload completed without errors
  */
 export class UploaderSystem extends AbstractSystem {
 

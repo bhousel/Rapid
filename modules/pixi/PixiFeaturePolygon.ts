@@ -18,14 +18,14 @@ type StrokeStyleWithDash = PIXI.StrokeStyle & DashLineOptions;
 
 
 /**
+ * This class renders a Polygon feature.
  *
- * Properties you can access:
- *   `lowRes`     PIXI.Sprite for a replacement graphic to display at low resolution
- *   `fill`       PIXI.Graphic for the fill Graphics (below)
- *   `strokes`    PIXI.Container for the stroke Graphics (above)
- *   `mask`       PIXI.Mesh for the mask (applied to fill)
- *
- *   (also all properties inherited from `AbstractPixiFeature`)
+ * Properties available:
+ * - `lowRes`     PIXI.Sprite for a replacement graphic to display at low resolution
+ * - `fill`       PIXI.Graphic for the fill Graphics (below)
+ * - `strokes`    PIXI.Container for the stroke Graphics (above)
+ * - `mask`       PIXI.Mesh for the mask (applied to fill)
+ * - (also all properties inherited from `AbstractPixiFeature`)
  */
 export class PixiFeaturePolygon extends AbstractPixiFeature {
   /** PIXI.Sprite for low resolution representation */

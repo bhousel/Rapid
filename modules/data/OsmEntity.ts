@@ -31,13 +31,13 @@ type TransientCache = Map<string, Map<string, unknown>>;
 
 
 /**
- * Here is where we put logic that is common to OSM data elements.
+ * This class contains logic that is common to OSM data elements.
  * Aside from the `props`, OSM data elements all contain a special `tags` object.
  *
  * OSM Entities are intended to be immutable - the `update()` method will return a new Entity.
  * (A lot of this was carried over from the previous `osmEntity` and similar classes.)
  *
- * Properties you can access:
+ * Properties available:
  *   `geoms`   Geometry object (inherited from `AbstractData`)
  *   `props`   Properties object (inherited from `AbstractData`)
  *   `tags`    Object containing key-value string pairs for the OSM tags

@@ -27,7 +27,7 @@ interface DrawAreaSnapshot {
 }
 
 /**
- * In `DrawAreaMode`, we are drawing a new area.
+ * In `DrawAreaMode`, the user is drawing a new area.
  */
 export class DrawAreaMode extends AbstractMode {
 

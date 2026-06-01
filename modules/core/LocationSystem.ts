@@ -38,7 +38,7 @@ interface BlockedRegion extends HasLocationSet {
  * https://github.com/ideditor/country-coder
  *
  * Events available:
- *   `locationchange`  Fires on any change in the location index
+ * - `locationchange`  Fires on any change in the location index
  */
 export class LocationSystem extends AbstractSystem {
 

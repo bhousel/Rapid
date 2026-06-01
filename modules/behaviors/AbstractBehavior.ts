@@ -55,7 +55,7 @@ export interface EventData {
  * It contains enable/disable methods which manage the event handlers for the behavior.
  * All behaviors are event emitters.
  *
- * Properties you can access:
+ * Properties available:
  *   `id` (or `behaviorID`)  String identifier for the behavior (e.g. 'draw')
  *   `enabled`               `true` if the event handlers are enabled, `false` if not.
  */

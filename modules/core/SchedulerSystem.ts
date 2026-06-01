@@ -133,9 +133,9 @@ const PRESSURE_RECOVER = {
  * `maxWorkers` and terminated on `resetAsync()`.
  *
  * Events available:
- *   `paused`    Fires when the system transitions from unpaused to paused
- *   `resumed`   Fires when the system transitions from paused to unpaused
- *   `pressure`  Fires when backpressure level changes
+ * - `paused`    Fires when the system transitions from unpaused to paused
+ * - `resumed`   Fires when the system transitions from paused to unpaused
+ * - `pressure`  Fires when backpressure level changes
  */
 export class SchedulerSystem extends AbstractSystem {
 
@@ -276,7 +276,7 @@ export class SchedulerSystem extends AbstractSystem {
     this._droppedCount = 0;
     if (this._pressure !== 'none') {
       this._pressure = 'none';
-      this.emit('pressure', 'none');
+      this.emit('pressurechange', 'none');
     }
 
     return Promise.resolve();
@@ -703,7 +703,7 @@ export class SchedulerSystem extends AbstractSystem {
 
   /**
    * Current backpressure level.  The scheduler automatically adjusts
-   * idle-queue draining based on this level and emits `'pressure'`
+   * idle-queue draining based on this level and emits `'pressurechange'`
    * events when the level changes.
    * @return  Current `PressureLevel`
    * @readonly
@@ -997,7 +997,7 @@ export class SchedulerSystem extends AbstractSystem {
 
   /**
    * Determines the pressure level from the dropped-frame ratio and
-   * emits a `'pressure'` event if it changed.  Uses separate escalation
+   * emits a `'pressurechange'` event if it changed.  Uses separate escalation
    * and recovery thresholds to prevent oscillation.
    */
   protected _computePressure(): void {
@@ -1023,7 +1023,7 @@ export class SchedulerSystem extends AbstractSystem {
 
     if (next !== prev) {
       this._pressure = next;
-      this.emit('pressure', next);
+      this.emit('pressurechange', next);
     }
   }
 }

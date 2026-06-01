@@ -23,8 +23,9 @@ interface RapidData {
 
 
 /**
- * Renders suggested features supplied by Rapid datasets (MapWithAI, ESRI, Overture)
- * @class
+ * This class renders Rapid map data.
+ * Rapid allows users to work with third party datasets external to OpenStreetMap.
+ * These datasets may be derived from authorative sources or AI-detected suggestions.
  */
 export class PixiLayerRapid extends AbstractPixiLayer {
 

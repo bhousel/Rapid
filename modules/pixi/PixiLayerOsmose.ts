@@ -9,7 +9,7 @@ const MINZOOM = 12;
 
 
 /**
- * @class
+ * This class renders Osmose Q/A markers.
  */
 export class PixiLayerOsmose extends AbstractPixiLayer {
 

@@ -10,9 +10,8 @@ import type { GeoJSONObject } from '../lib/types.ts';
 import type { Vec2 } from '@rapid-sdk/math';
 
 
-// Filter function to eliminate consecutive duplicates.
 /**
- *
+ * Filter function to eliminate consecutive duplicates.
  * @param node
  * @param i
  * @param arr
@@ -43,13 +42,14 @@ export interface Segment {
 
 
 /**
+ * This class contains the data for an OSM Way.
  * @see https://wiki.openstreetmap.org/wiki/Way
  *
- * Properties you can access:
- *   `geoms`   Geometry object (inherited from `AbstractData`)
- *   `props`   Properties object (inherited from `AbstractData`)
- *   `tags`    Object containing key-value string pairs for the OSM tags (inherited from `OsmEntity`)
- *   `nodes`   Accessor for the `nodes` property, an Array of node ids
+ * Properties available:
+ * - `geoms`   Geometry object (inherited from `AbstractData`)
+ * - `props`   Properties object (inherited from `AbstractData`)
+ * - `tags`    Object containing key-value string pairs for the OSM tags (inherited from `OsmEntity`)
+ * - `nodes`   Accessor for the `nodes` property, an Array of node ids
  */
 export class OsmWay extends OsmEntity {
 

@@ -79,7 +79,8 @@ interface ChainLink {
 
 
 /**
- * @class
+ * This class renders text labels.
+ * Labels are placed on their own layer above most map data.
  */
 export class PixiLayerLabels extends AbstractPixiLayer {
   /** Container whose origin is pinned to the world origin (for stable text placement) */

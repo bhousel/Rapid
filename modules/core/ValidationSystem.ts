@@ -44,8 +44,8 @@ export interface IssuesBySeverity {
 /**
  * `ValidationSystem` manages all the validator functions and maintains two caches
  * containing the validation results:
- *   `base` is the results of validating the base graph (before user edits)
- *   `head` is the results of validating the head graph (with user edits applied)
+ * - `base` is the results of validating the base graph (before user edits)
+ * - `head` is the results of validating the head graph (with user edits applied)
  *
  * We do both because that's the only way to know whether to credit a user with
  * fixing something (or breaking it).  This means that every feature downloaded
@@ -56,8 +56,8 @@ export interface IssuesBySeverity {
  * have easy access to things like the Graph or Edits/History.
  *
  * Events available:
- *   `validated`       Fires after some validation has occurred
- *   `focusedIssue`    Fires after an issue has received focus, receives the issue
+ * - `validated`       Fires after some validation has occurred
+ * - `focusedIssue`    Fires after an issue has received focus, receives the issue
  */
 export class ValidationSystem extends AbstractSystem {
 

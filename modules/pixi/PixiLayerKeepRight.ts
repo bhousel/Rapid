@@ -9,7 +9,7 @@ const MINZOOM = 12;
 
 
 /**
- * @class
+ * This class renders KeepRight Q/A markers.
  */
 export class PixiLayerKeepRight extends AbstractPixiLayer {
 

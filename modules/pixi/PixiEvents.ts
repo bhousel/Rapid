@@ -32,23 +32,23 @@ export interface NormalizedWheelEvent extends WheelEvent {
  * We bind them once here and dispatch them so that other code can do less work.
  *
  * Properties available:
- *   `enabled`              `true` if the event handlers are enabled, `false` if not.
- *   `coord`                `[x,y]` coordinates of the latest event (provided in "screen", "map", and "world")
- *   `pointerOverRenderer`  `true` if the pointer is over the renderer, `false` if not
- *   `modifierKeys`         Set containing the modifier keys that are currently down ('Alt', 'Control', 'Meta', 'Shift')
+ * - `enabled`              `true` if the event handlers are enabled, `false` if not.
+ * - `coord`                `[x,y]` coordinates of the latest event (provided in "screen", "map", and "world")
+ * - `pointerOverRenderer`  `true` if the pointer is over the renderer, `false` if not
+ * - `modifierKeys`         Set containing the modifier keys that are currently down ('Alt', 'Control', 'Meta', 'Shift')
  *
  * Events available:
- *   `click`             Fires on stage.click, receives a Pixi FederatedPointerEvent
- *   `keydown`           Fires on window.keydown, receives a DOM KeyboardEvent
- *   `keyup`             Fires on window.keyup, receives a DOM KeyboardEvent
- *   `modifierchange`    Fires when any modifier key is changed, receives the updated modifierKeys Set
- *   `pointercancel`     Fires on stage.pointercancel, receives a Pixi FederatedPointerEvent
- *   `pointerdown`       Fires on stage.pointerdown, receives a Pixi FederatedPointerEvent
- *   `pointermove`       Fires on stage.pointermove, receives a Pixi FederatedPointerEvent
- *   `pointerout`        Fires on canvas.pointerout, receives a DOM PointerEvent
- *   `pointerover`       Fires on canvas.pointerover, receives a DOM PointerEvent
- *   `pointerup`         Fires on stage.pointerup, receives a Pixi FederatedPointerEvent
- *   `wheel`             Fires on supersurface.wheel, receives a DOM WheelEvent + some properties containing normalized wheel delta values
+ * - `click`             Fires on stage.click, receives a Pixi FederatedPointerEvent
+ * - `keydown`           Fires on window.keydown, receives a DOM KeyboardEvent
+ * - `keyup`             Fires on window.keyup, receives a DOM KeyboardEvent
+ * - `modifierchange`    Fires when any modifier key is changed, receives the updated modifierKeys Set
+ * - `pointercancel`     Fires on stage.pointercancel, receives a Pixi FederatedPointerEvent
+ * - `pointerdown`       Fires on stage.pointerdown, receives a Pixi FederatedPointerEvent
+ * - `pointermove`       Fires on stage.pointermove, receives a Pixi FederatedPointerEvent
+ * - `pointerout`        Fires on canvas.pointerout, receives a DOM PointerEvent
+ * - `pointerover`       Fires on canvas.pointerover, receives a DOM PointerEvent
+ * - `pointerup`         Fires on stage.pointerup, receives a Pixi FederatedPointerEvent
+ * - `wheel`             Fires on supersurface.wheel, receives a DOM WheelEvent + some properties containing normalized wheel delta values
  */
 export class PixiEvents extends EventEmitter {
   /** Reference to the owning GraphicsSystem */

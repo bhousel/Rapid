@@ -461,7 +461,7 @@ When SchedulerSystem reports `'heavy'` pressure, NetworkSystem can defer new req
 // In initAsync — listen for pressure changes
 const scheduler = this.context.systems.scheduler;
 if (scheduler) {
-  scheduler.on('pressure', (level: PressureLevel) => {
+  scheduler.on('pressurechange', (level: PressureLevel) => {
     this._pressure = level;
   });
 }

@@ -12,7 +12,7 @@ const SELECTED = 0xffee00;
 
 
 /**
- * @class
+ * This class renders Mapillary detected object markers.
  */
 export class PixiLayerMapillaryDetections extends AbstractPixiLayer {
 

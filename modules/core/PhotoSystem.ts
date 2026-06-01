@@ -17,16 +17,16 @@ export type DateFilter = 'fromDate' | 'toDate';
  * `PhotoSystem` maintains the state of the photo viewer.
  *
  * Properties available:
- *   `fromDate`              Current fromDate filter value
- *   `toDate`                Current toDate filter value
- *   `usernames`             Current usernames filter value
- *   `currPhotoID`           Current PhotoID
- *   `currPhotoLayerID`      Current Photo LayerID
- *   `currDetectionID`       Current DetectionID
- *   `currLayerID`  Current Detection LayerID
+ * - `fromDate`              Current fromDate filter value
+ * - `toDate`                Current toDate filter value
+ * - `usernames`             Current usernames filter value
+ * - `currPhotoID`           Current PhotoID
+ * - `currPhotoLayerID`      Current Photo LayerID
+ * - `currDetectionID`       Current DetectionID
+ * - `currLayerID`  Current Detection LayerID
  *
  * Events available:
- *   `photochange`   Fires on any change in selected photo, detection, or filtering options
+ * -  `photochange`   Fires on any change in selected photo, detection, or filtering options
  */
 export class PhotoSystem extends AbstractSystem {
 

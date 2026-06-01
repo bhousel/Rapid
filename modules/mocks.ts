@@ -11,7 +11,7 @@ import type { Keybinding } from './util/keybinding.ts';
 // This file contains minimal mocks useful for testing.
 
 /**
- * @class
+ * A mock `AbstractSystem` class.
  */
 export class MockSystem extends AbstractSystem {
   /**
@@ -25,7 +25,7 @@ export class MockSystem extends AbstractSystem {
 }
 
 /**
- * @class
+ * A mock `Context` class.
  */
 export class MockContext {
   /** The map viewport (projection, pan, zoom) */
@@ -86,7 +86,7 @@ export class MockContext {
 
 
 /**
- * @class
+ * A mock `GraphicsSystem` class.
  */
 export class MockGfxSystem extends MockSystem {
   /** Stub scene property holding a MockSystem with an empty layers Map */

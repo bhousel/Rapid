@@ -21,22 +21,22 @@ export interface FeatureContainer extends PIXI.Container {
  * AbstractPixiFeature is the base class from which all rendered Features inherit.
  * It contains properties that used to manage the Feature in the scene graph.
  *
- * Properties you can access:
- *   `id` (or `featureID`)  Unique string to use for the name of this Feature
- *   `type`                 String describing what kind of Feature this is ('Point', 'LineString', 'Polygon')
- *   `container`            PIXI.Container() that contains all the graphics needed to draw the Feature
- *   `parentContainer`      PIXI.Container() for the parent - this Feature's container will be added to it.
- *   `geom`                 GeometryPart() class containing all the information about the geometry
- *   `style`                Object containing style info
- *   `label`                String containing the Feature's label (if any)
- *   `data`                 Data bound to this Feature (like `__data__` from the D3.js days)
- *   `dataID`               Data bound to this Feature (like `__data__` from the D3.js days)
- *   `visible`              `true` if the Feature is visible (`false` if it is culled)
- *   `allowInteraction`     `true` if the Feature is allowed to be interactive (emits Pixi events)
- *   `dirty`                `true` if the Feature needs to be rebuilt
- *   `v`                    Version of the Feature, can be used to detect changes
- *   `lod`                  Level of detail for the Feature last time it was styled (0 = off, 1 = simplified, 2 = full)
- *   `halo`                 A PIXI.DisplayObject() that contains the graphics for the Feature's halo (if it has one)
+ * Properties available:
+ * - `id` (or `featureID`)  Unique string to use for the name of this Feature
+ * - `type`                 String describing what kind of Feature this is ('Point', 'LineString', 'Polygon')
+ * - `container`            PIXI.Container() that contains all the graphics needed to draw the Feature
+ * - `parentContainer`      PIXI.Container() for the parent - this Feature's container will be added to it.
+ * - `geom`                 GeometryPart() class containing all the information about the geometry
+ * - `style`                Object containing style info
+ * - `label`                String containing the Feature's label (if any)
+ * - `data`                 Data bound to this Feature (like `__data__` from the D3.js days)
+ * - `dataID`               Data bound to this Feature (like `__data__` from the D3.js days)
+ * - `visible`              `true` if the Feature is visible (`false` if it is culled)
+ * - `allowInteraction`     `true` if the Feature is allowed to be interactive (emits Pixi events)
+ * - `dirty`                `true` if the Feature needs to be rebuilt
+ * - `v`                    Version of the Feature, can be used to detect changes
+ * - `lod`                  Level of detail for the Feature last time it was styled (0 = off, 1 = simplified, 2 = full)
+ * - `halo`                 A PIXI.DisplayObject() that contains the graphics for the Feature's halo (if it has one)
  */
 export class AbstractPixiFeature {
   /** Unique string identifier for this Feature */

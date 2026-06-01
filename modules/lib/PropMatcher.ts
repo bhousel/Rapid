@@ -107,11 +107,11 @@ export interface PropMatcherProps {
  * Used for matching OSM tags and other key-value properties against conditions.
  * Supports various comparison operators: equals, not equals, exists, regex, numeric comparisons, etc.
  *
- * Properties you can access:
- *   `key`   The property key to match
- *   `op`    The comparison operator
- *   `value` The value to compare against (if applicable)
- *   `props` The full props object
+ * Properties available:
+ * - `key`    The property key to match
+ * - `op`     The comparison operator
+ * - `value`  The value to compare against (if applicable)
+ * - `props`  The full props object
  */
 export class PropMatcher {
 

@@ -9,7 +9,7 @@ import type { Viewport, Vec2 } from '@rapid-sdk/math';
 
 
 /**
- * This class contains any UI elements to be 'drawn over' the map.
+ * This class renders various UI elements to be 'drawn over' the map.
  * Some of these containers will contain data managed by other layers.
  *
  * - selected / hovered vertices and other elements
@@ -17,8 +17,6 @@ import type { Viewport, Vec2 } from '@rapid-sdk/math';
  * - tile debugging grid
  * - lasso selection polygon
  * - others?
- *
- * @class
  */
 export class PixiLayerMapUI extends AbstractPixiLayer {
   /** Zoom level at the last render, used to detect zoom changes that require redrawing */

@@ -198,7 +198,7 @@ interface FrameMetrics {
 The scheduler emits events so other systems can react:
 
 ```typescript
-scheduler.on('pressure', (level: 'light' | 'moderate' | 'heavy' | 'none') => { ... });
+scheduler.on('pressurechange', (level: 'light' | 'moderate' | 'heavy' | 'none') => { ... });
 ```
 
 ### Timer Float

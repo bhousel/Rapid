@@ -18,9 +18,9 @@ const CUSTOM_COLOR = 0x00ffff;
 
 
 /**
- * This class contains any custom data traces that should be 'drawn over' the map.
- * This data only comes from the 'load custom data' option in the map data sidebar.
- * @class
+ * This class renders "custom data" - reference traces that should be 'drawn over' the map.
+ * This data comes from the 'load custom data' option in the map data sidebar,
+ * or may be supplied via a url parameter.
  */
 export class PixiLayerCustomData extends AbstractPixiLayer {
   /** Attribution string(s) for the currently loaded custom data */

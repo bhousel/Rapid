@@ -9,7 +9,7 @@ const MINZOOM = 12;
 
 
 /**
- * @class
+ * This class renders Maproulette task markers.
  */
 export class PixiLayerMapRoulette extends AbstractPixiLayer {
 

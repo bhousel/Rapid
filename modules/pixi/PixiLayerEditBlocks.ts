@@ -11,7 +11,8 @@ const MINZOOM = 4;
 
 
 /**
- * @class
+ * This class renders blocked regions - places where users are not allowed to edit.
+ * The blocked regions are owned by the `LocationSystem`.
  */
 export class PixiLayerEditBlocks extends AbstractPixiLayer {
 

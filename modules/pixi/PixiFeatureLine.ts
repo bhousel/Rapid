@@ -19,12 +19,12 @@ type StrokeStyleWithDash = PIXI.StrokeStyle & DashLineOptions;
 
 
 /**
+ * This class renders a Line feature.
  *
- * Properties you can access:
- *   `casing`     PIXI.Graphic for the casing (below)
- *   `stroke`     PIXI.Graphic for the stroke (above)
- *
- *   (also all properties inherited from `AbstractPixiFeature`)
+ * Properties available:
+ * - `casing`     PIXI.Graphic for the casing (below)
+ * - `stroke`     PIXI.Graphic for the stroke (above)
+ * -  (also all properties inherited from `AbstractPixiFeature`)
  */
 export class PixiFeatureLine extends AbstractPixiFeature {
   /** PIXI.Graphics for the casing (below) */

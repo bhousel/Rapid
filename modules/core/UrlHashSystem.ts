@@ -38,15 +38,15 @@ let _document: DocumentLike;
  *
  * Please see [API.md] for the current list of supported URL parameters.
  *
- * Properties you can access:
- *   `initialHashParams`  Map<string, string> containing the initial query params (e.g. `background=Bing` etc)
- *   `doUpdateTitle`     `true` if we should update the document title, `false` if not (default `true`)
- *   `titleBase`         The document title to use (default `Rapid`)
+ * Properties available:
+ * - `initialHashParams`  Map<string, string> containing the initial query params (e.g. `background=Bing` etc)
+ * - `doUpdateTitle`     `true` if we should update the document title, `false` if not (default `true`)
+ * - `titleBase`         The document title to use (default `Rapid`)
  *
  * Events available:
- *   `hashchange`   Fires on hashchange and when resumed, receives Map(currParams), Map(prevParams)
- *   `paused`       Fires when paused (inherited) — cancels pending hash/title updates
- *   `resumed`      Fires when resumed (inherited) — syncs hash and title, emits `hashchange`
+ * - `hashchange`   Fires on hashchange and when resumed, receives Map(currParams), Map(prevParams)
+ * - `paused`       Fires when paused (inherited) — cancels pending hash/title updates
+ * - `resumed`      Fires when resumed (inherited) — syncs hash and title, emits `hashchange`
  */
 export class UrlHashSystem extends AbstractSystem {
 

@@ -29,7 +29,8 @@ import type { Viewport } from '@rapid-sdk/math';
 
 
 /**
- * The "scene" maintains useful collections of Features.
+ * This class manages the collections of known `Layers` and `Features` in the scene.
+ * It is responsible for rendering and culling all of the data in our scene graph.
  *
  * Features are organized into thematic Layers that can be enabled or disabled if needed.
  * Each Layer is responsible for managing its own data and Features.
@@ -42,15 +43,16 @@ import type { Viewport } from '@rapid-sdk/math';
  *  - `DataID` - A feature may have data bound to it, for example OSM identifier like 'w-123'
  *  - `ClassID` - A pseudoclass identifier like 'hover' or 'select'
  *
- * Properties you can access:
- *   `groups`     `Map<GroupID, PIXI.Container>` of all groups
- *   `layers`     `Map<LayerID, Layer>` of all layers in the scene
- *   `features`   `Map<FeatureID, Feature>` of all features in the scene
+ * Properties available:
+ * - `groups`     `Map<GroupID, PIXI.Container>` of all groups
+ * - `layers`     `Map<LayerID, Layer>` of all layers in the scene
+ * - `features`   `Map<FeatureID, Feature>` of all features in the scene
  *
  * Events available:
- *   `layerchange`   Fires when layers are toggled from enabled/disabled
+ * - `layerchange`   Fires when layers are toggled from enabled/disabled
  */
 export class PixiScene extends EventEmitter {
+
   /** Reference to the owning GraphicsSystem */
   public gfx: GraphicsSystem;
   /** Global shared application context */

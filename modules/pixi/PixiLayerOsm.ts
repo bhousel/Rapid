@@ -89,8 +89,7 @@ function hasWikidata(entity: OsmEntity): boolean {
 
 
 /**
- * Renders OpenStreetMap entities (points, vertices, lines, polygons)
- * @class
+ * This class renders OpenStreetMap map data.
  */
 export class PixiLayerOsm extends AbstractPixiLayer {
   /** Container for area/polygon features */

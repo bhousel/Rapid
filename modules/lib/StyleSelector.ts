@@ -79,11 +79,11 @@ export interface FeatureMatchInfo {
  * It contains matching conditions, references one or more `styleIDs`,
  * and an optional 'weight' property to control the order in which they apply.
  *
- * Properties you can access:
- *   `id`        Unique identifier for this selector
- *   `styleIDs`  IDs of Styles to apply (merged in order)
- *   `weight`    The weight of this selector (higher weights override lower weights)
- *   `props`     The full props object
+ * Properties available:
+ * - `id`        Unique identifier for this selector
+ * - `styleIDs`  IDs of Styles to apply (merged in order)
+ * - `weight`    The weight of this selector (higher weights override lower weights)
+ * - `props`     The full props object
  */
 export class StyleSelector {
   /** Global shared application context */

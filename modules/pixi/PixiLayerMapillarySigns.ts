@@ -10,7 +10,7 @@ const MINZOOM = 12;
 
 
 /**
- * @class
+ * This class renders Mapillary detected street sign markers.
  */
 export class PixiLayerMapillarySigns extends AbstractPixiLayer {
 

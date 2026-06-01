@@ -6,9 +6,8 @@ import type { PixiScene } from './PixiScene.ts';
 
 
 /**
- * This class contains any overlay vectors that should be 'drawn over' the map, usually at low zooms.
- * The data for these are scraped from the RapidSystem's datasets, specifically the 'overlay' field.
- * @class
+ * This class renders the Rapid overlay heatmap.
+ * The heatmap is drawn over the map at low zooms.
  */
 export class PixiLayerRapidOverlay extends AbstractPixiLayer {
   /** Whether overlays have been defined for the current dataset set (null = not yet checked) */

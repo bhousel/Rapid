@@ -32,12 +32,12 @@ export interface AbstractDataProps {
  * Data elements are intended to be immutable - the `update()` method will return a new data element.
  * (A lot of this was carried over from the previous `osmEntity` and similar classes.)
  *
- * Properties you can access:
- *   `id` (or `dataID`)  Unique string to identify this data element.
- *   `type`              String describing what kind of data element this is (e.g. 'node', 'way', 'relation')
- *   `v`                 Internal version of the data element, can be used to detect changes
- *   `geoms`             Geometry object
- *   `props`             Properties object
+ * Properties available:
+ * - `id` (or `dataID`)  Unique string to identify this data element.
+ * - `type`              String describing what kind of data element this is (e.g. 'node', 'way', 'relation')
+ * - `v`                 Internal version of the data element, can be used to detect changes
+ * - `geoms`             Geometry object
+ * - `props`             Properties object
  *
  * @template P - The props interface for this data element (must extend AbstractDataProps)
  */

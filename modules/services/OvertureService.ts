@@ -36,6 +36,7 @@ export class OvertureService extends AbstractSystem {
   /** The most recent release entry from the catalog */
   public latestRelease: any;
 
+
   /**
    * @constructor
    * @param context - Global shared application context

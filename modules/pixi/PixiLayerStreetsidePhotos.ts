@@ -30,7 +30,7 @@ const fovLengthInterp: ScaleLinear<number, number> = scaleLinear([90, 10], [0.7,
 
 
 /**
- * @class
+ * This class renders the Bing Streetside map data - photo markers and traces.
  */
 export class PixiLayerStreetsidePhotos extends AbstractPixiLayer {
 

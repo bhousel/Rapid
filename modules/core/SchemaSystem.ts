@@ -169,13 +169,13 @@ export interface DeprecationRule {
  * For the default schema data, see: https://github.com/openstreetmap/id-tagging-schema
  *
  * Properties available:
- *   `geometryTypes`    The supported geometry types ('point', 'vertex', 'line', 'area', 'relation')
- *   `fieldTypes`       The supported field types (see also `ui/fields/index.js`)
- *   `defaultAssetIDs`  Default assetIDs that are loaded if no custom assets are requested
- *   `loadedAssetIDs`   Map<AssetID, string> - assetIDs that have been loaded (maps to version string)
+ * - `geometryTypes`    The supported geometry types ('point', 'vertex', 'line', 'area', 'relation')
+ * - `fieldTypes`       The supported field types (see also `ui/fields/index.js`)
+ * - `defaultAssetIDs`  Default assetIDs that are loaded if no custom assets are requested
+ * - `loadedAssetIDs`   Map<AssetID, string> - assetIDs that have been loaded (maps to version string)
  *
  * Events available:
- *   `schemachange`    Fires on any change in the available schemas
+ * - `schemachange`    Fires on any change in the available schemas
  */
 export class SchemaSystem extends AbstractSystem {
 

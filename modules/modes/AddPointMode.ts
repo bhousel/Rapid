@@ -15,7 +15,7 @@ const DEBUG = false;
 
 
 /**
- * In `AddPointMode`, we are waiting for the user to place a point somewhere
+ * In `AddPointMode`, we are waiting for the user to place a point somewhere.
  */
 export class AddPointMode extends AbstractMode {
 

@@ -24,7 +24,7 @@ import type {
 
 /**
  * NSI item with some additional runtime-added bookkeeping fields that NsiService attaches:
- *   `tkv` (the tree/key/value path) and `mainTag` (e.g. `brand:wikidata`).
+ * - `tkv` (the tree/key/value path) and `mainTag` (e.g. `brand:wikidata`).
  */
 export interface NsiItem extends NsiOrigItem {
   /** Tree/key/value path, e.g. `"brands/amenity/restaurant"` */
@@ -132,6 +132,7 @@ export class NsiService extends AbstractSystem {
 
   /** Internal NSI data cache */
   protected _nsi: Partial<NsiServiceCache>;
+
 
   /**
    * @constructor

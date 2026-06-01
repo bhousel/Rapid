@@ -88,11 +88,11 @@ interface ResolvedFields {
  * Users can pick from the available Presets in the Rapid editor.
  * See:  https://github.com/ideditor/schema-builder/blob/main/schemas/preset.json
  *
- * Properties you can access:
- *   `id` (or `presetID`)   Unique string to identify this Preset.
- *   `safeid`               The id, but safe for use in classes, DOM element ids, css selectors..
- *   `props`                Properties object
- *   `geometries`           `Set<GeometryType>` Geometries that this Preset works with
+ * Properties available:
+ * - `id` (or `presetID`)   Unique string to identify this Preset.
+ * - `safeid`               The id, but safe for use in classes, DOM element ids, css selectors..
+ * - `props`                Properties object
+ * - `geometries`           `Set<GeometryType>` Geometries that this Preset works with
  */
 export class Preset {
 

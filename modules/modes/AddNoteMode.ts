@@ -9,7 +9,7 @@ const DEBUG = false;
 
 
 /**
- * In `AddNoteMode`, we are waiting for the user to place a Note somewhere
+ * In `AddNoteMode`, we are waiting for the user to place a new OSM Note somewhere.
  */
 export class AddNoteMode extends AbstractMode {
 

@@ -15,7 +15,7 @@ interface DragNoteModeOptions {
 
 
 /**
- *  In `DragNoteMode`, the user has started dragging an OSM Note
+ *  In `DragNoteMode`, the user has started dragging a (new, unsaved) OSM Note.
  */
 export class DragNoteMode extends AbstractMode {
   /** The note (MarkerData) being dragged, or null if not dragging */

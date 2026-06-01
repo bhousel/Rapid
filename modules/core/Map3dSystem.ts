@@ -20,7 +20,10 @@ const SELECTION_COLOR = '#01d4fa';
 
 /**
  * `Map3dSystem` wraps an instance of MapLibre viewer
- *  and maintains the map state and style specification.
+ * and maintains the map state and style specification.
+ *
+ * Properties available:
+ * - `maplibre`  - the MapLibre map instance
  */
 export class Map3dSystem extends AbstractSystem {
 

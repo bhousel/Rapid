@@ -15,7 +15,7 @@ export interface RotateModeOptions {
 
 
 /**
- * In `RotateMode`, we are rotating one or more map features.
+ * In `RotateMode`, the user is rotating one or more map features.
  */
 export class RotateMode extends AbstractMode {
 

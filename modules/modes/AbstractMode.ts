@@ -11,13 +11,14 @@ import type { Context } from '../Context.ts';
  * `AbstractMode` is the base class from which all modes inherit.
  * All modes are event emitters.
  *
- * Properties you can access:
- *   `id` (or `modeID`)   String identifier for the mode (e.g. 'browse')
- *   `active`             `true` if the mode is active, `false` if not.
- *   `operations`         Array of operations allowed on the right-click edit menu
- *   `selectedData`       `Map<DataID, AbstractData>` containing selected data
+ * Properties available:
+ * -  `id` (or `modeID`)   String identifier for the mode (e.g. 'browse')
+ * -  `active`             `true` if the mode is active, `false` if not.
+ * -  `operations`         Array of operations allowed on the right-click edit menu
+ * -  `selectedData`       `Map<DataID, AbstractData>` containing selected data
  */
 export class AbstractMode extends EventEmitter {
+
   /** Unique string identifier for this mode (e.g. 'browse', 'select-osm') */
   public id: ModeID;
   /** Global shared application context */

@@ -14,13 +14,13 @@ type StrokeStyleWithDash = PIXI.StrokeStyle & DashLineOptions;
 
 
 /**
+ * This class renders a Point feature.
  *
- * Properties you can access:
- *   `marker`      PIXI.Sprite for the marker
- *   `icon`        PIXI.Sprite for the icon
- *   `viewfields`  PIXI.Container containing the viewfields (or null if none)
- *
- *   (also all properties inherited from `AbstractPixiFeature`)
+ * Properties available:
+ * - `marker`      PIXI.Sprite for the marker
+ * - `icon`        PIXI.Sprite for the icon
+ * - `viewfields`  PIXI.Container containing the viewfields (or null if none)
+ * - (also all properties inherited from `AbstractPixiFeature`)
  */
 export class PixiFeaturePoint extends AbstractPixiFeature {
   /** PIXI.Sprite for the marker */

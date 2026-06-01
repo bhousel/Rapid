@@ -114,11 +114,11 @@ function getTag(tags: OsmTags, key: string): string | undefined {
  * Custom style data can be merged in to supplement or override the defaults.
  *
  * Properties available:
- *   `defaultAssetIDs`  Default assetIDs that are loaded if no custom assets are requested
- *   `loadedAssetIDs`   Map<AssetID, string> - assetIDs that have been loaded (maps to version string)
+ * - `defaultAssetIDs`  Default assetIDs that are loaded if no custom assets are requested
+ * - `loadedAssetIDs`   Map<AssetID, string> - assetIDs that have been loaded (maps to version string)
  *
  * Events available:
- *   `stylechange`  Fires on any change in style
+ * - `stylechange`  Fires on any change in style
  */
 export class StyleSystem extends AbstractSystem {
 

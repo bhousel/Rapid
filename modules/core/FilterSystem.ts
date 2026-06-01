@@ -60,9 +60,10 @@ class Filter {
  * The code in here is relatively "hot", as it gets run against every entity.
  *
  * Events available:
- *   `filterchange`   Fires whenever user changes the enabled/disabled filters
+ * - `filterchange`   Fires whenever user changes the enabled/disabled filters
  */
 export class FilterSystem extends AbstractSystem {
+
   /** Map of filterID to Filter */
   protected _filters: Map<FilterID, Filter>;
   /** Set of filterIDs to hide */

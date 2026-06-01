@@ -103,8 +103,7 @@ export class WikidataService extends AbstractSystem {
 
 
   /**
-   * Given a Wikipedia language and article title,
-   *  retrieve an array of corresponding Wikidata entities.
+   * Given a Wikipedia language and article title, retrieve an array of corresponding Wikidata entities.
    * @param lang - language code
    * @param title - article title
    * @param callback - errback-style callback function to call with results

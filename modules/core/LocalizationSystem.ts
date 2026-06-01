@@ -62,7 +62,7 @@ export interface AppendFunction {
  * `LocalizationSystem` manages language and locale parameters including translated strings.
  *
  * Events available:
- *   `localechange`    Fires on any change in the current locale
+ * - `localechange`    Fires on any change in the current locale
  */
 export class LocalizationSystem extends AbstractSystem {
 

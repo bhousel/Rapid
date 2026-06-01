@@ -25,7 +25,7 @@ const MARKERSTYLE: Partial<MatchedStyle> = {
 
 
 /**
- * @class
+ * This class renders the Kartaview map data - photo markers and traces.
  */
 export class PixiLayerKartaPhotos extends AbstractPixiLayer {
 

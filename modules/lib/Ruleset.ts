@@ -66,14 +66,14 @@ export interface RulesetProps {
  * A `Ruleset` is a group of related `PropMatcher` rules with include/exclude semantics.
  * Matching logic: ANY 'include' matches AND NO 'exclude' matches.
  *
- * Properties you can access:
- *   `id`        Unique identifier for this ruleset
- *   `props`     The full props object
- *   `include`   The compiled include PropMatcher instances
- *   `exclude`   The compiled exclude PropMatcher instances
+ * Properties available:
+ * - `id`        Unique identifier for this ruleset
+ * - `props`     The full props object
+ * - `include`   The compiled include PropMatcher instances
+ * - `exclude`   The compiled exclude PropMatcher instances
  *
  * Methods:
- *   `match(obj)` Test if the property set belongs to this ruleset
+ * - `match(obj)` Test if the property set belongs to this ruleset
  */
 export class Ruleset {
 

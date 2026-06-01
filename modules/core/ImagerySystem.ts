@@ -64,17 +64,17 @@ export interface ImageryScope {
  * Custom imagery data can be merged in to supplement or override the defaults.
  *
  * Properties available:
- *   `sources`     `Map<ImagerySourceID, ImagerySource>` - Computed aggregate of all scopes
- *   `features`    `Map<ImagerySourceID, GeoJSON.Feature>` - Imagery geofences
- *   `offset`
- *   `brightness`
- *   `contrast`
- *   `saturation`
- *   `sharpness`
- *   `numGridSplits`
+ * - `sources`     `Map<ImagerySourceID, ImagerySource>` - Computed aggregate of all scopes
+ * - `features`    `Map<ImagerySourceID, GeoJSON.Feature>` - Imagery geofences
+ * - `offset`
+ * - `brightness`
+ * - `contrast`
+ * - `saturation`
+ * - `sharpness`
+ * - `numGridSplits`
  *
  * Events available:
- *   `imagerychange`   Fires on any change in imagery or display options
+ * - `imagerychange`   Fires on any change in imagery or display options
  */
 export class ImagerySystem extends AbstractSystem {
 

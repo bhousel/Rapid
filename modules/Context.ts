@@ -81,7 +81,7 @@ export interface Service {
  *  and contains references to all the core components.
  *
  * Events available:
- *   'modechange'   Fires when changing modes - receives the new mode
+ * - 'modechange'   Fires when changing modes - receives the new mode
  */
 export class Context extends EventEmitter {
   /** Application version string (semver format) */

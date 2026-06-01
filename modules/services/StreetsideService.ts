@@ -126,9 +126,9 @@ interface ImageLoadResult {
  * @see https://pannellum.org/documentation/api
  *
  * Events available:
- *   `imageChanged`   - fired when a new image is visible in the viewer
- *   `bearingChanged` - fired when the viewer has been panned, receives the bearing value in degrees.
- *   `fovChanged`     - fired when the viewer has been zoomed, receives the fov value in degrees.
+ * - `imageChanged`   - fired when a new image is visible in the viewer
+ * - `bearingChanged` - fired when the viewer has been panned, receives the bearing value in degrees.
+ * - `fovChanged`     - fired when the viewer has been zoomed, receives the fov value in degrees.
  */
 export class StreetsideService extends AbstractSystem {
 
@@ -152,6 +152,7 @@ export class StreetsideService extends AbstractSystem {
   protected _sceneOptions: SceneOptions;
   /** Tiler instance configured for Streetside tile requests */
   protected _tiler: Tiler;
+
 
   /**
    * @constructor

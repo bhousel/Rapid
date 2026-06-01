@@ -7,11 +7,6 @@ Items planned but not yet started.
 - **Direct mesh generation for polygons / lines**: replace the `PIXI.GpuGraphicsContext` + `PIXI.buildContextBatches()` round-trip in `PixiFeaturePolygon.ts` with direct `earcut` tessellation, or consider a shared mesh-generator path for polygons and lines. Meshes are batchable, so this could reduce draw calls while avoiding renderer-internal geometry extraction.
 - **Tile padding off-thread if measurable**: `_fromEdgePaddedCanvas()` does two canvas draws per tile on the main thread. If profiles show it matters, build the edge-padded tile source on a worker `OffscreenCanvas` and transfer an `ImageBitmap` back; GPU upload still stays with the Pixi renderer unless the renderer itself moves off-thread.
 
-## DashLine performance
-- Restore the texture-based DashLine path (currently disabled — `useTexture: false`). Pixi v8 broke the original `textureSpace: 'global'` matrix handling. Drawing per-segment via `lineTo` is far slower than a single stroke with a tiling dash texture.
-- Once textures work again, store dash-pattern textures in an atlas (one slot per `dash.toString() + width + scale` cache key). Avoids per-line texture swaps and reduces draw-call count for dashed renders (halos, lasso, casing dashes).
-- Also fix the existing `_getTexture` cache key, which only keys on `dash.toString()` — it should include width and scale (or be regenerated alongside the atlas migration).
-
 ## Line marker placement (oneway arrows, sided markers)
 - Today `getLineSegments` regenerates marker positions per-frame in the feature's update path, with an arbitrary 100-marker cap (`Rapid#544`) to keep long lines from spawning thousands of sprites.
 - Better approach (mirrors the label system): compute marker placement once in stable world coordinates, store as a list of `{worldCoord, angle}` records on the feature, and emit sprites only for the subset whose world position intersects the viewport. The cap goes away naturally — a 100km road only emits sprites for the ~few-dozen markers actually on screen.

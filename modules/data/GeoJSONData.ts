@@ -19,9 +19,9 @@ export interface GeoJSONProps extends AbstractDataProps {
  * This is a wrapper for any kind of arbitrary GeoJSON data.
  * Important:  pass the raw GeoJSON source as a `geojson` property.
  *
- * Properties you can access:
- *   `geoms`   Geometry object (inherited from `AbstractData`)
- *   `props`   Properties object (inherited from `AbstractData`)
+ * Properties available:
+ * - `geoms`   Geometry object (inherited from `AbstractData`)
+ * - `props`   Properties object (inherited from `AbstractData`)
  */
 export class GeoJSONData<P extends GeoJSONProps = GeoJSONProps> extends AbstractData<P> {
 

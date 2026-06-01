@@ -38,11 +38,10 @@ const sharpenMatrix = [
 
 
 /**
+ * This class renders the background raster imagery tiles and overlay tiles.
  *
- * Properties you can access:
- *   `isMinimap` - set this to `true` if this is a minimap background layer.
- *
- * @class
+ * Properties available:
+ * - `isMinimap` - set this to `true` if this is a minimap background layer.
  */
 export class PixiLayerBackgroundTiles extends AbstractPixiLayer {
   /** Whether this is a minimap background layer */

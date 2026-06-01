@@ -41,10 +41,10 @@ export interface GraphCache {
  * You can call these methods anytme to make modifications to the Graph,
  * but then you must call `commit` to update any Entities that rely on the Graph.
  *
- * Properties you can access:
- *   `id`      Unique string to identify this Graph
- *   `v`       Internal version of the Graph, can be used to detect changes
- *   `props`   Properties object
+ * Properties available:
+ * - `id`      Unique string to identify this Graph
+ * - `v`       Internal version of the Graph, can be used to detect changes
+ * - `props`   Properties object
  */
 export class Graph {
 

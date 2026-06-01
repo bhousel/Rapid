@@ -49,6 +49,7 @@ export class MapWithAIService extends AbstractSystem {
   /** Map of dataset IDs to their DatasetCache objects */
   protected _datasets: Map<DatasetID, DatasetCache>;
 
+
   /**
    * @constructor
    * @param context - Global shared application context

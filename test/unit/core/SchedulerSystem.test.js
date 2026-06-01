@@ -1220,17 +1220,17 @@ describe('SchedulerSystem', () => {
           });
         });
 
-        describe('pressure event emission', () => {
-          it('emits "pressure" event when level changes', () => {
+        describe('pressurechange event emission', () => {
+          it('emits "pressurechange" event when level changes', () => {
             const levels = [];
-            _scheduler.on('pressure', (level) => levels.push(level));
+            _scheduler.on('pressurechange', (level) => levels.push(level));
 
             const budget = _scheduler.targetFrameTime;
             for (let i = 0; i < 60; i++) {
               _scheduler._updateMetrics(budget * 2, budget * 2, 0);
             }
 
-            _scheduler.off('pressure');
+            _scheduler.off('pressurechange');
 
             assert.include(levels, 'light', 'should emit light');
             assert.include(levels, 'moderate', 'should emit moderate');
@@ -1241,14 +1241,14 @@ describe('SchedulerSystem', () => {
 
           it('does not emit when level stays the same', () => {
             const levels = [];
-            _scheduler.on('pressure', (level) => levels.push(level));
+            _scheduler.on('pressurechange', (level) => levels.push(level));
 
             const budget = _scheduler.targetFrameTime;
             // Two consecutive under-budget frames — both 'none', no event
             _scheduler._updateMetrics(budget * 0.5, budget * 0.3, 0);
             _scheduler._updateMetrics(budget * 0.5, budget * 0.3, 0);
 
-            _scheduler.off('pressure');
+            _scheduler.off('pressurechange');
 
             assert.deepEqual(levels, [], 'should not emit when staying at none');
           });
@@ -1319,7 +1319,7 @@ describe('SchedulerSystem', () => {
             assert.strictEqual(_scheduler.pressure, 'none');
           });
 
-          it('emits pressure "none" on resetAsync if was pressured', async () => {
+          it('emits pressurechange "none" on resetAsync if system was pressured', async () => {
             const budget = _scheduler.targetFrameTime;
             for (let i = 0; i < 60; i++) {
               _scheduler._updateMetrics(budget * 2, budget * 2, 0);
@@ -1327,20 +1327,20 @@ describe('SchedulerSystem', () => {
             assert.strictEqual(_scheduler.pressure, 'heavy');
 
             const levels = [];
-            _scheduler.on('pressure', (level) => levels.push(level));
+            _scheduler.on('pressurechange', (level) => levels.push(level));
             await _scheduler.resetAsync();
-            _scheduler.off('pressure');
+            _scheduler.off('pressurechange');
 
             assert.include(levels, 'none');
           });
 
-          it('does not emit pressure event on resetAsync if already "none"', async () => {
+          it('does not emit pressurechange event on resetAsync if already "none"', async () => {
             assert.strictEqual(_scheduler.pressure, 'none');
 
             const levels = [];
-            _scheduler.on('pressure', (level) => levels.push(level));
+            _scheduler.on('pressurechange', (level) => levels.push(level));
             await _scheduler.resetAsync();
-            _scheduler.off('pressure');
+            _scheduler.off('pressurechange');
 
             assert.deepEqual(levels, []);
           });

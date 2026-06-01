@@ -33,7 +33,7 @@ export interface SelectOsmModeOptions {
  *
  * For a while we needed to keep the old `modeSelect` around, and we should
  * eventually have a common select mode for everything but this is just my
- * attempt at updating the legacy osm-only select mode for now.
+ * attempt at updating the legacy OSM-only select mode for now.
  */
 export class SelectOsmMode extends AbstractMode {
 

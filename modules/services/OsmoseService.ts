@@ -77,6 +77,7 @@ export class OsmoseService extends AbstractSystem {
   /** Tiler instance used to compute tile coverage for the current viewport */
   protected _tiler: Tiler;
 
+
   /**
    * @constructor
    * @param context - Global shared application context

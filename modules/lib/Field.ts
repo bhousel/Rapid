@@ -95,11 +95,11 @@ interface FieldStrings {
  * The available fields are determined by the preset matched.
  * See:  https://github.com/ideditor/schema-builder/blob/main/schemas/field.json
  *
- * Properties you can access:
- *   `id` (or `fieldID`)   Unique string to identify this Field.
- *   `safeid`              The id, but safe for use in classes, DOM element ids, css selectors..
- *   `props`               Properties object
- *   `geometries`          `Set<string>` Geometries that this Field works with
+ * Properties available:
+ * - `id` (or `fieldID`)   Unique string to identify this Field.
+ * - `safeid`              The id, but safe for use in classes, DOM element ids, css selectors..
+ * - `props`               Properties object
+ * - `geometries`          `Set<string>` Geometries that this Field works with
  */
 export class Field {
 

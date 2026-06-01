@@ -188,12 +188,12 @@ export type MapillaryDetection = MarkerData<MapillaryDetectionProps>;
  * @see https://mapillary.github.io/mapillary-js/api
  *
  * Events available:
- *   `imageChanged`   - fired when a new image is visible in the viewer
- *   `bearingChanged` - fired when the viewer has been panned, receives the bearing value in degrees.
- *   `fovChanged`     - fired when the viewer has been zoomed, receives the fov value in degrees.
- *   `loadedImages`
- *   `loadedSigns`
- *   `loadedDetections`
+ * - `imageChanged`   - fired when a new image is visible in the viewer
+ * - `bearingChanged` - fired when the viewer has been panned, receives the bearing value in degrees.
+ * - `fovChanged`     - fired when the viewer has been zoomed, receives the fov value in degrees.
+ * - `loadedImages`
+ * - `loadedSigns`
+ * - `loadedDetections`
  */
 export class MapillaryService extends AbstractSystem {
 

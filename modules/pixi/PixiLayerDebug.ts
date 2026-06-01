@@ -11,7 +11,8 @@ import type { Viewport } from '@rapid-sdk/math';
 
 
 /**
- * @class
+ * This class renders debug map data.
+ * The debug layer is disabled by default.
  */
 export class PixiLayerDebug extends AbstractPixiLayer {
 

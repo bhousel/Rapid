@@ -29,6 +29,7 @@ export class NominatimService extends AbstractSystem {
   /** Spatial index cache of previously fetched Nominatim results */
   protected _nominatimCache: RBush<NominatimCacheItem>;
 
+
   /**
    * @constructor
    * @param context - Global shared application context

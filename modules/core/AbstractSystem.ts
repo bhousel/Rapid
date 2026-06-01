@@ -52,7 +52,7 @@ import type { Context } from '../Context.ts';
  *   `_resume()` is private — callers must hold onto the release token and call it when done.
  *   Emits `'paused'` / `'resumed'` events on state transitions.
  *
- * Properties you can access:
+ * Properties available:
  *   `id`         `String`   Identifier for the system (e.g. 'l10n')
  *   `autoStart`  `Boolean`  True to start automatically when initializing the Context
  *

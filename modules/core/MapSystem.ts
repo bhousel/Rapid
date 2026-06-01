@@ -20,15 +20,15 @@ const MAX_Z = 24;
  * `MapSystem` maintains the map state and provides an interface for manipulating the map view.
  *
  * Properties available:
- *   `highlightEdits`  `true` if edited features should be shown in a special style, `false` otherwise
- *   `areaFillMode`    one of 'full', 'partial' (default), or 'wireframe'
- *   `wireframeMode`   `true` if fill mode is 'wireframe', `false` otherwise
+ * - `highlightEdits`  `true` if edited features should be shown in a special style, `false` otherwise
+ * - `areaFillMode`    one of 'full', 'partial' (default), or 'wireframe'
+ * - `wireframeMode`   `true` if fill mode is 'wireframe', `false` otherwise
  *
  * Events available:
- *   `draw`       Fires after a full redraw
- *   `move`       Fires after the map's transform has changed (can fire frequently)
+ * - `draw`       Fires after a full redraw
+ * - `move`       Fires after the map's transform has changed (can fire frequently)
  *                 ('move' is mostly for when you want to update some content that floats over the map)
- *   `mapchange`  Fires on any change in map display options (wireframe/areafill, highlightedits)
+ * - `mapchange`  Fires on any change in map display options (wireframe/areafill, highlightedits)
  */
 export class MapSystem extends AbstractSystem {
 

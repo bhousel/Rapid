@@ -68,8 +68,8 @@ const DEFAULT_MAX_WORKERS = 2;
  * - NetworkSystem = network I/O (fetch lifecycle, inflight tracking, dedup, concurrency)
  *
  * Events available:
- *   `paused`     Fires when the system transitions from unpaused to paused
- *   `resumed`    Fires when the system transitions from paused to unpaused
+ * - `paused`     Fires when the system transitions from unpaused to paused
+ * - `resumed`    Fires when the system transitions from paused to unpaused
  */
 export class WorkerSystem extends AbstractSystem {
 

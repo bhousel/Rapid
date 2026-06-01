@@ -15,11 +15,12 @@ export interface RecheckBox extends BBox {
 
 /**
  * A `ValidationCache` stores validation state.
- * We create 2 of these:
- *   `base` for validation on the base graph (unedited)
- *   `head` for validation on the head graph (user edits applied)
+ * The `ValidationSystem` creates 2 of these:
+ * - `base` for validation on the base graph (unedited)
+ * - `head` for validation on the head graph (user edits applied)
  */
 export class ValidationCache {
+
   /** Identifier for this cache - 'base' or 'head' */
   public which: 'base' | 'head';
   /** The graph being validated */

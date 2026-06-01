@@ -22,7 +22,7 @@ type DOMRectData = Pick<DOMRectReadOnly, 'x' | 'y' | 'width' | 'height' | 'top' 
  *  and the `.main-content` container where the map canvas lives.
  *
  * Events available:
- *   `uichange`  Fires on any change in the ui (such as resize)
+ * - `uichange`  Fires on any change in the ui (such as resize)
  */
 export class UiSystem extends AbstractSystem {
 

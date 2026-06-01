@@ -9,7 +9,7 @@ const MINZOOM = 12;
 
 
 /**
- * @class
+ * This class renders OpenStreetMap note markers.
  */
 export class PixiLayerOsmNotes extends AbstractPixiLayer {
 
