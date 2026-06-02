@@ -4,13 +4,16 @@ import type { Context } from '../Context.ts';
 
 
 /** Task priority — determines scheduling order within each frame */
-type TaskPriority = 'urgent' | 'normal' | 'idle';
+export type PriorityLevel = 'urgent' | 'normal' | 'idle';
 
 /** Pressure levels from least to most severe */
-type PressureLevel = 'none' | 'light' | 'moderate' | 'heavy';
+export type PressureLevel = 'none' | 'light' | 'moderate' | 'heavy';
+
+/** Supported timer types */
+export type TimerType = 'timeout' | 'interval' | 'debounce' | 'throttle';
 
 /** Frame timing metrics exposed to consumers */
-interface FrameMetrics {
+export interface FrameMetrics {
   /** Exponential moving average of total frame time (ms) */
   avgFrameTime: number;
   /** EMA of frame callback time — APP + DRAW (ms) */
@@ -26,7 +29,7 @@ interface FrameMetrics {
 }
 
 /** A task waiting in an internal queue */
-interface QueuedTask {
+export interface QueuedTask {
   workID?: WorkID;
   fn: () => void;
   resolve: () => void;
@@ -34,28 +37,28 @@ interface QueuedTask {
 }
 
 /** Options for the general `schedule()` API */
-interface ScheduleOptions {
-  priority?: TaskPriority;
+export interface ScheduleOptions {
+  priority?: PriorityLevel;
   workID?: WorkID;
 }
 
 /** Options for the workID-based timer methods */
-interface TimerOptions {
+export interface TimerOptions {
   /** Delay or interval in milliseconds (default varies by method) */
   ms?: number;
   /** Which queue the matured task goes into (default `'normal'`) */
-  priority?: TaskPriority;
+  priority?: PriorityLevel;
   /** For debounce: fire on leading edge (default `false`) */
   leading?: boolean;
 }
 
 /** Internal tracking entry for a workID-keyed timer */
-interface TimerEntry {
+export interface TimerEntry {
   workID: WorkID;
-  type: 'timeout' | 'interval' | 'debounce' | 'throttle';
+  type: TimerType;
   fn: () => void;
   ms: number;
-  priority: TaskPriority;
+  priority: PriorityLevel;
   handle: ReturnType<typeof globalThis.setTimeout> | null;
   leading: boolean;
   /** Throttle: the most recent fn passed during the throttle window */
@@ -63,7 +66,8 @@ interface TimerEntry {
 }
 
 /** Callback registered to run once per frame in the game loop */
-type FrameCallback = (deltaMS: number) => void;
+export type FrameCallback = (deltaMS: number) => void;
+
 
 /**
  * Maximum deltaMS we'll report between frames.
@@ -283,8 +287,8 @@ export class SchedulerSystem extends AbstractSystem {
    *
    * @param fn - The function to execute
    * @param opts - Scheduling options (priority, etc.)
-   * @return Promise resolved after the task completes, rejected if the
-   *         task throws or is cancelled
+   * @return Promise resolved after the task completes, rejected if the task throws or is cancelled
+   *   (cancellations reject with `AbortError`)
    */
   public schedule(fn: () => void, opts?: ScheduleOptions): Promise<void> {
     return new Promise<void>((resolve, reject) => {
@@ -315,10 +319,13 @@ export class SchedulerSystem extends AbstractSystem {
    * and rejects their promises.  Useful during reset or teardown.
    */
   public cancelAllIdleTasks(): void {
+    const err = new Error('Scheduler task cancelled during reset.');
+    err.name = 'AbortError';
+
     const queues = [this._urgentQueue, this._normalQueue, this._idleQueue];
     for (const queue of queues) {
       for (const task of queue) {
-        task.reject();
+        task.reject(err);
       }
       queue.length = 0;
     }
@@ -666,15 +673,14 @@ export class SchedulerSystem extends AbstractSystem {
    * @param priority - Which queue to use
    * @param workID - Optional workID for cancellation support
    */
-  protected _enqueue(fn: () => void, priority: TaskPriority, workID?: WorkID): void {
+  protected _enqueue(fn: () => void, priority: PriorityLevel, workID?: WorkID): void {
     const task: QueuedTask = {
       workID,
       fn,
       resolve: () => {},
-      reject: (e) => {
-        if (e !== undefined) {
-          console.error(`SchedulerSystem: task '${workID ?? 'anonymous'}' threw:`, e);  // eslint-disable-line no-console
-        }
+      reject: (e: any) => {
+        if (e?.name === 'AbortError') return;  // expected cancellation
+        console.error(`SchedulerSystem: task '${workID ?? 'anonymous'}' threw:`, e);  // eslint-disable-line no-console
       },
     };
     switch (priority) {
@@ -692,11 +698,14 @@ export class SchedulerSystem extends AbstractSystem {
    * @param workID - The work identifier to remove
    */
   protected _removeFromQueues(workID: WorkID): void {
+    const err = new Error(`Scheduler task '${workID}' was cancelled.`);
+    err.name = 'AbortError';
+
     for (const queue of [this._urgentQueue, this._normalQueue, this._idleQueue]) {
       for (let i = queue.length - 1; i >= 0; i--) {
         if (queue[i].workID === workID) {
           const [task] = queue.splice(i, 1);
-          task.reject();
+          task.reject(err);
         }
       }
     }

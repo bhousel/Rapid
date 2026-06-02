@@ -219,6 +219,18 @@ describe('SchedulerSystem', () => {
         }
       });
 
+      it('rejects cancelled tasks with AbortError', async () => {
+        const prom = _scheduler.scheduleIdleTask(() => {});
+        _scheduler.cancelAllIdleTasks();
+
+        try {
+          await prom;
+          assert.fail('Promise should have been rejected');
+        } catch (err) {
+          assert.strictEqual(err?.name, 'AbortError');
+        }
+      });
+
       it('cancels tasks queued while paused', () => {
         const release = _scheduler.pause();
         _scheduler.scheduleIdleTask(() => {}).catch(() => {});
@@ -590,6 +602,18 @@ describe('SchedulerSystem', () => {
         assert.strictEqual(_scheduler.numPending, 1);
         _scheduler.cancel('test-remove-q');
         assert.strictEqual(_scheduler.numPending, 0);
+      });
+
+      it('rejects queued workID tasks with AbortError', async () => {
+        const prom = _scheduler.schedule(() => {}, { priority: 'normal', workID: 'test-remove-q-reject' });
+        _scheduler.cancel('test-remove-q-reject');
+
+        try {
+          await prom;
+          assert.fail('Promise should have been rejected');
+        } catch (err) {
+          assert.strictEqual(err?.name, 'AbortError');
+        }
       });
 
       it('does nothing for unknown workID', () => {

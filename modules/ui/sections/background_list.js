@@ -609,7 +609,11 @@ export function uiSectionBackgroundList(context) {
       }
     };
     if (scheduler) {
-      scheduler.scheduleIdleTask(fn);
+      scheduler.scheduleIdleTask(fn)
+        .catch(err => {
+          if (err?.name === 'AbortError') return;   // expected cancellation
+          console.error(err);  // eslint-disable-line no-console
+        });
     } else {
       fn();
     }

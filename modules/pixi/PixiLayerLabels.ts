@@ -522,7 +522,11 @@ export class PixiLayerLabels extends AbstractPixiLayer {
     scheduler.schedule(() => this._drainPendingRasters(), {
       priority: 'normal',
       workID: 'labels-raster-drain'
-    });
+    })
+      .catch(err => {
+        if (err?.name === 'AbortError') return;   // expected cancellation
+        console.error(err);  // eslint-disable-line no-console
+      });
   }
 
 

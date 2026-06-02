@@ -1,6 +1,7 @@
 import { AbstractSystem } from './AbstractSystem.ts';
 
 import type { Context } from '../Context.ts';
+import type { PriorityLevel } from './SchedulerSystem.ts';
 
 
 /** Message sent from main thread → worker */
@@ -26,7 +27,7 @@ interface PendingWorkerRequest {
   /** Cleanup function to remove AbortSignal listener, if any */
   signalCleanup: (() => void) | null;
   /** When set, resolution is deferred through SchedulerSystem instead of resolving immediately */
-  resultPriority: 'urgent' | 'normal' | 'idle' | null;
+  resultPriority: PriorityLevel | null;
 }
 
 /** Options for `dispatch()` */
@@ -45,7 +46,7 @@ export interface DispatchOptions {
    * When SchedulerSystem is unavailable (tests, CLI), the result
    * resolves immediately — no worse than the current behavior.
    */
-  resultPriority?: 'urgent' | 'normal' | 'idle';
+  resultPriority?: PriorityLevel;
 }
 
 /** Default max worker pool size */
@@ -376,16 +377,13 @@ export class WorkerSystem extends AbstractSystem {
 
       if (error !== undefined) {
         pending.reject(new Error(error));
-      } else if (pending.resultPriority) {
-        // Defer resolution through SchedulerSystem so heavy .then() chains
-        // (entity construction, graph rebase) run within frame budget.
-        if (scheduler) {
-          scheduler.schedule(() => pending.resolve(result), { priority: pending.resultPriority });
-        } else {
-          pending.resolve(result);  // fallback: resolve immediately
-        }
+      } else if (scheduler && pending.resultPriority) {
+        // Defer resolution through SchedulerSystem
+        scheduler
+          .schedule(() => pending.resolve(result), { priority: pending.resultPriority })
+          .catch(err => { pending.reject(err); });
       } else {
-        pending.resolve(result);
+        pending.resolve(result);  // fallback: resolve immediately
       }
     };
 

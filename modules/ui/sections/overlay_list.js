@@ -145,7 +145,11 @@ export function uiSectionOverlayList(context) {
    */
   function onMapDraw() {
     if (scheduler) {
-      scheduler.scheduleIdleTask(() => renderIfVisible());
+      scheduler.scheduleIdleTask(() => renderIfVisible())
+        .catch(err => {
+          if (err?.name === 'AbortError') return;   // expected cancellation
+          console.error(err);  // eslint-disable-line no-console
+        });
     } else {
       renderIfVisible();
     }

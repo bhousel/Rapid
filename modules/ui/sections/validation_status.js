@@ -160,7 +160,11 @@ export function uiSectionValidationStatus(context) {
 
   validator.on('validated', () => {
     if (scheduler) {
-      scheduler.scheduleIdleTask(section.reRender);
+      scheduler.scheduleIdleTask(section.reRender)
+        .catch(err => {
+          if (err?.name === 'AbortError') return;   // expected cancellation
+          console.error(err);  // eslint-disable-line no-console
+        });
     } else {
       section.reRender();
     }
@@ -169,7 +173,11 @@ export function uiSectionValidationStatus(context) {
   context.systems.map.on('draw', () => {
     scheduler?.debounce('ValidationStatus-render', () => {
       if (scheduler) {
-        scheduler.scheduleIdleTask(section.reRender);
+        scheduler.scheduleIdleTask(section.reRender)
+          .catch(err => {
+            if (err?.name === 'AbortError') return;   // expected cancellation
+            console.error(err);  // eslint-disable-line no-console
+          });
       } else {
         section.reRender();
       }

@@ -1,4 +1,4 @@
-import { afterEach, beforeAll, describe, it, mock } from 'bun:test';
+import { afterEach, beforeAll, describe, it, mock, spyOn } from 'bun:test';
 import { assert } from 'chai';
 import * as Rapid from '../../../modules/headless.js';
 
@@ -335,7 +335,7 @@ describe('WorkerSystem', () => {
 
 
       describe('resultPriority (scheduler deferred resolution)', () => {
-        it('resolves immediately when no scheduler is available', async () => {
+        it('resolves immediately when no SchedulerSystem is available', async () => {
           _worker.workerURL = workerURL;
           // MockContext doesn't provide context.systems.scheduler, so the
           // fallback path (resolve immediately) should fire.
@@ -343,44 +343,63 @@ describe('WorkerSystem', () => {
           assert.strictEqual(result, 'deferred');
         });
 
-        it('defers resolution through scheduler.schedule when scheduler exists', async () => {
+        it('defers resolution through when SchedulerSystem exists', async () => {
           _worker.workerURL = workerURL;
+          const scheduler = new Rapid.SchedulerSystem(context);
+          const scheduleSpy = spyOn(scheduler, 'schedule');
 
-          // Install a mock scheduler that captures scheduled callbacks
-          const scheduled = [];
-          const mockScheduler = {
-            schedule: mock((fn, opts) => {
-              scheduled.push({ fn, opts });
-            }),
-          };
-          context.systems.scheduler = mockScheduler;
+          context.systems.scheduler = scheduler;
+          await scheduler.initAsync().then(() => scheduler.startAsync());
 
           try {
             const prom = _worker.dispatch('ping', 'defer-me', undefined, { resultPriority: 'idle' });
-
-            // Wait for the worker to post back (the onmessage handler runs the scheduler branch)
-            // We need to poll briefly because the worker response is async
-            await Bun.sleep(100);
-
-            // The scheduler should have been called instead of resolving the promise directly
-            assert.isAbove(scheduled.length, 0, 'scheduler.schedule should have been called');
-            assert.deepStrictEqual(scheduled[0].opts, { priority: 'idle' });
-
-            // The promise should still be pending because the scheduler hasn't run the callback
-            let resolved = false;
-            prom.then(() => { resolved = true; });
-            await Bun.sleep(10);
-            assert.isFalse(resolved, 'promise should not resolve until scheduler runs the callback');
-
-            // Now run the scheduled callback — this should resolve the promise
-            scheduled[0].fn();
             const result = await prom;
-            assert.strictEqual(result, 'defer-me');
+
+            // The scheduler should have been used...
+            assert.lengthOf(scheduleSpy.mock.calls, 1, 'scheduler.schedule should have been called');
+            const call = scheduleSpy.mock.calls[0];
+            assert.typeOf(call[0], 'function');
+            assert.deepEqual(call[1], { priority: 'idle' });
+
+            assert.strictEqual(result, 'defer-me');  // ...and we get the ping response from the worker
+          } finally {
+            delete context.systems.scheduler;
+          }
+        });
+
+        it('rejects with AbortError upon SchedulerSystem task cancellation', async () => {
+          _worker.workerURL = workerURL;
+          const scheduler = new Rapid.SchedulerSystem(context);
+          const origSchedule = scheduler.schedule.bind(scheduler);
+          const mockSchedule = mock((...args) => {
+            const prom = origSchedule(args);  // schedule it..
+            scheduler.cancelAllIdleTasks();   // but cancel immediately
+            return prom;
+          });
+          scheduler.schedule = mockSchedule;
+
+          context.systems.scheduler = scheduler;
+          await scheduler.initAsync().then(() => scheduler.startAsync());
+
+          try {
+            const prom = _worker.dispatch('ping', 'defer-me', undefined, { resultPriority: 'idle' });
+            await prom;
+            assert.fail('Promise should have been rejected');
+
+          } catch (err) {
+            // The scheduler should have been used...
+            assert.lengthOf(mockSchedule.mock.calls, 1, 'scheduler.schedule should have been called');
+            const call = mockSchedule.mock.calls[0];
+            assert.typeOf(call[0], 'function');
+            assert.deepEqual(call[1], { priority: 'idle' });
+
+            assert.strictEqual(err?.name, 'AbortError');  // ...but the scheduler cancelled it
           } finally {
             delete context.systems.scheduler;
           }
         });
       });
+
     });
   });
 });

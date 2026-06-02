@@ -233,7 +233,11 @@ export function uiSectionValidationIssues(context, severity) {
       section.reRender();
     };
     if (scheduler) {
-      scheduler.scheduleIdleTask(fn);
+      scheduler.scheduleIdleTask(fn)
+        .catch(err => {
+          if (err?.name === 'AbortError') return;   // expected cancellation
+          console.error(err);  // eslint-disable-line no-console
+        });
     } else {
       fn();
     }

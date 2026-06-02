@@ -38,7 +38,11 @@ export function uiSectionReactContainer(context) {
     scheduler?.debounce('ReactContainer-render', () => {
       reRenderCount++;
       if (scheduler) {
-        scheduler.scheduleIdleTask(section.reRender);
+        scheduler.scheduleIdleTask(section.reRender)
+          .catch(err => {
+            if (err?.name === 'AbortError') return;   // expected cancellation
+            console.error(err);  // eslint-disable-line no-console
+          });
       } else {
         section.reRender();
       }
