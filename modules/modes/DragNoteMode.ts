@@ -1,5 +1,5 @@
 import { AbstractMode } from './AbstractMode.ts';
-import { vecAdd, vecRotate, vecSubtract } from '@rapid-sdk/math';
+import { projWorldToWgs84, vecAdd, vecRotate, vecSubtract } from '@rapid-sdk/math';
 
 import type { Context } from '../Context.ts';
 import type { EventData } from '../behaviors/AbstractBehavior.ts';
@@ -15,16 +15,15 @@ interface DragNoteModeOptions {
 
 
 /**
- *  In `DragNoteMode`, the user has started dragging a (new, unsaved) OSM Note.
+ *  In `DragNoteMode`, the user has started dragging a new, unsaved OSM Note.
  */
 export class DragNoteMode extends AbstractMode {
+
   /** The note (MarkerData) being dragged, or null if not dragging */
   public dragNote: MarkerData | null;
 
-  /** Starting location of the note before dragging */
-  protected _startLoc: Vec2 | null;
-  /** Location where user clicked to grab the note (for drag offset calculation) */
-  protected _clickLoc: Vec2 | null;
+  /** Difference between where the pin is, and where on the pin the user clicked */
+  protected _dragOffset: Vec2;
 
 
   /**
@@ -36,9 +35,7 @@ export class DragNoteMode extends AbstractMode {
     this.id = 'drag-note';
 
     this.dragNote = null;    // The note being dragged
-
-    this._startLoc = null;
-    this._clickLoc = null;
+    this._dragOffset = [0, 0];
 
     // Make sure the event handlers have `this` bound correctly
     this._move = this._move.bind(this);
@@ -64,13 +61,12 @@ export class DragNoteMode extends AbstractMode {
 
     this._active = true;
     this.dragNote = note;
-    this._startLoc = note.loc;
     this._selectedData.set(this.dragNote.id, this.dragNote);
 
-    // `_clickLoc` is used later to calculate a drag offset,
-    // to correct for where "on the pin" the user grabbed the target.
-    const point = context.behaviors.drag!.lastDown!.coord.map;
-    this._clickLoc = context.viewport.unproject(point);
+    // Calculate dragOffset, to correct for where "on the pin" the user grabbed the target.
+    const startCoord = note.geoms.parts[0]!.world!.coords as Vec2;  // A marker should have a single world coord
+    const clickCoord = context.behaviors.drag!.lastDown!.coord.world;
+    this._dragOffset = vecSubtract(startCoord, clickCoord);
 
     context.enableBehaviors(['drag', 'mapNudge']);
     context.behaviors.mapNudge!.allow();
@@ -95,8 +91,7 @@ export class DragNoteMode extends AbstractMode {
     this._active = false;
 
     this.dragNote = null;
-    this._startLoc = null;
-    this._clickLoc = null;
+    this._dragOffset = [0, 0];
     this._selectedData.clear();
 
     const context = this.context;
@@ -120,19 +115,12 @@ export class DragNoteMode extends AbstractMode {
     const context = this.context;
     const locations = context.systems.locations;
     const gfx = context.systems.gfx;
-    const osm = context.services.osm as any;
-    const viewport = context.viewport;
-    const point = eventData.coord.map;
+    const osm = context.services.osm;
+    const point = eventData.coord.world;
 
     // The "drag offset" is the difference between where the user grabbed
-    // the marker/pin and where the location of the note actually is.
-    // We calculate the drag offset each time because it's possible
-    // the user may have changed zooms while dragging..
-    const clickCoord = viewport.project(this._clickLoc!);
-    const startCoord = viewport.project(this._startLoc!);
-    const dragOffset = vecSubtract(startCoord, clickCoord);
-    const adjustedCoord = vecAdd(point, dragOffset);
-    const loc = viewport.unproject(adjustedCoord);
+    // the marker/pin and where the location of the node actually is.
+    const loc = projWorldToWgs84(vecAdd(point, this._dragOffset));
 
     if (locations?.isBlockedAt(loc)) {  // editing is blocked here
       this._cancel();
@@ -140,7 +128,7 @@ export class DragNoteMode extends AbstractMode {
     }
 
     this.dragNote = this.dragNote.update({ loc: loc });
-    osm.replaceNote(this.dragNote);
+    osm?.replaceNote(this.dragNote);
     this._selectedData.set(this.dragNote.id, this.dragNote);
 
     // Force a redraw - there is no event for notes that would tell the map to redraw.

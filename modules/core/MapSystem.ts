@@ -1,5 +1,7 @@
 import { AbstractSystem } from './AbstractSystem.ts';
-import { DEG2RAD, RAD2DEG, TAU, Extent, numClamp, numWrap, vecRotate, vecSubtract, WORLD_HALF, WORLD_ZOOM } from '@rapid-sdk/math';
+import {
+  DEG2RAD, RAD2DEG, TAU, Extent, numClamp, numWrap, projWgs84ToWorld,
+  vecRotate, vecSubtract, WORLD_HALF, WORLD_SCALE } from '@rapid-sdk/math';
 import { MarkerData } from '../data/MarkerData.ts';
 import { selection } from 'd3-selection';
 import { utilTotalExtent } from '../util/util.ts';
@@ -566,14 +568,13 @@ export class MapSystem extends AbstractSystem {
       return this;
     }
 
-    const world = view.wgs84ToWorld(loc2);
-
     // convert that coordinate back to screen coordinate at z2
     // worldToScreen formula: screen = (world - WORLD_HALF) * 2^(z - WORLD_ZOOM) + [tx, ty]
     // For center to land on `world`: tx = center - (world - WORLD_HALF) * k2 / 2^WORLD_ZOOM
+    const world = projWgs84ToWorld(loc2);
     const k2 = 2 ** z2;
-    const x2 = -((world[0] - WORLD_HALF) * k2 / 2 ** WORLD_ZOOM) + center[0];
-    const y2 = -((world[1] - WORLD_HALF) * k2 / 2 ** WORLD_ZOOM) + center[1];
+    const x2 = -((world[0] - WORLD_HALF) * k2 / WORLD_SCALE) + center[0];
+    const y2 = -((world[1] - WORLD_HALF) * k2 / WORLD_SCALE) + center[1];
 
     return this.transform({ x: x2, y: y2, z: z2, r: r2 }, duration) as this;
   }
@@ -610,13 +611,13 @@ export class MapSystem extends AbstractSystem {
       return Promise.resolve(t1);
     }
 
-    const world = view.wgs84ToWorld(loc2);
     // convert that coordinate back to screen coordinate at z2
     // worldToScreen formula: screen = (world - WORLD_HALF) * 2^(z - WORLD_ZOOM) + [tx, ty]
     // For center to land on `world`: tx = center - (world - WORLD_HALF) * k2 / 2^WORLD_ZOOM
+    const world = projWgs84ToWorld(loc2);
     const k2 = 2 ** z2;
-    const x2 = -((world[0] - WORLD_HALF) * k2 / 2 ** WORLD_ZOOM) + center[0];
-    const y2 = -((world[1] - WORLD_HALF) * k2 / 2 ** WORLD_ZOOM) + center[1];
+    const x2 = -((world[0] - WORLD_HALF) * k2 / WORLD_SCALE) + center[0];
+    const y2 = -((world[1] - WORLD_HALF) * k2 / WORLD_SCALE) + center[1];
 
     return this.setTransformAsync({ x: x2, y: y2, z: z2, r: r2 }, duration);
   }

@@ -4,6 +4,7 @@ import { PixiFeaturePoint } from './PixiFeaturePoint.ts';
 import { PixiFeaturePolygon } from './PixiFeaturePolygon.ts';
 import { projWorldToWgs84 } from '@rapid-sdk/math';
 
+import type { BBox } from 'rbush';
 import type { OsmEntity } from '../data/OsmEntity.ts';
 import type { PixiScene } from './PixiScene.ts';
 import type { StyleProps } from '../lib/Style.ts';
@@ -106,7 +107,7 @@ export class PixiLayerDebug extends AbstractPixiLayer {
           // Start with default style, and apply adjustments
           // set style = red if collides, green if not
           const style = structuredClone(DEFAULTSTYLE);
-          const box = { minX: worldPoi![0], minY: worldPoi![1], maxX: worldPoi![0], maxY: worldPoi![1] };
+          const box: BBox = { minX: worldPoi![0], minY: worldPoi![1], maxX: worldPoi![0], maxY: worldPoi![1] };
           // does this test point hit an OSM building?
           const didHitBuilding = spatial.getDataAtBox('osm', box).some(hit => _isBuilding(hit.contents as OsmEntity));
 

@@ -155,7 +155,6 @@ export class DragNodeMode extends AbstractMode {
     this._reselectIDs = [];
     this._wasMidpoint = false;
     this._dragOffset = [0, 0];
-
     this._selectedData.clear();
 
     const context = this.context;

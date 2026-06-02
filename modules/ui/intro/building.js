@@ -154,10 +154,11 @@ export function uiIntroBuilding(context, curtain) {
         if (_doesHouseExist() && _isHouseSelected()) {
           const graph = editor.staging.graph;
           const way = graph.entity(_houseID);
-          const nodes = graph.childNodes(way);
-          const points = utilArrayUniq(nodes).map(n => context.viewport.project(n.loc));
 
-          if (isMostlySquare(points)) {
+          // A way will have LineString or Polygon geometry. We can use 'outer' to get these points.
+          const points = way.geoms.parts[0]?.local?.outer;
+
+          if (points && isMostlySquare(points)) {
             resolve(chooseCategoryBuildingAsync);
           } else {
             resolve(retryHouseAsync);

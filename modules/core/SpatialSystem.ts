@@ -1,6 +1,6 @@
 import { AbstractSystem } from './AbstractSystem.ts';
 import { Graph } from '../lib/Graph.ts';
-import { projWgs84ToWorld, projWorldToWgs84, WORLD_SCALE, WORLD_ZOOM } from '@rapid-sdk/math';
+import { projWgs84ToWorld, projWorldToWgs84, WORLD_SCALE } from '@rapid-sdk/math';
 import RBush from 'rbush';
 import { type OneOrMore, utilIterable } from '../util/iterable.ts';
 
@@ -364,7 +364,7 @@ export class SpatialSystem extends AbstractSystem {
   public getDataAtLoc(datasetID: DatasetID, loc: Vec2): Box[] {
     const cache = this.getCache(datasetID);
     const [x, y] = projWgs84ToWorld(loc) as Vec2;
-    const epsilon = 1e-7 * 2 ** WORLD_ZOOM;
+    const epsilon = 1e-7 * WORLD_SCALE;
     const test = { minX: x - epsilon, minY: y - epsilon, maxX: x + epsilon, maxY: y + epsilon };
     return cache.dataRBush.search(test);
   }
@@ -378,7 +378,7 @@ export class SpatialSystem extends AbstractSystem {
   public hasDataAtLoc(datasetID: DatasetID, loc: Vec2): boolean {
     const cache = this.getCache(datasetID);
     const [x, y] = projWgs84ToWorld(loc) as Vec2;
-    const epsilon = 1e-7 * 2 ** WORLD_ZOOM;
+    const epsilon = 1e-7 * WORLD_SCALE;
     const test = { minX: x - epsilon, minY: y - epsilon, maxX: x + epsilon, maxY: y + epsilon };
     return cache.dataRBush.collides(test);
   }

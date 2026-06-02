@@ -62,9 +62,6 @@ interface TimerEntry {
   trailingFn: (() => void) | null;
 }
 
-/** Opaque cancel function returned by `scheduleTimeout` and `scheduleInterval` */
-type CancelFn = () => void;
-
 /** Callback registered to run once per frame in the game loop */
 type FrameCallback = (deltaMS: number) => void;
 
@@ -158,15 +155,9 @@ export class SchedulerSystem extends AbstractSystem {
   /** Low-priority tasks run only during idle time at the end of a frame */
   protected _idleQueue: QueuedTask[];
 
-  // workID-keyed timers (timeout, interval, debounce, throttle)
+  // WorkID-keyed timers (timeout, interval, debounce, throttle)
   /** Named timers (timeout / interval / debounce / throttle) keyed by workID */
-  protected _timers: Map<string, TimerEntry>;
-
-  // Legacy handle-based timers (Phase 1 API — still used by existing callers)
-  /** Active managed timeouts keyed by their setTimeout handle */
-  protected _timeouts: Set<ReturnType<typeof setTimeout>>;
-  /** Active managed intervals keyed by their setInterval handle */
-  protected _intervals: Set<ReturnType<typeof setInterval>>;
+  protected _timers: Map<WorkID, TimerEntry>;
 
   // Backpressure — frame timing metrics and pressure tracking
   /** EMA of total frame time (ms) */
@@ -193,10 +184,10 @@ export class SchedulerSystem extends AbstractSystem {
     super(context);
     this.id = 'scheduler';
     // No required dependencies — this system should be available very early.
-    this.requiredDependencies = new Set();
-    this.optionalDependencies = new Set();
+    this.requiredDependencies = new Set<SystemID>();
+    this.optionalDependencies = new Set<SystemID>();
 
-    this._frameCallbacks = new Map();
+    this._frameCallbacks = new Map<string, FrameCallback>();
     this._rafHandle = 0;
     this._lastTimestamp = 0;
     this._deltaMS = 0;
@@ -205,11 +196,7 @@ export class SchedulerSystem extends AbstractSystem {
     this._urgentQueue = [];
     this._normalQueue = [];
     this._idleQueue = [];
-
-    this._timers = new Map();
-
-    this._timeouts = new Set();
-    this._intervals = new Set();
+    this._timers = new Map<WorkID, TimerEntry>();
 
     this._avgFrameTime = 0;
     this._avgRenderTime = 0;
@@ -264,8 +251,6 @@ export class SchedulerSystem extends AbstractSystem {
   public resetAsync(): Promise<void> {
     this.cancelAllIdleTasks();
     this.cancelAllTimers();
-    this.cancelAllTimeouts();
-    this.cancelAllIntervals();
 
     // Reset backpressure metrics so recovered state doesn't carry over
     this._avgFrameTime = 0;
@@ -289,9 +274,9 @@ export class SchedulerSystem extends AbstractSystem {
    * task has executed.
    *
    * Priority controls ordering:
-   *   - `'urgent'`  — always runs this frame, even if over budget
-   *   - `'normal'`  — runs if budget remains after urgent tasks (default)
-   *   - `'idle'`    — runs only if budget remains after normal tasks
+   * - `'urgent'`  — always runs this frame, even if over budget
+   * - `'normal'`  — runs if budget remains after urgent tasks (default)
+   * - `'idle'`    — runs only if budget remains after normal tasks
    *
    * Tasks queued while the system is paused accumulate and drain
    * automatically when the game loop resumes.
@@ -595,98 +580,6 @@ export class SchedulerSystem extends AbstractSystem {
    */
   public get numTimers(): number {
     return this._timers.size;
-  }
-
-
-  /**
-   * Managed wrapper around `setTimeout`.  Returns a cancel function.
-   * The timeout is automatically cancelled on `resetAsync()`.
-   *
-   * @param fn - The function to execute after the delay
-   * @param ms - Delay in milliseconds (default 0)
-   * @return A cancel function that clears the timeout
-   */
-  public scheduleTimeout(fn: () => void, ms: number = 0): CancelFn {
-    let handle: ReturnType<typeof setTimeout> | null = null;
-
-    handle = globalThis.setTimeout(() => {
-      this._timeouts.delete(handle!);
-      handle = null;
-      fn();
-    }, ms);
-
-    this._timeouts.add(handle);
-
-    return () => {
-      if (handle !== null) {
-        globalThis.clearTimeout(handle);
-        this._timeouts.delete(handle);
-        handle = null;
-      }
-    };
-  }
-
-
-  /**
-   * Cancels every outstanding managed timeout.
-   */
-  public cancelAllTimeouts(): void {
-    for (const handle of this._timeouts) {
-      globalThis.clearTimeout(handle);
-    }
-    this._timeouts.clear();
-  }
-
-
-  /**
-   * Number of active managed timeouts.
-   * Useful for debugging and tests.
-   * @return  Count of active managed timeouts
-   * @readonly
-   */
-  public get numTimeouts(): number {
-    return this._timeouts.size;
-  }
-
-
-  /**
-   * Managed wrapper around `setInterval`.  Returns a cancel function.
-   * The interval is automatically cancelled on `resetAsync()`.
-   *
-   * @param fn - The function to execute on each interval tick
-   * @param ms - Interval in milliseconds
-   * @return A cancel function that clears the interval
-   */
-  public scheduleInterval(fn: () => void, ms: number): CancelFn {
-    const handle = globalThis.setInterval(fn, ms);
-    this._intervals.add(handle);
-
-    return () => {
-      globalThis.clearInterval(handle);
-      this._intervals.delete(handle);
-    };
-  }
-
-
-  /**
-   * Cancels every outstanding managed interval.
-   */
-  public cancelAllIntervals(): void {
-    for (const handle of this._intervals) {
-      globalThis.clearInterval(handle);
-    }
-    this._intervals.clear();
-  }
-
-
-  /**
-   * Number of active managed intervals.
-   * Useful for debugging and tests.
-   * @return  Count of active managed intervals
-   * @readonly
-   */
-  public get numIntervals(): number {
-    return this._intervals.size;
   }
 
 
