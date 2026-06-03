@@ -235,7 +235,7 @@ export class PixiScene extends EventEmitter {
    * @param layerIDs - layerIDs to keep enabled
    */
   public onlyLayers(layerIDs: OneOrMore<LayerID>): void {
-    const toEnable = new Set(utilIterable(layerIDs));
+    const toEnable = new Set<LayerID>(utilIterable(layerIDs));
     for (const layer of this.layers.values()) {
       layer.enabled = toEnable.has(layer.id);
     }

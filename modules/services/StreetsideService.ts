@@ -301,8 +301,8 @@ export class StreetsideService extends AbstractSystem {
     spatial.clearCache('streetside-sequences');
 
     this._cache = {
-      unattachedBubbles: new Set(),   // Set<PhotoID>
-      bubbleHasSequences: new Map(),  // Map<PhotoID, Set<SequenceID>>
+      unattachedBubbles: new Set<PhotoID>(),
+      bubbleHasSequences: new Map<PhotoID, Set<SequenceID>>(),
       metadataPromise: null,
       lastv: null
     };
@@ -886,7 +886,7 @@ export class StreetsideService extends AbstractSystem {
 
       let seqs = bubbleHasSequences.get(bubbleID);
       if (!seqs) {
-        seqs = new Set();
+        seqs = new Set<SequenceID>();
         bubbleHasSequences.set(bubbleID, seqs);
       }
       seqs.add(sequenceID);
@@ -913,7 +913,7 @@ export class StreetsideService extends AbstractSystem {
       // Prefer a sequence where the current bubble follows the previous bubble at the end of the sequnce.
       // But accept any sequence we can make, they don't always link in both directions.
       if (prevBubbleID && prevBubble) {
-        const trySequenceIDs = bubbleHasSequences.get(prevBubbleID) || new Set();
+        const trySequenceIDs = bubbleHasSequences.get(prevBubbleID) ?? new Set<SequenceID>();
         for (const sequenceID of trySequenceIDs) {
           const sequence = spatial.getData<StreetsideSequence>('streetside-sequences', sequenceID);
           if (!sequence) continue;
@@ -936,7 +936,7 @@ export class StreetsideService extends AbstractSystem {
       // Prefer a sequence where the current bubble precedes the next bubble at the beginning of the sequnce.
       // But accept any sequence we can make, they don't always link in both directions.
       if (nextBubbleID && nextBubble) {
-        const trySequenceIDs = bubbleHasSequences.get(nextBubbleID) || new Set();
+        const trySequenceIDs = bubbleHasSequences.get(nextBubbleID) ?? new Set<SequenceID>();
         for (const sequenceID of trySequenceIDs) {
           const sequence = spatial.getData<StreetsideSequence>('streetside-sequences', sequenceID);
           if (!sequence) continue;

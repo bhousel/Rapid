@@ -108,14 +108,16 @@ export class WaybackService extends AbstractSystem {
     this.requiredDependencies = new Set<SystemID>(['assets', 'network' /*,'spatial'*/]);
     this.optionalDependencies = new Set<SystemID>([]);
 
-    this.allDates = [];                 // Array<releaseDate> ascending
-    this.byReleaseNumber = new Map();   // Map<releaseNumber, WaybackRelease>
-    this.byReleaseDate = new Map();     // Map<releaseDate, WaybackRelease>
+    this.allDates = [];      // Array<releaseDate> ascending
+    this.byReleaseNumber = new Map<string, WaybackRelease>();
+    this.byReleaseDate = new Map<string, WaybackRelease>();
 
     this._tiler = new Tiler();
-    this._cache = { inflight: new Map() };
-    this._metadata = new Map();     // Map<key, WaybackMetadata>  where `key` like 'tileID_YYYY-MM-DD'
-    this._localDates = new Map();   // Map<tileID, Array<releaseDate>>
+    this._cache = {
+      inflight: new Map<TileID, InflightEntry>()
+    };
+    this._metadata = new Map<string, WaybackMetadata>();  // where string `key` like 'tileID_YYYY-MM-DD'
+    this._localDates = new Map<TileID, string[]>();       // TileID, Array<releaseDate>>
   }
 
 
@@ -204,7 +206,7 @@ export class WaybackService extends AbstractSystem {
     network.abortMatching(id => /^wayback-/.test(id));
 
     this._cache = {
-      inflight: new Map()  // Map<TileID, InflightEntry>
+      inflight: new Map<TileID, InflightEntry>()
     };
 
 //    const spatial = this.context.systems.spatial;

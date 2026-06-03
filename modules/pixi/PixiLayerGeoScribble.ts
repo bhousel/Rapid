@@ -61,11 +61,10 @@ export class PixiLayerGeoScribble extends AbstractPixiLayer {
     this._enabled = val;
 
     const context = this.context;
-    const gfx = context.systems.gfx!;
     const service = context.services.geoscribble;
     if (val && service) {
       service.startAsync()
-        .then(() => gfx.immediateRedraw());
+        .then(() => this.gfx.immediateRedraw());
     }
   }
 

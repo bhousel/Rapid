@@ -7,6 +7,7 @@ import type { Context } from '../Context.ts';
 import type { GeometryPart } from '../lib/GeometryPart.ts';
 import type { GraphicsSystem } from '../core/GraphicsSystem.ts';
 import type { MinimalStyleProps, StyleProps } from '../lib/Style.ts';
+import type { OneOrMore } from '../util/iterable.ts';
 import type { PixiScene } from './PixiScene.ts';
 import type { SingularGeometryType } from '../lib/types.ts';
 import type { Viewport } from '@rapid-sdk/math';
@@ -119,7 +120,7 @@ export class AbstractPixiFeature {
     this._data = null;
 
     // pseudoclasses, @see `AbstractPixiLayer.syncFeatureClasses()`
-    this._classes = new Set();
+    this._classes = new Set<ClassID>();
 
     this.layer.addFeature(this);
     this.scene.addFeature(this);
@@ -429,10 +430,10 @@ export class AbstractPixiFeature {
   /**
    * Adds a mapping from parent data to child data.
    * @param parentID - dataID of the parent (e.g. 'r123')
-   * @param childID - dataID of the child (e.g. 'w123')
+   * @param childID - dataIDs of the child (e.g. 'w123')
    */
-  public addChildData(parentID: DataID, childID: DataID): void {
-    this.layer.addChildData(parentID, childID);
+  public addChildData(parentID: DataID, childIDs: OneOrMore<DataID>): void {
+    this.layer.addChildData(parentID, childIDs);
     this.dirty = true;
   }
 

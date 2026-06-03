@@ -7,7 +7,7 @@ import { PixiFeaturePolygon } from './PixiFeaturePolygon.ts';
 import { projWorldToWgs84, vecAngle, vecLength, vecInterp, WORLD_ZOOM } from '@rapid-sdk/math';
 
 import type { MatchedStyle } from '../core/StyleSystem.ts';
-import type { OsmEntity, OsmNode, OsmRelationMember, OsmTags } from '../data/types.ts';
+import type { OsmEntity, OsmNode, OsmRelation, OsmRelationMember, OsmTags, OsmWay } from '../data/types.ts';
 import type { PixiLayerMapUI } from './PixiLayerMapUI.ts';
 import type { PixiScene } from './PixiScene.ts';
 import type { Vec2, Viewport } from '@rapid-sdk/math';
@@ -36,8 +36,8 @@ const HIGHWAYSTACK: Record<string, number> = {
 
 /** Visible OSM data sorted by geometry type */
 interface OsmData {
-  polygons: Map<EntityID, any>;
-  lines: Map<EntityID, any>;
+  polygons: Map<EntityID, OsmEntity>;
+  lines: Map<EntityID, OsmWay>;
   points: Map<EntityID, OsmNode>;
   vertices: Map<EntityID, OsmNode>;
 }
@@ -140,11 +140,10 @@ export class PixiLayerOsm extends AbstractPixiLayer {
     this._enabled = val;
 
     const context = this.context;
-    const gfx = context.systems.gfx!;
     const osm = context.services.osm;
     if (val && osm) {
       osm.startAsync()
-        .then(() => gfx.immediateRedraw());
+        .then(() => this.gfx.immediateRedraw());
     }
   }
 
@@ -201,10 +200,10 @@ export class PixiLayerOsm extends AbstractPixiLayer {
     entities = filters.filterScene(entities, graph);   // Apply feature filters
 
     const data: OsmData = {
-      polygons: new Map(),
-      lines: new Map(),
-      points: new Map(),
-      vertices: new Map(),
+      polygons: new Map<EntityID, OsmWay | OsmRelation>(),
+      lines: new Map<EntityID, OsmWay>(),
+      points: new Map<EntityID, OsmNode>(),
+      vertices: new Map<EntityID, OsmNode>(),
     };
 
     for (const entity of entities) {
@@ -214,9 +213,9 @@ export class PixiLayerOsm extends AbstractPixiLayer {
       } else if (geom === 'vertex') {
         data.vertices.set(entity.id, entity as OsmNode);
       } else if (geom === 'line') {
-        data.lines.set(entity.id, entity);
+        data.lines.set(entity.id, entity as OsmWay);
       } else if (geom === 'area') {
-        data.polygons.set(entity.id, entity);
+        data.polygons.set(entity.id, entity as OsmWay | OsmRelation);
       }
     }
 
@@ -264,8 +263,8 @@ export class PixiLayerOsm extends AbstractPixiLayer {
     // Create collections of the sibling and descendant IDs,
     // These will determine which vertices and midpoints get drawn.
     const related: RelatedIDs = {
-      descendantIDs: new Set(),
-      siblingIDs: new Set()
+      descendantIDs: new Set<EntityID>(),
+      siblingIDs: new Set<EntityID>()
     };
     for (const interestingID of interestingIDs) {
       this.getSelfAndDescendants(interestingID, related.descendantIDs);
@@ -347,10 +346,10 @@ export class PixiLayerOsm extends AbstractPixiLayer {
           feature.setData(entityID, entity);
           feature.clearChildData(entityID);
           if (entity.type === 'relation') {
-            feature.addChildData(entityID, entity.members.map((member: OsmRelationMember) => member.id));
+            feature.addChildData(entityID, (entity as OsmRelation).members.map((member: OsmRelationMember) => member.id));
           }
           if (entity.type === 'way') {
-            feature.addChildData(entityID, entity.nodes);
+            feature.addChildData(entityID, (entity as OsmWay).nodes);
           }
         }
 
@@ -395,7 +394,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
             poiFeature.v = version;
 
             const poiGeometry = new GeometryPart(context);
-            poiGeometry.setData({ type: 'Point', coordinates: projWorldToWgs84(part.world.poi) });
+            poiGeometry.setData({ type: 'Point', coordinates: projWorldToWgs84(part.world.poi!) });
             poiFeature.geometry = poiGeometry;
             poiFeature.setData(entityID, entity);
           }
@@ -465,14 +464,14 @@ export class PixiLayerOsm extends AbstractPixiLayer {
       return levelContainer;
     };
 
-    const entities = data.lines;
-    for (const [entityID, entity] of entities) {
-      const layer = (typeof entity.layer === 'function') ? entity.layer() : 0;
+    const ways = data.lines;
+    for (const [wayID, way] of ways) {
+      const layer = (typeof way.layer === 'function') ? way.layer() : 0;
       const levelContainer = _getLevelContainer(layer.toString());
-      const zindex = getzIndex(entity.tags);
-      const version = entity.v || 0;
+      const zindex = getzIndex(way.tags);
+      const version = way.v || 0;
 
-      const parts = entity.geoms.parts;
+      const parts = way.geoms.parts;
 
       for (let i = 0; i < parts.length; ++i) {
         const part = parts[i];
@@ -483,7 +482,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
           : [];
 
         for (let j = 0; j < rings.length; ++j) {
-          const featureID = `${this.layerID}-${entityID}-${i}-${j}`;
+          const featureID = `${this.layerID}-${wayID}-${i}-${j}`;
           let feature = this.features.get(featureID) as PixiFeatureLine | undefined;
 
           // If feature existed before as a different type, recreate it.
@@ -503,26 +502,20 @@ export class PixiLayerOsm extends AbstractPixiLayer {
             feature.parentContainer = levelContainer;    // Change layer stacking if necessary
             feature.container.zIndex = zindex;
 
-            feature.setData(entityID, entity);
-            feature.clearChildData(entityID);
-
-            if (entity.type === 'relation') {
-              feature.addChildData(entityID, entity.members.map((member: OsmRelationMember) => member.id));
-            }
-            if (entity.type === 'way') {
-              feature.addChildData(entityID, entity.nodes);
-            }
+            feature.setData(wayID, way);
+            feature.clearChildData(wayID);
+            feature.addChildData(wayID, way.nodes);
           }
 
           this.syncFeatureClasses(feature);
 
           if (feature.dirty) {
-            let tags = entity.tags;
-            let geometry = entity.geometry(graph);
+            let tags = way.tags;
+            let geometry = way.geometry(graph);
 
             // a line no tags - try to style match the tags of its parent relation
-            if (!entity.hasInterestingTags()) {
-              const parent = graph.parentRelations(entity).find(relation => relation.isMultipolygon());
+            if (!way.hasInterestingTags()) {
+              const parent = graph.parentRelations(way).find(relation => relation.isMultipolygon());
               if (parent) {
                 tags = parent.tags;
                 geometry = 'area';
@@ -532,14 +525,14 @@ export class PixiLayerOsm extends AbstractPixiLayer {
             const style = styles.styleMatch(tags, geometry, 'osm') as MatchedStyle;
             // Todo: handle alternating/two-way case too
             if (geometry === 'line') {
-              if (entity.isOneWay()) {
+              if (way.isOneWay()) {
                 style.lineMarker ??= {};
-                const isAlternating = (entity.tags.oneway === 'alternating' || entity.tags.oneway === 'reversible');
+                const isAlternating = (way.tags.oneway === 'alternating' || way.tags.oneway === 'reversible');
                 style.lineMarker.image = isAlternating ? 'twoway' : 'oneway';
               } else {
                 delete style.lineMarker;
               }
-              if (entity.isSided()) {
+              if (way.isSided()) {
                 style.sidedMarker ??= {};
                 style.sidedMarker.image = 'sided';
               } else {
@@ -556,7 +549,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
             }
             feature.style = style;
 
-            feature.label = l10n.displayName(entity.tags);
+            feature.label = l10n.displayName(way.tags);
           }
 
           feature.update(viewport);
@@ -599,8 +592,8 @@ export class PixiLayerOsm extends AbstractPixiLayer {
     };
 
 
-    const entities = data.vertices;
-    for (const [nodeID, node] of entities) {
+    const nodes = data.vertices;
+    for (const [nodeID, node] of nodes) {
       let parentContainer: PIXI.Container | null = null;
 
       if (styleZoom >= 16 && isInterestingVertex(node) ) {  // minor importance
@@ -688,8 +681,8 @@ export class PixiLayerOsm extends AbstractPixiLayer {
     const styles = context.systems.styles!;
     const pointsContainer = this.scene.groups.get('points')!;
 
-    const entities = data.points;
-    for (const [nodeID, node] of entities) {
+    const nodes = data.points;
+    for (const [nodeID, node] of nodes) {
       const featureID = `${this.layerID}-${nodeID}`;
       const version = node.v || 0;
       let feature = this.features.get(featureID) as PixiFeaturePoint | undefined;
@@ -763,8 +756,17 @@ export class PixiLayerOsm extends AbstractPixiLayer {
     const context = this.context;
     const graph = context.systems.editor!.staging.graph;
 
-    // Need to consider both lines and polygons for drawing our midpoints
-    const entities = new Map([...data.lines, ...data.polygons]);
+    // Need to gather both lines and polygons for drawing our midpoints
+    const ways = new Map<EntityID, OsmWay>();
+    for (const [entityID, entity] of data.lines) {
+      ways.set(entityID, entity);
+    }
+    for (const [entityID, entity] of data.polygons) {
+      if (entity.type === 'way') {
+        ways.set(entityID, entity as OsmWay);
+      }
+    }
+
 
     // Midpoints should be drawn above everything
     const mapUiLayer = this.scene.layers.get('map-ui') as PixiLayerMapUI;
@@ -782,7 +784,9 @@ export class PixiLayerOsm extends AbstractPixiLayer {
       marker: { color: 0xffffff, image: 'midpoint' }
     };
 
-    for (const [wayID, way] of entities) {
+    for (const [wayID, way] of ways) {
+      if (way.type !== 'way') continue;
+
       // Include only ways that are selected, or descended from a relation that is selected
       if (!related.descendantIDs.has(wayID)) continue;
 

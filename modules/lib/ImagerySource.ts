@@ -120,7 +120,7 @@ export class ImagerySource {
   /** Tile URL template (decrypted if the props template was encrypted) */
   protected _template: string;
   /** Pre-localized display strings keyed by locale code */
-  protected _strings: Map<string, ImagerySourceStrings>;
+  protected _strings: Map<LocaleCode, ImagerySourceStrings>;
   /** The locale code in effect when `_currStrings` was last computed */
   protected _currLocaleCode: LocaleCode | null;
   /** Display strings for the current locale (name, description) */
@@ -155,7 +155,7 @@ export class ImagerySource {
     this.safeid = utilSafeString(props.id);     // For use in classes, element ids, css selectors
     this._template = props.encrypted ? utilAesDecrypt(props.template!) : (props.template ?? '');
 
-    this._strings = new Map();    // Map<localeCode, Object> to store pre-localized text strings
+    this._strings = new Map<LocaleCode, ImagerySourceStrings>();  // pre-localized text strings
     this._currLocaleCode = null;  // The current locale code
     this._currStrings = {};       // The current strings
 

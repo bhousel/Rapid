@@ -173,7 +173,7 @@ export class AssetSystem extends AbstractSystem {
         return Promise.all(prerequisites.filter(Boolean));
       })
       .then(() => {
-        const hash = urlhash?.initialHashParams || new Map();
+        const hash = urlhash?.initialHashParams || new Map<string, string>();
 
         // Parse `assets` parameter: `key|value` pairs separated by commas
         // e.g. `assets=my_presets|https://example.com/presets.json,my_imagery|https://example.com/imagery.json`

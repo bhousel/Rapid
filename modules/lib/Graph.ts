@@ -82,9 +82,9 @@ export class Graph {
 
       this.base = other.base;     // Base cache is shared among the chain of Graphs
       this.local = {              // Local data is a clone of the predecessor data
-        entities:   new Map(other.local.entities),    // shallow clone
-        parentWays: new Map(other.local.parentWays),  // shallow clone
-        parentRels: new Map(other.local.parentRels)   // shallow clone
+        entities:    new Map<EntityID, OsmEntity | undefined>(other.local.entities),  // shallow clone
+        parentWays:  new Map<EntityID, Set<EntityID>>(other.local.parentWays),        // shallow clone
+        parentRels:  new Map<EntityID, Set<EntityID>>(other.local.parentRels)         // shallow clone
       };
 
     // A fresh Graph
@@ -96,14 +96,14 @@ export class Graph {
       this.previous = null;
 
       this.base = {
-        entities:   new Map(),
-        parentWays: new Map(),
-        parentRels: new Map()
+        entities:    new Map<EntityID, OsmEntity | undefined>(),
+        parentWays:  new Map<EntityID, Set<EntityID>>(),
+        parentRels:  new Map<EntityID, Set<EntityID>>()
       };
       this.local = {
-        entities:   new Map(),
-        parentWays: new Map(),
-        parentRels: new Map()
+        entities:    new Map<EntityID, OsmEntity | undefined>(),
+        parentWays:  new Map<EntityID, Set<EntityID>>(),
+        parentRels:  new Map<EntityID, Set<EntityID>>()
       };
     }
 
@@ -218,7 +218,7 @@ export class Graph {
   public parentWays(entity: OsmEntity): OsmWay[] {
     const base = this.base.parentWays;
     const local = this.local.parentWays;
-    const parentIDs = local.get(entity.id) ?? base.get(entity.id) ?? new Set();
+    const parentIDs = local.get(entity.id) ?? base.get(entity.id) ?? new Set<EntityID>();
     return Array.from(parentIDs).map(parentID => this.entity(parentID) as OsmWay);
   }
 
@@ -233,7 +233,7 @@ export class Graph {
   public parentRelations(entity: OsmEntity): OsmRelation[] {
     const base = this.base.parentRels;
     const local = this.local.parentRels;
-    const parentIDs = local.get(entity.id) ?? base.get(entity.id) ?? new Set();
+    const parentIDs = local.get(entity.id) ?? base.get(entity.id) ?? new Set<EntityID>();
     return Array.from(parentIDs).map(parentID => this.entity(parentID) as OsmRelation);
   }
 

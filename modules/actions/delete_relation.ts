@@ -32,7 +32,7 @@ export function actionDeleteRelation(relationID: EntityID, doDeleteDegenerate: b
     }
 
     // remove child members from this relation
-    const memberIDs = new Set(relation.members.map(m => m.id));
+    const memberIDs = new Set<EntityID>(relation.members.map(m => m.id));
     relation = relation.update({ members: [] });
     graph.replace(relation);
 

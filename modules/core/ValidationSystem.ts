@@ -94,17 +94,17 @@ export class ValidationSystem extends AbstractSystem {
   public constructor(context: Context) {
     super(context);
     this.id = 'validator';
-    this.requiredDependencies = new Set(['editor', 'l10n', 'scheduler', 'schema', 'spatial']);
-    this.optionalDependencies = new Set(['map', 'storage', 'ui', 'urlhash']);
+    this.requiredDependencies = new Set<SystemID>(['editor', 'l10n', 'scheduler', 'schema', 'spatial']);
+    this.optionalDependencies = new Set<SystemID>(['map', 'storage', 'ui', 'urlhash']);
 
-    this._validators = new Map();
+    this._validators = new Map<ValidatorID, ValidatorFunction>();
     this._base = new ValidationCache('base');
     this._head = new ValidationCache('head');
 
-    this._disabledValidatorIDs = new Set();
-    this._ignoredIssueIDs = new Set();
-    this._resolvedIssueIDs = new Set();
-    this._completeDiff = new Map();
+    this._disabledValidatorIDs = new Set<ValidatorID>();
+    this._ignoredIssueIDs = new Set<IssueID>();
+    this._resolvedIssueIDs = new Set<IssueID>();
+    this._completeDiff = new Map<EntityID, OsmEntity | undefined>();
     this._deferredST = new Set();
     this._errorOverrides = [];
     this._warningOverrides = [];
@@ -166,14 +166,14 @@ export class ValidationSystem extends AbstractSystem {
         //  `validationError=disconnected_way/highway`
         //  `validationError=crossing_ways/bridge*`
         //  `validationError=crossing_ways/bridge*,crossing_ways/tunnel*`
-        const hash = urlhash?.initialHashParams || new Map();
+        const hash = urlhash?.initialHashParams ?? new Map<string, string>();
         this._errorOverrides = this._parseHashParam(hash.get('validationError'));
         this._warningOverrides = this._parseHashParam(hash.get('validationWarning'));
         this._disableOverrides = this._parseHashParam(hash.get('validationDisable'));
 
         const disabledRules = storage?.getItem('validate-disabledRules') ?? '';
         const validatorIDs = utilExtractValues(disabledRules).filter(Boolean);
-        this._disabledValidatorIDs = new Set(validatorIDs);
+        this._disabledValidatorIDs = new Set<ValidatorID>(validatorIDs);
 
         // Setup event handlers..
         // When to run validation:
@@ -216,7 +216,8 @@ export class ValidationSystem extends AbstractSystem {
     this._resolvedIssueIDs.clear();
     this._base = new ValidationCache('base');
     this._head = new ValidationCache('head');
-    this._completeDiff = new Map();
+    this._completeDiff.clear();
+
     return Promise.resolve();
   }
 
@@ -468,7 +469,7 @@ export class ValidationSystem extends AbstractSystem {
     ];
 
     const allIssues = this.getIssues(options);
-    const forEntityIDs = new Set(entityIDs);
+    const forEntityIDs = new Set<EntityID>(entityIDs);
 
     return allIssues
       .filter(issue => (issue.entityIds ?? []).some(entityID => forEntityIDs.has(entityID)))
@@ -544,7 +545,7 @@ export class ValidationSystem extends AbstractSystem {
    * @param validatorID - Complete set of validatorIDs that should be disabled
    */
   public disableValidators(validatorID: ValidatorID[] = []): void {
-    this._disabledValidatorIDs = new Set(validatorID);
+    this._disabledValidatorIDs = new Set<ValidatorID>(validatorID);
 
     const storage = this.context.systems.storage;
     storage?.setItem('validate-disabledRules', [...this._disabledValidatorIDs].join(','));
@@ -610,7 +611,7 @@ export class ValidationSystem extends AbstractSystem {
     this._validationPromise = this._validateEntitiesAsync(this._head, entityIDs)
       .then(() => this._updateResolvedIssues(entityIDs))
       .then(() => this.emit('validated'))
-      .catch((e: Error) => console.error(e))  // eslint-disable-line
+      .catch(e => console.error(e))  // eslint-disable-line
       .then(() => {
         this._validationPromise = null;
 

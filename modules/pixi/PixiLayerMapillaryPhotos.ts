@@ -65,14 +65,6 @@ export class PixiLayerMapillaryPhotos extends AbstractPixiLayer {
 
 
   /**
-   * Every Layer should have a reset function to replace any Pixi objects and internal state.
-   */
-  public reset() {
-    super.reset();
-  }
-
-
-  /**
    * Called whenever the viewer's compass bearing has changed (user pans around)
    * @param bearing - the new bearing value in degrees
    */
@@ -98,20 +90,13 @@ export class PixiLayerMapillaryPhotos extends AbstractPixiLayer {
    */
   protected _dirtyCurrentPhoto(): void {
     const context = this.context;
-    const gfx = context.systems.gfx!;
     const photos = context.systems.photos;
 
     const currPhotoID = photos?.currPhotoID;
     if (!currPhotoID) return;  // shouldn't happen, the user is zooming/panning an image
 
-    // Dirty the feature(s) for this image so they will be redrawn.
-    const featureIDs = this._dataHasFeature.get(currPhotoID) ?? new Set();
-    for (const featureID of featureIDs) {
-      const feature = this.features.get(featureID) as any;
-      if (!feature) continue;
-      feature._styleDirty = true;
-    }
-    gfx.immediateRedraw();
+    this.dirtyData(currPhotoID);
+    this.gfx.immediateRedraw();
   }
 
 
@@ -144,16 +129,14 @@ export class PixiLayerMapillaryPhotos extends AbstractPixiLayer {
     this._enabled = val;
 
     const context = this.context;
-    const gfx = context.systems.gfx!;
     const mapillary = context.services.mapillary;
     if (val && mapillary) {
       mapillary.startAsync()
-        .then(() => gfx.immediateRedraw());
+        .then(() => this.gfx.immediateRedraw());
     }
   }
 
 
-  /**
   /**
    * Filters the photo markers by the current date range, username, and photo-type settings.
    * @param markers - all markers

@@ -44,6 +44,7 @@ const sharpenMatrix = [
  * - `isMinimap` - set this to `true` if this is a minimap background layer.
  */
 export class PixiLayerBackgroundTiles extends AbstractPixiLayer {
+
   /** Whether this is a minimap background layer */
   public isMinimap: boolean;
   /** Filter settings for brightness/contrast/saturation/sharpness */
@@ -56,9 +57,10 @@ export class PixiLayerBackgroundTiles extends AbstractPixiLayer {
   /** Active tile collections per imagery source, keyed by ImagerySourceID then TileID */
   protected _tileMaps: Map<ImagerySourceID, Map<TileID, CachedTile>>;
   /** URLs of tiles that have failed to load (to avoid retrying them) */
-  protected _failed: Set<string>;
+  protected _failedURLs: Set<string>;
   /** Tiler used to compute which tiles cover the current viewport */
   protected _tiler: Tiler;
+
 
   /**
    * @constructor
@@ -80,8 +82,8 @@ export class PixiLayerBackgroundTiles extends AbstractPixiLayer {
       sharpness: 1,
     };
 
-    this._tileMaps = new Map();    // Map<ImagerySourceID, Map<TileID, Tile>>
-    this._failed = new Set();      // Set<failed tileURLs>
+    this._tileMaps = new Map<ImagerySourceID, Map<TileID, CachedTile>>();
+    this._failedURLs = new Set<string>();
     this._tiler = new Tiler();
   }
 
@@ -98,7 +100,7 @@ export class PixiLayerBackgroundTiles extends AbstractPixiLayer {
 
     this.destroyAll();
     this._tileMaps.clear();
-    this._failed.clear();
+    this._failedURLs.clear();
   }
 
 
@@ -241,7 +243,7 @@ export class PixiLayerBackgroundTiles extends AbstractPixiLayer {
         }
 
         const url = source.url(tile.xyz);
-        if (!url || this._failed.has(url)) {
+        if (!url || this._failedURLs.has(url)) {
           hasHoles = true;   // url invalid or has failed in the past
         } else {
           // Create a CachedTile that extends the base tile with our extra properties
@@ -286,7 +288,7 @@ export class PixiLayerBackgroundTiles extends AbstractPixiLayer {
         })
         .then(blob => createImageBitmap(blob))
         .then(bitmap => {
-          this._failed.delete(tile.url);
+          this._failedURLs.delete(tile.url);
           if (!tile.sprite) {   // tile was destroyed while we were loading
             bitmap.close();
             return;
@@ -299,7 +301,7 @@ export class PixiLayerBackgroundTiles extends AbstractPixiLayer {
           this.gfx.deferredRedraw();
         })
         .catch(() => {
-          this._failed.add(tile.url);
+          this._failedURLs.add(tile.url);
           this.gfx.deferredRedraw();
         });
     }

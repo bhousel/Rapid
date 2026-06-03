@@ -6,6 +6,7 @@ import RBush from 'rbush';
 import { getLineSegments, getDebugBBox, lineToPoly } from './helpers.ts';
 
 import type { AbstractPixiFeature } from './AbstractPixiFeature.ts';
+import type { BBox } from 'rbush';
 import type { LabelProps, TextLabelProps, RopeLabelProps } from './PixiFeatureLabel.ts';
 import type { PixiFeatureLine } from './PixiFeatureLine.ts';
 import type { PixiFeaturePoint } from './PixiFeaturePoint.ts';
@@ -48,17 +49,13 @@ interface MeasuredLabel {
 }
 
 /** Box used in RBush for collision detection */
-interface LabelBox {
+interface LabelBox extends BBox {
   type: 'label' | 'avoid' | 'debug';
   id: BoxID;
   featureID: FeatureID;
   labelID?: LabelID | null;
   objectID?: string | null;
   tint?: number;
-  minX: number;
-  minY: number;
-  maxX: number;
-  maxY: number;
 }
 
 
@@ -141,29 +138,29 @@ export class PixiLayerLabels extends AbstractPixiLayer {
     this.labelContainer = null;
 
     // RBush spatial indexes
-    this._labelRBush = new RBush();  // label placement
-    this._debugRBush = new RBush();  // debug sprites
+    this._labelRBush = new RBush<LabelBox>();  // label placement
+    this._debugRBush = new RBush<LabelBox>();  // debug sprites
 
     // Keep track of the labelable features we have processed
-    this._avoided = new Set();   // Set<FeatureID>
-    this._labeled = new Set();   // Set<FeatureID>
+    this._avoided = new Set<FeatureID>();
+    this._labeled = new Set<FeatureID>();
 
     // Label placeholders — store the placement props for every possible label.
     // Each one is materialized into a `PixiFeatureLabel` lazily on first visibility
     // (see `renderLabels()`), to avoid creating display objects for the many labels
     // that are placed far off-screen.
-    this._placeholders = new Map();    // Map<LabelID, LabelProps>
+    this._placeholders = new Map<LabelID, LabelProps>();
 
     // Pixi Display Objects for debug bbox sprites.
     // (Label display objects live on their owning `PixiFeatureLabel` features.)
-    this._debugSprites = new Map();   // Map<objectID, PIXI.Sprite>
+    this._debugSprites = new Map<string, PIXI.Sprite>();
 
     // Boxes are objects for working with RBush.
-    this._boxes = new Map();         // Map<BoxID, LabelBox>
-    this._featureBoxes = new Map();  // Map<FeatureID, Set<BoxID>>
+    this._boxes = new Map<BoxID, LabelBox>();
+    this._featureBoxes = new Map<FeatureID, Set<BoxID>>();
 
-    // Keep track of textures that we've allocated
-    this._textureIDs = new Map();  // Map<string, TextureID>
+    // Mapping of a text string (e.g. "Main Street") to generated texture
+    this._textureIDs = new Map<string, TextureID>();
 
     // Deferred label rasterization queue (see measureLabel / resolveLabelTexture).
     this._pendingRasters = new Map();   // Map<TextureID, { str, style }>
@@ -672,7 +669,7 @@ export class PixiLayerLabels extends AbstractPixiLayer {
 
     let featureBoxIDs = this._featureBoxes.get(featureID);
     if (!featureBoxIDs) {
-      featureBoxIDs = new Set();
+      featureBoxIDs = new Set<BoxID>();
       this._featureBoxes.set(featureID, featureBoxIDs);
     }
     featureBoxIDs.add(boxID);

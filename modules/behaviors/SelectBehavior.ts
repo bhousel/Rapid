@@ -5,6 +5,7 @@ import { actionAddMidpoint } from '../actions/add_midpoint.ts';
 import { projWorldToWgs84, vecLength, vecProject } from '@rapid-sdk/math';
 import { utilDetect } from '../util/detect.ts';
 
+import type { AbstractData } from '../data/AbstractData.ts';
 import type { Context } from '../Context.ts';
 import type { EventData } from './AbstractBehavior.ts';
 import type { FederatedPointerEvent } from 'pixi.js';
@@ -38,6 +39,7 @@ export class SelectBehavior extends AbstractBehavior {
   public lastSpace: EventData | null;
   /** EventData for the most recent successful click event */
   public lastClick: EventData | null;
+
   /** Set of entity IDs for multi-selection (Shift+click) */
   protected _multiSelection: Set<EntityID>;
   /** Whether spacebar clicking is temporarily disabled */
@@ -56,7 +58,7 @@ export class SelectBehavior extends AbstractBehavior {
     super(context);
     this.id = 'select';
 
-    this._multiSelection = new Set();
+    this._multiSelection = new Set<EntityID>();
     this._spaceClickDisabled = false;
     this._showsMenu = false;
     this._showsMapRouletteMenu = false;
@@ -165,7 +167,7 @@ export class SelectBehavior extends AbstractBehavior {
     } else if (!this._spaceClickDisabled && [' ', 'Spacebar'].includes(e.key)) {
       // ignore spacebar events during text input
       const activeNode = document.activeElement;
-      if (activeNode && new Set(['INPUT', 'TEXTAREA']).has(activeNode.nodeName)) return;
+      if (activeNode && new Set<string>(['INPUT', 'TEXTAREA']).has(activeNode.nodeName)) return;
       e.preventDefault();
       e.stopPropagation();
       this._spacebar();
@@ -385,7 +387,7 @@ export class SelectBehavior extends AbstractBehavior {
       data instanceof GeoJSONData ||  // Clicked Custom Data (e.g. gpx track)..
       data instanceof MarkerData      // Clicked a MarkerData (OSM Note, KeepRight, Osmose, Maproulette)..
     ) {
-      const selection = new Map().set(dataID, data);
+      const selection = new Map<DataID, AbstractData>().set(dataID!, data);
       context.enter('select', { selection: selection });
       return;
 

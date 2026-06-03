@@ -54,8 +54,8 @@ export class Map3dSystem extends AbstractSystem {
     super(context);
     this.id = 'map3d';
     this.autoStart = false;
-    this.requiredDependencies = new Set(['editor', 'gfx', 'map', 'ui']);
-    this.optionalDependencies = new Set(['l10n', 'styles', 'urlhash', 'scheduler']);
+    this.requiredDependencies = new Set<SystemID>(['editor', 'gfx', 'map', 'ui']);
+    this.optionalDependencies = new Set<SystemID>(['l10n', 'styles', 'urlhash', 'scheduler']);
 
     // Ensure methods used as callbacks always have `this` bound correctly.
     this._hashChanged = this._hashChanged.bind(this);

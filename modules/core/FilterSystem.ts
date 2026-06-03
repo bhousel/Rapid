@@ -81,13 +81,13 @@ export class FilterSystem extends AbstractSystem {
   public constructor(context: Context) {
     super(context);
     this.id = 'filters';
-    this.requiredDependencies = new Set(['editor']);
-    this.optionalDependencies = new Set(['gfx', 'storage', 'urlhash']);
+    this.requiredDependencies = new Set<SystemID>(['editor']);
+    this.optionalDependencies = new Set<SystemID>(['gfx', 'storage', 'urlhash']);
 
-    this._filters = new Map();        // Map<FilterID, Filter>
-    this._hidden = new Set();         // Set<FilterID> to hide
-    this._forceVisible = new Set();   // Set<EntityIDs> to show
-    this._cache = {};                 // Cache of entity.key to matched FilterIDs
+    this._filters = new Map<FilterID, Filter>();
+    this._hidden = new Set<FilterID>();
+    this._forceVisible = new Set<EntityID>();
+    this._cache = {};
 
     // Ensure methods used as callbacks always have `this` bound correctly.
     this._hashChanged = this._hashChanged.bind(this);
@@ -360,7 +360,7 @@ export class FilterSystem extends AbstractSystem {
    * @param geometry - geometry of the Entity ('point', 'line', 'vertex', 'area', 'relation')
    * @return A Set containing the matched filterIDs
    */
-  public getMatches(entity: OsmEntity, graph: Graph, geometry: GeometryType): Set<string> {
+  public getMatches(entity: OsmEntity, graph: Graph, geometry: GeometryType): Set<FilterID> {
     // skip - vertexes are hidden based on whatever filters their parent ways have matched
     if (geometry === 'vertex') return new Set();
     // skip - most relations don't have a geometry worth checking
@@ -388,7 +388,7 @@ export class FilterSystem extends AbstractSystem {
       }
     }
 
-    let matches = new Set<string>();
+    let matches = new Set<FilterID>();
     for (const [filterID, filter] of this._filters) {
       if (filterID === 'others') {     // 'others' matches last
         if (matches.size) continue;    // skip if we matched something better already
@@ -612,7 +612,7 @@ export class FilterSystem extends AbstractSystem {
    * @param entityIDs - Array of Entity ids
    */
   public forceVisible(entityIDs: EntityID[]): void {
-    this._forceVisible = new Set();
+    this._forceVisible = new Set<EntityID>();
 
     const editor = this.context.systems.editor;
     if (!editor) return;
@@ -674,7 +674,7 @@ export class FilterSystem extends AbstractSystem {
     const urlhash = context.systems.urlhash;
 
     // gather hidden
-    this._hidden = new Set();
+    this._hidden = new Set<FilterID>();
     for (const [filterID, filter] of this._filters) {
       if (!filter.enabled) {
         this._hidden.add(filterID);

@@ -52,20 +52,11 @@ export class PixiLayerOsmose extends AbstractPixiLayer {
     this._enabled = val;
 
     const context = this.context;
-    const gfx = context.systems.gfx!;
     const osmose = context.services.osmose;
     if (val && osmose) {
       osmose.startAsync()
-        .then(() => gfx.immediateRedraw());
+        .then(() => this.gfx.immediateRedraw());
     }
-  }
-
-
-  /**
-   * Every Layer should have a reset function to replace any Pixi objects and internal state.
-   */
-  public reset() {
-    super.reset();
   }
 
 

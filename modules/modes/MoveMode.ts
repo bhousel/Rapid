@@ -4,7 +4,7 @@ import { projWgs84ToWorld, vecSubtract } from '@rapid-sdk/math';
 
 import type { Context } from '../Context.ts';
 import type { MoveCache } from '../actions/move.ts';
-import type { OsmNode } from '../data/OsmNode.ts';
+import type { OsmEntity, OsmNode } from '../data/types.ts';
 import type { Vec2 } from '@rapid-sdk/math';
 
 
@@ -68,7 +68,7 @@ export class MoveMode extends AbstractMode {
 
     // Gather valid entities and entityIDs from selection.
     // For this mode, keep only the OSM data.
-    this._selectedData = new Map();
+    this._selectedData = new Map<EntityID, OsmEntity>();
 
     for (const entityID of entityIDs) {
       const entity = graph.hasEntity(entityID);

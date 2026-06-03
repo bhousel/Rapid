@@ -152,22 +152,22 @@ export class StyleSystem extends AbstractSystem {
   public constructor(context: Context) {
     super(context);
     this.id = 'styles';
-    this.optionalDependencies = new Set(['assets', 'gfx', 'schema', 'urlhash']);
+    this.optionalDependencies = new Set<SystemID>(['assets', 'gfx', 'schema', 'urlhash']);
 
-    this._scopes = new Map();
+    this._scopes = new Map<ScopeID, StyleScope>();
 
-    this._defaultAssetIDs = new Set(['rapid_style']);
-    this._loadedAssetIDs = new Map();
+    this._defaultAssetIDs = new Set<AssetID>(['rapid_style']);
+    this._loadedAssetIDs = new Map<AssetID, string>();
     this._requestedAssetIDs = null;
 
-    this.styleGroups = new Set([
+    this.styleGroups = new Set<StyleGroup>([
       'base', 'fill', 'casing', 'stroke', 'marker', 'icon',
-      'viewfield', 'lineMarker', 'sidedMarker', 'label'] as StyleGroup[]
+      'viewfield', 'lineMarker', 'sidedMarker', 'label']
     );
 
     // Pattern IDs - hardcoded list that must match the patterns loaded by PixiTextures.
     // (Maybe we will make this dynamic someday, but for now it stays in code.)
-    this.patternIDs = new Set([
+    this.patternIDs = new Set<string>([
       'bushes', 'cemetery', 'cemetery_buddhist', 'cemetery_christian', 'cemetery_jewish', 'cemetery_muslim',
       'construction', 'dots', 'farmland', 'farmyard', 'forest', 'forest_broadleaved', 'forest_leafless',
       'forest_needleleaved', 'grass', 'landfill', 'lines', 'orchard', 'pond', 'quarry', 'vineyard',
@@ -363,7 +363,7 @@ export class StyleSystem extends AbstractSystem {
       return;
     }
 
-    this._requestedAssetIDs = new Set();
+    this._requestedAssetIDs = new Set<AssetID>();
     for (const assetID of utilIterable(vals)) {
       if (!assetID) continue;
       if (assetID === 'default') {
@@ -506,7 +506,11 @@ export class StyleSystem extends AbstractSystem {
   public getScope(scopeID: ScopeID): StyleScope {
     let scope = this._scopes.get(scopeID);
     if (!scope) {
-      scope = { variables: new Map(), styles: new Map(), selectors: new Map() };
+      scope = {
+        variables:  new Map<VariableID, Variable>(),
+        styles:     new Map<StyleID, Style>(),
+        selectors:  new Map<StyleSelectorID, StyleSelector>()
+      };
       this._scopes.set(scopeID, scope);
     }
     return scope;

@@ -89,7 +89,7 @@ export function validateDuplicateSegments(context: Context): ValidatorFunction {
 
       if (node1.loc !== node2.loc) {
         const parentWays1 = graph.parentWays(node1);
-        const parentWays2 = new Set(graph.parentWays(node2));
+        const parentWays2 = new Set<OsmWay>(graph.parentWays(node2));
         const sharedWays = parentWays1.filter(parentWay => parentWays2.has(parentWay));
 
         // Now, we want to filter out any shared ways that aren't routable.

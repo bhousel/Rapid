@@ -19,7 +19,7 @@ const substitutions: Record<string, string> = {
   'pt':    'pt-PT'
 };
 
-const skipLanguages = new Set([
+const skipLanguages = new Set<string>([
   'ase',   // American Sign Language
   'mis',   // "not yet assigned"
   'mul',   // "multiple languages"
@@ -41,12 +41,14 @@ export interface LangInfo {
 /**
  * Returns all of the available languages, with info from CLDR
  * about their native language name and script.
+ * ```
  *  {
  *    "en":      { "nativeName": "English"},
  *    "haw":     { "nativeName": "ʻŌlelo Hawaiʻi"},
  *    "kk-Arab": { "base": "kk", "script": "Arab", "nativeName": "قازاق ءتىلى (توتە)"},
  *    …
  *  }
+ * ```
  * @return Language code to language info
  */
 export async function langNamesInNativeLang(): Promise<Map<LangCode, LangInfo>> {
@@ -113,6 +115,7 @@ export async function langNamesInNativeLang(): Promise<Map<LangCode, LangInfo>> 
 /**
  * Returns the language names for the given language code.
  * For example, if passed 'en':
+ * ```
  *  {
  *    "en":    "English",
  *    "en-GB": "British English",
@@ -120,6 +123,7 @@ export async function langNamesInNativeLang(): Promise<Map<LangCode, LangInfo>> 
  *    "kk":    "Kurdish"
  *    …
  *  }
+ * ```
  * @param code - the language code to lookup
  * @return Language code to language names for the given language code
  */
@@ -164,12 +168,14 @@ export async function languageNamesInLanguageOf(code: LangCode): Promise<Map<Lan
 /**
  * Returns the script names for the given language code.
  * For example, if passed 'en':
+ * ```
  *  {
  *    "Arab":  "Arabic",
  *    "Hant":  "Traditional Han",
  *    "Latn":  "Latin",
  *    …
  *  }
+ * ```
  * @param code - the language code to lookup
  * @return Script codes to script names for the given language code
  */

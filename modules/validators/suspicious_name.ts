@@ -216,7 +216,7 @@ export function validateSuspiciousName(context: Context): ValidatorFunction {
     const hasWikidata = (!!tags.wikidata || !!tags['brand:wikidata'] || !!tags['operator:wikidata']);
     if (hasWikidata) return result;
 
-    const notNames = new Set((tags['not:name'] ?? '').split(';').map(s => s.trim()).filter(Boolean));
+    const notNames = new Set<string>((tags['not:name'] ?? '').split(';').map(s => s.trim()).filter(Boolean));
 
     for (const [k, v] of Object.entries(tags)) {
       if (!v) continue;   // no value

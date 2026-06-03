@@ -275,7 +275,7 @@ export class KartaviewService extends AbstractSystem {
     spatial.clearCache('kartaview-sequences');
 
     this._cache = {
-      nextPage:  new Map(),   // Map<TileID, Number>
+      nextPage:  new Map<string, number>(),  // keyed by tileID,page
       lastv:     null
     };
 

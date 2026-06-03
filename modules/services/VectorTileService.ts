@@ -1,33 +1,29 @@
+import * as Polyclip from 'polyclip-ts';
 import { AbstractSystem } from '../core/AbstractSystem.ts';
 import { Extent, Tiler, vecEqual } from '@rapid-sdk/math';
 import { GeoJSONData } from '../data/GeoJSONData.ts';
+// import geojsonRewind from '@mapbox/geojson-rewind';
 import { PMTiles } from 'pmtiles';
+import Protobuf from 'pbf';
+import RBush from 'rbush';
 import stringify from 'fast-json-stable-stringify';
 import { utilHashcode } from '@rapid-sdk/util';
 import { VectorTile } from '@mapbox/vector-tile';
-// import geojsonRewind from '@mapbox/geojson-rewind';
-import * as Polyclip from 'polyclip-ts';
-import Protobuf from 'pbf';
-import RBush from 'rbush';
 
-import type { Tile } from '@rapid-sdk/math';
 import type { Context } from '../Context.ts';
+import type { BBox } from 'rbush';
 import type { MVTFeatureResult } from '../core/NetworkSystem.worker.ts';
+import type { Tile } from '@rapid-sdk/math';
 
 
 /** RBush box with associated data */
-interface RBushBox {
-  /** Minimum X coordinate (longitude) of the bounding box */
-  minX: number;
-  /** Minimum Y coordinate (latitude) of the bounding box */
-  minY: number;
-  /** Maximum X coordinate (longitude) of the bounding box */
-  maxX: number;
-  /** Maximum Y coordinate (latitude) of the bounding box */
-  maxY: number;
+interface RBushBox extends BBox {
   /** The GeoJSONData feature contained within this bounding box */
   data: GeoJSONData;
 }
+
+/** Convenience type for string identifiers for tile edges */
+type EdgeID = string;
 
 /** Per-zoom cache for vector tile features */
 interface VTZoomCache {
@@ -36,9 +32,9 @@ interface VTZoomCache {
   /** Map of RBush bounding boxes keyed by feature ID */
   boxes: Map<string, RBushBox>;
   /** Queue of pending merge operations: edge ID → property hash → set of feature IDs */
-  toMerge: Map<string, Map<string, Set<string>>>;
+  toMerge: Map<EdgeID, Map<string, Set<string>>>;
   /** Set of edge IDs that have already been merged */
-  didMerge: Set<string>;
+  didMerge: Set<EdgeID>;
   /** RBush spatial index for efficient geographic querying of features at this zoom */
   rbush: RBush<RBushBox>;
 }
@@ -59,7 +55,7 @@ interface VTSource {
    */
   inflightPMTiles: Map<string, AbortController>;
   /** Map of loaded tile IDs to their tile metadata */
-  loaded: Map<string, Tile>;
+  loaded: Map<TileID, Tile>;
   /** Map of zoom levels to their per-zoom feature caches */
   zoomCache: Map<number, VTZoomCache>;
   /** Viewport version from the last data fetch, used to skip redundant loads */
@@ -103,7 +99,7 @@ export class VectorTileService extends AbstractSystem {
     this.optionalDependencies = new Set<SystemID>(['gfx']);
 
     // Sources are identified by their URL template..
-    this._sources = new Map();
+    this._sources = new Map<string, VTSource>();
     this._tiler = (new Tiler().tileSize(512) as Tiler).margin(1) as Tiler;
   }
 
@@ -256,13 +252,13 @@ export class VectorTileService extends AbstractSystem {
       const filename = url.pathname.split('/').at(-1);
 
       source = {
-        id:                 utilHashcode(template).toString(),
-        displayName:        hostname,
-        template:           template,
-        inflightPMTiles:    new Map(),   // Map<TileID, AbortController> (PMTiles only)
-        loaded:             new Map(),   // Map<TileID, Tile>
-        zoomCache:          new Map(),   // Map<number, Object zoomCache>
-        lastv:              null         // viewport version last time we fetched data
+        id:                utilHashcode(template).toString(),
+        displayName:       hostname,
+        template:          template,
+        inflightPMTiles:   new Map<TileID, AbortController>(),   // for PMTile sources only
+        loaded:            new Map<TileID, Tile>(),
+        zoomCache:         new Map<number, VTZoomCache>(),
+        lastv:             null         // viewport version last time we fetched data
       };
 
       this._sources.set(template, source);
@@ -298,11 +294,11 @@ export class VectorTileService extends AbstractSystem {
 
     if (!cache) {
       cache = {
-        features: new Map(),   // Map<FeatureID, Object>
-        boxes:    new Map(),   // Map<FeatureID, RBush box>
-        toMerge:  new Map(),   // Map<EdgeID, Map<prophash, Set<featureIDs>>>
-        didMerge: new Set(),   // Set<EdgeID>
-        rbush:    new RBush()
+        features: new Map<string, GeoJSONData>(),
+        boxes:    new Map<string, RBushBox>(),
+        toMerge:  new Map<EdgeID, Map<string, Set<string>>>(),  // Map<EdgeID, Map<prophash, Set<featureIDs>>>
+        didMerge: new Set<EdgeID>(),
+        rbush:    new RBush<RBushBox>()
       };
 
       source.zoomCache.set(zoom, cache);
@@ -500,17 +496,17 @@ export class VectorTileService extends AbstractSystem {
    * @param  prophash
    * @param  edgeID
    */
-  protected _queueMerge(cache: VTZoomCache, featureID: string, prophash: string, edgeID: string): void {
+  protected _queueMerge(cache: VTZoomCache, featureID: string, prophash: string, edgeID: EdgeID): void {
     if (cache.didMerge.has(edgeID)) return;  // we merged this edge already
 
     let mergemap = cache.toMerge.get(edgeID);
     if (!mergemap) {
-      mergemap = new Map();    // Map<prophash, Set<featureIDs>>
+      mergemap = new Map<string, Set<string>>();    // Map<prophash, Set<featureIDs>>
       cache.toMerge.set(edgeID, mergemap);
     }
     let featureIDs = mergemap.get(prophash);
     if (!featureIDs) {
-      featureIDs = new Set();
+      featureIDs = new Set<string>();
       mergemap.set(prophash, featureIDs);
     }
     featureIDs.add(featureID);

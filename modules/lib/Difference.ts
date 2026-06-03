@@ -76,16 +76,16 @@ export class Difference {
   public constructor(base: Graph | null, head: Graph) {
     this._base = base;
     this._head = head;
-    this._changes = new Map();
-    this.didChange = {};
+    this._changes = new Map<EntityID, DifferenceChange>();
     this._summary = null;
     this._complete = null;
+    this.didChange = {};
 
     if (!head) return;           // no head graph, no difference
     if (base === head) return;   // same Graph, no difference
 
     // Gather affected ids
-    let ids = new Set(head.local.entities.keys());
+    let ids = new Set<EntityID>(head.local.entities.keys());
     if (base) {                               // Note:  Maps are "Set-like"
       ids = ids.union(base.local.entities);   // keys() will be invoked automatially
     }
@@ -276,16 +276,16 @@ export class Difference {
       result.set(entityID, h);
 
       if (entity?.type === 'way') {
-        const headNodes = new Set((h as OsmWay | undefined)?.nodes);
-        const baseNodes = new Set((b as OsmWay | undefined)?.nodes);
+        const headNodes = new Set<EntityID>((h as OsmWay | undefined)?.nodes);
+        const baseNodes = new Set<EntityID>((b as OsmWay | undefined)?.nodes);
         for (const nodeID of headNodes.union(baseNodes)) {
           result.set(nodeID as EntityID, head.hasEntity(nodeID as EntityID));
         }
       }
 
       if (entity?.type === 'relation' && (entity as OsmRelation).isMultipolygon()) {
-        const headMembers = new Set((h as OsmRelation | undefined)?.members?.map((m: OsmRelationMember) => m.id));
-        const baseMembers = new Set((b as OsmRelation | undefined)?.members?.map((m: OsmRelationMember) => m.id));
+        const headMembers = new Set<EntityID>((h as OsmRelation | undefined)?.members?.map((m: OsmRelationMember) => m.id));
+        const baseMembers = new Set<EntityID>((b as OsmRelation | undefined)?.members?.map((m: OsmRelationMember) => m.id));
         for (const memberID of headMembers.union(baseMembers)) {
           const member = head.hasEntity(memberID as EntityID);
           if (!member) continue;   // not downloaded

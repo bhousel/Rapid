@@ -53,7 +53,7 @@ const keys_id = new Map();             // Index By Key     Map<key, stringID>
 const keys_rapid = new Map();          // Index By Key     Map<key, stringID>
 const sources_id = new Map();          // Source strings   Map<stringID, attributes object>
 const sources_rapid = new Map();       // Source strings   Map<stringID, attributes object>
-const same = new Set();                // Set<key>   // where source strings are the same in both iD and Rapid
+const same = new Set<string>();        // Set<key>   // where source strings are the same in both iD and Rapid
 const translations_id = new Map();     // Translated strings  Map<languageID, Map<stringID, attributes object>>
 const translations_rapid = new Map();  // Translated_strings  Map<languageID, Map<stringID, attributes object>>
 

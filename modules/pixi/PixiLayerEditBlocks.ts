@@ -43,14 +43,6 @@ export class PixiLayerEditBlocks extends AbstractPixiLayer {
 
 
   /**
-   * Every Layer should have a reset function to replace any Pixi objects and internal state.
-   */
-  public reset(): void {
-    super.reset();
-  }
-
-
-  /**
    * Render any edit blocking polygons that are visible in the viewport
    * @param frame - Integer frame being rendered
    * @param viewport - Pixi viewport to use for rendering
@@ -97,7 +89,6 @@ export class PixiLayerEditBlocks extends AbstractPixiLayer {
   }
 
 
-  /**
   /**
    * Renders the edit-block overlay polygons for this frame.
    * @param frame - Integer frame being rendered

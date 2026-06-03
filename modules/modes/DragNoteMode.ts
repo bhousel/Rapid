@@ -175,7 +175,7 @@ export class DragNoteMode extends AbstractMode {
    */
   protected _end(): void {
     if (this.dragNote) {
-      const selection = new Map().set(this.dragNote.id, this.dragNote);
+      const selection = new Map<DataID, MarkerData>().set(this.dragNote.id, this.dragNote);
       this.context.enter('select', { selection: selection });
     } else {
       this.context.enter('browse');

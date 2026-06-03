@@ -6,6 +6,7 @@ import { utilIterable } from '../util/iterable.ts';
 
 import type { Context } from '../Context.ts';
 import type { D3Selection } from 'd3-selection';
+import type { MarkerData } from '../data/MarkerData.ts';
 import type { OneOrMore } from '../util/iterable.ts';
 
 
@@ -23,7 +24,7 @@ export type DateFilter = 'fromDate' | 'toDate';
  * - `currPhotoID`           Current PhotoID
  * - `currPhotoLayerID`      Current Photo LayerID
  * - `currDetectionID`       Current DetectionID
- * - `currLayerID`  Current Detection LayerID
+ * - `currLayerID`           Current Detection LayerID
  *
  * Events available:
  * -  `photochange`   Fires on any change in selected photo, detection, or filtering options
@@ -56,9 +57,9 @@ export class PhotoSystem extends AbstractSystem {
   public constructor(context: Context) {
     super(context);
     this.id = 'photos';
-    this.optionalDependencies = new Set(['gfx', 'map', 'urlhash', 'ui']);
+    this.optionalDependencies = new Set<SystemID>(['gfx', 'map', 'urlhash', 'ui']);
 
-    this._filterPhotoTypes = new Set(this.photoTypes);
+    this._filterPhotoTypes = new Set<PhotoType>(this.photoTypes);
 
     // Ensure methods used as callbacks always have `this` bound correctly.
     this._hashChanged = this._hashChanged.bind(this);
@@ -511,7 +512,7 @@ export class PhotoSystem extends AbstractSystem {
       // Try to highlight any photos that show this detection,
       // And try to select a photo in the viewer that shows it.
       (service as any).selectDetectionAsync(detectionID)
-        .then((detection: any) => {
+        .then((detection: MarkerData) => {
           if (!detection) return;
           if (detection.id !== this._currDetectionID) return;  // exit if something else is now selected
 
@@ -519,13 +520,14 @@ export class PhotoSystem extends AbstractSystem {
           // but we haven't properly entered SelectMode yet.
           // This can happen if the detection arrived in the URL hash.
           if (!context.selectedData().has(detection.id)) {
-            const selection = new Map().set(detection.id, detection);
+            const selection = new Map<DetectionID, MarkerData>().set(detection.id, detection);
             context.enter('select', { selection: selection });
             return;  // exit to avoid infinite loop - entering select mode will bring us right back in here.
           }
 
           // Highlight any images that show this detection..
-          const highlightPhotoIDs = (detection.props.images ?? []).map((image: any) => image.id);
+          const images = (detection.props.images ?? []) as { id: string }[];
+          const highlightPhotoIDs = images.map(image => image.id);
           for (const photoID of highlightPhotoIDs) {
             scene?.setClass('highlightphoto', photoLayerID, photoID);
           }
@@ -534,19 +536,19 @@ export class PhotoSystem extends AbstractSystem {
           // - If the current photo already shows it, keep it selected
           // - Otherwise choose the "best" photo suggested by the detection
           // - Otherwise no selected photo.
-          let bestPhotoID;
-          if (this._currPhotoLayerID === photoLayerID && highlightPhotoIDs.includes(this._currPhotoID)) {
-            bestPhotoID = this._currPhotoID;
-          } else {
-            bestPhotoID = detection.props.bestImageID;
+          let bestPhotoID: string | null = null;
+          if (this._currPhotoID && this._currPhotoLayerID === photoLayerID && highlightPhotoIDs.includes(this._currPhotoID)) {
+            bestPhotoID = this._currPhotoID;   // curr photo shows it
+          } else if (detection.props?.bestImageID) {
+            bestPhotoID = detection.props?.bestImageID as string;
           }
 
           // If we are changing the selected photo to a new photo,
           // Try to adjust the map to show both the detection and the best photo (if any)
           // (note: make sure the detection actually has a location, see Rapid#1557)
-          if (detection.loc && (!this._currPhotoID || this._currPhotoID !== bestPhotoID)) {
+          if (bestPhotoID && detection.loc && (!this._currPhotoID || this._currPhotoID !== bestPhotoID)) {
             const extent = new Extent(detection.loc);
-            const bestPhoto = (service as any).getImage(bestPhotoID);
+            const bestPhoto = (service as any).getImage(bestPhotoID) as MarkerData;
             if (bestPhoto?.loc) {
               extent.extendSelf(bestPhoto.loc);
             }

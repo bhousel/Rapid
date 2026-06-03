@@ -92,7 +92,7 @@ export class DrawLineMode extends AbstractMode {
     this._insertIndex = undefined;
     this._editIndex = null;
     this._lastScreen = null;
-    this._snapshots = new Map();
+    this._snapshots = new Map<Graph, DrawLineSnapshot>();
 
     // Make sure the event handlers have `this` bound correctly
     this._cancel = this._cancel.bind(this);

@@ -32,7 +32,7 @@ export class WikidataService extends AbstractSystem {
     this.requiredDependencies = new Set<SystemID>(['network']);
     this.optionalDependencies = new Set<SystemID>(['l10n']);
 
-    this._cache = new Map();  // Map<qid, entitydata>
+    this._cache = new Map<string, Record<string, any>>();  // Map<qid, entitydata>
   }
 
 

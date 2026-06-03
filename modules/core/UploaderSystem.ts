@@ -107,8 +107,8 @@ export class UploaderSystem extends AbstractSystem {
   public constructor(context: Context) {
     super(context);
     this.id = 'uploader';
-    this.requiredDependencies = new Set(['editor', 'l10n']);
-    this.optionalDependencies = new Set(['schema']);
+    this.requiredDependencies = new Set<SystemID>(['editor', 'l10n']);
+    this.optionalDependencies = new Set<SystemID>(['schema']);
 
     this.changeset = null;    // uiCommit will create it
 
@@ -119,9 +119,9 @@ export class UploaderSystem extends AbstractSystem {
     // variables for conflict checking
     this._localGraph = null;
     this._remoteGraph = null;
-    this._toCheckIDs = new Set();
-    this._toLoadIDs = new Set();
-    this._loadedIDs = new Set();
+    this._toCheckIDs = new Set<EntityID>;
+    this._toLoadIDs = new Set<EntityID>;
+    this._loadedIDs = new Set<EntityID>;
     this._conflicts = [];
     this._errors = [];
 
@@ -221,9 +221,9 @@ export class UploaderSystem extends AbstractSystem {
     // reset variables
     this._localGraph = null;
     this._remoteGraph = null;
-    this._toCheckIDs = new Set();
-    this._toLoadIDs = new Set();
-    this._loadedIDs = new Set();
+    this._toCheckIDs = new Set<EntityID>;
+    this._toLoadIDs = new Set<EntityID>;
+    this._loadedIDs = new Set<EntityID>;
     this._conflicts = [];
     this._errors = [];
 
@@ -255,7 +255,7 @@ export class UploaderSystem extends AbstractSystem {
 
     // Gather entityIDs to check
     // We will load these from the OSM API into the `remoteGraph`
-    this._toCheckIDs = new Set();
+    this._toCheckIDs = new Set<EntityID>;
 
     for (const [entityID, item] of summary) {
       if (item.changeType === 'modified') {
@@ -270,8 +270,8 @@ export class UploaderSystem extends AbstractSystem {
       }
     }
 
-    this._toLoadIDs = new Set(this._toCheckIDs);
-    this._loadedIDs = new Set();
+    this._toLoadIDs = new Set<EntityID>(this._toCheckIDs);
+    this._loadedIDs = new Set<EntityID>;
 
     if (osm && this._toLoadIDs.size) {
       this.emit('progressChanged', this._loadedIDs.size, this._toCheckIDs.size);

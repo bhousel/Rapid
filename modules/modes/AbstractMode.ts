@@ -43,7 +43,7 @@ export class AbstractMode extends EventEmitter {
     this.context = context;
 
     this._active = false;
-    this._selectedData = new Map();
+    this._selectedData = new Map<DataID, AbstractData>();
     this.operations = [];
   }
 

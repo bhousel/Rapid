@@ -52,20 +52,11 @@ export class PixiLayerKeepRight extends AbstractPixiLayer {
     this._enabled = val;
 
     const context = this.context;
-    const gfx = context.systems.gfx!;
     const keepRight = context.services.keepright;
     if (val && keepRight) {
       keepRight.startAsync()
-        .then(() => gfx.immediateRedraw());
+        .then(() => this.gfx.immediateRedraw());
     }
-  }
-
-
-  /**
-   * Every Layer should have a reset function to replace any Pixi objects and internal state.
-   */
-  public reset() {
-    super.reset();
   }
 
 

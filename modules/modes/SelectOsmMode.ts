@@ -10,10 +10,7 @@ import { utilArrayIdentical } from '@rapid-sdk/util';
 import type { Context } from '../Context.ts';
 import type { EventData } from '../behaviors/AbstractBehavior.ts';
 import type { Extent, Vec2 } from '@rapid-sdk/math';
-import type { OsmEntity } from '../data/OsmEntity.ts';
-import type { OsmNode } from '../data/OsmNode.ts';
-import type { OsmRelation } from '../data/OsmRelation.ts';
-import type { OsmWay } from '../data/OsmWay.ts';
+import type { OsmEntity, OsmNode, OsmRelation, OsmWay } from '../data/types.ts';
 import type { Keybinding } from '../util/keybinding.ts';
 
 
@@ -107,7 +104,7 @@ export class SelectOsmMode extends AbstractMode {
 
     // Gather valid entities and entityIDs from selection.
     // For this mode, keep only the OSM data.
-    this._selectedData = new Map();
+    this._selectedData = new Map<EntityID, OsmEntity>();
     this._singularDatum = null;
     this._lastSelectedIDs = [];
     this._focusedParentID = options.focusedParentID ?? null;

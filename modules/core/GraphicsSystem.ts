@@ -105,8 +105,8 @@ export class GraphicsSystem extends AbstractSystem {
     super(context);
 
     this.id = 'gfx';
-    this.requiredDependencies = new Set(['map', 'scheduler']);
-    this.optionalDependencies = new Set(['assets', 'ui', 'urlhash']);
+    this.requiredDependencies = new Set<SystemID>(['map', 'scheduler']);
+    this.optionalDependencies = new Set<SystemID>(['assets', 'ui', 'urlhash']);
     this.highQuality = true;  // this can go false if we detect poor performance
 
     // Create these early

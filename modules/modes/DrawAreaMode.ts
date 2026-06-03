@@ -86,7 +86,7 @@ export class DrawAreaMode extends AbstractMode {
     // If we ever find ourself in an edit where we can't retrieve this information, leave `DrawLineMode`.
     // This means we've undo/redoed into an edit where the user wasn't drawing lines.
     // It's kinda hack, but I dont know what else to do right now.
-    this._snapshots = new Map();
+    this._snapshots = new Map<Graph, DrawAreaSnapshot>();
 
     // Make sure the event handlers have `this` bound correctly
     this._cancel = this._cancel.bind(this);

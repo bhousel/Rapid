@@ -74,7 +74,7 @@ export class UrlHashSystem extends AbstractSystem {
   public constructor(context: Context) {
     super(context);
     this.id = 'urlhash';
-    this.optionalDependencies = new Set(['editor', 'l10n', 'map', 'scheduler']);
+    this.optionalDependencies = new Set<SystemID>(['editor', 'l10n', 'map', 'scheduler']);
 
     this.doUpdateTitle = true;
     this.titleBase = 'Rapid';
@@ -112,9 +112,8 @@ export class UrlHashSystem extends AbstractSystem {
     }
 
     const q = utilStringQs(_window.location.hash);
-    this._initParams = new Map(Object.entries(q));
-
-    this._currParams = new Map(this._initParams);  // make copy
+    this._initParams = new Map<string, string>(Object.entries(q));
+    this._currParams = new Map<string, string>(this._initParams);  // make copy
     this._currHash = null;   // cached window.location.hash
     this._prevParams = null;
 
@@ -342,14 +341,18 @@ export class UrlHashSystem extends AbstractSystem {
     this._currHash = _window.location.hash;
     const q = utilStringQs(this._currHash);
 
-    if (!this._prevParams) {         // We haven't emitted `hashchange` yet
-      this._prevParams = new Map();  // set previous to empty Map, so everything looks new
+    if (!this._prevParams) {                         // We haven't emitted `hashchange` yet
+      this._prevParams = new Map<string, string>();  // set previous to empty Map, so everything looks new
     } else {
       this._prevParams = this._currParams;   // copy current -> previous
     }
 
-    this._currParams = new Map(Object.entries(q));
+    this._currParams = new Map<string, string>(Object.entries(q));
 
-    this.emit('hashchange', new Map(this._currParams), new Map(this._prevParams));  // emit copies
+    this.emit(
+      'hashchange',
+      new Map<string, string>(this._currParams),
+      new Map<string, string>(this._prevParams)
+    );  // emit copies
   }
 }

@@ -74,7 +74,7 @@ export class SpatialSystem extends AbstractSystem {
     super(context);
     this.id = 'spatial';
 
-    this._caches = new Map();
+    this._caches = new Map<DatasetID, SpatialCache>();
   }
 
 
@@ -119,9 +119,9 @@ export class SpatialSystem extends AbstractSystem {
     if (!cache) {
       cache = {
         graph:      new Graph(this.context),
-        boxes:      new Map(),
-        tiles:      new Map(),
-        data:       new Map(),
+        boxes:      new Map<DataID | TileID, Box>(),
+        tiles:      new Map<TileID, Tile>(),
+        data:       new Map<DataID, AbstractData>(),
         tileRBush:  new RBush<Box>(),
         dataRBush:  new RBush<Box>()
       };

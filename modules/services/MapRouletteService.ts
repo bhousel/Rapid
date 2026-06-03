@@ -128,7 +128,7 @@ export class MapRouletteService extends AbstractSystem {
     this.optionalDependencies = new Set<SystemID>(['map', 'gfx', 'urlhash']);
     this.autoStart = false;
 
-    this._challengeIDs = new Set();  // Set<string> - if we want to filter only a specific challengeID
+    this._challengeIDs = new Set<string>();  // if we want to filter only certain challengeIDs
     this.nearbyTaskEnabled = false;
     this.currentTask = null;
 
@@ -184,12 +184,12 @@ export class MapRouletteService extends AbstractSystem {
     spatial.clearCache('maproulette');
 
     this._cache = {
-      lastv: null,
-      tasks: new Map(),             // Map<taskID, MarkerData>
-      challenges: new Map(),        // Map<challengeID, Object>
-      tileRequest: new Map(),       // Map<tileID, { status }>
-      challengeRequest: new Map(),  // Map<challengeID, { status }>
-      closed: []                    // Array<{ challengeID, taskID }>
+      lastv:             null,
+      tasks:             new Map<string, MarkerData>(),
+      challenges:        new Map<string, ChallengeData>(),
+      tileRequest:       new Map<TileID, RequestEntry>(),
+      challengeRequest:  new Map<string, RequestEntry>(),
+      closed:            []    // Array<{ challengeID, taskID }>
     };
 
     return Promise.resolve();

@@ -68,7 +68,7 @@ export class OsmoseService extends AbstractSystem {
   /** Map<itemType, hex color> mapping Osmose item type numbers to display colors */
   protected _osmoseColors: Map<number, number>;
   /** Map<locale, issue strings> — lazily fetched localized strings for each issue type */
-  protected _osmoseStrings: Map<string, Record<string, OsmoseIssueStrings>>;
+  protected _osmoseStrings: Map<LocaleCode, Record<string, OsmoseIssueStrings>>;
   /** Static Osmose data loaded at startup (icons and issue type list) */
   protected _osmoseData: OsmoseData;
 
@@ -90,8 +90,8 @@ export class OsmoseService extends AbstractSystem {
     this.autoStart = false;
 
     // persistent data - loaded at start
-    this._osmoseColors = new Map();    // Map<itemType, hex color>
-    this._osmoseStrings = new Map();   // Map<locale, Object containing strings>
+    this._osmoseColors = new Map<number, number>();
+    this._osmoseStrings = new Map<LocaleCode, Record<string, OsmoseIssueStrings>>();
     this._osmoseData = { icons: {}, types: [] };
 
     this._cache = {} as OsmoseCache;
@@ -305,7 +305,7 @@ export class OsmoseService extends AbstractSystem {
    * @param locale - Optional locale code (defaults to the current locale)
    * @return stringdata
    */
-  public getStrings(itemType: string, locale?: string): OsmoseIssueStrings {
+  public getStrings(itemType: string, locale?: LocaleCode): OsmoseIssueStrings {
     const l10n = this.context.systems.l10n;
     locale = locale || l10n?.localeCode || 'en-US';
 

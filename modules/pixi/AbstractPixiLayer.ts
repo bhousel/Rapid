@@ -68,26 +68,26 @@ export class AbstractPixiLayer {
     this._enabled = false;  // Whether the user has chosen to see the layer
 
     // Collection of Features on this Layer
-    this.features = new Map();
-    this.retained = new Map();
+    this.features = new Map<FeatureID, AbstractPixiFeature>();
+    this.retained = new Map<FeatureID, number>();
 
     // Feature <-> Data
     // These lookups capture which features are bound to which data.
-    this._featureHasData = new Map();
-    this._dataHasFeature = new Map();
+    this._featureHasData = new Map<FeatureID, DataID>();
+    this._dataHasFeature = new Map<DataID, Set<FeatureID>>();
 
     // Parent Data <-> Child Data
     // We establish a parent-child data hierarchy (like what the DOM used to do for us)
     // For example, we need this to know which ways make up a multipolygon relation.
-    this._parentHasChildren = new Map();
-    this._childHasParents = new Map();
+    this._parentHasChildren = new Map<DataID, Set<DataID>>();
+    this._childHasParents = new Map<DataID, Set<DataID>>();
 
     // Data <-> Class
     // Data classes are strings (like what CSS classes used to do for us)
     // Counterintuitively, the Layer needs to be the source of truth for these data classes,
     // because a Feature can be 'selected' or 'drawing' even before it has been created, or after destroyed
-    this._dataHasClass = new Map();
-    this._classHasData = new Map();
+    this._dataHasClass = new Map<DataID, Set<ClassID>>();
+    this._classHasData = new Map<ClassID, Set<DataID>>();
   }
 
 
@@ -229,7 +229,7 @@ export class AbstractPixiLayer {
 
     let featureSet = this._dataHasFeature.get(dataID);
     if (!featureSet) {
-      featureSet = new Set();
+      featureSet = new Set<FeatureID>();
       this._dataHasFeature.set(dataID, featureSet);
     }
     featureSet.add(featureID);
@@ -272,7 +272,7 @@ export class AbstractPixiLayer {
   public addChildData(parentID: DataID, childIDs: OneOrMore<DataID>): void {
     let childSet = this._parentHasChildren.get(parentID);
     if (!childSet) {
-      childSet = new Set();
+      childSet = new Set<DataID>();
       this._parentHasChildren.set(parentID, childSet);
     }
 
@@ -281,7 +281,7 @@ export class AbstractPixiLayer {
 
       let parentSet = this._childHasParents.get(childID);
       if (!parentSet) {
-        parentSet = new Set();
+        parentSet = new Set<DataID>();
         this._childHasParents.set(childID, parentSet);
       }
       parentSet.add(parentID);
@@ -339,10 +339,10 @@ export class AbstractPixiLayer {
     if (result instanceof Set) {
       result.add(dataID);
     } else {
-      result = new Set([dataID]);
+      result = new Set<DataID>([dataID]);
     }
 
-    const childSet = this._parentHasChildren.get(dataID) ?? new Set();
+    const childSet = this._parentHasChildren.get(dataID) ?? new Set<DataID>();
     for (const childID of childSet) {
       if (!result.has(childID)) {
         this.getSelfAndDescendants(childID, result);
@@ -363,10 +363,10 @@ export class AbstractPixiLayer {
     if (result instanceof Set) {
       result.add(dataID);
     } else {
-      result = new Set([dataID]);
+      result = new Set<DataID>([dataID]);
     }
 
-    const parentSet = this._childHasParents.get(dataID) ?? new Set();
+    const parentSet = this._childHasParents.get(dataID) ?? new Set<DataID>();
     for (const parentID of parentSet) {
       if (!result.has(parentID)) {
         this.getSelfAndAncestors(parentID, result);
@@ -387,12 +387,12 @@ export class AbstractPixiLayer {
     if (result instanceof Set) {
       result.add(dataID);
     } else {
-      result = new Set([dataID]);
+      result = new Set<DataID>([dataID]);
     }
 
-    const parentSet = this._childHasParents.get(dataID) ?? new Set();
+    const parentSet = this._childHasParents.get(dataID) ?? new Set<DataID>();
     for (const parentID of parentSet) {
-      const siblingIDs = this._parentHasChildren.get(parentID) ?? new Set();
+      const siblingIDs = this._parentHasChildren.get(parentID) ?? new Set<DataID>();
       for (const siblingID of siblingIDs) {
         result.add(siblingID);
       }
@@ -410,14 +410,14 @@ export class AbstractPixiLayer {
   public setClass(classID: ClassID, dataID: DataID): void {
     let classIDs = this._dataHasClass.get(dataID);
     if (!classIDs) {
-      classIDs = new Set();
+      classIDs = new Set<ClassID>();
       this._dataHasClass.set(dataID, classIDs);
     }
     classIDs.add(classID);
 
     let dataIDs = this._classHasData.get(classID);
     if (!dataIDs) {
-      dataIDs = new Set();
+      dataIDs = new Set<DataID>();
       this._classHasData.set(classID, dataIDs);
     }
     dataIDs.add(dataID);
@@ -453,7 +453,7 @@ export class AbstractPixiLayer {
    * @param classID - classID to clear (e.g. 'hover')
    */
   public clearClass(classID: ClassID): void {
-    const dataIDs = this._classHasData.get(classID) ?? new Set();
+    const dataIDs = this._classHasData.get(classID) ?? new Set<DataID>();
     for (const dataID of dataIDs) {
       this.unsetClass(classID, dataID);
     }
@@ -466,8 +466,8 @@ export class AbstractPixiLayer {
    * @returns dataIDs the dataIDs that currently have this classID set
    */
   public getDataWithClass(classID: ClassID): Set<DataID> {
-    const dataIDs = this._classHasData.get(classID) ?? new Set();
-    return new Set(dataIDs);  // copy
+    const dataIDs = this._classHasData.get(classID) ?? new Set<DataID>();
+    return new Set<DataID>(dataIDs);  // copy
   }
 
 
@@ -487,7 +487,7 @@ export class AbstractPixiLayer {
     const dataID = this._featureHasData.get(featureID);
     if (!dataID) return;
 
-    const layerClasses = this._dataHasClass.get(dataID) ?? new Set();
+    const layerClasses = this._dataHasClass.get(dataID) ?? new Set<ClassID>();
     const featureClasses = feature.classes;
 
     for (const classID of featureClasses) {

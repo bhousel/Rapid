@@ -8,6 +8,7 @@ import { modes } from './modes/index.ts';
 import { services } from './services/index.ts';
 import { systems } from './core/index.ts';
 
+import type { AbstractData } from './data/AbstractData.ts';
 import type { AbstractMode } from './modes/AbstractMode.ts';
 import type { Behaviors } from './behaviors/types.ts';
 import type { D3Selection } from 'd3-selection';
@@ -647,9 +648,9 @@ export class Context extends EventEmitter {
    * Can contain multiple items of various types (e.g. OSM data, Rapid data, etc.)
    * @return  The current selected features as a `Map(datumID -> datum)`
    */
-  public selectedData(): Map<DataID, any> {
-    if (!this._currMode) return new Map();
-    return this._currMode.selectedData || new Map();
+  public selectedData(): Map<DataID, AbstractData> {
+    if (!this._currMode) return new Map<DataID, AbstractData>();
+    return this._currMode.selectedData ?? new Map<DataID, AbstractData>();
   }
 
   /**
@@ -667,7 +668,7 @@ export class Context extends EventEmitter {
    * @param  behaviorIDs  Single behavior ID or array of behavior IDs to enable
    */
   public enableBehaviors(behaviorIDs: OneOrMore<BehaviorID>): void {
-    const toEnable = new Set(utilIterable(behaviorIDs));
+    const toEnable = new Set<BehaviorID>(utilIterable(behaviorIDs));
 
     for (const [behaviorID, behavior] of Object.entries(this.behaviors)) {
       if (!behavior) continue;

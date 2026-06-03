@@ -61,7 +61,7 @@ export class MapWithAIService extends AbstractSystem {
     this.optionalDependencies = new Set<SystemID>(['assets', 'gfx', 'l10n', 'locations', 'rapid', 'urlhash']);
 
     this._tiler = new Tiler().zoomRange(TILEZOOM) as Tiler;
-    this._datasets = new Map();
+    this._datasets = new Map<DatasetID, DatasetCache>();
   }
 
 
@@ -132,7 +132,7 @@ export class MapWithAIService extends AbstractSystem {
 //      conflated: true,
       conflated: false,
       serviceID: 'mapwithai',
-      categories: new Set(['meta', 'roads', 'featured']),
+      categories: new Set<string>(['meta', 'roads', 'featured']),
       dataUsed: ['mapwithai', 'Facebook Roads'],
       itemUrl: 'https://github.com/facebookmicrosites/Open-Mapping-At-Facebook',
       licenseUrl: 'https://rapideditor.org/doc/license/MapWithAILicense.pdf',
@@ -145,7 +145,7 @@ export class MapWithAIService extends AbstractSystem {
 //      conflated: true,
       conflated: false,
       serviceID: 'mapwithai',
-      categories: new Set(['microsoft', 'buildings', 'featured']),
+      categories: new Set<string>(['microsoft', 'buildings', 'featured']),
       dataUsed: ['mapwithai', 'Microsoft Buildings'],
       itemUrl: 'https://github.com/microsoft/GlobalMLBuildingFootprints',
       licenseUrl: 'https://github.com/microsoft/USBuildingFootprints/blob/master/LICENSE-DATA',
@@ -157,8 +157,8 @@ export class MapWithAIService extends AbstractSystem {
 //      id: 'omdFootways',
 //      conflated: true,
 //      serviceID: 'mapwithai',
-//      categories: new Set(['meta', 'footways', 'featured']),
-//      tags: new Set(['opendata']),
+//      categories: new Set<string>(['meta', 'footways', 'featured']),
+//      tags: new Set<string>(['opendata']),
 //      overlay: {
 //        url: 'https://external.xx.fbcdn.net/maps/vtp/rapid_overlay_footways/2/{z}/{x}/{y}/',
 //        minZoom: 1,
@@ -176,8 +176,8 @@ export class MapWithAIService extends AbstractSystem {
 //      id: 'metaSyntheticFootways',
 //      conflated: true,
 //      serviceID: 'mapwithai',
-//      categories: new Set(['meta', 'footways', 'featured', 'preview']),
-//      tags: new Set(['opendata']),
+//      categories: new Set<string>(['meta', 'footways', 'featured', 'preview']),
+//      tags: new Set<string>(['opendata']),
 //      dataUsed: ['mapwithai', 'Meta Synthetic Footways'],
 //      itemUrl: 'https://github.com/facebookmicrosites/Open-Mapping-At-Facebook/wiki/Footways-FAQ',
 //      licenseUrl: 'https://github.com/facebookmicrosites/Open-Mapping-At-Facebook/wiki/Footways-FAQ#attribution-and-license',
@@ -190,7 +190,7 @@ export class MapWithAIService extends AbstractSystem {
       hidden: true,
       conflated: false,
       serviceID: 'mapwithai',
-      categories: new Set(['meta', 'roads']),
+      categories: new Set<string>(['meta', 'roads']),
       color: '#da26d3',
       dataUsed: [],
       label: 'Rapid Walkthrough'
@@ -215,10 +215,10 @@ export class MapWithAIService extends AbstractSystem {
         id: datasetID,
         graph: graph,
         tree: tree,
-        loaded: new Set(),           // Set<TileID>
-        seen: new Set(),             // Set<EntityID>
-        seenFirstNodeID: new Set(),  // Set<EntityID>
-        splitWays: new Map(),        // Map<originalID, Set<Entity>>
+        loaded: new Set<TileID>(),
+        seen: new Set<EntityID>(),
+        seenFirstNodeID: new Set<EntityID>(),
+        splitWays: new Map<string, Set<ParsedWay>>(),
         lastv: null
       };
       this._datasets.set(datasetID, ds);
@@ -356,7 +356,7 @@ export class MapWithAIService extends AbstractSystem {
         if (origID) {
           let splitWays = ds.splitWays.get(origID);
           if (!splitWays) {
-            splitWays = new Set();
+            splitWays = new Set<ParsedWay>();
             ds.splitWays.set(origID, splitWays);
           }
           splitWays.add(props as ParsedWay);

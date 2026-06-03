@@ -140,7 +140,9 @@ export class Tree {
   protected _includeParents(entity: OsmEntity, toUpdate: Map<EntityID, OsmEntity>, seen?: Set<EntityID>): void {
     const graph = this._currentSnapshot;
     const entityID = entity.id;
-    if (!seen) seen = new Set();
+    if (!seen) {
+      seen = new Set<EntityID>();
+    }
 
     if (seen.has(entityID)) return;
     seen.add(entityID);

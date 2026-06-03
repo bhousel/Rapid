@@ -1,8 +1,8 @@
 import RBush from 'rbush';
 
 import type { BBox } from 'rbush';
-import type { OsmEntity, OsmNode, OsmWay } from '../data/types.ts';
 import type { Graph } from './Graph.ts';
+import type { OsmEntity, OsmNode, OsmWay } from '../data/types.ts';
 import type { ValidationIssue } from './ValidationIssue.ts';
 
 
@@ -42,6 +42,7 @@ export class ValidationCache {
   /** Map of issue ID to its spatial box */
   public recheckBoxes: Map<IssueID, RecheckBox>;
 
+
   /**
    * @constructor
    * @param which - 'base' or 'head' (to identify the cache)
@@ -51,16 +52,16 @@ export class ValidationCache {
     this.graph = null;
     this.queue = [];
     this.queuePromise = null;
-    this.queuedEntityIDs = new Set();
-    this.provisionalEntityIDs = new Set();
-    this.issues = new Map();
-    this.entityIssueIDs = new Map();
+    this.queuedEntityIDs = new Set<EntityID>();
+    this.provisionalEntityIDs = new Set<EntityID>();
+    this.issues = new Map<IssueID, ValidationIssue>();
+    this.entityIssueIDs = new Map<EntityID, Set<IssueID>>();
 
     // A RBush spatial index that stores 'boxes'.
     // The boxes mark regions where the involved entities may need to be rechecked
     // by being part of a impossible oneway or disconnected way routing island.
     this.recheckRBush = new RBush();
-    this.recheckBoxes = new Map();
+    this.recheckBoxes = new Map<IssueID, RecheckBox>();
   }
 
 
@@ -85,7 +86,7 @@ export class ValidationCache {
     for (const entityID of issue.entityIds ?? []) {
       let issueIDs = this.entityIssueIDs.get(entityID);
       if (!issueIDs) {
-        issueIDs = new Set();
+        issueIDs = new Set<IssueID>();
         this.entityIssueIDs.set(entityID, issueIDs);
       }
       issueIDs.add(issue.id);

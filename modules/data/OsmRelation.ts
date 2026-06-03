@@ -91,7 +91,7 @@ export class OsmRelation extends OsmEntity {
    * @param seen - seen ids, used to avoid infinite loops and cycles.
    * @return GeoJSON representation of the OsmRelation
    */
-  public asGeoJSON(graph: Graph, seen?: Set<string>): GeoJSONObject {
+  public asGeoJSON(graph: Graph, seen?: Set<EntityID>): GeoJSONObject {
     return this.transient('geojson', () => {
 
       if (this.isMultipolygon()) {
@@ -108,7 +108,7 @@ export class OsmRelation extends OsmEntity {
       } else {  // Gather children into a FeatureCollection
 
         if (!seen) {
-          seen = new Set();
+          seen = new Set<EntityID>();
         }
         if (seen.has(this.id)) {
           return {} as GeoJSONObject;  // seen this already, avoid infinite loops and cycles

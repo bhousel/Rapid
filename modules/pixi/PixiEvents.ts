@@ -8,6 +8,17 @@ import type { GraphicsSystem } from '../core/GraphicsSystem.ts';
 import type { Vec2 } from '@rapid-sdk/math';
 
 
+/** Supported gesture types that we will watch for */
+export type GestureType = 'zoom' | 'pan';
+
+/** Supported modifier keys that we will watch for */
+export type ModifierKey =
+  | 'Alt'      // ALT key, on Mac: ⌥ (option)
+  | 'Control'  // CTRL key, on Mac: ⌃ (control)
+  | 'Meta'     // META, on Mac: ⌘ (command), on Windows (Win), on Linux (Super)
+  | 'Shift';   // Shift key, ⇧
+
+
 /** Coordinate data containing screen and map positions */
 export interface CoordData {
   /** Screen coordinates where [0,0] is top-left of the screen */
@@ -20,7 +31,7 @@ export interface CoordData {
 
 /** Extended WheelEvent with normalized delta values */
 export interface NormalizedWheelEvent extends WheelEvent {
-  _gesture: 'zoom' | 'pan';
+  _gesture: GestureType;
   _normalizedDeltaX: number;
   _normalizedDeltaY: number;
   _coord: CoordData;
@@ -58,7 +69,7 @@ export class PixiEvents extends EventEmitter {
   /** Whether the pointer is currently over the Pixi renderer canvas */
   public pointerOverRenderer: boolean;
   /** Set of currently held modifier keys (e.g. 'Alt', 'Control', 'Meta', 'Shift') */
-  public modifierKeys: Set<string>;
+  public modifierKeys: Set<ModifierKey>;
   /** Most recently seen pointer coordinates in screen, map, and world space */
   public coord: CoordData;
 
@@ -79,7 +90,7 @@ export class PixiEvents extends EventEmitter {
     this.context = gfx.context;
 
     this.pointerOverRenderer = false;
-    this.modifierKeys = new Set();
+    this.modifierKeys = new Set<ModifierKey>();
     this.coord = {
       screen: [0, 0],  // [0,0] is top,left of the screen
       map: [0, 0],     // [0,0] is the origin of the viewport (rotation removed)
@@ -244,7 +255,7 @@ export class PixiEvents extends EventEmitter {
    */
   protected _observeModifierKeys(e: PIXI.FederatedPointerEvent | KeyboardEvent): void {
     const modifiers = this.modifierKeys;
-    const toCheck = [
+    const toCheck: ModifierKey[] = [
       'Alt',      // ALT key, on Mac: ⌥ (option)
       'Control',  // CTRL key, on Mac: ⌃ (control)
       'Meta',     // META, on Mac: ⌘ (command), on Windows (Win), on Linux (Super)
@@ -432,7 +443,7 @@ export class PixiEvents extends EventEmitter {
     // (NB: We observe modifier keys elsewhere and can know whether the user really did press ctrlKey)
     const isPinchZoom = !isRoundNumber && e.ctrlKey && !this.modifierKeys.has('Control');
 
-    let gesture: 'zoom' | 'pan';  // Detect this wheel event as 'zoom' or 'pan'
+    let gesture: GestureType;  // Detect this wheel event as 'zoom' or 'pan'
     let speed: number;         // Multiplier to adjust the zoom speed
 
     if (isPinchZoom) {   // A pinch-zoom gesture on a trackpad...

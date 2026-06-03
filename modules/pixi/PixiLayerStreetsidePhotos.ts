@@ -54,33 +54,18 @@ export class PixiLayerStreetsidePhotos extends AbstractPixiLayer {
 
 
   /**
-   * Every Layer should have a reset function to replace any Pixi objects and internal state.
-   */
-  public reset() {
-    super.reset();
-  }
-
-
-  /**
    * If we are interacting with the viewer (zooming / panning),
    * dirty the current photo so its view cone gets redrawn
    */
   protected _dirtyCurrentPhoto(): void {
     const context = this.context;
-    const gfx = context.systems.gfx!;
     const photos = context.systems.photos;
 
     const currPhotoID = photos?.currPhotoID;
     if (!currPhotoID) return;  // shouldn't happen, the user is zooming/panning an image
 
-    // Dirty the feature(s) for this image so they will be redrawn.
-    const featureIDs = this._dataHasFeature.get(currPhotoID) ?? new Set();
-    for (const featureID of featureIDs) {
-      const feature = this.features.get(featureID) as any;
-      if (!feature) continue;
-      feature._styleDirty = true;
-    }
-    gfx.immediateRedraw();
+    this.dirtyData(currPhotoID);
+    this.gfx.immediateRedraw();
   }
 
 
@@ -113,11 +98,10 @@ export class PixiLayerStreetsidePhotos extends AbstractPixiLayer {
     this._enabled = val;
 
     const context = this.context;
-    const gfx = context.systems.gfx!;
     const streetside = context.services.streetside;
     if (val && streetside) {
       streetside.startAsync()
-        .then(() => gfx.immediateRedraw());
+        .then(() => this.gfx.immediateRedraw());
     }
   }
 

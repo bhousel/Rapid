@@ -119,7 +119,7 @@ export class Field {
   public geometries: Set<GeometryType>;
 
   /** Pre-localized display strings keyed by locale code */
-  protected _strings: Map<string, FieldStrings>;
+  protected _strings: Map<LocaleCode, FieldStrings>;
   /** The locale code in effect when `_currStrings` was last computed */
   protected _currLocaleCode: LocaleCode | null;
   /** Display strings for the current locale (label, terms, placeholder) */
@@ -142,7 +142,7 @@ export class Field {
       props.geometry = [props.geometry];
     }
 
-    this._strings = new Map();    // Map<localeCode, Object> to store pre-localized text strings
+    this._strings = new Map<LocaleCode, FieldStrings>();   // pre-localized text strings
     this._currLocaleCode = null;  // The current locale code
     this._currStrings = {} as FieldStrings;  // The current strings
 
@@ -167,9 +167,9 @@ export class Field {
 
     const schema = context.systems.schema!;
     if (this.props.geometry.length) {
-      this.geometries = new Set(this.props.geometry);
+      this.geometries = new Set<GeometryType>(this.props.geometry);
     } else {
-      this.geometries = new Set(schema.geometryTypes);  // all types allowed
+      this.geometries = new Set<GeometryType>(schema.geometryTypes);  // all types allowed
     }
   }
 

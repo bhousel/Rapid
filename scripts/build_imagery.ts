@@ -67,7 +67,7 @@ async function buildImagery() {
     /^EOXAT/                     // EOX AT *  (iD#9807)
   ];
 
-  const supportedWMSProjections = new Set([
+  const supportedWMSProjections = new Set<string>([
     // Web Mercator
     'EPSG:3857',
     // alternate codes used for Web Mercator

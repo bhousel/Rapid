@@ -6,8 +6,9 @@ import { PixiFeaturePolygon } from './PixiFeaturePolygon.ts';
 
 import type { Viewport } from '@rapid-sdk/math';
 import type { MatchedStyle } from '../core/StyleSystem.ts';
+import type { RapidDataset } from '../lib/RapidDataset.ts';
 import type { PixiScene } from './PixiScene.ts';
-import type { OsmEntity, OsmWay } from '../data/types.ts';
+import type { OsmEntity, OsmNode, OsmWay } from '../data/types.ts';
 
 
 /** Minimum zoom level where Rapid data is rendered */
@@ -16,7 +17,7 @@ const MINZOOM = 12;
 /** Collected data from services, sorted by geometry type */
 interface RapidData {
   points: OsmEntity[];
-  vertices: Set<OsmEntity>;
+  vertices: Set<OsmNode>;
   lines: OsmWay[];
   polygons: OsmEntity[];
 }
@@ -147,7 +148,6 @@ export class PixiLayerRapid extends AbstractPixiLayer {
     this._enabled = val;
 
     const context = this.context;
-    const gfx = context.systems.gfx!;
     const esri = context.services.esri;
     const mapwithai = context.services.mapwithai;
     const overture = context.services.overture;
@@ -161,7 +161,7 @@ export class PixiLayerRapid extends AbstractPixiLayer {
 
     if (val && services.length) {
       Promise.all(services.map(service => service.startAsync()))
-        .then(() => gfx.immediateRedraw());
+        .then(() => this.gfx.immediateRedraw());
     }
   }
 
@@ -214,7 +214,7 @@ export class PixiLayerRapid extends AbstractPixiLayer {
    * @param frame - Integer frame being rendered
    * @param viewport - Pixi viewport to use for rendering
    */
-  public renderDataset(dataset: any, frame: number, viewport: Viewport): void {
+  public renderDataset(dataset: RapidDataset, frame: number, viewport: Viewport): void {
     const context = this.context;
     const rapid = context.systems.rapid!;
     const viewZoom = viewport.transform.zoom;
@@ -246,7 +246,12 @@ export class PixiLayerRapid extends AbstractPixiLayer {
     };
 
     // Gather data
-    const data: RapidData = { points: [], vertices: new Set(), lines: [], polygons: [] };
+    const data: RapidData = {
+      points: [],
+      vertices: new Set<OsmNode>(),
+      lines: [],
+      polygons: []
+    };
 
     /* Facebook AI/ML */
     if (dataset.serviceID === 'mapwithai') {
@@ -333,23 +338,27 @@ export class PixiLayerRapid extends AbstractPixiLayer {
       basemapContainer.addChild(linesContainer);
     }
 
-    this.renderPolygons(areasContainer, dataset, dsGraph, frame, viewport, data);
-    this.renderLines(linesContainer, dataset, dsGraph, frame, viewport, data);
-    this.renderPoints(pointsContainer, dataset, dsGraph, frame, viewport, data);
+    this.renderPolygons(areasContainer, dataset, data, frame, viewport);
+    this.renderLines(linesContainer, dataset, data, frame, viewport);
+    this.renderPoints(pointsContainer, dataset, data, frame, viewport);
   }
 
 
   /**
-   * Renders the Rapid dataset polygon features for this frame.
+   * Renders the polygon features for the given Rapid dataset.
    * @param parentContainer
    * @param dataset
-   * @param graph
+   * @param data
    * @param frame
    * @param viewport
-   * @param data
    */
   public renderPolygons(
-    parentContainer: PIXI.Container, dataset: any, graph: any, frame: number, viewport: Viewport, data: RapidData): void {
+    parentContainer: PIXI.Container,
+    dataset: RapidDataset,
+    data: RapidData,
+    frame: number,
+    viewport: Viewport
+  ): void {
     const color = new PIXI.Color(dataset.color);
     const l10n = this.context.systems.l10n!;
 
@@ -392,15 +401,20 @@ export class PixiLayerRapid extends AbstractPixiLayer {
 
 
   /**
-   * Renders the Rapid dataset line features for this frame.
+   * Renders the line features for the given Rapid dataset.
    * @param parentContainer
    * @param dataset
-   * @param graph
+   * @param data
    * @param frame
    * @param viewport
-   * @param data
    */
-  public renderLines(parentContainer: PIXI.Container, dataset: any, graph: any, frame: number, viewport: Viewport, data: RapidData): void {
+  public renderLines(
+    parentContainer: PIXI.Container,
+    dataset: RapidDataset,
+    data: RapidData,
+    frame: number,
+    viewport: Viewport
+  ): void {
     const color = new PIXI.Color(dataset.color);
     const l10n = this.context.systems.l10n!;
 
@@ -456,21 +470,19 @@ export class PixiLayerRapid extends AbstractPixiLayer {
 
 
   /**
-   * Renders the Rapid dataset point features for this frame.
+   * Renders the point features for the given Rapid dataset.
    * @param parentContainer
    * @param dataset
-   * @param graph
+   * @param data
    * @param frame
    * @param viewport
-   * @param data
    */
   public renderPoints(
     parentContainer: PIXI.Container,
-    dataset: any,
-    graph: any,
+    dataset: RapidDataset,
+    data: RapidData,
     frame: number,
-    viewport: Viewport,
-    data: RapidData
+    viewport: Viewport
   ): void {
     const color = new PIXI.Color(dataset.color);
     const l10n = this.context.systems.l10n!;

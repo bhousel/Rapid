@@ -122,7 +122,7 @@ export class Preset {
   public suggestion: boolean;
 
   /** Pre-localized display strings keyed by locale code */
-  protected _strings: Map<string, PresetStrings>;
+  protected _strings: Map<LocaleCode, PresetStrings>;
   /** The locale code in effect when `_currStrings` was last computed */
   protected _currLocaleCode: LocaleCode | null;
   /** Display strings for the current locale (name, terms, aliases, search tokens) */
@@ -148,7 +148,7 @@ export class Preset {
       props.geometry = [props.geometry];
     }
 
-    this._strings = new Map();    // Map<localeCode, Object> to store pre-localized text strings
+    this._strings = new Map<LocaleCode, PresetStrings>();   // pre-localized text strings
     this._currLocaleCode = null;  // The current locale code
     this._currStrings = {} as PresetStrings;  // The current strings
     this._resolved = { fields: null, moreFields: null };
@@ -183,9 +183,9 @@ export class Preset {
 
     const schema = context.systems.schema!;
     if (this.props.geometry.length) {
-      this.geometries = new Set(this.props.geometry);
+      this.geometries = new Set<GeometryType>(this.props.geometry);
     } else {
-      this.geometries = new Set(schema.geometryTypes);  // all types allowed
+      this.geometries = new Set<GeometryType>(schema.geometryTypes);  // all types allowed
     }
   }
 

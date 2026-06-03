@@ -435,7 +435,8 @@ export class OsmWay extends OsmEntity {
    * @return `true` if the way is degenerate, `false` if not.
    */
   public isDegenerate(): boolean {
-    return (new Set(this.nodes).size < (this.isClosed() ? 3 : 2));
+    const unique = new Set<EntityID>(this.nodes);
+    return (unique.size < (this.isClosed() ? 3 : 2));
   }
 
   /**

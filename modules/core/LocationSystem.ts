@@ -59,7 +59,7 @@ export class LocationSystem extends AbstractSystem {
     this.id = 'locations';
 
     this._resolver = new LocationConflation();
-    this._blockFeatures = new Map();
+    this._blockFeatures = new Map<LocationSetID, GeoJSONData>();
 
     // BLOCKED REGIONS
     // These are static and don't depend on any custom GeoJSON, so we can resolve them synchronously here.

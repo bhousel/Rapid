@@ -68,20 +68,27 @@ export class PixiLayerKartaPhotos extends AbstractPixiLayer {
     this._enabled = val;
 
     const context = this.context;
-    const gfx = context.systems.gfx!;
     const kartaview = context.services.kartaview;
     if (val && kartaview) {
       kartaview.startAsync()
-        .then(() => gfx.immediateRedraw());
+        .then(() => this.gfx.immediateRedraw());
     }
   }
 
 
   /**
-   * Every Layer should have a reset function to replace any Pixi objects and internal state.
+   * If we are interacting with the viewer (zooming / panning),
+   * dirty the current photo so its view cone gets redrawn
    */
-  public reset() {
-    super.reset();
+  protected _dirtyCurrentPhoto(): void {
+    const context = this.context;
+    const photos = context.systems.photos;
+
+    const currPhotoID = photos?.currPhotoID;
+    if (!currPhotoID) return;  // shouldn't happen, the user is zooming/panning an image
+
+    this.dirtyData(currPhotoID);
+    this.gfx.immediateRedraw();
   }
 
 

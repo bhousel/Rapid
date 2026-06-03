@@ -57,7 +57,7 @@ export class StorageSystem extends AbstractSystem {
       this._storage = globalThis.localStorage;
 
     } catch (e) {
-      this._mock = new Map();
+      this._mock = new Map<string, string>();
       this._storage = {
         isMocked: true,
         hasItem: (k: string): boolean => this._mock!.has(k),

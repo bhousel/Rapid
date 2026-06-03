@@ -53,24 +53,14 @@ export class PixiLayerMapillarySigns extends AbstractPixiLayer {
     this._enabled = val;
 
     const context = this.context;
-    const gfx = context.systems.gfx!;
     const mapillary = context.services.mapillary;
     if (val && mapillary) {
       mapillary.startAsync()
-        .then(() => gfx.immediateRedraw());
+        .then(() => this.gfx.immediateRedraw());
     }
   }
 
 
-  /**
-   * Every Layer should have a reset function to replace any Pixi objects and internal state.
-   */
-  public reset() {
-    super.reset();
-  }
-
-
-  /**
   /**
    * Filters the sign markers by the current date range.
    * @param  markers - all markers

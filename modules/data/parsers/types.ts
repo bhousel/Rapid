@@ -14,7 +14,7 @@ export interface ParserOptions {
   /** Whether to skip results that have been seen before (default: true) */
   skipSeen: boolean;
   /** Filter to include only these types in the results */
-  filter: Set<string> | string[];
+  filter: Set<ParserDataType> | ParserDataType[];
 }
 
 

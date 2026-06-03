@@ -126,8 +126,8 @@ This project has reusable Copilot prompt files in `.github/prompts/`. Your edito
     constructor(context: Context) {
       super(context);
       this.id = 'foo';
-      this.requiredDependencies = new Set(['assets']);
-      this.optionalDependencies = new Set(['gfx', 'storage']);
+      this.requiredDependencies = new Set<SystemID>(['assets']);
+      this.optionalDependencies = new Set<SystemID>(['gfx', 'storage']);
     }
   }
   ```
@@ -135,8 +135,8 @@ This project has reusable Copilot prompt files in `.github/prompts/`. Your edito
   ```typescript
   class FooSystem extends AbstractSystem {
     readonly id = 'foo';  // avoid field initializers
-    requiredDependencies = new Set(['assets']);
-    optionalDependencies = new Set(['gfx', 'storage']);
+    requiredDependencies = new Set<SystemID>(['assets']);
+    optionalDependencies = new Set<SystemID>(['gfx', 'storage']);
 
     constructor(context: Context) {
       super(context);

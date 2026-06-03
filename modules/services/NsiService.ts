@@ -234,7 +234,10 @@ export class NsiService extends AbstractSystem {
     if (!n) return false;
 
     // tryNames just contains the `name` tag value and nothing else
-    const tryNames: NameGroups = { primary: new Set([n]), alternate: new Set() };
+    const tryNames: NameGroups = {
+      primary: new Set<string>([n]),
+      alternate: new Set<string>()
+    };
 
     // Gather key/value tag pairs to try to match
     const tryKVs = this._gatherKVs(tags);
@@ -451,7 +454,7 @@ export class NsiService extends AbstractSystem {
     if (!newName || !origName || newName === origName || newTags.branch) return false;
 
     const newNames = this._gatherNames(newTags);
-    const newSet = new Set([...newNames.primary, ...newNames.alternate]);
+    const newSet = new Set<string>([...newNames.primary, ...newNames.alternate]);
     if (newSet.has(origName)) return false;   // another tag holds the original name now
 
     // Test name fragments, longest to shortest, to fit them into a "Name Branch" pattern.
@@ -571,11 +574,10 @@ export class NsiService extends AbstractSystem {
           replacements:  (vals[3] as NsiReplacementsJSON).replacements,   // trivial old->new qid replacements
           trees:         (vals[4] as NsiTreesJSON).trees,                 // metadata about trees, main tags
           wikidata:      (vals[5] as NsiWikidataJSON).wikidata,           // metadata about wikidata and logos
-          kvt:           new Map(),              // Map<k, Map<v, t>>
-          qids:          new Map(),              // Map<wikidata QID → canonical QID>
-          ids:           new Map()               // Map<id, NSI item>
+          kvt:           new Map<string, Map<string, NsiTree>>(),
+          qids:          new Map<string, string>(),
+          ids:           new Map<string, NsiItem>()
         } as NsiServiceCache;
-
 
         const matcher = this._nsi.matcher = new Matcher();
         matcher.buildMatchIndex(this._nsi.data!);
@@ -595,7 +597,7 @@ export class NsiService extends AbstractSystem {
           // }
           let vmap = this._nsi.kvt!.get(k);
           if (!vmap) {
-            vmap = new Map();
+            vmap = new Map<string, NsiTree>();
             this._nsi.kvt!.set(k, vmap);
           }
           vmap.set(v, t);
@@ -730,7 +732,7 @@ export class NsiService extends AbstractSystem {
    * @return Object containing the primary and alternate names to test
    */
   protected _gatherNames(tags: OsmTags): NameGroups {
-    const empty: NameGroups = { primary: new Set(), alternate: new Set() };
+    const empty: NameGroups = { primary: new Set<string>(), alternate: new Set<string>() };
     const primary = new Set<string>();
     const alternate = new Set<string>();
     let foundSemi = false;

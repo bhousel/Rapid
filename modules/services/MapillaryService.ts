@@ -314,8 +314,8 @@ export class MapillaryService extends AbstractSystem {
       images:        { lastv: null },
       detections:    { lastv: null },
       signs:         { lastv: null },
-      segmentations: { data: new Map() },   // Map<SegmentationID, SegmentationData>
-      loaded:        new Set()              // Set<RequestID>
+      segmentations: { data: new Map<string, SegmentationData>() },
+      loaded:        new Set<RequestID>()
     };
 
     return Promise.resolve();

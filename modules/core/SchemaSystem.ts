@@ -211,31 +211,31 @@ export class SchemaSystem extends AbstractSystem {
   public constructor(context: Context) {
     super(context);
     this.id = 'schema';
-    this.optionalDependencies = new Set(['assets', 'gfx', 'l10n', 'locations', 'storage', 'urlhash']);
+    this.optionalDependencies = new Set<SystemID>(['assets', 'gfx', 'l10n', 'locations', 'storage', 'urlhash']);
 
-    this.geometryTypes = new Set(['point', 'vertex', 'line', 'area', 'relation'] as GeometryType[]);
+    this.geometryTypes = new Set<GeometryType>(['point', 'vertex', 'line', 'area', 'relation']);
 
     // The field types here must match the field types listed in `ui/fields/index.js`.
     // Other field types may be found in a tagging schema, but these are the ones Rapid currently supports.
     // Do not add a new field type without also adding a user interface component to support that field type.
-    this.fieldTypes = new Set([
+    this.fieldTypes = new Set<FieldType>([
       'access', 'address', 'check', 'combo', 'cycleway', 'defaultCheck', 'email',
       'identifier', 'lanes', 'localized', 'roadspeed', 'roadheight', 'manyCombo',
       'multiCombo', 'networkCombo', 'number', 'onewayCheck', 'radio', 'restrictions',
       'semiCombo', 'structureRadio', 'tel', 'text', 'textarea', 'typeCombo', 'url',
       'wikidata', 'wikipedia'
-    ] as FieldType[]);
+    ]);
 
     // Set of presetIDs that the user can add (if `null`, all are normally addable)
     this.addablePresetIDs = null;
 
-    this._scopes = new Map();    // Map<ScopeID, SchemaScope>
+    this._scopes = new Map<ScopeID, SchemaScope>();
 
     // The default schema assets.
     // 'id_tagging_schema' is a "bundle" that combines multiple id_tagging_schema files.
     // 'rapid_schema' is Rapid's customizations to merge in after.
-    this._defaultAssetIDs = new Set(['id_tagging_schema', 'osm_rulesets', 'rapid_schema']);
-    this._loadedAssetIDs = new Map();
+    this._defaultAssetIDs = new Set<AssetID>(['id_tagging_schema', 'osm_rulesets', 'rapid_schema']);
+    this._loadedAssetIDs = new Map<AssetID, string>();
     this._requestedAssetIDs = null;
     this._recentIDs = null;
     this._currLocaleCode = null;
@@ -279,7 +279,7 @@ export class SchemaSystem extends AbstractSystem {
         const presetIDs = urlhash?.initialHashParams.get('presets') || '';
         if (presetIDs) {
           const vals = utilExtractValues(presetIDs, /[,;|]/).filter(Boolean);  // allow '/' in PresetIDs
-          this.addablePresetIDs = new Set(vals);
+          this.addablePresetIDs = new Set<PresetID>(vals);
         }
 
         // If AssetSystem is available, tell it about default schema files and load them.
@@ -514,7 +514,7 @@ gfx?.scene?.reset();  // throw it all away
       return;
     }
 
-    this._requestedAssetIDs = new Set();
+    this._requestedAssetIDs = new Set<AssetID>();
     for (const assetID of utilIterable(vals)) {
       if (!assetID) continue;
       if (assetID === 'default') {
@@ -679,7 +679,7 @@ gfx?.scene?.reset();  // throw it all away
 
           let defaultIDs = scope.defaults.get(geometry as GeometryType);
           if (!defaultIDs) {
-            defaultIDs = new Set();
+            defaultIDs = new Set<PresetID | CategoryID>();
             scope.defaults.set(geometry as GeometryType, defaultIDs);
           }
 
@@ -757,29 +757,27 @@ gfx?.scene?.reset();  // throw it all away
     if (!scope) {
       // Doesn't exist yet - create.
       scope = {
-        variables: new Map(),
-        fields: new Map(),
-        presets: new Map(),
-        categories: new Map(),
-        defaults: new Map(),
-        universal: new Map(),
-        rulesets: new Map(),
-        matchIndex: new Map(),
-        searchIndexes: new Map(),
+        variables: new Map<VariableID, Variable>(),
+        fields: new Map<FieldID, Field>(),
+        presets: new Map<PresetID, Preset>(),
+        categories: new Map<CategoryID, Category>(),
+        rulesets: new Map<RulesetID, Ruleset>(),
+        defaults: new Map<GeometryType, Set<PresetID | CategoryID>>(),
+        universal: new Map<FieldID, Field>(),
+
+        matchIndex: new Map<GeometryType, Record<string, Record<string, Preset[]>>>(),
+        searchIndexes: new Map<LocaleCode, MiniSearch>(),
         currSearchIndex: null,
 
-        // Derived tag lookup tables
-        areaKeys: {},
-        deprecatedValues: {},
-
-        // improve
         deprecated: [],
-        discarded: {}
+        discarded: {},
+        areaKeys: {},
+        deprecatedValues: {}
       };
 
       // Initialize per-geometry caches
       for (const geometry of this.geometryTypes) {
-        scope.defaults.set(geometry, new Set());
+        scope.defaults.set(geometry, new Set<PresetID | CategoryID>());
         scope.matchIndex.set(geometry, {});
       }
 
@@ -823,7 +821,7 @@ gfx?.scene?.reset();  // throw it all away
 
     if (!query) return [];   // no query
 
-    const filterGeometries = new Set(utilIterable(geometries));
+    const filterGeometries = new Set<GeometryType>(utilIterable(geometries));
     if (!filterGeometries.size) return [];  // no geometry types
 
     // Get diacritic marks into a consistent format, perfer them combined into fewer characters.
@@ -1026,7 +1024,7 @@ gfx?.scene?.reset();  // throw it all away
     const scope = this.getScope(scopeID);
 
     // The ignore list is for keys that imply lines. (We always add `area=yes` for exceptions)
-    const ignore = new Set(['barrier', 'highway', 'footway', 'railway', 'junction', 'type']);
+    const ignore = new Set<string>(['barrier', 'highway', 'footway', 'railway', 'junction', 'type']);
     const areaKeys: TagKeyValueLookup = {};
 
     // ignore name-suggestion-index and deprecated presets

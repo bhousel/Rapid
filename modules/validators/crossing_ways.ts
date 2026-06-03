@@ -57,9 +57,9 @@ export function validateCrossingWays(context: Context): ValidatorFunction {
   }
 
   // lookups
-  const allowBridge = new Set(['aeroway', 'highway', 'railway', 'waterway']);
-  const allowTunnel = new Set(['highway', 'railway', 'waterway']);
-  const disallowFord = new Set([
+  const allowBridge = new Set<string>(['aeroway', 'highway', 'railway', 'waterway']);
+  const allowTunnel = new Set<string>(['highway', 'railway', 'waterway']);
+  const disallowFord = new Set<string>([
     'motorway', 'motorway_link', 'trunk', 'trunk_link',
     'primary', 'primary_link', 'secondary', 'secondary_link'
   ]);
@@ -127,10 +127,10 @@ export function validateCrossingWays(context: Context): ValidatorFunction {
    */
   function waysToCheck(entity: OsmEntity, graph: Graph): Set<OsmWay> {
     if (!getFeatureType(entity, graph)) {   // no type - not worth checking
-      return new Set();
+      return new Set<OsmWay>();
 
     } else if (entity.type === 'way') {
-      return new Set([entity as OsmWay]);
+      return new Set<OsmWay>([entity as OsmWay]);
 
     } else if (entity.type === 'relation' && entity.tags.type === 'multipolygon') {
       const result = new Set<OsmWay>();
@@ -146,7 +146,7 @@ export function validateCrossingWays(context: Context): ValidatorFunction {
       return result;
 
     } else {
-      return new Set();  // nothing to check
+      return new Set<OsmWay>();  // nothing to check
     }
   }
 

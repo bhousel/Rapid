@@ -121,18 +121,18 @@ export class ImagerySystem extends AbstractSystem {
   public constructor(context: Context) {
     super(context);
     this.id = 'imagery';
-    this.requiredDependencies = new Set(['network']);
-    this.optionalDependencies = new Set(['assets', 'gfx', 'l10n', 'storage', 'urlhash']);
+    this.requiredDependencies = new Set<SystemID>(['network']);
+    this.optionalDependencies = new Set<SystemID>(['assets', 'gfx', 'l10n', 'storage', 'urlhash']);
 
-    this._scopes = new Map();    // Map<ScopeID, ImageryScope>
-    this.features = new Map();   // Map<ImagerySourceID, GeoJSON.Feature>
+    this._scopes = new Map<ScopeID, ImageryScope>();
+    this.features = new Map<ImagerySourceID, GeoJSON.Feature>();
 
-    this._defaultAssetIDs = new Set(['editor_layer_index', 'rapid_imagery']);
-    this._loadedAssetIDs = new Map();
+    this._defaultAssetIDs = new Set<AssetID>(['editor_layer_index', 'rapid_imagery']);
+    this._loadedAssetIDs = new Map<AssetID, string>();
     this._requestedAssetIDs = null;
 
     this._baseLayer = null;
-    this._overlayLayers = new Map();
+    this._overlayLayers = new Map<ImagerySourceID, ImagerySource>();
     this._checkedBlocklists = [];
     this._isValid = true;
     this._whichPolygon = null;
@@ -321,7 +321,9 @@ export class ImagerySystem extends AbstractSystem {
   public getScope(scopeID: ScopeID): ImageryScope {
     let scope = this._scopes.get(scopeID);
     if (!scope) {
-      scope = { sources: new Map() };
+      scope = {
+        sources: new Map<ImagerySourceID, ImagerySource>()
+      };
       this._scopes.set(scopeID, scope);
     }
     return scope;
@@ -366,7 +368,7 @@ export class ImagerySystem extends AbstractSystem {
       return;
     }
 
-    this._requestedAssetIDs = new Set();
+    this._requestedAssetIDs = new Set<AssetID>();
     for (const assetID of utilIterable(vals)) {
       if (!assetID) continue;
       if (assetID === 'default') {

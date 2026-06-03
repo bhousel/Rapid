@@ -52,20 +52,11 @@ export class PixiLayerMapRoulette extends AbstractPixiLayer {
     this._enabled = val;
 
     const context = this.context;
-    const gfx = context.systems.gfx!;
     const maproulette = context.services.maproulette;
     if (val && maproulette) {
       maproulette.startAsync()
-        .then(() => gfx.immediateRedraw());
+        .then(() => this.gfx.immediateRedraw());
     }
-  }
-
-
-  /**
-   * Every Layer should have a reset function to replace any Pixi objects and internal state.
-   */
-  public reset() {
-    super.reset();
   }
 
 

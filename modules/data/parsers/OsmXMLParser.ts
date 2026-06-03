@@ -67,16 +67,18 @@ import type { OsmTags } from '../types.ts';
  * - 'bounds'         (returned with the `/map` API call)
  */
 export class OsmXMLParser {
+
   /** Unique identifiers already seen by this parser instance (avoids duplicates) */
   protected _seen: Set<string>;
   /** Accumulates the types of parsed data elements encountered (e.g. 'node', 'way', 'relation') */
   public types: Set<ParserDataType>;
 
+
   /**
    * @constructor
    */
   public constructor() {
-    this._seen = new Set();   // Set<string>  (unique identifers)
+    this._seen = new Set<string>();
 
     this._parseNode = this._parseNode.bind(this);
     this._parseWay = this._parseWay.bind(this);
@@ -93,7 +95,8 @@ export class OsmXMLParser {
     this._getTags = this._getTags.bind(this);
 
     this.types = new Set<ParserDataType>([
-      'node', 'way', 'relation', 'changeset', 'note', 'user', 'user_block', 'preferences', 'api', 'policy', 'bounds'
+      'node', 'way', 'relation', 'changeset', 'note', 'user',
+      'user_block', 'preferences', 'api', 'policy', 'bounds'
     ]);
   }
 
@@ -122,17 +125,17 @@ export class OsmXMLParser {
     const skipSeen = options.skipSeen ?? true;
 
     // include only these in the results (e.g. ['node','way','relation'])
-    let filter: Set<string>;
+    let filter: Set<ParserDataType>;
     if (options.filter instanceof Set) {
       filter = options.filter;
     } else if (Array.isArray(options.filter)) {
-      filter = new Set(options.filter);
+      filter = new Set<ParserDataType>(options.filter);
     } else {
       filter = this.types;
     }
 
     // Note: I'd like to try to find a way to avoid seenIDs, See note in EditSystem.merge()..
-    const results: ParserResult = { osm: {}, data: [], seenIDs: new Set() };
+    const results: ParserResult = { osm: {}, data: [], seenIDs: new Set<string>() };
     const xml: XmlDocument = (typeof content === 'string' ? new DOMParser().parseFromString(content.trimStart(), 'application/xml') : content);
 
     if (!xml?.childNodes) {

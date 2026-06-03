@@ -66,8 +66,12 @@ export interface AppendFunction {
  */
 export class LocalizationSystem extends AbstractSystem {
 
-  /** These are the different language packs that can be loaded */
-  protected readonly _scopes: Set<string>;
+  /**
+   * These are the different language packs that can be loaded
+   * Watch out: these are different from the "scopes" that we use elsewhere in rapid
+   *  in places like the SchemaSystem, StyleSystem, ImagerySystem.
+   */
+  protected readonly _scopes: Set<string>;  // TODO rename
 
   /** All known language codes and their local name */
   protected _languages: Record<LanguageCode, LanguageInfo>;
@@ -106,10 +110,11 @@ export class LocalizationSystem extends AbstractSystem {
   public constructor(context: Context) {
     super(context);
     this.id = 'l10n';
-    this.optionalDependencies = new Set(['assets', 'gfx', 'schema', 'urlhash']);
+    this.optionalDependencies = new Set<SystemID>(['assets', 'gfx', 'schema', 'urlhash']);
 
     // These are the different language packs that can be loaded..
-    this._scopes = new Set(['core', 'tagging', 'imagery', 'community']);
+    // watch out: these are different from "scopes" used elsewhere in Rapid.
+    this._scopes = new Set<string>(['core', 'tagging', 'imagery', 'community']);
 
     // Preferred locale codes can be used to override the detected locale, if they are set before init
     this._preferredLocaleCodes = [];
@@ -1126,7 +1131,7 @@ export class LocalizationSystem extends AbstractSystem {
    * @return The locales that we can actually support
    */
   protected _getSupportedLocales(requested: Iterable<LocaleCode>): LocaleCode[] {
-    const results = new Set();
+    const results = new Set<LocaleCode>();
 
     for (const locale of requested) {
       if (!locale) continue;

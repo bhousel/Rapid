@@ -141,10 +141,10 @@ export class NetworkSystem extends AbstractSystem {
   public constructor(context: Context) {
     super(context);
     this.id = 'network';
-    this.requiredDependencies = new Set();
+    this.requiredDependencies = new Set<SystemID>();
     this.optionalDependencies = new Set<SystemID>(['worker']);
 
-    this._inflight = new Map();
+    this._inflight = new Map<RequestID, InflightRequest>();
     this._queue = [];
     this._numActive = 0;
     this._defaultTimeout = DEFAULT_TIMEOUT;

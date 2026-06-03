@@ -43,8 +43,10 @@ type TransientCache = Map<string, Map<string, unknown>>;
  *   `tags`    Object containing key-value string pairs for the OSM tags
  */
 export class OsmEntity extends AbstractData<OsmEntityProps> {
+
   /** Cache for memoizing expensive calculations, shared between copies */
   protected _transients: TransientCache;
+
 
   /**
    * @constructor
@@ -67,7 +69,7 @@ export class OsmEntity extends AbstractData<OsmEntityProps> {
       this._transients = other._transients;
 
     } else {
-      this._transients = new Map();
+      this._transients = new Map<string, Map<string, unknown>>() as TransientCache;
     }
 
     // Idea: Store tags in a proto-less object to avoid collisions with
@@ -181,7 +183,7 @@ export class OsmEntity extends AbstractData<OsmEntityProps> {
     const entityKey = this.key;
     let cache = this._transients.get(entityKey);
     if (!cache) {
-      cache = new Map();
+      cache = new Map<string, Map<string, unknown>>() as TransientCache;
       this._transients.set(entityKey, cache);
     }
 

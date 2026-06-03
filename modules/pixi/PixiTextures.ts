@@ -6,6 +6,12 @@ import type { Context } from '../Context.ts';
 import type { GraphicsSystem } from '../core/GraphicsSystem.ts';
 
 
+/**
+ * Convenience type for texture key.
+ * These identifiers look like `${atlasID}-${textureID}`
+ */
+type TextureKey = string;
+
 /** Atlas collection containing symbol, text, and tile atlases */
 type AtlasCollection = Record<AtlasID, AtlasAllocator>;
 
@@ -40,9 +46,9 @@ export class PixiTextures {
   /** The active texture atlas collection (small / medium / large bins) */
   protected _atlas: AtlasCollection | null;
   /** All named textures keyed by a unique string (e.g. 'symbol-boldPin') */
-  protected _textureData: Map<string, TextureData>;
+  protected _textureData: Map<TextureKey, TextureData>;
   /** SVG symbol elements (or null if failed) keyed by icon name (e.g. 'temaki-school') */
-  protected _svgIcons: Map<string, SVGSymbolElement | null>;
+  protected _svgIcons: Map<TextureID, SVGSymbolElement | null>;
   /** Cached textures used by the DashLine plugin, keyed by dash pattern string */
   protected _dashTextureCache: DashTextureCache;
 
@@ -66,10 +72,10 @@ export class PixiTextures {
     // Each mapping is a unique identifying key to a PIXI.Texture
     // The Texture is not necessarily packed in an Atlas (but ideally it should be)
     // Important!  Make sure these texture keys don't conflict
-    this._textureData = new Map();   // Map<key, { PIXI.Texture, refcount }>  (e.g. 'symbol-boldPin')
+    this._textureData = new Map<TextureKey, TextureData>();  // (e.g. 'symbol-boldPin')
 
-    // Because SVGs take some time to texturize, store the svg string and texturize only if needed
-    this._svgIcons = new Map();   // Map<key, SVGSymbolElement>  (e.g. 'temaki-school')
+    // Because SVGs take some time to texturize, store the svg data and texturize only if needed
+    this._svgIcons = new Map<TextureID, SVGSymbolElement | null>();  // (e.g. 'temaki-school')
 
     // DashLine plugin needs its own cache - we could eventually put these in an atlas.
     this._dashTextureCache = {};

@@ -127,8 +127,8 @@ export class RapidDataset {
 
     this.id = props.id ?? '';
     this.serviceID = props.serviceID ?? '';
-    this.categories = props.categories ?? new Set();
-    this.tags = props.tags ?? new Set();
+    this.categories = props.categories ?? new Set<string>();
+    this.tags = props.tags ?? new Set<string>();
     this.color = props.color ?? RAPID_MAGENTA;
     this.dataUsed = props.dataUsed ?? [];
     this.extent = props.extent;

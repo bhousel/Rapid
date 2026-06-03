@@ -193,7 +193,7 @@ export class PropMatcher {
 
     // Pre-compile key list into Set for O(1) lookups
     if (this.keyOp === 'in' && Array.isArray(this.key)) {
-      this._keySet = new Set(this.key);
+      this._keySet = new Set<string>(this.key);
     }
 
     // Pre-compile value regex if needed
@@ -215,7 +215,7 @@ export class PropMatcher {
       if (typeof props.value === 'string' && isVarRef(props.value)) {
         this._varRef = props.value;
       } else if (Array.isArray(props.value)) {
-        this._valueSet = new Set(props.value as string[]);
+        this._valueSet = new Set<string>(props.value as string[]);
       }
     }
 
@@ -518,10 +518,10 @@ export class PropMatcher {
     if (Array.isArray(resolved)) {
       const strValues = resolved.map(String);
       this._resolvedValue = strValues;
-      this._valueSet = new Set(strValues);
+      this._valueSet = new Set<string>(strValues);
     } else {
       this._resolvedValue = String(resolved);
-      this._valueSet = new Set([String(resolved)]);
+      this._valueSet = new Set<string>([String(resolved)]);
     }
   }
 

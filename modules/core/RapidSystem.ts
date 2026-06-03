@@ -38,13 +38,13 @@ const RAPID_COLORS: readonly string[] = [
  */
 export class RapidSystem extends AbstractSystem {
 
-  /** Map<datasetID, RapidDataset> - all the datasets we know about */
+  /** Catalog of all the datasets we know about */
   public readonly catalog = new Map<DatasetID, RapidDataset>();
-  /** Set<string> - all the dataset 'categories' we know about */
+  /** All the dataset 'categories' we know about, free-text keywords attached to datasets */
   public readonly categories = new Set<string>();
-  /** Set<dataID> - features accepted by the user */
+  /** IDs of features accepted by the user */
   public readonly acceptIDs = new Set<DataID>();
-  /** Set<dataID> - features ignored by the user */
+  /** IDs of features ignored by the user */
   public readonly ignoreIDs = new Set<DataID>();
 
   /** IDs of datasets that have been added to the active list by the user */
@@ -68,7 +68,7 @@ export class RapidSystem extends AbstractSystem {
   public constructor(context: Context) {
     super(context);
     this.id = 'rapid';
-    this.optionalDependencies = new Set(['editor', 'gfx', 'urlhash']);
+    this.optionalDependencies = new Set<SystemID>(['editor', 'gfx', 'urlhash']);
 
     // Ensure methods used as callbacks always have `this` bound correctly.
     this._hashChanged = this._hashChanged.bind(this);
@@ -114,9 +114,9 @@ export class RapidSystem extends AbstractSystem {
     const context = this.context;
     const urlhash = context.systems.urlhash;
 
-    const esri = context.services.esri as any;
-    const mapwithai = context.services.mapwithai as any;
-    const overture = context.services.overture as any;
+    const esri = context.services.esri;
+    const mapwithai = context.services.mapwithai;
+    const overture = context.services.overture;
 
     // This code is written in a way that we can work with whatever
     // data-providing services are installed.
@@ -142,8 +142,8 @@ export class RapidSystem extends AbstractSystem {
 
         // Set some defaults if urlhash doesn't have them
         if (!urlhash?.initialHashParams.has('datasets')) {
-          this._addedDatasetIDs = new Set(['fbRoads', 'msBuildings', 'overture-places' /*, 'omdFootways'*/]);  // on menu
-          this._enabledDatasetIDs = new Set(['fbRoads', 'msBuildings']);  // checked
+          this._addedDatasetIDs = new Set<DatasetID>(['fbRoads', 'msBuildings', 'overture-places' /*, 'omdFootways'*/]);  // on menu
+          this._enabledDatasetIDs = new Set<DatasetID>(['fbRoads', 'msBuildings']);  // checked
           this._datasetsChanged();
         }
 

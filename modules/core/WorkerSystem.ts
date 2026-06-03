@@ -104,7 +104,7 @@ export class WorkerSystem extends AbstractSystem {
   public constructor(context: Context) {
     super(context);
     this.id = 'worker';
-    this.requiredDependencies = new Set();
+    this.requiredDependencies = new Set<SystemID>();
     this.optionalDependencies = new Set<SystemID>(['scheduler']);
 
     // Set a default value for _workerURL here.
@@ -124,8 +124,8 @@ export class WorkerSystem extends AbstractSystem {
     this._maxWorkers = DEFAULT_MAX_WORKERS;
     this._workerIndex = 0;
     this._nextRequestID = 1;
-    this._pendingRequests = new Map();
-    this._listeners = new Map();
+    this._pendingRequests = new Map<number, PendingWorkerRequest>();
+    this._listeners = new Map<ListenerID, Listener>();
   }
 
 

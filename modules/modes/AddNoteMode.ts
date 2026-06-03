@@ -86,7 +86,7 @@ export class AddNoteMode extends AbstractMode {
     const note: OsmNote = new MarkerData(context, props);
     osm.replaceNote(note);
 
-    const selection = new Map().set(note.id, note);
+    const selection = new Map<DataID, MarkerData>().set(note.id, note);
     context.enter('select', { selection: selection });
   }
 

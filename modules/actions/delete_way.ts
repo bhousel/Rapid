@@ -30,7 +30,7 @@ export function actionDeleteWay(wayID: EntityID, doDeleteDegenerate: boolean = t
     }
 
     // remove child nodes from this way
-    const nodeIDs = new Set(way.nodes);
+    const nodeIDs = new Set<EntityID>(way.nodes);
     way = way.update({ nodes: [] });
     graph.replace(way);
 

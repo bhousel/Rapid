@@ -86,7 +86,7 @@ export class Category {
   public presets: Preset[];
 
   /** Pre-localized display strings keyed by locale code */
-  protected _strings: Map<string, CategoryStrings>;
+  protected _strings: Map<LocaleCode, CategoryStrings>;
   /** The locale code in effect when `_currStrings` was last computed */
   protected _currLocaleCode: LocaleCode | null;
   /** Display strings for the current locale (name, terms, search tokens) */
@@ -106,7 +106,7 @@ export class Category {
       throw new Error('Category missing id property');
     }
 
-    this._strings = new Map();    // Map<localeCode, Object> to store pre-localized text strings
+    this._strings = new Map<LocaleCode, CategoryStrings>(); // pre-localized text strings
     this._currLocaleCode = null;  // The current locale code
     this._currStrings = {} as CategoryStrings;  // The current strings
 
@@ -122,7 +122,7 @@ export class Category {
 
     // For convenient access:
     this.categoryID = this.props.id;
-    this.geometries = new Set();
+    this.geometries = new Set<GeometryType>();
     this.presets = [];
   }
 
@@ -143,7 +143,7 @@ export class Category {
       .filter((p): p is Preset => !!p);
 
     // The geometries available for this category will include all geometries of its presets.
-    this.geometries = new Set();
+    this.geometries = new Set<GeometryType>();
     for (const preset of this.presets) {
       this.geometries = this.geometries.union(preset.geometries);
     }

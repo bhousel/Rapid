@@ -228,12 +228,14 @@ export class AtlasAllocator {
  * An `AtlasSource` is used by {@link AtlasAllocator} to manage texture sources.
  */
 export class AtlasSource extends PIXI.TextureSource<PIXI.BufferSourceOptions> {
+
   /** Map of texture UID to AtlasItem */
   public items: Map<number, AtlasItem>;
   /** The bin packer for this slab */
   public binPacker: GuilloteneAllocator;
   /** 2D context of the backing canvas, if canvas-backed (for canvas renderer) */
   protected _canvasCtx: CanvasRenderingContext2D | null;
+
 
   /**
    * Creates a TextureSource for the textures in the atlas (aka a "slab")
@@ -255,7 +257,7 @@ export class AtlasSource extends PIXI.TextureSource<PIXI.BufferSourceOptions> {
     });
     this.uploadMethodId = 'atlas';
 
-    this.items = new Map();
+    this.items = new Map<number, AtlasItem>();
     this.binPacker = new GuilloteneAllocator(size, size);
 
     // For the canvas renderer, we need a backing canvas as the resource.

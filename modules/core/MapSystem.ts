@@ -56,8 +56,8 @@ export class MapSystem extends AbstractSystem {
   public constructor(context: Context) {
     super(context);
     this.id = 'map';
-    this.requiredDependencies = new Set(['editor', 'gfx']);
-    this.optionalDependencies = new Set(['filters', 'l10n', 'rapid', 'schema', 'storage', 'urlhash']);
+    this.requiredDependencies = new Set<SystemID>(['editor', 'gfx']);
+    this.optionalDependencies = new Set<SystemID>(['filters', 'l10n', 'rapid', 'schema', 'storage', 'urlhash']);
 
     // display options
     this.areaFillOptions = ['wireframe', 'partial', 'full'];
@@ -758,7 +758,7 @@ export class MapSystem extends AbstractSystem {
       .then((note: MarkerData) => {
         if (!note.loc) return;
         scene.enableLayers('notes');
-        const selection = new Map().set(note.id, note);
+        const selection = new Map<DataID, MarkerData>().set(note.id, note);
         context.enter('select', { selection: selection });
         this.centerZoomEase(note.loc, 19);
       });

@@ -2,14 +2,14 @@ import { AbstractSystem } from './AbstractSystem.ts';
 import { Difference, Edit, Graph, Tree } from '../lib/index.ts';
 import { easeLinear as d3_easeLinear } from 'd3-ease';
 import { Extent, geoScaleToZoom } from '@rapid-sdk/math';
-import { OsmEntity as OsmEntityClass, createOsmEntity } from '../data/index.ts';
+import { OsmEntity, createOsmEntity } from '../data/index.ts';
 import { select as d3_select } from 'd3-selection';
 import { uiLoading } from '../ui/loading.js';
 import { utilArrayGroupBy, utilObjectOmit, utilSessionMutex } from '@rapid-sdk/util';
 
 import type { Context } from '../Context.ts';
 import type { Action } from '../actions/types.ts';
-import type { OsmEntity, OsmEntityProps, OsmTags } from '../data/types.ts';
+import type { OsmEntityProps, OsmRelation, OsmTags } from '../data/types.ts';
 import type { TransformProps, Vec2 } from '@rapid-sdk/math';
 
 
@@ -204,8 +204,8 @@ export class EditSystem extends AbstractSystem {
     super(context);
 
     this.id = 'editor';     // was 'history'
-    this.requiredDependencies = new Set(['spatial', 'storage']);
-    this.optionalDependencies = new Set(['gfx', 'imagery', 'photos', 'scheduler']);
+    this.requiredDependencies = new Set<SystemID>(['spatial', 'storage']);
+    this.optionalDependencies = new Set<SystemID>(['gfx', 'imagery', 'photos', 'scheduler']);
 
     this._mutex = utilSessionMutex('lock');
     this._canRestoreBackup = false;
@@ -215,7 +215,7 @@ export class EditSystem extends AbstractSystem {
     this._index = 0;
     this._staging = null!;
 
-    this._checkpoints = new Map();
+    this._checkpoints = new Map<CheckpointID, Checkpoint>();
     this._inTransition = false;
     this._inTransaction = false;
     this._tree = null!;
@@ -739,12 +739,12 @@ export class EditSystem extends AbstractSystem {
 
     // Collect the Entities, create if necessary...
     const entities: OsmEntity[] = [];
-    for (const props of toMerge) {
+    for (const entityOrProps of toMerge) {
       let entity: OsmEntity;
-      if (props instanceof OsmEntityClass) {
-        entity = props;
+      if (entityOrProps instanceof OsmEntity) {
+        entity = entityOrProps;
       } else {
-        entity = createOsmEntity(context, props);
+        entity = createOsmEntity(context, entityOrProps);
       }
       entities.push(entity);
 
@@ -767,7 +767,7 @@ export class EditSystem extends AbstractSystem {
     if (seenIDs instanceof Set) {
       effectiveSeenIDs = seenIDs;
     } else {
-      effectiveSeenIDs = new Set(entities.map(entity => entity.id));
+      effectiveSeenIDs = new Set<EntityID>(entities.map(entity => entity.id));
     }
 
     // If we are merging in new relation members, bump the relation's version.
@@ -775,9 +775,10 @@ export class EditSystem extends AbstractSystem {
       const entity = stagingGraph.hasEntity(id);
       if (entity?.type !== 'relation') continue;
 
-      for (const member of (entity as any).members) {
+      const relation = entity as OsmRelation;
+      for (const member of relation.members) {
         if (newIDs.has(member.id)) {
-          (entity as any).touch();  // bump version in place
+          relation.touch();  // bump version in place
         }
       }
     }
@@ -1266,7 +1267,7 @@ export class EditSystem extends AbstractSystem {
 
       // Merge base entities into base graph (force = true, as new nodes may affect their parentways extents in tree)
       const baseEntities = [...__baseEntities.values()];
-      const baseEntityIDs = new Set(__baseEntities.keys());
+      const baseEntityIDs = new Set<EntityID>(__baseEntities.keys());
       const baseGraph = this.base.graph!;
       baseGraph.rebase(baseEntities, [baseGraph], true);   // force = true
       this._tree.rebase(baseEntities, true);               // force = true

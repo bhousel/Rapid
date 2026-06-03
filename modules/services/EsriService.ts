@@ -127,7 +127,7 @@ export class EsriService extends AbstractSystem {
     this.optionalDependencies = new Set<SystemID>(['gfx', 'locations']);
 
     this._tiler = new Tiler().zoomRange(TILEZOOM) as Tiler;
-    this._datasets = new Map();
+    this._datasets = new Map<DatasetID, EsriDatasetEntry>();
 
     this._datasetsPromise = null;
   }
@@ -169,8 +169,8 @@ export class EsriService extends AbstractSystem {
       ds.graph = new Graph(this.context);
       ds.tree = new Tree(ds.graph, datasetID);
       ds.cache = {
-        loaded:    new Map(),   // Map<tileID, Tile>
-        seen:      new Set()    // Set<featureID>
+        loaded: new Map<TileID, Tile>(),
+        seen:   new Set<string>()
       };
       ds.lastv = null;
     }
@@ -189,7 +189,7 @@ export class EsriService extends AbstractSystem {
     //  and `getAvailableDatasets` is called by RapidSystem's `startAsync`.
     return [...this._datasets.values()].map(d => {
       // gather categories
-      const categories = new Set(['esri']);
+      const categories = new Set<string>(['esri']);
       for (const c of d.groupCategories) {
         categories.add(c.toLowerCase().replace('/categories/', ''));
       }
@@ -364,8 +364,8 @@ export class EsriService extends AbstractSystem {
     ds.graph = new Graph(this.context);
     ds.tree = new Tree(ds.graph, ds.id);
     ds.cache = {
-      loaded:    new Map(),   // Map<tileID, Tile>
-      seen:      new Set()    // Set<featureID>
+      loaded: new Map<TileID, Tile>(),
+      seen:   new Set<string>()
     };
     ds.lastv = null;
     ds.layer = null;   // the schema info will live here

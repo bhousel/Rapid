@@ -52,24 +52,14 @@ export class PixiLayerOsmNotes extends AbstractPixiLayer {
     this._enabled = val;
 
     const context = this.context;
-    const gfx = context.systems.gfx!;
     const osm = context.services.osm;
     if (val && osm) {
       osm.startAsync()
-        .then(() => gfx.immediateRedraw());
+        .then(() => this.gfx.immediateRedraw());
     }
   }
 
 
-  /**
-   * Every Layer should have a reset function to replace any Pixi objects and internal state.
-   */
-  public reset() {
-    super.reset();
-  }
-
-
-  /**
   /**
    * Renders the OSM note markers for this frame.
    * @param  frame    -  Integer frame being rendered
