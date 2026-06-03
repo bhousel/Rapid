@@ -45,6 +45,10 @@ export interface DispatchOptions {
    *
    * When SchedulerSystem is unavailable (tests, CLI), the result
    * resolves immediately — no worse than the current behavior.
+   *
+   * If SchedulerSystem later cancels queued deferred work (for example,
+   * during reset), the dispatch promise rejects with `AbortError`.
+   * Callers should treat this as an expected cancellation path.
    */
   resultPriority?: PriorityLevel;
 }
@@ -64,9 +68,9 @@ const DEFAULT_MAX_WORKERS = 2;
  *
  * This system has no required dependencies and should be available very early.
  * Design rationale:
- * - SchedulerSystem = **when** to run (game loop, queues, timers, backpressure)
- * - WorkerSystem = **where** to run (worker pool, task dispatch, listener registry)
- * - NetworkSystem = network I/O (fetch lifecycle, inflight tracking, dedup, concurrency)
+ * - `SchedulerSystem` = **when** to run (game loop, queues, timers, backpressure)
+ * - `WorkerSystem` = **where** to run (worker pool, task dispatch, listener registry)
+ * - `NetworkSystem` = network I/O (fetch lifecycle, inflight tracking, dedup, concurrency)
  *
  * Events available:
  * - `paused`     Fires when the system transitions from unpaused to paused
@@ -176,7 +180,8 @@ export class WorkerSystem extends AbstractSystem {
   public get workerURL(): string | null {
     return this._workerURL;
   }
-  /** Sets the URL for the worker script; pass null to disable worker offloading.
+  /**
+   * Sets the URL for the worker script; pass null to disable worker offloading.
    * @param url - URL string for the worker script, or `null` to disable
    */
   public set workerURL(url: string | null) {
@@ -193,7 +198,8 @@ export class WorkerSystem extends AbstractSystem {
   public get maxWorkers(): number {
     return this._maxWorkers;
   }
-  /** Sets the maximum number of workers in the pool (minimum 1).
+  /**
+   * Sets the maximum number of workers in the pool (minimum 1).
    * @param n - Maximum pool size; values below 1 are clamped to 1
    */
   public set maxWorkers(n: number) {
@@ -234,14 +240,23 @@ export class WorkerSystem extends AbstractSystem {
    * sent to the worker, the pending promise rejects with an AbortError,
    * and the worker-side AbortController is triggered.
    *
+   * If `options.resultPriority` is provided, result delivery may be deferred
+   * through SchedulerSystem. If that deferred task is cancelled before running
+   * (for example during scheduler reset), this promise also rejects with
+   * `AbortError`. Callers should handle `AbortError` as expected cancellation.
+   *
    * @param listenerID - The id of the listener function
    * @param data - Serializable input for the listener
    * @param signal - Optional AbortSignal to cancel the task
    * @param options - Optional dispatch options (e.g. deferred result priority)
-   * @return Promise resolved with the task result, or rejected on error
+   * @return Promise resolved with the task result, or rejected on error/cancellation
    * @throws Error if `workerURL` has not been set
    */
-  public dispatch<T = unknown>(listenerID: ListenerID, data?: unknown, signal?: AbortSignal, options?: DispatchOptions): Promise<T> {
+  public dispatch<T = unknown>(
+    listenerID: ListenerID,
+    data?: unknown, signal?: AbortSignal,
+    options?: DispatchOptions
+  ): Promise<T> {
     if (!this._workerURL) {
       return Promise.reject(new Error('WorkerSystem: workerURL not set'));
     }
@@ -361,6 +376,9 @@ export class WorkerSystem extends AbstractSystem {
 
   /**
    * Creates a new Worker and wires up message/error handlers.
+   *
+   * Deferred result delivery failures (including scheduler-triggered `AbortError` cancellations)
+   * are propagated to the original dispatch caller via `pending.reject(...)`.
    * @return  The newly created worker
    */
   protected _spawnWorker(): Worker {

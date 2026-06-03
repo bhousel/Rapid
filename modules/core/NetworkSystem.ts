@@ -48,7 +48,7 @@ export interface NetworkFetchOptions extends Omit<RequestInit, 'signal'> {
   listenerData?: Record<string, unknown>;
 
   /**
-   * When set, worker results are deferred through SchedulerSystem at
+   * When set, worker results are deferred through `SchedulerSystem` at
    * the given priority.  Prevents heavy `.then()` chains from blowing
    * the frame budget.  Passed through to `WorkerSystem.dispatch()`.
    * @see DispatchOptions.resultPriority
@@ -279,13 +279,22 @@ export class NetworkSystem extends AbstractSystem {
 
 
   /**
-   * The primary API.  Fetches a URL with automatic:
-   *   - Inflight dedup (by `key`)
-   *   - Timeout (default 30s, configurable)
-   *   - AbortController management
-   *   - Worker offloading (when worker + workerURL are available)
-   *   - Response parsing via `utilFetchResponse`
-   *   - Concurrency limiting
+   * Wrapper for the `fetch` API.  Fetches a URL with automatic:
+   * - Inflight dedup (by `key`)
+   * - Timeout (default 30s, configurable)
+   * - `AbortController` management
+   * - Worker offloading (when worker + workerURL are available)
+   * - Response parsing via `utilFetchResponse`
+   * - Concurrency limiting
+   *
+   * Rejection behavior:
+   * - `AbortError` for expected cancellation paths (manual abort, timeout,
+   *   or reset-related cancellation)
+   * - Other errors for true failures (network, parse, missing listener, etc.)
+   *
+   * If using the `resultPriority` option, results may be deferred through
+   * `SchedulerSystem` and can also reject with `AbortError` if the deferred
+   * task is cancelled before it runs.
    *
    * @param url - The URL to fetch
    * @param options - Fetch options + NetworkSystem extensions
@@ -316,6 +325,9 @@ export class NetworkSystem extends AbstractSystem {
    *
    * Inflight tracking, dedup, timeout, and abort still apply.
    * Always runs on main thread (no worker dispatch).
+   *
+   * Rejects with `AbortError` for expected cancellation paths
+   * (manual abort, timeout, reset-related cancellation).
    *
    * @param url - The URL to fetch
    * @param options - Fetch options + NetworkSystem extensions
@@ -446,6 +458,10 @@ export class NetworkSystem extends AbstractSystem {
    * The `.finally()` cleanup is chained directly onto the returned promise
    * so there is exactly one promise chain — no orphaned branches that
    * could produce unhandled rejections.
+   *
+   * Queued requests remain abortable while waiting for a concurrency slot;
+   * aborting a queued request rejects with `AbortError`.
+   *
    * @param requestID - The dedup/cancellation identifier
    * @param controller - The AbortController for this request
    * @param dispatch - Callback that performs the actual fetch
@@ -576,10 +592,14 @@ export class NetworkSystem extends AbstractSystem {
    * When a named `listenerID` is provided, it is dispatched to the worker
    * (via `dispatch`) when available, or executed directly
    * on the main thread using the registered listener as fallback.
+   * If `resultPriority` is set for a named listener, worker results are
+   * deferred through `SchedulerSystem`, so cancellation before deferred
+   * execution may reject with `AbortError`.
    *
    * Relative URLs are resolved to absolute before dispatching to a worker,
    * because the worker script runs in a different path context and would
    * resolve relative URLs against its own location.
+   *
    * @param url - The URL to fetch
    * @param signal - The abort signal for this request
    * @param options - Fetch options + NetworkSystem extensions
@@ -646,6 +666,7 @@ export class NetworkSystem extends AbstractSystem {
    * the worker script's location.
    *
    * Absolute URLs (http://, https://, data:, blob:) pass through unchanged.
+   *
    * @param url - The possibly-relative URL to resolve
    * @return  The absolute URL
    */

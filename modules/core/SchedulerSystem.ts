@@ -134,9 +134,9 @@ const PRESSURE_RECOVER = {
  * `maxWorkers` and terminated on `resetAsync()`.
  *
  * Events available:
- * - `paused`    Fires when the system transitions from unpaused to paused
- * - `resumed`   Fires when the system transitions from paused to unpaused
- * - `pressure`  Fires when backpressure level changes
+ * - `paused`          Fires when the system transitions from unpaused to paused
+ * - `resumed`         Fires when the system transitions from paused to unpaused
+ * - `pressurechange`  Fires when backpressure level changes
  */
 export class SchedulerSystem extends AbstractSystem {
 
@@ -288,7 +288,7 @@ export class SchedulerSystem extends AbstractSystem {
    * @param fn - The function to execute
    * @param opts - Scheduling options (priority, etc.)
    * @return Promise resolved after the task completes, rejected if the task throws or is cancelled
-   *   (cancellations reject with `AbortError`)
+   *   (cancellations reject with `AbortError`; callers can treat this as expected)
    */
   public schedule(fn: () => void, opts?: ScheduleOptions): Promise<void> {
     return new Promise<void>((resolve, reject) => {
@@ -315,8 +315,8 @@ export class SchedulerSystem extends AbstractSystem {
 
 
   /**
-   * Cancels every outstanding queued task (urgent, normal, and idle)
-   * and rejects their promises.  Useful during reset or teardown.
+   * Cancels every outstanding queued task and rejects their promises with `AbortError`.
+   * Useful during reset or teardown.
    */
   public cancelAllIdleTasks(): void {
     const err = new Error('Scheduler task cancelled during reset.');
@@ -352,7 +352,8 @@ export class SchedulerSystem extends AbstractSystem {
   public get targetFrameTime(): number {
     return this._targetFrameTime;
   }
-  /** Sets the target frame time budget in milliseconds (minimum 1 ms).
+  /**
+   * Sets the target frame time budget in milliseconds (minimum 1 ms).
    * @param ms - Frame budget in milliseconds; values below 1 are clamped to 1
    */
   public set targetFrameTime(ms: number) {
@@ -669,6 +670,10 @@ export class SchedulerSystem extends AbstractSystem {
    * Used by the workID-based timer methods when a timer matures.
    * Unlike `schedule()`, this does not return a Promise.
    *
+   * Cancellation rejections (`AbortError`) are expected during reset/cancel
+   * flows and intentionally ignored here, because there is no caller awaiting
+   * these fire-and-forget tasks.
+   *
    * @param fn - The function to execute
    * @param priority - Which queue to use
    * @param workID - Optional workID for cancellation support
@@ -693,7 +698,7 @@ export class SchedulerSystem extends AbstractSystem {
 
   /**
    * Removes all queued tasks matching `workID` from every priority queue
-   * and rejects their promises.
+   * and rejects their promises with `AbortError`.
    *
    * @param workID - The work identifier to remove
    */
@@ -808,8 +813,8 @@ export class SchedulerSystem extends AbstractSystem {
    * tasks only run while `performance.now()` is below the deadline.
    *
    * Under backpressure, idle queue draining is reduced or skipped:
-   *   - `'light'`    — idle tasks get half the remaining budget
-   *   - `'moderate'`/`'heavy'` — idle queue is skipped entirely
+   * - `'light'`    — idle tasks get half the remaining budget
+   * - `'moderate'`/`'heavy'` — idle queue is skipped entirely
    *
    * @param deadline - Absolute `performance.now()` time to stay under
    */
@@ -913,13 +918,12 @@ export class SchedulerSystem extends AbstractSystem {
     } else if (prev === 'light') {
       if (ratio > PRESSURE_ESCALATE.moderate)       next = 'moderate';
       else if (ratio < PRESSURE_RECOVER.light)      next = 'none';
-      else                                           next = 'light';
+      else                                          next = 'light';
     } else if (prev === 'moderate') {
-      if (ratio > PRESSURE_ESCALATE.heavy)           next = 'heavy';
-      else if (ratio < PRESSURE_RECOVER.moderate)    next = 'light';
-      else                                           next = 'moderate';
-    } else {
-      // prev === 'heavy'
+      if (ratio > PRESSURE_ESCALATE.heavy)          next = 'heavy';
+      else if (ratio < PRESSURE_RECOVER.moderate)   next = 'light';
+      else                                          next = 'moderate';
+    } else { // prev === 'heavy'
       next = ratio < PRESSURE_RECOVER.heavy ? 'moderate' : 'heavy';
     }
 
