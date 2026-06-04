@@ -7,7 +7,7 @@ import { PixiFeaturePolygon } from './PixiFeaturePolygon.ts';
 import { projWorldToWgs84, vecAngle, vecLength, vecInterp, WORLD_ZOOM } from '@rapid-sdk/math';
 
 import type { MatchedStyle } from '../core/StyleSystem.ts';
-import type { OsmEntity, OsmNode, OsmRelation, OsmRelationMember, OsmTags, OsmWay } from '../data/types.ts';
+import type { OsmEntity, OsmNode, OsmRelation, OsmTags, OsmWay } from '../data/types.ts';
 import type { PixiLayerMapUI } from './PixiLayerMapUI.ts';
 import type { PixiScene } from './PixiScene.ts';
 import type { Vec2, Viewport } from '@rapid-sdk/math';
@@ -180,7 +180,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
 
 
   /**
-   * Render any data we have, and schedule fetching more of it to cover the view
+   * Render any OSM data within view, and schedule fetching more of it to cover the view/
    * @param frame - Integer frame being rendered
    * @param viewport - Pixi viewport to use for rendering
    */
@@ -203,7 +203,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
       polygons: new Map<EntityID, OsmWay | OsmRelation>(),
       lines: new Map<EntityID, OsmWay>(),
       points: new Map<EntityID, OsmNode>(),
-      vertices: new Map<EntityID, OsmNode>(),
+      vertices: new Map<EntityID, OsmNode>()
     };
 
     for (const entity of entities) {
@@ -216,6 +216,9 @@ export class PixiLayerOsm extends AbstractPixiLayer {
         data.lines.set(entity.id, entity as OsmWay);
       } else if (geom === 'area') {
         data.polygons.set(entity.id, entity as OsmWay | OsmRelation);
+//      } else if (geom === 'relation') {
+//        // No support for this now, but it would be very nice to support
+//        // special rendering for a selected relation.
       }
     }
 
@@ -223,10 +226,11 @@ export class PixiLayerOsm extends AbstractPixiLayer {
     this.renderLines(frame, viewport, data);
     this.renderPoints(frame, viewport, data);
 
-    // At this point, all the visible linear features have been accounted for,
+    // At this point, all the visible features have been accounted for,
     // and parent-child data links have been established.
+    // We can prepare vertices and midpoints.
 
-    // Gather ids related for the selected/hovered/drawing features.
+    // Gather ids related to the selected/hovered/drawing features.
     const selectedIDs = this.getDataWithClass('select');
     const hoveredIDs = this.getDataWithClass('hover');
     const drawingIDs = this.getDataWithClass('drawing');
@@ -241,7 +245,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
       if (!extent) continue;
 
       // Determine dimensions in screen pixels
-      const worldScale = 2 ** (viewZoom - WORLD_ZOOM) || 1;
+      const worldScale = 2 ** (viewZoom - WORLD_ZOOM);
       const w = Math.abs(extent.max[0] - extent.min[0]) * worldScale;
       const h = Math.abs(extent.max[1] - extent.min[1]) * worldScale;
 
@@ -346,7 +350,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
           feature.setData(entityID, entity);
           feature.clearChildData(entityID);
           if (entity.type === 'relation') {
-            feature.addChildData(entityID, (entity as OsmRelation).members.map((member: OsmRelationMember) => member.id));
+            feature.addChildData(entityID, (entity as OsmRelation).members.map(member => member.id));
           }
           if (entity.type === 'way') {
             feature.addChildData(entityID, (entity as OsmWay).nodes);
@@ -359,7 +363,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
           const preset = schema.match(entity, graph);
 
           const geometry = entity.geometry(graph);
-          const style = styles.styleMatch(entity.tags, geometry, 'osm') as MatchedStyle;
+          const style = styles.styleMatch(entity.tags, geometry, 'osm');
           feature.style = style;
 
           const label = l10n.displayPOIName(entity.tags);
@@ -403,7 +407,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
 
           if (poiFeature.dirty) {
             // copy the polygon style, then apply customizations
-            const markerStyle = structuredClone(feature.style) as MatchedStyle;  // clone the style
+            const markerStyle = structuredClone(feature.style) as MatchedStyle;
 
             if (hasWikidata(entity)) {
               markerStyle.marker.image = 'boldPin';
@@ -466,7 +470,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
 
     const ways = data.lines;
     for (const [wayID, way] of ways) {
-      const layer = (typeof way.layer === 'function') ? way.layer() : 0;
+      const layer = way.layer();
       const levelContainer = _getLevelContainer(layer.toString());
       const zindex = getzIndex(way.tags);
       const version = way.v || 0;
@@ -475,89 +479,84 @@ export class PixiLayerOsm extends AbstractPixiLayer {
 
       for (let i = 0; i < parts.length; ++i) {
         const part = parts[i];
-        if (!part.world) continue;  // invalid?
+        if (!part.world || part.type !== 'LineString') continue;  // invalid?
 
-        const rings = (part.type === 'LineString') ? [part.world.coords]
-          : (part.type === 'Polygon') ? part.world.coords
-          : [];
+        const featureID = `${this.layerID}-${wayID}-${i}`;
+        let feature = this.features.get(featureID) as PixiFeatureLine | undefined;
 
-        for (let j = 0; j < rings.length; ++j) {
-          const featureID = `${this.layerID}-${wayID}-${i}-${j}`;
-          let feature = this.features.get(featureID) as PixiFeatureLine | undefined;
-
-          // If feature existed before as a different type, recreate it.
-          if (feature && feature.type !== 'LineString') {
-            feature.destroy();
-            feature = undefined;
-          }
-
-          if (!feature) {
-            feature = new PixiFeatureLine(this, featureID);
-          }
-
-          // If data has changed.. Replace data and parent-child links.
-          if (feature.v !== version) {
-            feature.v = version;
-            feature.geometry = part;
-            feature.parentContainer = levelContainer;    // Change layer stacking if necessary
-            feature.container.zIndex = zindex;
-
-            feature.setData(wayID, way);
-            feature.clearChildData(wayID);
-            feature.addChildData(wayID, way.nodes);
-          }
-
-          this.syncFeatureClasses(feature);
-
-          if (feature.dirty) {
-            let tags = way.tags;
-            let geometry = way.geometry(graph);
-
-            // a line no tags - try to style match the tags of its parent relation
-            if (!way.hasInterestingTags()) {
-              const parent = graph.parentRelations(way).find(relation => relation.isMultipolygon());
-              if (parent) {
-                tags = parent.tags;
-                geometry = 'area';
-              }
-            }
-
-            const style = styles.styleMatch(tags, geometry, 'osm') as MatchedStyle;
-            // Todo: handle alternating/two-way case too
-            if (geometry === 'line') {
-              if (way.isOneWay()) {
-                style.lineMarker ??= {};
-                const isAlternating = (way.tags.oneway === 'alternating' || way.tags.oneway === 'reversible');
-                style.lineMarker.image = isAlternating ? 'twoway' : 'oneway';
-              } else {
-                delete style.lineMarker;
-              }
-              if (way.isSided()) {
-                style.sidedMarker ??= {};
-                style.sidedMarker.image = 'sided';
-              } else {
-                delete style.sidedMarker;
-              }
-
-            } else {  // an area
-// todo, consider whether we need these
-              style.casing.width = 0;
-              style.stroke.color = style.fill.color;
-              style.stroke.width = 2;
-              delete style.lineMarker;
-              delete style.sidedMarker;
-            }
-            feature.style = style;
-
-            feature.label = l10n.displayName(way.tags);
-          }
-
-          feature.update(viewport);
-          this.retainFeature(feature, frame);
+        // If feature existed before as a different type, recreate it.
+        if (feature && feature.type !== 'LineString') {
+          feature.destroy();
+          feature = undefined;
         }
+
+        if (!feature) {
+          feature = new PixiFeatureLine(this, featureID);
+        }
+
+        // If data has changed.. Replace data and parent-child links.
+        if (feature.v !== version) {
+          feature.v = version;
+          feature.geometry = part;
+          feature.parentContainer = levelContainer;    // Change layer stacking if necessary
+          feature.container.zIndex = zindex;
+
+          feature.setData(wayID, way);
+          feature.clearChildData(wayID);
+          feature.addChildData(wayID, way.nodes);
+        }
+
+        this.syncFeatureClasses(feature);
+
+        if (feature.dirty) {
+          let styleTags = way.tags;
+          let styleGeometry: 'line' | 'area' = 'line';
+          let isUntaggedMultipolygonEdge = false;
+
+          // A line no tags - If it's a multipolygon edge (e.g. outer or inner),
+          // attempt to styleMatch the tags of its parent relation.
+          if (!way.hasInterestingTags()) {
+            const parent = graph.parentRelations(way).find(relation => relation.isMultipolygon());
+            if (parent) {
+              styleTags = parent.tags;
+              styleGeometry = 'area';
+              isUntaggedMultipolygonEdge = true;
+            }
+          }
+
+          const style = styles.styleMatch(styleTags, styleGeometry, 'osm');
+          if (way.isOneWay()) {
+            style.lineMarker ??= {};
+            const isAlternating = (way.tags.oneway === 'alternating' || way.tags.oneway === 'reversible');
+            style.lineMarker.image = isAlternating ? 'twoway' : 'oneway';
+          } else {
+            delete style.lineMarker;
+          }
+          if (way.isSided()) {    // todo: handle both-sided cases
+            style.sidedMarker ??= {};
+            style.sidedMarker.image = 'sided';
+          } else {
+            delete style.sidedMarker;
+          }
+
+          // Override styling for untagged 'inner'/'outer' ways.
+          // Note that multipolygons were already fully rendered by `renderPolygons` -
+          // what we are doing here is rendering the 'inner'/'outer' lines that
+          // sit on top of the multipolygon edges and are selectable as ways.
+          if (isUntaggedMultipolygonEdge) {
+            style.casing.width = 0;
+            style.stroke.color = style.fill.color;
+            style.stroke.width = 2;
+          }
+
+          feature.style = style;
+          feature.label = l10n.displayName(way.tags);
+        }
+
+        feature.update(viewport);
+        this.retainFeature(feature, frame);
       }
     }
-
   }
 
 
@@ -631,7 +630,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
       feature.parentContainer = parentContainer;   // change layer stacking if necessary
 
       if (feature.dirty) {
-        const markerStyle = styles.styleMatch(node.tags, 'vertex', 'osm') as MatchedStyle;
+        const markerStyle = styles.styleMatch(node.tags, 'vertex', 'osm');
 
         // If we have an icon, increase the size of the marker..
         if (markerStyle.icon.image) {
@@ -709,7 +708,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
       this.syncFeatureClasses(feature);
 
       if (feature.dirty) {
-        const markerStyle = styles.styleMatch(node.tags, 'point', 'osm') as MatchedStyle;
+        const markerStyle = styles.styleMatch(node.tags, 'point', 'osm');
 
         if (hasWikidata(node)) {
           markerStyle.marker.image = 'boldPin';
@@ -756,7 +755,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
     const context = this.context;
     const graph = context.systems.editor!.staging.graph;
 
-    // Need to gather both lines and polygons for drawing our midpoints
+    // Need to consider both lines and polygons for drawing our midpoints
     const ways = new Map<EntityID, OsmWay>();
     for (const [entityID, entity] of data.lines) {
       ways.set(entityID, entity);
