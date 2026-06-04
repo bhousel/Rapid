@@ -119,7 +119,7 @@ export class PixiLayerMapillaryDetections extends AbstractPixiLayer {
         feature = new PixiFeaturePoint(this, featureID);
         feature.parentContainer = parentContainer;
         feature.geometry = part;
-        feature.setData(d.id, d);
+        feature.data = d;
       }
 
       this.syncFeatureClasses(feature);

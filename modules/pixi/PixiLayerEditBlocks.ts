@@ -122,7 +122,7 @@ export class PixiLayerEditBlocks extends AbstractPixiLayer {
           feature.parentContainer = parentContainer;
           feature.container.cursor = 'not-allowed';
           feature.geometry = part;
-          feature.setData(dataID, d);
+          feature.data = d;
         }
 
         // this.syncFeatureClasses(feature);

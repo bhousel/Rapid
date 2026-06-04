@@ -74,6 +74,7 @@ export type LabelProps = TextLabelProps | RopeLabelProps;
  * - (also all properties inherited from `AbstractPixiFeature`)
  */
 export class PixiFeatureLabel extends AbstractPixiFeature {
+
   /** Narrow the inherited `layer` reference so we can call `resolveLabelTexture()`. */
   public declare layer: PixiLayerLabels;
 

@@ -23,6 +23,7 @@ type StrokeStyleWithDash = PIXI.StrokeStyle & DashLineOptions;
  * - (also all properties inherited from `AbstractPixiFeature`)
  */
 export class PixiFeaturePoint extends AbstractPixiFeature {
+
   /** PIXI.Sprite for the marker */
   public marker: PIXI.Sprite | null;
   /** PIXI.Sprite for the icon */

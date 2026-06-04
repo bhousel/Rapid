@@ -332,10 +332,13 @@ export class SelectBehavior extends AbstractBehavior {
     this._cancelLongPress();
 
     const context = this.context;
+    const editor = context.systems.editor!;
     const gfx = context.systems.gfx!;
+    const graph = editor.staging.graph;
     const photos = context.systems.photos;
     const scheduler = context.systems.scheduler!;
     const eventManager = gfx.eventManager!;
+
 
     const modifiers = eventManager.modifierKeys;
     const isMac = utilDetect().os === 'mac';
@@ -350,8 +353,8 @@ export class SelectBehavior extends AbstractBehavior {
 
     // Determine what we clicked on and switch modes..
     const target = eventData.target;
-    let data: any = target?.data;
-    let dataID = target?.dataID || null;
+    let data = target?.data;
+    let dataID = target?.dataID;
 
     // If we're clicking on something real, we want to pause doubleclick zooms
     if (data) {
@@ -363,8 +366,9 @@ export class SelectBehavior extends AbstractBehavior {
     // Clicked a midpoint..
     // Treat a click on a midpoint as if clicking on its parent way
     if (data?.type === 'midpoint') {
-      data = data.way;
-      dataID = data.id;
+      const wayID = data.props.wayID as EntityID;
+      data = graph.hasEntity(wayID);
+      dataID = data?.id;
     }
 
     // Clicked on nothing, or an edit block polygon..
@@ -462,7 +466,7 @@ export class SelectBehavior extends AbstractBehavior {
     const data: any = this.lastUp.target?.data;
 
     const isOSMWay = data instanceof OsmWay && !data.props.__fbid__;
-    const isMidpoint = data?.type === 'midpoint';
+    const isMidpoint = data instanceof MarkerData && data?.type === 'midpoint';
 
     let loc: Vec2 | undefined;
     let edge: [EntityID, EntityID] | undefined;
@@ -478,8 +482,8 @@ export class SelectBehavior extends AbstractBehavior {
       }
 
     } else if (isMidpoint) {
-      loc = data.loc;
-      edge = [data.a.id, data.b.id];
+      loc = data.props.loc;
+      edge = data.props.edge;
     }
 
     if (loc && edge) {

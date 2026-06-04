@@ -28,6 +28,7 @@ Rapid uses Pixi.js for hardware-accelerated 2D rendering. The rendering is organ
 
 | File | Description |
 |------|-------------|
+| `PixiFeatureLabel.ts` | Renders labels |
 | `PixiFeatureLine.ts` | Renders line features (roads, paths, etc.) |
 | `PixiFeaturePoint.ts` | Renders point features (POIs, nodes, etc.) |
 | `PixiFeaturePolygon.ts` | Renders polygon features (buildings, areas, etc.) |
@@ -65,18 +66,3 @@ Helper libraries for Pixi rendering:
 | `DashLine.ts` | Dashed line rendering |
 | `AtlasAllocator.ts` | Texture atlas allocation |
 | `GuilloteneAllocator.ts` | Guillotine bin-packing algorithm |
-
-## Layer System
-
-Layers are stacked by z-index and each manages its own set of features:
-
-```typescript
-// Layers track features by ID
-layer.features.get(featureID);
-
-// Features can have data bound to them
-layer.bindData(featureID, dataID);
-
-// And classes for styling
-layer.setClass(dataID, 'selected');
-```

@@ -1,12 +1,12 @@
 import { AbstractBehavior } from './AbstractBehavior.ts';
-import { MarkerData, OsmNode } from '../data/index.ts';
 import { select as d3_select } from 'd3-selection';
 import { utilDetect } from '../util/detect.ts';
 import { vecLength } from '@rapid-sdk/math';
 
-import type { FederatedPointerEvent } from 'pixi.js';
 import type { Context } from '../Context.ts';
+import type { FederatedPointerEvent } from 'pixi.js';
 import type { EventData, EventTarget } from './AbstractBehavior.ts';
+import type { OsmNode, OsmWay } from '../data/index.ts';
 
 
 const NEAR_TOLERANCE = 1;
@@ -130,10 +130,10 @@ export class DragBehavior extends AbstractBehavior {
     const data = target?.data;
     if (!data) return;
 
-    const isNote = data instanceof MarkerData && data.isNew && target.layerID === 'notes';
-    const isNode = data instanceof OsmNode && target.layerID === 'osm';       // not 'rapid'
-    const isMidpoint = (data as any).type === 'midpoint' && target.layerID === 'osm';  // not 'rapid'
-
+    // What are we dragging?
+    const isNote = data.type === 'note' && target.layerID === 'notes' && data.props.isNew;
+    const isNode = data.type === 'node' && target.layerID === 'osm';           // not 'rapid'
+    const isMidpoint = data?.type === 'midpoint' && target.layerID === 'osm';  // not 'rapid'
     if (!(isNote || isNode || isMidpoint)) return;
 
     this.lastDown = down;
@@ -187,20 +187,24 @@ export class DragBehavior extends AbstractBehavior {
         this.dragTarget = target;
         target.feature!.allowInteraction = false;
 
+        const data = target?.data;
+        if (!data) return;
+
         // What are we dragging?
-        const data: any = target.data;
-        const isNote = data instanceof MarkerData;
-        const isNode = data instanceof OsmNode;
-        const isMidpoint = (data.type === 'midpoint');
+        const isNote = data.type === 'note' && target.layerID === 'notes' && data.props.isNew;
+        const isNode = data.type === 'node' && target.layerID === 'osm';           // not 'rapid'
+        const isMidpoint = data?.type === 'midpoint' && target.layerID === 'osm';  // not 'rapid'
+        if (!(isNote || isNode || isMidpoint)) return;
 
         // If the current selection includes a parent of the dragged item,
         //  reselect those same feature(s) after the drag completes.
         // (The user is reshaping a line or area by dragging vertices or midpoints.)
-        let parentWays: any[] = [];
+        let parentWays: OsmWay[] = [];
         if (isMidpoint) {
-          parentWays = [data.way];
+          const wayID = data.props.wayID as EntityID;
+          parentWays = [ graph.entity(wayID) as OsmWay ];
         } else if (isNode) {
-          parentWays = graph.parentWays(data);
+          parentWays = graph.parentWays(data as OsmNode);
         }
 
         // Gather all parentIDs - include both ways and relations (such as multipolygons)
@@ -222,7 +226,7 @@ export class DragBehavior extends AbstractBehavior {
         } else if (isNote) {
           context.enter('drag-note', { noteID: data.id });
         } else if (isMidpoint) {
-          const midpoint = { loc: data.loc, edge: [ data.a.id, data.b.id ] };
+          const midpoint = { loc: data.props.loc, edge: data.props.edge };
           context.enter('drag-node', { midpoint: midpoint, reselectIDs: reselectIDs });
         }
 

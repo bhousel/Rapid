@@ -91,7 +91,7 @@ export class PixiLayerOsmNotes extends AbstractPixiLayer {
       if (feature.v !== version) {
         feature.v = version;
         feature.geometry = part;
-        feature.setData(dataID, d);
+        feature.data = d;
       }
 
       this.syncFeatureClasses(feature);

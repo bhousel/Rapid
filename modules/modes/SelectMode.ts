@@ -92,11 +92,14 @@ export class SelectMode extends AbstractMode {
         } else if (datum.serviceID === 'mapillary' && datum.props.object_type === 'traffic_sign') {
           layerID = 'mapillary-signs';
         }
-      } else if (datum instanceof MarkerData) {  // in most cases the `service` is the layerID
-        const serviceID = datum.serviceID;   // 'keepright', 'osmose', etc.
-        layerID = serviceID === 'osm' ? 'notes' : serviceID;
-        if (layerID === 'osm') {
-          layerID = 'notes';
+      } else if (datum instanceof MarkerData) {  // in most cases the `serviceID` is the `layerID`
+        const serviceID = datum.serviceID;       // 'keepright', 'osmose', etc.
+        if (serviceID === 'osm') {
+          if (datum.type === 'note') {
+            layerID = 'notes';   // OSM Notes
+          }
+        } else {
+          layerID = serviceID;
         }
       } else if (datum.props.__fbid__) {      // a Rapid feature
         layerID = 'rapid';
@@ -117,7 +120,7 @@ export class SelectMode extends AbstractMode {
  // The update handlers feel like they should live with the sidebar content components, not here
     let sidebarContent: any = null;
     // Selected a note...
-    if (datum instanceof MarkerData && datum.serviceID === 'osm') {
+    if (datum instanceof MarkerData && datum.serviceID === 'osm' && datum.type === 'note') {
       sidebarContent = (uiNoteEditor as any)(context).note(datum);
       sidebarContent
         .on('change', () => {

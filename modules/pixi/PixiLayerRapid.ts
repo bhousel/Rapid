@@ -378,7 +378,7 @@ export class PixiLayerRapid extends AbstractPixiLayer {
 
           feature.parentContainer = parentContainer;
           (feature as any).rapidFeature = true;
-          feature.setData(entity.id, entity);
+          feature.data = entity;
         }
 
         this.syncFeatureClasses(feature);
@@ -431,7 +431,7 @@ export class PixiLayerRapid extends AbstractPixiLayer {
           feature.geometry = part;
           feature.parentContainer = parentContainer;
           (feature as any).rapidFeature = true;
-          feature.setData(entity.id, entity);
+          feature.data = entity;
         }
 
         this.syncFeatureClasses(feature);
@@ -510,7 +510,7 @@ export class PixiLayerRapid extends AbstractPixiLayer {
         feature.geometry = part;
         feature.parentContainer = parentContainer;
         (feature as any).rapidFeature = true;
-        feature.setData(entity.id, entity);
+        feature.data = entity;
       }
 
       this.syncFeatureClasses(feature);
@@ -549,7 +549,7 @@ export class PixiLayerRapid extends AbstractPixiLayer {
         feature.parentContainer = parentContainer;
         (feature as any).rapidFeature = true;
         feature.allowInteraction = false;   // vertices in this layer don't actually need to be interactive
-        feature.setData(entity.id, entity);
+        feature.data = entity;
       }
 
       this.syncFeatureClasses(feature);

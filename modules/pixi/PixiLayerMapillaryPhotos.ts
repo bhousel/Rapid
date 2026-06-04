@@ -252,7 +252,7 @@ export class PixiLayerMapillaryPhotos extends AbstractPixiLayer {
         if (feature.v !== version) {
           feature.v = version;
           feature.geometry = part;
-          feature.setData(dataID, d);
+          feature.data = d;
         }
 
         this.syncFeatureClasses(feature);
@@ -276,7 +276,7 @@ export class PixiLayerMapillaryPhotos extends AbstractPixiLayer {
         feature = new PixiFeaturePoint(this, featureID);
         feature.parentContainer = parentContainer;
         feature.geometry = part;
-        feature.setData(dataID, d);
+        feature.data = d;
 
         if (d.props.sequenceID) {
           feature.addChildData(d.props.sequenceID as string, dataID);

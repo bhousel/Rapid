@@ -187,7 +187,7 @@ export class PixiLayerGeoScribble extends AbstractPixiLayer {
           feature.v = version;
           feature.label = (d.properties.text as string) || null;
           feature.geometry = part;
-          feature.setData(dataID, d);
+          feature.data = d;
         }
 
         this.syncFeatureClasses(feature);
@@ -243,7 +243,7 @@ export class PixiLayerGeoScribble extends AbstractPixiLayer {
           feature.v = version;
           feature.label = (d.properties.text as string) || null;
           feature.geometry = part;
-          feature.setData(dataID, d);
+          feature.data = d;
         }
 
         this.syncFeatureClasses(feature);

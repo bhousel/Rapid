@@ -218,7 +218,7 @@ export class PixiLayerStreetsidePhotos extends AbstractPixiLayer {
       if (feature.v !== version) {
         feature.v = version;
         feature.geometry = part;
-        feature.setData(dataID, d);
+        feature.data = d;
         feature.clearChildData(dataID);
         feature.addChildData(dataID, d.props.bubbleIDs as string);
       }
@@ -243,7 +243,7 @@ export class PixiLayerStreetsidePhotos extends AbstractPixiLayer {
         feature = new PixiFeaturePoint(this, featureID);
         feature.parentContainer = parentContainer;
         feature.geometry = part;
-        feature.setData(dataID, d);
+        feature.data = d;
       }
 
       this.syncFeatureClasses(feature);

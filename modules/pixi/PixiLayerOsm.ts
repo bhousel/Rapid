@@ -1,11 +1,13 @@
 import * as PIXI from 'pixi.js';
 import { AbstractPixiLayer } from './AbstractPixiLayer.ts';
 import { GeometryPart } from '../lib/GeometryPart.ts';
+import { MarkerData } from '../data/MarkerData.ts';
 import { PixiFeatureLine } from './PixiFeatureLine.ts';
 import { PixiFeaturePoint } from './PixiFeaturePoint.ts';
 import { PixiFeaturePolygon } from './PixiFeaturePolygon.ts';
 import { projWorldToWgs84, vecAngle, vecLength, vecInterp, WORLD_ZOOM } from '@rapid-sdk/math';
 
+import type { MarkerProps } from '../data/MarkerData.ts';
 import type { MatchedStyle } from '../core/StyleSystem.ts';
 import type { OsmEntity, OsmNode, OsmRelation, OsmTags, OsmWay } from '../data/types.ts';
 import type { PixiLayerMapUI } from './PixiLayerMapUI.ts';
@@ -48,18 +50,20 @@ interface RelatedIDs {
   siblingIDs: Set<EntityID>;
 }
 
-/** Midpoint data for adding nodes to ways */
-interface MidpointData {
+/** Midpoint properties */
+interface MidpointProps extends MarkerProps {
   type: 'midpoint';
+  serviceID: 'osm';
   id: string;
-  a: { id: string; point: Vec2 };
-  b: { id: string; point: Vec2 };
-  way: any;
-  world: Vec2;
-  loc: Vec2;
-  rot: number;
+  wayID: EntityID;
+  edge: [EntityID, EntityID];
+  dist: number;
+  rotation: number;
+  coord: Vec2;
 }
 
+/* Midpoints are markers that accept the MidpointProps */
+type Midpoint = MarkerData<MidpointProps>;
 
 /**
  * Returns z-index for highway tags (for drawing order)
@@ -92,10 +96,16 @@ function hasWikidata(entity: OsmEntity): boolean {
  * This class renders OpenStreetMap map data.
  */
 export class PixiLayerOsm extends AbstractPixiLayer {
+
   /** Container for area/polygon features */
   public areaContainer: PIXI.Container | null;
   /** Container for line features */
   public lineContainer: PIXI.Container | null;
+
+  /** collection of calculated midpoints */
+  protected _midpoints: Map<DataID, Midpoint>;
+
+
 
   /**
    * @constructor
@@ -108,6 +118,8 @@ export class PixiLayerOsm extends AbstractPixiLayer {
 
     this.areaContainer = null;
     this.lineContainer = null;
+
+    this._midpoints = new Map<DataID, Midpoint>();
   }
 
 
@@ -153,6 +165,8 @@ export class PixiLayerOsm extends AbstractPixiLayer {
    */
   public reset(): void {
     super.reset();
+
+    this._midpoints.clear();
 
     const groupContainer = this.scene.groups.get('basemap')!;
 
@@ -279,6 +293,8 @@ export class PixiLayerOsm extends AbstractPixiLayer {
 
     if (context.mode?.id === 'select-osm') {
       this.renderMidpoints(frame, viewport, data, related);
+    } else {
+      this._midpoints.clear();
     }
   }
 
@@ -347,7 +363,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
           const area = part.world.extent.area();
           feature.container.zIndex = -area;      // sort by area descending (small things above big things)
 
-          feature.setData(entityID, entity);
+          feature.data = entity;
           feature.clearChildData(entityID);
           if (entity.type === 'relation') {
             feature.addChildData(entityID, (entity as OsmRelation).members.map(member => member.id));
@@ -400,7 +416,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
             const poiGeometry = new GeometryPart(context);
             poiGeometry.setData({ type: 'Point', coordinates: projWorldToWgs84(part.world.poi!) });
             poiFeature.geometry = poiGeometry;
-            poiFeature.setData(entityID, entity);
+            poiFeature.data = entity;
           }
 
           this.syncFeatureClasses(poiFeature);
@@ -501,7 +517,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
           feature.parentContainer = levelContainer;    // Change layer stacking if necessary
           feature.container.zIndex = zindex;
 
-          feature.setData(wayID, way);
+          feature.data = way;
           feature.clearChildData(wayID);
           feature.addChildData(wayID, way.nodes);
         }
@@ -623,7 +639,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
         feature.v = version;
         const part = node.geoms.parts[0];
         feature.geometry = part;
-        feature.setData(nodeID, node);
+        feature.data = node;
       }
 
       this.syncFeatureClasses(feature);
@@ -702,7 +718,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
         feature.v = version;
         const part = node.geoms.parts[0];
         feature.geometry = part;
-        feature.setData(nodeID, node);
+        feature.data = node;
       }
 
       this.syncFeatureClasses(feature);
@@ -744,6 +760,74 @@ export class PixiLayerOsm extends AbstractPixiLayer {
 
 
   /**
+   * Gathers the midpoints that currently belong in the scene.
+   * @param  viewport - Pixi viewport to use for rendering
+   * @param  data - Visible OSM data to render, sorted by type
+   * @param  related - Collections of related OSM IDs
+   * @return Array of midpoint properties
+   */
+  protected _gatherMidpoints(viewport: Viewport, data: OsmData, related: RelatedIDs): MidpointProps[]  {
+    const context = this.context;
+    const graph = context.systems.editor!.staging.graph;
+
+    // Need to consider both `data.lines` and `data.polygons` for drawing our midpoints.
+    // Include only ways that are directly selected, or descended from a relation that is selected.
+    const ways = new Set<OsmWay>();
+    for (const [entityID, entity] of data.lines) {
+      if (!related.descendantIDs.has(entityID)) continue;   // not selected
+      ways.add(entity);
+    }
+    for (const [entityID, entity] of data.polygons) {
+      if (entity.type !== 'way') continue;                  // not a way
+      if (!related.descendantIDs.has(entityID)) continue;   // not selected
+      ways.add(entity as OsmWay);
+    }
+
+    const results: MidpointProps[] = [];
+    for (const way of ways) {
+      const nodes = graph.childNodes(way);
+      if (!nodes.length) continue;  // no nodes?
+
+      // swap order for reverse-drawn ways
+      const isReverse = (way.tags.oneway === '-1');
+
+      for (let i = 0; i < nodes.length - 1; i++) {
+        const node1 = isReverse ? nodes[i + 1] : nodes[i];
+        const node2 = isReverse ? nodes[i] : nodes[i + 1];
+
+        // gather world coordinates of the nodes
+        const coord1 = node1.geoms.parts[0].world?.coords as Vec2;
+        const coord2 = node2.geoms.parts[0].world?.coords as Vec2;
+        if (!coord1 || !coord2) continue;
+
+        const dist = vecLength(coord1, coord2);
+        const rotation = vecAngle(coord1, coord2);
+        const coord = vecInterp(coord1, coord2, 0.5);
+        const loc = projWorldToWgs84(coord);
+
+        // The node world coords can be used as a unique identifier
+        const key = `${coord1[0].toFixed(7)},${coord1[1].toFixed(7)}:${coord2[0].toFixed(7)},${coord2[1].toFixed(7)}`;
+
+        results.push({
+          type: 'midpoint',
+          serviceID: 'osm',
+          isNew: true,
+          id: key,
+          wayID: way.id,
+          edge: [node1.id, node2.id],
+          dist: dist,
+          rotation: rotation,
+          coord: coord,
+          loc: loc
+        });
+      }
+    }
+
+    return results;
+  }
+
+
+  /**
    * Renders the midpoint handles along visible OSM ways for this frame.
    * @param frame - Integer frame being rendered
    * @param viewport - Pixi viewport to use for rendering
@@ -751,124 +835,51 @@ export class PixiLayerOsm extends AbstractPixiLayer {
    * @param related - Collections of related OSM IDs
    */
   public renderMidpoints(frame: number, viewport: Viewport, data: OsmData, related: RelatedIDs): void {
-    const MIN_MIDPOINT_DIST = 40;   // distance in pixels
     const context = this.context;
-    const graph = context.systems.editor!.staging.graph;
 
-    // Need to consider both lines and polygons for drawing our midpoints
-    const ways = new Map<EntityID, OsmWay>();
-    for (const [entityID, entity] of data.lines) {
-      ways.set(entityID, entity);
-    }
-    for (const [entityID, entity] of data.polygons) {
-      if (entity.type === 'way') {
-        ways.set(entityID, entity as OsmWay);
-      }
-    }
-
+    // Convert screen pixel values to world units
+    const scale = 2 ** (WORLD_ZOOM - viewport.transform.z);
+    const minDistance = 40 * scale;
 
     // Midpoints should be drawn above everything
     const mapUiLayer = this.scene.layers.get('map-ui') as PixiLayerMapUI;
     const selectedContainer = mapUiLayer.selected;
 
-    // If any of these change, the midpoint needs to be redrawn.
-    // (This can happen if a sibling node has moved, the midpoint moves too)
-    const _midpointVersion = (d: MidpointData): number => {
-      return d.loc[0] + d.loc[1] + d.rot;
-    };
+    // Gather midpoints in view
+    const midpointData = this._gatherMidpoints(viewport, data, related);
+    for (const props of midpointData) {
+      if (props.dist < minDistance) continue;  // skip if points are too close at this zoom
 
-    // Generate midpoints from all the highlighted ways
-    const midpoints = new Map<string, MidpointData>();
-    const midpointStyle = {
-      marker: { color: 0xffffff, image: 'midpoint' }
-    };
-
-    for (const [wayID, way] of ways) {
-      if (way.type !== 'way') continue;
-
-      // Include only ways that are selected, or descended from a relation that is selected
-      if (!related.descendantIDs.has(wayID)) continue;
-
-      // Include only actual ways that have child nodes
-      const nodes = graph.childNodes(way);
-      if (!nodes.length) continue;
-
-      // Compute midpoints in projected screen coordinates
-      // We do this so that we can skip midpoints that are closer than the minimum distance.
-      interface NodeData {
-        id: EntityID;
-        point: Vec2;
-      };
-
-      const nodeData = nodes
-        .map((node: OsmNode): NodeData | null => {
-          if (!node.loc) return null;
-          return {
-            id: node.id,
-            point: viewport.project(node.loc)
-          };
-        })
-        .filter(Boolean) as NodeData[];
-
-      if (way.tags.oneway === '-1') {
-        nodeData.reverse();
+      // Generate data element if needed
+      let midpoint = this._midpoints.get(props.id);
+      if (!midpoint) {
+        midpoint = new MarkerData<MidpointProps>(context, props);
       }
 
-      for (let i = 0; i < nodeData.length - 1; i++) {
-        const a = nodeData[i];
-        const b = nodeData[i + 1];
-        const midpointID = [a.id, b.id].sort().join('-');
-        const dist = vecLength(a.point, b.point);
-        if (dist < MIN_MIDPOINT_DIST) continue;
+      // Check that this part has coordinates and is a Point
+      const part = midpoint.geoms.parts[0];
+      if (!part.world || part.type !== 'Point') continue;
 
-        const point = vecInterp(a.point, b.point, 0.5);
-        const rot = vecAngle(a.point, b.point) + viewport.transform.rotation;
-        const world = viewport.screenToWorld(point);
-        const midpoint: MidpointData = {
-          type: 'midpoint',
-          id: midpointID,
-          a: a,
-          b: b,
-          way: way,
-          world: world,
-          loc: projWorldToWgs84(world),
-          rot: rot
-        };
-
-        if (!midpoints.has(midpointID)) {
-          midpoints.set(midpointID, midpoint);
-        }
-      }
-    }
-
-    for (const [midpointID, midpoint] of midpoints) {
-      const featureID = `${this.layerID}-${midpointID}`;
+      const featureID = `${this.layerID}-midpoint-${midpoint.id}`;
       let feature = this.features.get(featureID) as PixiFeaturePoint | undefined;
 
       if (!feature) {
         feature = new PixiFeaturePoint(this, featureID);
-        feature.style = midpointStyle;
+        feature.style = {
+          marker: { color: 0xffffff, image: 'midpoint' }
+        };
         feature.parentContainer = selectedContainer;
-      }
-
-      // Something about the midpoint has changed
-      const v = _midpointVersion(midpoint);
-      if (feature.v !== v) {
-        feature.v = v;
-
-        const geometry = new GeometryPart(context);
-        geometry.setData({ type: 'Point', coordinates: midpoint.loc });
-        feature.geometry = geometry;
-
-        // Remember to apply rotation - it needs to go on the marker,
-        // because the container automatically rotates to be face up.
-        feature.marker!.rotation = midpoint.rot;
-
-        feature.setData(midpointID, midpoint);
-        feature.addChildData(midpoint.way.id, midpointID);
+        feature.geometry = part;
+        feature.data = midpoint;
+        feature.addChildData(midpoint.props.wayID, midpoint.id);
       }
 
       this.syncFeatureClasses(feature);
+      if (feature.dirty) {
+        // Important to apply viewport rotation - this needs to go on the marker,
+        // because the container automatically rotates to be north-up.
+        feature.marker!.rotation = midpoint.props.rotation + viewport.transform.rotation;
+      }
       feature.update(viewport);
       this.retainFeature(feature, frame);
     }

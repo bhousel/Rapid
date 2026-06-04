@@ -2,6 +2,7 @@ import * as PIXI from 'pixi.js';
 import { merge as deepMerge } from 'lodash-es';
 import { styleDefaults } from '../lib/Style.ts';
 
+import type { AbstractData } from '../data/AbstractData.ts';
 import type { AbstractPixiLayer } from './AbstractPixiLayer.ts';
 import type { Context } from '../Context.ts';
 import type { GeometryPart } from '../lib/GeometryPart.ts';
@@ -30,8 +31,7 @@ export interface FeatureContainer extends PIXI.Container {
  * - `geom`                 GeometryPart() class containing all the information about the geometry
  * - `style`                Object containing style info
  * - `label`                String containing the Feature's label (if any)
- * - `data`                 Data bound to this Feature (like `__data__` from the D3.js days)
- * - `dataID`               Data bound to this Feature (like `__data__` from the D3.js days)
+ * - `data`                 Data element bound to this Feature (like `__data__` from the D3.js days)
  * - `visible`              `true` if the Feature is visible (`false` if it is culled)
  * - `allowInteraction`     `true` if the Feature is allowed to be interactive (emits Pixi events)
  * - `dirty`                `true` if the Feature needs to be rebuilt
@@ -73,10 +73,8 @@ export class AbstractPixiFeature {
   protected _label: string | null;
   /** Whether the label needs to be reapplied */
   protected _labelDirty: boolean;
-  /** Identifier for the data bound to this Feature */
-  protected _dataID: DataID | null;
   /** Data bound to this Feature */
-  protected _data: unknown;
+  protected _data: AbstractData | null;
   /** Pseudoclasses for styling */
   protected _classes: Set<ClassID>;
 
@@ -115,8 +113,6 @@ export class AbstractPixiFeature {
     this._styleDirty = true;
     this._label = null;
     this._labelDirty = true;
-
-    this._dataID = null;
     this._data = null;
 
     // pseudoclasses, @see `AbstractPixiLayer.syncFeatureClasses()`
@@ -155,8 +151,6 @@ export class AbstractPixiFeature {
     this._geom = null;
     this._style = null!;
     this._label = null;
-
-    this._dataID = null;
     this._data = null;
   }
 
@@ -344,23 +338,20 @@ export class AbstractPixiFeature {
 
 
   /**
-   * Getter only, use `setData()` to change it.
-   * (because we need to know an id/key to identify the data by, and these can be anything)
-   * @return  The bound data element
-   * @readonly
+   * The bound data for this feature
+   * @return  Current `AbstractData`, or `null` if none bound
    */
-  public get data(): unknown {
+  public get data(): AbstractData | null {
     return this._data;
   }
-
   /**
-   * Getter only, use `setData()` to change it.
-   * (because we need to know an id/key to identify the data by, and these can be anything)
-   * @return  The bound data element's ID, or `null` if none
-   * @readonly
+   * Binds a data element to this feature and marks the feature as dirty.
+   * @param val - `AbstractData` to bind to this feature
    */
-  public get dataID(): DataID | null {
-    return this._dataID;
+  public set data(val: AbstractData) {
+    this._data = val;
+    this.layer.bindData(this.id, val.id);
+    this.dirty = true;
   }
 
 
@@ -413,18 +404,6 @@ export class AbstractPixiFeature {
    */
   public get classes(): ReadonlySet<ClassID> {
     return this._classes;
-  }
-
-  /**
-   * This binds the data element to the feature, also lets the layer know about it.
-   * @param dataID - Identifer for this data element (e.g. 'n123')
-   * @param data - data to bind to the feature (e.g. an OSM Node)
-   */
-  public setData(dataID: DataID, data: unknown): void {
-    this._dataID = dataID;
-    this._data = data;
-    this.layer.bindData(this.id, dataID);
-    this.dirty = true;
   }
 
   /**

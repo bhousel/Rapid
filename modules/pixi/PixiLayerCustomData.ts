@@ -257,7 +257,7 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
           feature.v = version;
           feature.label = l10n.displayName(d.properties as Record<string, string>);
           feature.geometry = part;
-          feature.setData(dataID, d);
+          feature.data = d;
         }
 
         this.syncFeatureClasses(feature);
@@ -314,7 +314,7 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
           feature.v = version;
           feature.label = l10n.displayName(d.properties as Record<string, string>);
           feature.geometry = part;
-          feature.setData(dataID, d);
+          feature.data = d;
         }
 
         this.syncFeatureClasses(feature);
@@ -412,7 +412,7 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
           feature.v = version;
           feature.label = l10n.displayName(d.properties as Record<string, string>);
           feature.geometry = part;
-          feature.setData(dataID, d);
+          feature.data = d;
         }
 
         this.syncFeatureClasses(feature);

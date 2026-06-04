@@ -28,6 +28,7 @@ type StrokeStyleWithDash = PIXI.StrokeStyle & DashLineOptions;
  * - (also all properties inherited from `AbstractPixiFeature`)
  */
 export class PixiFeaturePolygon extends AbstractPixiFeature {
+
   /** PIXI.Sprite for low resolution representation */
   public lowRes: PIXI.Sprite | null;
   /** PIXI.Graphics for the fill (below) */
