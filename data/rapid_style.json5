@@ -927,31 +927,31 @@
         "match": { "tags": [{ "key": "wetland", "value": "swamp" }] }
       },
 
-      // sport overrides - apply specific color/pattern
-      "sport-baseball": {
+      // sport overrides - apply specific color
+      "sport-sandy": {
         "weight": 5,
         "styleIDs": ["yellow"],
-        "match": { "tags": [{ "key": "sport", "value": "baseball" }] }
+        "match": {
+          "tags": [{
+            "key": "sport",
+            "op": "in",
+            "value": [
+              "baseball", "beachvolleyball", "bmx", "boules", "bullfighting", "cockfighting",
+              "equestrian", "motocross", "softball", "speedway"
+            ]
+          }]
+        }
       },
-      "sport-basketball": {
+      "sport-pavement": {
         "weight": 5,
         "styleIDs": ["darkgray"],
-        "match": { "tags": [{ "key": "sport", "value": "basketball" }] }
-      },
-      "sport-beachvolleyball": {
-        "weight": 5,
-        "styleIDs": ["yellow"],
-        "match": { "tags": [{ "key": "sport", "value": "beachvolleyball" }] }
-      },
-      "sport-skateboard": {
-        "weight": 5,
-        "styleIDs": ["darkgray"],
-        "match": { "tags": [{ "key": "sport", "value": "skateboard" }] }
-      },
-      "sport-softball": {
-        "weight": 5,
-        "styleIDs": ["yellow"],
-        "match": { "tags": [{ "key": "sport", "value": "softball" }] }
+        "match": {
+          "tags": [{
+            "key": "sport",
+            "op": "in",
+            "value": ["basketball", "skateboard"]
+          }]
+        }
       },
 
       // surface overrides - apply specific patterns
