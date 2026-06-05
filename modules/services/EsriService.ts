@@ -21,20 +21,22 @@ const TILEZOOM = 14;
 
 
 /**
- * Internal cache structure for tracking tile fetching state per dataset.
+ * Internal cache structure for tracking seen data and loaded pages
  */
-interface EsriTileCache {
-  /** Tiles that have been fully loaded, keyed by tileID */
-  loaded: Map<string, Tile>;
+interface EsriDataCache {
+  /** Already loaded RequestIDs */
+  loaded: Set<RequestID>;
   /** Set of feature IDs already parsed, to avoid duplicates across tiles */
-  seen: Set<string>;
+  seenIDs: Set<string>;
+  /** Next page of data to load for a given tile */
+  nextPage: Map<TileID, number>;
 }
 
 /**
  * Internal structure for a single Esri dataset, including its metadata
  * from ArcGIS, the local Graph/Tree, and tile cache.
  */
-interface EsriDatasetEntry {
+interface EsriDataset {
   /** Unique dataset identifier from ArcGIS */
   id: DatasetID;
   /** Human-readable title of the dataset */
@@ -57,14 +59,12 @@ interface EsriDatasetEntry {
   graph: Graph;
   /** Spatial index tree for efficient extent-based lookups */
   tree: Tree;
-  /** Tile fetch state tracking for this dataset */
-  cache: EsriTileCache;
   /** Last viewport version number, used to skip redundant tile loads */
   lastv: number | null;
   /** Layer schema info (fields, tagmap) loaded from the feature server */
-  layer: EsriLayer | null;
-  /** Allow additional ArcGIS metadata fields */
-  [key: string]: any;
+  layers: EsriLayer[] | null;
+  /** Inflight promise for loading layer schema info */
+  _layersPromise: Promise<void> | null;
 }
 
 /**
@@ -76,17 +76,19 @@ interface EsriLayer {
   /** Array of field metadata describing the layer's schema */
   fields: EsriField[];
   /** Maximum number of records the server returns per request */
-  maxRecordCount?: number;
-  /** Mapping from Esri field names to OSM tag keys */
-  tagmap: Record<string, string>;
-  /** Name of the field used as the unique object identifier */
-  idfield: string;
-  /** Allow additional layer metadata fields */
-  [key: string]: any;
+  maxRecordCount: number;
+  /** Name of the field that holds a display value */
+  displayField: string;
+  /** Name of the field holds the object identifier */
+  objectIdField: string;
+  /** Our internal mapping from Esri field names to OSM tag keys */
+  _tagmap: Record<string, string>;
+  /** Our internal cache of state for this layer */
+  _cache: EsriDataCache;
 }
 
 /**
- * Field metadata from an Esri layer.
+ * Field data from an Esri layer `fields` property.
  */
 interface EsriField {
   /** Internal field name in the Esri layer */
@@ -111,9 +113,9 @@ export class EsriService extends AbstractSystem {
   /** Tiler instance configured for the Esri tile zoom level */
   protected _tiler: Tiler;
   /** Map of all known Esri datasets, keyed by DatasetID */
-  protected _datasets: Map<DatasetID, EsriDatasetEntry>;
+  protected _datasets: Map<DatasetID, EsriDataset>;
   /** Cached promise for the initial dataset catalog load, to avoid duplicate fetches */
-  protected _datasetsPromise: Promise<Map<DatasetID, EsriDatasetEntry>> | null;
+  protected _datasetsPromise: Promise<Map<DatasetID, EsriDataset>> | null;
 
 
   /**
@@ -127,8 +129,7 @@ export class EsriService extends AbstractSystem {
     this.optionalDependencies = new Set<SystemID>(['gfx', 'locations']);
 
     this._tiler = new Tiler().zoomRange(TILEZOOM) as Tiler;
-    this._datasets = new Map<DatasetID, EsriDatasetEntry>();
-
+    this._datasets = new Map<DatasetID, EsriDataset>();
     this._datasetsPromise = null;
   }
 
@@ -168,11 +169,15 @@ export class EsriService extends AbstractSystem {
     for (const [datasetID, ds] of this._datasets) {
       ds.graph = new Graph(this.context);
       ds.tree = new Tree(ds.graph, datasetID);
-      ds.cache = {
-        loaded: new Map<TileID, Tile>(),
-        seen:   new Set<string>()
-      };
       ds.lastv = null;
+
+      // clear layer caches
+      for (const layer of ds.layers || []) {
+        const cache = layer._cache;
+        cache.loaded.clear();
+        cache.seenIDs.clear();
+        cache.nextPage.clear();
+      }
     }
 
     return Promise.resolve();
@@ -184,7 +189,7 @@ export class EsriService extends AbstractSystem {
    * @return The datasets this service provides
    */
   public getAvailableDatasets(): RapidDataset[] {
-    // Convert the internal dataset objects into "Rapid" datasets for the catalog.
+    // Convert the internal `EsriDataset` objects into `RapidDataset`s for the catalog.
     // We expect them to be all loaded now because `_loadDatasetsAsync` is called by `initAsync`
     //  and `getAvailableDatasets` is called by RapidSystem's `startAsync`.
     return [...this._datasets.values()].map(d => {
@@ -211,7 +216,7 @@ export class EsriService extends AbstractSystem {
         dataset.extent = new Extent(d.extent[0], d.extent[1]);
       }
 
-//      // Test running building layers through MapWithAI conflation service
+//      // experiment: process building layers through MapWithAI conflation service
 //      if (categories.has('buildings')) {
 //        dataset.conflated = true;
 //        dataset.serviceID = 'mapwithai';
@@ -223,7 +228,7 @@ export class EsriService extends AbstractSystem {
 
 
   /**
-   * Get already loaded data that appears in the current map view
+   * Get already loaded data that appears in the current map view.
    * @param datasetID - datasetID to get data for
    * @return Array of data (OSM Entities)
    */
@@ -237,7 +242,7 @@ export class EsriService extends AbstractSystem {
 
 
   /**
-   * Returns the graph for the given datasetID
+   * Returns the graph for the given datasetID.
    * @param datasetID - datasetID to get data for
    * @return The graph holding the data, or `undefined` if not found
    */
@@ -265,7 +270,7 @@ export class EsriService extends AbstractSystem {
 
 
   /**
-   * Schedule any data requests needed to cover the current map view
+   * Schedule any data requests needed to cover the current map view.
    * @param datasetID - datasetID to load tiles for
    * @throws Will throw if the datasetID is not found
    */
@@ -278,16 +283,22 @@ export class EsriService extends AbstractSystem {
     }
 
     // If we haven't loaded this dataset's schema information, do that first, then retry.
-    if (!ds.layer) {
-      this._loadDatasetLayerAsync(ds)
-        .then(() => this.loadTiles(datasetID));
+    if (!Array.isArray(ds.layers)) {
+      this._loadDatasetLayersAsync(ds)
+        .then(() => {
+          if (Array.isArray(ds.layers)) {
+            this.loadTiles(datasetID);
+          }
+        })
+        .catch(e => {
+          if (e.name === 'AbortError') return;
+          console.error(e);  // eslint-disable-line
+        });
       return;
     }
 
-    const cache = ds.cache;
     const context = this.context;
     const network = context.systems.network!;
-    const locations = context.systems.locations;
     const viewport = context.viewport;
 
     if (ds.lastv === viewport.v) return;  // exit early if the view is unchanged
@@ -296,294 +307,150 @@ export class EsriService extends AbstractSystem {
     // Determine the tiles needed to cover the view..
     const tiles = this._tiler.getTiles(viewport).tiles;
 
-    // Abort inflight requests that are no longer needed..
-    const neededIDs = new Set<RequestID>(tiles.map(tile => `esri-${ds.id}-${tile.id}`));
-    network.abortMatching(id => /^esri-/.test(id) && !neededIDs.has(id));
+    // Process each dataset layer..
+    for (const layer of ds.layers) {
+      const datasetID = ds.id;
+      const layerID = layer.id;
 
-    for (const tile of tiles) {
-      const tileID = tile.id;
-      const requestID = `esri-${ds.id}-${tileID}` as RequestID;
-      if (cache.loaded.has(tileID) || network.isInflight(requestID)) continue;
-
-      if (locations) {
-        // Skip if this tile covers a blocked region (all corners are blocked)
-        const corners = tile.wgs84Extent.polygon().slice(0, 4);
-        const isBlocked = corners.every(loc => locations.isBlockedAt(loc));
-        if (isBlocked) {
-          cache.loaded.set(tileID, tile);  // don't try again
-          continue;
-        }
-      }
-
-      this._loadTilePage(ds, tile, 0);
-    }
-  }
-
-
-  /**
-   * Loads all the available datasets from the Esri server
-   * @return Promise resolved when all pages of datasets have been loaded
-   */
-  protected _loadDatasetsAsync(): Promise<Map<DatasetID, EsriDatasetEntry>> {
-    if (this._datasetsPromise) return this._datasetsPromise;
-
-    const network = this.context.systems.network!;
-    return this._datasetsPromise = new Promise((resolve, reject) => {
-      // recursively fetch all pages of data
-      const fetchMore = (page: number): void => {
-        network.fetch<any>(this._searchURL(page))
-          .then(json => {
-            for (const ds of json.results ?? []) {
-              this._parseDataset(ds);
-            }
-
-            if (json.nextStart > 0) {
-              fetchMore(json.nextStart);  // fetch next page
-            } else {
-              resolve(this._datasets);
-            }
-          })
-          .catch(e => {
-            reject(e);
-          });
-      };
-
-      fetchMore(1);
-    });
-  }
-
-
-  /**
-   * Add this dataset to the list of available datasets
-   * @param ds - the dataset metadata from ArcGIS
-   */
-  protected _parseDataset(ds: any): void {
-    if (this._datasets.has(ds.id)) return;  // unless we've seen it already
-
-    this._datasets.set(ds.id, ds);
-    ds.graph = new Graph(this.context);
-    ds.tree = new Tree(ds.graph, ds.id);
-    ds.cache = {
-      loaded: new Map<TileID, Tile>(),
-      seen:   new Set<string>()
-    };
-    ds.lastv = null;
-    ds.layer = null;   // the schema info will live here
-
-    // Experiment: cleanup the `licenseInfo` field by removing styles. (not used currently)
-    // We had considered showing these to the user, but they could instead click "more info"
-    // and see all of this information and more on the ArcGIS page.
-    //  const license = select(document.createElement('div'));
-    //  license.html(ds.licenseInfo);       // set innerHtml
-    //  license.selectAll('*')
-    //    .attr('style', null)
-    //    .attr('size', null);
-    //  ds.license_html = license.html();   // get innerHtml
-  }
-
-
-  /**
-   * Each dataset has a schema (aka "tagmap") which is available behind the "layerUrl".
-   * Before we can use the dataset we need to load this information.
-   * @param ds - the dataset to load the schema information
-   * @return Promise resolved with the layer data when the dataset schema has been loaded
-   */
-  protected _loadDatasetLayerAsync(ds: EsriDatasetEntry): Promise<EsriLayer | void> {
-    if (!ds || !ds.url) {
-      return Promise.reject(`No dataset`);
-    } else if (ds.layer) {    // done already
-      return Promise.resolve(ds.layer);
-    }
-
-    const network = this.context.systems.network!;
-    return network.fetch<any>(this._layerURL(ds.url))
-      .then(json => {
-        if (!json.layers || !json.layers.length) {
-          throw new Error(`Missing layer info for datasetID: ${ds.id}`);
-        }
-
-        const layer: EsriLayer = json.layers[0];  // should return a single layer
-        ds.layer = layer;
-
-        // Use the field metadata to map to OSM tags
-        const tagmap: Record<string, string> = {};
-        for (const f of layer.fields) {
-          if (f.type === 'esriFieldTypeOID') {  // this is an id field, remember it
-            layer.idfield = f.name;
-          }
-          if (!f.editable) continue;   // 1. keep "editable" fields only
-          tagmap[f.name] = f.alias;    // 2. field `name` -> OSM tag (stored in `alias`)
-        }
-        layer.tagmap = tagmap;
-        return layer;
-      })
-      .catch(e => {
-        if (e.name === 'AbortError') return;
-        console.error(e);  // eslint-disable-line
+      // Abort inflight requests that are no longer needed..
+      const prefix = `esri-${datasetID}-${layerID}`;
+      const neededIDs = new Set<RequestID>(tiles.map(tile => `${prefix}-${tile.id}`));
+      network.abortMatching(id => {
+        const key = id.slice(0, id.lastIndexOf(','));  // requestID without page number
+        return key.startsWith(prefix) && !neededIDs.has(key);
       });
+
+      for (const tile of tiles) {
+        this._loadTileNextPage(ds, layer, tile);
+      }
+    }
   }
 
 
   /**
-   * Returns the URL used to search ArcGIS for datasets.
-   * @see https://developers.arcgis.com/rest/users-groups-and-items/search.htm
-   * @param start - the starting page
-   * @return the url to fetch the datasets
-   */
-  protected _searchURL(start: number): string {
-    const params = {
-      f: 'json',
-      sortField: 'title',
-      sortOrder: 'asc',
-      num: 100,
-      start: start
-    };
-    return `${APIROOT}/groups/${GROUPID}/search?` + utilQsString(params, false);
-    // use to get
-    // .results[]
-    //   .extent
-    //   .id
-    //   .thumbnail
-    //   .title
-    //   .snippet
-    //   .url (featureServer)
-  }
-
-  /**
-   * Returns the URL used to get available layers from a ArcGIS feature server.
-   * @param featureServerURL - The feature server URL
-   * @return The url to fetch the layers
-   */
-  protected _layerURL(featureServerURL: string): string {
-    return `${featureServerURL}/layers?f=json`;
-    // should return single layer(?)
-    // .layers[0]
-    //   .copyrightText
-    //   .fields
-    //   .geometryType   "esriGeometryPoint" or "esriGeometryPolygon" ?
-  }
-
-  /**
-   * Returns the URL used to get available data on a given dataset and tile.
+   * Get available data for a given dataset, layer, and tile.
+   * Data is fetched in pages, and fetches will continue recursively if needed, until
+   * all pages have been fetched. (We assume that the number of pages is reasonable).
    * @param ds - the dataset to fetch data for
+   * @param layer - the layer within the dataset to fetch data for
    * @param tile - the tile to fetch the data for
-   * @param page - what page of data to fetch (zero-based)
-   * @return The url to fetch the data
    */
-  protected _tileURL(ds: EsriDatasetEntry, tile: Tile, page: number = 0): string {
-    const layerID = ds.layer!.id;
-    const maxRecordCount = ds.layer!.maxRecordCount || 2000;
-    const extent = tile.wgs84Extent;
-    const resultOffset = maxRecordCount * page;
+  protected _loadTileNextPage(ds: EsriDataset, layer: EsriLayer, tile: Tile): void {
+    const context = this.context;
+    const gfx = context.systems.gfx;
+    const locations = context.systems.locations;
+    const network = context.systems.network!;
 
-    const params = {
-      f: 'geojson',
-      outfields: '*',
-      outSR: 4326,
-      geometryType: 'esriGeometryEnvelope',
-      geometry: extent.toParam(),
-      resultOffset: resultOffset,
-      resultRecordCount: maxRecordCount
-    };
-    return `${ds.url}/${layerID}/query?` + utilQsString(params, false);
-  }
-
-
-  /**
-   * Get available data for a given dataset from its feature server
-   * @param ds - the dataset to fetch data for
-   * @param tile - the tile to fetch the data for
-   * @param page - what page of data to fetch (zero-based)
-   */
-  protected _loadTilePage(ds: EsriDatasetEntry, tile: Tile, page: number): void {
-    const cache = ds.cache;
+    const cache = layer._cache;
+    const datasetID = ds.id;
+    const layerID = layer.id;
     const tileID = tile.id;
-    if (cache.loaded.has(tileID)) return;
 
-    const network = this.context.systems.network!;
-    const requestID = `esri-${ds.id}-${tileID}` as RequestID;
-    const url = this._tileURL(ds, tile, page);
+    const page = cache.nextPage.get(tileID) ?? 0;
+    if (page === Infinity) return;  // no more pages
 
+    const requestID = `esri-${datasetID}-${layerID}-${tileID},${page}`;
+    if (cache.loaded.has(requestID) || network.isInflight(requestID)) return;
+
+    if (locations) {
+      // Skip if this tile covers a blocked region (all corners are blocked)
+      const corners = tile.wgs84Extent.polygon().slice(0, 4);
+      const isBlocked = corners.every(loc => locations.isBlockedAt(loc));
+      if (isBlocked) {
+        cache.loaded.add(requestID);  // don't try again
+        return;
+      }
+    }
+
+    const url = this._tileURL(ds, layer, tile, page);
     network.fetch<any>(url, { requestID })
       .then(geojson => {
         if (!geojson) throw new Error('no geojson');
 
-        this._parseTile(ds, tile, geojson, (err, results) => {
-          if (err) throw new Error(err);
-          if (results) {
-            ds.graph.rebase(results);
-            ds.tree.rebase(results);
-          }
-        });
-        return geojson.properties?.exceededTransferLimit;
-      })
-      .then(hasMorePages => {
+        cache.loaded.add(requestID);
+        this._gotTile(ds, layer, geojson);
+
+        // Recursively fetch more pages of data, if needed (assumption: it's a small number)
+        const hasMorePages = geojson.properties?.exceededTransferLimit;
         if (hasMorePages) {
-          // Assumption: It's unusual to see multiple pages per z14 tile,
-          // (2000 features/page) so the recursion here should be ok.
-          this._loadTilePage(ds, tile, ++page);
-
-        } else {
-          // Only consider it loaded when all pages are loaded.
-          cache.loaded.set(tileID, tile);
-
-          const gfx = this.context.systems.gfx;
+          cache.nextPage.set(tileID, page + 1);
+          this._loadTileNextPage(ds, layer, tile);
+        } else {  // all pages loaded
+          cache.nextPage.set(tileID, Infinity);
           gfx?.deferredRedraw();
         }
       })
       .catch(e => {
-        if (e.name === 'AbortError') return;
+        if (e.name === 'AbortError') return;   // ok
         console.error(e);  // eslint-disable-line
+        cache.loaded.add(requestID);   // don't retry
       });
   }
 
 
   /**
-   * Parse the results from a tiled data fetch.
+   * Process the results of a fetched tile.
    * @param ds - the dataset we fetched
-   * @param tile - the tile we fetched
-   * @param geojson - the result GeoJSON data
-   * @param callback - errback-style callback function to call with results
+   * @param layer - the layer within the dataset we fetched
+   * @param geojson - a GeoJSON.FeatureCollection containing the data for this tile
    */
-  protected _parseTile(ds: EsriDatasetEntry, tile: Tile, geojson: GeoJSON.FeatureCollection, callback: (err: any, results?: OsmEntity[]) => void): void {
-    if (!geojson) return callback({ message: 'No GeoJSON', status: -1 });
+  protected _gotTile(
+    ds: EsriDataset,
+    layer: EsriLayer,
+    geojson: GeoJSON.FeatureCollection,
+  ): void {
 
-    // Expect a FeatureCollection with `features` array
     const results: OsmEntity[] = [];
-    for (const f of geojson.features ?? []) {
-      const entities = this._parseFeature(ds, f);
+    for (const feature of geojson.features ?? []) {
+      const entities = this._parseFeature(ds, layer, feature);
       if (entities) {
         results.push(...entities);
       }
     }
 
-    callback(null, results);
+    if (results.length) {
+      ds.graph.rebase(results);
+      ds.tree.rebase(results);
+    }
   }
 
 
   /**
-   * Parse a single GeoJSON feature
+   * Parse a single GeoJSON feature.
    * @param ds - the dataset we fetched
+   * @param layer - the layer within the dataset we fetched
    * @param feature - the GeoJSON feature that we fetched
    * @return An array of OSMEntities for that feature, or `null` if we skipped it
    */
-  protected _parseFeature(ds: EsriDatasetEntry, feature: GeoJSON.Feature): OsmEntity[] | null {
+  protected _parseFeature(
+    ds: EsriDataset,
+    layer: EsriLayer,
+    feature: GeoJSON.Feature
+  ): OsmEntity[] | null {
+
     const context = this.context;
     const geom = feature.geometry;
-    const properties = feature.properties;
-    if (!geom || !properties) return null;
+    const properties = feature.properties ?? {};
+    if (!geom) return null;
 
-    const featureID = properties[ds.layer!.idfield] || properties.OBJECTID || properties.FID || properties.id;
-    if (!featureID) return null;
+    // Try to determine an identifier for the feature
+    const datasetID = ds.id;
+    const layerID = layer.id;
+    const featureID = properties[layer.objectIdField] ?? properties.OBJECTID ?? properties.FID ?? properties.id;
+    if (featureID === null || featureID === undefined) return null;
+    const featureIDString = String(featureID);
 
-    // skip if we've seen this feature already on another tile
-    if (ds.cache.seen.has(featureID)) return null;
-    ds.cache.seen.add(featureID);
+    // Skip if we've seen this feature already on another tile
+    const cache = layer._cache;
+    if (cache.seenIDs.has(featureIDString)) return null;
+    cache.seenIDs.add(featureIDString);
 
-    const id = `${ds.id}-${featureID}`;
-    const metadata = { __fbid__: id, __service__: 'esri', __datasetid__: ds.id };
+    const dataID = `esri-${datasetID}-${layerID}-${featureIDString}`;
+    const metadata = { __fbid__: dataID, __service__: 'esri', __datasetid__: datasetID };
     const entities: OsmEntity[] = [];
     const nodemap = new Map<string, OsmNode>();
+
+    // NOTE:  No Multitypes for now (maybe not needed)
 
     // Point:  make a single node
     if (geom.type === 'Point') {
@@ -639,12 +506,13 @@ export class EsriService extends AbstractSystem {
 
     return null;
 
-    // no Multitypes for now (maybe not needed)
+
     /**
-     *
+     * Parse GeoJSON coordinate data into OSM Nodes.
+     * Accepts a LineString coordinates or single Polygon coordinate ring
      * @param coords
      */
-    function parseCoordinates(coords: number[][]): EntityID[] {
+    function parseCoordinates(coords: GeoJSON.Position[]): EntityID[] {
       const nodelist: EntityID[] = [];
       for (const coord of coords) {
         const key = coord.toString();
@@ -660,16 +528,18 @@ export class EsriService extends AbstractSystem {
     }
 
     /**
-     *
+     * Convert the properties into OSM tags.
+     * Only keys present in the `_tagmap` will be accepted as OSM tags.
      * @param properties
      */
-    function parseTags(properties: Record<string, any>): OsmTags {
+    function parseTags(properties: GeoJSON.GeoJsonProperties): OsmTags {
+      properties ??= {};
       const tags: Record<string, string> = {};
-      for (const prop of Object.keys(properties)) {
-        const k = clean(ds.layer!.tagmap[prop]);
-        const v = clean(properties[prop]);
-        if (k && v) {
-          tags[k] = v;
+      for (const [k, v] of Object.entries(properties)) {
+        const tagk = clean(layer._tagmap[k]);
+        const tagv = clean(v);
+        if (tagk && tagv) {
+          tags[tagk] = tagv;
         }
       }
 
@@ -685,12 +555,180 @@ export class EsriService extends AbstractSystem {
     }
 
     /**
-     *
+     * Coerce values into strings and trim whitespace
      * @param val
      */
     function clean(val: any): string | null {
       return val ? val.toString().trim() : null;
     }
+  }
+
+
+  /**
+   * Loads all the available datasets from the Esri server.
+   * This is called by `initAsync`.
+   * @return Promise resolved when all pages of datasets have been loaded
+   */
+  protected _loadDatasetsAsync(): Promise<Map<DatasetID, EsriDataset>> {
+    if (this._datasetsPromise) return this._datasetsPromise;
+
+    const network = this.context.systems.network!;
+    return this._datasetsPromise = new Promise((resolve, reject) => {
+      // recursively fetch all pages of data (assumption: it's a small number, maybe 2?)
+      const fetchMore = (page: number): void => {
+        network.fetch<any>(this._searchURL(page))
+          .then(json => {
+            for (const ds of json.results ?? []) {
+              this._prepareDataset(ds);
+            }
+
+            if (json.nextStart > 0) {
+              fetchMore(json.nextStart);  // fetch next page
+            } else {
+              resolve(this._datasets);
+            }
+          })
+          .catch(e => {
+            reject(e);
+          });
+      };
+
+      fetchMore(1);
+    });
+  }
+
+
+  /**
+   * Add this dataset to the list of available datasets
+   * @param ds - the dataset metadata from ArcGIS
+   */
+  protected _prepareDataset(ds: EsriDataset): void {
+    if (this._datasets.has(ds.id)) return;  // we've seen it already
+
+    this._datasets.set(ds.id, ds);
+    ds.graph = new Graph(this.context);
+    ds.tree = new Tree(ds.graph, ds.id);
+    ds.lastv = null;
+    ds.layers = null;   // the schema info will live here
+    ds._layersPromise = null;
+
+    // Experiment: cleanup the `licenseInfo` field by removing styles. (not used currently)
+    // We had considered showing these to the user, but they could instead click "more info"
+    // and see all of this information and more on the ArcGIS page.
+    //  const license = select(document.createElement('div'));
+    //  license.html(ds.licenseInfo);       // set innerHtml
+    //  license.selectAll('*')
+    //    .attr('style', null)
+    //    .attr('size', null);
+    //  ds.license_html = license.html();   // get innerHtml
+  }
+
+
+  /**
+   * Each dataset will make its data available in one or more layers.
+   * The layer contains the data dictionary (in `fields`) and various other useful metadata.
+   * Before we can use the dataset we need to load this information.
+   * @param ds - the dataset to load the schema information
+   * @return Promise resolved when the layer data has been loaded
+   */
+  protected _loadDatasetLayersAsync(ds: EsriDataset): Promise<void> {
+    if (!ds || !ds.url) {
+      return Promise.reject(`No dataset`);
+
+    } else if (Array.isArray(ds.layers)) {  // done already
+      return Promise.resolve();
+
+    } else if (ds._layersPromise) {
+      return ds._layersPromise;
+
+    } else {
+      const network = this.context.systems.network!;
+      ds._layersPromise = network.fetch<any>(this._layersURL(ds.url))
+        .then(json => {
+          if (!json.layers || !json.layers.length) {
+            throw new Error(`Missing layer info for datasetID: ${ds.id}`);
+          }
+
+          ds.layers = json.layers;
+
+          // For each layer, setup:
+          for (const layer of json.layers as EsriLayer[]) {
+            // `_tagmap`: mapping of Esri field -> OSM Tag.
+            const tagmap: Record<string, string> = {};
+            for (const f of layer.fields) {
+              if (!f.editable) continue;   // 1. keep "editable" fields only
+              tagmap[f.name] = f.alias;    // 2. field `name` -> OSM tag (stored in `alias`)
+            }
+            layer._tagmap = tagmap;
+
+            // `_cache`: cache of seen data and loaded pages
+            layer._cache = {
+              loaded: new Set<RequestID>(),
+              seenIDs: new Set<string>(),
+              nextPage: new Map<TileID, number>()
+            };
+          }
+        })
+        .finally(() => {
+          ds._layersPromise = null;
+        });
+
+      return ds._layersPromise;
+    }
+  }
+
+
+  /**
+   * Returns the URL used to search ArcGIS for datasets.
+   * @see https://developers.arcgis.com/rest/users-groups-and-items/search.htm
+   * @param start - the starting page
+   * @return the url to fetch the datasets
+   */
+  protected _searchURL(start: number): string {
+    const params = {
+      f: 'json',
+      sortField: 'title',
+      sortOrder: 'asc',
+      num: 100,
+      start: start
+    };
+    return `${APIROOT}/groups/${GROUPID}/search?` + utilQsString(params, false);
+  }
+
+
+  /**
+   * Returns the URL used to get available layers from a ArcGIS feature server.
+   * @param featureServerURL - The feature server URL
+   * @return The url to fetch the layers
+   */
+  protected _layersURL(featureServerURL: string): string {
+    return `${featureServerURL}/layers?f=json`;
+  }
+
+
+  /**
+   * Returns the URL used to get available data for a given dataset, layer, and tile.
+   * @param ds - the dataset to fetch data for
+   * @param layer - the layer within the dataset to fetch data for
+   * @param tile - the tile to fetch the data for
+   * @param page - what page of data to fetch (zero-based)
+   * @return The url to fetch the data
+   */
+  protected _tileURL(ds: EsriDataset, layer: EsriLayer, tile: Tile, page: number = 0): string {
+    const maxRecordCount = layer.maxRecordCount || 2000;
+    const extent = tile.wgs84Extent;
+    const resultOffset = maxRecordCount * page;
+
+    const params = {
+      f: 'geojson',
+      outfields: '*',
+      outSR: 4326,
+      geometryType: 'esriGeometryEnvelope',
+      geometry: extent.toParam(),
+      resultOffset: resultOffset,
+      resultRecordCount: maxRecordCount
+    };
+    return `${ds.url}/${layer.id}/query?` + utilQsString(params, false);
   }
 
 }
