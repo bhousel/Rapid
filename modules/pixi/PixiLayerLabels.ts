@@ -38,12 +38,16 @@ const TEXTSTYLE_ITALIC: PIXI.TextStyleOptions = {
 /** Convenience type */
 type BoxID = string;
 
-/** A measured label: dimensions decoupled from rasterization. */
-interface MeasuredLabel {
+/** Measurements for a label, including its expected width and height */
+interface LabelMeasurement {
+  /** Label text, e.g. "Main Street" */
   str: string;
+  /** Label style, either 'normal' or 'italic' */
   style: 'normal' | 'italic';
-  width: number;   // texture frame width (includes padding)
-  height: number;  // texture frame height (includes padding)
+  /** Label texture width (includes padding) */
+  width: number;
+  /** Label texture height (includes padding) */
+  height: number;
   /** Present only for ASCII point labels (BitmapText) — the display object is built inline. */
   bitmapText?: PIXI.BitmapText;
 }
@@ -58,8 +62,7 @@ interface LabelBox extends BBox {
   tint?: number;
 }
 
-
-/** Type for placement IDs */
+/** Placement ids for labels placed adjacent to map pins */
 type PlacementID =
   't1' | 't2' | 't3' | 't4' | 't5' |
   'r1' | 'r2' | 'r3' | 'r4' | 'r5' |
@@ -461,7 +464,7 @@ export class PixiLayerLabels extends AbstractPixiLayer {
    * @param style - 'normal' or 'italic'
    * @return Frame width/height in CSS pixels, padded the same way the texture will be
    */
-  public measureLabel(str: string, style: 'normal' | 'italic' = 'normal'): MeasuredLabel {
+  public measureLabel(str: string, style: 'normal' | 'italic' = 'normal'): LabelMeasurement {
     const textStyle = this._getTextStyle(str, style);
     const metrics = PIXI.CanvasTextMetrics.measureText(str, textStyle);
     const pad = this._getLabelPadding(str);
@@ -692,9 +695,9 @@ export class PixiLayerLabels extends AbstractPixiLayer {
 
       if (!feature.label) continue;  // no label needed
 
-      let measured: MeasuredLabel;
+      let measurement: LabelMeasurement;
       if (/^[\x20-\x7E]*$/.test(feature.label)) {   // is it in the printable ASCII range?
-        // ASCII-only labels use BitmapText (no atlas texture needed).
+        // ASCII-only labels can use BitmapText (no atlas texture needed).
         const bitmapText = new PIXI.BitmapText({
           text: feature.label,
           style: {
@@ -705,7 +708,7 @@ export class PixiLayerLabels extends AbstractPixiLayer {
         bitmapText.label = feature.label;
         bitmapText.anchor.set(0.5, 0.5);   // middle, middle
         const bRect = bitmapText.getLocalBounds();
-        measured = {
+        measurement = {
           str: feature.label,
           style: 'normal',
           width: bRect.width,
@@ -714,10 +717,10 @@ export class PixiLayerLabels extends AbstractPixiLayer {
         };
 
       } else {
-        measured = this.measureLabel(feature.label, 'normal');
+        measurement = this.measureLabel(feature.label, 'normal');
       }
 
-      this.placeTextLabel(feature, measured);
+      this.placeTextLabel(feature, measurement);
     }
   }
 
@@ -728,11 +731,11 @@ export class PixiLayerLabels extends AbstractPixiLayer {
    * @param features - The features to place point labels on
    */
   public labelLines(features: PixiFeatureLine[]): void {
-    // This is hacky, but we can sort the line labels by their parent container name.
-    // It might be a level container with a name like "1", "-1", or just a name like "lines"
-    // If `parseInt` fails, just sort the label above everything.
     /**
-     *
+     * Priority sort the labels according to what level their feature has been rendered on.
+     * This is hacky, but we can sort the line labels by their parent container label (name).
+     * It might be a level container with a name like "1", "-1", or just a name like "lines"
+     * If `parseInt` fails, just sort the label above everything.
      * @param feature
      */
     function level(feature: PixiFeatureLine): number {
@@ -769,8 +772,8 @@ export class PixiLayerLabels extends AbstractPixiLayer {
         labelCoords[i] = [temp.x - labelOffset.x, temp.y - labelOffset.y];
       }
 
-      const measured = this.measureLabel(feature.label, 'normal');
-      this.placeRopeLabel(feature, measured, labelCoords);
+      const measurement = this.measureLabel(feature.label, 'normal');
+      this.placeRopeLabel(feature, measurement, labelCoords);
     }
   }
 
@@ -798,7 +801,7 @@ export class PixiLayerLabels extends AbstractPixiLayer {
       const fBounds = feature.container.getBounds().rectangle;
       if (fBounds.width < 600 && fBounds.height < 600) continue;  // too small
 
-      const measured = this.measureLabel(feature.label, 'italic');
+      const measurement = this.measureLabel(feature.label, 'italic');
 
       // Project the outer ring from feature-local space to label space (= global screen minus labelOffset)
       // as a flat array, which is what `lineToPoly` expects.
@@ -826,7 +829,7 @@ export class PixiLayerLabels extends AbstractPixiLayer {
         coords[i] = [ bufferdata.inner[(i * 2)], bufferdata.inner[(i * 2) + 1] ];
       }
 
-      this.placeRopeLabel(feature, measured, coords);
+      this.placeRopeLabel(feature, measurement, coords);
     }
   }
 
@@ -835,10 +838,10 @@ export class PixiLayerLabels extends AbstractPixiLayer {
    * Text labels are used to label point features like map pins.
    * We generate several placement regions around the marker,
    *  try them until we find one that doesn't collide with something.
-   * @param feature - The feature to place point labels on
-   * @param measured - The label measurement (size + str/style + optional bitmapText)
+   * @param  feature - The feature to place point labels on
+   * @param  measurement - The label measurements (size + str/style + optional bitmapText)
    */
-  public placeTextLabel(feature: AbstractPixiFeature, measured: MeasuredLabel): void {
+  public placeTextLabel(feature: AbstractPixiFeature, measurement: LabelMeasurement): void {
     if (!feature) return;
 
     const showDebug = this.context.getDebug('label');
@@ -868,8 +871,8 @@ export class PixiLayerLabels extends AbstractPixiLayer {
     // `l` = label, these bounds are in "local" coordinates to the label,
     // 0,0 is the center of the label
     // (padY -1, because for some reason, calculated height seems higher than necessary)
-    const lWidth = measured.width;
-    const lHeight = measured.height - 2;  // .pad(0, -1) equivalent: shrink height by 1 on each side
+    const lWidth = measurement.width;
+    const lHeight = measurement.height - 2;  // .pad(0, -1) equivalent: shrink height by 1 on each side
     const some = 5;
     const more = 10;
     const lWidthHalf = lWidth * 0.5;
@@ -955,11 +958,11 @@ export class PixiLayerLabels extends AbstractPixiLayer {
         const style = feature.style as any;
         const props: TextLabelProps = {
           kind: 'text',
-          str: measured.str,
-          style: measured.style,
-          width: measured.width,
-          height: measured.height,
-          bitmapText: measured.bitmapText,
+          str: measurement.str,
+          style: measurement.style,
+          width: measurement.width,
+          height: measurement.height,
+          bitmapText: measurement.bitmapText,
           x: x,
           y: y,
           tint: style?.label?.color ?? 0xeeeeee
@@ -1000,11 +1003,11 @@ export class PixiLayerLabels extends AbstractPixiLayer {
    * We generate chains of bounding boxes along the line,
    *  then add the labels in spaces along the line wherever they fit.
    * @param feature - The feature to place rope labels on
-   * @param measured - The label measurement (size + str/style)
+   * @param measurement - The label measurements (size + str/style)
    * @param coords - The coordinates to place a rope on, in label space (= global screen minus labelOffset)
    */
-  public placeRopeLabel(feature: AbstractPixiFeature, measured: MeasuredLabel, coords: Vec2[]): void {
-    if (!feature || !measured || !coords) return;
+  public placeRopeLabel(feature: AbstractPixiFeature, measurement: LabelMeasurement, coords: Vec2[]): void {
+    if (!feature || !measurement || !coords) return;
     if (!feature.container.visible || !feature.container.renderable) return;
 
     const showDebug = this.context.getDebug('label');
@@ -1012,8 +1015,8 @@ export class PixiLayerLabels extends AbstractPixiLayer {
 
     // `l` = label, these bounds are in "local" coordinates to the label,
     // 0,0 is the center of the label
-    const lWidth = measured.width;
-    const lHeight = measured.height;
+    const lWidth = measurement.width;
+    const lHeight = measurement.height;
     const BENDLIMIT = Math.PI / 8;
 
     // The size of the collision test bounding boxes, in pixels.
@@ -1156,18 +1159,18 @@ export class PixiLayerLabels extends AbstractPixiLayer {
       // longer than the label needs to be, which can cause stretching of small labels.
       // Here we will scale the points down to the desired label width.
       let scaledCoords = ropeCoords.map(coord => vecSubtract(coord, ropeOrigin));  // to local coords
-      scaledCoords = geomRotate(scaledCoords, -angle, [0,0]);          // rotate to x axis
-      scaledCoords = scaledCoords.map(([x,y]) => [x * scaleX, y]);           // apply `scaleX`
-      scaledCoords = geomRotate(scaledCoords, angle, [0,0]);           // rotate back
-      scaledCoords = scaledCoords.map(coord => vecAdd(coord, ropeOrigin));   // back to global coords
+      scaledCoords = geomRotate(scaledCoords, -angle, [0,0]);                      // rotate to x axis
+      scaledCoords = scaledCoords.map(([x,y]) => [x * scaleX, y]);                 // apply `scaleX`
+      scaledCoords = geomRotate(scaledCoords, angle, [0,0]);                       // rotate back
+      scaledCoords = scaledCoords.map(coord => vecAdd(coord, ropeOrigin));         // back to global coords
 
       const style = feature.style as any;
       const props: RopeLabelProps = {
         kind: 'rope',
-        str: measured.str,
-        style: measured.style,
-        width: measured.width,
-        height: measured.height,
+        str: measurement.str,
+        style: measurement.style,
+        width: measurement.width,
+        height: measurement.height,
         coords: scaledCoords,
         tint: style?.label?.color ?? 0xeeeeee
       };

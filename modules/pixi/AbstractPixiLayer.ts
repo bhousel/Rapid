@@ -6,6 +6,7 @@ import type { GraphicsSystem } from '../core/GraphicsSystem.ts';
 import type { PixiScene } from './PixiScene.ts';
 import type { Viewport } from '@rapid-sdk/math';
 
+
 /**
  * AbstractPixiLayer is the base class from which all rendering Layers inherit.
  * It creates a container to hold the Layer data.
@@ -26,6 +27,7 @@ import type { Viewport } from '@rapid-sdk/math';
  * - `retained`           `Map<featureID, Integer frame>` last seen
  */
 export class AbstractPixiLayer {
+
   /** Unique identifier for this Layer */
   public id: LayerID;
   /** The Scene that owns this Layer */
@@ -53,6 +55,7 @@ export class AbstractPixiLayer {
   protected _dataHasClass: Map<DataID, Set<ClassID>>;
   /** Map of classID to Set of dataIDs */
   protected _classHasData: Map<ClassID, Set<DataID>>;
+
 
   /**
    * @constructor

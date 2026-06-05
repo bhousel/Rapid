@@ -13,9 +13,10 @@ import type { PixiScene } from './PixiScene.ts';
 import type { SingularGeometryType } from '../lib/types.ts';
 import type { Viewport } from '@rapid-sdk/math';
 
-/** Extended PIXI.Container with feature reference */
+
+/** A PIXI.Container with an optional reference back to the feature */
 export interface FeatureContainer extends PIXI.Container {
-  __feature__: AbstractPixiFeature | null;
+  __feature__?: AbstractPixiFeature | null;
 }
 
 
@@ -37,9 +38,10 @@ export interface FeatureContainer extends PIXI.Container {
  * - `dirty`                `true` if the Feature needs to be rebuilt
  * - `v`                    Version of the Feature, can be used to detect changes
  * - `lod`                  Level of detail for the Feature last time it was styled (0 = off, 1 = simplified, 2 = full)
- * - `halo`                 A PIXI.DisplayObject() that contains the graphics for the Feature's halo (if it has one)
+ * - `halo`                 A PIXI.Container() that contains the graphics for the Feature's halo (if it has one)
  */
 export class AbstractPixiFeature {
+
   /** Unique string identifier for this Feature */
   public id: FeatureID;
   /** The Layer that owns this Feature */
@@ -77,6 +79,7 @@ export class AbstractPixiFeature {
   protected _data: AbstractData | null;
   /** Pseudoclasses for styling */
   protected _classes: Set<ClassID>;
+
 
   /**
    * @constructor

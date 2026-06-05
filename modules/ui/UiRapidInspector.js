@@ -219,7 +219,7 @@ export class UiRapidInspector {
       const entity = graph.entity(datum.id);  // get the newly accepted entity
       const layer = scene.layers.get('osm');
       lastMove.target = {
-        displayObject: null,
+        container: null,
         feature: null,
         featureID: null,
         layer: layer,

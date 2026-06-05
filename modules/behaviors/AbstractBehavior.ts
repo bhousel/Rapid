@@ -11,8 +11,8 @@ import type { Vec2 } from '@rapid-sdk/math';
 
 /** Target information extracted from Pixi events */
 export interface EventTarget {
-  /** The Pixi DisplayObject that was targeted */
-  displayObject: FeatureContainer;
+  /** The PIXI.Container that was targeted */
+  container: FeatureContainer;
   /** The PixiFeature, or null */
   feature: AbstractPixiFeature | null;
   /** The feature ID, or null */
@@ -170,35 +170,35 @@ export class AbstractBehavior extends EventEmitter {
 
     //console.log(`hit: ${e.target?.label}`);
 
-    if (!e.target) {   // `e.target` is the PIXI.DisplayObject that triggered this event.
+    if (!e.target) {   // `e.target` is the PIXI.Container that triggered this event.
       return result;
     }
 
-    let dObj: any = e.target;
+    let currContainer: FeatureContainer = e.target;
 
     // Try to find a target feature - it will have a `__feature__` property.
-    // Look up through the parent hierarchy until we find one or end up at the root stage.
-    while (dObj) {
-      const feature = dObj.__feature__;
+    // Look up through the scene graph until we find one or end up at the root stage.
+    while (currContainer) {
+      const feature = currContainer.__feature__;
       if (feature) {
         result.target = {
-          displayObject: dObj,
+          container: currContainer,
           feature: feature,
           featureID: feature.id,
           layer: feature.layer,
           layerID: feature.layer.id,
           data: feature.data,
-          dataID: feature.data.id
+          dataID: feature.data?.id ?? null
         };
         return result;
 
       } else {
-        if (dObj.parent) {
-          dObj = dObj.parent;
+        if (currContainer.parent) {
+          currContainer = currContainer.parent;
 
         } else {  // can't look up any further, just return the original target.
           result.target = {
-            displayObject: e.target,
+            container: e.target,
             feature: null,
             featureID: null,
             layer: null,
