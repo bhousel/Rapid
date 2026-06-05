@@ -42,6 +42,7 @@ export interface AbstractDataProps {
  * @template P - The props interface for this data element (must extend AbstractDataProps)
  */
 export class AbstractData<P extends AbstractDataProps = AbstractDataProps> {
+
   /** Unique identifier for this data element */
   public id: string;
   /** Application context */
@@ -50,6 +51,7 @@ export class AbstractData<P extends AbstractDataProps = AbstractDataProps> {
   public geoms: Geometry;
   /** Properties object */
   public props: Partial<P>;
+
 
   /**
    * @constructor

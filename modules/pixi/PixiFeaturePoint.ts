@@ -6,11 +6,21 @@ import { WORLD_ZOOM } from '@rapid-sdk/math';
 
 import type { AbstractPixiLayer } from './AbstractPixiLayer.ts';
 import type { DashLineOptions } from './lib/DashLine.ts';
+import type { PixiFeatureProps } from './AbstractPixiFeature.ts';
 import type { PixiLayerMapUI } from './PixiLayerMapUI.ts';
 import type { Viewport } from '@rapid-sdk/math';
 
 /* Intersection type that includes both Pixi Stroke and DashLineOptions  */
 type StrokeStyleWithDash = PIXI.StrokeStyle & DashLineOptions;
+
+
+/** Additional properties for a point */
+export interface PixiFeaturePointProps extends PixiFeatureProps {
+  /** Set true to use a circular halo and hit area */
+  isCircular: boolean;
+  /** Set true if this is a "virtual" pin - these are rendered inside of a polygon */
+  isVirtual: boolean;
+}
 
 
 /**
@@ -30,13 +40,13 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
   public icon: PIXI.Sprite | null;
   /** PIXI.Container containing the viewfields (or null if none) */
   public viewfields: PIXI.Container | null;
+  /** Narrows the inherited `PixiFeatureProps` props to `PixiFeaturePointProps` */
+  public declare props: PixiFeaturePointProps;
 
   /** Count of viewfield sprites (to detect changes) */
   protected _viewfieldCount: number;
   /** Name of viewfield texture (to detect changes) */
   protected _viewfieldName: string | null;
-  /** Set true to use a circular halo and hit area */
-  protected _isCircular: boolean;
 
 
   /**
@@ -47,9 +57,9 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
   public constructor(layer: AbstractPixiLayer, featureID: FeatureID) {
     super(layer, featureID);
 
-    this._viewfieldCount = 0;     // to watch for change in # of viewfield sprites
-    this._viewfieldName = null;   // to watch for change in viewfield texture
-    this._isCircular = false;     // set true to use a circular halo and hit area
+    this._viewfieldCount = 0;         // to watch for change in # of viewfield sprites
+    this._viewfieldName = null;       // to watch for change in viewfield texture
+    this.props.isCircular = false;    // set true to use a circular halo and hit area
 
     const marker = new PIXI.Sprite();
     marker.label = 'marker';
@@ -322,7 +332,7 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
 
       // Replace pinlike markers with circles at lower zoom
       const markerID = isPin ? 'largeCircle' : (style.marker.image ?? 'smallCircle');
-      this._isCircular = /(circle|midpoint)$/i.test(markerID);
+      this.props.isCircular = /(circle|midpoint)$/i.test(markerID);
       marker.texture = textureManager.getTexture('symbol', markerID) || PIXI.Texture.EMPTY;
       marker.anchor.set(0.5, 0.5);  // middle, middle
       icon.position.set(0, 0);      // middle, middle
@@ -336,9 +346,9 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
 
       // Replace pinlike markers with circles if viewfields are present
       const markerID = (isPin && vfAngles.length) ? 'largeCircle' : (style.marker.image ?? 'smallCircle');
-      this._isCircular = /(circle|midpoint)$/i.test(markerID);
+      this.props.isCircular = /(circle|midpoint)$/i.test(markerID);
       marker.texture = textureManager.getTexture('symbol', markerID) || PIXI.Texture.EMPTY;
-      if (isPin && !this._isCircular) {
+      if (isPin && !this.props.isCircular) {
         marker.anchor.set(0.5, 1);    // middle, bottom
         icon.position.set(0, -14);    // mathematically 0,-15 is center of pin, but looks nicer moved down slightly
       } else {
@@ -387,7 +397,7 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
     rect.enlarge(new PIXI.Rectangle(-MINSIZE / 2, -MINSIZE / 2, MINSIZE, MINSIZE));
     rect.pad(4); // then pad a bit more
 
-    if (this._isCircular) {
+    if (this.props.isCircular) {
       this.container.hitArea = new PIXI.Circle(0, 0, rect.width / 2);
     } else {
       this.container.hitArea = rect;
@@ -400,7 +410,7 @@ export class PixiFeaturePoint extends AbstractPixiFeature {
    */
   public updateHalo(): void {
     const showHover = (this.visible && this._classes.has('hover'));
-    const showSelect = (this.visible && this._classes.has('select') && !(this as any).virtual);
+    const showSelect = (this.visible && this._classes.has('select') && !this.props.isVirtual);
     const showHighlight = (this.visible && this._classes.has('highlight'));
 
     // Hover

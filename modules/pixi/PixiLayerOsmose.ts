@@ -100,7 +100,7 @@ export class PixiLayerOsmose extends AbstractPixiLayer {
 
       this.syncFeatureClasses(feature);
       feature.update(viewport);
-      if (!(feature as any)._isCircular) {  // offset the icon to fit better in the "osmose" pin
+      if (!feature.props.isCircular) {  // offset the icon to fit better in the "osmose" pin
         feature.icon?.position.set(0, -17);
       }
 

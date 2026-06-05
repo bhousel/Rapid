@@ -1,12 +1,13 @@
 import * as PIXI from 'pixi.js';
 import { AbstractPixiFeature } from './AbstractPixiFeature.ts';
 
-import type { Viewport } from '@rapid-sdk/math';
+import type { PixiFeatureProps } from './AbstractPixiFeature.ts';
 import type { PixiLayerLabels } from './PixiLayerLabels.ts';
+import type { Viewport } from '@rapid-sdk/math';
 
 
 /** Properties for a text label (placed on a point feature). */
-export interface TextLabelProps {
+export interface TextLabelProps extends PixiFeatureProps {
   kind: 'text';
   str: string;
   style: 'normal' | 'italic';
@@ -28,7 +29,7 @@ export interface TextLabelProps {
 
 
 /** Properties for a rope label (placed along a line or polygon perimeter). */
-export interface RopeLabelProps {
+export interface RopeLabelProps extends PixiFeatureProps {
   kind: 'rope';
   str: string;
   style: 'normal' | 'italic';
@@ -40,7 +41,7 @@ export interface RopeLabelProps {
 }
 
 
-export type LabelProps = TextLabelProps | RopeLabelProps;
+export type PixiFeatureLabelProps = TextLabelProps | RopeLabelProps;
 
 
 /**
@@ -69,7 +70,7 @@ export type LabelProps = TextLabelProps | RopeLabelProps;
  * Labels do not participate in hit testing and do not draw halos.
  *
  * Properties available:
- * - `props`   The label content (text or rope) plus its placement
+ * - `props`   The label generation properties (text or rope) including its placement
  * - `display` The child display object (Sprite, BitmapText, or MeshRope), or null until built
  * - (also all properties inherited from `AbstractPixiFeature`)
  */
@@ -77,16 +78,15 @@ export class PixiFeatureLabel extends AbstractPixiFeature {
 
   /** Narrow the inherited `layer` reference so we can call `resolveLabelTexture()`. */
   public declare layer: PixiLayerLabels;
-
-  /** The label content + placement.  Assigned by the layer after construction. */
-  public props: LabelProps | null;
+  /** Narrows the inherited `PixiFeatureProps` props to `PixiFeatureLabelProps` */
+  public declare props: PixiFeatureLabelProps;
   /** The child display object — Sprite, BitmapText, or MeshRope (null until built) */
   public display: PIXI.Container | null;
 
 
   /**
    * @constructor
-   * @param layer - The `PixiLayerLabels` that owns this Feature
+   * @param layer - The `PixiLayerLabels` layer that owns this Feature
    * @param featureID - Unique string identifier for this label
    */
   public constructor(layer: PixiLayerLabels, featureID: FeatureID) {
@@ -97,7 +97,6 @@ export class PixiFeatureLabel extends AbstractPixiFeature {
     this.container.eventMode = 'none';
     this.container.sortableChildren = false;
 
-    this.props = null;
     this.display = null;
 
     this._styleDirty = true;
@@ -114,7 +113,6 @@ export class PixiFeatureLabel extends AbstractPixiFeature {
       this.display.destroy({ children: true });
       this.display = null;
     }
-    this.props = null;
     super.destroy();
   }
 
@@ -130,9 +128,9 @@ export class PixiFeatureLabel extends AbstractPixiFeature {
     if (!this._styleDirty || !this.props) return;
 
     if (this.props.kind === 'text') {
-      this._updateText(this.props);
+      this._updateText(this.props as TextLabelProps);
     } else {
-      this._updateRope(this.props);
+      this._updateRope(this.props as RopeLabelProps);
     }
   }
 

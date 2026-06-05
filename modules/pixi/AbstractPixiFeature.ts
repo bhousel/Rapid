@@ -19,6 +19,9 @@ export interface FeatureContainer extends PIXI.Container {
   __feature__?: AbstractPixiFeature | null;
 }
 
+/** A Feature may have arbitrary properties attached to it. */
+export type PixiFeatureProps = Record<string, unknown>;
+
 
 /**
  * AbstractPixiFeature is the base class from which all rendered Features inherit.
@@ -33,6 +36,7 @@ export interface FeatureContainer extends PIXI.Container {
  * - `style`                Object containing style info
  * - `label`                String containing the Feature's label (if any)
  * - `data`                 Data element bound to this Feature (like `__data__` from the D3.js days)
+ * - `props`                Properties object, can contain other arbitrary properties
  * - `visible`              `true` if the Feature is visible (`false` if it is culled)
  * - `allowInteraction`     `true` if the Feature is allowed to be interactive (emits Pixi events)
  * - `dirty`                `true` if the Feature needs to be rebuilt
@@ -54,6 +58,8 @@ export class AbstractPixiFeature {
   public context: Context;
   /** PIXI.Container that contains all the graphics needed to draw the Feature */
   public container: FeatureContainer;
+  /** Properties object, can be used to attach arbitrary data to this Feature */
+  public props: Partial<PixiFeatureProps>;
   /** Version of the Feature, can be used to detect changes */
   public v: number;
   /** Level of detail for the Feature last time it was styled (0 = off, 1 = simplified, 2 = full) */
@@ -93,6 +99,7 @@ export class AbstractPixiFeature {
     this.scene = layer.scene;
     this.gfx = layer.gfx;
     this.context = layer.context;
+    this.props = {};
 
     const container = new PIXI.Container() as FeatureContainer;
     this.container = container;
@@ -145,6 +152,7 @@ export class AbstractPixiFeature {
     this.scene = null!;
     this.gfx = null!;
     this.context = null!;
+    this.props = null!;
 
     if (this.halo) {
       this.halo.destroy({ children: true });

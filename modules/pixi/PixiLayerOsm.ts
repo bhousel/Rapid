@@ -12,6 +12,7 @@ import type { MatchedStyle } from '../core/StyleSystem.ts';
 import type { OsmEntity, OsmNode, OsmRelation, OsmTags, OsmWay } from '../data/types.ts';
 import type { PixiLayerMapUI } from './PixiLayerMapUI.ts';
 import type { PixiScene } from './PixiScene.ts';
+import type { Preset } from '../lib/Preset.ts';
 import type { Vec2, Viewport } from '@rapid-sdk/math';
 
 
@@ -318,7 +319,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
 
     // For deciding if an unlabeled polygon feature is interesting enough to show a virtual pin.
     // Note that labeled polygon features will always get a virtual pin.
-    const isInterestingPreset = (preset: any): boolean => {
+    const isInterestingPreset = (preset: Preset | null): boolean => {
       if (!preset || preset.isFallback()) return false;
 
       // These presets probably are not POIs
@@ -373,6 +374,8 @@ export class PixiLayerOsm extends AbstractPixiLayer {
           }
         }
 
+
+        const props = feature.props;
         this.syncFeatureClasses(feature);
 
         if (feature.dirty) {
@@ -388,12 +391,13 @@ export class PixiLayerOsm extends AbstractPixiLayer {
           // POI = "Point of Interest" -and- "Pole of Inaccessability"
           // For POIs mapped as polygons, we can create a virtual point feature at the pole of inaccessability.
           // Try to show a virtual pin if there is a label or if the preset is interesting enough..
+          // Store the details about this in the feature's properties object.
           if (showPoints && (label || isInterestingPreset(preset))) {
-            (feature as any).poiFeatureID = `${this.layerID}-${entityID}-poi-${i}`;
-            (feature as any).poiPreset = preset;
+            props.poiFeatureID = `${this.layerID}-${entityID}-poi-${i}`;
+            props.poiPreset = preset;
           } else {
-            (feature as any).poiFeatureID = null;
-            (feature as any).poiPreset = null;
+            props.poiFeatureID = null;
+            props.poiPreset = null;
           }
         }
 
@@ -401,12 +405,14 @@ export class PixiLayerOsm extends AbstractPixiLayer {
         this.retainFeature(feature, frame);
 
         // Same as above, but for the virtual POI, if any
-        if ((feature as any).poiFeatureID && (feature as any).poiPreset) {
-          let poiFeature = this.features.get((feature as any).poiFeatureID) as PixiFeaturePoint | undefined;
+        if (props.poiFeatureID) {
+          const poiFeatureID = props.poiFeatureID as FeatureID;
+          const poiPreset = props.poiPreset as Preset | null;
 
+          let poiFeature = this.features.get(poiFeatureID) as PixiFeaturePoint | undefined;
           if (!poiFeature) {
-            poiFeature = new PixiFeaturePoint(this, (feature as any).poiFeatureID);
-            (poiFeature as any).virtual = true;
+            poiFeature = new PixiFeaturePoint(this, poiFeatureID);
+            poiFeature.props.isVirtual = true;
             poiFeature.parentContainer = pointsContainer;
           }
 
@@ -441,7 +447,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
             // markerStyle.label.color = markerStyle.fill.color;
             markerStyle.icon.color = 0x444444;
 
-            const poiIcon = (feature as any).poiPreset?.props?.icon;
+            const poiIcon = poiPreset?.props?.icon;
             if (poiIcon) {
               markerStyle.icon.image = poiIcon;
             }

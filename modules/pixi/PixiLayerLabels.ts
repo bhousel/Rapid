@@ -7,7 +7,7 @@ import { getLineSegments, getDebugBBox, lineToPoly } from './helpers.ts';
 
 import type { AbstractPixiFeature } from './AbstractPixiFeature.ts';
 import type { BBox } from 'rbush';
-import type { LabelProps, TextLabelProps, RopeLabelProps } from './PixiFeatureLabel.ts';
+import type { PixiFeatureLabelProps, TextLabelProps, RopeLabelProps } from './PixiFeatureLabel.ts';
 import type { PixiFeatureLine } from './PixiFeatureLine.ts';
 import type { PixiFeaturePoint } from './PixiFeaturePoint.ts';
 import type { PixiFeaturePolygon } from './PixiFeaturePolygon.ts';
@@ -108,7 +108,7 @@ export class PixiLayerLabels extends AbstractPixiLayer {
   /** Mapping of a text string (e.g. "Main Street") to generated texture */
   protected _textureIDs: Map<string, TextureID>;
   /** Storage for label placeholders - they will be added to the scene lazily */
-  protected _placeholders: Map<LabelID, LabelProps>;
+  protected _placeholders: Map<LabelID, PixiFeatureLabelProps>;
   /** Mapping of Pixi object id to PIXI.Sprite */
   protected _debugSprites: Map<string, PIXI.Sprite>;
 
@@ -152,7 +152,7 @@ export class PixiLayerLabels extends AbstractPixiLayer {
     // Each one is materialized into a `PixiFeatureLabel` lazily on first visibility
     // (see `renderLabels()`), to avoid creating display objects for the many labels
     // that are placed far off-screen.
-    this._placeholders = new Map<LabelID, LabelProps>();
+    this._placeholders = new Map<LabelID, PixiFeatureLabelProps>();
 
     // Pixi Display Objects for debug bbox sprites.
     // (Label display objects live on their owning `PixiFeatureLabel` features.)

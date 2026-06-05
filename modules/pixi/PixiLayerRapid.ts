@@ -377,7 +377,6 @@ export class PixiLayerRapid extends AbstractPixiLayer {
           feature.container.zIndex = -area;      // sort by area descending (small things above big things)
 
           feature.parentContainer = parentContainer;
-          (feature as any).rapidFeature = true;
           feature.data = entity;
         }
 
@@ -430,7 +429,6 @@ export class PixiLayerRapid extends AbstractPixiLayer {
           feature = new PixiFeatureLine(this, featureID);
           feature.geometry = part;
           feature.parentContainer = parentContainer;
-          (feature as any).rapidFeature = true;
           feature.data = entity;
         }
 
@@ -509,7 +507,6 @@ export class PixiLayerRapid extends AbstractPixiLayer {
         feature = new PixiFeaturePoint(this, featureID);
         feature.geometry = part;
         feature.parentContainer = parentContainer;
-        (feature as any).rapidFeature = true;
         feature.data = entity;
       }
 
@@ -547,7 +544,6 @@ export class PixiLayerRapid extends AbstractPixiLayer {
         feature = new PixiFeaturePoint(this, featureID);
         feature.geometry = part;
         feature.parentContainer = parentContainer;
-        (feature as any).rapidFeature = true;
         feature.allowInteraction = false;   // vertices in this layer don't actually need to be interactive
         feature.data = entity;
       }

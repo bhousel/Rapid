@@ -36,6 +36,7 @@ export class MarkerData<P extends MarkerProps = MarkerProps> extends AbstractDat
   /** Narrows the inherited `Partial<P>` props to `P`; no JS is emitted — type-only. */
   public declare props: P;
 
+
   /**
    * @constructor
    * Data elements may be constructed by passing an application context or another data element.

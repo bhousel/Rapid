@@ -27,6 +27,7 @@ type StrokeStyleWithDash = PIXI.StrokeStyle & DashLineOptions;
  * -  (also all properties inherited from `AbstractPixiFeature`)
  */
 export class PixiFeatureLine extends AbstractPixiFeature {
+
   /** PIXI.Graphics for the casing (below) */
   public casing: PIXI.Graphics | null;
   /** PIXI.Graphics for the stroke (above) */
@@ -34,6 +35,7 @@ export class PixiFeatureLine extends AbstractPixiFeature {
 
   /** Buffer polygon data for hit testing and halo */
   protected _bufferdata: LineToPolyResult | null;
+
 
   /**
    * @constructor

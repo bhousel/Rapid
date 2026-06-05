@@ -25,12 +25,12 @@ export interface GeoJSONProps extends AbstractDataProps {
  */
 export class GeoJSONData<P extends GeoJSONProps = GeoJSONProps> extends AbstractData<P> {
 
-  // Narrow `props` from `Partial<P>` to `P`.
   // The constructor accepts `Partial<P>` for flexibility (e.g. tests),
   // but access sites can trust that required properties exist.
   // `declare` emits no JavaScript — it only refines the type.
-  /** Narrows the inherited `Partial<P>` props to `P`; no JS is emitted — type-only. */
+  /** Narrows the inherited `Partial<P>` props to `P` */
   public declare props: P;
+
 
   /**
    * @constructor

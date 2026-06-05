@@ -265,7 +265,7 @@ export class ImagerySource {
    */
   public get area(): number {
     if (!this.props.feature) return Number.MAX_VALUE;  // worldwide
-    const area = d3_geoArea(this.props.feature as any);
+    const area = d3_geoArea(this.props.feature);
     return isNaN(area) ? 0 : area;
   }
 
