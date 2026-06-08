@@ -522,7 +522,7 @@ export class PixiLayerRapid extends AbstractPixiLayer {
           feature.label = l10n.displayName(entity.tags);
 
           // experiment: label addresses
-          const housenumber = entity.tags['addr:housenumber'];
+          const housenumber = entity.tags['addr:unit'] ?? entity.tags['addr:housenumber'];
           if (!feature.label && housenumber) {
             feature.label = housenumber;
           }
@@ -553,8 +553,9 @@ export class PixiLayerRapid extends AbstractPixiLayer {
       if (feature.dirty) {
         feature.style = vertexStyle;
         feature.label = l10n.displayName(entity.tags);
+
         // experiment: label addresses
-        const housenumber = entity.tags['addr:housenumber'];
+        const housenumber = entity.tags['addr:unit'] ?? entity.tags['addr:housenumber'];
         if (!feature.label && housenumber) {
           feature.label = housenumber;
         }
