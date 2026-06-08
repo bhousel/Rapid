@@ -1,6 +1,6 @@
 import { AbstractSystem } from '../core/AbstractSystem.ts';
 import { Extent, Tiler } from '@rapid-sdk/math';
-import { Graph, RapidDataset, Tree } from '../lib/index.ts';
+import { Graph, RapidDataset } from '../lib/index.ts';
 import { OsmNode, OsmRelation, OsmWay } from '../data/index.ts';
 import { utilQsString } from '@rapid-sdk/util';
 
@@ -34,7 +34,7 @@ interface EsriDataCache {
 
 /**
  * Internal structure for a single Esri dataset, including its metadata
- * from ArcGIS, the local Graph/Tree, and tile cache.
+ * from ArcGIS, the local Graph, and tile cache.
  */
 interface EsriDataset {
   /** Unique dataset identifier from ArcGIS */
@@ -57,8 +57,6 @@ interface EsriDataset {
   licenseInfo: string;
   /** Local graph holding the parsed OSM entities for this dataset */
   graph: Graph;
-  /** Spatial index tree for efficient extent-based lookups */
-  tree: Tree;
   /** Last viewport version number, used to skip redundant tile loads */
   lastv: number | null;
   /** Layer schema info (fields, tagmap) loaded from the feature server */
@@ -163,12 +161,13 @@ export class EsriService extends AbstractSystem {
    */
   public resetAsync(): Promise<void> {
     const network = this.context.systems.network!;
+    const spatial = this.context.systems.spatial!;
 
     network.abortMatching(id => id.startsWith('esri'));
+    spatial.clearMatching(id => id.startsWith('esri'));
 
-    for (const [datasetID, ds] of this._datasets) {
+    for (const ds of this._datasets.values()) {
       ds.graph = new Graph(this.context);
-      ds.tree = new Tree(ds.graph, datasetID);
       ds.lastv = null;
 
       // clear layer caches
@@ -234,11 +233,11 @@ export class EsriService extends AbstractSystem {
    */
   public getData(datasetID: DatasetID): OsmEntity[] {
     const ds = this._datasets.get(datasetID);
-    if (!ds || !ds.tree || !ds.graph) return [];
+    if (!ds) return [];
 
-    const extent = this.context.viewport.visibleExtent();
-    return ds.tree.intersects(extent, ds.graph);
-  }
+    const spatial = this.context.systems.spatial!;
+    return spatial.getVisibleData(`esri-${ds.id}`).map(hit => hit.contents as OsmEntity);
+ }
 
 
   /**
@@ -367,6 +366,9 @@ export class EsriService extends AbstractSystem {
       .then(geojson => {
         if (!geojson) throw new Error('no geojson');
 
+        // We are not currently using the SpatialSystem to track loaded tiles because
+        // a tile request may kick off multiple per-layer or per-page subrequests.
+        //spatial.addTiles('esri-datasetID?', [tile]);   // mark as loaded
         cache.loaded.add(requestID);
         this._gotTile(ds, layer, geojson);
 
@@ -399,6 +401,7 @@ export class EsriService extends AbstractSystem {
     layer: EsriLayer,
     geojson: GeoJSON.FeatureCollection,
   ): void {
+    const spatial = this.context.systems.spatial!;
 
     const results: OsmEntity[] = [];
     for (const feature of geojson.features ?? []) {
@@ -409,8 +412,8 @@ export class EsriService extends AbstractSystem {
     }
 
     if (results.length) {
-      ds.graph.rebase(results);
-      ds.tree.rebase(results);
+      ds.graph.rebase(results);   // important: `graph.rebase` will call `.updateGeometry()`
+      spatial.addData(`esri-${ds.id}`, results);
     }
   }
 
@@ -607,7 +610,6 @@ export class EsriService extends AbstractSystem {
 
     this._datasets.set(ds.id, ds);
     ds.graph = new Graph(this.context);
-    ds.tree = new Tree(ds.graph, ds.id);
     ds.lastv = null;
     ds.layers = null;   // the schema info will live here
     ds._layersPromise = null;
