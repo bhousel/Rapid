@@ -104,6 +104,11 @@ async function buildData() {
 //    }
 //  }
 
+  // Create target folders if necessary
+  await $`mkdir -p ./data/l10n`;
+  await $`mkdir -p ./dist/data/l10n`;
+  await $`mkdir -p ./dist/data/schema`;
+
   // Start clean
   await $`rm -rf ./data/languages.json`;
   await $`rm -rf ./data/territory_languages.json`;
@@ -112,12 +117,6 @@ async function buildData() {
   await $`rm -rf ./dist/data/**/*.json{,c,5}`;
   await $`rm -rf ./dist/data/modules`;
   await $`rm -rf ./svg/fontawesome/*.svg`;
-
-  // Create target folders if necessary
-  await $`mkdir -p ./data/l10n`;
-  await $`mkdir -p ./dist/data/l10n`;
-  await $`mkdir -p ./dist/data/schema`;
-
 
   // Gather icons from various places that we need assembled into a spritesheet.
   // Start with icons we want to use in the UI that aren't tied to other data.
@@ -156,7 +155,7 @@ async function buildData() {
   let glob = new Glob('./data/**/*.json{,c,5}');
   for (const src of glob.scanSync()) {
     const dest = src.replace(/\\/g, '/').replace('data/', 'dist/data/');
-    await $`cp -f ${src} ${dest}`;
+    await $`cp ${src} ${dest}`;
   }
 
   // minify files
