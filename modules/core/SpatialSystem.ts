@@ -147,6 +147,19 @@ export class SpatialSystem extends AbstractSystem {
 
 
   /**
+   * Clear all spatial caches whose datasetID matches a predicate.
+   * @param predicate - Function that returns true for datasetIDs to clear
+   */
+  public clearMatching(predicate: (datasetID: DatasetID) => boolean): void {
+    for (const datasetID of this._caches.keys()) {
+      if (predicate(datasetID)) {
+        this.clearCache(datasetID);
+      }
+    }
+  }
+
+
+  /**
    * Insert data into the given cache.
    * (addData and replaceData are the same)
    * @param datasetID - the cache to insert into
@@ -244,7 +257,7 @@ export class SpatialSystem extends AbstractSystem {
       const extent = tile.worldExtent;  // already in world (z16) coordinates
       if (!extent) continue;
 
-      const box = extent.bbox() as unknown as Box;
+      const box = extent.bbox() as Box;
       box.datasetID = datasetID;
       box.boxID = tileID;
       box.contents = tile;
@@ -363,7 +376,7 @@ export class SpatialSystem extends AbstractSystem {
    */
   public getDataAtLoc(datasetID: DatasetID, loc: Vec2): Box[] {
     const cache = this.getCache(datasetID);
-    const [x, y] = projWgs84ToWorld(loc) as Vec2;
+    const [x, y] = projWgs84ToWorld(loc);
     const epsilon = 1e-7 * WORLD_SCALE;
     const test = { minX: x - epsilon, minY: y - epsilon, maxX: x + epsilon, maxY: y + epsilon };
     return cache.dataRBush.search(test);
@@ -377,7 +390,7 @@ export class SpatialSystem extends AbstractSystem {
    */
   public hasDataAtLoc(datasetID: DatasetID, loc: Vec2): boolean {
     const cache = this.getCache(datasetID);
-    const [x, y] = projWgs84ToWorld(loc) as Vec2;
+    const [x, y] = projWgs84ToWorld(loc);
     const epsilon = 1e-7 * WORLD_SCALE;
     const test = { minX: x - epsilon, minY: y - epsilon, maxX: x + epsilon, maxY: y + epsilon };
     return cache.dataRBush.collides(test);
@@ -393,7 +406,7 @@ export class SpatialSystem extends AbstractSystem {
    */
   public preventCoincidentLoc(datasetID: DatasetID, loc: Vec2): Vec2 {
     const cache = this.getCache(datasetID);
-    const [x, startY] = projWgs84ToWorld(loc) as Vec2;
+    const [x, startY] = projWgs84ToWorld(loc);
     let y = startY;
     const epsilon = 1e-7 * WORLD_SCALE;
 
@@ -401,7 +414,7 @@ export class SpatialSystem extends AbstractSystem {
       const test = { minX: x - epsilon, minY: y - epsilon, maxX: x + epsilon, maxY: y + epsilon };
       const didCollide = cache.dataRBush.collides(test);
       if (!didCollide) {
-        return projWorldToWgs84([x, y] as Vec2);
+        return projWorldToWgs84([x, y]);
       } else {
         // These are in world coordinates, so we are moving `y` south:
         // 6356752 (polar radius in meters) * 0.9 (because ±85°) / 256 px * this number / WORLD_SCALE = meters moved?
@@ -452,7 +465,7 @@ export class SpatialSystem extends AbstractSystem {
    */
   public hasTileAtLoc(datasetID: DatasetID, loc: Vec2): boolean {
     const cache = this.getCache(datasetID);
-    const [x, y] = projWgs84ToWorld(loc) as Vec2;
+    const [x, y] = projWgs84ToWorld(loc);
     const epsilon = 1e-7 * WORLD_SCALE;
     const test = { minX: x - epsilon, minY: y - epsilon, maxX: x + epsilon, maxY: y + epsilon };
     return cache.tileRBush.collides(test);

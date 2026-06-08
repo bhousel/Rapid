@@ -304,11 +304,8 @@ export class MapillaryService extends AbstractSystem {
     const network = context.systems.network!;
     const spatial = context.systems.spatial!;
 
-    network.abortMatching(id => /^mapillary-/.test(id));
-
-    spatial.clearCache('mapillary-images');
-    spatial.clearCache('mapillary-sequences');
-    spatial.clearCache('mapillary-detections');
+    network.abortMatching(id => id.startsWith('mapillary'));
+    spatial.clearMatching(id => id.startsWith('mapillary'));
 
     this._cache = {
       images:        { lastv: null },

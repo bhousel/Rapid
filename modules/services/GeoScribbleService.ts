@@ -81,8 +81,8 @@ export class GeoScribbleService extends AbstractSystem {
     const network = context.systems.network!;
     const spatial = context.systems.spatial!;
 
-    network.abortMatching(id => /^geoscribble-/.test(id));
-    spatial.clearCache('geoscribble');
+    network.abortMatching(id => id.startsWith('geoscribble'));
+    spatial.clearMatching(id => id.startsWith('geoscribble'));
 
     this._cache = {
       lastv:  null  // viewport version last time we fetched data
@@ -120,7 +120,7 @@ export class GeoScribbleService extends AbstractSystem {
 
     // Abort inflight requests that are no longer needed..
     const neededIDs = new Set<RequestID>(tiles.map(t => `geoscribble-${t.id}`));
-    network.abortMatching(id => /^geoscribble-/.test(id) && !neededIDs.has(id));
+    network.abortMatching(id => id.startsWith('geoscribble') && !neededIDs.has(id));
 
     // Issue new requests..
     for (const tile of tiles) {

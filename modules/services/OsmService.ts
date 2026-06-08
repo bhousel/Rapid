@@ -378,15 +378,13 @@ export class OsmService extends AbstractSystem {
     const spatial = context.systems.spatial!;
     const worker = context.systems.worker;
 
-    network.abortMatching(id => /^osm-/.test(id));
-
     this._tileCache = { lastv: null, toLoad: new Set<string>() };
     this._noteCache = { lastv: null, toLoad: new Set<string>(), closed: {} };
     this._userCache = { toLoad: new Set<string>(), user: {} };
     this._changeset = {};
 
-    spatial.clearCache('osm-data');
-    spatial.clearCache('osm-notes');
+    network.abortMatching(id => id.startsWith('osm'));
+    spatial.clearMatching(id => id.startsWith('osm'));
 
     // Reset the worker-side parser instances
     if (worker?.workerURL) {
@@ -1274,7 +1272,7 @@ export class OsmService extends AbstractSystem {
 
     // Abort inflight requests that are no longer needed..
     const neededIDs = new Set<RequestID>(tiles.map(t => `osm-tile-${t.id}` as RequestID));
-    network.abortMatching(id => /^osm-tile-/.test(id) && !neededIDs.has(id));
+    network.abortMatching(id => id.startsWith('osm-tile') && !neededIDs.has(id));
 
     // Issue new requests..
     for (const tile of tiles) {
@@ -1306,7 +1304,7 @@ export class OsmService extends AbstractSystem {
     // Stop loading tiles, and cancel any inflight tile/note requests
     this._tileCache.toLoad.clear();
     this._noteCache.toLoad.clear();
-    network.abortMatching(id => /^osm-tile-/.test(id) || /^osm-note-/.test(id));
+    network.abortMatching(id => id.startsWith('osm-tile') || id.startsWith('osm-note'));
 
     return this._rateLimit = {
       start: Math.floor(Date.now() / 1000),  // epoch seconds
@@ -1472,7 +1470,7 @@ export class OsmService extends AbstractSystem {
 
     // Abort inflight requests that are no longer needed
     const neededNoteIDs = new Set<RequestID>(tiles.map(t => `osm-note-tile-${t.id}` as RequestID));
-    network.abortMatching(id => /^osm-note-tile-/.test(id) && !neededNoteIDs.has(id));
+    network.abortMatching(id => id.startsWith('osm-note-tile') && !neededNoteIDs.has(id));
 
     // Issue new requests..
     for (const tile of tiles) {

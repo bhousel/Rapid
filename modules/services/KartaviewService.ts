@@ -269,10 +269,8 @@ export class KartaviewService extends AbstractSystem {
     const network = context.systems.network!;
     const spatial = context.systems.spatial!;
 
-    network.abortMatching(id => /^kartaview-/.test(id));
-
-    spatial.clearCache('kartaview-images');
-    spatial.clearCache('kartaview-sequences');
+    network.abortMatching(id => id.startsWith('kartaview'));
+    spatial.clearMatching(id => id.startsWith('kartaview'));
 
     this._cache = {
       nextPage:  new Map<string, number>(),  // keyed by tileID,page
@@ -320,7 +318,7 @@ export class KartaviewService extends AbstractSystem {
 
     // Abort inflight requests that are no longer needed..
     const neededIDs = new Set<RequestID>(needTiles.map(tile => `kartaview-${tile.id}`));
-    network.abortMatching(id => /^kartaview-/.test(id) && !neededIDs.has(id));
+    network.abortMatching(id => id.startsWith('kartaview') && !neededIDs.has(id));
 
     // Fetch files that are needed
     for (const tile of needTiles) {

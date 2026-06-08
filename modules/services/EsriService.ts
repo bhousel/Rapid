@@ -164,7 +164,7 @@ export class EsriService extends AbstractSystem {
   public resetAsync(): Promise<void> {
     const network = this.context.systems.network!;
 
-    network.abortMatching(id => /^esri-/.test(id));
+    network.abortMatching(id => id.startsWith('esri'));
 
     for (const [datasetID, ds] of this._datasets) {
       ds.graph = new Graph(this.context);

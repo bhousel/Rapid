@@ -180,8 +180,8 @@ export class MapRouletteService extends AbstractSystem {
     const network = context.systems.network!;
     const spatial = context.systems.spatial!;
 
-    network.abortMatching(id => /^maproulette-/.test(id));
-    spatial.clearCache('maproulette');
+    network.abortMatching(id => id.startsWith('maproulette'));
+    spatial.clearMatching(id => id.startsWith('maproulette'));
 
     this._cache = {
       lastv:             null,

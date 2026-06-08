@@ -296,9 +296,8 @@ export class StreetsideService extends AbstractSystem {
     const network = context.systems.network!;
     const spatial = context.systems.spatial!;
 
-    network.abortMatching(id => /^streetside-/.test(id));
-    spatial.clearCache('streetside-images');
-    spatial.clearCache('streetside-sequences');
+    network.abortMatching(id => id.startsWith('streetside'));
+    spatial.clearMatching(id => id.startsWith('streetside'));
 
     this._cache = {
       unattachedBubbles: new Set<PhotoID>(),
@@ -357,7 +356,7 @@ export class StreetsideService extends AbstractSystem {
 
     // Abort inflight requests that are no longer needed..
     const neededIDs = new Set<RequestID>(needTiles.map(tile => `streetside-${tile.id}`));
-    network.abortMatching(id => /^streetside-/.test(id) && !neededIDs.has(id));
+    network.abortMatching(id => id.startsWith('streetside') && !neededIDs.has(id));
 
     // Issue new requests..
     for (const tile of needTiles) {

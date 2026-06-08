@@ -145,8 +145,8 @@ export class OsmoseService extends AbstractSystem {
     const network = context.systems.network!;
     const spatial = context.systems.spatial!;
 
-    network.abortMatching(id => /^osmose-/.test(id));
-    spatial.clearCache('osmose');
+    network.abortMatching(id => id.startsWith('osmose'));
+    spatial.clearMatching(id => id.startsWith('osmose'));
 
     this._cache = {
       closed: {},
@@ -185,7 +185,7 @@ export class OsmoseService extends AbstractSystem {
 
     // Abort inflight requests that are no longer needed..
     const neededIDs = new Set<RequestID>(tiles.map(tile => `osmose-tile-${tile.id}`));
-    network.abortMatching(id => /^osmose-tile-/.test(id) && !neededIDs.has(id));
+    network.abortMatching(id => id.startsWith('osmose-tile') && !neededIDs.has(id));
 
     // Issue new requests..
     for (const tile of tiles) {

@@ -178,8 +178,8 @@ export class KeepRightService extends AbstractSystem {
     const network = context.systems.network!;
     const spatial = context.systems.spatial!;
 
-    network.abortMatching(id => /^keepright-/.test(id));
-    spatial.clearCache('keepright');
+    network.abortMatching(id => id.startsWith('keepright'));
+    spatial.clearMatching(id => id.startsWith('keepright'));
 
     this._cache = {
       closed: {},
@@ -219,7 +219,7 @@ export class KeepRightService extends AbstractSystem {
 
     // Abort inflight requests that are no longer needed..
     const neededIDs = new Set<RequestID>(tiles.map(tile => `keepright-tile-${tile.id}`));
-    network.abortMatching(id => /^keepright-tile-/.test(id) && !neededIDs.has(id));
+    network.abortMatching(id => id.startsWith('keepright-tile') && !neededIDs.has(id));
 
     // Issue new requests..
     for (const tile of tiles) {

@@ -241,11 +241,15 @@ export class EditSystem extends AbstractSystem {
     if (this._initPromise) return this._initPromise;
 
     const context = this.context;
-    const storage = context.systems.storage;
+    const spatial = context.systems.spatial!;
+    const storage = context.systems.storage!;
 
     return this._initPromise = super.initAsync()
       .then(() => {
-        const prerequisites = [ storage?.initAsync() ];
+        const prerequisites = [
+          spatial.initAsync(),
+          storage.initAsync()
+        ];
         return Promise.all(prerequisites.filter(Boolean) as Promise<void>[]);
       })
       .then(() => {

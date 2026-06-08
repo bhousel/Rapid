@@ -104,7 +104,7 @@ export class MapWithAIService extends AbstractSystem {
     const context = this.context;
     const network = context.systems.network!;
 
-    network.abortMatching(id => /^mapwithai-/.test(id));
+    network.abortMatching(id => id.startsWith('mapwithai'));
 
     for (const [datasetID, ds] of this._datasets) {
       ds.graph = new Graph(context);
@@ -261,7 +261,7 @@ export class MapWithAIService extends AbstractSystem {
 
     // Abort inflight requests that are no longer needed..
     const neededIDs = new Set<RequestID>(tiles.map(tile => `mapwithai-${tile.id}`));
-    network.abortMatching(id => /^mapwithai-/.test(id) && !neededIDs.has(id));
+    network.abortMatching(id => id.startsWith('mapwithai') && !neededIDs.has(id));
 
     for (const tile of tiles) {
       this.loadTile(ds, tile);

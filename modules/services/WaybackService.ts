@@ -203,14 +203,14 @@ export class WaybackService extends AbstractSystem {
    */
   public resetAsync(): Promise<void> {
     const network = this.context.systems.network!;
-    network.abortMatching(id => /^wayback-/.test(id));
+    // const spatial = this.context.systems.spatial!;
+
+    network.abortMatching(id => id.startsWith('wayback'));
+    // spatial.clearMatching(id => id.startsWith('wayback'));
 
     this._cache = {
       inflight: new Map<TileID, InflightEntry>()
     };
-
-//    const spatial = this.context.systems.spatial;
-//    spatial.clearCache('wayback');
 
     return Promise.resolve();
   }
@@ -275,7 +275,7 @@ export class WaybackService extends AbstractSystem {
       return inflight.promise;
     }
     // Any other inflight requests are no longer needed..
-    network.abortMatching(id => /^wayback-/.test(id));
+    network.abortMatching(id => id.startsWith('wayback'));
     cache.inflight.clear();
 
     const prom = Promise.resolve()

@@ -86,7 +86,7 @@ describe('SpatialSystem', () => {
     }
 
     // Helper to create mock tile
-    function createMockTile(tileID, locWgs84) {
+    function createMockTile(_tileID, locWgs84) {
       const tiler = new Rapid.sdk.Tiler();
       // Create a tile at the given location by using a small viewport.
       // The SDK's worldToScreen formula is: screen = (world - WORLD_HALF) * scale + [tx, ty]
@@ -142,6 +142,41 @@ describe('SpatialSystem', () => {
         assert.isEmpty(cacheAfter.boxes);
       });
     });
+
+  describe('clearMatching', () => {
+    it('clears only caches matching the predicate', () => {
+      const datasetID1 = 'test-ok1';
+      const datasetID2 = 'test-ok2';
+      const datasetID3 = 'test-no3';
+      const data = createMockData('data10', [10, 0]);
+      const tile = createMockTile('34589,32769,16', [10, 0]);
+
+      _spatial.addData(datasetID1, data);
+      _spatial.addTiles(datasetID1, tile);
+      _spatial.addData(datasetID2, data);
+      _spatial.addTiles(datasetID2, tile);
+      _spatial.addData(datasetID3, data);
+      _spatial.addTiles(datasetID3, tile);
+
+      _spatial.clearMatching(id => id.startsWith('test-ok'));
+
+      const cache1 = _spatial.getCache(datasetID1);
+      const cache2 = _spatial.getCache(datasetID2);
+      const cache3 = _spatial.getCache(datasetID3);
+
+      assert.isEmpty(cache1.data);
+      assert.isEmpty(cache1.tiles);
+      assert.isEmpty(cache1.boxes);
+
+      assert.isEmpty(cache2.data);
+      assert.isEmpty(cache2.tiles);
+      assert.isEmpty(cache2.boxes);
+
+      assert.hasAllKeys(cache3.data, ['data10']);
+      assert.hasAllKeys(cache3.tiles, ['34589,32769,16']);
+      assert.hasAllKeys(cache3.boxes, ['data10', '34589,32769,16']);
+    });
+  });
 
 
     describe('addData', () => {
