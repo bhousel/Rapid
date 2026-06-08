@@ -48,8 +48,6 @@ interface LabelMeasurement {
   width: number;
   /** Label texture height (includes padding) */
   height: number;
-  /** Present only for ASCII point labels (BitmapText) — the display object is built inline. */
-  bitmapText?: PIXI.BitmapText;
 }
 
 /** Box used in RBush for collision detection */
@@ -695,31 +693,7 @@ export class PixiLayerLabels extends AbstractPixiLayer {
 
       if (!feature.label) continue;  // no label needed
 
-      let measurement: LabelMeasurement;
-      if (/^[\x20-\x7E]*$/.test(feature.label)) {   // is it in the printable ASCII range?
-        // ASCII-only labels can use BitmapText (no atlas texture needed).
-        const bitmapText = new PIXI.BitmapText({
-          text: feature.label,
-          style: {
-            fontFamily: 'label-normal',
-            fontSize: 12
-          }
-        });
-        bitmapText.label = feature.label;
-        bitmapText.anchor.set(0.5, 0.5);   // middle, middle
-        const bRect = bitmapText.getLocalBounds();
-        measurement = {
-          str: feature.label,
-          style: 'normal',
-          width: bRect.width,
-          height: bRect.height,
-          bitmapText: bitmapText
-        };
-
-      } else {
-        measurement = this.measureLabel(feature.label, 'normal');
-      }
-
+      const measurement = this.measureLabel(feature.label, 'normal');
       this.placeTextLabel(feature, measurement);
     }
   }
@@ -839,7 +813,7 @@ export class PixiLayerLabels extends AbstractPixiLayer {
    * We generate several placement regions around the marker,
    *  try them until we find one that doesn't collide with something.
    * @param  feature - The feature to place point labels on
-   * @param  measurement - The label measurements (size + str/style + optional bitmapText)
+   * @param  measurement - The label measurements (size + str/style)
    */
   public placeTextLabel(feature: AbstractPixiFeature, measurement: LabelMeasurement): void {
     if (!feature) return;
@@ -962,7 +936,6 @@ export class PixiLayerLabels extends AbstractPixiLayer {
           style: measurement.style,
           width: measurement.width,
           height: measurement.height,
-          bitmapText: measurement.bitmapText,
           x: x,
           y: y,
           tint: style?.label?.color ?? 0xeeeeee

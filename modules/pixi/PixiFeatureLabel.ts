@@ -15,11 +15,6 @@ export interface TextLabelProps extends PixiFeatureProps {
   width: number;
   /** Texture frame height in CSS pixels (includes any padding). */
   height: number;
-  /**
-   * Pre-built BitmapText for the ASCII point-label fast path.
-   * If absent, the Sprite path is used and the texture is looked up at update() time.
-   */
-  bitmapText?: PIXI.BitmapText;
   /** Screen-space (label-coord) anchor for the label. */
   x: number;
   y: number;
@@ -129,7 +124,7 @@ export class PixiFeatureLabel extends AbstractPixiFeature {
 
     if (this.props.kind === 'text') {
       this._updateText(this.props as TextLabelProps);
-    } else {
+    } else if (this.props.kind === 'rope') {
       this._updateRope(this.props as RopeLabelProps);
     }
   }
@@ -144,38 +139,47 @@ export class PixiFeatureLabel extends AbstractPixiFeature {
 
 
   /**
-   * Build / restyle a text label.
-   * Two paths:
-   *   - ASCII point labels arrive with a pre-built `PIXI.BitmapText` — adopt it directly.
-   *   - Other labels look up an atlas texture and wrap it in a `PIXI.Sprite`.
-   *     If the texture isn't ready yet, leave `_styleDirty` set and retry next frame.
-   * @param props
+   * Build or restyle a text label.
+   * If the text only uses plain ASCII characters, use `PIXI.BitmapText` for speed.
+   * Otherwise generate a label texture and make a `PIXI.Sprite`.
+   * @param props   The properties for the Text Label to create
    */
   protected _updateText(props: TextLabelProps): void {
     if (!this.display) {
-      if (props.bitmapText) {
-        this.display = props.bitmapText;
+      // Is it in the printable ASCII range?  If so, `Pixi.BitmapText` should be faster..
+      const useBitmap = /^[\x20-\x7E]*$/.test(props.str);
+      if (useBitmap) {
+        const bitmap = new PIXI.BitmapText({
+          text: props.str,
+          style: {
+            fontFamily: 'label-normal',
+            fontSize: 12
+          }
+        });
+        bitmap.label = props.str;
+        bitmap.anchor.set(0.5, 0.5);   // middle, middle
+        bitmap.position.set(props.x, props.y);
+        this.display = bitmap;
+
       } else {
         const texture = this.layer.resolveLabelTexture(props.str, props.style);
         if (!texture) return;   // not ready — stay dirty
         const sprite = new PIXI.Sprite({ texture });
         sprite.label = props.str;
         sprite.anchor.set(0.5, 0.5);
+        sprite.position.set(props.x, props.y);
         this.display = sprite;
       }
       this.container.addChild(this.display);
     }
 
     this.display.tint = props.tint || 0xffffff;
-    this.display.position.set(props.x, props.y);
     this._styleDirty = false;
   }
 
 
   /**
-   * Build / restyle a rope label.
-   * Rope geometry doesn't change after placement, so we only build the
-   * `MeshRope` once; subsequent updates just refresh the tint.
+   * Build or restyle a rope label.
    * @param props
    */
   protected _updateRope(props: RopeLabelProps): void {
