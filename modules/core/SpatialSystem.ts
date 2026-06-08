@@ -10,15 +10,19 @@ import type { Context } from '../Context.ts';
 import type { Tile, Vec2 } from '@rapid-sdk/math';
 
 
+/** Convenience type - boxes are identified by either a data or tile ID */
+type BoxID = DataID | TileID;
+
 /**
  * A spatial index box with associated cache and data references.
  * Extends the RBush BBox with additional metadata.
  */
-export interface Box extends BBox {
-  /** The spatial index this box belongs to */
-  spatialID: SpatialID;
-  /** The data or tile ID (note: it is assumed that DataIDs and TileIDs will not clash) */
-  boxID: DataID | TileID;
+export interface SpatialBox extends BBox {
+  /**
+   * A unique Box identifier, should be a DataID or a TileID (the id of the box's contents).
+   * (note: we are assuming that DataIDs and TileIDs will not clash)
+   */
+  boxID: BoxID;
   /** The associated data or tile object */
   contents: AbstractData | Tile;
 }
@@ -32,15 +36,15 @@ interface SpatialCache {
   /** Graph of entities */
   graph: Graph;
   /** Map of dataID or tileID to Box */
-  boxes: Map<DataID | TileID, Box>;
+  boxes: Map<BoxID, SpatialBox>;
   /** Map of tileID to Tile */
   tiles: Map<TileID, Tile>;
   /** Map of dataID to AbstractData */
   data: Map<DataID, AbstractData>;
   /** RBush index for tiles */
-  tileRBush: RBush<Box>;
+  tileRBush: RBush<SpatialBox>;
   /** RBush index for data */
-  dataRBush: RBush<Box>;
+  dataRBush: RBush<SpatialBox>;
 }
 
 
@@ -111,7 +115,7 @@ export class SpatialSystem extends AbstractSystem {
 
 
   /**
-   * Get a spatial cache identified by the given spatial ID.
+   * Get a spatial cache identified by the given spatialID.
    * Create it if it doesn't exist yet.
    * @param spatialID - the spatial cache to get (or create)
    * @return spacial cache data
@@ -122,11 +126,11 @@ export class SpatialSystem extends AbstractSystem {
       cache = {
         id:         spatialID,
         graph:      new Graph(this.context),
-        boxes:      new Map<DataID | TileID, Box>(),
+        boxes:      new Map<BoxID, SpatialBox>(),
         tiles:      new Map<TileID, Tile>(),
         data:       new Map<DataID, AbstractData>(),
-        tileRBush:  new RBush<Box>(),
-        dataRBush:  new RBush<Box>()
+        tileRBush:  new RBush<SpatialBox>(),
+        dataRBush:  new RBush<SpatialBox>()
       };
       this._caches.set(spatialID, cache);
     }
@@ -135,7 +139,7 @@ export class SpatialSystem extends AbstractSystem {
 
 
   /**
-   * Clear (remove all items from) the given spatial cache
+   * Clear (remove all items from) the given spatial cache.
    * @param spatialID - the spatial cache to clear
    */
   public clearCache(spatialID: SpatialID): void {
@@ -181,7 +185,7 @@ export class SpatialSystem extends AbstractSystem {
   public replaceData(spatialID: SpatialID, items: OneOrMore<AbstractData>): void {
     const cache = this.getCache(spatialID);
 
-    const toInsert: Box[] = [];
+    const toInsert: SpatialBox[] = [];
     for (const data of utilIterable(items)) {
       if (!data) continue;
       const dataID = data.id;
@@ -198,8 +202,7 @@ export class SpatialSystem extends AbstractSystem {
       const extent = data.geoms?.world?.extent;
       if (!extent) continue;
 
-      const box = extent.bbox() as Box;
-      box.spatialID = spatialID;
+      const box = extent.bbox() as SpatialBox;
       box.boxID = dataID;
       box.contents = data;
 
@@ -248,7 +251,7 @@ export class SpatialSystem extends AbstractSystem {
   public addTiles(spatialID: SpatialID, items: OneOrMore<Tile>): void {
     const cache = this.getCache(spatialID);
 
-    const toInsert: Box[] = [];
+    const toInsert: SpatialBox[] = [];
     for (const tile of utilIterable(items)) {
       if (!tile) continue;
       const tileID = tile.id;
@@ -260,8 +263,7 @@ export class SpatialSystem extends AbstractSystem {
       const extent = tile.worldExtent;  // already in world (z16) coordinates
       if (!extent) continue;
 
-      const box = extent.bbox() as Box;
-      box.spatialID = spatialID;
+      const box = extent.bbox() as SpatialBox;
       box.boxID = tileID;
       box.contents = tile;
 
@@ -307,7 +309,7 @@ export class SpatialSystem extends AbstractSystem {
    * @param spatialID - the spatial cache to search
    * @return Array of boxes in the current map view
    */
-  public getVisibleData(spatialID: SpatialID): Box[] {
+  public getVisibleData(spatialID: SpatialID): SpatialBox[] {
     const cache = this.getCache(spatialID);
     const viewport = this.context.viewport;
     return cache.dataRBush.search(viewport.visibleWorldExtent().bbox());
@@ -318,8 +320,8 @@ export class SpatialSystem extends AbstractSystem {
    * This would only really be used for debugging purposes, it might return a lot.
    * @return Array of boxes in the current map view
    */
-  public getAllVisibleData(): Box[] {
-    const results: Box[] = [];
+  public getAllVisibleData(): SpatialBox[] {
+    const results: SpatialBox[] = [];
     for (const spatialID of this._caches.keys()) {
       results.push(...this.getVisibleData(spatialID));
     }
@@ -355,7 +357,7 @@ export class SpatialSystem extends AbstractSystem {
    * @param box - the search box (make sure to use world coordinates here)
    * @return Array of boxes in the given search box
    */
-  public getDataAtBox(spatialID: SpatialID, box: BBox): Box[] {
+  public getDataAtBox(spatialID: SpatialID, box: BBox): SpatialBox[] {
     const cache = this.getCache(spatialID);
     return cache.dataRBush.search(box);
   }
@@ -377,7 +379,7 @@ export class SpatialSystem extends AbstractSystem {
    * @param loc - the search location (WGS84 [lon,lat])
    * @return Array of boxes at the given location
    */
-  public getDataAtLoc(spatialID: SpatialID, loc: Vec2): Box[] {
+  public getDataAtLoc(spatialID: SpatialID, loc: Vec2): SpatialBox[] {
     const cache = this.getCache(spatialID);
     const [x, y] = projWgs84ToWorld(loc);
     const epsilon = 1e-7 * WORLD_SCALE;
