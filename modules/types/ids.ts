@@ -80,6 +80,8 @@ export type ScriptCode = string;
 export type SequenceID = string;
 /** Service ID (e.g. 'osm', 'mapillary', 'streetside') */
 export type ServiceID = string;
+/** Spatial ID - identifier for a spatial index cache */
+export type SpatialID = string;
 /** String ID - identifier for a localized string (e.g. 'toolbar.undo', 'modes.add_area') */
 export type StringID = string;
 /** Style ID - identifier for a style */
@@ -138,6 +140,7 @@ declare global {
   type ScriptCode = string;
   type SequenceID = string;
   type ServiceID = string;
+  type SpatialID = string;
   type StringID = string;
   type StyleID = string;
   type StyleSelectorID = string;

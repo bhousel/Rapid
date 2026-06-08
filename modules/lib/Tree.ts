@@ -1,5 +1,4 @@
 import { Difference } from './Difference.ts';
-//import RBush from 'rbush';
 
 import type { Graph } from './Graph.ts';
 import type { OsmEntity } from '../data/OsmEntity.ts';
@@ -21,8 +20,8 @@ export class Tree {
   protected _currentKey: string;
   /** Snapshot of the Graph at the last update (used to compute delta when re-syncing) */
   protected _currentSnapshot: Graph;
-  /** Dataset ID used when registering data with the SpatialSystem */
-  protected _cacheID: DatasetID;
+  /** Spatial ID used to identify this Tree with the SpatialSystem */
+  protected _spatialID: SpatialID;
 
 //  private _entityRBush: RBush;
 //  private _entityBoxes: Map<string, any>;
@@ -34,12 +33,12 @@ export class Tree {
   /**
    * @constructor
    * @param graph - The "current" Graph of entities that this tree is tracking
-   * @param cacheID - Identifier for the spatial cache
+   * @param spatialID - Identifier for the spatial cache
    */
-  public constructor(graph: Graph, cacheID: DatasetID) {
+  public constructor(graph: Graph, spatialID: SpatialID) {
     this._currentKey = graph.key;
     this._currentSnapshot = graph.snapshot();
-    this._cacheID = cacheID;
+    this._spatialID = spatialID;
 
 //    this._entityRBush = new RBush();
 //    this._entityBoxes = new Map();     // Map<entityID, Box Object>
@@ -59,7 +58,7 @@ export class Tree {
     const context = graph.context;
     const spatial = context.systems.spatial!;
 
-    spatial.removeData(this._cacheID, entityID);
+    spatial.removeData(this._spatialID, entityID);
 
 //    const ebox = this._entityBoxes.get(entityID);
 //    if (ebox) {
@@ -89,7 +88,7 @@ export class Tree {
     const context = graph.context;
     const spatial = context.systems.spatial!;
 
-    spatial.replaceData(this._cacheID, [...toUpdate.values()]);
+    spatial.replaceData(this._spatialID, [...toUpdate.values()]);
 
 //    let eboxes = [];
 //    let sboxes = [];
@@ -231,7 +230,7 @@ export class Tree {
       if (isDeleted) continue;
 
       // Entity is already in the tree, skip (unless force = true)
-      if (spatial.hasData(this._cacheID, entityID) && !force) continue;
+      if (spatial.hasData(this._spatialID, entityID) && !force) continue;
 //      if (this._entityBoxes.has(entityID) && !force) continue;
 
       // Add or Replace the Entity
@@ -256,7 +255,7 @@ export class Tree {
 
     const context = graph.context;
     const spatial = context.systems.spatial!;
-    return spatial.getVisibleData(this._cacheID).map(hit => graph.entity(hit.boxID));
+    return spatial.getVisibleData(this._spatialID).map(hit => graph.entity(hit.boxID));
 //    return this._entityRBush.search(extent.bbox()).map(ebox => graph.entity(ebox.id));
   }
 

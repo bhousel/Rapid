@@ -123,20 +123,20 @@ describe('SpatialSystem', () => {
 
     describe('clearCache', () => {
       it('clears all data from a cache', () => {
-        const datasetID = 'test-clear';
+        const spatialID = 'test-clear';
         const data = createMockData('data1', [10, 0]);
         const tile = createMockTile('tile1', [10, 0]);
 
-        _spatial.addData(datasetID, data);
-        _spatial.addTiles(datasetID, tile);
+        _spatial.addData(spatialID, data);
+        _spatial.addTiles(spatialID, tile);
 
-        const cacheBefore = _spatial.getCache(datasetID);
+        const cacheBefore = _spatial.getCache(spatialID);
         assert.isTrue(cacheBefore.data.size > 0);
         assert.isTrue(cacheBefore.tiles.size > 0);
 
-        _spatial.clearCache(datasetID);
+        _spatial.clearCache(spatialID);
 
-        const cacheAfter = _spatial.getCache(datasetID);
+        const cacheAfter = _spatial.getCache(spatialID);
         assert.isEmpty(cacheAfter.data);
         assert.isEmpty(cacheAfter.tiles);
         assert.isEmpty(cacheAfter.boxes);
@@ -145,24 +145,24 @@ describe('SpatialSystem', () => {
 
   describe('clearMatching', () => {
     it('clears only caches matching the predicate', () => {
-      const datasetID1 = 'test-ok1';
-      const datasetID2 = 'test-ok2';
-      const datasetID3 = 'test-no3';
+      const spatialID1 = 'test-ok1';
+      const spatialID2 = 'test-ok2';
+      const spatialID3 = 'test-no3';
       const data = createMockData('data10', [10, 0]);
       const tile = createMockTile('34589,32769,16', [10, 0]);
 
-      _spatial.addData(datasetID1, data);
-      _spatial.addTiles(datasetID1, tile);
-      _spatial.addData(datasetID2, data);
-      _spatial.addTiles(datasetID2, tile);
-      _spatial.addData(datasetID3, data);
-      _spatial.addTiles(datasetID3, tile);
+      _spatial.addData(spatialID1, data);
+      _spatial.addTiles(spatialID1, tile);
+      _spatial.addData(spatialID2, data);
+      _spatial.addTiles(spatialID2, tile);
+      _spatial.addData(spatialID3, data);
+      _spatial.addTiles(spatialID3, tile);
 
       _spatial.clearMatching(id => id.startsWith('test-ok'));
 
-      const cache1 = _spatial.getCache(datasetID1);
-      const cache2 = _spatial.getCache(datasetID2);
-      const cache3 = _spatial.getCache(datasetID3);
+      const cache1 = _spatial.getCache(spatialID1);
+      const cache2 = _spatial.getCache(spatialID2);
+      const cache3 = _spatial.getCache(spatialID3);
 
       assert.isEmpty(cache1.data);
       assert.isEmpty(cache1.tiles);
@@ -181,43 +181,43 @@ describe('SpatialSystem', () => {
 
     describe('addData', () => {
       it('adds a single data item', () => {
-        const datasetID = 'test-add-data-1';
+        const spatialID = 'test-add-data-1';
         const data = createMockData('data1', [10, 0]);
-        _spatial.addData(datasetID, data);
+        _spatial.addData(spatialID, data);
 
-        const cache = _spatial.getCache(datasetID);
+        const cache = _spatial.getCache(spatialID);
         assert.isTrue(cache.data.has('data1'));
         assert.strictEqual(cache.data.get('data1'), data);
       });
 
       it('adds multiple data items', () => {
-        const datasetID = 'test-add-data-2';
+        const spatialID = 'test-add-data-2';
         const data1 = createMockData('data1', [10, 0]);
         const data2 = createMockData('data2', [11, 0]);
-        _spatial.addData(datasetID, [data1, data2]);
+        _spatial.addData(spatialID, [data1, data2]);
 
-        const cache = _spatial.getCache(datasetID);
+        const cache = _spatial.getCache(spatialID);
         assert.isTrue(cache.data.has('data1'));
         assert.isTrue(cache.data.has('data2'));
       });
 
       it('ignores null/undefined items', () => {
-        const datasetID = 'test-add-data-null';
+        const spatialID = 'test-add-data-null';
         const data = createMockData('data1', [10, 0]);
-        _spatial.addData(datasetID, [data, null, undefined]);
+        _spatial.addData(spatialID, [data, null, undefined]);
 
-        const cache = _spatial.getCache(datasetID);
+        const cache = _spatial.getCache(spatialID);
         assert.strictEqual(cache.data.size, 1);
         assert.isTrue(cache.data.has('data1'));
       });
 
       it('skips data without extent', () => {
-        const datasetID = 'test-add-data-no-extent';
+        const spatialID = 'test-add-data-no-extent';
         const data = new Rapid.AbstractData(context, { id: 'data1' });
         // data has no geoms.world.extent
-        _spatial.addData(datasetID, data);
+        _spatial.addData(spatialID, data);
 
-        const cache = _spatial.getCache(datasetID);
+        const cache = _spatial.getCache(spatialID);
         assert.isFalse(cache.data.has('data1'));
       });
     });
@@ -225,24 +225,24 @@ describe('SpatialSystem', () => {
 
     describe('replaceData', () => {
       it('replaces existing data item', () => {
-        const datasetID = 'test-replace-data';
+        const spatialID = 'test-replace-data';
         const data1 = createMockData('data1', [10, 0]);
-        _spatial.addData(datasetID, data1);
+        _spatial.addData(spatialID, data1);
 
         const data2 = createMockData('data1', [11, 0]);
-        _spatial.replaceData(datasetID, data2);
+        _spatial.replaceData(spatialID, data2);
 
-        const cache = _spatial.getCache(datasetID);
+        const cache = _spatial.getCache(spatialID);
         assert.strictEqual(cache.data.size, 1);
         assert.strictEqual(cache.data.get('data1'), data2);
       });
 
       it('adds new data if not existing', () => {
-        const datasetID = 'test-replace-new';
+        const spatialID = 'test-replace-new';
         const data = createMockData('data1', [10, 0]);
-        _spatial.replaceData(datasetID, data);
+        _spatial.replaceData(spatialID, data);
 
-        const cache = _spatial.getCache(datasetID);
+        const cache = _spatial.getCache(spatialID);
         assert.isTrue(cache.data.has('data1'));
       });
     });
@@ -250,39 +250,39 @@ describe('SpatialSystem', () => {
 
     describe('removeData', () => {
       it('removes data by data object', () => {
-        const datasetID = 'test-remove-data-1';
+        const spatialID = 'test-remove-data-1';
         const data = createMockData('data1', [10, 0]);
-        _spatial.addData(datasetID, data);
+        _spatial.addData(spatialID, data);
 
-        _spatial.removeData(datasetID, data);
-        const cache = _spatial.getCache(datasetID);
+        _spatial.removeData(spatialID, data);
+        const cache = _spatial.getCache(spatialID);
         assert.isFalse(cache.data.has('data1'));
       });
 
       it('removes data by dataID', () => {
-        const datasetID = 'test-remove-data-2';
+        const spatialID = 'test-remove-data-2';
         const data = createMockData('data1', [10, 0]);
-        _spatial.addData(datasetID, data);
+        _spatial.addData(spatialID, data);
 
-        _spatial.removeData(datasetID, 'data1');
-        const cache = _spatial.getCache(datasetID);
+        _spatial.removeData(spatialID, 'data1');
+        const cache = _spatial.getCache(spatialID);
         assert.isFalse(cache.data.has('data1'));
       });
 
       it('removes multiple data items', () => {
-        const datasetID = 'test-remove-data-3';
+        const spatialID = 'test-remove-data-3';
         const data1 = createMockData('data1', [10, 0]);
         const data2 = createMockData('data2', [11, 0]);
-        _spatial.addData(datasetID, [data1, data2]);
+        _spatial.addData(spatialID, [data1, data2]);
 
-        _spatial.removeData(datasetID, ['data1', 'data2']);
-        const cache = _spatial.getCache(datasetID);
+        _spatial.removeData(spatialID, ['data1', 'data2']);
+        const cache = _spatial.getCache(spatialID);
         assert.isEmpty(cache.data);
       });
 
       it('handles removing non-existent data', () => {
-        const datasetID = 'test-remove-nonexistent';
-        _spatial.removeData(datasetID, 'nonexistent');
+        const spatialID = 'test-remove-nonexistent';
+        _spatial.removeData(spatialID, 'nonexistent');
         // Should not throw
         assert.isTrue(true);
       });
@@ -291,11 +291,11 @@ describe('SpatialSystem', () => {
 
     describe('getData', () => {
       it('returns data by dataID', () => {
-        const datasetID = 'test-get-data';
+        const spatialID = 'test-get-data';
         const data = createMockData('data1', [10, 0]);
-        _spatial.addData(datasetID, data);
+        _spatial.addData(spatialID, data);
 
-        const result = _spatial.getData(datasetID, 'data1');
+        const result = _spatial.getData(spatialID, 'data1');
         assert.strictEqual(result, data);
       });
 
@@ -308,11 +308,11 @@ describe('SpatialSystem', () => {
 
     describe('hasData', () => {
       it('returns true if data exists', () => {
-        const datasetID = 'test-has-data';
+        const spatialID = 'test-has-data';
         const data = createMockData('data1', [10, 0]);
-        _spatial.addData(datasetID, data);
+        _spatial.addData(spatialID, data);
 
-        assert.isTrue(_spatial.hasData(datasetID, 'data1'));
+        assert.isTrue(_spatial.hasData(spatialID, 'data1'));
       });
 
       it('returns false if data does not exist', () => {
@@ -323,13 +323,13 @@ describe('SpatialSystem', () => {
 
     describe('getDataAtBox', () => {
       it('returns data within a bounding box', () => {
-        const datasetID = 'test-data-at-box';
+        const spatialID = 'test-data-at-box';
         const data = createMockData('data1', [10, 0]);
-        _spatial.addData(datasetID, data);
+        _spatial.addData(spatialID, data);
 
         const [x, y] = Rapid.sdk.projWgs84ToWorld([10, 0]);
         const box = { minX: x - 0.01, minY: y - 0.01, maxX: x + 0.01, maxY: y + 0.01 };
-        const results = _spatial.getDataAtBox(datasetID, box);
+        const results = _spatial.getDataAtBox(spatialID, box);
 
         assert.isArray(results);
         assert.lengthOf(results, 1);
@@ -337,9 +337,9 @@ describe('SpatialSystem', () => {
       });
 
       it('returns empty array when no data in box', () => {
-        const datasetID = 'test-empty-box';
+        const spatialID = 'test-empty-box';
         const box = { minX: 0, minY: 0, maxX: 0.001, maxY: 0.001 };
-        const results = _spatial.getDataAtBox(datasetID, box);
+        const results = _spatial.getDataAtBox(spatialID, box);
 
         assert.isArray(results);
         assert.isEmpty(results);
@@ -349,39 +349,39 @@ describe('SpatialSystem', () => {
 
     describe('hasDataAtBox', () => {
       it('returns true if data exists in box', () => {
-        const datasetID = 'test-has-data-box';
+        const spatialID = 'test-has-data-box';
         const data = createMockData('data1', [10, 0]);
-        _spatial.addData(datasetID, data);
+        _spatial.addData(spatialID, data);
 
         const [x, y] = Rapid.sdk.projWgs84ToWorld([10, 0]);
         const box = { minX: x - 0.01, minY: y - 0.01, maxX: x + 0.01, maxY: y + 0.01 };
-        assert.isTrue(_spatial.hasDataAtBox(datasetID, box));
+        assert.isTrue(_spatial.hasDataAtBox(spatialID, box));
       });
 
       it('returns false if no data in box', () => {
-        const datasetID = 'test-no-data-box';
+        const spatialID = 'test-no-data-box';
         const box = { minX: 0, minY: 0, maxX: 0.001, maxY: 0.001 };
-        assert.isFalse(_spatial.hasDataAtBox(datasetID, box));
+        assert.isFalse(_spatial.hasDataAtBox(spatialID, box));
       });
     });
 
 
     describe('getDataAtLoc', () => {
       it('returns data at a specific location', () => {
-        const datasetID = 'test-data-at-loc';
+        const spatialID = 'test-data-at-loc';
         const loc = [10, 0];
         const data = createMockData('data1', loc);
-        _spatial.addData(datasetID, data);
+        _spatial.addData(spatialID, data);
 
-        const results = _spatial.getDataAtLoc(datasetID, loc);
+        const results = _spatial.getDataAtLoc(spatialID, loc);
         assert.isArray(results);
         assert.lengthOf(results, 1);
         assert.strictEqual(results[0].contents, data);
       });
 
       it('returns empty array when no data at location', () => {
-        const datasetID = 'test-empty-loc';
-        const results = _spatial.getDataAtLoc(datasetID, [50, 50]);
+        const spatialID = 'test-empty-loc';
+        const results = _spatial.getDataAtLoc(spatialID, [50, 50]);
         assert.isArray(results);
         assert.isEmpty(results);
       });
@@ -390,37 +390,37 @@ describe('SpatialSystem', () => {
 
     describe('hasDataAtLoc', () => {
       it('returns true if data exists at location', () => {
-        const datasetID = 'test-has-data-loc';
+        const spatialID = 'test-has-data-loc';
         const loc = [10, 0];
         const data = createMockData('data1', loc);
-        _spatial.addData(datasetID, data);
+        _spatial.addData(spatialID, data);
 
-        assert.isTrue(_spatial.hasDataAtLoc(datasetID, loc));
+        assert.isTrue(_spatial.hasDataAtLoc(spatialID, loc));
       });
 
       it('returns false if no data at location', () => {
-        const datasetID = 'test-no-data-loc';
-        assert.isFalse(_spatial.hasDataAtLoc(datasetID, [50, 50]));
+        const spatialID = 'test-no-data-loc';
+        assert.isFalse(_spatial.hasDataAtLoc(spatialID, [50, 50]));
       });
     });
 
 
     describe('addTiles', () => {
       it('adds a single tile', () => {
-        const datasetID = 'test-add-tile-1';
+        const spatialID = 'test-add-tile-1';
         const tile = createMockTile('tile1', [10, 0]);
         if (!tile) {
           assert.fail('Failed to create mock tile');
           return;
         }
 
-        _spatial.addTiles(datasetID, tile);
-        const cache = _spatial.getCache(datasetID);
+        _spatial.addTiles(spatialID, tile);
+        const cache = _spatial.getCache(spatialID);
         assert.isTrue(cache.tiles.has(tile.id));
       });
 
       it('adds multiple tiles', () => {
-        const datasetID = 'test-add-tile-2';
+        const spatialID = 'test-add-tile-2';
         const tile1 = createMockTile('tile1', [10, 0]);
         const tile2 = createMockTile('tile2', [11, 0]);
         if (!tile1 || !tile2) {
@@ -428,33 +428,33 @@ describe('SpatialSystem', () => {
           return;
         }
 
-        _spatial.addTiles(datasetID, [tile1, tile2]);
-        const cache = _spatial.getCache(datasetID);
+        _spatial.addTiles(spatialID, [tile1, tile2]);
+        const cache = _spatial.getCache(spatialID);
         assert.isTrue(cache.tiles.has(tile1.id));
         assert.isTrue(cache.tiles.has(tile2.id));
       });
 
       it('skips duplicate tiles', () => {
-        const datasetID = 'test-add-tile-dup';
+        const spatialID = 'test-add-tile-dup';
         const tile = createMockTile('tile1', [10, 0]);
         if (!tile) {
           assert.fail('Failed to create mock tile');
           return;
         }
 
-        _spatial.addTiles(datasetID, tile);
-        _spatial.addTiles(datasetID, tile);  // add again
+        _spatial.addTiles(spatialID, tile);
+        _spatial.addTiles(spatialID, tile);  // add again
 
-        const cache = _spatial.getCache(datasetID);
+        const cache = _spatial.getCache(spatialID);
         assert.strictEqual(cache.tiles.size, 1);
       });
 
       it('ignores null/undefined tiles', () => {
-        const datasetID = 'test-add-tile-null';
+        const spatialID = 'test-add-tile-null';
         const tile = createMockTile('tile1', [10, 0]);
-        _spatial.addTiles(datasetID, [tile, null, undefined]);
+        _spatial.addTiles(spatialID, [tile, null, undefined]);
 
-        const cache = _spatial.getCache(datasetID);
+        const cache = _spatial.getCache(spatialID);
         assert.strictEqual(cache.tiles.size, 1);
       });
     });
@@ -462,32 +462,32 @@ describe('SpatialSystem', () => {
 
     describe('removeTiles', () => {
       it('removes tile by tile object', () => {
-        const datasetID = 'test-remove-tile-1';
+        const spatialID = 'test-remove-tile-1';
         const tile = createMockTile('tile1', [10, 0]);
         if (!tile) {
           assert.fail('Failed to create mock tile');
           return;
         }
 
-        _spatial.addTiles(datasetID, tile);
-        _spatial.removeTiles(datasetID, tile);
+        _spatial.addTiles(spatialID, tile);
+        _spatial.removeTiles(spatialID, tile);
 
-        const cache = _spatial.getCache(datasetID);
+        const cache = _spatial.getCache(spatialID);
         assert.isFalse(cache.tiles.has(tile.id));
       });
 
       it('removes tile by tileID', () => {
-        const datasetID = 'test-remove-tile-2';
+        const spatialID = 'test-remove-tile-2';
         const tile = createMockTile('tile1', [10, 0]);
         if (!tile) {
           assert.fail('Failed to create mock tile');
           return;
         }
 
-        _spatial.addTiles(datasetID, tile);
-        _spatial.removeTiles(datasetID, tile.id);
+        _spatial.addTiles(spatialID, tile);
+        _spatial.removeTiles(spatialID, tile.id);
 
-        const cache = _spatial.getCache(datasetID);
+        const cache = _spatial.getCache(spatialID);
         assert.isFalse(cache.tiles.has(tile.id));
       });
     });
@@ -495,15 +495,15 @@ describe('SpatialSystem', () => {
 
     describe('getTile', () => {
       it('returns tile by tileID', () => {
-        const datasetID = 'test-get-tile';
+        const spatialID = 'test-get-tile';
         const tile = createMockTile('tile1', [10, 0]);
         if (!tile) {
           assert.fail('Failed to create mock tile');
           return;
         }
 
-        _spatial.addTiles(datasetID, tile);
-        const result = _spatial.getTile(datasetID, tile.id);
+        _spatial.addTiles(spatialID, tile);
+        const result = _spatial.getTile(spatialID, tile.id);
         assert.strictEqual(result, tile);
       });
 
@@ -516,15 +516,15 @@ describe('SpatialSystem', () => {
 
     describe('hasTile', () => {
       it('returns true if tile exists', () => {
-        const datasetID = 'test-has-tile';
+        const spatialID = 'test-has-tile';
         const tile = createMockTile('tile1', [10, 0]);
         if (!tile) {
           assert.fail('Failed to create mock tile');
           return;
         }
 
-        _spatial.addTiles(datasetID, tile);
-        assert.isTrue(_spatial.hasTile(datasetID, tile.id));
+        _spatial.addTiles(spatialID, tile);
+        assert.isTrue(_spatial.hasTile(spatialID, tile.id));
       });
 
       it('returns false if tile does not exist', () => {
@@ -535,31 +535,31 @@ describe('SpatialSystem', () => {
 
     describe('hasTileAtBox', () => {
       it('returns true if tile exists in box', () => {
-        const datasetID = 'test-has-tile-box';
+        const spatialID = 'test-has-tile-box';
         const tile = createMockTile('tile1', [10, 0]);
         if (!tile) {
           assert.fail('Failed to create mock tile');
           return;
         }
 
-        _spatial.addTiles(datasetID, tile);
+        _spatial.addTiles(spatialID, tile);
 
         const [x, y] = Rapid.sdk.projWgs84ToWorld([10, 0]);
         const box = { minX: x - 1000, minY: y - 1000, maxX: x + 1000, maxY: y + 1000 };
-        assert.isTrue(_spatial.hasTileAtBox(datasetID, box));
+        assert.isTrue(_spatial.hasTileAtBox(spatialID, box));
       });
 
       it('returns false if no tile in box', () => {
-        const datasetID = 'test-no-tile-box';
+        const spatialID = 'test-no-tile-box';
         const box = { minX: 0, minY: 0, maxX: 0.001, maxY: 0.001 };
-        assert.isFalse(_spatial.hasTileAtBox(datasetID, box));
+        assert.isFalse(_spatial.hasTileAtBox(spatialID, box));
       });
     });
 
 
     describe('hasTileAtLoc', () => {
       it('returns true if tile exists at location', () => {
-        const datasetID = 'test-has-tile-loc';
+        const spatialID = 'test-has-tile-loc';
         const loc = [10, 0];
         const tile = createMockTile('tile1', loc);
         if (!tile) {
@@ -567,38 +567,38 @@ describe('SpatialSystem', () => {
           return;
         }
 
-        _spatial.addTiles(datasetID, tile);
+        _spatial.addTiles(spatialID, tile);
         // Check if tile actually covers the location by using a location from the tile extent
         const extent = tile.worldExtent;
         const testLoc = Rapid.sdk.projWorldToWgs84([extent.min[0], extent.min[1]]);
-        assert.isTrue(_spatial.hasTileAtLoc(datasetID, testLoc));
+        assert.isTrue(_spatial.hasTileAtLoc(spatialID, testLoc));
       });
 
       it('returns false if no tile at location', () => {
-        const datasetID = 'test-no-tile-loc';
-        assert.isFalse(_spatial.hasTileAtLoc(datasetID, [50, 50]));
+        const spatialID = 'test-no-tile-loc';
+        assert.isFalse(_spatial.hasTileAtLoc(spatialID, [50, 50]));
       });
     });
 
 
     describe('getVisibleData', () => {
       it('returns data in the visible viewport', () => {
-        const datasetID = 'test-visible-data';
+        const spatialID = 'test-visible-data';
         const data = createMockData('data1', [10, 0]);
-        _spatial.addData(datasetID, data);
+        _spatial.addData(spatialID, data);
 
-        const results = _spatial.getVisibleData(datasetID);
+        const results = _spatial.getVisibleData(spatialID);
         assert.isArray(results);
         assert.lengthOf(results, 1);
         assert.strictEqual(results[0].contents, data);
       });
 
       it('returns empty array when no visible data', () => {
-        const datasetID = 'test-no-visible-data';
+        const spatialID = 'test-no-visible-data';
         const data = createMockData('data1', [100, 0]);  // far away
-        _spatial.addData(datasetID, data);
+        _spatial.addData(spatialID, data);
 
-        const results = _spatial.getVisibleData(datasetID);
+        const results = _spatial.getVisibleData(spatialID);
         assert.isArray(results);
         assert.isEmpty(results);
       });
@@ -618,9 +618,9 @@ describe('SpatialSystem', () => {
       });
 
       it('returns empty array when no visible data', () => {
-        const datasetID = 'test-all-visible-empty';
+        const spatialID = 'test-all-visible-empty';
         const data = createMockData('data1', [100, 0]);  // far away
-        _spatial.addData(datasetID, data);
+        _spatial.addData(spatialID, data);
 
         const results = _spatial.getAllVisibleData();
         // May have data from other tests, so just check it's an array
@@ -631,9 +631,9 @@ describe('SpatialSystem', () => {
 
     describe('preventCoincidentLoc', () => {
       it('returns original location when no collision', () => {
-        const datasetID = 'test-prevent-loc-1';
+        const spatialID = 'test-prevent-loc-1';
         const loc = [10, 0];
-        const result = _spatial.preventCoincidentLoc(datasetID, loc);
+        const result = _spatial.preventCoincidentLoc(spatialID, loc);
 
         assert.isArray(result);
         assert.closeTo(result[0], loc[0], 0.0001);
@@ -641,12 +641,12 @@ describe('SpatialSystem', () => {
       });
 
       it('adjusts location when collision exists', () => {
-        const datasetID = 'test-prevent-loc-2';
+        const spatialID = 'test-prevent-loc-2';
         const loc = [10, 0];
         const data = createMockData('data1', loc, 1e-8);  // very small extent
-        _spatial.addData(datasetID, data);
+        _spatial.addData(spatialID, data);
 
-        const result = _spatial.preventCoincidentLoc(datasetID, loc);
+        const result = _spatial.preventCoincidentLoc(spatialID, loc);
         assert.isArray(result);
         assert.closeTo(result[0], loc[0], 0.0001);
         // Y should be adjusted slightly south
@@ -657,16 +657,16 @@ describe('SpatialSystem', () => {
 
     describe('resetAsync (with data)', () => {
       it('clears all caches when reset', () => {
-        const datasetID = 'test-reset-data';
+        const spatialID = 'test-reset-data';
         const data = createMockData('data1', [10, 0]);
         const tile = createMockTile('tile1', [10, 0]);
 
-        _spatial.addData(datasetID, data);
-        _spatial.addTiles(datasetID, tile);
+        _spatial.addData(spatialID, data);
+        _spatial.addTiles(spatialID, tile);
 
         return _spatial.resetAsync()
           .then(() => {
-            const cache = _spatial.getCache(datasetID);
+            const cache = _spatial.getCache(spatialID);
             assert.isEmpty(cache.data);
             assert.isEmpty(cache.tiles);
             assert.isEmpty(cache.boxes);
