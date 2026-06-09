@@ -373,8 +373,8 @@ export class MapRouletteService extends AbstractSystem {
 
           // Update task statuses
           const toUpdate = [];
-          const allTasks = spatial.getCache('maproulette').data;
-          for (const task of allTasks.values()) {
+          const allTasks = spatial.getAllData<MapRouletteTask>('maproulette');
+          for (const task of allTasks) {
             if (task.props.parentId === challengeID && task.props.isVisible !== challenge.isVisible) {
               task.props.isVisible = challenge.isVisible;
               task.touch();

@@ -105,18 +105,37 @@ describe('SpatialSystem', () => {
       it('creates and returns a new cache', () => {
         const cache = _spatial.getCache('test-cache-1');
         assert.isObject(cache);
-        assert.instanceOf(cache.graph, Rapid.Graph);
-        assert.instanceOf(cache.boxes, Map);
-        assert.instanceOf(cache.tiles, Map);
-        assert.instanceOf(cache.data, Map);
-        assert.isObject(cache.tileRBush);
-        assert.isObject(cache.dataRBush);
+        assert.strictEqual(cache.id, 'test-cache-1');
+        assert.instanceOf(cache.indexes, Map);
       });
 
       it('returns the same cache on repeated calls', () => {
         const cache1 = _spatial.getCache('test-cache-2');
         const cache2 = _spatial.getCache('test-cache-2');
         assert.strictEqual(cache1, cache2);
+      });
+    });
+
+
+    describe('getIndex', () => {
+      it('creates and returns a named index within a cache', () => {
+        const index = _spatial.getIndex('test-index-1', 'data');
+        assert.isObject(index);
+        assert.strictEqual(index.id, 'data');
+        assert.instanceOf(index.boxes, Map);
+        assert.isObject(index.rbush);
+      });
+
+      it('returns the same index on repeated calls', () => {
+        const index1 = _spatial.getIndex('test-index-2', 'data');
+        const index2 = _spatial.getIndex('test-index-2', 'data');
+        assert.strictEqual(index1, index2);
+      });
+
+      it('creates separate indexes for different names', () => {
+        const dataIndex = _spatial.getIndex('test-index-3', 'data');
+        const tileIndex = _spatial.getIndex('test-index-3', 'tiles');
+        assert.notStrictEqual(dataIndex, tileIndex);
       });
     });
 
@@ -131,15 +150,14 @@ describe('SpatialSystem', () => {
         _spatial.addTiles(spatialID, tile);
 
         const cacheBefore = _spatial.getCache(spatialID);
-        assert.isTrue(cacheBefore.data.size > 0);
-        assert.isTrue(cacheBefore.tiles.size > 0);
+        assert.isTrue(_spatial.getIndex(spatialID, 'data').boxes.size > 0);
+        assert.isTrue(_spatial.getIndex(spatialID, 'tiles').boxes.size > 0);
+        assert.isObject(cacheBefore);
 
         _spatial.clearCache(spatialID);
 
-        const cacheAfter = _spatial.getCache(spatialID);
-        assert.isEmpty(cacheAfter.data);
-        assert.isEmpty(cacheAfter.tiles);
-        assert.isEmpty(cacheAfter.boxes);
+        assert.isEmpty(_spatial.getIndex(spatialID, 'data').boxes);
+        assert.isEmpty(_spatial.getIndex(spatialID, 'tiles').boxes);
       });
     });
 
@@ -160,21 +178,14 @@ describe('SpatialSystem', () => {
 
       _spatial.clearMatching(id => id.startsWith('test-ok'));
 
-      const cache1 = _spatial.getCache(spatialID1);
-      const cache2 = _spatial.getCache(spatialID2);
-      const cache3 = _spatial.getCache(spatialID3);
+      assert.isEmpty(_spatial.getIndex(spatialID1, 'data').boxes);
+      assert.isEmpty(_spatial.getIndex(spatialID1, 'tiles').boxes);
 
-      assert.isEmpty(cache1.data);
-      assert.isEmpty(cache1.tiles);
-      assert.isEmpty(cache1.boxes);
+      assert.isEmpty(_spatial.getIndex(spatialID2, 'data').boxes);
+      assert.isEmpty(_spatial.getIndex(spatialID2, 'tiles').boxes);
 
-      assert.isEmpty(cache2.data);
-      assert.isEmpty(cache2.tiles);
-      assert.isEmpty(cache2.boxes);
-
-      assert.hasAllKeys(cache3.data, ['data10']);
-      assert.hasAllKeys(cache3.tiles, ['34589,32769,16']);
-      assert.hasAllKeys(cache3.boxes, ['data10', '34589,32769,16']);
+      assert.hasAllKeys(_spatial.getIndex(spatialID3, 'data').boxes, ['data10']);
+      assert.hasAllKeys(_spatial.getIndex(spatialID3, 'tiles').boxes, ['34589,32769,16']);
     });
   });
 
@@ -185,9 +196,8 @@ describe('SpatialSystem', () => {
         const data = createMockData('data1', [10, 0]);
         _spatial.addData(spatialID, data);
 
-        const cache = _spatial.getCache(spatialID);
-        assert.isTrue(cache.data.has('data1'));
-        assert.strictEqual(cache.data.get('data1'), data);
+        assert.isTrue(_spatial.hasData(spatialID, 'data1'));
+        assert.strictEqual(_spatial.getData(spatialID, 'data1'), data);
       });
 
       it('adds multiple data items', () => {
@@ -196,9 +206,8 @@ describe('SpatialSystem', () => {
         const data2 = createMockData('data2', [11, 0]);
         _spatial.addData(spatialID, [data1, data2]);
 
-        const cache = _spatial.getCache(spatialID);
-        assert.isTrue(cache.data.has('data1'));
-        assert.isTrue(cache.data.has('data2'));
+        assert.isTrue(_spatial.hasData(spatialID, 'data1'));
+        assert.isTrue(_spatial.hasData(spatialID, 'data2'));
       });
 
       it('ignores null/undefined items', () => {
@@ -206,9 +215,8 @@ describe('SpatialSystem', () => {
         const data = createMockData('data1', [10, 0]);
         _spatial.addData(spatialID, [data, null, undefined]);
 
-        const cache = _spatial.getCache(spatialID);
-        assert.strictEqual(cache.data.size, 1);
-        assert.isTrue(cache.data.has('data1'));
+        assert.strictEqual(_spatial.getIndex(spatialID, 'data').boxes.size, 1);
+        assert.isTrue(_spatial.hasData(spatialID, 'data1'));
       });
 
       it('skips data without extent', () => {
@@ -217,8 +225,7 @@ describe('SpatialSystem', () => {
         // data has no geoms.world.extent
         _spatial.addData(spatialID, data);
 
-        const cache = _spatial.getCache(spatialID);
-        assert.isFalse(cache.data.has('data1'));
+        assert.isFalse(_spatial.hasData(spatialID, 'data1'));
       });
     });
 
@@ -232,9 +239,8 @@ describe('SpatialSystem', () => {
         const data2 = createMockData('data1', [11, 0]);
         _spatial.replaceData(spatialID, data2);
 
-        const cache = _spatial.getCache(spatialID);
-        assert.strictEqual(cache.data.size, 1);
-        assert.strictEqual(cache.data.get('data1'), data2);
+        assert.strictEqual(_spatial.getIndex(spatialID, 'data').boxes.size, 1);
+        assert.strictEqual(_spatial.getData(spatialID, 'data1'), data2);
       });
 
       it('adds new data if not existing', () => {
@@ -242,8 +248,7 @@ describe('SpatialSystem', () => {
         const data = createMockData('data1', [10, 0]);
         _spatial.replaceData(spatialID, data);
 
-        const cache = _spatial.getCache(spatialID);
-        assert.isTrue(cache.data.has('data1'));
+        assert.isTrue(_spatial.hasData(spatialID, 'data1'));
       });
     });
 
@@ -255,8 +260,7 @@ describe('SpatialSystem', () => {
         _spatial.addData(spatialID, data);
 
         _spatial.removeData(spatialID, data);
-        const cache = _spatial.getCache(spatialID);
-        assert.isFalse(cache.data.has('data1'));
+        assert.isFalse(_spatial.hasData(spatialID, 'data1'));
       });
 
       it('removes data by dataID', () => {
@@ -265,8 +269,7 @@ describe('SpatialSystem', () => {
         _spatial.addData(spatialID, data);
 
         _spatial.removeData(spatialID, 'data1');
-        const cache = _spatial.getCache(spatialID);
-        assert.isFalse(cache.data.has('data1'));
+        assert.isFalse(_spatial.hasData(spatialID, 'data1'));
       });
 
       it('removes multiple data items', () => {
@@ -276,8 +279,7 @@ describe('SpatialSystem', () => {
         _spatial.addData(spatialID, [data1, data2]);
 
         _spatial.removeData(spatialID, ['data1', 'data2']);
-        const cache = _spatial.getCache(spatialID);
-        assert.isEmpty(cache.data);
+        assert.isEmpty(_spatial.getIndex(spatialID, 'data').boxes);
       });
 
       it('handles removing non-existent data', () => {
@@ -415,8 +417,7 @@ describe('SpatialSystem', () => {
         }
 
         _spatial.addTiles(spatialID, tile);
-        const cache = _spatial.getCache(spatialID);
-        assert.isTrue(cache.tiles.has(tile.id));
+        assert.isTrue(_spatial.hasTile(spatialID, tile.id));
       });
 
       it('adds multiple tiles', () => {
@@ -429,9 +430,8 @@ describe('SpatialSystem', () => {
         }
 
         _spatial.addTiles(spatialID, [tile1, tile2]);
-        const cache = _spatial.getCache(spatialID);
-        assert.isTrue(cache.tiles.has(tile1.id));
-        assert.isTrue(cache.tiles.has(tile2.id));
+        assert.isTrue(_spatial.hasTile(spatialID, tile1.id));
+        assert.isTrue(_spatial.hasTile(spatialID, tile2.id));
       });
 
       it('skips duplicate tiles', () => {
@@ -445,8 +445,7 @@ describe('SpatialSystem', () => {
         _spatial.addTiles(spatialID, tile);
         _spatial.addTiles(spatialID, tile);  // add again
 
-        const cache = _spatial.getCache(spatialID);
-        assert.strictEqual(cache.tiles.size, 1);
+        assert.strictEqual(_spatial.getIndex(spatialID, 'tiles').boxes.size, 1);
       });
 
       it('ignores null/undefined tiles', () => {
@@ -454,8 +453,7 @@ describe('SpatialSystem', () => {
         const tile = createMockTile('tile1', [10, 0]);
         _spatial.addTiles(spatialID, [tile, null, undefined]);
 
-        const cache = _spatial.getCache(spatialID);
-        assert.strictEqual(cache.tiles.size, 1);
+        assert.strictEqual(_spatial.getIndex(spatialID, 'tiles').boxes.size, 1);
       });
     });
 
@@ -472,8 +470,7 @@ describe('SpatialSystem', () => {
         _spatial.addTiles(spatialID, tile);
         _spatial.removeTiles(spatialID, tile);
 
-        const cache = _spatial.getCache(spatialID);
-        assert.isFalse(cache.tiles.has(tile.id));
+        assert.isFalse(_spatial.hasTile(spatialID, tile.id));
       });
 
       it('removes tile by tileID', () => {
@@ -487,8 +484,7 @@ describe('SpatialSystem', () => {
         _spatial.addTiles(spatialID, tile);
         _spatial.removeTiles(spatialID, tile.id);
 
-        const cache = _spatial.getCache(spatialID);
-        assert.isFalse(cache.tiles.has(tile.id));
+        assert.isFalse(_spatial.hasTile(spatialID, tile.id));
       });
     });
 
@@ -666,10 +662,8 @@ describe('SpatialSystem', () => {
 
         return _spatial.resetAsync()
           .then(() => {
-            const cache = _spatial.getCache(spatialID);
-            assert.isEmpty(cache.data);
-            assert.isEmpty(cache.tiles);
-            assert.isEmpty(cache.boxes);
+            assert.isEmpty(_spatial.getIndex(spatialID, 'data').boxes);
+            assert.isEmpty(_spatial.getIndex(spatialID, 'tiles').boxes);
           });
       });
     });
