@@ -236,7 +236,8 @@ export class EsriService extends AbstractSystem {
     if (!ds) return [];
 
     const spatial = this.context.systems.spatial!;
-    return spatial.getVisibleData(`esri-${ds.id}`).map(hit => hit.contents as OsmEntity);
+    const spatialID = `esri-${ds.id}`;
+    return spatial.getVisibleData(spatialID).map(hit => hit.contents as OsmEntity);
  }
 
 
@@ -348,7 +349,8 @@ export class EsriService extends AbstractSystem {
     const page = cache.nextPage.get(tileID) ?? 0;
     if (page === Infinity) return;  // no more pages
 
-    const requestID = `esri-${datasetID}-${layerID}-${tileID},${page}`;
+    const spatialID = `esri-${datasetID}`;
+    const requestID = `${spatialID}-${layerID}-${tileID},${page}`;
     if (cache.loaded.has(requestID) || network.isInflight(requestID)) return;
 
     if (locations) {
@@ -368,7 +370,7 @@ export class EsriService extends AbstractSystem {
 
         // We are not currently using the SpatialSystem to track loaded tiles because
         // a tile request may kick off multiple per-layer or per-page subrequests.
-        //spatial.addTiles('esri-datasetID?', [tile]);   // mark as loaded
+        //spatial.addTiles(spatialID, [tile]);   // mark as loaded
         cache.loaded.add(requestID);
         this._gotTile(ds, layer, geojson);
 
@@ -396,12 +398,9 @@ export class EsriService extends AbstractSystem {
    * @param layer - the layer within the dataset we fetched
    * @param geojson - a GeoJSON.FeatureCollection containing the data for this tile
    */
-  protected _gotTile(
-    ds: EsriDataset,
-    layer: EsriLayer,
-    geojson: GeoJSON.FeatureCollection,
-  ): void {
+  protected _gotTile( ds: EsriDataset, layer: EsriLayer, geojson: GeoJSON.FeatureCollection): void {
     const spatial = this.context.systems.spatial!;
+    const spatialID = `esri-${ds.id}`;
 
     const results: OsmEntity[] = [];
     for (const feature of geojson.features ?? []) {
@@ -413,7 +412,7 @@ export class EsriService extends AbstractSystem {
 
     if (results.length) {
       ds.graph.rebase(results);   // important: `graph.rebase` will call `.updateGeometry()`
-      spatial.addData(`esri-${ds.id}`, results);
+      spatial.addData(spatialID, results);
     }
   }
 
@@ -425,12 +424,7 @@ export class EsriService extends AbstractSystem {
    * @param feature - the GeoJSON feature that we fetched
    * @return An array of OSMEntities for that feature, or `null` if we skipped it
    */
-  protected _parseFeature(
-    ds: EsriDataset,
-    layer: EsriLayer,
-    feature: GeoJSON.Feature
-  ): OsmEntity[] | null {
-
+  protected _parseFeature( ds: EsriDataset, layer: EsriLayer, feature: GeoJSON.Feature): OsmEntity[] | null {
     const context = this.context;
     const geom = feature.geometry;
     const properties = feature.properties ?? {};

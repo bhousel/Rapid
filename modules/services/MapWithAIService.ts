@@ -1,10 +1,10 @@
 import { AbstractSystem } from '../core/AbstractSystem.ts';
-import { Graph, RapidDataset, Tree } from '../lib/index.ts';
+import { Graph, RapidDataset } from '../lib/index.ts';
 import { Tiler } from '@rapid-sdk/math';
 import { OsmNode, OsmWay } from '../data/index.ts';
 
 import type { Context } from '../Context.ts';
-import type { Extent, Tile } from '@rapid-sdk/math';
+import type { Tile } from '@rapid-sdk/math';
 import type { OsmEntity } from '../data/OsmEntity.ts';
 import type { ParserResult, ParsedWay } from '../data/parsers/types.ts';
 
@@ -16,18 +16,14 @@ const TILEZOOM = 16;
 
 
 /**
- * Internal cache structure for a single dataset.
- * Each dataset has its own Graph, Tree, and tracking sets.
+ * Internal dataset cache structure.
+ * Each dataset has its own Graph and tracking sets.
  */
-interface DatasetCache {
+interface MapWithAIDataset {
   /** Unique identifier for this dataset */
   id: DatasetID;
   /** Graph instance holding the loaded MapWithAI entity data */
   graph: Graph;
-  /** Custom spatial tree for spatial queries on this dataset */
-  tree: Tree;
-  /** Set of tile IDs that have already been loaded */
-  loaded: Set<EntityID>;
   /** Set of entity IDs already seen, to avoid processing duplicates */
   seen: Set<EntityID>;
   /** Set of first-node IDs used to detect duplicate buildings */
@@ -46,8 +42,8 @@ export class MapWithAIService extends AbstractSystem {
 
   /** Tiler instance used to compute tile coverage for the current viewport */
   protected _tiler: Tiler;
-  /** Map of dataset IDs to their DatasetCache objects */
-  protected _datasets: Map<DatasetID, DatasetCache>;
+  /** Map of datasetIDs to their dataset objects */
+  protected _datasets: Map<DatasetID, MapWithAIDataset>;
 
 
   /**
@@ -61,7 +57,7 @@ export class MapWithAIService extends AbstractSystem {
     this.optionalDependencies = new Set<SystemID>(['assets', 'gfx', 'l10n', 'locations', 'rapid', 'urlhash']);
 
     this._tiler = new Tiler().zoomRange(TILEZOOM) as Tiler;
-    this._datasets = new Map<DatasetID, DatasetCache>();
+    this._datasets = new Map<DatasetID, MapWithAIDataset>();
   }
 
 
@@ -73,10 +69,11 @@ export class MapWithAIService extends AbstractSystem {
     if (this._initPromise) return this._initPromise;
 
     const network = this.context.systems.network!;
+    const spatial = this.context.systems.spatial!;
 
     return this._initPromise = super.initAsync()
       .then(() => {
-        const prerequisites = [ network.initAsync() ];
+        const prerequisites = [ network.initAsync(), spatial.initAsync() ];
         return Promise.all(prerequisites.filter(Boolean));
       })
       .then(() => this.resetAsync())
@@ -102,14 +99,14 @@ export class MapWithAIService extends AbstractSystem {
    */
   public resetAsync(): Promise<void> {
     const context = this.context;
-    const network = context.systems.network!;
+    const network = this.context.systems.network!;
+    const spatial = this.context.systems.spatial!;
 
     network.abortMatching(id => id.startsWith('mapwithai'));
+    spatial.clearMatching(id => id.startsWith('mapwithai'));
 
-    for (const [datasetID, ds] of this._datasets) {
+    for (const ds of this._datasets.values()) {
       ds.graph = new Graph(context);
-      ds.tree = new Tree(ds.graph, datasetID);
-      ds.loaded.clear();
       ds.seen.clear();
       ds.seenFirstNodeID.clear();
       ds.splitWays.clear();
@@ -206,16 +203,12 @@ export class MapWithAIService extends AbstractSystem {
    * @param datasetID - the cache to get (or create)
    * @return dataset cache
    */
-  public getDataset(datasetID: DatasetID): DatasetCache {
+  public getDataset(datasetID: DatasetID): MapWithAIDataset {
     let ds = this._datasets.get(datasetID);
     if (!ds) {
-      const graph = new Graph(this.context);
-      const tree = new Tree(graph, datasetID);
       ds = {
         id: datasetID,
-        graph: graph,
-        tree: tree,
-        loaded: new Set<TileID>(),
+        graph: new Graph(this.context),
         seen: new Set<EntityID>(),
         seenFirstNodeID: new Set<EntityID>(),
         splitWays: new Map<string, Set<ParsedWay>>(),
@@ -234,10 +227,11 @@ export class MapWithAIService extends AbstractSystem {
    */
   public getData(datasetID: DatasetID): OsmEntity[] {
     const ds = this._datasets.get(datasetID);
-    if (!ds || !ds.tree || !ds.graph) return [];
+    if (!ds) return [];
 
-    const extent = this.context.viewport.visibleExtent();
-    return ds.tree.intersects(extent, ds.graph);
+    const spatial = this.context.systems.spatial!;
+    const spatialID = `mapwithai-${ds.id}`;
+    return spatial.getVisibleData(spatialID).map(hit => hit.contents as OsmEntity);
   }
 
 
@@ -247,6 +241,7 @@ export class MapWithAIService extends AbstractSystem {
    */
   public loadTiles(datasetID: DatasetID): void {
     if (this._paused) return;
+    if (datasetID === 'rapid_intro_graph') return;   // merged separately, not loaded from network
 
     const context = this.context;
     const network = context.systems.network!;
@@ -260,8 +255,9 @@ export class MapWithAIService extends AbstractSystem {
     const tiles = this._tiler.getTiles(viewport).tiles;
 
     // Abort inflight requests that are no longer needed..
-    const neededIDs = new Set<RequestID>(tiles.map(tile => `mapwithai-${tile.id}`));
-    network.abortMatching(id => id.startsWith('mapwithai') && !neededIDs.has(id));
+    const spatialID = `mapwithai-${datasetID}`;
+    const neededIDs = new Set<RequestID>(tiles.map(tile => `${spatialID}-${tile.id}`));
+    network.abortMatching(id => id.startsWith(spatialID) && !neededIDs.has(id));
 
     for (const tile of tiles) {
       this.loadTile(ds, tile);
@@ -274,29 +270,34 @@ export class MapWithAIService extends AbstractSystem {
    * @param ds - the dataset info
    * @param tile - a tile object
    */
-  public loadTile(ds: DatasetCache, tile: Tile): void {
+  public loadTile(ds: MapWithAIDataset, tile: Tile): void {
     if (!ds || this._paused) return;
 
     const context = this.context;
-    const network = context.systems.network!;
     const locations = context.systems.locations;
-    const tileID = tile.id;
-    const requestID = `mapwithai-${tileID}` as RequestID;
+    const network = context.systems.network!;
+    const spatial = context.systems.spatial!;
 
-    if (ds.loaded.has(tileID) || network.isInflight(requestID)) return;
+    const tileID = tile.id;
+    const datasetID = ds.id;
+    const spatialID = `mapwithai-${datasetID}`;
+    const requestID = `${spatialID}-${tileID}`;
+
+    // already loaded, or inflight?
+    if (spatial.hasTile(spatialID, tileID) || network.isInflight(requestID)) return;
+    if (datasetID === 'rapid_intro_graph') return;   // merged separately, not loaded from network
 
     if (locations) {
       // Exit if this tile covers a blocked region (all corners are blocked)
       const corners = tile.wgs84Extent.polygon().slice(0, 4);
       const tileBlocked = corners.every(loc => locations.isBlockedAt(loc));
       if (tileBlocked) {
-        ds.loaded.add(tile.id);  // don't try again
+        spatial.addTiles(spatialID, [tile]);   // don't retry
         return;
       }
     }
 
-    const url = this._tileURL(ds, tile.wgs84Extent);
-
+    const url = this._tileURL(ds, tile);
     network.fetch<ParserResult>(url, {
       requestID,
       listenerID: 'network:fetchAndParseOsmXml',
@@ -316,15 +317,16 @@ export class MapWithAIService extends AbstractSystem {
    * @param ds - the dataset info
    * @param tile - a tile object
    */
-  protected _gotTile(results: ParserResult, ds: DatasetCache, tile: Tile): void {
+  protected _gotTile(results: ParserResult, ds: MapWithAIDataset, tile: Tile): void {
     if (!results) return;  // ignore empty responses
 
     const context = this.context;
     const gfx = context.systems.gfx;
+    const spatial = context.systems.spatial!;
 
     const graph = ds.graph;
-    const tree = ds.tree;
-    const tileID = tile.id;
+    const datasetID = ds.id;
+    const spatialID = `mapwithai-${datasetID}`;
 
     const entities: OsmEntity[] = [];
     for (const props of results.data) {
@@ -334,7 +336,7 @@ export class MapWithAIService extends AbstractSystem {
       Object.assign(props, {
         __fbid__: entityID,
         __service__: 'mapwithai',
-        __datasetid__: ds.id
+        __datasetid__: datasetID
       });
 
       if (props.type === 'node') {
@@ -382,9 +384,10 @@ export class MapWithAIService extends AbstractSystem {
     // Try to reconnect split ways.
     entities.push(...this._connectSplitWays(ds));
 
+    // important: `graph.rebase` will call `.updateGeometry()`
     graph.rebase(entities, [graph], true);   // true = force replace entities
-    tree.rebase(entities, true);
-    ds.loaded.add(tileID);
+    spatial.addData(spatialID, entities);
+    spatial.addTiles(spatialID, [tile]);
     gfx?.deferredRedraw();
   }
 
@@ -407,19 +410,24 @@ export class MapWithAIService extends AbstractSystem {
    * @param entities - entities to merge
    */
   public merge(datasetID: DatasetID, entities: OsmEntity[]): void {
+    const context = this.context;
+    const spatial = context.systems.spatial!;
+
     const ds = this.getDataset(datasetID);  // create caches, if needed
+    const spatialID = `mapwithai-${datasetID}`;
+
     ds.graph.rebase(entities);
-    ds.tree.rebase(entities);
+    spatial.addData(spatialID, entities);
   }
 
 
   /**
-   * Build the MapWithAI API URL for a given dataset and extent.
-   * @param dataset - the dataset cache to build the URL for
-   * @param extent - geographic extent of the tile
+   * Returns the MapWithAI URL used to get available data for a given dataset and extent.
+   * @param dataset - the dataset to fetch data for
+   * @param tile - the tile to fetch the data for
    * @return the fully-qualified API URL
    */
-  protected _tileURL(dataset: DatasetCache, extent: Extent): string {
+  protected _tileURL(dataset: MapWithAIDataset, tile: Tile): string {
     const context = this.context;
     const rapid = context.systems.rapid;
     const urlhash = context.systems.urlhash;
@@ -452,7 +460,7 @@ export class MapWithAIService extends AbstractSystem {
       qs.sources = `esri_building.${datasetID}`;
     }
 
-    qs.bbox = extent.toParam();
+    qs.bbox = tile.wgs84Extent.toParam();
 
     if (rapid?.taskExtent) {
       qs.crop_bbox = rapid.taskExtent.toParam();
@@ -464,17 +472,15 @@ export class MapWithAIService extends AbstractSystem {
     return url;
 
 
-    // This utilQsString does not sort the keys, because the MapWithAI service needs them to be ordered a certain way.
     /**
-     *
+     * This utilQsString does not sort the keys, because the MapWithAI service needs them to be ordered a certain way.
      * @param obj
      * @param noencode
      */
     function MWAIQsString(obj: Record<string, string | boolean>, noencode: boolean): string {
-      // encode everything except special characters used in certain hash parameters:
-      // "/" in map states, ":", ",", {" and "}" in background
       /**
-       *
+       * encode everything except special characters used in certain hash parameters:
+       * "/" in map states, ":", ",", {" and "}" in background
        * @param s
        */
       function softEncode(s: string): string {
@@ -494,7 +500,7 @@ export class MapWithAIService extends AbstractSystem {
    * @param ds - the dataset info
    * @return  The reassembled ways
    */
-  protected _connectSplitWays(ds: DatasetCache): OsmWay[] {
+  protected _connectSplitWays(ds: MapWithAIDataset): OsmWay[] {
     const context = this.context;
     const graph = ds.graph;
     const results: OsmWay[] = [];

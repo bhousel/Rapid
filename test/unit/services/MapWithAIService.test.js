@@ -163,8 +163,6 @@ describe('MapWithAIService', () => {
         assert.isObject(ds);
         assert.strictEqual(ds.id, 'test');
         assert.instanceOf(ds.graph, Rapid.Graph);
-        assert.instanceOf(ds.tree, Rapid.Tree);
-        assert.instanceOf(ds.loaded, Set);
         assert.instanceOf(ds.seen, Set);
         assert.instanceOf(ds.seenFirstNodeID, Set);
         assert.isNull(ds.lastv);
@@ -187,9 +185,9 @@ describe('MapWithAIService', () => {
         _mapwithai.loadTiles('msBuildings');
 
         await Bun.sleep(5);  // after all fetches have settled
-        const ds = _mapwithai.getDataset('msBuildings');
         const tileID = '8647,8192,14';
-        assert.isTrue(ds.loaded.has(tileID), 'tile at [10°, 0°] was loaded');
+        const spatial = context.systems.spatial;
+        assert.isTrue(spatial.hasTile('mapwithai-msBuildings', tileID), 'tile at [10°, 0°] was loaded');
         assert.lengthOf(fetchMock.callHistory.calls(), 1, 'fetch called once');
         assert.lengthOf(spyRedraw.mock.calls, 1, 'redraw called once');
         assert.lengthOf(spyError.mock.calls, 0, 'console.error not called');
@@ -206,9 +204,9 @@ describe('MapWithAIService', () => {
         _mapwithai.loadTiles('msBuildings');   // try again
 
         await Bun.sleep(5);  // after all fetches have settled
-        const ds = _mapwithai.getDataset('msBuildings');
         const tileID = '8647,8192,14';
-        assert.isTrue(ds.loaded.has(tileID), 'tile at [10°, 0°] was loaded');
+        const spatial = context.systems.spatial;
+        assert.isTrue(spatial.hasTile('mapwithai-msBuildings', tileID), 'tile at [10°, 0°] was loaded');
         assert.lengthOf(fetchMock.callHistory.calls(), 1, 'fetch called once');
         assert.lengthOf(spyRedraw.mock.calls, 1, 'redraw called once');
       });
@@ -222,11 +220,11 @@ describe('MapWithAIService', () => {
         _mapwithai.loadTiles('msBuildings');
 
         await Bun.sleep(5);  // after all fetches have settled
-        const ds = _mapwithai.getDataset('msBuildings');
         const tileID = '8647,8192,14';
-        assert.isTrue(ds.loaded.has(tileID), 'tile at [10°, 0°] was loaded');
+        const spatial = context.systems.spatial;
+        assert.isTrue(spatial.hasTile('mapwithai-msBuildings', tileID), 'tile at [10°, 0°] was loaded');
 
-        context.viewport.transform.v++;       // touch viewport
+        context.viewport.transform.v++;        // touch viewport
         _mapwithai.loadTiles('msBuildings');   // try again
 
         await Bun.sleep(5);  // after all fetches have settled
@@ -248,9 +246,10 @@ describe('MapWithAIService', () => {
         _mapwithai.loadTiles('msBuildings');
 
         await Bun.sleep(5);  // after all fetches have settled
-        const ds = _mapwithai.getDataset('msBuildings');
-        assert.isFalse(ds.loaded.has('8647,8192,14'), 'old tile at [10°, 0°] was not loaded');
-        assert.isTrue(ds.loaded.has('9102,8192,14'), 'new tile at [20°, 0°] was loaded');
+
+        const spatial = context.systems.spatial;
+        assert.isFalse(spatial.hasTile('mapwithai-msBuildings', '8647,8192,14'), 'old tile at [10°, 0°] was not loaded');
+        assert.isTrue(spatial.hasTile('mapwithai-msBuildings', '9102,8192,14'), 'new tile at [20°, 0°] was loaded');
         assert.lengthOf(fetchMock.callHistory.calls(), 2, 'fetch called twice - but one was aborted');
         assert.lengthOf(spyRedraw.mock.calls, 1, 'redraw called once');
         assert.lengthOf(spyError.mock.calls, 0, 'console.error not called');
@@ -262,9 +261,9 @@ describe('MapWithAIService', () => {
         _mapwithai.loadTiles('msBuildings');
 
         await Bun.sleep(5);  // after all fetches have settled
-        const ds = _mapwithai.getDataset('msBuildings');
         const tileID = '8647,8192,14';
-        assert.isFalse(ds.loaded.has(tileID), 'tile at [10°, 0°] is NOT considered loaded');
+        const spatial = context.systems.spatial;
+        assert.isFalse(spatial.hasTile('mapwithai-msBuildings', tileID), 'tile at [10°, 0°] was not loaded');
         assert.lengthOf(fetchMock.callHistory.calls(), 1, 'fetch called once');
         assert.lengthOf(spyRedraw.mock.calls, 0, 'redraw not called');
         assert.lengthOf(spyError.mock.calls, 1, 'console.error called once');

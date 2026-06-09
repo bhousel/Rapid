@@ -73,8 +73,9 @@ export class PixiLayerDebug extends AbstractPixiLayer {
     const parentContainer = this.scene.groups.get('debug-under')!;
 
     // Gather visible Microsoft Buildings
-    const msData = spatial.getVisibleData('msBuildings').filter(hit => _isBuilding(hit.contents as OsmEntity));
+    const msData = spatial.getVisibleData('mapwithai-msBuildings').filter(hit => _isBuilding(hit.contents as OsmEntity));
     for (const hit of msData) {
+      // note - the spatialID of 'osm-data' here is currently set by OsmService
       if (!spatial.hasTileAtBox('osm-data', hit)) continue;  // Is osm data loaded here?
 
       const data = hit.contents as OsmEntity;
@@ -109,6 +110,7 @@ export class PixiLayerDebug extends AbstractPixiLayer {
           const style = structuredClone(DEFAULTSTYLE);
           const box: BBox = { minX: worldPoi![0], minY: worldPoi![1], maxX: worldPoi![0], maxY: worldPoi![1] };
           // does this test point hit an OSM building?
+          // note - the spatialID of 'osm' here is currently set by Tree / EditSystem
           const didHitBuilding = spatial.getDataAtBox('osm', box).some(hit => _isBuilding(hit.contents as OsmEntity));
 
           if (didHitBuilding) {
