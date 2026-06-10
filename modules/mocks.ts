@@ -26,8 +26,11 @@ export class MockSystem extends AbstractSystem {
 
 /**
  * A mock `Context` class.
+ * Note that it comes with no systems or services set up.
+ * Tests must add any systems and services needed to run the thing being tested.
  */
 export class MockContext {
+
   /** The map viewport (projection, pan, zoom) */
   public viewport: Viewport;
   /** All systems available to this mock context */
@@ -36,8 +39,15 @@ export class MockContext {
   public services: Record<ServiceID, any>;
   /** Sequence counters for generating unique IDs */
   public sequences: Record<SequenceID, number>;
+
   /** Stub keybinding manager (backed by a MockSystem cast) */
   protected _keybinding: Keybinding;
+  /** Promise for init phase */
+  protected _initPromise: Promise<void> | null;
+  /** Promise for start phase */
+  protected _startPromise: Promise<void> | null;
+  /** Promise for reset */
+  protected _resetPromise: Promise<void> | null;
 
   /** @constructor */
   public constructor() {
@@ -46,13 +56,81 @@ export class MockContext {
     this.systems = {};
     this.viewport = new Viewport();
     this._keybinding = (new MockSystem(this as unknown as Context) as unknown as Keybinding);
+
+    this._initPromise = null;
+    this._startPromise = null;
+    this._resetPromise = null;
   }
-  /** Resolves immediately — no real async work in tests */
-  public initAsync()   { return Promise.resolve(); }
-  /** Resolves immediately — no real async work in tests */
-  public startAsync()  { return Promise.resolve(); }
-  /** Resolves immediately — no real async work in tests */
-  public resetAsync()  { return Promise.resolve(); }
+
+  /**
+   * Resolves immediately (tests must construct systems and services themselves).
+   * @return  A promise already resolved
+   */
+  public prepareAsync(): Promise<void> {
+    return Promise.resolve();
+  }
+
+  /**
+   * Initializes all systems and services.
+   * @return  Promise resolved when all components are initialized
+   */
+  public initAsync(): Promise<void> {
+    if (this._initPromise) return this._initPromise;
+
+    return this._initPromise = this.prepareAsync()
+      .then(() => {
+        const allSystems = Object.values(this.systems).filter(s => !!s);
+        const allServices = Object.values(this.services).filter(s => !!s);
+        return Promise.all(allSystems.map(s => s.initAsync()))
+          .then(() => Promise.all(allServices.map(s => s.initAsync())));
+      })
+      .then(() => { });  // void return
+  }
+
+  /**
+   * Starts all systems and services that have `autoStart` enabled.
+   * Implicitly calls `initAsync()` first if it hasn't been called yet.
+   * @return  Promise resolved when Rapid is running
+   */
+  public startAsync(): Promise<void> {
+    if (this._startPromise) return this._startPromise;
+
+    return this._startPromise = this.initAsync()
+      .then(() => {
+        const allSystems = Object.values(this.systems).filter(s => !!s);
+        const allServices = Object.values(this.services).filter(s => !!s);
+        return Promise.all(allSystems.map(s => s.autoStart ? s.startAsync() : Promise.resolve()))
+          .then(() => Promise.all(allServices.map(s => s.autoStart ? s.startAsync() : Promise.resolve())));
+      })
+      .then(() => { });  // void return
+  }
+
+  /**
+   * Convenience method that calls `prepareAsync()`, `initAsync()`, and `startAsync()`.
+   * @return  Promise resolved when Rapid is fully running
+   */
+  public runAsync(): Promise<void> {
+    return this.startAsync();
+  }
+
+  /**
+   * Call after completing an edit session to reset any internal state.
+   * @return  Promise resolved when Rapid is finished resetting
+   */
+  public resetAsync(): Promise<void> {
+    if (this._resetPromise) return this._resetPromise;
+
+    const allSystems = Object.values(this.systems).filter(s => !!s);
+    const allServices = Object.values(this.services).filter(s => !!s);
+
+    return this._resetPromise = Promise.resolve()
+      .then(() => Promise.all(allSystems.map(s => s.resetAsync())))
+      .then(() => Promise.all(allServices.map(s => s.resetAsync())))
+      .then(() => { })  // void return
+      .finally(() => { this._resetPromise = null; });
+  }
+
+
   /** Stub event emitter — no-ops and returns `this` for chaining */
   public on()          { return this; }
   /** Stub event emitter — no-ops and returns `this` for chaining */
