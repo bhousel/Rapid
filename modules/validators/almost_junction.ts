@@ -70,8 +70,6 @@ export function validateAlmostJunction(context: Context): ValidatorFunction {
     if (!isHighway(entity)) return result;
     if (entity.isDegenerate()) return result;
 
-//todo: using tree like this may be problematic - it may not reflect the graph we are validating
-    const tree = editor.tree;
     const way = entity as OsmWay;
     const extendableNodeInfos = findConnectableEndNodesByExtension(way, graph);
 
@@ -387,14 +385,14 @@ export function validateAlmostJunction(context: Context): ValidatorFunction {
       const extTipLoc = vecInterp(midNode.loc!, tipNode.loc!, t);
 
       // then, check if the extension part [tipNode.loc -> extTipLoc] intersects any other ways
-      const segmentInfos = tree.waySegments(queryExtent, graph);
+      const segmentInfos = editor.waySegments(queryExtent, graph);
       for (const segmentInfo of segmentInfos) {
-        const way2 = graph.entity(segmentInfo.wayId) as OsmWay;
+        const way2 = graph.entity(segmentInfo.wayID) as OsmWay;
 
         if (!isHighway(way2)) continue;
         if (!canConnectWays(way, way2)) continue;
 
-        const edge: [EntityID, EntityID] = segmentInfo.nodes.slice(0, 2);
+        const edge: [EntityID, EntityID] = segmentInfo.edge;
         if (edge[0] === tipNodeID || edge[1] === tipNodeID) continue;
 
         const nA = graph.entity(edge[0]) as OsmNode;

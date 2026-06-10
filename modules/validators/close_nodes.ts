@@ -1,6 +1,5 @@
-import { Extent, geoMetersToLat, geoMetersToLon, geoSphericalDistance } from '@rapid-sdk/math';
-
 import { actionMergeNodes } from '../actions/merge_nodes.ts';
+import { Extent, projWgs84ToWorld, geoSphericalDistance } from '@rapid-sdk/math';
 import { ValidationIssue } from '../lib/ValidationIssue.ts';
 import { ValidationFix } from '../lib/ValidationFix.ts';
 
@@ -9,6 +8,7 @@ import type { D3Selection } from 'd3-selection';
 import type { Graph } from '../lib/Graph.ts';
 import type { OsmEntity, OsmNode, OsmWay } from '../data/types.ts';
 import type { ValidatorFunction, ValidatorResult } from './types.ts';
+import type { Vec2 } from '@rapid-sdk/math';
 
 
 type WayType = 'boundary' | 'indoor' | 'building' | 'path' | 'other';
@@ -25,6 +25,7 @@ export function validateCloseNodes(context: Context): ValidatorFunction {
   const editor = context.systems.editor!;
   const l10n = context.systems.l10n!;
   const schema = context.systems.schema;
+  const spatial = context.systems.spatial!;
 
   const pointThresholdMeters = 0.2;
 
@@ -199,48 +200,64 @@ export function validateCloseNodes(context: Context): ValidatorFunction {
 
 
     /**
-     * Checks a detached point for nearby points within the threshold.
-     * @param node - The detached point node
-     * @returns Array of close-node issues with nearby points
+     * Generate a query box for the spatial system, given a center and a padding.
+     * @param   loc      - center coordinate (in WGS84 coordinates)
+     * @param   padding  - padding disatance (in meters)
+     * @returns Box object with `minX`,`minY`,`maxX`,`maxY` properties
+     */
+    function queryBox(loc: Vec2, padding: number) {
+      const extent = new Extent(loc).padByMeters(padding);
+
+      // Convert the WGS84 extent to a world-coordinate box.
+      const bb = extent.bbox();
+      const [ax, ay] = projWgs84ToWorld([bb.minX, bb.minY]);
+      const [bx, by] = projWgs84ToWorld([bb.maxX, bb.maxY]);
+      return {
+        minX: Math.min(ax, bx),
+        minY: Math.min(ay, by),
+        maxX: Math.max(ax, bx),
+        maxY: Math.max(ay, by)
+      };
+    }
+
+
+    /**
+     * Checks a node for nearby other nodes within the threshold.
+     * @param    node - The standalone point node
+     * @returns  Array of close-node issues with nearby points
      */
     function getIssuesForPoint(node: OsmNode): ValidationIssue[] {
       const issues: ValidationIssue[] = [];
-      const lon = node.loc![0];
-      const lat = node.loc![1];
-      const lon_range = geoMetersToLon(pointThresholdMeters, lat) / 2;
-      const lat_range = geoMetersToLat(pointThresholdMeters) / 2;
-      const queryExtent = new Extent(
-        [lon - lon_range, lat - lat_range],
-        [lon + lon_range, lat + lat_range]
-      );
 
-//todo: using tree like this may be problematic - it may not reflect the graph we are validating
-// update: it's probably ok, as `tree.intersects` will reset the tree to the graph are using..
-// (although this will surely hurt performance)
-      const intersected = editor.tree.intersects(queryExtent, graph);
+      const box = queryBox(node.loc!, pointThresholdMeters);
+      const spatialID = editor.spatialIDForGraph(graph);
+      const hits = spatial.getDataAtBox(spatialID, box);
 
-      for (const nearby of intersected) {
-        if (nearby.id === node.id) continue;  // ignore self
-        if (nearby.type !== 'node' || nearby.geometry(graph) !== 'point') continue;
+      const isNode1Stol = (node.tags['memorial:type'] === 'stolperstein' || node.tags['memorial'] === 'stolperstein');
 
-        if ((nearby as OsmNode).loc === node.loc || geoSphericalDistance(node.loc!, (nearby as OsmNode).loc!) < pointThresholdMeters) {
-          // ignore stolperstein (https://wiki.openstreetmap.org/wiki/DE:Stolpersteine)
-          if ('memorial:type' in node.tags && 'memorial:type' in nearby.tags && node.tags['memorial:type']==='stolperstein' && nearby.tags['memorial:type']==='stolperstein') continue;
-          if ('memorial' in node.tags && 'memorial' in nearby.tags && node.tags.memorial==='stolperstein' && nearby.tags.memorial === 'stolperstein') continue;
+      for (const hit of hits) {
+        const other = hit.contents as OsmNode;
+        if (other.id === node.id) continue;  // skip self
+        if (other.type !== 'node' || other.geometry(graph) !== 'point') continue;   // standalone points only
 
-          // allow very close points if tags indicate the z-axis might vary
-          const zAxisKeys = { layer: true, level: true, 'addr:housenumber': true, 'addr:unit': true };
-          let zAxisDifferentiates = false;
-          for (const key in zAxisKeys) {
-            const nodeValue = node.tags[key] || '0';
-            const nearbyValue = nearby.tags[key] || '0';
-            if (nodeValue !== nearbyValue) {
-              zAxisDifferentiates = true;
-              break;
-            }
+        // Ignore stolperstein (https://wiki.openstreetmap.org/wiki/DE:Stolpersteine), they are expected to be close.
+        const isNode2Stol = (other.tags['memorial:type'] === 'stolperstein' || other.tags['memorial'] === 'stolperstein');
+        if (isNode1Stol && isNode2Stol) continue;
+
+        // Allow very close points if tags indicate that they exist on different levels.
+        const zAxisKeys = ['layer', 'level', 'addr:housenumber', 'addr:unit'];
+        let isDifferentLevel = false;
+        for (const key of zAxisKeys) {
+          const nodeValue = node.tags[key] || '0';
+          const nearbyValue = other.tags[key] || '0';
+          if (nodeValue !== nearbyValue) {
+            isDifferentLevel = true;
+            break;
           }
-          if (zAxisDifferentiates) continue;
+        }
+        if (isDifferentLevel) continue;
 
+        if (other.loc === node.loc || geoSphericalDistance(node.loc!, other.loc!) < pointThresholdMeters) {
           issues.push(new ValidationIssue(context, {
             type: type,
             subtype: 'detached',
@@ -255,7 +272,7 @@ export function validateCloseNodes(context: Context): ValidatorFunction {
               }) : '';
             },
             reference: showReference,
-            entityIds: [node.id, nearby.id],
+            entityIds: [node.id, other.id],
             dynamicFixes: function() {
               return [
                 new ValidationFix({

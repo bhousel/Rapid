@@ -21,7 +21,6 @@ export function uiSectionRawMembershipEditor(context) {
     const map = context.systems.map;
     const schema = context.systems.schema;
     const taginfo = context.services.taginfo;
-    const viewport = context.viewport;
 
     var section = uiSection(context, 'raw-membership-editor')
         .shouldDisplay(function() {
@@ -277,8 +276,7 @@ export function uiSectionRawMembershipEditor(context) {
             });
 
         } else {
-            const extent = viewport.visibleExtent();
-            editor.intersects(extent).forEach(function(entity) {
+            editor.intersects().forEach(function(entity) {
                 if (entity.type !== 'relation' || entity.id === entityID) return;
 
                 var value = baseDisplayValue(entity);

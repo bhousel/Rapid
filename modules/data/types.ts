@@ -13,6 +13,7 @@ export type { OsmChangeset, OsmChangesetProps } from './OsmChangeset.ts';
 export type { OsmNode, OsmNodeProps } from './OsmNode.ts';
 export type { OsmRelation, OsmRelationProps, OsmRelationMember, IndexedMember } from './OsmRelation.ts';
 export type { OsmWay, OsmWayProps } from './OsmWay.ts';
+export type { Segment } from './OsmWay.ts';
 
 /** OSM tags as key-value string pairs */
 export type OsmTags = Record<string, string>;

@@ -839,11 +839,11 @@ describe('OsmWay', () => {
       assert.lengthOf(result, 2);
 
       const segment0 = result[0];
-      assert.deepInclude(segment0, { id: 'w1-0', wayId: 'w1', index: 0, nodes: ['a', 'b'] });
+      assert.deepInclude(segment0, { id: 'w1-0', wayID: 'w1', index: 0, edge: ['a', 'b'] });
       assert.deepEqual(segment0.extent(graph), new Rapid.sdk.Extent([0.0000, -0.0002], [0.0002, 0.0000]));
 
       const segment1 = result[1];
-      assert.deepInclude(segment1, { id: 'w1-1', wayId: 'w1', index: 1, nodes: ['b', 'c'] });
+      assert.deepInclude(segment1, { id: 'w1-1', wayID: 'w1', index: 1, edge: ['b', 'c'] });
       assert.deepEqual(segment1.extent(graph), new Rapid.sdk.Extent([-0.0002, -0.0002], [0.0002, -0.0002]));
     });
   });

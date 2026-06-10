@@ -211,7 +211,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
 
     context.loadTiles();  // Load tiles of OSM data to cover the view
 
-    let entities = editor.intersects(context.viewport.visibleExtent());   // Gather data in view
+    let entities = editor.intersects();   // Gather data in view
     entities = filters.filterScene(entities, graph);   // Apply feature filters
 
     const data: OsmData = {

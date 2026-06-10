@@ -1,7 +1,7 @@
 import { AbstractSystem } from './AbstractSystem.ts';
-import { Difference, Edit, Graph, Tree } from '../lib/index.ts';
+import { Difference, Edit, Graph } from '../lib/index.ts';
 import { easeLinear as d3_easeLinear } from 'd3-ease';
-import { Extent, geoScaleToZoom } from '@rapid-sdk/math';
+import { Extent, geoScaleToZoom, projWgs84ToWorld } from '@rapid-sdk/math';
 import { OsmEntity, createOsmEntity } from '../data/index.ts';
 import { select as d3_select } from 'd3-selection';
 import { uiLoading } from '../ui/loading.js';
@@ -9,8 +9,19 @@ import { utilArrayGroupBy, utilObjectOmit, utilSessionMutex } from '@rapid-sdk/u
 
 import type { Context } from '../Context.ts';
 import type { Action } from '../actions/types.ts';
-import type { OsmEntityProps, OsmRelation, OsmTags } from '../data/types.ts';
+import type { OsmEntityProps, OsmNode, OsmRelation, OsmTags, OsmWay, Segment } from '../data/types.ts';
+import type { SpatialItem } from './SpatialSystem.ts';
 import type { TransformProps, Vec2 } from '@rapid-sdk/math';
+
+
+/** SpatialID of the OSM spatial cache reflecting the unedited base graph */
+const OSM_BASE: SpatialID = 'osm-base';
+/** SpatialID of the OSM spatial cache reflecting the latest committed (stable) graph */
+const OSM_STABLE: SpatialID = 'osm-stable';
+/** SpatialID of the OSM spatial cache reflecting the work-in-progress (staging) graph */
+const OSM_STAGING: SpatialID = 'osm-staging';
+/** Name of the segments index within an OSM spatial cache */
+const SEGMENTS = 'segments';
 
 
 /** Options for commit/commitAppend */
@@ -179,8 +190,8 @@ export class EditSystem extends AbstractSystem {
   protected _inTransition: boolean;
   /** Whether a transaction is open (suppresses intermediate change events) */
   protected _inTransaction: boolean;
-  /** R-tree spatial index for fast entity lookup by bounding box */
-  protected _tree: Tree;
+  /** Per-cache tracking of which segment box ids belong to each way, so they can be removed later */
+  protected _osmSegmentIDs: Map<SpatialID, Map<EntityID, EntityID[]>>;
 
   /** Whether the most recent localStorage backup succeeded */
   protected _backupStatus: boolean;
@@ -218,7 +229,7 @@ export class EditSystem extends AbstractSystem {
     this._checkpoints = new Map<CheckpointID, Checkpoint>();
     this._inTransition = false;
     this._inTransaction = false;
-    this._tree = null!;
+    this._osmSegmentIDs = new Map();
 
     this._backupStatus = true;
     this._stableKey = null;
@@ -320,7 +331,15 @@ export class EditSystem extends AbstractSystem {
     const staging = new Edit({ graph: currGraph });
     this._staging = staging;
     this._hasWorkInProgress = false;
-    this._tree = new Tree(currGraph, 'osm');
+
+    // Clear the OSM spatial caches and segment tracking.
+    const spatial = this.context.systems.spatial;
+    if (spatial) {
+      spatial.clearCache(OSM_BASE);
+      spatial.clearCache(OSM_STABLE);
+      spatial.clearCache(OSM_STAGING);
+    }
+    this._osmSegmentIDs = new Map();
 
     this._stableKey = baseGraph.key;
     this._stableSnapshot = baseGraph.snapshot();
@@ -363,14 +382,6 @@ export class EditSystem extends AbstractSystem {
    */
   public get staging(): Edit {
     return this._staging;
-  }
-
-  /**
-   * The tree is a spatial index that keeps itself in sync with the `staging` graph.
-   * @return The Tree (spatial index)
-   */
-  public get tree(): Tree {
-    return this._tree;
   }
 
   /**
@@ -793,7 +804,11 @@ export class EditSystem extends AbstractSystem {
     graphs.push(stagingGraph);
 
     baseGraph.rebase(entities, graphs, false);  // force = false
-    this._tree.rebase(entities, false);         // force = false
+
+    // Newly downloaded data should appear in every OSM cache (unless locally overridden).
+    this._mergeIntoCache(OSM_BASE, baseGraph, entities);
+    this._mergeIntoCache(OSM_STABLE, this.stable.graph!, entities);
+    this._mergeIntoCache(OSM_STAGING, this.staging.graph!, entities);
 
     this.emit('merge', effectiveSeenIDs);
   }
@@ -850,12 +865,63 @@ export class EditSystem extends AbstractSystem {
 
 
   /**
-   * Returns the entities from the `staging` graph with bounding boxes overlapping the given `extent`.
-   * @param extent - the extent to test
-   * @return Entities intersecting the given Extent
+   * Returns the spatialID of the OSM spatial cache that corresponds to the given graph.
+   * Each OSM cache reflects exactly one graph and is kept current by `EditSystem`.
+   * @param graph - a graph (typically the base, stable, or staging graph)
+   * @return the matching spatialID; defaults to the staging cache if no match
    */
-  public intersects(extent: Extent): OsmEntity[] {
-    return this._tree.intersects(extent, this.staging.graph!);
+  public spatialIDForGraph(graph: Graph): SpatialID {
+    if (graph === this.base.graph) return OSM_BASE;
+    if (graph === this.stable.graph) return OSM_STABLE;
+    return OSM_STAGING;
+  }
+
+
+  /**
+   * Returns the OSM entities visible in the current map view, resolved against the given graph.
+   * (This replaces the old `Tree.intersects`.)
+   * @param graph - the graph to resolve entities against (defaults to the staging graph)
+   * @return Entities visible in the current map view
+   */
+  public intersects(graph?: Graph): OsmEntity[] {
+    const spatial = this.context.systems.spatial;
+    if (!spatial) return [];
+
+    const useGraph = graph ?? this.staging.graph!;
+    const spatialID = this.spatialIDForGraph(useGraph);
+
+    const results: OsmEntity[] = [];
+    for (const hit of spatial.getVisibleData(spatialID)) {
+      const entity = useGraph.hasEntity(hit.boxID);
+      if (entity) results.push(entity);
+    }
+    return results;
+  }
+
+
+  /**
+   * Returns the way Segments whose bounding boxes intersect the given extent.
+   * (This replaces the old `Tree.waySegments`.)
+   * @param extent - the extent to test (WGS84 lon/lat)
+   * @param graph - the graph to resolve segments against
+   * @return Array of way Segments intersecting the extent
+   */
+  public waySegments(extent: Extent, graph: Graph): Segment[] {
+    const spatial = this.context.systems.spatial;
+    if (!spatial) return [];
+
+    const spatialID = this.spatialIDForGraph(graph);
+
+    // Convert the WGS84 query extent to a world-coordinate box.
+    const bb = extent.bbox();
+    const [ax, ay] = projWgs84ToWorld([bb.minX, bb.minY]);
+    const [bx, by] = projWgs84ToWorld([bb.maxX, bb.maxY]);
+    const box = {
+      minX: Math.min(ax, bx), minY: Math.min(ay, by),
+      maxX: Math.max(ax, bx), maxY: Math.max(ay, by)
+    };
+
+    return spatial.getItemsAtBox(spatialID, SEGMENTS, box).map(hit => hit.contents as Segment);
   }
 
 
@@ -1274,7 +1340,11 @@ export class EditSystem extends AbstractSystem {
       const baseEntityIDs = new Set<EntityID>(__baseEntities.keys());
       const baseGraph = this.base.graph!;
       baseGraph.rebase(baseEntities, [baseGraph], true);   // force = true
-      this._tree.rebase(baseEntities, true);               // force = true
+
+      // Seed every OSM cache with the restored base data.
+      this._mergeIntoCache(OSM_BASE, baseGraph, baseEntities);
+      this._mergeIntoCache(OSM_STABLE, this.stable.graph!, baseEntities);
+      this._mergeIntoCache(OSM_STAGING, this.staging.graph!, baseEntities);
 
       // Reconstruct the edit history, each Graph derives from the previous one..
       // Start at i = 1, leaving base edit alone, the first edit will have nothing in it.
@@ -1509,6 +1579,165 @@ export class EditSystem extends AbstractSystem {
 
 
   /**
+   * Update an OSM spatial cache to reflect the changes in a `Difference`.
+   * Called immediately before emitting the corresponding change event, so that
+   *  listeners can rely on the spatial cache being current.
+   * @param spatialID - the OSM spatial cache to update (e.g. 'osm-staging' or 'osm-stable')
+   * @param graph - the head graph of the difference (staging or stable)
+   * @param diff - the difference to apply
+   */
+  protected _syncCacheFromDiff(spatialID: SpatialID, graph: Graph, diff: Difference): void {
+    const spatial = this.context.systems.spatial;
+    if (!spatial) return;
+
+    // `complete()` includes the changed entities plus their affected parents/children.
+    // A value of `undefined` means the entity no longer exists in the head graph.
+    const complete = diff.complete();
+
+    const toReplace: OsmEntity[] = [];
+    const toRemove: EntityID[] = [];
+    for (const [entityID, entity] of complete) {
+      if (entity) {
+        toReplace.push(entity);
+      } else {
+        toRemove.push(entityID);
+      }
+    }
+
+    spatial.removeData(spatialID, toRemove);
+    spatial.replaceData(spatialID, toReplace);
+
+    // Keep way segments in sync for any affected ways.
+    for (const entityID of toRemove) {
+      this._removeWaySegments(spatialID, entityID);  // safe even if it wasn't a way
+    }
+    for (const entity of toReplace) {
+      if (entity.type === 'way') {
+        this._updateWaySegments(spatialID, entity as OsmWay, graph);
+      }
+    }
+  }
+
+
+  /**
+   * Merge newly-downloaded entities into an OSM cache that reflects the given graph.
+   * New base data should appear in the cache unless the graph locally overrides or deletes it.
+   * @param spatialID - the OSM spatial cache to update
+   * @param graph - the graph this cache reflects (base, stable, or staging)
+   * @param entities - the newly-merged entities
+   */
+  protected _mergeIntoCache(spatialID: SpatialID, graph: Graph, entities: OsmEntity[]): void {
+    const spatial = this.context.systems.spatial;
+    if (!spatial) return;
+
+    const toReplace: OsmEntity[] = [];
+    for (const entity of entities) {
+      const current = graph.hasEntity(entity.id);  // a local override or deletion wins
+      if (current?.visible) {
+        toReplace.push(current);
+      } else {
+        spatial.removeData(spatialID, entity.id);
+        this._removeWaySegments(spatialID, entity.id);
+      }
+    }
+
+    spatial.replaceData(spatialID, toReplace);
+
+    for (const entity of toReplace) {
+      if (entity.type === 'way') {
+        this._updateWaySegments(spatialID, entity as OsmWay, graph);
+      }
+    }
+  }
+
+
+  /**
+   * Get (or create) the per-way segment-id tracking map for an OSM cache.
+   * @param spatialID - the OSM spatial cache
+   * @return Map of wayID to its segment box ids
+   */
+  protected _segmentTracker(spatialID: SpatialID): Map<EntityID, EntityID[]> {
+    let tracker = this._osmSegmentIDs.get(spatialID);
+    if (!tracker) {
+      tracker = new Map<EntityID, EntityID[]>();
+      this._osmSegmentIDs.set(spatialID, tracker);
+    }
+    return tracker;
+  }
+
+
+  /**
+   * Build `SpatialItem`s (with world-coordinate extents) for a way's segments.
+   * @param way - the way whose segments to build
+   * @param graph - the graph holding the node positions
+   * @return Array of SpatialItems, one per segment
+   */
+  protected _segmentItems(way: OsmWay, graph: Graph): SpatialItem[] {
+    const items: SpatialItem[] = [];
+    for (const seg of way.segments(graph)) {
+      const n0 = graph.hasEntity(seg.edge[0]) as OsmNode | undefined;
+      const n1 = graph.hasEntity(seg.edge[1]) as OsmNode | undefined;
+      if (!n0?.loc || !n1?.loc) continue;
+
+      const [ax, ay] = projWgs84ToWorld(n0.loc);
+      const [bx, by] = projWgs84ToWorld(n1.loc);
+      const extent = new Extent(
+        [Math.min(ax, bx), Math.min(ay, by)],
+        [Math.max(ax, bx), Math.max(ay, by)]
+      );
+      items.push({ id: seg.id, extent, contents: seg });
+    }
+    return items;
+  }
+
+
+  /**
+   * Add or update a way's segments in an OSM spatial cache, tracking the segment ids
+   *  so they can be removed later even if the segment count changes.
+   * @param spatialID - the OSM spatial cache to update
+   * @param way - the way whose segments to index
+   * @param graph - the graph holding the node positions
+   */
+  protected _updateWaySegments(spatialID: SpatialID, way: OsmWay, graph: Graph): void {
+    const spatial = this.context.systems.spatial;
+    if (!spatial) return;
+
+    const tracker = this._segmentTracker(spatialID);
+    const prevIDs = tracker.get(way.id);
+    if (prevIDs?.length) {
+      spatial.removeItems(spatialID, SEGMENTS, prevIDs);
+    }
+
+    const items = this._segmentItems(way, graph);
+    if (items.length) {
+      spatial.replaceItems(spatialID, SEGMENTS, items);
+      tracker.set(way.id, items.map(item => item.id));
+    } else {
+      tracker.delete(way.id);
+    }
+  }
+
+
+  /**
+   * Remove a way's tracked segments from an OSM spatial cache.
+   * No-op if the id is not a tracked way.
+   * @param spatialID - the OSM spatial cache to update
+   * @param wayID - the wayID whose segments to remove
+   */
+  protected _removeWaySegments(spatialID: SpatialID, wayID: EntityID): void {
+    const spatial = this.context.systems.spatial;
+    if (!spatial) return;
+
+    const tracker = this._segmentTracker(spatialID);
+    const prevIDs = tracker.get(wayID);
+    if (prevIDs?.length) {
+      spatial.removeItems(spatialID, SEGMENTS, prevIDs);
+    }
+    tracker.delete(wayID);
+  }
+
+
+  /**
    * Recalculate the differences and emit `stablechange` and `stagingchange` events.
    * @return Difference between before and after of `staging` Edit
    */
@@ -1525,6 +1754,7 @@ export class EditSystem extends AbstractSystem {
     // We still want to generate an empty Difference and emit 'stagingchange' in these situations.
     if (this._stagingKey !== stagingGraph.key || this._hasWorkInProgress) {
       stagingDifference = new Difference(this._stagingSnapshot!, stagingGraph);
+      this._syncCacheFromDiff(OSM_STAGING, stagingGraph, stagingDifference);
       this._stagingKey = stagingGraph.key;
       this._stagingSnapshot = stagingGraph.snapshot();
       this.emit('stagingchange', stagingDifference);
@@ -1533,6 +1763,7 @@ export class EditSystem extends AbstractSystem {
     if (this._stableKey !== stableGraph.key) {
       this._fullDifference = new Difference(baseGraph, stableGraph);
       const stableDifference = new Difference(this._stableSnapshot!, stableGraph);
+      this._syncCacheFromDiff(OSM_STABLE, stableGraph, stableDifference);
       this._stableKey = stableGraph.key;
       this._stableSnapshot = stableGraph.snapshot();
       this.emit('stablechange', stableDifference);

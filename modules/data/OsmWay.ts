@@ -34,9 +34,9 @@ export interface OsmWayProps extends OsmEntityProps {
  */
 export interface Segment {
   id: string;
-  wayId: string;
+  wayID: string;
   index: number;
-  nodes: [EntityID, EntityID];
+  edge: [EntityID, EntityID];
   extent: (graph: Graph) => Extent | undefined;
 }
 
@@ -474,12 +474,12 @@ export class OsmWay extends OsmEntity {
   public segments(graph: Graph): Segment[] {
 
     /**
-     *
+     * Calculates the extent of this segment.
      * @param graph
      */
     function segmentExtent(this: Segment, graph: Graph): Extent | undefined {
-      const n1 = graph.hasEntity(this.nodes[0]) as OsmNode;
-      const n2 = graph.hasEntity(this.nodes[1]) as OsmNode;
+      const n1 = graph.hasEntity(this.edge[0]) as OsmNode;
+      const n2 = graph.hasEntity(this.edge[1]) as OsmNode;
       return n1?.loc && n2?.loc && new Extent(
         [ Math.min(n1.loc[0], n2.loc[0]), Math.min(n1.loc[1], n2.loc[1]) ],
         [ Math.max(n1.loc[0], n2.loc[0]), Math.max(n1.loc[1], n2.loc[1]) ]
@@ -491,9 +491,9 @@ export class OsmWay extends OsmEntity {
       for (let i = 0; i < this.nodes.length - 1; i++) {
         segments.push({
           id: this.id + '-' + i,
-          wayId: this.id,
+          wayID: this.id,
           index: i,
-          nodes: [this.nodes[i], this.nodes[i + 1]],
+          edge: [this.nodes[i], this.nodes[i + 1]],
           extent: segmentExtent
         });
       }

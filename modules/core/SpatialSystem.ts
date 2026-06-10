@@ -6,7 +6,7 @@ import { type OneOrMore, utilIterable } from '../util/iterable.ts';
 import type { AbstractData } from '../data/AbstractData.ts';
 import type { BBox } from 'rbush';
 import type { Context } from '../Context.ts';
-import type { Tile, Vec2 } from '@rapid-sdk/math';
+import type { Extent, Tile, Vec2 } from '@rapid-sdk/math';
 
 
 /** Convenience type - boxes are identified by either a data or tile ID */
@@ -32,6 +32,20 @@ export interface SpatialBox extends BBox {
    * The associated object (data, tile, segment, buffer, …).
    * Its meaning is known only to the calling code, not to the SpatialSystem.
    */
+  contents: unknown;
+}
+
+/**
+ * An item to insert into a generic named index.
+ * The caller supplies the id, a world-coordinate extent, and the contents to store.
+ * (Used by `replaceItems` - the SpatialSystem has no knowledge of what `contents` means.)
+ */
+export interface SpatialItem {
+  /** Unique identifier for this item within its index */
+  id: BoxID;
+  /** Bounding extent, in world coordinates */
+  extent: Extent;
+  /** The object to store (meaning known only to the calling code) */
   contents: unknown;
 }
 
@@ -221,6 +235,67 @@ export class SpatialSystem extends AbstractSystem {
         this.clearCache(spatialID);
       }
     }
+  }
+
+
+  /**
+   * Insert or update items in an arbitrary named index.
+   * This is the generic, domain-agnostic way to index things (e.g. way segments, buffers)
+   *  that aren't `AbstractData` or `Tile`.  The caller supplies the world-coordinate extent.
+   * @param spatialID - the spatial cache to insert into
+   * @param indexID - the named index to insert into (e.g. 'segments')
+   * @param items - items to insert or replace
+   */
+  public replaceItems(spatialID: SpatialID, indexID: string, items: OneOrMore<SpatialItem>): void {
+    const index = this.getIndex(spatialID, indexID);
+
+    const toInsert: SpatialBox[] = [];
+    for (const item of utilIterable(items)) {
+      if (!item) continue;
+
+      // remove existing..
+      this._removeBox(index, item.id);
+
+      // insert new..
+      const box = item.extent.bbox() as SpatialBox;
+      box.boxID = item.id;
+      box.kind = indexID;
+      box.contents = item.contents;
+
+      index.boxes.set(item.id, box);
+      toInsert.push(box);
+    }
+
+    this._insertBoxes(index, toInsert);
+  }
+
+
+  /**
+   * Remove items from an arbitrary named index.
+   * @param spatialID - the spatial cache to remove from
+   * @param indexID - the named index to remove from (e.g. 'segments')
+   * @param ids - the item ids to remove
+   */
+  public removeItems(spatialID: SpatialID, indexID: string, ids: OneOrMore<BoxID>): void {
+    const index = this.getIndex(spatialID, indexID);
+
+    for (const id of utilIterable(ids)) {
+      if (!id) continue;
+      this._removeBox(index, id);
+    }
+  }
+
+
+  /**
+   * Search for items in an arbitrary named index within the given search box.
+   * @param spatialID - the spatial cache to search
+   * @param indexID - the named index to search (e.g. 'segments')
+   * @param box - the search box (make sure to use world coordinates here)
+   * @return Array of boxes in the given search box
+   */
+  public getItemsAtBox(spatialID: SpatialID, indexID: string, box: BBox): SpatialBox[] {
+    const index = this.getIndex(spatialID, indexID);
+    return index.rbush.search(box);
   }
 
 

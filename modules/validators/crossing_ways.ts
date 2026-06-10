@@ -104,13 +104,8 @@ export function validateCrossingWays(context: Context): ValidatorFunction {
     const result: ValidatorResult = { issues: [] };
     if (!schema) return result;
 
-// note: using tree like this may be problematic - it may not reflect the graph we are validating.
-// update: it's probably ok, as `tree.waySegments` will reset the tree to the graph are using..
-// (although this will surely hurt performance)
-    const tree = editor.tree;
-
     for (const way of waysToCheck(entity, graph)) {
-      for (const crossing of detectCandidateCrossings(way, graph, tree)) {
+      for (const crossing of detectCandidateCrossings(way, graph)) {
         result.issues.push(createIssue(crossing, graph));
       }
     }
@@ -364,10 +359,9 @@ export function validateCrossingWays(context: Context): ValidatorFunction {
    * Finds locations where a way's segments intersect segments of other ways.
    * @param way1 - The way to check
    * @param graph - The current graph
-   * @param tree - The spatial index tree
    * @returns Array of crossing details
    */
-  function detectCandidateCrossings(way1: OsmWay, graph: Graph, tree: any): CrossingInfo[] {
+  function detectCandidateCrossings(way1: OsmWay, graph: Graph): CrossingInfo[] {
     if (way1.type !== 'way') return [];
 
     const entity1 = getTaggedEntityForWay(way1, graph);
@@ -388,16 +382,16 @@ export function validateCrossingWays(context: Context): ValidatorFunction {
       );
 
       // Optimize by only checking overlapping segments, not every segment of overlapping ways
-      const segments = tree.waySegments(extent, graph);
+      const segments = editor.waySegments(extent, graph);
 
       for (const segment of segments) {
         // Don't check for self-intersection in this validation
-        if (segment.wayId === way1.id) continue;
+        if (segment.wayID === way1.id) continue;
 
         // Skip if this way was already checked and only one issue is needed
-        if (seenWayIDs.has(segment.wayId)) continue;
+        if (seenWayIDs.has(segment.wayID)) continue;
 
-        const way2 = graph.hasEntity(segment.wayId) as OsmWay | undefined;
+        const way2 = graph.hasEntity(segment.wayID) as OsmWay | undefined;
         if (!way2) continue;
 
         const entity2 = getTaggedEntityForWay(way2, graph);
@@ -405,8 +399,8 @@ export function validateCrossingWays(context: Context): ValidatorFunction {
         const tags2 = entity2.tags;
         if (type2 === null || isLegitCrossing(tags1, type1, tags2, type2)) continue;
 
-        const nAId = segment.nodes[0];
-        const nBId = segment.nodes[1];
+        const nAId = segment.edge[0];
+        const nBId = segment.edge[1];
 
         // n1 or n2 is a connection node; skip
         if (nAId === n1.id || nAId === n2.id || nBId === n1.id || nBId === n2.id) continue;

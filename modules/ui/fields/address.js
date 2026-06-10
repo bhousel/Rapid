@@ -9,8 +9,8 @@ import { utilGetSetValue, utilNoAuto, utilRebind } from '../../util/index.ts';
 
 export function uiFieldAddress(context, uifield) {
   const assets = context.systems.assets;
-  const editor = context.systems.editor;
   const l10n = context.systems.l10n;
+  const spatial = context.systems.spatial;
   const dispatch = d3_dispatch('change');
 
   let _selection = d3_select(null);
@@ -36,14 +36,38 @@ export function uiFieldAddress(context, uifield) {
     .catch(e => console.error(e));  // eslint-disable-line
 
 
-  function getNearbyStreets() {
-    const center = uifield.entityExtent.center();
-    const point = projWgs84ToWorld(center);
-    const box = new Extent(center).padByMeters(200);
+  /**
+   * Generate a query box for the spatial system, given a center and a padding.
+   * @param   loc      - center coordinate (in WGS84 coordinates)
+   * @param   padding  - padding disatance (in meters)
+   * @returns Box object with `minX`,`minY`,`maxX`,`maxY` properties
+   */
+  function queryBox(loc, padding) {
+    const extent = new Extent(loc).padByMeters(padding);
 
-    const streets = editor.intersects(box)
+    // Convert the WGS84 extent to a world-coordinate box.
+    const bb = extent.bbox();
+    const [ax, ay] = projWgs84ToWorld([bb.minX, bb.minY]);
+    const [bx, by] = projWgs84ToWorld([bb.maxX, bb.maxY]);
+    return {
+      minX: Math.min(ax, bx),
+      minY: Math.min(ay, by),
+      maxX: Math.max(ax, bx),
+      maxY: Math.max(ay, by)
+    };
+  }
+
+
+  function getNearbyStreets() {
+    const loc = uifield.entityExtent.center();
+    const point = projWgs84ToWorld(loc);
+    const box = queryBox(loc, 200);
+
+    const streets = spatial.getDataAtBox('osm-staging', box)
+      .map(hit => hit.contents)
       .filter(isAddressableStreet)
       .map(way => {
+        // Sort by distance to the addressable streets in the query box.
         // A way will have LineString or Polygon geometry. We can use 'outer' to get these points.
         const line = way.geoms.parts[0]?.world?.outer;
         if (!line) return null;
@@ -67,18 +91,25 @@ export function uiFieldAddress(context, uifield) {
 
 
   function getNearbyCities() {
-    const center = uifield.entityExtent.center();
-    const box = new Extent(center).padByMeters(200);
+    const loc = uifield.entityExtent.center();
+    const point = projWgs84ToWorld(loc);
+    const box = queryBox(loc, 200);
 
-    const cities = editor.intersects(box)
+    const cities = spatial.getDataAtBox('osm-staging', box)
+      .map(hit => hit.contents)
       .filter(isAddressableCity)
       .map(d => {
+        // Sort by distance to the center of the cities in the query box
+        const center = d.geoms.world?.extent?.center();
+        if (!center) return null;
+
         return {
           title: d.tags['addr:city'] || d.tags.name,
           value: d.tags['addr:city'] || d.tags.name,
-          dist: geoSphericalDistance(d.extent(editor.staging.graph).center(), center)
+          dist: geoSphericalDistance(point, center)
         };
       })
+      .filter(Boolean)
       .sort((a, b) => a.dist - b.dist);
 
     return utilArrayUniqBy(cities, 'value');
@@ -99,16 +130,22 @@ export function uiFieldAddress(context, uifield) {
 
   // Suggest values that are used by other nearby entities
   function getNearbyValues(key) {
-    const center = uifield.entityExtent.center();
-    const box = new Extent(center).padByMeters(200);
+    const loc = uifield.entityExtent.center();
+    const point = projWgs84ToWorld(loc);
+    const box = queryBox(loc, 200);
 
-    const results = editor.intersects(box)
+    const results = spatial.getDataAtBox('osm-staging', box)
+      .map(hit => hit.contents)
       .filter(entityHasAddressTag)
       .map(d => {
+        // Sort by distance to the center of the addressable OsmEntities in the query box
+        const center = d.geoms.world?.extent?.center();
+        if (!center) return null;
+
         return {
           title: d.tags[key],
           value: d.tags[key],
-          dist: geoSphericalDistance(d.extent(editor.staging.graph).center(), center)
+          dist: geoSphericalDistance(point, center)
         };
       })
       .sort((a, b) => a.dist - b.dist);

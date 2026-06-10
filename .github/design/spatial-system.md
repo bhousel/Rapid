@@ -107,15 +107,23 @@ Caveat: `RBush` indexes bounding boxes only, so a buffer/overlap query is inhere
 
 ## Sequencing
 
-- **Step 0 (this doc):** Capture the decisions and goals.
-- **Step 1:** Generalize `SpatialCache` to named indexes + generic `contents`, with back-compat wrappers. Pure refactor, no behavior change, fully testable.
-- **Step 2:** Delete `Tree`. Move diff/sync into `EditSystem` (driven off the `Difference` it already computes), updating each cache immediately before emitting `merge`/`stablechange`/`stagingchange`. Establish the `osm-base`/`osm-staging`/`osm-stable` caches. Add the `segments` index and repoint the validators (`crossing_ways`, `almost_junction`, `close_nodes`, `ValidationSystem`). Lock in "validators read stable, general code reads staging."
+- **Step 0 (this doc):** Capture the decisions and goals. ✅ Done.
+- **Step 1:** Generalize `SpatialCache` to named indexes + generic `contents`, with back-compat wrappers. Pure refactor, no behavior change, fully testable. ✅ Done.
+- **Step 2:** Delete `Tree`. Move diff/sync into `EditSystem` (driven off the `Difference` it already computes), updating each cache immediately before emitting `merge`/`stablechange`/`stagingchange`. Establish the `osm-base`/`osm-staging`/`osm-stable` caches. Add the `segments` index and repoint the validators (`crossing_ways`, `almost_junction`, `close_nodes`, `ValidationSystem`). Lock in "validators read stable, general code reads staging." ✅ Done.
+  - **Follow-up:** The `crossing_ways` / `almost_junction` unit test suites (`test/unit/validators/*.test.js`) are still `describe.todo` and use a `Rapid.Tree`-based mock harness. They need converting to a real `EditSystem` (populate via `editor.merge`, query via `editor.waySegments`) and re-enabling. The spatial mechanism they depend on is covered by new `EditSystem` `waySegments` tests in the meantime.
 - **Step 3:** Compute buffers in `GeometryPart`, add a `buffers` index, and add the two-phase refine query to `SpatialSystem`.
 - **Step 4:** Build cross-layer conflation queries on top.
 
+### Step 2 implementation notes
+
+- `EditSystem` exposes `intersects(extent, graph?)`, `waySegments(extent, graph)`, and `spatialIDForGraph(graph)`. The first two replace the old `Tree.intersects` / `Tree.waySegments`; callers were repointed.
+- `spatialIDForGraph` maps a graph to `osm-base` / `osm-stable` / `osm-staging` by identity (defaulting to staging). `intersects`/`waySegments` resolve hits through the *passed* graph, so a slight cache/graph mismatch degrades gracefully (missing entities are filtered out) rather than throwing.
+- Segments are stored in the `segments` index in **world coordinates**. `EditSystem._segmentItems` projects each way's node `loc`s to world space; `waySegments` projects the WGS84 query extent to a world box before searching. Per-way segment box ids are tracked in `EditSystem._osmSegmentIDs` so they can be removed even when a way's segment count changes.
+- New base data (from `merge` and `fromJSONAsync`) is pushed into **all three** caches via `_mergeIntoCache`, because the shared base cache means a `Difference` between two derived graphs won't surface unedited base entities.
+
 ## Boundary Summary
 
-- **`SpatialSystem`** — owns *where* things are and answers spatial questions. Generic bbox indexing + two-phase precise refine. No knowledge of OSM, segments, buffers, or photos as concepts.
-- **`EditSystem`** — owns OSM topology/history. Translates graph `Difference`s into spatial updates, generates segments, and decides which named OSM caches exist.
+- **`SpatialSystem`** — owns *where* things are and answers spatial questions. Generic bbox indexing (named indexes via `replaceItems`/`removeItems`/`getItemsAtBox`) + two-phase precise refine. No knowledge of OSM, segments, buffers, or photos as concepts.
+- **`EditSystem`** — owns OSM topology/history. Translates graph `Difference`s into spatial updates, generates segments, owns the `osm-base`/`osm-stable`/`osm-staging` caches, and exposes the OSM spatial queries.
 - **`GeometryPart`** — owns derived geometry (hull, centroid, poi, surround, **buffers**), computed once at `setData` time so data is ready to index.
 - **Data classes (`OsmWay`, etc.)** — own domain meaning (what a segment is, what counts as an interesting tag).

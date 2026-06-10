@@ -57,7 +57,9 @@ export class PixiLayerDebug extends AbstractPixiLayer {
     }
 
     const context = this.context;
+    const editor = context.systems.editor!;
     const spatial = context.systems.spatial!;
+    const graph = editor.staging.graph;
 
     const DEFAULTSTYLE = {
       fill: { color: 0xffff00, opacity: 0.5, width: 1, type: 'full' },  // always fill fully
@@ -110,8 +112,8 @@ export class PixiLayerDebug extends AbstractPixiLayer {
           const style = structuredClone(DEFAULTSTYLE);
           const box: BBox = { minX: worldPoi![0], minY: worldPoi![1], maxX: worldPoi![0], maxY: worldPoi![1] };
           // does this test point hit an OSM building?
-          // note - the spatialID of 'osm' here is currently set by Tree / EditSystem
-          const didHitBuilding = spatial.getDataAtBox('osm', box).some(hit => _isBuilding(hit.contents as OsmEntity));
+          const spatialID = editor.spatialIDForGraph(graph);
+          const didHitBuilding = spatial.getDataAtBox(spatialID, box).some(hit => _isBuilding(hit.contents as OsmEntity));
 
           if (didHitBuilding) {
             // console.log(`${dataID} id hit osm building ${didHitBuilding.contents.id}`);

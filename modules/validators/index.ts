@@ -12,9 +12,9 @@
 export type { ValidatorFactory, ValidatorFunction, ValidatorResult } from './types.ts';
 
 // Validators
-// export { validateAlmostJunction } from './almost_junction.ts';  // TODO FIX Tree.waySegments
+export { validateAlmostJunction } from './almost_junction.ts';
 export { validateAmbiguousCrossingTags } from './ambiguous_crossing_tags.ts';
-// export { validateCrossingWays } from './crossing_ways.ts';   // TODO FIX Tree.waySegments
+export { validateCrossingWays } from './crossing_ways.ts';
 export { validateCloseNodes } from './close_nodes.ts';
 export { validateCurbNodes } from './curb_nodes.ts';
 export { validateDisconnectedWay } from './disconnected_way.ts';

@@ -224,6 +224,50 @@ describe('EditSystem', () => {
     });
 
 
+    describe('waySegments', () => {
+      // Two ways crossing at the origin:  w1 is vertical (n1-n2), w2 is horizontal (n3-n4)
+      function mergeCrossingWays() {
+        const n1 = new Rapid.OsmNode(context, { id: 'n1', loc: [0, -1] });
+        const n2 = new Rapid.OsmNode(context, { id: 'n2', loc: [0,  1] });
+        const n3 = new Rapid.OsmNode(context, { id: 'n3', loc: [-1, 0] });
+        const n4 = new Rapid.OsmNode(context, { id: 'n4', loc: [ 1, 0] });
+        const w1 = new Rapid.OsmWay(context, { id: 'w1', nodes: ['n1', 'n2'] });
+        const w2 = new Rapid.OsmWay(context, { id: 'w2', nodes: ['n3', 'n4'] });
+        _editor.merge([n1, n2, n3, n4, w1, w2]);
+      }
+
+      it('indexes way segments and finds them by extent', () => {
+        mergeCrossingWays();
+        const extent = new Rapid.sdk.Extent([-0.5, -0.5], [0.5, 0.5]);
+        const segments = _editor.waySegments(extent, _editor.base.graph);
+        const wayIDs = new Set(segments.map(s => s.wayID));
+        assert.isTrue(wayIDs.has('w1'));
+        assert.isTrue(wayIDs.has('w2'));
+      });
+
+      it('returns no segments outside the queried extent', () => {
+        mergeCrossingWays();
+        const extent = new Rapid.sdk.Extent([10, 10], [11, 11]);  // far away
+        const segments = _editor.waySegments(extent, _editor.base.graph);
+        assert.isEmpty(segments);
+      });
+
+      it('removes a way\'s segments from the stable cache when the way is deleted', () => {
+        mergeCrossingWays();
+        const extent = new Rapid.sdk.Extent([-0.5, -0.5], [0.5, 0.5]);
+        assert.isNotEmpty(_editor.waySegments(extent, _editor.base.graph));
+
+        _editor.perform(Rapid.actionDeleteWay('w1'));
+        _editor.commit({ annotation: 'deleted w1' });
+
+        const segments = _editor.waySegments(extent, _editor.stable.graph);
+        const wayIDs = new Set(segments.map(s => s.wayID));
+        assert.isFalse(wayIDs.has('w1'));  // w1 segments gone
+        assert.isTrue(wayIDs.has('w2'));   // w2 segments remain
+      });
+    });
+
+
     describe('perform', () => {
       it('returns a Difference', () => {
         const diff = _editor.perform(Rapid.actionNoop());

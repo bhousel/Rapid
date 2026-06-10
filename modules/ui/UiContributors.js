@@ -79,7 +79,7 @@ export class UiContributors {
 
     // Gather nearby usernames
     const seen = new Set();
-    const entities = editor.intersects(viewport.visibleExtent());
+    const entities = editor.intersects();
     for (const entity of entities) {
       if (entity?.user) {
         seen.add(entity.user);

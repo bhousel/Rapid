@@ -1,7 +1,6 @@
 import * as Validators from '../validators/index.ts';
 import { AbstractSystem } from './AbstractSystem.ts';
 import { Difference } from '../lib/Difference.ts';
-import { Extent } from '@rapid-sdk/math';
 import { utilArrayChunk, utilArrayGroupBy } from '@rapid-sdk/util';
 import { utilExtractValues } from '../util/string.ts';
 import { ValidationCache } from '../lib/ValidationCache.ts';
@@ -276,9 +275,12 @@ export class ValidationSystem extends AbstractSystem {
       cache.uncacheIssuesOfType('unsquare_way');   // uncache existing
 
       // rerun for all buildings
-      const tree = this.context.systems.editor!.tree;
-      const buildings = tree.intersects(new Extent([-180,-90],[180, 90]), cache.graph)  // everywhere
-        .filter((entity: OsmEntity) => (entity.type === 'way' && entity.tags.building && entity.tags.building !== 'no'));
+      const editor = this.context.systems.editor!;
+      const spatial = this.context.systems.spatial!;
+      const spatialID = editor.spatialIDForGraph(cache.graph);
+
+      const buildings = spatial.getAllData<OsmEntity>(spatialID)
+        .filter(entity => (entity.type === 'way' && entity.tags.building && entity.tags.building !== 'no'));
 
       for (const entity of buildings) {
         const detected = checkUnsquareWay(entity, cache.graph);

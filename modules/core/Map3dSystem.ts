@@ -436,9 +436,8 @@ export class Map3dSystem extends AbstractSystem {
     const context = this.context;
     const editor = context.systems.editor;
     if (!editor) return;
-    const viewport = context.viewport;
 
-    const entities = editor.intersects(viewport.visibleExtent());
+    const entities = editor.intersects();
     const noRelationEnts = entities.filter((entity: OsmEntity) => !entity.id.startsWith('r'));
 
     const highways = noRelationEnts.filter((entity: OsmEntity) => {
