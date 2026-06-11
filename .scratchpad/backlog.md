@@ -18,6 +18,10 @@ Items planned but not yet started.
 - Have PixiLayerRapid call `styleMatch()` with a dataset/scope ID
 - Per-dataset schema querying (different presets for Rapid vs OSM data)
 
+## Conflation / buffers follow-ups (beyond Step 3)
+- **Internalize / replace `lineToPoly` offset-curve generation** — `lineToPoly` (used for halos) repurposes `PIXI.buildLine`, coupling halo generation to Pixi internals and a fragile triangle-walk. If we ever need *precise* buffer polygons (not just coverage boxes), internalizing the offset-curve math would unify halos + buffers and drop the Pixi coupling. Left alone for now; coverage boxes cover the conflation use case.
+- **Precise buffer polygons** — only if a consumer needs the actual buffer polygon rather than coverage boxes + a distance/overlap predicate. Likely unnecessary given the two-phase query.
+
 ## Performer-inspired statistics display
 - HUD overlay showing frame timing (APP/DRAW split), scene complexity, draw calls, texture usage, queue depth
 - Data sources: `scheduler.metrics`, GraphicsSystem performance marks (already in place, commented out), Pixi renderer stats, `scheduler.numPending`

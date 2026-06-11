@@ -289,4 +289,88 @@ describe('GeometryPart', () => {
     });
   });
 
+
+  describe('lazy derived products', () => {
+    const square = {
+      type: 'Polygon',
+      coordinates: [[ [-1, -1], [1, -1], [1, 1], [-1, 1], [-1, -1] ]]
+    };
+
+    it('computes hull, area, and winding for a polygon', () => {
+      const part = new Rapid.GeometryPart(context);
+      part.setData(square);
+
+      assert.isArray(part.local.hull);
+      assert.isArray(part.world.hull);
+      assert.isNumber(part.world.area);
+      assert.isAbove(part.world.area, 0);
+      assert.strictEqual(part.local.area, part.world.area);   // area is translation-invariant
+      assert.oneOf(part.world.winding, [1, -1]);
+      assert.strictEqual(part.local.winding, part.world.winding);
+    });
+
+    it('computes a surrounding rectangle for a polygon', () => {
+      const part = new Rapid.GeometryPart(context);
+      part.setData(square);
+
+      assert.isObject(part.local.surround);
+      assert.isObject(part.world.surround);
+      assert.isNumber(part.world.surround.angle);
+      assert.isArray(part.world.surround.polygon);
+    });
+
+    it('computes a flattened coordinate array for each ring', () => {
+      const part = new Rapid.GeometryPart(context);
+      part.setData(square);
+
+      const flat = part.local.flat;
+      assert.isArray(flat);
+      assert.isArray(flat[0]);
+      assert.lengthOf(flat[0], 10);   // 5 coordinate pairs -> 10 numbers
+    });
+
+    it('memoizes derived products (returns the same reference on repeated access)', () => {
+      const part = new Rapid.GeometryPart(context);
+      part.setData(square);
+
+      assert.strictEqual(part.world.hull, part.world.hull);
+      assert.strictEqual(part.local.flat, part.local.flat);
+      assert.strictEqual(part.world.surround, part.world.surround);
+    });
+
+    it('LineString poi falls back to the centroid', () => {
+      const part = new Rapid.GeometryPart(context);
+      part.setData({ type: 'LineString', coordinates: [[0, 0], [0.001, 0.001], [0.002, 0]] });
+
+      assert.isOk(part.world.centroid);
+      assert.strictEqual(part.world.poi, part.world.centroid);
+      assert.strictEqual(part.local.poi, part.local.centroid);
+    });
+
+    it('handles a two-coordinate line without computing rings', () => {
+      const part = new Rapid.GeometryPart(context);
+      part.setData({ type: 'LineString', coordinates: [[0, 0], [0.001, 0]] });
+
+      assert.strictEqual(part.world.area, 0);
+      assert.isUndefined(part.world.winding);
+      assert.isUndefined(part.world.hull);
+      assert.isUndefined(part.world.surround);
+      assert.isOk(part.world.centroid);
+      assert.deepEqual(part.world.poi, part.world.centroid);
+    });
+
+    it('clone re-derives equal derived products as independent arrays', () => {
+      const part = new Rapid.GeometryPart(context);
+      part.setData(square);
+
+      const area = part.world.area;
+      const hull = part.world.hull;
+
+      const clone = part.clone();
+      assert.strictEqual(clone.world.area, area);
+      assert.deepEqual(clone.world.hull, hull);
+      assert.notStrictEqual(clone.world.hull, hull);   // independent arrays
+    });
+  });
+
 });

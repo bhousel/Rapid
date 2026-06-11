@@ -7,6 +7,39 @@ import type { SurroundingRectangle, Vec2 } from '@rapid-sdk/math';
 import type { SingularGeometry, SingularGeometryType } from './types.ts';
 
 
+/**
+ * Wraps a producer function so it runs once on first call and caches the result.
+ * Used to defer `GeometryPart` derived products (hull, centroid, poi, …) until
+ * something actually reads them — most geometries are never rendered or conflated,
+ * so this saves both memory and CPU on large datasets.
+ * @param  fn - The producer to memoize
+ * @return A zero-arg function that computes once and returns the cached value
+ */
+function lazyValue<T>(fn: () => T): () => T {
+  let computed = false;
+  let value: T;
+  return (): T => {
+    if (!computed) {
+      value = fn();
+      computed = true;
+    }
+    return value;
+  };
+}
+
+/**
+ * Defines enumerable lazy getter properties on a frame object (`world` / `local`).
+ * Each getter computes its value on first access via the supplied memoized function.
+ * @param  obj - The frame object to attach getters to
+ * @param  getters - Map of property name to a memoized producer function
+ */
+function defineLazyProps(obj: object, getters: Record<string, () => unknown>): void {
+  for (const key in getters) {
+    Object.defineProperty(obj, key, { enumerable: true, configurable: true, get: getters[key] });
+  }
+}
+
+
 /** Original data, in WGS84 coordinates (longitude, latitude - [0,0] is Null Island) */
 export interface GeometryPartOrigData {
   /** GeoJSON Type - must be 'Point', 'LineString', or 'Polygon' */
@@ -121,33 +154,17 @@ export class GeometryPart {
 
 
   /**
-   * Returns a clone of this GeometryPart object
+   * Returns a clone of this GeometryPart object.
+   * Re-derives the projected frames from the original GeoJSON rather than deep-copying
+   * the computed caches — this is cheap (the derived products are lazy and won't be
+   * recomputed until accessed) and avoids copying potentially large coordinate arrays.
    * @return  A new GeometryPart
    */
   public clone(): GeometryPart {
     const copy = new GeometryPart(this.context);
-
-    for (const obj of ['orig', 'world', 'local'] as const) {
-      const src = this[obj];
-      if (!src) continue;
-
-      const dst: Record<string, unknown> = {};
-      for (const [k, v] of Object.entries(src)) {
-        if (v instanceof Extent) {
-          dst[k] = new Extent(v);
-        } else {
-          dst[k] = structuredClone(v);
-        }
-      }
-      if (obj === 'orig') {
-        copy.orig = dst as unknown as GeometryPartOrigData;
-      } else if (obj === 'world') {
-        copy.world = dst as unknown as GeometryPartWorldData;
-      } else {
-        copy.local = dst as unknown as GeometryPartLocalData;
-      }
+    if (this.orig) {
+      copy.setData(this.orig.geojson);
     }
-
     return copy;
   }
 
@@ -250,23 +267,14 @@ export class GeometryPart {
 
     // Choose extent center as the "origin" point.
     const worldOrigin = worldExtent.center();
-    const world: GeometryPartWorldData = {
-      coords: (type === 'LineString') ? worldRings[0] : worldRings,
-      extent: worldExtent,
-      origin: worldOrigin,
-      outer: worldRings[0]
-    };
 
     // Compute "local" coordinates by translating world coordinates relative to origin.
-    // Also generate flattened coordinate arrays in the same pass.
     const localExtent = new Extent();
     const localRings: Vec2[][] = new Array(worldRings.length);
-    const flatRings: number[][] = new Array(worldRings.length);
 
     for (let i = 0; i < worldRings.length; i++) {
       const worldRing = worldRings[i];
       localRings[i] = new Array(worldRing.length);
-      flatRings[i] = new Array(worldRing.length * 2);
 
       for (let j = 0; j < worldRing.length; j++) {
         const xy: Vec2 = [
@@ -274,8 +282,6 @@ export class GeometryPart {
           worldRing[j][1] - worldOrigin[1]
         ];
         localRings[i][j] = xy;
-        flatRings[i][j * 2] = xy[0];
-        flatRings[i][j * 2 + 1] = xy[1];
 
         if (i === 0) {  // the outer ring
           localExtent.extendSelf(xy);
@@ -283,101 +289,146 @@ export class GeometryPart {
       }
     }
 
+    // Core (eager) frame data — cheap projection that every consumer needs.
+    const world: GeometryPartWorldData = {
+      coords: (type === 'LineString') ? worldRings[0] : worldRings,
+      extent: worldExtent,
+      origin: worldOrigin,
+      outer: worldRings[0]
+    };
     const local: GeometryPartLocalData = {
       coords: (type === 'LineString') ? localRings[0] : localRings,
       extent: localExtent,
-      outer: localRings[0],
-      flat: flatRings
+      outer: localRings[0]
     };
 
     //
-    // Computed data...
-    // Prefer to perform the computations in local space to reduce floating point errors.
-    // Then translate local coodinates back to world space with `vecAdd` or `geomToOrigin`.
+    // Derived products are computed lazily on first access.
+    // Most geometries are never rendered or conflated,
+    // so deferring these saves memory and CPU on large datasets.
     //
+    // Prefer to perform the computations in local space to reduce floating point errors,
+    // then translate local results back to world space with `vecAdd` or `geomToOrigin`.
+    //
+    const outer = local.outer!;
+    const outerLen = outer.length;
 
-    if (world.outer!.length === 0) {          // no coordinates? - shouldn't happen
-      // no-op
-
-    } else if (world.outer!.length === 1) {   // single coordinate? - wrong but can happen
-      local.centroid = local.outer![0];
-      local.poi = local.centroid;
-      local.area = 0;
-      world.centroid = world.outer![0];
-      world.poi = world.centroid;
-      world.area = 0;
-
-    } else if (world.outer!.length === 2) {   // 2 coordinate line
-      local.centroid = vecInterp(local.outer![0], local.outer![1], 0.5);  // average the 2 points
-      local.poi = local.centroid;
-      local.area = 0;
-      world.centroid = vecAdd(local.centroid, worldOrigin);
-      world.poi = world.centroid;
-      world.area = 0;
-
-    } else {   // > 2 coordinates...
-
-      // Area
-      // Shoelace formula on the outer ring: unsigned area + winding direction.
-      // Translation doesn't change area, so local.area === world.area.
-      // The sign convention is the mathematical y-up one: positive = CCW.
-      // (Note that d3-polygon's polygonArea() flips this for screen-space y-down,
-      // we avoid it so callers don't have to reason about coordinate handedness.)
-      const ring = local.outer!;
+    // Shoelace sum on the local outer ring (shared by area + winding).
+    // The sign convention is the mathematical y-up one: positive = CCW.
+    // (Note that d3-polygon's polygonArea() flips this for screen-space y-down,
+    // we avoid it so callers don't have to reason about coordinate handedness.)
+    const shoelace = lazyValue<number>(() => {
       let s2 = 0;
-      for (let i = 0, m = ring.length; i < m; i++) {
-        const [x0, y0] = ring[i];
-        const [x1, y1] = ring[(i + 1) % m];
+      for (let i = 0, m = outer.length; i < m; i++) {
+        const [x0, y0] = outer[i];
+        const [x1, y1] = outer[(i + 1) % m];
         s2 += x0 * y1 - x1 * y0;
       }
-      local.area = Math.abs(s2) / 2;
-      local.winding = s2 >= 0 ? 1 : -1;
-      world.area = local.area;
-      world.winding = local.winding;
+      return s2;
+    });
 
-      // Convex Hull
-      local.hull = polygonHull(local.outer!) as Vec2[] | undefined;
-      if (local.hull) {
-        world.hull = geomToOrigin(local.hull, worldOrigin);
-      }
+    // Area is translation-invariant, so local.area === world.area.
+    const areaFn = lazyValue<number | undefined>(() => {
+      if (outerLen === 0) return undefined;       // no coordinates? - shouldn't happen
+      if (outerLen <= 2) return 0;                // single coordinate or 2 coordinate line
+      return Math.abs(shoelace()) / 2;
+    });
 
-      // Centroid
-      if (local.hull) {
-        if (local.hull.length === 2) {
-          local.centroid = vecInterp(local.hull[0], local.hull[1], 0.5);  // average the 2 points
-        } else {
-          local.centroid = polygonCentroid(local.hull) as Vec2;
+    // Winding direction of the outer ring: +1 = CCW, -1 = CW (in y-up math space).
+    const windingFn = lazyValue<1 | -1 | undefined>(() => {
+      if (outerLen <= 2) return undefined;        // only meaningful for rings
+      return shoelace() >= 0 ? 1 : -1;
+    });
+
+    // Convex hull (local), and the same hull translated back to world space.
+    const localHullFn = lazyValue<Vec2[] | undefined>(() => {
+      if (outerLen <= 2) return undefined;
+      return (polygonHull(outer) as Vec2[] | null) ?? undefined;
+    });
+    const worldHullFn = lazyValue<Vec2[] | undefined>(() => {
+      const hull = localHullFn();
+      return hull ? geomToOrigin(hull, worldOrigin) : undefined;
+    });
+
+    // Centroid (computed from the hull for numerical stability).
+    const localCentroidFn = lazyValue<Vec2 | undefined>(() => {
+      if (outerLen === 0) return undefined;
+      if (outerLen === 1) return outer[0];
+      if (outerLen === 2) return vecInterp(outer[0], outer[1], 0.5);  // average the 2 points
+      const hull = localHullFn();
+      if (!hull) return undefined;
+      if (hull.length === 2) return vecInterp(hull[0], hull[1], 0.5);  // average the 2 points
+      return polygonCentroid(hull) as Vec2;
+    });
+    const worldCentroidFn = lazyValue<Vec2 | undefined>(() => {
+      if (outerLen === 1) return world.outer![0];
+      const centroid = localCentroidFn();
+      return centroid ? vecAdd(centroid, worldOrigin) : undefined;
+    });
+
+    // Pole of Inaccessability (useful for label placement).
+    // Polygons use polylabel; lines and degenerate rings fall back to the centroid.
+    const localPoiFn = lazyValue<Vec2 | undefined>(() => {
+      if (outerLen <= 2 || type === 'LineString') return localCentroidFn();
+      return polylabel(local.coords as Vec2[][]) as Vec2;   // it expects outer + rings
+    });
+    const worldPoiFn = lazyValue<Vec2 | undefined>(() => {
+      if (outerLen <= 2 || type === 'LineString') return worldCentroidFn();
+      const poi = localPoiFn();
+      return poi ? vecAdd(poi, worldOrigin) : undefined;
+    });
+
+    // Flattened coordinate data (Pixi prefers this) - one flat array per ring.
+    const flatFn = lazyValue<number[][]>(() => {
+      const flatRings: number[][] = new Array(localRings.length);
+      for (let i = 0; i < localRings.length; i++) {
+        const ring = localRings[i];
+        const flat: number[] = new Array(ring.length * 2);
+        for (let j = 0; j < ring.length; j++) {
+          flat[j * 2] = ring[j][0];
+          flat[j * 2 + 1] = ring[j][1];
         }
-        if (local.centroid) {
-          world.centroid = vecAdd(local.centroid, worldOrigin);
-        }
+        flatRings[i] = flat;
       }
+      return flatRings;
+    });
 
-      // Pole of Inaccessability
-      if (type === 'LineString') {
-        local.poi = local.centroid;
-        world.poi = world.centroid;
-      } else {
-        local.poi = polylabel(local.coords as Vec2[][]) as Vec2;   // it expects outer + rings
-        world.poi = vecAdd(local.poi, worldOrigin);
-      }
+    // Surrounding rectangle (only meaningful for rings).
+    const localSurroundFn = lazyValue<SurroundingRectangle | undefined>(() => {
+      if (outerLen <= 2) return undefined;
+      return geomGetDominantSurroundingRectangle(outer) ?? undefined;
+    });
+    const worldSurroundFn = lazyValue<SurroundingRectangle | undefined>(() => {
+      const surround = localSurroundFn();
+      if (!surround) return undefined;
+      return {
+        polygon:     geomToOrigin(surround.polygon, worldOrigin),
+        angle:       surround.angle,
+        centroid:    vecAdd(surround.centroid, worldOrigin),
+        dimensions:  surround.dimensions.slice() as Vec2,   // copy, dimensions are the same
+        shortAxis:   geomToOrigin(surround.shortAxis, worldOrigin),
+        longAxis:    geomToOrigin(surround.longAxis, worldOrigin)
+      };
+    });
 
-      // Surrounding Rectangle
-      if (local.outer) {
-        local.surround = geomGetDominantSurroundingRectangle(local.outer) ?? undefined;
-
-        if (local.surround) {
-          world.surround = {
-            polygon:     geomToOrigin(local.surround.polygon, worldOrigin),
-            angle:       local.surround.angle,
-            centroid:    vecAdd(local.surround.centroid, worldOrigin),
-            dimensions:  local.surround.dimensions.slice() as Vec2,   // copy, dimensions are the same
-            shortAxis:   geomToOrigin(local.surround.shortAxis, worldOrigin),
-            longAxis:    geomToOrigin(local.surround.longAxis, worldOrigin)
-          };
-        }
-      }
-    }
+    // Area and winding are translation-invariant, so the same functions back both frames.
+    defineLazyProps(local, {
+      hull:      localHullFn,
+      centroid:  localCentroidFn,
+      poi:       localPoiFn,
+      area:      areaFn,
+      winding:   windingFn,
+      surround:  localSurroundFn,
+      flat:      flatFn
+    });
+    defineLazyProps(world, {
+      hull:      worldHullFn,
+      centroid:  worldCentroidFn,
+      poi:       worldPoiFn,
+      area:      areaFn,
+      winding:   windingFn,
+      surround:  worldSurroundFn
+    });
 
     this.world = world;
     this.local = local;

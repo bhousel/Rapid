@@ -95,15 +95,42 @@ Segment generation (way → `[{ wayID, nodes: [a, b], extent }, …]`) is OSM do
 
 Consumers to update: `crossing_ways.ts` and `almost_junction.ts` (currently call `tree.waySegments(...)`), and `close_nodes.ts` / `ValidationSystem.ts` (currently call `editor.tree.intersects(...)`).
 
-### 5. Buffers and precise queries (point 2 & 3)
+### 5. Buffers, coverage, and precise queries (point 2 & 3)
 
-Computing buffers in `GeometryPart` is the right call — it already derives hull/centroid/poi/surround from the source geometry, so a buffer is just one more derived geometry produced at `setData` time and ready to index when the data is added.
+The driving use case is **conflation**: take arbitrary data from an external source (POIs as points, sidewalks as lines, buildings as polygons) and determine the extent to which it already exists in the OSM basemap. Examples:
+- **Points (Overture Places):** buffer each point by a user-configurable radius, filter out the ones that already exist in OSM.
+- **Lines (sidewalks):** a sidewalk may *partially* exist in OSM — show the existing part and suggest extending it from the third-party data.
+- **Polygons (buildings):** filter out buildings already mapped in OSM.
 
-Caveat: `RBush` indexes bounding boxes only, so a buffer/overlap query is inherently **two-phase**:
-1. **bbox prefilter** via `RBush` (cheap, what we have today), then
-2. **precise refine** — test the candidate geometries for actual polygon containment/overlap.
+(There is hacky proof-of-concept code in `PixiLayerDebug` already doing the building case; Step 3 makes it real.)
 
-`SpatialSystem` should own the refine helper (e.g. a `getDataWithin(polygon)` that prefilters then tests), so the precise-geometry knowledge stays in one place rather than every caller re-implementing the second phase.
+**Minkowski sum vs. offset curves vs. coverage boxes.** A mathematically exact buffer is the Minkowski sum of the geometry with a disk. We don't need exactness — we need *speed*. Neither Turf nor JTS actually compute a Minkowski convolution: `@turf/buffer` wraps `jsts`, and JTS `BufferOp` is an offset-curve + noding + polygonization pipeline (the same family as `PIXI.buildLine`, which we already repurpose in `lineToPoly` for halos). For conflation we go simpler still: **cover the geometry in boxes** (a quantization), the same trick the rope-label placement uses (`getLineSegments` in `PixiLayerLabels`).
+
+**Buffer representation is per geometry type** — don't force everything into box-fills:
+
+| Type | Buffer representation | Phase-2 predicate |
+|------|----------------------|-------------------|
+| **Point** | one box, half-size `r` | `vecLength` ≤ `r` |
+| **LineString** | string of boxes sampled every ~`r` along the line | point/segment distance |
+| **Polygon** | the grown extent box (not a box-fill) | `geomPolygonIntersectsPolygon` / `geomPolygonContainsPolygon` |
+
+For lines this gives **partial matching for free** — each box is a spatial unit, so "which parts already exist in OSM" is a per-box answer (the "extend it here" suggestion). For polygons, quantizing a 2D region into boxes is wasteful; a single grown extent box for phase 1 + a real polygon-overlap test in phase 2 is cheaper and more accurate.
+
+**The buffer doubles as the query.** Because the OSM basemap is already indexed, the primary loop is "iterate third-party features, query OSM." The third-party feature's coverage boxes *are* the RBush query boxes — so we must *compute* buffers per third-party feature, but only need to *index* them for the **reverse query** ("which OSM features overlap third-party data," e.g. to style or flag them). We do foresee needing the reverse direction, so a `buffers` index is in scope — but build the compute + forward-query path first.
+
+**Radius is a recompute parameter, not baked into `setData`.** The user sets a conflation radius (e.g. 3 m), tweaks it (2.5 m), and we recompute. So:
+- `setData()` computes the radius-independent core projection (cheap).
+- A separate `computeCoverage(radius)` produces the coverage boxes / buffer for a given `r`, cached on the part and re-callable when the user adjusts the radius.
+
+**Two-phase query** (RBush indexes bboxes only):
+1. **bbox prefilter** via `RBush` (cheap, what we have today),
+2. **precise refine** — test candidates with an exact predicate (distance / polygon overlap).
+
+`SpatialSystem` owns generic phase-1 (`getItemsAtBox`, plus a `getItemsAtBoxes(boxes[])` that dedups hits) and a generic refine that takes a **caller-supplied predicate** — it never learns what "match" means. The match semantics (thresholds, "already mapped" logic, partial-line suggestions) live in a dedicated **Conflation** module, which is where the `PixiLayerDebug` demo graduates to.
+
+**Phase-2 primitives already exist** in `@rapid-sdk/math` (dependency-free): `geomPointInPolygon`, `geomPolygonContainsPolygon`, `geomPolygonIntersectsPolygon`, `geomLineIntersection`, `geomPathIntersections`, plus `vecProject`/`vecLength` for point-to-segment distance. Since we control `rapid-sdk`, any new helper (e.g. `geomCoverageBoxes`) can start life in `modules/geo` and migrate into the math library later if it proves generally useful. **We almost certainly never need `jsts`.**
+
+**Memory & laziness.** Rapid's whole purpose is working with huge amounts of map data in the browser, so caching cost matters. Today `GeometryPart.update()` eagerly computes hull/centroid/poi/area/winding/surround **and** the flattened arrays for *every* geometry — even ones never rendered or conflated. Step 3a moves these derived products behind **lazy memoized getters** so they're computed on first access only. This is a behavior-preserving refactor (callers still read `.world.hull`) that directly shrinks the footprint for large datasets, and sets up `coverage` to be just one more lazy product.
 
 ## Sequencing
 
@@ -111,8 +138,12 @@ Caveat: `RBush` indexes bounding boxes only, so a buffer/overlap query is inhere
 - **Step 1:** Generalize `SpatialCache` to named indexes + generic `contents`, with back-compat wrappers. Pure refactor, no behavior change, fully testable. ✅ Done.
 - **Step 2:** Delete `Tree`. Move diff/sync into `EditSystem` (driven off the `Difference` it already computes), updating each cache immediately before emitting `merge`/`stablechange`/`stagingchange`. Establish the `osm-base`/`osm-staging`/`osm-stable` caches. Add the `segments` index and repoint the validators (`crossing_ways`, `almost_junction`, `close_nodes`, `ValidationSystem`). Lock in "validators read stable, general code reads staging." ✅ Done.
   - **Follow-up:** The `crossing_ways` / `almost_junction` unit test suites (`test/unit/validators/*.test.js`) are still `describe.todo` and use a `Rapid.Tree`-based mock harness. They need converting to a real `EditSystem` (populate via `editor.merge`, query via `editor.waySegments`) and re-enabling. The spatial mechanism they depend on is covered by new `EditSystem` `waySegments` tests in the meantime.
-- **Step 3:** Compute buffers in `GeometryPart`, add a `buffers` index, and add the two-phase refine query to `SpatialSystem`.
-- **Step 4:** Build cross-layer conflation queries on top.
+- **Step 3:** Coverage/buffers + two-phase querying for conflation. Broken into:
+  - **3a — Lazy `GeometryPart`:** move derived products (`hull`, `centroid`, `poi`, `area`, `winding`, `surround`, `flat`) behind lazy memoized getters. Memory win, no behavior change, fully testable. Sets up `coverage` as one more lazy product.
+  - **3b — Coverage helper:** a pure `geomCoverageBoxes(coords, r, step)` in `modules/geo` + `GeometryPart.computeCoverage(r)` (radius is a recompute parameter). Coverage representation is per type (point → one box, line → boxes along the line, polygon → grown extent box). Unit-test coverage for each type.
+  - **3c — Query plumbing:** `SpatialSystem.getItemsAtBoxes(boxes[])` (dedup hits) + a generic refine that takes a caller-supplied predicate. Phase-2 uses existing `geom*` primitives. Add the `buffers` index to support the reverse query.
+  - **3d — Conflation module:** replace the `PixiLayerDebug` hack with a real per-type conflation pass (POI dedup, building filter, partial-sidewalk suggestion). Owns the match semantics.
+- **Step 4:** Build richer cross-layer conflation/styling queries on top (incl. reverse "which OSM features overlap third-party data").
 
 ### Step 2 implementation notes
 
@@ -123,7 +154,9 @@ Caveat: `RBush` indexes bounding boxes only, so a buffer/overlap query is inhere
 
 ## Boundary Summary
 
-- **`SpatialSystem`** — owns *where* things are and answers spatial questions. Generic bbox indexing (named indexes via `replaceItems`/`removeItems`/`getItemsAtBox`) + two-phase precise refine. No knowledge of OSM, segments, buffers, or photos as concepts.
+- **`SpatialSystem`** — owns *where* things are and answers spatial questions. Generic bbox indexing (named indexes via `replaceItems`/`removeItems`/`getItemsAtBox`/`getItemsAtBoxes`) + two-phase precise refine driven by a caller-supplied predicate. No knowledge of OSM, segments, buffers, photos, or "match" semantics as concepts.
 - **`EditSystem`** — owns OSM topology/history. Translates graph `Difference`s into spatial updates, generates segments, owns the `osm-base`/`osm-stable`/`osm-staging` caches, and exposes the OSM spatial queries.
-- **`GeometryPart`** — owns derived geometry (hull, centroid, poi, surround, **buffers**), computed once at `setData` time so data is ready to index.
+- **`GeometryPart`** — owns derived geometry (hull, centroid, poi, surround, **coverage/buffers**), computed lazily on first access (Step 3a) and re-computable for a given radius via `computeCoverage(r)`.
+- **`modules/geo`** — pure geometry helpers (e.g. `geomCoverageBoxes`, phase-2 predicates). May start here and migrate into `@rapid-sdk/math` later if generally useful.
+- **`Conflation` module** — owns the conflation *meaning*: thresholds, "already mapped" logic, per-type matching, partial-line suggestions. Wires `GeometryPart` coverage + `SpatialSystem` queries together. The `PixiLayerDebug` proof-of-concept graduates here.
 - **Data classes (`OsmWay`, etc.)** — own domain meaning (what a segment is, what counts as an interesting tag).
