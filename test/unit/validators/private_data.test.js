@@ -15,8 +15,10 @@ describe('validatePrivateData', () => {
   beforeAll(async () => {
     const schema = context.systems.schema;
     schema.requestedAssetIDs = '';
-    await schema.initAsync();
-    schema.merge(osmRulesets);
+    await context.initAsync()
+      .then(() => schema.merge(osmRulesets))
+      .then(() => context.startAsync());
+
     validator = Rapid.validatePrivateData(context);
   });
 

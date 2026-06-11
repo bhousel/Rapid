@@ -24,12 +24,10 @@ describe('validateAmbiguousCrossingTags', () => {
   beforeAll(async () => {
     const schema = context.systems.schema;
     schema.requestedAssetIDs = '';
-    await Promise.all([
-      context.systems.locations.initAsync(),
-      context.systems.spatial.initAsync(),
-      schema.initAsync()
-    ]);
-    schema.merge(osmRulesets);
+    await context.initAsync()
+      .then(() => schema.merge(osmRulesets))
+      .then(() => context.startAsync());
+
     validator = Rapid.validateAmbiguousCrossingTags(context);
   });
 

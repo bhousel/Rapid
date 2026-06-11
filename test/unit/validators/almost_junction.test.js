@@ -1,36 +1,47 @@
 import { beforeAll, beforeEach, describe, it } from 'bun:test';
 import { assert } from 'chai';
 import * as Rapid from '../../../modules/headless.js';
+import osmRulesets from '../../../data/osm_rulesets.json5';
 
 
-// TODO FIX Tree.waySegments
-describe.todo('validateAlmostJunction', () => {
-  let graph, tree;
-
-  class MockEditSystem extends Rapid.MockSystem {
-    get staging() { return { graph: graph }; }
-    get tree()    { return tree; }
-  }
+describe('validateAlmostJunction', () => {
+  let graph;
 
   const context = new Rapid.MockContext();
   context.systems = {
-    editor:   new MockEditSystem(context),
+    editor:   new Rapid.EditSystem(context),
     l10n:     new Rapid.LocalizationSystem(context),
-    spatial:  new Rapid.SpatialSystem(context)
+    schema:   new Rapid.SchemaSystem(context),
+    spatial:  new Rapid.SpatialSystem(context),
+    storage:  new Rapid.StorageSystem(context)
   };
 
-  const validator = null;//Rapid.validateAlmostJunction(context);
+  let validator;
 
+  beforeAll(async () => {
+    const schema = context.systems.schema;
+    schema.requestedAssetIDs = '';
+    await context.initAsync()
+      .then(() => schema.merge(osmRulesets))
+      .then(() => context.startAsync());
 
-  beforeAll(() => {
-    return context.systems.spatial.initAsync();
+    validator = Rapid.validateAlmostJunction(context);
   });
 
-  beforeEach(() => {
-    graph = new Rapid.Graph(context);       // reset
-    tree = new Rapid.Tree(graph, 'test');   // reset
-    return context.systems.spatial.resetAsync();
+  beforeEach(async () => {
+    await context.systems.editor.resetAsync();
+    graph = context.systems.editor.staging.graph;   // empty until entities are loaded
   });
+
+
+  // Load entities into the editor's spatial caches and refresh the validation graph.
+  // The editor keeps the OSM spatial caches (including way segments) in sync,
+  //  which is what the validator queries via `editor.waySegments`.
+  function load(entities) {
+    const editor = context.systems.editor;
+    editor.merge(entities);
+    graph = editor.staging.graph;
+  }
 
 
   function validate() {
@@ -64,9 +75,7 @@ describe.todo('validateAlmostJunction', () => {
       new Rapid.OsmWay(context, { id: 'w2', nodes: ['n3', 'n4'], tags: { highway: 'residential' }})
     ];
 
-    graph = new Rapid.Graph(context, entities);
-    tree = new Rapid.Tree(graph, 'test');
-    tree.rebase(entities, true);
+    load(entities);
 
     const issues = validate();
     assert.isArray(issues);
@@ -78,6 +87,7 @@ describe.todo('validateAlmostJunction', () => {
       entityIds: ['w1', 'n1', 'w2'],
       loc:       [22.42357, 0],
       data: {
+        midId:     'n2',
         edge:      ['n3', 'n4'],
         cross_loc: [22.42356, 0]
       }
@@ -100,9 +110,7 @@ describe.todo('validateAlmostJunction', () => {
       new Rapid.OsmWay(context, { id: 'w2', nodes: ['n3', 'n4'], tags: { highway: 'residential' }})
     ];
 
-    graph = new Rapid.Graph(context, entities);
-    tree = new Rapid.Tree(graph, 'test');
-    tree.rebase(entities, true);
+    load(entities);
 
     const issues = validate();
     assert.isArray(issues);
@@ -114,6 +122,7 @@ describe.todo('validateAlmostJunction', () => {
       entityIds: ['w1', 'n1', 'w2'],
       loc:       [22.42357, 0],
       data: {
+        midId:     'n2',
         edge:      ['n3', 'n4'],
         cross_loc: [22.42356, 0]
       }
@@ -136,9 +145,7 @@ describe.todo('validateAlmostJunction', () => {
       new Rapid.OsmWay(context, { id: 'w2', nodes: ['n3', 'n4'], tags: { highway: 'residential' }})
     ];
 
-    graph = new Rapid.Graph(context, entities);
-    tree = new Rapid.Tree(graph, 'test');
-    tree.rebase(entities, true);
+    load(entities);
 
     const issues = validate();
     assert.deepEqual(issues, []);
@@ -158,9 +165,7 @@ describe.todo('validateAlmostJunction', () => {
       new Rapid.OsmWay(context, { id: 'w2', nodes: ['n3', 'n4'], tags: { highway: 'residential' }})
     ];
 
-    graph = new Rapid.Graph(context, entities);
-    tree = new Rapid.Tree(graph, 'test');
-    tree.rebase(entities, true);
+    load(entities);
 
     const issues = validate();
     assert.deepEqual(issues, []);
@@ -180,9 +185,7 @@ describe.todo('validateAlmostJunction', () => {
       new Rapid.OsmWay(context, { id: 'w2', nodes: ['n3', 'n4'], tags: { highway: 'residential' }})
     ];
 
-    graph = new Rapid.Graph(context, entities);
-    tree = new Rapid.Tree(graph, 'test');
-    tree.rebase(entities, true);
+    load(entities);
 
     const issues = validate();
     assert.deepEqual(issues, []);
@@ -202,9 +205,7 @@ describe.todo('validateAlmostJunction', () => {
       new Rapid.OsmWay(context, { id: 'w2', nodes: ['n3', 'n4'], tags: { highway: 'path' }})
     ];
 
-    graph = new Rapid.Graph(context, entities);
-    tree = new Rapid.Tree(graph, 'test');
-    tree.rebase(entities, true);
+    load(entities);
 
     const issues = validate();
     assert.isArray(issues);
@@ -232,9 +233,7 @@ describe.todo('validateAlmostJunction', () => {
       new Rapid.OsmWay(context, { id: 'w2', nodes: ['n3', 'n4'], tags: { highway: 'path' }})
     ];
 
-    graph = new Rapid.Graph(context, entities);
-    tree = new Rapid.Tree(graph, 'test');
-    tree.rebase(entities, true);
+    load(entities);
 
     const issues = validate();
     assert.isArray(issues);
@@ -260,9 +259,7 @@ describe.todo('validateAlmostJunction', () => {
       new Rapid.OsmWay(context, { id: 'w1', nodes: ['n1', 'n2', 'n3', 'n4', 'n5'], tags: { highway: 'path' }})
     ];
 
-    graph = new Rapid.Graph(context, entities);
-    tree = new Rapid.Tree(graph, 'test');
-    tree.rebase(entities, true);
+    load(entities);
 
     const issues = validate();
     assert.isArray(issues);
@@ -292,9 +289,7 @@ describe.todo('validateAlmostJunction', () => {
       new Rapid.OsmWay(context, { id: 'w2', nodes: ['n5', 'n6'], tags: { highway: 'path' }}),
     ];
 
-    graph = new Rapid.Graph(context, entities);
-    tree = new Rapid.Tree(graph, 'test');
-    tree.rebase(entities, true);
+    load(entities);
 
     const issues = validate();
     assert.isArray(issues);

@@ -10,7 +10,6 @@ describe('validateOutdatedTags', () => {
   context.systems = {
     l10n:       new Rapid.LocalizationSystem(context),
     locations:  new Rapid.LocationSystem(context),
-    map:        new Rapid.MapSystem(context),
     schema:     new Rapid.SchemaSystem(context)
   };
 
@@ -18,13 +17,18 @@ describe('validateOutdatedTags', () => {
   beforeAll(async () => {
     const schema = context.systems.schema;
     schema.requestedAssetIDs = '';
-    await schema.initAsync();
-    schema.merge(osmRulesets);
-    const deprecated = [{ old: { highway: 'no' } }, { old: { highway: 'ford' }, replace: { ford: '*' } }];
-    schema.merge({
-      assetID: 'test_deprecated',
-      scopes: [{ scope: 'osm', deprecated }]
-    });
+    await context.initAsync()
+      .then(() => {
+        schema.merge(osmRulesets);
+
+        const deprecated = [{ old: { highway: 'no' } }, { old: { highway: 'ford' }, replace: { ford: '*' } }];
+        schema.merge({
+          assetID: 'test_deprecated',
+          scopes: [{ scope: 'osm', deprecated }]
+        });
+      })
+      .then(() => context.startAsync());
+
     validator = Rapid.validateOutdatedTags(context);
   });
 

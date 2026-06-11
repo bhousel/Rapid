@@ -15,11 +15,9 @@ describe('validateMismatchedGeometry', () => {
     editor:     new MockEditSystem(context),
     l10n:       new Rapid.LocalizationSystem(context),
     locations:  new Rapid.LocationSystem(context),
-    map:        new Rapid.MapSystem(context),
     schema:     new Rapid.SchemaSystem(context),
     spatial:    new Rapid.SpatialSystem(context),
-    storage:    new Rapid.StorageSystem(context),
-    urlhash:    new Rapid.UrlHashSystem(context)
+    storage:    new Rapid.StorageSystem(context)
   };
 
   const validator = Rapid.validateMismatchedGeometry(context);
@@ -28,6 +26,7 @@ describe('validateMismatchedGeometry', () => {
   // merge test preset data into the schema system
   beforeAll(() => {
     const schema = context.systems.schema;
+    schema.requestedAssetIDs = '';
 
     const testPresets = {
       assetID: 'geometry-test',
@@ -47,11 +46,9 @@ describe('validateMismatchedGeometry', () => {
       }]
     };
 
-    return schema.initAsync()
-      .then(() => {
-        schema.resetAll();
-        schema.merge(testPresets);
-      });
+    return context.initAsync()
+      .then(() => schema.merge(testPresets))
+      .then(() => context.startAsync());
   });
 
   beforeEach(() => {

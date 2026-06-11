@@ -1,40 +1,53 @@
 import { beforeAll, beforeEach, describe, it } from 'bun:test';
 import { assert } from 'chai';
 import * as Rapid from '../../../modules/headless.js';
+import osmRulesets from '../../../data/osm_rulesets.json5';
 
 
-// TODO FIX Tree.waySegments
-describe.todo('validateCrossingWays', () => {
-  let graph, tree;
-
-  class MockEditSystem extends Rapid.MockSystem {
-    get staging() { return { graph: graph }; }
-    get tree()    { return tree; }
-  }
+describe('validateCrossingWays', () => {
+  let graph;
 
   const context = new Rapid.MockContext();
   context.systems = {
-    editor:   new MockEditSystem(context),
+    editor:   new Rapid.EditSystem(context),
     l10n:     new Rapid.LocalizationSystem(context),
-    spatial:  new Rapid.SpatialSystem(context)
+    schema:   new Rapid.SchemaSystem(context),
+    spatial:  new Rapid.SpatialSystem(context),
+    storage:  new Rapid.StorageSystem(context)
   };
 
-  const validator = null;//Rapid.validateCrossingWays(context);
+  let validator;
 
+  beforeAll(async () => {
+    const schema = context.systems.schema;
+    schema.requestedAssetIDs = '';
+    await context.initAsync()
+      .then(() => schema.merge(osmRulesets))
+      .then(() => context.startAsync());
 
-  beforeAll(() => {
-    return context.systems.spatial.initAsync();
+    validator = Rapid.validateCrossingWays(context);
   });
 
-  beforeEach(() => {
-    graph = new Rapid.Graph(context);       // reset
-    tree = new Rapid.Tree(graph, 'test');   // reset
-    return context.systems.spatial.resetAsync();
+  beforeEach(async () => {
+    await context.systems.editor.resetAsync();
+    graph = context.systems.editor.staging.graph;   // empty until entities are loaded
   });
+
+
+  // Load entities into the editor's spatial caches and refresh the validation graph.
+  // The editor keeps the OSM spatial caches (including way segments) in sync,
+  //  which is what the validator queries via `editor.waySegments`.
+  function load(entities) {
+    const editor = context.systems.editor;
+    editor.merge(entities);
+    graph = editor.staging.graph;
+  }
 
 
   function validate() {
-    const entities = [ ...graph.base.entities.values() ];
+    // Iterate in a deterministic id order so issue ordering is stable across runs.
+    const entities = [ ...graph.base.entities.values() ]
+      .sort((a, b) => a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
 
     let issues = [];
     for (const entity of entities) {
@@ -61,9 +74,7 @@ describe.todo('validateCrossingWays', () => {
     const w2 = new Rapid.OsmWay(context, { id: 'w2', nodes: ['n3', 'n4'], tags: w2tags });
 
     const entities = [n1, n2, n3, n4, w1, w2];
-    graph = new Rapid.Graph(context, entities);
-    tree = new Rapid.Tree(graph, 'test');
-    tree.rebase(entities, true);
+    load(entities);
   }
 
 
@@ -450,9 +461,7 @@ describe.todo('validateCrossingWays', () => {
     const w2 = new Rapid.OsmWay(context, { id: 'w2', nodes: ['n3', 'n4', 'n5', 'n6'], tags: { highway: 'residential' }});
 
     const entities = [n1, n2, n3, n4, n5, n6, w1, w2];
-    graph = new Rapid.Graph(context, entities);
-    tree = new Rapid.Tree(graph, 'test');
-    tree.rebase(entities, true);
+    load(entities);
   }
 
   it('flags road crossing road twice', () => {
@@ -461,25 +470,25 @@ describe.todo('validateCrossingWays', () => {
     assert.isArray(issues);
     assert.lengthOf(issues, 4);
 
-    let issue = issues[0];
-    assert.strictEqual(issue.type, 'crossing_ways');
-    assert.deepEqual(issue.entityIds, ['w1', 'w2']);
-    assert.deepEqual(issue.loc, [0, 1]);
+    for (const issue of issues) {
+      assert.strictEqual(issue.type, 'crossing_ways');
+    }
 
-    issue = issues[1];
-    assert.strictEqual(issue.type, 'crossing_ways');
-    assert.deepEqual(issue.entityIds, ['w1', 'w2']);
-    assert.deepEqual(issue.loc, [0, -1]);
+    // Two issues come from validating w1, two from validating w2.
+    // (The order in which the two crossing points are found is not guaranteed.)
+    const w1Issues = issues.filter(issue => issue.entityIds[0] === 'w1');
+    const w2Issues = issues.filter(issue => issue.entityIds[0] === 'w2');
+    assert.lengthOf(w1Issues, 2);
+    assert.lengthOf(w2Issues, 2);
 
-    issue = issues[2];
-    assert.strictEqual(issue.type, 'crossing_ways');
-    assert.deepEqual(issue.entityIds, ['w2', 'w1']);
-    assert.deepEqual(issue.loc, [0, 1]);
+    for (const issue of w1Issues) assert.deepEqual(issue.entityIds, ['w1', 'w2']);
+    for (const issue of w2Issues) assert.deepEqual(issue.entityIds, ['w2', 'w1']);
 
-    issue = issues[3];
-    assert.strictEqual(issue.type, 'crossing_ways');
-    assert.deepEqual(issue.entityIds, ['w2', 'w1']);
-    assert.deepEqual(issue.loc, [0, -1]);
+    // Both crossing points should be present in each group.
+    for (const group of [w1Issues, w2Issues]) {
+      const locs = group.map(issue => issue.loc).sort((a, b) => a[1] - b[1]);
+      assert.deepEqual(locs, [[0, -1], [0, 1]]);
+    }
   });
 
 
@@ -505,9 +514,7 @@ describe.todo('validateCrossingWays', () => {
     const r1 = new Rapid.OsmRelation(context, {id: 'r-1', members: [{ id: 'w2', type: 'way' }, { id: 'w3', type: 'way' }], tags: r1tags });
 
     const entities = [n1, n2, n3, n4, n5, n6, w1, w2, w3, r1];
-    graph = new Rapid.Graph(context, entities);
-    tree = new Rapid.Tree(graph, 'test');
-    tree.rebase(entities, true);
+    load(entities);
   }
 
   it('ignores road line crossing relation with building=yes without a type', () => {
