@@ -3,6 +3,24 @@ import { assert } from 'chai';
 import * as Rapid from '../../../modules/headless.js';
 
 
+// helper functions
+// Generate a spatialID for a legacy method that appends -data or -tiles
+function sid(legacyID, suffix) {
+  return `${legacyID}-${suffix}`;
+}
+// Build a generic SpatialItem with a small world-coordinate extent
+function createItem(id, locWgs84, contents, half = 0.001) {
+  const [x, y] = Rapid.sdk.projWgs84ToWorld(locWgs84);
+  const extent = new Rapid.sdk.Extent([x - half, y - half], [x + half, y + half]);
+  return { id, extent, contents: contents ?? { id } };
+}
+// Build a world-coordinate search box around a [lon,lat]
+function worldBox(locWgs84, half = 0.01) {
+  const [x, y] = Rapid.sdk.projWgs84ToWorld(locWgs84);
+  return { minX: x - half, minY: y - half, maxX: x + half, maxY: y + half };
+}
+
+
 describe('SpatialSystem', () => {
   // Setup context..
   const context = new Rapid.MockContext();
@@ -102,92 +120,123 @@ describe('SpatialSystem', () => {
 
 
     describe('getCache', () => {
-      it('creates and returns a new cache', () => {
-        const cache = _spatial.getCache('test-cache-1');
+      it('creates and returns a spatial cache', () => {
+        const spatialID = `test-data1`;
+        const cache = _spatial.getCache(spatialID);
         assert.isObject(cache);
-        assert.strictEqual(cache.id, 'test-cache-1');
-        assert.instanceOf(cache.indexes, Map);
+        assert.strictEqual(cache.id, spatialID);
+        assert.instanceOf(cache.boxes, Map);
+        assert.isObject(cache.rbush);
       });
 
       it('returns the same cache on repeated calls', () => {
-        const cache1 = _spatial.getCache('test-cache-2');
-        const cache2 = _spatial.getCache('test-cache-2');
+        const spatialID = `test-data2`;
+        const cache1 = _spatial.getCache(spatialID);
+        const cache2 = _spatial.getCache(spatialID);
         assert.strictEqual(cache1, cache2);
       });
     });
 
 
-    describe('getIndex', () => {
-      it('creates and returns a named index within a cache', () => {
-        const index = _spatial.getIndex('test-index-1', 'data');
-        assert.isObject(index);
-        assert.strictEqual(index.id, 'data');
-        assert.instanceOf(index.boxes, Map);
-        assert.isObject(index.rbush);
+    describe('generic item helpers', () => {
+      it('getItem returns a previously inserted item', () => {
+        const spatialID = 'test-generic-item';
+        const item = createItem('item1', [10, 0], { foo: 'bar' });
+        _spatial.replaceItems(spatialID, item);
+
+        const found = _spatial.getItem(spatialID, 'item1');
+        assert.deepStrictEqual(found, { foo: 'bar' });
       });
 
-      it('returns the same index on repeated calls', () => {
-        const index1 = _spatial.getIndex('test-index-2', 'data');
-        const index2 = _spatial.getIndex('test-index-2', 'data');
-        assert.strictEqual(index1, index2);
+      it('getAllItems returns all inserted items', () => {
+        const spatialID = 'test-generic-all';
+        _spatial.replaceItems(spatialID, [
+          createItem('a', [10, 0], { id: 'a' }),
+          createItem('b', [11, 0], { id: 'b' })
+        ]);
+
+        const all = _spatial.getAllItems(spatialID);
+        assert.lengthOf(all, 2);
       });
 
-      it('creates separate indexes for different names', () => {
-        const dataIndex = _spatial.getIndex('test-index-3', 'data');
-        const tileIndex = _spatial.getIndex('test-index-3', 'tiles');
-        assert.notStrictEqual(dataIndex, tileIndex);
+      it('hasItem returns true for existing item ids', () => {
+        const spatialID = 'test-generic-has';
+        _spatial.replaceItems(spatialID, createItem('a', [10, 0]));
+        assert.isTrue(_spatial.hasItem(spatialID, 'a'));
+      });
+
+      it('hasItemsAtBox and hasItemsAtLoc detect indexed items', () => {
+        const spatialID = 'test-generic-collide';
+        _spatial.replaceItems(spatialID, createItem('a', [10, 0]));
+
+        const box = worldBox([10, 0]);
+        assert.isTrue(_spatial.hasItemsAtBox(spatialID, box));
+        assert.isTrue(_spatial.hasItemsAtLoc(spatialID, [10, 0]));
+      });
+
+      it('getItemsAtLoc returns hits at a location', () => {
+        const spatialID = 'test-generic-atloc';
+        _spatial.replaceItems(spatialID, createItem('a', [10, 0]));
+
+        const hits = _spatial.getItemsAtLoc(spatialID, [10, 0]);
+        assert.lengthOf(hits, 1);
+        assert.strictEqual(hits[0].boxID, 'a');
+      });
+
+      it('preventCoincidentItemLoc nudges to a non-colliding location', () => {
+        const spatialID = 'test-generic-prevent';
+        _spatial.replaceItems(spatialID, createItem('a', [10, 0], { id: 'a' }, 1e-8));
+
+        const result = _spatial.preventCoincidentItemLoc(spatialID, [10, 0]);
+        assert.isArray(result);
+        assert.closeTo(result[0], 10, 0.0001);
+        assert.isBelow(result[1], 0);
       });
     });
 
 
     describe('clearCache', () => {
-      it('clears all data from a cache', () => {
+      it('clears all data for a given spatialID', () => {
         const spatialID = 'test-clear';
-        const data = createMockData('data1', [10, 0]);
-        const tile = createMockTile('tile1', [10, 0]);
+        const item = createItem('seg1', [10, 0], { kind: 'segment' });
+        _spatial.replaceItems(spatialID, item);
 
-        _spatial.addData(spatialID, data);
-        _spatial.addTiles(spatialID, tile);
-
-        const cacheBefore = _spatial.getCache(spatialID);
-        assert.isTrue(_spatial.getIndex(spatialID, 'data').boxes.size > 0);
-        assert.isTrue(_spatial.getIndex(spatialID, 'tiles').boxes.size > 0);
-        assert.isObject(cacheBefore);
+        const cache = _spatial.getCache(spatialID);
+        assert.lengthOf(cache.boxes, 1);
 
         _spatial.clearCache(spatialID);
-
-        assert.isEmpty(_spatial.getIndex(spatialID, 'data').boxes);
-        assert.isEmpty(_spatial.getIndex(spatialID, 'tiles').boxes);
+        assert.isEmpty(cache.boxes);
       });
     });
 
-  describe('clearMatching', () => {
-    it('clears only caches matching the predicate', () => {
-      const spatialID1 = 'test-ok1';
-      const spatialID2 = 'test-ok2';
-      const spatialID3 = 'test-no3';
-      const data = createMockData('data10', [10, 0]);
-      const tile = createMockTile('34589,32769,16', [10, 0]);
 
-      _spatial.addData(spatialID1, data);
-      _spatial.addTiles(spatialID1, tile);
-      _spatial.addData(spatialID2, data);
-      _spatial.addTiles(spatialID2, tile);
-      _spatial.addData(spatialID3, data);
-      _spatial.addTiles(spatialID3, tile);
+    describe('clearMatching', () => {
+      it('clears only cachees matching the predicate', () => {
+        const spatialID1 = 'test-ok1';
+        const spatialID2 = 'test-ok2';
+        const spatialID3 = 'test-no3';
+        const data = createMockData('data10', [10, 0]);
+        const tile = createMockTile('34589,32769,16', [10, 0]);
 
-      _spatial.clearMatching(id => id.startsWith('test-ok'));
+        _spatial.addData(spatialID1, data);
+        _spatial.addTiles(spatialID1, tile);
+        _spatial.addData(spatialID2, data);
+        _spatial.addTiles(spatialID2, tile);
+        _spatial.addData(spatialID3, data);
+        _spatial.addTiles(spatialID3, tile);
 
-      assert.isEmpty(_spatial.getIndex(spatialID1, 'data').boxes);
-      assert.isEmpty(_spatial.getIndex(spatialID1, 'tiles').boxes);
+        _spatial.clearMatching(id => id.startsWith('test-ok'));
 
-      assert.isEmpty(_spatial.getIndex(spatialID2, 'data').boxes);
-      assert.isEmpty(_spatial.getIndex(spatialID2, 'tiles').boxes);
+        assert.isEmpty(_spatial.getCache(sid(spatialID1, 'data')).boxes);
+        assert.isEmpty(_spatial.getCache(sid(spatialID1, 'tiles')).boxes);
 
-      assert.hasAllKeys(_spatial.getIndex(spatialID3, 'data').boxes, ['data10']);
-      assert.hasAllKeys(_spatial.getIndex(spatialID3, 'tiles').boxes, ['34589,32769,16']);
+        assert.isEmpty(_spatial.getCache(sid(spatialID2, 'data')).boxes);
+        assert.isEmpty(_spatial.getCache(sid(spatialID2, 'tiles')).boxes);
+
+        assert.hasAllKeys(_spatial.getCache(sid(spatialID3, 'data')).boxes, ['data10']);
+        assert.hasAllKeys(_spatial.getCache(sid(spatialID3, 'tiles')).boxes, ['34589,32769,16']);
+      });
     });
-  });
 
 
     describe('addData', () => {
@@ -215,7 +264,7 @@ describe('SpatialSystem', () => {
         const data = createMockData('data1', [10, 0]);
         _spatial.addData(spatialID, [data, null, undefined]);
 
-        assert.strictEqual(_spatial.getIndex(spatialID, 'data').boxes.size, 1);
+        assert.strictEqual(_spatial.getCache(`${spatialID}-data`).boxes.size, 1);
         assert.isTrue(_spatial.hasData(spatialID, 'data1'));
       });
 
@@ -239,7 +288,7 @@ describe('SpatialSystem', () => {
         const data2 = createMockData('data1', [11, 0]);
         _spatial.replaceData(spatialID, data2);
 
-        assert.strictEqual(_spatial.getIndex(spatialID, 'data').boxes.size, 1);
+        assert.strictEqual(_spatial.getCache(`${spatialID}-data`).boxes.size, 1);
         assert.strictEqual(_spatial.getData(spatialID, 'data1'), data2);
       });
 
@@ -279,7 +328,7 @@ describe('SpatialSystem', () => {
         _spatial.addData(spatialID, [data1, data2]);
 
         _spatial.removeData(spatialID, ['data1', 'data2']);
-        assert.isEmpty(_spatial.getIndex(spatialID, 'data').boxes);
+        assert.isEmpty(_spatial.getCache(`${spatialID}-data`).boxes);
       });
 
       it('handles removing non-existent data', () => {
@@ -445,7 +494,7 @@ describe('SpatialSystem', () => {
         _spatial.addTiles(spatialID, tile);
         _spatial.addTiles(spatialID, tile);  // add again
 
-        assert.strictEqual(_spatial.getIndex(spatialID, 'tiles').boxes.size, 1);
+        assert.strictEqual(_spatial.getCache(`${spatialID}-tiles`).boxes.size, 1);
       });
 
       it('ignores null/undefined tiles', () => {
@@ -453,7 +502,7 @@ describe('SpatialSystem', () => {
         const tile = createMockTile('tile1', [10, 0]);
         _spatial.addTiles(spatialID, [tile, null, undefined]);
 
-        assert.strictEqual(_spatial.getIndex(spatialID, 'tiles').boxes.size, 1);
+        assert.strictEqual(_spatial.getCache(`${spatialID}-tiles`).boxes.size, 1);
       });
     });
 
@@ -601,30 +650,6 @@ describe('SpatialSystem', () => {
     });
 
 
-    describe('getAllVisibleData', () => {
-      it('returns visible data from all caches', () => {
-        const data1 = createMockData('data1', [10, 0]);
-        const data2 = createMockData('data2', [10, 0]);
-        _spatial.addData('cache1', data1);
-        _spatial.addData('cache2', data2);
-
-        const results = _spatial.getAllVisibleData();
-        assert.isArray(results);
-        assert.isAtLeast(results.length, 2);
-      });
-
-      it('returns empty array when no visible data', () => {
-        const spatialID = 'test-all-visible-empty';
-        const data = createMockData('data1', [100, 0]);  // far away
-        _spatial.addData(spatialID, data);
-
-        const results = _spatial.getAllVisibleData();
-        // May have data from other tests, so just check it's an array
-        assert.isArray(results);
-      });
-    });
-
-
     describe('preventCoincidentLoc', () => {
       it('returns original location when no collision', () => {
         const spatialID = 'test-prevent-loc-1';
@@ -651,6 +676,208 @@ describe('SpatialSystem', () => {
     });
 
 
+    describe('replaceItems / getItemsAtBox', () => {
+      it('inserts items into an cache and finds them by box', () => {
+        const spatialID = 'test-items-1';
+        const item = createItem('seg1', [10, 0], { kind: 'segment' });
+        _spatial.replaceItems(spatialID, item);
+
+        const results = _spatial.getItemsAtBox(spatialID, worldBox([10, 0]));
+        assert.lengthOf(results, 1);
+        assert.strictEqual(results[0].boxID, 'seg1');
+        assert.deepStrictEqual(results[0].contents, { kind: 'segment' });
+      });
+
+      it('replaces an existing item with the same id', () => {
+        const segSpatialID = sid('test-items-replace', 'segments');
+        _spatial.replaceItems(segSpatialID, createItem('seg1', [10, 0], 'old'));
+        _spatial.replaceItems(segSpatialID, createItem('seg1', [11, 0], 'new'));
+
+        assert.strictEqual(_spatial.getCache(segSpatialID).boxes.size, 1);
+        assert.isEmpty(_spatial.getItemsAtBox(segSpatialID, worldBox([10, 0])));
+        const results = _spatial.getItemsAtBox(segSpatialID, worldBox([11, 0]));
+        assert.lengthOf(results, 1);
+        assert.strictEqual(results[0].contents, 'new');
+      });
+
+      it('inserts multiple items at once', () => {
+        const segSpatialID = sid('test-items-multi', 'segments');
+        _spatial.replaceItems(segSpatialID, [
+          createItem('seg1', [10, 0]),
+          createItem('seg2', [11, 0])
+        ]);
+        assert.strictEqual(_spatial.getCache(segSpatialID).boxes.size, 2);
+      });
+
+      it('ignores null/undefined items', () => {
+        const segSpatialID = sid('test-items-null', 'segments');
+        _spatial.replaceItems(segSpatialID, [createItem('seg1', [10, 0]), null, undefined]);
+        assert.strictEqual(_spatial.getCache(segSpatialID).boxes.size, 1);
+      });
+    });
+
+
+    describe('removeItems', () => {
+      it('removes items by id from an cache', () => {
+        const spatialID = sid('test-remove-items', 'segments');
+        _spatial.replaceItems(spatialID, [
+          createItem('seg1', [10, 0]),
+          createItem('seg2', [11, 0])
+        ]);
+
+        _spatial.removeItems(spatialID, 'seg1');
+        assert.isEmpty(_spatial.getItemsAtBox(spatialID, worldBox([10, 0])));
+        assert.lengthOf(_spatial.getItemsAtBox(spatialID, worldBox([11, 0])), 1);
+      });
+
+      it('removes multiple items at once', () => {
+        const spatialID = 'test-remove-items-multi';
+        _spatial.replaceItems(spatialID, [
+          createItem('seg1', [10, 0]),
+          createItem('seg2', [11, 0])
+        ]);
+
+        _spatial.removeItems(spatialID, ['seg1', 'seg2']);
+        assert.isEmpty(_spatial.getCache(spatialID).boxes);
+      });
+
+      it('handles removing non-existent items', () => {
+        const spatialID = 'test-remove-items-nonexistent';
+        _spatial.removeItems(spatialID, 'nope');
+        assert.isEmpty(_spatial.getCache(spatialID).boxes);
+      });
+    });
+
+
+    describe('getItemsAtBoxes', () => {
+      it('returns the union of hits across multiple boxes', () => {
+        const spatialID = 'test-boxes-union';
+        _spatial.replaceItems(spatialID, [
+          createItem('a', [10, 0]),
+          createItem('b', [20, 0])
+        ]);
+
+        const results = _spatial.getItemsAtBoxes(spatialID, [worldBox([10, 0]), worldBox([20, 0])]);
+        assert.lengthOf(results, 2);
+        const ids = results.map(r => r.boxID).sort();
+        assert.deepStrictEqual(ids, ['a', 'b']);
+      });
+
+      it('deduplicates a candidate that overlaps several query boxes', () => {
+        const spatialID = 'test-boxes-dedup';
+        _spatial.replaceItems(spatialID, createItem('big', [10, 0], 'big', 0.05));
+
+        const boxes = [worldBox([10, 0], 0.001), worldBox([10.0005, 0], 0.001)];
+        const results = _spatial.getItemsAtBoxes(spatialID, boxes);
+        assert.lengthOf(results, 1);
+        assert.strictEqual(results[0].boxID, 'big');
+      });
+
+      it('accepts a single box (OneOrMore)', () => {
+        const spatialID = 'test-boxes-single';
+        _spatial.replaceItems(spatialID, createItem('a', [10, 0]));
+
+        const results = _spatial.getItemsAtBoxes(spatialID, worldBox([10, 0]));
+        assert.lengthOf(results, 1);
+        assert.strictEqual(results[0].boxID, 'a');
+      });
+
+      it('ignores null/undefined boxes', () => {
+        const spatialID = 'test-boxes-null';
+        _spatial.replaceItems(spatialID, createItem('a', [10, 0]));
+
+        const results = _spatial.getItemsAtBoxes(spatialID, [null, worldBox([10, 0]), undefined]);
+        assert.lengthOf(results, 1);
+      });
+
+      it('returns an empty array when nothing matches', () => {
+        const spatialID = 'test-boxes-empty';
+        _spatial.replaceItems(spatialID, createItem('a', [10, 0]));
+
+        const results = _spatial.getItemsAtBoxes(spatialID, [worldBox([50, 50])]);
+        assert.isArray(results);
+        assert.isEmpty(results);
+      });
+
+      it('returns an empty array for empty input', () => {
+        const spatialID = 'test-boxes-empty-input';
+        const results = _spatial.getItemsAtBoxes(spatialID, []);
+        assert.isArray(results);
+        assert.isEmpty(results);
+      });
+    });
+
+
+    describe('refineItems', () => {
+      it('keeps only candidates for which the predicate returns true', () => {
+        const dataSpatialID = 'test-refine-keep';
+        _spatial.replaceItems(dataSpatialID, [
+          createItem('a', [10, 0], 'keep'),
+          createItem('b', [20, 0], 'drop')
+        ]);
+        const candidates = _spatial.getItemsAtBoxes(dataSpatialID, [worldBox([10, 0]), worldBox([20, 0])]);
+
+        const refined = _spatial.refineItems(candidates, box => box.contents === 'keep');
+        assert.lengthOf(refined, 1);
+        assert.strictEqual(refined[0].contents, 'keep');
+      });
+
+      it('returns an empty array when the predicate always fails', () => {
+        const dataSpatialID = 'test-refine-none';
+        _spatial.replaceItems(dataSpatialID, createItem('a', [10, 0]));
+        const candidates = _spatial.getItemsAtBox(dataSpatialID, worldBox([10, 0]));
+
+        const refined = _spatial.refineItems(candidates, () => false);
+        assert.isArray(refined);
+        assert.isEmpty(refined);
+      });
+
+      it('passes each candidate box to the predicate', () => {
+        const dataSpatialID = 'test-refine-args';
+        _spatial.replaceItems(dataSpatialID, createItem('a', [10, 0]));
+        const candidates = _spatial.getItemsAtBox(dataSpatialID, worldBox([10, 0]));
+
+        const seen = [];
+        _spatial.refineItems(candidates, box => { seen.push(box); return true; });
+        assert.lengthOf(seen, 1);
+        assert.strictEqual(seen[0].boxID, 'a');
+      });
+    });
+
+
+    describe('two-phase conflation query (buffers cache)', () => {
+      it('finds and refines OSM candidates overlapping coverage boxes (forward query)', () => {
+        const dataSpatialID = 'test-conflation-forward';
+        _spatial.replaceItems(dataSpatialID, [
+          createItem('near', [10, 0], { loc: [10, 0] }),
+          createItem('far', [30, 0], { loc: [30, 0] })
+        ]);
+
+        const coverage = [worldBox([10, 0], 0.005), worldBox([10.01, 0], 0.005)];
+        const candidates = _spatial.getItemsAtBoxes(dataSpatialID, coverage);
+        assert.lengthOf(candidates, 1);
+        assert.strictEqual(candidates[0].boxID, 'near');
+
+        const matched = _spatial.refineItems(candidates, box => box.contents.loc[0] === 10);
+        assert.lengthOf(matched, 1);
+        assert.strictEqual(matched[0].boxID, 'near');
+      });
+
+      it('cachees third-party buffers for the reverse query', () => {
+        const bufferSpatialID = 'test-conflation-reverse';
+        _spatial.replaceItems(bufferSpatialID, [
+          createItem('tp1', [10, 0], { source: 'overture' }),
+          createItem('tp2', [20, 0], { source: 'overture' })
+        ]);
+
+        const hits = _spatial.getItemsAtBox(bufferSpatialID, worldBox([10, 0]));
+        assert.lengthOf(hits, 1);
+        assert.strictEqual(hits[0].boxID, 'tp1');
+        assert.deepStrictEqual(hits[0].contents, { source: 'overture' });
+      });
+    });
+
+
     describe('resetAsync (with data)', () => {
       it('clears all caches when reset', () => {
         const spatialID = 'test-reset-data';
@@ -662,8 +889,8 @@ describe('SpatialSystem', () => {
 
         return _spatial.resetAsync()
           .then(() => {
-            assert.isEmpty(_spatial.getIndex(spatialID, 'data').boxes);
-            assert.isEmpty(_spatial.getIndex(spatialID, 'tiles').boxes);
+            assert.isEmpty(_spatial.getCache(`${spatialID}-data`).boxes);
+            assert.isEmpty(_spatial.getCache(`${spatialID}-tiles`).boxes);
           });
       });
     });

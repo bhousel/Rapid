@@ -14,6 +14,8 @@ export type AssetID = string;
 export type AtlasID = 'symbol' | 'text' | 'tile';
 /** Behavior ID (e.g. 'drag', 'draw', 'hover', 'select') */
 export type BehaviorID = string;
+/** Box ID - identifier for a bounding box in an RBush spatial index  */
+export type BoxID = string;
 /** Category ID - identifier for a preset category */
 export type CategoryID = string;
 /** Checkpoint ID - identifier for an edit checkpoint */
@@ -107,6 +109,7 @@ declare global {
   type AssetID = string;
   type AtlasID = 'symbol' | 'text' | 'tile';
   type BehaviorID = string;
+  type BoxID = string;
   type CategoryID = string;
   type CheckpointID = string;
   type ClassID = string;

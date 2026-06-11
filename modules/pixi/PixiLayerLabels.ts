@@ -36,9 +36,6 @@ const TEXTSTYLE_ITALIC: PIXI.TextStyleOptions = {
   stroke: { color: 0xffffff, width: 3, join: 'round' }
 };
 
-/** Convenience type */
-type BoxID = string;
-
 /** Measurements for a label, including its expected width and height */
 interface LabelMeasurement {
   /** Label text, e.g. "Main Street" */

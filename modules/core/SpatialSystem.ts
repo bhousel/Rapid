@@ -9,29 +9,14 @@ import type { Context } from '../Context.ts';
 import type { Extent, Tile, Vec2 } from '@rapid-sdk/math';
 
 
-/** Convenience type - boxes are identified by either a data or tile ID */
-type BoxID = DataID | TileID;
-
-/** Names of the standard indexes within a spatial cache */
-const DATA = 'data';
-const TILES = 'tiles';
-
 /**
  * A spatial index box with associated cache and data references.
  * Extends the RBush BBox with additional metadata.
  */
 export interface SpatialBox extends BBox {
-  /**
-   * A unique Box identifier, should be a DataID or a TileID (the id of the box's contents).
-   * (note: we are assuming that DataIDs and TileIDs will not clash)
-   */
+  /** Unique identifier for this item within its spatial index */
   boxID: BoxID;
-  /** The name of the index this box belongs to (e.g. 'data', 'tiles', 'segments') */
-  kind: string;
-  /**
-   * The associated object (data, tile, segment, buffer, …).
-   * Its meaning is known only to the calling code, not to the SpatialSystem.
-   */
+  /** The object to store (meaning known only to the calling code) */
   contents: unknown;
 }
 
@@ -41,7 +26,7 @@ export interface SpatialBox extends BBox {
  * (Used by `replaceItems` - the SpatialSystem has no knowledge of what `contents` means.)
  */
 export interface SpatialItem {
-  /** Unique identifier for this item within its index */
+  /** Unique identifier for this item within its spatial index */
   id: BoxID;
   /** Bounding extent, in world coordinates */
   extent: Extent;
@@ -50,33 +35,20 @@ export interface SpatialItem {
 }
 
 /**
- * A named spatial index within a cache: a box map paired with an RBush over the same boxes.
- * A cache may hold any number of these (e.g. 'data', 'tiles', and later 'segments', 'buffers').
+ * A spatial index: a box map paired with an RBush over the same boxes.
  */
-interface SpatialIndex {
-  /** The identifier for this index (e.g. 'data', 'tiles') */
-  id: string;
-  /** Map of boxID to Box */
+interface SpatialCache {
+  /** The identifier of this spatial index */
+  id: SpatialID;
+  /** Boxes tracked by the spatial index */
   boxes: Map<BoxID, SpatialBox>;
   /** RBush index over the boxes */
   rbush: RBush<SpatialBox>;
 }
 
-/**
- * Internal cache structure for spatial data.
- * Holds an open-ended set of named indexes; the SpatialSystem has no knowledge
- * of what any particular index contains - that meaning belongs to the calling code.
- */
-interface SpatialCache {
-  /** The identifier for this spatial cache */
-  id: SpatialID;
-  /** Map of indexID to named SpatialIndex (e.g. 'data', 'tiles') */
-  indexes: Map<string, SpatialIndex>;
-}
-
 
 /**
- * `SpatialSystem` maintains spatial caches of all data known to Rapid.
+ * `SpatialSystem` maintains spatial caches.
  *  It is used to compute which data is visible and to perform conflation across data layers.
  *  All data should be stored in "world coordinates", (projected to Mercator and prescaled).
  *
@@ -95,7 +67,7 @@ interface SpatialCache {
  */
 export class SpatialSystem extends AbstractSystem {
 
-  /** Map of spatialID to spatial cache */
+  /** map of spatialID to spatial index */
   protected _caches: Map<SpatialID, SpatialCache>;
 
 
@@ -144,54 +116,43 @@ export class SpatialSystem extends AbstractSystem {
   /**
    * Get a spatial cache identified by the given spatialID.
    * Create it if it doesn't exist yet.
-   * @param spatialID - the spatial cache to get (or create)
-   * @return spacial cache data
+   * @param   spatialID - spatialID
+   * @return  the SpatialCache
    */
   public getCache(spatialID: SpatialID): SpatialCache {
     let cache = this._caches.get(spatialID);
     if (!cache) {
       cache = {
-        id:       spatialID,
-        indexes:  new Map<string, SpatialIndex>()
+        id:    spatialID,
+        boxes: new Map<BoxID, SpatialBox>(),
+        rbush: new RBush<SpatialBox>()
       };
       this._caches.set(spatialID, cache);
     }
     return cache;
   }
 
-
   /**
-   * Get a named index within a spatial cache.
-   * Create both the cache and the index if they don't exist yet.
-   * @param spatialID - the spatial cache to get (or create)
-   * @param indexID - the named index to get (or create), e.g. 'data', 'tiles'
-   * @return the named SpatialIndex
-   */
-  public getIndex(spatialID: SpatialID, indexID: string): SpatialIndex {
-    const cache = this.getCache(spatialID);
-    let index = cache.indexes.get(indexID);
-    if (!index) {
-      index = {
-        id:     indexID,
-        boxes:  new Map<BoxID, SpatialBox>(),
-        rbush:  new RBush<SpatialBox>()
-      };
-      cache.indexes.set(indexID, index);
-    }
-    return index;
-  }
-
-
-  /**
-   * Clear (remove all items from) the given spatial cache.
-   * Keeps the cache and its indexes, but empties them.
-   * @param spatialID - the spatial cache to clear
+   * Clear (remove all items from) the given spatial index.
+   * @param spatialID - the spatialID of the cache to clear
    */
   public clearCache(spatialID: SpatialID): void {
-    const cache = this.getCache(spatialID);
-    for (const index of cache.indexes.values()) {
-      index.boxes.clear();
-      index.rbush.clear();
+    const cache = this._caches.get(spatialID);
+    if (cache) {
+      cache.boxes.clear();
+      cache.rbush.clear();
+    }
+  }
+
+  /**
+   * Clear all spatial indexes whose spatialID matches a predicate.
+   * @param predicate - Function that returns true for spatialIDs to clear
+   */
+  public clearMatching(predicate: (spatialID: SpatialID) => boolean): void {
+    for (const spatialID of this._caches.keys()) {
+      if (predicate(spatialID)) {
+        this.clearCache(spatialID);
+      }
     }
   }
 
@@ -202,7 +163,7 @@ export class SpatialSystem extends AbstractSystem {
    * @param index - the index to insert into
    * @param boxes - the boxes to insert
    */
-  protected _insertBoxes(index: SpatialIndex, boxes: SpatialBox[]): void {
+  protected _insertBoxes(index: SpatialCache, boxes: SpatialBox[]): void {
     if (boxes.length > 1) {
       index.rbush.load(boxes);
     } else if (boxes.length === 1) {
@@ -216,7 +177,7 @@ export class SpatialSystem extends AbstractSystem {
    * @param index - the index to remove from
    * @param boxID - the boxID to remove
    */
-  protected _removeBox(index: SpatialIndex, boxID: BoxID): void {
+  protected _removeBox(index: SpatialCache, boxID: BoxID): void {
     const existing = index.boxes.get(boxID);
     if (existing) {
       index.boxes.delete(boxID);
@@ -226,28 +187,14 @@ export class SpatialSystem extends AbstractSystem {
 
 
   /**
-   * Clear all spatial caches whose spatialID matches a predicate.
-   * @param predicate - Function that returns true for spatialIDs to clear
-   */
-  public clearMatching(predicate: (spatialID: SpatialID) => boolean): void {
-    for (const spatialID of this._caches.keys()) {
-      if (predicate(spatialID)) {
-        this.clearCache(spatialID);
-      }
-    }
-  }
-
-
-  /**
-   * Insert or update items in an arbitrary named index.
+   * Insert or update items in a spatial index.
    * This is the generic, domain-agnostic way to index things (e.g. way segments, buffers)
-   *  that aren't `AbstractData` or `Tile`.  The caller supplies the world-coordinate extent.
-   * @param spatialID - the spatial cache to insert into
-   * @param indexID - the named index to insert into (e.g. 'segments')
+   * that aren't `AbstractData` or `Tile`. The caller supplies world-coordinate extents.
+   * @param spatialID - spatialID to insert into
    * @param items - items to insert or replace
    */
-  public replaceItems(spatialID: SpatialID, indexID: string, items: OneOrMore<SpatialItem>): void {
-    const index = this.getIndex(spatialID, indexID);
+  public replaceItems(spatialID: SpatialID, items: OneOrMore<SpatialItem>): void {
+    const index = this.getCache(spatialID);
 
     const toInsert: SpatialBox[] = [];
     for (const item of utilIterable(items)) {
@@ -259,7 +206,6 @@ export class SpatialSystem extends AbstractSystem {
       // insert new..
       const box = item.extent.bbox() as SpatialBox;
       box.boxID = item.id;
-      box.kind = indexID;
       box.contents = item.contents;
 
       index.boxes.set(item.id, box);
@@ -271,13 +217,12 @@ export class SpatialSystem extends AbstractSystem {
 
 
   /**
-   * Remove items from an arbitrary named index.
-   * @param spatialID - the spatial cache to remove from
-   * @param indexID - the named index to remove from (e.g. 'segments')
+   * Remove items from a spatial index.
+   * @param spatialID - spatialID to remove from
    * @param ids - the item ids to remove
    */
-  public removeItems(spatialID: SpatialID, indexID: string, ids: OneOrMore<BoxID>): void {
-    const index = this.getIndex(spatialID, indexID);
+  public removeItems(spatialID: SpatialID, ids: OneOrMore<BoxID>): void {
+    const index = this.getCache(spatialID);
 
     for (const id of utilIterable(ids)) {
       if (!id) continue;
@@ -287,174 +232,60 @@ export class SpatialSystem extends AbstractSystem {
 
 
   /**
-   * Search for items in an arbitrary named index within the given search box.
-   * @param spatialID - the spatial cache to search
-   * @param indexID - the named index to search (e.g. 'segments')
-   * @param box - the search box (make sure to use world coordinates here)
+   * Search for items in a spatial index within the given search box.
+   * @param spatialID - spatialID to search
+   * @param box - the search box (world coordinates)
    * @return Array of boxes in the given search box
    */
-  public getItemsAtBox(spatialID: SpatialID, indexID: string, box: BBox): SpatialBox[] {
-    const index = this.getIndex(spatialID, indexID);
+  public getItemsAtBox(spatialID: SpatialID, box: BBox): SpatialBox[] {
+    const index = this.getCache(spatialID);
     return index.rbush.search(box);
   }
 
 
   /**
-   * Insert data into the given spatial cache.
-   * (addData and replaceData are the same)
-   * @param spatialID - the spatial cache to insert into
-   * @param items - items to add
+   * Phase 1 of a two-phase spatial query: a bbox prefilter over many search boxes.
+   * Searches the index for each box and returns the union of hits, deduplicated by `boxID`.
+   * @param spatialID - spatialID to search
+   * @param boxes - one or more search boxes (world coordinates)
+   * @return Array of unique boxes overlapping any of the search boxes
    */
-  public addData(spatialID: SpatialID, items: OneOrMore<AbstractData>): void {
-    this.replaceData(spatialID, items);
-  }
+  public getItemsAtBoxes(spatialID: SpatialID, boxes: OneOrMore<BBox>): SpatialBox[] {
+    const index = this.getCache(spatialID);
 
-
-  /**
-   * Insert or update data in the spatial cache.
-   * @param spatialID - the spatial cache to insert into
-   * @param items - items to replace
-   */
-  public replaceData(spatialID: SpatialID, items: OneOrMore<AbstractData>): void {
-    const index = this.getIndex(spatialID, DATA);
-
-    const toInsert: SpatialBox[] = [];
-    for (const data of utilIterable(items)) {
-      if (!data) continue;
-      const dataID = data.id;
-
-      // remove existing..
-      this._removeBox(index, dataID);
-
-      // insert new..
-      const extent = data.geoms?.world?.extent;
-      if (!extent) continue;
-
-      const box = extent.bbox() as SpatialBox;
-      box.boxID = dataID;
-      box.kind = DATA;
-      box.contents = data;
-
-      index.boxes.set(dataID, box);
-      toInsert.push(box);
-    }
-
-    this._insertBoxes(index, toInsert);
-  }
-
-
-  /**
-   * Remove data from the spatial cache.
-   * Can pass either data or dataIDs for removal.
-   * @param spatialID - the spatial cache to remove from
-   * @param itemsOrIDs - items to remove
-   */
-  public removeData(spatialID: SpatialID, itemsOrIDs: OneOrMore<AbstractData | DataID>): void {
-    const index = this.getIndex(spatialID, DATA);
-
-    for (const item of utilIterable(itemsOrIDs)) {
-      const dataID = (typeof item === 'string') ? item : item?.id;
-      if (!dataID) continue;
-
-      this._removeBox(index, dataID);
-    }
-  }
-
-
-  /**
-   * Insert tiles into the spatial cache. This is how we mark data as loaded.
-   * @param spatialID - the spatial cache to insert into
-   * @param items - tiles to insert
-   */
-  public addTiles(spatialID: SpatialID, items: OneOrMore<Tile>): void {
-    const index = this.getIndex(spatialID, TILES);
-
-    const toInsert: SpatialBox[] = [];
-    for (const tile of utilIterable(items)) {
-      if (!tile) continue;
-      const tileID = tile.id;
-
-      // skip if tile is already indexed
-      if (index.boxes.has(tileID)) continue;
-
-      // insert new.. (we are assuming dataIDs will never look like tileIDs.)
-      const extent = tile.worldExtent;  // already in world (z16) coordinates
-      if (!extent) continue;
-
-      const box = extent.bbox() as SpatialBox;
-      box.boxID = tileID;
-      box.kind = TILES;
-      box.contents = tile;
-
-      index.boxes.set(tileID, box);
-      toInsert.push(box);
-    }
-
-    this._insertBoxes(index, toInsert);
-  }
-
-
-  /**
-   * Remove tiles from the spatial cache.
-   * Can pass either tiles or tileIDs for removal.
-   * @param spatialID - the spatial cache to remove from
-   * @param itemsOrIDs - items to remove
-   */
-  public removeTiles(spatialID: SpatialID, itemsOrIDs: OneOrMore<Tile | TileID>): void {
-    const index = this.getIndex(spatialID, TILES);
-
-    for (const item of utilIterable(itemsOrIDs)) {
-      const tileID = (typeof item === 'string') ? item : item?.id;
-      if (!tileID) continue;
-
-      this._removeBox(index, tileID);
-    }
-  }
-
-
-  /**
-   * Get already loaded and cached data that appears in the current map view
-   * @param spatialID - the spatial cache to search
-   * @return Array of boxes in the current map view
-   */
-  public getVisibleData(spatialID: SpatialID): SpatialBox[] {
-    const index = this.getIndex(spatialID, DATA);
-    const viewport = this.context.viewport;
-    return index.rbush.search(viewport.visibleWorldExtent().bbox());
-  }
-
-  /**
-   * Get all visible data for all spatial caches.
-   * This would only really be used for debugging purposes, it might return a lot.
-   * @return Array of boxes in the current map view
-   */
-  public getAllVisibleData(): SpatialBox[] {
+    const seen = new Set<BoxID>();
     const results: SpatialBox[] = [];
-    for (const spatialID of this._caches.keys()) {
-      results.push(...this.getVisibleData(spatialID));
+    for (const box of utilIterable(boxes)) {
+      if (!box) continue;
+      for (const hit of index.rbush.search(box)) {
+        if (seen.has(hit.boxID)) continue;
+        seen.add(hit.boxID);
+        results.push(hit);
+      }
     }
     return results;
   }
 
+
   /**
-   * Return the requested data.
-   * @param spatialID - the spatial cache to search
-   * @param dataID - the dataID to lookup
-   * @return The data if found, or `undefined` if not found
+   * Return the requested item.
+   * @param spatialID - spatialID to search
+   * @param boxID - item id to lookup
+   * @return The item if found, or `undefined` if not found
    */
-  public getData<T extends AbstractData = AbstractData>(spatialID: Nullable<SpatialID>, dataID: Nullable<DataID>): T | undefined {
-    if (!spatialID || !dataID) return undefined;
-    const index = this.getIndex(spatialID, DATA);
-    return index.boxes.get(dataID)?.contents as T | undefined;
+  public getItem<T = unknown>(spatialID: Nullable<SpatialID>, boxID: Nullable<BoxID>): T | undefined {
+    if (!spatialID || !boxID) return undefined;
+    const index = this.getCache(spatialID);
+    return index.boxes.get(boxID)?.contents as T | undefined;
   }
 
   /**
-   * Return all data in the given spatial cache, regardless of visibility.
-   * @param spatialID - the spatial cache to search
-   * @return Array of all data contents in the cache
+   * Return all items in the given spatial index.
+   * @param spatialID - spatialID to search
+   * @return Array of all item contents in the index
    */
-  public getAllData<T extends AbstractData = AbstractData>(spatialID: SpatialID): T[] {
-    const index = this.getIndex(spatialID, DATA);
+  public getAllItems<T = unknown>(spatialID: SpatialID): T[] {
+    const index = this.getCache(spatialID);
     const results: T[] = [];
     for (const box of index.boxes.values()) {
       results.push(box.contents as T);
@@ -463,46 +294,35 @@ export class SpatialSystem extends AbstractSystem {
   }
 
   /**
-   * Is the given dataID one we know about?
-   * @param spatialID - the spatial cache to search
-   * @param dataID - the dataID to lookup
-   * @return `true` if data exists, `false` if not
+   * Is the given item id one we know about?
+   * @param spatialID - spatialID to search
+   * @param boxID - item id to lookup
+   * @return `true` if item exists, `false` if not
    */
-  public hasData(spatialID: SpatialID, dataID: DataID): boolean {
-    const index = this.getIndex(spatialID, DATA);
-    return index.boxes.has(dataID);
+  public hasItem(spatialID: SpatialID, boxID: BoxID): boolean {
+    const index = this.getCache(spatialID);
+    return index.boxes.has(boxID);
   }
 
   /**
-   * Search for data within the given spatial cache and search box.
-   * @param spatialID - the spatial cache to search
-   * @param box - the search box (make sure to use world coordinates here)
-   * @return Array of boxes in the given search box
-   */
-  public getDataAtBox(spatialID: SpatialID, box: BBox): SpatialBox[] {
-    const index = this.getIndex(spatialID, DATA);
-    return index.rbush.search(box);
-  }
-
-  /**
-   * Does data exist in the given search box?
-   * @param spatialID - the spatial cache to search
-   * @param box - the search box (make sure to use world coordinates here)
+   * Does an item exist in the given search box?
+   * @param spatialID - spatialID to search
+   * @param box - search box (world coordinates)
    * @return `true` if something exists, `false` if not
    */
-  public hasDataAtBox(spatialID: SpatialID, box: BBox): boolean {
-    const index = this.getIndex(spatialID, DATA);
+  public hasItemsAtBox(spatialID: SpatialID, box: BBox): boolean {
+    const index = this.getCache(spatialID);
     return index.rbush.collides(box);
   }
 
   /**
-   * Search for data at the given [lon,lat] coordinate.
-   * @param spatialID - the spatial cache to search
-   * @param loc - the search location (WGS84 [lon,lat])
+   * Search for items at the given [lon,lat] coordinate.
+   * @param spatialID - spatialID to search
+   * @param loc - search location (WGS84 [lon,lat])
    * @return Array of boxes at the given location
    */
-  public getDataAtLoc(spatialID: SpatialID, loc: Vec2): SpatialBox[] {
-    const index = this.getIndex(spatialID, DATA);
+  public getItemsAtLoc(spatialID: SpatialID, loc: Vec2): SpatialBox[] {
+    const index = this.getCache(spatialID);
     const [x, y] = projWgs84ToWorld(loc);
     const epsilon = 1e-7 * WORLD_SCALE;
     const test = { minX: x - epsilon, minY: y - epsilon, maxX: x + epsilon, maxY: y + epsilon };
@@ -510,13 +330,13 @@ export class SpatialSystem extends AbstractSystem {
   }
 
   /**
-   * Does data exist at the given [lon,lat] coordinate?
-   * @param spatialID - the spatial cache to search
-   * @param loc - the search location (WGS84 [lon,lat])
-   * @return `true` if data exists there, `false` if not
+   * Does an item exist at the given [lon,lat] coordinate?
+   * @param spatialID - spatialID to search
+   * @param loc - search location (WGS84 [lon,lat])
+   * @return `true` if an item exists there, `false` if not
    */
-  public hasDataAtLoc(spatialID: SpatialID, loc: Vec2): boolean {
-    const index = this.getIndex(spatialID, DATA);
+  public hasItemsAtLoc(spatialID: SpatialID, loc: Vec2): boolean {
+    const index = this.getCache(spatialID);
     const [x, y] = projWgs84ToWorld(loc);
     const epsilon = 1e-7 * WORLD_SCALE;
     const test = { minX: x - epsilon, minY: y - epsilon, maxX: x + epsilon, maxY: y + epsilon };
@@ -524,15 +344,14 @@ export class SpatialSystem extends AbstractSystem {
   }
 
   /**
-   * This checks if the spatial cache already has something at that location, and if so,
-   *  moves the location down slightly to a location that doesn't conflict.
-   * Used for Markers in situations where you don't want them covering each other.
-   * @param spatialID - the spatial cache to search
-   * @param loc - the search location (WGS84 [lon,lat])
+   * Move a location south until no item collides there.
+   * Used for marker-like data when overlap should be avoided.
+   * @param spatialID - spatialID to search
+   * @param loc - search location (WGS84 [lon,lat])
    * @return Adjusted [lon,lat] coordinate
    */
-  public preventCoincidentLoc(spatialID: SpatialID, loc: Vec2): Vec2 {
-    const index = this.getIndex(spatialID, DATA);
+  public preventCoincidentItemLoc(spatialID: SpatialID, loc: Vec2): Vec2 {
+    const index = this.getCache(spatialID);
     const [x, startY] = projWgs84ToWorld(loc);
     let y = startY;
     const epsilon = 1e-7 * WORLD_SCALE;
@@ -543,59 +362,300 @@ export class SpatialSystem extends AbstractSystem {
       if (!didCollide) {
         return projWorldToWgs84([x, y]);
       } else {
-        // These are in world coordinates, so we are moving `y` south:
-        // 6356752 (polar radius in meters) * 0.9 (because ±85°) / 256 px * this number / WORLD_SCALE = meters moved?
-        y += 0.00001 * WORLD_SCALE;   // roughly 0.22 meters?
+        y += 0.00001 * WORLD_SCALE;
       }
     }
   }
 
 
   /**
+   * Phase 2 of a two-phase spatial query: a precise refine.
+   * Filters phase-1 candidates (from `getItemsAtBox` / `getItemsAtBoxes`) with a
+   * caller-supplied predicate.  Because `RBush` only indexes bounding boxes, phase 1 may
+   * return false positives; the predicate applies the exact test (distance, polygon
+   * overlap, …) the caller cares about.
+   *
+   * `SpatialSystem` never learns what "match" means — the predicate owns that semantic,
+   * keeping the spatial engine domain-agnostic.
+   *
+   * @param candidates - phase-1 candidate boxes to refine
+   * @param predicate - returns `true` to keep a candidate, `false` to drop it
+   * @return The candidates for which `predicate` returned `true`
+   */
+  public refineItems(candidates: SpatialBox[], predicate: (box: SpatialBox) => boolean): SpatialBox[] {
+    const results: SpatialBox[] = [];
+    for (const box of candidates) {
+      if (predicate(box)) {
+        results.push(box);
+      }
+    }
+    return results;
+  }
+
+
+  /**
+   * Insert data into the given spatial cache.
+   * (addData and replaceData are the same)
+   * @param legacyID - the spatial cache to insert into
+   * @param items - items to add
+   * @deprecated
+   */
+  public addData(legacyID: SpatialID, items: OneOrMore<AbstractData>): void {
+    this.replaceData(legacyID, items);
+  }
+
+
+  /**
+   * Insert or update data in the spatial cache.
+   * @param legacyID - the spatial cache to insert into
+   * @param items - items to replace
+   * @deprecated
+   */
+  public replaceData(legacyID: SpatialID, items: OneOrMore<AbstractData>): void {
+    const dataSpatialID = `${legacyID}-data`;
+
+    const toInsert: SpatialItem[] = [];
+    for (const data of utilIterable(items)) {
+      if (!data) continue;
+      const dataID = data.id;
+
+      // remove existing.. (also handles entries that now lack an extent)
+      this.removeItems(dataSpatialID, dataID);
+
+      // insert new..
+      const extent = data.geoms?.world?.extent;
+      if (!extent) continue;
+
+      toInsert.push({ id: dataID, extent, contents: data });
+    }
+
+    if (toInsert.length) {
+      this.replaceItems(dataSpatialID, toInsert);
+    }
+  }
+
+
+  /**
+   * Remove data from the spatial cache.
+   * Can pass either data or dataIDs for removal.
+   * @param legacyID - the spatial cache to remove from
+   * @param itemsOrIDs - items to remove
+   * @deprecated
+   */
+  public removeData(legacyID: SpatialID, itemsOrIDs: OneOrMore<AbstractData | DataID>): void {
+    const dataSpatialID = `${legacyID}-data`;
+    const toRemove: BoxID[] = [];
+
+    for (const item of utilIterable(itemsOrIDs)) {
+      const dataID = (typeof item === 'string') ? item : item?.id;
+      if (!dataID) continue;
+      toRemove.push(dataID);
+    }
+
+    if (toRemove.length) {
+      this.removeItems(dataSpatialID, toRemove);
+    }
+  }
+
+
+  /**
+   * Insert tiles into the spatial cache. This is how we mark data as loaded.
+   * @param legacyID - the spatial cache to insert into
+   * @param items - tiles to insert
+   * @deprecated
+   */
+  public addTiles(legacyID: SpatialID, items: OneOrMore<Tile>): void {
+    const tileSpatialID = `${legacyID}-tiles`;
+
+    const toInsert: SpatialItem[] = [];
+    for (const tile of utilIterable(items)) {
+      if (!tile) continue;
+      const tileID = tile.id;
+
+      // skip if tile is already indexed
+      if (this.hasItem(tileSpatialID, tileID)) continue;
+
+      // insert new.. (we are assuming dataIDs will never look like tileIDs.)
+      const extent = tile.worldExtent;  // already in world (z16) coordinates
+      if (!extent) continue;
+
+      toInsert.push({ id: tileID, extent, contents: tile });
+    }
+
+    if (toInsert.length) {
+      this.replaceItems(tileSpatialID, toInsert);
+    }
+  }
+
+
+  /**
+   * Remove tiles from the spatial cache.
+   * Can pass either tiles or tileIDs for removal.
+   * @param legacyID - the spatial cache to remove from
+   * @param itemsOrIDs - items to remove
+   * @deprecated
+   */
+  public removeTiles(legacyID: SpatialID, itemsOrIDs: OneOrMore<Tile | TileID>): void {
+    const tileSpatialID = `${legacyID}-tiles`;
+    const toRemove: BoxID[] = [];
+
+    for (const item of utilIterable(itemsOrIDs)) {
+      const tileID = (typeof item === 'string') ? item : item?.id;
+      if (!tileID) continue;
+      toRemove.push(tileID);
+    }
+
+    if (toRemove.length) {
+      this.removeItems(tileSpatialID, toRemove);
+    }
+  }
+
+
+  /**
+   * Get already loaded and cached data that appears in the current map view
+   * @param legacyID - the spatial cache to search
+   * @return Array of boxes in the current map view
+   * @deprecated
+   */
+  public getVisibleData(legacyID: SpatialID): SpatialBox[] {
+    const index = this.getCache(`${legacyID}-data`);
+    const viewport = this.context.viewport;
+    return index.rbush.search(viewport.visibleWorldExtent().bbox());
+  }
+
+  /**
+   * Return the requested data.
+   * @param legacyID - the spatial cache to search
+   * @param dataID - the dataID to lookup
+   * @return The data if found, or `undefined` if not found
+   * @deprecated
+   */
+  public getData<T extends AbstractData = AbstractData>(legacyID: Nullable<SpatialID>, dataID: Nullable<DataID>): T | undefined {
+    return this.getItem<T>(legacyID ? `${legacyID}-data` as SpatialID : null, dataID);
+  }
+
+  /**
+   * Return all data in the given spatial cache, regardless of visibility.
+   * @param legacyID - the spatial cache to search
+   * @return Array of all data contents in the cache
+   * @deprecated
+   */
+  public getAllData<T extends AbstractData = AbstractData>(legacyID: SpatialID): T[] {
+    return this.getAllItems<T>(`${legacyID}-data` as SpatialID);
+  }
+
+  /**
+   * Is the given dataID one we know about?
+   * @param legacyID - the spatial cache to search
+   * @param dataID - the dataID to lookup
+   * @return `true` if data exists, `false` if not
+   * @deprecated
+   */
+  public hasData(legacyID: SpatialID, dataID: DataID): boolean {
+    return this.hasItem(`${legacyID}-data` as SpatialID, dataID);
+  }
+
+  /**
+   * Search for data within the given spatial cache and search box.
+   * @param legacyID - the spatial cache to search
+   * @param box - the search box (make sure to use world coordinates here)
+   * @return Array of boxes in the given search box
+   * @deprecated
+   */
+  public getDataAtBox(legacyID: SpatialID, box: BBox): SpatialBox[] {
+    const index = this.getCache(`${legacyID}-data`);
+    return index.rbush.search(box);
+  }
+
+  /**
+   * Does data exist in the given search box?
+   * @param legacyID - the spatial cache to search
+   * @param box - the search box (make sure to use world coordinates here)
+   * @return `true` if something exists, `false` if not
+   * @deprecated
+   */
+  public hasDataAtBox(legacyID: SpatialID, box: BBox): boolean {
+    return this.hasItemsAtBox(`${legacyID}-data` as SpatialID, box);
+  }
+
+  /**
+   * Search for data at the given [lon,lat] coordinate.
+   * @param legacyID - the spatial cache to search
+   * @param loc - the search location (WGS84 [lon,lat])
+   * @return Array of boxes at the given location
+   * @deprecated
+   */
+  public getDataAtLoc(legacyID: SpatialID, loc: Vec2): SpatialBox[] {
+    return this.getItemsAtLoc(`${legacyID}-data` as SpatialID, loc);
+  }
+
+  /**
+   * Does data exist at the given [lon,lat] coordinate?
+   * @param legacyID - the spatial cache to search
+   * @param loc - the search location (WGS84 [lon,lat])
+   * @return `true` if data exists there, `false` if not
+   * @deprecated
+   */
+  public hasDataAtLoc(legacyID: SpatialID, loc: Vec2): boolean {
+    return this.hasItemsAtLoc(`${legacyID}-data` as SpatialID, loc);
+  }
+
+  /**
+   * This checks if the spatial cache already has something at that location, and if so,
+   *  moves the location down slightly to a location that doesn't conflict.
+   * Used for Markers in situations where you don't want them covering each other.
+   * @param legacyID - the spatial cache to search
+   * @param loc - the search location (WGS84 [lon,lat])
+   * @return Adjusted [lon,lat] coordinate
+   * @deprecated
+   */
+  public preventCoincidentLoc(legacyID: SpatialID, loc: Vec2): Vec2 {
+    return this.preventCoincidentItemLoc(`${legacyID}-data` as SpatialID, loc);
+  }
+
+
+  /**
    * Return the requested tile.
-   * @param spatialID - the spatial cache to search
+   * @param legacyID - the spatial cache to search
    * @param tileID - the tileID to lookup
    * @return The tile if found, or `undefined` if not found
+   * @deprecated
    */
-  public getTile(spatialID: SpatialID, tileID: TileID): Tile | undefined {
-    const index = this.getIndex(spatialID, TILES);
-    return index.boxes.get(tileID)?.contents as Tile | undefined;
+  public getTile(legacyID: SpatialID, tileID: TileID): Tile | undefined {
+    return this.getItem<Tile>(`${legacyID}-tiles` as SpatialID, tileID);
   }
 
   /**
    * Is the given tileID one we know about?
-   * @param spatialID - the spatial cache to search
+   * @param legacyID - the spatial cache to search
    * @param tileID - the tileID to lookup
    * @return `true` if the tile is loaded, `false` if not
+   * @deprecated
    */
-  public hasTile(spatialID: SpatialID, tileID: TileID): boolean {
-    const index = this.getIndex(spatialID, TILES);
-    return index.boxes.has(tileID);
+  public hasTile(legacyID: SpatialID, tileID: TileID): boolean {
+    return this.hasItem(`${legacyID}-tiles` as SpatialID, tileID);
   }
 
   /**
    * Does a tile exist in the given search box?
-   * @param spatialID - the spatial cache to search
-    * @param box - the search box (world coordinates, z16)
+   * @param legacyID - the spatial cache to search
+   * @param box - the search box (world coordinates, z16)
    * @return `true` if something exists, `false` if not
+   * @deprecated
    */
-  public hasTileAtBox(spatialID: SpatialID, box: BBox): boolean {
-    const index = this.getIndex(spatialID, TILES);
-    return index.rbush.collides(box);
+  public hasTileAtBox(legacyID: SpatialID, box: BBox): boolean {
+    return this.hasItemsAtBox(`${legacyID}-tiles` as SpatialID, box);
   }
 
   /**
    * Is a tile loaded at the given [lon,lat] coordinate?
-   * @param spatialID - the spatial cache to search
+   * @param legacyID - the spatial cache to search
    * @param loc - the search location (WGS84 [lon,lat])
    * @return `true` if a tile has been loaded there, `false` if not
+   * @deprecated
    */
-  public hasTileAtLoc(spatialID: SpatialID, loc: Vec2): boolean {
-    const index = this.getIndex(spatialID, TILES);
-    const [x, y] = projWgs84ToWorld(loc);
-    const epsilon = 1e-7 * WORLD_SCALE;
-    const test = { minX: x - epsilon, minY: y - epsilon, maxX: x + epsilon, maxY: y + epsilon };
-    return index.rbush.collides(test);
+  public hasTileAtLoc(legacyID: SpatialID, loc: Vec2): boolean {
+    return this.hasItemsAtLoc(`${legacyID}-tiles` as SpatialID, loc);
   }
 
 }

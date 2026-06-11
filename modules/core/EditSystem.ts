@@ -20,8 +20,17 @@ const OSM_BASE: SpatialID = 'osm-base';
 const OSM_STABLE: SpatialID = 'osm-stable';
 /** SpatialID of the OSM spatial cache reflecting the work-in-progress (staging) graph */
 const OSM_STAGING: SpatialID = 'osm-staging';
-/** Name of the segments index within an OSM spatial cache */
-const SEGMENTS = 'segments';
+/** Suffix used for segment spatial caches */
+const SEGMENTS_SUFFIX = '--segments';
+
+/**
+ * Return the flat spatialID used for way segments associated with an OSM cache.
+ * @param spatialID - base OSM spatialID
+ * @return flat segment spatialID
+ */
+function segmentSpatialID(spatialID: SpatialID): SpatialID {
+  return `${spatialID}${SEGMENTS_SUFFIX}` as SpatialID;
+}
 
 
 /** Options for commit/commitAppend */
@@ -921,7 +930,7 @@ export class EditSystem extends AbstractSystem {
       maxX: Math.max(ax, bx), maxY: Math.max(ay, by)
     };
 
-    return spatial.getItemsAtBox(spatialID, SEGMENTS, box).map(hit => hit.contents as Segment);
+    return spatial.getItemsAtBox(segmentSpatialID(spatialID), box).map(hit => hit.contents as Segment);
   }
 
 
@@ -1704,13 +1713,14 @@ export class EditSystem extends AbstractSystem {
 
     const tracker = this._segmentTracker(spatialID);
     const prevIDs = tracker.get(way.id);
+    const segSpatialID = segmentSpatialID(spatialID);
     if (prevIDs?.length) {
-      spatial.removeItems(spatialID, SEGMENTS, prevIDs);
+      spatial.removeItems(segSpatialID, prevIDs);
     }
 
     const items = this._segmentItems(way, graph);
     if (items.length) {
-      spatial.replaceItems(spatialID, SEGMENTS, items);
+      spatial.replaceItems(segSpatialID, items);
       tracker.set(way.id, items.map(item => item.id));
     } else {
       tracker.delete(way.id);
@@ -1730,8 +1740,9 @@ export class EditSystem extends AbstractSystem {
 
     const tracker = this._segmentTracker(spatialID);
     const prevIDs = tracker.get(wayID);
+    const segSpatialID = segmentSpatialID(spatialID);
     if (prevIDs?.length) {
-      spatial.removeItems(spatialID, SEGMENTS, prevIDs);
+      spatial.removeItems(segSpatialID, prevIDs);
     }
     tracker.delete(wayID);
   }

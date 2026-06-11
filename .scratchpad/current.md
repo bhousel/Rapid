@@ -17,8 +17,14 @@ determine how much already exists in OSM (conflation). Buffers are quantized "co
   double-covered. Refactored `PixiLayerLabels.placeRopeLabel` to consume it (dropped the
   `getLineSegments` + manual box-math nested loop). 13 new unit tests in `test/unit/geo/geom.test.js`.
   `GeometryPart.computeCoverage(r)` still TODO (deferred to when a conflation consumer needs it).
-- **3c** — `SpatialSystem.getItemsAtBoxes()` + generic predicate refine; add `buffers` index for
-  the reverse query.
+- **3c — Query plumbing** ✅ done. `SpatialSystem.getItemsAtBoxes(spatialID, boxes)`
+  (phase-1 bbox prefilter over many boxes, deduped by `boxID`) + `refineItems(candidates, predicate)`
+  (phase-2 precise refine with a caller-supplied predicate — SpatialSystem stays domain-agnostic).
+  Follow-up simplification: SpatialSystem storage is now **flat** (one RBush per `spatialID`, no nested
+  cache/index map), and the legacy `(spatialID, indexID, ...)` API overloads are removed.
+  Callers now use flat IDs directly (e.g. `osm-staging--segments`) with
+  `replaceItems`/`removeItems`/`getItemsAtBox`/`getItemsAtBoxes` flat signatures only.
+  SpatialSystem unit tests were migrated and still pass.
 - **3d** — `Conflation` module (graduates the `PixiLayerDebug` POC); owns match semantics.
 
 ### Notes / gotchas

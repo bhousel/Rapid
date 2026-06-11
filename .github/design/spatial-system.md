@@ -71,21 +71,16 @@ Loosen the rigid cache so it holds an open-ended map of named indexes, each pair
 Sketch (final names/shape TBD in implementation):
 
 ```ts
-interface SpatialIndex {
+interface SpatialCache {
   id: string;                          // 'data', 'tiles', 'segments', 'buffers'
   boxes: Map<BoxID, SpatialBox>;
   rbush: RBush<SpatialBox>;
-}
-
-interface SpatialCache {
-  id: SpatialID;
-  indexes: Map<string, SpatialIndex>;  // replaces tiles/data + tileRBush/dataRBush
 }
 ```
 
 `SpatialBox.contents` becomes generic (`unknown` / a type param) plus a `kind` discriminator so callers can tell what they got back. The existing `addData`/`addTiles`/`getVisibleData`/etc. become thin wrappers over a generic index API (`index('data')`, `index('tiles')`), so this is a **non-breaking refactor first** — public behavior is unchanged, the internals just stop being hardcoded.
 
-**Hard rule:** `SpatialSystem` / `SpatialIndex` must not have specialized knowledge of the things they store. A segment, a buffer, an OSM entity, a photo — all are just "something with a bbox and some `contents`" to the index. The meaning lives in the calling code.
+**Hard rule:** `SpatialSystem` / `SpatialCache` must not have specialized knowledge of the things they store. A segment, a buffer, an OSM entity, a photo — all are just "something with a bbox and some `contents`" to the index. The meaning lives in the calling code.
 
 ### 4. Way segments (point 2)
 
@@ -141,7 +136,7 @@ For lines this gives **partial matching for free** — each box is a spatial uni
 - **Step 3:** Coverage/buffers + two-phase querying for conflation. Broken into:
   - **3a — Lazy `GeometryPart`:** move derived products (`hull`, `centroid`, `poi`, `area`, `winding`, `surround`, `flat`) behind lazy memoized getters. Memory win, no behavior change, fully testable. Sets up `coverage` as one more lazy product.
   - **3b — Coverage helper:** a pure `geomCoverageBoxes(coords, r, step)` in `modules/geo` + `GeometryPart.computeCoverage(r)` (radius is a recompute parameter). Coverage representation is per type (point → one box, line → boxes along the line, polygon → grown extent box). Unit-test coverage for each type.
-  - **3c — Query plumbing:** `SpatialSystem.getItemsAtBoxes(boxes[])` (dedup hits) + a generic refine that takes a caller-supplied predicate. Phase-2 uses existing `geom*` primitives. Add the `buffers` index to support the reverse query.
+  - **3c — Query plumbing:** ✅ Done. `SpatialSystem.getItemsAtBoxes(spatialID, boxes)` (phase-1 prefilter over many boxes, deduped by `boxID`) + `refineItems(candidates, predicate)` (phase-2 precise refine with a caller-supplied predicate). Phase-2 uses existing `geom*` primitives in the *calling* code. The `buffers` index is a normal flat spatialID. After implementing 3c we simplified storage further: `SpatialSystem` is now flat (`Map<spatialID, RBush>`), and legacy `(spatialID, indexID)` overloads were removed. Callers use flat IDs like `osm-staging--segments` directly.
   - **3d — Conflation module:** replace the `PixiLayerDebug` hack with a real per-type conflation pass (POI dedup, building filter, partial-sidewalk suggestion). Owns the match semantics.
 - **Step 4:** Build richer cross-layer conflation/styling queries on top (incl. reverse "which OSM features overlap third-party data").
 
