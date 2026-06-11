@@ -8,8 +8,8 @@ Items planned but not yet started.
 - **Tile padding off-thread if measurable**: `_fromEdgePaddedCanvas()` does two canvas draws per tile on the main thread. If profiles show it matters, build the edge-padded tile source on a worker `OffscreenCanvas` and transfer an `ImageBitmap` back; GPU upload still stays with the Pixi renderer unless the renderer itself moves off-thread.
 
 ## Line marker placement (oneway arrows, sided markers)
-- Today `getLineSegments` regenerates marker positions per-frame in the feature's update path, with an arbitrary 100-marker cap (`Rapid#544`) to keep long lines from spawning thousands of sprites.
-- Better approach (mirrors the label system): compute marker placement once in stable world coordinates, store as a list of `{worldCoord, angle}` records on the feature, and emit sprites only for the subset whose world position intersects the viewport. The cap goes away naturally — a 100km road only emits sprites for the ~few-dozen markers actually on screen.
+- Today `geomGetPositionsAlongLine` (moved from `pixi/helpers.ts` to `geo/geom.ts`) regenerates marker positions per-frame in the feature's update path, with an arbitrary 100-marker cap (`Rapid#544`, the `isLimited` param) to keep long lines from spawning thousands of sprites.
+- Better approach (mirrors the label system): compute marker placement once in stable world coordinates, store as a list of `{worldCoord, angle}` records on the feature, and emit sprites only for the subset whose world position intersects the viewport. The cap (and the `isLimited` param) goes away naturally — a 100km road only emits sprites for the ~few-dozen markers actually on screen.
 - Spacing should be expressed in world units derived from a target screen-px spacing at a reference zoom, so density stays visually consistent.
 - Sprite lifecycle would mirror PixiLayerLabels' RBush+renderObjects pattern: reuse sprites, destroy when scrolled offscreen, repopulate when scrolled back in.
 

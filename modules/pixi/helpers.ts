@@ -1,5 +1,5 @@
 import * as PIXI from 'pixi.js';
-import { vecAdd, vecAngle, vecEqual, vecLength, type Vec2 } from '@rapid-sdk/math';
+import { vecEqual, vecLength, type Vec2 } from '@rapid-sdk/math';
 
 
 /** Line style options for lineToPoly */
@@ -18,14 +18,6 @@ export interface LineToPolyResult {
   outer?: number[];
   /** Flattened inner path (for closed lines only) */
   inner?: number[];
-}
-
-/** Segment returned by getLineSegments */
-export interface LineSegment {
-  /** Array of [x,y] coordinates along the segment */
-  coords: Vec2[];
-  /** Heading angle in radians */
-  angle: number;
 }
 
 
@@ -299,91 +291,6 @@ export function lineToPoly(flatPoints: number[], lineStyle: LineStyle = {}): Lin
   }
 
   return result;
-}
-
-
-/**
- * This walks a line and breaks it up into segments containing coordinates at given spacing that share a heading.
- * It is used to position oneway arrows, or sided markers, or cover a line in bounding boxes for labeling purposes.
- * For example:
- * ```
- *   a --- b       [{ coords: [>,>,>,>], angle: 0     },
- *         |   ->   { coords: [v,v],     angle: -PI/2 },
- *   d --- c        { coords: [<,<,<,<], angle: PI    }]
- * ```
- *
- * @param   points      - Array of [x,y] coordinates that make up the line.
- * @param   spacing     - Distance between segments (in the same units as `points`)
- * @param   isSided     - If applying a 'sided' style to the line, arrows will be drawn perpendicular to the line segments.
- * @param   isLimited   - Whether to limit the number (temporary, see below)
- * @param   sidedOffset - Perpendicular offset used for sided markers (in the same units as `points`). Default 7.
- * @return  Array of segment Objects in the format { coords: Array<Vec2>, angle: number }
- */
-export function getLineSegments(
-  points: Vec2[],
-  spacing: number,
-  isSided: boolean = false,
-  isLimited: boolean = false,
-  sidedOffset: number = 7
-): LineSegment[] {
-  let offset = spacing;
-  let a: Vec2 | undefined;
-
-  const segments: LineSegment[] = [];
-  for (const b of points) {
-    if (a) {
-      let span = vecLength(a, b) - offset;
-
-      if (span >= 0) {
-        const heading = vecAngle(a, b);
-
-        // temporary, see https://github.com/facebook/Rapid/issues/544
-        // If we would generate more than 100 markers on this segment, widen the spacing
-        // so exactly 100 fit instead.  Use a segment-local variable so the adjusted
-        // spacing doesn't bleed into subsequent point-pairs on the same line.
-        // Note: when the condition holds, span/100 >= spacing > 0 (no risk of zero-step).
-        let segSpacing = spacing;
-        if (isLimited && (span >= spacing * 100)) {
-          segSpacing = span / 100;
-        }
-
-        const dx = segSpacing * Math.cos(heading);
-        const dy = segSpacing * Math.sin(heading);
-
-        let sided_dx = 0;
-        let sided_dy = 0;
-        // For 'sided' segments, we want to offset the arrows so that they are not centered on the line segment's path
-        if (isSided) {
-          sided_dx = sidedOffset * Math.cos(heading + Math.PI / 2);
-          sided_dy = sidedOffset * Math.sin(heading + Math.PI / 2);
-        }
-
-        let p: Vec2 = [
-          a[0] + offset * Math.cos(heading) + sided_dx,
-          a[1] + offset * Math.sin(heading) + sided_dy
-        ];
-
-        // generate coordinates between `a` and `b`, spaced `segSpacing` apart
-        const coords: Vec2[] = [a, p];
-
-        for (span -= segSpacing; span >= 0; span -= segSpacing) {
-          p = vecAdd(p, [dx, dy]);
-          coords.push(p);
-        }
-        coords.push(b);
-
-        segments.push({
-          coords: coords.slice(1, -1),   // skip first and last
-          angle: heading + (isSided ? Math.PI / 2 : 0)
-        });
-      }
-
-      offset = -span;
-    }
-    a = b;
-  }
-
-  return segments;
 }
 
 

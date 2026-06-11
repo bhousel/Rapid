@@ -2,7 +2,8 @@ import * as PIXI from 'pixi.js';
 import { AbstractPixiFeature } from './AbstractPixiFeature.ts';
 import { DashLine } from './lib/DashLine.ts';
 import { GlowFilter } from 'pixi-filters';
-import { getLineSegments, lineToPoly, type LineToPolyResult } from './helpers.ts';
+import { lineToPoly, type LineToPolyResult } from './helpers.ts';
+import { geomLineSegments } from '../geo/index.ts';
 import { WORLD_ZOOM } from '@rapid-sdk/math';
 
 import type { AbstractPixiLayer } from './AbstractPixiLayer.ts';
@@ -154,7 +155,7 @@ export class PixiFeatureLine extends AbstractPixiFeature {
       // Show line markers (e.g. oneway arrows)
       if (lineMarkerTextureID) {
         const lineMarkerTexture = textureManager.getTexture('symbol', lineMarkerTextureID) || PIXI.Texture.WHITE;
-        const segments = getLineSegments(points, ONEWAY_SPACING * localScale, false, true);  /* sided = false, limited = true */
+        const segments = geomLineSegments(points, ONEWAY_SPACING * localScale, false, true);  /* sided = false, limited = true */
         segments.forEach(segment => {
           segment.coords.forEach(([x, y]) => {
             const sprite = new PIXI.Sprite(lineMarkerTexture);
@@ -173,7 +174,7 @@ export class PixiFeatureLine extends AbstractPixiFeature {
       // Show side markers (e.g. sided triangles)
       if (sideMarkerTextureID) {
         const sideMarkerTexture = textureManager.getTexture('symbol', sideMarkerTextureID) || PIXI.Texture.WHITE;
-        const segments = getLineSegments(points, SIDED_SPACING * localScale, true, true, 7 * localScale);  /* sided = true, limited = true */
+        const segments = geomLineSegments(points, SIDED_SPACING * localScale, true, true, 7 * localScale);  /* sided = true, limited = true */
         segments.forEach(segment => {
           segment.coords.forEach(([x, y]) => {
             const sprite = new PIXI.Sprite(sideMarkerTexture);

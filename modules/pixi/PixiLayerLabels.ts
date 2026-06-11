@@ -3,7 +3,8 @@ import { AbstractPixiLayer } from './AbstractPixiLayer.ts';
 import { HALF_PI, TAU, WORLD_HALF, numWrap, vecAdd, vecAngle, vecScale, vecSubtract, geomRotate } from '@rapid-sdk/math';
 import { PixiFeatureLabel } from './PixiFeatureLabel.ts';
 import RBush from 'rbush';
-import { getLineSegments, getDebugBBox, lineToPoly } from './helpers.ts';
+import { getDebugBBox, lineToPoly } from './helpers.ts';
+import { geomCoverageBoxes } from '../geo/index.ts';
 
 import type { AbstractPixiFeature } from './AbstractPixiFeature.ts';
 import type { BBox } from 'rbush';
@@ -1004,8 +1005,10 @@ export class PixiLayerLabels extends AbstractPixiLayer {
     // We'll break long chains into smaller regions and center a label within each region
     const maxChainLength = numBoxes + 15;
 
-    // Cover the line in bounding boxes
-    const segments = getLineSegments(coords, boxsize);
+    // Cover the line in bounding boxes.
+    // `geomCoverageBoxes` walks the line placing square boxes (half-size `boxhalf`)
+    // every `boxsize` units, each carrying that segment's heading angle.
+    const coverage = geomCoverageBoxes(coords, boxhalf, boxsize);
 
     const labelBoxes: LabelBox[] = [];
     const debugBoxes: LabelBox[] = [];
@@ -1029,72 +1032,70 @@ export class PixiLayerLabels extends AbstractPixiLayer {
     };
 
 
-    // Walk the line, creating chains of bounding boxes,
+    // Walk the coverage boxes, creating chains of bounding boxes,
     // and testing for candidate chains where labels can go.
-    segments.forEach((segment, segmentIndex) => {
-      const currAngle = numWrap(segment.angle, 0, TAU);  // normalize to 0…2π
+    const EPSILON = 0.01;
+    coverage.forEach((cbox, boxIndex) => {
+      const currAngle = numWrap(cbox.angle, 0, TAU);  // normalize to 0…2π
+      const coord = cbox.coord;
 
-      segment.coords.forEach((coord, coordIndex) => {
-        const [x, y] = coord;
-        const EPSILON = 0.01;
-        const labelBox: LabelBox = {
-          type: 'label',
-          id: `${featureID}-${segmentIndex}-${coordIndex}`,
-          featureID: featureID,
-          labelID: null,   // will be assigned below if this spot gets a label
-          minX: x - boxhalf + EPSILON,
-          minY: y - boxhalf + EPSILON,
-          maxX: x + boxhalf - EPSILON,
-          maxY: y + boxhalf - EPSILON
-        };
+      const labelBox: LabelBox = {
+        type: 'label',
+        id: `${featureID}-${boxIndex}`,
+        featureID: featureID,
+        labelID: null,   // will be assigned below if this spot gets a label
+        minX: cbox.minX + EPSILON,
+        minY: cbox.minY + EPSILON,
+        maxX: cbox.maxX - EPSILON,
+        maxY: cbox.maxY - EPSILON
+      };
 
-        const debugBox: LabelBox = {
-          type: 'debug',
-          id: labelBox.id + '-debug',
-          featureID: featureID,
-          tint: 0x00ff00,   // may be changed below
-          objectID: null,
-          minX: labelBox.minX,
-          minY: labelBox.minY,
-          maxX: labelBox.maxX,
-          maxY: labelBox.maxY
-        };
+      const debugBox: LabelBox = {
+        type: 'debug',
+        id: labelBox.id + '-debug',
+        featureID: featureID,
+        tint: 0x00ff00,   // may be changed below
+        objectID: null,
+        minX: labelBox.minX,
+        minY: labelBox.minY,
+        maxX: labelBox.maxX,
+        maxY: labelBox.maxY
+      };
 
-        // Avoid placing labels where the line bends too much..
-        let tooBendy = false;
-        if (prevAngle !== null) {
-          // compare angles properly: https://stackoverflow.com/a/1878936/7620
-          const diff = Math.abs(currAngle - prevAngle);
-          tooBendy = Math.min(TAU - diff, diff) > BENDLIMIT;
-        }
-        prevAngle = currAngle;
+      // Avoid placing labels where the line bends too much..
+      let tooBendy = false;
+      if (prevAngle !== null) {
+        // compare angles properly: https://stackoverflow.com/a/1878936/7620
+        const diff = Math.abs(currAngle - prevAngle);
+        tooBendy = Math.min(TAU - diff, diff) > BENDLIMIT;
+      }
+      prevAngle = currAngle;
 
-        if (tooBendy) {
+      if (tooBendy) {
+        finishChain();
+        debugBox.tint = 0xff33ff;  // magenta (too bendy)
+
+      } else if (this._labelRBush.collides(labelBox)) {
+        finishChain();
+        debugBox.tint = 0xff0000;  // red (collision)
+
+      } else {   // Label can go here..
+        debugBox.tint = 0x00ff00;  // green (ok)
+        currChain.push({
+          labelBox: labelBox,
+          debugBox: debugBox,
+          coord: coord,
+          angle: currAngle
+        });
+        if (currChain.length === maxChainLength) {
           finishChain();
-          debugBox.tint = 0xff33ff;  // magenta (too bendy)
-
-        } else if (this._labelRBush.collides(labelBox)) {
-          finishChain();
-          debugBox.tint = 0xff0000;  // red (collision)
-
-        } else {   // Label can go here..
-          debugBox.tint = 0x00ff00;  // green (ok)
-          currChain.push({
-            labelBox: labelBox,
-            debugBox: debugBox,
-            coord: coord,
-            angle: currAngle
-          });
-          if (currChain.length === maxChainLength) {
-            finishChain();
-          }
         }
+      }
 
-        if (showDebug) {
-          this._cacheBox(debugBox);
-          debugBoxes.push(debugBox);
-        }
-      });
+      if (showDebug) {
+        this._cacheBox(debugBox);
+        debugBoxes.push(debugBox);
+      }
     });
 
     finishChain();

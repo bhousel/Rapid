@@ -9,17 +9,24 @@ determine how much already exists in OSM (conflation). Buffers are quantized "co
 (fast, not mathematically exact), per geometry type. The buffer doubles as the RBush query.
 
 ### Sub-steps
-- **3a — Lazy `GeometryPart`** ← *in progress*. Move derived products (`hull`, `centroid`,
-  `poi`, `area`, `winding`, `surround`, `flat`) behind lazy memoized getters. `update()` keeps
-  the cheap core (coords/extent/origin/outer) eager. `clone()` re-derives from `orig` instead of
-  deep-copying computed values. No caller changes; callers still read `.world.hull` etc.
-- **3b** — `geomCoverageBoxes()` in `modules/geo` + `GeometryPart.computeCoverage(r)` (radius is
-  a recompute parameter, not baked into `setData`).
+- **3a — Lazy `GeometryPart`** ✅ done (`328a4c388`). Derived products are lazy memoized getters;
+  `clone()` re-derives from `orig`.
+- **3b — Coverage helper** ✅ done. `geomCoverageBoxes(coords, radius, step?)` in
+  [modules/geo/geom.ts](../modules/geo/geom.ts) — unit-agnostic; point → one box, polyline →
+  boxes every `step` along each segment (each carries heading angle), shared vertices not
+  double-covered. Refactored `PixiLayerLabels.placeRopeLabel` to consume it (dropped the
+  `getLineSegments` + manual box-math nested loop). 13 new unit tests in `test/unit/geo/geom.test.js`.
+  `GeometryPart.computeCoverage(r)` still TODO (deferred to when a conflation consumer needs it).
 - **3c** — `SpatialSystem.getItemsAtBoxes()` + generic predicate refine; add `buffers` index for
   the reverse query.
 - **3d** — `Conflation` module (graduates the `PixiLayerDebug` POC); owns match semantics.
 
 ### Notes / gotchas
+- `geomCoverageBoxes` is unit-agnostic (radius/step in the same planar units as coords). Labels
+  pass pixel sizes; conflation will pass world units (meters→world conversion done by the caller).
+- Label box sampling changed slightly: `geomCoverageBoxes` includes segment endpoints/vertices and
+  samples uniformly, vs. `getLineSegments`' offset-accumulating, endpoint-skipping behavior. All
+  unit + browser tests still pass; placement is visually equivalent/cleaner.
 - Phase-2 predicates already exist in `@rapid-sdk/math` (`geomPointInPolygon`,
   `geomPolygonIntersectsPolygon`, `geomPolygonContainsPolygon`, `geomLineIntersection`,
   `vecProject`/`vecLength`). We control `rapid-sdk`, so new helpers can start in `modules/geo`.
