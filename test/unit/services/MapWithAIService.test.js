@@ -186,8 +186,8 @@ describe('MapWithAIService', () => {
 
         await Bun.sleep(5);  // after all fetches have settled
         const tileID = '8647,8192,14';
-        const spatial = context.systems.spatial;
-        assert.isTrue(spatial.hasTile('mapwithai-msBuildings', tileID), 'tile at [10°, 0°] was loaded');
+        const network = context.systems.network;
+        assert.isTrue(network.isCompleted(`mapwithai-msBuildings-tile-${tileID}`), 'tile at [10°, 0°] was loaded');
         assert.lengthOf(fetchMock.callHistory.calls(), 1, 'fetch called once');
         assert.lengthOf(spyRedraw.mock.calls, 1, 'redraw called once');
         assert.lengthOf(spyError.mock.calls, 0, 'console.error not called');
@@ -205,8 +205,8 @@ describe('MapWithAIService', () => {
 
         await Bun.sleep(5);  // after all fetches have settled
         const tileID = '8647,8192,14';
-        const spatial = context.systems.spatial;
-        assert.isTrue(spatial.hasTile('mapwithai-msBuildings', tileID), 'tile at [10°, 0°] was loaded');
+        const network = context.systems.network;
+        assert.isTrue(network.isCompleted(`mapwithai-msBuildings-tile-${tileID}`), 'tile at [10°, 0°] was loaded');
         assert.lengthOf(fetchMock.callHistory.calls(), 1, 'fetch called once');
         assert.lengthOf(spyRedraw.mock.calls, 1, 'redraw called once');
       });
@@ -221,8 +221,8 @@ describe('MapWithAIService', () => {
 
         await Bun.sleep(5);  // after all fetches have settled
         const tileID = '8647,8192,14';
-        const spatial = context.systems.spatial;
-        assert.isTrue(spatial.hasTile('mapwithai-msBuildings', tileID), 'tile at [10°, 0°] was loaded');
+        const network = context.systems.network;
+        assert.isTrue(network.isCompleted(`mapwithai-msBuildings-tile-${tileID}`), 'tile at [10°, 0°] was loaded');
 
         context.viewport.transform.v++;        // touch viewport
         _mapwithai.loadTiles('msBuildings');   // try again
@@ -247,9 +247,9 @@ describe('MapWithAIService', () => {
 
         await Bun.sleep(5);  // after all fetches have settled
 
-        const spatial = context.systems.spatial;
-        assert.isFalse(spatial.hasTile('mapwithai-msBuildings', '8647,8192,14'), 'old tile at [10°, 0°] was not loaded');
-        assert.isTrue(spatial.hasTile('mapwithai-msBuildings', '9102,8192,14'), 'new tile at [20°, 0°] was loaded');
+        const network = context.systems.network;
+        assert.isFalse(network.isCompleted('mapwithai-msBuildings-tile-8647,8192,14'), 'old tile at [10°, 0°] was not loaded');
+        assert.isTrue(network.isCompleted('mapwithai-msBuildings-tile-9102,8192,14'), 'new tile at [20°, 0°] was loaded');
         assert.lengthOf(fetchMock.callHistory.calls(), 2, 'fetch called twice - but one was aborted');
         assert.lengthOf(spyRedraw.mock.calls, 1, 'redraw called once');
         assert.lengthOf(spyError.mock.calls, 0, 'console.error not called');
@@ -262,8 +262,8 @@ describe('MapWithAIService', () => {
 
         await Bun.sleep(5);  // after all fetches have settled
         const tileID = '8647,8192,14';
-        const spatial = context.systems.spatial;
-        assert.isFalse(spatial.hasTile('mapwithai-msBuildings', tileID), 'tile at [10°, 0°] was not loaded');
+        const network = context.systems.network;
+        assert.isFalse(network.isCompleted(`mapwithai-msBuildings-tile-${tileID}`), 'tile at [10°, 0°] was not loaded');
         assert.lengthOf(fetchMock.callHistory.calls(), 1, 'fetch called once');
         assert.lengthOf(spyRedraw.mock.calls, 0, 'redraw not called');
         assert.lengthOf(spyError.mock.calls, 1, 'console.error called once');

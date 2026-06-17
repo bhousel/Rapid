@@ -45,9 +45,9 @@ describe('OsmService.worker listeners', () => {
       }, signal);
 
       assert.isTrue(result.ok);
-      assert.isObject(result.results);
-      assert.isArray(result.results.data);
-      assert.isAbove(result.results.data.length, 0, 'should parse at least one element');
+      assert.isObject(result.value);
+      assert.isArray(result.value.data);
+      assert.isAbove(result.value.data.length, 0, 'should parse at least one element');
     });
 
     it('passes parser options through', async () => {
@@ -66,7 +66,7 @@ describe('OsmService.worker listeners', () => {
       }, signal);
 
       assert.isTrue(result.ok);
-      assert.isArray(result.results.data);
+      assert.isArray(result.value.data);
     });
 
     it('passes RequestInit options to fetch', async () => {
@@ -112,9 +112,9 @@ describe('OsmService.worker listeners', () => {
       }, signal);
 
       assert.isTrue(result.ok);
-      assert.isObject(result.results);
-      assert.isArray(result.results.data);
-      assert.isAbove(result.results.data.length, 0, 'should parse at least one element');
+      assert.isObject(result.value);
+      assert.isArray(result.value.data);
+      assert.isAbove(result.value.data.length, 0, 'should parse at least one element');
     });
   });
 
@@ -135,7 +135,7 @@ describe('OsmService.worker listeners', () => {
       assert.strictEqual(result.status, 404);
       assert.strictEqual(result.statusText, 'Not Found');
       assert.strictEqual(result.message, '404 Not Found');
-      assert.strictEqual(result.responseText, 'Not Found');
+      assert.strictEqual(result.body, 'Not Found');
     });
 
     it('returns error result with status details on 403', async () => {
@@ -170,7 +170,7 @@ describe('OsmService.worker listeners', () => {
 
       assert.isFalse(result.ok);
       assert.strictEqual(result.status, 429);
-      assert.include(result.responseText, 'Rate limit');
+      assert.include(result.body, 'Rate limit');
     });
 
     it('handles unreadable response body gracefully', async () => {
@@ -188,8 +188,8 @@ describe('OsmService.worker listeners', () => {
 
       assert.isFalse(result.ok);
       assert.strictEqual(result.status, 500);
-      // responseText should fall back to empty string when body is unreadable
-      assert.strictEqual(result.responseText, '');
+      // body should fall back to empty string when body is unreadable
+      assert.strictEqual(result.body, '');
     });
   });
 
@@ -214,7 +214,7 @@ describe('OsmService.worker listeners', () => {
         format: 'json',
       }, signal);
       assert.isTrue(first.ok);
-      const firstCount = first.results.data.length;
+      const firstCount = first.value.data.length;
 
       // Second parse without reset — parser may skip seen elements
       globalThis.fetch = mock(() =>
@@ -242,7 +242,7 @@ describe('OsmService.worker listeners', () => {
         format: 'json',
       }, signal);
       assert.isTrue(third.ok);
-      assert.strictEqual(third.results.data.length, firstCount, 'should re-parse elements after reset');
+      assert.strictEqual(third.value.data.length, firstCount, 'should re-parse elements after reset');
     });
   });
 });

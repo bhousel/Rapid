@@ -1,20 +1,8 @@
 import { OsmJSONParser, OsmXMLParser } from '../data/parsers/index.ts';
-import { utilFetchResponse } from '../util/fetch_response.ts';
+import { fetchEnvelope, utilFetchResponse } from '../util/fetch_response.ts';
 
+import type { FetchEnvelope } from '../util/fetch_response.ts';
 import type { ParserOptions, ParserResult } from '../data/parsers/types.ts';
-
-
-/**
- * Result type for `osmService:fetchAndParse`.
- *
- * On success the listener returns `{ ok: true, results }`.
- * On HTTP error it reads the response body and returns the status
- * details so the main thread can branch on status codes without
- * needing a full Response object.
- */
-export type OsmFetchResult =
-  | { ok: true; results: ParserResult }
-  | { ok: false; status: number; statusText: string; message: string; responseText: string };
 
 
 /** Options passed via listenerData */
@@ -33,52 +21,25 @@ const osmXmlParser = new OsmXMLParser();
 
 
 /**
- * Fetches OSM data and parses it on the worker.
+ * Fetches OSM data and parses it on the worker, wrapping the outcome in a
+ * `FetchEnvelope`.
  *
- * Unlike the generic network listeners, this one never throws for
- * HTTP errors.  Instead it returns a discriminated result type so the
- * main-thread `loadFromAPI` can inspect status codes (400/401/403
- * for auth issues, 429/509 for rate limits, etc.) without needing
- * a full Response object — which can't cross the worker boundary.
- *
- * AbortErrors still propagate as thrown errors so the existing
+ * The envelope lets the main-thread `loadFromAPI` inspect HTTP status codes
+ * (400/401/403 for auth issues, 429/509 for rate limits, etc.) and the response
+ * body without needing a full `Response` object — which can't cross the worker
+ * boundary.  `AbortError` and transport failures still reject so the existing
  * cancellation logic works unchanged.
+ *
  * @listens `osmService:fetchAndParse`
  * @param  data    Message data - expects the url, optional RequestInit, format, and additional parser options
  * @param  signal  Abort signal
- * @return  Promise resolved with an OsmFetchResult
+ * @return  Promise resolved with a FetchEnvelope (rejected only on abort/transport error)
  */
-export async function fetchAndParse(data: unknown, signal: AbortSignal): Promise<OsmFetchResult> {
+export async function fetchAndParse(data: unknown, signal: AbortSignal): Promise<FetchEnvelope<ParserResult>> {
   const { url, init, format, parserOptions } = data as OsmFetchOptions;
-
-  const response = await fetch(url, { ...init, signal });
-
-  if (!response.ok) {
-    // Read the body so the caller can extract rate-limit details etc.
-    let responseText = '';
-    try {
-      responseText = await response.text();
-    } catch {
-      // Ignore — body may already be consumed or unreadable
-    }
-
-    return {
-      ok: false,
-      status: response.status,
-      statusText: response.statusText,
-      message: `${response.status} ${response.statusText}`,
-      responseText,
-    };
-  }
-
-  // Parse the body according to content-type (utilFetchResponse handles
-  // JSON vs XML vs text based on the Content-Type header)
-  const content = await utilFetchResponse(response);
-
   const parser = format === 'json' ? osmJsonParser : osmXmlParser;
-  const results = parser.parse(content, parserOptions);
-
-  return { ok: true, results };
+  return fetchEnvelope(fetch, url, { ...init, signal },
+    async response => parser.parse(await utilFetchResponse(response), parserOptions));
 }
 
 

@@ -69,7 +69,7 @@ describe('OsmService', () => {
         assert.instanceOf(prom, Promise);
         return prom
           .then(() => {
-            assert.instanceOf(osm._tileCache.toLoad, Set);
+            assert.isNull(osm._tileCache.lastv);
             assert.instanceOf(osm._noteCache.toLoad, Set);
             assert.instanceOf(osm._userCache.toLoad, Set);
             assert.isAbove(osm.connectionID, 0);
@@ -108,7 +108,7 @@ describe('OsmService', () => {
         assert.instanceOf(prom, Promise);
         return prom
           .then(() => {
-            assert.instanceOf(osm._tileCache.toLoad, Set);
+            assert.isNull(osm._tileCache.lastv);
             assert.instanceOf(osm._noteCache.toLoad, Set);
             assert.instanceOf(osm._userCache.toLoad, Set);
           });
@@ -363,38 +363,35 @@ describe('OsmService', () => {
       });
 
       it('loads a tile of data and requests a redraw', async () => {
-        const spatial = context.systems.spatial;
         fetchMock.route(/map\.json/, sample.mapJSON, { delay: 1 });
         _osm.loadTiles();
 
         await Bun.sleep(5);  // after all fetches have settled
-        assert.isTrue(spatial.hasTileAtLoc('osm-data', [-74.0444216, 40.6694299]), 'tile was loaded');
+        assert.isTrue(_osm.isDataLoaded([-74.0444216, 40.6694299]), 'tile was loaded');
         const mapCalls = fetchMock.callHistory.calls().filter(c => /map\.json/.test(c.url));
         assert.lengthOf(mapCalls, 1, 'map.json fetched once');
         assert.lengthOf(spyRedraw.mock.calls, 1, 'redraw called once');
       });
 
       it(`doesn't retry inflight tiles`, async () => {
-        const spatial = context.systems.spatial;
         fetchMock.route(/map\.json/, sample.mapJSON, { delay: 1 });
         _osm.loadTiles();
         context.viewport.transform.v++;  // touch viewport
         _osm.loadTiles();               // try again
 
         await Bun.sleep(5);  // after all fetches have settled
-        assert.isTrue(spatial.hasTileAtLoc('osm-data', [-74.0444216, 40.6694299]), 'tile was loaded');
+        assert.isTrue(_osm.isDataLoaded([-74.0444216, 40.6694299]), 'tile was loaded');
         const mapCalls = fetchMock.callHistory.calls().filter(c => /map\.json/.test(c.url));
         assert.lengthOf(mapCalls, 1, 'map.json fetched once');
         assert.lengthOf(spyRedraw.mock.calls, 1, 'redraw called once');
       });
 
       it(`doesn't retry loaded tiles`, async () => {
-        const spatial = context.systems.spatial;
         fetchMock.route(/map\.json/, sample.mapJSON, { delay: 1 });
         _osm.loadTiles();
 
         await Bun.sleep(5);  // after all fetches have settled
-        assert.isTrue(spatial.hasTileAtLoc('osm-data', [-74.0444216, 40.6694299]), 'tile was loaded');
+        assert.isTrue(_osm.isDataLoaded([-74.0444216, 40.6694299]), 'tile was loaded');
 
         context.viewport.transform.v++;  // touch viewport
         _osm.loadTiles();               // try again
@@ -406,7 +403,6 @@ describe('OsmService', () => {
       });
 
       it('aborts unwanted tile requests', async () => {
-        const spatial = context.systems.spatial;
         fetchMock.route(/map\.json/, sample.mapJSON, { delay: 1 });
         _osm.loadTiles();
 
@@ -417,19 +413,18 @@ describe('OsmService', () => {
         _osm.loadTiles();
 
         await Bun.sleep(5);  // after all fetches have settled
-        assert.isFalse(spatial.hasTileAtLoc('osm-data', [-74.0444216, 40.6694299]), 'old tile was not loaded');
+        assert.isFalse(_osm.isDataLoaded([-74.0444216, 40.6694299]), 'old tile was not loaded');
         const mapCalls = fetchMock.callHistory.calls().filter(c => /map\.json/.test(c.url));
         assert.lengthOf(mapCalls, 2, 'map.json fetched twice - but one was aborted');
       });
 
       it('allows retrying errored tiles', async () => {
-        const spatial = context.systems.spatial;
         const errResponse = { status: 403, body: 'Forbidden', headers: { 'Content-Type': 'text/plain' } };
         fetchMock.route(/map\.json/, errResponse, { delay: 1 });
         _osm.loadTiles();
 
         await Bun.sleep(5);  // after all fetches have settled
-        assert.isFalse(spatial.hasTileAtLoc('osm-data', [-74.0444216, 40.6694299]), 'tile is NOT considered loaded');
+        assert.isFalse(_osm.isDataLoaded([-74.0444216, 40.6694299]), 'tile is NOT considered loaded');
         let mapCalls = fetchMock.callHistory.calls().filter(c => /map\.json/.test(c.url));
         assert.lengthOf(mapCalls, 1, 'map.json fetched once');
         assert.lengthOf(spyRedraw.mock.calls, 0, 'redraw not called on error');
@@ -673,8 +668,7 @@ describe('OsmService', () => {
         assert.lengthOf(fetchMock.callHistory.calls(), 1);  // fetch called once
         assert.lengthOf(spyRedraw.mock.calls, 1);           // redraw called once
 
-        const spatial = context.systems.spatial;
-        assert.isTrue(spatial.hasTileAtLoc('osm-notes', [10, 0]));  // tile is loaded here
+        assert.isNotEmpty(_osm.getNotes());  // notes were loaded into the visible area
       });
     });
 

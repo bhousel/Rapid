@@ -1,5 +1,314 @@
 # Network System Design
 
+This document describes the design for Rapid's centralized network request system, which consolidates fetch lifecycle management, inflight tracking, request deduplication, timeouts, worker-based fetch offloading, and concurrency limiting.
+
+## Problem
+
+Every service in Rapid independently managed its own fetch lifecycle.  This led to:
+
+- **4 different AbortController patterns** — `Map<TileID, AbortController>`, `InflightEntry { promise, controller }`, `Record<string, AbortController>`, split GET/POST Maps
+- **Zero request timeouts** across all 19 services — a dead server hung the fetch indefinitely (see [#1487](https://github.com/facebook/Rapid/issues/1487))
+- **Aborted requests staying in inflight caches** — when an AbortError was caught but the cleanup happened in the success path, the inflight entry leaked (see [#1451](https://github.com/facebook/Rapid/issues/1451))
+- **Duplicated boilerplate** — abort-old-tiles, check-if-loaded, create-controller, fetch, parse, handle-abort-error, cleanup-in-finally — repeated in every tile-loading service
+- **No coordination** — when backpressure was heavy, services kept firing requests that added to congestion
+- **Main-thread parsing** — all JSON/XML/protobuf parsing happened on the main thread, blocking frame rendering
+
+## Goals
+
+1. **Single source of truth** for inflight request tracking — eliminates the leaking-inflight bug class entirely
+2. **Automatic timeouts** — every request gets a configurable `AbortSignal.timeout`, solving #1487
+3. **Worker offloading** — fetch + parse runs in a web worker when WorkerSystem is available, keeping the main thread free for rendering
+4. **Deduplication** — same-key requests return the existing promise rather than firing a duplicate
+5. **Centralized abort** — `abortAll()`, `abort(key)`, and viewport-based cleanup in one place
+6. **Backpressure awareness** — global concurrency cap prevents fetch storms
+7. **Outcome tracking** — `isCompleted` / `getStatus` / `markCompleted` / `forget` let services manage tile-load state without a spatial index for tiles
+
+## Non-Goals
+
+- Replacing `osm-auth` — OsmService's OAuth flow stays in OsmService.  NetworkSystem provides the request interceptor hook for auth headers.
+- Response caching / spatial indexing — services own their domain-specific caches.  NetworkSystem tracks only what's *in flight* and what has *settled with an explicit requestID*.
+- Rate limiting — OsmService's rate limit logic is domain-specific (429 response parsing, duration extraction).  NetworkSystem provides the abort-all hook that rate limiting calls into, but doesn't own the policy.
+- PMTiles — the PMTiles library manages its own fetch internally.
+
+## Design
+
+### System Identity
+
+```
+ID:                   'network'
+requiredDependencies: (none)
+optionalDependencies: ['worker']
+autoStart:            true
+```
+
+### Core Data Structures
+
+```typescript
+/** Tracks a single inflight request */
+interface InflightRequest<T = unknown> {
+  requestID: RequestID;
+  controller: AbortController;
+  /** Shared FetchEnvelope promise — used for dedup */
+  promise: Promise<FetchEnvelope<T>>;
+  created: number;
+}
+```
+
+All inflight requests live in one `Map<RequestID, InflightRequest>`.  No per-service tracking needed.
+
+### FetchEnvelope — the worker-boundary type
+
+Because web workers can only post plain data (not `Response` objects), and because thrown `Error` objects lose their `.status` field when flattened to a string by `worker.postMessage`, every worker listener returns a `FetchEnvelope<T>`:
+
+```typescript
+type FetchEnvelope<T = unknown> =
+  | { ok: true;  status: number; value: T }
+  | { ok: false; status: number; statusText: string; message: string; body?: string };
+```
+
+The envelope carries the real HTTP status in all cases — success, HTTP error, and worker-dispatched error — so `NetworkSystem` can always record an honest outcome.  `AbortError` and transport failures are *not* wrapped; they reject the promise normally.
+
+All worker listeners (`network:fetchAndParse*`, `osmService:fetchAndParse`) return envelopes.  The main-thread fallback path does too, via `fetchEnvelope()` in `util/fetch_response.ts`.
+
+### Outcome Tracking (`_completed`)
+
+```typescript
+// Protected map: only requests with an explicit requestID option are recorded.
+// Auto-computed IDs ('GET https://...') are NOT tracked — keeps the map lean.
+protected _completed: Map<RequestID, number>;  // requestID → HTTP status (or sentinel)
+```
+
+Status sentinels:
+- `STATUS_SKIPPED = -1` — request never sent (e.g. tile covers a blocked region)
+- `STATUS_ERROR = 0`   — transport failure / worker-flattened error (no HTTP status available)
+
+**NetworkSystem is the single writer.**  Services use the public API:
+
+| Method | Purpose |
+|---|---|
+| `isCompleted(id)` | `true` if the ID has settled (success, HTTP error, or skip) |
+| `getStatus(id)` | HTTP status code or sentinel, `undefined` if not settled |
+| `markCompleted(id, status?)` | Mark as settled without sending (default: `STATUS_SKIPPED`) |
+| `forget(id)` | Remove from settled map to allow retry |
+| `clearAll()` / `clearMatching(pred)` | Bulk-clear (called by `resetAsync`) |
+
+**Aborted requests are never recorded** — this is the invariant that makes "pan away, pan back reloads the tile" work.
+
+### Public API
+
+```typescript
+class NetworkSystem extends AbstractSystem {
+
+  /** Fetch and unwrap — throws FetchError on HTTP error. The 90% case. */
+  fetch<T = unknown>(url: string, options?: NetworkFetchOptions): Promise<T>;
+
+  /** Fetch and return the envelope — HTTP errors resolve rather than throw.
+   *  Used by OsmService, which needs to branch on status codes (auth retry, rate-limit). */
+  fetchEnvelope<T = unknown>(url: string, options?: NetworkFetchOptions): Promise<FetchEnvelope<T>>;
+
+  /** Fetch and return the raw Response (always main-thread, never throws on HTTP error). */
+  fetchRaw(url: string, options?: NetworkFetchOptions): Promise<Response>;
+
+  abort(requestID: RequestID): void;
+  abortAll(): void;
+  abortMatching(predicate: (requestID: RequestID) => boolean): void;
+
+  isInflight(requestID: RequestID): boolean;
+  isCompleted(requestID: RequestID): boolean;
+  getStatus(requestID: RequestID): number | undefined;
+  markCompleted(requestID: RequestID, status?: number): void;
+  forget(requestID: RequestID): void;
+
+  clearAll(): void;
+  clearMatching(predicate: (requestID: RequestID) => boolean): void;
+  hasMatching(predicate: (requestID: RequestID) => boolean): boolean;
+
+  addRequestInterceptor(interceptor: RequestInterceptor): void;
+  removeRequestInterceptor(interceptor: RequestInterceptor): void;
+
+  get numInflight(): number;
+  get numActive(): number;
+  get numQueued(): number;
+  get defaultTimeout(): number;
+  set defaultTimeout(ms: number);
+  get maxInflight(): number;
+  set maxInflight(n: number);
+}
+```
+
+### Options
+
+```typescript
+interface NetworkFetchOptions extends Omit<RequestInit, 'signal'> {
+  /** Explicit ID for dedup, cancellation, and outcome recording.
+   *  If omitted, a default `'${METHOD} ${url}'` ID is used for dedup only
+   *  (NOT recorded in _completed). */
+  requestID?: RequestID;
+
+  /** Timeout in milliseconds.  Overrides `defaultTimeout`.  0 = no timeout. */
+  timeout?: number;
+
+  /** Custom fetch function (escape hatch — interceptors are preferred for auth). */
+  fetchFn?: (url: string, init?: RequestInit) => Promise<Response>;
+
+  /** Always fetch on main thread. Default: false. */
+  mainThread?: boolean;
+
+  /** Named listener for worker dispatch (e.g. 'network:fetchAndParse'). */
+  listenerID?: ListenerID;
+
+  /** Extra serializable data passed to the named listener. */
+  listenerData?: Record<string, unknown>;
+
+  /** Defers result resolution through SchedulerSystem at the given priority.
+   *  Prevents heavy .then() chains from blowing frame budgets. */
+  resultPriority?: 'urgent' | 'normal' | 'idle';
+}
+```
+
+### Fetch Flow
+
+```
+network.fetch(url, { requestID, timeout, listenerID, ... })
+│
+├── Dedup check: is requestID already inflight?
+│   └── YES → unwrap existing envelope promise → return value or throw FetchError
+│
+├── Compute: track = (options.requestID !== undefined)
+├── Create AbortController + combined signal (controller ∨ AbortSignal.timeout)
+│
+├── Dispatch decision (in _dispatchFetch):
+│   ├── listenerID + worker available?  → worker.dispatch(listenerID, payload, signal)
+│   ├── listenerID + no worker?         → worker.getListener(listenerID)(payload, signal)
+│   └── no listenerID?
+│       ├── worker available?           → worker.dispatch('network:fetchAndParse', ...)
+│       └── main thread                 → fetchEnvelope(fetchFn, url, init, parse)
+│
+├── _trackAndDispatch(requestID, controller, dispatch, track):
+│   ├── On envelope resolve:  if (track) _completed.set(id, env.status); return env
+│   ├── On reject (non-abort): if (track) _completed.set(id, err.status ?? 0); rethrow
+│   └── On AbortError:  rethrow WITHOUT recording  ← critical invariant
+│
+└── .finally() → cleanup inflight map, drain queue
+```
+
+### Request Interceptors
+
+```typescript
+type RequestInterceptor = (url: string, init: RequestInit) => RequestInit;
+```
+
+Interceptors run on the **main thread** before dispatch, producing a serializable `RequestInit` that is safe to send to a worker.  This is the correct place for auth headers: the token is available on the main thread, and the augmented init crosses the worker boundary as plain data.
+
+OsmService registers `_authInterceptor` at init time.  It adds `Authorization: Bearer <token>` to any request targeting `this._apiroot`, using `oauth.getAccessToken()` (osm-auth v3.2.0+).
+
+### Worker Integration
+
+Worker listeners always return `FetchEnvelope<T>` — never raw values, never throw on HTTP error.  This is how status survives the worker boundary.
+
+```typescript
+// NetworkSystem.worker.ts — generic fetch listener
+export async function fetchAndParse(data: unknown, signal: AbortSignal): Promise<FetchEnvelope<any>> {
+  const { url, init } = data as FetchAndParseOptions;
+  return fetchEnvelope(fetch, url, { ...init, signal }, utilFetchResponse);
+}
+
+// OsmService.worker.ts — OSM-specific listener (keeps its own parser state)
+export async function fetchAndParse(data: unknown, signal: AbortSignal): Promise<FetchEnvelope<ParserResult>> {
+  const { url, init, format, parserOptions } = data as OsmFetchOptions;
+  const parser = format === 'json' ? osmJsonParser : osmXmlParser;
+  return fetchEnvelope(fetch, url, { ...init, signal },
+    async r => parser.parse(await utilFetchResponse(r), parserOptions));
+}
+```
+
+AbortError still propagates as a rejection from all listeners — it is never wrapped in an envelope.
+
+### Service Migration Pattern
+
+**After migration** — a typical tile-loading service:
+
+```typescript
+loadTiles(): void {
+  const network = this.context.systems.network!;
+
+  if (this._lastv === viewport.v) return;
+  this._lastv = viewport.v;
+
+  const tiles = this._tiler.getTiles(viewport).tiles;
+  const neededIDs = new Set(tiles.map(t => `service-tile-${t.id}`));
+
+  network.abortMatching(id => id.startsWith('service-tile-') && !neededIDs.has(id));
+
+  for (const tile of tiles) {
+    const requestID = `service-tile-${tile.id}`;
+    if (network.isCompleted(requestID) || network.isInflight(requestID)) continue;
+
+    network.fetch(url, { requestID })
+      .then(data => this._gotTile(data))
+      .catch(err => {
+        if (err.name === 'AbortError') return;   // ok, tile is stale
+        console.error(err);
+        // don't-retry: NetworkSystem already recorded the error status in _completed.
+        // do-retry:    call network.forget(requestID) to allow another attempt.
+      });
+  }
+}
+```
+
+Key differences from pre-migration code:
+- No `AbortController` or `inflight Map` in the service
+- No `.finally()` cleanup needed
+- Tile-load state tracked in `network.isCompleted()` instead of a spatial tile index
+- Retry policy expressed via `network.forget()` (explicit opt-in), not silent
+
+**OsmService** uses `fetchEnvelope` (not `fetch`) because it needs to branch on HTTP status codes for auth retry and rate-limit handling:
+
+```typescript
+network.fetchEnvelope<ParserResult>(url, {
+  requestID,
+  listenerID: 'osmService:fetchAndParse',
+  listenerData: { format, parserOptions: options },
+  resultPriority: 'normal',
+})
+  .then((env: FetchEnvelope<ParserResult>) => {
+    if (!env.ok) {
+      // branch on env.status: 401/403 → logout+retry, 429 → rate-limit, etc.
+    }
+    // success: env.value contains the parsed result
+  });
+```
+
+OsmService data/note tiles call `network.forget(requestID)` on error (retryable).  Blocked-region tiles call `network.markCompleted(requestID)` without sending.
+
+### Concurrency Limiting
+
+```typescript
+get maxInflight(): number;   // default: 100
+set maxInflight(n: number);
+```
+
+When `numActive >= maxInflight`, new requests enter a FIFO queue.  Queued requests are abortable for free (no network request started).  Queue drains in `.finally()` of completed active requests.
+
+### Worker-Side Abort
+
+`WorkerSystem.dispatch()` accepts an `AbortSignal`.  When the signal fires, WorkerSystem sends `{ type: 'cancel', id }` to the worker, which aborts the active `fetch()`.  No wasted bandwidth, no worker starvation when the viewport changes.
+
+## Implementation Status
+
+NetworkSystem is **fully implemented and all services have been migrated**.
+
+Key milestones:
+- Core system with inflight tracking, dedup, timeout, concurrency limiting
+- WorkerSystem extraction (worker pool + listener registry separate from NetworkSystem)
+- Request interceptor API (auth headers on main thread, serializable for workers)
+- Worker offloading: `network:fetchAndParse*` listeners, `osmService:fetchAndParse`
+- `resultPriority` option for deferred result resolution through SchedulerSystem
+- `FetchEnvelope` universal worker-boundary type (replaces bespoke `OsmFetchResult`)
+- `_completed: Map<RequestID, number>` outcome tracking with `STATUS_SKIPPED`/`STATUS_ERROR` sentinels
+- All 19 services migrated; 3170 unit tests pass
+
+
 This document describes the design for Rapid's centralized network request system, which consolidates fetch lifecycle management, inflight tracking, request deduplication, timeouts, and worker-based fetch offloading — all currently duplicated across 15+ services.
 
 ## Problem
@@ -390,7 +699,7 @@ loadTiles(): void {
   }
 
   for (const tile of tiles) {
-    if (spatial.hasTile('geoscribble', tileID)) continue;
+    if (spatial.hasItem('geoscribble-tiles', tileID)) continue;
     if (cache.inflight.has(tileID)) continue;
 
     const controller = new AbortController();
@@ -401,7 +710,7 @@ loadTiles(): void {
       .then(response => this._gotTile(tile, response))
       .catch(err => {
         if (err.name === 'AbortError') return;
-        spatial.addTiles('geoscribble', [tile]);
+        spatial.addItems('geoscribble-tiles', [tile]);
       })
       .finally(() => cache.inflight.delete(tileID));
   }
@@ -424,14 +733,14 @@ loadTiles(): void {
 
   for (const tile of tiles) {
     const requestID = `geoscribble-${tile.id}`;
-    if (spatial.hasTile('geoscribble', tileID)) continue;
+    if (spatial.hasItem('geoscribble-tiles', tile.id)) continue;
     if (network.isInflight(requestID)) continue;
 
     network.fetch(url, { requestID })
       .then(response => this._gotTile(tile, response))
       .catch(err => {
         if (err.name === 'AbortError') return;
-        spatial.addTiles('geoscribble', [tile]);
+        spatial.addItems('geoscribble-tiles', [tile]);
       });
     // No .finally() needed — NetworkSystem handles inflight cleanup
     // No AbortController management — NetworkSystem handles it

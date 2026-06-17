@@ -1,11 +1,11 @@
 import { AbstractSystem } from '../core/AbstractSystem.ts';
 import { MarkerData } from '../data/MarkerData.ts';
-import { Tiler } from '@rapid-sdk/math';
+import { Extent, geoSphericalDistance, projWgs84ToWorld, Tiler } from '@rapid-sdk/math';
 import { utilExtractValues } from '../util/string.ts';
 
 import type { Context } from '../Context.ts';
 import type { MarkerProps } from '../data/MarkerData.ts';
-import type { Tile } from '@rapid-sdk/math';
+import type { Tile, Vec2 } from '@rapid-sdk/math';
 
 
 /** Properties specific to MapRoulette task markers */
@@ -23,9 +23,7 @@ export interface MapRouletteTaskProps extends MarkerProps {
   /** Challenge instruction text (may contain Mustache templates) */
   instruction?: string;
   /** GeoJSON features associated with this task */
-  taskFeatures?: any;
-  /** Primary GeoJSON feature for this task */
-  taskFeature?: any;
+  features?: GeoJSON.Feature[];
   /** Numeric status code for the task (e.g. 1 = Fixed) */
   taskStatus?: number;
   /** User comment submitted with the task update */
@@ -44,12 +42,6 @@ const TILEZOOM = 14;
 /** Base URL for the MapRoulette REST API v2 */
 const MAPROULETTE_API = 'https://maproulette.org/api/v2';
 
-
-/** Status of a tile or challenge request */
-interface RequestEntry {
-  /** Current request state: 'inflight', 'loaded', or 'error' */
-  status?: string;
-}
 
 /** Closed task record */
 interface ClosedEntry {
@@ -79,22 +71,6 @@ interface ChallengeData {
   [key: string]: any;
 }
 
-/** Internal cache for MapRoulette data */
-interface MapRouletteCache {
-  /** Last viewport version used for tile loading, to avoid redundant work */
-  lastv: number | null;
-  /** Cached task Markers keyed by task ID */
-  tasks: Map<string, MarkerData>;
-  /** Cached challenge data keyed by challenge ID */
-  challenges: Map<string, ChallengeData>;
-  /** Tile request statuses keyed by tile ID */
-  tileRequest: Map<TileID, RequestEntry>;
-  /** Challenge request statuses keyed by challenge ID */
-  challengeRequest: Map<string, RequestEntry>;
-  /** Tasks closed during this editing session */
-  closed: ClosedEntry[];
-}
-
 
 /**
  * `MapRouletteService` connects to the MapRoulette API to fetch about challenges and tasks.
@@ -111,10 +87,16 @@ export class MapRouletteService extends AbstractSystem {
 
   /** Set of challenge IDs to filter tasks by (empty means show all visible) */
   protected _challengeIDs: Set<string>;
-  /** Internal data cache for tasks, challenges, and request tracking */
-  protected _cache: MapRouletteCache;
   /** Tiler instance for computing tile coverage at the configured zoom level */
   protected _tiler: Tiler;
+  /** Last viewport version used for tile loading, to avoid redundant work */
+  protected _lastv: number | null;
+  /** Cached challenge data keyed by challenge ID */
+  protected _challenges: Map<string, ChallengeData>;
+  /** ChallengeIDs that we need to load */
+  protected _challengeQueue: Set<string>;
+  /** Tasks closed during this editing session */
+  protected _closed: ClosedEntry[];
 
 
   /**
@@ -132,8 +114,11 @@ export class MapRouletteService extends AbstractSystem {
     this.nearbyTaskEnabled = false;
     this.currentTask = null;
 
-    this._cache = {} as MapRouletteCache;
     this._tiler = (new Tiler().zoomRange(TILEZOOM) as Tiler).skipNullIsland(true) as Tiler;
+    this._lastv = null;
+    this._challenges = new Map<string, ChallengeData>();
+    this._challengeQueue = new Set<string>();
+    this._closed = [];
 
     // Ensure methods used as callbacks always have `this` bound correctly.
     this._hashChanged = this._hashChanged.bind(this);
@@ -180,17 +165,13 @@ export class MapRouletteService extends AbstractSystem {
     const network = context.systems.network!;
     const spatial = context.systems.spatial!;
 
-    network.abortMatching(id => id.startsWith('maproulette'));
-    spatial.clearMatching(id => id.startsWith('maproulette'));
+    network.clearMatching(id => id.startsWith('maproulette-') || id.includes(MAPROULETTE_API));
+    spatial.clearMatching(id => id.startsWith('maproulette-'));
 
-    this._cache = {
-      lastv:             null,
-      tasks:             new Map<string, MarkerData>(),
-      challenges:        new Map<string, ChallengeData>(),
-      tileRequest:       new Map<TileID, RequestEntry>(),
-      challengeRequest:  new Map<string, RequestEntry>(),
-      closed:            []    // Array<{ challengeID, taskID }>
-    };
+    this._lastv = null;
+    this._challenges.clear();
+    this._challengeQueue.clear();
+    this._closed = [];
 
     return Promise.resolve();
   }
@@ -232,7 +213,7 @@ export class MapRouletteService extends AbstractSystem {
   public getData(): MapRouletteTask[] {
     const spatial = this.context.systems.spatial!;
 
-    return (spatial.getVisibleData('maproulette')
+    return (spatial.getVisibleItems('maproulette-data')
       .map(hit => hit.contents) as MapRouletteTask[])
       .filter(task => {
         if (this._challengeIDs.size) {
@@ -251,7 +232,7 @@ export class MapRouletteService extends AbstractSystem {
    */
   public getTask(dataID: DataID): MapRouletteTask | undefined {
     const spatial = this.context.systems.spatial!;
-    return spatial.getData<MapRouletteTask>('maproulette', dataID);
+    return spatial.getItem<MapRouletteTask>('maproulette-data', dataID);
   }
 
 
@@ -261,7 +242,7 @@ export class MapRouletteService extends AbstractSystem {
    * @return The challenge with that id, or `undefined` if not found
    */
   public getChallenge(challengeID: string): ChallengeData | undefined {
-    return this._cache.challenges.get(challengeID);
+    return this._challenges.get(challengeID);
   }
 
 
@@ -273,29 +254,20 @@ export class MapRouletteService extends AbstractSystem {
 
     const context = this.context;
     const network = context.systems.network!;
-    const spatial = context.systems.spatial!;
     const viewport = context.viewport;
-    const cache = this._cache;
 
-    if (cache.lastv === viewport.v) return;  // exit early if the view is unchanged
-    cache.lastv = viewport.v;
+    if (this._lastv === viewport.v) return;  // exit early if the view is unchanged
+    this._lastv = viewport.v;
 
     // Determine the tiles needed to cover the view..
     const tiles = this._tiler.getTiles(viewport).tiles;
 
     // Abort inflight requests that are no longer needed..
-    for (const [tileID, request] of cache.tileRequest) {
-      if (request.status !== 'inflight') continue;
-      const isNeeded = tiles.some(tile => tile.id === tileID);
-      if (!isNeeded) {
-        network.abort(`maproulette-tile-${tileID}`);
-      }
-    }
+    const neededIDs = new Set<RequestID>(tiles.map(tile => `maproulette-tile-${tile.id}`));
+    network.abortMatching(id => id.startsWith('maproulette-tile') && !neededIDs.has(id));
 
     // Issue new requests..
     for (const tile of tiles) {
-      const tileID = tile.id;
-      if (spatial.hasTile('maproulette', tileID)) continue;
       this.loadTile(tile);
     }
   }
@@ -308,138 +280,131 @@ export class MapRouletteService extends AbstractSystem {
   public loadTile(tile: Tile): void {
     const context = this.context;
     const network = context.systems.network!;
-    const spatial = context.systems.spatial!;
 
-    const cache = this._cache;
-    if (cache.tileRequest.has(tile.id)) return;
+    const requestID = `maproulette-tile-${tile.id}`;
+    if (network.isCompleted(requestID) || network.isInflight(requestID)) return;
 
     const extent = tile.wgs84Extent;
     const bbox = extent.rectangle().join('/');  // minX/minY/maxX/maxY
     const url = `${MAPROULETTE_API}/tasks/box/${bbox}`;
-    const requestID = `maproulette-tile-${tile.id}`;
-
-    cache.tileRequest.set(tile.id, { status: 'inflight' });
 
     network.fetch<any>(url, { requestID })
       .then(data => {
-        spatial.addTiles('maproulette', [tile]);   // mark as loaded
-        cache.tileRequest.set(tile.id, { status: 'loaded' });
-
         for (const props of (data ?? [])) {
           this._cacheTask(props);
         }
-
-        this.loadChallenges();   // call this sometimes
+        this._drainChallengeQueue();   // call this sometimes
       })
       .catch(err => {
-        if (err.name === 'AbortError') {
-          cache.tileRequest.delete(tile.id);  // allow retry
-        } else {  // real error
-          console.error(err);    // eslint-disable-line no-console
-          spatial.addTiles('maproulette', [tile]);              // don't retry
-          cache.tileRequest.set(tile.id, { status: 'error' });  // don't retry
-        }
+        if (err.name === 'AbortError') return;   // ok
+        console.error(err);  // eslint-disable-line
       });
   }
 
 
   /**
-   * Schedule any data requests needed for challenges we are interested in
+   * Get challenge details for challenges in the queue
    */
-  public loadChallenges(): void {
+  protected _drainChallengeQueue(): void {
     if (this._paused) return;
 
     const context = this.context;
     const gfx = context.systems.gfx;
-    const network = context.systems.network!;
-    const spatial = context.systems.spatial!;
-    const cache = this._cache;
 
-
-    for (const [challengeID, val] of cache.challengeRequest) {
-      if (val.status) return;  // processed already
-
-      const url = `${MAPROULETTE_API}/challenge/${challengeID}`;
-      const requestID = `maproulette-challenge-${challengeID}`;
-
-      cache.challengeRequest.set(challengeID, { status: 'inflight' });
-
-      network.fetch<any>(url, { requestID })
-        .then(challenge => {
-          cache.challengeRequest.set(challengeID, { status: 'loaded' });
-
-          challenge.id = challenge.id.toString();    // force to string
-          challenge.isVisible = challenge.enabled && !challenge.deleted;
-
-          // Update task statuses
-          const toUpdate = [];
-          const allTasks = spatial.getAllData<MapRouletteTask>('maproulette');
-          for (const task of allTasks) {
-            if (task.props.parentId === challengeID && task.props.isVisible !== challenge.isVisible) {
-              task.props.isVisible = challenge.isVisible;
-              task.touch();
-              toUpdate.push(task);
-            }
-          }
-          spatial.replaceData('maproulette', toUpdate);
-
-          // save the challenge
-          cache.challenges.set(challengeID, challenge);
-
-          gfx?.deferredRedraw();
-        })
-        .catch(err => {
-          if (err.name === 'AbortError') {
-            cache.challengeRequest.delete(challengeID);  // allow retry
-          } else {  // real error
-            console.error(err);    // eslint-disable-line no-console
-            cache.challengeRequest.set(challengeID, { status: 'error' });  // don't retry
-          }
-        });
+    for (const challengeID of this._challengeQueue) {
+      this._challengeQueue.delete(challengeID);
+      this.loadChallengeAsync(challengeID);
     }
+    gfx?.deferredRedraw();
   }
 
 
   /**
-   * This loads the challenge instructions and adds it to an existing task.
+   * This loads the challenge details and updates existing tasks as needed.
    * @see https://maproulette.org/docs/swagger-ui/index.html#/Challenge/read
+   * @param challengeID  - the challengeID to load
+   * @return Promise resolved with the challenge
+   */
+  public loadChallengeAsync(challengeID: string): Promise<ChallengeData> {
+    const challenge = this._challenges.get(challengeID);
+    if (challenge) return Promise.resolve(challenge);  // done already
+
+    const context = this.context;
+    const network = context.systems.network!;
+    const spatial = context.systems.spatial!;
+
+    const url = `${MAPROULETTE_API}/challenge/${challengeID}`;
+    const requestID = `maproulette-challenge-${challengeID}`;
+
+    return network.fetch<any>(url, { requestID })
+      .then(challenge => {
+        challenge.id = challenge.id.toString();    // force to string
+        challenge.isVisible = challenge.enabled && !challenge.deleted;
+        challenge.instruction ??= '';
+        challenge.description ??= '';
+        this._challenges.set(challengeID, challenge);
+
+        // Update task details
+        const toUpdate = [];
+        const allTasks = spatial.getAllItems<MapRouletteTask>('maproulette-data');
+        for (const task of allTasks) {
+          if (task.props.parentId !== challengeID) continue;
+          if (task.props.instruction !== undefined) continue;   // done already
+
+          task.props.isVisible = challenge.isVisible;
+          task.props.instruction = challenge.instruction;
+          task.props.description = challenge.description;
+          task.touch();
+          toUpdate.push(task);
+        }
+        spatial.replaceData('maproulette-data', toUpdate);
+
+        return challenge;
+      })
+      .catch(err => {
+        if (err.name === 'AbortError') return;   // ok
+        console.error(err);  // eslint-disable-line
+      });
+  }
+
+
+  /**
+   * The task markers that we fetch from the bounding box query do not include all the details.
+   * This makes sure that we've also fetched the full challenge and task details.
    * @param task
    * @return Promise resolved with the task
    */
-  public loadTaskDetailAsync(task: MapRouletteTask): Promise<MapRouletteTask> {
-    if (task.props.description !== undefined) return Promise.resolve(task);  // already done
-
-    const network = this.context.systems.network!;
+  public loadCompleteTaskAsync(task: MapRouletteTask): Promise<MapRouletteTask> {
     const challengeID = task.props.parentId;
-    const url = `${MAPROULETTE_API}/challenge/${challengeID}`;
-
-    return network.fetch<any>(url)
-      .then(data => {
-        task.props.instruction = data.instruction || '';
-        task.props.description = data.description || '';
-        return task.touch();
-      })
-      .then(task => this.loadTaskFeaturesAsync(task));
+    return this.loadChallengeAsync(challengeID)
+      .then(() => this.loadTaskAsync(task));
   }
 
 
   /**
-   * This loads the task features geojson and adds it to an existing task.
+   * This loads the full task details if needed, and updates the task marker.
+   * The important detail here is the properties stored in the task's geojson.
    * Those properties are used to replace the Mustache tags in the challenge.instruction/.description.
    * @see https://maproulette.org/docs/swagger-ui/index.html#/Task/read
    * @param task
    * @return Promise resolved when we've fetched the task details
    */
-  public loadTaskFeaturesAsync(task: MapRouletteTask): Promise<MapRouletteTask> {
-    if (task.props.taskFeatures !== undefined) return Promise.resolve(task);  // already done
+  public loadTaskAsync(task: MapRouletteTask): Promise<MapRouletteTask> {
+    if (task.props.features !== undefined) return Promise.resolve(task);  // already done
 
-    const network = this.context.systems.network!;
+    const context = this.context;
+    const network = context.systems.network!;
+    const spatial = context.systems.spatial!;
+
     const url = `${MAPROULETTE_API}/task/${task.id}`;
+    const requestID = `maproulette-task-${task.id}`;
 
-    return network.fetch<any>(url)
+    return network.fetch<any>(url, { requestID })
       .then(data => {
-        task.props.taskFeature = data?.geometries?.features || [];
-        return task.touch();
+        task.props.features = data?.geometries?.features || [];
+        task.touch();
+        spatial.replaceData('maproulette-data', task);
+        return task;
       });
   }
 
@@ -458,10 +423,10 @@ export class MapRouletteService extends AbstractSystem {
     const apikey = task.props.mapRouletteApiKey;
 
     // A comment is optional, but if we have one, POST it..
-    const commentKey = `maproulette-comment-${taskID}`;
-    if (taskComment && !network.isInflight(commentKey)) {
+    const commentID = `maproulette-comment-${taskID}`;
+    if (taskComment && !network.isInflight(commentID)) {
       network.fetch<any>(`${MAPROULETTE_API}/task/${taskID}/comment`, {
-        requestID: commentKey,
+        requestID: commentID,
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -470,11 +435,8 @@ export class MapRouletteService extends AbstractSystem {
         body: JSON.stringify({ actionId: 2, comment: taskComment })
       })
       .catch(err => {
-        if (err.name === 'AbortError') {
-          return;  // ok
-        } else {  // real error
-          console.error(err);    // eslint-disable-line no-console
-        }
+        if (err.name === 'AbortError') return;  // ok
+        console.error(err);    // eslint-disable-line no-console
       });
     }
 
@@ -504,19 +466,16 @@ export class MapRouletteService extends AbstractSystem {
       .then(() => {
         // All requests completed successfully
         if (taskStatus === 1) {  // only counts if the use chose "I Fixed It".
-          this._cache.closed.push({ taskID: taskID as string, challengeID: challengeID as string });
+          this._closed.push({ taskID, challengeID });
         }
         this.removeItem(task);
         this.context.enter('browse');
         if (callback) callback(null, task);
       })
       .catch(err => {
-        if (err.name === 'AbortError') {
-          return;  // ok
-        } else {  // real error
-          console.error(err);    // eslint-disable-line no-console
-          if (callback) callback(err.message);
-        }
+        if (err.name === 'AbortError') return;  // ok
+        console.error(err);    // eslint-disable-line no-console
+        if (callback) callback(err.message);
       });
     }
   }
@@ -531,7 +490,7 @@ export class MapRouletteService extends AbstractSystem {
     if (!(item instanceof MarkerData) || !item.id) return null;
 
     const spatial = this.context.systems.spatial!;
-    spatial.replaceData('maproulette', item);
+    spatial.replaceData('maproulette-data', item);
     return item;
   }
 
@@ -544,7 +503,7 @@ export class MapRouletteService extends AbstractSystem {
     if (!(item instanceof MarkerData) || !item.id) return;
 
     const spatial = this.context.systems.spatial!;
-    spatial.removeData('maproulette', item);
+    spatial.removeItems('maproulette-data', item.id);
   }
 
 
@@ -553,94 +512,68 @@ export class MapRouletteService extends AbstractSystem {
    * @return Array of closed task entries
    */
   public getClosed(): ClosedEntry[] {
-    return this._cache.closed;
+    return this._closed;
   }
 
 
   /**
-   * Initiates the process to find and fly to a nearby task based on the current task's challenge ID and task ID.
-   * @param task - The current task containing task details.
+   * For a given task, selects the next most nearby task that is available
+   * and belongs to the same challenge as the current task.
+   * @param task - The current task
    */
   public flyToNearbyTask(task: MapRouletteTask): void {
     if (!this.nearbyTaskEnabled) return;
-    const challengeID = task.props.parentId as string;
-    const taskID = task.id;
-    if (!challengeID || !taskID) return;
-    this.filterNearbyTasks(challengeID, taskID);
-  }
 
+    const context = this.context;
+    const map = context.systems.map;
+    const spatial = context.systems.spatial!;
 
-  /**
-   * Retrieves challenge details from cache or API.
-   * @param challengeID - The ID of the challenge.
-   * @returns Promise resolving with challenge data.
-   */
-  public getChallengeDetails(challengeID: string): Promise<ChallengeData> {
-// Why is this different from what `loadChallenges()` does???
-    const cachedChallenge = this._cache.challenges.get(challengeID);
-    if (cachedChallenge) {
-      return Promise.resolve(cachedChallenge);
-    } else {
-      const network = this.context.systems.network!;
-      const challengeUrl = `${MAPROULETTE_API}/challenge/${challengeID}`;
-      return network.fetch<any>(challengeUrl);
-    }
-  }
+    const currCoord = task.geoms.parts[0].world?.coords as Vec2;  // Current task world coordinate
+    if (!currCoord) return;
 
+    const extent = new Extent(task.loc).padByMeters(5000);   // search up to 5km
+    // Convert the WGS84 extent to a world-coordinate box.
+    const bb = extent.bbox();
+    const [ax, ay] = projWgs84ToWorld([bb.minX, bb.minY]);
+    const [bx, by] = projWgs84ToWorld([bb.maxX, bb.maxY]);
+    const search = {
+      minX: Math.min(ax, bx),
+      minY: Math.min(ay, by),
+      maxX: Math.max(ax, bx),
+      maxY: Math.max(ay, by)
+    };
 
-  /**
-   * Fetches nearby tasks for a given challenge and task ID, and flies to the nearest task.
-   * @param challengeID - The ID of the challenge.
-   * @param taskID - The ID of the current task.
-   * @param zoom - Optional zoom level for the map.
-   */
-  public filterNearbyTasks(challengeID: string, taskID: string, zoom?: number): void {
-    const nearbyTasksUrl = `${MAPROULETTE_API}/challenge/${challengeID}/tasksNearby/${taskID}?excludeSelfLocked=true&limit=1`;
-    if (!taskID) return;
-    const network = this.context.systems.network!;
+    const hits = spatial.getItemsAtBox('maproulette-data', search)
+      .map(hit => hit.contents as MarkerData<MapRouletteTaskProps>);
 
-    network.fetch<any>(nearbyTasksUrl)
-      .then((nearbyTasks: any[]) => {
-        if (!nearbyTasks?.length) return;  // no nearby tasks?
+    const nearby = [];
+    for (const other of hits) {
+      if (other.id === task.id) continue;   // skip self
+      if (other.props.parentId !== task.props.parentId) continue;
 
-        const props = nearbyTasks[0];
-        // fix a few things that are named differently?
-        props.parentId = props.parent.toString();
-        props.point.lng = props.location.coordinates[0];
-        props.point.lat = props.location.coordinates[1];
+      const otherStatus = other.props.taskStatus ?? 0;
+      if (otherStatus !== 0) continue;   // task must be available
 
-        const task = this._cacheTask(props);  // create task, or get existing from cache
+      const otherCoord = other.geoms.parts[0].world?.coords as Vec2;  // Other task world coordinate
+      if (!otherCoord) continue;
 
-// Why is this different from what `loadChallenges()` does???
-        return this.getChallengeDetails(challengeID)
-          .then(challengeData => {
-            task.props.title = challengeData.name;
-            task.props.parentName = challengeData.name;
-            task.touch();
-
-            const map = this.context.systems.map;
-            if (task.loc && zoom !== undefined) {
-              map?.centerZoomEase(task.loc, zoom);
-            }
-            this.selectAndDisplayTask(task);
-          });
-      })
-      .catch(err => {
-        console.error('Error fetching nearby tasks for challenge:', challengeID, err);  // eslint-disable-line no-console
+      nearby.push({
+        task: other,
+        dist: geoSphericalDistance(currCoord, otherCoord)
       });
-  }
+    }
 
+    if (!nearby.length) return;
 
-  /**
-   * Selects a task and updates the sidebar reflect the selection
-   * @param task - The task to be selected
-   */
-  public selectAndDisplayTask(task: MapRouletteTask): void {
-    if (!(task instanceof MarkerData)) return;
+    nearby.sort((a, b) => a.dist - b.dist);
+    const other = nearby[0]!.task;
+    if (other.loc) {
+      map?.centerEase(other.loc);
+    }
 
-    this.currentTask = task;
-    const selection = new Map<string, MarkerData>().set(task.id, task);
-    this.context.enter('select', { selection });
+    this.currentTask = other;
+    const selection = new Map<string, MarkerData>().set(other.id, other);
+    context.enter('select', { selection });
   }
 
 
@@ -664,30 +597,31 @@ export class MapRouletteService extends AbstractSystem {
     const context = this.context;
     const spatial = context.systems.spatial!;
 
-    const cache = this._cache;
     const taskID = props.id.toString();
     const challengeID = props.parentId.toString();
 
-    let task = spatial.getData<MapRouletteTask>('maproulette', taskID);
+    let task = spatial.getItem<MapRouletteTask>('maproulette-data', taskID);
     if (task) return task;  // seen it already
 
     // Have we seen this challenge before?
-    const challenge = cache.challenges.get(challengeID);
+    const challenge = this._challenges.get(challengeID);
     if (!challenge) {
-      cache.challengeRequest.set(challengeID, {});  // queue fetching it
-      props.isVisible = false;
+      this._challengeQueue.add(challengeID);  // if not, queue fetching it.
+      props.isVisible = false;                // keep invisible for now
     } else {
       props.isVisible = challenge.isVisible;
+      props.instruction = challenge.instruction;
+      props.description = challenge.description;
     }
 
     props.id = taskID;               // force to string
     props.parentId = challengeID;    // force to string
-    props.loc = spatial.preventCoincidentLoc('maproulette', [props.point.lng, props.point.lat]);
+    props.loc = spatial.getFreeLoc('maproulette-data', [props.point.lng, props.point.lat]);
     props.serviceID = this.id;
 
     // Create a MarkerData for the task
     task = new MarkerData<MapRouletteTaskProps>(context, props as Partial<MapRouletteTaskProps>);
-    spatial.addData('maproulette', task);
+    spatial.addData('maproulette-data', task);
 
     return task;
   }

@@ -80,14 +80,6 @@ KR_COLORS.set('390', 0x009900);
 KR_COLORS.set('400', 0xcc3355);
 
 
-/** Internal cache for KeepRight tile data */
-interface KeepRightCache {
-  /** Map of issues marked as closed, keyed by entity ID */
-  closed: Record<string, boolean>;
-  /** Last viewport version number used for change detection */
-  lastv: number | null;
-}
-
 /** Error type template from QA data */
 interface KRErrorType {
   /** Severity level (e.g. 'error', 'warning') */
@@ -116,10 +108,12 @@ export class KeepRightService extends AbstractSystem {
 
   /** Persistent KeepRight QA data (error templates and localization strings) loaded at startup */
   protected _krData: KRData;
-  /** Internal cache for KeepRight data, spatial index, and request tracking */
-  protected _cache: KeepRightCache;
   /** Tiler instance used to compute tile coverage for the current viewport */
   protected _tiler: Tiler;
+  /** Map of issues marked as closed, keyed by entity ID */
+  protected _closed: Set<string>;
+  /** Last viewport version number used for change detection */
+  protected _lastv: number | null;
 
 
   /**
@@ -136,8 +130,9 @@ export class KeepRightService extends AbstractSystem {
     // persistent data - loaded at init
     this._krData = { errorTypes: {}, localizeStrings: {} };
 
-    this._cache = {} as KeepRightCache;
     this._tiler = (new Tiler().zoomRange(TILEZOOM) as Tiler).skipNullIsland(true) as Tiler;
+    this._closed = new Set<string>();
+    this._lastv = null;
   }
 
 
@@ -178,13 +173,11 @@ export class KeepRightService extends AbstractSystem {
     const network = context.systems.network!;
     const spatial = context.systems.spatial!;
 
-    network.abortMatching(id => id.startsWith('keepright'));
-    spatial.clearMatching(id => id.startsWith('keepright'));
+    network.clearMatching(id => id.startsWith('keepright-'));
+    spatial.clearMatching(id => id.startsWith('keepright-'));
 
-    this._cache = {
-      closed: {},
-      lastv:  null
-    };
+    this._closed.clear();
+    this._lastv = null;
 
     return Promise.resolve();
   }
@@ -196,7 +189,7 @@ export class KeepRightService extends AbstractSystem {
    */
   public getData(): MarkerData[] {
     const spatial = this.context.systems.spatial!;
-    return spatial.getVisibleData('keepright').map(hit => hit.contents) as MarkerData[];
+    return spatial.getVisibleItems('keepright-data').map(hit => hit.contents) as MarkerData[];
   }
 
 
@@ -207,12 +200,10 @@ export class KeepRightService extends AbstractSystem {
   public loadTiles(): void {
     const context = this.context;
     const network = context.systems.network!;
-    const spatial = context.systems.spatial!;
     const viewport = context.viewport;
-    const cache = this._cache;
 
-    if (cache.lastv === viewport.v) return;  // exit early if the view is unchanged
-    cache.lastv = viewport.v;
+    if (this._lastv === viewport.v) return;  // exit early if the view is unchanged
+    this._lastv = viewport.v;
 
     // Determine the tiles needed to cover the view..
     const tiles = this._tiler.getTiles(viewport).tiles;
@@ -223,50 +214,45 @@ export class KeepRightService extends AbstractSystem {
 
     // Issue new requests..
     for (const tile of tiles) {
-      const tileID = tile.id;
-      if (spatial.hasTile('keepright', tileID) || network.isInflight(`keepright-tile-${tileID}`)) continue;
-      this.loadTile(tile);
+      this._loadTile(tile);
     }
   }
 
 
   /**
    * Load a single tile of data.
-   * @param tile - Tile data
+   * @param tile - Tile to load
    */
-  public loadTile(tile: Tile): void {
+  protected _loadTile(tile: Tile): void {
     const context = this.context;
-    const spatial = context.systems.spatial!;
     const network = context.systems.network!;
-    const tileID = tile.id;
+
+    const requestID = `keepright-tile-${tile.id}`;
+    if (network.isCompleted(requestID) || network.isInflight(requestID)) return;
 
     const options = { format: 'geojson', ch: KR_RULES };
     const [ left, top, right, bottom ] = tile.wgs84Extent.rectangle();
     const params = Object.assign({}, options, { left, bottom, right, top });
     const url = `${KEEPRIGHT_API}/export.php?` + utilQsString(params, false);
-    const requestID = `keepright-tile-${tileID}`;
 
     network.fetch<any>(url, { requestID })
-      .then(response => this._gotTile(tile, response))
+      .then(response => this._gotTile(response))
       .catch(err => {
-        if (err.name === 'AbortError') return;          // ok
-        if (err instanceof Error) console.error(err);   // eslint-disable-line no-console
-        spatial.addTiles('keepright', [tile]);          // don't retry
+        if (err.name === 'AbortError') return;   // ok
+        console.error(err);  // eslint-disable-line
       });
   }
 
 
   /**
    * Parse the response from the tile fetch.
-   * @param tile - Tile data
    * @param response - Response data
    */
-  protected _gotTile(tile: Tile, response: any): void {
+  protected _gotTile(response: any): void {
     const context = this.context;
     const gfx = context.systems.gfx;
     const spatial = context.systems.spatial!;
-
-    spatial.addTiles('keepright', [tile]);   // mark as loaded
+    const spatialID = 'keepright-data';
 
     if (!Array.isArray(response?.features)) {
       throw new Error('Invalid response');
@@ -326,7 +312,7 @@ export class KeepRightService extends AbstractSystem {
           break;
       }
 
-      loc = spatial.preventCoincidentLoc('keepright', loc);
+      loc = spatial.getFreeLoc(spatialID, loc);
 
       const props: Record<string, any> = {
         id:              id,
@@ -346,7 +332,7 @@ export class KeepRightService extends AbstractSystem {
 
       props.replacements = this._tokenReplacements(props);
 
-      spatial.addData('keepright', new MarkerData(context, props));
+      spatial.addData(spatialID, new MarkerData(context, props));
     }
 
     gfx?.deferredRedraw();
@@ -388,7 +374,7 @@ export class KeepRightService extends AbstractSystem {
           this.removeItem(item);
         } else if (item.props.newStatus === 'ignore_t') {   // ignore temporarily (error fixed)
           this.removeItem(item);
-          this._cache.closed[`${item.props.schema}:${dataID}`] = true;
+          this._closed.add(`${item.props.schema}:${dataID}`);
         } else {
           const replaced = this.replaceItem(item.update({
             comment: item.props.newComment,
@@ -410,7 +396,7 @@ export class KeepRightService extends AbstractSystem {
    */
   public getError(dataID: DataID): KeepRightIssue | undefined {
     const spatial = this.context.systems.spatial!;
-    return spatial.getData<KeepRightIssue>('keepright', dataID);
+    return spatial.getItem<KeepRightIssue>('keepright-data', dataID);
   }
 
 
@@ -433,7 +419,7 @@ export class KeepRightService extends AbstractSystem {
     if (!(item instanceof MarkerData) || !item.id) return null;
 
     const spatial = this.context.systems.spatial!;
-    spatial.replaceData('keepright', item);
+    spatial.replaceData('keepright-data', item);
     return item;
   }
 
@@ -446,7 +432,7 @@ export class KeepRightService extends AbstractSystem {
     if (!(item instanceof MarkerData) || !item.id) return;
 
     const spatial = this.context.systems.spatial!;
-    spatial.removeData('keepright', item);
+    spatial.removeItems('keepright-data', item.id);
   }
 
 
@@ -465,7 +451,7 @@ export class KeepRightService extends AbstractSystem {
    * @return Array of closed item ids
    */
   public getClosedIDs(): string[] {
-    return Object.keys(this._cache.closed).sort();
+    return [...this._closed].sort();
   }
 
 

@@ -35,8 +35,6 @@ describe('validateCloseNodes', () => {
 
 
   // Load entities into the editor's spatial caches and refresh the validation graph.
-  // Detached-point checks query the spatial index via `spatial.getDataAtBox`,
-  //  which the editor keeps in sync with the staging graph.
   function load(entities) {
     const editor = context.systems.editor;
     editor.merge(entities);

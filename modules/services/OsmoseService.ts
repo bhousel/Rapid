@@ -36,13 +36,6 @@ const TILEZOOM = 14;
 const OSMOSE_API = 'https://osmose.openstreetmap.fr/api/0.3';
 
 
-/** Internal cache for Osmose tile data */
-interface OsmoseCache {
-  /** Map of issues marked as closed, keyed by entity ID */
-  closed: Record<string, number>;
-  lastv: number | null;
-}
-
 /** Persistent Osmose data loaded at startup */
 interface OsmoseData {
   icons: Record<string, string>;
@@ -72,10 +65,12 @@ export class OsmoseService extends AbstractSystem {
   /** Static Osmose data loaded at startup (icons and issue type list) */
   protected _osmoseData: OsmoseData;
 
-  /** Internal cache for Osmose data, spatial index, and request tracking */
-  protected _cache: OsmoseCache;
   /** Tiler instance used to compute tile coverage for the current viewport */
   protected _tiler: Tiler;
+  /** Map of issues marked as closed, keyed by entity ID */
+  protected _closed: Record<string, number>;
+  /** Last viewport version number used for change detection */
+  protected _lastv: number | null;
 
 
   /**
@@ -94,8 +89,9 @@ export class OsmoseService extends AbstractSystem {
     this._osmoseStrings = new Map<LocaleCode, Record<string, OsmoseIssueStrings>>();
     this._osmoseData = { icons: {}, types: [] };
 
-    this._cache = {} as OsmoseCache;
     this._tiler = (new Tiler().zoomRange(TILEZOOM) as Tiler).skipNullIsland(true) as Tiler;
+    this._closed = {};
+    this._lastv = null;
   }
 
 
@@ -145,13 +141,11 @@ export class OsmoseService extends AbstractSystem {
     const network = context.systems.network!;
     const spatial = context.systems.spatial!;
 
-    network.abortMatching(id => id.startsWith('osmose'));
-    spatial.clearMatching(id => id.startsWith('osmose'));
+    network.clearMatching(id => id.startsWith('osmose-') || id.includes(OSMOSE_API));
+    spatial.clearMatching(id => id.startsWith('osmose-'));
 
-    this._cache = {
-      closed: {},
-      lastv:  null  // viewport version last time we fetched data
-    };
+    this._closed = {};
+    this._lastv = null;
 
     return Promise.resolve();
   }
@@ -163,7 +157,7 @@ export class OsmoseService extends AbstractSystem {
    */
   public getData(): MarkerData[] {
     const spatial = this.context.systems.spatial!;
-    return spatial.getVisibleData('osmose').map(hit => hit.contents) as MarkerData[];
+    return spatial.getVisibleItems('osmose-data').map(hit => hit.contents) as MarkerData[];
   }
 
 
@@ -173,12 +167,10 @@ export class OsmoseService extends AbstractSystem {
   public loadTiles(): void {
     const context = this.context;
     const network = context.systems.network!;
-    const spatial = context.systems.spatial!;
     const viewport = context.viewport;
-    const cache = this._cache;
 
-    if (cache.lastv === viewport.v) return;  // exit early if the view is unchanged
-    cache.lastv = viewport.v;
+    if (this._lastv === viewport.v) return;  // exit early if the view is unchanged
+    this._lastv = viewport.v;
 
     // Determine the tiles needed to cover the view..
     const tiles = this._tiler.getTiles(viewport).tiles;
@@ -189,49 +181,44 @@ export class OsmoseService extends AbstractSystem {
 
     // Issue new requests..
     for (const tile of tiles) {
-      const tileID = tile.id;
-      if (spatial.hasTile('osmose', tileID) || network.isInflight(`osmose-tile-${tileID}`)) continue;
-      this.loadTile(tile);
+      this._loadTile(tile);
     }
   }
 
 
   /**
    * Load a single tile of data.
-   * @param tile - Tile data
+   * @param tile - Tile to load
    */
-  public loadTile(tile: Tile): void {
+  protected _loadTile(tile: Tile): void {
     const context = this.context;
     const network = context.systems.network!;
-    const spatial = context.systems.spatial!;
-    const tileID = tile.id;
+
+    const requestID = `osmose-tile-${tile.id}`;
+    if (network.isCompleted(requestID) || network.isInflight(requestID)) return;
 
     const [x, y, z] = tile.xyz;
     const params = { item: this._osmoseData.types };   // Only request the types that we support
     const url = `${OSMOSE_API}/issues/${z}/${x}/${y}.geojson?` + utilQsString(params, false);
-    const requestID = `osmose-tile-${tileID}`;
 
     network.fetch<any>(url, { requestID })
-      .then(response => this._gotTile(tile, response))
+      .then(response => this._gotTile(response))
       .catch(err => {
-        if (err.name === 'AbortError') return;          // ok
-        if (err instanceof Error) console.error(err);   // eslint-disable-line no-console
-        spatial.addTiles('osmose', [tile]);             // don't retry
+        if (err.name === 'AbortError') return;   // ok
+        console.error(err);  // eslint-disable-line
       });
   }
 
 
   /**
    * Parse the response from the tile fetch
-   * @param tile - Tile data
    * @param response - Response data
    */
-  protected _gotTile(tile: Tile, response: any): void {
+  protected _gotTile(response: any): void {
     const context = this.context;
     const gfx = context.systems.gfx;
     const spatial = context.systems.spatial!;
-
-    spatial.addTiles('osmose', [tile]);   // mark as loaded
+    const spatialID = 'osmose-data';
 
     for (const feature of (response.features ?? [])) {
       // Osmose issues are uniquely identified by a unique
@@ -243,7 +230,7 @@ export class OsmoseService extends AbstractSystem {
       // Filter out unsupported issue types (some are too specific or advanced)
       if (!iconID) continue;
 
-      const loc = spatial.preventCoincidentLoc('osmose', feature.geometry.coordinates);
+      const loc = spatial.getFreeLoc(spatialID, feature.geometry.coordinates);
       const props: Record<string, any> = {
         id:        id,
         class:     cl,
@@ -259,7 +246,7 @@ export class OsmoseService extends AbstractSystem {
         props.elems = [];
       }
 
-      spatial.addData('osmose', new MarkerData(context, props));
+      spatial.addData(spatialID, new MarkerData(context, props));
     }
 
     gfx?.deferredRedraw();
@@ -281,7 +268,6 @@ export class OsmoseService extends AbstractSystem {
     const localeCode = l10n?.localeCode || 'en-US';
 
     const url = `${OSMOSE_API}/issue/${issue.id}?langs=${localeCode}`;
-
     return network.fetch<any>(url)
       .then((data: any) => {
         // Associated elements used for highlighting
@@ -345,8 +331,8 @@ export class OsmoseService extends AbstractSystem {
     const issueID = issue.id;
     const status = issue.props.newStatus as string;
     const item = issue.props.item as string;
-    const requestID = `osmose-post-${issueID}`;
 
+    const requestID = `osmose-post-${issueID}`;
     if (network.isInflight(requestID)) {
       return callback({ message: 'Issue update already inflight', status: -2 }, issue);
     }
@@ -364,10 +350,10 @@ export class OsmoseService extends AbstractSystem {
 
         if (status === 'done') {
           // Keep track of the number of issues closed per `item` to tag the changeset
-          if (!(item in this._cache.closed)) {
-            this._cache.closed[item] = 0;
+          if (!(item in this._closed)) {
+            this._closed[item] = 0;
           }
-          this._cache.closed[item] += 1;
+          this._closed[item] += 1;
         }
 
         if (callback) {
@@ -384,7 +370,7 @@ export class OsmoseService extends AbstractSystem {
    */
   public getError(dataID: DataID): OsmoseIssue | undefined {
     const spatial = this.context.systems.spatial!;
-    return spatial.getData<OsmoseIssue>('osmose', dataID);
+    return spatial.getItem<OsmoseIssue>('osmose-data', dataID);
   }
 
 
@@ -397,7 +383,7 @@ export class OsmoseService extends AbstractSystem {
     if (!(item instanceof MarkerData) || !item.id) return null;
 
     const spatial = this.context.systems.spatial!;
-    spatial.replaceData('osmose', item);
+    spatial.replaceData('osmose-data', item);
     return item;
   }
 
@@ -410,7 +396,7 @@ export class OsmoseService extends AbstractSystem {
     if (!(item instanceof MarkerData) || !item.id) return;
 
     const spatial = this.context.systems.spatial!;
-    spatial.removeData('osmose', item);
+    spatial.removeItems('osmose-data', item.id);
   }
 
 
@@ -420,7 +406,7 @@ export class OsmoseService extends AbstractSystem {
    * @return the closed cache
    */
   public getClosedCounts(): Record<string, number> {
-    return this._cache.closed;
+    return this._closed;
   }
 
 

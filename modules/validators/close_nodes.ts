@@ -231,7 +231,7 @@ export function validateCloseNodes(context: Context): ValidatorFunction {
 
       const box = queryBox(node.loc!, pointThresholdMeters);
       const spatialID = editor.spatialIDForGraph(graph);
-      const hits = spatial.getDataAtBox(spatialID, box);
+      const hits = spatial.getItemsAtBox(spatialID, box);
 
       const isNode1Stol = (node.tags['memorial:type'] === 'stolperstein' || node.tags['memorial'] === 'stolperstein');
 

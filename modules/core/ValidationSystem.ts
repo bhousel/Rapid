@@ -279,7 +279,7 @@ export class ValidationSystem extends AbstractSystem {
       const spatial = this.context.systems.spatial!;
       const spatialID = editor.spatialIDForGraph(cache.graph);
 
-      const buildings = spatial.getAllData<OsmEntity>(spatialID)
+      const buildings = spatial.getAllItems<OsmEntity>(spatialID)
         .filter(entity => (entity.type === 'way' && entity.tags.building && entity.tags.building !== 'no'));
 
       for (const entity of buildings) {

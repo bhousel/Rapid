@@ -2,7 +2,25 @@ import { DOMParser } from '@xmldom/xmldom';
 import JSON5 from 'json5';
 
 /**
+ * Properties to construct a `FetchError` when the original `Response` is unavailable
+ * (e.g. when an HTTP error has crossed the web worker boundary as a `FetchEnvelope`).
+ */
+export interface FetchErrorInit {
+  /** HTTP status code (e.g. 404) */
+  status: number;
+  /** HTTP status text (e.g. 'Not Found') */
+  statusText: string;
+  /** Optional message override (defaults to `'<status> <statusText>'`) */
+  message?: string;
+  /** Optional response body text, captured for error inspection (e.g. rate-limit details) */
+  body?: string;
+}
+
+
+/**
  * Pack up the parts of the response that we may need later for error handling.
+ * Can be constructed from a `Response` (main-thread fetch) or from plain
+ * `FetchErrorInit` properties (when the error has crossed the worker boundary).
  */
 export class FetchError extends Error {
 
@@ -10,23 +28,97 @@ export class FetchError extends Error {
   public status: number;
   /** HTTP status text (e.g. 'Not Found') */
   public statusText: string;
-  /** The original Fetch API Response object, available for further inspection */
-  public response: Response;
+  /** The original Fetch API Response object, available for further inspection (main thread only) */
+  public response?: Response;
+  /** Response body text, if captured (available even when `response` is not) */
+  public body?: string;
 
 
   /**
    * @constructor
-   * @param response - The failed Fetch API Response
+   * @param init - The failed Fetch API `Response`, or plain `FetchErrorInit` properties
    */
-  public constructor(response: Response) {
-    const message = response.status + ' ' + response.statusText;    // e.g. '404 Not Found'
-    super(message);
+  public constructor(init: Response | FetchErrorInit) {
+    if (init instanceof Response) {
+      super(init.status + ' ' + init.statusText);    // e.g. '404 Not Found'
+      this.status = init.status;
+      this.statusText = init.statusText;
+      this.response = init;   // make full response available, in case anyone wants it
+    } else {
+      super(init.message ?? (init.status + ' ' + init.statusText));
+      this.status = init.status;
+      this.statusText = init.statusText;
+      this.body = init.body;
+    }
 
     this.name = 'FetchError';
-    this.status = response.status;
-    this.statusText = response.statusText;
-    this.response = response;   // make full response available, in case anyone wants it
   }
+}
+
+
+/**
+ * A serializable wrapper around the outcome of a fetch + parse.
+ *
+ * Unlike a raw `Response` (which cannot cross the web worker boundary) or a
+ * thrown `FetchError` (which gets flattened to a plain string when posted back
+ * from a worker), a `FetchEnvelope` carries the HTTP status and parsed value as
+ * plain data.  This lets `NetworkSystem` record the real status of every
+ * settled request, and lets callers branch on HTTP errors without a full
+ * `Response` object.
+ *
+ * - On success: `{ ok: true, status, value }`
+ * - On HTTP error: `{ ok: false, status, statusText, message, body }`
+ *
+ * Note that `AbortError` and transport failures (DNS, offline) are *not* wrapped
+ * in an envelope — they reject the promise as usual.
+ *
+ * @template T - the type of the parsed value on success
+ */
+export type FetchEnvelope<T = unknown> =
+  | { ok: true; status: number; value: T }
+  | { ok: false; status: number; statusText: string; message: string; body?: string };
+
+
+/**
+ * Fetch a URL and wrap the outcome in a `FetchEnvelope`.
+ *
+ * The response is parsed via the supplied `parse` function only on HTTP success.
+ * On HTTP error, the body text is captured (best-effort) so callers can inspect
+ * details such as rate-limit retry durations.
+ *
+ * `AbortError` and transport failures are *not* caught — they reject the promise.
+ *
+ * @param fetchFn - The fetch implementation to use (e.g. `globalThis.fetch`)
+ * @param url - The URL to fetch
+ * @param init - The `RequestInit` (should already include any `signal`)
+ * @param parse - Parses a successful `Response` into the envelope's `value`
+ * @return  Promise resolved with a `FetchEnvelope`
+ */
+export async function fetchEnvelope<T>(
+  fetchFn: (url: string, init?: RequestInit) => Promise<Response>,
+  url: string,
+  init: RequestInit,
+  parse: (response: Response) => Promise<T> | T
+): Promise<FetchEnvelope<T>> {
+  const response = await fetchFn(url, init);
+
+  if (!response.ok) {
+    let body = '';
+    try {
+      body = await response.text();
+    } catch {
+      // Body may be unreadable or already consumed — ignore
+    }
+    return {
+      ok: false,
+      status: response.status,
+      statusText: response.statusText,
+      message: `${response.status} ${response.statusText}`,
+      body
+    };
+  }
+
+  return { ok: true, status: response.status, value: await parse(response) };
 }
 
 

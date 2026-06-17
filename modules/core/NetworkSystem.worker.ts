@@ -2,8 +2,9 @@ import { VectorTile } from '@mapbox/vector-tile';
 import Protobuf from 'pbf';
 
 import { OsmJSONParser, OsmXMLParser } from '../data/parsers/index.ts';
-import { utilFetchResponse } from '../util/fetch_response.ts';
+import { fetchEnvelope, utilFetchResponse } from '../util/fetch_response.ts';
 
+import type { FetchEnvelope } from '../util/fetch_response.ts';
 import type { ParserOptions, ParserResult } from '../data/parsers/types.ts';
 
 // Long-lived parser instances - These persist for the lifetime of the execution context.
@@ -41,56 +42,16 @@ export interface MVTFeatureResult {
 
 
 /**
- * Fetches generic data from a URL and parses the response via utilFetchResponse.
- * @listens `network:fetchAndParse`
- * @param  data    Message data - expects the url and optional RequestInit passed to `fetch`
- * @param  signal  Abort signal
- * @return  Promise resolved with the data, or rejected if error
+ * Decode a Mapbox Vector Tile buffer into an array of GeoJSON features.
+ * Features wholly outside the tile's coordinate space (i.e. on neighbor tiles,
+ * spilling into the buffer) are skipped.
+ * @param  buffer  The protobuf ArrayBuffer
+ * @param  x  Tile x coordinate
+ * @param  y  Tile y coordinate
+ * @param  z  Tile z coordinate
+ * @return  Array of MVTFeatureResult
  */
-export async function fetchAndParse(data: unknown, signal: AbortSignal): Promise<any> {
-  const { url, init } = data as FetchAndParseOptions;
-  const response = await fetch(url, { ...init, signal });
-  return utilFetchResponse(response);
-};
-
-/**
- * Fetches OSM JSON data from a URL and parses the response via `utilFetchResponse`.
- * @listens `network:fetchAndParseOsmJSON`
- * @param  data    Message data - expects the url, optional RequestInit passed to `fetch`, and optional parser options
- * @param  signal  Abort signal
- * @return  Promise resolved with the data, or rejected if error
- */
-export async function fetchAndParseOsmJson(data: unknown, signal: AbortSignal): Promise<ParserResult> {
-  const { parserOptions } = data as FetchAndParseOsmOptions;
-  const json = await fetchAndParse(data, signal);
-  return osmJsonParser.parse(json, parserOptions);
-};
-
-/**
- * Fetches OSM XML data from a URL and parses the response via `utilFetchResponse`.
- * @listens `network:fetchAndParseOsmXML`
- * @param  data    Message data - expects the url, optional RequestInit passed to `fetch`, and optional parser options
- * @param  signal  Abort signal
- * @return  Promise resolved with the data, or rejected if error
- */
-export async function fetchAndParseOsmXml(data: unknown, signal: AbortSignal): Promise<ParserResult> {
-  const { parserOptions } = data as FetchAndParseOsmOptions;
-  const xml = await fetchAndParse(data, signal);
-  return osmXmlParser.parse(xml, parserOptions);
-};
-
-/**
- * Fetches a Mapbox Vector Tile from a URL, decodes the protobuf, and converts each feature to GeoJSON.
- * @listens `network:fetchAndParseMVT`
- * @param  data    Message data - expects the url, optional RequestInit, and tileXYZ coordinates
- * @param  signal  Abort signal
- * @return  Promise resolved with an array of MVTFeatureResult
- */
-export async function fetchAndParseMVT(data: unknown, signal: AbortSignal): Promise<MVTFeatureResult[]> {
-  const { tileXYZ } = data as FetchAndParseMVTOptions;
-  const [x, y, z] = tileXYZ;
-
-  const buffer = await fetchAndParse(data, signal);
+function decodeMVT(buffer: ArrayBuffer | null, x: number, y: number, z: number): MVTFeatureResult[] {
   if (!buffer) return [];
 
   const vt = new VectorTile(new Protobuf(buffer));
@@ -118,6 +79,60 @@ export async function fetchAndParseMVT(data: unknown, signal: AbortSignal): Prom
   }
 
   return results;
+}
+
+
+/**
+ * Fetches generic data from a URL and wraps the parsed result in a `FetchEnvelope`.
+ * @listens `network:fetchAndParse`
+ * @param  data    Message data - expects the url and optional RequestInit passed to `fetch`
+ * @param  signal  Abort signal
+ * @return  Promise resolved with a FetchEnvelope (rejected only on abort/transport error)
+ */
+export async function fetchAndParse(data: unknown, signal: AbortSignal): Promise<FetchEnvelope<any>> {
+  const { url, init } = data as FetchAndParseOptions;
+  return fetchEnvelope(fetch, url, { ...init, signal }, utilFetchResponse);
+};
+
+/**
+ * Fetches OSM JSON data from a URL and wraps the parsed result in a `FetchEnvelope`.
+ * @listens `network:fetchAndParseOsmJSON`
+ * @param  data    Message data - expects the url, optional RequestInit passed to `fetch`, and optional parser options
+ * @param  signal  Abort signal
+ * @return  Promise resolved with a FetchEnvelope (rejected only on abort/transport error)
+ */
+export async function fetchAndParseOsmJson(data: unknown, signal: AbortSignal): Promise<FetchEnvelope<ParserResult>> {
+  const { url, init, parserOptions } = data as FetchAndParseOsmOptions;
+  return fetchEnvelope(fetch, url, { ...init, signal },
+    async response => osmJsonParser.parse(await utilFetchResponse(response), parserOptions));
+};
+
+/**
+ * Fetches OSM XML data from a URL and wraps the parsed result in a `FetchEnvelope`.
+ * @listens `network:fetchAndParseOsmXML`
+ * @param  data    Message data - expects the url, optional RequestInit passed to `fetch`, and optional parser options
+ * @param  signal  Abort signal
+ * @return  Promise resolved with a FetchEnvelope (rejected only on abort/transport error)
+ */
+export async function fetchAndParseOsmXml(data: unknown, signal: AbortSignal): Promise<FetchEnvelope<ParserResult>> {
+  const { url, init, parserOptions } = data as FetchAndParseOsmOptions;
+  return fetchEnvelope(fetch, url, { ...init, signal },
+    async response => osmXmlParser.parse(await utilFetchResponse(response), parserOptions));
+};
+
+/**
+ * Fetches a Mapbox Vector Tile from a URL, decodes the protobuf, and wraps the
+ * resulting GeoJSON features in a `FetchEnvelope`.
+ * @listens `network:fetchAndParseMVT`
+ * @param  data    Message data - expects the url, optional RequestInit, and tileXYZ coordinates
+ * @param  signal  Abort signal
+ * @return  Promise resolved with a FetchEnvelope (rejected only on abort/transport error)
+ */
+export async function fetchAndParseMVT(data: unknown, signal: AbortSignal): Promise<FetchEnvelope<MVTFeatureResult[]>> {
+  const { url, init, tileXYZ } = data as FetchAndParseMVTOptions;
+  const [x, y, z] = tileXYZ;
+  return fetchEnvelope(fetch, url, { ...init, signal },
+    async response => decodeMVT(await utilFetchResponse(response), x, y, z));
 };
 
 /**

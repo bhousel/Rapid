@@ -48,7 +48,7 @@ describe('GeoScribbleService', () => {
         assert.instanceOf(geoscribble.optionalDependencies, Set);
         assert.isFalse(geoscribble.autoStart);
 
-        assert.deepEqual(geoscribble._cache, {});
+        assert.isNull(geoscribble._lastv);
       });
     });
 
@@ -59,8 +59,7 @@ describe('GeoScribbleService', () => {
         assert.instanceOf(prom, Promise);
         return prom
           .then(() => {
-            const cache = geoscribble._cache;
-            assert.isNull(cache.lastv);
+            assert.isNull(geoscribble._lastv);
           });
       });
 
@@ -88,13 +87,12 @@ describe('GeoScribbleService', () => {
     describe('resetAsync', () => {
       it('returns a promise to reset', () => {
         const geoscribble = new Rapid.GeoScribbleService(context);
-        geoscribble._cache = {};
+        geoscribble._lastv = 5;  // pretend we fetched at some viewport version
         const prom = geoscribble.resetAsync();
         assert.instanceOf(prom, Promise);
         return prom
           .then(() => {
-            const cache = geoscribble._cache;
-            assert.isNull(cache.lastv);
+            assert.isNull(geoscribble._lastv);
           });
       });
     });
@@ -107,6 +105,21 @@ describe('GeoScribbleService', () => {
 
     const origError = console.error;
     const spyError = mock();
+
+    // Map a WGS84 loc used in these tests to its viewport transform.
+    const TRANSFORMS = {
+      '10,0': { x: -116508, y: 0, z: 14 },
+      '20,0': { x: -233017, y: 0, z: 14 }
+    };
+
+    // A tile covering `loc` is considered "loaded" once its network request has completed.
+    // (Tile-load tracking moved from the SpatialSystem to NetworkSystem.completed.)
+    function tileLoaded(loc) {
+      const network = context.systems.network;
+      const viewport = new Rapid.sdk.Viewport(TRANSFORMS[loc.join(',')], [64, 64]);
+      const tiles = _geoscribble._tiler.getTiles(viewport).tiles;
+      return tiles.length > 0 && tiles.every(tile => network.isCompleted(`geoscribble-tile-${tile.id}`));
+    }
 
     afterAll(() => {
       console.error = origError;
@@ -131,37 +144,34 @@ describe('GeoScribbleService', () => {
 
     describe('loadTiles', () => {
       it('loads a tile of data and requests a redraw', async () => {
-        const spatial = context.systems.spatial;
         fetchMock.route(/geojson/, sample.data10, { delay: 1 });
         _geoscribble.loadTiles();
 
         await Bun.sleep(5);  // after all fetches have settled
-        assert.isTrue(spatial.hasTileAtLoc('geoscribble', [10, 0]), 'tile at [10°, 0°] was loaded');
+        assert.isTrue(tileLoaded([10, 0]), 'tile at [10°, 0°] was loaded');
         assert.lengthOf(fetchMock.callHistory.calls(), 1, 'fetch called once');
         assert.lengthOf(spyRedraw.mock.calls, 1, 'redraw called once');
         assert.lengthOf(spyError.mock.calls, 0, 'console.error not called');
       });
 
       it(`doesn't retry inflight tiles`, async () => {
-        const spatial = context.systems.spatial;
         fetchMock.route(/geojson/, sample.data10, { delay: 1 });
         _geoscribble.loadTiles();
         context.viewport.transform.v++;  // touch viewport
         _geoscribble.loadTiles();        // try again
 
         await Bun.sleep(5);  // after all fetches have settled
-        assert.isTrue(spatial.hasTileAtLoc('geoscribble', [10, 0]), 'tile at [10°, 0°] was loaded');
+        assert.isTrue(tileLoaded([10, 0]), 'tile at [10°, 0°] was loaded');
         assert.lengthOf(fetchMock.callHistory.calls(), 1, 'fetch called once');
         assert.lengthOf(spyRedraw.mock.calls, 1, 'redraw called once');
       });
 
       it(`doesn't retry loaded tiles`, async () => {
-        const spatial = context.systems.spatial;
         fetchMock.route(/geojson/, sample.data10, { delay: 1 });
         _geoscribble.loadTiles();
 
         await Bun.sleep(5);  // after all fetches have settled
-        assert.isTrue(spatial.hasTileAtLoc('geoscribble', [10, 0]), 'tile at [10°, 0°] was loaded');
+        assert.isTrue(tileLoaded([10, 0]), 'tile at [10°, 0°] was loaded');
 
         context.viewport.transform.v++;  // touch viewport
         _geoscribble.loadTiles();        // try again
@@ -173,7 +183,6 @@ describe('GeoScribbleService', () => {
       });
 
       it('aborts unwanted tile requests', async () => {
-        const spatial = context.systems.spatial;
         fetchMock.route(/geojson/, sample.data10, { delay: 1 });
         _geoscribble.loadTiles();
 
@@ -182,21 +191,20 @@ describe('GeoScribbleService', () => {
         _geoscribble.loadTiles();
 
         await Bun.sleep(5);  // after all fetches have settled
-        assert.isFalse(spatial.hasTileAtLoc('geoscribble', [10, 0]), 'tile at [10°, 0°] was not loaded');
-        assert.isTrue(spatial.hasTileAtLoc('geoscribble', [20, 0]), 'tile at [20°, 0°] was loaded');
+        assert.isFalse(tileLoaded([10, 0]), 'tile at [10°, 0°] was not loaded');
+        assert.isTrue(tileLoaded([20, 0]), 'tile at [20°, 0°] was loaded');
         assert.lengthOf(fetchMock.callHistory.calls(), 2, 'fetch called twice - but one was aborted');
         assert.lengthOf(spyRedraw.mock.calls, 1, 'redraw called once');
         assert.lengthOf(spyError.mock.calls, 0, 'console.error not called');
       });
 
       it(`doesn't retry errored tiles`, async () => {
-        const spatial = context.systems.spatial;
         const errResponse = { status: 403, body: 'Forbidden', headers: { 'Content-Type': 'text/plain' } };
         fetchMock.route(/geojson/, errResponse, { delay: 1 });
         _geoscribble.loadTiles();
 
         await Bun.sleep(5);  // after all fetches have settled
-        assert.isTrue(spatial.hasTileAtLoc('geoscribble', [10, 0]), 'tile at [10°, 0°] considered loaded');
+        assert.isTrue(tileLoaded([10, 0]), 'tile at [10°, 0°] considered loaded');
         assert.lengthOf(fetchMock.callHistory.calls(), 1, 'fetch called once');
         assert.lengthOf(spyRedraw.mock.calls, 0, 'redraw not called');
         assert.lengthOf(spyError.mock.calls, 1, 'console.error called once');

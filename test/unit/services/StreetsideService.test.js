@@ -114,6 +114,21 @@ describe('StreetsideService', () => {
     const origError = console.error;
     const spyError = mock();
 
+    // Map a WGS84 loc used in these tests to its viewport transform.
+    const TRANSFORMS = {
+      '10,0': { x: -116508, y: 0, z: 14 },
+      '20,0': { x: -233017, y: 0, z: 14 }
+    };
+
+    // A tile covering `loc` is considered "loaded" once its network request has completed.
+    // (Tile-load tracking moved from the SpatialSystem to NetworkSystem.completed.)
+    function tileLoaded(loc) {
+      const network = context.systems.network;
+      const viewport = new Rapid.sdk.Viewport(TRANSFORMS[loc.join(',')], [64, 64]);
+      const tiles = _streetside._tiler.getTiles(viewport).tiles;
+      return tiles.length > 0 && tiles.every(tile => network.isCompleted(`streetside-tile-${tile.id}`));
+    }
+
     beforeAll(() => {
       console.error = spyError;
       _streetside = new Rapid.StreetsideService(context);
@@ -143,7 +158,6 @@ describe('StreetsideService', () => {
 
     describe('loadTiles', () => {
       it('loads a tile of data and requests a redraw', async () => {
-        const spatial = context.systems.spatial;
         fetchMock
           .route(/StreetSideBubbleMetaData/, {
             body: JSON.stringify(sample.bubbles10),
@@ -154,14 +168,13 @@ describe('StreetsideService', () => {
         _streetside.loadTiles();
 
         await Bun.sleep(5);  // after all fetches have settled
-        assert.isTrue(spatial.hasTileAtLoc('streetside-images', [10, 0]), 'tile at [10°, 0°] was loaded');
+        assert.isTrue(tileLoaded([10, 0]), 'tile at [10°, 0°] was loaded');
         assert.lengthOf(fetchMock.callHistory.calls(), 1, 'fetch called once');
         assert.lengthOf(spyRedraw.mock.calls, 1, 'redraw called once');
         assert.lengthOf(spyError.mock.calls, 0, 'console.error not called');
       });
 
       it(`doesn't retry inflight tiles`, async () => {
-        const spatial = context.systems.spatial;
         fetchMock
           .route(/StreetSideBubbleMetaData/, {
             body: JSON.stringify(sample.bubbles10),
@@ -174,13 +187,12 @@ describe('StreetsideService', () => {
         _streetside.loadTiles();         // try again
 
         await Bun.sleep(5);  // after all fetches have settled
-        assert.isTrue(spatial.hasTileAtLoc('streetside-images', [10, 0]), 'tile at [10°, 0°] was loaded');
+        assert.isTrue(tileLoaded([10, 0]), 'tile at [10°, 0°] was loaded');
         assert.lengthOf(fetchMock.callHistory.calls(), 1, 'fetch called once');
         assert.lengthOf(spyRedraw.mock.calls, 1, 'redraw called once');
       });
 
       it(`doesn't retry loaded tiles`, async () => {
-        const spatial = context.systems.spatial;
         fetchMock
           .route(/StreetSideBubbleMetaData/, {
             body: JSON.stringify(sample.bubbles10),
@@ -191,7 +203,7 @@ describe('StreetsideService', () => {
         _streetside.loadTiles();
 
         await Bun.sleep(5);  // after all fetches have settled
-        assert.isTrue(spatial.hasTileAtLoc('streetside-images', [10, 0]), 'tile at [10°, 0°] was loaded');
+        assert.isTrue(tileLoaded([10, 0]), 'tile at [10°, 0°] was loaded');
 
         context.viewport.transform.v++;  // touch viewport
         _streetside.loadTiles();         // try again
@@ -203,7 +215,6 @@ describe('StreetsideService', () => {
       });
 
       it('aborts unwanted tile requests', async () => {
-        const spatial = context.systems.spatial;
         fetchMock
           .route(/StreetSideBubbleMetaData/, {
             body: JSON.stringify(sample.bubbles10),
@@ -218,21 +229,20 @@ describe('StreetsideService', () => {
         _streetside.loadTiles();
 
         await Bun.sleep(5);  // after all fetches have settled
-        assert.isFalse(spatial.hasTileAtLoc('streetside-images', [10, 0]), 'tile at [10°, 0°] was not loaded');
-        assert.isTrue(spatial.hasTileAtLoc('streetside-images', [20, 0]), 'tile at [20°, 0°] was loaded');
+        assert.isFalse(tileLoaded([10, 0]), 'tile at [10°, 0°] was not loaded');
+        assert.isTrue(tileLoaded([20, 0]), 'tile at [20°, 0°] was loaded');
         assert.lengthOf(fetchMock.callHistory.calls(), 2, 'fetch called twice - but one was aborted');
         assert.lengthOf(spyRedraw.mock.calls, 1, 'redraw called once');
         assert.lengthOf(spyError.mock.calls, 0, 'console.error not called');
       });
 
       it('allows retrying errored tiles', async () => {
-        const spatial = context.systems.spatial;
         const errResponse = { status: 403, body: 'Forbidden', headers: { 'Content-Type': 'text/plain' } };
         fetchMock.route(/StreetSideBubbleMetaData/, errResponse, { delay: 1 });
         _streetside.loadTiles();
 
         await Bun.sleep(5);  // after all fetches have settled
-        assert.isFalse(spatial.hasTileAtLoc('streetside-images', [10, 0]), 'tile at [10°, 0°] is NOT considered loaded');
+        assert.isFalse(tileLoaded([10, 0]), 'tile at [10°, 0°] is NOT considered loaded');
         assert.lengthOf(fetchMock.callHistory.calls(), 1, 'fetch called once');
         assert.lengthOf(spyRedraw.mock.calls, 0, 'redraw not called');
         assert.lengthOf(spyError.mock.calls, 1, 'console.error called once');

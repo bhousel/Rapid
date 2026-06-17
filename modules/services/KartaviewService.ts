@@ -24,20 +24,6 @@ const MAXRESULTS = 1000;
 const TILEZOOM = 14;
 
 
-/** Extended Tile with origID for pagination tracking */
-interface KartaviewTile extends Tile {
-  /** Original tile ID before the page number suffix was appended */
-  origID?: string;
-}
-
-/** Internal cache for Kartaview tile data */
-interface KartaviewCache {
-  /** Next page number to fetch for each original tile ID */
-  nextPage: Map<string, number>;
-  /** Last viewport version that was loaded, to skip redundant updates */
-  lastv: number | null;
-}
-
 /** Properties passed to `_cacheImage` to create or update an image */
 interface ImageSource {
   /** Unique image identifier */
@@ -126,12 +112,14 @@ export class KartaviewService extends AbstractSystem {
 
   /** D3 zoom behavior controlling pan/zoom within the photo viewer */
   protected _imgZoom: ZoomBehavior<Element, unknown>;
-  /** Internal cache for inflight requests and pagination state */
-  protected _cache: KartaviewCache;
   /** Whether to display high-resolution images in the viewer */
   protected _hires: boolean;
   /** Tiler instance used to partition the viewport into tile requests */
   protected _tiler: Tiler;
+  /** Next page number to fetch for each tile ID */
+  protected _nextPage: Map<TileID, number>;
+  /** Last viewport version that was loaded, to skip redundant updates */
+  protected _lastv: number | null;
 
 
   /**
@@ -150,9 +138,10 @@ export class KartaviewService extends AbstractSystem {
       .translateExtent([[0, 0], [320, 240]])
       .scaleExtent([1, 15]);
 
-    this._cache = {} as KartaviewCache;
     this._hires = false;
     this._tiler = (new Tiler().zoomRange(TILEZOOM) as Tiler).skipNullIsland(true) as Tiler;
+    this._nextPage = new Map<TileID, number>();
+    this._lastv = null;
 
     // Ensure methods used as callbacks always have `this` bound correctly.
     this._keydown = this._keydown.bind(this);
@@ -269,13 +258,11 @@ export class KartaviewService extends AbstractSystem {
     const network = context.systems.network!;
     const spatial = context.systems.spatial!;
 
-    network.abortMatching(id => id.startsWith('kartaview'));
-    spatial.clearMatching(id => id.startsWith('kartaview'));
+    network.clearMatching(id => id.startsWith('kartaview-') || id.includes(KARTAVIEW_API) || id.includes(OPENSTREETCAM_API));
+    spatial.clearMatching(id => id.startsWith('kartaview-'));
 
-    this._cache = {
-      nextPage:  new Map<string, number>(),  // keyed by tileID,page
-      lastv:     null
-    };
+    this._nextPage.clear();
+    this._lastv = null;
 
     return Promise.resolve();
   }
@@ -287,7 +274,7 @@ export class KartaviewService extends AbstractSystem {
    */
   public getImages(): MarkerData[] {
     const spatial = this.context.systems.spatial!;
-    return spatial.getVisibleData('kartaview-images').map(hit => hit.contents) as MarkerData[];
+    return spatial.getVisibleItems('kartaview-images').map(hit => hit.contents) as MarkerData[];
   }
 
 
@@ -297,7 +284,7 @@ export class KartaviewService extends AbstractSystem {
    */
   public getSequences(): GeoJSONData[] {
     const spatial = this.context.systems.spatial!;
-    return spatial.getVisibleData('kartaview-sequences').map(hit => hit.contents) as GeoJSONData[];
+    return spatial.getVisibleItems('kartaview-sequences').map(hit => hit.contents) as GeoJSONData[];
   }
 
 
@@ -305,24 +292,130 @@ export class KartaviewService extends AbstractSystem {
    * Schedule any data requests needed to cover the current map view
    */
   public loadTiles(): void {
-    const cache = this._cache;
     const context = this.context;
     const network = context.systems.network!;
     const viewport = context.viewport;
 
-    if (cache.lastv === viewport.v) return;  // exit early if the view is unchanged
-    cache.lastv = viewport.v;
+    if (this._lastv === viewport.v) return;  // exit early if the view is unchanged
+    this._lastv = viewport.v;
 
     // Determine the tiles needed to cover the view..
-    const needTiles = this._tiler.getTiles(viewport).tiles;
+    const tiles = this._tiler.getTiles(viewport).tiles;
 
     // Abort inflight requests that are no longer needed..
-    const neededIDs = new Set<RequestID>(needTiles.map(tile => `kartaview-${tile.id}`));
-    network.abortMatching(id => id.startsWith('kartaview') && !neededIDs.has(id));
+    const neededIDs = new Set<RequestID>(tiles.map(tile => `kartaview-tile-${tile.id}`));
+    network.abortMatching(id => {
+      const key = id.slice(0, id.lastIndexOf(','));  // requestID without page number
+      return key.startsWith('kartaview-tile') && !neededIDs.has(key);
+    });
 
     // Fetch files that are needed
-    for (const tile of needTiles) {
-      this._loadNextTilePageAsync(tile);
+    for (const tile of tiles) {
+      this._loadNextTilePage(tile);
+    }
+  }
+
+
+  /**
+   * Load the next page of data for the given tile.
+   * This uses `https://kartaview.org/1.0/list/nearby-photos/`
+   * @param  tile - tile object
+   */
+  protected _loadNextTilePage(tile: Tile): void {
+    const context = this.context;
+    const network = context.systems.network!;
+
+    const currZoom = context.viewport.transform.zoom;
+    const maxPages = this._maxPageAtZoom(currZoom);
+    const page = this._nextPage.get(tile.id) ?? 1;
+    if (page > maxPages) return;
+
+    const requestID = `kartaview-tile-${tile.id},${page}`;
+    if (network.isCompleted(requestID) || network.isInflight(requestID)) return;
+
+    const bbox = tile.wgs84Extent.bbox();
+    const params = utilQsString({
+      ipp: MAXRESULTS,
+      page: page,
+      bbTopLeft: [bbox.maxY, bbox.minX].join(','),
+      bbBottomRight: [bbox.minY, bbox.maxX].join(','),
+    }, true);
+
+    const url = `${KARTAVIEW_API}/1.0/list/nearby-photos/`;
+    network.fetch<any>(url, {
+      requestID,
+      method: 'POST',
+      body: params,
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    })
+      .then(response => this._gotTile(tile, page, response))
+      .catch(err => {
+        if (err.name === 'AbortError') return;  // ok
+        console.error(err);  // eslint-disable-line
+      });
+  }
+
+
+  /**
+   * Parse the response from the tile fetch
+   * @param tile - The tile fetched
+   * @param page - The page of data fetched
+   * @param response - Response data
+   */
+  protected _gotTile(tile: Tile, page: number, response: any): void {
+    const context = this.context;
+    const gfx = context.systems.gfx;
+    const spatial = context.systems.spatial!;
+
+    const data = response?.currentPageItems || [];
+    if (!data.length) return;
+
+    const seenSequences = new Set<GeoJSONData>();
+
+    // Process and cache the images
+    for (const d of data) {
+      const imageID = d.id.toString();
+      const sequenceID = d.sequence_id.toString();
+
+      // Note that this API call gives us the `username`, but not the image urls.
+      // It also uses 'snake_case' instead of 'camelCase'.
+      const image = this._cacheImage({
+        id: imageID,
+        sequenceID: sequenceID,
+        loc: [+d.lng, +d.lat],
+        ca: parseFloat(d.heading ?? d.headers),
+        isPano: (d.field_of_view === '360'),
+        captured_by: d.username,
+        captured_at: (d.shot_date ?? d.date_added),
+        sequenceIndex: parseInt(d.sequence_index, 10)
+      });
+
+      // Update the sequence to include this image, create if needed..
+      const sequence = this._cacheSequence(image);
+      seenSequences.add(sequence);
+    }
+
+    // Rebuild the geometry for the the seen sequences.
+    // Update geometry in-place.. hope this is ok.
+    for (const sequence of seenSequences) {
+      const geojson = sequence.props.geojson as any;
+      const imageIDs = sequence.props.imageIDs as PhotoID[];
+
+      geojson.geometry.coordinates = imageIDs.map(imageID => {
+        const image = spatial.getItem<KartaviewImage>('kartaview-images', imageID);
+        return image?.loc;
+      }).filter(Boolean);
+      sequence.updateGeometry().touch();
+      spatial.replaceData('kartaview-sequences', sequence);
+    }
+
+    gfx?.deferredRedraw();
+
+    if (data.length === MAXRESULTS) {
+      this._nextPage.set(tile.id, page + 1);
+      this._loadNextTilePage(tile);
+    } else {
+      this._nextPage.set(tile.id, Infinity);   // loaded all available pages for this tile
     }
   }
 
@@ -397,7 +490,7 @@ export class KartaviewService extends AbstractSystem {
           .selectAll('.osc-image')
           .remove();
 
-        const sequence = spatial.getData<KartaviewSequence>('kartaview-sequences', image?.props?.sequenceID);
+        const sequence = spatial.getItem<KartaviewSequence>('kartaview-sequences', image?.props?.sequenceID);
         const r = sequence?.props?.rotation ?? 0;
 
         $imageWrap
@@ -463,7 +556,7 @@ export class KartaviewService extends AbstractSystem {
     // Attribution Section
     const $attribution: D3Selection = $wrapper.selectAll('.photo-attribution').html('&nbsp;');  // clear DOM content
 
-    const image = spatial.getData<KartaviewImage>('kartaview-images', imageID!);
+    const image = spatial.getItem<KartaviewImage>('kartaview-images', imageID!);
     if (!image) return;
 
     const props = image.props;
@@ -516,116 +609,6 @@ export class KartaviewService extends AbstractSystem {
 
 
   /**
-   * Load the next page of image data for the given tile.
-   * This uses `https://kartaview.org/1.0/list/nearby-photos/`
-   * @param  tile - tile object
-   * @return  Promise resolved when there is nothing more to do
-   */
-  protected _loadNextTilePageAsync(tile: KartaviewTile): Promise<void> {
-    // preserve the original tile.id - we will add append a page number to tile.id
-    tile.origID ??= tile.id;
-
-    const context = this.context;
-    const gfx = context.systems.gfx;
-    const network = context.systems.network!;
-    const spatial = context.systems.spatial!;
-
-    const cache = this._cache;
-    const bbox = tile.wgs84Extent.bbox();
-    const currZoom = context.viewport.transform.zoom;
-    const maxPages = this._maxPageAtZoom(currZoom);
-    const nextPage = cache.nextPage.get(tile.origID) ?? 1;
-
-    if (nextPage > maxPages) return Promise.resolve();
-
-    // Modify the tile.id to include the page number.
-    // This is the tile id that the spatial system will keep track of.
-    // TODO: I am not completely sure it is ok to embed the page number in the tileID here.
-    // `spatial.addTiles` will not match with `spatial.hasTile`?
-    const tileID = tile.id = `${tile.origID},${nextPage}`;
-    const requestID = `kartaview-${tileID}` as RequestID;
-    if (spatial.hasTile('kartaview-images', tileID) || network.isInflight(requestID)) {
-      return Promise.resolve();
-    }
-
-    const params = utilQsString({
-      ipp: MAXRESULTS,
-      page: nextPage,
-      bbTopLeft: [bbox.maxY, bbox.minX].join(','),
-      bbBottomRight: [bbox.minY, bbox.maxX].join(','),
-    }, true);
-
-    const url = `${KARTAVIEW_API}/1.0/list/nearby-photos/`;
-    const prom = network.fetch<any>(url, {
-      requestID,
-      method: 'POST',
-      body: params,
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    })
-      .then(response => {
-        spatial.addTiles('kartaview-images', [tile]);   // mark as loaded
-        const data = response?.currentPageItems || [];
-        if (!data.length) return;
-
-        const seenSequences = new Set<GeoJSONData>();
-
-        // Process and cache the images
-        for (const d of data) {
-          const imageID = d.id.toString();
-          const sequenceID = d.sequence_id.toString();
-
-          // Note that this API call gives us the `username`, but not the image urls.
-          // It also uses 'snake_case' instead of 'camelCase'.
-          const image = this._cacheImage({
-            id:             imageID,
-            sequenceID:     sequenceID,
-            loc:            [+d.lng, +d.lat],
-            ca:             parseFloat(d.heading ?? d.headers),
-            isPano:         (d.field_of_view === '360'),
-            captured_by:    d.username,
-            captured_at:    (d.shot_date ?? d.date_added),
-            sequenceIndex:  parseInt(d.sequence_index, 10)
-          });
-
-          // Update the sequence to include this image, create if needed..
-          const sequence = this._cacheSequence(image);
-          seenSequences.add(sequence);
-        }
-
-        // Rebuild the geometry for the the seen sequences.
-        // Update geometry in-place.. hope this is ok.
-        for (const sequence of seenSequences) {
-          const geojson = sequence.props.geojson as any;
-          const imageIDs = sequence.props.imageIDs as PhotoID[];
-
-          geojson.geometry.coordinates = imageIDs.map(imageID => {
-            const image = spatial.getData<KartaviewImage>('kartaview-images', imageID);
-            return image?.loc;
-          }).filter(Boolean);
-          sequence.updateGeometry().touch();
-          spatial.replaceData('kartaview-sequences', sequence);
-        }
-
-        gfx?.deferredRedraw();
-
-        if (data.length === MAXRESULTS) {
-          cache.nextPage.set(tile.origID!, nextPage + 1);
-          this._loadNextTilePageAsync(tile);
-        } else {
-          cache.nextPage.set(tile.origID!, Infinity);   // loaded all available pages for this tile
-        }
-      })
-      .catch(err => {
-        if (err.name === 'AbortError') return;         // ok
-        if (err instanceof Error) console.error(err);  // eslint-disable-line no-console
-        spatial.addTiles('kartaview-images', [tile]);  // don't retry
-      });
-
-    return prom;
-  }
-
-
-  /**
    * Load a single image.
    * This uses `https://api.openstreetcam.org/2.0/photo/<imageID>`
    * If the image has not yet been fetched (for example if we are loading an image
@@ -641,14 +624,15 @@ export class KartaviewService extends AbstractSystem {
 
     // If the image is already cached with an imageUrl, we can just resolve.
     // const image = cache.images.get(imageID);
-    const image = spatial.getData<KartaviewImage>('kartaview-images', imageID);
+    const image = spatial.getItem<KartaviewImage>('kartaview-images', imageID);
     if (image?.props?.imageLowUrl) {
       return Promise.resolve(image);  // fetched it already
     }
 
+    const requestID = `kartaview-image-${imageID}`;
     const url = `${OPENSTREETCAM_API}/2.0/photo/${imageID}`;
 
-    return network.fetch<any>(url)
+    return network.fetch<any>(url, { requestID })
       .then(response => {
         const d = response?.result?.data;
         if (!d) throw new Error(`Image ${imageID} not found`);
@@ -679,7 +663,7 @@ export class KartaviewService extends AbstractSystem {
         const imageIDs = sequence.props.imageIDs as PhotoID[];
 
         geojson.geometry.coordinates = imageIDs.map(imageID => {
-          const image = spatial.getData<KartaviewImage>('kartaview-images', imageID);
+          const image = spatial.getItem<KartaviewImage>('kartaview-images', imageID);
           return image?.loc;
         }).filter(Boolean);
 
@@ -720,10 +704,10 @@ export class KartaviewService extends AbstractSystem {
     const photos = context.systems.photos!;
     const spatial = context.systems.spatial!;
 
-    const image = spatial.getData<KartaviewImage>('kartaview-images', photos.currPhotoID!);
+    const image = spatial.getItem<KartaviewImage>('kartaview-images', photos.currPhotoID!);
     if (!image) return;
 
-    const sequence = spatial.getData<KartaviewSequence>('kartaview-sequences', image.props?.sequenceID as string);
+    const sequence = spatial.getItem<KartaviewSequence>('kartaview-sequences', image.props?.sequenceID as string);
     if (!sequence) return;
 
     let r: number = sequence.props?.rotation ?? 0;
@@ -785,10 +769,10 @@ export class KartaviewService extends AbstractSystem {
     const photos = context.systems.photos!;
     const spatial = context.systems.spatial!;
 
-    const image = spatial.getData<KartaviewImage>('kartaview-images', photos.currPhotoID!);
+    const image = spatial.getItem<KartaviewImage>('kartaview-images', photos.currPhotoID!);
     if (!image) return;
 
-    const sequence = spatial.getData<KartaviewSequence>('kartaview-sequences', image.props?.sequenceID as string);
+    const sequence = spatial.getItem<KartaviewSequence>('kartaview-sequences', image.props?.sequenceID as string);
     if (!sequence) return;
 
     const nextIndex = (image.props.sequenceIndex ?? 0) + stepBy;
@@ -811,9 +795,9 @@ export class KartaviewService extends AbstractSystem {
     const spatial = context.systems.spatial!;
     const imageID = source.id;
 
-    let image = spatial.getData<KartaviewImage>('kartaview-images', imageID);
+    let image = spatial.getItem<KartaviewImage>('kartaview-images', imageID);
     if (!image) {
-      const loc = spatial.preventCoincidentLoc('kartaview-images', source.loc);
+      const loc = spatial.getFreeLoc('kartaview-images', source.loc);
       image = new MarkerData<KartaviewImageProps>(context, {
         type:       'photo',
         serviceID:  this.id as ServiceID,
@@ -857,7 +841,7 @@ export class KartaviewService extends AbstractSystem {
     const sequenceID = image.props.sequenceID;
     const sequenceIndex = image.props.sequenceIndex ?? 0;
 
-    let sequence = spatial.getData<KartaviewSequence>('kartaview-sequences', sequenceID);
+    let sequence = spatial.getItem<KartaviewSequence>('kartaview-sequences', sequenceID);
     if (!sequence) {
       sequence = new GeoJSONData<KartaviewSequenceProps>(context, {
         id:         sequenceID,

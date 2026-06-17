@@ -50,7 +50,9 @@ describe('KartaviewService', () => {
         assert.instanceOf(kartaview.optionalDependencies, Set);
         assert.isFalse(kartaview.autoStart);
 
-        assert.deepEqual(kartaview._cache, {});
+        assert.instanceOf(kartaview._nextPage, Map);
+        assert.isEmpty(kartaview._nextPage);
+        assert.isNull(kartaview._lastv);
       });
     });
 
@@ -61,10 +63,9 @@ describe('KartaviewService', () => {
         assert.instanceOf(prom, Promise);
         return prom
           .then(() => {
-            const cache = kartaview._cache;
-            assert.instanceOf(cache.nextPage, Map);
-            assert.isEmpty(cache.nextPage);
-            assert.isNull(cache.lastv);
+            assert.instanceOf(kartaview._nextPage, Map);
+            assert.isEmpty(kartaview._nextPage);
+            assert.isNull(kartaview._lastv);
           });
       });
 
@@ -92,15 +93,15 @@ describe('KartaviewService', () => {
     describe('resetAsync', () => {
       it('returns a promise to reset', () => {
         const kartaview = new Rapid.KartaviewService(context);
-        kartaview._cache = {};
+        kartaview._nextPage = new Map([['t', 2]]);
+        kartaview._lastv = 5;
         const prom = kartaview.resetAsync();
         assert.instanceOf(prom, Promise);
         return prom
           .then(() => {
-            const cache = kartaview._cache;
-            assert.instanceOf(cache.nextPage, Map);
-            assert.isEmpty(cache.nextPage);
-            assert.isNull(cache.lastv);
+            assert.instanceOf(kartaview._nextPage, Map);
+            assert.isEmpty(kartaview._nextPage);
+            assert.isNull(kartaview._lastv);
           });
       });
     });
@@ -113,6 +114,22 @@ describe('KartaviewService', () => {
 
     const origError = console.error;
     const spyError = mock();
+
+    // Map a WGS84 loc used in these tests to its viewport transform.
+    const TRANSFORMS = {
+      '10,0': { x: -116508, y: 0, z: 14 },
+      '20,0': { x: -233017, y: 0, z: 14 }
+    };
+
+    // A tile covering `loc` is considered "loaded" once its network request has completed.
+    // (Tile-load tracking moved from the SpatialSystem to NetworkSystem.completed.)
+    // Kartaview request ids are paginated (`kartaview-tile-<id>,<page>`); page 1 is always first.
+    function tileLoaded(loc) {
+      const network = context.systems.network;
+      const viewport = new Rapid.sdk.Viewport(TRANSFORMS[loc.join(',')], [64, 64]);
+      const tiles = _kartaview._tiler.getTiles(viewport).tiles;
+      return tiles.length > 0 && tiles.every(tile => network.isCompleted(`kartaview-tile-${tile.id},1`));
+    }
 
     beforeAll(() => {
       console.error = spyError;
@@ -136,24 +153,22 @@ describe('KartaviewService', () => {
 
     describe('loadTiles', () => {
       it('loads a tile of data and requests a redraw', async () => {
-        const spatial = context.systems.spatial;
         fetchMock.route(/nearby-photos/, sample.nearbyPhotos10, { delay: 1 });
         _kartaview.loadTiles();
 
         await Bun.sleep(5);  // after all fetches have settled
-        assert.isTrue(spatial.hasTileAtLoc('kartaview-images', [10, 0]), 'tile at [10°, 0°] was loaded');
+        assert.isTrue(tileLoaded([10, 0]), 'tile at [10°, 0°] was loaded');
         assert.lengthOf(fetchMock.callHistory.calls(), 1, 'fetch called once');
         assert.lengthOf(spyRedraw.mock.calls, 1, 'redraw called once');
         assert.lengthOf(spyError.mock.calls, 0, 'console.error not called');
       });
 
       it(`doesn't retry loaded tiles`, async () => {
-        const spatial = context.systems.spatial;
         fetchMock.route(/nearby-photos/, sample.nearbyPhotos10, { delay: 1 });
         _kartaview.loadTiles();
 
         await Bun.sleep(5);  // after all fetches have settled
-        assert.isTrue(spatial.hasTileAtLoc('kartaview-images', [10, 0]), 'tile at [10°, 0°] was loaded');
+        assert.isTrue(tileLoaded([10, 0]), 'tile at [10°, 0°] was loaded');
 
         context.viewport.transform.v++;  // touch viewport
         _kartaview.loadTiles();          // try again
@@ -165,7 +180,6 @@ describe('KartaviewService', () => {
       });
 
       it('aborts unwanted tile requests', async () => {
-        const spatial = context.systems.spatial;
         fetchMock.route(/nearby-photos/, sample.nearbyPhotos10, { delay: 1 });
         _kartaview.loadTiles();
 
@@ -174,21 +188,20 @@ describe('KartaviewService', () => {
         _kartaview.loadTiles();
 
         await Bun.sleep(5);  // after all fetches have settled
-        assert.isFalse(spatial.hasTileAtLoc('kartaview-images', [10, 0]), 'tile at [10°, 0°] was not loaded');
-        assert.isTrue(spatial.hasTileAtLoc('kartaview-images', [20, 0]), 'tile at [20°, 0°] was loaded');
+        assert.isFalse(tileLoaded([10, 0]), 'tile at [10°, 0°] was not loaded');
+        assert.isTrue(tileLoaded([20, 0]), 'tile at [20°, 0°] was loaded');
         assert.lengthOf(fetchMock.callHistory.calls(), 2, 'fetch called twice - but one was aborted');
         assert.lengthOf(spyRedraw.mock.calls, 1, 'redraw called once');
         assert.lengthOf(spyError.mock.calls, 0, 'console.error not called');
       });
 
       it(`doesn't retry errored tiles`, async () => {
-        const spatial = context.systems.spatial;
         const errResponse = { status: 403, body: 'Forbidden', headers: { 'Content-Type': 'text/plain' } };
         fetchMock.route(/nearby-photos/, errResponse, { delay: 1 });
         _kartaview.loadTiles();
 
         await Bun.sleep(5);  // after all fetches have settled
-        assert.isTrue(spatial.hasTileAtLoc('kartaview-images', [10, 0]), 'tile at [10°, 0°] considered loaded');
+        assert.isTrue(tileLoaded([10, 0]), 'tile at [10°, 0°] considered loaded');
         assert.lengthOf(fetchMock.callHistory.calls(), 1, 'fetch called once');
         assert.lengthOf(spyRedraw.mock.calls, 0, 'redraw not called');
         assert.lengthOf(spyError.mock.calls, 1, 'console.error called once');

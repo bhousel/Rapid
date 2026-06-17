@@ -24,8 +24,6 @@ const TILEZOOM = 14;
  * Internal cache structure for tracking seen data and loaded pages
  */
 interface EsriDataCache {
-  /** Already loaded RequestIDs */
-  loaded: Set<RequestID>;
   /** Set of feature IDs already parsed, to avoid duplicates across tiles */
   seenIDs: Set<string>;
   /** Next page of data to load for a given tile */
@@ -163,8 +161,8 @@ export class EsriService extends AbstractSystem {
     const network = this.context.systems.network!;
     const spatial = this.context.systems.spatial!;
 
-    network.abortMatching(id => id.startsWith('esri'));
-    spatial.clearMatching(id => id.startsWith('esri'));
+    network.clearMatching(id => id.startsWith('esri-'));
+    spatial.clearMatching(id => id.startsWith('esri-'));
 
     for (const ds of this._datasets.values()) {
       ds.graph = new Graph(this.context);
@@ -173,7 +171,6 @@ export class EsriService extends AbstractSystem {
       // clear layer caches
       for (const layer of ds.layers || []) {
         const cache = layer._cache;
-        cache.loaded.clear();
         cache.seenIDs.clear();
         cache.nextPage.clear();
       }
@@ -236,8 +233,8 @@ export class EsriService extends AbstractSystem {
     if (!ds) return [];
 
     const spatial = this.context.systems.spatial!;
-    const spatialID = `esri-${ds.id}`;
-    return spatial.getVisibleData(spatialID).map(hit => hit.contents as OsmEntity);
+    const spatialID = `esri-${ds.id}-data`;
+    return spatial.getVisibleItems(spatialID).map(hit => hit.contents as OsmEntity);
  }
 
 
@@ -309,11 +306,8 @@ export class EsriService extends AbstractSystem {
 
     // Process each dataset layer..
     for (const layer of ds.layers) {
-      const datasetID = ds.id;
-      const layerID = layer.id;
-
       // Abort inflight requests that are no longer needed..
-      const prefix = `esri-${datasetID}-${layerID}`;
+      const prefix = `esri-${ds.id}-${layer.id}-tile`;
       const neededIDs = new Set<RequestID>(tiles.map(tile => `${prefix}-${tile.id}`));
       network.abortMatching(id => {
         const key = id.slice(0, id.lastIndexOf(','));  // requestID without page number
@@ -342,23 +336,19 @@ export class EsriService extends AbstractSystem {
     const network = context.systems.network!;
 
     const cache = layer._cache;
-    const datasetID = ds.id;
-    const layerID = layer.id;
-    const tileID = tile.id;
-
-    const page = cache.nextPage.get(tileID) ?? 0;
+    const page = cache.nextPage.get(tile.id) ?? 0;
     if (page === Infinity) return;  // no more pages
 
-    const spatialID = `esri-${datasetID}`;
-    const requestID = `${spatialID}-${layerID}-${tileID},${page}`;
-    if (cache.loaded.has(requestID) || network.isInflight(requestID)) return;
+    const prefix = `esri-${ds.id}-${layer.id}-tile`;
+    const requestID = `${prefix}-${tile.id},${page}`;
+    if (network.isCompleted(requestID) || network.isInflight(requestID)) return;
 
     if (locations) {
       // Skip if this tile covers a blocked region (all corners are blocked)
       const corners = tile.wgs84Extent.polygon().slice(0, 4);
       const isBlocked = corners.every(loc => locations.isBlockedAt(loc));
       if (isBlocked) {
-        cache.loaded.add(requestID);  // don't try again
+        network.markCompleted(requestID);  // don't try again (blocked region)
         return;
       }
     }
@@ -368,26 +358,21 @@ export class EsriService extends AbstractSystem {
       .then(geojson => {
         if (!geojson) throw new Error('no geojson');
 
-        // We are not currently using the SpatialSystem to track loaded tiles because
-        // a tile request may kick off multiple per-layer or per-page subrequests.
-        //spatial.addTiles(spatialID, [tile]);   // mark as loaded
-        cache.loaded.add(requestID);
         this._gotTile(ds, layer, geojson);
 
         // Recursively fetch more pages of data, if needed (assumption: it's a small number)
         const hasMorePages = geojson.properties?.exceededTransferLimit;
         if (hasMorePages) {
-          cache.nextPage.set(tileID, page + 1);
+          cache.nextPage.set(tile.id, page + 1);
           this._loadTileNextPage(ds, layer, tile);
         } else {  // all pages loaded
-          cache.nextPage.set(tileID, Infinity);
+          cache.nextPage.set(tile.id, Infinity);
           gfx?.deferredRedraw();
         }
       })
       .catch(e => {
         if (e.name === 'AbortError') return;   // ok
         console.error(e);  // eslint-disable-line
-        cache.loaded.add(requestID);   // don't retry
       });
   }
 
@@ -398,9 +383,9 @@ export class EsriService extends AbstractSystem {
    * @param layer - the layer within the dataset we fetched
    * @param geojson - a GeoJSON.FeatureCollection containing the data for this tile
    */
-  protected _gotTile( ds: EsriDataset, layer: EsriLayer, geojson: GeoJSON.FeatureCollection): void {
+  protected _gotTile(ds: EsriDataset, layer: EsriLayer, geojson: GeoJSON.FeatureCollection): void {
     const spatial = this.context.systems.spatial!;
-    const spatialID = `esri-${ds.id}`;
+    const spatialID = `esri-${ds.id}-data`;
 
     const results: OsmEntity[] = [];
     for (const feature of geojson.features ?? []) {
@@ -659,7 +644,6 @@ export class EsriService extends AbstractSystem {
 
             // `_cache`: cache of seen data and loaded pages
             layer._cache = {
-              loaded: new Set<RequestID>(),
               seenIDs: new Set<string>(),
               nextPage: new Map<TileID, number>()
             };

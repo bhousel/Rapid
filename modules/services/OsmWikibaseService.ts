@@ -107,7 +107,7 @@ export class OsmWikibaseService extends AbstractSystem {
     const scheduler = context.systems.scheduler;
 
     scheduler?.cancel('osmwikibase-request');  // cancel any request in progress
-    network.abortMatching(id => /wiki\.openstreetmap\.org/.test(id));
+    network.clearMatching(id => id.includes(this.apibase));
 
     return Promise.resolve();
   }

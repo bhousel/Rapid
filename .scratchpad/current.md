@@ -22,7 +22,7 @@ determine how much already exists in OSM (conflation). Buffers are quantized "co
   (phase-2 precise refine with a caller-supplied predicate — SpatialSystem stays domain-agnostic).
   Follow-up simplification: SpatialSystem storage is now **flat** (one RBush per `spatialID`, no nested
   cache/index map), and the legacy `(spatialID, indexID, ...)` API overloads are removed.
-  Callers now use flat IDs directly (e.g. `osm-staging--segments`) with
+  Callers now use flat IDs directly (e.g. `editor_staging-segments`) with
   `replaceItems`/`removeItems`/`getItemsAtBox`/`getItemsAtBoxes` flat signatures only.
   SpatialSystem unit tests were migrated and still pass.
 - **3d** — `Conflation` module (graduates the `PixiLayerDebug` POC); owns match semantics.
@@ -38,4 +38,18 @@ determine how much already exists in OSM (conflation). Buffers are quantized "co
   `vecProject`/`vecLength`). We control `rapid-sdk`, so new helpers can start in `modules/geo`.
 - No code serializes `geoms` across the worker boundary, and nothing spreads/`structuredClone`s a
   part's `world`/`local` — so lazy getters + re-derive `clone()` are safe.
+
+## NetworkSystem / SpatialSystem cleanup (uncommitted, in working tree)
+
+A large set of uncommitted changes fixing bugs discovered during the SpatialSystem/NetworkSystem
+refactor and improving tile-load tracking.  All 3170 unit tests + 121 browser tests pass.
+
+Key items ready to commit:
+- **SpatialSystem bugs fixed**: `replaceItems` now populates `cache.items` Map; `replaceData` uses `d.id`/`d`; `hasItemAtLoc()` added; `clearMatching` iterates `.keys()`.
+- **EditSystem `_reset`** clears `editor_*` pattern (includes segment caches); stale `osm-staging` reference in `address.js` fixed.
+- **NetworkSystem `_completed: Map<RequestID, number>`** replaces `Set`. `STATUS_SKIPPED=-1`, `STATUS_ERROR=0` sentinels. API: `isCompleted`, `getStatus`, `markCompleted`, `forget`. Only explicit `requestID` options recorded.
+- **`FetchEnvelope<T>`** universal worker-boundary transport replaces bespoke `OsmFetchResult`. All listeners return envelopes. `fetchEnvelope()` public method on NetworkSystem.
+- **`FetchError` extended** to accept `FetchErrorInit` (reconstructable from envelope fields).
+- **Services**: don't-retry services shed manual `completed.add`; do-retry use `network.forget()`; blocked-region use `markCompleted()`. OsmService `loadNotes` zoom bug fixed. Note-tile retry fixed.
+- **All service + core tests updated** for new patterns (3170 pass).
 

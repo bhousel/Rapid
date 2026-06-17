@@ -216,7 +216,7 @@ export class LassoBehavior extends AbstractBehavior {
 
     // Gather OsmNodes within the lasso.
     const spatialID = editor.spatialIDForGraph(graph);
-    const hits = spatial.getDataAtBox(spatialID, this._extent.bbox());
+    const hits = spatial.getItemsAtBox(spatialID, this._extent.bbox());
     for (const hit of hits) {
       const node = hit.contents as OsmNode;
       if (node.type !== 'node') continue;

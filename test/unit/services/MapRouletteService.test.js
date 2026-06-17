@@ -48,7 +48,10 @@ describe('MapRouletteService', () => {
         assert.instanceOf(maproulette.optionalDependencies, Set);
         assert.isFalse(maproulette.autoStart);
 
-        assert.deepEqual(maproulette._cache, {});
+        assert.instanceOf(maproulette._challenges, Map);
+        assert.isEmpty(maproulette._challenges);
+        assert.deepEqual(maproulette._closed, []);
+        assert.isNull(maproulette._lastv);
       });
     });
 
@@ -59,11 +62,10 @@ describe('MapRouletteService', () => {
         assert.instanceOf(prom, Promise);
         return prom
           .then(() => {
-            const cache = maproulette._cache;
-            assert.instanceOf(cache.challenges, Map);
-            assert.isEmpty(cache.challenges);
-            assert.deepEqual(cache.closed, []);
-            assert.isNull(cache.lastv);
+            assert.instanceOf(maproulette._challenges, Map);
+            assert.isEmpty(maproulette._challenges);
+            assert.deepEqual(maproulette._closed, []);
+            assert.isNull(maproulette._lastv);
           });
       });
 
@@ -91,16 +93,16 @@ describe('MapRouletteService', () => {
     describe('resetAsync', () => {
       it('returns a promise to reset', () => {
         const maproulette = new Rapid.MapRouletteService(context);
-        maproulette._cache = {};
+        maproulette._closed = [{ id: 'x' }];
+        maproulette._lastv = 5;
         const prom = maproulette.resetAsync();
         assert.instanceOf(prom, Promise);
         return prom
           .then(() => {
-            const cache = maproulette._cache;
-            assert.instanceOf(cache.challenges, Map);
-            assert.isEmpty(cache.challenges);
-            assert.deepEqual(cache.closed, []);
-            assert.isNull(cache.lastv);
+            assert.instanceOf(maproulette._challenges, Map);
+            assert.isEmpty(maproulette._challenges);
+            assert.deepEqual(maproulette._closed, []);
+            assert.isNull(maproulette._lastv);
           });
       });
     });
@@ -113,6 +115,21 @@ describe('MapRouletteService', () => {
 
     const origError = console.error;
     const spyError = mock();
+
+    // Map a WGS84 loc used in these tests to its viewport transform.
+    const TRANSFORMS = {
+      '10,0': { x: -116508, y: 0, z: 14 },
+      '20,0': { x: -233017, y: 0, z: 14 }
+    };
+
+    // A tile covering `loc` is considered "loaded" once its network request has completed.
+    // (Tile-load tracking moved from the SpatialSystem to NetworkSystem.completed.)
+    function tileLoaded(loc) {
+      const network = context.systems.network;
+      const viewport = new Rapid.sdk.Viewport(TRANSFORMS[loc.join(',')], [64, 64]);
+      const tiles = _maproulette._tiler.getTiles(viewport).tiles;
+      return tiles.length > 0 && tiles.every(tile => network.isCompleted(`maproulette-tile-${tile.id}`));
+    }
 
     beforeAll(() => {
       console.error = spyError;
@@ -136,20 +153,18 @@ describe('MapRouletteService', () => {
 
     describe('loadTiles', () => {
       it('loads a tile of data and requests a redraw', async () => {
-        const spatial = context.systems.spatial;
         fetchMock.route(/tasks/, sample.data10, { delay: 1 });
         fetchMock.route(/challenge/, sample.challenge100, { delay: 1 });
         _maproulette.loadTiles();
 
         await Bun.sleep(5);  // after all fetches have settled
-        assert.isTrue(spatial.hasTileAtLoc('maproulette', [10, 0]), 'tile at [10°, 0°] was loaded');
+        assert.isTrue(tileLoaded([10, 0]), 'tile at [10°, 0°] was loaded');
         assert.lengthOf(fetchMock.callHistory.calls(), 2, '1 for tasks, 1 for the challenge');
         assert.lengthOf(spyRedraw.mock.calls, 1, 'redraw called once');
         assert.lengthOf(spyError.mock.calls, 0, 'console.error not called');
       });
 
       it(`doesn't retry inflight tiles`, async () => {
-        const spatial = context.systems.spatial;
         fetchMock.route(/tasks/, sample.data10, { delay: 1 });
         fetchMock.route(/challenge/, sample.challenge100, { delay: 1 });
         _maproulette.loadTiles();
@@ -157,19 +172,18 @@ describe('MapRouletteService', () => {
         _maproulette.loadTiles();        // try again
 
         await Bun.sleep(5);  // after all fetches have settled
-        assert.isTrue(spatial.hasTileAtLoc('maproulette', [10, 0]), 'tile at [10°, 0°] was loaded');
+        assert.isTrue(tileLoaded([10, 0]), 'tile at [10°, 0°] was loaded');
         assert.lengthOf(fetchMock.callHistory.calls(), 2, '1 for tasks, 1 for the challenge');
         assert.lengthOf(spyRedraw.mock.calls, 1, 'redraw called once');
       });
 
       it(`doesn't retry loaded tiles`, async () => {
-        const spatial = context.systems.spatial;
         fetchMock.route(/tasks/, sample.data10, { delay: 1 });
         fetchMock.route(/challenge/, sample.challenge100, { delay: 1 });
         _maproulette.loadTiles();
 
         await Bun.sleep(5);  // after all fetches have settled
-        assert.isTrue(spatial.hasTileAtLoc('maproulette', [10, 0]), 'tile at [10°, 0°] was loaded');
+        assert.isTrue(tileLoaded([10, 0]), 'tile at [10°, 0°] was loaded');
 
         context.viewport.transform.v++;  // touch viewport
         _maproulette.loadTiles();        // try again
@@ -181,7 +195,6 @@ describe('MapRouletteService', () => {
       });
 
       it('aborts unwanted tile requests', async () => {
-        const spatial = context.systems.spatial;
         fetchMock.route(/tasks/, sample.data10, { delay: 1 });
         fetchMock.route(/challenge/, sample.challenge100, { delay: 1 });
         _maproulette.loadTiles();
@@ -191,19 +204,18 @@ describe('MapRouletteService', () => {
         _maproulette.loadTiles();
 
         await Bun.sleep(5);  // after all fetches have settled
-        assert.isFalse(spatial.hasTileAtLoc('maproulette', [10, 0]), 'tile at [10°, 0°] was not loaded');
-        assert.isTrue(spatial.hasTileAtLoc('maproulette', [20, 0]), 'tile at [20°, 0°] was loaded');
+        assert.isFalse(tileLoaded([10, 0]), 'tile at [10°, 0°] was not loaded');
+        assert.isTrue(tileLoaded([20, 0]), 'tile at [20°, 0°] was loaded');
         assert.lengthOf(spyError.mock.calls, 0, 'console.error not called');
       });
 
       it(`doesn't retry errored tiles`, async () => {
-        const spatial = context.systems.spatial;
         const errResponse = { status: 403, body: 'Forbidden', headers: { 'Content-Type': 'text/plain' } };
         fetchMock.route(/tasks/, errResponse, { delay: 1 });
         _maproulette.loadTiles();
 
         await Bun.sleep(5);  // after all fetches have settled
-        assert.isTrue(spatial.hasTileAtLoc('maproulette', [10, 0]), 'tile at [10°, 0°] considered loaded');
+        assert.isTrue(tileLoaded([10, 0]), 'tile at [10°, 0°] considered loaded');
         assert.lengthOf(spyRedraw.mock.calls, 0, 'redraw not called');
         assert.lengthOf(spyError.mock.calls, 1, 'console.error called once');
         assert.match(spyError.mock.lastCall[0], /Forbidden/i);

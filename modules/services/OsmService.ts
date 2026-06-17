@@ -3,16 +3,16 @@ import { JXON } from '../util/jxon.ts';
 import { OsmEntity, MarkerData } from '../data/index.ts';
 import { osmAuth } from 'osm-auth';
 import { osmServiceListeners } from './OsmService.worker.ts';
-import { Tiler, Viewport } from '@rapid-sdk/math';
+import { Extent, numClamp, projWgs84ToWorld, projWorldToWgs84, Tiler, WORLD_SIZE } from '@rapid-sdk/math';
 import { utilArrayChunk, utilArrayUniq, utilObjectOmit, utilQsString } from '@rapid-sdk/util';
 
 import type { Context } from '../Context.ts';
 import type { EntityType } from '../data/types.ts';
+import type { FetchEnvelope } from '../util/fetch_response.ts';
 import type { MarkerProps } from '../data/MarkerData.ts';
 import type { OsmChangeset, OsmChanges } from '../data/OsmChangeset.ts';
-import type { OsmFetchResult } from './OsmService.worker.ts';
 import type { ParserDataType, ParserOptions, ParserResult, ParsedApi, ParsedData, ParsedPolicy } from '../data/parsers/types.ts';
-import type { Tile, Vec2 } from '@rapid-sdk/math';
+import type { Tile, Vec2, Vec3 } from '@rapid-sdk/math';
 
 
 /** Properties specific to OSM note markers */
@@ -52,8 +52,6 @@ interface RateLimitInfo {
 interface TileCache {
   /** Last viewport version number used for tile loading */
   lastv: number | null;
-  /** Set of tile IDs pending loading */
-  toLoad: Set<string>;
 }
 
 /** Cache for note loading state */
@@ -378,13 +376,13 @@ export class OsmService extends AbstractSystem {
     const spatial = context.systems.spatial!;
     const worker = context.systems.worker;
 
-    this._tileCache = { lastv: null, toLoad: new Set<string>() };
+    this._tileCache = { lastv: null };
     this._noteCache = { lastv: null, toLoad: new Set<string>(), closed: {} };
     this._userCache = { toLoad: new Set<string>(), user: {} };
     this._changeset = {};
 
-    network.abortMatching(id => id.startsWith('osm'));
-    spatial.clearMatching(id => id.startsWith('osm'));
+    network.clearMatching(id => id.startsWith('osm-'));
+    spatial.clearMatching(id => id.startsWith('osm-'));
 
     // Reset the worker-side parser instances
     if (worker?.workerURL) {
@@ -555,13 +553,13 @@ export class OsmService extends AbstractSystem {
     const url = /^http/i.test(path) ? path : (this._apiroot + path);
     const computedID = requestID ?? (`GET ${url}` as RequestID);
 
-    network.fetch<OsmFetchResult>(url, {
+    network.fetchEnvelope<ParserResult>(url, {
       requestID: computedID,
       listenerID: 'osmService:fetchAndParse',
       listenerData: { format, parserOptions: options },
       resultPriority: 'normal',
     })
-      .then((response: OsmFetchResult) => {
+      .then((env: FetchEnvelope<ParserResult>) => {
         // The user switched connection while the request was inflight.
         // Ignore content and raise an error.
         if (this._connectionID !== cid) {
@@ -569,8 +567,8 @@ export class OsmService extends AbstractSystem {
           return;
         }
 
-        if (!response.ok) {
-          const { status, statusText, message, responseText } = response;
+        if (!env.ok) {
+          const { status, statusText, message, body } = env;
 
           // 400 Bad Request, 401 Unauthorized, 403 Forbidden (while logged in)
           // An issue has occurred with the user's credentials.
@@ -585,7 +583,7 @@ export class OsmService extends AbstractSystem {
           // 509 Bandwidth Limit Exceeded, 429 Too Many Requests
           if (status === 509 || status === 429) {
             let duration = 10;  // default 10sec, see if response contains a better value
-            const match = responseText.match(/ (\d+) seconds/);
+            const match = (body ?? '').match(/ (\d+) seconds/);
             if (match) {
               duration = parseInt(match[1], 10);
             }
@@ -613,7 +611,7 @@ export class OsmService extends AbstractSystem {
           this.deferredReloadApiStatus();    // reload status / clear warning
         }
 
-        if (callback) callback(null, response.results);
+        if (callback) callback(null, env.value);
       })
       .catch((err: any) => {
         if (err.name === 'AbortError') return;  // ok
@@ -1244,44 +1242,6 @@ export class OsmService extends AbstractSystem {
 
 
   /**
-   * Load OSM entity data from the API in tiles covering the current viewport.
-   * Aborts any in-flight requests for tiles no longer visible and issues new ones.
-   * GET /api/0.6/map?bbox=
-   * @param  callback - optional errback-style callback called per-tile with results
-   */
-  public loadTiles(callback?: Errback | null): void {
-    if (this._paused || this.getRateLimit()) {
-      if (callback) callback(null, { data: [] });
-      return;
-    }
-
-    const context = this.context;
-    const network = context.systems.network!;
-    const viewport = context.viewport;
-
-    const cache = this._tileCache;
-    if (cache.lastv === viewport.v) {  // exit early if the view is unchanged
-      if (callback) callback(null, { data: [] });
-      return;
-    }
-
-    cache.lastv = viewport.v;
-
-    // Determine the tiles needed to cover the view..
-    const tiles = (this._tiler.zoomRange(this._tileZoom) as Tiler).getTiles(viewport).tiles;
-
-    // Abort inflight requests that are no longer needed..
-    const neededIDs = new Set<RequestID>(tiles.map(t => `osm-tile-${t.id}` as RequestID));
-    network.abortMatching(id => id.startsWith('osm-tile') && !neededIDs.has(id));
-
-    // Issue new requests..
-    for (const tile of tiles) {
-      this.loadTile(tile, callback);
-    }
-  }
-
-
-  /**
    * This will establish a rate limit for the given duration in seconds.
    * If a rate limit already exists, extend the time if needed.
    * @param  seconds - seconds to impose the rate limit (default 10 sec)
@@ -1302,15 +1262,14 @@ export class OsmService extends AbstractSystem {
     const network = context.systems.network!;
 
     // Stop loading tiles, and cancel any inflight tile/note requests
-    this._tileCache.toLoad.clear();
     this._noteCache.toLoad.clear();
-    network.abortMatching(id => id.startsWith('osm-tile') || id.startsWith('osm-note'));
+    network.abortMatching(id => id.startsWith('osm-data-tile') || id.startsWith('osm-note'));
 
     return this._rateLimit = {
       start: Math.floor(Date.now() / 1000),  // epoch seconds
       duration: seconds,                     // retry-after seconds
       remaining: seconds,
-      elapsed:  0
+      elapsed: 0
     };
   }
 
@@ -1347,6 +1306,44 @@ export class OsmService extends AbstractSystem {
 
 
   /**
+   * Load OSM entity data from the API in tiles covering the current viewport.
+   * Aborts any in-flight requests for tiles no longer visible and issues new ones.
+   * GET /api/0.6/map?bbox=
+   * @param  callback - optional errback-style callback called per-tile with results
+   */
+  public loadTiles(callback?: Errback | null): void {
+    if (this._paused || this.getRateLimit()) {
+      if (callback) callback(null, { data: [] });
+      return;
+    }
+
+    const context = this.context;
+    const network = context.systems.network!;
+    const viewport = context.viewport;
+
+    const cache = this._tileCache;
+    if (cache.lastv === viewport.v) {  // exit early if the view is unchanged
+      if (callback) callback(null, { data: [] });
+      return;
+    }
+    cache.lastv = viewport.v;
+
+    // Determine the tiles needed to cover the view..
+    const tiles = (this._tiler.zoomRange(this._tileZoom) as Tiler).getTiles(viewport).tiles;
+
+    // Abort inflight requests that are no longer needed..
+    const prefix = `osm-data-tile`;
+    const neededIDs = new Set<RequestID>(tiles.map(tile => `${prefix}-${tile.id}`));
+    network.abortMatching(id => id.startsWith(prefix) && !neededIDs.has(id));
+
+    // Issue new requests..
+    for (const tile of tiles) {
+      this.loadTile(tile, callback);
+    }
+  }
+
+
+  /**
    * Load a single data tile from the API.
    * Skips tiles that are already loaded, in-flight, or cover a blocked region.
    * GET /api/0.6/map?bbox=
@@ -1354,34 +1351,38 @@ export class OsmService extends AbstractSystem {
    * @param  callback - optional errback-style callback called with the results
    */
   public loadTile(tile: Tile, callback?: Errback | null): void {
-    if (this._paused || this.getRateLimit()) return;
+    if (this._paused || this.getRateLimit()) {
+      if (callback) callback(null, { data: [] });
+      return;
+    }
 
     const context = this.context;
-    const cache = this._tileCache;
     const gfx = context.systems.gfx;
-    const network = context.systems.network!;
-    const spatial = context.systems.spatial!;
     const locations = context.systems.locations;
-    const tileID = tile.id;
-    const tileRequestID = `osm-tile-${tileID}` as RequestID;
+    const network = context.systems.network!;
 
-    if (spatial.hasTile('osm-data', tileID)) return;
-    if (network.isInflight(tileRequestID)) return;
+    const tileID = tile.id;
+    const prefix = `osm-data-tile`;
+    const requestID = `${prefix}-${tileID}`;
+    if (network.isCompleted(requestID) || network.isInflight(requestID)) return;
 
     if (locations) {
-      // Exit if this tile covers a blocked region (all corners are blocked)
+      // Skip if this tile covers a blocked region (all corners are blocked)
       const corners = tile.wgs84Extent.polygon().slice(0, 4);
-      const tileBlocked = corners.every(loc => locations.isBlockedAt(loc));
-      if (tileBlocked) {
-        spatial.addTiles('osm-data', tile);   // don't try again
+      const isBlocked = corners.every(loc => locations.isBlockedAt(loc));
+      if (isBlocked) {
+        network.markCompleted(requestID);  // don't try again (blocked region)
+        if (callback) callback(null, { data: [] });
         return;
       }
     }
 
-    const gotTile = (err: any, results?: ParserResult): void => {
-      if (!err) {
-        cache.toLoad.delete(tileID);
-        spatial.addTiles('osm-data', [tile]);
+    const done = (err: any, results?: ParserResult): void => {
+      if (err) {
+        // The settled request was recorded in `completed` by NetworkSystem.
+        // Forget it so that errored tiles can be retried later.
+        network.forget(requestID);
+      } else {
         gfx?.deferredRedraw();
       }
 
@@ -1394,71 +1395,102 @@ export class OsmService extends AbstractSystem {
     const json = (this.preferJSON ? '.json' : '');
     const path = `/api/0.6/map${json}?bbox=` + tile.wgs84Extent.toParam();
 
-    this.loadFromAPI(path, gotTile, options, tileRequestID);
+    this.loadFromAPI(path, done, options, requestID);
   }
 
 
   /**
-   * Is OSM data exist at the given [lon,lat] coordinate?
+   * Return a tile that covers the given location.
+   * @param   loc - the search location (WGS84 [lon,lat])
+   * @return  Tile object
+   */
+  public getTileAtLoc(loc: Vec2): Tile {
+    const coord = projWgs84ToWorld(loc);
+
+    const z = Math.round(this._tileZoom);
+    const pow2z = 2 ** z;
+    const worldScale = pow2z / WORLD_SIZE;
+    const tileScale = WORLD_SIZE / pow2z;
+    const min = 0;
+    const max = pow2z - 1;
+
+    const x = numClamp(Math.floor(coord[0] * worldScale), min, max);
+    const y = numClamp(Math.floor(coord[1] * worldScale), min, max);
+
+    // The tile bounds in world coordinates
+    const tileMin: Vec2 = [x * tileScale, y * tileScale];
+    const tileMax: Vec2 = [(x + 1) * tileScale, (y + 1) * tileScale];
+    const tileExtent = new Extent(tileMin, tileMax);
+
+    // back to lon/lat
+    const wgs84Min = projWorldToWgs84([tileMin[0], tileMax[1]]);  // bottom left
+    const wgs84Max = projWorldToWgs84([tileMax[0], tileMin[1]]);  // top right
+    const wgs84Extent = new Extent(wgs84Min, wgs84Max);
+    const xyz: Vec3 = [x, y, z];
+
+    const tile: Tile = {
+      id: xyz.toString(),
+      xyz: xyz,
+      wgs84Extent: wgs84Extent,
+      worldExtent: tileExtent,
+      isVisible: false
+    };
+
+    return tile;
+  }
+
+
+  /**
+   * Is OSM data loaded at the given [lon,lat] coordinate?
    * @param   loc - the search location (WGS84 [lon,lat])
    * @return  `true` if data exists there, `false` if not
    */
   public isDataLoaded(loc: Vec2): boolean {
-    const spatial = this.context.systems.spatial!;
-    return spatial.hasTileAtLoc('osm-data', loc);
+    const network = this.context.systems.network!;
+
+    const tile = this.getTileAtLoc(loc);
+    const prefix = `osm-data-tile`;
+    const requestID = `${prefix}-${tile.id}`;
+
+    return network.isCompleted(requestID);
   }
 
 
   /**
-   * Queue loading the tile that covers the given `loc`
+   * Queue loading the tile that covers the given `loc`.
    * @param   loc - the search location (WGS84 [lon,lat])
    * @param   callback - errback-style callback function to call with results
    */
   public loadTileAtLoc(loc: Vec2, callback?: Errback | null): void {
-    const context = this.context;
-    const network = context.systems.network!;
-    const spatial = context.systems.spatial!;
+    if (this._paused || this.getRateLimit()) {
+      if (callback) callback(null, { data: [] });
+      return;
+    }
 
-    if (this._paused || this.getRateLimit()) return;
-    const cache = this._tileCache;
-
-    // Back off if the toLoad queue is filling up.. re iD#6417
+    // Back off if the queue is filling up.. re iD#6417
     // (Currently `loadTileAtLoc` requests are considered low priority - used by operations to
     // let users safely edit geometries which extend to unloaded tiles.  We can drop some.)
-    if (cache.toLoad.size > 50) return;
-
-//worldcoordinates
-    // const k = geoZoomToScale(this._tileZoom + 1);
-    // const offset = new Viewport({ k: k }).project(loc);
-    // const viewport = new Viewport({ k: k, x: -offset[0], y: -offset[1] });
-    // const tiles = this._tiler.zoomRange(this._tileZoom).getTiles(viewport).tiles;
-    const z2 = this._tileZoom + 1;
-    const offset = new Viewport({ z: z2 }).project(loc);
-    const viewport = new Viewport({ x: -offset[0], y: -offset[1], z: z2 });
-    const tiles = (this._tiler.zoomRange(this._tileZoom) as Tiler).getTiles(viewport).tiles;
-
-    for (const tile of tiles) {
-      if (spatial.hasTile('osm-data', tile.id)) continue;   // already loaded
-      const tileRequestID = `osm-tile-${tile.id}` as RequestID;
-      if (cache.toLoad.has(tile.id) || network.isInflight(tileRequestID)) continue;   // queued or inflight
-
-      cache.toLoad.add(tile.id);
-      this.loadTile(tile, callback);
+    const network = this.context.systems.network!;
+    if (network.numQueued > 50) {
+      if (callback) callback(null, { data: [] });
+      return;
     }
+
+    const tile = this.getTileAtLoc(loc);
+    this.loadTile(tile, callback);
   }
 
 
   /**
-   * Schedule any data requests needed to cover the current map view
+   * Load OSM note data from the API in tiles covering the current viewport.
+   * Aborts any in-flight requests for tiles no longer visible and issues new ones.
    * @param  noteOptions - note options
    */
   public loadNotes(noteOptions?: NoteOptions): void {
     if (this._paused || this.getRateLimit()) return;
 
     const context = this.context;
-    const locations = context.systems.locations;
     const network = context.systems.network!;
-    const spatial = context.systems.spatial!;
     const viewport = context.viewport;
 
     const cache = this._noteCache;
@@ -1468,48 +1500,55 @@ export class OsmService extends AbstractSystem {
     // Determine the tiles needed to cover the view..
     const tiles = (this._tiler.zoomRange(this._noteZoom) as Tiler).getTiles(viewport).tiles;
 
-    // Abort inflight requests that are no longer needed
-    const neededNoteIDs = new Set<RequestID>(tiles.map(t => `osm-note-tile-${t.id}` as RequestID));
-    network.abortMatching(id => id.startsWith('osm-note-tile') && !neededNoteIDs.has(id));
+    // Abort inflight requests that are no longer needed..
+    const prefix = `osm-note-tile`;
+    const neededIDs = new Set<RequestID>(tiles.map(tile => `${prefix}-${tile.id}`));
+    network.abortMatching(id => id.startsWith(prefix) && !neededIDs.has(id));
 
     // Issue new requests..
     for (const tile of tiles) {
-      const tileID = tile.id;
-      if (spatial.hasTile('osm-notes', tileID)) continue;
-      const tileRequestID = `osm-note-tile-${tileID}` as RequestID;
-      if (network.isInflight(tileRequestID)) continue;
-
-      if (locations) {
-        // Skip if this tile covers a blocked region (all corners are blocked)
-        const corners = tile.wgs84Extent.polygon().slice(0, 4);
-        const tileBlocked = corners.every((loc: Vec2) => locations.isBlockedAt(loc));
-        if (tileBlocked) {
-          spatial.addTiles('osm-notes', [tile]);   // don't try again
-          continue;
-        }
-      }
-      this.loadNotesTile(tile, noteOptions);
+      this.loadNoteTile(tile, noteOptions);
     }
   }
 
 
   /**
-   * Load a single tile of note data.
+   * Load a single note tile from the API.
    * GET /api/0.6/notes?bbox=
-   * @param  tile - Tile data
+   * @param  tile - the tile to load
    * @param  noteOptions - note options
    */
-  public loadNotesTile(tile: Tile, noteOptions?: NoteOptions): void {
+  public loadNoteTile(tile: Tile, noteOptions?: NoteOptions): void {
+    if (this._paused || this.getRateLimit()) return;
+
     noteOptions = Object.assign({ limit: 10000, closed: 7 }, noteOptions);
 
     const context = this.context;
     const gfx = context.systems.gfx;
-    const spatial = context.systems.spatial!;
-    const tileID = tile.id;
+    const locations = context.systems.locations;
+    const network = context.systems.network!;
 
-    const errback = (err: any, results?: ParserResult): void => {
+    const tileID = tile.id;
+    const prefix = `osm-note-tile`;
+    const requestID = `${prefix}-${tileID}`;
+    if (network.isCompleted(requestID) || network.isInflight(requestID)) return;
+
+    if (locations) {
+      // Skip if this tile covers a blocked region (all corners are blocked)
+      const corners = tile.wgs84Extent.polygon().slice(0, 4);
+      const isBlocked = corners.every(loc => locations.isBlockedAt(loc));
+      if (isBlocked) {
+        network.markCompleted(requestID);  // don't try again (blocked region)
+        return;
+      }
+    }
+
+    const done = (err: any, results?: ParserResult): void => {
+      if (err) {
+        network.forget(requestID);   // allow retry on error
+        return;
+      }
       if (results) {
-        spatial.addTiles('osm-notes', [tile]);   // mark as loaded
         for (const props of (results.data ?? [])) {
           this._cacheNote(props);
         }
@@ -1517,13 +1556,12 @@ export class OsmService extends AbstractSystem {
       }
     };
 
-    const tileRequestID = `osm-note-tile-${tileID}` as RequestID;
     const json = (this.preferJSON ? '.json' : '');
     const options = { skipSeen: true, filter: new Set<ParserDataType>(['note']) };
     const path = `/api/0.6/notes${json}?limit=` + noteOptions.limit + '&closed='
       + noteOptions.closed + '&bbox=' + tile.wgs84Extent.toParam();
 
-    this.loadFromAPI(path, errback, options, tileRequestID);
+    this.loadFromAPI(path, done, options, requestID);
   }
 
 
@@ -1539,7 +1577,7 @@ export class OsmService extends AbstractSystem {
     const gfx = context.systems.gfx;
 
     const noteID = id.toString();
-    let note = spatial.getData<OsmNote>('osm-notes', noteID);
+    let note = spatial.getItem<OsmNote>('osm-notes', noteID);
     if (note) {
       return Promise.resolve(note);
     }
@@ -1559,8 +1597,8 @@ export class OsmService extends AbstractSystem {
 
       const options = { skipSeen: false, filter: new Set<ParserDataType>(['note']) };
       const json = (this.preferJSON ? '.json' : '');
-
-      this.loadFromAPI(`/api/0.6/notes/${noteID}${json}`, errback, options);
+      const path = `/api/0.6/notes/${noteID}${json}`;
+      this.loadFromAPI(path, errback, options);
     });
   }
 
@@ -1576,39 +1614,46 @@ export class OsmService extends AbstractSystem {
     const gfx = context.systems.gfx;
     const network = context.systems.network!;
     const noteID = note.id;
-    const requestID = `osm-note-post-create-${noteID}` as RequestID;
+    const requestID = `osm-note-post-create-${noteID}`;
 
     if (network.isInflight(requestID)) {
-      return callback({ message: 'Note update already inflight', status: -2 }, note);
+      callback?.({ message: 'Note update already inflight', status: -2 }, note);
+      return;
     } else if (!this.authenticated()) {
-      return callback({ message: 'Not Authenticated', status: -3 }, note);
+      callback?.({ message: 'Not Authenticated', status: -3 }, note);
+      return;
+    } else if (!Array.isArray(note.loc) || !note.props.newComment) {
+      callback?.({ message: 'No location or description', status: -4 }, note);
+      return;
     }
 
-    if (!Array.isArray(note.loc) || !note.props.newComment) return;  // location & description required
 
-    const createdNote = (err: any, xml?: any): void => {
-      if (err) { return callback(err); }
-
-      // we get the updated note back, remove from caches and reparse..
-      this.removeNote(note);
-
-      const options = { skipSeen: false };
-      return (this as any)._parseXML(xml, (err: any, results: any) => {
-        if (err) {
-          return callback(err);
-        } else {
-          gfx?.deferredRedraw();
-          return callback(null, results.data[0]);
-        }
-      }, options);
+    const done = (err: any, results?: ParserResult): void => {
+      if (err) {
+        callback?.(err);
+        return;
+      } else if (Array.isArray(results?.data)) {
+        // We get the updated note back, remove from caches and reparse..
+        this.removeNote(note);
+        note = this._cacheNote(results!.data[0]);
+        gfx?.deferredRedraw();
+        callback?.(null, note!);
+        return;
+      } else {
+        callback?.({ message: 'No Response', status: -5 });
+        return;
+      }
     };
 
-    const errback = this._wrapcb(createdNote);
+    const parserOptions = { skipSeen: false, filter: new Set<ParserDataType>(['note']) };
+    const errback = this._wrapcb(done);
     const resource = this._apiroot + '/api/0.6/notes?' +
       utilQsString({ lon: note.loc[0], lat: note.loc[1], text: note.props.newComment }, false);
 
     network.fetch<any>(resource, {
       requestID,
+      listenerID: 'osmService:fetchAndParse',
+      listenerData: { format: 'xml', parserOptions: parserOptions },
       method: 'POST',
       mainThread: true
     })
@@ -1636,14 +1681,17 @@ export class OsmService extends AbstractSystem {
     const context = this.context;
     const gfx = context.systems.gfx;
     const network = context.systems.network!;
-    const noteID = note.id;
-    const requestID = `osm-note-post-update-${noteID}` as RequestID;
 
-    if (!this.authenticated()) {
-      return callback({ message: 'Not Authenticated', status: -3 }, note);
-    }
+    const cache = this._noteCache;
+    const noteID = note.id;
+    const requestID = `osm-note-post-update-${noteID}`;
+
     if (network.isInflight(requestID)) {
-      return callback({ message: 'Note update already inflight', status: -2 }, note);
+      callback?.({ message: 'Note update already inflight', status: -2 }, note);
+      return;
+    } else if (!this.authenticated()) {
+      callback?.({ message: 'Not Authenticated', status: -3 }, note);
+      return;
     }
 
     let action;
@@ -1653,34 +1701,38 @@ export class OsmService extends AbstractSystem {
       action = 'reopen';
     } else {
       action = 'comment';
-      if (!note.props.newComment) return; // when commenting, comment required
+      if (!note.props.newComment) { // when commenting, comment required
+        callback?.({ message: 'No description', status: -4 }, note);
+        return;
+      }
     }
 
-    const updatedNote = (err: any, xml?: any): void => {
-      if (err) { return callback(err); }
-
-      // we get the updated note back, remove from caches and reparse..
-      this.removeNote(note);
-
-      // update closed note cache - used to populate `closed:note` changeset tag
-      if (action === 'close') {
-        this._noteCache.closed[noteID] = true;
-      } else if (action === 'reopen') {
-        delete this._noteCache.closed[noteID];
-      }
-
-      const options = { skipSeen: false };
-      return (this as any)._parseXML(xml, (err: any, results: any) => {
-        if (err) {
-          return callback(err);
-        } else {
-          gfx?.deferredRedraw();
-          return callback(null, results.data[0]);
+    const done = (err: any, results?: ParserResult): void => {
+      if (err) {
+        callback?.(err);
+        return;
+      } else if (Array.isArray(results?.data)) {
+        // Update closed note cache - used to populate `closed:note` changeset tag
+        if (action === 'close') {
+          cache.closed[noteID] = true;
+        } else if (action === 'reopen') {
+          delete cache.closed[noteID];
         }
-      }, options);
+
+        // We get the updated note back, remove from caches and reparse..
+        this.removeNote(note);
+        note = this._cacheNote(results!.data[0]);
+        gfx?.deferredRedraw();
+        callback?.(null, note!);
+        return;
+      } else {
+        callback?.({ message: 'No Response', status: -5 });
+        return;
+      }
     };
 
-    const errback = this._wrapcb(updatedNote);
+    const parserOptions = { skipSeen: false, filter: new Set<ParserDataType>(['note']) };
+    const errback = this._wrapcb(done);
     let resource = this._apiroot + `/api/0.6/notes/${noteID}/${action}`;
     if (note.props.newComment) {
       resource += '?' + utilQsString({ text: note.props.newComment }, false);
@@ -1688,6 +1740,8 @@ export class OsmService extends AbstractSystem {
 
     network.fetch<any>(resource, {
       requestID,
+      listenerID: 'osmService:fetchAndParse',
+      listenerData: { format: 'xml', parserOptions: parserOptions },
       method: 'POST',
       mainThread: true
     })
@@ -1711,7 +1765,7 @@ export class OsmService extends AbstractSystem {
    */
   public caches(obj?: CachesObject): CachesObject | this {
     /**
-     *
+     * clone the cache
      * @param source
      */
     function cloneCache(source: Record<string, any>): Record<string, any> {
@@ -1771,7 +1825,8 @@ export class OsmService extends AbstractSystem {
   }
 
 
-  /** Returns whether the user is currently authenticated with the OSM API
+  /**
+   * Returns whether the user is currently authenticated with the OSM API
    * @return  `true` if the user is authenticated
    */
   public authenticated(): boolean {
@@ -1828,7 +1883,7 @@ export class OsmService extends AbstractSystem {
    */
   public getNotes(): OsmNote[] {
     const spatial = this.context.systems.spatial!;
-    return spatial.getVisibleData('osm-notes').map(hit => hit.contents) as OsmNote[];
+    return spatial.getVisibleItems('osm-notes').map(hit => hit.contents) as OsmNote[];
   }
 
 
@@ -1839,7 +1894,7 @@ export class OsmService extends AbstractSystem {
    */
   public getNote(dataID: string): OsmNote | undefined {
     const spatial = this.context.systems.spatial!;
-    return spatial.getData<OsmNote>('osm-notes', dataID);
+    return spatial.getItem<OsmNote>('osm-notes', dataID);
   }
 
 
@@ -1865,7 +1920,7 @@ export class OsmService extends AbstractSystem {
     if (!(item instanceof MarkerData) || !item.id) return;
 
     const spatial = this.context.systems.spatial!;
-    spatial.removeData('osm-notes', item);
+    spatial.removeItems('osm-notes', item.id);
   }
 
 
@@ -1918,7 +1973,7 @@ export class OsmService extends AbstractSystem {
    */
   protected _isChangesetInflight(): boolean {
     const network = this.context.systems.network!;
-    return network.hasMatching(id => /^osm-changeset-/.test(id));
+    return network.hasMatching(id => id.startsWith('osm-changeset-'));
   }
 
 
@@ -1932,9 +1987,9 @@ export class OsmService extends AbstractSystem {
     const spatial = context.systems.spatial!;
     const noteID = source.id;
 
-    let note = spatial.getData<OsmNote>('osm-notes', noteID);
+    let note = spatial.getItem<OsmNote>('osm-notes', noteID);
     if (!note) {
-      const loc = spatial.preventCoincidentLoc('osm-notes', source.loc);
+      const loc = spatial.getFreeLoc('osm-notes', source.loc);
       note = new MarkerData<OsmNoteProps>(this.context, {
         type:       'note',
         serviceID:  this.id,

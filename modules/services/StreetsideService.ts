@@ -14,6 +14,9 @@ import type { GeoJSONProps } from '../data/GeoJSONData.ts';
 import type { MarkerProps } from '../data/MarkerData.ts';
 import type { Quad, Tile, Vec2 } from '@rapid-sdk/math';
 
+const BUBBLE_API = 'https://t.ssl.ak.tiles.virtualearth.net/tiles/cmd/StreetSideBubbleMetaData?';
+const IMAGE_API = 'https://ecn.t0.tiles.virtualearth.net/tiles/';
+
 
 /** Properties for Streetside bubble (photo) markers */
 export interface StreetsideBubbleProps extends MarkerProps {
@@ -296,8 +299,8 @@ export class StreetsideService extends AbstractSystem {
     const network = context.systems.network!;
     const spatial = context.systems.spatial!;
 
-    network.abortMatching(id => id.startsWith('streetside'));
-    spatial.clearMatching(id => id.startsWith('streetside'));
+    network.clearMatching(id => id.startsWith('streetside-') || id.includes(BUBBLE_API) || id.includes(IMAGE_API));
+    spatial.clearMatching(id => id.startsWith('streetside-'));
 
     this._cache = {
       unattachedBubbles: new Set<PhotoID>(),
@@ -324,7 +327,7 @@ export class StreetsideService extends AbstractSystem {
    */
   public getImages(): MarkerData[] {
     const spatial = this.context.systems.spatial!;
-    return spatial.getVisibleData('streetside-images').map(hit => hit.contents) as MarkerData[];
+    return spatial.getVisibleItems('streetside-images').map(hit => hit.contents) as MarkerData[];
   }
 
 
@@ -334,7 +337,7 @@ export class StreetsideService extends AbstractSystem {
    */
   public getSequences(): GeoJSONData[] {
     const spatial = this.context.systems.spatial!;
-    return spatial.getVisibleData('streetside-sequences').map(hit => hit.contents) as GeoJSONData[];
+    return spatial.getVisibleItems('streetside-sequences').map(hit => hit.contents) as GeoJSONData[];
   }
 
 
@@ -344,7 +347,6 @@ export class StreetsideService extends AbstractSystem {
   public loadTiles(): void {
     const context = this.context;
     const network = context.systems.network!;
-    const spatial = context.systems.spatial!;
     const viewport = context.viewport;
     const cache = this._cache;
 
@@ -352,21 +354,108 @@ export class StreetsideService extends AbstractSystem {
     cache.lastv = viewport.v;
 
     // Determine the tiles needed to cover the view..
-    const needTiles = this._tiler.getTiles(viewport).tiles;
+    const tiles = this._tiler.getTiles(viewport).tiles;
 
     // Abort inflight requests that are no longer needed..
-    const neededIDs = new Set<RequestID>(needTiles.map(tile => `streetside-${tile.id}`));
-    network.abortMatching(id => id.startsWith('streetside') && !neededIDs.has(id));
+    const neededIDs = new Set<RequestID>(tiles.map(tile => `streetside-tile-${tile.id}`));
+    network.abortMatching(id => id.startsWith('streetside-tile') && !neededIDs.has(id));
 
     // Issue new requests..
-    for (const tile of needTiles) {
-      const tileID = tile.id;
-      const requestID = `streetside-${tileID}` as RequestID;
-      if (spatial.hasTile('streetside-images', tileID) || network.isInflight(requestID)) continue;
-
-      // Promise.all([this._fetchMetadataAsync(tile), this._loadTileAsync(tile)])
-      this._loadTileAsync(tile);
+    for (const tile of tiles) {
+      // Promise.all([this._fetchMetadataAsync(tile), this._loadTile(tile)])
+      this._loadTile(tile);
     }
+  }
+
+
+  /**
+   * Load a single tile of data.
+   * bubbles:   undocumented / unsupported API?
+   * see Rapid#1305, iD#10100
+   * @param tile - Tile to load
+   */
+  protected _loadTile(tile: Tile): void {
+    const context = this.context;
+    const network = context.systems.network!;
+
+    const requestID = `streetside-tile-${tile.id}`;
+    if (network.isCompleted(requestID) || network.isInflight(requestID)) return;
+
+    const [w, s, e, n] = tile.wgs84Extent.rectangle();
+    const MAXRESULTS = 2000;
+    const bubbleKey = 'AuftgJsO0Xs8Ts4M1xZUQJQXJNsvmh3IV8DkNieCiy3tCwCUMq76-WpkrBtNAuEm';
+    const bubbleURL = BUBBLE_API + utilQsString({ north: n, south: s, east: e, west: w, count: MAXRESULTS, key: bubbleKey }, false);
+
+    network.fetch<string>(bubbleURL, { requestID })
+      .then(data => this._gotTile(JSON.parse(data)))  // Content-Type is 'text/plain' for some reason
+      .catch(err => {
+        if (err.name === 'AbortError') return;  // ok
+        console.error(err);  // eslint-disable-line
+        network.forget(requestID);   // allow retry on error
+      });
+  }
+
+
+  /**
+   * Process the response from the tile fetch.
+   * @param bubbles - Response data
+   */
+  protected _gotTile(bubbles: any): void {
+    const context = this.context;
+    const gfx = context.systems.gfx;
+    const photos = context.systems.photos!;
+    const spatial = context.systems.spatial!;
+    const spatialID = 'streetside-images';
+
+    const cache = this._cache;
+
+    if (!Array.isArray(bubbles)) return;
+    if ((bubbles as any).error) throw new Error((bubbles as any).error);
+
+    // [].shift() removes the first element, some statistics info, not a bubble point
+    bubbles.shift();
+    if (!bubbles.length) return;
+
+    let selectBubbleID: PhotoID | null = null;
+    const toLoad: MarkerData[] = [];
+    for (const bubble of bubbles) {
+      const bubbleID = bubble.id.toString();
+      if (this._waitingForPhotoID === bubbleID) {
+        selectBubbleID = bubbleID;
+        this._waitingForPhotoID = null;
+      }
+
+      if (spatial.hasItem(spatialID, bubbleID)) continue;  // skip duplicates
+      if (!Number.isFinite(bubble.lo) || !Number.isFinite(bubble.la)) continue;  // skip bubbles without valid coordinates
+
+      const loc = spatial.getFreeLoc(spatialID, [bubble.lo, bubble.la]);
+      const props = {
+        type: 'photo',
+        serviceID: this.id,
+        loc: loc,
+        id: bubbleID,
+        ca: bubble.he,
+        captured_at: bubble.cd,
+        captured_by: 'microsoft',
+        pr: bubble.pr?.toString(),  // previous
+        ne: bubble.ne?.toString(),  // next
+        isPano: true
+      };
+
+      toLoad.push(new MarkerData(context, props));
+      cache.unattachedBubbles.add(bubbleID);
+    }
+
+    spatial.addData(spatialID, toLoad);
+
+    this._connectSequences();
+
+    if (selectBubbleID) {
+      photos.selectPhoto();                              // deselect
+      photos.selectPhoto('streetside', selectBubbleID);  // reselect
+    }
+
+    gfx?.deferredRedraw();
   }
 
 
@@ -431,7 +520,7 @@ export class StreetsideService extends AbstractSystem {
 
     // It's possible we could be trying to show a photo that hasn't been fetched yet
     // (e.g. if we are starting up with a photoID specified in the url hash)
-    const bubble = spatial.getData<MarkerData<StreetsideBubbleProps>>('streetside-images', bubbleID);
+    const bubble = spatial.getItem<MarkerData<StreetsideBubbleProps>>('streetside-images', bubbleID);
     if (!bubble) {
       this._waitingForPhotoID = bubbleID;
       return Promise.resolve();
@@ -441,15 +530,13 @@ export class StreetsideService extends AbstractSystem {
 
     this._updatePhotoFooter(bubbleID);
 
-    const streetsideImagesApi = 'https://ecn.t0.tiles.virtualearth.net/tiles/';
-
     const asNumber = parseInt(bubbleID, 10);
     let bubbleIdQuadKey = asNumber.toString(4);
     const paddingNeeded = 16 - bubbleIdQuadKey.length;
     for (let i = 0; i < paddingNeeded; i++) {
       bubbleIdQuadKey = '0' + bubbleIdQuadKey;
     }
-    const imgUrlPrefix = streetsideImagesApi + 'hs' + bubbleIdQuadKey;
+    const imgUrlPrefix = IMAGE_API + 'hs' + bubbleIdQuadKey;
     // const imgUrlSuffix = '.jpg?g=6338&n=z';
     const imgUrlSuffix = '?g=13305&n=z';
 
@@ -555,7 +642,7 @@ export class StreetsideService extends AbstractSystem {
     // Attribution Section
     const $attribution: D3Selection = $wrapper.selectAll('.photo-attribution').html('&nbsp;');  // clear DOM content
 
-    const bubble = spatial.getData<StreetsideBubble>('streetside-images', bubbleID as string);
+    const bubble = spatial.getItem<StreetsideBubble>('streetside-images', bubbleID as string);
     if (!bubble) return;
 
     const props = bubble.props;
@@ -728,7 +815,7 @@ export class StreetsideService extends AbstractSystem {
     const spatial = context.systems.spatial!;
 
     const currBubbleID = photos.currPhotoID;
-    const selected = spatial.getData<StreetsideBubble>('streetside-images', currBubbleID);
+    const selected = spatial.getItem<StreetsideBubble>('streetside-images', currBubbleID);
     if (!selected) return;
 
     let nextID = (stepBy === 1 ? selected.props.ne : selected.props.pr) as PhotoID;
@@ -770,7 +857,7 @@ export class StreetsideService extends AbstractSystem {
 
     // find nearest other bubble in the search polygon
     let minDist = Infinity;
-    const hits = spatial.getDataAtBox('streetside-images', extent.bbox());
+    const hits = spatial.getItemsAtBox('streetside-images', extent.bbox());
     for (const hit of hits) {
       const bubble = hit.contents as StreetsideBubble;
       if (bubble.id === selected.id) continue;
@@ -789,74 +876,11 @@ export class StreetsideService extends AbstractSystem {
       }
     }
 
-    const nextBubble = spatial.getData('streetside-images', nextID);
+    const nextBubble = spatial.getItem<StreetsideBubble>('streetside-images', nextID);
     if (!nextBubble) return;
 
     photos.selectPhoto('streetside', nextBubble.id);
     this.emit('imageChanged');
-  }
-
-
-  /**
-   * Process the response from the tile fetch.
-   * @param tile - Tile data
-   * @param bubbles - Response data
-   */
-  protected _gotTile(tile: Tile, bubbles: any): void {
-    const context = this.context;
-    const gfx = context.systems.gfx;
-    const photos = context.systems.photos!;
-    const spatial = context.systems.spatial!;
-    const cache = this._cache;
-
-    spatial.addTiles('streetside-images', [tile]);   // mark as loaded
-
-    if (!Array.isArray(bubbles)) return;
-    if ((bubbles as any).error) throw new Error((bubbles as any).error);
-
-    // [].shift() removes the first element, some statistics info, not a bubble point
-    bubbles.shift();
-    if (!bubbles.length) return;
-
-    let selectBubbleID: PhotoID | null = null;
-    const toLoad: MarkerData[] = [];
-    for (const bubble of bubbles) {
-      const bubbleID = bubble.id.toString();
-      if (this._waitingForPhotoID === bubbleID) {
-        selectBubbleID = bubbleID;
-        this._waitingForPhotoID = null;
-      }
-
-      if (spatial.hasData('streetside-images', bubbleID))  continue;  // skip duplicates
-      if (!Number.isFinite(bubble.lo) || !Number.isFinite(bubble.la)) continue;  // skip bubbles without valid coordinates
-
-      const loc = spatial.preventCoincidentLoc('streetside-images', [bubble.lo, bubble.la]);
-      const props = {
-        type:         'photo',
-        serviceID:    this.id,
-        loc:          loc,
-        id:           bubbleID,
-        ca:           bubble.he,
-        captured_at:  bubble.cd,
-        captured_by:  'microsoft',
-        pr:           bubble.pr?.toString(),  // previous
-        ne:           bubble.ne?.toString(),  // next
-        isPano:       true
-      };
-
-      toLoad.push(new MarkerData(context, props));
-      cache.unattachedBubbles.add(bubbleID);
-    }
-
-    spatial.addData('streetside-images', toLoad);
-    this._connectSequences();
-
-    if (selectBubbleID) {
-      photos.selectPhoto();                              // deselect
-      photos.selectPhoto('streetside', selectBubbleID);  // reselect
-    }
-
-    gfx?.deferredRedraw();
   }
 
 
@@ -896,7 +920,7 @@ export class StreetsideService extends AbstractSystem {
       if (!unattachedBubbles.has(currBubbleID)) continue;  // done already
 
       // Get current bubble (the one we are trying to attach)
-      const currBubble = spatial.getData<StreetsideBubble>('streetside-images', currBubbleID);
+      const currBubble = spatial.getItem<StreetsideBubble>('streetside-images', currBubbleID);
       if (!currBubble) {  // missing? shouldn't happen
         unattachedBubbles.delete(currBubbleID);
         continue;
@@ -904,9 +928,9 @@ export class StreetsideService extends AbstractSystem {
 
       // Get adjacent bubbles (if possible)
       const prevBubbleID = currBubble.props.pr;
-      const prevBubble = prevBubbleID && spatial.getData<StreetsideBubble>('streetside-images', prevBubbleID);
+      const prevBubble = prevBubbleID && spatial.getItem<StreetsideBubble>('streetside-images', prevBubbleID);
       const nextBubbleID = currBubble.props.ne;
-      const nextBubble = nextBubbleID && spatial.getData<StreetsideBubble>('streetside-images', nextBubbleID);
+      const nextBubble = nextBubbleID && spatial.getItem<StreetsideBubble>('streetside-images', nextBubbleID);
 
       // Try to link current bubble to the previous bubble's sequence.
       // Prefer a sequence where the current bubble follows the previous bubble at the end of the sequnce.
@@ -914,7 +938,7 @@ export class StreetsideService extends AbstractSystem {
       if (prevBubbleID && prevBubble) {
         const trySequenceIDs = bubbleHasSequences.get(prevBubbleID) ?? new Set<SequenceID>();
         for (const sequenceID of trySequenceIDs) {
-          const sequence = spatial.getData<StreetsideSequence>('streetside-sequences', sequenceID);
+          const sequence = spatial.getItem<StreetsideSequence>('streetside-sequences', sequenceID);
           if (!sequence) continue;
           const bubbleIDs = sequence.props.bubbleIDs;  // we will update bubbleIDs in-place
           const beginID = bubbleIDs.at(0);
@@ -937,7 +961,7 @@ export class StreetsideService extends AbstractSystem {
       if (nextBubbleID && nextBubble) {
         const trySequenceIDs = bubbleHasSequences.get(nextBubbleID) ?? new Set<SequenceID>();
         for (const sequenceID of trySequenceIDs) {
-          const sequence = spatial.getData<StreetsideSequence>('streetside-sequences', sequenceID);
+          const sequence = spatial.getItem<StreetsideSequence>('streetside-sequences', sequenceID);
           if (!sequence) continue;
           const bubbleIDs = sequence.props.bubbleIDs;  // we will update bubbleIDs in-place
           const beginID = bubbleIDs.at(0);
@@ -996,10 +1020,10 @@ export class StreetsideService extends AbstractSystem {
 
     // Any sequences that we touched, bump version number and recompute the coordinate array
     for (const sequenceID of touchedSequenceIDs) {
-      const sequence = spatial.getData<StreetsideSequence>('streetside-sequences', sequenceID);
+      const sequence = spatial.getItem<StreetsideSequence>('streetside-sequences', sequenceID);
       if (!sequence) continue;
       const bubbles = sequence.props.bubbleIDs
-        .map((bubbleID: PhotoID) => spatial.getData<StreetsideBubble>('streetside-images', bubbleID));
+        .map((bubbleID: PhotoID) => spatial.getItem<StreetsideBubble>('streetside-images', bubbleID));
 
       // We will update the properties in-place.. hope this is ok.
       sequence.props.captured_at = bubbles[0]?.props.captured_at;
@@ -1033,33 +1057,6 @@ export class StreetsideService extends AbstractSystem {
       .then(data => {
         if (!data) throw new Error('no data');
         return data;
-      });
-  }
-
-
-  /**
-   * bubbles:   undocumented / unsupported API?
-   * see Rapid#1305, iD#10100
-   * @param tile
-   */
-  protected _loadTileAsync(tile: Tile): Promise<void> {
-    const network = this.context.systems.network!;
-    const requestID = `streetside-${tile.id}` as RequestID;
-
-    if (network.isInflight(requestID)) return Promise.resolve();
-
-    const [w, s, e, n] = tile.wgs84Extent.rectangle();
-    const MAXRESULTS = 2000;
-
-    const bubbleURLBase = 'https://t.ssl.ak.tiles.virtualearth.net/tiles/cmd/StreetSideBubbleMetaData?';
-    const bubbleKey = 'AuftgJsO0Xs8Ts4M1xZUQJQXJNsvmh3IV8DkNieCiy3tCwCUMq76-WpkrBtNAuEm';
-    const bubbleURL = bubbleURLBase + utilQsString({ north: n, south: s, east: e, west: w, count: MAXRESULTS, key: bubbleKey }, false);
-
-    return network.fetch<string>(bubbleURL, { requestID })
-      .then(data => this._gotTile(tile, JSON.parse(data)))  // Content-Type is 'text/plain' for some reason
-      .catch(err => {
-        if (err.name === 'AbortError') return;  // ok
-        if (err instanceof Error) console.error(err);   // eslint-disable-line no-console
       });
   }
 

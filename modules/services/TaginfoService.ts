@@ -192,7 +192,7 @@ export class TaginfoService extends AbstractSystem {
     const scheduler = context.systems.scheduler;
 
     scheduler?.cancel('taginfo-request');  // cancel any request in progress
-    network.abortMatching(id => /taginfo\.openstreetmap\.org/.test(id));
+    network.clearMatching(id => id.includes(TAGINFO_API));
 
     return Promise.resolve();
   }

@@ -63,8 +63,6 @@ interface MapillaryCache {
   signs: DatasetCache;
   /** Decoded segmentation geometries keyed by segmentation ID */
   segmentations: SegmentationCache;
-  /** Requests that have already been loaded */
-  loaded: Set<RequestID>;
 }
 
 /** Properties passed to `_cacheImage` to create or update an image */
@@ -304,15 +302,14 @@ export class MapillaryService extends AbstractSystem {
     const network = context.systems.network!;
     const spatial = context.systems.spatial!;
 
-    network.abortMatching(id => id.startsWith('mapillary'));
-    spatial.clearMatching(id => id.startsWith('mapillary'));
+    network.clearMatching(id => id.startsWith('mapillary-') || id.includes(apiUrl) || id.includes(baseTileUrl));
+    spatial.clearMatching(id => id.startsWith('mapillary-'));
 
     this._cache = {
       images:        { lastv: null },
       detections:    { lastv: null },
       signs:         { lastv: null },
-      segmentations: { data: new Map<string, SegmentationData>() },
-      loaded:        new Set<RequestID>()
+      segmentations: { data: new Map<string, SegmentationData>() }
     };
 
     return Promise.resolve();
@@ -358,7 +355,7 @@ export class MapillaryService extends AbstractSystem {
    */
   public getImage(imageID: PhotoID): MapillaryImage | undefined {
     const spatial = this.context.systems.spatial!;
-    return spatial.getData<MapillaryImage>('mapillary-images', imageID);
+    return spatial.getItem<MapillaryImage>('mapillary-images', imageID);
   }
 
 
@@ -369,7 +366,7 @@ export class MapillaryService extends AbstractSystem {
    */
   public getSequence(sequenceID: SequenceID): GeoJSONData | undefined {
     const spatial = this.context.systems.spatial!;
-    return spatial.getData<GeoJSONData>('mapillary-sequences', sequenceID);
+    return spatial.getItem<GeoJSONData>('mapillary-sequences', sequenceID);
   }
 
 
@@ -380,7 +377,7 @@ export class MapillaryService extends AbstractSystem {
    */
   public getDetection(detectionID: DetectionID): MapillaryDetection | undefined {
     const spatial = this.context.systems.spatial!;
-    return spatial.getData<MapillaryDetection>('mapillary-detections', detectionID);
+    return spatial.getItem<MapillaryDetection>('mapillary-detections', detectionID);
   }
 
 
@@ -390,16 +387,15 @@ export class MapillaryService extends AbstractSystem {
    * @return  Array of Markers
    */
   public getData(datasetID: MapillaryDatasetID): MarkerData[] {
-
     const spatial = this.context.systems.spatial!;
 
     if (datasetID === 'images') {
-      return spatial.getVisibleData('mapillary-images')
+      return spatial.getVisibleItems('mapillary-images')
         .map(hit => hit.contents) as MarkerData[];
 
     } else {  // both signs and detections are currently stored in the `detections` cache
       const type = (datasetID === 'signs') ? 'traffic_sign' : 'point';
-      return spatial.getVisibleData('mapillary-detections')
+      return spatial.getVisibleItems('mapillary-detections')
         .map(hit => (hit.contents as MarkerData))
         .filter(d => d.props.object_type === type);
     }
@@ -412,7 +408,7 @@ export class MapillaryService extends AbstractSystem {
    */
   public getSequences(): GeoJSONData[] {
     const spatial = this.context.systems.spatial!;
-    return spatial.getVisibleData('mapillary-sequences')
+    return spatial.getVisibleItems('mapillary-sequences')
       .map(hit => hit.contents) as GeoJSONData[];
   }
 
@@ -489,12 +485,122 @@ export class MapillaryService extends AbstractSystem {
     const tiles = this._tiler.getTiles(viewport).tiles;
 
     // Abort inflight requests that are no longer needed..
-    const neededIDs = new Set<RequestID>(tiles.map(tile => `mapillary-${datasetID}-${tile.id}`));
-    network.abortMatching(id => id.startsWith(`mapillary-${datasetID}-`) && !neededIDs.has(id));
+    const prefix = `mapillary-${datasetID}-tile`;
+    const neededIDs = new Set<RequestID>(tiles.map(tile => `${prefix}-${tile.id}`));
+    network.abortMatching(id => id.startsWith(prefix) && !neededIDs.has(id));
 
     for (const tile of tiles) {
       this._loadTile(datasetID, tile);
     }
+  }
+
+
+  /**
+   * Load a vector tile of data for the given dataset.
+   * This uses `https://tiles.mapillary.com/maps/vtp/mly1_public/2/{z}/{x}/{y}?access_token=XXX`
+   * @see    https://www.mapillary.com/developer/api-documentation#vector-tiles
+   * @param  datasetID - one of 'images', 'signs', or 'detections'
+   * @param  tile - a tile object
+   */
+  protected _loadTile(datasetID: MapillaryDatasetID, tile: Tile): void {
+    const context = this.context;
+    const network = context.systems.network!;
+
+    const tileUrls: Record<MapillaryDatasetID, string> = {
+      images: imageTileUrl,
+      signs: trafficSignTileUrl,
+      detections: detectionTileUrl
+    };
+    let url: string = tileUrls[datasetID];
+
+    url = url
+      .replace('{x}', tile.xyz[0].toString())
+      .replace('{y}', tile.xyz[1].toString())
+      .replace('{z}', tile.xyz[2].toString());
+
+    const prefix = `mapillary-${datasetID}-tile`;
+    const requestID = `${prefix}-${tile.id}`;
+    if (network.isCompleted(requestID) || network.isInflight(requestID)) return;
+
+    network.fetch<MVTFeatureResult[]>(url, {
+      requestID,
+      listenerID: 'network:fetchAndParseMVT',
+      listenerData: { tileXYZ: tile.xyz }
+    })
+      .then(results => {
+        this._gotTile(results);
+
+        if (datasetID === 'images') {
+          this.emit('loadedImages');
+        } else if (datasetID === 'signs') {
+          this.emit('loadedSigns');
+        } else if (datasetID === 'detections') {
+          this.emit('loadedDetections');
+        }
+      })
+      .catch(err => {
+        if (err.name === 'AbortError') return;  // ok
+        console.error(err);  // eslint-disable-line
+      });
+  }
+
+
+  /**
+   * Process pre-parsed vector tile features
+   * @see    https://www.mapillary.com/developer/api-documentation#vector-tiles
+   * @param  results - parsed MVT features from the worker
+   */
+  protected _gotTile(results: MVTFeatureResult[]): void {
+    const context = this.context;
+    const gfx = context.systems.gfx;
+    const spatial = context.systems.spatial!;
+
+    for (const { layerID, feature } of results) {
+      if (!feature) continue;
+
+      if (layerID === 'image') {
+        this._cacheImage({
+          id: feature.properties!.id.toString(),
+          loc: (feature.geometry as any).coordinates,
+          sequenceID: feature.properties!.sequence_id.toString(),
+          captured_at: feature.properties!.captured_at,
+          ca: feature.properties!.compass_angle,
+          isPano: feature.properties!.is_pano,
+        });
+
+      } else if (layerID === 'sequence') {
+        const sequenceID = feature.properties!.id.toString();
+        let sequence = spatial.getItem<GeoJSONData>('mapillary-sequences', sequenceID);
+        if (!sequence) {
+          const props = {
+            id: sequenceID,
+            serviceID: this.id as ServiceID,
+            type: 'sequence',
+            geojson: {
+              type: 'FeatureCollection',
+              features: []
+            }
+          };
+          sequence = new GeoJSONData(context, props as Partial<GeoJSONProps>);
+        }
+        (sequence.props.geojson as GeoJSON.FeatureCollection).features.push(feature);  // updating it in-place, hope this is ok.
+        sequence.updateGeometry().touch();
+        spatial.replaceData('mapillary-sequences', sequence);
+
+      } else if (layerID === 'point' || layerID === 'traffic_sign') {
+        // Note that the tile API _does not_ give us `images` or `aligned_direction`
+        this._cacheDetection({
+          id: feature.properties!.id.toString(),
+          loc: (feature.geometry as any).coordinates,
+          first_seen_at: feature.properties!.first_seen_at,
+          last_seen_at: feature.properties!.last_seen_at,
+          value: feature.properties!.value,
+          object_type: layerID
+        });
+      }
+    }
+
+    gfx?.deferredRedraw();
   }
 
 
@@ -619,7 +725,7 @@ export class MapillaryService extends AbstractSystem {
     if (this._selectedImageID === imageID) {
       const context = this.context;
       const spatial = context.systems.spatial!;
-      const image = spatial.getData<MapillaryImage>('mapillary-images', imageID);
+      const image = spatial.getItem<MapillaryImage>('mapillary-images', imageID);
 
       if (this._shouldShowSegmentations()) {
         return this._loadImageSegmentationsAsync(image!)
@@ -736,7 +842,7 @@ export class MapillaryService extends AbstractSystem {
     const $attribution: D3Selection = $wrapper.selectAll('.photo-attribution').html('&nbsp;');  // clear DOM content
 
     if (!imageID) return;
-    const image = spatial.getData<MapillaryImage>('mapillary-images', imageID);
+    const image = spatial.getItem<MapillaryImage>('mapillary-images', imageID);
     if (!image) return;
 
     if (image.props.captured_by) {
@@ -867,124 +973,6 @@ export class MapillaryService extends AbstractSystem {
 
 
   /**
-   * Load a vector tile of data for the given dataset.
-   * This uses `https://tiles.mapillary.com/maps/vtp/mly1_public/2/{z}/{x}/{y}?access_token=XXX`
-   * @see    https://www.mapillary.com/developer/api-documentation#vector-tiles
-   * @param  datasetID - one of 'images', 'signs', or 'detections'
-   * @param  tile - a tile object
-   */
-  protected _loadTile(datasetID: MapillaryDatasetID, tile: Tile): void {
-    const context = this.context;
-    const gfx = context.systems.gfx;
-    const spatial = context.systems.spatial!;
-    const network = context.systems.network!;
-
-    const tileUrls: Record<MapillaryDatasetID, string> = {
-      images: imageTileUrl,
-      signs: trafficSignTileUrl,
-      detections: detectionTileUrl
-    };
-    let url: string = tileUrls[datasetID];
-
-    url = url
-      .replace('{x}', tile.xyz[0].toString())
-      .replace('{y}', tile.xyz[1].toString())
-      .replace('{z}', tile.xyz[2].toString());
-
-    const cache = this._cache;
-    const requestID = `mapillary-${datasetID}-${tile.id}` as RequestID;
-
-    if (cache.loaded.has(requestID) || network.isInflight(requestID)) {
-      return;
-    }
-
-    network.fetch<MVTFeatureResult[]>(url, {
-      requestID,
-      listenerID: 'network:fetchAndParseMVT',
-      listenerData: { tileXYZ: tile.xyz }
-    })
-      .then(results => {
-        cache.loaded.add(requestID);
-
-        this._gotTile(results);
-
-        gfx?.deferredRedraw();
-
-        if (datasetID === 'images') {
-          spatial.addTiles('mapillary-images', [tile]);
-          this.emit('loadedImages');
-        } else if (datasetID === 'signs') {
-          this.emit('loadedSigns');
-        } else if (datasetID === 'detections') {
-          // spatial.addTiles('mapillary-detections', [tile]);  /// detections and signs are currently shared, so idk.
-          this.emit('loadedDetections');
-        }
-      })
-      .catch(err => {
-        if (err.name === 'AbortError') return;          // ok
-        if (err instanceof Error) console.error(err);   // eslint-disable-line no-console
-        cache.loaded.add(requestID);  // don't retry
-      });
-  }
-
-
-  /**
-   * Process pre-parsed vector tile features
-   * @see    https://www.mapillary.com/developer/api-documentation#vector-tiles
-   * @param  results - parsed MVT features from the worker
-   */
-  protected _gotTile(results: MVTFeatureResult[]): void {
-    const context = this.context;
-    const spatial = context.systems.spatial!;
-
-    for (const { layerID, feature } of results) {
-      if (!feature) continue;
-
-      if (layerID === 'image') {
-        this._cacheImage({
-          id:          feature.properties!.id.toString(),
-          loc:         (feature.geometry as any).coordinates,
-          sequenceID:  feature.properties!.sequence_id.toString(),
-          captured_at: feature.properties!.captured_at,
-          ca:          feature.properties!.compass_angle,
-          isPano:      feature.properties!.is_pano,
-        });
-
-      } else if (layerID === 'sequence') {
-        const sequenceID = feature.properties!.id.toString();
-        let sequence = spatial.getData<GeoJSONData>('mapillary-sequences', sequenceID);
-        if (!sequence) {
-          const props = {
-            id:         sequenceID,
-            serviceID:  this.id as ServiceID,
-            type:       'sequence',
-            geojson: {
-              type:      'FeatureCollection',
-              features:  []
-            }
-          };
-          sequence = new GeoJSONData(context, props as Partial<GeoJSONProps>);
-        }
-        (sequence.props.geojson as GeoJSON.FeatureCollection).features.push(feature);  // updating it in-place, hope this is ok.
-        sequence.updateGeometry().touch();
-        spatial.replaceData('mapillary-sequences', sequence);
-
-      } else if (layerID === 'point' || layerID === 'traffic_sign') {
-        // Note that the tile API _does not_ give us `images` or `aligned_direction`
-        this._cacheDetection({
-          id:            feature.properties!.id.toString(),
-          loc:           (feature.geometry as any).coordinates,
-          first_seen_at: feature.properties!.first_seen_at,
-          last_seen_at:  feature.properties!.last_seen_at,
-          value:         feature.properties!.value,
-          object_type:   layerID
-        });
-      }
-    }
-  }
-
-
-  /**
    * Get the details for a given detected feature (object or sign)
    * This uses `https://graph.mapillary.com/<map_feature_id>`
    * This API call gives us 2 things the tile API does not: `images` and `aligned_direction`
@@ -999,7 +987,7 @@ export class MapillaryService extends AbstractSystem {
     const spatial = context.systems.spatial!;
 
     // Is data is cached already and includes the `images` Array?  If so, resolve immediately.
-    const detection = spatial.getData<MapillaryDetection>('mapillary-detections', detectionID);
+    const detection = spatial.getItem<MapillaryDetection>('mapillary-detections', detectionID);
     if (Array.isArray(detection?.props?.images)) {
       return Promise.resolve(detection);
     }
@@ -1007,8 +995,9 @@ export class MapillaryService extends AbstractSystem {
     // Not cached, load it..
     const fields = 'id,geometry,aligned_direction,first_seen_at,last_seen_at,object_value,object_type,images';
     const url = `${apiUrl}/${detectionID}?access_token=${accessToken}&fields=${fields}`;
+    const requestID = `mapillary-detection-${detectionID}`;
 
-    return network.fetch<any>(url)
+    return network.fetch<any>(url, { requestID })
       .then(response => {
         if (!response) {
           throw new Error('No Data');
@@ -1057,9 +1046,10 @@ export class MapillaryService extends AbstractSystem {
     const imageID = image.id;
     const fields = 'id,created_at,geometry,image,value';
     const url = `${apiUrl}/${imageID}/detections?access_token=${accessToken}&fields=${fields}`;
+    const requestID = `mapillary-segmentations-for-${imageID}`;
 
     const network = this.context.systems.network!;
-    return network.fetch<any>(url)
+    return network.fetch<any>(url, { requestID })
       .then(response => {
         if (!response) {
           throw new Error('No Data');
@@ -1112,9 +1102,10 @@ export class MapillaryService extends AbstractSystem {
     const detectionID = detection.id;
     const fields = 'id,created_at,geometry,image,value';
     const url = `${apiUrl}/${detectionID}/detections?access_token=${accessToken}&fields=${fields}`;
+    const requestID = `mapillary-detection-${detectionID}`;
 
     const network = this.context.systems.network!;
-    return network.fetch<any>(url)
+    return network.fetch<any>(url, { requestID })
       .then(response => {
         if (!response) {
           throw new Error('No Data');
@@ -1255,7 +1246,7 @@ export class MapillaryService extends AbstractSystem {
     const moveEnd = (_e: ViewerStateEvent): void => {
       const imageID = photos.currPhotoID;
       if (!imageID) return;
-      const image = spatial.getData<MapillaryImage>('mapillary-images', imageID);
+      const image = spatial.getItem<MapillaryImage>('mapillary-images', imageID);
 
       // If we update the segmentations before the viewer is finished moving,
       // they end up drawn in the wrong place!
@@ -1294,9 +1285,9 @@ export class MapillaryService extends AbstractSystem {
     const spatial = context.systems.spatial!;
     const imageID = source.id;
 
-    let image = spatial.getData<MapillaryImage>('mapillary-images', imageID);
+    let image = spatial.getItem<MapillaryImage>('mapillary-images', imageID);
     if (!image) {
-      const loc = spatial.preventCoincidentLoc('mapillary-images', source.loc);
+      const loc = spatial.getFreeLoc('mapillary-images', source.loc);
       image = new MarkerData(this.context, {
         type:       'photo',
         serviceID:  this.id as ServiceID,
@@ -1333,7 +1324,7 @@ export class MapillaryService extends AbstractSystem {
     const spatial = context.systems.spatial!;
     const detectionID = source.id;
 
-    let detection = spatial.getData<MapillaryDetection>('mapillary-detections', detectionID);
+    let detection = spatial.getItem<MapillaryDetection>('mapillary-detections', detectionID);
     if (!detection) {
       detection = new MarkerData<MapillaryDetectionProps>(this.context, {
         type:         'detection',
@@ -1347,7 +1338,7 @@ export class MapillaryService extends AbstractSystem {
     // (see Rapid#1557 - sometimes we don't have this!)
     if (!detection.loc && source.loc) {
       // MarkerData `loc` should really have been set at construction time, but unfortunately we need to redo it
-      const loc = spatial.preventCoincidentLoc('mapillary-detections', source.loc);
+      const loc = spatial.getFreeLoc('mapillary-detections', source.loc);
       detection.props.loc = loc;
       detection.updateGeometry();
     }

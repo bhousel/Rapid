@@ -9,6 +9,7 @@ import { utilGetSetValue, utilNoAuto, utilRebind } from '../../util/index.ts';
 
 export function uiFieldAddress(context, uifield) {
   const assets = context.systems.assets;
+  const editor = context.systems.editor;
   const l10n = context.systems.l10n;
   const spatial = context.systems.spatial;
   const dispatch = d3_dispatch('change');
@@ -63,7 +64,8 @@ export function uiFieldAddress(context, uifield) {
     const point = projWgs84ToWorld(loc);
     const box = queryBox(loc, 200);
 
-    const streets = spatial.getDataAtBox('osm-staging', box)
+    const spatialID = editor.spatialIDForGraph(editor.staging.graph);
+    const streets = spatial.getItemsAtBox(spatialID, box)
       .map(hit => hit.contents)
       .filter(isAddressableStreet)
       .map(way => {
@@ -95,7 +97,8 @@ export function uiFieldAddress(context, uifield) {
     const point = projWgs84ToWorld(loc);
     const box = queryBox(loc, 200);
 
-    const cities = spatial.getDataAtBox('osm-staging', box)
+    const spatialID = editor.spatialIDForGraph(editor.staging.graph);
+    const cities = spatial.getItemsAtBox(spatialID, box)
       .map(hit => hit.contents)
       .filter(isAddressableCity)
       .map(d => {
@@ -134,7 +137,8 @@ export function uiFieldAddress(context, uifield) {
     const point = projWgs84ToWorld(loc);
     const box = queryBox(loc, 200);
 
-    const results = spatial.getDataAtBox('osm-staging', box)
+    const spatialID = editor.spatialIDForGraph(editor.staging.graph);
+    const results = spatial.getItemsAtBox(spatialID, box)
       .map(hit => hit.contents)
       .filter(entityHasAddressTag)
       .map(d => {

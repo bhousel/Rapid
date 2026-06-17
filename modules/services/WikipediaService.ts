@@ -49,6 +49,7 @@ export class WikipediaService extends AbstractSystem {
    * @return Promise resolved when this component has completed resetting
    */
   public resetAsync(): Promise<void> {
+    // note: no need to clear network requests here - they can persist across sessions.
     return Promise.resolve();
   }
 

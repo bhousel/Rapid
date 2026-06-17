@@ -4,20 +4,12 @@ import { Tiler } from '@rapid-sdk/math';
 import { utilQsString } from '@rapid-sdk/util';
 
 import type { Context } from '../Context.ts';
-import type { Tile } from '@rapid-sdk/math';
 
 
 /** Zoom level used for tiling GeoScribble data requests */
 const TILEZOOM = 14;
 /** Base URL for the GeoScribble GeoJSONData API endpoint */
 const GEOSCRIBBLE_API = 'https://geoscribble.osmz.ru/geojson';
-
-
-/** Internal cache for GeoScribble tile data */
-interface GeoScribbleCache {
-  /** Viewport version number from the last data fetch, used to skip redundant loads */
-  lastv: number | null;
-}
 
 
 /**
@@ -29,10 +21,10 @@ interface GeoScribbleCache {
  */
 export class GeoScribbleService extends AbstractSystem {
 
-  /** Internal cache holding in-flight requests and viewport version tracking */
-  protected _cache: GeoScribbleCache;
   /** Tiler instance used to compute which tiles cover the current viewport */
   protected _tiler: Tiler;
+  /** Last viewport version number used for change detection */
+  protected _lastv: number | null;
 
 
   /**
@@ -46,8 +38,8 @@ export class GeoScribbleService extends AbstractSystem {
     this.optionalDependencies = new Set<SystemID>(['gfx']);
     this.autoStart = false;
 
-    this._cache = {} as GeoScribbleCache;
     this._tiler = (new Tiler().zoomRange(TILEZOOM) as Tiler).skipNullIsland(true) as Tiler;
+    this._lastv = null;
   }
 
 
@@ -81,12 +73,10 @@ export class GeoScribbleService extends AbstractSystem {
     const network = context.systems.network!;
     const spatial = context.systems.spatial!;
 
-    network.abortMatching(id => id.startsWith('geoscribble'));
-    spatial.clearMatching(id => id.startsWith('geoscribble'));
+    network.clearMatching(id => id.startsWith('geoscribble-') || id.includes(GEOSCRIBBLE_API));
+    spatial.clearMatching(id => id.startsWith('geoscribble-'));
 
-    this._cache = {
-      lastv:  null  // viewport version last time we fetched data
-    };
+    this._lastv = null;
 
     return Promise.resolve();
   }
@@ -96,9 +86,9 @@ export class GeoScribbleService extends AbstractSystem {
    * Get already loaded data that appears in the current map view
    * @return  Array of data
    */
-  public getData(): any[] {
+  public getData(): GeoJSONData[] {
     const spatial = this.context.systems.spatial!;
-    return spatial.getVisibleData('geoscribble').map(hit => hit.contents);
+    return spatial.getVisibleItems('geoscribble-data').map(hit => hit.contents as GeoJSONData);
   }
 
 
@@ -106,53 +96,47 @@ export class GeoScribbleService extends AbstractSystem {
    * Schedule any data requests needed to cover the current map view
    */
   public loadTiles(): void {
-    const cache = this._cache;
     const context = this.context;
     const network = context.systems.network!;
-    const spatial = context.systems.spatial!;
     const viewport = context.viewport;
 
-    if (cache.lastv === viewport.v) return;  // exit early if the view is unchanged
-    cache.lastv = viewport.v;
+    if (this._lastv === viewport.v) return;  // exit early if the view is unchanged
+    this._lastv = viewport.v;
 
     // Determine the tiles needed to cover the view..
     const tiles = this._tiler.getTiles(viewport).tiles;
 
     // Abort inflight requests that are no longer needed..
-    const neededIDs = new Set<RequestID>(tiles.map(t => `geoscribble-${t.id}`));
-    network.abortMatching(id => id.startsWith('geoscribble') && !neededIDs.has(id));
+    const neededIDs = new Set<RequestID>(tiles.map(tile => `geoscribble-tile-${tile.id}`));
+    network.abortMatching(id => id.startsWith('geoscribble-tile') && !neededIDs.has(id));
 
     // Issue new requests..
     for (const tile of tiles) {
       const tileID = tile.id;
-      const requestID = `geoscribble-${tileID}`;
-      if (spatial.hasTile('geoscribble', tileID) || network.isInflight(requestID)) continue;
+      const requestID = `geoscribble-tile-${tileID}`;
+      if (network.isCompleted(requestID) || network.isInflight(requestID)) continue;
 
       const rect = tile.wgs84Extent.rectangle().join(',');
       const url = GEOSCRIBBLE_API + '?' + utilQsString({ bbox: rect }, false);
 
       network.fetch<any>(url, { requestID })
-        .then(response => this._gotTile(tile, response))
+        .then(response => this._gotTile(response))
         .catch(err => {
           if (err.name === 'AbortError') return;  // ok
-          spatial.addTiles('geoscribble', [tile]);   // don't retry
-          if (err instanceof Error) console.error(err);   // eslint-disable-line no-console
+          console.error(err);  // eslint-disable-line
         });
     }
   }
 
 
   /**
-   * Parse the response from the tile fetch
-   * @param tile - Tile data
+   * Parse the response from the tile fetch.
    * @param response - Response data
    */
-  protected _gotTile(tile: Tile, response: any): void {
+  protected _gotTile(response: any): void {
     const context = this.context;
     const gfx = context.systems.gfx;
     const spatial = context.systems.spatial!;
-
-    spatial.addTiles('geoscribble', [tile]);   // mark as loaded
 
     if (!Array.isArray(response?.features)) {
       throw new Error('Invalid response');
@@ -163,8 +147,7 @@ export class GeoScribbleService extends AbstractSystem {
       toLoad.push(new GeoJSONData(context, { serviceID: this.id, geojson: feature }));
     }
 
-    spatial.addData('geoscribble', toLoad);
-
+    spatial.addData('geoscribble-data', toLoad);
     gfx?.deferredRedraw();
   }
 

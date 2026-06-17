@@ -10,7 +10,7 @@ import type { ParserResult, ParsedWay } from '../data/parsers/types.ts';
 
 
 /** Base URL for the MapWithAI vector tile API endpoint */
-const APIROOT = 'https://mapwith.ai/maps/ml_roads';
+const MWAI_API = 'https://mapwith.ai/maps/ml_roads';
 /** Zoom level used for tiling MapWithAI data requests */
 const TILEZOOM = 16;
 
@@ -99,11 +99,15 @@ export class MapWithAIService extends AbstractSystem {
    */
   public resetAsync(): Promise<void> {
     const context = this.context;
-    const network = this.context.systems.network!;
-    const spatial = this.context.systems.spatial!;
+    const network = context.systems.network!;
+    const spatial = context.systems.spatial!;
+    const urlhash = context.systems.urlhash;
 
-    network.abortMatching(id => id.startsWith('mapwithai'));
-    spatial.clearMatching(id => id.startsWith('mapwithai'));
+    const customUrlRoot = urlhash?.getParam('fb_ml_road_url');
+    const urlRoot = customUrlRoot || MWAI_API;
+
+    network.clearMatching(id => id.startsWith('mapwithai-') || id.includes(urlRoot));
+    spatial.clearMatching(id => id.startsWith('mapwithai-'));
 
     for (const ds of this._datasets.values()) {
       ds.graph = new Graph(context);
@@ -230,8 +234,8 @@ export class MapWithAIService extends AbstractSystem {
     if (!ds) return [];
 
     const spatial = this.context.systems.spatial!;
-    const spatialID = `mapwithai-${ds.id}`;
-    return spatial.getVisibleData(spatialID).map(hit => hit.contents as OsmEntity);
+    const spatialID = `mapwithai-${ds.id}-data`;
+    return spatial.getVisibleItems(spatialID).map(hit => hit.contents as OsmEntity);
   }
 
 
@@ -255,44 +259,38 @@ export class MapWithAIService extends AbstractSystem {
     const tiles = this._tiler.getTiles(viewport).tiles;
 
     // Abort inflight requests that are no longer needed..
-    const spatialID = `mapwithai-${datasetID}`;
-    const neededIDs = new Set<RequestID>(tiles.map(tile => `${spatialID}-${tile.id}`));
-    network.abortMatching(id => id.startsWith(spatialID) && !neededIDs.has(id));
+    const prefix = `mapwithai-${datasetID}-tile`;
+    const neededIDs = new Set<RequestID>(tiles.map(tile => `${prefix}-${tile.id}`));
+    network.abortMatching(id => id.startsWith(prefix) && !neededIDs.has(id));
 
     for (const tile of tiles) {
-      this.loadTile(ds, tile);
+      this._loadTile(ds, tile);
     }
   }
 
 
   /**
-   * Load a single tile of data
-   * @param ds - the dataset info
-   * @param tile - a tile object
+   * Get available data for a given dataset and tile.
+   * @param ds - the dataset to fetch the data for
+   * @param tile - the tile to fetch the data for
    */
-  public loadTile(ds: MapWithAIDataset, tile: Tile): void {
+  protected _loadTile(ds: MapWithAIDataset, tile: Tile): void {
     if (!ds || this._paused) return;
 
     const context = this.context;
     const locations = context.systems.locations;
     const network = context.systems.network!;
-    const spatial = context.systems.spatial!;
 
-    const tileID = tile.id;
-    const datasetID = ds.id;
-    const spatialID = `mapwithai-${datasetID}`;
-    const requestID = `${spatialID}-${tileID}`;
-
-    // already loaded, or inflight?
-    if (spatial.hasTile(spatialID, tileID) || network.isInflight(requestID)) return;
-    if (datasetID === 'rapid_intro_graph') return;   // merged separately, not loaded from network
+    const requestID = `mapwithai-${ds.id}-tile-${tile.id}`;
+    if (network.isCompleted(requestID) || network.isInflight(requestID)) return;
+    if (ds.id === 'rapid_intro_graph') return;   // merged separately, not loaded from network
 
     if (locations) {
-      // Exit if this tile covers a blocked region (all corners are blocked)
+      // Skip if this tile covers a blocked region (all corners are blocked)
       const corners = tile.wgs84Extent.polygon().slice(0, 4);
       const tileBlocked = corners.every(loc => locations.isBlockedAt(loc));
       if (tileBlocked) {
-        spatial.addTiles(spatialID, [tile]);   // don't retry
+        network.markCompleted(requestID);  // don't try again (blocked region)
         return;
       }
     }
@@ -303,21 +301,21 @@ export class MapWithAIService extends AbstractSystem {
       listenerID: 'network:fetchAndParseOsmXml',
       listenerData: { parserOptions: { skipSeen: false, filter: ['node', 'way'] } },
     })
-      .then(results => this._gotTile(results, ds, tile))
+      .then(results => this._gotTile(ds, results))
       .catch(e => {
         if (e.name === 'AbortError') return;
         console.error(e);  // eslint-disable-line
+        network.forget(requestID);   // allow retry on error
       });
   }
 
 
   /**
-   * Process the parsed results from a tile fetch.
+   * Process the results of a fetched tile.
+   * @param ds - the dataset we fetched
    * @param results - the parsed data from OsmXMLParser
-   * @param ds - the dataset info
-   * @param tile - a tile object
    */
-  protected _gotTile(results: ParserResult, ds: MapWithAIDataset, tile: Tile): void {
+  protected _gotTile(ds: MapWithAIDataset, results: ParserResult): void {
     if (!results) return;  // ignore empty responses
 
     const context = this.context;
@@ -325,8 +323,6 @@ export class MapWithAIService extends AbstractSystem {
     const spatial = context.systems.spatial!;
 
     const graph = ds.graph;
-    const datasetID = ds.id;
-    const spatialID = `mapwithai-${datasetID}`;
 
     const entities: OsmEntity[] = [];
     for (const props of results.data) {
@@ -336,7 +332,7 @@ export class MapWithAIService extends AbstractSystem {
       Object.assign(props, {
         __fbid__: entityID,
         __service__: 'mapwithai',
-        __datasetid__: datasetID
+        __datasetid__: ds.id
       });
 
       if (props.type === 'node') {
@@ -386,8 +382,9 @@ export class MapWithAIService extends AbstractSystem {
 
     // important: `graph.rebase` will call `.updateGeometry()`
     graph.rebase(entities, [graph], true);   // true = force replace entities
+
+    const spatialID = `mapwithai-${ds.id}-data`;
     spatial.addData(spatialID, entities);
-    spatial.addTiles(spatialID, [tile]);
     gfx?.deferredRedraw();
   }
 
@@ -414,9 +411,11 @@ export class MapWithAIService extends AbstractSystem {
     const spatial = context.systems.spatial!;
 
     const ds = this.getDataset(datasetID);  // create caches, if needed
-    const spatialID = `mapwithai-${datasetID}`;
 
+    // important: `graph.rebase` will call `.updateGeometry()`
     ds.graph.rebase(entities);
+
+    const spatialID = `mapwithai-${ds.id}-data`;
     spatial.addData(spatialID, entities);
   }
 
@@ -467,7 +466,7 @@ export class MapWithAIService extends AbstractSystem {
     }
 
     const customUrlRoot = urlhash?.getParam('fb_ml_road_url');
-    const urlRoot = customUrlRoot || APIROOT;
+    const urlRoot = customUrlRoot || MWAI_API;
     const url = urlRoot + '?' + MWAIQsString(qs, true);  // true = noencode
     return url;
 

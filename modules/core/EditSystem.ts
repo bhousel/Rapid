@@ -14,25 +14,6 @@ import type { SpatialItem } from './SpatialSystem.ts';
 import type { TransformProps, Vec2 } from '@rapid-sdk/math';
 
 
-/** SpatialID of the OSM spatial cache reflecting the unedited base graph */
-const OSM_BASE: SpatialID = 'osm-base';
-/** SpatialID of the OSM spatial cache reflecting the latest committed (stable) graph */
-const OSM_STABLE: SpatialID = 'osm-stable';
-/** SpatialID of the OSM spatial cache reflecting the work-in-progress (staging) graph */
-const OSM_STAGING: SpatialID = 'osm-staging';
-/** Suffix used for segment spatial caches */
-const SEGMENTS_SUFFIX = '--segments';
-
-/**
- * Return the flat spatialID used for way segments associated with an OSM cache.
- * @param spatialID - base OSM spatialID
- * @return flat segment spatialID
- */
-function segmentSpatialID(spatialID: SpatialID): SpatialID {
-  return `${spatialID}${SEGMENTS_SUFFIX}` as SpatialID;
-}
-
-
 /** Options for commit/commitAppend */
 export interface CommitOptions {
   /** Annotation describing the edit */
@@ -341,13 +322,9 @@ export class EditSystem extends AbstractSystem {
     this._staging = staging;
     this._hasWorkInProgress = false;
 
-    // Clear the OSM spatial caches and segment tracking.
-    const spatial = this.context.systems.spatial;
-    if (spatial) {
-      spatial.clearCache(OSM_BASE);
-      spatial.clearCache(OSM_STABLE);
-      spatial.clearCache(OSM_STAGING);
-    }
+    // Clear the spatial caches.
+    const spatial = this.context.systems.spatial!;
+    spatial.clearMatching(id => id.startsWith('editor_'));
     this._osmSegmentIDs = new Map();
 
     this._stableKey = baseGraph.key;
@@ -815,9 +792,9 @@ export class EditSystem extends AbstractSystem {
     baseGraph.rebase(entities, graphs, false);  // force = false
 
     // Newly downloaded data should appear in every OSM cache (unless locally overridden).
-    this._mergeIntoCache(OSM_BASE, baseGraph, entities);
-    this._mergeIntoCache(OSM_STABLE, this.stable.graph!, entities);
-    this._mergeIntoCache(OSM_STAGING, this.staging.graph!, entities);
+    this._mergeIntoCache('editor_base', baseGraph, entities);
+    this._mergeIntoCache('editor_stable', this.stable.graph!, entities);
+    this._mergeIntoCache('editor_staging', this.staging.graph!, entities);
 
     this.emit('merge', effectiveSeenIDs);
   }
@@ -880,9 +857,9 @@ export class EditSystem extends AbstractSystem {
    * @return the matching spatialID; defaults to the staging cache if no match
    */
   public spatialIDForGraph(graph: Graph): SpatialID {
-    if (graph === this.base.graph) return OSM_BASE;
-    if (graph === this.stable.graph) return OSM_STABLE;
-    return OSM_STAGING;
+    if (graph === this.base.graph) return 'editor_base';
+    if (graph === this.stable.graph) return 'editor_stable';
+    return 'editor_staging';
   }
 
 
@@ -893,15 +870,13 @@ export class EditSystem extends AbstractSystem {
    * @return Entities visible in the current map view
    */
   public intersects(graph?: Graph): OsmEntity[] {
-    const spatial = this.context.systems.spatial;
-    if (!spatial) return [];
-
+    const spatial = this.context.systems.spatial!;
     const useGraph = graph ?? this.staging.graph!;
     const spatialID = this.spatialIDForGraph(useGraph);
 
     const results: OsmEntity[] = [];
-    for (const hit of spatial.getVisibleData(spatialID)) {
-      const entity = useGraph.hasEntity(hit.boxID);
+    for (const hit of spatial.getVisibleItems(spatialID)) {
+      const entity = useGraph.hasEntity(hit.id);
       if (entity) results.push(entity);
     }
     return results;
@@ -919,8 +894,6 @@ export class EditSystem extends AbstractSystem {
     const spatial = this.context.systems.spatial;
     if (!spatial) return [];
 
-    const spatialID = this.spatialIDForGraph(graph);
-
     // Convert the WGS84 query extent to a world-coordinate box.
     const bb = extent.bbox();
     const [ax, ay] = projWgs84ToWorld([bb.minX, bb.minY]);
@@ -930,7 +903,8 @@ export class EditSystem extends AbstractSystem {
       maxX: Math.max(ax, bx), maxY: Math.max(ay, by)
     };
 
-    return spatial.getItemsAtBox(segmentSpatialID(spatialID), box).map(hit => hit.contents as Segment);
+    const segSpatialID = this.spatialIDForGraph(graph) + '-segments';
+    return spatial.getItemsAtBox(segSpatialID, box).map(hit => hit.contents as Segment);
   }
 
 
@@ -1351,9 +1325,9 @@ export class EditSystem extends AbstractSystem {
       baseGraph.rebase(baseEntities, [baseGraph], true);   // force = true
 
       // Seed every OSM cache with the restored base data.
-      this._mergeIntoCache(OSM_BASE, baseGraph, baseEntities);
-      this._mergeIntoCache(OSM_STABLE, this.stable.graph!, baseEntities);
-      this._mergeIntoCache(OSM_STAGING, this.staging.graph!, baseEntities);
+      this._mergeIntoCache('editor_base', baseGraph, baseEntities);
+      this._mergeIntoCache('editor_stable', this.stable.graph!, baseEntities);
+      this._mergeIntoCache('editor_staging', this.staging.graph!, baseEntities);
 
       // Reconstruct the edit history, each Graph derives from the previous one..
       // Start at i = 1, leaving base edit alone, the first edit will have nothing in it.
@@ -1591,7 +1565,7 @@ export class EditSystem extends AbstractSystem {
    * Update an OSM spatial cache to reflect the changes in a `Difference`.
    * Called immediately before emitting the corresponding change event, so that
    *  listeners can rely on the spatial cache being current.
-   * @param spatialID - the OSM spatial cache to update (e.g. 'osm-staging' or 'osm-stable')
+   * @param spatialID - the OSM spatial cache to update (e.g. 'editor_staging' or 'editor_stable')
    * @param graph - the head graph of the difference (staging or stable)
    * @param diff - the difference to apply
    */
@@ -1613,7 +1587,7 @@ export class EditSystem extends AbstractSystem {
       }
     }
 
-    spatial.removeData(spatialID, toRemove);
+    spatial.removeItems(spatialID, toRemove);
     spatial.replaceData(spatialID, toReplace);
 
     // Keep way segments in sync for any affected ways.
@@ -1645,7 +1619,7 @@ export class EditSystem extends AbstractSystem {
       if (current?.visible) {
         toReplace.push(current);
       } else {
-        spatial.removeData(spatialID, entity.id);
+        spatial.removeItems(spatialID, entity.id);
         this._removeWaySegments(spatialID, entity.id);
       }
     }
@@ -1694,7 +1668,9 @@ export class EditSystem extends AbstractSystem {
         [Math.min(ax, bx), Math.min(ay, by)],
         [Math.max(ax, bx), Math.max(ay, by)]
       );
-      items.push({ id: seg.id, extent, contents: seg });
+
+      const item = Object.assign({ id: seg.id, contents: seg }, extent.bbox()) as SpatialItem;
+      items.push(item);
     }
     return items;
   }
@@ -1713,7 +1689,7 @@ export class EditSystem extends AbstractSystem {
 
     const tracker = this._segmentTracker(spatialID);
     const prevIDs = tracker.get(way.id);
-    const segSpatialID = segmentSpatialID(spatialID);
+    const segSpatialID = spatialID + '-segments';
     if (prevIDs?.length) {
       spatial.removeItems(segSpatialID, prevIDs);
     }
@@ -1740,7 +1716,7 @@ export class EditSystem extends AbstractSystem {
 
     const tracker = this._segmentTracker(spatialID);
     const prevIDs = tracker.get(wayID);
-    const segSpatialID = segmentSpatialID(spatialID);
+    const segSpatialID = spatialID + '-segments';
     if (prevIDs?.length) {
       spatial.removeItems(segSpatialID, prevIDs);
     }
@@ -1765,7 +1741,7 @@ export class EditSystem extends AbstractSystem {
     // We still want to generate an empty Difference and emit 'stagingchange' in these situations.
     if (this._stagingKey !== stagingGraph.key || this._hasWorkInProgress) {
       stagingDifference = new Difference(this._stagingSnapshot!, stagingGraph);
-      this._syncCacheFromDiff(OSM_STAGING, stagingGraph, stagingDifference);
+      this._syncCacheFromDiff('editor_staging', stagingGraph, stagingDifference);
       this._stagingKey = stagingGraph.key;
       this._stagingSnapshot = stagingGraph.snapshot();
       this.emit('stagingchange', stagingDifference);
@@ -1774,7 +1750,7 @@ export class EditSystem extends AbstractSystem {
     if (this._stableKey !== stableGraph.key) {
       this._fullDifference = new Difference(baseGraph, stableGraph);
       const stableDifference = new Difference(this._stableSnapshot!, stableGraph);
-      this._syncCacheFromDiff(OSM_STABLE, stableGraph, stableDifference);
+      this._syncCacheFromDiff('editor_stable', stableGraph, stableDifference);
       this._stableKey = stableGraph.key;
       this._stableSnapshot = stableGraph.snapshot();
       this.emit('stablechange', stableDifference);

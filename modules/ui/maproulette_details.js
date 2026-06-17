@@ -72,7 +72,7 @@ export function uiMapRouletteDetails(context) {
       // Tasks have a featureCollection. Usually there is only one feature, but we still have to handle multiple.
       // In case properties are duplicated between features, we take the last value. I don't expect this to happen or be an issue.
       const allProperties = new Map();
-      task.props.taskFeatures.map(f => f.properties).forEach(properties => {
+      task.props.features.map(f => f.properties).forEach(properties => {
         Object.keys(properties).forEach(key => {
           allProperties.set(key, properties[key]);
         });
@@ -138,7 +138,7 @@ export function uiMapRouletteDetails(context) {
       .merge($$details);
 
 
-    maproulette.loadTaskDetailAsync(_marker).then(task => {
+    maproulette.loadCompleteTaskAsync(_marker).then(task => {
       if (!task) return;
       if (_marker.id !== task.id) return;
 

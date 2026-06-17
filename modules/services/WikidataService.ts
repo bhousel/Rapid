@@ -59,6 +59,7 @@ export class WikidataService extends AbstractSystem {
    * @return Promise resolved when this component has completed resetting
    */
   public resetAsync(): Promise<void> {
+    // note: no need to clear network requests here - they can persist across sessions.
     this._cache.clear();
     return Promise.resolve();
   }

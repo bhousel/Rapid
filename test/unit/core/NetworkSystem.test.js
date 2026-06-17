@@ -252,7 +252,7 @@ describe('NetworkSystem', () => {
   // -- deduplication --
 
   describe('deduplication', () => {
-    it('returns the same promise for duplicate keys', async () => {
+    it('dedups duplicate keys into a single network request', async () => {
       const mockFetch = mock(() =>
         Promise.resolve(new Response(JSON.stringify({ id: 1 }), {
           headers: { 'content-type': 'application/json' },
@@ -262,9 +262,10 @@ describe('NetworkSystem', () => {
 
       const prom1 = _network.fetch('https://example.com/dedup.json', { timeout: 0 });
       const prom2 = _network.fetch('https://example.com/dedup.json', { timeout: 0 });
-      assert.strictEqual(prom1, prom2);
-      assert.strictEqual(mockFetch.mock.calls.length, 1);
-      await prom1;
+      const [r1, r2] = await Promise.all([prom1, prom2]);
+      assert.deepStrictEqual(r1, r2);
+      assert.deepStrictEqual(r1, { id: 1 });
+      assert.strictEqual(mockFetch.mock.calls.length, 1);  // only one network request
     });
   });
 
@@ -415,6 +416,132 @@ describe('NetworkSystem', () => {
   });
 
 
+  // -- completed / isCompleted / getStatus / markCompleted / forget --
+
+  describe('completed tracking', () => {
+    it('records a successfully completed request with its HTTP status', async () => {
+      const mockFetch = mock(() =>
+        Promise.resolve(new Response('{}', { status: 200, headers: { 'content-type': 'application/json' } }))
+      );
+      globalThis.fetch = mockFetch;
+
+      assert.isFalse(_network.isCompleted('osm-tile-1'));
+      await _network.fetch('https://example.com/data', { requestID: 'osm-tile-1', timeout: 0 });
+      assert.isTrue(_network.isCompleted('osm-tile-1'));
+      assert.strictEqual(_network.getStatus('osm-tile-1'), 200);
+    });
+
+    it('records an HTTP-error request with its status (so it is "completed")', async () => {
+      const mockFetch = mock(() =>
+        Promise.resolve(new Response('Not Found', { status: 404, statusText: 'Not Found' }))
+      );
+      globalThis.fetch = mockFetch;
+
+      await _network.fetch('https://example.com/missing', { requestID: 'osm-tile-404', timeout: 0 })
+        .catch(() => { /* fetch() throws FetchError on http-error */ });
+
+      assert.isTrue(_network.isCompleted('osm-tile-404'));
+      assert.strictEqual(_network.getStatus('osm-tile-404'), 404);
+    });
+
+    it('does not record an aborted request', async () => {
+      const mockFetch = mock((url, init) => {
+        return new Promise((resolve, reject) => {
+          const onAbort = () => { const err = new Error('Aborted'); err.name = 'AbortError'; reject(err); };
+          if (init?.signal?.aborted) { onAbort(); return; }
+          init?.signal?.addEventListener('abort', onAbort, { once: true });
+        });
+      });
+      globalThis.fetch = mockFetch;
+
+      const prom = _network.fetch('https://example.com/data', { requestID: 'osm-tile-2', timeout: 0 });
+      _network.abort('osm-tile-2');
+      await Promise.allSettled([prom]);
+      assert.isFalse(_network.isCompleted('osm-tile-2'));
+      assert.isUndefined(_network.getStatus('osm-tile-2'));
+    });
+
+    it('markCompleted records a skipped request without sending it', () => {
+      assert.isFalse(_network.isCompleted('skip-1'));
+      _network.markCompleted('skip-1');
+      assert.isTrue(_network.isCompleted('skip-1'));
+      assert.strictEqual(_network.getStatus('skip-1'), -1);  // STATUS_SKIPPED
+    });
+
+    it('markCompleted accepts an explicit status', () => {
+      _network.markCompleted('skip-2', 204);
+      assert.strictEqual(_network.getStatus('skip-2'), 204);
+    });
+
+    it('forget removes a recorded request so it can be retried', () => {
+      _network.markCompleted('forget-1');
+      assert.isTrue(_network.isCompleted('forget-1'));
+      _network.forget('forget-1');
+      assert.isFalse(_network.isCompleted('forget-1'));
+      assert.isUndefined(_network.getStatus('forget-1'));
+    });
+  });
+
+
+  // -- clearAll --
+
+  describe('clearAll', () => {
+    it('aborts inflight requests and clears the completed set', async () => {
+      const mockFetch = mock(() =>
+        Promise.resolve(new Response('{}', { headers: { 'content-type': 'application/json' } }))
+      );
+      globalThis.fetch = mockFetch;
+
+      await _network.fetch('https://example.com/a', { requestID: 'a', timeout: 0 });
+      assert.isTrue(_network.isCompleted('a'));
+
+      _network.clearAll();
+      assert.isFalse(_network.isCompleted('a'));
+    });
+  });
+
+
+  // -- clearMatching --
+
+  describe('clearMatching', () => {
+    it('clears only completed requests matching the predicate', async () => {
+      const mockFetch = mock(() =>
+        Promise.resolve(new Response('{}', { headers: { 'content-type': 'application/json' } }))
+      );
+      globalThis.fetch = mockFetch;
+
+      await _network.fetch('https://example.com/1', { requestID: 'osm-tile-1', timeout: 0 });
+      await _network.fetch('https://example.com/2', { requestID: 'osm-tile-2', timeout: 0 });
+      await _network.fetch('https://example.com/3', { requestID: 'esri-tile-1', timeout: 0 });
+
+      _network.clearMatching(id => id.startsWith('osm-'));
+
+      assert.isFalse(_network.isCompleted('osm-tile-1'));
+      assert.isFalse(_network.isCompleted('osm-tile-2'));
+      assert.isTrue(_network.isCompleted('esri-tile-1'));  // not matched, retained
+    });
+
+    it('passes the full requestID to the predicate (not a substring)', async () => {
+      // Regression: iterating the `completed` Map must yield full requestID keys.
+      // A buggy `for (const id of completed)` iterates [key, value] entries (or a
+      // buggy `for (const [id] of completed)` over a Set destructures each string to
+      // its first character), so the predicate would never match.
+      const mockFetch = mock(() =>
+        Promise.resolve(new Response('{}', { headers: { 'content-type': 'application/json' } }))
+      );
+      globalThis.fetch = mockFetch;
+
+      await _network.fetch('https://example.com/1', { requestID: 'osm-tile-1', timeout: 0 });
+      await _network.fetch('https://example.com/2', { requestID: 'osmose-tile-1', timeout: 0 });
+
+      _network.clearMatching(id => id.startsWith('osm-'));
+
+      assert.isFalse(_network.isCompleted('osm-tile-1'));    // 'osm-' prefix matched
+      assert.isTrue(_network.isCompleted('osmose-tile-1'));  // 'osmose-' must NOT match 'osm-'
+    });
+  });
+
+
   // -- fetchRaw --
 
   describe('fetchRaw', () => {
@@ -437,8 +564,8 @@ describe('NetworkSystem', () => {
 
       const prom1 = _network.fetchRaw('https://example.com/raw', { timeout: 0 });
       const prom2 = _network.fetchRaw('https://example.com/raw', { timeout: 0 });
-      assert.strictEqual(prom1, prom2);
-      await prom1;
+      await Promise.all([prom1, prom2]);
+      assert.strictEqual(mockFetch.mock.calls.length, 1);  // only one network request
     });
   });
 
@@ -577,7 +704,8 @@ describe('NetworkSystem', () => {
         await network.initAsync();
         await network.startAsync();
 
-        worker.registerListener('test:echo', (payload, signal) => Promise.resolve({ payload, aborted: signal.aborted }));
+        worker.registerListener('test:echo', (payload, signal) =>
+          Promise.resolve({ ok: true, status: 200, value: { payload, aborted: signal.aborted } }));
 
         const result = await network.fetch('https://example.com/listener', {
           listenerID: 'test:echo',
@@ -606,7 +734,7 @@ describe('NetworkSystem', () => {
       const network = new Rapid.NetworkSystem(context);
 
       worker.dispatch = mock((listenerID, payload, signal, options) => {
-        return Promise.resolve({ listenerID, payload, hasSignal: signal instanceof AbortSignal, options });
+        return Promise.resolve({ ok: true, status: 200, value: { listenerID, payload, hasSignal: signal instanceof AbortSignal, options } });
       });
 
       context.systems.worker = worker;

@@ -128,7 +128,7 @@ export class VectorTileService extends AbstractSystem {
    */
   public resetAsync(): Promise<void> {
     const network = this.context.systems.network!;
-    network.abortMatching(id => id.startsWith('vt-'));
+    network.clearMatching(id => id.startsWith('vt-'));
 
     for (const source of this._sources.values()) {
       for (const controller of source.inflightPMTiles.values()) {

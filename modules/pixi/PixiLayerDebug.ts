@@ -74,11 +74,16 @@ export class PixiLayerDebug extends AbstractPixiLayer {
 
     const parentContainer = this.scene.groups.get('debug-under')!;
 
+    const msSpatialID = 'mapwithai-msBuildings-data';
+    const osmSpatialID = editor.spatialIDForGraph(graph);
+
     // Gather visible Microsoft Buildings
-    const msData = spatial.getVisibleData('mapwithai-msBuildings').filter(hit => _isBuilding(hit.contents as OsmEntity));
+    const search = context.viewport.visibleWorldExtent().bbox();
+    const msData = spatial.getItemsAtBox(msSpatialID, search)
+      .filter(hit => _isBuilding(hit.contents as OsmEntity));
+
     for (const hit of msData) {
-      // note - the spatialID of 'osm-data' here is currently set by OsmService
-      if (!spatial.hasTileAtBox('osm-data', hit)) continue;  // Is osm data loaded here?
+      if (!spatial.hasItemsAtBox(osmSpatialID, hit)) continue;  // Is osm data loaded here?
 
       const data = hit.contents as OsmEntity;
       // if (data.type !== 'way') continue;  // consider ways only (not the nodes at the corners)
@@ -112,8 +117,7 @@ export class PixiLayerDebug extends AbstractPixiLayer {
           const style = structuredClone(DEFAULTSTYLE);
           const box: BBox = { minX: worldPoi![0], minY: worldPoi![1], maxX: worldPoi![0], maxY: worldPoi![1] };
           // does this test point hit an OSM building?
-          const spatialID = editor.spatialIDForGraph(graph);
-          const didHitBuilding = spatial.getDataAtBox(spatialID, box).some(hit => _isBuilding(hit.contents as OsmEntity));
+          const didHitBuilding = spatial.getItemsAtBox(osmSpatialID, box).some(hit => _isBuilding(hit.contents as OsmEntity));
 
           if (didHitBuilding) {
             // console.log(`${dataID} id hit osm building ${didHitBuilding.contents.id}`);

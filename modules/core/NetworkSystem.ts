@@ -1,8 +1,9 @@
 import { AbstractSystem } from './AbstractSystem.ts';
 import { networkListeners } from './NetworkSystem.worker.ts';
-import { utilFetchResponse } from '../util/fetch_response.ts';
+import { FetchError, fetchEnvelope, utilFetchResponse } from '../util/fetch_response.ts';
 
 import type { Context } from '../Context.ts';
+import type { FetchEnvelope } from '../util/fetch_response.ts';
 import type { DispatchOptions } from './WorkerSystem.ts';
 
 
@@ -63,8 +64,8 @@ interface InflightRequest<T = unknown> {
   requestID: RequestID;
   /** The AbortController for this request */
   controller: AbortController;
-  /** The in-progress promise (for dedup — second caller gets same promise) */
-  promise: Promise<T>;
+  /** The in-progress envelope promise (for dedup — second caller gets same promise) */
+  promise: Promise<FetchEnvelope<T>>;
   /** Timestamp when the request was created (for diagnostics) */
   created: number;
 }
@@ -90,6 +91,19 @@ const DEFAULT_TIMEOUT = 30_000;
 
 /** Default maximum concurrent inflight requests */
 const DEFAULT_MAX_INFLIGHT = 100;
+
+/**
+ * Sentinel status recorded in `completed` for a request that was never sent over
+ * the network (e.g. a tile skipped because it covers a blocked region).
+ */
+export const STATUS_SKIPPED = -1;
+
+/**
+ * Sentinel status recorded in `completed` for a request that failed without a
+ * usable HTTP status (e.g. a transport/DNS failure, or a worker error whose
+ * status was lost crossing the worker boundary).
+ */
+export const STATUS_ERROR = 0;
 
 
 /**
@@ -119,7 +133,13 @@ const DEFAULT_MAX_INFLIGHT = 100;
  * - `resumed`  Fires when the system transitions from paused to unpaused
  */
 export class NetworkSystem extends AbstractSystem {
-
+  /**
+   * All settled requests that used an explicit `requestID`, mapped to their outcome status.
+   * The status is the HTTP status code, or one of the `STATUS_*` sentinels
+   * (`STATUS_SKIPPED` for requests never sent, `STATUS_ERROR` for failures with
+   * no usable HTTP status).  Aborted requests are *not* recorded.
+   */
+  protected _completed: Map<RequestID, number>;
   /** All currently inflight requests, keyed by requestID */
   protected _inflight: Map<RequestID, InflightRequest>;
   /** FIFO queue for requests waiting on a concurrency slot */
@@ -144,6 +164,7 @@ export class NetworkSystem extends AbstractSystem {
     this.requiredDependencies = new Set<SystemID>();
     this.optionalDependencies = new Set<SystemID>(['worker']);
 
+    this._completed = new Map<RequestID, number>();
     this._inflight = new Map<RequestID, InflightRequest>();
     this._queue = [];
     this._numActive = 0;
@@ -188,13 +209,13 @@ export class NetworkSystem extends AbstractSystem {
 
 
   /**
-   * Aborts all inflight requests and clears the queue.
+   * Aborts all inflight requests, and clears the queue, and the completed requests.
    * @return Promise resolved when this component has completed resetting
    */
   public resetAsync(): Promise<void> {
     const worker = this.context.systems.worker;
 
-    this.abortAll();
+    this.clearAll();
 
     if (worker?.workerURL) {
       return worker.dispatch<void>('network:reset');
@@ -270,11 +291,57 @@ export class NetworkSystem extends AbstractSystem {
   /**
    * Returns true if a request with the given requestID is currently tracked
    * (either active or queued).
-   * @param requestID - The dedup/cancellation identifier
+   * @param requestID - The request identifier
    * @return  `true` if the request is currently inflight
    */
   public isInflight(requestID: RequestID): boolean {
     return this._inflight.has(requestID);
+  }
+
+
+  /**
+   * Returns true if a request with the given requestID has settled (succeeded,
+   * failed with an HTTP error, or was skipped).  Aborted requests are not recorded.
+   * @param requestID - The request identifier
+   * @return  `true` if the request has settled
+   */
+  public isCompleted(requestID: RequestID): boolean {
+    return this._completed.has(requestID);
+  }
+
+
+  /**
+   * Returns the recorded outcome status for a settled request, or `undefined`
+   * if the request has not settled.  The status is an HTTP status code, or one
+   * of the `STATUS_*` sentinels.
+   * @param requestID - The request identifier
+   * @return  The recorded status, or `undefined`
+   */
+  public getStatus(requestID: RequestID): number | undefined {
+    return this._completed.get(requestID);
+  }
+
+
+  /**
+   * Manually mark a request as completed without sending it.
+   * Used by callers to skip a request they don't want to issue (e.g. a tile
+   * covering a blocked region).  Defaults to the `STATUS_SKIPPED` sentinel.
+   * @param requestID - The request identifier
+   * @param status - The status to record (default `STATUS_SKIPPED`)
+   */
+  public markCompleted(requestID: RequestID, status: number = STATUS_SKIPPED): void {
+    this._completed.set(requestID, status);
+  }
+
+
+  /**
+   * Forget a recorded request so that it may be issued again.
+   * Used by callers that want to retry a request that settled with an error.
+   * No-op if the requestID is not recorded.
+   * @param requestID - The request identifier
+   */
+  public forget(requestID: RequestID): void {
+    this._completed.delete(requestID);
   }
 
 
@@ -286,35 +353,48 @@ export class NetworkSystem extends AbstractSystem {
    * - Worker offloading (when worker + workerURL are available)
    * - Response parsing via `utilFetchResponse`
    * - Concurrency limiting
+   * - Outcome recording into `completed`
    *
    * Rejection behavior:
    * - `AbortError` for expected cancellation paths (manual abort, timeout,
    *   or reset-related cancellation)
-   * - Other errors for true failures (network, parse, missing listener, etc.)
+   * - `FetchError` for HTTP errors (carries `status`/`statusText`/`body`)
+   * - Other errors for true failures (transport, parse, missing listener, etc.)
    *
-   * If using the `resultPriority` option, results may be deferred through
-   * `SchedulerSystem` and can also reject with `AbortError` if the deferred
-   * task is cancelled before it runs.
+   * Callers that want to branch on HTTP status *without* a try/catch should use
+   * `fetchEnvelope()` instead.
    *
    * @param url - The URL to fetch
    * @param options - Fetch options + NetworkSystem extensions
    * @return The parsed response
    */
   public fetch<T = unknown>(url: string, options?: NetworkFetchOptions): Promise<T> {
-    const method = (options?.method ?? 'GET').toUpperCase();
-    const requestID = options?.requestID ?? `${method} ${url}`;
-    const timeout = options?.timeout ?? this._defaultTimeout;
+    return this._getOrDispatch<T>(url, options).then(env => {
+      if (env.ok) return env.value;
+      throw new FetchError({
+        status: env.status,
+        statusText: env.statusText,
+        message: env.message,
+        body: env.body
+      });
+    });
+  }
 
-    // Dedup: if same requestID is already inflight, return existing promise
-    const existing = this._inflight.get(requestID);
-    if (existing) return existing.promise as Promise<T>;
 
-    const controller = new AbortController();
-    const signal = this._createCombinedSignal(controller, timeout);
-    const dispatch = (): Promise<T> => this._dispatchFetch<T>(url, signal, options);
-
-    const promise = this._trackAndDispatch<T>(requestID, controller, dispatch);
-    return promise;
+  /**
+   * Like `fetch`, but resolves with a `FetchEnvelope` instead of unwrapping it.
+   * HTTP errors resolve with `{ ok: false, status, ... }` rather than throwing,
+   * so callers can branch on status codes without a try/catch.  `AbortError`
+   * and transport failures still reject.
+   *
+   * Inflight tracking, dedup, timeout, abort, and outcome recording all apply.
+   *
+   * @param url - The URL to fetch
+   * @param options - Fetch options + NetworkSystem extensions
+   * @return  A `FetchEnvelope` describing the outcome
+   */
+  public fetchEnvelope<T = unknown>(url: string, options?: NetworkFetchOptions): Promise<FetchEnvelope<T>> {
+    return this._getOrDispatch<T>(url, options);
   }
 
 
@@ -323,11 +403,10 @@ export class NetworkSystem extends AbstractSystem {
    * parsing through `utilFetchResponse`.  Useful for binary data,
    * streams, or when the caller needs response headers.
    *
-   * Inflight tracking, dedup, timeout, and abort still apply.
-   * Always runs on main thread (no worker dispatch).
-   *
-   * Rejects with `AbortError` for expected cancellation paths
-   * (manual abort, timeout, reset-related cancellation).
+   * Inflight tracking, dedup, timeout, abort, and outcome recording still apply.
+   * Always runs on main thread (no worker dispatch).  Unlike `fetch`, HTTP
+   * errors do *not* reject — the raw `Response` is returned for the caller to
+   * inspect.  Rejects with `AbortError` for expected cancellation paths.
    *
    * @param url - The URL to fetch
    * @param options - Fetch options + NetworkSystem extensions
@@ -337,21 +416,53 @@ export class NetworkSystem extends AbstractSystem {
     const method = (options?.method ?? 'GET').toUpperCase();
     const requestID = options?.requestID ?? `${method} ${url}`;
     const timeout = options?.timeout ?? this._defaultTimeout;
+    const trackCompleted = options?.requestID !== undefined;
 
     // Dedup
     const existing = this._inflight.get(requestID);
-    if (existing) return existing.promise as Promise<Response>;
+    if (existing) {
+      return (existing.promise as Promise<FetchEnvelope<Response>>).then(env => (env as { value: Response }).value);
+    }
 
     const controller = new AbortController();
     const signal = this._createCombinedSignal(controller, timeout);
-    const dispatch = (): Promise<Response> => {
+    const dispatch = async (): Promise<FetchEnvelope<Response>> => {
       const fetchFn = options?.fetchFn ?? globalThis.fetch;
       const init = this._applyInterceptors(url, this._buildInit(options, signal));
-      return fetchFn(url, init);
+      const response = await fetchFn(url, init);
+      // Raw fetches treat any received Response as a completion (the caller
+      // inspects `response.status` itself), so always wrap as `ok: true`.
+      return { ok: true, status: response.status, value: response };
     };
 
-    const promise = this._trackAndDispatch<Response>(requestID, controller, dispatch);
-    return promise;
+    return this._trackAndDispatch<Response>(requestID, controller, dispatch, trackCompleted)
+      .then(env => (env as { value: Response }).value);
+  }
+
+
+  /**
+   * Dedup helper shared by `fetch` and `fetchEnvelope`.  Returns the shared
+   * `FetchEnvelope` promise for the requestID — either the existing inflight
+   * one, or a freshly dispatched one.
+   * @param url - The URL to fetch
+   * @param options - Fetch options + NetworkSystem extensions
+   * @return  The shared `FetchEnvelope` promise
+   */
+  protected _getOrDispatch<T>(url: string, options?: NetworkFetchOptions): Promise<FetchEnvelope<T>> {
+    const method = (options?.method ?? 'GET').toUpperCase();
+    const requestID = options?.requestID ?? `${method} ${url}`;
+    const timeout = options?.timeout ?? this._defaultTimeout;
+
+    // Dedup: if same requestID is already inflight, return existing promise
+    const existing = this._inflight.get(requestID);
+    if (existing) return existing.promise as Promise<FetchEnvelope<T>>;
+
+    const controller = new AbortController();
+    const signal = this._createCombinedSignal(controller, timeout);
+    const dispatch = (): Promise<FetchEnvelope<T>> => this._dispatchFetch<T>(url, signal, options);
+    const trackCompleted = options?.requestID !== undefined;
+
+    return this._trackAndDispatch<T>(requestID, controller, dispatch, trackCompleted);
   }
 
 
@@ -400,6 +511,28 @@ export class NetworkSystem extends AbstractSystem {
       if (predicate(this._queue[i].requestID)) {
         this._queue[i].controller.abort();
         this._queue.splice(i, 1);
+      }
+    }
+  }
+
+  /**
+   * Clears all inflight, queued, and completed requests.
+   */
+  public clearAll(): void {
+    this.abortAll();
+    this._completed.clear();
+  }
+
+  /**
+   * Clears inflight, queued, and completed requests that match a predicate.
+   * @param predicate - Function that returns true for requestIDs to abort
+   */
+  public clearMatching(predicate: (requestID: RequestID) => boolean): void {
+    this.abortMatching(predicate);
+
+    for (const requestID of this._completed.keys()) {
+      if (predicate(requestID)) {
+        this._completed.delete(requestID);
       }
     }
   }
@@ -464,27 +597,38 @@ export class NetworkSystem extends AbstractSystem {
    *
    * @param requestID - The dedup/cancellation identifier
    * @param controller - The AbortController for this request
-   * @param dispatch - Callback that performs the actual fetch
-   * @return  A promise that resolves with the dispatched request's result
+   * @param dispatch - Callback that performs the actual fetch, producing an envelope
+   * @param trackCompleted - If true, record the outcome in `_completed`
+   * @return  A promise that resolves with the request's `FetchEnvelope`
    */
   protected _trackAndDispatch<T>(
     requestID: RequestID,
     controller: AbortController,
-    dispatch: () => Promise<T>,
-  ): Promise<T> {
-    let promise: Promise<T>;
+    dispatch: () => Promise<FetchEnvelope<T>>,
+    trackCompleted: boolean,
+  ): Promise<FetchEnvelope<T>> {
+    const onResolve = trackCompleted
+      ? (env: FetchEnvelope<T>) => this._recordSettled(requestID, env)
+      : (env: FetchEnvelope<T>) => env;
+    const onReject = trackCompleted
+      ? (err: unknown): never => this._recordFailed(requestID, err)
+      : (err: unknown): never => { throw err; };
+
+    let promise: Promise<FetchEnvelope<T>>;
 
     if (this._numActive < this._maxInflight) {
       // Dispatch immediately
       this._numActive++;
-      promise = dispatch().finally(() => {
-        this._numActive--;
-        this._inflight.delete(requestID);
-        this._drainQueue();
-      });
+      promise = dispatch()
+        .then(onResolve, onReject)
+        .finally(() => {
+          this._numActive--;
+          this._inflight.delete(requestID);
+          this._drainQueue();
+        });
     } else {
       // Queue for later dispatch
-      promise = new Promise<T>((resolve, reject) => {
+      promise = new Promise<FetchEnvelope<T>>((resolve, reject) => {
         if (controller.signal.aborted) {
           const err = new Error('The operation was aborted.');
           err.name = 'AbortError';
@@ -497,7 +641,8 @@ export class NetworkSystem extends AbstractSystem {
           controller,
           run: () => {
             this._numActive++;
-            dispatch()
+          dispatch()
+              .then(onResolve, onReject)
               .finally(() => {
                 this._numActive--;
                 this._inflight.delete(requestID);
@@ -524,6 +669,37 @@ export class NetworkSystem extends AbstractSystem {
     this._inflight.set(requestID, inflight);
 
     return promise;
+  }
+
+
+  /**
+   * Records a settled request's status in `completed` and returns the envelope.
+   * Called for both successful and HTTP-error envelopes (both carry a status).
+   * @param requestID - The request identifier
+   * @param env - The settled `FetchEnvelope`
+   * @return  The same envelope, for chaining
+   */
+  protected _recordSettled<T>(requestID: RequestID, env: FetchEnvelope<T>): FetchEnvelope<T> {
+    this._completed.set(requestID, env.status);
+    return env;
+  }
+
+
+  /**
+   * Records a failed request's status in `completed` and re-throws the error.
+   * Aborts are *not* recorded (so they remain retryable).  Other failures
+   * (transport errors, worker-flattened errors, parse errors) record the
+   * error's HTTP status if present, otherwise the `STATUS_ERROR` sentinel.
+   * @param requestID - The request identifier
+   * @param err - The rejection reason
+   * @throws Always re-throws `err`
+   */
+  protected _recordFailed(requestID: RequestID, err: unknown): never {
+    if ((err as { name?: string })?.name !== 'AbortError') {
+      const status = (err as { status?: number })?.status ?? STATUS_ERROR;
+      this._completed.set(requestID, status);
+    }
+    throw err;
   }
 
 
@@ -603,13 +779,13 @@ export class NetworkSystem extends AbstractSystem {
    * @param url - The URL to fetch
    * @param signal - The abort signal for this request
    * @param options - Fetch options + NetworkSystem extensions
-   * @return  The parsed (or listener-produced) response
+   * @return  The fetch outcome as a `FetchEnvelope`
    */
   protected _dispatchFetch<T>(
     url: string,
     signal: AbortSignal,
     options?: NetworkFetchOptions,
-  ): Promise<T> {
+  ): Promise<FetchEnvelope<T>> {
     const worker = this.context.systems.worker;
 
     const fetchFn = options?.fetchFn;
@@ -636,13 +812,13 @@ export class NetworkSystem extends AbstractSystem {
       const dispatchOpts: DispatchOptions | undefined = resultPriority ? { resultPriority } : undefined;
 
       if (useWorker) {
-        return worker.dispatch<T>(listenerID, payload, signal, dispatchOpts);
+        return worker.dispatch<FetchEnvelope<T>>(listenerID, payload, signal, dispatchOpts);
       }
 
       // Main-thread fallback — call the registered listener directly
       const listener = worker?.getListener(listenerID);
       if (listener) {
-        return Promise.resolve(listener(payload, signal)) as Promise<T>;
+        return Promise.resolve(listener(payload, signal)) as Promise<FetchEnvelope<T>>;
       }
 
       return Promise.reject(new Error(`NetworkSystem: listener '${listenerID}' not registered`));
@@ -650,11 +826,11 @@ export class NetworkSystem extends AbstractSystem {
 
     // Default fetch+parse path
     if (useWorker) {
-      return worker.dispatch<T>('network:fetchAndParse', { url, init }, signal);
+      return worker.dispatch<FetchEnvelope<T>>('network:fetchAndParse', { url, init }, signal);
     } else {
       const actualFetchFn = fetchFn ?? globalThis.fetch;
       init.signal = signal;
-      return actualFetchFn(url, init).then(utilFetchResponse) as Promise<T>;
+      return fetchEnvelope<T>(actualFetchFn, url, init, utilFetchResponse as (r: Response) => Promise<T>);
     }
   }
 

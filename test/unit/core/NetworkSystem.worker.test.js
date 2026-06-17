@@ -42,7 +42,7 @@ describe('NetworkSystem.worker listeners', () => {
       );
 
       const result = await WORKER.fetchAndParse({ url: 'https://example.com/data.json' }, signal);
-      assert.deepStrictEqual(result, { hello: 'world' });
+      assert.deepStrictEqual(result, { ok: true, status: 200, value: { hello: 'world' } });
     });
 
     it('passes RequestInit options to fetch', async () => {
@@ -63,18 +63,16 @@ describe('NetworkSystem.worker listeners', () => {
       assert.strictEqual(headers.get('authorization'), 'Bearer token');
     });
 
-    it('rejects on HTTP error', async () => {
+    it('returns an HTTP-error envelope (does not throw)', async () => {
       originalFetch = globalThis.fetch;
       globalThis.fetch = mock(() =>
         Promise.resolve(new Response('Not Found', { status: 404, statusText: 'Not Found' }))
       );
 
-      try {
-        await WORKER.fetchAndParse({ url: 'https://example.com/dummy' }, signal);
-        assert.fail('should have thrown');
-      } catch (e) {
-        assert.match(e.message, /404/);
-      }
+      const result = await WORKER.fetchAndParse({ url: 'https://example.com/dummy' }, signal);
+      assert.strictEqual(result.ok, false);
+      assert.strictEqual(result.status, 404);
+      assert.match(result.message, /404/);
     });
   });
 
@@ -89,9 +87,9 @@ describe('NetworkSystem.worker listeners', () => {
       );
 
       const result = await WORKER.fetchAndParseOsmJson({ url: 'https://api.openstreetmap.org/api/0.6/map.json' }, signal);
-      assert.isObject(result);
-      assert.isArray(result.data);
-      assert.isAbove(result.data.length, 0, 'should parse at least one element');
+      assert.isTrue(result.ok);
+      assert.isArray(result.value.data);
+      assert.isAbove(result.value.data.length, 0, 'should parse at least one element');
     });
 
     it('passes parser options through', async () => {
@@ -108,7 +106,8 @@ describe('NetworkSystem.worker listeners', () => {
         parserOptions: { skipSeen: false },
       }, signal);
 
-      assert.isArray(result.data);
+      assert.isTrue(result.ok);
+      assert.isArray(result.value.data);
     });
   });
 
@@ -123,9 +122,9 @@ describe('NetworkSystem.worker listeners', () => {
       );
 
       const result = await WORKER.fetchAndParseOsmXml({ url: 'https://api.openstreetmap.org/api/0.6/map' }, signal);
-      assert.isObject(result);
-      assert.isArray(result.data);
-      assert.isAbove(result.data.length, 0, 'should parse at least one element');
+      assert.isTrue(result.ok);
+      assert.isArray(result.value.data);
+      assert.isAbove(result.value.data.length, 0, 'should parse at least one element');
     });
   });
 
@@ -139,10 +138,12 @@ describe('NetworkSystem.worker listeners', () => {
         }))
       );
 
-      const results = await WORKER.fetchAndParseMVT({
+      const result = await WORKER.fetchAndParseMVT({
         url: 'https://tiles.example.com/14/8647/8192.mvt',
         tileXYZ: sample.tileXYZ
       }, signal);
+      assert.isTrue(result.ok);
+      const results = result.value;
       assert.isArray(results);
       assert.isAbove(results.length, 0, 'should have at least one feature');
 
@@ -168,8 +169,9 @@ describe('NetworkSystem.worker listeners', () => {
         url: 'https://tiles.example.com/empty.mvt',
         tileXYZ: sample.tileXYZ
       }, signal);
-      assert.isArray(results);
-      assert.strictEqual(results.length, 0);
+      assert.isTrue(results.ok);
+      assert.isArray(results.value);
+      assert.strictEqual(results.value.length, 0);
     });
 
     it('works with the Mapillary-style multi-layer fixture', async () => {
@@ -180,10 +182,12 @@ describe('NetworkSystem.worker listeners', () => {
         }))
       );
 
-      const results = await WORKER.fetchAndParseMVT({
+      const result = await WORKER.fetchAndParseMVT({
         url: 'https://tiles.example.com/14/8647/8192.mvt',
         tileXYZ: sample.tileXYZ
       }, signal);
+      assert.isTrue(result.ok);
+      const results = result.value;
       assert.isArray(results);
 
       const layerIDs = [...new Set(results.map(r => r.layerID))];
