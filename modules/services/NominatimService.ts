@@ -1,18 +1,9 @@
 import { AbstractSystem } from '../core/AbstractSystem.ts';
 import { Extent } from '@rapid-sdk/math';
-import RBush from 'rbush';
 import { utilQsString } from '@rapid-sdk/util';
 
-import type { BBox } from 'rbush';
 import type { Context } from '../Context.ts';
 import type { Vec2 } from '@rapid-sdk/math';
-
-
-/** RBush item with associated Nominatim result data */
-interface NominatimCacheItem extends BBox {
-  /** Associated Nominatim result data */
-  data: any;
-}
 
 /** Errback-style callback for Nominatim results */
 type NominatimCallback = (err: Error | string | null, result?: any) => void;
@@ -26,8 +17,6 @@ export class NominatimService extends AbstractSystem {
 
   /** Base URL for the Nominatim API */
   public apibase: string;
-  /** Spatial index cache of previously fetched Nominatim results */
-  protected _nominatimCache: RBush<NominatimCacheItem>;
 
 
   /**
@@ -37,11 +26,10 @@ export class NominatimService extends AbstractSystem {
   public constructor(context: Context) {
     super(context);
     this.id = 'nominatim';
-    this.requiredDependencies = new Set<SystemID>(['network']);
+    this.requiredDependencies = new Set<SystemID>(['network', 'spatial']);
     this.optionalDependencies = new Set<SystemID>(['l10n']);
 
     this.apibase = 'https://nominatim.openstreetmap.org/';
-    this._nominatimCache = new RBush<NominatimCacheItem>();
 
     // Ensure methods used as callbacks always have `this` bound correctly.
     this.countryCode = this.countryCode.bind(this);
@@ -74,9 +62,11 @@ export class NominatimService extends AbstractSystem {
    */
   public resetAsync(): Promise<void> {
     const network = this.context.systems.network!;
-    network.clearMatching(id => id.includes(this.apibase));
+    const spatial = this.context.systems.spatial!;
 
-    this._nominatimCache = new RBush<NominatimCacheItem>();
+    network.clearMatching(id => id.includes(this.apibase));
+    spatial.clearCache('nominatim');
+
     return Promise.resolve();
   }
 
@@ -105,12 +95,15 @@ export class NominatimService extends AbstractSystem {
    * @param callback - errback-style callback function to call with results
    */
   public reverse(loc: Vec2, callback: NominatimCallback): void {
-    const cached = this._nominatimCache.search(
-      { minX: loc[0], minY: loc[1], maxX: loc[0], maxY: loc[1] }
-    );
+    const spatial = this.context.systems.spatial!;
+
+    // Note: we are searching and indexing by wgs84 coords here, not world coordinates.
+    // This is ok, but different than how other code that uses SpatialSystem works.
+    const search = { minX: loc[0], minY: loc[1], maxX: loc[0], maxY: loc[1] };
+    const cached = spatial.getItemsAtBox('nominatim', search);
 
     if (cached.length > 0) {
-      if (callback) callback(null, cached[0].data);
+      callback?.(null, cached[0].contents);
       return;
     }
 
@@ -127,13 +120,13 @@ export class NominatimService extends AbstractSystem {
         if (result?.error) {
           throw new Error(result.error);
         }
-        const extent = new Extent(loc).padByMeters(200);
-        this._nominatimCache.insert(Object.assign(extent.bbox(), { data: result }));
-        if (callback) callback(null, result);
+        const bbox = new Extent(loc).padByMeters(200).bbox();
+        spatial.addItems('nominatim', { id: `${loc[0]},${loc[1]}`, contents: result, ...bbox });
+        callback?.(null, result);
       })
       .catch(err => {
         if (err.name === 'AbortError') return;
-        if (callback) callback(err.message);
+        callback?.(err.message);
       });
   }
 
@@ -157,11 +150,11 @@ export class NominatimService extends AbstractSystem {
         if (result?.error) {
           throw new Error(result.error);
         }
-        if (callback) callback(null, result);
+        callback?.(null, result);
       })
       .catch(err => {
         if (err.name === 'AbortError') return;
-        if (callback) callback(err.message);
+        callback?.(err.message);
       });
   }
 

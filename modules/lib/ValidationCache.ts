@@ -1,16 +1,7 @@
-import RBush from 'rbush';
-
-import type { BBox } from 'rbush';
+import type { Context } from '../Context.ts';
 import type { Graph } from './Graph.ts';
 import type { OsmEntity, OsmNode, OsmWay } from '../data/types.ts';
 import type { ValidationIssue } from './ValidationIssue.ts';
-
-
-/** Type for the spatial index box used in RBush */
-export interface RecheckBox extends BBox {
-  /** Issue ID this box belongs to */
-  issueID: IssueID;
-}
 
 
 /**
@@ -21,6 +12,8 @@ export interface RecheckBox extends BBox {
  */
 export class ValidationCache {
 
+  /** Global shared application context */
+  public context: Context;
   /** Identifier for this cache - 'base' or 'head' */
   public which: 'base' | 'head';
   /** The graph being validated */
@@ -37,17 +30,18 @@ export class ValidationCache {
   public issues: Map<IssueID, ValidationIssue>;
   /** Map of entity ID to Set of issue IDs affecting that entity */
   public entityIssueIDs: Map<EntityID, Set<IssueID>>;
-  /** RBush spatial index for connectivity issues */
-  public recheckRBush: RBush<RecheckBox>;
-  /** Map of issue ID to its spatial box */
-  public recheckBoxes: Map<IssueID, RecheckBox>;
+
+  /** SpatialSystem cache id for connectivity recheck regions (WGS84 coords), e.g. 'validation-head' */
+  protected _spatialID: SpatialID;
 
 
   /**
    * @constructor
+   * @param context - Global shared application context
    * @param which - 'base' or 'head' (to identify the cache)
    */
-  public constructor(which: 'base' | 'head') {
+  public constructor(context: Context, which: 'base' | 'head') {
+    this.context = context;
     this.which = which;
     this.graph = null;
     this.queue = [];
@@ -57,11 +51,20 @@ export class ValidationCache {
     this.issues = new Map<IssueID, ValidationIssue>();
     this.entityIssueIDs = new Map<EntityID, Set<IssueID>>();
 
-    // A RBush spatial index that stores 'boxes'.
-    // The boxes mark regions where the involved entities may need to be rechecked
-    // by being part of a impossible oneway or disconnected way routing island.
-    this.recheckRBush = new RBush();
-    this.recheckBoxes = new Map<IssueID, RecheckBox>();
+    // Connectivity recheck regions (impossible_oneway / disconnected_way) are tracked in a
+    // SpatialSystem cache keyed by `_spatialID`.  These boxes are in WGS84 coordinates, so we
+    // only use the box-based query methods (not the world-coordinate convenience helpers).
+    // Start from a clean cache for this instance - ValidationCaches are recreated frequently.
+    this._spatialID = `validation-${which}`;
+    context.systems.spatial!.clearCache(this._spatialID);
+  }
+
+
+  /**
+   * The SpatialSystem cache id used for this cache's connectivity recheck regions.
+   */
+  public get spatialID(): SpatialID {
+    return this._spatialID;
   }
 
 
@@ -70,6 +73,7 @@ export class ValidationCache {
    * @param issue - The ValidationIssue to cache
    */
   public cacheIssue(issue: ValidationIssue): void {
+    const spatial = this.context.systems.spatial!;
     if (this.issues.has(issue.id)) {
       this.uncacheIssue(issue);
     }
@@ -77,9 +81,7 @@ export class ValidationCache {
     if (issue.type === 'disconnected_way' || issue.type === 'impossible_oneway') {
       const extent = issue.extent(this.graph!);
       if (extent) {
-        const box: RecheckBox = Object.assign({ issueID: issue.id }, extent.bbox());
-        this.recheckRBush.insert(box);
-        this.recheckBoxes.set(issue.id, box);
+        spatial.addItems(this._spatialID, { id: issue.id, contents: issue.id, ...extent.bbox() });
       }
     }
 
@@ -100,11 +102,8 @@ export class ValidationCache {
    * @param issue - The ValidationIssue to remove
    */
   public uncacheIssue(issue: ValidationIssue): void {
-    const box = this.recheckBoxes.get(issue.id);
-    if (box) {
-      this.recheckRBush.remove(box);
-      this.recheckBoxes.delete(issue.id);
-    }
+    const spatial = this.context.systems.spatial!;
+    spatial.removeItems(this._spatialID, issue.id);
 
     for (const entityID of issue.entityIds ?? []) {
       const issueIDs = this.entityIssueIDs.get(entityID);
@@ -184,6 +183,7 @@ export class ValidationCache {
     const results = new Set<EntityID>(entityIDs);  // include original entityIDs
     if (!graph || !results.size) return results;   // nothing to do
 
+    const spatial = this.context.systems.spatial!;
     const relatedIssueIDs = new Set<IssueID>();
 
     for (const entityID of entityIDs) {
@@ -200,9 +200,8 @@ export class ValidationCache {
         // Gather nearby connectivity Issues (impossible oneway, disconnected way)
         const extent = (entity as any).extent(graph);
         if (extent) {
-          const boxes = this.recheckRBush.search(extent.bbox()) ?? [];
-          for (const box of boxes) {
-            relatedIssueIDs.add(box.issueID);
+          for (const hit of spatial.getItemsAtBox(this._spatialID, extent.bbox())) {
+            relatedIssueIDs.add(hit.contents as IssueID);
           }
         }
 

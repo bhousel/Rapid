@@ -2,13 +2,12 @@ import * as PIXI from 'pixi.js';
 import { AbstractPixiLayer } from './AbstractPixiLayer.ts';
 import { HALF_PI, TAU, WORLD_HALF, numWrap, vecAdd, vecAngle, vecScale, vecSubtract, geomRotate } from '@rapid-sdk/math';
 import { PixiFeatureLabel } from './PixiFeatureLabel.ts';
-import RBush from 'rbush';
 import { getDebugBBox, lineToPoly } from './helpers.ts';
-import { geomCoverageBoxes } from '../geo/index.ts';
+import { geomLineSegments } from '../geo/index.ts';
 
 import type { AbstractPixiFeature } from './AbstractPixiFeature.ts';
-import type { BBox } from 'rbush';
 import type { PixiFeatureLabelProps, TextLabelProps, RopeLabelProps } from './PixiFeatureLabel.ts';
+import type { SpatialItem } from '../core/SpatialSystem.ts';
 import type { PixiFeatureLine } from './PixiFeatureLine.ts';
 import type { PixiFeaturePoint } from './PixiFeaturePoint.ts';
 import type { PixiFeaturePolygon } from './PixiFeaturePolygon.ts';
@@ -18,6 +17,10 @@ import type { Vec2, Viewport } from '@rapid-sdk/math';
 
 
 const MINZOOM = 12;
+
+// SpatialSystem cache identifiers for label placement boxes and debug boxes.
+const SPATIAL_LABELS = 'labels';
+const SPATIAL_DEBUG = 'labels-debug';
 
 const TEXTSTYLE_NORMAL: PIXI.TextStyleOptions = {
   fill: { color: 0x333333 },
@@ -48,14 +51,25 @@ interface LabelMeasurement {
   height: number;
 }
 
-/** Box used in RBush for collision detection */
-interface LabelBox extends BBox {
+/**
+ * Label-specific metadata, stored as the `contents` of a `LabelItem`.
+ * The spatial framing (`id` and `minX`/`minY`/`maxX`/`maxY`) lives on the `LabelItem` itself.
+ */
+interface LabelContents {
   type: 'label' | 'avoid' | 'debug';
-  id: BoxID;
   featureID: FeatureID;
   labelID?: LabelID | null;
   objectID?: string | null;
   tint?: number;
+}
+
+/**
+ * A `SpatialItem` used for label placement and collision detection.
+ * Narrows `contents` to `LabelContents` so label items can be stored in the
+ * `SpatialSystem` directly, with no wrapping or conversion step.
+ */
+interface LabelItem extends SpatialItem {
+  contents: LabelContents;
 }
 
 /** Placement ids for labels placed adjacent to map pins */
@@ -67,8 +81,8 @@ type PlacementID =
 
 /** Chain link for rope label placement */
 interface ChainLink {
-  labelBox: LabelBox;
-  debugBox: LabelBox;
+  labelItem: LabelItem;
+  debugItem: LabelItem;
   coord: Vec2;
   angle: number;
 }
@@ -86,18 +100,10 @@ export class PixiLayerLabels extends AbstractPixiLayer {
   /** Container that holds all visible label features */
   public labelContainer: PIXI.Container | null;
 
-  /** Labeling spatial index - contains boxes covering placed labels and regions to avoid */
-  protected _labelRBush: RBush<LabelBox>;
-  /** Debugging spatial index - contains boxes covering all tested regions */
-  protected _debugRBush: RBush<LabelBox>;
-
   /** FeatureIDs that we are avoiding (e.g. map pins, vertices, junctions) */
   protected _avoided: Set<FeatureID>;
   /** FeatureIDs that have been labeled (points, roads, etc) - note that point features can be both avoided and labeled */
   protected _labeled: Set<FeatureID>;
-
-  /** Mapping of a BoxID to a Box, as indexed by RBush */
-  protected _boxes: Map<BoxID, LabelBox>;
 
   /** Mapping of a FeatureID to the boxes that cover it */
   protected _featureBoxes: Map<FeatureID, Set<BoxID>>;
@@ -136,10 +142,6 @@ export class PixiLayerLabels extends AbstractPixiLayer {
     this.debugContainer = null;
     this.labelContainer = null;
 
-    // RBush spatial indexes
-    this._labelRBush = new RBush<LabelBox>();  // label placement
-    this._debugRBush = new RBush<LabelBox>();  // debug sprites
-
     // Keep track of the labelable features we have processed
     this._avoided = new Set<FeatureID>();
     this._labeled = new Set<FeatureID>();
@@ -154,8 +156,7 @@ export class PixiLayerLabels extends AbstractPixiLayer {
     // (Label display objects live on their owning `PixiFeatureLabel` features.)
     this._debugSprites = new Map<string, PIXI.Sprite>();
 
-    // Boxes are objects for working with RBush.
-    this._boxes = new Map<BoxID, LabelBox>();
+    // Track which boxes cover each feature (so we can find them again in `resetFeature`).
     this._featureBoxes = new Map<FeatureID, Set<BoxID>>();
 
     // Mapping of a text string (e.g. "Main Street") to generated texture
@@ -186,19 +187,19 @@ export class PixiLayerLabels extends AbstractPixiLayer {
    */
   public reset() {
     super.reset();
+    const spatial = this.context.systems.spatial!;
 
     // Destroy any Pixi display objects that we created.
     for (const object of this._debugSprites.values()) {
       object.destroy();
     }
 
-    this._labelRBush.clear();
-    this._debugRBush.clear();
+    spatial.clearCache(SPATIAL_LABELS);
+    spatial.clearCache(SPATIAL_DEBUG);
     this._avoided.clear();
     this._labeled.clear();
     this._placeholders.clear();
     this._debugSprites.clear();
-    this._boxes.clear();
     this._featureBoxes.clear();
     this._pendingRasters.clear();
     if (this._rasterDrainScheduled) {
@@ -249,6 +250,7 @@ export class PixiLayerLabels extends AbstractPixiLayer {
    * @param featureID - The feature ID to reset
    */
   public resetFeature(featureID: FeatureID): void {
+    const spatial = this.context.systems.spatial!;
     this._avoided.delete(featureID);
     this._labeled.delete(featureID);
 
@@ -256,25 +258,26 @@ export class PixiLayerLabels extends AbstractPixiLayer {
     const debugObjectIDs = new Set<string>();
 
     // Gather `labelIDs` from the label boxes, `objectIDs` from the debug boxes.
-    // Then remove the boxes from the RBushes and our box cache.
+    // Then remove the boxes from the spatial caches.
     const boxIDs = this._featureBoxes.get(featureID) || [];
     for (const boxID of boxIDs) {
-      const box = this._boxes.get(boxID);
-      if (box) {
-        if (box.type === 'label' || box.type === 'avoid') {
-          this._labelRBush.remove(box);
+      // Note that label and debug `boxIDs` will not collide (debug IDs will have `-debug` at the end of them).
+      // A given boxID will be found in either SPATIAL_LABELS or SPATIAL_DEBUG.
+      const contents = spatial.getItem<LabelContents>(SPATIAL_LABELS, boxID) ?? spatial.getItem<LabelContents>(SPATIAL_DEBUG, boxID);
+      if (contents) {
+        if (contents.type === 'label' || contents.type === 'avoid') {
+          spatial.removeItems(SPATIAL_LABELS, boxID);
         }
-        if (box.type === 'debug') {
-          this._debugRBush.remove(box);
-          if (box.objectID) {
-            debugObjectIDs.add(box.objectID);
+        if (contents.type === 'debug') {
+          spatial.removeItems(SPATIAL_DEBUG, boxID);
+          if (contents.objectID) {
+            debugObjectIDs.add(contents.objectID);
           }
         }
-        if (box.labelID) {
-          labelIDs.add(box.labelID);
+        if (contents.labelID) {
+          labelIDs.add(contents.labelID);
         }
       }
-      this._boxes.delete(boxID);
     }
     this._featureBoxes.delete(featureID);
 
@@ -561,6 +564,7 @@ export class PixiLayerLabels extends AbstractPixiLayer {
    *  destroy the label and flag the feature as labeldirty for relabeling
    */
   public gatherAvoids(): void {
+    const spatial = this.context.systems.spatial!;
     const showDebug = this.context.getDebug('label');
 
     // Gather the containers that have avoidable stuff on them.
@@ -577,8 +581,8 @@ export class PixiLayerLabels extends AbstractPixiLayer {
     }
 
     // For each container, gather the things to avoid.
-    const labelBoxes: LabelBox[] = [];
-    const debugBoxes: LabelBox[] = [];
+    const labelItems: LabelItem[] = [];
+    const debugItems: LabelItem[] = [];
 
     const avoidObject = (sourceObject: PIXI.Container): void => {
       if (!sourceObject.visible || !sourceObject.renderable) return;
@@ -597,41 +601,46 @@ export class PixiLayerLabels extends AbstractPixiLayer {
 
       const EPSILON = 0.01;
 
-      const avoidBox: LabelBox = {
-        type: 'avoid',
+      const avoidItem: LabelItem = {
         id: `${featureID}-avoid`,
-        featureID: featureID,
-        labelID: null,
+        contents: {
+          type: 'avoid',
+          featureID: featureID,
+          labelID: null
+        },
         minX: fRect.x + EPSILON,
         minY: fRect.y + EPSILON,
         maxX: fRect.x + fRect.width - EPSILON,
         maxY: fRect.y + fRect.height - EPSILON
       };
 
-      this._cacheBox(avoidBox);
-      labelBoxes.push(avoidBox);
+      this._cacheBox(avoidItem);
+      labelItems.push(avoidItem);
 
       if (showDebug) {
-        const debugBox: LabelBox = {
-          type: 'debug',
-          id: avoidBox.id + '-debug',
-          featureID: featureID,
-          tint: 0xff0000,   // red (avoid)
-          objectID: null,
-          minX: avoidBox.minX,
-          minY: avoidBox.minY,
-          maxX: avoidBox.maxX,
-          maxY: avoidBox.maxY
+        const debugItem: LabelItem = {
+          id: avoidItem.id + '-debug',
+          contents: {
+            type: 'debug',
+            featureID: featureID,
+            tint: 0xff0000,   // red (avoid)
+            objectID: null
+          },
+          minX: avoidItem.minX,
+          minY: avoidItem.minY,
+          maxX: avoidItem.maxX,
+          maxY: avoidItem.maxY
         };
 
-        this._cacheBox(debugBox);
-        debugBoxes.push(debugBox);
+        this._cacheBox(debugItem);
+        debugItems.push(debugItem);
       }
 
       // If there is already a label where this avoid box is, we will need to redo that label.
       // This is somewhat common that a label will be placed somewhere, then as more map loads,
       // we learn that some of those junctions become important and we need to avoid them.
-      for (const hit of this._labelRBush.search(avoidBox)) {
+      for (const item of spatial.getItemsAtBox(SPATIAL_LABELS, avoidItem)) {
+        const hit = item.contents as LabelContents;
         if (hit.type === 'label' && hit.featureID) {
           this.resetFeature(hit.featureID);
         }
@@ -644,27 +653,24 @@ export class PixiLayerLabels extends AbstractPixiLayer {
       }
     }
 
-    // Bulk insert any boxes we collected..
-    if (labelBoxes.length) {
-      this._labelRBush.load(labelBoxes);
+    // Bulk insert any items we collected..
+    if (labelItems.length) {
+      spatial.addItems(SPATIAL_LABELS, labelItems);
     }
-    if (showDebug && debugBoxes.length) {
-      this._debugRBush.load(debugBoxes);
+    if (showDebug && debugItems.length) {
+      spatial.addItems(SPATIAL_DEBUG, debugItems);
     }
   }
 
 
   /**
-   * Add the given box to the caches.
-   * The box should have `id` and `featureID` properties.
-   * @param box - the box to cache
+   * Track which boxes cover the given feature, so we can find them again in `resetFeature`.
+   * @param item - the label item to track
    */
-  protected _cacheBox(box: LabelBox): void {
-    const boxID = box.id;
-    const featureID = box.featureID;
+  protected _cacheBox(item: LabelItem): void {
+    const boxID = item.id;
+    const featureID = item.contents.featureID;
     if (!boxID || !featureID) return;
-
-    this._boxes.set(boxID, box);
 
     let featureBoxIDs = this._featureBoxes.get(featureID);
     if (!featureBoxIDs) {
@@ -816,6 +822,7 @@ export class PixiLayerLabels extends AbstractPixiLayer {
   public placeTextLabel(feature: AbstractPixiFeature, measurement: LabelMeasurement): void {
     if (!feature) return;
 
+    const spatial = this.context.systems.spatial!;
     const showDebug = this.context.getDebug('label');
     const featureID = feature.id;
     const container = feature.container;
@@ -910,11 +917,13 @@ export class PixiLayerLabels extends AbstractPixiLayer {
       // Use a label-specific ID so the label feature doesn't collide with the source
       // feature in `scene.features` (which is keyed by `feature.id`).
       const labelID: LabelID = `${featureID}-label`;
-      const labelBox: LabelBox = {
-        type: 'label',
+      const labelItem: LabelItem = {
         id: `${featureID}-${placementID}`,
-        featureID: featureID,
-        labelID: labelID,
+        contents: {
+          type: 'label',
+          featureID: featureID,
+          labelID: labelID
+        },
         minX: x - lWidthHalf + EPSILON,
         minY: y - lHeightHalf + EPSILON,
         maxX: x + lWidthHalf - EPSILON,
@@ -925,7 +934,7 @@ export class PixiLayerLabels extends AbstractPixiLayer {
       // Store the placeholder props, and insert the box into the rbush so
       // nothing else gets placed there.  The PixiFeatureLabel itself is
       // created lazily in renderObjects() the first time this label is in view.
-      if (!this._labelRBush.collides(labelBox)) {
+      if (!spatial.hasItemsAtBox(SPATIAL_LABELS, labelItem)) {
 //        picked = placementID;
         const style = feature.style as any;
         const props: TextLabelProps = {
@@ -940,24 +949,26 @@ export class PixiLayerLabels extends AbstractPixiLayer {
         };
         this._placeholders.set(labelID, props);
 
-        this._cacheBox(labelBox);
-        this._labelRBush.insert(labelBox);
+        this._cacheBox(labelItem);
+        spatial.addItems(SPATIAL_LABELS, labelItem);
 
         if (showDebug) {
-          const debugBox: LabelBox = {
-            type: 'debug',
-            id: labelBox.id + '-debug',
-            featureID: featureID,
-            tint: 0x00ff00,   // green (ok)
-            objectID: null,
-            minX: labelBox.minX,
-            minY: labelBox.minY,
-            maxX: labelBox.maxX,
-            maxY: labelBox.maxY
+          const debugItem: LabelItem = {
+            id: labelItem.id + '-debug',
+            contents: {
+              type: 'debug',
+              featureID: featureID,
+              tint: 0x00ff00,   // green (ok)
+              objectID: null
+            },
+            minX: labelItem.minX,
+            minY: labelItem.minY,
+            maxX: labelItem.maxX,
+            maxY: labelItem.maxY
           };
 
-          this._cacheBox(debugBox);
-          this._debugRBush.insert(debugBox);
+          this._cacheBox(debugItem);
+          spatial.addItems(SPATIAL_DEBUG, debugItem);
         }
         break;
       }
@@ -981,6 +992,7 @@ export class PixiLayerLabels extends AbstractPixiLayer {
     if (!feature || !measurement || !coords) return;
     if (!feature.container.visible || !feature.container.renderable) return;
 
+    const spatial = this.context.systems.spatial!;
     const showDebug = this.context.getDebug('label');
     const featureID = feature.id;
 
@@ -998,17 +1010,18 @@ export class PixiLayerLabels extends AbstractPixiLayer {
     // # of boxes needed to provide enough length for this label
     const numBoxes = Math.ceil(lWidth / boxsize) + 1;
     // Labels will be stretched across boxes slightly, this will scale them back to `lWidth` pixels
-    const scaleX = lWidth / ((numBoxes-1) * boxsize);
+    const scaleX = lWidth / ((numBoxes - 1) * boxsize);
     // We'll break long chains into smaller regions and center a label within each region
     const maxChainLength = numBoxes + 15;
 
     // Cover the line in bounding boxes.
-    // `geomCoverageBoxes` walks the line placing square boxes (half-size `boxhalf`)
-    // every `boxsize` units, each carrying that segment's heading angle.
-    const coverage = geomCoverageBoxes(coords, boxhalf, boxsize);
+    // `geomLineSegments` walks the whole line continuously, emitting positions spaced exactly
+    // `boxsize` apart.  That uniform spacing is what lets the `scaleX` math above hold (so the
+    // label text is sized correctly without any post-correction).
+    const segments = geomLineSegments(coords, boxsize);
 
-    const labelBoxes: LabelBox[] = [];
-    const debugBoxes: LabelBox[] = [];
+    const labelItems: LabelItem[] = [];
+    const debugItems: LabelItem[] = [];
     const candidates: ChainLink[][] = [];
     let currChain: ChainLink[] = [];
     let prevAngle: number | null = null;
@@ -1022,77 +1035,84 @@ export class PixiLayerLabels extends AbstractPixiLayer {
         candidates.push(currChain);
       } else {  // too short to be a candidate
         for (const link of currChain) {
-          link.debugBox.tint = 0xffff33;  // yellow (too small)
+          link.debugItem.contents.tint = 0xffff33;  // yellow (too small)
         }
       }
       currChain = [];   // reset chain
     };
 
 
-    // Walk the coverage boxes, creating chains of bounding boxes,
+    // Walk the line, creating chains of bounding boxes,
     // and testing for candidate chains where labels can go.
     const EPSILON = 0.01;
-    coverage.forEach((cbox, boxIndex) => {
-      const currAngle = numWrap(cbox.angle, 0, TAU);  // normalize to 0…2π
-      const coord = cbox.coord;
+    segments.forEach((segment, segmentIndex) => {
+      const currAngle = numWrap(segment.angle, 0, TAU);  // normalize to 0…2π
 
-      const labelBox: LabelBox = {
-        type: 'label',
-        id: `${featureID}-${boxIndex}`,
-        featureID: featureID,
-        labelID: null,   // will be assigned below if this spot gets a label
-        minX: cbox.minX + EPSILON,
-        minY: cbox.minY + EPSILON,
-        maxX: cbox.maxX - EPSILON,
-        maxY: cbox.maxY - EPSILON
-      };
+      segment.coords.forEach((coord, coordIndex) => {
+        const [x, y] = coord;
 
-      const debugBox: LabelBox = {
-        type: 'debug',
-        id: labelBox.id + '-debug',
-        featureID: featureID,
-        tint: 0x00ff00,   // may be changed below
-        objectID: null,
-        minX: labelBox.minX,
-        minY: labelBox.minY,
-        maxX: labelBox.maxX,
-        maxY: labelBox.maxY
-      };
+        const labelItem: LabelItem = {
+          id: `${featureID}-${segmentIndex}-${coordIndex}`,
+          contents: {
+            type: 'label',
+            featureID: featureID,
+            labelID: null   // will be assigned below if this spot gets a label
+          },
+          minX: x - boxhalf + EPSILON,
+          minY: y - boxhalf + EPSILON,
+          maxX: x + boxhalf - EPSILON,
+          maxY: y + boxhalf - EPSILON
+        };
 
-      // Avoid placing labels where the line bends too much..
-      let tooBendy = false;
-      if (prevAngle !== null) {
-        // compare angles properly: https://stackoverflow.com/a/1878936/7620
-        const diff = Math.abs(currAngle - prevAngle);
-        tooBendy = Math.min(TAU - diff, diff) > BENDLIMIT;
-      }
-      prevAngle = currAngle;
+        const debugItem: LabelItem = {
+          id: labelItem.id + '-debug',
+          contents: {
+            type: 'debug',
+            featureID: featureID,
+            tint: 0x00ff00,   // may be changed below
+            objectID: null
+          },
+          minX: labelItem.minX,
+          minY: labelItem.minY,
+          maxX: labelItem.maxX,
+          maxY: labelItem.maxY
+        };
 
-      if (tooBendy) {
-        finishChain();
-        debugBox.tint = 0xff33ff;  // magenta (too bendy)
-
-      } else if (this._labelRBush.collides(labelBox)) {
-        finishChain();
-        debugBox.tint = 0xff0000;  // red (collision)
-
-      } else {   // Label can go here..
-        debugBox.tint = 0x00ff00;  // green (ok)
-        currChain.push({
-          labelBox: labelBox,
-          debugBox: debugBox,
-          coord: coord,
-          angle: currAngle
-        });
-        if (currChain.length === maxChainLength) {
-          finishChain();
+        // Avoid placing labels where the line bends too much..
+        let tooBendy = false;
+        if (prevAngle !== null) {
+          // compare angles properly: https://stackoverflow.com/a/1878936/7620
+          const diff = Math.abs(currAngle - prevAngle);
+          tooBendy = Math.min(TAU - diff, diff) > BENDLIMIT;
         }
-      }
+        prevAngle = currAngle;
 
-      if (showDebug) {
-        this._cacheBox(debugBox);
-        debugBoxes.push(debugBox);
-      }
+        if (tooBendy) {
+          finishChain();
+          debugItem.contents.tint = 0xff33ff;  // magenta (too bendy)
+
+        } else if (spatial.hasItemsAtBox(SPATIAL_LABELS, labelItem)) {
+          finishChain();
+          debugItem.contents.tint = 0xff0000;  // red (collision)
+
+        } else {   // Label can go here..
+          debugItem.contents.tint = 0x00ff00;  // green (ok)
+          currChain.push({
+            labelItem: labelItem,
+            debugItem: debugItem,
+            coord: coord,
+            angle: currAngle
+          });
+          if (currChain.length === maxChainLength) {
+            finishChain();
+          }
+        }
+
+        if (showDebug) {
+          this._cacheBox(debugItem);
+          debugItems.push(debugItem);
+        }
+      });
     });
 
     finishChain();
@@ -1109,10 +1129,10 @@ export class PixiLayerLabels extends AbstractPixiLayer {
       const ropeCoords: Vec2[] = [];
       for (let i = startIndex; i < startIndex + numBoxes; i++) {
         ropeCoords.push(chain[i].coord);
-        const labelBox = chain[i].labelBox;
-        labelBox.labelID = labelID;
-        this._cacheBox(labelBox);
-        labelBoxes.push(labelBox);
+        const labelItem = chain[i].labelItem;
+        labelItem.contents.labelID = labelID;
+        this._cacheBox(labelItem);
+        labelItems.push(labelItem);
       }
 
       if (!ropeCoords.length) return;  // shouldn't happen, min numBoxes is 2 boxes
@@ -1148,12 +1168,12 @@ export class PixiLayerLabels extends AbstractPixiLayer {
       this._placeholders.set(labelID, props);
     });
 
-    // Bulk insert any boxes we collected..
-    if (labelBoxes.length) {
-      this._labelRBush.load(labelBoxes);
+    // Bulk insert any items we collected..
+    if (labelItems.length) {
+      spatial.addItems(SPATIAL_LABELS, labelItems);
     }
-    if (showDebug && debugBoxes.length) {
-      this._debugRBush.load(debugBoxes);
+    if (showDebug && debugItems.length) {
+      spatial.addItems(SPATIAL_DEBUG, debugItems);
     }
   }
 
@@ -1168,6 +1188,7 @@ export class PixiLayerLabels extends AbstractPixiLayer {
    * @param viewport - Pixi viewport to use for rendering
    */
   public renderLabels(frame: number, viewport: Viewport): void {
+    const spatial = this.context.systems.spatial!;
     // bhousel 4/1/26:  MeshRope is not supported for
     // the new experimental Pixi Canvas renderer yet.
     const renderer = this.gfx!.pixi!.renderer;
@@ -1187,9 +1208,10 @@ export class PixiLayerLabels extends AbstractPixiLayer {
     // Note that a single label may have many covering boxes inserted into the rbush.
     const labelIDs = new Set<LabelID>();
     const seenTextures = new Set<string>();
-    for (const box of this._labelRBush.search(screenBounds)) {
-      if (box.labelID) {    // a real label (not an avoid)
-        labelIDs.add(box.labelID);
+    for (const item of spatial.getItemsAtBox(SPATIAL_LABELS, screenBounds)) {
+      const contents = item.contents as LabelContents;
+      if (contents.labelID) {    // a real label (not an avoid)
+        labelIDs.add(contents.labelID);
       }
     }
 
@@ -1230,6 +1252,7 @@ export class PixiLayerLabels extends AbstractPixiLayer {
    * This renders any of the debug sprites in the view
    */
   public renderDebug(): void {
+    const spatial = this.context.systems.spatial!;
     // Get the display bounds in screen/global coordinates
     const screen = this.gfx.pixi!.screen;
     const labelOffset = this._labelOffset;
@@ -1241,15 +1264,16 @@ export class PixiLayerLabels extends AbstractPixiLayer {
     };
 
     // Create and add debug boxes to the scene, if needed
-    const boxes = this._debugRBush.search(screenBounds);
-    for (const box of boxes) {
-      if (!box.objectID) {
-        const tint = box.tint ?? 0xffffff;
-        const objectID = box.id;
-        const sprite = getDebugBBox(box.minX, box.minY, box.maxX - box.minX, box.maxY - box.minY, tint, 0.65, objectID);
+    const items = spatial.getItemsAtBox(SPATIAL_DEBUG, screenBounds);
+    for (const item of items) {
+      const contents = item.contents as LabelContents;
+      if (!contents.objectID) {
+        const tint = contents.tint ?? 0xffffff;
+        const objectID = item.id;
+        const sprite = getDebugBBox(item.minX, item.minY, item.maxX - item.minX, item.maxY - item.minY, tint, 0.65, objectID);
 
         this._debugSprites.set(objectID, sprite);
-        box.objectID = objectID;
+        contents.objectID = objectID;
         this.debugContainer!.addChild(sprite);
       }
     }

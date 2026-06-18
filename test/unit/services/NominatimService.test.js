@@ -14,6 +14,7 @@ describe('NominatimService', () => {
   // Setup context..
   const context = new Rapid.MockContext();
   context.systems.network = new Rapid.NetworkSystem(context);
+  context.systems.spatial = new Rapid.SpatialSystem(context);
 
   // Setup fetchMock..
   beforeAll(() => {

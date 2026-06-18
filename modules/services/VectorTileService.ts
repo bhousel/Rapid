@@ -5,38 +5,27 @@ import { GeoJSONData } from '../data/GeoJSONData.ts';
 // import geojsonRewind from '@mapbox/geojson-rewind';
 import { PMTiles } from 'pmtiles';
 import Protobuf from 'pbf';
-import RBush from 'rbush';
 import stringify from 'fast-json-stable-stringify';
 import { utilHashcode } from '@rapid-sdk/util';
 import { VectorTile } from '@mapbox/vector-tile';
 
 import type { Context } from '../Context.ts';
-import type { BBox } from 'rbush';
 import type { MVTFeatureResult } from '../core/NetworkSystem.worker.ts';
-import type { Tile } from '@rapid-sdk/math';
+import type { Tile, Vec2 } from '@rapid-sdk/math';
 
-
-/** RBush box with associated data */
-interface RBushBox extends BBox {
-  /** The GeoJSONData feature contained within this bounding box */
-  data: GeoJSONData;
-}
 
 /** Convenience type for string identifiers for tile edges */
 type EdgeID = string;
 
+
 /** Per-zoom cache for vector tile features */
 interface VTZoomCache {
-  /** Map of GeoJSONData features keyed by feature ID */
-  features: Map<string, GeoJSONData>;
-  /** Map of RBush bounding boxes keyed by feature ID */
-  boxes: Map<string, RBushBox>;
-  /** Queue of pending merge operations: edge ID → property hash → set of feature IDs */
-  toMerge: Map<EdgeID, Map<string, Set<string>>>;
+  /** SpatialSystem cache id for this zoomcache, will look like: `vt-${source.id}-z${zoom}` */
+  spatialID: SpatialID;
+  /** Queue of pending merge operations: edge ID → property hash → set of data IDs */
+  toMerge: Map<EdgeID, Map<string, Set<DataID>>>;
   /** Set of edge IDs that have already been merged */
   didMerge: Set<EdgeID>;
-  /** RBush spatial index for efficient geographic querying of features at this zoom */
-  rbush: RBush<RBushBox>;
 }
 
 /** Source for vector tile data */
@@ -95,7 +84,7 @@ export class VectorTileService extends AbstractSystem {
   public constructor(context: Context) {
     super(context);
     this.id = 'vectortile';
-    this.requiredDependencies = new Set<SystemID>(['network']);
+    this.requiredDependencies = new Set<SystemID>(['network', 'spatial']);
     this.optionalDependencies = new Set<SystemID>(['gfx']);
 
     // Sources are identified by their URL template..
@@ -128,7 +117,9 @@ export class VectorTileService extends AbstractSystem {
    */
   public resetAsync(): Promise<void> {
     const network = this.context.systems.network!;
+    const spatial = this.context.systems.spatial!;
     network.clearMatching(id => id.startsWith('vt-'));
+    spatial.clearMatching(id => id.startsWith('vt-'));
 
     for (const source of this._sources.values()) {
       for (const controller of source.inflightPMTiles.values()) {
@@ -140,11 +131,8 @@ export class VectorTileService extends AbstractSystem {
       source.loaded.clear();
       source.readyPromise = undefined;
       for (const cache of source.zoomCache.values()) {
-        cache.features.clear();
-        cache.boxes.clear();
         cache.toMerge.clear();
         cache.didMerge.clear();
-        cache.rbush.clear();
       }
       source.zoomCache.clear();
       source.lastv = null;
@@ -165,8 +153,8 @@ export class VectorTileService extends AbstractSystem {
     if (!source) return [];
 
     const context = this.context;
+    const spatial = context.systems.spatial!;
     const viewport = context.viewport;
-    const bbox = viewport.visibleExtent().bbox();
 
     // Note that because vector tiles are 512px, they are offset by -1 zoom level
     // from the main map zoom, which follows 256px and OSM convention.
@@ -180,11 +168,11 @@ export class VectorTileService extends AbstractSystem {
     for (let diff = 0; diff < 12; diff++) {
       cache = source.zoomCache.get(zoom + diff);
       if (cache) {
-        return cache.rbush.search(bbox).map(d => d.data);
+        return spatial.getVisibleItems(cache.spatialID).map(hit => hit.contents as GeoJSONData);
       }
       cache = source.zoomCache.get(zoom - diff);
       if (cache) {
-        return cache.rbush.search(bbox).map(d => d.data);
+        return spatial.getVisibleItems(cache.spatialID).map(hit => hit.contents as GeoJSONData);
       }
     }
     return [];
@@ -224,7 +212,7 @@ export class VectorTileService extends AbstractSystem {
             }
           }
         } else {
-          const neededIDs = new Set<RequestID>(tiles.map(t => `vt-${source.id}-${t.id}`));
+          const neededIDs = new Set<RequestID>(tiles.map(tile => `vt-${source.id}-${tile.id}`));
           network.abortMatching(id => id.startsWith(`vt-${source.id}-`) && !neededIDs.has(id));
         }
 
@@ -294,11 +282,9 @@ export class VectorTileService extends AbstractSystem {
 
     if (!cache) {
       cache = {
-        features: new Map<string, GeoJSONData>(),
-        boxes:    new Map<string, RBushBox>(),
-        toMerge:  new Map<EdgeID, Map<string, Set<string>>>(),  // Map<EdgeID, Map<prophash, Set<featureIDs>>>
-        didMerge: new Set<EdgeID>(),
-        rbush:    new RBush<RBushBox>()
+        spatialID: `vt-${source.id}-z${zoom}`,
+        toMerge:   new Map<EdgeID, Map<string, Set<DataID>>>(),
+        didMerge:  new Set<EdgeID>()
       };
 
       source.zoomCache.set(zoom, cache);
@@ -309,7 +295,7 @@ export class VectorTileService extends AbstractSystem {
 
 
   /**
-   * Fetches and parses a single vector tile, caching its features.
+   * Fetches and parses a single vector tile.
    * @param  source - The vector tile source
    * @param  tile - The tile to load
    * @return the fetch promise
@@ -341,7 +327,7 @@ export class VectorTileService extends AbstractSystem {
 
     } else {
       const network = this.context.systems.network!;
-      const requestID = `vt-${source.id}-${tileID}` as RequestID;
+      const requestID = `vt-${source.id}-${tileID}`;
       if (network.isInflight(requestID)) return;
 
       const url = source.template
@@ -421,6 +407,9 @@ export class VectorTileService extends AbstractSystem {
   protected _processVTResults(source: VTSource, tile: Tile, results: MVTFeatureResult[]): void {
     if (!results || !results.length) return;
 
+    const context = this.context;
+    const spatial = context.systems.spatial!;
+
     // Get some info about this tile and its neighbors
     const [x, y, z] = tile.xyz;
     const tileID = tile.id;
@@ -447,7 +436,7 @@ export class VectorTileService extends AbstractSystem {
         orig.properties![k] = String(v);
       }
 
-      // When features have the same properties, we'll consider them mergeable.
+      // When neighbor features have the same properties, we'll consider them mergeable.
       const prophash = utilHashcode(stringify(orig.properties)).toString();
 
       // It's common for a vector tile to return 'Multi' GeoJSON features..
@@ -457,32 +446,32 @@ export class VectorTileService extends AbstractSystem {
         const extent = this._calcExtent(part);
         if (!isFinite(extent.min[0])) continue;  // invalid - no coordinates?
 
-        // If it has an ID, remove it.  We'll generate a unique one.
+        // If it already has an ID, remove it.  We'll generate a unique one.
         delete part.id;
 
-        part._prophash = prophash;
-        part._layerID = layerID;
-        part._origID = origID;
+        (part as any)._prophash = prophash;
+        (part as any)._layerID = layerID;
+        (part as any)._origID = origID;
 
-        const feat = new GeoJSONData(this.context, { geojson: part });
-        const featureID = feat.id;  // the generated ID
+        const d = new GeoJSONData(context, { geojson: part });
+        const dataID = d.id;  // the generated ID
         // rewind?  really something that `GeometryPart` should handle now
 
         // For Polygons only, determine if this feature clips to a tile edge.
-        // If so, we'll try to merge it with similar features on the neighboring tile
+        // If so, we'll try to merge it with a matching feature on the neighboring tile
         if (part.geometry.type === 'Polygon') {
-          if (extent.min[0] < tileExtent.min[0]) { this._queueMerge(cache, featureID, prophash, leftEdge); }
-          if (extent.max[0] > tileExtent.max[0]) { this._queueMerge(cache, featureID, prophash, rightEdge); }
-          if (extent.min[1] < tileExtent.min[1]) { this._queueMerge(cache, featureID, prophash, bottomEdge); }
-          if (extent.max[1] > tileExtent.max[1]) { this._queueMerge(cache, featureID, prophash, topEdge); }
+          if (extent.min[0] < tileExtent.min[0]) { this._queueMerge(cache, dataID, prophash, leftEdge); }
+          if (extent.max[0] > tileExtent.max[0]) { this._queueMerge(cache, dataID, prophash, rightEdge); }
+          if (extent.min[1] < tileExtent.min[1]) { this._queueMerge(cache, dataID, prophash, bottomEdge); }
+          if (extent.max[1] > tileExtent.max[1]) { this._queueMerge(cache, dataID, prophash, topEdge); }
         }
 
-        newFeatures.push(feat);
+        newFeatures.push(d);
       }
     }
 
     if (newFeatures.length) {
-      this._cacheFeatures(cache, newFeatures);
+      spatial.replaceData(cache.spatialID, newFeatures);
       const gfx = this.context.systems.gfx;
       gfx?.deferredRedraw();
     }
@@ -490,32 +479,33 @@ export class VectorTileService extends AbstractSystem {
 
 
   /**
-   * Mark this data as eligible for merging across given tile edge
-   * @param  cache
-   * @param  featureID
-   * @param  prophash
-   * @param  edgeID
+   * Mark this GeoJSON feature as eligible for merging across given tile edge.
+   * As more parts of the map load, we will check the merge map and try to merge candidates.
+   * @param  cache    - the zoomCache where the feature is stored
+   * @param  dataID   - the dataID of the GeoJSON feature
+   * @param  prophash - the hash of the GeoJSON feature's properties
+   * @param  edgeID   - the edge across which we are merging
    */
-  protected _queueMerge(cache: VTZoomCache, featureID: string, prophash: string, edgeID: EdgeID): void {
+  protected _queueMerge(cache: VTZoomCache, dataID: DataID, prophash: string, edgeID: EdgeID): void {
     if (cache.didMerge.has(edgeID)) return;  // we merged this edge already
 
     let mergemap = cache.toMerge.get(edgeID);
     if (!mergemap) {
-      mergemap = new Map<string, Set<string>>();    // Map<prophash, Set<featureIDs>>
+      mergemap = new Map<string, Set<DataID>>();
       cache.toMerge.set(edgeID, mergemap);
     }
-    let featureIDs = mergemap.get(prophash);
-    if (!featureIDs) {
-      featureIDs = new Set<string>();
-      mergemap.set(prophash, featureIDs);
+    let dataIDs = mergemap.get(prophash);
+    if (!dataIDs) {
+      dataIDs = new Set<DataID>();
+      mergemap.set(prophash, dataIDs);
     }
-    featureIDs.add(featureID);
+    dataIDs.add(dataID);
   }
 
 
   /**
    * Call this sometimes to merge polygons across tile edges
-   * @param source
+   * @param source  - the vector tile source to check
    */
   protected _processMergeQueue(source: VTSource): void {
     for (const cache of source.zoomCache.values()) {
@@ -529,9 +519,9 @@ export class VectorTileService extends AbstractSystem {
 
         cache.didMerge.add(edgeID);
 
-        // All the features that share this prophash along this edge can be merged
-        for (const [prophash, featureIDs] of mergemap) {
-          this._mergePolygons(cache, prophash, featureIDs, lowTile, highTile);
+        // Features that share this prophash along this edge can be merged
+        for (const [prophash, dataIDs] of mergemap) {
+          this._mergeNeighbors(cache, prophash, dataIDs, lowTile, highTile);
           mergemap.delete(prophash);  // done this prophash
         }
         cache.toMerge.delete(edgeID);
@@ -541,69 +531,49 @@ export class VectorTileService extends AbstractSystem {
 
 
   /**
-   * Caches features and their bounding boxes into the given zoom cache and its spatial index.
-   * @param  cache - The zoom-level cache to populate
-   * @param  features - The features to cache
+   * Merge the given features across the given edge (defined by lowTile/highTile).
+   * The tiles involved in this merge will be in one of these orientations:
+   * ```
+   *                        +------+
+   *  +-----+------+        | low  |
+   *  | low | high |   or   +------+
+   *  +-----+------+        | high |
+   *                        +------+
+   * ```
+   *
+   * @param  cache    - the zoomCache where the feature is stored
+   * @param  prophash - the hash of the GeoJSON feature's properties
+   * @param  dataID2  - the dataIDs of the GeoJSON features to merge
+   * @param  lowTile  - the low tile
+   * @param  highTile - the high tile
    */
-  protected _cacheFeatures(cache: VTZoomCache, features: GeoJSONData[]): void {
-    const boxes = [];
-    for (const feature of features) {
-      cache.features.set(feature.id, feature);  // cache feature
+  protected _mergeNeighbors(
+    cache: VTZoomCache,
+    prophash: string,
+    dataIDs: Set<DataID>,
+    lowTile: Tile,
+    highTile: Tile
+  ): void {
+    const context = this.context;
+    const spatial = context.systems.spatial!;
 
-      const extent = feature.extent();
-      if (!extent) continue;
-
-      const box: RBushBox = { ...extent.bbox(), data: feature };
-      cache.boxes.set(feature.id, box);   // cache box
-      boxes.push(box);
+    // Gather the current candidates from the cache
+    const features = [];
+    for (const dataID of dataIDs) {
+      const item = spatial.getItem<GeoJSONData>(cache.spatialID, dataID);
+      if (!item) continue;
+      features.push(item);
     }
 
-    cache.rbush.load(boxes);  // bulk load
-  }
+    if (!features) return;  // nothing to do
 
-
-  /**
-   * Removes the given features (and their boxes) from the zoom cache and spatial index.
-   * @param  cache - The zoom-level cache to update
-   * @param  featureIDs - The IDs of the features to remove
-   */
-  protected _uncacheFeatureIDs(cache: VTZoomCache, featureIDs: Set<string>): void {
-    for (const featureID of featureIDs) {
-      const box = cache.boxes.get(featureID);
-      if (box) {
-        cache.boxes.delete(featureID);  // uncache box
-        cache.rbush.remove(box);
-      }
-      cache.features.delete(featureID);  // uncache feature
-    }
-  }
-
-
-  /**
-   * Merge the given features across the given edge (defined by lowTile/highTile)
-   * @param  cache
-   * @param  prophash
-   * @param  featureIDs - featureIDs to merge
-   * @param  lowTile
-   * @param  highTile
-   */
-  protected _mergePolygons(cache: VTZoomCache, prophash: string, featureIDs: Set<string>, lowTile: Tile, highTile: Tile): void {
-    const features = Array.from(featureIDs).map(featureID => cache.features.get(featureID)).filter((f): f is GeoJSONData => !!f);
-    if (!features.length) return;
+    // Uncache existing data - we will replace with merged versions below.
+    spatial.removeItems(cache.spatialID, dataIDs);
 
     // We have more edges to keep track of now..
-    // The tiles involved in this merge will be in one of these orientations:
-    //
-    //                          +------+
-    //  +-----+------+          | low  |
-    //  | low | high |    or    +------+
-    //  +-----+------+          | high |
-    //                          +------+
-    //
+    // Define tile edges (lower x,y,z - higher x,y,z)
     // Important to ignore the edge between low-high, as this is the one we are currently merging!
     // Edges to ignore will either be "lowRight,highLeft" or "lowBottom,highTop"
-
-    // Define tile edges (lower x,y,z - higher x,y,z)
     const [lx, ly, lz] = lowTile.xyz;
     const [hx, hy, hz] = highTile.xyz;
     const lowTileID = lowTile.id;
@@ -624,8 +594,6 @@ export class VectorTileService extends AbstractSystem {
     // The merged feature(s) can copy some properties from the first one
     const source = features[0]!;
 
-    this._uncacheFeatureIDs(cache, featureIDs);
-
     // Union the coordinates together
     // (I believe these should all be single part Polygons)
     const sourceCoords = features.map(feature => feature.geoms.parts[0].orig!.coords as Polyclip.Geom);
@@ -635,7 +603,7 @@ export class VectorTileService extends AbstractSystem {
     }
 
     // `Polyclip.union` always returns a MultiPolygon
-    const merged = {
+    const merged : GeoJSON.Feature = {
       type: 'Feature',
       geometry: {
         type: 'MultiPolygon',
@@ -655,29 +623,29 @@ export class VectorTileService extends AbstractSystem {
       // It shouldn't have an id at this point, but we will take no chances.
       delete part.id;
 
-      part._prophash = source.props._prophash;
-      part._layerID = source.props._layerID;
-      part._origID = source.props._origID;
+      (part as any)._prophash = source.props._prophash;
+      (part as any)._layerID = source.props._layerID;
+      (part as any)._origID = source.props._origID;
 
-      const feat = new GeoJSONData(this.context, { geojson: part });
-      const featureID = feat.id;  // the generated ID
+      const d = new GeoJSONData(context, { geojson: part });
+      const dataID = d.id;  // the generated ID
       // rewind?  really something that `GeometryPart` should handle now
 
-      // More merging may be necessary
-      if (extent.min[0] < lowTileExtent.min[0])                   { this._queueMerge(cache, featureID, prophash, lowLeftEdge); }
-      if (isVertical && extent.max[0] > lowTileExtent.max[0])     { this._queueMerge(cache, featureID, prophash, lowRightEdge); }
-      if (isHorizontal && extent.min[1] < lowTileExtent.min[1])   { this._queueMerge(cache, featureID, prophash, lowBottomEdge); }
-      if (extent.max[1] > lowTileExtent.max[1])                   { this._queueMerge(cache, featureID, prophash, lowTopEdge); }
-      if (isVertical && extent.min[0] < highTileExtent.min[0])    { this._queueMerge(cache, featureID, prophash, highLeftEdge); }
-      if (extent.max[0] > highTileExtent.max[0])                  { this._queueMerge(cache, featureID, prophash, highRightEdge); }
-      if (extent.min[1] < highTileExtent.min[1])                  { this._queueMerge(cache, featureID, prophash, highBottomEdge); }
-      if (isHorizontal && extent.max[1] > highTileExtent.max[1])  { this._queueMerge(cache, featureID, prophash, highTopEdge); }
+      // More merging may be necessary - does the newly merged feature cross more edges?
+      if (extent.min[0] < lowTileExtent.min[0])                   { this._queueMerge(cache, dataID, prophash, lowLeftEdge); }
+      if (isVertical && extent.max[0] > lowTileExtent.max[0])     { this._queueMerge(cache, dataID, prophash, lowRightEdge); }
+      if (isHorizontal && extent.min[1] < lowTileExtent.min[1])   { this._queueMerge(cache, dataID, prophash, lowBottomEdge); }
+      if (extent.max[1] > lowTileExtent.max[1])                   { this._queueMerge(cache, dataID, prophash, lowTopEdge); }
+      if (isVertical && extent.min[0] < highTileExtent.min[0])    { this._queueMerge(cache, dataID, prophash, highLeftEdge); }
+      if (extent.max[0] > highTileExtent.max[0])                  { this._queueMerge(cache, dataID, prophash, highRightEdge); }
+      if (extent.min[1] < highTileExtent.min[1])                  { this._queueMerge(cache, dataID, prophash, highBottomEdge); }
+      if (isHorizontal && extent.max[1] > highTileExtent.max[1])  { this._queueMerge(cache, dataID, prophash, highTopEdge); }
 
-      newFeatures.push(feat);
+      newFeatures.push(d);
     }
 
     if (newFeatures.length) {
-      this._cacheFeatures(cache, newFeatures);
+      spatial.replaceData(cache.spatialID, newFeatures);
       const gfx = this.context.systems.gfx;
       gfx?.deferredRedraw();
     }
@@ -728,7 +696,7 @@ export class VectorTileService extends AbstractSystem {
    * This will remove them in-place
    * @param  geojson - a GeoJSONData Feature
    */
-  protected _dedupePoints(geojson: any): void {
+  protected _dedupePoints(geojson: GeoJSON.Feature): void {
     const geometry = geojson?.geometry;
     if (!geojson || !geometry) return;
     if (geometry.type !== 'Polygon') return;
@@ -741,10 +709,10 @@ export class VectorTileService extends AbstractSystem {
       const cleaned = [];
       let prevPoint = null;
       for (let j = 0; j < ring.length; j++) {
-        const point = ring[j];
+        const point = ring[j] as Vec2;
         if (j === 0 || j === ring.length - 1) {   // leave first/last points alone
           cleaned.push(point);
-        } else if (!vecEqual(point, prevPoint, EPSILON)) {
+        } else if (prevPoint && !vecEqual(point, prevPoint, EPSILON)) {
           cleaned.push(point);
         }
         prevPoint = point;
@@ -761,10 +729,11 @@ export class VectorTileService extends AbstractSystem {
    * @param  geojson - any GeoJSONData Feature
    * @return array of single GeoJSONData features
    */
-  protected _toSingleFeatures(geojson: any): any[] {
+  protected _toSingleFeatures(geojson: GeoJSON.Feature): GeoJSON.Feature[] {
     const result: any[] = [];
     const geometry = geojson?.geometry;
     if (!geojson || !geometry) return result;
+    if (geometry.type === 'GeometryCollection') return result;  // pacify TypeScript
 
     const type = geometry.type;
     const coords = geometry.coordinates;

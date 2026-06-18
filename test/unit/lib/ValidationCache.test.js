@@ -5,19 +5,20 @@ import * as Rapid from '../../../modules/headless.js';
 
 describe('ValidationCache', () => {
   const context = new Rapid.MockContext();
+  context.systems.spatial = new Rapid.SpatialSystem(context);
   let graph;
   let cache;
 
   beforeEach(() => {
     graph = new Rapid.Graph(context);
-    cache = new Rapid.ValidationCache('head');
+    cache = new Rapid.ValidationCache(context, 'head');
     cache.graph = graph;
   });
 
 
   describe('constructor', () => {
     it('constructs a ValidationCache for "base"', () => {
-      const baseCache = new Rapid.ValidationCache('base');
+      const baseCache = new Rapid.ValidationCache(context, 'base');
       assert.instanceOf(baseCache, Rapid.ValidationCache);
       assert.strictEqual(baseCache.which, 'base');
       assert.isNull(baseCache.graph);
@@ -32,12 +33,10 @@ describe('ValidationCache', () => {
       assert.isEmpty(baseCache.issues);
       assert.instanceOf(baseCache.entityIssueIDs, Map);
       assert.isEmpty(baseCache.entityIssueIDs);
-      assert.instanceOf(baseCache.recheckBoxes, Map);
-      assert.isEmpty(baseCache.recheckBoxes);
     });
 
     it('constructs a ValidationCache for "head"', () => {
-      const headCache = new Rapid.ValidationCache('head');
+      const headCache = new Rapid.ValidationCache(context, 'head');
       assert.instanceOf(headCache, Rapid.ValidationCache);
       assert.strictEqual(headCache.which, 'head');
     });
@@ -106,7 +105,7 @@ describe('ValidationCache', () => {
 
       cache.cacheIssue(issue);
 
-      assert.isTrue(cache.recheckBoxes.has(issue.id));
+      assert.isTrue(context.systems.spatial.hasItem(cache.spatialID, issue.id));
     });
 
     it('stores impossible_oneway issues in spatial index', () => {
@@ -122,7 +121,7 @@ describe('ValidationCache', () => {
 
       cache.cacheIssue(issue);
 
-      assert.isTrue(cache.recheckBoxes.has(issue.id));
+      assert.isTrue(context.systems.spatial.hasItem(cache.spatialID, issue.id));
     });
   });
 
@@ -189,10 +188,10 @@ describe('ValidationCache', () => {
       });
 
       cache.cacheIssue(issue);
-      assert.isTrue(cache.recheckBoxes.has(issue.id));
+      assert.isTrue(context.systems.spatial.hasItem(cache.spatialID, issue.id));
 
       cache.uncacheIssue(issue);
-      assert.isFalse(cache.recheckBoxes.has(issue.id));
+      assert.isFalse(context.systems.spatial.hasItem(cache.spatialID, issue.id));
     });
   });
 

@@ -14,9 +14,12 @@ determine how much already exists in OSM (conflation). Buffers are quantized "co
 - **3b — Coverage helper** ✅ done. `geomCoverageBoxes(coords, radius, step?)` in
   [modules/geo/geom.ts](../modules/geo/geom.ts) — unit-agnostic; point → one box, polyline →
   boxes every `step` along each segment (each carries heading angle), shared vertices not
-  double-covered. Refactored `PixiLayerLabels.placeRopeLabel` to consume it (dropped the
-  `getLineSegments` + manual box-math nested loop). 13 new unit tests in `test/unit/geo/geom.test.js`.
+  double-covered. 13 new unit tests in `test/unit/geo/geom.test.js`.
   `GeometryPart.computeCoverage(r)` still TODO (deferred to when a conflation consumer needs it).
+  **Note**: `geomCoverageBoxes` was briefly used in `PixiLayerLabels.placeRopeLabel` (commit
+  `f9f34ffdc`) but was reverted — rope labels need a *uniform sampler* (equal arc-length spacing),
+  not a coverage sampler (per-segment subdivision). Use `geomLineSegments(coords, boxsize)` for
+  rope placement; reserve `geomCoverageBoxes` for conflation.
 - **3c — Query plumbing** ✅ done. `SpatialSystem.getItemsAtBoxes(spatialID, boxes)`
   (phase-1 bbox prefilter over many boxes, deduped by `boxID`) + `refineItems(candidates, predicate)`
   (phase-2 precise refine with a caller-supplied predicate — SpatialSystem stays domain-agnostic).
@@ -39,17 +42,33 @@ determine how much already exists in OSM (conflation). Buffers are quantized "co
 - No code serializes `geoms` across the worker boundary, and nothing spreads/`structuredClone`s a
   part's `world`/`local` — so lazy getters + re-derive `clone()` are safe.
 
-## NetworkSystem / SpatialSystem cleanup (uncommitted, in working tree)
+## Session work (2026-06-18) — uncommitted
 
-A large set of uncommitted changes fixing bugs discovered during the SpatialSystem/NetworkSystem
-refactor and improving tile-load tracking.  All 3170 unit tests + 121 browser tests pass.
+All in working tree; 3170 unit tests pass; `check:ts` + `check:lint` clean.
 
-Key items ready to commit:
-- **SpatialSystem bugs fixed**: `replaceItems` now populates `cache.items` Map; `replaceData` uses `d.id`/`d`; `hasItemAtLoc()` added; `clearMatching` iterates `.keys()`.
-- **EditSystem `_reset`** clears `editor_*` pattern (includes segment caches); stale `osm-staging` reference in `address.js` fixed.
-- **NetworkSystem `_completed: Map<RequestID, number>`** replaces `Set`. `STATUS_SKIPPED=-1`, `STATUS_ERROR=0` sentinels. API: `isCompleted`, `getStatus`, `markCompleted`, `forget`. Only explicit `requestID` options recorded.
-- **`FetchEnvelope<T>`** universal worker-boundary transport replaces bespoke `OsmFetchResult`. All listeners return envelopes. `fetchEnvelope()` public method on NetworkSystem.
-- **`FetchError` extended** to accept `FetchErrorInit` (reconstructable from envelope fields).
-- **Services**: don't-retry services shed manual `completed.add`; do-retry use `network.forget()`; blocked-region use `markCompleted()`. OsmService `loadNotes` zoom bug fixed. Note-tile retry fixed.
-- **All service + core tests updated** for new patterns (3170 pass).
+### RBush → SpatialSystem consolidation
+Removed all remaining `new RBush` usages outside `SpatialSystem` itself:
+- **`PixiLayerLabels`** — `_labelRBush`, `_debugRBush`, `_boxes` Map → two `SpatialSystem` caches
+  (`SPATIAL_LABELS = 'labels'`, `SPATIAL_DEBUG = 'labels-debug'`). Items use `LabelItem extends
+  SpatialItem` with `contents: LabelContents` (type/featureID/labelID/objectID/tint). Kept
+  `_featureBoxes` (feature→box secondary index; SpatialSystem doesn't provide this).
+- **`NominatimService`** — `_nominatimCache` RBush → `SpatialSystem` cache `'nominatim'` (WGS84
+  coords). `spatial` added to `requiredDependencies`.
+- **`ValidationCache`** — `recheckRBush` + `recheckBoxes` → `SpatialSystem` cache `validation-${which}`.
+  Threaded `context` into constructor (`new ValidationCache(context, which)`). Public `spatialID`
+  getter. Updated all 5 construction sites in `ValidationSystem` + tests.
+- **`VectorTileService`** — per-source×zoom `boxes` Map + `rbush` → `SpatialSystem` caches
+  `vt-${source.id}-z${zoom}`. `reset()` → `spatial.clearMatching(id => id.startsWith('vt-'))`. 
+  `spatial` added to `requiredDependencies`.
+
+### PixiLayerLabels rope-label squish bug
+- **Root cause**: commit `f9f34ffdc` switched rope box sampling from `geomLineSegments` (uniform
+  arc-length sampler) to `geomCoverageBoxes` (per-segment subdivider). Coverage boxes space
+  closer than `boxsize` so `scaleX = lWidth / ((numBoxes-1)*boxsize)` was wrong → labels squished.
+- **Fix**: reverted rope walker back to `geomLineSegments(coords, boxsize)` with the original
+  count-based chain math. `geomCoverageBoxes` stays for its conflation purpose only.
+
+### VectorTileService GeometryCollection guard
+- `_toSingleFeatures` typed `geometry` as `GeoJSON.Geometry` (union including `GeometryCollection`,
+  which has no `coordinates`). Added early-return guard for `geometry.type === 'GeometryCollection'`.
 

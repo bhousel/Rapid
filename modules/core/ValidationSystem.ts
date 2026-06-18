@@ -97,8 +97,8 @@ export class ValidationSystem extends AbstractSystem {
     this.optionalDependencies = new Set<SystemID>(['map', 'storage', 'ui', 'urlhash']);
 
     this._validators = new Map<ValidatorID, ValidatorFunction>();
-    this._base = new ValidationCache('base');
-    this._head = new ValidationCache('head');
+    this._base = new ValidationCache(context, 'base');
+    this._head = new ValidationCache(context, 'head');
 
     this._disabledValidatorIDs = new Set<ValidatorID>();
     this._ignoredIssueIDs = new Set<IssueID>();
@@ -213,8 +213,8 @@ export class ValidationSystem extends AbstractSystem {
     // clear caches
     this._ignoredIssueIDs.clear();
     this._resolvedIssueIDs.clear();
-    this._base = new ValidationCache('base');
-    this._head = new ValidationCache('head');
+    this._base = new ValidationCache(this.context, 'base');
+    this._head = new ValidationCache(this.context, 'head');
     this._completeDiff.clear();
 
     return Promise.resolve();
@@ -586,7 +586,7 @@ export class ValidationSystem extends AbstractSystem {
 
     // User has not edited, or undone back to the base state, reset head cache
     if (stableGraph === baseGraph) {
-      this._head = new ValidationCache('head');
+      this._head = new ValidationCache(context, 'head');
       this._head.graph = stableGraph;
       this._resolvedIssueIDs.clear();
       this.emit('validated');
