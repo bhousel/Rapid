@@ -1,6 +1,7 @@
 import { uiIcon } from './icon.js';
 import { uiDataHeader } from './data_header.js';
 import { uiSectionRawTagEditor } from './sections/raw_tag_editor.js';
+import { utilObjectOmit } from '@rapid-sdk/util';
 
 
 export function uiDataEditor(context) {
@@ -65,6 +66,25 @@ export function uiDataEditor(context) {
       .selectAll('textarea.tag-text')
       .attr('readonly', true)
       .classed('readonly', true);
+
+
+// DEBUG
+    const props = utilObjectOmit(_datum?.props ?? {}, ['geojson']);
+    const propsStr = Object.entries(props).reduce((acc, item) => {
+      const line = `${item[0]} = ${item[1]}\n`;
+      return acc += line;
+    }, '');
+
+    let $propInspector = $body.selectAll('.data-prop-inspector')
+      .data([_datum], d => d.id);
+
+    $propInspector.exit()
+      .remove();
+
+    $propInspector.enter()
+      .append('pre')
+      .attr('class', 'data-prop-inspector')
+      .text(propsStr);
   }
 
 

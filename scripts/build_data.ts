@@ -110,13 +110,13 @@ async function buildData() {
   await $`mkdir -p ./dist/data/schema`;
 
   // Start clean
-  await $`rm -rf ./data/languages.json`;
-  await $`rm -rf ./data/territory_languages.json`;
-  await $`rm -rf ./data/l10n/*.en.json`;
+  await $`rm -f ./data/languages.json`;
+  await $`rm -f ./data/territory_languages.json`;
+  await $`rm -f ./data/l10n/*.en.json`.nothrow();
   await $`rm -rf ./data/modules`;
-  await $`rm -rf ./dist/data/**/*.json{,c,5}`;
+  await $`rm -f ./dist/data/**/*.json{,c,5}`.nothrow();
   await $`rm -rf ./dist/data/modules`;
-  await $`rm -rf ./svg/fontawesome/*.svg`;
+  await $`rm -f ./svg/fontawesome/*.svg`;
 
   // Gather icons from various places that we need assembled into a spritesheet.
   // Start with icons we want to use in the UI that aren't tied to other data.
