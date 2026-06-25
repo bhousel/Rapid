@@ -1,5 +1,7 @@
+import { actionAddMidpoint } from '../actions/add_midpoint.ts';
+import { actionConnect } from './connect.ts';
 import { OsmNode, OsmRelation, OsmWay } from '../data/index.ts';
-import { Vec2, vecEqual, vecInterp } from '@rapid-sdk/math';
+import { Extent, geoSphericalDistance, projWorldToWgs84, projWgs84ToWorld, Vec2, vecEqual, vecProject, vecInterp } from '@rapid-sdk/math';
 
 import type { Action } from './types.ts';
 import type { Graph } from '../lib/Graph.ts';
@@ -12,6 +14,14 @@ interface ConnectionPoint {
   interpLoc: Vec2;
 }
 
+/**
+ * Extended Action that includes additional methods.
+ */
+interface RapidAcceptAction extends Action {
+  /** Returns the full set of entityIDs accepted */
+  getAllIDs(): Set<EntityID>;
+}
+
 
 /**
  * Accepts a Rapid feature from an external graph into the main graph.
@@ -20,16 +30,19 @@ interface ConnectionPoint {
  * @param   extGraph  - The external Graph containing the Rapid features
  * @return  An Action function that adds the given Rapid feature to the main graph
  */
-export function actionRapidAcceptFeature(entityID: EntityID, extGraph: Graph): Action {
+export function actionRapidAcceptFeature(entityID: EntityID, extGraph: Graph): RapidAcceptAction {
 
-  return (graph: Graph): Graph => {
+  const allIDs = new Set<EntityID>();
+
+  const action: RapidAcceptAction = ((graph: Graph): Graph => {
     const seenRelations = new Map<EntityID, OsmRelation>();    // avoid infinite recursion
     const extEntity = extGraph.entity(entityID);
 
     if (extEntity.type === 'node') {
       acceptNode(extEntity as OsmNode);
     } else if (extEntity.type === 'way') {
-      acceptWay(extEntity as OsmWay);
+      const way = acceptWay(extEntity as OsmWay);
+      attemptAutoconnect(extEntity as OsmWay, extGraph, way, graph);
     } else if (extEntity.type === 'relation') {
       acceptRelation(extEntity as OsmRelation);
     }
@@ -48,7 +61,7 @@ export function actionRapidAcceptFeature(entityID: EntityID, extGraph: Graph): A
     function acceptNode(extNode: OsmNode): OsmNode {
       const node = new OsmNode(extNode);   // copy node before modifying
       removeMetadata(node);
-
+      allIDs.add(node.id);
       graph.replace(node);
       return node;
     }
@@ -65,39 +78,46 @@ export function actionRapidAcceptFeature(entityID: EntityID, extGraph: Graph): A
     function acceptWay(extWay: OsmWay): OsmWay {
       let way = new OsmWay(extWay);   // copy way before modifying
       removeMetadata(way);
+      allIDs.add(way.id);
 
       const nodes: EntityID[] = [];
       for (const nodeID of way.nodes) {
-        let node = new OsmNode(extGraph.entity(nodeID) as OsmNode);   // copy node before modifying
-        const connTag = node.tags.conn;
-        const conn: string[] | undefined = connTag ? connTag.split(',') : undefined;
-        const dupeID: string | undefined = node.tags.dupe;
-        removeMetadata(node);
-
-        const dupe = (dupeID && graph.hasEntity(dupeID)) as OsmNode | undefined;
-        if (dupe && vecEqual(dupe.loc!, node.loc!)) {
-          node = dupe;   // prefer the original node identified by dupeID
-        }
-
-        if (conn && graph.hasEntity(conn[0])) {
-          //conn=w316746574,n3229071295,n3229071273
-          const targetWay = graph.hasEntity(conn[0]) as OsmWay | null;
-          const nodeA = graph.hasEntity(conn[1]) as OsmNode | null;
-          const nodeB = graph.hasEntity(conn[2]) as OsmNode | null;
-
-          if (targetWay && nodeA && nodeB) {
-            const result = findConnectionPoint(graph, node, targetWay, nodeA, nodeB);
-            if (result && vecEqual(result.interpLoc, node.loc!)) {
-              // Create a new node with updated loc since loc is readonly
-              node = node.update({ loc: result.interpLoc });
-              graph.replace(targetWay.addNode(node.id, result.insertIdx));
-            }
-          }
-        }
-
-        graph.replace(node);
+        const node = acceptNode(extGraph.entity(nodeID) as OsmNode);
         nodes.push(node.id);
       }
+
+// This is the legacy code that relies on `conn` and `dupe` tags added by the MapWithAI server.
+//      for (const nodeID of way.nodes) {
+//        let node = new OsmNode(extGraph.entity(nodeID) as OsmNode);   // copy node before modifying
+//        const connTag = node.tags.conn;
+//        const conn: string[] | undefined = connTag ? connTag.split(',') : undefined;
+//        const dupeID: string | undefined = node.tags.dupe;
+//        removeMetadata(node);
+//
+//        const dupe = (dupeID && graph.hasEntity(dupeID)) as OsmNode | undefined;
+//        if (dupe && vecEqual(dupe.loc!, node.loc!)) {
+//          node = dupe;   // prefer the original node identified by dupeID
+//        }
+//
+//        if (conn && graph.hasEntity(conn[0])) {
+//          //conn=w316746574,n3229071295,n3229071273
+//          const targetWay = graph.hasEntity(conn[0]) as OsmWay | null;
+//          const nodeA = graph.hasEntity(conn[1]) as OsmNode | null;
+//          const nodeB = graph.hasEntity(conn[2]) as OsmNode | null;
+//
+//          if (targetWay && nodeA && nodeB) {
+//            const result = findConnectionPoint(graph, node, targetWay, nodeA, nodeB);
+//            if (result && vecEqual(result.interpLoc, node.loc!)) {
+//              // Create a new node with updated loc since loc is readonly
+//              node = node.update({ loc: result.interpLoc });
+//              graph.replace(targetWay.addNode(node.id, result.insertIdx));
+//            }
+//          }
+//        }
+//
+//        graph.replace(node);
+//        nodes.push(node.id);
+//      }
 
       way = way.update({ nodes: nodes });
       graph.replace(way);
@@ -118,6 +138,7 @@ export function actionRapidAcceptFeature(entityID: EntityID, extGraph: Graph): A
 
       let relation = new OsmRelation(extRelation);  // copy relation before modifying
       removeMetadata(relation);
+      allIDs.add(relation.id);
 
       const members: OsmRelationMember[] = [];
       for (const member of relation.members) {
@@ -142,7 +163,119 @@ export function actionRapidAcceptFeature(entityID: EntityID, extGraph: Graph): A
       seenRelations.set(extRelation.id, relation);  // don't create it again
       return relation;
     }
-  };
+
+
+    /**
+     * After adding a way, automatically connect it to existing features in the working graph.
+     * @param  extWay    - the original OsmWay in the external graph
+     * @param  extGraph  - the external Graph
+     * @param  way       - the newly accepted OsmWay
+     * @param  graph     - the current Graph
+     */
+    function attemptAutoconnect(extWay: OsmWay, extGraph: Graph, way: OsmWay, graph: Graph): void {
+      const context = graph.context;
+      const editor = context.systems.editor;
+      const rapid = context.systems.rapid;
+      const schema = context.systems.schema;
+      const spatial = context.systems.spatial;
+      const storage = context.systems.storage;
+
+      const doAutoconnect = storage?.getItem('rapid-internal-feature.autoConnect') === 'true';
+      if (!doAutoconnect || !editor || !rapid || !spatial) return;
+
+      graph = graph.commit();
+
+      // spatialIDs follow a standard format
+      const serviceID = extWay.props.__service__;
+      const datasetID = extWay.props.__datasetid__;
+      const extSpatialID = `${serviceID}-${datasetID}-data`;
+      const baseSpatialID = editor.spatialIDForGraph(graph);  // 'editor_staging'
+
+      // For each node in the way we've just accepted, look for things to connect to...
+      for (const nodeID of way.nodes) {
+        let node = graph.entity(nodeID) as OsmNode;
+        const coord = node.geoms.parts[0].world?.coords as Vec2;  // A node should have a single world coord
+        if (!coord) continue;
+
+        // 1. If there are unaccepted nodes in the external dataset at the same location as
+        // the node that we just added, mark them accepted also and import their tags.
+        const extHits = spatial.getItemsAtCoord(extSpatialID, coord);
+        for (const hit of extHits) {
+          const other = hit.contents as OsmNode;
+          const otherID = other.id;
+          if (other.type !== 'node') continue;
+          if (rapid.acceptIDs.has(otherID) || rapid.ignoreIDs.has(otherID) || allIDs.has(otherID)) continue;
+
+          const copy = new OsmNode(other);   // copy node before modifying
+          removeMetadata(copy);
+          allIDs.add(copy.id);
+          for (const [k, v] of Object.entries(copy.props?.tags ?? {})) {
+            node.props.tags![k] = v;
+          }
+          node.touch();
+          graph.replace(node);
+        }
+
+        // 2. If the node can connect to the basemap, do that.
+        const SNAP_DIST = 1;   // 1 meter
+        const box = queryBox(node.loc!, SNAP_DIST);
+        const baseHits = spatial.getItemsAtBox(baseSpatialID, box);
+        for (const hit of baseHits) {
+          // Make sure we're using the current the version of the target as it exists in this graph.
+          const target = graph.hasEntity((hit.contents as OsmEntity).id);
+          if (!target) continue;
+
+          // Code here is similar to snapping code found in places like DragNodeMode.ts.
+          // snap to node or way if possible.
+          if (target.type === 'node') {
+            graph = actionConnect([ node.id, target.id ])(graph);
+            // refresh entities after connect (one of them survived)
+            node = (graph.hasEntity(node.id) ?? graph.hasEntity(target.id)) as OsmNode;
+            way = graph.entity(way.id) as OsmWay;
+
+          } else if (target.type === 'way') {
+            const targetWay = target as OsmWay;
+            if (!isTaggedAsHighway(targetWay)) continue;  // connect to highway/path only
+
+            // A way will have LineString or Polygon geometry. We can use 'outer' to get these points.
+            const line = targetWay.geoms.parts[0]!.world!.outer as Vec2[];
+            const choice = vecProject(coord, line);
+            if (choice && choice.point) {
+              const snapLoc = projWorldToWgs84(choice.point);
+              const dist = geoSphericalDistance(node.loc!, snapLoc);
+              if (dist < SNAP_DIST) {
+                const edge: [EntityID, EntityID] = [ targetWay.nodes[choice.index - 1], targetWay.nodes[choice.index] ];
+                graph = actionAddMidpoint({ loc: snapLoc, edge }, node)(graph);
+                // refresh entities after connect
+                node = graph.entity(node.id) as OsmNode;
+                way = graph.entity(way.id) as OsmWay;
+              }
+            }
+          }
+        }
+      }
+
+      // 3.connect disconnected ways?
+
+      /**
+       * Tests whether an entity's highway tag matches a known routable highway.
+       * @param entity - The entity to check
+       * @returns `true` if the entity is tagged as a routable highway
+       */
+      function isTaggedAsHighway(entity: OsmEntity): boolean {
+        return !!schema!.getScope('osm').rulesets.get('connected_highway')?.match({ highway: entity.tags.highway });
+      }
+    }
+
+  }) as RapidAcceptAction;
+
+
+  /**
+   *  Accessor to get _all_ the ids that were accepted by the action.
+   */
+  action.getAllIDs = () => allIDs;
+
+  return action;
 
 
   /**
@@ -229,4 +362,29 @@ export function actionRapidAcceptFeature(entityID: EntityID, extGraph: Graph): A
     delete tags.import;
     delete tags.dupe;
   }
+
+
+  /**
+   * Generate a query box for the spatial system, given a center and a padding.
+   * @param   loc      - center coordinate (in WGS84 coordinates)
+   * @param   padding  - padding disatance (in meters)
+   * @returns Box object with `minX`,`minY`,`maxX`,`maxY` properties
+   */
+  function queryBox(loc: Vec2, padding: number) {
+    const extent = new Extent(loc).padByMeters(padding);
+
+    // Convert the WGS84 extent to a world-coordinate box.
+    const bb = extent.bbox();
+    const [ax, ay] = projWgs84ToWorld([bb.minX, bb.minY]);
+    const [bx, by] = projWgs84ToWorld([bb.maxX, bb.maxY]);
+    return {
+      minX: Math.min(ax, bx),
+      minY: Math.min(ay, by),
+      maxX: Math.max(ax, bx),
+      maxY: Math.max(ay, by)
+    };
+  }
+
+
 }
+

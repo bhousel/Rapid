@@ -184,6 +184,10 @@ export class UiRapidInspector {
     const datasetID = datum.props.__datasetid__.replace('-conflated', '');
     const dataset = rapid.datasets.get(datasetID);
 
+    const action = actionRapidAcceptFeature(datum.id, graph);
+    editor.perform(action);
+    const allIDs = [...action.getAllIDs()];
+
     // In place of a string annotation, this introduces an "object-style"
     // annotation, where "type" and "description" are standard keys,
     // and there may be additional properties. Note that this will be
@@ -192,10 +196,10 @@ export class UiRapidInspector {
       type: 'rapid_accept_feature',
       description: l10n.t('rapid_inspector.option_accept.annotation'),
       entityID: datum.id,
+      allIDs: allIDs,
       dataUsed: dataset?.dataUsed || [datasetID]
     };
 
-    editor.perform(actionRapidAcceptFeature(datum.id, graph));
     editor.commit({ annotation: annotation, selectedIDs: [datum.id] });
 
     // What next

@@ -18,7 +18,12 @@ export class UiRapidPowerUserFeatures {
     const urlhash = context.systems.urlhash;
 
     this.featureFlags = [
-      'previewDatasets', 'tagnosticRoadCombine', 'tagSources', 'showAutoFix', 'allowLargeEdits'
+      'autoConnect',
+      'previewDatasets',
+      'tagnosticRoadCombine',
+      'tagSources',
+      'showAutoFix',
+      'allowLargeEdits'
     ];
 
     // D3 selections

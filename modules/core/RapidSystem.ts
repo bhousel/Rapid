@@ -372,9 +372,14 @@ export class RapidSystem extends AbstractSystem {
       const annotation = edit.annotation as Record<string, unknown> | undefined;
 
       if (annotation?.type === 'rapid_accept_feature') {
-        if (annotation.entityID)  this.acceptIDs.add(annotation.entityID as string);
+        const ids = (annotation.allIDs ?? []) as EntityID[];
+        for (const id of ids) {
+          this.acceptIDs.add(id);
+        }
       } else if (annotation?.type === 'rapid_ignore_feature') {
-        if (annotation.entityID)  this.ignoreIDs.add(annotation.entityID as string);
+        if (annotation.entityID) {
+          this.ignoreIDs.add(annotation.entityID as string);
+        }
       }
     }
   }

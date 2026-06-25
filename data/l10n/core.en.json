@@ -1463,6 +1463,10 @@
         "label": "Rapid Power User Features",
         "description": "for Rapid Insiders"
       },
+      "autoConnect": {
+        "label": "Autoconnect on Accept",
+        "description": "Accepted new features are automatically connected to existing features"
+      },
       "previewDatasets": {
         "label": "Show preview datasets",
         "description": "Preview datasets are still in review and not available for all users"
