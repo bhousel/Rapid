@@ -1,10 +1,13 @@
 import { actionAddMidpoint } from '../actions/add_midpoint.ts';
 import { actionConnect } from './connect.ts';
 import { OsmNode, OsmRelation, OsmWay } from '../data/index.ts';
-import { Extent, geoSphericalDistance, projWorldToWgs84, projWgs84ToWorld, Vec2, vecEqual, vecProject, vecInterp } from '@rapid-sdk/math';
+import { Extent, geoSphericalDistance, projWorldToWgs84, projWgs84ToWorld, Vec2, vecProject, vecInterp } from '@rapid-sdk/math';
+import { validateCrossingWays } from '../validators/crossing_ways.ts';
 
 import type { Action } from './types.ts';
+import type { Closest } from '@rapid-sdk/math';
 import type { Graph } from '../lib/Graph.ts';
+import type { Midpoint } from '../actions/add_midpoint.ts';
 import type { OsmEntity, OsmRelationMember, OsmTags } from '../data/types.ts';
 
 
@@ -42,7 +45,7 @@ export function actionRapidAcceptFeature(entityID: EntityID, extGraph: Graph): R
       acceptNode(extEntity as OsmNode);
     } else if (extEntity.type === 'way') {
       const way = acceptWay(extEntity as OsmWay);
-      attemptAutoconnect(extEntity as OsmWay, extGraph, way, graph);
+      attemptAutoconnect(extEntity as OsmWay, way, graph);
     } else if (extEntity.type === 'relation') {
       acceptRelation(extEntity as OsmRelation);
     }
@@ -168,11 +171,10 @@ export function actionRapidAcceptFeature(entityID: EntityID, extGraph: Graph): R
     /**
      * After adding a way, automatically connect it to existing features in the working graph.
      * @param  extWay    - the original OsmWay in the external graph
-     * @param  extGraph  - the external Graph
      * @param  way       - the newly accepted OsmWay
      * @param  graph     - the current Graph
      */
-    function attemptAutoconnect(extWay: OsmWay, extGraph: Graph, way: OsmWay, graph: Graph): void {
+    function attemptAutoconnect(extWay: OsmWay, way: OsmWay, graph: Graph): void {
       const context = graph.context;
       const editor = context.systems.editor;
       const rapid = context.systems.rapid;
@@ -185,13 +187,15 @@ export function actionRapidAcceptFeature(entityID: EntityID, extGraph: Graph): R
 
       graph = graph.commit();
 
-      // spatialIDs follow a standard format
       const serviceID = extWay.props.__service__;
       const datasetID = extWay.props.__datasetid__;
-      const extSpatialID = `${serviceID}-${datasetID}-data`;
+      const extSpatialID = `${serviceID}-${datasetID}-data`;  // spatialID naming convention
       const baseSpatialID = editor.spatialIDForGraph(graph);  // 'editor_staging'
 
       // For each node in the way we've just accepted, look for things to connect to...
+      // Be careful: some of the modifications below can modify or replace `way` or `node`.
+      // for (let i = 0; i < way.nodes.length; i++)
+      //  const nodeID = way.nodes[i];
       for (const nodeID of way.nodes) {
         let node = graph.entity(nodeID) as OsmNode;
         const coord = node.geoms.parts[0].world?.coords as Vec2;  // A node should have a single world coord
@@ -217,6 +221,9 @@ export function actionRapidAcceptFeature(entityID: EntityID, extGraph: Graph): R
         }
 
         // 2. If the node can connect to the basemap, do that.
+        // Code here is similar to snapping code found in places like DragNodeMode.ts.
+        // Choose the closest thing within the snap distance, either a node or a way.
+        // Snap only to highways for now.
         const SNAP_DIST = 1;   // 1 meter
         const box = queryBox(node.loc!, SNAP_DIST);
         const baseHits = spatial.getItemsAtBox(baseSpatialID, box);
@@ -225,17 +232,17 @@ export function actionRapidAcceptFeature(entityID: EntityID, extGraph: Graph): R
           const target = graph.hasEntity((hit.contents as OsmEntity).id);
           if (!target) continue;
 
-          // Code here is similar to snapping code found in places like DragNodeMode.ts.
-          // snap to node or way if possible.
           if (target.type === 'node') {
-            graph = actionConnect([ node.id, target.id ])(graph);
+            if (!hasParentHighway(graph, target as OsmNode)) continue;  // connect to highway/path only
+
+            graph = actionConnect([node.id, target.id])(graph);
             // refresh entities after connect (one of them survived)
             node = (graph.hasEntity(node.id) ?? graph.hasEntity(target.id)) as OsmNode;
             way = graph.entity(way.id) as OsmWay;
 
           } else if (target.type === 'way') {
             const targetWay = target as OsmWay;
-            if (!isTaggedAsHighway(targetWay)) continue;  // connect to highway/path only
+            if (!isHighway(graph, targetWay)) continue;  // connect to highway/path only
 
             // A way will have LineString or Polygon geometry. We can use 'outer' to get these points.
             const line = targetWay.geoms.parts[0]!.world!.outer as Vec2[];
@@ -244,7 +251,7 @@ export function actionRapidAcceptFeature(entityID: EntityID, extGraph: Graph): R
               const snapLoc = projWorldToWgs84(choice.point);
               const dist = geoSphericalDistance(node.loc!, snapLoc);
               if (dist < SNAP_DIST) {
-                const edge: [EntityID, EntityID] = [ targetWay.nodes[choice.index - 1], targetWay.nodes[choice.index] ];
+                const edge: [EntityID, EntityID] = [targetWay.nodes[choice.index - 1], targetWay.nodes[choice.index]];
                 graph = actionAddMidpoint({ loc: snapLoc, edge }, node)(graph);
                 // refresh entities after connect
                 node = graph.entity(node.id) as OsmNode;
@@ -253,18 +260,121 @@ export function actionRapidAcceptFeature(entityID: EntityID, extGraph: Graph): R
             }
           }
         }
+
+        // First, compute the distance to neighbor nodes.
+        // We don't want to snap to anything in the basemap farther than this distance.
+        // (It could cause a node to jump past its neighbor or break the way!)
+//        let neighborDistance = Infinity;  // in meters
+//        const nextID = way.nodes[i + 1];
+//        const prevID = way.nodes[i - 1];
+//        const nextNode = (nextID ? graph.hasEntity(nextID) : undefined) as OsmNode | undefined;
+//        const prevNode = (prevID ? graph.hasEntity(prevID) : undefined) as OsmNode | undefined;
+//        const nextLoc = nextNode?.loc;
+//        const prevLoc = prevNode?.loc;
+//        if (nextLoc) {
+//          neighborDistance = Math.min(neighborDistance, geoSphericalDistance(node.loc!, nextLoc));
+//        }
+//        if (prevLoc) {
+//          neighborDistance = Math.min(neighborDistance, geoSphericalDistance(node.loc!, prevLoc));
+//        }
+//
+//        const SEARCH_DIST = Math.min(0.5, neighborDistance);   // 1 meter (or less if close neighbor)
+//        let minDistance = Infinity;
+//        let target: OsmEntity | undefined;
+//        let midpoint: Midpoint | undefined;
+//
+//        const box = queryBox(node.loc!, SEARCH_DIST);
+//        const baseHits = spatial.getItemsAtBox(baseSpatialID, box);
+//        for (const hit of baseHits) {
+//          // Make sure we're using the current the version of the candidate as it exists in this graph.
+//          const candidate = graph.hasEntity((hit.contents as OsmEntity).id);
+//          if (!candidate) continue;
+//
+//          if (candidate.type === 'node') {
+//            const candidateNode = candidate as OsmNode;
+//            if (!hasParentHighway(graph, candidateNode)) continue;
+//
+//            const dist = geoSphericalDistance(node.loc!, candidateNode.loc!);
+//            if (dist > neighborDistance) continue;  // let our neighbor snap here instead.
+//            if (dist < minDistance) {
+//              minDistance = dist;
+//              target = candidateNode;
+//            }
+//
+//          } else if (candidate.type === 'way') {
+//            const candidateWay = candidate as OsmWay;
+//            if (!isHighway(graph, candidateWay)) continue;
+//
+//            // A way will have LineString or Polygon geometry. We can use 'outer' to get these points.
+//            const line = candidateWay.geoms.parts[0]!.world!.outer as Vec2[];
+//            const choice = vecProject(coord, line);
+//
+//            if (choice && choice.point) {
+//              // Add a slight distance penalty - It's possible that we will hit both a candidate node and way
+//              // at 0 distance, and we'd perfer connecting to the node over adding a midpoint on the way.
+//              const loc = projWorldToWgs84(choice.point);
+//              const dist = geoSphericalDistance(node.loc!, loc) + 1e-7;
+//              if (dist > neighborDistance) continue;  // let our neighbor snap here instead.
+//              if (dist < minDistance) {
+//                const edge: [EntityID, EntityID] = [candidateWay.nodes[choice.index - 1], candidateWay.nodes[choice.index]];
+//                minDistance = dist;
+//                target = candidateWay;
+//                midpoint = { edge, loc };
+//              }
+//            }
+//          }
+//        }
+//
+//        // snap to node or way if possible.
+//        if (target?.type === 'node') {
+//          graph = actionConnect([ node.id, target.id ])(graph);
+//          // refresh entities after connect (one of them survived)
+//          node = (graph.hasEntity(node.id) ?? graph.hasEntity(target.id)) as OsmNode;
+//          way = graph.entity(way.id) as OsmWay;
+//
+//        } else if (target?.type === 'way' && midpoint) {
+//          graph = actionAddMidpoint(midpoint, node)(graph);
+//          // refresh entities after connect
+//          node = graph.entity(node.id) as OsmNode;
+//          way = graph.entity(way.id) as OsmWay;
+//        }
       }
 
-      // 3.connect disconnected ways?
+      // 3. Run the validator for crossing ways and autofix whatever it found.
+      const checkCrossingWays = validateCrossingWays(context);
+      const result = checkCrossingWays(way, graph);
+      for (const issue of result.issues) {
+        if (issue.autoArgs) {
+          graph = issue.autoArgs[0](graph);   // autoArgs = [action, annotation]
+        }
+      }
 
       /**
-       * Tests whether an entity's highway tag matches a known routable highway.
-       * @param entity - The entity to check
-       * @returns `true` if the entity is tagged as a routable highway
+       * Tests whether the given way is a line tagged as a routable highway.
+       * @param graph  - The graph to check
+       * @param entity - The way to check
+       * @returns `true` if the way is a routable highway
        */
-      function isTaggedAsHighway(entity: OsmEntity): boolean {
-        return !!schema!.getScope('osm').rulesets.get('connected_highway')?.match({ highway: entity.tags.highway });
+      function isHighway(graph: Graph, way: OsmWay): boolean {
+        if (way.geometry(graph) !== 'line') return false;
+        return !!schema!.getScope('osm').rulesets.get('connected_highway')?.match({ highway: way.tags.highway });
       }
+
+      /**
+       * Tests whether the given node has a parent routable highway.
+       * @param graph  - The graph to check
+       * @param node   - The node to check
+       * @returns `true` if the node has a parent routable highway
+       */
+      function hasParentHighway(graph: Graph, node: OsmNode): boolean {
+        for (const parent of graph.parentWays(node)) {
+          if (isHighway(graph, parent)) {
+            return true;
+          }
+        }
+        return false;
+      }
+
     }
 
   }) as RapidAcceptAction;

@@ -5,6 +5,7 @@ import { actionChangeTags } from '../actions/change_tags.ts';
 import { actionUpgradeTags } from '../actions/upgrade_tags.ts';
 import { Graph, ValidationIssue, ValidationFix } from '../lib/index.ts';
 
+import type { Action } from '../actions/types.ts';
 import type { Context } from '../Context.ts';
 import type { D3Selection } from 'd3-selection';
 import type { NsiUpgradeResult } from '../services/NsiService.ts';
@@ -156,7 +157,7 @@ export function validateOutdatedTags(context: Context): ValidatorFunction {
 
     // Allow autofix for simple upgrades..
     // `noncanonical_brand` upgrades may have false positives, so they should be reviewed manually.
-    let autoArgs: unknown[] | undefined;
+    let autoArgs: [Action, unknown] | undefined;
     if (subtype !== 'noncanonical_brand') {
       autoArgs = [actionDoTagUpgrade, l10n.t('issues.fix.upgrade_tags.annotation')];
     }

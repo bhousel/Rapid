@@ -733,7 +733,7 @@ export function validateCrossingWays(context: Context): ValidatorFunction {
           const minEdgeLengthMeters = 0.55;
 
           /**
-           *
+           * Does the given node act as an intersection that connects to other ways?
            * @param node
            */
           function countIncidentEdges(node: OsmNode): number {
@@ -755,9 +755,8 @@ export function validateCrossingWays(context: Context): ValidatorFunction {
             return edgeCount;
           }
 
-          // decide where to bound the structure along the way, splitting as necessary
           /**
-           *
+           * Decide where to bound the structure along the way, splitting as necessary
            * @param edgeToSplit
            * @param endNode
            * @param locGetter

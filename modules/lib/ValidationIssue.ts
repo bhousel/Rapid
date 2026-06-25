@@ -2,6 +2,7 @@ import { Extent } from '@rapid-sdk/math';
 import { utilTotalExtent } from '../util/util.ts';
 import { ValidationFix } from './ValidationFix.ts';
 
+import type { Action } from '../actions/types.ts';
 import type { Context } from '../Context.ts';
 import type { D3Selection } from 'd3-selection';
 import type { Vec2 } from '@rapid-sdk/math';
@@ -30,8 +31,8 @@ export interface ValidationIssueProps {
   data: Record<string, unknown>;
   /** String to further differentiate the issue */
   hash: string;
-  /** If this issue can be autofixed, supply the autofix args at issue creation */
-  autoArgs: unknown[];
+  /** If this issue can be autofixed, autoArgs will contain an [action, annotation] tuple. */
+  autoArgs?: [Action, unknown];
   /** Function returning localized string for the issue message */
   message: () => string;
   /** Function to render reference information */
@@ -67,8 +68,8 @@ export class ValidationIssue {
   public data: Record<string, unknown> | undefined;
   /** String to further differentiate the issue */
   public hash: string | undefined;
-  /** If this issue can be autofixed, supply the autofix args at issue creation */
-  public autoArgs: unknown[] | undefined;
+  /** If this issue can be autofixed, autoArgs will contain an [action, annotation] tuple. */
+  public autoArgs: [Action, unknown] | undefined;
   /** Function returning localized string for the issue message */
   public message: () => string;
   /** Function to render reference information */

@@ -4,6 +4,7 @@ import { geoOrthoCanOrthogonalize } from '../geo/ortho.ts';
 import { ValidationIssue } from '../lib/ValidationIssue.ts';
 import { ValidationFix } from '../lib/ValidationFix.ts';
 
+import type { Action } from '../actions/types.ts';
 import type { Context } from '../Context.ts';
 import type { D3Selection } from 'd3-selection';
 import type { Graph } from '../lib/Graph.ts';
@@ -95,7 +96,7 @@ export function validateUnsquareWay(context: Context): ValidatorFunction {
 
     if (!geoOrthoCanOrthogonalize(points, isClosed, epsilon, degreeThreshold, true)) return result;
 
-    let autoArgs;
+    let autoArgs: [Action, unknown] | undefined;
     // don't allow autosquaring features linked to wikidata
     if (!entity.tags.wikidata) {
       // important to use the same `degreeThreshold` as for detection:
