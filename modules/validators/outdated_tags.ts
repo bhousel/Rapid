@@ -157,7 +157,7 @@ export function validateOutdatedTags(context: Context): ValidatorFunction {
 
     // Allow autofix for simple upgrades..
     // `noncanonical_brand` upgrades may have false positives, so they should be reviewed manually.
-    let autoArgs: [Action, unknown] | undefined;
+    let autoArgs: [Action, string] | undefined;
     if (subtype !== 'noncanonical_brand') {
       autoArgs = [actionDoTagUpgrade, l10n.t('issues.fix.upgrade_tags.annotation')];
     }

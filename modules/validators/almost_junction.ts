@@ -10,6 +10,7 @@ import { geoHasSelfIntersections } from '../geo/geom.ts';
 import { ValidationIssue } from '../lib/ValidationIssue.ts';
 import { ValidationFix } from '../lib/ValidationFix.ts';
 
+import type { Action } from '../actions/types.ts';
 import type { Context } from '../Context.ts';
 import type { D3Selection } from 'd3-selection';
 import type { Graph } from '../lib/Graph.ts';
@@ -17,6 +18,14 @@ import type { Midpoint } from '../actions/add_midpoint.ts';
 import type { OsmEntity, OsmNode, OsmTags, OsmWay } from '../data/types.ts';
 import type { ValidatorFunction, ValidatorResult } from './types.ts';
 import type { Vec2 } from '@rapid-sdk/math';
+
+interface ConnectionInfo {
+  mid: OsmNode;
+  node: OsmNode;
+  wid: EntityID;
+  edge: [EntityID, EntityID],
+  cross_loc: Vec2
+};
 
 
 /**
@@ -71,14 +80,20 @@ export function validateAlmostJunction(context: Context): ValidatorFunction {
     if (entity.isDegenerate()) return result;
 
     const way = entity as OsmWay;
-    const extendableNodeInfos = findConnectableEndNodesByExtension(way, graph);
+    if (way.isClosed()) return result;
 
+    const extendableNodeInfos = findConnectableEndNodesByExtension(way, graph);
     for (const extendableNodeInfo of extendableNodeInfos) {
-      result.issues.push(new ValidationIssue(context, {
+      const autoArgs : [Action, string] = [
+        actionExtendNode(extendableNodeInfo),
+        l10n.t('issues.fix.connect_almost_junction.annotation')
+      ];
+
+      const issue = new ValidationIssue(context, {
         type,
         subtype: 'highway-highway',
         severity: 'warning',
-        message: function(this: any) {
+        message: function (this: any) {
           const graph = editor.staging.graph;
           const entity1 = graph.hasEntity(this.entityIds[0]);
           if (this.entityIds[0] === this.entityIds[2]) {
@@ -101,16 +116,60 @@ export function validateAlmostJunction(context: Context): ValidatorFunction {
         ],
         loc: extendableNodeInfo.node.loc,
         hash: JSON.stringify(extendableNodeInfo.node.loc),
+        autoArgs: autoArgs,
         data: {
           midId: extendableNodeInfo.mid.id,
           edge: extendableNodeInfo.edge,
           cross_loc: extendableNodeInfo.cross_loc
         },
         dynamicFixes: makeFixes
-      }));
+      });
+
+      result.issues.push(issue);
     }
 
     return result;
+
+
+    /**
+     * An action to perform the steps to extend the endpoint.
+     * @returns an Action function that accepts a graph and returns a modified graph.
+     */
+    function actionExtendNode(info: ConnectionInfo) {
+      return (graph: Graph) => {
+        const midNode = graph.hasEntity(info.mid.id) as OsmNode;
+        const endNode = graph.hasEntity(info.node.id) as OsmNode;
+        const crossWay = graph.hasEntity(info.wid) as OsmWay;
+        if (!midNode || !endNode || !crossWay) return graph;
+
+        // When endpoints are close, just join if resulting small change in angle (iD#7201)
+        const nearEndNodes = findNearbyEndNodes(endNode, crossWay, graph);
+        if (nearEndNodes.length > 0) {
+          const colinear = findSmallJoinAngle(midNode, endNode, nearEndNodes);
+          if (colinear) {
+            return actionMergeNodes([colinear.id, endNode.id], colinear.loc!)(graph);
+          }
+        }
+
+        const targetEdge = info.edge;
+        const crossLoc = info.cross_loc;
+        const edgeA = graph.hasEntity(info.edge[0]) as OsmNode;
+        const edgeB = graph.hasEntity(info.edge[1]) as OsmNode;
+        if (!edgeA || !edgeB) return graph;
+
+        const edgeNodes = [edgeA, edgeB];
+        const points = edgeNodes.map(node => node.loc!);
+        const closest = geoSphericalClosestPoint(points, crossLoc);
+
+        // already a point nearby, just connect to that
+        if (closest && closest.distance < WELD_TH_METERS) {
+          const node = edgeNodes[closest.index] as OsmNode;
+          return actionMergeNodes([node.id, endNode.id], closest.point)(graph);
+        } else {   // create a midpoint on the target way
+          return actionAddMidpoint({ loc: crossLoc, edge: targetEdge } as Midpoint, endNode)(graph);
+        }
+      };
+    }
 
 
     /**
@@ -151,7 +210,7 @@ export function validateAlmostJunction(context: Context): ValidatorFunction {
           const closest = geoSphericalClosestPoint(points, crossLoc);  // note: using wgs84, should change this
 
           // already a point nearby, just connect to that
-          if (closest && closest.distance < WELD_TH_METERS) {    // note: this will not be in meters
+          if (closest && closest.distance < WELD_TH_METERS) {
             const node = edgeNodes[closest.index] as OsmNode;
             editor.perform(actionMergeNodes([ node.id, endNode.id ], closest.point));
             editor.commit({
@@ -203,6 +262,7 @@ export function validateAlmostJunction(context: Context): ValidatorFunction {
         .text(l10n.t('issues.almost_junction.highway-highway.reference'));
     }
 
+
     /**
      * Tests whether a node is a valid candidate for extension.
      * Must be loaded, not tagged as not-continuing, and have exactly one parent way.
@@ -214,55 +274,40 @@ export function validateAlmostJunction(context: Context): ValidatorFunction {
       // Bail out if map not fully loaded here - we won't know all the node's parentWays. - iD#5938
       // Don't worry, as more map tiles are loaded, we'll have additional chances to validate it.
       const osm = context.services.osm;
-      if (osm && !osm.isDataLoaded(node.loc!)) {
-        return false;
-      }
-      if (isTaggedAsNotContinuing(node) || graph.parentWays(node).length !== 1) {
-        return false;
-      }
-
-      let occurrences = 0;
-      for (const index in way.nodes) {
-        if (way.nodes[index] === node.id) {
-          occurrences += 1;
-          if (occurrences > 1) {
-            return false;
-          }
-        }
-      }
+      if (osm && !osm.isDataLoaded(node.loc!)) return false;
+      if (isTaggedAsNotContinuing(node)) return false;                      // node is tagged as not continuing
+      if (graph.parentWays(node).length !== 1) return false;                // node has several parents already
+      if (way.nodes.filter(id => id === node.id).length > 1) return false;  // node appears multiple times in way
       return true;
     }
 
+
     /**
      * Finds endpoints of a way that could be connected to nearby roads
-     * by extending the last edge segment.
+     * by extending them a short distance.
      * @param way - The way to check
      * @param graph - The current graph
      * @returns Array of connection info objects for extendable endpoints
      */
-    function findConnectableEndNodesByExtension(way: OsmWay, graph: Graph): any[] {
-      const results: any[] = [];
-      if (way.isClosed()) return results;
+    function findConnectableEndNodesByExtension(way: OsmWay, graph: Graph): ConnectionInfo[] {
+      const results: ConnectionInfo[] = [];
 
-      let testNodes: OsmNode[];
-      const indices = [0, way.nodes.length - 1];
-      indices.forEach(nodeIndex => {
-        const nodeID = way.nodes[nodeIndex];
-        const node = graph.entity(nodeID) as OsmNode;
+      for (const i of [0, way.nodes.length - 1]) {     // first, last
+        const nodeID = way.nodes[i];
+        const node = graph.hasEntity(nodeID) as OsmNode;
+        if (!node) continue;
+        if (!isExtendableCandidate(node, way)) continue;
 
-        if (!isExtendableCandidate(node, way)) return;
+        const connectionInfo = canConnectByExtend(way, i);
+        if (!connectionInfo) continue;
 
-        const connectionInfo = canConnectByExtend(way, nodeIndex);
-        if (!connectionInfo) return;
-
-        testNodes = graph.childNodes(way).slice();   // shallow copy
-        testNodes[nodeIndex] = testNodes[nodeIndex].move(connectionInfo.cross_loc);
-
-        // don't flag issue if connecting the ways would cause self-intersection
-        if (geoHasSelfIntersections(testNodes, nodeID)) return;
+        // Try moving the node - would it create a self intersection?  If so, skip it.
+        const testNodes = graph.childNodes(way).slice();   // shallow copy
+        testNodes[i] = testNodes[i].move(connectionInfo.cross_loc);
+        if (geoHasSelfIntersections(testNodes, nodeID)) continue;
 
         results.push(connectionInfo);
-      });
+      }
 
       return results;
     }
@@ -331,6 +376,7 @@ export function validateAlmostJunction(context: Context): ValidatorFunction {
       return tags[key] !== undefined && tags[key] !== 'no';
     }
 
+
     /**
      * Tests whether two ways can be connected based on bridge/tunnel status and layer/level compatibility.
      * @param way - The first way
@@ -359,17 +405,20 @@ export function validateAlmostJunction(context: Context): ValidatorFunction {
       return true;
     }
 
+
     /**
      * Tests whether extending a way's endpoint would intersect a nearby way segment.
-     * @param way - The way to extend
-     * @param endNodeIdx - Index of the endpoint node (0 or last)
-     * @returns Connection info with edge and crossing location, or `null`
+     * @param   way - The way to extend
+     * @param   endIndex - Index of the endpoint node (0 or last)
+     * @return  Connection info with edge and crossing location, or `null`
      */
-    function canConnectByExtend(way: OsmWay, endNodeIdx: number): any | null {
-      const tipNodeID = way.nodes[endNodeIdx];  // the 'tip' node for extension point
-      const midNodeID = endNodeIdx === 0 ? way.nodes[1] : way.nodes[way.nodes.length - 2];  // the other node of the edge
-      const tipNode = graph.entity(tipNodeID) as OsmNode;
-      const midNode = graph.entity(midNodeID) as OsmNode;
+    function canConnectByExtend(way: OsmWay, endIndex: number): ConnectionInfo | null {
+      const tipNodeID = way.nodes[endIndex];  // the 'tip' node for extension point
+      const midNodeID = endIndex === 0 ? way.nodes[1] : way.nodes[way.nodes.length - 2];  // the other node of the edge
+      const tipNode = graph.hasEntity(tipNodeID) as OsmNode;
+      const midNode = graph.hasEntity(midNodeID) as OsmNode;
+      if (!tipNode || !midNode) return null;
+
       const lon = tipNode.loc![0];
       const lat = tipNode.loc![1];
       const lon_range = geoMetersToLon(EXTEND_TH_METERS, lat) / 2;
@@ -379,12 +428,15 @@ export function validateAlmostJunction(context: Context): ValidatorFunction {
         [lon + lon_range, lat + lat_range]
       );
 
-      // first, extend the edge of [midNode -> tipNode] by EXTEND_TH_METERS and find the "extended tip" location
-      const edgeLen = geoSphericalDistance(midNode.loc!, tipNode.loc!);
-      const t = EXTEND_TH_METERS / edgeLen + 1.0;
-      const extTipLoc = vecInterp(midNode.loc!, tipNode.loc!, t);
+      // Extend the endpoint along [midNode -> tipNode] by EXTEND_TH_METERS
+      const segLength = geoSphericalDistance(midNode.loc!, tipNode.loc!);
+      const t1 = 1 + (EXTEND_TH_METERS / segLength);
+      const farLoc = vecInterp(midNode.loc!, tipNode.loc!, t1);
+      // We'll also test a position where the endpoint is pulled back by a small amount
+      const t2 = 0.95;
+      const nearLoc = vecInterp(midNode.loc!, tipNode.loc!, t2);
 
-      // then, check if the extension part [tipNode.loc -> extTipLoc] intersects any other ways
+      // Check if the test [nearLoc -> farLoc] intersects any other ways
       const segmentInfos = editor.waySegments(queryExtent, graph);
       for (const segmentInfo of segmentInfos) {
         const way2 = graph.entity(segmentInfo.wayID) as OsmWay;
@@ -393,11 +445,11 @@ export function validateAlmostJunction(context: Context): ValidatorFunction {
         if (!canConnectWays(way, way2)) continue;
 
         const edge: [EntityID, EntityID] = segmentInfo.edge;
-        if (edge[0] === tipNodeID || edge[1] === tipNodeID) continue;
+        if (edge[0] === tipNodeID || edge[1] === tipNodeID) continue;  // skip self
 
         const nA = graph.entity(edge[0]) as OsmNode;
         const nB = graph.entity(edge[1]) as OsmNode;
-        const crossLoc = geomLineIntersection([tipNode.loc!, extTipLoc], [nA.loc!, nB.loc!]);
+        const crossLoc = geomLineIntersection([nearLoc, farLoc], [nA.loc!, nB.loc!]);
         if (crossLoc) {
           return {
             mid: midNode,

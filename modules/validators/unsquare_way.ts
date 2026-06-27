@@ -96,7 +96,7 @@ export function validateUnsquareWay(context: Context): ValidatorFunction {
 
     if (!geoOrthoCanOrthogonalize(points, isClosed, epsilon, degreeThreshold, true)) return result;
 
-    let autoArgs: [Action, unknown] | undefined;
+    let autoArgs: [Action, string] | undefined;
     // don't allow autosquaring features linked to wikidata
     if (!entity.tags.wikidata) {
       // important to use the same `degreeThreshold` as for detection:

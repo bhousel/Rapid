@@ -8,6 +8,7 @@ import { OsmNode } from '../data/OsmNode.ts';
 import { ValidationIssue } from '../lib/ValidationIssue.ts';
 import { ValidationFix } from '../lib/ValidationFix.ts';
 
+import type { Action } from '../actions/types.ts';
 import type { Context } from '../Context.ts';
 import type { D3Selection } from 'd3-selection';
 import type { Graph } from '../lib/Graph.ts';
@@ -846,7 +847,12 @@ export function validateCrossingWays(context: Context): ValidatorFunction {
    * @param tags - Tags to assign to the new connection node
    * @returns A `[action, annotation]` tuple
    */
-  function getConnectWaysAction(loc: Vec2, edges: [EntityID, EntityID][], crossingWayID: EntityID | null, tags: OsmTags): any[] {
+  function getConnectWaysAction(
+    loc: Vec2,
+    edges: [EntityID, EntityID][],
+    crossingWayID: EntityID | null,
+    tags: OsmTags
+  ): [Action, string] {
 
     const actionConnectCrossingWays = (graph: Graph): Graph => {
       // Create a new candidate junction node which will be inserted at the connection location..
