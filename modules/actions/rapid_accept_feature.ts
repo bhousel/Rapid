@@ -194,12 +194,29 @@ export function actionRapidAcceptFeature(entityID: EntityID, extGraph: Graph): R
 
       // For each node in the way we've just accepted, look for things to connect to...
       // Be careful: some of the modifications below can modify or replace `way` or `node`.
-      // for (let i = 0; i < way.nodes.length; i++)
-      //  const nodeID = way.nodes[i];
-      for (const nodeID of way.nodes) {
+      for (let i = 0; i < way.nodes.length; i++) {
+        const nodeID = way.nodes[i];
         let node = graph.entity(nodeID) as OsmNode;
         const coord = node.geoms.parts[0].world?.coords as Vec2;  // A node should have a single world coord
         if (!coord) continue;
+
+        // First, compute the distance to neighbor nodes.
+        // We don't want to snap to anything in the basemap farther than this distance.
+        // (It could cause a node to jump past its neighbor or break the way!)
+        let neighborDistance = Infinity;  // in meters
+        const nextID = way.nodes[i + 1];
+        const prevID = way.nodes[i - 1];
+        const nextNode = (nextID ? graph.hasEntity(nextID) : undefined) as OsmNode | undefined;
+        const prevNode = (prevID ? graph.hasEntity(prevID) : undefined) as OsmNode | undefined;
+        const nextLoc = nextNode?.loc;
+        const prevLoc = prevNode?.loc;
+        if (nextLoc) {
+          neighborDistance = Math.min(neighborDistance, geoSphericalDistance(node.loc!, nextLoc));
+        }
+        if (prevLoc) {
+          neighborDistance = Math.min(neighborDistance, geoSphericalDistance(node.loc!, prevLoc));
+        }
+
 
         // 1. If there are unaccepted nodes in the external dataset at the same location as
         // the node that we just added, mark them accepted also and import their tags.
@@ -224,7 +241,7 @@ export function actionRapidAcceptFeature(entityID: EntityID, extGraph: Graph): R
         // Code here is similar to snapping code found in places like DragNodeMode.ts.
         // Choose the closest thing within the snap distance, either a node or a way.
         // Snap only to highways for now.
-        const SNAP_DIST = 1;   // 1 meter
+        const SNAP_DIST = 0.01;   // 1 cm
         const box = queryBox(node.loc!, SNAP_DIST);
         const baseHits = spatial.getItemsAtBox(baseSpatialID, box);
         for (const hit of baseHits) {
@@ -232,12 +249,20 @@ export function actionRapidAcceptFeature(entityID: EntityID, extGraph: Graph): R
           const target = graph.hasEntity((hit.contents as OsmEntity).id);
           if (!target) continue;
 
+          const targetID = target.id;
           if (target.type === 'node') {
-            if (!hasParentHighway(graph, target as OsmNode)) continue;  // connect to highway/path only
+            const targetNode = target as OsmNode;
+            // Don't connect to another already accepted sibling node on the same way.
+            // It can make the way go degenerate and disappear!
+            if (way.nodes.includes(targetID)) continue;
+            if (!hasParentHighway(graph, targetNode)) continue;   // Connect to highway/path only
 
-            graph = actionConnect([node.id, target.id])(graph);
+            const dist = geoSphericalDistance(targetNode.loc!, node.loc!);
+            if (dist > neighborDistance) continue;  // let our neighbor snap here instead.
+
+            graph = actionConnect([node.id, targetNode.id])(graph);
             // refresh entities after connect (one of them survived)
-            node = (graph.hasEntity(node.id) ?? graph.hasEntity(target.id)) as OsmNode;
+            node = (graph.hasEntity(node.id) ?? graph.hasEntity(targetID)) as OsmNode;
             way = graph.entity(way.id) as OsmWay;
 
           } else if (target.type === 'way') {
@@ -250,6 +275,7 @@ export function actionRapidAcceptFeature(entityID: EntityID, extGraph: Graph): R
             if (choice && choice.point) {
               const snapLoc = projWorldToWgs84(choice.point);
               const dist = geoSphericalDistance(node.loc!, snapLoc);
+              if (dist > neighborDistance) continue;  // let our neighbor snap here instead.
               if (dist < SNAP_DIST) {
                 const edge: [EntityID, EntityID] = [targetWay.nodes[choice.index - 1], targetWay.nodes[choice.index]];
                 graph = actionAddMidpoint({ loc: snapLoc, edge }, node)(graph);
