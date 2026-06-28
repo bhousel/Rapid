@@ -1,6 +1,6 @@
 import {
   Extent, geoMetersToLat, geoMetersToLon, geoSphericalDistance, geoSphericalClosestPoint,
-  geomLineIntersection, vecAngle, vecInterp
+  geomLineIntersection, vecAngle, vecEqual, vecInterp
 } from '@rapid-sdk/math';
 
 import { actionAddMidpoint } from '../actions/add_midpoint.ts';
@@ -449,7 +449,17 @@ export function validateAlmostJunction(context: Context): ValidatorFunction {
 
         const nA = graph.entity(edge[0]) as OsmNode;
         const nB = graph.entity(edge[1]) as OsmNode;
-        const crossLoc = geomLineIntersection([nearLoc, farLoc], [nA.loc!, nB.loc!]);
+
+        // Check if nodes are coincident first (geomLineIntersection misses this!)
+        let crossLoc: Vec2 | undefined | null;
+        if (vecEqual(nA.loc!, tipNode.loc!, 1e-7)) {
+          crossLoc = nA.loc;
+        } else if (vecEqual(nB.loc!, tipNode.loc!, 1e-7)) {
+          crossLoc = nB.loc;
+        } else {
+          crossLoc = geomLineIntersection([nearLoc, farLoc], [nA.loc!, nB.loc!]);
+        }
+
         if (crossLoc) {
           return {
             mid: midNode,
