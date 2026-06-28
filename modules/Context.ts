@@ -184,7 +184,7 @@ export class Context extends EventEmitter {
     super();
 
     // this.version = '2.5.3';             // see https://semver.org/ for examples
-    this.version = '3.0.0-pre.0';    // see https://semver.org/ for examples
+    this.version = '3.0.0-pre.1';    // see https://semver.org/ for examples
 
     // If user has not seen this version of our software, we will show them a modal at startup.
     // Just bump these dates to a higher number to get the screen to come back.
