@@ -23,7 +23,7 @@ export function uiSettingsCustomBackground(context) {
 
     modal.select('.modal-section.header')
       .append('h3')
-      .html(l10n.tHtml('settings.custom_background.header'));
+      .text(l10n.t('settings.custom_background.header'));
 
     const prefix = 'settings.custom_background.instructions';
     const info = l10n.t(`${prefix}.info`);
@@ -85,7 +85,7 @@ ${info}
     buttonSection
       .insert('button', '.ok-button')
       .attr('class', 'button cancel-button secondary-action')
-      .html(l10n.tHtml('confirm.cancel'));
+      .text(l10n.t('confirm.cancel'));
 
     buttonSection.select('.cancel-button')
       .on('click.cancel', _clickCancel);

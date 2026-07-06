@@ -36,7 +36,7 @@ export function uiSettingsCustomData(context) {
 
     modal.select('.modal-section.header')
       .append('h3')
-      .html(l10n.tHtml('settings.custom_data.header'));
+      .text(l10n.t(`${prefix}.header`));
 
 
     const textSection = modal.select('.modal-section.message-text');
@@ -115,7 +115,7 @@ ${url_tokens}
     textSection
       .append('textarea')
       .attr('class', 'field-url')
-      .attr('placeholder', l10n.t('settings.custom_data.url.placeholder'))
+      .attr('placeholder', l10n.t(`$prefix}.url.placeholder`))
       .call(utilNoAuto)
       .property('value', _currUrl);
 
@@ -126,7 +126,7 @@ ${url_tokens}
     buttonSection
       .insert('button', '.ok-button')
       .attr('class', 'button cancel-button secondary-action')
-      .html(l10n.tHtml('confirm.cancel'));
+      .text(l10n.t('confirm.cancel'));
 
     buttonSection.select('.cancel-button')
       .on('click.cancel', clickCancel);

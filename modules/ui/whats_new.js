@@ -111,6 +111,7 @@ Big changes are coming soon to Rapid. including:
       .attr('target', '_blank');
 
 
+    /* OK Button */
     const $buttonWrap = $content
       .append('div')
       .attr('class', 'modal-section buttons');
