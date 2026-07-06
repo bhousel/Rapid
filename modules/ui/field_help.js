@@ -126,13 +126,13 @@
 //        if (d.key === 'help.field.restrictions.inspecting') {
 //            content
 //                .insert('img', 'p.from_shadow')
-//                .attr('class', 'field-help-image cf')
+//                .attr('class', 'field-help-image')
 //                .attr('src', assets.getFileURL('img/tr_inspect.gif'));
 //
 //        } else if (d.key === 'help.field.restrictions.modifying') {
 //            content
 //                .insert('img', 'p.allow_turn')
-//                .attr('class', 'field-help-image cf')
+//                .attr('class', 'field-help-image')
 //                .attr('src', assets.getFileURL('img/tr_modify.gif'));
 //        }
 //    }
@@ -192,7 +192,7 @@
 //
 //        var titleEnter = enter
 //            .append('div')
-//            .attr('class', 'field-help-title cf');
+//            .attr('class', 'field-help-title');
 //
 //        titleEnter
 //            .append('h2')
@@ -211,7 +211,7 @@
 //
 //        var navEnter = enter
 //            .append('div')
-//            .attr('class', 'field-help-nav cf');
+//            .attr('class', 'field-help-nav');
 //
 //        var titles = docs.map(function(d) { return d.title; });
 //        navEnter.selectAll('.field-help-nav-item')

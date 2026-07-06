@@ -107,7 +107,7 @@ export function uiMapRouletteEditor(context) {
     // enter
     const $$saveSection = $saveSection.enter()
       .append('div')
-      .attr('class', 'mr-save save-section cf');
+      .attr('class', 'mr-save save-section');
 
     // update
     $saveSection = $saveSection
@@ -153,7 +153,7 @@ export function uiMapRouletteEditor(context) {
     // enter
     const $$commentSave = $commentSave.enter()
       .append('div')
-      .attr('class', 'note-save save-section cf');
+      .attr('class', 'note-save save-section');
 
     $$commentSave
       .append('h4')

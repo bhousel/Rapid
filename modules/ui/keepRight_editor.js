@@ -85,7 +85,7 @@ export function uiKeepRightEditor(context) {
     // enter
     const $$saveSection = $saveSection.enter()
       .append('div')
-      .attr('class', 'qa-save save-section cf');
+      .attr('class', 'qa-save save-section');
 
     $$saveSection
       .append('h4')

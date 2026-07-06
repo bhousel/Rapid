@@ -1,3 +1,8 @@
+/*
+This file contains the "Rapid" styling overrides for the parts of the UI that are not iD.
+It generally uses a dark theme with magenta highlight colors.
+*/
+
 /* possibly existed before and was removed? */
 svg.icon.icon-30 {
   width: 30px;
@@ -56,7 +61,7 @@ button.rapid-features.layer-off use {
   color: rgba(0,0,0,.4);
 }
 
-/* rapid logo with wordmark embedded in text */
+/* Rapid logo with wordmark embedded in text */
 .icon.pre-text.rapid {
   vertical-align: text-top;
   margin-right: 0;
@@ -182,7 +187,8 @@ button.rapid-features.layer-off use {
 }
 
 
-/* Sidebar - Rapid/Overture Inspectors */
+/* Sidebar - Rapid/Overture Inspectors
+------------------------------------------------------- */
 .rapid-inspector,
 .overture-inspector {
   display: flex;
@@ -404,14 +410,9 @@ button.overture-inspector-close:hover {
   object-fit: contain;
 }
 
-/* For things that should stack in rows */
-.rapid-stack {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-}
 
-/* Rapid modal dialogs */
+/* Rapid modal dialogs
+------------------------------------------------------- */
 .modal.rapid-modal {
   top: 80px;
   min-width: 650px;
@@ -435,7 +436,7 @@ button.overture-inspector-close:hover {
 }
 
 .modal.rapid-modal .modal-section.buttons {
-  /* flex-flow: column; */
+  justify-content: center;
   padding: 20px;
   width: 100%;
 }
@@ -474,7 +475,8 @@ button.overture-inspector-close:hover {
   background: #8885;
 }
 
-/* Splash, Whats New, Login to OSM */
+/* Splash, Whats New, Login to OSM
+------------------------------------------------------- */
 .modal.rapid-modal .modal-section .icon.pre-text.rapid {
   color: #da26d3;
   fill: #fff;
@@ -538,8 +540,7 @@ button.overture-inspector-close:hover {
   flex: 0 0 36px;
 }
 
-
-/* dark scrollbars */
+/* Dark scrollbars */
 .modal.rapid-modal ::-webkit-scrollbar {
   width: 8px;
 }
@@ -557,8 +558,9 @@ button.overture-inspector-close:hover {
 }
 
 
-/* Toggle Features */
-.modal.rapid-modal .rapid-checkbox {
+/* Rapid Menu (Add/remove datasets)
+------------------------------------------------------- */
+.rapid-checkbox {
   font-size: 20px;
   display: flex;
   justify-content: flex-start;
@@ -566,33 +568,31 @@ button.overture-inspector-close:hover {
   padding: 5px 10px;
   width: 100%;
 }
-.modal.rapid-modal .rapid-datasets-container > .rapid-checkbox:last-of-type {
-  padding-bottom: 15px;
-}
 
-.modal.rapid-modal .rapid-stack .rapid-datasets-container {
+.rapid-datasets-container {
   display: flex;
   flex-flow: column;
   width: 100%;
+  padding: unset;
 }
-
-.rapid-stack .rapid-checkbox.rapid-toggle-all {
-  border-bottom: 1px solid #888a;
-  padding: 45px 10px 10px 10px;
+.rapid-datasets-container > .rapid-checkbox:last-of-type {
+  padding-bottom: 15px;
 }
-.rapid-stack .rapid-checkbox.rapid-browse-catalog,
-.rapid-stack .rapid-checkbox.rapid-add-custom-data {
-  border-top: 1px solid #888a;
+.rapid-checkbox.rapid-toggle-all {
+  padding: 50px 10px 15px 10px;  /* leave space on top for close 'x' */
+}
+.rapid-checkbox.rapid-browse-catalog,
+.rapid-checkbox.rapid-add-custom-data {
   padding: 10px;
   cursor: pointer;
 }
-.rapid-stack .rapid-checkbox.rapid-browse-catalog:hover,
-.rapid-stack .rapid-checkbox.rapid-add-custom-data:hover {
+.rapid-checkbox.rapid-browse-catalog:hover,
+.rapid-checkbox.rapid-add-custom-data:hover {
   color: #ddd;
   background: #8885;
 }
 
-.modal.rapid-modal .rapid-stack .rapid-feature {
+.modal.rapid-modal .rapid-feature {
   display: flex;
   flex-flow: column nowrap;
 }
@@ -752,37 +752,38 @@ hide this one and style something on top of it.  */
 }
 
 
-/* Rapid Power User features */
-.rapid-stack.poweruser .modal-section-heading {
+/* Rapid Poweruser features
+------------------------------------------------------- */
+.poweruser .modal-section-heading {
   display: flex;
   flex-flow: column;
   padding: 10px 20px;
   width: 100%;
 }
 
-.rapid-stack.poweruser .modal-section-heading h3 {
+.poweruser .modal-section-heading h3 {
   font-size: 24px
 }
-.rapid-stack.poweruser .modal-heading-desc {
+.poweruser .modal-heading-desc {
   font-size: 16px;
   font-style: italic;
 }
-.rapid-stack.poweruser .modal-heading-desc .smile {
+.poweruser .modal-heading-desc .smile {
   font-style: normal;
   margin: 0 10px;
 }
-.rapid-stack.poweruser .rapid-features-container {
+.poweruser .rapid-features-container {
   width: 100%;
   border-top: 1px solid #888a;
 }
-.rapid-stack.poweruser .rapid-features-container > .rapid-checkbox:last-of-type {
+.poweruser .rapid-features-container > .rapid-checkbox:last-of-type {
   padding-bottom: 15px;
 }
-.rapid-stack.poweruser .rapid-features-container .rapid-feature-label {
+.poweruser .rapid-features-container .rapid-feature-label {
   margin: 0 5px;
 }
 
-.rapid-stack.poweruser .rapid-features-container .rapid-feature-description {
+.poweruser .rapid-features-container .rapid-feature-description {
   font-size: 14px;
   font-style: italic;
   margin: -5px 5px 5px 5px;
@@ -791,10 +792,10 @@ hide this one and style something on top of it.  */
 
 
 /* `modal2-wrap` is an absolutely positioned `div` needed to create a new stacking context,
-   so we can put a secondary modal on top of the existing modal.
+   so we can put a secondary modal on top of an existing modal.
    (it functions like .shaded for layout but without adding any shading)
    Used by:
-    - Rapid Catalog
+    - Rapid Data Catalog
     - Rapid Add Custom Dataset
 */
 .modal2-wrap {
@@ -807,10 +808,11 @@ hide this one and style something on top of it.  */
   z-index: 51;   /* above existing modal */
 }
 
-/* Dataset Catalog (secondary modal) */
+/* Dataset Catalog (secondary modal)
+------------------------------------------------------- */
 .modal.rapid-modal.modal-catalog {
   width: 80%;
-  min-width: 600px;
+  min-width: 675px;   /* should be wider than .rapid-modal */
   max-width: 1000px;
   min-height: 85%;
 }
@@ -963,14 +965,15 @@ div.combobox.combobox-dataset-categories a:focus {
 .rapid-catalog-datasets {
   display: flex;
   flex-flow: row wrap;
-  justify-content: flex-start;
+  justify-content: space-between;
   align-items: flex-start;
+  align-content: flex-start;
   padding: 5px;
   width: 100%;
 }
 .rapid-catalog-dataset {
   display: flex;
-  flex: 1 1 40%;
+  flex: 0 0 48%;
   flex-flow: row nowrap;
   padding: 10px;
   margin: 5px;
@@ -1044,11 +1047,12 @@ img.rapid-catalog-dataset-thumbnail.inverted {
 }
 
 
-/* Add Custom Dataset (secondary modal) */
+/* Add Custom Dataset (secondary modal)
+------------------------------------------------------- */
 .modal.rapid-modal.modal-add-dataset {
   width: 80%;
-  min-width: 600px;
-  max-width: 1000px;
+  min-width: 675px;   /* should be wider than .rapid-modal */
+  max-width: 675px;
 }
 
 .modal.rapid-modal.modal-add-dataset p {
@@ -1095,8 +1099,16 @@ img.rapid-catalog-dataset-thumbnail.inverted {
   padding: 20px;
 }
 
+.modal-add-dataset .instructions-url {
+  padding: 20px 0;
+}
+.modal-add-dataset textarea.field-url {
+  height: 90px;
+  width: 100%;
+}
 
-/* Colorpicker popup */
+/* Colorpicker popup
+------------------------------------------------------- */
 .colorpicker-popup {
   position: absolute;
   padding: 10px;

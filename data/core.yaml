@@ -1122,7 +1122,7 @@ en:
       tooltip: Ignore this feature.
 
   rapid_menu:
-    browse_data_catalog: Browse Data Catalog
+    browse_data_catalog: Browse Open Data Catalog
     add_custom_data: Add Custom Data
     center_map: Center map here
     license: License
@@ -1170,7 +1170,7 @@ en:
       description: Remove the limitations about editing features that are not currently visible
 
   rapid_catalog:
-    heading: Data Catalog
+    heading: Open Data Catalog
     about_the_catalog: "These datasets have been provided as open data by various organizations for the purpose of improving OpenStreetMap.<br/>You can learn more by clicking the links below, or visiting [the Rapid Guide](https://github.com/facebookmicrosites/Open-Mapping-At-Facebook/wiki/Esri-ArcGIS-FAQ) or [Esri/ArcGIS dataset page on the OSM Wiki](https://wiki.openstreetmap.org/wiki/Esri/ArcGIS_Datasets)."  # This string may contain markdown
     filter_datasets: filter datasets    # placeholder text for the filter text
     any_type: any type                  # placeholder text for the filter type dropdown
@@ -1198,7 +1198,7 @@ en:
       trees: trees
 
   rapid_add_dataset:
-    heading: Add Custom Dataset
+    heading: Add Custom Data
     instructions: "Custom map data can be added either of two ways:"
     file:
       heading: Local Data File

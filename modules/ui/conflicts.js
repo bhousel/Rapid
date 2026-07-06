@@ -192,7 +192,7 @@ export function uiConflicts(context) {
 
     details
       .append('div')
-      .attr('class', 'conflict-nav-buttons joined cf')
+      .attr('class', 'conflict-nav-buttons joined')
       .selectAll('button')
       .data(['previous', 'next'])
       .enter()

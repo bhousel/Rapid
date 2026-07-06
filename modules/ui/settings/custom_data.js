@@ -115,7 +115,7 @@ ${url_tokens}
     textSection
       .append('textarea')
       .attr('class', 'field-url')
-      .attr('placeholder', l10n.t(`$prefix}.url.placeholder`))
+      .attr('placeholder', l10n.t(`${prefix}.url.placeholder`))
       .call(utilNoAuto)
       .property('value', _currUrl);
 

@@ -82,7 +82,7 @@ export function uiOsmoseEditor(context) {
     // enter
     const $$saveSection = $saveSection.enter()
       .append('div')
-      .attr('class', 'qa-save save-section cf');
+      .attr('class', 'qa-save save-section');
 
     // update
     $saveSection = $$saveSection

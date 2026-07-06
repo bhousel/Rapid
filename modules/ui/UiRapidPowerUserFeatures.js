@@ -64,7 +64,7 @@ export class UiRapidPowerUserFeatures {
       .attr('class', 'modal rapid-modal');
 
     this.$modal.select('.content')
-      .attr('class', 'content rapid-stack poweruser');
+      .attr('class', 'content poweruser');
 
     this.render();
   }
@@ -126,7 +126,7 @@ export class UiRapidPowerUserFeatures {
     // enter
     const $$features = $features.enter()
       .append('div')
-      .attr('class', 'rapid-features-container');
+      .attr('class', 'modal-section rapid-features-container');
 
     $features = $features.merge($$features);
 

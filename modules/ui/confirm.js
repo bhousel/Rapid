@@ -17,7 +17,7 @@ export function uiConfirm(context, selection) {
     .attr('class', 'modal-section message-text');
 
   let buttons = section.append('div')
-    .attr('class', 'modal-section buttons cf');
+    .attr('class', 'modal-section buttons');
 
 
   modalSelection.okButton = function() {

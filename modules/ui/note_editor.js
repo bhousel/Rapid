@@ -97,7 +97,7 @@ export function uiNoteEditor(context) {
     // enter
     const $$noteSave = $noteSave.enter()
       .append('div')
-      .attr('class', 'note-save save-section cf');
+      .attr('class', 'note-save save-section');
 
     $$noteSave
       .append('h4')

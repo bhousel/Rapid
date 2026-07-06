@@ -115,7 +115,7 @@ export class UiRapidCatalog extends EventEmitter {
 
     $$modal
       .append('div')
-      .attr('class', 'content rapid-stack');
+      .attr('class', 'content');
 
     // update
     this.$wrap = $wrap = $wrap.merge($$wrap);

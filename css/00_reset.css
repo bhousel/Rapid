@@ -144,17 +144,3 @@ input::-moz-focus-inner {
     border: 0;
     padding: 0;
 }
-
-/*
-** Markup free clearing
-** Details: http://www.positioniseverything.net/easyclearing.html
-*/
-.cf:before,
-.cf:after {
-    content: " "; /* 1 */
-    display: table; /* 2 */
-}
-
-.cf:after {
-    clear: both;
-}

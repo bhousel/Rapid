@@ -17,13 +17,11 @@ import { utilCmd } from '../util/cmd.ts';
  * <div class='modal rapid-modal'>
  *   <button class='close'/>
  *   <div class='content'>
- *     <div class='rapid-stack'>
- *       <div class='modal-section rapid-toggle-all'/>       // "Toggle All Rapid Features"
- *       <div class='rapid-datasets-container'> … </div>     //   …list of datasets…
- *       <div class='modal-section rapid-browse-catalog'/>   // "Browse Data Catalog"
- *       <div class='modal-section rapid-add-custom-data'/>  // "Add Custom Data"
- *       <div class='modal-section buttons'/>                // "OK" button
- *     </div>
+ *     <div class='modal-section rapid-toggle-all'/>       // "Toggle All Rapid Features"
+ *     <div class='rapid-datasets-container'> … </div>     //   …list of datasets…
+ *     <div class='modal-section rapid-browse-catalog'/>   // "Browse Data Catalog"
+ *     <div class='modal-section rapid-add-custom-data'/>  // "Add Custom Data"
+ *     <div class='modal-section buttons'/>                // "OK" button
  *   </div>
  * </div>
  */
@@ -79,9 +77,6 @@ export class UiRapidDatasetToggle {
 
     this.ColorPicker = uiRapidColorpicker(context, this.$modal)
       .on('change', this.changeColor);
-
-    this.$modal.select('.content')
-      .attr('class', 'content rapid-stack');
 
     this.render();
   }
@@ -164,7 +159,7 @@ export class UiRapidDatasetToggle {
     // enter
     const $$datasets = $datasets.enter()
       .append('div')
-      .attr('class', 'rapid-datasets-container');
+      .attr('class', 'modal-section rapid-datasets-container');
 
     // update
     $datasets = $datasets.merge($$datasets);
