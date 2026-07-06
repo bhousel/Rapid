@@ -66,6 +66,7 @@ export { uiPopover } from './popover.js';
 export { uiPresetIcon } from './preset_icon.js';
 export { uiPresetList } from './preset_list.js';
 export { UiProjectLinks } from './UiProjectLinks.js';
+export { UiRapidAddDataset } from './UiRapidAddDataset.js';
 export { UiRapidCatalog } from './UiRapidCatalog.js';
 export { uiRapidColorpicker } from './rapid_colorpicker.js';
 export { UiRapidDatasetToggle } from './UiRapidDatasetToggle.js';

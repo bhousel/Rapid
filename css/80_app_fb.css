@@ -352,7 +352,7 @@ button.overture-inspector-close:hover {
 }
 
 .rapid-inspector-notice {
-    font-style: italic;
+  font-style: italic;
 }
 
 .rapid-inspector-choice .choice-wrap {
@@ -435,7 +435,7 @@ button.overture-inspector-close:hover {
 }
 
 .modal.rapid-modal .modal-section.buttons {
-  flex-flow: column;
+  /* flex-flow: column; */
   padding: 20px;
   width: 100%;
 }
@@ -559,7 +559,7 @@ button.overture-inspector-close:hover {
 
 /* Toggle Features */
 .modal.rapid-modal .rapid-checkbox {
-  font-size: 24px;
+  font-size: 20px;
   display: flex;
   justify-content: flex-start;
   align-items: center;
@@ -580,12 +580,14 @@ button.overture-inspector-close:hover {
   border-bottom: 1px solid #888a;
   padding: 45px 10px 10px 10px;
 }
-.rapid-stack .rapid-checkbox.rapid-manage-datasets {
+.rapid-stack .rapid-checkbox.rapid-browse-catalog,
+.rapid-stack .rapid-checkbox.rapid-add-custom-data {
   border-top: 1px solid #888a;
   padding: 10px;
   cursor: pointer;
 }
-.rapid-stack .rapid-checkbox.rapid-manage-datasets:hover {
+.rapid-stack .rapid-checkbox.rapid-browse-catalog:hover,
+.rapid-stack .rapid-checkbox.rapid-add-custom-data:hover {
   color: #ddd;
   background: #8885;
 }
@@ -787,12 +789,15 @@ hide this one and style something on top of it.  */
   color: #aaa;
 }
 
-/* Rapid Catalog modal */
-/* catalog-wrap is an absolutely positioned div to create a new stacking context,
-   so we can put a modal on top of the other modal.
+
+/* `modal2-wrap` is an absolutely positioned `div` needed to create a new stacking context,
+   so we can put a secondary modal on top of the existing modal.
    (it functions like .shaded for layout but without adding any shading)
+   Used by:
+    - Rapid Catalog
+    - Rapid Add Custom Dataset
 */
-.catalog-wrap {
+.modal2-wrap {
   position: absolute;
   top: 0;
   bottom: 0;
@@ -801,6 +806,8 @@ hide this one and style something on top of it.  */
   overflow: auto;
   z-index: 51;   /* above existing modal */
 }
+
+/* Dataset Catalog (secondary modal) */
 .modal.rapid-modal.modal-catalog {
   width: 80%;
   min-width: 600px;
@@ -809,6 +816,7 @@ hide this one and style something on top of it.  */
 }
 .modal.rapid-modal.modal-catalog p {
   font-size: 12px;
+  padding-bottom: unset;
 }
 
 .modal-catalog .modal-section {
@@ -833,10 +841,12 @@ hide this one and style something on top of it.  */
   align-items: center;
 }
 
-.rapid-catalog-header-icon {
+.rapid-catalog-header-icon,
+.rapid-add-dataset-heading-icon {
   flex: 0 0 40px;
 }
-.rapid-catalog-header-text {
+.rapid-catalog-header-text,
+.rapid-add-dataset-heading-text {
   flex: 1 1 auto;
   font-size: 24px;
   padding: 0 5px;
@@ -845,7 +855,7 @@ hide this one and style something on top of it.  */
   color: #ddd;
 }
 
-.modal-catalog .modal-section.rapid-catalog-filter {
+.modal-section.rapid-catalog-filter {
   display: flex;
   flex-flow: row nowrap;
   padding: 10px 20px;
@@ -1032,6 +1042,59 @@ img.rapid-catalog-dataset-thumbnail.inverted {
   margin: 10px 0;
   padding: 0 15px;
 }
+
+
+/* Add Custom Dataset (secondary modal) */
+.modal.rapid-modal.modal-add-dataset {
+  width: 80%;
+  min-width: 600px;
+  max-width: 1000px;
+}
+
+.modal.rapid-modal.modal-add-dataset p {
+  font-size: 12px;
+  padding-bottom: unset;
+}
+
+.modal-add-dataset .modal-section {
+  display: flex;
+  flex-flow: row nowrap;
+  align-items: center;
+  width: 100%;
+  padding: 0;
+}
+
+.modal-add-dataset .modal-section.rapid-add-dataset-heading {
+  display: flex;
+  flex-flow: column nowrap;
+  padding: 10px 20px;
+  border-bottom: 1px solid #aaaa;
+  color: #fff;
+}
+
+.modal-add-dataset .modal-section.rapid-add-dataset-heading > div {
+  display: flex;
+  flex: 1;
+  width: 100%;
+  align-items: center;
+}
+
+.modal-add-datset .rapid-add-dataset-heading-icon {
+  flex: 0 0 40px;
+}
+
+.modal-add-datset .rapid-add-dataset-heading-text {
+  flex: 1 1 auto;
+  font-size: 24px;
+  padding: 0 5px;
+}
+
+.modal-add-dataset .rapid-add-dataset-text {
+  flex-flow: column nowrap;
+  align-items: flex-start;
+  padding: 20px;
+}
+
 
 /* Colorpicker popup */
 .colorpicker-popup {

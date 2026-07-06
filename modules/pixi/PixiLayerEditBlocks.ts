@@ -85,7 +85,7 @@ export class PixiLayerEditBlocks extends AbstractPixiLayer {
       .append('a')
       .attr('target', '_blank')
       .attr('href', (d: GeoJSONData) => d.properties.url as string)
-      .text(l10n?.t('rapid_menu.more_info') || 'More Info');
+      .text(l10n?.t('rapid_catalog.more_info') || 'More Info');
   }
 
 

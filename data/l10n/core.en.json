@@ -1402,38 +1402,12 @@
       }
     },
     "rapid_menu": {
+      "browse_data_catalog": "Browse Data Catalog",
+      "add_custom_data": "Add Custom Data",
+      "center_map": "Center map here",
       "license": "License",
       "toggle_all": "Toggle all {rapidicon} data",
-      "add_manage_datasets": "Add/Manage Datasets",
-      "center_map": "Center map here",
       "worldwide": "Worldwide",
-      "no_datasets": "No datasets available.",
-      "remove": "Remove",
-      "add_dataset": "Add Dataset",
-      "dataset_added": "Dataset added",
-      "more_info": "More Info",
-      "about_the_catalog": "These datasets have been provided as open data by various organizations and the Esri user community for the purpose of improving OpenStreetMap.<br/>You can learn more by clicking the links below, or visiting [the Rapid Guide](https://github.com/facebookmicrosites/Open-Mapping-At-Facebook/wiki/Esri-ArcGIS-FAQ) or [Esri/ArcGIS dataset page on the OSM Wiki](https://wiki.openstreetmap.org/wiki/Esri/ArcGIS_Datasets).",
-      "clear_filters": "Clear Filters",
-      "filter_datasets": "filter datasets",
-      "any_type": "any type",
-      "datasets_found": {
-        "one": "{n} dataset found",
-        "other": "{gt}{n} datasets found"
-      },
-      "category": {
-        "addresses": "addresses",
-        "buildings": "buildings",
-        "esri": "Esri",
-        "featured": "featured",
-        "footways": "footways",
-        "meta": "Meta",
-        "microsoft": "Microsoft",
-        "overture": "Overture",
-        "places": "places",
-        "preview": "preview",
-        "roads": "roads",
-        "trees": "trees"
-      },
       "fbRoads": {
         "label": "Facebook Roads",
         "description": "AI predicted roads detected from Maxar Premium imagery and available in over 80 countries."
@@ -1486,6 +1460,57 @@
       "allowLargeEdits": {
         "label": "Allow large edits",
         "description": "Remove the limitations about editing features that are not currently visible"
+      }
+    },
+    "rapid_catalog": {
+      "heading": "Data Catalog",
+      "about_the_catalog": "These datasets have been provided as open data by various organizations for the purpose of improving OpenStreetMap.<br/>You can learn more by clicking the links below, or visiting [the Rapid Guide](https://github.com/facebookmicrosites/Open-Mapping-At-Facebook/wiki/Esri-ArcGIS-FAQ) or [Esri/ArcGIS dataset page on the OSM Wiki](https://wiki.openstreetmap.org/wiki/Esri/ArcGIS_Datasets).",
+      "filter_datasets": "filter datasets",
+      "any_type": "any type",
+      "add_dataset": "Add Dataset",
+      "remove": "Remove",
+      "clear_filters": "Clear Filters",
+      "dataset_added": "Dataset added",
+      "no_datasets": "No datasets available.",
+      "more_info": "More Info",
+      "datasets_found": {
+        "one": "{n} dataset found",
+        "other": "{gt}{n} datasets found"
+      },
+      "category": {
+        "addresses": "addresses",
+        "buildings": "buildings",
+        "esri": "Esri",
+        "featured": "featured",
+        "footways": "footways",
+        "meta": "Meta",
+        "microsoft": "Microsoft",
+        "overture": "Overture",
+        "places": "places",
+        "preview": "preview",
+        "roads": "roads",
+        "trees": "trees"
+      }
+    },
+    "rapid_add_dataset": {
+      "heading": "Add Custom Dataset",
+      "instructions": "Custom map data can be added either of two ways:",
+      "file": {
+        "heading": "Local Data File",
+        "instructions": "Choose a local data file. Supported file types are:",
+        "types": "`.gpx`, `.kml`, `.geojson`, `.json`",
+        "label": "Browse files"
+      },
+      "or": "Or",
+      "url": {
+        "heading": "Remote Data URL",
+        "instructions": "Enter a URL to any of the above file types, an MVT-style vector tile service, or a .pmtiles archive.",
+        "tokens": "Supported replacement tokens:",
+        "xyz": "`{zoom}` or `{z}`, `{x}`, `{y}` for Z/X/Y tile scheme",
+        "example_file": "https://example.com/custom.gpx",
+        "example_xyz": "https://example.com/{z}/{x}/{y}.mvt?access_token=123",
+        "example_pmtiles": "https://example.com/buildings.pmtiles",
+        "placeholder": "Enter a url"
       }
     },
     "version": {

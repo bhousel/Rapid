@@ -3,8 +3,9 @@ import { select } from 'd3-selection';
 import { icon } from './intro/helper.js';
 import { uiIcon } from './icon.js';
 import { uiModal } from './modal.js';
-import { uiRapidColorpicker } from './rapid_colorpicker.js';
+import { UiRapidAddDataset } from './UiRapidAddDataset.js';
 import { UiRapidCatalog } from './UiRapidCatalog.js';
+import { uiRapidColorpicker } from './rapid_colorpicker.js';
 import { utilCmd } from '../util/cmd.ts';
 
 
@@ -19,7 +20,8 @@ import { utilCmd } from '../util/cmd.ts';
  *     <div class='rapid-stack'>
  *       <div class='modal-section rapid-toggle-all'/>       // "Toggle All Rapid Features"
  *       <div class='rapid-datasets-container'> … </div>     //   …list of datasets…
- *       <div class='modal-section rapid-manage-datasets'/>  // "Add/Manage Datasets"
+ *       <div class='modal-section rapid-browse-catalog'/>   // "Browse Data Catalog"
+ *       <div class='modal-section rapid-add-custom-data'/>  // "Add Custom Data"
  *       <div class='modal-section buttons'/>                // "OK" button
  *     </div>
  *   </div>
@@ -171,26 +173,26 @@ export class UiRapidDatasetToggle {
       .call(this.renderDatasets);
 
 
-    /* View/Manage Datasets */
-    let $manageDatasets = $content.selectAll('.rapid-manage-datasets')
+    /* Browse Data Catalog */
+    let $catalogOption = $content.selectAll('.rapid-browse-catalog')
       .data([0]);
 
     // enter
-    const $$manageDatasets = $manageDatasets.enter()
+    const $$catalogOption = $catalogOption.enter()
       .append('div')
-      .attr('class', 'modal-section rapid-checkbox rapid-manage-datasets')
+      .attr('class', 'modal-section rapid-checkbox rapid-browse-catalog')
       .on('click', () => {
         const CatalogModal = new UiRapidCatalog(context, this.$modal).on('done', this.rerender);
         context.container().call(CatalogModal.show);
       });
 
-    $$manageDatasets
+    $$catalogOption
       .append('div')
       .attr('class', 'rapid-feature-label-container')
       .append('div')
       .attr('class', 'rapid-feature-label');
 
-    $$manageDatasets
+    $$catalogOption
       .append('div')
       .attr('class', 'rapid-checkbox-inputs')
       .append('div')
@@ -198,12 +200,48 @@ export class UiRapidDatasetToggle {
       .call(uiIcon('', 'icon-30'));
 
     // update
-    $manageDatasets = $manageDatasets.merge($$manageDatasets);
+    $catalogOption = $catalogOption.merge($$catalogOption);
 
-    $manageDatasets.selectAll('.rapid-feature-label')
-      .text(l10n.t('rapid_menu.add_manage_datasets'));
+    $catalogOption.selectAll('.rapid-feature-label')
+      .text(l10n.t('rapid_menu.browse_data_catalog'));
 
-    $manageDatasets.selectAll('.rapid-checkbox-label use')
+    $catalogOption.selectAll('.rapid-checkbox-label use')
+      .attr('xlink:href', l10n.isRTL ? '#rapid-icon-backward' : '#rapid-icon-forward');
+
+
+    /* Add Custom Data */
+    let $addCustomOption = $content.selectAll('.rapid-add-custom-data')
+      .data([0]);
+
+    // enter
+    const $$addCustomOption = $addCustomOption.enter()
+      .append('div')
+      .attr('class', 'modal-section rapid-checkbox rapid-add-custom-data')
+      .on('click', () => {
+        const AddDatasetModal = new UiRapidAddDataset(context, this.$modal).on('done', this.rerender);
+        context.container().call(AddDatasetModal.show);
+      });
+
+    $$addCustomOption
+      .append('div')
+      .attr('class', 'rapid-feature-label-container')
+      .append('div')
+      .attr('class', 'rapid-feature-label');
+
+    $$addCustomOption
+      .append('div')
+      .attr('class', 'rapid-checkbox-inputs')
+      .append('div')
+      .attr('class', 'rapid-checkbox-label')
+      .call(uiIcon('', 'icon-30'));
+
+    // update
+    $addCustomOption = $addCustomOption.merge($$addCustomOption);
+
+    $addCustomOption.selectAll('.rapid-feature-label')
+      .text(l10n.t('rapid_menu.add_custom_data'));
+
+    $addCustomOption.selectAll('.rapid-checkbox-label use')
       .attr('xlink:href', l10n.isRTL ? '#rapid-icon-backward' : '#rapid-icon-forward');
 
 
@@ -234,7 +272,7 @@ export class UiRapidDatasetToggle {
 
 
   /**
-   * Renders the list of datasets into the `.rapid-datasets-container` div.
+   * Renders the list of active datasets into the `.rapid-datasets-container` div.
    * @param {d3-selection} $selection - A d3-selection to a HTMLElement that this component should render itself into
    */
   renderDatasets($selection) {
