@@ -8,12 +8,12 @@ import { uiModal } from './modal.js';
  */
 export function uiRapidSplash(context) {
   const l10n = context.systems.l10n;
-  const storage = context.systems.storage;
+  const settings = context.systems.settings;
 
 
   return function render(selection) {
-    if (storage.hasItem('sawRapidSplash')) return;
-    storage.setItem('sawRapidSplash', true);
+    if (settings?.has('ui.sawRapidSplash')) return;
+    settings?.set('ui.sawRapidSplash', 'true');
 
     const modalSelection = uiModal(selection);
     const rtl = l10n.isRTL ? '-rtl' : '';

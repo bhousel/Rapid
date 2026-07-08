@@ -10,13 +10,13 @@ export function operationMerge(context, selectedIDs) {
   const editor = context.systems.editor;
   const l10n = context.systems.l10n;
   const schema = context.systems.schema;
-  const storage = context.systems.storage;
+  const settings = context.systems.settings;
 
   let action = chooseAction();
 
   function chooseAction() {
     const graph = editor.staging.graph;
-    const tagnosticRoadCombine = storage.getItem('rapid-internal-feature.tagnosticRoadCombine') === 'true';
+    const tagnosticRoadCombine = settings?.get('poweruser.tagnosticRoadCombine') === 'true';
     const options = { tagnosticRoadCombine: tagnosticRoadCombine };
 
     // prefer a non-disabled action first

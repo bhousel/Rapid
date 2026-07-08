@@ -5,7 +5,7 @@ import { uiSection } from '../section.js';
 
 export function uiSectionValidationOptions(context) {
   const l10n = context.systems.l10n;
-  const storage = context.systems.storage;
+  const settings = context.systems.settings;
   const validator = context.systems.validator;
   let _$parent;
 
@@ -73,8 +73,8 @@ export function uiSectionValidationOptions(context) {
 
   function getOptions() {
     return {
-      what: storage.getItem('validate-what') || 'edited',  // 'all', 'edited'
-      where: storage.getItem('validate-where') || 'all'    // 'all', 'visible'
+      what: settings?.get('validator.what') || 'edited',  // 'all', 'edited'
+      where: settings?.get('validator.where') || 'all'    // 'all', 'visible'
     };
   }
 
@@ -83,7 +83,7 @@ export function uiSectionValidationOptions(context) {
       val = d3_event.target.value;
     }
 
-    storage.setItem(`validate-${d}`, val);
+    settings?.set(`validation.${d}`, val);
 
     // I think this is just to get the list to update?
     // Maybe we can have an `optionchanged` event to do this without interrupting the validator

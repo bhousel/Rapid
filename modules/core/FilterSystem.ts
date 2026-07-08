@@ -82,7 +82,7 @@ export class FilterSystem extends AbstractSystem {
     super(context);
     this.id = 'filters';
     this.requiredDependencies = new Set<SystemID>(['editor']);
-    this.optionalDependencies = new Set<SystemID>(['gfx', 'storage', 'urlhash']);
+    this.optionalDependencies = new Set<SystemID>(['gfx', 'settings', 'urlhash']);
 
     this._filters = new Map<FilterID, Filter>();
     this._hidden = new Set<FilterID>();
@@ -121,11 +121,12 @@ export class FilterSystem extends AbstractSystem {
     if (this._initPromise) return this._initPromise;
 
     const context = this.context;
+    const settings = context.systems.settings;
     const urlhash = context.systems.urlhash;
 
     return this._initPromise = super.initAsync()
       .then(() => {
-        const prerequisites = [ urlhash?.initAsync() ];
+        const prerequisites = [ settings?.initAsync(), urlhash?.initAsync() ];
         return Promise.all(prerequisites.filter(Boolean));
       })
       .then(() => {
@@ -143,12 +144,12 @@ export class FilterSystem extends AbstractSystem {
     if (this._startPromise) return this._startPromise;
 
     const context = this.context;
-    const storage = context.systems.storage;
+    const settings = context.systems.settings;
     const urlhash = context.systems.urlhash;
 
     // Take filter values from urlhash first, localstorage second,
     // Default to having boundaries hidden
-    const toHide = urlhash?.getParam('disable_features') ?? storage?.getItem('disabled-features') ?? 'boundaries';
+    const toHide = urlhash?.getParam('disable_features') ?? settings?.get('filters.disabledFilters') ?? 'boundaries';
     const filterIDs = utilExtractValues(toHide).filter(Boolean);
     for (const filterID of filterIDs) {
       this._hidden.add(filterID);
@@ -670,7 +671,7 @@ export class FilterSystem extends AbstractSystem {
   protected _filterChanged(): void {
     const context = this.context;
     const gfx = context.systems.gfx;
-    const storage = context.systems.storage;
+    const settings = context.systems.settings;
     const urlhash = context.systems.urlhash;
 
     // gather hidden
@@ -685,8 +686,8 @@ export class FilterSystem extends AbstractSystem {
     // update url hash
     urlhash?.setParam('disable_features', filterIDs.length ? filterIDs : null);
 
-    // update localstorage
-    storage?.setItem('disabled-features', filterIDs);
+    // update settings
+    settings?.set('filters.disabledFilters', filterIDs);
 
     gfx?.immediateRedraw();
     this.emit('filterchange');

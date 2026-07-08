@@ -18,10 +18,10 @@ export function uiSectionValidationStatus(context) {
   }
 
   function getOptions() {
-    const storage = context.systems.storage;
+    const settings = context.systems.settings;
     return {
-      what: storage.getItem('validate-what') || 'edited',
-      where: storage.getItem('validate-where') || 'all'
+      what: settings?.get('validator.what') || 'edited',
+      where: settings?.get('validator.where') || 'all'
     };
   }
 

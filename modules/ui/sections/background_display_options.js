@@ -7,13 +7,12 @@ import { uiSection } from '../section.js';
 export function uiSectionBackgroundDisplayOptions(context) {
   const imagery = context.systems.imagery;
   const l10n = context.systems.l10n;
-  const storage = context.systems.storage;
 
   const section = uiSection(context, 'background-display-options')
     .label(l10n.t('background.display_options'))
     .disclosureContent(renderDisclosureContent);
 
-  let _storedOpacity = storage.getItem('background-opacity');
+  let _storedOpacity = context.systems.settings?.get('imagery.opacity') ?? null;
   const MINVAL = 0;
   const MAXVAL = 3;
   const settings = ['brightness', 'contrast', 'saturation', 'sharpness'];
@@ -32,7 +31,7 @@ export function uiSectionBackgroundDisplayOptions(context) {
 
     _options[d] = val;
     if (d === 'brightness') {
-      storage.setItem('background-opacity', val);
+      context.systems.settings?.set('imagery.opacity', String(val));
       imagery.brightness = val;
     } else if (d === 'contrast') {
       imagery.contrast = val;

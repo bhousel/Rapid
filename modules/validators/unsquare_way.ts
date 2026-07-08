@@ -89,8 +89,8 @@ export function validateUnsquareWay(context: Context): ValidatorFunction {
 
 
     // user-configurable square threshold
-    const storage = context.systems.storage;
-    const storedStr = storage?.getItem('validate-square-degrees');
+    const settings = context.systems.settings;
+    const storedStr = settings?.get('validator.squareDegrees');
     const parsed = storedStr != null ? parseFloat(storedStr) : NaN;  // eslint-disable-line no-eq-null
     const degreeThreshold = isNaN(parsed) ? DEFAULT_DEG_THRESHOLD : parsed;
 

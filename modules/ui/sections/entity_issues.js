@@ -10,9 +10,9 @@ export function uiSectionEntityIssues(context) {
   const editor = context.systems.editor;
   const l10n = context.systems.l10n;
   const map = context.systems.map;
-  const storage = context.systems.storage;
+  const settings = context.systems.settings;
   const validator = context.systems.validator;
-  const preference = storage.getItem('entity-issues.reference.expanded') || 'true';
+  const preference = settings?.get('ui.entityIssues.referenceExpanded') || 'true';
 
   let _isExpanded = (preference === 'true');
   let _entityIDs = [];
@@ -114,7 +114,7 @@ export function uiSectionEntityIssues(context) {
         const info = container.selectAll('.issue-info');
         const isExpanded = info.classed('expanded');
         _isExpanded = !isExpanded;
-        storage.setItem('entity-issues.reference.expanded', _isExpanded);  // update preference
+        settings?.set('ui.entityIssues.referenceExpanded', String(_isExpanded));  // update preference
 
         if (isExpanded) {
           info

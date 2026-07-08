@@ -211,7 +211,7 @@ export class SchemaSystem extends AbstractSystem {
   public constructor(context: Context) {
     super(context);
     this.id = 'schema';
-    this.optionalDependencies = new Set<SystemID>(['assets', 'gfx', 'l10n', 'locations', 'storage', 'urlhash']);
+    this.optionalDependencies = new Set<SystemID>(['assets', 'gfx', 'l10n', 'locations', 'settings', 'urlhash']);
 
     this.geometryTypes = new Set<GeometryType>(['point', 'vertex', 'line', 'area', 'relation']);
 
@@ -258,6 +258,7 @@ export class SchemaSystem extends AbstractSystem {
     const assets = context.systems.assets;
     const l10n = context.systems.l10n;
     const locations = context.systems.locations;
+    const settings = context.systems.settings;
     const urlhash = context.systems.urlhash;
 
     return this._initPromise = super.initAsync()
@@ -266,6 +267,7 @@ export class SchemaSystem extends AbstractSystem {
           assets?.initAsync(),
           l10n?.initAsync(),
           locations?.initAsync(),
+          settings?.initAsync(),
           urlhash?.initAsync(),
         ];
         return Promise.all(prerequisites.filter(Boolean) as Promise<void>[]);
@@ -413,9 +415,9 @@ export class SchemaSystem extends AbstractSystem {
 
 
 // HACK for demo
-const storage = context.systems.storage as any;
+const settings = context.systems.settings;
 this._recentIDs = [];
-storage?.setItem('preset_recents', JSON.stringify(this._recentIDs));
+settings?.set('schema.presetRecents', this._recentIDs);
 
 // clear all entities cached transients
 const editor = context.systems.editor as any;
@@ -1238,16 +1240,12 @@ gfx?.scene?.reset();  // throw it all away
    */
   public getRecents(scopeID: ScopeID = 'osm'): Preset[] {
     const context = this.context;
-    const storage = context.systems.storage;
+    const settings = context.systems.settings;
     const scope = this.getScope(scopeID);
 
     let itemIDs = this._recentIDs;
-    if (!Array.isArray(itemIDs)) {  // first time, try to get them from localStorage
-      if (storage) {
-        itemIDs = JSON.parse(storage.getItem('preset_recents') ?? '[]') || [];
-      } else {
-        itemIDs = [];
-      }
+    if (!Array.isArray(itemIDs)) {  // first time, try to get them from settings
+      itemIDs = settings?.get<string[]>('schema.presetRecents') ?? [];
     }
 
     const presets = (itemIDs ?? [])
@@ -1272,7 +1270,7 @@ gfx?.scene?.reset();  // throw it all away
   public setMostRecent(preset: Preset): void {
     if (!preset?.props?.searchable) return;
 
-    const storage = this.context.systems.storage;
+    const settings = this.context.systems.settings;
 
     if (!Array.isArray(this._recentIDs)) {
       this._recentIDs = [];
@@ -1281,7 +1279,7 @@ gfx?.scene?.reset();  // throw it all away
     this._recentIDs.unshift(preset.id);   // prepend array
     this._recentIDs = utilArrayUniq(this._recentIDs).slice(0, MAXRECENTS);
 
-    storage?.setItem('preset_recents', JSON.stringify(this._recentIDs));
+    settings?.set('schema.presetRecents', this._recentIDs);
   }
 
 

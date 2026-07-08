@@ -276,10 +276,10 @@ export class UiRapidDatasetToggle {
     const map = context.systems.map;
     const rapid = context.systems.rapid;
     const scene = context.systems.gfx.scene;
-    const storage = context.systems.storage;
+    const settings = context.systems.settings;
 
     const isRapidEnabled = scene.layers.get('rapid')?.enabled;
-    const showPreview = storage.getItem('rapid-internal-feature.previewDatasets') === 'true';
+    const showPreview = settings?.get('poweruser.previewDatasets') === 'true';
     const datasets = [...rapid.datasets.values()]
       .filter(d => d.added && (showPreview || !d.beta));    // exclude preview datasets unless user has opted into them
 

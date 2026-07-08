@@ -323,10 +323,10 @@ export class UiRapidCatalog extends EventEmitter {
     const context = this.context;
     const l10n = context.systems.l10n;
     const rapid = context.systems.rapid;
-    const storage = context.systems.storage;
+    const settings = context.systems.settings;
     const $content = this.$modal.selectAll('.content');
 
-    const showPreview = storage.getItem('rapid-internal-feature.previewDatasets') === 'true';
+    const showPreview = settings?.get('poweruser.previewDatasets') === 'true';
 
     const $status = $selection.selectAll('.rapid-catalog-datasets-status');
     const $results = $selection.selectAll('.rapid-catalog-datasets');

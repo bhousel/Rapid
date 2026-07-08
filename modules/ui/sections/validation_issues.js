@@ -16,7 +16,7 @@ export function uiSectionValidationIssues(context, severity) {
   const editor = context.systems.editor;
   const l10n = context.systems.l10n;
   const map = context.systems.map;
-  const storage = context.systems.storage;
+  const settings = context.systems.settings;
   const urlhash = context.systems.urlhash;
   const validator = context.systems.validator;
   const scheduler = context.systems.scheduler;
@@ -66,7 +66,7 @@ export function uiSectionValidationIssues(context, severity) {
 
   // Creates the issues list if needed and updates it with the current issues
   function drawIssuesList(selection, issues) {
-    const showAutoFix = (storage.getItem('rapid-internal-feature.showAutoFix') === 'true');
+    const showAutoFix = (settings?.get('poweruser.showAutoFix') === 'true');
 
     let list = selection.selectAll('.issues-list')
       .data([0]);
@@ -206,8 +206,8 @@ export function uiSectionValidationIssues(context, severity) {
   // Get the current display options for the issues lists
   function getOptions() {
     return {
-      what: storage.getItem('validate-what') || 'edited',
-      where: storage.getItem('validate-where') || 'all'
+      what: settings?.get('validator.what') || 'edited',
+      where: settings?.get('validator.where') || 'all'
     };
   }
 

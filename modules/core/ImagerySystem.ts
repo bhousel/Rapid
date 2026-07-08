@@ -122,7 +122,7 @@ export class ImagerySystem extends AbstractSystem {
     super(context);
     this.id = 'imagery';
     this.requiredDependencies = new Set<SystemID>(['network']);
-    this.optionalDependencies = new Set<SystemID>(['assets', 'gfx', 'l10n', 'storage', 'urlhash']);
+    this.optionalDependencies = new Set<SystemID>(['assets', 'gfx', 'l10n', 'settings', 'urlhash']);
 
     this._scopes = new Map<ScopeID, ImageryScope>();
     this.features = new Map<ImagerySourceID, GeoJSON.Feature>();
@@ -161,7 +161,7 @@ export class ImagerySystem extends AbstractSystem {
     const assets = context.systems.assets;
     const gfx = context.systems.gfx;
     const l10n = context.systems.l10n;
-    const storage = context.systems.storage;
+    const settings = context.systems.settings;
     const urlhash = context.systems.urlhash;
 
     return this._initPromise = super.initAsync()
@@ -170,7 +170,7 @@ export class ImagerySystem extends AbstractSystem {
           assets?.initAsync(),
           gfx?.initAsync(),      // `gfx.scene` will exist after `initAsync`
           l10n?.initAsync(),
-          storage?.initAsync(),
+          settings?.initAsync(),
           urlhash?.initAsync()
         ];
         return Promise.all(prerequisites.filter(Boolean));
@@ -269,7 +269,7 @@ export class ImagerySystem extends AbstractSystem {
    */
   public resetAll(): void {
     const context = this.context;
-    const storage = context.systems.storage;
+    const settings = context.systems.settings;
 
     this._loadedAssetIDs.clear();
     this.features.clear();
@@ -285,7 +285,7 @@ export class ImagerySystem extends AbstractSystem {
 
     // Add 'Custom' - seed it with whatever template the user has used previously
     const custom = new ImagerySourceCustom(context);
-    custom.template = storage?.getItem('background-custom-template') ?? '';
+    custom.template = settings?.get('imagery.custom[0].template') ?? '';
     common.sources.set(custom.id.toLowerCase(), custom);
 
     this._baseLayer = none;
@@ -600,14 +600,14 @@ export class ImagerySystem extends AbstractSystem {
    */
   public chooseDefaultSource(): ImagerySource {
     const context = this.context;
-    const storage = context.systems.storage;
+    const settings = context.systems.settings;
 
     const available = this.visibleSources();
     const first = available[0];
     const best = available.find(s => s.props.best);
 
     // Consider previously chosen imagery unless it was 'none'
-    const previousID = storage?.getItem('background-last-used') || 'none';
+    const previousID = settings?.get('imagery.lastUsed') || 'none';
     const previous = (previousID !== 'none') && this.getSourceByID(previousID);
 
     return best ||

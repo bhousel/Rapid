@@ -9,7 +9,7 @@ export function operationOrthogonalize(context, selectedIDs) {
   const editor = context.systems.editor;
   const graph = editor.staging.graph;
   const l10n = context.systems.l10n;
-  const storage = context.systems.storage;
+  const settings = context.systems.settings;
 
   const entities = selectedIDs.map(entityID => graph.hasEntity(entityID)).filter(Boolean);
   const isNew = entities.every(entity => entity.isNew());
@@ -94,7 +94,7 @@ export function operationOrthogonalize(context, selectedIDs) {
 
     // If the selection is not 80% contained in view
     function tooLarge() {
-      const allowLargeEdits = storage.getItem('rapid-internal-feature.allowLargeEdits') === 'true';
+      const allowLargeEdits = settings?.get('poweruser.allowLargeEdits') === 'true';
       return !allowLargeEdits && extent.percentContainedIn(context.viewport.visibleExtent()) < 0.8;
     }
 

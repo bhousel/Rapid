@@ -11,7 +11,7 @@ export function operationDelete(context, selectedIDs) {
   const graph = editor.staging.graph;
   const l10n = context.systems.l10n;
   const map = context.systems.map;
-  const storage = context.systems.storage;
+  const settings = context.systems.settings;
   const viewport = context.viewport;
 
   const entities = selectedIDs.map(entityID => graph.hasEntity(entityID)).filter(Boolean);
@@ -95,7 +95,7 @@ export function operationDelete(context, selectedIDs) {
 
     // If the selection is not 80% contained in view
     function tooLarge() {
-      const allowLargeEdits = storage.getItem('rapid-internal-feature.allowLargeEdits') === 'true';
+      const allowLargeEdits = settings?.get('poweruser.allowLargeEdits') === 'true';
       return !allowLargeEdits && extent.percentContainedIn(viewport.visibleExtent()) < 0.8;
     }
 

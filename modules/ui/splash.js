@@ -13,14 +13,14 @@ import { uiModal } from './modal.js';
 export function uiSplash(context) {
   const assets = context.systems.assets;
   const l10n = context.systems.l10n;
-  const storage = context.systems.storage;
+  const settings = context.systems.settings;
 
-  const sawPrivacyVersion = parseInt(storage.getItem('sawPrivacyVersion'), 10) || 0;
+  const sawPrivacyVersion = parseInt(settings?.get('ui.sawPrivacyVersion') ?? '', 10) || 0;
 
 
   return function render($selection) {
     const rtl = l10n.isRTL ? '-rtl' : '';
-    storage.setItem('sawPrivacyVersion', context.privacyVersion);
+    settings?.set('ui.sawPrivacyVersion', String(context.privacyVersion));
 
     // prefetch intro graph data now, while user is looking at the splash screen
     assets.loadAssetAsync('intro_graph');

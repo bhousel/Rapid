@@ -8,7 +8,7 @@ import { utilGetSetValue, utilNoAuto } from '../../util/index.ts';
 export function uiSectionValidationRules(context) {
   const l10n = context.systems.l10n;
   const scheduler = context.systems.scheduler;
-  const storage = context.systems.storage;
+  const settings = context.systems.settings;
   const validator = context.systems.validator;
 
   const MINSQUARE = 0;
@@ -119,10 +119,7 @@ export function uiSectionValidationRules(context) {
 
 
     // user-configurable square threshold
-    let degStr = storage.getItem('validate-square-degrees');
-    if (degStr === null) {
-      degStr = DEFAULTSQUARE.toString();
-    }
+    let degStr = settings?.get('validator.squareDegrees') ?? DEFAULTSQUARE.toString();
 
     let span = items.selectAll('.square-degrees');
     let input = span.selectAll('.square-degrees-input')
@@ -173,7 +170,7 @@ export function uiSectionValidationRules(context) {
     input
       .property('value', degStr);
 
-    storage.setItem('validate-square-degrees', degStr);
+    settings?.set('validator.squareDegrees', degStr);
     validator.revalidateUnsquare();
   }
 

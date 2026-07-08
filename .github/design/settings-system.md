@@ -393,26 +393,60 @@ Migration guarantees:
 - Idempotent when rerun on same version.
 - Unit tests for each migration step.
 
-## Legacy Key Mapping (initial)
+## Legacy Key Mapping
 
-Initial one-time import into v1 envelope:
+One-time import into the v1 envelope. Settings paths are **owned by the systemID** of the
+system responsible for them and use **camelCase** leaf names:
 
-- `background-custom-template` -> `rapid.imagery.custom[0].template`
-- `background-favorites` -> `rapid.imagery.favorites`
-- `background-last-used` -> `rapid.imagery.lastUsed`
-- `background-last-used-toggle` -> `rapid.imagery.lastUsedToggle`
-- `background-opacity` -> `rapid.imagery.opacity`
-- `preset_recents` -> `rapid.schema.presetRecents`
-- `preferences.privacy.thirdpartyicons` -> `rapid.privacy.thirdPartyIcons`
-- `prefs.mouse_wheel.interaction` -> `rapid.ui.mouseWheelInteraction`
-- `rapid-internal-feature.*` -> `rapid.experiments.*`
-- `sawRapidSplash`, `sawWhatsNewVersion`, `sawPrivacyVersion` -> `rapid.ui.*`
-- `inspector.collapsed`, `inspector.width` -> `rapid.ui.inspector.*`
-- `walkthrough_*` -> `rapid.ui.walkthrough.*`
+- `background-custom-template` -> `imagery.custom[0].template`
+- `background-favorites` -> `imagery.favorites`
+- `background-last-used` -> `imagery.lastUsed`
+- `background-last-used-toggle` -> `imagery.lastUsedToggle`
+- `background-opacity` -> `imagery.opacity`
+- `preset_recents` -> `schema.presetRecents`
+- `preferences.privacy.thirdpartyicons` -> `ui.privacy.thirdPartyIcons`
+- `prefs.mouse_wheel.interaction` -> `ui.mouseWheelInteraction`
+- `rapid-internal-feature.*` -> `poweruser.*` (active flags) / `poweruser.was.*` (backups)
+- `validate-what` / `validate-where` / `validate-square-degrees` / `validate-disabledRules`
+  -> `validator.what` / `validator.where` / `validator.squareDegrees` / `validator.disabledRules`
+- `disabled-features` -> `filters.disabledFilters`
+- `area-fill` / `area-fill-toggle` -> `map.areaFill` / `map.areaFillToggle`
+- `turn-restriction-distance` / `turn-restriction-via-way0` -> `ui.restrictions.maxDistance` / `ui.restrictions.viaWay0`
+- `raw-tag-editor-view` -> `ui.rawTagEditorView`
+- `disclosure.<key>.expanded` -> `ui.disclosure.<key>.expanded`
+- `settings-custom-data-url` -> `ui.customData.url`
+- `sawRapidSplash`, `sawWhatsNewVersion`, `sawPrivacyVersion`, `sawVersion` -> `ui.*`
+- `inspector.collapsed`, `inspector.width` -> `ui.inspector.*`
+- `walkthrough_*` -> `ui.walkthrough.*`
+- `entity-issues.reference.expanded` -> `ui.entityIssues.referenceExpanded`
+
+### Why the legacy key names matter (iD compatibility)
+
+The legacy localStorage key names read by the migration are **the same keys the iD editor
+uses**. When Rapid and iD are served from the same origin (which happens via tasking managers
+and similar tools), reading these exact keys lets us **honor a user's existing iD preferences**
+on their first Rapid session. For this reason the migration must keep reading the original iD
+key names verbatim — do not rename the *source* keys, only the destination settings paths.
+
+
+### Key naming convention
+
+- Each settings path begins with the **systemID of the owning system** (e.g. `validator.*`,
+  `filters.*`, `map.*`, `imagery.*`, `schema.*`, `poweruser.*`), so ownership is obvious from
+  the key. UI-only preferences with no single owning system live under `ui.*`.
+- Leaf names are **camelCase**.
+
+### Not persisted (deliberately)
+
+- **Changeset draft metadata** (`comment`, `source`, `hashtags`) is *session state*, not a
+  durable preference — it is seeded from the urlhash at init and owned by `UploaderSystem`
+  as public properties (`uploader.comment` / `.source` / `.hashtags`). It is intentionally
+  **not** stored in settings. (The old localStorage `comment`/`commentDate`/`hashtags`/`source`
+  keys, with their 2-day expiry hack, are retired.)
+- Edit backup/history stays with `EditSystem` (high-churn, out of settings scope).
 
 Notes:
-- Some existing keys should remain outside settings scope for now (for example edit backup/history managed by `EditSystem`).
-- Maintain compatibility reads for a limited deprecation window.
+- Legacy keys are read (never re-written) during a limited deprecation window.
 
 ## Rollout Plan
 
@@ -435,15 +469,30 @@ Notes:
 - Legacy keys are read but left in place so not-yet-migrated callsites still work.
 - Idempotent: existing settings win over re-imported legacy values.
 
-### Phase 2: First callsite migrations (next)
+### Phase 2: First callsite migrations ✅ done
 
-Migrate highest-impact settings first, defining each domain's settings interface in its
-owning system:
-- Custom background template flow.
-- Imagery custom/favorites/last used/opacities.
-- Schema preset recents.
+All callsites that previously read/wrote the legacy `storage` keys now use the typed
+`SettingsSystem` paths instead. Systems access `settings` as an **optional** dependency
+(`settings?.get(...)` / `settings?.set(...)`) to keep coupling low; `storage` is only kept
+where a file still uses it for non-migrated keys (e.g. `EditSystem` edit backups). Settings
+paths are keyed by the **owning systemID** and use **camelCase** (see naming convention above).
+Highlights:
+- Imagery: custom template, favorites, last-used (+toggle), opacity.
+- Schema: preset recents, now stored as a native array (no `JSON.stringify`).
+- Validator: `validator.what` / `where` / `squareDegrees` / `disabledRules`.
+- Poweruser: all `rapid-internal-feature.*` flags → `poweruser.*`; `.was.` backups → `poweruser.was.*`.
+- Filters / Map: `filters.disabledFilters`, `map.areaFill` / `map.areaFillToggle`.
+- UI: splash/whatsnew/version flags, walkthrough progress, inspector width/collapsed,
+  mouse-wheel interaction, third-party-icon privacy, raw-tag-editor view, disclosure state,
+  custom-data URL.
 
-Keep behavior parity while replacing direct key access.
+Changeset draft metadata (`comment`/`source`/`hashtags`) was moved *out* of settings and onto
+`UploaderSystem` as public, session-scoped properties (see "Not persisted" above).
+
+The v0→v1 migration was extended to also import `poweruser.autoConnect`, `poweruser.tagSources`,
+`validator.disabledRules`, `filters.disabledFilters`, `map.areaFill`/`areaFillToggle`, and
+`ui.rawTagEditorView` so no previously-persisted value is orphaned. Legacy keys are still read
+(never written) during the deprecation window.
 
 ### Phase 3: OSM sync foundation
 

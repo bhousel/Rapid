@@ -17,11 +17,10 @@
 //    const editor = context.systems.editor;
 //    const l10n = context.systems.l10n;
 //    const schema = context.systems.schema;
-//    const storage = context.systems.storage;
+//    const settings = context.systems.settings;
 //
-//    storage.removeItem('turn-restriction-via-way');                    // remove old key
-//    var storedViaWay = storage.getItem('turn-restriction-via-way0');   // use new key iD#6922
-//    var storedDistance = storage.getItem('turn-restriction-distance');
+//    var storedViaWay = settings?.get('ui.restrictions.viaWay0');       // iD#6922
+//    var storedDistance = settings?.get('ui.restrictions.maxDistance');
 //
 //    var _maxViaWay = storedViaWay !== null ? (+storedViaWay) : 0;
 //    var _maxDistance = storedDistance ? (+storedDistance) : 30;
@@ -147,7 +146,7 @@
 //                _maxDistance = +val;
 //                _intersection = null;
 //                _container.selectAll('.layer-osm .layer-turns *').remove();
-//                storage.setItem('turn-restriction-distance', _maxDistance);
+//                settings?.set('ui.restrictions.maxDistance', String(_maxDistance));
 //                _parent.call(restrictions);
 //            });
 //
@@ -189,7 +188,7 @@
 //                var val = d3_select(this).property('value');
 //                _maxViaWay = +val;
 //                _container.selectAll('.layer-osm .layer-turns *').remove();
-//                storage.setItem('turn-restriction-via-way0', _maxViaWay);
+//                settings?.set('ui.restrictions.viaWay0', String(_maxViaWay));
 //                _parent.call(restrictions);
 //            });
 //

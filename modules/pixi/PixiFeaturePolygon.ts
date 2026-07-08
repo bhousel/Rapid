@@ -167,7 +167,7 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
     }
 
     const context = this.context;
-    const storage = context.systems.storage;
+    const settings = context.systems.settings;
     const map = context.systems.map;
     const viewZoom = viewport.transform.zoom;
     const isWireframe = !!map?.wireframeMode;
@@ -194,7 +194,7 @@ export class PixiFeaturePolygon extends AbstractPixiFeature {
     const pattern = style.fill?.pattern;
     const dash = style.stroke?.dash ?? null;
 
-    const fillPreference = storage?.getItem('area-fill') ?? 'partial';
+    const fillPreference = settings?.get('map.areaFill') ?? 'partial';
     let doFullFill = (style.fill?.type ?? fillPreference) === 'full';
 
     const lowRes = this.lowRes!;

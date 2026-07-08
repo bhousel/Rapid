@@ -42,8 +42,28 @@ fidelity, array compaction, legacy import, reserved-namespace guard, persistence
 + `keys()` tests in StorageSystem.test.js. Full unit suite green (3260 pass) + browser (121 pass),
 tsc + eslint clean.
 
-**Next (Phase 2):** migrate first callsites — custom background flow, ImagerySystem, SchemaSystem
-`preset_recents` — defining each domain's settings interface in its owning system.
+**Phase 2 done (2026-07-08):** migrated all legacy `storage` key callsites to the typed
+`settings.get/set` API. `settings` is an OPTIONAL dependency everywhere (`settings?.`); kept
+`storage` only where a file still uses non-migrated keys (EditSystem backups). Paths follow the
+migration mapping (`imagery.custom[0].template`, `schema.presetRecents`, `experiments.*`,
+`validation.*`, `ui.walkthrough.*`, `changeset.*`, `privacy.thirdPartyIcons`,
+`ui.mouseWheelInteraction`, `ui.inspector.*`, etc.). schema.presetRecents now stored as a native
+array (no JSON.stringify). Extended the v0→v1 migration to also import `experiments.autoConnect`,
+`experiments.tagSources`, and `validation.disabledRules`; poweruser `.was.` backups →
+`experiments.was.*`. tsc + eslint clean; unit + browser-op tests green (7 pre-existing failures
+unrelated to this work: utilDetect env, Mapillary/Streetside net timeouts, one UrlHash test).
+
+**Phase 2 follow-up — key naming + changeset ownership (2026-07-08):**
+- Settings keys now start with the **owning systemID** (camelCase leaves): `validation.*`→`validator.*`,
+  `experiments.*`→`poweruser.*` (incl. `.was.`), `customData`→`ui.customData`.
+- Migrated a few missed prefs: `disabled-features`→`filters.disabledFilters`,
+  `area-fill`/`area-fill-toggle`→`map.areaFill`/`map.areaFillToggle`,
+  `raw-tag-editor-view`→`ui.rawTagEditorView`, `disclosure.<key>.expanded`→`ui.disclosure.<key>.expanded`.
+- **Changeset draft metadata removed from settings.** `comment`/`source`/`hashtags` are now public,
+  session-scoped properties on `UploaderSystem`, seeded from the urlhash in `initAsync` (urlhash added
+  as an optional dep). The old 2-day-expiry localStorage hack is gone. Behavior change: a changeset
+  comment no longer survives a page reload (it was only persisted via that hack).
+- Migration extended so nothing is orphaned; tests updated. tsc + eslint + unit + browser all green.
 
 
 ## Spatial System — Step 3 (conflation: coverage/buffers + two-phase querying)

@@ -420,7 +420,7 @@ export class PixiEvents extends EventEmitter {
     e.stopImmediatePropagation();   // don't scroll page contents either
 
     const context = this.context;
-    const storage = context.systems.storage;
+    const settings = context.systems.settings;
 
     this._observeCoordinate(e.offsetX, e.offsetY);
     const [dX, dY] = this._normalizeWheelDelta(e);
@@ -455,7 +455,7 @@ export class PixiEvents extends EventEmitter {
       speed = 3;
 
     } else {  // consider user mouse_wheel preference
-      const wheelPref = storage?.getItem('prefs.mouse_wheel.interaction') ?? this._wheelDefault;
+      const wheelPref = settings?.get('ui.mouseWheelInteraction') ?? this._wheelDefault;
 
       // User wants to 'pan' by default OR
       // We autodetect - either horizontal scroll present or vertical scroll is a round number...

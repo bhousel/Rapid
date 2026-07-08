@@ -5,13 +5,13 @@ import { uiSection } from '../section.js';
 
 export function uiSectionPrivacy(context) {
   const l10n = context.systems.l10n;
-  const storage = context.systems.storage;
+  const settings = context.systems.settings;
 
   const section = uiSection(context, 'preferences-third-party')
     .label(l10n.t('preferences.privacy.title'))
     .disclosureContent(renderDisclosureContent);
 
-  let _showThirdPartyIcons = storage.getItem('preferences.privacy.thirdpartyicons') || 'true';
+  let _showThirdPartyIcons = settings?.get('ui.privacy.thirdPartyIcons') || 'true';
 
   function renderDisclosureContent(selection) {
     // enter
@@ -36,7 +36,7 @@ export function uiSectionPrivacy(context) {
       .on('change', d3_event => {
         d3_event.preventDefault();
         _showThirdPartyIcons = (_showThirdPartyIcons === 'true') ? 'false' : 'true';
-        storage.setItem('preferences.privacy.thirdpartyicons', _showThirdPartyIcons);
+        settings?.set('ui.privacy.thirdPartyIcons', _showThirdPartyIcons);
         update();
       });
 

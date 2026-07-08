@@ -1472,10 +1472,9 @@ export class EditSystem extends AbstractSystem {
     const storage = this.context.systems.storage!;
     storage.removeItem(this._backupKey());
 
-    // clear the changeset metadata associated with the saved history
-    storage.removeItem('comment');
-    storage.removeItem('hashtags');
-    storage.removeItem('source');
+    // clear the draft changeset metadata associated with the saved history
+    const uploader = this.context.systems.uploader;
+    uploader?.clearDraft();
   }
 
 

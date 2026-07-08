@@ -8,7 +8,7 @@ import { utilNoAuto, utilRebind } from '../../util/index.ts';
 export function uiSettingsCustomData(context) {
   const l10n = context.systems.l10n;
   const scene = context.systems.gfx.scene;
-  const storage = context.systems.storage;
+  const settings = context.systems.settings;
   const urlhash = context.systems.urlhash;
   const dispatch = d3_dispatch('change');
   const prefix = 'settings.custom_data';  // prefix for text strings
@@ -23,8 +23,8 @@ export function uiSettingsCustomData(context) {
     const dataLayer = scene.layers.get('custom-data');
 
     // Keep separate copies of original and current settings
-    // Take initial values from urlhash first, localstorage second
-    const origUrl = urlhash.getParam('data') || urlhash.getParam('gpx') || storage.getItem('settings-custom-data-url');
+    // Take initial values from urlhash first, stored settings second
+    const origUrl = urlhash.getParam('data') || urlhash.getParam('gpx') || settings?.get('ui.customData.url');
     const origFileList = (dataLayer && dataLayer.getFileList()) || null;
     let _currUrl = origUrl;
     let _currFileList = origFileList;
@@ -144,7 +144,7 @@ ${url_tokens}
     // Restore the original settings
     function clickCancel() {
       textSection.select('.field-url').property('value', origUrl);
-      storage.setItem('settings-custom-data-url', origUrl);
+      settings?.set('ui.customData.url', origUrl || '');
       this.blur();
       modal.close();
     }
@@ -159,7 +159,7 @@ ${url_tokens}
       // One or the other but not both
       if (_currUrl) {
         currSettings = { url: _currUrl, fileList: null };
-        storage.setItem('settings-custom-data-url', _currUrl);
+        settings?.set('ui.customData.url', _currUrl);
       } else if (_currFileList)  {
         currSettings = { url: null, fileList: _currFileList };
       }

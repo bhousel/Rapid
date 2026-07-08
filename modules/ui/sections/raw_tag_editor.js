@@ -14,7 +14,7 @@ export function uiSectionRawTagEditor(context, id) {
   const l10n = context.systems.l10n;
   const scheduler = context.systems.scheduler;
   const schema = context.systems.schema;
-  const storage = context.systems.storage;
+  const settings = context.systems.settings;
   const taginfo = context.services.taginfo;
   const dispatch = d3_dispatch('change');
 
@@ -38,7 +38,7 @@ export function uiSectionRawTagEditor(context, id) {
     _discardKeys = new Set(Object.keys(osmScope.discarded));
   }
 
-  let _tagView = storage?.getItem('raw-tag-editor-view') || 'list';   // 'list, 'text'
+  let _tagView = settings?.get('ui.rawTagEditorView') || 'list';   // 'list, 'text'
   let _readOnlyTags = [];
   let _orderedKeys = [];   // the keys in the order we want them to display
   let _didFocus = false;
@@ -94,7 +94,7 @@ export function uiSectionRawTagEditor(context, id) {
       .attr('title', d => l10n.t(`icons.${d.id}`))
       .on('click', function(d3_event, clicked) {
         _tagView = clicked.id;
-        storage?.setItem('raw-tag-editor-view', clicked.id);
+        settings?.set('ui.rawTagEditorView', clicked.id);
 
         wrap.selectAll('.raw-tag-option')
           .classed('selected', d => d === clicked);

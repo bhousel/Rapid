@@ -50,7 +50,7 @@ export class UiValidatorStatus {
 
     const context = this.context;
     const l10n = context.systems.l10n;
-    const storage = context.systems.storage;
+    const settings = context.systems.settings;
     const validator = context.systems.validator;
 
     // Create/remove wrapper div if necessary
@@ -68,8 +68,8 @@ export class UiValidatorStatus {
     // Gather info to display
     const chips = [];
     const openIssues = validator.getIssuesBySeverity({
-      what: storage.getItem('validate-what') ?? 'edited',
-      where: storage.getItem('validate-where') ?? 'all'
+      what: settings?.get('validator.what') ?? 'edited',
+      where: settings?.get('validator.where') ?? 'all'
     });
 
     for (const [severity, issues] of Object.entries(openIssues)) {
@@ -82,7 +82,7 @@ export class UiValidatorStatus {
       }
     }
 
-    if (storage.getItem('validate-what') === 'all') {
+    if (settings?.get('validator.what') === 'all') {
       const resolvedIssues = validator.getResolvedIssues();
       if (resolvedIssues.length) {
         chips.push({

@@ -33,7 +33,7 @@ export function uiSectionBackgroundList(context) {
   const l10n = context.systems.l10n;
   const map = context.systems.map;
   const scheduler = context.systems.scheduler;
-  const storage = context.systems.storage;
+  const settings = context.systems.settings;
   const wayback = context.services.wayback;
   const ui = context.systems.ui;
 
@@ -51,14 +51,14 @@ export function uiSectionBackgroundList(context) {
   const settingsCustomBackground = uiSettingsCustomBackground(context)
     .on('change', customChanged);
 
-  const stored = JSON.parse(storage.getItem('background-favorites')) || [];
+  const stored = settings?.get('imagery.favorites') ?? [];
   // note: older versions stored favorites as an object, but we only need the keys of this object
   const vals = Array.isArray(stored) ? stored : Object.keys(stored);
   const _favoriteIDs = new Set(vals);
 
 
   function previousBackgroundID() {
-    return storage.getItem('background-last-used-toggle');
+    return settings?.get('imagery.lastUsedToggle');
   }
 
   function isNotOverlay(d) {
@@ -429,9 +429,9 @@ export function uiSectionBackgroundList(context) {
 
     const previousBackground = imagery.baseLayerSource();
     if (previousBackground instanceof ImagerySource) {
-      storage.setItem('background-last-used-toggle', previousBackground.id);
+      settings?.set('imagery.lastUsedToggle', previousBackground.id);
     }
-    storage.setItem('background-last-used', sourceID);
+    settings?.set('imagery.lastUsed', sourceID);
     imagery.setSourceByID(sourceID);
   }
 
@@ -494,7 +494,7 @@ export function uiSectionBackgroundList(context) {
     }
 
     const vals = [..._favoriteIDs];
-    storage.setItem('background-favorites', JSON.stringify(vals));
+    settings?.set('imagery.favorites', vals);
 
     select(target.parentElement)
       .transition()

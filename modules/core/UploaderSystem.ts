@@ -76,6 +76,16 @@ export class UploaderSystem extends AbstractSystem {
   /** The current changeset being uploaded (created by uiCommit) */
   public changeset: OsmChangeset | null;
 
+  /**
+   * Draft changeset comment. Session state seeded from the urlhash at init time;
+   * intentionally NOT persisted (a changeset comment is ephemeral, not a durable preference).
+   */
+  public comment: string;
+  /** Draft changeset source (session state, seeded from the urlhash) */
+  public source: string;
+  /** Draft changeset hashtags (session state, seeded from the urlhash) */
+  public hashtags: string;
+
   /** The original set of changes captured when an upload was initiated */
   protected _origChanges: UploadChanges | null;
   /** Tag keys that should be stripped from entities before uploading */
@@ -108,9 +118,13 @@ export class UploaderSystem extends AbstractSystem {
     super(context);
     this.id = 'uploader';
     this.requiredDependencies = new Set<SystemID>(['editor', 'l10n']);
-    this.optionalDependencies = new Set<SystemID>(['schema']);
+    this.optionalDependencies = new Set<SystemID>(['schema', 'urlhash']);
 
     this.changeset = null;    // uiCommit will create it
+
+    this.comment = '';
+    this.source = '';
+    this.hashtags = '';
 
     this._origChanges = null;
     this._discardTags = {};
@@ -142,13 +156,15 @@ export class UploaderSystem extends AbstractSystem {
     const editor = context.systems.editor;
     const l10n = context.systems.l10n;
     const schema = context.systems.schema;
+    const urlhash = context.systems.urlhash;
 
     return this._initPromise = super.initAsync()
       .then(() => {
         const prerequisites = [
           editor?.initAsync(),
           l10n?.initAsync(),
-          schema?.initAsync()
+          schema?.initAsync(),
+          urlhash?.initAsync()
         ];
         return Promise.all(prerequisites.filter(Boolean));
       })
@@ -157,6 +173,12 @@ export class UploaderSystem extends AbstractSystem {
           const osmScope = schema.getScope('osm');
           this._discardTags = osmScope.discarded as Record<string, boolean>;
         }
+
+        // Seed the draft changeset metadata from the urlhash (one-time init params).
+        // These are session-scoped and not persisted.
+        this.comment = urlhash?.initialHashParams.get('comment') ?? '';
+        this.source = urlhash?.initialHashParams.get('source') ?? '';
+        this.hashtags = urlhash?.initialHashParams.get('hashtags') ?? '';
       });
   }
 
@@ -177,6 +199,18 @@ export class UploaderSystem extends AbstractSystem {
   public resetAsync(): Promise<void> {
     this.changeset = null;
     return Promise.resolve();
+  }
+
+
+  /**
+   * Clears the draft changeset metadata (comment / source / hashtags).
+   * Called when the user discards their edits or switches API endpoints, so the
+   * next changeset starts fresh. (This is session state, not a persisted preference.)
+   */
+  public clearDraft(): void {
+    this.comment = '';
+    this.source = '';
+    this.hashtags = '';
   }
 
 

@@ -136,9 +136,9 @@ export function actionRapidAcceptFeature(entityID: EntityID, extGraph: Graph): R
       const context = graph.context;
       const rapid = context.systems.rapid;
       const spatial = context.systems.spatial;
-      const storage = context.systems.storage;
+      const settings = context.systems.settings;
 
-      const doAutoconnect = storage?.getItem('rapid-internal-feature.autoConnect') === 'true';
+      const doAutoconnect = settings?.get('poweruser.autoConnect') === 'true';
       if (!doAutoconnect || !rapid || !spatial) return;
 
       graph = graph.commit();

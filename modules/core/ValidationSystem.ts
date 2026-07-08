@@ -94,7 +94,7 @@ export class ValidationSystem extends AbstractSystem {
     super(context);
     this.id = 'validator';
     this.requiredDependencies = new Set<SystemID>(['editor', 'l10n', 'scheduler', 'schema', 'spatial']);
-    this.optionalDependencies = new Set<SystemID>(['map', 'storage', 'ui', 'urlhash']);
+    this.optionalDependencies = new Set<SystemID>(['map', 'settings', 'ui', 'urlhash']);
 
     this._validators = new Map<ValidatorID, ValidatorFunction>();
     this._base = new ValidationCache(context, 'base');
@@ -141,7 +141,7 @@ export class ValidationSystem extends AbstractSystem {
 
     const editor = context.systems.editor;
     const schema = context.systems.schema;
-    const storage = context.systems.storage;
+    const settings = context.systems.settings;
     const urlhash = context.systems.urlhash;
 
     return this._initPromise = super.initAsync()
@@ -149,7 +149,7 @@ export class ValidationSystem extends AbstractSystem {
         const prerequisites = [
           editor?.initAsync(),
           schema?.initAsync(),
-          storage?.initAsync(),
+          settings?.initAsync(),
           urlhash?.initAsync()
         ];
         return Promise.all(prerequisites.filter(Boolean));
@@ -170,7 +170,7 @@ export class ValidationSystem extends AbstractSystem {
         this._warningOverrides = this._parseHashParam(hash.get('validationWarning'));
         this._disableOverrides = this._parseHashParam(hash.get('validationDisable'));
 
-        const disabledRules = storage?.getItem('validate-disabledRules') ?? '';
+        const disabledRules = settings?.get('validator.disabledRules') ?? '';
         const validatorIDs = utilExtractValues(disabledRules).filter(Boolean);
         this._disabledValidatorIDs = new Set<ValidatorID>(validatorIDs);
 
@@ -535,8 +535,8 @@ export class ValidationSystem extends AbstractSystem {
       this._disabledValidatorIDs.add(validatorID);
     }
 
-    const storage = this.context.systems.storage;
-    storage?.setItem('validate-disabledRules', [...this._disabledValidatorIDs].join(','));
+    const settings = this.context.systems.settings;
+    settings?.set('validator.disabledRules', [...this._disabledValidatorIDs].join(','));
     this.validateAsync();
   }
 
@@ -549,8 +549,8 @@ export class ValidationSystem extends AbstractSystem {
   public disableValidators(validatorID: ValidatorID[] = []): void {
     this._disabledValidatorIDs = new Set<ValidatorID>(validatorID);
 
-    const storage = this.context.systems.storage;
-    storage?.setItem('validate-disabledRules', [...this._disabledValidatorIDs].join(','));
+    const settings = this.context.systems.settings;
+    settings?.set('validator.disabledRules', [...this._disabledValidatorIDs].join(','));
     this.validateAsync();
   }
 

@@ -12,7 +12,7 @@ import { uiModal } from './modal.js';
 export function uiWhatsNew(context) {
   // const assets = context.systems.assets;
   const l10n = context.systems.l10n;
-  const storage = context.systems.storage;
+  const settings = context.systems.settings;
 
 
   return function render(selection) {
@@ -95,9 +95,9 @@ Big changes are coming soon to Rapid. including:
       .attr('class', 'rapid-feature-checkbox')
       .on('click', e => {
         if (e.target.checked) {
-          storage.setItem('sawWhatsNewVersion', context.whatsNewVersion);
+          settings?.set('ui.sawWhatsNewVersion', String(context.whatsNewVersion));
         } else {
-          storage.removeItem('sawWhatsNewVersion');
+          settings?.unset('ui.sawWhatsNewVersion');
         }
       });
 

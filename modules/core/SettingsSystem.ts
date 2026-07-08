@@ -155,54 +155,41 @@ function importLegacyKeys(tree: SettingsTree, storage: StorageSystem): SettingsT
     imported.schema = { presetRecents };
   }
 
-  // privacy
-  const privacy: Record<string, SettingsValue> = {};
-  put(privacy, 'thirdPartyIcons', getStr('preferences.privacy.thirdpartyicons'));
-  if (Object.keys(privacy).length) {
-    imported.privacy = privacy;
+  // poweruser (formerly the `rapid-internal-feature.*` keys)
+  const poweruser: Record<string, SettingsValue> = {};
+  put(poweruser, 'allowLargeEdits', getStr('rapid-internal-feature.allowLargeEdits'));
+  put(poweruser, 'autoConnect', getStr('rapid-internal-feature.autoConnect'));
+  put(poweruser, 'previewDatasets', getStr('rapid-internal-feature.previewDatasets'));
+  put(poweruser, 'showAutoFix', getStr('rapid-internal-feature.showAutoFix'));
+  put(poweruser, 'tagnosticRoadCombine', getStr('rapid-internal-feature.tagnosticRoadCombine'));
+  put(poweruser, 'tagSources', getStr('rapid-internal-feature.tagSources'));
+  if (Object.keys(poweruser).length) {
+    imported.poweruser = poweruser;
   }
 
-  // experiments (formerly the `rapid-internal-feature.*` keys)
-  const experiments: Record<string, SettingsValue> = {};
-  put(experiments, 'allowLargeEdits', getStr('rapid-internal-feature.allowLargeEdits'));
-  put(experiments, 'previewDatasets', getStr('rapid-internal-feature.previewDatasets'));
-  put(experiments, 'showAutoFix', getStr('rapid-internal-feature.showAutoFix'));
-  put(experiments, 'tagnosticRoadCombine', getStr('rapid-internal-feature.tagnosticRoadCombine'));
-  if (Object.keys(experiments).length) {
-    imported.experiments = experiments;
+  // validator
+  const validator: Record<string, SettingsValue> = {};
+  put(validator, 'disabledRules', getStr('validate-disabledRules'));
+  put(validator, 'squareDegrees', getStr('validate-square-degrees'));
+  put(validator, 'what', getStr('validate-what'));
+  put(validator, 'where', getStr('validate-where'));
+  if (Object.keys(validator).length) {
+    imported.validator = validator;
   }
 
-  // validation
-  const validation: Record<string, SettingsValue> = {};
-  put(validation, 'squareDegrees', getStr('validate-square-degrees'));
-  put(validation, 'what', getStr('validate-what'));
-  put(validation, 'where', getStr('validate-where'));
-  if (Object.keys(validation).length) {
-    imported.validation = validation;
+  // filters
+  const filters: Record<string, SettingsValue> = {};
+  put(filters, 'disabledFilters', getStr('disabled-features'));
+  if (Object.keys(filters).length) {
+    imported.filters = filters;
   }
 
-  // restrictions
-  const restrictions: Record<string, SettingsValue> = {};
-  put(restrictions, 'maxDistance', getStr('turn-restriction-distance'));
-  put(restrictions, 'viaWay0', getStr('turn-restriction-via-way0'));
-  if (Object.keys(restrictions).length) {
-    imported.restrictions = restrictions;
-  }
-
-  // changeset
-  const changeset: Record<string, SettingsValue> = {};
-  put(changeset, 'comment', getStr('comment'));
-  put(changeset, 'commentDate', getStr('commentDate'));
-  put(changeset, 'hashtags', getStr('hashtags'));
-  put(changeset, 'source', getStr('source'));
-  if (Object.keys(changeset).length) {
-    imported.changeset = changeset;
-  }
-
-  // custom data
-  const customDataURL = getStr('settings-custom-data-url');
-  if (customDataURL !== undefined) {
-    imported.customData = { url: customDataURL };
+  // map
+  const map: Record<string, SettingsValue> = {};
+  put(map, 'areaFill', getStr('area-fill'));
+  put(map, 'areaFillToggle', getStr('area-fill-toggle'));
+  if (Object.keys(map).length) {
+    imported.map = map;
   }
 
   // ui
@@ -212,6 +199,7 @@ function importLegacyKeys(tree: SettingsTree, storage: StorageSystem): SettingsT
   put(ui, 'sawVersion', getStr('sawVersion'));
   put(ui, 'sawWhatsNewVersion', getStr('sawWhatsNewVersion'));
   put(ui, 'mouseWheelInteraction', getStr('prefs.mouse_wheel.interaction'));
+  put(ui, 'rawTagEditorView', getStr('raw-tag-editor-view'));
 
   const inspector: Record<string, SettingsValue> = {};
   put(inspector, 'collapsed', getStr('inspector.collapsed'));
@@ -232,6 +220,24 @@ function importLegacyKeys(tree: SettingsTree, storage: StorageSystem): SettingsT
   put(entityIssues, 'referenceExpanded', getStr('entity-issues.reference.expanded'));
   if (Object.keys(entityIssues).length) {
     ui.entityIssues = entityIssues;
+  }
+
+  const privacy: Record<string, SettingsValue> = {};
+  put(privacy, 'thirdPartyIcons', getStr('preferences.privacy.thirdpartyicons'));
+  if (Object.keys(privacy).length) {
+    ui.privacy = privacy;
+  }
+
+  const restrictions: Record<string, SettingsValue> = {};
+  put(restrictions, 'maxDistance', getStr('turn-restriction-distance'));
+  put(restrictions, 'viaWay0', getStr('turn-restriction-via-way0'));
+  if (Object.keys(restrictions).length) {
+    ui.restrictions = restrictions;
+  }
+
+  const customDataURL = getStr('settings-custom-data-url');
+  if (customDataURL !== undefined) {
+    ui.customData = { url: customDataURL };
   }
 
   if (Object.keys(ui).length) {

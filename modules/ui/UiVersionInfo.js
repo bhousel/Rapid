@@ -23,8 +23,8 @@ export class UiVersionInfo {
     const isPrerelease = currVersion.includes('-');
     const isValidVersion = /\d+\.\d+\.\d+.*/.test(currVersion);
 
-    const storage = context.systems.storage;
-    const sawVersion = storage.getItem('sawVersion');
+    const settings = context.systems.settings;
+    const sawVersion = settings?.get('ui.sawVersion') ?? null;
 
     this.isNewUser = (sawVersion === null);
     this.isNewVersion = false;
@@ -35,7 +35,7 @@ export class UiVersionInfo {
     // - not a prerelease version
     if (isValidVersion) {
       this.isNewVersion = (sawVersion !== currVersion) && !isPrerelease;
-      storage.setItem('sawVersion', currVersion);
+      settings?.set('ui.sawVersion', currVersion);
     }
 
     // Create child components

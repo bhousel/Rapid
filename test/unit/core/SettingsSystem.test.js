@@ -12,10 +12,10 @@ const LEGACY_KEYS = [
   'rapid-internal-feature.showAutoFix', 'rapid-internal-feature.tagnosticRoadCombine',
   'sawRapidSplash', 'sawPrivacyVersion', 'sawVersion', 'sawWhatsNewVersion',
   'settings-custom-data-url', 'validate-square-degrees', 'validate-what', 'validate-where',
-  'turn-restriction-distance', 'turn-restriction-via-way0',
+  'validate-disabledRules', 'turn-restriction-distance', 'turn-restriction-via-way0',
   'walkthrough_completed', 'walkthrough_started', 'walkthrough_progress',
   'inspector.collapsed', 'inspector.width', 'entity-issues.reference.expanded',
-  'comment', 'commentDate', 'hashtags', 'source'
+  'raw-tag-editor-view', 'disabled-features', 'area-fill', 'area-fill-toggle'
 ];
 
 
@@ -240,9 +240,9 @@ describe('SettingsSystem', () => {
           assert.deepEqual(settings.get('imagery.favorites'), ['EsriWorldImagery']);
           assert.strictEqual(settings.get('imagery.opacity'), '0.5');
           assert.deepEqual(settings.get('schema.presetRecents'), ['building', 'highway/residential']);
-          assert.strictEqual(settings.get('privacy.thirdPartyIcons'), 'false');
+          assert.strictEqual(settings.get('ui.privacy.thirdPartyIcons'), 'false');
           assert.strictEqual(settings.get('ui.sawWhatsNewVersion'), '20241222');
-          assert.strictEqual(settings.get('experiments.allowLargeEdits'), 'true');
+          assert.strictEqual(settings.get('poweruser.allowLargeEdits'), 'true');
           assert.strictEqual(settings.get('ui.walkthrough.progress'), 'welcome;point');
         });
     });

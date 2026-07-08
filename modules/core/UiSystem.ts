@@ -81,8 +81,8 @@ export class UiSystem extends AbstractSystem {
     super(context);
     this.id = 'ui';
     // Require any systems that might be required by any UI component.
-    this.requiredDependencies = new Set<SystemID>(['assets', 'editor', 'gfx', 'imagery', 'l10n', 'map', 'network', 'spatial', 'storage', 'urlhash']);
-    this.optionalDependencies = new Set<SystemID>(['scheduler']);
+    this.requiredDependencies = new Set<SystemID>(['assets', 'editor', 'gfx', 'imagery', 'l10n', 'map', 'network', 'spatial', 'urlhash']);
+    this.optionalDependencies = new Set<SystemID>(['scheduler', 'settings']);
 
     this._mapRect = null;
     this._needWidth = {};
@@ -229,7 +229,7 @@ export class UiSystem extends AbstractSystem {
     const context = this.context;
     const editor = context.systems.editor!;
     const map = context.systems.map!;
-    const storage = context.systems.storage!;
+    const settings = context.systems.settings;
     const urlhash = context.systems.urlhash!;
     const $container: D3Selection = context.container();
 
@@ -253,8 +253,8 @@ export class UiSystem extends AbstractSystem {
 
         // What to show first?
         const startWalkthrough = urlhash.initialHashParams.get('walkthrough') === 'true';
-        const sawPrivacyVersion = parseInt(storage.getItem('sawPrivacyVersion') ?? '', 10) || 0;
-        const sawWhatsNewVersion = parseInt(storage.getItem('sawWhatsNewVersion') ?? '', 10) || 0;
+        const sawPrivacyVersion = parseInt(settings?.get('ui.sawPrivacyVersion') ?? '', 10) || 0;
+        const sawWhatsNewVersion = parseInt(settings?.get('ui.sawWhatsNewVersion') ?? '', 10) || 0;
 
         if (startWalkthrough) {
           $container.call(uiIntro(context));     // Jump right into walkthrough..

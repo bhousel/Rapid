@@ -237,23 +237,23 @@ export class UiRapidPowerUserFeatures {
 
     const context = this.context;
     const urlhash = context.systems.urlhash;
-    const storage = context.systems.storage;
+    const settings = context.systems.settings;
 
     const isPowerUser = urlhash.getParam('poweruser') === 'true';
     if (!isPowerUser) {
       for (const featureFlag of this.featureFlags) {
-        const val = storage.getItem(`rapid-internal-feature.${featureFlag}`);
+        const val = settings?.get(`poweruser.${featureFlag}`);
         if (val) {
-          storage.setItem(`rapid-internal-feature.was.${featureFlag}`, val);
-          storage.removeItem(`rapid-internal-feature.${featureFlag}`);
+          settings?.set(`poweruser.was.${featureFlag}`, val);
+          settings?.unset(`poweruser.${featureFlag}`);
         }
       }
     } else {
       for (const featureFlag of this.featureFlags) {
-        const val = storage.getItem(`rapid-internal-feature.was.${featureFlag}`);
+        const val = settings?.get(`poweruser.was.${featureFlag}`);
         if (val) {
-          storage.setItem(`rapid-internal-feature.${featureFlag}`, val);
-          storage.removeItem(`rapid-internal-feature.was.${featureFlag}`);
+          settings?.set(`poweruser.${featureFlag}`, val);
+          settings?.unset(`poweruser.was.${featureFlag}`);
         }
       }
     }
@@ -266,8 +266,8 @@ export class UiRapidPowerUserFeatures {
    * @return  {boolean}  `true` if the flag is enabled, `false` if not
    */
   isFeatureEnabled(featureFlag) {
-    const storage = this.context.systems.storage;
-    return storage.getItem(`rapid-internal-feature.${featureFlag}`) === 'true';
+    const settings = this.context.systems.settings;
+    return settings?.get(`poweruser.${featureFlag}`) === 'true';
   }
 
 
@@ -280,11 +280,11 @@ export class UiRapidPowerUserFeatures {
     const context = this.context;
     const gfx = context.systems.gfx;
     const rapid = context.systems.rapid;
-    const storage = context.systems.storage;
+    const settings = context.systems.settings;
 
-    let enabled = storage.getItem(`rapid-internal-feature.${featureFlag}`) === 'true';
+    let enabled = settings?.get(`poweruser.${featureFlag}`) === 'true';
     enabled = !enabled;
-    storage.setItem(`rapid-internal-feature.${featureFlag}`, enabled);
+    settings?.set(`poweruser.${featureFlag}`, String(enabled));
 
     // custom on-toggle behaviors can go here
     if (featureFlag === 'previewDatasets' && !enabled) {   // if user unchecked previewDatasets feature

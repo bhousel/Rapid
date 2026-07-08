@@ -121,11 +121,11 @@ export class UiSidebar {
 
     const context = this.context;
     const l10n = context.systems.l10n;
-    const storage = context.systems.storage;
+    const settings = context.systems.settings;
 
     const dir = l10n.textDirection;
-    const preferCollapsed = (storage.getItem('inspector.collapsed') === 'true');
-    const storedWidth = +(storage.getItem('inspector.width') || DEFAULT_WIDTH);
+    const preferCollapsed = (settings?.get('ui.inspector.collapsed') === 'true');
+    const storedWidth = +(settings?.get('ui.inspector.width') || DEFAULT_WIDTH);
     this._expandWidth = Math.max(MIN_WIDTH, storedWidth);
 
     // add .sidebar
@@ -709,9 +709,9 @@ export class UiSidebar {
     const preferCollapsed = $sidebar.classed('collapsed') ? 'true' : 'false';
     const preferWidth = this._expandWidth;
 
-    const storage = this.context.systems.storage;
-    storage.setItem('inspector.collapsed', preferCollapsed);
-    storage.setItem('inspector.width', preferWidth);
+    const settings = this.context.systems.settings;
+    settings?.set('ui.inspector.collapsed', preferCollapsed);
+    settings?.set('ui.inspector.width', String(preferWidth));
   }
 
 

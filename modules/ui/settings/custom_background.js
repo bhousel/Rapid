@@ -7,13 +7,13 @@ import { utilNoAuto, utilRebind } from '../../util/index.ts';
 
 export function uiSettingsCustomBackground(context) {
   const l10n = context.systems.l10n;
-  const storage = context.systems.storage;
+  const settings = context.systems.settings;
   const dispatch = d3_dispatch('change');
 
 
   function render(selection) {
     // keep separate copies of original and current settings
-    let _origSettings = { template: storage.getItem('background-custom-template') };
+    let _origSettings = { template: settings?.get('imagery.custom[0].template') ?? '' };
     let _currSettings = { ..._origSettings };  // shallow copy
 
     let modal = uiConfirm(context, selection).okButton();
@@ -97,7 +97,7 @@ ${info}
     // restore the original template
     function _clickCancel() {
       textSection.select('.field-template').property('value', _origSettings.template);
-      storage.setItem('background-custom-template', _origSettings.template);
+      settings?.set('imagery.custom[0].template', _origSettings.template);
       this.blur();
       modal.close();
     }
@@ -105,7 +105,7 @@ ${info}
     // accept the current template
     function _clickSave() {
       _currSettings.template = textSection.select('.field-template').property('value');
-      storage.setItem('background-custom-template', _currSettings.template);
+      settings?.set('imagery.custom[0].template', _currSettings.template);
       this.blur();
       modal.close();
       dispatch.call('change', this, _currSettings);

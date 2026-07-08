@@ -247,10 +247,10 @@ export function uiPresetIcon(context) {
       geom = 'route';
     }
 
-    const storage = context.systems.storage;
+    const settings = context.systems.settings;
     const styles = context.systems.styles;
 
-    const showThirdPartyIcons = (storage.getItem('preferences.privacy.thirdpartyicons') ?? 'true') === 'true';
+    const showThirdPartyIcons = (settings?.get('ui.privacy.thirdPartyIcons') ?? 'true') === 'true';
     const imageURL = showThirdPartyIcons && p?.props?.imageURL;
     const picon = getIcon(p, geom);
     // const showPoint = isPreset && (geom === 'point');     // not actually used

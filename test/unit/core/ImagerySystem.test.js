@@ -703,7 +703,7 @@ describe('ImagerySystem', () => {
 
       afterEach(() => {
         _imagery.setSourceByID('none');
-        delete context.systems.storage;
+        delete context.systems.settings;
         context.viewport = origViewport;
       });
 
@@ -722,11 +722,11 @@ describe('ImagerySystem', () => {
       });
 
       it('returns previously used source from storage', () => {
-        // Mock storage with previously used source
-        context.systems.storage = {
-          getItem: (key) => {
-            if (key === 'background-last-used') return 'ca-imagery';
-            return null;
+        // Mock settings with previously used source
+        context.systems.settings = {
+          get: (path) => {
+            if (path === 'imagery.lastUsed') return 'ca-imagery';
+            return undefined;
           }
         };
 
@@ -742,11 +742,11 @@ describe('ImagerySystem', () => {
       });
 
       it('ignores previously used "none" source', () => {
-        // Mock storage with 'none' as previous
-        context.systems.storage = {
-          getItem: (key) => {
-            if (key === 'background-last-used') return 'none';
-            return null;
+        // Mock settings with 'none' as previous
+        context.systems.settings = {
+          get: (path) => {
+            if (path === 'imagery.lastUsed') return 'none';
+            return undefined;
           }
         };
 
@@ -1146,30 +1146,30 @@ describe('ImagerySystem', () => {
     });
 
 
-    describe('resetAll with storage', () => {
-      let mockStorage;
+    describe('resetAll with settings', () => {
+      let mockSettings;
 
       beforeAll(() => {
-        // Set up mock storage with a custom template
-        mockStorage = {
-          getItem: (key) => {
-            if (key === 'background-custom-template') {
+        // Set up mock settings with a custom template
+        mockSettings = {
+          get: (path) => {
+            if (path === 'imagery.custom[0].template') {
               return 'https://custom.example.com/{z}/{x}/{y}.png';
             }
-            return null;
+            return undefined;
           }
         };
-        context.systems.storage = mockStorage;
+        context.systems.settings = mockSettings;
       });
 
       afterEach(() => {
-        // Clear storage mock
-        delete context.systems.storage;
+        // Clear settings mock
+        delete context.systems.settings;
         // Re-merge the test data for subsequent tests
         return _imagery.initAsync().then(() => _imagery.startAsync());
       });
 
-      it('loads custom template from storage', () => {
+      it('loads custom template from settings', () => {
         _imagery.resetAll();
         const custom = _imagery.sources.get('custom');
         assert.strictEqual(custom.template, 'https://custom.example.com/{z}/{x}/{y}.png');

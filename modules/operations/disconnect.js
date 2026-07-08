@@ -9,7 +9,7 @@ export function operationDisconnect(context, selectedIDs) {
   const editor = context.systems.editor;
   const graph = editor.staging.graph;
   const l10n = context.systems.l10n;
-  const storage = context.systems.storage;
+  const settings = context.systems.settings;
   const viewport = context.viewport;
 
   const entities = selectedIDs.map(entityID => graph.hasEntity(entityID)).filter(Boolean);
@@ -191,7 +191,7 @@ export function operationDisconnect(context, selectedIDs) {
 
     // If the selection is not 80% contained in view
     function tooLarge() {
-      const allowLargeEdits = storage.getItem('rapid-internal-feature.allowLargeEdits') === 'true';
+      const allowLargeEdits = settings?.get('poweruser.allowLargeEdits') === 'true';
       return !allowLargeEdits && extent.percentContainedIn(viewport.visibleExtent()) < 0.8;
     }
 

@@ -48,7 +48,7 @@ export function uiIntro(context, skipToRapid) {
   const osm = context.services.osm;
   const rapid = context.systems.rapid;
   const scene = context.systems.gfx.scene;
-  const storage = context.systems.storage;
+  const settings = context.systems.settings;
   const urlhash = context.systems.urlhash;
   const ui = context.systems.ui;
 
@@ -144,10 +144,10 @@ export function uiIntro(context, skipToRapid) {
     selection.call(_curtain.enable);
 
     // Store that the user started the walkthrough..
-    storage.setItem('walkthrough_started', 'yes');
+    settings?.set('ui.walkthrough.started', 'yes');
 
     // Restore previous walkthrough progress..
-    const storedProgress = storage.getItem('walkthrough_progress') || '';
+    const storedProgress = settings?.get('ui.walkthrough.progress') || '';
     _progress = storedProgress.split(';').filter(Boolean);
 
     // Create the chapters
@@ -160,7 +160,7 @@ export function uiIntro(context, skipToRapid) {
 
           // Store walkthrough progress..
           _progress.push(chapterID);
-          storage.setItem('walkthrough_progress', utilArrayUniq(_progress).join(';'));
+          settings?.set('ui.walkthrough.progress', utilArrayUniq(_progress).join(';'));
 
           if (i < chapterFlow.length - 1) {
             const nextID = chapterFlow[i + 1];
@@ -243,7 +243,7 @@ export function uiIntro(context, skipToRapid) {
     // Store if walkthrough is completed..
     const incomplete = utilArrayDifference(chapterFlow, _progress);
     if (!incomplete.length) {
-      storage.setItem('walkthrough_completed', 'yes');
+      settings?.set('ui.walkthrough.completed', 'yes');
     }
 
     // Restore Rapid datasets and service

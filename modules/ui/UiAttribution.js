@@ -45,8 +45,8 @@ export class UiAttribution {
     const imagery = context.systems.imagery;
     const l10n = context.systems.l10n;
     const scene = context.systems.gfx.scene;
-    const storage = context.systems.storage;
-    const showThirdPartyIcons = (storage.getItem('preferences.privacy.thirdpartyicons') ?? 'true') === 'true';
+    const settings = context.systems.settings;
+    const showThirdPartyIcons = (settings?.get('ui.privacy.thirdPartyIcons') ?? 'true') === 'true';
     const isRapidEnabled = scene.layers.get('rapid')?.enabled;
 
     // attribution wrapper

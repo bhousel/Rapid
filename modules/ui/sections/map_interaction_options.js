@@ -3,7 +3,7 @@ import { uiSection } from '../section.js';
 
 
 export function uiSectionMapInteractionOptions(context) {
-  const storage = context.systems.storage;
+  const settings = context.systems.settings;
   const l10n = context.systems.l10n;
 
   const section = uiSection(context, 'map_interaction')
@@ -78,12 +78,12 @@ export function uiSectionMapInteractionOptions(context) {
 
 
   function isActiveWheelOption(d) {
-    const curr = storage.getItem('prefs.mouse_wheel.interaction') || 'auto';
+    const curr = settings?.get('ui.mouseWheelInteraction') || 'auto';
     return curr === d;
   }
 
   function setWheelOption(d3_event, d) {
-    storage.setItem('prefs.mouse_wheel.interaction', d);
+    settings?.set('ui.mouseWheelInteraction', d);
     section.reRender();
   }
 

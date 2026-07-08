@@ -13,7 +13,7 @@ import { utilFunctor, utilRebind } from '../util/index.ts';
 //
 export function uiDisclosure(context, key) {
   const l10n = context.systems.l10n;
-  const storage = context.systems.storage;
+  const settings = context.systems.settings;
   const dispatch = d3_dispatch('toggled');
 
   let _isExpanded = true;        // by default, disclosures start out expanded
@@ -25,7 +25,7 @@ export function uiDisclosure(context, key) {
 
   let disclosure = function render(selection) {
     if (_checkPreference) {   // does user's preference override _isExpanded
-      const preferExpanded = storage?.getItem(`disclosure.${key}.expanded`) || 'true';
+      const preferExpanded = settings?.get(`ui.disclosure.${key}.expanded`) || 'true';
       _isExpanded = (preferExpanded === 'true');
     }
     if (_expandOverride !== undefined) {
@@ -86,7 +86,7 @@ export function uiDisclosure(context, key) {
 
       // Only update the expanded preference if it's not been overrided
       if (_checkPreference && _expandOverride === undefined) {
-        storage?.setItem(`disclosure.${key}.expanded`, _isExpanded);
+        settings?.set(`ui.disclosure.${key}.expanded`, String(_isExpanded));
       }
       _expandOverride = undefined;  // reset this flag here, as the user has interacted with it
 

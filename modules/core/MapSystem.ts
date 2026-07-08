@@ -57,7 +57,7 @@ export class MapSystem extends AbstractSystem {
     super(context);
     this.id = 'map';
     this.requiredDependencies = new Set<SystemID>(['editor', 'gfx']);
-    this.optionalDependencies = new Set<SystemID>(['filters', 'l10n', 'rapid', 'schema', 'storage', 'urlhash']);
+    this.optionalDependencies = new Set<SystemID>(['filters', 'l10n', 'rapid', 'schema', 'settings', 'urlhash']);
 
     // display options
     this.areaFillOptions = ['wireframe', 'partial', 'full'];
@@ -93,7 +93,7 @@ export class MapSystem extends AbstractSystem {
     const l10n = context.systems.l10n;
     const rapid = context.systems.rapid;
     const schema = context.systems.schema;
-    const storage = context.systems.storage;
+    const settings = context.systems.settings;
     const urlhash = context.systems.urlhash;
 
     return this._initPromise = super.initAsync()
@@ -101,14 +101,14 @@ export class MapSystem extends AbstractSystem {
         const prerequisites = [
           gfx.initAsync(),
           l10n?.initAsync(),
-          storage?.initAsync(),
+          settings?.initAsync(),
           urlhash?.initAsync()
         ];
         return Promise.all(prerequisites.filter(Boolean));
       })
       .then(() => {
-        this._currFillMode = (storage?.getItem('area-fill') || 'partial') as AreaFillMode;           // the current fill mode
-        this._toggleFillMode = (storage?.getItem('area-fill-toggle') || 'partial') as AreaFillMode;  // the previous *non-wireframe* fill mode
+        this._currFillMode = (settings?.get('map.areaFill') || 'partial') as AreaFillMode;           // the current fill mode
+        this._toggleFillMode = (settings?.get('map.areaFillToggle') || 'partial') as AreaFillMode;  // the previous *non-wireframe* fill mode
 
         // Scene will exist after gfx init
         const scene = gfx.scene!;
@@ -997,18 +997,18 @@ export class MapSystem extends AbstractSystem {
   public set areaFillMode(val: AreaFillMode) {
     const context = this.context;
     const gfx = context.systems.gfx!;
-    const storage = context.systems.storage;
+    const settings = context.systems.settings;
 
     const current = this._currFillMode;
     if (current === val) return;  // no change
 
     if (current !== 'wireframe') {
       this._toggleFillMode = current;
-      storage?.setItem('area-fill-toggle', current);  // remember the previous *non-wireframe* fill mode
+      settings?.set('map.areaFillToggle', current);  // remember the previous *non-wireframe* fill mode
     }
 
     this._currFillMode = val;
-    storage?.setItem('area-fill', val);
+    settings?.set('map.areaFill', val);
 
     gfx.scene!.dirtyScene();
     gfx.immediateRedraw();

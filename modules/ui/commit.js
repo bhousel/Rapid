@@ -35,9 +35,8 @@ export function uiCommit(context) {
   const editor = context.systems.editor;
   const l10n = context.systems.l10n;
   const rapid = context.systems.rapid;
-  const storage = context.systems.storage;
+  const settings = context.systems.settings;
   const uploader = context.systems.uploader;
-  const urlhash = context.systems.urlhash;
   const validator = context.systems.validator;
 
   const dispatch = d3_dispatch('cancel');
@@ -70,37 +69,11 @@ export function uiCommit(context) {
   function initChangeset() {
     const localeCode = l10n.localeCode;
 
-    // Expire stored comment, hashtags, source after cutoff datetime - iD#3947 iD#4899
-    const commentDate = +storage.getItem('commentDate') || 0;
-    const currDate = Date.now();
-    const cutoff = 2 * 86400 * 1000;   // 2 days
-    if (commentDate > currDate || currDate - commentDate > cutoff) {
-      storage.removeItem('comment');
-      storage.removeItem('hashtags');
-      storage.removeItem('source');
-    }
-
-    // Override with any `comment`,`source`,`hashtags` that we got from the urlhash, if any
-    const defaultChangesetComment = urlhash.initialHashParams.get('comment');
-    const defaultChangesetSource = urlhash.initialHashParams.get('source');
-    const defaultChangesetHashtags = urlhash.initialHashParams.get('hashtags');
-
-    if (defaultChangesetComment) {
-      storage.setItem('comment', defaultChangesetComment);
-      storage.setItem('commentDate', Date.now());
-    }
-    if (defaultChangesetSource) {
-      storage.setItem('source', defaultChangesetSource);
-      storage.setItem('commentDate', Date.now());
-    }
-    if (defaultChangesetHashtags) {
-      storage.setItem('hashtags', defaultChangesetHashtags);
-      storage.setItem('commentDate', Date.now());
-    }
-
+    // The draft comment/source/hashtags are session state owned by UploaderSystem.
+    // They are seeded from the urlhash at init time (see UploaderSystem.initAsync).
     const detected = utilDetect();
     const tags = {
-      comment:     storage.getItem('comment') || '',
+      comment:     uploader.comment || '',
       created_by:  context.cleanTagValue('Rapid ' + context.version),
       host:        context.cleanTagValue(detected.host),
       locale:      context.cleanTagValue(localeCode)
@@ -110,14 +83,12 @@ export function uiCommit(context) {
     // hashtags if any hashtags are found in the comment - iD#4304
     findHashtags(tags, true);
 
-    const hashtags = storage.getItem('hashtags');
-    if (hashtags) {
-      tags.hashtags = hashtags;
+    if (uploader.hashtags) {
+      tags.hashtags = uploader.hashtags;
     }
 
-    const source = storage.getItem('source');
-    if (source) {
-      tags.source = source;
+    if (uploader.source) {
+      tags.source = uploader.source;
     }
 
     uploader.changeset = new OsmChangeset(context, { tags: tags });
@@ -587,19 +558,17 @@ export function uiCommit(context) {
         changed.comment = '';
       }
       if (!onInput) {
-        storage.setItem('comment', changed.comment);
-        storage.setItem('commentDate', Date.now());
+        uploader.comment = changed.comment;
       }
     }
     if (changed.hasOwnProperty('source')) {
       if (changed.source === undefined) {
-        storage.removeItem('source');
+        uploader.source = '';
       } else if (!onInput) {
-        storage.setItem('source', changed.source);
-        storage.setItem('commentDate', Date.now());
+        uploader.source = changed.source;
       }
     }
-    // no need to update `storage` for `hashtags` here since it's done in `updateChangeset`
+    // no need to update `hashtags` here since it's done in `updateChangeset`
 
     updateChangeset(changed, onInput);
 
@@ -614,7 +583,7 @@ export function uiCommit(context) {
 
     // always remove stored hashtags if there are hashtags in the comment - iD#4304
     if (detectedHashtags.length) {
-      storage.removeItem('hashtags');
+      uploader.hashtags = '';
     }
     if (!detectedHashtags.length || !commentOnly) {
       detectedHashtags = detectedHashtags.concat(hashtagHashtags());
@@ -686,10 +655,10 @@ export function uiCommit(context) {
       const arr = findHashtags(tags, commentOnly);
       if (arr.length) {
         tags.hashtags = context.cleanTagValue(arr.join(';'));
-        storage.setItem('hashtags', tags.hashtags);
+        uploader.hashtags = tags.hashtags;
       } else {
         delete tags.hashtags;
-        storage.removeItem('hashtags');
+        uploader.hashtags = '';
       }
     }
 
@@ -701,17 +670,17 @@ export function uiCommit(context) {
       // first 100 edits - new user
       if (changesetsCount <= 100) {
         let s;
-        s = storage.getItem('walkthrough_completed');
+        s = settings?.get('ui.walkthrough.completed');
         if (s) {
           tags['ideditor:walkthrough_completed'] = s;
         }
 
-        s = storage.getItem('walkthrough_progress');
+        s = settings?.get('ui.walkthrough.progress');
         if (s) {
           tags['ideditor:walkthrough_progress'] = s;
         }
 
-        s = storage.getItem('walkthrough_started');
+        s = settings?.get('ui.walkthrough.started');
         if (s) {
           tags['ideditor:walkthrough_started'] = s;
         }
