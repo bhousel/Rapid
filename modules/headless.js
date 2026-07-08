@@ -25,6 +25,7 @@ export { PhotoSystem } from './core/PhotoSystem.ts';
 export { RapidSystem } from './core/RapidSystem.ts';
 export { SchemaSystem } from './core/SchemaSystem.ts';
 export { SchedulerSystem } from './core/SchedulerSystem.ts';
+export { SettingsSystem } from './core/SettingsSystem.ts';
 export { SpatialSystem } from './core/SpatialSystem.ts';
 export { StorageSystem } from './core/StorageSystem.ts';
 export { StyleSystem } from './core/StyleSystem.ts';

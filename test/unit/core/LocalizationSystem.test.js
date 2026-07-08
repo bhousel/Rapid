@@ -92,6 +92,23 @@ describe('LocalizationSystem', () => {
           .then(() => assert.isTrue(true));
       });
     });
+
+    describe('_loadStringsAsync', () => {
+      it('normalizes TX_DOT keys if present in loaded assets', () => {
+        // TX_DOT is now normalized to dots at load time — verify via _loadStringsAsync
+        const l10n = new Rapid.LocalizationSystem(context);
+        assets._loaded.l10n_imagery_en = { en: { imagery: { 'basemap<TX_DOT>at': { name: 'Basemap Legacy' } } } };
+
+        return l10n._loadStringsAsync('en')
+          .then(() => {
+            const result = l10n._store.peek(['en', 'imagery', 'imagery', 'basemap.at', 'name']);
+            assert.strictEqual(result, 'Basemap Legacy');
+          })
+          .finally(() => {
+            assets._loaded.l10n_imagery_en = { en: {} };  // restore
+          });
+      });
+    });
   });
 
 
@@ -104,7 +121,7 @@ describe('LocalizationSystem', () => {
       _l10n._currLocaleCode = 'en-US';  // Force 'en-US' for the testing
 
       // init?
-      _l10n._strings = {
+      _l10n._store.replace({
         en: {
           core: {
             inspector: {
@@ -153,9 +170,36 @@ describe('LocalizationSystem', () => {
             }
           }
         }
-      };
+      });
     });
 
+    describe('t', () => {
+      it('decodes percent-encoding in stringIDs', () => {
+        _l10n._store.set(['en', 'imagery'], {
+          imagery: {
+            'basemap.at': {
+              name: 'Basemap AT'
+            }
+          }
+        });
+
+        const text = _l10n.t('_imagery.imagery.basemap%2Eat.name');
+        assert.strictEqual(text, 'Basemap AT');
+      });
+
+      it('decodes legacy <TX_DOT> in stringIDs', () => {
+        _l10n._store.set(['en', 'imagery'], {
+          imagery: {
+            'basemap.at': {
+              name: 'Basemap AT'
+            }
+          }
+        });
+
+        const text = _l10n.t('_imagery.imagery.basemap<TX_DOT>at.name');
+        assert.strictEqual(text, 'Basemap AT');
+      });
+    });
 
     describe('displayName', () => {
       it('returns the name if tagged with a name', () => {

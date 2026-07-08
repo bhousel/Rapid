@@ -17,6 +17,7 @@ import { NetworkSystem } from './NetworkSystem.ts';
 import { PhotoSystem } from './PhotoSystem.ts';
 import { RapidSystem } from './RapidSystem.ts';
 import { SchedulerSystem } from './SchedulerSystem.ts';
+import { SettingsSystem } from './SettingsSystem.ts';
 import { SchemaSystem } from './SchemaSystem.ts';
 import { SpatialSystem } from './SpatialSystem.ts';
 import { StorageSystem } from './StorageSystem.ts';
@@ -42,6 +43,7 @@ export {
   PhotoSystem,
   RapidSystem,
   SchedulerSystem,
+  SettingsSystem,
   SchemaSystem,
   SpatialSystem,
   StorageSystem,
@@ -88,6 +90,7 @@ systems.available.set('network', NetworkSystem);
 systems.available.set('photos', PhotoSystem);
 systems.available.set('rapid', RapidSystem);
 systems.available.set('scheduler', SchedulerSystem);
+systems.available.set('settings', SettingsSystem);
 systems.available.set('schema', SchemaSystem);
 systems.available.set('spatial', SpatialSystem);
 systems.available.set('storage', StorageSystem);

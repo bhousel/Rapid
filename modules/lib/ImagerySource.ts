@@ -159,7 +159,9 @@ export class ImagerySource {
     this._currLocaleCode = null;  // The current locale code
     this._currStrings = {};       // The current strings
 
-    const idtx = props.id.replace(/\./g, '<TX_DOT>');  // replace '.' in ids, so localization system can handle them
+    // encodeURIComponent leaves '.' unencoded, so add an explicit replacement so
+    // dots in imagery IDs don't split as path separators in the localization lookup.
+    const idtx = encodeURIComponent(props.id).replace(/\./g, '%2E');
     this.props.nameStringID ??= `_imagery.imagery.${idtx}.name`;
     this.props.descriptionStringID ??= `_imagery.imagery.${idtx}.description`;
 

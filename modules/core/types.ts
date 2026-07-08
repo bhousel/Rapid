@@ -20,6 +20,7 @@ import type { NetworkSystem } from './NetworkSystem.ts';
 import type { PhotoSystem } from './PhotoSystem.ts';
 import type { RapidSystem } from './RapidSystem.ts';
 import type { SchedulerSystem } from './SchedulerSystem.ts';
+import type { SettingsSystem } from './SettingsSystem.ts';
 import type { SchemaSystem } from './SchemaSystem.ts';
 import type { SpatialSystem } from './SpatialSystem.ts';
 import type { StorageSystem } from './StorageSystem.ts';
@@ -57,6 +58,7 @@ export interface Systems {
   photos?: PhotoSystem;
   rapid?: RapidSystem;
   scheduler?: SchedulerSystem;
+  settings?: SettingsSystem;
   schema?: SchemaSystem;
   spatial?: SpatialSystem;
   storage?: StorageSystem;

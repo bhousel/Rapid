@@ -158,7 +158,6 @@ describe('StorageSystem', () => {
         _storage.removeItem('remove-key');
         assert.isFalse(_storage.hasItem('remove-key'));
       });
-
       it('does nothing for non-existent keys', () => {
         // Should not throw
         assert.doesNotThrow(() => {
@@ -174,6 +173,31 @@ describe('StorageSystem', () => {
         assert.isTrue(_storage.hasItem('key2'));
         _storage.removeItem('key2');
         assert.isFalse(_storage.hasItem('key2'));
+      });
+    });
+
+    describe('keys', () => {
+      it('returns an empty array when no items are stored', () => {
+        _storage.clear();
+        assert.deepEqual(_storage.keys(), []);
+      });
+
+      it('lists all stored keys', () => {
+        _storage.clear();
+        _storage.setItem('keys-a', '1');
+        _storage.setItem('keys-b', '2');
+        const keys = _storage.keys();
+        assert.sameMembers(keys, ['keys-a', 'keys-b']);
+        _storage.clear();
+      });
+
+      it('reflects removals', () => {
+        _storage.clear();
+        _storage.setItem('keys-a', '1');
+        _storage.setItem('keys-b', '2');
+        _storage.removeItem('keys-a');
+        assert.sameMembers(_storage.keys(), ['keys-b']);
+        _storage.clear();
       });
     });
 

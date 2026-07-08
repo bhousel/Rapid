@@ -118,6 +118,27 @@ export class StorageSystem extends AbstractSystem {
 
 
   /**
+   * Lists all keys currently present in storage.
+   * @return An array of all stored keys
+   */
+  public keys(): string[] {
+    if (this._mock) {
+      return [...this._mock.keys()];
+    }
+
+    const storage = this._storage as Storage;
+    const out: string[] = [];
+    for (let i = 0; i < storage.length; i++) {
+      const k = storage.key(i);
+      if (k !== null) {
+        out.push(k);
+      }
+    }
+    return out;
+  }
+
+
+  /**
    * Stores a value under a key, handling quota-exceeded errors gracefully.
    * @param k - String key to set the value for
    * @param v - String value to set

@@ -33,7 +33,7 @@ This module contains a mix of data structures, schema classes, and utility funct
 | `Geometry.ts` | Geometry wrapper for data elements |
 | `GeometryPart.ts` | Individual parts of multi-part geometries |
 | `Graph.ts` | Immutable graph structure holding all entities |
-| `Tree.ts` | R-tree spatial index for fast lookups |
+| `TreeStore.ts` | Generic nested key/value tree store: path access (`get`/`peek`/`set`/`has`/`unset`) plus flat-key (de)serialization (`toFlat`/`fromFlat`) |
 
 ### Imagery & Datasets
 

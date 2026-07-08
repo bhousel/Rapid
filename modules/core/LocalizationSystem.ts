@@ -1,4 +1,5 @@
 import { AbstractSystem } from './AbstractSystem.ts';
+import { TreeStore } from '../lib/TreeStore.ts';
 import { numClamp, numWrap } from '@rapid-sdk/math';
 import { utilDate } from '../util/date.ts';
 import { utilDetect } from '../util/detect.ts';
@@ -10,6 +11,9 @@ import type { Graph } from '../lib/Graph.ts';
 import type { OsmEntity, OsmTags } from '../data/index.ts';
 import type { Vec2 } from '@rapid-sdk/math';
 
+
+/** Convenience type for string identifiers for transifex resources */
+type ResourceID = string;
 
 /** Information about a language */
 export interface LanguageInfo {
@@ -47,8 +51,23 @@ export interface StringReplacements {
   [key: string]: string | number | undefined;
 }
 
-/** Cache structure for localized strings by scope */
-type StringCache = Record<LocaleCode, Record<string, any>>;
+/**
+ * Recursively renames all object keys that use the legacy `<TX_DOT>` sentinel
+ * back to literal dots. Transifex can't use dots in translation keys, so older
+ * data files used `<TX_DOT>` as a stand-in; normalizing at load time means the
+ * resolver never needs to know about the old encoding.
+ * @param obj - The object to normalize
+ * @return A new object with `<TX_DOT>` replaced by `.` in all keys (deeply)
+ */
+function normalizeTxDotKeys(obj: Record<string, any>): Record<string, any> {
+  const result: Record<string, any> = {};
+  for (const [key, value] of Object.entries(obj)) {
+    const normalKey = key.replace(/<TX_DOT>/g, '.');
+    result[normalKey] = TreeStore.isPlainObject(value) ? normalizeTxDotKeys(value) : value;
+  }
+  return result;
+}
+
 
 /** Function that appends localized text to a D3 selection */
 export interface AppendFunction {
@@ -66,12 +85,8 @@ export interface AppendFunction {
  */
 export class LocalizationSystem extends AbstractSystem {
 
-  /**
-   * These are the different language packs that can be loaded
-   * Watch out: these are different from the "scopes" that we use elsewhere in rapid
-   *  in places like the SchemaSystem, StyleSystem, ImagerySystem.
-   */
-  protected readonly _scopes: Set<string>;  // TODO rename
+  /** Hardcoded list of language packs that can be loaded - they correspond to Transifex "resources" */
+  protected readonly _resources: Set<ResourceID>;
 
   /** All known language codes and their local name */
   protected _languages: Record<LanguageCode, LanguageInfo>;
@@ -99,8 +114,8 @@ export class LocalizationSystem extends AbstractSystem {
   /** Localized display names for all script codes in the current locale */
   protected _currScriptNames: Record<ScriptCode, string>;
 
-  /** Cache for loaded string data, organized by locale then scope */
-  protected _strings: StringCache;
+  /** Cache for loaded string data, organized by locale and resource id */
+  protected _store: TreeStore;
 
 
   /**
@@ -113,8 +128,7 @@ export class LocalizationSystem extends AbstractSystem {
     this.optionalDependencies = new Set<SystemID>(['assets', 'gfx', 'schema', 'urlhash']);
 
     // These are the different language packs that can be loaded..
-    // watch out: these are different from "scopes" used elsewhere in Rapid.
-    this._scopes = new Set<string>(['core', 'tagging', 'imagery', 'community']);
+    this._resources = new Set<ResourceID>(['core', 'tagging', 'imagery', 'community']);
 
     // Preferred locale codes can be used to override the detected locale, if they are set before init
     this._preferredLocaleCodes = [];
@@ -172,7 +186,7 @@ export class LocalizationSystem extends AbstractSystem {
     this._territoryLanguages = {};
 
     // `_strings`
-    // Where we keep all loaded string data, organized by "locale" then "scope":
+    // A `TreeStore` holding all loaded string data, organized by "locale" then "resourceID":
     // {
     //   en: {
     //     core:    { icons: {…}, toolbar: {…}, modes: {…}, operations: {…}, … },
@@ -185,7 +199,7 @@ export class LocalizationSystem extends AbstractSystem {
     //     …
     //   },
     // }
-    this._strings = {} as StringCache;
+    this._store = new TreeStore();
 
     // Ensure methods used as callbacks always have `this` bound correctly.
     this._hashChanged = this._hashChanged.bind(this);
@@ -413,10 +427,11 @@ export class LocalizationSystem extends AbstractSystem {
   protected _loadStringsAsync(locale: string): Promise<void | PromiseSettledResult<void>[]> {
     const context = this.context;
     const assets = context.systems.assets;
+    const store = this._store;
 
     // If no AssetSystem, we can't load strings - just use an empty cache for the locale
     if (!assets) {
-      this._strings[locale] = {};
+      store.set(locale, {});
       return Promise.resolve();
     }
 
@@ -424,23 +439,23 @@ export class LocalizationSystem extends AbstractSystem {
       locale = 'en';
     }
 
-    const cache = this._strings;
-    if (cache[locale]) {  // already loaded
+    if (store.has(locale)) {  // already loaded
       return Promise.resolve();
-    } else {
-      cache[locale] = {};
     }
+    store.set(locale, {});  // mark present so concurrent calls don't re-register
 
     const loadPromises: Promise<void>[] = [];
-    for (const scope of this._scopes) {   // 'core', 'tagging', 'imagery', 'community'
-      const assetID = `l10n_${scope}_${locale}`;
-      const assetSource = { preferred: `data/l10n/${scope}.${locale}.min.json` };
+    for (const resource of this._resources) {   // 'core', 'tagging', 'imagery', 'community'
+      const assetID = `l10n_${resource}_${locale}`;
+      const assetSource = { preferred: `data/l10n/${resource}.${locale}.min.json` };
       assets.registerAsset(assetID, assetSource);
 
       const prom = assets.loadAssetAsync(assetID)
         .then((data) => {
-          const d = data as Record<string, any>;
-          cache[locale][scope] = d[locale];
+          const resourceStrings = (data as Record<string, any>)[locale];
+          if (resourceStrings !== undefined) {
+            store.set([locale, resource], normalizeTxDotKeys(resourceStrings));
+          }
         });
 
       loadPromises.push(prom);
@@ -511,8 +526,8 @@ export class LocalizationSystem extends AbstractSystem {
    * This function will recurse through all `searchLocales` until a string is found.
    * or until we run out of locales, then we will return a special "Missing translation" string.
    *
-   * Note: If the `stringID` starts with an underscore, the first part is used as the "scope".
-   * Otherwise, the default `core` scope will be used.
+   * Note: If the `stringID` starts with an underscore, the first part is used as the "resourceID".
+   * Otherwise, the default `core` resource will be used.
    *
    * @param origStringID  - string identifier
    * @param replacements  - token replacements and default string
@@ -524,6 +539,14 @@ export class LocalizationSystem extends AbstractSystem {
     replacements?: StringReplacements,
     searchLocales?: LocaleCode[]
   ): ResolvedString {
+
+    const decodeSegment = (segment: string): string => {
+      try {
+        return decodeURIComponent(segment);
+      } catch {
+        return segment;
+      }
+    };
 
     const isTestEnvironment = (!('window' in globalThis)) || ('assert' in globalThis) || ('expect' in globalThis);
 
@@ -541,30 +564,30 @@ export class LocalizationSystem extends AbstractSystem {
 
     // Note that we don't overwrite `locale` because that `en-US` value
     // might be used later by the pluralRule or number formatter.
-    let tryLocale: string | undefined = locale;
+    let tryLocale: string = locale;
     if (locale.toLowerCase() === 'en-us') {  // `en-US` strings are stored as `en`
       tryLocale = 'en';
     }
 
     let stringID = origStringID.trim();
-    let scope = 'core';
+    let resourceID = 'core';
 
     if (stringID[0] === '_') {
       const parts = stringID.split('.');
-      scope = parts[0].slice(1);
+      resourceID = parts[0].slice(1);
       stringID = parts.slice(1).join('.');
     }
 
-    const path = stringID
-      .split('.')
-      .map(s => s.replace(/<TX_DOT>/g, '.'))
-      .reverse();
+    // Split the stringID into path segments.
+    // Dot-containing IDs may arrive percent-encoded (e.g. `%2E` → `.`) or, for
+    // old callers, as `<TX_DOT>`. Both are decoded here. Data-side `<TX_DOT>`
+    // keys are normalized to dots at load time, so no data fallback is needed.
+    const rawSegments = stringID.split('.');
+    const segments = rawSegments.map(s => decodeSegment(s.replace(/<TX_DOT>/g, '.')));
 
-    let result: any = tryLocale && this._strings[tryLocale] && this._strings[tryLocale][scope];
-    while (result !== undefined && path.length) {
-      const key = path.pop()!;
-      result = result[key];
-    }
+    // `peek` returns a copy-free live reference — this is the hot read path, and
+    // we only read (never mutate) the result below.
+    let result: any = this._store.peek([tryLocale, resourceID, ...segments]);
 
     if (result !== undefined) {
       if (replacements) {
@@ -1204,14 +1227,15 @@ export class LocalizationSystem extends AbstractSystem {
       currLocale = 'en';
     }
 
-    const langNamesCurr = this._strings[currLocale]?.core?.languageNames ?? {};
-    const langNamesLang = this._strings[languageCode]?.core?.languageNames ?? {};
-    const langNamesEn = this._strings?.en?.core?.languageNames ?? {};
+    const store = this._store;
+    const langNamesCurr = store.peek<Record<LanguageCode, string>>([currLocale, 'core', 'languageNames']) ?? {};
+    const langNamesLang = store.peek<Record<LanguageCode, string>>([languageCode, 'core', 'languageNames']) ?? {};
+    const langNamesEn = store.peek<Record<LanguageCode, string>>(['en', 'core', 'languageNames']) ?? {};
     this._currLanguageNames = Object.assign({}, langNamesEn, langNamesLang, langNamesCurr);
 
-    const scriptNamesCurr = this._strings[currLocale]?.core?.scriptNames ?? {};
-    const scriptNamesLang = this._strings[languageCode]?.core?.scriptNames ?? {};
-    const scriptNamesEn = this._strings?.en?.core?.scriptNames ?? {};
+    const scriptNamesCurr = store.peek<Record<ScriptCode, string>>([currLocale, 'core', 'scriptNames']) ?? {};
+    const scriptNamesLang = store.peek<Record<ScriptCode, string>>([languageCode, 'core', 'scriptNames']) ?? {};
+    const scriptNamesEn = store.peek<Record<ScriptCode, string>>(['en', 'core', 'scriptNames']) ?? {};
     this._currScriptNames = Object.assign({}, scriptNamesEn, scriptNamesLang, scriptNamesCurr);
 
     gfx?.immediateRedraw();

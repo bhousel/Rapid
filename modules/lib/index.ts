@@ -20,6 +20,7 @@ export * from './RapidDataset.ts';
 export * from './Ruleset.ts';
 export * from './Style.ts';
 export * from './StyleSelector.ts';
+export * from './TreeStore.ts';
 export * from './ValidationCache.ts';
 export * from './ValidationFix.ts';
 export * from './ValidationIssue.ts';

@@ -83,6 +83,13 @@ describe('ImagerySource', () => {
         assert.strictEqual(_custom.props.nameStringID, 'background.custom');
         assert.strictEqual(_custom.props.descriptionStringID, '');
       });
+
+      it('percent-encodes dotted imagery IDs in generated stringIDs', () => {
+        const dotted = new Rapid.ImagerySource(context, { id: 'basemap.at' });
+        // Dots must be encoded as %2E — encodeURIComponent alone leaves '.' unencoded
+        assert.strictEqual(dotted.props.nameStringID, '_imagery.imagery.basemap%2Eat.name');
+        assert.strictEqual(dotted.props.descriptionStringID, '_imagery.imagery.basemap%2Eat.description');
+      });
     });
 
     describe('name', () => {
