@@ -15,6 +15,34 @@ import type { ParserDataType, ParserOptions, ParserResult, ParsedApi, ParsedData
 import type { Tile, Vec2, Vec3 } from '@rapid-sdk/math';
 
 
+/**
+ * The OSM single-key preference routes (`PUT|DELETE /api/0.6/user/preferences/:preference_key`)
+ * expose the key as a Rails route param constrained to `[^/.?]+`, so a key containing `.` (or
+ * `/`, `?`) can't be addressed — the route stops at the first dot and the request 404s.
+ * Percent-encoding the dot doesn't help, because the OSM front-end normalizes `%2E` back to `.`
+ * before routing.  As a workaround we substitute `.` with `~` for the stored/URL key: `~` is a
+ * URL-safe unreserved character (never percent-encoded by `encodeURIComponent`, never
+ * path-normalized) that no known preference key uses, so the mapping is reversible.
+ *
+ * Callers always pass and receive normal dotted keys — this substitution is transparent
+ * (applied on single-key write, reversed when reading preferences back).
+ * @param key - the caller-facing (dotted) key
+ * @return  the on-the-wire / stored key
+ */
+function encodePreferenceKey(key: string): string {
+  return key.startsWith('rapid.settings') ? key.replace(/\./g, '~') : key;
+}
+
+/**
+ * Inverse of `encodePreferenceKey`: maps a stored `~` back to `.`.
+ * @param key - the stored key
+ * @return  the caller-facing (dotted) key
+ */
+function decodePreferenceKey(key: string): string {
+  return key.replace(/~/g, '.');
+}
+
+
 /** Properties specific to OSM note markers */
 export interface OsmNoteProps extends MarkerProps {
   /** API URL for the note */
@@ -86,7 +114,7 @@ interface NoteOptions {
   closed?: number;
 }
 
-/** Options passed to switchAsync */
+/** Options passed to `switchAsync()` */
 interface SwitchOptions {
   /** OSM website URL to switch to */
   url: string;
@@ -218,7 +246,7 @@ export class OsmService extends AbstractSystem {
   /** Cached details of the authenticated user, or null */
   protected _userDetails: any | null;
   /** Cached preferences of the authenticated user, or null */
-  protected _userPreferences: any | null;
+  protected _userPreferences: Record<string, string> | null;
   /** The `osm-auth` instance used for OAuth2 authentication */
   protected _oauth: OsmAuthInstance;
 
@@ -257,6 +285,7 @@ export class OsmService extends AbstractSystem {
     this._noteZoom = 12;
     this._apiStatus = null;
     this._rateLimit = null;
+
     this._userChangesets = null;
     this._userDetails = null;
     this._userPreferences = null;
@@ -272,7 +301,7 @@ export class OsmService extends AbstractSystem {
     // - `redirect_uri` should be a page that the authorizing server (e.g. `openstreetmap.org`)
     //   can redirect the user back to as the final step in the OAuth2 handshake.
     // - By convention we redirect back to a file `land.html` on the same server that Rapid is served from.
-    // - The `redirect_uri` value can be overridden by an option to `switchAsync`.
+    // - The `redirect_uri` value can be overridden by an option to `switchAsync()`.
     // - Because OAuth2 requires applications to register their allowable `redirect_uri` values,
     //   there is a short list of `redirect_uris` that will work. Redirecting anywhere else will
     //   result in "The requested redirect uri is malformed or doesn't match client redirect URI".
@@ -368,8 +397,6 @@ export class OsmService extends AbstractSystem {
     this._connectionID++;
     this._apiStatus = null;
     this._rateLimit = null;
-    this._userChangesets = null;
-    this._userDetails = null;
 
     const context = this.context;
     const network = context.systems.network!;
@@ -395,7 +422,8 @@ export class OsmService extends AbstractSystem {
 
 
   /**
-   * Switch connection and credentials, and reset
+   * Switch connection and credentials, and reset.
+   * If the `newOptions` contains an 'access_token', the user is considered preauthenticated.
    * @param newOptions
    * @return  Promise resolved when this component has completed resetting
    */
@@ -406,13 +434,24 @@ export class OsmService extends AbstractSystem {
     this._wwwroot = newOptions.url;
     this._apiroot = newOptions.apiUrl;
 
-    // Copy the existing options, but omit 'access_token'.
+    // These must be reloaded after we switch servers.
+    this._userChangesets = null;
+    this._userDetails = null;
+    this._userPreferences = null;
+    // apistatus, ratelimit, connectionID are all reset by `resetAsync` below.
+
+    // Copy the existing options without 'access_token'.
     // (if we did preauth, access_token won't work on a different server)
     const oldOptions = utilObjectOmit(this._oauth.options(), ['access_token']);
     this._oauth.options(Object.assign(oldOptions, newOptions));
 
     return this.resetAsync()
       .then(() => {
+        this.reloadApiStatus();
+        if (this.authenticated()) {  // if `newOptions` has preauthenticated the user,
+          this.loadCurrentUserDataAsync();  // eagerly load the details and preferences
+        }
+
         gfx?.immediateRedraw();
         this.emit('authchange');
       });
@@ -540,7 +579,12 @@ export class OsmService extends AbstractSystem {
    * @param   requestID - optional requestID for NetworkSystem tracking
    * @return  the RequestID used for this request
    */
-  public loadFromAPI(path: string, callback: Errback | null, options: Partial<ParserOptions> = {}, requestID?: RequestID): RequestID {
+  public loadFromAPI(
+    path: string,
+    callback: Errback | null,
+    options: Partial<ParserOptions> = {},
+    requestID?: RequestID
+  ): RequestID {
     const context = this.context;
     const network = context.systems.network!;
 
@@ -563,7 +607,7 @@ export class OsmService extends AbstractSystem {
         // The user switched connection while the request was inflight.
         // Ignore content and raise an error.
         if (this._connectionID !== cid) {
-          if (callback) callback({ message: 'Connection Switched', status: -1 });
+          callback?.({ message: 'Connection Switched', status: -1 });
           return;
         }
 
@@ -598,7 +642,7 @@ export class OsmService extends AbstractSystem {
             }
           }
 
-          if (callback) callback({ message, status, statusText });
+          callback?.({ message, status, statusText });
           return;
         }
 
@@ -611,18 +655,18 @@ export class OsmService extends AbstractSystem {
           this.deferredReloadApiStatus();    // reload status / clear warning
         }
 
-        if (callback) callback(null, env.value);
+        callback?.(null, env.value);
       })
       .catch((err: any) => {
         if (err.name === 'AbortError') return;  // ok
 
         // The user switched connection while the request was inflight
         if (this._connectionID !== cid) {
-          if (callback) callback({ message: 'Connection Switched', status: -1 });
+          callback?.({ message: 'Connection Switched', status: -1 });
           return;
         }
 
-        if (callback) callback(err);
+        callback?.(err);
       });
 
     return computedID;
@@ -859,9 +903,26 @@ export class OsmService extends AbstractSystem {
 
 
   /**
+   * Try to load all extra data for the currently logged in user.
+   * This includes user changesets, user details, and user preferences.
+   * This method resolves silently on errors instead of rejecting.
+   * @return  Promise resolved after all calls have been attempted
+   */
+  public loadCurrentUserDataAsync(): Promise<void> {
+    return this.getUserDetailsAsync()
+      .then(() => this.getUserPreferencesAsync())
+      .then(() => this.getUserChangesetsAsync())
+      .catch(() => () => {})   // ignore errors
+      .then(() => { return; });
+  }
+
+
+  /**
    * Get the details of the logged-in user.
+   * This call should be done before other calls to get the user's changesets or preferences.
    * GET /api/0.6/user/details
    * @return  Promise resolved with the current logged in user's details
+   * @throws  Throws if there is no current logged in user
    */
   public getUserDetailsAsync(): Promise<any> {
     if (!this.authenticated()) {
@@ -892,45 +953,10 @@ export class OsmService extends AbstractSystem {
 
 
   /**
-   * Get the stored preferences for the logged in user.
-   * GET /api/0.6/user/preferences
-   * @return  Promise resolved with the current logged in user's preferences
-   */
-  public getUserPreferencesAsync(): Promise<any> {
-    if (!this.authenticated()) {
-      this._userPreferences = null;
-      return Promise.reject(new Error('Not logged in'));
-    }
-    if (this._userPreferences) {
-      return Promise.resolve(this._userPreferences);
-    }
-
-    return new Promise((resolve, reject) => {
-      const errback = (err: any, results?: ParserResult): void => {
-        if (err) {
-          reject(err);
-        } else {
-          this._userPreferences = results!.data[0];
-          resolve(this._userPreferences);
-        }
-      };
-
-      const options = { skipSeen: false, filter: new Set<ParserDataType>(['preferences']) };
-      const json = (this.preferJSON ? '.json' : '');
-
-      this.loadFromAPI(
-        `/api/0.6/user/preferences${json}`,
-        errback,
-        options
-      );
-    });
-  }
-
-
-  /**
    * Get the previous changesets for the logged in user.
    * GET /api/0.6/changesets?user=#id
    * @return  Promise resolved with the current logged in user's previous changesets
+   * @throws  Throws if there is no current logged in user
    */
   public getUserChangesetsAsync(): Promise<any[]> {
     if (!this.authenticated()) {
@@ -958,6 +984,224 @@ export class OsmService extends AbstractSystem {
           this.loadFromAPI(`/api/0.6/changesets${json}?user=${user.id}`, errback, options);
         });
       });
+  }
+
+
+  /**
+   * Get the stored preferences for the logged in user.
+   * GET /api/0.6/user/preferences
+   * @return  Promise resolved with the current logged in user's preferences
+   * @throws  Throws if there is no current logged in user
+   */
+  public getUserPreferencesAsync(): Promise<any> {
+    if (!this.authenticated()) {
+      this._userPreferences = null;
+      return Promise.reject(new Error('Not logged in'));
+    }
+    if (this._userPreferences) {
+      return Promise.resolve(this._userPreferences);
+    }
+
+    return new Promise((resolve, reject) => {
+      const errback = (err: any, results?: ParserResult): void => {
+        if (err) {
+          reject(err);
+        } else {
+          // The raw parsed preference data is available in `results!.data[0]`.
+          // Decode our `~`-substituted dots back to normal dotted keys (see `encodePreferenceKey`).
+          this._userPreferences = {} as Record<string, string>;
+          const parsed: any = results!.data[0];
+          const raw: Record<string, unknown> = parsed?.preferences ?? {};
+          for (const [rawk, v] of Object.entries(raw)) {
+            const k = decodePreferenceKey(rawk);
+            this._userPreferences[k] = String(v);
+          }
+          resolve(this._userPreferences);
+        }
+      };
+
+      const options = { skipSeen: false, filter: new Set<ParserDataType>(['preferences']) };
+      const json = (this.preferJSON ? '.json' : '');
+
+      this.loadFromAPI(
+        `/api/0.6/user/preferences${json}`,
+        errback,
+        options
+      );
+    });
+  }
+
+
+  /**
+   * Replace the logged-in user's ENTIRE set of preferences.
+   * PUT /api/0.6/user/preferences
+   *
+   * WARNING: This is a full replace — any preference keys not present in
+   * `preferences` will be removed from the server.  Callers that only want to
+   * update a subset should read the current preferences first and merge, or use
+   * the single-key `putUserPreferenceAsync` / `deleteUserPreferenceAsync` methods.
+   *
+   * @param  preferences - a Map or Record of key -> value string pairs
+   * @return Promise resolved with the `_userPreferences` data when the update has completed
+   * @throws Rejects if not logged in, if there are too many preferences, or if a
+   *   key/value is empty or exceeds the OSM length limits.
+   */
+  public putUserPreferencesAsync(
+    preferences: Record<string, string> | Map<string, string>
+  ): Promise<typeof this._userPreferences> {
+    if (!this.authenticated()) {
+      return Promise.reject(new Error('Not logged in'));
+    }
+
+    const context = this.context;
+    const network = context.systems.network!;
+
+    const maxKey = context.maxCharsForTagKey || 255;
+    const maxValue = context.maxCharsForTagValue || 255;
+
+    const entries = (preferences instanceof Map) ? [...preferences] : Object.entries(preferences);
+
+// This limit of 150 preferences seems to be a documentation error.
+// From what we can tell of the openstreetmap-website code, no such limit exists.
+//    if (entries.length > OSM_MAX_PREFERENCES) {
+//      return Promise.reject(new Error(`Too many preferences: ${entries.length} (max ${OSM_MAX_PREFERENCES})`));
+//    }
+    for (const [k, v] of entries) {
+      if (k.length < 1 || k.length > maxKey) {
+        return Promise.reject(new Error(`Preference key must be 1-${maxKey} chars: ${k}`));
+      }
+      if (v.length < 1 || v.length > maxValue) {
+        return Promise.reject(new Error(`Preference value must be 1-${maxValue} chars for key: ${k}`));
+      }
+    }
+
+    const requestID = 'osm-preferences-put-all' as RequestID;
+    const resource = this._apiroot + '/api/0.6/user/preferences';
+
+    // Build the preferences XML document directly (see the OSM API docs).
+    // Values may contain `&`, `<`, quotes (e.g. imagery template URLs), so escape them.
+    const escapeXML = (s: string): string =>
+      s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    const body = '<?xml version="1.0" encoding="UTF-8"?>\n<osm>\n<preferences>\n' +
+      entries.map(([k, v]) => `<preference k="${escapeXML(encodePreferenceKey(k))}" v="${escapeXML(v)}"/>\n`) +
+      '</preferences>\n</osm>';
+
+    return network.fetchRaw(resource, {
+      requestID,
+      method: 'PUT',
+      headers: { 'Content-Type': 'text/xml' },
+      body,
+      mainThread: true
+    })
+      .then(response => {
+        if (!response.ok) {
+          throw new Error(`Failed to update preferences: ${response.status} ${response.statusText}`);
+        }
+        this._userPreferences = Object.fromEntries(entries);
+        return this._userPreferences;
+      });
+  }
+
+
+  /**
+   * Set a single preference for the logged-in user.
+   * PUT /api/0.6/user/preferences/[key]
+   * @param  key - the preference key (1-255 chars)
+   * @param  value - the preference value (1-255 chars)
+   * @return Promise resolved with the `_userPreferences` data when the update has completed
+   * @throws Rejects if not logged in or if the key/value is empty or exceeds OSM length limits.
+   */
+  public putUserPreferenceAsync(key: string, value: string): Promise<typeof this._userPreferences> {
+    // Make sure we've first pulled the preferences from the server.
+    return this.getUserPreferencesAsync()
+      .then(() => {
+        const context = this.context;
+        const network = context.systems.network!;
+
+        const maxKey = context.maxCharsForTagKey || 255;
+        const maxValue = context.maxCharsForTagValue || 255;
+
+        if (typeof key !== 'string' || !key.length) {
+          return Promise.reject(new Error('Preference key is required'));
+        }
+        if (key.length > maxKey) {
+          return Promise.reject(new Error(`Preference key too long (max ${maxKey}): ${key}`));
+        }
+        if (typeof value !== 'string' || value.length < 1) {
+          return Promise.reject(new Error(`Preference value is required for key: ${key}`));
+        }
+        if (value.length > maxValue) {
+          return Promise.reject(new Error(`Preference value too long (max ${maxValue}) for key: ${key}`));
+        }
+        const currVal = this._userPreferences![key];
+        if (currVal === value) {
+          return Promise.resolve(this._userPreferences);  // nothing to do
+        }
+
+        const encodedKey = encodeURIComponent(encodePreferenceKey(key));
+        const requestID = `osm-preference-put-${encodedKey}` as RequestID;
+        const resource = `${this._apiroot}/api/0.6/user/preferences/${encodedKey}`;
+
+        return network.fetchRaw(resource, {
+          requestID,
+          method: 'PUT',
+          headers: { 'Content-Type': 'text/plain' },
+          body: value,
+          mainThread: true
+        })
+          .then(response => {
+            if (!response.ok) {
+              throw new Error(`Failed to set preference '${key}': ${response.status} ${response.statusText}`);
+            }
+            if (this._userPreferences) {     // success - update the local copy
+              this._userPreferences[key] = value;
+            }
+            return this._userPreferences;
+          });
+      });
+  }
+
+
+  /**
+   * Delete a single preference for the logged-in user.
+   * DELETE /api/0.6/user/preferences/[key]
+   * A missing key (404) is treated as success, since the desired end state is the same.
+   * @param  key - the preference key to delete
+   * @return Promise resolved with the `_userPreferences` data when the update has completed
+   * @throws Rejects if not logged in.
+   */
+  public deleteUserPreferenceAsync(key: string): Promise<typeof this._userPreferences> {
+    // Make sure we've first pulled the preferences from the server.
+    return this.getUserPreferencesAsync()
+      .then(() => {
+        if (typeof key !== 'string' || !key.length) {
+          return Promise.reject(new Error('Preference key is required'));
+        }
+        if (!this._userPreferences![key]) {
+          return Promise.resolve(this._userPreferences);  // nothing to do
+        }
+
+        const network = this.context.systems.network!;
+        const encodedKey = encodeURIComponent(encodePreferenceKey(key));
+        const requestID = `osm-preference-delete-${encodedKey}` as RequestID;
+        const resource = `${this._apiroot}/api/0.6/user/preferences/${encodedKey}`;
+
+        return network.fetchRaw(resource, {
+          requestID,
+          method: 'DELETE',
+          mainThread: true
+        })
+          .then(response => {
+            if (!response.ok && response.status !== 404) {
+              throw new Error(`Failed to delete preference '${key}': ${response.status} ${response.statusText}`);
+            }
+            // Keep the cached preferences current (if we've pulled them).
+            if (this._userPreferences) {     // success - update the local copy
+              delete this._userPreferences[key];
+            }
+            return this._userPreferences;
+          });
+    });
   }
 
 
@@ -1044,7 +1288,7 @@ export class OsmService extends AbstractSystem {
   }
 
   /**
-   * Uses `throttle` to checking the API status too frequently
+   * Uses `throttle` to avoid checking the API status too frequently
    */
   public deferredReloadApiStatus(): void {
     const scheduler = this.context.systems.scheduler;
@@ -1313,7 +1557,7 @@ export class OsmService extends AbstractSystem {
    */
   public loadTiles(callback?: Errback | null): void {
     if (this._paused || this.getRateLimit()) {
-      if (callback) callback(null, { data: [] });
+      callback?.(null, { data: [] });
       return;
     }
 
@@ -1323,7 +1567,7 @@ export class OsmService extends AbstractSystem {
 
     const cache = this._tileCache;
     if (cache.lastv === viewport.v) {  // exit early if the view is unchanged
-      if (callback) callback(null, { data: [] });
+      callback?.(null, { data: [] });
       return;
     }
     cache.lastv = viewport.v;
@@ -1352,7 +1596,7 @@ export class OsmService extends AbstractSystem {
    */
   public loadTile(tile: Tile, callback?: Errback | null): void {
     if (this._paused || this.getRateLimit()) {
-      if (callback) callback(null, { data: [] });
+      callback?.(null, { data: [] });
       return;
     }
 
@@ -1372,7 +1616,7 @@ export class OsmService extends AbstractSystem {
       const isBlocked = corners.every(loc => locations.isBlockedAt(loc));
       if (isBlocked) {
         network.markCompleted(requestID);  // don't try again (blocked region)
-        if (callback) callback(null, { data: [] });
+        callback?.(null, { data: [] });
         return;
       }
     }
@@ -1463,7 +1707,7 @@ export class OsmService extends AbstractSystem {
    */
   public loadTileAtLoc(loc: Vec2, callback?: Errback | null): void {
     if (this._paused || this.getRateLimit()) {
-      if (callback) callback(null, { data: [] });
+      callback?.(null, { data: [] });
       return;
     }
 
@@ -1472,7 +1716,7 @@ export class OsmService extends AbstractSystem {
     // let users safely edit geometries which extend to unloaded tiles.  We can drop some.)
     const network = this.context.systems.network!;
     if (network.numQueued > 50) {
-      if (callback) callback(null, { data: [] });
+      callback?.(null, { data: [] });
       return;
     }
 
@@ -1835,7 +2079,7 @@ export class OsmService extends AbstractSystem {
 
 
   /**
-   * Initiate the OAuth2 authentication flow.
+   * Initiate an OAuth2 authentication flow.
    * Opens a popup window for the user to authorize Rapid,
    * then reloads the API status and emits an `authchange` event on success.
    * @param  callback - optional errback-style callback called with the auth result
@@ -1849,21 +2093,23 @@ export class OsmService extends AbstractSystem {
     this._rateLimit = null;
     this._userChangesets = null;
     this._userDetails = null;
+    this._userPreferences = null;
 
     const gotResult = (err: any, result?: any): void => {
       if (err) {
-        if (callback) callback(err);
+        callback?.(err);
         return;
       }
       if (this._connectionID !== cid) {
-        if (callback) callback({ message: 'Connection Switched', status: -1 });
+        callback?.({ message: 'Connection Switched', status: -1 });
         return;
       }
       this.reloadApiStatus();
-//      this.userChangesets(function() {});  // eagerly load user details/changesets
+      this.loadCurrentUserDataAsync();  // eagerly load the user's details and preferences
+
       gfx?.immediateRedraw();
       this.emit('authchange');
-      if (callback) callback(err, result);
+      callback?.(err, result);
     };
 
     // Ensure the locale is correctly set before opening the popup

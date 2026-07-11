@@ -604,7 +604,8 @@ export const preferencesJSON = {
   "preferences": {
     "foo": "bar",
     "hello": "world",
-    "empty": ""
+    "empty": "",
+    "rapid~settings~areaFill": "partial"
    }
 };
 

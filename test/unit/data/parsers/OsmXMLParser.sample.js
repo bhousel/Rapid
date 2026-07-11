@@ -387,6 +387,7 @@ export const preferencesXML =
     <preference k="foo" v="bar"/>
     <preference k="hello" v="world"/>
     <preference k="empty"/>
+    <preference k="rapid~settings~areaFill" v="partial"/>
     <preference v="ignoreme"/>
   </preferences>
 </osm>`;
@@ -907,7 +908,8 @@ export const preferencesResult = {
   preferences: {
     foo: 'bar',
     hello: 'world',
-    empty: ''
+    empty: '',
+    'rapid~settings~areaFill': 'partial'
   }
 };
 

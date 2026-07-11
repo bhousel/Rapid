@@ -18,7 +18,7 @@ Design: [.github/design/settings-system.md](../.github/design/settings-system.md
   (`test/unit/lib/TreeStore.test.js`). (`modules/util/keypath.ts` was folded in and deleted.)
 - `modules/core/SettingsSystem.ts` — holds a `TreeStore` (`_store`) and only adds the
   settings-specific `rapid.settings.*` namespace, engine metadata, and legacy migrations.
-  Public API: `get/set/unset/has/getAll/toJSON/fromJSON/saveAsync` + sync stubs. Emits
+  Public API: `get/set/unset/has/getAll/toJSON/fromJSON` + sync stubs. Emits
   `settingschange`. `resetAsync` is a no-op (settings are durable). Requires `storage`;
   key-per-setting persistence.
 - `modules/core/LocalizationSystem.ts` — `_strings` is now a `TreeStore` keyed
@@ -64,6 +64,25 @@ unrelated to this work: utilDetect env, Mapillary/Streetside net timeouts, one U
   as an optional dep). The old 2-day-expiry localStorage hack is gone. Behavior change: a changeset
   comment no longer survives a page reload (it was only persisted via that hack).
 - Migration extended so nothing is orphaned; tests updated. tsc + eslint + unit + browser all green.
+
+**Phase 3 — OSM sync foundation (2026-07-10):**
+- `OsmService`: `getUserPreferencesAsync` now caches a decoded plain `Record<string, string>`.
+  The dotted-key routing workaround remains `.` ↔ `~`, and both single-key writes and the bulk
+  XML writer currently persist the `~`-substituted form for Rapid's dotted keys. The single-key
+  write methods call `getUserPreferencesAsync()` first so a remote baseline is pulled before they
+  mutate local cached state or skip no-op writes.
+- `OsmService` no longer invalidates `_userPreferences` after successful writes. Instead it keeps
+  the cache current in place: bulk PUT replaces the full record, single PUT updates one key,
+  DELETE removes one key. `logout()` and connection switches clear the cache, and successful auth
+  / preauthenticated `switchAsync()` eagerly call `loadCurrentUserDataAsync()` to preload details,
+  preferences, and changesets.
+- `SettingsSystem`: local helpers were renamed around the current implementation
+  (`_loadLocal`, `_saveLocal`, `_allSettings`, `_deferredSyncRemote`, `_remote`). Sync entrypoint
+  is now `syncRemote()`, which always does pull-then-push. `pullRemoteAsync()` seeds `_remote` and
+  applies remote settings only when the remote `updatedAt` is newer; `pushRemoteAsync()` diffs
+  against `_remote` and issues single-key PUT/DELETE calls for Rapid-owned keys only.
+- Pushes remain throttled through `SchedulerSystem`, values that OSM can't represent stay
+  local-only, and the unit suite is green aside from the known unrelated env/network failures.
 
 
 ## Spatial System — Step 3 (conflation: coverage/buffers + two-phase querying)

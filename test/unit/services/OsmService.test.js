@@ -294,8 +294,8 @@ describe('OsmService', () => {
             assert.isObject(result);
             assert.isNotOk(_osm.authenticated());
 
-            const calls = fetchMock.callHistory.calls();
-            assert.isAtLeast(calls.length, 2);   // auth, unauth, capabilities
+            const calls = fetchMock.callHistory.calls().filter(call => call.url.includes('map.json'));
+            assert.lengthOf(calls, 2);
             assert.property((calls[0].options.headers || {}), 'authorization');
             assert.notProperty((calls[1].options.headers || {}), 'authorization');
           });
@@ -314,8 +314,8 @@ describe('OsmService', () => {
             assert.isObject(result);
             assert.isNotOk(_osm.authenticated());
 
-            const calls = fetchMock.callHistory.calls();
-            assert.isAtLeast(calls.length, 2);   // auth, unauth, capabilities
+            const calls = fetchMock.callHistory.calls().filter(call => call.url.includes('map.json'));
+            assert.lengthOf(calls, 2);
             assert.property((calls[0].options.headers || {}), 'authorization');
             assert.notProperty((calls[1].options.headers || {}), 'authorization');
           });
@@ -334,8 +334,8 @@ describe('OsmService', () => {
             assert.isObject(result);
             assert.isNotOk(_osm.authenticated());
 
-            const calls = fetchMock.callHistory.calls();
-            assert.isAtLeast(calls.length, 2);   // auth, unauth, capabilities
+            const calls = fetchMock.callHistory.calls().filter(call => call.url.includes('map.json'));
+            assert.lengthOf(calls, 2);
             assert.property((calls[0].options.headers || {}), 'authorization');
             assert.notProperty((calls[1].options.headers || {}), 'authorization');
           });
@@ -599,6 +599,7 @@ describe('OsmService', () => {
       });
     });
 
+
     describe('getUserPreferencesAsync', () => {
       it('rejects if not logged in', () => {
         const prom = _osm.getUserPreferencesAsync();
@@ -612,12 +613,200 @@ describe('OsmService', () => {
         return loginAsync()
           .then(() => _osm.getUserPreferencesAsync())
           .then(result => {
-            assert.strictEqual(result.type, 'preferences');
-            assert.isObject(result.preferences);
-            assert.strictEqual(result.preferences.foo, 'bar');
+            assert.isObject(result);
+            assert.strictEqual(result.foo, 'bar');
+          });
+      });
+
+      it('decodes `~` back to dots in preference keys', () => {
+        return loginAsync()
+          .then(() => _osm.getUserPreferencesAsync())
+          .then(result => {
+            assert.strictEqual(result['rapid.settings.areaFill'], 'partial');
+            assert.isUndefined(result['rapid~settings~areaFill']);
           });
       });
     });
+
+
+    describe('putUserPreferencesAsync', () => {
+      it('rejects if not logged in', () => {
+        const prom = _osm.putUserPreferencesAsync({ foo: 'bar' });
+        assert.instanceOf(prom, Promise);
+        return prom
+          .then(val => assert.fail(`Promise was fulfilled but should have been rejected: ${val}`))
+          .catch(err => assert.match(err, /not logged in/i));
+      });
+
+      it('uploads the full set of preferences and resolves with the updated userPreferences data', () => {
+        fetchMock.route(
+          match => (match.options.method || '').toUpperCase() === 'PUT' && /user\/preferences$/.test(match.url),
+          { status: 200, body: '' }
+        );
+        const allPreferences = { 'rapid.settings.ui.foo': 'bar' };
+
+        return loginAsync()
+          .then(() => _osm.putUserPreferencesAsync(allPreferences))
+          .then(result => {
+            assert.isObject(result);
+            assert.deepEqual(result, allPreferences);
+            const calls = fetchMock.callHistory.calls()
+              .filter(c => /user\/preferences$/.test(c.url) && (c.options.method || '').toUpperCase() === 'PUT');
+            assert.lengthOf(calls, 1);
+          });
+      });
+
+// This limit of 150 preferences seems to be a documentation error.
+// From what we can tell of the openstreetmap-website code, no such limit exists.
+//      it('rejects when there are too many preferences', () => {
+//        const many = {};
+//        for (let i = 0; i < 151; i++) many[`k${i}`] = 'v';
+//
+//        return loginAsync()
+//          .then(() => _osm.putUserPreferencesAsync(many))
+//          .then(val => assert.fail(`Promise was fulfilled but should have been rejected: ${val}`))
+//          .catch(err => assert.match(err, /too many preferences/i));
+//      });
+
+      it('rejects when a value is too long', () => {
+        const longValue = 'x'.repeat(256);
+
+        return loginAsync()
+          .then(() => _osm.putUserPreferencesAsync({ foo: longValue }))
+          .then(val => assert.fail(`Promise was fulfilled but should have been rejected: ${val}`))
+          .catch(err => assert.match(err, /must be 1-255/i));
+      });
+
+      it('rejects when a value is empty', () => {
+        return loginAsync()
+          .then(() => _osm.putUserPreferencesAsync({ foo: '' }))
+          .then(val => assert.fail(`Promise was fulfilled but should have been rejected: ${val}`))
+          .catch(err => assert.match(err, /must be 1-255/i));
+      });
+    });
+
+
+    describe('putUserPreferenceAsync', () => {
+      it('rejects if not logged in', () => {
+        const prom = _osm.putUserPreferenceAsync('foo', 'bar');
+        assert.instanceOf(prom, Promise);
+        return prom
+          .then(val => assert.fail(`Promise was fulfilled but should have been rejected: ${val}`))
+          .catch(err => assert.match(err, /not logged in/i));
+      });
+
+      it('rejects when the value is too long', () => {
+        return loginAsync()
+          .then(() => _osm.putUserPreferenceAsync('foo', 'x'.repeat(256)))
+          .then(val => assert.fail(`Promise was fulfilled but should have been rejected: ${val}`))
+          .catch(err => assert.match(err, /too long/i));
+      });
+
+      it('rejects when the value is empty', () => {
+        return loginAsync()
+          .then(() => _osm.putUserPreferenceAsync('foo', ''))
+          .then(val => assert.fail(`Promise was fulfilled but should have been rejected: ${val}`))
+          .catch(err => assert.match(err, /value is required/i));
+      });
+
+      it('updates a single user preference and resolves with the updated userPreferences data', () => {
+        fetchMock.route(
+          match => (match.options.method || '').toUpperCase() === 'PUT' && /user\/preferences\/foo$/.test(match.url),
+          { status: 200, body: '' }
+        );
+
+        return loginAsync()
+          .then(() => _osm.putUserPreferenceAsync('foo', 'updated'))
+          .then(result => {
+            assert.isObject(result);
+            assert.strictEqual(result.foo, 'updated');
+            const getCalls = fetchMock.callHistory.calls()
+              .filter(c => c.url.includes('foo') && (c.options.method || '').toUpperCase() === 'PUT');
+            assert.lengthOf(getCalls, 1);  // single PUT call was made
+          });
+      });
+
+      it('substitutes dots with `~` in the key for the URL', () => {
+        fetchMock.route(
+          match => (match.options.method || '').toUpperCase() === 'PUT' && /user\/preferences\/rapid~settings~foo$/.test(match.url),
+          { status: 200, body: '' }
+        );
+
+        return loginAsync()
+          .then(() => _osm.putUserPreferenceAsync('rapid.settings.foo', 'bar'))
+          .then(result => {
+            assert.isObject(result);
+            assert.strictEqual(result['rapid.settings.foo'], 'bar');
+            const getCalls = fetchMock.callHistory.calls()
+              .filter(c => c.url.includes('foo') && (c.options.method || '').toUpperCase() === 'PUT');
+            assert.lengthOf(getCalls, 1);  // single PUT call was made
+          });
+      });
+
+      it('avoids an api call if the preference is already set to the given value', () => {
+        fetchMock.route(
+          match => (match.options.method || '').toUpperCase() === 'PUT' && /user\/preferences\/hello$/.test(match.url),
+          { status: 200, body: '' }
+        );
+
+        return loginAsync()
+          .then(() => _osm.putUserPreferenceAsync('hello', 'world'))
+          .then(result => {   // resolves, does not reject
+            assert.isObject(result);
+            assert.isUndefined(result.missing);
+            const getCalls = fetchMock.callHistory.calls()
+              .filter(c => c.url.includes('hello') && (c.options.method || '').toUpperCase() === 'PUT');
+            assert.lengthOf(getCalls, 0);  // didn't attempt the call
+          });
+      });
+    });
+
+
+    describe('deleteUserPreferenceAsync', () => {
+      it('rejects if not logged in', () => {
+        const prom = _osm.deleteUserPreferenceAsync('foo');
+        assert.instanceOf(prom, Promise);
+        return prom
+          .then(val => assert.fail(`Promise was fulfilled but should have been rejected: ${val}`))
+          .catch(err => assert.match(err, /not logged in/i));
+      });
+
+      it('deletes a single user preference and resolves with the updated userPreferences data', () => {
+        fetchMock.route(
+          match => (match.options.method || '').toUpperCase() === 'DELETE' && /user\/preferences\/foo$/.test(match.url),
+          { status: 200, body: '' }
+        );
+
+        return loginAsync()
+          .then(() => _osm.deleteUserPreferenceAsync('foo'))
+          .then(result => {
+            assert.isObject(result);
+            assert.isUndefined(result.foo);
+
+            const getCalls = fetchMock.callHistory.calls()
+              .filter(c => c.url.includes('foo') && (c.options.method || '').toUpperCase() === 'DELETE');
+            assert.lengthOf(getCalls, 1);  // single DELETE call was made
+          });
+      });
+
+      it('avoids an api call if the preference is already deleted/missing', () => {
+        fetchMock.route(
+          match => (match.options.method || '').toUpperCase() === 'DELETE' && /user\/preferences\/missing$/.test(match.url),
+          { status: 404, body: '' }
+        );
+
+        return loginAsync()
+          .then(() => _osm.deleteUserPreferenceAsync('missing'))
+          .then(result => {   // resolves, does not reject
+            assert.isObject(result);
+            assert.isUndefined(result.missing);
+            const getCalls = fetchMock.callHistory.calls()
+              .filter(c => c.url.includes('missing') && (c.options.method || '').toUpperCase() === 'DELETE');
+            assert.lengthOf(getCalls, 0);  // didn't attempt the call
+          });
+      });
+    });
+
 
     describe('getUserChangesetsAsync', () => {
       it('rejects if not logged in', () => {

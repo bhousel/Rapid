@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, it } from 'bun:test';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, it, mock } from 'bun:test';
 import { assert } from 'chai';
 import * as Rapid from '../../../modules/headless.js';
 
@@ -300,6 +300,181 @@ describe('SettingsSystem', () => {
         .then(() => {
           settings.fromJSON({});
           assert.deepEqual(settings.getAll(), {});
+        });
+    });
+  });
+
+
+  describe('remote sync', () => {
+    const orig = console.warn;
+    const spyWarn = mock();
+
+    beforeAll(() => {
+      console.warn = spyWarn;
+    });
+
+    beforeEach(() => {
+      spyWarn.mockClear();  // reset call count
+    });
+
+    afterAll(() => {
+      console.warn = orig;
+    });
+
+    // A minimal stand-in for OsmService's single-key preference API.
+    function makeMockOsm(opts = {}) {
+      const authenticated = opts.authenticated ?? true;
+      const state = { preferences: { ...(opts.preferences || {}) }, puts: [], deletes: [] };
+      return {
+        authenticated: () => authenticated,
+        getUserPreferencesAsync: () => Promise.resolve({ ...state.preferences }),
+        putUserPreferenceAsync: (key, value) => {
+          state.puts.push([key, value]);
+          state.preferences[key] = value;
+          return Promise.resolve();
+        },
+        deleteUserPreferenceAsync: (key) => {
+          state.deletes.push(key);
+          delete state.preferences[key];
+          return Promise.resolve();
+        },
+        _state: state
+      };
+    }
+
+    it('pushRemoteAsync reports no-osm-service when OSM is unavailable', () => {
+      context.services = {};
+      const settings = new Rapid.SettingsSystem(context);
+      return settings.initAsync()
+        .then(() => settings.pushRemoteAsync())
+        .then(result => assert.deepEqual(result, { ok: false, reason: 'no-osm-service' }));
+    });
+
+    it('pushRemoteAsync reports not-authenticated when logged out', () => {
+      context.services = { osm: makeMockOsm({ authenticated: false }) };
+      const settings = new Rapid.SettingsSystem(context);
+      return settings.initAsync()
+        .then(() => settings.pushRemoteAsync())
+        .then(result => assert.deepEqual(result, { ok: false, reason: 'not-authenticated' }));
+    });
+
+    it('pushRemoteAsync sends single-key PUTs for changed settings and leaves other prefs untouched', () => {
+      const osm = makeMockOsm({ preferences: { 'some.other.pref': 'keepme' } });
+      context.services = { osm };
+      const settings = new Rapid.SettingsSystem(context);
+      return settings.initAsync()
+        .then(() => {
+          settings.set('ui.sawWhatsNewVersion', '42');
+          return settings.pushRemoteAsync();
+        })
+        .then(result => {
+          assert.isTrue(result.ok);
+          assert.strictEqual(osm._state.preferences['some.other.pref'], 'keepme');   // untouched
+          assert.strictEqual(osm._state.preferences['rapid.settings.ui.sawWhatsNewVersion'], '42');
+          assert.strictEqual(osm._state.preferences['rapid.settings.meta.updatedAt'], settings.toJSON().rapid.updatedAt);
+          const putKeys = osm._state.puts.map(([k]) => k);
+          assert.include(putKeys, 'rapid.settings.ui.sawWhatsNewVersion');
+          assert.notInclude(osm._state.deletes, 'some.other.pref');   // never touches non-Rapid keys
+        });
+    });
+
+    it('pushRemoteAsync skips empty and oversized values', () => {
+      const osm = makeMockOsm();
+      context.services = { osm };
+      const settings = new Rapid.SettingsSystem(context);
+      return settings.initAsync()
+        .then(() => {
+          settings.set('imagery.custom[0].template', '');   // empty -> can't be stored remotely
+          settings.set('ui.big', 'x'.repeat(256));          // oversized -> skipped
+          settings.set('ui.small', 'ok');
+          return settings.pushRemoteAsync();
+        })
+        .then(result => {
+          assert.isTrue(result.ok);
+          assert.isUndefined(osm._state.preferences['rapid.settings.imagery.custom[0].template']);
+          assert.isUndefined(osm._state.preferences['rapid.settings.ui.big']);
+          assert.strictEqual(osm._state.preferences['rapid.settings.ui.small'], 'ok');
+          const putKeys = osm._state.puts.map(([k]) => k);
+          assert.notInclude(putKeys, 'rapid.settings.imagery.custom[0].template');
+          assert.notInclude(putKeys, 'rapid.settings.ui.big');
+        });
+    });
+
+    it('pushRemoteAsync deletes remote keys that are no longer set locally', () => {
+      const osm = makeMockOsm();
+      context.services = { osm };
+      const settings = new Rapid.SettingsSystem(context);
+      return settings.initAsync()
+        .then(() => {
+          settings.set('ui.foo', 'bar');
+          return settings.pushRemoteAsync();
+        })
+        .then(() => {
+          assert.strictEqual(osm._state.preferences['rapid.settings.ui.foo'], 'bar');
+          settings.unset('ui.foo');
+          return settings.pushRemoteAsync();
+        })
+        .then(result => {
+          assert.isTrue(result.ok);
+          assert.isUndefined(osm._state.preferences['rapid.settings.ui.foo']);
+          assert.include(osm._state.deletes, 'rapid.settings.ui.foo');
+        });
+    });
+
+    it('pushRemoteAsync does not re-send unchanged settings on a subsequent push', () => {
+      const osm = makeMockOsm();
+      context.services = { osm };
+      const settings = new Rapid.SettingsSystem(context);
+      return settings.initAsync()
+        .then(() => {
+          settings.set('ui.foo', 'bar');
+          return settings.pushRemoteAsync();
+        })
+        .then(() => {
+          const putCount = osm._state.puts.length;
+          return settings.pushRemoteAsync().then(result => {
+            assert.deepEqual(result, { ok: true, reason: 'up-to-date' });
+            assert.strictEqual(osm._state.puts.length, putCount);   // no additional PUTs
+          });
+        });
+    });
+
+    it('pullRemoteAsync applies remote settings when the remote copy is newer', () => {
+      const future = new Date(Date.now() + 60000).toISOString();
+      const osm = makeMockOsm({
+        preferences: {
+          'rapid.settings.meta.updatedAt': future,
+          'rapid.settings.ui.sawWhatsNewVersion': '99'
+        }
+      });
+      context.services = { osm };
+      const settings = new Rapid.SettingsSystem(context);
+      return settings.initAsync()
+        .then(() => settings.pullRemoteAsync())
+        .then(result => {
+          assert.deepEqual(result, { ok: true, reason: 'pulled' });
+          assert.strictEqual(settings.get('ui.sawWhatsNewVersion'), '99');
+        });
+    });
+
+    it('pullRemoteAsync keeps local settings when the local copy is newer', () => {
+      const past = new Date(Date.now() - 60000).toISOString();
+      const osm = makeMockOsm({
+        preferences: {
+          'rapid.settings.meta.updatedAt': past,
+          'rapid.settings.ui.sawWhatsNewVersion': '1'
+        }
+      });
+      const settings = new Rapid.SettingsSystem(context);
+      return settings.initAsync()
+        .then(() => {
+          settings.set('ui.sawWhatsNewVersion', '2');   // bumps local updatedAt to now (newer than `past`)
+          context.services = { osm };                   // attach OSM *after* the local edit, so no auto-push clobbers `past`
+          return settings.pullRemoteAsync();
+        })
+        .then(result => {
+          assert.deepEqual(result, { ok: true, reason: 'local-newer' });
+          assert.strictEqual(settings.get('ui.sawWhatsNewVersion'), '2');
         });
     });
   });

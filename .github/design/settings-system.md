@@ -212,37 +212,23 @@ interface SettingsSystem {
   toJSON(): RapidSettingsEnvelope;
   fromJSON(envelope: RapidSettingsEnvelope): void;
 
-  // Persistence
-  saveAsync(): Promise<void>;
-  resetAsync(): Promise<void>;   // no-op: settings are durable, survive resets
-
-  // Sync controls (stubbed until Phase 3)
+  // Sync controls
   pullRemoteAsync(): Promise<SyncResult>;
   pushRemoteAsync(): Promise<SyncResult>;
-  syncNowAsync(): Promise<SyncResult>;
+  syncRemote(): Promise<SyncResult>;
 }
 ```
 
 Implementation details:
 - Backed by `StorageSystem` (a required dependency) for local key/value persistence.
 - Uses simple built-in TypeScript/JavaScript data structures; no third-party state libraries.
-- Values are type-tagged (`s:` / `n:` / `b:`) so scalars round-trip losslessly.
+- Leaf values are plain strings; consuming systems coerce on read.
 - `get()` and `getAll()` return deep copies so callers cannot mutate internal state.
 - The reserved `meta` top-level namespace holds engine metadata (version, timestamps);
   writing to it throws.
 - Consuming systems may still add small typed helpers (e.g. `addCustomSource`) on top of
   the generic API to reduce path-level mistakes.
 
-## Persistence Adapters
-
-```ts
-interface SettingsAdapter {
-  id: 'local' | 'remote-osm';
-  loadAsync(): Promise<RapidSettingsEnvelope | null>;
-  saveAsync(envelope: RapidSettingsEnvelope): Promise<void>;
-  clearAsync(): Promise<void>;
-}
-```
 
 ### Key Codec (Shared by Local + Remote)
 
@@ -494,11 +480,76 @@ The v0→v1 migration was extended to also import `poweruser.autoConnect`, `powe
 `ui.rawTagEditorView` so no previously-persisted value is orphaned. Legacy keys are still read
 (never written) during the deprecation window.
 
-### Phase 3: OSM sync foundation
+### Phase 3: OSM sync foundation ✅ done (initial)
 
-- Add OSM preference write APIs in `OsmService`.
-- Implement remote adapter for all supported settings domains using key-per-setting sync.
-- Add explicit sync triggers and telemetry/logging.
+#### OSM preferences API — findings (verified against openstreetmap-website source)
+
+The API is under-documented; confirmed from `api/user_preferences_controller.rb` + `user_preference.rb`:
+- **GET** (`index`) supports both XML and JSON responses.
+- **Bulk PUT** (`update_all`) parses the request body as **XML only** (`LibXML::XML::Parser`),
+  regardless of a `.json` URL suffix — there is **no JSON write payload**. It's also a full
+  *replace*, and it parses with `NOERROR`, so sending a non-XML body silently matches zero
+  `<preference>` nodes and **wipes all preferences** (a real footgun — full-replace is dangerous).
+- **Single-key PUT** (`update`) takes a **raw plain-text body** (`pref.v = request.raw_post`) —
+  no XML or JSON at all. Single-key GET/DELETE are equally trivial.
+- **Hard limits:** key and value are each **1–255 chars** (`validates :length => 1..255`). Notably,
+  there is **no count limit** in the current code — the "150 preferences" figure is stale/folklore.
+- **Dotted-key routing gotcha (important).** The single-key routes expose the key as a Rails route
+  param constrained to `[^/.?]+`, so any key containing `.` (or `/`, `?`) can't be addressed — the
+  route stops at the first dot and the request **404s**. Percent-encoding the dot doesn't help
+  either: the OSM front-end normalizes `%2E` back to `.` before routing. Our settings keys are
+  dotted (`rapid.settings.*`), so this affects every write.
+
+Implications: single-key writes are simpler (plain text, no serialization), non-destructive by
+construction, and scale past any count concern — so they are the default sync mechanism. The
+dotted-key routing gotcha is worked around entirely inside `OsmService` (see below), so the rest
+of the system keeps using normal dotted keys.
+
+#### `OsmService` preference write APIs (`modules/services/OsmService.ts`)
+- `putUserPreferenceAsync(key, value)` — single `PUT /user/preferences/[key]` (plain-text body).
+- `deleteUserPreferenceAsync(key)` — single `DELETE /user/preferences/[key]` (404 = success).
+- `putUserPreferencesAsync(prefs)` — bulk `PUT /user/preferences` (full replace). Builds the
+  preferences XML directly (escaped) rather than via `JXON` (whose `document.implementation` use
+  breaks under happy-dom). Kept for completeness / one-shot seed-reset; **not** used by the sync.
+- **Dot substitution (`.` ↔ `~`).** To dodge the dotted-key routing gotcha, the single-key
+  methods substitute `.` → `~` for the stored/URL key (`encodePreferenceKey`), and
+  `getUserPreferencesAsync` reverses it (`decodePreferenceKey`) so callers always see dotted keys.
+  `~` is chosen because it's a URL-safe unreserved char (never percent-encoded by
+  `encodeURIComponent`, never path-normalized) and no known preference key uses it, so the mapping
+  is reversible. **Current implementation note:** `putUserPreferencesAsync` also encodes keys with
+  `encodePreferenceKey` when building the XML, so bulk and single-key writes both persist the same
+  `~`-substituted key form for Rapid's dotted keys.
+- All validate the OSM limits (key/value **1–255 chars**, reject empty).
+- **`_userPreferences` cache semantics.** `null` means "not pulled yet" — `getUserPreferencesAsync`
+  does the fetch (a "pull") and populates it as a plain `Record<string, string>`, and thereafter
+  serves from cache. The write methods currently call `getUserPreferencesAsync()` first to ensure a
+  baseline has been pulled before mutating or diffing. Writes **keep the cache current in place**
+  (single-key PUT sets `preferences[key]`, DELETE removes it, bulk PUT replaces the whole map)
+  instead of invalidating it. `logout()` and connection switches reset it to `null`; `switchAsync()`
+  and successful auth eagerly call `loadCurrentUserDataAsync()` to preload details, preferences,
+  and changesets. `resetAsync()` itself does not currently clear `_userPreferences`. Tests in
+  `OsmService.test.js`.
+
+#### Remote adapter + sync triggers (`SettingsSystem`)
+- `pushRemoteAsync()` uses **single-key PUT/DELETE for just the deltas** since the last known
+  remote state (`_remote` snapshot). Non-destructive by construction — only `rapid.settings.*`
+  keys are ever touched. **Empty values** (OSM requires length ≥ 1) and over-limit key/values
+  are silently skipped and stay local-only. The snapshot is updated only for calls that succeed,
+  so failures retry on the next push. Returns `up-to-date` when there's no diff.
+- `pullRemoteAsync()` reads remote prefs, seeds `_remote`, and applies the remote copy **only if
+  its `updatedAt` is newer** (last-write-wins).
+- `syncRemote()` is the public "do the whole thing" method: it always pulls first, then pushes
+  unless the pull already superseded local.
+- Pushes are **throttled** (`SchedulerSystem`, 2s window) via `_deferredSyncRemote()`, scheduled
+  from `_touch()` — mirrors `UrlHashSystem._deferredUpdateHash`. No-op when OSM is absent or the
+  user is logged out. `scheduler` is a new optional dependency.
+- There is no longer a separate `_pulledRemote` gate in the implementation; the deferred sync path
+  simply calls `syncRemote()` every time, so the remote baseline is re-pulled before each push.
+- Tests in `SettingsSystem.test.js` (single-key PUT/DELETE deltas, empty+oversized skip,
+  no-op re-push, foreign-pref preservation, LWW pull/push).
+
+Still TODO (later): telemetry/logging, a settings UI for sync status/controls, and re-seeding the
+`_remote` snapshot on OSM endpoint switch (Phase 4).
 
 ### Phase 4: Expand domain coverage
 

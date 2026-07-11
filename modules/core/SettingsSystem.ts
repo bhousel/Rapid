@@ -32,12 +32,6 @@ export interface RapidSettingsEnvelope {
   };
 }
 
-/** The result of a remote sync operation. */
-export interface SyncResult {
-  ok: boolean;
-  reason: string;
-}
-
 
 /** The internal snapshot produced while loading settings from storage. */
 interface LoadedSettings {
@@ -53,6 +47,14 @@ interface SettingsMigration {
   migrate(tree: SettingsTree, storage: StorageSystem): SettingsTree;
 }
 
+/** The results of an attempted remote sync */
+interface SyncResult {
+  /** `true` if the sync succeeded, `false` if not */
+  ok: boolean;
+  /** Description of what occurred  */
+  reason: string;
+}
+
 
 // ---------------------------------------------------------------------------
 // Storage key constants
@@ -60,12 +62,12 @@ interface SettingsMigration {
 
 /** Prefix shared by every settings storage key. */
 const SETTINGS_PREFIX = 'rapid.settings';
-
 /** Reserved namespace for engine metadata (version, timestamps). Not a user domain. */
 const SETTINGS_META_PREFIX = `${SETTINGS_PREFIX}.meta.`;
-
 /** The latest settings payload version. Bump this when adding a migration. */
 const CURRENT_SETTINGS_VERSION = 1;
+/** How long to wait (ms) after a settings change before pushing to the remote store. */
+const SYNC_THROTTLE = 1000;
 
 
 // ---------------------------------------------------------------------------
@@ -80,7 +82,7 @@ const CURRENT_SETTINGS_VERSION = 1;
  * @return `true` if the key is under the settings prefix
  */
 function isSettingsKey(key: string): boolean {
-  return key.startsWith(`${SETTINGS_PREFIX}.`) || key.startsWith(`${SETTINGS_PREFIX}[`);
+  return key.startsWith(SETTINGS_PREFIX);
 }
 
 
@@ -107,7 +109,7 @@ function isMetaKey(key: string): boolean {
  * @param storage - The storage system to read legacy keys from
  * @return A tree seeded with any legacy values that were present
  */
-function importLegacyKeys(tree: SettingsTree, storage: StorageSystem): SettingsTree {
+function migrate_v0_v1(tree: SettingsTree, storage: StorageSystem): SettingsTree {
   const getStr = (k: string): string | undefined => storage.getItem(k) ?? undefined;
 
   const getJSON = (k: string): unknown => {
@@ -251,7 +253,7 @@ function importLegacyKeys(tree: SettingsTree, storage: StorageSystem): SettingsT
 
 /** The ordered list of migrations, applied whenever the stored version is behind. */
 const SETTINGS_MIGRATIONS: SettingsMigration[] = [
-  { toVersion: 1, migrate: importLegacyKeys }
+  { toVersion: 1, migrate: migrate_v0_v1 }
 ];
 
 
@@ -270,27 +272,25 @@ const SETTINGS_MIGRATIONS: SettingsMigration[] = [
  * Leaf values are always strings (the same contract as `localStorage` and the OSM
  * user-preferences API); callers coerce as needed (e.g. `Number(...)`, `=== 'true'`).
  *
- * Persistence is **key-per-setting** rather than one large blob, so the same
- * layout works for `localStorage` today and for OpenStreetMap's key/value user
- * preferences (with their 255-char and 150-key limits) in the future.
- *
  * The in-memory tree and its flat-key (de)serialization are handled by the
  * generic `TreeStore` (in `lib/`); this system only adds the settings-specific
  * `rapid.settings.*` namespace, engine metadata, and legacy-key migrations.
  *
  * Events available:
- * - `settingschange`   Fires after any mutation that changes the persisted settings
+ * - `settingschange`   Fires after any change in the persisted settings
  */
 export class SettingsSystem extends AbstractSystem {
 
   /** The in-memory settings tree (domain data only, no engine metadata). */
   protected _store: TreeStore;
-  /** The current settings payload version. */
+  /** The current settings version. */
   protected _version: number;
   /** The Rapid app version that last wrote these settings. */
   protected _appVersion: string;
   /** ISO timestamp of the last mutation, used for future remote conflict resolution. */
   protected _updatedAt: string;
+  /** Settings that are stored in the remote store, if any */
+  protected _remote: Map<string, string>;
 
 
   /**
@@ -301,11 +301,16 @@ export class SettingsSystem extends AbstractSystem {
     super(context);
     this.id = 'settings';
     this.requiredDependencies = new Set<SystemID>(['storage']);
+    this.optionalDependencies = new Set<SystemID>(['scheduler']);
 
     this._store = new TreeStore();
     this._version = CURRENT_SETTINGS_VERSION;
     this._appVersion = context.version;
     this._updatedAt = new Date(0).toISOString();
+    this._remote = new Map<string, string>();
+
+    // Ensure methods used as callbacks always have `this` bound correctly.
+    this.syncRemote = this.syncRemote.bind(this);
   }
 
 
@@ -315,11 +320,13 @@ export class SettingsSystem extends AbstractSystem {
    * @return  Promise resolved when this component has completed initialization
    */
   public initAsync(): Promise<void> {
+    const context = this.context;
+    const storage = context.systems.storage!;
+
     return super.initAsync()
-      .then(() => this.context.systems.storage!.initAsync())
+      .then(() => storage.initAsync())
       .then(() => {
-        const storage = this.context.systems.storage!;
-        const loaded = this._load();
+        const loaded = this._loadLocal();
 
         let tree = loaded.tree;
         let migrated = false;
@@ -336,7 +343,7 @@ export class SettingsSystem extends AbstractSystem {
         this._updatedAt = migrated ? new Date().toISOString() : loaded.updatedAt;
 
         if (migrated) {
-          this._save();
+          this._saveLocal();
         }
       });
   }
@@ -419,6 +426,18 @@ export class SettingsSystem extends AbstractSystem {
 
 
   /**
+   * Guards against modifying the reserved `meta` namespace.
+   * @param parts - The parsed path segments
+   * @throws Error if the top-level segment is `meta`
+   */
+  protected _assertNotReserved(parts: KeyPathPart[]): void {
+    if (parts[0] === 'meta') {
+      throw new Error(`Settings path '${String(parts[0])}' is reserved`);
+    }
+  }
+
+
+  /**
    * Returns a deep copy of the entire settings tree.
    * @return  A structural copy of all settings
    */
@@ -444,8 +463,8 @@ export class SettingsSystem extends AbstractSystem {
 
 
   /**
-   * Replaces all settings from a previously-exported envelope, then persists
-   * and emits a `change` event.
+   * Replaces all settings from a previously-exported envelope,
+   * then persists and emits a `settingschange` event.
    * @param envelope - The settings envelope to import
    */
   public fromJSON(envelope: RapidSettingsEnvelope): void {
@@ -454,45 +473,8 @@ export class SettingsSystem extends AbstractSystem {
     this._version = CURRENT_SETTINGS_VERSION;
     this._appVersion = this.context.version;
     this._updatedAt = new Date().toISOString();
-    this._save();
+    this._saveLocal();
     this.emit('settingschange');
-  }
-
-
-  /**
-   * Persists the current settings to storage.
-   * @return  Promise resolved when the write completes
-   */
-  public saveAsync(): Promise<void> {
-    this._save();
-    return Promise.resolve();
-  }
-
-
-  /**
-   * Pulls settings from the remote (OSM account) store. Not yet implemented.
-   * @return  Promise resolved with the sync result
-   */
-  public pullRemoteAsync(): Promise<SyncResult> {
-    return Promise.resolve({ ok: false, reason: 'remote-sync-not-implemented' });
-  }
-
-
-  /**
-   * Pushes settings to the remote (OSM account) store. Not yet implemented.
-   * @return  Promise resolved with the sync result
-   */
-  public pushRemoteAsync(): Promise<SyncResult> {
-    return Promise.resolve({ ok: false, reason: 'remote-sync-not-implemented' });
-  }
-
-
-  /**
-   * Runs a full remote sync (pull then conditional push). Not yet implemented.
-   * @return  Promise resolved with the sync result
-   */
-  public syncNowAsync(): Promise<SyncResult> {
-    return Promise.resolve({ ok: false, reason: 'remote-sync-not-implemented' });
   }
 
 
@@ -500,7 +482,7 @@ export class SettingsSystem extends AbstractSystem {
    * Loads the settings tree and engine metadata from storage.
    * @return  The loaded tree plus its stored version and metadata
    */
-  protected _load(): LoadedSettings {
+  protected _loadLocal(): LoadedSettings {
     const storage = this.context.systems.storage!;
     const entries: [string, string][] = [];
 
@@ -543,51 +525,232 @@ export class SettingsSystem extends AbstractSystem {
 
 
   /**
-   * Persists the current settings to storage as one namespaced key per setting,
-   * writing changed keys and removing any that no longer exist.
+   * Returns the complete set of `rapid.settings.*` storage keys and values.
+   * Includes metadata keys plus the flattened settings tree.
+   * @return  Map of storage key to string value
    */
-  protected _save(): void {
-    const storage = this.context.systems.storage!;
+  protected _allSettings(): Map<string, string> {
+    const all = new Map<string, string>();
+    all.set(`${SETTINGS_META_PREFIX}settingsVersion`, String(this._version));
+    all.set(`${SETTINGS_META_PREFIX}updatedAt`, this._updatedAt);
+    all.set(`${SETTINGS_META_PREFIX}appVersion`, this._appVersion);
 
-    const desired = new Map<string, string>();
-    desired.set(`${SETTINGS_META_PREFIX}settingsVersion`, String(this._version));
-    desired.set(`${SETTINGS_META_PREFIX}updatedAt`, this._updatedAt);
-    desired.set(`${SETTINGS_META_PREFIX}appVersion`, this._appVersion);
     for (const [flatKey, value] of this._store.toFlat()) {
       // A leading `[` means a top-level array index; otherwise join with a `.`.
       const storageKey = flatKey.startsWith('[') ? `${SETTINGS_PREFIX}${flatKey}` : `${SETTINGS_PREFIX}.${flatKey}`;
-      desired.set(storageKey, value);
+      all.set(storageKey, value);
     }
+    return all;
+  }
 
+
+  /**
+   * Updates the modified timestamp, persists locally, emits a `settingschange` event,
+   * and schedules a deferred sync with the remote store.
+   */
+  protected _touch(): void {
+    this._updatedAt = new Date().toISOString();
+    this._saveLocal();
+    this.emit('settingschange');
+    this._deferredSyncRemote();
+  }
+
+
+  /**
+   * Persists the current settings to storage as one namespaced key per setting,
+   * writing changed keys and removing any that no longer exist.
+   */
+  protected _saveLocal(): void {
+    const storage = this.context.systems.storage!;
     const stale = new Set(storage.keys().filter(isSettingsKey));
-    for (const [key, value] of desired) {
+    const allSettings = this._allSettings();
+
+    for (const [key, value] of allSettings) {
       storage.setItem(key, value);
       stale.delete(key);
     }
-    for (const key of stale) {
+    for (const key of stale) {  // unused settings keys remain in stale, they can be removed
       storage.removeItem(key);
     }
   }
 
 
   /**
-   * Updates the modified timestamp, persists, and emits a `change` event.
+   * Schedules a throttled sync with the remote (OSM account) store, so that a burst
+   * of settings changes results in a single sync. No-op when there is no
+   * OSM service or the user is not logged in.
    */
-  protected _touch(): void {
-    this._updatedAt = new Date().toISOString();
-    this._save();
-    this.emit('settingschange');
+  protected _deferredSyncRemote(): void {
+    const context = this.context;
+    const osm = context.services?.osm;
+    const scheduler = context.systems.scheduler;
+    if (!osm || !osm.authenticated()) return;   // can't sync
+
+    if (scheduler) {
+      scheduler.throttle('settings-remote-push', this.syncRemote, { ms: SYNC_THROTTLE, leading: false });
+    } else {
+      this.syncRemote();
+    }
   }
 
 
   /**
-   * Guards against writing to the reserved `meta` namespace.
-   * @param parts - The parsed path segments
-   * @throws Error if the top-level segment is `meta`
+   * Runs a full remote sync, if possible.
+   * - `pullRemoteAsync()`: pull remote settings if possible, and apply those settings
+   *   locally if they are newer (based on the last-update-wins `updatedAt` timestamp).
+   * - `pushRemoteAsync()` push settings that have changed against the `_remote` copy,
+   *   and update the remote `updatedAt` timestamp.
+   * @return  Promise resolved with the sync result
    */
-  protected _assertNotReserved(parts: KeyPathPart[]): void {
-    if (parts[0] === 'meta') {
-      throw new Error(`Settings path '${String(parts[0])}' is reserved`);
-    }
+  public syncRemote(): Promise<SyncResult> {
+    return this.pullRemoteAsync()
+      .then(result => {
+        // If we just pulled a newer remote copy, we're already in sync.
+        if (result.reason === 'pulled') return result;
+        // Otherwise push our (newer, or seed) copy up.
+        return this.pushRemoteAsync();
+      });
   }
+
+
+  /**
+   * Pulls settings from the remote (OSM account) store and applies them locally
+   * if the remote copy is newer (based on last-update-wins `updatedAt` timestamp).
+   * (Requires the OSM service to exist and the user to be logged in.)
+   *
+   * Regardless of whether the remote copy is applied, we retain a copy of the remote
+   * settings in `this._remote`, so that the next push only sends the differences.
+   *
+   * @return  Promise resolved with the sync result
+   */
+  public pullRemoteAsync(): Promise<SyncResult> {
+    const osm = this.context.services?.osm;
+    if (!osm) return Promise.resolve({ ok: false, reason: 'no-osm-service' });
+    if (!osm.authenticated()) return Promise.resolve({ ok: false, reason: 'not-authenticated' });
+
+    return osm.getUserPreferencesAsync()
+      .then(result => {
+        const userPreferences: Record<string, unknown> = result ?? {};
+        const entries: [string, string][] = [];        // just the data (flat) entries
+        let remoteUpdatedAt: string | undefined;
+
+        // Gather the settings keys stored in the remote, so the followup push only sends deltas.
+        this._remote.clear();
+        for (const [key, value] of Object.entries(userPreferences)) {
+          if (!isSettingsKey(key)) continue;  // not a rapid setting
+          const str = String(value);
+          this._remote.set(key, str);
+          if (isMetaKey(key)) {
+            if (key.slice(SETTINGS_META_PREFIX.length) === 'updatedAt') {
+              remoteUpdatedAt = str;
+            }
+            continue;
+          }
+          let flatKey = key.slice(SETTINGS_PREFIX.length);
+          if (flatKey.startsWith('.')) flatKey = flatKey.slice(1);
+          entries.push([flatKey, str]);
+        }
+
+        if (remoteUpdatedAt === undefined) {
+          return { ok: false, reason: 'no-remote-settings' };
+        }
+
+        // Last-write-wins: only apply the remote copy if it is newer than ours.
+        if (Date.parse(remoteUpdatedAt) <= Date.parse(this._updatedAt)) {
+          return { ok: true, reason: 'local-newer' };
+        }
+
+        // Remote is newer
+        this._store.replace(TreeStore.fromFlat(entries).toJSON());
+        this._updatedAt = remoteUpdatedAt;
+        this._saveLocal();
+        this.emit('settingschange');
+        return { ok: true, reason: 'pulled' };
+      })
+      .catch(err => ({ ok: false, reason: err?.message ?? 'pull-failed' }));
+  }
+
+
+  /**
+   * Pushes settings to the remote (OSM account) store using **single-key** PUT/DELETE
+   * calls for just the differences since the last known remote state (`this._remote`).
+   * (Requires the OSM service to exist and the user to be logged in.)
+   *
+   * This is non-destructive to other applications' preferences — we only ever touch
+   * keys we own (`rapid.settings.*`). Settings that can't be represented remotely are
+   * silently skipped and stay local-only:
+   * - empty values (the OSM API requires a value length of at least 1), and
+   * - values whose key or value exceeds the OSM 255-char limit.
+   *
+   * The `_remote` snapshot is updated only for calls that succeed, so that in the event
+   * that the API is temporarily unavailable, the updates can be pushed again later.
+   *
+   * @return  Promise resolved with the sync result
+   */
+  public pushRemoteAsync(): Promise<SyncResult> {
+    const context = this.context;
+    const osm = context.services?.osm;
+    if (!osm) return Promise.resolve({ ok: false, reason: 'no-osm-service' });
+    if (!osm.authenticated()) return Promise.resolve({ ok: false, reason: 'not-authenticated' });
+
+    const maxKey = context.maxCharsForTagKey || 255;
+    const maxValue = context.maxCharsForTagValue || 255;
+
+    // The desired remote set: our settings minus anything the OSM API can't store.
+    const desired = new Map<string, string>();
+    for (const [key, value] of this._allSettings()) {
+      if (value.length === 0) continue;   // OSM requires a value length >= 1; empty stays local-only
+      if (key.length > maxKey || value.length > maxValue) {
+        console.warn(`SettingsSystem: skipping oversized setting for remote sync: ${key}`);  // eslint-disable-line no-console
+        continue;
+      }
+      desired.set(key, value);
+    }
+
+    // Diff against what we believe is already on the remote.
+    const puts: string[] = [];      // keys to PUT (added or changed)
+    const deletes: string[] = [];   // keys to DELETE (no longer present locally)
+    for (const [key, value] of desired) {
+      if (this._remote.get(key) !== value) puts.push(key);
+    }
+    for (const key of this._remote.keys()) {
+      if (!desired.has(key)) deletes.push(key);
+    }
+
+    if (!puts.length && !deletes.length) {
+      return Promise.resolve({ ok: true, reason: 'up-to-date' });
+    }
+
+    const jobs: Promise<{ key: string; op: 'put' | 'delete'; ok: boolean }>[] = [];
+    for (const key of puts) {
+      jobs.push(
+        osm.putUserPreferenceAsync(key, desired.get(key)!)
+          .then(() => ({ key, op: 'put' as const, ok: true }))
+          .catch(() => ({ key, op: 'put' as const, ok: false }))
+      );
+    }
+    for (const key of deletes) {
+      jobs.push(
+        osm.deleteUserPreferenceAsync(key)
+          .then(() => ({ key, op: 'delete' as const, ok: true }))
+          .catch(() => ({ key, op: 'delete' as const, ok: false }))
+      );
+    }
+
+    // Perform the updates
+    return Promise.all(jobs).then(outcomes => {
+      let failed = 0;
+      for (const { key, op, ok } of outcomes) {
+        if (!ok) { failed++; continue; }
+        if (op === 'put') {
+          this._remote.set(key, desired.get(key)!);
+        } else {
+          this._remote.delete(key);
+        }
+      }
+      return failed ? { ok: false, reason: `partial-failure (${failed})` } : { ok: true, reason: 'pushed' };
+    });
+  }
+
+
 }

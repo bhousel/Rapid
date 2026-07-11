@@ -40,6 +40,13 @@ export class MockContext {
   /** Sequence counters for generating unique IDs */
   public sequences: Record<SequenceID, number>;
 
+  /** Maximum characters allowed for tag keys */
+  public maxCharsForTagKey: number;
+  /** Maximum characters allowed for tag values */
+  public maxCharsForTagValue: number;
+  /** Maximum characters allowed for relation roles */
+  public maxCharsForRelationRole: number;
+
   /** Stub keybinding manager (backed by a MockSystem cast) */
   protected _keybinding: Keybinding;
   /** Promise for init phase */
@@ -48,6 +55,7 @@ export class MockContext {
   protected _startPromise: Promise<void> | null;
   /** Promise for reset */
   protected _resetPromise: Promise<void> | null;
+
 
   /** @constructor */
   public constructor() {
@@ -60,6 +68,10 @@ export class MockContext {
     this._initPromise = null;
     this._startPromise = null;
     this._resetPromise = null;
+
+    this.maxCharsForTagKey = 255;
+    this.maxCharsForTagValue = 255;
+    this.maxCharsForRelationRole = 255;
   }
 
   /**
