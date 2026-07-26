@@ -1,6 +1,7 @@
 import { select as d3_select } from 'd3-selection';
 
 import { uiIcon } from './icon.js';
+import { utilSanitizeHTML } from '../util/sanitize.ts';
 
 
 export function uiNoteComments(context) {
@@ -51,19 +52,22 @@ export function uiNoteComments(context) {
             .attr('href', osm.userURL(d.user))
             .attr('target', '_blank');
         }
-        $selection
-          .html(d => d.user || l10n.tHtml('note.anonymous'));
+        if (d.user) {
+          $selection.text(d.user);
+        } else {
+          $selection.html(l10n.tHtml('note.anonymous'));
+        }
       });
 
     $$metadata
       .append('div')
       .attr('class', 'comment-date')
-      .html(d => l10n.t(`note.status.${d.action}`, { when: l10n.displayShortDate(d.date) }));
+      .text(d => l10n.t(`note.status.${d.action}`, { when: l10n.displayShortDate(d.date) }));
 
     $$main
       .append('div')
       .attr('class', 'comment-text')
-      .html(d => d.html)
+      .html(d => utilSanitizeHTML(d.html))
       .selectAll('a')
         .attr('rel', 'noopener nofollow')
         .attr('target', '_blank');

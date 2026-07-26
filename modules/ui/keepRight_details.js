@@ -1,5 +1,6 @@
 import { select as d3_select } from 'd3-selection';
 
+import { utilSanitizeHTML } from '../util/sanitize.ts';
 import { utilHighlightEntities } from '../util/util.ts';
 
 
@@ -52,7 +53,7 @@ export function uiKeepRightDetails(context) {
     $$description
       .append('div')
       .attr('class', 'qa-details-description-text')
-      .html(issueDetailHTML);
+      .html(d => utilSanitizeHTML(issueDetailHTML(d)));
 
     // If there are entity links in the error message..
     const relatedEntities = [];

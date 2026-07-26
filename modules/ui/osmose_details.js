@@ -1,5 +1,6 @@
 import { select as d3_select } from 'd3-selection';
 
+import { utilSanitizeHTML } from '../util/sanitize.ts';
 import { utilHighlightEntities } from '../util/util.ts';
 
 
@@ -53,7 +54,7 @@ export function uiOsmoseDetails(context) {
       $$div
         .append('p')
         .attr('class', 'qa-details-description-text')
-        .html(detailHtml)
+        .html(utilSanitizeHTML(detailHtml))
         .selectAll('a')
         .attr('rel', 'noopener')
         .attr('target', '_blank');
@@ -80,7 +81,7 @@ export function uiOsmoseDetails(context) {
 
       $$div
         .append('p')
-        .html(fixHtml)
+        .html(utilSanitizeHTML(fixHtml))
         .selectAll('a')
         .attr('rel', 'noopener')
         .attr('target', '_blank');
@@ -98,7 +99,7 @@ export function uiOsmoseDetails(context) {
 
       $$div
         .append('p')
-        .html(trapHtml)
+        .html(utilSanitizeHTML(trapHtml))
         .selectAll('a')
         .attr('rel', 'noopener')
         .attr('target', '_blank');
@@ -123,7 +124,7 @@ export function uiOsmoseDetails(context) {
 
           $$detailsDiv
             .append('p')
-            .html(d => d.props.detail)
+            .html(d => utilSanitizeHTML(d.props.detail))
             .selectAll('a')
             .attr('rel', 'noopener')
             .attr('target', '_blank');
@@ -142,7 +143,7 @@ export function uiOsmoseDetails(context) {
           .append('a')
           .attr('href', '#')
           .attr('class', 'error_entity_link')
-          .html(d => d)
+          .text(d => d)
           .each((d, i, nodes) => {
             const node = nodes[i];
             const $$link = d3_select(node);

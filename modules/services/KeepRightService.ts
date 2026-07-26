@@ -1,5 +1,6 @@
 import { AbstractSystem } from '../core/AbstractSystem.ts';
 import { MarkerData } from '../data/MarkerData.ts';
+import { utilEscapeHTML } from '../util/sanitize.ts';
 import { Tiler } from '@rapid-sdk/math';
 import { utilQsString } from '@rapid-sdk/util';
 
@@ -463,7 +464,6 @@ export class KeepRightService extends AbstractSystem {
    */
   protected _tokenReplacements(props: Record<string, any>): Record<string, string> | undefined {
     const l10n = this.context.systems.l10n!;
-    const htmlRegex = new RegExp(/<\/[a-z][\s\S]*>/);
     const replacements: Record<string, string> = {};
 
     const issueTemplate = this._krData.errorTypes[props.whichType];
@@ -495,13 +495,12 @@ export class KeepRightService extends AbstractSystem {
       const idType = 'IDs' in issueTemplate ? issueTemplate.IDs![i-1] : '';
       if (idType && capture) {   // link IDs if present in the capture
         capture = this._parseError(capture, idType);
-      } else if (htmlRegex.test(capture)) {   // escape any html in non-IDs
-        capture = '\\' +  capture + '\\';
       } else {
         const compare = capture.toLowerCase();
         if (this._krData.localizeStrings[compare]) {   // some replacement strings can be localized
           capture = l10n.t('QA.keepRight.error_parts.' + this._krData.localizeStrings[compare]);
         }
+        capture = utilEscapeHTML(capture);
       }
 
       replacements['var' + i] = capture;
