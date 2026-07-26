@@ -2,6 +2,7 @@ import { select as d3_select } from 'd3-selection';
 
 import { uiIcon } from './icon.js';
 import { utilSanitizeHTML } from '../util/sanitize.ts';
+import { utilSafeURL } from '../util/url.ts';
 
 
 // Pass `what` object of the form:
@@ -51,7 +52,7 @@ export function uiTagReference(context, what) {
       _body
         .append('img')
         .attr('class', 'tag-reference-wiki-image')
-        .attr('src', docs.imageURL)
+        .attr('src', utilSafeURL(docs.imageURL))
         .on('load', () => done())
         .on('error', function() {
           d3_select(this).remove();
@@ -76,7 +77,7 @@ export function uiTagReference(context, what) {
       .attr('class', 'tag-reference-edit')
       .attr('target', '_blank')
       .attr('title', l10n.t('inspector.edit_reference'))
-      .attr('href', docs.editURL)
+      .attr('href', utilSafeURL(docs.editURL))
       .call(uiIcon('#rapid-icon-edit', 'inline'));
 
     if (docs.wiki) {
@@ -84,7 +85,7 @@ export function uiTagReference(context, what) {
         .append('a')
         .attr('class', 'tag-reference-link')
         .attr('target', '_blank')
-        .attr('href', docs.wiki.url)
+        .attr('href', utilSafeURL(docs.wiki.url))
         .call(uiIcon('#rapid-icon-out-link', 'inline'))
         .append('span')
         .html(l10n.tHtml(docs.wiki.text));

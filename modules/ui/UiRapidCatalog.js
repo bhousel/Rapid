@@ -4,7 +4,7 @@ import { marked } from 'marked';
 
 import { uiIcon } from './icon.js';
 import { uiCombobox} from './combobox.js';
-import { utilKeybinding, utilNoAuto, utilSanitizeHTML } from '../util/index.ts';
+import { utilKeybinding, utilNoAuto, utilSafeURL, utilSanitizeHTML } from '../util/index.ts';
 
 const MAXRESULTS = 100;
 
@@ -432,7 +432,7 @@ export class UiRapidCatalog extends EventEmitter {
       .append('a')
       .attr('class', 'rapid-catalog-dataset-link')
       .attr('target', '_blank')
-      .attr('href', d => d.itemUrl);
+      .attr('href', d => utilSafeURL(d.itemUrl));
 
     $$link
       .append('span')
@@ -458,7 +458,7 @@ export class UiRapidCatalog extends EventEmitter {
       .append('img')
       .attr('class', 'rapid-catalog-dataset-thumbnail')
       .classed('inverted', d => d.categories.has('esri'))  // invert colors from light->dark
-      .attr('src', d => d.thumbnailUrl);
+      .attr('src', d => utilSafeURL(d.thumbnailUrl));
 
     // update
     $datasets = $datasets.merge($$datasets).order();

@@ -1,6 +1,7 @@
 import { selection, select } from 'd3-selection';
 
 import { utilSanitizeHTML } from '../util/sanitize.ts';
+import { utilSafeURL } from '../util/url.ts';
 
 
 /**
@@ -113,7 +114,7 @@ export class UiAttribution {
       .append('a')
       .attr('class', 'attribution')
       .attr('target', '_blank')
-      .attr('href', d => d.props.terms_url || null)
+      .attr('href', d => utilSafeURL(d.props.terms_url))
       .each((d, i, nodes) => {
         const $$link = select(nodes[i]);
 
@@ -127,7 +128,7 @@ export class UiAttribution {
           $$link
             .append('img')
             .attr('class', 'attribution-image')
-            .attr('src', d.props.icon);
+            .attr('src', utilSafeURL(d.props.icon));
         }
 
         $$link

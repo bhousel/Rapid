@@ -6,6 +6,7 @@ import { uiIcon } from './icon.js';
 import { uiDisclosure } from '../ui/disclosure.js';
 import { utilRebind } from '../util/rebind.ts';
 import { utilSanitizeHTML } from '../util/sanitize.ts';
+import { utilSafeURL } from '../util/url.ts';
 
 
 let _oci = null;
@@ -215,7 +216,7 @@ export function uiSuccess(context) {
       .attr('class', 'cell-icon community-icon')
       .append('a')
       .attr('target', '_blank')
-      .attr('href', d => d.resolved.url)
+      .attr('href', d => utilSafeURL(d.resolved.url))
       .append('svg')
       .attr('class', 'logo-small')
       .append('use')
@@ -344,7 +345,7 @@ export function uiSuccess(context) {
         .attr('class', 'community-event-name')
         .append('a')
         .attr('target', '_blank')
-        .attr('href', d => d.url)
+        .attr('href', d => utilSafeURL(d.url))
         .text(d => {
           let name = d.name;
           if (d.i18n && d.id) {

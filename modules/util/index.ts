@@ -16,4 +16,5 @@ export * from './keybinding.ts';
 export * from './rebind.ts';
 export * from './sanitize.ts';
 export * from './string.ts';
+export * from './url.ts';
 export * from './util.ts';
