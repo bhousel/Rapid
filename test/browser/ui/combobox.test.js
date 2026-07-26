@@ -104,6 +104,20 @@ describe('uiCombobox', () => {
     assert.strictEqual(d3.selectAll('.container > div.combobox').size(), 1);
   });
 
+  it('sanitizes HTML labels', () => {
+    const unsafe = [{
+      display: '<script>alert(1)</script><img src="x" onerror="alert(2)">',
+      value: 'unsafe'
+    }];
+
+    input.call(combobox.data(unsafe));
+    focusTypeahead(input);
+    simulateKeypress('↓');
+
+    assert.strictEqual(body.selectAll('.combobox-option script').size(), 0);
+    assert.strictEqual(body.selectAll('.combobox-option [onerror]').size(), 0);
+  });
+
   it('filters entries to those matching the value', () => {
     input.call(combobox.data(data));
     focusTypeahead(input);

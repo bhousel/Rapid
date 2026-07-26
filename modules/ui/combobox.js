@@ -1,7 +1,7 @@
 import { dispatch as d3_dispatch } from 'd3-dispatch';
 import { select as d3_select } from 'd3-selection';
 
-import { utilGetSetValue, utilRebind } from '../util/index.ts';
+import { utilGetSetValue, utilRebind, utilSanitizeHTML } from '../util/index.ts';
 
 
 // This code assumes that the combobox values will not have duplicate entries.
@@ -388,7 +388,7 @@ export function uiCombobox(context, klass) {
                     if (typeof d.display === 'function') {  // display function
                         selection.call(d.display);
                     } else if (d.display) {                 // display html value
-                        selection.html(d.display);
+                        selection.html(utilSanitizeHTML(d.display));
                     } else {                                // text value
                         selection.text(d.value);
                     }

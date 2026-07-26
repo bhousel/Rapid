@@ -1,5 +1,8 @@
 import { timeout as d3_timeout } from 'd3-timer';
 
+import { utilSanitizeHTML } from '../util/sanitize.ts';
+
+
 export function uiFlash(context) {
     var _flashTimer;
 
@@ -64,7 +67,7 @@ export function uiFlash(context) {
         content
             .selectAll('.flash-text')
             .attr('class', 'flash-text')
-            .html(_label);
+            .html(utilSanitizeHTML(_label));
 
 
         _flashTimer = d3_timeout(function() {
