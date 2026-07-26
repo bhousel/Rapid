@@ -5,7 +5,7 @@ import { Extent, numWrap } from '@rapid-sdk/math';
 import { JXON } from '../util/jxon.ts';
 import { OsmChangeset } from '../data/OsmChangeset.ts';
 import { uiIcon } from './icon.js';
-import { utilHighlightEntities, utilKeybinding, utilRebind } from '../util/index.ts';
+import { utilHighlightEntities, utilKeybinding, utilRebind, utilSanitizeHTML } from '../util/index.ts';
 
 
 export function uiConflicts(context) {
@@ -183,7 +183,7 @@ export function uiConflicts(context) {
       .enter()
       .append('li')
       .attr('class', 'conflict-detail-item')
-      .html(d => d);
+      .html(d => utilSanitizeHTML(d));
 
     details
       .append('div')

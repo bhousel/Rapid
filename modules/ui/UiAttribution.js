@@ -1,5 +1,7 @@
 import { selection, select } from 'd3-selection';
 
+import { utilSanitizeHTML } from '../util/sanitize.ts';
+
 
 /**
  * The Attribution compnoent shows attribution for the imagery layers.
@@ -115,9 +117,9 @@ export class UiAttribution {
       .each((d, i, nodes) => {
         const $$link = select(nodes[i]);
 
-        // add html directly (maybe we shouldn't?)
+        // Sanitize HTML from imagery provider metadata
         if (d.props.terms_html) {
-          $$link.html(d.props.terms_html);
+          $$link.html(utilSanitizeHTML(d.props.terms_html));
           return;
         }
 

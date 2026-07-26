@@ -3,6 +3,7 @@ import { marked } from 'marked';
 
 import { uiIcon } from './icon.js';
 import { uiTooltip } from './tooltip.js';
+import { utilSanitizeHTML } from '../util/sanitize.ts';
 
 
 
@@ -279,7 +280,7 @@ export class UiOvertureInspector {
       $notice = $notice.merge($$notice);
 
       $notice
-        .html(marked.parse(l10n.t('rapid_inspector.notice.open_data', { url: dataset.licenseUrl })));
+        .html(utilSanitizeHTML(marked.parse(l10n.t('rapid_inspector.notice.open_data', { url: dataset.licenseUrl }))));
 
       $notice.selectAll('a')   // links in markdown should open in new page
         .attr('target', '_blank');

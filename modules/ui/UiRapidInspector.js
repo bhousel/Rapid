@@ -7,6 +7,7 @@ import { uiFlash } from './flash.js';
 //import { uiRapidFirstEditDialog } from './rapid_first_edit_dialog.js';
 import { uiTooltip } from './tooltip.js';
 import { utilKeybinding } from '../util/keybinding.ts';
+import { utilSanitizeHTML } from '../util/sanitize.ts';
 
 const ACCEPT_FEATURES_LIMIT = 50;
 
@@ -467,7 +468,7 @@ export class UiRapidInspector {
       $notice = $notice.merge($$notice);
 
       $notice
-        .html(marked.parse(l10n.t('rapid_inspector.notice.open_data', { url: dataset.licenseUrl })));
+        .html(utilSanitizeHTML(marked.parse(l10n.t('rapid_inspector.notice.open_data', { url: dataset.licenseUrl }))));
 
       $notice.selectAll('a')   // links in markdown should open in new page
         .attr('target', '_blank');

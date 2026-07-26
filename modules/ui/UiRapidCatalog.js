@@ -4,7 +4,7 @@ import { marked } from 'marked';
 
 import { uiIcon } from './icon.js';
 import { uiCombobox} from './combobox.js';
-import { utilKeybinding, utilNoAuto } from '../util/index.ts';
+import { utilKeybinding, utilNoAuto, utilSanitizeHTML } from '../util/index.ts';
 
 const MAXRESULTS = 100;
 
@@ -175,7 +175,7 @@ export class UiRapidCatalog extends EventEmitter {
       .text(l10n.t('rapid_catalog.heading'));
 
     $header.selectAll('.rapid-catalog-header-about')
-      .html(marked.parse(l10n.t('rapid_catalog.about_the_catalog')));
+      .html(utilSanitizeHTML(marked.parse(l10n.t('rapid_catalog.about_the_catalog'))));
 
     $header.selectAll('.rapid-catalog-header-about a')
       .attr('target', '_blank');   // make sure the markdown links go to a new page
@@ -557,7 +557,7 @@ export class UiRapidCatalog extends EventEmitter {
   /**
    */
   highlight(needle, haystack) {
-    let html = haystack;
+    let html = utilSanitizeHTML(haystack);
     if (needle) {
       const re = new RegExp('\(' + _escapeRegex(needle) + '\)', 'gi');
       html = html.replace(re, '<mark>$1</mark>');
@@ -571,4 +571,3 @@ export class UiRapidCatalog extends EventEmitter {
   }
 
 }
-
