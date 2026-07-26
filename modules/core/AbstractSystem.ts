@@ -1,4 +1,4 @@
-import { EventEmitter } from 'tseep';
+import { EventEmitter } from 'tseep/lib/ee-safe';
 
 import type { Context } from '../Context.ts';
 

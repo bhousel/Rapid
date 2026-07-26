@@ -4,7 +4,10 @@
 This file serves as the 'redirect_uri' to complete the OAuth handshake.
 It receives the authorization code and closes its own window.
 -->
-  <head></head>
+  <head>
+    <meta charset='utf-8'>
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; connect-src 'self' blob: data: http: https:; font-src 'self' data: https:; form-action 'self' https:; frame-src 'self' https:; img-src 'self' blob: data: http: https:; media-src 'self' blob: data: http: https:; object-src 'none'; script-src 'self' https://browser-update.org https://cdn.jsdelivr.net 'strict-dynamic' 'sha256-S3Ub6vFalB2NG+toDbbO6IN0bIVLCkBCT2ZCXS4/F9A='; script-src-attr 'none'; style-src 'self' 'unsafe-inline' https:; worker-src 'self' blob:">
+  </head>
   <body>
     <script>
       if (new URLSearchParams(location.search).has("code")) {

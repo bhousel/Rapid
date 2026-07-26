@@ -1,4 +1,4 @@
-import { EventEmitter } from 'tseep';
+import { EventEmitter } from 'tseep/lib/ee-safe';
 import { select } from 'd3-selection';
 import { marked } from 'marked';
 
@@ -312,4 +312,3 @@ ${url_tokens}
 
 
 }
-

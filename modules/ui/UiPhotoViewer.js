@@ -1,4 +1,4 @@
-import { EventEmitter } from 'tseep';
+import { EventEmitter } from 'tseep/lib/ee-safe';
 import { selection, select } from 'd3-selection';
 import { numClamp } from '@rapid-sdk/math';
 

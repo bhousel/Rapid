@@ -73,7 +73,7 @@ jobs:
 
     # Rewrite the urls and embed build info in index.html
     - name: 🔨 Predeploy index.html
-      run: bun scripts/predeploy.js
+      run: bun scripts/predeploy.ts
 
     - name: 📤  Copy build to S3
       run: |

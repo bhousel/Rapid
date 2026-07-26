@@ -2,6 +2,7 @@
 <html>
   <head>
     <meta charset='utf-8'>
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; connect-src 'self' blob: data: http: https:; font-src 'self' data: https:; form-action 'self' https:; frame-src 'self' https:; img-src 'self' blob: data: http: https:; media-src 'self' blob: data: http: https:; object-src 'none'; script-src 'self' https://browser-update.org https://cdn.jsdelivr.net 'strict-dynamic' 'sha256-JIiCqdi9DU2lRiEZXmme5QSvSOv3DcbtMOWdBMHGw90=' 'sha256-OrqNtS2EGl1p9qUorPEWFAb2amzFneO2fxOaFTbA9jo=' 'unsafe-eval'; script-src-attr 'none'; style-src 'self' 'unsafe-inline' https:; worker-src 'self' blob:">
     <title>Rapid</title>
     <link rel='stylesheet' href='css/rapid.min.css'>
     <link rel='icon' type='image/svg' href='img/rapid_favicon.svg'>
@@ -22,8 +23,12 @@
   </head>
 
   <body>
-    <script>var $buoop={required:{i:15,e:-4,f:-3,o:-3,s:-1,c:-3},reminder:0,noclose:true,no_permanent_hide:true,insecure:true,api:2021.06};</script>
-    <script src='https://browser-update.org/update.js'></script>
+    <script>
+      var $buoop={required:{i:15,e:-4,f:-3,o:-3,s:-1,c:-3},reminder:0,noclose:true,no_permanent_hide:true,insecure:true,api:2021.06};
+      var browserUpdateScript = document.createElement('script');
+      browserUpdateScript.src = 'https://browser-update.org/update.js';
+      document.head.appendChild(browserUpdateScript);
+    </script>
     <div id='rapid-container'></div>
 
     <script>

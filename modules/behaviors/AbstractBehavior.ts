@@ -1,4 +1,4 @@
-import { EventEmitter } from 'tseep';
+import { EventEmitter } from 'tseep/lib/ee-safe';
 import { vecRotate } from '@rapid-sdk/math';
 
 import type { Context } from '../Context.ts';
