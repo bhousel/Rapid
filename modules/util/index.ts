@@ -14,5 +14,6 @@ export * from './jsonp_request.ts';
 export * from './jxon.ts';
 export * from './keybinding.ts';
 export * from './rebind.ts';
+export * from './sanitize.ts';
 export * from './string.ts';
 export * from './util.ts';
