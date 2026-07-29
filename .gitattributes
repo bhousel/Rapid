@@ -11,5 +11,4 @@
 *.yaml linguist-detectable
 
 docs/** linguist-documentation
-dist/** linguist-generated
 data/** linguist-vendored
