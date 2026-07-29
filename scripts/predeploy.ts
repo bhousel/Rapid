@@ -3,6 +3,9 @@
 // Then we can just copy this `index.html` around and things will just work.
 // This is how we do deploys of Rapid.
 
+import { updateContentSecurityPolicy } from './content_security_policy.ts';
+
+
 const now = new Date();
 const yyyy = now.getUTCFullYear();
 const mm = ('0' + (now.getUTCMonth() + 1)).slice(-2);
@@ -40,6 +43,9 @@ if (isDebug) {
 } else {
   content = content.replaceAll('rapid.min.js', `${path}/rapid.min.js`);
 }
+
+// The replacements above change an inline script, so refresh its CSP hash.
+content = updateContentSecurityPolicy(content, { allowUnsafeEval: true });
 
 // Write the file back
 await Bun.write(file, content);

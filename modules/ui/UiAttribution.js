@@ -1,5 +1,8 @@
 import { selection, select } from 'd3-selection';
 
+import { utilSanitizeHTML } from '../util/sanitize.ts';
+import { utilSafeURL } from '../util/url.ts';
+
 
 /**
  * The Attribution compnoent shows attribution for the imagery layers.
@@ -111,13 +114,13 @@ export class UiAttribution {
       .append('a')
       .attr('class', 'attribution')
       .attr('target', '_blank')
-      .attr('href', d => d.props.terms_url || null)
+      .attr('href', d => utilSafeURL(d.props.terms_url))
       .each((d, i, nodes) => {
         const $$link = select(nodes[i]);
 
-        // add html directly (maybe we shouldn't?)
+        // Sanitize HTML from imagery provider metadata
         if (d.props.terms_html) {
-          $$link.html(d.props.terms_html);
+          $$link.html(utilSanitizeHTML(d.props.terms_html));
           return;
         }
 
@@ -125,7 +128,7 @@ export class UiAttribution {
           $$link
             .append('img')
             .attr('class', 'attribution-image')
-            .attr('src', d.props.icon);
+            .attr('src', utilSafeURL(d.props.icon));
         }
 
         $$link

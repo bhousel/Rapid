@@ -1,10 +1,10 @@
-import { EventEmitter } from 'tseep';
+import { EventEmitter } from 'tseep/lib/ee-safe';
 import { select } from 'd3-selection';
 import { marked } from 'marked';
 
 import { uiIcon } from './icon.js';
 import { uiCombobox} from './combobox.js';
-import { utilKeybinding, utilNoAuto } from '../util/index.ts';
+import { utilKeybinding, utilNoAuto, utilSafeURL, utilSanitizeHTML } from '../util/index.ts';
 
 const MAXRESULTS = 100;
 
@@ -175,7 +175,7 @@ export class UiRapidCatalog extends EventEmitter {
       .text(l10n.t('rapid_catalog.heading'));
 
     $header.selectAll('.rapid-catalog-header-about')
-      .html(marked.parse(l10n.t('rapid_catalog.about_the_catalog')));
+      .html(utilSanitizeHTML(marked.parse(l10n.t('rapid_catalog.about_the_catalog'))));
 
     $header.selectAll('.rapid-catalog-header-about a')
       .attr('target', '_blank');   // make sure the markdown links go to a new page
@@ -432,7 +432,7 @@ export class UiRapidCatalog extends EventEmitter {
       .append('a')
       .attr('class', 'rapid-catalog-dataset-link')
       .attr('target', '_blank')
-      .attr('href', d => d.itemUrl);
+      .attr('href', d => utilSafeURL(d.itemUrl));
 
     $$link
       .append('span')
@@ -458,7 +458,7 @@ export class UiRapidCatalog extends EventEmitter {
       .append('img')
       .attr('class', 'rapid-catalog-dataset-thumbnail')
       .classed('inverted', d => d.categories.has('esri'))  // invert colors from light->dark
-      .attr('src', d => d.thumbnailUrl);
+      .attr('src', d => utilSafeURL(d.thumbnailUrl));
 
     // update
     $datasets = $datasets.merge($$datasets).order();
@@ -557,7 +557,7 @@ export class UiRapidCatalog extends EventEmitter {
   /**
    */
   highlight(needle, haystack) {
-    let html = haystack;
+    let html = utilSanitizeHTML(haystack);
     if (needle) {
       const re = new RegExp('\(' + _escapeRegex(needle) + '\)', 'gi');
       html = html.replace(re, '<mark>$1</mark>');
@@ -571,4 +571,3 @@ export class UiRapidCatalog extends EventEmitter {
   }
 
 }
-

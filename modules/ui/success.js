@@ -5,6 +5,8 @@ import { resolveStrings } from 'osm-community-index';
 import { uiIcon } from './icon.js';
 import { uiDisclosure } from '../ui/disclosure.js';
 import { utilRebind } from '../util/rebind.ts';
+import { utilSanitizeHTML } from '../util/sanitize.ts';
+import { utilSafeURL } from '../util/url.ts';
 
 
 let _oci = null;
@@ -214,7 +216,7 @@ export function uiSuccess(context) {
       .attr('class', 'cell-icon community-icon')
       .append('a')
       .attr('target', '_blank')
-      .attr('href', d => d.resolved.url)
+      .attr('href', d => utilSafeURL(d.resolved.url))
       .append('svg')
       .attr('class', 'logo-small')
       .append('use')
@@ -248,12 +250,12 @@ export function uiSuccess(context) {
     selection
       .append('div')
       .attr('class', 'community-name')
-      .html(d.resolved.nameHTML);
+      .html(utilSanitizeHTML(d.resolved.nameHTML));
 
     selection
       .append('div')
       .attr('class', 'community-description')
-      .html(d.resolved.descriptionHTML);
+      .html(utilSanitizeHTML(d.resolved.descriptionHTML));
 
     // Create an expanding section if any of these are present..
     if (d.resolved.extendedDescriptionHTML || (d.languageCodes && d.languageCodes.length)) {
@@ -310,7 +312,7 @@ export function uiSuccess(context) {
         moreEnter
           .append('div')
           .attr('class', 'community-extended-description')
-          .html(d.resolved.extendedDescriptionHTML);
+          .html(utilSanitizeHTML(d.resolved.extendedDescriptionHTML));
       }
 
       if (d.languageCodes && d.languageCodes.length) {
@@ -343,7 +345,7 @@ export function uiSuccess(context) {
         .attr('class', 'community-event-name')
         .append('a')
         .attr('target', '_blank')
-        .attr('href', d => d.url)
+        .attr('href', d => utilSafeURL(d.url))
         .text(d => {
           let name = d.name;
           if (d.i18n && d.id) {

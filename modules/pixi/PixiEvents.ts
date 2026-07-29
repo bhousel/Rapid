@@ -1,5 +1,5 @@
 import * as PIXI from 'pixi.js';
-import { EventEmitter } from 'tseep';
+import { EventEmitter } from 'tseep/lib/ee-safe';
 import { vecRotate } from '@rapid-sdk/math';
 import { utilDetect } from '../util/detect.ts';
 
@@ -551,4 +551,3 @@ export class PixiEvents extends EventEmitter {
     return [pX, pY];
   }
 }
-

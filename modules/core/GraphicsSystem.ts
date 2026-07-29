@@ -1,4 +1,5 @@
 import * as PIXI from 'pixi.js';
+import 'pixi.js/unsafe-eval';
 import { AbstractSystem } from './AbstractSystem.ts';
 import { PixiEvents } from '../pixi/PixiEvents.ts';
 import { PixiScene } from '../pixi/PixiScene.ts';

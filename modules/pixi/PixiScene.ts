@@ -1,5 +1,5 @@
 import * as PIXI from 'pixi.js';
-import { EventEmitter } from 'tseep';
+import { EventEmitter } from 'tseep/lib/ee-safe';
 import { PixiLayerBackgroundTiles } from './PixiLayerBackgroundTiles.js';
 import { PixiLayerCustomData } from './PixiLayerCustomData.js';
 import { PixiLayerDebug } from './PixiLayerDebug.ts';

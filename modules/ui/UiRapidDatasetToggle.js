@@ -7,6 +7,7 @@ import { UiRapidAddDataset } from './UiRapidAddDataset.js';
 import { UiRapidCatalog } from './UiRapidCatalog.js';
 import { uiRapidColorpicker } from './rapid_colorpicker.js';
 import { utilCmd } from '../util/cmd.ts';
+import { utilSafeURL } from '../util/url.ts';
 
 
 /**
@@ -352,7 +353,7 @@ export class UiRapidDatasetToggle {
       .append('a')
       .attr('class', 'rapid-feature-licence-link')
       .attr('target', '_blank')
-      .attr('href', d => d.licenseUrl);
+      .attr('href', d => utilSafeURL(d.licenseUrl));
 
     $$link
       .append('span')

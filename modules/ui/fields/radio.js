@@ -67,7 +67,7 @@ export function uiFieldRadio(context, uifield) {
 
         enter
             .append('span')
-            .html(d => l10n.tHtml(`${stringBase}.${d}`, { 'default': d }));
+            .text(d => l10n.t(`${stringBase}.${d}`, { 'default': d }));
 
         labels = labels
             .merge(enter);
@@ -299,9 +299,9 @@ export function uiFieldRadio(context, uifield) {
         var selection = radios.filter(function() { return this.checked; });
 
         if (selection.empty()) {
-            placeholder.html(l10n.tHtml('inspector.none'));
+            placeholder.text(l10n.t('inspector.none'));
         } else {
-            placeholder.html(selection.attr('value'));
+            placeholder.text(selection.attr('value'));
             _oldType[selection.datum()] = tags[selection.datum()];
         }
 

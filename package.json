@@ -23,6 +23,7 @@
     "build:js": "bun ./scripts/build_js.ts",
     "build:svg": "bun ./scripts/build_svg.ts",
     "check": "bun run --sequential 'check:*'",
+    "check:csp": "bun ./scripts/check_csp.ts",
     "check:json": "bun ./scripts/validate_json.ts",
     "check:lint": "eslint ./modules ./test ./scripts",
     "check:ts": "tsc --noEmit",
