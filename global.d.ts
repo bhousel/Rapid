@@ -59,6 +59,13 @@ declare module 'd3-selection' {
   export type D3EnterSelection = Selection<any, any, any, any>;
 
   /**
+   * Standard D3 Callback types
+   */
+  export type D3CallbackBoolean = (datum: any, index: number, groups: any) => boolean;
+  export type D3CallbackValue = (datum: any, index: number, groups: any) => any;
+  export type D3CallbackVoid = (datum: any, index: number, groups: any) => void;
+
+  /**
    * Override D3 Selection interface to make callbacks more permissive.
    * D3's default types are very strict about datum types, causing friction
    * when the datum type is unknown or when chaining selections.
@@ -75,19 +82,19 @@ declare module 'd3-selection' {
     ): Selection<GElement, NewDatum, PElement, PDatum>;
 
     /** Permissive attr with value function - datum can be typed by caller. */
-    attr(name: string, value: (datum: any, index: number, groups: any) => any): this;
+    attr(name: string, value: D3CallbackValue): this;
     /** Permissive style with value function - datum can be typed by caller. */
-    style(name: string, value: (datum: any, index: number, groups: any) => any, priority?: 'important' | null): this;
+    style(name: string, value: D3CallbackValue, priority?: 'important' | null): this;
     /** Permissive text with value function - datum can be typed by caller. */
-    text(value: (datum: any, index: number, groups: any) => any): this;
+    text(value: D3CallbackValue): this;
     /** Permissive html with value function - datum can be typed by caller. */
-    html(value: (datum: any, index: number, groups: any) => any): this;
+    html(value: D3CallbackValue): this;
     /** Permissive classed with value function - datum can be typed by caller. */
-    classed(names: string, value: (datum: any, index: number, groups: any) => boolean): this;
+    classed(names: string, value: D3CallbackBoolean): this;
     /** Permissive property with value function - datum can be typed by caller. */
-    property(name: string, value: (datum: any, index: number, groups: any) => any): this;
+    property(name: string, value: D3CallbackValue): this;
     /** Permissive filter with function - datum can be typed by caller. */
-    filter(selector: (datum: any, index: number, groups: any) => boolean): Selection<GElement, Datum, PElement, PDatum>;
+    filter(selector: D3CallbackBoolean): Selection<GElement, Datum, PElement, PDatum>;
     /** Permissive sort - datum can be typed by caller. */
     sort(comparator: (a: any, b: any) => number): this;
     /** Permissive each - datum can be typed by caller. */

@@ -1,4 +1,4 @@
-describe('uiFieldAccess', () => {
+describe('UiFieldAccess', () => {
 
   const context = new Rapid.MockContext();
   let selection, field, uifield;
@@ -39,8 +39,8 @@ describe('uiFieldAccess', () => {
 
 
   it('creates inputs for a constiety of modes of access', () => {
-    const access = Rapid.uiFieldAccess(context, uifield);
-    selection.call(access);
+    const access = new Rapid.UiFieldAccess(context, uifield);
+    selection.call(access.render);
     assert.strictEqual(selection.selectAll('.preset-access-access').size(), 1);
     assert.strictEqual(selection.selectAll('.preset-access-foot').size(), 1);
     assert.strictEqual(selection.selectAll('.preset-access-motor_vehicle').size(), 1);
@@ -50,7 +50,7 @@ describe('uiFieldAccess', () => {
 
 
   it('does not include "yes", "designated", "dismount" options for general access (iD#934), (iD#2213)', () => {
-    const access = Rapid.uiFieldAccess(context, uifield);
+    const access = new Rapid.UiFieldAccess(context, uifield);
     const options = access.options('access').map(v => v.value);
     assert.notInclude(options, 'yes');
     assert.notInclude(options, 'designated');
@@ -59,7 +59,7 @@ describe('uiFieldAccess', () => {
 
 
   it('does include a "dismount" option for bicycles (iD#2726)', () => {
-    const access = Rapid.uiFieldAccess(context, uifield);
+    const access = new Rapid.UiFieldAccess(context, uifield);
     let options;
 
     options = access.options('bicycle').map(v => v.value);
@@ -71,8 +71,8 @@ describe('uiFieldAccess', () => {
 
 
   it('sets foot placeholder to "yes" for steps and pedestrian', () => {
-    const access = Rapid.uiFieldAccess(context, uifield);
-    selection.call(access);
+    const access = new Rapid.UiFieldAccess(context, uifield);
+    selection.call(access.render);
 
     access.tags({ highway: 'steps' });
     assert.strictEqual(selection.selectAll('.preset-input-access-foot').attr('placeholder'), 'yes');
@@ -83,8 +83,8 @@ describe('uiFieldAccess', () => {
 
 
   it('sets foot placeholder to "designated" for footways', () => {
-    const access = Rapid.uiFieldAccess(context, uifield);
-    selection.call(access);
+    const access = new Rapid.UiFieldAccess(context, uifield);
+    selection.call(access.render);
 
     access.tags({ highway: 'footway' });
     assert.strictEqual(selection.selectAll('.preset-input-access-foot').attr('placeholder'), 'designated');
@@ -92,8 +92,8 @@ describe('uiFieldAccess', () => {
 
 
   it('sets bicycle placeholder to "designated" for cycleways', () => {
-    const access = Rapid.uiFieldAccess(context, uifield);
-    selection.call(access);
+    const access = new Rapid.UiFieldAccess(context, uifield);
+    selection.call(access.render);
 
     access.tags({ highway: 'cycleway' });
     assert.strictEqual(selection.selectAll('.preset-input-access-bicycle').attr('placeholder'), 'designated');
@@ -101,8 +101,8 @@ describe('uiFieldAccess', () => {
 
 
   it('sets horse placeholder to "designated" for bridleways', () => {
-    const access = Rapid.uiFieldAccess(context, uifield);
-    selection.call(access);
+    const access = new Rapid.UiFieldAccess(context, uifield);
+    selection.call(access.render);
 
     access.tags({ highway: 'bridleway' });
     assert.strictEqual(selection.selectAll('.preset-input-access-horse').attr('placeholder'), 'designated');
@@ -110,8 +110,8 @@ describe('uiFieldAccess', () => {
 
 
   it('sets motor_vehicle placeholder to "no" for footways, steps, pedestrian, cycleway, bridleway, and path', () => {
-    const access = Rapid.uiFieldAccess(context, uifield);
-    selection.call(access);
+    const access = new Rapid.UiFieldAccess(context, uifield);
+    selection.call(access.render);
     ['footway', 'steps', 'pedestrian', 'cycleway', 'bridleway', 'path'].forEach(value => {
       access.tags({ highway: value });
       assert.strictEqual(selection.selectAll('.preset-input-access-motor_vehicle').attr('placeholder'), 'no');
@@ -120,8 +120,8 @@ describe('uiFieldAccess', () => {
 
 
   it('sets motor_vehicle placeholder to "yes" for various other highway tags', () => {
-    const access = Rapid.uiFieldAccess(context, uifield);
-    selection.call(access);
+    const access = new Rapid.UiFieldAccess(context, uifield);
+    selection.call(access.render);
     [
       'residential', 'motorway', 'trunk', 'primary', 'secondary', 'tertiary', 'service',
       'unclassified', 'motorway_link', 'trunk_link', 'primary_link', 'secondary_link', 'tertiary_link'
@@ -133,8 +133,8 @@ describe('uiFieldAccess', () => {
 
 
   it('overrides a "yes" or "designated" placeholder with more specific access tag (iD#2213)', () => {
-    const access = Rapid.uiFieldAccess(context, uifield);
-    selection.call(access);
+    const access = new Rapid.UiFieldAccess(context, uifield);
+    selection.call(access.render);
 
     access.tags({ highway: 'service', access: 'emergency' });
     assert.strictEqual(selection.selectAll('.preset-input-access-motor_vehicle').attr('placeholder'), 'emergency');
@@ -145,8 +145,8 @@ describe('uiFieldAccess', () => {
 
 
   it('overrides a "no" placeholder with more specific access tag (iD#2763)', () => {
-    const access = Rapid.uiFieldAccess(context, uifield);
-    selection.call(access);
+    const access = new Rapid.UiFieldAccess(context, uifield);
+    selection.call(access.render);
 
     access.tags({ highway: 'cycleway', access: 'destination' });
     assert.strictEqual(selection.selectAll('.preset-input-access-motor_vehicle').attr('placeholder'), 'destination');

@@ -1,10 +1,10 @@
 import { AbstractMode } from './AbstractMode.ts';
 import { select as d3_select } from 'd3-selection';
-import { uiCommit } from '../ui/commit.js';
+import { UiCommit } from '../ui/UiCommit.js';
 import { uiConfirm } from '../ui/confirm.js';
-import { uiConflicts } from '../ui/conflicts.js';
+import { UiConflicts } from '../ui/UiConflicts.js';
 import { uiLoading } from '../ui/loading.js';
-import { uiSuccess } from '../ui/success.js';
+import { UiSuccess } from '../ui/UiSuccess.js';
 import { utilKeybinding } from '../util/index.ts';
 
 import type { Context } from '../Context.ts';
@@ -92,17 +92,17 @@ export class SaveMode extends AbstractMode {
     this._active = true;
     this._wasSuccessfulSave = false;
 
-    this._uiCommit = (uiCommit(context) as any)
-      .on('cancel', this._cancel);
+    this._uiCommit = new UiCommit(context);
+    this._uiCommit.on('cancel', this._cancel);
 
     if (osm.authenticated()) {
-      Sidebar.show(this._uiCommit);
+      Sidebar.show(this._uiCommit.render);
     } else {
       osm.authenticate((err: Error | null) => {
         if (err) {
           this._cancel();
         } else {
-          Sidebar.show(this._uiCommit);
+          Sidebar.show(this._uiCommit.render);
         }
       });
     }
@@ -223,7 +223,8 @@ export class SaveMode extends AbstractMode {
       .classed('active', true)
       .classed('inactive', false);
 
-    this._uiConflicts = (uiConflicts(context) as any)
+    this._uiConflicts = new UiConflicts(context);
+    this._uiConflicts
       .conflictList(conflicts)
       .origChanges(origChanges)
       .on('cancel', () => {
@@ -242,7 +243,7 @@ export class SaveMode extends AbstractMode {
         uploader.processResolvedConflicts();
       });
 
-    $selection.call(this._uiConflicts);
+    $selection.call(this._uiConflicts.render);
   }
 
 
@@ -353,7 +354,7 @@ export class SaveMode extends AbstractMode {
       .on('cancel', () => Sidebar.hide());
 
     this._wasSuccessfulSave = true;
-    Sidebar.show(successContent);
+    Sidebar.show(successContent.render);
 
     // Add delay before resetting to allow for postgres replication iD#1646 iD#2678
     globalThis.setTimeout(() => {
@@ -434,7 +435,7 @@ export class SaveMode extends AbstractMode {
    * the success screen like "Thank you for editing around place, region."
    */
   protected _prepareForSuccess(): void {
-    this._uiSuccess = uiSuccess(this.context);
+    this._uiSuccess = new UiSuccess(this.context);
     this._location = null;
 
     const context = this.context;

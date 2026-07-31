@@ -1,4 +1,4 @@
-describe('uiNoteComments', () => {
+describe('UiNoteComments', () => {
 
   const context = new Rapid.MockContext();
 
@@ -27,7 +27,9 @@ describe('uiNoteComments', () => {
     };
     const selection = d3.select(document.createElement('div'));
 
-    selection.call(Rapid.uiNoteComments(context).note(note));
+    const noteComments = new Rapid.UiNoteComments(context);
+    noteComments.datum = note;
+    selection.call(noteComments.render);
 
     assert.strictEqual(selection.select('.comment-author').text(), username);
     assert.strictEqual(selection.selectAll('.comment-author img').size(), 0);

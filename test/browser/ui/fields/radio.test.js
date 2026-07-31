@@ -1,4 +1,4 @@
-describe('uiFieldRadio', () => {
+describe('UiFieldRadio', () => {
 
   const context = new Rapid.MockContext();
   let selection, field, uifield;
@@ -34,9 +34,9 @@ describe('uiFieldRadio', () => {
 
 
   it('renders option labels as text', () => {
-    const radio = Rapid.uiFieldRadio(context, uifield);
+    const radio = new Rapid.UiFieldRadio(context, uifield);
 
-    selection.call(radio);
+    selection.call(radio.render);
 
     assert.strictEqual(selection.select('label span').text(), field.props.options[0]);
     assert.strictEqual(selection.selectAll('img').size(), 0);

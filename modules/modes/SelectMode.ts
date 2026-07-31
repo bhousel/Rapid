@@ -1,12 +1,12 @@
 import { AbstractMode } from './AbstractMode.ts';
 import { AbstractData, GeoJSONData, MarkerData } from '../data/index.ts';
 import { Extent } from '@rapid-sdk/math';
-import { uiOsmoseEditor } from '../ui/osmose_editor.js';
-import { uiDataEditor } from '../ui/data_editor.js';
-import { uiDetectionInspector } from '../ui/detection_inspector.js';
-import { uiKeepRightEditor } from '../ui/keepRight_editor.js';
-import { uiNoteEditor } from '../ui/note_editor.js';
-import { uiMapRouletteEditor } from '../ui/maproulette_editor.js';
+import { UiOsmoseEditor } from '../ui/UiOsmoseEditor.js';
+import { UiDataEditor } from '../ui/UiDataEditor.js';
+import { UiDetectionInspector } from '../ui/UiDetectionInspector.js';
+import { UiKeepRightEditor } from '../ui/UiKeepRightEditor.js';
+import { UiNoteEditor } from '../ui/UiNoteEditor.js';
+import { UiMapRouletteEditor } from '../ui/UiMapRouletteEditor.js';
 
 import type { Context } from '../Context.ts';
 
@@ -121,56 +121,67 @@ export class SelectMode extends AbstractMode {
     let sidebarContent: any = null;
     // Selected a note...
     if (datum instanceof MarkerData && datum.serviceID === 'osm' && datum.type === 'note') {
-      sidebarContent = (uiNoteEditor as any)(context).note(datum);
-      sidebarContent
-        .on('change', () => {
+      const noteEditor = new UiNoteEditor(context);
+      noteEditor.datum = datum;
+      noteEditor.on('change', () => {
           gfx?.immediateRedraw();  // force a redraw (there is no history change that would otherwise do this)
           const osm = context.services.osm as any;
           const note = osm?.getNote(datumID);
           if (!(note instanceof MarkerData)) return;  // or - go to browse mode
-          Sidebar?.show(sidebarContent.note(note));
+          noteEditor.datum = note;
+          Sidebar?.show(noteEditor.render);
           this._selectedData.set(datumID, note);  // update selectedData after a change happens?
         });
+      sidebarContent = noteEditor.render;
 
     } else if (datum instanceof MarkerData && datum.serviceID === 'keepright') {
-      sidebarContent = (uiKeepRightEditor as any)(context).error(datum);
-      sidebarContent
-        .on('change', () => {
+      const keepRightEditor = new UiKeepRightEditor(context);
+      keepRightEditor.datum = datum;
+      keepRightEditor.on('change', () => {
           gfx?.immediateRedraw();  // force a redraw (there is no history change that would otherwise do this)
           const keepright = context.services.keepright as any;
           const error = keepright?.getError(datumID);
           if (!(error instanceof MarkerData)) return;  // or - go to browse mode?
-          Sidebar?.show(sidebarContent.error(error));
+          keepRightEditor.datum = error;
+          Sidebar?.show(keepRightEditor.render);
           this._selectedData.set(datumID, error);  // update selectedData after a change happens?
         });
+      sidebarContent = keepRightEditor.render;
 
     } else if (datum instanceof MarkerData && datum.serviceID === 'osmose') {
-      sidebarContent = (uiOsmoseEditor as any)(context).error(datum);
-      sidebarContent
-        .on('change', () => {
+      const osmoseEditor = new UiOsmoseEditor(context);
+      osmoseEditor.datum = datum;
+      osmoseEditor.on('change', () => {
           gfx?.immediateRedraw();  // force a redraw (there is no history change that would otherwise do this)
           const osmose = context.services.osmose as any;
           const error = osmose?.getError(datumID);
           if (!(error instanceof MarkerData)) return;  // or - go to browse mode?
-          Sidebar?.show(sidebarContent.error(error));
+          osmoseEditor.datum = error;
+          Sidebar?.show(osmoseEditor.render);
           this._selectedData.set(datumID, error);  // update selectedData after a change happens?
         });
+      sidebarContent = osmoseEditor.render;
 
     } else if (datum instanceof MarkerData && datum.serviceID === 'maproulette') {
-      sidebarContent = (uiMapRouletteEditor as any)(context).error(datum);
-      (ui as any)?.MapRouletteMenu?.error(datum);
-      sidebarContent
-        .on('change', () => {
+      const maprouletteEditor = new UiMapRouletteEditor(context);
+      maprouletteEditor.datum = datum;
+      const menu = (ui as any)?.MapRouletteMenu;
+      if (menu) menu.datum = datum;
+      maprouletteEditor.on('change', () => {
           gfx?.immediateRedraw();  // force a redraw (there is no history change that would otherwise do this)
           const maproulette = context.services.maproulette as any;
           const error = maproulette?.getError(datumID);
           if (!(error instanceof MarkerData)) return;  // or - go to browse mode?
-          Sidebar?.show(sidebarContent.error(error));
+          maprouletteEditor.datum = error;
+          Sidebar?.show(maprouletteEditor.render);
           this._selectedData.set(datumID, error);  // update selectedData after a change happens?
         });
+      sidebarContent = maprouletteEditor.render;
 
     } else if (datum instanceof MarkerData && datum.type === 'detection') {
-      sidebarContent = (uiDetectionInspector as any)(context).datum(datum);
+      const detectionInspector = new UiDetectionInspector(context);
+      detectionInspector.datum = datum;
+      sidebarContent = detectionInspector.render;
       const serviceID = datum.serviceID;
       const type = (datum.props.object_type === 'traffic_sign') ? 'signs' : 'detections';
       const layerID = `${serviceID}-${type}`;    // e.g. 'mapillary-signs' or 'mapillary-detections'
@@ -178,7 +189,9 @@ export class SelectMode extends AbstractMode {
 
     // Selected custom data (e.g. gpx track)...
     } else if (datum instanceof GeoJSONData) {
-      sidebarContent = (uiDataEditor as any)(context).datum(datum);
+      const dataEditor = new UiDataEditor(context);
+      dataEditor.datum = datum;
+      sidebarContent = dataEditor.render;
 
     // Selected Overture feature...
     } else if (datum.props.overture) {

@@ -4,14 +4,21 @@ Things that went wrong once and shouldn't go wrong again.
 
 ## TypeScript
 
-- **`Object.entries()` widens keys** — Always returns `[string, V][]`. Cast at iteration site: `Object.entries(obj) as [keyof MyType, unknown][]`. Or iterate a known key set and index directly.
-- **Tiler method chaining** — `new Tiler().tileSize(512)` returns `number | Tiler`. Need `as Tiler` casts on the chain.
+- **`Object.entries()` widens keys** — Always returns `[string, V][]`. Cast at iteration site: `Object.entries(obj) as [keyof MyType, unknown][]`. Or iterate a known key set and index directly.- **Tiler method chaining** — `new Tiler().tileSize(512)` returns `number | Tiler`. Need `as Tiler` casts on the chain.
 - **`utilQsString`** requires 2 args `(obj, noencode: boolean)` — pass `false` for the second.
 - **`osmAuth()` types wrong upstream** — Declared as class constructor but is actually a factory function. Local interface workaround in OsmService.ts until upstream is fixed.
 - **JSDoc first-line duplication** — Two redundant patterns to watch for and avoid:
   1. A line that is just the backticked class name: `` * `ClassName` ``
   2. A `ClassName - description` prefix on the first line
   Both clutter IntelliSense by repeating the symbol name that's already shown. Start the description directly on the first line instead.
+
+## UI class conversion (modules/ui)
+
+- **`git mv`, never new-file-plus-leftover.** A rename done as "create `UiFoo.ts` + forget to delete `foo.ts`" leaves the old file as an **untracked** dead duplicate that still imports now-removed symbols. After any rename pass, grep for stale sibling files (`entity_editor.ts` next to `UiEntityEditor.ts`) and check `git status` for `??` orphans.
+- **`$`-selection props must be `public`, not `protected`.** eslint `naming-convention` forces `protected` members to be `_`-prefixed, which collides with the `$var` selection convention. Declare selection state as `public $foo: D3Selection` (matches `UiInspector`/`AbstractUiSection`); keep non-selection protected state `_`-prefixed.
+- **Element-`this` d3 handlers → class methods.** `.on('click', function(){ d3_select(this) })` → arrow using `d3_event.currentTarget`. `.each(function(this){ d3_select(this) })` → `.each((_, i, nodes) => d3_select(nodes[i]))`. Leave self-contained element-`this` value/each callbacks as `function(this: any)` when they need no field state.
+- **Async re-render guards.** Original factories often used `if (_tags)` (undefined until `tags()` called) to skip a re-render before render. Class fields initialized to `{}` make that guard always-true — guard on render state instead (`if (!this.$input.empty())`).
+- **Don't force shared DOM-builders into classes.** `disclosure`, `section`, `icon`, `toggle`, `tooltip`, `popover`, `combobox`, `form_fields` are stateless helpers still called by unconverted JS; converting them ripples into that JS. Keep them as typed functions until their consumers convert.
 
 ## Testing
 

@@ -1,5 +1,68 @@
 # Current Work
 
+## UI System modernization (2026-07-29) — branch `ui_refactors`
+
+- Added design doc: [.github/design/ui-system.md](../.github/design/ui-system.md)
+- Plan: convert ALL of `modules/ui/` (~130 files) to TypeScript class components following the
+  newest conventions (`UiMapToolbar`/`UiSystem` shape) — idempotent render, relocalization-safe,
+  lifecycle-aware. Dependency-first phasing (foundational primitives → fields → sidebar → QA
+  editors → panes → toolbar/cards → rapid/dialogs → intro → barrels).
+- Quarantined: `sections/*.jsx` React demo (only a commented import). Disabled `field_help.js` /
+  `fields/restrictions.js` will be converted too (un-commented later). Barrels (`index.js`) last.
+- **Key finding:** `moduleResolution: bundler` resolves `./foo.js` imports to `foo.ts` at
+  type-check AND build — so `.js`→`.ts` renames need no importer-extension churn.
+- **Design principle:** lifecycle components (render into a `$parent`, own state/events) → TS
+  classes; a small set of shared, stateless DOM-builders still consumed by unconverted JS stay
+  typed functions (`icon`, `toggle`, `tooltip`, `popover`, `combobox`, `form_fields`, `disclosure`,
+  `section`). **Everything else is a class** (user preference: "convert to classes wherever possible").
+- **Phase 1 DONE + verified**: icon, toggle, modal, confirm, loading, popover, tooltip, combobox,
+  form_fields, `UiFlash` (class + `ui.Flash.show({…})`). `disclosure`/`section` kept as functions.
+- **Phase 2 (field system) DONE + verified**: all `fields/*` are **TS classes** (`UiFieldAccess`,
+  `UiFieldCombo`, `UiFieldText`, `UiFieldCheck`, `UiFieldRadio`, `UiFieldLocalized`, `UiFieldWikidata`,
+  `UiFieldWikipedia`, `UiFieldTextarea`, `UiFieldLanes`, `UiFieldRoadspeed`, `UiFieldCycleway`,
+  `UiFieldAddress`) + `UiTagReference`. `fields/index.ts` is a typed `uiFields` registry of **class
+  constructors**; `UiField` does `new uiFields[type](...)` + `.render`. `restrictions`/`field_help`
+  stay commented-out (converted, wired-but-disabled).
+- **Phase 3 (sidebar/inspector) DONE + verified**: `sections/*` are classes extending a new
+  `AbstractUiSection` (`UiSectionFeatureType`, `UiSectionRawTagEditor`, `UiSectionValidation*`, …);
+  `UiEntityEditor`, `UiPresetList`, `UiPresetIcon`, `UiInspector`, `UiOvertureInspector`, `UiSidebar`,
+  `UiFeatureList`, `UiDataEditor`, `UiDataHeader` are TS classes.
+- **Filenames renamed to `CamelCase.ts`** (class name) via `git mv` for all converted components;
+  barrels + import sites updated. Removed 5 untracked orphan dupes left from an earlier bad rename
+  (`entity_editor.ts` etc.). Verified: tsc/eslint/build clean, browser 133 / unit 3290 / 0 fail.
+- **Learnings** (see design-doc Progress log + lessons.md): `$`-selection props must be `public`
+  (lint `naming-convention` vs `$var`); always `git mv` (grep for stale sibling files after a rename
+  pass); element-`this` d3 handlers → arrows via `d3_event.currentTarget` / `.each((_,i,nodes)=>…)`.
+- **Next:** Phase 4 (QA / issue editors) — **DONE**: all five families converted to TS classes and
+  renamed to `CamelCase.ts` (keepRight, osmose, note[+report], detection, maproulette[+menu]). Class
+  shape: public `datum`, bound `render($selection)`, `on('change')` via `d3_dispatch`+`utilRebind`;
+  the maproulette menu is owned by `UiSystem` (props `datum`/`anchorLoc`/`triggerType` + `close()`).
+  Updated `SelectMode.ts` branches, `UiSidebar.ts`/`UiSystem.ts` sites, `ui/index.js` barrel, and two
+  browser tests. Verified tsc/eslint/build clean, browser 133 / unit 3290 / 0 fail.
+- **Next up:** Phase 5 (panes & their sections + settings/*) — **DONE**: all 14 remaining `.js`
+  sections → `UiSectionX` classes extending `AbstractUiSection`; `pane` → `UiPane` base class + five
+  `UiPaneX` subclasses (UiMapPanes news them up); `settings/custom_*` → `UiSettingsCustom*` classes
+  (consumed by the BackgroundList/DataLayers sections). All barrels + `commit.js` wired. Verified
+  tsc/eslint/build clean, browser 133 / unit 3290 / 0 fail.
+- **Next:** Phase 6 (toolbar/controls/cards + many already-Level-3 root `Ui*` components → TS)
+  — **SKIPPED then DONE** (converted 2026-08-01 after Phase 7).
+- **Phase 7 (Rapid-specific & dialogs) — DONE + verified**: 5 already-class `UiRapid*` files JS→TS'd
+  (git mv only, zero consumer changes); 12 factory functions → classes (`UiSplash`/`UiRestore`/
+  `UiWhatsNew`/`UiRapidSplash`/`UiRapidFirstEditDialog`/`UiCommit`/`UiChangesetEditor`/
+  `UiCommitWarnings`/`UiSuccess`/`UiConflicts`/`UiEditMenu`/`UiRapidColorpicker`). Consumers wired:
+  `ui/index.js` barrel, `UiSystem.ts`, `SaveMode.ts`, `UiRapidDatasetToggle.ts`, `commit_warnings.test.js`.
+  Key insight: components handed to `Sidebar.show(fn)`/`$sel.call(fn)` must pass the bound `.render`.
+- **Phase 6 (toolbar/controls/cards/overmap + 24 root `Ui*`) — DONE + verified**: all 38 files were
+  already ES6 classes, so pure JS→TS (git mv + types, **zero consumer changes** — same class names,
+  bundler resolves `.js`→`.ts`, barrels unchanged). `cards/*` (5, `AbstractUiCard` → abstract),
+  `controls/*` (4), `tools/*` (5), and 24 root components (`UiMinimap`/`UiShortcuts`/`UiSpector`/
+  `UiOvermap`/`UiInfoCards`/`UiPhotoViewer`/`UiMap3dViewer`/`UiMapControls`/`UiMapPanes`/`UiMapToolbar`/
+  `UiMapFooter`/`UiAttribution`/`UiContributors`/`UiSourceSwitch`/`UiProjectLinks`/`UiVersionInfo`/
+  `UiViewOn`/`UiApiStatus`/`UiFilterStatus`/`UiValidatorStatus`/`UiAccount`/`UiScale`/`UiDefs`/
+  `UiFullscreen`). Added `modules/types/geojson-rewind.d.ts` ambient decl. Verified tsc/eslint/build
+  clean, browser 133 / unit 3290 / 0 fail.
+- **Next:** Phase 8 (intro/walkthrough) then Phase 9 (final barrel/cleanup).
+
 ## Settings System design (2026-07-07)
 
 - Added design doc: [.github/design/settings-system.md](../.github/design/settings-system.md)

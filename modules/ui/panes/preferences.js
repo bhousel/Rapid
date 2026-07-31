@@ -1,8 +1,8 @@
 import { uiPane } from '../pane.js';
-import { uiSectionPrivacy } from '../sections/privacy.js';
-//import { uiSectionColorSelection } from '../sections/color_selection.js';
-//import { uiSectionColorblindModeOptions } from '../sections/colorblind_mode_options.js';
-import { uiSectionMapInteractionOptions } from '../sections/map_interaction_options.js';
+import { UiSectionPrivacy } from '../sections/UiSectionPrivacy.js';
+//import { UiSectionColorSelection } from '../sections/UiSectionColorSelection.js';
+//import { UiSectionColorblindModeOptions } from '../sections/UiSectionColorblindModeOptions.js';
+import { UiSectionMapInteractionOptions } from '../sections/UiSectionMapInteractionOptions.js';
 
 
 export function uiPanePreferences(context) {
@@ -14,8 +14,8 @@ export function uiPanePreferences(context) {
     .description(l10n.t('preferences.description'))
     .iconName('fas-user-cog')
     .sections([
-      uiSectionPrivacy(context),
-      uiSectionMapInteractionOptions(context),
+      new UiSectionPrivacy(context),
+      new UiSectionMapInteractionOptions(context),
 //      uiSectionColorSelection(context),
 //      uiSectionColorblindModeOptions(context)
     ]);

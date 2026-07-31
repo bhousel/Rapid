@@ -3,9 +3,9 @@ import { select } from 'd3-selection';
 import { utilDetect } from '../util/detect.ts';
 import { vecAdd } from '@rapid-sdk/math';
 import {
-  UiApiStatus, UiDefs, uiEditMenu, uiFlash, UiFullscreen, uiIntro,
-  uiLoading, UiMapFooter, UiMapToolbar, uiMapRouletteMenu, UiOvermap,
-  uiSplash, uiRestore, UiShortcuts, UiSidebar, uiWhatsNew
+  UiApiStatus, UiDefs, UiEditMenu, UiFlash, UiFullscreen, uiIntro,
+  uiLoading, UiMapFooter, UiMapToolbar, UiMapRouletteMenu, UiOvermap,
+  UiSplash, UiRestore, UiShortcuts, UiSidebar, UiWhatsNew
 } from '../ui/index.js';
 
 import type { Context } from '../Context.ts';
@@ -154,9 +154,9 @@ export class UiSystem extends AbstractSystem {
         const loading = uiLoading(context) as any;
         this.AuthModal = loading.blocking(true).message(l10n.t('loading_auth'));
         this.Defs = new UiDefs(context);
-        this.EditMenu = uiEditMenu(context);
-        this.MapRouletteMenu = uiMapRouletteMenu(context);
-        this.Flash = uiFlash(context);
+        this.EditMenu = new UiEditMenu(context);
+        this.MapRouletteMenu = new UiMapRouletteMenu(context);
+        this.Flash = new UiFlash(context);
         this.Fullscreen = new UiFullscreen(context);
         this.MapFooter = new UiMapFooter(context);
         this.MapToolbar = new UiMapToolbar(context);
@@ -259,11 +259,11 @@ export class UiSystem extends AbstractSystem {
         if (startWalkthrough) {
           $container.call(uiIntro(context));     // Jump right into walkthrough..
         } else if (editor.canRestoreBackup) {
-          $container.call(uiRestore(context));   // Offer to restore backup edits..
+          new UiRestore(context).render($container);   // Offer to restore backup edits..
         } else if (sawPrivacyVersion !== context.privacyVersion) {
-          $container.call(uiSplash(context));    // Show "Welcome to Rapid" / Privacy Policy
+          new UiSplash(context).render($container);    // Show "Welcome to Rapid" / Privacy Policy
         } else if (sawWhatsNewVersion !== context.whatsNewVersion) {
-          $container.call(uiWhatsNew(context));  // Show "Whats New"
+          new UiWhatsNew(context).render($container);  // Show "Whats New"
         }
 
         this._started = true;
@@ -524,7 +524,7 @@ dims = vecAdd(dims, [overscan * 2, overscan * 2]);
 
     // render the menu
     const $overlay: D3Selection = select(gfx.overlay);
-    $overlay.call(this.EditMenu);
+    $overlay.call(this.EditMenu.render);
   }
 
 
@@ -546,7 +546,7 @@ dims = vecAdd(dims, [overscan * 2, overscan * 2]);
 
     if (operations.length && context.editable()) {
       this.EditMenu.operations(operations);
-      $overlay.call(this.EditMenu);   // redraw it
+      $overlay.call(this.EditMenu.render);   // redraw it
     } else {
       this.EditMenu.close();
     }
@@ -570,12 +570,11 @@ dims = vecAdd(dims, [overscan * 2, overscan * 2]);
     const gfx = context.systems.gfx!;
     const viewport = context.viewport;
 
-    this.MapRouletteMenu
-      .anchorLoc(viewport.unproject(anchorPoint))
-      .triggerType(triggerType);
+    this.MapRouletteMenu.anchorLoc = viewport.unproject(anchorPoint);
+    this.MapRouletteMenu.triggerType = triggerType;
 
-      const $overlay: D3Selection = select(gfx.overlay);
-    $overlay.call(this.MapRouletteMenu);
+    const $overlay: D3Selection = select(gfx.overlay);
+    $overlay.call(this.MapRouletteMenu.render);
     this._showsMapRouletteMenu = true;
   }
 

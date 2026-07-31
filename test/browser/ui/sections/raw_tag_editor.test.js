@@ -1,4 +1,4 @@
-describe('uiSectionRawTagEditor', () => {
+describe('UiSectionRawTagEditor', () => {
 
   const context = new Rapid.MockContext();
   const entity = new Rapid.OsmNode(context, { id: 'n-1' });
@@ -29,7 +29,7 @@ describe('uiSectionRawTagEditor', () => {
   }
 
   function render(tags) {
-    rawTagEditor = Rapid.uiSectionRawTagEditor(context, 'raw-tag-editor')
+    rawTagEditor = new Rapid.UiSectionRawTagEditor(context, 'raw-tag-editor')
       .entityIDs([ entity.id ])
       .presets([ { isFallback: () => false } ])
       .tags(tags);

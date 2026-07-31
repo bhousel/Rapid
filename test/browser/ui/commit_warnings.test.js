@@ -26,7 +26,7 @@ describe('uiCommitWarnings', () => {
   it('renders validation messages as text', () => {
     const selection = d3.select(document.createElement('div'));
 
-    selection.call(Rapid.uiCommitWarnings(context));
+    selection.call(new Rapid.UiCommitWarnings(context).render);
 
     assert.strictEqual(selection.select('.issue-message').text(), message);
     assert.strictEqual(selection.selectAll('.issue-message img').size(), 0);

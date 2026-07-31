@@ -1,9 +1,9 @@
 import { uiPane } from '../pane.js';
-import { uiSectionBackgroundDisplayOptions } from '../sections/background_display_options.js';
-import { uiSectionBackgroundList } from '../sections/background_list.js';
-import { uiSectionBackgroundOffset } from '../sections/background_offset.js';
-import { uiSectionGridDisplayOptions } from '../sections/grid_display_options.js';
-import { uiSectionOverlayList } from '../sections/overlay_list.js';
+import { UiSectionBackgroundDisplayOptions } from '../sections/UiSectionBackgroundDisplayOptions.js';
+import { UiSectionBackgroundList } from '../sections/UiSectionBackgroundList.js';
+import { UiSectionBackgroundOffset } from '../sections/UiSectionBackgroundOffset.js';
+import { UiSectionGridDisplayOptions } from '../sections/UiSectionGridDisplayOptions.js';
+import { UiSectionOverlayList } from '../sections/UiSectionOverlayList.js';
 // import { uiSectionReactContainer } from '../sections/react_container.jsx';
 
 
@@ -16,11 +16,11 @@ export function uiPaneBackground(context) {
     .description(l10n.t('background.description'))
     .iconName('rapid-icon-layers')
     .sections([
-      uiSectionBackgroundList(context),
+      new UiSectionBackgroundList(context),
       // uiSectionReactContainer(context),
-      uiSectionOverlayList(context),
-      uiSectionGridDisplayOptions(context),
-      uiSectionBackgroundDisplayOptions(context),
-      uiSectionBackgroundOffset(context)
+      new UiSectionOverlayList(context),
+      new UiSectionGridDisplayOptions(context),
+      new UiSectionBackgroundDisplayOptions(context),
+      new UiSectionBackgroundOffset(context)
     ]);
 }

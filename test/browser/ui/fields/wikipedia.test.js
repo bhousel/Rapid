@@ -1,4 +1,4 @@
-describe('uiFieldWikipedia', () => {
+describe('UiFieldWikipedia', () => {
 
   const context = new Rapid.MockContext();
   let entity, base, graph, selection, field, uifield;
@@ -81,10 +81,10 @@ describe('uiFieldWikipedia', () => {
 
 
   it('recognizes lang:title format', () => {
-    const wikipedia = Rapid.uiFieldWikipedia(context, uifield);
+    const wikipedia = new Rapid.UiFieldWikipedia(context, uifield);
     return delay(1)  // async, so data will be available
       .then(() => {
-        selection.call(wikipedia);
+        selection.call(wikipedia.render);
         wikipedia.tags({ wikipedia: 'en:Title' });
 
         assert.strictEqual(Rapid.utilGetSetValue(selection.selectAll('.wiki-lang')), 'English');
@@ -94,11 +94,11 @@ describe('uiFieldWikipedia', () => {
 
 
   it('sets language, value', () => {
-    const wikipedia = Rapid.uiFieldWikipedia(context, uifield).entityIDs([entity.id]);
+    const wikipedia = new Rapid.UiFieldWikipedia(context, uifield).entityIDs([entity.id]);
     return delay(1)  // async, so data will be available
       .then(() => {
         wikipedia.on('change', changeTags);
-        selection.call(wikipedia);
+        selection.call(wikipedia.render);
 
         const spy = (...args) => spy.mock.calls.push(args);
         spy.mock = { calls: [] };
@@ -127,11 +127,11 @@ describe('uiFieldWikipedia', () => {
 
 
   it('recognizes pasted URLs', () => {
-    const wikipedia = Rapid.uiFieldWikipedia(context, uifield).entityIDs([entity.id]);
+    const wikipedia = new Rapid.UiFieldWikipedia(context, uifield).entityIDs([entity.id]);
     return delay(1)  // async, so data will be available
       .then(() => {
         wikipedia.on('change', changeTags);
-        selection.call(wikipedia);
+        selection.call(wikipedia.render);
 
         Rapid.utilGetSetValue(selection.selectAll('.wiki-title'), 'http://de.wikipedia.org/wiki/Title');
 
@@ -146,13 +146,13 @@ describe('uiFieldWikipedia', () => {
 
   describe('encodePath', () => {
     it('returns an encoded URI component that contains the title with spaces replaced by underscores', done => {
-      const wikipedia = Rapid.uiFieldWikipedia(context, uifield).entityIDs([entity.id]);
+      const wikipedia = new Rapid.UiFieldWikipedia(context, uifield).entityIDs([entity.id]);
       assert.strictEqual(wikipedia.encodePath('? (film)', undefined), '%3F_(film)');
       done();
     });
 
     it('returns an encoded URI component that includes an anchor fragment', done => {
-      const wikipedia = Rapid.uiFieldWikipedia(context, uifield).entityIDs([entity.id]);
+      const wikipedia = new Rapid.UiFieldWikipedia(context, uifield).entityIDs([entity.id]);
       // this can be tested manually by entering '? (film)#Themes and style in the search box before focusing out'
       assert.strictEqual(wikipedia.encodePath('? (film)', 'Themes and style'), '%3F_(film)#Themes_and_style');
       done();
@@ -162,26 +162,26 @@ describe('uiFieldWikipedia', () => {
 
   describe('encodeURIAnchorFragment', () => {
     it('returns an encoded URI anchor fragment', done => {
-      const wikipedia = Rapid.uiFieldWikipedia(context, uifield).entityIDs([entity.id]);
+      const wikipedia = new Rapid.UiFieldWikipedia(context, uifield).entityIDs([entity.id]);
       // this can be similarly tested by entering 'Section#Arts, entertainment and media' in the search box before focusing out'
       assert.strictEqual(wikipedia.encodeURIAnchorFragment('Theme?'), '#Theme%3F');
       done();
     });
 
     it('replaces all whitespace characters with underscore', done => {
-      const wikipedia = Rapid.uiFieldWikipedia(context, uifield).entityIDs([entity.id]);
+      const wikipedia = new Rapid.UiFieldWikipedia(context, uifield).entityIDs([entity.id]);
       assert.strictEqual(wikipedia.encodeURIAnchorFragment('Themes And Styles'), '#Themes_And_Styles');
       done();
     });
 
     it('encodes % characters, does not replace them with a dot', done => {
-      const wikipedia = Rapid.uiFieldWikipedia(context, uifield).entityIDs([entity.id]);
+      const wikipedia = new Rapid.UiFieldWikipedia(context, uifield).entityIDs([entity.id]);
       assert.strictEqual(wikipedia.encodeURIAnchorFragment('Is%this_100% correct'), '#Is%25this_100%25_correct');
       done();
     });
 
     it('encodes characters that are URI encoded characters', done => {
-      const wikipedia = Rapid.uiFieldWikipedia(context, uifield).entityIDs([entity.id]);
+      const wikipedia = new Rapid.UiFieldWikipedia(context, uifield).entityIDs([entity.id]);
       assert.strictEqual(wikipedia.encodeURIAnchorFragment('Section %20%25'), '#Section_%2520%2525');
       done();
     });
@@ -189,16 +189,16 @@ describe('uiFieldWikipedia', () => {
 
 
   it('defaults to previously-used language', () => {
-    const wikipedia1 = Rapid.uiFieldWikipedia(context, uifield);
-    const wikipedia2 = Rapid.uiFieldWikipedia(context, uifield);
+    const wikipedia1 = new Rapid.UiFieldWikipedia(context, uifield);
+    const wikipedia2 = new Rapid.UiFieldWikipedia(context, uifield);
 
     return delay(1)  // async, so data will be available
       .then(() => {
-        selection.call(wikipedia1);
+        selection.call(wikipedia1.render);
         Rapid.utilGetSetValue(selection.selectAll('.wiki-lang'), 'Deutsch');
       })
       .then(() => {
-        selection.call(wikipedia2);
+        selection.call(wikipedia2.render);
         wikipedia2.tags({});
         assert.strictEqual(Rapid.utilGetSetValue(selection.selectAll('.wiki-lang')), 'Deutsch');
       });
@@ -206,10 +206,10 @@ describe('uiFieldWikipedia', () => {
 
 
   it.skip('does not set delayed wikidata tag if graph has changed', done => {
-    const wikipedia = Rapid.uiFieldWikipedia(context, uifield).entityIDs([entity.id]);
+    const wikipedia = new Rapid.UiFieldWikipedia(context, uifield).entityIDs([entity.id]);
     const editor = context.systems.editor;
     wikipedia.on('change', changeTags);
-    selection.call(wikipedia);
+    selection.call(wikipedia.render);
 
     const spy = (...args) => spy.mock.calls.push(args);
     spy.mock = { calls: [] };

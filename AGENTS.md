@@ -66,15 +66,18 @@ This project has reusable Copilot prompt files in `.github/prompts/`. Your edito
 - Use ES module syntax (`import`/`export`)
 - Prefer `??` (nullish coalescing) over `||` for defaults
 - Use `?.` (optional chaining) for safe property access
+- Use optional chaining for **optional callback/function calls** too, e.g. `callback?.apply(this)` or `fn?.(args)`, instead of `if (callback) callback.apply(this)`
 - **No trailing whitespace** - ensure lines don't end with spaces or tabs
 
 ### Function Structure and Dependencies
 - **Group system/service access at the top of functions** - this makes it easy to scan what a function depends on and understand coupling
+- **List the captured dependencies in alphabetical order** - a predictable order lets a reader scan the coupling at a glance
 - Separate dependency access from logic with a blank line
+- **Capture a system in a local variable before using it - even optional ones.** Don't reach into `context.systems.foo` inline in the middle of a function body (e.g. `context.systems.scheduler?.debounce(...)`). Hoist it to a named `const` at the top with the other dependencies so every system the function touches is visible in one place.
 - Example:
   ```typescript
   enter(options: SomeOptions = {}): boolean {
-    // Dependencies first
+    // Dependencies first, alphabetical
     const context = this.context;
     const editor = context.systems.editor!;
     const filters = context.systems.filters!;
@@ -90,11 +93,23 @@ This project has reusable Copilot prompt files in `.github/prompts/`. Your edito
 
 ### Optional Systems
 - Some systems are optional and may not exist in all deployment contexts
+- Capture them at the top of the function like any other dependency (no inline `context.systems.x?.…`), then branch on presence
 - Use optional chaining (`?.`) for systems that might not be present:
   - `locations` - LocationManager may not be configured
   - `ui` - UiSystem won't exist in a future CLI build
   - `scheduler` - SchedulerSystem may not be initialized in tests or CLI
 - Example: `if (loc && locations?.isBlockedAt(loc)) continue;`
+- **Provide a fallback so the work still happens when an optional system is absent.** An optional system usually improves *how* something is done (debouncing, deferring, animating), not *whether* it happens. Don't let its absence silently skip the work - prefer an explicit branch over bare optional chaining when skipping would be wrong:
+  ```typescript
+  const scheduler = context.systems.scheduler;  // optional
+
+  // scheduler debounces the redraw; without it, just redraw immediately
+  if (scheduler) {
+    scheduler.debounce('MyCard-render', () => this.rerender(), { ms: 250 });
+  } else {
+    this.rerender();
+  }
+  ```
 - This keeps code working even when optional systems are absent
 
 ### System Ownership of Runtime State
@@ -190,6 +205,7 @@ export class Category {
   - ❌ `@param {string} name` → ✅ `@param name` with TypeScript parameter type
   - ❌ `@return {number}` → ✅ `@return` with TypeScript return type
   - ❌ `@type {Array<string>}` → ✅ TypeScript type annotation
+- **Document every parameter.** If a method has parameters, its JSDoc must include a matching `@param name - description` for each one (e.g. a `render($selection)` needs `@param $selection - …`). Never include a `{type}` — the signature carries it.
 - **Use `@throws` for methods that throw exceptions** - document what conditions cause throws
   - Format: `@throws Error description of when/why it throws`
   - No curly braces around the type (consistent with other JSDoc in TypeScript)
@@ -465,9 +481,11 @@ import type { OsmNode, OsmWay } from '../core/index.ts';
 - Import directly from `'d3-selection'`, not from `types.ts`
 - The module augmentation makes D3 callbacks accept `any` datum type to reduce friction
 - These types are intentionally loose — they improve code clarity and are more self-documenting than `as any` casts or unwieldy built-in d3 generic types
+- **Callback type aliases** (`D3CallbackBoolean`, `D3CallbackValue`, `D3CallbackVoid`, from `global.d.ts`) describe the standard d3 `(datum, index, groups) => …` shape. Use them anywhere a variable/parameter is *typed* as a d3 callback, instead of spelling out `(datum: any, index: number, groups: any) => …`. (Inline lambdas passed straight to `.attr`/`.each`/etc. don't need them — d3's permissive types already cover those.)
 - **Naming conventions**:
   - Prefix variables holding a selection with `$`, e.g., `$parent`, `$child`
   - Prefix variables holding an _enter_ selection with `$$`, e.g., `$$items`
+  - **This applies to function parameters/arguments too**, not just local variables. A parameter that receives a `D3Selection` should be named `$selection`, `$parent`, etc. — e.g. `function render($parent: D3Selection)`, not `function render(parent: D3Selection)`.
 - **When editing or reviewing TypeScript files**, look for `$`-prefixed variables without a type annotation and add `D3Selection`. Look for `$$`-prefixed variables and add `D3EnterSelection`.
 - Where `merge()` is used to combine a selection with an enter selection, type the result as `D3Selection` (no need for `as any`):
   ```typescript
@@ -482,6 +500,11 @@ import type { OsmNode, OsmWay } from '../core/index.ts';
     let $$child: D3EnterSelection = $child.enter().append('div');
   }
   ```
+
+### Relocalization (d3 render)
+- **Set localized strings on the UPDATE (merged) selection, never on an enter-only (`$$`) selection.** Enter runs once; anything set there won't re-localize when the user changes language.
+- `.text(...)`, `.html(...)`, and `.attr('title' | 'placeholder' | 'aria-label' | 'alt', …)` derived from `l10n.t(...)` / `l10n.tHtml(...)` belong on `$foo` **after** `.merge($$foo)`. Enter (`$$`) is for structure only — `.append(...)`, static `.attr('class', …)`, static `.on(...)`.
+- For the full UI component checklist (render `$parent` capture, optional-system fallbacks, `@param` coverage, relocalization), see [`.github/instructions/ui-components.instructions.md`](.github/instructions/ui-components.instructions.md) — it is auto-applied to `modules/ui/**`.
 
 ### GeoJSON Types
 - **`@types/geojson`** is installed as a dev dependency and exposes a global `GeoJSON` namespace via UMD declaration
@@ -526,7 +549,7 @@ Track TypeScript conversion progress here:
 | `modules/geo/` | ✅ Complete | All files converted |
 | `modules/operations/` | ❌ Not started | |
 | `modules/services/` | ✅ Complete | All files converted |
-| `modules/ui/` | ❌ Not started | |
+| `modules/ui/` | 🚧 In progress | Phases 1–7 done (primitives, fields, sidebar/inspector, QA editors, panes, toolbar/controls/cards, Rapid-specific/dialogs) as TS classes; see `.github/design/ui-system.md` progress log. Phases 8–9 (intro/walkthrough, barrels/cleanup) remain. |
 | `modules/validators/` | ✅ Complete | All files converted |
 
 ## Testing

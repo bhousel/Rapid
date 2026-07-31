@@ -82,18 +82,20 @@ export class KeyOperationBehavior extends AbstractBehavior {
     const disabled = operation.disabled();
 
     if (disabled) {
-      ui.Flash
-        .duration(4000)
-        .iconName(`#rapid-operation-${operation.id}`)
-        .iconClass('operation disabled')
-        .label(operation.tooltip)();
+      ui.Flash.show({
+        duration: 4000,
+        iconName: `#rapid-operation-${operation.id}`,
+        iconClass: 'operation disabled',
+        label: operation.tooltip
+      });
 
     } else {
-      ui.Flash
-        .duration(2000)
-        .iconName(`#rapid-operation-${operation.id}`)
-        .iconClass('operation')
-        .label(operation.annotation() || operation.title)();
+      ui.Flash.show({
+        duration: 2000,
+        iconName: `#rapid-operation-${operation.id}`,
+        iconClass: 'operation',
+        label: operation.annotation() || operation.title
+      });
 
       if (operation.point) {
         operation.point(null);  // copy-paste detail 😕

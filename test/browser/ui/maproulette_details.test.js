@@ -1,4 +1,4 @@
-describe('uiMapRouletteDetails', () => {
+describe('UiMapRouletteDetails', () => {
 
   const context = new Rapid.MockContext();
   const marker = { id: '1', key: 'maproulette-1' };
@@ -27,7 +27,9 @@ describe('uiMapRouletteDetails', () => {
   it('sanitizes challenge descriptions and instructions', async () => {
     const selection = d3.select(document.createElement('div'));
 
-    selection.call(Rapid.uiMapRouletteDetails(context).task(marker));
+    const details = new Rapid.UiMapRouletteDetails(context);
+    details.datum = marker;
+    selection.call(details.render);
     await new Promise(resolve => { setTimeout(resolve, 0); });
 
     assert.strictEqual(selection.selectAll('script').size(), 0);

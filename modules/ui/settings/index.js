@@ -1,2 +1,2 @@
-export { uiSettingsCustomBackground } from './custom_background.js';
-export { uiSettingsCustomData } from './custom_data.js';
+export { UiSettingsCustomBackground } from './UiSettingsCustomBackground.js';
+export { UiSettingsCustomData } from './UiSettingsCustomData.js';

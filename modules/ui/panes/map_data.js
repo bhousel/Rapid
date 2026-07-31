@@ -1,9 +1,9 @@
 import { uiPane } from '../pane.js';
 
-import { uiSectionDataLayers } from '../sections/data_layers.js';
-import { uiSectionMapFeatures } from '../sections/map_features.js';
-import { uiSectionMapStyleOptions } from '../sections/map_style_options.js';
-import { uiSectionPhotoOverlays } from '../sections/photo_overlays.js';
+import { UiSectionDataLayers } from '../sections/UiSectionDataLayers.js';
+import { UiSectionMapFeatures } from '../sections/UiSectionMapFeatures.js';
+import { UiSectionMapStyleOptions } from '../sections/UiSectionMapStyleOptions.js';
+import { UiSectionPhotoOverlays } from '../sections/UiSectionPhotoOverlays.js';
 
 
 export function uiPaneMapData(context) {
@@ -15,9 +15,9 @@ export function uiPaneMapData(context) {
     .description(l10n.t('map_data.description'))
     .iconName('rapid-icon-data')
     .sections([
-      uiSectionDataLayers(context),
-      uiSectionPhotoOverlays(context),
-      uiSectionMapStyleOptions(context),
-      uiSectionMapFeatures(context)
+      new UiSectionDataLayers(context),
+      new UiSectionPhotoOverlays(context),
+      new UiSectionMapStyleOptions(context),
+      new UiSectionMapFeatures(context)
     ]);
 }

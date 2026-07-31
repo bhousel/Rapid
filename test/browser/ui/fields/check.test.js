@@ -1,4 +1,4 @@
-describe('uiFieldCheck', () => {
+describe('UiFieldCheck', () => {
 
   const context = new Rapid.MockContext();
   let selection, field, uifield;
@@ -34,10 +34,10 @@ describe('uiFieldCheck', () => {
 
 
   it('renders an unknown tag value as text', () => {
-    const check = Rapid.uiFieldCheck(context, uifield);
+    const check = new Rapid.UiFieldCheck(context, uifield);
     const value = '<img src="x" onerror="alert(1)">';
 
-    selection.call(check);
+    selection.call(check.render);
     check.tags({ test: value });
 
     assert.strictEqual(selection.select('.value').text(), `\"${value}\"`);

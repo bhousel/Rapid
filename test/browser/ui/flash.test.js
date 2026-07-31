@@ -24,7 +24,7 @@ describe('uiFlash', () => {
 
 
   it('flash is shown', () => {
-    Rapid.uiFlash(context).duration(10)();
+    new Rapid.UiFlash(context).show({ duration: 10 });
     const flashWrap = d3.selectAll('.flash-wrap');
     const footerWrap = d3.selectAll('.map-footer-wrap');
     assert.isTrue(flashWrap.classed('map-footer-show'));
@@ -32,15 +32,16 @@ describe('uiFlash', () => {
   });
 
   it('sanitizes the label', () => {
-    Rapid.uiFlash(context)
-      .label('<script>alert(1)</script><img src="x" onerror="alert(2)">')();
+    new Rapid.UiFlash(context).show({
+      label: '<script>alert(1)</script><img src="x" onerror="alert(2)">'
+    });
 
     assert.strictEqual(container.selectAll('.flash-text script').size(), 0);
     assert.strictEqual(container.selectAll('.flash-text [onerror]').size(), 0);
   });
 
   it('flash goes away', () => {
-    Rapid.uiFlash(context).duration(10)();
+    new Rapid.UiFlash(context).show({ duration: 10 });
     return delay(20)
       .then(() => {
         d3.timerFlush();
