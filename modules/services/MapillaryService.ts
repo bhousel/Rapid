@@ -1,6 +1,6 @@
 import { AbstractSystem } from '../core/AbstractSystem.ts';
 import { select as d3_select } from 'd3-selection';
-import Protobuf from 'pbf';
+import { PbfReader } from 'pbf';
 import { MarkerData, GeoJSONData } from '../data/index.ts';
 import { Tiler, geoSphericalDistance } from '@rapid-sdk/math';
 import { VectorTile } from '@mapbox/vector-tile';
@@ -1400,7 +1400,7 @@ export class MapillaryService extends AbstractSystem {
       for (let i = 0; i < decodedGeometry.length; i++) {
         arr[i] = decodedGeometry.charCodeAt(i);
       }
-      const tile = new VectorTile(new Protobuf(arr.buffer));
+      const tile = new VectorTile(new PbfReader(arr.buffer));
       const layer = tile.layers['mpy-or'];
       const geometries = layer.feature(0).loadGeometry();
       const polygon = geometries

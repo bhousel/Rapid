@@ -1,5 +1,5 @@
 import { VectorTile } from '@mapbox/vector-tile';
-import Protobuf from 'pbf';
+import { PbfReader } from 'pbf';
 
 import { OsmJSONParser, OsmXMLParser } from '../data/parsers/index.ts';
 import { fetchEnvelope, utilFetchResponse } from '../util/fetch_response.ts';
@@ -54,7 +54,7 @@ export interface MVTFeatureResult {
 function decodeMVT(buffer: ArrayBuffer | null, x: number, y: number, z: number): MVTFeatureResult[] {
   if (!buffer) return [];
 
-  const vt = new VectorTile(new Protobuf(buffer));
+  const vt = new VectorTile(new PbfReader(buffer));
   const results: MVTFeatureResult[] = [];
 
   for (const [layerID, vtLayer] of Object.entries(vt.layers)) {

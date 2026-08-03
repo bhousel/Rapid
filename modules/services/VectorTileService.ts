@@ -3,7 +3,7 @@ import { AbstractSystem } from '../core/AbstractSystem.ts';
 import { Extent, Tiler, projWorldToWgs84, vecEqual, WORLD_SIZE } from '@rapid-sdk/math';
 import { GeoJSONData } from '../data/GeoJSONData.ts';
 import { PMTiles } from 'pmtiles';
-import Protobuf from 'pbf';
+import { PbfReader } from 'pbf';
 import { utilArrayGroupBy, utilHashcode } from '@rapid-sdk/util';
 import { VectorTile } from '@mapbox/vector-tile';
 
@@ -373,7 +373,7 @@ export class VectorTileService extends AbstractSystem {
     if (!buffer) return;  // 'no data' is ok
 
     const [x, y, z] = tile.xyz;
-    const vt = new VectorTile(new Protobuf(buffer));
+    const vt = new VectorTile(new PbfReader(buffer));
     const results: MVTFeatureResult[] = [];
 
     for (const [layerID, vtLayer] of Object.entries(vt.layers)) {
