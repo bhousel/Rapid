@@ -8,8 +8,8 @@ import type { D3Selection } from 'd3-selection';
 import type { UiPopover } from './popover.js';
 
 
-/** A functor: either a value, or a function returning that value. */
-type Functor<T> = () => T;
+/** A functor: either a value, or a function that optionally accepts the bound datum. */
+type Functor<T> = (datum?: any) => T;
 
 
 /** A tooltip control: a popover with title, heading, and shortcut text. */
@@ -60,9 +60,10 @@ export function uiTooltip(context: Context): UiTooltip {
 
 
   tooltip.content(function(this: any) {
-    const heading = _heading();
-    const text = _title();
-    const shortcut = _shortcut();
+    const datum = d3_select(this).datum();
+    const heading = _heading(datum);
+    const text = _title(datum);
+    const shortcut = _shortcut(datum);
 
     return function($selection: D3Selection): void {
       const $headingWrap: D3Selection = $selection
