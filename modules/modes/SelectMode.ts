@@ -119,63 +119,64 @@ export class SelectMode extends AbstractMode {
     Sidebar?.reset();
  // The update handlers feel like they should live with the sidebar content components, not here
     let sidebarContent: any = null;
+
     // Selected a note...
     if (datum instanceof MarkerData && datum.serviceID === 'osm' && datum.type === 'note') {
       const noteEditor = new UiNoteEditor(context);
       noteEditor.datum = datum;
       noteEditor.on('change', () => {
-          gfx?.immediateRedraw();  // force a redraw (there is no history change that would otherwise do this)
-          const osm = context.services.osm as any;
-          const note = osm?.getNote(datumID);
-          if (!(note instanceof MarkerData)) return;  // or - go to browse mode
-          noteEditor.datum = note;
-          Sidebar?.show(noteEditor.render);
-          this._selectedData.set(datumID, note);  // update selectedData after a change happens?
-        });
+        gfx?.immediateRedraw();  // force a redraw (there is no history change that would otherwise do this)
+        const osm = context.services.osm;
+        const d = osm?.getNote(datumID);   // marker may contain stale data - get latest
+        if (!(d instanceof MarkerData)) return;  // or - go to browse mode
+        noteEditor.datum = d;
+        Sidebar?.show(noteEditor.render);
+        this._selectedData.set(datumID, d);  // update selectedData after a change happens?
+      });
       sidebarContent = noteEditor.render;
 
     } else if (datum instanceof MarkerData && datum.serviceID === 'keepright') {
       const keepRightEditor = new UiKeepRightEditor(context);
       keepRightEditor.datum = datum;
       keepRightEditor.on('change', () => {
-          gfx?.immediateRedraw();  // force a redraw (there is no history change that would otherwise do this)
-          const keepright = context.services.keepright as any;
-          const error = keepright?.getError(datumID);
-          if (!(error instanceof MarkerData)) return;  // or - go to browse mode?
-          keepRightEditor.datum = error;
-          Sidebar?.show(keepRightEditor.render);
-          this._selectedData.set(datumID, error);  // update selectedData after a change happens?
-        });
+        gfx?.immediateRedraw();  // force a redraw (there is no history change that would otherwise do this)
+        const keepright = context.services.keepright;
+        const d = keepright?.getError(datumID);  // marker may contain stale data - get latest
+        if (!(d instanceof MarkerData)) return;  // or - go to browse mode?
+        keepRightEditor.datum = d;
+        Sidebar?.show(keepRightEditor.render);
+        this._selectedData.set(datumID, d);  // update selectedData after a change happens?
+      });
       sidebarContent = keepRightEditor.render;
 
     } else if (datum instanceof MarkerData && datum.serviceID === 'osmose') {
       const osmoseEditor = new UiOsmoseEditor(context);
       osmoseEditor.datum = datum;
       osmoseEditor.on('change', () => {
-          gfx?.immediateRedraw();  // force a redraw (there is no history change that would otherwise do this)
-          const osmose = context.services.osmose as any;
-          const error = osmose?.getError(datumID);
-          if (!(error instanceof MarkerData)) return;  // or - go to browse mode?
-          osmoseEditor.datum = error;
-          Sidebar?.show(osmoseEditor.render);
-          this._selectedData.set(datumID, error);  // update selectedData after a change happens?
-        });
+        gfx?.immediateRedraw();  // force a redraw (there is no history change that would otherwise do this)
+        const osmose = context.services.osmose;
+        const d = osmose?.getError(datumID);     // marker may contain stale data - get latest
+        if (!(d instanceof MarkerData)) return;  // or - go to browse mode?
+        osmoseEditor.datum = d;
+        Sidebar?.show(osmoseEditor.render);
+        this._selectedData.set(datumID, d);  // update selectedData after a change happens?
+      });
       sidebarContent = osmoseEditor.render;
 
     } else if (datum instanceof MarkerData && datum.serviceID === 'maproulette') {
       const maprouletteEditor = new UiMapRouletteEditor(context);
       maprouletteEditor.datum = datum;
-      const menu = (ui as any)?.MapRouletteMenu;
+      const menu = ui?.MapRouletteMenu;
       if (menu) menu.datum = datum;
       maprouletteEditor.on('change', () => {
-          gfx?.immediateRedraw();  // force a redraw (there is no history change that would otherwise do this)
-          const maproulette = context.services.maproulette as any;
-          const error = maproulette?.getError(datumID);
-          if (!(error instanceof MarkerData)) return;  // or - go to browse mode?
-          maprouletteEditor.datum = error;
-          Sidebar?.show(maprouletteEditor.render);
-          this._selectedData.set(datumID, error);  // update selectedData after a change happens?
-        });
+        gfx?.immediateRedraw();  // force a redraw (there is no history change that would otherwise do this)
+        const maproulette = context.services.maproulette;
+        const d = maproulette?.getTask(datumID);  // marker may contain stale data - get latest
+        if (!(d instanceof MarkerData)) return;   // or - go to browse mode?
+        maprouletteEditor.datum = d;
+        Sidebar?.show(maprouletteEditor.render);
+        this._selectedData.set(datumID, d);  // update selectedData after a change happens?
+      });
       sidebarContent = maprouletteEditor.render;
 
     } else if (datum instanceof MarkerData && datum.type === 'detection') {

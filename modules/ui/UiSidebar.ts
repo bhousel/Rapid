@@ -341,9 +341,9 @@ export class UiSidebar {
       this.show(this.OsmoseEditor.render);
 
     } else if (datum instanceof MarkerData && datum.serviceID === 'maproulette') {
-      const service: any = context.services.maproulette;
+      const service = context.services.maproulette;
       if (service) {
-        datum = service.getError(datum.id);  // marker may contain stale data - get latest
+        datum = service.getTask(datum.id);  // marker may contain stale data - get latest
       }
       this.MapRouletteMenu.datum = datum;
       this.MapRouletteEditor.datum = datum;
