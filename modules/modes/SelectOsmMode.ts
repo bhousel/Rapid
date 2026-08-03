@@ -320,7 +320,7 @@ export class SelectOsmMode extends AbstractMode {
       e.preventDefault();
 
       const MOVE_AMOUNT = 3;   // in pixels
-      let delta: [number, number] | undefined;
+      let delta: Vec2 | undefined;
       if (e.key === 'ArrowLeft') {
         delta = [-MOVE_AMOUNT, 0];
       } else if (e.key === 'ArrowRight') {
@@ -338,7 +338,7 @@ export class SelectOsmMode extends AbstractMode {
         }
         // Pixel delta -> world delta.  The scale factor is `2^z`.
         const k = Math.pow(2, t.z);
-        const worldDelta: [number, number] = vecScale(delta, 1 / k) as [number, number];
+        const worldDelta = vecScale(delta, 1 / k);
         operation = Operations.operationMove(context, selectedIDs);
         action = actionMove(selectedIDs, worldDelta);
       }
@@ -353,7 +353,7 @@ export class SelectOsmMode extends AbstractMode {
           duration: 4000,
           iconName: `#rapid-operation-${operation.id}`,
           iconClass: 'operation disabled',
-          label: operation.tooltip
+          label: operation.tooltip()
         });
 
         return;

@@ -86,7 +86,7 @@ export class KeyOperationBehavior extends AbstractBehavior {
         duration: 4000,
         iconName: `#rapid-operation-${operation.id}`,
         iconClass: 'operation disabled',
-        label: operation.tooltip
+        label: operation.tooltip()
       });
 
     } else {
