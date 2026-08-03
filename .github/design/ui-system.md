@@ -323,9 +323,51 @@ Order matters within the phase:
   `changeset_editor`, `edit_menu`.
 
 ### Phase 8 — Intro / walkthrough (large, self-contained)
-- `intro/helper`, `intro/welcome`, `intro/navigation`, `intro/point`, `intro/area`, `intro/line`,
-  `intro/building`, `intro/rapid`, `intro/start_editing`, `intro/intro`. (`UiCurtain` already class.)
-- Convert `helper.js` first (shared utilities), then chapters, then `intro.js` orchestrator.
+
+The walkthrough is architecturally unlike the rest of `modules/ui/`: the chapters are **stateful
+controllers / promise-based step state machines**, not idempotent `render($parent)` components. They're
+also long-standing pain points — brittle, and people have wanted to add chapters or make parts
+optional/extendable. So Phase 8 deliberately **departs from the normal D3-component conventions** and
+adds structure to make the chapters uniform and extensible.
+
+**Approach: class + shared base, and convert Promises → async/await.**
+
+1. **`helper.ts`** (convert first) — the shared utilities (`icon`, `helpHtml`, `localize`,
+   `isMostlySquare`, `transitionTime`, `delayAsync`, `eventCancel`) stay **typed functions** (like the
+   other kept primitives). `icon`/`helpHtml` are already imported by 6 converted TS files, so the
+   bundler resolves their `./intro/helper.js` imports to `.ts` with no edits.
+2. **`UiCurtain.ts`** — straight JS→TS (already a class in the canonical shape).
+3. **`AbstractIntroChapter.ts`** (new base class) — encapsulates the machinery every chapter duplicates:
+   - public `title` (l10n id), `on('done')` via `d3_dispatch` + `utilRebind`, and `enter()`/`exit()`/
+     `restart()` lifecycle.
+   - an async **step runner** `_runAsync(step)` (a `while` loop: run step → await → advance to the
+     returned next step; on cancel return; on error log + retry the same step — preserving current
+     semantics but readable).
+   - the four **event-wait hooks** the chapters use — `_onModeChange` (context `modechange`),
+     `_onStableChange` / `_onStagingChange` (editor), `_onMapMove` (map `move`) — wired once as listener
+     proxies in `enter()` and torn down in `finally`. A chapter simply sets the hooks it needs
+     (`this._onModeChange = () => resolve(this._nextStep)`); unused hooks stay null.
+   - `_cancelled` / `_rejectStep` state so `exit()` can bail out of the in-flight awaited step.
+4. **8 chapter classes** `UiIntroWelcome`/`Navigation`/`Point`/`Area`/`Line`/`Building`/`Rapid`/
+   `StartEditing` extending the base (git mv → CamelCase.ts). Closure state → protected fields; each
+   `*Async()` step becomes a `protected async _stepAsync(): Promise<IntroStep>` method that `await`s the
+   sequential parts and `return await new Promise(...)` for the user-action wait. The `_runAsync` runner
+   invokes steps with `.call(this)`, so steps return bare method references. Chapters have no
+   interdependencies (only import `helper`), so they're parallelizable.
+5. **`UiIntro.ts`** — orchestrator → class. Chapter registry becomes a map of constructors
+   (`new UiIntroX(context, curtain)`); keeps the pause/resume, save/restore, nav-bar, and
+   enter/finish logic. Preserve the `skipToRapid` option (used by `UiRapidSplash`). Entry method
+   `start($parent, { skipToRapid })` (or bound `render`); wire the 5 consumers: `UiSystem`, `UiSplash`,
+   `UiRapidSplash`, `UiPaneHelp`, `ui/index.js` barrel.
+
+**Conventions intentionally NOT applied here** (documented departures): no `render($parent)` capture
+(chapters use `enter()`/`exit()`); relocalization-on-update N/A (one-shot walkthrough that fully
+restarts); typing is intentionally loose (`any`) across the many cross-system touchpoints
+(`curtain.reveal` options, editor diffs, entity graphs).
+
+**Verification risk:** there is **no automated test coverage** for the walkthrough (it's interactive).
+Verification is tsc/eslint/build **plus a manual browser smoke-test** of the walkthrough (Help pane →
+Start the Tutorial, and the Rapid-splash "skip to Rapid" path).
 
 ### Phase 9 — Barrels & cleanup
 - Convert all `index.js` → `index.ts`, update `ui/index.js` → `ui/index.ts`.
@@ -530,3 +572,58 @@ Order matters within the phase:
   d3 merge update-selections annotated `let $x: D3Selection`; vendor APIs (fullscreen, Spector global,
   geolocation) cast `as any`. Verified tsc/eslint/build clean, browser 133 / unit 3290 / 0 fail.
 - **Remaining:** Phase 8 (intro/walkthrough) and Phase 9 (final barrel/cleanup).
+
+### Phase 8 complete (2026-07-31) — intro / walkthrough (class + shared base, async/await)
+
+- **`helper.ts`** — the shared utilities stayed typed functions (`icon`, `helpHtml`, `localize`,
+  `isMostlySquare`, `transitionTime`, `delayAsync`, `eventCancel`); no importer changes needed.
+- **`UiCurtain.ts`** — straight JS→TS (already a class).
+- **`AbstractIntroChapter.ts`** (new base) — encapsulates the machinery every chapter duplicated:
+  `title`, `on('done')` dispatch, `enter()`/`exit()`/`restart()`, the async step runner `_runAsync`
+  (a `while` loop: run step → await → advance; cancel returns; error logs + retries), and the four
+  event-wait hooks (`_onModeChange`/`_onStableChange`/`_onStagingChange`/`_onMapMove`) wired once as
+  listener proxies in `enter()`. A chapter sets only the hooks it needs; `_rejectStep` lets `exit()`
+  interrupt the in-flight awaited step.
+- **8 chapter classes** `UiIntroWelcome/Navigation/Point/Area/Line/Building/Rapid/StartEditing` extend
+  the base (git mv → CamelCase.ts). Each `*Async()` step became a `protected async _stepAsync():
+  Promise<IntroStep | void>` — **Promises converted to async/await** (`.then(new Promise)` → `await …;
+  try { return await new Promise(...) } finally {…}`), which makes the previously-brittle step machine
+  much more readable/extensible. Steps return bare method refs; `_runAsync` invokes them with
+  `.call(this)`. `UiIntroRapid`/`UiIntroStartEditing` override `enter()`/`exit()` (calling `super`) for
+  their layer/overlay setup.
+- **`UiIntro.ts`** — orchestrator → class; chapter registry is now a map of constructors
+  (`new chapterUi[id](context, curtain)`). Entry is `start($parent, skipToRapid)`. Wired 5 consumers:
+  `ui/index.js` barrel, `UiSystem`, `UiSplash`, `UiRapidSplash` (uses `skipToRapid`), `UiPaneHelp` —
+  all `new UiIntro(context).start(context.container(), …)`.
+- **Documented departures:** no `render($parent)` capture (chapters use `enter()`/`exit()`);
+  relocalization N/A (one-shot walkthrough); loose `any` typing across cross-system touchpoints.
+- **Verified:** tsc/eslint/build clean, browser 133 / unit 3290 / 0 fail, **plus a browser smoke-test**:
+  launched the walkthrough (Welcome splash → nav bar with all 8 chapters → Welcome chapter → switched to
+  Points → `_addPointAsync` rendered its curtain tooltip), zero walkthrough JS errors.
+- **Pre-existing bug noted (not fixed):** `UiCurtain.redrawDarkness` has `mapRect.botom -= 30;` (typo for
+  `bottom`) — silently no-ops; left as behavior-preserving.
+- **Remaining:** Phase 9 (final barrel/cleanup) + the 3 orphaned `panes/*.js` and 2 quarantined `.jsx`.
+
+### Phase 9 complete (2026-08-03) — barrels & cleanup — 🎉 `modules/ui/` conversion DONE
+
+- **Fixed the `UiCurtain.redrawDarkness` `botom`→`bottom` typo** (from Phase 8 review) — `mapRect` is a
+  mutable copy from `_copyRect`, so the intended 30px bottom-toolbar trim now actually applies.
+- **Barrels → `.ts`:** `git mv` the 7 `index.js` barrels (`ui/`, `cards/`, `controls/`, `panes/`,
+  `sections/`, `settings/`, `tools/`) to `index.ts`. No importer changes needed — external importers
+  (`core/UiSystem.ts`, `modules/index.js`) keep their `./ui/index.js` specifiers, which the bundler
+  resolves to `.ts` (same mechanism used for every rename this project). The `.ts` barrels keep their
+  `.js` re-export specifiers, consistent with the rest of the codebase.
+- **Deleted 3 orphaned dead files:** `panes/background.js`, `panes/map_data.js`, `panes/preferences.js`
+  (`git rm`) — leftover snake_case dupes from the Phase 5 pane rename, superseded by `UiPaneX.ts` and
+  imported nowhere.
+- **Left in place (documented):** the 2 quarantined React-demo `sections/*.jsx` (`react_container.jsx`,
+  `ReactComponent.jsx` — referenced only by commented imports; React isn't even a dependency) and the
+  disabled `fields/UiFieldRestrictions.ts` / `field_help.ts` (already `.ts`, wired-but-commented).
+- **No `.js` files remain under `modules/ui/`**; `AGENTS.md` conversion table flipped to ✅ Complete.
+- **Verified:** tsc 0 / eslint 0 errors (2 pre-existing `todo` warnings) / build clean / browser 133 /
+  unit 3290 / 0 fail.
+
+## Definition of Done — ✅ met
+The `modules/ui/` TypeScript conversion is complete. Every component is a TS class following the canonical
+shape, with one documented, deliberate departure: the intro/walkthrough chapters are `enter()`/`exit()`
+state machines (`AbstractIntroChapter` + async/await step runner) rather than `render($parent)` components.

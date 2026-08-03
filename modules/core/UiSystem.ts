@@ -3,7 +3,7 @@ import { select } from 'd3-selection';
 import { utilDetect } from '../util/detect.ts';
 import { vecAdd } from '@rapid-sdk/math';
 import {
-  UiApiStatus, UiDefs, UiEditMenu, UiFlash, UiFullscreen, uiIntro,
+  UiApiStatus, UiDefs, UiEditMenu, UiFlash, UiFullscreen, UiIntro,
   uiLoading, UiMapFooter, UiMapToolbar, UiMapRouletteMenu, UiOvermap,
   UiSplash, UiRestore, UiShortcuts, UiSidebar, UiWhatsNew
 } from '../ui/index.js';
@@ -257,7 +257,7 @@ export class UiSystem extends AbstractSystem {
         const sawWhatsNewVersion = parseInt(settings?.get('ui.sawWhatsNewVersion') ?? '', 10) || 0;
 
         if (startWalkthrough) {
-          $container.call(uiIntro(context));     // Jump right into walkthrough..
+          new UiIntro(context).start($container);     // Jump right into walkthrough..
         } else if (editor.canRestoreBackup) {
           new UiRestore(context).render($container);   // Offer to restore backup edits..
         } else if (sawPrivacyVersion !== context.privacyVersion) {

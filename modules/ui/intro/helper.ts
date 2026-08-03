@@ -1,10 +1,15 @@
 import { geoSphericalDistance, vecNormalizedDot } from '@rapid-sdk/math';
 import { utilCmd } from '../../util/cmd.ts';
 
+import type { Context } from '../../Context.ts';
+import type { Vec2 } from '@rapid-sdk/math';
+
 /**
  * Insert an icon
+ * @param name   the icon id (e.g. `#rapid-icon-point`)
+ * @param klass  optional additional class name
  */
-export function icon(name, klass) {
+export function icon(name: string, klass?: string): string {
   // Generate alt text for interaction icons
   let title = '';
   const matched = name.toLowerCase().match(/^#rapid-interaction-(.*)$/);
@@ -19,8 +24,9 @@ export function icon(name, klass) {
 
 /**
  * Event handler that just cancels the event
+ * @param d3_event  the event to cancel
  */
-export function eventCancel(d3_event) {
+export function eventCancel(d3_event: Event): void {
   d3_event.stopPropagation();
   d3_event.preventDefault();
 }
@@ -29,9 +35,15 @@ export function eventCancel(d3_event) {
 // Returns the localized HTML element for `stringID` with a standardized set of icon, key, and
 // label replacements suitable for tutorials and documentation. Optionally supplemented
 // with custom `replacements`
-let helpStringReplacements;
-export function helpHtml(context, stringID, replacements) {
-  const l10n = context.systems.l10n;
+let helpStringReplacements: Record<string, string> | undefined;
+/**
+ * Returns the localized HTML for `stringID` with standardized replacements.
+ * @param context       Global shared application context
+ * @param stringID      the localization string id to look up
+ * @param replacements  optional custom replacements to supplement the standard set
+ */
+export function helpHtml(context: Context, stringID: string, replacements?: Record<string, any>): string {
+  const l10n = context.systems.l10n!;
   const isRTL = l10n.isRTL;
 
   // only load these the first time
@@ -160,9 +172,9 @@ export function helpHtml(context, stringID, replacements) {
 
 
 /**
- * @param  text
+ * @param text  the text to slugify
  */
-function slugify(text) {
+function slugify(text: string): string {
   return text.toString().toLowerCase()
     .replace(/\s+/g, '-')           // Replace spaces with '-'
     .replace(/[^\w\-]+/g, '')       // Remove all non-word chars
@@ -172,15 +184,16 @@ function slugify(text) {
 }
 
 
-export let missingStrings = {};
+export const missingStrings: Record<string, string> = {};
 
 /**
  * Warn about any missing walkthrough names
- * @param  key
- * @param  text
+ * @param context  Global shared application context
+ * @param key      the localization key to check
+ * @param text     the fallback text if the key is missing
  */
-function _checkKey(context, key, text) {
-  const l10n = context.systems.l10n;
+function _checkKey(context: Context, key: string, text: string): void {
+  const l10n = context.systems.l10n!;
   if (l10n.t(key, { default: undefined }) === undefined) {
     if (missingStrings.hasOwnProperty(key)) return;  // warn once
     missingStrings[key] = text;
@@ -191,14 +204,15 @@ function _checkKey(context, key, text) {
 
 /**
  * Localize the given walkthrough entity
- * @param  obj
+ * @param context  Global shared application context
+ * @param obj      the walkthrough entity to localize
  */
-export function localize(context, obj) {
-  const l10n = context.systems.l10n;
+export function localize(context: Context, obj: any): any {
+  const l10n = context.systems.l10n!;
   let key;
 
   // Assign name if entity has one..
-  let name = obj.tags && obj.tags.name;
+  const name = obj.tags && obj.tags.name;
   if (name) {
     key = 'intro.graph.name.' + slugify(name);
     obj.tags.name = l10n.t(key, { default: name });
@@ -206,7 +220,7 @@ export function localize(context, obj) {
   }
 
   // Assign street name if entity has one..
-  let street = obj.tags && obj.tags['addr:street'];
+  const street = obj.tags && obj.tags['addr:street'];
   if (street) {
     key = 'intro.graph.name.' + slugify(street);
     obj.tags['addr:street'] = l10n.t(key, { default: street });
@@ -240,9 +254,9 @@ export function localize(context, obj) {
 
 /**
  * Used to detect squareness.. some duplicataion of code from actionOrthogonalize.
- * @param  points
+ * @param points  the polygon points to test
  */
-export function isMostlySquare(points) {
+export function isMostlySquare(points: Vec2[]): boolean {
   // note: uses 15 here instead of the 12 from actionOrthogonalize because
   // actionOrthogonalize can actually straighten some larger angles as it iterates
   const threshold = 15; // degrees within right or straight
@@ -271,7 +285,7 @@ export function isMostlySquare(points) {
  * @param   loc2  `Array` [lon,lat]
  * @return  milliseconds to ease from `loc1` to `loc2`
  */
-export function transitionTime(loc1, loc2) {
+export function transitionTime(loc1: Vec2, loc2: Vec2): number {
   const dist = geoSphericalDistance(loc1, loc2);
   if (dist < 1e-4) {
     return 0;
@@ -291,6 +305,6 @@ export function transitionTime(loc1, loc2) {
  * @param  ms  milliseconds of delay (defaults to 300)
  * @return Promise that settles after the delay
  */
-export function delayAsync(ms = 300) {
-  return new Promise(resolve => { window.setTimeout(resolve, ms); });
+export function delayAsync(ms = 300): Promise<void> {
+  return new Promise<void>(resolve => { window.setTimeout(resolve, ms); });
 }

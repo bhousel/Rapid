@@ -549,7 +549,7 @@ Track TypeScript conversion progress here:
 | `modules/geo/` | ✅ Complete | All files converted |
 | `modules/operations/` | ❌ Not started | |
 | `modules/services/` | ✅ Complete | All files converted |
-| `modules/ui/` | 🚧 In progress | Phases 1–7 done (primitives, fields, sidebar/inspector, QA editors, panes, toolbar/controls/cards, Rapid-specific/dialogs) as TS classes; see `.github/design/ui-system.md` progress log. Phases 8–9 (intro/walkthrough, barrels/cleanup) remain. |
+| `modules/ui/` | ✅ Complete | All 9 phases done — every component is a TS class (with a documented departure for the intro/walkthrough state machines); barrels are `index.ts`. Only the quarantined React demo (`sections/*.jsx`) and disabled `UiFieldRestrictions`/`field_help` remain non-standard. See `.github/design/ui-system.md` progress log. |
 | `modules/validators/` | ✅ Complete | All files converted |
 
 ## Testing

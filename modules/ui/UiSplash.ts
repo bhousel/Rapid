@@ -1,7 +1,7 @@
 import { marked } from 'marked';
 
 import { icon } from './intro/helper.js';
-import { uiIntro } from './intro/intro.js';
+import { UiIntro } from './intro/UiIntro.js';
 import { uiModal } from './modal.js';
 
 import type { Context } from '../Context.ts';
@@ -91,7 +91,7 @@ export class UiSplash {
       .append('button')
       .attr('class', 'walkthrough')
       .on('click', () => {
-        context.container().call(uiIntro(context));
+        new UiIntro(context).start(context.container());
         $modal.close();
       });
 

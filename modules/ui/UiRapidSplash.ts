@@ -1,5 +1,5 @@
 import { icon } from './intro/helper.js';
-import { uiIntro } from './intro/intro.js';
+import { UiIntro } from './intro/UiIntro.js';
 import { uiModal } from './modal.js';
 
 import type { Context } from '../Context.ts';
@@ -66,7 +66,7 @@ export class UiRapidSplash {
       .append('button')
       .attr('class', 'walkthrough')
       .on('click', () => {
-        context.container().call(uiIntro(context, false));
+        new UiIntro(context).start(context.container(), false);
         $modal.close();
       });
 
@@ -84,7 +84,7 @@ export class UiRapidSplash {
       .append('button')
       .attr('class', 'rapid-walkthrough')
       .on('click', () => {
-        context.container().call(uiIntro(context, true));
+        new UiIntro(context).start(context.container(), true);
         $modal.close();
       });
 

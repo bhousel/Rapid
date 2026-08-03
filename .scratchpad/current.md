@@ -61,7 +61,23 @@
   `UiViewOn`/`UiApiStatus`/`UiFilterStatus`/`UiValidatorStatus`/`UiAccount`/`UiScale`/`UiDefs`/
   `UiFullscreen`). Added `modules/types/geojson-rewind.d.ts` ambient decl. Verified tsc/eslint/build
   clean, browser 133 / unit 3290 / 0 fail.
-- **Next:** Phase 8 (intro/walkthrough) then Phase 9 (final barrel/cleanup).
+- **Phase 8 (intro/walkthrough) — DONE + verified**: converted the walkthrough with a deliberate
+  departure from the D3-component conventions (chapters are state machines, not `render($parent)`
+  components). `helper.ts` (typed fns) + `UiCurtain.ts` (JS→TS) + new `AbstractIntroChapter` base
+  (owns `enter/exit/restart`, the async `_runAsync` step runner, and the 4 event-wait hooks) + 8
+  chapter classes (`UiIntroWelcome/Navigation/Point/Area/Line/Building/Rapid/StartEditing`) +
+  `UiIntro` orchestrator class. **Promises → async/await** throughout the step machine. Wired 5
+  consumers (`ui/index.js`, `UiSystem`, `UiSplash`, `UiRapidSplash`, `UiPaneHelp`) to
+  `new UiIntro(context).start(...)`. Verified tsc/eslint/build clean + browser 133 / unit 3290 +
+  a live browser smoke-test (walkthrough launches, nav bar, chapter switching, Points step all work).
+- **Phase 9 (barrels & cleanup) — DONE. 🎉 `modules/ui/` TS conversion COMPLETE.** Fixed the
+  `UiCurtain` `botom`→`bottom` typo; `git mv` the 7 `index.js` barrels → `index.ts` (no importer
+  changes — bundler resolves `./ui/index.js`→`.ts`); `git rm` the 3 orphaned `panes/*.js` dupes;
+  left the 2 quarantined `sections/*.jsx` (dead React demo) + disabled `UiFieldRestrictions`/`field_help`.
+  No `.js` left under `modules/ui/`. AGENTS.md conversion row → ✅ Complete. Verified tsc0/eslint0/
+  build/browser133/unit3290.
+- **Next:** nothing outstanding for `modules/ui/`. (Open question for the user: delete the 2 dead
+  `sections/*.jsx` demo files, or keep them quarantined?)
 
 ## Settings System design (2026-07-07)
 

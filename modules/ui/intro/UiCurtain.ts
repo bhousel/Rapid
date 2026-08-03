@@ -3,16 +3,33 @@ import { easeLinear } from 'd3-ease';
 import { selection, select } from 'd3-selection';
 import * as Polyclip from 'polyclip-ts';
 
+import type { Context } from '../../Context.ts';
+import type { D3Selection } from 'd3-selection';
+import type { Vec2 } from '@rapid-sdk/math';
+
 
 /**
  */
 export class UiCurtain {
+  public context: Context;
+
+  protected _enabled: boolean;
+  protected _revealOptions: any;
+  protected _revealPolygon: any[];       // The hole in the curtain being revealed
+  protected _darknessDirty: any;         // need to recompute the darkness?
+  protected _tooltipDirty: boolean;      // need to recompute the tooltip?
+  protected _inTransition: boolean;
+
+  // D3 selections
+  public $parent: D3Selection | null;
+  public $curtain: D3Selection | null;
+  public $tooltip: D3Selection | null;
 
   /**
    * @constructor
-   * @param  {Context}  context - Global shared application context
+   * @param  context - Global shared application context
    */
-  constructor(context) {
+  public constructor(context: Context) {
     this.context = context;
 
     this._enabled = false;
@@ -41,9 +58,9 @@ export class UiCurtain {
   /**
    * Accepts a parent selection, and renders the content under it.
    * (The parent selection is required the first time, but can be inferred on subsequent renders)
-   * @param {d3-selection} $parent - A d3-selection to a HTMLElement that this component should render itself into
+   * @param $parent - A d3-selection to a HTMLElement that this component should render itself into
    */
-  enable($parent = this.$parent) {
+  public enable($parent = this.$parent): void {
     if ($parent instanceof selection) {
       this.$parent = $parent;
     } else {
@@ -79,8 +96,8 @@ export class UiCurtain {
       .attr('class', 'popover-inner');
 
     // register event handlers
-    this.context.systems.map.on('move', this.redraw);
-    this.context.systems.ui.on('uichange', this.resize);
+    this.context.systems.map!.on('move', this.redraw);
+    this.context.systems.ui!.on('uichange', this.resize);
 
     this.resize();   // get the width/height
   }
@@ -89,29 +106,29 @@ export class UiCurtain {
   /**
    * Removes all curtain data and unregisters event handlers
    */
-  disable() {
+  public disable(): void {
     if (!this._enabled) return;
     this._enabled = false;
 
-    this.$curtain.remove();
+    this.$curtain!.remove();
     this.$curtain = null;
 
-    this.$tooltip.remove();
+    this.$tooltip!.remove();
     this.$tooltip = null;
 
     this._revealOptions = null;
     this._revealPolygon = [];
 
     // unregister event handlers
-    this.context.systems.map.off('move', this.redraw);
-    this.context.systems.ui.off('uichange', this.resize);
+    this.context.systems.map!.off('move', this.redraw);
+    this.context.systems.ui!.off('uichange', this.resize);
   }
 
 
   /**
    * Recalculate the dimensions of container and map rectangles and redraw everything
    */
-  resize() {
+  public resize(): void {
     if (!this.$curtain) return;  // called too early?
 
     this._revealPolygon = [];
@@ -125,7 +142,7 @@ export class UiCurtain {
   /**
    * Hide just makes the curtain completely black
    */
-  hide() {
+  public hide(): void {
     this.reveal({ duration: 0 });
   }
 
@@ -135,20 +152,20 @@ export class UiCurtain {
    *   - what to reveal
    *   - tooltip / action button
    *
-   * @param  {Object}    [opts]
-   * @param  {integer}   [opts.duration]        transition time in milliseconds (default 250ms)
-   * @param  {string}    [opts.revealSelector]  reveal selector
-   * @param  {Element}   [opts.revealNode]      reveal node
-   * @param  {Extent}    [opts.revealExtent]    reveal Extent in WGS85 coords [lon,lat]
-   * @param  {number}    [opts.revealPadding]   reveal additional padding in px
-   * @param  {string}    [opts.tipSelector]     tooltip selector
-   * @param  {Element}   [opts.tipNode]         tooltip node
-   * @param  {string}    [opts.tipHtml]         tooltip html
-   * @param  {string}    [opts.tipClass]        tooltip class
-   * @param  {string}    [opts.buttonText]      create a button with this text label
-   * @param  {function}  [opts.buttonCallback]  the callback for the button
+   * @param  opts                 reveal options
+   * @param  opts.duration        transition time in milliseconds (default 250ms)
+   * @param  opts.revealSelector  reveal selector
+   * @param  opts.revealNode      reveal node
+   * @param  opts.revealExtent    reveal Extent in WGS85 coords [lon,lat]
+   * @param  opts.revealPadding   reveal additional padding in px
+   * @param  opts.tipSelector     tooltip selector
+   * @param  opts.tipNode         tooltip node
+   * @param  opts.tipHtml         tooltip html
+   * @param  opts.tipClass        tooltip class
+   * @param  opts.buttonText      create a button with this text label
+   * @param  opts.buttonCallback  the callback for the button
    */
-  reveal(opts = {}) {
+  public reveal(opts: any = {}): D3Selection | undefined {
     if (!this.$tooltip) return;  // called too early?
 
     this._revealOptions = Object.assign({}, opts, { duration: 250 });
@@ -165,7 +182,7 @@ export class UiCurtain {
 
   /**
    */
-  redraw() {
+  public redraw(): void {
     if (this._inTransition) return;
     this.redrawDarkness();
     this.redrawTooltip();
@@ -177,17 +194,18 @@ export class UiCurtain {
    *
    * This is only done one time, unless there is a revealExtent that needs
    *  to be reprojected whenver the map moves
+   * @param duration  transition time in milliseconds (default 0)
    */
-  redrawDarkness(duration = 0) {
+  public redrawDarkness(duration = 0): void {
     if (!this._darknessDirty) return;  // nothing to do
     if (!this.$curtain) return;   // called too early
 
     const context = this.context;
     const $container = context.container();
-    const containerNode = $container.node();
+    const containerNode = $container.node() as HTMLElement;
     const containerRect = this._copyRect(containerNode.getBoundingClientRect());
 
-    const mapNode = $container.select('.main-map').node();
+    const mapNode = $container.select('.main-map').node() as HTMLElement;
     const mapRect = this._copyRect(mapNode.getBoundingClientRect());
 
     const opts = this._revealOptions;
@@ -202,10 +220,10 @@ export class UiCurtain {
 
         // Add 50px overscan experiment, see UISystem.js
         // Maybe find a nicer way to include overscan and view padding into places like this.
-        const origin = [mapRect.left - 50, mapRect.top - 50];
+        const origin = [mapRect.left - 50, mapRect.top - 50] as Vec2;
         // Normally `view.project` projects lng/lat coordinates to map coordinates.
         // `true` = consider rotation and project to coordinates on the surface instead
-        const extentPolygon = opts.revealExtent.polygon().map(point => vecAdd(origin, view.project(point, true)));
+        const extentPolygon = opts.revealExtent.polygon().map((point: Vec2) => vecAdd(origin, view.project(point, true)));
 
         // Note: padding not supported for revealExtent
         // (If you want it padded, just request a larger extent)
@@ -214,7 +232,7 @@ export class UiCurtain {
         // (otherwise we could pan the reveal off the map but still reveal a square of sidebar)
         // trim away from toolbars
         mapRect.top += 72;
-        mapRect.botom -= 30;
+        mapRect.bottom -= 30;
 
         const mapPolygon = [
           [mapRect.left, mapRect.top],
@@ -292,7 +310,7 @@ export class UiCurtain {
       path += 'Z';
     }
 
-    let $darkness = this.$curtain.selectAll('path')
+    let $darkness: D3Selection = this.$curtain.selectAll('path')
       .data([0])
       .interrupt();
 
@@ -302,7 +320,7 @@ export class UiCurtain {
       .attr('class', 'curtain-darkness');
 
     // update
-    $darkness = $darkness.merge($$darkness);
+    $darkness = $darkness.merge($$darkness) as D3Selection;
 
     if (duration > 0) {
       this._inTransition = true;
@@ -310,7 +328,7 @@ export class UiCurtain {
         .transition()
         .duration(duration)
         .ease(easeLinear)
-        .on('end interrupt', () => this._inTransition = false);
+        .on('end interrupt', () => this._inTransition = false) as any;
 
     } else {
       this._inTransition = false;
@@ -329,14 +347,14 @@ export class UiCurtain {
    * Recalculates the tooltip contents and placement.
    * Contents are only updated once, but placement recalculates whenever this is called.
    */
-  redrawTooltip() {
+  public redrawTooltip(): void {
     if (!this.$tooltip) return;   // called too early
 
     const context = this.context;
-    const isRTL = context.systems.l10n.isRTL;
+    const isRTL = context.systems.l10n!.isRTL;
 
     const $container = context.container();
-    const containerNode = $container.node();
+    const containerNode = $container.node() as HTMLElement;
     const containerRect = this._copyRect(containerNode.getBoundingClientRect());
 
     const opts = this._revealOptions;
@@ -406,7 +424,7 @@ export class UiCurtain {
 
       // Determine the size the tooltip wants to be.
       const ARROW = 5;  // allow extra space for the arrow
-      const tip = this._copyRect(this.$tooltip.node().getBoundingClientRect());
+      const tip = this._copyRect((this.$tooltip.node() as HTMLElement).getBoundingClientRect());
       let placement, tipX, tipY;
 
       // Clamp reveal rectangle to container and update width/height..
@@ -477,10 +495,10 @@ export class UiCurtain {
 
   /**
    * ClientRects are immutable, so copy them to an Object in case we need to pad/trim them.
-   * @param   {DOMRect}  src - rectangle (or something that looks like one)
-   * @returns {Object}  Object containing the copied properties
+   * @param   src - rectangle (or something that looks like one)
+   * @returns Object containing the copied properties
    */
-  _copyRect(src) {
+  protected _copyRect(src: any): any {
     return {
       x: src.x,
       y: src.y,

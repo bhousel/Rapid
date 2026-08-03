@@ -34,7 +34,7 @@ export { UiFlash } from './UiFlash.ts';
 export { uiFormFields } from './form_fields.js';
 export { UiFullscreen } from './UiFullscreen.js';
 export { uiIcon } from './icon.js';
-export { uiIntro } from './intro/intro.js';
+export { UiIntro } from './intro/UiIntro.js';
 export { UiInfoCards } from './UiInfoCards.js';
 export { UiInspector } from './UiInspector.js';
 export { UiKeepRightDetails } from './UiKeepRightDetails.js';

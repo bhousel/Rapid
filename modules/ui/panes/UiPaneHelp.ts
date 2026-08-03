@@ -3,7 +3,7 @@ import { marked } from 'marked';
 
 import { UiPane } from '../UiPane.js';
 import { uiIcon } from '../icon.js';
-import { uiIntro } from '../intro/intro.js';
+import { UiIntro } from '../intro/UiIntro.js';
 import { uiTooltip } from '../tooltip.js';
 import { helpHtml } from '../intro/helper.js';
 
@@ -481,7 +481,7 @@ export class UiPaneHelp extends UiPane {
 
     d3_event.preventDefault();
     if ((context as any).inIntro) return;
-    context.container().call(uiIntro(context));
+    new UiIntro(context).start(context.container());
     ui?.togglePanes();
   }
 
