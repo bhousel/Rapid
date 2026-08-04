@@ -1,8 +1,8 @@
-import { dispatch as d3_dispatch } from 'd3-dispatch';
+import { EventEmitter } from 'tseep/lib/ee-safe';
 import { select as d3_select } from 'd3-selection';
 
 import { uiCombobox } from '../combobox.js';
-import { utilGetSetValue, utilNoAuto, utilRebind } from '../../util/index.ts';
+import { utilGetSetValue, utilNoAuto } from '../../util/index.ts';
 
 import type { Context } from '../../Context.ts';
 import type { D3Selection } from 'd3-selection';
@@ -118,11 +118,8 @@ const placeholdersByHighway: Record<string, Record<string, string>> = {
 };
 
 
-export class UiFieldAccess {
+export class UiFieldAccess extends EventEmitter {
   public context: Context;
-  public dispatch: any;
-  /** Added at runtime by `utilRebind` */
-  public on!: (...args: any[]) => any;
 
   protected _uifield: any;
   public $items: D3Selection;
@@ -133,6 +130,7 @@ export class UiFieldAccess {
    * @param uifield - The `UiField` wrapper that owns this field internal
    */
   public constructor(context: Context, uifield: any) {
+    super();
     this.context = context;
     this._uifield = uifield;
 
@@ -141,9 +139,6 @@ export class UiFieldAccess {
 
     this.render = this.render.bind(this);
     this._change = this._change.bind(this);
-
-    this.dispatch = d3_dispatch('change');
-    utilRebind(this as any, this.dispatch, 'on');
   }
 
 
@@ -232,7 +227,7 @@ export class UiFieldAccess {
     if (!value && typeof this._tags[d] !== 'string') return;
 
     tagChange[d] = value || undefined;
-    this.dispatch.call('change', this, tagChange);
+    this.emit('change', tagChange);
   }
 
 

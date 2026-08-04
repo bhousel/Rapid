@@ -1,6 +1,4 @@
-import { dispatch as d3_dispatch } from 'd3-dispatch';
-
-import { utilRebind } from '../../util/rebind.ts';
+import { EventEmitter } from 'tseep/lib/ee-safe';
 
 import type { Context } from '../../Context.ts';
 import type { UiCurtain } from './UiCurtain.ts';
@@ -19,7 +17,7 @@ export type IntroStep = () => Promise<IntroStep | void>;
  *
  * Unlike normal `modules/ui` components, a chapter is a small state machine, not an idempotent
  * `render($parent)` component. The base owns the machinery every chapter needs:
- *  - a `title` and a `'done'` dispatch (`on('done')` added via `utilRebind`)
+ *  - a `title` and a `'done'` event (emitted via `EventEmitter`; listen with `on('done')`)
  *  - the `enter()` / `exit()` / `restart()` lifecycle
  *  - an async step runner (`_runAsync`) that advances through the steps a chapter returns
  *  - four event-wait hooks (`_onModeChange`, `_onStableChange`, `_onStagingChange`, `_onMapMove`)
@@ -28,17 +26,13 @@ export type IntroStep = () => Promise<IntroStep | void>;
  *
  * A subclass sets `this.title`, implements `_firstStep()`, and implements its `_stepAsync()` methods.
  */
-export abstract class AbstractIntroChapter {
+export abstract class AbstractIntroChapter extends EventEmitter {
   public context: Context;
 
   /** The chapter's title (an l10n string id) - set by the subclass. */
   public title: string;
 
-  /** Added at runtime by `utilRebind` */
-  public on!: (...args: any[]) => any;
-
   protected _curtain: UiCurtain;
-  protected _dispatch: any;
 
   /** `true` once `exit()` has been called, so the step runner bails out. */
   protected _cancelled: boolean;
@@ -58,11 +52,11 @@ export abstract class AbstractIntroChapter {
    * @param curtain - The `UiCurtain` used to reveal parts of the UI during the walkthrough
    */
   public constructor(context: Context, curtain: UiCurtain) {
+    super();
     this.context = context;
     this._curtain = curtain;
     this.title = '';   // subclass overrides
 
-    this._dispatch = d3_dispatch('done');
     this._cancelled = false;
     this._rejectStep = null;
     this._onModeChange = null;
@@ -78,8 +72,6 @@ export abstract class AbstractIntroChapter {
     this._stableChangeListener = this._stableChangeListener.bind(this);
     this._stagingChangeListener = this._stagingChangeListener.bind(this);
     this._mapMoveListener = this._mapMoveListener.bind(this);
-
-    utilRebind(this as any, this._dispatch, 'on');
   }
 
 
@@ -168,7 +160,7 @@ export abstract class AbstractIntroChapter {
    * Emit the `'done'` event to signal the chapter is complete.
    */
   protected _done(): void {
-    this._dispatch.call('done');
+    this.emit('done');
   }
 
 

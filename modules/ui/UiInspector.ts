@@ -82,11 +82,11 @@ export class UiInspector {
       .on('merge', this._onMerge);
 
     this.PresetList
-      .on('choose', (choice: any) => this.setPreset(choice))
-      .on('cancel', () => this.setPreset());
+      .on('choose', (choice: any) => { this.setPreset(choice); })
+      .on('cancel', () => { this.setPreset(); });
 
     this.EntityEditor
-      .on('choose', (selected: any) => this.showPresetList(selected, true));  // true = animate in
+      .on('choose', (selected: any) => { this.showPresetList(selected, true); });  // true = animate in
   }
 
 

@@ -1,8 +1,8 @@
-import { dispatch as d3_dispatch } from 'd3-dispatch';
+import { EventEmitter } from 'tseep/lib/ee-safe';
 import { select as d3_select } from 'd3-selection';
 
 import { uiIcon } from './icon.js';
-import { utilKeybinding, utilRebind } from '../util/index.ts';
+import { utilKeybinding } from '../util/index.ts';
 
 import type { Context } from '../Context.ts';
 import type { D3Selection } from 'd3-selection';
@@ -13,11 +13,8 @@ import type { D3Selection } from 'd3-selection';
  * Rapid dataset. Render it into a selection carrying the dataset datum via
  * `.render($selection)`. Emits `change` (dataset id + color) and `done`.
  */
-export class UiRapidColorpicker {
+export class UiRapidColorpicker extends EventEmitter {
   public context: Context;
-  protected _dispatch: any;
-  /** Added at runtime by `utilRebind` */
-  public on!: (...args: any[]) => any;
 
   protected _parentModal: any;
   protected _close: () => void;
@@ -28,6 +25,7 @@ export class UiRapidColorpicker {
    * @param parentModal - the parent modal that the colorpicker popup is shown on top of
    */
   public constructor(context: Context, parentModal?: any) {
+    super();
     this.context = context;
     this._parentModal = parentModal;
     this._close = () => {};
@@ -36,9 +34,6 @@ export class UiRapidColorpicker {
     this.render = this.render.bind(this);
     this._togglePopup = this._togglePopup.bind(this);
     this._handleClick = this._handleClick.bind(this);
-
-    this._dispatch = d3_dispatch('change', 'done');
-    utilRebind(this as any, this._dispatch, 'on');
   }
 
 
@@ -166,7 +161,7 @@ export class UiRapidColorpicker {
       d3_select(document).call(keybinding);
       d3_select(document).on('click.colorpicker', null);
       this._close = () => {};
-      this._dispatch.call('done');
+      this.emit('done');
     };
 
     const keybinding = utilKeybinding('modal');
@@ -200,7 +195,7 @@ export class UiRapidColorpicker {
       .attr('class', 'colorpicker-option')
       .style('color', (d: any) => d)
       .on('click', (_: any, selectedColor: any) => {
-        this._dispatch.call('change', this, dataset.id, selectedColor);
+        this.emit('change', dataset.id, selectedColor);
         $colorItems.classed('selected', (d: any) => d === selectedColor);
       });
 

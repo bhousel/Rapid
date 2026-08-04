@@ -1,10 +1,10 @@
-import { dispatch as d3_dispatch } from 'd3-dispatch';
+import { EventEmitter } from 'tseep/lib/ee-safe';
 import { select as d3_select } from 'd3-selection';
 import { Extent, projWgs84ToWorld, geoSphericalDistance, vecProject } from '@rapid-sdk/math';
 import { utilArrayUniqBy } from '@rapid-sdk/util';
 import { iso1A2Code } from '@rapideditor/country-coder';
 import { uiCombobox } from '../combobox.js';
-import { utilGetSetValue, utilNoAuto, utilRebind } from '../../util/index.ts';
+import { utilGetSetValue, utilNoAuto } from '../../util/index.ts';
 
 import type { Vec2 } from '@rapid-sdk/math';
 import type { Context } from '../../Context.ts';
@@ -12,11 +12,8 @@ import type { D3Selection } from 'd3-selection';
 import type { TagChange, Tags } from './types.ts';
 
 
-export class UiFieldAddress {
+export class UiFieldAddress extends EventEmitter {
   public context: Context;
-  public dispatch: any;
-  /** Added at runtime by `utilRebind` */
-  public on!: (...args: any[]) => any;
 
   protected _uifield: any;
   public $parent: D3Selection;
@@ -27,6 +24,7 @@ export class UiFieldAddress {
   protected _addressFormats: any[];
 
   public constructor(context: Context, uifield: any) {
+    super();
     const assets = context.systems.assets!;
 
     this.context = context;
@@ -46,9 +44,6 @@ export class UiFieldAddress {
 
     this.render = this.render.bind(this);
     this._updatePlaceholder = this._updatePlaceholder.bind(this);
-
-    this.dispatch = d3_dispatch('change');
-    utilRebind(this as any, this.dispatch, 'on');
 
     assets.loadAssetAsync('address_formats')
       .then((d: any) => {
@@ -359,7 +354,7 @@ export class UiFieldAddress {
           tagChange[key] = value || undefined;
         });
 
-      this.dispatch.call('change', this, tagChange, onInput);
+      this.emit('change', tagChange, onInput);
     };
   }
 

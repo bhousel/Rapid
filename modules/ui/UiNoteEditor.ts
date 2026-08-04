@@ -1,4 +1,4 @@
-import { dispatch as d3_dispatch } from 'd3-dispatch';
+import { EventEmitter } from 'tseep/lib/ee-safe';
 import { select as d3_select, selection } from 'd3-selection';
 
 import { uiIcon } from './icon.js';
@@ -6,7 +6,7 @@ import { UiNoteComments } from './UiNoteComments.js';
 import { UiNoteHeader } from './UiNoteHeader.js';
 import { UiNoteReport } from './UiNoteReport.js';
 import { UiViewOn } from './UiViewOn.js';
-import { utilNoAuto, utilRebind } from '../util/index.ts';
+import { utilNoAuto } from '../util/index.ts';
 
 import type { Context } from '../Context.ts';
 import type { D3Selection } from 'd3-selection';
@@ -18,11 +18,8 @@ import type { D3Selection } from 'd3-selection';
  * (and `newNote` to autofocus a fresh note), then call `.render($parent)`.
  * Emits `change` when the note is created/updated/cancelled.
  */
-export class UiNoteEditor {
+export class UiNoteEditor extends EventEmitter {
   public context: Context;
-  public dispatch: any;
-  /** Added at runtime by `utilRebind` */
-  public on!: (...args: any[]) => any;
   public datum: any;
   public newNote: boolean;
   public $parent: D3Selection | null;
@@ -34,6 +31,7 @@ export class UiNoteEditor {
   protected _authWired: boolean;
 
   public constructor(context: Context) {
+    super();
     this.context = context;
     this.datum = null;
     this.newNote = false;
@@ -55,9 +53,6 @@ export class UiNoteEditor {
     this._clickSave = this._clickSave.bind(this);
     this._clickStatus = this._clickStatus.bind(this);
     this._clickComment = this._clickComment.bind(this);
-
-    this.dispatch = d3_dispatch('change');
-    utilRebind(this as any, this.dispatch, 'on');
   }
 
   /** Re-renders into the last-known parent selection (used on auth changes). */
@@ -436,7 +431,7 @@ export class UiNoteEditor {
       osm.removeNote(d);
     }
     this.context.enter('browse');
-    this.dispatch.call('change', this);
+    this.emit('change');
   }
 
 
@@ -450,7 +445,7 @@ export class UiNoteEditor {
     const osm = this.context.services.osm as any;
     if (osm) {
       osm.postNoteCreate(d, (err: any, note: any) => {
-        this.dispatch.call('change', this, note);
+        this.emit('change', note);
       });
     }
   }
@@ -467,7 +462,7 @@ export class UiNoteEditor {
     if (osm) {
       const setStatus = (d.props.status === 'open' ? 'closed' : 'open');
       osm.postNoteUpdate(d, setStatus, (err: any, note: any) => {
-        this.dispatch.call('change', this, note);
+        this.emit('change', note);
       });
     }
   }
@@ -483,7 +478,7 @@ export class UiNoteEditor {
     const osm = this.context.services.osm as any;
     if (osm) {
       osm.postNoteUpdate(d, d.props.status, (err: any, note: any) => {
-        this.dispatch.call('change', this, note);
+        this.emit('change', note);
       });
     }
   }

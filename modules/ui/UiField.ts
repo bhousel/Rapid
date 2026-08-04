@@ -1,4 +1,4 @@
-import { dispatch as d3_dispatch } from 'd3-dispatch';
+import { EventEmitter } from 'tseep/lib/ee-safe';
 import { select as d3_select } from 'd3-selection';
 import { utilUniqueString } from '@rapid-sdk/util';
 
@@ -7,7 +7,7 @@ import { uiTooltip } from './tooltip.js';
 // import { uiFieldHelp } from './field_help.js';
 import { uiFields } from './fields/index.js';
 import { UiTagReference } from './UiTagReference.js';
-import { utilRebind, utilTotalExtent } from '../util/index.ts';
+import { utilTotalExtent } from '../util/index.ts';
 import { LANGUAGE_SUFFIX_REGEX } from './fields/UiFieldLocalized.js';
 
 import type { Context } from '../Context.ts';
@@ -18,7 +18,7 @@ import type { Tags, UiFieldInternal } from './fields/types.ts';
 /**
  * Creates a new field, wraps the actual _internal implementation of that field
  */
-export class UiField {
+export class UiField extends EventEmitter {
   public context: Context;
   public presetField: any;
   public entityIDs: EntityID[];
@@ -34,10 +34,6 @@ export class UiField {
   public safeid: string;
   public uid: string;
   public entityExtent: any;
-  public dispatch: any;
-
-  /** Added at runtime by `utilRebind` */
-  public on!: (...args: any[]) => any;
 
   protected _show: boolean;
   protected _internal: UiFieldInternal | null;
@@ -54,6 +50,7 @@ export class UiField {
    * @param options - field display options
    */
   public constructor(context: Context, presetField: any, entityIDs: EntityID[] = [], options: any = {}) {
+    super();
     this.context = context;
     this.presetField = presetField;
     this.entityIDs = entityIDs;
@@ -108,9 +105,6 @@ export class UiField {
       .placement('bottom');
 
 
-    this.dispatch = d3_dispatch('change', 'revert');
-    utilRebind(this as any, this.dispatch, 'on');
-
     // Ensure methods used as callbacks always have `this` bound correctly.
     // (This is also necessary when using `d3-selection.call`)
     this.isAllowed = this.isAllowed.bind(this);
@@ -136,7 +130,7 @@ export class UiField {
 
     this._internal = new uiFields[this.type](this.context, this)
       .on('change', (tagChange: Tags, onInput: boolean) => {
-        this.dispatch.call('change', this, tagChange, onInput);
+        this.emit('change', tagChange, onInput);
       });
 
     // If this field cares about the entities, pass them along
@@ -216,7 +210,7 @@ export class UiField {
       keys.add('crossing');
     }
 
-    this.dispatch.call('revert', this, [...keys]);
+    this.emit('revert', [...keys]);
   }
 
 
@@ -243,7 +237,7 @@ export class UiField {
     for (const k of keys) {
       tagChange[k] = undefined;
     }
-    this.dispatch.call('change', this, tagChange);
+    this.emit('change', tagChange);
   }
 
 
@@ -445,7 +439,7 @@ export class UiField {
     if (this.default && this.key && this._tags[this.key] !== this.default) {
       const tagChange: Tags = {};
       tagChange[this.key] = this.default;
-      this.dispatch.call('change', this, tagChange);
+      this.emit('change', tagChange);
     }
   }
 

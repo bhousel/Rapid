@@ -1,4 +1,4 @@
-import { dispatch as d3_dispatch } from 'd3-dispatch';
+import { EventEmitter } from 'tseep/lib/ee-safe';
 import { select as d3_select } from 'd3-selection';
 import { utilArrayGroupBy, utilUniqueString } from '@rapid-sdk/util';
 import deepEqual from 'fast-deep-equal';
@@ -10,7 +10,7 @@ import { UiChangesetEditor } from './UiChangesetEditor.js';
 import { UiSectionChanges } from './sections/UiSectionChanges.js';
 import { UiCommitWarnings } from './UiCommitWarnings.js';
 import { UiSectionRawTagEditor } from './sections/UiSectionRawTagEditor.js';
-import { utilDetect, utilRebind } from '../util/index.ts';
+import { utilDetect } from '../util/index.ts';
 
 import type { Context } from '../Context.ts';
 import type { D3Selection } from 'd3-selection';
@@ -40,11 +40,8 @@ const hashtagRegex = /(#[^\u2000-\u206F\u2E00-\u2E7F\s\\'!"#$%()*,.\/:;<=>?@\[\]
  * editor, and change summary. Call `.render($selection)` to draw it. Emits
  * `cancel` when the user cancels.
  */
-export class UiCommit {
+export class UiCommit extends EventEmitter {
   public context: Context;
-  protected _dispatch: any;
-  /** Added at runtime by `utilRebind` */
-  public on!: (...args: any[]) => any;
 
   protected _userDetails: any;
   protected _selection: any;
@@ -55,6 +52,7 @@ export class UiCommit {
   protected _commitWarnings: UiCommitWarnings;
 
   public constructor(context: Context) {
+    super();
     this.context = context;
     this._userDetails = undefined;
     this._selection = undefined;
@@ -64,8 +62,6 @@ export class UiCommit {
     this._render = this._render.bind(this);
     this._changeTags = this._changeTags.bind(this);
 
-    this._dispatch = d3_dispatch('cancel');
-
     this._changesetEditor = new UiChangesetEditor(context)
       .on('change', this._changeTags);
     this._rawTagEditor = new UiSectionRawTagEditor(context, 'changeset-tag-editor')
@@ -73,8 +69,6 @@ export class UiCommit {
       .readOnlyTags(readOnlyTags);
     this._commitChanges = new UiSectionChanges(context);
     this._commitWarnings = new UiCommitWarnings(context);
-
-    utilRebind(this as any, this._dispatch, 'on');
   }
 
 
@@ -360,7 +354,7 @@ export class UiCommit {
       .append('button')
       .attr('class', 'close')
       .on('click', (d3_event: Event) => {
-        this._dispatch.call('cancel', d3_event.currentTarget);
+        this.emit('cancel');
       })
       .call(uiIcon('#rapid-icon-close'));
 
@@ -538,7 +532,7 @@ export class UiCommit {
 
     buttonSection.selectAll('.cancel-button')
       .on('click.cancel', (d3_event: Event) => {
-        this._dispatch.call('cancel', d3_event.currentTarget);
+        this.emit('cancel');
       });
 
     buttonSection.selectAll('.save-button')

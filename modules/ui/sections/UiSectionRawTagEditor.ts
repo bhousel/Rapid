@@ -1,4 +1,3 @@
-import { dispatch as d3_dispatch } from 'd3-dispatch';
 import { select as d3_select } from 'd3-selection';
 import { utilArrayDifference, utilArrayIdentical, utilTagDiff } from '@rapid-sdk/util';
 
@@ -6,7 +5,7 @@ import { uiIcon } from '../icon.js';
 import { uiCombobox } from '../combobox.js';
 import { AbstractUiSection } from '../AbstractUiSection.js';
 import { UiTagReference } from '../UiTagReference.js';
-import { utilGetSetValue, utilNoAuto, utilRebind } from '../../util/index.ts';
+import { utilGetSetValue, utilNoAuto } from '../../util/index.ts';
 
 import type { Context } from '../../Context.ts';
 import type { D3Selection } from 'd3-selection';
@@ -42,10 +41,6 @@ function unstringify(s: string): string {
 
 
 export class UiSectionRawTagEditor extends AbstractUiSection {
-  public dispatch: any;
-  /** Added at runtime by `utilRebind` */
-  public on!: (...args: any[]) => any;
-
   protected _discardKeys: Set<string>;
   protected _tagView: string;    // 'list', 'text'
   protected _readOnlyTags: RegExp[];
@@ -92,9 +87,6 @@ export class UiSectionRawTagEditor extends AbstractUiSection {
     this._valueChange = this._valueChange.bind(this);
     this._removeTag = this._removeTag.bind(this);
     this._addTag = this._addTag.bind(this);
-
-    this.dispatch = d3_dispatch('change');
-    utilRebind(this as any, this.dispatch, 'on');
   }
 
 
@@ -681,7 +673,7 @@ export class UiSectionRawTagEditor extends AbstractUiSection {
     // Delay change in case this change is blurring an edited combo. - iD#5878
     const applyChange = () => {
       if (!this._pendingChange) return;
-      this.dispatch.call('change', this, entityIDs, this._pendingChange);
+      this.emit('change', entityIDs, this._pendingChange);
       this._pendingChange = null;
     };
     if (scheduler) {

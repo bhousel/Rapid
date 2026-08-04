@@ -828,6 +828,7 @@ export class UiIntroLine extends AbstractIntroChapter {
 
     this._washingtonSegmentID = null;
 
+    let onToggled: ((open: boolean) => void) | undefined;
     try {
       return await new Promise<IntroStep>((resolve, reject) => {
         this._rejectStep = reject;
@@ -844,13 +845,14 @@ export class UiIntroLine extends AbstractIntroChapter {
           tipHtml: rightClickString
         });
 
-        EditMenu.on('toggled.intro', (open: boolean) => {
+        onToggled = (open: boolean) => {
           if (open) resolve(this._splitIntersectionAsync);
-        });
+        };
+        EditMenu.on('toggled', onToggled);
       });
     } finally {
       this._onStagingChange = null;
-      EditMenu.on('toggled.intro', null);
+      if (onToggled) EditMenu.off('toggled', onToggled);
     }
   }
 
@@ -1052,6 +1054,7 @@ export class UiIntroLine extends AbstractIntroChapter {
       return this._multiSelectAsync;   // both need to be selected - go back
     }
 
+    let onToggled: ((open: boolean) => void) | undefined;
     try {
       return await new Promise<IntroStep>((resolve, reject) => {
         this._rejectStep = reject;
@@ -1066,14 +1069,15 @@ export class UiIntroLine extends AbstractIntroChapter {
           tipHtml: rightClickString
         });
 
-        EditMenu.on('toggled.intro', (open: boolean) => {
+        onToggled = (open: boolean) => {
           if (open) resolve(this._multiDeleteAsync);
-        });
+        };
+        EditMenu.on('toggled', onToggled);
       });
     } finally {
       this._onModeChange = null;
       this._onStagingChange = null;
-      EditMenu.on('toggled.intro', null);
+      if (onToggled) EditMenu.off('toggled', onToggled);
     }
   }
 

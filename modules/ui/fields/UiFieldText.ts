@@ -1,8 +1,8 @@
-import { dispatch as d3_dispatch } from 'd3-dispatch';
+import { EventEmitter } from 'tseep/lib/ee-safe';
 import { select as d3_select } from 'd3-selection';
 import { iso1A2Code } from '@rapideditor/country-coder';
 
-import { utilGetSetValue, utilNoAuto, utilRebind } from '../../util/index.ts';
+import { utilGetSetValue, utilNoAuto } from '../../util/index.ts';
 import { uiIcon } from '../icon.js';
 
 import type { Context } from '../../Context.ts';
@@ -18,11 +18,8 @@ export {
 };
 
 
-export class UiFieldText {
+export class UiFieldText extends EventEmitter {
   public context: Context;
-  public dispatch: any;
-  /** Added at runtime by `utilRebind` */
-  public on!: (...args: any[]) => any;
 
   protected _uifield: any;
   public $input: D3Selection;
@@ -36,6 +33,7 @@ export class UiFieldText {
    * @param uifield - The `UiField` wrapper that owns this field internal
    */
   public constructor(context: Context, uifield: any) {
+    super();
     this.context = context;
     this._uifield = uifield;
 
@@ -46,9 +44,6 @@ export class UiFieldText {
     this._phoneFormats = {};
 
     this.render = this.render.bind(this);
-
-    this.dispatch = d3_dispatch('change');
-    utilRebind(this as any, this.dispatch, 'on');
 
     if (uifield.type === 'tel') {
       const assets = context.systems.assets!;
@@ -292,7 +287,7 @@ export class UiFieldText {
         utilGetSetValue(this.$input, val);
       }
       tagChange[key] = val || undefined;
-      this.dispatch.call('change', this, tagChange, onInput);
+      this.emit('change', tagChange, onInput);
     };
   }
 

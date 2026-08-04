@@ -1,21 +1,18 @@
-import { dispatch as d3_dispatch } from 'd3-dispatch';
+import { EventEmitter } from 'tseep/lib/ee-safe';
 import { select as d3_select } from 'd3-selection';
 
 import { actionChangeTags } from '../../actions/change_tags.js';
 import { uiIcon } from '../icon.js';
 import { uiCombobox } from '../combobox.js';
-import { utilGetSetValue, utilNoAuto, utilRebind } from '../../util/index.ts';
+import { utilGetSetValue, utilNoAuto } from '../../util/index.ts';
 
 import type { Context } from '../../Context.ts';
 import type { D3Selection } from 'd3-selection';
 import type { Tags } from './types.ts';
 
 
-export class UiFieldWikipedia {
+export class UiFieldWikipedia extends EventEmitter {
   public context: Context;
-  public dispatch: any;
-  /** Added at runtime by `utilRebind` */
-  public on!: (...args: any[]) => any;
 
   public static supportsMultiselection = false;
 
@@ -30,6 +27,7 @@ export class UiFieldWikipedia {
   protected _titleCombo: any;
 
   public constructor(context: Context, uifield: any) {
+    super();
     const assets = context.systems.assets!;
 
     this.context = context;
@@ -86,9 +84,6 @@ export class UiFieldWikipedia {
           callback( data.map((d: any) => ({ value: d })) );
         });
       });
-
-    this.dispatch = d3_dispatch('change');
-    utilRebind(this as any, this.dispatch, 'on');
   }
 
 
@@ -272,7 +267,7 @@ export class UiFieldWikipedia {
       syncTags.wikipedia = undefined;
     }
 
-    this.dispatch.call('change', this, syncTags);
+    this.emit('change', syncTags);
 
 
     if (skipWikidata || !value || !this._language()[2]) return;

@@ -103,7 +103,7 @@ describe('UiFieldWikipedia', () => {
         const spy = (...args) => spy.mock.calls.push(args);
         spy.mock = { calls: [] };
 
-        wikipedia.on('change.spy', spy);
+        wikipedia.on('change', spy);
 
         Rapid.utilGetSetValue(selection.selectAll('.wiki-lang'), 'Deutsch');
 
@@ -214,7 +214,7 @@ describe('UiFieldWikipedia', () => {
     const spy = (...args) => spy.mock.calls.push(args);
     spy.mock = { calls: [] };
 
-    wikipedia.on('change.spy', spy);
+    wikipedia.on('change', spy);
 
     // Set title to "Skip"
     Rapid.utilGetSetValue(selection.selectAll('.wiki-lang'), 'Deutsch');

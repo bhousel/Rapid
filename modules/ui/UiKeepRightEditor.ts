@@ -1,11 +1,11 @@
-import { dispatch as d3_dispatch } from 'd3-dispatch';
+import { EventEmitter } from 'tseep/lib/ee-safe';
 import { select as d3_select, selection } from 'd3-selection';
 
 import { uiIcon } from './icon.js';
 import { UiKeepRightDetails } from './UiKeepRightDetails.js';
 import { UiKeepRightHeader } from './UiKeepRightHeader.js';
 import { UiViewOn } from './UiViewOn.js';
-import { utilNoAuto, utilRebind } from '../util/index.ts';
+import { utilNoAuto } from '../util/index.ts';
 
 import type { Context } from '../Context.ts';
 import type { D3Selection } from 'd3-selection';
@@ -16,11 +16,8 @@ import type { D3Selection } from 'd3-selection';
  * (header, details, comment + action buttons). Set the issue via the public `datum`
  * property, then call `.render($parent)`. Emits `change` when the issue is updated.
  */
-export class UiKeepRightEditor {
+export class UiKeepRightEditor extends EventEmitter {
   public context: Context;
-  public dispatch: any;
-  /** Added at runtime by `utilRebind` */
-  public on!: (...args: any[]) => any;
   public datum: any;
 
   // D3 selections
@@ -31,6 +28,7 @@ export class UiKeepRightEditor {
   protected _viewOn: UiViewOn;
 
   public constructor(context: Context) {
+    super();
     this.context = context;
     this.datum = null;
 
@@ -45,9 +43,6 @@ export class UiKeepRightEditor {
     this.render = this.render.bind(this);
     this._saveSection = this._saveSection.bind(this);
     this._saveButtons = this._saveButtons.bind(this);
-
-    this.dispatch = d3_dispatch('change');
-    utilRebind(this as any, this.dispatch, 'on');
   }
 
 
@@ -243,7 +238,7 @@ export class UiKeepRightEditor {
       .on('click.comment', (d3_event: Event, d: any) => {
         (d3_event.currentTarget as HTMLElement).blur();    // avoid keeping focus on the button - iD#4641
         if (keepright) {
-          keepright.postUpdate(d, (err: any, item: any) => this.dispatch.call('change', this, item));
+          keepright.postUpdate(d, (err: any, item: any) => this.emit('change', item));
         }
       });
 
@@ -256,7 +251,7 @@ export class UiKeepRightEditor {
         (d3_event.currentTarget as HTMLElement).blur();    // avoid keeping focus on the button - iD#4641
         if (keepright) {
           d.props.newStatus = 'ignore_t';   // ignore temporarily (item fixed)
-          keepright.postUpdate(d, (err: any, item: any) => this.dispatch.call('change', this, item));
+          keepright.postUpdate(d, (err: any, item: any) => this.emit('change', item));
         }
       });
 
@@ -269,7 +264,7 @@ export class UiKeepRightEditor {
         (d3_event.currentTarget as HTMLElement).blur();    // avoid keeping focus on the button - iD#4641
         if (keepright) {
           d.props.newStatus = 'ignore';   // ignore permanently (false positive)
-          keepright.postUpdate(d, (err: any, item: any) => this.dispatch.call('change', this, item));
+          keepright.postUpdate(d, (err: any, item: any) => this.emit('change', item));
         }
       });
   }

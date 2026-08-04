@@ -1,18 +1,15 @@
-import { dispatch as d3_dispatch } from 'd3-dispatch';
+import { EventEmitter } from 'tseep/lib/ee-safe';
 import { select as d3_select } from 'd3-selection';
 
-import { utilGetSetValue, utilNoAuto, utilRebind } from '../../util/index.ts';
+import { utilGetSetValue, utilNoAuto } from '../../util/index.ts';
 
 import type { Context } from '../../Context.ts';
 import type { D3Selection } from 'd3-selection';
 import type { TagChange, Tags } from './types.ts';
 
 
-export class UiFieldTextarea {
+export class UiFieldTextarea extends EventEmitter {
   public context: Context;
-  public dispatch: any;
-  /** Added at runtime by `utilRebind` */
-  public on!: (...args: any[]) => any;
 
   protected _uifield: any;
   public $input: D3Selection;
@@ -23,6 +20,7 @@ export class UiFieldTextarea {
    * @param uifield - The `UiField` wrapper that owns this field internal
    */
   public constructor(context: Context, uifield: any) {
+    super();
     this.context = context;
     this._uifield = uifield;
 
@@ -30,9 +28,6 @@ export class UiFieldTextarea {
     this._tags = {};
 
     this.render = this.render.bind(this);
-
-    this.dispatch = d3_dispatch('change');
-    utilRebind(this as any, this.dispatch, 'on');
   }
 
 
@@ -84,7 +79,7 @@ export class UiFieldTextarea {
 
       const t: TagChange = {};
       t[key] = val || undefined;
-      this.dispatch.call('change', this, t, onInput);
+      this.emit('change', t, onInput);
     };
   }
 

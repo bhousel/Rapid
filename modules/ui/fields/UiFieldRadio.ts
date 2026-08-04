@@ -1,9 +1,8 @@
-import { dispatch as d3_dispatch } from 'd3-dispatch';
+import { EventEmitter } from 'tseep/lib/ee-safe';
 import { select as d3_select } from 'd3-selection';
 import { utilArrayUnion } from '@rapid-sdk/util';
 
 import { UiField } from '../UiField.js';
-import { utilRebind } from '../../util/rebind.ts';
 
 import type { Context } from '../../Context.ts';
 import type { D3Selection } from 'd3-selection';
@@ -12,11 +11,8 @@ import type { Tags } from './types.ts';
 export { UiFieldRadio as UiFieldStructureRadio };
 
 
-export class UiFieldRadio {
+export class UiFieldRadio extends EventEmitter {
   public context: Context;
-  public dispatch: any;
-  /** Added at runtime by `utilRebind` */
-  public on!: (...args: any[]) => any;
 
   protected _uifield: any;
   protected _scope: any;
@@ -35,6 +31,7 @@ export class UiFieldRadio {
    * @param uifield - The `UiField` wrapper that owns this field internal
    */
   public constructor(context: Context, uifield: any) {
+    super();
     const schema = context.systems.schema!;
 
     this.context = context;
@@ -56,9 +53,6 @@ export class UiFieldRadio {
     this._changeType = this._changeType.bind(this);
     this._changeLayer = this._changeLayer.bind(this);
     this._changeRadio = this._changeRadio.bind(this);
-
-    this.dispatch = d3_dispatch('change');
-    utilRebind(this as any, this.dispatch, 'on');
   }
 
 
@@ -296,7 +290,7 @@ export class UiFieldRadio {
       }
     }
 
-    this.dispatch.call('change', this, t, onInput);
+    this.emit('change', t, onInput);
   }
 
 
@@ -309,7 +303,7 @@ export class UiFieldRadio {
     if (t.layer === '0') {
       t.layer = undefined;
     }
-    this.dispatch.call('change', this, t, onInput);
+    this.emit('change', t, onInput);
   }
 
 
@@ -346,7 +340,7 @@ export class UiFieldRadio {
       }
     }
 
-    this.dispatch.call('change', this, t);
+    this.emit('change', t);
   }
 
 

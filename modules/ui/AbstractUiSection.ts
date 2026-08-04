@@ -1,4 +1,5 @@
 import { select as d3_select } from 'd3-selection';
+import { EventEmitter } from 'tseep/lib/ee-safe';
 
 import { uiDisclosure } from './disclosure.js';
 
@@ -19,7 +20,7 @@ import type { UiDisclosure } from './disclosure.js';
  * Subclasses may also override `label()` and `shouldDisplay()`, and may set
  * `this._classes` (extra container classes) and `this._disclosureExpandOverride`.
  */
-export abstract class AbstractUiSection {
+export abstract class AbstractUiSection extends EventEmitter {
   public context: Context;
   public id: string;
 
@@ -35,6 +36,7 @@ export abstract class AbstractUiSection {
    * @param  id      - unique identifier for this section (used for CSS classes)
    */
   public constructor(context: Context, id: string) {
+    super();
     this.context = context;
     this.id = id;
 

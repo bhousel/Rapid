@@ -1,10 +1,9 @@
-import { dispatch as d3_dispatch } from 'd3-dispatch';
+import { EventEmitter } from 'tseep/lib/ee-safe';
 
 import { uiIcon } from './icon.js';
 import { uiCombobox} from './combobox.js';
 import { UiField } from './UiField.js';
 import { uiFormFields } from './form_fields.js';
-import { utilRebind } from '../util/index.ts';
 
 import type { Context } from '../Context.ts';
 import type { D3Selection } from 'd3-selection';
@@ -15,11 +14,8 @@ import type { D3Selection } from 'd3-selection';
  * fields in the commit sidebar. Set the changeset via `.changesetID(id)` and
  * `.tags(tags)`, then call `.render($selection)`. Emits `change` on edits.
  */
-export class UiChangesetEditor {
+export class UiChangesetEditor extends EventEmitter {
   public context: Context;
-  protected _dispatch: any;
-  /** Added at runtime by `utilRebind` */
-  public on!: (...args: any[]) => any;
 
   protected _scope: any;
   protected _formFields: any;
@@ -29,6 +25,7 @@ export class UiChangesetEditor {
   protected _changesetID: any;
 
   public constructor(context: Context) {
+    super();
     this.context = context;
 
     const schema = context.systems.schema!;
@@ -42,9 +39,6 @@ export class UiChangesetEditor {
 
     // Ensure methods used as callbacks always have `this` bound correctly.
     this.render = this.render.bind(this);
-
-    this._dispatch = d3_dispatch('change');
-    utilRebind(this as any, this._dispatch, 'on');
   }
 
 
@@ -73,7 +67,7 @@ export class UiChangesetEditor {
       this._uifields.forEach((field: any) => {
         field
           .on('change', (t: any, onInput: any) => {
-            this._dispatch.call('change', field, undefined, t, onInput);
+            this.emit('change', undefined, t, onInput);
           });
       });
     }

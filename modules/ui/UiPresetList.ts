@@ -1,4 +1,4 @@
-import { dispatch as d3_dispatch } from 'd3-dispatch';
+import { EventEmitter } from 'tseep/lib/ee-safe';
 import { select as d3_select, selection } from 'd3-selection';
 
 import { actionChangePreset } from '../actions/change_preset.js';
@@ -8,7 +8,7 @@ import { uiIcon } from './icon.js';
 import { UiPresetIcon } from './UiPresetIcon.js';
 import { UiTagReference } from './UiTagReference.js';
 import { uiTooltip } from './tooltip.js';
-import { utilKeybinding, utilNoAuto, utilRebind, utilTotalExtent } from '../util/index.ts';
+import { utilKeybinding, utilNoAuto, utilTotalExtent } from '../util/index.ts';
 
 import type { Context } from '../Context.ts';
 import type { D3Selection } from 'd3-selection';
@@ -20,11 +20,8 @@ const MAXSEARCH = 50;   // how many search results to show
  * The `UiPresetList` renders a searchable list of Presets/Categories that the user can
  * choose from to assign a feature type to the selected entities.
  */
-export class UiPresetList {
+export class UiPresetList extends EventEmitter {
   public context: Context;
-  public dispatch: any;
-  /** Added at runtime by `utilRebind` */
-  public on!: (...args: any[]) => any;
 
   public $parent: D3Selection | null;
 
@@ -41,6 +38,7 @@ export class UiPresetList {
    * @param  context - Global shared application context
    */
   public constructor(context: Context) {
+    super();
     this.context = context;
 
     this.$parent = null;
@@ -62,9 +60,6 @@ export class UiPresetList {
     this._searchKeydown = this._searchKeydown.bind(this);
     this._searchKeypress = this._searchKeypress.bind(this);
     this._searchInput = this._searchInput.bind(this);
-
-    this.dispatch = d3_dispatch('cancel', 'choose');
-    utilRebind(this as any, this.dispatch, 'on');
   }
 
 
@@ -105,7 +100,7 @@ export class UiPresetList {
     $$header
       .append('button')
       .attr('class', 'preset-choose')
-      .on('click', () => this.dispatch.call('cancel', this))
+      .on('click', () => this.emit('cancel'))
       .call(uiIcon(isRTL ? '#rapid-icon-backward' : '#rapid-icon-forward'));
 
     // update
@@ -830,6 +825,6 @@ class PresetItem {
       annotation: l10n.t('operations.change_tags.annotation'),
       selectedIDs: list._entityIDs
     });
-    list.dispatch.call('choose', this, item);
+    list.emit('choose', item);
   }
 }

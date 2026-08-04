@@ -2,7 +2,20 @@
 
 Non-obvious choices where "why did we do it this way?" isn't captured in the code.
 
-## Web content security
+## UI events: EventEmitter over d3_dispatch/utilRebind
+
+All UI class components that emit events extend `EventEmitter` from `tseep/lib/ee-safe` — the same
+library used by `AbstractSystem`, `AbstractMode`, `AbstractBehavior`, and `Context`. This gives a
+single, consistent event API across the whole codebase (`.on` / `.off` / `.emit`) and removes the
+d3-dispatch + `utilRebind` + `public on!` boilerplate that every emitting class had to repeat.
+
+The two factory functions `combobox.ts` and `disclosure.ts` still use `d3_dispatch` (they rebind
+the dispatch onto a returned function-object, not a class instance). Converting them would require
+changing their call-site API; deferred until their remaining JS consumers are converted.
+
+`UiFieldRestrictions` was the only disabled/stub class; it still extends `EventEmitter` even though
+its `render()` is a placeholder, because the field registry (`uiFields`) instantiates it just like
+any other field type.
 
 - **Use explicit strict sanitization only at known trust boundaries.** External QA content, notes, remote metadata, Markdown, and reusable HTML widgets pass through Rapid's detached-document allowlist. The sanitizer rejects foreign namespaces and unsafe URL schemes, hardens new-window links, and reparses until serialization is stable. It fails closed to escaped text when DOM parsing is unavailable.
 - **Do not install a document-wide Trusted Types default policy.** Rapid's registries and embedding model let extensions own their rendering. A global policy rewrites those extension sinks, and DOMPurify's assumptions did not hold in live Chrome. Keep sanitization local to the core trust boundaries instead.

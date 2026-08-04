@@ -1,10 +1,10 @@
 import { select as d3_select } from 'd3-selection';
-import { dispatch as d3_dispatch } from 'd3-dispatch';
+import { EventEmitter } from 'tseep/lib/ee-safe';
 import { vecAdd } from '@rapid-sdk/math';
 
 import { uiTooltip } from './tooltip.js';
 import { uiIcon } from './icon.js';
-import { utilHighlightEntities, utilRebind } from '../util/index.ts';
+import { utilHighlightEntities } from '../util/index.ts';
 
 import type { Context } from '../Context.ts';
 import type { D3Selection } from 'd3-selection';
@@ -25,11 +25,8 @@ const TOOLTIP_WIDTH = 210;      // see also `.edit-menu .tooltip` CSS; include m
  * and `operations()`, then call `.render($selection)`. Call `close()` to dismiss it.
  * Emits `toggled`.
  */
-export class UiEditMenu {
+export class UiEditMenu extends EventEmitter {
   public context: Context;
-  protected _dispatch: any;
-  /** Added at runtime by `utilRebind` */
-  public on!: (...args: any[]) => any;
 
   // Menu state, these are locked in when menu is initially shown
   // but needed later if the menu is repositioned
@@ -46,6 +43,7 @@ export class UiEditMenu {
 
   /** Creates a new edit menu bound to the shared application context. */
   public constructor(context: Context) {
+    super();
     this.context = context;
 
     this._menu = d3_select(null);
@@ -65,9 +63,6 @@ export class UiEditMenu {
     this._updatePosition = this._updatePosition.bind(this);
     this._click = this._click.bind(this);
     this._pointerup = this._pointerup.bind(this);
-
-    this._dispatch = d3_dispatch('toggled');
-    utilRebind(this as any, this._dispatch, 'on');
   }
 
 
@@ -200,7 +195,7 @@ export class UiEditMenu {
     map.off('move', this._updatePosition);
     map.on('move', this._updatePosition);
 
-    this._dispatch.call('toggled', this, true);
+    this.emit('toggled', true);
   }
 
 
@@ -374,7 +369,7 @@ export class UiEditMenu {
     this._menu.remove();
     this._tooltips.clear();
 
-    this._dispatch.call('toggled', this, false);
+    this.emit('toggled', false);
   }
 
 

@@ -1,9 +1,8 @@
-import { dispatch as d3_dispatch } from 'd3-dispatch';
+import { EventEmitter } from 'tseep/lib/ee-safe';
 import { select as d3_select } from 'd3-selection';
 import { vecAdd } from '@rapid-sdk/math';
 
 import { uiIcon } from './icon.js';
-import { utilRebind } from '../util/rebind.ts';
 
 import type { Context } from '../Context.ts';
 import type { D3Selection } from 'd3-selection';
@@ -23,11 +22,8 @@ const VERTICAL_PADDING = 4;
  * (Fixed / Can't Complete / Already Fixed / Not an Issue). Set `datum`, `anchorLoc`, and
  * `triggerType`, then call `.render($selection)`. Emits `toggled` and `change`.
  */
-export class UiMapRouletteMenu {
+export class UiMapRouletteMenu extends EventEmitter {
   public context: Context;
-  public dispatch: any;
-  /** Added at runtime by `utilRebind` */
-  public on!: (...args: any[]) => any;
 
   public datum: any;
   public anchorLoc: Vec2;
@@ -42,6 +38,7 @@ export class UiMapRouletteMenu {
 
   /** Creates a new MapRoulette menu bound to the shared application context. */
   public constructor(context: Context) {
+    super();
     this.context = context;
     this.datum = null;
     this.anchorLoc = [0, 0];
@@ -58,9 +55,6 @@ export class UiMapRouletteMenu {
     this.render = this.render.bind(this);
     this.close = this.close.bind(this);
     this._updatePosition = this._updatePosition.bind(this);
-
-    this.dispatch = d3_dispatch('toggled', 'change');
-    utilRebind(this as any, this.dispatch, 'on');
   }
 
 
@@ -142,7 +136,7 @@ export class UiMapRouletteMenu {
     map.off('move', this._updatePosition);
     map.on('move', this._updatePosition);
 
-    this.dispatch.call('toggled', this, true);
+    this.emit('toggled', true);
   }
 
 
@@ -283,7 +277,7 @@ export class UiMapRouletteMenu {
           console.error(err);  // eslint-disable-line no-console
           return;
         }
-        this.dispatch.call('change', this, item);
+        this.emit('change', item);
         if (maproulette.nearbyTaskEnabled) {
           maproulette.flyToNearbyTask(d);
         }
@@ -314,7 +308,7 @@ export class UiMapRouletteMenu {
 
     map.off('move', this._updatePosition);
     this.$menu.remove();
-    this.dispatch.call('toggled', this, false);
+    this.emit('toggled', false);
 
     (context.systems.ui as any)._showsMapRouletteMenu = false; // Reset state
   }

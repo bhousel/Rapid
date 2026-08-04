@@ -1,11 +1,11 @@
-import { dispatch as d3_dispatch } from 'd3-dispatch';
+import { EventEmitter } from 'tseep/lib/ee-safe';
 import { select as d3_select, selection } from 'd3-selection';
 
 import { uiIcon } from './icon.js';
 import { UiMapRouletteDetails } from './UiMapRouletteDetails.js';
 import { UiMapRouletteHeader } from './UiMapRouletteHeader.js';
 import { UiViewOn } from './UiViewOn.js';
-import { utilNoAuto, utilRebind } from '../util/index.ts';
+import { utilNoAuto } from '../util/index.ts';
 
 import type { Context } from '../Context.ts';
 import type { D3Selection } from 'd3-selection';
@@ -36,11 +36,8 @@ function getActionColor(action: string): string {
  * (header, details, action buttons, comment + submit). Set the task via the public
  * `datum` property, then call `.render($parent)`. Emits `change` when the task is updated.
  */
-export class UiMapRouletteEditor {
+export class UiMapRouletteEditor extends EventEmitter {
   public context: Context;
-  public dispatch: any;
-  /** Added at runtime by `utilRebind` */
-  public on!: (...args: any[]) => any;
   public datum: any;
 
   protected _header: UiMapRouletteHeader;
@@ -54,6 +51,7 @@ export class UiMapRouletteEditor {
   public $parent: D3Selection | null;
 
   public constructor(context: Context) {
+    super();
     this.context = context;
     this.datum = null;
     this._actionTaken = '';
@@ -75,9 +73,6 @@ export class UiMapRouletteEditor {
     this._saveButtons = this._saveButtons.bind(this);
     this._submitButtons = this._submitButtons.bind(this);
     this._nearbyTaskChanged = this._nearbyTaskChanged.bind(this);
-
-    this.dispatch = d3_dispatch('change');
-    utilRebind(this as any, this.dispatch, 'on');
   }
 
 
@@ -650,7 +645,7 @@ export class UiMapRouletteEditor {
         console.error(err);  // eslint-disable-line no-console
         return;
       }
-      this.dispatch.call('change', this, item);
+      this.emit('change', item);
       // Fly to a nearby task if the feature is enabled, after the update
       if (maproulette.nearbyTaskEnabled) {
         maproulette.flyToNearbyTask(d);

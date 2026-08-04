@@ -1,8 +1,8 @@
-import { dispatch as d3_dispatch } from 'd3-dispatch';
+import { EventEmitter } from 'tseep/lib/ee-safe';
 import { select as d3_select } from 'd3-selection';
 
 import { uiCombobox } from '../combobox.js';
-import { utilGetSetValue, utilNoAuto, utilRebind } from '../../util/index.ts';
+import { utilGetSetValue, utilNoAuto } from '../../util/index.ts';
 
 import type { Context } from '../../Context.ts';
 import type { D3Selection } from 'd3-selection';
@@ -14,11 +14,8 @@ function stripcolon(s: string): string {
 }
 
 
-export class UiFieldCycleway {
+export class UiFieldCycleway extends EventEmitter {
     public context: Context;
-    public dispatch: any;
-    /** Added at runtime by `utilRebind` */
-    public on!: (...args: any[]) => any;
 
     protected _uifield: any;
     public $items: D3Selection;
@@ -30,6 +27,7 @@ export class UiFieldCycleway {
      * @param uifield - The `UiField` wrapper that owns this field internal
      */
     public constructor(context: Context, uifield: any) {
+        super();
         this.context = context;
         this._uifield = uifield;
 
@@ -39,9 +37,6 @@ export class UiFieldCycleway {
 
         this.render = this.render.bind(this);
         this._change = this._change.bind(this);
-
-        this.dispatch = d3_dispatch('change');
-        utilRebind(this as any, this.dispatch, 'on');
     }
 
 
@@ -158,7 +153,7 @@ export class UiFieldCycleway {
             tag[otherKey] = otherValue;
         }
 
-        this.dispatch.call('change', this, tag);
+        this.emit('change', tag);
     }
 
 

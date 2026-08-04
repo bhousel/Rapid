@@ -1,10 +1,9 @@
-import { dispatch as d3_dispatch } from 'd3-dispatch';
+import { EventEmitter } from 'tseep/lib/ee-safe';
 import { select as d3_select } from 'd3-selection';
 import { resolveStrings } from 'osm-community-index';
 
 import { uiIcon } from './icon.js';
 import { uiDisclosure } from '../ui/disclosure.js';
-import { utilRebind } from '../util/rebind.ts';
 import { utilSanitizeHTML } from '../util/sanitize.ts';
 import { utilSafeURL } from '../util/url.ts';
 
@@ -23,16 +22,14 @@ const MAXEVENTS = 2;
  * public `changeset()` setter (and optionally `location()`), then call `.render($selection)`.
  * Emits `cancel` when the user closes the screen.
  */
-export class UiSuccess {
+export class UiSuccess extends EventEmitter {
   public context: Context;
-  protected _dispatch: any;
-  /** Added at runtime by `utilRebind` */
-  public on!: (...args: any[]) => any;
 
   protected _changeset: any;
   protected _location: any;
 
   public constructor(context: Context) {
+    super();
     this.context = context;
     this._changeset = null;
     this._location = null;
@@ -40,9 +37,6 @@ export class UiSuccess {
     // Ensure methods used as callbacks always have `this` bound correctly.
     this.render = this.render.bind(this);
     this._showCommunityLinks = this._showCommunityLinks.bind(this);
-
-    this._dispatch = d3_dispatch('cancel');
-    utilRebind(this as any, this._dispatch, 'on');
 
     this._getCommunityIndexAsync();   // start fetching the data
   }
@@ -137,7 +131,7 @@ export class UiSuccess {
     $header
       .append('button')
       .attr('class', 'close')
-      .on('click', () => this._dispatch.call('cancel'))
+      .on('click', () => this.emit('cancel'))
       .call(uiIcon('#rapid-icon-close'));
 
     const $body = $selection

@@ -1,17 +1,13 @@
-import { dispatch as d3_dispatch } from 'd3-dispatch';
+import { EventEmitter } from 'tseep/lib/ee-safe';
 
-import { utilRebind } from '../../util/rebind.ts';
 import { utilGetDimensions } from '../../util/dimensions.ts';
 
 import type { Context } from '../../Context.ts';
 import type { D3Selection } from 'd3-selection';
 
 
-export class UiFieldLanes {
+export class UiFieldLanes extends EventEmitter {
     public context: Context;
-    public dispatch: any;
-    /** Added at runtime by `utilRebind` */
-    public on!: (...args: any[]) => any;
 
     public static supportsMultiselection = false;
 
@@ -19,15 +15,13 @@ export class UiFieldLanes {
     protected _entityIDs: EntityID[];
 
     public constructor(context: Context, uifield: any) {
+        super();
         this.context = context;
         this._uifield = uifield;
 
         this._entityIDs = [];
 
         this.render = this.render.bind(this);
-
-        this.dispatch = d3_dispatch('change');
-        utilRebind(this as any, this.dispatch, 'on');
     }
 
 
@@ -48,7 +42,7 @@ export class UiFieldLanes {
         const lanesData = (graph.entity(this._entityIDs[0]) as any).lanes();
 
         if (!context.container().select('.inspector-wrap.inspector-hidden').empty() || !$selection.node().parentNode) {
-            $selection.call(this.off);
+            $selection.call(this._detach);
             return;
         }
 
@@ -170,5 +164,5 @@ export class UiFieldLanes {
     public focus(): void {}
 
     /** Detaches event handlers from the field. (no-op for lanes) */
-    public off(): void {}
+    protected _detach(): void {}
 }

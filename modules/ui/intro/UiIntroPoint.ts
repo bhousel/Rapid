@@ -451,6 +451,7 @@ export class UiIntroPoint extends AbstractIntroChapter {
     if (!this._doesPointExist()) return this._reselectPointAsync;
     if (!['browse', 'select-osm'].includes(context.mode?.id ?? '')) context.enter('browse');
 
+    let onToggled: ((open: boolean) => void) | undefined;
     try {
       return await new Promise<IntroStep>((resolve, reject) => {
         this._rejectStep = reject;
@@ -462,13 +463,14 @@ export class UiIntroPoint extends AbstractIntroChapter {
           tipHtml: helpHtml(context, `intro.points.${textID}`)
         });
 
-        EditMenu.on('toggled.intro', (open: boolean) => {
+        onToggled = (open: boolean) => {
           if (open) resolve(this._enterDeleteAsync);
-        });
+        };
+        EditMenu.on('toggled', onToggled);
       });
     } finally {
       this._onStagingChange = null;
-      EditMenu.on('toggled.intro', null);
+      if (onToggled) EditMenu.off('toggled', onToggled);
     }
   }
 

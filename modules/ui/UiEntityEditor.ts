@@ -1,11 +1,10 @@
-import { dispatch as d3_dispatch } from 'd3-dispatch';
+import { EventEmitter } from 'tseep/lib/ee-safe';
 import { selection } from 'd3-selection';
 import { utilArrayIdentical, utilCleanTags } from '@rapid-sdk/util';
 import deepEqual from 'fast-deep-equal';
 
 import { actionChangeTags, actionSyncCrossingTags } from '../actions/index.ts';
 import { uiIcon } from './icon.js';
-import { utilRebind } from '../util/rebind.ts';
 
 import { UiSectionEntityIssues } from './sections/UiSectionEntityIssues.js';
 import { UiSectionFeatureType } from './sections/UiSectionFeatureType.js';
@@ -27,11 +26,8 @@ let _wasSelectedIDs: EntityID[] = [];
  * It gathers the various inspector sections (feature type, fields, raw tags, members, etc.)
  * and renders them into the sidebar.
  */
-export class UiEntityEditor {
+export class UiEntityEditor extends EventEmitter {
   public context: Context;
-  public dispatch: any;
-  /** Added at runtime by `utilRebind` */
-  public on!: (...args: any[]) => any;
 
   public $parent: D3Selection | null;
 
@@ -48,6 +44,7 @@ export class UiEntityEditor {
    * @param  context - Global shared application context
    */
   public constructor(context: Context) {
+    super();
     this.context = context;
 
     const editor = context.systems.editor!;
@@ -71,11 +68,9 @@ export class UiEntityEditor {
     this._changeRawTags = this._changeRawTags.bind(this);
     this._revertTags = this._revertTags.bind(this);
 
-    this.dispatch = d3_dispatch('choose');
-
     this._sections = [
       new UiSectionSelectionList(context),
-      new UiSectionFeatureType(context).on('choose', (selected: any) => this.dispatch.call('choose', this, selected)),
+      new UiSectionFeatureType(context).on('choose', (selected: any) => { this.emit('choose', selected); }),
       new UiSectionEntityIssues(context),
       new UiSectionPresetFields(context).on('change', this._changeTags).on('revert', this._revertTags),
       new UiSectionRawTagEditor(context, 'raw-tag-editor').on('change', this._changeRawTags),
@@ -86,8 +81,6 @@ export class UiEntityEditor {
     // reset listener
     editor.off('stagingchange', this._onStagingChange);
     editor.on('stagingchange', this._onStagingChange);
-
-    utilRebind(this as any, this.dispatch, 'on');
   }
 
 
@@ -140,7 +133,7 @@ export class UiEntityEditor {
       .text(this._entityIDs.length === 1 ? l10n.t('map_data.layers.osm.feature') : l10n.t('inspector.multiselect'));
 
     $header.selectAll('.preset-reset')
-      .on('click', () => this.dispatch.call('choose', this, this._selectedPresets));
+      .on('click', () => this.emit('choose', this._selectedPresets));
 
     // Body
     let $body: D3Selection = this.$parent.selectAll('.inspector-body')

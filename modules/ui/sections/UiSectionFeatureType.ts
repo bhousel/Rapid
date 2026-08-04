@@ -1,9 +1,7 @@
-import { dispatch as d3_dispatch } from 'd3-dispatch';
 import { utilArrayIdentical } from '@rapid-sdk/util';
 
 import { AbstractUiSection } from '../AbstractUiSection.js';
 import { uiTooltip } from '../tooltip.js';
-import { utilRebind } from '../../util/rebind.ts';
 import { UiPresetIcon } from '../UiPresetIcon.js';
 import { UiTagReference } from '../UiTagReference.js';
 
@@ -12,10 +10,6 @@ import type { D3Selection } from 'd3-selection';
 
 
 export class UiSectionFeatureType extends AbstractUiSection {
-  public dispatch: any;
-  /** Added at runtime by `utilRebind` */
-  public on!: (...args: any[]) => any;
-
   protected _entityIDs: EntityID[];
   protected _presets: any[];
   protected _tagReference: UiTagReference | undefined;
@@ -25,9 +19,6 @@ export class UiSectionFeatureType extends AbstractUiSection {
     this._entityIDs = [];
     this._presets = [];
     this._tagReference = undefined;
-
-    this.dispatch = d3_dispatch('choose');
-    utilRebind(this as any, this.dispatch, 'on');
   }
 
 
@@ -135,7 +126,7 @@ export class UiSectionFeatureType extends AbstractUiSection {
 
     $selection.selectAll('.preset-reset')
       .on('click', (d3_event: Event) => {
-         this.dispatch.call('choose', this, this._presets);
+         this.emit('choose', this._presets);
       })
       .on('pointerdown pointerup mousedown mouseup', function(d3_event: Event) {
         d3_event.preventDefault();

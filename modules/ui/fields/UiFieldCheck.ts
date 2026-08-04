@@ -1,7 +1,6 @@
-import { dispatch as d3_dispatch } from 'd3-dispatch';
+import { EventEmitter } from 'tseep/lib/ee-safe';
 import { select as d3_select } from 'd3-selection';
 
-import { utilRebind } from '../../util/rebind.ts';
 import { actionReverse } from '../../actions/reverse.js';
 import { uiIcon } from '../icon.js';
 
@@ -13,11 +12,8 @@ export { UiFieldCheck as UiFieldDefaultCheck };
 export { UiFieldCheck as UiFieldOnewayCheck };
 
 
-export class UiFieldCheck {
+export class UiFieldCheck extends EventEmitter {
   public context: Context;
-  public dispatch: any;
-  /** Added at runtime by `utilRebind` */
-  public on!: (...args: any[]) => any;
 
   protected _uifield: any;
   protected _values: (string | undefined)[];
@@ -36,6 +32,7 @@ export class UiFieldCheck {
    * @param uifield - The `UiField` wrapper that owns this field internal
    */
   public constructor(context: Context, uifield: any) {
+    super();
     const l10n = context.systems.l10n!;
 
     this.context = context;
@@ -71,9 +68,6 @@ export class UiFieldCheck {
         this._texts.push(l10n.t('inspector.check.no'));
       }
     }
-
-    this.dispatch = d3_dispatch('change');
-    utilRebind(this as any, this.dispatch, 'on');
   }
 
 
@@ -212,7 +206,7 @@ export class UiFieldCheck {
           tagChange[key] = this._values[0];
         }
 
-        this.dispatch.call('change', this, tagChange);
+        this.emit('change', tagChange);
       });
 
 

@@ -1,4 +1,4 @@
-import { dispatch as d3_dispatch } from 'd3-dispatch';
+import { EventEmitter } from 'tseep/lib/ee-safe';
 import { select as d3_select } from 'd3-selection';
 import { drag as d3_drag } from 'd3-drag';
 import { utilArrayUniq, utilUnicodeCharsCount } from '@rapid-sdk/util';
@@ -6,7 +6,7 @@ import { iso1A2Code } from '@rapideditor/country-coder';
 
 import { uiCombobox } from '../combobox.js';
 import { utilKeybinding } from '../../util/keybinding.ts';
-import { utilGetSetValue, utilNoAuto, utilRebind } from '../../util/index.ts';
+import { utilGetSetValue, utilNoAuto } from '../../util/index.ts';
 
 import type { Context } from '../../Context.ts';
 import type { D3Selection } from 'd3-selection';
@@ -21,11 +21,8 @@ export {
 };
 
 
-export class UiFieldCombo {
+export class UiFieldCombo extends EventEmitter {
   public context: Context;
-  public dispatch: any;
-  /** Added at runtime by `utilRebind` */
-  public on!: (...args: any[]) => any;
 
   protected _uifield: any;
   protected _isMulti: boolean;
@@ -47,6 +44,7 @@ export class UiFieldCombo {
   protected _staticPlaceholder: string;
 
   public constructor(context: Context, uifield: any) {
+    super();
     const presetField = uifield.presetField;
 
     this.context = context;
@@ -83,9 +81,6 @@ export class UiFieldCombo {
     this._setPlaceholder = this._setPlaceholder.bind(this);
     this._change = this._change.bind(this);
     this._removeMultikey = this._removeMultikey.bind(this);
-
-    this.dispatch = d3_dispatch('change');
-    utilRebind(this as any, this.dispatch, 'on');
   }
 
 
@@ -387,7 +382,7 @@ export class UiFieldCombo {
       t[uifield.key] = val || undefined;
     }
 
-    this.dispatch.call('change', this, t);
+    this.emit('change', t);
   }
 
 
@@ -425,7 +420,7 @@ export class UiFieldCombo {
       arr = utilArrayUniq(arr);
       t[key] = arr.length ? arr.join(';') : undefined;
     }
-    this.dispatch.call('change', this, t);
+    this.emit('change', t);
   }
 
 
@@ -708,7 +703,7 @@ export class UiFieldCombo {
 
             const t: Tags = {};
             t[key] = undefined;
-            this.dispatch.call('change', this, t);
+            this.emit('change', t);
           }
         });
     }
@@ -724,7 +719,7 @@ export class UiFieldCombo {
     const key = uifield.key;
     const $container = this.$container;
     const multiData = this._multiData;
-    const dispatch = this.dispatch;
+    const emit = this.emit.bind(this);
 
     // allow drag and drop re-ordering of chips
     let dragOrigin: any, targetIndex: any;
@@ -838,7 +833,7 @@ export class UiFieldCombo {
             t[key] = undefined;
           }
 
-          dispatch.call('change', this, t);
+          emit('change', t);
         }
         dragOrigin = undefined;
         targetIndex = undefined;

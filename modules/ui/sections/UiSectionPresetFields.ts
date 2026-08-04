@@ -1,20 +1,14 @@
-import { dispatch as d3_dispatch } from 'd3-dispatch';
 import { utilArrayIdentical, utilArrayUnion } from '@rapid-sdk/util';
 
 import { AbstractUiSection } from '../AbstractUiSection.js';
 import { UiField } from '../UiField.js';
 import { uiFormFields } from '../form_fields.js';
-import { utilRebind } from '../../util/rebind.ts';
 
 import type { Context } from '../../Context.ts';
 import type { D3Selection } from 'd3-selection';
 
 
 export class UiSectionPresetFields extends AbstractUiSection {
-  public dispatch: any;
-  /** Added at runtime by `utilRebind` */
-  public on!: (...args: any[]) => any;
-
   protected _formFields: any;
   protected _state: string | undefined;    // can be 'hide', 'hover', or 'select'
   protected _uifields: any[] | null;
@@ -30,9 +24,6 @@ export class UiSectionPresetFields extends AbstractUiSection {
     this._presets = [];
     this._tags = undefined;
     this._entityIDs = [];
-
-    this.dispatch = d3_dispatch('change', 'revert');
-    utilRebind(this as any, this.dispatch, 'on');
   }
 
 
@@ -117,10 +108,10 @@ export class UiSectionPresetFields extends AbstractUiSection {
       const ids = this._entityIDs.slice();  // make copy (eslint warning)
       for (const uifield of this._uifields) {
         uifield.on('change', (t: any, onInput: boolean) => {
-          this.dispatch.call('change', uifield, ids, t, onInput);
+          this.emit('change', ids, t, onInput);
         });
         uifield.on('revert', (keys: string[]) => {
-          this.dispatch.call('revert', uifield, keys);
+          this.emit('revert', keys);
         });
       }
     }

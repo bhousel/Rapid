@@ -1,8 +1,8 @@
-import { dispatch as d3_dispatch } from 'd3-dispatch';
+import { EventEmitter } from 'tseep/lib/ee-safe';
 import { marked } from 'marked';
 
 import { uiConfirm } from '../confirm.js';
-import { utilNoAuto, utilRebind } from '../../util/index.ts';
+import { utilNoAuto } from '../../util/index.ts';
 
 import type { Context } from '../../Context.ts';
 import type { D3Selection } from 'd3-selection';
@@ -12,20 +12,15 @@ import type { D3Selection } from 'd3-selection';
  * The `UiSettingsCustomBackground` renders a modal for entering a custom imagery template.
  * Call `.render($selection)` to open it; emits `change` with the new settings on save.
  */
-export class UiSettingsCustomBackground {
+export class UiSettingsCustomBackground extends EventEmitter {
   public context: Context;
-  public dispatch: any;
-  /** Added at runtime by `utilRebind` */
-  public on!: (...args: any[]) => any;
 
   public constructor(context: Context) {
+    super();
     this.context = context;
 
     // Ensure methods used as callbacks always have `this` bound correctly.
     this.render = this.render.bind(this);
-
-    this.dispatch = d3_dispatch('change');
-    utilRebind(this as any, this.dispatch, 'on');
   }
 
 
@@ -129,7 +124,7 @@ ${info}
       settings?.set('imagery.custom[0].template', _currSettings.template);
       (d3_event.currentTarget as HTMLElement).blur();
       modal.close();
-      this.dispatch.call('change', this, _currSettings);
+      this.emit('change', _currSettings);
     };
 
     $buttonSection.select('.cancel-button')

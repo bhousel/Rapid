@@ -141,10 +141,11 @@ export class UiFoo {
   become either simple `get bar()/set bar()` accessors or plain public fields, depending on whether
   chaining is actually used by callers. Prefer plain fields/accessors; drop the fluent-chaining
   return-`this` pattern unless a caller depends on it.
-- **`utilRebind`/`d3_dispatch`:** components that dispatch events (`.on('change', …)`) should keep an
-  event mechanism. Prefer the codebase's existing `EventEmitter` pattern where classes already use it;
-  otherwise retain `d3_dispatch` + a typed `.on()` passthrough during conversion to avoid behavior
-  changes. Do **not** invent a new event system in this pass.
+- **Events:** all UI classes that emit events extend `EventEmitter` from `tseep/lib/ee-safe`.
+  Call `super()` first in the constructor, emit via `this.emit('event', ...args)`, consumers use
+  `.on('event', handler)` / `.off('event', handler)`. Do **not** use `d3_dispatch` / `utilRebind`.
+  (The two factory functions `combobox.ts` and `disclosure.ts` still use `d3_dispatch` — they are
+  intentional exceptions, not classes.)
 - **Relocalization:** move all `.text(...)`, `.html(...)`, `.attr('title', …)`, tooltip strings, and
   `l10n.t(...)` calls into the post-merge update selection. Enter creates empty structural elements
   only. This is the single most important behavioral upgrade.
@@ -338,7 +339,7 @@ adds structure to make the chapters uniform and extensible.
    bundler resolves their `./intro/helper.js` imports to `.ts` with no edits.
 2. **`UiCurtain.ts`** — straight JS→TS (already a class in the canonical shape).
 3. **`AbstractIntroChapter.ts`** (new base class) — encapsulates the machinery every chapter duplicates:
-   - public `title` (l10n id), `on('done')` via `d3_dispatch` + `utilRebind`, and `enter()`/`exit()`/
+   - public `title` (l10n id), `on('done')` via `EventEmitter`, and `enter()`/`exit()`/
      `restart()` lifecycle.
    - an async **step runner** `_runAsync(step)` (a `while` loop: run step → await → advance to the
      returned next step; on cancel return; on error log + retry the same step — preserving current
@@ -406,8 +407,8 @@ Start the Tutorial, and the Rapid-splash "skip to Rapid" path).
 
 - **Scale (~130 files).** Mitigate with strict dependency-first phasing and per-phase verification;
   each phase is shippable.
-- **Hidden coupling via `index.js` barrels & `utilRebind`.** Mitigate by converting barrels last and
-  keeping `d3_dispatch` where events exist rather than redesigning event flow now.
+- **Hidden coupling via `index.js` barrels** — mitigated by converting barrels last, with no importer
+  changes needed (bundler resolves `./foo.js` → `foo.ts`).
 - **Relocalization regressions** (text created on enter). Mitigate with the explicit enter→update
   audit step per component and by leaning on `localechange` top-down rerender.
 - **`git mv` history preservation.** Always rename via `git mv`, never delete+create.
@@ -463,7 +464,7 @@ Start the Tutorial, and the Rapid-splash "skip to Rapid" path).
   convention. Declare selection state as `public $foo: D3Selection` (matches `UiInspector`,
   `AbstractUiSection`). Non-selection protected state stays `_`-prefixed.
 - **Field internals API.** Each `UiFieldX` exposes `render($selection)`, `tags(tags)`, `focus()`,
-  optional `entityIDs(ids?)`, and an `on(...)` passthrough (via `utilRebind` + `d3_dispatch`).
+  optional `entityIDs(ids?)`, and an `on(...)` from its `EventEmitter` base.
   `UiField` calls these; `supportsMultiselection` is a static on the class (e.g. `UiFieldLanes`).
 - **`git mv` gotcha.** When a rename is done as *new file + leftover original* instead of a true
   `git mv`, the old `snake_case.ts` lingers as an **untracked** dead duplicate. Five such orphans
@@ -484,8 +485,8 @@ Start the Tutorial, and the Rapid-splash "skip to Rapid" path).
   - detection: `UiDetectionHeader/Details/Inspector`
   - maproulette: `UiMapRouletteHeader/Details/Editor/Menu`
 - **Reference triad:** keepRight (`UiKeepRightHeader`, `UiKeepRightDetails`, `UiKeepRightEditor`).- **Class API for QA editors:** each editor exposes a public `datum` property (the marker/error),
-  a bound `render($selection)`, and (for editors that post updates) `on('change', …)` via
-  `d3_dispatch` + `utilRebind`. Header/details sub-components are plain `public datum` + `render`,
+  a bound `render($selection)`, and (for editors that post updates) `on('change', …)` via `EventEmitter`.
+  Header/details sub-components are plain `public datum` + `render`,
   rendered via `$editor.call(this._header.render)`. This mirrors `UiDataEditor`/`UiDataHeader`.
 - **Call-site pattern (replaces the old fluent `.error(datum)` that returned a render fn):**
   - `UiSidebar`: `this.KeepRightEditor.datum = datum; this.show(this.KeepRightEditor.render);`
@@ -539,11 +540,9 @@ Start the Tutorial, and the Rapid-splash "skip to Rapid" path).
   `UiRapidFirstEditDialog`, `commit`→`UiCommit`, `changeset_editor`→`UiChangesetEditor`,
   `commit_warnings`→`UiCommitWarnings`, `success`→`UiSuccess`, `conflicts`→`UiConflicts`,
   `edit_menu`→`UiEditMenu`, `rapid_colorpicker`→`UiRapidColorpicker`. Each: `public constructor(context)`,
-  bound `render($selection)`, factory-closure state → `protected _x`, fluent getter/setters return `this`
-  (`changeset`/`location`/`conflictList`/`origChanges`/`anchorLoc`/`triggerType`/`operations`), dispatch
-  components keep `d3_dispatch` + `utilRebind` + `public on!`. `UiEditMenu` mirrors `UiMapRouletteMenu`
-  (adds `close()`); `UiCommit` news up its child components (`UiChangesetEditor`, `UiCommitWarnings`,
-  `UiSectionRawTagEditor`, `UiSectionChanges`).
+  bound `render($selection)`, factory-closure state → `protected _x`, fluent getter/setters return `this`.
+  At the time of conversion these components used `d3_dispatch` + `utilRebind` for events; these were
+  subsequently replaced with `EventEmitter` (see post-Phase-9 entry below).
 - **Consumers wired:** `ui/index.js` barrel (12 exports renamed); `UiSystem.ts`
   (`new UiEditMenu/UiSplash/UiRestore/UiWhatsNew`, `.call(this.EditMenu.render)`);
   `SaveMode.ts` (`new UiCommit/UiConflicts/UiSuccess`, `.on()` on a separate line, `Sidebar.show(x.render)` /
@@ -617,11 +616,37 @@ Start the Tutorial, and the Rapid-splash "skip to Rapid" path).
   (`git rm`) — leftover snake_case dupes from the Phase 5 pane rename, superseded by `UiPaneX.ts` and
   imported nowhere.
 - **Left in place (documented):** the 2 quarantined React-demo `sections/*.jsx` (`react_container.jsx`,
-  `ReactComponent.jsx` — referenced only by commented imports; React isn't even a dependency) and the
-  disabled `fields/UiFieldRestrictions.ts` / `field_help.ts` (already `.ts`, wired-but-commented).
+  `ReactComponent.jsx` — referenced only by commented imports; React isn't even a dependency) and
+  `field_help.ts` (wired-but-commented). `UiFieldRestrictions.ts` was converted to a stub class
+  in the post-Phase-9 work (see below).
 - **No `.js` files remain under `modules/ui/`**; `AGENTS.md` conversion table flipped to ✅ Complete.
 - **Verified:** tsc 0 / eslint 0 errors (2 pre-existing `todo` warnings) / build clean / browser 133 /
   unit 3290 / 0 fail.
+
+### Post-Phase-9 — EventEmitter migration + UiFieldRestrictions stub (2026-08-04)
+
+- **EventEmitter migration (34 classes + 2 base classes):** All UI classes that emitted events via
+  `d3_dispatch` + `utilRebind` were converted to extend `EventEmitter` from `tseep/lib/ee-safe`.
+  Both `AbstractUiSection` and `AbstractIntroChapter` now `extends EventEmitter` so all their
+  subclasses inherit `.on`/`.off`/`.emit` without re-declaring the pattern. The legacy pattern
+  (`public dispatch: any`, `public on!`, `utilRebind(this as any, this.dispatch, 'on')`) is gone
+  from every converted class. `emit('ev', ...args)` replaces `dispatch.call('ev', that, ...args)`
+  (the `that` 2nd argument was dropped — no consumer relied on it). Factory functions
+  `combobox.ts`/`disclosure.ts` still use `d3_dispatch` and remain unchanged (not classes).
+  Gotchas: tseep `emit` returns boolean so consumer arrow-handlers that return non-void need block
+  bodies; d3-dispatch namespace syntax (`toggled.intro`) → saved-handler-ref + `.off`; one test
+  used `on('change.spy', fn)` → changed to `on('change', fn)`; `UiFieldLanes` had a concrete
+  `off()` that shadowed `EventEmitter.off` → renamed to `_detach()`.
+  SaveMode's `.on('cancel', null)` removal idiom → `.off('cancel', this._cancel)`.
+  Verified: tsc 0 / eslint 0 errors (4 pre-existing `todo` warnings) / build clean / browser 133 /
+  unit 3290 / 0 fail.
+- **`UiFieldRestrictions.ts` stub class:** Converted from all-commented legacy code into a modern
+  `EventEmitter` class registered in `fields/index.ts` (`restrictions:`). The `render()` method
+  creates an empty `.restriction-container` placeholder (the old interactive mini-map depended on
+  `svgLayers`/`svgVertices`/`svgLines`/`svgTurns` from the removed `modules/svg/` layer system).
+  A `// todo` comment marks where the Pixi reimplementation goes. The field is registered in
+  `uiFields` but is still NOT instantiated by `UiSectionPresetFields` — the block stays commented.
+- **`fields/index.ts`:** Fixed 4-space indentation → 2-space throughout.
 
 ## Definition of Done — ✅ met
 The `modules/ui/` TypeScript conversion is complete. Every component is a TS class following the canonical

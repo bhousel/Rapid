@@ -145,7 +145,7 @@ export class SaveMode extends AbstractMode {
     const uploader = context.systems.uploader!;
     const Sidebar = ui.Sidebar;
 
-    this._uiCommit.on('cancel', null);
+    this._uiCommit.off('cancel', this._cancel);
     this._uiCommit = null;
 
     uploader

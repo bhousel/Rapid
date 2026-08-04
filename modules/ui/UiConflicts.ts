@@ -1,11 +1,11 @@
-import { dispatch as d3_dispatch } from 'd3-dispatch';
+import { EventEmitter } from 'tseep/lib/ee-safe';
 import { select as d3_select } from 'd3-selection';
 import { Extent, numWrap } from '@rapid-sdk/math';
 
 import { JXON } from '../util/jxon.ts';
 import { OsmChangeset } from '../data/OsmChangeset.ts';
 import { uiIcon } from './icon.js';
-import { utilHighlightEntities, utilKeybinding, utilRebind, utilSanitizeHTML } from '../util/index.ts';
+import { utilHighlightEntities, utilKeybinding, utilSanitizeHTML } from '../util/index.ts';
 
 import type { Context } from '../Context.ts';
 import type { D3Selection } from 'd3-selection';
@@ -17,11 +17,8 @@ import type { D3Selection } from 'd3-selection';
  * `conflictList()` / `origChanges()` setters, then call `.render($selection)`.
  * Emits `cancel` and `save`.
  */
-export class UiConflicts {
+export class UiConflicts extends EventEmitter {
   public context: Context;
-  protected _dispatch: any;
-  /** Added at runtime by `utilRebind` */
-  public on!: (...args: any[]) => any;
 
   protected _keybinding: any;
   protected _origChanges: any;
@@ -29,6 +26,7 @@ export class UiConflicts {
   protected _shownConflictIndex: any;
 
   public constructor(context: Context) {
+    super();
     this.context = context;
     this._origChanges = null;
     this._conflictList = null;
@@ -42,9 +40,6 @@ export class UiConflicts {
     this._tryAgain = this._tryAgain.bind(this);
     this._showConflict = this._showConflict.bind(this);
     this._addChoices = this._addChoices.bind(this);
-
-    this._dispatch = d3_dispatch('cancel', 'save');
-    utilRebind(this as any, this._dispatch, 'on');
   }
 
 
@@ -63,13 +58,13 @@ export class UiConflicts {
   /** Dismisses the conflict screen and retries the save. */
   protected _tryAgain(): void {
     this._keybindingOff();
-    this._dispatch.call('save');
+    this.emit('save');
   }
 
   /** Dismisses the conflict screen and cancels the save. */
   protected _cancel(): void {
     this._keybindingOff();
-    this._dispatch.call('cancel');
+    this.emit('cancel');
   }
 
 

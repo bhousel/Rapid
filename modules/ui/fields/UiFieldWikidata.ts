@@ -1,9 +1,9 @@
-import { dispatch as d3_dispatch } from 'd3-dispatch';
+import { EventEmitter } from 'tseep/lib/ee-safe';
 import { select as d3_select } from 'd3-selection';
 
 import { actionChangeTags } from '../../actions/change_tags.js';
 import { uiIcon } from '../icon.js';
-import { utilGetSetValue, utilNoAuto, utilRebind } from '../../util/index.ts';
+import { utilGetSetValue, utilNoAuto } from '../../util/index.ts';
 import { uiCombobox } from '../combobox.js';
 
 import type { Context } from '../../Context.ts';
@@ -11,11 +11,8 @@ import type { D3Selection } from 'd3-selection';
 import type { Tags } from './types.ts';
 
 
-export class UiFieldWikidata {
+export class UiFieldWikidata extends EventEmitter {
     public context: Context;
-    public dispatch: any;
-    /** Added at runtime by `utilRebind` */
-    public on!: (...args: any[]) => any;
 
     protected _uifield: any;
     public $parent: D3Selection;
@@ -29,6 +26,7 @@ export class UiFieldWikidata {
     protected _combobox: any;
 
     public constructor(context: Context, uifield: any) {
+        super();
         this.context = context;
         this._uifield = uifield;
 
@@ -50,9 +48,6 @@ export class UiFieldWikidata {
 
         this.render = this.render.bind(this);
         this._fetchWikidataItems = this._fetchWikidataItems.bind(this);
-
-        this.dispatch = d3_dispatch('change');
-        utilRebind(this as any, this.dispatch, 'on');
     }
 
 
@@ -223,7 +218,7 @@ export class UiFieldWikidata {
       const key = uifield.key;
       const syncTags: Tags = {};
       syncTags[key] = this._qid ?? undefined;
-      this.dispatch.call('change', this, syncTags);
+      this.emit('change', syncTags);
 
       if (!this._wikipediaKey) return;
 

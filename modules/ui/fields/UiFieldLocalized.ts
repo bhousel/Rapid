@@ -1,4 +1,4 @@
-import { dispatch as d3_dispatch } from 'd3-dispatch';
+import { EventEmitter } from 'tseep/lib/ee-safe';
 import { select as d3_select } from 'd3-selection';
 import { utilArrayUniq, utilUniqueString } from '@rapid-sdk/util';
 import { iso1A2Code } from '@rapideditor/country-coder';
@@ -6,7 +6,7 @@ import { iso1A2Code } from '@rapideditor/country-coder';
 import { uiIcon } from '../icon.js';
 import { uiTooltip } from '../tooltip.js';
 import { uiCombobox } from '../combobox.js';
-import { utilGetSetValue, utilNoAuto, utilRebind } from '../../util/index.ts';
+import { utilGetSetValue, utilNoAuto } from '../../util/index.ts';
 
 import type { Context } from '../../Context.ts';
 import type { D3Selection } from 'd3-selection';
@@ -19,11 +19,8 @@ import type { Tags } from './types.ts';
 export const LANGUAGE_SUFFIX_REGEX = /^(.*):([a-z]{2,3}(?:-[A-Z][a-z]{3})?(?:-[A-Z]{2})?)$/;
 
 
-export class UiFieldLocalized {
+export class UiFieldLocalized extends EventEmitter {
   public context: Context;
-  public dispatch: any;
-  /** Added at runtime by `utilRebind` */
-  public on!: (...args: any[]) => any;
 
   protected _uifield: any;
   public $input: D3Selection;
@@ -39,6 +36,7 @@ export class UiFieldLocalized {
   protected _entityIDs: EntityID[];
 
   public constructor(context: Context, uifield: any) {
+    super();
     const l10n = context.systems.l10n!;
 
     this.context = context;
@@ -69,9 +67,6 @@ export class UiFieldLocalized {
     this._buttonTip = uiTooltip(context)
       .title(l10n.t('translate.translate'))
       .placement('left');
-
-    this.dispatch = d3_dispatch('change', 'input');
-    utilRebind(this as any, this.dispatch, 'on');
   }
 
 
@@ -318,7 +313,7 @@ export class UiFieldLocalized {
       const t: Tags = {};
 
       t[uifield.key] = val || undefined;
-      this.dispatch.call('change', this, t, onInput);
+      this.emit('change', t, onInput);
     };
   }
 
@@ -371,7 +366,7 @@ export class UiFieldLocalized {
     }
 
     d.lang = lang;
-    this.dispatch.call('change', this, tags);
+    this.emit('change', tags);
   }
 
 
@@ -392,7 +387,7 @@ export class UiFieldLocalized {
     const t: any = {};
     t[this._key(d.lang)] = value;
     d.value = value;
-    this.dispatch.call('change', this, t);
+    this.emit('change', t);
   }
 
 
@@ -498,7 +493,7 @@ export class UiFieldLocalized {
               // remove from entity tags
               const t: any = {};
               t[langKey] = undefined;
-              this.dispatch.call('change', this, t);
+              this.emit('change', t);
               return;
             }
 

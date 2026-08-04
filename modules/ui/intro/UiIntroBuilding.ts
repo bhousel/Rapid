@@ -371,6 +371,7 @@ export class UiIntroBuilding extends AbstractIntroChapter {
 
     await map.setMapParamsAsync(this._houseExtent.center(), setZoom, 0, 100);
 
+    let onToggled: ((open: boolean) => void) | undefined;
     try {
       return await new Promise<IntroStep>((resolve, reject) => {
         this._rejectStep = reject;
@@ -382,13 +383,14 @@ export class UiIntroBuilding extends AbstractIntroChapter {
           tipHtml: helpHtml(context, `intro.buildings.${textID}`)
         });
 
-        EditMenu.on('toggled.intro', (open: boolean) => {
+        onToggled = (open: boolean) => {
           if (open) resolve(this._clickSquareAsync);
-        });
+        };
+        EditMenu.on('toggled', onToggled);
       });
     } finally {
       this._onStableChange = null;
-      EditMenu.on('toggled.intro', null);
+      if (onToggled) EditMenu.off('toggled', onToggled);
     }
   }
 
@@ -714,6 +716,7 @@ export class UiIntroBuilding extends AbstractIntroChapter {
     if (!['browse', 'select-osm'].includes(context.mode?.id ?? '')) context.enter('browse');
     editor.restoreCheckpoint('hasTank');
 
+    let onToggled: ((open: boolean) => void) | undefined;
     try {
       return await new Promise<IntroStep>((resolve, reject) => {
         this._rejectStep = reject;
@@ -725,13 +728,14 @@ export class UiIntroBuilding extends AbstractIntroChapter {
           tipHtml: helpHtml(context, `intro.buildings.${textID}`)
         });
 
-        EditMenu.on('toggled.intro', (open: boolean) => {
+        onToggled = (open: boolean) => {
           if (open) resolve(this._clickCircleAsync);
-        });
+        };
+        EditMenu.on('toggled', onToggled);
       });
     } finally {
       this._onStableChange = null;
-      EditMenu.on('toggled.intro', null);
+      if (onToggled) EditMenu.off('toggled', onToggled);
     }
   }
 
