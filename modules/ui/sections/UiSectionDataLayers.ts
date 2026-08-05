@@ -8,6 +8,17 @@ import { utilCmd } from '../../util/cmd.ts';
 
 import type { Context } from '../../Context.ts';
 import type { D3Selection } from 'd3-selection';
+import type { AbstractPixiLayer } from '../../pixi/AbstractPixiLayer.ts';
+import type { PixiLayerCustomData } from '../../pixi/PixiLayerCustomData.ts';
+import type { UiSettingsCustomData } from '../settings/UiSettingsCustomData.ts';
+
+
+/** A base-layer item binding: id, optional layer reference, and keyboard-shortcut key path */
+interface BaseLayerItem {
+  id: LayerID;
+  layer: AbstractPixiLayer | undefined;
+  key: string;
+}
 
 
 /** UiSectionDataLayers
@@ -32,7 +43,7 @@ import type { D3Selection } from 'd3-selection';
 export class UiSectionDataLayers extends AbstractUiSection {
   protected _previousLayerStates: Map<string, boolean>;
   protected _keys: string[] | null;
-  protected _settingsCustomData: any;
+  protected _settingsCustomData: UiSettingsCustomData;
 
   /**
    * @param context - Global shared application context
@@ -190,7 +201,7 @@ export class UiSectionDataLayers extends AbstractUiSection {
     const context = this.context;
     const l10n = context.systems.l10n!;
 
-    $selection.each((d: any, i, nodes) => {
+    $selection.each((d: AbstractPixiLayer, i, nodes) => {
       const item = d3_select(nodes[i]).select('label');
       const placement = (i < nodes.length / 2) ? 'bottom' : 'top';
 
@@ -242,11 +253,11 @@ export class UiSectionDataLayers extends AbstractUiSection {
 
     const $$li = $li.enter()
       .append('li')
-      .attr('class', (d: any) => `list-item list-item-${d.id}`);
+      .attr('class', (d: BaseLayerItem) => `list-item list-item-${d.id}`);
 
     const $$label = $$li
       .append('label')
-      .each((d: any, i, nodes) => {
+      .each((d: BaseLayerItem, i, nodes) => {
         d3_select(nodes[i])
           .call(uiTooltip(context)
             .title(l10n.t(`map_data.layers.${d.id}.tooltip`))
@@ -258,18 +269,18 @@ export class UiSectionDataLayers extends AbstractUiSection {
     $$label
       .append('input')
       .attr('type', 'checkbox')
-      .on('change', (e: Event, d: any) => this._toggleLayer(d.id));
+      .on('change', (e: Event, d: BaseLayerItem) => this._toggleLayer(d.id));
 
     $$label
       .append('span')
-      .text((d: any) => l10n.t(`map_data.layers.${d.id}.title`));
+      .text((d: BaseLayerItem) => l10n.t(`map_data.layers.${d.id}.title`));
 
     // Update
     $li
       .merge($$li)
-      .classed('active', (d: any) => this._showsLayer(d.id))
+      .classed('active', (d: BaseLayerItem) => this._showsLayer(d.id))
       .selectAll('input')
-      .property('checked', (d: any) => this._showsLayer(d.id));
+      .property('checked', (d: BaseLayerItem) => this._showsLayer(d.id));
   }
 
 
@@ -283,8 +294,8 @@ export class UiSectionDataLayers extends AbstractUiSection {
     const scene = context.systems.gfx!.scene!;
 
     const qaKeys = ['maproulette', 'keepright', 'osmose', 'geoscribble'];
-    const qaLayers = qaKeys.map(layerID => scene.layers.get(layerID)).filter(Boolean) as any[];
-    const maproulette = context.services.maproulette as any;
+    const qaLayers = qaKeys.map(layerID => scene.layers.get(layerID)).filter(Boolean) as AbstractPixiLayer[];
+    const maproulette = context.services.maproulette;
 
     let $ul: D3Selection = $selection
       .selectAll('.layer-list-qa')
@@ -303,7 +314,7 @@ export class UiSectionDataLayers extends AbstractUiSection {
 
     const $$li = $li.enter()
       .append('li')
-      .attr('class', (d: any) => `list-item list-item-${d.id}`);
+      .attr('class', (d: AbstractPixiLayer) => `list-item list-item-${d.id}`);
 
     const $$label = $$li
       .append('label')
@@ -312,14 +323,14 @@ export class UiSectionDataLayers extends AbstractUiSection {
     $$label
       .append('input')
       .attr('type', 'checkbox')
-      .on('change', (e: Event, d: any) => this._toggleLayer(d.id));
+      .on('change', (e: Event, d: AbstractPixiLayer) => this._toggleLayer(d.id));
 
     $$label
       .append('span')
-      .text((d: any) => l10n.t(`map_data.layers.${d.id}.title`, { n: 999 }));
+      .text((d: AbstractPixiLayer) => l10n.t(`map_data.layers.${d.id}.title`, { n: 999 }));
 
     // Add input box for MapRoulette challenge IDs
-    $$label.filter((d: any) => d.id === 'maproulette')
+    $$label.filter((d: AbstractPixiLayer) => d.id === 'maproulette')
       .append('input')
       .attr('type', 'text')
       .attr('placeholder', l10n.t('map_data.layers.maproulette.id_placeholder'))
@@ -331,10 +342,10 @@ export class UiSectionDataLayers extends AbstractUiSection {
     $li = $li.merge($$li);
 
     $li
-      .classed('active', (d: any) => d.enabled)
+      .classed('active', (d: AbstractPixiLayer) => d.enabled)
       .call(this._setTooltips)
       .selectAll('input[type="checkbox"]')
-      .property('checked', (d: any) => d.enabled);
+      .property('checked', (d: AbstractPixiLayer) => d.enabled);
 
     $li
       .selectAll('input.challenge-ids')
@@ -412,7 +423,7 @@ export class UiSectionDataLayers extends AbstractUiSection {
         if (d3_select(target).classed('disabled')) return;
         d3_event.preventDefault();
         d3_event.stopPropagation();
-        const customLayer = scene.layers.get('custom-data') as any;
+        const customLayer = scene.layers.get('custom-data') as PixiLayerCustomData;
         customLayer?.fitZoom();
       })
       .call(uiIcon('#rapid-icon-framed-dot', 'monochrome'));
@@ -422,15 +433,15 @@ export class UiSectionDataLayers extends AbstractUiSection {
       .merge($$ul);
 
     $ul.selectAll('.list-item-data')
-      .classed('active', (d: any) => d.enabled)
+      .classed('active', (d: PixiLayerCustomData) => d.enabled)
       .selectAll('label')
-      .classed('deemphasize', (d: any) => !d.hasData)
+      .classed('deemphasize', (d: PixiLayerCustomData) => !d.hasData())
       .selectAll('input')
-      .property('disabled', (d: any) => !d.hasData)
-      .property('checked', (d: any) => d.enabled);
+      .property('disabled', (d: PixiLayerCustomData) => !d.hasData())
+      .property('checked', (d: PixiLayerCustomData) => d.enabled);
 
     $ul.selectAll('button.zoom-to-data')
-      .classed('disabled', (d: any) => !d.hasData);
+      .classed('disabled', (d: PixiLayerCustomData) => !d.hasData());
   }
 
 
@@ -448,10 +459,10 @@ export class UiSectionDataLayers extends AbstractUiSection {
    * Handles a change to the custom data settings.
    * @param d - object containing the custom data settings (url or fileList)
    */
-  protected _customChanged(d: any): void {
+  protected _customChanged(d: { url?: string | null; fileList?: FileList | null }): void {
     const scene = this.context.systems.gfx!.scene!;
 
-    const customLayer = scene.layers.get('custom-data') as any;
+    const customLayer = scene.layers.get('custom-data') as PixiLayerCustomData;
     if (!customLayer) return;
 
     if (d?.url) {
@@ -467,8 +478,8 @@ export class UiSectionDataLayers extends AbstractUiSection {
    * @param d3_event - change event, if called from a change handler
    */
   protected _mapRouletteIDsChanged(d3_event: Event): void {
-    const maproulette = this.context.services.maproulette as any;
-    maproulette.challengeIDs = (d3_event.target as HTMLInputElement).value;
+    const maproulette = this.context.services.maproulette;
+    maproulette!.challengeIDs = (d3_event.target as HTMLInputElement).value;
   }
 
 

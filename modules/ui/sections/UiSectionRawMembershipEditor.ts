@@ -14,8 +14,27 @@ import { utilNoAuto, utilIsColorValid, utilHighlightEntities } from '../../util/
 
 import type { Context } from '../../Context.ts';
 import type { D3Selection } from 'd3-selection';
+import type { Graph } from '../../lib/Graph.ts';
+import type { IndexedMember, OsmRelationMember } from '../../data/index.ts';
 
 const MAX_MEMBERSHIPS = 1000;
+
+/** A row in the rendered membership list, one per (entity, relation) membership */
+interface MembershipRow {
+  relation: OsmRelation;
+  members: IndexedMember[];
+  hash: string;
+  uid?: string;
+  role?: string | string[];
+}
+
+/** An item returned by the nearby-relation combobox fetcher */
+interface NearbyRelationItem {
+  relation: OsmRelation | null;
+  value: string;
+  title?: string;
+  display?: string | (($selection: D3Selection) => void);
+}
 
 
 export class UiSectionRawMembershipEditor extends AbstractUiSection {
@@ -40,10 +59,10 @@ export class UiSectionRawMembershipEditor extends AbstractUiSection {
     this._nearbyCombo = uiCombobox(context, 'parent-relation')
       .minItems(1)
       .fetcher(this._fetchNearbyRelations)
-      .itemsMouseEnter((d3_event: Event, d: any) => {
+      .itemsMouseEnter((d3_event: Event, d: NearbyRelationItem) => {
         if (d.relation) utilHighlightEntities(context, [d.relation.id], true);
       })
-      .itemsMouseLeave((d3_event: Event, d: any) => {
+      .itemsMouseLeave((d3_event: Event, d: NearbyRelationItem) => {
         if (d.relation) utilHighlightEntities(context, [d.relation.id], false);
       });
   }
@@ -75,9 +94,9 @@ export class UiSectionRawMembershipEditor extends AbstractUiSection {
    * Returns the relations shared as parents by all selected entities.
    * @return the shared parent relations
    */
-  protected _getSharedParentRelations(): any[] {
+  protected _getSharedParentRelations(): OsmRelation[] {
     const editor = this.context.systems.editor!;
-    let parents: any[] = [];
+    let parents: OsmRelation[] = [];
     for (let i = 0; i < this._entityIDs.length; i++) {
       const graph = editor.staging.graph;
       const entity = graph.hasEntity(this._entityIDs[i]);
@@ -98,8 +117,8 @@ export class UiSectionRawMembershipEditor extends AbstractUiSection {
    * Builds the membership rows (one per relation, or per membership for single selections).
    * @return the membership row data
    */
-  protected _getMemberships(): any[] {
-    const memberships: any[] = [];
+  protected _getMemberships(): MembershipRow[] {
+    const memberships: MembershipRow[] = [];
     const relations = this._getSharedParentRelations().slice(0, MAX_MEMBERSHIPS);
 
     const isMultiselect = this._entityIDs.length > 1;
@@ -108,7 +127,7 @@ export class UiSectionRawMembershipEditor extends AbstractUiSection {
     for (const relation of relations) {
       membership = {
         relation: relation,
-        members: [] as any[],
+        members: [] as IndexedMember[],
         hash: relation.key
       };
       for (let index = 0; index < relation.members.length; index++) {
@@ -125,7 +144,7 @@ export class UiSectionRawMembershipEditor extends AbstractUiSection {
             memberships.push(membership);
             membership = {
               relation: relation,
-              members: [] as any[],
+              members: [] as IndexedMember[],
               hash: relation.key
             };
           }
@@ -134,10 +153,10 @@ export class UiSectionRawMembershipEditor extends AbstractUiSection {
       if (membership.members.length) memberships.push(membership);
     }
 
-    memberships.forEach(function(membership: any) {
+    memberships.forEach(function(membership: MembershipRow) {
       membership.uid = utilUniqueString('membership-' + membership.relation.id);
-      const roles: any[] = [];
-      membership.members.forEach(function(member: any) {
+      const roles: string[] = [];
+      membership.members.forEach(function(member: OsmRelationMember) {
         if (roles.indexOf(member.role) === -1) roles.push(member.role);
       });
       membership.role = roles.length === 1 ? roles[0] : roles;
@@ -152,7 +171,7 @@ export class UiSectionRawMembershipEditor extends AbstractUiSection {
    * @param d3_event - the triggering click event
    * @param d - the membership row datum
    */
-  protected _selectRelation(d3_event: Event, d: any): void {
+  protected _selectRelation(d3_event: Event, d: MembershipRow): void {
     const context = this.context;
     d3_event.preventDefault();
 
@@ -168,7 +187,7 @@ export class UiSectionRawMembershipEditor extends AbstractUiSection {
    * @param d3_event - the triggering click event
    * @param d - the membership row datum
    */
-  protected _zoomToRelation(d3_event: Event, d: any): void {
+  protected _zoomToRelation(d3_event: Event, d: MembershipRow): void {
     const context = this.context;
     const editor = context.systems.editor!;
     const map = context.systems.map!;
@@ -188,7 +207,7 @@ export class UiSectionRawMembershipEditor extends AbstractUiSection {
    * @param entity - the relation entity
    * @return a valid color string, or `null`
    */
-  protected _getColor(entity: any): string | null {
+  protected _getColor(entity: OsmEntity): string | null {
     const val = entity?.type === 'relation' && entity?.tags.colour;
     return (val && utilIsColorValid(val)) ? val : null;
   }
@@ -199,7 +218,7 @@ export class UiSectionRawMembershipEditor extends AbstractUiSection {
    * @param d3_event - the triggering blur/change event
    * @param d - the membership row datum
    */
-  protected _changeRole(d3_event: any, d: any): void {
+  protected _changeRole(d3_event: Event, d: MembershipRow): void {
     const context = this.context;
     const editor = context.systems.editor!;
     const l10n = context.systems.l10n!;
@@ -211,14 +230,14 @@ export class UiSectionRawMembershipEditor extends AbstractUiSection {
 
     if (!newRole.trim() && typeof d.role !== 'string') return;
 
-    const membersToUpdate = d.members.filter(function(member: any) {
+const membersToUpdate = d.members.filter(function(member: IndexedMember) {
       return member.role !== newRole;
     });
 
     if (membersToUpdate.length) {
       this._inChange = true;
 
-      const changeMemberRoles = (graph: any) => {
+      const changeMemberRoles = (graph: Graph) => {
         for (const member of membersToUpdate) {
           const newMember = Object.assign({}, member, { role: newRole });
           delete newMember.index;
@@ -242,7 +261,7 @@ export class UiSectionRawMembershipEditor extends AbstractUiSection {
    * @param d - the membership row datum (or new-row datum with a null relation)
    * @param role - the role to assign
    */
-  protected _addMembership(d: any, role: string): void {
+  protected _addMembership(d: NearbyRelationItem, role: string): void {
     const context = this.context;
     const editor = context.systems.editor!;
     const l10n = context.systems.l10n!;
@@ -252,7 +271,7 @@ export class UiSectionRawMembershipEditor extends AbstractUiSection {
 
     const entityIDs = this._entityIDs;
     function actionAddMembers(relationId: EntityID, ids: EntityID[], role: string) {
-      return function(graph: any) {
+      return function(graph: Graph) {
         for (const i in ids) {
           const member = { id: ids[i], type: graph.entity(ids[i]).type, role: role };
           graph = actionAddMember(relationId, member)(graph);
@@ -288,7 +307,7 @@ export class UiSectionRawMembershipEditor extends AbstractUiSection {
    * @param d3_event - the triggering click event
    * @param d - the membership row datum
    */
-  protected _deleteMembership(d3_event: any, d: any): void {
+  protected _deleteMembership(d3_event: Event, d: MembershipRow): void {
     const context = this.context;
     const editor = context.systems.editor!;
     const l10n = context.systems.l10n!;
@@ -299,7 +318,7 @@ export class UiSectionRawMembershipEditor extends AbstractUiSection {
     // remove the hover-highlight styling
     utilHighlightEntities(context, [d.relation.id], false);
 
-    const indexes = d.members.map(function(member: any) {
+const indexes = d.members.map(function(member: IndexedMember) {
       return member.index;
     });
 
@@ -316,7 +335,7 @@ export class UiSectionRawMembershipEditor extends AbstractUiSection {
    * @param q - the search query
    * @param callback - receives the combobox result data
    */
-  protected _fetchNearbyRelations(q: string, callback: (data: any[]) => void): void {
+  protected _fetchNearbyRelations(q: string, callback: (data: NearbyRelationItem[]) => void): void {
     const context = this.context;
     const editor = context.systems.editor!;
     const schema = context.systems.schema!;
@@ -329,17 +348,17 @@ export class UiSectionRawMembershipEditor extends AbstractUiSection {
     };
 
     const entityID = this._entityIDs[0];
-    const result: any[] = [];
+    const result: NearbyRelationItem[] = [];
     const graph = editor.staging.graph;
 
-    function baseDisplayValue(entity: any): string {
+    function baseDisplayValue(entity: OsmRelation): string {
       const preset = schema.match(entity, graph);
       const presetName = preset?.name || l10n.t('inspector.relation');
       const entityName = l10n.displayName(entity.tags) || '';
       return presetName + ' ' + entityName;
     }
 
-    const baseDisplayLabel = (entity: any): ($selection: D3Selection) => void => {
+    const baseDisplayLabel = (entity: OsmRelation): ($selection: D3Selection) => void => {
       const preset = schema.match(entity, graph);
       const presetName = preset?.name || l10n.t('inspector.relation');
       const entityName = l10n.displayName(entity.tags) || '';
@@ -367,7 +386,7 @@ export class UiSectionRawMembershipEditor extends AbstractUiSection {
       });
 
     } else {
-      editor.intersects().forEach(function(entity: any) {
+      editor.intersects().forEach(function(entity: OsmEntity) {
         if (entity.type !== 'relation' || entity.id === entityID) return;
 
         const value = baseDisplayValue(entity);
@@ -386,16 +405,16 @@ export class UiSectionRawMembershipEditor extends AbstractUiSection {
 
       // Dedupe identical names by appending relation id - see iD#2891
       const dupeGroups = Object.values(utilArrayGroupBy(result, 'value'))
-        .filter(function(v: any) { return v.length > 1; });
+        .filter(function(v) { return v.length > 1; });
 
-      dupeGroups.forEach(function(group: any) {
-        group.forEach(function(obj: any) {
-          obj.value += ' ' + obj.relation.id;
+      dupeGroups.forEach(function(group) {
+        group.forEach(function(obj) {
+          obj.value += ' ' + obj.relation!.id;
         });
       });
     }
 
-    result.forEach(function(obj: any) {
+    result.forEach(function(obj) {
       obj.title = obj.value;
     });
 
@@ -430,7 +449,7 @@ export class UiSectionRawMembershipEditor extends AbstractUiSection {
 
 
     const $items: D3Selection = $list.selectAll('li.member-row-normal')
-      .data(memberships, function(d: any) {
+      .data(memberships, function(d: MembershipRow) {
         return d.hash;
       });
 
@@ -445,17 +464,17 @@ export class UiSectionRawMembershipEditor extends AbstractUiSection {
 
     // highlight the relation in the map while hovering on the list item
     $$items
-      .on('mouseover', function(d3_event: Event, d: any) {
+      .on('mouseover', function(d3_event: Event, d: MembershipRow) {
         utilHighlightEntities(context, [d.relation.id], true);
       })
-      .on('mouseout', function(d3_event: Event, d: any) {
+      .on('mouseout', function(d3_event: Event, d: MembershipRow) {
         utilHighlightEntities(context, [d.relation.id], false);
       });
 
     const $$label = $$items
       .append('label')
       .attr('class', 'field-label')
-      .attr('for', (d: any) => d.uid);
+      .attr('for', (d: MembershipRow) => d.uid);
 
     const $$labelLink = $$label
       .append('span')
@@ -467,7 +486,7 @@ export class UiSectionRawMembershipEditor extends AbstractUiSection {
     $$labelLink
       .append('span')
       .attr('class', 'member-entity-type')
-      .text((d: any) => {
+      .text((d: MembershipRow) => {
         const preset = schema.match(d.relation, graph);
         return preset?.name || l10n.t('inspector.relation');
       });
@@ -475,9 +494,9 @@ export class UiSectionRawMembershipEditor extends AbstractUiSection {
     $$labelLink
       .append('span')
       .attr('class', 'member-entity-name')
-      .classed('has-color', (d: any) => !!this._getColor(d.relation))
-      .style('border-color', (d: any) => this._getColor(d.relation))
-      .text((d: any) => {
+      .classed('has-color', (d: MembershipRow) => !!this._getColor(d.relation))
+      .style('border-color', (d: MembershipRow) => this._getColor(d.relation))
+      .text((d: MembershipRow) => {
         const preset = schema.match(d.relation, graph);
         const isNsiPreset = preset?.suggestion;
         // For NSI presets, we dont want to display the network name twice
@@ -504,20 +523,20 @@ export class UiSectionRawMembershipEditor extends AbstractUiSection {
     $$wrap
       .append('input')
       .attr('class', 'member-role')
-      .attr('id', function(d: any) {
+      .attr('id', function(d: MembershipRow) {
         return d.uid;
       })
       .property('type', 'text')
-      .property('value', function(d: any) {
+      .property('value', function(d: MembershipRow) {
         return typeof d.role === 'string' ? d.role : '';
       })
-      .attr('title', function(d: any) {
+      .attr('title', function(d: MembershipRow) {
         return Array.isArray(d.role) ? d.role.filter(Boolean).join('\n') : d.role;
       })
-      .attr('placeholder', function(d: any) {
+      .attr('placeholder', function(d: MembershipRow) {
         return Array.isArray(d.role) ? l10n.t('inspector.multiple_roles') : l10n.t('inspector.role');
       })
-      .classed('mixed', function(d: any) {
+      .classed('mixed', function(d: MembershipRow) {
         return Array.isArray(d.role);
       })
       .call(utilNoAuto)
@@ -629,7 +648,7 @@ export class UiSectionRawMembershipEditor extends AbstractUiSection {
       });
 
 
-    function acceptEntity(d: any): void {
+    function acceptEntity(d: NearbyRelationItem): void {
       if (!d) {
         cancelEntity();
         return;
@@ -653,7 +672,7 @@ export class UiSectionRawMembershipEditor extends AbstractUiSection {
     }
 
 
-    function bindTypeahead(this: any, d: any): void {
+    function bindTypeahead(this: HTMLElement, d: MembershipRow): void {
       const $row = d3_select(this);
       const $role = $row.selectAll('input.member-role');
       const origValue = $role.property('value');
@@ -693,7 +712,7 @@ export class UiSectionRawMembershipEditor extends AbstractUiSection {
     }
 
 
-    function unbind(this: any): void {
+    function unbind(this: HTMLElement): void {
       const $row = d3_select(this);
 
       $row.selectAll('input.member-role')

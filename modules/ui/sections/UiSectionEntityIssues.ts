@@ -7,12 +7,14 @@ import { utilHighlightEntities } from '../../util/util.ts';
 
 import type { Context } from '../../Context.ts';
 import type { D3Selection } from 'd3-selection';
+import type { ValidationFix } from '../../lib/ValidationFix.ts';
+import type { ValidationIssue } from '../../lib/ValidationIssue.ts';
 
 
 export class UiSectionEntityIssues extends AbstractUiSection {
   protected _isExpanded: boolean;
   protected _entityIDs: EntityID[];
-  protected _issues: any[];
+  protected _issues: ValidationIssue[];
   protected _activeIssueID: string | null;
 
   public constructor(context: Context) {
@@ -74,7 +76,7 @@ export class UiSectionEntityIssues extends AbstractUiSection {
   protected _makeActiveIssue(issueID: string): void {
     this._activeIssueID = issueID;
     this.$container.selectAll('.issue-container')
-      .classed('active', (d: any) => d.id === this._activeIssueID);
+      .classed('active', (d: ValidationIssue) => d.id === this._activeIssueID);
   }
 
 
@@ -94,7 +96,7 @@ export class UiSectionEntityIssues extends AbstractUiSection {
     this._activeIssueID = this._issues.length ? this._issues[0].id : null;
 
     let $containers: D3Selection = $selection.selectAll('.issue-container')
-      .data(this._issues, (d: any) => d.key);
+      .data(this._issues, (d: ValidationIssue) => d.key!);
 
     // Exit
     $containers.exit()
@@ -108,13 +110,13 @@ export class UiSectionEntityIssues extends AbstractUiSection {
 
     const $$items = $$containers
       .append('div')
-      .attr('class', (d: any) => `issue severity-${d.severity}`)
-      .on('mouseover.highlight', (d3_event: Event, d: any) => {
+      .attr('class', (d: ValidationIssue) => `issue severity-${d.severity}`)
+      .on('mouseover.highlight', (d3_event: Event, d: ValidationIssue) => {
         // don't hover-highlight the selected entity
         const otherIDs = d.entityIds.filter((id: EntityID) => !this._entityIDs.includes(id));
         utilHighlightEntities(context, otherIDs, true);
       })
-      .on('mouseout.highlight', (d3_event: Event, d: any) => {
+      .on('mouseout.highlight', (d3_event: Event, d: ValidationIssue) => {
         const otherIDs = d.entityIds.filter((id: EntityID) => !this._entityIDs.includes(id));
         utilHighlightEntities(context, otherIDs, false);
       });
@@ -126,7 +128,7 @@ export class UiSectionEntityIssues extends AbstractUiSection {
     const $$text = $$labels
       .append('button')
       .attr('class', 'issue-text')
-      .on('click', (d3_event: Event, d: any) => {
+      .on('click', (d3_event: Event, d: ValidationIssue) => {
         this._makeActiveIssue(d.id);    // expand only the clicked item
         const graph = editor.staging.graph;
         const extent = d.extent(graph);
@@ -137,7 +139,7 @@ export class UiSectionEntityIssues extends AbstractUiSection {
       });
 
     $$text
-      .each((d: any, i, nodes) => {
+      .each((d: ValidationIssue, i, nodes) => {
         d3_select(nodes[i])
           .call(uiIcon(validator.getSeverityIcon(d.severity), 'issue-icon'));
       });
@@ -154,7 +156,7 @@ export class UiSectionEntityIssues extends AbstractUiSection {
       .call(uiIcon('#rapid-icon-inspect'));
 
     $$infoButton
-      .on('click', (d3_event: any) => {
+      .on('click', (d3_event: Event) => {
         const button = d3_event.currentTarget;
         d3_event.stopPropagation();
         d3_event.preventDefault();
@@ -191,9 +193,9 @@ export class UiSectionEntityIssues extends AbstractUiSection {
     $$containers
       .append('div')
       .attr('class', 'issue-info' + (this._isExpanded ? ' expanded' : ''))
-      .style('max-height', (this._isExpanded ? null as any : '0'))
+      .style('max-height', (this._isExpanded ? null : '0'))
       .style('opacity', (this._isExpanded ? '1' : '0'))
-      .each((d: any, i, nodes) => {
+      .each((d: ValidationIssue, i, nodes) => {
         const $info = d3_select(nodes[i]);
         if (typeof d.reference === 'function') {
           $info.call(d.reference);
@@ -206,16 +208,16 @@ export class UiSectionEntityIssues extends AbstractUiSection {
     // Update
     $containers = $containers
       .merge($$containers)
-      .classed('active', (d: any) => d.id === this._activeIssueID);
+      .classed('active', (d: ValidationIssue) => d.id === this._activeIssueID);
 
     $containers.selectAll('.issue-message')
-      .text((d: any) => d.message(context));
+      .text((d: ValidationIssue) => d.message(context));
 
     // fixes
     const $fixLists = $containers.selectAll('.issue-fix-list');
 
     const $fixes = $fixLists.selectAll('.issue-fix-item')
-      .data((d: any) => (d.fixes ? d.fixes() : []), (d: any) => d.id);
+      .data((d: ValidationIssue) => (d.fixes ? d.fixes() : []), (d: ValidationFix) => d.id);
 
     $fixes.exit()
       .remove();
@@ -226,9 +228,9 @@ export class UiSectionEntityIssues extends AbstractUiSection {
 
     const $$buttons = $$fixes
       .append('button')
-      .on('click', (d3_event: any, d: any) => {
+      .on('click', (d3_event: Event, d: ValidationFix) => {
         // not all fixes are actionable
-        if (d3_select(d3_event.currentTarget).attr('disabled') || !d.onClick) return;
+        if (d3_select(d3_event.currentTarget as Element).attr('disabled') || !d.onClick) return;
 
         // Don't run another fix for this issue within a second of running one
         // (Necessary for "Select a feature type" fix. Most fixes should only ever run once)
@@ -238,11 +240,11 @@ export class UiSectionEntityIssues extends AbstractUiSection {
         utilHighlightEntities(context, d.issue.entityIds.concat(d.entityIds), false);  // remove hover-highlighting
         d.onClick();
       })
-      .on('mouseover.highlight', (d3_event: Event, d: any) => utilHighlightEntities(context, d.issue.entityIds, true))
-      .on('mouseout.highlight', (d3_event: Event, d: any) => utilHighlightEntities(context, d.issue.entityIds, false));
+      .on('mouseover.highlight', (d3_event: Event, d: ValidationFix) => utilHighlightEntities(context, d.issue!.entityIds, true))
+      .on('mouseout.highlight', (d3_event: Event, d: ValidationFix) => utilHighlightEntities(context, d.issue!.entityIds, false));
 
     $$buttons
-      .each((d: any, i, nodes) => {
+      .each((d: ValidationFix, i, nodes) => {
         const iconName = d.icon ?? 'rapid-icon-wrench';
         d3_select(nodes[i]).call(uiIcon(`#${iconName}`, 'fix-icon'));
       });
@@ -250,13 +252,13 @@ export class UiSectionEntityIssues extends AbstractUiSection {
     $$buttons
       .append('span')
       .attr('class', 'fix-message')
-      .text((d: any) => d.title);
+      .text((d: ValidationFix) => d.title);
 
     $$fixes.merge($fixes)
       .selectAll('button')
-      .classed('actionable', (d: any) => typeof d.onClick === 'function')
-      .attr('disabled', (d: any) => typeof d.onClick === 'function' ? null : 'true')
-      .attr('title', (d: any) => d.disabledReason ?? null);
+      .classed('actionable', (d: ValidationFix) => typeof d.onClick === 'function')
+      .attr('disabled', (d: ValidationFix) => typeof d.onClick === 'function' ? null : 'true')
+      .attr('title', (d: ValidationFix) => d.disabledReason ?? null);
   }
 
 
@@ -290,7 +292,7 @@ export class UiSectionEntityIssues extends AbstractUiSection {
    * Handles the validator's `focusedIssue` event by activating that issue.
    * @param issue - the focused issue
    */
-  protected _onFocused(issue: any): void {
+  protected _onFocused(issue: ValidationIssue): void {
     this._makeActiveIssue(issue.id);
   }
 }

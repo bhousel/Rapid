@@ -11,6 +11,8 @@ import { utilCmd } from '../../util/cmd.ts';
 
 import type { Context } from '../../Context.ts';
 import type { D3Selection } from 'd3-selection';
+import type { ImagerySourceCustom } from '../../lib/ImagerySource.ts';
+import type { UiSettingsCustomBackground } from '../settings/UiSettingsCustomBackground.ts';
 import type { Vec2 } from '@rapid-sdk/math';
 
 
@@ -39,7 +41,7 @@ export class UiSectionBackgroundList extends AbstractUiSection {
   protected _waybackDates: string[];
   protected _waybackLoc: Vec2 | null;
   protected _favoriteIDs: Set<string>;
-  protected _settingsCustomBackground: any;
+  protected _settingsCustomBackground: UiSettingsCustomBackground;
 
 
   /**
@@ -83,9 +85,9 @@ export class UiSectionBackgroundList extends AbstractUiSection {
     this._settingsCustomBackground = new UiSettingsCustomBackground(context);
     this._settingsCustomBackground.on('change', this._customChanged);
 
-    const stored: any = settings?.get('imagery.favorites') ?? [];
+    const stored: unknown = settings?.get('imagery.favorites') ?? [];
     // note: older versions stored favorites as an object, but we only need the keys of this object
-    const vals = Array.isArray(stored) ? stored : Object.keys(stored);
+    const vals = Array.isArray(stored) ? stored as string[] : Object.keys(stored as object);
     this._favoriteIDs = new Set<string>(vals);
 
     // Event listeners
@@ -162,8 +164,8 @@ export class UiSectionBackgroundList extends AbstractUiSection {
   public renderDisclosureContent($selection: D3Selection): void {
     const context = this.context;
     const l10n = context.systems.l10n!;
-    const map3d = context.systems.map3d as any;
-    const ui = context.systems.ui as any;
+    const map3d = context.systems.map3d;
+    const ui = context.systems.ui;
 
     const BackgroundCard = ui.InfoCards.BackgroundCard;
     const LocationCard = ui.InfoCards.LocationCard;
@@ -323,7 +325,7 @@ export class UiSectionBackgroundList extends AbstractUiSection {
     const context = this.context;
     const l10n = context.systems.l10n!;
 
-    $selection.each((d: any, i, nodes) => {
+    $selection.each((d: ImagerySource, i, nodes) => {
       const $item = select(nodes[i]).select('label');
       const placement = (i < nodes.length / 2) ? 'bottom' : 'top';
 
@@ -373,14 +375,14 @@ export class UiSectionBackgroundList extends AbstractUiSection {
     const context = this.context;
     const imagery = context.systems.imagery!;
     const l10n = context.systems.l10n!;
-    const wayback = context.services.wayback as any;
+    const wayback = context.services.wayback;
 
     const sources = imagery
       .visibleSources()
       .filter(this._isNotOverlay);
 
     let $listItems: D3Selection = $selection.selectAll('li')
-      .data(sources, (d: any) => d.id);
+      .data(sources, (d: ImagerySource) => d.id);
 
     // exit
     $listItems.exit()
@@ -389,8 +391,8 @@ export class UiSectionBackgroundList extends AbstractUiSection {
     // enter
     const $$listItems = $listItems.enter()
       .append('li')
-      .classed('layer-custom', (d: any) => d.id === 'custom')
-      .classed('best', (d: any) => d.props.best);
+      .classed('layer-custom', (d: ImagerySource) => d.id === 'custom')
+      .classed('best', (d: ImagerySource) => d.props.best);
 
     const $$label = $$listItems
       .append('label');
@@ -404,10 +406,10 @@ export class UiSectionBackgroundList extends AbstractUiSection {
     $$label
       .append('span')
       .attr('class', 'background-name')
-      .text((d: any) => d.name);
+      .text((d: ImagerySource) => d.name);
 
     $$listItems
-      .each((d: any, i, nodes) => {
+      .each((d: ImagerySource, i, nodes) => {
         const $li = select(nodes[i]);
 
         // Wayback gets an extra dropdown for picking the date
@@ -459,14 +461,14 @@ export class UiSectionBackgroundList extends AbstractUiSection {
       .sort(this._sortSources) as D3Selection;
 
     $listItems
-      .each((d: any, i, nodes) => {
+      .each((d: ImagerySource, i, nodes) => {
         const $li = select(nodes[i]);
 
         $li
-          .classed('active', (d: any) => imagery.showsLayer(d))
+          .classed('active', (d: ImagerySource) => imagery.showsLayer(d))
           .call(this._setTooltips)
           .selectAll('input')
-          .property('checked', (d: any) => imagery.showsLayer(d));
+          .property('checked', (d: ImagerySource) => imagery.showsLayer(d));
 
         // Update the Wayback release date options
         if (d.id === 'EsriWayback') {
@@ -480,18 +482,18 @@ export class UiSectionBackgroundList extends AbstractUiSection {
 
           const $dropdown = $li.selectAll('.wayback-date');
           const $options: D3Selection = $dropdown.selectAll('option')
-            .data(this._waybackDates, (d: any) => d);
+            .data(this._waybackDates, (d: string) => d);
 
           $options.exit()
             .remove();
 
           const $$options: D3Selection = $options.enter()
             .append('option')
-            .attr('value', (d: any) => d)
-            .text((d: any) => d);
+            .attr('value', (d: string) => d)
+            .text((d: string) => d);
 
           $options.merge($$options)
-            .attr('selected', (d: any) => (d === currDate ? '' : null))
+            .attr('selected', (d: string) => (d === currDate ? '' : null))
             .order();
         }
 
@@ -542,10 +544,10 @@ export class UiSectionBackgroundList extends AbstractUiSection {
    * Handles a change to the custom imagery settings.
    * @param d - object containing settings for the custom imagery
    */
-  protected _customChanged(d: any): void {
+  protected _customChanged(d: { template?: string }): void {
     const imagery = this.context.systems.imagery!;
 
-    const customSource = imagery.getSourceByID('custom') as any;
+    const customSource = imagery.getSourceByID('custom') as ImagerySourceCustom;
     if (d?.template) {
       customSource.template = d.template;
       this._chooseBackground(undefined, customSource);
@@ -588,7 +590,7 @@ export class UiSectionBackgroundList extends AbstractUiSection {
    * @param d3_event - click event, if called from a click handler
    * @param d        - ImagerySource being toggled
    */
-  protected _toggleFavorite(d3_event: Event, d: any): void {
+  protected _toggleFavorite(d3_event: Event, d: ImagerySource): void {
     const context = this.context;
     const settings = context.systems.settings;
 
@@ -694,7 +696,7 @@ export class UiSectionBackgroundList extends AbstractUiSection {
 
     if (needsRefresh && !this._waybackPromise) {
       this._waybackPromise = wayback.getLocalDatesAsync()
-        .then((result: any) => {
+        .then((result: Record<string, unknown>) => {
           if (!Array.isArray(result)) return;
 
           const allDates = wayback.allDates;
@@ -731,7 +733,7 @@ export class UiSectionBackgroundList extends AbstractUiSection {
     };
     if (scheduler) {
       scheduler.scheduleIdleTask(fn)
-        .catch((err: any) => {
+        .catch((err: unknown) => {
           if (err?.name === 'AbortError') return;   // expected cancellation
           console.error(err);  // eslint-disable-line no-console
         });

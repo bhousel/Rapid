@@ -9,6 +9,7 @@ import { utilNoAuto } from '../util/index.ts';
 
 import type { Context } from '../Context.ts';
 import type { D3Selection } from 'd3-selection';
+import type { MapRouletteTask } from '../services/MapRouletteService.ts';
 
 
 /**
@@ -38,7 +39,7 @@ function getActionColor(action: string): string {
  */
 export class UiMapRouletteEditor extends EventEmitter {
   public context: Context;
-  public datum: any;
+  public datum: MapRouletteTask | null;
 
   protected _header: UiMapRouletteHeader;
   protected _details: UiMapRouletteDetails;
@@ -90,8 +91,8 @@ export class UiMapRouletteEditor extends EventEmitter {
 
     const context = this.context;
     const l10n = context.systems.l10n!;
-    const maproulette = context.services.maproulette as any;
-    const osm = context.services.osm as any;
+    const maproulette = context.services.maproulette!;
+    const osm = context.services.osm!;
 
     if (!osm || !maproulette) return;
 
@@ -155,14 +156,14 @@ export class UiMapRouletteEditor extends EventEmitter {
 
 
   /** Fetch the user's MapRoulette API key from their OSM preferences. */
-  protected _getApiKeyAsync(): Promise<any> {
-    const osm = this.context.services.osm as any;
+  protected _getApiKeyAsync(): Promise<string | null> {
+    const osm = this.context.services.osm!;
     return osm.getUserPreferencesAsync()
       .then((prefs: any) => {
         this._apikey = prefs.maproulette_apikey_v2;
         return this._apikey;
       })
-      .catch((err: any) => {
+      .catch((err: unknown) => {
         this._apikey = null;
         console.error(err);  // eslint-disable-line no-console
       });
@@ -179,7 +180,7 @@ export class UiMapRouletteEditor extends EventEmitter {
     const isShown = (this.datum && isSelected);
 
     let $saveSection: D3Selection = $selection.selectAll('.mr-save')
-      .data(isShown ? [this.datum] : [], (d: any) => d.key);
+      .data(isShown ? [this.datum] : [], (d: MapRouletteTask) => d.key!);
 
     // exit
     $saveSection.exit()
@@ -205,16 +206,16 @@ export class UiMapRouletteEditor extends EventEmitter {
   protected _commentSaveSection($selection: D3Selection): void {
     const context = this.context;
     const l10n = context.systems.l10n!;
-    const maproulette = context.services.maproulette as any;
+    const maproulette = context.services.maproulette!;
 
     const errID = this.datum?.id;
     const isSelected = errID && context.selectedData().has(errID);
 
     let $commentSave: D3Selection = $selection.selectAll('.note-save')
-      .data(isSelected && this._actionTaken ? [this.datum] : [], (d: any) => d.key);
+      .data(isSelected && this._actionTaken ? [this.datum] : [], (d: MapRouletteTask) => d.key!);
 
     const changeInput = (d3_event: Event): void => {
-      const $input = d3_select(d3_event.currentTarget as any);
+      const $input = d3_select(d3_event.currentTarget as HTMLTextAreaElement);
       const val = ($input.property('value') as string).trim() || undefined;
 
       this.datum.props.newComment = val;
@@ -244,7 +245,7 @@ export class UiMapRouletteEditor extends EventEmitter {
       .append('textarea')
       .attr('class', 'new-comment-input')
       .attr('maxlength', 1000)
-      .property('value', (d: any) => d.props.newComment)
+      .property('value', (d: MapRouletteTask) => d.props.newComment ?? '')
       .call(utilNoAuto)
       .on('input.note-input', changeInput)
       .on('blur.note-input', changeInput)
@@ -275,7 +276,7 @@ export class UiMapRouletteEditor extends EventEmitter {
   protected _userDetails($selection: D3Selection): void {
     const context = this.context;
     const l10n = context.systems.l10n!;
-    const osm = context.services.osm as any;
+    const osm = context.services.osm!;
 
     let $detailSection: D3Selection = $selection.selectAll('.detail-section')
       .data([0]);
@@ -367,7 +368,7 @@ export class UiMapRouletteEditor extends EventEmitter {
           .attr('href', osm.userURL(user.display_name))
           .attr('target', '_blank');
       })
-      .catch((err: any) => {
+      .catch((err: unknown) => {
         this._user = null;
         console.error(err);  // eslint-disable-line no-console
       });
@@ -383,8 +384,8 @@ export class UiMapRouletteEditor extends EventEmitter {
   protected _saveButtons($selection: D3Selection): void {
     const context = this.context;
     const l10n = context.systems.l10n!;
-    const maproulette = context.services.maproulette as any;
-    const ui = context.systems.ui as any;  // optional
+    const maproulette = context.services.maproulette!;
+    const ui = context.systems.ui;  // optional
 
     this._getApiKeyAsync()
       .then(() => {
@@ -400,12 +401,12 @@ export class UiMapRouletteEditor extends EventEmitter {
           $selection.selectAll('.mr-save .buttons').style('display', ''); // Ensure buttons are shown if menu is not open
         }
 
-        const isSaveDisabled = (d: any): true | null => {
+        const isSaveDisabled = (d: MapRouletteTask): true | null => {
           return (d && hasAuth) ? null : true;
         };
 
         let $buttons: D3Selection = $selection.selectAll('.buttons')
-          .data(isSelected ? [this.datum] : [], (d: any) => d.key);
+          .data(isSelected ? [this.datum] : [], (d: MapRouletteTask) => d.key!);
 
         // exit
         $buttons.exit()
@@ -457,22 +458,22 @@ export class UiMapRouletteEditor extends EventEmitter {
         $buttons.select('.fixedIt-button')
           .attr('disabled', isSaveDisabled(this.datum))
           .text(l10n.t('map_data.layers.maproulette.fixed'))
-          .on('click.fixedIt', (d3_event: Event, d: any) => this._fixedIt(d3_event, d, $selection));
+          .on('click.fixedIt', (d3_event: Event, d: MapRouletteTask) => this._fixedIt(d3_event, d, $selection));
 
         $buttons.select('.cantComplete-button')
           .attr('disabled', isSaveDisabled(this.datum))
           .text(l10n.t('map_data.layers.maproulette.cantComplete'))
-          .on('click.cantComplete', (d3_event: Event, d: any) => this._cantComplete(d3_event, d, $selection));
+          .on('click.cantComplete', (d3_event: Event, d: MapRouletteTask) => this._cantComplete(d3_event, d, $selection));
 
         $buttons.select('.alreadyFixed-button')
           .attr('disabled', isSaveDisabled(this.datum))
           .text(l10n.t('map_data.layers.maproulette.alreadyFixed'))
-          .on('click.alreadyFixed', (d3_event: Event, d: any) => this._alreadyFixed(d3_event, d, $selection));
+          .on('click.alreadyFixed', (d3_event: Event, d: MapRouletteTask) => this._alreadyFixed(d3_event, d, $selection));
 
         $buttons.select('.notAnIssue-button')
           .attr('disabled', isSaveDisabled(this.datum))
           .text(l10n.t('map_data.layers.maproulette.notAnIssue'))
-          .on('click.notAnIssue', (d3_event: Event, d: any) => this._notAnIssue(d3_event, d, $selection));
+          .on('click.notAnIssue', (d3_event: Event, d: MapRouletteTask) => this._notAnIssue(d3_event, d, $selection));
       });
   }
 
@@ -483,7 +484,7 @@ export class UiMapRouletteEditor extends EventEmitter {
    */
   protected _nearbyTaskChanged(d3_event: Event): void {
     const isChecked = (d3_event.target as HTMLInputElement).checked;
-    const maproulette = this.context.services.maproulette as any;
+    const maproulette = this.context.services.maproulette!;
     if (maproulette) {
       maproulette.nearbyTaskEnabled = isChecked;
     }
@@ -518,7 +519,7 @@ export class UiMapRouletteEditor extends EventEmitter {
     const errID = this.datum?.id;
     const isSelected = errID && context.selectedData().has(errID);
     let $buttons: D3Selection = $selection.selectAll('.buttons')
-      .data(isSelected ? [this.datum] : [], (d: any) => d.key);
+      .data(isSelected ? [this.datum] : [], (d: MapRouletteTask) => d.key!);
 
     // exit
     $buttons.exit()
@@ -543,11 +544,11 @@ export class UiMapRouletteEditor extends EventEmitter {
 
     $buttons.select('.cancel-button')
       .text(l10n.t('map_data.layers.maproulette.cancel'))
-      .on('click.cancel', (d3_event: Event, d: any) => this._clickCancel(d3_event, d, $selection));
+      .on('click.cancel', (d3_event: Event, d: MapRouletteTask) => this._clickCancel(d3_event, d, $selection));
 
     $buttons.select('.submit-button')
       .text(l10n.t('map_data.layers.maproulette.submit'))
-      .on('click.submit', (d3_event: Event, d: any) => this._clickSubmit(d3_event, d));
+      .on('click.submit', (d3_event: Event, d: MapRouletteTask) => this._clickSubmit(d3_event, d));
   }
 
 
@@ -557,7 +558,7 @@ export class UiMapRouletteEditor extends EventEmitter {
    * @param d - the bound task datum
    * @param $selection - the save section selection to re-render
    */
-  protected _fixedIt(d3_event: Event, d: any, $selection: D3Selection): void {
+  protected _fixedIt(d3_event: Event, d: MapRouletteTask, $selection: D3Selection): void {
     (d3_event.currentTarget as HTMLElement).blur();    // avoid keeping focus on the button - iD#4641
     d.props._status = 1;
     this._actionTaken = 'FIXED';
@@ -572,7 +573,7 @@ export class UiMapRouletteEditor extends EventEmitter {
    * @param d - the bound task datum
    * @param $selection - the save section selection to re-render
    */
-  protected _cantComplete(d3_event: Event, d: any, $selection: D3Selection): void {
+  protected _cantComplete(d3_event: Event, d: MapRouletteTask, $selection: D3Selection): void {
     (d3_event.currentTarget as HTMLElement).blur();    // avoid keeping focus on the button - iD#4641
     d.props._status = 6;
     this._actionTaken = `CAN'T COMPLETE`;
@@ -586,7 +587,7 @@ export class UiMapRouletteEditor extends EventEmitter {
    * @param d - the bound task datum
    * @param $selection - the save section selection to re-render
    */
-  protected _alreadyFixed(d3_event: Event, d: any, $selection: D3Selection): void {
+  protected _alreadyFixed(d3_event: Event, d: MapRouletteTask, $selection: D3Selection): void {
     (d3_event.currentTarget as HTMLElement).blur();    // avoid keeping focus on the button - iD#4641
     d.props._status = 5;
     this._actionTaken = 'ALREADY FIXED';
@@ -600,7 +601,7 @@ export class UiMapRouletteEditor extends EventEmitter {
    * @param d - the bound task datum
    * @param $selection - the save section selection to re-render
    */
-  protected _notAnIssue(d3_event: Event, d: any, $selection: D3Selection): void {
+  protected _notAnIssue(d3_event: Event, d: MapRouletteTask, $selection: D3Selection): void {
     (d3_event.currentTarget as HTMLElement).blur();    // avoid keeping focus on the button - iD#4641
     d.props._status = 2;
     this._actionTaken = 'NOT AN ISSUE';
@@ -614,7 +615,7 @@ export class UiMapRouletteEditor extends EventEmitter {
    * @param d - the bound task datum
    * @param $selection - the save section selection to re-render
    */
-  protected _clickCancel(d3_event: Event, d: any, $selection: D3Selection): void {
+  protected _clickCancel(d3_event: Event, d: MapRouletteTask, $selection: D3Selection): void {
     (d3_event.currentTarget as HTMLElement).blur();    // avoid keeping focus on the button - iD#4641
     this._actionTaken = '';
     d.props._status = '';
@@ -627,10 +628,10 @@ export class UiMapRouletteEditor extends EventEmitter {
    * @param d3_event - the triggering click event
    * @param d - the bound task datum
    */
-  protected _clickSubmit(d3_event: Event, d: any): void {
+  protected _clickSubmit(d3_event: Event, d: MapRouletteTask): void {
     const context = this.context;
-    const maproulette = context.services.maproulette as any;
-    const osm = context.services.osm as any;
+    const maproulette = context.services.maproulette!;
+    const osm = context.services.osm!;
 
     (d3_event.currentTarget as HTMLElement).blur();    // avoid keeping focus on the button - iD#4641
     const userID = osm._userDetails.id;
@@ -640,7 +641,7 @@ export class UiMapRouletteEditor extends EventEmitter {
     d.props.comment = d3_select('.new-comment-input').property('value').trim();
     d.props.taskId = d.id;
     d.props.userId = userID;
-    maproulette.postUpdate(d, (err: any, item: any) => {
+    maproulette.postUpdate(d, (err: string | null, item?: MapRouletteTask) => {
       if (err) {
         console.error(err);  // eslint-disable-line no-console
         return;

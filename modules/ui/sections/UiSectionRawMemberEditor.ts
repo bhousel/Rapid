@@ -13,8 +13,20 @@ import { utilHighlightEntities, utilIsColorValid, utilNoAuto } from '../../util/
 
 import type { Context } from '../../Context.ts';
 import type { D3Selection } from 'd3-selection';
+import type { OsmEntity } from '../../data/index.ts';
+import type { OsmRelation, OsmRelationMember } from '../../data/index.ts';
 
 const MAX_MEMBERS = 1000;
+
+interface MemberRowData {
+  index: number;
+  id: EntityID;
+  type: string;
+  role: string;
+  relation: OsmRelation;
+  member?: OsmEntity;
+  uid: string;
+}
 
 
 export class UiSectionRawMemberEditor extends AbstractUiSection {
@@ -57,7 +69,7 @@ export class UiSectionRawMemberEditor extends AbstractUiSection {
     const editor = this.context.systems.editor!;
     const l10n = this.context.systems.l10n!;
     const graph = editor.staging.graph;  // the current graph
-    const entity: any = graph.hasEntity(this._entityIDs[0]);
+    const entity = graph.hasEntity(this._entityIDs[0]) as OsmRelation | undefined;
     if (!entity) return '';
 
     const gt = entity.members.length > MAX_MEMBERS ? '>' : '';
@@ -71,7 +83,7 @@ export class UiSectionRawMemberEditor extends AbstractUiSection {
    * @param d3_event - the triggering click event
    * @param d - the member row datum
    */
-  protected _downloadMember(d3_event: any, d: any): void {
+  protected _downloadMember(d3_event: Event, d: MemberRowData): void {
     d3_event.preventDefault();
 
     // display the loading indicator
@@ -86,7 +98,7 @@ export class UiSectionRawMemberEditor extends AbstractUiSection {
    * @param d3_event - the triggering click event
    * @param d - the member row datum
    */
-  protected _zoomToMember(d3_event: Event, d: any): void {
+  protected _zoomToMember(d3_event: Event, d: MemberRowData): void {
     const context = this.context;
     const editor = context.systems.editor!;
     const map = context.systems.map!;
@@ -106,7 +118,7 @@ export class UiSectionRawMemberEditor extends AbstractUiSection {
    * @param d3_event - the triggering click event
    * @param d - the member row datum
    */
-  protected _selectMember(d3_event: Event, d: any): void {
+  protected _selectMember(d3_event: Event, d: MemberRowData): void {
     const context = this.context;
     const editor = context.systems.editor!;
     const map = context.systems.map!;
@@ -117,7 +129,7 @@ export class UiSectionRawMemberEditor extends AbstractUiSection {
     utilHighlightEntities(context, [d.id], false);
 
     const graph = editor.staging.graph;
-    const entity: any = graph.entity(d.id);
+    const entity = graph.entity(d.id);
     const extent = viewport.visibleExtent();
     if (!entity.intersects(extent, graph)) {
       // zoom to the entity if its extent is not visible now
@@ -133,7 +145,7 @@ export class UiSectionRawMemberEditor extends AbstractUiSection {
    * @param d3_event - the triggering blur/change event
    * @param d - the member row datum
    */
-  protected _changeRole(d3_event: any, d: any): void {
+  protected _changeRole(d3_event: Event, d: MemberRowData): void {
     const context = this.context;
     const editor = context.systems.editor!;
     const l10n = context.systems.l10n!;
@@ -156,7 +168,7 @@ export class UiSectionRawMemberEditor extends AbstractUiSection {
    * @param d3_event - the triggering click event
    * @param d - the member row datum
    */
-  protected _deleteMember(d3_event: Event, d: any): void {
+  protected _deleteMember(d3_event: Event, d: MemberRowData): void {
     const context = this.context;
     const editor = context.systems.editor!;
     const l10n = context.systems.l10n!;
@@ -190,10 +202,10 @@ export class UiSectionRawMemberEditor extends AbstractUiSection {
 
     const graph = editor.staging.graph;  // the current graph
     const entityID = this._entityIDs[0];
-    const entity: any = graph.entity(entityID);
-    const memberships: any[] = [];
+    const entity = graph.entity(entityID) as OsmRelation;
+    const memberships: MemberRowData[] = [];
 
-    entity.members.slice(0, MAX_MEMBERS).forEach((member: any, index: number) => {
+    entity.members.slice(0, MAX_MEMBERS).forEach((member: OsmRelationMember, index: number) => {
       memberships.push({
         index: index,
         id: member.id,
@@ -215,7 +227,7 @@ export class UiSectionRawMemberEditor extends AbstractUiSection {
 
 
     let $items: D3Selection = $list.selectAll('li')
-      .data(memberships, (d: any) => {
+      .data(memberships, (d: MemberRowData) => {
         const parentKey = d.relation.key;
         const childKey = d.member?.key || 'incomplete';
         return `${parentKey},${d.index},${childKey}`;
@@ -228,10 +240,10 @@ export class UiSectionRawMemberEditor extends AbstractUiSection {
     const $$items = $items.enter()
       .append('li')
       .attr('class', 'member-row form-field')
-      .classed('member-incomplete', (d: any) => !d.member);
+      .classed('member-incomplete', (d: MemberRowData) => !d.member);
 
     $$items
-      .each((d: any, i, nodes) => {
+      .each((d: MemberRowData, i, nodes) => {
         const $item = d3_select(nodes[i]);
 
         const $label = $item
@@ -254,17 +266,17 @@ export class UiSectionRawMemberEditor extends AbstractUiSection {
           $labelLink
             .append('span')
             .attr('class', 'member-entity-type')
-            .text((d: any) => {
+            .text((d: MemberRowData) => {
               const preset = schema.match(d.member, graph);
-              return preset?.name || l10n.displayType(d.member.id);
+              return preset?.name || l10n.displayType(d.member!.id);
             });
 
           $labelLink
             .append('span')
             .attr('class', 'member-entity-name')
-            .classed('has-color', (d: any) => !!this._getColor(d.member))
-            .style('border-color', (d: any) => this._getColor(d.member))
-            .text((d: any) => (d.member ? l10n.displayName(d.member.tags) : ''));
+            .classed('has-color', (d: MemberRowData) => !!this._getColor(d.member))
+            .style('border-color', (d: MemberRowData) => this._getColor(d.member))
+            .text((d: MemberRowData) => (d.member ? l10n.displayName(d.member.tags) : ''));
 
           $label
             .append('button')
@@ -310,7 +322,7 @@ export class UiSectionRawMemberEditor extends AbstractUiSection {
     $$wrap
       .append('input')
       .attr('class', 'member-role')
-      .attr('id', (d: any) => d.uid)
+      .attr('id', (d: MemberRowData) => d.uid)
       .property('type', 'text')
       .attr('placeholder', l10n.t('inspector.role'))
       .call(utilNoAuto);
@@ -325,7 +337,7 @@ export class UiSectionRawMemberEditor extends AbstractUiSection {
       .order();
 
     $items.select('input.member-role')
-      .property('value', (d: any) => d.role)
+      .property('value', (d: MemberRowData) => d.role)
       .on('blur', this._changeRole)
       .on('change', this._changeRole);
 
@@ -335,9 +347,9 @@ export class UiSectionRawMemberEditor extends AbstractUiSection {
     let x0: number, y0: number, targetIndex: number | null;
 
     $items.call(d3_drag()
-      .on('start', function(d3_event: any) {
-        x0 = d3_event.x;
-        y0 = d3_event.y;
+      .on('start', function(d3_event: Event) {
+        x0 = d3_event.x as number;
+        y0 = d3_event.y as number;
         targetIndex = null;
       })
       .on('drag', function(this: any, d3_event: any) {
@@ -355,7 +367,7 @@ export class UiSectionRawMemberEditor extends AbstractUiSection {
         targetIndex = null;
 
         $selection.selectAll('li.member-row')
-          .style('transform', function(this: any, d2: any, index2: number) {
+          .style('transform', function(this: any, d2: MemberRowData, index2: number) {
             const node = d3_select(this).node();
             if (index === index2) {
               return `translate(${dx}px, ${dy}px)`;
@@ -373,7 +385,7 @@ export class UiSectionRawMemberEditor extends AbstractUiSection {
             return null;
           });
       })
-      .on('end', function(this: any, d3_event: any, d: any) {
+      .on('end', function(this: any, d3_event: any, d: MemberRowData) {
         if (!d3_select(this).classed('dragging')) return;
 
         const index = $items.nodes().indexOf(this);
@@ -413,7 +425,7 @@ export class UiSectionRawMemberEditor extends AbstractUiSection {
    * @param entity - the member entity
    * @return a valid color string, or `null`
    */
-  protected _getColor(entity: any): string | null {
+  protected _getColor(entity: OsmEntity | undefined): string | null {
     const val = entity?.type === 'relation' && entity?.tags.colour;
     return (val && utilIsColorValid(val)) ? val : null;
   }
@@ -425,7 +437,7 @@ export class UiSectionRawMemberEditor extends AbstractUiSection {
    * @param i - the row index within the selection
    * @param nodes - the selection's DOM nodes
    */
-  protected _bindCombo(d: any, i: number, nodes: any): void {
+  protected _bindCombo(d: MemberRowData, i: number, nodes: ArrayLike<HTMLElement>): void {
     const context = this.context;
     const editor = context.systems.editor!;
     const taginfo = context.services.taginfo;
@@ -487,7 +499,7 @@ export class UiSectionRawMemberEditor extends AbstractUiSection {
    * @param i - the row index within the selection
    * @param nodes - the selection's DOM nodes
    */
-  protected _unbindCombo(d: any, i: number, nodes: any): void {
+  protected _unbindCombo(d: MemberRowData, i: number, nodes: ArrayLike<HTMLElement>): void {
     const $row = d3_select(nodes[i]);
     $row.selectAll('input.member-role')
       .call(uiCombobox.off, this.context);

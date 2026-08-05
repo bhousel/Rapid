@@ -10,8 +10,28 @@ import type { Vec2 } from '@rapid-sdk/math';
 import type { Context } from '../../Context.ts';
 import type { D3Selection } from 'd3-selection';
 import type { Field } from '../../lib/index.ts';
+import type { OsmEntity } from '../../data/index.ts';
+import type { SpatialItem } from '../../core/SpatialSystem.ts';
 import type { TagChange, Tags } from './types.ts';
 import type { UiFieldOptions } from '../UiField.js';
+
+interface AddressFormat {
+  countryCodes?: string[];
+  format: string[][];
+  dropdowns?: string[];
+  widths?: Record<string, number>;
+}
+
+interface AddressSuggestion {
+  title: string;
+  value: string;
+  dist: number;
+}
+
+interface AddressSubfield {
+  id: string;
+  width: number;
+}
 
 
 export class UiFieldAddress extends UiField {
@@ -19,7 +39,7 @@ export class UiFieldAddress extends UiField {
   public $wrap: D3Selection;
   protected _tags: Tags;
   protected _countryCode: string | undefined;
-  protected _addressFormats: any[];
+  protected _addressFormats: AddressFormat[];
 
   public constructor(context: Context, presetField: Field, entityIDs: EntityID[] = [], options: Partial<UiFieldOptions> = {}) {
     super(context, presetField, entityIDs, options);
@@ -40,13 +60,13 @@ export class UiFieldAddress extends UiField {
     this._updatePlaceholder = this._updatePlaceholder.bind(this);
 
     assets.loadAssetAsync('address_formats')
-      .then((d: any) => {
+      .then((d: { addressFormats: AddressFormat[] }) => {
         this._addressFormats = d.addressFormats;
         if (!this.$parent.empty()) {
           this.$parent.call(this.renderContent);  // rerender
         }
       })
-      .catch((e: any) => console.error(e));  // eslint-disable-line
+      .catch((e: unknown) => console.error(e));  // eslint-disable-line
   }
 
 
@@ -73,7 +93,7 @@ export class UiFieldAddress extends UiField {
 
 
   /** Finds nearby streets with names to suggest as `addr:street` values. */
-  protected _getNearbyStreets(): any[] {
+  protected _getNearbyStreets(): AddressSuggestion[] {
     const context = this.context;
     const editor = context.systems.editor!;
     const spatial = context.systems.spatial!;
@@ -83,35 +103,36 @@ export class UiFieldAddress extends UiField {
     const box = this._queryBox(loc, 200);
 
     const spatialID = editor.spatialIDForGraph(editor.staging.graph);
-    const streets = spatial.getItemsAtBox(spatialID, box)
-      .map((hit: any) => hit.contents)
+    const streets = (spatial.getItemsAtBox(spatialID, box)
+      .map((hit: SpatialItem) => hit.contents as OsmEntity)
       .filter(isAddressableStreet)
-      .map((way: any) => {
+      .map((way: OsmEntity) => {
         // Sort by distance to the addressable streets in the query box.
         // A way will have LineString or Polygon geometry. We can use 'outer' to get these points.
-        const line = way.geoms.parts[0]?.world?.outer;
+        const line = (way as any).geoms.parts[0]?.world?.outer;
         if (!line) return null;
 
-        const choice: any = vecProject(point, line);
+        const choice = vecProject(point, line);
+        if (!choice) return null;
         return {
-          title: way.tags.name,
-          value: way.tags.name,
+          title: way.tags.name!,
+          value: way.tags.name!,
           dist: choice.distance
         };
       })
-      .filter(Boolean)
-      .sort((a: any, b: any) => a.dist - b.dist);
+      .filter(Boolean) as AddressSuggestion[])
+      .sort((a: AddressSuggestion, b: AddressSuggestion) => a.dist - b.dist);
 
-    return utilArrayUniqBy(streets, 'value' as any);
+    return utilArrayUniqBy(streets, 'value');
 
-    function isAddressableStreet(d: any): boolean {
-      return d.tags.highway && d.tags.name && d.type === 'way';
+    function isAddressableStreet(d: OsmEntity): boolean {
+      return !!d.tags.highway && !!d.tags.name && d.type === 'way';
     }
   }
 
 
   /** Finds nearby cities/towns/villages to suggest as `addr:city` values. */
-  protected _getNearbyCities(): any[] {
+  protected _getNearbyCities(): AddressSuggestion[] {
     const context = this.context;
     const editor = context.systems.editor!;
     const spatial = context.systems.spatial!;
@@ -121,26 +142,26 @@ export class UiFieldAddress extends UiField {
     const box = this._queryBox(loc, 200);
 
     const spatialID = editor.spatialIDForGraph(editor.staging.graph);
-    const cities = spatial.getItemsAtBox(spatialID, box)
-      .map((hit: any) => hit.contents)
+    const cities = (spatial.getItemsAtBox(spatialID, box)
+      .map((hit: SpatialItem) => hit.contents as OsmEntity)
       .filter(isAddressableCity)
-      .map((d: any) => {
+      .map((d: OsmEntity) => {
         // Sort by distance to the center of the cities in the query box
-        const center = d.geoms.world?.extent?.center();
+        const center = (d as any).geoms.world?.extent?.center();
         if (!center) return null;
 
         return {
-          title: d.tags['addr:city'] || d.tags.name,
-          value: d.tags['addr:city'] || d.tags.name,
+          title: (d.tags['addr:city'] || d.tags.name)!,
+          value: (d.tags['addr:city'] || d.tags.name)!,
           dist: geoSphericalDistance(point, center)
         };
       })
-      .filter(Boolean)
-      .sort((a: any, b: any) => a.dist - b.dist);
+      .filter(Boolean) as AddressSuggestion[])
+      .sort((a: AddressSuggestion, b: AddressSuggestion) => a.dist - b.dist);
 
-    return utilArrayUniqBy(cities, 'value' as any);
+    return utilArrayUniqBy(cities, 'value');
 
-    function isAddressableCity(d: any): boolean {
+    function isAddressableCity(d: OsmEntity): boolean {
       if (d.tags.name) {
         if (d.tags.admin_level === '8' && d.tags.boundary === 'administrative') return true;
         if (d.tags.border_type === 'city') return true;
@@ -160,7 +181,7 @@ export class UiFieldAddress extends UiField {
    * @param key - The address tag key (e.g. `addr:postcode`) to gather nearby values for
    * @returns Sorted, de-duplicated suggestion objects
    */
-  protected _getNearbyValues(key: string): any[] {
+  protected _getNearbyValues(key: string): AddressSuggestion[] {
     const context = this.context;
     const editor = context.systems.editor!;
     const spatial = context.systems.spatial!;
@@ -171,26 +192,27 @@ export class UiFieldAddress extends UiField {
     const box = this._queryBox(loc, 200);
 
     const spatialID = editor.spatialIDForGraph(editor.staging.graph);
-    const results = spatial.getItemsAtBox(spatialID, box)
-      .map((hit: any) => hit.contents)
+    const results = (spatial.getItemsAtBox(spatialID, box)
+      .map((hit: SpatialItem) => hit.contents as OsmEntity)
       .filter(entityHasAddressTag)
-      .map((d: any) => {
+      .map((d: OsmEntity) => {
         // Sort by distance to the center of the addressable OsmEntities in the query box
-        const center = d.geoms.world?.extent?.center();
+        const center = (d as any).geoms.world?.extent?.center();
         if (!center) return null;
 
         return {
-          title: d.tags[key],
-          value: d.tags[key],
+          title: d.tags[key]!,
+          value: d.tags[key]!,
           dist: geoSphericalDistance(point, center)
         };
       })
-      .sort((a: any, b: any) => a.dist - b.dist);
+      .filter(Boolean) as AddressSuggestion[])
+      .sort((a: AddressSuggestion, b: AddressSuggestion) => a.dist - b.dist);
 
-    return utilArrayUniqBy(results, 'value' as any);
+    return utilArrayUniqBy(results, 'value');
 
-    function entityHasAddressTag(d: any): boolean {
-      return !entityIDs.includes(d.id) && d.tags[key];
+    function entityHasAddressTag(d: OsmEntity): boolean {
+      return !entityIDs.includes(d.id) && !!d.tags[key];
     }
   }
 
@@ -204,7 +226,7 @@ export class UiFieldAddress extends UiField {
 
     if (!this._countryCode) return;
 
-    let addressFormat: any;
+    let addressFormat: AddressFormat | undefined;
     for (const format of this._addressFormats) {
       if (!addressFormat && !format.countryCodes) {
         addressFormat = format;   // choose the default format, keep going
@@ -225,7 +247,7 @@ export class UiFieldAddress extends UiField {
       city: 2/3, state: 1/4, postcode: 1/3
     };
 
-    function row(r: string[]): any[] {
+    function row(r: string[]): AddressSubfield[] {
       // Normalize widths.
       const total = r.reduce((sum, key) => {
         return sum + (widths[key] || 0.5);
@@ -240,7 +262,7 @@ export class UiFieldAddress extends UiField {
     }
 
     const $rows: D3Selection = this.$wrap.selectAll('.addr-row')
-      .data(addressFormat.format, (d: any) => d.toString());
+      .data(addressFormat.format, (d: string[]) => d.toString());
 
     $rows.exit()
       .remove();
@@ -254,13 +276,13 @@ export class UiFieldAddress extends UiField {
       .enter()
       .append('input')
       .property('type', 'text')
-      .attr('class', (d: any) => `addr-${d.id}`)
+      .attr('class', (d: AddressSubfield) => `addr-${d.id}`)
       .call(utilNoAuto)
       .each(addDropdown)
-      .style('width', (d: any) => (d.width * 100) + '%');
+      .style('width', (d: AddressSubfield) => (d.width * 100) + '%');
 
 
-    function addDropdown(this: any, d: any): void {
+    function addDropdown(this: HTMLInputElement, d: AddressSubfield): void {
       if (!dropdowns.includes(d.id)) return;  // not a dropdown
 
       const getValues = (d.id === 'street') ? getNearbyStreets
@@ -310,7 +332,7 @@ export class UiFieldAddress extends UiField {
 
     const center = this.entityExtent!.center();
     let countryCode;
-    if ((context as any).inIntro) {  // localize the address format for the walkthrough
+    if (context.inIntro) {  // localize the address format for the walkthrough
       countryCode = l10n.t('intro.graph.countrycode');
     } else {
       countryCode = iso1A2Code(center);
@@ -332,7 +354,7 @@ export class UiFieldAddress extends UiField {
       const context = this.context;
       const tagChange: TagChange = {};
       this.$wrap.selectAll('input')
-        .each((subfield: any, i, nodes) => {
+        .each((subfield: AddressSubfield, i, nodes) => {
           const node = nodes[i] as HTMLInputElement;
           const key = this.key + ':' + subfield.id;
           const value = onInput ? node.value : context.cleanTagValue(node.value);
@@ -356,7 +378,7 @@ export class UiFieldAddress extends UiField {
   protected _updatePlaceholder($inputSelection: D3Selection): D3Selection {
     const l10n = this.context.systems.l10n!;
 
-    return $inputSelection.attr('placeholder', (subfield: any) => {
+    return $inputSelection.attr('placeholder', (subfield: AddressSubfield) => {
       const key = `${this.key}:${subfield.id}`;
       if (this._tags && Array.isArray(this._tags[key])) {
         return l10n.t('inspector.multiple_values');
@@ -383,18 +405,18 @@ export class UiFieldAddress extends UiField {
   protected _updateTags(tags: Tags): void {
     const fieldKey = this.key;
 
-    const t: any = tags;
-    (utilGetSetValue(this.$wrap.selectAll('input'), function(subfield: any) {
+    const t = tags;
+    (utilGetSetValue(this.$wrap.selectAll('input'), function(subfield: AddressSubfield) {
         const key = fieldKey + ':' + subfield.id;
         const val = t[key];
         return typeof val === 'string' ? val : '';
       }) as D3Selection)
-      .attr('title', (subfield: any) => {
+      .attr('title', (subfield: AddressSubfield) => {
         const key = this.key + ':' + subfield.id;
         const val = t[key];
         return val && Array.isArray(val) && val.filter(Boolean).join('\n');
       })
-      .classed('mixed', (subfield: any) => {
+      .classed('mixed', (subfield: AddressSubfield) => {
         const key = this.key + ':' + subfield.id;
         return Array.isArray(t[key]);
       })

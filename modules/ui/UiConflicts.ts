@@ -9,6 +9,29 @@ import { utilHighlightEntities, utilKeybinding, utilSanitizeHTML } from '../util
 
 import type { Context } from '../Context.ts';
 import type { D3Selection } from 'd3-selection';
+import type { Keybinding } from '../util/keybinding.ts';
+import type { OsmChanges } from '../data/OsmChangeset.ts';
+
+
+/**
+ * A choice option within a conflict resolution (keep mine / keep theirs).
+ */
+interface ChoiceOption {
+  id: EntityID;
+  text: string;
+  action: () => void;
+}
+
+/**
+ * A single conflict to resolve.
+ */
+interface ConflictItem {
+  id: EntityID;
+  name: string;
+  details?: string[];
+  chosen?: EntityID;
+  choices?: ChoiceOption[];
+}
 
 
 /**
@@ -20,10 +43,10 @@ import type { D3Selection } from 'd3-selection';
 export class UiConflicts extends EventEmitter {
   public context: Context;
 
-  protected _keybinding: any;
-  protected _origChanges: any;
-  protected _conflictList: any;
-  protected _shownConflictIndex: any;
+  protected _keybinding: Keybinding;
+  protected _origChanges: OsmChanges | null;
+  protected _conflictList: ConflictItem[] | null;
+  protected _shownConflictIndex: number | null;
 
   public constructor(context: Context) {
     super();
@@ -111,7 +134,7 @@ export class UiConflicts extends EventEmitter {
 
     // Download changes link
     const changeset = new OsmChangeset(context);
-    delete (changeset as any).id;  // Export without changeset_id
+    delete (changeset as { id?: string }).id;  // Export without changeset_id
 
     const data = JXON.stringify(changeset.osmChangeJXON(this._origChanges));
     const blob = new Blob([data], { type: 'text/xml;charset=utf-8;' });
@@ -175,7 +198,7 @@ export class UiConflicts extends EventEmitter {
     index = numWrap(index, 0, this._conflictList.length);
     this._shownConflictIndex = index;
 
-    const $parent = d3_select(($selection.node() as HTMLElement).parentNode as any);
+    const $parent = d3_select(($selection.node() as HTMLElement).parentNode as HTMLElement);
 
     // enable save button if this is the last conflict being reviewed..
     if (index === this._conflictList.length - 1) {
@@ -210,8 +233,8 @@ export class UiConflicts extends EventEmitter {
       .append('a')
       .attr('class', 'conflict-description')
       .attr('href', '#')
-      .text((d: any) => d.name)
-      .on('click', (d3_event: Event, d: any) => {
+      .text((d: ConflictItem) => d.name)
+      .on('click', (d3_event: Event, d: ConflictItem) => {
         d3_event.preventDefault();
         this._showEntityID(d.id);
       });
@@ -224,11 +247,11 @@ export class UiConflicts extends EventEmitter {
       .append('ul')
       .attr('class', 'conflict-detail-list')
       .selectAll('li')
-      .data((d: any) => d.details || [])
+      .data((d: ConflictItem) => d.details || [])
       .enter()
       .append('li')
       .attr('class', 'conflict-detail-item')
-      .html((d: any) => utilSanitizeHTML(d));
+      .html((d: string) => utilSanitizeHTML(d));
 
     $$details
       .append('div')
@@ -242,12 +265,12 @@ export class UiConflicts extends EventEmitter {
       .data(['previous', 'next'])
       .enter()
       .append('button')
-      .html((d: any) => l10n.tHtml(`save.conflict.${d}`))
+      .html((d: string) => l10n.tHtml(`save.conflict.${d}`))
       .attr('class', 'conflict-nav-button action col6')
-      .attr('disabled', (d: any, i: number) => {
-        return (i === 0 && index === 0) || (i === 1 && index === this._conflictList.length - 1) || null;
+      .attr('disabled', (d: string, i: number) => {
+        return (i === 0 && index === 0) || (i === 1 && index === this._conflictList!.length - 1) || null;
       })
-      .on('click', (d3_event: Event, d: any) => {
+      .on('click', (d3_event: Event, d: string) => {
         d3_event.preventDefault();
 
         const $container = $parent.selectAll('.conflict-container');
@@ -272,7 +295,7 @@ export class UiConflicts extends EventEmitter {
       .append('ul')
       .attr('class', 'layer-list')
       .selectAll('li')
-      .data((d: any) => d.choices || []);
+      .data((d: ConflictItem) => d.choices || []);
 
     // enter
     const $$choices = $choices.enter()
@@ -285,22 +308,22 @@ export class UiConflicts extends EventEmitter {
     $$label
       .append('input')
       .attr('type', 'radio')
-      .attr('name', (d: any) => d.id)
-      .on('change', (d3_event: Event, d: any) => {
-        const ul = (d3_event.currentTarget as HTMLElement).parentNode!.parentNode!.parentNode as any;
+      .attr('name', (d: ChoiceOption) => d.id)
+      .on('change', (d3_event: Event, d: ChoiceOption) => {
+        const ul = (d3_event.currentTarget as HTMLElement).parentNode!.parentNode!.parentNode as HTMLUListElement;
         ul.__data__.chosen = d.id;
         this._choose(d3_event, ul, d);
       });
 
     $$label
       .append('span')
-      .text((d: any) => d.text);
+      .text((d: ChoiceOption) => d.text);
 
     // update
     $$choices
       .merge($choices)
-      .each((d: any, i: number, nodes: any) => {
-        const ul = nodes[i].parentNode;
+      .each((d: ChoiceOption, i: number, nodes: ArrayLike<HTMLElement>) => {
+        const ul = (nodes[i] as HTMLElement).parentNode as HTMLUListElement;
         if (ul.__data__.chosen === d.id) {
           this._choose(null, ul, d);
         }
@@ -314,7 +337,7 @@ export class UiConflicts extends EventEmitter {
    * @param ul - the `<ul>` element holding the choices
    * @param datum - the chosen resolution datum
    */
-  protected _choose(d3_event: Event | null, ul: any, datum: any): void {
+  protected _choose(d3_event: Event | null, ul: HTMLUListElement, datum: ChoiceOption): void {
     const context = this.context;
     const editor = context.systems.editor!;
 
@@ -322,12 +345,12 @@ export class UiConflicts extends EventEmitter {
 
     d3_select(ul)
       .selectAll('li')
-      .classed('active', (d: any) => d === datum)
+      .classed('active', (d: ChoiceOption) => d === datum)
       .selectAll('input')
-      .property('checked', (d: any) => d === datum);
+      .property('checked', (d: ChoiceOption) => d === datum);
 
     let extent = new Extent();
-    let graph: any, entity: any;
+    let graph, entity;
 
     graph = editor.staging.graph;
     entity = graph.hasEntity(datum.id);
@@ -348,12 +371,12 @@ export class UiConflicts extends EventEmitter {
    * @param id - the entity ID to show
    * @param extent - an optional extent to fit the map to
    */
-  protected _showEntityID(id: any, extent?: any): void {
+  protected _showEntityID(id: EntityID, extent?: Extent): void {
     const context = this.context;
     const editor = context.systems.editor!;
     const map = context.systems.map!;
 
-    utilHighlightEntities(context, false as any, false);   // unhighlight
+    utilHighlightEntities(context, [], false);   // unhighlight
 
     const graph = editor.staging.graph;
     const entity = graph.hasEntity(id);
@@ -383,7 +406,7 @@ export class UiConflicts extends EventEmitter {
    * Gets or sets the list of conflicts to resolve.
    * @param val - the conflict list to set; omit to get the current value
    */
-  public conflictList(val?: any): any {
+  public conflictList(val?: ConflictItem[]): any {
     if (val === undefined) return this._conflictList;
     this._conflictList = val;
     return this;
@@ -394,7 +417,7 @@ export class UiConflicts extends EventEmitter {
    * Gets or sets the original changes captured before the conflict.
    * @param val - the original changes to set; omit to get the current value
    */
-  public origChanges(val?: any): any {
+  public origChanges(val?: OsmChanges): any {
     if (val === undefined) return this._origChanges;
     this._origChanges = val;
     return this;
@@ -402,7 +425,7 @@ export class UiConflicts extends EventEmitter {
 
 
   /** Returns the entity IDs for the currently shown conflict. */
-  public shownEntityIds(): any[] {
+  public shownEntityIds(): EntityID[] {
     if (this._conflictList && typeof this._shownConflictIndex === 'number') {
       return [this._conflictList[this._shownConflictIndex].id];
     }

@@ -7,7 +7,10 @@ import { AbstractUiSection } from '../AbstractUiSection.js';
 import { UiTagReference } from '../UiTagReference.js';
 import { utilGetSetValue, utilNoAuto } from '../../util/index.ts';
 
+import type { Category } from '../../lib/Category.ts';
 import type { Context } from '../../Context.ts';
+import type { Preset } from '../../lib/Preset.ts';
+import type { Tags } from '../fields/types.ts';
 import type { D3Selection } from 'd3-selection';
 
 
@@ -16,8 +19,16 @@ const AVAILABLE_VIEWS = [
   { id: 'text', icon: '#fas-i-cursor' }
 ];
 
+type ViewOption = typeof AVAILABLE_VIEWS[number];
 
-function isMultiValueTag(d: any): boolean {
+interface TagRow {
+  index: number;
+  key: string;
+  value: string | string[];
+}
+
+
+function isMultiValueTag(d: { value: unknown }): boolean {
   return Array.isArray(d.value);
 }
 
@@ -49,8 +60,8 @@ export class UiSectionRawTagEditor extends AbstractUiSection {
   protected _showBlank: boolean;
   protected _pendingChange: Record<string, string | undefined> | null;
   protected _state: string | undefined;    // can be 'hide', 'hover', or 'select'
-  protected _presets: any;
-  protected _tags: any;
+  protected _presets: (Preset | Category)[] | undefined;
+  protected _tags: Tags | undefined;
   protected _entityIDs: EntityID[];
 
   public constructor(context: Context, id: string) {
@@ -145,18 +156,18 @@ export class UiSectionRawTagEditor extends AbstractUiSection {
       .attr('class', 'raw-tag-options');
 
     const $$option = $$options.selectAll('.raw-tag-option')
-      .data(AVAILABLE_VIEWS, (d: any) => d.id)
+      .data(AVAILABLE_VIEWS, (d: ViewOption) => d.id)
       .enter();
 
     $$option
       .append('button')
-      .attr('class', (d: any) => `raw-tag-option raw-tag-option-${d.id}` + (this._tagView === d.id ? ' selected' : ''))
-      .on('click', (d3_event: Event, clicked: any) => {
+      .attr('class', (d: ViewOption) => `raw-tag-option raw-tag-option-${d.id}` + (this._tagView === d.id ? ' selected' : ''))
+      .on('click', (d3_event: Event, clicked: ViewOption) => {
         this._tagView = clicked.id;
         settings?.set('ui.rawTagEditorView', clicked.id);
 
         $wrap.selectAll('.raw-tag-option')
-          .classed('selected', (d: any) => d === clicked);
+          .classed('selected', (d: ViewOption) => d === clicked);
 
         $wrap.selectAll('.tag-text')
           .classed('hide', (clicked.id !== 'text'))
@@ -165,14 +176,14 @@ export class UiSectionRawTagEditor extends AbstractUiSection {
         $wrap.selectAll('.tag-list, .add-row')
           .classed('hide', (clicked.id !== 'list'));
       })
-      .each((d: any, i, nodes) => {
+      .each((d: ViewOption, i, nodes) => {
         d3_select(nodes[i])
           .call(uiIcon(d.icon));
       });
 
     // set localized titles on the update selection so they re-localize on language change
     $wrap.selectAll('.raw-tag-option')
-      .attr('title', (d: any) => l10n.t(`icons.${d.id}`));
+      .attr('title', (d: ViewOption) => l10n.t(`icons.${d.id}`));
 
 
     // View as Text
@@ -191,7 +202,7 @@ export class UiSectionRawTagEditor extends AbstractUiSection {
       .attr('placeholder', l10n.t('inspector.key_value'))
       .call(utilGetSetValue, textData)
       .each((d, i, nodes) => this._setTextareaHeight(nodes[i] as HTMLTextAreaElement))
-      .on('input', (d3_event: any) => this._setTextareaHeight(d3_event.currentTarget))
+      .on('input', (d3_event: Event) => this._setTextareaHeight(d3_event.currentTarget as HTMLTextAreaElement))
       .on('focus', this._onFocus)
       .on('blur', this._textChanged)
       .on('change', this._textChanged);
@@ -231,10 +242,10 @@ export class UiSectionRawTagEditor extends AbstractUiSection {
 
     // Tag list items
     let $items: D3Selection = $list.selectAll('.tag-row')
-      .data(rowData, (d: any) => d.key);
+      .data(rowData, (d: TagRow) => d.key);
 
     $items.exit()
-      .each((d: any, i, nodes) => {
+      .each((d: TagRow, i, nodes) => {
         const $row = d3_select(nodes[i]);
         $row.selectAll('input.key, input.value')
           .call(uiCombobox.off, context);
@@ -283,10 +294,10 @@ export class UiSectionRawTagEditor extends AbstractUiSection {
     // Update
     $items = $items
       .merge($$items)
-      .sort((a: any, b: any) => a.index - b.index);
+      .sort((a: TagRow, b: TagRow) => a.index - b.index);
 
     $items
-      .each((d: any, i, nodes) => {
+      .each((d: TagRow, i, nodes) => {
         const $row = d3_select(nodes[i]);
         $row.select('input.key');      // propagate bound data
         $row.select('input.value');    // propagate bound data
@@ -295,9 +306,9 @@ export class UiSectionRawTagEditor extends AbstractUiSection {
           this._addComboboxes($row);
         }
 
-        const referenceOptions: any = { key: d.key };
+        const referenceOptions: { key: string; value?: string } = { key: d.key };
         if (!isMultiValueTag(d)) {
-          referenceOptions.value = d.value;
+          referenceOptions.value = d.value as string;
         }
 
         const reference = new UiTagReference(context, referenceOptions);
@@ -314,16 +325,16 @@ export class UiSectionRawTagEditor extends AbstractUiSection {
       });
 
     $items.selectAll('input.key')
-      .attr('title', (d: any) => d.key)
-      .attr('readonly', (d: any) => this._isReadOnlyTag(d) || isMultiValueTag(d) || null)
-      .call(utilGetSetValue, (d: any) => d.key);
+      .attr('title', (d: TagRow) => d.key)
+      .attr('readonly', (d: TagRow) => this._isReadOnlyTag(d) || isMultiValueTag(d) || null)
+      .call(utilGetSetValue, (d: TagRow) => d.key);
 
     $items.selectAll('input.value')
       .classed('mixed', isMultiValueTag)
-      .attr('title', (d: any) => isMultiValueTag(d) ? d.value.filter(Boolean).join('\n') : d.value)
-      .attr('readonly', (d: any) => this._isReadOnlyTag(d) || null)
-      .attr('placeholder', (d: any) => isMultiValueTag(d) ? l10n.t('inspector.multiple_values') : null)
-      .call(utilGetSetValue, (d: any) => isMultiValueTag(d) ? '' : d.value);
+      .attr('title', (d: TagRow) => isMultiValueTag(d) ? (d.value as string[]).filter(Boolean).join('\n') : d.value as string)
+      .attr('readonly', (d: TagRow) => this._isReadOnlyTag(d) || null)
+      .attr('placeholder', (d: TagRow) => isMultiValueTag(d) ? l10n.t('inspector.multiple_values') : null)
+      .call(utilGetSetValue, (d: TagRow) => isMultiValueTag(d) ? '' : d.value as string);
 
     $items.selectAll('button.remove')
       .attr('title', l10n.t('icons.remove'))
@@ -336,7 +347,7 @@ export class UiSectionRawTagEditor extends AbstractUiSection {
    * @param d - the row datum ({ key, value })
    * @return `true` if the key matches a read-only pattern
    */
-  protected _isReadOnlyTag(d: any): boolean {
+  protected _isReadOnlyTag(d: { key: string }): boolean {
     for (const regex of this._readOnlyTags) {
       if (regex.test(d.key)) return true;
     }
@@ -365,7 +376,7 @@ export class UiSectionRawTagEditor extends AbstractUiSection {
    * @param rows - the row data to serialize
    * @return the joined `key=value` text
    */
-  protected _rowsToText(rows: any[]): string {
+  protected _rowsToText(rows: TagRow[]): string {
     const str = rows
       .filter(row => row.key && row.key.trim() !== '')
       .map(row => {
@@ -431,7 +442,7 @@ export class UiSectionRawTagEditor extends AbstractUiSection {
    * Adds a blank row when Tab is pressed on the last (non-empty) value field.
    * @param d3_event - the triggering keydown event
    */
-  protected _pushMore(d3_event: any): void {
+  protected _pushMore(d3_event: KeyboardEvent): void {
     const el = d3_event.currentTarget;
     // if pressing Tab on the last value field with content, add a blank row
     if (d3_event.keyCode === 9 && !d3_event.shiftKey &&
@@ -531,7 +542,7 @@ export class UiSectionRawTagEditor extends AbstractUiSection {
    * @param d3_event - the triggering blur/change event
    * @param d - the row datum
    */
-  protected _keyChange(d3_event: any, d: any): void {
+  protected _keyChange(d3_event: Event, d: TagRow): void {
     const context = this.context;
     const el = d3_event.currentTarget;
     if (d3_select(el).attr('readonly')) return;
@@ -553,7 +564,7 @@ export class UiSectionRawTagEditor extends AbstractUiSection {
     if (kNew && kNew !== kOld && this._tags[kNew] !== undefined) {
       el.value = kOld;     // reset the key
       this.$container.selectAll('.tag-list input.value')
-        .each((d: any, i, nodes) => {
+          .each((d: TagRow, i, nodes) => {
           if (d.key === kNew) {     // send focus to that other value combo instead
             const input = nodes[i] as HTMLInputElement;
             input.focus();
@@ -595,7 +606,7 @@ export class UiSectionRawTagEditor extends AbstractUiSection {
    * @param d3_event - the triggering blur/change event
    * @param d - the row datum
    */
-  protected _valueChange(d3_event: any, d: any): void {
+  protected _valueChange(d3_event: Event, d: TagRow): void {
     const context = this.context;
     const el = d3_event.currentTarget;
     if (this._isReadOnlyTag(d)) return;
@@ -617,7 +628,7 @@ export class UiSectionRawTagEditor extends AbstractUiSection {
    * @param d3_event - the triggering pointer/mouse event
    * @param d - the row datum
    */
-  protected _removeTag(d3_event: Event, d: any): void {
+  protected _removeTag(d3_event: Event, d: TagRow): void {
     if (this._isReadOnlyTag(d)) return;
 
     if (d.key === '') {    // removing the blank row
@@ -705,7 +716,7 @@ export class UiSectionRawTagEditor extends AbstractUiSection {
    * @param val - the new presets, or omit to get the current value
    * @return the current presets (getter) or `this` (setter)
    */
-  public presets(val?: any): any {
+  public presets(val?: (Preset | Category)[]): any {
     if (!arguments.length) return this._presets;
     this._presets = val;
 
@@ -727,7 +738,7 @@ export class UiSectionRawTagEditor extends AbstractUiSection {
    * @param val - the new tags, or omit to get the current value
    * @return the current tags (getter) or `this` (setter)
    */
-  public tags(val?: any): any {
+  public tags(val?: Tags): any {
     if (!arguments.length) return this._tags;
     this._tags = val;
     return this;

@@ -1,5 +1,6 @@
 import { EventEmitter } from 'tseep/lib/ee-safe';
 import { select as d3_select, selection } from 'd3-selection';
+import { Vec2 } from '@rapid-sdk/math';
 
 import { actionChangePreset } from '../actions/change_preset.js';
 import { Category, Preset } from '../lib/index.ts';
@@ -12,6 +13,7 @@ import { utilKeybinding, utilNoAuto, utilTotalExtent } from '../util/index.ts';
 
 import type { Context } from '../Context.ts';
 import type { D3Selection } from 'd3-selection';
+import type { Graph } from '../lib/Graph.ts';
 
 const MAXSEARCH = 50;   // how many search results to show
 
@@ -26,9 +28,9 @@ export class UiPresetList extends EventEmitter {
   public $parent: D3Selection | null;
 
   protected _entityIDs: EntityID[];
-  protected _currLoc: any;
-  protected _allGeometries: any[];
-  protected _defaults: any[];
+  protected _currLoc: Vec2 | null;
+  protected _allGeometries: string[];
+  protected _defaults: (Preset | Category)[];
   protected _selectedPresetIDs: Set<string>;
   protected _autofocus: boolean;
   protected _list: D3Selection;
@@ -175,7 +177,7 @@ export class UiPresetList extends EventEmitter {
    * Handles the delete/undo shortcut hacks, then delegates to `_searchKeydown`.
    * @param  e - the keydown event
    */
-  protected _searchInitialKeydown(e: any): void {
+  protected _searchInitialKeydown(e: KeyboardEvent): void {
     const context = this.context;
     const editor = context.systems.editor!;
     const el = e.currentTarget;
@@ -210,7 +212,7 @@ export class UiPresetList extends EventEmitter {
    * Down arrow moves focus into the preset list.
    * @param  e - the keydown event
    */
-  protected _searchKeydown(e: any): void {
+  protected _searchKeydown(e: KeyboardEvent): void {
     if (e.keyCode === utilKeybinding.keyCodes['↓'] &&       // down arrow
       // if insertion point is at the end of the string
       (this._input.node() as HTMLInputElement).selectionStart === this._input.property('value').length
@@ -231,10 +233,10 @@ export class UiPresetList extends EventEmitter {
    * Return chooses the first item in the list.
    * @param  e - the keypress event
    */
-  protected _searchKeypress(e: any): void {
-    const val = e.currentTarget.value;
+  protected _searchKeypress(e: KeyboardEvent): void {
+    const val = (e.currentTarget as HTMLInputElement).value;
     if (e.keyCode === 13 && val.length) {  // ↩ Return
-      const item = this._list.selectAll('.preset-list-item:first-child').datum() as any;
+      const item = this._list.selectAll('.preset-list-item:first-child').datum() as ListItem;
       item.choose();
     }
   }
@@ -251,7 +253,7 @@ export class UiPresetList extends EventEmitter {
     const query = this._input.property('value');
     this._list.classed('filtered', query.length);
 
-    let items: any[];
+    let items: (Preset | Category)[];
     let messageText: string;
     if (query.length) {  // do search
       const fallbackCount = this._allGeometries.length;
@@ -259,7 +261,7 @@ export class UiPresetList extends EventEmitter {
       const results = schema.search(query, this._allGeometries, this._currLoc);
 
       messageText = l10n.t('inspector.results', { n: results.length, search: query });
-      items = results.map((result: any) => {
+      items = results.map((result: { id: PresetID }) => {
         const scope = schema.getScope('osm');
         return scope?.presets.get(result.id) ?? scope?.categories.get(result.id);
       }).slice(0, maxCount);
@@ -291,8 +293,8 @@ export class UiPresetList extends EventEmitter {
    * @param  $selection  - parent selection to render list items into (in this case, a `div.preset-list`)
    * @param  arr - Categories and Presets to include in the list
    */
-  protected _drawList($selection: D3Selection, arr: any[]): void {
-    const data: any[] = [];
+  protected _drawList($selection: D3Selection, arr: (Preset | Category)[]): void {
+    const data: ListItem[] = [];
     for (const item of arr) {
       if (item instanceof Category) {
         data.push(new CategoryItem(this, item));
@@ -305,7 +307,7 @@ export class UiPresetList extends EventEmitter {
     // Because `d3.selectAll` uses `element.querySelectorAll`, `:scope` refers to self
     // see https://developer.mozilla.org/en-US/docs/Web/CSS/:scope
     let $items: D3Selection = $selection.selectAll(':scope > .preset-list-item')
-      .data(data, (d: any) => d.item.id);
+      .data(data, (d: ListItem) => d.item.id);
 
     // exit
     $items.exit()
@@ -314,7 +316,7 @@ export class UiPresetList extends EventEmitter {
     // enter
     const $$items = $items.enter()
       .append('div')
-      .attr('class', (d: any) => `preset-list-item preset-${d.item.safeid}`)
+      .attr('class', (d: ListItem) => `preset-list-item preset-${d.item.safeid}`)
       .style('opacity', 0)
       .transition()
       .style('opacity', 1);
@@ -322,8 +324,8 @@ export class UiPresetList extends EventEmitter {
     // update
     $items = $items.merge($$items as any)
       .order()   // make them match the order of `arr`
-      .each((d: any, i, nodes) => d3_select(nodes[i]).call(d.render))
-      .classed('current', (d: any) => this._selectedPresetIDs.has(d.item.id));
+      .each((d: ListItem, i, nodes) => d3_select(nodes[i]).call(d.render))
+      .classed('current', (d: ListItem) => this._selectedPresetIDs.has(d.item.id));
 
     this._checkFilteringRules();
   }
@@ -334,16 +336,16 @@ export class UiPresetList extends EventEmitter {
    * This allows users to use keyboard navigation to focus different items and expand/contract Categories.
    * @param  e - the keydown event
    */
-  public _itemKeydown(e: any): void {
+  public _itemKeydown(e: KeyboardEvent): void {
     const l10n = this.context.systems.l10n!;
     const target = e.currentTarget;
     const $selection = d3_select(target);
 
     // the actively focused item
     const $item = d3_select(target.closest('.preset-list-item'));
-    const node = $item.node() as any;
-    const $parentItem = d3_select(node.parentNode.closest('.preset-list-item'));
-    const parentNode = $parentItem.node() as any;
+    const node = $item.node() as HTMLElement;
+    const $parentItem = d3_select(node.parentNode!.closest('.preset-list-item'));
+    const parentNode = $parentItem.node() as HTMLElement | null;
     const isRTL = l10n.isRTL;
 
     // arrow down, move focus to the next, lower item
@@ -405,7 +407,7 @@ export class UiPresetList extends EventEmitter {
     } else if (e.keyCode === utilKeybinding.keyCodes[isRTL ? '←' : '→']) {
       e.preventDefault();
       e.stopPropagation();
-      ($item.datum() as any).choose();
+      ($item.datum() as ListItem).choose();
     }
   }
 
@@ -427,7 +429,7 @@ export class UiPresetList extends EventEmitter {
     // remove existing tooltips
     $buttons.call(uiTooltip(context).destroyAny);
 
-    $buttons.each((d: any, i, nodes) => {
+    $buttons.each((d: ListItem, i, nodes) => {
       const $selection = d3_select(nodes[i]);
 
       let filterID;  // check whether this preset would be hidden by the current filtering rules
@@ -516,7 +518,7 @@ export class UiPresetList extends EventEmitter {
    * Get or set the presets that should appear selected/current in the list.
    * @param  val? - array of presets to set; if omitted, returns the current selected ids
    */
-  public selected(val?: any[]): any {
+  public selected(val?: (Preset | Category)[]): any {
     if (!arguments.length) return this._selectedPresetIDs;
 
     this._selectedPresetIDs = new Set();
@@ -543,7 +545,7 @@ export class UiPresetList extends EventEmitter {
     const counts: Record<string, number> = {};
 
     for (const entityID of this._entityIDs) {
-      const entity: any = graph.entity(entityID);
+      const entity = graph.entity(entityID);
       let geometry = entity.geometry(graph);
       // Treat entities on addr:interpolation lines as points, not vertices - iD#3241
       if (geometry === 'vertex' && entity.isOnAddressLine(graph)) {
@@ -561,22 +563,25 @@ export class UiPresetList extends EventEmitter {
   }
 }
 
+/** Union type for CategoryItem and PresetItem (the objects bound as D3 data in the preset list) */
+type ListItem = CategoryItem | PresetItem;
+
 
 /**
  * A list item representing a Category (which can be expanded to reveal a sublist of Presets).
  */
 class CategoryItem {
-  public list: any;
+  public list: UiPresetList;
   public box: D3Selection | null;
   public sublist: D3Selection | null;
   public shown: boolean;
-  public item: any;
+  public item: Category;
 
   /**
    * @param  list - the owning `UiPresetList`
    * @param  category - the Category this item represents
    */
-  public constructor(list: any, category: any) {
+  public constructor(list: UiPresetList, category: Category) {
     this.list = list;
     this.box = null;
     this.sublist = null;
@@ -606,7 +611,7 @@ class CategoryItem {
     const isRTL = l10n.isRTL;
 
     const $$wrap = $selection.selectAll(':scope > .preset-list-button-wrap')
-      .data([this], (d: any) => d.item.id)
+      .data([this], (d: CategoryItem) => d.item.id)
       .enter()
       .append('div')
       .attr('class', 'preset-list-button-wrap category');
@@ -632,7 +637,7 @@ class CategoryItem {
       .attr('class', 'namepart')
       .call(uiIcon((isRTL ? '#rapid-icon-backward' : '#rapid-icon-forward'), 'inline'))
       .append('span')
-      .text((d: any) => d.item.name + '…');
+      .text((d: CategoryItem) => d.item.name + '…');
 
     this.box = $selection
       .append('div')
@@ -653,7 +658,7 @@ class CategoryItem {
    * keydown handler for a category item - expands/collapses or delegates to the list.
    * @param  e - the keydown event
    */
-  protected _keydown(e: any): void {
+  protected _keydown(e: KeyboardEvent): void {
     const l10n = this.list.context.systems.l10n!;
     const target = e.currentTarget;
     const $selection = d3_select(target);
@@ -678,7 +683,7 @@ class CategoryItem {
    * click handler for a category item - toggles the expand/collapse icon and expansion.
    * @param  e - the click event
    */
-  protected _click(e: any): void {
+  protected _click(e: MouseEvent): void {
     const l10n = this.list.context.systems.l10n!;
     const isRTL = l10n.isRTL;
     const target = e.currentTarget;
@@ -729,15 +734,15 @@ class CategoryItem {
  * A list item representing a single Preset.
  */
 class PresetItem {
-  public list: any;
-  public item: any;
-  public reference: any;
+  public list: UiPresetList;
+  public item: Preset;
+  public reference: UiTagReference;
 
   /**
    * @param  list - the owning `UiPresetList`
    * @param  preset - the Preset this item represents
    */
-  public constructor(list: any, preset: any) {
+  public constructor(list: UiPresetList, preset: Preset) {
     this.list = list;
     this.item = preset;
     this.reference = new UiTagReference(list.context, preset.reference());
@@ -760,7 +765,7 @@ class PresetItem {
     const preset = this.item;
 
     const $$wrap = $selection.selectAll('.preset-list-button-wrap')
-      .data([this], (d: any) => d.item.id)
+      .data([this], (d: PresetItem) => d.item.id)
       .enter()
       .append('div')
       .attr('class', 'preset-list-button-wrap');
@@ -790,7 +795,7 @@ class PresetItem {
       .enter()
       .append('div')
       .attr('class', 'namepart')
-      .text((d: any) => d);
+      .text((d: string) => d);
 
     $$wrap.call(this.reference.button);
     $selection.call(this.reference.body);
@@ -812,7 +817,7 @@ class PresetItem {
       schema.setMostRecent(item);
     }
 
-    const combinedAction = (graph: any) => {
+    const combinedAction = (graph: Graph) => {
       for (const entityID of list._entityIDs) {
         const oldPreset = schema.match(graph.entity(entityID), graph);
         graph = actionChangePreset(entityID, oldPreset, item)(graph);
