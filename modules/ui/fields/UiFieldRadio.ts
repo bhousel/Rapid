@@ -7,6 +7,7 @@ import { createUiField } from './index.js';
 import type { Context } from '../../Context.ts';
 import type { D3Selection } from 'd3-selection';
 import type { Field } from '../../lib/index.ts';
+import type { SchemaScope } from '../../core/SchemaSystem.ts';
 import type { Tags } from './types.ts';
 import type { UiFieldOptions } from '../UiField.js';
 
@@ -14,15 +15,15 @@ export { UiFieldRadio as UiFieldStructureRadio };
 
 
 export class UiFieldRadio extends UiField {
-  protected _scope: any;
-  protected _radioData: any[];
+  protected _scope: SchemaScope;
+  protected _radioData: string[];
   public $placeholder: D3Selection;
   public $wrap: D3Selection;
   public $labels: D3Selection;
   public $radios: D3Selection;
   protected _typeField: UiField | null;
   protected _layerField: UiField | null;
-  protected _oldType: any;
+  protected _oldType: Record<string, string>;
 
   /**
    * @param context - Global shared application context
@@ -57,7 +58,7 @@ export class UiFieldRadio extends UiField {
    * Returns the datum of the currently active radio, or `false` if none is active.
    * @return The active radio's bound value, or `false`
    */
-  protected _selectedKey(): any {
+  protected _selectedKey(): string | false {
     const $node = this.$wrap.selectAll('.form-field-input-radio label.active input');
     return !$node.empty() && $node.datum();
   }
@@ -127,7 +128,7 @@ export class UiFieldRadio extends UiField {
    * @param $selection - A d3-selection to render the extras into
    * @param tags - The current entity tags
    */
-  protected _structureExtras($selection: D3Selection, tags: any): void {
+  protected _structureExtras($selection: D3Selection, tags: Tags): void {
     const context = this.context;
     const l10n = context.systems.l10n!;
     const scope = this._scope;
@@ -169,7 +170,7 @@ export class UiFieldRadio extends UiField {
     }
 
     let $typeItem: D3Selection = $list.selectAll('.structure-type-item')
-      .data(this._typeField ? [this._typeField] : [], function(d: any) { return d.id; });
+      .data(this._typeField ? [this._typeField] : [], function(d: UiField) { return d.id; });
 
     // Exit
     $typeItem.exit()
@@ -257,7 +258,7 @@ export class UiFieldRadio extends UiField {
    * @param t - The proposed tag change
    * @param onInput - `true` while typing, `false`/omit on commit
    */
-  protected _changeType(t: any, onInput: any): void {
+  protected _changeType(t: Tags, onInput: boolean | undefined): void {
     const key = this._selectedKey();
     if (!key) return;
 
@@ -293,7 +294,7 @@ export class UiFieldRadio extends UiField {
    * @param t - The proposed tag change
    * @param onInput - `true` while typing, `false`/omit on commit
    */
-  protected _changeLayer(t: any, onInput: any): void {
+  protected _changeLayer(t: Tags, onInput: boolean | undefined): void {
     if (t.layer === '0') {
       t.layer = undefined;
     }
@@ -306,14 +307,14 @@ export class UiFieldRadio extends UiField {
     const key = this.key;
     const type = this.type;
     const oldType = this._oldType;
-    const t: any = {};
-    let activeKey: any;
+    const t: Tags = {};
+    let activeKey: string | undefined;
 
     if (key) {
       t[key] = undefined;
     }
 
-    this.$radios.each(function(this: any, d) {
+    this.$radios.each(function(this: HTMLInputElement, d: string) {
       const active = d3_select(this).property('checked');
       if (active) activeKey = d;
 
@@ -349,35 +350,35 @@ export class UiFieldRadio extends UiField {
     const type = this.type;
     const t: any = tags;
 
-    this.$radios.property('checked', function(d: any) {
+    this.$radios.property('checked', function(d: string) {
       if (key) {
         return t[key] === d;
       }
-      return !!(typeof t[d] === 'string' && t[d].toLowerCase() !== 'no');
+      return !!(typeof t[d] === 'string' && (t[d] as string).toLowerCase() !== 'no');
     });
 
-    function isMixed(d: any): boolean {
+    function isMixed(d: string): boolean {
       if (key) {
-        return Array.isArray(t[key]) && t[key].includes(d);
+        return Array.isArray(t[key]) && (t[key] as string[]).includes(d);
       }
       return Array.isArray(t[d]);
     }
 
     this.$labels
-      .classed('active', function(d: any) {
+      .classed('active', function(d: string) {
         if (key) {
-          return (Array.isArray(t[key]) && t[key].includes(d))
+          return (Array.isArray(t[key]) && (t[key] as string[]).includes(d))
             || t[key] === d;
         }
-        return Array.isArray(t[d]) || !!(t[d] && t[d].toLowerCase() !== 'no');
+        return Array.isArray(t[d]) || !!(t[d] && (t[d] as string).toLowerCase() !== 'no');
       })
       .classed('mixed', isMixed)
-      .attr('title', function(d: any) {
+      .attr('title', function(d: string) {
         return isMixed(d) ? l10n.t('inspector.unshared_value_tooltip') : null;
       });
 
 
-    const selection = this.$radios.filter(function(this: any) { return this.checked; });
+    const selection = this.$radios.filter(function(this: HTMLInputElement) { return this.checked; });
 
     if (selection.empty()) {
       this.$placeholder.text(l10n.t('inspector.none'));
