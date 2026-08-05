@@ -7,13 +7,15 @@ import { utilHighlightEntities } from '../../util/util.ts';
 
 import type { Context } from '../../Context.ts';
 import type { D3Selection } from 'd3-selection';
+import type { IssuesBySeverity } from '../../core/ValidationSystem.ts';
+import type { ValidationIssue } from '../../lib/ValidationIssue.ts';
 
 const MAX_ISSUES = 1000;
 
 
 export class UiSectionValidationIssues extends AbstractUiSection {
   protected _severity: string;    // 'error', 'warning', or 'suggestion'
-  protected _issues: any[];
+  protected _issues: ValidationIssue[];
 
   /**
    * @param  context - Global shared application context
@@ -38,7 +40,7 @@ export class UiSectionValidationIssues extends AbstractUiSection {
 
     validator.on('validated', this._deferredRender);
 
-    urlhash.on('hashchange', (currParams: any, prevParams: any) => {
+    urlhash.on('hashchange', (currParams: URLSearchParams, prevParams: URLSearchParams) => {
       if (currParams.get('poweruser') !== prevParams.get('poweruser')) {   // change in poweruser status
         this._deferredRender();
       }
@@ -88,7 +90,7 @@ export class UiSectionValidationIssues extends AbstractUiSection {
 
     // sort issues by distance away from the center of the map
     let issues = this._issues
-      .map(function withDistance(issue: any) {
+      .map(function withDistance(issue: ValidationIssue) {
         const extent = issue.extent(graph);
         const dist = extent ? geoSphericalDistance(centerLoc, extent.center()) : 0;
         return Object.assign(issue, { dist: dist });
@@ -107,7 +109,7 @@ export class UiSectionValidationIssues extends AbstractUiSection {
    * @param $selection - A d3-selection to render the list into
    * @param issues - the issues to display
    */
-  protected _drawIssuesList($selection: D3Selection, issues: any[]): void {
+  protected _drawIssuesList($selection: D3Selection, issues: ValidationIssue[]): void {
     const context = this.context;
     const l10n = context.systems.l10n!;
     const settings = context.systems.settings;
@@ -125,7 +127,7 @@ export class UiSectionValidationIssues extends AbstractUiSection {
 
 
     let $items: D3Selection = $list.selectAll('li')
-      .data(issues, (d: any) => d.key);
+      .data(issues, (d: ValidationIssue) => d.key!);
 
     // Exit
     $items.exit()
@@ -134,14 +136,14 @@ export class UiSectionValidationIssues extends AbstractUiSection {
     // Enter
     const $$items = $items.enter()
       .append('li')
-      .attr('class', (d: any) => `issue severity-${d.severity}`);
+      .attr('class', (d: ValidationIssue) => `issue severity-${d.severity}`);
 
     const $$labels = $$items
       .append('button')
       .attr('class', 'issue-label')
-      .on('click',     (d3_event, d: any) => validator.focusIssue(d))
-      .on('mouseover', (d3_event, d: any) => utilHighlightEntities(context, d.entityIds, true))
-      .on('mouseout',  (d3_event, d: any) => utilHighlightEntities(context, d.entityIds, false));
+      .on('click',     (d3_event, d: ValidationIssue) => validator.focusIssue(d))
+      .on('mouseover', (d3_event, d: ValidationIssue) => utilHighlightEntities(context, d.entityIds, true))
+      .on('mouseout',  (d3_event, d: ValidationIssue) => utilHighlightEntities(context, d.entityIds, false));
 
     const $$text = $$labels
       .append('span')
@@ -150,7 +152,7 @@ export class UiSectionValidationIssues extends AbstractUiSection {
     $$text
       .append('span')
       .attr('class', 'issue-icon')
-      .each((d: any, i, nodes) => {
+      .each((d: ValidationIssue, i, nodes) => {
         d3_select(nodes[i])
           .call(uiIcon(validator.getSeverityIcon(d.severity)));
       });
@@ -175,10 +177,10 @@ export class UiSectionValidationIssues extends AbstractUiSection {
       .order();
 
     $items.selectAll('.issue-message')
-      .text((d: any) => d.message(context));
+      .text((d: ValidationIssue) => d.message(context));
 
     $items.selectAll('.issue-autofix')
-      .classed('hide', (d: any) => !(showAutoFix && d.autoArgs));
+      .classed('hide', (d: ValidationIssue) => !(showAutoFix && d.autoArgs));
 
 
     const autofixable = issues.filter(issue => issue.autoArgs);
@@ -226,7 +228,7 @@ export class UiSectionValidationIssues extends AbstractUiSection {
    * @param d3_event - the triggering click event
    * @param issue - the issue to fix
    */
-  protected _clickAutoFix(d3_event: any, issue: any): void {
+  protected _clickAutoFix(d3_event: Event, issue: ValidationIssue): void {
     const editor = this.context.systems.editor!;
     if (d3_event) {
       d3_event.preventDefault();
@@ -244,7 +246,7 @@ export class UiSectionValidationIssues extends AbstractUiSection {
    * @param d3_event - the triggering click event
    * @param issues - the autofixable issues to fix
    */
-  protected _clickAutoFixAll(d3_event: any, issues: any[]): void {
+  protected _clickAutoFixAll(d3_event: Event, issues: ValidationIssue[]): void {
     const editor = this.context.systems.editor!;
     const l10n = this.context.systems.l10n!;
     if (d3_event) {
@@ -283,7 +285,9 @@ export class UiSectionValidationIssues extends AbstractUiSection {
   protected _reloadIssues(): void {
     const validator = this.context.systems.validator!;
     const options = this._getOptions();
-    this._issues = (validator.getIssuesBySeverity(options as any) as any)[this._severity];
+    const options = this._getOptions();
+    const issuesBySeverity = validator.getIssuesBySeverity(options as Parameters<typeof validator.getIssuesBySeverity>[0]);
+    this._issues = issuesBySeverity[this._severity as keyof IssuesBySeverity];
   }
 
 
@@ -309,7 +313,7 @@ export class UiSectionValidationIssues extends AbstractUiSection {
     };
     if (scheduler) {
       scheduler.scheduleIdleTask(fn)
-        .catch((err: any) => {
+        .catch((err: unknown) => {
           if (err?.name === 'AbortError') return;   // expected cancellation
           console.error(err);  // eslint-disable-line no-console
         });

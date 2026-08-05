@@ -9,6 +9,7 @@ import { utilNoAuto } from '../util/index.ts';
 
 import type { Context } from '../Context.ts';
 import type { D3Selection } from 'd3-selection';
+import type { KeepRightIssue } from '../services/KeepRightService.ts';
 
 
 /**
@@ -18,7 +19,7 @@ import type { D3Selection } from 'd3-selection';
  */
 export class UiKeepRightEditor extends EventEmitter {
   public context: Context;
-  public datum: any;
+  public datum: KeepRightIssue | null;
 
   // D3 selections
   public $parent: D3Selection | null;
@@ -60,7 +61,7 @@ export class UiKeepRightEditor extends EventEmitter {
 
     const context = this.context;
     const l10n = context.systems.l10n!;
-    const keepright = context.services.keepright as any;
+    const keepright = context.services.keepright;
 
     let $header: D3Selection = $parent.selectAll('.header')
       .data([0]);
@@ -128,17 +129,17 @@ export class UiKeepRightEditor extends EventEmitter {
   protected _saveSection($selection: D3Selection): void {
     const context = this.context;
     const l10n = context.systems.l10n!;
-    const keepright = context.services.keepright as any;
+    const keepright = context.services.keepright;
 
     const errID = this.datum?.id;
     const isSelected = errID && context.selectedData().has(errID);
     const isShown = (this.datum && (isSelected || this.datum.props.newComment || this.datum.props.comment));
 
     let $saveSection: D3Selection = $selection.selectAll('.qa-save')
-      .data(isShown ? [this.datum] : [], (d: any) => d.key);
+      .data(isShown ? [this.datum] : [], (d: KeepRightIssue) => d.key!);
 
     const changeInput = (d3_event: Event): void => {
-      const $input = d3_select(d3_event.currentTarget as any);
+      const $input = d3_select(d3_event.currentTarget as HTMLTextAreaElement);
       let val: string | undefined = ($input.property('value') as string).trim();
 
       if (val === this.datum.props.comment) {
@@ -173,7 +174,7 @@ export class UiKeepRightEditor extends EventEmitter {
       .append('textarea')
       .attr('class', 'new-comment-input')
       .attr('maxlength', 1000)
-      .property('value', (d: any) => d.props.newComment || d.props.comment)
+      .property('value', (d: KeepRightIssue) => d.props.newComment || d.props.comment || '')
       .call(utilNoAuto)
       .on('input', changeInput)
       .on('blur', changeInput);
@@ -200,12 +201,12 @@ export class UiKeepRightEditor extends EventEmitter {
   protected _saveButtons($selection: D3Selection): void {
     const context = this.context;
     const l10n = context.systems.l10n!;
-    const keepright = context.services.keepright as any;
+    const keepright = context.services.keepright;
 
     const errID = this.datum?.id;
     const isSelected = errID && context.selectedData().has(errID);
     let $buttons: D3Selection = $selection.selectAll('.buttons')
-      .data(isSelected ? [this.datum] : [], (d: any) => d.key);
+      .data(isSelected ? [this.datum] : [], (d: KeepRightIssue) => d.key!);
 
     // exit
     $buttons.exit()
@@ -233,9 +234,9 @@ export class UiKeepRightEditor extends EventEmitter {
       .merge($$buttons);
 
     $buttons.select('.comment-button')   // select and propagate data
-      .attr('disabled', (d: any) => d.props.newComment ? null : true)
+      .attr('disabled', (d: KeepRightIssue) => d.props.newComment ? null : true)
       .text(l10n.t('QA.keepRight.save_comment'))
-      .on('click.comment', (d3_event: Event, d: any) => {
+      .on('click.comment', (d3_event: Event, d: KeepRightIssue) => {
         (d3_event.currentTarget as HTMLElement).blur();    // avoid keeping focus on the button - iD#4641
         if (keepright) {
           keepright.postUpdate(d, (err: any, item: any) => this.emit('change', item));
@@ -243,11 +244,11 @@ export class UiKeepRightEditor extends EventEmitter {
       });
 
     $buttons.select('.close-button')   // select and propagate data
-      .text((d: any) => {
+      .text((d: KeepRightIssue) => {
         const andComment = (d.props.newComment ? '_comment' : '');
         return l10n.t(`QA.keepRight.close${andComment}`);
       })
-      .on('click.close', (d3_event: Event, d: any) => {
+      .on('click.close', (d3_event: Event, d: KeepRightIssue) => {
         (d3_event.currentTarget as HTMLElement).blur();    // avoid keeping focus on the button - iD#4641
         if (keepright) {
           d.props.newStatus = 'ignore_t';   // ignore temporarily (item fixed)
@@ -256,11 +257,11 @@ export class UiKeepRightEditor extends EventEmitter {
       });
 
     $buttons.select('.ignore-button')   // select and propagate data
-      .text((d: any) => {
+      .text((d: KeepRightIssue) => {
         const andComment = (d.props.newComment ? '_comment' : '');
         return l10n.t(`QA.keepRight.ignore${andComment}`);
       })
-      .on('click.ignore', (d3_event: Event, d: any) => {
+      .on('click.ignore', (d3_event: Event, d: KeepRightIssue) => {
         (d3_event.currentTarget as HTMLElement).blur();    // avoid keeping focus on the button - iD#4641
         if (keepright) {
           d.props.newStatus = 'ignore';   // ignore permanently (false positive)
