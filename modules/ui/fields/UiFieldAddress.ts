@@ -1,38 +1,32 @@
-import { EventEmitter } from 'tseep/lib/ee-safe';
 import { select as d3_select } from 'd3-selection';
 import { Extent, projWgs84ToWorld, geoSphericalDistance, vecProject } from '@rapid-sdk/math';
 import { utilArrayUniqBy } from '@rapid-sdk/util';
 import { iso1A2Code } from '@rapideditor/country-coder';
 import { uiCombobox } from '../combobox.js';
+import { UiField } from '../UiField.js';
 import { utilGetSetValue, utilNoAuto } from '../../util/index.ts';
 
 import type { Vec2 } from '@rapid-sdk/math';
 import type { Context } from '../../Context.ts';
 import type { D3Selection } from 'd3-selection';
+import type { Field } from '../../lib/index.ts';
 import type { TagChange, Tags } from './types.ts';
+import type { UiFieldOptions } from '../UiField.js';
 
 
-export class UiFieldAddress extends EventEmitter {
-  public context: Context;
-
-  protected _uifield: any;
+export class UiFieldAddress extends UiField {
   public $parent: D3Selection;
   public $wrap: D3Selection;
-  protected _entityIDs: EntityID[];
   protected _tags: Tags;
   protected _countryCode: string | undefined;
   protected _addressFormats: any[];
 
-  public constructor(context: Context, uifield: any) {
-    super();
+  public constructor(context: Context, presetField: Field, entityIDs: EntityID[] = [], options: Partial<UiFieldOptions> = {}) {
+    super(context, presetField, entityIDs, options);
     const assets = context.systems.assets!;
-
-    this.context = context;
-    this._uifield = uifield;
 
     this.$parent = d3_select(null);
     this.$wrap = d3_select(null);
-    this._entityIDs = [];
     this._tags = {};
     this._countryCode = undefined;
     this._addressFormats = [{
@@ -42,14 +36,14 @@ export class UiFieldAddress extends EventEmitter {
       ]
     }];
 
-    this.render = this.render.bind(this);
+    this.renderContent = this.renderContent.bind(this);
     this._updatePlaceholder = this._updatePlaceholder.bind(this);
 
     assets.loadAssetAsync('address_formats')
       .then((d: any) => {
         this._addressFormats = d.addressFormats;
         if (!this.$parent.empty()) {
-          this.$parent.call(this.render);  // rerender
+          this.$parent.call(this.renderContent);  // rerender
         }
       })
       .catch((e: any) => console.error(e));  // eslint-disable-line
@@ -83,9 +77,8 @@ export class UiFieldAddress extends EventEmitter {
     const context = this.context;
     const editor = context.systems.editor!;
     const spatial = context.systems.spatial!;
-    const uifield = this._uifield;
 
-    const loc = uifield.entityExtent.center();
+    const loc = this.entityExtent!.center();
     const point = projWgs84ToWorld(loc);
     const box = this._queryBox(loc, 200);
 
@@ -122,9 +115,8 @@ export class UiFieldAddress extends EventEmitter {
     const context = this.context;
     const editor = context.systems.editor!;
     const spatial = context.systems.spatial!;
-    const uifield = this._uifield;
 
-    const loc = uifield.entityExtent.center();
+    const loc = this.entityExtent!.center();
     const point = projWgs84ToWorld(loc);
     const box = this._queryBox(loc, 200);
 
@@ -172,10 +164,9 @@ export class UiFieldAddress extends EventEmitter {
     const context = this.context;
     const editor = context.systems.editor!;
     const spatial = context.systems.spatial!;
-    const uifield = this._uifield;
-    const entityIDs = this._entityIDs;
+    const entityIDs = this.entityIDs;
 
-    const loc = uifield.entityExtent.center();
+    const loc = this.entityExtent!.center();
     const point = projWgs84ToWorld(loc);
     const box = this._queryBox(loc, 200);
 
@@ -303,10 +294,9 @@ export class UiFieldAddress extends EventEmitter {
    *  can re-render the field in place.
    * @param $selection - A d3-selection to the HTMLElement this field renders into
    */
-  public render($selection: D3Selection): void {
+  public renderContent($selection: D3Selection): void {
     const context = this.context;
     const l10n = context.systems.l10n!;
-    const uifield = this._uifield;
 
     this.$parent = $selection;
 
@@ -315,10 +305,10 @@ export class UiFieldAddress extends EventEmitter {
 
     this.$wrap = this.$wrap.enter()
       .append('div')
-      .attr('class', `form-field-input-wrap form-field-input-${uifield.type}`)
+      .attr('class', `form-field-input-wrap form-field-input-${this.type}`)
       .merge(this.$wrap);
 
-    const center = uifield.entityExtent.center();
+    const center = this.entityExtent!.center();
     let countryCode;
     if ((context as any).inIntro) {  // localize the address format for the walkthrough
       countryCode = l10n.t('intro.graph.countrycode');
@@ -340,12 +330,11 @@ export class UiFieldAddress extends EventEmitter {
   protected _change(onInput?: boolean): () => void {
     return () => {
       const context = this.context;
-      const uifield = this._uifield;
       const tagChange: TagChange = {};
       this.$wrap.selectAll('input')
         .each((subfield: any, i, nodes) => {
           const node = nodes[i] as HTMLInputElement;
-          const key = uifield.key + ':' + subfield.id;
+          const key = this.key + ':' + subfield.id;
           const value = onInput ? node.value : context.cleanTagValue(node.value);
 
           // don't override multiple values with blank string
@@ -366,15 +355,14 @@ export class UiFieldAddress extends EventEmitter {
    */
   protected _updatePlaceholder($inputSelection: D3Selection): D3Selection {
     const l10n = this.context.systems.l10n!;
-    const uifield = this._uifield;
 
     return $inputSelection.attr('placeholder', (subfield: any) => {
-      const key = `${uifield.key}:${subfield.id}`;
+      const key = `${this.key}:${subfield.id}`;
       if (this._tags && Array.isArray(this._tags[key])) {
         return l10n.t('inspector.multiple_values');
       }
 
-      let placeholderID = `_tagging.presets.fields.${uifield.id}.placeholders.${subfield.id}`;
+      let placeholderID = `_tagging.presets.fields.${this.id}.placeholders.${subfield.id}`;
       if (this._countryCode) {
         // Address field placeholders have a special overriding behavior where they sometimes look like
         // `tag!code`, for example `city!vn`, meaning to show this placeholder string only in Vietnam.
@@ -393,21 +381,21 @@ export class UiFieldAddress extends EventEmitter {
    * @param tags - The entity tags to display
    */
   protected _updateTags(tags: Tags): void {
-    const uifield = this._uifield;
+    const fieldKey = this.key;
 
     const t: any = tags;
     (utilGetSetValue(this.$wrap.selectAll('input'), function(subfield: any) {
-        const key = uifield.key + ':' + subfield.id;
+        const key = fieldKey + ':' + subfield.id;
         const val = t[key];
         return typeof val === 'string' ? val : '';
       }) as D3Selection)
       .attr('title', (subfield: any) => {
-        const key = uifield.key + ':' + subfield.id;
+        const key = this.key + ':' + subfield.id;
         const val = t[key];
         return val && Array.isArray(val) && val.filter(Boolean).join('\n');
       })
       .classed('mixed', (subfield: any) => {
-        const key = uifield.key + ':' + subfield.id;
+        const key = this.key + ':' + subfield.id;
         return Array.isArray(t[key]);
       })
       .call(this._updatePlaceholder);
@@ -415,22 +403,10 @@ export class UiFieldAddress extends EventEmitter {
 
 
   /**
-   * Gets or sets the entity IDs this field is editing.
-   * @param val - The entity IDs to set; if omitted, acts as a getter
-   * @returns The current entity IDs (getter) or `this` (setter)
-   */
-  public entityIDs(val?: EntityID[]): any {
-    if (!arguments.length) return this._entityIDs;
-    this._entityIDs = val as EntityID[];
-    return this;
-  }
-
-
-  /**
    * Updates the field UI to reflect the given entity tags.
    * @param tags - The entity tags to display
    */
-  public tags(tags: Tags): void {
+  public syncTags(tags: Tags): void {
     this._tags = tags;
     this._updateTags(tags);
   }

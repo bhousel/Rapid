@@ -1,7 +1,7 @@
 describe('UiFieldLocalized', () => {
 
   const context = new Rapid.MockContext();
-  let selection, field, uifield;
+  let selection, field;
 
   class MockEditSystem extends Rapid.MockSystem {
     constructor(context) {
@@ -43,8 +43,6 @@ describe('UiFieldLocalized', () => {
   beforeEach(() => {
     selection = d3.select(document.createElement('div'));
     field = new Rapid.Field(context, { id: 'name', key: 'name', type: 'localized' });
-    uifield = new Rapid.UiField(context, field);
-    uifield.locked = () => { return false; };
   });
 
   function delay(msec) {
@@ -53,7 +51,8 @@ describe('UiFieldLocalized', () => {
 
 
   it('adds a blank set of fields when the + button is clicked', () => {
-    const localized = new Rapid.UiFieldLocalized(context, uifield);
+    const localized = new Rapid.UiFieldLocalized(context, field);
+    localized.locked = () => false;
     return delay(1)  // async, so AssetSystem promise will have settled
       .then(() => {
         selection.call(localized.render);
@@ -67,7 +66,8 @@ describe('UiFieldLocalized', () => {
   });
 
   it('doesn\'t create a tag when the value is empty', () => {
-    const localized = new Rapid.UiFieldLocalized(context, uifield);
+    const localized = new Rapid.UiFieldLocalized(context, field);
+    localized.locked = () => false;
     return delay(1)  // async, so AssetSystem promise will have settled
       .then(() => {
         selection.call(localized.render);
@@ -88,7 +88,8 @@ describe('UiFieldLocalized', () => {
   });
 
   it('doesn\'t create a tag when the name is empty', () => {
-    const localized = new Rapid.UiFieldLocalized(context, uifield);
+    const localized = new Rapid.UiFieldLocalized(context, field);
+    localized.locked = () => false;
     return delay(1)  // async, so AssetSystem promise will have settled
       .then(() => {
         selection.call(localized.render);
@@ -109,7 +110,8 @@ describe('UiFieldLocalized', () => {
   });
 
   it('creates a tag after setting language then value', () => {
-    const localized = new Rapid.UiFieldLocalized(context, uifield);
+    const localized = new Rapid.UiFieldLocalized(context, field);
+    localized.locked = () => false;
     return delay(1)  // async, so AssetSystem promise will have settled
       .then(() => {
         selection.call(localized.render);
@@ -134,7 +136,8 @@ describe('UiFieldLocalized', () => {
   });
 
   it('creates a tag after setting value then language', () => {
-    const localized = new Rapid.UiFieldLocalized(context, uifield);
+    const localized = new Rapid.UiFieldLocalized(context, field);
+    localized.locked = () => false;
     return delay(1)  // async, so AssetSystem promise will have settled
       .then(() => {
         selection.call(localized.render);
@@ -159,11 +162,12 @@ describe('UiFieldLocalized', () => {
   });
 
   it('changes an existing language', () => {
-    const localized = new Rapid.UiFieldLocalized(context, uifield);
+    const localized = new Rapid.UiFieldLocalized(context, field);
+    localized.locked = () => false;
     return delay(1)  // async, so AssetSystem promise will have settled
       .then(() => {
         selection.call(localized.render);
-        localized.tags({ 'name:de': 'Value' });
+        localized.syncTags({ 'name:de': 'Value' });
 
         localized.on('change', tags => {
           assert.deepEqual(tags, { 'name:de': undefined, 'name:en': 'Value' });
@@ -177,11 +181,12 @@ describe('UiFieldLocalized', () => {
   });
 
   it('ignores similar keys like `old_name`', () => {
-    const localized = new Rapid.UiFieldLocalized(context, uifield);
+    const localized = new Rapid.UiFieldLocalized(context, field);
+    localized.locked = () => false;
     return delay(1)  // async, so AssetSystem promise will have settled
       .then(() => {
         selection.call(localized.render);
-        localized.tags({ 'old_name:de': 'Value' });
+        localized.syncTags({ 'old_name:de': 'Value' });
 
         assert.isTrue(selection.selectAll('.localized-lang').empty());
         assert.isTrue(selection.selectAll('.localized-value').empty());
@@ -189,11 +194,12 @@ describe('UiFieldLocalized', () => {
   });
 
   it('removes the tag when the language is emptied', () => {
-    const localized = new Rapid.UiFieldLocalized(context, uifield);
+    const localized = new Rapid.UiFieldLocalized(context, field);
+    localized.locked = () => false;
     return delay(1)  // async, so AssetSystem promise will have settled
       .then(() => {
         selection.call(localized.render);
-        localized.tags({ 'name:de': 'Value' });
+        localized.syncTags({ 'name:de': 'Value' });
 
         localized.on('change', tags => {
           assert.deepEqual(tags, { 'name:de': undefined });
@@ -207,11 +213,12 @@ describe('UiFieldLocalized', () => {
   });
 
   it('removes the tag when the value is emptied', () => {
-    const localized = new Rapid.UiFieldLocalized(context, uifield);
+    const localized = new Rapid.UiFieldLocalized(context, field);
+    localized.locked = () => false;
     return delay(1)  // async, so AssetSystem promise will have settled
       .then(() => {
         selection.call(localized.render);
-        localized.tags({ 'name:de': 'Value' });
+        localized.syncTags({ 'name:de': 'Value' });
 
         localized.on('change', tags => {
           assert.deepEqual(tags, { 'name:de': undefined });

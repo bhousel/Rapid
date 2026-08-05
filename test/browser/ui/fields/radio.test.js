@@ -1,7 +1,7 @@
 describe('UiFieldRadio', () => {
 
   const context = new Rapid.MockContext();
-  let selection, field, uifield;
+  let selection, field;
 
   class MockEditSystem extends Rapid.MockSystem {
     constructor(context) {
@@ -29,14 +29,13 @@ describe('UiFieldRadio', () => {
       options: ['<img src="x" onerror="alert(1)">'],
       type: 'radio'
     });
-    uifield = new Rapid.UiField(context, field);
   });
 
 
   it('renders option labels as text', () => {
-    const radio = new Rapid.UiFieldRadio(context, uifield);
+    const radio = new Rapid.UiFieldRadio(context, field);
 
-    selection.call(radio.render);
+    selection.call(radio.renderContent);
 
     assert.strictEqual(selection.select('label span').text(), field.props.options[0]);
     assert.strictEqual(selection.selectAll('img').size(), 0);

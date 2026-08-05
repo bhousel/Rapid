@@ -54,11 +54,16 @@ import { UiFieldWikidata } from './UiFieldWikidata.js';
 import { UiFieldWikipedia } from './UiFieldWikipedia.js';
 
 import type { Context } from '../../Context.ts';
-import type { UiFieldInternal } from './types.ts';
+import type { UiField } from '../UiField.js';
 
 
-/** A field constructor: creates the internal implementation for a field type. */
-export type UiFieldConstructor = (new (context: Context, uifield: any) => UiFieldInternal) & {
+/** A field constructor: creates a `UiField` subclass for a given field type. */
+export type UiFieldConstructor = (new (
+  context: Context,
+  presetField: any,
+  entityIDs?: EntityID[],
+  options?: any
+) => UiField) & {
   supportsMultiselection?: boolean;
 };
 
@@ -93,3 +98,26 @@ export const uiFields: Record<string, UiFieldConstructor> = {
   wikidata: UiFieldWikidata,
   wikipedia: UiFieldWikipedia
 };
+
+
+/**
+ * Creates the `UiField` for a preset field, choosing the subclass by `presetField.type`.
+ * @param context - Global shared application context
+ * @param presetField - the Field definition tracked by the SchemaSystem
+ * @param entityIDs - the entities this field applies to
+ * @param options - field display options
+ * @return the constructed `UiField` subclass instance
+ * @throws Error if there is no field type registered for `presetField.type`
+ */
+export function createUiField(
+  context: Context,
+  presetField: any,
+  entityIDs: EntityID[] = [],
+  options: any = {}
+): UiField {
+  const ctor = uiFields[presetField.type];
+  if (!ctor) {
+    throw new Error(`No field type registered for "${presetField.type}"`);
+  }
+  return new ctor(context, presetField, entityIDs, options);
+}

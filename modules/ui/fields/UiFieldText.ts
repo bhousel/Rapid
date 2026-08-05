@@ -1,13 +1,15 @@
-import { EventEmitter } from 'tseep/lib/ee-safe';
 import { select as d3_select } from 'd3-selection';
 import { iso1A2Code } from '@rapideditor/country-coder';
 
+import { UiField } from '../UiField.js';
 import { utilGetSetValue, utilNoAuto } from '../../util/index.ts';
 import { uiIcon } from '../icon.js';
 
 import type { Context } from '../../Context.ts';
 import type { D3Selection } from 'd3-selection';
+import type { Field } from '../../lib/index.ts';
 import type { TagChange, Tags } from './types.ts';
+import type { UiFieldOptions } from '../UiField.js';
 
 export {
   UiFieldText as UiFieldUrl,
@@ -18,34 +20,29 @@ export {
 };
 
 
-export class UiFieldText extends EventEmitter {
-  public context: Context;
-
-  protected _uifield: any;
+export class UiFieldText extends UiField {
   public $input: D3Selection;
   public $outlinkButton: D3Selection;
-  protected _entityIDs: EntityID[];
   protected _tags: Tags;
   protected _phoneFormats: Record<string, string>;
 
   /**
    * @param context - Global shared application context
-   * @param uifield - The `UiField` wrapper that owns this field internal
+   * @param presetField - the original Field tracked by the SchemaSystem
+   * @param entityIDs - the entities this field applies to
+   * @param options - field display options
    */
-  public constructor(context: Context, uifield: any) {
-    super();
-    this.context = context;
-    this._uifield = uifield;
+  public constructor(context: Context, presetField: Field, entityIDs: EntityID[] = [], options: Partial<UiFieldOptions> = {}) {
+    super(context, presetField, entityIDs, options);
 
     this.$input = d3_select(null);
     this.$outlinkButton = d3_select(null);
-    this._entityIDs = [];
     this._tags = {};
     this._phoneFormats = {};
 
-    this.render = this.render.bind(this);
+    this.renderContent = this.renderContent.bind(this);
 
-    if (uifield.type === 'tel') {
+    if (this.type === 'tel') {
       const assets = context.systems.assets!;
       assets.loadAssetAsync('phone_formats')
         .then((d: any) => {
@@ -61,12 +58,11 @@ export class UiFieldText extends EventEmitter {
   protected _calcLocked(): void {
     const editor = this.context.systems.editor!;
     const schema = this.context.systems.schema!;
-    const uifield = this._uifield;
 
     const graph = editor.staging.graph;
     // Protect certain fields that have a companion `*:wikidata` value
     const lockable = ['brand', 'network', 'operator', 'flag'];
-    const isLocked = lockable.includes(uifield.id) && this._entityIDs.length && this._entityIDs.some(entityID => {
+    const isLocked = lockable.includes(this.id) && this.entityIDs.length && this.entityIDs.some(entityID => {
       const entity = graph.hasEntity(entityID);
       if (!entity) return false;
 
@@ -77,11 +73,11 @@ export class UiFieldText extends EventEmitter {
       const isSuggestion = preset?.suggestion;
 
       // Lock the field if there is a value and a companion `*:wikidata` value
-      const which = uifield.id;   // 'brand', 'network', 'operator', 'flag'
+      const which = this.id;   // 'brand', 'network', 'operator', 'flag'
       return isSuggestion && !!entity.tags[which] && !!entity.tags[which + ':wikidata'];
     });
 
-    uifield.locked(isLocked);
+    this.locked(!!isLocked);
   }
 
 
@@ -91,21 +87,20 @@ export class UiFieldText extends EventEmitter {
    *  renders into `$selection` directly rather than capturing `$parent` for re-render.
    * @param $selection - A d3-selection to the HTMLElement this component renders into
    */
-  public render($selection: D3Selection): void {
+  public renderContent($selection: D3Selection): void {
     const context = this.context;
     const l10n = context.systems.l10n!;
-    const uifield = this._uifield;
-    const presetField = uifield.presetField;
+    const presetField = this.presetField;
 
     this._calcLocked();
-    const isLocked = uifield.locked();
+    const isLocked = this.locked();
 
     let $wrap: D3Selection = $selection.selectAll('.form-field-input-wrap')
       .data([0]);
 
     $wrap = $wrap.enter()
       .append('div')
-      .attr('class', `form-field-input-wrap form-field-input-${uifield.type}`)
+      .attr('class', `form-field-input-wrap form-field-input-${this.type}`)
       .merge($wrap);
 
     this.$input = $wrap.selectAll('input')
@@ -113,9 +108,9 @@ export class UiFieldText extends EventEmitter {
 
     this.$input = this.$input.enter()
       .append('input')
-      .attr('type', uifield.type === 'identifier' || uifield.type === 'roadheight' ? 'text' : uifield.type)
-      .attr('id', uifield.uid)
-      .classed(uifield.type, true)
+      .attr('type', this.type === 'identifier' || this.type === 'roadheight' ? 'text' : this.type)
+      .attr('id', this.uid)
+      .classed(this.type, true)
       .call(utilNoAuto)
       .merge(this.$input);
 
@@ -127,10 +122,10 @@ export class UiFieldText extends EventEmitter {
       .on('change', this._change());
 
 
-    if (uifield.type === 'tel') {
+    if (this.type === 'tel') {
       this._updatePhonePlaceholder();
 
-    } else if (uifield.type === 'number') {
+    } else if (this.type === 'number') {
       this.$input.attr('type', 'text');
 
       const inc = +(presetField.props.increment || 1);
@@ -156,7 +151,7 @@ export class UiFieldText extends EventEmitter {
           this._change()();
         });
 
-    } else if (uifield.type === 'identifier' && presetField.props.urlFormat && presetField.props.pattern) {
+    } else if (this.type === 'identifier' && presetField.props.urlFormat && presetField.props.pattern) {
       this.$input.attr('type', 'text');
 
       this.$outlinkButton = $wrap.selectAll('.foreign-id-permalink')
@@ -187,7 +182,7 @@ export class UiFieldText extends EventEmitter {
           return '';
         });
 
-    } else if (uifield.type === 'url') {
+    } else if (this.type === 'url') {
       this.$input.attr('type', 'text');
 
       this.$outlinkButton = $wrap.selectAll('.foreign-id-permalink')
@@ -213,10 +208,9 @@ export class UiFieldText extends EventEmitter {
 
   /** Updates the field's placeholder to the phone-number format for the current country. */
   protected _updatePhonePlaceholder(): void {
-    const uifield = this._uifield;
     if (this.$input.empty() || !Object.keys(this._phoneFormats).length) return;
 
-    const extent = uifield.entityExtent;
+    const extent = this.entityExtent;
     const countryCode = extent && iso1A2Code(extent.center());
     const format = countryCode && this._phoneFormats[countryCode.toLowerCase()];
     if (format) this.$input.attr('placeholder', format);
@@ -228,12 +222,11 @@ export class UiFieldText extends EventEmitter {
    * @return The link value, or `null` if the value is not valid
    */
   protected _validIdentifierValueForLink(): any {
-    const uifield = this._uifield;
-    const pattern = uifield.presetField.props.pattern;
+    const pattern = this.presetField.props.pattern;
     const value = (utilGetSetValue(this.$input) as string).trim().split(';')[0];
 
-    if (uifield.type === 'url' && /^https?:\/\//i.test(value)) return value;
-    if (uifield.type === 'identifier' && pattern) {
+    if (this.type === 'url' && /^https?:\/\//i.test(value)) return value;
+    if (this.type === 'identifier' && pattern) {
       return value && value.match(new RegExp(pattern));
     }
     return null;
@@ -247,7 +240,7 @@ export class UiFieldText extends EventEmitter {
    * @return The clamped number
    */
   protected _clamped(num: number): number {
-    const presetField = this._uifield.presetField;
+    const presetField = this.presetField;
     if (presetField.props.minValue !== undefined) {
       num = Math.max(num, presetField.props.minValue);
     }
@@ -266,8 +259,7 @@ export class UiFieldText extends EventEmitter {
   protected _change(onInput?: boolean): () => void {
     return () => {
       const context = this.context;
-      const uifield = this._uifield;
-      const key = uifield.key;
+      const key = this.key;
       const tagChange: TagChange = {};
       let val = utilGetSetValue(this.$input) as string;
       if (!onInput) val = context.cleanTagValue(val);
@@ -276,7 +268,7 @@ export class UiFieldText extends EventEmitter {
       if (!val && Array.isArray(this._tags[key])) return;
 
       if (!onInput) {
-        if (uifield.type === 'number' && val) {
+        if (this.type === 'number' && val) {
           let vals = val.split(';');
           vals = vals.map(v => {
             const num = parseFloat(v.trim());
@@ -293,32 +285,19 @@ export class UiFieldText extends EventEmitter {
 
 
   /**
-   * Gets or sets the entity IDs this field applies to.
-   * @param val - The new entity IDs, or omit to get the current IDs
-   * @return The current entity IDs (getter) or `this` (setter)
-   */
-  public entityIDs(val?: EntityID[]): any {
-    if (!arguments.length) return this._entityIDs;
-    this._entityIDs = val as EntityID[];
-    return this;
-  }
-
-
-  /**
    * Updates the field UI to reflect the given entity tags.
    * @param tags - The entity tags to display
    */
-  public tags(tags: Tags): void {
+  public syncTags(tags: Tags): void {
     const l10n = this.context.systems.l10n!;
-    const uifield = this._uifield;
 
     this._tags = tags;
-    const key = uifield.key;
+    const key = this.key;
     const isMixed = Array.isArray(tags[key]);
 
     (utilGetSetValue(this.$input, !isMixed && tags[key] ? (tags[key] as string) : '') as D3Selection)
       .attr('title', isMixed ? (tags[key] as string[]).filter(Boolean).join('\n') : null)
-      .attr('placeholder', isMixed ? l10n.t('inspector.multiple_values') : (uifield.placeholder || l10n.t('inspector.unknown')))
+      .attr('placeholder', isMixed ? l10n.t('inspector.multiple_values') : (this.placeholder || l10n.t('inspector.unknown')))
       .classed('mixed', isMixed);
 
     if (this.$outlinkButton && !this.$outlinkButton.empty()) {

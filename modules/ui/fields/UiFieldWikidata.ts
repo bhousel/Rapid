@@ -1,52 +1,47 @@
-import { EventEmitter } from 'tseep/lib/ee-safe';
 import { select as d3_select } from 'd3-selection';
 
 import { actionChangeTags } from '../../actions/change_tags.js';
 import { uiIcon } from '../icon.js';
+import { UiField } from '../UiField.js';
 import { utilGetSetValue, utilNoAuto } from '../../util/index.ts';
 import { uiCombobox } from '../combobox.js';
 
 import type { Context } from '../../Context.ts';
 import type { D3Selection } from 'd3-selection';
+import type { Field } from '../../lib/index.ts';
 import type { Tags } from './types.ts';
+import type { UiFieldOptions } from '../UiField.js';
 
 
-export class UiFieldWikidata extends EventEmitter {
-    public context: Context;
-
-    protected _uifield: any;
+export class UiFieldWikidata extends UiField {
     public $parent: D3Selection;
     public $searchInput: D3Selection;
     protected _qid: string | null;
     protected _wikidataEntity: any;
     protected _wikiURL: string;
-    protected _entityIDs: EntityID[];
     protected _wikipediaKey: any;
     protected _hintKey: any;
     protected _combobox: any;
 
-    public constructor(context: Context, uifield: any) {
-        super();
-        this.context = context;
-        this._uifield = uifield;
+    public constructor(context: Context, presetField: Field, entityIDs: EntityID[] = [], options: Partial<UiFieldOptions> = {}) {
+        super(context, presetField, entityIDs, options);
 
         this.$parent = d3_select(null);
         this.$searchInput = d3_select(null);
         this._qid = null;
         this._wikidataEntity = null;
         this._wikiURL = '';
-        this._entityIDs = [];
 
-        this._wikipediaKey = uifield.keys && uifield.keys.find(function(key: string) {
+        this._wikipediaKey = this.keys && this.keys.find(function(key: string) {
             return key.includes('wikipedia');
         });
-        this._hintKey = uifield.key === 'wikidata' ? 'name' : uifield.key.split(':')[0];
+        this._hintKey = this.key === 'wikidata' ? 'name' : this.key.split(':')[0];
 
-        this._combobox = uiCombobox(context, 'combo-' + uifield.safeid)
+        this._combobox = uiCombobox(context, 'combo-' + this.safeid)
             .caseSensitive(true)
             .minItems(1);
 
-        this.render = this.render.bind(this);
+        this.renderContent = this.renderContent.bind(this);
         this._fetchWikidataItems = this._fetchWikidataItems.bind(this);
     }
 
@@ -57,9 +52,8 @@ export class UiFieldWikidata extends EventEmitter {
      *  (e.g. the wikidata lookup callbacks) can re-render the field in place.
      * @param $selection - A d3-selection to the HTMLElement this field renders into
      */
-    public render($selection: D3Selection): void {
+    public renderContent($selection: D3Selection): void {
         const l10n = this.context.systems.l10n!;
-        const uifield = this._uifield;
         const combobox = this._combobox;
 
         this.$parent = $selection;
@@ -69,7 +63,7 @@ export class UiFieldWikidata extends EventEmitter {
 
         $wrap = $wrap.enter()
             .append('div')
-            .attr('class', 'form-field-input-wrap form-field-input-' + uifield.type)
+            .attr('class', 'form-field-input-wrap form-field-input-' + this.type)
             .merge($wrap);
 
 
@@ -91,7 +85,7 @@ export class UiFieldWikidata extends EventEmitter {
         $$searchRow
             .append('input')
             .attr('type', 'text')
-            .attr('id', uifield.uid)
+            .attr('id', this.uid)
             .style('flex', '1')
             .call(utilNoAuto)
             .on('focus', (d3_event: Event) => {
@@ -182,8 +176,8 @@ export class UiFieldWikidata extends EventEmitter {
         if (!q && this._hintKey) {
             // other tags may be good search terms
             const graph = editor.staging.graph;
-            for (const i in this._entityIDs) {
-                const entity = graph.hasEntity(this._entityIDs[i]) as any;
+            for (const i in this.entityIDs) {
+                const entity = graph.hasEntity(this.entityIDs[i]) as any;
                 if (entity.tags[this._hintKey]) {
                     q = entity.tags[this._hintKey];
                     break;
@@ -213,9 +207,8 @@ export class UiFieldWikidata extends EventEmitter {
       const context = this.context;
       const editor = context.systems.editor!;
       const wikidata = context.services.wikidata as any;
-      const uifield = this._uifield;
 
-      const key = uifield.key;
+      const key = this.key;
       const syncTags: Tags = {};
       syncTags[key] = this._qid ?? undefined;
       this.emit('change', syncTags);
@@ -224,7 +217,7 @@ export class UiFieldWikidata extends EventEmitter {
 
       // attempt asynchronous update of wikipedia tag..
       const initGraph = editor.staging.graph;
-      const initEntityIDs = this._entityIDs;
+      const initEntityIDs = this.entityIDs;
 
       wikidata.entityByQID(this._qid, (err: any, result: any) => {
         if (err || !result?.sitelinks) return;
@@ -316,12 +309,11 @@ export class UiFieldWikidata extends EventEmitter {
      * Updates the field UI to reflect the given entity tags.
      * @param tags - The entity tags to display
      */
-    public tags(tags: Tags): void {
+    public syncTags(tags: Tags): void {
         const l10n = this.context.systems.l10n!;
         const wikidata = this.context.services.wikidata as any;
-        const uifield = this._uifield;
 
-        const key = uifield.key;
+        const key = this.key;
         const t: any = tags;
         const isMixed = Array.isArray(tags[key]);
         this.$searchInput
@@ -411,18 +403,6 @@ export class UiFieldWikidata extends EventEmitter {
         }
         // default to any available value
         return propObj[langKeys[0]].value;
-    }
-
-
-    /**
-     * Gets or sets the entity IDs this field is editing.
-     * @param val - The entity IDs to set; if omitted, acts as a getter
-     * @returns The current entity IDs (getter) or `this` (setter)
-     */
-    public entityIDs(val?: EntityID[]): any {
-        if (!arguments.length) return this._entityIDs;
-        this._entityIDs = val as EntityID[];
-        return this;
     }
 
 

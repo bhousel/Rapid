@@ -1,33 +1,32 @@
-import { EventEmitter } from 'tseep/lib/ee-safe';
 import { select as d3_select } from 'd3-selection';
 
+import { UiField } from '../UiField.js';
 import { utilGetSetValue, utilNoAuto } from '../../util/index.ts';
 
 import type { Context } from '../../Context.ts';
 import type { D3Selection } from 'd3-selection';
+import type { Field } from '../../lib/index.ts';
 import type { TagChange, Tags } from './types.ts';
+import type { UiFieldOptions } from '../UiField.js';
 
 
-export class UiFieldTextarea extends EventEmitter {
-  public context: Context;
-
-  protected _uifield: any;
+export class UiFieldTextarea extends UiField {
   public $input: D3Selection;
   protected _tags: Tags;
 
   /**
    * @param context - Global shared application context
-   * @param uifield - The `UiField` wrapper that owns this field internal
+   * @param presetField - the original Field tracked by the SchemaSystem
+   * @param entityIDs - the entities this field applies to
+   * @param options - field display options
    */
-  public constructor(context: Context, uifield: any) {
-    super();
-    this.context = context;
-    this._uifield = uifield;
+  public constructor(context: Context, presetField: Field, entityIDs: EntityID[] = [], options: Partial<UiFieldOptions> = {}) {
+    super(context, presetField, entityIDs, options);
 
     this.$input = d3_select(null);
     this._tags = {};
 
-    this.render = this.render.bind(this);
+    this.renderContent = this.renderContent.bind(this);
   }
 
 
@@ -37,15 +36,13 @@ export class UiFieldTextarea extends EventEmitter {
    *  renders into `$selection` directly rather than capturing `$parent` for re-render.
    * @param $selection - A d3-selection to the HTMLElement this component renders into
    */
-  public render($selection: D3Selection): void {
-    const uifield = this._uifield;
-
+  public renderContent($selection: D3Selection): void {
     let $wrap: D3Selection = $selection.selectAll('.form-field-input-wrap')
       .data([0]);
 
     $wrap = $wrap.enter()
       .append('div')
-      .attr('class', `form-field-input-wrap form-field-input-${uifield.type}`)
+      .attr('class', `form-field-input-wrap form-field-input-${this.type}`)
       .merge($wrap);
 
     this.$input = $wrap.selectAll('textarea')
@@ -53,7 +50,7 @@ export class UiFieldTextarea extends EventEmitter {
 
     this.$input = this.$input.enter()
       .append('textarea')
-      .attr('id', uifield.uid)
+      .attr('id', this.uid)
       .call(utilNoAuto)
       .on('input', this._change(true))
       .on('blur', this._change())
@@ -70,7 +67,7 @@ export class UiFieldTextarea extends EventEmitter {
   protected _change(onInput?: boolean): () => void {
     return () => {
       const context = this.context;
-      const key = this._uifield.key;
+      const key = this.key;
       let val = utilGetSetValue(this.$input) as string;
       if (!onInput) val = context.cleanTagValue(val);
 
@@ -88,15 +85,14 @@ export class UiFieldTextarea extends EventEmitter {
    * Updates the field UI to reflect the given entity tags.
    * @param tags - The entity tags to display
    */
-  public tags(tags: Tags): void {
+  public syncTags(tags: Tags): void {
     const l10n = this.context.systems.l10n!;
-    const uifield = this._uifield;
 
     this._tags = tags;
-    const key = uifield.key;
+    const key = this.key;
     const isMixed = Array.isArray(tags[key]);
     const placeholder = isMixed ? l10n.t('inspector.multiple_values') :
-      (uifield.placeholder || l10n.t('inspector.unknown'));
+      (this.placeholder || l10n.t('inspector.unknown'));
 
     (utilGetSetValue(this.$input, !isMixed && tags[key] ? (tags[key] as string) : '') as D3Selection)
       .attr('title', isMixed ? (tags[key] as string[]).filter(Boolean).join('\n') : null)

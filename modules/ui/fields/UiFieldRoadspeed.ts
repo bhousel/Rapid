@@ -1,13 +1,15 @@
-import { EventEmitter } from 'tseep/lib/ee-safe';
 import { select as d3_select } from 'd3-selection';
 import { roadSpeedUnit } from '@rapideditor/country-coder';
 
+import { UiField } from '../UiField.js';
 import { uiCombobox } from '../combobox.js';
 import { utilGetSetValue, utilNoAuto } from '../../util/index.ts';
 
 import type { Context } from '../../Context.ts';
 import type { D3Selection } from 'd3-selection';
+import type { Field } from '../../lib/index.ts';
 import type { Tags } from './types.ts';
+import type { UiFieldOptions } from '../UiField.js';
 
 
 const metricValues = [20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120];
@@ -22,10 +24,7 @@ function comboValues(d: any): { value: string; title: string } {
 }
 
 
-export class UiFieldRoadspeed extends EventEmitter {
-    public context: Context;
-
-    protected _uifield: any;
+export class UiFieldRoadspeed extends UiField {
     public $unitInput: D3Selection;
     public $input: D3Selection;
     protected _tags: Tags;
@@ -33,10 +32,8 @@ export class UiFieldRoadspeed extends EventEmitter {
     protected _speedCombo: any;
     protected _unitCombo: any;
 
-    public constructor(context: Context, uifield: any) {
-        super();
-        this.context = context;
-        this._uifield = uifield;
+    public constructor(context: Context, presetField: Field, entityIDs: EntityID[] = [], options: Partial<UiFieldOptions> = {}) {
+        super(context, presetField, entityIDs, options);
 
         this.$unitInput = d3_select(null);
         this.$input = d3_select(null);
@@ -47,7 +44,7 @@ export class UiFieldRoadspeed extends EventEmitter {
         this._unitCombo = uiCombobox(context, 'roadspeed-unit')
             .data(['km/h', 'mph'].map(comboValues));
 
-        this.render = this.render.bind(this);
+        this.renderContent = this.renderContent.bind(this);
         this._change = this._change.bind(this);
         this._changeUnits = this._changeUnits.bind(this);
     }
@@ -59,15 +56,13 @@ export class UiFieldRoadspeed extends EventEmitter {
      *  renders into `$selection` directly rather than capturing `$parent` for re-render.
      * @param $selection - A d3-selection to the HTMLElement this component renders into
      */
-    public render($selection: D3Selection): void {
-        const uifield = this._uifield;
-
+    public renderContent($selection: D3Selection): void {
         let $wrap: D3Selection = $selection.selectAll('.form-field-input-wrap')
             .data([0]);
 
         $wrap = $wrap.enter()
             .append('div')
-            .attr('class', 'form-field-input-wrap form-field-input-' + uifield.type)
+            .attr('class', 'form-field-input-wrap form-field-input-' + this.type)
             .merge($wrap);
 
 
@@ -78,7 +73,7 @@ export class UiFieldRoadspeed extends EventEmitter {
             .append('input')
             .attr('type', 'text')
             .attr('class', 'roadspeed-number')
-            .attr('id', uifield.uid)
+            .attr('id', this.uid)
             .call(utilNoAuto)
             .call(this._speedCombo)
             .merge(this.$input);
@@ -87,7 +82,7 @@ export class UiFieldRoadspeed extends EventEmitter {
             .on('change', this._change)
             .on('blur', this._change);
 
-        const loc = uifield.entityExtent.center();
+        const loc = this.entityExtent!.center();
         this._isImperial = roadSpeedUnit(loc) === 'mph';
 
         this.$unitInput = $wrap.selectAll('input.roadspeed-unit')
@@ -125,11 +120,10 @@ export class UiFieldRoadspeed extends EventEmitter {
     /** Dispatches the current roadspeed value as a tag change. */
     protected _change(): void {
         const context = this.context;
-        const uifield = this._uifield;
 
         const tag: Tags = {};
         const value = (utilGetSetValue(this.$input) as string).trim();
-        const key = uifield.key;
+        const key = this.key;
 
         // don't override multiple values with blank string
         if (!value && Array.isArray(this._tags[key])) return;
@@ -150,12 +144,11 @@ export class UiFieldRoadspeed extends EventEmitter {
      * Updates the field UI to reflect the given entity tags.
      * @param tags - The entity tags to display
      */
-    public tags(tags: Tags): void {
+    public syncTags(tags: Tags): void {
         const l10n = this.context.systems.l10n!;
-        const uifield = this._uifield;
 
         this._tags = tags;
-        const key = uifield.key;
+        const key = this.key;
 
         let value: any = tags[key];
         const isMixed = Array.isArray(value);
@@ -173,7 +166,7 @@ export class UiFieldRoadspeed extends EventEmitter {
 
         (utilGetSetValue(this.$input, typeof value === 'string' ? value : '') as D3Selection)
             .attr('title', isMixed ? (value as string[]).filter(Boolean).join('\n') : null)
-            .attr('placeholder', isMixed ? l10n.t('inspector.multiple_values') : uifield.placeholder)
+            .attr('placeholder', isMixed ? l10n.t('inspector.multiple_values') : this.placeholder)
             .classed('mixed', isMixed);
     }
 

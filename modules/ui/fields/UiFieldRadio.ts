@@ -1,54 +1,51 @@
-import { EventEmitter } from 'tseep/lib/ee-safe';
 import { select as d3_select } from 'd3-selection';
 import { utilArrayUnion } from '@rapid-sdk/util';
 
 import { UiField } from '../UiField.js';
+import { createUiField } from './index.js';
 
 import type { Context } from '../../Context.ts';
 import type { D3Selection } from 'd3-selection';
+import type { Field } from '../../lib/index.ts';
 import type { Tags } from './types.ts';
+import type { UiFieldOptions } from '../UiField.js';
 
 export { UiFieldRadio as UiFieldStructureRadio };
 
 
-export class UiFieldRadio extends EventEmitter {
-  public context: Context;
-
-  protected _uifield: any;
+export class UiFieldRadio extends UiField {
   protected _scope: any;
   protected _radioData: any[];
   public $placeholder: D3Selection;
   public $wrap: D3Selection;
   public $labels: D3Selection;
   public $radios: D3Selection;
-  protected _typeField: any;
-  protected _layerField: any;
+  protected _typeField: UiField | null;
+  protected _layerField: UiField | null;
   protected _oldType: any;
-  protected _entityIDs: EntityID[];
 
   /**
    * @param context - Global shared application context
-   * @param uifield - The `UiField` wrapper that owns this field internal
+   * @param presetField - the original Field tracked by the SchemaSystem
+   * @param entityIDs - the entities this field applies to
+   * @param options - field display options
    */
-  public constructor(context: Context, uifield: any) {
-    super();
+  public constructor(context: Context, presetField: Field, entityIDs: EntityID[] = [], options: Partial<UiFieldOptions> = {}) {
+    super(context, presetField, entityIDs, options);
     const schema = context.systems.schema!;
 
-    this.context = context;
-    this._uifield = uifield;
     this._scope = schema.getScope('osm');
 
     this.$placeholder = d3_select(null);
     this.$wrap = d3_select(null);
     this.$labels = d3_select(null);
     this.$radios = d3_select(null);
-    this._radioData = (uifield.presetField.props.options || uifield.keys).slice();  // shallow copy
+    this._radioData = (presetField.props.options || this.keys).slice();  // shallow copy
     this._typeField = null;
     this._layerField = null;
     this._oldType = {};
-    this._entityIDs = [];
 
-    this.render = this.render.bind(this);
+    this.renderContent = this.renderContent.bind(this);
     this._structureExtras = this._structureExtras.bind(this);
     this._changeType = this._changeType.bind(this);
     this._changeLayer = this._changeLayer.bind(this);
@@ -72,9 +69,8 @@ export class UiFieldRadio extends EventEmitter {
    *  renders into `$selection` directly rather than capturing `$parent` for re-render.
    * @param $selection - A d3-selection to the HTMLElement this component renders into
    */
-  public render($selection: D3Selection): void {
+  public renderContent($selection: D3Selection): void {
     const l10n = this.context.systems.l10n!;
-    const uifield = this._uifield;
 
     $selection.classed('preset-radio', true);
 
@@ -101,11 +97,11 @@ export class UiFieldRadio extends EventEmitter {
     $$enter = this.$labels.enter()
       .append('label');
 
-    const stringBase = `_tagging.presets.fields.${uifield.id}.options`;
+    const stringBase = `_tagging.presets.fields.${this.id}.options`;
     $$enter
       .append('input')
       .attr('type', 'radio')
-      .attr('name', uifield.id)
+      .attr('name', this.id)
       .attr('checked', false);
 
     $$enter
@@ -134,7 +130,6 @@ export class UiFieldRadio extends EventEmitter {
   protected _structureExtras($selection: D3Selection, tags: any): void {
     const context = this.context;
     const l10n = context.systems.l10n!;
-    const uifield = this._uifield;
     const scope = this._scope;
 
     const selected = this._selectedKey() || tags.layer !== undefined;
@@ -165,10 +160,10 @@ export class UiFieldRadio extends EventEmitter {
     // Type
     if (type) {
       if (!this._typeField || this._typeField.id !== selected) {
-        this._typeField = (new UiField(context, type, this._entityIDs, { wrap: false }) as any)
+        this._typeField = createUiField(context, type, this.entityIDs, { wrap: false })
           .on('change', this._changeType);
       }
-      this._typeField.tags(tags);
+      this._typeField!.tags(tags);
     } else {
       this._typeField = null;
     }
@@ -211,14 +206,14 @@ export class UiFieldRadio extends EventEmitter {
     // Layer
     if (layer && showLayer) {
       if (!this._layerField) {
-        this._layerField = (new UiField(context, layer, this._entityIDs, { wrap: false }) as any)
+        this._layerField = createUiField(context, layer, this.entityIDs, { wrap: false })
           .on('change', this._changeLayer);
       }
-      this._layerField.tags(tags);
-      uifield.keys = utilArrayUnion(uifield.keys, ['layer']);
+      this._layerField!.tags(tags);
+      this.keys = utilArrayUnion(this.keys, ['layer']);
     } else {
       this._layerField = null;
-      uifield.keys = uifield.keys.filter(function(k: string) { return k !== 'layer'; });
+      this.keys = this.keys.filter(function(k: string) { return k !== 'layer'; });
     }
 
     let $layerItem: D3Selection = $list.selectAll('.structure-layer-item')
@@ -263,7 +258,6 @@ export class UiFieldRadio extends EventEmitter {
    * @param onInput - `true` while typing, `false`/omit on commit
    */
   protected _changeType(t: any, onInput: any): void {
-    const uifield = this._uifield;
     const key = this._selectedKey();
     if (!key) return;
 
@@ -272,7 +266,7 @@ export class UiFieldRadio extends EventEmitter {
       this._oldType[key] = val;
     }
 
-    if (uifield.type === 'structureRadio') {
+    if (this.type === 'structureRadio') {
       // remove layer if it should not be set
       if (val === 'no' ||
         (key !== 'bridge' && key !== 'tunnel') ||
@@ -309,28 +303,29 @@ export class UiFieldRadio extends EventEmitter {
 
   /** Handles a radio selection change and dispatches the resulting tag change. */
   protected _changeRadio(): void {
-    const uifield = this._uifield;
+    const key = this.key;
+    const type = this.type;
     const oldType = this._oldType;
     const t: any = {};
     let activeKey: any;
 
-    if (uifield.key) {
-      t[uifield.key] = undefined;
+    if (key) {
+      t[key] = undefined;
     }
 
     this.$radios.each(function(this: any, d) {
       const active = d3_select(this).property('checked');
       if (active) activeKey = d;
 
-      if (uifield.key) {
-        if (active) t[uifield.key] = d;
+      if (key) {
+        if (active) t[key] = d;
       } else {
         const val = oldType[activeKey] || 'yes';
         t[d] = active ? val : undefined;
       }
     });
 
-    if (uifield.type === 'structureRadio') {
+    if (type === 'structureRadio') {
       if (activeKey === 'bridge') {
         t.layer = '1';
       } else if (activeKey === 'tunnel' && t.tunnel !== 'building_passage') {
@@ -348,30 +343,31 @@ export class UiFieldRadio extends EventEmitter {
    * Updates the field UI to reflect the given entity tags.
    * @param tags - The entity tags to display
    */
-  public tags(tags: Tags): void {
+  public syncTags(tags: Tags): void {
     const l10n = this.context.systems.l10n!;
-    const uifield = this._uifield;
+    const key = this.key;
+    const type = this.type;
     const t: any = tags;
 
     this.$radios.property('checked', function(d: any) {
-      if (uifield.key) {
-        return t[uifield.key] === d;
+      if (key) {
+        return t[key] === d;
       }
       return !!(typeof t[d] === 'string' && t[d].toLowerCase() !== 'no');
     });
 
     function isMixed(d: any): boolean {
-      if (uifield.key) {
-        return Array.isArray(t[uifield.key]) && t[uifield.key].includes(d);
+      if (key) {
+        return Array.isArray(t[key]) && t[key].includes(d);
       }
       return Array.isArray(t[d]);
     }
 
     this.$labels
       .classed('active', function(d: any) {
-        if (uifield.key) {
-          return (Array.isArray(t[uifield.key]) && t[uifield.key].includes(d))
-            || t[uifield.key] === d;
+        if (key) {
+          return (Array.isArray(t[key]) && t[key].includes(d))
+            || t[key] === d;
         }
         return Array.isArray(t[d]) || !!(t[d] && t[d].toLowerCase() !== 'no');
       })
@@ -390,7 +386,7 @@ export class UiFieldRadio extends EventEmitter {
       this._oldType[selection.datum()] = t[selection.datum()];
     }
 
-    if (uifield.type === 'structureRadio') {
+    if (type === 'structureRadio') {
       // For waterways without a tunnel tag, set 'culvert' as
       // the _oldType to default to if the user picks 'tunnel'
       if (!!t.waterway && !this._oldType.tunnel) {
@@ -408,21 +404,8 @@ export class UiFieldRadio extends EventEmitter {
   }
 
 
-  /**
-   * Gets or sets the entity IDs this field applies to.
-   * @param val - The new entity IDs, or omit to get the current IDs
-   * @return The current entity IDs (getter) or `this` (setter)
-   */
-  public entityIDs(val?: EntityID[]): any {
-    if (!arguments.length) return this._entityIDs;
-    this._entityIDs = val as EntityID[];
-    this._oldType = {};
-    return this;
-  }
-
-
   /** Returns whether this field is allowed for the current selection. */
   public isAllowed(): boolean {
-    return this._entityIDs.length === 1;
+    return this.entityIDs.length === 1;
   }
 }

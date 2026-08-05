@@ -1,7 +1,7 @@
 import { utilArrayIdentical, utilArrayUnion } from '@rapid-sdk/util';
 
 import { AbstractUiSection } from '../AbstractUiSection.js';
-import { UiField } from '../UiField.js';
+import { createUiField } from '../fields/index.js';
 import { uiFormFields } from '../form_fields.js';
 
 import type { Context } from '../../Context.ts';
@@ -85,7 +85,7 @@ export class UiSectionPresetFields extends AbstractUiSection {
       this._uifields = [];
       for (const field of sharedFields) {
         if (!(allGeometries as any).isSubsetOf(field.geometries)) continue;  // skip fields that don't support all geometries needed
-        this._uifields.push(new UiField(context, field, this._entityIDs));
+        this._uifields.push(createUiField(context, field, this._entityIDs));
       }
 
 //    let singularEntity = _entityIDs.length === 1 && graph.hasEntity(_entityIDs[0]);
@@ -102,7 +102,7 @@ export class UiSectionPresetFields extends AbstractUiSection {
       for (const field of additionalFields) {
         if (sharedFields.includes(field)) continue;                 // skip fields that were already included above
         if (!(allGeometries as any).isSubsetOf(field.geometries)) continue;  // skip fields that don't support all geometries needed
-        this._uifields.push(new UiField(context, field, this._entityIDs, { show: false }) );
+        this._uifields.push(createUiField(context, field, this._entityIDs, { show: false }) );
       }
 
       const ids = this._entityIDs.slice();  // make copy (eslint warning)

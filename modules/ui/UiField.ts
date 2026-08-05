@@ -5,38 +5,60 @@ import { utilUniqueString } from '@rapid-sdk/util';
 import { uiIcon } from './icon.js';
 import { uiTooltip } from './tooltip.js';
 // import { uiFieldHelp } from './field_help.js';
-import { uiFields } from './fields/index.js';
 import { UiTagReference } from './UiTagReference.js';
 import { utilTotalExtent } from '../util/index.ts';
-import { LANGUAGE_SUFFIX_REGEX } from './fields/UiFieldLocalized.js';
+import { LANGUAGE_SUFFIX_REGEX } from './fields/types.ts';
 
 import type { Context } from '../Context.ts';
 import type { D3Selection } from 'd3-selection';
-import type { Tags, UiFieldInternal } from './fields/types.ts';
+import type { Extent } from '@rapid-sdk/math';
+import type { Field } from '../lib/index.ts';
+import type { Tags } from './fields/types.ts';
+
+
+/** Display options controlling how a `UiField` renders its chrome. */
+export interface UiFieldOptions {
+  /** Whether the field is shown, or tucked away in the "Add field" list */
+  show: boolean;
+  /** Whether to wrap the input with the label/chrome */
+  wrap: boolean;
+  /** Whether to show the remove (trash) button */
+  remove: boolean;
+  /** Whether to show the revert (undo) button */
+  revert: boolean;
+  /** Whether to show the tag-reference info button */
+  info: boolean;
+}
 
 
 /**
- * Creates a new field, wraps the actual _internal implementation of that field
+ * `UiField` is the base class for an editable field in the entity editor. It renders the shared
+ * field "chrome" (label, lock, remove/revert buttons, tag reference) and delegates the
+ * field-specific input UI to a `UiFieldX` subclass via `renderContent()` / `syncTags()`.
+ *
+ * Construct a concrete field with `createUiField(context, presetField, …)` from `fields/index.ts`,
+ * which picks the subclass by `presetField.type`.
  */
 export class UiField extends EventEmitter {
   public context: Context;
-  public presetField: any;
+  public presetField: Field;
   public entityIDs: EntityID[];
-  public options: any;
+  public options: UiFieldOptions;
   public id: string;
   public type: string;
-  public label: any;
-  public terms: any;
-  public placeholder: any;
-  public default: any;
+  public label: string;
+  public terms: string[];
+  public placeholder: string;
+  public default: string;
   public key: string;
   public keys: string[];
   public safeid: string;
   public uid: string;
-  public entityExtent: any;
+  public entityExtent: Extent | null;
+
+  public static supportsMultiselection = true;
 
   protected _show: boolean;
-  protected _internal: UiFieldInternal | null;
   protected _state: string;
   protected _tags: Tags;
   protected _locked: boolean;
@@ -49,7 +71,7 @@ export class UiField extends EventEmitter {
    * @param entityIDs - the entities this field applies to
    * @param options - field display options
    */
-  public constructor(context: Context, presetField: any, entityIDs: EntityID[] = [], options: any = {}) {
+  public constructor(context: Context, presetField: Field, entityIDs: EntityID[] = [], options: Partial<UiFieldOptions> = {}) {
     super();
     this.context = context;
     this.presetField = presetField;
@@ -86,7 +108,6 @@ export class UiField extends EventEmitter {
     this.uid = utilUniqueString(`form-field-${presetField.safeid}`);
 
     this._show = this.options.show;
-    this._internal = null;
     this._state = '';
     this._tags = {};
 
@@ -112,31 +133,10 @@ export class UiField extends EventEmitter {
     this.isShown = this.isShown.bind(this);
     this.remove = this.remove.bind(this);
     this.render = this.render.bind(this);
+    this.renderContent = this.renderContent.bind(this);
     this.revert = this.revert.bind(this);
+    this.syncTags = this.syncTags.bind(this);
     this.tagsContainFieldKey = this.tagsContainFieldKey.bind(this);
-
-    // Create the field internals now if we know it will be shown
-    if (this._show) {
-      this._createField();
-    }
-  }
-
-
-  /**
-   * Creates the field internals.  Done lazily, once we know the field will be shown.
-   */
-  protected _createField(): void {
-    if (this._internal) return;
-
-    this._internal = new uiFields[this.type](this.context, this)
-      .on('change', (tagChange: Tags, onInput: boolean) => {
-        this.emit('change', tagChange, onInput);
-      });
-
-    // If this field cares about the entities, pass them along
-    if (typeof this._internal!.entityIDs === 'function') {
-      this._internal!.entityIDs(this.entityIDs);
-    }
   }
 
 
@@ -312,10 +312,6 @@ export class UiField extends EventEmitter {
       .each((d, i, nodes) => {
         const $selection: D3Selection = d3_select(nodes[i]);
 
-        if (!this._internal) {
-          this._createField();
-        }
-
 //        // instantiate field help
 //        let help;
 //        if (this.options.wrap && this.type === 'restrictions') {
@@ -337,7 +333,7 @@ export class UiField extends EventEmitter {
         }
 
         $selection
-          .call(this._internal!.render);
+          .call(this.renderContent);
 
 //        // add field help components
 //        if (help) {
@@ -355,7 +351,7 @@ export class UiField extends EventEmitter {
             .call(reference.button);
         }
 
-        this._internal!.tags(this._tags);
+        this.syncTags(this._tags);
       });
 
 
@@ -409,9 +405,6 @@ export class UiField extends EventEmitter {
     // always show a field if it has a value to display
     if (this.tagsContainFieldKey() && !this._show) {
       this._show = true;
-      if (!this._internal) {
-        this._createField();
-      }
     }
 
     return this;
@@ -430,12 +423,9 @@ export class UiField extends EventEmitter {
   }
 
 
-  /** Shows the field, creating its internals and applying any default value. */
+  /** Shows the field, applying any default value. */
   public show(): void {
     this._show = true;
-    if (!this._internal) {
-      this._createField();
-    }
     if (this.default && this.key && this._tags[this.key] !== this.default) {
       const tagChange: Tags = {};
       tagChange[this.key] = this.default;
@@ -473,7 +463,7 @@ export class UiField extends EventEmitter {
     if (!this.entityIDs?.length) return true;
 
     // Does this field support multiselection?
-    if (this.entityIDs.length > 1 && uiFields[this.type].supportsMultiselection === false) {
+    if (this.entityIDs.length > 1 && (this.constructor as typeof UiField).supportsMultiselection === false) {
       return false;
     }
 
@@ -521,9 +511,21 @@ export class UiField extends EventEmitter {
   }
 
 
-  /** Moves keyboard focus to the field's input. */
-  public focus(): void {
-    this._internal?.focus();
-  }
+  /**
+   * Renders the field-specific input UI into the field container.
+   * The base renders nothing; each `UiFieldX` subclass overrides this.
+   * @param $selection - A d3-selection to the `.form-field` container
+   */
+  public renderContent($selection: D3Selection): void {}
+
+  /**
+   * Updates the field-specific input UI to reflect the current tags.
+   * The base does nothing; each `UiFieldX` subclass overrides this.
+   * @param tags - The current tags
+   */
+  public syncTags(tags: Tags): void {}
+
+  /** Moves keyboard focus to the field's input. The base does nothing; subclasses override this. */
+  public focus(): void {}
 
 }

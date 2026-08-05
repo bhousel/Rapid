@@ -1,27 +1,20 @@
-import { EventEmitter } from 'tseep/lib/ee-safe';
+import { UiField } from '../UiField.js';
 
 import { utilGetDimensions } from '../../util/dimensions.ts';
 
 import type { Context } from '../../Context.ts';
 import type { D3Selection } from 'd3-selection';
+import type { Field } from '../../lib/index.ts';
+import type { UiFieldOptions } from '../UiField.js';
 
 
-export class UiFieldLanes extends EventEmitter {
-    public context: Context;
-
+export class UiFieldLanes extends UiField {
     public static supportsMultiselection = false;
 
-    protected _uifield: any;
-    protected _entityIDs: EntityID[];
+    public constructor(context: Context, presetField: Field, entityIDs: EntityID[] = [], options: Partial<UiFieldOptions> = {}) {
+        super(context, presetField, entityIDs, options);
 
-    public constructor(context: Context, uifield: any) {
-        super();
-        this.context = context;
-        this._uifield = uifield;
-
-        this._entityIDs = [];
-
-        this.render = this.render.bind(this);
+        this.renderContent = this.renderContent.bind(this);
     }
 
 
@@ -31,15 +24,14 @@ export class UiFieldLanes extends EventEmitter {
      *  renders into `$selection` directly rather than capturing `$parent` for re-render.
      * @param $selection - A d3-selection to the HTMLElement this component renders into
      */
-    public render($selection: D3Selection): void {
+    public renderContent($selection: D3Selection): void {
         const context = this.context;
-        const uifield = this._uifield;
 
         const LANE_WIDTH = 40;
         const LANE_HEIGHT = 200;
 
         const graph = context.systems.editor!.staging.graph;
-        const lanesData = (graph.entity(this._entityIDs[0]) as any).lanes();
+        const lanesData = (graph.entity(this.entityIDs[0]) as any).lanes();
 
         if (!context.container().select('.inspector-wrap.inspector-hidden').empty() || !$selection.node().parentNode) {
             $selection.call(this._detach);
@@ -51,7 +43,7 @@ export class UiFieldLanes extends EventEmitter {
 
         $wrap = $wrap.enter()
             .append('div')
-            .attr('class', 'form-field-input-wrap form-field-input-' + uifield.type)
+            .attr('class', 'form-field-input-wrap form-field-input-' + this.type)
             .merge($wrap);
 
         let $surface: D3Selection = $wrap.selectAll('.surface')
@@ -149,16 +141,8 @@ export class UiFieldLanes extends EventEmitter {
     }
 
 
-    /**
-     * Gets or sets the entity IDs this field is editing.
-     * @param val - The entity IDs to set
-     */
-    public entityIDs(val?: EntityID[]): any {
-        this._entityIDs = val as EntityID[];
-    }
-
     /** Updates the field UI to reflect the given entity tags. (no-op for lanes) */
-    public tags(): void {}
+    public syncTags(): void {}
 
     /** Moves keyboard focus to the field's input. (no-op for lanes) */
     public focus(): void {}

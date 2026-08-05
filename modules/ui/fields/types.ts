@@ -1,6 +1,3 @@
-import type { D3Selection } from 'd3-selection';
-
-
 /** A set of tag changes to apply: key → new value (`undefined` removes the tag). */
 export type TagChange = Record<string, string | undefined>;
 
@@ -13,20 +10,7 @@ export type Tags = Record<string, string | string[] | undefined>;
 
 
 /**
- * The internal implementation created by a `UiFieldX` class.
- * Each field renders itself into a selection via `render()` and exposes a small API.
- * The index signature keeps this permissive, since individual field types add their own methods.
+ * Matches a localized tag key `key:<code>`, capturing the base key and the BCP47 locale code
+ * (e.g. `name:en`, `name:zh-Hant-TW`). Group 1 is the base key, group 2 is the locale code.
  */
-export interface UiFieldInternal {
-  /** Renders the field into the given selection */
-  render($selection: D3Selection): void;
-  /** Updates the field with the current tags */
-  tags(tags: Tags): void;
-  /** Moves focus into the field's primary input */
-  focus(): void;
-  /** Subscribes to field events (`change`, `revert`, …) */
-  on(...args: any[]): UiFieldInternal;
-  /** Some fields want to know which entities are selected */
-  entityIDs?(ids?: string[]): any;
-  [key: string]: any;
-}
+export const LANGUAGE_SUFFIX_REGEX = /^(.*):([a-z]{2,3}(?:-[A-Z][a-z]{3})?(?:-[A-Z]{2})?)$/;

@@ -1,7 +1,9 @@
-import { EventEmitter } from 'tseep/lib/ee-safe';
+import { UiField } from '../UiField.js';
 
 import type { Context } from '../../Context.ts';
 import type { D3Selection } from 'd3-selection';
+import type { Field } from '../../lib/index.ts';
+import type { UiFieldOptions } from '../UiField.js';
 
 
 /**
@@ -14,26 +16,19 @@ import type { D3Selection } from 'd3-selection';
  * The field is registered in `uiFields`, but is intentionally not yet instantiated by
  * `UiSectionPresetFields`.
  */
-export class UiFieldRestrictions extends EventEmitter {
-  public context: Context;
-
+export class UiFieldRestrictions extends UiField {
   public static supportsMultiselection = false;
-
-  protected _uifield: any;
-  protected _entityIDs: EntityID[];
 
   /**
    * @param context - Global shared application context
-   * @param uifield - The `UiField` wrapper that owns this field internal
+   * @param presetField - the original Field tracked by the SchemaSystem
+   * @param entityIDs - the entities this field applies to
+   * @param options - field display options
    */
-  public constructor(context: Context, uifield: any) {
-    super();
-    this.context = context;
-    this._uifield = uifield;
+  public constructor(context: Context, presetField: Field, entityIDs: EntityID[] = [], options: Partial<UiFieldOptions> = {}) {
+    super(context, presetField, entityIDs, options);
 
-    this._entityIDs = [];
-
-    this.render = this.render.bind(this);
+    this.renderContent = this.renderContent.bind(this);
   }
 
 
@@ -43,15 +38,13 @@ export class UiFieldRestrictions extends EventEmitter {
    *  renders into `$selection` directly rather than capturing `$parent` for re-render.
    * @param $selection - A d3-selection to the HTMLElement this component renders into
    */
-  public render($selection: D3Selection): void {
-    const uifield = this._uifield;
-
+  public renderContent($selection: D3Selection): void {
     let $wrap: D3Selection = $selection.selectAll('.form-field-input-wrap')
       .data([0]);
 
     $wrap = $wrap.enter()
       .append('div')
-      .attr('class', 'form-field-input-wrap form-field-input-' + uifield.type)
+      .attr('class', 'form-field-input-wrap form-field-input-' + this.type)
       .merge($wrap);
 
     // todo: reimplement the turn-restriction editor (intersection preview + turn editing) on Pixi.
@@ -64,16 +57,8 @@ export class UiFieldRestrictions extends EventEmitter {
   }
 
 
-  /**
-   * Gets or sets the entity IDs this field is editing.
-   * @param val - The entity IDs to set
-   */
-  public entityIDs(val?: EntityID[]): any {
-    this._entityIDs = val as EntityID[];
-  }
-
   /** Updates the field UI to reflect the given entity tags. (no-op until the editor is reimplemented) */
-  public tags(): void { }
+  public syncTags(): void { }
 
   /** Moves keyboard focus to the field's input. (no-op until the editor is reimplemented) */
   public focus(): void { }

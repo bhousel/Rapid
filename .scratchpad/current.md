@@ -1,32 +1,44 @@
 # Current Work
 
-## EventEmitter migration — branch `ui_refactors` (uncommitted)
+## UI field inheritance refactor (Idea 2) — DONE (uncommitted), branch `ui_refactors`
 
-Replaced the legacy `d3_dispatch` + `utilRebind` event pattern with `EventEmitter` from
-`tseep/lib/ee-safe` across all UI class components.  42 files changed; not yet committed.
+The 14 `UiFieldX` classes now **`extends UiField`** instead of being composed by it. `UiField._internal`,
+`_createField()`, the `UiFieldInternal` interface, and the internal→wrapper event re-wiring are all gone —
+a subclass emits `change` directly on itself. Construct via
+`createUiField(context, presetField, entityIDs?, options?)` (picks the subclass by `presetField.type`);
+this replaced the ~7 `new UiField(...)` sites.
 
-**What changed:**
-- `AbstractUiSection` and `AbstractIntroChapter` now `extends EventEmitter` (so all subclasses inherit
-  `.on`/`.off`/`.emit` automatically).
-- 34 other classes converted: all field internals (`UiFieldX`), `UiField`, `UiChangesetEditor`,
-  `UiEntityEditor`, the 3 dispatch-using sections, `UiPresetList`, `UiRapidColorpicker`,
-  `UiMapRouletteMenu`, `UiSettingsCustomBackground/Data`, the 4 QA editors, `UiCommit`,
-  `UiConflicts`, `UiSuccess`, `UiEditMenu`.
-- The 5 intro chapter `EditMenu.on('toggled.intro', h)` / `on('toggled.intro', null)` calls
-  converted to saved-handler-ref + `.off('toggled', h)`.
-- `SaveMode`'s `.on('cancel', null)` removal idiom → `.off('cancel', this._cancel)`.
-- `UiFieldLanes.off()` → `_detach()` to avoid colliding with `EventEmitter.off`.
-- One browser test (`wikipedia.test.js`) updated: `on('change.spy', fn)` → `on('change', fn)`.
-- `combobox.ts` / `disclosure.ts` still use `d3_dispatch` (factory functions, not classes — left alone).
+Key mechanics that made it work:
+- Broke the load-time import cycle: moved `LANGUAGE_SUFFIX_REGEX` to `fields/types.ts`, dropped
+  `UiField`'s `import { uiFields }` (`isAllowed` now reads
+  `(this.constructor as typeof UiField).supportsMultiselection`), and put the `createUiField` factory in
+  `fields/index.ts` (NOT on `UiField`, which must not import the registry).
+- Resolved base/field name collisions: field `render`→`renderContent`, `tags(t)`→`syncTags(t)`, dropped
+  the field `entityIDs(ids)` method (base has the `entityIDs` array). `options()` on Access/Cycleway
+  collided with the base `options` config object → renamed to `_fieldOptions()`.
+- `UiFieldLocalized`: folded the old `entityIDs()` side effect (`_loadCountryCode()`) into the ctor.
+- Field browser tests updated to `new UiFieldX(context, field, entityIDs?)` + renamed methods; the
+  field-body tests call `renderContent` (body only) rather than `render` (chrome+body).
 
-**UiFieldRestrictions stub (`fields/UiFieldRestrictions.ts`):** converted from all-commented legacy
-code to a modern `EventEmitter` class registered in `fields/index.ts`. The `render()` is a stub
-(empty `.restriction-container` div + `// todo`) — the old SVG mini-map depended on `modules/svg/`
-which was removed. The field is registered in `uiFields` but NOT yet instantiated by
-`UiSectionPresetFields` (that block stays commented). `fields/index.ts` indentation fixed (4→2 spaces).
+Verified: tsc 0 / eslint 0 (3 pre-existing todo warnings) / build / browser 133 / unit 3290.
 
-**Verified:** tsc 0 errors / eslint 0 errors (4 pre-existing `todo` warnings) / build OK /
-browser 133 pass / unit 3290 pass.
+### Follow-up: `any` narrowing pass (field system)
+Narrowed the trivial `any`s exposed by the cleaner field model:
+- `UiField`: `presetField: Field`, `options: UiFieldOptions` (new exported interface) + ctor
+  `Partial<UiFieldOptions>`, `label: string`, `terms: string[]`, `placeholder: string`, `default: string`,
+  `entityExtent: Extent | null`.
+- All 14 field ctors: `presetField: Field`, `options: Partial<UiFieldOptions>`.
+- `UiFieldRadio`: `_typeField`/`_layerField: UiField | null` (+ dropped 2 now-needless `as any`, since
+  `createUiField().on()` returns `UiField`).
+- Supporting: `!` at 5 unguarded `entityExtent.center()` sites; `?.` for 2 `countryCode` assignments.
+- Left as-is (not trivial): d3 callback `(d: any)`, `_combobox: any` (complex callable type),
+  `_comboData`/`_scope`/Address suggestion return types.
+
+## Next up
+- **Idea 1a:** convert `combobox.ts` + `disclosure.ts` to `EventEmitter` (last `d3-dispatch` users),
+  then delete `modules/util/rebind.ts` + its test + the `utilRebind` export. `disclosure`'s only real
+  consumer is `AbstractUiSection`; `combobox` is attached via `.call()` at ~13 sites. `uiSection`/
+  `section.ts` is dead except the quarantined `react_container.jsx`.
 
 ## Open questions
-- Delete the 2 dead quarantined `sections/*.jsx` React demo files (currently ignored by all real code)?
+- Delete the 2 dead quarantined `sections/*.jsx` React demo files + `section.ts`/`uiSection`?

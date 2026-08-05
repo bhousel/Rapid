@@ -2,7 +2,7 @@ import { EventEmitter } from 'tseep/lib/ee-safe';
 
 import { uiIcon } from './icon.js';
 import { uiCombobox} from './combobox.js';
-import { UiField } from './UiField.js';
+import { createUiField } from './fields/index.js';
 import { uiFormFields } from './form_fields.js';
 
 import type { Context } from '../Context.ts';
@@ -59,9 +59,9 @@ export class UiChangesetEditor extends EventEmitter {
       initial = true;
 
       this._uifields = [
-        new UiField(context, this._scope?.fields.get('comment'), null as any, { show: true, revert: false }),
-        new UiField(context, this._scope?.fields.get('source'), null as any, { show: false, revert: false }),
-        new UiField(context, this._scope?.fields.get('hashtags'), null as any, { show: false, revert: false }),
+        createUiField(context, this._scope?.fields.get('comment'), null as any, { show: true, revert: false }),
+        createUiField(context, this._scope?.fields.get('source'), null as any, { show: false, revert: false }),
+        createUiField(context, this._scope?.fields.get('hashtags'), null as any, { show: false, revert: false }),
       ];
 
       this._uifields.forEach((field: any) => {

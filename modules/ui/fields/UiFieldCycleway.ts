@@ -1,12 +1,14 @@
-import { EventEmitter } from 'tseep/lib/ee-safe';
 import { select as d3_select } from 'd3-selection';
 
 import { uiCombobox } from '../combobox.js';
+import { UiField } from '../UiField.js';
 import { utilGetSetValue, utilNoAuto } from '../../util/index.ts';
 
 import type { Context } from '../../Context.ts';
 import type { D3Selection } from 'd3-selection';
+import type { Field } from '../../lib/index.ts';
 import type { Tags } from './types.ts';
+import type { UiFieldOptions } from '../UiField.js';
 
 
 function stripcolon(s: string): string {
@@ -14,28 +16,25 @@ function stripcolon(s: string): string {
 }
 
 
-export class UiFieldCycleway extends EventEmitter {
-    public context: Context;
-
-    protected _uifield: any;
+export class UiFieldCycleway extends UiField {
     public $items: D3Selection;
     public $wrap: D3Selection;
     protected _tags: Tags;
 
     /**
      * @param context - Global shared application context
-     * @param uifield - The `UiField` wrapper that owns this field internal
+     * @param presetField - The preset field definition this field renders
+     * @param entityIDs - The entities this field applies to
+     * @param options - Field display options
      */
-    public constructor(context: Context, uifield: any) {
-        super();
-        this.context = context;
-        this._uifield = uifield;
+    public constructor(context: Context, presetField: Field, entityIDs: EntityID[] = [], options: Partial<UiFieldOptions> = {}) {
+        super(context, presetField, entityIDs, options);
 
         this.$items = d3_select(null);
         this.$wrap = d3_select(null);
         this._tags = {};
 
-        this.render = this.render.bind(this);
+        this.renderContent = this.renderContent.bind(this);
         this._change = this._change.bind(this);
     }
 
@@ -46,18 +45,17 @@ export class UiFieldCycleway extends EventEmitter {
      *  renders into `$selection` directly rather than capturing `$parent` for re-render.
      * @param $selection - A d3-selection to the HTMLElement this component renders into
      */
-    public render($selection: D3Selection): void {
+    public renderContent($selection: D3Selection): void {
         const context = this.context;
         const l10n = context.systems.l10n!;
-        const uifield = this._uifield;
-        const getOptions = (): any[] => this.options();
+        const getOptions = (): any[] => this._fieldOptions();
 
         this.$wrap = $selection.selectAll('.form-field-input-wrap')
             .data([0]);
 
         this.$wrap = this.$wrap.enter()
             .append('div')
-            .attr('class', 'form-field-input-wrap form-field-input-' + uifield.type)
+            .attr('class', 'form-field-input-wrap form-field-input-' + this.type)
             .merge(this.$wrap);
 
 
@@ -78,7 +76,7 @@ export class UiFieldCycleway extends EventEmitter {
             .append('li')
             .attr('class', d => 'labeled-input preset-cycleway-' + stripcolon(d));
 
-        const stringBase = `_tagging.presets.fields.${uifield.id}.types`;
+        const stringBase = `_tagging.presets.fields.${this.id}.types`;
         $$enter
             .append('div')
             .attr('class', 'label preset-label-cycleway')
@@ -158,12 +156,11 @@ export class UiFieldCycleway extends EventEmitter {
 
 
     /** Returns the selectable options for this field. */
-    public options(): any[] {
+    public _fieldOptions(): any[] {
         const l10n = this.context.systems.l10n!;
-        const uifield = this._uifield;
 
-        const stringBase = `_tagging.presets.fields.${uifield.id}.options.`;
-        const opts = uifield.presetField.props.options;
+        const stringBase = `_tagging.presets.fields.${this.id}.options.`;
+        const opts = this.presetField.props.options;
         return opts.map(function(option: string) {
             return {
                 title: l10n.t(`${stringBase}.${option}.description`),
@@ -177,9 +174,9 @@ export class UiFieldCycleway extends EventEmitter {
      * Updates the field UI to reflect the given entity tags.
      * @param tags - The entity tags to display
      */
-    public tags(tags: Tags): void {
+    public syncTags(tags: Tags): void {
         const l10n = this.context.systems.l10n!;
-        const uifield = this._uifield;
+        const placeholder = this.placeholder;
 
         this._tags = tags;
 
@@ -207,7 +204,7 @@ export class UiFieldCycleway extends EventEmitter {
                 if (Array.isArray(tags.cycleway) || Array.isArray(tags[d])) {
                     return l10n.t('inspector.multiple_values');
                 }
-                return uifield.placeholder;
+                return placeholder;
             })
             .classed('mixed', function(d: any) {
                 return Array.isArray(tags.cycleway) || Array.isArray(tags[d]);

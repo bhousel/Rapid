@@ -1,21 +1,20 @@
-import { EventEmitter } from 'tseep/lib/ee-safe';
 import { select as d3_select } from 'd3-selection';
 
 import { actionReverse } from '../../actions/reverse.js';
 import { uiIcon } from '../icon.js';
+import { UiField } from '../UiField.js';
 
 import type { Context } from '../../Context.ts';
 import type { D3Selection } from 'd3-selection';
+import type { Field } from '../../lib/index.ts';
 import type { TagChange, Tags } from './types.ts';
+import type { UiFieldOptions } from '../UiField.js';
 
 export { UiFieldCheck as UiFieldDefaultCheck };
 export { UiFieldCheck as UiFieldOnewayCheck };
 
 
-export class UiFieldCheck extends EventEmitter {
-  public context: Context;
-
-  protected _uifield: any;
+export class UiFieldCheck extends UiField {
   protected _values: (string | undefined)[];
   protected _texts: string[];
   public $input: D3Selection;
@@ -24,19 +23,17 @@ export class UiFieldCheck extends EventEmitter {
   public $reverser: D3Selection;
   protected _tags: Tags;
   protected _impliedYes: boolean;
-  protected _entityIDs: EntityID[];
   protected _value: any;
 
   /**
    * @param context - Global shared application context
-   * @param uifield - The `UiField` wrapper that owns this field internal
+   * @param presetField - The preset field definition this field renders
+   * @param entityIDs - The entities this field applies to
+   * @param options - Field display options
    */
-  public constructor(context: Context, uifield: any) {
-    super();
+  public constructor(context: Context, presetField: Field, entityIDs: EntityID[] = [], options: Partial<UiFieldOptions> = {}) {
+    super(context, presetField, entityIDs, options);
     const l10n = context.systems.l10n!;
-
-    this.context = context;
-    this._uifield = uifield;
 
     this._values = [];
     this._texts = [];
@@ -46,24 +43,23 @@ export class UiFieldCheck extends EventEmitter {
     this.$reverser = d3_select(null);
     this._tags = {};
     this._impliedYes = false;
-    this._entityIDs = [];
     this._value = undefined;
 
-    this.render = this.render.bind(this);
+    this.renderContent = this.renderContent.bind(this);
     this._reverserSetText = this._reverserSetText.bind(this);
 
     // Prepare the values and texts that this checkbox works with
-    const options = uifield.presetField.props.options;
-    if (Array.isArray(options)) {
-      const stringBase = `_tagging.presets.fields.${uifield.id}.options`;
-      for (const v of options) {
+    const fieldOptions = presetField.props.options;
+    if (Array.isArray(fieldOptions)) {
+      const stringBase = `_tagging.presets.fields.${this.id}.options`;
+      for (const v of fieldOptions) {
         this._values.push(v === 'undefined' ? undefined : v);
         this._texts.push(l10n.t(`${stringBase}.${v}`, { 'default': v }));
       }
     } else {
       this._values = [undefined, 'yes'];
       this._texts = [l10n.t('inspector.unknown'), l10n.t('inspector.check.yes')];
-      if (uifield.type !== 'defaultCheck') {
+      if (this.type !== 'defaultCheck') {
         this._values.push('no');
         this._texts.push(l10n.t('inspector.check.no'));
       }
@@ -76,17 +72,16 @@ export class UiFieldCheck extends EventEmitter {
   protected _checkImpliedYes(): void {
     const context = this.context;
     const editor = context.systems.editor!;
-    const uifield = this._uifield;
 
-    this._impliedYes = (uifield.id === 'oneway_yes');
+    this._impliedYes = (this.id === 'oneway_yes');
 
     // hack: pretend `oneway` field is a `oneway_yes` field
     // where implied oneway tag exists (e.g. `junction=roundabout`) iD#2220, iD#1841
-    if (uifield.id === 'oneway' && this._entityIDs.length) {
+    if (this.id === 'oneway' && this.entityIDs.length) {
       const schema = context.systems.schema;
       const rulesets = schema?.getScope('osm')?.rulesets;
       const graph = editor.staging.graph;
-      const entity = graph.entity(this._entityIDs[0]);
+      const entity = graph.entity(this.entityIDs[0]);
 
       const isImpliedOneway = rulesets?.get('oneway_forward')?.match(entity.tags)
         || rulesets?.get('oneway_backward')?.match(entity.tags)
@@ -122,7 +117,7 @@ export class UiFieldCheck extends EventEmitter {
     const l10n = context.systems.l10n!;
 
     const graph = editor.staging.graph;
-    const entity = (this._entityIDs.length && graph.hasEntity(this._entityIDs[0])) as any;
+    const entity = (this.entityIDs.length && graph.hasEntity(this.entityIDs[0])) as any;
     if (this._reverserHidden() || !entity) return $selection;
 
     const first = entity.first();
@@ -144,11 +139,10 @@ export class UiFieldCheck extends EventEmitter {
    *  renders into `$selection` directly rather than capturing `$parent` for re-render.
    * @param $selection - A d3-selection to the HTMLElement this component renders into
    */
-  public render($selection: D3Selection): void {
+  public renderContent($selection: D3Selection): void {
     const context = this.context;
     const editor = context.systems.editor!;
     const l10n = context.systems.l10n!;
-    const uifield = this._uifield;
 
     this._checkImpliedYes();
 
@@ -161,15 +155,15 @@ export class UiFieldCheck extends EventEmitter {
 
     $$enter
       .append('input')
-      .property('indeterminate', uifield.type !== 'defaultCheck')
+      .property('indeterminate', this.type !== 'defaultCheck')
       .attr('type', 'checkbox')
-      .attr('id', uifield.uid);
+      .attr('id', this.uid);
 
     $$enter
       .append('span')
       .attr('class', 'value');
 
-    if (uifield.type === 'onewayCheck') {
+    if (this.type === 'onewayCheck') {
       $$enter
         .append('button')
         .attr('class', 'reverser' + (this._reverserHidden() ? ' hide' : ''))
@@ -187,7 +181,7 @@ export class UiFieldCheck extends EventEmitter {
     this.$input
       .on('click', (d3_event: MouseEvent) => {
         d3_event.stopPropagation();
-        const key = uifield.key;
+        const key = this.key;
         const tagChange: TagChange = {};
 
         if (Array.isArray(this._tags[key])) {
@@ -210,7 +204,7 @@ export class UiFieldCheck extends EventEmitter {
       });
 
 
-    if (uifield.type === 'onewayCheck') {
+    if (this.type === 'onewayCheck') {
       this.$reverser = this.$label.selectAll('.reverser');
 
       this.$reverser
@@ -218,10 +212,10 @@ export class UiFieldCheck extends EventEmitter {
         .on('click', (d3_event: MouseEvent) => {
           d3_event.preventDefault();
           d3_event.stopPropagation();
-          if (!this._entityIDs.length) return;
+          if (!this.entityIDs.length) return;
 
           const combinedAction = (graph: any) => {
-            for (const entityID of this._entityIDs) {
+            for (const entityID of this.entityIDs) {
               graph = actionReverse(entityID)(graph);
             }
             return graph;
@@ -230,7 +224,7 @@ export class UiFieldCheck extends EventEmitter {
           editor.perform(combinedAction);
           editor.commit({
             annotation: l10n.t('operations.reverse.annotation.line', { n: 1 }),
-            selectedIDs: this._entityIDs
+            selectedIDs: this.entityIDs
           });
 
           d3_select(d3_event.currentTarget as any)
@@ -241,27 +235,14 @@ export class UiFieldCheck extends EventEmitter {
 
 
   /**
-   * Gets or sets the entity IDs this field applies to.
-   * @param val - The new entity IDs, or omit to get the current IDs
-   * @return The current entity IDs (getter) or `this` (setter)
-   */
-  public entityIDs(val?: EntityID[]): any {
-    if (!arguments.length) return this._entityIDs;
-    this._entityIDs = val as EntityID[];
-    return this;
-  }
-
-
-  /**
    * Updates the field UI to reflect the given entity tags.
    * @param tags - The entity tags to display
    */
-  public tags(tags: Tags): void {
+  public syncTags(tags: Tags): void {
     const l10n = this.context.systems.l10n!;
-    const uifield = this._uifield;
 
     this._tags = tags;
-    const key = uifield.key;
+    const key = this.key;
 
     const isChecked = (val: any): boolean => {
       return val !== 'no' && val !== '' && val !== undefined && val !== null;
@@ -277,12 +258,12 @@ export class UiFieldCheck extends EventEmitter {
     const isMixed = Array.isArray(tags[key]);
     this._value = !isMixed && tags[key] && (tags[key] as string).toLowerCase();
 
-    if (uifield.type === 'onewayCheck' && (this._value === '1' || this._value === '-1')) {
+    if (this.type === 'onewayCheck' && (this._value === '1' || this._value === '-1')) {
       this._value = 'yes';
     }
 
     this.$input
-      .property('indeterminate', isMixed || (uifield.type !== 'defaultCheck' && !this._value))
+      .property('indeterminate', isMixed || (this.type !== 'defaultCheck' && !this._value))
       .property('checked', isChecked(this._value));
 
     this.$text
@@ -292,7 +273,7 @@ export class UiFieldCheck extends EventEmitter {
     this.$label
       .classed('set', !!this._value);
 
-    if (uifield.type === 'onewayCheck') {
+    if (this.type === 'onewayCheck') {
       this.$reverser
         .classed('hide', this._reverserHidden())
         .call(this._reverserSetText);

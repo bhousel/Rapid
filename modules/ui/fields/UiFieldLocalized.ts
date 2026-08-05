@@ -1,8 +1,8 @@
-import { EventEmitter } from 'tseep/lib/ee-safe';
 import { select as d3_select } from 'd3-selection';
 import { utilArrayUniq, utilUniqueString } from '@rapid-sdk/util';
 import { iso1A2Code } from '@rapideditor/country-coder';
 
+import { UiField } from '../UiField.js';
 import { uiIcon } from '../icon.js';
 import { uiTooltip } from '../tooltip.js';
 import { uiCombobox } from '../combobox.js';
@@ -10,19 +10,14 @@ import { utilGetSetValue, utilNoAuto } from '../../util/index.ts';
 
 import type { Context } from '../../Context.ts';
 import type { D3Selection } from 'd3-selection';
+import type { Field } from '../../lib/index.ts';
 import type { Tags } from './types.ts';
+import type { UiFieldOptions } from '../UiField.js';
+
+import { LANGUAGE_SUFFIX_REGEX } from './types.ts';
 
 
-// Matches 'key:<code>', where <code> is a BCP47 locale code.
-// Motivation is to avoid matching on similarly formatted tags that are
-//  not for languages, e.g. name:left, name:source, etc. - iD#9124, iD#10333
-export const LANGUAGE_SUFFIX_REGEX = /^(.*):([a-z]{2,3}(?:-[A-Z][a-z]{3})?(?:-[A-Z]{2})?)$/;
-
-
-export class UiFieldLocalized extends EventEmitter {
-  public context: Context;
-
-  protected _uifield: any;
+export class UiFieldLocalized extends UiField {
   public $input: D3Selection;
   public $localizedInputs: D3Selection;
   public $parent: D3Selection;
@@ -33,14 +28,11 @@ export class UiFieldLocalized extends EventEmitter {
   protected _multilingual: any[];
   protected _buttonTip: any;
   protected _wikiTitles: any;
-  protected _entityIDs: EntityID[];
 
-  public constructor(context: Context, uifield: any) {
-    super();
+  public constructor(context: Context, presetField: Field, entityIDs: EntityID[] = [], options: Partial<UiFieldOptions> = {}) {
+    super(context, presetField, entityIDs, options);
+
     const l10n = context.systems.l10n!;
-
-    this.context = context;
-    this._uifield = uifield;
 
     this.$input = d3_select(null);
     this.$localizedInputs = d3_select(null);
@@ -50,9 +42,8 @@ export class UiFieldLocalized extends EventEmitter {
     this._languagesArray = [];
     this._multilingual = [];
     this._wikiTitles = null;
-    this._entityIDs = [];
 
-    this.render = this.render.bind(this);
+    this.renderContent = this.renderContent.bind(this);
     this._renderMultilingual = this._renderMultilingual.bind(this);
     this._changeLang = this._changeLang.bind(this);
     this._changeValue = this._changeValue.bind(this);
@@ -67,6 +58,8 @@ export class UiFieldLocalized extends EventEmitter {
     this._buttonTip = uiTooltip(context)
       .title(l10n.t('translate.translate'))
       .placement('left');
+
+    this._loadCountryCode();
   }
 
 
@@ -102,13 +95,12 @@ export class UiFieldLocalized extends EventEmitter {
   protected _calcLocked(): void {
     const editor = this.context.systems.editor!;
     const schema = this.context.systems.schema!;
-    const uifield = this._uifield;
 
     const graph = editor.staging.graph;
     // Protect name field for suggestion presets that don't display a brand/operator field
-    const isLocked = (uifield.id === 'name') &&
-      this._entityIDs.length &&
-      this._entityIDs.some(function(entityID) {
+    const isLocked = (this.id === 'name') &&
+      this.entityIDs.length &&
+      this.entityIDs.some(function(entityID) {
         const entity = graph.hasEntity(entityID);
         if (!entity) return false;
 
@@ -141,7 +133,7 @@ export class UiFieldLocalized extends EventEmitter {
         return false;
       });
 
-    uifield.locked(isLocked);
+    this.locked(!!isLocked);
   }
 
 
@@ -151,8 +143,6 @@ export class UiFieldLocalized extends EventEmitter {
    * @param tags - The entity tags to read localized values from
    */
   protected _calcMultilingual(tags: Tags): void {
-    const uifield = this._uifield;
-
     const existingLangsOrdered = this._multilingual.map(function(item) {
       return item.lang;
     });
@@ -160,7 +150,7 @@ export class UiFieldLocalized extends EventEmitter {
 
     for (const k in tags) {
       const m = k.match(LANGUAGE_SUFFIX_REGEX);
-      if (m && m[1] === uifield.key && m[2]) {
+      if (m && m[1] === this.key && m[2]) {
         const item = { lang: m[2], value: tags[k] };
         if (existingLangs.has(item.lang)) {
           // update the value
@@ -188,12 +178,10 @@ export class UiFieldLocalized extends EventEmitter {
    *  (e.g. `tags()`) can re-render the field in place.
    * @param $selection - A d3-selection to the HTMLElement this field renders into
    */
-  public render($selection: D3Selection): void {
-    const uifield = this._uifield;
-
+  public renderContent($selection: D3Selection): void {
     this.$parent = $selection;
     this._calcLocked();
-    const isLocked = uifield.locked();
+    const isLocked = this.locked();
 
     let $wrap: D3Selection = $selection.selectAll('.form-field-input-wrap')
       .data([0]);
@@ -201,7 +189,7 @@ export class UiFieldLocalized extends EventEmitter {
     // enter/update
     $wrap = $wrap.enter()
       .append('div')
-      .attr('class', 'form-field-input-wrap form-field-input-' + uifield.type)
+      .attr('class', 'form-field-input-wrap form-field-input-' + this.type)
       .merge($wrap);
 
     this.$input = $wrap.selectAll('.localized-main')
@@ -211,7 +199,7 @@ export class UiFieldLocalized extends EventEmitter {
     this.$input = this.$input.enter()
       .append('input')
       .attr('type', 'text')
-      .attr('id', uifield.uid)
+      .attr('id', this.uid)
       .attr('class', 'localized-main')
       .call(utilNoAuto)
       .merge(this.$input);
@@ -266,10 +254,9 @@ export class UiFieldLocalized extends EventEmitter {
    */
   protected _addNew(d3_event: Event): void {
     const l10n = this.context.systems.l10n!;
-    const uifield = this._uifield;
 
     d3_event.preventDefault();
-    if (uifield.locked()) return;
+    if (this.locked()) return;
 
     let defaultLang = l10n.languageCode.toLowerCase();
     let langExists = this._multilingual.find(function(datum) { return datum.lang === defaultLang; });
@@ -297,9 +284,8 @@ export class UiFieldLocalized extends EventEmitter {
   protected _change(onInput?: boolean): (d3_event: Event) => void {
     return (d3_event: Event) => {
       const context = this.context;
-      const uifield = this._uifield;
 
-      if (uifield.locked()) {
+      if (this.locked()) {
         d3_event.preventDefault();
         return;
       }
@@ -308,11 +294,11 @@ export class UiFieldLocalized extends EventEmitter {
       if (!onInput) val = context.cleanTagValue(val);
 
       // don't override multiple values with blank string
-      if (!val && Array.isArray(this._tags[uifield.key])) return;
+      if (!val && Array.isArray(this._tags[this.key])) return;
 
       const t: Tags = {};
 
-      t[uifield.key] = val || undefined;
+      t[this.key] = val || undefined;
       this.emit('change', t, onInput);
     };
   }
@@ -324,7 +310,7 @@ export class UiFieldLocalized extends EventEmitter {
    * @returns The `key:lang` tag key
    */
   protected _key(lang: string): string {
-    return this._uifield.key + ':' + lang;
+    return this.key + ':' + lang;
   }
 
 
@@ -438,7 +424,6 @@ export class UiFieldLocalized extends EventEmitter {
    */
   protected _renderMultilingual($selection: D3Selection): void {
     const l10n = this.context.systems.l10n!;
-    const uifield = this._uifield;
     const langCombo = this._langCombo;
 
     let $entries: D3Selection = $selection.selectAll('div.entry')
@@ -481,7 +466,7 @@ export class UiFieldLocalized extends EventEmitter {
           .append('button')
           .attr('class', 'remove-icon-multilingual')
           .on('click', (d3_event: Event, d: any) => {
-            if (uifield.locked()) return;
+            if (this.locked()) return;
             d3_event.preventDefault();
 
             // remove the UI item manually
@@ -572,11 +557,10 @@ export class UiFieldLocalized extends EventEmitter {
    * Updates the field UI to reflect the given entity tags.
    * @param tags - The entity tags to display
    */
-  public tags(tags: Tags): void {
+  public syncTags(tags: Tags): void {
     const context = this.context;
     const l10n = context.systems.l10n!;
     const wikipedia = context.services.wikipedia as any;
-    const uifield = this._uifield;
 
     this._tags = tags;
 
@@ -592,17 +576,17 @@ export class UiFieldLocalized extends EventEmitter {
       }
     }
 
-    const isMixed = Array.isArray(tags[uifield.key]);
+    const isMixed = Array.isArray(tags[this.key]);
 
-    (utilGetSetValue(this.$input, typeof tags[uifield.key] === 'string' ? tags[uifield.key] as string : '') as D3Selection)
-      .attr('title', isMixed ? (tags[uifield.key] as string[]).filter(Boolean).join('\n') : null)
-      .attr('placeholder', isMixed ? l10n.t('inspector.multiple_values') : uifield.placeholder)
+    (utilGetSetValue(this.$input, typeof tags[this.key] === 'string' ? tags[this.key] as string : '') as D3Selection)
+      .attr('title', isMixed ? (tags[this.key] as string[]).filter(Boolean).join('\n') : null)
+      .attr('placeholder', isMixed ? l10n.t('inspector.multiple_values') : this.placeholder)
       .classed('mixed', isMixed);
 
     this._calcMultilingual(tags);
 
     this.$parent
-      .call(this.render);
+      .call(this.renderContent);
   }
 
 
@@ -612,25 +596,10 @@ export class UiFieldLocalized extends EventEmitter {
   }
 
 
-  /**
-   * Gets or sets the entity IDs this field is editing.
-   * @param val - The entity IDs to set; if omitted, acts as a getter
-   * @returns The current entity IDs (getter) or `this` (setter)
-   */
-  public entityIDs(val?: EntityID[]): any {
-    if (!arguments.length) return this._entityIDs;
-    this._entityIDs = val as EntityID[];
-    this._multilingual = [];
-    this._loadCountryCode();
-    return this;
-  }
-
-
   /** Loads the ISO country code for the current entity's location. */
   protected _loadCountryCode(): void {
-    const uifield = this._uifield;
-    const extent = uifield.entityExtent;
+    const extent = this.entityExtent;
     const countryCode = extent && iso1A2Code(extent.center());
-    this._countryCode = countryCode && countryCode.toLowerCase();
+    this._countryCode = countryCode?.toLowerCase();
   }
 }

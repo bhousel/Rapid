@@ -1,46 +1,38 @@
-import { EventEmitter } from 'tseep/lib/ee-safe';
 import { select as d3_select } from 'd3-selection';
 
 import { actionChangeTags } from '../../actions/change_tags.js';
 import { uiIcon } from '../icon.js';
 import { uiCombobox } from '../combobox.js';
+import { UiField } from '../UiField.js';
 import { utilGetSetValue, utilNoAuto } from '../../util/index.ts';
 
 import type { Context } from '../../Context.ts';
 import type { D3Selection } from 'd3-selection';
+import type { Field } from '../../lib/index.ts';
 import type { Tags } from './types.ts';
+import type { UiFieldOptions } from '../UiField.js';
 
 
-export class UiFieldWikipedia extends EventEmitter {
-  public context: Context;
-
+export class UiFieldWikipedia extends UiField {
   public static supportsMultiselection = false;
 
-  protected _uifield: any;
   public $langInput: D3Selection;
   public $titleInput: D3Selection;
   protected _wikiURL: string;
-  protected _entityIDs: EntityID[];
-  protected _tags: Tags;
   protected _dataWikipedia: any[];
   protected _langCombo: any;
   protected _titleCombo: any;
 
-  public constructor(context: Context, uifield: any) {
-    super();
+  public constructor(context: Context, presetField: Field, entityIDs: EntityID[] = [], options: Partial<UiFieldOptions> = {}) {
+    super(context, presetField, entityIDs, options);
     const assets = context.systems.assets!;
-
-    this.context = context;
-    this._uifield = uifield;
 
     this.$langInput = d3_select(null);
     this.$titleInput = d3_select(null);
     this._wikiURL = '';
-    this._entityIDs = [];
-    this._tags = {};
     this._dataWikipedia = [];
 
-    this.render = this.render.bind(this);
+    this.renderContent = this.renderContent.bind(this);
     this._changeLang = this._changeLang.bind(this);
 
     assets.loadAssetAsync('wmf_sitematrix')
@@ -71,8 +63,8 @@ export class UiFieldWikipedia extends EventEmitter {
         if (!value) {
           value = '';
           const graph = editor.staging.graph;
-          for (const i in this._entityIDs) {
-            const entity = graph.hasEntity(this._entityIDs[i]) as any;
+          for (const i in this.entityIDs) {
+            const entity = graph.hasEntity(this.entityIDs[i]) as any;
             if (entity.tags.name) {
               value = entity.tags.name;
               break;
@@ -93,17 +85,16 @@ export class UiFieldWikipedia extends EventEmitter {
    *  renders into `$selection` directly rather than capturing `$parent` for re-render.
    * @param $selection - A d3-selection to the HTMLElement this component renders into
    */
-  public render($selection: D3Selection): void {
+  public renderContent($selection: D3Selection): void {
     const context = this.context;
     const l10n = context.systems.l10n!;
-    const uifield = this._uifield;
 
     let $wrap: D3Selection = $selection.selectAll('.form-field-input-wrap')
       .data([0]);
 
     $wrap = $wrap.enter()
       .append('div')
-      .attr('class', `form-field-input-wrap form-field-input-${uifield.type}`)
+      .attr('class', `form-field-input-wrap form-field-input-${this.type}`)
       .merge($wrap);
 
 
@@ -148,7 +139,7 @@ export class UiFieldWikipedia extends EventEmitter {
       .append('input')
       .attr('type', 'text')
       .attr('class', 'wiki-title')
-      .attr('id', uifield.uid)
+      .attr('id', this.uid)
       .call(utilNoAuto)
       .call(this._titleCombo)
       .merge(this.$titleInput);
@@ -274,7 +265,7 @@ export class UiFieldWikipedia extends EventEmitter {
 
     // attempt asynchronous update of wikidata tag..
     const initGraph = editor.staging.graph;
-    const initEntityIDs = this._entityIDs;
+    const initEntityIDs = this.entityIDs;
 
     wikidata.itemsByTitle(this._language()[2], value, (err: any, data: any) => {
       if (err || !data || !Object.keys(data).length) return;
@@ -304,7 +295,7 @@ export class UiFieldWikipedia extends EventEmitter {
    * Updates the field UI to reflect the given entity tags.
    * @param tags - The entity tags to display
    */
-  public tags(tags: Tags): void {
+  public syncTags(tags: Tags): void {
     this._tags = tags;
     this._updateForTags(tags);
   }
@@ -315,8 +306,7 @@ export class UiFieldWikipedia extends EventEmitter {
    * @param tags - The entity tags to read the wikipedia value from
    */
   protected _updateForTags(tags: Tags): void {
-    const uifield = this._uifield;
-    const key = uifield.key;
+    const key = this.key;
     const value = typeof tags[key] === 'string' ? tags[key] as string : '';
     // Expect tag format of `tagLang:tagArticleTitle`, e.g. `fr:Paris`, with
     // optional suffix of `#anchor`
@@ -374,18 +364,6 @@ export class UiFieldWikipedia extends EventEmitter {
     if (!anchor) return '';
     const underscoredAnchor = anchor.replace(/ /g, '_');
     return '#' + encodeURIComponent(underscoredAnchor);
-  }
-
-
-  /**
-   * Gets or sets the entity IDs this field is editing.
-   * @param val - The entity IDs to set; if omitted, acts as a getter
-   * @returns The current entity IDs (getter) or `this` (setter)
-   */
-  public entityIDs(val?: EntityID[]): any {
-    if (!arguments.length) return this._entityIDs;
-    this._entityIDs = val as EntityID[];
-    return this;
   }
 
 

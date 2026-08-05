@@ -1,7 +1,7 @@
 describe('UiFieldCheck', () => {
 
   const context = new Rapid.MockContext();
-  let selection, field, uifield;
+  let selection, field;
 
   class MockEditSystem extends Rapid.MockSystem {
     constructor(context) {
@@ -29,16 +29,15 @@ describe('UiFieldCheck', () => {
       key: 'test',
       type: 'check'
     });
-    uifield = new Rapid.UiField(context, field);
   });
 
 
   it('renders an unknown tag value as text', () => {
-    const check = new Rapid.UiFieldCheck(context, uifield);
+    const check = new Rapid.UiFieldCheck(context, field);
     const value = '<img src="x" onerror="alert(1)">';
 
     selection.call(check.render);
-    check.tags({ test: value });
+    check.syncTags({ test: value });
 
     assert.strictEqual(selection.select('.value').text(), `\"${value}\"`);
     assert.strictEqual(selection.selectAll('img').size(), 0);

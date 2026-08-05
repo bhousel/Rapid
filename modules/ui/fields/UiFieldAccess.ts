@@ -1,12 +1,14 @@
-import { EventEmitter } from 'tseep/lib/ee-safe';
 import { select as d3_select } from 'd3-selection';
 
 import { uiCombobox } from '../combobox.js';
+import { UiField } from '../UiField.js';
 import { utilGetSetValue, utilNoAuto } from '../../util/index.ts';
 
 import type { Context } from '../../Context.ts';
 import type { D3Selection } from 'd3-selection';
+import type { Field } from '../../lib/index.ts';
 import type { TagChange, Tags } from './types.ts';
+import type { UiFieldOptions } from '../UiField.js';
 
 
 const placeholdersByHighway: Record<string, Record<string, string>> = {
@@ -118,26 +120,23 @@ const placeholdersByHighway: Record<string, Record<string, string>> = {
 };
 
 
-export class UiFieldAccess extends EventEmitter {
-  public context: Context;
-
-  protected _uifield: any;
+export class UiFieldAccess extends UiField {
   public $items: D3Selection;
   protected _tags: Tags;
 
   /**
    * @param context - Global shared application context
-   * @param uifield - The `UiField` wrapper that owns this field internal
+   * @param presetField - The preset field definition this field renders
+   * @param entityIDs - The entities this field applies to
+   * @param options - Field display options
    */
-  public constructor(context: Context, uifield: any) {
-    super();
-    this.context = context;
-    this._uifield = uifield;
+  public constructor(context: Context, presetField: Field, entityIDs: EntityID[] = [], options: Partial<UiFieldOptions> = {}) {
+    super(context, presetField, entityIDs, options);
 
     this.$items = d3_select(null);
     this._tags = {};
 
-    this.render = this.render.bind(this);
+    this.renderContent = this.renderContent.bind(this);
     this._change = this._change.bind(this);
   }
 
@@ -148,17 +147,16 @@ export class UiFieldAccess extends EventEmitter {
    *  renders into `$selection` directly rather than capturing `$parent` for re-render.
    * @param $selection - A d3-selection to the HTMLElement this component renders into
    */
-  public render($selection: D3Selection): void {
+  public renderContent($selection: D3Selection): void {
     const context = this.context;
     const l10n = context.systems.l10n!;
-    const uifield = this._uifield;
 
     let $wrap: D3Selection = $selection.selectAll('.form-field-input-wrap')
       .data([0]);
 
     $wrap = $wrap.enter()
       .append('div')
-      .attr('class', `form-field-input-wrap form-field-input-${uifield.type}`)
+      .attr('class', `form-field-input-wrap form-field-input-${this.type}`)
       .merge($wrap);
 
     let $list: D3Selection = $wrap.selectAll('ul')
@@ -171,14 +169,14 @@ export class UiFieldAccess extends EventEmitter {
 
 
     this.$items = $list.selectAll('li')
-      .data(uifield.keys);
+      .data(this.keys);
 
     // Enter
     const $$enter = this.$items.enter()
       .append('li')
       .attr('class', d => `labeled-input preset-access-${d}`);
 
-    const stringBase = `_tagging.presets.fields.${uifield.id}.types`;
+    const stringBase = `_tagging.presets.fields.${this.id}.types`;
     $$enter
       .append('div')
       .attr('class', 'label preset-label-access')
@@ -194,7 +192,7 @@ export class UiFieldAccess extends EventEmitter {
       .each((d, i, nodes) => {
         d3_select(nodes[i])
           .call(uiCombobox(context, `access-${d}`)
-            .data(this.options(d))
+            .data(this._fieldOptions(d))
           );
       });
 
@@ -236,9 +234,8 @@ export class UiFieldAccess extends EventEmitter {
    * @param type - The access type key to build options for
    * @return An array of `{ title, value }` option objects
    */
-  public options(type: string): any[] {
+  public _fieldOptions(type: string): any[] {
     const l10n = this.context.systems.l10n!;
-    const uifield = this._uifield;
 
     const options = ['no', 'permissive', 'private', 'permit', 'destination'];
 
@@ -251,7 +248,7 @@ export class UiFieldAccess extends EventEmitter {
       }
     }
 
-    const stringBase = `_tagging.presets.fields.${uifield.id}.options`;
+    const stringBase = `_tagging.presets.fields.${this.id}.options`;
     return options.map(val => {
       return {
         title: l10n.t(`${stringBase}.${val}.description`),
@@ -265,9 +262,8 @@ export class UiFieldAccess extends EventEmitter {
    * Updates the field UI to reflect the given entity tags.
    * @param tags - The entity tags to display
    */
-  public tags(tags: Tags): void {
+  public syncTags(tags: Tags): void {
     const l10n = this.context.systems.l10n!;
-    const uifield = this._uifield;
 
     this._tags = tags;
     const t: any = tags;
@@ -307,7 +303,7 @@ export class UiFieldAccess extends EventEmitter {
             }
           }
         }
-        return uifield.placeholder;
+        return this.placeholder;
       });
   }
 

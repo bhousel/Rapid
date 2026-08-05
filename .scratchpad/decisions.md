@@ -2,6 +2,28 @@
 
 Non-obvious choices where "why did we do it this way?" isn't captured in the code.
 
+## UI fields: inheritance over composition
+
+Each concrete field (`UiFieldCheck`, `UiFieldCombo`, …) **`extends UiField`** rather than being an
+"internal" object composed by a `UiField` wrapper. The composition was an ES5-era holdover (no real
+class inheritance back then). Inheritance removes the wrapper/internal split, the `_internal`/
+`_createField()` machinery, the `UiFieldInternal` interface, and the event re-wiring — a field now
+emits `change` on itself.
+
+- **Construct fields via `createUiField(context, presetField, …)`** (in `fields/index.ts`), never
+  `new UiField(...)`. `UiField` can't be constructed generically anymore — the concrete subclass is
+  chosen by `presetField.type`. The factory lives in the registry module so that `UiField` itself does
+  NOT import `uiFields` (that would be a load-time circular import, since fields `extends UiField`).
+- **Name collisions were the real friction, not the mechanics.** The base wrapper API and the field
+  render API shared names, so the field-side ones were renamed: `render`→`renderContent` (base
+  `render()` draws the field chrome, then calls `renderContent()` for the input body — mirrors
+  `AbstractUiSection`), `tags(t)`→`syncTags(t)` (base keeps the fluent `tags(val?)` getter/setter),
+  and the field's `entityIDs(ids)` setter was dropped (the base owns the `entityIDs` array).
+  `UiFieldAccess`/`UiFieldCycleway` had an `options(key)` choice-list method that collided with the
+  base `options` config object → renamed `_fieldOptions(key)`.
+- **`supportsMultiselection` is read off the instance** via `(this.constructor as typeof UiField)`,
+  not a registry lookup — another reason `UiField` needs no `uiFields` import.
+
 ## UI events: EventEmitter over d3_dispatch/utilRebind
 
 All UI class components that emit events extend `EventEmitter` from `tseep/lib/ee-safe` — the same

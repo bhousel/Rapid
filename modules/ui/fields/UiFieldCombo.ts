@@ -1,16 +1,18 @@
-import { EventEmitter } from 'tseep/lib/ee-safe';
 import { select as d3_select } from 'd3-selection';
 import { drag as d3_drag } from 'd3-drag';
 import { utilArrayUniq, utilUnicodeCharsCount } from '@rapid-sdk/util';
 import { iso1A2Code } from '@rapideditor/country-coder';
 
+import { UiField } from '../UiField.js';
 import { uiCombobox } from '../combobox.js';
 import { utilKeybinding } from '../../util/keybinding.ts';
 import { utilGetSetValue, utilNoAuto } from '../../util/index.ts';
 
 import type { Context } from '../../Context.ts';
 import type { D3Selection } from 'd3-selection';
+import type { Field } from '../../lib/index.ts';
 import type { Tags } from './types.ts';
+import type { UiFieldOptions } from '../UiField.js';
 
 export {
   UiFieldCombo as UiFieldManyCombo,
@@ -21,10 +23,7 @@ export {
 };
 
 
-export class UiFieldCombo extends EventEmitter {
-  public context: Context;
-
-  protected _uifield: any;
+export class UiFieldCombo extends UiField {
   protected _isMulti: boolean;
   protected _isNetwork: boolean;
   protected _isSemi: boolean;
@@ -38,26 +37,21 @@ export class UiFieldCombo extends EventEmitter {
   public $input: D3Selection;
   protected _comboData: any[];
   protected _multiData: any[];
-  protected _entityIDs: EntityID[];
   protected _tags: Tags;
   protected _countryCode: string | undefined;
   protected _staticPlaceholder: string;
 
-  public constructor(context: Context, uifield: any) {
-    super();
-    const presetField = uifield.presetField;
+  public constructor(context: Context, presetField: Field, entityIDs: EntityID[] = [], options: Partial<UiFieldOptions> = {}) {
+    super(context, presetField, entityIDs, options);
 
-    this.context = context;
-    this._uifield = uifield;
-
-    this._isMulti = (uifield.type === 'multiCombo' || uifield.type === 'manyCombo');
-    this._isNetwork = (uifield.type === 'networkCombo');
-    this._isSemi = (uifield.type === 'semiCombo');
+    this._isMulti = (this.type === 'multiCombo' || this.type === 'manyCombo');
+    this._isNetwork = (this.type === 'networkCombo');
+    this._isSemi = (this.type === 'semiCombo');
     this._optarray = presetField.props.options;
-    this._showTagInfoSuggestions = uifield.type !== 'manyCombo' && presetField.props.autoSuggestions !== false;
-    this._allowCustomValues = uifield.type !== 'manyCombo' && presetField.props.customValues !== false;
+    this._showTagInfoSuggestions = this.type !== 'manyCombo' && presetField.props.autoSuggestions !== false;
+    this._allowCustomValues = this.type !== 'manyCombo' && presetField.props.customValues !== false;
     this._snake_case = (presetField.props.snake_case || (presetField.props.snake_case === undefined));
-    this._combobox = uiCombobox(context, 'combo-' + uifield.safeid)
+    this._combobox = uiCombobox(context, 'combo-' + this.safeid)
       .caseSensitive(presetField.props.caseSensitive)
       .minItems(this._isMulti || this._isSemi ? 1 : 2);
     this.$container = d3_select(null);
@@ -65,17 +59,16 @@ export class UiFieldCombo extends EventEmitter {
     this.$input = d3_select(null);
     this._comboData = [];
     this._multiData = [];
-    this._entityIDs = [];
     this._tags = {};
     this._countryCode = undefined;
     this._staticPlaceholder = '';
 
     // ensure multiCombo field.key ends with a ':'
-    if (this._isMulti && uifield.key && /[^:]$/.test(uifield.key)) {
-      uifield.key += ':';
+    if (this._isMulti && this.key && /[^:]$/.test(this.key)) {
+      this.key += ':';
     }
 
-    this.render = this.render.bind(this);
+    this.renderContent = this.renderContent.bind(this);
     this._initCombo = this._initCombo.bind(this);
     this._setTaginfoValues = this._setTaginfoValues.bind(this);
     this._setPlaceholder = this._setPlaceholder.bind(this);
@@ -99,8 +92,6 @@ export class UiFieldCombo extends EventEmitter {
   // (for multiCombo, dval should be the key suffix, not the entire key)
   /** @param dval - The display value (for multiCombo, the key suffix) */
   protected _tagValue(dval: string): string | undefined {
-    const uifield = this._uifield;
-
     dval = this._clean(dval || '');
 
     const found = this._comboData.find(o => {
@@ -108,7 +99,7 @@ export class UiFieldCombo extends EventEmitter {
     });
     if (found) return found.key;
 
-    if (uifield.type === 'typeCombo' && !dval) {
+    if (this.type === 'typeCombo' && !dval) {
       return 'yes';
     }
 
@@ -121,16 +112,15 @@ export class UiFieldCombo extends EventEmitter {
   /** @param tval - The tag value (for multiCombo, the key suffix) */
   protected _displayValue(tval: string): string {
     const l10n = this.context.systems.l10n!;
-    const uifield = this._uifield;
 
     tval = tval || '';
 
-    const stringID = `_tagging.presets.fields.${uifield.id}.options.${tval}`;
+    const stringID = `_tagging.presets.fields.${this.id}.options.${tval}`;
     if (l10n.hasTextForStringID(stringID)) {
       return l10n.t(stringID, { default: tval });
     }
 
-    if (uifield.type === 'typeCombo' && tval.toLowerCase() === 'yes') {
+    if (this.type === 'typeCombo' && tval.toLowerCase() === 'yes') {
       return '';
     }
 
@@ -185,12 +175,11 @@ export class UiFieldCombo extends EventEmitter {
    */
   protected _setStaticValues(callback?: (data: any[]) => void): void {
     const l10n = this.context.systems.l10n!;
-    const uifield = this._uifield;
 
     if (!this._optarray) return;
 
     this._comboData = this._optarray.map((v: string) => {
-      const stringID = `_tagging.presets.fields.${uifield.id}.options.${v}`;
+      const stringID = `_tagging.presets.fields.${this.id}.options.${v}`;
       return {
         key: v,
         value: l10n.t(stringID, { default: v }),
@@ -215,7 +204,6 @@ export class UiFieldCombo extends EventEmitter {
     const editor = context.systems.editor!;
     const l10n = context.systems.l10n!;
     const schema = context.systems.schema!;
-    const uifield = this._uifield;
 
     const taginfo = context.services.taginfo as any;
     const graph = editor.staging.graph;
@@ -227,7 +215,7 @@ export class UiFieldCombo extends EventEmitter {
     }
 
     const fn = this._isMulti ? taginfo.multikeys : taginfo.values;
-    let query = (this._isMulti ? uifield.key : '') + q;
+    let query = (this._isMulti ? this.key : '') + q;
     const hasCountryPrefix = this._isNetwork && this._countryCode && this._countryCode.indexOf(q.toLowerCase()) === 0;
     if (hasCountryPrefix) {
       query = this._countryCode + ':';
@@ -235,12 +223,12 @@ export class UiFieldCombo extends EventEmitter {
 
     const params: any = {
       debounce: (q !== ''),
-      key: uifield.key,
+      key: this.key,
       query: query
     };
 
-    if (this._entityIDs.length) {
-      const entity = graph.entity(this._entityIDs[0]);
+    if (this.entityIDs.length) {
+      const entity = graph.entity(this.entityIDs[0]);
       params.geometry = entity.geometry(graph);
     }
 
@@ -248,7 +236,7 @@ export class UiFieldCombo extends EventEmitter {
       if (err) return;
 
       data = data.filter((d: any) => {
-        if (uifield.type === 'typeCombo' && d.value === 'yes') {
+        if (this.type === 'typeCombo' && d.value === 'yes') {
           // don't show the fallback value
           return false;
         }
@@ -258,7 +246,7 @@ export class UiFieldCombo extends EventEmitter {
       });
 
       // don't suggest deprecated tag values
-      const deprecatedValues = schema.getScope('osm').deprecatedValues[uifield.key];
+      const deprecatedValues = schema.getScope('osm').deprecatedValues[this.key];
       if (deprecatedValues) {
         data = data.filter((d: any) => {
           return deprecatedValues.indexOf(d.value) === -1;
@@ -276,8 +264,8 @@ export class UiFieldCombo extends EventEmitter {
 
       this._comboData = data.map((d: any) => {
         let k = d.value;
-        if (this._isMulti) k = k.replace(uifield.key, '');
-        const stringID = `_tagging.presets.fields.${uifield.id}.options.${k}`;
+        if (this._isMulti) k = k.replace(this.key, '');
+        const stringID = `_tagging.presets.fields.${this.id}.options.${k}`;
         const label = l10n.t(stringID, { default: k });
         return {
           key: k,
@@ -300,17 +288,16 @@ export class UiFieldCombo extends EventEmitter {
    */
   protected _setPlaceholder(values: any[]): void {
     const l10n = this.context.systems.l10n!;
-    const uifield = this._uifield;
 
     if (this._isMulti || this._isSemi) {
-      this._staticPlaceholder = uifield.placeholder || l10n.t('inspector.add');
+      this._staticPlaceholder = this.placeholder || l10n.t('inspector.add');
     } else {
       const vals = values
         .map(d => d.value)
         .filter(s => s.length < 20);
 
       const placeholders = vals.length > 1 ? vals : values.map(d => d.key);
-      this._staticPlaceholder = uifield.placeholder || placeholders.slice(0, 3).join(', ');
+      this._staticPlaceholder = this.placeholder || placeholders.slice(0, 3).join(', ');
     }
 
     if (!/(…|\.\.\.)$/.test(this._staticPlaceholder)) {
@@ -318,7 +305,7 @@ export class UiFieldCombo extends EventEmitter {
     }
 
     let ph;
-    if (!this._isMulti && !this._isSemi && this._tags && Array.isArray(this._tags[uifield.key])) {
+    if (!this._isMulti && !this._isSemi && this._tags && Array.isArray(this._tags[this.key])) {
       ph = l10n.t('inspector.multiple_values');
     } else {
       ph =  this._staticPlaceholder;
@@ -333,7 +320,6 @@ export class UiFieldCombo extends EventEmitter {
   protected _change(): void {
     const context = this.context;
     const scheduler = context.systems.scheduler;  // optional
-    const uifield = this._uifield;
 
     const t: Tags = {};
     let val;
@@ -348,7 +334,7 @@ export class UiFieldCombo extends EventEmitter {
 
       if (this._isMulti) {
         utilArrayUniq(vals).forEach(v => {
-          let key = (uifield.key || '') + v;
+          let key = (this.key || '') + v;
           if (this._tags) {
             // don't set a multicombo value to 'yes' if it already has a non-'no' value
             // e.g. `language:de=main`
@@ -356,14 +342,14 @@ export class UiFieldCombo extends EventEmitter {
             if (typeof old === 'string' && old.toLowerCase() !== 'no') return;
           }
           key = context.cleanTagKey(key);
-          uifield.keys.push(key);
+          this.keys.push(key);
           t[key] = 'yes';
         });
 
       } else if (this._isSemi) {
         let arr = this._multiData.map(d => d.key);
         arr = arr.concat(vals);
-        t[uifield.key] = context.cleanTagValue(utilArrayUniq(arr).filter(Boolean).join(';'));
+        t[this.key] = context.cleanTagValue(utilArrayUniq(arr).filter(Boolean).join(';'));
       }
 
       if (scheduler) {
@@ -376,10 +362,10 @@ export class UiFieldCombo extends EventEmitter {
       const rawValue = utilGetSetValue(this.$input) as string;
 
       // don't override multiple values with blank string
-      if (!rawValue && Array.isArray(this._tags[uifield.key])) return;
+      if (!rawValue && Array.isArray(this._tags[this.key])) return;
 
       val = context.cleanTagValue(this._tagValue(rawValue) ?? '');
-      t[uifield.key] = val || undefined;
+      t[this.key] = val || undefined;
     }
 
     this.emit('change', t);
@@ -389,7 +375,7 @@ export class UiFieldCombo extends EventEmitter {
   /** Returns true if the current entity is a Rapid (AI-suggested) feature. */
   protected _isRapidFeature(): boolean {
     const rapid = this.context.systems.rapid!;
-    const entityID = this._entityIDs?.length && this._entityIDs[0];
+    const entityID = this.entityIDs?.length && this.entityIDs[0];
     return !!entityID && rapid.acceptIDs.has(entityID);
   }
 
@@ -400,8 +386,7 @@ export class UiFieldCombo extends EventEmitter {
    * @param d        - The chip datum to remove
    */
   protected _removeMultikey(d3_event: Event, d: any): void {
-    const uifield = this._uifield;
-    const key = uifield.key;
+    const key = this.key;
 
     d3_event.preventDefault();
     d3_event.stopPropagation();
@@ -430,10 +415,9 @@ export class UiFieldCombo extends EventEmitter {
    *  renders into `$selection` directly rather than capturing `$parent` for re-render.
    * @param $selection - A d3-selection to the HTMLElement this component renders into
    */
-  public render($selection: D3Selection): void {
+  public renderContent($selection: D3Selection): void {
     const context = this.context;
     const scheduler = context.systems.scheduler;  // optional
-    const uifield = this._uifield;
 
     this.$container = $selection.selectAll('.form-field-input-wrap')
       .data([0]);
@@ -452,7 +436,7 @@ export class UiFieldCombo extends EventEmitter {
 
       // Use a separate line for each value in the Destinations and Via fields
       // to mimic highway exit signs
-      if (uifield.key === 'destination' || uifield.key === 'via') {
+      if (this.key === 'destination' || this.key === 'via') {
         listClass += ' full-line-chips';
       }
 
@@ -487,15 +471,15 @@ export class UiFieldCombo extends EventEmitter {
     this.$input = this.$input.enter()
       .append('input')
       .attr('type', 'text')
-      .attr('id', uifield.uid)
+      .attr('id', this.uid)
       .call(utilNoAuto)
       .call(this._initCombo, $selection)
       .merge(this.$input);
 
     if (this._isNetwork) {
-      const extent = uifield.entityExtent;
+      const extent = this.entityExtent;
       const countryCode = extent && iso1A2Code(extent.center());
-      this._countryCode = countryCode && countryCode.toLowerCase();
+      this._countryCode = countryCode?.toLowerCase();
     }
 
     this.$input
@@ -529,14 +513,13 @@ export class UiFieldCombo extends EventEmitter {
    * Updates the field UI to reflect the given entity tags.
    * @param tags - The entity tags to display
    */
-  public tags(tags: Tags): void {
+  public syncTags(tags: Tags): void {
     const context = this.context;
     const l10n = context.systems.l10n!;
-    const uifield = this._uifield;
 
     this._tags = tags;
-    const key = uifield.key;
-    let keys = uifield.keys;
+    const key = this.key;
+    let keys = this.keys;
 
     if (this._isMulti || this._isSemi) {
       this._multiData = [];
@@ -647,7 +630,7 @@ export class UiFieldCombo extends EventEmitter {
         .classed('raw-value', (d) => {
           let k = d.key;
           if (this._isMulti) k = k.replace(key, '');
-          const stringID = `_tagging.presets.fields.${uifield.id}.placeholders.options.${k}`;
+          const stringID = `_tagging.presets.fields.${this.id}.placeholders.options.${k}`;
           return !l10n.hasTextForStringID(stringID);
         })
         .classed('draggable', allowDragAndDrop)
@@ -666,7 +649,7 @@ export class UiFieldCombo extends EventEmitter {
         .text((d: any) => d.value);
 
       // Don't show delete '×' on the source chip for rapid features
-      if (!(uifield.key === 'source' && this._isRapidFeature())) {
+      if (!(this.key === 'source' && this._isRapidFeature())) {
         $chips.select('a')
           .attr('href', '#')
           .on('click', this._removeMultikey)
@@ -679,8 +662,8 @@ export class UiFieldCombo extends EventEmitter {
       const isMixed = Array.isArray(v);
       const mixedValues = isMixed && (v as string[]).map(val => this._displayValue(val)).filter(Boolean);
 
-      const showsValue = !isMixed && v && !(uifield.type === 'typeCombo' && v === 'yes');
-      const stringID = `_tagging.presets.fields.${uifield.id}.placeholders.options.${v}`;
+      const showsValue = !isMixed && v && !(this.type === 'typeCombo' && v === 'yes');
+      const stringID = `_tagging.presets.fields.${this.id}.placeholders.options.${v}`;
       const isRawValue = showsValue && !l10n.hasTextForStringID(stringID);
       const isKnownValue = showsValue && !isRawValue;
       const isReadOnly = !this._allowCustomValues || isKnownValue;
@@ -715,8 +698,7 @@ export class UiFieldCombo extends EventEmitter {
    * @param $selection - The chip selection to make draggable
    */
   protected _registerDragAndDrop($selection: D3Selection): void {
-    const uifield = this._uifield;
-    const key = uifield.key;
+    const key = this.key;
     const $container = this.$container;
     const multiData = this._multiData;
     const emit = this.emit.bind(this);
@@ -845,17 +827,5 @@ export class UiFieldCombo extends EventEmitter {
   /** Moves keyboard focus to the field's input. */
   public focus(): void {
     this.$input.node().focus();
-  }
-
-
-  /**
-   * Gets or sets the entity IDs this field is editing.
-   * @param val - The entity IDs to set; if omitted, acts as a getter
-   * @returns The current entity IDs (getter) or `this` (setter)
-   */
-  public entityIDs(val?: EntityID[]): any {
-    if (!arguments.length) return this._entityIDs;
-    this._entityIDs = val || [];
-    return this;
   }
 }
