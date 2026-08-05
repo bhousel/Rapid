@@ -4,6 +4,7 @@ import { AbstractUiSection } from '../AbstractUiSection.js';
 import { uiTooltip } from '../tooltip.js';
 import { utilGetSetValue, utilNoAuto } from '../../util/index.ts';
 
+import type { AbstractPixiLayer } from '../../pixi/AbstractPixiLayer.ts';
 import type { Context } from '../../Context.ts';
 import type { D3Selection } from 'd3-selection';
 
@@ -120,13 +121,13 @@ export class UiSectionPhotoOverlays extends AbstractUiSection {
 
     const allLayerIDs = photos.layerIDs;
     const LayerIDs = photos.LayerIDs;
-    const layers = allLayerIDs.map(layerID => scene.layers.get(layerID)).filter(Boolean) as any[];
+    const layers = allLayerIDs.map(layerID => scene.layers.get(layerID)).filter(Boolean) as AbstractPixiLayer[];
     const data = layers.filter(layer => layer.supported);
 
-    function layerSupported(d: any): boolean {
+    function layerSupported(d: AbstractPixiLayer): boolean {
       return d && d.supported;
     }
-    function layerEnabled(d: any): boolean {
+    function layerEnabled(d: AbstractPixiLayer): boolean {
       return layerSupported(d) && d.enabled;
     }
 
@@ -147,7 +148,7 @@ export class UiSectionPhotoOverlays extends AbstractUiSection {
 
     const $$li = $li.enter()
       .append('li')
-      .attr('class', (d: any) => {
+      .attr('class', (d: AbstractPixiLayer) => {
         let classes = `list-item-photos list-item-${d.id}`;
         if (LayerIDs.includes(d.id)) {
           classes += ' indented';
@@ -157,7 +158,7 @@ export class UiSectionPhotoOverlays extends AbstractUiSection {
 
     const $$label = $$li
       .append('label')
-      .each((d: any, i, nodes) => {
+      .each((d: AbstractPixiLayer, i, nodes) => {
         const stringID = d.id.replace(/-/g, '_') + '.tooltip';
         d3_select(nodes[i])
           .call(uiTooltip(context)
@@ -169,11 +170,11 @@ export class UiSectionPhotoOverlays extends AbstractUiSection {
     $$label
       .append('input')
       .attr('type', 'checkbox')
-      .on('change', (d3_event: Event, d: any) => this._toggleLayer(d.id));
+      .on('change', (d3_event: Event, d: AbstractPixiLayer) => this._toggleLayer(d.id));
 
     $$label
       .append('span')
-      .text((d: any) => {
+      .text((d: AbstractPixiLayer) => {
         const stringID = d.id.replace(/-/g, '_') + '.title';
         return l10n.t(stringID);
       });
@@ -198,7 +199,7 @@ export class UiSectionPhotoOverlays extends AbstractUiSection {
 
     const photoTypes = photos.photoTypes;
 
-    function typeEnabled(d: any): boolean {
+    function typeEnabled(d: PhotoType): boolean {
       return photos.showsPhotoType(d);
     }
 
@@ -222,11 +223,11 @@ export class UiSectionPhotoOverlays extends AbstractUiSection {
 
     const $$li = $li.enter()
       .append('li')
-      .attr('class', (d: any) => `list-item-photo-types list-item-${d}`);
+      .attr('class', (d: PhotoType) => `list-item-photo-types list-item-${d}`);
 
     const $$label = $$li
       .append('label')
-      .each((d: any, i, nodes) => {
+      .each((d: PhotoType, i, nodes) => {
         d3_select(nodes[i])
           .call(uiTooltip(context)
             .title(l10n.t(`photo_overlays.photo_type.${d}.tooltip`))
@@ -237,11 +238,11 @@ export class UiSectionPhotoOverlays extends AbstractUiSection {
     $$label
       .append('input')
       .attr('type', 'checkbox')
-      .on('change', (d3_event: Event, d: any) => photos.togglePhotoType(d));
+      .on('change', (d3_event: Event, d: PhotoType) => photos.togglePhotoType(d));
 
     $$label
       .append('span')
-      .text((d: any) => l10n.t(`photo_overlays.photo_type.${d}.title`));
+      .text((d: PhotoType) => l10n.t(`photo_overlays.photo_type.${d}.title`));
 
     // Update
     $li
@@ -263,7 +264,7 @@ export class UiSectionPhotoOverlays extends AbstractUiSection {
 
     const dateFilterTypes = photos.dateFilters;
 
-    function filterEnabled(d: any): boolean {
+    function filterEnabled(d: string): boolean {
       return !!photos.dateFilterValue(d);
     }
 
@@ -291,7 +292,7 @@ export class UiSectionPhotoOverlays extends AbstractUiSection {
 
     const $$label = $$li
       .append('label')
-      .each((d: any, i, nodes) => {
+      .each((d: string, i, nodes) => {
         d3_select(nodes[i])
           .call(uiTooltip(context)
             .title(l10n.t(`photo_overlays.date_filter.${d}.tooltip`))
@@ -301,7 +302,7 @@ export class UiSectionPhotoOverlays extends AbstractUiSection {
 
     $$label
       .append('span')
-      .text((d: any) => l10n.t(`photo_overlays.date_filter.${d}.title`));
+      .text((d: string) => l10n.t(`photo_overlays.date_filter.${d}.title`));
 
     $$label
       .append('input')
@@ -309,15 +310,15 @@ export class UiSectionPhotoOverlays extends AbstractUiSection {
       .attr('class', 'list-item-input')
       .attr('placeholder', l10n.t('units.year_month_day'))
       .call(utilNoAuto)
-      .each((d: any, i, nodes) => {
+      .each((d: string, i, nodes) => {
         utilGetSetValue(d3_select(nodes[i]), photos.dateFilterValue(d) || '');
       })
-      .on('change', (d3_event: Event, d: any) => {
-        const value = (utilGetSetValue(d3_select(d3_event.currentTarget as any)) as string).trim();
+      .on('change', (d3_event: Event, d: string) => {
+        const value = (utilGetSetValue(d3_select(d3_event.currentTarget as HTMLInputElement)) as string).trim();
         photos.setDateFilter(d, value);
         // reload the displayed dates
         $li.selectAll('input')
-          .each((d: any, i, nodes) => {
+          .each((d: string, i, nodes) => {
             utilGetSetValue(d3_select(nodes[i]), photos.dateFilterValue(d) || '');
           });
       });

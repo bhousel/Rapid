@@ -23,11 +23,21 @@ export {
 };
 
 
+interface ComboItem {
+  key: string;
+  value: string;
+  title?: string;
+  display?: string;
+  klass?: string;
+  isMixed?: boolean;
+}
+
+
 export class UiFieldCombo extends UiField {
   protected _isMulti: boolean;
   protected _isNetwork: boolean;
   protected _isSemi: boolean;
-  protected _optarray: any;
+  protected _optarray: string[] | undefined;
   protected _showTagInfoSuggestions: boolean;
   protected _allowCustomValues: boolean;
   protected _snake_case: boolean;
@@ -35,8 +45,8 @@ export class UiFieldCombo extends UiField {
   public $container: D3Selection;
   protected _inputWrap: D3Selection;
   public $input: D3Selection;
-  protected _comboData: any[];
-  protected _multiData: any[];
+  protected _comboData: ComboItem[];
+  protected _multiData: ComboItem[];
   protected _tags: Tags;
   protected _countryCode: string | undefined;
   protected _staticPlaceholder: string;
@@ -137,7 +147,7 @@ export class UiFieldCombo extends UiField {
    * @param a - The array to subtract from
    * @param b - The array of objects to exclude (matched by `value`)
    */
-  protected _objectDifference(a: any[], b: any[]): any[] {
+  protected _objectDifference(a: ComboItem[], b: ComboItem[]): ComboItem[] {
     return a.filter(d1 => {
       return !b.some(d2 => {
         return !d2.isMixed && d1.value === d2.value;
@@ -173,7 +183,7 @@ export class UiFieldCombo extends UiField {
    * Populates the combobox from the field's static option list.
    * @param callback - Optional callback receiving the computed combo data
    */
-  protected _setStaticValues(callback?: (data: any[]) => void): void {
+  protected _setStaticValues(callback?: (data: ComboItem[]) => void): void {
     const l10n = this.context.systems.l10n!;
 
     if (!this._optarray) return;
@@ -199,7 +209,7 @@ export class UiFieldCombo extends UiField {
    * @param q        - The query text to look up
    * @param callback - Optional callback receiving the computed combo data
    */
-  protected _setTaginfoValues(q: string, callback?: (data: any[]) => void): void {
+  protected _setTaginfoValues(q: string, callback?: (data: ComboItem[]) => void): void {
     const context = this.context;
     const editor = context.systems.editor!;
     const l10n = context.systems.l10n!;
@@ -286,7 +296,7 @@ export class UiFieldCombo extends UiField {
    * Updates the input placeholder based on the available values.
    * @param values - The combo data values used to build the placeholder
    */
-  protected _setPlaceholder(values: any[]): void {
+  protected _setPlaceholder(values: ComboItem[]): void {
     const l10n = this.context.systems.l10n!;
 
     if (this._isMulti || this._isSemi) {
@@ -385,7 +395,7 @@ export class UiFieldCombo extends UiField {
    * @param d3_event - The triggering DOM event
    * @param d        - The chip datum to remove
    */
-  protected _removeMultikey(d3_event: Event, d: any): void {
+  protected _removeMultikey(d3_event: Event, d: ComboItem): void {
     const key = this.key;
 
     d3_event.preventDefault();
@@ -608,7 +618,7 @@ export class UiFieldCombo extends UiField {
       // or if the field is already at its character limit
       const hideAdd = (!this._allowCustomValues && !available.length) || maxLength <= 0;
       this.$container.selectAll('.chiplist .input-wrap')
-        .style('display', hideAdd ? 'none' : null as any);
+        .style('display', hideAdd ? 'none' : null);
 
 
       // Render chips
@@ -646,7 +656,7 @@ export class UiFieldCombo extends UiField {
       }
 
       $chips.select('span')
-        .text((d: any) => d.value);
+        .text((d: ComboItem) => d.value);
 
       // Don't show delete '×' on the source chip for rapid features
       if (!(this.key === 'source' && this._isRapidFeature())) {
