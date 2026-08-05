@@ -9,6 +9,21 @@ import { utilCmd, utilHighlightEntities, utilIsColorValid, utilNoAuto } from '..
 
 import type { Context } from '../Context.ts';
 import type { D3Selection } from 'd3-selection';
+import type { OsmEntity } from '../data/index.ts';
+import type { Tags } from './fields/types.ts';
+
+
+/** A single result item in the feature search list */
+interface SearchResult {
+  id: EntityID | number;
+  entity?: OsmEntity;
+  geometry: string;
+  type: string;
+  name: string;
+  distance?: number;
+  location?: [number, number];
+  noteID?: string;
+}
 
 
 /**
@@ -28,7 +43,7 @@ export class UiFeatureList {
   public $search: D3Selection | null;
   public $list: D3Selection | null;
 
-  protected _geocodeResults: any;
+  protected _geocodeResults: SearchResult[] | null | undefined;
 
   /**
    * @param  context - Global shared application context
@@ -205,7 +220,7 @@ export class UiFeatureList {
       .remove();
 
     const $items = $list.selectAll('.feature-list-item')
-      .data(results, (d: any) => d.id);
+      .data(results, (d: SearchResult) => d.id);
 
     const $$items = $items.enter()
       .insert('button', '.geocode-item')
@@ -219,7 +234,7 @@ export class UiFeatureList {
       .attr('class', 'label');
 
     $$label
-      .each((d: any, i, nodes) => {
+      .each((d: SearchResult, i, nodes) => {
         select(nodes[i])
           .call(uiIcon(`#rapid-icon-${d.geometry}`, 'pre-text'));
       });
@@ -227,14 +242,14 @@ export class UiFeatureList {
     $$label
       .append('span')
       .attr('class', 'entity-type')
-      .text((d: any) => d.type);
+      .text((d: SearchResult) => d.type);
 
     $$label
       .append('span')
       .attr('class', 'entity-name')
-      .classed('has-color', (d: any) => !!this._getColor(d.entity))
-      .style('border-color', (d: any) => this._getColor(d.entity))
-      .text((d: any) => d.name);
+      .classed('has-color', (d: SearchResult) => !!this._getColor(d.entity))
+      .style('border-color', (d: SearchResult) => this._getColor(d.entity))
+      .text((d: SearchResult) => d.name);
 
     $$items
       .style('opacity', 0)
@@ -252,7 +267,7 @@ export class UiFeatureList {
    * Handler for the ⌘F shortcut to focus the search input
    * @param e? - the keypress event (if any)
    */
-  protected _focusSearch(e?: any): void {
+  protected _focusSearch(e?: KeyboardEvent): void {
     if (!this.$search) return;  // called too early?
     if (this.context.mode?.id !== 'browse') return;
 
@@ -265,7 +280,7 @@ export class UiFeatureList {
    * Handler for keydown event - unfocus the search if user presses `Escape`
    * @param e - the keydown event
    */
-  protected _keydown(e: any): void {
+  protected _keydown(e: KeyboardEvent): void {
     if (!this.$search) return;  // called too early?
 
     if (e.keyCode === 27) {  // escape
@@ -278,13 +293,13 @@ export class UiFeatureList {
    * Handler for keypress events
    * @param e - the keypress event
    */
-  protected _keypress(e: any): void {
+  protected _keypress(e: KeyboardEvent): void {
     if (!this.$search || !this.$list) return;  // called too early?
 
     const q = this.$search.property('value');
     const $items = this.$list.selectAll('.feature-list-item');
     if (e.keyCode === 13 && q.length && $items.size()) {  // ↩ Return
-      this._click(e, $items.datum());
+      this._click(e as Event, $items.datum() as SearchResult);
     }
   }
 
@@ -314,7 +329,7 @@ export class UiFeatureList {
    * @param   entity - The OSM Entity to check
    * @result  The color string, if any
    */
-  protected _getColor(entity: any): string | null {
+  protected _getColor(entity: OsmEntity | undefined): string | null {
     const val = entity?.type === 'relation' && entity?.tags.colour;
     return (val && utilIsColorValid(val)) ? val : null;
   }
@@ -325,7 +340,7 @@ export class UiFeatureList {
    * @param  e - the mouseover event
    * @param  d - data bound to the list item
    */
-  protected _mouseover(e: any, d: any): void {
+  protected _mouseover(e: Event, d: SearchResult): void {
     if (!d.id || d.id === -1) return;
     utilHighlightEntities(this.context, [d.id], true);
   }
@@ -336,7 +351,7 @@ export class UiFeatureList {
    * @param  e - the mouseout event
    * @param  d - data bound to the list item
    */
-  protected _mouseout(e: any, d: any): void {
+  protected _mouseout(e: Event, d: SearchResult): void {
     if (!d.id || d.id === -1) return;
     utilHighlightEntities(this.context, [d.id], false);
   }
@@ -348,7 +363,7 @@ export class UiFeatureList {
    * @param  e - the click or keypress event
    * @param  d - data bound to the list item
    */
-  protected _click(e: any, d: any): void {
+  protected _click(e: Event, d: SearchResult): void {
     e.preventDefault();
 
     const context = this.context;
@@ -378,7 +393,7 @@ export class UiFeatureList {
 
     const q = this.$search.property('value');
 
-    nominatim.search(q, (err: any, results: any) => {
+    nominatim.search(q, (err: unknown, results: SearchResult[]) => {
       this._geocodeResults = results || [];
       this._drawList();
     });
@@ -396,7 +411,7 @@ export class UiFeatureList {
    * This does the search
    * @return  Array of search results
    */
-  protected _getSearchResults(): any[] {
+  protected _getSearchResults(): SearchResult[] {
     if (!this.$search) return [];  // called too early?
 
     const context = this.context;
@@ -406,7 +421,7 @@ export class UiFeatureList {
 
     const centerLoc = context.viewport.centerLoc();
     const q = this.$search.property('value').toLowerCase();
-    let results: any[] = [];
+    let results: SearchResult[] = [];
 
     if (!q) return results;
 
@@ -454,10 +469,10 @@ export class UiFeatureList {
     const local = graph.local.entities;
     const ids = new Set([...base.keys(), ...local.keys()]);
 
-    let localResults: any[] = [];
+    let localResults: SearchResult[] = [];
     for (const id of ids) {
       if (local.has(id) && local.get(id) === undefined) continue;  // deleted locally
-      const entity: any = graph.hasEntity(id);
+      const entity = graph.hasEntity(id);
       if (!entity) continue;
 
       const name = l10n.displayName(entity.tags) || '';
@@ -490,10 +505,10 @@ export class UiFeatureList {
 
       // Make a temporary OSM Feature so we can preset match and better localize the search result - iD#4725
       const id = `${d.osm_type[0]}${d.osm_id}`;  // e.g. w123
-      const tags: any = {};
+      const tags: Tags = {};
       tags[d.class] = d.type;   // e.g. boundary=administrative
 
-      const attrs: any = { id: id, type: d.osm_type, tags: tags };
+      const attrs: { id: EntityID; type: string; tags: Tags; nodes?: string[] } = { id: id as EntityID, type: d.osm_type, tags: tags };
       if (d.osm_type === 'way') {   // for ways, add some fake closed nodes
         attrs.nodes = ['a','a'];    // so that geometry area is possible
       }

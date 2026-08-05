@@ -14,6 +14,8 @@ import { utilDetect } from '../util/index.ts';
 
 import type { Context } from '../Context.ts';
 import type { D3Selection } from 'd3-selection';
+import type { Tags } from './fields/types.ts';
+import type { ValidationIssue } from '../lib/ValidationIssue.ts';
 
 
 const readOnlyTags = [
@@ -44,7 +46,7 @@ export class UiCommit extends EventEmitter {
   public context: Context;
 
   protected _userDetails: any;
-  protected _selection: any;
+  protected _selection: D3Selection | null;
 
   protected _changesetEditor: UiChangesetEditor;
   protected _rawTagEditor: UiSectionRawTagEditor;
@@ -104,7 +106,7 @@ export class UiCommit extends EventEmitter {
     // The draft comment/source/hashtags are session state owned by UploaderSystem.
     // They are seeded from the urlhash at init time (see UploaderSystem.initAsync).
     const detected = utilDetect();
-    const tags: any = {
+    const tags: Tags = {
       comment:     uploader.comment || '',
       created_by:  context.cleanTagValue('Rapid ' + context.version),
       host:        context.cleanTagValue(detected.host),
@@ -135,7 +137,7 @@ export class UiCommit extends EventEmitter {
     const uploader = context.systems.uploader!;
     const validator = context.systems.validator!;
 
-    const tags: any = { ...uploader.changeset!.tags };   // shallow copy
+    const tags: Tags = { ...uploader.changeset!.tags };   // shallow copy
 
     // Sync up the `rapid:poweruser` tag
     // Set to true if the user had poweruser on at any point during their editing
@@ -150,7 +152,7 @@ export class UiCommit extends EventEmitter {
     const mrComments = new Set();
     const mrSources = new Set();
     let usedMapRoulette = false;
-    const maproulette = context.services.maproulette as any;
+    const maproulette = context.services.maproulette;
     if (maproulette) {
       const mapRouletteClosed = maproulette.getClosed();
       const seen = new Set();
@@ -272,21 +274,21 @@ export class UiCommit extends EventEmitter {
     }
 
     // Update tags for closed issues and notes
-    const osm = context.services.osm as any;
+    const osm = context.services.osm;
     if (osm) {
       const osmClosed = osm.getClosedIDs();
       if (osmClosed.length) {
         tags['closed:note'] = context.cleanTagValue(osmClosed.join(';'));
       }
     }
-    const keepright = context.services.keepright as any;
+    const keepright = context.services.keepright;
     if (keepright) {
       const krClosed = keepright.getClosedIDs();
       if (krClosed.length) {
         tags['closed:keepright'] = context.cleanTagValue(krClosed.join(';'));
       }
     }
-    const osmose = context.services.osmose as any;
+    const osmose = context.services.osmose;
     if (osmose) {
       const osmoseClosed = osmose.getClosedCounts();
       for (const itemType in osmoseClosed) {
@@ -309,12 +311,12 @@ export class UiCommit extends EventEmitter {
     uploader.changeset = uploader.changeset!.update({ tags: tags });
 
 
-    function _addIssueCounts(issues: any, prefix: string): void {
-      const issuesByType: any = utilArrayGroupBy(issues, 'type');
+    function _addIssueCounts(issues: ValidationIssue[], prefix: string): void {
+      const issuesByType: Record<string, ValidationIssue[]> = utilArrayGroupBy(issues, 'type');
       for (const issueType in issuesByType) {
         const issuesOfType = issuesByType[issueType];
         if (issuesOfType[0].subtype) {
-          const issuesBySubtype: any = utilArrayGroupBy(issuesOfType, 'subtype');
+          const issuesBySubtype: Record<string, ValidationIssue[]> = utilArrayGroupBy(issuesOfType, 'subtype');
           for (const issueSubtype in issuesBySubtype) {
             const issuesOfSubtype = issuesBySubtype[issueSubtype];
             tags[prefix + ':' + issueType + ':' + issueSubtype] = context.cleanTagValue(issuesOfSubtype.length.toString());
@@ -336,8 +338,8 @@ export class UiCommit extends EventEmitter {
     const l10n = context.systems.l10n!;
     const uploader = context.systems.uploader!;
 
-    const osm = context.services.osm as any;
-    if (!osm) return;
+    const osm2 = context.services.osm;
+    if (!osm2) return;
 
     let header: D3Selection = $selection.selectAll('.header')
       .data([0]);
@@ -621,7 +623,7 @@ export class UiCommit extends EventEmitter {
    * @param changed - the changed tags
    * @param onInput - `true` if this is an in-progress input event
    */
-  protected _changeTags(_: any, changed: any, onInput: any): void {
+  protected _changeTags(_: unknown, changed: Record<string, string | undefined>, onInput: boolean | undefined): void {
     const context = this.context;
     const uploader = context.systems.uploader!;
 
@@ -656,7 +658,7 @@ export class UiCommit extends EventEmitter {
    * @param commentOnly - if `true`, only extract hashtags found in the comment
    * @return The list of unique hashtags
    */
-  protected _findHashtags(tags: any, commentOnly: boolean): string[] {
+  protected _findHashtags(tags: Tags, commentOnly: boolean): string[] {
     const context = this.context;
     const uploader = context.systems.uploader!;
 
@@ -710,7 +712,7 @@ export class UiCommit extends EventEmitter {
    * @param tags - the changeset tags to inspect
    * @return `true` if a review is requested
    */
-  protected _isReviewRequested(tags: any): boolean {
+  protected _isReviewRequested(tags: Tags): boolean {
     let rr = tags.review_requested;
     if (rr === undefined) return false;
     rr = rr.trim().toLowerCase();
@@ -723,12 +725,12 @@ export class UiCommit extends EventEmitter {
    * @param changed - the changed tags to apply
    * @param onInput - `true` if this is an in-progress input event
    */
-  protected _updateChangeset(changed: any, onInput?: any): void {
+  protected _updateChangeset(changed: Record<string, string | undefined>, onInput?: boolean): void {
     const context = this.context;
     const settings = context.systems.settings;
     const uploader = context.systems.uploader!;
 
-    const tags: any = { ...uploader.changeset!.tags };   // shallow copy
+    const tags: Tags = { ...uploader.changeset!.tags };   // shallow copy
 
     Object.keys(changed).forEach(function(k) {
       const v = changed[k];

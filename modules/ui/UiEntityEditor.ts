@@ -14,8 +14,14 @@ import { UiSectionRawMembershipEditor } from './sections/UiSectionRawMembershipE
 import { UiSectionRawTagEditor } from './sections/UiSectionRawTagEditor.js';
 import { UiSectionSelectionList } from './sections/UiSectionSelectionList.js';
 
+import type { AbstractUiSection } from './AbstractUiSection.ts';
+import type { Category } from '../lib/Category.ts';
 import type { Context } from '../Context.ts';
 import type { D3Selection } from 'd3-selection';
+import type { Difference } from '../lib/Difference.ts';
+import type { Graph } from '../lib/Graph.ts';
+import type { Preset } from '../lib/Preset.ts';
+import type { Tags } from './fields/types.ts';
 
 
 let _wasSelectedIDs: EntityID[] = [];
@@ -31,14 +37,14 @@ export class UiEntityEditor extends EventEmitter {
 
   public $parent: D3Selection | null;
 
-  protected _crossingKeys: Set<any>;
-  protected _sections: any[];
+  protected _crossingKeys: Set<string>;
+  protected _sections: AbstractUiSection[];
   protected _state: string;          // can be 'hide', 'hover', or 'select'
   protected _modified: boolean;
-  protected _startGraph: any;
+  protected _startGraph: Graph | undefined;
   protected _entityIDs: EntityID[];
-  protected _selectedPresets: any[];
-  protected _newFeature: any;
+  protected _selectedPresets: (Preset | undefined)[];
+  protected _newFeature: boolean | undefined;
 
   /**
    * @param  context - Global shared application context
@@ -70,7 +76,7 @@ export class UiEntityEditor extends EventEmitter {
 
     this._sections = [
       new UiSectionSelectionList(context),
-      new UiSectionFeatureType(context).on('choose', (selected: any) => { this.emit('choose', selected); }),
+      new UiSectionFeatureType(context).on('choose', (selected: Preset | Category) => { this.emit('choose', selected); }),
       new UiSectionEntityIssues(context),
       new UiSectionPresetFields(context).on('change', this._changeTags).on('revert', this._revertTags),
       new UiSectionRawTagEditor(context, 'raw-tag-editor').on('change', this._changeRawTags),
@@ -216,7 +222,7 @@ export class UiEntityEditor extends EventEmitter {
    * Get or set whether the edited entity is a newly created feature.
    * @param  val? - the value to set; if omitted, returns the current value
    */
-  public newFeature(val?: any): any {
+  public newFeature(val?: boolean): any {
     if (!arguments.length) return this._newFeature;
     this._newFeature = val;
     return this;
@@ -227,7 +233,7 @@ export class UiEntityEditor extends EventEmitter {
    * Get or set the presets currently selected for the edited entities.
    * @param  val? - array of presets to set; if omitted, returns the current presets
    */
-  public presets(val?: any[]): any {
+  public presets(val?: (Preset | undefined)[]): any {
     if (!arguments.length) return this._selectedPresets;
 
     // don't reload the same preset
@@ -242,7 +248,7 @@ export class UiEntityEditor extends EventEmitter {
    * Responds to a staging change, re-rendering if the change affects the edited entities.
    * @param  difference - the Difference describing what changed
    */
-  protected _onStagingChange(difference: any): void {
+  protected _onStagingChange(difference: Difference | null): void {
     const context = this.context;
     const editor = context.systems.editor!;
 
@@ -284,7 +290,7 @@ export class UiEntityEditor extends EventEmitter {
    * @param  changed - object of the changed key/value pairs
    * @param  onInput? - true if the change fired on input (before blur)
    */
-  protected _changeRawTags(entityIDs: EntityID[], changed: any, onInput?: boolean): void {
+  protected _changeRawTags(entityIDs: EntityID[], changed: Record<string, string | undefined>, onInput?: boolean): void {
     this._changeTags(entityIDs, changed, onInput, true);
   }
 
@@ -299,7 +305,7 @@ export class UiEntityEditor extends EventEmitter {
    * @param  onInput? - true if the change fired on input (before blur)
    * @param  wasRawTagEditor - true if the change came from the raw tag editor
    */
-  protected _changeTags(entityIDs: EntityID[], changed: any, onInput?: boolean, wasRawTagEditor = false): void {
+  protected _changeTags(entityIDs: EntityID[], changed: Record<string, string | undefined>, onInput?: boolean, wasRawTagEditor = false): void {
     const context = this.context;
     const editor = context.systems.editor!;
     const l10n = context.systems.l10n!;
@@ -316,10 +322,10 @@ export class UiEntityEditor extends EventEmitter {
       const entity = graph.hasEntity(entityID);
       if (!entity) continue;
 
-      let tags: any = { ...entity.tags };   // shallow copy
+      let tags: Tags = { ...entity.tags };   // shallow copy
       let involvesCrossing = false;
 
-      for (const [k, v] of Object.entries(changed) as [string, any][]) {
+      for (const [k, v] of Object.entries(changed) as [string, string | undefined][]) {
         if (!k) continue;
         if (crossingKeys.has(k)) {
           involvesCrossing = true;
@@ -384,15 +390,15 @@ export class UiEntityEditor extends EventEmitter {
       const currGraph = editor.staging.graph;
       const original = baseGraph.hasEntity(entityID);
       const current = currGraph.entity(entityID);
-      let tags: any = { ...current.tags };   // shallow copy
+      let tags: Tags = { ...current.tags };   // shallow copy
 
-      const changed: Record<string, any> = {};
+      const changed: Record<string, string | undefined> = {};
       for (const key of keys) {
         changed[key] = original?.tags[key] ?? undefined;
       }
 
       let involvesCrossing = false;
-      for (const [k, v] of Object.entries(changed) as [string, any][]) {
+      for (const [k, v] of Object.entries(changed) as [string, string | undefined][]) {
         if (!k) continue;
 
         if (crossingKeys.has(k)) {
@@ -490,8 +496,8 @@ export class UiEntityEditor extends EventEmitter {
    * @param  entityIDs - the entities to combine tags from
    * @param  graph - the Graph to look up entities in
    */
-  protected _getCombinedTags(entityIDs: EntityID[], graph: any): any {
-    const combined = new Map<string, Set<any>>();    // Map<key, Set<value>
+  protected _getCombinedTags(entityIDs: EntityID[], graph: Graph): Tags {
+    const combined = new Map<string, Set<string | undefined>>();    // Map<key, Set<value>
     const counts = new Map<string, number>();      // Map<kv, number>
 
     const entities = entityIDs.map(entityID => graph.hasEntity(entityID)).filter(Boolean);
@@ -518,7 +524,7 @@ export class UiEntityEditor extends EventEmitter {
     }
 
     // Return results as an Object, where the values are either single values or Arrays
-    const results: any = {};
+    const results: Tags = {};
     for (const [k, vals] of combined) {
       const arr = [...vals];
 
