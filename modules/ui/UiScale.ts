@@ -23,6 +23,7 @@ export class UiScale {
   public rerender: () => void;
   protected _deferredUpdateScale: () => void;
 
+
   /**
    * @param  context - Global shared application context
    */

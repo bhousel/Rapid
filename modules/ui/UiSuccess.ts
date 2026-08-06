@@ -9,9 +9,42 @@ import { utilSafeURL } from '../util/url.ts';
 
 import type { Context } from '../Context.ts';
 import type { D3Selection } from 'd3-selection';
+import type { OsmChangeset } from '../data/OsmChangeset.ts';
 
 
-let _oci: any = null;
+let _oci: Oci | null = null;
+
+
+interface OciEvent {
+  when?: string;
+  name?: string;
+  where?: string;
+  description?: string;
+  url?: string;
+  i18n?: boolean;
+  id?: string;
+  date?: Date;
+}
+
+interface OciResource {
+  id?: string;
+  type?: string;
+  locationSetID?: string;
+  order?: number;
+  events?: OciEvent[];
+  languageCodes?: string[];
+  resolved?: {
+    url?: string;
+    nameHTML?: string;
+    descriptionHTML?: string;
+    extendedDescriptionHTML?: string;
+  };
+}
+
+interface Oci {
+  resources: OciResource[];
+  defaults: Record<string, unknown>;
+}
 
 const MAXEVENTS = 2;
 
@@ -25,8 +58,8 @@ const MAXEVENTS = 2;
 export class UiSuccess extends EventEmitter {
   public context: Context;
 
-  protected _changeset: any;
-  protected _location: any;
+  protected _changeset: OsmChangeset | null;
+  protected _location: string | null;
 
   public constructor(context: Context) {
     super();
@@ -46,7 +79,7 @@ export class UiSuccess extends EventEmitter {
    * Loads and caches the OSM community index data (features, resources, defaults).
    * @return A promise that resolves to the cached community index object
    */
-  protected _getCommunityIndexAsync(): Promise<any> {
+  protected _getCommunityIndexAsync(): Promise<Oci> {
     const context = this.context;
     const assets = context.systems.assets!;
     const locations = context.systems.locations;  // optional
@@ -56,7 +89,7 @@ export class UiSuccess extends EventEmitter {
         assets.loadAssetAsync('oci_resources'),
         assets.loadAssetAsync('oci_defaults')
       ])
-      .then((vals: any) => {
+      .then((vals: [{ features: unknown[] }, { resources: Record<string, OciResource> }, { defaults: Record<string, unknown> }]) => {
         if (_oci) return _oci;
 
         // Merge Custom Features
@@ -64,7 +97,7 @@ export class UiSuccess extends EventEmitter {
           locations.mergeCustomGeoJSON(vals[0]);
         }
 
-        const ociResources: any[] = Object.values(vals[1].resources);
+        const ociResources: OciResource[] = Object.values(vals[1].resources);
         if (locations && ociResources.length) {
           // Resolve all locationSet features.
           return locations.mergeLocationSets(ociResources)
@@ -92,7 +125,7 @@ export class UiSuccess extends EventEmitter {
    * @param when - the raw date string to parse
    * @return The parsed `Date`, or `undefined` if the input was empty
    */
-  protected _parseEventDate(when: any): Date | undefined {
+  protected _parseEventDate(when: string | undefined): Date | undefined {
     if (!when) return;
 
     let raw = when.trim();
@@ -157,7 +190,7 @@ export class UiSuccess extends EventEmitter {
       .append('span')
       .text(l10n.t('success.help_link_text'));
 
-    const osm = context.services.osm as any;
+    const osm = context.services.osm;
     if (!osm) return;
 
     const changesetURL = osm.changesetURL(this._changeset.id);
@@ -205,12 +238,13 @@ export class UiSuccess extends EventEmitter {
       .then(oci => {
         if (!locations) return;   // community links need the `locations` system
 
-        const loc = map.center() as any;
+        const loc = map.center();
+        if (!loc) return;
         const validHere = locations.locationSetsAt(loc);
 
         // Gather the communities
-        const communities: any[] = [];
-        oci.resources.forEach((resource: any) => {
+        const communities: { area: number; order: number; resource: OciResource }[] = [];
+        oci.resources.forEach((resource: OciResource) => {
           const area = validHere.get(resource.locationSetID);
           if (!area) return;
 
@@ -239,7 +273,7 @@ export class UiSuccess extends EventEmitter {
    * @param $selection - A d3-selection to the HTMLElement this section renders into
    * @param resources - the community resources to list
    */
-  protected _showCommunityLinks($selection: D3Selection, resources: any[]): void {
+  protected _showCommunityLinks($selection: D3Selection, resources: OciResource[]): void {
     const context = this.context;
     const l10n = context.systems.l10n!;
 
@@ -267,11 +301,11 @@ export class UiSuccess extends EventEmitter {
       .attr('class', 'cell-icon community-icon')
       .append('a')
       .attr('target', '_blank')
-      .attr('href', (d: any) => utilSafeURL(d.resolved.url))
+      .attr('href', (d: OciResource) => utilSafeURL(d.resolved?.url))
       .append('svg')
       .attr('class', 'logo-small')
       .append('use')
-      .attr('xlink:href', (d: any) => `#community-${d.type}`);
+      .attr('xlink:href', (d: OciResource) => `#community-${d.type}`);
 
     const $communityDetail = $$row
       .append('td')
@@ -300,7 +334,7 @@ export class UiSuccess extends EventEmitter {
    * @param i - the index within the selection
    * @param nodes - the nodes in the selection
    */
-  protected _showCommunityDetails(d: any, i: number, nodes: any): void {
+  protected _showCommunityDetails(d: OciResource, i: number, nodes: ArrayLike<HTMLElement>): void {
     const context = this.context;
     const l10n = context.systems.l10n!;
 
@@ -330,17 +364,17 @@ export class UiSuccess extends EventEmitter {
     }
 
     const nextEvents = (d.events || [])
-      .map((event: any) => {
+      .map((event: OciEvent) => {
         event.date = this._parseEventDate(event.when);
         return event;
       })
-      .filter((event: any) => {      // date is valid and future (or today)
-        const t = event.date.getTime();
+      .filter((event: OciEvent) => {      // date is valid and future (or today)
+        const t = event.date?.getTime();
         const now = (new Date()).setHours(0,0,0,0);
-        return !isNaN(t) && t >= now;
+        return t !== undefined && !isNaN(t) && t >= now;
       })
-      .sort((a: any, b: any) => {       // sort by date ascending
-        return a.date < b.date ? -1 : a.date > b.date ? 1 : 0;
+      .sort((a: OciEvent, b: OciEvent) => {       // sort by date ascending
+        return a.date! < b.date! ? -1 : a.date! > b.date! ? 1 : 0;
       })
       .slice(0, MAXEVENTS);   // limit number of events shown
 
@@ -405,8 +439,8 @@ export class UiSuccess extends EventEmitter {
         .attr('class', 'community-event-name')
         .append('a')
         .attr('target', '_blank')
-        .attr('href', (d: any) => utilSafeURL(d.url))
-        .text((d: any) => {
+        .attr('href', (d: OciEvent) => utilSafeURL(d.url))
+        .text((d: OciEvent) => {
           let name = d.name;
           if (d.i18n && d.id) {
             name = l10n.t(`_community.${communityID}.events.${d.id}.name`, { default: name });
@@ -417,43 +451,43 @@ export class UiSuccess extends EventEmitter {
       $$item
         .append('div')
         .attr('class', 'community-event-when')
-        .text((d: any) => {
-          const options: any = { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' };
-          if (d.date.getHours() || d.date.getMinutes()) {   // include time if it has one
+        .text((d: OciEvent) => {
+          const options: Intl.DateTimeFormatOptions = { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' };
+          if (d.date!.getHours() || d.date!.getMinutes()) {   // include time if it has one
             options.hour = 'numeric';
             options.minute = 'numeric';
           }
           const localeCode = l10n.localeCode;
-          return d.date.toLocaleString(localeCode, options);
+          return d.date!.toLocaleString(localeCode, options);
         });
 
       $$item
         .append('div')
         .attr('class', 'community-event-where')
-        .text((d: any) => {
+        .text((d: OciEvent) => {
           let where = d.where;
           if (d.i18n && d.id) {
             where = l10n.t(`_community.${communityID}.events.${d.id}.where`, { default: where });
           }
-          return where;
+          return where ?? '';
         });
 
       $$item
         .append('div')
         .attr('class', 'community-event-description')
-        .text((d: any) => {
+        .text((d: OciEvent) => {
           let description = d.description;
           if (d.i18n && d.id) {
             description = l10n.t(`_community.${communityID}.events.${d.id}.description`, { default: description });
           }
-          return description;
+          return description ?? '';
         });
     }
   }
 
 
   /** Gets or sets the changeset to summarize. */
-  public changeset(val?: any): any {
+  public changeset(val?: OsmChangeset): any {
     if (val === undefined) return this._changeset;
     this._changeset = val;
     return this;
@@ -461,7 +495,7 @@ export class UiSuccess extends EventEmitter {
 
 
   /** Gets or sets the edit location. */
-  public location(val?: any): any {
+  public location(val?: string): any {
     if (val === undefined) return this._location;
     this._location = val;
     return this;

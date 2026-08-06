@@ -62,7 +62,7 @@ export class UiField extends EventEmitter {
   protected _state: string;
   protected _tags: Tags;
   protected _locked: boolean;
-  protected _lockedTip: any;
+  protected _lockedTip: ReturnType<typeof uiTooltip>;
 
 
   /**
@@ -152,8 +152,8 @@ export class UiField extends EventEmitter {
     const currGraph = editor.staging.graph;
 
     return this.entityIDs.some(entityID => {
-      const original: any = baseGraph.hasEntity(entityID);
-      const current: any = currGraph.hasEntity(entityID);
+      const original = baseGraph.hasEntity(entityID);
+      const current = currGraph.hasEntity(entityID);
       return this.keys.some(key => {
         return original ? current.tags[key] !== original.tags[key] : current.tags[key];
       });
@@ -319,7 +319,7 @@ export class UiField extends EventEmitter {
 //        }
 
         // instantiate tag reference
-        let reference: any;
+        let reference: UiTagReference | undefined;
         if (this.options.wrap && this.options.info) {
           let referenceKey = this.key || '';
           if (this.type === 'multiCombo') {   // lookup key without the trailing ':'

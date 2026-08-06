@@ -6,6 +6,7 @@ import { uiIcon } from './icon.js';
 
 import type { Context } from '../Context.ts';
 import type { D3Selection } from 'd3-selection';
+import type { MapRouletteTask } from '../services/MapRouletteService.ts';
 import type { Vec2 } from '@rapid-sdk/math';
 
 
@@ -25,7 +26,7 @@ const VERTICAL_PADDING = 4;
 export class UiMapRouletteMenu extends EventEmitter {
   public context: Context;
 
-  public datum: any;
+  public datum: MapRouletteTask | null;
   public anchorLoc: Vec2;
   public triggerType: string;
 
@@ -105,7 +106,7 @@ export class UiMapRouletteMenu extends EventEmitter {
 
     const $$buttons = $buttons.enter()
       .append('button')
-      .attr('class', (d: any) => `maproulette-menu-item maproulette-menu-item-${d}`)
+      .attr('class', (d: string) => `maproulette-menu-item maproulette-menu-item-${d}`)
       .style('height', `${buttonHeight}px`)
       .on('click', (d3_event: Event, actionId: string) => {
         if (!this._mapRouletteApiKey) {
@@ -225,32 +226,32 @@ export class UiMapRouletteMenu extends EventEmitter {
   }
 
 
-  protected _fixedIt(d3_event: Event, d: any): void {
+  protected _fixedIt(d3_event: Event, d: MapRouletteTask): void {
     d.props._status = 1;
     this._submitTask(d3_event, d);
   }
 
-  protected _cantComplete(d3_event: Event, d: any): void {
+  protected _cantComplete(d3_event: Event, d: MapRouletteTask): void {
     d.props._status = 6;
     this._submitTask(d3_event, d);
   }
 
-  protected _alreadyFixed(d3_event: Event, d: any): void {
+  protected _alreadyFixed(d3_event: Event, d: MapRouletteTask): void {
     d.props._status = 5;
     this._submitTask(d3_event, d);
   }
 
-  protected _notAnIssue(d3_event: Event, d: any): void {
+  protected _notAnIssue(d3_event: Event, d: MapRouletteTask): void {
     d.props._status = 2;
     this._submitTask(d3_event, d);
   }
 
 
   /** Submits the task to MapRoulette with the updated status. */
-  protected _submitTask(d3_event: Event, d: any): void {
+  protected _submitTask(d3_event: Event, d: MapRouletteTask): void {
     const context = this.context;
-    const maproulette = context.services.maproulette as any;
-    const osm = context.services.osm as any;
+    const maproulette = context.services.maproulette!;
+    const osm = context.services.osm!;
 
     if (!d) {
       console.error('No task to submit'); // eslint-disable-line no-console
@@ -287,9 +288,9 @@ export class UiMapRouletteMenu extends EventEmitter {
 
 
   /** Retrieves the MapRoulette API key from the user's preferences. */
-  protected _getApiKey(callback: (err: any, apiKey?: string) => void): void {
-    const osm = this.context.services.osm as any;
-    osm.loadMapRouletteKey((err: any, preferences: any) => {
+  protected _getApiKey(callback: (err: unknown, apiKey?: string) => void): void {
+    const osm = this.context.services.osm!;
+    (osm as any).loadMapRouletteKey((err: any, preferences: any) => {
       if (typeof callback === 'function') {
         if (err) {
           callback(err);

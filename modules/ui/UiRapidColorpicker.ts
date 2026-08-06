@@ -6,6 +6,12 @@ import { utilKeybinding } from '../util/index.ts';
 
 import type { Context } from '../Context.ts';
 import type { D3Selection } from 'd3-selection';
+import type { RapidDataset } from '../lib/RapidDataset.ts';
+
+/** Minimal interface for the parent modal, which exposes a closeable `close` method */
+interface ModalLike {
+  close: () => void;
+}
 
 
 /**
@@ -16,7 +22,7 @@ import type { D3Selection } from 'd3-selection';
 export class UiRapidColorpicker extends EventEmitter {
   public context: Context;
 
-  protected _parentModal: any;
+  protected _parentModal: ModalLike | undefined;
   protected _close: () => void;
 
   /**
@@ -24,7 +30,7 @@ export class UiRapidColorpicker extends EventEmitter {
    * @param context - Global shared application context
    * @param parentModal - the parent modal that the colorpicker popup is shown on top of
    */
-  public constructor(context: Context, parentModal?: any) {
+  public constructor(context: Context, parentModal?: ModalLike) {
     super();
     this.context = context;
     this._parentModal = parentModal;
@@ -41,7 +47,7 @@ export class UiRapidColorpicker extends EventEmitter {
    * Opens the color popup, or closes it if already open.
    * @param event - the triggering click event
    */
-  protected _togglePopup(event: any): void {
+  protected _togglePopup(event: Event): void {
     const context = this.context;
     const $shaded = context.container().selectAll('.shaded');  // container for the existing modal
     if ($shaded.empty()) return;
@@ -49,7 +55,7 @@ export class UiRapidColorpicker extends EventEmitter {
     if ($shaded.selectAll('.colorpicker-popup').size()) {
       this._close();
     } else {
-      this._renderPopup($shaded, event.currentTarget);
+      this._renderPopup($shaded, event.currentTarget as HTMLElement);
     }
   }
 
@@ -58,7 +64,7 @@ export class UiRapidColorpicker extends EventEmitter {
    * Dismisses the popup if the user clicks outside the colorpicker.
    * @param d3_event - the document click event
    */
-  protected _handleClick(d3_event: any): void {
+  protected _handleClick(d3_event: Event): void {
     const target = d3_event.target;
     const className = (target && target.className) || '';
     if (!/colorpicker/i.test(className)) {
@@ -93,7 +99,7 @@ export class UiRapidColorpicker extends EventEmitter {
    */
   public render($selection: D3Selection): void {
     const $colorpicker: D3Selection = $selection.selectAll('.rapid-colorpicker')
-      .data((d: any) => [d], (d: any) => d.id);   // retain data from parent
+      .data((d: RapidDataset) => [d], (d: RapidDataset) => d.id);   // retain data from parent
 
     // enter
     const $$colorpicker = $colorpicker.enter()
@@ -110,9 +116,9 @@ export class UiRapidColorpicker extends EventEmitter {
     $colorpicker
       .merge($$colorpicker)
       .selectAll('.rapid-colorpicker-fill')
-      .style('background', (d: any) => d.color)
+      .style('background', (d: RapidDataset) => d.color)
       .select('.icon')  // propagate bound data
-      .style('color', (d: any) => this._getBrightness(d.color) > 140.5 ? '#333' : '#fff');
+      .style('color', (d: RapidDataset) => this._getBrightness(d.color) > 140.5 ? '#333' : '#fff');
   }
 
 
@@ -121,7 +127,7 @@ export class UiRapidColorpicker extends EventEmitter {
    * @param $selection - A d3-selection to the container the popup renders into
    * @param forNode - the swatch node the popup is anchored to (carries the dataset datum)
    */
-  protected _renderPopup($selection: D3Selection, forNode: any): void {
+  protected _renderPopup($selection: D3Selection, forNode: HTMLElement): void {
     const context = this.context;
     const l10n = context.systems.l10n!;
     const rapid = context.systems.rapid!;
@@ -193,10 +199,10 @@ export class UiRapidColorpicker extends EventEmitter {
     const $$colorItems = $colorItems.enter()
       .append('div')
       .attr('class', 'colorpicker-option')
-      .style('color', (d: any) => d)
-      .on('click', (_: any, selectedColor: any) => {
+      .style('color', (d: string) => d)
+      .on('click', (_: Event, selectedColor: string) => {
         this.emit('change', dataset.id, selectedColor);
-        $colorItems.classed('selected', (d: any) => d === selectedColor);
+        $colorItems.classed('selected', (d: string) => d === selectedColor);
       });
 
     $$colorItems
@@ -208,7 +214,7 @@ export class UiRapidColorpicker extends EventEmitter {
       .merge($$colorItems);
 
     $colorItems
-      .classed('selected', (d: any) => d === dataset.color);
+      .classed('selected', (d: string) => d === dataset.color);
 
     $popup
       .transition()

@@ -1,6 +1,5 @@
-import { select as d3_select } from 'd3-selection';
+import { selection } from 'd3-selection';
 import { iso1A2Code } from '@rapideditor/country-coder';
-
 import { UiField } from '../UiField.js';
 import { utilGetSetValue, utilNoAuto } from '../../util/index.ts';
 import { uiIcon } from '../icon.js';
@@ -20,13 +19,28 @@ export {
 };
 
 
+/**
+ * This UI component displays an input text field.
+ * There are several variants:
+ * - 'text':
+ * - 'url':
+ * - 'email':
+ * - 'tel':
+ * - 'identifier':
+ * - 'number':
+ */
 export class UiFieldText extends UiField {
-  public $input: D3Selection;
-  public $outlinkButton: D3Selection;
+  // D3 selections
+  public $parent: D3Selection | null;
+  public $input: D3Selection | null;
+  public $outlinkButton: D3Selection | null;
+
   protected _tags: Tags;
   protected _phoneFormats: Record<string, string>;
 
+
   /**
+   * @constructor
    * @param context - Global shared application context
    * @param presetField - the original Field tracked by the SchemaSystem
    * @param entityIDs - the entities this field applies to
@@ -35,8 +49,11 @@ export class UiFieldText extends UiField {
   public constructor(context: Context, presetField: Field, entityIDs: EntityID[] = [], options: Partial<UiFieldOptions> = {}) {
     super(context, presetField, entityIDs, options);
 
-    this.$input = d3_select(null);
-    this.$outlinkButton = d3_select(null);
+    // D3 selections
+    this.$parent = null;
+    this.$input = null;
+    this.$outlinkButton = null;
+
     this._tags = {};
     this._phoneFormats = {};
 
@@ -49,45 +66,23 @@ export class UiFieldText extends UiField {
           this._phoneFormats = d.phoneFormats;
           this._updatePhonePlaceholder();
         })
-        .catch((e: any) => console.error(e));  // eslint-disable-line
+        .catch((e: unknown) => console.error(e));  // eslint-disable-line
     }
   }
 
 
-  /** Determines whether the field should be locked (protected `*:wikidata` companion values). */
-  protected _calcLocked(): void {
-    const editor = this.context.systems.editor!;
-    const schema = this.context.systems.schema!;
-
-    const graph = editor.staging.graph;
-    // Protect certain fields that have a companion `*:wikidata` value
-    const lockable = ['brand', 'network', 'operator', 'flag'];
-    const isLocked = lockable.includes(this.id) && this.entityIDs.length && this.entityIDs.some(entityID => {
-      const entity = graph.hasEntity(entityID);
-      if (!entity) return false;
-
-      // Features linked to Wikidata are likely important and should be protected
-      if (entity.tags.wikidata) return true;
-
-      const preset = schema.match(entity, graph);
-      const isSuggestion = preset?.suggestion;
-
-      // Lock the field if there is a value and a companion `*:wikidata` value
-      const which = this.id;   // 'brand', 'network', 'operator', 'flag'
-      return isSuggestion && !!entity.tags[which] && !!entity.tags[which + ':wikidata'];
-    });
-
-    this.locked(!!isLocked);
-  }
-
-
   /**
-   * Renders the content into the given selection.
-   * This component is handed its target selection by its parent on each render, so it
-   *  renders into `$selection` directly rather than capturing `$parent` for re-render.
-   * @param $selection - A d3-selection to the HTMLElement this component renders into
+   * Accepts a parent selection, and renders the content under it.
+   * (The parent selection is required the first time, but can be inferred on subsequent renders)
+   * @param $parent - A d3-selection to a HTMLElement that this component should render itself into
    */
-  public renderContent($selection: D3Selection): void {
+  public renderContent($parent = this.$parent): void {
+    if ($parent instanceof selection) {
+      this.$parent = $parent;
+    } else {
+      return;   // no parent - called too early?
+    }
+
     const context = this.context;
     const l10n = context.systems.l10n!;
     const presetField = this.presetField;
@@ -95,7 +90,7 @@ export class UiFieldText extends UiField {
     this._calcLocked();
     const isLocked = this.locked();
 
-    let $wrap: D3Selection = $selection.selectAll('.form-field-input-wrap')
+    let $wrap: D3Selection = $parent.selectAll('.form-field-input-wrap')
       .data([0]);
 
     $wrap = $wrap.enter()
@@ -134,20 +129,20 @@ export class UiFieldText extends UiField {
 
       $buttons.enter()
         .append('button')
-        .attr('class', function(d) {
+        .attr('class', function (d) {
           const which = (d > 0) ? 'increment' : 'decrement';
           return `form-field-button ${which}`;
         })
         .merge($buttons)
         .on('click', (d3_event: Event, d: number) => {
           d3_event.preventDefault();
-          const raw_vals = this.$input.node().value || '0';
+          const raw_vals = this.$input!.node().value || '0';
           let vals = raw_vals.split(';');
           vals = vals.map((v: string) => {
             const num = parseFloat(v.trim());
             return isFinite(num) ? this._clamped(num + d) : v.trim();
           });
-          this.$input.node().value = vals.join(';');
+          this.$input!.node().value = vals.join(';');
           this._change()();
         });
 
@@ -206,8 +201,37 @@ export class UiFieldText extends UiField {
   }
 
 
+  /** Determines whether the field should be locked (protected `*:wikidata` companion values). */
+  protected _calcLocked(): void {
+    const context = this.context;
+    const editor = context.systems.editor!;
+    const schema = context.systems.schema!;
+    const graph = editor.staging.graph;
+
+    // Protect certain fields that have a companion `*:wikidata` value
+    const lockable = ['brand', 'network', 'operator', 'flag'];
+    const isLocked = lockable.includes(this.id) && this.entityIDs.length && this.entityIDs.some(entityID => {
+      const entity = graph.hasEntity(entityID);
+      if (!entity) return false;
+
+      // Features linked to Wikidata are likely important and should be protected
+      if (entity.tags.wikidata) return true;
+
+      const preset = schema.match(entity, graph);
+      const isSuggestion = preset?.suggestion;
+
+      // Lock the field if there is a value and a companion `*:wikidata` value
+      const which = this.id;   // 'brand', 'network', 'operator', 'flag'
+      return isSuggestion && !!entity.tags[which] && !!entity.tags[which + ':wikidata'];
+    });
+
+    this.locked(!!isLocked);
+  }
+
+
   /** Updates the field's placeholder to the phone-number format for the current country. */
   protected _updatePhonePlaceholder(): void {
+    if (!this.$input) return;   // called too early?
     if (this.$input.empty() || !Object.keys(this._phoneFormats).length) return;
 
     const extent = this.entityExtent;
@@ -222,6 +246,7 @@ export class UiFieldText extends UiField {
    * @return The link value, or `null` if the value is not valid
    */
   protected _validIdentifierValueForLink(): any {
+    if (!this.$input) return;   // called too early?
     const pattern = this.presetField.props.pattern;
     const value = (utilGetSetValue(this.$input) as string).trim().split(';')[0];
 
@@ -233,7 +258,6 @@ export class UiFieldText extends UiField {
   }
 
 
-  // clamp number to min/max
   /**
    * Clamps a number to the field's configured min/max values.
    * @param num - The number to clamp
@@ -258,6 +282,7 @@ export class UiFieldText extends UiField {
    */
   protected _change(onInput?: boolean): () => void {
     return () => {
+      if (!this.$input) return;   // called too early?
       const context = this.context;
       const key = this.key;
       const tagChange: TagChange = {};
@@ -289,6 +314,7 @@ export class UiFieldText extends UiField {
    * @param tags - The entity tags to display
    */
   public syncTags(tags: Tags): void {
+    if (!this.$input) return;   // called too early?
     const l10n = this.context.systems.l10n!;
 
     this._tags = tags;
@@ -309,6 +335,7 @@ export class UiFieldText extends UiField {
 
   /** Moves keyboard focus to the field's input. */
   public focus(): void {
+    if (!this.$input) return;   // called too early?
     const node = this.$input.node();
     if (node) node.focus();
   }

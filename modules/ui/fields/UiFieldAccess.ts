@@ -1,5 +1,4 @@
-import { select as d3_select } from 'd3-selection';
-
+import { select, selection } from 'd3-selection';
 import { uiCombobox } from '../combobox.js';
 import { UiField } from '../UiField.js';
 import { utilGetSetValue, utilNoAuto } from '../../util/index.ts';
@@ -120,11 +119,21 @@ const placeholdersByHighway: Record<string, Record<string, string>> = {
 };
 
 
+/**
+ * This UI component displays an access field.
+ * It includes subfields for different modes of transport:
+ *  "all", "foot", "motor vehicle", "bicycle", "horse"
+ */
 export class UiFieldAccess extends UiField {
-  public $items: D3Selection;
+  // D3 selections
+  public $parent: D3Selection | null;
+  public $items: D3Selection | null;
+
   protected _tags: Tags;
 
+
   /**
+   * @constructor
    * @param context - Global shared application context
    * @param presetField - The preset field definition this field renders
    * @param entityIDs - The entities this field applies to
@@ -133,7 +142,10 @@ export class UiFieldAccess extends UiField {
   public constructor(context: Context, presetField: Field, entityIDs: EntityID[] = [], options: Partial<UiFieldOptions> = {}) {
     super(context, presetField, entityIDs, options);
 
-    this.$items = d3_select(null);
+    // D3 selections
+    this.$parent = null;
+    this.$items = null;
+
     this._tags = {};
 
     this.renderContent = this.renderContent.bind(this);
@@ -142,16 +154,21 @@ export class UiFieldAccess extends UiField {
 
 
   /**
-   * Renders the content into the given selection.
-   * This component is handed its target selection by its parent on each render, so it
-   *  renders into `$selection` directly rather than capturing `$parent` for re-render.
-   * @param $selection - A d3-selection to the HTMLElement this component renders into
+   * Accepts a parent selection, and renders the content under it.
+   * (The parent selection is required the first time, but can be inferred on subsequent renders)
+   * @param $parent - A d3-selection to a HTMLElement that this component should render itself into
    */
-  public renderContent($selection: D3Selection): void {
+  public renderContent($parent = this.$parent): void {
+    if ($parent instanceof selection) {
+      this.$parent = $parent;
+    } else {
+      return;   // no parent - called too early?
+    }
+
     const context = this.context;
     const l10n = context.systems.l10n!;
 
-    let $wrap: D3Selection = $selection.selectAll('.form-field-input-wrap')
+    let $wrap: D3Selection = $parent.selectAll('.form-field-input-wrap')
       .data([0]);
 
     $wrap = $wrap.enter()
@@ -172,17 +189,17 @@ export class UiFieldAccess extends UiField {
       .data(this.keys);
 
     // Enter
-    const $$enter = this.$items.enter()
+    const $$items = this.$items.enter()
       .append('li')
       .attr('class', d => `labeled-input preset-access-${d}`);
 
     const stringBase = `_tagging.presets.fields.${this.id}.types`;
-    $$enter
+    $$items
       .append('div')
       .attr('class', 'label preset-label-access')
       .attr('for', d => `preset-input-access-${d}`);
 
-    $$enter
+    $$items
       .append('div')
       .attr('class', 'preset-input-access-wrap')
       .append('input')
@@ -190,7 +207,7 @@ export class UiFieldAccess extends UiField {
       .attr('class', d => `preset-input-access preset-input-access-${d}`)
       .call(utilNoAuto)
       .each((d, i, nodes) => {
-        d3_select(nodes[i])
+        select(nodes[i])
           .call(uiCombobox(context, `access-${d}`)
             .data(this._fieldOptions(d))
           );
@@ -198,7 +215,7 @@ export class UiFieldAccess extends UiField {
 
 
     // Update
-    this.$items = this.$items.merge($$enter);
+    this.$items = this.$items.merge($$items);
 
     // Set localized text on the update selection so it re-localizes on language change.
     this.$items.selectAll('.preset-label-access')
@@ -219,7 +236,7 @@ export class UiFieldAccess extends UiField {
     const context = this.context;
 
     const tagChange: TagChange = {};
-    const value = context.cleanTagValue(utilGetSetValue(d3_select(d3_event.currentTarget as any)) as string);
+    const value = context.cleanTagValue(utilGetSetValue(select(d3_event.currentTarget as any)) as string);
 
     // don't override multiple values with blank string
     if (!value && typeof this._tags[d] !== 'string') return;
@@ -263,6 +280,8 @@ export class UiFieldAccess extends UiField {
    * @param tags - The entity tags to display
    */
   public syncTags(tags: Tags): void {
+    if (!this.$items) return;   // called too early?
+
     const l10n = this.context.systems.l10n!;
 
     this._tags = tags;
@@ -310,7 +329,8 @@ export class UiFieldAccess extends UiField {
 
   /** Moves keyboard focus to the field's input. */
   public focus(): void {
-    (this.$items.selectAll('.preset-input-access')
-      .node() as HTMLElement).focus();
+    if (!this.$items) return;   // called too early?
+
+    (this.$items.selectAll('.preset-input-access').node() as HTMLElement).focus();
   }
 }

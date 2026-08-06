@@ -5,6 +5,15 @@ import { utilSanitizeHTML } from '../util/sanitize.ts';
 
 import type { Context } from '../Context.ts';
 import type { D3Selection } from 'd3-selection';
+import type { OsmNote } from '../services/OsmService.ts';
+
+interface NoteComment {
+  uid?: string;
+  user?: string;
+  action?: string;
+  date?: string;
+  html?: string;
+}
 
 
 /**
@@ -13,7 +22,7 @@ import type { D3Selection } from 'd3-selection';
  */
 export class UiNoteComments {
   public context: Context;
-  public datum: any;
+  public datum: OsmNote | null;
 
   // D3 selections
   public $parent: D3Selection | null;
@@ -64,7 +73,7 @@ export class UiNoteComments {
 
     $$comment
       .append('div')
-      .attr('class', (d: any) => `comment-avatar user-${d.uid}`)
+      .attr('class', (d: NoteComment) => `comment-avatar user-${d.uid}`)
       .call(uiIcon('#rapid-icon-avatar', 'comment-avatar-icon'));
 
     const $$main = $$comment
@@ -78,9 +87,9 @@ export class UiNoteComments {
     $$metadata
       .append('div')
       .attr('class', 'comment-author')
-      .each((d: any, i: number, nodes: any) => {
+      .each((d: NoteComment, i: number, nodes: ArrayLike<HTMLElement>) => {
         let $author = d3_select(nodes[i]);
-        const osm = context.services.osm as any;
+        const osm = context.services.osm;
         if (osm && d.user) {
           $author = $author
             .append('a')
@@ -98,12 +107,12 @@ export class UiNoteComments {
     $$metadata
       .append('div')
       .attr('class', 'comment-date')
-      .text((d: any) => l10n.t(`note.status.${d.action}`, { when: l10n.displayShortDate(d.date) }));
+      .text((d: NoteComment) => l10n.t(`note.status.${d.action}`, { when: l10n.displayShortDate(d.date) }));
 
     $$main
       .append('div')
       .attr('class', 'comment-text')
-      .html((d: any) => utilSanitizeHTML(d.html))
+      .html((d: NoteComment) => utilSanitizeHTML(d.html))
       .selectAll('a')
         .attr('rel', 'noopener nofollow')
         .attr('target', '_blank');
@@ -117,7 +126,7 @@ export class UiNoteComments {
   protected _replaceAvatars($selection: D3Selection): void {
     const context = this.context;
     const settings = context.systems.settings;
-    const osm = context.services.osm as any;
+    const osm = context.services.osm;
 
     const showThirdPartyIcons = settings?.get('ui.privacy.thirdPartyIcons') ?? 'true';
     if (showThirdPartyIcons !== 'true' || !osm) return;

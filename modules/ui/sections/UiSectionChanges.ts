@@ -9,10 +9,11 @@ import { utilHighlightEntities } from '../../util/util.ts';
 
 import type { Context } from '../../Context.ts';
 import type { D3Selection } from 'd3-selection';
+import type { SummaryEntry } from '../../lib/Difference.ts';
 
 
 export class UiSectionChanges extends AbstractUiSection {
-  protected _discardTags: any;
+  protected _discardTags: Record<string, unknown>;
 
   /**
    * @param context - Global shared application context
@@ -56,7 +57,7 @@ export class UiSectionChanges extends AbstractUiSection {
     const map = context.systems.map!;
     const schema = context.systems.schema!;
 
-    const click = (d3_event: Event, change: any): void => {
+    const click = (d3_event: Event, change: SummaryEntry): void => {
       if (change.changeType !== 'deleted') {
         const entity = change.entity;
         map.fitEntitiesEase(entity);
@@ -91,12 +92,12 @@ export class UiSectionChanges extends AbstractUiSection {
 
     const $$buttons = $$itemsEnter
       .append('button')
-      .on('mouseover', (e: Event, d: any) => utilHighlightEntities(context, [d.entity.id], true))
-      .on('mouseout', () => utilHighlightEntities(context, false as any, false))
+      .on('mouseover', (e: Event, d: SummaryEntry) => utilHighlightEntities(context, [d.entity.id], true))
+      .on('mouseout', () => utilHighlightEntities(context, [], false))
       .on('click', click);
 
     $$buttons
-      .each((d: any, i: number, nodes: any) => {
+      .each((d: SummaryEntry, i: number, nodes: ArrayLike<HTMLElement>) => {
         const geom = d.entity.geometry(d.graph);
         d3_select(nodes[i])
           .call(uiIcon(`#rapid-icon-${geom}`, `pre-text ${d.changeType}`));
@@ -105,12 +106,12 @@ export class UiSectionChanges extends AbstractUiSection {
     $$buttons
       .append('span')
       .attr('class', 'change-type')
-      .text((d: any) => l10n.t(`commit.${d.changeType}`) + ' ');
+      .text((d: SummaryEntry) => l10n.t(`commit.${d.changeType}`) + ' ');
 
     $$buttons
       .append('strong')
       .attr('class', 'entity-type')
-      .text((d: any) => {
+      .text((d: SummaryEntry) => {
         const preset = schema.match(d.entity, d.graph);
         return (preset && preset.name) || l10n.displayType(d.entity.id);
       });
@@ -118,7 +119,7 @@ export class UiSectionChanges extends AbstractUiSection {
     $$buttons
       .append('span')
       .attr('class', 'entity-name')
-      .text((d: any) => {
+      .text((d: SummaryEntry) => {
         const name = l10n.displayName(d.entity.tags);
         let string = '';
         if (name !== '') {
@@ -135,7 +136,7 @@ export class UiSectionChanges extends AbstractUiSection {
     const changeset = new OsmChangeset(context).update({ id: undefined });
     const changes = editor.changes(actionDiscardTags(editor.difference(), this._discardTags));
 
-    delete (changeset as any).id;  // Export without chnageset_id
+    delete (changeset as { id?: string }).id;  // Export without changeset_id
 
     const data = JXON.stringify(changeset.osmChangeJXON(changes));
     const blob = new Blob([data], {type: 'text/xml;charset=utf-8;'});

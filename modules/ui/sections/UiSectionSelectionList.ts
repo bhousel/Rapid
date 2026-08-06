@@ -6,6 +6,7 @@ import { utilHighlightEntities } from '../../util/util.ts';
 
 import type { Context } from '../../Context.ts';
 import type { D3Selection } from 'd3-selection';
+import type { OsmEntity } from '../../data/index.ts';
 
 
 export class UiSectionSelectionList extends AbstractUiSection {
@@ -60,7 +61,7 @@ export class UiSectionSelectionList extends AbstractUiSection {
    * @param d3_event - the triggering click event
    * @param entity - the entity to select
    */
-  protected _selectEntity(d3_event: Event, entity: any): void {
+  protected _selectEntity(d3_event: Event, entity: OsmEntity): void {
     this.context.enter('select-osm', { selection: { osm: [entity.id] }} );
   }
 
@@ -70,7 +71,7 @@ export class UiSectionSelectionList extends AbstractUiSection {
    * @param d3_event - the triggering click event
    * @param entity - the entity to deselect
    */
-  protected _deselectEntity(d3_event: Event, entity: any): void {
+  protected _deselectEntity(d3_event: Event, entity: OsmEntity): void {
     const selectedIDs = this._selectedIDs.slice();
     const index = selectedIDs.indexOf(entity.id);
     if (index > -1) {
@@ -104,7 +105,7 @@ export class UiSectionSelectionList extends AbstractUiSection {
       .filter(Boolean);
 
     let $items: D3Selection = $list.selectAll('.feature-list-item')
-      .data(entities, (d: any) => d.key);
+      .data(entities, (d: OsmEntity) => d.key);
 
     $items.exit()
       .remove();
@@ -113,7 +114,7 @@ export class UiSectionSelectionList extends AbstractUiSection {
     const $$enter = $items.enter()
       .append('li')
       .attr('class', 'feature-list-item')
-      .each((d: any, i, nodes) => {
+      .each((d: OsmEntity, i, nodes) => {
         d3_select(nodes[i])
           .on('mouseover', () => utilHighlightEntities(context, [d.id], true))
           .on('mouseout', () => utilHighlightEntities(context, [d.id], false));

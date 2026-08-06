@@ -1,5 +1,4 @@
-import { select as d3_select } from 'd3-selection';
-
+import { selection } from 'd3-selection';
 import { UiField } from '../UiField.js';
 import { utilGetSetValue, utilNoAuto } from '../../util/index.ts';
 
@@ -10,9 +9,16 @@ import type { TagChange, Tags } from './types.ts';
 import type { UiFieldOptions } from '../UiField.js';
 
 
+/**
+ * This UI component displays a textarea field.
+ */
 export class UiFieldTextarea extends UiField {
-  public $input: D3Selection;
+  // D3 selections
+  public $parent: D3Selection | null;
+  public $input: D3Selection | null;
+
   protected _tags: Tags;
+
 
   /**
    * @param context - Global shared application context
@@ -23,7 +29,10 @@ export class UiFieldTextarea extends UiField {
   public constructor(context: Context, presetField: Field, entityIDs: EntityID[] = [], options: Partial<UiFieldOptions> = {}) {
     super(context, presetField, entityIDs, options);
 
-    this.$input = d3_select(null);
+    // D3 selections
+    this.$parent = null;
+    this.$input = null;
+
     this._tags = {};
 
     this.renderContent = this.renderContent.bind(this);
@@ -31,13 +40,18 @@ export class UiFieldTextarea extends UiField {
 
 
   /**
-   * Renders the content into the given selection.
-   * This component is handed its target selection by its parent on each render, so it
-   *  renders into `$selection` directly rather than capturing `$parent` for re-render.
-   * @param $selection - A d3-selection to the HTMLElement this component renders into
+   * Accepts a parent selection, and renders the content under it.
+   * (The parent selection is required the first time, but can be inferred on subsequent renders)
+   * @param $parent - A d3-selection to a HTMLElement that this component should render itself into
    */
-  public renderContent($selection: D3Selection): void {
-    let $wrap: D3Selection = $selection.selectAll('.form-field-input-wrap')
+  public renderContent($parent = this.$parent): void {
+    if ($parent instanceof selection) {
+      this.$parent = $parent;
+    } else {
+      return;   // no parent - called too early?
+    }
+
+    let $wrap: D3Selection = $parent.selectAll('.form-field-input-wrap')
       .data([0]);
 
     $wrap = $wrap.enter()
@@ -66,6 +80,8 @@ export class UiFieldTextarea extends UiField {
    */
   protected _change(onInput?: boolean): () => void {
     return () => {
+      if (!this.$input) return;   // called too early?
+
       const context = this.context;
       const key = this.key;
       let val = utilGetSetValue(this.$input) as string;
@@ -86,6 +102,7 @@ export class UiFieldTextarea extends UiField {
    * @param tags - The entity tags to display
    */
   public syncTags(tags: Tags): void {
+    if (!this.$input) return;   // called too early?
     const l10n = this.context.systems.l10n!;
 
     this._tags = tags;
@@ -103,6 +120,7 @@ export class UiFieldTextarea extends UiField {
 
   /** Moves keyboard focus to the field's input. */
   public focus(): void {
+    if (!this.$input) return;   // called too early?
     this.$input.node().focus();
   }
 }

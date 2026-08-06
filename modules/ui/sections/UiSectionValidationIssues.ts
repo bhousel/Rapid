@@ -285,7 +285,6 @@ export class UiSectionValidationIssues extends AbstractUiSection {
   protected _reloadIssues(): void {
     const validator = this.context.systems.validator!;
     const options = this._getOptions();
-    const options = this._getOptions();
     const issuesBySeverity = validator.getIssuesBySeverity(options as Parameters<typeof validator.getIssuesBySeverity>[0]);
     this._issues = issuesBySeverity[this._severity as keyof IssuesBySeverity];
   }

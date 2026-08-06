@@ -5,13 +5,14 @@ import { utilGetSetValue, utilNoAuto } from '../util/index.ts';
 
 import type { Context } from '../Context.ts';
 import type { D3Selection } from 'd3-selection';
+import type { UiField } from './UiField.js';
 
 
 /** A form-fields control (callable + fluent), renders a set of fields into a selection. */
 export interface UiFormFields {
   ($selection: D3Selection): void;
-  fieldsArr(): any[];
-  fieldsArr(val: any[]): UiFormFields;
+  fieldsArr(): UiField[];
+  fieldsArr(val: UiField[]): UiFormFields;
   state(): string;
   state(val: string): UiFormFields;
   klass(): string;
@@ -29,7 +30,7 @@ export interface UiFormFields {
 export function uiFormFields(context: Context): UiFormFields {
   const l10n = context.systems.l10n!;
   const moreCombo = uiCombobox(context, 'more-fields').minItems(1);
-  let _uifields: any[] = [];
+  let _uifields: UiField[] = [];
   let _lastPlaceholder = '';
   let _state = '';
   let _klass = '';
@@ -50,7 +51,7 @@ export function uiFormFields(context: Context): UiFormFields {
 
 
     let $fields: D3Selection = $container.selectAll('.wrap-form-field')
-      .data(shown, (d: any) => (d.id + (d.entityIDs ? d.entityIDs.join() : '')));
+      .data(shown, (d: UiField) => (d.id + (d.entityIDs ? d.entityIDs.join() : '')));
 
     $fields.exit()
       .remove();
@@ -58,7 +59,7 @@ export function uiFormFields(context: Context): UiFormFields {
     // Enter
     const $$fields = $fields.enter()
       .append('div')
-      .attr('class', (d: any) => `wrap-form-field wrap-form-field-${d.safeid}`);
+      .attr('class', (d: UiField) => `wrap-form-field wrap-form-field-${d.safeid}`);
 
     // Update
     $fields = $fields
@@ -66,12 +67,12 @@ export function uiFormFields(context: Context): UiFormFields {
 
     $fields
       .order()
-      .each((d: any, i, nodes) => {
+      .each((d: UiField, i, nodes) => {
         d3_select(nodes[i]).call(d.render);
       });
 
 
-    const labels: any[] = [];
+    const labels: string[] = [];
     const moreFields = notShown.map(uifield => {
       const label = uifield.label;
       labels.push(label);
@@ -146,7 +147,7 @@ export function uiFormFields(context: Context): UiFormFields {
   } as UiFormFields;
 
 
-  formFields.fieldsArr = function(val?: any[]): any {
+  formFields.fieldsArr = function(val?: UiField[]): any {
     if (!arguments.length) return _uifields;
     _uifields = val || [];
     return formFields;

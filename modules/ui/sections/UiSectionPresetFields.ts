@@ -6,14 +6,18 @@ import { uiFormFields } from '../form_fields.js';
 
 import type { Context } from '../../Context.ts';
 import type { D3Selection } from 'd3-selection';
+import type { Field } from '../../lib/index.ts';
+import type { Preset } from '../../lib/Preset.ts';
+import type { Tags } from '../fields/types.ts';
+import type { UiField } from '../UiField.js';
 
 
 export class UiSectionPresetFields extends AbstractUiSection {
   protected _formFields: any;
   protected _state: string | undefined;    // can be 'hide', 'hover', or 'select'
-  protected _uifields: any[] | null;
-  protected _presets: any[];
-  protected _tags: any;
+  protected _uifields: UiField[] | null;
+  protected _presets: Preset[];
+  protected _tags: Tags | undefined;
   protected _entityIDs: EntityID[];
 
   public constructor(context: Context) {
@@ -59,9 +63,9 @@ export class UiSectionPresetFields extends AbstractUiSection {
         allGeometries.add(geometry);
       }
 
-      let allFields: any[] = [];
-      let allMoreFields: any[] = [];
-      let sharedTotalFields: any[] | undefined;
+      let allFields: Field[] = [];
+      let allMoreFields: Field[] = [];
+      let sharedTotalFields: Field[] | undefined;
 
       for (const preset of this._presets) {
         const fields = preset.fields();
@@ -107,7 +111,7 @@ export class UiSectionPresetFields extends AbstractUiSection {
 
       const ids = this._entityIDs.slice();  // make copy (eslint warning)
       for (const uifield of this._uifields) {
-        uifield.on('change', (t: any, onInput: boolean) => {
+        uifield.on('change', (t: Tags, onInput: boolean) => {
           this.emit('change', ids, t, onInput);
         });
         uifield.on('revert', (keys: string[]) => {
@@ -144,10 +148,10 @@ export class UiSectionPresetFields extends AbstractUiSection {
    * @param val - the new presets, or omit to get the current value
    * @return the current presets (getter) or `this` (setter)
    */
-  public presets(val?: any[]): any {
+  public presets(val?: Preset[]): any {
     if (!arguments.length) return this._presets;
     if (!this._presets || !val || !utilArrayIdentical(this._presets, val)) {
-      this._presets = val as any[];
+      this._presets = val ?? [];
       this._uifields = null;
     }
     return this;
@@ -171,7 +175,7 @@ export class UiSectionPresetFields extends AbstractUiSection {
    * @param val - the new tags, or omit to get the current value
    * @return the current tags (getter) or `this` (setter)
    */
-  public tags(val?: any): any {
+  public tags(val?: Tags): any {
     if (!arguments.length) return this._tags;
     this._tags = val;
     // Don't reset _uifields here.

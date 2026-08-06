@@ -18,6 +18,9 @@ import { uiTooltip } from './tooltip.js';
 
 import type { Context } from '../Context.ts';
 import type { D3Selection } from 'd3-selection';
+import type { UiDataEditor } from './UiDataEditor.js';
+import type { UiRapidInspector } from './UiRapidInspector.js';
+import type { Vec2 } from '@rapid-sdk/math';
 
 
 const NEAR_TOLERANCE = 4;
@@ -43,7 +46,7 @@ export class UiSidebar {
   public context: Context;
 
   // Child components
-  public DataEditor: any;
+  public DataEditor: UiDataEditor;
   public DetectionInspector: UiDetectionInspector;
   public FeatureList: UiFeatureList;
   public Inspector: UiInspector;
@@ -52,7 +55,7 @@ export class UiSidebar {
   public MapRouletteMenu: UiMapRouletteMenu;
   public NoteEditor: UiNoteEditor;
   public OsmoseEditor: UiOsmoseEditor;
-  public RapidInspector: any;
+  public RapidInspector: UiRapidInspector;
   public OvertureInspector: UiOvertureInspector;
   public Tooltip: any;
 
@@ -64,14 +67,14 @@ export class UiSidebar {
   public $featureList: D3Selection | null;
   public $inspector: D3Selection | null;
 
-  public hover: (target: any) => void;
+  public hover: (target: unknown) => void;
 
-  protected _keys: any;
-  protected _currTargetID: any;
-  protected _startPointerID: any;
-  protected _startCoord: any;
+  protected _keys: string | string[] | null;
+  protected _currTargetID: DataID | null;
+  protected _startPointerID: number | string | null;
+  protected _startCoord: Vec2 | null;
   protected _startWidth: number | null;
-  protected _lastCoord: any;
+  protected _lastCoord: Vec2 | null;
   protected _lastWidth: number | null;
   protected _expandWidth: number;
 
@@ -132,7 +135,7 @@ export class UiSidebar {
      * This just wraps the internal `_hover` in a throttle to keep it from being called too frequently.
      * @param  target - data element to target
      */
-    this.hover = (target: any) => {
+    this.hover = (target: unknown) => {
       // scheduler throttles the hover; without it, hover immediately
       if (scheduler) {
         scheduler.throttle('UiSidebar-hover', () => this._hover(target), { ms: 200 });
@@ -277,7 +280,7 @@ export class UiSidebar {
    * Hovers the given target data
    * @param  target - data element to target
    */
-  protected _hover(target: any): void {
+  protected _hover(target: unknown): void {
     const $sidebar = this.$sidebar;
     const $inspector = this.$inspector;
     const $featureList = this.$featureList;
@@ -402,7 +405,7 @@ export class UiSidebar {
    * @param  ids - ids to select (expected to be OSM IDs)
    * @param  newFeature - true if it's a new feature, passed to the inspector
    */
-  public showInspector(ids: any, newFeature = false): void {
+  public showInspector(ids: EntityID[], newFeature = false): void {
     const $sidebar = this.$sidebar;
     const $inspector = this.$inspector;
     const $featureList = this.$featureList;
@@ -442,7 +445,7 @@ export class UiSidebar {
    * (except for the OSM editing "inspector", which is special)
    * @param  renderFn - A function suitable for use in `d3-selection.call`
    */
-  public show(renderFn: any): void {
+  public show(renderFn: ($selection: D3Selection) => void): void {
     const $sidebar = this.$sidebar;
     const $inspector = this.$inspector;
     const $featureList = this.$featureList;
@@ -489,7 +492,7 @@ export class UiSidebar {
    * Shows inspector open to Preset List
    * @param  args - forwarded to `UiInspector.showPresetList` (optional selected presets, animate flag)
    */
-  public showPresetList(...args: any[]): void {
+  public showPresetList(...args: Parameters<UiInspector['showPresetList']>): void {
     this.Inspector.showPresetList(...args);
   }
 
@@ -498,7 +501,7 @@ export class UiSidebar {
    * Shows inspector open to Entity Editor
    * @param  args - forwarded to `UiInspector.showEntityEditor` (optional presets, animate flag)
    */
-  public showEntityEditor(...args: any[]): void {
+  public showEntityEditor(...args: Parameters<UiInspector['showEntityEditor']>): void {
     this.Inspector.showEntityEditor(...args);
   }
 
@@ -630,7 +633,7 @@ export class UiSidebar {
    * Handler for pointerdown events on the resizer.
    * @param e - the pointerdown event
    */
-  protected _pointerdown(e: any): void {
+  protected _pointerdown(e: PointerEvent): void {
     if (this._startPointerID) return;  // already resizing
 
     if ('button' in e && e.button !== 0) return;
@@ -668,7 +671,7 @@ export class UiSidebar {
    * Handler for pointermove events
    * @param e - the pointermove event
    */
-  protected _pointermove(e: any): void {
+  protected _pointermove(e: PointerEvent): void {
     if (this._startPointerID !== (e.pointerId || 'mouse')) return;   // not down, or different pointer
 
     e.preventDefault();
@@ -698,7 +701,7 @@ export class UiSidebar {
    * Handler for pointerup events
    * @param e - the pointerup event
    */
-  protected _pointerup(e: any): void {
+  protected _pointerup(e: PointerEvent): void {
     if (this._startPointerID !== (e.pointerId || 'mouse')) return;   // not down, or different pointer
 
     this._startPointerID = null;
@@ -730,8 +733,8 @@ export class UiSidebar {
       .style('flex-basis', `${expandWidth}px`);  // done resize, put expanded width back here
 
     const startCoord = this._startCoord;
-    const endCoord = [e.clientX ?? startCoord[0], e.clientY];
-    const dist = vecLength(startCoord, endCoord as any);
+    const endCoord: Vec2 = [e.clientX ?? (startCoord as Vec2)[0], e.clientY];
+    const dist = vecLength(startCoord as Vec2, endCoord);
     if (dist < NEAR_TOLERANCE) {  // this was a click, not a drag
       this.toggle();              // run the toggle transition
     } else {
@@ -745,7 +748,7 @@ export class UiSidebar {
    * Just cancels an event
    * @param  e? - triggering event (if any)
    */
-  protected _eventCancel(e: any): void {
+  protected _eventCancel(e: Event): void {
     if (e)  e.preventDefault();
   }
 

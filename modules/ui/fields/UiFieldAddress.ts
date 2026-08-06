@@ -1,4 +1,4 @@
-import { select as d3_select } from 'd3-selection';
+import { select, selection } from 'd3-selection';
 import { Extent, projWgs84ToWorld, geoSphericalDistance, vecProject } from '@rapid-sdk/math';
 import { utilArrayUniqBy } from '@rapid-sdk/util';
 import { iso1A2Code } from '@rapideditor/country-coder';
@@ -14,6 +14,7 @@ import type { OsmEntity } from '../../data/index.ts';
 import type { SpatialItem } from '../../core/SpatialSystem.ts';
 import type { TagChange, Tags } from './types.ts';
 import type { UiFieldOptions } from '../UiField.js';
+
 
 interface AddressFormat {
   countryCodes?: string[];
@@ -33,40 +34,95 @@ interface AddressSubfield {
   width: number;
 }
 
+const DEFAULTFORMAT = {
+  format: [
+    ['housenumber', 'street'],
+    ['city', 'postcode']
+  ]
+};
 
+
+/**
+ * This UI component displays an address field.
+ * It determines the appropriate country code and adjust the subfields to
+ * match the address format of the country where the feature is located.
+ */
 export class UiFieldAddress extends UiField {
-  public $parent: D3Selection;
-  public $wrap: D3Selection;
+  // D3 selections
+  public $parent: D3Selection | null;
+  public $wrap: D3Selection | null;
+
   protected _tags: Tags;
   protected _countryCode: string | undefined;
   protected _addressFormats: AddressFormat[];
 
+
+  /**
+   * @constructor
+   * @param context - Global shared application context
+   * @param presetField - The preset field definition this field renders
+   * @param entityIDs - The entities this field applies to
+   * @param options - Field display options
+   */
   public constructor(context: Context, presetField: Field, entityIDs: EntityID[] = [], options: Partial<UiFieldOptions> = {}) {
     super(context, presetField, entityIDs, options);
     const assets = context.systems.assets!;
 
-    this.$parent = d3_select(null);
-    this.$wrap = d3_select(null);
+    // D3 selections
+    this.$parent = null;
+    this.$wrap = null;
+
     this._tags = {};
     this._countryCode = undefined;
-    this._addressFormats = [{
-      format: [
-        ['housenumber', 'street'],
-        ['city', 'postcode']
-      ]
-    }];
+    this._addressFormats = [DEFAULTFORMAT];
 
     this.renderContent = this.renderContent.bind(this);
     this._updatePlaceholder = this._updatePlaceholder.bind(this);
 
+
     assets.loadAssetAsync('address_formats')
-      .then((d: { addressFormats: AddressFormat[] }) => {
-        this._addressFormats = d.addressFormats;
-        if (!this.$parent.empty()) {
-          this.$parent.call(this.renderContent);  // rerender
-        }
+      .then((d: any) => {
+        this._addressFormats = d.addressFormats as AddressFormat[];
+        this.renderContent();  // rerender
       })
       .catch((e: unknown) => console.error(e));  // eslint-disable-line
+  }
+
+
+  /**
+   * Accepts a parent selection, and renders the content under it.
+   * (The parent selection is required the first time, but can be inferred on subsequent renders)
+   * @param $parent - A d3-selection to a HTMLElement that this component should render itself into
+   */
+  public renderContent($parent = this.$parent): void {
+    if ($parent instanceof selection) {
+      this.$parent = $parent;
+    } else {
+      return;   // no parent - called too early?
+    }
+
+    const context = this.context;
+    const l10n = context.systems.l10n!;
+
+    this.$wrap = $parent.selectAll('.form-field-input-wrap')
+      .data([0]);
+
+    this.$wrap = this.$wrap.enter()
+      .append('div')
+      .attr('class', `form-field-input-wrap form-field-input-${this.type}`)
+      .merge(this.$wrap);
+
+    const center = this.entityExtent!.center();
+    let countryCode;
+    if (context.inIntro) {  // localize the address format for the walkthrough
+      countryCode = l10n.t('intro.graph.countrycode');
+    } else {
+      countryCode = iso1A2Code(center);
+    }
+    if (countryCode) {
+      this._countryCode = countryCode.toLowerCase();
+      this._updateForCountryCode();
+    }
   }
 
 
@@ -175,7 +231,6 @@ export class UiFieldAddress extends UiField {
   }
 
 
-  // Suggest values that are used by other nearby entities
   /**
    * Suggests values for the given address key that are used by nearby entities.
    * @param key - The address tag key (e.g. `addr:postcode`) to gather nearby values for
@@ -219,22 +274,27 @@ export class UiFieldAddress extends UiField {
 
   /** Rebuilds the address subfield inputs to match the current country's address format. */
   protected _updateForCountryCode(): void {
+    if (!this.$wrap) return;   // called too early?
+
     const context = this.context;
     const getNearbyStreets = this._getNearbyStreets.bind(this);
     const getNearbyCities = this._getNearbyCities.bind(this);
     const getNearbyValues = this._getNearbyValues.bind(this);
 
-    if (!this._countryCode) return;
-
+    // choose an address format
     let addressFormat: AddressFormat | undefined;
     for (const format of this._addressFormats) {
-      if (!addressFormat && !format.countryCodes) {
-        addressFormat = format;   // choose the default format, keep going
-      } else if (format.countryCodes.includes(this._countryCode)) {
+      const codes = format.countryCodes || [];
+      if (!addressFormat && !codes.length) {
+        addressFormat = format;   // choose the default format, but keep looking
+      } else if (codes.includes(this._countryCode || '')) {
         addressFormat = format;   // choose the country format, stop here
         break;
       }
     }
+
+    // shouldn't happen, by this point we should have a default format or a country format.
+    if (!addressFormat) return;
 
     const dropdowns = addressFormat.dropdowns || [
       'city', 'county', 'country', 'district', 'hamlet',
@@ -289,7 +349,7 @@ export class UiFieldAddress extends UiField {
         : (d.id === 'city') ? getNearbyCities
         : getNearbyValues;
 
-      d3_select(this)
+      select(this)
         .call(uiCombobox(context, `address-${d.id}`)
           .minItems(1)
           .caseSensitive(true)
@@ -311,46 +371,14 @@ export class UiFieldAddress extends UiField {
 
 
   /**
-   * Renders the field into the given selection.
-   * Captures the selection in `this.$parent` on each render so other methods
-   *  can re-render the field in place.
-   * @param $selection - A d3-selection to the HTMLElement this field renders into
-   */
-  public renderContent($selection: D3Selection): void {
-    const context = this.context;
-    const l10n = context.systems.l10n!;
-
-    this.$parent = $selection;
-
-    this.$wrap = $selection.selectAll('.form-field-input-wrap')
-      .data([0]);
-
-    this.$wrap = this.$wrap.enter()
-      .append('div')
-      .attr('class', `form-field-input-wrap form-field-input-${this.type}`)
-      .merge(this.$wrap);
-
-    const center = this.entityExtent!.center();
-    let countryCode;
-    if (context.inIntro) {  // localize the address format for the walkthrough
-      countryCode = l10n.t('intro.graph.countrycode');
-    } else {
-      countryCode = iso1A2Code(center);
-    }
-    if (countryCode) {
-      this._countryCode = countryCode.toLowerCase();
-      this._updateForCountryCode();
-    }
-  }
-
-
-  /**
    * Returns a change handler that dispatches tag changes from the address subfields.
    * @param onInput - When true, treats the change as a live input event (no tag-value cleaning)
    * @returns An event handler that dispatches the tag change
    */
   protected _change(onInput?: boolean): () => void {
     return () => {
+      if (!this.$wrap) return;   // called too early?
+
       const context = this.context;
       const tagChange: TagChange = {};
       this.$wrap.selectAll('input')
@@ -403,6 +431,8 @@ export class UiFieldAddress extends UiField {
    * @param tags - The entity tags to display
    */
   protected _updateTags(tags: Tags): void {
+    if (!this.$wrap) return;   // called too early?
+
     const fieldKey = this.key;
 
     const t = tags;
@@ -436,6 +466,8 @@ export class UiFieldAddress extends UiField {
 
   /** Moves keyboard focus to the field's input. */
   public focus(): void {
+    if (!this.$wrap) return;   // called too early?
+
     const node = this.$wrap.selectAll('input').node() as HTMLElement | null;
     if (node) node.focus();
   }

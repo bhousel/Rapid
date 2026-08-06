@@ -5,6 +5,7 @@ import { utilHighlightEntities } from '../util/util.ts';
 
 import type { Context } from '../Context.ts';
 import type { D3Selection } from 'd3-selection';
+import type { OsmoseIssue } from '../services/OsmoseService.ts';
 
 
 /**
@@ -14,7 +15,7 @@ import type { D3Selection } from 'd3-selection';
  */
 export class UiOsmoseDetails {
   public context: Context;
-  public datum: any;
+  public datum: OsmoseIssue | null;
 
   // D3 selections
   public $parent: D3Selection | null;
@@ -49,12 +50,12 @@ export class UiOsmoseDetails {
     const gfx = context.systems.gfx!;
     const l10n = context.systems.l10n!;
     const map = context.systems.map!;
-    const osmose = context.services.osmose as any;
+    const osmose = context.services.osmose!;
     const schema = context.systems.schema!;
     const scene = gfx.scene!;
 
     let $details: D3Selection = $parent.selectAll('.sidebar-details')
-      .data(this.datum ? [this.datum] : [], (d: any) => d.key);
+      .data(this.datum ? [this.datum] : [], (d: OsmoseIssue) => d.key!);
 
     $details.exit()
       .remove();
@@ -207,7 +208,7 @@ export class UiOsmoseDetails {
             // Replace with friendly name if possible
             // (The entity may not yet be loaded into the graph)
             if (entity) {
-              let name: any = l10n.displayName(entity.tags);  // try to use common name
+              let name: string | undefined = l10n.displayName(entity.tags);  // try to use common name
               if (!name) {
                 const preset = schema.match(entity, graph);
                 name = preset && !preset.isFallback() && preset.name;  // fallback to preset name
@@ -223,7 +224,7 @@ export class UiOsmoseDetails {
         filters.forceVisible(d.props.elems);
         gfx.immediateRedraw();
       })
-      .catch((e: any) => console.error(e));  // eslint-disable-line
+      .catch((e: unknown) => console.error(e));  // eslint-disable-line
   }
 
 
@@ -232,8 +233,8 @@ export class UiOsmoseDetails {
    * @param d    - The issue datum
    * @param type - The string type to look up (e.g. 'detail', 'trap', 'fix')
    */
-  protected _issueString(d: any, type: string): string {
-    const osmose = this.context.services.osmose as any;
+  protected _issueString(d: OsmoseIssue, type: string): string {
+    const osmose = this.context.services.osmose!;
 
     if (!osmose || !d) return '';
 

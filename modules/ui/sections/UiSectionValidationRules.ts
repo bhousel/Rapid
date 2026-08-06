@@ -122,7 +122,7 @@ export class UiSectionValidationRules extends AbstractUiSection {
     const $$items = $items.enter()
       .append('li')
       .call(uiTooltip(context)
-        .title(((d: any) => l10n.t(`issues.${d}.tip`)) as any)
+        .title((d: ValidatorID) => l10n.t(`issues.${d}.tip`))
         .placement('top')
       );
 
@@ -137,8 +137,8 @@ export class UiSectionValidationRules extends AbstractUiSection {
 
     $$label
       .append('span')
-      .html((d: any) => {
-        const params: any = {};
+      .html((d: ValidatorID) => {
+        const params: Record<string, string> = {};
         if (d === 'unsquare_way') {
           params.val = '<span class="square-degrees"></span>';
         }
@@ -172,12 +172,12 @@ export class UiSectionValidationRules extends AbstractUiSection {
       .attr('step', '0.5')
       .attr('class', 'square-degrees-input')
       .call(utilNoAuto)
-      .on('click', function (this: any, d3_event: Event) {
+      .on('click', function (this: HTMLInputElement, d3_event: Event) {
         d3_event.preventDefault();
         d3_event.stopPropagation();
         this.select();
       })
-      .on('keyup', function (this: any, d3_event: any) {
+      .on('keyup', function (this: HTMLInputElement, d3_event: KeyboardEvent) {
         if (d3_event.keyCode === 13) { // ↩ Return
           this.blur();
           this.select();
@@ -193,7 +193,7 @@ export class UiSectionValidationRules extends AbstractUiSection {
    * Handles editing the unsquare-way degree threshold (clamps and persists it).
    * @param d3_event - the triggering blur event
    */
-  protected _changeSquare(d3_event: any): void {
+  protected _changeSquare(d3_event: Event): void {
     const settings = this.context.systems.settings;
     const validator = this.context.systems.validator!;
 
@@ -225,7 +225,7 @@ export class UiSectionValidationRules extends AbstractUiSection {
    * @param d - the validator id
    * @return `true` if the validator is enabled
    */
-  protected _isValidatorEnabled(d: any): boolean {
+  protected _isValidatorEnabled(d: ValidatorID): boolean {
     const validator = this.context.systems.validator!;
     return validator.isValidatorEnabled(d);
   }
@@ -236,7 +236,7 @@ export class UiSectionValidationRules extends AbstractUiSection {
    * @param d3_event - the triggering change event
    * @param d - the validator id
    */
-  protected _toggleValidator(d3_event: Event, d: any): void {
+  protected _toggleValidator(d3_event: Event, d: ValidatorID): void {
     const validator = this.context.systems.validator!;
     validator.toggleValidator(d);
   }
@@ -249,7 +249,7 @@ export class UiSectionValidationRules extends AbstractUiSection {
     const scheduler = this.context.systems.scheduler;
     if (scheduler) {
       scheduler.scheduleIdleTask(this.reRender)
-        .catch((err: any) => {
+        .catch((err: unknown) => {
           if (err?.name === 'AbortError') return;   // expected cancellation
           console.error(err);  // eslint-disable-line no-console
         });

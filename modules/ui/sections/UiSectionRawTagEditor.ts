@@ -7,6 +7,7 @@ import { AbstractUiSection } from '../AbstractUiSection.js';
 import { UiTagReference } from '../UiTagReference.js';
 import { utilGetSetValue, utilNoAuto } from '../../util/index.ts';
 
+import type { TagDiff } from '@rapid-sdk/util';
 import type { Category } from '../../lib/Category.ts';
 import type { Context } from '../../Context.ts';
 import type { Preset } from '../../lib/Preset.ts';
@@ -398,9 +399,9 @@ export class UiSectionRawTagEditor extends AbstractUiSection {
    * Handles edits in the text view, diffing the parsed tags against the current tags.
    * @param d3_event - the triggering blur/change event
    */
-  protected _textChanged(d3_event: any): void {
+  protected _textChanged(d3_event: Event): void {
     const context = this.context;
-    const newText = d3_event.currentTarget.value.trim();
+    const newText = (d3_event.currentTarget as HTMLTextAreaElement).value.trim();
     const newTags: Record<string, string> = {};
     newText.split('\n').forEach((row: string) => {
       const m = row.match(/^\s*([^=]+)=(.*)$/);
@@ -416,7 +417,7 @@ export class UiSectionRawTagEditor extends AbstractUiSection {
 
     this._pendingChange = this._pendingChange || {};
 
-    tagDiff.forEach((change: any) => {
+    tagDiff.forEach((change: TagDiff) => {
       if (this._isReadOnlyTag({ key: change.key })) return;
 
       // skip unchanged multiselection placeholders

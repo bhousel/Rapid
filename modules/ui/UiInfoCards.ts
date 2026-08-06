@@ -6,8 +6,12 @@ import { UiLocationCard } from './cards/UiLocationCard.js';
 import { UiMeasurementCard } from './cards/UiMeasurementCard.js';
 import { utilCmd } from '../util/cmd.ts';
 
+import type { AbstractUiCard } from './cards/AbstractUiCard.ts';
 import type { Context } from '../Context.ts';
 import type { D3Selection } from 'd3-selection';
+import type {
+  UiBackgroundCard, UiHistoryCard, UiLocationCard, UiMeasurementCard
+} from './cards/index.js';
 
 
 /**
@@ -19,17 +23,17 @@ export class UiInfoCards {
   public context: Context;
 
   // Child components
-  public BackgroundCard: any;
-  public HistoryCard: any;
-  public LocationCard: any;
-  public MeasurementCard: any;
-  public cards: any[];
+  public BackgroundCard: UiBackgroundCard;
+  public HistoryCard: UiHistoryCard;
+  public LocationCard: UiLocationCard;
+  public MeasurementCard: UiMeasurementCard;
+  public cards: AbstractUiCard[];
 
   // D3 selections
   public $parent: D3Selection | null;
 
-  protected _wasVisible: Set<any>;
-  protected _keys: any;
+  protected _wasVisible: Set<string>;
+  protected _keys: string | string[] | null;
 
   /**
    * @param  context - Global shared application context
@@ -106,7 +110,7 @@ export class UiInfoCards {
     if (e) e.preventDefault();
 
     // Which cards are currently visible?
-    const currVisible = new Set<any>();
+    const currVisible = new Set<string>();
     for (const Card of this.cards) {
       if (Card.visible) {
         currVisible.add(Card);

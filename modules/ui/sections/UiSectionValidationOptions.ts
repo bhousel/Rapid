@@ -3,6 +3,16 @@ import { AbstractUiSection } from '../AbstractUiSection.js';
 import type { Context } from '../../Context.ts';
 import type { D3Selection } from 'd3-selection';
 
+interface OptionItem {
+  key: string;
+  values: string[];
+}
+
+interface OptionValue {
+  key: string;
+  value: string;
+}
+
 
 export class UiSectionValidationOptions extends AbstractUiSection {
   public constructor(context: Context) {
@@ -35,18 +45,18 @@ export class UiSectionValidationOptions extends AbstractUiSection {
     ];
 
     let $options: D3Selection = $wrap.selectAll('.issues-option')
-      .data(data, (d: any) => d.key);
+      .data(data, (d: OptionItem) => d.key);
 
     const $$options = $options.enter()
       .append('div')
-      .attr('class', (d: any) => `issues-option issues-option-${d.key}`);
+      .attr('class', (d: OptionItem) => `issues-option issues-option-${d.key}`);
 
     $$options
       .append('div')
       .attr('class', 'issues-option-title');
 
     const $$labels = $$options.selectAll('label')
-      .data((d: any) => {
+      .data((d: OptionItem) => {
         return d.values.map((val: string) => ({ value: val, key: d.key }) );
       })
       .enter()
@@ -55,10 +65,10 @@ export class UiSectionValidationOptions extends AbstractUiSection {
     $$labels
       .append('input')
       .attr('type', 'radio')
-      .attr('name', (d: any) => `issues-option-${d.key}`)
-      .attr('value', (d: any) => d.value)
-      .property('checked', (d: any) => this._getOptions()[d.key] === d.value)
-      .on('change', (d3_event, d: any) => this._updateOptionValue(d3_event, d.key, d.value));
+      .attr('name', (d: OptionValue) => `issues-option-${d.key}`)
+      .attr('value', (d: OptionValue) => d.value)
+      .property('checked', (d: OptionValue) => this._getOptions()[d.key] === d.value)
+      .on('change', (d3_event, d: OptionValue) => this._updateOptionValue(d3_event, d.key, d.value));
 
     $$labels
       .append('span');
@@ -67,10 +77,10 @@ export class UiSectionValidationOptions extends AbstractUiSection {
     $options = $options.merge($$options);
 
     $options.selectAll('.issues-option-title')
-      .text((d: any) => l10n.t(`issues.options.${d.key}.title`));
+      .text((d: OptionItem) => l10n.t(`issues.options.${d.key}.title`));
 
     $options.selectAll('label span')
-      .text((d: any) => l10n.t(`issues.options.${d.key}.${d.value}`));
+      .text((d: OptionValue) => l10n.t(`issues.options.${d.key}.${d.value}`));
   }
 
 
@@ -93,7 +103,7 @@ export class UiSectionValidationOptions extends AbstractUiSection {
    * @param d - the option key ('what' or 'where')
    * @param val - the new value (read from the event target if omitted)
    */
-  protected _updateOptionValue(d3_event: any, d: string, val?: string): void {
+  protected _updateOptionValue(d3_event: Event, d: string, val?: string): void {
     const settings = this.context.systems.settings;
     const validator = this.context.systems.validator!;
 

@@ -2,8 +2,12 @@ import * as PIXI from 'pixi.js';
 
 import { uiIcon } from './icon.js';
 
+import type { Category } from '../lib/Category.ts';
 import type { Context } from '../Context.ts';
 import type { D3Selection } from 'd3-selection';
+import type { MatchedStyle } from '../core/StyleSystem.ts';
+import type { Preset } from '../lib/Preset.ts';
+import type { Tags } from './fields/types.ts';
 
 
 /**
@@ -14,8 +18,8 @@ import type { D3Selection } from 'd3-selection';
 export class UiPresetIcon {
   public context: Context;
 
-  protected _preset: any;
-  protected _geometry: any;
+  protected _preset: Preset | Category | Preset[] | null;
+  protected _geometry: string | null;
 
   /**
    * @param  context - Global shared application context
@@ -35,7 +39,7 @@ export class UiPresetIcon {
    * Fluent getter/setter for the preset (or category, or array) to display.
    * @param  val? - the preset/category/array to set; if omitted, returns the current value
    */
-  public preset(val?: any): any {
+  public preset(val?: Preset | Category | Preset[] | null): any {
     if (!arguments.length) return this._preset;
     this._preset = val;
     return this;
@@ -46,7 +50,7 @@ export class UiPresetIcon {
    * Fluent getter/setter for the geometry to display the icon for.
    * @param  val? - the geometry to set; if omitted, returns the current value
    */
-  public geometry(val?: any): any {
+  public geometry(val?: string | null): any {
     if (!arguments.length) return this._geometry;
     this._geometry = val;
     return this;
@@ -58,7 +62,7 @@ export class UiPresetIcon {
    * @param  p - the preset, category, or array of features
    * @param  geom - the geometry to pick an icon for
    */
-  protected _getIcon(p: any, geom: string): string {
+  protected _getIcon(p: Preset | Category | Preset[] | null, geom: string): string {
     if (Array.isArray(p)) return 'rapid-icon-data';
     if (p?.props?.icon) return p.props.icon;
     if (geom === 'line') return 'rapid-other-line';
@@ -72,7 +76,7 @@ export class UiPresetIcon {
    * @param  $container - the selection to render the border into
    * @param  style - the style (fill color/opacity) to use
    */
-  protected _renderCategoryBorder($container: D3Selection, style: any): void {
+  protected _renderCategoryBorder($container: D3Selection, style: MatchedStyle): void {
     const px = 60;
     const color = new PIXI.Color(style.fill.color).toHex();
     const opacity = style.fill.opacity;
@@ -138,7 +142,7 @@ export class UiPresetIcon {
    * @param  $container - the selection to render the border into
    * @param  style - the style (fill color/opacity) to use
    */
-  protected _renderAreaBorder($container: D3Selection, style: any): void {
+  protected _renderAreaBorder($container: D3Selection, style: MatchedStyle): void {
     const px = 60;
     const mid = px / 2;
     const len = px * 2/3;
@@ -188,7 +192,7 @@ export class UiPresetIcon {
    * @param  $container - the selection to render the line into
    * @param  style - the style (casing/stroke color, dash) to use
    */
-  protected _renderLine($container: D3Selection, style: any): void {
+  protected _renderLine($container: D3Selection, style: MatchedStyle): void {
     const px = 60;
     const y = Math.round(px * 0.72);
     const l = Math.round(px * 0.6);
@@ -305,7 +309,7 @@ export class UiPresetIcon {
     const isPreset = !isMulti && (typeof p.setTags === 'function');
     const isCategory = !isMulti && !isPreset;
 
-    const tags: any = isPreset ? p.setTags({}, geom) : {};
+    const tags: Tags = isPreset ? (p as Preset).setTags({}, geom) : {};
     for (const k in tags) {
       if (tags[k] === '*') {
         tags[k] = 'yes';

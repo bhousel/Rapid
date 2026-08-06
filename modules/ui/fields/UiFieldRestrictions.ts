@@ -1,3 +1,4 @@
+import { selection } from 'd3-selection';
 import { UiField } from '../UiField.js';
 
 import type { Context } from '../../Context.ts';
@@ -17,9 +18,15 @@ import type { UiFieldOptions } from '../UiField.js';
  * `UiSectionPresetFields`.
  */
 export class UiFieldRestrictions extends UiField {
+  // D3 selections
+  public $parent: D3Selection | null;
+  public $wrap: D3Selection | null;
+
   public static supportsMultiselection = false;
 
+
   /**
+   * @constructor
    * @param context - Global shared application context
    * @param presetField - the original Field tracked by the SchemaSystem
    * @param entityIDs - the entities this field applies to
@@ -28,21 +35,30 @@ export class UiFieldRestrictions extends UiField {
   public constructor(context: Context, presetField: Field, entityIDs: EntityID[] = [], options: Partial<UiFieldOptions> = {}) {
     super(context, presetField, entityIDs, options);
 
+    // D3 selections
+    this.$parent = null;
+    this.$wrap = null;
+
     this.renderContent = this.renderContent.bind(this);
   }
 
 
   /**
-   * Renders the content into the given selection.
-   * This component is handed its target selection by its parent on each render, so it
-   *  renders into `$selection` directly rather than capturing `$parent` for re-render.
-   * @param $selection - A d3-selection to the HTMLElement this component renders into
+   * Accepts a parent selection, and renders the content under it.
+   * (The parent selection is required the first time, but can be inferred on subsequent renders)
+   * @param $parent - A d3-selection to a HTMLElement that this component should render itself into
    */
-  public renderContent($selection: D3Selection): void {
-    let $wrap: D3Selection = $selection.selectAll('.form-field-input-wrap')
+  public renderContent($parent = this.$parent): void {
+    if ($parent instanceof selection) {
+      this.$parent = $parent;
+    } else {
+      return;   // no parent - called too early?
+    }
+
+    let $wrap: D3Selection = $parent.selectAll('.form-field-input-wrap')
       .data([0]);
 
-    $wrap = $wrap.enter()
+    this.$wrap = $wrap = $wrap.enter()
       .append('div')
       .attr('class', 'form-field-input-wrap form-field-input-' + this.type)
       .merge($wrap);

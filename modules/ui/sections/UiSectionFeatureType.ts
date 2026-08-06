@@ -7,11 +7,12 @@ import { UiTagReference } from '../UiTagReference.js';
 
 import type { Context } from '../../Context.ts';
 import type { D3Selection } from 'd3-selection';
+import type { Preset } from '../../lib/Preset.ts';
 
 
 export class UiSectionFeatureType extends AbstractUiSection {
   protected _entityIDs: EntityID[];
-  protected _presets: any[];
+  protected _presets: Preset[];
   protected _tagReference: UiTagReference | undefined;
 
   public constructor(context: Context) {
@@ -49,15 +50,15 @@ export class UiSectionFeatureType extends AbstractUiSection {
    * @param val - the new presets, or omit to get the current value
    * @return the current presets (getter) or `this` (setter)
    */
-  public presets(val?: any[]): any {
+  public presets(val?: Preset[]): any {
     if (!arguments.length) return this._presets;
 
     // don't reload the same preset
-    if (!utilArrayIdentical(val as any[], this._presets)) {
-      this._presets = val as any[];
+    if (!utilArrayIdentical(val!, this._presets)) {
+      this._presets = val!;
 
       if (this._presets.length === 1) {
-        this._tagReference = new UiTagReference(this.context, this._presets[0].reference()).showing(false) as any;
+        this._tagReference = new UiTagReference(this.context, this._presets[0].reference()).showing(false);
       }
     }
 
@@ -116,11 +117,11 @@ export class UiSectionFeatureType extends AbstractUiSection {
     // update header
     if (this._tagReference) {
       $selection.selectAll('.preset-list-button-wrap .accessory-buttons')
-        .style('display', this._presets.length === 1 ? null as any : 'none')
+        .style('display', this._presets.length === 1 ? null : 'none')
         .call(this._tagReference.button);
 
       $tagReferenceBodyWrap
-        .style('display', this._presets.length === 1 ? null as any : 'none')
+        .style('display', this._presets.length === 1 ? null : 'none')
         .call(this._tagReference.body);
     }
 
@@ -148,7 +149,7 @@ export class UiSectionFeatureType extends AbstractUiSection {
 
     const $label = $selection.select('.label-inner');
     const $nameparts = $label.selectAll('.namepart')
-      .data(names, (d: any) => d);
+      .data(names, (d: string) => d);
 
     $nameparts.exit()
       .remove();

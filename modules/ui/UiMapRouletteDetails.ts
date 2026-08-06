@@ -6,6 +6,7 @@ import { utilHighlightEntities } from '../util/util.ts';
 
 import type { Context } from '../Context.ts';
 import type { D3Selection } from 'd3-selection';
+import type { MapRouletteTask } from '../services/MapRouletteService.ts';
 
 
 /**
@@ -107,7 +108,7 @@ function transformId(id: string): string {
  */
 export class UiMapRouletteDetails {
   public context: Context;
-  public datum: any;
+  public datum: MapRouletteTask | null;
 
   // D3 selections
   public $parent: D3Selection | null;
@@ -138,10 +139,10 @@ export class UiMapRouletteDetails {
 
     const context = this.context;
     const l10n = context.systems.l10n!;
-    const maproulette = context.services.maproulette as any;
+    const maproulette = context.services.maproulette!;
 
     let $details: D3Selection = $parent.selectAll('.sidebar-details')
-      .data(this.datum ? [this.datum] : [], (d: any) => d.key);
+      .data(this.datum ? [this.datum] : [], (d: MapRouletteTask) => d.key!);
 
     $details.exit()
       .remove();

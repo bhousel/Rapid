@@ -4,8 +4,11 @@ import { UiEntityEditor } from './UiEntityEditor.js';
 import { UiPresetList } from './UiPresetList.js';
 import { UiViewOn } from './UiViewOn.js';
 
+import type { Category } from '../lib/Category.ts';
 import type { Context } from '../Context.ts';
 import type { D3Selection } from 'd3-selection';
+import type { Preset } from '../lib/Preset.ts';
+import type { UiViewOn } from './UiViewOn.js';
 
 
 /**
@@ -36,7 +39,7 @@ export class UiInspector {
   // Child components
   public PresetList: UiPresetList;
   public EntityEditor: UiEntityEditor;
-  public ViewOn: any;
+  public ViewOn: UiViewOn;
 
   // D3 selections
   public $parent: D3Selection | null;
@@ -82,11 +85,11 @@ export class UiInspector {
       .on('merge', this._onMerge);
 
     this.PresetList
-      .on('choose', (choice: any) => { this.setPreset(choice); })
+      .on('choose', (choice: Preset | Category) => { this.setPreset(choice); })
       .on('cancel', () => { this.setPreset(); });
 
     this.EntityEditor
-      .on('choose', (selected: any) => { this.showPresetList(selected, true); });  // true = animate in
+      .on('choose', (selected: (Preset | undefined)[]) => { this.showPresetList(selected, true); });  // true = animate in
   }
 
 
@@ -160,7 +163,7 @@ export class UiInspector {
     }
 
     // add .sidebar-footer
-    const entityID = graph.hasEntity((entityIDs.length === 1 && entityIDs[0]) as any);
+    const entityID = entityIDs.length === 1 ? graph.hasEntity(entityIDs[0]) : undefined;
     this.ViewOn.stringID = 'inspector.view_on_osm';
     this.ViewOn.url = (osm && entityID) ? osm.entityURL(entityID) : '';
 
@@ -170,7 +173,7 @@ export class UiInspector {
     $footer.enter()
       .append('div')
       .attr('class', 'sidebar-footer')
-      .merge($footer as any)
+      .merge($footer)
       .call(this.ViewOn.render);
 
 
@@ -214,7 +217,7 @@ export class UiInspector {
    * @param  selected? - optional Array of presets selected
    * @param  animate? - whether to animate the pane
    */
-  public showPresetList(selected?: any[], animate?: boolean): void | false {
+  public showPresetList(selected?: (Preset | undefined)[], animate?: boolean): void | false {
     const $paneWrap = this.$paneWrap;
     const $presetPane = this.$presetPane;
     const $editorPane = this.$editorPane;
@@ -247,7 +250,7 @@ export class UiInspector {
    * @param  presets? - optional Array of presets selected
    * @param  animate? - whether to animate the pane
    */
-  public showEntityEditor(presets?: any[], animate?: boolean): void | false {
+  public showEntityEditor(presets?: (Preset | undefined)[], animate?: boolean): void | false {
     const $paneWrap = this.$paneWrap;
     const $presetPane = this.$presetPane;
     const $editorPane = this.$editorPane;
@@ -281,7 +284,7 @@ export class UiInspector {
    * Choose the given preset
    * @param preset - the Preset to choose
    */
-  public setPreset(preset?: any): void | false {
+  public setPreset(preset?: Preset | Category): void | false {
     const $presetPane = this.$presetPane;
     if (!$presetPane) return false;  // called too early?
 
@@ -303,7 +306,7 @@ export class UiInspector {
    * refresh this component and its children. Rapid#1311
    * @param newIDs - Set of EntityIDs that were just merged in
    */
-  protected _onMerge(newIDs: any): void {
+  protected _onMerge(newIDs: EntityID[]): void {
     if (!(newIDs instanceof Set)) return;
     if (!this._entityIDs.length) return;
 

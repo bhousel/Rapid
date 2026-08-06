@@ -1,5 +1,5 @@
-import { select as d3_select } from 'd3-selection';
-import { drag as d3_drag } from 'd3-drag';
+import { select, selection } from 'd3-selection';
+import { drag } from 'd3-drag';
 import { utilArrayUniq, utilUnicodeCharsCount } from '@rapid-sdk/util';
 import { iso1A2Code } from '@rapideditor/country-coder';
 
@@ -33,7 +33,23 @@ interface ComboItem {
 }
 
 
+/**
+ * This UI component displays a combo/dropdown field.
+ * There are several variants:
+ * - 'combo':
+ * - 'multiCombo':
+ * - 'manyCombo':
+ * - 'semiCombo':
+ * - 'networkCombo':
+ * - 'typeCombo':
+ */
 export class UiFieldCombo extends UiField {
+  // D3 selections
+  public $parent: D3Selection | null;
+  public $container: D3Selection | null;
+  public $input: D3Selection | null;
+  public $inputWrap: D3Selection | null;
+
   protected _isMulti: boolean;
   protected _isNetwork: boolean;
   protected _isSemi: boolean;
@@ -42,17 +58,28 @@ export class UiFieldCombo extends UiField {
   protected _allowCustomValues: boolean;
   protected _snake_case: boolean;
   protected _combobox: any;
-  public $container: D3Selection;
-  protected _inputWrap: D3Selection;
-  public $input: D3Selection;
   protected _comboData: ComboItem[];
   protected _multiData: ComboItem[];
   protected _tags: Tags;
   protected _countryCode: string | undefined;
   protected _staticPlaceholder: string;
 
+
+  /**
+   * @constructor
+   * @param context - Global shared application context
+   * @param presetField - The preset field definition this field renders
+   * @param entityIDs - The entities this field applies to
+   * @param options - Field display options
+   */
   public constructor(context: Context, presetField: Field, entityIDs: EntityID[] = [], options: Partial<UiFieldOptions> = {}) {
     super(context, presetField, entityIDs, options);
+
+    // D3 selections
+    this.$parent = null;
+    this.$container = null;
+    this.$input = null;
+    this.$inputWrap = null;
 
     this._isMulti = (this.type === 'multiCombo' || this.type === 'manyCombo');
     this._isNetwork = (this.type === 'networkCombo');
@@ -64,9 +91,6 @@ export class UiFieldCombo extends UiField {
     this._combobox = uiCombobox(context, 'combo-' + this.safeid)
       .caseSensitive(presetField.props.caseSensitive)
       .minItems(this._isMulti || this._isSemi ? 1 : 2);
-    this.$container = d3_select(null);
-    this._inputWrap = d3_select(null);
-    this.$input = d3_select(null);
     this._comboData = [];
     this._multiData = [];
     this._tags = {};
@@ -84,6 +108,111 @@ export class UiFieldCombo extends UiField {
     this._setPlaceholder = this._setPlaceholder.bind(this);
     this._change = this._change.bind(this);
     this._removeMultikey = this._removeMultikey.bind(this);
+  }
+
+
+  /**
+   * Accepts a parent selection, and renders the content under it.
+   * (The parent selection is required the first time, but can be inferred on subsequent renders)
+   * @param $parent - A d3-selection to a HTMLElement that this component should render itself into
+   */
+  public renderContent($parent = this.$parent): void {
+    if ($parent instanceof selection) {
+      this.$parent = $parent;
+    } else {
+      return;   // no parent - called too early?
+    }
+
+    const context = this.context;
+    const scheduler = context.systems.scheduler;  // optional
+
+    this.$container = $parent.selectAll('.form-field-input-wrap')
+      .data([0]);
+
+    const type = (this._isMulti || this._isSemi) ? 'multicombo' : 'combo';
+    this.$container = this.$container.enter()
+      .append('div')
+      .attr('class', 'form-field-input-wrap form-field-input-' + type)
+      .merge(this.$container);
+
+    if (this._isMulti || this._isSemi) {
+      this.$container = this.$container.selectAll('.chiplist')
+        .data([0]);
+
+      let listClass = 'chiplist';
+
+      // Use a separate line for each value in the Destinations and Via fields
+      // to mimic highway exit signs
+      if (this.key === 'destination' || this.key === 'via') {
+        listClass += ' full-line-chips';
+      }
+
+      this.$container = this.$container.enter()
+        .append('ul')
+        .attr('class', listClass)
+        .on('click', () => {
+          if (scheduler) {
+            scheduler.setTimeout('ui-combo-focus', () => { this.$input?.node()?.focus(); }, { ms: 10 });
+          } else {
+            this?.$input?.node().focus();
+          }
+        })
+        .merge(this.$container);
+
+
+      this.$inputWrap = this.$container.selectAll('.input-wrap')
+        .data([0]);
+
+      this.$inputWrap = this.$inputWrap.enter()
+        .append('li')
+        .attr('class', 'input-wrap')
+        .merge(this.$inputWrap);
+
+      this.$input = this.$inputWrap.selectAll('input')
+        .data([0]);
+    } else {
+      this.$input = this.$container.selectAll('input')
+        .data([0]);
+    }
+
+    this.$input = this.$input.enter()
+      .append('input')
+      .attr('type', 'text')
+      .attr('id', this.uid)
+      .call(utilNoAuto)
+      .call(this._initCombo, $parent)
+      .merge(this.$input);
+
+    if (this._isNetwork) {
+      const extent = this.entityExtent;
+      const countryCode = extent && iso1A2Code(extent.center());
+      this._countryCode = countryCode?.toLowerCase();
+    }
+
+    this.$input
+      .on('change', this._change)
+      .on('blur', this._change);
+
+    this.$input
+      .on('keydown.field', (d3_event: KeyboardEvent) => {
+        switch (d3_event.keyCode) {
+          case 13: // ↩ Return
+            this?.$input?.node()?.blur(); // blurring also enters the value
+            d3_event.stopPropagation();
+            break;
+        }
+      });
+
+    if (this._isMulti || this._isSemi) {
+      this._combobox
+        .on('accept', () => {
+          this?.$input?.node()?.blur();
+          this?.$input?.node()?.focus();
+        });
+
+      this.$input
+        .on('focus', () => { this?.$container?.classed('active', true); });
+    }
   }
 
 
@@ -138,12 +267,12 @@ export class UiFieldCombo extends UiField {
   }
 
 
-  // Compute the difference between arrays of objects by `value` property
-  //
-  // objectDifference([{value:1}, {value:2}, {value:3}], [{value:2}])
-  // > [{value:1}, {value:3}]
-  //
   /**
+   * Compute the difference between arrays of objects by `value` property
+   * @example
+   * objectDifference([{value:1}, {value:2}, {value:3}], [{value:2}])
+   * > [{value:1}, {value:3}]
+   *
    * @param a - The array to subtract from
    * @param b - The array of objects to exclude (matched by `value`)
    */
@@ -243,6 +372,7 @@ export class UiFieldCombo extends UiField {
     }
 
     fn(params, (err: any, data: any) => {
+      if (!this.$container) return;   // called too early?
       if (err) return;
 
       data = data.filter((d: any) => {
@@ -297,6 +427,7 @@ export class UiFieldCombo extends UiField {
    * @param values - The combo data values used to build the placeholder
    */
   protected _setPlaceholder(values: ComboItem[]): void {
+    if (!this.$container) return;   // called too early?
     const l10n = this.context.systems.l10n!;
 
     if (this._isMulti || this._isSemi) {
@@ -328,6 +459,7 @@ export class UiFieldCombo extends UiField {
 
   /** Reads the current input value(s) and dispatches the resulting tag change. */
   protected _change(): void {
+    if (!this.$container || !this.$input) return;   // called too early?
     const context = this.context;
     const scheduler = context.systems.scheduler;  // optional
 
@@ -363,7 +495,7 @@ export class UiFieldCombo extends UiField {
       }
 
       if (scheduler) {
-        scheduler.setTimeout('ui-combo-focus', () => { this.$input.node().focus(); }, { ms: 10 });
+        scheduler.setTimeout('ui-combo-focus', () => { this.$input?.node()?.focus(); }, { ms: 10 });
       } else {
         this.$input.node().focus();
       }
@@ -420,110 +552,13 @@ export class UiFieldCombo extends UiField {
 
 
   /**
-   * Renders the content into the given selection.
-   * This component is handed its target selection by its parent on each render, so it
-   *  renders into `$selection` directly rather than capturing `$parent` for re-render.
-   * @param $selection - A d3-selection to the HTMLElement this component renders into
-   */
-  public renderContent($selection: D3Selection): void {
-    const context = this.context;
-    const scheduler = context.systems.scheduler;  // optional
-
-    this.$container = $selection.selectAll('.form-field-input-wrap')
-      .data([0]);
-
-    const type = (this._isMulti || this._isSemi) ? 'multicombo' : 'combo';
-    this.$container = this.$container.enter()
-      .append('div')
-      .attr('class', 'form-field-input-wrap form-field-input-' + type)
-      .merge(this.$container);
-
-    if (this._isMulti || this._isSemi) {
-      this.$container = this.$container.selectAll('.chiplist')
-        .data([0]);
-
-      let listClass = 'chiplist';
-
-      // Use a separate line for each value in the Destinations and Via fields
-      // to mimic highway exit signs
-      if (this.key === 'destination' || this.key === 'via') {
-        listClass += ' full-line-chips';
-      }
-
-      this.$container = this.$container.enter()
-        .append('ul')
-        .attr('class', listClass)
-        .on('click', () => {
-          if (scheduler) {
-            scheduler.setTimeout('ui-combo-focus', () => { this.$input.node().focus(); }, { ms: 10 });
-          } else {
-            this.$input.node().focus();
-          }
-        })
-        .merge(this.$container);
-
-
-      this._inputWrap = this.$container.selectAll('.input-wrap')
-        .data([0]);
-
-      this._inputWrap = this._inputWrap.enter()
-        .append('li')
-        .attr('class', 'input-wrap')
-        .merge(this._inputWrap);
-
-      this.$input = this._inputWrap.selectAll('input')
-        .data([0]);
-    } else {
-      this.$input = this.$container.selectAll('input')
-        .data([0]);
-    }
-
-    this.$input = this.$input.enter()
-      .append('input')
-      .attr('type', 'text')
-      .attr('id', this.uid)
-      .call(utilNoAuto)
-      .call(this._initCombo, $selection)
-      .merge(this.$input);
-
-    if (this._isNetwork) {
-      const extent = this.entityExtent;
-      const countryCode = extent && iso1A2Code(extent.center());
-      this._countryCode = countryCode?.toLowerCase();
-    }
-
-    this.$input
-      .on('change', this._change)
-      .on('blur', this._change);
-
-    this.$input
-      .on('keydown.field', (d3_event: KeyboardEvent) => {
-        switch (d3_event.keyCode) {
-          case 13: // ↩ Return
-            this.$input.node().blur(); // blurring also enters the value
-            d3_event.stopPropagation();
-            break;
-        }
-      });
-
-    if (this._isMulti || this._isSemi) {
-      this._combobox
-        .on('accept', () => {
-          this.$input.node().blur();
-          this.$input.node().focus();
-        });
-
-      this.$input
-        .on('focus', () => { this.$container.classed('active', true); });
-    }
-  }
-
-
-  /**
    * Updates the field UI to reflect the given entity tags.
    * @param tags - The entity tags to display
    */
   public syncTags(tags: Tags): void {
+    if (!this.$container) return;   // called too early?
+    if (!this.$input) return;   // called too early?
+
     const context = this.context;
     const l10n = context.systems.l10n!;
 
@@ -618,7 +653,7 @@ export class UiFieldCombo extends UiField {
       // or if the field is already at its character limit
       const hideAdd = (!this._allowCustomValues && !available.length) || maxLength <= 0;
       this.$container.selectAll('.chiplist .input-wrap')
-        .style('display', hideAdd ? 'none' : null);
+        .style('display', () => hideAdd ? 'none' : null);
 
 
       // Render chips
@@ -628,14 +663,14 @@ export class UiFieldCombo extends UiField {
       $chips.exit()
         .remove();
 
-      const $$enter = $chips.enter()
+      const $$chips = $chips.enter()
         .insert('li', '.input-wrap')
         .attr('class', 'chip');
 
-      $$enter.append('span');
-      $$enter.append('a');
+      $$chips.append('span');
+      $$chips.append('a');
 
-      $chips = $chips.merge($$enter)
+      $chips = $chips.merge($$chips)
         .order()
         .classed('raw-value', (d) => {
           let k = d.key;
@@ -708,14 +743,16 @@ export class UiFieldCombo extends UiField {
    * @param $selection - The chip selection to make draggable
    */
   protected _registerDragAndDrop($selection: D3Selection): void {
+    if (!this.$container) return;   // called too early?
+
     const key = this.key;
     const $container = this.$container;
     const multiData = this._multiData;
     const emit = this.emit.bind(this);
 
     // allow drag and drop re-ordering of chips
-    let dragOrigin: any, targetIndex: any;
-    $selection.call(d3_drag<any, any>()
+    let dragOrigin: { x: number; y: number } | null, targetIndex: number | null;
+    $selection.call(drag<any, any>()
       .on('start', function(d3_event: any) {
         dragOrigin = {
           x: d3_event.x,
@@ -723,27 +760,28 @@ export class UiFieldCombo extends UiField {
         };
         targetIndex = null;
       })
-      .on('drag', function(this: any, d3_event: any) {
+      .on('drag', function(this: HTMLElement, d3_event: any) {
         const x = d3_event.x - dragOrigin.x,
           y = d3_event.y - dragOrigin.y;
 
-        if (!d3_select(this).classed('dragging') &&
+        if (!select(this).classed('dragging') &&
           // don't display drag until dragging beyond a distance threshold
           Math.sqrt(Math.pow(x, 2) + Math.pow(y, 2)) <= 5) return;
 
         const index = $selection.nodes().indexOf(this);
 
-        d3_select(this)
+        select(this)
           .classed('dragging', true);
 
         targetIndex = null;
         let targetIndexOffsetTop: number | null = null;
-        const draggedTagWidth = d3_select(this).node().offsetWidth;
+        const draggedTagWidth = select(this).node()?.offsetWidth;
 
         if (key === 'destination' || key === 'via') { // meaning tags are full width
           $container.selectAll('.chip')
-            .style('transform', function(this: any, d2, index2) {
-              const node = d3_select(this).node();
+            .style('transform', function(this: HTMLElement, d2, index2) {
+              const node = select(this).node();
+              if (!node) return;
 
               if (index === index2) {
                 return 'translate(' + x + 'px, ' + y + 'px)';
@@ -764,8 +802,9 @@ export class UiFieldCombo extends UiField {
             });
         } else {
           $container.selectAll('.chip')
-            .each(function(this: any, d2, index2) {
-              const node = d3_select(this).node();
+            .each(function(this: HTMLElement, d2, index2) {
+              const node = select(this).node();
+              if (!node) return;
 
               // check the cursor is in the bounding box
               if (
@@ -779,8 +818,8 @@ export class UiFieldCombo extends UiField {
                 targetIndexOffsetTop = node.offsetTop;
               }
             })
-            .style('transform', function(this: any, d2, index2) {
-              const node = d3_select(this).node();
+            .style('transform', function(this: HTMLElement, d2, index2) {
+              const node = select(this).node();
 
               if (index === index2) {
                 return 'translate(' + x + 'px, ' + y + 'px)';
@@ -798,13 +837,13 @@ export class UiFieldCombo extends UiField {
             });
           }
       })
-      .on('end', function(this: any) {
-        if (!d3_select(this).classed('dragging')) {
+      .on('end', function(this: HTMLElement) {
+        if (!select(this).classed('dragging')) {
           return;
         }
         const index = $selection.nodes().indexOf(this);
 
-        d3_select(this)
+        select(this)
           .classed('dragging', false);
 
         $container.selectAll('.chip')
@@ -836,6 +875,7 @@ export class UiFieldCombo extends UiField {
 
   /** Moves keyboard focus to the field's input. */
   public focus(): void {
+    if (!this.$input) return;   // called too early?
     this.$input.node().focus();
   }
 }

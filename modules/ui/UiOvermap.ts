@@ -11,6 +11,14 @@ import { UiSpector } from './UiSpector.js';
 
 import type { Context } from '../Context.ts';
 import type { D3Selection } from 'd3-selection';
+import type { UiAttribution } from './UiAttribution.js';
+import type { UiInfoCards } from './UiInfoCards.js';
+import type { UiMap3dViewer } from './UiMap3dViewer.js';
+import type { UiMapControls } from './UiMapControls.js';
+import type { UiMapPanes } from './UiMapPanes.js';
+import type { UiMinimap } from './UiMinimap.js';
+import type { UiPhotoViewer } from './UiPhotoViewer.js';
+import type { UiSpector } from './UiSpector.js';
 
 
 /**
@@ -27,14 +35,14 @@ export class UiOvermap {
   public context: Context;
 
   // Child components
-  public Attribution: any;
-  public InfoCards: any;
-  public Map3dViewer: any;
-  public MapControls: any;
-  public MapPanes: any;
-  public Minimap: any;
-  public PhotoViewer: any;
-  public Spector: any;
+  public Attribution: UiAttribution;
+  public InfoCards: UiInfoCards;
+  public Map3dViewer: UiMap3dViewer;
+  public MapControls: UiMapControls;
+  public MapPanes: UiMapPanes;
+  public Minimap: UiMinimap;
+  public PhotoViewer: UiPhotoViewer;
+  public Spector: UiSpector;
 
   // D3 selections
   public $parent: D3Selection | null;

@@ -1,4 +1,4 @@
-import { select as d3_select } from 'd3-selection';
+import { select, selection } from 'd3-selection';
 import { utilArrayUniq, utilUniqueString } from '@rapid-sdk/util';
 import { iso1A2Code } from '@rapideditor/country-coder';
 
@@ -17,26 +17,55 @@ import type { UiFieldOptions } from '../UiField.js';
 import { LANGUAGE_SUFFIX_REGEX } from './types.ts';
 
 
+interface LanguageItem {
+  localName: string;
+  nativeName: string;
+  code: string;
+  label: string;
+}
+
+interface MultilingualItem {
+  lang: string;
+  value: string | string[] | undefined;
+}
+
+
+/**
+ * This UI component displays a localized name field.
+ * It includes a primary field, a button for "add multilingual",
+ * and additional fields for any localized tags such as `name:en`, `name:de`, etc.
+ */
 export class UiFieldLocalized extends UiField {
-  public $input: D3Selection;
-  public $localizedInputs: D3Selection;
-  public $parent: D3Selection;
+  // D3 selections
+  public $parent: D3Selection | null;
+  public $input: D3Selection | null;
+  public $localizedInputs: D3Selection | null;
+
   protected _countryCode: string | undefined;
   protected _tags: Tags;
-  protected _languagesArray: any[];
+  protected _languagesArray: LanguageItem[];
   protected _langCombo: any;
-  protected _multilingual: any[];
+  protected _multilingual: MultilingualItem[];
   protected _buttonTip: any;
-  protected _wikiTitles: any;
+  protected _wikiTitles: Record<string, string> | null;
 
+  /**
+   * @constructor
+   * @param context - Global shared application context
+   * @param presetField - The preset field definition this field renders
+   * @param entityIDs - The entities this field applies to
+   * @param options - Field display options
+   */
   public constructor(context: Context, presetField: Field, entityIDs: EntityID[] = [], options: Partial<UiFieldOptions> = {}) {
     super(context, presetField, entityIDs, options);
 
     const l10n = context.systems.l10n!;
 
-    this.$input = d3_select(null);
-    this.$localizedInputs = d3_select(null);
-    this.$parent = d3_select(null);
+    // D3 selections
+    this.$parent = null;
+    this.$input = null;
+    this.$localizedInputs = null;
+
     this._countryCode = undefined;
     this._tags = {};
     this._languagesArray = [];
@@ -63,127 +92,22 @@ export class UiFieldLocalized extends UiField {
   }
 
 
-  /** Builds the array of languages used to populate the language combobox. */
-  protected _buildLanguagesArray(): void {
-    const l10n = this.context.systems.l10n!;
-
-    if (this._languagesArray.length) return;  // done already
-
-    // some conversion is needed to ensure correct OSM tags are used
-    const replacements: Record<string, string | boolean> = {
-      sr: 'sr-Cyrl',      // in OSM, `sr` implies Cyrillic
-      'sr-Cyrl': false    // `sr-Cyrl` isn't used in OSM
-    };
-
-    const languages = l10n.languages as any;
-    for (const code in languages) {
-      if (replacements[code] === false) continue;
-      let metaCode: string = code;
-      if (replacements[code]) metaCode = replacements[code] as string;
-
-      this._languagesArray.push({
-        localName: l10n.languageName(metaCode, { localOnly: true }),
-        nativeName: languages[metaCode].nativeName,
-        code: code,
-        label: l10n.languageName(metaCode)
-      });
-    }
-  }
-
-
-  /** Recomputes whether the field should be locked (e.g. protected suggestion-preset names). */
-  protected _calcLocked(): void {
-    const editor = this.context.systems.editor!;
-    const schema = this.context.systems.schema!;
-
-    const graph = editor.staging.graph;
-    // Protect name field for suggestion presets that don't display a brand/operator field
-    const isLocked = (this.id === 'name') &&
-      this.entityIDs.length &&
-      this.entityIDs.some(function(entityID) {
-        const entity = graph.hasEntity(entityID);
-        if (!entity) return false;
-
-        // Features linked to Wikidata are likely important and should be protected
-        if (entity.tags.wikidata) return true;
-
-        // Assume the name has already been confirmed if its source has been researched
-        if (entity.tags['name:etymology:wikidata']) return true;
-
-        // Lock the `name` if this is a suggestion preset that assigns the name,
-        // and the preset does not display a `brand` or `operator` field.
-        // (For presets like hotels, car dealerships, post offices, the `name` should remain editable)
-        // see also similar logic in `outdated_tags.js`
-        const preset = schema.match(entity, graph);
-        if (preset) {
-          const isSuggestion = preset.props.suggestion;
-          const fields = preset.fields();
-          const showsBrandField = fields.some((d: any) => d.id === 'brand');
-          const showsOperatorField = fields.some((d: any) => d.id === 'operator');
-          const setsName = preset.addTags.name;
-          const setsBrandWikidata = preset.addTags['brand:wikidata'];
-          const setsOperatorWikidata = preset.addTags['operator:wikidata'];
-
-          return (isSuggestion && setsName && (
-            (setsBrandWikidata && !showsBrandField) ||
-            (setsOperatorWikidata && !showsOperatorField)
-          ));
-        }
-
-        return false;
-      });
-
-    this.locked(!!isLocked);
-  }
-
-
-  // update _multilingual, maintaining the existing order
   /**
-   * Updates `_multilingual` from the given tags, preserving existing order.
-   * @param tags - The entity tags to read localized values from
+   * Accepts a parent selection, and renders the content under it.
+   * (The parent selection is required the first time, but can be inferred on subsequent renders)
+   * @param $parent - A d3-selection to a HTMLElement that this component should render itself into
    */
-  protected _calcMultilingual(tags: Tags): void {
-    const existingLangsOrdered = this._multilingual.map(function(item) {
-      return item.lang;
-    });
-    const existingLangs = new Set(existingLangsOrdered.filter(Boolean));
-
-    for (const k in tags) {
-      const m = k.match(LANGUAGE_SUFFIX_REGEX);
-      if (m && m[1] === this.key && m[2]) {
-        const item = { lang: m[2], value: tags[k] };
-        if (existingLangs.has(item.lang)) {
-          // update the value
-          this._multilingual[existingLangsOrdered.indexOf(item.lang)].value = item.value;
-          existingLangs.delete(item.lang);
-        } else {
-          this._multilingual.push(item);
-        }
-      }
+  public renderContent($parent = this.$parent): void {
+    if ($parent instanceof selection) {
+      this.$parent = $parent;
+    } else {
+      return;   // no parent - called too early?
     }
 
-    // Don't remove items based on deleted tags, since this makes the UI
-    // disappear unexpectedly when clearing values - iD#8164
-    this._multilingual.forEach(function(item) {
-      if (item.lang && existingLangs.has(item.lang)) {
-        item.value = '';
-      }
-    });
-  }
-
-
-  /**
-   * Renders the field into the given selection.
-   * Captures the selection in `this.$parent` on each render so other methods
-   *  (e.g. `tags()`) can re-render the field in place.
-   * @param $selection - A d3-selection to the HTMLElement this field renders into
-   */
-  public renderContent($selection: D3Selection): void {
-    this.$parent = $selection;
     this._calcLocked();
     const isLocked = this.locked();
 
-    let $wrap: D3Selection = $selection.selectAll('.form-field-input-wrap')
+    let $wrap: D3Selection = $parent.selectAll('.form-field-input-wrap')
       .data([0]);
 
     // enter/update
@@ -231,7 +155,7 @@ export class UiFieldLocalized extends UiField {
       this._calcMultilingual(this._tags);
     }
 
-    this.$localizedInputs = $selection.selectAll('.localized-multilingual')
+    this.$localizedInputs = $parent.selectAll('.localized-multilingual')
       .data([0]);
 
     this.$localizedInputs = this.$localizedInputs.enter()
@@ -248,11 +172,120 @@ export class UiFieldLocalized extends UiField {
   }
 
 
+  /** Builds the array of languages used to populate the language combobox. */
+  protected _buildLanguagesArray(): void {
+    const l10n = this.context.systems.l10n!;
+
+    if (this._languagesArray.length) return;  // done already
+
+    // some conversion is needed to ensure correct OSM tags are used
+    const replacements: Record<string, string | boolean> = {
+      sr: 'sr-Cyrl',      // in OSM, `sr` implies Cyrillic
+      'sr-Cyrl': false    // `sr-Cyrl` isn't used in OSM
+    };
+
+    for (const code of Object.keys(l10n.languages)) {
+      if (replacements[code] === false) continue;
+      let metaCode: string = code;
+      if (replacements[code]) metaCode = replacements[code] as string;
+
+      const label = l10n.languageName(metaCode);
+      const localName = l10n.languageName(metaCode, { localOnly: true });
+      const nativeName = l10n.languages[metaCode].nativeName;
+
+      if (label && localName && nativeName) {
+        this._languagesArray.push({ code, label, localName, nativeName });
+      }
+    }
+  }
+
+
+  /** Recomputes whether the field should be locked (e.g. protected suggestion-preset names). */
+  protected _calcLocked(): void {
+    const editor = this.context.systems.editor!;
+    const schema = this.context.systems.schema!;
+
+    const graph = editor.staging.graph;
+    // Protect name field for suggestion presets that don't display a brand/operator field
+    const isLocked = (this.id === 'name') &&
+      this.entityIDs.length &&
+      this.entityIDs.some(function(entityID) {
+        const entity = graph.hasEntity(entityID);
+        if (!entity) return false;
+
+        // Features linked to Wikidata are likely important and should be protected
+        if (entity.tags.wikidata) return true;
+
+        // Assume the name has already been confirmed if its source has been researched
+        if (entity.tags['name:etymology:wikidata']) return true;
+
+        // Lock the `name` if this is a suggestion preset that assigns the name,
+        // and the preset does not display a `brand` or `operator` field.
+        // (For presets like hotels, car dealerships, post offices, the `name` should remain editable)
+        // see also similar logic in `outdated_tags.js`
+        const preset = schema.match(entity, graph);
+        if (preset) {
+          const isSuggestion = preset.props.suggestion;
+          const fields = preset.fields();
+          const showsBrandField = fields.some((d: Field) => d.id === 'brand');
+          const showsOperatorField = fields.some((d: Field) => d.id === 'operator');
+          const setsName = preset.addTags.name;
+          const setsBrandWikidata = preset.addTags['brand:wikidata'];
+          const setsOperatorWikidata = preset.addTags['operator:wikidata'];
+
+          return (isSuggestion && setsName && (
+            (setsBrandWikidata && !showsBrandField) ||
+            (setsOperatorWikidata && !showsOperatorField)
+          ));
+        }
+
+        return false;
+      });
+
+    this.locked(!!isLocked);
+  }
+
+
+  // update _multilingual, maintaining the existing order
+  /**
+   * Updates `_multilingual` from the given tags, preserving existing order.
+   * @param tags - The entity tags to read localized values from
+   */
+  protected _calcMultilingual(tags: Tags): void {
+    const existingLangsOrdered = this._multilingual.map(item => item.lang);
+    const existingLangs = new Set(existingLangsOrdered.filter(Boolean));
+
+    for (const k in tags) {
+      const m = k.match(LANGUAGE_SUFFIX_REGEX);
+      if (m && m[1] === this.key && m[2]) {
+        const item = { lang: m[2], value: tags[k] };
+        if (existingLangs.has(item.lang)) {
+          // update the value
+          this._multilingual[existingLangsOrdered.indexOf(item.lang)].value = item.value;
+          existingLangs.delete(item.lang);
+        } else {
+          this._multilingual.push(item);
+        }
+      }
+    }
+
+    // Don't remove items based on deleted tags, since this makes the UI
+    // disappear unexpectedly when clearing values - iD#8164
+    for (const item of this._multilingual) {
+      if (item.lang && existingLangs.has(item.lang)) {
+        item.value = '';
+      }
+    };
+  }
+
+
   /**
    * Adds a new empty multilingual entry and re-renders the multilingual inputs.
    * @param d3_event - The triggering DOM event
    */
   protected _addNew(d3_event: Event): void {
+    if (!this.$localizedInputs) return;   // called too early?
+
     const l10n = this.context.systems.l10n!;
 
     d3_event.preventDefault();
@@ -290,7 +323,7 @@ export class UiFieldLocalized extends UiField {
         return;
       }
 
-      let val = utilGetSetValue(d3_select(d3_event.currentTarget as any)) as string;
+      let val = utilGetSetValue(select(d3_event.currentTarget as HTMLInputElement)) as string;
       if (!onInput) val = context.cleanTagValue(val);
 
       // don't override multiple values with blank string
@@ -319,16 +352,16 @@ export class UiFieldLocalized extends UiField {
    * @param d3_event - The triggering DOM event
    * @param d        - The multilingual entry datum being edited
    */
-  protected _changeLang(d3_event: Event, d: any): void {
+  protected _changeLang(d3_event: Event, d: MultilingualItem): void {
     const context = this.context;
 
     // Ensure languages array is built
     this._buildLanguagesArray();
 
-    const tags: any = {};
+    const tags: Tags = {};
 
     // make sure unrecognized suffixes are lowercase - iD#7156
-    let lang = (utilGetSetValue(d3_select(d3_event.currentTarget as any)) as string).toLowerCase();
+    let lang = (utilGetSetValue(select(d3_event.currentTarget as HTMLInputElement)) as string).toLowerCase();
 
     const language = this._languagesArray.find(function(d) {
       return d.label.toLowerCase() === lang ||
@@ -343,7 +376,7 @@ export class UiFieldLocalized extends UiField {
 
     const newKey = lang && context.cleanTagKey(this._key(lang));
 
-    const value = utilGetSetValue(d3_select((d3_event.currentTarget as any).parentNode).selectAll('.localized-value'));
+    const value = utilGetSetValue(select((d3_event.currentTarget as HTMLElement).parentNode as HTMLElement).selectAll('.localized-value'));
 
     if (newKey && value) {
       tags[newKey] = value;
@@ -361,16 +394,16 @@ export class UiFieldLocalized extends UiField {
    * @param d3_event - The triggering DOM event
    * @param d        - The multilingual entry datum being edited
    */
-  protected _changeValue(d3_event: Event, d: any): void {
+  protected _changeValue(d3_event: Event, d: MultilingualItem): void {
     const context = this.context;
 
     if (!d.lang) return;
-    const value = context.cleanTagValue(utilGetSetValue(d3_select(d3_event.currentTarget as any)) as string) || undefined;
+    const value = context.cleanTagValue(utilGetSetValue(select(d3_event.currentTarget as HTMLInputElement)) as string) || undefined;
 
     // don't override multiple values with blank string
     if (!value && Array.isArray(d.value)) return;
 
-    const t: any = {};
+    const t: Tags = {};
     t[this._key(d.lang)] = value;
     d.value = value;
     this.emit('change', t);
@@ -382,7 +415,7 @@ export class UiFieldLocalized extends UiField {
    * @param value - The current input text to filter languages by
    * @param cb    - Receives the list of matching language options
    */
-  protected _getLanguages(value: string, cb: (data: any[]) => void): void {
+  protected _getLanguages(value: string, cb: (data: { value: string }[]) => void): void {
     const l10n = this.context.systems.l10n!;
 
     // Ensure languages array is built (it may not have been ready earlier)
@@ -398,7 +431,7 @@ export class UiFieldLocalized extends UiField {
       langCodes = langCodes.concat(territoryLanguages[this._countryCode]);
     }
 
-    let langItems: any[] = [];
+    let langItems: LanguageItem[] = [];
     langCodes.forEach((code) => {
       const langItem = this._languagesArray.find(function(item) {
         return item.code === code;
@@ -427,7 +460,7 @@ export class UiFieldLocalized extends UiField {
     const langCombo = this._langCombo;
 
     let $entries: D3Selection = $selection.selectAll('div.entry')
-      .data(this._multilingual, function(d: any) { return d.lang; });
+      .data(this._multilingual, function(d: MultilingualItem) { return d.lang; });
 
     $entries.exit()
       .style('top', '0')
@@ -442,30 +475,30 @@ export class UiFieldLocalized extends UiField {
       .append('div')
       .attr('class', 'entry')
       .each((_, index, nodes) => {
-        const $wrap = d3_select(nodes[index]);
+        const $wrap: D3Selection = select(nodes[index]);
         const uid = utilUniqueString(String(index));
 
-        const label = $wrap
+        const $label: D3Selection = $wrap
           .append('label')
           .attr('class', 'field-label')
           .attr('for', uid);
 
-        const text = label
+        const $text: D3Selection = $label
           .append('span')
           .attr('class', 'label-text');
 
-        text
+        $text
           .append('span')
           .attr('class', 'label-textvalue');
 
-        text
+        $text
           .append('span')
           .attr('class', 'label-textannotation');
 
-        label
+        $label
           .append('button')
           .attr('class', 'remove-icon-multilingual')
-          .on('click', (d3_event: Event, d: any) => {
+          .on('click', (d3_event: Event, d: MultilingualItem) => {
             if (this.locked()) return;
             d3_event.preventDefault();
 
@@ -476,7 +509,7 @@ export class UiFieldLocalized extends UiField {
             if (langKey && langKey in this._tags) {
               delete this._tags[langKey];
               // remove from entity tags
-              const t: any = {};
+              const t: Tags = {};
               t[langKey] = undefined;
               this.emit('change', t);
               return;
@@ -512,8 +545,8 @@ export class UiFieldLocalized extends UiField {
       .style('margin-top', '10px')
       .style('max-height', '240px')
       .style('opacity', '1')
-      .on('end', function(this: any) {
-        d3_select(this)
+      .on('end', function(this: HTMLElement) {
+        select(this)
           .style('max-height', '')
           .style('overflow', 'visible');
       });
@@ -529,7 +562,7 @@ export class UiFieldLocalized extends UiField {
     $entries.select('.label-textvalue')
       .html(l10n.tHtml('translate.localized_translation_label'));
 
-    (utilGetSetValue($entries.select('.localized-lang'), (d: any) => {
+    (utilGetSetValue($entries.select('.localized-lang'), (d: MultilingualItem) => {
       const langItem = this._languagesArray.find(function(item) {
         return item.code === d.lang;
       });
@@ -538,16 +571,16 @@ export class UiFieldLocalized extends UiField {
     }) as D3Selection)
       .attr('placeholder', l10n.t('translate.localized_translation_language'));
 
-    (utilGetSetValue($entries.select('.localized-value'), function(d: any) {
+    (utilGetSetValue($entries.select('.localized-value'), function(d: MultilingualItem) {
         return typeof d.value === 'string' ? d.value : '';
       }) as D3Selection)
-      .attr('title', function(d: any) {
+      .attr('title', function(d: MultilingualItem) {
         return Array.isArray(d.value) ? d.value.filter(Boolean).join('\n') : null;
       })
-      .attr('placeholder', function(d: any) {
+      .attr('placeholder', function(d: MultilingualItem) {
         return Array.isArray(d.value) ? l10n.t('inspector.multiple_values') : l10n.t('translate.localized_translation_name');
       })
-      .classed('mixed', function(d: any) {
+      .classed('mixed', function(d: MultilingualItem) {
         return Array.isArray(d.value);
       });
   }
@@ -558,6 +591,8 @@ export class UiFieldLocalized extends UiField {
    * @param tags - The entity tags to display
    */
   public syncTags(tags: Tags): void {
+    if (!this.$input) return;   // called too early?
+
     const context = this.context;
     const l10n = context.systems.l10n!;
     const wikipedia = context.services.wikipedia as any;
@@ -584,14 +619,13 @@ export class UiFieldLocalized extends UiField {
       .classed('mixed', isMixed);
 
     this._calcMultilingual(tags);
-
-    this.$parent
-      .call(this.renderContent);
+    this.renderContent();
   }
 
 
   /** Moves keyboard focus to the field's input. */
   public focus(): void {
+    if (!this.$input) return;   // called too early?
     (this.$input.node() as HTMLElement).focus();
   }
 

@@ -1,6 +1,5 @@
-import { select as d3_select } from 'd3-selection';
+import { select, selection } from 'd3-selection';
 import { utilArrayUnion } from '@rapid-sdk/util';
-
 import { UiField } from '../UiField.js';
 import { createUiField } from './index.js';
 
@@ -14,18 +13,29 @@ import type { UiFieldOptions } from '../UiField.js';
 export { UiFieldRadio as UiFieldStructureRadio };
 
 
+/**
+ * This UI component displays a radio button field.
+ * There are several variants:
+ * - 'radio':
+ * - 'structureRadio':
+ */
 export class UiFieldRadio extends UiField {
+  // D3 selections
+  public $parent: D3Selection | null;
+  public $placeholder: D3Selection | null;
+  public $wrap: D3Selection | null;
+  public $labels: D3Selection | null;
+  public $radios: D3Selection | null;
+
   protected _scope: SchemaScope;
   protected _radioData: string[];
-  public $placeholder: D3Selection;
-  public $wrap: D3Selection;
-  public $labels: D3Selection;
-  public $radios: D3Selection;
   protected _typeField: UiField | null;
   protected _layerField: UiField | null;
-  protected _oldType: Record<string, string>;
+  protected _oldType: Record<string, string | string[] | undefined>;
+
 
   /**
+   * @constructor
    * @param context - Global shared application context
    * @param presetField - the original Field tracked by the SchemaSystem
    * @param entityIDs - the entities this field applies to
@@ -37,10 +47,13 @@ export class UiFieldRadio extends UiField {
 
     this._scope = schema.getScope('osm');
 
-    this.$placeholder = d3_select(null);
-    this.$wrap = d3_select(null);
-    this.$labels = d3_select(null);
-    this.$radios = d3_select(null);
+    // D3 selections
+    this.$parent = null;
+    this.$placeholder = null;
+    this.$wrap = null;
+    this.$labels = null;
+    this.$radios = null;
+
     this._radioData = (presetField.props.options || this.keys).slice();  // shallow copy
     this._typeField = null;
     this._layerField = null;
@@ -55,27 +68,22 @@ export class UiFieldRadio extends UiField {
 
 
   /**
-   * Returns the datum of the currently active radio, or `false` if none is active.
-   * @return The active radio's bound value, or `false`
+   * Accepts a parent selection, and renders the content under it.
+   * (The parent selection is required the first time, but can be inferred on subsequent renders)
+   * @param $parent - A d3-selection to a HTMLElement that this component should render itself into
    */
-  protected _selectedKey(): string | false {
-    const $node = this.$wrap.selectAll('.form-field-input-radio label.active input');
-    return !$node.empty() && $node.datum();
-  }
+  public renderContent($parent = this.$parent): void {
+    if ($parent instanceof selection) {
+      this.$parent = $parent;
+    } else {
+      return;   // no parent - called too early?
+    }
 
-
-  /**
-   * Renders the content into the given selection.
-   * This component is handed its target selection by its parent on each render, so it
-   *  renders into `$selection` directly rather than capturing `$parent` for re-render.
-   * @param $selection - A d3-selection to the HTMLElement this component renders into
-   */
-  public renderContent($selection: D3Selection): void {
     const l10n = this.context.systems.l10n!;
 
-    $selection.classed('preset-radio', true);
+    $parent.classed('preset-radio', true);
 
-    this.$wrap = $selection.selectAll('.form-field-input-wrap')
+    this.$wrap = $parent.selectAll('.form-field-input-wrap')
       .data([0]);
 
     let $$enter: D3Selection = this.$wrap.enter()
@@ -133,8 +141,8 @@ export class UiFieldRadio extends UiField {
     const l10n = context.systems.l10n!;
     const scope = this._scope;
 
-    const selected = this._selectedKey() || tags.layer !== undefined;
-    const type = scope?.fields.get(selected);
+    const selected: string | boolean = this._selectedKey() || tags.layer !== undefined;
+    const type = typeof selected === 'string' ? scope?.fields.get(selected) : null;
     const layer = scope?.fields.get('layer');
     const showLayer = (selected === 'bridge' || selected === 'tunnel' || tags.layer !== undefined);
 
@@ -170,7 +178,7 @@ export class UiFieldRadio extends UiField {
     }
 
     let $typeItem: D3Selection = $list.selectAll('.structure-type-item')
-      .data(this._typeField ? [this._typeField] : [], function(d: UiField) { return d.id; });
+      .data(this._typeField ? [this._typeField] : [], d => d.id);
 
     // Exit
     $typeItem.exit()
@@ -304,6 +312,8 @@ export class UiFieldRadio extends UiField {
 
   /** Handles a radio selection change and dispatches the resulting tag change. */
   protected _changeRadio(): void {
+    if (!this.$radios) return;   // called too early?
+
     const key = this.key;
     const type = this.type;
     const oldType = this._oldType;
@@ -315,14 +325,14 @@ export class UiFieldRadio extends UiField {
     }
 
     this.$radios.each(function(this: HTMLInputElement, d: string) {
-      const active = d3_select(this).property('checked');
-      if (active) activeKey = d;
+      const isActive = select(this).property('checked') as boolean;
+      if (isActive) activeKey = d;
 
       if (key) {
-        if (active) t[key] = d;
+        if (isActive) t[key] = d;
       } else {
-        const val = oldType[activeKey] || 'yes';
-        t[d] = active ? val : undefined;
+        const val = oldType[(activeKey || '')] || 'yes';
+        t[d] = isActive ? val : undefined;
       }
     });
 
@@ -341,10 +351,25 @@ export class UiFieldRadio extends UiField {
 
 
   /**
+   * Returns the datum of the currently active radio, or `false` if none is active.
+   * @return The active radio's bound value, or `false`
+   */
+  protected _selectedKey(): string | false {
+    if (!this.$wrap) return false;   // called too early?
+
+    const $node = this.$wrap.selectAll('.form-field-input-radio label.active input');
+    if ($node.empty()) return false;
+    return $node.datum() as string;
+  }
+
+
+  /**
    * Updates the field UI to reflect the given entity tags.
    * @param tags - The entity tags to display
    */
   public syncTags(tags: Tags): void {
+    if (!this.$radios || !this.$labels || !this.$wrap || !this.$placeholder) return;   // called too early?
+
     const l10n = this.context.systems.l10n!;
     const key = this.key;
     const type = this.type;
@@ -401,6 +426,7 @@ export class UiFieldRadio extends UiField {
 
   /** Moves keyboard focus to the field's input. */
   public focus(): void {
+    if (!this.$radios) return;   // called too early?
     (this.$radios.node() as HTMLElement).focus();
   }
 

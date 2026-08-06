@@ -10,6 +10,17 @@ import type { Context } from '../Context.ts';
 import type { D3Selection } from 'd3-selection';
 import type { Vec2 } from '@rapid-sdk/math';
 
+/** Minimal interface for an operation bound as data in the edit menu */
+interface Operation {
+  id: OperationID;
+  title: string;
+  mouseOnly?: boolean;
+  disabled(): string | null | false;
+  tooltip(): string;
+  keys?: string[];
+  relatedEntityIds?(): EntityID[];
+}
+
 
 const VIEW_TOP_MARGIN = 85;     // viewport top margin
 const VIEW_BOTTOM_MARGIN = 45;  // viewport bottom margin
@@ -31,8 +42,8 @@ export class UiEditMenu extends EventEmitter {
   // Menu state, these are locked in when menu is initially shown
   // but needed later if the menu is repositioned
   protected _menu: D3Selection;
-  protected _operations: any[];
-  protected _tooltips: Map<string, any>;   // Map(id -> tooltip)
+  protected _operations: Operation[];
+  protected _tooltips: Map<OperationID, any>;   // Map(id -> tooltip)
   protected _anchorLoc: Vec2;              // Array [lon,lat] wgs84 coordinate where the menu should be anchored
   protected _oldz: number;
   protected _triggerType: string;          // 'touch', 'pen', or 'rightclick'
@@ -82,7 +93,7 @@ export class UiEditMenu extends EventEmitter {
     }
 
     const isTouchMenu = this._triggerType.includes('touch') || this._triggerType.includes('pen');
-    const ops = this._operations.filter((op: any) => !isTouchMenu || !op.mouseOnly);
+    const ops = this._operations.filter((op: Operation) => !isTouchMenu || !op.mouseOnly);
     if (!ops.length) return;
 
     // Position the menu above the anchor for stylus and finger input
@@ -96,7 +107,7 @@ export class UiEditMenu extends EventEmitter {
     const buttonHeight = showLabels ? 32 : 34;
     if (showLabels) {
       // Get a general idea of the width based on the length of the label
-      this._menuWidth = 52 + Math.min(120, 6 * Math.max(...ops.map((op: any) => op.title.length)));
+      this._menuWidth = 52 + Math.min(120, 6 * Math.max(...ops.map((op: Operation) => op.title.length)));
     } else {
       this._menuWidth = 44;
     }
@@ -116,7 +127,7 @@ export class UiEditMenu extends EventEmitter {
     this._menu = $wrap.merge($$wrap);
 
     let $buttons: D3Selection = this._menu.selectAll('.edit-menu-item')
-      .data(ops, (d: any) => d.id);
+      .data(ops, (d: Operation) => d.id);
 
     // Exit
     $buttons.exit()
@@ -125,7 +136,7 @@ export class UiEditMenu extends EventEmitter {
     // Enter
     const $$buttons = $buttons.enter()
       .append('button')
-      .attr('class', (d: any) => `edit-menu-item edit-menu-item-${d.id}`)
+      .attr('class', (d: Operation) => `edit-menu-item edit-menu-item-${d.id}`)
       .style('height', `${buttonHeight}px`)
       .on('click', this._click)
       // don't listen for `mouseup` because we only care about non-mouse pointer types
@@ -134,17 +145,17 @@ export class UiEditMenu extends EventEmitter {
         // don't let button presses also act as map input - iD#1869
         d3_event.stopPropagation();
       })
-      .on('mouseenter.highlight', (d3_event: Event, d: any) => {
+      .on('mouseenter.highlight', (d3_event: Event, d: Operation) => {
         if (!d.relatedEntityIds || d3_select(d3_event.currentTarget as HTMLElement).classed('disabled')) return;
         utilHighlightEntities(context, d.relatedEntityIds(), true);
       })
-      .on('mouseleave.highlight', (d3_event: Event, d: any) => {
+      .on('mouseleave.highlight', (d3_event: Event, d: Operation) => {
         if (!d.relatedEntityIds) return;
         utilHighlightEntities(context, d.relatedEntityIds(), false);
       });
 
     // create placeholder icon, label, tooltip
-    $$buttons.each((d: any, i: number, nodes: any) => {
+    $$buttons.each((d: Operation, i: number, nodes: ArrayLike<HTMLElement>) => {
       const $button = d3_select(nodes[i]);
 
       $button
@@ -169,17 +180,17 @@ export class UiEditMenu extends EventEmitter {
     $buttons = $buttons.merge($$buttons);
 
     // refresh with current data
-    $buttons.each((d: any, i: number, nodes: any) => {
+    $buttons.each((d: Operation, i: number, nodes: ArrayLike<HTMLElement>) => {
       const $button = d3_select(nodes[i]);
 
       $button
-        .classed('disabled', (d: any) => d.disabled());
+        .classed('disabled', (d: Operation) => !!d.disabled());
 
       $button.selectAll('.icon-wrap use')
         .attr('href', `#rapid-operation-${d.id}`);
 
       $button.selectAll('.label')
-        .text((d: any) => d.title);
+        .text((d: Operation) => d.title);
 
       const tooltip = this._tooltips.get(d.id);
       if (tooltip) {
@@ -203,7 +214,7 @@ export class UiEditMenu extends EventEmitter {
    * Records the pointer type of the last `pointerup` (called before `click`).
    * @param d3_event - the `pointerup` event
    */
-  protected _pointerup(d3_event: any): void {
+  protected _pointerup(d3_event: PointerEvent): void {
     this._lastPointerUpType = d3_event.pointerType;
   }
 
@@ -213,7 +224,7 @@ export class UiEditMenu extends EventEmitter {
    * @param d3_event - the triggering event
    * @param operation - the operation bound to the clicked item
    */
-  protected _click(d3_event: Event, operation: any): void {
+  protected _click(d3_event: Event, operation: Operation): void {
     const context = this.context;
     const ui = context.systems.ui;
 
@@ -400,7 +411,7 @@ export class UiEditMenu extends EventEmitter {
    * Some operations may be skipped if we've detected pen/touch input
    * @param val - the operations to set; omit to get the current value
    */
-  public operations(val?: any): any {
+  public operations(val?: Operation[]): any {
     if (val === undefined) return this._operations;
     this._operations = val;
     return this;

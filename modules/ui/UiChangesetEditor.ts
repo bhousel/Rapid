@@ -7,6 +7,9 @@ import { uiFormFields } from './form_fields.js';
 
 import type { Context } from '../Context.ts';
 import type { D3Selection } from 'd3-selection';
+import type { SchemaScope } from '../core/SchemaSystem.ts';
+import type { Tags } from './fields/types.ts';
+import type { UiField } from './UiField.js';
 
 
 /**
@@ -17,12 +20,12 @@ import type { D3Selection } from 'd3-selection';
 export class UiChangesetEditor extends EventEmitter {
   public context: Context;
 
-  protected _scope: any;
+  protected _scope: SchemaScope;
   protected _formFields: any;
   protected _commentCombo: any;
-  protected _uifields: any;
-  protected _tags: any;
-  protected _changesetID: any;
+  protected _uifields: UiField[] | null | undefined;
+  protected _tags: Tags | undefined;
+  protected _changesetID: string | undefined;
 
   public constructor(context: Context) {
     super();
@@ -59,20 +62,20 @@ export class UiChangesetEditor extends EventEmitter {
       initial = true;
 
       this._uifields = [
-        createUiField(context, this._scope?.fields.get('comment'), null as any, { show: true, revert: false }),
-        createUiField(context, this._scope?.fields.get('source'), null as any, { show: false, revert: false }),
-        createUiField(context, this._scope?.fields.get('hashtags'), null as any, { show: false, revert: false }),
+        createUiField(context, this._scope?.fields.get('comment'), [], { show: true, revert: false }),
+        createUiField(context, this._scope?.fields.get('source'), [], { show: false, revert: false }),
+        createUiField(context, this._scope?.fields.get('hashtags'), [], { show: false, revert: false }),
       ];
 
-      this._uifields.forEach((field: any) => {
+      this._uifields.forEach((field: UiField) => {
         field
-          .on('change', (t: any, onInput: any) => {
+          .on('change', (t: Tags, onInput: boolean) => {
             this.emit('change', undefined, t, onInput);
           });
       });
     }
 
-    this._uifields.forEach((field: any) => {
+    this._uifields.forEach((field: UiField) => {
       field
         .tags(this._tags);
     });
@@ -96,7 +99,7 @@ export class UiChangesetEditor extends EventEmitter {
       (commentField.node() as HTMLTextAreaElement | null)?.dispatchEvent(new Event('blur', { bubbles: true, cancelable: true }));
 
       // Populate dropdown with user's recent changeset comments, if possible
-      const osm = context.services.osm as any;
+      const osm = context.services.osm;
       if (osm) {
         osm.getUserChangesetsAsync()
           .then((changesets: any) => {
@@ -160,7 +163,7 @@ export class UiChangesetEditor extends EventEmitter {
    * Gets or sets the changeset tags.
    * @param val - the tags to set; omit to get the current value
    */
-  public tags(val?: any): any {
+  public tags(val?: Tags): any {
     if (val === undefined) return this._tags;
     this._tags = val;
     // Don't reset _uifields here.
@@ -172,7 +175,7 @@ export class UiChangesetEditor extends EventEmitter {
    * Gets or sets the changeset ID.
    * @param val - the changeset ID to set; omit to get the current value
    */
-  public changesetID(val?: any): any {
+  public changesetID(val?: string): any {
     if (val === undefined) return this._changesetID;
     if (this._changesetID === val) return this;
     this._changesetID = val;

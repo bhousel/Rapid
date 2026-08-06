@@ -6,6 +6,10 @@ import {
 
 import type { Context } from '../Context.ts';
 import type { D3Selection } from 'd3-selection';
+import type { UiPane } from './UiPane.ts';
+import type {
+  UiPaneBackground, UiPaneHelp, UiPaneIssues, UiPaneMapData, UiPanePreferences
+} from './panes/index.js';
 
 
 /**
@@ -16,12 +20,12 @@ export class UiMapPanes {
   public context: Context;
 
   // Child components
-  public Background: any;
-  public MapData: any;
-  public Issues: any;
-  public Preferences: any;
-  public Help: any;
-  public panes: any[];
+  public Background: UiPaneBackground;
+  public MapData: UiPaneMapData;
+  public Issues: UiPaneIssues;
+  public Preferences: UiPanePreferences;
+  public Help: UiPaneHelp;
+  public panes: UiPane[];
 
   // D3 selections
   public $parent: D3Selection | null;
@@ -78,9 +82,9 @@ export class UiMapPanes {
 
     // Add the panes (enter only)
     $$panes.selectAll('.map-pane')
-      .data(this.panes, (d: any) => d.id)
+      .data(this.panes, (d: UiPane) => d.id)
       .enter()
-      .each((d: any, i, nodes) => {
+      .each((d: UiPane, i, nodes) => {
         select(nodes[i]).call(d.renderPane);
       });
 
@@ -88,9 +92,9 @@ export class UiMapPanes {
     const $mapControls = $parent.selectAll('.map-controls');
 
     $mapControls.selectAll('.map-pane-control')
-      .data(this.panes, (d: any) => d.id)
+      .data(this.panes, (d: UiPane) => d.id)
       .enter()
-      .each((d: any, i, nodes) => {
+      .each((d: UiPane, i, nodes) => {
         select(nodes[i]).call(d.renderToggleButton);
       });
   }

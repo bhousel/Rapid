@@ -8,6 +8,7 @@ import { UiViewOn } from './UiViewOn.js';
 
 import type { Context } from '../Context.ts';
 import type { D3Selection } from 'd3-selection';
+import type { OsmoseIssue } from '../services/OsmoseService.ts';
 
 
 /**
@@ -17,7 +18,7 @@ import type { D3Selection } from 'd3-selection';
  */
 export class UiOsmoseEditor extends EventEmitter {
   public context: Context;
-  public datum: any;
+  public datum: OsmoseIssue | null;
 
   // D3 selections
   public $parent: D3Selection | null;
@@ -59,7 +60,7 @@ export class UiOsmoseEditor extends EventEmitter {
 
     const context = this.context;
     const l10n = context.systems.l10n!;
-    const osmose = context.services.osmose as any;
+    const osmose = context.services.osmose;
 
     let $header: D3Selection = $parent.selectAll('.header')
       .data([0]);
@@ -128,7 +129,7 @@ export class UiOsmoseEditor extends EventEmitter {
     const isShown = (this.datum && isSelected);
 
     let $saveSection: D3Selection = $selection.selectAll('.qa-save')
-      .data(isShown ? [this.datum] : [], (d: any) => d.key);
+      .data(isShown ? [this.datum] : [], (d: OsmoseIssue) => d.key!);
 
     // exit
     $saveSection.exit()
@@ -153,12 +154,12 @@ export class UiOsmoseEditor extends EventEmitter {
   protected _saveButtons($selection: D3Selection): void {
     const context = this.context;
     const l10n = context.systems.l10n!;
-    const osmose = context.services.osmose as any;
+    const osmose2 = context.services.osmose!;
 
     const errID = this.datum?.id;
     const isSelected = errID && context.selectedData().has(errID);
     let $buttons: D3Selection = $selection.selectAll('.buttons')
-      .data(isSelected ? [this.datum] : [], (d: any) => d.key);
+      .data(isSelected ? [this.datum] : [], (d: OsmoseIssue) => d.key!);
 
     // exit
     $buttons.exit()
@@ -183,23 +184,23 @@ export class UiOsmoseEditor extends EventEmitter {
 
     $buttons.select('.close-button')
       .text(l10n.t('QA.keepRight.close'))
-      .on('click.close', (d3_event: Event, d: any) => {
+      .on('click.close', (d3_event: Event, d: OsmoseIssue) => {
         (d3_event.currentTarget as HTMLElement).blur();    // avoid keeping focus on the button - iD#4641
-        if (osmose) {
+        if (osmose2) {
           d.props.newStatus = 'done';
           d.touch();
-          osmose.postUpdate(d, (err: any, item: any) => this.emit('change', item));
+          osmose2.postUpdate(d, (err: any, item: any) => this.emit('change', item));
         }
       });
 
     $buttons.select('.ignore-button')
       .text(l10n.t('QA.keepRight.ignore'))
-      .on('click.ignore', (d3_event: Event, d: any) => {
+      .on('click.ignore', (d3_event: Event, d: OsmoseIssue) => {
         (d3_event.currentTarget as HTMLElement).blur();    // avoid keeping focus on the button - iD#4641
-        if (osmose) {
+        if (osmose2) {
           d.props.newStatus = 'false';
           d.touch();
-          osmose.postUpdate(d, (err: any, item: any) => this.emit('change', item));
+          osmose2.postUpdate(d, (err: any, item: any) => this.emit('change', item));
         }
       });
   }

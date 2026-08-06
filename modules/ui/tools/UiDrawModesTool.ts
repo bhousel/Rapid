@@ -6,6 +6,15 @@ import { uiTooltip } from '../tooltip.js';
 import type { Context } from '../../Context.ts';
 import type { D3Selection } from 'd3-selection';
 
+interface DrawCommand {
+  id: string;
+  icon: string;
+  preset?: unknown;
+  getTitle(): string;
+  getDescription(): string;
+  getKey(): string;
+}
+
 
 /**
  * A toolbar section for the mode buttons
@@ -15,12 +24,12 @@ export class UiDrawModesTool {
   public id: string;
   public stringID: string;
   public Tooltip: any;
-  public commands: any[];
+  public commands: DrawCommand[];
   public $parent: D3Selection | null;
   public rerender: () => void;
   public debouncedRender: () => void;
 
-  protected _keys: any;
+  protected _keys: string | string[] | null;
 
   /**
    * @param  context - Global shared application context
@@ -71,8 +80,8 @@ export class UiDrawModesTool {
     // Create child components
     this.Tooltip = (uiTooltip(context) as any)
       .placement('bottom')
-      .title((d: any) => d.getDescription())
-      .shortcut((d: any) => d.getKey());
+      .title((d: DrawCommand) => d.getDescription())
+      .shortcut((d: DrawCommand) => d.getKey());
 
     // D3 selections
     this.$parent = null;
@@ -213,7 +222,7 @@ export class UiDrawModesTool {
    * @param   d - the command bound to the button
    * @return  `true` if the button should be enabled, `false` if not
    */
-  public buttonEnabled(d: any) {
+  public buttonEnabled(d: DrawCommand) {
     if (d.id === 'add-note') return this.notesEnabled() && this.notesEditable();
     if (d.id !== 'add-note') return this.osmEnabled() && this.osmEditable();
   }
@@ -223,7 +232,7 @@ export class UiDrawModesTool {
    * @param  e? - triggering event (if any)
    * @param  d? - object bound to the selection (i.e. the command)
    */
-  public choose(e?: Event, d?: any): void {
+  public choose(e?: Event, d?: DrawCommand): void {
     if (e)  e.preventDefault();
     if (!d || !this.buttonEnabled(d)) return;
 

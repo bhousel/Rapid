@@ -1,5 +1,4 @@
-import { select as d3_select } from 'd3-selection';
-
+import { select, selection } from 'd3-selection';
 import { actionReverse } from '../../actions/reverse.js';
 import { uiIcon } from '../icon.js';
 import { UiField } from '../UiField.js';
@@ -14,18 +13,30 @@ export { UiFieldCheck as UiFieldDefaultCheck };
 export { UiFieldCheck as UiFieldOnewayCheck };
 
 
+/**
+ * This UI component displays a checkbox field.
+ * There are several variants:
+ * - 'check':
+ * - 'defaultcheck':
+ * - 'onewaycheck':
+ */
 export class UiFieldCheck extends UiField {
+  // D3 selections
+  public $parent: D3Selection | null;
+  public $input: D3Selection | null;
+  public $text: D3Selection | null;
+  public $label: D3Selection | null;
+  public $reverser: D3Selection | null;
+
   protected _values: (string | undefined)[];
   protected _texts: string[];
-  public $input: D3Selection;
-  public $text: D3Selection;
-  public $label: D3Selection;
-  public $reverser: D3Selection;
   protected _tags: Tags;
   protected _impliedYes: boolean;
   protected _value: any;
 
+
   /**
+   * @constructor
    * @param context - Global shared application context
    * @param presetField - The preset field definition this field renders
    * @param entityIDs - The entities this field applies to
@@ -35,12 +46,15 @@ export class UiFieldCheck extends UiField {
     super(context, presetField, entityIDs, options);
     const l10n = context.systems.l10n!;
 
+    // D3 selctions
+    this.$parent = null;
+    this.$input = null;
+    this.$text = null;
+    this.$label = null;
+    this.$reverser = null;
+
     this._values = [];
     this._texts = [];
-    this.$input = d3_select(null);
-    this.$text = d3_select(null);
-    this.$label = d3_select(null);
-    this.$reverser = d3_select(null);
     this._tags = {};
     this._impliedYes = false;
     this._value = undefined;
@@ -67,7 +81,111 @@ export class UiFieldCheck extends UiField {
   }
 
 
-  // Checks tags to see whether an undefined value is "Assumed to be Yes"
+  /**
+   * Accepts a parent selection, and renders the content under it.
+   * (The parent selection is required the first time, but can be inferred on subsequent renders)
+   * @param $parent - A d3-selection to a HTMLElement that this component should render itself into
+   */
+  public renderContent($parent = this.$parent): void {
+    if ($parent instanceof selection) {
+      this.$parent = $parent;
+    } else {
+      return;   // no parent - called too early?
+    }
+    const context = this.context;
+    const editor = context.systems.editor!;
+    const l10n = context.systems.l10n!;
+
+    this._checkImpliedYes();
+
+    this.$label = $parent.selectAll('.form-field-input-wrap')
+      .data([0]);
+
+    const $$label = this.$label.enter()
+      .append('label')
+      .attr('class', 'form-field-input-wrap form-field-input-check');
+
+    $$label
+      .append('input')
+      .property('indeterminate', this.type !== 'defaultCheck')
+      .attr('type', 'checkbox')
+      .attr('id', this.uid);
+
+    $$label
+      .append('span')
+      .attr('class', 'value');
+
+    if (this.type === 'onewayCheck') {
+      $$label
+        .append('button')
+        .attr('class', 'reverser' + (this._reverserHidden() ? ' hide' : ''))
+        .append('span')
+        .attr('class', 'reverser-span');
+    }
+
+    this.$label = this.$label.merge($$label);
+    this.$input = this.$label.selectAll('input');
+    this.$text = this.$label.selectAll('span.value');
+
+    // Set localized text on the update selection so it re-localizes on language change.
+    this.$text.text(this._texts[0]);
+
+    this.$input
+      .on('click', (d3_event: MouseEvent) => {
+        d3_event.stopPropagation();
+        const key = this.key;
+        const tagChange: TagChange = {};
+
+        if (Array.isArray(this._tags[key])) {
+          if (this._values.indexOf('yes') !== -1) {
+            tagChange[key] = 'yes';
+          } else {
+            tagChange[key] = this._values[0];
+          }
+        } else {
+          tagChange[key] = this._values[(this._values.indexOf(this._value) + 1) % this._values.length];
+        }
+
+        // Don't cycle through `alternating` or `reversible` states - iD#4970
+        // (They are supported as translated strings, but should not toggle with clicks)
+        if (tagChange[key] === 'reversible' || tagChange[key] === 'alternating') {
+          tagChange[key] = this._values[0];
+        }
+
+        this.emit('change', tagChange);
+      });
+
+
+    if (this.type === 'onewayCheck') {
+      this.$reverser = this.$label.selectAll('.reverser');
+
+      this.$reverser
+        .call(this._reverserSetText)
+        .on('click', (d3_event: MouseEvent) => {
+          d3_event.preventDefault();
+          d3_event.stopPropagation();
+          if (!this.entityIDs.length) return;
+
+          const combinedAction = (graph: any) => {
+            for (const entityID of this.entityIDs) {
+              graph = actionReverse(entityID)(graph);
+            }
+            return graph;
+          };
+
+          editor.perform(combinedAction);
+          editor.commit({
+            annotation: l10n.t('operations.reverse.annotation.line', { n: 1 }),
+            selectedIDs: this.entityIDs
+          });
+
+          select(d3_event.currentTarget as any)
+            .call(this._reverserSetText);
+        });
+    }
+  }
+
+
   /** Checks tags to see whether an undefined value is "assumed to be yes". */
   protected _checkImpliedYes(): void {
     const context = this.context;
@@ -134,111 +252,12 @@ export class UiFieldCheck extends UiField {
 
 
   /**
-   * Renders the content into the given selection.
-   * This component is handed its target selection by its parent on each render, so it
-   *  renders into `$selection` directly rather than capturing `$parent` for re-render.
-   * @param $selection - A d3-selection to the HTMLElement this component renders into
-   */
-  public renderContent($selection: D3Selection): void {
-    const context = this.context;
-    const editor = context.systems.editor!;
-    const l10n = context.systems.l10n!;
-
-    this._checkImpliedYes();
-
-    this.$label = $selection.selectAll('.form-field-input-wrap')
-      .data([0]);
-
-    const $$enter = this.$label.enter()
-      .append('label')
-      .attr('class', 'form-field-input-wrap form-field-input-check');
-
-    $$enter
-      .append('input')
-      .property('indeterminate', this.type !== 'defaultCheck')
-      .attr('type', 'checkbox')
-      .attr('id', this.uid);
-
-    $$enter
-      .append('span')
-      .attr('class', 'value');
-
-    if (this.type === 'onewayCheck') {
-      $$enter
-        .append('button')
-        .attr('class', 'reverser' + (this._reverserHidden() ? ' hide' : ''))
-        .append('span')
-        .attr('class', 'reverser-span');
-    }
-
-    this.$label = this.$label.merge($$enter);
-    this.$input = this.$label.selectAll('input');
-    this.$text = this.$label.selectAll('span.value');
-
-    // Set localized text on the update selection so it re-localizes on language change.
-    this.$text.text(this._texts[0]);
-
-    this.$input
-      .on('click', (d3_event: MouseEvent) => {
-        d3_event.stopPropagation();
-        const key = this.key;
-        const tagChange: TagChange = {};
-
-        if (Array.isArray(this._tags[key])) {
-          if (this._values.indexOf('yes') !== -1) {
-            tagChange[key] = 'yes';
-          } else {
-            tagChange[key] = this._values[0];
-          }
-        } else {
-          tagChange[key] = this._values[(this._values.indexOf(this._value) + 1) % this._values.length];
-        }
-
-        // Don't cycle through `alternating` or `reversible` states - iD#4970
-        // (They are supported as translated strings, but should not toggle with clicks)
-        if (tagChange[key] === 'reversible' || tagChange[key] === 'alternating') {
-          tagChange[key] = this._values[0];
-        }
-
-        this.emit('change', tagChange);
-      });
-
-
-    if (this.type === 'onewayCheck') {
-      this.$reverser = this.$label.selectAll('.reverser');
-
-      this.$reverser
-        .call(this._reverserSetText)
-        .on('click', (d3_event: MouseEvent) => {
-          d3_event.preventDefault();
-          d3_event.stopPropagation();
-          if (!this.entityIDs.length) return;
-
-          const combinedAction = (graph: any) => {
-            for (const entityID of this.entityIDs) {
-              graph = actionReverse(entityID)(graph);
-            }
-            return graph;
-          };
-
-          editor.perform(combinedAction);
-          editor.commit({
-            annotation: l10n.t('operations.reverse.annotation.line', { n: 1 }),
-            selectedIDs: this.entityIDs
-          });
-
-          d3_select(d3_event.currentTarget as any)
-            .call(this._reverserSetText);
-        });
-    }
-  }
-
-
-  /**
    * Updates the field UI to reflect the given entity tags.
    * @param tags - The entity tags to display
    */
   public syncTags(tags: Tags): void {
+    if (!this.$input || !this.$label || !this.$text) return;   // called too early?
+
     const l10n = this.context.systems.l10n!;
 
     this._tags = tags;
@@ -273,7 +292,7 @@ export class UiFieldCheck extends UiField {
     this.$label
       .classed('set', !!this._value);
 
-    if (this.type === 'onewayCheck') {
+    if (this.type === 'onewayCheck' && this.$reverser) {
       this.$reverser
         .classed('hide', this._reverserHidden())
         .call(this._reverserSetText);
@@ -283,6 +302,7 @@ export class UiFieldCheck extends UiField {
 
   /** Moves keyboard focus to the field's input. */
   public focus(): void {
+    if (!this.$input) return;   // called too early?
     this.$input.node().focus();
   }
 }

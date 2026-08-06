@@ -1,5 +1,4 @@
-import { select as d3_select } from 'd3-selection';
-
+import { selection } from 'd3-selection';
 import { actionChangeTags } from '../../actions/change_tags.js';
 import { uiIcon } from '../icon.js';
 import { uiCombobox } from '../combobox.js';
@@ -10,25 +9,47 @@ import type { Context } from '../../Context.ts';
 import type { D3Selection } from 'd3-selection';
 import type { Field } from '../../lib/index.ts';
 import type { Tags } from './types.ts';
+import type { OsmTags } from '../../data/types.ts';
 import type { UiFieldOptions } from '../UiField.js';
 
+/** Wikipedia language entry: [displayName, nativeName, apiCode] */
+type WikipediaLanguage = [string, string, string];
 
+
+/**
+ * This UI component displays a wikidata field.
+ * It includes subfields for the value, the language, and a button to open Wikipedia.
+ */
 export class UiFieldWikipedia extends UiField {
+  // D3 selections
+  public $parent: D3Selection | null;
+  public $langInput: D3Selection | null;
+  public $titleInput: D3Selection | null;
+
   public static supportsMultiselection = false;
 
-  public $langInput: D3Selection;
-  public $titleInput: D3Selection;
   protected _wikiURL: string;
-  protected _dataWikipedia: any[];
+  protected _dataWikipedia: WikipediaLanguage[];
   protected _langCombo: any;
   protected _titleCombo: any;
 
+
+  /**
+   * @constructor
+   * @param context - Global shared application context
+   * @param presetField - the original Field tracked by the SchemaSystem
+   * @param entityIDs - the entities this field applies to
+   * @param options - field display options
+   */
   public constructor(context: Context, presetField: Field, entityIDs: EntityID[] = [], options: Partial<UiFieldOptions> = {}) {
     super(context, presetField, entityIDs, options);
     const assets = context.systems.assets!;
 
-    this.$langInput = d3_select(null);
-    this.$titleInput = d3_select(null);
+    // D3 selections
+    this.$parent = null;
+    this.$langInput = null;
+    this.$titleInput = null;
+
     this._wikiURL = '';
     this._dataWikipedia = [];
 
@@ -36,36 +57,36 @@ export class UiFieldWikipedia extends UiField {
     this._changeLang = this._changeLang.bind(this);
 
     assets.loadAssetAsync('wmf_sitematrix')
-      .then((d: any) => {
+      .then((d: WikipediaLanguage[]) => {
         this._dataWikipedia = d;
         if (!this.$langInput.empty()) this._updateForTags(this._tags);
       })
-      .catch((e: any) => console.error(e));  // eslint-disable-line
+      .catch((e: unknown) => console.error(e));  // eslint-disable-line
 
     this._langCombo = uiCombobox(context, 'wikipedia-lang')
       .fetcher((value, callback) => {
         const v = value.toLowerCase();
         callback(this._dataWikipedia
-          .filter((d: any) => {
+          .filter((d: WikipediaLanguage) => {
             return d[0].toLowerCase().indexOf(v) >= 0 ||
               d[1].toLowerCase().indexOf(v) >= 0 ||
               d[2].toLowerCase().indexOf(v) >= 0;
           })
-          .map((d: any) => ({ value: d[1] }))
+          .map((d: WikipediaLanguage) => ({ value: d[1] }))
         );
       });
 
     this._titleCombo = uiCombobox(context, 'wikipedia-title')
       .fetcher((value, callback) => {
         const editor = context.systems.editor!;
-        const wikipedia = context.services.wikipedia as any;
+        const wikipedia = context.services.wikipedia!;
 
         if (!value) {
           value = '';
           const graph = editor.staging.graph;
           for (const i in this.entityIDs) {
-            const entity = graph.hasEntity(this.entityIDs[i]) as any;
-            if (entity.tags.name) {
+            const entity = graph.hasEntity(this.entityIDs[i]);
+            if (entity?.tags.name) {
               value = entity.tags.name;
               break;
             }
@@ -80,16 +101,21 @@ export class UiFieldWikipedia extends UiField {
 
 
   /**
-   * Renders the content into the given selection.
-   * This component is handed its target selection by its parent on each render, so it
-   *  renders into `$selection` directly rather than capturing `$parent` for re-render.
-   * @param $selection - A d3-selection to the HTMLElement this component renders into
+   * Accepts a parent selection, and renders the content under it.
+   * (The parent selection is required the first time, but can be inferred on subsequent renders)
+   * @param $parent - A d3-selection to a HTMLElement that this component should render itself into
    */
-  public renderContent($selection: D3Selection): void {
+  public renderContent($parent = this.$parent): void {
+    if ($parent instanceof selection) {
+      this.$parent = $parent;
+    } else {
+      return;   // no parent - called too early?
+    }
+
     const context = this.context;
     const l10n = context.systems.l10n!;
 
-    let $wrap: D3Selection = $selection.selectAll('.form-field-input-wrap')
+    let $wrap: D3Selection = $parent.selectAll('.form-field-input-wrap')
       .data([0]);
 
     $wrap = $wrap.enter()
@@ -197,6 +223,8 @@ export class UiFieldWikipedia extends UiField {
    * @returns A `[localName, nativeName, code]` language info row
    */
   protected _language(skipEnglishFallback?: boolean): string[] {
+    if (!this.$langInput) return [];   // called too early?
+
     const value = (utilGetSetValue(this.$langInput) as string).toLowerCase();
 
     for (const i in this._dataWikipedia) {
@@ -214,6 +242,8 @@ export class UiFieldWikipedia extends UiField {
 
   /** Normalizes the language input to the native language name, then applies the change. */
   protected _changeLang(): void {
+    if (!this.$langInput) return;   // called too early?
+
     utilGetSetValue(this.$langInput, this._language()[1]);
     this._change(true);
   }
@@ -224,13 +254,15 @@ export class UiFieldWikipedia extends UiField {
    * @param skipWikidata - When true, skips the asynchronous wikidata tag lookup
    */
   protected _change(skipWikidata?: boolean): void {
+    if (!this.$titleInput || !this.$langInput) return;   // called too early?
+
     const context = this.context;
     const editor = context.systems.editor!;
-    const wikidata = context.services.wikidata as any;
+    const wikidata = context.services.wikidata!;
 
     let value = utilGetSetValue(this.$titleInput) as string;
     const m = value.match(/https?:\/\/([-a-z]+)\.wikipedia\.org\/(?:wiki|\1-[-a-z]+)\/([^#]+)(?:#(.+))?/);
-    const langInfo = m && this._dataWikipedia.find((d: any) => m[1] === d[2]);
+    const langInfo = m && this._dataWikipedia.find((d: WikipediaLanguage) => m[1] === d[2]);
     const syncTags: Tags = {};
 
     if (langInfo) {
@@ -276,13 +308,14 @@ export class UiFieldWikipedia extends UiField {
 
       const qids = Object.keys(data);
       const value = qids && qids.find(id => id.match(/^Q\d+$/));
+      if (!value) return;
 
       for (const entityID of initEntityIDs) {
         const entity = graph.entity(entityID);
-        const asyncTags: any = { ...entity.tags };  // shallow copy
-        if (asyncTags.wikidata !== value) {
-          asyncTags.wikidata = value;
-          editor.perform(actionChangeTags(entityID, asyncTags));
+        const setTags: OsmTags = { ...entity.tags };  // shallow copy
+        if (setTags.wikidata !== value) {
+          setTags.wikidata = value;
+          editor.perform(actionChangeTags(entityID, setTags));
         }
       }
       // do not dispatch.call('change') here, because entity_editor
@@ -306,6 +339,8 @@ export class UiFieldWikipedia extends UiField {
    * @param tags - The entity tags to read the wikipedia value from
    */
   protected _updateForTags(tags: Tags): void {
+    if (!this.$titleInput || !this.$langInput) return;   // called too early?
+
     const key = this.key;
     const value = typeof tags[key] === 'string' ? tags[key] as string : '';
     // Expect tag format of `tagLang:tagArticleTitle`, e.g. `fr:Paris`, with
@@ -314,7 +349,7 @@ export class UiFieldWikipedia extends UiField {
     const tagLang = m && m[1];
     const tagArticleTitle = m && m[2];
     const anchor = m && m[3];
-    const tagLangInfo = tagLang && this._dataWikipedia.find((d: any) => tagLang === d[2]);
+    const tagLangInfo = tagLang && this._dataWikipedia.find((d: WikipediaLanguage) => tagLang === d[2]);
 
     // value in correct format
     if (tagLangInfo) {
@@ -369,6 +404,7 @@ export class UiFieldWikipedia extends UiField {
 
   /** Moves keyboard focus to the field's input. */
   public focus(): void {
+    if (!this.$titleInput) return;   // called too early?
     (this.$titleInput.node() as HTMLElement).focus();
   }
 }

@@ -6,6 +6,7 @@ import { uiTooltip } from '../tooltip.js';
 
 import type { Context } from '../../Context.ts';
 import type { D3Selection } from 'd3-selection';
+import type { ImagerySource } from '../../lib/ImagerySource.ts';
 
 
 /** UiSectionOverlayList
@@ -61,7 +62,7 @@ export class UiSectionOverlayList extends AbstractUiSection {
    * @param d - the imagery source to test
    * @return `true` if the source is an overlay
    */
-  protected _isOverlay(d: any): boolean {
+  protected _isOverlay(d: ImagerySource): boolean {
     return !!d.props.overlay;
   }
 
@@ -98,7 +99,7 @@ export class UiSectionOverlayList extends AbstractUiSection {
   protected _setTooltips($selection: D3Selection): void {
     const context = this.context;
 
-    $selection.each((d: any, i: number, nodes: any) => {
+    $selection.each((d: ImagerySource, i: number, nodes: ArrayLike<HTMLElement>) => {
       const item = d3_select(nodes[i]).select('label');
       const span = item.select('span');
       const placement = (i < nodes.length / 2) ? 'bottom' : 'top';
@@ -123,7 +124,7 @@ export class UiSectionOverlayList extends AbstractUiSection {
   protected _updateLayerSelections($selection: D3Selection): void {
     const imagery = this.context.systems.imagery!;
 
-    const isActive = (d: any): boolean => imagery.showsLayer(d);
+    const isActive = (d: ImagerySource): boolean => imagery.showsLayer(d);
 
     $selection.selectAll('li')
       .classed('active', isActive)
@@ -142,14 +143,14 @@ export class UiSectionOverlayList extends AbstractUiSection {
 
     const sources = imagery
       .visibleSources()
-      .filter((d: any) => this._isOverlay(d));
+      .filter((d: ImagerySource) => this._isOverlay(d));
 
-    const sortSources = (a: any, b: any): number => {
+    const sortSources = (a: ImagerySource, b: ImagerySource): number => {
       return d3_descending(a.area, b.area) || d3_ascending(a.name, b.name) || 0;
     };
 
     const $layerLinks: D3Selection = $selection.selectAll('li')
-      .data(sources, (d: any) => d.name);
+      .data(sources, (d: ImagerySource) => d.name);
 
     $layerLinks.exit()
       .remove();
@@ -168,7 +169,7 @@ export class UiSectionOverlayList extends AbstractUiSection {
 
     $$label
       .append('span')
-      .text((d: any) => d.name);
+      .text((d: ImagerySource) => d.name);
 
 
     $selection.selectAll('li')
@@ -184,7 +185,7 @@ export class UiSectionOverlayList extends AbstractUiSection {
    * @param d3_event - the change event
    * @param d        - ImagerySource being toggled
    */
-  protected _chooseOverlay(d3_event: Event, d: any): void {
+  protected _chooseOverlay(d3_event: Event, d: ImagerySource): void {
     const imagery = this.context.systems.imagery!;
 
     d3_event.preventDefault();
@@ -201,7 +202,7 @@ export class UiSectionOverlayList extends AbstractUiSection {
 
     if (scheduler) {
       scheduler.scheduleIdleTask(() => this._renderIfVisible())
-        .catch((err: any) => {
+        .catch((err: unknown) => {
           if (err?.name === 'AbortError') return;   // expected cancellation
           console.error(err);  // eslint-disable-line no-console
         });

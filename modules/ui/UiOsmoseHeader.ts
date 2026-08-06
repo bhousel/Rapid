@@ -3,6 +3,7 @@ import * as PIXI from 'pixi.js';
 
 import type { Context } from '../Context.ts';
 import type { D3Selection } from 'd3-selection';
+import type { OsmoseIssue } from '../services/OsmoseService.ts';
 
 
 /**
@@ -11,7 +12,7 @@ import type { D3Selection } from 'd3-selection';
  */
 export class UiOsmoseHeader {
   public context: Context;
-  public datum: any;
+  public datum: OsmoseIssue | null;
 
   // D3 selections
   public $parent: D3Selection | null;
@@ -41,7 +42,7 @@ export class UiOsmoseHeader {
     }
 
     const context = this.context;
-    const osmose = context.services.osmose as any;
+    const osmose = context.services.osmose;
 
     let iconFill = 0xffffff;
     if (osmose) {
@@ -49,7 +50,7 @@ export class UiOsmoseHeader {
     }
 
     const $header = $parent.selectAll('.qa-header')
-      .data(this.datum ? [this.datum] : [], (d: any) => d.key);
+      .data(this.datum ? [this.datum] : [], (d: OsmoseIssue) => d.key!);
 
     $header.exit()
       .remove();
@@ -65,7 +66,7 @@ export class UiOsmoseHeader {
       .attr('width', '20px')
       .attr('height', '27px')
       .attr('viewbox', '0 0 20 27')
-      .attr('class', (d: any) => `qaItem ${d.serviceID}`);
+      .attr('class', (d: OsmoseIssue) => `qaItem ${d.serviceID}`);
 
     $$svg
       .append('polygon')
@@ -79,7 +80,7 @@ export class UiOsmoseHeader {
       .attr('width', '13px')
       .attr('height', '13px')
       .attr('transform', 'translate(3.5, 5)')
-      .attr('xlink:href', (d: any) => d.props.iconID ? `#${d.props.iconID}` : '');
+      .attr('xlink:href', (d: OsmoseIssue) => d.props.iconID ? `#${d.props.iconID}` : '');
 
     $$header
       .append('div')
@@ -89,7 +90,7 @@ export class UiOsmoseHeader {
     const $merged: D3Selection = ($header as D3Selection).merge($$header);
 
     $merged.select('.qa-header-label')
-      .text((d: any) => this._issueTitle(d));
+      .text((d: OsmoseIssue) => this._issueTitle(d));
   }
 
 
@@ -97,9 +98,9 @@ export class UiOsmoseHeader {
    * Returns the localized title string for the given Osmose issue.
    * @param d - The issue datum
    */
-  protected _issueTitle(d: any): string {
+  protected _issueTitle(d: OsmoseIssue): string {
     const l10n = this.context.systems.l10n!;
-    const osmose = this.context.services.osmose as any;
+    const osmose = this.context.services.osmose;
 
     const unknown = l10n.t('inspector.unknown');
     if (!osmose || !d) return unknown;
