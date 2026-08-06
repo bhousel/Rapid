@@ -1,7 +1,7 @@
 import { utilArrayUniq, utilGetAllNodes } from '@rapid-sdk/util';
 
-import { actionDisconnect } from '../actions/disconnect.js';
-import { KeyOperationBehavior } from '../behaviors/KeyOperationBehavior.js';
+import { actionDisconnect } from '../actions/disconnect.ts';
+import { KeyOperationBehavior } from '../behaviors/KeyOperationBehavior.ts';
 import { utilTotalExtent } from '../util/util.ts';
 
 

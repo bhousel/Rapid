@@ -1,6 +1,6 @@
 import { AbstractIntroChapter } from './AbstractIntroChapter.ts';
 import { helpHtml } from './helper.ts';
-import { uiModal } from '../modal.js';
+import { uiModal } from '../modal.ts';
 
 import type { Context } from '../../Context.ts';
 import type { IntroStep } from './AbstractIntroChapter.ts';

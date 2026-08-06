@@ -1,5 +1,5 @@
-import { actionDeleteRelation } from './delete_relation.js';
-import { actionDeleteWay } from './delete_way.js';
+import { actionDeleteRelation } from './delete_relation.ts';
+import { actionDeleteWay } from './delete_way.ts';
 import { geomPathIntersections } from '@rapid-sdk/math';
 import { osmJoinWays } from '../lib/multipolygon.ts';
 import { utilArrayGroupBy, utilArrayIdentical, utilArrayIntersection } from '@rapid-sdk/util';

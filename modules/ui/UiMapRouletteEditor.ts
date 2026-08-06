@@ -1,10 +1,9 @@
 import { EventEmitter } from 'tseep/lib/ee-safe';
 import { select as d3_select, selection } from 'd3-selection';
-
-import { uiIcon } from './icon.js';
-import { UiMapRouletteDetails } from './UiMapRouletteDetails.js';
-import { UiMapRouletteHeader } from './UiMapRouletteHeader.js';
-import { UiViewOn } from './UiViewOn.js';
+import { uiIcon } from './icon.ts';
+import { UiMapRouletteDetails } from './UiMapRouletteDetails.ts';
+import { UiMapRouletteHeader } from './UiMapRouletteHeader.ts';
+import { UiViewOn } from './UiViewOn.ts';
 import { utilNoAuto } from '../util/index.ts';
 
 import type { Context } from '../Context.ts';
@@ -41,16 +40,22 @@ export class UiMapRouletteEditor extends EventEmitter {
   public context: Context;
   public datum: MapRouletteTask | null;
 
-  protected _header: UiMapRouletteHeader;
-  protected _details: UiMapRouletteDetails;
-  protected _viewOn: UiViewOn;
-  protected _actionTaken: string;
-  protected _apikey: string | null;
-  protected _user: any;
+  // Child Components
+  public MapRouletteHeader: UiMapRouletteHeader;
+  public MapRouletteDetails: UiMapRouletteDetails;
+  public ViewOn: UiViewOn;
 
   // D3 selections
   public $parent: D3Selection | null;
 
+  protected _actionTaken: string;
+  protected _apikey: string | null;
+  protected _user: any;
+
+
+  /**
+   * @param  context - Global shared application context
+   */
   public constructor(context: Context) {
     super();
     this.context = context;
@@ -59,9 +64,10 @@ export class UiMapRouletteEditor extends EventEmitter {
     this._apikey = null;
     this._user = null;
 
-    this._header = new UiMapRouletteHeader(context);
-    this._details = new UiMapRouletteDetails(context);
-    this._viewOn = new UiViewOn(context);
+    // Create child components
+    this.MapRouletteHeader = new UiMapRouletteHeader(context);
+    this.MapRouletteDetails = new UiMapRouletteDetails(context);
+    this.ViewOn = new UiViewOn(context);
 
     // D3 selections
     this.$parent = null;
@@ -128,21 +134,21 @@ export class UiMapRouletteEditor extends EventEmitter {
     const $editor: D3Selection = $body.selectAll('.mr-editor')
       .data([0]);
 
-    this._header.datum = this.datum;
-    this._details.datum = this.datum;
+    this.MapRouletteHeader.datum = this.datum;
+    this.MapRouletteDetails.datum = this.datum;
 
     $editor.enter()
       .append('div')
       .attr('class', 'modal-section mr-editor')
       .merge($editor)
-      .call(this._header.render)
-      .call(this._details.render)
+      .call(this.MapRouletteHeader.render)
+      .call(this.MapRouletteDetails.render)
       .call(this._saveSection)
       .call(this._commentSaveSection);
 
 
-    this._viewOn.stringID = 'inspector.view_on_maproulette';
-    this._viewOn.url = (maproulette && this.datum) ? maproulette.itemURL(this.datum) : '';
+    this.ViewOn.stringID = 'inspector.view_on_maproulette';
+    this.ViewOn.url = (maproulette && this.datum) ? maproulette.itemURL(this.datum) : '';
 
     const $footer: D3Selection = $parent.selectAll('.sidebar-footer')
       .data([0]);
@@ -151,7 +157,7 @@ export class UiMapRouletteEditor extends EventEmitter {
       .append('div')
       .attr('class', 'sidebar-footer')
       .merge($footer)
-      .call(this._viewOn.render);
+      .call(this.ViewOn.render);
   }
 
 
@@ -166,6 +172,7 @@ export class UiMapRouletteEditor extends EventEmitter {
       .catch((err: unknown) => {
         this._apikey = null;
         console.error(err);  // eslint-disable-line no-console
+        return null;
       });
   }
 
@@ -180,7 +187,7 @@ export class UiMapRouletteEditor extends EventEmitter {
     const isShown = (this.datum && isSelected);
 
     let $saveSection: D3Selection = $selection.selectAll('.mr-save')
-      .data(isShown ? [this.datum] : [], (d: MapRouletteTask) => d.key!);
+      .data(isShown ? [this.datum!] : [], (d: MapRouletteTask) => d.key!);
 
     // exit
     $saveSection.exit()
@@ -212,16 +219,16 @@ export class UiMapRouletteEditor extends EventEmitter {
     const isSelected = errID && context.selectedData().has(errID);
 
     let $commentSave: D3Selection = $selection.selectAll('.note-save')
-      .data(isSelected && this._actionTaken ? [this.datum] : [], (d: MapRouletteTask) => d.key!);
+      .data(isSelected && this._actionTaken ? [this.datum!] : [], (d: MapRouletteTask) => d.key!);
 
     const changeInput = (d3_event: Event): void => {
       const $input = d3_select(d3_event.currentTarget as HTMLTextAreaElement);
       const val = ($input.property('value') as string).trim() || undefined;
 
-      this.datum.props.newComment = val;
-      this.datum.touch();
+      this.datum!.props.newComment = val;
+      this.datum!.touch();
       if (maproulette) {
-        maproulette.replaceTask(this.datum);  // update note cache
+        maproulette.replaceItem(this.datum!);  // update note cache
       }
 
       $commentSave
@@ -394,7 +401,7 @@ export class UiMapRouletteEditor extends EventEmitter {
         const isSelected = errID && context.selectedData().has(errID);
 
         // Check if the MapRoulette menu is showing
-        if (ui?._showsMapRouletteMenu) {
+        if ((ui as any)?._showsMapRouletteMenu) {
           $selection.selectAll('.mr-save .buttons').style('display', 'none');
           return;
         } else {
@@ -406,7 +413,7 @@ export class UiMapRouletteEditor extends EventEmitter {
         };
 
         let $buttons: D3Selection = $selection.selectAll('.buttons')
-          .data(isSelected ? [this.datum] : [], (d: MapRouletteTask) => d.key!);
+          .data(isSelected ? [this.datum!] : [], (d: MapRouletteTask) => d.key!);
 
         // exit
         $buttons.exit()
@@ -456,22 +463,22 @@ export class UiMapRouletteEditor extends EventEmitter {
           .text(l10n.t('map_data.layers.maproulette.nearbyTask.title'));
 
         $buttons.select('.fixedIt-button')
-          .attr('disabled', isSaveDisabled(this.datum))
+          .attr('disabled', isSaveDisabled(this.datum!))
           .text(l10n.t('map_data.layers.maproulette.fixed'))
           .on('click.fixedIt', (d3_event: Event, d: MapRouletteTask) => this._fixedIt(d3_event, d, $selection));
 
         $buttons.select('.cantComplete-button')
-          .attr('disabled', isSaveDisabled(this.datum))
+          .attr('disabled', isSaveDisabled(this.datum!))
           .text(l10n.t('map_data.layers.maproulette.cantComplete'))
           .on('click.cantComplete', (d3_event: Event, d: MapRouletteTask) => this._cantComplete(d3_event, d, $selection));
 
         $buttons.select('.alreadyFixed-button')
-          .attr('disabled', isSaveDisabled(this.datum))
+          .attr('disabled', isSaveDisabled(this.datum!))
           .text(l10n.t('map_data.layers.maproulette.alreadyFixed'))
           .on('click.alreadyFixed', (d3_event: Event, d: MapRouletteTask) => this._alreadyFixed(d3_event, d, $selection));
 
         $buttons.select('.notAnIssue-button')
-          .attr('disabled', isSaveDisabled(this.datum))
+          .attr('disabled', isSaveDisabled(this.datum!))
           .text(l10n.t('map_data.layers.maproulette.notAnIssue'))
           .on('click.notAnIssue', (d3_event: Event, d: MapRouletteTask) => this._notAnIssue(d3_event, d, $selection));
       });
@@ -519,7 +526,7 @@ export class UiMapRouletteEditor extends EventEmitter {
     const errID = this.datum?.id;
     const isSelected = errID && context.selectedData().has(errID);
     let $buttons: D3Selection = $selection.selectAll('.buttons')
-      .data(isSelected ? [this.datum] : [], (d: MapRouletteTask) => d.key!);
+      .data(isSelected ? [this.datum!] : [], (d: MapRouletteTask) => d.key!);
 
     // exit
     $buttons.exit()
@@ -634,13 +641,14 @@ export class UiMapRouletteEditor extends EventEmitter {
     const osm = context.services.osm!;
 
     (d3_event.currentTarget as HTMLElement).blur();    // avoid keeping focus on the button - iD#4641
-    const userID = osm._userDetails.id;
+    const userID = (osm as any)._userDetails.id;
 
-    d.props.taskStatus = d.props._status;
-    d.props.mapRouletteApiKey = this._apikey;
-    d.props.comment = d3_select('.new-comment-input').property('value').trim();
-    d.props.taskId = d.id;
-    d.props.userId = userID;
+    const props = d.props as any;
+    props.taskStatus = props._status;
+    props.mapRouletteApiKey = this._apikey;
+    props.comment = d3_select('.new-comment-input').property('value').trim();
+    props.taskId = d.id;
+    props.userId = userID;
     maproulette.postUpdate(d, (err: string | null, item?: MapRouletteTask) => {
       if (err) {
         console.error(err);  // eslint-disable-line no-console

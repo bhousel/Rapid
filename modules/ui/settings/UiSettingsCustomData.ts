@@ -1,7 +1,6 @@
 import { EventEmitter } from 'tseep/lib/ee-safe';
 import { marked } from 'marked';
-
-import { uiConfirm } from '../confirm.js';
+import { uiConfirm } from '../confirm.ts';
 import { utilNoAuto } from '../../util/index.ts';
 
 import type { Context } from '../../Context.ts';
@@ -24,6 +23,10 @@ const ACCEPT = [
 export class UiSettingsCustomData extends EventEmitter {
   public context: Context;
 
+
+  /**
+   * @param  context - Global shared application context
+   */
   public constructor(context: Context) {
     super();
     this.context = context;

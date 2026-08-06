@@ -1,10 +1,9 @@
 import { selection } from 'd3-selection';
 import { EventEmitter } from 'tseep/lib/ee-safe';
-
-import { UiOsmoseDetails } from './UiOsmoseDetails.js';
-import { UiOsmoseHeader } from './UiOsmoseHeader.js';
-import { uiIcon } from './icon.js';
-import { UiViewOn } from './UiViewOn.js';
+import { UiOsmoseDetails } from './UiOsmoseDetails.ts';
+import { UiOsmoseHeader } from './UiOsmoseHeader.ts';
+import { uiIcon } from './icon.ts';
+import { UiViewOn } from './UiViewOn.ts';
 
 import type { Context } from '../Context.ts';
 import type { D3Selection } from 'd3-selection';
@@ -23,10 +22,15 @@ export class UiOsmoseEditor extends EventEmitter {
   // D3 selections
   public $parent: D3Selection | null;
 
-  protected _header: UiOsmoseHeader;
-  protected _details: UiOsmoseDetails;
-  protected _viewOn: UiViewOn;
+  // Child components
+  public OsmoseHeader: UiOsmoseHeader;
+  public OsmoseDetails: UiOsmoseDetails;
+  public ViewOn: UiViewOn;
 
+
+  /**
+   * @param  context - Global shared application context
+   */
   public constructor(context: Context) {
     super();
     this.context = context;
@@ -35,9 +39,10 @@ export class UiOsmoseEditor extends EventEmitter {
     // D3 selections
     this.$parent = null;
 
-    this._header = new UiOsmoseHeader(context);
-    this._details = new UiOsmoseDetails(context);
-    this._viewOn = new UiViewOn(context);
+    // Create child components
+    this.OsmoseHeader = new UiOsmoseHeader(context);
+    this.OsmoseDetails = new UiOsmoseDetails(context);
+    this.ViewOn = new UiViewOn(context);
 
     // Ensure methods used as callbacks always have `this` bound correctly.
     this.render = this.render.bind(this);
@@ -94,19 +99,19 @@ export class UiOsmoseEditor extends EventEmitter {
     const $editor: D3Selection = $body.selectAll('.qa-editor')
       .data([0]);
 
-    this._header.datum = this.datum;
-    this._details.datum = this.datum;
+    this.OsmoseHeader.datum = this.datum;
+    this.OsmoseDetails.datum = this.datum;
 
     $editor.enter()
       .append('div')
       .attr('class', 'modal-section qa-editor')
       .merge($editor)
-      .call(this._header.render)
-      .call(this._details.render)
+      .call(this.OsmoseHeader.render)
+      .call(this.OsmoseDetails.render)
       .call(this._saveSection);
 
-    this._viewOn.stringID = 'inspector.view_on_osmose';
-    this._viewOn.url = osmose ? osmose.itemURL(this.datum) : '';
+    this.ViewOn.stringID = 'inspector.view_on_osmose';
+    this.ViewOn.url = osmose ? osmose.itemURL(this.datum!) : '';
 
     const $footer: D3Selection = $parent.selectAll('.sidebar-footer')
       .data([0]);
@@ -115,7 +120,7 @@ export class UiOsmoseEditor extends EventEmitter {
       .append('div')
       .attr('class', 'sidebar-footer')
       .merge($footer)
-      .call(this._viewOn.render);
+      .call(this.ViewOn.render);
   }
 
 

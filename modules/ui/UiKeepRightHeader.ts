@@ -1,7 +1,6 @@
 import { selection } from 'd3-selection';
 import * as PIXI from 'pixi.js';
-
-import { uiIcon } from './icon.js';
+import { uiIcon } from './icon.ts';
 
 import type { Context } from '../Context.ts';
 import type { D3Selection } from 'd3-selection';
@@ -18,6 +17,10 @@ export class UiKeepRightHeader {
   // D3 selections
   public $parent: D3Selection | null;
 
+
+  /**
+   * @param  context - Global shared application context
+   */
   public constructor(context: Context) {
     this.context = context;
     this.datum = null;

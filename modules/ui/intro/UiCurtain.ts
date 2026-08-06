@@ -25,6 +25,7 @@ export class UiCurtain {
   public $curtain: D3Selection | null;
   public $tooltip: D3Selection | null;
 
+
   /**
    * @constructor
    * @param  context - Global shared application context

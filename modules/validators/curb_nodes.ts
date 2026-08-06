@@ -3,7 +3,7 @@ import { geoLatToMeters, geoLonToMeters, geoMetersToLat, geoMetersToLon } from '
 import { OsmNode } from '../data/OsmNode.ts';
 import { ValidationIssue } from '../lib/ValidationIssue.ts';
 import { ValidationFix } from '../lib/ValidationFix.ts';
-import { uiIcon } from '../ui/icon.js';
+import { uiIcon } from '../ui/icon.ts';
 
 import type { Context } from '../Context.ts';
 import type { D3Selection } from 'd3-selection';

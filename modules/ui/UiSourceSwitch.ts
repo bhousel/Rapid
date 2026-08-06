@@ -17,6 +17,7 @@ export class UiSourceSwitch {
 
   protected _isLive: boolean;
 
+
   /**
    * @param  context - Global shared application context
    */

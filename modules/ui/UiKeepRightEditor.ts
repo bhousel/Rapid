@@ -1,10 +1,9 @@
 import { EventEmitter } from 'tseep/lib/ee-safe';
 import { select as d3_select, selection } from 'd3-selection';
-
-import { uiIcon } from './icon.js';
-import { UiKeepRightDetails } from './UiKeepRightDetails.js';
-import { UiKeepRightHeader } from './UiKeepRightHeader.js';
-import { UiViewOn } from './UiViewOn.js';
+import { uiIcon } from './icon.ts';
+import { UiKeepRightDetails } from './UiKeepRightDetails.ts';
+import { UiKeepRightHeader } from './UiKeepRightHeader.ts';
+import { UiViewOn } from './UiViewOn.ts';
 import { utilNoAuto } from '../util/index.ts';
 
 import type { Context } from '../Context.ts';
@@ -28,6 +27,10 @@ export class UiKeepRightEditor extends EventEmitter {
   protected _details: UiKeepRightDetails;
   protected _viewOn: UiViewOn;
 
+
+  /**
+   * @param  context - Global shared application context
+   */
   public constructor(context: Context) {
     super();
     this.context = context;
@@ -109,7 +112,7 @@ export class UiKeepRightEditor extends EventEmitter {
 
 
     this._viewOn.stringID = 'inspector.view_on_keepright';
-    this._viewOn.url = keepright ? keepright.issueURL(this.datum) : '';
+    this._viewOn.url = keepright ? keepright.issueURL(this.datum!) : '';
 
     const $footer: D3Selection = $parent.selectAll('.sidebar-footer')
       .data([0]);
@@ -136,18 +139,18 @@ export class UiKeepRightEditor extends EventEmitter {
     const isShown = (this.datum && (isSelected || this.datum.props.newComment || this.datum.props.comment));
 
     let $saveSection: D3Selection = $selection.selectAll('.qa-save')
-      .data(isShown ? [this.datum] : [], (d: KeepRightIssue) => d.key!);
+      .data(isShown ? [this.datum!] : [], (d: KeepRightIssue) => d.key!);
 
     const changeInput = (d3_event: Event): void => {
       const $input = d3_select(d3_event.currentTarget as HTMLTextAreaElement);
       let val: string | undefined = ($input.property('value') as string).trim();
 
-      if (val === this.datum.props.comment) {
+      if (val === this.datum!.props.comment) {
         val = undefined;
       }
 
       // store the unsaved comment with the issue itself
-      this.datum = this.datum.update({ newComment: val });
+      this.datum = this.datum!.update({ newComment: val });
 
       if (keepright) {
         keepright.replaceItem(this.datum);  // update keepright cache

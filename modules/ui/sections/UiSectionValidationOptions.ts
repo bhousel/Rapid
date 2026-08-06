@@ -1,4 +1,4 @@
-import { AbstractUiSection } from '../AbstractUiSection.js';
+import { AbstractUiSection } from './AbstractUiSection.ts';
 
 import type { Context } from '../../Context.ts';
 import type { D3Selection } from 'd3-selection';
@@ -15,6 +15,10 @@ interface OptionValue {
 
 
 export class UiSectionValidationOptions extends AbstractUiSection {
+
+  /**
+   * @param  context - Global shared application context
+   */
   public constructor(context: Context) {
     super(context, 'issues-options');
 
@@ -108,7 +112,7 @@ export class UiSectionValidationOptions extends AbstractUiSection {
     const validator = this.context.systems.validator!;
 
     if (!val && d3_event && d3_event.target) {
-      val = d3_event.target.value;
+      val = (d3_event.target as HTMLInputElement).value;
     }
 
     settings?.set(`validation.${d}`, val as string);

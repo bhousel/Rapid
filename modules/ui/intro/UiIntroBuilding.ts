@@ -1,14 +1,12 @@
 import { Extent } from '@rapid-sdk/math';
-
 import { AbstractIntroChapter } from './AbstractIntroChapter.ts';
-import { actionChangePreset } from '../../actions/change_preset.js';
+import { actionChangePreset } from '../../actions/change_preset.ts';
 import { delayAsync, eventCancel, helpHtml, isMostlySquare, transitionTime } from './helper.ts';
-
-import type { Vec2 } from '@rapid-sdk/math';
 
 import type { Context } from '../../Context.ts';
 import type { IntroStep } from './AbstractIntroChapter.ts';
 import type { UiCurtain } from './UiCurtain.ts';
+import type { Vec2 } from '@rapid-sdk/math';
 
 
 /**

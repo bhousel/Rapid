@@ -1,15 +1,15 @@
 import { EventEmitter } from 'tseep/lib/ee-safe';
-
-import { uiIcon } from './icon.js';
-import { uiCombobox} from './combobox.js';
-import { createUiField } from './fields/index.js';
-import { uiFormFields } from './form_fields.js';
+import { selection } from 'd3-selection';
+import { uiIcon } from './icon.ts';
+import { uiCombobox} from './combobox.ts';
+import { createUiField } from './fields/index.ts';
+import { uiFormFields } from './form_fields.ts';
 
 import type { Context } from '../Context.ts';
-import type { D3Selection } from 'd3-selection';
+import type { D3Selection, D3EnterSelection } from 'd3-selection';
 import type { SchemaScope } from '../core/SchemaSystem.ts';
-import type { Tags } from './fields/types.ts';
-import type { UiField } from './UiField.js';
+import type { OsmTags } from '../data/types.ts';
+import type { UiField } from './UiField.ts';
 
 
 /**
@@ -20,16 +20,26 @@ import type { UiField } from './UiField.js';
 export class UiChangesetEditor extends EventEmitter {
   public context: Context;
 
+  // D3 selections
+  public $parent: D3Selection | null;
+
   protected _scope: SchemaScope;
   protected _formFields: any;
   protected _commentCombo: any;
   protected _uifields: UiField[] | null | undefined;
-  protected _tags: Tags | undefined;
+  protected _tags: OsmTags | undefined;
   protected _changesetID: string | undefined;
 
+
+  /**
+   * @param  context - Global shared application context
+   */
   public constructor(context: Context) {
     super();
     this.context = context;
+
+    // D3 selections
+    this.$parent = null;
 
     const schema = context.systems.schema!;
     this._scope = schema.getScope('osm');
@@ -46,13 +56,16 @@ export class UiChangesetEditor extends EventEmitter {
 
 
   /**
-   * Renders the content into the given selection.
-   * This component is handed its target selection by its parent (the save flow /
-   *  `UiCommit`) on each render, so it renders into `$selection` directly rather than
-   *  capturing `$parent` for re-render.
-   * @param $selection - A d3-selection to the HTMLElement this component renders into
+   * Accepts a parent selection, and renders the content under it.
+   * (The parent selection is required the first time, but can be inferred on subsequent renders)
+   * @param $parent - A d3-selection to a HTMLElement that this component should render itself into
    */
-  public render($selection: D3Selection): void {
+  public render($parent = this.$parent): void {
+    if ($parent instanceof selection) {
+      this.$parent = $parent;
+    } else {
+      return;   // no parent - called too early?
+    }
     const context = this.context;
     const l10n = context.systems.l10n!;
 
@@ -67,26 +80,26 @@ export class UiChangesetEditor extends EventEmitter {
         createUiField(context, this._scope?.fields.get('hashtags'), [], { show: false, revert: false }),
       ];
 
-      this._uifields.forEach((field: UiField) => {
+      for (const field of this._uifields) {
         field
-          .on('change', (t: Tags, onInput: boolean) => {
+          .on('change', (t: OsmTags, onInput: boolean) => {
             this.emit('change', undefined, t, onInput);
           });
-      });
+      }
     }
 
-    this._uifields.forEach((field: UiField) => {
+    for (const field of this._uifields) {
       field
         .tags(this._tags);
-    });
+    }
 
 
-    $selection
+    $parent
       .call(this._formFields.fieldsArr(this._uifields));
 
 
     if (initial) {
-      const commentField = $selection.select('.form-field-comment textarea');
+      const commentField = $parent.select('.form-field-comment textarea');
       const commentNode = commentField.node() as HTMLTextAreaElement | null;
 
       if (commentNode) {
@@ -120,22 +133,23 @@ export class UiChangesetEditor extends EventEmitter {
     }
 
     // Add warning if comment mentions Google
-    const hasGoogle = this._tags.comment.match(/google/i);
-    const commentWarning = $selection.select('.form-field-comment').selectAll('.comment-warning')
+    const commentVal = this._tags?.comment || '';
+    const hasGoogle = commentVal.match(/google/i);
+    let $commentWarning = $parent.select('.form-field-comment').selectAll('.comment-warning')
       .data(hasGoogle ? [0] : []);
 
-    commentWarning.exit()
+    $commentWarning.exit()
       .transition()
       .duration(200)
       .style('opacity', 0)
       .remove();
 
-    const commentEnter = commentWarning.enter()
+    const $$commentWarning: D3EnterSelection = $commentWarning.enter()
       .insert('div', '.tag-reference-body')
       .attr('class', 'field-warning comment-warning')
       .style('opacity', 0);
 
-    const $$link = commentEnter
+    const $$link = $$commentWarning
       .append('a')
       .attr('target', '_blank')
       .call(uiIcon('#rapid-icon-alert', 'inline'));
@@ -143,13 +157,14 @@ export class UiChangesetEditor extends EventEmitter {
     $$link
       .append('span');
 
-    commentEnter
+    $$commentWarning
       .transition()
       .duration(200)
       .style('opacity', 1);
 
     // update - set localized href/text here so they re-localize on language change
-    const $commentWarning: D3Selection = commentWarning.merge(commentEnter as D3Selection) as D3Selection;
+    $commentWarning = $commentWarning
+      .merge($$commentWarning);
 
     $commentWarning.select('a')
       .attr('href', l10n.t('commit.google_warning_link'));
@@ -163,7 +178,7 @@ export class UiChangesetEditor extends EventEmitter {
    * Gets or sets the changeset tags.
    * @param val - the tags to set; omit to get the current value
    */
-  public tags(val?: Tags): any {
+  public tags(val?: OsmTags): any {
     if (val === undefined) return this._tags;
     this._tags = val;
     // Don't reset _uifields here.

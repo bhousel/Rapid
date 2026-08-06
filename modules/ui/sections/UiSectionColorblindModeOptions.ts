@@ -1,8 +1,8 @@
 import * as PIXI from 'pixi.js';
 
-import { AbstractUiSection } from '../AbstractUiSection.js';
-import { uiTooltip } from '../tooltip.js';
-import { uiCombobox } from '../combobox.js';
+import { AbstractUiSection } from './AbstractUiSection.ts';
+import { uiTooltip } from '../tooltip.ts';
+import { uiCombobox } from '../combobox.ts';
 import { utilNoAuto } from '../../util/util.ts';
 
 import type { Context } from '../../Context.ts';

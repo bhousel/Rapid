@@ -1,6 +1,5 @@
 import { select as d3_select } from 'd3-selection';
-
-import { AbstractUiSection } from '../AbstractUiSection.js';
+import { AbstractUiSection } from './AbstractUiSection.ts';
 
 import type { Context } from '../../Context.ts';
 import type { D3Selection } from 'd3-selection';
@@ -9,6 +8,7 @@ import type { D3Selection } from 'd3-selection';
 export class UiSectionGridDisplayOptions extends AbstractUiSection {
   protected _taskWired: boolean;
   protected _$content: D3Selection;
+
 
   /**
    * @param context - Global shared application context

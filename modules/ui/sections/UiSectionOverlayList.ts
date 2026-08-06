@@ -1,8 +1,7 @@
 import { descending as d3_descending, ascending as d3_ascending } from 'd3-array';
 import { select as d3_select } from 'd3-selection';
-
-import { AbstractUiSection } from '../AbstractUiSection.js';
-import { uiTooltip } from '../tooltip.js';
+import { AbstractUiSection } from './AbstractUiSection.ts';
+import { uiTooltip } from '../tooltip.ts';
 
 import type { Context } from '../../Context.ts';
 import type { D3Selection } from 'd3-selection';
@@ -203,7 +202,7 @@ export class UiSectionOverlayList extends AbstractUiSection {
     if (scheduler) {
       scheduler.scheduleIdleTask(() => this._renderIfVisible())
         .catch((err: unknown) => {
-          if (err?.name === 'AbortError') return;   // expected cancellation
+          if ((err as any)?.name === 'AbortError') return;   // expected cancellation
           console.error(err);  // eslint-disable-line no-console
         });
     } else {

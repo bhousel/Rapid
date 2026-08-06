@@ -1,4 +1,4 @@
-import { actionDeleteNode } from './delete_node.js';
+import { actionDeleteNode } from './delete_node.ts';
 import { DEG2RAD, projWorldToWgs84, vecAdd, vecEqual, vecInterp, vecLength, vecNormalize, vecProject, vecScale, vecSubtract } from '@rapid-sdk/math';
 import { geoOrthoCalcScore, geoOrthoCanOrthogonalize, geoOrthoNormalizedDotProduct } from '../geo/ortho.ts';
 import { Graph } from '../lib/Graph.ts';

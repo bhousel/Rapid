@@ -1,11 +1,10 @@
 import { EventEmitter } from 'tseep/lib/ee-safe';
 import { select as d3_select, selection } from 'd3-selection';
-
-import { uiIcon } from './icon.js';
-import { UiNoteComments } from './UiNoteComments.js';
-import { UiNoteHeader } from './UiNoteHeader.js';
-import { UiNoteReport } from './UiNoteReport.js';
-import { UiViewOn } from './UiViewOn.js';
+import { uiIcon } from './icon.ts';
+import { UiNoteComments } from './UiNoteComments.ts';
+import { UiNoteHeader } from './UiNoteHeader.ts';
+import { UiNoteReport } from './UiNoteReport.ts';
+import { UiViewOn } from './UiViewOn.ts';
 import { utilNoAuto } from '../util/index.ts';
 
 import type { Context } from '../Context.ts';
@@ -23,26 +22,37 @@ export class UiNoteEditor extends EventEmitter {
   public context: Context;
   public datum: OsmNote | null;
   public newNote: boolean;
+
+  // D3 selections
   public $parent: D3Selection | null;
 
-  protected _header: UiNoteHeader;
-  protected _comments: UiNoteComments;
-  protected _report: UiNoteReport;
-  protected _viewOn: UiViewOn;
+  // Child Components
+  public NoteHeader: UiNoteHeader;
+  public NoteComments: UiNoteComments;
+  public NoteReport: UiNoteReport;
+  public ViewOn: UiViewOn;
+
   protected _authWired: boolean;
 
+
+  /**
+   * @param  context - Global shared application context
+   */
   public constructor(context: Context) {
     super();
     this.context = context;
     this.datum = null;
     this.newNote = false;
-    this.$parent = null;
     this._authWired = false;
 
-    this._header = new UiNoteHeader(context);
-    this._comments = new UiNoteComments(context);
-    this._report = new UiNoteReport(context);
-    this._viewOn = new UiViewOn(context);
+    // D3 Selections
+    this.$parent = null;
+
+    // Create child components
+    this.NoteHeader = new UiNoteHeader(context);
+    this.NoteComments = new UiNoteComments(context);
+    this.NoteReport = new UiNoteReport(context);
+    this.ViewOn = new UiViewOn(context);
 
     // Ensure methods used as callbacks always have `this` bound correctly.
     this.render = this.render.bind(this);
@@ -109,21 +119,21 @@ export class UiNoteEditor extends EventEmitter {
     const $editor: D3Selection = $body.selectAll('.note-editor')
       .data([0]);
 
-    this._header.datum = this.datum;
-    this._comments.datum = this.datum;
+    this.NoteHeader.datum = this.datum;
+    this.NoteComments.datum = this.datum;
 
     $editor.enter()
       .append('div')
       .attr('class', 'modal-section note-editor')
       .merge($editor)
-      .call(this._header.render)
-      .call(this._comments.render)
+      .call(this.NoteHeader.render)
+      .call(this.NoteComments.render)
       .call(this._saveSection);
 
-    this._viewOn.stringID = 'inspector.view_on_osm';
-    this._viewOn.url = osm?.noteURL(this.datum);
+    this.ViewOn.stringID = 'inspector.view_on_osm';
+    this.ViewOn.url = osm?.noteURL(this.datum);
 
-    this._report.datum = this.datum;
+    this.NoteReport.datum = this.datum;
 
     const $footer: D3Selection = $parent.selectAll('.sidebar-footer')
       .data([0]);
@@ -132,8 +142,8 @@ export class UiNoteEditor extends EventEmitter {
       .append('div')
       .attr('class', 'sidebar-footer')
       .merge($footer)
-      .call(this._viewOn.render)
-      .call(this._report.render);
+      .call(this.ViewOn.render)
+      .call(this.NoteReport.render);
 
 
     // rerender the note editor on any auth change (wire once to avoid leaking listeners)
@@ -164,7 +174,7 @@ export class UiNoteEditor extends EventEmitter {
       const osm = context.services.osm!;
       if (!osm) return;
       if (!osm.authenticated()) return;
-      if (!this.datum.props.newComment) return;
+      if (!this.datum!.props.newComment) return;
 
       d3_event.preventDefault();
 
@@ -173,12 +183,12 @@ export class UiNoteEditor extends EventEmitter {
 
       // focus on button and submit (scheduler defers a tick; without it, do it now)
       const submit = () => {
-        if (this.datum.isNew) {
+        if (this.datum!.isNew) {
           ($noteSave.selectAll('.save-button').node() as HTMLElement).focus();
-          this._clickSave(this.datum);
+          this._clickSave(this.datum as any);
         } else {
           ($noteSave.selectAll('.comment-button').node() as HTMLElement).focus();
-          this._clickComment(this.datum);
+          this._clickComment(this.datum as any);
         }
       };
       if (scheduler) {
@@ -238,7 +248,7 @@ export class UiNoteEditor extends EventEmitter {
       .merge($noteSave);
 
     $noteSave.select('h4')
-      .text(this.datum.isNew ? l10n.t('note.newDescription') : l10n.t('note.newComment'));
+      .text(this.datum!.isNew ? l10n.t('note.newDescription') : l10n.t('note.newComment'));
 
     $noteSave
       .call(this._userDetails)
@@ -371,7 +381,7 @@ export class UiNoteEditor extends EventEmitter {
       .append('div')
       .attr('class', 'buttons');
 
-    if (this.datum.isNew) {
+    if (this.datum!.isNew) {
       $$buttons
         .append('button')
         .attr('class', 'button cancel-button secondary-action');
@@ -478,7 +488,7 @@ export class UiNoteEditor extends EventEmitter {
     (d3_event?.currentTarget as HTMLElement | undefined)?.blur();    // avoid keeping focus on the button - iD#4641
     const osm = this.context.services.osm!;
     if (osm) {
-      osm.postNoteUpdate(d!, d!.props.status, (err: any, note: any) => {
+      osm.postNoteUpdate(d!, d!.props.status!, (err: any, note: any) => {
         this.emit('change', note);
       });
     }

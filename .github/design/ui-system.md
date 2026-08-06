@@ -22,7 +22,7 @@ indentation and filename casing:
   Example: `sections/raw_membership_editor.js`, `combobox.js`.
 - **Level 2 — modern functional (ES6).** 2-space indent, `const`/`let`, arrow functions, still the
   D3 closure-returns-render pattern but usually with an explicit named `render(selection)` function.
-  `snake_case.js` filenames. Example: `preset_icon.js`, `entity_editor.js`.
+  `snake_case.js` filenames. Example: `preset_icon.ts`, `entity_editor.js`.
 - **Level 3 — modern class (ES6).** 2-space indent, ES6 `class`, `new Foo(context)` lifecycle,
   explicit `render($parent = this.$parent)`, `$`/`$$` selection naming, JSDoc. `CamelCase.js`
   filenames. Example: `UiMapToolbar.js`, `cards/AbstractUiCard.js`.

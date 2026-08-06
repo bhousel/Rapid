@@ -1,7 +1,6 @@
 import { selection, select } from 'd3-selection';
-
-import { uiIcon } from '../icon.js';
-import { uiTooltip } from '../tooltip.js';
+import { uiIcon } from '../icon.ts';
+import { uiTooltip } from '../tooltip.ts';
 
 import type { Context } from '../../Context.ts';
 import type { D3Selection } from 'd3-selection';

@@ -1,9 +1,9 @@
 import { selection } from 'd3-selection';
 import { Extent } from '@rapid-sdk/math';
 
-import { uiIcon } from '../icon.js';
-import { uiLoading } from '../loading.js';
-import { uiTooltip } from '../tooltip.js';
+import { uiIcon } from '../icon.ts';
+import { uiLoading } from '../loading.ts';
+import { uiTooltip } from '../tooltip.ts';
 
 import type { Context } from '../../Context.ts';
 import type { D3Selection } from 'd3-selection';
@@ -34,6 +34,7 @@ export class UiGeolocateControl {
   protected _isSupported: boolean;
   protected _isActive: boolean;
   protected _isInitial: boolean;
+
 
   /**
    * @param  context - Global shared application context

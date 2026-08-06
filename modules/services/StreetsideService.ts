@@ -5,7 +5,7 @@ import {
   geomRotate, geomPointInPolygon, projWgs84ToWorld, vecLength
 } from '@rapid-sdk/math';
 import { MarkerData, GeoJSONData } from '../data/index.ts';
-import { uiIcon } from '../ui/icon.js';
+import { uiIcon } from '../ui/icon.ts';
 import { utilQsString } from '@rapid-sdk/util';
 
 import type { Context } from '../Context.ts';

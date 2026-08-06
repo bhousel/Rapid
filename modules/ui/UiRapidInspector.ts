@@ -1,10 +1,9 @@
 import { select, selection } from 'd3-selection';
 import { marked } from 'marked';
-
-import { actionNoop, actionRapidAcceptFeature } from '../actions/index.js';
-import { uiIcon } from './icon.js';
-//import { uiRapidFirstEditDialog } from './rapid_first_edit_dialog.js';
-import { uiTooltip } from './tooltip.js';
+import { actionNoop, actionRapidAcceptFeature } from '../actions/index.ts';
+import { uiIcon } from './icon.ts';
+//import { uiRapidFirstEditDialog } from './rapid_first_edit_dialog.ts';
+import { uiTooltip } from './tooltip.ts';
 import { utilKeybinding } from '../util/keybinding.ts';
 import { utilSanitizeHTML } from '../util/sanitize.ts';
 
@@ -44,6 +43,7 @@ export class UiRapidInspector {
   // accept and enter one of these modes:
   public moveFeature: (e: any, d: any) => void;
   public rotateFeature: (e: any, d: any) => void;
+
 
   /**
    * @param  context - Global shared application context

@@ -46,7 +46,7 @@ Rapid's UI is built using D3.js for DOM manipulation. Components follow a patter
 | `conflicts.js` | Edit conflicts resolution |
 | `flash.js` | Flash messages |
 | `loading.js` | Loading indicator |
-| `modal.js` | Modal dialog base |
+| `modal.ts` | Modal dialog base |
 | `restore.js` | Restore unsaved edits dialog |
 | `splash.js` | Welcome splash screen |
 | `success.js` | Upload success message |

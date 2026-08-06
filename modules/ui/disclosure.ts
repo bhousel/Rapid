@@ -1,7 +1,6 @@
 import { dispatch as d3_dispatch } from 'd3-dispatch';
-
-import { uiIcon } from './icon.js';
-import { uiToggle } from './toggle.js';
+import { uiIcon } from './icon.ts';
+import { uiToggle } from './toggle.ts';
 import { utilFunctor, utilRebind } from '../util/index.ts';
 
 import type { Context } from '../Context.ts';

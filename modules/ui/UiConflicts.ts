@@ -1,10 +1,9 @@
 import { EventEmitter } from 'tseep/lib/ee-safe';
 import { select as d3_select } from 'd3-selection';
 import { Extent, numWrap } from '@rapid-sdk/math';
-
 import { JXON } from '../util/jxon.ts';
 import { OsmChangeset } from '../data/OsmChangeset.ts';
-import { uiIcon } from './icon.js';
+import { uiIcon } from './icon.ts';
 import { utilHighlightEntities, utilKeybinding, utilSanitizeHTML } from '../util/index.ts';
 
 import type { Context } from '../Context.ts';
@@ -48,6 +47,10 @@ export class UiConflicts extends EventEmitter {
   protected _conflictList: ConflictItem[] | null;
   protected _shownConflictIndex: number | null;
 
+
+  /**
+   * @param  context - Global shared application context
+   */
   public constructor(context: Context) {
     super();
     this.context = context;
@@ -136,7 +139,7 @@ export class UiConflicts extends EventEmitter {
     const changeset = new OsmChangeset(context);
     delete (changeset as { id?: string }).id;  // Export without changeset_id
 
-    const data = JXON.stringify(changeset.osmChangeJXON(this._origChanges));
+    const data = JXON.stringify(changeset.osmChangeJXON(this._origChanges!));
     const blob = new Blob([data], { type: 'text/xml;charset=utf-8;' });
     const fileName = 'changes.osc';
 
@@ -172,7 +175,7 @@ export class UiConflicts extends EventEmitter {
 
     $$buttons
       .append('button')
-      .attr('disabled', this._conflictList.length > 1)
+      .attr('disabled', this._conflictList!.length > 1)
       .attr('class', 'action conflicts-button col6')
       .html(l10n.tHtml('save.title'))
       .on('click.try_again', this._tryAgain);
@@ -195,13 +198,13 @@ export class UiConflicts extends EventEmitter {
     const l10n = context.systems.l10n!;
     const scheduler = context.systems.scheduler;
 
-    index = numWrap(index, 0, this._conflictList.length);
+    index = numWrap(index, 0, this._conflictList!.length);
     this._shownConflictIndex = index;
 
     const $parent = d3_select(($selection.node() as HTMLElement).parentNode as HTMLElement);
 
     // enable save button if this is the last conflict being reviewed..
-    if (index === this._conflictList.length - 1) {
+    if (index === this._conflictList!.length - 1) {
       scheduler?.setTimeout('conflicts-enable-save', () => {
         $parent.select('.conflicts-button')
           .attr('disabled', null);
@@ -215,7 +218,7 @@ export class UiConflicts extends EventEmitter {
 
     const $conflict = $selection
       .selectAll('.conflict')
-      .data([this._conflictList[index]]);
+      .data([this._conflictList![index]]);
 
     $conflict.exit()
       .remove();
@@ -227,7 +230,7 @@ export class UiConflicts extends EventEmitter {
     $$conflict
       .append('h4')
       .attr('class', 'conflict-count')
-      .html(l10n.tHtml('save.conflict.count', { num: index + 1, total: this._conflictList.length }));
+      .html(l10n.tHtml('save.conflict.count', { num: index + 1, total: this._conflictList!.length }));
 
     $$conflict
       .append('a')
@@ -311,7 +314,7 @@ export class UiConflicts extends EventEmitter {
       .attr('name', (d: ChoiceOption) => d.id)
       .on('change', (d3_event: Event, d: ChoiceOption) => {
         const ul = (d3_event.currentTarget as HTMLElement).parentNode!.parentNode!.parentNode as HTMLUListElement;
-        ul.__data__.chosen = d.id;
+        (ul as any).__data__.chosen = d.id;
         this._choose(d3_event, ul, d);
       });
 
@@ -324,7 +327,7 @@ export class UiConflicts extends EventEmitter {
       .merge($choices)
       .each((d: ChoiceOption, i: number, nodes: ArrayLike<HTMLElement>) => {
         const ul = (nodes[i] as HTMLElement).parentNode as HTMLUListElement;
-        if (ul.__data__.chosen === d.id) {
+        if ((ul as any).__data__.chosen === d.id) {
           this._choose(null, ul, d);
         }
       });
@@ -349,18 +352,24 @@ export class UiConflicts extends EventEmitter {
       .selectAll('input')
       .property('checked', (d: ChoiceOption) => d === datum);
 
-    let extent = new Extent();
-    let graph, entity;
+    // Gather the extent of the change (check entity pre- and post- action)
+    const extent = new Extent();
 
-    graph = editor.staging.graph;
-    entity = graph.hasEntity(datum.id);
-    if (entity) extent = extent.extend(entity.extent(graph));
+    let graph = editor.staging.graph;
+    let entity = graph.hasEntity(datum.id);
+    let other = entity?.extent();
+    if (other) {
+      extent.extendSelf(other);
+    }
 
     datum.action();
 
     graph = editor.staging.graph;
     entity = graph.hasEntity(datum.id);
-    if (entity) extent = extent.extend(entity.extent(graph));
+    other = entity?.extent();
+    if (other) {
+      extent.extendSelf(other);
+    }
 
     this._showEntityID(datum.id, extent);
   }

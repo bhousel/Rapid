@@ -6,7 +6,7 @@ import type { Action } from '../actions/types.ts';
 import type { Context } from '../Context.ts';
 import type { D3Selection } from 'd3-selection';
 import type { Vec2 } from '@rapid-sdk/math';
-import type { Graph } from './Graph.js';
+import type { Graph } from './Graph.ts';
 
 
 /** Severity level for validation issues */

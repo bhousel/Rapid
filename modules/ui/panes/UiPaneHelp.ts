@@ -1,11 +1,10 @@
 import { select as d3_select } from 'd3-selection';
 import { marked } from 'marked';
-
-import { UiPane } from '../UiPane.js';
-import { uiIcon } from '../icon.js';
-import { UiIntro } from '../intro/UiIntro.js';
-import { uiTooltip } from '../tooltip.js';
-import { helpHtml } from '../intro/helper.js';
+import { UiPane } from '../UiPane.ts';
+import { uiIcon } from '../icon.ts';
+import { UiIntro } from '../intro/UiIntro.ts';
+import { uiTooltip } from '../tooltip.ts';
+import { helpHtml } from '../intro/helper.ts';
 
 import type { Context } from '../../Context.ts';
 import type { D3Selection } from 'd3-selection';

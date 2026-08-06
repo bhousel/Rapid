@@ -2,14 +2,13 @@ import { Extent } from '@rapid-sdk/math';
 import { select as d3_select } from 'd3-selection';
 
 import { AbstractIntroChapter } from './AbstractIntroChapter.ts';
-import { actionChangePreset } from '../../actions/change_preset.js';
+import { actionChangePreset } from '../../actions/change_preset.ts';
 import { delayAsync, eventCancel, helpHtml, icon, transitionTime } from './helper.ts';
-
-import type { Vec2 } from '@rapid-sdk/math';
 
 import type { Context } from '../../Context.ts';
 import type { IntroStep } from './AbstractIntroChapter.ts';
 import type { UiCurtain } from './UiCurtain.ts';
+import type { Vec2 } from '@rapid-sdk/math';
 
 
 const buildingExtent = new Extent([-85.63261, 41.94391], [-85.63222, 41.94419]);

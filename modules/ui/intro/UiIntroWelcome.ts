@@ -1,5 +1,4 @@
 import { Extent } from '@rapid-sdk/math';
-
 import { AbstractIntroChapter } from './AbstractIntroChapter.ts';
 import { helpHtml } from './helper.ts';
 

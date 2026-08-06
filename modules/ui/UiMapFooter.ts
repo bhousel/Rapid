@@ -3,7 +3,7 @@ import { selection } from 'd3-selection';
 import {
   UiAccount, UiContributors, UiFilterStatus, UiProjectLinks,
   UiScale, UiSourceSwitch, UiValidatorStatus, UiVersionInfo
-} from './index.js';
+} from './index.ts';
 
 import type { Context } from '../Context.ts';
 import type { D3Selection } from 'd3-selection';
@@ -27,17 +27,18 @@ export class UiMapFooter {
   public context: Context;
 
   // Child components
-  public AccountInfo: any;
-  public Contributors: any;
-  public FilterStatus: any;
-  public ProjectLinks: any;
-  public Scale: any;
-  public SourceSwitch: any;
-  public ValidatorStatus: any;
-  public VersionInfo: any;
+  public AccountInfo: UiAccount;
+  public Contributors: UiContributors;
+  public FilterStatus: UiFilterStatus;
+  public ProjectLinks: UiProjectLinks;
+  public Scale: UiScale;
+  public SourceSwitch: UiSourceSwitch;
+  public ValidatorStatus: UiValidatorStatus;
+  public VersionInfo: UiVersionInfo;
 
   // D3 selections
   public $parent: D3Selection | null;
+
 
   /**
    * @param  context - Global shared application context

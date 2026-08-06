@@ -1,8 +1,5 @@
 import { selection, select } from 'd3-selection';
-
-import {
-  UiBearingControl, UiGeolocateControl, UiZoomControl, UiZoomToControl
-} from './controls/index.js';
+import { UiBearingControl, UiGeolocateControl, UiZoomControl, UiZoomToControl } from './controls/index.ts';
 
 import type { Context } from '../Context.ts';
 import type { D3Selection } from 'd3-selection';
@@ -16,13 +13,14 @@ export class UiMapControls {
   public context: Context;
 
   // Child components
-  public BearingControl: any;
-  public ZoomControl: any;
-  public ZoomToControl: any;
-  public GeolocateControl: any;
+  public BearingControl: UiBearingControl;
+  public ZoomControl: UiZoomControl;
+  public ZoomToControl: UiZoomToControl;
+  public GeolocateControl: UiGeolocateControl;
 
   // D3 selections
   public $parent: D3Selection | null;
+
 
   /**
    * @param  context - Global shared application context

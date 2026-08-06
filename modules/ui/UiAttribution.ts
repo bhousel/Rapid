@@ -1,5 +1,4 @@
 import { selection, select } from 'd3-selection';
-
 import { utilSanitizeHTML } from '../util/sanitize.ts';
 import { utilSafeURL } from '../util/url.ts';
 
@@ -18,6 +17,7 @@ export class UiAttribution {
 
   public rerender: () => void;
   public throttledRender: () => void;
+
 
   /**
    * @param  context - Global shared application context

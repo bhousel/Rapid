@@ -1,7 +1,7 @@
 import React from 'react';
 import ReactDom from 'react-dom';
 import ReactComponent from './ReactComponent';
-import { uiSection } from '../section.js';
+import { uiSection } from './section.ts';
 
 
 export function uiSectionReactContainer(context) {

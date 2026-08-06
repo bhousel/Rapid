@@ -1,10 +1,10 @@
 import { select as d3_select } from 'd3-selection';
 
 import { JXON } from '../../util/jxon.ts';
-import { actionDiscardTags } from '../../actions/discard_tags.js';
-import { AbstractUiSection } from '../AbstractUiSection.js';
+import { actionDiscardTags } from '../../actions/discard_tags.ts';
+import { AbstractUiSection } from './AbstractUiSection.ts';
 import { OsmChangeset } from '../../data/OsmChangeset.ts';
-import { uiIcon } from '../icon.js';
+import { uiIcon } from '../icon.ts';
 import { utilHighlightEntities } from '../../util/util.ts';
 
 import type { Context } from '../../Context.ts';

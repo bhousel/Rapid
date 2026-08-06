@@ -20,6 +20,7 @@ export abstract class AbstractUiCard {
   public $parent: D3Selection | null;
   public $wrap: D3Selection | null;
 
+
   /**
    * @constructor
    * @param  context - Global shared application context

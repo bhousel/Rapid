@@ -1,4 +1,4 @@
-import { actionDeleteMultiple } from './delete_multiple.js';
+import { actionDeleteMultiple } from './delete_multiple.ts';
 
 import type { Action } from './types.ts';
 import type { Graph } from '../lib/Graph.ts';

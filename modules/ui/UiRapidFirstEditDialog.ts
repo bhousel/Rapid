@@ -1,6 +1,6 @@
-import { icon } from './intro/helper.js';
-import { uiModal } from './modal.js';
-import { UiRapidSplash } from './UiRapidSplash.js';
+import { icon } from './intro/helper.ts';
+import { uiModal } from './modal.ts';
+import { UiRapidSplash } from './UiRapidSplash.ts';
 
 import type { Context } from '../Context.ts';
 import type { D3Selection } from 'd3-selection';

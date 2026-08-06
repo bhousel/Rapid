@@ -1,7 +1,7 @@
 import { selection } from 'd3-selection';
 
-import { AbstractUiCard } from './AbstractUiCard.js';
-import { uiIcon } from '../icon.js';
+import { AbstractUiCard } from './AbstractUiCard.ts';
+import { uiIcon } from '../icon.ts';
 import { utilCmd } from '../../util/cmd.ts';
 
 import type { Context } from '../../Context.ts';
@@ -18,6 +18,7 @@ export class UiLocationCard extends AbstractUiCard {
   protected _currLocation: string | null;
   protected _keys: string[] | null;
   protected _deferredUpdateLocation: (loc: any) => void;
+
 
   /**
    * @constructor

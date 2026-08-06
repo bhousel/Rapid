@@ -1,8 +1,8 @@
 import { selection } from 'd3-selection';
-import { actionChangeTags } from '../../actions/change_tags.js';
-import { uiIcon } from '../icon.js';
-import { uiCombobox } from '../combobox.js';
-import { UiField } from '../UiField.js';
+import { actionChangeTags } from '../../actions/change_tags.ts';
+import { uiIcon } from '../icon.ts';
+import { uiCombobox } from '../combobox.ts';
+import { UiField } from '../UiField.ts';
 import { utilGetSetValue, utilNoAuto } from '../../util/index.ts';
 
 import type { Context } from '../../Context.ts';
@@ -10,7 +10,7 @@ import type { D3Selection } from 'd3-selection';
 import type { Field } from '../../lib/index.ts';
 import type { Tags } from './types.ts';
 import type { OsmTags } from '../../data/types.ts';
-import type { UiFieldOptions } from '../UiField.js';
+import type { UiFieldOptions } from '../UiField.ts';
 
 /** Wikipedia language entry: [displayName, nativeName, apiCode] */
 type WikipediaLanguage = [string, string, string];
@@ -57,9 +57,9 @@ export class UiFieldWikipedia extends UiField {
     this._changeLang = this._changeLang.bind(this);
 
     assets.loadAssetAsync('wmf_sitematrix')
-      .then((d: WikipediaLanguage[]) => {
+      .then((d: any) => {
         this._dataWikipedia = d;
-        if (!this.$langInput.empty()) this._updateForTags(this._tags);
+        if (this.$langInput && !this.$langInput.empty()) this._updateForTags(this._tags);
       })
       .catch((e: unknown) => console.error(e));  // eslint-disable-line
 

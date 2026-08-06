@@ -2,7 +2,6 @@ import * as PIXI from 'pixi.js';
 import { selection } from 'd3-selection';
 import { zoom, zoomIdentity } from 'd3-zoom';
 import { HALF_PI, Viewport, geoScaleToZoom, geoZoomToScale, numClamp, vecAdd, vecInterp, vecSubtract } from '@rapid-sdk/math';
-
 import { PixiLayerBackgroundTiles } from '../pixi/PixiLayerBackgroundTiles.ts';
 
 import type { Context } from '../Context.ts';
@@ -41,6 +40,7 @@ export class UiMinimap {
   public $supersurface: D3Selection | null;
   public $surface: D3Selection | null;
   public $wrap: D3Selection | null;
+
 
   /**
    * @param  context - Global shared application context

@@ -1,5 +1,5 @@
 import type { TransformProps } from '@rapid-sdk/math';
-import type { Graph } from './Graph.js';
+import type { Graph } from './Graph.ts';
 
 
 /**

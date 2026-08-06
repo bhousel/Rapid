@@ -1,8 +1,8 @@
-import { uiModal } from './modal.js';
+import { uiModal } from './modal.ts';
 
 import type { Context } from '../Context.ts';
 import type { D3Selection } from 'd3-selection';
-import type { UiModalSelection } from './modal.js';
+import type { UiModalSelection } from './modal.ts';
 
 
 /** A confirm dialog's selection, augmented with an `okButton()` method. */

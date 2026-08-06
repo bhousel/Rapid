@@ -1,11 +1,10 @@
 import { select as d3_select } from 'd3-selection';
+import { uiDisclosure } from '../disclosure.ts';
+import { utilFunctor } from '../../util/util.ts';
 
-import { uiDisclosure } from './disclosure.js';
-import { utilFunctor } from '../util/util.ts';
-
-import type { Context } from '../Context.ts';
+import type { Context } from '../../Context.ts';
 import type { D3Selection } from 'd3-selection';
-import type { UiDisclosure } from './disclosure.js';
+import type { UiDisclosure } from '../disclosure.ts';
 
 
 /** A functor: either a value, or a function returning that value. */

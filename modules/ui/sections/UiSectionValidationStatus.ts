@@ -1,11 +1,16 @@
-import { uiIcon } from '../icon.js';
-import { AbstractUiSection } from '../AbstractUiSection.js';
+import { uiIcon } from '../icon.ts';
+import { AbstractUiSection } from './AbstractUiSection.ts';
 
 import type { Context } from '../../Context.ts';
 import type { D3Selection } from 'd3-selection';
 
 
 export class UiSectionValidationStatus extends AbstractUiSection {
+
+
+  /**
+   * @param  context - Global shared application context
+   */
   public constructor(context: Context) {
     super(context, 'issues-status');
 

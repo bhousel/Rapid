@@ -1,23 +1,23 @@
-export * from './UiFieldCheck.js';
-export * from './UiFieldCombo.js';
-export * from './UiFieldText.js';
-export * from './UiFieldAccess.js';
-export * from './UiFieldAddress.js';
-export * from './UiFieldCycleway.js';
-export * from './UiFieldLanes.js';
-export * from './UiFieldLocalized.js';
-export * from './UiFieldRoadspeed.js';
-export * from './UiFieldRadio.js';
-export * from './UiFieldRestrictions.js';
-export * from './UiFieldTextarea.js';
-export * from './UiFieldWikidata.js';
-export * from './UiFieldWikipedia.js';
+export * from './UiFieldCheck.ts';
+export * from './UiFieldCombo.ts';
+export * from './UiFieldText.ts';
+export * from './UiFieldAccess.ts';
+export * from './UiFieldAddress.ts';
+export * from './UiFieldCycleway.ts';
+export * from './UiFieldLanes.ts';
+export * from './UiFieldLocalized.ts';
+export * from './UiFieldRoadspeed.ts';
+export * from './UiFieldRadio.ts';
+export * from './UiFieldRestrictions.ts';
+export * from './UiFieldTextarea.ts';
+export * from './UiFieldWikidata.ts';
+export * from './UiFieldWikipedia.ts';
 
 import {
   UiFieldCheck,
   UiFieldDefaultCheck,
   UiFieldOnewayCheck
-} from './UiFieldCheck.js';
+} from './UiFieldCheck.ts';
 
 import {
   UiFieldCombo,
@@ -26,7 +26,7 @@ import {
   UiFieldNetworkCombo,
   UiFieldSemiCombo,
   UiFieldTypeCombo
-} from './UiFieldCombo.js';
+} from './UiFieldCombo.ts';
 
 import {
   UiFieldEmail,
@@ -35,26 +35,26 @@ import {
   UiFieldTel,
   UiFieldText,
   UiFieldUrl
-} from './UiFieldText.js';
+} from './UiFieldText.ts';
 
 import {
   UiFieldRadio,
   UiFieldStructureRadio
-} from './UiFieldRadio.js';
+} from './UiFieldRadio.ts';
 
-import { UiFieldAccess } from './UiFieldAccess.js';
-import { UiFieldAddress } from './UiFieldAddress.js';
-import { UiFieldCycleway } from './UiFieldCycleway.js';
-import { UiFieldLanes } from './UiFieldLanes.js';
-import { UiFieldLocalized } from './UiFieldLocalized.js';
-import { UiFieldRoadspeed } from './UiFieldRoadspeed.js';
-import { UiFieldRestrictions } from './UiFieldRestrictions.js';
-import { UiFieldTextarea } from './UiFieldTextarea.js';
-import { UiFieldWikidata } from './UiFieldWikidata.js';
-import { UiFieldWikipedia } from './UiFieldWikipedia.js';
+import { UiFieldAccess } from './UiFieldAccess.ts';
+import { UiFieldAddress } from './UiFieldAddress.ts';
+import { UiFieldCycleway } from './UiFieldCycleway.ts';
+import { UiFieldLanes } from './UiFieldLanes.ts';
+import { UiFieldLocalized } from './UiFieldLocalized.ts';
+import { UiFieldRoadspeed } from './UiFieldRoadspeed.ts';
+import { UiFieldRestrictions } from './UiFieldRestrictions.ts';
+import { UiFieldTextarea } from './UiFieldTextarea.ts';
+import { UiFieldWikidata } from './UiFieldWikidata.ts';
+import { UiFieldWikipedia } from './UiFieldWikipedia.ts';
 
 import type { Context } from '../../Context.ts';
-import type { UiField } from '../UiField.js';
+import type { UiField } from '../UiField.ts';
 
 
 /** A field constructor: creates a `UiField` subclass for a given field type. */

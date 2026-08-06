@@ -1,11 +1,13 @@
-import { AbstractUiSection } from '../AbstractUiSection.js';
-import { uiTooltip } from '../tooltip.js';
+import { AbstractUiSection } from './AbstractUiSection.ts';
+import { uiTooltip } from '../tooltip.ts';
 
 import type { Context } from '../../Context.ts';
 import type { D3Selection } from 'd3-selection';
 
 
 export class UiSectionMapFeatures extends AbstractUiSection {
+
+
   /**
    * @param context - Global shared application context
    */

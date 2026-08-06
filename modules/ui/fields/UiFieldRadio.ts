@@ -1,14 +1,14 @@
 import { select, selection } from 'd3-selection';
 import { utilArrayUnion } from '@rapid-sdk/util';
-import { UiField } from '../UiField.js';
-import { createUiField } from './index.js';
+import { UiField } from '../UiField.ts';
+import { createUiField } from './index.ts';
 
 import type { Context } from '../../Context.ts';
 import type { D3Selection } from 'd3-selection';
 import type { Field } from '../../lib/index.ts';
 import type { SchemaScope } from '../../core/SchemaSystem.ts';
 import type { Tags } from './types.ts';
-import type { UiFieldOptions } from '../UiField.js';
+import type { UiFieldOptions } from '../UiField.ts';
 
 export { UiFieldRadio as UiFieldStructureRadio };
 

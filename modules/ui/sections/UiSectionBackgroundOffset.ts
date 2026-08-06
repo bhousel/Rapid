@@ -1,8 +1,7 @@
 import { select as d3_select } from 'd3-selection';
 import { geoMetersToOffset, geoOffsetToMeters } from '@rapid-sdk/math';
-
-import { AbstractUiSection } from '../AbstractUiSection.js';
-import { uiIcon } from '../icon.js';
+import { AbstractUiSection } from './AbstractUiSection.ts';
+import { uiIcon } from '../icon.ts';
 
 import type { Context } from '../../Context.ts';
 import type { D3Selection } from 'd3-selection';

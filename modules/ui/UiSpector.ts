@@ -25,6 +25,7 @@ export class UiSpector {
   public $parent: D3Selection | null;
   public $wrap: D3Selection | null;
 
+
   /**
    * @param  context - Global shared application context
    */

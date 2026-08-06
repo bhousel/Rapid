@@ -1,7 +1,6 @@
 import { utilArrayUniq } from '@rapid-sdk/util';
-
-import { actionExtract } from '../actions/extract.js';
-import { KeyOperationBehavior } from '../behaviors/KeyOperationBehavior.js';
+import { actionExtract } from '../actions/extract.ts';
+import { KeyOperationBehavior } from '../behaviors/KeyOperationBehavior.ts';
 import { utilTotalExtent } from '../util/util.ts';
 
 

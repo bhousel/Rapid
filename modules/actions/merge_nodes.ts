@@ -1,4 +1,4 @@
-import { actionConnect } from './connect.js';
+import { actionConnect } from './connect.ts';
 import { vecAdd, vecEqual, vecScale } from '@rapid-sdk/math';
 
 import type { Action } from './types.ts';

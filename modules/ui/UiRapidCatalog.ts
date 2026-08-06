@@ -1,9 +1,8 @@
 import { EventEmitter } from 'tseep/lib/ee-safe';
 import { select } from 'd3-selection';
 import { marked } from 'marked';
-
-import { uiIcon } from './icon.js';
-import { uiCombobox} from './combobox.js';
+import { uiIcon } from './icon.ts';
+import { uiCombobox} from './combobox.ts';
 import { utilKeybinding, utilNoAuto, utilSafeURL, utilSanitizeHTML } from '../util/index.ts';
 
 import type { Context } from '../Context.ts';
@@ -29,6 +28,7 @@ export class UiRapidCatalog extends EventEmitter {
   protected _filterText: string | null;
   protected _filterCategory: string | null;
   protected _myClose: () => unknown;
+
 
   /**
    * @param  context - Global shared application context

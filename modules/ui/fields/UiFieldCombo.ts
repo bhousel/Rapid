@@ -3,8 +3,8 @@ import { drag } from 'd3-drag';
 import { utilArrayUniq, utilUnicodeCharsCount } from '@rapid-sdk/util';
 import { iso1A2Code } from '@rapideditor/country-coder';
 
-import { UiField } from '../UiField.js';
-import { uiCombobox } from '../combobox.js';
+import { UiField } from '../UiField.ts';
+import { uiCombobox } from '../combobox.ts';
 import { utilKeybinding } from '../../util/keybinding.ts';
 import { utilGetSetValue, utilNoAuto } from '../../util/index.ts';
 
@@ -12,7 +12,7 @@ import type { Context } from '../../Context.ts';
 import type { D3Selection } from 'd3-selection';
 import type { Field } from '../../lib/index.ts';
 import type { Tags } from './types.ts';
-import type { UiFieldOptions } from '../UiField.js';
+import type { UiFieldOptions } from '../UiField.ts';
 
 export {
   UiFieldCombo as UiFieldManyCombo,
@@ -761,8 +761,8 @@ export class UiFieldCombo extends UiField {
         targetIndex = null;
       })
       .on('drag', function(this: HTMLElement, d3_event: any) {
-        const x = d3_event.x - dragOrigin.x,
-          y = d3_event.y - dragOrigin.y;
+        const x = d3_event.x - dragOrigin!.x,
+          y = d3_event.y - dragOrigin!.y;
 
         if (!select(this).classed('dragging') &&
           // don't display drag until dragging beyond a distance threshold
@@ -820,6 +820,7 @@ export class UiFieldCombo extends UiField {
             })
             .style('transform', function(this: HTMLElement, d2, index2) {
               const node = select(this).node();
+              if (!node) return null;
 
               if (index === index2) {
                 return 'translate(' + x + 'px, ' + y + 'px)';
@@ -827,9 +828,9 @@ export class UiFieldCombo extends UiField {
 
               // only translate tags in the same row
               if (node.offsetTop === targetIndexOffsetTop) {
-                if (index2 < index && index2 >= targetIndex) {
+                if (index2 < index && index2 >= targetIndex!) {
                   return 'translateX(' + draggedTagWidth + 'px)';
-                } else if (index2 > index && index2 <= targetIndex) {
+                } else if (index2 > index && index2 <= targetIndex!) {
                   return 'translateX(-' + draggedTagWidth + 'px)';
                 }
               }
@@ -866,8 +867,8 @@ export class UiFieldCombo extends UiField {
 
           emit('change', t);
         }
-        dragOrigin = undefined;
-        targetIndex = undefined;
+        dragOrigin = null;
+        targetIndex = null;
       })
     );
   }

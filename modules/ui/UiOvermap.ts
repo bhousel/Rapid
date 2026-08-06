@@ -1,24 +1,15 @@
 import { selection } from 'd3-selection';
-
-import { UiAttribution } from './UiAttribution.js';
-import { UiInfoCards } from './UiInfoCards.js';
-import { UiMap3dViewer } from './UiMap3dViewer.js';
-import { UiMapControls } from './UiMapControls.js';
-import { UiMapPanes } from './UiMapPanes.js';
-import { UiMinimap } from './UiMinimap.js';
-import { UiPhotoViewer } from './UiPhotoViewer.js';
-import { UiSpector } from './UiSpector.js';
+import { UiAttribution } from './UiAttribution.ts';
+import { UiInfoCards } from './UiInfoCards.ts';
+import { UiMap3dViewer } from './UiMap3dViewer.ts';
+import { UiMapControls } from './UiMapControls.ts';
+import { UiMapPanes } from './UiMapPanes.ts';
+import { UiMinimap } from './UiMinimap.ts';
+import { UiPhotoViewer } from './UiPhotoViewer.ts';
+import { UiSpector } from './UiSpector.ts';
 
 import type { Context } from '../Context.ts';
 import type { D3Selection } from 'd3-selection';
-import type { UiAttribution } from './UiAttribution.js';
-import type { UiInfoCards } from './UiInfoCards.js';
-import type { UiMap3dViewer } from './UiMap3dViewer.js';
-import type { UiMapControls } from './UiMapControls.js';
-import type { UiMapPanes } from './UiMapPanes.js';
-import type { UiMinimap } from './UiMinimap.js';
-import type { UiPhotoViewer } from './UiPhotoViewer.js';
-import type { UiSpector } from './UiSpector.js';
 
 
 /**
@@ -46,6 +37,7 @@ export class UiOvermap {
 
   // D3 selections
   public $parent: D3Selection | null;
+
 
   /**
    * @param  context - Global shared application context

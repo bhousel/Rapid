@@ -1,11 +1,10 @@
 import { EventEmitter } from 'tseep/lib/ee-safe';
 import { select as d3_select } from 'd3-selection';
 import { utilUniqueString } from '@rapid-sdk/util';
-
-import { uiIcon } from './icon.js';
-import { uiTooltip } from './tooltip.js';
-// import { uiFieldHelp } from './field_help.js';
-import { UiTagReference } from './UiTagReference.js';
+import { uiIcon } from './icon.ts';
+import { uiTooltip } from './tooltip.ts';
+// import { uiFieldHelp } from './field_help.ts';
+import { UiTagReference } from './UiTagReference.ts';
 import { utilTotalExtent } from '../util/index.ts';
 import { LANGUAGE_SUFFIX_REGEX } from './fields/types.ts';
 
@@ -123,7 +122,7 @@ export class UiField extends EventEmitter {
     this._locked = false;
     this._lockedTip = uiTooltip(context)
       .title(l10n.t('inspector.lock.suggestion', { label: this.label }))
-      .placement('bottom');
+      .placement('bottom') as ReturnType<typeof uiTooltip>;
 
 
     // Ensure methods used as callbacks always have `this` bound correctly.
@@ -155,7 +154,7 @@ export class UiField extends EventEmitter {
       const original = baseGraph.hasEntity(entityID);
       const current = currGraph.hasEntity(entityID);
       return this.keys.some(key => {
-        return original ? current.tags[key] !== original.tags[key] : current.tags[key];
+        return original ? current?.tags[key] !== original.tags[key] : current?.tags[key];
       });
     });
   }

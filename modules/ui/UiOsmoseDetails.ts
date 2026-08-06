@@ -1,5 +1,4 @@
 import { select as d3_select, selection } from 'd3-selection';
-
 import { utilSanitizeHTML } from '../util/sanitize.ts';
 import { utilHighlightEntities } from '../util/util.ts';
 
@@ -20,6 +19,10 @@ export class UiOsmoseDetails {
   // D3 selections
   public $parent: D3Selection | null;
 
+
+  /**
+   * @param  context - Global shared application context
+   */
   public constructor(context: Context) {
     this.context = context;
     this.datum = null;
@@ -64,9 +67,9 @@ export class UiOsmoseDetails {
       .append('div')
       .attr('class', 'sidebar-details qa-details-container');
 
-    const detailHtml = this._issueString(this.datum, 'detail');
-    const trapHtml = this._issueString(this.datum, 'trap');
-    const fixHtml = this._issueString(this.datum, 'fix');
+    const detailHtml = this._issueString(this.datum!, 'detail');
+    const trapHtml = this._issueString(this.datum!, 'trap');
+    const fixHtml = this._issueString(this.datum!, 'fix');
 
     // Description
     if (detailHtml) {
@@ -144,10 +147,10 @@ export class UiOsmoseDetails {
     // Save current item to check if UI changed by time request resolves
     if (!osmose) return;
 
-    osmose.loadIssueDetailAsync(this.datum)
+    osmose.loadIssueDetailAsync(this.datum!)
       .then((d: any) => {
         // Do nothing if the datum has changed by the time Promise resolves
-        if (this.datum.id !== d.id) return;
+        if (this.datum!.id !== d.id) return;
 
         // No details to add if there are no associated issue elements
         if (!d.props.elems || d.props.elems.length === 0) return;
@@ -211,7 +214,7 @@ export class UiOsmoseDetails {
               let name: string | undefined = l10n.displayName(entity.tags);  // try to use common name
               if (!name) {
                 const preset = schema.match(entity, graph);
-                name = preset && !preset.isFallback() && preset.name;  // fallback to preset name
+                name = (preset && !preset.isFallback() && preset.name) || undefined;  // fallback to preset name
               }
 
               if (name) {
@@ -239,7 +242,7 @@ export class UiOsmoseDetails {
     if (!osmose || !d) return '';
 
     // Issue strings are cached from Osmose API
-    const s = osmose.getStrings(d.props.type);
-    return (type in s) ? s[type] : '';
+    const s = osmose.getStrings(d.props.type!);
+    return (type in s) ? (s as any)[type] : '';
   }
 }

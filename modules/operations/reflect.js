@@ -1,7 +1,6 @@
 import { utilGetAllNodes } from '@rapid-sdk/util';
-
-import { actionReflect } from '../actions/reflect.js';
-import { KeyOperationBehavior } from '../behaviors/KeyOperationBehavior.js';
+import { actionReflect } from '../actions/reflect.ts';
+import { KeyOperationBehavior } from '../behaviors/KeyOperationBehavior.ts';
 import { utilTotalExtent } from '../util/util.ts';
 
 

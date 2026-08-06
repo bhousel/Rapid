@@ -4,9 +4,9 @@ import geojsonRewind from '@mapbox/geojson-rewind';
 import { Extent, geoSphericalDistance } from '@rapid-sdk/math';
 import { utilGetAllNodes } from '@rapid-sdk/util';
 
-import { AbstractUiCard } from './AbstractUiCard.js';
+import { AbstractUiCard } from './AbstractUiCard.ts';
 import { MarkerData } from '../../data/MarkerData.ts';
-import { uiIcon } from '../icon.js';
+import { uiIcon } from '../icon.ts';
 import { utilCmd } from '../../util/cmd.ts';
 
 import type { Context } from '../../Context.ts';
@@ -50,6 +50,7 @@ export class UiMeasurementCard extends AbstractUiCard {
 
   protected _isImperial: boolean;
   protected _keys: string[] | null;
+
 
   /**
    * @constructor

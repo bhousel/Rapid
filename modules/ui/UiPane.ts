@@ -1,9 +1,8 @@
 import { select as d3_select } from 'd3-selection';
+import { uiIcon } from './icon.ts';
+import { uiTooltip } from './tooltip.ts';
 
-import { uiIcon } from './icon.js';
-import { uiTooltip } from './tooltip.js';
-
-import type { AbstractUiSection } from './AbstractUiSection.js';
+import type { AbstractUiSection } from './sections/AbstractUiSection.ts';
 import type { Context } from '../Context.ts';
 import type { D3Selection } from 'd3-selection';
 
@@ -28,6 +27,11 @@ export class UiPane {
 
   protected _paneTooltip: any;
 
+
+  /**
+   * @param  context - Global shared application context
+   * @param  id  - the identifier for the pane
+   */
   public constructor(context: Context, id: string) {
     this.context = context;
     this.id = id;

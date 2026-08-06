@@ -1,8 +1,8 @@
 import { select } from 'd3-selection';
 import { utilArrayUniq } from '@rapid-sdk/util';
 
-import { uiIcon } from './icon.js';
-import { uiModal } from './modal.js';
+import { uiIcon } from './icon.ts';
+import { uiModal } from './modal.ts';
 import { utilCmd, utilDetect } from '../util/index.ts';
 
 import type { Context } from '../Context.ts';
@@ -36,6 +36,7 @@ export class UiShortcuts {
 
   // D3 selections
   public $modal: any;
+
 
   /**
    * @param  context - Global shared application context
@@ -338,7 +339,7 @@ export class UiShortcuts {
    */
   public hide(): void {
     if (!this.$modal) return;
-    this.$modal.close();
+    this.$modal!.close();
     this.$modal = null;
   }
 

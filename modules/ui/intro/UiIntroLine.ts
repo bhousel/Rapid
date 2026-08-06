@@ -1,13 +1,11 @@
 import { Extent, geoSphericalDistance } from '@rapid-sdk/math';
-
 import { AbstractIntroChapter } from './AbstractIntroChapter.ts';
 import { delayAsync, eventCancel, helpHtml, icon, transitionTime } from './helper.ts';
-
-import type { Vec2 } from '@rapid-sdk/math';
 
 import type { Context } from '../../Context.ts';
 import type { IntroStep } from './AbstractIntroChapter.ts';
 import type { UiCurtain } from './UiCurtain.ts';
+import type { Vec2 } from '@rapid-sdk/math';
 
 
 /**

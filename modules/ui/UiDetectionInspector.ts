@@ -1,9 +1,8 @@
 import { selection } from 'd3-selection';
-
-import { uiIcon } from './icon.js';
-import { UiDetectionDetails } from './UiDetectionDetails.js';
-import { UiDetectionHeader } from './UiDetectionHeader.js';
-import { UiViewOn } from './UiViewOn.js';
+import { uiIcon } from './icon.ts';
+import { UiDetectionDetails } from './UiDetectionDetails.ts';
+import { UiDetectionHeader } from './UiDetectionHeader.ts';
+import { UiViewOn } from './UiViewOn.ts';
 
 import type { Context } from '../Context.ts';
 import type { D3Selection } from 'd3-selection';
@@ -25,6 +24,10 @@ export class UiDetectionInspector {
   // D3 selections
   public $parent: D3Selection | null;
 
+
+  /**
+   * @param  context - Global shared application context
+   */
   public constructor(context: Context) {
     this.context = context;
     this.datum = null;

@@ -1,16 +1,14 @@
 import { select as d3_select } from 'd3-selection';
-
-import { AbstractUiSection } from '../AbstractUiSection.js';
-import { uiTooltip } from '../tooltip.js';
-import { uiIcon } from '../icon.js';
-import { UiSettingsCustomData } from '../settings/UiSettingsCustomData.js';
+import { AbstractUiSection } from './AbstractUiSection.ts';
+import { uiTooltip } from '../tooltip.ts';
+import { uiIcon } from '../icon.ts';
+import { UiSettingsCustomData } from '../settings/UiSettingsCustomData.ts';
 import { utilCmd } from '../../util/cmd.ts';
 
 import type { Context } from '../../Context.ts';
 import type { D3Selection } from 'd3-selection';
 import type { AbstractPixiLayer } from '../../pixi/AbstractPixiLayer.ts';
 import type { PixiLayerCustomData } from '../../pixi/PixiLayerCustomData.ts';
-import type { UiSettingsCustomData } from '../settings/UiSettingsCustomData.ts';
 
 
 /** A base-layer item binding: id, optional layer reference, and keyboard-shortcut key path */
@@ -44,6 +42,7 @@ export class UiSectionDataLayers extends AbstractUiSection {
   protected _previousLayerStates: Map<string, boolean>;
   protected _keys: string[] | null;
   protected _settingsCustomData: UiSettingsCustomData;
+
 
   /**
    * @param context - Global shared application context
@@ -349,7 +348,7 @@ export class UiSectionDataLayers extends AbstractUiSection {
 
     $li
       .selectAll('input.challenge-ids')
-      .attr('value', maproulette.challengeIDs);
+      .attr('value', maproulette?.challengeIDs ?? null);
   }
 
 

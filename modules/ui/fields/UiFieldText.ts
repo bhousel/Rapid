@@ -1,14 +1,14 @@
 import { selection } from 'd3-selection';
 import { iso1A2Code } from '@rapideditor/country-coder';
-import { UiField } from '../UiField.js';
+import { UiField } from '../UiField.ts';
 import { utilGetSetValue, utilNoAuto } from '../../util/index.ts';
-import { uiIcon } from '../icon.js';
+import { uiIcon } from '../icon.ts';
 
 import type { Context } from '../../Context.ts';
 import type { D3Selection } from 'd3-selection';
 import type { Field } from '../../lib/index.ts';
 import type { TagChange, Tags } from './types.ts';
-import type { UiFieldOptions } from '../UiField.js';
+import type { UiFieldOptions } from '../UiField.ts';
 
 export {
   UiFieldText as UiFieldUrl,

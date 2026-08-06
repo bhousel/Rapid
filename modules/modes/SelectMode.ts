@@ -1,12 +1,12 @@
 import { AbstractMode } from './AbstractMode.ts';
 import { AbstractData, GeoJSONData, MarkerData } from '../data/index.ts';
 import { Extent } from '@rapid-sdk/math';
-import { UiOsmoseEditor } from '../ui/UiOsmoseEditor.js';
-import { UiDataEditor } from '../ui/UiDataEditor.js';
-import { UiDetectionInspector } from '../ui/UiDetectionInspector.js';
-import { UiKeepRightEditor } from '../ui/UiKeepRightEditor.js';
-import { UiNoteEditor } from '../ui/UiNoteEditor.js';
-import { UiMapRouletteEditor } from '../ui/UiMapRouletteEditor.js';
+import { UiOsmoseEditor } from '../ui/UiOsmoseEditor.ts';
+import { UiDataEditor } from '../ui/UiDataEditor.ts';
+import { UiDetectionInspector } from '../ui/UiDetectionInspector.ts';
+import { UiKeepRightEditor } from '../ui/UiKeepRightEditor.ts';
+import { UiNoteEditor } from '../ui/UiNoteEditor.ts';
+import { UiMapRouletteEditor } from '../ui/UiMapRouletteEditor.ts';
 
 import type { Context } from '../Context.ts';
 

@@ -1,8 +1,7 @@
 import { selection } from 'd3-selection';
 import { marked } from 'marked';
-
-import { uiIcon } from './icon.js';
-import { uiTooltip } from './tooltip.js';
+import { uiIcon } from './icon.ts';
+import { uiTooltip } from './tooltip.ts';
 import { utilSanitizeHTML } from '../util/sanitize.ts';
 
 import type { Context } from '../Context.ts';
@@ -27,12 +26,17 @@ import type { D3Selection } from 'd3-selection';
 export class UiOvertureInspector {
   public context: Context;
   public datum: any;
+
+  // D3 Selections
   public $parent: D3Selection | null;
   public $inspector: D3Selection | null;
+
+  // Child Components
   public AcceptTooltip: any;
   public IgnoreTooltip: any;
 
   protected _keys: any;
+
 
   /**
    * @param  context - Global shared application context

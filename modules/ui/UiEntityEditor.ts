@@ -2,24 +2,24 @@ import { EventEmitter } from 'tseep/lib/ee-safe';
 import { selection } from 'd3-selection';
 import { utilArrayIdentical, utilCleanTags } from '@rapid-sdk/util';
 import deepEqual from 'fast-deep-equal';
-
 import { actionChangeTags, actionSyncCrossingTags } from '../actions/index.ts';
-import { uiIcon } from './icon.js';
+import { uiIcon } from './icon.ts';
 
-import { UiSectionEntityIssues } from './sections/UiSectionEntityIssues.js';
-import { UiSectionFeatureType } from './sections/UiSectionFeatureType.js';
-import { UiSectionPresetFields } from './sections/UiSectionPresetFields.js';
-import { UiSectionRawMemberEditor } from './sections/UiSectionRawMemberEditor.js';
-import { UiSectionRawMembershipEditor } from './sections/UiSectionRawMembershipEditor.js';
-import { UiSectionRawTagEditor } from './sections/UiSectionRawTagEditor.js';
-import { UiSectionSelectionList } from './sections/UiSectionSelectionList.js';
+import { UiSectionEntityIssues } from './sections/UiSectionEntityIssues.ts';
+import { UiSectionFeatureType } from './sections/UiSectionFeatureType.ts';
+import { UiSectionPresetFields } from './sections/UiSectionPresetFields.ts';
+import { UiSectionRawMemberEditor } from './sections/UiSectionRawMemberEditor.ts';
+import { UiSectionRawMembershipEditor } from './sections/UiSectionRawMembershipEditor.ts';
+import { UiSectionRawTagEditor } from './sections/UiSectionRawTagEditor.ts';
+import { UiSectionSelectionList } from './sections/UiSectionSelectionList.ts';
 
-import type { AbstractUiSection } from './AbstractUiSection.ts';
 import type { Category } from '../lib/Category.ts';
 import type { Context } from '../Context.ts';
 import type { D3Selection } from 'd3-selection';
 import type { Difference } from '../lib/Difference.ts';
 import type { Graph } from '../lib/Graph.ts';
+import type { OsmEntity } from '../data/index.ts';
+import type { OsmTags } from '../data/types.ts';
 import type { Preset } from '../lib/Preset.ts';
 import type { Tags } from './fields/types.ts';
 
@@ -37,14 +37,16 @@ export class UiEntityEditor extends EventEmitter {
 
   public $parent: D3Selection | null;
 
-  protected _crossingKeys: Set<string>;
-  protected _sections: AbstractUiSection[];
+  protected _crossingKeys: Set<string | number>;
+  // sections have heterogeneous APIs (entityIDs/presets/tags/state), so keep loose
+  protected _sections: any[];
   protected _state: string;          // can be 'hide', 'hover', or 'select'
   protected _modified: boolean;
   protected _startGraph: Graph | undefined;
   protected _entityIDs: EntityID[];
   protected _selectedPresets: (Preset | undefined)[];
   protected _newFeature: boolean | undefined;
+
 
   /**
    * @param  context - Global shared application context
@@ -345,7 +347,7 @@ export class UiEntityEditor extends EventEmitter {
       }
 
       if (!deepEqual(entity.tags, tags)) {
-        editor.perform(actionChangeTags(entityID, tags));
+        editor.perform(actionChangeTags(entityID, tags as OsmTags));
         if (!wasRawTagEditor && involvesCrossing) {
           editor.perform(actionSyncCrossingTags(entityID));
         }
@@ -413,7 +415,7 @@ export class UiEntityEditor extends EventEmitter {
       tags = utilCleanTags(tags);
 
       if (!deepEqual(current.tags, tags)) {
-        editor.perform(actionChangeTags(entityID, tags));
+        editor.perform(actionChangeTags(entityID, tags as OsmTags));
         if (involvesCrossing) {
           editor.perform(actionSyncCrossingTags(entityID));
         }
@@ -462,8 +464,8 @@ export class UiEntityEditor extends EventEmitter {
     if (!isForNewSelection) {
       // A "weak" preset doesn't set any tags. (e.g. "Address")
       const isWeakPreset = this._selectedPresets.length === 1 &&
-        !this._selectedPresets[0].isFallback() &&
-        Object.keys(this._selectedPresets[0].addTags || {}).length === 0;
+        !this._selectedPresets[0]?.isFallback() &&
+        Object.keys(this._selectedPresets[0]?.addTags || {}).length === 0;
 
       // Don't replace a weak preset with a fallback preset (e.g. "Point")
       if (isWeakPreset && matches.length === 1 && matches[0]?.isFallback()) return;
@@ -500,7 +502,7 @@ export class UiEntityEditor extends EventEmitter {
     const combined = new Map<string, Set<string | undefined>>();    // Map<key, Set<value>
     const counts = new Map<string, number>();      // Map<kv, number>
 
-    const entities = entityIDs.map(entityID => graph.hasEntity(entityID)).filter(Boolean);
+    const entities = entityIDs.map(entityID => graph.hasEntity(entityID)).filter(Boolean) as OsmEntity[];
 
     // Gather the keys
     for (const entity of entities) {
@@ -533,6 +535,7 @@ export class UiEntityEditor extends EventEmitter {
 
       } else {   // entities have different values..
         // sort in place, by frequency then alphabetically
+        // (the array may include `undefined` for entities missing the tag; consumers tolerate it)
         results[k] = arr.sort((v1, v2) => {
           const count1 = counts.get(`${k}=${v1}`) ?? 0;
           const count2 = counts.get(`${k}=${v2}`) ?? 0;
@@ -543,7 +546,7 @@ export class UiEntityEditor extends EventEmitter {
             return v1.localeCompare(v2);
           }
           return v1 ? 1 : -1;
-        });
+        }) as string[];
       }
     }
 

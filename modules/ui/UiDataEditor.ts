@@ -1,8 +1,7 @@
 import { selection } from 'd3-selection';
-
-import { uiIcon } from './icon.js';
-import { UiDataHeader } from './UiDataHeader.js';
-import { UiSectionRawTagEditor } from './sections/UiSectionRawTagEditor.js';
+import { uiIcon } from './icon.ts';
+import { UiDataHeader } from './UiDataHeader.ts';
+import { UiSectionRawTagEditor } from './sections/UiSectionRawTagEditor.ts';
 import { utilObjectOmit } from '@rapid-sdk/util';
 
 import type { Context } from '../Context.ts';
@@ -23,6 +22,10 @@ export class UiDataEditor {
   // D3 selections
   public $parent: D3Selection | null;
 
+
+  /**
+   * @param  context - Global shared application context
+   */
   public constructor(context: Context) {
     this.context = context;
     this.datum = null;

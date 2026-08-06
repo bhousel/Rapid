@@ -1,8 +1,8 @@
 import { geoSphericalDistance } from '@rapid-sdk/math';
 import { utilGetAllNodes } from '@rapid-sdk/util';
 
-import { actionDeleteMultiple } from '../actions/delete_multiple.js';
-import { KeyOperationBehavior } from '../behaviors/KeyOperationBehavior.js';
+import { actionDeleteMultiple } from '../actions/delete_multiple.ts';
+import { KeyOperationBehavior } from '../behaviors/KeyOperationBehavior.ts';
 import { utilCmd, utilTotalExtent } from '../util/index.ts';
 
 

@@ -4,7 +4,7 @@ import { Extent, Tiler, projWorldToWgs84, vecEqual, WORLD_SIZE } from '@rapid-sd
 import { GeoJSONData } from '../data/GeoJSONData.ts';
 import { PMTiles } from 'pmtiles';
 import { PbfReader } from 'pbf';
-import { utilArrayGroupBy, utilHashcode } from '@rapid-sdk/util';
+import { utilHashcode } from '@rapid-sdk/util';
 import { VectorTile } from '@mapbox/vector-tile';
 
 import type { BBox } from 'rbush';
@@ -17,14 +17,14 @@ import type { Tile, Vec2 } from '@rapid-sdk/math';
 // The maximum tries we will merge across a given edge
 // This gives features an opportunity to re-enter the merge queue
 // as more parts of the map load.
-const MAX_MERGE_ATTEMPTS = 4;
+// const MAX_MERGE_ATTEMPTS = 4;
 
 /** Convenience type for string identifiers for tile edges (`lowID:highID`) */
 type EdgeID = string;
 /** Convenience type for string property hashes */
 type HashString = string;
 /** Convenience type for string identifiers for tile edges (`tileID:[n,e,s,w]`) */
-type SearchID = string;
+// type SearchID = string;
 
 
 /** Per-zoom cache for vector tile features */

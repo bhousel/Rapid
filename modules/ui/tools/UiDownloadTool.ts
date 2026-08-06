@@ -1,10 +1,9 @@
 import { selection } from 'd3-selection';
-
 import { JXON } from '../../util/jxon.ts';
 import { OsmChangeset } from '../../data/OsmChangeset.ts';
-import { actionDiscardTags } from '../../actions/discard_tags.js';
-import { uiIcon } from '../icon.js';
-import { uiTooltip } from '../tooltip.js';
+import { actionDiscardTags } from '../../actions/discard_tags.ts';
+import { uiIcon } from '../icon.ts';
+import { uiTooltip } from '../tooltip.ts';
 
 import type { Context } from '../../Context.ts';
 import type { D3Selection } from 'd3-selection';
@@ -22,6 +21,7 @@ export class UiDownloadTool {
   public Tooltip: any;
   public $parent: D3Selection | null;
   public rerender: () => void;
+
 
   /**
    * @param  context - Global shared application context

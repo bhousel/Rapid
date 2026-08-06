@@ -1,8 +1,8 @@
-import { UiPane } from '../UiPane.js';
-import { UiSectionPrivacy } from '../sections/UiSectionPrivacy.js';
-//import { UiSectionColorSelection } from '../sections/UiSectionColorSelection.js';
-//import { UiSectionColorblindModeOptions } from '../sections/UiSectionColorblindModeOptions.js';
-import { UiSectionMapInteractionOptions } from '../sections/UiSectionMapInteractionOptions.js';
+import { UiPane } from '../UiPane.ts';
+import { UiSectionPrivacy } from '../sections/UiSectionPrivacy.ts';
+//import { UiSectionColorSelection } from '../sections/UiSectionColorSelection.ts';
+//import { UiSectionColorblindModeOptions } from '../sections/UiSectionColorblindModeOptions.ts';
+import { UiSectionMapInteractionOptions } from '../sections/UiSectionMapInteractionOptions.ts';
 
 import type { Context } from '../../Context.ts';
 

@@ -1,14 +1,12 @@
 import { selection } from 'd3-selection';
-
-import { UiEntityEditor } from './UiEntityEditor.js';
-import { UiPresetList } from './UiPresetList.js';
-import { UiViewOn } from './UiViewOn.js';
+import { UiEntityEditor } from './UiEntityEditor.ts';
+import { UiPresetList } from './UiPresetList.ts';
+import { UiViewOn } from './UiViewOn.ts';
 
 import type { Category } from '../lib/Category.ts';
 import type { Context } from '../Context.ts';
 import type { D3Selection } from 'd3-selection';
 import type { Preset } from '../lib/Preset.ts';
-import type { UiViewOn } from './UiViewOn.js';
 
 
 /**
@@ -51,6 +49,7 @@ export class UiInspector {
   protected _state: string;
   protected _entityIDs: EntityID[];
   protected _newFeature: boolean;
+
 
   /**
    * @param  context - Global shared application context
@@ -173,7 +172,7 @@ export class UiInspector {
     $footer.enter()
       .append('div')
       .attr('class', 'sidebar-footer')
-      .merge($footer)
+      .merge($footer as any)
       .call(this.ViewOn.render);
 
 
@@ -295,7 +294,7 @@ export class UiInspector {
       const choice = preset ? [preset] : null;
       const input = $presetPane.select('.preset-search-input').node() as HTMLInputElement;
       input.value = '';
-      this.showEntityEditor(choice ?? undefined, true);  // true = animate
+      this.showEntityEditor((choice ?? undefined) as any, true);  // true = animate
     }
   }
 

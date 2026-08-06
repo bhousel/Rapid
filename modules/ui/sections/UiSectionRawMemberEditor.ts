@@ -2,19 +2,17 @@ import { drag as d3_drag } from 'd3-drag';
 import { select as d3_select } from 'd3-selection';
 import { vecLength, vecSubtract } from '@rapid-sdk/math';
 import { utilUniqueString } from '@rapid-sdk/util';
-
-import { actionChangeMember } from '../../actions/change_member.js';
-import { actionDeleteMember } from '../../actions/delete_member.js';
-import { actionMoveMember } from '../../actions/move_member.js';
-import { uiIcon } from '../icon.js';
-import { uiCombobox } from '../combobox.js';
-import { AbstractUiSection } from '../AbstractUiSection.js';
+import { actionChangeMember } from '../../actions/change_member.ts';
+import { actionDeleteMember } from '../../actions/delete_member.ts';
+import { actionMoveMember } from '../../actions/move_member.ts';
+import { uiIcon } from '../icon.ts';
+import { uiCombobox } from '../combobox.ts';
+import { AbstractUiSection } from './AbstractUiSection.ts';
 import { utilHighlightEntities, utilIsColorValid, utilNoAuto } from '../../util/util.ts';
 
 import type { Context } from '../../Context.ts';
 import type { D3Selection } from 'd3-selection';
-import type { OsmEntity } from '../../data/index.ts';
-import type { OsmRelation, OsmRelationMember } from '../../data/index.ts';
+import type { OsmEntity, OsmRelation, OsmRelationMember } from '../../data/index.ts';
 
 const MAX_MEMBERS = 1000;
 
@@ -32,6 +30,9 @@ interface MemberRowData {
 export class UiSectionRawMemberEditor extends AbstractUiSection {
   protected _entityIDs: EntityID[];
 
+  /**
+   * @param  context - Global shared application context
+   */
   public constructor(context: Context) {
     super(context, 'raw-member-editor');
     this._entityIDs = [];
@@ -87,7 +88,7 @@ export class UiSectionRawMemberEditor extends AbstractUiSection {
     d3_event.preventDefault();
 
     // display the loading indicator
-    d3_select(d3_event.currentTarget.parentNode).classed('tag-reference-loading', true);
+    d3_select((d3_event.currentTarget as HTMLElement).parentNode as HTMLElement).classed('tag-reference-loading', true);
     this.context.loadEntityAsync(d.id)
       .then(() => this.reRender());
   }
@@ -131,7 +132,7 @@ export class UiSectionRawMemberEditor extends AbstractUiSection {
     const graph = editor.staging.graph;
     const entity = graph.entity(d.id);
     const extent = viewport.visibleExtent();
-    if (!entity.intersects(extent, graph)) {
+    if (!entity.intersects(extent)) {
       // zoom to the entity if its extent is not visible now
       map.fitEntitiesEase(entity);
     }
@@ -150,11 +151,11 @@ export class UiSectionRawMemberEditor extends AbstractUiSection {
     const editor = context.systems.editor!;
     const l10n = context.systems.l10n!;
     const oldRole = d.role;
-    const newRole = context.cleanRelationRole(d3_select(d3_event.currentTarget).property('value'));
+    const newRole = context.cleanRelationRole(d3_select(d3_event.currentTarget as HTMLElement).property('value'));
 
     if (oldRole !== newRole) {
       const member = { id: d.id, type: d.type, role: newRole };
-      editor.perform(actionChangeMember(d.relation.id, member, d.index));
+      editor.perform(actionChangeMember(d.relation.id, member as OsmRelationMember, d.index));
       editor.commit({
         annotation: l10n.t('operations.change_role.annotation', { n: 1 }),
         selectedIDs: [d.relation.id]
@@ -267,7 +268,7 @@ export class UiSectionRawMemberEditor extends AbstractUiSection {
             .append('span')
             .attr('class', 'member-entity-type')
             .text((d: MemberRowData) => {
-              const preset = schema.match(d.member, graph);
+              const preset = schema.match(d.member!, graph);
               return preset?.name || l10n.displayType(d.member!.id);
             });
 
@@ -347,7 +348,7 @@ export class UiSectionRawMemberEditor extends AbstractUiSection {
     let x0: number, y0: number, targetIndex: number | null;
 
     $items.call(d3_drag()
-      .on('start', function(d3_event: Event) {
+      .on('start', function(this: any, d3_event: any) {
         x0 = d3_event.x as number;
         y0 = d3_event.y as number;
         targetIndex = null;
@@ -385,7 +386,7 @@ export class UiSectionRawMemberEditor extends AbstractUiSection {
             return null;
           });
       })
-      .on('end', function(this: any, d3_event: any, d: MemberRowData) {
+      .on('end', function(this: any, d3_event: any, d: any) {
         if (!d3_select(this).classed('dragging')) return;
 
         const index = $items.nodes().indexOf(this);
@@ -461,7 +462,7 @@ export class UiSectionRawMemberEditor extends AbstractUiSection {
 
     $role.call(uiCombobox(context, 'member-role')
       .fetcher(function(role: string, callback: (data: any[]) => void) {
-        // The `geometry` param is used in the `taginfo.js` interface for
+        // The `geometry` param is used in the `taginfo.ts` interface for
         // filtering results, as a key into the `tag_members_fractions`
         // object.  If we don't know the geometry because the member is
         // not yet downloaded, it's ok to guess based on type.
@@ -480,7 +481,7 @@ export class UiSectionRawMemberEditor extends AbstractUiSection {
         taginfo!.roles({
           debounce: true,
           rtype: d.relation.tags.type || '',
-          geometry: geometry,
+          geometry: geometry as any,
           query: role
         }, (err: any, data: any) => {
           if (!err) callback(sort(role, data));

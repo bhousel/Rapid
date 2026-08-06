@@ -1,11 +1,10 @@
-import { select as d3_select } from 'd3-selection';
+import { select } from 'd3-selection';
 import { EventEmitter } from 'tseep/lib/ee-safe';
+import { uiDisclosure } from '../disclosure.ts';
 
-import { uiDisclosure } from './disclosure.js';
-
-import type { Context } from '../Context.ts';
+import type { Context } from '../../Context.ts';
 import type { D3Selection } from 'd3-selection';
-import type { UiDisclosure } from './disclosure.js';
+import type { UiDisclosure } from '../disclosure.ts';
 
 
 /**
@@ -14,8 +13,8 @@ import type { UiDisclosure } from './disclosure.js';
  * toggleable disclosure (a heading the user can expand/collapse).
  *
  * Subclasses provide their content by implementing exactly one of:
- *   - `renderDisclosureContent($selection)` — content shown inside a `UiDisclosure`
- *   - `renderContent($selection)` — content shown on its own (no disclosure)
+ * - `renderDisclosureContent($selection)` — content shown inside a `UiDisclosure`
+ * - `renderContent($selection)` — content shown on its own (no disclosure)
  *
  * Subclasses may also override `label()` and `shouldDisplay()`, and may set
  * `this._classes` (extra container classes) and `this._disclosureExpandOverride`.
@@ -40,7 +39,7 @@ export abstract class AbstractUiSection extends EventEmitter {
     this.context = context;
     this.id = id;
 
-    this.$container = d3_select(null);
+    this.$container = select(null);
 
     this._classes = '';
     this._disclosure = undefined;

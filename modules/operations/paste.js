@@ -1,7 +1,6 @@
 import { Extent, projWgs84ToWorld, vecSubtract } from '@rapid-sdk/math';
-
-import { actionCopyEntities } from '../actions/copy_entities.js';
-import { actionMove } from '../actions/move.js';
+import { actionCopyEntities } from '../actions/copy_entities.ts';
+import { actionMove } from '../actions/move.ts';
 import { utilCmd } from '../util/cmd.ts';
 
 

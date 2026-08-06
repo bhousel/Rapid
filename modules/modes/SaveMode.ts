@@ -1,10 +1,10 @@
 import { AbstractMode } from './AbstractMode.ts';
 import { select as d3_select } from 'd3-selection';
-import { UiCommit } from '../ui/UiCommit.js';
-import { uiConfirm } from '../ui/confirm.js';
-import { UiConflicts } from '../ui/UiConflicts.js';
-import { uiLoading } from '../ui/loading.js';
-import { UiSuccess } from '../ui/UiSuccess.js';
+import { UiCommit } from '../ui/UiCommit.ts';
+import { uiConfirm } from '../ui/confirm.ts';
+import { UiConflicts } from '../ui/UiConflicts.ts';
+import { uiLoading } from '../ui/loading.ts';
+import { UiSuccess } from '../ui/UiSuccess.ts';
 import { utilKeybinding } from '../util/index.ts';
 
 import type { Context } from '../Context.ts';

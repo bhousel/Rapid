@@ -1,4 +1,4 @@
-import { uiIcon } from './icon.js';
+import { uiIcon } from './icon.ts';
 
 import type { Context } from '../Context.ts';
 import type { D3Selection } from 'd3-selection';
@@ -11,6 +11,10 @@ import type { D3Selection } from 'd3-selection';
 export class UiCommitWarnings {
   public context: Context;
 
+
+  /**
+   * @param  context - Global shared application context
+   */
   public constructor(context: Context) {
     this.context = context;
 

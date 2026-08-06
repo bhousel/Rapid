@@ -2,17 +2,17 @@ import { select, selection } from 'd3-selection';
 import { utilArrayUniq, utilUniqueString } from '@rapid-sdk/util';
 import { iso1A2Code } from '@rapideditor/country-coder';
 
-import { UiField } from '../UiField.js';
-import { uiIcon } from '../icon.js';
-import { uiTooltip } from '../tooltip.js';
-import { uiCombobox } from '../combobox.js';
+import { UiField } from '../UiField.ts';
+import { uiIcon } from '../icon.ts';
+import { uiTooltip } from '../tooltip.ts';
+import { uiCombobox } from '../combobox.ts';
 import { utilGetSetValue, utilNoAuto } from '../../util/index.ts';
 
 import type { Context } from '../../Context.ts';
 import type { D3Selection } from 'd3-selection';
 import type { Field } from '../../lib/index.ts';
 import type { Tags } from './types.ts';
-import type { UiFieldOptions } from '../UiField.js';
+import type { UiFieldOptions } from '../UiField.ts';
 
 import { LANGUAGE_SUFFIX_REGEX } from './types.ts';
 
@@ -222,7 +222,7 @@ export class UiFieldLocalized extends UiField {
         // Lock the `name` if this is a suggestion preset that assigns the name,
         // and the preset does not display a `brand` or `operator` field.
         // (For presets like hotels, car dealerships, post offices, the `name` should remain editable)
-        // see also similar logic in `outdated_tags.js`
+        // see also similar logic in `outdated_tags.ts`
         const preset = schema.match(entity, graph);
         if (preset) {
           const isSuggestion = preset.props.suggestion;

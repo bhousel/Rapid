@@ -1,6 +1,6 @@
-import { icon } from './intro/helper.js';
-import { UiIntro } from './intro/UiIntro.js';
-import { uiModal } from './modal.js';
+import { icon } from './intro/helper.ts';
+import { UiIntro } from './intro/UiIntro.ts';
+import { uiModal } from './modal.ts';
 
 import type { Context } from '../Context.ts';
 import type { D3Selection } from 'd3-selection';
@@ -11,6 +11,7 @@ import type { D3Selection } from 'd3-selection';
  */
 export class UiRapidSplash {
   public context: Context;
+
 
   /**
    * @param  context - Global shared application context

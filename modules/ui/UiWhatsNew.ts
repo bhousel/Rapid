@@ -1,7 +1,6 @@
 import { marked } from 'marked';
-
-import { icon } from './intro/helper.js';
-import { uiModal } from './modal.js';
+import { icon } from './intro/helper.ts';
+import { uiModal } from './modal.ts';
 
 import type { Context } from '../Context.ts';
 import type { D3Selection } from 'd3-selection';
@@ -9,8 +8,8 @@ import type { D3Selection } from 'd3-selection';
 
 /**
  * This is the "whats new" screen we show to the users if:
- *   - They have used Rapid before and seen the welcome screen
- *   - They do not have backup changes to restore
+ * - They have used Rapid before and seen the welcome screen
+ * - They do not have backup changes to restore
  */
 export class UiWhatsNew {
   public context: Context;

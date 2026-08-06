@@ -4,7 +4,7 @@ import { easeLinear as d3_easeLinear } from 'd3-ease';
 import { Extent, geoScaleToZoom, projWgs84ToWorld } from '@rapid-sdk/math';
 import { OsmEntity, createOsmEntity } from '../data/index.ts';
 import { select as d3_select } from 'd3-selection';
-import { uiLoading } from '../ui/loading.js';
+import { uiLoading } from '../ui/loading.ts';
 import { utilArrayGroupBy, utilObjectOmit, utilSessionMutex } from '@rapid-sdk/util';
 
 import type { Context } from '../Context.ts';

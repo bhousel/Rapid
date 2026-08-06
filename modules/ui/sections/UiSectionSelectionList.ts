@@ -1,7 +1,6 @@
 import { select as d3_select } from 'd3-selection';
-
-import { uiIcon } from '../icon.js';
-import { AbstractUiSection } from '../AbstractUiSection.js';
+import { uiIcon } from '../icon.ts';
+import { AbstractUiSection } from './AbstractUiSection.ts';
 import { utilHighlightEntities } from '../../util/util.ts';
 
 import type { Context } from '../../Context.ts';
@@ -12,6 +11,10 @@ import type { OsmEntity } from '../../data/index.ts';
 export class UiSectionSelectionList extends AbstractUiSection {
   protected _selectedIDs: EntityID[];
 
+
+  /**
+   * @param  context - Global shared application context
+   */
   public constructor(context: Context) {
     super(context, 'selected-features');
     this._selectedIDs = [];

@@ -3,26 +3,28 @@ import type { D3Selection } from 'd3-selection';
 /** Element with optional value property (like form input elements) */
 type ValueElement = Element & { value?: string };
 
-/** A value or a function that computes a value for each element */
-type ValueAccessor = (this: Element, datum: unknown, index: number, groups: ArrayLike<Element>) => string | null | undefined;
+/**
+ * A function that computes a value for each element.
+ * Generic on the datum type `D` so typed callbacks don't fight the compiler.
+ */
+type ValueAccessor<D> = (this: Element, datum: D, index: number, groups: ArrayLike<Element>) => string | null | undefined;
 
 /**
  * Like selection.property('value', ...), but avoids no-op value sets,
- * which can result in layout/repaint thrashing in some situations.
+ * which can result in layout/repaint thrashing (and cursor jumps on focused inputs).
  *
- * When called with one argument (selection only), gets the value property.
- * When called with two arguments, sets the value property efficiently.
+ * Getter: `utilGetSetValue($sel)` returns the `value` property of the (first) element.
+ * Setter: `utilGetSetValue($sel, value)` sets the `value` property efficiently and
+ *  returns the selection for chaining. `value` may be a string, a per-element function,
+ *  or null/undefined to delete the property.
  *
  * @param selection - D3 selection of form elements
- * @param value - The value to set, a function to compute the value, or null/undefined to delete
- * @returns The value (when getting) or the selection (when setting)
+ * @returns The value string (when getting) or the selection (when setting)
  */
-export function utilGetSetValue(selection: D3Selection, value?: Nullable<string | ValueAccessor>): string | D3Selection {
-  /**
-   *
-   * @param val
-   */
-  function d3_selection_value(val: Nullable<string | ValueAccessor>): (this: ValueElement, datum: unknown, index: number, groups: ArrayLike<Element>) => void {
+export function utilGetSetValue(selection: D3Selection): string;
+export function utilGetSetValue<D = unknown>(selection: D3Selection, value: Nullable<string | ValueAccessor<D>>): D3Selection;
+export function utilGetSetValue<D = unknown>(selection: D3Selection, value?: Nullable<string | ValueAccessor<D>>): string | D3Selection {
+  function d3_selection_value(val: Nullable<string | ValueAccessor<D>>): (this: ValueElement, datum: D, index: number, groups: ArrayLike<Element>) => void {
     /** Deletes the `value` property from the element (sets to undefined/empty). */
     function valueNull(this: ValueElement): void {
       delete this.value;
@@ -35,14 +37,9 @@ export function utilGetSetValue(selection: D3Selection, value?: Nullable<string 
       }
     }
 
-    /**
-     *
-     * @param datum
-     * @param index
-     * @param groups
-     */
-    function valueFunction(this: ValueElement, datum: unknown, index: number, groups: ArrayLike<Element>): void {
-      const x = (val as ValueAccessor).call(this, datum, index, groups);
+    /** Sets the element's `value` from the accessor result, if it differs. */
+    function valueFunction(this: ValueElement, datum: D, index: number, groups: ArrayLike<Element>): void {
+      const x = (val as ValueAccessor<D>).call(this, datum, index, groups);
       if (x === null || x === undefined) {
         delete this.value;
       } else if (this.value !== x) {

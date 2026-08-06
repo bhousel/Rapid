@@ -1,7 +1,6 @@
 import { selection } from 'd3-selection';
-
-import { uiIcon } from './icon.js';
-import { uiTooltip } from './tooltip.js';
+import { uiIcon } from './icon.ts';
+import { uiTooltip } from './tooltip.ts';
 import { utilDetect } from '../util/detect.ts';
 
 import type { Context } from '../Context.ts';
@@ -21,6 +20,7 @@ export class UiProjectLinks {
 
   // D3 selections
   public $parent: D3Selection | null;
+
 
   /**
    * @param  context - Global shared application context

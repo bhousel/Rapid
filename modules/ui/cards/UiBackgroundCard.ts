@@ -1,8 +1,8 @@
 import { selection } from 'd3-selection';
 import { Extent } from '@rapid-sdk/math';
 
-import { AbstractUiCard } from './AbstractUiCard.js';
-import { uiIcon } from '../icon.js';
+import { AbstractUiCard } from './AbstractUiCard.ts';
+import { uiIcon } from '../icon.ts';
 import { utilCmd } from '../../util/cmd.ts';
 
 import type { Context } from '../../Context.ts';
@@ -23,6 +23,7 @@ export class UiBackgroundCard extends AbstractUiCard {
   protected _currSourceID: string | null;
   protected _metadata: Record<string, any>;
   protected _keys: string[] | null;
+
 
   /**
    * @constructor

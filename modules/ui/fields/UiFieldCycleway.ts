@@ -1,13 +1,13 @@
 import { select, selection } from 'd3-selection';
-import { uiCombobox } from '../combobox.js';
-import { UiField } from '../UiField.js';
+import { uiCombobox } from '../combobox.ts';
+import { UiField } from '../UiField.ts';
 import { utilGetSetValue, utilNoAuto } from '../../util/index.ts';
 
 import type { Context } from '../../Context.ts';
 import type { D3Selection } from 'd3-selection';
 import type { Field } from '../../lib/index.ts';
 import type { Tags } from './types.ts';
-import type { UiFieldOptions } from '../UiField.js';
+import type { UiFieldOptions } from '../UiField.ts';
 
 
 function stripcolon(s: string): string {

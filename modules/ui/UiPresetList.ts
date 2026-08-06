@@ -1,19 +1,18 @@
 import { EventEmitter } from 'tseep/lib/ee-safe';
 import { select as d3_select, selection } from 'd3-selection';
-import { Vec2 } from '@rapid-sdk/math';
-
-import { actionChangePreset } from '../actions/change_preset.js';
+import { actionChangePreset } from '../actions/change_preset.ts';
 import { Category, Preset } from '../lib/index.ts';
 import { operationDelete } from '../operations/delete.js';
-import { uiIcon } from './icon.js';
-import { UiPresetIcon } from './UiPresetIcon.js';
-import { UiTagReference } from './UiTagReference.js';
-import { uiTooltip } from './tooltip.js';
+import { uiIcon } from './icon.ts';
+import { UiPresetIcon } from './UiPresetIcon.ts';
+import { UiTagReference } from './UiTagReference.ts';
+import { uiTooltip } from './tooltip.ts';
 import { utilKeybinding, utilNoAuto, utilTotalExtent } from '../util/index.ts';
 
 import type { Context } from '../Context.ts';
 import type { D3Selection } from 'd3-selection';
 import type { Graph } from '../lib/Graph.ts';
+import type { Vec2 } from '@rapid-sdk/math';
 
 const MAXSEARCH = 50;   // how many search results to show
 
@@ -25,16 +24,18 @@ const MAXSEARCH = 50;   // how many search results to show
 export class UiPresetList extends EventEmitter {
   public context: Context;
 
+  // D3 selections
   public $parent: D3Selection | null;
+  public $list: D3Selection | null;
+  public $input: D3Selection | null;
 
   protected _entityIDs: EntityID[];
   protected _currLoc: Vec2 | null;
-  protected _allGeometries: string[];
+  protected _allGeometries: GeometryType[];
   protected _defaults: (Preset | Category)[];
   protected _selectedPresetIDs: Set<string>;
   protected _autofocus: boolean;
-  protected _list: D3Selection;
-  protected _input: D3Selection;
+
 
   /**
    * @param  context - Global shared application context
@@ -43,15 +44,17 @@ export class UiPresetList extends EventEmitter {
     super();
     this.context = context;
 
+    // D3 selections
     this.$parent = null;
+    this.$list = null;
+    this.$input = null;
+
     this._entityIDs = [];
     this._currLoc = null;
     this._allGeometries = [];
     this._defaults = [];
     this._selectedPresetIDs = new Set<string>();
     this._autofocus = false;
-    this._list = d3_select(null);
-    this._input = d3_select(null);
 
     // Ensure methods used as callbacks always have `this` bound correctly.
     this.render = this.render.bind(this);
@@ -139,12 +142,12 @@ export class UiPresetList extends EventEmitter {
 
     // update
     $search = $search.merge($$search);
-    this._input = $search.selectAll('.preset-search-input');
-    this._input.attr('placeholder', l10n.t('inspector.search'));
+    this.$input = $search.selectAll('.preset-search-input');
+    this.$input.attr('placeholder', l10n.t('inspector.search'));
 
     if (this._autofocus) {
       // Safari 14 doesn't always like to focus immediately, so schedule it with setTimeout
-      setTimeout(() => (this._input.node() as HTMLElement).focus(), 0);
+      setTimeout(() => (this.$input?.node() as HTMLElement)?.focus(), 0);
     }
 
 
@@ -162,7 +165,7 @@ export class UiPresetList extends EventEmitter {
       .attr('class', 'preset-list-main preset-list');
 
     // update
-    this._list = $listWrap.merge($$listWrap)
+    this.$list = $listWrap.merge($$listWrap)
       .selectAll('.preset-list-main')
       .call(this._drawList, this._defaults);
 
@@ -178,10 +181,12 @@ export class UiPresetList extends EventEmitter {
    * @param  e - the keydown event
    */
   protected _searchInitialKeydown(e: KeyboardEvent): void {
+    if (!this.$input) return;  // called too soon?
+
     const context = this.context;
     const editor = context.systems.editor!;
-    const el = e.currentTarget;
-    const val = this._input.property('value');
+    const el = e.currentTarget as HTMLElement;
+    const val = this.$input.property('value');
 
     // hack to let delete shortcut work when search is autofocused
     if (val.length === 0 &&
@@ -213,14 +218,16 @@ export class UiPresetList extends EventEmitter {
    * @param  e - the keydown event
    */
   protected _searchKeydown(e: KeyboardEvent): void {
+    if (!this.$input || !this.$list) return;  // called too soon?
+
     if (e.keyCode === utilKeybinding.keyCodes['↓'] &&       // down arrow
       // if insertion point is at the end of the string
-      (this._input.node() as HTMLInputElement).selectionStart === this._input.property('value').length
+      (this.$input.node() as HTMLInputElement).selectionStart === this.$input.property('value').length
     ) {
       e.preventDefault();
       e.stopPropagation();
       // move focus to the first item in the preset list
-      const $buttons = this._list.selectAll('.preset-list-button');
+      const $buttons = this.$list.selectAll('.preset-list-button');
       if (!$buttons.empty()) {
         ($buttons.node() as HTMLElement).focus();
       }
@@ -234,9 +241,11 @@ export class UiPresetList extends EventEmitter {
    * @param  e - the keypress event
    */
   protected _searchKeypress(e: KeyboardEvent): void {
+    if (!this.$list) return;  // called too soon?
+
     const val = (e.currentTarget as HTMLInputElement).value;
     if (e.keyCode === 13 && val.length) {  // ↩ Return
-      const item = this._list.selectAll('.preset-list-item:first-child').datum() as ListItem;
+      const item = this.$list.selectAll('.preset-list-item:first-child').datum() as ListItem;
       item.choose();
     }
   }
@@ -246,12 +255,14 @@ export class UiPresetList extends EventEmitter {
    * Runs the search for the current query and redraws the list.
    */
   protected _searchInput(): void {
+    if (!this.$input || !this.$list) return;  // called too soon?
+
     const context = this.context;
     const l10n = context.systems.l10n!;
     const schema = context.systems.schema!;
 
-    const query = this._input.property('value');
-    this._list.classed('filtered', query.length);
+    const query = this.$input.property('value');
+    this.$list.classed('filtered', query.length);
 
     let items: (Preset | Category)[];
     let messageText: string;
@@ -264,7 +275,7 @@ export class UiPresetList extends EventEmitter {
       items = results.map((result: { id: PresetID }) => {
         const scope = schema.getScope('osm');
         return scope?.presets.get(result.id) ?? scope?.categories.get(result.id);
-      }).slice(0, maxCount);
+      }).slice(0, maxCount) as (Preset | Category)[];
 
       // Append fallback preset(s)
       for (const geom of this._allGeometries) {
@@ -279,7 +290,7 @@ export class UiPresetList extends EventEmitter {
       items = this._defaults;
     }
 
-    this._list.call(this._drawList, items);
+    this.$list.call(this._drawList, items);
 
     (this.$parent as D3Selection).selectAll('.preset-list-message')
       .text(messageText);
@@ -337,14 +348,16 @@ export class UiPresetList extends EventEmitter {
    * @param  e - the keydown event
    */
   public _itemKeydown(e: KeyboardEvent): void {
+    if (!this.$input) return;  // called too soon?
+
     const l10n = this.context.systems.l10n!;
-    const target = e.currentTarget;
+    const target = e.currentTarget as HTMLElement;
     const $selection = d3_select(target);
 
     // the actively focused item
     const $item = d3_select(target.closest('.preset-list-item'));
     const node = $item.node() as HTMLElement;
-    const $parentItem = d3_select(node.parentNode!.closest('.preset-list-item'));
+    const $parentItem = d3_select((node.parentNode as HTMLElement).closest('.preset-list-item'));
     const parentNode = $parentItem.node() as HTMLElement | null;
     const isRTL = l10n.isRTL;
 
@@ -392,7 +405,7 @@ export class UiPresetList extends EventEmitter {
         ($prevItem.select('.preset-list-button').node() as HTMLElement).focus();     // focus on the previous item
       } else {
         // the focus is at the top of the list, move focus back to the search field
-        (this._input.node() as HTMLElement).focus();
+        (this.$input.node() as HTMLElement).focus();
       }
 
     // arrow left, move focus to the parent item if there is one
@@ -416,6 +429,8 @@ export class UiPresetList extends EventEmitter {
    * Applies the current filtering rules, disabling and tooltipping any hidden presets.
    */
   protected _checkFilteringRules(): void {
+    if (!this.$list) return;  // called too soon?
+
     const context = this.context;
     const editor = context.systems.editor!;
     const filters = context.systems.filters!;
@@ -424,7 +439,7 @@ export class UiPresetList extends EventEmitter {
     const graph = editor.staging.graph;
     if (!this._entityIDs.every(entityID => graph.hasEntity(entityID))) return;
 
-    const $buttons = this._list.selectAll('.preset-list-button');
+    const $buttons = this.$list.selectAll('.preset-list-button');
 
     // remove existing tooltips
     $buttons.call(uiTooltip(context).destroyAny);
@@ -434,7 +449,7 @@ export class UiPresetList extends EventEmitter {
 
       let filterID;  // check whether this preset would be hidden by the current filtering rules
       for (const geometry of this._allGeometries) {
-        filterID = filters.isHiddenPreset(d.item, geometry);
+        filterID = filters.isHiddenPreset(d.item as any, geometry);
         if (filterID) break;
       }
 
@@ -470,6 +485,7 @@ export class UiPresetList extends EventEmitter {
    */
   public entityIDs(val?: EntityID[]): any {
     if (!arguments.length) return this._entityIDs;
+    if (!this.$input || !this.$list) return;  // called too soon?
 
     const context = this.context;
     const editor = context.systems.editor!;
@@ -480,8 +496,8 @@ export class UiPresetList extends EventEmitter {
     this._allGeometries = [];
     this._defaults = [];
     this._selectedPresetIDs = new Set();
-    this._input.property('value', '');
-    this._list.selectAll('.preset-list-item').remove();
+    this.$input.property('value', '');
+    this.$list.selectAll('.preset-list-item').remove();
 
     if (this._entityIDs.length) {
       const graph = editor.staging.graph;
@@ -539,7 +555,7 @@ export class UiPresetList extends EventEmitter {
    * Gather the geometries present on the selected entities.
    * They will be sorted so that the most represented geometries appear earlier in the list.
    */
-  protected _gatherGeometries(): string[] {
+  protected _gatherGeometries(): GeometryType[] {
     const editor = this.context.systems.editor!;
     const graph = editor.staging.graph;
     const counts: Record<string, number> = {};
@@ -548,7 +564,7 @@ export class UiPresetList extends EventEmitter {
       const entity = graph.entity(entityID);
       let geometry = entity.geometry(graph);
       // Treat entities on addr:interpolation lines as points, not vertices - iD#3241
-      if (geometry === 'vertex' && entity.isOnAddressLine(graph)) {
+      if (geometry === 'vertex' && (entity as any).isOnAddressLine(graph)) {
         geometry = 'point';
       }
 
@@ -559,7 +575,7 @@ export class UiPresetList extends EventEmitter {
       counts[geometry] += 1;
     }
 
-    return Object.keys(counts).sort((geom1, geom2) => counts[geom2] - counts[geom1]);
+    return Object.keys(counts).sort((geom1, geom2) => counts[geom2] - counts[geom1]) as GeometryType[];
   }
 }
 
@@ -571,7 +587,7 @@ type ListItem = CategoryItem | PresetItem;
  * A list item representing a Category (which can be expanded to reveal a sublist of Presets).
  */
 class CategoryItem {
-  public list: UiPresetList;
+  public list: any;
   public box: D3Selection | null;
   public sublist: D3Selection | null;
   public shown: boolean;
@@ -581,7 +597,7 @@ class CategoryItem {
    * @param  list - the owning `UiPresetList`
    * @param  category - the Category this item represents
    */
-  public constructor(list: UiPresetList, category: Category) {
+  public constructor(list: any, category: Category) {
     this.list = list;
     this.box = null;
     this.sublist = null;
@@ -660,7 +676,7 @@ class CategoryItem {
    */
   protected _keydown(e: KeyboardEvent): void {
     const l10n = this.list.context.systems.l10n!;
-    const target = e.currentTarget;
+    const target = e.currentTarget as HTMLElement;
     const $selection = d3_select(target);
     if (e.keyCode === utilKeybinding.keyCodes[l10n.isRTL ? '←' : '→']) {  // right arrow, expand the focused item
       e.preventDefault();
@@ -683,10 +699,10 @@ class CategoryItem {
    * click handler for a category item - toggles the expand/collapse icon and expansion.
    * @param  e - the click event
    */
-  protected _click(e: MouseEvent): void {
+  protected _click(e: MouseEvent | KeyboardEvent): void {
     const l10n = this.list.context.systems.l10n!;
     const isRTL = l10n.isRTL;
-    const target = e.currentTarget;
+    const target = e.currentTarget as HTMLElement;
     const $selection = d3_select(target);
     const isExpanded = $selection.classed('expanded');
     const iconName = isExpanded ? (isRTL ? '#rapid-icon-backward' : '#rapid-icon-forward') : '#rapid-icon-down';
@@ -734,7 +750,7 @@ class CategoryItem {
  * A list item representing a single Preset.
  */
 class PresetItem {
-  public list: UiPresetList;
+  public list: any;
   public item: Preset;
   public reference: UiTagReference;
 
@@ -742,7 +758,7 @@ class PresetItem {
    * @param  list - the owning `UiPresetList`
    * @param  preset - the Preset this item represents
    */
-  public constructor(list: UiPresetList, preset: Preset) {
+  public constructor(list: any, preset: Preset) {
     this.list = list;
     this.item = preset;
     this.reference = new UiTagReference(list.context, preset.reference());

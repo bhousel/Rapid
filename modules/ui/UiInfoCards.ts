@@ -1,17 +1,13 @@
 import { selection } from 'd3-selection';
-
-import { UiBackgroundCard } from './cards/UiBackgroundCard.js';
-import { UiHistoryCard } from './cards/UiHistoryCard.js';
-import { UiLocationCard } from './cards/UiLocationCard.js';
-import { UiMeasurementCard } from './cards/UiMeasurementCard.js';
+import { UiBackgroundCard } from './cards/UiBackgroundCard.ts';
+import { UiHistoryCard } from './cards/UiHistoryCard.ts';
+import { UiLocationCard } from './cards/UiLocationCard.ts';
+import { UiMeasurementCard } from './cards/UiMeasurementCard.ts';
 import { utilCmd } from '../util/cmd.ts';
 
 import type { AbstractUiCard } from './cards/AbstractUiCard.ts';
 import type { Context } from '../Context.ts';
 import type { D3Selection } from 'd3-selection';
-import type {
-  UiBackgroundCard, UiHistoryCard, UiLocationCard, UiMeasurementCard
-} from './cards/index.js';
 
 
 /**
@@ -32,8 +28,9 @@ export class UiInfoCards {
   // D3 selections
   public $parent: D3Selection | null;
 
-  protected _wasVisible: Set<string>;
+  protected _wasVisible: Set<AbstractUiCard>;
   protected _keys: string | string[] | null;
+
 
   /**
    * @param  context - Global shared application context
@@ -110,7 +107,7 @@ export class UiInfoCards {
     if (e) e.preventDefault();
 
     // Which cards are currently visible?
-    const currVisible = new Set<string>();
+    const currVisible = new Set<AbstractUiCard>();
     for (const Card of this.cards) {
       if (Card.visible) {
         currVisible.add(Card);

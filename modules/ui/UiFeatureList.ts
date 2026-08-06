@@ -1,10 +1,9 @@
 import { selection, select } from 'd3-selection';
 import { Extent, geoSphericalDistance } from '@rapid-sdk/math';
 import * as sexagesimal from '@mapbox/sexagesimal';
-
 import { Graph } from '../lib/Graph.ts';
 import { createOsmEntity } from '../data/index.ts';
-import { uiIcon } from './icon.js';
+import { uiIcon } from './icon.ts';
 import { utilCmd, utilHighlightEntities, utilIsColorValid, utilNoAuto } from '../util/index.ts';
 
 import type { Context } from '../Context.ts';
@@ -23,6 +22,17 @@ interface SearchResult {
   distance?: number;
   location?: [number, number];
   noteID?: string;
+  extent?: Extent;
+}
+
+/** A raw geocoding result from the Nominatim service */
+interface GeocodeResult {
+  osm_type?: string;
+  osm_id?: string | number;
+  class: string;
+  type: string;
+  display_name: string;
+  boundingbox: string[];
 }
 
 
@@ -43,7 +53,8 @@ export class UiFeatureList {
   public $search: D3Selection | null;
   public $list: D3Selection | null;
 
-  protected _geocodeResults: SearchResult[] | null | undefined;
+  protected _geocodeResults: GeocodeResult[] | null | undefined;
+
 
   /**
    * @param  context - Global shared application context
@@ -342,7 +353,7 @@ export class UiFeatureList {
    */
   protected _mouseover(e: Event, d: SearchResult): void {
     if (!d.id || d.id === -1) return;
-    utilHighlightEntities(this.context, [d.id], true);
+    utilHighlightEntities(this.context, [d.id as EntityID], true);
   }
 
 
@@ -353,7 +364,7 @@ export class UiFeatureList {
    */
   protected _mouseout(e: Event, d: SearchResult): void {
     if (!d.id || d.id === -1) return;
-    utilHighlightEntities(this.context, [d.id], false);
+    utilHighlightEntities(this.context, [d.id as EntityID], false);
   }
 
 
@@ -373,8 +384,8 @@ export class UiFeatureList {
       map.centerZoomEase([d.location[1], d.location[0]], 19);
 
     } else if (d.id !== -1) {  // looks like an OSM Entity
-      utilHighlightEntities(context, [d.id], false);
-      map.selectEntityID(d.id, true);   // select and fit, download first if necessary
+      utilHighlightEntities(context, [d.id as EntityID], false);
+      map.selectEntityID(d.id as EntityID, true);   // select and fit, download first if necessary
 
     } else if (d.noteID) {  // looks like an OSM Note
       map.selectNoteID(d.noteID);
@@ -393,7 +404,7 @@ export class UiFeatureList {
 
     const q = this.$search.property('value');
 
-    nominatim.search(q, (err: unknown, results: SearchResult[]) => {
+    nominatim.search(q, (err: unknown, results: GeocodeResult[]) => {
       this._geocodeResults = results || [];
       this._drawList();
     });
@@ -428,7 +439,7 @@ export class UiFeatureList {
     // User typed something that looks like a coordinate pair
     const locationMatch = sexagesimal.pair(q.toUpperCase()) || l10n.dmsMatcher(q);
     if (locationMatch) {
-      const loc = [ parseFloat(locationMatch[0]), parseFloat(locationMatch[1]) ];
+      const loc: [number, number] = [ parseFloat(locationMatch[0]), parseFloat(locationMatch[1]) ];
       results.push({
         id: -1,
         geometry: 'point',
@@ -480,7 +491,7 @@ export class UiFeatureList {
 
       const matched = schema.match(entity, graph);
       const type = (matched && matched.name) || l10n.displayType(entity.id);
-      const extent = entity.extent(graph);
+      const extent = (entity as any).extent(graph);   // extent(graph) not typed on the OSM class hierarchy
       const distance = extent ? geoSphericalDistance(centerLoc, extent.center()) : 0;
 
       localResults.push({
@@ -495,7 +506,7 @@ export class UiFeatureList {
       if (localResults.length > 100) break;
     }
 
-    localResults = localResults.sort((a, b) => a.distance - b.distance);
+    localResults = localResults.sort((a, b) => (a.distance ?? 0) - (b.distance ?? 0));
     results = results.concat(localResults);
 
 

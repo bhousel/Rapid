@@ -1,8 +1,7 @@
 import { EventEmitter } from 'tseep/lib/ee-safe';
 import { select as d3_select } from 'd3-selection';
 import { vecAdd } from '@rapid-sdk/math';
-
-import { uiIcon } from './icon.js';
+import { uiIcon } from './icon.ts';
 
 import type { Context } from '../Context.ts';
 import type { D3Selection } from 'd3-selection';
@@ -145,16 +144,16 @@ export class UiMapRouletteMenu extends EventEmitter {
   protected _executeAction(actionId: string, d3_event: Event): void {
     switch (actionId) {
       case 'fixed':
-        this._fixedIt(d3_event, this.datum);
+        this._fixedIt(d3_event, this.datum!);
         break;
       case 'cantComplete':
-        this._cantComplete(d3_event, this.datum);
+        this._cantComplete(d3_event, this.datum!);
         break;
       case 'alreadyFixed':
-        this._alreadyFixed(d3_event, this.datum);
+        this._alreadyFixed(d3_event, this.datum!);
         break;
       case 'notAnIssue':
-        this._notAnIssue(d3_event, this.datum);
+        this._notAnIssue(d3_event, this.datum!);
         break;
     }
   }
@@ -258,11 +257,12 @@ export class UiMapRouletteMenu extends EventEmitter {
       return;
     }
 
-    const userID = osm._userDetails.id;
+    const userID = (osm as any)._userDetails.id;
 
     if (maproulette) {
-      d.props.taskStatus = d.props._status;
-      d.props.mapRouletteApiKey = this._mapRouletteApiKey;
+      const props = d.props as any;
+      props.taskStatus = props._status;
+      props.mapRouletteApiKey = this._mapRouletteApiKey;
 
       const $commentInput = d3_select('.new-comment-input');
       if ($commentInput.empty()) {

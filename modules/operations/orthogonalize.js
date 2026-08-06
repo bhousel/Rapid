@@ -1,7 +1,6 @@
 import { utilGetAllNodes } from '@rapid-sdk/util';
-
-import { actionOrthogonalize } from '../actions/orthogonalize.js';
-import { KeyOperationBehavior } from '../behaviors/KeyOperationBehavior.js';
+import { actionOrthogonalize } from '../actions/orthogonalize.ts';
+import { KeyOperationBehavior } from '../behaviors/KeyOperationBehavior.ts';
 import { utilTotalExtent } from '../util/util.ts';
 
 

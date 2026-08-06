@@ -3,23 +3,21 @@ import { interpolateNumber } from 'd3-interpolate';
 import { Extent, vecLength } from '@rapid-sdk/math';
 
 import { GeoJSONData, MarkerData, OsmEntity, OsmNode } from '../data/index.ts';
-import { UiDataEditor } from './UiDataEditor.js';
-import { UiFeatureList } from './UiFeatureList.js';
-import { UiInspector } from './UiInspector.js';
-import { UiDetectionInspector } from './UiDetectionInspector.js';
-import { UiKeepRightEditor } from './UiKeepRightEditor.js';
-import { UiMapRouletteEditor } from './UiMapRouletteEditor.js';
-import { UiMapRouletteMenu } from './UiMapRouletteMenu.js';
-import { UiOsmoseEditor } from './UiOsmoseEditor.js';
-import { UiNoteEditor } from './UiNoteEditor.js';
-import { UiRapidInspector } from './UiRapidInspector.js';
-import { UiOvertureInspector } from './UiOvertureInspector.js';
-import { uiTooltip } from './tooltip.js';
+import { UiDataEditor } from './UiDataEditor.ts';
+import { UiFeatureList } from './UiFeatureList.ts';
+import { UiInspector } from './UiInspector.ts';
+import { UiDetectionInspector } from './UiDetectionInspector.ts';
+import { UiKeepRightEditor } from './UiKeepRightEditor.ts';
+import { UiMapRouletteEditor } from './UiMapRouletteEditor.ts';
+import { UiMapRouletteMenu } from './UiMapRouletteMenu.ts';
+import { UiOsmoseEditor } from './UiOsmoseEditor.ts';
+import { UiNoteEditor } from './UiNoteEditor.ts';
+import { UiRapidInspector } from './UiRapidInspector.ts';
+import { UiOvertureInspector } from './UiOvertureInspector.ts';
+import { uiTooltip } from './tooltip.ts';
 
 import type { Context } from '../Context.ts';
 import type { D3Selection } from 'd3-selection';
-import type { UiDataEditor } from './UiDataEditor.js';
-import type { UiRapidInspector } from './UiRapidInspector.js';
 import type { Vec2 } from '@rapid-sdk/math';
 
 
@@ -77,6 +75,7 @@ export class UiSidebar {
   protected _lastCoord: Vec2 | null;
   protected _lastWidth: number | null;
   protected _expandWidth: number;
+
 
   /**
    * @param  context - Global shared application context
@@ -293,7 +292,7 @@ export class UiSidebar {
     const context = this.context;
     const editor = context.systems.editor!;
     const graph = editor.staging.graph;
-    let datum = target;
+    let datum: any = target;
 
     // Start by clearing out any custom state.
     this.reset();
@@ -681,7 +680,7 @@ export class UiSidebar {
     const ui = context.systems.ui;
 
     const scaleX = l10n.isRTL ? -1 : 1;
-    const dx = (e.clientX - this._lastCoord[0]) * scaleX;
+    const dx = (e.clientX - this._lastCoord![0]) * scaleX;
     const setWidth = this._lastWidth! + dx;
 
     if (dx) {

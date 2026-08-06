@@ -1,15 +1,15 @@
 import { EventEmitter } from 'tseep/lib/ee-safe';
 import { select as d3_select } from 'd3-selection';
 import { resolveStrings } from 'osm-community-index';
-
-import { uiIcon } from './icon.js';
-import { uiDisclosure } from '../ui/disclosure.js';
+import { uiIcon } from './icon.ts';
+import { uiDisclosure } from '../ui/disclosure.ts';
 import { utilSanitizeHTML } from '../util/sanitize.ts';
 import { utilSafeURL } from '../util/url.ts';
 
 import type { Context } from '../Context.ts';
 import type { D3Selection } from 'd3-selection';
 import type { OsmChangeset } from '../data/OsmChangeset.ts';
+import type { Vec2 } from '@rapid-sdk/math';
 
 
 let _oci: Oci | null = null;
@@ -61,6 +61,10 @@ export class UiSuccess extends EventEmitter {
   protected _changeset: OsmChangeset | null;
   protected _location: string | null;
 
+
+  /**
+   * @param  context - Global shared application context
+   */
   public constructor(context: Context) {
     super();
     this.context = context;
@@ -89,7 +93,7 @@ export class UiSuccess extends EventEmitter {
         assets.loadAssetAsync('oci_resources'),
         assets.loadAssetAsync('oci_defaults')
       ])
-      .then((vals: [{ features: unknown[] }, { resources: Record<string, OciResource> }, { defaults: Record<string, unknown> }]) => {
+      .then((vals: any) => {
         if (_oci) return _oci;
 
         // Merge Custom Features
@@ -177,7 +181,7 @@ export class UiSuccess extends EventEmitter {
 
     $summary
       .append('h3')
-      .text(l10n.t('success.thank_you' + (this._location ? '_location' : ''), { where: this._location }));
+      .text(l10n.t('success.thank_you' + (this._location ? '_location' : ''), { where: this._location ?? undefined }));
 
     $summary
       .append('p')
@@ -193,7 +197,7 @@ export class UiSuccess extends EventEmitter {
     const osm = context.services.osm;
     if (!osm) return;
 
-    const changesetURL = osm.changesetURL(this._changeset.id);
+    const changesetURL = osm.changesetURL(this._changeset!.id);
 
     const $table = $summary
       .append('table')
@@ -231,7 +235,7 @@ export class UiSuccess extends EventEmitter {
       .append('a')
       .attr('target', '_blank')
       .attr('href', changesetURL)
-      .text(this._changeset.id);
+      .text(this._changeset!.id);
 
     // Get OSM community index features intersecting the map..
     this._getCommunityIndexAsync()
@@ -240,17 +244,17 @@ export class UiSuccess extends EventEmitter {
 
         const loc = map.center();
         if (!loc) return;
-        const validHere = locations.locationSetsAt(loc);
+        const validHere = locations.locationSetsAt(loc as Vec2);
 
         // Gather the communities
         const communities: { area: number; order: number; resource: OciResource }[] = [];
         oci.resources.forEach((resource: OciResource) => {
-          const area = validHere.get(resource.locationSetID);
+          const area = validHere.get(resource.locationSetID!);
           if (!area) return;
 
           // Resolve strings
           const localize = (stringID: string) => l10n.t(`_community.${stringID}`);
-          resource.resolved = resolveStrings(resource, oci.defaults, localize);
+          resource.resolved = resolveStrings(resource as any, oci.defaults as any, localize);
 
           communities.push({
             area: area,
@@ -344,15 +348,15 @@ export class UiSuccess extends EventEmitter {
     $selection
       .append('div')
       .attr('class', 'community-name')
-      .html(utilSanitizeHTML(d.resolved.nameHTML));
+      .html(utilSanitizeHTML(d.resolved!.nameHTML));
 
     $selection
       .append('div')
       .attr('class', 'community-description')
-      .html(utilSanitizeHTML(d.resolved.descriptionHTML));
+      .html(utilSanitizeHTML(d.resolved!.descriptionHTML));
 
     // Create an expanding section if any of these are present..
-    if (d.resolved.extendedDescriptionHTML || (d.languageCodes && d.languageCodes.length)) {
+    if (d.resolved!.extendedDescriptionHTML || (d.languageCodes && d.languageCodes.length)) {
       $selection
         .append('div')
         .call(uiDisclosure(context, `community-more-${d.id}`)
@@ -402,11 +406,11 @@ export class UiSuccess extends EventEmitter {
         .append('div')
         .attr('class', 'community-more');
 
-      if (d.resolved.extendedDescriptionHTML) {
+      if (d.resolved!.extendedDescriptionHTML) {
         $$more
           .append('div')
           .attr('class', 'community-extended-description')
-          .html(utilSanitizeHTML(d.resolved.extendedDescriptionHTML));
+          .html(utilSanitizeHTML(d.resolved!.extendedDescriptionHTML));
       }
 
       if (d.languageCodes && d.languageCodes.length) {

@@ -1,5 +1,4 @@
 import { utilArrayDifference, utilArrayUniq } from '@rapid-sdk/util';
-
 import { createOsmEntity } from '../../data/index.ts';
 import { localize } from './helper.ts';
 import { uiIcon } from '../icon.ts';

@@ -1,11 +1,11 @@
 import * as PIXI from 'pixi.js';
-
-import { uiIcon } from './icon.js';
+import { uiIcon } from './icon.ts';
 
 import type { Category } from '../lib/Category.ts';
 import type { Context } from '../Context.ts';
 import type { D3Selection } from 'd3-selection';
 import type { MatchedStyle } from '../core/StyleSystem.ts';
+import type { OsmTags } from '../data/types.ts';
 import type { Preset } from '../lib/Preset.ts';
 import type { Tags } from './fields/types.ts';
 
@@ -20,6 +20,7 @@ export class UiPresetIcon {
 
   protected _preset: Preset | Category | Preset[] | null;
   protected _geometry: string | null;
+
 
   /**
    * @param  context - Global shared application context
@@ -41,7 +42,7 @@ export class UiPresetIcon {
    */
   public preset(val?: Preset | Category | Preset[] | null): any {
     if (!arguments.length) return this._preset;
-    this._preset = val;
+    this._preset = val ?? null;
     return this;
   }
 
@@ -52,7 +53,7 @@ export class UiPresetIcon {
    */
   public geometry(val?: string | null): any {
     if (!arguments.length) return this._geometry;
-    this._geometry = val;
+    this._geometry = val ?? null;
     return this;
   }
 
@@ -66,7 +67,7 @@ export class UiPresetIcon {
     if (Array.isArray(p)) return 'rapid-icon-data';
     if (p?.props?.icon) return p.props.icon;
     if (geom === 'line') return 'rapid-other-line';
-    if (geom === 'vertex') return p.isFallback() ? '' : 'temaki-vertex';
+    if (geom === 'vertex') return p?.isFallback() ? '' : 'temaki-vertex';
     return 'maki-marker-stroked';
   }
 
@@ -90,7 +91,7 @@ export class UiPresetIcon {
       .attr('viewBox', `0 0 ${px} ${px}`)
       .append('path')
       .attr('fill', color)
-      .attr('fill-opacity', opacity)
+      .attr('fill-opacity', opacity ?? null)
       .attr('stroke', color)
       .attr('d', FOLDER_PATH);
   }
@@ -161,7 +162,7 @@ export class UiPresetIcon {
     $svg
       .append('path')
       .attr('fill', color)
-      .attr('fill-opacity', opacity)
+      .attr('fill-opacity', opacity ?? null)
       .attr('stroke', color)
       .attr('d', `M${c1} ${c1} L${c1} ${c2} L${c2} ${c2} L${c2} ${c1} Z`);
 
@@ -306,10 +307,10 @@ export class UiPresetIcon {
 
     // 'p' is either an array, a preset or a category
     const isMulti = Array.isArray(p);
-    const isPreset = !isMulti && (typeof p.setTags === 'function');
+    const isPreset = !isMulti && (typeof (p as Preset).setTags === 'function');
     const isCategory = !isMulti && !isPreset;
 
-    const tags: Tags = isPreset ? (p as Preset).setTags({}, geom) : {};
+    const tags: Tags = isPreset ? (p as Preset).setTags({}, geom as any) : {};
     for (const k in tags) {
       if (tags[k] === '*') {
         tags[k] = 'yes';
@@ -324,14 +325,14 @@ export class UiPresetIcon {
     const styles = context.systems.styles!;
 
     const showThirdPartyIcons = (settings?.get('ui.privacy.thirdPartyIcons') ?? 'true') === 'true';
-    const imageURL = showThirdPartyIcons && p?.props?.imageURL;
+    const imageURL = showThirdPartyIcons && (p as any)?.props?.imageURL;
     const picon = this._getIcon(p, geom);
     // const showPoint = isPreset && (geom === 'point');     // not actually used
     const showVertex = isPreset && (geom === 'vertex');
     const showLine = isPreset && (geom === 'line');
     const showArea = isPreset && (geom === 'area');
     const showRoute = isPreset && (geom === 'route') && (p.id !== 'type/route');
-    const style = styles.styleMatch(tags, this._geometry, 'osm');
+    const style = styles.styleMatch(tags as OsmTags, this._geometry as any, 'osm');
 
     $container
       .classed('showing-img', !!imageURL);

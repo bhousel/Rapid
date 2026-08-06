@@ -1,9 +1,8 @@
 import { utilArrayIdentical } from '@rapid-sdk/util';
-
-import { AbstractUiSection } from '../AbstractUiSection.js';
-import { uiTooltip } from '../tooltip.js';
-import { UiPresetIcon } from '../UiPresetIcon.js';
-import { UiTagReference } from '../UiTagReference.js';
+import { AbstractUiSection } from './AbstractUiSection.ts';
+import { uiTooltip } from '../tooltip.ts';
+import { UiPresetIcon } from '../UiPresetIcon.ts';
+import { UiTagReference } from '../UiTagReference.ts';
 
 import type { Context } from '../../Context.ts';
 import type { D3Selection } from 'd3-selection';
@@ -15,6 +14,10 @@ export class UiSectionFeatureType extends AbstractUiSection {
   protected _presets: Preset[];
   protected _tagReference: UiTagReference | undefined;
 
+
+  /**
+   * @param  context - Global shared application context
+   */
   public constructor(context: Context) {
     super(context, 'feature-type');
     this._entityIDs = [];
@@ -117,11 +120,11 @@ export class UiSectionFeatureType extends AbstractUiSection {
     // update header
     if (this._tagReference) {
       $selection.selectAll('.preset-list-button-wrap .accessory-buttons')
-        .style('display', this._presets.length === 1 ? null : 'none')
+        .style('display', (this._presets.length === 1 ? null : 'none') as string)
         .call(this._tagReference.button);
 
       $tagReferenceBodyWrap
-        .style('display', this._presets.length === 1 ? null : 'none')
+        .style('display', (this._presets.length === 1 ? null : 'none') as string)
         .call(this._tagReference.body);
     }
 
@@ -137,7 +140,7 @@ export class UiSectionFeatureType extends AbstractUiSection {
     const geometries = this._entityGeometries();
     $selection.select('.preset-list-item button')
       .call(new UiPresetIcon(context)
-        .geometry(geometries.length === 1 ? geometries[0] : geometries)
+        .geometry((geometries.length === 1 ? geometries[0] : geometries) as any)
         .preset(this._presets.length === 1 ? this._presets[0] : this._presets)
         .render
       );

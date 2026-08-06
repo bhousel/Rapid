@@ -1,8 +1,8 @@
 import { selection } from 'd3-selection';
 
-import { AbstractUiCard } from './AbstractUiCard.js';
+import { AbstractUiCard } from './AbstractUiCard.ts';
 import { MarkerData } from '../../data/MarkerData.ts';
-import { uiIcon } from '../icon.js';
+import { uiIcon } from '../icon.ts';
 import { utilCmd } from '../../util/cmd.ts';
 
 import type { Context } from '../../Context.ts';
@@ -18,6 +18,7 @@ export class UiHistoryCard extends AbstractUiCard {
   public deferredRender: () => void;
 
   protected _keys: string[] | null;
+
 
   /**
    * @constructor

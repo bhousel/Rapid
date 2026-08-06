@@ -6,7 +6,7 @@ import {
   UiApiStatus, UiDefs, UiEditMenu, UiFlash, UiFullscreen, UiIntro,
   uiLoading, UiMapFooter, UiMapToolbar, UiMapRouletteMenu, UiOvermap,
   UiSplash, UiRestore, UiShortcuts, UiSidebar, UiWhatsNew
-} from '../ui/index.js';
+} from '../ui/index.ts';
 
 import type { Context } from '../Context.ts';
 import type { D3EnterSelection, D3Selection } from 'd3-selection';

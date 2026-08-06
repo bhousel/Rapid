@@ -1,5 +1,4 @@
 import { selection, select } from 'd3-selection';
-
 import { utilFetchResponse } from '../util/fetch_response.ts';
 
 import type { Context } from '../Context.ts';
@@ -27,6 +26,7 @@ export class UiDefs {
 
   // D3 selections
   public $parent: D3Selection | null;
+
 
   /**
    * @param  context - Global shared application context

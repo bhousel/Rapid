@@ -1,4 +1,4 @@
-import { actionSyncCrossingTags } from './sync_crossing_tags.js';
+import { actionSyncCrossingTags } from './sync_crossing_tags.ts';
 
 import type { Action } from './types.ts';
 import type { Graph } from '../lib/Graph.ts';

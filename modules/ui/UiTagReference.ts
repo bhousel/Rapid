@@ -1,6 +1,5 @@
-import { select as d3_select } from 'd3-selection';
-
-import { uiIcon } from './icon.js';
+import { select } from 'd3-selection';
+import { uiIcon } from './icon.ts';
 import { utilSanitizeHTML } from '../util/sanitize.ts';
 import { utilSafeURL } from '../util/url.ts';
 
@@ -26,12 +25,15 @@ export interface UiTagReferenceWhat {
 export class UiTagReference {
   public context: Context;
 
+  // D3 selections
+  public $button: D3Selection | null;
+  public $body: D3Selection | null;
+
   protected _what: UiTagReferenceWhat;
   protected _wikibase: any;
-  public $button: D3Selection;
-  public $body: D3Selection;
   protected _loaded: boolean | undefined;
   protected _showing: boolean | undefined;
+
 
   /**
    * @param context - Global shared application context
@@ -42,8 +44,10 @@ export class UiTagReference {
     this._what = what;
     this._wikibase = context.services[what.qid ? 'wikidata' : 'osmwikibase'] as any;
 
-    this.$button = d3_select(null);
-    this.$body = d3_select(null);
+    // D3 selections
+    this.$button = null;
+    this.$body = null;
+
     this._loaded = undefined;
     this._showing = undefined;
 
@@ -132,7 +136,7 @@ export class UiTagReference {
    * Begins loading the documentation from the wikibase service.
    */
   protected _load(): void {
-    if (!this._wikibase) return;
+    if (!this.$button || !this._wikibase) return;  // called too early?
 
     this.$button
       .classed('tag-reference-loading', true);
@@ -147,6 +151,8 @@ export class UiTagReference {
    * @param docs - the loaded documentation
    */
   protected _gotDocs(err: any, docs: any): void {
+    if (!this.$body) return;  // called too early?
+
     const l10n = this.context.systems.l10n!;
     const what = this._what;
 
@@ -168,7 +174,7 @@ export class UiTagReference {
         .attr('src', utilSafeURL(docs.imageURL))
         .on('load', () => this._done())
         .on('error', (d3_event: any) => {
-          d3_select(d3_event.currentTarget).remove();
+          select(d3_event.currentTarget).remove();
           this._done();
         });
     } else {
@@ -222,6 +228,8 @@ export class UiTagReference {
    * Reveals the documentation body (expand) and updates the info icon.
    */
   protected _done(): void {
+    if (!this.$body || !this.$button) return;  // called too early?
+
     this._loaded = true;
 
     this.$button
@@ -238,7 +246,7 @@ export class UiTagReference {
 
     this.$button.selectAll('svg.icon use')
       .each((d, i, nodes) => {
-        const $iconUse = d3_select(nodes[i]);
+        const $iconUse = select(nodes[i]);
         if ($iconUse.attr('href') === '#rapid-icon-info') {
           $iconUse.attr('href', '#rapid-icon-info-filled');
         }
@@ -250,20 +258,22 @@ export class UiTagReference {
    * Collapses the documentation body and restores the info icon.
    */
   protected _hide(): void {
+    if (!this.$body || !this.$button) return;  // called too early?
+
     this.$body
       .transition()
       .duration(200)
       .style('max-height', '0px')
       .style('opacity', '0')
       .on('end', () => {
-        this.$body.classed('expanded', false);
+        this.$body?.classed('expanded', false);
       });
 
     this._showing = false;
 
     this.$button.selectAll('svg.icon use')
       .each((d, i, nodes) => {
-        const $iconUse = d3_select(nodes[i]);
+        const $iconUse = select(nodes[i]);
         if ($iconUse.attr('href') === '#rapid-icon-info-filled') {
           $iconUse.attr('href', '#rapid-icon-info');
         }

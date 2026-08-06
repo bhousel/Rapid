@@ -1,20 +1,20 @@
 import { EventEmitter } from 'tseep/lib/ee-safe';
-import { select as d3_select } from 'd3-selection';
+import { select, selection } from 'd3-selection';
 import { utilArrayGroupBy, utilUniqueString } from '@rapid-sdk/util';
 import deepEqual from 'fast-deep-equal';
 
 import { OsmChangeset } from '../data/OsmChangeset.ts';
-import { uiIcon } from './icon.js';
-import { uiTooltip } from './tooltip.js';
-import { UiChangesetEditor } from './UiChangesetEditor.js';
-import { UiSectionChanges } from './sections/UiSectionChanges.js';
-import { UiCommitWarnings } from './UiCommitWarnings.js';
-import { UiSectionRawTagEditor } from './sections/UiSectionRawTagEditor.js';
+import { uiIcon } from './icon.ts';
+import { uiTooltip } from './tooltip.ts';
+import { UiChangesetEditor } from './UiChangesetEditor.ts';
+import { UiSectionChanges } from './sections/UiSectionChanges.ts';
+import { UiCommitWarnings } from './UiCommitWarnings.ts';
+import { UiSectionRawTagEditor } from './sections/UiSectionRawTagEditor.ts';
 import { utilDetect } from '../util/index.ts';
 
 import type { Context } from '../Context.ts';
 import type { D3Selection } from 'd3-selection';
-import type { Tags } from './fields/types.ts';
+import type { OsmTags } from '../data/types.ts';
 import type { ValidationIssue } from '../lib/ValidationIssue.ts';
 
 
@@ -45,19 +45,27 @@ const hashtagRegex = /(#[^\u2000-\u206F\u2E00-\u2E7F\s\\'!"#$%()*,.\/:;<=>?@\[\]
 export class UiCommit extends EventEmitter {
   public context: Context;
 
+  // D3 selections
+  public $parent: D3Selection | null;
+
   protected _userDetails: any;
-  protected _selection: D3Selection | null;
 
   protected _changesetEditor: UiChangesetEditor;
   protected _rawTagEditor: UiSectionRawTagEditor;
   protected _commitChanges: UiSectionChanges;
   protected _commitWarnings: UiCommitWarnings;
 
+
+  /**
+   * @param  context - Global shared application context
+   */
   public constructor(context: Context) {
     super();
     this.context = context;
     this._userDetails = undefined;
-    this._selection = undefined;
+
+    // D3 selections
+    this.$parent = null;
 
     // Ensure methods used as callbacks always have `this` bound correctly.
     this.render = this.render.bind(this);
@@ -75,23 +83,23 @@ export class UiCommit extends EventEmitter {
 
 
   /**
-   * Renders the content into the given selection.
-   * This component is handed its target selection by its parent (the save flow /
-   *  `UiCommit`) on each render, so it renders into `$selection` directly rather than
-   *  capturing `$parent` for re-render.
-   * @param $selection - A d3-selection to the HTMLElement this component renders into
+   * Accepts a parent selection, and renders the content under it.
+   * (The parent selection is required the first time, but can be inferred on subsequent renders)
+   * @param $parent - A d3-selection to a HTMLElement that this component should render itself into
    */
-  public render($selection: D3Selection): void {
-    const context = this.context;
-    const uploader = context.systems.uploader!;
-
-    this._selection = $selection;
+  public render($parent = this.$parent): void {
+    if ($parent instanceof selection) {
+      this.$parent = $parent;
+    } else {
+      return;   // no parent - called too early?
+    }
+    const uploader = this.context.systems.uploader!;
 
     // Initialize changeset if one does not exist yet.
     if (!uploader.changeset) this._initChangeset();
 
     this._updateSessionChangesetTags();
-    $selection.call(this._render);
+    $parent.call(this._render);
   }
 
 
@@ -106,7 +114,7 @@ export class UiCommit extends EventEmitter {
     // The draft comment/source/hashtags are session state owned by UploaderSystem.
     // They are seeded from the urlhash at init time (see UploaderSystem.initAsync).
     const detected = utilDetect();
-    const tags: Tags = {
+    const tags: OsmTags = {
       comment:     uploader.comment || '',
       created_by:  context.cleanTagValue('Rapid ' + context.version),
       host:        context.cleanTagValue(detected.host),
@@ -137,7 +145,7 @@ export class UiCommit extends EventEmitter {
     const uploader = context.systems.uploader!;
     const validator = context.systems.validator!;
 
-    const tags: Tags = { ...uploader.changeset!.tags };   // shallow copy
+    const tags: OsmTags = { ...uploader.changeset!.tags };   // shallow copy
 
     // Sync up the `rapid:poweruser` tag
     // Set to true if the user had poweruser on at any point during their editing
@@ -149,8 +157,8 @@ export class UiCommit extends EventEmitter {
 
     // If the user has completed any MapRoulette tasks, we may have sources or comments to use.
     // (do this before we set sources below)
-    const mrComments = new Set();
-    const mrSources = new Set();
+    const mrComments = new Set<string>();
+    const mrSources = new Set<string>();
     let usedMapRoulette = false;
     const maproulette = context.services.maproulette;
     if (maproulette) {
@@ -338,8 +346,8 @@ export class UiCommit extends EventEmitter {
     const l10n = context.systems.l10n!;
     const uploader = context.systems.uploader!;
 
-    const osm2 = context.services.osm;
-    if (!osm2) return;
+    const osm = context.services.osm;
+    if (!osm) return;
 
     let header: D3Selection = $selection.selectAll('.header')
       .data([0]);
@@ -425,7 +433,7 @@ export class UiCommit extends EventEmitter {
         if (this._userDetails === user) return;  // no change
         this._userDetails = user;
 
-        const userLink = d3_select(document.createElement('div'));
+        const userLink = select(document.createElement('div'));
 
         const href = user?.img?.href;
         if (href) {
@@ -541,7 +549,7 @@ export class UiCommit extends EventEmitter {
       .classed('disabled', uploadBlockerTooltipText !== null)
       .on('click.save', (d3_event: Event) => {
         const el = d3_event.currentTarget as HTMLElement;
-        if (!d3_select(el).classed('disabled')) {
+        if (!select(el).classed('disabled')) {
           el.blur();    // avoid keeping focus on the button - iD#4641
 
           const tags = uploader.changeset!.tags;
@@ -646,8 +654,8 @@ export class UiCommit extends EventEmitter {
 
     this._updateChangeset(changed, onInput);
 
-    if (this._selection) {
-      this._selection.call(this._render);
+    if (this.$parent) {
+      this.$parent.call(this._render);
     }
   }
 
@@ -658,7 +666,7 @@ export class UiCommit extends EventEmitter {
    * @param commentOnly - if `true`, only extract hashtags found in the comment
    * @return The list of unique hashtags
    */
-  protected _findHashtags(tags: Tags, commentOnly: boolean): string[] {
+  protected _findHashtags(tags: OsmTags, commentOnly: boolean): string[] {
     const context = this.context;
     const uploader = context.systems.uploader!;
 
@@ -684,7 +692,7 @@ export class UiCommit extends EventEmitter {
     });
 
     // Extract hashtags from `comment`
-    function commentHashtags() {
+    function commentHashtags(): string[] {
       const matches = (tags.comment || '')
         .replace(/http\S*/g, '')  // drop anything that looks like a URL - iD#4289
         .match(hashtagRegex);
@@ -693,14 +701,14 @@ export class UiCommit extends EventEmitter {
     }
 
     // Extract and clean hashtags from `hashtags`
-    function hashtagHashtags() {
+    function hashtagHashtags(): string[] {
       const matches = (tags.hashtags || '')
         .split(/[,;\s]+/)
         .map(function (s: string) {
           if (s[0] !== '#') { s = '#' + s; }    // prepend '#'
           const matched = s.match(hashtagRegex);
           return matched && matched[0];
-        }).filter(Boolean);                     // exclude falsy
+        }).filter(Boolean) as string[];         // exclude falsy
 
       return matches || [];
     }
@@ -712,7 +720,7 @@ export class UiCommit extends EventEmitter {
    * @param tags - the changeset tags to inspect
    * @return `true` if a review is requested
    */
-  protected _isReviewRequested(tags: Tags): boolean {
+  protected _isReviewRequested(tags: OsmTags): boolean {
     let rr = tags.review_requested;
     if (rr === undefined) return false;
     rr = rr.trim().toLowerCase();
@@ -730,7 +738,7 @@ export class UiCommit extends EventEmitter {
     const settings = context.systems.settings;
     const uploader = context.systems.uploader!;
 
-    const tags: Tags = { ...uploader.changeset!.tags };   // shallow copy
+    const tags: OsmTags = { ...uploader.changeset!.tags };   // shallow copy
 
     Object.keys(changed).forEach(function(k) {
       const v = changed[k];

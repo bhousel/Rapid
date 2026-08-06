@@ -1,4 +1,4 @@
-import { actionDeleteRelation } from './delete_relation.js';
+import { actionDeleteRelation } from './delete_relation.ts';
 
 import type { Action } from './types.ts';
 import type { Graph } from '../lib/Graph.ts';

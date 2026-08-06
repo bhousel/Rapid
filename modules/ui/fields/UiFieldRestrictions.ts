@@ -1,10 +1,10 @@
 import { selection } from 'd3-selection';
-import { UiField } from '../UiField.js';
+import { UiField } from '../UiField.ts';
 
 import type { Context } from '../../Context.ts';
 import type { D3Selection } from 'd3-selection';
 import type { Field } from '../../lib/index.ts';
-import type { UiFieldOptions } from '../UiField.js';
+import type { UiFieldOptions } from '../UiField.ts';
 
 
 /**

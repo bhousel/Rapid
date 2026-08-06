@@ -1,5 +1,5 @@
-import { actionChangeTags } from '../actions/change_tags.js';
-import { KeyOperationBehavior } from '../behaviors/KeyOperationBehavior.js';
+import { actionChangeTags } from '../actions/change_tags.ts';
+import { KeyOperationBehavior } from '../behaviors/KeyOperationBehavior.ts';
 import { utilCmd } from '../util/cmd.ts';
 
 

@@ -2,8 +2,8 @@ import { select, selection } from 'd3-selection';
 import { Extent, projWgs84ToWorld, geoSphericalDistance, vecProject } from '@rapid-sdk/math';
 import { utilArrayUniqBy } from '@rapid-sdk/util';
 import { iso1A2Code } from '@rapideditor/country-coder';
-import { uiCombobox } from '../combobox.js';
-import { UiField } from '../UiField.js';
+import { uiCombobox } from '../combobox.ts';
+import { UiField } from '../UiField.ts';
 import { utilGetSetValue, utilNoAuto } from '../../util/index.ts';
 
 import type { Vec2 } from '@rapid-sdk/math';
@@ -13,7 +13,7 @@ import type { Field } from '../../lib/index.ts';
 import type { OsmEntity } from '../../data/index.ts';
 import type { SpatialItem } from '../../core/SpatialSystem.ts';
 import type { TagChange, Tags } from './types.ts';
-import type { UiFieldOptions } from '../UiField.js';
+import type { UiFieldOptions } from '../UiField.ts';
 
 
 interface AddressFormat {

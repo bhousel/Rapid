@@ -1,7 +1,7 @@
 import { select, selection } from 'd3-selection';
 
-import { uiIcon } from '../icon.js';
-import { uiTooltip } from '../tooltip.js';
+import { uiIcon } from '../icon.ts';
+import { uiTooltip } from '../tooltip.ts';
 import { utilCmd, utilKeybinding } from '../../util/index.ts';
 
 import type { Context } from '../../Context.ts';
@@ -22,6 +22,7 @@ export class UiZoomControl {
 
   public rerender: () => void;
   public zooms: any[];
+
 
   /**
    * @param  context - Global shared application context

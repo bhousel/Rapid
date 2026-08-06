@@ -1,4 +1,4 @@
-import { uiModal } from './modal.js';
+import { uiModal } from './modal.ts';
 
 import type { Context } from '../Context.ts';
 import type { D3Selection } from 'd3-selection';
@@ -13,6 +13,7 @@ export class UiRapidPowerUserFeatures {
   public featureFlags: string[];
   public $modal: any;
   public rerender: () => void;
+
 
   /**
    * @param  context - Global shared application context

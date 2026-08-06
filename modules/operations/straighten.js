@@ -1,8 +1,7 @@
 import { utilArrayDifference, utilGetAllNodes } from '@rapid-sdk/util';
-
-import { actionStraightenNodes } from '../actions/straighten_nodes.js';
-import { actionStraightenWay } from '../actions/straighten_way.js';
-import { KeyOperationBehavior } from '../behaviors/KeyOperationBehavior.js';
+import { actionStraightenNodes } from '../actions/straighten_nodes.ts';
+import { actionStraightenWay } from '../actions/straighten_way.ts';
+import { KeyOperationBehavior } from '../behaviors/KeyOperationBehavior.ts';
 import { utilTotalExtent } from '../util/util.ts';
 
 

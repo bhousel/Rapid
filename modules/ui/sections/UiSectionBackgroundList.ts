@@ -2,17 +2,16 @@ import { select } from 'd3-selection';
 import { easeCubicInOut } from 'd3-ease';
 import { geoSphericalDistance, numWrap } from '@rapid-sdk/math';
 
-import { AbstractUiSection } from '../AbstractUiSection.js';
+import { AbstractUiSection } from './AbstractUiSection.ts';
 import { ImagerySource } from '../../lib/ImagerySource.ts';
-import { uiIcon } from '../icon.js';
-import { UiSettingsCustomBackground } from '../settings/UiSettingsCustomBackground.js';
-import { uiTooltip } from '../tooltip.js';
+import { uiIcon } from '../icon.ts';
+import { UiSettingsCustomBackground } from '../settings/UiSettingsCustomBackground.ts';
+import { uiTooltip } from '../tooltip.ts';
 import { utilCmd } from '../../util/cmd.ts';
 
 import type { Context } from '../../Context.ts';
 import type { D3Selection } from 'd3-selection';
 import type { ImagerySourceCustom } from '../../lib/ImagerySource.ts';
-import type { UiSettingsCustomBackground } from '../settings/UiSettingsCustomBackground.ts';
 import type { Vec2 } from '@rapid-sdk/math';
 
 
@@ -164,8 +163,8 @@ export class UiSectionBackgroundList extends AbstractUiSection {
   public renderDisclosureContent($selection: D3Selection): void {
     const context = this.context;
     const l10n = context.systems.l10n!;
-    const map3d = context.systems.map3d;
-    const ui = context.systems.ui;
+    const map3d = context.systems.map3d!;
+    const ui = context.systems.ui!;
 
     const BackgroundCard = ui.InfoCards.BackgroundCard;
     const LocationCard = ui.InfoCards.LocationCard;
@@ -472,7 +471,7 @@ export class UiSectionBackgroundList extends AbstractUiSection {
 
         // Update the Wayback release date options
         if (d.id === 'EsriWayback') {
-          const currDate = d.date;
+          const currDate = (d as any).date;
 
           // If we don't know the locally changed dates yet, just show all dates in the dropdown
           if (wayback && !this._waybackDates.length) {
@@ -734,7 +733,7 @@ export class UiSectionBackgroundList extends AbstractUiSection {
     if (scheduler) {
       scheduler.scheduleIdleTask(fn)
         .catch((err: unknown) => {
-          if (err?.name === 'AbortError') return;   // expected cancellation
+          if ((err as any)?.name === 'AbortError') return;   // expected cancellation
           console.error(err);  // eslint-disable-line no-console
         });
     } else {

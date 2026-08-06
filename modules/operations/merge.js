@@ -1,9 +1,8 @@
-import { actionJoin } from '../actions/join.js';
-import { actionMerge } from '../actions/merge.js';
-import { actionMergeNodes } from '../actions/merge_nodes.js';
-import { actionMergePolygon } from '../actions/merge_polygon.js';
-
-import { KeyOperationBehavior } from '../behaviors/KeyOperationBehavior.js';
+import { actionJoin } from '../actions/join.ts';
+import { actionMerge } from '../actions/merge.ts';
+import { actionMergeNodes } from '../actions/merge_nodes.ts';
+import { actionMergePolygon } from '../actions/merge_polygon.ts';
+import { KeyOperationBehavior } from '../behaviors/KeyOperationBehavior.ts';
 
 
 export function operationMerge(context, selectedIDs) {

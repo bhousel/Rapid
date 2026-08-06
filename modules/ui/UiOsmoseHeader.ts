@@ -17,6 +17,10 @@ export class UiOsmoseHeader {
   // D3 selections
   public $parent: D3Selection | null;
 
+
+  /**
+   * @param  context - Global shared application context
+   */
   public constructor(context: Context) {
     this.context = context;
     this.datum = null;
@@ -46,7 +50,7 @@ export class UiOsmoseHeader {
 
     let iconFill = 0xffffff;
     if (osmose) {
-      iconFill = osmose.getColor(this.datum?.props.item);
+      iconFill = osmose.getColor(this.datum?.props.item ?? 0);
     }
 
     const $header = $parent.selectAll('.qa-header')
@@ -106,7 +110,7 @@ export class UiOsmoseHeader {
     if (!osmose || !d) return unknown;
 
     // Issue titles supplied by Osmose
-    const s = osmose.getStrings(d.props.type);
-    return ('title' in s) ? s.title : unknown;
+    const s = osmose.getStrings(d.props.type!);
+    return ('title' in s) ? (s.title ?? unknown) : unknown;
   }
 }

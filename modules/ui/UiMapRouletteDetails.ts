@@ -1,6 +1,5 @@
 import { select as d3_select, selection } from 'd3-selection';
 import { marked } from 'marked';
-
 import { utilSanitizeHTML } from '../util/sanitize.ts';
 import { utilHighlightEntities } from '../util/util.ts';
 
@@ -113,6 +112,10 @@ export class UiMapRouletteDetails {
   // D3 selections
   public $parent: D3Selection | null;
 
+
+  /**
+   * @param  context - Global shared application context
+   */
   public constructor(context: Context) {
     this.context = context;
     this.datum = null;
@@ -166,9 +169,9 @@ export class UiMapRouletteDetails {
       .text(l10n.t('map_data.layers.maproulette.loading_task_details'));
 
 
-    maproulette.loadCompleteTaskAsync(this.datum).then((task: any) => {
+    maproulette.loadCompleteTaskAsync(this.datum!).then((task: any) => {
       if (!task) return;
-      if (this.datum.id !== task.id) return;
+      if (this.datum!.id !== task.id) return;
 
       const $qaDetails = $details.selectAll('.qa-details-subsection');
       $qaDetails.html(''); // replace contents

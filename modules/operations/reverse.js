@@ -1,5 +1,5 @@
-import { actionReverse } from '../actions/reverse.js';
-import { KeyOperationBehavior } from '../behaviors/KeyOperationBehavior.js';
+import { actionReverse } from '../actions/reverse.ts';
+import { KeyOperationBehavior } from '../behaviors/KeyOperationBehavior.ts';
 
 
 export function operationReverse(context, selectedIDs) {

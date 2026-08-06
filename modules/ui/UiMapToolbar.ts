@@ -1,8 +1,5 @@
 import { selection, select } from 'd3-selection';
-
-import {
-  UiDownloadTool, UiDrawModesTool, UiRapidTool, UiSaveTool, UiUndoRedoTool
-} from './tools/index.js';
+import { UiDownloadTool, UiDrawModesTool, UiRapidTool, UiSaveTool, UiUndoRedoTool } from './tools/index.ts';
 
 import type { Context } from '../Context.ts';
 import type { D3Selection } from 'd3-selection';
@@ -35,6 +32,7 @@ export class UiMapToolbar {
   public $parent: D3Selection | null;
 
   public rerender: () => void;
+
 
   /**
    * @param  context - Global shared application context

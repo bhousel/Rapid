@@ -1,9 +1,8 @@
 import { select as d3_select } from 'd3-selection';
 import { EventEmitter } from 'tseep/lib/ee-safe';
 import { vecAdd } from '@rapid-sdk/math';
-
-import { uiTooltip } from './tooltip.js';
-import { uiIcon } from './icon.js';
+import { uiTooltip } from './tooltip.ts';
+import { uiIcon } from './icon.ts';
 import { utilHighlightEntities } from '../util/index.ts';
 
 import type { Context } from '../Context.ts';
@@ -52,7 +51,10 @@ export class UiEditMenu extends EventEmitter {
   protected _menuWidth: number;
   protected _lastPointerUpType: string | null;
 
-  /** Creates a new edit menu bound to the shared application context. */
+
+  /**
+   * @param  context - Global shared application context
+   */
   public constructor(context: Context) {
     super();
     this.context = context;
@@ -197,7 +199,7 @@ export class UiEditMenu extends EventEmitter {
         tooltip
           .heading(d.title)
           .title(d.tooltip())
-          .shortcut(d.keys[0]);  // display the first key combo, if there are alternates
+          .shortcut(d.keys?.[0] ?? '');  // display the first key combo, if there are alternates
       }
     });
 
@@ -250,11 +252,11 @@ export class UiEditMenu extends EventEmitter {
           duration: 2000,
           iconName: `#rapid-operation-${operation.id}`,
           iconClass: 'operation',
-          label: operation.annotation() || operation.title
+          label: (operation as any).annotation() || operation.title
         });
       }
 
-      operation();
+      (operation as any)();
       this.close();
     }
     this._lastPointerUpType = null;

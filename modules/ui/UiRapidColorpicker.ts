@@ -1,12 +1,12 @@
 import { EventEmitter } from 'tseep/lib/ee-safe';
-import { select as d3_select } from 'd3-selection';
-
-import { uiIcon } from './icon.js';
+import { select } from 'd3-selection';
+import { uiIcon } from './icon.ts';
 import { utilKeybinding } from '../util/index.ts';
 
 import type { Context } from '../Context.ts';
 import type { D3Selection } from 'd3-selection';
 import type { RapidDataset } from '../lib/RapidDataset.ts';
+
 
 /** Minimal interface for the parent modal, which exposes a closeable `close` method */
 interface ModalLike {
@@ -22,15 +22,16 @@ interface ModalLike {
 export class UiRapidColorpicker extends EventEmitter {
   public context: Context;
 
-  protected _parentModal: ModalLike | undefined;
+  protected _parentModal: ModalLike;
   protected _close: () => void;
+
 
   /**
    * Creates a new colorpicker bound to the given parent modal.
    * @param context - Global shared application context
    * @param parentModal - the parent modal that the colorpicker popup is shown on top of
    */
-  public constructor(context: Context, parentModal?: ModalLike) {
+  public constructor(context: Context, parentModal: ModalLike) {
     super();
     this.context = context;
     this._parentModal = parentModal;
@@ -65,7 +66,7 @@ export class UiRapidColorpicker extends EventEmitter {
    * @param d3_event - the document click event
    */
   protected _handleClick(d3_event: Event): void {
-    const target = d3_event.target;
+    const target = d3_event.target as any;
     const className = (target && target.className) || '';
     if (!/colorpicker/i.test(className)) {
       d3_event.stopPropagation();
@@ -98,8 +99,11 @@ export class UiRapidColorpicker extends EventEmitter {
    * @param $selection - A d3-selection to the HTMLElement this renders into
    */
   public render($selection: D3Selection): void {
+    // capture the dataset from the parent selection
+    const datum = $selection.datum() as RapidDataset | undefined;
+
     const $colorpicker: D3Selection = $selection.selectAll('.rapid-colorpicker')
-      .data((d: RapidDataset) => [d], (d: RapidDataset) => d.id);   // retain data from parent
+      .data(datum ? [datum] : [], d => d.id);   // retain data from parent
 
     // enter
     const $$colorpicker = $colorpicker.enter()
@@ -127,7 +131,7 @@ export class UiRapidColorpicker extends EventEmitter {
    * @param $selection - A d3-selection to the container the popup renders into
    * @param forNode - the swatch node the popup is anchored to (carries the dataset datum)
    */
-  protected _renderPopup($selection: D3Selection, forNode: HTMLElement): void {
+  protected _renderPopup($selection: D3Selection, forNode: any): void {
     const context = this.context;
     const l10n = context.systems.l10n!;
     const rapid = context.systems.rapid!;
@@ -164,16 +168,16 @@ export class UiRapidColorpicker extends EventEmitter {
 
       const keybinding = utilKeybinding('modal');
       keybinding.on(['⌫', '⎋'], origClose);
-      d3_select(document).call(keybinding);
-      d3_select(document).on('click.colorpicker', null);
+      select(document).call(keybinding);
+      select(document).on('click.colorpicker', null);
       this._close = () => {};
       this.emit('done');
     };
 
     const keybinding = utilKeybinding('modal');
     keybinding.on(['⌫', '⎋'], this._close);
-    d3_select(document).call(keybinding);
-    d3_select(document).on('click.colorpicker', this._handleClick);
+    select(document).call(keybinding);
+    select(document).on('click.colorpicker', this._handleClick);
 
     $popup
       .append('div')

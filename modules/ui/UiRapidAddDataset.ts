@@ -1,8 +1,7 @@
 import { EventEmitter } from 'tseep/lib/ee-safe';
 import { select } from 'd3-selection';
 import { marked } from 'marked';
-
-import { uiIcon } from './icon.js';
+import { uiIcon } from './icon.ts';
 import { utilKeybinding, utilNoAuto } from '../util/index.ts';
 
 import type { Context } from '../Context.ts';
@@ -26,6 +25,7 @@ export class UiRapidAddDataset extends EventEmitter {
   protected _currUrl: string | null;
   protected _clickedOk: () => void;       // custom OK handler
   protected _clickedCancel: () => void;   // custom Cancel handler
+
 
   /**
    * @param  context - Global shared application context

@@ -1,8 +1,8 @@
-import { UiPane } from '../UiPane.js';
-import { UiSectionValidationIssues } from '../sections/UiSectionValidationIssues.js';
-import { UiSectionValidationOptions } from '../sections/UiSectionValidationOptions.js';
-import { UiSectionValidationRules } from '../sections/UiSectionValidationRules.js';
-import { UiSectionValidationStatus } from '../sections/UiSectionValidationStatus.js';
+import { UiPane } from '../UiPane.ts';
+import { UiSectionValidationIssues } from '../sections/UiSectionValidationIssues.ts';
+import { UiSectionValidationOptions } from '../sections/UiSectionValidationOptions.ts';
+import { UiSectionValidationRules } from '../sections/UiSectionValidationRules.ts';
+import { UiSectionValidationStatus } from '../sections/UiSectionValidationStatus.ts';
 
 import type { Context } from '../../Context.ts';
 

@@ -1,7 +1,6 @@
 import { EventEmitter } from 'tseep/lib/ee-safe';
 import { marked } from 'marked';
-
-import { uiConfirm } from '../confirm.js';
+import { uiConfirm } from '../confirm.ts';
 import { utilNoAuto } from '../../util/index.ts';
 
 import type { Context } from '../../Context.ts';
@@ -15,6 +14,9 @@ import type { D3Selection } from 'd3-selection';
 export class UiSettingsCustomBackground extends EventEmitter {
   public context: Context;
 
+  /**
+   * @param  context - Global shared application context
+   */
   public constructor(context: Context) {
     super();
     this.context = context;

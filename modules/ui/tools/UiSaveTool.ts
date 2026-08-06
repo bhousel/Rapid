@@ -1,8 +1,7 @@
 import { selection } from 'd3-selection';
 import { interpolateRgb } from 'd3-interpolate';
-
-import { uiIcon } from '../icon.js';
-import { uiTooltip } from '../tooltip.js';
+import { uiIcon } from '../icon.ts';
+import { uiTooltip } from '../tooltip.ts';
 import { utilCmd } from '../../util/cmd.ts';
 
 import type { Context } from '../../Context.ts';

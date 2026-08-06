@@ -1,6 +1,5 @@
 import { select as d3_select, selection } from 'd3-selection';
-
-import { uiIcon } from './icon.js';
+import { uiIcon } from './icon.ts';
 import { utilSanitizeHTML } from '../util/sanitize.ts';
 
 import type { Context } from '../Context.ts';
@@ -27,6 +26,10 @@ export class UiNoteComments {
   // D3 selections
   public $parent: D3Selection | null;
 
+
+  /**
+   * @param  context - Global shared application context
+   */
   public constructor(context: Context) {
     this.context = context;
     this.datum = null;
@@ -66,7 +69,7 @@ export class UiNoteComments {
       .merge($comments);
 
     const $$comment = $comments.selectAll('.comment')
-      .data(this.datum.props.comments)
+      .data(this.datum.props.comments ?? [])
       .enter()
       .append('div')
       .attr('class', 'comment');
@@ -88,7 +91,7 @@ export class UiNoteComments {
       .append('div')
       .attr('class', 'comment-author')
       .each((d: NoteComment, i: number, nodes: ArrayLike<HTMLElement>) => {
-        let $author = d3_select(nodes[i]);
+        let $author: D3Selection = d3_select(nodes[i]);
         const osm = context.services.osm;
         if (osm && d.user) {
           $author = $author
@@ -107,7 +110,7 @@ export class UiNoteComments {
     $$metadata
       .append('div')
       .attr('class', 'comment-date')
-      .text((d: NoteComment) => l10n.t(`note.status.${d.action}`, { when: l10n.displayShortDate(d.date) }));
+      .text((d: NoteComment) => l10n.t(`note.status.${d.action}`, { when: l10n.displayShortDate(d.date ?? '') }));
 
     $$main
       .append('div')
@@ -131,8 +134,8 @@ export class UiNoteComments {
     const showThirdPartyIcons = settings?.get('ui.privacy.thirdPartyIcons') ?? 'true';
     if (showThirdPartyIcons !== 'true' || !osm) return;
 
-    const uids = new Set();  // gather uids in the comment thread
-    for (const d of this.datum.props.comments) {
+    const uids = new Set<string>();  // gather uids in the comment thread
+    for (const d of (this.datum?.props.comments ?? [])) {
       if (d.uid) uids.add(d.uid);
     }
 

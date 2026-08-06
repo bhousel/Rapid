@@ -13,6 +13,7 @@ export class UiMap3dViewer {
   // D3 selections
   public $parent: D3Selection | null;
 
+
   /**
    * @param  context - Global shared application context
    */

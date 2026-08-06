@@ -1,4 +1,4 @@
-import { actionDeleteNode } from './delete_node.js';
+import { actionDeleteNode } from './delete_node.ts';
 import { osmJoinWays } from '../lib/multipolygon.ts';
 import { projWorldToWgs84, vecAdd, vecInterp, vecLength, vecProject, vecSubtract } from '@rapid-sdk/math';
 

@@ -1,5 +1,5 @@
-import { actionSplit } from '../actions/split.js';
-import { KeyOperationBehavior } from '../behaviors/KeyOperationBehavior.js';
+import { actionSplit } from '../actions/split.ts';
+import { KeyOperationBehavior } from '../behaviors/KeyOperationBehavior.ts';
 
 
 export function operationSplit(context, selectedIDs) {

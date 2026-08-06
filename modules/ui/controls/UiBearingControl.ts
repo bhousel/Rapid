@@ -1,8 +1,8 @@
 import { selection } from 'd3-selection';
 import { vecRotate } from '@rapid-sdk/math';
 
-import { uiIcon } from '../icon.js';
-import { uiTooltip } from '../tooltip.js';
+import { uiIcon } from '../icon.ts';
+import { uiTooltip } from '../tooltip.ts';
 
 import type { Context } from '../../Context.ts';
 import type { D3Selection } from 'd3-selection';
@@ -21,6 +21,7 @@ export class UiBearingControl {
   // D3 selections
   public $parent: D3Selection | null;
   public $button: D3Selection | null;
+
 
   /**
    * @param  context - Global shared application context

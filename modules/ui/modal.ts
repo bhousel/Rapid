@@ -1,6 +1,5 @@
 import { select as d3_select } from 'd3-selection';
-
-import { uiIcon } from './icon.js';
+import { uiIcon } from './icon.ts';
 import { utilKeybinding } from '../util/keybinding.ts';
 
 import type { D3Selection } from 'd3-selection';

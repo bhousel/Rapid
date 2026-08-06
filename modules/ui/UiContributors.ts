@@ -1,6 +1,5 @@
 import { selection, select } from 'd3-selection';
-
-import { uiIcon } from './icon.js';
+import { uiIcon } from './icon.ts';
 
 import type { Context } from '../Context.ts';
 import type { D3Selection } from 'd3-selection';
@@ -21,6 +20,7 @@ export class UiContributors {
   public deferredRender: () => void;
 
   protected _lastv: any;
+
 
   /**
    * @param  context - Global shared application context

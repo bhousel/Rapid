@@ -1,8 +1,7 @@
 import { EventEmitter } from 'tseep/lib/ee-safe';
 import { selection, select } from 'd3-selection';
 import { numClamp } from '@rapid-sdk/math';
-
-import { uiIcon } from './icon.js';
+import { uiIcon } from './icon.ts';
 
 import type { Context } from '../Context.ts';
 import type { D3Selection } from 'd3-selection';
@@ -55,6 +54,7 @@ export class UiPhotoViewer extends EventEmitter {
   // D3 selections
   public $parent: D3Selection | null;
   public $viewer: D3Selection | null;
+
 
   /**
    * @param  context - Global shared application context

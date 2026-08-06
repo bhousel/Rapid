@@ -1,7 +1,6 @@
 import { numClamp } from '@rapid-sdk/math';
-
-import { AbstractUiSection } from '../AbstractUiSection.js';
-import { uiIcon } from '../icon.js';
+import { AbstractUiSection } from './AbstractUiSection.ts';
+import { uiIcon } from '../icon.ts';
 
 import type { Context } from '../../Context.ts';
 import type { D3Selection } from 'd3-selection';
@@ -14,6 +13,7 @@ const SETTINGS = ['brightness', 'contrast', 'saturation', 'sharpness'];
 
 export class UiSectionBackgroundDisplayOptions extends AbstractUiSection {
   protected _options: Record<string, number>;
+
 
   /**
    * @param context - Global shared application context

@@ -1,8 +1,7 @@
 import { select as d3_select } from 'd3-selection';
 import { geoSphericalDistance } from '@rapid-sdk/math';
-
-import { uiIcon } from '../icon.js';
-import { AbstractUiSection } from '../AbstractUiSection.js';
+import { uiIcon } from '../icon.ts';
+import { AbstractUiSection } from './AbstractUiSection.ts';
 import { utilHighlightEntities } from '../../util/util.ts';
 
 import type { Context } from '../../Context.ts';
@@ -177,7 +176,7 @@ export class UiSectionValidationIssues extends AbstractUiSection {
       .order();
 
     $items.selectAll('.issue-message')
-      .text((d: ValidationIssue) => d.message(context));
+      .text((d: ValidationIssue) => (d.message as any)(context));
 
     $items.selectAll('.issue-autofix')
       .classed('hide', (d: ValidationIssue) => !(showAutoFix && d.autoArgs));
@@ -236,8 +235,8 @@ export class UiSectionValidationIssues extends AbstractUiSection {
     }
 
     utilHighlightEntities(this.context, issue.entityIds, false);  // unhighlight
-    editor.perform(issue.autoArgs[0]);   // autoArgs = [action, annotation]
-    editor.commit({ annotation: issue.autoArgs[1], selectedIDs: issue.entityIds });
+    editor.perform(issue.autoArgs![0]);   // autoArgs = [action, annotation]
+    editor.commit({ annotation: issue.autoArgs![1] as any, selectedIDs: issue.entityIds });
   }
 
 
@@ -257,7 +256,7 @@ export class UiSectionValidationIssues extends AbstractUiSection {
     editor.beginTransaction();
 
     for (const issue of issues) {
-      const action = issue.autoArgs[0];  // autoArgs = [action, annotation]
+      const action = issue.autoArgs![0];  // autoArgs = [action, annotation]
       editor.perform(action);
     }
 
@@ -313,7 +312,7 @@ export class UiSectionValidationIssues extends AbstractUiSection {
     if (scheduler) {
       scheduler.scheduleIdleTask(fn)
         .catch((err: unknown) => {
-          if (err?.name === 'AbortError') return;   // expected cancellation
+          if ((err as any)?.name === 'AbortError') return;   // expected cancellation
           console.error(err);  // eslint-disable-line no-console
         });
     } else {

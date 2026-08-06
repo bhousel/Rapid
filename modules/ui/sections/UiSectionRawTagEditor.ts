@@ -1,15 +1,15 @@
 import { select as d3_select } from 'd3-selection';
 import { utilArrayDifference, utilArrayIdentical, utilTagDiff } from '@rapid-sdk/util';
-
-import { uiIcon } from '../icon.js';
-import { uiCombobox } from '../combobox.js';
-import { AbstractUiSection } from '../AbstractUiSection.js';
-import { UiTagReference } from '../UiTagReference.js';
+import { uiIcon } from '../icon.ts';
+import { uiCombobox } from '../combobox.ts';
+import { AbstractUiSection } from './AbstractUiSection.ts';
+import { UiTagReference } from '../UiTagReference.ts';
 import { utilGetSetValue, utilNoAuto } from '../../util/index.ts';
 
 import type { TagDiff } from '@rapid-sdk/util';
 import type { Category } from '../../lib/Category.ts';
 import type { Context } from '../../Context.ts';
+import type { OsmTags } from '../../data/types.ts';
 import type { Preset } from '../../lib/Preset.ts';
 import type { Tags } from '../fields/types.ts';
 import type { D3Selection } from 'd3-selection';
@@ -62,9 +62,13 @@ export class UiSectionRawTagEditor extends AbstractUiSection {
   protected _pendingChange: Record<string, string | undefined> | null;
   protected _state: string | undefined;    // can be 'hide', 'hover', or 'select'
   protected _presets: (Preset | Category)[] | undefined;
-  protected _tags: Tags | undefined;
+  protected _tags: Tags;
   protected _entityIDs: EntityID[];
 
+
+  /**
+   * @param  context - Global shared application context
+   */
   public constructor(context: Context, id: string) {
     super(context, id);
     this._classes = 'raw-tag-editor';
@@ -86,7 +90,7 @@ export class UiSectionRawTagEditor extends AbstractUiSection {
     this._pendingChange = null;
     this._state = undefined;
     this._presets = undefined;
-    this._tags = undefined;
+    this._tags = {};
     this._entityIDs = [];
 
     // Ensure methods used as callbacks always have `this` bound correctly.
@@ -137,8 +141,8 @@ export class UiSectionRawTagEditor extends AbstractUiSection {
     }
 
     // assemble row data
-    const rowData = this._orderedKeys.map((key, index) => {
-      return { index: index, key: key, value: this._tags[key] };
+    const rowData: TagRow[] = this._orderedKeys.map((key, index) => {
+      return { index: index, key: key, value: (this._tags[key] ?? '') as string | string[] };
     });
 
     // append blank row last, if necessary
@@ -325,17 +329,17 @@ export class UiSectionRawTagEditor extends AbstractUiSection {
         $row.select('button.remove');   // propagate bound data
       });
 
-    $items.selectAll('input.key')
+    const $keys = $items.selectAll('input.key')
       .attr('title', (d: TagRow) => d.key)
-      .attr('readonly', (d: TagRow) => this._isReadOnlyTag(d) || isMultiValueTag(d) || null)
-      .call(utilGetSetValue, (d: TagRow) => d.key);
+      .attr('readonly', (d: TagRow) => this._isReadOnlyTag(d) || isMultiValueTag(d) || null);
+    utilGetSetValue($keys, (d: TagRow) => d.key);
 
-    $items.selectAll('input.value')
+    const $values = $items.selectAll('input.value')
       .classed('mixed', isMultiValueTag)
       .attr('title', (d: TagRow) => isMultiValueTag(d) ? (d.value as string[]).filter(Boolean).join('\n') : d.value as string)
       .attr('readonly', (d: TagRow) => this._isReadOnlyTag(d) || null)
-      .attr('placeholder', (d: TagRow) => isMultiValueTag(d) ? l10n.t('inspector.multiple_values') : null)
-      .call(utilGetSetValue, (d: TagRow) => isMultiValueTag(d) ? '' : d.value as string);
+      .attr('placeholder', (d: TagRow) => isMultiValueTag(d) ? l10n.t('inspector.multiple_values') : null);
+    utilGetSetValue($values, (d: TagRow) => isMultiValueTag(d) ? '' : d.value as string);
 
     $items.selectAll('button.remove')
       .attr('title', l10n.t('icons.remove'))
@@ -412,7 +416,7 @@ export class UiSectionRawTagEditor extends AbstractUiSection {
       }
     });
 
-    const tagDiff = utilTagDiff(this._tags, newTags);
+    const tagDiff = utilTagDiff(this._tags as OsmTags, newTags);
     if (!tagDiff.length) return;
 
     this._pendingChange = this._pendingChange || {};
@@ -444,7 +448,7 @@ export class UiSectionRawTagEditor extends AbstractUiSection {
    * @param d3_event - the triggering keydown event
    */
   protected _pushMore(d3_event: KeyboardEvent): void {
-    const el = d3_event.currentTarget;
+    const el = d3_event.currentTarget as HTMLElement;
     // if pressing Tab on the last value field with content, add a blank row
     if (d3_event.keyCode === 9 && !d3_event.shiftKey &&
       this.$container.selectAll('.tag-list li:last-child input.value').node() === el &&
@@ -476,7 +480,7 @@ export class UiSectionRawTagEditor extends AbstractUiSection {
         .fetcher((value: string, callback: (data: any[]) => void) => {
           const keyString = utilGetSetValue($key) as string;
           if (!this._tags[keyString]) return;
-          const data = this._tags[keyString].filter(Boolean).map((tagValue: string) => {
+          const data = (this._tags[keyString] as string[]).filter(Boolean).map((tagValue: string) => {
             return {
               value: tagValue,
               title: tagValue
@@ -545,7 +549,7 @@ export class UiSectionRawTagEditor extends AbstractUiSection {
    */
   protected _keyChange(d3_event: Event, d: TagRow): void {
     const context = this.context;
-    const el = d3_event.currentTarget;
+    const el = d3_event.currentTarget as HTMLInputElement;
     if (d3_select(el).attr('readonly')) return;
 
     const kOld = d.key;
@@ -575,7 +579,7 @@ export class UiSectionRawTagEditor extends AbstractUiSection {
       return;
     }
 
-    const row = el.parentNode.parentNode;
+    const row = (el.parentNode as HTMLElement).parentNode as HTMLElement;
     const $inputVal = d3_select(row).selectAll('input.value');
     const vNew = context.cleanTagValue(utilGetSetValue($inputVal) as string);
 
@@ -609,7 +613,7 @@ export class UiSectionRawTagEditor extends AbstractUiSection {
    */
   protected _valueChange(d3_event: Event, d: TagRow): void {
     const context = this.context;
-    const el = d3_event.currentTarget;
+    const el = d3_event.currentTarget as HTMLInputElement;
     if (this._isReadOnlyTag(d)) return;
 
     // exit if this is a multiselection and no value was entered
@@ -741,7 +745,7 @@ export class UiSectionRawTagEditor extends AbstractUiSection {
    */
   public tags(val?: Tags): any {
     if (!arguments.length) return this._tags;
-    this._tags = val;
+    this._tags = val ?? {};
     return this;
   }
 

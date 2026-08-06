@@ -1,9 +1,9 @@
-import { UiPane } from '../UiPane.js';
+import { UiPane } from '../UiPane.ts';
 
-import { UiSectionDataLayers } from '../sections/UiSectionDataLayers.js';
-import { UiSectionMapFeatures } from '../sections/UiSectionMapFeatures.js';
-import { UiSectionMapStyleOptions } from '../sections/UiSectionMapStyleOptions.js';
-import { UiSectionPhotoOverlays } from '../sections/UiSectionPhotoOverlays.js';
+import { UiSectionDataLayers } from '../sections/UiSectionDataLayers.ts';
+import { UiSectionMapFeatures } from '../sections/UiSectionMapFeatures.ts';
+import { UiSectionMapStyleOptions } from '../sections/UiSectionMapStyleOptions.ts';
+import { UiSectionPhotoOverlays } from '../sections/UiSectionPhotoOverlays.ts';
 
 import type { Context } from '../../Context.ts';
 

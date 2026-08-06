@@ -1,4 +1,4 @@
-import { actionDeleteMultiple } from './delete_multiple.js';
+import { actionDeleteMultiple } from './delete_multiple.ts';
 import { createOsmEntity } from '../data/index.ts';
 import deepEqual from 'fast-deep-equal';
 import { diff3Merge, MergeRegion } from 'node-diff3';

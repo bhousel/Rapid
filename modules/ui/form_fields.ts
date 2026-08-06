@@ -1,11 +1,10 @@
 import { select as d3_select } from 'd3-selection';
-
-import { uiCombobox } from './combobox.js';
+import { uiCombobox } from './combobox.ts';
 import { utilGetSetValue, utilNoAuto } from '../util/index.ts';
 
 import type { Context } from '../Context.ts';
 import type { D3Selection } from 'd3-selection';
-import type { UiField } from './UiField.js';
+import type { UiField } from './UiField.ts';
 
 
 /** A form-fields control (callable + fluent), renders a set of fields into a selection. */

@@ -1,7 +1,6 @@
 import { select as d3_select } from 'd3-selection';
-
-import { uiTooltip } from '../tooltip.js';
-import { AbstractUiSection } from '../AbstractUiSection.js';
+import { uiTooltip } from '../tooltip.ts';
+import { AbstractUiSection } from './AbstractUiSection.ts';
 import { utilGetSetValue, utilNoAuto } from '../../util/index.ts';
 
 import type { Context } from '../../Context.ts';
@@ -15,6 +14,10 @@ const DEFAULTSQUARE = 5;  // see also `validators/unsquare_way.ts`
 export class UiSectionValidationRules extends AbstractUiSection {
   protected _validatorIDs: string[];
 
+
+  /**
+   * @param  context - Global shared application context
+   */
   public constructor(context: Context) {
     super(context, 'issues-rules');
 
@@ -197,7 +200,7 @@ export class UiSectionValidationRules extends AbstractUiSection {
     const settings = this.context.systems.settings;
     const validator = this.context.systems.validator!;
 
-    const $input = d3_select(d3_event.currentTarget);
+    const $input = d3_select(d3_event.currentTarget as HTMLElement);
     let degStr = (utilGetSetValue($input) as string).trim();
     let degNum = parseFloat(degStr);
 
@@ -250,7 +253,7 @@ export class UiSectionValidationRules extends AbstractUiSection {
     if (scheduler) {
       scheduler.scheduleIdleTask(this.reRender)
         .catch((err: unknown) => {
-          if (err?.name === 'AbortError') return;   // expected cancellation
+          if ((err as any)?.name === 'AbortError') return;   // expected cancellation
           console.error(err);  // eslint-disable-line no-console
         });
     } else {

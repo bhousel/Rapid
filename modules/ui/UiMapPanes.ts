@@ -1,15 +1,9 @@
 import { selection, select } from 'd3-selection';
-
-import {
-  UiPaneBackground, UiPaneHelp, UiPaneIssues, UiPaneMapData, UiPanePreferences
-} from './panes/index.js';
+import { UiPaneBackground, UiPaneHelp, UiPaneIssues, UiPaneMapData, UiPanePreferences } from './panes/index.ts';
 
 import type { Context } from '../Context.ts';
 import type { D3Selection } from 'd3-selection';
 import type { UiPane } from './UiPane.ts';
-import type {
-  UiPaneBackground, UiPaneHelp, UiPaneIssues, UiPaneMapData, UiPanePreferences
-} from './panes/index.js';
 
 
 /**
@@ -29,6 +23,7 @@ export class UiMapPanes {
 
   // D3 selections
   public $parent: D3Selection | null;
+
 
   /**
    * @param  context - Global shared application context

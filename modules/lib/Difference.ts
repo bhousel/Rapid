@@ -33,7 +33,7 @@ export interface DifferenceFlags {
 /**
  * Summary entry describing a change to an entity.
  */
-interface SummaryEntry {
+export interface SummaryEntry {
   /** The entity that changed */
   entity: OsmEntity;
   /** The Graph where the entity can be found (head or base) */

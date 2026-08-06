@@ -1,8 +1,8 @@
 //import { select as d3_select } from 'd3-selection';
 //import { marked } from 'marked';
 //
-//import { uiIcon } from './icon.js';
-//import { icon } from './intro/helper.js';
+//import { uiIcon } from './icon.ts';
+//import { icon } from './intro/helper.ts';
 //
 //
 //// This currently only works with the 'restrictions' field

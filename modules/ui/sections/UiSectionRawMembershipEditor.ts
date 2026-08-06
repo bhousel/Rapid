@@ -1,15 +1,14 @@
 import { select as d3_select } from 'd3-selection';
 import { utilArrayGroupBy, utilArrayIntersection, utilUniqueString } from '@rapid-sdk/util';
-
-import { actionAddEntity } from '../../actions/add_entity.js';
-import { actionAddMember } from '../../actions/add_member.js';
-import { actionChangeMember } from '../../actions/change_member.js';
-import { actionDeleteMembers } from '../../actions/delete_members.js';
+import { actionAddEntity } from '../../actions/add_entity.ts';
+import { actionAddMember } from '../../actions/add_member.ts';
+import { actionChangeMember } from '../../actions/change_member.ts';
+import { actionDeleteMembers } from '../../actions/delete_members.ts';
 import { OsmEntity, OsmRelation } from '../../data/index.ts';
-import { uiIcon } from '../icon.js';
-import { uiCombobox } from '../combobox.js';
-import { AbstractUiSection } from '../AbstractUiSection.js';
-import { uiTooltip } from '../tooltip.js';
+import { uiIcon } from '../icon.ts';
+import { uiCombobox } from '../combobox.ts';
+import { AbstractUiSection } from './AbstractUiSection.ts';
+import { uiTooltip } from '../tooltip.ts';
 import { utilNoAuto, utilIsColorValid, utilHighlightEntities } from '../../util/util.ts';
 
 import type { Context } from '../../Context.ts';
@@ -43,6 +42,10 @@ export class UiSectionRawMembershipEditor extends AbstractUiSection {
   protected _entityIDs: EntityID[];
   protected _showBlank: boolean;
 
+
+  /**
+   * @param  context - Global shared application context
+   */
   public constructor(context: Context) {
     super(context, 'raw-membership-editor');
     this._inChange = false;
@@ -223,10 +226,10 @@ export class UiSectionRawMembershipEditor extends AbstractUiSection {
     const editor = context.systems.editor!;
     const l10n = context.systems.l10n!;
 
-    if (d === 0) return;    // called on newrow (shouldn't happen)
+    if ((d as any) === 0) return;    // called on newrow (shouldn't happen)
     if (this._inChange) return;  // avoid accidental recursive call iD#5731
 
-    const newRole = context.cleanRelationRole(d3_select(d3_event.currentTarget).property('value'));
+    const newRole = context.cleanRelationRole(d3_select(d3_event.currentTarget as HTMLElement).property('value'));
 
     if (!newRole.trim() && typeof d.role !== 'string') return;
 
@@ -240,7 +243,7 @@ const membersToUpdate = d.members.filter(function(member: IndexedMember) {
       const changeMemberRoles = (graph: Graph) => {
         for (const member of membersToUpdate) {
           const newMember = Object.assign({}, member, { role: newRole });
-          delete newMember.index;
+          delete (newMember as any).index;
           graph = actionChangeMember(d.relation.id, newMember, member.index)(graph);
         }
         return graph;
@@ -274,7 +277,7 @@ const membersToUpdate = d.members.filter(function(member: IndexedMember) {
       return function(graph: Graph) {
         for (const i in ids) {
           const member = { id: ids[i], type: graph.entity(ids[i]).type, role: role };
-          graph = actionAddMember(relationId, member)(graph);
+          graph = actionAddMember(relationId, member as OsmRelationMember)(graph);
         }
         return graph;
       };
@@ -312,8 +315,8 @@ const membersToUpdate = d.members.filter(function(member: IndexedMember) {
     const editor = context.systems.editor!;
     const l10n = context.systems.l10n!;
 
-    d3_event.currentTarget.blur();   // avoid keeping focus on the button
-    if (d === 0) return;   // called on newrow (shouldn't happen)
+    (d3_event.currentTarget as HTMLElement).blur();   // avoid keeping focus on the button
+    if ((d as any) === 0) return;   // called on newrow (shouldn't happen)
 
     // remove the hover-highlight styling
     utilHighlightEntities(context, [d.relation.id], false);
@@ -379,28 +382,30 @@ const indexes = d.members.map(function(member: IndexedMember) {
     const explicitRelation = q && graph.hasEntity(q.toLowerCase());
     if (explicitRelation && explicitRelation.type === 'relation' && explicitRelation.id !== entityID) {
       // loaded relation is specified explicitly, only show that
+      const rel = explicitRelation as OsmRelation;
       result.push({
-        relation: explicitRelation,
-        value: baseDisplayValue(explicitRelation) + ' ' + explicitRelation.id,
-        display: baseDisplayLabel(explicitRelation)
+        relation: rel,
+        value: baseDisplayValue(rel) + ' ' + rel.id,
+        display: baseDisplayLabel(rel)
       });
 
     } else {
       editor.intersects().forEach(function(entity: OsmEntity) {
         if (entity.type !== 'relation' || entity.id === entityID) return;
 
-        const value = baseDisplayValue(entity);
-        if (q && (value + ' ' + entity.id).toLowerCase().indexOf(q.toLowerCase()) === -1) return;
+        const rel = entity as OsmRelation;
+        const value = baseDisplayValue(rel);
+        if (q && (value + ' ' + rel.id).toLowerCase().indexOf(q.toLowerCase()) === -1) return;
 
         result.push({
-          relation: entity,
+          relation: rel,
           value: value,
-          display: baseDisplayLabel(entity)
+          display: baseDisplayLabel(rel)
         });
       });
 
       result.sort(function(a, b) {
-        return OsmEntity.creationOrder(a.relation, b.relation);
+        return OsmEntity.creationOrder(a.relation!, b.relation!);
       });
 
       // Dedupe identical names by appending relation id - see iD#2891

@@ -1,11 +1,10 @@
 import { select as d3_select } from 'd3-selection';
-
-import { uiPopover } from './popover.js';
+import { uiPopover } from './popover.ts';
 import { utilCmd, utilFunctor, utilSanitizeHTML } from '../util/index.ts';
 
 import type { Context } from '../Context.ts';
 import type { D3Selection } from 'd3-selection';
-import type { UiPopover } from './popover.js';
+import type { UiPopover } from './popover.ts';
 
 
 /** A functor: either a value, or a function that optionally accepts the bound datum. */

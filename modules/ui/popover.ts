@@ -1,5 +1,4 @@
 import { select as d3_select } from 'd3-selection';
-
 import { utilFunctor } from '../util/util.ts';
 
 import type { Context } from '../Context.ts';

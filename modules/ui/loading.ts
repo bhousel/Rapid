@@ -1,6 +1,5 @@
 import { select as d3_select } from 'd3-selection';
-
-import { uiModal } from './modal.js';
+import { uiModal } from './modal.ts';
 
 import type { Context } from '../Context.ts';
 import type { D3Selection } from 'd3-selection';

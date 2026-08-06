@@ -1,11 +1,10 @@
 import { select } from 'd3-selection';
-
-import { icon } from './intro/helper.js';
-import { uiIcon } from './icon.js';
-import { uiModal } from './modal.js';
-import { UiRapidAddDataset } from './UiRapidAddDataset.js';
-import { UiRapidCatalog } from './UiRapidCatalog.js';
-import { UiRapidColorpicker } from './UiRapidColorpicker.js';
+import { icon } from './intro/helper.ts';
+import { uiIcon } from './icon.ts';
+import { uiModal } from './modal.ts';
+import { UiRapidAddDataset } from './UiRapidAddDataset.ts';
+import { UiRapidCatalog } from './UiRapidCatalog.ts';
+import { UiRapidColorpicker } from './UiRapidColorpicker.ts';
 import { utilCmd } from '../util/cmd.ts';
 import { utilSafeURL } from '../util/url.ts';
 
@@ -31,9 +30,10 @@ import type { D3Selection } from 'd3-selection';
  */
 export class UiRapidDatasetToggle {
   public context: Context;
-  public ColorPicker: any;
+  public ColorPicker: UiRapidColorpicker | null;
   public $modal: any;
   public rerender: () => void;
+
 
   /**
    * @param  context - Global shared application context
@@ -417,9 +417,11 @@ export class UiRapidDatasetToggle {
     $rows.selectAll('.rapid-feature-extent-worldwide')
       .text(l10n.t('rapid_menu.worldwide'));
 
-    $rows.selectAll('.rapid-colorpicker-label')
-      .attr('disabled', isRapidEnabled ? null : true)
-      .call(this.ColorPicker.render);
+    if (this.ColorPicker) {
+      $rows.selectAll('.rapid-colorpicker-label')
+        .attr('disabled', isRapidEnabled ? null : true)
+        .call(this.ColorPicker.render);
+    }
 
     $rows.selectAll('.rapid-checkbox-label')
       .classed('disabled', !isRapidEnabled);

@@ -1,5 +1,4 @@
 import { select as d3_select, selection } from 'd3-selection';
-
 import { utilSanitizeHTML } from '../util/sanitize.ts';
 import { utilHighlightEntities } from '../util/util.ts';
 
@@ -19,6 +18,10 @@ export class UiKeepRightDetails {
   // D3 selections
   public $parent: D3Selection | null;
 
+
+  /**
+   * @param  context - Global shared application context
+   */
   public constructor(context: Context) {
     this.context = context;
     this.datum = null;

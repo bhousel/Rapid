@@ -1,13 +1,13 @@
 import { select, selection } from 'd3-selection';
-import { actionReverse } from '../../actions/reverse.js';
-import { uiIcon } from '../icon.js';
-import { UiField } from '../UiField.js';
+import { actionReverse } from '../../actions/reverse.ts';
+import { uiIcon } from '../icon.ts';
+import { UiField } from '../UiField.ts';
 
 import type { Context } from '../../Context.ts';
 import type { D3Selection } from 'd3-selection';
 import type { Field } from '../../lib/index.ts';
 import type { TagChange, Tags } from './types.ts';
-import type { UiFieldOptions } from '../UiField.js';
+import type { UiFieldOptions } from '../UiField.ts';
 
 export { UiFieldCheck as UiFieldDefaultCheck };
 export { UiFieldCheck as UiFieldOnewayCheck };

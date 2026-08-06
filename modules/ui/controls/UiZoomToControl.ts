@@ -1,7 +1,7 @@
 import { selection } from 'd3-selection';
 
-import { uiIcon } from '../icon.js';
-import { uiTooltip } from '../tooltip.js';
+import { uiIcon } from '../icon.ts';
+import { uiTooltip } from '../tooltip.ts';
 
 import type { Context } from '../../Context.ts';
 import type { D3Selection } from 'd3-selection';
@@ -22,6 +22,7 @@ export class UiZoomToControl {
 
   protected _prevTransform: any;   // After a zoom in, the previous transform to zoom back out
   protected _keys: string[] | null;
+
 
   /**
    * @param  context - Global shared application context

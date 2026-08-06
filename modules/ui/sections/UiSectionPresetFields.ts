@@ -1,15 +1,14 @@
 import { utilArrayIdentical, utilArrayUnion } from '@rapid-sdk/util';
-
-import { AbstractUiSection } from '../AbstractUiSection.js';
-import { createUiField } from '../fields/index.js';
-import { uiFormFields } from '../form_fields.js';
+import { AbstractUiSection } from './AbstractUiSection.ts';
+import { createUiField } from '../fields/index.ts';
+import { uiFormFields } from '../form_fields.ts';
 
 import type { Context } from '../../Context.ts';
 import type { D3Selection } from 'd3-selection';
 import type { Field } from '../../lib/index.ts';
 import type { Preset } from '../../lib/Preset.ts';
 import type { Tags } from '../fields/types.ts';
-import type { UiField } from '../UiField.js';
+import type { UiField } from '../UiField.ts';
 
 
 export class UiSectionPresetFields extends AbstractUiSection {
@@ -20,8 +19,13 @@ export class UiSectionPresetFields extends AbstractUiSection {
   protected _tags: Tags | undefined;
   protected _entityIDs: EntityID[];
 
+
+  /**
+   * @param  context - Global shared application context
+   */
   public constructor(context: Context) {
     super(context, 'preset-fields');
+
     this._formFields = uiFormFields(context);
     this._state = undefined;
     this._uifields = null;

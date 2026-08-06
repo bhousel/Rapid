@@ -1,5 +1,4 @@
 import { timeout as d3_timeout } from 'd3-timer';
-
 import { utilSanitizeHTML } from '../util/sanitize.ts';
 
 import type { Context } from '../Context.ts';
@@ -37,6 +36,7 @@ export class UiFlash {
 
   /** Timer that hides the flash again, or `null` when nothing is showing */
   protected _flashTimer: Timer | null;
+
 
   /**
    * @param context - Global shared application context

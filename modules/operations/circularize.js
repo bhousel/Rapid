@@ -1,7 +1,6 @@
 import { utilGetAllNodes } from '@rapid-sdk/util';
-
-import { actionCircularize } from '../actions/circularize.js';
-import { KeyOperationBehavior } from '../behaviors/KeyOperationBehavior.js';
+import { actionCircularize } from '../actions/circularize.ts';
+import { KeyOperationBehavior } from '../behaviors/KeyOperationBehavior.ts';
 import { utilTotalExtent } from '../util/util.ts';
 
 

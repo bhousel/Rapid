@@ -1,9 +1,9 @@
-import { UiPane } from '../UiPane.js';
-import { UiSectionBackgroundDisplayOptions } from '../sections/UiSectionBackgroundDisplayOptions.js';
-import { UiSectionBackgroundList } from '../sections/UiSectionBackgroundList.js';
-import { UiSectionBackgroundOffset } from '../sections/UiSectionBackgroundOffset.js';
-import { UiSectionGridDisplayOptions } from '../sections/UiSectionGridDisplayOptions.js';
-import { UiSectionOverlayList } from '../sections/UiSectionOverlayList.js';
+import { UiPane } from '../UiPane.ts';
+import { UiSectionBackgroundDisplayOptions } from '../sections/UiSectionBackgroundDisplayOptions.ts';
+import { UiSectionBackgroundList } from '../sections/UiSectionBackgroundList.ts';
+import { UiSectionBackgroundOffset } from '../sections/UiSectionBackgroundOffset.ts';
+import { UiSectionGridDisplayOptions } from '../sections/UiSectionGridDisplayOptions.ts';
+import { UiSectionOverlayList } from '../sections/UiSectionOverlayList.ts';
 // import { UiSectionReactContainer } from '../sections/react_container.jsx';
 
 import type { Context } from '../../Context.ts';
