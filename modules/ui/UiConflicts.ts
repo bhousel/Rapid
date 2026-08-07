@@ -121,7 +121,7 @@ export class UiConflicts extends EventEmitter {
 
     $$header
       .append('h3')
-      .html(l10n.tHtml('save.conflict.header'));
+      .text(l10n.t('save.conflict.header'));
 
     const $$body = $selection.selectAll('.body')
       .data([0])
@@ -132,7 +132,7 @@ export class UiConflicts extends EventEmitter {
     const $$conflictsHelp = $$body
       .append('div')
       .attr('class', 'conflicts-help')
-      .html(l10n.tHtml('save.conflict.help'));
+      .text(l10n.t('save.conflict.help'));
 
 
     // Download changes link
@@ -155,7 +155,7 @@ export class UiConflicts extends EventEmitter {
     $$link
       .call(uiIcon('#rapid-icon-load', 'inline'))
       .append('span')
-      .html(l10n.tHtml('save.conflict.download_changes'));
+      .text(l10n.t('save.conflict.download_changes'));
 
     $$body
       .append('div')
@@ -167,7 +167,7 @@ export class UiConflicts extends EventEmitter {
       .attr('class', 'conflicts-done')
       .attr('opacity', 0)
       .style('display', 'none')
-      .html(l10n.tHtml('save.conflict.done'));
+      .text(l10n.t('save.conflict.done'));
 
     const $$buttons = $$body
       .append('div')
@@ -177,13 +177,13 @@ export class UiConflicts extends EventEmitter {
       .append('button')
       .attr('disabled', this._conflictList!.length > 1)
       .attr('class', 'action conflicts-button col6')
-      .html(l10n.tHtml('save.title'))
+      .text(l10n.t('save.title'))
       .on('click.try_again', this._tryAgain);
 
     $$buttons
       .append('button')
       .attr('class', 'secondary-action conflicts-button col6')
-      .html(l10n.tHtml('confirm.cancel'))
+      .text(l10n.t('confirm.cancel'))
       .on('click.cancel', this._cancel);
   }
 
@@ -230,7 +230,7 @@ export class UiConflicts extends EventEmitter {
     $$conflict
       .append('h4')
       .attr('class', 'conflict-count')
-      .html(l10n.tHtml('save.conflict.count', { num: index + 1, total: this._conflictList!.length }));
+      .text(l10n.t('save.conflict.count', { num: index + 1, total: this._conflictList!.length }));
 
     $$conflict
       .append('a')
@@ -268,7 +268,7 @@ export class UiConflicts extends EventEmitter {
       .data(['previous', 'next'])
       .enter()
       .append('button')
-      .html((d: string) => l10n.tHtml(`save.conflict.${d}`))
+      .text((d: string) => l10n.t(`save.conflict.${d}`))
       .attr('class', 'conflict-nav-button action col6')
       .attr('disabled', (d: string, i: number) => {
         return (i === 0 && index === 0) || (i === 1 && index === this._conflictList!.length - 1) || null;

@@ -557,7 +557,7 @@ export class UiFieldLocalized extends UiField {
 
     // set localized text on the update selection so it re-localizes on language change
     $entries.select('.label-textvalue')
-      .html(l10n.tHtml('translate.localized_translation_label'));
+      .text(l10n.t('translate.localized_translation_label'));
 
     (utilGetSetValue($entries.select('.localized-lang'), (d: MultilingualItem) => {
       const langItem = this._languagesArray.find(function(item) {

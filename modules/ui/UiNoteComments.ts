@@ -103,7 +103,7 @@ export class UiNoteComments {
         if (d.user) {
           $author.text(d.user);
         } else {
-          $author.html(l10n.tHtml('note.anonymous'));
+          $author.text(l10n.t('note.anonymous'));
         }
       });
 

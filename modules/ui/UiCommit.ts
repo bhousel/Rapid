@@ -372,7 +372,7 @@ export class UiCommit extends EventEmitter {
     header = header.merge(headerTitle);
 
     header.select('h3')
-      .html(l10n.tHtml('commit.title'));
+      .text(l10n.t('commit.title'));
 
     let body: D3Selection = $selection.selectAll('.body')
       .data([0]);
@@ -488,7 +488,7 @@ export class UiCommit extends EventEmitter {
       .merge(requestReviewEnter);
 
     requestReview.selectAll('span')
-      .html(l10n.tHtml('commit.request_review'));
+      .text(l10n.t('commit.request_review'));
 
     const toggleRequestReview = (): void => {
       const rr = requestReviewInput.property('checked');
@@ -535,10 +535,10 @@ export class UiCommit extends EventEmitter {
       .merge(buttonEnter);
 
     buttonSection.selectAll('.cancel-button .label')
-      .html(l10n.tHtml('commit.cancel'));
+      .text(l10n.t('commit.cancel'));
 
     buttonSection.selectAll('.save-button .label')
-      .html(l10n.tHtml('commit.save'));
+      .text(l10n.t('commit.save'));
 
     buttonSection.selectAll('.cancel-button')
       .on('click.cancel', (d3_event: Event) => {

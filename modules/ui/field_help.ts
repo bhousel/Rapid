@@ -197,7 +197,7 @@
 //        titleEnter
 //            .append('h2')
 //            .attr('class', isRTL ? 'fr' : 'fl')
-//            .html(l10n.tHtml('help.field.' + fieldName + '.title'));
+//            .text(l10n.t(`help.field.${fieldName}.title`));
 //
 //        titleEnter
 //            .append('button')
@@ -219,7 +219,7 @@
 //            .enter()
 //            .append('div')
 //            .attr('class', 'field-help-nav-item')
-//            .html(function(d) { return d; })
+//            .text((d: string) => d)
 //            .on('click', function(d3_event, d) {
 //                d3_event.stopPropagation();
 //                d3_event.preventDefault();
