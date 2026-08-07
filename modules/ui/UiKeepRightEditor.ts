@@ -1,5 +1,5 @@
 import { EventEmitter } from 'tseep/lib/ee-safe';
-import { select as d3_select, selection } from 'd3-selection';
+import { select, selection } from 'd3-selection';
 import { uiIcon } from './icon.ts';
 import { UiKeepRightDetails } from './UiKeepRightDetails.ts';
 import { UiKeepRightHeader } from './UiKeepRightHeader.ts';
@@ -142,7 +142,7 @@ export class UiKeepRightEditor extends EventEmitter {
       .data(isShown ? [this.datum!] : [], (d: KeepRightIssue) => d.key!);
 
     const changeInput = (d3_event: Event): void => {
-      const $input = d3_select(d3_event.currentTarget as HTMLTextAreaElement);
+      const $input = select(d3_event.currentTarget as HTMLTextAreaElement);
       let val: string | undefined = ($input.property('value') as string).trim();
 
       if (val === this.datum!.props.comment) {

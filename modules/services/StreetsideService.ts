@@ -1,4 +1,4 @@
-import { select as d3_select } from 'd3-selection';
+import { select } from 'd3-selection';
 import { AbstractSystem } from '../core/AbstractSystem.ts';
 import {
   DEG2RAD, Extent, Tiler, geoMetersToLat, geoMetersToLon,
@@ -708,7 +708,7 @@ export class StreetsideService extends AbstractSystem {
         if (++count === 2) resolve();
       };
 
-      const $head: D3Selection = d3_select('head');
+      const $head: D3Selection = select('head');
 
       $head.selectAll('#rapideditor-pannellum-css')
         .data([0])
@@ -764,13 +764,13 @@ export class StreetsideService extends AbstractSystem {
 
     this.context.container().select('#rapideditor-viewer-streetside')
       .on('pointerdown.streetside', () => {
-        d3_select(window)
+        select(window)
           .on('pointermove.streetside', () => {
             this.emit('bearingChanged', this._viewer.getYaw());
           });
       })
       .on('pointerup.streetside pointercancel.streetside', () => {
-        d3_select(window)
+        select(window)
           .on('pointermove.streetside', null);
       });
   }

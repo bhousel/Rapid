@@ -1,4 +1,4 @@
-import { select as d3_select } from 'd3-selection';
+import { select } from 'd3-selection';
 import { uiTooltip } from '../tooltip.ts';
 import { AbstractUiSection } from './AbstractUiSection.ts';
 import { utilGetSetValue, utilNoAuto } from '../../util/index.ts';
@@ -200,7 +200,7 @@ export class UiSectionValidationRules extends AbstractUiSection {
     const settings = this.context.systems.settings;
     const validator = this.context.systems.validator!;
 
-    const $input = d3_select(d3_event.currentTarget as HTMLElement);
+    const $input = select(d3_event.currentTarget as HTMLElement);
     let degStr = (utilGetSetValue($input) as string).trim();
     let degNum = parseFloat(degStr);
 

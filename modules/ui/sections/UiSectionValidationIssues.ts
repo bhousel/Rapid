@@ -1,4 +1,4 @@
-import { select as d3_select } from 'd3-selection';
+import { select } from 'd3-selection';
 import { geoSphericalDistance } from '@rapid-sdk/math';
 import { uiIcon } from '../icon.ts';
 import { AbstractUiSection } from './AbstractUiSection.ts';
@@ -152,7 +152,7 @@ export class UiSectionValidationIssues extends AbstractUiSection {
       .append('span')
       .attr('class', 'issue-icon')
       .each((d: ValidationIssue, i, nodes) => {
-        d3_select(nodes[i])
+        select(nodes[i])
           .call(uiIcon(validator.getSeverityIcon(d.severity)));
       });
 

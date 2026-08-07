@@ -1,5 +1,5 @@
 import { Extent } from '@rapid-sdk/math';
-import { select as d3_select } from 'd3-selection';
+import { select } from 'd3-selection';
 import { AbstractIntroChapter } from './AbstractIntroChapter.ts';
 import { delayAsync, eventCancel, helpHtml, icon, transitionTime } from './helper.ts';
 
@@ -167,7 +167,7 @@ export class UiIntroRapid extends AbstractIntroChapter {
         this._rejectStep = reject;
         this._onModeChange = () => resolve(this._acceptRoadAsync);
 
-        d3_select('.inspector-wrap').on('wheel.intro', eventCancel);  // prevent scrolling
+        select('.inspector-wrap').on('wheel.intro', eventCancel);  // prevent scrolling
 
         curtain.reveal({
           revealExtent: tulipLaneExtent,
@@ -176,7 +176,7 @@ export class UiIntroRapid extends AbstractIntroChapter {
       });
     } finally {
       this._onModeChange = null;
-      d3_select('.inspector-wrap').on('wheel.intro', null);
+      select('.inspector-wrap').on('wheel.intro', null);
     }
   }
 
@@ -256,7 +256,7 @@ export class UiIntroRapid extends AbstractIntroChapter {
     if (!this._isTulipLaneAccepted()) return this._selectRoadAsync;
     if (!this._isTulipLaneSelected()) context.enter('select-osm', { selection: { osm: [this._tulipLaneID] }});
 
-    const issuesButton = d3_select('div.map-control.issues-control > button');
+    const issuesButton = select('div.map-control.issues-control > button');
 
     try {
       return await new Promise<IntroStep>((resolve, reject) => {
@@ -290,7 +290,7 @@ export class UiIntroRapid extends AbstractIntroChapter {
       if (!this._isTulipLaneAccepted()) { resolve(this._selectRoadAsync); return; }
       if (!this._isTulipLaneSelected()) context.enter('select-osm', { selection: { osm: [this._tulipLaneID] }});
 
-      const label = d3_select('li.issue.severity-warning');
+      const label = select('li.issue.severity-warning');
       curtain.reveal({
         revealNode: label.node(),   // "connect these features" is expected to be the first child
         revealPadding: 5,
@@ -311,7 +311,7 @@ export class UiIntroRapid extends AbstractIntroChapter {
     if (!this._isTulipLaneAccepted()) return this._selectRoadAsync;
     if (!this._isTulipLaneSelected()) context.enter('select-osm', { selection: { osm: [this._tulipLaneID] }});
 
-    const undoButton = d3_select('.map-toolbar button.undo-button');
+    const undoButton = select('.map-toolbar button.undo-button');
 
     try {
       return await new Promise<IntroStep>((resolve, reject) => {

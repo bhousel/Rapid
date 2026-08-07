@@ -121,7 +121,7 @@ export class UiZoomToControl {
    * @param  e - triggering event (if any)
    */
   public zoomTo(e?: Event): void {
-    if (e)  e.preventDefault();
+    e?.preventDefault();
 
     const context = this.context;
     const extent = (context.mode as any)?.extent;

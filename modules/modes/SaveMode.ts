@@ -1,5 +1,5 @@
 import { AbstractMode } from './AbstractMode.ts';
-import { select as d3_select } from 'd3-selection';
+import { select } from 'd3-selection';
 import { UiCommit } from '../ui/UiCommit.ts';
 import { uiConfirm } from '../ui/confirm.ts';
 import { UiConflicts } from '../ui/UiConflicts.ts';
@@ -299,8 +299,8 @@ export class SaveMode extends AbstractMode {
       .on('click', function(this: Element, d3_event: Event) {
         d3_event.preventDefault();
 
-        const $error: D3Selection = d3_select(this);
-        const $detail: D3Selection = d3_select((this as HTMLElement).nextElementSibling);
+        const $error: D3Selection = select(this);
+        const $detail: D3Selection = select((this as HTMLElement).nextElementSibling);
         const exp = $error.classed('expanded');
 
         $detail.style('display', exp ? 'none' : 'block');
@@ -418,7 +418,7 @@ export class SaveMode extends AbstractMode {
    * Enable keyboard shortcuts for the save mode (Escape to cancel).
    */
   protected _keybindingOn(): void {
-    d3_select(document).call(this._keybinding.on('⎋', this._cancel, true));
+    select(document).call(this._keybinding.on('⎋', this._cancel, true));
   }
 
 
@@ -426,7 +426,7 @@ export class SaveMode extends AbstractMode {
    * Disable keyboard shortcuts for the save mode.
    */
   protected _keybindingOff(): void {
-    d3_select(document).call(this._keybinding.unbind);
+    select(document).call(this._keybinding.unbind);
   }
 
 

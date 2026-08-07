@@ -139,7 +139,7 @@ export class UiZoomControl {
    * @param e - triggering event (if any)
    */
   public zoomIn(e?: Event): void {
-    if (e)  e.preventDefault();
+    e?.preventDefault();
     const map = this.context.systems.map!;
     map.zoomIn();
   }
@@ -148,7 +148,7 @@ export class UiZoomControl {
    * @param e - triggering event (if any)
    */
   public zoomOut(e?: Event): void {
-    if (e)  e.preventDefault();
+    e?.preventDefault();
     const map = this.context.systems.map!;
     map.zoomOut();
   }
@@ -157,7 +157,7 @@ export class UiZoomControl {
    * @param e - triggering event (if any)
    */
   public zoomInFurther(e?: Event): void {
-    if (e)  e.preventDefault();
+    e?.preventDefault();
     const map = this.context.systems.map!;
     map.zoomInFurther();
   }
@@ -166,7 +166,7 @@ export class UiZoomControl {
    * @param e - triggering event (if any)
    */
   public zoomOutFurther(e?: Event): void {
-    if (e)  e.preventDefault();
+    e?.preventDefault();
     const map = this.context.systems.map!;
     map.zoomOutFurther();
   }

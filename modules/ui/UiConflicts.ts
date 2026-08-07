@@ -1,5 +1,5 @@
 import { EventEmitter } from 'tseep/lib/ee-safe';
-import { select as d3_select } from 'd3-selection';
+import { select } from 'd3-selection';
 import { Extent, numWrap } from '@rapid-sdk/math';
 import { JXON } from '../util/jxon.ts';
 import { OsmChangeset } from '../data/OsmChangeset.ts';
@@ -71,13 +71,13 @@ export class UiConflicts extends EventEmitter {
 
   /** Binds the keyboard shortcuts used by the conflict screen. */
   protected _keybindingOn(): void {
-    d3_select(document)
+    select(document)
       .call(this._keybinding.on('⎋', this._cancel, true));
   }
 
   /** Unbinds the keyboard shortcuts used by the conflict screen. */
   protected _keybindingOff(): void {
-    d3_select(document)
+    select(document)
       .call(this._keybinding.unbind);
   }
 
@@ -201,7 +201,7 @@ export class UiConflicts extends EventEmitter {
     index = numWrap(index, 0, this._conflictList!.length);
     this._shownConflictIndex = index;
 
-    const $parent = d3_select(($selection.node() as HTMLElement).parentNode as HTMLElement);
+    const $parent = select(($selection.node() as HTMLElement).parentNode as HTMLElement);
 
     // enable save button if this is the last conflict being reviewed..
     if (index === this._conflictList!.length - 1) {
@@ -346,7 +346,7 @@ export class UiConflicts extends EventEmitter {
 
     if (d3_event) d3_event.preventDefault();
 
-    d3_select(ul)
+    select(ul)
       .selectAll('li')
       .classed('active', (d: ChoiceOption) => d === datum)
       .selectAll('input')

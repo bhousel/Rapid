@@ -1,4 +1,4 @@
-import { select as d3_select } from 'd3-selection';
+import { select } from 'd3-selection';
 import { AbstractUiSection } from './AbstractUiSection.ts';
 import { uiTooltip } from '../tooltip.ts';
 import { uiIcon } from '../icon.ts';
@@ -113,7 +113,7 @@ export class UiSectionDataLayers extends AbstractUiSection {
    * @param e - triggering event (if any)
    */
   protected _toggleAllLayers(e?: Event): void {
-    if (e)  e.preventDefault();
+    e?.preventDefault();
 
     const allLayerIDs = [
       'osm', 'notes', 'rapid', 'maproulette', 'keepright', 'osmose', 'geoscribble',
@@ -142,7 +142,7 @@ export class UiSectionDataLayers extends AbstractUiSection {
    * @param layerID - the layer to toggle
    */
   protected _toggleLayerKey(e: Event | undefined, layerID: string): void {
-    if (e)  e.preventDefault();
+    e?.preventDefault();
     this._toggleLayer(layerID);
   }
 
@@ -201,7 +201,7 @@ export class UiSectionDataLayers extends AbstractUiSection {
     const l10n = context.systems.l10n!;
 
     $selection.each((d: AbstractPixiLayer, i, nodes) => {
-      const item = d3_select(nodes[i]).select('label');
+      const item = select(nodes[i]).select('label');
       const placement = (i < nodes.length / 2) ? 'bottom' : 'top';
 
       const tooltip = uiTooltip(context).placement(placement) as any;
@@ -257,7 +257,7 @@ export class UiSectionDataLayers extends AbstractUiSection {
     const $$label = $$li
       .append('label')
       .each((d: BaseLayerItem, i, nodes) => {
-        d3_select(nodes[i])
+        select(nodes[i])
           .call(uiTooltip(context)
             .title(l10n.t(`map_data.layers.${d.id}.tooltip`))
             .shortcut(utilCmd('⇧' + l10n.t(d.key)))
@@ -419,7 +419,7 @@ export class UiSectionDataLayers extends AbstractUiSection {
       )
       .on('click', (d3_event: Event) => {
         const target = d3_event.currentTarget as HTMLElement;
-        if (d3_select(target).classed('disabled')) return;
+        if (select(target).classed('disabled')) return;
         d3_event.preventDefault();
         d3_event.stopPropagation();
         const customLayer = scene.layers.get('custom-data') as PixiLayerCustomData;

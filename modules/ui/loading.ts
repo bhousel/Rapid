@@ -1,4 +1,4 @@
-import { select as d3_select } from 'd3-selection';
+import { select } from 'd3-selection';
 import { uiModal } from './modal.ts';
 
 import type { Context } from '../Context.ts';
@@ -35,7 +35,7 @@ export interface UiLoadingControl {
 export function uiLoading(context: Context): UiLoadingControl {
   const assets = context.systems.assets!;
 
-  let $modalSelection: D3Selection = d3_select(null);
+  let $modalSelection: D3Selection = select(null);
   let _message = '';
   let _blocking = false;
 

@@ -1,9 +1,9 @@
 import { AbstractSystem } from './AbstractSystem.ts';
 import { Difference, Edit, Graph } from '../lib/index.ts';
-import { easeLinear as d3_easeLinear } from 'd3-ease';
+import { easeLinear } from 'd3-ease';
 import { Extent, geoScaleToZoom, projWgs84ToWorld } from '@rapid-sdk/math';
 import { OsmEntity, createOsmEntity } from '../data/index.ts';
-import { select as d3_select } from 'd3-selection';
+import { select } from 'd3-selection';
 import { uiLoading } from '../ui/loading.ts';
 import { utilArrayGroupBy, utilObjectOmit, utilSessionMutex } from '@rapid-sdk/util';
 
@@ -307,7 +307,7 @@ export class EditSystem extends AbstractSystem {
    * Internal reset of all stored data
    */
   protected _reset(): void {
-    d3_select(document).interrupt('editTransition');    // complete any transition already in progress
+    select(document).interrupt('editTransition');    // complete any transition already in progress
     this.context.systems.scheduler?.cancel('edit-backup');
 
     // Create a new Base Graph / Base Edit.
@@ -405,7 +405,7 @@ export class EditSystem extends AbstractSystem {
    * @return Difference between before and after of `staging` Edit
    */
   public perform(...args: Action[]): Difference | undefined {
-    d3_select(document).interrupt('editTransition');    // complete any transition already in progress
+    select(document).interrupt('editTransition');    // complete any transition already in progress
     this._perform(args, 1);
     return this._emitChanges();   // only one place in the code uses this return - split operation?
   }
@@ -423,7 +423,7 @@ export class EditSystem extends AbstractSystem {
    * @return Promise fulfilled when the transition is completed
    */
   public performAsync(action: Action): Promise<void> {
-    d3_select(document).interrupt('editTransition');    // complete any transition already in progress
+    select(document).interrupt('editTransition');    // complete any transition already in progress
 
     if (typeof action !== 'function') {
       return Promise.reject();
@@ -438,10 +438,10 @@ export class EditSystem extends AbstractSystem {
     const DURATION = 150;
 
     return new Promise(resolve => {
-      d3_select(document)
+      select(document)
         .transition('editTransition')
         .duration(DURATION)
-        .ease(d3_easeLinear)
+        .ease(easeLinear)
         .tween('edit.tween', () => {
           return (t: number) => {
             this._replaceStaging();
@@ -480,7 +480,7 @@ export class EditSystem extends AbstractSystem {
   public revert(): Difference | undefined {
     if (!this._hasWorkInProgress) return;
 
-    d3_select(document).interrupt('editTransition');    // complete any transition already in progress
+    select(document).interrupt('editTransition');    // complete any transition already in progress
     this._replaceStaging();
     return this._emitChanges();
   }
@@ -514,7 +514,7 @@ export class EditSystem extends AbstractSystem {
    * @param options.selectedIDs - Array of selectedIDs
    */
   public commit(options: CommitOptions = {}): void {
-    d3_select(document).interrupt('editTransition');    // complete any transition already in progress
+    select(document).interrupt('editTransition');    // complete any transition already in progress
 
     const context = this.context;
     const staging = this.staging;
@@ -567,7 +567,7 @@ export class EditSystem extends AbstractSystem {
    * @throws Will throw if you try to append to the `base` edit
    */
   public commitAppend(options: CommitOptions = {}): void {
-    d3_select(document).interrupt('editTransition');    // complete any transition already in progress
+    select(document).interrupt('editTransition');    // complete any transition already in progress
 
     const context = this.context;
     const staging = this.staging;
@@ -612,7 +612,7 @@ export class EditSystem extends AbstractSystem {
    *                             `staging` (WIP after Edit1)
    */
   public undo(): void {
-    d3_select(document).interrupt('editTransition');    // complete any transition already in progress
+    select(document).interrupt('editTransition');    // complete any transition already in progress
 
     const prevIndex = this._index;
 
@@ -654,7 +654,7 @@ export class EditSystem extends AbstractSystem {
    *                                                 `staging` (WIP after Edit3)
    */
   public redo(): void {
-    d3_select(document).interrupt('editTransition');    // complete any transition already in progress
+    select(document).interrupt('editTransition');    // complete any transition already in progress
 
     const prevIndex = this._index;
     if (this._index < this._history.length - 1) {
@@ -676,7 +676,7 @@ export class EditSystem extends AbstractSystem {
    */
   public setCheckpoint(checkpointID: CheckpointID): void {
     if (!checkpointID) return;
-    d3_select(document).interrupt('editTransition');    // complete any transition already in progress
+    select(document).interrupt('editTransition');    // complete any transition already in progress
 
     // Save a shallow copy of history, in case user undos away the edit that `_index` points to.
     this._checkpoints.set(checkpointID, {
@@ -693,7 +693,7 @@ export class EditSystem extends AbstractSystem {
    */
   public restoreCheckpoint(checkpointID: CheckpointID): void {
     if (!checkpointID) return;
-    d3_select(document).interrupt('editTransition');    // complete any transition already in progress
+    select(document).interrupt('editTransition');    // complete any transition already in progress
 
     const prevIndex = this._index;
     const checkpoint = this._checkpoints.get(checkpointID);

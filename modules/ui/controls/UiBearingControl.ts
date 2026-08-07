@@ -143,7 +143,7 @@ export class UiBearingControl {
    * @param e - triggering event (if any)
    */
   public resetBearing(e?: Event): void {
-    if (e)  e.preventDefault();
+    e?.preventDefault();
 
     const context = this.context;
     const map = context.systems.map!;

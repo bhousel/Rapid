@@ -81,7 +81,7 @@ export class UiSpector {
    * @param  e? - triggering event (if any)
    */
   public toggle(e?: Event): void {
-    if (e) e.preventDefault();
+    e?.preventDefault();
     this._initSpectorUI();
 
     const $wrap = this.$wrap;

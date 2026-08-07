@@ -1,4 +1,4 @@
-import { select as d3_select, selection } from 'd3-selection';
+import { select, selection } from 'd3-selection';
 import { marked } from 'marked';
 import { utilSanitizeHTML } from '../util/sanitize.ts';
 import { utilHighlightEntities } from '../util/util.ts';
@@ -249,16 +249,16 @@ export class UiMapRouletteDetails {
       // Attach hover and click event listeners
       $parent.selectAll('.highlight-link')
         .on('mouseover', (d3_event: Event) => {
-          const osmId = transformId(d3_select(d3_event.currentTarget as any).attr('data-osm-id'));
+          const osmId = transformId(select(d3_event.currentTarget as any).attr('data-osm-id'));
           utilHighlightEntities(context, [osmId], true);
         })
         .on('mouseout', (d3_event: Event) => {
-          const osmId = transformId(d3_select(d3_event.currentTarget as any).attr('data-osm-id'));
+          const osmId = transformId(select(d3_event.currentTarget as any).attr('data-osm-id'));
           utilHighlightEntities(context, [osmId], false);
         })
         .on('click', (d3_event: Event) => {
           d3_event.preventDefault();
-          const osmId = transformId(d3_select(d3_event.currentTarget as any).attr('data-osm-id'));
+          const osmId = transformId(select(d3_event.currentTarget as any).attr('data-osm-id'));
           utilHighlightEntities(context, [osmId], false);
           this._highlightFeature(osmId);
         });

@@ -1,4 +1,4 @@
-import { select as d3_select } from 'd3-selection';
+import { select } from 'd3-selection';
 import { uiDisclosure } from '../disclosure.ts';
 import { utilFunctor } from '../../util/util.ts';
 
@@ -49,7 +49,7 @@ export type UiSectionComponent = UiSection & Record<string, any>;
 //
 export function uiSection(context: Context, sectionID: string): UiSection {
   let _classes: Functor<string> = utilFunctor('');
-  let $container: D3Selection = d3_select(null);
+  let $container: D3Selection = select(null);
 
   let _shouldDisplay: Functor<boolean> | undefined;
   let _content: UiSectionContent | undefined;

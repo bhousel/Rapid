@@ -104,7 +104,7 @@ export class UiInfoCards {
    * @param  e? - triggering event (if any)
    */
   public toggle(e?: Event): void {
-    if (e) e.preventDefault();
+    e?.preventDefault();
 
     // Which cards are currently visible?
     const currVisible = new Set<AbstractUiCard>();

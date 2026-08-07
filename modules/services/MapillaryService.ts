@@ -1,5 +1,5 @@
 import { AbstractSystem } from '../core/AbstractSystem.ts';
-import { select as d3_select } from 'd3-selection';
+import { select } from 'd3-selection';
 import { PbfReader } from 'pbf';
 import { MarkerData, GeoJSONData } from '../data/index.ts';
 import { Tiler, geoSphericalDistance } from '@rapid-sdk/math';
@@ -1168,7 +1168,7 @@ export class MapillaryService extends AbstractSystem {
         if (++count === 2) resolve();
       };
 
-      const $head: D3Selection = d3_select('head');
+      const $head: D3Selection = select('head');
 
       $head.selectAll('#rapideditor-mapillary-css')
         .data([0])

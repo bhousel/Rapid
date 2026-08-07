@@ -25,15 +25,15 @@ describe('UiNoteComments', () => {
         }]
       }
     };
-    const selection = d3.select(document.createElement('div'));
+    const $selection = d3.select(document.createElement('div'));
 
     const noteComments = new Rapid.UiNoteComments(context);
     noteComments.datum = note;
-    selection.call(noteComments.render);
+    $selection.call(noteComments.render);
 
-    assert.strictEqual(selection.select('.comment-author').text(), username);
-    assert.strictEqual(selection.selectAll('.comment-author img').size(), 0);
-    assert.strictEqual(selection.selectAll('.comment-text script').size(), 0);
-    assert.strictEqual(selection.selectAll('.comment-text [href^="javascript:"]').size(), 0);
+    assert.strictEqual($selection.select('.comment-author').text(), username);
+    assert.strictEqual($selection.selectAll('.comment-author img').size(), 0);
+    assert.strictEqual($selection.selectAll('.comment-text script').size(), 0);
+    assert.strictEqual($selection.selectAll('.comment-text [href^="javascript:"]').size(), 0);
   });
 });

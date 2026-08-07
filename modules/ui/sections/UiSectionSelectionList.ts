@@ -1,4 +1,4 @@
-import { select as d3_select } from 'd3-selection';
+import { select } from 'd3-selection';
 import { uiIcon } from '../icon.ts';
 import { AbstractUiSection } from './AbstractUiSection.ts';
 import { utilHighlightEntities } from '../../util/util.ts';
@@ -118,7 +118,7 @@ export class UiSectionSelectionList extends AbstractUiSection {
       .append('li')
       .attr('class', 'feature-list-item')
       .each((d: OsmEntity, i, nodes) => {
-        d3_select(nodes[i])
+        select(nodes[i])
           .on('mouseover', () => utilHighlightEntities(context, [d.id], true))
           .on('mouseout', () => utilHighlightEntities(context, [d.id], false));
       });
@@ -153,7 +153,7 @@ export class UiSectionSelectionList extends AbstractUiSection {
 
     $items.selectAll('.entity-geom-icon use')
       .attr('href', (d, i, nodes) => {
-        const el = d3_select(nodes[i]) as any;
+        const el = select(nodes[i]) as any;
         const entity = el._groups[0][0].parentNode.parentNode.__data__;
         return '#rapid-icon-' + entity.geometry(graph);
       });

@@ -1,4 +1,4 @@
-import { select as d3_select } from 'd3-selection';
+import { select } from 'd3-selection';
 
 import { JXON } from '../../util/jxon.ts';
 import { actionDiscardTags } from '../../actions/discard_tags.ts';
@@ -99,7 +99,7 @@ export class UiSectionChanges extends AbstractUiSection {
     $$buttons
       .each((d: SummaryEntry, i: number, nodes: ArrayLike<HTMLElement>) => {
         const geom = d.entity.geometry(d.graph);
-        d3_select(nodes[i])
+        select(nodes[i])
           .call(uiIcon(`#rapid-icon-${geom}`, `pre-text ${d.changeType}`));
       });
 

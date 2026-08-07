@@ -1,4 +1,4 @@
-import { select as d3_select } from 'd3-selection';
+import { select } from 'd3-selection';
 
 import type { D3Selection } from 'd3-selection';
 
@@ -21,7 +21,7 @@ export function uiToggle(show: boolean, callback?: (this: Element) => void): ($s
       .transition()
       .style('opacity', show ? 1 : 0)
       .on('end', function(this: Element) {
-        d3_select(this)
+        select(this)
           .classed('hide', !show)
           .style('opacity', null);
         callback?.apply(this);

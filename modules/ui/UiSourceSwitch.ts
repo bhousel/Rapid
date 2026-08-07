@@ -86,7 +86,7 @@ export class UiSourceSwitch {
    * @param  e? - triggering event (if any)
    */
   public toggle(e?: Event): void {
-    if (e)  e.preventDefault();
+    e?.preventDefault();
 
     const context = this.context;
     const editor = context.systems.editor!;

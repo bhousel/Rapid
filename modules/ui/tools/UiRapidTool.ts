@@ -155,7 +155,7 @@ export class UiRapidTool {
    * @param  d? - object bound to the selection (i.e. the modal component)
    */
   public choose(e?: Event, d?: any): void {
-    if (e)  e.preventDefault();
+    e?.preventDefault();
     if (d)  d.show();
   }
 

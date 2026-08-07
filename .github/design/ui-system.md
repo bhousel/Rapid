@@ -88,7 +88,6 @@ export class UiFoo {
 
     // Ensure methods used as callbacks always have `this` bound correctly.
     this.render = this.render.bind(this);
-    this.rerender = (() => this.render());  // call render without argument
 
     // Event wiring (rerender on relevant changes)
     const l10n = context.systems.l10n!;

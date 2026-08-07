@@ -1,4 +1,4 @@
-import { select as d3_select } from 'd3-selection';
+import { select } from 'd3-selection';
 import { uiCombobox } from './combobox.ts';
 import { utilGetSetValue, utilNoAuto } from '../util/index.ts';
 
@@ -67,7 +67,7 @@ export function uiFormFields(context: Context): UiFormFields {
     $fields
       .order()
       .each((d: UiField, i, nodes) => {
-        d3_select(nodes[i]).call(d.render);
+        select(nodes[i]).call(d.render);
       });
 
 

@@ -151,7 +151,7 @@ export class UiValidatorStatus {
    * @param  e? - triggering event (if any)
    */
   public click(e?: Event): void {
-    if (e)  e.preventDefault();
+    e?.preventDefault();
 
     const context = this.context;
     const ui = context.systems.ui;  // optional

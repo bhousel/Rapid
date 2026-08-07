@@ -1,4 +1,4 @@
-import { select as d3_select } from 'd3-selection';
+import { select } from 'd3-selection';
 
 import type { D3Selection } from 'd3-selection';
 import type { Vec2 } from '@rapid-sdk/math';
@@ -45,7 +45,7 @@ export function utilGetDimensions($selection: Nullable<D3Selection>, force: bool
  * @returns The D3 selection for method chaining, or a null selection if input was invalid
  */
 export function utilSetDimensions($selection: Nullable<D3Selection>, dimensions: Nullable<Vec2>): D3Selection {
-  if (!$selection) return d3_select(null as unknown as Element);
+  if (!$selection) return select(null as unknown as Element);
   if ($selection.empty()) return $selection;
 
   const node = $selection.node();

@@ -115,7 +115,7 @@ export class UiGeolocateControl {
    * @param e - triggering event (if any)
    */
   public toggle(e?: Event): void {
-    if (e)  e.preventDefault();
+    e?.preventDefault();
     if (!this._isSupported) return;
     if (this.context.inIntro) return;
 
@@ -133,7 +133,7 @@ export class UiGeolocateControl {
    * @param  e - triggering event (if any)
    */
   public start(e?: Event): void {
-    if (e)  e.preventDefault();
+    e?.preventDefault();
     if (!this._isSupported) return;
     if (this.context.inIntro) return;
     if (this._isActive) return;    // already started
@@ -155,7 +155,7 @@ export class UiGeolocateControl {
    * @param  e - triggering event (if any)
    */
   public stop(e?: Event): void {
-    if (e)  e.preventDefault();
+    e?.preventDefault();
     if (!this._isActive) return;    // already stopped
 
     const context = this.context;

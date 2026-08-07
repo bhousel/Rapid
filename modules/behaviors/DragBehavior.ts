@@ -1,5 +1,5 @@
 import { AbstractBehavior } from './AbstractBehavior.ts';
-import { select as d3_select } from 'd3-selection';
+import { select } from 'd3-selection';
 import { utilDetect } from '../util/detect.ts';
 import { vecLength } from '@rapid-sdk/math';
 
@@ -153,7 +153,7 @@ export class DragBehavior extends AbstractBehavior {
     const graph = editor.staging.graph;
 
     // If we detect the edit (right-click) menu, we should cease any dragging behavior.
-    const hasEditMenu = d3_select(gfx.overlay).select('.edit-menu').size();
+    const hasEditMenu = select(gfx.overlay).select('.edit-menu').size();
     if (hasEditMenu) {
       this._pointercancel(e);
       return;

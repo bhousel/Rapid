@@ -1,13 +1,13 @@
 describe('uiFlash', () => {
 
   const context = new Rapid.MockContext();
-  let body, container;
+  let body, $container;
 
   beforeEach(() => {
     body = d3.select('body');
-    container = body.append('div');
-    context.container = () => container;
-    container
+    $container = body.append('div');
+    context.container = () => $container;
+    $container
       .append('div')
       .attr('class', 'flash-wrap')
       .append('div')
@@ -15,7 +15,7 @@ describe('uiFlash', () => {
   });
 
   afterEach(() => {
-    container.remove();
+    $container.remove();
   });
 
   function delay(msec) {
@@ -36,8 +36,8 @@ describe('uiFlash', () => {
       label: '<script>alert(1)</script><img src="x" onerror="alert(2)">'
     });
 
-    assert.strictEqual(container.selectAll('.flash-text script').size(), 0);
-    assert.strictEqual(container.selectAll('.flash-text [onerror]').size(), 0);
+    assert.strictEqual($container.selectAll('.flash-text script').size(), 0);
+    assert.strictEqual($container.selectAll('.flash-text [onerror]').size(), 0);
   });
 
   it('flash goes away', () => {

@@ -1,5 +1,5 @@
 import { EventEmitter } from 'tseep/lib/ee-safe';
-import { select as d3_select } from 'd3-selection';
+import { select } from 'd3-selection';
 import { resolveStrings } from 'osm-community-index';
 import { uiIcon } from './icon.ts';
 import { uiDisclosure } from '../ui/disclosure.ts';
@@ -342,7 +342,7 @@ export class UiSuccess extends EventEmitter {
     const context = this.context;
     const l10n = context.systems.l10n!;
 
-    const $selection = d3_select(nodes[i]);
+    const $selection = select(nodes[i]);
     const communityID = d.id;
 
     $selection

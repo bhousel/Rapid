@@ -1,5 +1,5 @@
 import { Extent } from '@rapid-sdk/math';
-import { select as d3_select } from 'd3-selection';
+import { select } from 'd3-selection';
 
 import { AbstractIntroChapter } from './AbstractIntroChapter.ts';
 import { actionChangePreset } from '../../actions/change_preset.ts';
@@ -307,7 +307,7 @@ export class UiIntroPoint extends AbstractIntroChapter {
         ui.Sidebar.showEntityEditor();
 
         const iconSelector = '.entity-editor-pane button.close svg use';
-        const iconName = d3_select(iconSelector).attr('href') || '#rapid-icon-close';
+        const iconName = select(iconSelector).attr('href') || '#rapid-icon-close';
         curtain.reveal({
           revealSelector: '.entity-editor-pane',
           tipHtml: helpHtml(context, 'intro.points.add_close', { button: icon(iconName, 'inline') })

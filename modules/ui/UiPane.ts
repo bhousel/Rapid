@@ -1,4 +1,4 @@
-import { select as d3_select } from 'd3-selection';
+import { select } from 'd3-selection';
 import { uiIcon } from './icon.ts';
 import { uiTooltip } from './tooltip.ts';
 
@@ -41,7 +41,7 @@ export class UiPane {
     this.iconName = '';
     this.sections = [];
 
-    this.$pane = d3_select(null);
+    this.$pane = select(null);
     this._paneTooltip = null;
 
     // Ensure methods used as callbacks always have `this` bound correctly.

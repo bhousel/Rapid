@@ -1,4 +1,4 @@
-import { select as d3_select } from 'd3-selection';
+import { select } from 'd3-selection';
 import { utilTagDiff } from '@rapid-sdk/util';
 
 import { actionChangePreset, actionChangeTags, actionSyncCrossingTags } from '../actions/index.ts';
@@ -403,7 +403,7 @@ export function validateAmbiguousCrossingTags(context: Context): ValidatorFuncti
       // Render either the tagDiff or a message in its place.
       $$suggestions
         .each((d: any, i: number, nodes: any) => {
-          const $$suggestion = d3_select(nodes[i]);
+          const $$suggestion = select(nodes[i]);
 
           if (!d.tagDiff.length) {
             $$suggestion

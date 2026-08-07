@@ -93,7 +93,7 @@ export class UiProjectLinks {
    * @param  e? - triggering event (if any)
    */
   public reportIssue(e?: Event): void {
-    if (e)  e.preventDefault();
+    e?.preventDefault();
 
     this.BugTooltip.hide();
 

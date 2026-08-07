@@ -1,4 +1,4 @@
-import { select as d3_select } from 'd3-selection';
+import { select } from 'd3-selection';
 import { utilFunctor } from '../util/util.ts';
 
 import type { Context } from '../Context.ts';
@@ -54,7 +54,7 @@ let _popoverID = 0;
  */
 export function uiPopover(context: Context, klass?: string): UiPopover {
   const _id = _popoverID++;
-  let $anchorSelection: D3Selection = d3_select(null);
+  let $anchorSelection: D3Selection = select(null);
   const popover = function($selection: D3Selection): void {
     $anchorSelection = $selection;
     $selection.each(setup);
@@ -62,7 +62,7 @@ export function uiPopover(context: Context, klass?: string): UiPopover {
   const _animation: Functor<boolean> = utilFunctor(false);
   let _placement: Functor<string> = utilFunctor('top'); // top, bottom, left, right
   let _alignment: Functor<string> = utilFunctor('center');  // leading, center, trailing
-  let _scrollContainer: Functor<D3Selection> = utilFunctor(d3_select(null));
+  let _scrollContainer: Functor<D3Selection> = utilFunctor(select(null));
   let _content: UiPopoverContent | undefined;
   let _displayType: Functor<string> = utilFunctor('');
   let _hasArrow: Functor<boolean> = utilFunctor(true);
@@ -163,7 +163,7 @@ export function uiPopover(context: Context, klass?: string): UiPopover {
   };
 
   function setup(this: any): void {
-    const $anchor = d3_select(this);
+    const $anchor = select(this);
     const animate = _animation();
     let $popoverSelection: D3Selection = $anchor.selectAll('.popover-' + _id)
       .data([0]);
@@ -251,7 +251,7 @@ export function uiPopover(context: Context, klass?: string): UiPopover {
 
 
   function show(this: any): void {
-    const $anchor = d3_select(this);
+    const $anchor = select(this);
     let $popoverSelection = $anchor.selectAll('.popover-' + _id);
 
     if ($popoverSelection.empty()) {
@@ -273,7 +273,7 @@ export function uiPopover(context: Context, klass?: string): UiPopover {
   }
 
   function updateContent(this: any): void {
-    const $anchor = d3_select(this);
+    const $anchor = select(this);
 
     if (_content) {
       $anchor.selectAll('.popover-' + _id + ' > .popover-inner')
@@ -289,7 +289,7 @@ export function uiPopover(context: Context, klass?: string): UiPopover {
 
 
   function updatePosition(this: any): void {
-    const $anchor = d3_select(this);
+    const $anchor = select(this);
     const $popoverSelection = $anchor.selectAll('.popover-' + _id);
 
     const $scrollContainer = _scrollContainer && _scrollContainer();
@@ -367,7 +367,7 @@ export function uiPopover(context: Context, klass?: string): UiPopover {
     }
 
     function getFrame(node: any): { x: number; y: number; w: number; h: number } {
-      const positionStyle = d3_select(node).style('position');
+      const positionStyle = select(node).style('position');
       if (positionStyle === 'absolute' || positionStyle === 'static') {
         return {
           x: node.offsetLeft - scrollLeft,
@@ -388,7 +388,7 @@ export function uiPopover(context: Context, klass?: string): UiPopover {
 
 
   function hide(this: any): void {
-    const $anchor = d3_select(this);
+    const $anchor = select(this);
     if (_displayType() === 'clickFocus') {
       $anchor.classed('active', false);
     }
@@ -397,7 +397,7 @@ export function uiPopover(context: Context, klass?: string): UiPopover {
 
 
   function toggle(this: any): void {
-    if (d3_select(this).select('.popover-' + _id).classed('in')) {
+    if (select(this).select('.popover-' + _id).classed('in')) {
       hide.call(this);
     } else {
       show.call(this);

@@ -1,4 +1,4 @@
-import { select as d3_select } from 'd3-selection';
+import { select } from 'd3-selection';
 import { AbstractUiSection } from './AbstractUiSection.ts';
 
 import type { Context } from '../../Context.ts';
@@ -17,7 +17,7 @@ export class UiSectionGridDisplayOptions extends AbstractUiSection {
     super(context, 'grid-display-options');
 
     this._taskWired = false;
-    this._$content = d3_select(null);
+    this._$content = select(null);
 
     // Ensure methods used as callbacks always have `this` bound correctly.
     this._renderGrid = this._renderGrid.bind(this);
@@ -48,14 +48,14 @@ export class UiSectionGridDisplayOptions extends AbstractUiSection {
       this._taskWired = true;
       rapid.on('taskchanged', () => {
         if (rapid.isTaskRectangular()) {
-          d3_select('.section-grid-display-options').classed('hide', false);
+          select('.section-grid-display-options').classed('hide', false);
           this._renderGrid(this._$content);
         }
       });
     }
 
     if (!rapid.isTaskRectangular()) {
-      d3_select('.section-grid-display-options').classed('hide', true);
+      select('.section-grid-display-options').classed('hide', true);
       return;
     }
   }

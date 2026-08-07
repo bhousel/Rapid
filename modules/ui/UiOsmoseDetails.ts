@@ -1,4 +1,4 @@
-import { select as d3_select, selection } from 'd3-selection';
+import { select, selection } from 'd3-selection';
 import { utilSanitizeHTML } from '../util/sanitize.ts';
 import { utilHighlightEntities } from '../util/util.ts';
 
@@ -185,7 +185,7 @@ export class UiOsmoseDetails {
           .text((d: any) => d)
           .each((d: any, i: number, nodes: any) => {
             const node = nodes[i];
-            const $$link = d3_select(node);
+            const $$link = select(node);
             const entityID = node.textContent;
             const graph = editor.staging.graph;
             const entity = graph.hasEntity(entityID);

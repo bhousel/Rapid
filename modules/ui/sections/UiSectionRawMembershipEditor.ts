@@ -1,4 +1,4 @@
-import { select as d3_select } from 'd3-selection';
+import { select } from 'd3-selection';
 import { utilArrayGroupBy, utilArrayIntersection, utilUniqueString } from '@rapid-sdk/util';
 import { actionAddEntity } from '../../actions/add_entity.ts';
 import { actionAddMember } from '../../actions/add_member.ts';
@@ -229,7 +229,7 @@ export class UiSectionRawMembershipEditor extends AbstractUiSection {
     if ((d as any) === 0) return;    // called on newrow (shouldn't happen)
     if (this._inChange) return;  // avoid accidental recursive call iD#5731
 
-    const newRole = context.cleanRelationRole(d3_select(d3_event.currentTarget as HTMLElement).property('value'));
+    const newRole = context.cleanRelationRole(select(d3_event.currentTarget as HTMLElement).property('value'));
 
     if (!newRole.trim() && typeof d.role !== 'string') return;
 
@@ -678,7 +678,7 @@ const indexes = d.members.map(function(member: IndexedMember) {
 
 
     function bindTypeahead(this: HTMLElement, d: MembershipRow): void {
-      const $row = d3_select(this);
+      const $row = select(this);
       const $role = $row.selectAll('input.member-role');
       const origValue = $role.property('value');
 
@@ -718,7 +718,7 @@ const indexes = d.members.map(function(member: IndexedMember) {
 
 
     function unbind(this: HTMLElement): void {
-      const $row = d3_select(this);
+      const $row = select(this);
 
       $row.selectAll('input.member-role')
         .call(uiCombobox.off, context);

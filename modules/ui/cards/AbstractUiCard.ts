@@ -63,7 +63,7 @@ export abstract class AbstractUiCard {
    * @param  e? - triggering event (if any)
    */
   public show(e?: Event): void {
-    if (e) e.preventDefault();
+    e?.preventDefault();
 
     if (this._isVisible) {  // already visible
       this.render();        // just rerender
@@ -89,7 +89,7 @@ export abstract class AbstractUiCard {
    * @param  e? - triggering event (if any)
    */
   public hide(e?: Event): void {
-    if (e) e.preventDefault();
+    e?.preventDefault();
 
     if (!this.$wrap) return;        // called too early?
     if (!this._isVisible) return;   // already invisible

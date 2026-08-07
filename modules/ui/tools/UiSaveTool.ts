@@ -135,7 +135,7 @@ export class UiSaveTool {
    * @param  e? - triggering event (if any)
    */
   public choose(e?: Event): void {
-    if (e)  e.preventDefault();
+    e?.preventDefault();
     if (this.isDisabled()) return;
 
     //  // consider: there are no tooltips for touch interactions so flash feedback instead

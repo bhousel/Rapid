@@ -1,5 +1,5 @@
 import { EventEmitter } from 'tseep/lib/ee-safe';
-import { select as d3_select } from 'd3-selection';
+import { select } from 'd3-selection';
 import { vecAdd } from '@rapid-sdk/math';
 import { uiIcon } from './icon.ts';
 
@@ -44,7 +44,7 @@ export class UiMapRouletteMenu extends EventEmitter {
     this.anchorLoc = [0, 0];
     this.triggerType = '';
 
-    this.$menu = d3_select(null);
+    this.$menu = select(null);
     this._oldz = 0;
     this._menuTop = false;
     this._menuHeight = 0;
@@ -264,7 +264,7 @@ export class UiMapRouletteMenu extends EventEmitter {
       props.taskStatus = props._status;
       props.mapRouletteApiKey = this._mapRouletteApiKey;
 
-      const $commentInput = d3_select('.new-comment-input');
+      const $commentInput = select('.new-comment-input');
       if ($commentInput.empty()) {
         d.props.comment = '';
       } else {

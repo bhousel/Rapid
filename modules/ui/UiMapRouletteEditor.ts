@@ -1,5 +1,5 @@
 import { EventEmitter } from 'tseep/lib/ee-safe';
-import { select as d3_select, selection } from 'd3-selection';
+import { select, selection } from 'd3-selection';
 import { uiIcon } from './icon.ts';
 import { UiMapRouletteDetails } from './UiMapRouletteDetails.ts';
 import { UiMapRouletteHeader } from './UiMapRouletteHeader.ts';
@@ -222,7 +222,7 @@ export class UiMapRouletteEditor extends EventEmitter {
       .data(isSelected && this._actionTaken ? [this.datum!] : [], (d: MapRouletteTask) => d.key!);
 
     const changeInput = (d3_event: Event): void => {
-      const $input = d3_select(d3_event.currentTarget as HTMLTextAreaElement);
+      const $input = select(d3_event.currentTarget as HTMLTextAreaElement);
       const val = ($input.property('value') as string).trim() || undefined;
 
       this.datum!.props.newComment = val;
@@ -358,7 +358,7 @@ export class UiMapRouletteEditor extends EventEmitter {
     osm.getUserDetailsAsync()
       .then((user: any) => {
         this._user = user;
-        const $userLink = d3_select(document.createElement('div'));
+        const $userLink = select(document.createElement('div'));
 
         const href = user?.img?.href;
         if (href) {
@@ -504,11 +504,11 @@ export class UiMapRouletteEditor extends EventEmitter {
    */
   protected _setSaveButtonVisibility(isVisible: boolean): void {
     if (isVisible) {
-      d3_select('.note-save').style('display', 'block');   // Show the commentSaveSection
-      d3_select('.mr-save .buttons').style('display', 'none');  // Hide the buttons
+      select('.note-save').style('display', 'block');   // Show the commentSaveSection
+      select('.mr-save .buttons').style('display', 'none');  // Hide the buttons
     } else {
-      d3_select('.note-save').style('display', 'none');  // Hide the commentSaveSection
-      d3_select('.mr-save .buttons').style('display', '');  // Show the buttons
+      select('.note-save').style('display', 'none');  // Hide the commentSaveSection
+      select('.mr-save .buttons').style('display', '');  // Show the buttons
     }
   }
 
@@ -646,7 +646,7 @@ export class UiMapRouletteEditor extends EventEmitter {
     const props = d.props as any;
     props.taskStatus = props._status;
     props.mapRouletteApiKey = this._apikey;
-    props.comment = d3_select('.new-comment-input').property('value').trim();
+    props.comment = select('.new-comment-input').property('value').trim();
     props.taskId = d.id;
     props.userId = userID;
     maproulette.postUpdate(d, (err: string | null, item?: MapRouletteTask) => {

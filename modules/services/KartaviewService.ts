@@ -4,7 +4,7 @@ import { Tiler } from '@rapid-sdk/math';
 import { uiIcon } from '../ui/icon.ts';
 import { utilQsString } from '@rapid-sdk/util';
 import { utilSetTransform } from '../util/index.ts';
-import { zoom as d3_zoom, zoomIdentity as d3_zoomIdentity } from 'd3-zoom';
+import { zoom, zoomIdentity } from 'd3-zoom';
 
 import type { Context } from '../Context.ts';
 import type { D3EnterSelection, D3Selection } from 'd3-selection';
@@ -133,7 +133,7 @@ export class KartaviewService extends AbstractSystem {
     this.optionalDependencies = new Set<SystemID>(['gfx', 'ui']);
     this.autoStart = false;
 
-    this._imgZoom = d3_zoom()
+    this._imgZoom = zoom()
       .extent([[0, 0], [320, 240]])
       .translateExtent([[0, 0], [320, 240]])
       .scaleExtent([1, 15]);
@@ -234,7 +234,7 @@ export class KartaviewService extends AbstractSystem {
 
     // Register viewer resize handler
     ui?.PhotoViewer.on('resize', (dimensions: Vec2) => {
-      this._imgZoom = d3_zoom()
+      this._imgZoom = zoom()
         .extent([[0, 0], dimensions])
         .translateExtent([[0, 0], dimensions])
         .scaleExtent([1, 15])
@@ -484,7 +484,7 @@ export class KartaviewService extends AbstractSystem {
         $wrapper
           .transition()
           .duration(100)
-          .call(this._imgZoom.transform as any, d3_zoomIdentity);
+          .call(this._imgZoom.transform as any, zoomIdentity);
 
         $imageWrap
           .selectAll('.osc-image')
@@ -722,7 +722,7 @@ export class KartaviewService extends AbstractSystem {
     $wrapper
       .transition()
       .duration(100)
-      .call(this._imgZoom.transform as any, d3_zoomIdentity);
+      .call(this._imgZoom.transform as any, zoomIdentity);
 
     $wrapper.selectAll('.osc-image')
       .transition()

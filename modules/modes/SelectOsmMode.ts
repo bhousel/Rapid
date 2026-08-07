@@ -3,7 +3,7 @@ import { AbstractMode } from './AbstractMode.ts';
 import { actionDeleteRelation } from '../actions/delete_relation.ts';
 import { actionMove, actionRotate } from '../actions/index.ts';
 import { DEG2RAD, vecAdd, vecRotate, vecScale } from '@rapid-sdk/math';
-import { select as d3_select } from 'd3-selection';
+import { select } from 'd3-selection';
 import { utilCmd, utilKeybinding, utilTotalExtent } from '../util/index.ts';
 import { utilArrayIdentical } from '@rapid-sdk/util';
 
@@ -153,7 +153,7 @@ export class SelectOsmMode extends AbstractMode {
       .on(['}', utilCmd('⌘]'), 'end'], this._lastVertex)
       .on(['\\', 'pause'], this._focusNextParent);
 
-    d3_select(document)
+    select(document)
       .call(this.keybinding);
 
     eventManager.on('keydown', this._keydown);
@@ -227,7 +227,7 @@ export class SelectOsmMode extends AbstractMode {
     filters.forceVisible([]);
 
     if (this.keybinding) {
-      d3_select(document).call(this.keybinding.unbind);
+      select(document).call(this.keybinding.unbind);
       this.keybinding = null;
     }
 

@@ -162,7 +162,7 @@ export class UiUndoRedoTool {
    * @param  d? - object bound to the selection (i.e. the command)
    */
   public choose(e?: Event, d?: any): void {
-    if (e)  e.preventDefault();
+    e?.preventDefault();
     if (!d) return;
 
     const context = this.context;

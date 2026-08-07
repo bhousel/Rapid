@@ -1,5 +1,5 @@
 import { EventEmitter } from 'tseep/lib/ee-safe';
-import { select as d3_select } from 'd3-selection';
+import { select } from 'd3-selection';
 import { Viewport } from '@rapid-sdk/math';
 import { utilUnicodeCharsTruncated } from '@rapid-sdk/util';
 
@@ -240,7 +240,7 @@ export class Context extends EventEmitter {
     // this.lastPointerType = () => _uiSystem.lastPointerType;
     this.lastPointerType = 'mouse';
     this._keybinding = utilKeybinding('context');
-    d3_select(document).call(this._keybinding);
+    select(document).call(this._keybinding);
 
     // Connection
     this._preauth = null;
@@ -262,7 +262,7 @@ export class Context extends EventEmitter {
     };
 
     // Container (a d3 selection)
-    this.$container = d3_select(null);
+    this.$container = select(null);
     this._embed = null;
 
     // true/false whether we are in the intro walkthrough
@@ -781,7 +781,7 @@ export class Context extends EventEmitter {
    * @param val - DOM Element to use as the application container
    */
   public set containerNode(val: Element) {
-    this.container(d3_select(val));
+    this.container(select(val));
   }
 
   /**

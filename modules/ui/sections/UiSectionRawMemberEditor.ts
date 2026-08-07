@@ -1,5 +1,5 @@
-import { drag as d3_drag } from 'd3-drag';
-import { select as d3_select } from 'd3-selection';
+import { drag } from 'd3-drag';
+import { select } from 'd3-selection';
 import { vecLength, vecSubtract } from '@rapid-sdk/math';
 import { utilUniqueString } from '@rapid-sdk/util';
 import { actionChangeMember } from '../../actions/change_member.ts';
@@ -88,7 +88,7 @@ export class UiSectionRawMemberEditor extends AbstractUiSection {
     d3_event.preventDefault();
 
     // display the loading indicator
-    d3_select((d3_event.currentTarget as HTMLElement).parentNode as HTMLElement).classed('tag-reference-loading', true);
+    select((d3_event.currentTarget as HTMLElement).parentNode as HTMLElement).classed('tag-reference-loading', true);
     this.context.loadEntityAsync(d.id)
       .then(() => this.reRender());
   }
@@ -151,7 +151,7 @@ export class UiSectionRawMemberEditor extends AbstractUiSection {
     const editor = context.systems.editor!;
     const l10n = context.systems.l10n!;
     const oldRole = d.role;
-    const newRole = context.cleanRelationRole(d3_select(d3_event.currentTarget as HTMLElement).property('value'));
+    const newRole = context.cleanRelationRole(select(d3_event.currentTarget as HTMLElement).property('value'));
 
     if (oldRole !== newRole) {
       const member = { id: d.id, type: d.type, role: newRole };
@@ -245,7 +245,7 @@ export class UiSectionRawMemberEditor extends AbstractUiSection {
 
     $$items
       .each((d: MemberRowData, i, nodes) => {
-        const $item = d3_select(nodes[i]);
+        const $item = select(nodes[i]);
 
         const $label = $item
           .append('label')
@@ -347,7 +347,7 @@ export class UiSectionRawMemberEditor extends AbstractUiSection {
 
     let x0: number, y0: number, targetIndex: number | null;
 
-    $items.call(d3_drag()
+    $items.call(drag()
       .on('start', function(this: any, d3_event: any) {
         x0 = d3_event.x as number;
         y0 = d3_event.y as number;
@@ -358,18 +358,18 @@ export class UiSectionRawMemberEditor extends AbstractUiSection {
         const [dx, dy] = vecSubtract([x1, y1], [x0, y0]);
 
         // don't display drag until dragging beyond a distance threshold
-        if (!d3_select(this).classed('dragging') && vecLength([dx, dy]) <= 5) return;
+        if (!select(this).classed('dragging') && vecLength([dx, dy]) <= 5) return;
 
         const index = $items.nodes().indexOf(this);
 
-        d3_select(this)
+        select(this)
           .classed('dragging', true);
 
         targetIndex = null;
 
         $selection.selectAll('li.member-row')
           .style('transform', function(this: any, d2: MemberRowData, index2: number) {
-            const node = d3_select(this).node();
+            const node = select(this).node();
             if (index === index2) {
               return `translate(${dx}px, ${dy}px)`;
             } else if (index2 > index && y1 > node.offsetTop) {
@@ -387,11 +387,11 @@ export class UiSectionRawMemberEditor extends AbstractUiSection {
           });
       })
       .on('end', function(this: any, d3_event: any, d: any) {
-        if (!d3_select(this).classed('dragging')) return;
+        if (!select(this).classed('dragging')) return;
 
         const index = $items.nodes().indexOf(this);
 
-        d3_select(this)
+        select(this)
           .classed('dragging', false);
 
         $selection.selectAll('li.member-row')
@@ -443,7 +443,7 @@ export class UiSectionRawMemberEditor extends AbstractUiSection {
     const editor = context.systems.editor!;
     const taginfo = context.services.taginfo;
 
-    const $row = d3_select(nodes[i]);
+    const $row = select(nodes[i]);
     const $role = $row.selectAll('input.member-role');
     const origValue = $role.property('value');
 
@@ -501,7 +501,7 @@ export class UiSectionRawMemberEditor extends AbstractUiSection {
    * @param nodes - the selection's DOM nodes
    */
   protected _unbindCombo(d: MemberRowData, i: number, nodes: ArrayLike<HTMLElement>): void {
-    const $row = d3_select(nodes[i]);
+    const $row = select(nodes[i]);
     $row.selectAll('input.member-role')
       .call(uiCombobox.off, this.context);
   }

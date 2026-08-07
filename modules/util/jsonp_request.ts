@@ -1,4 +1,4 @@
-import { select as d3_select } from 'd3-selection';
+import { select } from 'd3-selection';
 
 
 /** Augment globalThis with JSONP-related properties used for testing/mocking */
@@ -89,7 +89,7 @@ export function jsonpRequest(url: string, callback: JsonpCallback): JsonpRequest
 
   const cb = create(url);
 
-  const script = d3_select('head')
+  const script = select('head')
     .append('script')
     .attr('type', 'text/javascript')
     .attr('src', url.replace(/(\{|%7B)callback(\}|%7D)/, cb));

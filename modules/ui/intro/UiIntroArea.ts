@@ -1,6 +1,6 @@
 import { Extent } from '@rapid-sdk/math';
-import { select as d3_select } from 'd3-selection';
-import { interpolateNumber as d3_interpolateNumber } from 'd3-interpolate';
+import { select } from 'd3-selection';
+import { interpolateNumber } from 'd3-interpolate';
 import { AbstractIntroChapter } from './AbstractIntroChapter.ts';
 import { delayAsync, eventCancel, helpHtml, icon, transitionTime } from './helper.ts';
 
@@ -321,9 +321,9 @@ export class UiIntroArea extends AbstractIntroChapter {
             .transition()
             .duration(250)
             .tween('scroll.inspector', (d: any, i: number, nodes: any) => {
-              const lerp = d3_interpolateNumber(start, end);
+              const lerp = interpolateNumber(start, end);
               return function(t: number) {
-                const el = d3_select(nodes[i]) as any;
+                const el = select(nodes[i]) as any;
                 el.scrollTop = lerp(t);
               };
             });

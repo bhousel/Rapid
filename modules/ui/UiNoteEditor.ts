@@ -1,5 +1,5 @@
 import { EventEmitter } from 'tseep/lib/ee-safe';
-import { select as d3_select, selection } from 'd3-selection';
+import { select, selection } from 'd3-selection';
 import { uiIcon } from './icon.ts';
 import { UiNoteComments } from './UiNoteComments.ts';
 import { UiNoteHeader } from './UiNoteHeader.ts';
@@ -178,7 +178,7 @@ export class UiNoteEditor extends EventEmitter {
 
       d3_event.preventDefault();
 
-      d3_select(d3_event.currentTarget as HTMLTextAreaElement)
+      select(d3_event.currentTarget as HTMLTextAreaElement)
         .on('keydown.note-input', null);
 
       // focus on button and submit (scheduler defers a tick; without it, do it now)
@@ -199,7 +199,7 @@ export class UiNoteEditor extends EventEmitter {
     };
 
     const changeInput = (d3_event: Event): void => {
-      const $input = d3_select(d3_event.currentTarget as HTMLTextAreaElement);
+      const $input = select(d3_event.currentTarget as HTMLTextAreaElement);
       const val = ($input.property('value') as string).trim() || undefined;
 
       // store the unsaved comment with the note itself
@@ -330,7 +330,7 @@ export class UiNoteEditor extends EventEmitter {
 
     osm.getUserDetailsAsync()
       .then((user: any) => {
-        const $userLink = d3_select(document.createElement('div'));
+        const $userLink = select(document.createElement('div'));
 
         const href = user?.img?.href;
         if (href) {

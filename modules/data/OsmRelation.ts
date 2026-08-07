@@ -1,4 +1,4 @@
-import { geoArea as d3_geoArea } from 'd3-geo';
+import { geoArea } from 'd3-geo';
 import { geomPolygonContainsPolygon, geomPolygonIntersectsPolygon } from '@rapid-sdk/math';
 import { OsmEntity, OsmEntityProps } from './OsmEntity.ts';
 import { osmJoinWays } from '../lib/multipolygon.ts';
@@ -492,7 +492,7 @@ export class OsmRelation extends OsmEntity {
     const result: Vec2[][][] = outers.map(o => {
       // Heuristic for detecting counterclockwise winding order. Assumes
       // that OpenStreetMap polygons are not hemisphere-spanning.
-      return [d3_geoArea({ type: 'Polygon', coordinates: [o] }) > 2 * Math.PI ? o.reverse() : o];
+      return [geoArea({ type: 'Polygon', coordinates: [o] }) > 2 * Math.PI ? o.reverse() : o];
     });
 
     /**
@@ -518,7 +518,7 @@ export class OsmRelation extends OsmEntity {
     }
 
     for (let inner of inners) {
-      if (d3_geoArea({ type: 'Polygon', coordinates: [inner] }) < 2 * Math.PI) {
+      if (geoArea({ type: 'Polygon', coordinates: [inner] }) < 2 * Math.PI) {
         inner = inner.reverse();
       }
 

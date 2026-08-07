@@ -1,4 +1,4 @@
-import { geoArea as d3_geoArea, geoMercatorRaw as d3_geoMercatorRaw } from 'd3-geo';
+import { geoArea, geoMercatorRaw } from 'd3-geo';
 import { DEG2RAD, RAD2DEG, TAU, geoSphericalDistance } from '@rapid-sdk/math';
 import { utilAesDecrypt, utilQsString, utilStringQs, utilSafeString } from '@rapid-sdk/util';
 import { utilDateString } from '../util/date.ts';
@@ -267,7 +267,7 @@ export class ImagerySource {
    */
   public get area(): number {
     if (!this.props.feature) return Number.MAX_VALUE;  // worldwide
-    const area = d3_geoArea(this.props.feature);
+    const area = geoArea(this.props.feature);
     return isNaN(area) ? 0 : area;
   }
 
@@ -361,7 +361,7 @@ export class ImagerySource {
             y: lat * RAD2DEG
           };
         default: // EPSG:3857 and synonyms
-          mercCoords = d3_geoMercatorRaw(lon, lat);
+          mercCoords = geoMercatorRaw(lon, lat);
           return {
             x: 20037508.34 / Math.PI * mercCoords[0],
             y: 20037508.34 / Math.PI * mercCoords[1]

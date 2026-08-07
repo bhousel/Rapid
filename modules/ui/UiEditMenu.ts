@@ -1,4 +1,4 @@
-import { select as d3_select } from 'd3-selection';
+import { select } from 'd3-selection';
 import { EventEmitter } from 'tseep/lib/ee-safe';
 import { vecAdd } from '@rapid-sdk/math';
 import { uiTooltip } from './tooltip.ts';
@@ -59,7 +59,7 @@ export class UiEditMenu extends EventEmitter {
     super();
     this.context = context;
 
-    this._menu = d3_select(null);
+    this._menu = select(null);
     this._operations = [];
     this._tooltips = new Map();
     this._anchorLoc = [0, 0];
@@ -148,7 +148,7 @@ export class UiEditMenu extends EventEmitter {
         d3_event.stopPropagation();
       })
       .on('mouseenter.highlight', (d3_event: Event, d: Operation) => {
-        if (!d.relatedEntityIds || d3_select(d3_event.currentTarget as HTMLElement).classed('disabled')) return;
+        if (!d.relatedEntityIds || select(d3_event.currentTarget as HTMLElement).classed('disabled')) return;
         utilHighlightEntities(context, d.relatedEntityIds(), true);
       })
       .on('mouseleave.highlight', (d3_event: Event, d: Operation) => {
@@ -158,7 +158,7 @@ export class UiEditMenu extends EventEmitter {
 
     // create placeholder icon, label, tooltip
     $$buttons.each((d: Operation, i: number, nodes: ArrayLike<HTMLElement>) => {
-      const $button = d3_select(nodes[i]);
+      const $button = select(nodes[i]);
 
       $button
         .append('div')
@@ -183,7 +183,7 @@ export class UiEditMenu extends EventEmitter {
 
     // refresh with current data
     $buttons.each((d: Operation, i: number, nodes: ArrayLike<HTMLElement>) => {
-      const $button = d3_select(nodes[i]);
+      const $button = select(nodes[i]);
 
       $button
         .classed('disabled', (d: Operation) => !!d.disabled());

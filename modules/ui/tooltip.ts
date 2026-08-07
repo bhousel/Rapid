@@ -1,4 +1,4 @@
-import { select as d3_select } from 'd3-selection';
+import { select } from 'd3-selection';
 import { uiPopover } from './popover.ts';
 import { utilCmd, utilFunctor, utilSanitizeHTML } from '../util/index.ts';
 
@@ -59,7 +59,7 @@ export function uiTooltip(context: Context): UiTooltip {
 
 
   tooltip.content(function(this: any) {
-    const datum = d3_select(this).datum();
+    const datum = select(this).datum();
     const heading = _heading(datum);
     const text = _title(datum);
     const shortcut = _shortcut(datum);
@@ -114,7 +114,7 @@ export function uiTooltip(context: Context): UiTooltip {
         .data(d => (typeof d === 'string') ? d.split('') : [])
         .enter()
         .each((d, i, nodes) => {
-          const $selection = d3_select(nodes[i]);
+          const $selection = select(nodes[i]);
 
           $selection
             .append('kbd')

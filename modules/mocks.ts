@@ -1,4 +1,4 @@
-import { select as d3_select } from 'd3-selection';
+import { select } from 'd3-selection';
 import { Viewport } from '@rapid-sdk/math';
 import { AbstractSystem } from './core/AbstractSystem.ts';
 
@@ -150,7 +150,7 @@ export class MockContext {
   /** Returns the stub keybinding manager */
   public keybinding()  { return this._keybinding; }
   /** Returns an empty D3 selection (no DOM in tests) */
-  public container()   { return d3_select(null); }
+  public container()   { return select(null); }
   /**
    * Stub tag key cleaner that returns the value unchanged.
    * @param val - The tag key to clean

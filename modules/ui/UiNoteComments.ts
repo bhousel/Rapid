@@ -1,4 +1,4 @@
-import { select as d3_select, selection } from 'd3-selection';
+import { select, selection } from 'd3-selection';
 import { uiIcon } from './icon.ts';
 import { utilSanitizeHTML } from '../util/sanitize.ts';
 
@@ -91,7 +91,7 @@ export class UiNoteComments {
       .append('div')
       .attr('class', 'comment-author')
       .each((d: NoteComment, i: number, nodes: ArrayLike<HTMLElement>) => {
-        let $author: D3Selection = d3_select(nodes[i]);
+        let $author: D3Selection = select(nodes[i]);
         const osm = context.services.osm;
         if (osm && d.user) {
           $author = $author

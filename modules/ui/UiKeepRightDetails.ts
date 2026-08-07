@@ -1,4 +1,4 @@
-import { select as d3_select, selection } from 'd3-selection';
+import { select, selection } from 'd3-selection';
 import { utilSanitizeHTML } from '../util/sanitize.ts';
 import { utilHighlightEntities } from '../util/util.ts';
 
@@ -84,7 +84,7 @@ export class UiKeepRightDetails {
       .attr('href', '#')
       .each((d: any, i: number, nodes: any) => {
         const node = nodes[i];
-        const $link = d3_select(node);
+        const $link = select(node);
         const isObjectLink = $link.classed('error_object_link');
         const entityID = isObjectLink ? (this.datum.props.objectType.charAt(0) + this.datum.props.objectId) : node.textContent;
         const graph = editor.staging.graph;

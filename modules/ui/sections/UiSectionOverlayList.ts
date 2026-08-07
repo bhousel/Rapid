@@ -1,5 +1,5 @@
-import { descending as d3_descending, ascending as d3_ascending } from 'd3-array';
-import { select as d3_select } from 'd3-selection';
+import { descending, ascending } from 'd3-array';
+import { select } from 'd3-selection';
 import { AbstractUiSection } from './AbstractUiSection.ts';
 import { uiTooltip } from '../tooltip.ts';
 
@@ -30,7 +30,7 @@ export class UiSectionOverlayList extends AbstractUiSection {
     const imagery = context.systems.imagery!;
     const map = context.systems.map!;
 
-    this._overlayList = d3_select(null);
+    this._overlayList = select(null);
 
     // Ensure methods used as callbacks always have `this` bound correctly.
     this._drawListItems = this._drawListItems.bind(this);
@@ -99,7 +99,7 @@ export class UiSectionOverlayList extends AbstractUiSection {
     const context = this.context;
 
     $selection.each((d: ImagerySource, i: number, nodes: ArrayLike<HTMLElement>) => {
-      const item = d3_select(nodes[i]).select('label');
+      const item = select(nodes[i]).select('label');
       const span = item.select('span');
       const placement = (i < nodes.length / 2) ? 'bottom' : 'top';
       const isOverflowing = (span.property('clientWidth') !== span.property('scrollWidth'));
@@ -145,7 +145,7 @@ export class UiSectionOverlayList extends AbstractUiSection {
       .filter((d: ImagerySource) => this._isOverlay(d));
 
     const sortSources = (a: ImagerySource, b: ImagerySource): number => {
-      return d3_descending(a.area, b.area) || d3_ascending(a.name, b.name) || 0;
+      return descending(a.area, b.area) || ascending(a.name, b.name) || 0;
     };
 
     const $layerLinks: D3Selection = $selection.selectAll('li')

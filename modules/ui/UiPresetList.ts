@@ -1,5 +1,5 @@
 import { EventEmitter } from 'tseep/lib/ee-safe';
-import { select as d3_select, selection } from 'd3-selection';
+import { select, selection } from 'd3-selection';
 import { actionChangePreset } from '../actions/change_preset.ts';
 import { Category, Preset } from '../lib/index.ts';
 import { operationDelete } from '../operations/delete.js';
@@ -206,7 +206,7 @@ export class UiPresetList extends EventEmitter {
 
     } else if (!e.ctrlKey && !e.metaKey) {
       // don't check for delete/undo hack on future keydown events
-      d3_select(el).on('keydown', this._searchKeydown);
+      select(el).on('keydown', this._searchKeydown);
       this._searchKeydown(e);
     }
   }
@@ -335,7 +335,7 @@ export class UiPresetList extends EventEmitter {
     // update
     $items = $items.merge($$items as any)
       .order()   // make them match the order of `arr`
-      .each((d: ListItem, i, nodes) => d3_select(nodes[i]).call(d.render))
+      .each((d: ListItem, i, nodes) => select(nodes[i]).call(d.render))
       .classed('current', (d: ListItem) => this._selectedPresetIDs.has(d.item.id));
 
     this._checkFilteringRules();
@@ -352,12 +352,12 @@ export class UiPresetList extends EventEmitter {
 
     const l10n = this.context.systems.l10n!;
     const target = e.currentTarget as HTMLElement;
-    const $selection = d3_select(target);
+    const $selection = select(target);
 
     // the actively focused item
-    const $item = d3_select(target.closest('.preset-list-item'));
+    const $item = select(target.closest('.preset-list-item'));
     const node = $item.node() as HTMLElement;
-    const $parentItem = d3_select((node.parentNode as HTMLElement).closest('.preset-list-item'));
+    const $parentItem = select((node.parentNode as HTMLElement).closest('.preset-list-item'));
     const parentNode = $parentItem.node() as HTMLElement | null;
     const isRTL = l10n.isRTL;
 
@@ -367,13 +367,13 @@ export class UiPresetList extends EventEmitter {
       e.stopPropagation();
 
       // the next item in the list at the same level
-      let $nextItem = d3_select(node.nextElementSibling);
+      let $nextItem = select(node.nextElementSibling);
 
       // if there is no next item in this list
       if ($nextItem.empty()) {
         if (parentNode) {        // if there is a parent item
           // the item is the last item of a sublist, select the next item at the parent level
-          $nextItem = d3_select(parentNode.nextElementSibling);
+          $nextItem = select(parentNode.nextElementSibling);
         }
       } else if ($selection.classed('expanded')) {                           // if the focused item is expanded
         $nextItem = $item.select('.subgrid .preset-list-item:first-child');  // select the first subitem instead
@@ -389,7 +389,7 @@ export class UiPresetList extends EventEmitter {
       e.stopPropagation();
 
       // the previous item in the list at the same level
-      let $prevItem = d3_select(node.previousElementSibling);
+      let $prevItem = select(node.previousElementSibling);
 
       // if there is no previous item in this list
       if ($prevItem.empty()) {
@@ -445,7 +445,7 @@ export class UiPresetList extends EventEmitter {
     $buttons.call(uiTooltip(context).destroyAny);
 
     $buttons.each((d: ListItem, i, nodes) => {
-      const $selection = d3_select(nodes[i]);
+      const $selection = select(nodes[i]);
 
       let filterID;  // check whether this preset would be hidden by the current filtering rules
       for (const geometry of this._allGeometries) {
@@ -677,7 +677,7 @@ class CategoryItem {
   protected _keydown(e: KeyboardEvent): void {
     const l10n = this.list.context.systems.l10n!;
     const target = e.currentTarget as HTMLElement;
-    const $selection = d3_select(target);
+    const $selection = select(target);
     if (e.keyCode === utilKeybinding.keyCodes[l10n.isRTL ? '←' : '→']) {  // right arrow, expand the focused item
       e.preventDefault();
       e.stopPropagation();
@@ -703,7 +703,7 @@ class CategoryItem {
     const l10n = this.list.context.systems.l10n!;
     const isRTL = l10n.isRTL;
     const target = e.currentTarget as HTMLElement;
-    const $selection = d3_select(target);
+    const $selection = select(target);
     const isExpanded = $selection.classed('expanded');
     const iconName = isExpanded ? (isRTL ? '#rapid-icon-backward' : '#rapid-icon-forward') : '#rapid-icon-down';
     $selection.classed('expanded', !isExpanded);

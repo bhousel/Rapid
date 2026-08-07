@@ -1,4 +1,4 @@
-import { select as d3_select } from 'd3-selection';
+import { select } from 'd3-selection';
 import { utilArrayDifference, utilArrayIdentical, utilTagDiff } from '@rapid-sdk/util';
 import { uiIcon } from '../icon.ts';
 import { uiCombobox } from '../combobox.ts';
@@ -182,7 +182,7 @@ export class UiSectionRawTagEditor extends AbstractUiSection {
           .classed('hide', (clicked.id !== 'list'));
       })
       .each((d: ViewOption, i, nodes) => {
-        d3_select(nodes[i])
+        select(nodes[i])
           .call(uiIcon(d.icon));
       });
 
@@ -251,7 +251,7 @@ export class UiSectionRawTagEditor extends AbstractUiSection {
 
     $items.exit()
       .each((d: TagRow, i, nodes) => {
-        const $row = d3_select(nodes[i]);
+        const $row = select(nodes[i]);
         $row.selectAll('input.key, input.value')
           .call(uiCombobox.off, context);
       })
@@ -303,7 +303,7 @@ export class UiSectionRawTagEditor extends AbstractUiSection {
 
     $items
       .each((d: TagRow, i, nodes) => {
-        const $row = d3_select(nodes[i]);
+        const $row = select(nodes[i]);
         $row.select('input.key');      // propagate bound data
         $row.select('input.value');    // propagate bound data
 
@@ -367,7 +367,7 @@ export class UiSectionRawTagEditor extends AbstractUiSection {
   protected _setTextareaHeight(el: HTMLTextAreaElement): void {
     if (this._tagView !== 'text') return;
 
-    const $selection = d3_select(el);
+    const $selection = select(el);
     const matches = el.value.match(/\n/g);
     const lineCount = 2 + Number(matches && matches.length);
     const lineHeight = 20;
@@ -452,7 +452,7 @@ export class UiSectionRawTagEditor extends AbstractUiSection {
     // if pressing Tab on the last value field with content, add a blank row
     if (d3_event.keyCode === 9 && !d3_event.shiftKey &&
       this.$container.selectAll('.tag-list li:last-child input.value').node() === el &&
-      utilGetSetValue(d3_select(el))) {
+      utilGetSetValue(select(el))) {
       this._addTag();
     }
   }
@@ -550,7 +550,7 @@ export class UiSectionRawTagEditor extends AbstractUiSection {
   protected _keyChange(d3_event: Event, d: TagRow): void {
     const context = this.context;
     const el = d3_event.currentTarget as HTMLInputElement;
-    if (d3_select(el).attr('readonly')) return;
+    if (select(el).attr('readonly')) return;
 
     const kOld = d.key;
 
@@ -580,7 +580,7 @@ export class UiSectionRawTagEditor extends AbstractUiSection {
     }
 
     const row = (el.parentNode as HTMLElement).parentNode as HTMLElement;
-    const $inputVal = d3_select(row).selectAll('input.value');
+    const $inputVal = select(row).selectAll('input.value');
     const vNew = context.cleanTagValue(utilGetSetValue($inputVal) as string);
 
     this._pendingChange = this._pendingChange || {};

@@ -1,5 +1,5 @@
 import { DEG2RAD, Extent, vecEqual } from '@rapid-sdk/math';
-import { select as d3_select } from 'd3-selection';
+import { select } from 'd3-selection';
 import { AbstractIntroChapter } from './AbstractIntroChapter.ts';
 import { uiIcon } from '../icon.ts';
 import { delayAsync, eventCancel, helpHtml, icon, transitionTime } from './helper.ts';
@@ -135,7 +135,7 @@ export class UiIntroNavigation extends AbstractIntroChapter {
 
         this._onMapMove = () => {
           if (!vecEqual(map.center() as Vec2, startCenter)) {  // center changed
-            const instruction = d3_select('.curtain-tooltip .instruction');
+            const instruction = select('.curtain-tooltip .instruction');
             instruction.call(uiIcon('#rapid-icon-apply', 'inline success'));
           }
         };
@@ -178,7 +178,7 @@ export class UiIntroNavigation extends AbstractIntroChapter {
 
         this._onMapMove = () => {
           if (context.viewport.transform.zoom !== startZoom) {  // zoom changed
-            const instruction = d3_select('.curtain-tooltip .instruction');
+            const instruction = select('.curtain-tooltip .instruction');
             instruction.call(uiIcon('#rapid-icon-apply', 'inline success'));
           }
         };
@@ -243,7 +243,7 @@ export class UiIntroNavigation extends AbstractIntroChapter {
 
         this._onMapMove = () => {
           if (context.viewport.transform.rotation !== startRotation) {  // rotation changed
-            const instruction = d3_select('.curtain-tooltip .instruction');
+            const instruction = select('.curtain-tooltip .instruction');
             instruction.call(uiIcon('#rapid-icon-apply', 'inline success'));
           }
         };
@@ -544,7 +544,7 @@ export class UiIntroNavigation extends AbstractIntroChapter {
         ui.Sidebar.showEntityEditor();
 
         const iconSelector = '.entity-editor-pane button.close svg use';
-        const iconName = d3_select(iconSelector).attr('href') || '#rapid-icon-close';
+        const iconName = select(iconSelector).attr('href') || '#rapid-icon-close';
         curtain.reveal({
           revealSelector: '.entity-editor-pane',
           tipSelector: '.entity-editor-pane button.close',
@@ -688,7 +688,7 @@ export class UiIntroNavigation extends AbstractIntroChapter {
 
         ui.Sidebar.showEntityEditor();
         const iconSelector = '.entity-editor-pane button.close svg use';
-        const iconName = d3_select(iconSelector).attr('href') || '#rapid-icon-close';
+        const iconName = select(iconSelector).attr('href') || '#rapid-icon-close';
         const tipHtml = helpHtml(context, 'intro.navigation.street_different_fields') + '{br}' +
           helpHtml(context, 'intro.navigation.editor_street', {
             button: icon(iconName, 'inline'),

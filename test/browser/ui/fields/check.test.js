@@ -1,7 +1,7 @@
 describe('UiFieldCheck', () => {
 
   const context = new Rapid.MockContext();
-  let selection, field;
+  let $selection, field;
 
   class MockEditSystem extends Rapid.MockSystem {
     constructor(context) {
@@ -18,12 +18,12 @@ describe('UiFieldCheck', () => {
     l10n:    new Rapid.LocalizationSystem(context),
     schema:  new Rapid.SchemaSystem(context)
   };
-  context.container = () => selection;
+  context.container = () => $selection;
 
   before(() => context.systems.l10n.initAsync());
 
   beforeEach(() => {
-    selection = d3.select(document.createElement('div'));
+    $selection = d3.select(document.createElement('div'));
     field = new Rapid.Field(context, {
       id: 'test_check',
       key: 'test',
@@ -36,10 +36,10 @@ describe('UiFieldCheck', () => {
     const check = new Rapid.UiFieldCheck(context, field);
     const value = '<img src="x" onerror="alert(1)">';
 
-    selection.call(check.render);
+    $selection.call(check.render);
     check.syncTags({ test: value });
 
-    assert.strictEqual(selection.select('.value').text(), `\"${value}\"`);
-    assert.strictEqual(selection.selectAll('img').size(), 0);
+    assert.strictEqual($selection.select('.value').text(), `\"${value}\"`);
+    assert.strictEqual($selection.selectAll('img').size(), 0);
   });
 });

@@ -107,7 +107,7 @@ export class UiDownloadTool {
    * @param  e? - triggering event (if any)
    */
   public choose(e?: Event): void {
-    if (e)  e.preventDefault();
+    e?.preventDefault();
     if (this.isDisabled()) return;
 
     const context = this.context;

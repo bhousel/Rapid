@@ -138,15 +138,3 @@ D3's `.data()` and other selection methods have complex generic signatures. Type
 .text((d: GeoJSONData) => d.props.text as string)
 ```
 
-## ScaleLinear Import
-
-Consolidate d3-scale imports to avoid duplicate import warnings:
-```typescript
-import { scaleLinear, type ScaleLinear } from 'd3-scale';
-```
-Not:
-```typescript
-import { scaleLinear } from 'd3-scale';
-import type { ScaleLinear } from 'd3-scale';  // duplicate!
-```
-

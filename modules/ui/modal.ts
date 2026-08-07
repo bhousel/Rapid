@@ -1,4 +1,4 @@
-import { select as d3_select } from 'd3-selection';
+import { select } from 'd3-selection';
 import { uiIcon } from './icon.ts';
 import { utilKeybinding } from '../util/keybinding.ts';
 
@@ -45,7 +45,7 @@ export function uiModal(this: unknown, $selection: D3Selection, blocking?: boole
       .duration(200)
       .style('top', '0px');
 
-    d3_select(document)
+    select(document)
       .call(keybinding.unbind);
   };
 
@@ -76,7 +76,7 @@ export function uiModal(this: unknown, $selection: D3Selection, blocking?: boole
       .on('⌫', $shaded.close)
       .on('⎋', $shaded.close);
 
-    d3_select(document)
+    select(document)
       .call(keybinding);
   }
 
@@ -107,7 +107,7 @@ export function uiModal(this: unknown, $selection: D3Selection, blocking?: boole
     if (node) {
       node.focus();
     } else {
-      (d3_select(this).node() as HTMLElement).blur();
+      (select(this).node() as HTMLElement).blur();
     }
   }
 
@@ -119,7 +119,7 @@ export function uiModal(this: unknown, $selection: D3Selection, blocking?: boole
     if (nodes.length) {
       nodes[nodes.length - 1].focus();
     } else {
-      (d3_select(this).node() as HTMLElement).blur();
+      (select(this).node() as HTMLElement).blur();
     }
   }
 }

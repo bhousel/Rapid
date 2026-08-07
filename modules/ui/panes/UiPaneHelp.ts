@@ -1,4 +1,4 @@
-import { select as d3_select } from 'd3-selection';
+import { select } from 'd3-selection';
 import { marked } from 'marked';
 import { UiPane } from '../UiPane.ts';
 import { uiIcon } from '../icon.ts';
@@ -414,7 +414,7 @@ export class UiPaneHelp extends UiPane {
     const isRTL = l10n.isRTL;
     this._$content.property('scrollTop', 0);
 
-    const $helpPane = d3_select((this._$content.node() as HTMLElement).parentElement);
+    const $helpPane = select((this._$content.node() as HTMLElement).parentElement);
     $helpPane.selectAll('.pane-heading > h2').text(d.title);
 
     const $content = this._$content.selectAll('.help-content');

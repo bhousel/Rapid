@@ -1,4 +1,4 @@
-import { timeout as d3_timeout } from 'd3-timer';
+import { timeout } from 'd3-timer';
 import { utilSanitizeHTML } from '../util/sanitize.ts';
 
 import type { Context } from '../Context.ts';
@@ -115,7 +115,7 @@ export class UiFlash {
       .attr('class', 'flash-text')
       .html(utilSanitizeHTML(label));    // watch out: labels may still contain html
 
-    this._flashTimer = d3_timeout(() => {
+    this._flashTimer = timeout(() => {
       this._flashTimer = null;
       $container.select('.map-footer-wrap')
         .classed('map-footer-hide', false)

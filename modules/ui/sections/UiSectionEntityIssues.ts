@@ -1,4 +1,4 @@
-import { select as d3_select } from 'd3-selection';
+import { select } from 'd3-selection';
 import { utilArrayIdentical } from '@rapid-sdk/util';
 import { uiIcon } from '../icon.ts';
 import { AbstractUiSection } from './AbstractUiSection.ts';
@@ -143,7 +143,7 @@ export class UiSectionEntityIssues extends AbstractUiSection {
 
     $$text
       .each((d: ValidationIssue, i, nodes) => {
-        d3_select(nodes[i])
+        select(nodes[i])
           .call(uiIcon(validator.getSeverityIcon(d.severity), 'issue-icon'));
       });
 
@@ -165,7 +165,7 @@ export class UiSectionEntityIssues extends AbstractUiSection {
         d3_event.preventDefault();
         button.blur();    // avoid keeping focus on the button - iD#4641
 
-        const $container = d3_select(button.parentNode.parentNode.parentNode);
+        const $container = select(button.parentNode.parentNode.parentNode);
         const $info = $container.selectAll('.issue-info');
         const isExpanded = $info.classed('expanded');
         this._isExpanded = !isExpanded;
@@ -199,7 +199,7 @@ export class UiSectionEntityIssues extends AbstractUiSection {
       .style('max-height', (this._isExpanded ? null : '0') as string)
       .style('opacity', (this._isExpanded ? '1' : '0'))
       .each((d: ValidationIssue, i, nodes) => {
-        const $info = d3_select(nodes[i]);
+        const $info = select(nodes[i]);
         if (typeof d.reference === 'function') {
           $info.call(d.reference);
         } else {
@@ -233,7 +233,7 @@ export class UiSectionEntityIssues extends AbstractUiSection {
       .append('button')
       .on('click', (d3_event: Event, d: ValidationFix) => {
         // not all fixes are actionable
-        if (d3_select(d3_event.currentTarget as Element).attr('disabled') || !d.onClick) return;
+        if (select(d3_event.currentTarget as Element).attr('disabled') || !d.onClick) return;
 
         // Don't run another fix for this issue within a second of running one
         // (Necessary for "Select a feature type" fix. Most fixes should only ever run once)
@@ -249,7 +249,7 @@ export class UiSectionEntityIssues extends AbstractUiSection {
     $$buttons
       .each((d: ValidationFix, i, nodes) => {
         const iconName = d.icon ?? 'rapid-icon-wrench';
-        d3_select(nodes[i]).call(uiIcon(`#${iconName}`, 'fix-icon'));
+        select(nodes[i]).call(uiIcon(`#${iconName}`, 'fix-icon'));
       });
 
     $$buttons

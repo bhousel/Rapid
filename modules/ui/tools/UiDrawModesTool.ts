@@ -232,7 +232,7 @@ export class UiDrawModesTool {
    * @param  d? - object bound to the selection (i.e. the command)
    */
   public choose(e?: Event, d?: DrawCommand): void {
-    if (e)  e.preventDefault();
+    e?.preventDefault();
     if (!d || !this.buttonEnabled(d)) return;
 
     const context = this.context;

@@ -1,7 +1,7 @@
 import { AbstractSystem } from './AbstractSystem.ts';
 import { Color } from 'pixi.js';
 import { RAD2DEG, numWrap, geomPolygonContainsPolygon, vecEqual } from '@rapid-sdk/math';
-import { select as d3_select } from 'd3-selection';
+import { select } from 'd3-selection';
 import { utilCmd } from '../util/cmd.ts';
 
 import type { Vec2 } from '@rapid-sdk/math';
@@ -245,7 +245,7 @@ export class Map3dSystem extends AbstractSystem {
    * @param  e - triggering event (if any)
    */
   public toggle(e?: Event): void {
-    if (e)  e.preventDefault();
+    e?.preventDefault();
     this.visible = !this.visible;
   }
 
@@ -294,7 +294,7 @@ export class Map3dSystem extends AbstractSystem {
         if (++count === 2) resolve();
       };
 
-      const $head = d3_select('head');
+      const $head = select('head');
 
       $head.selectAll('#rapideditor-maplibre-css')
         .data([0])

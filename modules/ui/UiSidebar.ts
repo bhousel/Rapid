@@ -748,7 +748,7 @@ export class UiSidebar {
    * @param  e? - triggering event (if any)
    */
   protected _eventCancel(e: Event): void {
-    if (e)  e.preventDefault();
+    e?.preventDefault();
   }
 
 

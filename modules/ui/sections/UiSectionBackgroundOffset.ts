@@ -1,4 +1,4 @@
-import { select as d3_select } from 'd3-selection';
+import { select } from 'd3-selection';
 import { geoMetersToOffset, geoOffsetToMeters } from '@rapid-sdk/math';
 import { AbstractUiSection } from './AbstractUiSection.ts';
 import { uiIcon } from '../icon.ts';
@@ -93,7 +93,7 @@ export class UiSectionBackgroundOffset extends AbstractUiSection {
   protected _inputOffset(d3_event: Event): void {
     const imagery = this.context.systems.imagery!;
 
-    const $input = d3_select(d3_event.target as any);
+    const $input = select(d3_event.target as any);
     let val: any = ($input.node() as HTMLInputElement).value;
 
     if (val === '') return this._resetOffset();
@@ -151,11 +151,11 @@ export class UiSectionBackgroundOffset extends AbstractUiSection {
       context.container().selectAll('.nudge-surface')
         .remove();
 
-      d3_select(window)
+      select(window)
         .on('.drag-bg-offset', null);
     };
 
-    d3_select(window)
+    select(window)
       .on('pointermove.drag-bg-offset', pointermove)
       .on('pointerup.drag-bg-offset', pointerup)
       .on('pointercancel.drag-bg-offset', pointerup);

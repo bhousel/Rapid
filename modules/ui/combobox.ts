@@ -1,5 +1,5 @@
 import { dispatch as d3_dispatch } from 'd3-dispatch';
-import { select as d3_select } from 'd3-selection';
+import { select } from 'd3-selection';
 import { utilGetSetValue, utilRebind, utilSanitizeHTML } from '../util/index.ts';
 
 import type { Context } from '../Context.ts';
@@ -104,7 +104,7 @@ export function uiCombobox(context: Context, klass?: string): UiCombobox {
         const parent = this.parentNode;
         const sibling = this.nextSibling;
 
-        d3_select(parent).selectAll('.combobox-caret')
+        select(parent).selectAll('.combobox-caret')
           .filter(function(d) { return d === $input.node(); })
           .data([$input.node()])
           .enter()
@@ -436,7 +436,7 @@ export function uiCombobox(context: Context, klass?: string): UiCombobox {
         })
         .attr('title', function(d) { return d.title; })
         .each(function(d, i, nodes) {
-          const $selection = d3_select(nodes[i]);
+          const $selection = select(nodes[i]);
           if (typeof d.display === 'function') {  // display function
             $selection.call(d.display);
           } else if (d.display) {                 // display html value

@@ -106,7 +106,7 @@ export class UiFullscreen {
    * @return  Promise settled when the browser is finished toggling
    */
   public toggle(e?: Event): Promise<void> {
-    if (e)  e.preventDefault();
+    e?.preventDefault();
     if (!this.isSupported()) return Promise.resolve();  // do nothing
 
     if (!this.isFullscreen()) {

@@ -1,5 +1,5 @@
 import { EventEmitter } from 'tseep/lib/ee-safe';
-import { select as d3_select } from 'd3-selection';
+import { select } from 'd3-selection';
 import { utilUniqueString } from '@rapid-sdk/util';
 import { uiIcon } from './icon.ts';
 import { uiTooltip } from './tooltip.ts';
@@ -309,7 +309,7 @@ export class UiField extends EventEmitter {
 // kind of a convoluted way to do it.. selection.each over one thing that is just `this`? :-/
     $container
       .each((d, i, nodes) => {
-        const $selection: D3Selection = d3_select(nodes[i]);
+        const $selection: D3Selection = select(nodes[i]);
 
 //        // instantiate field help
 //        let help;

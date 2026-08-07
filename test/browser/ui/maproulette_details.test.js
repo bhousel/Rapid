@@ -25,15 +25,15 @@ describe('UiMapRouletteDetails', () => {
 
 
   it('sanitizes challenge descriptions and instructions', async () => {
-    const selection = d3.select(document.createElement('div'));
+    const $selection = d3.select(document.createElement('div'));
 
     const details = new Rapid.UiMapRouletteDetails(context);
     details.datum = marker;
-    selection.call(details.render);
+    $selection.call(details.render);
     await new Promise(resolve => { setTimeout(resolve, 0); });
 
-    assert.strictEqual(selection.selectAll('script').size(), 0);
-    assert.strictEqual(selection.selectAll('[href^="javascript:"]').size(), 0);
-    assert.strictEqual(selection.selectAll('[onerror]').size(), 0);
+    assert.strictEqual($selection.selectAll('script').size(), 0);
+    assert.strictEqual($selection.selectAll('[href^="javascript:"]').size(), 0);
+    assert.strictEqual($selection.selectAll('[onerror]').size(), 0);
   });
 });

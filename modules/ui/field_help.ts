@@ -1,4 +1,4 @@
-//import { select as d3_select } from 'd3-selection';
+//import { select } from 'd3-selection';
 //import { marked } from 'marked';
 //
 //import { uiIcon } from './icon.ts';
@@ -13,9 +13,9 @@
 //    const l10n = context.systems.l10n;
 //
 //    var fieldHelp = {};
-//    var _inspector = d3_select(null);
-//    var _wrap = d3_select(null);
-//    var _body = d3_select(null);
+//    var _inspector = select(null);
+//    var _wrap = select(null);
+//    var _body = select(null);
 //
 //    var fieldHelpKeys = {
 //        restrictions: [

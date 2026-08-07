@@ -1,4 +1,4 @@
-import { select as d3_select } from 'd3-selection';
+import { select } from 'd3-selection';
 import { AbstractUiSection } from './AbstractUiSection.ts';
 import { uiTooltip } from '../tooltip.ts';
 import { utilGetSetValue, utilNoAuto } from '../../util/index.ts';
@@ -161,7 +161,7 @@ export class UiSectionPhotoOverlays extends AbstractUiSection {
       .append('label')
       .each((d: AbstractPixiLayer, i, nodes) => {
         const stringID = d.id.replace(/-/g, '_') + '.tooltip';
-        d3_select(nodes[i])
+        select(nodes[i])
           .call(uiTooltip(context)
             .title(l10n.t(stringID))
             .placement('top')
@@ -229,7 +229,7 @@ export class UiSectionPhotoOverlays extends AbstractUiSection {
     const $$label = $$li
       .append('label')
       .each((d: PhotoType, i, nodes) => {
-        d3_select(nodes[i])
+        select(nodes[i])
           .call(uiTooltip(context)
             .title(l10n.t(`photo_overlays.photo_type.${d}.tooltip`))
             .placement('top')
@@ -294,7 +294,7 @@ export class UiSectionPhotoOverlays extends AbstractUiSection {
     const $$label = $$li
       .append('label')
       .each((d: string, i, nodes) => {
-        d3_select(nodes[i])
+        select(nodes[i])
           .call(uiTooltip(context)
             .title(l10n.t(`photo_overlays.date_filter.${d}.tooltip`))
             .placement('top')
@@ -312,15 +312,15 @@ export class UiSectionPhotoOverlays extends AbstractUiSection {
       .attr('placeholder', l10n.t('units.year_month_day'))
       .call(utilNoAuto)
       .each((d: string, i, nodes) => {
-        utilGetSetValue(d3_select(nodes[i]), photos.dateFilterValue(d as any) || '');
+        utilGetSetValue(select(nodes[i]), photos.dateFilterValue(d as any) || '');
       })
       .on('change', (d3_event: Event, d: string) => {
-        const value = (utilGetSetValue(d3_select(d3_event.currentTarget as HTMLInputElement)) as string).trim();
+        const value = (utilGetSetValue(select(d3_event.currentTarget as HTMLInputElement)) as string).trim();
         photos.setDateFilter(d as any, value);
         // reload the displayed dates
         $li.selectAll('input')
           .each((d: string, i, nodes) => {
-            utilGetSetValue(d3_select(nodes[i]), photos.dateFilterValue(d as any) || '');
+            utilGetSetValue(select(nodes[i]), photos.dateFilterValue(d as any) || '');
           });
       });
 
