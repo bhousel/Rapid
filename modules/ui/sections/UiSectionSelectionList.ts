@@ -114,7 +114,7 @@ export class UiSectionSelectionList extends AbstractUiSection {
       .remove();
 
     // Enter
-    const $$enter = $items.enter()
+    const $$items = $items.enter()
       .append('li')
       .attr('class', 'feature-list-item')
       .each((d: OsmEntity, i, nodes) => {
@@ -123,25 +123,25 @@ export class UiSectionSelectionList extends AbstractUiSection {
           .on('mouseout', () => utilHighlightEntities(context, [d.id], false));
       });
 
-    const $label = $$enter
+    const $$label = $$items
       .append('button')
       .attr('class', 'label')
       .on('click', this._selectEntity);
 
-    $label
+    $$label
       .append('span')
       .attr('class', 'entity-geom-icon')
       .call(uiIcon('', 'pre-text'));
 
-    $label
+    $$label
       .append('span')
       .attr('class', 'entity-type');
 
-    $label
+    $$label
       .append('span')
       .attr('class', 'entity-name');
 
-    $$enter
+    $$items
       .append('button')
       .attr('class', 'close')
       .attr('title', l10n.t('icons.deselect'))
@@ -149,7 +149,7 @@ export class UiSectionSelectionList extends AbstractUiSection {
       .call(uiIcon('#rapid-icon-close'));
 
     // Update
-    $items = $items.merge($$enter);
+    $items = $items.merge($$items);
 
     $items.selectAll('.entity-geom-icon use')
       .attr('href', (d, i, nodes) => {
@@ -159,9 +159,9 @@ export class UiSectionSelectionList extends AbstractUiSection {
       });
 
     $items.selectAll('.entity-type')
-      .text((entity: any) => schema.match(entity, graph)?.name);
+      .text((entity: OsmEntity) => schema.match(entity, graph)?.name);
 
     $items.selectAll('.entity-name')
-      .text((entity: any) => l10n.displayName(entity.tags));
+      .text((entity: OsmEntity) => l10n.displayName(entity.tags));
   }
 }

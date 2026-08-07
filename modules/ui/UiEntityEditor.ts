@@ -35,6 +35,7 @@ let _wasSelectedIDs: EntityID[] = [];
 export class UiEntityEditor extends EventEmitter {
   public context: Context;
 
+  // D3 Selections
   public $parent: D3Selection | null;
 
   protected _crossingKeys: Set<string | number>;
@@ -60,7 +61,9 @@ export class UiEntityEditor extends EventEmitter {
     // Crossings.. :-(  If touching any of these, call the sync action.  Rapid#1260
     this._crossingKeys = schema?.getScope('osm')?.variables.get('crossing_sync_keys')?.asSet() ?? new Set();
 
+    // D3 Selections
     this.$parent = null;
+
     this._state = '';
     this._modified = false;
     this._startGraph = undefined;

@@ -4,7 +4,7 @@ import { vecAdd } from '@rapid-sdk/math';
 import { uiIcon } from './icon.ts';
 
 import type { Context } from '../Context.ts';
-import type { D3Selection } from 'd3-selection';
+import type { D3EnterSelection, D3Selection } from 'd3-selection';
 import type { MapRouletteTask } from '../services/MapRouletteService.ts';
 import type { Vec2 } from '@rapid-sdk/math';
 
@@ -106,7 +106,7 @@ export class UiMapRouletteMenu extends EventEmitter {
     this.$menu = $parent.selectAll('.maproulette-menu')
       .data([0]);
 
-    const $$menu = this.$menu.enter()
+    const $$menu: D3EnterSelection = this.$menu.enter()
       .append('div')
       .attr('class', 'maproulette-menu')
       .style('padding', VERTICAL_PADDING + 'px 0');
@@ -114,10 +114,10 @@ export class UiMapRouletteMenu extends EventEmitter {
     this.$menu = this.$menu
       .merge($$menu);
 
-    const $buttons = this.$menu.selectAll('.maproulette-menu-item')
+    const $buttons: D3Selection = this.$menu.selectAll('.maproulette-menu-item')
       .data(['fixed', 'cantComplete', 'alreadyFixed', 'notAnIssue']);
 
-    const $$buttons = $buttons.enter()
+    const $$buttons: D3EnterSelection = $buttons.enter()
       .append('button')
       .attr('class', (d: string) => `maproulette-menu-item maproulette-menu-item-${d}`)
       .style('height', `${buttonHeight}px`)

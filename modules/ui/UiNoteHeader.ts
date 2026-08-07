@@ -2,7 +2,8 @@ import { selection } from 'd3-selection';
 import { uiIcon } from './icon.ts';
 
 import type { Context } from '../Context.ts';
-import type { D3Selection } from 'd3-selection';
+import type { D3EnterSelection, D3Selection } from 'd3-selection';
+import type { OsmNote } from '../services/OsmService.ts';
 
 
 /**
@@ -11,7 +12,7 @@ import type { D3Selection } from 'd3-selection';
  */
 export class UiNoteHeader {
   public context: Context;
-  public datum: any;
+  public datum: OsmNote | null;
 
   // D3 selections
   public $parent: D3Selection | null;
@@ -46,20 +47,20 @@ export class UiNoteHeader {
 
     const l10n = this.context.systems.l10n!;
 
-    const $header = $parent.selectAll('.note-header')
-      .data((this.datum ? [this.datum] : []), (d: any) => d.key );
+    const $header: D3Selection = $parent.selectAll('.note-header')
+      .data((this.datum ? [this.datum] : []), (d: OsmNote) => d.key );
 
     $header.exit()
       .remove();
 
-    const $$header = $header.enter()
+    const $$header: D3EnterSelection = $header.enter()
       .append('div')
       .attr('class', 'note-header');
 
-    const $$icon = $$header
+    const $$icon: D3EnterSelection = $$header
       .append('div')
-      .attr('class', (d: any) => `note-header-icon ${d.props.status}`)
-      .classed('new', (d: any) => d.isNew);
+      .attr('class', (d: OsmNote) => `note-header-icon ${d.props.status}`)
+      .classed('new', (d: OsmNote) => d.isNew);
 
     $$icon
       .append('div')
@@ -67,7 +68,7 @@ export class UiNoteHeader {
       .call(uiIcon('#rapid-icon-note', 'note-fill'));
 
     $$icon
-      .each((d: any) => {
+      .each((d: OsmNote) => {
         let statusIcon;
         if (d.isNew) {
           statusIcon = '#rapid-icon-plus';
@@ -85,7 +86,7 @@ export class UiNoteHeader {
     $$header
       .append('div')
       .attr('class', 'note-header-label')
-      .text((d: any) => {
+      .text((d: OsmNote) => {
         if (d.isNew) {
           return l10n.t('note.new');
         } else {

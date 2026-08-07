@@ -7,7 +7,7 @@ import { UiViewOn } from './UiViewOn.ts';
 import { utilNoAuto } from '../util/index.ts';
 
 import type { Context } from '../Context.ts';
-import type { D3Selection } from 'd3-selection';
+import type { D3EnterSelection, D3Selection } from 'd3-selection';
 import type { MapRouletteTask } from '../services/MapRouletteService.ts';
 
 
@@ -105,7 +105,7 @@ export class UiMapRouletteEditor extends EventEmitter {
     const $header: D3Selection = $parent.selectAll('.header')
       .data([0]);
 
-    const $$header = $header.enter()
+    const $$header: D3EnterSelection = $header.enter()
       .append('div')
       .attr('class', 'header fillL');
 
@@ -240,7 +240,7 @@ export class UiMapRouletteEditor extends EventEmitter {
       .remove();
 
     // enter
-    const $$commentSave = $commentSave.enter()
+    const $$commentSave: D3EnterSelection = $commentSave.enter()
       .append('div')
       .attr('class', 'note-save save-section');
 
@@ -307,7 +307,7 @@ export class UiMapRouletteEditor extends EventEmitter {
           .remove();
 
       } else {
-        const $$auth = $sel.enter()
+        const $$auth: D3EnterSelection = $sel.enter()
           .insert('div', '.tag-reference-body')
           .attr('class', 'field-warning auth-warning')
           .style('opacity', 0);
@@ -420,7 +420,7 @@ export class UiMapRouletteEditor extends EventEmitter {
           .remove();
 
         // enter
-        const $$buttons = $buttons.enter()
+        const $$buttons: D3EnterSelection = $buttons.enter()
           .append('div')
           .attr('class', 'buttons');
 
@@ -440,7 +440,7 @@ export class UiMapRouletteEditor extends EventEmitter {
           .append('button')
           .attr('class', 'button notAnIssue-button action');
 
-        const $$checkboxNearby = $$buttons.append('div')
+        const $$checkboxNearby: D3EnterSelection = $$buttons.append('div')
           .attr('class', 'checkbox-section');
 
         $$checkboxNearby

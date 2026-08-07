@@ -1,7 +1,8 @@
 import { selection } from 'd3-selection';
 
 import type { Context } from '../Context.ts';
-import type { D3Selection } from 'd3-selection';
+import type { D3EnterSelection, D3Selection } from 'd3-selection';
+import type { MapRouletteTask } from '../services/MapRouletteService.ts';
 
 
 /**
@@ -10,10 +11,11 @@ import type { D3Selection } from 'd3-selection';
  */
 export class UiMapRouletteHeader {
   public context: Context;
-  public datum: any;
+  public datum: MapRouletteTask | null;
 
   // D3 selections
   public $parent: D3Selection | null;
+
 
   /**
    * @param  context - Global shared application context
@@ -45,16 +47,16 @@ export class UiMapRouletteHeader {
     const l10n = this.context.systems.l10n!;
 
     let $header: D3Selection = $parent.selectAll('.qa-header')
-      .data(this.datum ? [this.datum] : [], (d: any) => d.key);
+      .data(this.datum ? [this.datum] : [], (d: MapRouletteTask) => d.key);
 
     $header.exit()
       .remove();
 
-    const $$header = $header.enter()
+    const $$header: D3EnterSelection = $header.enter()
       .append('div')
       .attr('class', 'qa-header');
 
-    const $$svg = $$header
+    const $$svg: D3EnterSelection = $$header
       .append('div')
       .attr('class', 'qa-header-icon')
       .append('svg')
@@ -84,6 +86,6 @@ export class UiMapRouletteHeader {
     // update
     $header = $header.merge($$header);
     $header.select('.qa-header-label')
-      .text((d: any) => d.props.parentName || l10n.t('inspector.unknown'));
+      .text((d: MapRouletteTask) => d.props.parentName || l10n.t('inspector.unknown'));
   }
 }

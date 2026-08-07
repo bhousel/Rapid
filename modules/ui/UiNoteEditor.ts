@@ -8,7 +8,7 @@ import { UiViewOn } from './UiViewOn.ts';
 import { utilNoAuto } from '../util/index.ts';
 
 import type { Context } from '../Context.ts';
-import type { D3Selection } from 'd3-selection';
+import type { D3EnterSelection, D3Selection } from 'd3-selection';
 import type { OsmNote } from '../services/OsmService.ts';
 
 
@@ -85,7 +85,7 @@ export class UiNoteEditor extends EventEmitter {
     let $header: D3Selection = $parent.selectAll('.header')
       .data([0]);
 
-    const $$header = $header.enter()
+    const $$header: D3EnterSelection = $header.enter()
       .append('div')
       .attr('class', 'header fillL');
 
@@ -195,7 +195,7 @@ export class UiNoteEditor extends EventEmitter {
     };
 
     const changeInput = (d3_event: Event): void => {
-      const $input = select(d3_event.currentTarget as HTMLTextAreaElement);
+      const $input: D3Selection = select(d3_event.currentTarget as HTMLTextAreaElement);
       const val = ($input.property('value') as string).trim() || undefined;
 
       // store the unsaved comment with the note itself
@@ -215,7 +215,7 @@ export class UiNoteEditor extends EventEmitter {
       .remove();
 
     // enter
-    const $$noteSave = $noteSave.enter()
+    const $$noteSave: D3EnterSelection = $noteSave.enter()
       .append('div')
       .attr('class', 'note-save save-section');
 
@@ -223,7 +223,7 @@ export class UiNoteEditor extends EventEmitter {
       .append('h4')
       .attr('class', '.note-save-header');
 
-    const $$textarea = $$noteSave
+    const $$textarea: D3EnterSelection = $$noteSave
       .append('textarea')
       .attr('class', 'new-comment-input')
       .attr('placeholder', l10n.t('note.inputPlaceholder'))
@@ -240,8 +240,7 @@ export class UiNoteEditor extends EventEmitter {
     }
 
     // update
-    $noteSave = ($$noteSave as D3Selection)
-      .merge($noteSave);
+    $noteSave = $noteSave.merge($$noteSave);
 
     $noteSave.select('h4')
       .text(this.datum!.isNew ? l10n.t('note.newDescription') : l10n.t('note.newComment'));

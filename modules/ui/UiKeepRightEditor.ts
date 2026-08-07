@@ -7,7 +7,7 @@ import { UiViewOn } from './UiViewOn.ts';
 import { utilNoAuto } from '../util/index.ts';
 
 import type { Context } from '../Context.ts';
-import type { D3Selection } from 'd3-selection';
+import type { D3EnterSelection, D3Selection } from 'd3-selection';
 import type { KeepRightIssue } from '../services/KeepRightService.ts';
 
 
@@ -71,7 +71,7 @@ export class UiKeepRightEditor extends EventEmitter {
     let $header: D3Selection = $parent.selectAll('.header')
       .data([0]);
 
-    const $$header = $header.enter()
+    const $$header: D3EnterSelection = $header.enter()
       .append('div')
       .attr('class', 'header fillL');
 
@@ -167,7 +167,7 @@ export class UiKeepRightEditor extends EventEmitter {
       .remove();
 
     // enter
-    const $$saveSection = $saveSection.enter()
+    const $$saveSection: D3EnterSelection = $saveSection.enter()
       .append('div')
       .attr('class', 'qa-save save-section');
 

@@ -2,7 +2,8 @@ import { selection } from 'd3-selection';
 import { uiIcon } from './icon.ts';
 
 import type { Context } from '../Context.ts';
-import type { D3Selection } from 'd3-selection';
+import type { D3EnterSelection, D3Selection } from 'd3-selection';
+import type { OsmNote } from '../services/OsmService.ts';
 
 
 /**
@@ -11,7 +12,7 @@ import type { D3Selection } from 'd3-selection';
  */
 export class UiNoteReport {
   public context: Context;
-  public datum: any;
+  public datum: OsmNote | null;
 
   // D3 selections
   public $parent: D3Selection | null;
@@ -46,28 +47,35 @@ export class UiNoteReport {
 
     const context = this.context;
     const l10n = context.systems.l10n!;
-    const osm = context.services.osm as any;
+    const osm = context.services.osm;
 
-    let url;
+    let url: string | undefined;
     if (osm && this.datum && !this.datum.isNew) {
       url = osm.noteReportURL(this.datum);
     }
 
-    const $link = $parent.selectAll('.note-report')
+    let $link: D3Selection = $parent.selectAll('.note-report')
       .data(url ? [url] : []);
 
     $link.exit()
       .remove();
 
-    const $$link = $link.enter()
+    // enter
+    const $$link: D3EnterSelection = $link.enter()
       .append('a')
       .attr('class', 'note-report')
       .attr('target', '_blank')
-      .attr('href', (d: any) => d)
+      .attr('href', (d: string) => d)
       .call(uiIcon('#rapid-icon-out-link', 'inline'));
 
     $$link
       .append('span')
+      .attr('class', 'note-report-text');
+
+    // update
+    $link = $link.merge($$link);
+
+    $link.selectAll('.note-report-text')
       .text(l10n.t('note.report'));
   }
 }

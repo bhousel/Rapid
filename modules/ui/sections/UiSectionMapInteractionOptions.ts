@@ -39,30 +39,30 @@ export class UiSectionMapInteractionOptions extends AbstractUiSection {
   public renderDisclosureContent($selection: D3Selection): void {
     const l10n = this.context.systems.l10n!;
 
-    const $container: D3Selection = $selection.selectAll('.mouse-wheel-options')
+    let $options: D3Selection = $selection.selectAll('.mouse-wheel-options')
       .data([0]);
 
     // Enter
-    const $$enter = $container.enter()
+    const $$options = $options.enter()
       .append('div')
       .attr('class', 'mouse-wheel-options');
 
-    $$enter
+    $$options
       .append('div')
       .attr('class', 'mouse-wheel-title');
 
-    $$enter
+    $$options
       .append('ul')
       .attr('class', 'layer-list mouse-wheel-options-list');
 
     // Update
-    const $merged = $container.merge($$enter);
+    $options = $options.merge($$options);
 
     // Set localized title on the update selection so it re-localizes on language change.
-    $merged.select('.mouse-wheel-title')
+    $options.select('.mouse-wheel-title')
       .text(l10n.t('preferences.map_interaction.mouse_wheel.title'));
 
-    $merged.selectAll('.mouse-wheel-options-list')
+    $options.selectAll('.mouse-wheel-options-list')
       .call(this._drawListItems);
   }
 
@@ -81,7 +81,7 @@ export class UiSectionMapInteractionOptions extends AbstractUiSection {
       return curr === d;
     };
 
-    const $items: D3Selection = $selection.selectAll('li')
+    let $items: D3Selection = $selection.selectAll('li')
       .data(MOUSE_WHEEL_OPTIONS);
 
     // Exit
@@ -89,14 +89,14 @@ export class UiSectionMapInteractionOptions extends AbstractUiSection {
       .remove();
 
     // Enter
-    const $$enter = $items.enter()
+    const $$items = $items.enter()
       .append('li')
       .call((uiTooltip(context) as any)
         .title((d: string) => l10n.t(`preferences.map_interaction.mouse_wheel.${d}.tooltip`))
         .placement('top')
       );
 
-    const $$label = $$enter
+    const $$label = $$items
       .append('label');
 
     $$label
@@ -113,7 +113,9 @@ export class UiSectionMapInteractionOptions extends AbstractUiSection {
       .text((d: string) => l10n.t(`preferences.map_interaction.mouse_wheel.${d}.title`));
 
     // Update
-    $items.merge($$enter)
+    $items = $items.merge($$items);
+
+    $items
       .classed('active', isActiveWheelOption)
       .selectAll('input')
       .property('checked', isActiveWheelOption)

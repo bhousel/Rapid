@@ -1,7 +1,8 @@
 import { selection } from 'd3-selection';
 
 import type { Context } from '../Context.ts';
-import type { D3Selection } from 'd3-selection';
+import type { D3EnterSelection, D3Selection } from 'd3-selection';
+import type { MapillaryDetection } from '../services/MapillaryService.ts';
 
 
 /**
@@ -10,7 +11,7 @@ import type { D3Selection } from 'd3-selection';
  */
 export class UiDetectionDetails {
   public context: Context;
-  public datum: any;
+  public datum: MapillaryDetection | null;
 
   // D3 selections
   public $parent: D3Selection | null;
@@ -46,18 +47,18 @@ export class UiDetectionDetails {
     const l10n = this.context.systems.l10n!;
 
     let $details: D3Selection = $parent.selectAll('.sidebar-details')
-      .data(this.datum ? [this.datum] : [], (d: any) => d.key);
+      .data(this.datum ? [this.datum] : [], (d: MapillaryDetection) => d.key);
 
     $details.exit()
       .remove();
 
     // enter - structure only
-    const $$details = $details.enter()
+    const $$details: D3EnterSelection = $details.enter()
       .append('div')
       .attr('class', 'sidebar-details qa-details-container');
 
     // description
-    const $$description = $$details
+    const $$description: D3EnterSelection = $$details
       .append('div')
       .attr('class', 'qa-details-item');
 
@@ -65,21 +66,21 @@ export class UiDetectionDetails {
       .append('h3')
       .attr('class', 'detection-details-title');
 
-    const $$type = $$description
+    const $$type: D3EnterSelection = $$description
       .append('div')
       .attr('class', 'detection-type');
 
     $$type.append('strong');
     $$type.append('span');
 
-    const $$firstseen = $$description
+    const $$firstseen: D3EnterSelection = $$description
       .append('div')
       .attr('class', 'detection-first-seen');
 
     $$firstseen.append('strong');
     $$firstseen.append('span');
 
-    const $$lastseen = $$description
+    const $$lastseen: D3EnterSelection = $$description
       .append('div')
       .attr('class', 'detection-last-seen');
 
@@ -96,18 +97,18 @@ export class UiDetectionDetails {
     $type.select('strong')
       .text(l10n.t('inspector.type') + ':');
     $type.select('span')
-      .text((d: any) => d.props.value);
+      .text((d: MapillaryDetection) => d.props.value);
 
     const $firstseen = $details.select('.detection-first-seen');
     $firstseen.select('strong')
       .text(l10n.t('inspector.first_seen') + ':');
     $firstseen.select('span')
-      .text((d: any) => d.props.first_seen_at ? l10n.displayShortDate(d.props.first_seen_at) : l10n.t('inspector.unknown'));
+      .text((d: MapillaryDetection) => d.props.first_seen_at ? l10n.displayShortDate(d.props.first_seen_at) : l10n.t('inspector.unknown'));
 
     const $lastseen = $details.select('.detection-last-seen');
     $lastseen.select('strong')
       .text(l10n.t('inspector.last_seen') + ':');
     $lastseen.select('span')
-      .text((d: any) => d.props.last_seen_at ? l10n.displayShortDate(d.props.last_seen_at) : l10n.t('inspector.unknown'));
+      .text((d: MapillaryDetection) => d.props.last_seen_at ? l10n.displayShortDate(d.props.last_seen_at) : l10n.t('inspector.unknown'));
   }
 }

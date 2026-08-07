@@ -62,7 +62,6 @@ export { UiOsmoseHeader } from './UiOsmoseHeader.ts';
 export { UiOvermap } from './UiOvermap.ts';
 export { UiPane } from './UiPane.ts';
 export { UiPhotoViewer } from './UiPhotoViewer.ts';
-export { uiPopover } from './popover.ts';
 export { UiPresetIcon } from './UiPresetIcon.ts';
 export { UiPresetList } from './UiPresetList.ts';
 export { UiProjectLinks } from './UiProjectLinks.ts';

@@ -5,7 +5,7 @@ import { ValidationIssue } from '../lib/ValidationIssue.ts';
 import { ValidationFix } from '../lib/ValidationFix.ts';
 
 import type { Context } from '../Context.ts';
-import type { D3Selection } from 'd3-selection';
+import type { D3EnterSelection, D3Selection } from 'd3-selection';
 import type { Graph } from '../lib/Graph.ts';
 import type { OsmEntity, OsmTags } from '../data/types.ts';
 import type { TagDiff } from '@rapid-sdk/util';
@@ -124,20 +124,22 @@ export function validatePrivateData(context: Context): ValidatorFunction {
      * @param $selection
      */
     function showReference($selection: D3Selection): void {
-      const $$enter = $selection.selectAll('.issue-reference')
-        .data([0])
+      let $reference: D3Selection = $selection.selectAll('.issue-reference')
+        .data([0]);
+
+      // enter
+      const $$reference: D3EnterSelection = $reference
         .enter();
 
-      $$enter
+      $$reference
         .append('div')
-        .attr('class', 'issue-reference')
-        .text(l10n.t('issues.private_data.reference'));
+        .attr('class', 'issue-reference');
 
-      $$enter
+      $$reference
         .append('strong')
-        .text(l10n.t('issues.suggested'));
+        .attr('class', 'issue-suggested');
 
-      $$enter
+      $$reference
         .append('table')
         .attr('class', 'tagDiff-table')
         .selectAll('.tagDiff-row')
@@ -151,6 +153,15 @@ export function validatePrivateData(context: Context): ValidatorFunction {
           return `tagDiff-cell tagDiff-cell-${klass}`;
         })
         .text((d: TagDiff) => d.display);
+
+      // update
+      $reference = $reference.merge($$reference);
+
+      $reference.selectAll('.issue-reference')
+        .text(l10n.t('issues.private_data.reference'));
+
+      $reference.selectAll('.issue-suggested')
+        .text(l10n.t('issues.suggested'));
     }
   };
 

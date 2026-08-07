@@ -5,7 +5,8 @@ import { UiDetectionHeader } from './UiDetectionHeader.ts';
 import { UiViewOn } from './UiViewOn.ts';
 
 import type { Context } from '../Context.ts';
-import type { D3Selection } from 'd3-selection';
+import type { D3EnterSelection, D3Selection } from 'd3-selection';
+import type { MapillaryService, MapillaryDetection } from '../services/MapillaryService.ts';
 
 
 /**
@@ -15,7 +16,7 @@ import type { D3Selection } from 'd3-selection';
  */
 export class UiDetectionInspector {
   public context: Context;
-  public datum: any;
+  public datum: MapillaryDetection | null;
 
   // Child components
   public DetectionHeader: UiDetectionHeader;
@@ -66,7 +67,7 @@ export class UiDetectionInspector {
     let $header: D3Selection = $parent.selectAll('.header')
       .data([0]);
 
-    const $$header = $header.enter()
+    const $$header: D3EnterSelection = $header.enter()
       .append('div')
       .attr('class', 'header fillL');
 
@@ -109,12 +110,13 @@ export class UiDetectionInspector {
 
 
     // add .sidebar-footer
-    const service = context.services[this.datum.props.serviceID] as any;
-    const imageID = this.datum.props.bestImageID || photos.currPhotoID;
+    const serviceID = this.datum?.props.serviceID;
+    const service = serviceID && context.services[serviceID];
+    const imageID = this.datum?.props.bestImageID || photos.currPhotoID;
 
     if (service && imageID) {
       this.ViewOn.stringID = 'mapillary.view_on_mapillary';
-      this.ViewOn.url = service.imageURL(imageID);
+      this.ViewOn.url = (service as MapillaryService).imageURL(imageID);
     } else {
       this.ViewOn.stringID = '';
       this.ViewOn.url = '';

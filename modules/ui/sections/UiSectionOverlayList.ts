@@ -145,10 +145,10 @@ export class UiSectionOverlayList extends AbstractUiSection {
     $layerLinks.exit()
       .remove();
 
-    const $$enter = $layerLinks.enter()
+    const $$layerLinks = $layerLinks.enter()
       .append('li');
 
-    const $$label = $$enter
+    const $$label = $$layerLinks
       .append('label');
 
     $$label

@@ -3,7 +3,8 @@ import * as PIXI from 'pixi.js';
 import { uiIcon } from './icon.ts';
 
 import type { Context } from '../Context.ts';
-import type { D3Selection } from 'd3-selection';
+import type { D3EnterSelection, D3Selection } from 'd3-selection';
+import type { KeepRightIssue } from '../services/KeepRightService.ts';
 
 
 /**
@@ -12,7 +13,7 @@ import type { D3Selection } from 'd3-selection';
  */
 export class UiKeepRightHeader {
   public context: Context;
-  public datum: any;
+  public datum: KeepRightIssue | null;
 
   // D3 selections
   public $parent: D3Selection | null;
@@ -46,20 +47,20 @@ export class UiKeepRightHeader {
     }
 
     const context = this.context;
-    const keepright = context.services.keepright as any;
+    const keepright = context.services.keepright;
 
     let iconFill = 0xffffff;
-    if (keepright) {
-      iconFill = keepright.getColor(this.datum?.props.parentIssueType);
+    if (keepright && this.datum) {
+      iconFill = keepright.getColor(this.datum.props.parentIssueType);
     }
 
-    const $header = $parent.selectAll('.qa-header')
-      .data(this.datum ? [this.datum] : [], (d: any) => d.key);
+    let $header: D3Selection = $parent.selectAll('.qa-header')
+      .data(this.datum ? [this.datum] : [], (d: KeepRightIssue) => d.key);
 
     $header.exit()
       .remove();
 
-    const $$header: D3Selection = $header.enter()
+    const $$header: D3EnterSelection = $header.enter()
       .append('div')
       .attr('class', 'qa-header');
 
@@ -67,7 +68,7 @@ export class UiKeepRightHeader {
       .append('div')
       .attr('class', 'qa-header-icon')
       .append('div')
-      .attr('class', (d: any) => `qaItem ${d.serviceID}`)
+      .attr('class', (d: KeepRightIssue) => `qaItem ${d.serviceID}`)
       .call(uiIcon('#rapid-icon-bolt'));
 
     $$header
@@ -75,12 +76,12 @@ export class UiKeepRightHeader {
       .attr('class', 'qa-header-label');
 
     // update (text/color written every render so a locale switch re-fills them)
-    const $merged: D3Selection = ($header as D3Selection).merge($$header);
+    $header = $header.merge($$header);
 
-    $merged.select('.qa-header-label')
-      .text((d: any) => this._issueTitle(d));
+    $header.select('.qa-header-label')
+      .text((d: KeepRightIssue) => this._issueTitle(d));
 
-    $merged.selectAll('.qaItem svg.icon')
+    $header.selectAll('.qaItem svg.icon')
       .attr('stroke', '#333')
       .attr('stroke-width', '1.3px')
       .attr('color', new PIXI.Color(iconFill).toHex());
@@ -91,7 +92,7 @@ export class UiKeepRightHeader {
    * Returns the localized title string for the given KeepRight issue.
    * @param d - The issue datum
    */
-  protected _issueTitle(d: any): string {
+  protected _issueTitle(d: KeepRightIssue): string {
     const l10n = this.context.systems.l10n!;
 
     const { itemType, parentIssueType } = d.props;

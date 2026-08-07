@@ -3,7 +3,8 @@ import { utilSanitizeHTML } from '../util/sanitize.ts';
 import { utilHighlightEntities } from '../util/util.ts';
 
 import type { Context } from '../Context.ts';
-import type { D3Selection } from 'd3-selection';
+import type { D3EnterSelection, D3Selection } from 'd3-selection';
+import type { KeepRightIssue } from '../services/KeepRightService.ts';
 
 
 /**
@@ -13,7 +14,7 @@ import type { D3Selection } from 'd3-selection';
  */
 export class UiKeepRightDetails {
   public context: Context;
-  public datum: any;
+  public datum: KeepRightIssue | null;
 
   // D3 selections
   public $parent: D3Selection | null;
@@ -56,17 +57,17 @@ export class UiKeepRightDetails {
     const scene = gfx.scene!;
 
     let $details: D3Selection = $parent.selectAll('.sidebar-details')
-      .data(this.datum ? [this.datum] : [], (d: any) => d.key);
+      .data(this.datum ? [this.datum] : [], (d: KeepRightIssue) => d.key);
 
     $details.exit()
       .remove();
 
-    const $$details = $details.enter()
+    const $$details: D3EnterSelection = $details.enter()
       .append('div')
       .attr('class', 'sidebar-details qa-details-container');
 
     // description
-    const $$description = $$details
+    const $$description: D3EnterSelection = $$details
       .append('div')
       .attr('class', 'qa-details-subsection');
 
@@ -76,17 +77,17 @@ export class UiKeepRightDetails {
     $$description
       .append('div')
       .attr('class', 'qa-details-description-text')
-      .html((d: any) => utilSanitizeHTML(this._issueDetailHTML(d)));
+      .html((d: KeepRightIssue) => utilSanitizeHTML(this._issueDetailHTML(d)));
 
     // If there are entity links in the error message..
     const relatedEntities: string[] = [];
     $$description.selectAll('.error_entity_link, .error_object_link')
       .attr('href', '#')
-      .each((d: any, i: number, nodes: any) => {
+      .each((d: KeepRightIssue, i: number, nodes: any) => {
         const node = nodes[i];
-        const $link = select(node);
+        const $link: D3Selection = select(node);
         const isObjectLink = $link.classed('error_object_link');
-        const entityID = isObjectLink ? (this.datum.props.objectType.charAt(0) + this.datum.props.objectId) : node.textContent;
+        const entityID = isObjectLink ? (d.props.objectType.charAt(0) + d.props.objectId) : node.textContent;
         const graph = editor.staging.graph;
         const entity = graph.hasEntity(entityID);
 
@@ -106,7 +107,7 @@ export class UiKeepRightDetails {
             utilHighlightEntities(context, [entityID], false);
 
             scene.enableLayers('osm');  // make sure osm layer is even on
-            map.centerZoomEase(this.datum.loc, 20);
+            map.centerZoomEase(d.loc, 20);
             map.selectEntityID(entityID);
           });
 
@@ -140,7 +141,7 @@ export class UiKeepRightDetails {
    * Returns the localized detail/description HTML for the given KeepRight issue.
    * @param d - The issue datum
    */
-  protected _issueDetailHTML(d: any): string {
+  protected _issueDetailHTML(d: KeepRightIssue): string {
     const l10n = this.context.systems.l10n!;
 
     const { itemType, parentIssueType } = d.props;
