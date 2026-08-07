@@ -16,9 +16,12 @@ import type { D3Selection } from 'd3-selection';
  */
 export class UiRapidAddDataset extends EventEmitter {
   public context: Context;
+
+  // D3 selections
   public $parentModal: any;
   public $wrap: D3Selection | null;
   public $modal: D3Selection | null;
+
   public rerender: () => void;
 
   protected _currFileList: FileList | null;

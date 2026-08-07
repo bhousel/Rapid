@@ -20,9 +20,12 @@ const MAXRESULTS = 100;
 export class UiRapidCatalog extends EventEmitter {
   public context: Context;
   public CategoryCombo: any;
+
+  // D3 selections
   public $parentModal: any;
   public $wrap: D3Selection | null;
   public $modal: D3Selection | null;
+
   public rerender: () => void;
 
   protected _filterText: string | null;

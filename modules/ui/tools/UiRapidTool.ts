@@ -19,8 +19,12 @@ export class UiRapidTool {
   public PowerUserModal: any;
   public RapidTooltip: any;
   public PowerUserTooltip: any;
+
+  // D3 selections
   public $parent: D3Selection | null;
+
   public rerender: () => void;
+
 
   /**
    * @param  context - Global shared application context

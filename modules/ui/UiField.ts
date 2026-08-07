@@ -31,7 +31,7 @@ export interface UiFieldOptions {
 
 
 /**
- * `UiField` is the base class for an editable field in the entity editor. It renders the shared
+ * `UiField` is the base class for a field in the entity editor. It renders the shared
  * field "chrome" (label, lock, remove/revert buttons, tag reference) and delegates the
  * field-specific input UI to a `UiFieldX` subclass via `renderContent()` / `syncTags()`.
  *

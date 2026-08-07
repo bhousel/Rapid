@@ -14,6 +14,7 @@ export class UiFullscreen {
   public $parent: D3Selection | null;
   // public $button: D3Selection | null;
 
+
   /**
    * @param  context - Global shared application context
    */

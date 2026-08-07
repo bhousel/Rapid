@@ -48,6 +48,8 @@ interface GeocodeResult {
  */
 export class UiFeatureList {
   public context: Context;
+
+  // D3 selections
   public $parent: D3Selection | null;
   public $featureList: D3Selection | null;
   public $search: D3Selection | null;

@@ -30,6 +30,7 @@ export abstract class AbstractUiSection extends EventEmitter {
   protected _disclosure: UiDisclosure | undefined;
   protected _disclosureExpandOverride: boolean | undefined;
 
+
   /**
    * @param  context - Global shared application context
    * @param  id      - unique identifier for this section (used for CSS classes)

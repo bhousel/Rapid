@@ -30,8 +30,13 @@ import type { D3Selection } from 'd3-selection';
  */
 export class UiRapidDatasetToggle {
   public context: Context;
+
+  // Child components
   public ColorPicker: UiRapidColorpicker | null;
+
+  // D3 selections
   public $modal: any;
+
   public rerender: () => void;
 
 
@@ -63,29 +68,6 @@ export class UiRapidDatasetToggle {
     // Setup event handlers
     scene.on('layerchange', this.rerender);
     l10n.on('localechange', this.rerender);
-  }
-
-
-  /**
-   * This shows the datataset modal if it isn't already being shown.
-   * For this kind of popup component, must first `show()` to create the modal.
-   */
-  public show(): void {
-    const context = this.context;
-    const $container = context.container();   // $container is always the parent for a modal
-
-    const isShowing = $container.selectAll('.shaded').size();
-    if (isShowing) return;  // a modal is already showing
-
-    this.$modal = uiModal($container);
-
-    this.$modal.select('.modal')
-      .attr('class', 'modal rapid-modal');
-
-    this.ColorPicker = new UiRapidColorpicker(context, this.$modal);
-    this.ColorPicker.on('change', this.changeColor);
-
-    this.render();
   }
 
 
@@ -270,6 +252,29 @@ export class UiRapidDatasetToggle {
 
     $buttons.selectAll('.button')
       .text(l10n.t('confirm.okay'));
+  }
+
+
+  /**
+   * This shows the datataset modal if it isn't already being shown.
+   * For this kind of popup component, must first `show()` to create the modal.
+   */
+  public show(): void {
+    const context = this.context;
+    const $container = context.container();   // $container is always the parent for a modal
+
+    const isShowing = $container.selectAll('.shaded').size();
+    if (isShowing) return;  // a modal is already showing
+
+    this.$modal = uiModal($container);
+
+    this.$modal.select('.modal')
+      .attr('class', 'modal rapid-modal');
+
+    this.ColorPicker = new UiRapidColorpicker(context, this.$modal);
+    this.ColorPicker.on('change', this.changeColor);
+
+    this.render();
   }
 
 

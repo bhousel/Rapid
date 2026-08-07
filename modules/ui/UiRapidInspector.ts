@@ -492,7 +492,6 @@ export class UiRapidInspector {
       $notice.selectAll('a')   // links in markdown should open in new page
         .attr('target', '_blank');
     }
-
   }
 
 

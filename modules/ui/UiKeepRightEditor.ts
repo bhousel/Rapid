@@ -23,9 +23,10 @@ export class UiKeepRightEditor extends EventEmitter {
   // D3 selections
   public $parent: D3Selection | null;
 
-  protected _header: UiKeepRightHeader;
-  protected _details: UiKeepRightDetails;
-  protected _viewOn: UiViewOn;
+  // Child components
+  public KeepRightHeader: UiKeepRightHeader;
+  public KeepRightDetails: UiKeepRightDetails;
+  public ViewOn: UiViewOn;
 
 
   /**
@@ -39,9 +40,10 @@ export class UiKeepRightEditor extends EventEmitter {
     // D3 selections
     this.$parent = null;
 
-    this._header = new UiKeepRightHeader(context);
-    this._details = new UiKeepRightDetails(context);
-    this._viewOn = new UiViewOn(context);
+    // Create child components
+    this.KeepRightHeader = new UiKeepRightHeader(context);
+    this.KeepRightDetails = new UiKeepRightDetails(context);
+    this.ViewOn = new UiViewOn(context);
 
     // Ensure methods used as callbacks always have `this` bound correctly.
     this.render = this.render.bind(this);
@@ -99,20 +101,20 @@ export class UiKeepRightEditor extends EventEmitter {
     const $editor: D3Selection = $body.selectAll('.qa-editor')
       .data([0]);
 
-    this._header.datum = this.datum;
-    this._details.datum = this.datum;
+    this.KeepRightHeader.datum = this.datum;
+    this.KeepRightDetails.datum = this.datum;
 
     $editor.enter()
       .append('div')
       .attr('class', 'modal-section qa-editor')
       .merge($editor)
-      .call(this._header.render)
-      .call(this._details.render)
+      .call(this.KeepRightHeader.render)
+      .call(this.KeepRightDetails.render)
       .call(this._saveSection);
 
 
-    this._viewOn.stringID = 'inspector.view_on_keepright';
-    this._viewOn.url = keepright ? keepright.issueURL(this.datum!) : '';
+    this.ViewOn.stringID = 'inspector.view_on_keepright';
+    this.ViewOn.url = keepright ? keepright.issueURL(this.datum!) : '';
 
     const $footer: D3Selection = $parent.selectAll('.sidebar-footer')
       .data([0]);
@@ -121,7 +123,7 @@ export class UiKeepRightEditor extends EventEmitter {
       .append('div')
       .attr('class', 'sidebar-footer')
       .merge($footer)
-      .call(this._viewOn.render);
+      .call(this.ViewOn.render);
   }
 
 

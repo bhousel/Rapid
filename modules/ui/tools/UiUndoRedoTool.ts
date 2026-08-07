@@ -16,7 +16,10 @@ export class UiUndoRedoTool {
   public stringID: string;
   public Tooltip: any;
   public commands: any[];
+
+  // D3 selections
   public $parent: D3Selection | null;
+
   public rerender: () => void;
   public debouncedRender: () => void;
 

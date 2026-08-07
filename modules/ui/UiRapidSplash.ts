@@ -18,6 +18,8 @@ export class UiRapidSplash {
    */
   public constructor(context: Context) {
     this.context = context;
+
+    // Ensure methods used as callbacks always have `this` bound correctly.
     this.render = this.render.bind(this);
   }
 

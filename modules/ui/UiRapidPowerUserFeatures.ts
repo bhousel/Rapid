@@ -11,7 +11,10 @@ import type { D3Selection } from 'd3-selection';
 export class UiRapidPowerUserFeatures {
   public context: Context;
   public featureFlags: string[];
+
+  // D3 selections
   public $modal: any;
+
   public rerender: () => void;
 
 

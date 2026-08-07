@@ -17,9 +17,10 @@ export class UiDetectionInspector {
   public context: Context;
   public datum: any;
 
-  protected _header: UiDetectionHeader;
-  protected _details: UiDetectionDetails;
-  protected _viewOn: UiViewOn;
+  // Child components
+  public DetectionHeader: UiDetectionHeader;
+  public DetectionDetails: UiDetectionDetails;
+  public ViewOn: UiViewOn;
 
   // D3 selections
   public $parent: D3Selection | null;
@@ -32,9 +33,10 @@ export class UiDetectionInspector {
     this.context = context;
     this.datum = null;
 
-    this._header = new UiDetectionHeader(context);
-    this._details = new UiDetectionDetails(context);
-    this._viewOn = new UiViewOn(context);
+    // Create child components
+    this.DetectionHeader = new UiDetectionHeader(context);
+    this.DetectionDetails = new UiDetectionDetails(context);
+    this.ViewOn = new UiViewOn(context);
 
     // D3 selections
     this.$parent = null;
@@ -95,15 +97,15 @@ export class UiDetectionInspector {
     const $details: D3Selection = $body.selectAll('.qa-editor')
       .data([0]);
 
-    this._header.datum = this.datum;
-    this._details.datum = this.datum;
+    this.DetectionHeader.datum = this.datum;
+    this.DetectionDetails.datum = this.datum;
 
     $details.enter()
       .append('div')
       .attr('class', 'modal-section qa-editor')
       .merge($details)
-      .call(this._header.render)
-      .call(this._details.render);
+      .call(this.DetectionHeader.render)
+      .call(this.DetectionDetails.render);
 
 
     // add .sidebar-footer
@@ -111,11 +113,11 @@ export class UiDetectionInspector {
     const imageID = this.datum.props.bestImageID || photos.currPhotoID;
 
     if (service && imageID) {
-      this._viewOn.stringID = 'mapillary.view_on_mapillary';
-      this._viewOn.url = service.imageURL(imageID);
+      this.ViewOn.stringID = 'mapillary.view_on_mapillary';
+      this.ViewOn.url = service.imageURL(imageID);
     } else {
-      this._viewOn.stringID = '';
-      this._viewOn.url = '';
+      this.ViewOn.stringID = '';
+      this.ViewOn.url = '';
     }
 
     const $footer: D3Selection = $parent.selectAll('.sidebar-footer')
@@ -125,6 +127,6 @@ export class UiDetectionInspector {
       .append('div')
       .attr('class', 'sidebar-footer')
       .merge($footer)
-      .call(this._viewOn.render);
+      .call(this.ViewOn.render);
   }
 }

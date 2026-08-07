@@ -19,7 +19,10 @@ export class UiDownloadTool {
   public id: string;
   public stringID: string;
   public Tooltip: any;
+
+  // D3 selections
   public $parent: D3Selection | null;
+
   public rerender: () => void;
 
 

@@ -24,11 +24,15 @@ export class UiDrawModesTool {
   public stringID: string;
   public Tooltip: any;
   public commands: DrawCommand[];
+
+  // D3 selections
   public $parent: D3Selection | null;
+
   public rerender: () => void;
   public debouncedRender: () => void;
 
   protected _keys: string | string[] | null;
+
 
   /**
    * @param  context - Global shared application context

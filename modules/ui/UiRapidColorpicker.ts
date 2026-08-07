@@ -45,6 +45,40 @@ export class UiRapidColorpicker extends EventEmitter {
 
 
   /**
+   * Renders into the given selection.
+   * A fresh instance is created and rendered per row/use, so it renders into
+   *  `$selection` rather than capturing `$parent`.
+   * @param $selection - A d3-selection to the HTMLElement this renders into
+   */
+  public render($selection: D3Selection): void {
+    // capture the dataset from the parent selection
+    const datum = $selection.datum() as RapidDataset | undefined;
+
+    const $colorpicker: D3Selection = $selection.selectAll('.rapid-colorpicker')
+      .data(datum ? [datum] : [], d => d.id);   // retain data from parent
+
+    // enter
+    const $$colorpicker = $colorpicker.enter()
+      .append('div')
+      .attr('class', 'rapid-colorpicker')
+      .on('click', this._togglePopup);
+
+    $$colorpicker
+      .append('div')
+      .attr('class', 'rapid-colorpicker-fill')
+      .call(uiIcon('#fas-palette'));
+
+    // update
+    $colorpicker
+      .merge($$colorpicker)
+      .selectAll('.rapid-colorpicker-fill')
+      .style('background', (d: RapidDataset) => d.color)
+      .select('.icon')  // propagate bound data
+      .style('color', (d: RapidDataset) => this._getBrightness(d.color) > 140.5 ? '#333' : '#fff');
+  }
+
+
+  /**
    * Opens the color popup, or closes it if already open.
    * @param event - the triggering click event
    */
@@ -89,40 +123,6 @@ export class UiRapidColorpicker extends EventEmitter {
     const g = parseInt(short ? color[2] + color[2] : color[3] + color[4], 16);
     const b = parseInt(short ? color[3] + color[3] : color[5] + color[6], 16);
     return ((r * 299) + (g * 587) + (b * 114)) / 1000;
-  }
-
-
-  /**
-   * Renders into the given selection.
-   * A fresh instance is created and rendered per row/use, so it renders into
-   *  `$selection` rather than capturing `$parent`.
-   * @param $selection - A d3-selection to the HTMLElement this renders into
-   */
-  public render($selection: D3Selection): void {
-    // capture the dataset from the parent selection
-    const datum = $selection.datum() as RapidDataset | undefined;
-
-    const $colorpicker: D3Selection = $selection.selectAll('.rapid-colorpicker')
-      .data(datum ? [datum] : [], d => d.id);   // retain data from parent
-
-    // enter
-    const $$colorpicker = $colorpicker.enter()
-      .append('div')
-      .attr('class', 'rapid-colorpicker')
-      .on('click', this._togglePopup);
-
-    $$colorpicker
-      .append('div')
-      .attr('class', 'rapid-colorpicker-fill')
-      .call(uiIcon('#fas-palette'));
-
-    // update
-    $colorpicker
-      .merge($$colorpicker)
-      .selectAll('.rapid-colorpicker-fill')
-      .style('background', (d: RapidDataset) => d.color)
-      .select('.icon')  // propagate bound data
-      .style('color', (d: RapidDataset) => this._getBrightness(d.color) > 140.5 ? '#333' : '#fff');
   }
 
 

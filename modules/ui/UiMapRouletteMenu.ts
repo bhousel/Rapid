@@ -1,5 +1,5 @@
 import { EventEmitter } from 'tseep/lib/ee-safe';
-import { select } from 'd3-selection';
+import { select, selection } from 'd3-selection';
 import { vecAdd } from '@rapid-sdk/math';
 import { uiIcon } from './icon.ts';
 
@@ -29,14 +29,20 @@ export class UiMapRouletteMenu extends EventEmitter {
   public anchorLoc: Vec2;
   public triggerType: string;
 
-  public $menu: D3Selection;
+  // D3 selections
+  public $parent: D3Selection | null;
+  public $menu: D3Selection | null;
+
   protected _oldz: number;
   protected _menuTop: boolean;
   protected _menuHeight: number;
   protected _menuWidth: number;
   protected _mapRouletteApiKey: string | null;
 
-  /** Creates a new MapRoulette menu bound to the shared application context. */
+
+  /**
+   * @param  context - Global shared application context
+   */
   public constructor(context: Context) {
     super();
     this.context = context;
@@ -44,7 +50,10 @@ export class UiMapRouletteMenu extends EventEmitter {
     this.anchorLoc = [0, 0];
     this.triggerType = '';
 
-    this.$menu = select(null);
+    // D3 selections
+    this.$parent = null;
+    this.$menu = null;
+
     this._oldz = 0;
     this._menuTop = false;
     this._menuHeight = 0;
@@ -59,12 +68,17 @@ export class UiMapRouletteMenu extends EventEmitter {
 
 
   /**
-   * Renders the menu into the given overlay selection.
-   * The menu is rebuilt and repositioned into the overlay each time it is shown, so it
-   *  renders into `$selection` rather than capturing `$parent`.
-   * @param $selection - A d3-selection to the overlay this menu renders into
+   * Accepts a parent selection, and renders the content under it.
+   * (The parent selection is required the first time, but can be inferred on subsequent renders)
+   * @param $parent - A d3-selection to a HTMLElement that this component should render itself into
    */
-  public render($selection: D3Selection): void {
+  public render($parent: D3Selection | null = this.$parent): void {
+    if ($parent instanceof selection) {
+      this.$parent = $parent;
+    } else {
+      return;   // no parent - called too early?
+    }
+
     const context = this.context;
     const l10n = context.systems.l10n!;
     const map = context.systems.map!;
@@ -89,7 +103,7 @@ export class UiMapRouletteMenu extends EventEmitter {
     this._menuHeight = VERTICAL_PADDING * 2 + 4 * buttonHeight; // 4 actions
     this._oldz = viewport.transform.zoom;
 
-    this.$menu = $selection.selectAll('.maproulette-menu')
+    this.$menu = $parent.selectAll('.maproulette-menu')
       .data([0]);
 
     const $$menu = this.$menu.enter()
@@ -161,12 +175,13 @@ export class UiMapRouletteMenu extends EventEmitter {
 
   /** Updates the position of the menu based on the viewport and anchor location. */
   protected _updatePosition(): void {
+    if (!this.$menu || this.$menu.empty()) return;
+
     const context = this.context;
     const gfx = context.systems.gfx!;
     const l10n = context.systems.l10n!;
     const viewport = context.viewport;
 
-    if (!this.$menu || this.$menu.empty()) return;
 
     if (this._oldz !== viewport.transform.zoom) {
       this.close();
@@ -308,7 +323,7 @@ export class UiMapRouletteMenu extends EventEmitter {
     const map = context.systems.map!;
 
     map.off('move', this._updatePosition);
-    this.$menu.remove();
+    this.$menu?.remove();
     this.emit('toggled', false);
 
     (context.systems.ui as any)._showsMapRouletteMenu = false; // Reset state

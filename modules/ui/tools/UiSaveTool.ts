@@ -17,7 +17,10 @@ export class UiSaveTool {
   public stringID: string;
   public key: string;
   public Tooltip: any;
+
+  // D3 selections
   public $parent: D3Selection | null;
+
   public rerender: () => void;
 
   protected _numChanges: number;
