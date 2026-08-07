@@ -1,7 +1,6 @@
 import { select, selection } from 'd3-selection';
 import { utilArrayUniq, utilUniqueString } from '@rapid-sdk/util';
 import { iso1A2Code } from '@rapideditor/country-coder';
-
 import { UiField } from '../UiField.ts';
 import { uiIcon } from '../icon.ts';
 import { uiTooltip } from '../tooltip.ts';
@@ -18,8 +17,8 @@ import { LANGUAGE_SUFFIX_REGEX } from './types.ts';
 
 
 interface LanguageItem {
-  localName: string;
-  nativeName: string;
+  localName: string | null;
+  nativeName: string | null;
   code: string;
   label: string;
 }
@@ -189,13 +188,11 @@ export class UiFieldLocalized extends UiField {
       let metaCode: string = code;
       if (replacements[code]) metaCode = replacements[code] as string;
 
-      const label = l10n.languageName(metaCode);
+      const label = l10n.languageName(metaCode) ?? code;
       const localName = l10n.languageName(metaCode, { localOnly: true });
-      const nativeName = l10n.languages[metaCode].nativeName;
+      const nativeName = l10n.languages[metaCode].nativeName || null;
 
-      if (label && localName && nativeName) {
-        this._languagesArray.push({ code, label, localName, nativeName });
-      }
+      this._languagesArray.push({ code, label, localName, nativeName });
     }
   }
 
