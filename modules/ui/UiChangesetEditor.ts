@@ -3,7 +3,7 @@ import { selection } from 'd3-selection';
 import { uiIcon } from './icon.ts';
 import { uiCombobox} from './combobox.ts';
 import { createUiField } from './fields/index.ts';
-import { uiFormFields } from './form_fields.ts';
+import { UiFormFields } from './UiFormFields.ts';
 
 import type { Context } from '../Context.ts';
 import type { D3Selection, D3EnterSelection } from 'd3-selection';
@@ -23,8 +23,10 @@ export class UiChangesetEditor extends EventEmitter {
   // D3 selections
   public $parent: D3Selection | null;
 
+  // Child components
+  public FormFields: UiFormFields;
+
   protected _scope: SchemaScope;
-  protected _formFields: any;
   protected _commentCombo: any;
   protected _uifields: UiField[] | null | undefined;
   protected _tags: OsmTags | undefined;
@@ -41,10 +43,12 @@ export class UiChangesetEditor extends EventEmitter {
     // D3 selections
     this.$parent = null;
 
+    // Create child components
+    this.FormFields = new UiFormFields(context);
+
     const schema = context.systems.schema!;
     this._scope = schema.getScope('osm');
 
-    this._formFields = uiFormFields(context);
     this._commentCombo = uiCombobox(context, 'comment').caseSensitive(true);
     this._uifields = undefined;
     this._tags = undefined;
@@ -93,9 +97,11 @@ export class UiChangesetEditor extends EventEmitter {
         .tags(this._tags);
     }
 
+    // update
+    this.FormFields.fieldsArr = this._uifields;
 
     $parent
-      .call(this._formFields.fieldsArr(this._uifields));
+      .call(this.FormFields.render);
 
 
     if (initial) {

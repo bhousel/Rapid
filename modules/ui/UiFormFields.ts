@@ -1,4 +1,4 @@
-import { select } from 'd3-selection';
+import { select, selection } from 'd3-selection';
 import { uiCombobox } from './combobox.ts';
 import { utilGetSetValue, utilNoAuto } from '../util/index.ts';
 
@@ -7,45 +7,68 @@ import type { D3Selection } from 'd3-selection';
 import type { UiField } from './UiField.ts';
 
 
-/** A form-fields control (callable + fluent), renders a set of fields into a selection. */
-export interface UiFormFields {
-  ($selection: D3Selection): void;
-  fieldsArr(): UiField[];
-  fieldsArr(val: UiField[]): UiFormFields;
-  state(): string;
-  state(val: string): UiFormFields;
-  klass(): string;
-  klass(val: string): UiFormFields;
-}
-
-
 /**
  * Renders a list of shown fields, plus a "more fields" combobox for adding hidden ones.
- * Configure with the fluent methods, then render via `$selection.call(formFields)`.
- *
- * @param context - Global shared application context
- * @return the form-fields control
  */
-export function uiFormFields(context: Context): UiFormFields {
-  const l10n = context.systems.l10n!;
-  const moreCombo = uiCombobox(context, 'more-fields').minItems(1);
-  let _uifields: UiField[] = [];
-  let _lastPlaceholder = '';
-  let _state = '';
-  let _klass = '';
+export class UiFormFields {
+  public context: Context;
+  public fieldsArr: UiField[];
+  public state: string;
+  public klass: string;
+
+  // D3 selections
+  public $parent: D3Selection | null;
+
+  protected _moreCombo: any;
+  protected _lastPlaceholder: string;
 
 
-  const formFields = function($selection: D3Selection): void {
-    const allowedFields = _uifields.filter(uifield => uifield.isAllowed());
+  /**
+   * @param  context - Global shared application context
+   */
+  public constructor(context: Context) {
+    this.context = context;
+
+    // D3 selections
+    this.$parent = null;
+
+    this.fieldsArr = [];
+    this.state = '';
+    this.klass = '';
+
+    this._moreCombo = uiCombobox(context, 'more-fields').minItems(1);
+    this._lastPlaceholder = '';
+
+    // Ensure methods used as callbacks always have `this` bound correctly.
+    this.render = this.render.bind(this);
+  }
+
+
+  /**
+   * Accepts a parent selection, and renders the content under it.
+   * (The parent selection is required the first time, but can be inferred on subsequent renders)
+   * @param $parent - A d3-selection to a HTMLElement that this component should render itself into
+   */
+  public render($parent: D3Selection | null = this.$parent): void {
+    if ($parent instanceof selection) {
+      this.$parent = $parent;
+    } else {
+      return;   // no parent - called too early?
+    }
+
+    const context = this.context;
+    const l10n = context.systems.l10n!;
+
+    const allowedFields = this.fieldsArr.filter(uifield => uifield.isAllowed());
     const shown = allowedFields.filter(uifield => uifield.isShown());
     const notShown = allowedFields.filter(uifield => !uifield.isShown());
 
-    let $container: D3Selection = $selection.selectAll('.form-fields-container')
+    let $container: D3Selection = $parent.selectAll('.form-fields-container')
       .data([0]);
 
     $container = $container.enter()
       .append('div')
-      .attr('class', 'form-fields-container ' + (_klass || ''))
+      .attr('class', 'form-fields-container ' + (this.klass || ''))
       .merge($container);
 
 
@@ -92,8 +115,8 @@ export function uiFormFields(context: Context): UiFormFields {
 
     const placeholder = labels.slice(0, 3).join(', ') + ((labels.length > 3) ? '…' : '');
 
-    let $more: D3Selection = $selection.selectAll('.more-fields')
-      .data((_state === 'hover' || moreFields.length === 0) ? [] : [0]);
+    let $more: D3Selection = $parent.selectAll('.more-fields')
+      .data((this.state === 'hover' || moreFields.length === 0) ? [] : [0]);
 
     $more.exit()
       .remove();
@@ -127,43 +150,22 @@ export function uiFormFields(context: Context): UiFormFields {
 
     $input
       .call(utilGetSetValue, '')
-      .call(moreCombo
+      .call(this._moreCombo
         .data(moreFields)
         .on('accept', (d: any) => {
           if (!d) return;  // user entered something that was not matched
           const uifield = d.field;
           uifield.show();
-          $selection.call(formFields);  // rerender
+          this.render();
           uifield.focus();
         })
       );
 
     // avoid updating placeholder excessively (triggers style recalc)
-    if (_lastPlaceholder !== placeholder) {
+    if (this._lastPlaceholder !== placeholder) {
       $input.attr('placeholder', placeholder);
-      _lastPlaceholder = placeholder;
+      this._lastPlaceholder = placeholder;
     }
-  } as UiFormFields;
+  }
 
-
-  formFields.fieldsArr = function(val?: UiField[]): any {
-    if (!arguments.length) return _uifields;
-    _uifields = val || [];
-    return formFields;
-  };
-
-  formFields.state = function(val?: string): any {
-    if (!arguments.length) return _state;
-    _state = val as string;
-    return formFields;
-  };
-
-  formFields.klass = function(val?: string): any {
-    if (!arguments.length) return _klass;
-    _klass = val as string;
-    return formFields;
-  };
-
-
-  return formFields;
 }

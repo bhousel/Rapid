@@ -1,7 +1,7 @@
 import { utilArrayIdentical, utilArrayUnion } from '@rapid-sdk/util';
 import { AbstractUiSection } from './AbstractUiSection.ts';
 import { createUiField } from '../fields/index.ts';
-import { uiFormFields } from '../form_fields.ts';
+import { UiFormFields } from '../UiFormFields.ts';
 
 import type { Context } from '../../Context.ts';
 import type { D3Selection } from 'd3-selection';
@@ -12,7 +12,9 @@ import type { UiField } from '../UiField.ts';
 
 
 export class UiSectionPresetFields extends AbstractUiSection {
-  protected _formFields: any;
+  // Child Compnoents
+  public FormFields: UiFormFields;
+
   protected _state: string | undefined;    // can be 'hide', 'hover', or 'select'
   protected _uifields: UiField[] | null;
   protected _presets: Preset[];
@@ -26,7 +28,9 @@ export class UiSectionPresetFields extends AbstractUiSection {
   public constructor(context: Context) {
     super(context, 'preset-fields');
 
-    this._formFields = uiFormFields(context);
+    // Create child components
+    this.FormFields = new UiFormFields(context);
+
     this._state = undefined;
     this._uifields = null;
     this._presets = [];
@@ -128,13 +132,13 @@ export class UiSectionPresetFields extends AbstractUiSection {
       uifield.state(this._state).tags(this._tags);
     }
 
+    // update
+    this.FormFields.fieldsArr = this._uifields;
+    this.FormFields.state = this._state || '';
+    this.FormFields.klass = 'grouped-items-area';
 
     $selection
-      .call(this._formFields
-        .fieldsArr(this._uifields)
-        .state(this._state as string)
-        .klass('grouped-items-area')
-      );
+      .call(this.FormFields.render);
 
 
     $selection.selectAll('.wrap-form-field input')

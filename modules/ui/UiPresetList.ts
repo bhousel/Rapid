@@ -485,7 +485,6 @@ export class UiPresetList extends EventEmitter {
    */
   public entityIDs(val?: EntityID[]): any {
     if (!arguments.length) return this._entityIDs;
-    if (!this.$input || !this.$list) return;  // called too soon?
 
     const context = this.context;
     const editor = context.systems.editor!;
@@ -496,8 +495,9 @@ export class UiPresetList extends EventEmitter {
     this._allGeometries = [];
     this._defaults = [];
     this._selectedPresetIDs = new Set();
-    this.$input.property('value', '');
-    this.$list.selectAll('.preset-list-item').remove();
+
+    this.$input?.property('value', '');
+    this.$list?.selectAll('.preset-list-item')?.remove();
 
     if (this._entityIDs.length) {
       const graph = editor.staging.graph;

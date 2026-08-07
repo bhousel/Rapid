@@ -31,7 +31,7 @@ export { UiField } from './UiField.ts';
 export { UiFilterStatus } from './UiFilterStatus.ts';
 // export { uiFieldHelp } from './field_help.ts';
 export { UiFlash } from './UiFlash.ts';
-export { uiFormFields } from './form_fields.ts';
+export { UiFormFields } from './UiFormFields.ts';
 export { UiFullscreen } from './UiFullscreen.ts';
 export { uiIcon } from './icon.ts';
 export { UiIntro } from './intro/UiIntro.ts';
