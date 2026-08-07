@@ -83,7 +83,6 @@ export { UiSpector } from './UiSpector.ts';
 export { UiSplash } from './UiSplash.ts';
 export { UiSuccess } from './UiSuccess.ts';
 export { UiTagReference } from './UiTagReference.ts';
-export { uiToggle } from './toggle.ts';
 export { uiTooltip } from './tooltip.ts';
 export { UiValidatorStatus } from './UiValidatorStatus.ts';
 export { UiVersionInfo } from './UiVersionInfo.ts';

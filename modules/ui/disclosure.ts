@@ -1,6 +1,5 @@
 import { dispatch as d3_dispatch } from 'd3-dispatch';
 import { uiIcon } from './icon.ts';
-import { uiToggle } from './toggle.ts';
 import { utilFunctor, utilRebind } from '../util/index.ts';
 
 import type { Context } from '../Context.ts';
@@ -106,8 +105,8 @@ export function uiDisclosure(context: Context, key: string): UiDisclosure {
     }
 
 
-    function _onClick(this: any, d3_event: Event): void {
-      d3_event.preventDefault();
+    function _onClick(this: any, e: Event): void {
+      e.preventDefault();
       _isExpanded = !_isExpanded;
 
       // Only update the expanded preference if it's not been overrided
@@ -124,7 +123,15 @@ export function uiDisclosure(context: Context, key: string): UiDisclosure {
         .attr('xlink:href', `#rapid-icon-${icon}`);
 
       $wrap
-        .call(uiToggle(_isExpanded));
+        .style('opacity', _isExpanded ? 0 : 1)
+        .classed('hide', false)
+        .transition()
+        .style('opacity', _isExpanded ? 1 : 0)
+        .on('end', () => {
+          $wrap
+            .classed('hide', !_isExpanded)
+            .style('opacity', null);
+        });
 
       if (_isExpanded) {
         $wrap
