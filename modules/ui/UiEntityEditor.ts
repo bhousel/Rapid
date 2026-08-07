@@ -271,7 +271,7 @@ export class UiEntityEditor extends EventEmitter {
     const currPreset = this._selectedPresets.length === 1 && this._selectedPresets[0];
 
     this.modified(this._startGraph !== graph);
-    this.$parent.call(this.render);  // rerender
+    this.$parent.call(this.render);
 
     // If this difference caused the preset to change, flash the button.
     if (prevPreset !== currPreset) {

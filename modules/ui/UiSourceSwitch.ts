@@ -13,8 +13,6 @@ export class UiSourceSwitch {
   // D3 selections
   public $parent: D3Selection | null;
 
-  public rerender: () => void;
-
   protected _isLive: boolean;
 
 
@@ -32,7 +30,6 @@ export class UiSourceSwitch {
     // Ensure methods used as callbacks always have `this` bound correctly.
     // (This is also necessary when using `d3-selection.call`)
     this.render = this.render.bind(this);
-    this.rerender = (() => this.render());  // call render without argument
     this.toggle = this.toggle.bind(this);
   }
 
@@ -108,7 +105,7 @@ export class UiSourceSwitch {
 
     context.resetAsync()   // remove downloaded data
       .then(() => osm.switchAsync((this._isLive ? keys[0] : keys[1]) as any))
-      .then(this.rerender);
+      .then(() => this.render());
   }
 
 }

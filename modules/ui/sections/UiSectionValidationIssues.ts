@@ -29,7 +29,7 @@ export class UiSectionValidationIssues extends AbstractUiSection {
     this._drawIssuesList = this._drawIssuesList.bind(this);
     this._clickAutoFix = this._clickAutoFix.bind(this);
     this._clickAutoFixAll = this._clickAutoFixAll.bind(this);
-    this._deferredRender = this._deferredRender.bind(this);
+    this._renderWhenIdle = this._renderWhenIdle.bind(this);
 
     // event handlers to refresh the lists
     const map = context.systems.map!;
@@ -37,20 +37,20 @@ export class UiSectionValidationIssues extends AbstractUiSection {
     const urlhash = context.systems.urlhash!;
     const validator = context.systems.validator!;
 
-    validator.on('validated', this._deferredRender);
+    validator.on('validated', this._renderWhenIdle);
 
     urlhash.on('hashchange', (currParams: URLSearchParams, prevParams: URLSearchParams) => {
       if (currParams.get('poweruser') !== prevParams.get('poweruser')) {   // change in poweruser status
-        this._deferredRender();
+        this._renderWhenIdle();
       }
     });
 
     map.on('draw', () => {
       // scheduler debounces the redraw; without it, just redraw immediately
       if (scheduler) {
-        scheduler.debounce('ValidationIssues-render', this._deferredRender, { ms: 500 });
+        scheduler.debounce('ValidationIssues-render', this._renderWhenIdle, { ms: 500 });
       } else {
-        this._deferredRender();
+        this._renderWhenIdle();
       }
     });
   }
@@ -302,12 +302,12 @@ export class UiSectionValidationIssues extends AbstractUiSection {
    * Rerenders the issue pane contents, waiting for an idle moment
    * (falls back to immediate if no scheduler).
    */
-  protected _deferredRender(): void {
+  protected _renderWhenIdle(): void {
     const scheduler = this.context.systems.scheduler;
     const fn = () => {
       if (!this._isVisible()) return;
       this._reloadIssues();
-      this.reRender();
+      this.renderInner();
     };
     if (scheduler) {
       scheduler.scheduleIdleTask(fn)

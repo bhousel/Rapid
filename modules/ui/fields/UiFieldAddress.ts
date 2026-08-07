@@ -79,7 +79,6 @@ export class UiFieldAddress extends UiField {
     this.renderContent = this.renderContent.bind(this);
     this._updatePlaceholder = this._updatePlaceholder.bind(this);
 
-
     assets.loadAssetAsync('address_formats')
       .then((d: any) => {
         this._addressFormats = d.addressFormats as AddressFormat[];

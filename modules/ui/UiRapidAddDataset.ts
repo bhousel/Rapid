@@ -22,8 +22,6 @@ export class UiRapidAddDataset extends EventEmitter {
   public $wrap: D3Selection | null;
   public $modal: D3Selection | null;
 
-  public rerender: () => void;
-
   protected _currFileList: FileList | null;
   protected _currUrl: string | null;
   protected _clickedOk: () => void;       // custom OK handler
@@ -53,11 +51,10 @@ export class UiRapidAddDataset extends EventEmitter {
     // (This is also necessary when using `d3-selection.call`)
     this.show = this.show.bind(this);
     this.render = this.render.bind(this);
-    this.rerender = (() => this.render());  // call render without argument
 
     // Setup event handlers
     const l10n = context.systems.l10n!;
-    l10n.on('localechange', this.rerender);
+    l10n.on('localechange', this.render);
   }
 
 

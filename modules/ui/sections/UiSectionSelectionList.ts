@@ -24,7 +24,7 @@ export class UiSectionSelectionList extends AbstractUiSection {
     this._deselectEntity = this._deselectEntity.bind(this);
 
     const editor = context.systems.editor!;
-    editor.on('stablechange', () => this.reRender());
+    editor.on('stablechange', this.renderInner);
   }
 
 

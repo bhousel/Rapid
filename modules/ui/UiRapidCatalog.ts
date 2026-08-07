@@ -26,8 +26,6 @@ export class UiRapidCatalog extends EventEmitter {
   public $wrap: D3Selection | null;
   public $modal: D3Selection | null;
 
-  public rerender: () => void;
-
   protected _filterText: string | null;
   protected _filterCategory: string | null;
   protected _myClose: () => unknown;
@@ -57,7 +55,6 @@ export class UiRapidCatalog extends EventEmitter {
     // (This is also necessary when using `d3-selection.call`)
     this.show = this.show.bind(this);
     this.render = this.render.bind(this);
-    this.rerender = (() => this.render());  // call render without argument
     this.renderDatasets = this.renderDatasets.bind(this);
     this.sortCategories = this.sortCategories.bind(this);
     this.sortDatasets = this.sortDatasets.bind(this);
@@ -66,7 +63,7 @@ export class UiRapidCatalog extends EventEmitter {
 
     // Setup event handlers
     const l10n = context.systems.l10n!;
-    l10n.on('localechange', this.rerender);
+    l10n.on('localechange', this.render);
   }
 
 

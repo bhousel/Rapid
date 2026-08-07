@@ -16,7 +16,6 @@ const METADATA_KEYS = ['zoom', 'vintage', 'source', 'description', 'resolution',
  */
 export class UiBackgroundCard extends AbstractUiCard {
   public id: string;
-  public rerender: () => void;
   public deferredRender: () => void;
   public deferredUpdateMetadata: () => void;
 
@@ -44,14 +43,13 @@ export class UiBackgroundCard extends AbstractUiCard {
     // Ensure methods used as callbacks always have `this` bound correctly.
     // (This is also necessary when using `d3-selection.call`)
     this.render = this.render.bind(this);
-    this.rerender = (() => this.render());  // call render without argument
     this.updateMetadata = this.updateMetadata.bind(this);
     this.deferredRender = () => {
       // scheduler debounces the redraw; without it, just redraw immediately
       if (scheduler) {
-        scheduler.debounce('UiBackgroundCard-render', () => this.rerender(), { ms: 250 });
+        scheduler.debounce('UiBackgroundCard-render', () => this.render(), { ms: 250 });
       } else {
-        this.rerender();
+        this.render();
       }
     };
     this.deferredUpdateMetadata = () => {

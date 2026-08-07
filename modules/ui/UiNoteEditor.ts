@@ -56,7 +56,6 @@ export class UiNoteEditor extends EventEmitter {
 
     // Ensure methods used as callbacks always have `this` bound correctly.
     this.render = this.render.bind(this);
-    this.rerender = (() => { if (this.$parent) this.render(this.$parent); });
     this._saveSection = this._saveSection.bind(this);
     this._userDetails = this._userDetails.bind(this);
     this._buttons = this._buttons.bind(this);
@@ -65,9 +64,6 @@ export class UiNoteEditor extends EventEmitter {
     this._clickStatus = this._clickStatus.bind(this);
     this._clickComment = this._clickComment.bind(this);
   }
-
-  /** Re-renders into the last-known parent selection (used on auth changes). */
-  public rerender: () => void;
 
 
   /**
@@ -149,7 +145,7 @@ export class UiNoteEditor extends EventEmitter {
     // rerender the note editor on any auth change (wire once to avoid leaking listeners)
     if (osm && !this._authWired) {
       this._authWired = true;
-      osm.on('authchange', this.rerender);
+      osm.on('authchange', this.render);
     }
   }
 

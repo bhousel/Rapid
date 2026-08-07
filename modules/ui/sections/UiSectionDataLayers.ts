@@ -70,8 +70,8 @@ export class UiSectionDataLayers extends AbstractUiSection {
     this._settingsCustomData.on('change', this._customChanged);
 
     // Add or replace event handlers
-    scene.off('layerchange', this.reRender);
-    scene.on('layerchange', this.reRender);
+    scene.off('layerchange', this.renderInner);
+    scene.on('layerchange', this.renderInner);
     l10n.off('localechange', this._setupKeybinding);
     l10n.on('localechange', this._setupKeybinding);
 

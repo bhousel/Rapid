@@ -19,7 +19,6 @@ export class UiFilterStatus {
   // D3 selections
   public $parent: D3Selection | null;
 
-  public rerender: () => void;
   public deferredRender: () => void;
 
 
@@ -41,14 +40,13 @@ export class UiFilterStatus {
     // Ensure methods used as callbacks always have `this` bound correctly.
     // (This is also necessary when using `d3-selection.call`)
     this.render = this.render.bind(this);
-    this.rerender = (() => this.render());  // call render without argument
     this.click = this.click.bind(this);
     this.deferredRender = () => {
       // scheduler throttles the redraw; without it, just redraw immediately
       if (scheduler) {
-        scheduler.throttle('UiFilterStatus-render', () => this.rerender(), { ms: 1000 });
+        scheduler.throttle('UiFilterStatus-render', () => this.render(), { ms: 1000 });
       } else {
-        this.rerender();
+        this.render();
       }
     };
 

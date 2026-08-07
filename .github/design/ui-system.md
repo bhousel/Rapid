@@ -33,7 +33,7 @@ indentation and filename casing:
 
 1. Every file under `modules/ui/` becomes a **TypeScript class component** (Level 4).
 2. Uniform lifecycle: constructed with `new Foo(context)`, `render($parent = this.$parent)`,
-   plus `rerender`/`throttledRender` where appropriate.
+   plus `throttledRender` where appropriate.
 3. **Idempotent rendering** — every component can be re-rendered top-down at any time (this is how
    `UiSystem` already handles `localechange`, re-rendering the whole tree).
 4. **Relocalization-safe** — text content is written in the *update* phase (post-merge), never only
@@ -89,9 +89,9 @@ export class UiFoo {
     // Ensure methods used as callbacks always have `this` bound correctly.
     this.render = this.render.bind(this);
 
-    // Event wiring (rerender on relevant changes)
+    // Event wiring (render on relevant changes)
     const l10n = context.systems.l10n!;
-    l10n.on('localechange', this.rerender);
+    l10n.on('localechange', this.render);
   }
 
 
@@ -155,8 +155,7 @@ export class UiFoo {
 - **Types:** use ID types (`EntityID`, `PresetID`, etc.) instead of `string` where the name implies it.
   Untyped legacy sub-components may be typed `any` temporarily; prefer real types when cheap.
 - **Binding:** bind callback methods in the constructor (`this.render = this.render.bind(this)`).
-- **`rerender`/`throttledRender`:** add `rerender = () => this.render()` when the component subscribes
-  to events. Add a throttled variant (see existing usages of `throttle`/scheduler debounce) only when
+- **`throttledRender`:** Add a throttled variant (see existing usages of `throttle`/scheduler debounce) only when
   the component already throttled or clearly needs it (high-frequency map/hover events).
 - **Comments:** preserve existing comments (AGENTS.md). Don't add narration. Convert JSDoc `@param {T}`
   → TS-typed `@param` (drop the `{T}`).
@@ -166,7 +165,7 @@ export class UiFoo {
 - `cards/AbstractUiCard.js` is already a base class → convert to `AbstractUiCard.ts` first; other
   cards extend it.
 - Consider (but do not force) a light shared `AbstractUiComponent` interface capturing
-  `context`, `$parent`, `render`, `rerender`. Only introduce it if it removes real duplication;
+  `context`, `$parent`, `render`. Only introduce it if it removes real duplication;
   otherwise keep components independent to avoid premature abstraction (per AGENTS.md).
 
 ## Inventory
@@ -510,7 +509,7 @@ Start the Tutorial, and the Rapid-splash "skip to Rapid" path).
   `ColorblindModeOptions`, `Changes`. Each overrides `label()` (returns the l10n string) and
   implements `renderDisclosureContent($selection)` (or `renderContent`); factory-scoped state →
   `protected _x`; helpers → protected methods (bound when passed to `.call`/`.on`); events wired in
-  the constructor (`foo.on('event', this.reRender)`).
+  the constructor (`foo.on('event', this.render)`).
 - **Panes:** `pane` → `UiPane` **base class** (public `key`/`label`/`description`/`iconName`/`sections`;
   methods `renderPane`/`renderToggleButton`/`renderContent`/`togglePane`). The five panes became
   `UiPaneBackground/MapData/Issues/Preferences/Help` subclasses that set their properties in the

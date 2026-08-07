@@ -90,7 +90,7 @@ export class UiSectionRawMemberEditor extends AbstractUiSection {
     // display the loading indicator
     select((d3_event.currentTarget as HTMLElement).parentNode as HTMLElement).classed('tag-reference-loading', true);
     this.context.loadEntityAsync(d.id)
-      .then(() => this.reRender());
+      .then(() => this.renderInner());
   }
 
 

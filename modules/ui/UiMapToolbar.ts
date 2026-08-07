@@ -31,8 +31,6 @@ export class UiMapToolbar {
   // D3 selections
   public $parent: D3Selection | null;
 
-  public rerender: () => void;
-
 
   /**
    * @param  context - Global shared application context
@@ -53,10 +51,9 @@ export class UiMapToolbar {
     // Ensure methods used as callbacks always have `this` bound correctly.
     // (This is also necessary when using `d3-selection.call`)
     this.render = this.render.bind(this);
-    this.rerender = (() => this.render());  // call render without argument
 
     const urlhash = context.systems.urlhash!;
-    urlhash.on('hashchange', this.rerender);
+    urlhash.on('hashchange', this.render);
   }
 
 

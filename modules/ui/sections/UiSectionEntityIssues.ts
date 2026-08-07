@@ -78,6 +78,8 @@ export class UiSectionEntityIssues extends AbstractUiSection {
    */
   protected _makeActiveIssue(issueID: string): void {
     this._activeIssueID = issueID;
+
+    if (!this.$container) return;
     this.$container.selectAll('.issue-container')
       .classed('active', (d: ValidationIssue) => d.id === this._activeIssueID);
   }
@@ -287,7 +289,7 @@ export class UiSectionEntityIssues extends AbstractUiSection {
    */
   protected _onValidated(): void {
     this._reloadIssues();   // Refresh on validated events
-    this.reRender();
+    this.renderInner();
   }
 
 

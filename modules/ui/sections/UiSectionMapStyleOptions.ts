@@ -19,8 +19,8 @@ export class UiSectionMapStyleOptions extends AbstractUiSection {
     // Ensure methods used as callbacks always have `this` bound correctly.
     this._drawListItems = this._drawListItems.bind(this);
 
-    map.off('mapchange', this.reRender);
-    map.on('mapchange', this.reRender);
+    map.off('mapchange', this.renderInner);
+    map.on('mapchange', this.renderInner);
   }
 
 

@@ -1,4 +1,4 @@
-import { select } from 'd3-selection';
+import { selection } from 'd3-selection';
 import { EventEmitter } from 'tseep/lib/ee-safe';
 import { uiDisclosure } from '../disclosure.ts';
 
@@ -24,7 +24,8 @@ export abstract class AbstractUiSection extends EventEmitter {
   public id: string;
 
   // D3 selections
-  public $container: D3Selection;
+  public $parent: D3Selection | null;
+  public $container: D3Selection | null;
 
   protected _classes: string;
   protected _disclosure: UiDisclosure | undefined;
@@ -40,7 +41,9 @@ export abstract class AbstractUiSection extends EventEmitter {
     this.context = context;
     this.id = id;
 
-    this.$container = select(null);
+    // D3 selections
+    this.$parent = null;
+    this.$container = null;
 
     this._classes = '';
     this._disclosure = undefined;
@@ -49,8 +52,78 @@ export abstract class AbstractUiSection extends EventEmitter {
     // Ensure methods used as callbacks always have `this` bound correctly.
     // (This is also necessary when using `d3-selection.call`)
     this.render = this.render.bind(this);
-    this.reRender = this.reRender.bind(this);
-    this._renderInner = this._renderInner.bind(this);
+    this.renderInner = this.renderInner.bind(this);
+  }
+
+
+  /**
+   * Accepts a parent selection, and renders the content under it.
+   * (The parent selection is required the first time, but can be inferred on subsequent renders)
+   * @param $parent - A d3-selection to a HTMLElement that this component should render itself into
+   */
+  public render($parent = this.$parent): void {
+    if ($parent instanceof selection) {
+      this.$parent = $parent;
+    } else {
+      return;   // no parent - called too early?
+    }
+
+    this.$container = $parent
+      .selectAll(`.section-${this.id}`)
+      .data([0]);
+
+    // enter
+    const $$container = this.$container
+      .enter()
+      .append('div')
+      .attr('class', `section section-${this.id} ${this._classes}`.trim());
+
+    // update
+    this.$container = $$container
+      .merge(this.$container);
+
+    this.$container
+      .call(this.renderInner);
+  }
+
+
+  /**
+   * Renders the section's inner content, handling the `shouldDisplay` check and
+   * dispatching to either the disclosure content or the plain content.
+   */
+  public renderInner(): void {
+    const $container = this.$container;
+    if (!$container) return;  // called too early?
+
+    // The section may be hidden completely if it isn't needed.
+    const shouldDisplay = this.shouldDisplay();
+    $container.classed('hide', !shouldDisplay);
+    if (!shouldDisplay) {
+      $container.html('');
+      return;
+    }
+
+    const self = this as any;
+
+    // Render the content inside a Disclosure
+    if (typeof self.renderDisclosureContent === 'function') {
+      if (!this._disclosure) {   // create if needed
+        this._disclosure = uiDisclosure(this.context, this.id.replace(/-/g, '_'))
+          .label(() => this.label())
+          .content(self.renderDisclosureContent.bind(this));
+      }
+
+      this._disclosure
+        .expandOverride(this._disclosureExpandOverride);
+
+      $container
+        .call(this._disclosure);
+
+      // Render the content on its own
+    } else if (typeof self.renderContent === 'function') {
+      $container
+        .call(self.renderContent.bind(this));
+    }
   }
 
 
@@ -67,73 +140,5 @@ export abstract class AbstractUiSection extends EventEmitter {
    */
   public shouldDisplay(): boolean {
     return true;
-  }
-
-
-  /**
-   * Renders the section container into the given parent selection.
-   * @param  $selection - A d3-selection to render into
-   */
-  public render($selection: D3Selection): void {
-    this.$container = $selection
-      .selectAll(`.section-${this.id}`)
-      .data([0]);
-
-    const $$container = this.$container
-      .enter()
-      .append('div')
-      .attr('class', `section section-${this.id} ${this._classes}`.trim());
-
-    this.$container = $$container
-      .merge(this.$container);
-
-    this.$container
-      .call(this._renderInner);
-  }
-
-
-  /**
-   * Re-renders the section's content into the existing container.
-   */
-  public reRender(): void {
-    this.$container
-      .call(this._renderInner);
-  }
-
-
-  /**
-   * Renders the section's inner content, handling the `shouldDisplay` check and
-   * dispatching to either the disclosure content or the plain content.
-   */
-  protected _renderInner($selection: D3Selection): void {
-    const self = this as any;
-
-    // The section may be hidden completely if it isn't needed.
-    const shouldDisplay = this.shouldDisplay();
-    $selection.classed('hide', !shouldDisplay);
-    if (!shouldDisplay) {
-      $selection.html('');
-      return;
-    }
-
-    // Render the content inside a Disclosure
-    if (typeof self.renderDisclosureContent === 'function') {
-      if (!this._disclosure) {   // create if needed
-        this._disclosure = uiDisclosure(this.context, this.id.replace(/-/g, '_'))
-          .label(() => this.label())
-          .content(self.renderDisclosureContent.bind(this));
-      }
-
-      this._disclosure
-        .expandOverride(this._disclosureExpandOverride);
-
-      $selection
-        .call(this._disclosure);
-
-    // Render the content on its own
-    } else if (typeof self.renderContent === 'function') {
-      $selection
-        .call(self.renderContent.bind(this));
-    }
   }
 }

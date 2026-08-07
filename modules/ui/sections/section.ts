@@ -30,8 +30,8 @@ export interface UiSection {
   disclosureContent(val: UiSectionContent): UiSection;
   disclosureExpandOverride(): boolean | undefined;
   disclosureExpandOverride(val: boolean | undefined): UiSection;
-  render($selection: D3Selection): void;
-  reRender(): void;
+  render($parent: D3Selection): void;
+  renderInner(): void;
 }
 
 
@@ -103,8 +103,8 @@ export function uiSection(context: Context, sectionID: string): UiSection {
   };
 
 
-  section.render = function render($selection: D3Selection): void {
-    $container = $selection
+  section.render = function render($parent: D3Selection): void {
+    $container = $parent
       .selectAll(`.section-${sectionID}`)
       .data([0]);
 
@@ -121,7 +121,7 @@ export function uiSection(context: Context, sectionID: string): UiSection {
   };
 
 
-  section.reRender = function() {
+  section.renderInner = function() {
     $container
       .call(renderContent);
   };

@@ -67,7 +67,7 @@ export class UiSectionBackgroundDisplayOptions extends AbstractUiSection {
     } else if (d === 'sharpness') {
       imagery.sharpness = val;
     }
-    this.reRender();
+    this.renderInner();
   }
 
 

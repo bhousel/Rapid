@@ -15,20 +15,20 @@ export class UiSectionValidationStatus extends AbstractUiSection {
     super(context, 'issues-status');
 
     // Ensure methods used as callbacks always have `this` bound correctly.
-    this._reRenderIdle = this._reRenderIdle.bind(this);
+    this._renderWhenIdle = this._renderWhenIdle.bind(this);
 
     const map = context.systems.map!;
     const scheduler = context.systems.scheduler;  // optional
     const validator = context.systems.validator!;
 
-    validator.on('validated', this._reRenderIdle);
+    validator.on('validated', this._renderWhenIdle);
 
     map.on('draw', () => {
       // scheduler debounces the redraw; without it, just redraw immediately
       if (scheduler) {
-        scheduler.debounce('ValidationStatus-render', this._reRenderIdle, { ms: 1000 });
+        scheduler.debounce('ValidationStatus-render', this._renderWhenIdle, { ms: 1000 });
       } else {
-        this._reRenderIdle();
+        this._renderWhenIdle();
       }
     });
   }
@@ -210,16 +210,16 @@ export class UiSectionValidationStatus extends AbstractUiSection {
   /**
    * Re-renders, waiting for an idle moment (falls back to immediate if no scheduler).
    */
-  protected _reRenderIdle(): void {
+  protected _renderWhenIdle(): void {
     const scheduler = this.context.systems.scheduler;
     if (scheduler) {
-      scheduler.scheduleIdleTask(this.reRender)
+      scheduler.scheduleIdleTask(this.renderInner)
         .catch((err: any) => {
           if (err?.name === 'AbortError') return;   // expected cancellation
           console.error(err);  // eslint-disable-line no-console
         });
     } else {
-      this.reRender();
+      this.renderInner();
     }
   }
 }

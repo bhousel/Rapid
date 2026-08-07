@@ -105,9 +105,9 @@ This project has reusable Copilot prompt files in `.github/prompts/`. Your edito
 
   // scheduler debounces the redraw; without it, just redraw immediately
   if (scheduler) {
-    scheduler.debounce('MyCard-render', () => this.rerender(), { ms: 250 });
+    scheduler.debounce('MyCard-render', () => this.render(), { ms: 250 });
   } else {
-    this.rerender();
+    this.render();
   }
   ```
 - This keeps code working even when optional systems are absent

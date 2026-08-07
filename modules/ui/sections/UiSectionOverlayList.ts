@@ -37,11 +37,10 @@ export class UiSectionOverlayList extends AbstractUiSection {
     this._setTooltips = this._setTooltips.bind(this);
     this._updateLayerSelections = this._updateLayerSelections.bind(this);
     this._chooseOverlay = this._chooseOverlay.bind(this);
-    this._renderIfVisible = this._renderIfVisible.bind(this);
     this._onMapDraw = this._onMapDraw.bind(this);
     this._deferredOnMapDraw = this._deferredOnMapDraw.bind(this);
 
-    imagery.on('imagerychange', this._renderIfVisible);
+    imagery.on('imagerychange', this.renderInner);
     map.on('draw', this._deferredOnMapDraw);
   }
 
@@ -64,14 +63,6 @@ export class UiSectionOverlayList extends AbstractUiSection {
   protected _isOverlay(d: ImagerySource): boolean {
     return !!d.props.overlay;
   }
-
-  /**
-   * Re-renders the disclosure content (skips rendering if the disclosure is closed).
-   */
-  protected _renderIfVisible(): void {
-    this.reRender();
-  }
-
 
   /**
    * Render the overlay list.
@@ -200,13 +191,13 @@ export class UiSectionOverlayList extends AbstractUiSection {
     const scheduler = this.context.systems.scheduler;
 
     if (scheduler) {
-      scheduler.scheduleIdleTask(() => this._renderIfVisible())
+      scheduler.scheduleIdleTask(() => this.renderInner())
         .catch((err: unknown) => {
           if ((err as any)?.name === 'AbortError') return;   // expected cancellation
           console.error(err);  // eslint-disable-line no-console
         });
     } else {
-      this._renderIfVisible();
+      this.renderInner();
     }
   }
 

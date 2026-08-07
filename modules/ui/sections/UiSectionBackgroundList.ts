@@ -137,7 +137,7 @@ export class UiSectionBackgroundList extends AbstractUiSection {
    */
   protected _renderIfVisible(): void {
     if (this._isVisible()) {
-      this.reRender();
+      this.renderInner();
     }
   }
 
@@ -147,6 +147,7 @@ export class UiSectionBackgroundList extends AbstractUiSection {
    * @return `true` if both the background pane and this disclosure are open
    */
   protected _isVisible(): boolean {
+    if (!this.$container) return false;
     const context = this.context;
 
     const $container = context.container();

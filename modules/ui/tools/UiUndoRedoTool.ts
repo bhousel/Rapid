@@ -20,7 +20,6 @@ export class UiUndoRedoTool {
   // D3 selections
   public $parent: D3Selection | null;
 
-  public rerender: () => void;
   public debouncedRender: () => void;
 
   /**
@@ -74,13 +73,12 @@ export class UiUndoRedoTool {
     // (This is also necessary when using `d3-selection.call`)
     this.choose = this.choose.bind(this);
     this.render = this.render.bind(this);
-    this.rerender = (() => this.render());  // call render without argument
     this.debouncedRender = () => {
       // scheduler throttles the redraw; without it, just redraw immediately
       if (scheduler) {
-        scheduler.throttle('UiUndoRedoTool-render', () => this.rerender(), { ms: 500 });
+        scheduler.throttle('UiUndoRedoTool-render', () => this.render(), { ms: 500 });
       } else {
-        this.rerender();
+        this.render();
       }
     };
 
@@ -89,8 +87,8 @@ export class UiUndoRedoTool {
       context.keybinding().on(d.key, e => this.choose(e, d));
     }
     map.on('draw', this.debouncedRender);
-    editor.on('stablechange', this.rerender);
-    context.on('modechange', this.rerender);
+    editor.on('stablechange', this.render);
+    context.on('modechange', this.render);
   }
 
 

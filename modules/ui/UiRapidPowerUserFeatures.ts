@@ -15,8 +15,6 @@ export class UiRapidPowerUserFeatures {
   // D3 selections
   public $modal: any;
 
-  public rerender: () => void;
-
 
   /**
    * @param  context - Global shared application context
@@ -43,14 +41,13 @@ export class UiRapidPowerUserFeatures {
     // (This is also necessary when using `d3-selection.call`)
     this.show = this.show.bind(this);
     this.render = this.render.bind(this);
-    this.rerender = (() => this.render());  // call render without argument
     this.renderFeatures = this.renderFeatures.bind(this);
     this.updateFeatureFlags = this.updateFeatureFlags.bind(this);
     this.isFeatureEnabled = this.isFeatureEnabled.bind(this);
     this.toggleFeature = this.toggleFeature.bind(this);
 
     // Setup event handlers
-    l10n.on('localechange', this.rerender);
+    l10n.on('localechange', this.render);
     urlhash.on('hashchange', this.updateFeatureFlags);
   }
 

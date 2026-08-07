@@ -19,7 +19,7 @@ export class UiSectionMapFeatures extends AbstractUiSection {
     // Ensure methods used as callbacks always have `this` bound correctly.
     this._drawListItems = this._drawListItems.bind(this);
 
-    filters.on('filterchange', this.reRender);
+    filters.on('filterchange', this.renderInner);
   }
 
 

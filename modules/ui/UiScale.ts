@@ -20,7 +20,6 @@ export class UiScale {
   public $parent: D3Selection | null;
   public $wrap: D3Selection | null;
 
-  public rerender: () => void;
   protected _deferredUpdateScale: () => void;
 
 
@@ -43,7 +42,6 @@ export class UiScale {
     // Ensure methods used as callbacks always have `this` bound correctly.
     // (This is also necessary when using `d3-selection.call`)
     this.render = this.render.bind(this);
-    this.rerender = (() => this.render());  // call render without argument
     this.toggleUnits = this.toggleUnits.bind(this);
     this.updateScale = this.updateScale.bind(this);
     this._deferredUpdateScale = () => {

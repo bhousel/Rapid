@@ -26,7 +26,7 @@ export class UiSectionValidationRules extends AbstractUiSection {
     this._changeSquare = this._changeSquare.bind(this);
     this._isValidatorEnabled = this._isValidatorEnabled.bind(this);
     this._toggleValidator = this._toggleValidator.bind(this);
-    this._reRenderIdle = this._reRenderIdle.bind(this);
+    this._renderWhenIdle = this._renderWhenIdle.bind(this);
 
     const l10n = context.systems.l10n!;
     const validator = context.systems.validator!;
@@ -37,7 +37,7 @@ export class UiSectionValidationRules extends AbstractUiSection {
         return l10n.t(`issues.${key1}.title`) < l10n.t(`issues.${key2}.title`) ? -1 : 1;
       });
 
-    validator.on('validated', this._reRenderIdle);
+    validator.on('validated', this._renderWhenIdle);
   }
 
 
@@ -248,16 +248,16 @@ export class UiSectionValidationRules extends AbstractUiSection {
   /**
    * Re-renders, waiting for an idle moment (falls back to immediate if no scheduler).
    */
-  protected _reRenderIdle(): void {
+  protected _renderWhenIdle(): void {
     const scheduler = this.context.systems.scheduler;
     if (scheduler) {
-      scheduler.scheduleIdleTask(this.reRender)
+      scheduler.scheduleIdleTask(this.renderInner)
         .catch((err: unknown) => {
           if ((err as any)?.name === 'AbortError') return;   // expected cancellation
           console.error(err);  // eslint-disable-line no-console
         });
     } else {
-      this.reRender();
+      this.renderInner();
     }
   }
 }

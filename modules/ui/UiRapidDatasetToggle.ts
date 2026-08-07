@@ -37,8 +37,6 @@ export class UiRapidDatasetToggle {
   // D3 selections
   public $modal: any;
 
-  public rerender: () => void;
-
 
   /**
    * @param  context - Global shared application context
@@ -59,15 +57,14 @@ export class UiRapidDatasetToggle {
     // (This is also necessary when using `d3-selection.call`)
     this.show = this.show.bind(this);
     this.render = this.render.bind(this);
-    this.rerender = (() => this.render());  // call render without argument
     this.renderDatasets = this.renderDatasets.bind(this);
     this.changeColor = this.changeColor.bind(this);
     this.toggleDataset = this.toggleDataset.bind(this);
     this.toggleRapid = this.toggleRapid.bind(this);
 
     // Setup event handlers
-    scene.on('layerchange', this.rerender);
-    l10n.on('localechange', this.rerender);
+    scene.on('layerchange', this.render);
+    l10n.on('localechange', this.render);
   }
 
 
@@ -166,7 +163,7 @@ export class UiRapidDatasetToggle {
       .append('div')
       .attr('class', 'modal-section rapid-checkbox rapid-browse-catalog')
       .on('click', () => {
-        const CatalogModal = new UiRapidCatalog(context, this.$modal).on('done', this.rerender);
+        const CatalogModal = new UiRapidCatalog(context, this.$modal).on('done', this.render);
         context.container().call(CatalogModal.show);
       });
 
@@ -202,7 +199,7 @@ export class UiRapidDatasetToggle {
       .append('div')
       .attr('class', 'modal-section rapid-checkbox rapid-add-custom-data')
       .on('click', () => {
-        const AddDatasetModal = new UiRapidAddDataset(context, this.$modal).on('done', this.rerender);
+        const AddDatasetModal = new UiRapidAddDataset(context, this.$modal).on('done', this.render);
         context.container().call(AddDatasetModal.show);
       });
 

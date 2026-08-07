@@ -20,7 +20,6 @@ export class UiZoomControl {
   // D3 selections
   public $parent: D3Selection | null;
 
-  public rerender: () => void;
   public zooms: any[];
 
 
@@ -42,7 +41,6 @@ export class UiZoomControl {
     // Ensure methods used as callbacks always have `this` bound correctly.
     // (This is also necessary when using `d3-selection.call`)
     this.render = this.render.bind(this);
-    this.rerender = (() => this.render());  // call render without argument
     this.zoomIn = this.zoomIn.bind(this);
     this.zoomOut = this.zoomOut.bind(this);
     this.zoomInFurther = this.zoomInFurther.bind(this);
@@ -77,7 +75,7 @@ export class UiZoomControl {
       context.keybinding().on(utilCmd('⌥' + key), this.zoomOutFurther);
     });
 
-    map.on('draw', this.rerender);
+    map.on('draw', this.render);
   }
 
   /**

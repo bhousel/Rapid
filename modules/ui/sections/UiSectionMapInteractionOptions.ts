@@ -105,7 +105,7 @@ export class UiSectionMapInteractionOptions extends AbstractUiSection {
       .attr('name', 'mouse_wheel')
       .on('change', (d3_event: Event, d: string) => {
         settings?.set('ui.mouseWheelInteraction', d);
-        this.reRender();
+        this.renderInner();
       });
 
     $$label

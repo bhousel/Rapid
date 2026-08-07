@@ -648,7 +648,7 @@ const indexes = d.members.map(function(member: IndexedMember) {
     $addRow.select('.add-relation')
       .on('click', () => {
         this._showBlank = true;
-        this.reRender();
+        this.renderInner();
         ($list.selectAll('.member-entity-input').node() as HTMLElement).focus();
       });
 

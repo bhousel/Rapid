@@ -448,6 +448,8 @@ export class UiSectionRawTagEditor extends AbstractUiSection {
    * @param d3_event - the triggering keydown event
    */
   protected _pushMore(d3_event: KeyboardEvent): void {
+    if (!this.$container) return;  // called too early?
+
     const el = d3_event.currentTarget as HTMLElement;
     // if pressing Tab on the last value field with content, add a blank row
     if (d3_event.keyCode === 9 && !d3_event.shiftKey &&
@@ -566,10 +568,10 @@ export class UiSectionRawTagEditor extends AbstractUiSection {
     }
 
     // new key is already in use, switch focus to the existing row
-    if (kNew && kNew !== kOld && this._tags[kNew] !== undefined) {
+    if (this.$container && kNew && kNew !== kOld && this._tags[kNew] !== undefined) {
       el.value = kOld;     // reset the key
       this.$container.selectAll('.tag-list input.value')
-          .each((d: TagRow, i, nodes) => {
+        .each((d: TagRow, i, nodes) => {
           if (d.key === kNew) {     // send focus to that other value combo instead
             const input = nodes[i] as HTMLInputElement;
             input.focus();
@@ -638,7 +640,7 @@ export class UiSectionRawTagEditor extends AbstractUiSection {
 
     if (d.key === '') {    // removing the blank row
       this._showBlank = false;
-      this.reRender();
+      this.renderInner();
 
     } else {
       // remove the key from the ordered key index
@@ -659,8 +661,10 @@ export class UiSectionRawTagEditor extends AbstractUiSection {
     // Without the setTimeout, the `content` render would wipe out the pending tag change.
     const addTag = () => {
       this._showBlank = true;
-      this.reRender();
-      (this.$container.selectAll('.tag-list li:last-child input.key').node() as HTMLElement).focus();
+      this.renderInner();
+      if (this.$container) {
+        (this.$container.selectAll('.tag-list li:last-child input.key').node() as HTMLElement).focus();
+      }
     };
     if (scheduler) {
       scheduler.setTimeout('ui-raw-tag-editor-add-tag', addTag, { ms: 20 });

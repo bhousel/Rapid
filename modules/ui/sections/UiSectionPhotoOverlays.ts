@@ -44,10 +44,10 @@ export class UiSectionPhotoOverlays extends AbstractUiSection {
     this._drawDateFilter = this._drawDateFilter.bind(this);
 
     // Add or replace event handlers
-    scene.off('layerchange', this.reRender);
-    scene.on('layerchange', this.reRender);
-    photos.off('photochange', this.reRender);
-    photos.on('photochange', this.reRender);
+    scene.off('layerchange', this.renderInner);
+    scene.on('layerchange', this.renderInner);
+    photos.off('photochange', this.renderInner);
+    photos.on('photochange', this.renderInner);
   }
 
 

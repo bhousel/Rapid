@@ -46,7 +46,6 @@ function asLineString(feature: any): any {
  */
 export class UiMeasurementCard extends AbstractUiCard {
   public id: string;
-  public rerender: () => void;
 
   protected _isImperial: boolean;
   protected _keys: string[] | null;
@@ -69,12 +68,11 @@ export class UiMeasurementCard extends AbstractUiCard {
     // Ensure methods used as callbacks always have `this` bound correctly.
     // (This is also necessary when using `d3-selection.call`)
     this.render = this.render.bind(this);
-    this.rerender = (() => this.render());  // call render without argument
     this._setupKeybinding = this._setupKeybinding.bind(this);
 
     // Event listeners
-    map.on('draw', this.rerender);
-    context.on('modechange', this.rerender);
+    map.on('draw', this.render);
+    context.on('modechange', this.render);
     l10n.on('localechange', this._setupKeybinding);
 
     this._setupKeybinding();
