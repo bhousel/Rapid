@@ -111,7 +111,41 @@ export class PixiEvents extends EventEmitter {
     this._pointerup = this._pointerup.bind(this);
     this._wheel = this._wheel.bind(this);
 
+    // Dispatch over a copy of the listener list (see `_emit`).
+    // tseep's `ee-safe` emit walks the live listener array with a cached length
+    // and removes listeners in place, so a listener that unbinds other handlers
+    // mid-dispatch (e.g. a `pointermove` handler that enters a new mode) leaves
+    // a hole in the array and throws "ev[i] is not a function".
+    this.emit = this._emit.bind(this) as this['emit'];
+
     this.enable();
+  }
+
+
+  /**
+   * Dispatches an event to its listeners over a snapshot of the listener list.
+   *
+   * This replaces tseep's `ee-safe` `emit`, which iterates the live listener
+   * array with a cached length. If a listener adds or removes listeners for the
+   * same event while it runs (a common side effect of entering/exiting a mode
+   * during pointer handling), the live array is mutated in place and the cached
+   * length no longer matches — leaving holes that throw "ev[i] is not a
+   * function". Iterating a copy makes dispatch immune to those side effects,
+   * matching Node's `EventEmitter` semantics: the set of listeners is fixed for
+   * the duration of a single `emit`.
+   *
+   * @param event - The event name to dispatch
+   * @param args - Arguments to pass to each listener
+   * @return `true` if the event had listeners, `false` otherwise
+   */
+  protected _emit(event: string | symbol, ...args: unknown[]): boolean {
+    const listeners = this.events[event];
+    if (!listeners || listeners.length === 0) return false;
+
+    for (const listener of listeners.slice()) {
+      listener(...args);
+    }
+    return true;
   }
 
 
