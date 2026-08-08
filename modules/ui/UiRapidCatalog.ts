@@ -2,7 +2,7 @@ import { EventEmitter } from 'tseep/lib/ee-safe';
 import { select } from 'd3-selection';
 import { marked } from 'marked';
 import { uiIcon } from './icon.ts';
-import { uiCombobox} from './combobox.ts';
+import { UiCombobox } from './UiCombobox.ts';
 import { utilKeybinding, utilNoAuto, utilSafeURL, utilSanitizeHTML } from '../util/index.ts';
 
 import type { Context } from '../Context.ts';
@@ -44,7 +44,7 @@ export class UiRapidCatalog extends EventEmitter {
     this._myClose = () => true;   // custom close handler
 
     // Child components
-    this.CategoryCombo = uiCombobox(context, 'dataset-categories');
+    this.CategoryCombo = new UiCombobox(context, 'dataset-categories');
 
     // D3 selections
     this.$parentModal = $parentModal;
@@ -234,7 +234,7 @@ export class UiRapidCatalog extends EventEmitter {
       .append('input')
       .attr('class', 'rapid-catalog-filter-type')
       .call(utilNoAuto)
-      .call(this.CategoryCombo)
+      .call(this.CategoryCombo.attach)
       .on('blur change', e => {
         const element = e.currentTarget as HTMLInputElement;
         const val = (element && element.value) || '';

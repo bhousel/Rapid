@@ -6,7 +6,7 @@ import { actionChangeMember } from '../../actions/change_member.ts';
 import { actionDeleteMembers } from '../../actions/delete_members.ts';
 import { OsmEntity, OsmRelation } from '../../data/index.ts';
 import { uiIcon } from '../icon.ts';
-import { uiCombobox } from '../combobox.ts';
+import { UiCombobox } from '../UiCombobox.ts';
 import { AbstractUiSection } from './AbstractUiSection.ts';
 import { uiTooltip } from '../tooltip.ts';
 import { utilNoAuto, utilIsColorValid, utilHighlightEntities } from '../../util/util.ts';
@@ -59,7 +59,7 @@ export class UiSectionRawMembershipEditor extends AbstractUiSection {
     this._changeRole = this._changeRole.bind(this);
     this._deleteMembership = this._deleteMembership.bind(this);
 
-    this._nearbyCombo = uiCombobox(context, 'parent-relation')
+    this._nearbyCombo = new UiCombobox(context, 'parent-relation')
       .minItems(1)
       .fetcher(this._fetchNearbyRelations)
       .itemsMouseEnter((d3_event: Event, d: NearbyRelationItem) => {
@@ -609,6 +609,7 @@ const indexes = d.members.map(function(member: IndexedMember) {
       .call(this._nearbyCombo
         .on('accept', acceptEntity)
         .on('cancel', cancelEntity)
+        .attach
       );
 
 
@@ -695,7 +696,7 @@ const indexes = d.members.map(function(member: IndexedMember) {
         return sameletter.concat(other);
       }
 
-      $role.call(uiCombobox(context, 'member-role')
+      $role.call(new UiCombobox(context, 'member-role')
         .fetcher(function(role: string, callback: (data: any[]) => void) {
           const graph = editor.staging.graph;
           const entity = graph.hasEntity(entityIDs[0]);
@@ -713,6 +714,7 @@ const indexes = d.members.map(function(member: IndexedMember) {
         .on('cancel', function() {
           $role.property('value', origValue);
         })
+        .attach
       );
     }
 
@@ -721,7 +723,7 @@ const indexes = d.members.map(function(member: IndexedMember) {
       const $row = select(this);
 
       $row.selectAll('input.member-role')
-        .call(uiCombobox.off, context);
+        .call(UiCombobox.off, context);
     }
   }
 

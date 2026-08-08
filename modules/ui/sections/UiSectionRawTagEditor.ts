@@ -1,7 +1,7 @@
 import { select } from 'd3-selection';
 import { utilArrayDifference, utilArrayIdentical, utilTagDiff } from '@rapid-sdk/util';
 import { uiIcon } from '../icon.ts';
-import { uiCombobox } from '../combobox.ts';
+import { UiCombobox } from '../UiCombobox.ts';
 import { AbstractUiSection } from './AbstractUiSection.ts';
 import { UiTagReference } from '../UiTagReference.ts';
 import { utilGetSetValue, utilNoAuto } from '../../util/index.ts';
@@ -253,7 +253,7 @@ export class UiSectionRawTagEditor extends AbstractUiSection {
       .each((d: TagRow, i, nodes) => {
         const $row = select(nodes[i]);
         $row.selectAll('input.key, input.value')
-          .call(uiCombobox.off, context);
+          .call(UiCombobox.off, context);
       })
       .remove();
 
@@ -477,7 +477,7 @@ export class UiSectionRawTagEditor extends AbstractUiSection {
     if (!this._entityIDs.length) return;
 
     if (isMultiValueTag(d)) {
-      $value.call(uiCombobox(context, 'tag-value')
+      $value.call(new UiCombobox(context, 'tag-value')
         .minItems(1)
         .fetcher((value: string, callback: (data: any[]) => void) => {
           const keyString = utilGetSetValue($key) as string;
@@ -489,7 +489,7 @@ export class UiSectionRawTagEditor extends AbstractUiSection {
             };
           });
           callback(data);
-        }));
+        }).attach);
       return;
     }
 
@@ -497,7 +497,7 @@ export class UiSectionRawTagEditor extends AbstractUiSection {
     const entity = graph.hasEntity(this._entityIDs[0]);
     const geometry = entity?.geometry(graph);
 
-    $key.call(uiCombobox(context, 'tag-key')
+    $key.call(new UiCombobox(context, 'tag-key')
       .fetcher((value: string, callback: (data: any[]) => void) => {
         taginfo!.keys({
           debounce: true,
@@ -514,9 +514,9 @@ export class UiSectionRawTagEditor extends AbstractUiSection {
             callback(sort(value, filtered));
           }
         });
-      }));
+      }).attach);
 
-    $value.call(uiCombobox(context, 'tag-value')
+    $value.call(new UiCombobox(context, 'tag-value')
       .fetcher((value: string, callback: (data: any[]) => void) => {
         taginfo!.values({
           debounce: true,
@@ -526,7 +526,7 @@ export class UiSectionRawTagEditor extends AbstractUiSection {
         }, (err: any, data: any) => {
           if (!err) callback(sort(value, data));
         });
-      }));
+      }).attach);
 
 
     function sort(value: string, data: any[]): any[] {

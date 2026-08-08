@@ -1,5 +1,5 @@
 import { select, selection } from 'd3-selection';
-import { uiCombobox } from '../combobox.ts';
+import { UiCombobox } from '../UiCombobox.ts';
 import { UiField } from '../UiField.ts';
 import { utilGetSetValue, utilNoAuto } from '../../util/index.ts';
 
@@ -107,8 +107,9 @@ export class UiFieldCycleway extends UiField {
       .call(utilNoAuto)
       .each(function (this: HTMLInputElement, d) {
         select(this)
-          .call(uiCombobox(context, 'cycleway-' + stripcolon(d))
+          .call(new UiCombobox(context, 'cycleway-' + stripcolon(d))
             .data(getOptions())
+            .attach
           );
       });
 

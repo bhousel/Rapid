@@ -6,7 +6,7 @@ import { actionChangeMember } from '../../actions/change_member.ts';
 import { actionDeleteMember } from '../../actions/delete_member.ts';
 import { actionMoveMember } from '../../actions/move_member.ts';
 import { uiIcon } from '../icon.ts';
-import { uiCombobox } from '../combobox.ts';
+import { UiCombobox } from '../UiCombobox.ts';
 import { AbstractUiSection } from './AbstractUiSection.ts';
 import { utilHighlightEntities, utilIsColorValid, utilNoAuto } from '../../util/util.ts';
 
@@ -460,7 +460,7 @@ export class UiSectionRawMemberEditor extends AbstractUiSection {
       return sameletter.concat(other);
     }
 
-    $role.call(uiCombobox(context, 'member-role')
+    $role.call(new UiCombobox(context, 'member-role')
       .fetcher(function(role: string, callback: (data: any[]) => void) {
         // The `geometry` param is used in the `taginfo.ts` interface for
         // filtering results, as a key into the `tag_members_fractions`
@@ -490,6 +490,7 @@ export class UiSectionRawMemberEditor extends AbstractUiSection {
       .on('cancel', () => {
         $role.property('value', origValue);
       })
+      .attach
     );
   }
 
@@ -503,6 +504,6 @@ export class UiSectionRawMemberEditor extends AbstractUiSection {
   protected _unbindCombo(d: MemberRowData, i: number, nodes: ArrayLike<HTMLElement>): void {
     const $row = select(nodes[i]);
     $row.selectAll('input.member-role')
-      .call(uiCombobox.off, this.context);
+      .call(UiCombobox.off, this.context);
   }
 }

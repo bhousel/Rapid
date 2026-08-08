@@ -1,7 +1,7 @@
 import { selection } from 'd3-selection';
 import { roadSpeedUnit } from '@rapideditor/country-coder';
 import { UiField } from '../UiField.ts';
-import { uiCombobox } from '../combobox.ts';
+import { UiCombobox } from '../UiCombobox.ts';
 import { utilGetSetValue, utilNoAuto } from '../../util/index.ts';
 
 import type { Context } from '../../Context.ts';
@@ -57,8 +57,8 @@ export class UiFieldRoadspeed extends UiField {
     this._tags = {};
     this._isImperial = false;
 
-    this._speedCombo = uiCombobox(context, 'roadspeed');
-    this._unitCombo = uiCombobox(context, 'roadspeed-unit')
+    this._speedCombo = new UiCombobox(context, 'roadspeed');
+    this._unitCombo = new UiCombobox(context, 'roadspeed-unit')
       .data(['km/h', 'mph'].map(comboValues));
 
     this.renderContent = this.renderContent.bind(this);
@@ -97,7 +97,7 @@ export class UiFieldRoadspeed extends UiField {
       .attr('class', 'roadspeed-number')
       .attr('id', this.uid)
       .call(utilNoAuto)
-      .call(this._speedCombo)
+      .call(this._speedCombo.attach)
       .merge(this.$input);
 
     this.$input
@@ -114,7 +114,7 @@ export class UiFieldRoadspeed extends UiField {
       .append('input')
       .attr('type', 'text')
       .attr('class', 'roadspeed-unit')
-      .call(this._unitCombo)
+      .call(this._unitCombo.attach)
       .merge(this.$unitInput);
 
     this.$unitInput

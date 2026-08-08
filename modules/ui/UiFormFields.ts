@@ -1,5 +1,5 @@
 import { select, selection } from 'd3-selection';
-import { uiCombobox } from './combobox.ts';
+import { UiCombobox } from './UiCombobox.ts';
 import { utilGetSetValue, utilNoAuto } from '../util/index.ts';
 
 import type { Context } from '../Context.ts';
@@ -36,7 +36,7 @@ export class UiFormFields {
     this.state = '';
     this.klass = '';
 
-    this._moreCombo = uiCombobox(context, 'more-fields').minItems(1);
+    this._moreCombo = new UiCombobox(context, 'more-fields').minItems(1);
     this._lastPlaceholder = '';
 
     // Ensure methods used as callbacks always have `this` bound correctly.
@@ -159,6 +159,7 @@ export class UiFormFields {
           this.render();
           uifield.focus();
         })
+        .attach
       );
 
     // avoid updating placeholder excessively (triggers style recalc)

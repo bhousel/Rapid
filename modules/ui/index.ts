@@ -11,7 +11,7 @@ export { UiAccount } from './UiAccount.ts';
 export { UiApiStatus } from './UiApiStatus.ts';
 export { UiAttribution } from './UiAttribution.ts';
 export { UiChangesetEditor } from './UiChangesetEditor.ts';
-export { uiCombobox } from './combobox.ts';
+export { UiCombobox } from './UiCombobox.ts';
 export { UiCommit } from './UiCommit.ts';
 export { UiCommitWarnings } from './UiCommitWarnings.ts';
 export { uiConfirm } from './confirm.ts';

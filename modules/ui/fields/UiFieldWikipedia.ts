@@ -1,7 +1,7 @@
 import { selection } from 'd3-selection';
 import { actionChangeTags } from '../../actions/change_tags.ts';
 import { uiIcon } from '../icon.ts';
-import { uiCombobox } from '../combobox.ts';
+import { UiCombobox } from '../UiCombobox.ts';
 import { UiField } from '../UiField.ts';
 import { utilGetSetValue, utilNoAuto } from '../../util/index.ts';
 
@@ -63,7 +63,7 @@ export class UiFieldWikipedia extends UiField {
       })
       .catch((e: unknown) => console.error(e));  // eslint-disable-line
 
-    this._langCombo = uiCombobox(context, 'wikipedia-lang')
+    this._langCombo = new UiCombobox(context, 'wikipedia-lang')
       .fetcher((value, callback) => {
         const v = value.toLowerCase();
         callback(this._dataWikipedia
@@ -76,7 +76,7 @@ export class UiFieldWikipedia extends UiField {
         );
       });
 
-    this._titleCombo = uiCombobox(context, 'wikipedia-title')
+    this._titleCombo = new UiCombobox(context, 'wikipedia-title')
       .fetcher((value, callback) => {
         const editor = context.systems.editor!;
         const wikipedia = context.services.wikipedia!;
@@ -141,7 +141,7 @@ export class UiFieldWikipedia extends UiField {
       .attr('type', 'text')
       .attr('class', 'wiki-lang')
       .call(utilNoAuto)
-      .call(this._langCombo)
+      .call(this._langCombo.attach)
       .merge(this.$langInput);
 
     this.$langInput
@@ -167,7 +167,7 @@ export class UiFieldWikipedia extends UiField {
       .attr('class', 'wiki-title')
       .attr('id', this.uid)
       .call(utilNoAuto)
-      .call(this._titleCombo)
+      .call(this._titleCombo.attach)
       .merge(this.$titleInput);
 
     this.$titleInput

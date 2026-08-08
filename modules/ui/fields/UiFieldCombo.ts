@@ -4,7 +4,7 @@ import { utilArrayUniq, utilUnicodeCharsCount } from '@rapid-sdk/util';
 import { iso1A2Code } from '@rapideditor/country-coder';
 
 import { UiField } from '../UiField.ts';
-import { uiCombobox } from '../combobox.ts';
+import { UiCombobox } from '../UiCombobox.ts';
 import { utilKeybinding } from '../../util/keybinding.ts';
 import { utilGetSetValue, utilNoAuto } from '../../util/index.ts';
 
@@ -88,7 +88,7 @@ export class UiFieldCombo extends UiField {
     this._showTagInfoSuggestions = this.type !== 'manyCombo' && presetField.props.autoSuggestions !== false;
     this._allowCustomValues = this.type !== 'manyCombo' && presetField.props.customValues !== false;
     this._snake_case = (presetField.props.snake_case || (presetField.props.snake_case === undefined));
-    this._combobox = uiCombobox(context, 'combo-' + this.safeid)
+    this._combobox = new UiCombobox(context, 'combo-' + this.safeid)
       .caseSensitive(presetField.props.caseSensitive)
       .minItems(this._isMulti || this._isSemi ? 1 : 2);
     this._comboData = [];
@@ -299,10 +299,10 @@ export class UiFieldCombo extends UiField {
 
     const taginfo = context.services.taginfo as any;
     if (taginfo && this._showTagInfoSuggestions) {
-      $selection.call(this._combobox.fetcher(this._setTaginfoValues), $attachTo);
+      $selection.call(this._combobox.fetcher(this._setTaginfoValues).attach, $attachTo);
       this._setTaginfoValues('', this._setPlaceholder);
     } else {
-      $selection.call(this._combobox, $attachTo);
+      $selection.call(this._combobox.attach, $attachTo);
       this._setStaticValues(this._setPlaceholder);
     }
   }

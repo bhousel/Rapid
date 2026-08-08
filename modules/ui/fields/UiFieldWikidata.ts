@@ -3,7 +3,7 @@ import { actionChangeTags } from '../../actions/change_tags.ts';
 import { uiIcon } from '../icon.ts';
 import { UiField } from '../UiField.ts';
 import { utilGetSetValue, utilNoAuto } from '../../util/index.ts';
-import { uiCombobox } from '../combobox.ts';
+import { UiCombobox } from '../UiCombobox.ts';
 
 import type { Context } from '../../Context.ts';
 import type { D3Selection } from 'd3-selection';
@@ -50,7 +50,7 @@ export class UiFieldWikidata extends UiField {
     this._wikipediaKey = this.keys && this.keys.find(key => key.includes('wikipedia'));
     this._hintKey = this.key === 'wikidata' ? 'name' : this.key.split(':')[0];
 
-    this._combobox = uiCombobox(context, `combo-${this.safeid}`)
+    this._combobox = new UiCombobox(context, `combo-${this.safeid}`)
       .caseSensitive(true)
       .minItems(1);
 
@@ -111,7 +111,7 @@ export class UiFieldWikidata extends UiField {
       .on('blur', () => {
         this._setLabelForEntity();
       })
-      .call(combobox.fetcher(this._fetchWikidataItems));
+      .call(combobox.fetcher(this._fetchWikidataItems).attach);
 
     combobox.on('accept', (d: any) => {
       if (d) {

@@ -1,5 +1,5 @@
 import { select, selection } from 'd3-selection';
-import { uiCombobox } from '../combobox.ts';
+import { UiCombobox } from '../UiCombobox.ts';
 import { UiField } from '../UiField.ts';
 import { utilGetSetValue, utilNoAuto } from '../../util/index.ts';
 
@@ -208,8 +208,9 @@ export class UiFieldAccess extends UiField {
       .call(utilNoAuto)
       .each((d, i, nodes) => {
         select(nodes[i])
-          .call(uiCombobox(context, `access-${d}`)
+          .call(new UiCombobox(context, `access-${d}`)
             .data(this._fieldOptions(d))
+            .attach
           );
       });
 

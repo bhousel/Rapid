@@ -1,7 +1,7 @@
 import { EventEmitter } from 'tseep/lib/ee-safe';
 import { selection } from 'd3-selection';
 import { uiIcon } from './icon.ts';
-import { uiCombobox} from './combobox.ts';
+import { UiCombobox } from './UiCombobox.ts';
 import { createUiField } from './fields/index.ts';
 import { UiFormFields } from './UiFormFields.ts';
 
@@ -49,7 +49,7 @@ export class UiChangesetEditor extends EventEmitter {
     const schema = context.systems.schema!;
     this._scope = schema.getScope('osm');
 
-    this._commentCombo = uiCombobox(context, 'comment').caseSensitive(true);
+    this._commentCombo = new UiCombobox(context, 'comment').caseSensitive(true);
     this._uifields = undefined;
     this._tags = undefined;
     this._changesetID = undefined;
@@ -133,7 +133,7 @@ export class UiChangesetEditor extends EventEmitter {
             }
 
             commentField
-              .call(this._commentCombo.data(data));
+              .call(this._commentCombo.data(data).attach);
         });
       }
     }

@@ -2,7 +2,7 @@ import * as PIXI from 'pixi.js';
 
 import { AbstractUiSection } from './AbstractUiSection.ts';
 import { uiTooltip } from '../tooltip.ts';
-import { uiCombobox } from '../combobox.ts';
+import { UiCombobox } from '../UiCombobox.ts';
 import { utilNoAuto } from '../../util/util.ts';
 
 import type { Context } from '../../Context.ts';
@@ -51,7 +51,7 @@ export class UiSectionColorblindModeOptions extends AbstractUiSection {
     deuteranopiaFilter.matrix = deuteranopiaMatrix;
     tritanopiaFilter.matrix = tritanopiaMatrix;
 
-    this._colorblindCombo = uiCombobox(context, 'colorblind-mode-options');
+    this._colorblindCombo = new UiCombobox(context, 'colorblind-mode-options');
     this._checkboxState = false;
 
     this._loadComboBoxData();
@@ -118,7 +118,7 @@ export class UiSectionColorblindModeOptions extends AbstractUiSection {
     $$pickerCombo.append('input')
       .attr('class', 'color-select')
       .call(utilNoAuto)
-      .call(this._colorblindCombo)
+      .call(this._colorblindCombo.attach)
       .on('blur change', (d3_event: any) => {
         const element = d3_event.currentTarget;
         const val = element.value;

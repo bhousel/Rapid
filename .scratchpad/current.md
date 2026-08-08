@@ -35,13 +35,15 @@ Narrowed the trivial `any`s exposed by the cleaner field model:
   `_comboData`/`_scope`/Address suggestion return types.
 
 ## Next up
-- **Idea 1a:** `disclosure` is now the `UiDisclosure` class on `EventEmitter` (done 2026-08-07);
-  `combobox.ts` is the **last** `d3-dispatch`/`utilRebind` user. Convert it to `EventEmitter`, then
-  delete `modules/util/rebind.ts` + its test + the `utilRebind` export. `combobox` is attached via
-  `.call()` at ~13 sites (a class would need `.call(instance.attach)`). `uiSection`/`section.ts` is
-  dead except the quarantined `react_container.jsx`.
-- `loading` is now the `UiLoading` class (done 2026-08-07). `modal`/`confirm` stay one-shot function
-  builders (documented exception); `field_help` stays dead pending a restrictions-field revival.
+- **Idea 1a — DONE (2026-08-08):** `combobox` → `UiCombobox` class on `EventEmitter`, attached via
+  `.call(combo.attach)` at ~13 sites; `uiCombobox.off` → `static UiCombobox.off`. `d3_dispatch` and
+  `utilRebind` are now fully retired (`modules/util/rebind.ts` + its test + the `util/index.ts` export
+  deleted). Single-listener `accept`/`cancel` semantics preserved via a constructor-time `on` wrapper
+  (`removeAllListeners(event)` before add), since consumers re-register on each render.
+- `disclosure`/`loading` are the `UiDisclosure`/`UiLoading` classes (done 2026-08-07). `modal`/`confirm`
+  stay one-shot function builders (documented exception); `field_help` stays dead pending a
+  restrictions-field revival. `uiSection`/`section.ts` is dead except the quarantined
+  `react_container.jsx`.
 
 ## Open questions
 - Delete the 2 dead quarantined `sections/*.jsx` React demo files + `section.ts`/`uiSection`?

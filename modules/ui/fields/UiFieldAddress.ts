@@ -2,7 +2,7 @@ import { select, selection } from 'd3-selection';
 import { Extent, projWgs84ToWorld, geoSphericalDistance, vecProject } from '@rapid-sdk/math';
 import { utilArrayUniqBy } from '@rapid-sdk/util';
 import { iso1A2Code } from '@rapideditor/country-coder';
-import { uiCombobox } from '../combobox.ts';
+import { UiCombobox } from '../UiCombobox.ts';
 import { UiField } from '../UiField.ts';
 import { utilGetSetValue, utilNoAuto } from '../../util/index.ts';
 
@@ -349,12 +349,13 @@ export class UiFieldAddress extends UiField {
         : getNearbyValues;
 
       select(this)
-        .call(uiCombobox(context, `address-${d.id}`)
+        .call(new UiCombobox(context, `address-${d.id}`)
           .minItems(1)
           .caseSensitive(true)
           .fetcher(function(value, callback) {
             callback(getValues(`addr:${d.id}`));
           })
+          .attach
         );
     }
 

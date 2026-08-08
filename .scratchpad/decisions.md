@@ -31,9 +31,12 @@ library used by `AbstractSystem`, `AbstractMode`, `AbstractBehavior`, and `Conte
 single, consistent event API across the whole codebase (`.on` / `.off` / `.emit`) and removes the
 d3-dispatch + `utilRebind` + `public on!` boilerplate that every emitting class had to repeat.
 
-The two factory functions `combobox.ts` and `disclosure.ts` still use `d3_dispatch` (they rebind
-the dispatch onto a returned function-object, not a class instance). Converting them would require
-changing their call-site API; deferred until their remaining JS consumers are converted.
+`combobox` and `disclosure` (the last two `d3_dispatch`/`utilRebind` holdouts) are now the
+`UiCombobox`/`UiDisclosure` classes, so **`d3_dispatch` and `utilRebind` are fully retired** —
+`modules/util/rebind.ts` and its test were deleted. `UiCombobox` needed one wrinkle: its consumers
+re-register `accept`/`cancel` on every render and relied on d3-dispatch's one-listener-per-type
+replacement, so its constructor wraps `on` to `removeAllListeners(event)` before adding (tseep types
+`on` as a class field, so it can't be overridden as a method — the wrapper is assigned in the ctor).
 
 `UiFieldRestrictions` was the only disabled/stub class; it still extends `EventEmitter` even though
 its `render()` is a placeholder, because the field registry (`uiFields`) instantiates it just like

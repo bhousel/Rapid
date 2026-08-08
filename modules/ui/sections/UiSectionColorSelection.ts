@@ -1,6 +1,6 @@
 import { AbstractUiSection } from './AbstractUiSection.ts';
 import { uiTooltip } from '../tooltip.ts';
-import { uiCombobox } from '../combobox.ts';
+import { UiCombobox } from '../UiCombobox.ts';
 import { utilNoAuto } from '../../util/util.ts';
 
 import type { Context } from '../../Context.ts';
@@ -24,7 +24,7 @@ export class UiSectionColorSelection extends AbstractUiSection {
     const colors = context.systems.colors as any;
 
     this._comboData = [];
-    this._colorCombo = uiCombobox(context, 'color-selection');
+    this._colorCombo = new UiCombobox(context, 'color-selection');
     this._colorSelectedId = null;
     this._checkboxState = false;
 
@@ -108,7 +108,7 @@ export class UiSectionColorSelection extends AbstractUiSection {
     $$pickerCombo.append('input')
       .attr('class', 'color-select')
       .call(utilNoAuto)
-      .call(this._colorCombo)
+      .call(this._colorCombo.attach)
       .on('blur change', (d3_event: any) => {
         const element = d3_event.currentTarget;
         const val = (element && element.value) || '';

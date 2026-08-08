@@ -4,7 +4,7 @@ import { iso1A2Code } from '@rapideditor/country-coder';
 import { UiField } from '../UiField.ts';
 import { uiIcon } from '../icon.ts';
 import { uiTooltip } from '../tooltip.ts';
-import { uiCombobox } from '../combobox.ts';
+import { UiCombobox } from '../UiCombobox.ts';
 import { utilGetSetValue, utilNoAuto } from '../../util/index.ts';
 
 import type { Context } from '../../Context.ts';
@@ -79,7 +79,7 @@ export class UiFieldLocalized extends UiField {
     this._getLanguages = this._getLanguages.bind(this);
 
     // reuse these combos
-    this._langCombo = uiCombobox(context, 'localized-lang')
+    this._langCombo = new UiCombobox(context, 'localized-lang')
       .fetcher(this._getLanguages)
       .minItems(0);
 
@@ -523,7 +523,7 @@ export class UiFieldLocalized extends UiField {
           .attr('type', 'text')
           .on('blur', this._changeLang)
           .on('change', this._changeLang)
-          .call(langCombo);
+          .call(langCombo.attach);
 
         $wrap
           .append('input')

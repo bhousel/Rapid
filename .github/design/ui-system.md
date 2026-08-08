@@ -143,8 +143,8 @@ export class UiFoo {
 - **Events:** all UI classes that emit events extend `EventEmitter` from `tseep/lib/ee-safe`.
   Call `super()` first in the constructor, emit via `this.emit('event', ...args)`, consumers use
   `.on('event', handler)` / `.off('event', handler)`. Do **not** use `d3_dispatch` / `utilRebind`.
-  (The two factory functions `combobox.ts` and `disclosure.ts` still use `d3_dispatch` — they are
-  intentional exceptions, not classes.)
+  (Both are fully retired: `combobox`/`disclosure` were the last users, and `modules/util/rebind.ts`
+  plus its test were deleted.)
 - **Relocalization:** move all `.text(...)`, `.html(...)`, `.attr('title', …)`, tooltip strings, and
   `l10n.t(...)` calls into the post-merge update selection. Enter creates empty structural elements
   only. This is the single most important behavioral upgrade.
@@ -423,6 +423,28 @@ Start the Tutorial, and the Rapid-splash "skip to Rapid" path).
 
 ## Progress log
 
+### `combobox` → class + `d3_dispatch`/`utilRebind` retired (2026-08-08) — branch `ui_refactors`
+
+- **`combobox.ts` → `UiCombobox.ts`**: now a `UiCombobox` class extending `EventEmitter`. The ~15
+  nested closures became protected methods; per-attachment state (`$input`/`$attachTo`) lives on the
+  instance. Fluent setters (`canAutocomplete/caseSensitive/data/fetcher/minItems/itemsMouseEnter/
+  itemsMouseLeave`) use TS getter/setter overloads (setter returns `this`). `uiCombobox.off` →
+  `static UiCombobox.off`.
+- **`.call()` idiom → `.attach`:** a class instance isn't callable, so every `input.call(combo…)`
+  became `input.call(combo….attach)` (attach is bound in the constructor). Updated ~13 sites across
+  fields (`Access`, `Address`, `Combo`, `Cycleway`, `Localized`, `Roadspeed`, `Wikidata`, `Wikipedia`),
+  sections (`ColorSelection`, `ColorblindModeOptions`, `RawMemberEditor`, `RawMembershipEditor`,
+  `RawTagEditor`), `UiChangesetEditor`, `UiFormFields`, `UiRapidCatalog`, plus the browser test.
+- **Single-listener `accept`/`cancel` semantics preserved:** consumers re-register these on each
+  render and relied on d3-dispatch's one-listener-per-type replacement. `EventEmitter.on` *adds*, so
+  the constructor wraps `on` to `removeAllListeners(event)` before adding — behavior-identical, zero
+  consumer churn. (tseep types `on` as a class field, so it can't be overridden as a method; the
+  wrapper is assigned in the constructor.)
+- **Retired `d3_dispatch` + `utilRebind`:** combobox/disclosure were the last users. Deleted
+  `modules/util/rebind.ts`, its `test/unit/util/rebind.test.js`, and the `util/index.ts` export
+  (drops `utilRebind` from the public API). No `d3-dispatch` imports remain in `modules/`.
+- **Verified:** `tsc` 0 / `eslint` 0 errors / build OK / browser 133 pass / unit 3289 pass / 0 fail.
+
 ### `disclosure` + `loading` → classes (2026-08-07) — branch `ui_refactors`
 
 - **`disclosure.ts` → `UiDisclosure.ts`** (`git mv`): now a `UiDisclosure` class extending
@@ -475,9 +497,9 @@ Start the Tutorial, and the Rapid-splash "skip to Rapid" path).
   typed *functions*; the user asked to prefer **classes wherever possible**, so those were reworked
   into classes matching the canonical shape. Goal 1 ("every file a TS class") stands. The remaining
   intentional function exceptions are shared, stateless DOM-builders still consumed by unconverted
-  JS or attached inline via `.call()`: `icon`, `toggle`, `tooltip`, `popover`, `combobox`,
-  `form_fields`, `modal`, `confirm`, `section`. (`disclosure`/`loading` were converted to the
-  `UiDisclosure`/`UiLoading` classes on 2026-08-07.)
+  JS or attached inline via `.call()`: `icon`, `toggle`, `tooltip`, `popover`,
+  `form_fields`, `modal`, `confirm`, `section`. (`disclosure`/`loading`/`combobox` were converted to
+  the `UiDisclosure`/`UiLoading`/`UiCombobox` classes; `combobox` also retired `d3_dispatch`/`utilRebind`.)
 - **`$`-prefixed selection properties must be `public`.** The eslint `naming-convention` rule
   requires `protected` members to be `_`-prefixed, which conflicts with the `$var` selection
   convention. Declare selection state as `public $foo: D3Selection` (matches `UiInspector`,
