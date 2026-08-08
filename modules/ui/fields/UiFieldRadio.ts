@@ -86,16 +86,16 @@ export class UiFieldRadio extends UiField {
     this.$wrap = $parent.selectAll('.form-field-input-wrap')
       .data([0]);
 
-    let $$enter: D3Selection = this.$wrap.enter()
+    let $$wrap: D3Selection = this.$wrap.enter()
       .append('div')
       .attr('class', 'form-field-input-wrap form-field-input-radio');
 
-    $$enter
+    $$wrap
       .append('span')
       .attr('class', 'placeholder');
 
     this.$wrap = this.$wrap
-      .merge($$enter);
+      .merge($$wrap);
 
 
     this.$placeholder = this.$wrap.selectAll('.placeholder');
@@ -103,21 +103,21 @@ export class UiFieldRadio extends UiField {
     this.$labels = this.$wrap.selectAll('label')
       .data(this._radioData);
 
-    $$enter = this.$labels.enter()
+    $$wrap = this.$labels.enter()
       .append('label');
 
     const stringBase = `_tagging.presets.fields.${this.id}.options`;
-    $$enter
+    $$wrap
       .append('input')
       .attr('type', 'radio')
       .attr('name', this.id)
       .attr('checked', false);
 
-    $$enter
+    $$wrap
       .append('span');
 
     this.$labels = this.$labels
-      .merge($$enter);
+      .merge($$wrap);
 
     // Set localized value/text on the update selection so they re-localize on language change.
     this.$labels.selectAll('input')

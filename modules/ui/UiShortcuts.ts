@@ -6,7 +6,7 @@ import { uiModal } from './modal.ts';
 import { utilCmd, utilDetect } from '../util/index.ts';
 
 import type { Context } from '../Context.ts';
-import type { D3Selection } from 'd3-selection';
+import type { D3EnterSelection, D3Selection } from 'd3-selection';
 
 
 /**
@@ -86,6 +86,9 @@ export class UiShortcuts {
     const l10n = context.systems.l10n!;
     const $content: D3Selection = this.$modal.select('.content');
 
+    // replace all content on render
+    $content.html('');
+
     // enter
     $content
       .selectAll('.shortcuts-heading')
@@ -96,14 +99,14 @@ export class UiShortcuts {
       .append('h3')
       .text(l10n.t('shortcuts.title'));
 
-    const $$wrapper = $content
+    const $$wrapper: D3EnterSelection = $content
       .selectAll('.shortcuts-wrapper')
       .data([0])
       .enter()
       .append('div')
       .attr('class', 'shortcuts-wrapper modal-section');
 
-    const $$navbar = $$wrapper
+    const $$navbar: D3EnterSelection = $$wrapper
       .append('div')
       .attr('class', 'nav-bar');
 
@@ -123,25 +126,25 @@ export class UiShortcuts {
       .text(d => l10n.t(d.text));
 
 
-    const $$content = $$wrapper
+    const $$content: D3EnterSelection = $$wrapper
       .append('div')
       .attr('class', 'shortcuts-content');
 
-    const $$tabs = $$content
+    const $$tabs: D3EnterSelection = $$content
       .selectAll('.shortcut-tab')
       .data(this._dataShortcuts)
       .enter()
       .append('div')
       .attr('class', d => `shortcut-tab shortcut-tab-${d.tab}`);
 
-    const $$columns = $$tabs
+    const $$columns: D3EnterSelection = $$tabs
       .selectAll('.shortcut-column')
       .data((d: any) => d.columns)
       .enter()
       .append('table')
       .attr('class', 'shortcut-column');
 
-    const $$rows = $$columns
+    const $$rows: D3EnterSelection = $$columns
       .selectAll('.shortcut-row')
       .data((d: any) => d.rows)
       .enter()
@@ -150,7 +153,7 @@ export class UiShortcuts {
 
 
     // Rows without a "shortcuts" property are the subsection headings
-    const $$sectionRow = $$rows
+    const $$sectionRow: D3EnterSelection = $$rows
       .filter(d => !d.shortcuts);
 
     // Each "section" row contains:
@@ -170,7 +173,7 @@ export class UiShortcuts {
 
 
     // Rows with a "shortcuts" property are the actual shortcuts
-    const $$shortcutRow = $$rows
+    const $$shortcutRow: D3EnterSelection = $$rows
       .filter(d => d.shortcuts);
 
     // Each "shortcut" row contains:
@@ -182,7 +185,7 @@ export class UiShortcuts {
       .append('td')
       .attr('class', 'shortcut-keys')
       .each((d, i, nodes) => {
-        const $$selection = select(nodes[i]);
+        const $$selection: D3EnterSelection = select(nodes[i]);
 
         // Add modifiers, if any..
         let modifiers = d.modifiers || [];
@@ -294,7 +297,7 @@ export class UiShortcuts {
 
 
     // Update
-    const $wrapper = $content.selectAll('.shortcuts-wrapper');
+    const $wrapper: D3Selection = $content.selectAll('.shortcuts-wrapper');
 
     $wrapper.selectAll('.nav-item')
       .classed('active', (d, i) => i === this._activeTab);

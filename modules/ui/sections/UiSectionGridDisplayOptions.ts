@@ -90,11 +90,11 @@ export class UiSectionGridDisplayOptions extends AbstractUiSection {
     const $gridItems = $gridList.selectAll('li')
       .data(gridData, (d: any) => d.name);
 
-    const $$enter = $gridItems.enter()
+    const $$gridItems = $gridItems.enter()
       .insert('li', '.custom-gridsopt')
       .attr('class', 'gridsopt');
 
-    const $$label = $$enter.append('label');
+    const $$label = $$gridItems.append('label');
 
     $$label.append('input')
       .attr('type', 'radio')
