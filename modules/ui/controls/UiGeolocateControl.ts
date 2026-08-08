@@ -2,7 +2,7 @@ import { selection } from 'd3-selection';
 import { Extent } from '@rapid-sdk/math';
 
 import { uiIcon } from '../icon.ts';
-import { uiLoading } from '../loading.ts';
+import { UiLoading } from '../UiLoading.ts';
 import { uiTooltip } from '../tooltip.ts';
 
 import type { Context } from '../../Context.ts';
@@ -25,7 +25,7 @@ export class UiGeolocateControl {
 
   // Child components
   public Tooltip: any;
-  public Loading: any;
+  public Loading: UiLoading;
 
   // D3 selections
   public $parent: D3Selection | null;
@@ -48,7 +48,7 @@ export class UiGeolocateControl {
 
     // Create child components
     this.Tooltip = uiTooltip(context);
-    this.Loading = uiLoading(context).blocking(true);
+    this.Loading = new UiLoading(context).blocking(true);
 
     // D3 selections
     this.$parent = null;
@@ -241,7 +241,7 @@ export class UiGeolocateControl {
     scheduler?.setTimeout('ui-geolocate-initial', this.error, GEOLOCATE_TIMEOUT as any);
     this._isInitial = true;
 
-    this.context.container().call(this.Loading);  // Block UI
+    this.context.container().call(this.Loading.render);  // Block UI
   }
 
 

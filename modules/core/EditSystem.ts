@@ -4,7 +4,7 @@ import { easeLinear } from 'd3-ease';
 import { Extent, geoScaleToZoom, projWgs84ToWorld } from '@rapid-sdk/math';
 import { OsmEntity, createOsmEntity } from '../data/index.ts';
 import { select } from 'd3-selection';
-import { uiLoading } from '../ui/loading.ts';
+import { UiLoading } from '../ui/UiLoading.ts';
 import { utilArrayGroupBy, utilObjectOmit, utilSessionMutex } from '@rapid-sdk/util';
 
 import type { Context } from '../Context.ts';
@@ -1213,8 +1213,8 @@ export class EditSystem extends AbstractSystem {
     let loading: any;
     const isTestEnvironment = (!('window' in globalThis)) || ('assert' in globalThis) || ('expect' in globalThis);
     if (!isTestEnvironment) {
-      loading = uiLoading(context).blocking(true);
-      context.container().call(loading);   // block ui
+      loading = new UiLoading(context).blocking(true);
+      context.container().call(loading.render);   // block ui
     }
 
     const __baseEntities = new Map<EntityID, OsmEntity>();        // Map<entityID, Entity>
@@ -1464,16 +1464,19 @@ export class EditSystem extends AbstractSystem {
    * - A changeset is inflight, we remove it to prevent the user from restoring duplicate edits
    */
   public clearBackup(): void {
+    const context = this.context;
+    const scheduler = context.systems.scheduler;
+    const storage = context.systems.storage!;
+    const uploader = context.systems.uploader;
+
     this._canRestoreBackup = false;
-    this.context.systems.scheduler?.cancel('edit-backup');
+    scheduler?.cancel('edit-backup');
 
     if (!this._mutex.locked()) return;  // another browser tab owns the history
 
-    const storage = this.context.systems.storage!;
     storage.removeItem(this._backupKey());
 
     // clear the draft changeset metadata associated with the saved history
-    const uploader = this.context.systems.uploader;
     uploader?.clearDraft();
   }
 

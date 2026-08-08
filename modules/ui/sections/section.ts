@@ -1,10 +1,9 @@
 import { select } from 'd3-selection';
-import { uiDisclosure } from '../disclosure.ts';
+import { UiDisclosure } from '../UiDisclosure.ts';
 import { utilFunctor } from '../../util/util.ts';
 
 import type { Context } from '../../Context.ts';
 import type { D3Selection } from 'd3-selection';
-import type { UiDisclosure } from '../disclosure.ts';
 
 
 /** A functor: either a value, or a function returning that value. */
@@ -143,7 +142,7 @@ export function uiSection(context: Context, sectionID: string): UiSection {
     // Render the content inside a Disclosure
     if (_disclosureContent) {
       if (!_disclosure) {   // create if needed
-        _disclosure = uiDisclosure(context, sectionID.replace(/-/g, '_'))
+        _disclosure = new UiDisclosure(context, sectionID.replace(/-/g, '_'))
           .label(_label || '')
           .content(_disclosureContent);
       }
@@ -152,7 +151,7 @@ export function uiSection(context: Context, sectionID: string): UiSection {
         .expandOverride(_disclosureExpandOverride);
 
       $selection
-        .call(_disclosure);
+        .call(_disclosure.render);
 
     // Render the content on its own
     } else if (_content) {

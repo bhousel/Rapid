@@ -35,10 +35,13 @@ Narrowed the trivial `any`s exposed by the cleaner field model:
   `_comboData`/`_scope`/Address suggestion return types.
 
 ## Next up
-- **Idea 1a:** convert `combobox.ts` + `disclosure.ts` to `EventEmitter` (last `d3-dispatch` users),
-  then delete `modules/util/rebind.ts` + its test + the `utilRebind` export. `disclosure`'s only real
-  consumer is `AbstractUiSection`; `combobox` is attached via `.call()` at ~13 sites. `uiSection`/
-  `section.ts` is dead except the quarantined `react_container.jsx`.
+- **Idea 1a:** `disclosure` is now the `UiDisclosure` class on `EventEmitter` (done 2026-08-07);
+  `combobox.ts` is the **last** `d3-dispatch`/`utilRebind` user. Convert it to `EventEmitter`, then
+  delete `modules/util/rebind.ts` + its test + the `utilRebind` export. `combobox` is attached via
+  `.call()` at ~13 sites (a class would need `.call(instance.attach)`). `uiSection`/`section.ts` is
+  dead except the quarantined `react_container.jsx`.
+- `loading` is now the `UiLoading` class (done 2026-08-07). `modal`/`confirm` stay one-shot function
+  builders (documented exception); `field_help` stays dead pending a restrictions-field revival.
 
 ## Open questions
 - Delete the 2 dead quarantined `sections/*.jsx` React demo files + `section.ts`/`uiSection`?

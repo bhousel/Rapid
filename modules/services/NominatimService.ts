@@ -6,7 +6,7 @@ import type { Context } from '../Context.ts';
 import type { Vec2 } from '@rapid-sdk/math';
 
 /** Errback-style callback for Nominatim results */
-type NominatimCallback = (err: Error | string | null, result?: any) => void;
+type NominatimCallback = (err: Error | null, result?: any) => void;
 
 
 /**
@@ -83,7 +83,7 @@ export class NominatimService extends AbstractSystem {
       } else if (result.address) {
         return callback(null, result.address.country_code);
       } else {
-        return callback('Unable to geocode', null);
+        return callback(new Error('Unable to geocode'), null);
       }
     });
   }

@@ -4,7 +4,7 @@ import { utilDetect } from '../util/detect.ts';
 import { vecAdd } from '@rapid-sdk/math';
 import {
   UiApiStatus, UiDefs, UiEditMenu, UiFlash, UiFullscreen, UiIntro,
-  uiLoading, UiMapFooter, UiMapToolbar, UiMapRouletteMenu, UiOvermap,
+  UiLoading, UiMapFooter, UiMapToolbar, UiMapRouletteMenu, UiOvermap,
   UiSplash, UiRestore, UiShortcuts, UiSidebar, UiWhatsNew
 } from '../ui/index.ts';
 
@@ -151,7 +151,7 @@ export class UiSystem extends AbstractSystem {
 
         // Create UI components
         this.ApiStatus = new UiApiStatus(context);
-        const loading = uiLoading(context) as any;
+        const loading = new UiLoading(context);
         this.AuthModal = loading.blocking(true).message(l10n.t('loading_auth'));
         this.Defs = new UiDefs(context);
         this.EditMenu = new UiEditMenu(context);
@@ -181,7 +181,7 @@ export class UiSystem extends AbstractSystem {
         const osm = context.services.osm as any;
         if (osm) {
           osm
-            .on('authLoading', () => context.container()?.call(this.AuthModal))
+            .on('authLoading', () => context.container()?.call(this.AuthModal.render))
             .on('authDone', () => this.AuthModal.close());
         }
       });

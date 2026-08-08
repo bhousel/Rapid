@@ -423,11 +423,32 @@ Start the Tutorial, and the Rapid-splash "skip to Rapid" path).
 
 ## Progress log
 
+### `disclosure` + `loading` → classes (2026-08-07) — branch `ui_refactors`
+
+- **`disclosure.ts` → `UiDisclosure.ts`** (`git mv`): now a `UiDisclosure` class extending
+  `EventEmitter` (retiring its `d3-dispatch`/`utilRebind` usage — combobox is now the last
+  `d3-dispatch` user). Fluent `expanded()/checkPreference()/expandOverride()/label()/content()`
+  setters use TS overloads (getter returns the value, setter returns `this`) so chaining and
+  property-narrowing work without `any`. Owns its rendered `$hideToggle`/`$wrap` selections as
+  public props; `render($selection)` is a documented "props passed down" renderer (the parent owns
+  the target). Emits `toggled` (no current listeners, preserved for API parity).
+- **`loading.ts` → `UiLoading.ts`** (`git mv`): now a `UiLoading` class with overloaded fluent
+  `message()`/`blocking()` setters, `render($parent)` to show (canonical capture-parent shape),
+  plus `close()`/`isShown()`.
+- **Call-site migration:** the d3 `.call(instance)` idiom becomes `.call(instance.render)` because a
+  class instance isn't callable. Updated consumers: `AbstractUiSection`, legacy `section.ts`,
+  `UiSuccess` (2 disclosures); `EditSystem`, `UiSystem` (`AuthModal`), `UiGeolocateControl`,
+  `SaveMode` (loading). Barrel exports `UiDisclosure`/`UiLoading`.
+- **Verified:** `tsc` 0 errors, `eslint` 0 errors (pre-existing `todo`/complexity warnings only),
+  browser 133 pass / unit 3290 pass / 0 fail.
+
 ### Phases 1–3 complete (2026-07-30) — branch `ui_refactors`
 
 - **Phase 1 (primitives):** `icon`, `toggle`, `tooltip`, `popover`, `modal`, `confirm`, `loading`,
-  `combobox`, `form_fields`, `flash` (→ `UiFlash` class). `disclosure` and `section` are **kept as
-  typed functions** (`uiDisclosure`, `uiSection`) — see decision below.
+  `combobox`, `form_fields`, `flash` (→ `UiFlash` class). `disclosure` and `section` were initially
+  **kept as typed functions** (`uiDisclosure`, `uiSection`); `disclosure` has since been converted to
+  the `UiDisclosure` class (see 2026-08-07 entry below). `section`/`uiSection` remains a typed
+  function (dead except the quarantined `react_container.jsx`).
 - **Phase 2 (fields):** all `fields/*` are TS classes (`UiFieldAccess`, `UiFieldCombo`,
   `UiFieldText` [was `input`, also aliased as `Url`/`Identifier`/`Number`/`Tel`/`Email`],
   `UiFieldCheck` [+`Default`/`Oneway`], `UiFieldRadio` [+`Structure`], `UiFieldLocalized`,
@@ -452,11 +473,11 @@ Start the Tutorial, and the Rapid-splash "skip to Rapid" path).
 
 - **Classes over functions (user preference).** An earlier pass converted fields/`tag_reference` to
   typed *functions*; the user asked to prefer **classes wherever possible**, so those were reworked
-  into classes matching the canonical shape. Goal 1 ("every file a TS class") stands. The **only**
+  into classes matching the canonical shape. Goal 1 ("every file a TS class") stands. The remaining
   intentional function exceptions are shared, stateless DOM-builders still consumed by unconverted
-  JS: `icon`, `toggle`, `tooltip`, `popover`, `combobox`, `form_fields`, **`disclosure`**, `section`.
-  Convert `disclosure`/`section` to classes only once their JS consumers (`success.js`, Phase-5
-  `.js` sections) are converted, to avoid rippling into unconverted code.
+  JS or attached inline via `.call()`: `icon`, `toggle`, `tooltip`, `popover`, `combobox`,
+  `form_fields`, `modal`, `confirm`, `section`. (`disclosure`/`loading` were converted to the
+  `UiDisclosure`/`UiLoading` classes on 2026-08-07.)
 - **`$`-prefixed selection properties must be `public`.** The eslint `naming-convention` rule
   requires `protected` members to be `_`-prefixed, which conflicts with the `$var` selection
   convention. Declare selection state as `public $foo: D3Selection` (matches `UiInspector`,

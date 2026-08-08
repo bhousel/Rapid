@@ -1,10 +1,9 @@
 import { selection } from 'd3-selection';
 import { EventEmitter } from 'tseep/lib/ee-safe';
-import { uiDisclosure } from '../disclosure.ts';
+import { UiDisclosure } from '../UiDisclosure.ts';
 
 import type { Context } from '../../Context.ts';
 import type { D3Selection } from 'd3-selection';
-import type { UiDisclosure } from '../disclosure.ts';
 
 
 /**
@@ -108,7 +107,7 @@ export abstract class AbstractUiSection extends EventEmitter {
     // Render the content inside a Disclosure
     if (typeof self.renderDisclosureContent === 'function') {
       if (!this._disclosure) {   // create if needed
-        this._disclosure = uiDisclosure(this.context, this.id.replace(/-/g, '_'))
+        this._disclosure = new UiDisclosure(this.context, this.id.replace(/-/g, '_'))
           .label(() => this.label())
           .content(self.renderDisclosureContent.bind(this));
       }
@@ -117,7 +116,7 @@ export abstract class AbstractUiSection extends EventEmitter {
         .expandOverride(this._disclosureExpandOverride);
 
       $container
-        .call(this._disclosure);
+        .call(this._disclosure.render);
 
       // Render the content on its own
     } else if (typeof self.renderContent === 'function') {

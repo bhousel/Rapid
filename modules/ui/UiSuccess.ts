@@ -2,7 +2,7 @@ import { EventEmitter } from 'tseep/lib/ee-safe';
 import { select } from 'd3-selection';
 import { resolveStrings } from 'osm-community-index';
 import { uiIcon } from './icon.ts';
-import { uiDisclosure } from '../ui/disclosure.ts';
+import { UiDisclosure } from '../ui/UiDisclosure.ts';
 import { utilSanitizeHTML } from '../util/sanitize.ts';
 import { utilSafeURL } from '../util/url.ts';
 
@@ -359,11 +359,12 @@ export class UiSuccess extends EventEmitter {
     if (d.resolved!.extendedDescriptionHTML || (d.languageCodes && d.languageCodes.length)) {
       $selection
         .append('div')
-        .call(uiDisclosure(context, `community-more-${d.id}`)
+        .call(new UiDisclosure(context, `community-more-${d.id}`)
           .expanded(false)
           .checkPreference(false)
           .label(l10n.t('success.more'))
           .content(showMore)
+          .render
         );
     }
 
@@ -385,11 +386,12 @@ export class UiSuccess extends EventEmitter {
     if (nextEvents.length) {
       $selection
         .append('div')
-        .call(uiDisclosure(context, `community-events-${d.id}`)
+        .call(new UiDisclosure(context, `community-events-${d.id}`)
           .expanded(false)
           .checkPreference(false)
           .label(l10n.t('success.events'))
           .content(showNextEvents)
+          .render
         )
         .select('.hide-toggle')
         .append('span')

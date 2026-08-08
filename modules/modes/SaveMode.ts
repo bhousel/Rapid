@@ -3,7 +3,7 @@ import { select } from 'd3-selection';
 import { UiCommit } from '../ui/UiCommit.ts';
 import { uiConfirm } from '../ui/confirm.ts';
 import { UiConflicts } from '../ui/UiConflicts.ts';
-import { uiLoading } from '../ui/loading.ts';
+import { UiLoading } from '../ui/UiLoading.ts';
 import { UiSuccess } from '../ui/UiSuccess.ts';
 import { utilKeybinding } from '../util/index.ts';
 
@@ -24,11 +24,11 @@ export class SaveMode extends AbstractMode {
   /** Current location string for success message */
   protected _location: string | null;
   /** UI component for conflicts */
-  protected _uiConflicts: any;
+  protected _uiConflicts: UiConflicts | null;
   /** UI component for commit */
-  protected _uiCommit: any;
+  protected _uiCommit: UiCommit | null;
   /** UI component for success message */
-  protected _uiSuccess: any;
+  protected _uiSuccess: UiSuccess | null;
   /** UI component for save loading */
   protected _saveLoading: any;
   /** Whether the save was successful */
@@ -45,6 +45,13 @@ export class SaveMode extends AbstractMode {
 
     this._keybinding = utilKeybinding('SaveMode');
 
+    this._location = null;
+    this._uiConflicts = null;
+    this._uiCommit = null;
+    this._uiSuccess = null;
+    this._saveLoading = null;
+    this._wasSuccessfulSave = false;
+
     // Make sure the event handlers have `this` bound correctly
     this._cancel = this._cancel.bind(this);
     this._hideLoading = this._hideLoading.bind(this);
@@ -59,13 +66,6 @@ export class SaveMode extends AbstractMode {
     this._saveEnded = this._saveEnded.bind(this);
     this._saveStarted = this._saveStarted.bind(this);
     this._showLoading = this._showLoading.bind(this);
-
-    this._location = null;
-    this._uiConflicts = null;
-    this._uiCommit = null;
-    this._uiSuccess = null;
-    this._saveLoading = null;
-    this._wasSuccessfulSave = false;
   }
 
 
@@ -75,7 +75,7 @@ export class SaveMode extends AbstractMode {
    */
   public enter(): boolean {
     const context = this.context;
-    const osm = context.services.osm as any;
+    const osm = context.services.osm;
     const ui = context.systems.ui!;
     const uploader = context.systems.uploader!;
     const Sidebar = ui.Sidebar;
@@ -99,6 +99,7 @@ export class SaveMode extends AbstractMode {
       Sidebar.show(this._uiCommit.render);
     } else {
       osm.authenticate((err: Error | null) => {
+        if (!this._uiCommit) return;  // exited before auth completed?
         if (err) {
           this._cancel();
         } else {
@@ -145,18 +146,16 @@ export class SaveMode extends AbstractMode {
     const uploader = context.systems.uploader!;
     const Sidebar = ui.Sidebar;
 
-    this._uiCommit.off('cancel', this._cancel);
+    this._uiConflicts?.removeAllListeners();
+    this._uiConflicts = null;
+
+    this._uiCommit?.removeAllListeners();
     this._uiCommit = null;
 
-    uploader
-      .off('progressChanged', this._progressChanged)
-      .off('resultConflicts', this._resultConflicts)
-      .off('resultErrors', this._resultErrors)
-      .off('resultNoChanges', this._resultNoChanges)
-      .off('resultSuccess', this._resultSuccess)
-      .off('saveEnded', this._saveEnded)
-      .off('saveStarted', this._saveStarted)
-      .off('willAttemptUpload', this._prepareForSuccess);
+    this._uiSuccess?.removeAllListeners();
+    this._uiSuccess = null;
+
+    uploader.removeAllListeners();
 
     this._keybindingOff();
     this._hideLoading();
@@ -348,6 +347,8 @@ export class SaveMode extends AbstractMode {
     const ui = context.systems.ui!;
     const Sidebar = ui.Sidebar;
 
+    this._uiSuccess = new UiSuccess(this.context);
+
     const successContent = this._uiSuccess
       .changeset(changeset)
       .location(this._location)
@@ -395,11 +396,11 @@ export class SaveMode extends AbstractMode {
     const context = this.context;
     const l10n = context.systems.l10n!;
 
-    const loading = uiLoading(context);
+    const loading = new UiLoading(context);
     loading.blocking(true);
     loading.message(l10n.t('save.uploading'));
     this._saveLoading = loading;
-    context.container().call(this._saveLoading);  // block input during upload
+    context.container().call(this._saveLoading.render);  // block input during upload
   }
 
 
@@ -435,14 +436,13 @@ export class SaveMode extends AbstractMode {
    * the success screen like "Thank you for editing around place, region."
    */
   protected _prepareForSuccess(): void {
-    this._uiSuccess = new UiSuccess(this.context);
     this._location = null;
 
     const context = this.context;
     const l10n = context.systems.l10n!;
     const loc = context.viewport.centerLoc();
 
-    const nominatim = context.services.nominatim as any;
+    const nominatim = context.services.nominatim;
     if (!nominatim) return;
 
     nominatim.reverse(loc, (err: Error | null, result: any) => {
