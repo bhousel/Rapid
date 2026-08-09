@@ -1,7 +1,7 @@
 import * as PIXI from 'pixi.js';
 
 import { AbstractUiSection } from './AbstractUiSection.ts';
-import { uiTooltip } from '../tooltip.ts';
+import { UiTooltip } from '../UiTooltip.ts';
 import { UiCombobox } from '../UiCombobox.ts';
 import { utilNoAuto } from '../../util/util.ts';
 
@@ -109,8 +109,8 @@ export class UiSectionColorblindModeOptions extends AbstractUiSection {
       .enter()
       .append('div')
       .attr('class', 'layer-list preferences-colorblind-mode-options-list')
-      .call(uiTooltip(context)
-        .title(l10n.tHtml('preferences.colorblind_options.tooltip')));
+      .call(new UiTooltip(context)
+        .title(l10n.tHtml('preferences.colorblind_options.tooltip')).attach);
 
 
     const $$pickerCombo = $$colorOptionsListEnter.append('div');

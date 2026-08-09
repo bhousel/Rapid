@@ -1,5 +1,5 @@
 import { AbstractUiSection } from './AbstractUiSection.ts';
-import { uiTooltip } from '../tooltip.ts';
+import { UiTooltip } from '../UiTooltip.ts';
 
 import type { Context } from '../../Context.ts';
 import type { D3Selection } from 'd3-selection';
@@ -91,9 +91,10 @@ export class UiSectionMapInteractionOptions extends AbstractUiSection {
     // Enter
     const $$items = $items.enter()
       .append('li')
-      .call((uiTooltip(context) as any)
+      .call(new UiTooltip(context)
         .title((d: string) => l10n.t(`preferences.map_interaction.mouse_wheel.${d}.tooltip`))
         .placement('top')
+        .attach
       );
 
     const $$label = $$items

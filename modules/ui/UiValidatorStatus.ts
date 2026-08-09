@@ -1,6 +1,6 @@
 import { selection, select } from 'd3-selection';
 import { uiIcon } from './icon.ts';
-import { uiTooltip } from './tooltip.ts';
+import { UiTooltip } from './UiTooltip.ts';
 
 import type { Context } from '../Context.ts';
 import type { D3Selection } from 'd3-selection';
@@ -14,8 +14,8 @@ export class UiValidatorStatus {
   public context: Context;
 
   // Child components
-  public IssuesTooltip: any;
-  public ResolvedTooltip: any;
+  public IssuesTooltip: UiTooltip;
+  public ResolvedTooltip: UiTooltip;
 
   // D3 selections
   public $parent: D3Selection | null;
@@ -28,8 +28,8 @@ export class UiValidatorStatus {
     this.context = context;
 
     // Create child components
-    this.IssuesTooltip = uiTooltip(context).placement('top');
-    this.ResolvedTooltip = uiTooltip(context).placement('top');
+    this.IssuesTooltip = new UiTooltip(context).placement('top');
+    this.ResolvedTooltip = new UiTooltip(context).placement('top');
 
     // D3 selections
     this.$parent = null;
@@ -118,7 +118,7 @@ export class UiValidatorStatus {
 
         $$chip
           .on('click', this.click)
-          .call(d.tooltip)
+          .call(d.tooltip.attach)
           .call(uiIcon(validator.getSeverityIcon(d.id)));
 
         $$chip

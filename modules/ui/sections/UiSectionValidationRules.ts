@@ -1,5 +1,5 @@
 import { select } from 'd3-selection';
-import { uiTooltip } from '../tooltip.ts';
+import { UiTooltip } from '../UiTooltip.ts';
 import { AbstractUiSection } from './AbstractUiSection.ts';
 import { utilGetSetValue, utilNoAuto } from '../../util/index.ts';
 
@@ -124,9 +124,10 @@ export class UiSectionValidationRules extends AbstractUiSection {
     // Enter
     const $$items = $items.enter()
       .append('li')
-      .call(uiTooltip(context)
+      .call(new UiTooltip(context)
         .title((d: ValidatorID) => l10n.t(`issues.${d}.tip`))
         .placement('top')
+        .attach
       );
 
     const $$label = $$items

@@ -1,6 +1,6 @@
 import { selection } from 'd3-selection';
 import { uiIcon } from './icon.ts';
-import { uiTooltip } from './tooltip.ts';
+import { UiTooltip } from './UiTooltip.ts';
 
 import type { Context } from '../Context.ts';
 import type { D3Selection } from 'd3-selection';
@@ -14,7 +14,7 @@ export class UiFilterStatus {
   public context: Context;
 
   // Child components
-  public Tooltip: any;
+  public Tooltip: UiTooltip;
 
   // D3 selections
   public $parent: D3Selection | null;
@@ -32,7 +32,7 @@ export class UiFilterStatus {
     const scheduler = context.systems.scheduler;  // optional
 
     // Create child components
-    this.Tooltip = uiTooltip(context).placement('top');
+    this.Tooltip = new UiTooltip(context).placement('top');
 
     // D3 selections
     this.$parent = null;
@@ -84,7 +84,7 @@ export class UiFilterStatus {
       .attr('class', 'chip')
       .attr('href', '#')
       .on('click', this.click)
-      .call(this.Tooltip)
+      .call(this.Tooltip.attach)
       .call(uiIcon('#fas-filter'));
 
     $$chip

@@ -5,7 +5,7 @@ import deepEqual from 'fast-deep-equal';
 
 import { OsmChangeset } from '../data/OsmChangeset.ts';
 import { uiIcon } from './icon.ts';
-import { uiTooltip } from './tooltip.ts';
+import { UiTooltip } from './UiTooltip.ts';
 import { UiChangesetEditor } from './UiChangesetEditor.ts';
 import { UiSectionChanges } from './sections/UiSectionChanges.ts';
 import { UiCommitWarnings } from './UiCommitWarnings.ts';
@@ -472,7 +472,7 @@ export class UiCommit extends EventEmitter {
 
     if (!labelEnter.empty()) {
       labelEnter
-        .call(uiTooltip(context).title(l10n.t('commit.request_review_info')).placement('top'));
+        .call(new UiTooltip(context).title(l10n.t('commit.request_review_info')).placement('top').attach);
     }
 
     labelEnter
@@ -564,11 +564,11 @@ export class UiCommit extends EventEmitter {
       });
 
     // remove any existing tooltip
-    uiTooltip(context).destroyAny(buttonSection.selectAll('.save-button'));
+    new UiTooltip(context).destroyAny(buttonSection.selectAll('.save-button'));
 
     if (uploadBlockerTooltipText) {
       buttonSection.selectAll('.save-button')
-        .call(uiTooltip(context).title(uploadBlockerTooltipText).placement('top'));
+        .call(new UiTooltip(context).title(uploadBlockerTooltipText).placement('top').attach);
     }
 
     // Raw Tag Editor

@@ -1,6 +1,6 @@
 import { select } from 'd3-selection';
 import { AbstractUiSection } from './AbstractUiSection.ts';
-import { uiTooltip } from '../tooltip.ts';
+import { UiTooltip } from '../UiTooltip.ts';
 import { utilGetSetValue, utilNoAuto } from '../../util/index.ts';
 
 import type { AbstractPixiLayer } from '../../pixi/AbstractPixiLayer.ts';
@@ -162,9 +162,10 @@ export class UiSectionPhotoOverlays extends AbstractUiSection {
       .each((d: AbstractPixiLayer, i, nodes) => {
         const stringID = d.id.replace(/-/g, '_') + '.tooltip';
         select(nodes[i])
-          .call(uiTooltip(context)
+          .call(new UiTooltip(context)
             .title(l10n.t(stringID))
             .placement('top')
+            .attach
           );
       });
 
@@ -230,9 +231,10 @@ export class UiSectionPhotoOverlays extends AbstractUiSection {
       .append('label')
       .each((d: PhotoType, i, nodes) => {
         select(nodes[i])
-          .call(uiTooltip(context)
+          .call(new UiTooltip(context)
             .title(l10n.t(`photo_overlays.photo_type.${d}.tooltip`))
             .placement('top')
+            .attach
           );
       });
 
@@ -295,9 +297,10 @@ export class UiSectionPhotoOverlays extends AbstractUiSection {
       .append('label')
       .each((d: string, i, nodes) => {
         select(nodes[i])
-          .call(uiTooltip(context)
+          .call(new UiTooltip(context)
             .title(l10n.t(`photo_overlays.date_filter.${d}.tooltip`))
             .placement('top')
+            .attach
           );
       });
 

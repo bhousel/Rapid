@@ -1,6 +1,6 @@
 import { select } from 'd3-selection';
 import { AbstractUiSection } from './AbstractUiSection.ts';
-import { uiTooltip } from '../tooltip.ts';
+import { UiTooltip } from '../UiTooltip.ts';
 import { uiIcon } from '../icon.ts';
 import { UiSettingsCustomData } from '../settings/UiSettingsCustomData.ts';
 import { utilCmd } from '../../util/cmd.ts';
@@ -204,7 +204,7 @@ export class UiSectionDataLayers extends AbstractUiSection {
       const item = select(nodes[i]).select('label');
       const placement = (i < nodes.length / 2) ? 'bottom' : 'top';
 
-      const tooltip = uiTooltip(context).placement(placement) as any;
+      const tooltip = new UiTooltip(context).placement(placement);
       item.call(tooltip.destroyAny);
 
       let titleHtml = '';
@@ -214,7 +214,7 @@ export class UiSectionDataLayers extends AbstractUiSection {
 
       if (titleHtml) {
         tooltip.title(l10n.t(`map_data.layers.${d.id}.tooltip`));
-        item.call(tooltip);
+        item.call(tooltip.attach);
       }
     });
   }
@@ -258,10 +258,11 @@ export class UiSectionDataLayers extends AbstractUiSection {
       .append('label')
       .each((d: BaseLayerItem, i, nodes) => {
         select(nodes[i])
-          .call(uiTooltip(context)
+          .call(new UiTooltip(context)
             .title(l10n.t(`map_data.layers.${d.id}.tooltip`))
             .shortcut(utilCmd('⇧' + l10n.t(d.key)))
             .placement('bottom')
+            .attach
           );
       });
 
@@ -383,9 +384,10 @@ export class UiSectionDataLayers extends AbstractUiSection {
 
     const $$label = $$li
       .append('label')
-      .call(uiTooltip(context)
+      .call(new UiTooltip(context)
         .title(l10n.t('map_data.layers.custom.tooltip'))
         .placement('top')
+        .attach
       );
 
     $$label
@@ -400,9 +402,10 @@ export class UiSectionDataLayers extends AbstractUiSection {
     $$li
       .append('button')
       .attr('class', 'open-data-options')
-      .call(uiTooltip(context)
+      .call(new UiTooltip(context)
         .title(l10n.t('settings.custom_data.tooltip'))
         .placement(isRTL ? 'right' : 'left')
+        .attach
       )
       .on('click', (d3_event: Event) => {
         d3_event.preventDefault();
@@ -413,9 +416,10 @@ export class UiSectionDataLayers extends AbstractUiSection {
     $$li
       .append('button')
       .attr('class', 'zoom-to-data')
-      .call(uiTooltip(context)
+      .call(new UiTooltip(context)
         .title(l10n.t('map_data.layers.custom.zoom'))
         .placement(isRTL ? 'right' : 'left')
+        .attach
       )
       .on('click', (d3_event: Event) => {
         const target = d3_event.currentTarget as HTMLElement;
@@ -504,10 +508,11 @@ export class UiSectionDataLayers extends AbstractUiSection {
       .append('li')
       .attr('class', 'history-panel-toggle-item')
       .append('label')
-      .call(uiTooltip(context)
+      .call(new UiTooltip(context)
         .title(l10n.t('map_data.history_panel.tooltip'))
         .shortcut(utilCmd('⌘⇧' + l10n.t('shortcuts.command.toggle_history_card.key')))
         .placement('top')
+        .attach
       );
 
     $$historyPanelLabel
@@ -522,10 +527,11 @@ export class UiSectionDataLayers extends AbstractUiSection {
       .append('li')
       .attr('class', 'measurement-panel-toggle-item')
       .append('label')
-      .call(uiTooltip(context)
+      .call(new UiTooltip(context)
         .title(l10n.t('map_data.measurement_panel.tooltip'))
         .shortcut(utilCmd('⌘⇧' + l10n.t('shortcuts.command.toggle_measurement_card.key')))
         .placement('top')
+        .attach
       );
 
     $$measurementPanelLabel

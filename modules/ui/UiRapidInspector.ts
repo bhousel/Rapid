@@ -3,7 +3,7 @@ import { marked } from 'marked';
 import { actionNoop, actionRapidAcceptFeature } from '../actions/index.ts';
 import { uiIcon } from './icon.ts';
 //import { uiRapidFirstEditDialog } from './rapid_first_edit_dialog.ts';
-import { uiTooltip } from './tooltip.ts';
+import { UiTooltip } from './UiTooltip.ts';
 import { utilKeybinding } from '../util/keybinding.ts';
 import { utilSanitizeHTML } from '../util/sanitize.ts';
 
@@ -37,8 +37,8 @@ export class UiRapidInspector {
   public $inspector: D3Selection | null;
 
   // Child components
-  public AcceptTooltip: any;
-  public IgnoreTooltip: any;
+  public AcceptTooltip: UiTooltip;
+  public IgnoreTooltip: UiTooltip;
 
   // accept and enter one of these modes:
   public moveFeature: (e: any, d: any) => void;
@@ -63,8 +63,8 @@ export class UiRapidInspector {
     this.$inspector = null;
 
     // Create child components
-    this.AcceptTooltip = uiTooltip(context).placement('bottom');
-    this.IgnoreTooltip = uiTooltip(context).placement('bottom');
+    this.AcceptTooltip = new UiTooltip(context).placement('bottom');
+    this.IgnoreTooltip = new UiTooltip(context).placement('bottom');
 
     // Ensure methods used as callbacks always have `this` bound correctly.
     // (This is also necessary when using `d3-selection.call`)
@@ -524,7 +524,7 @@ export class UiRapidInspector {
       .append('button')
       .attr('class', 'choice-button')
       .on('click', d.onClick)
-      .call(d.tooltip);
+      .call(d.tooltip.attach);
 
     $$choiceActionButton
       .append('svg')

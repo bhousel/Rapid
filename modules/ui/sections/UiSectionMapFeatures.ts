@@ -1,5 +1,5 @@
 import { AbstractUiSection } from './AbstractUiSection.ts';
-import { uiTooltip } from '../tooltip.ts';
+import { UiTooltip } from '../UiTooltip.ts';
 
 import type { Context } from '../../Context.ts';
 import type { D3Selection } from 'd3-selection';
@@ -109,14 +109,15 @@ export class UiSectionMapFeatures extends AbstractUiSection {
       .remove();
 
     // Enter
-    const $$enter = $items.enter()
+    const $$items = $items.enter()
       .append('li')
-      .call((uiTooltip(context) as any)
+      .call(new UiTooltip(context)
         .title((d: string) => l10n.t(`filters.${d}.tooltip`))
         .placement('top')
+        .attach
       );
 
-    const $$label = $$enter
+    const $$label = $$items
       .append('label');
 
     $$label
@@ -131,7 +132,7 @@ export class UiSectionMapFeatures extends AbstractUiSection {
 
     // Update
     $items = $items
-      .merge($$enter);
+      .merge($$items);
 
     $items
       .classed('active', showsFeature)

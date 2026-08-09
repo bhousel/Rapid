@@ -8,7 +8,7 @@ import { OsmEntity, OsmRelation } from '../../data/index.ts';
 import { uiIcon } from '../icon.ts';
 import { UiCombobox } from '../UiCombobox.ts';
 import { AbstractUiSection } from './AbstractUiSection.ts';
-import { uiTooltip } from '../tooltip.ts';
+import { UiTooltip } from '../UiTooltip.ts';
 import { utilNoAuto, utilIsColorValid, utilHighlightEntities } from '../../util/util.ts';
 
 import type { Context } from '../../Context.ts';
@@ -629,9 +629,10 @@ const indexes = d.members.map(function(member: IndexedMember) {
     $$addRelationButton
       .call(uiIcon('#rapid-icon-plus', 'light'));
     $$addRelationButton
-      .call(uiTooltip(context)
+      .call(new UiTooltip(context)
         .title(l10n.t('inspector.add_to_relation'))
         .placement(l10n.isRTL ? 'left' : 'right')
+        .attach
        );
 
     $$addRow

@@ -3,7 +3,7 @@ import { Extent } from '@rapid-sdk/math';
 
 import { uiIcon } from '../icon.ts';
 import { UiLoading } from '../UiLoading.ts';
-import { uiTooltip } from '../tooltip.ts';
+import { UiTooltip } from '../UiTooltip.ts';
 
 import type { Context } from '../../Context.ts';
 import type { D3Selection } from 'd3-selection';
@@ -24,7 +24,7 @@ export class UiGeolocateControl {
   public context: Context;
 
   // Child components
-  public Tooltip: any;
+  public Tooltip: UiTooltip;
   public Loading: UiLoading;
 
   // D3 selections
@@ -47,7 +47,7 @@ export class UiGeolocateControl {
     this._isInitial = false;  // only pan the map after the initial geolocate
 
     // Create child components
-    this.Tooltip = uiTooltip(context);
+    this.Tooltip = new UiTooltip(context);
     this.Loading = new UiLoading(context).blocking(true);
 
     // D3 selections
@@ -92,7 +92,7 @@ export class UiGeolocateControl {
       .append('button')
       .attr('class', 'geolocate')
       .on('click', this.toggle)
-      .call(this.Tooltip)
+      .call(this.Tooltip.attach)
       .call(uiIcon('#rapid-icon-geolocate', 'light'));
 
     // update

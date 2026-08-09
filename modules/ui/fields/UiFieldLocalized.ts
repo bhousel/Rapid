@@ -3,7 +3,7 @@ import { utilArrayUniq, utilUniqueString } from '@rapid-sdk/util';
 import { iso1A2Code } from '@rapideditor/country-coder';
 import { UiField } from '../UiField.ts';
 import { uiIcon } from '../icon.ts';
-import { uiTooltip } from '../tooltip.ts';
+import { UiTooltip } from '../UiTooltip.ts';
 import { UiCombobox } from '../UiCombobox.ts';
 import { utilGetSetValue, utilNoAuto } from '../../util/index.ts';
 
@@ -45,7 +45,7 @@ export class UiFieldLocalized extends UiField {
   protected _languagesArray: LanguageItem[];
   protected _langCombo: any;
   protected _multilingual: MultilingualItem[];
-  protected _buttonTip: any;
+  protected _buttonTip: UiTooltip;
   protected _wikiTitles: Record<string, string> | null;
 
   /**
@@ -83,7 +83,7 @@ export class UiFieldLocalized extends UiField {
       .fetcher(this._getLanguages)
       .minItems(0);
 
-    this._buttonTip = uiTooltip(context)
+    this._buttonTip = new UiTooltip(context)
       .title(l10n.t('translate.translate'))
       .placement('left');
 
@@ -146,7 +146,7 @@ export class UiFieldLocalized extends UiField {
 
     $translateButton
       .classed('disabled', !!isLocked)
-      .call(isLocked ? this._buttonTip.destroy : this._buttonTip)
+      .call(isLocked ? this._buttonTip.destroy : this._buttonTip.attach)
       .on('click', this._addNew);
 
 

@@ -1,6 +1,6 @@
 import { selection, select } from 'd3-selection';
 import { uiIcon } from '../icon.ts';
-import { uiTooltip } from '../tooltip.ts';
+import { UiTooltip } from '../UiTooltip.ts';
 
 import type { Context } from '../../Context.ts';
 import type { D3Selection } from 'd3-selection';
@@ -22,7 +22,7 @@ export class UiDrawModesTool {
   public context: Context;
   public id: string;
   public stringID: string;
-  public Tooltip: any;
+  public Tooltip: UiTooltip;
   public commands: DrawCommand[];
 
   // D3 selections
@@ -80,7 +80,7 @@ export class UiDrawModesTool {
 
 
     // Create child components
-    this.Tooltip = (uiTooltip(context) as any)
+    this.Tooltip = new UiTooltip(context)
       .placement('bottom')
       .title((d: DrawCommand) => d.getDescription())
       .shortcut((d: DrawCommand) => d.getKey());
@@ -165,7 +165,7 @@ export class UiDrawModesTool {
       .each((d, i, nodes) => {
         select(nodes[i])
           .call(uiIcon(`#rapid-icon-${d.icon}`))
-          .call(this.Tooltip);
+          .call(this.Tooltip.attach);
       });
 
     $$buttons

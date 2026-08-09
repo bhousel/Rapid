@@ -1,6 +1,6 @@
 import { select } from 'd3-selection';
 import { uiIcon } from './icon.ts';
-import { uiTooltip } from './tooltip.ts';
+import { UiTooltip } from './UiTooltip.ts';
 
 import type { AbstractUiSection } from './sections/AbstractUiSection.ts';
 import type { Context } from '../Context.ts';
@@ -25,7 +25,7 @@ export class UiPane {
   // D3 selections
   public $pane: D3Selection;
 
-  protected _paneTooltip: any;
+  protected _paneTooltip: UiTooltip | null;
 
 
   /**
@@ -91,7 +91,7 @@ export class UiPane {
 
     if (!this._paneTooltip) {
       const isRTL = l10n.isRTL;
-      this._paneTooltip = (uiTooltip(context) as any)
+      this._paneTooltip = new UiTooltip(context)
         .placement(isRTL ? 'right' : 'left')
         .title(this.description)
         .shortcut(this.key);
@@ -105,7 +105,7 @@ export class UiPane {
       .append('button')
       .on('click', this.togglePane)
       .call(uiIcon(`#${this.iconName}`, 'light'))
-      .call(this._paneTooltip);
+      .call(this._paneTooltip!.attach);
   }
 
 

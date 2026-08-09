@@ -1,6 +1,6 @@
 import { utilArrayIdentical } from '@rapid-sdk/util';
 import { AbstractUiSection } from './AbstractUiSection.ts';
-import { uiTooltip } from '../tooltip.ts';
+import { UiTooltip } from '../UiTooltip.ts';
 import { UiPresetIcon } from '../UiPresetIcon.ts';
 import { UiTagReference } from '../UiTagReference.ts';
 
@@ -90,9 +90,10 @@ export class UiSectionFeatureType extends AbstractUiSection {
     const $$presetButton = $$presetButtonWrap
       .append('button')
       .attr('class', 'preset-list-button preset-reset')
-      .call(uiTooltip(context)
+      .call(new UiTooltip(context)
         .title(l10n.t('inspector.back_tooltip'))
         .placement('bottom')
+        .attach
       );
 
     $$presetButton.append('div')

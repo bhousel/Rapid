@@ -3,7 +3,7 @@ import { marked } from 'marked';
 import { UiPane } from '../UiPane.ts';
 import { uiIcon } from '../icon.ts';
 import { UiIntro } from '../intro/UiIntro.ts';
-import { uiTooltip } from '../tooltip.ts';
+import { UiTooltip } from '../UiTooltip.ts';
 import { helpHtml } from '../intro/helper.ts';
 
 import type { Context } from '../../Context.ts';
@@ -342,10 +342,11 @@ export class UiPaneHelp extends UiPane {
     const $$shortcuts = $$toc
       .append('li')
       .attr('class', 'shortcuts')
-      .call(uiTooltip(context)
+      .call(new UiTooltip(context)
         .title(l10n.t('shortcuts.tooltip'))
         .shortcut('?')
         .placement('top')
+        .attach
       )
       .append('a')
       .attr('href', '#')

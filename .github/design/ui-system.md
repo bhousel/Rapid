@@ -423,7 +423,32 @@ Start the Tutorial, and the Rapid-splash "skip to Rapid" path).
 
 ## Progress log
 
-### `combobox` → class + `d3_dispatch`/`utilRebind` retired (2026-08-08) — branch `ui_refactors`
+### `tooltip` → `UiTooltip` class (2026-08-09) — branch `ui_refactors`
+
+- **`tooltip.ts` → `UiTooltip.ts`**: now a `UiTooltip` class extending `EventEmitter` (for family
+  consistency; no events emitted yet). The element-`this` internals (`setup`/`show`/`hide`/`toggle`/
+  `updateContent`/`updatePosition`) became protected methods taking the anchor **node**; hover/focus
+  handlers read the anchor via `d3_event.currentTarget` (arrows, no `function(this)`). Fluent setters
+  (`displayType`/`hasArrow`/`placement`/`alignment`/`scrollContainer`/`content`/`title`/`heading`/
+  `shortcut`) use getter/setter **overloads** (setter returns `this`). `attach`/`show`/`hide`/`toggle`/
+  `updateContent`/`destroy`/`destroyAny` are bound in the ctor for `.call()` use.
+- **Default content is a method, not a `this`-aliased closure.** The old factory set a default
+  `_content` function that read the element datum via `select(this).datum()`. To avoid a
+  `no-this-alias` (`const self = this`), `_content` now defaults to `undefined` and `_updateContent`
+  branches: custom `_content` is still called with the element-`this` contract
+  (`this._content.call(node)`), otherwise it calls `this._defaultContent($anchor.datum())`.
+- **`.call()` idiom → `.attach`** at all ~61 sites across 36 files (controls, tools, sections, panes,
+  fields, top-level). Bare `.call(this.Tooltip)` / `.call(d.tooltip)` / `.call(localTip)` →
+  `.call(x.attach)`; ternaries like `.call(cond ? tip : tip.destroy)` got `.attach` on the bare
+  branch; `.updateContent()`/`.hide()`/`.show()`/`.destroy(…)`/`.destroyAny(…)` direct calls and
+  `.call(x.destroy)`/`.call(x.updateContent)` bound-method args were left unchanged.
+- **Killed the `any`s (the whole point).** ~20 `public Tooltip: any` (and `_lockedTip`, `_buttonTip`,
+  `_paneTooltip`, `_tooltips: Map<…, any>`) are now typed `UiTooltip`, and ~8 inline
+  `(uiTooltip(context) as any)` / `... as any` casts were removed — the overloaded `.title(d => …)`
+  datum functors now type-check natively.
+- **Verified:** `tsc` 0 / `eslint` 0 errors / build OK / browser 133 pass / unit 3289 pass / 0 fail.
+
+
 
 - **`combobox.ts` → `UiCombobox.ts`**: now a `UiCombobox` class extending `EventEmitter`. The ~15
   nested closures became protected methods; per-attachment state (`$input`/`$attachTo`) lives on the
@@ -561,8 +586,10 @@ Start the Tutorial, and the Rapid-splash "skip to Rapid" path).
   classes (public bound `render($selection)` + `on('change')`); the `UiSectionBackgroundList` and
   `UiSectionDataLayers` consumers now do `new UiSettingsX(context)`, wire `.on('change', …)` on a
   separate line, and call `.render`.
-- **Gotcha:** the typed `uiTooltip().title(…)` expects a zero-arg `Functor` — cast
-  `(uiTooltip(context) as any)` when passing a datum function `.title(d => …)`.
+- **Gotcha (historical, now resolved):** the old typed `uiTooltip().title(…)` factory needed
+  `(uiTooltip(context) as any)` when passing a datum function `.title(d => …)`. The `UiTooltip`
+  class (2026-08-09) fixed this with proper getter/setter overloads, and all those `as any` casts
+  were removed.
 - Consumers updated: `sections/index.js`, `panes/index.js`, `settings/index.js`, `ui/index.js`
   barrels; `commit.js` (`new UiSectionChanges`). Also removed two more stray untracked orphan `.ts`
   dupes (`feature_type.ts`, `raw_tag_editor.ts`). Verified tsc/eslint/build clean, browser 133 /

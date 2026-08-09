@@ -1,6 +1,6 @@
 import { selection } from 'd3-selection';
 import { uiIcon } from './icon.ts';
-import { uiTooltip } from './tooltip.ts';
+import { UiTooltip } from './UiTooltip.ts';
 import { utilDetect } from '../util/detect.ts';
 
 import type { Context } from '../Context.ts';
@@ -15,8 +15,8 @@ export class UiProjectLinks {
   public context: Context;
 
   // Child components
-  public BugTooltip: any;
-  public TranslateTooltip: any;
+  public BugTooltip: UiTooltip;
+  public TranslateTooltip: UiTooltip;
 
   // D3 selections
   public $parent: D3Selection | null;
@@ -29,8 +29,8 @@ export class UiProjectLinks {
     this.context = context;
 
     // Create child components
-    this.BugTooltip = uiTooltip(context).placement('top');
-    this.TranslateTooltip = uiTooltip(context).placement('top');
+    this.BugTooltip = new UiTooltip(context).placement('top');
+    this.TranslateTooltip = new UiTooltip(context).placement('top');
 
     // D3 selections
     this.$parent = null;
@@ -70,14 +70,14 @@ export class UiProjectLinks {
       .attr('target', '_blank')
       .on('click', this.reportIssue)
       .call(uiIcon('#rapid-icon-bug', 'light'))
-      .call(this.BugTooltip);
+      .call(this.BugTooltip.attach);
 
     $$wrap
       .append('a')
       .attr('target', '_blank')
       .attr('href', 'https://github.com/facebook/Rapid/blob/main/CONTRIBUTING.md#translations')
       .call(uiIcon('#rapid-icon-translate', 'light'))
-      .call(this.TranslateTooltip);
+      .call(this.TranslateTooltip.attach);
 
     // update
     $wrap = $wrap.merge($$wrap);

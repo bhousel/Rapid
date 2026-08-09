@@ -1,7 +1,7 @@
 import { selection } from 'd3-selection';
 import { marked } from 'marked';
 import { uiIcon } from './icon.ts';
-import { uiTooltip } from './tooltip.ts';
+import { UiTooltip } from './UiTooltip.ts';
 import { utilSanitizeHTML } from '../util/sanitize.ts';
 
 import type { Context } from '../Context.ts';
@@ -32,8 +32,8 @@ export class UiOvertureInspector {
   public $inspector: D3Selection | null;
 
   // Child Components
-  public AcceptTooltip: any;
-  public IgnoreTooltip: any;
+  public AcceptTooltip: UiTooltip;
+  public IgnoreTooltip: UiTooltip;
 
   protected _keys: any;
 
@@ -52,8 +52,8 @@ export class UiOvertureInspector {
     this.$inspector = null;
 
     // Create child components
-    this.AcceptTooltip = uiTooltip(context).placement('bottom');
-    this.IgnoreTooltip = uiTooltip(context).placement('bottom');
+    this.AcceptTooltip = new UiTooltip(context).placement('bottom');
+    this.IgnoreTooltip = new UiTooltip(context).placement('bottom');
 
     // Ensure methods used as callbacks always have `this` bound correctly.
     // (This is also necessary when using `d3-selection.call`)

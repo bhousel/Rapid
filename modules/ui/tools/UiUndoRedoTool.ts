@@ -1,6 +1,6 @@
 import { selection, select } from 'd3-selection';
 import { uiIcon } from '../icon.ts';
-import { uiTooltip } from '../tooltip.ts';
+import { UiTooltip } from '../UiTooltip.ts';
 import { utilCmd } from '../../util/cmd.ts';
 
 import type { Context } from '../../Context.ts';
@@ -14,7 +14,7 @@ export class UiUndoRedoTool {
   public context: Context;
   public id: string;
   public stringID: string;
-  public Tooltip: any;
+  public Tooltip: UiTooltip;
   public commands: any[];
 
   // D3 selections
@@ -36,7 +36,7 @@ export class UiUndoRedoTool {
     const scheduler = context.systems.scheduler;  // optional
 
     // Create child components
-    this.Tooltip = (uiTooltip(context) as any)
+    this.Tooltip = new UiTooltip(context)
       .title((d: any) => {
         // Handle string- or object-style annotations. Object-style
         // should include "type" and "description" keys, where
@@ -131,7 +131,7 @@ export class UiUndoRedoTool {
       .append('button')
       .attr('class', d => `disabled ${d.id}-button bar-button`)
       .on('click', this.choose)
-      .call(this.Tooltip)
+      .call(this.Tooltip.attach)
       .call(uiIcon(''));
 
     // update

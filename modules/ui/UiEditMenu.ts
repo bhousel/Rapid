@@ -1,7 +1,7 @@
 import { select } from 'd3-selection';
 import { EventEmitter } from 'tseep/lib/ee-safe';
 import { vecAdd } from '@rapid-sdk/math';
-import { uiTooltip } from './tooltip.ts';
+import { UiTooltip } from './UiTooltip.ts';
 import { uiIcon } from './icon.ts';
 import { utilHighlightEntities } from '../util/index.ts';
 
@@ -42,7 +42,7 @@ export class UiEditMenu extends EventEmitter {
   // but needed later if the menu is repositioned
   protected _menu: D3Selection;
   protected _operations: Operation[];
-  protected _tooltips: Map<OperationID, any>;   // Map(id -> tooltip)
+  protected _tooltips: Map<OperationID, UiTooltip>;   // Map(id -> tooltip)
   protected _anchorLoc: Vec2;              // Array [lon,lat] wgs84 coordinate where the menu should be anchored
   protected _oldz: number;
   protected _triggerType: string;          // 'touch', 'pen', or 'rightclick'
@@ -171,10 +171,10 @@ export class UiEditMenu extends EventEmitter {
           .attr('class', 'label');
       }
 
-      const tooltip = uiTooltip(context);
+      const tooltip = new UiTooltip(context);
       this._tooltips.set(d.id, tooltip);
       $button
-        .call(tooltip);
+        .call(tooltip.attach);
     });
 
 

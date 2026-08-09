@@ -3,7 +3,7 @@ import { JXON } from '../../util/jxon.ts';
 import { OsmChangeset } from '../../data/OsmChangeset.ts';
 import { actionDiscardTags } from '../../actions/discard_tags.ts';
 import { uiIcon } from '../icon.ts';
-import { uiTooltip } from '../tooltip.ts';
+import { UiTooltip } from '../UiTooltip.ts';
 
 import type { Context } from '../../Context.ts';
 import type { D3Selection } from 'd3-selection';
@@ -18,7 +18,7 @@ export class UiDownloadTool {
   public context: Context;
   public id: string;
   public stringID: string;
-  public Tooltip: any;
+  public Tooltip: UiTooltip;
 
   // D3 selections
   public $parent: D3Selection | null;
@@ -35,7 +35,7 @@ export class UiDownloadTool {
     const editor = context.systems.editor!;
 
     // Create child components
-    this.Tooltip = uiTooltip(context);
+    this.Tooltip = new UiTooltip(context);
 
     // D3 selections
     this.$parent = null;
@@ -81,7 +81,7 @@ export class UiDownloadTool {
       .append('button')
       .attr('class', 'downloadOsc disabled bar-button')
       .on('click', this.choose)
-      .call(this.Tooltip)
+      .call(this.Tooltip.attach)
       .call(uiIcon('#rapid-icon-download'));
 
     // update

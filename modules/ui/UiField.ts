@@ -2,7 +2,7 @@ import { EventEmitter } from 'tseep/lib/ee-safe';
 import { select } from 'd3-selection';
 import { utilUniqueString } from '@rapid-sdk/util';
 import { uiIcon } from './icon.ts';
-import { uiTooltip } from './tooltip.ts';
+import { UiTooltip } from './UiTooltip.ts';
 // import { uiFieldHelp } from './field_help.ts';
 import { UiTagReference } from './UiTagReference.ts';
 import { utilTotalExtent } from '../util/index.ts';
@@ -61,7 +61,7 @@ export class UiField extends EventEmitter {
   protected _state: string;
   protected _tags: Tags;
   protected _locked: boolean;
-  protected _lockedTip: ReturnType<typeof uiTooltip>;
+  protected _lockedTip: UiTooltip;
 
 
   /**
@@ -120,9 +120,9 @@ export class UiField extends EventEmitter {
     }
 
     this._locked = false;
-    this._lockedTip = uiTooltip(context)
+    this._lockedTip = new UiTooltip(context)
       .title(l10n.t('inspector.lock.suggestion', { label: this.label }))
-      .placement('bottom') as ReturnType<typeof uiTooltip>;
+      .placement('bottom');
 
 
     // Ensure methods used as callbacks always have `this` bound correctly.
@@ -373,7 +373,7 @@ export class UiField extends EventEmitter {
       .append('use')
       .attr('xlink:href', '#fas-lock');
 
-    $container.call(this._locked ? this._lockedTip : this._lockedTip.destroy);
+    $container.call(this._locked ? this._lockedTip.attach : this._lockedTip.destroy);
   }
 
 

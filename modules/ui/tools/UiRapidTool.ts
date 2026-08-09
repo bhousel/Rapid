@@ -1,7 +1,7 @@
 import { selection } from 'd3-selection';
 import { UiRapidDatasetToggle } from '../UiRapidDatasetToggle.ts';
 import { UiRapidPowerUserFeatures } from '../UiRapidPowerUserFeatures.ts';
-import { uiTooltip } from '../tooltip.ts';
+import { UiTooltip } from '../UiTooltip.ts';
 import { utilCmd } from '../../util/cmd.ts';
 
 import type { Context } from '../../Context.ts';
@@ -17,8 +17,8 @@ export class UiRapidTool {
   public stringID: string;
   public RapidModal: any;
   public PowerUserModal: any;
-  public RapidTooltip: any;
-  public PowerUserTooltip: any;
+  public RapidTooltip: UiTooltip;
+  public PowerUserTooltip: UiTooltip;
 
   // D3 selections
   public $parent: D3Selection | null;
@@ -39,8 +39,8 @@ export class UiRapidTool {
     // Create child components
     this.RapidModal = new UiRapidDatasetToggle(context);
     this.PowerUserModal = new UiRapidPowerUserFeatures(context);
-    this.RapidTooltip = uiTooltip(context);
-    this.PowerUserTooltip = uiTooltip(context);
+    this.RapidTooltip = new UiTooltip(context);
+    this.PowerUserTooltip = new UiTooltip(context);
 
     // D3 selections
     this.$parent = null;
@@ -113,7 +113,7 @@ export class UiRapidTool {
       .append('button')
       .attr('class', 'bar-button rapid-features')
       .on('click', this.choose)
-      .call(this.RapidTooltip);
+      .call(this.RapidTooltip.attach);
 
     $$rapidButton
       .append('svg')
@@ -140,7 +140,7 @@ export class UiRapidTool {
       .append('button')
       .attr('class', 'bar-button rapid-poweruser-features')
       .on('click', this.choose)
-      .call(this.PowerUserTooltip)
+      .call(this.PowerUserTooltip.attach)
       .append('div')
       .attr('class', 'beta');
 

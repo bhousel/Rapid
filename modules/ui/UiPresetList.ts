@@ -6,7 +6,7 @@ import { operationDelete } from '../operations/delete.js';
 import { uiIcon } from './icon.ts';
 import { UiPresetIcon } from './UiPresetIcon.ts';
 import { UiTagReference } from './UiTagReference.ts';
-import { uiTooltip } from './tooltip.ts';
+import { UiTooltip } from './UiTooltip.ts';
 import { utilKeybinding, utilNoAuto, utilTotalExtent } from '../util/index.ts';
 
 import type { Context } from '../Context.ts';
@@ -442,7 +442,7 @@ export class UiPresetList extends EventEmitter {
     const $buttons = this.$list.selectAll('.preset-list-button');
 
     // remove existing tooltips
-    $buttons.call(uiTooltip(context).destroyAny);
+    $buttons.call(new UiTooltip(context).destroyAny);
 
     $buttons.each((d: ListItem, i, nodes) => {
       const $selection = select(nodes[i]);
@@ -459,10 +459,11 @@ export class UiPresetList extends EventEmitter {
         .classed('disabled', isHidden);
 
       if (isHidden) {
-        $selection.call((uiTooltip(context)
+        $selection.call(new UiTooltip(context)
           .title(l10n.t('filters.hidden_preset.manual', { features: l10n.t(`filters.${filterID}.description`) }))
           .placement(i < 2 ? 'bottom' : 'top')
-        ) as any);
+          .attach
+        );
       }
     });
   }

@@ -1,5 +1,5 @@
 import { AbstractUiSection } from './AbstractUiSection.ts';
-import { uiTooltip } from '../tooltip.ts';
+import { UiTooltip } from '../UiTooltip.ts';
 import { UiCombobox } from '../UiCombobox.ts';
 import { utilNoAuto } from '../../util/util.ts';
 
@@ -99,8 +99,8 @@ export class UiSectionColorSelection extends AbstractUiSection {
       .enter()
       .append('div')
       .attr('class', 'layer-list preferences-color-selection-list')
-      .call(uiTooltip(context)
-        .title(l10n.tHtml('preferences.color_selection.tooltip')));
+      .call(new UiTooltip(context)
+        .title(l10n.tHtml('preferences.color_selection.tooltip')).attach);
 
 
     const $$pickerCombo = $$colorOptionsListEnter.append('div');

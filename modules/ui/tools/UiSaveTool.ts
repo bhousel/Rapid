@@ -1,7 +1,7 @@
 import { selection } from 'd3-selection';
 import { interpolateRgb } from 'd3-interpolate';
 import { uiIcon } from '../icon.ts';
-import { uiTooltip } from '../tooltip.ts';
+import { UiTooltip } from '../UiTooltip.ts';
 import { utilCmd } from '../../util/cmd.ts';
 
 import type { Context } from '../../Context.ts';
@@ -16,7 +16,7 @@ export class UiSaveTool {
   public id: string;
   public stringID: string;
   public key: string;
-  public Tooltip: any;
+  public Tooltip: UiTooltip;
 
   // D3 selections
   public $parent: D3Selection | null;
@@ -36,7 +36,7 @@ export class UiSaveTool {
     this._numChanges = 0;
 
     // Create child components
-    this.Tooltip = uiTooltip(context);
+    this.Tooltip = new UiTooltip(context);
 
     // D3 selections
     this.$parent = null;
@@ -86,7 +86,7 @@ export class UiSaveTool {
       .append('button')
       .attr('class', 'save disabled bar-button')
       .on('click', this.choose)
-      .call(this.Tooltip)
+      .call(this.Tooltip.attach)
       .call(uiIcon('#rapid-icon-save'));
 
     $$button

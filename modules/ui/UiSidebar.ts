@@ -14,7 +14,7 @@ import { UiOsmoseEditor } from './UiOsmoseEditor.ts';
 import { UiNoteEditor } from './UiNoteEditor.ts';
 import { UiRapidInspector } from './UiRapidInspector.ts';
 import { UiOvertureInspector } from './UiOvertureInspector.ts';
-import { uiTooltip } from './tooltip.ts';
+import { UiTooltip } from './UiTooltip.ts';
 
 import type { Context } from '../Context.ts';
 import type { D3Selection } from 'd3-selection';
@@ -55,7 +55,7 @@ export class UiSidebar {
   public OsmoseEditor: UiOsmoseEditor;
   public RapidInspector: UiRapidInspector;
   public OvertureInspector: UiOvertureInspector;
-  public Tooltip: any;
+  public Tooltip: UiTooltip;
 
   // D3 selections
   public $parent: D3Selection | null;
@@ -97,7 +97,7 @@ export class UiSidebar {
     this.OsmoseEditor = new UiOsmoseEditor(context);
     this.RapidInspector = new UiRapidInspector(context);
     this.OvertureInspector = new UiOvertureInspector(context);
-    this.Tooltip = uiTooltip(context);
+    this.Tooltip = new UiTooltip(context);
 
     // D3 selections
     this.$parent = null;
@@ -209,6 +209,7 @@ export class UiSidebar {
         .placement(dir === 'rtl' ? 'right' : 'left')  // place on the sidebar side (i.e. don't cover the map)
         .title(l10n.t('inspector.tooltip'))
         .shortcut(l10n.t('shortcuts.command.toggle_inspector.key'))
+        .attach
       );
 
     $sidebar

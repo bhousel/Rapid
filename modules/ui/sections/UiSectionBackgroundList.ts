@@ -6,7 +6,7 @@ import { AbstractUiSection } from './AbstractUiSection.ts';
 import { ImagerySource } from '../../lib/ImagerySource.ts';
 import { uiIcon } from '../icon.ts';
 import { UiSettingsCustomBackground } from '../settings/UiSettingsCustomBackground.ts';
-import { uiTooltip } from '../tooltip.ts';
+import { UiTooltip } from '../UiTooltip.ts';
 import { utilCmd } from '../../util/cmd.ts';
 
 import type { Context } from '../../Context.ts';
@@ -190,10 +190,11 @@ export class UiSectionBackgroundList extends AbstractUiSection {
       .append('li')
       .attr('class', 'minimap-toggle-item')
       .append('label')
-      .call(uiTooltip(context)
+      .call(new UiTooltip(context)
         .title(l10n.t('background.minimap.tooltip'))
         .shortcut(l10n.t('shortcuts.command.toggle_minimap.key'))
         .placement('top')
+        .attach
       );
 
     $$minimapLabel
@@ -212,10 +213,11 @@ export class UiSectionBackgroundList extends AbstractUiSection {
       .append('li')
       .attr('class', 'map3d-toggle-item')
       .append('label')
-      .call(uiTooltip(context)
+      .call(new UiTooltip(context)
         .title(l10n.t('background.3dmap.tooltip'))
         .shortcut(utilCmd('⌘' + l10n.t('shortcuts.command.toggle_3dmap.key')))
         .placement('top')
+        .attach
       );
 
     $$map3dLabel
@@ -236,10 +238,11 @@ export class UiSectionBackgroundList extends AbstractUiSection {
       .append('li')
       .attr('class', 'background-panel-toggle-item')
       .append('label')
-      .call(uiTooltip(context)
+      .call(new UiTooltip(context)
         .title(l10n.t('background.panel.tooltip'))
         .shortcut(utilCmd('⌘⇧' + l10n.t('shortcuts.command.toggle_background_card.key')))
         .placement('top')
+        .attach
       );
 
     $$panelLabel
@@ -254,10 +257,11 @@ export class UiSectionBackgroundList extends AbstractUiSection {
       .append('li')
       .attr('class', 'location-panel-toggle-item')
       .append('label')
-      .call(uiTooltip(context)
+      .call(new UiTooltip(context)
         .title(l10n.t('background.location_panel.tooltip'))
         .shortcut(utilCmd('⌘⇧' + l10n.t('shortcuts.command.toggle_location_card.key')))
         .placement('top')
+        .attach
       );
 
     $$locPanelLabel
@@ -329,7 +333,7 @@ export class UiSectionBackgroundList extends AbstractUiSection {
       const $item = select(nodes[i]).select('label');
       const placement = (i < nodes.length / 2) ? 'bottom' : 'top';
 
-      const tooltip: any = uiTooltip(context).placement(placement);
+      const tooltip = new UiTooltip(context).placement(placement);
       $item.call(tooltip.destroyAny);
 
       let titleHtml = '';
@@ -343,7 +347,7 @@ export class UiSectionBackgroundList extends AbstractUiSection {
 
       if (titleHtml) {
         tooltip.title(titleHtml);
-        $item.call(tooltip);
+        $item.call(tooltip.attach);
       }
     });
   }
@@ -436,9 +440,10 @@ export class UiSectionBackgroundList extends AbstractUiSection {
           $li
             .append('button')
             .attr('class', 'layer-browse')
-            .call(uiTooltip(context)
+            .call(new UiTooltip(context)
               .title(l10n.t('settings.custom_background.tooltip'))
               .placement(l10n.isRTL ? 'right' : 'left')
+              .attach
             )
             .on('click', this._clickCustom)
             .call(uiIcon('#rapid-icon-more'));

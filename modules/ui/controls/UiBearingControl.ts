@@ -2,7 +2,7 @@ import { selection } from 'd3-selection';
 import { vecRotate } from '@rapid-sdk/math';
 
 import { uiIcon } from '../icon.ts';
-import { uiTooltip } from '../tooltip.ts';
+import { UiTooltip } from '../UiTooltip.ts';
 
 import type { Context } from '../../Context.ts';
 import type { D3Selection } from 'd3-selection';
@@ -16,7 +16,7 @@ export class UiBearingControl {
   public context: Context;
 
   // Child components
-  public Tooltip: any;
+  public Tooltip: UiTooltip;
 
   // D3 selections
   public $parent: D3Selection | null;
@@ -30,7 +30,7 @@ export class UiBearingControl {
     this.context = context;
 
     // Create child components
-    this.Tooltip = uiTooltip(context)
+    this.Tooltip = new UiTooltip(context)
       .shortcut('⇧ ');  // hack, we will replace the space with the arrow keys icon
 
     // D3 selections
@@ -78,7 +78,7 @@ export class UiBearingControl {
       .attr('class', 'bearing_n');
 
     $$button
-      .call(this.Tooltip)
+      .call(this.Tooltip.attach)
       .call(uiIcon('#rapid-icon-compass', 'light'));
 
     // update

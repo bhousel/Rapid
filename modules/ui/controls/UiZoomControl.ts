@@ -1,7 +1,7 @@
 import { select, selection } from 'd3-selection';
 
 import { uiIcon } from '../icon.ts';
-import { uiTooltip } from '../tooltip.ts';
+import { UiTooltip } from '../UiTooltip.ts';
 import { utilCmd, utilKeybinding } from '../../util/index.ts';
 
 import type { Context } from '../../Context.ts';
@@ -15,7 +15,7 @@ export class UiZoomControl {
   public context: Context;
 
   // Child components
-  public Tooltip: any;
+  public Tooltip: UiTooltip;
 
   // D3 selections
   public $parent: D3Selection | null;
@@ -33,7 +33,7 @@ export class UiZoomControl {
     const map = context.systems.map!;
 
     // Create child components
-    this.Tooltip = uiTooltip(context);
+    this.Tooltip = new UiTooltip(context);
 
     // D3 selections
     this.$parent = null;
@@ -105,7 +105,7 @@ export class UiZoomControl {
           d.action(e);
         }
       })
-      .call(this.Tooltip)
+      .call(this.Tooltip.attach)
       .each((d, i, nodes) => {
         select(nodes[i])
           .call(uiIcon(`#${d.icon}`, 'light'));

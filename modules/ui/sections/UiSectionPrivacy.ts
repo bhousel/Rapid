@@ -1,5 +1,5 @@
 import { AbstractUiSection } from './AbstractUiSection.ts';
-import { uiTooltip } from '../tooltip.ts';
+import { UiTooltip } from '../UiTooltip.ts';
 import { uiIcon } from '../icon.ts';
 
 import type { Context } from '../../Context.ts';
@@ -57,9 +57,10 @@ export class UiSectionPrivacy extends AbstractUiSection {
       .append('li')
       .attr('class', 'privacy-third-party-icons-item')
       .append('label')
-      .call(uiTooltip(context)
+      .call(new UiTooltip(context)
         .title(l10n.t('preferences.privacy.third_party_icons.tooltip'))
         .placement('bottom')
+        .attach
       );
 
     $$thirdPartyIcons

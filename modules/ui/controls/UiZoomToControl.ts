@@ -1,7 +1,7 @@
 import { selection } from 'd3-selection';
 
 import { uiIcon } from '../icon.ts';
-import { uiTooltip } from '../tooltip.ts';
+import { UiTooltip } from '../UiTooltip.ts';
 
 import type { Context } from '../../Context.ts';
 import type { D3Selection } from 'd3-selection';
@@ -15,7 +15,7 @@ export class UiZoomToControl {
   public context: Context;
 
   // Child components
-  public Tooltip: any;
+  public Tooltip: UiTooltip;
 
   // D3 selections
   public $parent: D3Selection | null;
@@ -36,7 +36,7 @@ export class UiZoomToControl {
     this._keys = null;
 
     // Create child components
-    this.Tooltip = uiTooltip(context);
+    this.Tooltip = new UiTooltip(context);
 
     // D3 selections
     this.$parent = null;
@@ -80,7 +80,7 @@ export class UiZoomToControl {
       .append('button')
       .attr('class', 'zoom-to-selection')
       .on('click', this.zoomTo)
-      .call(this.Tooltip)
+      .call(this.Tooltip.attach)
       .call(uiIcon('#rapid-icon-framed-dot', 'light'));
 
     // update

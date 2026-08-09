@@ -1,7 +1,7 @@
 import { descending, ascending } from 'd3-array';
 import { select } from 'd3-selection';
 import { AbstractUiSection } from './AbstractUiSection.ts';
-import { uiTooltip } from '../tooltip.ts';
+import { UiTooltip } from '../UiTooltip.ts';
 
 import type { Context } from '../../Context.ts';
 import type { D3Selection } from 'd3-selection';
@@ -95,12 +95,13 @@ export class UiSectionOverlayList extends AbstractUiSection {
       const placement = (i < nodes.length / 2) ? 'bottom' : 'top';
       const isOverflowing = (span.property('clientWidth') !== span.property('scrollWidth'));
 
-      item.call(uiTooltip(context).destroyAny);
+      item.call(new UiTooltip(context).destroyAny);
 
       if (d.description || isOverflowing) {
-        item.call((uiTooltip(context) as any)
+        item.call(new UiTooltip(context)
           .placement(placement)
           .title(d.description || d.name)
+          .attach
         );
       }
     });

@@ -42,6 +42,39 @@ replacement, so its constructor wraps `on` to `removeAllListeners(event)` before
 its `render()` is a placeholder, because the field registry (`uiFields`) instantiates it just like
 any other field type.
 
+## UI primitives `tooltip`/`modal`/`confirm` → classes (reversing the earlier "keep as functions")
+
+An earlier pass kept `icon`, `tooltip`, `popover`, `modal`, `confirm`, `combobox`, `disclosure`,
+`section` as typed **factory functions** ("one-shot builders"). That heuristic was wrong for
+components that are actually **owned and re-rendered over time** — the real test is ownership +
+lifecycle, not construction ergonomics. `combobox`/`disclosure`/`loading` were already converted;
+`tooltip`/`modal`/`confirm` are next. (`icon` stays a stateless function; `section`/`uiSection` is
+dead except the quarantined React demo; `popover` is folded into tooltip.)
+
+- **`tooltip` is genuinely owned state.** ~20 components hold `public Tooltip: any` and reconfigure +
+  relocalize it on every render (e.g. `UiZoomControl` sets `.title()/.placement()/.shortcut()` then
+  `.updateContent()`), plus ~40 inline `.call(uiTooltip(ctx)…)` sites. A `UiTooltip` class (extending
+  `EventEmitter` for family consistency) kills the `any`s and gives owners a typed, holdable handle.
+  Attach idiom `sel.call(tooltip)` → `sel.call(tooltip.attach)`.
+
+## Modal stack is owned by `UiSystem`
+
+The single-modal limitation in `uiModal` (global `document` keybinding + "replace the one existing
+modal" logic) forces ugly hacks whenever a second modal must sit on top of a first — see
+`UiRapidCatalog`/`UiRapidAddDataset`, which monkeypatch `$parentModal.close` and hand-rebuild
+`utilKeybinding`. The fix is a **modal stack owned by `UiSystem`** (`context.systems.ui`):
+
+- Each `UiModal` instance owns its own `.shaded` backdrop layer; `show()` pushes onto the stack,
+  `close()` pops. Only the **top** modal receives Esc/Backspace (one document handler routes to the
+  top), which is what makes nesting work without clobbering the parent's keybindings.
+- Owning the stack on `UiSystem` follows the "runtime state lives on a system" rule (a future CLI
+  build simply has no `ui` system, so modals no-op) and matches the reality that there is exactly one
+  active/top modal at a time.
+- `UiConfirm extends UiModal` (thin: header + message + `okButton()`), converted **after** `UiModal`.
+- The `UiRapidCatalog`/`UiRapidAddDataset` hacks delete entirely once nesting is native.
+- **Sequencing:** `tooltip` first (independent, no unknowns), then `modal` + `confirm` together once
+  the `UiSystem`-owned stack is in place.
+
 - **Use explicit strict sanitization only at known trust boundaries.** External QA content, notes, remote metadata, Markdown, and reusable HTML widgets pass through Rapid's detached-document allowlist. The sanitizer rejects foreign namespaces and unsafe URL schemes, hardens new-window links, and reparses until serialization is stable. It fails closed to escaped text when DOM parsing is unavailable.
 - **Do not install a document-wide Trusted Types default policy.** Rapid's registries and embedding model let extensions own their rendering. A global policy rewrites those extension sinks, and DOMPurify's assumptions did not hold in live Chrome. Keep sanitization local to the core trust boundaries instead.
 - **Keep CSP inline scripts hash-based and extension-aware.** `script-src` has no `unsafe-inline`; exact SHA-256 hashes authorize the bootstraps and `strict-dynamic` propagates that trust to registered service scripts. HTTPS styles and fonts remain available to extension assets. The editor documents explicitly opt into `unsafe-eval` because Mapillary JS 4 unconditionally compiles filters with `new Function`; the OAuth callback does not. Core Pixi and event emitters use their no-eval implementations.
