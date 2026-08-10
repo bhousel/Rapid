@@ -24,7 +24,7 @@
     "skipLibCheck": true,
     "noFallthroughCasesInSwitch": true,
     "noUncheckedIndexedAccess": false,
-    // "noImplicitOverride": true,
+    // "noImplicitOverride": true,   // TODO: enable once all 329 implicit overrides across behaviors/core/modes/ui are tagged
 
     // Some stricter flags (disabled by default)
     "noUnusedLocals": false,

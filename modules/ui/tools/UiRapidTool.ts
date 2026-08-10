@@ -15,8 +15,8 @@ export class UiRapidTool {
   public context: Context;
   public id: string;
   public stringID: string;
-  public RapidModal: any;
-  public PowerUserModal: any;
+  public RapidModal: UiRapidDatasetToggle;
+  public PowerUserModal: UiRapidPowerUserFeatures;
   public RapidTooltip: UiTooltip;
   public PowerUserTooltip: UiTooltip;
 

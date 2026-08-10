@@ -22,11 +22,11 @@ export class UiMapToolbar {
   public context: Context;
 
   // Child components
-  public DrawModes: any;
-  public Rapid: any;
-  public UndoRedo: any;
-  public Save: any;
-  public Download: any;
+  public DrawModes: UiDrawModesTool;
+  public Rapid: UiRapidTool;
+  public UndoRedo: UiUndoRedoTool;
+  public Save: UiSaveTool;
+  public Download: UiDownloadTool;
 
   // D3 selections
   public $parent: D3Selection | null;

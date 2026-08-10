@@ -170,6 +170,10 @@ export class UiFoo {
 
 ## Inventory
 
+> **Note (2026-08-10):** The inventory below reflects the **initial state** of `modules/ui/` at the
+> start of this project. The conversion is now complete — all components are TypeScript classes.
+> For current state, see the `## Progress log` section below and the conversion table in `AGENTS.md`.
+
 Counts are approximate line counts. **Level** is the current level; all targets are **Level 4 (TS class)**.
 
 ### Already Level 3 (class) — JS→TS conversion only (lowest risk)
@@ -263,7 +267,7 @@ wired but commented at their call sites exactly as today until they're re-enable
 ## Dependency Clusters & Phasing
 
 Convert **dependency-first** so consumers only ever import already-modernized code. Verify after each
-phase (`bun run test:ts` + `bun run lint`, then targeted tests). Each phase is independently
+phase (`bun run check:ts` + `bun run check:lint`, then targeted tests). Each phase is independently
 shippable.
 
 ### Phase 0 — Prep
@@ -395,8 +399,8 @@ Start the Tutorial, and the Rapid-splash "skip to Rapid" path).
 
 ## Verification (run after every phase; per AGENTS.md)
 
-1. `bun tsc --noEmit` (or `bun run test:ts`) — types clean.
-2. `bun run lint` — no new warnings; **do not** suppress `todo`/`fixme`.
+1. `bun tsc --noEmit` (or `bun run check:ts`) — types clean.
+2. `bun run check:lint` — no new warnings; **do not** suppress `todo`/`fixme`.
 3. `bun run build:js` — build succeeds.
 4. `bun run test:unit` and `bun run test:browser` — green (note any pre-existing failures).
 5. Spot-check in the running app for the touched cluster (sidebar, panes, intro, etc.).
@@ -416,10 +420,10 @@ Start the Tutorial, and the Rapid-splash "skip to Rapid" path).
 
 ## Definition of Done
 
-- No `.js`/`.jsx` files remain under `modules/ui/` except the quarantined `.jsx` (pending decision).
-- All components are TS classes following the canonical shape.
-- `bun run test` passes (lint + unit + browser + type-check).
-- `AGENTS.md` conversion table shows `modules/ui/` ✅ Complete.
+- ✅ No `.js`/`.jsx` files remain under `modules/ui/` except the quarantined `.jsx` (pending decision).
+- ✅ All components are TS classes following the canonical shape.
+- ✅ `bun run test` passes (lint + unit + browser + type-check).
+- ✅ `AGENTS.md` conversion table shows `modules/ui/` ✅ Complete.
 
 ## Progress log
 
@@ -556,11 +560,12 @@ Start the Tutorial, and the Rapid-splash "skip to Rapid" path).
 
 - **Classes over functions (user preference).** An earlier pass converted fields/`tag_reference` to
   typed *functions*; the user asked to prefer **classes wherever possible**, so those were reworked
-  into classes matching the canonical shape. Goal 1 ("every file a TS class") stands. The remaining
-  intentional function exceptions are shared, stateless DOM-builders still consumed by unconverted
-  JS or attached inline via `.call()`: `icon`, `toggle`, `tooltip`, `popover`,
-  `form_fields`, `modal`, `confirm`, `section`. (`disclosure`/`loading`/`combobox` were converted to
-  the `UiDisclosure`/`UiLoading`/`UiCombobox` classes; `combobox` also retired `d3_dispatch`/`utilRebind`.)
+  into classes matching the canonical shape. Goal 1 ("every file a TS class") stands. The **only**
+  remaining intentional function exception is `icon` (stateless DOM-builder, called in ~100 files;
+  a class would be churn with no lifecycle benefit). All other former factory functions —
+  `disclosure`, `loading`, `combobox`, `tooltip`, `modal`, `confirm` — are now TS classes.
+  `toggle`/`popover` were deleted; `form_fields` became `UiFormFields`; `section`/`uiSection` is dead
+  code (only referenced by the quarantined `react_container.jsx`).
 - **`$`-prefixed selection properties must be `public`.** The eslint `naming-convention` rule
   requires `protected` members to be `_`-prefixed, which conflicts with the `$var` selection
   convention. Declare selection state as `public $foo: D3Selection` (matches `UiInspector`,

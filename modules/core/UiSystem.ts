@@ -12,7 +12,11 @@ import {
 import type { Context } from '../Context.ts';
 import type { D3EnterSelection, D3Selection } from 'd3-selection';
 import type { Keybinding } from '../util/keybinding.ts';
+import type { UiInfoCards } from '../ui/UiInfoCards.ts';
+import type { UiMinimap } from '../ui/UiMinimap.ts';
 import type { UiModal } from '../ui/UiModal.ts';
+import type { UiPhotoViewer } from '../ui/UiPhotoViewer.ts';
+import type { UiSpector } from '../ui/UiSpector.ts';
 import type { Vec2 } from '@rapid-sdk/math';
 
 
@@ -45,39 +49,39 @@ export class UiSystem extends AbstractSystem {
 
   // Child UI components, created during initAsync
   /** API status indicator component */
-  public ApiStatus: any;
+  public ApiStatus: UiApiStatus;
   /** Authentication loading modal */
-  public AuthModal: any;
+  public AuthModal: UiLoading;
   /** SVG `<defs>` container for sprites and clip paths */
-  public Defs: any;
+  public Defs: UiDefs;
   /** Context menu shown when right-clicking map features */
-  public EditMenu: any;
+  public EditMenu: UiEditMenu;
   /** MapRoulette-specific context menu */
-  public MapRouletteMenu: any;
+  public MapRouletteMenu: UiMapRouletteMenu;
   /** Transient notification/flash overlay */
-  public Flash: any;
+  public Flash: UiFlash;
   /** Fullscreen toggle button and state manager */
-  public Fullscreen: any;
+  public Fullscreen: UiFullscreen;
   /** Footer bar with attribution and zoom indicator */
-  public MapFooter: any;
+  public MapFooter: UiMapFooter;
   /** Top toolbar containing mode buttons and search */
-  public MapToolbar: any;
+  public MapToolbar: UiMapToolbar;
   /** Overlay panels drawn on top of the map (zoom controls, issue pins, etc.) */
-  public Overmap: any;
+  public Overmap: UiOvermap;
   /** Keyboard shortcut reference panel */
-  public Shortcuts: any;
+  public Shortcuts: UiShortcuts;
   /** Right-side inspector / tag editor panel */
-  public Sidebar: any;
+  public Sidebar: UiSidebar;
 
   // References to components that live deeper in the tree
   /** Info-card components displayed over the map (e.g. measurement, history) */
-  public InfoCards: any;
+  public InfoCards: UiInfoCards;
   /** Mini-map overview panel */
-  public Minimap: any;
+  public Minimap: UiMinimap;
   /** Photo viewer panel (Mapillary, Streetside, KartaView, etc.) */
-  public PhotoViewer: any;
+  public PhotoViewer: UiPhotoViewer;
   /** WebGL Spector debugging overlay */
-  public Spector: any;
+  public Spector: UiSpector;
 
 
   /**
@@ -100,25 +104,25 @@ export class UiSystem extends AbstractSystem {
     this._modalKeybinding = utilKeybinding('modal');
 
     // Child components, we will defer creating these until after some other things have initted.
-    this.ApiStatus = null;
-    this.AuthModal = null;
-    this.Defs = null;
-    this.EditMenu = null;
-    this.MapRouletteMenu = null;
-    this.Flash = null;
-    this.Fullscreen = null;
-    this.MapFooter = null;
-    this.MapToolbar = null;
-    this.Overmap = null;
-    this.Shortcuts = null;
-    this.Sidebar = null;
+    this.ApiStatus = null!;
+    this.AuthModal = null!;
+    this.Defs = null!;
+    this.EditMenu = null!;
+    this.MapRouletteMenu = null!;
+    this.Flash = null!;
+    this.Fullscreen = null!;
+    this.MapFooter = null!;
+    this.MapToolbar = null!;
+    this.Overmap = null!;
+    this.Shortcuts = null!;
+    this.Sidebar = null!;
 
     // These components live below in the tree, but we will hold a reference
     // to them here in the UiSystem, so other code can find them easily.
-    this.InfoCards = null;
-    this.Minimap = null;
-    this.PhotoViewer = null;
-    this.Spector = null;
+    this.InfoCards = null!;
+    this.Minimap = null!;
+    this.PhotoViewer = null!;
+    this.Spector = null!;
 
     // Ensure methods used as callbacks always have `this` bound correctly.
     // (This is also necessary when using `d3-selection.call`)
@@ -597,7 +601,7 @@ dims = vecAdd(dims, [overscan * 2, overscan * 2]);
     const operations = context.mode?.operations ?? [];
 
     if (operations.length && context.editable()) {
-      this.EditMenu.operations(operations);
+      this.EditMenu.operations(operations as any[]);
       $overlay.call(this.EditMenu.render);   // redraw it
     } else {
       this.EditMenu.close();

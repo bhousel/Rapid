@@ -33,7 +33,9 @@ initialized to `null` in the constructor.
 
 **Documented exceptions** keep `render($selection)` or `render()` — but the JSDoc MUST say *why*
 (who owns the target selection):
-- **Modal children** — `$modal` is always the parent; `render()` takes no argument.
+- **Modal children** — the owner renders into `modal.$content` (a `D3Selection`). Treat it like any
+  other handed-down selection; `render()` typically takes no argument since `$content` is captured
+  at `show()` time.
 - **"Props passed down" components** handed their target by a parent on each render (fields, save-flow
   sub-components), one-shot modal creators, menus, and per-row/per-item renderers.
 

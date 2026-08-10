@@ -1,5 +1,5 @@
 import * as PIXI from 'pixi.js';
-import { merge as deepMerge } from 'lodash-es';
+import { utilDeepMerge } from '../util/deep_merge.ts';
 import { styleDefaults } from '../lib/Style.ts';
 
 import type { AbstractData } from '../data/AbstractData.ts';
@@ -119,7 +119,7 @@ export class AbstractPixiFeature {
 
     this._geom = null;
     this._geomDirty = true;
-    this._style = deepMerge({}, styleDefaults);
+    this._style = utilDeepMerge({}, styleDefaults) as MinimalStyleProps;
     this._styleDirty = true;
     this._label = null;
     this._labelDirty = true;
@@ -302,7 +302,7 @@ export class AbstractPixiFeature {
    */
   public set style(props: Partial<StyleProps>) {
     // result: defaults ← props
-    this._style = deepMerge({}, styleDefaults, props) as MinimalStyleProps;
+    this._style = utilDeepMerge({}, styleDefaults, props) as MinimalStyleProps;
     this._styleDirty = true;
   }
 

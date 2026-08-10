@@ -106,9 +106,12 @@ export class UiCombobox extends EventEmitter {
     this._render = this._render.bind(this);
     this._accept = this._accept.bind(this);
 
-    // The combobox keeps at most one listener per event (matching the d3-dispatch
-    // behavior its consumers rely on, since they re-register `accept`/`cancel` on
-    // each render). Wrap `on` to clear prior listeners for the event before adding.
+    // `accept` and `cancel` are single-listener events: each attach site re-registers
+    // a new handler on every render, expecting the old one to be replaced. This matches
+    // the d3-dispatch semantics the combobox was originally written against. We wrap `on`
+    // here so that registering a new listener automatically removes any previous one for
+    // the same event. (tseep types `on` as a class field, so method override is not
+    // possible — the wrapper is assigned in the constructor instead.)
     const _on = this.on;
     this.on = ((event: any, listener: any) => {
       this.removeAllListeners(event);

@@ -1,4 +1,4 @@
-import { merge as deepMerge } from 'lodash-es';
+import { utilDeepMerge } from '../util/deep_merge.ts';
 import { isVarRef, resolveVarRef } from './Variable.ts';
 
 import type { Vec2 } from '@rapid-sdk/math';
@@ -366,7 +366,7 @@ export class Style {
     // result: styleDefaults ← userDefaults ← fallbacks ← this.resolved
     // userDefaults (e.g. DEFAULTS style from the asset file) fills the gap between hardcoded
     // styleDefaults and the semantic fallbacks, so base.color and stroke/fill cascades still win.
-    return deepMerge({}, styleDefaults, userDefaults?.resolved ?? {}, fallbacks, resolved) as MinimalStyleProps;
+    return utilDeepMerge({}, styleDefaults, userDefaults?.resolved ?? {}, fallbacks, resolved) as MinimalStyleProps;
   }
 
 
@@ -378,7 +378,7 @@ export class Style {
    * @return A new Style with merged properties
    */
   public merge(other: Style): Style {
-    const merged = deepMerge({}, this.resolved, other.resolved) as StyleProps;
+    const merged = utilDeepMerge({}, this.resolved, other.resolved) as StyleProps;
     merged.id = this.id;  // Keep original ID
     return new Style(this.context, merged);
   }

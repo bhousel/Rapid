@@ -1,5 +1,5 @@
 import { AbstractSystem } from './AbstractSystem.ts';
-import { merge as deepMerge } from 'lodash-es';
+import { utilDeepMerge } from '../util/deep_merge.ts';
 import { Style, styleDefaults } from '../lib/Style.ts';
 import { StyleSelector } from '../lib/StyleSelector.ts';
 import { Variable } from '../lib/Variable.ts';
@@ -554,7 +554,7 @@ export class StyleSystem extends AbstractSystem {
       for (const styleID of selector.styleIDs) {
         const style = scopeStyles.get(styleID);
         if (style) {
-          combinedProps = deepMerge(combinedProps, style.resolved) as StyleProps;
+          combinedProps = utilDeepMerge(combinedProps, style.resolved) as StyleProps;
           combinedIDs.add(styleID);
         } else {
           console.error(`invalid styleID: ${styleID}`);  // eslint-disable-line

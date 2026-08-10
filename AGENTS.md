@@ -556,16 +556,16 @@ Track TypeScript conversion progress here:
 
 After making changes:
 1. Run `bun tsc --noEmit` to check types
-2. Run `bun run lint` to perform linting
+2. Run `bun run check:lint` to perform linting
 3. Run `bun run build:js` to verify build
 4. Run `bun run test` for full test suite (or the sub-commands below for faster iteration)
-5. Run `bun run validate:json` to validate data files against JSON schemas
+5. Run `bun run check:json` to validate data files against JSON schemas
 
 ### Test Commands
 - `bun run test` — runs lint + unit + browser + type-check (the full suite)
 - `bun run test:unit` — unit tests only (`test/unit/`)
 - `bun run test:browser` — browser tests with happy-dom preload (`test/browser/`)
-- `bun run test:ts` — type-check via `tsc --noEmit`
+- `bun run check:ts` — type-check via `tsc --noEmit`
 - **Do NOT use bare `bun test`** — it skips the `--preload ./test/test_setup.js` that provides happy-dom globals. Browser tests will fail with misleading errors about missing DOM APIs.
 
 ### JSON Schemas
@@ -574,7 +574,7 @@ After making changes:
 - Component schemas use `$ref` to reference each other (e.g. `matcher.schema.json` is used by both `selector.schema.json` and `ruleset.schema.json`)
 - Imagery schema tracks the upstream [editor-layer-index schema](https://github.com/osmlab/editor-layer-index) closely
 - Field, preset, category, defaults, deprecated, and discarded schemas are compatible with [schema-builder](https://github.com/ideditor/schema-builder) / [id-tagging-schema](https://github.com/openstreetmap/id-tagging-schema)
-- When changing data file structure, update the corresponding schema and run `bun run validate:json`
+- When changing data file structure, update the corresponding schema and run `bun run check:json`
 
 ### Writing Meaningful Assertions
 - **Avoid `assert.isTrue(true)` in feature tests** — If a `.then()` callback only does `assert.isTrue(true)`, ask: "what is this test actually verifying?"

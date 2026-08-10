@@ -1,48 +1,9 @@
 # Current Work
 
-## UI field inheritance refactor (Idea 2) — DONE (uncommitted), branch `ui_refactors`
+## UI module refactor — branch `ui_refactors`
 
-The 14 `UiFieldX` classes now **`extends UiField`** instead of being composed by it. `UiField._internal`,
-`_createField()`, the `UiFieldInternal` interface, and the internal→wrapper event re-wiring are all gone —
-a subclass emits `change` directly on itself. Construct via
-`createUiField(context, presetField, entityIDs?, options?)` (picks the subclass by `presetField.type`);
-this replaced the ~7 `new UiField(...)` sites.
-
-Key mechanics that made it work:
-- Broke the load-time import cycle: moved `LANGUAGE_SUFFIX_REGEX` to `fields/types.ts`, dropped
-  `UiField`'s `import { uiFields }` (`isAllowed` now reads
-  `(this.constructor as typeof UiField).supportsMultiselection`), and put the `createUiField` factory in
-  `fields/index.ts` (NOT on `UiField`, which must not import the registry).
-- Resolved base/field name collisions: field `render`→`renderContent`, `tags(t)`→`syncTags(t)`, dropped
-  the field `entityIDs(ids)` method (base has the `entityIDs` array). `options()` on Access/Cycleway
-  collided with the base `options` config object → renamed to `_fieldOptions()`.
-- `UiFieldLocalized`: folded the old `entityIDs()` side effect (`_loadCountryCode()`) into the ctor.
-- Field browser tests updated to `new UiFieldX(context, field, entityIDs?)` + renamed methods; the
-  field-body tests call `renderContent` (body only) rather than `render` (chrome+body).
-
-Verified: tsc 0 / eslint 0 (3 pre-existing todo warnings) / build / browser 133 / unit 3290.
-
-### Follow-up: `any` narrowing pass (field system)
-Narrowed the trivial `any`s exposed by the cleaner field model:
-- `UiField`: `presetField: Field`, `options: UiFieldOptions` (new exported interface) + ctor
-  `Partial<UiFieldOptions>`, `label: string`, `terms: string[]`, `placeholder: string`, `default: string`,
-  `entityExtent: Extent | null`.
-- All 14 field ctors: `presetField: Field`, `options: Partial<UiFieldOptions>`.
-- `UiFieldRadio`: `_typeField`/`_layerField: UiField | null` (+ dropped 2 now-needless `as any`, since
-  `createUiField().on()` returns `UiField`).
-- Supporting: `!` at 5 unguarded `entityExtent.center()` sites; `?.` for 2 `countryCode` assignments.
-- Left as-is (not trivial): d3 callback `(d: any)`, `_combobox: any` (complex callable type),
-  `_comboData`/`_scope`/Address suggestion return types.
-## UI primitive → class conversions (reversing earlier "keep as functions") — COMPLETE
-Decision + rationale in `.scratchpad/decisions.md`. All three done:
-1. **`tooltip` → `UiTooltip` (2026-08-09):** `EventEmitter`; ~61 `.call(tip)` → `.call(tip.attach)` across
-   36 files; killed ~20 `public Tooltip: any` + ~8 inline `as any` casts.
-2. **`modal` → `UiModal` + `confirm` → `UiConfirm extends UiModal` (2026-08-10):** each instance owns its
-   own `.shaded` layer and stacks natively; **`UiSystem` owns the modal stack** (`_modals` +
-   `pushModal`/`popModal`) and a single `utilKeybinding('modal')` on `document` routes `⎋`/`⌫` to the
-   top non-blocking modal. Deleted the `UiRapidCatalog`/`UiRapidAddDataset` monkeypatch hacks (they now
-   own nested `UiModal`s). Converted all one-shot + owned modal consumers, `UiLoading`, and the confirm
-   consumers. Tests rewritten to the class API.
+All major refactor waves on this branch are now committed and pushed. See `completed.md` for
+a reverse-chronological history. The `modules/ui/` conversion table in `AGENTS.md` is current.
 
 ## Future work
 - **Automated testing of `UiSystem` + `UiWhatever` components.** The modal stack + Esc/Backspace routing
@@ -51,14 +12,7 @@ Decision + rationale in `.scratchpad/decisions.md`. All three done:
   Figure out a way to exercise `UiSystem`-owned behavior (headless browser? a testable stack seam?).
 - **Manual smoke-test** the nested Rapid dataset modals (catalog / add-custom-data / colorpicker) in a
   real browser to confirm stacking, Esc, and close behavior.
-
-### Done recently
-- **`combobox` → `UiCombobox` (2026-08-08):** class on `EventEmitter`, `.call(combo.attach)` at ~13 sites;
-  `uiCombobox.off` → `static UiCombobox.off`. `d3_dispatch`/`utilRebind` fully retired (rebind.ts + test +
-  export deleted). Single-listener `accept`/`cancel` preserved via a ctor `on` wrapper.
-- **`disclosure`/`loading` → `UiDisclosure`/`UiLoading` (2026-08-07).**
-- `icon` stays a stateless function; `field_help` stays dead pending a restrictions-field revival;
-  `uiSection`/`section.ts` is dead except the quarantined `react_container.jsx`.
+- **`modules/operations/`** — the only folder still showing ❌ in the conversion table; has not been started.
 
 ## Open questions
 - Delete the 2 dead quarantined `sections/*.jsx` React demo files + `section.ts`/`uiSection`?
