@@ -1,7 +1,7 @@
 import { select } from 'd3-selection';
 import { icon } from './intro/helper.ts';
 import { uiIcon } from './icon.ts';
-import { uiModal } from './modal.ts';
+import { UiModal } from './UiModal.ts';
 import { UiRapidAddDataset } from './UiRapidAddDataset.ts';
 import { UiRapidCatalog } from './UiRapidCatalog.ts';
 import { UiRapidColorpicker } from './UiRapidColorpicker.ts';
@@ -34,8 +34,8 @@ export class UiRapidDatasetToggle {
   // Child components
   public ColorPicker: UiRapidColorpicker | null;
 
-  // D3 selections
-  public $modal: any;
+  // Child components
+  protected _modal: UiModal | null;
 
 
   /**
@@ -50,8 +50,8 @@ export class UiRapidDatasetToggle {
     // Child components (will be created in `show()`)
     this.ColorPicker = null;
 
-    // D3 selections
-    this.$modal = null;
+    // Child components
+    this._modal = null;
 
     // Ensure methods used as callbacks always have `this` bound correctly.
     // (This is also necessary when using `d3-selection.call`)
@@ -75,14 +75,14 @@ export class UiRapidDatasetToggle {
    */
   public render(): void {
     // Modals are created at the time when `show()` is first called
-    if (!this.$modal) return;
+    if (!this._modal) return;
 
     const context = this.context;
     const l10n = context.systems.l10n!;
     const scene = context.systems.gfx!.scene!;
     const rtl = l10n.isRTL ? '-rtl' : '';
     const isRapidEnabled = scene.layers.get('rapid')?.enabled;
-    const $content = this.$modal.select('.content');
+    const $content: any = this._modal.$content;   // legacy render body, typed loosely
 
     /* Toggle All */
     let $toggleAll = $content.selectAll('.rapid-toggle-all')
@@ -163,8 +163,8 @@ export class UiRapidDatasetToggle {
       .append('div')
       .attr('class', 'modal-section rapid-checkbox rapid-browse-catalog')
       .on('click', () => {
-        const CatalogModal = new UiRapidCatalog(context, this.$modal).on('done', this.render);
-        context.container().call(CatalogModal.show);
+        const CatalogModal = new UiRapidCatalog(context).on('done', this.render);
+        CatalogModal.show();
       });
 
     $$catalogOption
@@ -199,8 +199,8 @@ export class UiRapidDatasetToggle {
       .append('div')
       .attr('class', 'modal-section rapid-checkbox rapid-add-custom-data')
       .on('click', () => {
-        const AddDatasetModal = new UiRapidAddDataset(context, this.$modal).on('done', this.render);
-        context.container().call(AddDatasetModal.show);
+        const AddDatasetModal = new UiRapidAddDataset(context).on('done', this.render);
+        AddDatasetModal.show();
       });
 
     $$addCustomOption
@@ -238,7 +238,7 @@ export class UiRapidDatasetToggle {
     $$buttons
       .append('button')
       .attr('class', 'button ok-button action')
-      .on('click', () => this.$modal.close());
+      .on('click', () => this._modal!.close());
 
     // set focus (but only on enter)
     const buttonNode = $$buttons.selectAll('button').node();
@@ -260,15 +260,15 @@ export class UiRapidDatasetToggle {
     const context = this.context;
     const $container = context.container();   // $container is always the parent for a modal
 
-    const isShowing = $container.selectAll('.shaded').size();
-    if (isShowing) return;  // a modal is already showing
+    if (this._modal?.isShown) return;  // already showing
 
-    this.$modal = uiModal($container);
+    this._modal = new UiModal(context);
+    this._modal.show($container);
 
-    this.$modal.select('.modal')
+    this._modal.$modal!
       .attr('class', 'modal rapid-modal');
 
-    this.ColorPicker = new UiRapidColorpicker(context, this.$modal);
+    this.ColorPicker = new UiRapidColorpicker(context, this._modal);
     this.ColorPicker.on('change', this.changeColor);
 
     this.render();

@@ -791,23 +791,6 @@ hide this one and style something on top of it.  */
 }
 
 
-/* `modal2-wrap` is an absolutely positioned `div` needed to create a new stacking context,
-   so we can put a secondary modal on top of an existing modal.
-   (it functions like .shaded for layout but without adding any shading)
-   Used by:
-    - Rapid Data Catalog
-    - Rapid Add Custom Dataset
-*/
-.modal2-wrap {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  overflow: auto;
-  z-index: 51;   /* above existing modal */
-}
-
 /* Dataset Catalog (secondary modal)
 ------------------------------------------------------- */
 .modal.rapid-modal.modal-catalog {

@@ -1,6 +1,7 @@
 import { AbstractSystem } from './AbstractSystem.ts';
 import { select } from 'd3-selection';
 import { utilDetect } from '../util/detect.ts';
+import { utilKeybinding } from '../util/keybinding.ts';
 import { vecAdd } from '@rapid-sdk/math';
 import {
   UiApiStatus, UiDefs, UiEditMenu, UiFlash, UiFullscreen, UiIntro,
@@ -10,6 +11,8 @@ import {
 
 import type { Context } from '../Context.ts';
 import type { D3EnterSelection, D3Selection } from 'd3-selection';
+import type { Keybinding } from '../util/keybinding.ts';
+import type { UiModal } from '../ui/UiModal.ts';
 import type { Vec2 } from '@rapid-sdk/math';
 
 
@@ -35,6 +38,10 @@ export class UiSystem extends AbstractSystem {
   protected _resizeTimeout: number | null;
   /** Whether the MapRoulette context menu is currently open */
   protected _showsMapRouletteMenu: boolean;
+  /** Stack of currently-open modals; the last entry is the topmost */
+  protected _modals: UiModal[];
+  /** Document keybinding that routes Esc/Backspace to the top modal */
+  protected _modalKeybinding: Keybinding;
 
   // Child UI components, created during initAsync
   /** API status indicator component */
@@ -89,6 +96,9 @@ export class UiSystem extends AbstractSystem {
     this._resizeTimeout = null;
     this._showsMapRouletteMenu = false;
 
+    this._modals = [];
+    this._modalKeybinding = utilKeybinding('modal');
+
     // Child components, we will defer creating these until after some other things have initted.
     this.ApiStatus = null;
     this.AuthModal = null;
@@ -114,6 +124,45 @@ export class UiSystem extends AbstractSystem {
     // (This is also necessary when using `d3-selection.call`)
     this.render = this.render.bind(this);
     this.resize = this.resize.bind(this);
+    this._closeTopModal = this._closeTopModal.bind(this);
+
+    // Esc/Backspace dismiss the top (non-blocking) modal on the stack.
+    this._modalKeybinding
+      .on('⌫', this._closeTopModal)
+      .on('⎋', this._closeTopModal);
+  }
+
+
+  /**
+   * Registers a modal as the new top of the stack (moving it up if already present).
+   * @param modal - the modal being shown
+   */
+  public pushModal(modal: UiModal): void {
+    const i = this._modals.indexOf(modal);
+    if (i !== -1) this._modals.splice(i, 1);
+    this._modals.push(modal);
+  }
+
+
+  /**
+   * Unregisters a modal from the stack.
+   * @param modal - the modal being closed
+   */
+  public popModal(modal: UiModal): void {
+    const i = this._modals.indexOf(modal);
+    if (i !== -1) this._modals.splice(i, 1);
+  }
+
+
+  /**
+   * Closes the top modal on the stack, unless it is a blocking modal.
+   * Wired to Esc/Backspace via `_modalKeybinding`.
+   */
+  protected _closeTopModal(): void {
+    const top = this._modals[this._modals.length - 1];
+    if (top && !top.blocking) {
+      top.close();
+    }
   }
 
 
@@ -146,6 +195,9 @@ export class UiSystem extends AbstractSystem {
       })
       .then(() => {
         window.addEventListener('resize', this.resize);
+
+        // Route Esc/Backspace to the top modal on the stack.
+        select(document).call(this._modalKeybinding);
 
         this._checkEnvironment();  // are we in a dev or staging environment?
 

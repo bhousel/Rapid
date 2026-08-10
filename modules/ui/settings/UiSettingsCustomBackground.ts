@@ -1,6 +1,6 @@
 import { EventEmitter } from 'tseep/lib/ee-safe';
 import { marked } from 'marked';
-import { uiConfirm } from '../confirm.ts';
+import { UiConfirm } from '../UiConfirm.ts';
 import { utilNoAuto } from '../../util/index.ts';
 
 import type { Context } from '../../Context.ts';
@@ -41,12 +41,12 @@ export class UiSettingsCustomBackground extends EventEmitter {
     const _origSettings = { template: settings?.get('imagery.custom[0].template') ?? '' };
     const _currSettings = { ..._origSettings };  // shallow copy
 
-    const modal = uiConfirm(context, $selection).okButton();
+    const modal = new UiConfirm(context).show($selection).okButton();
 
-    modal
+    modal.$shaded!
       .classed('settings-modal settings-custom-background', true);
 
-    modal.select('.modal-section.header')
+    modal.$header!
       .append('h3')
       .text(l10n.t('settings.custom_background.header'));
 
@@ -89,7 +89,7 @@ ${info}
 `) as string;
 
 
-    const $textSection = modal.select('.modal-section.message-text');
+    const $textSection = modal.$message!;
 
     $textSection
       .append('div')
@@ -105,7 +105,7 @@ ${info}
 
 
     // insert a cancel button
-    const $buttonSection = modal.select('.modal-section.buttons');
+    const $buttonSection = modal.$buttons!;
 
     $buttonSection
       .insert('button', '.ok-button')

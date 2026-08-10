@@ -423,6 +423,42 @@ Start the Tutorial, and the Rapid-splash "skip to Rapid" path).
 
 ## Progress log
 
+### `modal` + `confirm` → classes with a `UiSystem`-owned modal stack (2026-08-10) — branch `ui_refactors`
+
+- **`modal.ts` → `UiModal.ts`**: now a `UiModal` class (`EventEmitter`). Each instance owns its own
+  `.shaded` backdrop (`$shaded`/`$modal`/`$content`), `show($parent)` / `close()` (emits `close`),
+  focus-trap handlers read the keytrap via `d3_event.currentTarget`. The old "replace the one existing
+  modal" logic is gone — modals stack natively (`.shaded` is `z-index: 5000; position: absolute`, so
+  later-in-DOM paints on top).
+- **`confirm.ts` → `UiConfirm.ts`**: `UiConfirm extends UiModal`, adding the `.modal-alert`
+  header/message/buttons (`$header`/`$message`/`$buttons`) + `okButton()`.
+- **`UiSystem` owns the modal stack + Esc/Backspace routing.** `_modals: UiModal[]` +
+  `pushModal()`/`popModal()`; a single `utilKeybinding('modal')` installed once on `document` routes
+  `⎋`/`⌫` to the **top non-blocking** modal (`_closeTopModal`). Installed once, never clobbered — this
+  is the fix for the old per-modal keybinding that overwrote itself. (The keybinding's bubble handler
+  already skips INPUT/SELECT/TEXTAREA, so Esc doesn't fire while typing in a modal field.)
+- **Deleted the stacking hacks.** `UiRapidCatalog`/`UiRapidAddDataset` no longer take a `$parentModal`,
+  no longer monkeypatch `$parentModal.close`, build a `.modal2-wrap`, or hand-rebuild keybindings —
+  each simply owns a nested `UiModal` shown on top (`this._modal.on('close', …)` → `emit('done')`).
+  `UiRapidColorpicker`'s `_parentModal.close` monkeypatch still works: `UiModal.close` is a reassignable
+  bound property, and `UiSystem` routes Esc through `modal.close()`, so a disabled close is respected.
+- **Consumers converted:** owned modals (`UiShortcuts`, `UiRapidPowerUserFeatures`,
+  `UiRapidDatasetToggle`) hold a `UiModal` (renamed `_modal`, deduped via `this._modal?.isShown`);
+  one-shot modals (`UiSplash`, `UiRapidSplash`, `UiWhatsNew`, `UiRestore`, `UiRapidFirstEditDialog`,
+  `UiIntroStartEditing`) do `new UiModal(context).show($sel)` and render into `.$content`; `UiLoading`
+  owns a blocking `UiModal`; confirm consumers (`SaveMode`, `UiSettingsCustomBackground/Data`) do
+  `new UiConfirm(context).show($sel).okButton()` and read `.$header`/`.$message`/`.$buttons`/`.$shaded`.
+- **Tests:** `modal.test.js`/`confirm.test.js` rewritten to the class API (instantiate/show, sections,
+  `okButton`, close via `close()` / close-button / OK-button). The raw standalone Esc/Backspace tests
+  were **dropped** — that behavior now lives in `UiSystem`'s stack and needs a running `UiSystem`
+  (see the Future work note).
+- **Future work:** figure out automated testing for `UiSystem` (and the `UiWhatever` components) —
+  the modal stack + keybinding routing can't be unit-tested under bun without instantiating a full
+  `UiSystem`, which currently needs a browser.
+- **Manual smoke-test recommended:** open Rapid → Rapid datasets modal → "Browse data catalog" / "Add
+  custom data" (nested modals), Esc/close behavior, and the dataset colorpicker.
+- **Verified:** `tsc` 0 / `eslint` 0 errors / build OK / browser 129 pass / unit 3289 pass / 0 fail.
+
 ### `tooltip` → `UiTooltip` class (2026-08-09) — branch `ui_refactors`
 
 - **`tooltip.ts` → `UiTooltip.ts`**: now a `UiTooltip` class extending `EventEmitter` (for family

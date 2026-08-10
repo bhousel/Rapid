@@ -1,4 +1,4 @@
-import { uiModal } from './modal.ts';
+import { UiModal } from './UiModal.ts';
 
 import type { Context } from '../Context.ts';
 import type { D3Selection } from 'd3-selection';
@@ -32,12 +32,12 @@ export class UiRestore {
 
     if (!editor.canRestoreBackup) return;
 
-    const $modal = uiModal($selection, true);
+    const modal = new UiModal(context, true).show($selection);
 
-    $modal.select('.modal')
+    modal.$modal!
       .attr('class', 'modal fillL');
 
-    const $introModal = $modal.select('.content');
+    const $introModal = modal.$content!;
 
     $introModal
       .append('div')
@@ -60,7 +60,7 @@ export class UiRestore {
       .attr('class', 'restore')
       .on('click', () => {
         editor.restoreBackup();
-        $modal.remove();
+        modal.close();
       });
 
     $restore
@@ -78,7 +78,7 @@ export class UiRestore {
       .attr('class', 'reset')
       .on('click', () => {
         editor.clearBackup();
-        $modal.remove();
+        modal.close();
       });
 
     $reset

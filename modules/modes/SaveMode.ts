@@ -1,7 +1,7 @@
 import { AbstractMode } from './AbstractMode.ts';
 import { select } from 'd3-selection';
 import { UiCommit } from '../ui/UiCommit.ts';
-import { uiConfirm } from '../ui/confirm.ts';
+import { UiConfirm } from '../ui/UiConfirm.ts';
 import { UiConflicts } from '../ui/UiConflicts.ts';
 import { UiLoading } from '../ui/UiLoading.ts';
 import { UiSuccess } from '../ui/UiSuccess.ts';
@@ -257,29 +257,25 @@ export class SaveMode extends AbstractMode {
 
     this._keybindingOn();
 
-    const $selection = uiConfirm(context, context.container());
-    $selection
-      .select('.modal-section.header')
+    const confirm = new UiConfirm(context).show(context.container());
+    confirm.$header!
       .append('h3')
       .text(l10n.t('save.error'));
 
-    this._addErrors($selection, errors);
-    $selection.okButton();
+    this._addErrors(confirm.$message!, errors);
+    confirm.okButton();
   }
 
 
   /**
    * Helper to render error messages into a D3 selection.
    * Creates expandable error items with details.
-   * @param  $selection - The D3 selection to render errors into
+   * @param  $message - The confirm dialog's message selection to render errors into
    * @param  data - Array of error objects with msg and details properties
    */
-  protected _addErrors($selection: D3Selection, data: any[]): void {
+  protected _addErrors($message: D3Selection, data: any[]): void {
     const context = this.context;
     const l10n = context.systems.l10n!;
-
-    const $message: D3Selection = $selection
-      .select('.modal-section.message-text');
 
     const $items: D3Selection = $message
       .selectAll('.error-container')

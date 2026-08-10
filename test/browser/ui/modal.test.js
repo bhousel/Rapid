@@ -1,5 +1,11 @@
-describe('uiModal', () => {
+describe('UiModal', () => {
+
+  const context = new Rapid.MockContext();
   let elem;
+
+  function delay(msec) {
+    return new Promise(resolve => { setTimeout(resolve, msec); });
+  }
 
   beforeEach(() => {
     elem = d3.select('body')
@@ -12,60 +18,40 @@ describe('uiModal', () => {
       .remove();
   });
 
-  function delay(msec) {
-    return new Promise(resolve => { setTimeout(resolve, msec); });
-  }
+  // Note: Esc/Backspace dismissal is routed through `UiSystem`'s modal stack, so it
+  // can't be exercised here without a running `UiSystem`.  See `.scratchpad/current.md`.
 
-  it('can be instantiated', () => {
-    const $selection = Rapid.uiModal(elem);
-    assert.isOk($selection);
+  it('can be instantiated and shown', () => {
+    const modal = new Rapid.UiModal(context).show(elem);
+    assert.isOk(modal);
+    assert.isTrue(modal.isShown);
   });
 
   it('has a content section', () => {
-    const $selection = Rapid.uiModal(elem);
-    assert.strictEqual($selection.selectAll('div.content').size(), 1);
+    const modal = new Rapid.UiModal(context).show(elem);
+    assert.strictEqual(modal.$modal.selectAll('div.content').size(), 1);
   });
 
-  it('can be dismissed by calling close function', () => {
-    const $selection = Rapid.uiModal(elem);
-    $selection.close();
+  it('can be dismissed by calling close', () => {
+    const modal = new Rapid.UiModal(context).show(elem);
+    const node = modal.$shaded.node();
+    modal.close();
     return delay(275)
       .then(() => {
         d3.timerFlush();
-        assert.isNull($selection.node().parentNode);
+        assert.isNull(node.parentNode);
       });
   });
 
   it('can be dismissed by clicking the close button', () => {
-    const $selection = Rapid.uiModal(elem);
-    const target = $selection.select('button.close').node();
+    const modal = new Rapid.UiModal(context).show(elem);
+    const node = modal.$shaded.node();
+    const target = modal.$modal.select('button.close').node();
     target.dispatchEvent(new MouseEvent('click'));
     return delay(275)
       .then(() => {
         d3.timerFlush();
-        assert.isNull($selection.node().parentNode);
-      });
-  });
-
-  it('can be dismissed by pressing escape', () => {
-    const $selection = Rapid.uiModal(elem);
-    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', keyCode: 27 }));
-    document.dispatchEvent(new KeyboardEvent('keyup', { key: 'Escape', keyCode: 27 }));
-    return delay(275)
-      .then(() => {
-        d3.timerFlush();
-        assert.isNull($selection.node().parentNode);
-      });
-  });
-
-  it('can be dismissed by pressing backspace', () => {
-    const $selection = Rapid.uiModal(elem);
-    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Backspace', keyCode: 8 }));
-    document.dispatchEvent(new KeyboardEvent('keyup', { key: 'Backspace', keyCode: 8 }));
-    return delay(275)
-      .then(() => {
-        d3.timerFlush();
-        assert.isNull($selection.node().parentNode);
+        assert.isNull(node.parentNode);
       });
   });
 

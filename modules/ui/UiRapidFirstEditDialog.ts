@@ -1,5 +1,5 @@
 import { icon } from './intro/helper.ts';
-import { uiModal } from './modal.ts';
+import { UiModal } from './UiModal.ts';
 import { UiRapidSplash } from './UiRapidSplash.ts';
 
 import type { Context } from '../Context.ts';
@@ -30,13 +30,13 @@ export class UiRapidFirstEditDialog {
     const context = this.context;
     const l10n = context.systems.l10n!;
 
-    const $modal = uiModal($selection);
+    const modal = new UiModal(context).show($selection);
     const rtl = l10n.isRTL ? '-rtl' : '';
 
-    $modal.select('.modal')
+    modal.$modal!
       .attr('class', 'modal rapid-modal');
 
-    const $content = $modal.select('.content');
+    const $content = modal.$content!;
 
     $content
       .append('div')
@@ -59,7 +59,7 @@ export class UiRapidFirstEditDialog {
     const $exploring = $buttonWrap
       .append('button')
       .attr('class', 'rapid-explore')
-      .on('click', $modal.close);
+      .on('click', modal.close);
 
     $exploring
       .append('div')
@@ -69,7 +69,7 @@ export class UiRapidFirstEditDialog {
       .append('button')
       .attr('class', 'rapid-login-to-osm')
       .on('click', () => {
-        $modal.close();
+        modal.close();
         const osm = context.services.osm;
         if (!osm) return;
         osm.authenticate(() => new UiRapidSplash(context).render(context.container()) );

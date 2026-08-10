@@ -1,5 +1,5 @@
 import { selection } from 'd3-selection';
-import { uiModal } from './modal.ts';
+import { UiModal } from './UiModal.ts';
 
 import type { Context } from '../Context.ts';
 import type { D3EnterSelection, D3Selection } from 'd3-selection';
@@ -16,8 +16,8 @@ export class UiLoading {
 
   // D3 selections
   public $parent: D3Selection | null;
-  /** The shaded-backdrop selection returned by `uiModal`, or an empty selection when hidden */
-  public $modal: D3Selection | null;
+  /** The modal that hosts the loading spinner, or `null` when hidden */
+  protected _modal: UiModal | null;
 
   protected _message: string;
   protected _blocking: boolean;
@@ -31,7 +31,7 @@ export class UiLoading {
 
     // D3 selections
     this.$parent = null;
-    this.$modal = null;
+    this._modal = null;
 
     this._message = '';
     this._blocking = false;
@@ -76,8 +76,6 @@ export class UiLoading {
    * @param $parent - A d3-selection to a HTMLElement that this component should render itself into
    */
   public render($parent: D3Selection | null = this.$parent): void {
-    // Note we should change this - $parent will always be `context.container()`
-    // This is a detail that `uiModal` should just handle though.
     if ($parent instanceof selection) {
       this.$parent = $parent;
     } else {
@@ -87,11 +85,12 @@ export class UiLoading {
     const context = this.context;
     const assets = context.systems.assets!;
 
-    if (!this.$modal) {
-      this.$modal = uiModal($parent, this._blocking);
+    if (!this._modal) {
+      this._modal = new UiModal(context, this._blocking);
+      this._modal.show($parent);
     }
 
-    const $content: D3Selection = this.$modal.select('.content');
+    const $content: D3Selection = this._modal.$content!;
     $content.classed('loading-modal', true);
 
     let $section: D3Selection = $content.selectAll('.modal-section')
@@ -118,7 +117,7 @@ export class UiLoading {
     $section.selectAll('.modal-message')
       .text(this._message);
 
-    this.$modal.select('button.close')
+    this._modal.$modal!.select('button.close')
       .attr('class', 'hide');
   }
 
@@ -127,8 +126,8 @@ export class UiLoading {
    * Removes the loading modal.
    */
   public close(): void {
-    this.$modal?.remove();
-    this.$modal = null;
+    this._modal?.close();
+    this._modal = null;
   }
 
 
@@ -136,7 +135,6 @@ export class UiLoading {
    * @return `true` if the loading modal is currently shown
    */
   public isShown(): boolean {
-    if (!this.$modal) return false;
-    return !this.$modal.empty() && !!this.$modal.node()?.parentNode;
+    return !!this._modal?.isShown;
   }
 }

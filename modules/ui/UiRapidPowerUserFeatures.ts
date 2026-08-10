@@ -1,4 +1,4 @@
-import { uiModal } from './modal.ts';
+import { UiModal } from './UiModal.ts';
 
 import type { Context } from '../Context.ts';
 import type { D3Selection } from 'd3-selection';
@@ -12,8 +12,8 @@ export class UiRapidPowerUserFeatures {
   public context: Context;
   public featureFlags: string[];
 
-  // D3 selections
-  public $modal: any;
+  // Child components
+  protected _modal: UiModal | null;
 
 
   /**
@@ -34,8 +34,8 @@ export class UiRapidPowerUserFeatures {
       'allowLargeEdits'
     ];
 
-    // D3 selections
-    this.$modal = null;
+    // Child components
+    this._modal = null;
 
     // Ensure methods used as callbacks always have `this` bound correctly.
     // (This is also necessary when using `d3-selection.call`)
@@ -60,17 +60,17 @@ export class UiRapidPowerUserFeatures {
     const context = this.context;
     const $container = context.container();   // $container is always the parent for a modal
 
-    const isShowing = $container.selectAll('.shaded').size();
-    if (isShowing) return;  // a modal is already showing
+    if (this._modal?.isShown) return;  // already showing
 
     this.updateFeatureFlags();
 
-    this.$modal = uiModal($container);
+    this._modal = new UiModal(context);
+    this._modal.show($container);
 
-    this.$modal.select('.modal')
+    this._modal.$modal!
       .attr('class', 'modal rapid-modal');
 
-    this.$modal.select('.content')
+    this._modal.$content!
       .attr('class', 'content poweruser');
 
     this.render();
@@ -84,11 +84,11 @@ export class UiRapidPowerUserFeatures {
    */
   public render(): void {
     // Modals are created at the time when `show()` is first called
-    if (!this.$modal) return;
+    if (!this._modal) return;
 
     const context = this.context;
     const l10n = context.systems.l10n!;
-    const $content = this.$modal.select('.content');
+    const $content: any = this._modal.$content;   // legacy render body, typed loosely
 
     /* Heading */
     let $heading = $content.selectAll('.modal-section-heading')
@@ -153,7 +153,7 @@ export class UiRapidPowerUserFeatures {
     $$buttons
       .append('button')
       .attr('class', 'button ok-button action')
-      .on('click', () => this.$modal.close());
+      .on('click', () => this._modal!.close());
 
     // set focus (but only on enter)
     const buttonNode = $$buttons.selectAll('button').node() as HTMLElement | null;

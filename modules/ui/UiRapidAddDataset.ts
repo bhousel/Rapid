@@ -1,8 +1,8 @@
 import { EventEmitter } from 'tseep/lib/ee-safe';
-import { select } from 'd3-selection';
 import { marked } from 'marked';
 import { uiIcon } from './icon.ts';
-import { utilKeybinding, utilNoAuto } from '../util/index.ts';
+import { UiModal } from './UiModal.ts';
+import { utilNoAuto } from '../util/index.ts';
 
 import type { Context } from '../Context.ts';
 import type { D3Selection } from 'd3-selection';
@@ -10,6 +10,7 @@ import type { D3Selection } from 'd3-selection';
 
 /**
  * This is the modal where the user can add a custom dataset to Rapid.
+ * It owns a nested `UiModal` shown on top of the dataset-toggle modal.
  *
  * Events available:
  *   `done`   Fires when the user is finished and they are closing this modal
@@ -17,40 +18,32 @@ import type { D3Selection } from 'd3-selection';
 export class UiRapidAddDataset extends EventEmitter {
   public context: Context;
 
-  // D3 selections
-  public $parentModal: any;
-  public $wrap: D3Selection | null;
-  public $modal: D3Selection | null;
+  // Child components
+  protected _modal: UiModal | null;
 
   protected _currFileList: FileList | null;
   protected _currUrl: string | null;
-  protected _clickedOk: () => void;       // custom OK handler
-  protected _clickedCancel: () => void;   // custom Cancel handler
 
 
   /**
    * @param  context - Global shared application context
-   * @param  $parentModal - the parent modal that this dialog is shown on top of
    */
-  public constructor(context: Context, $parentModal: any) {
+  public constructor(context: Context) {
     super();
     this.context = context;
 
     this._currFileList = null;
     this._currUrl = null;
 
-    this._clickedOk = () => true;       // custom OK handler
-    this._clickedCancel = () => true;   // custom Cancel handler
-
-    // D3 selections
-    this.$parentModal = $parentModal;
-    this.$wrap = null;
-    this.$modal = null;
+    // Child components
+    this._modal = null;
 
     // Ensure methods used as callbacks always have `this` bound correctly.
     // (This is also necessary when using `d3-selection.call`)
     this.show = this.show.bind(this);
     this.render = this.render.bind(this);
+    this._clickedOk = this._clickedOk.bind(this);
+    this._clickedCancel = this._clickedCancel.bind(this);
 
     // Setup event handlers
     const l10n = context.systems.l10n!;
@@ -59,106 +52,51 @@ export class UiRapidAddDataset extends EventEmitter {
 
 
   /**
-   * This shows the add-dataset screen if it isn't alreaday being shown.
+   * This shows the add-dataset screen if it isn't already being shown.
    * For this kind of popup component, must first `show()` to create the modal.
    */
   public show(): void {
     const context = this.context;
-    const $container = context.container();   // $container is always the parent for a modal
 
-    // Unfortunately `uiModal` is written in a way that there can be only one at a time.
-    // So we need to roll our own modal here instead of just creating a second `uiModal`.
-    const $shaded = $container.selectAll('.shaded');  // container for the existing modal
-    if ($shaded.empty()) return;
-    if ($shaded.selectAll('.modal-add-dataset').size()) return;  // modal exists already
+    if (this._modal?.isShown) return;
 
-    const origClose = this.$parentModal.close;
-    this.$parentModal.close = () => { /* ignore */ };
+    this._modal = new UiModal(context);
+    this._modal.show(context.container());
+    this._modal.$modal!
+      .attr('class', 'modal rapid-modal modal-add-dataset');
 
-    // Setup Ok/Cancel behaviors
-    this._clickedOk = () => {
-      this.$modal!
-        .transition()
-        .duration(200)
-        .style('top', '0px')
-        .on('end', () => this.$wrap!.remove());
-
-      this.$parentModal.close = origClose;  // restore close handler
-
-      const keybinding = utilKeybinding('modal');
-      keybinding.on(['⌫', '⎋'], origClose);
-      select(document).call(keybinding);
-      this.emit('done');
-    };
-
-    this._clickedCancel = () => {
-      this._currFileList = null;
-      this._currUrl = null;
-      this.$modal!
-        .transition()
-        .duration(200)
-        .style('top', '0px')
-        .on('end', () => this.$wrap!.remove());
-
-      this.$parentModal.close = origClose;  // restore close handler
-
-      const keybinding = utilKeybinding('modal');
-      keybinding.on(['⌫', '⎋'], origClose);
-      select(document).call(keybinding);
-      this.emit('done');
-    };
-
-    // Override the default modal close handler - we'll have it click "cancel"
-    const keybinding = utilKeybinding('modal');
-    keybinding.on(['⌫', '⎋'], this._clickedCancel);
-    select(document).call(keybinding);
-
-    let $wrap: D3Selection = $shaded.selectAll('.modal2-wrap')
-      .data([0]);
-
-    // enter
-    const $$wrap = $wrap.enter()
-      .append('div')
-      .attr('class', 'modal2-wrap');  // need absolutely positioned div here for new stacking context
-
-    const $$modal = $$wrap
-      .append('div')
-      .attr('class', 'modal rapid-modal modal-add-dataset')  // Rapid styling
-      .style('opacity', 0);
-
-    $$modal
-      .append('button')
-      .attr('class', 'close')
-      .on('click', this._clickedCancel)
-      .call(uiIcon('#rapid-icon-close'));
-
-    $$modal
-      .append('div')
-      .attr('class', 'content');
-
-    // update
-    this.$wrap = $wrap = $wrap.merge($$wrap) as D3Selection;
-    this.$modal = $wrap.selectAll('.modal-add-dataset');
-
-    this.$modal
-      .transition()
-      .style('opacity', 1);
+    // Closing (X button, Esc, OK, or Cancel) notifies the parent to re-render.
+    this._modal.on('close', () => { this.emit('done'); });
 
     this.render();
+  }
+
+
+  /** Accepts and dismisses the dialog. */
+  protected _clickedOk(): void {
+    this._modal?.close();
+  }
+
+
+  /** Cancels and dismisses the dialog, clearing any pending file/url. */
+  protected _clickedCancel(): void {
+    this._currFileList = null;
+    this._currUrl = null;
+    this._modal?.close();
   }
 
 
   /**
    * Renders the content inside the modal.
    * Note that most `render` functions accept a parent selection,
-   *  this one doesn't need it - `$modal` is always the parent.
+   *  this one doesn't need it - the owned modal is always the parent.
    */
   public render(): void {
-    if (!this.$modal) return;  // need to call `show()` first to create the modal.
+    if (!this._modal) return;  // need to call `show()` first to create the modal.
 
     const context = this.context;
     const l10n = context.systems.l10n!;
-    const $content = this.$modal.selectAll('.content');
+    const $content = this._modal.$content!;
 
     const prefix = 'rapid_add_dataset';  // prefix for text strings
     const accept = [

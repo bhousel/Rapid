@@ -1,7 +1,7 @@
 import { marked } from 'marked';
 import { icon } from './intro/helper.ts';
 import { UiIntro } from './intro/UiIntro.ts';
-import { uiModal } from './modal.ts';
+import { UiModal } from './UiModal.ts';
 
 import type { Context } from '../Context.ts';
 import type { D3Selection } from 'd3-selection';
@@ -46,14 +46,14 @@ export class UiSplash {
     // prefetch intro graph data now, while user is looking at the splash screen
     assets.loadAssetAsync('intro_graph');
 
-    // `uiModal` returns a selection that is appended to $selection (in this case $container)
-    // We can append to the the $modal selection here.
+    // `UiModal.show()` appends the modal into $selection (in this case $container),
+    // and exposes `$content` to render into.
     // (todo: instead of appending, rewrite as a data bind that supports rerendering)
-    const $modal = uiModal($selection);
-    $modal.select('.modal')
+    const modal = new UiModal(context).show($selection);
+    modal.$modal!
       .attr('class', 'modal rapid-modal modal-splash');
 
-    const $content = $modal.select('.content');
+    const $content = modal.$content!;
     $content
       .append('div')
       .attr('class', 'modal-section')
@@ -93,7 +93,7 @@ export class UiSplash {
       .attr('class', 'walkthrough')
       .on('click', () => {
         new UiIntro(context).start(context.container());
-        $modal.close();
+        modal.close();
       });
 
     $walkthrough
@@ -109,7 +109,7 @@ export class UiSplash {
     const $startEditing = $buttonWrap
       .append('button')
       .attr('class', 'start-editing')
-      .on('click', $modal.close);
+      .on('click', modal.close);
 
     $startEditing
       .append('svg')

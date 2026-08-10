@@ -33,17 +33,24 @@ Narrowed the trivial `any`s exposed by the cleaner field model:
 - Supporting: `!` at 5 unguarded `entityExtent.center()` sites; `?.` for 2 `countryCode` assignments.
 - Left as-is (not trivial): d3 callback `(d: any)`, `_combobox: any` (complex callable type),
   `_comboData`/`_scope`/Address suggestion return types.
-## Next up — convert `tooltip`/`modal`/`confirm` to classes (reversing earlier "keep as functions")
-Decision + rationale captured in `.scratchpad/decisions.md`. Sequencing:
-1. **`tooltip` → `UiTooltip` — DONE (2026-08-09):** class on `EventEmitter`; ~61 `.call(tip)` sites →
-   `.call(tip.attach)` across 36 files; element-`this` internals became protected methods taking the
-   anchor node (handlers read `d3_event.currentTarget`). Killed ~20 `public Tooltip: any` + ~8 inline
-   `as any` casts (datum functors now type-check via getter/setter overloads). Default content is a
-   `_defaultContent(datum)` method (no `this`-alias); `_updateContent` branches custom vs default.
-2. **`modal` → `UiModal` + stack owned by `UiSystem` (NEXT):** each instance owns its `.shaded` layer;
-   `UiSystem` holds the stack; one document key handler routes Esc/Backspace to the top. Deletes the
-   `UiRapidCatalog`/`UiRapidAddDataset` monkeypatch hacks.
-3. **`confirm` → `UiConfirm extends UiModal`** (after modal).
+## UI primitive → class conversions (reversing earlier "keep as functions") — COMPLETE
+Decision + rationale in `.scratchpad/decisions.md`. All three done:
+1. **`tooltip` → `UiTooltip` (2026-08-09):** `EventEmitter`; ~61 `.call(tip)` → `.call(tip.attach)` across
+   36 files; killed ~20 `public Tooltip: any` + ~8 inline `as any` casts.
+2. **`modal` → `UiModal` + `confirm` → `UiConfirm extends UiModal` (2026-08-10):** each instance owns its
+   own `.shaded` layer and stacks natively; **`UiSystem` owns the modal stack** (`_modals` +
+   `pushModal`/`popModal`) and a single `utilKeybinding('modal')` on `document` routes `⎋`/`⌫` to the
+   top non-blocking modal. Deleted the `UiRapidCatalog`/`UiRapidAddDataset` monkeypatch hacks (they now
+   own nested `UiModal`s). Converted all one-shot + owned modal consumers, `UiLoading`, and the confirm
+   consumers. Tests rewritten to the class API.
+
+## Future work
+- **Automated testing of `UiSystem` + `UiWhatever` components.** The modal stack + Esc/Backspace routing
+  now live on `UiSystem`; we can't unit-test that under bun without instantiating a full `UiSystem`
+  (currently needs a browser). The raw standalone Esc/Backspace modal tests were dropped for this reason.
+  Figure out a way to exercise `UiSystem`-owned behavior (headless browser? a testable stack seam?).
+- **Manual smoke-test** the nested Rapid dataset modals (catalog / add-custom-data / colorpicker) in a
+  real browser to confirm stacking, Esc, and close behavior.
 
 ### Done recently
 - **`combobox` → `UiCombobox` (2026-08-08):** class on `EventEmitter`, `.call(combo.attach)` at ~13 sites;

@@ -1,6 +1,6 @@
 import { EventEmitter } from 'tseep/lib/ee-safe';
 import { marked } from 'marked';
-import { uiConfirm } from '../confirm.ts';
+import { UiConfirm } from '../UiConfirm.ts';
 import { utilNoAuto } from '../../util/index.ts';
 
 import type { Context } from '../../Context.ts';
@@ -58,17 +58,17 @@ export class UiSettingsCustomData extends EventEmitter {
     let _currUrl = origUrl;
     let _currFileList = origFileList;
 
-    const modal = uiConfirm(context, $selection).okButton();
+    const modal = new UiConfirm(context).show($selection).okButton();
 
-    modal
+    modal.$shaded!
       .classed('settings-modal settings-custom-data', true);
 
-    modal.select('.modal-section.header')
+    modal.$header!
       .append('h3')
       .text(l10n.t(`${PREFIX}.header`));
 
 
-    const $textSection = modal.select('.modal-section.message-text');
+    const $textSection = modal.$message!;
 
     const data_instructions = l10n.t(`${PREFIX}.instructions`);
     const file_heading = l10n.t(`${PREFIX}.file.heading`);
@@ -150,7 +150,7 @@ ${url_tokens}
 
 
     // Setup Ok/Cancel buttons
-    const $buttonSection = modal.select('.modal-section.buttons');
+    const $buttonSection = modal.$buttons!;
 
     $buttonSection
       .insert('button', '.ok-button')

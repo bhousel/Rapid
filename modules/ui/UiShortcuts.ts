@@ -2,7 +2,7 @@ import { select } from 'd3-selection';
 import { utilArrayUniq } from '@rapid-sdk/util';
 
 import { uiIcon } from './icon.ts';
-import { uiModal } from './modal.ts';
+import { UiModal } from './UiModal.ts';
 import { utilCmd, utilDetect } from '../util/index.ts';
 
 import type { Context } from '../Context.ts';
@@ -11,7 +11,7 @@ import type { D3EnterSelection, D3Selection } from 'd3-selection';
 
 /**
  * This is a UI component for displaying the keyboard shortcuts (when the user presses '?')
- * It is a modified `uiModal` component.
+ * It is a modal component built on `UiModal`.
  * We load the data from 'shortcuts.json' to populate this screen.
  *
  * +------------------------------+
@@ -34,8 +34,8 @@ export class UiShortcuts {
   protected _keys: any;
   protected _dataShortcuts: any;
 
-  // D3 selections
-  public $modal: any;
+  // Child components
+  protected _modal: UiModal | null;
 
 
   /**
@@ -51,8 +51,8 @@ export class UiShortcuts {
     // Modal and data will be created when calling `show()`
     this._dataShortcuts = null;
 
-    // D3 selections
-    this.$modal = null;
+    // Child components
+    this._modal = null;
 
     // Ensure methods used as callbacks always have `this` bound correctly.
     // (This is also necessary when using `d3-selection.call`)
@@ -80,11 +80,11 @@ export class UiShortcuts {
    */
   public render(): void {
     // Modals are created at the time when `show()` is first called
-    if (!this.$modal || !this._dataShortcuts) return;
+    if (!this._modal || !this._dataShortcuts) return;
 
     const context = this.context;
     const l10n = context.systems.l10n!;
-    const $content: D3Selection = this.$modal.select('.content');
+    const $content: D3Selection = this._modal.$content!;
 
     // replace all content on render
     $content.html('');
@@ -321,12 +321,12 @@ export class UiShortcuts {
       .then((data: any) => {
         this._dataShortcuts = data.shortcuts;
 
-        const isShowing = $container.selectAll('.shaded').size();
-        if (isShowing) return;  // a modal is already showing
+        if (this._modal?.isShown) return;  // already showing
 
-        this.$modal = uiModal($container);
+        this._modal = new UiModal(context);
+        this._modal.show($container);
 
-        this.$modal.select('.modal')
+        this._modal.$modal!
           .classed('modal-shortcuts', true);
 
         this.render();
@@ -341,9 +341,9 @@ export class UiShortcuts {
    * Hides the shortcuts modal.
    */
   public hide(): void {
-    if (!this.$modal) return;
-    this.$modal!.close();
-    this.$modal = null;
+    if (!this._modal) return;
+    this._modal.close();
+    this._modal = null;
   }
 
 

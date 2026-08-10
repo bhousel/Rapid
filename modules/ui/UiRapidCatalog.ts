@@ -1,9 +1,9 @@
 import { EventEmitter } from 'tseep/lib/ee-safe';
-import { select } from 'd3-selection';
 import { marked } from 'marked';
 import { uiIcon } from './icon.ts';
 import { UiCombobox } from './UiCombobox.ts';
-import { utilKeybinding, utilNoAuto, utilSafeURL, utilSanitizeHTML } from '../util/index.ts';
+import { UiModal } from './UiModal.ts';
+import { utilNoAuto, utilSafeURL, utilSanitizeHTML } from '../util/index.ts';
 
 import type { Context } from '../Context.ts';
 import type { D3Selection } from 'd3-selection';
@@ -21,35 +21,26 @@ export class UiRapidCatalog extends EventEmitter {
   public context: Context;
   public CategoryCombo: any;
 
-  // D3 selections
-  public $parentModal: any;
-  public $wrap: D3Selection | null;
-  public $modal: D3Selection | null;
+  // Child components
+  protected _modal: UiModal | null;
 
   protected _filterText: string | null;
   protected _filterCategory: string | null;
-  protected _myClose: () => unknown;
 
 
   /**
    * @param  context - Global shared application context
-   * @param  $parentModal - the parent modal that this catalog is shown on top of
    */
-  public constructor(context: Context, $parentModal: any) {
+  public constructor(context: Context) {
     super();
     this.context = context;
 
     this._filterText = null;
     this._filterCategory = null;
-    this._myClose = () => true;   // custom close handler
 
     // Child components
     this.CategoryCombo = new UiCombobox(context, 'dataset-categories');
-
-    // D3 selections
-    this.$parentModal = $parentModal;
-    this.$wrap = null;
-    this.$modal = null;
+    this._modal = null;
 
     // Ensure methods used as callbacks always have `this` bound correctly.
     // (This is also necessary when using `d3-selection.call`)
@@ -60,6 +51,7 @@ export class UiRapidCatalog extends EventEmitter {
     this.sortDatasets = this.sortDatasets.bind(this);
     this.toggleDataset = this.toggleDataset.bind(this);
     this.highlight = this.highlight.bind(this);
+    this._clickedClose = this._clickedClose.bind(this);
 
     // Setup event handlers
     const l10n = context.systems.l10n!;
@@ -73,86 +65,42 @@ export class UiRapidCatalog extends EventEmitter {
    */
   public show(): void {
     const context = this.context;
-    const $container = context.container();   // $container is always the parent for a modal
 
-    // Unfortunately `uiModal` is written in a way that there can be only one at a time.
-    // So we need to roll our own modal here instead of just creating a second `uiModal`.
-    const $shaded = $container.selectAll('.shaded');  // container for the existing modal
-    if ($shaded.empty()) return;
-    if ($shaded.selectAll('.modal-catalog').size()) return;  // catalog modal exists already
+    if (this._modal?.isShown) return;
 
-    const origClose = this.$parentModal.close;
-    this.$parentModal.close = () => { /* ignore */ };
+    this._modal = new UiModal(context);
+    this._modal.show(context.container());
+    this._modal.$modal!
+      .attr('class', 'modal rapid-modal modal-catalog');
 
-    // override the close handler
-    this._myClose = () => {
+    // Closing (X button, Esc, or the OK button) resets the filters and notifies the parent.
+    this._modal.on('close', () => {
       this._filterText = null;
       this._filterCategory = null;
-      this.$modal
-        ?.transition()
-        .duration(200)
-        .style('top', '0px')
-        .on('end', () => this.$wrap?.remove());
-
-      this.$parentModal.close = origClose;  // restore close handler
-
-      const keybinding = utilKeybinding('modal');
-      keybinding.on(['⌫', '⎋'], origClose);
-      select(document).call(keybinding);
       this.emit('done');
-    };
-
-
-    const keybinding = utilKeybinding('modal');
-    keybinding.on(['⌫', '⎋'], this._myClose);
-    select(document).call(keybinding);
-
-    let $wrap: D3Selection = $shaded.selectAll('.modal2-wrap')
-      .data([0]);
-
-    // enter
-    const $$wrap = $wrap.enter()
-      .append('div')
-      .attr('class', 'modal2-wrap');  // need absolutely positioned div here for new stacking context
-
-    const $$modal = $$wrap
-      .append('div')
-      .attr('class', 'modal rapid-modal modal-catalog')  // Rapid styling
-      .style('opacity', 0);
-
-    $$modal
-      .append('button')
-      .attr('class', 'close')
-      .on('click', this._myClose)
-      .call(uiIcon('#rapid-icon-close'));
-
-    $$modal
-      .append('div')
-      .attr('class', 'content');
-
-    // update
-    this.$wrap = $wrap = $wrap.merge($$wrap);
-    this.$modal = $wrap.selectAll('.modal-catalog');
-
-    this.$modal
-      ?.transition()
-      .style('opacity', 1);
+    });
 
     this.render();
+  }
+
+
+  /** Dismisses the catalog. */
+  protected _clickedClose(): void {
+    this._modal?.close();
   }
 
 
   /**
    * Renders the content inside the modal.
    * Note that most `render` functions accept a parent selection,
-   *  this one doesn't need it - `$modal` is always the parent.
+   *  this one doesn't need it - the owned modal is always the parent.
    */
   public render(): void {
-    if (!this.$modal) return;  // need to call `show()` first to create the modal.
+    if (!this._modal) return;  // need to call `show()` first to create the modal.
 
     const context = this.context;
     const l10n = context.systems.l10n!;
-    const $content = this.$modal.selectAll('.content');
+    const $content = this._modal.$content!;
 
     /* Header section */
     let $header: D3Selection = $content.selectAll('.rapid-catalog-header')
@@ -316,7 +264,7 @@ export class UiRapidCatalog extends EventEmitter {
     $$buttons
       .append('button')
       .attr('class', 'button ok-button action')
-      .on('click', this._myClose);
+      .on('click', this._clickedClose);
 
     // update
     $buttons = $buttons.merge($$buttons);
@@ -331,13 +279,13 @@ export class UiRapidCatalog extends EventEmitter {
    * @param $selection - A d3-selection to a HTMLElement that this component should render itself into
    */
   public renderDatasets($selection: D3Selection): void {
-    if (!this.$modal) return;  // need to call `show()` first to create the modal.
+    if (!this._modal) return;  // need to call `show()` first to create the modal.
 
     const context = this.context;
     const l10n = context.systems.l10n!;
     const rapid = context.systems.rapid!;
     const settings = context.systems.settings;
-    const $content = this.$modal.selectAll('.content');
+    const $content = this._modal.$content!;
 
     const showPreview = settings?.get('poweruser.previewDatasets') === 'true';
 

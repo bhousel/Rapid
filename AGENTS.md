@@ -549,7 +549,7 @@ Track TypeScript conversion progress here:
 | `modules/geo/` | ✅ Complete | All files converted |
 | `modules/operations/` | ❌ Not started | |
 | `modules/services/` | ✅ Complete | All files converted |
-| `modules/ui/` | ✅ Complete | All 9 phases done — every component is a TS class (with a documented departure for the intro/walkthrough state machines); barrels are `index.ts`. A few stateless/inline-attached primitives stay typed functions by design (`icon`, `modal`, `confirm`, `section`/`uiSection`) — `modal`/`confirm` are slated to become classes with a `UiSystem`-owned modal stack. Only the quarantined React demo (`sections/*.jsx`) and disabled `UiFieldRestrictions`/`field_help` remain non-standard. See `.github/design/ui-system.md` progress log. |
+| `modules/ui/` | ✅ Complete | All 9 phases done — every component is a TS class (with a documented departure for the intro/walkthrough state machines); barrels are `index.ts`. A couple of stateless/inline-attached primitives stay typed functions by design (`icon`, `section`/`uiSection`). Only the quarantined React demo (`sections/*.jsx`) and disabled `UiFieldRestrictions`/`field_help` remain non-standard. See `.github/design/ui-system.md` progress log. |
 | `modules/validators/` | ✅ Complete | All files converted |
 
 ## Testing

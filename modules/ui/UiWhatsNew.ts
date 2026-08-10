@@ -1,6 +1,6 @@
 import { marked } from 'marked';
 import { icon } from './intro/helper.ts';
-import { uiModal } from './modal.ts';
+import { UiModal } from './UiModal.ts';
 
 import type { Context } from '../Context.ts';
 import type { D3Selection } from 'd3-selection';
@@ -37,16 +37,16 @@ export class UiWhatsNew {
     const l10n = context.systems.l10n!;
     const settings = context.systems.settings;
 
-    // `uiModal` returns a selection that is appended to $selection (in this case $container)
-    // We can append to the the $modal selection here.
+    // `UiModal.show()` appends the modal into $selection (in this case $container),
+    // and exposes `$content` to render into.
     // (todo: instead of appending, rewrite as a data bind that supports rerendering)
-    const $modal = uiModal($selection);
+    const modal = new UiModal(context).show($selection);
     const rtl = l10n.isRTL ? '-rtl' : '';
 
-    $modal.select('.modal')
+    modal.$modal!
       .attr('class', 'modal rapid-modal modal-whatsnew');
 
-    const $content = $modal.select('.content');
+    const $content = modal.$content!;
     $content
       .append('div')
       .attr('class', 'modal-section')
@@ -141,7 +141,7 @@ Big changes are coming soon to Rapid. including:
       .append('button')
       .attr('class', 'button ok-button action')
       .text(l10n.t('confirm.okay'))
-      .on('click', $modal.close);
+      .on('click', modal.close);
 
     ($okButton.node() as HTMLElement | null)?.focus();
   }

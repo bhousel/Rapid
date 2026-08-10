@@ -1,6 +1,6 @@
 import { icon } from './intro/helper.ts';
 import { UiIntro } from './intro/UiIntro.ts';
-import { uiModal } from './modal.ts';
+import { UiModal } from './UiModal.ts';
 
 import type { Context } from '../Context.ts';
 import type { D3Selection } from 'd3-selection';
@@ -38,13 +38,13 @@ export class UiRapidSplash {
     if (settings?.has('ui.sawRapidSplash')) return;
     settings?.set('ui.sawRapidSplash', 'true');
 
-    const $modal = uiModal($selection);
+    const modal = new UiModal(context).show($selection);
     const rtl = l10n.isRTL ? '-rtl' : '';
 
-    $modal.select('.modal')
+    modal.$modal!
       .attr('class', 'modal rapid-modal modal-splash');   // Rapid styling
 
-    const $introModal = $modal.select('.content');
+    const $introModal = modal.$content!;
 
     $introModal
       .append('div')
@@ -70,7 +70,7 @@ export class UiRapidSplash {
       .attr('class', 'walkthrough')
       .on('click', () => {
         new UiIntro(context).start(context.container(), false);
-        $modal.close();
+        modal.close();
       });
 
     $walkthrough
@@ -88,7 +88,7 @@ export class UiRapidSplash {
       .attr('class', 'rapid-walkthrough')
       .on('click', () => {
         new UiIntro(context).start(context.container(), true);
-        $modal.close();
+        modal.close();
       });
 
     $rapidWalkthrough
@@ -105,7 +105,7 @@ export class UiRapidSplash {
       .append('button')
       .attr('class', 'start-editing')
       .on('click', () => {
-        $modal.close();
+        modal.close();
       });
 
     $startEditing
@@ -118,7 +118,7 @@ export class UiRapidSplash {
       .append('div')
       .text(l10n.t('rapid_splash.start'));
 
-    $modal.select('button.close')
+    modal.$modal!.select('button.close')
       .attr('class', 'hide');
   }
 }
