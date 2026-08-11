@@ -143,8 +143,8 @@ export function actionRapidAcceptFeature(entityID: EntityID, extGraph: Graph): R
 
       graph = graph.commit();
 
-      const serviceID = extWay.props.__service__;
-      const datasetID = extWay.props.__datasetid__;
+      const serviceID = extWay.props.serviceID;
+      const datasetID = extWay.props.datasetID;
       const extSpatialID = `${serviceID}-${datasetID}-data`;  // spatialID naming convention
 
       // 1. If there are unaccepted nodes in the external dataset at the same location as
@@ -212,10 +212,9 @@ export function actionRapidAcceptFeature(entityID: EntityID, extGraph: Graph): R
     const props = entity.props as Record<string, unknown>;
     const tags = props.tags as OsmTags;
 
-    delete props.__fbid__;
-    delete props.__origid__;
-    delete props.__service__;
-    delete props.__datasetid__;
+    delete props.fbID;
+    delete props.serviceID;
+    delete props.datasetID;
     delete tags.conn;
     delete tags.orig_id;
     delete tags.debug_way_id;

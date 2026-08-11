@@ -339,7 +339,6 @@ export class SelectBehavior extends AbstractBehavior {
     const scheduler = context.systems.scheduler!;
     const eventManager = gfx.eventManager!;
 
-
     const modifiers = eventManager.modifierKeys;
     const isMac = utilDetect().os === 'mac';
     const disableSnap = modifiers.has('Alt') || modifiers.has('Meta') || (!isMac && modifiers.has('Control'));
@@ -355,6 +354,8 @@ export class SelectBehavior extends AbstractBehavior {
     const target = eventData.target;
     let data = target?.data;
     let dataID = target?.dataID;
+    const layerID = target?.layerID || null;
+    const serviceID = (data?.props?.serviceID || '') as ServiceID;
 
     // If we're clicking on something real, we want to pause doubleclick zooms
     if (data) {
@@ -380,14 +381,12 @@ export class SelectBehavior extends AbstractBehavior {
 
     // Clicked on a photo..
     } else if (photos && data.type === 'photo') {
-      const layerID = target?.layerID || null;
       photos.selectPhoto(layerID, dataID);
       return;
 
-    // Clicked a non-OSM feature..
+    // Clicked a selectable non-OSM feature..
     } else if (
-      data.props.__fbid__ ||                     // Clicked a MapWithAI/Esri feature..
-      data.props.serviceID === 'overture' ||     // Clicked an Overture feature..
+      ['mapwithai', 'esri', 'overture'].includes(serviceID) ||    // Clicked Rapid data..
       data instanceof GeoJSONData ||  // Clicked Custom Data (e.g. gpx track)..
       data instanceof MarkerData      // Clicked a MarkerData (OSM Note, KeepRight, Osmose, Maproulette)..
     ) {
@@ -412,7 +411,7 @@ export class SelectBehavior extends AbstractBehavior {
             selectedIDs = selectedIDs.filter(id => id !== dataID);      // deselect it..
             context.enter('select-osm', { selection: { osm: selectedIDs }} );
           }
-        } else {                       // not already in selectedIDs...
+        } else {                        // not already in selectedIDs...
           selectedIDs.push(dataID!);    // select it..
           context.enter('select-osm', { selection: { osm: selectedIDs }} );
         }
@@ -465,7 +464,7 @@ export class SelectBehavior extends AbstractBehavior {
     const point = this.lastUp.coord.world;
     const data: any = this.lastUp.target?.data;
 
-    const isOSMWay = data instanceof OsmWay && !data.props.__fbid__;
+    const isOSMWay = data instanceof OsmWay && !data.props.fbID;
     const isMidpoint = data instanceof MarkerData && data?.type === 'midpoint';
 
     let loc: Vec2 | undefined;

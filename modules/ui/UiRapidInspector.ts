@@ -9,6 +9,7 @@ import { utilSanitizeHTML } from '../util/sanitize.ts';
 
 import type { Context } from '../Context.ts';
 import type { D3Selection } from 'd3-selection';
+import type { OsmEntity } from '../data/OsmEntity.ts';
 
 const ACCEPT_FEATURES_LIMIT = 50;
 
@@ -28,7 +29,7 @@ const ACCEPT_FEATURES_LIMIT = 50;
  */
 export class UiRapidInspector {
   public context: Context;
-  public datum: any;
+  public datum: OsmEntity | null;
   protected _keys: string[] | null;
   protected _keybinding: any;
 
@@ -73,7 +74,6 @@ export class UiRapidInspector {
     this.renderTagInfo = this.renderTagInfo.bind(this);
     this.renderChoices = this.renderChoices.bind(this);
     this.renderChoice = this.renderChoice.bind(this);
-    this.renderNotice = this.renderNotice.bind(this);
     this.acceptFeature = this.acceptFeature.bind(this);
     this.ignoreFeature = this.ignoreFeature.bind(this);
     this._setupKeybinding = this._setupKeybinding.bind(this);
@@ -145,8 +145,7 @@ export class UiRapidInspector {
     $inspector.selectAll('.body')
       .call(this.renderFeatureInfo)
       .call(this.renderTagInfo)
-      .call(this.renderChoices)
-      .call(this.renderNotice);
+      .call(this.renderChoices);
   }
 
 
@@ -186,10 +185,10 @@ export class UiRapidInspector {
     const l10n = context.systems.l10n!;
     const rapid = context.systems.rapid!;
     const scene = context.systems.gfx!.scene;
-    const ui = context.systems.ui;  // optional
+    const ui = context.systems.ui!;
 
     if (this.isAcceptFeatureDisabled()) {
-      ui?.Flash.show({
+      ui.Flash.show({
         duration: 5000,
         label: l10n.t(
           'rapid_inspector.option_accept.disabled_flash',
@@ -199,9 +198,10 @@ export class UiRapidInspector {
       return;
     }
 
-    const service = context.services[datum.props.__service__] as any;
-    const graph = service.graph(datum.props.__datasetid__);
-    const datasetID = datum.props.__datasetid__.replace('-conflated', '');
+    const serviceID = datum.props.serviceID as ServiceID;
+    const service = context.services[serviceID] as any;
+    const graph = service.graph(datum.props.datasetID);
+    const datasetID = (datum.props.datasetID as DatasetID).replace('-conflated', '');
     const dataset = rapid.datasets.get(datasetID);
 
     const action = actionRapidAcceptFeature(datum.id, graph);
@@ -324,7 +324,7 @@ export class UiRapidInspector {
     const l10n = context.systems.l10n!;
     const rapid = context.systems.rapid!;
 
-    const datasetID = datum.props.__datasetid__.replace('-conflated', '');
+    const datasetID = (datum.props.datasetID as DatasetID).replace('-conflated', '');
     const dataset = rapid.datasets.get(datasetID) as any;
     const color = dataset.color;
 
@@ -454,44 +454,6 @@ export class UiRapidInspector {
 
     $choices.selectAll('.rapid-inspector-choice')
       .each(this.renderChoice);
-  }
-
-
-
-  /**
-   * Renders the 'rapid-inspector-notice' section
-   * This section contains remarks about the data - license, usage, or other hints
-   * @param $selection - A d3-selection to a HTMLElement that this content should render itself into
-   */
-  public renderNotice($selection: D3Selection): void {
-    const context = this.context;
-    const l10n = context.systems.l10n!;
-    const rapid = context.systems.rapid!;
-    const datum = this.datum;
-    if (!datum) return;
-
-    const datasetID = datum.props.__datasetid__.replace('-conflated', '');
-    const dataset = rapid.datasets.get(datasetID) as any;
-
-    // Only display notice data for open data (for now)
-    if (dataset.tags.has('opendata') && dataset.licenseUrl) {
-      let $notice: D3Selection = $selection.selectAll('.rapid-inspector-notice')
-        .data([0]);
-
-      // enter
-      const $$notice = $notice.enter()
-        .append('div')
-        .attr('class', 'rapid-inspector-notice');
-
-      // update
-      $notice = $notice.merge($$notice);
-
-      $notice
-        .html(utilSanitizeHTML(marked.parse(l10n.t('rapid_inspector.notice.open_data', { url: dataset.licenseUrl })) as string));
-
-      $notice.selectAll('a')   // links in markdown should open in new page
-        .attr('target', '_blank');
-    }
   }
 
 

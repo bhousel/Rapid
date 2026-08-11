@@ -294,18 +294,19 @@ export class UiSidebar {
     const editor = context.systems.editor!;
     const graph = editor.staging.graph;
     let datum: any = target;
+    const serviceID = (datum?.props?.serviceID || '') as ServiceID;
 
     // Start by clearing out any custom state.
     this.reset();
 
     // Hovering on MapWithAI/Esri data..
-    if (datum?.props?.__fbid__) {
-      this.RapidInspector.datum = datum;
+    if (serviceID === 'mapwithai' || serviceID === 'esri') {
+      this.RapidInspector.datum = datum as OsmEntity;
       this.show(this.RapidInspector.render);
 
     // Hovering on Overture data..
-    } else if (datum?.props?.serviceID === 'overture') {
-      this.OvertureInspector.datum = datum;
+    } else if (serviceID === 'overture') {
+      this.OvertureInspector.datum = datum as GeoJSONData;
       this.show(this.OvertureInspector.render);
 
     // Hovering on Mapillary detection..

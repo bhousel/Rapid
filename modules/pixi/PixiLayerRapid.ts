@@ -297,7 +297,7 @@ export class PixiLayerRapid extends AbstractPixiLayer {
         if (isAcceptedOrIgnored(entity.id)) continue;
 
         const geom = entity.geometry(dsGraph);
-        if (geom === 'point' && !!entity.props.__fbid__) {  // standalone points only (not vertices/childnodes)
+        if (geom === 'point') {   // standalone points only (not vertices/childnodes)
           renderData.points.push(entity as OsmNode);
         } else if (geom === 'line') {
           renderData.lines.push(entity as OsmWay);

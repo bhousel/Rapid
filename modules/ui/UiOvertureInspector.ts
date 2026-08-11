@@ -69,7 +69,6 @@ export class UiOvertureInspector {
     this.render = this.render.bind(this);
     this.renderFeatureInfo = this.renderFeatureInfo.bind(this);
     this.renderPropertyInfo = this.renderPropertyInfo.bind(this);
-    this.renderNotice = this.renderNotice.bind(this);
   }
 
 
@@ -130,8 +129,7 @@ export class UiOvertureInspector {
 
     $inspector.selectAll('.body')
       .call(this.renderFeatureInfo)
-      .call(this.renderPropertyInfo)
-      .call(this.renderNotice);
+      .call(this.renderPropertyInfo);
   }
 
 
@@ -285,41 +283,4 @@ export class UiOvertureInspector {
     }
   }
 
-
-  /**
-   * Renders the 'overture-inspector-notice' section
-   * This section contains remarks about the data - license, usage, or other hints
-   * @param $selection - A d3-selection to a HTMLElement that this content should render itself into
-   */
-  public renderNotice($selection: D3Selection): void {
-    const context = this.context;
-    const l10n = context.systems.l10n!;
-    const rapid = context.systems.rapid!;
-
-    const datasetID = this.datum?.props?.datasetID as DatasetID || '';
-    const dataset = rapid.datasets.get(datasetID);
-    const showNotice = dataset?.tags.has('opendata') && !!dataset?.licenseUrl;
-
-    // Only display notice and link if the dataset is tagged as open data (for now)
-    let $notice: D3Selection = $selection.selectAll('.overture-inspector-notice')
-      .data(showNotice ? [ dataset?.licenseUrl ] : []);
-
-    // exit
-    $notice.exit()
-      .remove();
-
-    // enter
-    const $$notice: D3EnterSelection = $notice.enter()
-      .append('div')
-      .attr('class', 'overture-inspector-notice');
-
-    // update
-    $notice = $notice.merge($$notice);
-
-    $notice
-      .html(d => utilSanitizeHTML(marked.parse(l10n.t('rapid_inspector.notice.open_data', { url: d })) as string));
-
-    $notice.selectAll('a')   // links in markdown should open in new page
-      .attr('target', '_blank');
-  }
 }

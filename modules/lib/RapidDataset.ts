@@ -16,8 +16,6 @@ export interface RapidDatasetProps {
   serviceID: ServiceID;
   /** Categories this dataset belongs to (e.g. 'buildings', 'addresses') */
   categories: Set<string>;
-  /** Tags/flags for this dataset (e.g. 'opendata') */
-  tags: Set<string>;
   /** Display color for this dataset */
   color: string;
   /** Data usage information */
@@ -72,8 +70,6 @@ export class RapidDataset {
   public serviceID: ServiceID;
   /** Categories this dataset belongs to (e.g. 'buildings', 'addresses') */
   public categories: Set<string>;
-  /** Tags/flags for this dataset (e.g. 'opendata') */
-  public tags: Set<string>;
   /** Display color for features from this dataset */
   public color: string;
   /** Source attribution strings shown in the changeset */
@@ -128,7 +124,6 @@ export class RapidDataset {
     this.id = props.id ?? '';
     this.serviceID = props.serviceID ?? '';
     this.categories = props.categories ?? new Set<string>();
-    this.tags = props.tags ?? new Set<string>();
     this.color = props.color ?? RAPID_MAGENTA;
     this.dataUsed = props.dataUsed ?? [];
     this.extent = props.extent;

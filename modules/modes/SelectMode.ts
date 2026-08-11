@@ -1,5 +1,5 @@
 import { AbstractMode } from './AbstractMode.ts';
-import { AbstractData, GeoJSONData, MarkerData } from '../data/index.ts';
+import { AbstractData, OsmEntity, GeoJSONData, MarkerData } from '../data/index.ts';
 import { Extent } from '@rapid-sdk/math';
 import { UiOsmoseEditor } from '../ui/UiOsmoseEditor.ts';
 import { UiDataEditor } from '../ui/UiDataEditor.ts';
@@ -80,20 +80,23 @@ export class SelectMode extends AbstractMode {
       }
     }
 
-    // Handle select style class
+    // Handle 'select' style class.
+    // This code chooses the layer that the data came from, so it can be 'select' classed.
+    // It's hacky and we should remove this, maybe by including layerID in the `options` passed in.
     scene.clearClass('select');
     for (const datum of selection.values()) {
+      const serviceID = (datum.props?.serviceID ?? '') as ServiceID;
       let layerID = null;
 
-      // hacky - improve?
-      if (datum instanceof MarkerData && datum.type === 'detection') {  // A detection (object or sign)
-        if (datum.serviceID === 'mapillary' && datum.props.object_type === 'point') {
+      if (['mapwithai', 'esri', 'overture'].includes(serviceID)) {
+        layerID = 'rapid';
+      } else if (datum instanceof MarkerData && datum.type === 'detection') {
+        if (serviceID === 'mapillary' && datum.props.object_type === 'point') {
           layerID = 'mapillary-detections';
-        } else if (datum.serviceID === 'mapillary' && datum.props.object_type === 'traffic_sign') {
+        } else if (serviceID === 'mapillary' && datum.props.object_type === 'traffic_sign') {
           layerID = 'mapillary-signs';
         }
-      } else if (datum instanceof MarkerData) {  // in most cases the `serviceID` is the `layerID`
-        const serviceID = datum.serviceID;       // 'keepright', 'osmose', etc.
+      } else if (datum instanceof MarkerData) {   // in most cases the `serviceID` is the `layerID`
         if (serviceID === 'osm') {
           if (datum.type === 'note') {
             layerID = 'notes';   // OSM Notes
@@ -101,10 +104,6 @@ export class SelectMode extends AbstractMode {
         } else {
           layerID = serviceID;
         }
-      } else if (datum.props.__fbid__) {      // a MapWithAI/Esri feature
-        layerID = 'rapid';
-      } else if (datum.props.serviceID === 'overture') {   // Overture data
-        layerID = 'rapid';
       } else if (datum instanceof GeoJSONData) {  // custom data
         layerID = 'custom-data';
       }
@@ -191,14 +190,14 @@ export class SelectMode extends AbstractMode {
     // Selected Overture feature...
     } else if (datum.props.serviceID === 'overture') {
       if (Sidebar) {
-        Sidebar.OvertureInspector.datum = datum;
+        Sidebar.OvertureInspector.datum = datum as GeoJSONData;
         sidebarContent = Sidebar.OvertureInspector.render;
       }
 
     // Selected MapWithAI/Esri feature...
-    } else if (datum.props?.__fbid__) {
+    } else if (datum.props.serviceID === 'mapwithai' || datum.props.serviceID === 'esri') {
       if (Sidebar) {
-        Sidebar.RapidInspector.datum = datum;
+        Sidebar.RapidInspector.datum = datum as OsmEntity;
         sidebarContent = Sidebar.RapidInspector.render;
       }
 

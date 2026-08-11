@@ -329,11 +329,7 @@ export class MapWithAIService extends AbstractSystem {
       const entityID = props.id as EntityID;
 
       // add some extra metadata properties
-      Object.assign(props, {
-        __fbid__: entityID,
-        __service__: 'mapwithai',
-        __datasetid__: ds.id
-      });
+      Object.assign(props, { fbID: entityID, serviceID: 'mapwithai', datasetID: ds.id });
 
       if (props.type === 'node') {
         if (ds.seen.has(entityID)) continue;   // can skip seen nodes

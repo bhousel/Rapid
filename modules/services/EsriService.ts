@@ -428,7 +428,7 @@ export class EsriService extends AbstractSystem {
     cache.seenIDs.add(featureIDString);
 
     const dataID = `esri-${datasetID}-${layerID}-${featureIDString}`;
-    const metadata = { __fbid__: dataID, __service__: 'esri', __datasetid__: datasetID };
+    const metadata = { fbID: dataID, serviceID: 'esri', datasetID: datasetID };
     const entities: OsmEntity[] = [];
     const nodemap = new Map<string, OsmNode>();
 
