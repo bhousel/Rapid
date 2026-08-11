@@ -386,8 +386,8 @@ export class SelectBehavior extends AbstractBehavior {
 
     // Clicked a non-OSM feature..
     } else if (
-      data.props.__fbid__ ||      // Clicked a Rapid feature..
-      data.props.overture ||      // Clicked an Overture feature..
+      data.props.__fbid__ ||                     // Clicked a MapWithAI/Esri feature..
+      data.props.serviceID === 'overture' ||     // Clicked an Overture feature..
       data instanceof GeoJSONData ||  // Clicked Custom Data (e.g. gpx track)..
       data instanceof MarkerData      // Clicked a MarkerData (OSM Note, KeepRight, Osmose, Maproulette)..
     ) {

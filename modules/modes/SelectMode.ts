@@ -101,9 +101,9 @@ export class SelectMode extends AbstractMode {
         } else {
           layerID = serviceID;
         }
-      } else if (datum.props.__fbid__) {      // a Rapid feature
+      } else if (datum.props.__fbid__) {      // a MapWithAI/Esri feature
         layerID = 'rapid';
-      } else if (datum.props.overture) {      // Overture data
+      } else if (datum.props.serviceID === 'overture') {   // Overture data
         layerID = 'rapid';
       } else if (datum instanceof GeoJSONData) {  // custom data
         layerID = 'custom-data';
@@ -188,25 +188,25 @@ export class SelectMode extends AbstractMode {
       const layerID = `${serviceID}-${type}`;    // e.g. 'mapillary-signs' or 'mapillary-detections'
       photos.selectDetection(layerID, datum.id);
 
-    // Selected custom data (e.g. gpx track)...
-    } else if (datum instanceof GeoJSONData) {
-      const dataEditor = new UiDataEditor(context);
-      dataEditor.datum = datum;
-      sidebarContent = dataEditor.render;
-
     // Selected Overture feature...
-    } else if (datum.props.overture) {
+    } else if (datum.props.serviceID === 'overture') {
       if (Sidebar) {
         Sidebar.OvertureInspector.datum = datum;
         sidebarContent = Sidebar.OvertureInspector.render;
       }
 
-    // Selected Rapid feature...
+    // Selected MapWithAI/Esri feature...
     } else if (datum.props?.__fbid__) {
       if (Sidebar) {
         Sidebar.RapidInspector.datum = datum;
         sidebarContent = Sidebar.RapidInspector.render;
       }
+
+    // Selected other unspecified Geo Data (vector tile, geojson, etc..)
+    } else if (datum instanceof GeoJSONData) {
+      const dataEditor = new UiDataEditor(context);
+      dataEditor.datum = datum;
+      sidebarContent = dataEditor.render;
     }
 
     // Todo: build a sidebar UI for:

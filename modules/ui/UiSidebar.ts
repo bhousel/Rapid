@@ -298,18 +298,13 @@ export class UiSidebar {
     // Start by clearing out any custom state.
     this.reset();
 
-    // Hovering on Geo Data (vector tile, geojson, etc..)
-    if (datum instanceof GeoJSONData) {
-      this.DataEditor.datum = datum;
-      this.show(this.DataEditor.render);
-
-    // Hovering on Rapid data..
-    } else if (datum?.props?.__fbid__) {
+    // Hovering on MapWithAI/Esri data..
+    if (datum?.props?.__fbid__) {
       this.RapidInspector.datum = datum;
       this.show(this.RapidInspector.render);
 
     // Hovering on Overture data..
-    } else if (datum?.overture) {
+    } else if (datum?.props?.serviceID === 'overture') {
       this.OvertureInspector.datum = datum;
       this.show(this.OvertureInspector.render);
 
@@ -318,6 +313,7 @@ export class UiSidebar {
       this.DetectionInspector.datum = datum;
       this.show(this.DetectionInspector.render);
 
+    // Hovering on an OSM Note...
     } else if (datum instanceof MarkerData && datum.serviceID === 'osm') {
       if (context.mode?.id === 'drag-note') return;
       const service = context.services.osm;
@@ -327,6 +323,7 @@ export class UiSidebar {
       this.NoteEditor.datum = datum;
       this.show(this.NoteEditor.render);
 
+    // Hovering on a KeepRight Marker...
     } else if (datum instanceof MarkerData && datum.serviceID === 'keepright') {
       const service = context.services.keepright;
       if (service) {
@@ -335,6 +332,7 @@ export class UiSidebar {
       this.KeepRightEditor.datum = datum;
       this.show(this.KeepRightEditor.render);
 
+    // Hovering on an Osmose Marker...
     } else if (datum instanceof MarkerData && datum.serviceID === 'osmose') {
       const service = context.services.osmose;
       if (service) {
@@ -343,6 +341,7 @@ export class UiSidebar {
       this.OsmoseEditor.datum = datum;
       this.show(this.OsmoseEditor.render);
 
+    // Hovering on a MapRoulette Marker...
     } else if (datum instanceof MarkerData && datum.serviceID === 'maproulette') {
       const service = context.services.maproulette;
       if (service) {
@@ -351,7 +350,13 @@ export class UiSidebar {
       this.MapRouletteMenu.datum = datum;
       this.MapRouletteEditor.datum = datum;
       this.show(this.MapRouletteEditor.render);
+
+    // Hovering on other unspecified Geo Data (vector tile, geojson, etc..)
+    } else if (datum instanceof GeoJSONData) {
+      this.DataEditor.datum = datum;
+      this.show(this.DataEditor.render);
     }
+
 
     // ^ That covers all the custom content we can hover over.
     // If any of the above matched, `this.show()` would have taken care

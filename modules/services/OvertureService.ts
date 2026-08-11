@@ -1,40 +1,39 @@
-import { AbstractSystem } from '../core/AbstractSystem.ts';
 import { RapidDataset } from '../lib/RapidDataset.ts';
 import { utilFetchResponse } from '../util/fetch_response.ts';
+import { VectorTileService } from './VectorTileService.ts';
 
 import type { Context } from '../Context.ts';
 import type { GeoJSONData } from '../data/GeoJSONData.ts';
-import type { VectorTileService } from './VectorTileService.ts';
 
-/** Base URL for Overture PMTiles hosted on S3 */
-const PMTILES_ROOT_URL = 'https://overturemaps-tiles-us-west-2-beta.s3.us-west-2.amazonaws.com/';
-/** Path to the PMTiles catalog JSON file */
-const PMTILES_CATALOG_PATH = 'pmtiles_catalog.json';
 
-/** Catalog file structure from S3 */
-interface PMTilesCatalog {
-  /** Available PMTiles releases with their file listings */
-  releases: Array<{
-    release_id: string;
-    files: Array<{ theme: string; href: string }>;
-  }>;
-}
+/**
+ * STAC catalog root — used to discover the latest Overture release and per-theme PMTiles URLs.
+ * See: https://stac.overturemaps.org/catalog.json
+ */
+const STAC_CATALOG_URL = 'https://stac.overturemaps.org/catalog.json';
+
+/** STAC themes to fetch PMTiles URLs for */
+const WANTED_THEMES = new Set(['buildings', 'places', 'transportation']);
+
+/** Minimum zoom level for loading building data (prevents slowdown at low zooms) */
+const MIN_BUILDING_ZOOM = 17;
+/** Minimum zoom level for loading transportation data */
+const MIN_TRANSPORTATION_ZOOM = 16;
 
 
 /**
  * `OvertureService` connects to the 'official' sources of Overture PMTiles
- *  by acting as a wrapper around the vector tile service
+ *  by extending the vector tile service.
  *
  * - Protomaps .pmtiles single-file archive containing MVT
  *    https://protomaps.com/docs/pmtiles
  *    https://github.com/protomaps/PMTiles
  */
-export class OvertureService extends AbstractSystem {
-
-  /** Parsed PMTiles catalog data from S3 */
-  public pmTilesCatalog: PMTilesCatalog;
-  /** The most recent release entry from the catalog */
-  public latestRelease: any;
+export class OvertureService extends VectorTileService {
+  /** Map of theme id to PMTiles URL, e.g. 'buildings' → 'https://…/buildings.pmtiles' */
+  protected _pmtilesUrls: Map<string, string>;
+  /** The latest releaseID, e.g. '2026-01-21.0' */
+  protected _releaseID: string;
 
 
   /**
@@ -44,29 +43,54 @@ export class OvertureService extends AbstractSystem {
   public constructor(context: Context) {
     super(context);
     this.id = 'overture';
-    this.pmTilesCatalog = { releases: [] };
-    this.latestRelease = '';
+
+    this._pmtilesUrls = new Map<string, string>();
+    this._releaseID = '';
   }
 
 
   /**
-   * Load and parse the overture catalog data
-   * @return  Promise resolved when the data has been loaded
+   * _loadStacCatalogAsync
+   * Walk the Overture STAC catalog to discover the latest release and resolve
+   * per-theme PMTiles URLs (buildings, places, etc.).
+   *
+   * Catalog structure:
+   *   root catalog → release catalogs (latest tagged) → theme catalogs → pmtiles links
+   *
+   * @return {Promise} Promise resolved when the catalog has been loaded
    */
-  protected _loadS3CatalogAsync(): Promise<void> {
-    return fetch(PMTILES_ROOT_URL + PMTILES_CATALOG_PATH)
-      .then(utilFetchResponse)
-      .then((json: PMTilesCatalog) => {
-        this.pmTilesCatalog = json;
+  protected async _loadStacCatalogAsync() {
+    try {
+      // 1. Fetch root catalog
+      const rootData = await fetch(STAC_CATALOG_URL).then(utilFetchResponse);
 
-        // Grab the very latest date stamp and keep track of the release associated with it.
-        const dateStrings = this.pmTilesCatalog.releases.map(release => release.release_id);
-        dateStrings.sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
-        this.latestRelease = this.pmTilesCatalog.releases.find(release => release.release_id === dateStrings[0]);
-      })
-      .catch(error => {
-        console.error('Error fetching or parsing the PMTiles Catalog: ', error);   // eslint-disable-line no-console
+      // 2. Find the latest release (link with `latest: true`)
+      const childLinks = (rootData.links ?? []).filter((l: any) => l.rel === 'child');
+      const latestLink = childLinks.find((l: any) => l.latest === true);
+      if (!latestLink) throw new Error('No latest release found in STAC root catalog');
+
+      const releaseUrl = new URL(latestLink.href, STAC_CATALOG_URL).href;
+      const releaseData = await fetch(releaseUrl).then(utilFetchResponse);
+      this._releaseID = releaseData.id ?? '';
+
+      // 3. Fetch only the themes we need
+      const themeLinks = (releaseData.links ?? []).filter((l: any) => l.rel === 'child' && WANTED_THEMES.has(l.title));
+      const themeFetches = themeLinks.map(async (link: any) => {
+        const themeUrl = new URL(link.href, releaseUrl).href;
+        const themeData = await fetch(themeUrl).then(utilFetchResponse);
+        const pmtilesLink = (themeData.links ?? []).find((l: any) => l.rel === 'pmtiles');
+        if (pmtilesLink) {
+          const themeName = themeData.id ?? link.title;
+          const pmtilesUrl = new URL(pmtilesLink.href, themeUrl).href;
+          this._pmtilesUrls.set(themeName, pmtilesUrl);
+        }
       });
+
+      await Promise.all(themeFetches);
+      // console.log(`[OvertureService] Loaded STAC release "${this._releaseID}" with themes: ${[...this._pmtilesUrls.keys()].join(', ')}`);  // eslint-disable-line no-console
+    } catch (error) {
+      console.error('[OvertureService] Error loading STAC catalog:', error);  // eslint-disable-line no-console
+    }
   }
 
 
@@ -77,11 +101,8 @@ export class OvertureService extends AbstractSystem {
   public initAsync(): Promise<void> {
     if (this._initPromise) return this._initPromise;
 
-    const vtService = this.context.services.vectortile as VectorTileService;
-
     return this._initPromise = super.initAsync()
-      .then(() => vtService.initAsync())
-      .then(() => this._loadS3CatalogAsync());
+      .then(() => this._loadStacCatalogAsync());
   }
 
 
@@ -90,13 +111,7 @@ export class OvertureService extends AbstractSystem {
    * @return  Promise resolved when this component has completed startup
    */
   public startAsync(): Promise<void> {
-    if (this._startPromise) return this._startPromise;
-
-    const vtService = this.context.services.vectortile as VectorTileService;
-
-    return this._startPromise = Promise.resolve()
-      .then(() => vtService.startAsync())
-      .then(() => { this._started = true; });
+    return super.startAsync();
   }
 
 
@@ -105,21 +120,46 @@ export class OvertureService extends AbstractSystem {
    * @return  The datasets this service provides
    */
   public getAvailableDatasets(): RapidDataset[] {
-    // just this one for now
     const places = new RapidDataset(this.context, {
       id: 'overture-places',
       conflated: false,
       serviceID: 'overture',
-      categories: new Set<string>(['overture', 'places', 'featured']),
+      categories: new Set<string>(['overture', 'places']),
       color: '#00ffff',
       dataUsed: ['overture', 'Overture Places'],
       itemUrl: 'https://docs.overturemaps.org/guides/places/',
-      licenseUrl: 'https://docs.overturemaps.org/attribution/#places',
+      licenseUrl: 'https://docs.overturemaps.org/attribution/',
       labelStringID: 'rapid_menu.overture.places.label',
       descriptionStringID: 'rapid_menu.overture.places.description'
     });
 
-    return [places];
+    const buildings = new RapidDataset(this.context, {
+      id: 'overture-buildings',
+      conflated: false,
+      serviceID: 'overture',
+      categories: new Set<string>(['overture', 'buildings']),
+      color: '#00ffff', // '#00bfff',  // Deep sky blue for Esri community maps
+      dataUsed: ['overture', 'Overture Buildings'],
+      itemUrl: 'https://docs.overturemaps.org/guides/buildings/',
+      licenseUrl: 'https://docs.overturemaps.org/attribution/#buildings',
+      labelStringID: 'rapid_menu.overture.buildings.label',
+      descriptionStringID: 'rapid_menu.overture.buildings.description'
+    });
+
+    const tomtomRoads = new RapidDataset(this.context, {
+      id: 'overture-tomtom-roads',
+      conflated: false,
+      serviceID: 'overture',
+      categories: new Set<string>(['overture', 'tomtom', 'roads', 'featured']),
+      color: '#00ffff',  // '#da26d3',  // Rapid magenta
+      dataUsed: ['overture', 'TomTom'],
+      itemUrl: 'https://docs.overturemaps.org/guides/transportation/',
+      licenseUrl: 'https://docs.overturemaps.org/attribution/',
+      labelStringID: 'rapid_menu.overture.tomtom_roads.label',
+      descriptionStringID: 'rapid_menu.overture.tomtom_roads.description'
+    });
+
+    return [places, buildings, tomtomRoads];
   }
 
 
@@ -128,14 +168,22 @@ export class OvertureService extends AbstractSystem {
    * @param  datasetID - dataset to load tiles for
    */
   public loadTiles(datasetID: DatasetID): void {
-    const vtService = this.context.services.vectortile as VectorTileService;
+    const context = this.context;
+    const zoom = context.viewport.transform.zoom;
 
-    //TODO: Revisit the id-to-url mapping once we're done.
-    if (datasetID.includes('places')) {
-      const file = this.latestRelease.files.find((file: any) => file.theme === 'places');
-      const url = PMTILES_ROOT_URL + file.href;
+    if (datasetID === 'overture-places') {
+      const url = this._pmtilesUrls.get('places');
+      if (url) super.loadTiles(url, datasetID);
 
-      vtService.loadTiles(url);
+    } else if (datasetID === 'overture-buildings') {
+      if (zoom < MIN_BUILDING_ZOOM) return;
+      const url = this._pmtilesUrls.get('buildings');
+      if (url) super.loadTiles(url, datasetID);
+
+    } else if (datasetID === 'overture-tomtom-roads') {
+      if (zoom < MIN_TRANSPORTATION_ZOOM) return;
+      const url = this._pmtilesUrls.get('transportation');
+      if (url) super.loadTiles(url, datasetID);
     }
   }
 
@@ -146,15 +194,25 @@ export class OvertureService extends AbstractSystem {
    * @return Array of data
    */
   public getData(datasetID: DatasetID): GeoJSONData[] {
-    const vtService = this.context.services.vectortile as VectorTileService;
+    const context = this.context;
+    const zoom = context.viewport.transform.zoom;
 
-    if (datasetID.includes('places')) {
-      const file = this.latestRelease.files.find((file: any) => file.theme === 'places');
-      const url = PMTILES_ROOT_URL + file.href;
-      return vtService.getData(url);
-    } else {
-      return [];
+    if (datasetID === 'overture-places') {
+      const url = this._pmtilesUrls.get('places');
+      if (url) return super.getData(url);
+
+    } else if (datasetID === 'overture-buildings') {
+      if (zoom < MIN_BUILDING_ZOOM) return [];
+      const url = this._pmtilesUrls.get('buildings');
+      if (url) return super.getData(url);
+
+    } else if (datasetID === 'overture-tomtom-roads') {
+      if (zoom < MIN_TRANSPORTATION_ZOOM) return [];
+      const url = this._pmtilesUrls.get('transportation');
+      if (url) return super.getData(url);
     }
+
+    return [];
   }
 
 }

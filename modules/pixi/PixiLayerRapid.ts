@@ -3,23 +3,24 @@ import { AbstractPixiLayer } from './AbstractPixiLayer.ts';
 import { PixiFeatureLine } from './PixiFeatureLine.ts';
 import { PixiFeaturePoint } from './PixiFeaturePoint.ts';
 import { PixiFeaturePolygon } from './PixiFeaturePolygon.ts';
+import { AbstractData, GeoJSONData, OsmEntity, OsmNode, OsmWay } from '../data/index.ts';
 
 import type { Viewport } from '@rapid-sdk/math';
 import type { MatchedStyle } from '../core/StyleSystem.ts';
 import type { RapidDataset } from '../lib/RapidDataset.ts';
 import type { PixiScene } from './PixiScene.ts';
-import type { OsmEntity, OsmNode, OsmWay } from '../data/types.ts';
+import type { OsmTags } from '../data/types.ts';
 
 
 /** Minimum zoom level where Rapid data is rendered */
 const MINZOOM = 12;
 
 /** Collected data from services, sorted by geometry type */
-interface RapidData {
-  points: OsmEntity[];
-  vertices: Set<OsmNode>;
-  lines: OsmWay[];
-  polygons: OsmEntity[];
+interface RenderData {
+  points: AbstractData[];
+  vertices: Set<AbstractData>;
+  lines: AbstractData[];
+  polygons: AbstractData[];
 }
 
 
@@ -234,34 +235,30 @@ export class PixiLayerRapid extends AbstractPixiLayer {
     // Adjust the dataset id for whether we want the data conflated or not
     const datasetID = dataset.id + (useConflation ? '-conflated' : '');
 
-    // Overture data isn't editable, nor conflatable... yet.
-    let dsGraph = null;
-    if (dataset.serviceID !== 'overture') {
-       dsGraph = service.graph(datasetID);
-    }
-
     // Filter out features that have already been accepted or ignored by the user.
-    const isAcceptedOrIgnored = (entity: any): boolean => {
-      return rapid.acceptIDs.has(entity.id) || rapid.ignoreIDs.has(entity.id);
+    const isAcceptedOrIgnored = (dataID: DataID): boolean => {
+      return rapid.acceptIDs.has(dataID) || rapid.ignoreIDs.has(dataID);
     };
 
     // Gather data
-    const data: RapidData = {
+    const renderData: RenderData = {
       points: [],
       vertices: new Set<OsmNode>(),
       lines: [],
       polygons: []
     };
 
-    /* Facebook AI/ML */
+    /* Facebook MapWithAI */
     if (dataset.serviceID === 'mapwithai') {
+      const mapwithai = context.services.mapwithai!;
       if (viewZoom >= 15) {  // avoid firing off too many API requests
-        service.loadTiles(datasetID);  // fetch more
+        mapwithai.loadTiles(datasetID);
       }
 
-      // Skip features already accepted/ignored by the user
-      const entities = service.getData(datasetID)
-        .filter((entity: OsmEntity) => entity.type === 'way' && !isAcceptedOrIgnored(entity)) as OsmWay[];
+      // Gather data in view - we only want OsmWays here
+      const dsGraph = mapwithai.graph(datasetID);
+      const entities = mapwithai.getData(datasetID)
+        .filter((entity: OsmEntity) => entity.type === 'way' && !isAcceptedOrIgnored(entity.id)) as OsmWay[];
 
       // MapWithAIService gives us roads and buildings together,
       // so filter further according to which dataset we're drawing
@@ -270,50 +267,70 @@ export class PixiLayerRapid extends AbstractPixiLayer {
         || dataset.id === 'metaSyntheticFootways'
         || dataset.id === 'rapid_intro_graph'
       ) {
-        data.lines = entities.filter((d: OsmWay) => d.geometry(dsGraph) === 'line' && !!d.tags.highway) as OsmWay[];
+        renderData.lines = entities.filter((d: OsmWay) => d.geometry(dsGraph) === 'line' && !!d.tags.highway) as OsmWay[];
 
         // Gather endpoint vertices, we will render these also
-        for (const way of data.lines) {
-          const first = dsGraph.entity(way.first());
-          const last = dsGraph.entity(way.last());
-          data.vertices.add(first);
-          data.vertices.add(last);
+        for (const way of renderData.lines as OsmWay[]) {
+          const first = dsGraph.entity(way.first() as EntityID) as OsmNode;
+          const last = dsGraph.entity(way.last() as EntityID) as OsmNode;
+          renderData.vertices.add(first);
+          renderData.vertices.add(last);
         }
 
-      } else {  // ms buildings or esri buildings through conflation service
-        data.polygons = entities.filter((d: OsmEntity) => d.geometry(dsGraph) === 'area');
+      } else {  // Microsoft or Esri buildings retrieved through the MapWithAI conflation service
+        renderData.polygons = entities.filter((d: OsmWay) => d.geometry(dsGraph) === 'area');
       }
 
     /* ESRI ArcGIS */
     } else if (dataset.serviceID === 'esri') {
-      if (viewZoom >= 14) {  // avoid firing off too many API requests
-        service.loadTiles(datasetID);  // fetch more
+      const esri = context.services.esri!;
+      if (viewZoom >= 15) {  // avoid firing off too many API requests
+        esri.loadTiles(datasetID);
       }
 
-      const entities = service.getData(datasetID);
+      // Gather data in view
+      const dsGraph = esri.graph(datasetID);
+      if (!dsGraph) return;
+      const entities = esri.getData(datasetID);
+
       for (const entity of entities) {
-        if (isAcceptedOrIgnored(entity)) continue;   // skip features already accepted/ignored by the user
+        if (isAcceptedOrIgnored(entity.id)) continue;
+
         const geom = entity.geometry(dsGraph);
         if (geom === 'point' && !!entity.props.__fbid__) {  // standalone points only (not vertices/childnodes)
-          data.points.push(entity);
+          renderData.points.push(entity as OsmNode);
         } else if (geom === 'line') {
-          data.lines.push(entity);
+          renderData.lines.push(entity as OsmWay);
         } else if (geom === 'area') {
-          data.polygons.push(entity);
+          renderData.polygons.push(entity);
         }
       }
 
+    /* Overture */
     } else if (dataset.serviceID === 'overture') {
-      if (viewZoom >= 16) {  // avoid firing off too many API requests
-        service.loadTiles(datasetID);  // fetch more
+      const overture = context.services.overture!;
+      if (viewZoom >= 15) {  // avoid firing off too many API requests
+        overture.loadTiles(datasetID);
       }
-      const entities = service.getData(datasetID);
 
-      // Just support points (for now)
-      for (const entity of entities) {
-        entity.overture = true;
-        entity.props.__datasetid__ = datasetID;
-        data.points.push(entity);
+      const data = overture.getData(datasetID);   // GeoJSONData from the VectorTileService
+      for (const d of data) {
+        if (isAcceptedOrIgnored(d.id)) continue;
+
+        if (d.geoms.parts.some(part => part.type === 'Polygon')) {
+          renderData.polygons.push(d);
+        }
+        if (d.geoms.parts.some(part => part.type === 'LineString')) {
+          renderData.lines.push(d);
+        }
+
+        // The TomTom Roads dataset includes standalone points at all junctions.
+        // These do not seem to have useful information in them.
+        if (dataset.id !== 'overture-tomtom-roads') {
+          if (d.geoms.parts.some(part => part.type === 'Point')) {
+            renderData.points.push(d);
+          }
+        }
       }
     }
 
@@ -338,9 +355,9 @@ export class PixiLayerRapid extends AbstractPixiLayer {
       basemapContainer.addChild(linesContainer);
     }
 
-    this.renderPolygons(areasContainer, dataset, data, frame, viewport);
-    this.renderLines(linesContainer, dataset, data, frame, viewport);
-    this.renderPoints(pointsContainer, dataset, data, frame, viewport);
+    this.renderPolygons(areasContainer, dataset, renderData, frame, viewport);
+    this.renderLines(linesContainer, dataset, renderData, frame, viewport);
+    this.renderPoints(pointsContainer, dataset, renderData, frame, viewport);
   }
 
 
@@ -355,17 +372,17 @@ export class PixiLayerRapid extends AbstractPixiLayer {
   public renderPolygons(
     parentContainer: PIXI.Container,
     dataset: RapidDataset,
-    data: RapidData,
+    data: RenderData,
     frame: number,
     viewport: Viewport
   ): void {
     const color = new PIXI.Color(dataset.color);
     const l10n = this.context.systems.l10n!;
 
-    for (const entity of data.polygons) {
-      for (let i = 0; i < entity.geoms.parts.length; ++i) {
-        const part = entity.geoms.parts[i];
-        const featureID = `${this.layerID}-${dataset.id}-${entity.id}-${i}`;
+    for (const d of data.polygons) {
+      for (let i = 0; i < d.geoms.parts.length; ++i) {
+        const part = d.geoms.parts[i];
+        const featureID = `${this.layerID}-${dataset.id}-${d.id}-${i}`;
         let feature = this.features.get(featureID);
 
         if (!feature) {
@@ -377,7 +394,7 @@ export class PixiLayerRapid extends AbstractPixiLayer {
           feature.container.zIndex = -area;      // sort by area descending (small things above big things)
 
           feature.parentContainer = parentContainer;
-          feature.data = entity;
+          feature.data = d;
         }
 
         this.syncFeatureClasses(feature);
@@ -388,8 +405,10 @@ export class PixiLayerRapid extends AbstractPixiLayer {
             label: { color: colorNum },
             fill: { color: colorNum },
           };
+
+          const tags = this._getTags(d);
           feature.style = style;
-          feature.label = l10n.displayName(entity.tags);
+          feature.label = l10n.displayName(tags);
           feature.update(viewport);
         }
 
@@ -410,17 +429,17 @@ export class PixiLayerRapid extends AbstractPixiLayer {
   public renderLines(
     parentContainer: PIXI.Container,
     dataset: RapidDataset,
-    data: RapidData,
+    data: RenderData,
     frame: number,
     viewport: Viewport
   ): void {
     const color = new PIXI.Color(dataset.color);
     const l10n = this.context.systems.l10n!;
 
-    for (const entity of data.lines) {
-      for (let i = 0; i < entity.geoms.parts.length; i++) {
-        const part = entity.geoms.parts[i];
-        const featureID = `${this.layerID}-${dataset.id}-${entity.id}-${i}`;
+    for (const d of data.lines) {
+      for (let i = 0; i < d.geoms.parts.length; i++) {
+        const part = d.geoms.parts[i];
+        const featureID = `${this.layerID}-${dataset.id}-${d.id}-${i}`;
         let feature = this.features.get(featureID) as PixiFeatureLine | undefined;
 
         if (!feature) {
@@ -429,12 +448,14 @@ export class PixiLayerRapid extends AbstractPixiLayer {
           feature = new PixiFeatureLine(this, featureID);
           feature.geometry = part;
           feature.parentContainer = parentContainer;
-          feature.data = entity;
+          feature.data = d;
         }
 
         this.syncFeatureClasses(feature);
 
         if (feature.dirty) {
+          const tags = this._getTags(d);
+
           const colorNum = color.toNumber();
           const style: Partial<MatchedStyle> = {
             casing: { color: 0x444444, width: 5, cap: 'round', join: 'round' },
@@ -442,22 +463,25 @@ export class PixiLayerRapid extends AbstractPixiLayer {
             label: { color: colorNum }
           };
 
-          if (entity.isOneWay()) {
-            style.lineMarker ??= {};
-            const isAlternating = (entity.tags.oneway === 'alternating' || entity.tags.oneway === 'reversible');
-            style.lineMarker.image = isAlternating ? 'twoway' : 'oneway';
-          } else {
-            delete style.lineMarker;
-          }
-          if (entity.isSided()) {
-            style.sidedMarker ??= {};
-            style.sidedMarker.image = 'sided';
-          } else {
-            delete style.sidedMarker;
+          if (d instanceof OsmWay) {
+            const way = d as OsmWay;
+            if (way.isOneWay()) {
+              style.lineMarker ??= {};
+              const isAlternating = (tags.oneway === 'alternating' || tags.oneway === 'reversible');
+              style.lineMarker.image = isAlternating ? 'twoway' : 'oneway';
+            } else {
+              delete style.lineMarker;
+            }
+            if (way.isSided()) {
+              style.sidedMarker ??= {};
+              style.sidedMarker.image = 'sided';
+            } else {
+              delete style.sidedMarker;
+            }
           }
 
           feature.style = style;
-          feature.label = l10n.displayName(entity.tags);
+          feature.label = l10n.displayName(tags);
           feature.update(viewport);
         }
 
@@ -478,7 +502,7 @@ export class PixiLayerRapid extends AbstractPixiLayer {
   public renderPoints(
     parentContainer: PIXI.Container,
     dataset: RapidDataset,
-    data: RapidData,
+    data: RenderData,
     frame: number,
     viewport: Viewport
   ): void {
@@ -496,66 +520,64 @@ export class PixiLayerRapid extends AbstractPixiLayer {
       label: { color: colorNum }
     };
 
-    for (const entity of data.points) {
-      const featureID = `${this.layerID}-${dataset.id}-${entity.id}`;
+    for (const d of data.points) {
+      const featureID = `${this.layerID}-${dataset.id}-${d.id}`;
       let feature = this.features.get(featureID) as PixiFeaturePoint | undefined;
 
       if (!feature) {
-        const part = entity.geoms.parts[0];
+        const part = d.geoms.parts[0];
         if (!part.world) continue;  // invalid?
 
         feature = new PixiFeaturePoint(this, featureID);
         feature.geometry = part;
         feature.parentContainer = parentContainer;
-        feature.data = entity;
+        feature.data = d;
       }
 
       this.syncFeatureClasses(feature);
 
       if (feature.dirty) {
+        const tags = this._getTags(d);
         feature.style = pointStyle;
 
-        const geojson = (entity as any).geojson;
-        if (geojson) {
-          feature.label = geojson.properties['@name'];
-        } else {
-          feature.label = l10n.displayName(entity.tags);
+        feature.label = l10n.displayName(tags);
 
-          // experiment: label addresses
-          const housenumber = entity.tags['addr:unit'] ?? entity.tags['addr:housenumber'];
-          if (!feature.label && housenumber) {
-            feature.label = housenumber;
-          }
+        // experiment: label addresses
+        const housenumber = tags['addr:unit'] ?? tags['addr:housenumber'];
+        if (!feature.label && housenumber) {
+          feature.label = housenumber;
         }
+
         feature.update(viewport);
       }
 
       this.retainFeature(feature, frame);
     }
 
-    for (const entity of data.vertices) {
-      const featureID = `${this.layerID}-${entity.id}`;
+    for (const d of data.vertices) {
+      const featureID = `${this.layerID}-${d.id}`;
       let feature = this.features.get(featureID) as PixiFeaturePoint | undefined;
 
       if (!feature) {
-        const part = entity.geoms.parts[0];
+        const part = d.geoms.parts[0];
         if (!part.world) continue;  // invalid?
 
         feature = new PixiFeaturePoint(this, featureID);
         feature.geometry = part;
         feature.parentContainer = parentContainer;
         feature.allowInteraction = false;   // vertices in this layer don't actually need to be interactive
-        feature.data = entity;
+        feature.data = d;
       }
 
       this.syncFeatureClasses(feature);
 
       if (feature.dirty) {
+        const tags = this._getTags(d);
         feature.style = vertexStyle;
-        feature.label = l10n.displayName(entity.tags);
+        feature.label = l10n.displayName(tags);
 
         // experiment: label addresses
-        const housenumber = entity.tags['addr:unit'] ?? entity.tags['addr:housenumber'];
+        const housenumber = tags['addr:unit'] ?? tags['addr:housenumber'];
         if (!feature.label && housenumber) {
           feature.label = housenumber;
         }
@@ -564,5 +586,22 @@ export class PixiLayerRapid extends AbstractPixiLayer {
 
       this.retainFeature(feature, frame);
     }
+  }
+
+
+  /**
+   * Gathers an object that looks like OsmTags from the given data.
+   * @param d  The data entity (will be an OsmEntity or a GeoJSONData)
+   */
+  protected _getTags(d: AbstractData): OsmTags {
+    if (d instanceof OsmEntity) {   // entities already have tags
+      return d.tags;
+    } else if (d instanceof GeoJSONData) {
+      const name = d.properties['@name'];
+      if (typeof name === 'string') {
+        return { name };
+      }
+    }
+    return {};
   }
 }

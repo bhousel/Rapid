@@ -39,8 +39,10 @@ interface VTZoomCache {
 
 /** Source for vector tile data */
 interface VTSource {
-  /** Unique identifier derived from the URL template hash */
+  /** Unique identifier for this source - will either use the caller-provided datasetID or a generated id */
   id: string;
+  /** Optional caller-provided identifier for the source */
+  datasetID?: DatasetID;
   /** Human-readable name for this source (hostname or filename) */
   displayName: string;
   /** URL template for fetching vector tiles (contains {x}, {y}, {z} placeholders) */
@@ -186,9 +188,10 @@ export class VectorTileService extends AbstractSystem {
   /**
    * Schedule any data requests needed to cover the current map view
    * @param  template - template to load tiles for
+   * @param  datasetID - optional datasetID to identify this source by
    */
-  public loadTiles(template: string): void {
-    this._getSourceAsync(template)
+  public loadTiles(template: string, datasetID?: DatasetID): void {
+    this._getSourceAsync(template, datasetID)
       .then(source => {
         const context = this.context;
         const network = context.systems.network!;
@@ -231,9 +234,10 @@ export class VectorTileService extends AbstractSystem {
   /**
    * Create a new cache to hold data for the given template
    * @param  template - A url template for fetching data (e.g. a z/x/y tileserver or .pmtiles)
+   * @param  datasetID - optional datasetID to identify this source by
    * @return Promise resolved to the source object once it is ready to use
    */
-  protected _getSourceAsync(template: string): Promise<VTSource> {
+  protected _getSourceAsync(template: string, datasetID?: DatasetID): Promise<VTSource> {
     if (!template) return Promise.reject(new Error('No template'));
 
     let source = this._sources.get(template);
@@ -244,7 +248,8 @@ export class VectorTileService extends AbstractSystem {
       const filename = url.pathname.split('/').at(-1);
 
       source = {
-        id:                utilHashcode(template).toString(),
+        id:                datasetID ?? utilHashcode(template).toString(),
+        datasetID:         datasetID,
         displayName:       hostname,
         template:          template,
         tiler:             (new Tiler().tileSize(512) as Tiler).margin(1) as Tiler,
@@ -448,12 +453,13 @@ export class VectorTileService extends AbstractSystem {
         delete part.properties?.id;
 
         const props: GeoJSONProps = {
-          _prophash: prophash,
-          _layerID: layerID,
-          _origID: origID,
-          _tileID: tile.id,
-          geojson: part,
-          serviceID: this.id
+          prophash:   prophash,
+          layerID:    layerID,
+          origID:     origID,
+          tileID:     tile.id,
+          serviceID:  this.id,
+          datasetID:  source.datasetID,
+          geojson:    part
         };
 
         const d = new GeoJSONData(context, props);
@@ -597,7 +603,7 @@ export class VectorTileService extends AbstractSystem {
     }
 
     const type = d.geoms.parts[0]!.type;
-    const prophash = d.props._prophash as HashString;
+    const prophash = d.props.prophash as HashString;
 
     // Gather candidates for merging - the search should include dataID too
     const candidates = new Map<DataID, GeoJSONData>();
@@ -606,7 +612,7 @@ export class VectorTileService extends AbstractSystem {
       for (const hit of hits) {
         const other = hit.contents as GeoJSONData;
         if (other.geoms.parts[0]?.type !== type) continue;  // type doesn't match
-        if (other.props._prophash !== prophash) continue;   // prophash doesn't match
+        if (other.props.prophash !== prophash) continue;   // prophash doesn't match
 
         candidates.set(other.id, other);
       }
@@ -670,7 +676,7 @@ export class VectorTileService extends AbstractSystem {
 //
 //    let didMerge = false;
 //    // merge polygons that share the same prophash
-//    const polygonGroups = utilArrayGroupBy(polys, (d => d.props._prophash as HashString));
+//    const polygonGroups = utilArrayGroupBy(polys, (d => d.props.prophash as HashString));
 //    for (const candidates of Object.values(polygonGroups)) {
 //      if (candidates.length < 2) continue;
 //      if (this._mergePolygons(cache, candidates, lowTile, highTile, edgeID)) {
@@ -679,7 +685,7 @@ export class VectorTileService extends AbstractSystem {
 //    }
 //
 //    // stitch lines that share the same prophash
-//    const lineGroups = utilArrayGroupBy(lines, (d => d.props._prophash as HashString));
+//    const lineGroups = utilArrayGroupBy(lines, (d => d.props.prophash as HashString));
 //    for (const group of Object.values(lineGroups)) {
 //      if (group.length < 2) continue;
 //      if (this._stitchLines(cache, group, edgeID)) {
@@ -826,11 +832,12 @@ export class VectorTileService extends AbstractSystem {
 
       for (const part of parts) {
         const props: GeoJSONProps = {
-          _prophash: survivor.props._prophash,
-          _layerID: survivor.props._layerID,
-          _origID: survivor.props._origID,
-          geojson: part,
-          serviceID: this.id
+          prophash:    survivor.props.prophash,
+          layerID:     survivor.props.layerID,
+          origID:      survivor.props.origID,
+          serviceID:   this.id,
+          datasetID:   survivor.props.datasetID,
+          geojson:     part
         };
         const d = new GeoJSONData(context, props);
         newData.push(d);
@@ -995,11 +1002,12 @@ export class VectorTileService extends AbstractSystem {
 //      oldIDs = sourceIDs;
 //      for (const part of parts) {
 //        const props: GeoJSONProps = {
-//          _prophash: survivor.props._prophash,
-//          _layerID: survivor.props._layerID,
-//          _origID: survivor.props._origID,
-//          geojson: part,
-//          serviceID: this.id
+//          prophash:   survivor.props.prophash,
+//          layerID:    survivor.props.layerID,
+//          origID:     survivor.props.origID,
+//          serviceID:  this.id,
+//          datasetID:  survivor.props.datasetID,
+//          geojson:    part
 //        };
 //        const d = new GeoJSONData(context, props);
 //        toReplace.push(d);
@@ -1134,15 +1142,16 @@ export class VectorTileService extends AbstractSystem {
 //      const newFeatures: GeoJSONData[] = [];
 //      for (const coords of polylines) {
 //        const props: GeoJSONProps = {
-//          _prophash: source.props._prophash,
-//          _layerID: source.props._layerID,
-//          _origID: source.props._origID,
+//          prophash:   source.props.prophash,
+//          layerID:    source.props.layerID,
+//          origID:     source.props.origID,
+//          datasetID:  source.props,datasetID,
+//          serviceID:  this.id,
 //          geojson: {
 //            type: 'Feature',
 //            properties: { ...source.properties },
 //            geometry: { type: 'LineString', coordinates: coords }
-//          } as GeoJSON.Feature,
-//          serviceID: this.id
+//          } as GeoJSON.Feature
 //        };
 //        newFeatures.push(new GeoJSONData(context, props));
 //      }

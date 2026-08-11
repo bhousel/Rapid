@@ -1419,7 +1419,15 @@
       "overture": {
         "places": {
           "label": "Overture Places",
-          "description": "Contains over 53 million point representations of real-world entities: schools, businesses, hospitals, religious organizations, landmarks, mountain peaks, and much more."
+          "description": "Points of interest sourced from various commercial and community contributors, available through the Overture Maps Foundation."
+        },
+        "buildings": {
+          "label": "Overture Buildings",
+          "description": "Building footprints contributed by various open data providers, available through the Overture Maps Foundation."
+        },
+        "tomtom_roads": {
+          "label": "TomTom Roads",
+          "description": "Road network data sourced from TomTom, available through the Overture Maps Foundation."
         }
       },
       "omdFootways": {

@@ -10,7 +10,7 @@ import type { GeoJSONObject } from '../lib/types.ts';
 export interface GeoJSONProps extends AbstractDataProps {
   /** The raw GeoJSON source data */
   geojson: GeoJSONObject;
-  /** Associated service ID (e.g. 'mapillary', 'keepright') */
+  /** Associated serviceID (e.g. 'mapillary', 'keepright') */
   serviceID: ServiceID;
 }
 

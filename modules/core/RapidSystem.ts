@@ -234,8 +234,8 @@ export class RapidSystem extends AbstractSystem {
    * The datasets currently added to the editing session.
    * @return The currently added datasets
    */
-  public get datasets(): Map<string, RapidDataset> {
-    const results = new Map<string, RapidDataset>();
+  public get datasets(): Map<DatasetID, RapidDataset> {
+    const results = new Map<DatasetID, RapidDataset>();
     for (const datasetID of this._addedDatasetIDs) {
       const dataset = this.catalog.get(datasetID);
       if (dataset) {

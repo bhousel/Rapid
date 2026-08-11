@@ -1,12 +1,14 @@
 import { selection } from 'd3-selection';
 import { marked } from 'marked';
 import { uiIcon } from './icon.ts';
-import { UiTooltip } from './UiTooltip.ts';
+//import { UiTooltip } from './UiTooltip.ts';
 import { utilSanitizeHTML } from '../util/sanitize.ts';
 
 import type { Context } from '../Context.ts';
-import type { D3Selection } from 'd3-selection';
+import type { D3EnterSelection, D3Selection } from 'd3-selection';
+import type { GeoJSONData } from '../data/GeoJSONData.ts';
 
+const OVERTURE_CYAN = '#00ffff';
 
 
 /**
@@ -18,22 +20,29 @@ import type { D3Selection } from 'd3-selection';
  *  <div class='overture-inspector'>
  *    <div class='header'>…</div>
  *    <div class='body'>
- *      <div class='theme-info'/>              // Theme name, e.g. "Places" or "Addresses"
- *      <div class='property-info'/>           // List of properties on this feature
+ *      <div class='feature-info'>
+ *        <div class='dataset-label'/>             // Dataset name, e.g. "Places" or "Buildings"
+ *      </div>
+ *      <div class='property-info'>
+ *        <div class='property-bag'>               // List of `key=value` properties on this feature
+ *          …
+ *        </div>
+ *      <div>
+ *      <div class='overture-inspector-notice'/>   // Legal notice, required in some situations
  *    </div>
  *  </div>
  */
 export class UiOvertureInspector {
   public context: Context;
-  public datum: any;
+  public datum: GeoJSONData | null;
 
   // D3 Selections
   public $parent: D3Selection | null;
   public $inspector: D3Selection | null;
 
-  // Child Components
-  public AcceptTooltip: UiTooltip;
-  public IgnoreTooltip: UiTooltip;
+//  // Child Components
+//  public AcceptTooltip: UiTooltip;
+//  public IgnoreTooltip: UiTooltip;
 
   protected _keys: any;
 
@@ -51,9 +60,9 @@ export class UiOvertureInspector {
     this.$parent = null;
     this.$inspector = null;
 
-    // Create child components
-    this.AcceptTooltip = new UiTooltip(context).placement('bottom');
-    this.IgnoreTooltip = new UiTooltip(context).placement('bottom');
+//    // Create child components
+//    this.AcceptTooltip = new UiTooltip(context).placement('bottom');
+//    this.IgnoreTooltip = new UiTooltip(context).placement('bottom');
 
     // Ensure methods used as callbacks always have `this` bound correctly.
     // (This is also necessary when using `d3-selection.call`)
@@ -77,6 +86,7 @@ export class UiOvertureInspector {
     }
 
     const context = this.context;
+    const assets = context.systems.assets!;
     const l10n = context.systems.l10n!;
     const rtl = l10n.isRTL ? '-rtl' : '';
 
@@ -112,7 +122,7 @@ export class UiOvertureInspector {
     // update
     this.$inspector = $inspector = $inspector.merge($$inspector);
     $inspector.selectAll('img.wordmark-overture')
-      .attr('src', this.context.assetPath + 'img/omf-wordmark' + rtl + '.svg');
+      .attr('src', assets.getFileURL(`img/omf-wordmark${rtl}.svg`));
 
     // localize logo
     $inspector.selectAll('.logo-overture > use')
@@ -147,18 +157,20 @@ export class UiOvertureInspector {
    * @param $selection - A d3-selection to a HTMLElement that this content should render itself into
    */
   public renderFeatureInfo($selection: D3Selection): void {
-    const datum = this.datum;
-    if (!datum) return;
-
     const context = this.context;
     const rapid = context.systems.rapid!;
 
-    const datasetID = datum.props.__datasetid__;
-    const dataset: any = rapid.datasets.get(datasetID);
-    const color = dataset.color;
+    const datum = this.datum;
+    const datasetID = (datum?.props?.datasetID ?? '') as DatasetID;
+    const dataset = rapid.datasets.get(datasetID);
+    const color = dataset?.color ?? OVERTURE_CYAN;
 
     let $featureInfo: D3Selection = $selection.selectAll('.feature-info')
-      .data([0]);
+      .data(datum ? [datum] : [], d => d.id);
+
+    // exit
+    $featureInfo.exit()
+      .remove();
 
     // enter
     const $$featureInfo = $featureInfo.enter()
@@ -177,7 +189,7 @@ export class UiOvertureInspector {
       .style('color', this.getBrightness(color) > 140.5 ? '#333' : '#fff');
 
     $featureInfo.selectAll('.dataset-label')
-      .text(dataset.getLabel());
+      .text(dataset?.getLabel() || '');
   }
 
 
@@ -186,18 +198,22 @@ export class UiOvertureInspector {
    * @param $selection - A d3-selection to a HTMLElement that this content should render itself into
    */
   public renderPropertyInfo($selection: D3Selection): void {
-    const properties = this.datum?.geojson.properties;
-    if (!properties) return;
+    const datum = this.datum;
+    const properties = datum?.properties || {};
 
-    let $propInfo: D3Selection = $selection.selectAll('.property-info')
-      .data([0]);
+    const $propInfo: D3Selection = $selection.selectAll('.property-info')
+      .data(datum ? [datum] : [], d => d.id);
+
+    // exit
+    $propInfo.exit()
+      .remove();
 
     // enter
-    const $$propInfo = $propInfo.enter()
+    const $$propInfo: D3EnterSelection = $propInfo.enter()
       .append('div')
       .attr('class', 'property-info');
 
-    const $$propBag = $$propInfo
+    const $$propBag: D3EnterSelection = $$propInfo
       .append('div')
       .attr('class', 'property-bag');
 
@@ -215,9 +231,14 @@ export class UiOvertureInspector {
         key = key.slice(1);
       }
       key = key.charAt(0).toUpperCase() + key.slice(1);
-      $$propHeading.text(key);
 
-      const $$tagEntry = $$propBag.append('div').attr('class', 'property-entry');
+      $$propHeading
+        .text(key);
+
+      const $$tagEntry = $$propBag
+        .append('div')
+        .attr('class', 'property-entry');
+
       const parsedJson = this._getJsonStructure(v);
       if (parsedJson === null) continue;
 
@@ -245,14 +266,12 @@ export class UiOvertureInspector {
         $$tagEntry.append('div').attr('class', 'property-value').text(v);
       }
     }
-
-    // update
-    $propInfo = $propInfo.merge($$propInfo);
   }
 
 
   /**
-   * _getJsonStructure is used to test the values we receive from the Overture data, which may be strings, Json arrays, or Json objects.
+   * Test the values we receive from the Overture data,
+   * which may be strings, JSON arrays, or JSON objects.
    * @param   str - the value to test and parse
    * @returns null if the str isn't a string, empty object {} if the string can't be parsed into JSON, or the parsed object.
    */
@@ -276,31 +295,31 @@ export class UiOvertureInspector {
     const context = this.context;
     const l10n = context.systems.l10n!;
     const rapid = context.systems.rapid!;
-    const datum = this.datum;
-    if (!datum) return;
 
-    const datasetID = datum.props.__datasetid__.replace('-conflated', '');
-    const dataset: any = rapid.datasets.get(datasetID);
+    const datasetID = this.datum?.props?.datasetID as DatasetID || '';
+    const dataset = rapid.datasets.get(datasetID);
+    const showNotice = dataset?.tags.has('opendata') && !!dataset?.licenseUrl;
 
-    // Only display notice data for open data (for now)
-    if (dataset.tags.has('opendata') && dataset.licenseUrl) {
-      let $notice: D3Selection = $selection.selectAll('.overture-inspector-notice')
-        .data([0]);
+    // Only display notice and link if the dataset is tagged as open data (for now)
+    let $notice: D3Selection = $selection.selectAll('.overture-inspector-notice')
+      .data(showNotice ? [ dataset?.licenseUrl ] : []);
 
-      // enter
-      const $$notice = $notice.enter()
-        .append('div')
-        .attr('class', 'overture-inspector-notice');
+    // exit
+    $notice.exit()
+      .remove();
 
-      // update
-      $notice = $notice.merge($$notice);
+    // enter
+    const $$notice: D3EnterSelection = $notice.enter()
+      .append('div')
+      .attr('class', 'overture-inspector-notice');
 
-      $notice
-        .html(utilSanitizeHTML(marked.parse(l10n.t('rapid_inspector.notice.open_data', { url: dataset.licenseUrl })) as string));
+    // update
+    $notice = $notice.merge($$notice);
 
-      $notice.selectAll('a')   // links in markdown should open in new page
-        .attr('target', '_blank');
-    }
+    $notice
+      .html(d => utilSanitizeHTML(marked.parse(l10n.t('rapid_inspector.notice.open_data', { url: d })) as string));
 
+    $notice.selectAll('a')   // links in markdown should open in new page
+      .attr('target', '_blank');
   }
 }
