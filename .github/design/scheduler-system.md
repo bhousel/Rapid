@@ -472,7 +472,6 @@ Resolved design questions (kept for context):
 Every active d3 transition is a separate rAF competitor that can manipulate the DOM, trigger layout/reflow, and consume frame budget outside the scheduler's control. We've hit this before: d3 transitions were once used for map transform easing and caused jittery rendering. That's been fixed, but the underlying conflict remains for UI animations.
 
 **Current state:**
-- **`d3-timer`**: 1 direct import — `flash.js` uses `d3_timeout` for a one-shot notification timer. Trivial to replace with `scheduler.scheduleTimeout`.
 - **`d3-transition`**: 49 call sites, all doing DOM animations (opacity fades, height collapses, panel slides). All in UI code — none touch the Pixi render path. They come in via `d3-selection`'s `.transition()` method, so there's no explicit import to grep for.
 
 **Stretch goal (future phase):** Replace `d3-transition` usage with scheduler-managed tween/transition helpers. The scheduler could provide a `scheduler.tween(workID, fn, { duration, easing })` API that runs the animation callback within the frame loop's idle budget — or in a dedicated "UI animation" phase — keeping DOM animation work coordinated with rendering. CSS transitions/animations could also replace many of these cases, since the browser's compositor can run those off the main thread entirely.

@@ -1,21 +1,22 @@
 describe('uiFlash', () => {
 
   const context = new Rapid.MockContext();
-  let body, $container;
+  let $body, $container;
 
   beforeEach(() => {
-    body = d3.select('body');
-    $container = body.append('div');
-    context.container = () => $container;
+    $body = d3.select('body');
+    $container = $body.append('div');
     $container
       .append('div')
       .attr('class', 'flash-wrap')
       .append('div')
       .attr('class', 'map-footer-wrap');
+    context.$container = $container;
   });
 
   afterEach(() => {
     $container.remove();
+    context.$container = d3.select(null);
   });
 
   function delay(msec) {
@@ -25,10 +26,10 @@ describe('uiFlash', () => {
 
   it('flash is shown', () => {
     new Rapid.UiFlash(context).show({ duration: 10 });
-    const flashWrap = d3.selectAll('.flash-wrap');
-    const footerWrap = d3.selectAll('.map-footer-wrap');
-    assert.isTrue(flashWrap.classed('map-footer-show'));
-    assert.isTrue(footerWrap.classed('map-footer-hide'));
+    const $flashWrap = d3.selectAll('.flash-wrap');
+    const $footerWrap = d3.selectAll('.map-footer-wrap');
+    assert.isTrue($flashWrap.classed('map-footer-show'));
+    assert.isTrue($footerWrap.classed('map-footer-hide'));
   });
 
   it('sanitizes the label', () => {
@@ -44,11 +45,10 @@ describe('uiFlash', () => {
     new Rapid.UiFlash(context).show({ duration: 10 });
     return delay(20)
       .then(() => {
-        d3.timerFlush();
-        const flashWrap = d3.selectAll('.flash-wrap');
-        const footerWrap = d3.selectAll('.map-footer-wrap');
-        assert.isTrue(flashWrap.classed('map-footer-hide'));
-        assert.isTrue(footerWrap.classed('map-footer-show'));
+        const $flashWrap = d3.selectAll('.flash-wrap');
+        const $footerWrap = d3.selectAll('.map-footer-wrap');
+        assert.isTrue($flashWrap.classed('map-footer-hide'));
+        assert.isTrue($footerWrap.classed('map-footer-show'));
       });
   });
 
