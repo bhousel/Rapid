@@ -18,7 +18,7 @@ const ACCEPT = [
 
 /**
  * The `UiSettingsCustomData` renders a modal for supplying a custom data file or URL.
- * Call `.render($selection)` to open it; emits `change` with the new settings on save.
+ * Call `.render()` to open it; emits `change` with the new settings on save.
  */
 export class UiSettingsCustomData extends EventEmitter {
   public context: Context;
@@ -37,12 +37,9 @@ export class UiSettingsCustomData extends EventEmitter {
 
 
   /**
-   * Renders the content into the given selection.
-   * This component is handed its target selection by its parent on each render, so it
-   *  renders into `$selection` directly rather than capturing `$parent` for re-render.
-   * @param $selection - A d3-selection to the HTMLElement this component renders into
+   * Renders the content inside the Modal component.
    */
-  public render($selection: D3Selection): void {
+  public render(): void {
     const context = this.context;
     const l10n = context.systems.l10n!;
     const scene = context.systems.gfx!.scene!;
@@ -58,17 +55,17 @@ export class UiSettingsCustomData extends EventEmitter {
     let _currUrl = origUrl;
     let _currFileList = origFileList;
 
-    const modal = new UiConfirm(context).show($selection).okButton();
+    const Modal = new UiConfirm(context).show().okButton();
 
-    modal.$shaded!
+    Modal.$shaded!
       .classed('settings-modal settings-custom-data', true);
 
-    modal.$header!
+    Modal.$header!
       .append('h3')
       .text(l10n.t(`${PREFIX}.header`));
 
 
-    const $textSection = modal.$message!;
+    const $textSection: D3Selection = Modal.$message!;
 
     const data_instructions = l10n.t(`${PREFIX}.instructions`);
     const file_heading = l10n.t(`${PREFIX}.file.heading`);
@@ -150,7 +147,7 @@ ${url_tokens}
 
 
     // Setup Ok/Cancel buttons
-    const $buttonSection = modal.$buttons!;
+    const $buttonSection = Modal.$buttons!;
 
     $buttonSection
       .insert('button', '.ok-button')
@@ -162,7 +159,7 @@ ${url_tokens}
       $textSection.select('.field-url').property('value', origUrl);
       settings?.set('ui.customData.url', origUrl || '');
       (d3_event.currentTarget as HTMLElement).blur();
-      modal.close();
+      Modal.close();
     };
 
     // Accept the current settings
@@ -180,7 +177,7 @@ ${url_tokens}
       }
 
       (d3_event.currentTarget as HTMLElement).blur();
-      modal.close();
+      Modal.close();
       this.emit('change', currSettings);
     };
 

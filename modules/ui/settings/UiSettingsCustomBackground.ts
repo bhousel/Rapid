@@ -9,7 +9,7 @@ import type { D3Selection } from 'd3-selection';
 
 /**
  * The `UiSettingsCustomBackground` renders a modal for entering a custom imagery template.
- * Call `.render($selection)` to open it; emits `change` with the new settings on save.
+ * Call `.render()` to open it; emits `change` with the new settings on save.
  */
 export class UiSettingsCustomBackground extends EventEmitter {
   public context: Context;
@@ -27,12 +27,9 @@ export class UiSettingsCustomBackground extends EventEmitter {
 
 
   /**
-   * Renders the content into the given selection.
-   * This component is handed its target selection by its parent on each render, so it
-   *  renders into `$selection` directly rather than capturing `$parent` for re-render.
-   * @param $selection - A d3-selection to the HTMLElement this component renders into
+   * Renders the content inside the Modal component.
    */
-  public render($selection: D3Selection): void {
+  public render(): void {
     const context = this.context;
     const l10n = context.systems.l10n!;
     const settings = context.systems.settings;
@@ -41,12 +38,12 @@ export class UiSettingsCustomBackground extends EventEmitter {
     const _origSettings = { template: settings?.get('imagery.custom[0].template') ?? '' };
     const _currSettings = { ..._origSettings };  // shallow copy
 
-    const modal = new UiConfirm(context).show($selection).okButton();
+    const Modal = new UiConfirm(context).show().okButton();
 
-    modal.$shaded!
+    Modal.$shaded!
       .classed('settings-modal settings-custom-background', true);
 
-    modal.$header!
+    Modal.$header!
       .append('h3')
       .text(l10n.t('settings.custom_background.header'));
 
@@ -89,7 +86,7 @@ ${info}
 `) as string;
 
 
-    const $textSection = modal.$message!;
+    const $textSection: D3Selection = Modal.$message!;
 
     $textSection
       .append('div')
@@ -105,7 +102,7 @@ ${info}
 
 
     // insert a cancel button
-    const $buttonSection = modal.$buttons!;
+    const $buttonSection = Modal.$buttons!;
 
     $buttonSection
       .insert('button', '.ok-button')
@@ -117,7 +114,7 @@ ${info}
       $textSection.select('.field-template').property('value', _origSettings.template);
       settings?.set('imagery.custom[0].template', _origSettings.template);
       (d3_event.currentTarget as HTMLElement).blur();
-      modal.close();
+      Modal.close();
     };
 
     // accept the current template
@@ -125,7 +122,7 @@ ${info}
       _currSettings.template = $textSection.select('.field-template').property('value');
       settings?.set('imagery.custom[0].template', _currSettings.template);
       (d3_event.currentTarget as HTMLElement).blur();
-      modal.close();
+      Modal.close();
       this.emit('change', _currSettings);
     };
 

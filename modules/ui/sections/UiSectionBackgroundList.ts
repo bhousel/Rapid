@@ -40,7 +40,9 @@ export class UiSectionBackgroundList extends AbstractUiSection {
   protected _waybackDates: string[];
   protected _waybackLoc: Vec2 | null;
   protected _favoriteIDs: Set<string>;
-  protected _settingsCustomBackground: UiSettingsCustomBackground;
+
+  // Child Components
+  public CustomBackgroundSettings: UiSettingsCustomBackground;
 
 
   /**
@@ -81,8 +83,8 @@ export class UiSectionBackgroundList extends AbstractUiSection {
     this._deferredOnMapDraw = this._deferredOnMapDraw.bind(this);
     this._setupKeybinding = this._setupKeybinding.bind(this);
 
-    this._settingsCustomBackground = new UiSettingsCustomBackground(context);
-    this._settingsCustomBackground.on('change', this._customChanged);
+    this.CustomBackgroundSettings = new UiSettingsCustomBackground(context);
+    this.CustomBackgroundSettings.on('change', this._customChanged);
 
     const stored: unknown = settings?.get('imagery.favorites') ?? [];
     // note: older versions stored favorites as an object, but we only need the keys of this object
@@ -565,13 +567,11 @@ export class UiSectionBackgroundList extends AbstractUiSection {
 
   /**
    * Opens the custom background settings dialog.
-   * @param d3_event - click event, if called by a click handler
+   * @param  e? - triggering event, if any
    */
-  protected _clickCustom(d3_event?: Event): void {
-    const context = this.context;
-
-    if (d3_event) d3_event.preventDefault();
-    context.container().call(this._settingsCustomBackground.render);
+  protected _clickCustom(e?: Event): void {
+    if (e) e.preventDefault();
+    this.CustomBackgroundSettings.render();
   }
 
 

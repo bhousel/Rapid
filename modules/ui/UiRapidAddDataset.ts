@@ -19,7 +19,7 @@ export class UiRapidAddDataset extends EventEmitter {
   public context: Context;
 
   // Child components
-  protected _modal: UiModal | null;
+  public Modal: UiModal | null;
 
   protected _currFileList: FileList | null;
   protected _currUrl: string | null;
@@ -36,7 +36,7 @@ export class UiRapidAddDataset extends EventEmitter {
     this._currUrl = null;
 
     // Child components
-    this._modal = null;
+    this.Modal = null;
 
     // Ensure methods used as callbacks always have `this` bound correctly.
     // (This is also necessary when using `d3-selection.call`)
@@ -58,15 +58,15 @@ export class UiRapidAddDataset extends EventEmitter {
   public show(): void {
     const context = this.context;
 
-    if (this._modal?.isShown) return;
+    if (this.Modal?.isShown) return;
 
-    this._modal = new UiModal(context);
-    this._modal.show(context.container());
-    this._modal.$modal!
+    this.Modal = new UiModal(context);
+    this.Modal.show();
+    this.Modal.$modal!
       .attr('class', 'modal rapid-modal modal-add-dataset');
 
     // Closing (X button, Esc, OK, or Cancel) notifies the parent to re-render.
-    this._modal.on('close', () => { this.emit('done'); });
+    this.Modal.on('close', () => { this.emit('done'); });
 
     this.render();
   }
@@ -74,7 +74,7 @@ export class UiRapidAddDataset extends EventEmitter {
 
   /** Accepts and dismisses the dialog. */
   protected _clickedOk(): void {
-    this._modal?.close();
+    this.Modal?.close();
   }
 
 
@@ -82,21 +82,19 @@ export class UiRapidAddDataset extends EventEmitter {
   protected _clickedCancel(): void {
     this._currFileList = null;
     this._currUrl = null;
-    this._modal?.close();
+    this.Modal?.close();
   }
 
 
   /**
-   * Renders the content inside the modal.
-   * Note that most `render` functions accept a parent selection,
-   *  this one doesn't need it - the owned modal is always the parent.
+   * Renders the content inside the Modal component.
    */
   public render(): void {
-    if (!this._modal) return;  // need to call `show()` first to create the modal.
+    if (!this.Modal) return;  // need to call `show()` first to create the modal.
 
     const context = this.context;
     const l10n = context.systems.l10n!;
-    const $content = this._modal.$content!;
+    const $content = this.Modal.$content!;
 
     const prefix = 'rapid_add_dataset';  // prefix for text strings
     const accept = [

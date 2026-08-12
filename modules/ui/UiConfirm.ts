@@ -33,12 +33,10 @@ export class UiConfirm extends UiModal {
 
 
   /**
-   * Shows the confirm dialog, adding the alert layout (header / message / buttons) to the content.
-   * @param $parent - a d3-selection to a HTMLElement that the dialog should render into
-   * @return `this`
+   * Shows the confirm dialog.
    */
-  public override show($parent: D3Selection | null = this.$parent): this {
-    super.show($parent);
+  public override show(): this {
+    super.show();
     if (!this.$modal || !this.$content) return this;   // no parent - called too early?
 
     this.$modal.classed('modal-alert', true);

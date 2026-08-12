@@ -35,7 +35,7 @@ export class UiShortcuts {
   protected _dataShortcuts: any;
 
   // Child components
-  protected _modal: UiModal | null;
+  public Modal: UiModal | null;
 
 
   /**
@@ -52,7 +52,7 @@ export class UiShortcuts {
     this._dataShortcuts = null;
 
     // Child components
-    this._modal = null;
+    this.Modal = null;
 
     // Ensure methods used as callbacks always have `this` bound correctly.
     // (This is also necessary when using `d3-selection.call`)
@@ -80,11 +80,11 @@ export class UiShortcuts {
    */
   public render(): void {
     // Modals are created at the time when `show()` is first called
-    if (!this._modal || !this._dataShortcuts) return;
+    if (!this.Modal || !this._dataShortcuts) return;
 
     const context = this.context;
     const l10n = context.systems.l10n!;
-    const $content: D3Selection = this._modal.$content!;
+    const $content: D3Selection = this.Modal.$content!;
 
     // replace all content on render
     $content.html('');
@@ -315,18 +315,17 @@ export class UiShortcuts {
   public show(): void {
     const context = this.context;
     const assets = context.systems.assets!;
-    const $container = context.container();   // $container is always the parent for a modal
 
     assets.loadAssetAsync('shortcuts')
       .then((data: any) => {
         this._dataShortcuts = data.shortcuts;
 
-        if (this._modal?.isShown) return;  // already showing
+        if (this.Modal?.isShown) return;  // already showing
 
-        this._modal = new UiModal(context);
-        this._modal.show($container);
+        this.Modal = new UiModal(context);
+        this.Modal.show();
 
-        this._modal.$modal!
+        this.Modal.$modal!
           .classed('modal-shortcuts', true);
 
         this.render();
@@ -341,9 +340,9 @@ export class UiShortcuts {
    * Hides the shortcuts modal.
    */
   public hide(): void {
-    if (!this._modal) return;
-    this._modal.close();
-    this._modal = null;
+    if (!this.Modal) return;
+    this.Modal.close();
+    this.Modal = null;
   }
 
 
@@ -351,7 +350,7 @@ export class UiShortcuts {
    * Toggle the shortcuts modal
    */
   public toggle(): void {
-    const $container = this.context.container();
+    const $container = this.context.$container;
 
     const otherShowing = $container.selectAll('.shaded > div:not(.modal-shortcuts)').size();
     if (otherShowing) return;  // some other modal is already showing

@@ -480,8 +480,8 @@ export class UiPaneHelp extends UiPane {
     const ui = context.systems.ui;
 
     d3_event.preventDefault();
-    if ((context as any).inIntro) return;
-    new UiIntro(context).start(context.container());
+    if (context.inIntro) return;
+    new UiIntro(context).start();
     ui?.togglePanes();
   }
 
@@ -491,7 +491,7 @@ export class UiPaneHelp extends UiPane {
    * @param d3_event - triggering event
    */
   protected _clickShortcuts(d3_event: Event): void {
-    const ui = this.context.systems.ui as any;
+    const ui = this.context.systems.ui;
     d3_event.preventDefault();
     ui?.Shortcuts?.show();
   }

@@ -449,9 +449,9 @@ Start the Tutorial, and the Rapid-splash "skip to Rapid" path).
 - **Consumers converted:** owned modals (`UiShortcuts`, `UiRapidPowerUserFeatures`,
   `UiRapidDatasetToggle`) hold a `UiModal` (renamed `_modal`, deduped via `this._modal?.isShown`);
   one-shot modals (`UiSplash`, `UiRapidSplash`, `UiWhatsNew`, `UiRestore`, `UiRapidFirstEditDialog`,
-  `UiIntroStartEditing`) do `new UiModal(context).show($sel)` and render into `.$content`; `UiLoading`
+  `UiIntroStartEditing`) do `new UiModal(context).show()` and render into `.$content`; `UiLoading`
   owns a blocking `UiModal`; confirm consumers (`SaveMode`, `UiSettingsCustomBackground/Data`) do
-  `new UiConfirm(context).show($sel).okButton()` and read `.$header`/`.$message`/`.$buttons`/`.$shaded`.
+  `new UiConfirm(context).show().okButton()` and read `.$header`/`.$message`/`.$buttons`/`.$shaded`.
 - **Tests:** `modal.test.js`/`confirm.test.js` rewritten to the class API (instantiate/show, sections,
   `okButton`, close via `close()` / close-button / OK-button). The raw standalone Esc/Backspace tests
   were **dropped** — that behavior now lives in `UiSystem`'s stack and needs a running `UiSystem`

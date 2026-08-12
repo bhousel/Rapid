@@ -25,12 +25,9 @@ export class UiRapidSplash {
 
 
   /**
-   * Builds the modal and renders its content.
-   * The given selection is the container the modal attaches to. This is a one-shot
-   *  modal (not re-rendered in place), so it does not capture `$parent`.
-   * @param $selection - A d3-selection to the container this modal attaches to
+   * Renders the content inside the Modal component.
    */
-  public render($selection: D3Selection): void {
+  public render(): void {
     const context = this.context;
     const l10n = context.systems.l10n!;
     const settings = context.systems.settings;
@@ -38,18 +35,20 @@ export class UiRapidSplash {
     if (settings?.has('ui.sawRapidSplash')) return;
     settings?.set('ui.sawRapidSplash', 'true');
 
-    const modal = new UiModal(context).show($selection);
+    const Modal = new UiModal(context);
+    Modal.show();
     const rtl = l10n.isRTL ? '-rtl' : '';
 
-    modal.$modal!
+    Modal.$modal!
       .attr('class', 'modal rapid-modal modal-splash');   // Rapid styling
 
-    const $introModal = modal.$content!;
+    const $introModal: D3Selection = Modal.$content!;
 
     $introModal
       .append('div')
       .attr('class','modal-section')
-      .append('h3').text(l10n.t('rapid_splash.welcome'));
+      .append('h3')
+      .text(l10n.t('rapid_splash.welcome'));
 
     $introModal
       .append('div')
@@ -69,8 +68,8 @@ export class UiRapidSplash {
       .append('button')
       .attr('class', 'walkthrough')
       .on('click', () => {
-        new UiIntro(context).start(context.container(), false);
-        modal.close();
+        new UiIntro(context).start(false);
+        Modal.close();
       });
 
     $walkthrough
@@ -87,8 +86,8 @@ export class UiRapidSplash {
       .append('button')
       .attr('class', 'rapid-walkthrough')
       .on('click', () => {
-        new UiIntro(context).start(context.container(), true);
-        modal.close();
+        new UiIntro(context).start(true);
+        Modal.close();
       });
 
     $rapidWalkthrough
@@ -105,7 +104,7 @@ export class UiRapidSplash {
       .append('button')
       .attr('class', 'start-editing')
       .on('click', () => {
-        modal.close();
+        Modal.close();
       });
 
     $startEditing
@@ -118,7 +117,7 @@ export class UiRapidSplash {
       .append('div')
       .text(l10n.t('rapid_splash.start'));
 
-    modal.$modal!.select('button.close')
+    Modal.$modal!.select('button.close')
       .attr('class', 'hide');
   }
 }

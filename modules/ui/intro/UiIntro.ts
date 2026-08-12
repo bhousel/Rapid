@@ -59,9 +59,13 @@ export class UiIntro {
   protected _resume: any;
   protected _progress: string[];
   protected _currChapter: AbstractIntroChapter | null;
-  protected _curtain: UiCurtain | null;
-  protected _buttons: any;
-  protected _navwrap: any;
+
+  // Child Components
+  public Curtain: UiCurtain | null;
+
+  // D3 Selections
+  public $buttons: D3Selection | null;
+  public $navwrap: D3Selection | null;
 
 
   /**
@@ -76,9 +80,13 @@ export class UiIntro {
     this._resume = {};
     this._progress = [];
     this._currChapter = null;
-    this._curtain = null;
-    this._buttons = null;
-    this._navwrap = null;
+
+    // Child Components
+    this.Curtain = null;
+
+    // D3 Selections
+    this.$buttons = null;
+    this.$navwrap = null;
 
     // Ensure methods used as callbacks always have `this` bound correctly.
     this.start = this.start.bind(this);
@@ -89,10 +97,9 @@ export class UiIntro {
   /**
    * Start the walkthrough. Loads the tutorial graph data, then launches the walkthrough into the
    * given parent selection.
-   * @param $parent      - A d3-selection to the root container to render the walkthrough into
    * @param skipToRapid  - `true` to start on the Rapid chapter (used by the Rapid splash screen)
    */
-  public start($parent: D3Selection, skipToRapid = false): void {
+  public start(skipToRapid = false): void {
     const context = this.context;
     const assets = context.systems.assets!;
 
@@ -115,17 +122,16 @@ export class UiIntro {
         }
       }
 
-      this._startIntro($parent, skipToRapid);
+      this._startIntro(skipToRapid);
     });
   }
 
 
   /**
    * After the walkthrough data has been loaded, this starts the walkthrough.
-   * @param $parent      - A d3-selection to the root container to render the walkthrough into
    * @param skipToRapid  - `true` to start on the Rapid chapter
    */
-  protected _startIntro($parent: D3Selection, skipToRapid: boolean): void {
+  protected _startIntro(skipToRapid: boolean): void {
     const context = this.context;
     const editor = context.systems.editor!;
     const imagery = context.systems.imagery!;
@@ -137,6 +143,7 @@ export class UiIntro {
     const settings = context.systems.settings;
     const ui = context.systems.ui!;
     const urlhash = context.systems.urlhash!;
+    const $container = context.$container;
 
     // Pause several systems, preserving the resume functions.
     this._resume = {
@@ -145,7 +152,7 @@ export class UiIntro {
       mapwithai:  mapwithai?.pause()     // disable network
     };
 
-    context.container().classed('inIntro', true);
+    $container.classed('inIntro', true);
     context.inIntro = true;
     context.enter('browse');
 
@@ -181,8 +188,8 @@ export class UiIntro {
     imagery.brightness = 1;
 
     ui.Sidebar.expand(false);   // false = no animation
-    this._curtain = new UiCurtain(context);
-    $parent.call(this._curtain.enable);
+    this.Curtain = new UiCurtain(context);
+    $container.call(this.Curtain.enable);
 
     // Store that the user started the walkthrough..
     settings?.set('ui.walkthrough.started', 'yes');
@@ -193,9 +200,9 @@ export class UiIntro {
 
     // Create the chapters
     const chapters = chapterFlow.map((chapterID, i) => {
-      const chapter = new chapterUi[chapterID](context, this._curtain!);
+      const chapter = new chapterUi[chapterID](context, this.Curtain!);
       chapter.on('done', () => {    // When completing each chapter..
-        this._buttons
+        this.$buttons!
           .filter((d: any) => d.title === chapter.title)
           .classed('finished', true);
 
@@ -205,7 +212,7 @@ export class UiIntro {
 
         if (i < chapterFlow.length - 1) {
           const nextID = chapterFlow[i + 1];
-          context.container().select(`button.chapter-${nextID}`)
+          $container.select(`button.chapter-${nextID}`)
             .classed('next', true);
         } else {
           this._finish();
@@ -215,33 +222,33 @@ export class UiIntro {
     });
 
 
-    this._navwrap = $parent
+    this.$navwrap = $container
       .append('div')
       .attr('class', 'intro-nav-wrap fillD');
 
-    this._navwrap
+    this.$navwrap
       .append('svg')
       .attr('class', 'intro-nav-wrap-logo')
       .append('use')
       .attr('xlink:href', '#rapid-logo-walkthrough');
 
-    const buttonwrap = this._navwrap
+    const buttonwrap = this.$navwrap
       .append('div')
       .attr('class', 'joined')
       .selectAll('button.chapter');
 
-    this._buttons = buttonwrap
+    this.$buttons = buttonwrap
       .data(chapters)
       .enter()
       .append('button')
       .attr('class', (d: any, i: number) => `chapter chapter-${chapterFlow[i]}`)
       .on('click', this._enterChapter);
 
-    this._buttons
+    this.$buttons
       .append('span')
       .text((d: any) => l10n.t(d.title));
 
-    this._buttons
+    this.$buttons
       .append('span')
       .attr('class', 'status')
       .call(uiIcon(l10n.isRTL ? '#rapid-icon-backward' : '#rapid-icon-forward', 'inline'));
@@ -261,10 +268,10 @@ export class UiIntro {
   /**
    * Call this to enter a new chapter.
    * Either called explicitly or by clicking a button in the chapter navigation bar.
-   * @param d3_event    - If clicked on a button, the click event (not used)
+   * @param e           - If clicked on a button, the click event (not used)
    * @param newChapter  - The chapter to enter
    */
-  protected _enterChapter(d3_event: any, newChapter: AbstractIntroChapter): void {
+  protected _enterChapter(e: any, newChapter: AbstractIntroChapter): void {
     const context = this.context;
 
     if (this._currChapter) this._currChapter.exit();
@@ -273,7 +280,7 @@ export class UiIntro {
     this._currChapter = newChapter;
     this._currChapter.enter();
 
-    this._buttons
+    this.$buttons!
       .classed('next', false)
       .classed('active', (d: any) => d.title === this._currChapter!.title);
   }
@@ -302,8 +309,8 @@ export class UiIntro {
     rapid.addDatasets(this._original.datasetsAdded);       // added to menu
     rapid.enableDatasets(this._original.datasetsEnabled);  // enabled/checked
 
-    this._curtain!.disable();
-    this._navwrap.remove();
+    this.Curtain!.disable();
+    this.$navwrap!.remove();
 
     // Restore Map State
     for (const [layerID, layer] of scene.layers) {
@@ -315,7 +322,7 @@ export class UiIntro {
     map.transform(this._original.transform);
     window.location.replace(this._original.hash);
 
-    context.container().classed('inIntro', false);
+    context.$container.classed('inIntro', false);
     context.inIntro = false;
 
     // Resume paused systems

@@ -4,8 +4,9 @@ import { AbstractSystem } from './core/AbstractSystem.ts';
 
 import type { TransformProps } from '@rapid-sdk/math';
 import type { Context } from './Context.ts';
-import type { Systems } from './core/types.ts';
+import type { D3Selection } from 'd3-selection';
 import type { Keybinding } from './util/keybinding.ts';
+import type { Systems } from './core/types.ts';
 
 
 // This file contains minimal mocks useful for testing.
@@ -47,6 +48,10 @@ export class MockContext {
   /** Maximum characters allowed for relation roles */
   public maxCharsForRelationRole: number;
 
+  /** Container element (D3 selection) */
+  public $container: D3Selection;
+
+
   /** Stub keybinding manager (backed by a MockSystem cast) */
   protected _keybinding: Keybinding;
   /** Promise for init phase */
@@ -64,6 +69,9 @@ export class MockContext {
     this.systems = {};
     this.viewport = new Viewport();
     this._keybinding = (new MockSystem(this as unknown as Context) as unknown as Keybinding);
+
+    // An empty D3 selection (assume no DOM in tests, though they may set up their own)
+    this.$container = select(null);
 
     this._initPromise = null;
     this._startPromise = null;
@@ -149,8 +157,21 @@ export class MockContext {
   public off()         { return this; }
   /** Returns the stub keybinding manager */
   public keybinding()  { return this._keybinding; }
-  /** Returns an empty D3 selection (no DOM in tests) */
-  public container()   { return select(null); }
+
+  /**
+   * Gets or sets the container element as a D3 selection.
+   * @param  val  Optional D3 selection to set as the container
+   * @return  The container selection (if no argument), or `this` for chaining
+   */
+  public container(): D3Selection;
+  public container(val: D3Selection): this;
+  public container(val?: D3Selection): D3Selection | this {
+    if (val === undefined) return this.$container;
+    this.$container = val;
+    this.$container.classed('ideditor', true);
+    return this;
+  }
+
   /**
    * Stub tag key cleaner that returns the value unchanged.
    * @param val - The tag key to clean

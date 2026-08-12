@@ -1,8 +1,6 @@
 import { selection } from 'd3-selection';
-import { marked } from 'marked';
 import { uiIcon } from './icon.ts';
 //import { UiTooltip } from './UiTooltip.ts';
-import { utilSanitizeHTML } from '../util/sanitize.ts';
 
 import type { Context } from '../Context.ts';
 import type { D3EnterSelection, D3Selection } from 'd3-selection';

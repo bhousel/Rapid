@@ -27,12 +27,9 @@ export class UiSplash {
 
 
   /**
-   * Builds the modal and renders its content.
-   * The given selection is the container the modal attaches to. This is a one-shot
-   *  modal (not re-rendered in place), so it does not capture `$parent`.
-   * @param $selection - A d3-selection to the container this modal attaches to
+   * Renders the content inside the Modal component.
    */
-  public render($selection: D3Selection): void {
+  public render(): void {
     const context = this.context;
     const assets = context.systems.assets!;
     const l10n = context.systems.l10n!;
@@ -46,14 +43,11 @@ export class UiSplash {
     // prefetch intro graph data now, while user is looking at the splash screen
     assets.loadAssetAsync('intro_graph');
 
-    // `UiModal.show()` appends the modal into $selection (in this case $container),
-    // and exposes `$content` to render into.
-    // (todo: instead of appending, rewrite as a data bind that supports rerendering)
-    const modal = new UiModal(context).show($selection);
-    modal.$modal!
+    const Modal = new UiModal(context).show();
+    Modal.$modal!
       .attr('class', 'modal rapid-modal modal-splash');
 
-    const $content = modal.$content!;
+    const $content: D3Selection = Modal.$content!;
     $content
       .append('div')
       .attr('class', 'modal-section')
@@ -92,8 +86,8 @@ export class UiSplash {
       .append('button')
       .attr('class', 'walkthrough')
       .on('click', () => {
-        new UiIntro(context).start(context.container());
-        modal.close();
+        new UiIntro(context).start();
+        Modal.close();
       });
 
     $walkthrough
@@ -109,7 +103,7 @@ export class UiSplash {
     const $startEditing = $buttonWrap
       .append('button')
       .attr('class', 'start-editing')
-      .on('click', modal.close);
+      .on('click', Modal.close);
 
     $startEditing
       .append('svg')

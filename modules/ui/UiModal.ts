@@ -16,7 +16,6 @@ export class UiModal extends EventEmitter {
   public context: Context;
 
   // D3 selections
-  public $parent: D3Selection | null;
   public $shaded: D3Selection | null;    // the shaded backdrop layer
   public $modal: D3Selection | null;     // the `.modal` box
   public $content: D3Selection | null;   // the `.content` area (where the owner renders)
@@ -34,7 +33,6 @@ export class UiModal extends EventEmitter {
     this._blocking = blocking;
 
     // D3 selections
-    this.$parent = null;
     this.$shaded = null;
     this.$modal = null;
     this.$content = null;
@@ -60,29 +58,23 @@ export class UiModal extends EventEmitter {
    * @return `true` if the modal is currently shown
    */
   public get isShown(): boolean {
-    return !!this.$shaded && !this.$shaded.empty() && !!this.$shaded.node()?.parentNode;
+    return !!this.$shaded;
   }
 
 
   /**
-   * Shows the modal by building its backdrop/box into the given parent selection and
-   * registering it with the `UiSystem` modal stack.
-   * (The parent selection is required the first time, but can be inferred on subsequent shows)
-   * @param $parent - a d3-selection to a HTMLElement that the modal should render into
-   * @return `this`
+   * Shows the modal.
+   * Note that most `render` functions accept a parent selection,
+   * this one doesn't need it - the root $container is always the parent.
    */
-  public show($parent: D3Selection | null = this.$parent): this {
+  public show(): this {
     const context = this.context;
-    const ui = context.systems.ui;   // optional
+    const ui = context.systems.ui;
+    const $container = context.$container;
 
-    if ($parent) {
-      this.$parent = $parent;
-    } else {
-      return this;   // no parent - called too early?
-    }
-    if (this.isShown) return this;   // already showing
+    if (this.$shaded) return this;   // already showing
 
-    const $shaded = this.$shaded = $parent
+    const $shaded = this.$shaded = $container
       .append('div')
       .attr('class', 'shaded')
       .style('opacity', 0);
@@ -134,7 +126,7 @@ export class UiModal extends EventEmitter {
    * and emits a `close` event.
    */
   public close(): void {
-    const ui = this.context.systems.ui;   // optional
+    const ui = this.context.systems.ui;
     const $shaded = this.$shaded;
     const $modal = this.$modal;
     if (!$shaded) return;

@@ -13,7 +13,7 @@ export class UiRapidPowerUserFeatures {
   public featureFlags: string[];
 
   // Child components
-  protected _modal: UiModal | null;
+  public Modal: UiModal | null;
 
 
   /**
@@ -35,7 +35,7 @@ export class UiRapidPowerUserFeatures {
     ];
 
     // Child components
-    this._modal = null;
+    this.Modal = null;
 
     // Ensure methods used as callbacks always have `this` bound correctly.
     // (This is also necessary when using `d3-selection.call`)
@@ -58,19 +58,18 @@ export class UiRapidPowerUserFeatures {
    */
   public show(): void {
     const context = this.context;
-    const $container = context.container();   // $container is always the parent for a modal
 
-    if (this._modal?.isShown) return;  // already showing
+    if (this.Modal?.isShown) return;  // already showing
 
     this.updateFeatureFlags();
 
-    this._modal = new UiModal(context);
-    this._modal.show($container);
+    this.Modal = new UiModal(context);
+    this.Modal.show();
 
-    this._modal.$modal!
+    this.Modal.$modal!
       .attr('class', 'modal rapid-modal');
 
-    this._modal.$content!
+    this.Modal.$content!
       .attr('class', 'content poweruser');
 
     this.render();
@@ -78,17 +77,15 @@ export class UiRapidPowerUserFeatures {
 
 
   /**
-   * Renders the content inside the modal.
-   * Note that most `render` functions accept a parent selection,
-   *  this one doesn't need it - `$modal` is always the parent.
+   * Renders the content inside the Modal component.
    */
   public render(): void {
     // Modals are created at the time when `show()` is first called
-    if (!this._modal) return;
+    if (!this.Modal) return;
 
     const context = this.context;
     const l10n = context.systems.l10n!;
-    const $content: any = this._modal.$content;   // legacy render body, typed loosely
+    const $content: any = this.Modal.$content;   // legacy render body, typed loosely
 
     /* Heading */
     let $heading = $content.selectAll('.modal-section-heading')
@@ -153,7 +150,7 @@ export class UiRapidPowerUserFeatures {
     $$buttons
       .append('button')
       .attr('class', 'button ok-button action')
-      .on('click', () => this._modal!.close());
+      .on('click', () => this.Modal!.close());
 
     // set focus (but only on enter)
     const buttonNode = $$buttons.selectAll('button').node() as HTMLElement | null;

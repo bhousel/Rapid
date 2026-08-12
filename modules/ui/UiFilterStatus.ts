@@ -131,7 +131,7 @@ export class UiFilterStatus {
     e?.preventDefault();
 
     const context = this.context;
-    const ui = context.systems.ui;  // optional
+    const ui = context.systems.ui;
 
     this.Tooltip.hide();
 

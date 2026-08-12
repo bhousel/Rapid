@@ -19,10 +19,10 @@ const MAXRESULTS = 100;
  */
 export class UiRapidCatalog extends EventEmitter {
   public context: Context;
-  public CategoryCombo: any;
 
   // Child components
-  protected _modal: UiModal | null;
+  public CategoryCombo: UiCombobox;
+  public Modal: UiModal | null;
 
   protected _filterText: string | null;
   protected _filterCategory: string | null;
@@ -40,7 +40,7 @@ export class UiRapidCatalog extends EventEmitter {
 
     // Child components
     this.CategoryCombo = new UiCombobox(context, 'dataset-categories');
-    this._modal = null;
+    this.Modal = null;
 
     // Ensure methods used as callbacks always have `this` bound correctly.
     // (This is also necessary when using `d3-selection.call`)
@@ -66,15 +66,15 @@ export class UiRapidCatalog extends EventEmitter {
   public show(): void {
     const context = this.context;
 
-    if (this._modal?.isShown) return;
+    if (this.Modal?.isShown) return;
 
-    this._modal = new UiModal(context);
-    this._modal.show(context.container());
-    this._modal.$modal!
+    this.Modal = new UiModal(context);
+    this.Modal.show();
+    this.Modal.$modal!
       .attr('class', 'modal rapid-modal modal-catalog');
 
     // Closing (X button, Esc, or the OK button) resets the filters and notifies the parent.
-    this._modal.on('close', () => {
+    this.Modal.on('close', () => {
       this._filterText = null;
       this._filterCategory = null;
       this.emit('done');
@@ -86,7 +86,7 @@ export class UiRapidCatalog extends EventEmitter {
 
   /** Dismisses the catalog. */
   protected _clickedClose(): void {
-    this._modal?.close();
+    this.Modal?.close();
   }
 
 
@@ -96,11 +96,11 @@ export class UiRapidCatalog extends EventEmitter {
    *  this one doesn't need it - the owned modal is always the parent.
    */
   public render(): void {
-    if (!this._modal) return;  // need to call `show()` first to create the modal.
+    if (!this.Modal) return;  // need to call `show()` first to create the modal.
 
     const context = this.context;
     const l10n = context.systems.l10n!;
-    const $content = this._modal.$content!;
+    const $content = this.Modal.$content!;
 
     /* Header section */
     let $header: D3Selection = $content.selectAll('.rapid-catalog-header')
@@ -279,13 +279,13 @@ export class UiRapidCatalog extends EventEmitter {
    * @param $selection - A d3-selection to a HTMLElement that this component should render itself into
    */
   public renderDatasets($selection: D3Selection): void {
-    if (!this._modal) return;  // need to call `show()` first to create the modal.
+    if (!this.Modal) return;  // need to call `show()` first to create the modal.
 
     const context = this.context;
     const l10n = context.systems.l10n!;
     const rapid = context.systems.rapid!;
     const settings = context.systems.settings;
-    const $content = this._modal.$content!;
+    const $content = this.Modal.$content!;
 
     const showPreview = settings?.get('poweruser.previewDatasets') === 'true';
 

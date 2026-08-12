@@ -4,6 +4,10 @@ import type { Context } from '../Context.ts';
 import type { D3Selection } from 'd3-selection';
 
 
+/**
+ * The `UiRestore` component is a modal component that offers the user
+ * choices to restore or clear their saved edits from a previous session.
+ */
 export class UiRestore {
   public context: Context;
 
@@ -20,24 +24,21 @@ export class UiRestore {
 
 
   /**
-   * Builds the modal and renders its content.
-   * The given selection is the container the modal attaches to. This is a one-shot
-   *  modal (not re-rendered in place), so it does not capture `$parent`.
-   * @param $selection - A d3-selection to the container this modal attaches to
+   * Renders the content inside the Modal component.
    */
-  public render($selection: D3Selection): void {
+  public render(): void {
     const context = this.context;
     const editor = context.systems.editor!;
     const l10n = context.systems.l10n!;
 
     if (!editor.canRestoreBackup) return;
 
-    const modal = new UiModal(context, true).show($selection);
+    const Modal = new UiModal(context, true).show();
 
-    modal.$modal!
+    Modal.$modal!
       .attr('class', 'modal fillL');
 
-    const $introModal = modal.$content!;
+    const $introModal: D3Selection = Modal.$content!;
 
     $introModal
       .append('div')
@@ -60,7 +61,7 @@ export class UiRestore {
       .attr('class', 'restore')
       .on('click', () => {
         editor.restoreBackup();
-        modal.close();
+        Modal.close();
       });
 
     $restore
@@ -78,7 +79,7 @@ export class UiRestore {
       .attr('class', 'reset')
       .on('click', () => {
         editor.clearBackup();
-        modal.close();
+        Modal.close();
       });
 
     $reset

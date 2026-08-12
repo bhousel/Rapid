@@ -23,16 +23,17 @@ export class SaveMode extends AbstractMode {
   protected _keybinding: Keybinding;
   /** Current location string for success message */
   protected _location: string | null;
-  /** UI component for conflicts */
-  protected _uiConflicts: UiConflicts | null;
-  /** UI component for commit */
-  protected _uiCommit: UiCommit | null;
-  /** UI component for success message */
-  protected _uiSuccess: UiSuccess | null;
-  /** UI component for save loading */
-  protected _saveLoading: any;
   /** Whether the save was successful */
   protected _wasSuccessfulSave: boolean;
+
+  /** UI component for conflicts */
+  public Conflicts: UiConflicts | null;
+  /** UI component for commit */
+  public Commit: UiCommit | null;
+  /** UI component for success message */
+  public Success: UiSuccess | null;
+  /** UI component for save loading */
+  public Loading: UiLoading | null;
 
 
   /**
@@ -46,11 +47,13 @@ export class SaveMode extends AbstractMode {
     this._keybinding = utilKeybinding('SaveMode');
 
     this._location = null;
-    this._uiConflicts = null;
-    this._uiCommit = null;
-    this._uiSuccess = null;
-    this._saveLoading = null;
     this._wasSuccessfulSave = false;
+
+    // Child Components
+    this.Conflicts = null;
+    this.Commit = null;
+    this.Success = null;
+    this.Loading = null;
 
     // Make sure the event handlers have `this` bound correctly
     this._cancel = this._cancel.bind(this);
@@ -92,18 +95,18 @@ export class SaveMode extends AbstractMode {
     this._active = true;
     this._wasSuccessfulSave = false;
 
-    this._uiCommit = new UiCommit(context);
-    this._uiCommit.on('cancel', this._cancel);
+    this.Commit = new UiCommit(context);
+    this.Commit.on('cancel', this._cancel);
 
     if (osm.authenticated()) {
-      Sidebar.show(this._uiCommit.render);
+      Sidebar.show(this.Commit.render);
     } else {
       osm.authenticate((err: Error | null) => {
-        if (!this._uiCommit) return;  // exited before auth completed?
+        if (!this.Commit) return;  // exited before auth completed?
         if (err) {
           this._cancel();
         } else {
-          Sidebar.show(this._uiCommit.render);
+          Sidebar.show(this.Commit.render);
         }
       });
     }
@@ -146,14 +149,14 @@ export class SaveMode extends AbstractMode {
     const uploader = context.systems.uploader!;
     const Sidebar = ui.Sidebar;
 
-    this._uiConflicts?.removeAllListeners();
-    this._uiConflicts = null;
+    this.Conflicts?.removeAllListeners();
+    this.Conflicts = null;
 
-    this._uiCommit?.removeAllListeners();
-    this._uiCommit = null;
+    this.Commit?.removeAllListeners();
+    this.Commit = null;
 
-    this._uiSuccess?.removeAllListeners();
-    this._uiSuccess = null;
+    this.Success?.removeAllListeners();
+    this.Success = null;
 
     uploader.removeAllListeners();
 
@@ -222,8 +225,8 @@ export class SaveMode extends AbstractMode {
       .classed('active', true)
       .classed('inactive', false);
 
-    this._uiConflicts = new UiConflicts(context);
-    this._uiConflicts
+    this.Conflicts = new UiConflicts(context);
+    this.Conflicts
       .conflictList(conflicts)
       .origChanges(origChanges)
       .on('cancel', () => {
@@ -242,7 +245,7 @@ export class SaveMode extends AbstractMode {
         uploader.processResolvedConflicts();
       });
 
-    $selection.call(this._uiConflicts.render);
+    $selection.call(this.Conflicts.render);
   }
 
 
@@ -257,7 +260,7 @@ export class SaveMode extends AbstractMode {
 
     this._keybindingOn();
 
-    const confirm = new UiConfirm(context).show(context.container());
+    const confirm = new UiConfirm(context).show();
     confirm.$header!
       .append('h3')
       .text(l10n.t('save.error'));
@@ -343,9 +346,9 @@ export class SaveMode extends AbstractMode {
     const ui = context.systems.ui!;
     const Sidebar = ui.Sidebar;
 
-    this._uiSuccess = new UiSuccess(this.context);
+    this.Success = new UiSuccess(this.context);
 
-    const successContent = this._uiSuccess
+    const successContent = this.Success
       .changeset(changeset)
       .location(this._location)
       .on('cancel', () => Sidebar.hide());
@@ -387,7 +390,7 @@ export class SaveMode extends AbstractMode {
    * Block the UI by adding a spinner
    */
   protected _showLoading(): void {
-    if (this._saveLoading) return;
+    if (this.Loading) return;
 
     const context = this.context;
     const l10n = context.systems.l10n!;
@@ -395,8 +398,8 @@ export class SaveMode extends AbstractMode {
     const loading = new UiLoading(context);
     loading.blocking(true);
     loading.message(l10n.t('save.uploading'));
-    this._saveLoading = loading;
-    context.container().call(this._saveLoading.render);  // block input during upload
+    this.Loading = loading;
+    context.container().call(this.Loading.render);  // block input during upload
   }
 
 
@@ -404,10 +407,10 @@ export class SaveMode extends AbstractMode {
    * Unlock the UI by removing the spinner
    */
   protected _hideLoading(): void {
-    if (!this._saveLoading) return;
+    if (!this.Loading) return;
 
-    this._saveLoading.close();
-    this._saveLoading = null;
+    this.Loading.close();
+    this.Loading = null;
   }
 
 

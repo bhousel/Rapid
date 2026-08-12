@@ -21,22 +21,19 @@ export class UiRapidFirstEditDialog {
 
 
   /**
-   * Builds the modal and renders its content.
-   * The given selection is the container the modal attaches to. This is a one-shot
-   *  modal (not re-rendered in place), so it does not capture `$parent`.
-   * @param $selection - A d3-selection to the container this modal attaches to
+   * Renders the content inside the Modal component.
    */
-  public render($selection: D3Selection): void {
+  public render(): void {
     const context = this.context;
     const l10n = context.systems.l10n!;
 
-    const modal = new UiModal(context).show($selection);
+    const Modal = new UiModal(context).show();
     const rtl = l10n.isRTL ? '-rtl' : '';
 
-    modal.$modal!
+    Modal.$modal!
       .attr('class', 'modal rapid-modal');
 
-    const $content = modal.$content!;
+    const $content: D3Selection = Modal.$content!;
 
     $content
       .append('div')
@@ -59,7 +56,7 @@ export class UiRapidFirstEditDialog {
     const $exploring = $buttonWrap
       .append('button')
       .attr('class', 'rapid-explore')
-      .on('click', modal.close);
+      .on('click', Modal.close);
 
     $exploring
       .append('div')
@@ -69,10 +66,10 @@ export class UiRapidFirstEditDialog {
       .append('button')
       .attr('class', 'rapid-login-to-osm')
       .on('click', () => {
-        modal.close();
+        Modal.close();
         const osm = context.services.osm;
         if (!osm) return;
-        osm.authenticate(() => new UiRapidSplash(context).render(context.container()) );
+        osm.authenticate(() => new UiRapidSplash(context).render() );
       });
 
     $loginToOsm

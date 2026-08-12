@@ -199,12 +199,12 @@ export class SelectBehavior extends AbstractBehavior {
 
     const context = this.context;
     const scheduler = context.systems.scheduler!;
-    const ui = context.systems.ui!;
+    const ui = context.systems.ui;
 
-    ui.closeEditMenu();
+    ui?.closeEditMenu();
     this._showsMenu = false;
 
-    ui.closeMapRouletteMenu();
+    ui?.closeMapRouletteMenu();
     this._showsMapRouletteMenu = false;
 
     const down = this._getEventData(e);
@@ -260,6 +260,9 @@ export class SelectBehavior extends AbstractBehavior {
 
     if (down.isCancelled) return;   // was cancelled already by moving too much
 
+    const context = this.context;
+    const ui = context.systems.ui;
+
     const dist = vecLength(down.coord.screen, up.coord.screen);
     const updist = vecLength(up.coord.screen, this.lastUp ? this.lastUp.coord.screen : [0, 0]);
     const lClick = (up.event as PointerEvent).button === 0;
@@ -274,14 +277,13 @@ export class SelectBehavior extends AbstractBehavior {
       this.lastClick = this.lastUp = up;  // We will accept this as a click
 
       if ((up.event as PointerEvent).button === 2) {   // right click
-        if (!this.context.selectedIDs().includes(down.target!.dataID!)) {
+        if (!context.selectedIDs().includes(down.target!.dataID!)) {
           this._doSelect();    // Select it first, if needed
         }
         const target = down.target;
         if ((target?.data as any)?.serviceID === 'maproulette') {
-          const ui = this.context.systems.ui!;
           const anchorPoint = up.coord.screen;
-          ui.showMapRouletteMenu(anchorPoint, 'rightclick');
+          ui?.showMapRouletteMenu(anchorPoint, 'rightclick');
         } else {
           this._doContextMenu(); // Then show the context menu.
         }
@@ -506,7 +508,7 @@ export class SelectBehavior extends AbstractBehavior {
     const context = this.context;
     const gfx = context.systems.gfx!;
     const eventManager = gfx.eventManager!;
-    const ui = context.systems.ui!;
+    const ui = context.systems.ui;
 
     const modifiers = eventManager.modifierKeys;
     const isMac = utilDetect().os === 'mac';
@@ -523,22 +525,22 @@ export class SelectBehavior extends AbstractBehavior {
     if (data instanceof MarkerData && data.serviceID === 'maproulette') {
       const anchorPoint = eventData.coord.screen;
       if (this._showsMapRouletteMenu) {
-        ui.closeMapRouletteMenu();
+        ui?.closeMapRouletteMenu();
         this._showsMapRouletteMenu = false;
       } else {
-        ui.showMapRouletteMenu(anchorPoint, 'rightclick');
+        ui?.showMapRouletteMenu(anchorPoint, 'rightclick');
         this._showsMapRouletteMenu = true;
       }
       return;
     }
     if (this._showsMenu) {   // menu is on, toggle it off
-      ui.closeEditMenu();
+      ui?.closeEditMenu();
       this._showsMenu = false;
 
     } else {                 // menu is off, toggle it on
       // Only attempt to display the context menu if we're focused on a non-Rapid OSM Entity.
       this._showsMenu = true;
-      ui.showEditMenu(eventData.coord.map, 'rightclick');
+      ui?.showEditMenu(eventData.coord.map, 'rightclick');
     }
   }
 

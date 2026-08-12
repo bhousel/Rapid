@@ -313,13 +313,13 @@ export class UiSystem extends AbstractSystem {
         const sawWhatsNewVersion = parseInt(settings?.get('ui.sawWhatsNewVersion') ?? '', 10) || 0;
 
         if (startWalkthrough) {
-          new UiIntro(context).start($container);     // Jump right into walkthrough..
+          new UiIntro(context).start();     // Jump right into walkthrough..
         } else if (editor.canRestoreBackup) {
-          new UiRestore(context).render($container);   // Offer to restore backup edits..
+          new UiRestore(context).render();   // Offer to restore backup edits..
         } else if (sawPrivacyVersion !== context.privacyVersion) {
-          new UiSplash(context).render($container);    // Show "Welcome to Rapid" / Privacy Policy
+          new UiSplash(context).render();    // Show "Welcome to Rapid" / Privacy Policy
         } else if (sawWhatsNewVersion !== context.whatsNewVersion) {
-          new UiWhatsNew(context).render($container);  // Show "Whats New"
+          new UiWhatsNew(context).render();  // Show "Whats New"
         }
 
         this._started = true;

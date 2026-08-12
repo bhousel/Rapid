@@ -392,7 +392,7 @@ export class UiMapRouletteEditor extends EventEmitter {
     const context = this.context;
     const l10n = context.systems.l10n!;
     const maproulette = context.services.maproulette!;
-    const ui = context.systems.ui;  // optional
+    const ui = context.systems.ui;
 
     this._getApiKeyAsync()
       .then(() => {

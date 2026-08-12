@@ -1,11 +1,9 @@
 import { select, selection } from 'd3-selection';
-import { marked } from 'marked';
 import { actionNoop, actionRapidAcceptFeature } from '../actions/index.ts';
 import { uiIcon } from './icon.ts';
 //import { uiRapidFirstEditDialog } from './rapid_first_edit_dialog.ts';
 import { UiTooltip } from './UiTooltip.ts';
 import { utilKeybinding } from '../util/keybinding.ts';
-import { utilSanitizeHTML } from '../util/sanitize.ts';
 
 import type { Context } from '../Context.ts';
 import type { D3Selection } from 'd3-selection';
@@ -185,10 +183,10 @@ export class UiRapidInspector {
     const l10n = context.systems.l10n!;
     const rapid = context.systems.rapid!;
     const scene = context.systems.gfx!.scene;
-    const ui = context.systems.ui!;
+    const ui = context.systems.ui;
 
     if (this.isAcceptFeatureDisabled()) {
-      ui.Flash.show({
+      ui?.Flash.show({
         duration: 5000,
         label: l10n.t(
           'rapid_inspector.option_accept.disabled_flash',

@@ -82,11 +82,11 @@ export class UiIntroStartEditing extends AbstractIntroChapter {
   // Click Ok to advance
   protected async _showSaveAsync(): Promise<IntroStep | void> {
     const context = this.context;
-    const container = context.container();
+    const $container = context.$container;
     const l10n = context.systems.l10n!;
     const curtain = this._curtain;
 
-    container.selectAll('.shaded').remove();  // in case user opened keyboard shortcuts
+    $container.selectAll('.shaded').remove();  // in case user opened keyboard shortcuts
 
     return new Promise<IntroStep>((resolve, reject) => {
       this._rejectStep = reject;
@@ -104,20 +104,20 @@ export class UiIntroStartEditing extends AbstractIntroChapter {
   // Click the button to advance
   protected async _showStartMappingAsync(): Promise<IntroStep | void> {
     const context = this.context;
-    const container = context.container();
     const l10n = context.systems.l10n!;
+    const $container = context.$container;
 
-    container.selectAll('.shaded').remove();  // in case user opened keyboard shortcuts
+    $container.selectAll('.shaded').remove();  // in case user opened keyboard shortcuts
 
-    const modal = new UiModal(context).show(container);
-    modal.$modal!.attr('class', 'modal-splash modal');
-    modal.$modal!.selectAll('.close').remove();
+    const Modal = new UiModal(context).show();
+    Modal.$modal!.attr('class', 'modal-splash modal');
+    Modal.$modal!.selectAll('.close').remove();
 
     try {
       return await new Promise<IntroStep | void>((resolve, reject) => {
         this._rejectStep = reject;
 
-        const startbutton = modal.$content!
+        const $startbutton = Modal.$content!
           .attr('class', 'fillL')
           .append('button')
           .attr('class', 'modal-section huge-modal-button')
@@ -126,18 +126,18 @@ export class UiIntroStartEditing extends AbstractIntroChapter {
             this._done();
           });
 
-        startbutton
+        $startbutton
           .append('svg')
           .attr('class', 'illustration')
           .append('use')
           .attr('xlink:href', '#rapid-logo-walkthrough');
 
-        startbutton
+        $startbutton
           .append('h2')
           .html(l10n.tHtml('intro.startediting.start'));
       });
     } finally {
-      modal.close();
+      Modal.close();
     }
   }
 }

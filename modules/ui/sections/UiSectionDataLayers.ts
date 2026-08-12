@@ -493,7 +493,7 @@ export class UiSectionDataLayers extends AbstractUiSection {
   protected _drawPanelItems($selection: D3Selection): void {
     const context = this.context;
     const l10n = context.systems.l10n!;
-    const ui = context.systems.ui as any;
+    const ui = context.systems.ui!;
 
     const HistoryCard = ui.InfoCards.HistoryCard;
     const MeasurementCard = ui.InfoCards.MeasurementCard;
