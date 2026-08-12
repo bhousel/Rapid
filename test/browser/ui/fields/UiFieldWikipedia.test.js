@@ -1,7 +1,7 @@
 describe('UiFieldWikipedia', () => {
 
   const context = new Rapid.MockContext();
-  let entity, base, graph, selection, field;
+  let $container, entity, base, graph, field;
 
   class MockWikidataService {
     constructor() { }
@@ -29,8 +29,6 @@ describe('UiFieldWikipedia', () => {
     scheduler:  new Rapid.SchedulerSystem(context),
     schema:     new Rapid.SchemaSystem(context)
   };
-  context.container = () => selection;
-
 
   before(() => {
     // Setup mock asset data needed for testing
@@ -55,13 +53,18 @@ describe('UiFieldWikipedia', () => {
     base = new Rapid.Graph(context, [entity]);
     graph = new Rapid.Graph(base);
 
-    selection = d3.select(document.createElement('div'));
+    context.$container = $container = d3.select(document.createElement('div'));
     field = new Rapid.Field(context, {
       id:   'wikipedia',
       key:  'wikipedia',
       keys: ['wikipedia', 'wikidata'],
       type: 'wikipedia'
     });
+  });
+
+  afterEach(() => {
+    $container.remove();
+    context.$container = d3.select(null);
   });
 
   function delay(msec) {
@@ -83,11 +86,11 @@ describe('UiFieldWikipedia', () => {
     const wikipedia = new Rapid.UiFieldWikipedia(context, field);
     return delay(1)  // async, so data will be available
       .then(() => {
-        selection.call(wikipedia.renderContent);
+        $container.call(wikipedia.renderContent);
         wikipedia.syncTags({ wikipedia: 'en:Title' });
 
-        assert.strictEqual(Rapid.utilGetSetValue(selection.selectAll('.wiki-lang')), 'English');
-        assert.strictEqual(Rapid.utilGetSetValue(selection.selectAll('.wiki-title')), 'Title');
+        assert.strictEqual(Rapid.utilGetSetValue($container.selectAll('.wiki-lang')), 'English');
+        assert.strictEqual(Rapid.utilGetSetValue($container.selectAll('.wiki-title')), 'Title');
       });
   });
 
@@ -97,22 +100,22 @@ describe('UiFieldWikipedia', () => {
     return delay(1)  // async, so data will be available
       .then(() => {
         wikipedia.on('change', changeTags);
-        selection.call(wikipedia.renderContent);
+        $container.call(wikipedia.renderContent);
 
         const spy = (...args) => spy.mock.calls.push(args);
         spy.mock = { calls: [] };
 
         wikipedia.on('change', spy);
 
-        Rapid.utilGetSetValue(selection.selectAll('.wiki-lang'), 'Deutsch');
+        Rapid.utilGetSetValue($container.selectAll('.wiki-lang'), 'Deutsch');
 
-        const langInput = selection.selectAll('.wiki-lang').node();
+        const langInput = $container.selectAll('.wiki-lang').node();
         langInput.dispatchEvent(new Event('change'));
         langInput.dispatchEvent(new FocusEvent('blur'));
 
-        Rapid.utilGetSetValue(selection.selectAll('.wiki-title'), 'Title');
+        Rapid.utilGetSetValue($container.selectAll('.wiki-title'), 'Title');
 
-        const titleInput = selection.selectAll('.wiki-title').node();
+        const titleInput = $container.selectAll('.wiki-title').node();
         titleInput.dispatchEvent(new Event('change'));
         titleInput.dispatchEvent(new FocusEvent('blur'));
 
@@ -130,15 +133,15 @@ describe('UiFieldWikipedia', () => {
     return delay(1)  // async, so data will be available
       .then(() => {
         wikipedia.on('change', changeTags);
-        selection.call(wikipedia.renderContent);
+        $container.call(wikipedia.renderContent);
 
-        Rapid.utilGetSetValue(selection.selectAll('.wiki-title'), 'http://de.wikipedia.org/wiki/Title');
+        Rapid.utilGetSetValue($container.selectAll('.wiki-title'), 'http://de.wikipedia.org/wiki/Title');
 
-        const titleInput = selection.selectAll('.wiki-title').node();
+        const titleInput = $container.selectAll('.wiki-title').node();
         titleInput.dispatchEvent(new Event('change'));
 
-        assert.strictEqual(Rapid.utilGetSetValue(selection.selectAll('.wiki-lang')), 'Deutsch');
-        assert.strictEqual(Rapid.utilGetSetValue(selection.selectAll('.wiki-title')), 'Title');
+        assert.strictEqual(Rapid.utilGetSetValue($container.selectAll('.wiki-lang')), 'Deutsch');
+        assert.strictEqual(Rapid.utilGetSetValue($container.selectAll('.wiki-title')), 'Title');
       });
   });
 
@@ -193,13 +196,13 @@ describe('UiFieldWikipedia', () => {
 
     return delay(1)  // async, so data will be available
       .then(() => {
-        selection.call(wikipedia1.render);
-        Rapid.utilGetSetValue(selection.selectAll('.wiki-lang'), 'Deutsch');
+        $container.call(wikipedia1.render);
+        Rapid.utilGetSetValue($container.selectAll('.wiki-lang'), 'Deutsch');
       })
       .then(() => {
-        selection.call(wikipedia2.render);
+        $container.call(wikipedia2.render);
         wikipedia2.syncTags({});
-        assert.strictEqual(Rapid.utilGetSetValue(selection.selectAll('.wiki-lang')), 'Deutsch');
+        assert.strictEqual(Rapid.utilGetSetValue($container.selectAll('.wiki-lang')), 'Deutsch');
       });
   });
 
@@ -208,7 +211,7 @@ describe('UiFieldWikipedia', () => {
     const wikipedia = new Rapid.UiFieldWikipedia(context, field, [entity.id]);
     const editor = context.systems.editor;
     wikipedia.on('change', changeTags);
-    selection.call(wikipedia.render);
+    $container.call(wikipedia.render);
 
     const spy = (...args) => spy.mock.calls.push(args);
     spy.mock = { calls: [] };
@@ -216,10 +219,10 @@ describe('UiFieldWikipedia', () => {
     wikipedia.on('change', spy);
 
     // Set title to "Skip"
-    Rapid.utilGetSetValue(selection.selectAll('.wiki-lang'), 'Deutsch');
-    Rapid.utilGetSetValue(selection.selectAll('.wiki-title'), 'Skip');
+    Rapid.utilGetSetValue($container.selectAll('.wiki-lang'), 'Deutsch');
+    Rapid.utilGetSetValue($container.selectAll('.wiki-title'), 'Skip');
 
-    const titleInput = selection.selectAll('.wiki-title').node();
+    const titleInput = $container.selectAll('.wiki-title').node();
     titleInput.dispatchEvent(new Event('change'));
     titleInput.dispatchEvent(new FocusEvent('blur'));
 
@@ -229,9 +232,9 @@ describe('UiFieldWikipedia', () => {
 
     // t30:  graph change - Set title to "Title"
     setTimeout(() => {
-      Rapid.utilGetSetValue(selection.selectAll('.wiki-title'), 'Title');
+      Rapid.utilGetSetValue($container.selectAll('.wiki-title'), 'Title');
 
-      const titleInput = selection.selectAll('.wiki-title').node();
+      const titleInput = $container.selectAll('.wiki-title').node();
       titleInput.dispatchEvent(new Event('change'));
       titleInput.dispatchEvent(new FocusEvent('blur'));
     }, 30);

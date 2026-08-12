@@ -1,6 +1,6 @@
 describe('UiNoteComments', () => {
-
   const context = new Rapid.MockContext();
+  let $container;
 
   context.systems = {
     l10n: new Rapid.LocalizationSystem(context)
@@ -9,6 +9,14 @@ describe('UiNoteComments', () => {
 
   before(() => context.systems.l10n.initAsync());
 
+  beforeEach(() => {
+    context.$container = $container = d3.select(document.createElement('div'));
+  });
+
+  afterEach(() => {
+    $container.remove();
+    context.$container = d3.select(null);
+  });
 
   it('sanitizes comment HTML and renders usernames as text', () => {
     const dirtyHTML = '<script>alert(1)</script><a href="javascript:alert(2)">link</a>';
@@ -25,15 +33,13 @@ describe('UiNoteComments', () => {
         }]
       }
     };
-    const $selection = d3.select(document.createElement('div'));
+    const NoteComments = new Rapid.UiNoteComments(context);
+    NoteComments.datum = note;
+    $container.call(NoteComments.render);
 
-    const noteComments = new Rapid.UiNoteComments(context);
-    noteComments.datum = note;
-    $selection.call(noteComments.render);
-
-    assert.strictEqual($selection.select('.comment-author').text(), username);
-    assert.strictEqual($selection.selectAll('.comment-author img').size(), 0);
-    assert.strictEqual($selection.selectAll('.comment-text script').size(), 0);
-    assert.strictEqual($selection.selectAll('.comment-text [href^="javascript:"]').size(), 0);
+    assert.strictEqual($container.select('.comment-author').text(), username);
+    assert.strictEqual($container.selectAll('.comment-author img').size(), 0);
+    assert.strictEqual($container.selectAll('.comment-text script').size(), 0);
+    assert.strictEqual($container.selectAll('.comment-text [href^="javascript:"]').size(), 0);
   });
 });

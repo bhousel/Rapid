@@ -1,7 +1,7 @@
 describe('UiFieldRadio', () => {
 
   const context = new Rapid.MockContext();
-  let selection, field;
+  let $container, field;
 
   class MockEditSystem extends Rapid.MockSystem {
     constructor(context) {
@@ -22,7 +22,7 @@ describe('UiFieldRadio', () => {
   before(() => context.systems.l10n.initAsync());
 
   beforeEach(() => {
-    selection = d3.select(document.createElement('div'));
+    context.$container = $container = d3.select(document.createElement('div'));
     field = new Rapid.Field(context, {
       id: 'test_radio',
       key: 'test',
@@ -31,13 +31,18 @@ describe('UiFieldRadio', () => {
     });
   });
 
+  afterEach(() => {
+    $container.remove();
+    context.$container = d3.select(null);
+  });
+
 
   it('renders option labels as text', () => {
     const radio = new Rapid.UiFieldRadio(context, field);
 
-    selection.call(radio.renderContent);
+    $container.call(radio.renderContent);
 
-    assert.strictEqual(selection.select('label span').text(), field.props.options[0]);
-    assert.strictEqual(selection.selectAll('img').size(), 0);
+    assert.strictEqual($container.select('label span').text(), field.props.options[0]);
+    assert.strictEqual($container.selectAll('img').size(), 0);
   });
 });

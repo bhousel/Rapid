@@ -1,7 +1,7 @@
 describe('UiFieldAccess', () => {
 
   const context = new Rapid.MockContext();
-  let $selection, field;
+  let $container, field;
 
   class MockEditSystem extends Rapid.MockSystem {
     constructor(context) {
@@ -18,7 +18,6 @@ describe('UiFieldAccess', () => {
     l10n:    new Rapid.LocalizationSystem(context),
     schema:  new Rapid.SchemaSystem(context)
   };
-  context.container = () => $selection;
 
   before(() => {
     return Promise.all([
@@ -28,7 +27,7 @@ describe('UiFieldAccess', () => {
   });
 
   beforeEach(() => {
-    $selection = d3.select(document.createElement('div'));
+    context.$container = $container = d3.select(document.createElement('div'));
     field = new Rapid.Field(context, {
       id:   'access',
       keys: ['access', 'foot', 'motor_vehicle', 'bicycle', 'horse'],
@@ -36,15 +35,20 @@ describe('UiFieldAccess', () => {
     });
   });
 
+  afterEach(() => {
+    $container.remove();
+    context.$container = d3.select(null);
+  });
+
 
   it('creates inputs for a constiety of modes of access', () => {
     const access = new Rapid.UiFieldAccess(context, field);
-    $selection.call(access.render);
-    assert.strictEqual($selection.selectAll('.preset-access-access').size(), 1);
-    assert.strictEqual($selection.selectAll('.preset-access-foot').size(), 1);
-    assert.strictEqual($selection.selectAll('.preset-access-motor_vehicle').size(), 1);
-    assert.strictEqual($selection.selectAll('.preset-access-bicycle').size(), 1);
-    assert.strictEqual($selection.selectAll('.preset-access-horse').size(), 1);
+    $container.call(access.render);
+    assert.strictEqual($container.selectAll('.preset-access-access').size(), 1);
+    assert.strictEqual($container.selectAll('.preset-access-foot').size(), 1);
+    assert.strictEqual($container.selectAll('.preset-access-motor_vehicle').size(), 1);
+    assert.strictEqual($container.selectAll('.preset-access-bicycle').size(), 1);
+    assert.strictEqual($container.selectAll('.preset-access-horse').size(), 1);
   });
 
 
@@ -71,84 +75,84 @@ describe('UiFieldAccess', () => {
 
   it('sets foot placeholder to "yes" for steps and pedestrian', () => {
     const access = new Rapid.UiFieldAccess(context, field);
-    $selection.call(access.render);
+    $container.call(access.render);
 
     access.syncTags({ highway: 'steps' });
-    assert.strictEqual($selection.selectAll('.preset-input-access-foot').attr('placeholder'), 'yes');
+    assert.strictEqual($container.selectAll('.preset-input-access-foot').attr('placeholder'), 'yes');
 
     access.syncTags({ highway: 'pedestrian' });
-    assert.strictEqual($selection.selectAll('.preset-input-access-foot').attr('placeholder'), 'yes');
+    assert.strictEqual($container.selectAll('.preset-input-access-foot').attr('placeholder'), 'yes');
   });
 
 
   it('sets foot placeholder to "designated" for footways', () => {
     const access = new Rapid.UiFieldAccess(context, field);
-    $selection.call(access.render);
+    $container.call(access.render);
 
     access.syncTags({ highway: 'footway' });
-    assert.strictEqual($selection.selectAll('.preset-input-access-foot').attr('placeholder'), 'designated');
+    assert.strictEqual($container.selectAll('.preset-input-access-foot').attr('placeholder'), 'designated');
   });
 
 
   it('sets bicycle placeholder to "designated" for cycleways', () => {
     const access = new Rapid.UiFieldAccess(context, field);
-    $selection.call(access.render);
+    $container.call(access.render);
 
     access.syncTags({ highway: 'cycleway' });
-    assert.strictEqual($selection.selectAll('.preset-input-access-bicycle').attr('placeholder'), 'designated');
+    assert.strictEqual($container.selectAll('.preset-input-access-bicycle').attr('placeholder'), 'designated');
   });
 
 
   it('sets horse placeholder to "designated" for bridleways', () => {
     const access = new Rapid.UiFieldAccess(context, field);
-    $selection.call(access.render);
+    $container.call(access.render);
 
     access.syncTags({ highway: 'bridleway' });
-    assert.strictEqual($selection.selectAll('.preset-input-access-horse').attr('placeholder'), 'designated');
+    assert.strictEqual($container.selectAll('.preset-input-access-horse').attr('placeholder'), 'designated');
   });
 
 
   it('sets motor_vehicle placeholder to "no" for footways, steps, pedestrian, cycleway, bridleway, and path', () => {
     const access = new Rapid.UiFieldAccess(context, field);
-    $selection.call(access.render);
+    $container.call(access.render);
     ['footway', 'steps', 'pedestrian', 'cycleway', 'bridleway', 'path'].forEach(value => {
       access.syncTags({ highway: value });
-      assert.strictEqual($selection.selectAll('.preset-input-access-motor_vehicle').attr('placeholder'), 'no');
+      assert.strictEqual($container.selectAll('.preset-input-access-motor_vehicle').attr('placeholder'), 'no');
     });
   });
 
 
   it('sets motor_vehicle placeholder to "yes" for various other highway tags', () => {
     const access = new Rapid.UiFieldAccess(context, field);
-    $selection.call(access.render);
+    $container.call(access.render);
     [
       'residential', 'motorway', 'trunk', 'primary', 'secondary', 'tertiary', 'service',
       'unclassified', 'motorway_link', 'trunk_link', 'primary_link', 'secondary_link', 'tertiary_link'
     ].forEach(value => {
       access.syncTags({ highway: value });
-      assert.strictEqual($selection.selectAll('.preset-input-access-motor_vehicle').attr('placeholder'), 'yes');
+      assert.strictEqual($container.selectAll('.preset-input-access-motor_vehicle').attr('placeholder'), 'yes');
     });
   });
 
 
   it('overrides a "yes" or "designated" placeholder with more specific access tag (iD#2213)', () => {
     const access = new Rapid.UiFieldAccess(context, field);
-    $selection.call(access.render);
+    $container.call(access.render);
 
     access.syncTags({ highway: 'service', access: 'emergency' });
-    assert.strictEqual($selection.selectAll('.preset-input-access-motor_vehicle').attr('placeholder'), 'emergency');
+    assert.strictEqual($container.selectAll('.preset-input-access-motor_vehicle').attr('placeholder'), 'emergency');
 
     access.syncTags({ highway: 'cycleway', access: 'permissive' });
-    assert.strictEqual($selection.selectAll('.preset-input-access-bicycle').attr('placeholder'), 'permissive');
+    assert.strictEqual($container.selectAll('.preset-input-access-bicycle').attr('placeholder'), 'permissive');
   });
 
 
   it('overrides a "no" placeholder with more specific access tag (iD#2763)', () => {
     const access = new Rapid.UiFieldAccess(context, field);
-    $selection.call(access.render);
+    $container.call(access.render);
 
     access.syncTags({ highway: 'cycleway', access: 'destination' });
-    assert.strictEqual($selection.selectAll('.preset-input-access-motor_vehicle').attr('placeholder'), 'destination');
+    assert.strictEqual($container.selectAll('.preset-input-access-motor_vehicle').attr('placeholder'), 'destination');
   });
 
 });

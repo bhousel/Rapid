@@ -1,6 +1,7 @@
 describe('UiMapRouletteDetails', () => {
-
   const context = new Rapid.MockContext();
+  let $container;
+
   const marker = { id: '1', key: 'maproulette-1' };
   const task = {
     id: '1',
@@ -23,17 +24,24 @@ describe('UiMapRouletteDetails', () => {
 
   before(() => context.systems.l10n.initAsync());
 
+  beforeEach(() => {
+    context.$container = $container = d3.select(document.createElement('div'));
+  });
+
+  afterEach(() => {
+    $container.remove();
+    context.$container = d3.select(null);
+  });
+
 
   it('sanitizes challenge descriptions and instructions', async () => {
-    const $selection = d3.select(document.createElement('div'));
-
-    const details = new Rapid.UiMapRouletteDetails(context);
-    details.datum = marker;
-    $selection.call(details.render);
+    const MapRouletteDetails = new Rapid.UiMapRouletteDetails(context);
+    MapRouletteDetails.datum = marker;
+    $container.call(MapRouletteDetails.render);
     await new Promise(resolve => { setTimeout(resolve, 0); });
 
-    assert.strictEqual($selection.selectAll('script').size(), 0);
-    assert.strictEqual($selection.selectAll('[href^="javascript:"]').size(), 0);
-    assert.strictEqual($selection.selectAll('[onerror]').size(), 0);
+    assert.strictEqual($container.selectAll('script').size(), 0);
+    assert.strictEqual($container.selectAll('[href^="javascript:"]').size(), 0);
+    assert.strictEqual($container.selectAll('[onerror]').size(), 0);
   });
 });

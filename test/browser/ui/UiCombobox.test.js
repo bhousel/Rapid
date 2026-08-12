@@ -1,7 +1,7 @@
 describe('UiCombobox', () => {
 
   const context = new Rapid.MockContext();
-  let $body, $container, $content, $input, $combobox;
+  let $container, $content, $input, Combobox;
 
   context.systems = {
     scheduler: new Rapid.SchedulerSystem(context)
@@ -13,18 +13,16 @@ describe('UiCombobox', () => {
   });
 
   beforeEach(() => {
-    $body = d3.select('body');
-    $container = $body.append('div').attr('class', 'container');
-    context.container = () => $container;
+    context.$container = $container = d3.select('body').append('div').attr('class', 'container');
     $content = $container.append('div');
     $input = $content.append('input');
-    $combobox = new Rapid.UiCombobox(context);
+    Combobox = new Rapid.UiCombobox(context);
   });
 
   afterEach(() => {
-    $body.selectAll('.combobox').remove();
     $content.remove();
     $container.remove();
+    context.$container = d3.select(null);
   });
 
 
@@ -93,15 +91,15 @@ describe('UiCombobox', () => {
   }
 
   it('adds the combobox-input class', () => {
-    $input.call($combobox.attach);
+    $input.call(Combobox.attach);
     assert.isTrue($input.classed('combobox-input'));
   });
 
   it('adds combobox under container', () => {
-    $input.call($combobox.data(data).attach);
+    $input.call(Combobox.data(data).attach);
     focusTypeahead($input);
     simulateKeypress('↓');
-    assert.strictEqual(d3.selectAll('.container > div.combobox').size(), 1);
+    assert.strictEqual($container.selectAll('div.combobox').size(), 1);
   });
 
   it('sanitizes HTML labels', () => {
@@ -110,48 +108,48 @@ describe('UiCombobox', () => {
       value: 'unsafe'
     }];
 
-    $input.call($combobox.data(unsafe).attach);
+    $input.call(Combobox.data(unsafe).attach);
     focusTypeahead($input);
     simulateKeypress('↓');
 
-    assert.strictEqual($body.selectAll('.combobox-option script').size(), 0);
-    assert.strictEqual($body.selectAll('.combobox-option [onerror]').size(), 0);
+    assert.strictEqual($container.selectAll('.combobox-option script').size(), 0);
+    assert.strictEqual($container.selectAll('.combobox-option [onerror]').size(), 0);
   });
 
   it('filters entries to those matching the value', () => {
-    $input.call($combobox.data(data).attach);
+    $input.call(Combobox.data(data).attach);
     focusTypeahead($input);
     simulateKeypress('b');
-    assert.strictEqual($body.selectAll('.combobox-option').size(), 3);
-    assert.strictEqual($body.selectAll('.combobox-option').nodes()[0].text, 'foobar');
-    assert.strictEqual($body.selectAll('.combobox-option').nodes()[1].text, 'bar');
-    assert.strictEqual($body.selectAll('.combobox-option').nodes()[2].text, 'Baz');
+    assert.strictEqual($container.selectAll('.combobox-option').size(), 3);
+    assert.strictEqual($container.selectAll('.combobox-option').nodes()[0].text, 'foobar');
+    assert.strictEqual($container.selectAll('.combobox-option').nodes()[1].text, 'bar');
+    assert.strictEqual($container.selectAll('.combobox-option').nodes()[2].text, 'Baz');
   });
 
   it('shows all entries when activating the combo', () => {
-    $input.property('value', 'foobar').call($combobox.data(data).attach);
+    $input.property('value', 'foobar').call(Combobox.data(data).attach);
     focusTypeahead($input);
     simulateKeypress('↓');
-    assert.strictEqual($body.selectAll('.combobox-option').size(), 5);
-    assert.strictEqual($body.selectAll('.combobox-option').text(), 'foobar');
+    assert.strictEqual($container.selectAll('.combobox-option').size(), 5);
+    assert.strictEqual($container.selectAll('.combobox-option').text(), 'foobar');
   });
 
   it('selects the first option that matches the input', () => {
-    $input.call($combobox.data(data).attach);
+    $input.call(Combobox.data(data).attach);
     focusTypeahead($input);
     simulateKeypress('b');
-    assert.strictEqual($body.selectAll('.combobox-option.selected').size(), 1);
-    assert.strictEqual($body.selectAll('.combobox-option.selected').text(), 'bar');
+    assert.strictEqual($container.selectAll('.combobox-option.selected').size(), 1);
+    assert.strictEqual($container.selectAll('.combobox-option.selected').text(), 'bar');
   });
 
   it('prefers an option that exactly matches the input over the first option', () => {
-    $input.call($combobox.data(data).attach);
+    $input.call(Combobox.data(data).attach);
     focusTypeahead($input);
     simulateKeypress('f');
     simulateKeypress('o');
     simulateKeypress('o');
-    assert.strictEqual($body.selectAll('.combobox-option.selected').size(), 1);
-    assert.strictEqual($body.selectAll('.combobox-option.selected').text(), 'foo');  // skip foobar
+    assert.strictEqual($container.selectAll('.combobox-option.selected').size(), 1);
+    assert.strictEqual($container.selectAll('.combobox-option.selected').text(), 'foo');  // skip foobar
   });
 
   it('does not autocomplete numeric options', () => {
@@ -159,23 +157,23 @@ describe('UiCombobox', () => {
       { title: '100', value: '100' },
       { title: '110', value: '110' }
     ];
-    $input.call($combobox.data(numeric).attach);
+    $input.call(Combobox.data(numeric).attach);
     focusTypeahead($input);
     simulateKeypress('1');
     simulateKeypress('0');
-    assert.strictEqual($body.selectAll('.combobox-option.selected').size(), 0);
+    assert.strictEqual($container.selectAll('.combobox-option.selected').size(), 0);
   });
 
   it('does not autocomplete if canAutocomplete(false)', () => {
-    $input.call($combobox.data(data).canAutocomplete(false).attach);
+    $input.call(Combobox.data(data).canAutocomplete(false).attach);
     focusTypeahead($input);
     simulateKeypress('b');
     assert.strictEqual($input.property('value'), 'b');
-    assert.strictEqual($body.selectAll('.combobox-option.selected').size(), 0);
+    assert.strictEqual($container.selectAll('.combobox-option.selected').size(), 0);
   });
 
   it('selects the completed portion of the value', () => {
-    $input.call($combobox.data(data).attach);
+    $input.call(Combobox.data(data).attach);
     focusTypeahead($input);
     simulateKeypress('b');
     assert.strictEqual($input.property('value'), 'bar');
@@ -184,7 +182,7 @@ describe('UiCombobox', () => {
   });
 
   it('does not preserve the case of the input portion of the value by default', () => {
-    $input.call($combobox.data(data).attach);
+    $input.call(Combobox.data(data).attach);
     focusTypeahead($input);
     simulateKeypress('B');
     assert.strictEqual($input.property('value'), 'bar');
@@ -193,8 +191,8 @@ describe('UiCombobox', () => {
   });
 
   it('does preserve the case of the input portion of the value with caseSensitive option', () => {
-    $combobox.caseSensitive(true);
-    $input.call($combobox.data(data).attach);
+    Combobox.caseSensitive(true);
+    $input.call(Combobox.data(data).attach);
     focusTypeahead($input);
     simulateKeypress('B');
     assert.strictEqual($input.property('value'), 'Baz');
@@ -203,69 +201,69 @@ describe('UiCombobox', () => {
   });
 
   it('does not select when value is empty', () => {
-    $input.call($combobox.data(data).attach);
+    $input.call(Combobox.data(data).attach);
     focusTypeahead($input);
     $input.node().dispatchEvent(new InputEvent('input'));
-    assert.strictEqual($body.selectAll('.combobox-option.selected').size(), 0);
+    assert.strictEqual($container.selectAll('.combobox-option.selected').size(), 0);
   });
 
   it('does not select when value is not a prefix of any suggestion', () => {
-    $input.call( $combobox.fetcher((_, cb) => cb(data)).attach );
+    $input.call( Combobox.fetcher((_, cb) => cb(data)).attach );
     focusTypeahead($input);
     simulateKeypress('b');
     simulateKeypress('i');
-    assert.strictEqual($body.selectAll('.combobox-option.selected').size(), 0);
+    assert.strictEqual($container.selectAll('.combobox-option.selected').size(), 0);
   });
 
   it('does not select or autocomplete after ⌫', () => {
-    $input.call($combobox.data(data).attach);
+    $input.call(Combobox.data(data).attach);
     focusTypeahead($input);
     simulateKeypress('b');
     simulateKeypress('⌫');
-    assert.strictEqual($body.selectAll('.combobox-option.selected').size(), 0);
+    assert.strictEqual($container.selectAll('.combobox-option.selected').size(), 0);
     assert.strictEqual($input.property('value'), 'b');
   });
 
   it('does not select or autocomplete after ⌦', () => {
-    $input.call($combobox.data(data).attach);
+    $input.call(Combobox.data(data).attach);
     focusTypeahead($input);
     simulateKeypress('f');
     simulateKeypress('b');
     simulateKeypress('←');
     simulateKeypress('←');
     simulateKeypress('⌦');
-    assert.strictEqual($body.selectAll('.combobox-option.selected').size(), 0);
+    assert.strictEqual($container.selectAll('.combobox-option.selected').size(), 0);
     assert.strictEqual($input.property('value'), 'b');
   });
 
   it('selects and autocompletes the next/prev suggestion on ↓/↑', () => {
-    $input.call($combobox.data(data).attach);
+    $input.call(Combobox.data(data).attach);
     focusTypeahead($input);
 
     simulateKeypress('↓');
-    assert.strictEqual($body.selectAll('.combobox-option.selected').size(), 1);
-    assert.strictEqual($body.selectAll('.combobox-option.selected').text(), 'foobar');
+    assert.strictEqual($container.selectAll('.combobox-option.selected').size(), 1);
+    assert.strictEqual($container.selectAll('.combobox-option.selected').text(), 'foobar');
     assert.strictEqual($input.property('value'), 'foobar');
 
     simulateKeypress('↓');
-    assert.strictEqual($body.selectAll('.combobox-option.selected').size(), 1);
-    assert.strictEqual($body.selectAll('.combobox-option.selected').text(), 'foo');
+    assert.strictEqual($container.selectAll('.combobox-option.selected').size(), 1);
+    assert.strictEqual($container.selectAll('.combobox-option.selected').text(), 'foo');
     assert.strictEqual($input.property('value'), 'foo');
 
     simulateKeypress('↑');
-    assert.strictEqual($body.selectAll('.combobox-option.selected').size(), 1);
-    assert.strictEqual($body.selectAll('.combobox-option.selected').text(), 'foobar');
+    assert.strictEqual($container.selectAll('.combobox-option.selected').size(), 1);
+    assert.strictEqual($container.selectAll('.combobox-option.selected').text(), 'foobar');
     assert.strictEqual($input.property('value'), 'foobar');
   });
 
   it('emits accepted event with selected datum on ⇥', done => {
     const onAccept = val => {
       assert.deepEqual(val, { title: 'bar', value: 'bar' });
-      $combobox.off('accept', onAccept);
+      Combobox.off('accept', onAccept);
       done();
     };
-    $combobox.on('accept', onAccept);
-    $input.call($combobox.data(data).attach);
+    Combobox.on('accept', onAccept);
+    $input.call(Combobox.data(data).attach);
     focusTypeahead($input);
     simulateKeypress('b');
     simulateKeypress('⇥');
@@ -274,11 +272,11 @@ describe('UiCombobox', () => {
   it('emits accepted event with selected datum on ↩', done => {
     const onAccept = val => {
       assert.deepEqual(val, { title: 'bar', value: 'bar' });
-      $combobox.off('accept', onAccept);
+      Combobox.off('accept', onAccept);
       done();
     };
-    $combobox.on('accept', onAccept);
-    $input.call($combobox.data(data).attach);
+    Combobox.on('accept', onAccept);
+    $input.call(Combobox.data(data).attach);
     focusTypeahead($input);
     simulateKeypress('b');
     simulateKeypress('↩');
@@ -288,9 +286,9 @@ describe('UiCombobox', () => {
     const spy = (...args) => spy.mock.calls.push(args);
     spy.mock = { calls: [] };
 
-    $combobox.on('cancel', spy);
+    Combobox.on('cancel', spy);
 
-    $input.call($combobox.data(data).attach);
+    $input.call(Combobox.data(data).attach);
     focusTypeahead($input);
     simulateKeypress('b');
     simulateKeypress('⎋');
@@ -298,9 +296,9 @@ describe('UiCombobox', () => {
   });
 
   it('hides on ↩', () => {
-    $input.call($combobox.data(data).attach);
+    $input.call(Combobox.data(data).attach);
     $input.node().focus();
     simulateKeypress('↩');
-    assert.strictEqual($body.selectAll('.combobox').size(), 0);
+    assert.strictEqual($container.selectAll('.combobox').size(), 0);
   });
 });

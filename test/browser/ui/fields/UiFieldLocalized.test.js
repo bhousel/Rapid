@@ -1,7 +1,7 @@
 describe('UiFieldLocalized', () => {
 
   const context = new Rapid.MockContext();
-  let selection, field;
+  let $container, field;
 
   class MockEditSystem extends Rapid.MockSystem {
     constructor(context) {
@@ -21,7 +21,6 @@ describe('UiFieldLocalized', () => {
     scheduler: new Rapid.SchedulerSystem(context),
     schema:    new Rapid.SchemaSystem(context)
   };
-  context.container = () => selection;
 
   before(() => {
     // Setup mock asset data that LocalizationSystem attempts to load during initAsync.
@@ -41,8 +40,13 @@ describe('UiFieldLocalized', () => {
   });
 
   beforeEach(() => {
-    selection = d3.select(document.createElement('div'));
+    context.$container = $container = d3.select(document.createElement('div'));
     field = new Rapid.Field(context, { id: 'name', key: 'name', type: 'localized' });
+  });
+
+  afterEach(() => {
+    $container.remove();
+    context.$container = d3.select(null);
   });
 
   function delay(msec) {
@@ -55,13 +59,13 @@ describe('UiFieldLocalized', () => {
     localized.locked = () => false;
     return delay(1)  // async, so AssetSystem promise will have settled
       .then(() => {
-        selection.call(localized.render);
+        $container.call(localized.render);
 
-        const addButton = selection.selectAll('.localized-add').node();
+        const addButton = $container.selectAll('.localized-add').node();
         addButton.dispatchEvent(new MouseEvent('click'));
 
-        assert.lengthOf(selection.selectAll('.localized-lang').nodes(), 1);
-        assert.lengthOf(selection.selectAll('.localized-value').nodes(), 1);
+        assert.lengthOf($container.selectAll('.localized-lang').nodes(), 1);
+        assert.lengthOf($container.selectAll('.localized-value').nodes(), 1);
       });
   });
 
@@ -70,18 +74,18 @@ describe('UiFieldLocalized', () => {
     localized.locked = () => false;
     return delay(1)  // async, so AssetSystem promise will have settled
       .then(() => {
-        selection.call(localized.render);
+        $container.call(localized.render);
 
-        const addButton = selection.selectAll('.localized-add').node();
+        const addButton = $container.selectAll('.localized-add').node();
         addButton.dispatchEvent(new MouseEvent('click'));
 
         localized.on('change', tags => {
           assert.deepEqual(tags, {});
         });
 
-        Rapid.utilGetSetValue(selection.selectAll('.localized-lang'), 'Deutsch');
+        Rapid.utilGetSetValue($container.selectAll('.localized-lang'), 'Deutsch');
 
-        const langInput = selection.selectAll('.localized-lang').node();
+        const langInput = $container.selectAll('.localized-lang').node();
         langInput.dispatchEvent(new Event('change'));
         langInput.dispatchEvent(new FocusEvent('blur'));
       });
@@ -92,18 +96,18 @@ describe('UiFieldLocalized', () => {
     localized.locked = () => false;
     return delay(1)  // async, so AssetSystem promise will have settled
       .then(() => {
-        selection.call(localized.render);
+        $container.call(localized.render);
 
-        const addButton = selection.selectAll('.localized-add').node();
+        const addButton = $container.selectAll('.localized-add').node();
         addButton.dispatchEvent(new MouseEvent('click'));
 
         localized.on('change', tags => {
           assert.deepEqual(tags, {});
         });
 
-        Rapid.utilGetSetValue(selection.selectAll('.localized-value'), 'Value');
+        Rapid.utilGetSetValue($container.selectAll('.localized-value'), 'Value');
 
-        const valueInput = selection.selectAll('.localized-value').node();
+        const valueInput = $container.selectAll('.localized-value').node();
         valueInput.dispatchEvent(new Event('change'));
         valueInput.dispatchEvent(new FocusEvent('blur'));
       });
@@ -114,23 +118,23 @@ describe('UiFieldLocalized', () => {
     localized.locked = () => false;
     return delay(1)  // async, so AssetSystem promise will have settled
       .then(() => {
-        selection.call(localized.render);
+        $container.call(localized.render);
 
-        const addButton = selection.selectAll('.localized-add').node();
+        const addButton = $container.selectAll('.localized-add').node();
         addButton.dispatchEvent(new MouseEvent('click'));
 
-        Rapid.utilGetSetValue(selection.selectAll('.localized-lang'), 'Deutsch');
+        Rapid.utilGetSetValue($container.selectAll('.localized-lang'), 'Deutsch');
 
-        const langInput = selection.selectAll('.localized-lang').node();
+        const langInput = $container.selectAll('.localized-lang').node();
         langInput.dispatchEvent(new Event('change'));
 
         localized.on('change', tags => {
           assert.deepEqual(tags, { 'name:de': 'Value' });
         });
 
-        Rapid.utilGetSetValue(selection.selectAll('.localized-value'), 'Value');
+        Rapid.utilGetSetValue($container.selectAll('.localized-value'), 'Value');
 
-        const valueInput = selection.selectAll('.localized-value').node();
+        const valueInput = $container.selectAll('.localized-value').node();
         valueInput.dispatchEvent(new Event('change'));
       });
   });
@@ -140,23 +144,23 @@ describe('UiFieldLocalized', () => {
     localized.locked = () => false;
     return delay(1)  // async, so AssetSystem promise will have settled
       .then(() => {
-        selection.call(localized.render);
+        $container.call(localized.render);
 
-        const addButton = selection.selectAll('.localized-add').node();
+        const addButton = $container.selectAll('.localized-add').node();
         addButton.dispatchEvent(new MouseEvent('click'));
 
-        Rapid.utilGetSetValue(selection.selectAll('.localized-value'), 'Value');
+        Rapid.utilGetSetValue($container.selectAll('.localized-value'), 'Value');
 
-        const valueInput = selection.selectAll('.localized-value').node();
+        const valueInput = $container.selectAll('.localized-value').node();
         valueInput.dispatchEvent(new Event('change'));
 
         localized.on('change', tags => {
           assert.deepEqual(tags, { 'name:de': 'Value' });
         });
 
-        Rapid.utilGetSetValue(selection.selectAll('.localized-lang'), 'Deutsch');
+        Rapid.utilGetSetValue($container.selectAll('.localized-lang'), 'Deutsch');
 
-        const langInput = selection.selectAll('.localized-lang').node();
+        const langInput = $container.selectAll('.localized-lang').node();
         langInput.dispatchEvent(new Event('change'));
       });
   });
@@ -166,16 +170,16 @@ describe('UiFieldLocalized', () => {
     localized.locked = () => false;
     return delay(1)  // async, so AssetSystem promise will have settled
       .then(() => {
-        selection.call(localized.render);
+        $container.call(localized.render);
         localized.syncTags({ 'name:de': 'Value' });
 
         localized.on('change', tags => {
           assert.deepEqual(tags, { 'name:de': undefined, 'name:en': 'Value' });
         });
 
-        Rapid.utilGetSetValue(selection.selectAll('.localized-lang'), 'English');
+        Rapid.utilGetSetValue($container.selectAll('.localized-lang'), 'English');
 
-        const langInput = selection.selectAll('.localized-lang').node();
+        const langInput = $container.selectAll('.localized-lang').node();
         langInput.dispatchEvent(new Event('change'));
     });
   });
@@ -185,11 +189,11 @@ describe('UiFieldLocalized', () => {
     localized.locked = () => false;
     return delay(1)  // async, so AssetSystem promise will have settled
       .then(() => {
-        selection.call(localized.render);
+        $container.call(localized.render);
         localized.syncTags({ 'old_name:de': 'Value' });
 
-        assert.isTrue(selection.selectAll('.localized-lang').empty());
-        assert.isTrue(selection.selectAll('.localized-value').empty());
+        assert.isTrue($container.selectAll('.localized-lang').empty());
+        assert.isTrue($container.selectAll('.localized-value').empty());
       });
   });
 
@@ -198,16 +202,16 @@ describe('UiFieldLocalized', () => {
     localized.locked = () => false;
     return delay(1)  // async, so AssetSystem promise will have settled
       .then(() => {
-        selection.call(localized.render);
+        $container.call(localized.render);
         localized.syncTags({ 'name:de': 'Value' });
 
         localized.on('change', tags => {
           assert.deepEqual(tags, { 'name:de': undefined });
         });
 
-        Rapid.utilGetSetValue(selection.selectAll('.localized-lang'), '');
+        Rapid.utilGetSetValue($container.selectAll('.localized-lang'), '');
 
-        const langInput = selection.selectAll('.localized-lang').node();
+        const langInput = $container.selectAll('.localized-lang').node();
         langInput.dispatchEvent(new Event('change'));
       });
   });
@@ -217,16 +221,16 @@ describe('UiFieldLocalized', () => {
     localized.locked = () => false;
     return delay(1)  // async, so AssetSystem promise will have settled
       .then(() => {
-        selection.call(localized.render);
+        $container.call(localized.render);
         localized.syncTags({ 'name:de': 'Value' });
 
         localized.on('change', tags => {
           assert.deepEqual(tags, { 'name:de': undefined });
         });
 
-        Rapid.utilGetSetValue(selection.selectAll('.localized-value'), '');
+        Rapid.utilGetSetValue($container.selectAll('.localized-value'), '');
 
-        const valueInput = selection.selectAll('.localized-value').node();
+        const valueInput = $container.selectAll('.localized-value').node();
         valueInput.dispatchEvent(new Event('change'));
       });
   });

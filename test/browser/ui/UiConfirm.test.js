@@ -1,16 +1,17 @@
 describe('UiConfirm', () => {
   const context = new Rapid.MockContext();
+  let $container;
 
   function delay(msec) {
     return new Promise(resolve => { setTimeout(resolve, msec); });
   }
 
   beforeEach(() => {
-    context.$container = d3.select('body').append('div').attr('class', 'confirm-wrap');
+    context.$container = $container = d3.select('body').append('div').attr('class', 'confirm-wrap');
   });
 
   afterEach(() => {
-    context.$container.remove();
+    $container.remove();
     context.$container = d3.select(null);
   });
 

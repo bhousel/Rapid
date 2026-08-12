@@ -1,7 +1,7 @@
 describe('uiCommitWarnings', () => {
-
   const context = new Rapid.MockContext();
   const message = '<img src="x" onerror="alert(1)">';
+  let $container;
 
   context.systems = {
     l10n: new Rapid.LocalizationSystem(context),
@@ -22,13 +22,19 @@ describe('uiCommitWarnings', () => {
 
   before(() => context.systems.l10n.initAsync());
 
+  beforeEach(() => {
+    context.$container = $container = d3.select(document.createElement('div'));
+  });
+
+  afterEach(() => {
+    $container.remove();
+    context.$container = d3.select(null);
+  });
+
 
   it('renders validation messages as text', () => {
-    const $selection = d3.select(document.createElement('div'));
-
-    $selection.call(new Rapid.UiCommitWarnings(context).render);
-
-    assert.strictEqual($selection.select('.issue-message').text(), message);
-    assert.strictEqual($selection.selectAll('.issue-message img').size(), 0);
+    $container.call(new Rapid.UiCommitWarnings(context).render);
+    assert.strictEqual($container.select('.issue-message').text(), message);
+    assert.strictEqual($container.selectAll('.issue-message img').size(), 0);
   });
 });
