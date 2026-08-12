@@ -103,7 +103,7 @@ export class UiRapidDatasetToggle {
       .append('div')
       .attr('class', 'modal-section rapid-checkbox rapid-toggle-all');
 
-    const $$toggleAllText = $$toggleAll
+    const $$toggleAllText: D3EnterSelection = $$toggleAll
       .append('div')
       .attr('class', 'rapid-feature-label-container');
 
@@ -115,7 +115,7 @@ export class UiRapidDatasetToggle {
       .append('span')
       .attr('class', 'rapid-feature-hotkey');
 
-    const $$toggleAllLabel = $$toggleAll
+    const $$toggleAllLabel: D3EnterSelection = $$toggleAll
       .append('div')
       .attr('class', 'rapid-checkbox-inputs')
       .append('label')
@@ -148,11 +148,11 @@ export class UiRapidDatasetToggle {
 
 
     /* Dataset List */
-    let $datasets = $content.selectAll('.rapid-datasets-container')
+    let $datasets: D3Selection = $content.selectAll('.rapid-datasets-container')
       .data([0]);
 
     // enter
-    const $$datasets = $datasets.enter()
+    const $$datasets: D3EnterSelection = $datasets.enter()
       .append('div')
       .attr('class', 'modal-section rapid-datasets-container');
 
@@ -164,11 +164,11 @@ export class UiRapidDatasetToggle {
 
 
     /* Browse Data Catalog */
-    let $catalogOption = $content.selectAll('.rapid-browse-catalog')
+    let $catalogOption: D3Selection = $content.selectAll('.rapid-browse-catalog')
       .data([0]);
 
     // enter
-    const $$catalogOption = $catalogOption.enter()
+    const $$catalogOption: D3EnterSelection = $catalogOption.enter()
       .append('div')
       .attr('class', 'modal-section rapid-checkbox rapid-browse-catalog')
       .on('click', () => {
@@ -200,11 +200,11 @@ export class UiRapidDatasetToggle {
 
 
     /* Add Custom Data */
-    let $addCustomOption = $content.selectAll('.rapid-add-custom-data')
+    let $addCustomOption: D3Selection = $content.selectAll('.rapid-add-custom-data')
       .data([0]);
 
     // enter
-    const $$addCustomOption = $addCustomOption.enter()
+    const $$addCustomOption: D3EnterSelection = $addCustomOption.enter()
       .append('div')
       .attr('class', 'modal-section rapid-checkbox rapid-add-custom-data')
       .on('click', () => {
@@ -236,11 +236,11 @@ export class UiRapidDatasetToggle {
 
 
     /* OK Button */
-    let $buttons = $content.selectAll('.modal-section.buttons')
+    let $buttons: D3Selection = $content.selectAll('.modal-section.buttons')
       .data([0]);
 
     // enter
-    const $$buttons = $buttons.enter()
+    const $$buttons: D3EnterSelection = $buttons.enter()
       .append('div')
       .attr('class', 'modal-section buttons');
 
@@ -250,8 +250,8 @@ export class UiRapidDatasetToggle {
       .on('click', () => this.Modal!.close());
 
     // set focus (but only on enter)
-    const buttonNode = $$buttons.selectAll('button').node();
-    if (buttonNode) buttonNode.focus();
+    const buttonNode = $$buttons.selectAll('button').node() as HTMLElement | null;
+    buttonNode?.focus();
 
     // update
     $buttons = $buttons.merge($$buttons);

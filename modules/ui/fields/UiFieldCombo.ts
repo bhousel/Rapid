@@ -102,6 +102,7 @@ export class UiFieldCombo extends UiField {
       this.key += ':';
     }
 
+    this.focus = this.focus.bind(this);
     this.renderContent = this.renderContent.bind(this);
     this._initCombo = this._initCombo.bind(this);
     this._setTaginfoValues = this._setTaginfoValues.bind(this);
@@ -152,9 +153,9 @@ export class UiFieldCombo extends UiField {
         .attr('class', listClass)
         .on('click', () => {
           if (scheduler) {
-            scheduler.setTimeout('ui-combo-focus', () => { this.$input?.node()?.focus(); }, { ms: 10 });
+            scheduler.setTimeout('ui-combo-focus', this.focus, { ms: 10 });
           } else {
-            this?.$input?.node().focus();
+            this.focus();
           }
         })
         .merge(this.$container);
@@ -497,7 +498,8 @@ export class UiFieldCombo extends UiField {
       if (scheduler) {
         scheduler.setTimeout('ui-combo-focus', () => { this.$input?.node()?.focus(); }, { ms: 10 });
       } else {
-        this.$input.node().focus();
+        const node = this.$input.selectAll('input').node() as HTMLInputElement | null;
+        node?.focus();
       }
 
     } else {
@@ -877,6 +879,7 @@ export class UiFieldCombo extends UiField {
   /** Moves keyboard focus to the field's input. */
   public focus(): void {
     if (!this.$input) return;   // called too early?
-    this.$input.node().focus();
+    const node = this.$input.node() as HTMLInputElement | null;
+    node?.focus();
   }
 }

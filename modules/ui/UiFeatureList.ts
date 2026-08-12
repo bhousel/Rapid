@@ -285,7 +285,8 @@ export class UiFeatureList {
     if (this.context.mode?.id !== 'browse') return;
 
     e?.preventDefault();
-    (this.$search.node() as HTMLElement).focus();
+    const node = this.$search.node() as HTMLElement | null;
+    node?.focus();
   }
 
 

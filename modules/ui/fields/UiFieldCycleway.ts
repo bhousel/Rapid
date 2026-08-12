@@ -235,7 +235,7 @@ export class UiFieldCycleway extends UiField {
   public focus(): void {
     if (!this.$wrap) return;   // called too early?
 
-    const node = this.$wrap.selectAll('input').node() as HTMLElement | null;
+    const node = this.$wrap.selectAll('input').node() as HTMLInputElement | null;
     node?.focus();
   }
 }

@@ -154,7 +154,7 @@ export class UiRapidPowerUserFeatures {
 
     // set focus (but only on enter)
     const buttonNode = $$buttons.selectAll('button').node() as HTMLElement | null;
-    if (buttonNode) buttonNode.focus();
+    buttonNode?.focus();
 
     // update
     $buttons = $buttons.merge($$buttons);

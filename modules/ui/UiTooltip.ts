@@ -466,7 +466,8 @@ export class UiTooltip extends EventEmitter {
     const displayType = this._displayType();
     if (displayType === 'clickFocus') {
       $anchor.classed('active', true);
-      ($tooltip.node() as HTMLElement).focus();
+      const tipNode = $tooltip.node() as HTMLElement | null;
+      tipNode?.focus();
     }
 
     this._updateContent(node);

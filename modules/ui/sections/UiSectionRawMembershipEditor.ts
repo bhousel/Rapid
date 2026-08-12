@@ -651,7 +651,8 @@ const indexes = d.members.map(function(member: IndexedMember) {
       .on('click', () => {
         this._showBlank = true;
         this.renderInner();
-        ($list.selectAll('.member-entity-input').node() as HTMLElement).focus();
+        const node = $list.selectAll('.member-entity-input').node() as HTMLElement | null;
+        node?.focus();
       });
 
 

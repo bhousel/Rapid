@@ -336,7 +336,7 @@ export class UiFieldText extends UiField {
   /** Moves keyboard focus to the field's input. */
   public focus(): void {
     if (!this.$input) return;   // called too early?
-    const node = this.$input.node();
-    if (node) node.focus();
+    const node = this.$input.node() as HTMLInputElement | null;
+    node?.focus();
   }
 }

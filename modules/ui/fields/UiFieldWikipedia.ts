@@ -405,6 +405,7 @@ export class UiFieldWikipedia extends UiField {
   /** Moves keyboard focus to the field's input. */
   public focus(): void {
     if (!this.$titleInput) return;   // called too early?
-    (this.$titleInput.node() as HTMLElement).focus();
+    const node = this.$titleInput.node() as HTMLInputElement | null;
+    node?.focus();
   }
 }

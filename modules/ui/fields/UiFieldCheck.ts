@@ -303,6 +303,7 @@ export class UiFieldCheck extends UiField {
   /** Moves keyboard focus to the field's input. */
   public focus(): void {
     if (!this.$input) return;   // called too early?
-    this.$input.node().focus();
+    const node = this.$input.node() as HTMLInputElement | null;
+    node?.focus();
   }
 }

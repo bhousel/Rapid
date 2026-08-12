@@ -443,6 +443,7 @@ export class UiFieldWikidata extends UiField {
   /** Moves keyboard focus to the field's input. */
   public focus(): void {
     if (!this.$searchInput) return;   // called too early?
-    (this.$searchInput.node() as HTMLElement).focus();
+    const node = this.$searchInput.node() as HTMLInputElement | null;
+    node?.focus();
   }
 }

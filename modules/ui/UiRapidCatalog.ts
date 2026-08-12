@@ -171,7 +171,7 @@ export class UiRapidCatalog extends EventEmitter {
 
     // set focus (but only on enter)
     const inputNode = $$filterSearch.selectAll('.rapid-catalog-filter-search').node() as HTMLElement | null;
-    if (inputNode) inputNode.focus();
+    inputNode?.focus();
 
 
     const $$filterType = $$filter

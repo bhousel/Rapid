@@ -331,7 +331,7 @@ export class UiFieldAccess extends UiField {
   /** Moves keyboard focus to the field's input. */
   public focus(): void {
     if (!this.$items) return;   // called too early?
-
-    (this.$items.selectAll('.preset-input-access').node() as HTMLElement).focus();
+    const node = this.$items.selectAll('.preset-input-access').node() as HTMLElement | null;
+    node?.focus();
   }
 }

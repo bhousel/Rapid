@@ -64,7 +64,7 @@ Big changes are coming soon to Rapid. including:
 `;
 //    const markdown = l10n.t('whats_new.text_v25') + '\n\n' + l10n.t('whats_new.project_links') + '\n\n';
 
-    const $mainSection = $content
+    const $mainSection: D3Selection = $content
       .append('div')
       .attr('class', 'modal-section');
 
@@ -93,7 +93,7 @@ Big changes are coming soon to Rapid. including:
 // //      .attr('src', assets.getFileURL('img/rapid-v23-rotation.mp4'))
 // //      .attr('autoplay', '');
 
-    const $checkbox = $mainSection
+    const $checkbox: D3Selection= $mainSection
       .append('div')
       .attr('class', 'rapid-checkbox whatsnew-dontshow')
       .append('label')
@@ -120,23 +120,23 @@ Big changes are coming soon to Rapid. including:
       .append('div')
       .attr('class', 'rapid-checkbox-custom');
 
-
     // outbound links should open in new tab
     $content.selectAll('a')
       .attr('target', '_blank');
 
 
     /* OK Button */
-    const $buttonWrap = $content
+    const $buttonWrap: D3Selection = $content
       .append('div')
       .attr('class', 'modal-section buttons');
 
-    const $okButton = $buttonWrap
+    const $okButton: D3Selection = $buttonWrap
       .append('button')
       .attr('class', 'button ok-button action')
       .text(l10n.t('confirm.okay'))
       .on('click', modal.close);
 
-    ($okButton.node() as HTMLElement | null)?.focus();
+    const node = $okButton.node() as HTMLElement | null;
+    node?.focus();
   }
 }

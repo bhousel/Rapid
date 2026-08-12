@@ -86,8 +86,8 @@ describe('UiCombobox', () => {
   }
 
 
-  function focusTypeahead(input) {
-    input.node().focus();
+  function focusTypeahead($input) {
+    $input.node().focus();
   }
 
   it('adds the combobox-input class', () => {

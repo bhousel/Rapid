@@ -427,7 +427,8 @@ export class UiFieldRadio extends UiField {
   /** Moves keyboard focus to the field's input. */
   public focus(): void {
     if (!this.$radios) return;   // called too early?
-    (this.$radios.node() as HTMLElement).focus();
+    const node = this.$radios.node() as HTMLInputElement | null;
+    node?.focus();
   }
 
 

@@ -469,6 +469,6 @@ export class UiFieldAddress extends UiField {
     if (!this.$wrap) return;   // called too early?
 
     const node = this.$wrap.selectAll('input').node() as HTMLElement | null;
-    if (node) node.focus();
+    node?.focus();
   }
 }
