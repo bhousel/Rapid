@@ -4,12 +4,13 @@ import { uiIcon } from './icon.ts';
 import { UiModal } from './UiModal.ts';
 import { UiRapidAddDataset } from './UiRapidAddDataset.ts';
 import { UiRapidCatalog } from './UiRapidCatalog.ts';
-//import { UiRapidColorpicker } from './UiRapidColorpicker.ts';
+import { UiRapidColorpicker } from './UiRapidColorpicker.ts';
 import { utilCmd } from '../util/cmd.ts';
 import { utilSafeURL } from '../util/url.ts';
 
 import type { Context } from '../Context.ts';
 import type { D3EnterSelection, D3Selection } from 'd3-selection';
+import type { RapidDataset } from '../lib/RapidDataset.ts';
 
 
 /**
@@ -33,6 +34,7 @@ export class UiRapidDatasetToggle {
 
   // Child components
   public Modal: UiModal | null;
+  public colorpickers: Record<DatasetID, UiRapidColorpicker>;
 
 
   /**
@@ -46,6 +48,7 @@ export class UiRapidDatasetToggle {
 
     // Child components
     this.Modal = null;
+    this.colorpickers = {};
 
     // Ensure methods used as callbacks always have `this` bound correctly.
     // (This is also necessary when using `d3-selection.call`)
@@ -91,7 +94,7 @@ export class UiRapidDatasetToggle {
     const scene = context.systems.gfx!.scene!;
     const rtl = l10n.isRTL ? '-rtl' : '';
     const isRapidEnabled = scene.layers.get('rapid')?.enabled;
-    const $content: any = this.Modal.$content;   // legacy render body, typed loosely
+    const $content = this.Modal.$content!;
 
     /* Toggle All */
     let $toggleAll: D3Selection = $content.selectAll('.rapid-toggle-all')
@@ -279,23 +282,27 @@ export class UiRapidDatasetToggle {
       .filter(d => d.added && (showPreview || !d.beta));    // exclude preview datasets unless user has opted into them
 
     let $rows: D3Selection = $selection.selectAll('.rapid-checkbox-dataset')
-      .data(datasets, d => d.id);
+      .data(datasets, (d: RapidDataset) => d.id);
 
     // exit
     $rows.exit()
+      .each((d: RapidDataset) => {
+        const control = this.colorpickers[d.id];
+        control?.close();
+      })
       .remove();
 
     // enter
-    const $$rows = $rows.enter()
+    const $$rows: D3EnterSelection = $rows.enter()
       .append('div')
       .attr('class', 'rapid-checkbox rapid-checkbox-dataset');
 
-    const $$label = $$rows
+    const $$label: D3EnterSelection = $$rows
       .append('div')
       .attr('class', 'rapid-feature');
 
     // line1: name and optional beta badge
-    const $$line1 = $$label
+    const $$line1: D3EnterSelection = $$label
       .append('div')
       .attr('class', 'rapid-feature-label-container');
 
@@ -304,18 +311,18 @@ export class UiRapidDatasetToggle {
       .attr('class', 'rapid-feature-label');
 
     $$line1
-      .filter(d => d.beta)
+      .filter((d: RapidDataset) => d.beta)
       .append('div')
       .attr('class', 'rapid-feature-label-beta beta');
 
     // line2:  extent and license link
-    const $$line2 = $$label
+    const $$line2: D3EnterSelection = $$label
       .append('div')
       .attr('class', 'rapid-feature-extent-container');
 
     $$line2
-      .each((d, i, nodes) => {
-        const $$extent = select(nodes[i]);
+      .each((d: RapidDataset, i: number, nodes: HTMLElement[]) => {
+        const $$extent: D3EnterSelection = select(nodes[i]);
 
         // if the data spans more than 100°*100°, it might as well be worldwide
         if (d.extent && d.extent.area() < 10000) {
@@ -334,20 +341,20 @@ export class UiRapidDatasetToggle {
         }
       });
 
-    const $$license = $$line2
-      .filter(d => d.licenseUrl);
+    const $$license: D3EnterSelection = $$line2
+      .filter((d: RapidDataset) => !!d.licenseUrl);
 
     $$license
       .append('div')
       .attr('class', 'rapid-feature-label-divider');
 
-    const $$link = $$license
+    const $$link: D3EnterSelection = $$license
       .append('div')
       .attr('class', 'rapid-feature-license')
       .append('a')
       .attr('class', 'rapid-feature-licence-link')
       .attr('target', '_blank')
-      .attr('href', d => utilSafeURL(d.licenseUrl));
+      .attr('href', (d: RapidDataset) => utilSafeURL(d.licenseUrl));
 
     $$link
       .append('span')
@@ -357,15 +364,21 @@ export class UiRapidDatasetToggle {
       .call(uiIcon('#rapid-icon-out-link', 'inline'));
 
 
-    const $$inputs = $$rows
+    const $$inputs: D3EnterSelection = $$rows
       .append('div')
       .attr('class', 'rapid-checkbox-inputs');
 
-    $$inputs
+    const $$colorpickers: D3EnterSelection = $$inputs
       .append('label')
       .attr('class', 'rapid-colorpicker-label');
 
-    const $$checkboxes = $$inputs
+    $$colorpickers.each((d: RapidDataset) => {
+      const control = new UiRapidColorpicker(context);
+      control.on('change', (val: string) => this.changeColor(d, val));
+      this.colorpickers[d.id] = control;
+    });
+
+    const $$checkboxes: D3EnterSelection = $$inputs
       .append('label')
       .attr('class', 'rapid-checkbox-label');
 
@@ -405,17 +418,22 @@ export class UiRapidDatasetToggle {
     $rows.selectAll('.rapid-feature-extent-worldwide')
       .text(l10n.t('rapid_menu.worldwide'));
 
-    // if (this.ColorPicker) {
-      // $rows.selectAll('.rapid-colorpicker-label')
-        // .attr('disabled', isRapidEnabled ? null : true)
-        // .call(this.ColorPicker.render);
-    // }
+    $rows.selectAll('.rapid-colorpicker-label')
+      .attr('disabled', isRapidEnabled ? null : true)
+      .each((d: RapidDataset, i: number, nodes: HTMLElement[]) => {
+        const $selection: D3Selection = select(nodes[i]);
+        const control = this.colorpickers[d.id];
+        if (control) {
+          control.color = d.color;
+          $selection.call(control.render);
+        }
+      });
 
     $rows.selectAll('.rapid-checkbox-label')
       .classed('disabled', !isRapidEnabled);
 
     $rows.selectAll('.rapid-feature-checkbox')
-      .property('checked', d => d.enabled)
+      .property('checked', (d: RapidDataset) => d.enabled)
       .attr('disabled', isRapidEnabled ? null : true);
   }
 
@@ -435,7 +453,7 @@ export class UiRapidDatasetToggle {
    * @param  e? - triggering event (if any)
    * @param  d - bound datum (the RapidDataset in this case)
    */
-  public toggleDataset(e: Event, d: any): void {
+  public toggleDataset(e: Event, d: RapidDataset): void {
     const context = this.context;
     const rapid = context.systems.rapid!;
 
@@ -446,29 +464,25 @@ export class UiRapidDatasetToggle {
 
   /**
    * Called when a user has selected a color with the colorpicker
-   * @param  datasetID  - the datasetID to update
-   * @param  color      - hexstring for the color e.g. '#da26d3'
+   * @param  dataset  - the RapidDataset to update
+   * @param  color    - hexstring for the color e.g. '#da26d3'
    */
-  public changeColor(datasetID: string, color: string): void {
+  public changeColor(dataset: RapidDataset, color: string): void {
     const context = this.context;
     const gfx = context.systems.gfx!;
-    const rapid = context.systems.rapid!;
     const scene = gfx.scene!;
 
-    const dataset = rapid.datasets.get(datasetID);
-    if (dataset) {
-      dataset.color = color;
+    dataset.color = color;
 
-      scene.dirtyLayers(['rapid', 'rapidoverlay']);
-      gfx.immediateRedraw();
-      this.render();
+    scene.dirtyLayers(['rapid', 'rapidoverlay']);
+    gfx.immediateRedraw();
+    this.render();
 
-      // In case a Rapid feature is already selected, reselect it to update sidebar too
-      const mode = context.mode;
-      if (mode?.id === 'select') {  // new (not legacy) select mode
-        const selection = new Map(mode.selectedData);
-        context.enter('select', { selection: selection });
-      }
+    // In case a Rapid feature is already selected, reselect it to update sidebar too
+    const mode = context.mode;
+    if (mode?.id === 'select') {  // new (not legacy) select mode
+      const selection = new Map(mode.selectedData);
+      context.enter('select', { selection: selection });
     }
   }
 
