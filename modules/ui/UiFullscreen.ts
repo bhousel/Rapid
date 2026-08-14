@@ -65,6 +65,7 @@ export class UiFullscreen {
 
 
   /**
+   * Returns `true` if fullscreen mode is supported in this browser.
    * @return  `true` if the container can be made fullscreen, `false` if not
    */
   public isSupported(): boolean {
@@ -74,6 +75,7 @@ export class UiFullscreen {
 
 
   /**
+   * Returns `true` if we are in fullscreen mode.
    * @return  `true` if the container is currently fullscreen, `false` if not
    */
   public isFullscreen(): boolean {
@@ -83,6 +85,7 @@ export class UiFullscreen {
 
 
   /**
+   * Enters fullscreen mode.
    * @return  Promise settled when the browser has entered fullscreen mode
    */
   public requestFullscreen(): Promise<void> {
@@ -93,6 +96,7 @@ export class UiFullscreen {
 
 
   /**
+   * Exits fullscreen mode.
    * @return  Promise settled when the browser has left fullscreen mode
    */
   public exitFullscreen(): Promise<void> {
@@ -102,8 +106,8 @@ export class UiFullscreen {
 
 
   /**
-   * Toggle fullscreen mode
-   * @param  e? - triggering event (if any)
+   * Toggle fullscreen mode.
+   * @param   [e] - the triggering event, if any
    * @return  Promise settled when the browser is finished toggling
    */
   public toggle(e?: Event): Promise<void> {

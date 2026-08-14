@@ -170,9 +170,9 @@ export class UiRapidInspector {
 
   /**
    * Called when the user presses Add Feature.
-   * @param  e?         - triggering event (if any)
-   * @param  d?         - object bound to the selection (i.e. the command) (not used)
-   * @param  nextMode?  - optional next mode to enter after accepting ('move' or 'rotate')
+   * @param  [e] - the triggering event, if any
+   * @param  [d] - object bound to the selection (i.e. the command) (not used)
+   * @param  [nextMode] - optional next mode to enter after accepting ('move' or 'rotate')
    */
   public acceptFeature(e?: any, d?: any, nextMode?: string): void {
     const datum = this.datum;
@@ -270,10 +270,10 @@ export class UiRapidInspector {
 
   /**
    * Called when the user presses "Ignore Feature".
-   * @param  e? - triggering event (if any)
-   * @param  d? - object bound to the selection (i.e. the command) (not used)
+   * @param  [e] - the triggering event, if any
+   * @param  [d] - object bound to the selection (i.e. the command) (not used)
    */
-  public ignoreFeature(e?: any): void {
+  public ignoreFeature(e?: Event): void {
     const datum = this.datum;
     if (!datum) return;
 

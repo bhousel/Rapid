@@ -15,13 +15,13 @@ const [trimW, trimH] = [45, 105];  // trim amounts to allow for toolbars
  * It creates a "nine slice" frame like below to allow for resize handles be placed around the edges:
  * (aside: we should extract this into its own component and use it other places
  *  where we want a resizable, movable window - minimap, 3dmap, maybe others)
- *
+ * ```
  *       top-left |   top-middle  | top-right
  *    ------------+---------------+------------
  *    middle-left | middle-middle | middle-right
  *    ------------+---------------+------------
  *    bottom-left | bottom-middle | bottom-right
- *
+ * ```
  *  The 'middle-middle' section is where the various photo services can add their viewers.
  *  Each viewer is classed as 'photo-wrapper' and is absolutely positioned within middle-middle,
  *    inset slightly to allow the user enough of space to use the resize handles.

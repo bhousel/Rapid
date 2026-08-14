@@ -2,17 +2,18 @@ import { selection } from 'd3-selection';
 import { uiIcon } from './icon.ts';
 
 import type { Context } from '../Context.ts';
-import type { D3Selection } from 'd3-selection';
+import type { D3EnterSelection, D3Selection } from 'd3-selection';
 
 
 /**
- * This component adds a link like "View On OSM"
+ * This component adds a link near the bottom
+ * of the inspectorlike "View On OSM".
  */
 export class UiViewOn {
   public context: Context;
 
-  public url: any;
-  public stringID: any;
+  public url: string | null;
+  public stringID: string | null;
 
   // D3 selections
   public $parent: D3Selection | null;
@@ -55,14 +56,14 @@ export class UiViewOn {
     const stringID = this.stringID;
 
     let $viewon: D3Selection = $parent.selectAll('.view-on')
-      .data(url && stringID ? [url] : [], d => d);
+      .data(url && stringID ? [url] : [], (d: string) => d);
 
     // exit
     $viewon.exit()
       .remove();
 
     // enter
-    const $$viewon = $viewon.enter()
+    const $$viewon: D3EnterSelection = $viewon.enter()
       .append('a')
       .attr('class', 'view-on')
       .attr('target', '_blank')
@@ -75,7 +76,7 @@ export class UiViewOn {
     $viewon = $viewon.merge($$viewon);
 
     $viewon
-      .attr('href', d => d);
+      .attr('href', (d: string) => d);
 
     $viewon.selectAll('span')
       .text(stringID ? l10n.t(stringID) : '');

@@ -4,7 +4,7 @@ import { utilSanitizeHTML } from '../util/sanitize.ts';
 import { utilSafeURL } from '../util/url.ts';
 
 import type { Context } from '../Context.ts';
-import type { D3Selection } from 'd3-selection';
+import type { D3EnterSelection, D3Selection } from 'd3-selection';
 
 
 /**
@@ -61,9 +61,9 @@ export class UiTagReference {
 
   /**
    * Renders the info toggle button into the given selection.
-   * @param $selection - A d3-selection to a HTMLElement to render the button into
-   * @param klass      - optional extra class to add to the button
-   * @param iconName   - optional icon name (defaults to `inspect`)
+   * @param  $selection - A d3-selection to a HTMLElement to render the button into
+   * @param  [klass]      - optional extra class to add to the button
+   * @param  [iconName]   - optional icon name (defaults to `inspect`)
    */
   public button($selection: D3Selection, klass?: string, iconName?: string): void {
     const l10n = this.context.systems.l10n!;
@@ -96,13 +96,13 @@ export class UiTagReference {
 
   /**
    * Renders the (initially collapsed) documentation body into the given selection.
-   * @param $selection - A d3-selection to a HTMLElement to render the body into
+   * @param  $selection - A d3-selection to a HTMLElement to render the body into
    */
   public body($selection: D3Selection): void {
     const what = this._what;
     const itemID = what.qid || (what.key + '-' + (what.value || ''));
     this.$body = $selection.selectAll('.tag-reference-body')
-      .data([itemID], d => d as string);
+      .data([itemID], (d: string) => d);
 
     this.$body.exit()
       .remove();
@@ -122,7 +122,7 @@ export class UiTagReference {
 
   /**
    * Gets or sets whether the documentation body is currently showing.
-   * @param  val - when provided, sets the showing state
+   * @param  [val] - when provided, sets the showing state
    * @return the current showing state (getter), or `this` (setter)
    */
   public showing(val?: boolean): any {
@@ -162,7 +162,7 @@ export class UiTagReference {
       this.$body
         .append('p')
         .attr('class', 'tag-reference-description')
-        .html(l10n.tHtml('inspector.no_documentation_key'));
+        .text(l10n.t('inspector.no_documentation_key'));
       this._done();
       return;
     }
@@ -185,7 +185,7 @@ export class UiTagReference {
     if (docs.description) {
       docsHtml = utilSanitizeHTML(l10n.htmlForLocalizedText(docs.description, docs.descriptionLocaleCode));
     } else {
-      docsHtml = l10n.tHtml('inspector.no_documentation_key');
+      docsHtml = utilSanitizeHTML(l10n.tHtml('inspector.no_documentation_key'));
     }
 
     this.$body
@@ -207,7 +207,7 @@ export class UiTagReference {
         .attr('href', utilSafeURL(docs.wiki.url))
         .call(uiIcon('#rapid-icon-out-link', 'inline'))
         .append('span')
-        .html(l10n.tHtml(docs.wiki.text));
+        .html(l10n.tHtml(utilSanitizeHTML(docs.wiki.text)));
     }
 
     // Add link to info about "good changeset comments" - iD#2923
@@ -219,7 +219,7 @@ export class UiTagReference {
         .call(uiIcon('#rapid-icon-out-link', 'inline'))
         .attr('href', l10n.t('commit.about_changeset_comments_link'))
         .append('span')
-        .html(l10n.tHtml('commit.about_changeset_comments'));
+        .text(l10n.t('commit.about_changeset_comments'));
     }
   }
 

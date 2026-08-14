@@ -80,7 +80,7 @@ export class UiSourceSwitch {
 
   /**
    * Toggles between live and dev database
-   * @param  e? - triggering event (if any)
+   * @param [e] - the triggering event, if any
    */
   public toggle(e?: Event): void {
     e?.preventDefault();

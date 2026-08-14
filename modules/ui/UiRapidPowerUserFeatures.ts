@@ -1,16 +1,20 @@
+import { EventEmitter } from 'tseep/lib/ee-safe';
 import { UiModal } from './UiModal.ts';
 
 import type { Context } from '../Context.ts';
-import type { D3Selection } from 'd3-selection';
+import type { D3EnterSelection, D3Selection } from 'd3-selection';
 
 
 /**
- * This is the modal where the user can toggle on and off power user features.
+ * This is the Modal where the user can toggle on and off poweruser features.
  * It is shown by clicking the "Beta" button in the top menu, if `&poweruser=true` is in the url.
+ *
+ * Events available:
+ * - `done`:  Fires when the user is finished and they are closing this Modal
  */
-export class UiRapidPowerUserFeatures {
+export class UiRapidPowerUserFeatures extends EventEmitter {
   public context: Context;
-  public featureFlags: string[];
+  protected _featureFlags: string[];
 
   // Child components
   public Modal: UiModal | null;
@@ -20,12 +24,10 @@ export class UiRapidPowerUserFeatures {
    * @param  context - Global shared application context
    */
   public constructor(context: Context) {
+    super();
     this.context = context;
 
-    const l10n = context.systems.l10n!;
-    const urlhash = context.systems.urlhash!;
-
-    this.featureFlags = [
+    this._featureFlags = [
       'autoConnect',
       'previewDatasets',
       'tagnosticRoadCombine',
@@ -39,12 +41,41 @@ export class UiRapidPowerUserFeatures {
 
     // Ensure methods used as callbacks always have `this` bound correctly.
     // (This is also necessary when using `d3-selection.call`)
+    this._done = this._done.bind(this);
     this.show = this.show.bind(this);
+    this.close = this.close.bind(this);
     this.render = this.render.bind(this);
     this.renderFeatures = this.renderFeatures.bind(this);
     this.updateFeatureFlags = this.updateFeatureFlags.bind(this);
     this.isFeatureEnabled = this.isFeatureEnabled.bind(this);
     this.toggleFeature = this.toggleFeature.bind(this);
+  }
+
+
+  /**
+   * This shows the datataset modal if it isn't already being shown.
+   * For a Modal component, must first `show()` to create the modal.
+   */
+  public show(): void {
+    const context = this.context;
+    const l10n = context.systems.l10n!;
+    const urlhash = context.systems.urlhash!;
+
+    if (this.Modal?.isShown) return;  // already showing
+
+    this.updateFeatureFlags();
+
+    this.Modal = new UiModal(context).show();
+
+    this.Modal.$modal!
+      .attr('class', 'modal rapid-modal');
+    this.Modal.$content!
+      .attr('class', 'content poweruser');
+
+    // Handle the various ways of closing the modal ('X' button, Esc, OK Button, etc.)
+    this.Modal.once('close', this._done);
+
+    this.render();
 
     // Setup event handlers
     l10n.on('localechange', this.render);
@@ -53,26 +84,29 @@ export class UiRapidPowerUserFeatures {
 
 
   /**
-   * This shows the poweruser features modal if it isn't already being shown.
-   * For this kind of popup component, must first `show()` to create the modal.
+   * Dismisses and removes the Modal, if it exists.
+   * @param [e] - the triggering event, if any
    */
-  public show(): void {
+  public close(e?: Event): void {
+    e?.preventDefault();
+    this.Modal?.close();
+  }
+
+
+  /**
+   * Emits a 'done' event and cleans up the Modal.
+   * All the various ways of closing the Modal end up here.
+   */
+  protected _done(): void {
     const context = this.context;
+    const l10n = context.systems.l10n!;
+    const urlhash = context.systems.urlhash!;
 
-    if (this.Modal?.isShown) return;  // already showing
+    this.emit('done');
+    this.Modal = null;
 
-    this.updateFeatureFlags();
-
-    this.Modal = new UiModal(context);
-    this.Modal.show();
-
-    this.Modal.$modal!
-      .attr('class', 'modal rapid-modal');
-
-    this.Modal.$content!
-      .attr('class', 'content poweruser');
-
-    this.render();
+    l10n.off('localechange', this.render);
+    urlhash.off('hashchange', this.updateFeatureFlags);
   }
 
 
@@ -80,19 +114,18 @@ export class UiRapidPowerUserFeatures {
    * Renders the content inside the Modal component.
    */
   public render(): void {
-    // Modals are created at the time when `show()` is first called
     if (!this.Modal) return;
 
     const context = this.context;
     const l10n = context.systems.l10n!;
-    const $content: any = this.Modal.$content;   // legacy render body, typed loosely
+    const $content = this.Modal.$content!;   // legacy render body, typed loosely
 
     /* Heading */
-    let $heading = $content.selectAll('.modal-section-heading')
+    let $heading: D3Selection = $content.selectAll('.modal-section-heading')
       .data([0]);
 
     // enter
-    const $$heading = $heading.enter()
+    const $$heading: D3EnterSelection = $heading.enter()
       .append('div')
       .attr('class', 'modal-section-heading');
 
@@ -100,7 +133,7 @@ export class UiRapidPowerUserFeatures {
       .append('h3')
       .attr('class', 'modal-heading');
 
-    const $$description = $$heading
+    const $$description: D3EnterSelection = $$heading
       .append('div')
       .attr('class', 'modal-heading-desc');
 
@@ -117,18 +150,18 @@ export class UiRapidPowerUserFeatures {
     $heading = $heading.merge($$heading);
 
     $heading.selectAll('.modal-heading')
-      .html(l10n.t('rapid_poweruser.heading.label'));
+      .text(l10n.t('rapid_poweruser.heading.label'));
 
     $heading.selectAll('.modal-heading-desc-text')
       .text(l10n.t('rapid_poweruser.heading.description'));
 
 
     /* Features */
-    let $features = $content.selectAll('.rapid-features-container')
+    let $features: D3Selection = $content.selectAll('.rapid-features-container')
       .data([0]);
 
     // enter
-    const $$features = $features.enter()
+    const $$features: D3EnterSelection = $features.enter()
       .append('div')
       .attr('class', 'modal-section rapid-features-container');
 
@@ -139,18 +172,18 @@ export class UiRapidPowerUserFeatures {
 
 
     /* OK Button */
-    let $buttons = $content.selectAll('.modal-section.buttons')
+    let $buttons: D3Selection= $content.selectAll('.modal-section.buttons')
       .data([0]);
 
     // enter
-    const $$buttons = $buttons.enter()
+    const $$buttons: D3EnterSelection = $buttons.enter()
       .append('div')
       .attr('class', 'modal-section buttons');
 
     $$buttons
       .append('button')
       .attr('class', 'button ok-button action')
-      .on('click', () => this.Modal!.close());
+      .on('click', this.close);
 
     // set focus (but only on enter)
     const buttonNode = $$buttons.selectAll('button').node() as HTMLElement | null;
@@ -173,14 +206,14 @@ export class UiRapidPowerUserFeatures {
     const l10n = context.systems.l10n!;
 
     let $rows: D3Selection = $selection.selectAll('.rapid-checkbox-feature')
-      .data(this.featureFlags, d => d);
+      .data(this._featureFlags, d => d);
 
     // enter
-    const $$rows = $rows.enter()
+    const $$rows: D3EnterSelection = $rows.enter()
       .append('div')
       .attr('class', 'rapid-checkbox rapid-checkbox-feature');
 
-    const $$descriptions = $$rows
+    const $$descriptions: D3EnterSelection = $$rows
       .append('div')
       .attr('class', 'rapid-feature');
 
@@ -192,11 +225,11 @@ export class UiRapidPowerUserFeatures {
       .append('div')
       .attr('class', 'rapid-feature-description');
 
-    const $$inputs = $$rows
+    const $$inputs: D3EnterSelection = $$rows
       .append('div')
       .attr('class', 'rapid-checkbox-inputs');
 
-    const $$checkboxes = $$inputs
+    const $$checkboxes: D3EnterSelection = $$inputs
       .append('label')
       .attr('class', 'rapid-checkbox-label');
 
@@ -245,7 +278,7 @@ export class UiRapidPowerUserFeatures {
 
     const isPowerUser = urlhash.getParam('poweruser') === 'true';
     if (!isPowerUser) {
-      for (const featureFlag of this.featureFlags) {
+      for (const featureFlag of this._featureFlags) {
         const val = settings?.get(`poweruser.${featureFlag}`);
         if (val) {
           settings?.set(`poweruser.was.${featureFlag}`, val);
@@ -253,7 +286,7 @@ export class UiRapidPowerUserFeatures {
         }
       }
     } else {
-      for (const featureFlag of this.featureFlags) {
+      for (const featureFlag of this._featureFlags) {
         const val = settings?.get(`poweruser.was.${featureFlag}`);
         if (val) {
           settings?.set(`poweruser.${featureFlag}`, val);
@@ -277,12 +310,12 @@ export class UiRapidPowerUserFeatures {
 
   /**
    * Toggles the given feature flag between on/off
-   * @param  e? - triggering event (if any)
+   * @param  [e] - the triggering event, if any
    * @param  featureFlag - the feature flag to toggle
    */
   public toggleFeature(e?: Event, featureFlag?: string): void {
     const context = this.context;
-    const gfx = context.systems.gfx!;
+    const gfx = context.systems.gfx;
     const rapid = context.systems.rapid!;
     const settings = context.systems.settings;
 
@@ -299,7 +332,7 @@ export class UiRapidPowerUserFeatures {
         }
       }
       context.enter('browse');   // return to browse mode (in case something was selected)
-      gfx.immediateRedraw();
+      gfx?.immediateRedraw();
     }
   }
 

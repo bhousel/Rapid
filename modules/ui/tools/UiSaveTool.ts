@@ -133,7 +133,8 @@ export class UiSaveTool {
 
 
   /**
-   * @param  e? - triggering event (if any)
+   * Chooses this item (usually because the user clicked on its button).
+   * @param [e] - the triggering event, if any
    */
   public choose(e?: Event): void {
     e?.preventDefault();

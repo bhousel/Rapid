@@ -159,8 +159,9 @@ export class UiUndoRedoTool {
 
 
   /**
-   * @param  e? - triggering event (if any)
-   * @param  d? - object bound to the selection (i.e. the command)
+   * Chooses this item (usually because the user clicked on its button).
+   * @param [e] - the triggering event, if any
+   * @param [d] - object bound to the selection (i.e. the command)
    */
   public choose(e?: Event, d?: any): void {
     e?.preventDefault();

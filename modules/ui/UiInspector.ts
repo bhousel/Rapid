@@ -213,8 +213,8 @@ export class UiInspector {
 
   /**
    * Show the preset list, optionally with given selected array, and optionally with a slide-in animation
-   * @param  selected? - optional Array of presets selected
-   * @param  animate? - whether to animate the pane
+   * @param  [selected] - optional Array of presets selected
+   * @param  [animate] - whether to animate the pane
    */
   public showPresetList(selected?: (Preset | undefined)[], animate?: boolean): void | false {
     const $paneWrap = this.$paneWrap;
@@ -246,8 +246,8 @@ export class UiInspector {
 
   /**
    * Show the entity editor, optionally with the given presets, optionally with slide-in animation
-   * @param  presets? - optional Array of presets selected
-   * @param  animate? - whether to animate the pane
+   * @param  [presets] - optional Array of presets selected
+   * @param  [animate] - whether to animate the pane
    */
   public showEntityEditor(presets?: (Preset | undefined)[], animate?: boolean): void | false {
     const $paneWrap = this.$paneWrap;
@@ -327,7 +327,7 @@ export class UiInspector {
 
   /**
    * Get or set the inspector state ('hide', 'hover', or 'select').
-   * @param  val? - the state to set; if omitted, returns the current state
+   * @param  [val] - the state to set; if omitted, returns the current state
    */
   public state(val?: string): any {
     if (val === undefined) return this._state;
@@ -343,7 +343,7 @@ export class UiInspector {
 
   /**
    * Get or set the entities being inspected.
-   * @param  val? - array of EntityIDs to set; if omitted, returns the current ids
+   * @param  [val] - array of EntityIDs to set; if omitted, returns the current ids
    */
   public entityIDs(val?: EntityID[]): any {
     if (val === undefined) return this._entityIDs;
@@ -354,7 +354,7 @@ export class UiInspector {
 
   /**
    * Get or set whether the inspected entity is a newly created feature.
-   * @param  val? - the flag to set; if omitted, returns the current value
+   * @param  [val] - the flag to set; if omitted, returns the current value
    */
   public newFeature(val?: boolean): any {
     if (val === undefined) return this._newFeature;

@@ -101,7 +101,7 @@ export class UiInfoCards {
 
   /**
    * Toggles all info cards on/off
-   * @param  e? - triggering event (if any)
+   * @param [e] - the triggering event, if any
    */
   public toggle(e?: Event): void {
     e?.preventDefault();

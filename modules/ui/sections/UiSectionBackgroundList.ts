@@ -567,21 +567,21 @@ export class UiSectionBackgroundList extends AbstractUiSection {
 
   /**
    * Opens the custom background settings dialog.
-   * @param  e? - triggering event, if any
+   * @param [e] - the triggering event, if any
    */
   protected _clickCustom(e?: Event): void {
-    if (e) e.preventDefault();
+    e?.preventDefault();
     this.CustomBackgroundSettings.render();
   }
 
 
   /**
    * Handles a change to the selected Wayback release date.
-   * @param d3_event - change event, if called from a change handler
+   * @param e - change event, if called from a change handler
    */
-  protected _waybackDateChange(d3_event: Event): void {
+  protected _waybackDateChange(e: Event): void {
     let sourceID = 'EsriWayback';
-    const selectedDate = (d3_event.target as HTMLSelectElement).value;
+    const selectedDate = (e.target as HTMLSelectElement).value;
     if (selectedDate) {
       sourceID += '_' + selectedDate;
     }

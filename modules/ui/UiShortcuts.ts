@@ -1,3 +1,4 @@
+import { EventEmitter } from 'tseep/lib/ee-safe';
 import { select } from 'd3-selection';
 import { utilArrayUniq } from '@rapid-sdk/util';
 
@@ -14,6 +15,10 @@ import type { D3EnterSelection, D3Selection } from 'd3-selection';
  * It is a modal component built on `UiModal`.
  * We load the data from 'shortcuts.json' to populate this screen.
  *
+ * Events available:
+ * - `done`:  Fires when the user is finished and they are closing this Modal
+ *
+ * ```
  * +------------------------------+
  * | Keyboard Shortcuts         X |   `.shortcuts-heading`
  * +------------------------------+
@@ -25,8 +30,9 @@ import type { D3EnterSelection, D3Selection } from 'd3-selection';
  * |  | row      |  | row      |  |  |     each of those contains multiple `.shortcut-column`
  * |  +----------+  +----------+  |  |      each of those contains multiple `.shortcut-row`
  * +------------------------------+  /
+ * ```
  */
-export class UiShortcuts {
+export class UiShortcuts extends EventEmitter {
   public context: Context;
 
   protected _detectedOS: string;
@@ -42,6 +48,7 @@ export class UiShortcuts {
    * @param  context - Global shared application context
    */
   public constructor(context: Context) {
+    super();
     this.context = context;
 
     this._detectedOS = utilDetect().os;
@@ -56,20 +63,15 @@ export class UiShortcuts {
 
     // Ensure methods used as callbacks always have `this` bound correctly.
     // (This is also necessary when using `d3-selection.call`)
+    this._done = this._done.bind(this);
     this.show = this.show.bind(this);
-    this.hide = this.hide.bind(this);
+    this.close = this.close.bind(this);
     this.toggle = this.toggle.bind(this);
     this.render = this.render.bind(this);
+    this._localeChanged = this._localeChanged.bind(this);
     this._setupKeybinding = this._setupKeybinding.bind(this);
 
-    // Setup event handlers..
-    const l10n = context.systems.l10n!;
-    l10n.on('localechange', () => {
-      this._setupKeybinding();
-      this.render();
-    });
-
-    this._setupKeybinding();
+    this._setupKeybinding();  // listen for '?' key
   }
 
 
@@ -207,7 +209,6 @@ export class UiShortcuts {
             .text('+');
         }
 
-
         // Add shortcuts, if any..
         let shortcuts = d.shortcuts || [];
         if (this._detectedOS === 'win' && d.text === 'shortcuts.editing.commands.redo') {
@@ -308,13 +309,13 @@ export class UiShortcuts {
 
 
   /**
-   * Shows the shortcuts modal.
-   * This will create the modal, then load the shortcuts data, then render()
+   * This shows the Modal if it isn't already being shown.
    * For this kind of popup component, must first `show()` to create the modal.
    */
   public show(): void {
     const context = this.context;
     const assets = context.systems.assets!;
+    const l10n = context.systems.l10n!;
 
     assets.loadAssetAsync('shortcuts')
       .then((data: any) => {
@@ -322,13 +323,17 @@ export class UiShortcuts {
 
         if (this.Modal?.isShown) return;  // already showing
 
-        this.Modal = new UiModal(context);
-        this.Modal.show();
-
+        this.Modal = new UiModal(context).show();
         this.Modal.$modal!
           .classed('modal-shortcuts', true);
 
+        // Handle the various ways of closing the modal ('X' button, Esc, OK Button, etc.)
+        this.Modal.once('close', this._done);
+
         this.render();
+
+        // Setup event handlers..
+        l10n.on('localechange', this._localeChanged);
       })
       .catch(e => {
         console.error(e);  // eslint-disable-line
@@ -337,12 +342,35 @@ export class UiShortcuts {
 
 
   /**
-   * Hides the shortcuts modal.
+   * Dismisses and removes the Modal, if it exists.
+   * @param [e] - the triggering event, if any
    */
-  public hide(): void {
-    if (!this.Modal) return;
-    this.Modal.close();
+  public close(e?: Event): void {
+    e?.preventDefault();
+    this.Modal?.close();
+  }
+
+
+  /**
+   * Emits a 'done' event and cleans up the Modal.
+   * All the various ways of closing the Modal end up here.
+   */
+  protected _done(): void {
+    const context = this.context;
+    const l10n = context.systems.l10n!;
+
+    this.emit('done');
     this.Modal = null;
+    l10n.off('localechange', this._localeChanged);
+  }
+
+
+  /**
+   * Handler for locale changes.
+   */
+  protected _localeChanged(): void {
+    this._setupKeybinding();
+    this.render();
   }
 
 
@@ -352,12 +380,12 @@ export class UiShortcuts {
   public toggle(): void {
     const $container = this.context.$container;
 
-    const otherShowing = $container.selectAll('.shaded > div:not(.modal-shortcuts)').size();
+    const otherShowing = !!$container.selectAll('.shaded > div:not(.modal-shortcuts)').size();
     if (otherShowing) return;  // some other modal is already showing
 
     const isShowing = $container.selectAll('.shaded > div.modal-shortcuts').size();
     if (isShowing) {
-      this.hide();
+      this.close();
     } else {
       this.show();
     }

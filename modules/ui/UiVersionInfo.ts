@@ -3,7 +3,7 @@ import { uiIcon } from './icon.ts';
 import { UiTooltip } from './UiTooltip.ts';
 
 import type { Context } from '../Context.ts';
-import type { D3Selection } from 'd3-selection';
+import type { D3EnterSelection, D3Selection } from 'd3-selection';
 
 
 /**
@@ -82,7 +82,7 @@ export class UiVersionInfo {
     let $wrap: D3Selection = $parent.selectAll('.version-wrap')
       .data([0]);
 
-    const $$wrap = $wrap.enter()
+    const $$wrap: D3EnterSelection = $wrap.enter()
       .append('div')
       .attr('class', 'version-wrap');
 

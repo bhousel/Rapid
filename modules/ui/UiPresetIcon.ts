@@ -38,7 +38,7 @@ export class UiPresetIcon {
 
   /**
    * Fluent getter/setter for the preset (or category, or array) to display.
-   * @param  val? - the preset/category/array to set; if omitted, returns the current value
+   * @param  [val] - the preset/category/array to set; if omitted, returns the current value
    */
   public preset(val?: Preset | Category | Preset[] | null): any {
     if (!arguments.length) return this._preset;
@@ -49,7 +49,7 @@ export class UiPresetIcon {
 
   /**
    * Fluent getter/setter for the geometry to display the icon for.
-   * @param  val? - the geometry to set; if omitted, returns the current value
+   * @param  [val] - the geometry to set; if omitted, returns the current value
    */
   public geometry(val?: string | null): any {
     if (!arguments.length) return this._geometry;

@@ -190,7 +190,7 @@ export class UiRapidColorpicker extends EventEmitter {
 
   /**
    * Opens the color popup.
-   * @param e? - the triggering click event, if any
+   * @param [e] - the triggering event, if any
    */
   public show(e?: Event): void {
     e?.preventDefault();
@@ -209,7 +209,7 @@ export class UiRapidColorpicker extends EventEmitter {
 
   /**
    * Closes the color popup.
-   * @param e? - the triggering click event, if any
+   * @param [e] - the triggering event, if any
    */
   public close(e?: Event): void {
     e?.preventDefault();
@@ -221,7 +221,7 @@ export class UiRapidColorpicker extends EventEmitter {
 
   /**
    * Toggles the color popup
-   * @param e? - the triggering click event
+   * @param [e] - the triggering event, if any
    */
   public toggle(e?: Event): void {
     if (this.Modal?.isShown) {

@@ -356,8 +356,8 @@ export class UiMinimap {
 
 
   /**
-   * Toggles the minimap on/off
-   * @param  e? - triggering event (if any)
+   * Toggles the minimap on/off.
+   * @param [e] - the triggering event, if any
    */
   public toggle(e?: Event): void {
     e?.preventDefault();

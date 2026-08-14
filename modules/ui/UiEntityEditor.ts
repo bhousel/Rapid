@@ -172,7 +172,7 @@ export class UiEntityEditor extends EventEmitter {
 
   /**
    * Get or set whether the entity has been modified.
-   * @param  val? - the flag to set; if omitted, returns the current value
+   * @param  [val] - the flag to set; if omitted, returns the current value
    */
   public modified(val?: boolean): any {
     if (!arguments.length) return this._modified;
@@ -183,7 +183,7 @@ export class UiEntityEditor extends EventEmitter {
 
   /**
    * Get or set the editor state ('hide', 'hover', or 'select').
-   * @param  val? - the state to set; if omitted, returns the current state
+   * @param  [val] - the state to set; if omitted, returns the current state
    */
   public state(val?: string): any {
     if (!arguments.length) return this._state;
@@ -194,7 +194,7 @@ export class UiEntityEditor extends EventEmitter {
 
   /**
    * Get or set the entities being edited.
-   * @param  val? - array of EntityIDs to set; if omitted, returns the current ids
+   * @param  [val] - array of EntityIDs to set; if omitted, returns the current ids
    */
   public entityIDs(val?: EntityID[]): any {
     if (!arguments.length) return this._entityIDs;
@@ -225,7 +225,7 @@ export class UiEntityEditor extends EventEmitter {
 
   /**
    * Get or set whether the edited entity is a newly created feature.
-   * @param  val? - the value to set; if omitted, returns the current value
+   * @param  [val] - the value to set; if omitted, returns the current value
    */
   public newFeature(val?: boolean): any {
     if (!arguments.length) return this._newFeature;
@@ -236,7 +236,7 @@ export class UiEntityEditor extends EventEmitter {
 
   /**
    * Get or set the presets currently selected for the edited entities.
-   * @param  val? - array of presets to set; if omitted, returns the current presets
+   * @param  [val] - array of presets to set; if omitted, returns the current presets
    */
   public presets(val?: (Preset | undefined)[]): any {
     if (!arguments.length) return this._selectedPresets;
@@ -293,7 +293,7 @@ export class UiEntityEditor extends EventEmitter {
    * (It will trigger validation warnings for any crossing tags that go out of sync)
    * @param  entityIDs - the entities whose tags changed
    * @param  changed - object of the changed key/value pairs
-   * @param  onInput? - true if the change fired on input (before blur)
+   * @param  [onInput] - true if the change fired on input (before blur)
    */
   protected _changeRawTags(entityIDs: EntityID[], changed: Record<string, string | undefined>, onInput?: boolean): void {
     this._changeTags(entityIDs, changed, onInput, true);
@@ -307,8 +307,8 @@ export class UiEntityEditor extends EventEmitter {
    * We'll also sync up the crossing tags if this update didn't come from the raw tag editor.
    * @param  entityIDs - the entities whose tags changed
    * @param  changed - object of the changed key/value pairs
-   * @param  onInput? - true if the change fired on input (before blur)
-   * @param  wasRawTagEditor - true if the change came from the raw tag editor
+   * @param  [onInput] - true if the change fired on input (before blur)
+   * @param  [wasRawTagEditor=false] - true if the change came from the raw tag editor
    */
   protected _changeTags(entityIDs: EntityID[], changed: Record<string, string | undefined>, onInput?: boolean, wasRawTagEditor = false): void {
     const context = this.context;

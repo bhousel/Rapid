@@ -6,16 +6,16 @@ import { UiModal } from './UiModal.ts';
 import { utilNoAuto, utilSafeURL, utilSanitizeHTML } from '../util/index.ts';
 
 import type { Context } from '../Context.ts';
-import type { D3Selection } from 'd3-selection';
+import type { D3EnterSelection, D3Selection } from 'd3-selection';
 
 const MAXRESULTS = 100;
 
 
 /**
- * This is the modal where the user can browse the catalog of datasets.
+ * This is the Modal where the user can browse the catalog of datasets.
  *
  * Events available:
- *   `done`   Fires when the user is finished and they are closing this modal
+ * - `done`:  Fires when the user is finished and they are closing this Modal
  */
 export class UiRapidCatalog extends EventEmitter {
   public context: Context;
@@ -44,14 +44,15 @@ export class UiRapidCatalog extends EventEmitter {
 
     // Ensure methods used as callbacks always have `this` bound correctly.
     // (This is also necessary when using `d3-selection.call`)
+    this._done = this._done.bind(this);
     this.show = this.show.bind(this);
+    this.close = this.close.bind(this);
     this.render = this.render.bind(this);
     this.renderDatasets = this.renderDatasets.bind(this);
     this.sortCategories = this.sortCategories.bind(this);
     this.sortDatasets = this.sortDatasets.bind(this);
     this.toggleDataset = this.toggleDataset.bind(this);
     this.highlight = this.highlight.bind(this);
-    this._clickedClose = this._clickedClose.bind(this);
 
     // Setup event handlers
     const l10n = context.systems.l10n!;
@@ -60,7 +61,7 @@ export class UiRapidCatalog extends EventEmitter {
 
 
   /**
-   * This shows the catalog if it isn't alreaday being shown.
+   * This shows the catalog if it isn't already being shown.
    * For this kind of popup component, must first `show()` to create the modal.
    */
   public show(): void {
@@ -68,25 +69,36 @@ export class UiRapidCatalog extends EventEmitter {
 
     if (this.Modal?.isShown) return;
 
-    this.Modal = new UiModal(context);
-    this.Modal.show();
+    this.Modal = new UiModal(context).show();
     this.Modal.$modal!
       .attr('class', 'modal rapid-modal modal-catalog');
 
-    // Closing (X button, Esc, or the OK button) resets the filters and notifies the parent.
-    this.Modal.on('close', () => {
-      this._filterText = null;
-      this._filterCategory = null;
-      this.emit('done');
-    });
+    // Handle the various ways of closing the modal ('X' button, Esc, OK Button, etc.)
+    this.Modal.once('close', this._done);
 
     this.render();
   }
 
 
-  /** Dismisses the catalog. */
-  protected _clickedClose(): void {
+  /**
+   * Dismisses and removes the Modal, if it exists.
+   * @param [e] - the triggering event, if any
+   */
+  public close(e?: Event): void {
+    e?.preventDefault();
     this.Modal?.close();
+  }
+
+
+  /**
+   * Emits a 'done' event and cleans up the Modal.
+   * All the various ways of closing the Modal end up here.
+   */
+  protected _done(): void {
+    this.emit('done');
+    this.Modal = null;
+    this._filterText = null;
+    this._filterCategory = null;
   }
 
 
@@ -106,11 +118,11 @@ export class UiRapidCatalog extends EventEmitter {
     let $header: D3Selection = $content.selectAll('.rapid-catalog-header')
       .data([0]);
 
-    const $$header = $header.enter()
+    const $$header: D3EnterSelection = $header.enter()
       .append('div')
       .attr('class', 'modal-section rapid-catalog-header');
 
-    const $$line1 = $$header
+    const $$line1: D3EnterSelection = $$header
       .append('div');
 
     $$line1
@@ -122,7 +134,7 @@ export class UiRapidCatalog extends EventEmitter {
       .append('div')
       .attr('class', 'rapid-catalog-header-text');
 
-    const $$line2 = $$header
+    const $$line2: D3EnterSelection = $$header
       .append('div');
 
     $$line2
@@ -147,11 +159,11 @@ export class UiRapidCatalog extends EventEmitter {
       .data([0]);
 
     // enter
-    const $$filter = $filter.enter()
+    const $$filter: D3EnterSelection = $filter.enter()
       .append('div')
       .attr('class', 'modal-section rapid-catalog-filter');
 
-    const $$filterSearch = $$filter
+    const $$filterSearch: D3EnterSelection = $$filter
       .append('div')
       .attr('class', 'rapid-catalog-filter-search-wrap');
 
@@ -173,8 +185,7 @@ export class UiRapidCatalog extends EventEmitter {
     const inputNode = $$filterSearch.selectAll('.rapid-catalog-filter-search').node() as HTMLElement | null;
     inputNode?.focus();
 
-
-    const $$filterType = $$filter
+    const $$filterType: D3EnterSelection = $$filter
       .append('div')
       .attr('class', 'rapid-catalog-filter-type-wrap');
 
@@ -201,7 +212,7 @@ export class UiRapidCatalog extends EventEmitter {
       .attr('class', 'rapid-catalog-filter-clear')
       .append('a')
       .attr('href', '#')
-      .on('click', e => {
+      .on('click', (e: Event) => {
         e.preventDefault();
         const element = e.currentTarget as HTMLElement;
         element.blur();
@@ -233,7 +244,7 @@ export class UiRapidCatalog extends EventEmitter {
       .data([0]);
 
     // enter
-    const $$datasets = $datasets.enter()
+    const $$datasets: D3EnterSelection = $datasets.enter()
       .append('div')
       .attr('class', 'modal-section rapid-catalog-datasets-section');
 
@@ -257,14 +268,14 @@ export class UiRapidCatalog extends EventEmitter {
       .data([0]);
 
     // enter
-    const $$buttons = $buttons.enter()
+    const $$buttons: D3EnterSelection = $buttons.enter()
       .append('div')
       .attr('class', 'modal-section buttons');
 
     $$buttons
       .append('button')
       .attr('class', 'button ok-button action')
-      .on('click', this._clickedClose);
+      .on('click', this.close);
 
     // update
     $buttons = $buttons.merge($$buttons);
@@ -289,8 +300,8 @@ export class UiRapidCatalog extends EventEmitter {
 
     const showPreview = settings?.get('poweruser.previewDatasets') === 'true';
 
-    const $status = $selection.selectAll('.rapid-catalog-datasets-status');
-    const $results = $selection.selectAll('.rapid-catalog-datasets');
+    const $status: D3Selection = $selection.selectAll('.rapid-catalog-datasets-status');
+    const $results: D3Selection = $selection.selectAll('.rapid-catalog-datasets');
 
     if (!rapid.catalog.size) {
       $results.classed('hide', true);
@@ -353,11 +364,11 @@ export class UiRapidCatalog extends EventEmitter {
       .remove();
 
     // enter
-    const $$datasets = $datasets.enter()
+    const $$datasets: D3EnterSelection = $datasets.enter()
       .append('div')
       .attr('class', 'rapid-catalog-dataset');
 
-    const $$label = $$datasets
+    const $$label: D3EnterSelection = $$datasets
       .append('div')
       .attr('class', 'rapid-catalog-dataset-label');
 
@@ -365,7 +376,7 @@ export class UiRapidCatalog extends EventEmitter {
       .append('div')
       .attr('class', 'rapid-catalog-dataset-name');
 
-    const $$categories = $$label
+    const $$categories: D3EnterSelection = $$label
       .append('div')
       .attr('class', 'dataset-categories');
 
@@ -386,7 +397,7 @@ export class UiRapidCatalog extends EventEmitter {
       .append('div')
       .attr('class', 'rapid-catalog-dataset-snippet');
 
-    const $$link = $$label
+    const $$link: D3EnterSelection = $$label
       .filter(d => d.itemUrl)
       .append('div')
       .attr('class', 'rapid-catalog-dataset-more-info')
@@ -411,7 +422,7 @@ export class UiRapidCatalog extends EventEmitter {
       .attr('class', 'rapid-catalog-dataset-action')
       .on('click', this.toggleDataset);
 
-    const $$thumbnail = $$datasets
+    const $$thumbnail: D3EnterSelection = $$datasets
       .append('div')
       .attr('class', 'rapid-catalog-dataset-thumb');
 
@@ -497,7 +508,7 @@ export class UiRapidCatalog extends EventEmitter {
 
   /**
    * Toggles the given dataset between added/removed.
-   * @param  e? - triggering event (if any)
+   * @param  [e] - the triggering event, if any
    * @param  d - bound datum (the dataset in this case)
    */
   public toggleDataset(e: any, d: any) {

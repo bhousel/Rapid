@@ -59,8 +59,8 @@ export abstract class AbstractUiCard {
 
 
   /**
-   * Shows the component
-   * @param  e? - triggering event (if any)
+   * Shows the component.
+   * @param [e] - the triggering event, if any
    */
   public show(e?: Event): void {
     e?.preventDefault();
@@ -85,8 +85,8 @@ export abstract class AbstractUiCard {
 
 
   /**
-   * Hides the component
-   * @param  e? - triggering event (if any)
+   * Hides the component.
+   * @param [e] - the triggering event, if any
    */
   public hide(e?: Event): void {
     e?.preventDefault();
@@ -106,8 +106,8 @@ export abstract class AbstractUiCard {
 
 
   /**
-   * Toggles the component between shown/hidden
-   * @param  e? - triggering event (if any)
+   * Toggles the component between shown/hidden.
+   * @param [e] - the triggering event, if any
    */
   public toggle(e?: Event): void {
     if (this._isVisible) {

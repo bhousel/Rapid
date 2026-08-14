@@ -471,7 +471,7 @@ export class UiPresetList extends EventEmitter {
 
   /**
    * Get or set whether the search field should autofocus on render.
-   * @param  val? - the flag to set; if omitted, returns the current value
+   * @param  [val] - the flag to set; if omitted, returns the current value
    */
   public autofocus(val?: boolean): any {
     if (!arguments.length) return this._autofocus;
@@ -482,7 +482,7 @@ export class UiPresetList extends EventEmitter {
 
   /**
    * Get or set the entities the preset list is choosing a preset for.
-   * @param  val? - array of EntityIDs to set; if omitted, returns the current ids
+   * @param  [val] - array of EntityIDs to set; if omitted, returns the current ids
    */
   public entityIDs(val?: EntityID[]): any {
     if (!arguments.length) return this._entityIDs;
@@ -533,7 +533,7 @@ export class UiPresetList extends EventEmitter {
 
   /**
    * Get or set the presets that should appear selected/current in the list.
-   * @param  val? - array of presets to set; if omitted, returns the current selected ids
+   * @param  [val] - array of presets to set; if omitted, returns the current selected ids
    */
   public selected(val?: (Preset | Category)[]): any {
     if (!arguments.length) return this._selectedPresetIDs;

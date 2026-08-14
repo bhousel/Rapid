@@ -278,7 +278,7 @@ export class UiFeatureList {
 
   /**
    * Handler for the ⌘F shortcut to focus the search input
-   * @param e? - the keypress event (if any)
+   * @param [e] - the triggering event, if any
    */
   protected _focusSearch(e?: KeyboardEvent): void {
     if (!this.$search) return;  // called too early?

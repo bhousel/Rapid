@@ -493,6 +493,6 @@ export class UiPaneHelp extends UiPane {
   protected _clickShortcuts(d3_event: Event): void {
     const ui = this.context.systems.ui;
     d3_event.preventDefault();
-    ui?.Shortcuts?.show();
+    ui?.Shortcuts?.toggle();
   }
 }

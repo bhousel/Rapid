@@ -10,10 +10,9 @@ import type { D3Selection } from 'd3-selection';
 
 /**
  * This is the modal where the user can add a custom dataset to Rapid.
- * It owns a nested `UiModal` shown on top of the dataset-toggle modal.
  *
  * Events available:
- *   `done`   Fires when the user is finished and they are closing this modal
+ * - `done` - Fires when the user is finished, emits the new datasetID if one was added.
  */
 export class UiRapidAddDataset extends EventEmitter {
   public context: Context;
@@ -23,6 +22,9 @@ export class UiRapidAddDataset extends EventEmitter {
 
   protected _currFileList: FileList | null;
   protected _currUrl: string | null;
+
+  /** The datasetID for the newly added RapidDataset. */
+  protected _datasetID: DatasetID | null;
 
 
   /**
@@ -34,55 +36,100 @@ export class UiRapidAddDataset extends EventEmitter {
 
     this._currFileList = null;
     this._currUrl = null;
+    this._datasetID = null;
 
     // Child components
     this.Modal = null;
 
     // Ensure methods used as callbacks always have `this` bound correctly.
     // (This is also necessary when using `d3-selection.call`)
-    this.show = this.show.bind(this);
-    this.render = this.render.bind(this);
     this._clickedOk = this._clickedOk.bind(this);
     this._clickedCancel = this._clickedCancel.bind(this);
+    this._done = this._done.bind(this);
+    this.show = this.show.bind(this);
+    this.close = this.close.bind(this);
+    this.render = this.render.bind(this);
+  }
+
+
+  /**
+   * This shows the Modal if it isn't already being shown.
+   * For this kind of popup component, must first `show()` to create the modal.
+   */
+  public show(): void {
+    const context = this.context;
+    const l10n = context.systems.l10n!;
+
+    if (this.Modal?.isShown) return;
+
+    this.Modal = new UiModal(context).show();
+    this.Modal.$modal!
+      .attr('class', 'modal rapid-modal modal-add-dataset');
+
+    // Handle the various ways of closing the modal ('X' button, Esc, OK Button, etc.)
+    this.Modal.once('close', this._done);
+
+    this.render();
 
     // Setup event handlers
-    const l10n = context.systems.l10n!;
     l10n.on('localechange', this.render);
   }
 
 
   /**
-   * This shows the add-dataset screen if it isn't already being shown.
-   * For this kind of popup component, must first `show()` to create the modal.
+   * Dismisses and removes the Modal, if it exists.
+   * @param [e] - the triggering event, if any
    */
-  public show(): void {
-    const context = this.context;
-
-    if (this.Modal?.isShown) return;
-
-    this.Modal = new UiModal(context);
-    this.Modal.show();
-    this.Modal.$modal!
-      .attr('class', 'modal rapid-modal modal-add-dataset');
-
-    // Closing (X button, Esc, OK, or Cancel) notifies the parent to re-render.
-    this.Modal.on('close', () => { this.emit('done'); });
-
-    this.render();
-  }
-
-
-  /** Accepts and dismisses the dialog. */
-  protected _clickedOk(): void {
+  public close(e?: Event): void {
+    e?.preventDefault();
     this.Modal?.close();
   }
 
 
-  /** Cancels and dismisses the dialog, clearing any pending file/url. */
-  protected _clickedCancel(): void {
+  /**
+   * Emits a 'done' event and cleans up the Modal.
+   * All the various ways of closing the Modal end up here.
+   */
+  protected _done(): void {
+    const context = this.context;
+    const l10n = context.systems.l10n!;
+
+//    if (this._datasetID) {
+//        // do the thing
+//    }
+
+    this.emit('done', this._datasetID);
+    this.Modal = null;
     this._currFileList = null;
     this._currUrl = null;
-    this.Modal?.close();
+    this._datasetID = null;
+
+    l10n.off('localechange', this.render);
+  }
+
+
+  /**
+   * When clicking "cancel", remove any partially entered data, and close.
+   * @param [e] - the triggering event, if any
+   */
+  protected _clickedCancel(e?: Event): void {
+    e?.preventDefault();
+    this._currFileList = null;
+    this._currUrl = null;
+    this._datasetID = null;
+    this.close();
+  }
+
+
+  /**
+   * When clicking "ok", test dataset for validity, create a RapidDataset, then close.
+   * @param [e] - the triggering event, if any
+   */
+  protected _clickedOk(e?: Event): void {
+    e?.preventDefault();
+
+    // todo: do the stuff
+    this.close();
   }
 
 
@@ -258,6 +305,5 @@ ${url_tokens}
     $buttons.selectAll('.cancel-button')
       .text(l10n.t('confirm.cancel'));
   }
-
 
 }

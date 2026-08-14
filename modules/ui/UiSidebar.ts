@@ -388,7 +388,7 @@ export class UiSidebar {
 
 
   /**
-   * Test if the sidebar is covering up the given extent
+   * Test if the sidebar is covering up the given extent.
    * @param  wgs84Extent - an Extent in lon/lat coordinates
    * @return `true` if the sidebar is intersecting the `Extent`, `false` if not
    */
@@ -407,7 +407,7 @@ export class UiSidebar {
 
 
   /**
-   * Selects the given ids - they are expected to be OSM IDs already loaded (in the Graph)
+   * Selects the given ids - they are expected to be OSM IDs already loaded (in the Graph).
    * @param  ids - ids to select (expected to be OSM IDs)
    * @param  newFeature - true if it's a new feature, passed to the inspector
    */
@@ -446,9 +446,9 @@ export class UiSidebar {
 
 
   /**
-   * Shows some "custom" content in the sidebar
+   * Shows some "custom" content in the sidebar.
    * This is how almost all content renders to the sidebar
-   * (except for the OSM editing "inspector", which is special)
+   * (except for the OSM editing "inspector", which is special).
    * @param  renderFn - A function suitable for use in `d3-selection.call`
    */
   public show(renderFn: ($selection: D3Selection) => void): void {
@@ -479,7 +479,7 @@ export class UiSidebar {
 
 
   /**
-   * Removes all content from the sidebar..
+   * Removes all content from the sidebar.
    * This resets the sidebar back to where it shows the featureList / search component.
    */
   public hide(): void {
@@ -495,7 +495,7 @@ export class UiSidebar {
 
 
   /**
-   * Shows inspector open to Preset List
+   * Shows inspector open to Preset List.
    * @param  args - forwarded to `UiInspector.showPresetList` (optional selected presets, animate flag)
    */
   public showPresetList(...args: Parameters<UiInspector['showPresetList']>): void {
@@ -504,7 +504,7 @@ export class UiSidebar {
 
 
   /**
-   * Shows inspector open to Entity Editor
+   * Shows inspector open to Entity Editor.
    * @param  args - forwarded to `UiInspector.showEntityEditor` (optional presets, animate flag)
    */
   public showEntityEditor(...args: Parameters<UiInspector['showEntityEditor']>): void {
@@ -513,8 +513,8 @@ export class UiSidebar {
 
 
   /**
-   * Expands the sidebar
-   * @param  animate? - whether to animate the pane
+   * Expands the sidebar.
+   * @param  [animate] - whether to animate the pane
    */
   public expand(animate?: boolean): void {
     const $sidebar = this.$sidebar;
@@ -527,8 +527,8 @@ export class UiSidebar {
 
 
   /**
-   * Collapses the sidebar
-   * @param  animate? - whether to animate the pane
+   * Collapses the sidebar.
+   * @param  [animate] - whether to animate the pane
    */
   public collapse(animate?: boolean): void {
     const $sidebar = this.$sidebar;
@@ -542,7 +542,7 @@ export class UiSidebar {
 
   /**
    * Toggles the sidebar between expanded/collapsed states
-   * @param  animate? - whether to animate the pane
+   * @param  [animate=true] - whether to animate the pane
    */
   public toggle(animate = true): void {
     const $sidebar = this.$sidebar;
@@ -674,7 +674,7 @@ export class UiSidebar {
 
 
   /**
-   * Handler for pointermove events
+   * Handler for pointermove events.
    * @param e - the pointermove event
    */
   protected _pointermove(e: PointerEvent): void {
@@ -704,7 +704,7 @@ export class UiSidebar {
 
 
   /**
-   * Handler for pointerup events
+   * Handler for pointerup events.
    * @param e - the pointerup event
    */
   protected _pointerup(e: PointerEvent): void {
@@ -751,8 +751,8 @@ export class UiSidebar {
 
 
   /**
-   * Just cancels an event
-   * @param  e? - triggering event (if any)
+   * Just cancels an event.
+   * @param [e] - the triggering event, if any
    */
   protected _eventCancel(e: Event): void {
     e?.preventDefault();
@@ -760,7 +760,7 @@ export class UiSidebar {
 
 
   /**
-   * Store the sidebar preferences
+   * Store the sidebar preferences.
    */
   protected _storePreferences(): void {
     const $sidebar = this.$sidebar;
@@ -776,7 +776,7 @@ export class UiSidebar {
 
 
   /**
-   * This sets up the keybinding, replacing existing if needed
+   * This sets up the keybinding, replacing existing if needed.
    */
   protected _setupKeybinding(): void {
     const context = this.context;

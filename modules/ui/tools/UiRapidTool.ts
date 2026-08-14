@@ -152,12 +152,13 @@ export class UiRapidTool {
 
 
   /**
-   * @param  e? - triggering event (if any)
-   * @param  d? - object bound to the selection (i.e. the modal component)
+   * Chooses this item (usually because the user clicked on its button).
+   * @param [e] - the triggering event, if any
+   * @param [d] - object bound to the selection (i.e. the Modal)
    */
   public choose(e?: Event, d?: any): void {
     e?.preventDefault();
-    if (d)  d.show();
+    d?.show();
   }
 
 
