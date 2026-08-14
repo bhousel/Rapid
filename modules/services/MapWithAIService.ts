@@ -127,6 +127,10 @@ export class MapWithAIService extends AbstractSystem {
    */
   public getAvailableDatasets(): RapidDataset[] {
     const context = this.context;
+    const urlhash = context.systems.urlhash;
+
+    const customUrlRoot = urlhash?.getParam('fb_ml_road_url');
+    const sourceUrl = customUrlRoot || MWAI_API;
 
     const fbRoads = new RapidDataset(context, {
       id: 'fbRoads',
@@ -135,6 +139,7 @@ export class MapWithAIService extends AbstractSystem {
       serviceID: 'mapwithai',
       categories: new Set<string>(['meta', 'roads', 'featured']),
       dataUsed: ['mapwithai', 'Facebook Roads'],
+      sourceUrl: sourceUrl,
       itemUrl: 'https://github.com/facebookmicrosites/Open-Mapping-At-Facebook',
       licenseUrl: 'https://rapideditor.org/doc/license/MapWithAILicense.pdf',
       labelStringID: 'rapid_menu.fbRoads.label',
@@ -148,6 +153,7 @@ export class MapWithAIService extends AbstractSystem {
       serviceID: 'mapwithai',
       categories: new Set<string>(['microsoft', 'buildings', 'featured']),
       dataUsed: ['mapwithai', 'Microsoft Buildings'],
+      sourceUrl: sourceUrl,
       itemUrl: 'https://github.com/microsoft/GlobalMLBuildingFootprints',
       licenseUrl: 'https://github.com/microsoft/USBuildingFootprints/blob/master/LICENSE-DATA',
       labelStringID: 'rapid_menu.msBuildings.label',
@@ -166,6 +172,7 @@ export class MapWithAIService extends AbstractSystem {
 //        maxZoom: 15,
 //      },
 //      dataUsed: ['mapwithai', 'Open Footways'],
+//      sourceUrl: sourceUrl,
 //      itemUrl: 'https://github.com/facebookmicrosites/Open-Mapping-At-Facebook/wiki/Footways-FAQ',
 //      licenseUrl: 'https://github.com/facebookmicrosites/Open-Mapping-At-Facebook/wiki/Footways-FAQ#attribution-and-license',
 //      labelStringID: 'rapid_menu.omdFootways.label',
@@ -180,6 +187,7 @@ export class MapWithAIService extends AbstractSystem {
 //      categories: new Set<string>(['meta', 'footways', 'featured', 'preview']),
 //      tags: new Set<string>(['opendata']),
 //      dataUsed: ['mapwithai', 'Meta Synthetic Footways'],
+//      sourceUrl: sourceUrl,
 //      itemUrl: 'https://github.com/facebookmicrosites/Open-Mapping-At-Facebook/wiki/Footways-FAQ',
 //      licenseUrl: 'https://github.com/facebookmicrosites/Open-Mapping-At-Facebook/wiki/Footways-FAQ#attribution-and-license',
 //      labelStringID: 'rapid_menu.metaSyntheticFootways.label',

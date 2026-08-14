@@ -1222,6 +1222,21 @@ en:
       example_pmtiles: "https://example.com/buildings.pmtiles"
       placeholder: Enter a url
 
+  rapid_dataset_settings:
+    heading: Dataset Settings
+    details:
+      heading: Dataset Details
+      source: Source
+      name: Name
+      description: Description
+      url: URL
+    thumbnail:
+      instruction: Click to Change
+    conflation:
+      heading: Conflation Settings
+    dictionary:
+      heading: Data Mapping
+
   version:
     whats_new: "What's new in Rapid {version}"
 

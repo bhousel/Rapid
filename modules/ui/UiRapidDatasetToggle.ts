@@ -1,3 +1,4 @@
+import { EventEmitter } from 'tseep/lib/ee-safe';
 import { select } from 'd3-selection';
 import { icon } from './intro/helper.ts';
 import { uiIcon } from './icon.ts';
@@ -5,6 +6,7 @@ import { UiModal } from './UiModal.ts';
 import { UiRapidAddDataset } from './UiRapidAddDataset.ts';
 import { UiRapidCatalog } from './UiRapidCatalog.ts';
 import { UiRapidColorpicker } from './UiRapidColorpicker.ts';
+import { UiRapidDatasetSettings } from './UiRapidDatasetSettings.ts';
 import { utilCmd } from '../util/cmd.ts';
 import { utilSafeURL } from '../util/url.ts';
 
@@ -14,8 +16,11 @@ import type { RapidDataset } from '../lib/RapidDataset.ts';
 
 
 /**
- * This is the modal where the user can toggle on and off datasets.
+ * This is the Modal where the user can toggle on and off datasets.
  * It is shown by clicking the main "Rapid" button in the top menu.
+ *
+ * Events available:
+ * - `done`:  Fires when the user is finished and they are closing this Modal
  *
  * @example
  * <div class='modal rapid-modal'>
@@ -29,39 +34,35 @@ import type { RapidDataset } from '../lib/RapidDataset.ts';
  *   </div>
  * </div>
  */
-export class UiRapidDatasetToggle {
+export class UiRapidDatasetToggle extends EventEmitter {
   public context: Context;
 
   // Child components
   public Modal: UiModal | null;
-  public colorpickers: Record<DatasetID, UiRapidColorpicker>;
+  protected _colorpickers: Record<DatasetID, UiRapidColorpicker>;
 
 
   /**
    * @param  context - Global shared application context
    */
   public constructor(context: Context) {
+    super();
     this.context = context;
-
-    const l10n = context.systems.l10n!;
-    const scene = context.systems.gfx!.scene!;
 
     // Child components
     this.Modal = null;
-    this.colorpickers = {};
+    this._colorpickers = {};
 
     // Ensure methods used as callbacks always have `this` bound correctly.
     // (This is also necessary when using `d3-selection.call`)
+    this._done = this._done.bind(this);
     this.show = this.show.bind(this);
+    this.close = this.close.bind(this);
     this.render = this.render.bind(this);
     this.renderDatasets = this.renderDatasets.bind(this);
     this.changeColor = this.changeColor.bind(this);
     this.toggleDataset = this.toggleDataset.bind(this);
     this.toggleRapid = this.toggleRapid.bind(this);
-
-    // Setup event handlers
-    scene.on('layerchange', this.render);
-    l10n.on('localechange', this.render);
   }
 
 
@@ -71,15 +72,51 @@ export class UiRapidDatasetToggle {
    */
   public show(): void {
     const context = this.context;
+    const l10n = context.systems.l10n!;
+    const scene = context.systems.gfx!.scene!;
 
     if (this.Modal?.isShown) return;  // already showing
 
     this.Modal = new UiModal(context).show();
-
     this.Modal.$modal!
       .attr('class', 'modal rapid-modal');
 
+    // Handle the various ways of closing the modal ('X' button, Esc, OK Button, etc.)
+    this.Modal.once('close', this._done);
+
     this.render();
+
+    // Setup event handlers
+    scene.on('layerchange', this.render);
+    l10n.on('localechange', this.render);
+  }
+
+
+  /**
+   * Dismisses and removes the Modal, if it exists.
+   * @param [e] - the triggering event, if any
+   */
+  public close(e?: Event): void {
+    e?.preventDefault();
+    this.Modal?.close();
+  }
+
+
+  /**
+   * Emits a 'done' event and cleans up the Modal.
+   * All the various ways of closing the Modal end up here.
+   */
+  protected _done(): void {
+    const context = this.context;
+    const l10n = context.systems.l10n!;
+    const scene = context.systems.gfx!.scene!;
+
+    this.emit('done');
+    this.Modal = null;
+    this._colorpickers = {};
+
+    scene.off('layerchange', this.render);
+    l10n.off('localechange', this.render);
   }
 
 
@@ -250,11 +287,7 @@ export class UiRapidDatasetToggle {
     $$buttons
       .append('button')
       .attr('class', 'button ok-button action')
-      .on('click', () => this.Modal!.close());
-
-    // set focus (but only on enter)
-    const buttonNode = $$buttons.selectAll('button').node() as HTMLElement | null;
-    buttonNode?.focus();
+      .on('click', this.close);
 
     // update
     $buttons = $buttons.merge($$buttons);
@@ -287,8 +320,9 @@ export class UiRapidDatasetToggle {
     // exit
     $rows.exit()
       .each((d: RapidDataset) => {
-        const control = this.colorpickers[d.id];
+        const control = this._colorpickers[d.id];
         control?.close();
+        delete this._colorpickers[d.id];
       })
       .remove();
 
@@ -330,7 +364,7 @@ export class UiRapidDatasetToggle {
             .append('a')
             .attr('class', 'rapid-feature-extent-center-map')
             .attr('href', '#')
-            .on('click', (e) => {
+            .on('click', (e: Event) => {
               e.preventDefault();
               map.extent(d.extent);
             });
@@ -375,8 +409,24 @@ export class UiRapidDatasetToggle {
     $$colorpickers.each((d: RapidDataset) => {
       const control = new UiRapidColorpicker(context);
       control.on('change', (val: string) => this.changeColor(d, val));
-      this.colorpickers[d.id] = control;
+      this._colorpickers[d.id] = control;
     });
+
+    const $$settings: D3EnterSelection = $$inputs
+      .append('label')
+      .attr('class', 'rapid-settings-label');
+
+    $$settings
+      .append('div')
+      .attr('class', 'rapid-feature-settings')
+      .on('click', (e: Event, d: RapidDataset) => {
+        const SettingsModal = new UiRapidDatasetSettings(context).on('done', this.render);
+        SettingsModal.dataset = d;
+        SettingsModal.show();
+      })
+      .append('div')
+      .attr('class', 'rapid-settings-icon')
+      .call(uiIcon('#fas-gear'));
 
     const $$checkboxes: D3EnterSelection = $$inputs
       .append('label')
@@ -422,7 +472,7 @@ export class UiRapidDatasetToggle {
       .attr('disabled', isRapidEnabled ? null : true)
       .each((d: RapidDataset, i: number, nodes: HTMLElement[]) => {
         const $selection: D3Selection = select(nodes[i]);
-        const control = this.colorpickers[d.id];
+        const control = this._colorpickers[d.id];
         if (control) {
           control.color = d.color;
           $selection.call(control.render);
@@ -440,7 +490,7 @@ export class UiRapidDatasetToggle {
 
   /**
    * Called when a user has clicked the checkbox to toggle all Rapid layers on/off.
-   * @param  e? - triggering event (if any)
+   * @param [e] - the triggering event, if any
    */
   public toggleRapid(): void {
     const scene = this.context.systems.gfx!.scene!;
@@ -450,7 +500,7 @@ export class UiRapidDatasetToggle {
 
   /**
    * Called when a user has clicked the checkbox to toggle a dataset on/off.
-   * @param  e? - triggering event (if any)
+   * @param  [e] - the triggering event, if any
    * @param  d - bound datum (the RapidDataset in this case)
    */
   public toggleDataset(e: Event, d: RapidDataset): void {

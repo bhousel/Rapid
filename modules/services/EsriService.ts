@@ -203,6 +203,7 @@ export class EsriService extends AbstractSystem {
         dataUsed: ['esri', this.getDataUsed(d.title)],
         label: d.title,
         description: d.snippet,
+        sourceUrl: d.url,
         itemUrl: `${HOMEROOT}/item.html?id=${d.id}`,
         licenseUrl: 'https://wiki.openstreetmap.org/wiki/Esri/ArcGIS_Datasets#License',
         thumbnailUrl: `${APIROOT}/items/${d.id}/info/${d.thumbnail}?w=400`

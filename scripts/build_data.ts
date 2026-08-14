@@ -128,6 +128,7 @@ async function buildData() {
     'fas-backward-step',
     'fas-filter',
     'fas-forward-step',
+    'fas-gear',
     'fas-i-cursor',
     'fas-lock',
     'fas-palette',

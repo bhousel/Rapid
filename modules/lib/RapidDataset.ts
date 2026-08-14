@@ -24,6 +24,8 @@ export interface RapidDatasetProps {
   extent: Extent;
   /** Whether this is an overlay dataset */
   overlay: boolean;
+  /** URL for the data */
+  sourceUrl: string;
   /** URL for more information about this dataset */
   itemUrl: string;
   /** URL for license information */
@@ -78,6 +80,8 @@ export class RapidDataset {
   public extent: Extent | undefined;
   /** Whether this dataset is rendered as an overlay on top of the base map */
   public overlay: boolean | undefined;
+  /** URL for the data */
+  public sourceUrl: string;
   /** URL for a landing page with more information about this dataset */
   public itemUrl: string;
   /** URL for the license governing use of this dataset */
@@ -129,6 +133,7 @@ export class RapidDataset {
     this.extent = props.extent;
     this.overlay = props.overlay;
 
+    this.sourceUrl = props.sourceUrl ?? '';
     this.itemUrl = props.itemUrl ?? '';
     this.licenseUrl = props.licenseUrl ?? '';
     this.thumbnailUrl = props.thumbnailUrl ?? this.getThumbnail();

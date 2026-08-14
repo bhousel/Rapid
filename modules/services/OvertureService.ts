@@ -127,6 +127,7 @@ export class OvertureService extends VectorTileService {
       categories: new Set<string>(['overture', 'places']),
       color: '#00ffff',
       dataUsed: ['overture', 'Overture Places'],
+      sourceUrl: this._pmtilesUrls.get('places'),
       itemUrl: 'https://docs.overturemaps.org/guides/places/',
       licenseUrl: 'https://docs.overturemaps.org/attribution/',
       labelStringID: 'rapid_menu.overture.places.label',
@@ -140,6 +141,7 @@ export class OvertureService extends VectorTileService {
       categories: new Set<string>(['overture', 'buildings']),
       color: '#00ffff', // '#00bfff',  // Deep sky blue for Esri community maps
       dataUsed: ['overture', 'Overture Buildings'],
+      sourceUrl: this._pmtilesUrls.get('buildings'),
       itemUrl: 'https://docs.overturemaps.org/guides/buildings/',
       licenseUrl: 'https://docs.overturemaps.org/attribution/#buildings',
       labelStringID: 'rapid_menu.overture.buildings.label',
@@ -153,6 +155,7 @@ export class OvertureService extends VectorTileService {
       categories: new Set<string>(['overture', 'tomtom', 'roads', 'featured']),
       color: '#00ffff',  // '#da26d3',  // Rapid magenta
       dataUsed: ['overture', 'TomTom'],
+      sourceUrl: this._pmtilesUrls.get('transportation'),
       itemUrl: 'https://docs.overturemaps.org/guides/transportation/',
       licenseUrl: 'https://docs.overturemaps.org/attribution/',
       labelStringID: 'rapid_menu.overture.tomtom_roads.label',

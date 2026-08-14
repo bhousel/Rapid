@@ -69,6 +69,7 @@ export { UiRapidAddDataset } from './UiRapidAddDataset.ts';
 export { UiRapidCatalog } from './UiRapidCatalog.ts';
 export { UiRapidColorpicker } from './UiRapidColorpicker.ts';
 export { UiRapidDatasetToggle } from './UiRapidDatasetToggle.ts';
+export { UiRapidDatasetSettings } from './UiRapidDatasetSettings.ts';
 export { UiRapidFirstEditDialog } from './UiRapidFirstEditDialog.ts';
 export { UiRapidInspector } from './UiRapidInspector.ts';
 export { UiRapidPowerUserFeatures } from './UiRapidPowerUserFeatures.ts';
