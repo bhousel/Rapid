@@ -75,7 +75,7 @@ export class UiSectionRawMemberEditor extends AbstractUiSection {
 
     const gt = entity.members.length > MAX_MEMBERS ? '>' : '';
     const count = gt + entity.members.slice(0, MAX_MEMBERS).length;
-    return l10n.t('inspector.title_count', { title: l10n.t('inspector.members'), count: count });
+    return l10n.t('inspector.title_count', { title: l10n.t('text.members'), count: count });
   }
 
 
@@ -300,7 +300,7 @@ export class UiSectionRawMemberEditor extends AbstractUiSection {
           $labelText
             .append('span')
             .attr('class', 'member-entity-type')
-            .text(l10n.t(`inspector.${d.type}`, { id: d.id }));
+            .text(l10n.t(`text.${d.type}`, { id: d.id }));
 
           $labelText
             .append('span')
@@ -325,7 +325,7 @@ export class UiSectionRawMemberEditor extends AbstractUiSection {
       .attr('class', 'member-role')
       .attr('id', (d: MemberRowData) => d.uid)
       .property('type', 'text')
-      .attr('placeholder', l10n.t('inspector.role'))
+      .attr('placeholder', l10n.t('text.role'))
       .call(utilNoAuto);
 
     if (taginfo) {

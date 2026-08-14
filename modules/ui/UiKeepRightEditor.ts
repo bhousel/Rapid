@@ -189,7 +189,7 @@ export class UiKeepRightEditor extends EventEmitter {
       .merge($$saveSection);
 
     $saveSection.select('h4')
-      .text(l10n.t('QA.keepRight.comment'));
+      .text(l10n.t('text.comment'));
 
     $saveSection.select('.new-comment-input')
       .attr('placeholder', l10n.t('QA.keepRight.comment_placeholder'));

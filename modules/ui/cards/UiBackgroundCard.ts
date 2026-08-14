@@ -156,9 +156,9 @@ export class UiBackgroundCard extends AbstractUiCard {
     if (source.id === 'EsriWayback') {
       $list
         .append('li')
-        .text(l10n.t('background.wayback.date') + ':')
+        .text(l10n.t('text.date') + ':')
         .append('span')
-        .text(source.date || l10n.t('inspector.unknown'));
+        .text(source.date || l10n.t('text.unknown'));
     }
 
     // Add list items for all the imagery metadata
@@ -250,7 +250,7 @@ export class UiBackgroundCard extends AbstractUiCard {
 
       // update vintage
       const vintage = result.vintage;
-      this._metadata.vintage = vintage?.range || l10n.t('inspector.unknown');
+      this._metadata.vintage = vintage?.range || l10n.t('text.unknown');
       $content.selectAll('.background-info-list-vintage')
         .classed('hide', false)
         .selectAll('.background-info-span-vintage')

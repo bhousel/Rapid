@@ -300,10 +300,10 @@ ${url_tokens}
     $buttons = $buttons.merge($$buttons) as D3Selection;
 
     $buttons.selectAll('.ok-button')
-      .text(l10n.t('confirm.okay'));
+      .text(l10n.t('text.okay'));
 
     $buttons.selectAll('.cancel-button')
-      .text(l10n.t('confirm.cancel'));
+      .text(l10n.t('text.cancel'));
   }
 
 }

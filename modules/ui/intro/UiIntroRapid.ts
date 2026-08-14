@@ -114,7 +114,7 @@ export class UiIntroRapid extends AbstractIntroChapter {
         tipHtml: helpHtml(context, 'intro.rapid.start', {
           rapid: icon(`#rapid-logo-rapid-wordmark${rtl}`, 'pre-text rapid')
         }),
-        buttonText: l10n.t('intro.ok'),
+        buttonText: l10n.t('text.okay'),
         buttonCallback: () => resolve(this._showHideRoadsAsync)
       });
     });
@@ -137,7 +137,7 @@ export class UiIntroRapid extends AbstractIntroChapter {
         tipHtml: helpHtml(context, 'intro.rapid.ai_roads', {
           rapid: icon(`#rapid-logo-rapid-wordmark${rtl}`, 'pre-text rapid')
         }),
-        buttonText: l10n.t('intro.ok'),
+        buttonText: l10n.t('text.okay'),
         buttonCallback: () => resolve(this._selectRoadAsync)
       });
     });
@@ -237,7 +237,7 @@ export class UiIntroRapid extends AbstractIntroChapter {
           tipHtml: helpHtml(context, 'intro.rapid.add_road_not_saved_yet', {
             rapid: icon(`#rapid-logo-rapid-wordmark${rtl}`, 'pre-text rapid')
           }),
-          buttonText: l10n.t('intro.ok'),
+          buttonText: l10n.t('text.okay'),
           buttonCallback: () => resolve(this._showIssuesButtonAsync)
         });
       });
@@ -295,7 +295,7 @@ export class UiIntroRapid extends AbstractIntroChapter {
         revealNode: label.node(),   // "connect these features" is expected to be the first child
         revealPadding: 5,
         tipHtml: helpHtml(context, 'intro.rapid.new_lints'),
-        buttonText: l10n.t('intro.ok'),
+        buttonText: l10n.t('text.okay'),
         buttonCallback: () => resolve(this._undoRoadAddAsync)
       });
     });
@@ -345,7 +345,7 @@ export class UiIntroRapid extends AbstractIntroChapter {
       curtain.reveal({
         revealExtent: tulipLaneExtent,
         tipHtml: helpHtml(context, 'intro.rapid.undo_road_add_aftermath'),
-        buttonText: l10n.t('intro.ok'),
+        buttonText: l10n.t('text.okay'),
         buttonCallback: () => resolve(this._selectRoadAgainAsync)
       });
     });
@@ -441,7 +441,7 @@ export class UiIntroRapid extends AbstractIntroChapter {
       revealSelector: '.ideditor',
       tipSelector: '.intro-nav-wrap .chapter-startEditing',
       tipHtml: helpHtml(context, 'intro.rapid.done', { next: l10n.t('intro.startediting.title') }),
-      buttonText: l10n.t('intro.ok'),
+      buttonText: l10n.t('text.okay'),
       buttonCallback: () => curtain.reveal({ revealSelector: '.ideditor' })  // re-reveal but without the tooltip
     });
     // chapter is done

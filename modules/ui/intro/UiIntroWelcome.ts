@@ -46,7 +46,7 @@ export class UiIntroWelcome extends AbstractIntroChapter {
       curtain.reveal({
         revealSelector: '.intro-nav-wrap .chapter-welcome',
         tipHtml: helpHtml(context, 'intro.welcome.welcome'),
-        buttonText: l10n.t('intro.ok'),
+        buttonText: l10n.t('text.okay'),
         buttonCallback: () => resolve(this._practiceAsync)
       });
     });
@@ -65,7 +65,7 @@ export class UiIntroWelcome extends AbstractIntroChapter {
       curtain.reveal({
         revealSelector: '.intro-nav-wrap .chapter-welcome',
         tipHtml: helpHtml(context, 'intro.welcome.practice'),
-        buttonText: l10n.t('intro.ok'),
+        buttonText: l10n.t('text.okay'),
         buttonCallback: () => resolve(this._wordsAsync)
       });
     });
@@ -84,7 +84,7 @@ export class UiIntroWelcome extends AbstractIntroChapter {
       curtain.reveal({
         revealSelector: '.intro-nav-wrap .chapter-welcome',
         tipHtml: helpHtml(context, 'intro.welcome.words'),
-        buttonText: l10n.t('intro.ok'),
+        buttonText: l10n.t('text.okay'),
         buttonCallback: () => resolve(this._chaptersAsync)
       });
     });

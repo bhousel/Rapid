@@ -227,7 +227,7 @@ export class UiIntroPoint extends AbstractIntroChapter {
           revealSelector: '.entity-editor-pane',
           tipHtml: helpHtml(context, 'intro.points.feature_editor'),
           tipClass: 'intro-points-describe',
-          buttonText: l10n.t('intro.ok'),
+          buttonText: l10n.t('text.okay'),
           buttonCallback: () => resolve(this._addNameAsync)
         });
       });
@@ -268,7 +268,7 @@ export class UiIntroPoint extends AbstractIntroChapter {
           const tooltip = curtain.reveal({
             revealSelector: '.entity-editor-pane',
             tipHtml: helpHtml(context, 'intro.points.fields_info'),
-            buttonText: l10n.t('intro.ok'),
+            buttonText: l10n.t('text.okay'),
             buttonCallback: () => resolve(this._addCloseEditorAsync)
           });
 
@@ -547,7 +547,7 @@ export class UiIntroPoint extends AbstractIntroChapter {
       revealSelector: '.ideditor',
       tipSelector: '.intro-nav-wrap .chapter-area',
       tipHtml: helpHtml(context, 'intro.points.play', { next: l10n.t('intro.areas.title') }),
-      buttonText: l10n.t('intro.ok'),
+      buttonText: l10n.t('text.okay'),
       buttonCallback: () => curtain.reveal({ revealSelector: '.ideditor' })  // re-reveal but without the tooltip
     });
     // chapter is done

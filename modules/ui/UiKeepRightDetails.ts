@@ -129,7 +129,7 @@ export class UiKeepRightDetails {
     // update — set localized title here so it re-localizes on language change
     $details = $details.merge($$details);
     $details.select('h4')
-      .text(l10n.t('QA.keepRight.detail_description'));
+      .text(l10n.t('text.description'));
 
     // Don't hide entities related to this issue - iD#5880
     filters.forceVisible(relatedEntities);
@@ -145,7 +145,7 @@ export class UiKeepRightDetails {
     const l10n = this.context.systems.l10n!;
 
     const { itemType, parentIssueType } = d.props;
-    const unknown = l10n.t('inspector.unknown');
+    const unknown = l10n.t('text.unknown');
     const replacements = d.props.replacements || {};  // some replacements are html linkified
     replacements.default = unknown;  // special key `default` works as a fallback string
 

@@ -535,10 +535,10 @@ export class UiCommit extends EventEmitter {
       .merge(buttonEnter);
 
     buttonSection.selectAll('.cancel-button .label')
-      .text(l10n.t('commit.cancel'));
+      .text(l10n.t('text.cancel'));
 
     buttonSection.selectAll('.save-button .label')
-      .text(l10n.t('commit.save'));
+      .text(l10n.t('text.upload'));
 
     buttonSection.selectAll('.cancel-button')
       .on('click.cancel', (d3_event: Event) => {

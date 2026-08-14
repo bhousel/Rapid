@@ -210,7 +210,7 @@ export class UiMapRouletteDetails {
 
         $descriptionHeader
           .append('h4')
-          .text(l10n.t('map_data.layers.maproulette.detail_title'));
+          .text(l10n.t('text.details'));
 
         const $descriptionContent = $description
           .append('section')

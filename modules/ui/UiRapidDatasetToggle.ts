@@ -293,7 +293,7 @@ export class UiRapidDatasetToggle extends EventEmitter {
     $buttons = $buttons.merge($$buttons);
 
     $buttons.selectAll('.button')
-      .text(l10n.t('confirm.okay'));
+      .text(l10n.t('text.okay'));
   }
 
 

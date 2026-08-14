@@ -30,7 +30,7 @@ export class UiDownloadTool {
   public constructor(context: Context) {
     this.context = context;
     this.id = 'download_osc';
-    this.stringID = 'download_osc.title';
+    this.stringID = 'text.download';
 
     const editor = context.systems.editor!;
 

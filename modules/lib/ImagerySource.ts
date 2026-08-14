@@ -490,7 +490,7 @@ export class ImagerySourceNone extends ImagerySource {
     super(context, {
       id: 'none',
       template: '',
-      nameStringID: 'background.none',
+      nameStringID: 'text.none',
       descriptionStringID: ''
     });
   }
@@ -530,7 +530,7 @@ export class ImagerySourceCustom extends ImagerySource {
     super(context, {
       id: 'custom',
       template: template,
-      nameStringID: 'background.custom',
+      nameStringID: 'text.custom',
       descriptionStringID: ''
     });
   }
@@ -704,7 +704,7 @@ export class ImagerySourceEsri extends ImagerySource {
     const loc = tile.wgs84Extent.center();
     const tileID = tile.xyz.join('/');
     const zoom = Math.min(tile.xyz[2], this.props.zoomExtent![1]);
-    const unknown = l10n?.t('inspector.unknown') || 'unknown';
+    const unknown = l10n?.t('text.unknown') || 'unknown';
 
     if (this._inflight[tileID]) return;
 
@@ -911,7 +911,7 @@ export class ImagerySourceEsriWayback extends ImagerySourceEsri {
     const context = this.context;
     const l10n = context.systems.l10n;
     const wayback = (context.services as any).wayback;
-    const unknown = l10n?.t('inspector.unknown') || 'unknown';
+    const unknown = l10n?.t('text.unknown') || 'unknown';
 
     const release = wayback.byReleaseDate.get(this.date);
     if (!release) {

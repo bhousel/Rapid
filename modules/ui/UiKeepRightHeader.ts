@@ -96,7 +96,7 @@ export class UiKeepRightHeader {
     const l10n = this.context.systems.l10n!;
 
     const { itemType, parentIssueType } = d.props;
-    const unknown = l10n.t('inspector.unknown');
+    const unknown = l10n.t('text.unknown');
     const replacements = d.props.replacements || {};
     replacements.default = unknown;  // special key `default` works as a fallback string
 

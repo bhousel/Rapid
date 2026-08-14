@@ -69,7 +69,7 @@ export class UiCommitWarnings {
         .merge(container);
 
       container.select('h3')
-        .html(severity === 'warning' ? l10n.tHtml('commit.warnings') : l10n.tHtml('commit.errors'));
+        .html(severity === 'warning' ? l10n.tHtml('text.warnings') : l10n.tHtml('text.errors'));
 
 
       let items: D3Selection = container.select('ul').selectAll('li')

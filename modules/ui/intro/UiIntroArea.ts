@@ -474,7 +474,7 @@ export class UiIntroArea extends AbstractIntroChapter {
         curtain.reveal({
           revealSelector: '.entity-editor-pane',
           tipHtml: helpHtml(context, 'intro.areas.retry_add_field', { field: descriptionField.label }),
-          buttonText: l10n.t('intro.ok'),
+          buttonText: l10n.t('text.okay'),
           buttonCallback: () => resolve(this._clickAddFieldAsync)
         });
       });
@@ -496,7 +496,7 @@ export class UiIntroArea extends AbstractIntroChapter {
       revealSelector: '.ideditor',
       tipSelector: '.intro-nav-wrap .chapter-line',
       tipHtml: helpHtml(context, 'intro.areas.play', { next: l10n.t('intro.lines.title') }),
-      buttonText: l10n.t('intro.ok'),
+      buttonText: l10n.t('text.okay'),
       buttonCallback: () => curtain.reveal({ revealSelector: '.ideditor' })  // re-reveal but without the tooltip
     });
   }

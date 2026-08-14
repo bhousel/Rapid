@@ -118,10 +118,10 @@ export function helpHtml(context: Context, stringID: string, replacements?: Reco
       toggle_notes_key: l10n.t('shortcuts.command.toggle_osm_notes.key'),
 
       // reference localized UI labels directly so that they'll always match
-      save: l10n.t('save.title'),
+      save: l10n.t('text.save'),
       undo: l10n.t('undo.title'),
       redo: l10n.t('redo.title'),
-      upload: l10n.t('commit.save'),
+      upload: l10n.t('text.upload'),
       point: l10n.t('modes.add_point.title'),
       line: l10n.t('modes.add_line.title'),
       area: l10n.t('modes.add_area.title'),
@@ -147,16 +147,16 @@ export function helpHtml(context: Context, stringID: string, replacements?: Reco
 
       map_data: l10n.t('map_data.title'),
       osm_notes: l10n.t('map_data.layers.notes.title'),
-      fields: l10n.t('inspector.fields'),
-      tags: l10n.t('inspector.tags'),
-      relations: l10n.t('inspector.relations'),
+      fields: l10n.t('text.fields'),
+      tags: l10n.t('text.tags'),
+      relations: l10n.t('text.relations'),
       new_relation: l10n.t('inspector.new_relation'),
       turn_restrictions: l10n.t('_tagging.presets.fields.restrictions.label'),
       background_settings: l10n.t('background.description'),
       imagery_offset: l10n.t('background.fix_misalignment'),
       start_the_walkthrough: l10n.t('splash.walkthrough'),
-      help: l10n.t('help.title'),
-      ok: l10n.t('intro.ok')
+      help: l10n.t('text.help'),
+      ok: l10n.t('text.okay')
     };
   }
 

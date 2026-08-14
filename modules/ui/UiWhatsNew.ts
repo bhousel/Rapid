@@ -133,7 +133,7 @@ Big changes are coming soon to Rapid. including:
     const $okButton: D3Selection = $buttonWrap
       .append('button')
       .attr('class', 'button ok-button action')
-      .text(l10n.t('confirm.okay'))
+      .text(l10n.t('text.okay'))
       .on('click', modal.close);
 
     const node = $okButton.node() as HTMLElement | null;

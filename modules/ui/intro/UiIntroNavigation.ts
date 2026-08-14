@@ -105,7 +105,7 @@ export class UiIntroNavigation extends AbstractIntroChapter {
       curtain.reveal({
         revealSelector: '.main-map',
         tipHtml: tipHtml,
-        buttonText: l10n.t('intro.ok'),
+        buttonText: l10n.t('text.okay'),
         buttonCallback: () => resolve(this._panMapAsync)
       });
     });
@@ -143,7 +143,7 @@ export class UiIntroNavigation extends AbstractIntroChapter {
         curtain.reveal({
           revealSelector: '.main-map',
           tipHtml: tipHtml,
-          buttonText: l10n.t('intro.ok'),
+          buttonText: l10n.t('text.okay'),
           buttonCallback: () => resolve(this._zoomMapAsync)
         });
       });
@@ -186,7 +186,7 @@ export class UiIntroNavigation extends AbstractIntroChapter {
         curtain.reveal({
           revealSelector: '.main-map',
           tipHtml: tipHtml,
-          buttonText: l10n.t('intro.ok'),
+          buttonText: l10n.t('text.okay'),
           buttonCallback: () => resolve(this._userSettingsAsync)
         });
       });
@@ -213,7 +213,7 @@ export class UiIntroNavigation extends AbstractIntroChapter {
       curtain.reveal({
         revealSelector: '.map-panes .preferences-pane',
         tipHtml: helpHtml(context, 'intro.navigation.user_settings'),
-        buttonText: l10n.t('intro.ok'),
+        buttonText: l10n.t('text.okay'),
         buttonCallback: () => {
           ui.togglePanes();   // hide preferences pane
           resolve(this._rotateMapAsync);
@@ -251,7 +251,7 @@ export class UiIntroNavigation extends AbstractIntroChapter {
         curtain.reveal({
           revealSelector: '.main-map',
           tipHtml: tipHtml,
-          buttonText: l10n.t('intro.ok'),
+          buttonText: l10n.t('text.okay'),
           buttonCallback: () => resolve(this._resetBearingAsync)
         });
       });
@@ -313,7 +313,7 @@ export class UiIntroNavigation extends AbstractIntroChapter {
       curtain.reveal({
         revealSelector: '.main-map',
         tipHtml: helpHtml(context, 'intro.navigation.features'),
-        buttonText: l10n.t('intro.ok'),
+        buttonText: l10n.t('text.okay'),
         buttonCallback: () => resolve(this._pointsLinesAreasAsync)
       });
     });
@@ -332,7 +332,7 @@ export class UiIntroNavigation extends AbstractIntroChapter {
       curtain.reveal({
         revealSelector: '.main-map',
         tipHtml: helpHtml(context, 'intro.navigation.points_lines_areas'),
-        buttonText: l10n.t('intro.ok'),
+        buttonText: l10n.t('text.okay'),
         buttonCallback: () => resolve(this._nodesWaysAsync)
       });
     });
@@ -351,7 +351,7 @@ export class UiIntroNavigation extends AbstractIntroChapter {
       curtain.reveal({
         revealSelector: '.main-map',
         tipHtml: helpHtml(context, 'intro.navigation.nodes_ways'),
-        buttonText: l10n.t('intro.ok'),
+        buttonText: l10n.t('text.okay'),
         buttonCallback: () => resolve(this._clickTownHallAsync)
       });
     });
@@ -410,7 +410,7 @@ export class UiIntroNavigation extends AbstractIntroChapter {
         curtain.reveal({
           revealExtent: this._townHallExtent,
           tipHtml: helpHtml(context, 'intro.navigation.selected_townhall'),
-          buttonText: l10n.t('intro.ok'),
+          buttonText: l10n.t('text.okay'),
           buttonCallback: () => resolve(this._editorTownHallAsync)
         });
       });
@@ -442,7 +442,7 @@ export class UiIntroNavigation extends AbstractIntroChapter {
         curtain.reveal({
           revealSelector: '.entity-editor-pane',
           tipHtml: helpHtml(context, 'intro.navigation.editor_townhall'),
-          buttonText: l10n.t('intro.ok'),
+          buttonText: l10n.t('text.okay'),
           buttonCallback: () => resolve(this._presetTownHallAsync)
         });
       });
@@ -483,7 +483,7 @@ export class UiIntroNavigation extends AbstractIntroChapter {
           revealSelector: '.entity-editor-pane .section-feature-type',
           revealPadding: 5,
           tipHtml: helpHtml(context, 'intro.navigation.preset_townhall', { preset: preset!.name }),
-          buttonText: l10n.t('intro.ok'),
+          buttonText: l10n.t('text.okay'),
           buttonCallback: () => resolve(this._fieldsTownHallAsync)
         });
       });
@@ -517,7 +517,7 @@ export class UiIntroNavigation extends AbstractIntroChapter {
           revealSelector: '.entity-editor-pane .section-preset-fields',
           revealPadding: 5,
           tipHtml: helpHtml(context, 'intro.navigation.fields_townhall'),
-          buttonText: l10n.t('intro.ok'),
+          buttonText: l10n.t('text.okay'),
           buttonCallback: () => resolve(this._closeTownHallAsync)
         });
       });
@@ -662,7 +662,7 @@ export class UiIntroNavigation extends AbstractIntroChapter {
           revealExtent: this._springStreetExtent,
           revealPadding: 40,
           tipHtml: helpHtml(context, 'intro.navigation.selected_street', { name: l10n.t('intro.graph.name.spring-street') }),
-          buttonText: l10n.t('intro.ok'),
+          buttonText: l10n.t('text.okay'),
           buttonCallback: () => resolve(this._editorStreetAsync)
         });
       });
@@ -719,7 +719,7 @@ export class UiIntroNavigation extends AbstractIntroChapter {
       revealSelector: '.ideditor',
       tipSelector: '.intro-nav-wrap .chapter-point',
       tipHtml: helpHtml(context, 'intro.navigation.play', { next: l10n.t('intro.points.title') }),
-      buttonText: l10n.t('intro.ok'),
+      buttonText: l10n.t('text.okay'),
       buttonCallback: () => curtain.reveal({ revealSelector: '.ideditor' })  // re-reveal but without the tooltip
     });
   }

@@ -109,7 +109,7 @@ export class UiFieldTextarea extends UiField {
     const key = this.key;
     const isMixed = Array.isArray(tags[key]);
     const placeholder = isMixed ? l10n.t('inspector.multiple_values') :
-      (this.placeholder || l10n.t('inspector.unknown'));
+      (this.placeholder || l10n.t('text.unknown'));
 
     (utilGetSetValue(this.$input, !isMixed && tags[key] ? (tags[key] as string) : '') as D3Selection)
       .attr('title', isMixed ? (tags[key] as string[]).filter(Boolean).join('\n') : null)

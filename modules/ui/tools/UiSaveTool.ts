@@ -30,7 +30,7 @@ export class UiSaveTool {
   public constructor(context: Context) {
     this.context = context;
     this.id = 'save';
-    this.stringID = 'save.title';
+    this.stringID = 'text.save';
     this.key = utilCmd('⌘S');
 
     this._numChanges = 0;

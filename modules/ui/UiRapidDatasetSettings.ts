@@ -205,7 +205,7 @@ export class UiRapidDatasetSettings extends EventEmitter {
     $buttons = $buttons.merge($$buttons);
 
     $buttons.selectAll('.button')
-      .text(l10n.t('confirm.okay'));
+      .text(l10n.t('text.okay'));
   }
 
 
@@ -239,6 +239,16 @@ export class UiRapidDatasetSettings extends EventEmitter {
     $$details
       .append('h3')
       .attr('class', 'dataset-details-heading');
+
+    const $$identifier = $$details
+      .append('div')
+      .attr('class', 'dataset-details-row');
+    $$identifier
+      .append('div')
+      .attr('class', 'dataset-details-label identifier-label');
+    $$identifier
+      .append('div')
+      .attr('class', 'dataset-details-value identifier-value');
 
     const $$source = $$details
       .append('div')
@@ -299,18 +309,24 @@ export class UiRapidDatasetSettings extends EventEmitter {
     $details.selectAll('.dataset-details-value')
       .classed('disabled', isLocked);
 
+    $details.selectAll('.identifier-label')
+      .text(l10n.t('rapid_dataset_settings.details.identifier'));
+    $details.selectAll('.identifier-value')
+      .classed('disabled', true)   // this one is always locked
+      .text(ds.id || '');
+
     $details.selectAll('.source-label')
       .text(l10n.t('rapid_dataset_settings.details.source'));
     $details.selectAll('.source-value')
       .text(ds.serviceID || '');
 
     $details.selectAll('.name-label')
-      .text(l10n.t('rapid_dataset_settings.details.name'));
+      .text(l10n.t('text.name'));
     $details.selectAll('.name-value')
       .text(ds.getLabel() || '');
 
     $details.selectAll('.description-label')
-      .text(l10n.t('rapid_dataset_settings.details.description'));
+      .text(l10n.t('text.description'));
     $details.selectAll('.description-value')
       .text(ds.getDescription() || '');
 

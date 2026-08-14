@@ -432,7 +432,7 @@ export class UiFieldCombo extends UiField {
     const l10n = this.context.systems.l10n!;
 
     if (this._isMulti || this._isSemi) {
-      this._staticPlaceholder = this.placeholder || l10n.t('inspector.add');
+      this._staticPlaceholder = this.placeholder || l10n.t('text.add');
     } else {
       const vals = values
         .map(d => d.value)

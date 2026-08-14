@@ -157,7 +157,7 @@ export class UiFeatureList {
 
     // update
     this.$search
-      .attr('placeholder', l10n.t('inspector.search'));
+      .attr('placeholder', l10n.t('text.search'));
 
 
     // add .inspector-body and .feature-list
@@ -446,7 +446,7 @@ export class UiFeatureList {
       results.push({
         id: -1,
         geometry: 'point',
-        type: l10n.t('inspector.location'),
+        type: l10n.t('text.location'),
         name: l10n.dmsCoordinatePair([loc[1], loc[0]]),
         location: loc
       });
@@ -463,7 +463,7 @@ export class UiFeatureList {
           id: -1,
           noteID: entityID,
           geometry: 'note',
-          type: l10n.t('note.note'),
+          type: l10n.t('text.note'),
           name: entityID
         });
       } else {
@@ -549,26 +549,26 @@ export class UiFeatureList {
       results.push({
         id: 'n' + q,
         geometry: 'point',
-        type: l10n.t('inspector.node'),
+        type: l10n.t('text.node'),
         name: q
       });
       results.push({
         id: 'w' + q,
         geometry: 'line',
-        type: l10n.t('inspector.way'),
+        type: l10n.t('text.way'),
         name: q
       });
       results.push({
         id: 'r' + q,
         geometry: 'relation',
-        type: l10n.t('inspector.relation'),
+        type: l10n.t('text.relation'),
         name: q
       });
       results.push({
         id: -1,
         noteID: q,
         geometry: 'note',
-        type: l10n.t('note.note'),
+        type: l10n.t('text.note'),
         name: q
       });
     }

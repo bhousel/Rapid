@@ -68,7 +68,7 @@ export class UiConfirm extends UiModal {
       ?.append('button')
       .attr('class', 'button ok-button action')
       .on('click.confirm', () => this.close())
-      .text(l10n?.t('confirm.okay') ?? 'Okay')
+      .text(l10n?.t('text.okay') ?? 'Okay')
       .node()
       ?.focus();
 

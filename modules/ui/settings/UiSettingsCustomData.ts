@@ -152,7 +152,7 @@ ${url_tokens}
     $buttonSection
       .insert('button', '.ok-button')
       .attr('class', 'button cancel-button secondary-action')
-      .text(l10n.t('confirm.cancel'));
+      .text(l10n.t('text.cancel'));
 
     // Restore the original settings
     const clickCancel = (d3_event: Event): void => {

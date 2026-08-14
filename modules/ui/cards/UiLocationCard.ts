@@ -106,7 +106,7 @@ export class UiLocationCard extends AbstractUiCard {
     this.$wrap = $wrap = $wrap.merge($$wrap);
 
     $wrap.selectAll('h3')
-      .text(l10n.t('info_panels.location.title'));
+      .text(l10n.t('text.location'));
 
     // .card-content
     const $content = $wrap.selectAll('.card-content');

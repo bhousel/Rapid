@@ -106,7 +106,7 @@ export class UiSectionChanges extends AbstractUiSection {
     $$buttons
       .append('span')
       .attr('class', 'change-type')
-      .text((d: SummaryEntry) => l10n.t(`commit.${d.changeType}`) + ' ');
+      .text((d: SummaryEntry) => l10n.t(`text.${d.changeType}`) + ' ');
 
     $$buttons
       .append('strong')

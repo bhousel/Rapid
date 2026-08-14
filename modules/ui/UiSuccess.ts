@@ -362,7 +362,7 @@ export class UiSuccess extends EventEmitter {
         .call(new UiDisclosure(context, `community-more-${d.id}`)
           .expanded(false)
           .checkPreference(false)
-          .label(l10n.t('success.more'))
+          .label(l10n.t('text.more'))
           .content(showMore)
           .render
         );

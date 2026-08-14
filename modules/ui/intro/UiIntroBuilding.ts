@@ -223,7 +223,7 @@ export class UiIntroBuilding extends AbstractIntroChapter {
       curtain.reveal({
         revealExtent: this._houseExtent,
         tipHtml: helpHtml(context, 'intro.buildings.retry_building'),
-        buttonText: l10n.t('intro.ok'),
+        buttonText: l10n.t('text.okay'),
         buttonCallback: () => resolve(this._addHouseAsync)
       });
     });
@@ -469,7 +469,7 @@ export class UiIntroBuilding extends AbstractIntroChapter {
       curtain.reveal({
         revealExtent: this._houseExtent,
         tipHtml: helpHtml(context, 'intro.buildings.retry_square'),
-        buttonText: l10n.t('intro.ok'),
+        buttonText: l10n.t('text.okay'),
         buttonCallback: () => resolve(this._rightClickHouseAsync)
       });
     });
@@ -491,7 +491,7 @@ export class UiIntroBuilding extends AbstractIntroChapter {
       curtain.reveal({
         revealExtent: this._houseExtent,
         tipHtml: helpHtml(context, 'intro.buildings.done_square'),
-        buttonText: l10n.t('intro.ok'),
+        buttonText: l10n.t('text.okay'),
         buttonCallback: () => resolve(this._addTankAsync)
       });
     });
@@ -814,7 +814,7 @@ export class UiIntroBuilding extends AbstractIntroChapter {
       curtain.reveal({
         revealExtent: this._tankExtent,
         tipHtml: helpHtml(context, 'intro.buildings.retry_circle'),
-        buttonText: l10n.t('intro.ok'),
+        buttonText: l10n.t('text.okay'),
         buttonCallback: () => resolve(this._rightClickTankAsync)
       });
     });
@@ -833,7 +833,7 @@ export class UiIntroBuilding extends AbstractIntroChapter {
       revealSelector: '.ideditor',
       tipSelector: '.intro-nav-wrap .chapter-rapid',
       tipHtml: helpHtml(context, 'intro.buildings.play', { next: l10n.t('intro.rapid.title') }),
-      buttonText: l10n.t('intro.ok'),
+      buttonText: l10n.t('text.okay'),
       buttonCallback: () => curtain.reveal({ revealSelector: '.ideditor' })  // re-reveal but without the tooltip
     });
     // chapter is done

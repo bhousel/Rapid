@@ -401,7 +401,7 @@ export class UiNoteEditor extends EventEmitter {
       .merge($$buttons);
 
     $buttons.select('.cancel-button')   // select and propagate data
-      .text(l10n.t('confirm.cancel'))
+      .text(l10n.t('text.cancel'))
       .on('click.cancel', this._clickCancel);
 
     $buttons.select('.save-button')     // select and propagate data
@@ -420,7 +420,7 @@ export class UiNoteEditor extends EventEmitter {
 
     $buttons.select('.comment-button')   // select and propagate data
       .attr('disabled', isSaveDisabled)
-      .text(l10n.t('note.comment'))
+      .text(l10n.t('text.comment'))
       .on('click.comment', this._clickComment);
   }
 

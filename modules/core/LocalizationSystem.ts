@@ -882,9 +882,9 @@ export class LocalizationSystem extends AbstractSystem {
    */
   public displayType(entityID: EntityID): string {
     return ({
-      n: this.t('inspector.node'),
-      w: this.t('inspector.way'),
-      r: this.t('inspector.relation')
+      n: this.t('text.node'),
+      w: this.t('text.way'),
+      r: this.t('text.relation')
     } as Record<string, string>)[entityID.charAt(0)];
   }
 

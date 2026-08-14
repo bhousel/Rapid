@@ -89,7 +89,7 @@ export class UiSectionRawMembershipEditor extends AbstractUiSection {
     const parents = this._getSharedParentRelations();
     const gt = parents.length > MAX_MEMBERSHIPS ? '>' : '';
     const count = gt + parents.slice(0, MAX_MEMBERSHIPS).length;
-    return l10n.t('inspector.title_count', { title: l10n.t('inspector.relations'), count: count });
+    return l10n.t('inspector.title_count', { title: l10n.t('text.relations'), count: count });
   }
 
 
@@ -356,14 +356,14 @@ const indexes = d.members.map(function(member: IndexedMember) {
 
     function baseDisplayValue(entity: OsmRelation): string {
       const preset = schema.match(entity, graph);
-      const presetName = preset?.name || l10n.t('inspector.relation');
+      const presetName = preset?.name || l10n.t('text.relation');
       const entityName = l10n.displayName(entity.tags) || '';
       return presetName + ' ' + entityName;
     }
 
     const baseDisplayLabel = (entity: OsmRelation): ($selection: D3Selection) => void => {
       const preset = schema.match(entity, graph);
-      const presetName = preset?.name || l10n.t('inspector.relation');
+      const presetName = preset?.name || l10n.t('text.relation');
       const entityName = l10n.displayName(entity.tags) || '';
       const color = this._getColor(entity);
 
@@ -493,7 +493,7 @@ const indexes = d.members.map(function(member: IndexedMember) {
       .attr('class', 'member-entity-type')
       .text((d: MembershipRow) => {
         const preset = schema.match(d.relation, graph);
-        return preset?.name || l10n.t('inspector.relation');
+        return preset?.name || l10n.t('text.relation');
       });
 
     $$labelLink
@@ -539,7 +539,7 @@ const indexes = d.members.map(function(member: IndexedMember) {
         return Array.isArray(d.role) ? d.role.filter(Boolean).join('\n') : d.role;
       })
       .attr('placeholder', function(d: MembershipRow) {
-        return Array.isArray(d.role) ? l10n.t('inspector.multiple_roles') : l10n.t('inspector.role');
+        return Array.isArray(d.role) ? l10n.t('inspector.multiple_roles') : l10n.t('text.role');
       })
       .classed('mixed', function(d: MembershipRow) {
         return Array.isArray(d.role);
@@ -602,7 +602,7 @@ const indexes = d.members.map(function(member: IndexedMember) {
       .attr('placeholder', l10n.t('inspector.choose_relation'));
 
     $newMembership.selectAll('.member-role')
-      .attr('placeholder', l10n.t('inspector.role'));
+      .attr('placeholder', l10n.t('text.role'));
 
     $newMembership.selectAll('.member-entity-input')
       .on('blur', cancelEntity)   // if it wasn't accepted normally, cancel it

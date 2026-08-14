@@ -144,7 +144,7 @@ export class UiFieldWikidata extends UiField {
     // Enter
     const $$items = $items.enter()
       .append('li')
-      .attr('class', d => `labeled-input preset-wikidata-${d}`);
+      .attr('class', (d: string) => `labeled-input preset-wikidata-${d}`);
 
     $$items
       .append('div')
@@ -174,7 +174,7 @@ export class UiFieldWikidata extends UiField {
     $items = $items.merge($$items);
 
     $items.select('.label')
-      .text(d => l10n.t(`wikidata.${d}`));
+      .text((d: string) => l10n.t(`wikidata.${d}`));
     $items.select('button.form-field-button')
       .attr('title', l10n.t('icons.copy'));
   }

@@ -52,7 +52,7 @@ export class UiIntroStartEditing extends AbstractIntroChapter {
       curtain.reveal({
         revealSelector: '.map-control.help-control',
         tipHtml: helpHtml(context, 'intro.startediting.help'),
-        buttonText: l10n.t('intro.ok'),
+        buttonText: l10n.t('text.okay'),
         buttonCallback: () => resolve(this._shortcutsAsync)
       });
     });
@@ -71,7 +71,7 @@ export class UiIntroStartEditing extends AbstractIntroChapter {
       curtain.reveal({
         revealSelector: '.map-control.help-control',
         tipHtml: helpHtml(context, 'intro.startediting.shortcuts'),
-        buttonText: l10n.t('intro.ok'),
+        buttonText: l10n.t('text.okay'),
         buttonCallback: () => resolve(this._showSaveAsync)
       });
     });
@@ -93,7 +93,7 @@ export class UiIntroStartEditing extends AbstractIntroChapter {
       curtain.reveal({
         revealSelector: '.map-toolbar button.save',
         tipHtml: helpHtml(context, 'intro.startediting.save'),
-        buttonText: l10n.t('intro.ok'),
+        buttonText: l10n.t('text.okay'),
         buttonCallback: () => resolve(this._showStartMappingAsync)
       });
     });

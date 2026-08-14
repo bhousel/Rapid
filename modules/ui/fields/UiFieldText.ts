@@ -323,7 +323,7 @@ export class UiFieldText extends UiField {
 
     (utilGetSetValue(this.$input, !isMixed && tags[key] ? (tags[key] as string) : '') as D3Selection)
       .attr('title', isMixed ? (tags[key] as string[]).filter(Boolean).join('\n') : null)
-      .attr('placeholder', isMixed ? l10n.t('inspector.multiple_values') : (this.placeholder || l10n.t('inspector.unknown')))
+      .attr('placeholder', isMixed ? l10n.t('inspector.multiple_values') : (this.placeholder || l10n.t('text.unknown')))
       .classed('mixed', isMixed);
 
     if (this.$outlinkButton && !this.$outlinkButton.empty()) {

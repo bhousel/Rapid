@@ -153,7 +153,7 @@ export class UiMeasurementCard extends AbstractUiCard {
 
     if (selectedData.size === 1 && isNote) {   // selected 1 OSM Note
       const note = selectedItem;
-      heading = l10n.t('note.note') + ' ' + note.id;
+      heading = l10n.t('text.note') + ' ' + note.id;
       location = note.loc;
       geometry = 'note';
 

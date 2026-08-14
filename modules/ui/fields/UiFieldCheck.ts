@@ -72,7 +72,7 @@ export class UiFieldCheck extends UiField {
       }
     } else {
       this._values = [undefined, 'yes'];
-      this._texts = [l10n.t('inspector.unknown'), l10n.t('inspector.check.yes')];
+      this._texts = [l10n.t('text.unknown'), l10n.t('inspector.check.yes')];
       if (this.type !== 'defaultCheck') {
         this._values.push('no');
         this._texts.push(l10n.t('inspector.check.no'));

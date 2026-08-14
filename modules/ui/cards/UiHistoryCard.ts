@@ -148,7 +148,7 @@ export class UiHistoryCard extends AbstractUiCard {
         $content
           .append('h4')
           .attr('class', 'history-heading')
-          .text(l10n.t('note.note') + ' ' + datumID);
+          .text(l10n.t('text.note') + ' ' + datumID);
 
         $content
           .call(this.renderNote, datum);
@@ -295,7 +295,7 @@ export class UiHistoryCard extends AbstractUiCard {
     const context = this.context;
     const l10n = context.systems.l10n!;
 
-    if (!timestamp) return l10n.t('inspector.unknown');
+    if (!timestamp) return l10n.t('text.unknown');
 
     const options: Intl.DateTimeFormatOptions = {
       day: 'numeric', month: 'short', year: 'numeric',
@@ -303,7 +303,7 @@ export class UiHistoryCard extends AbstractUiCard {
     };
 
     const d = new Date(timestamp);
-    if (isNaN(d.getTime())) return l10n.t('inspector.unknown');
+    if (isNaN(d.getTime())) return l10n.t('text.unknown');
 
     const localeCode = context.systems.l10n!.localeCode;
     return d.toLocaleString(localeCode, options);
@@ -323,7 +323,7 @@ export class UiHistoryCard extends AbstractUiCard {
     if (!username) {
       $selection
         .append('span')
-        .text(l10n.t('inspector.unknown'));
+        .text(l10n.t('text.unknown'));
       return;
     }
 
@@ -368,7 +368,7 @@ export class UiHistoryCard extends AbstractUiCard {
     if (!changesetID) {
       $selection
         .append('span')
-        .text(l10n.t('inspector.unknown'));
+        .text(l10n.t('text.unknown'));
       return;
     }
 

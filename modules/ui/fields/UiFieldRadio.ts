@@ -204,7 +204,7 @@ export class UiFieldRadio extends UiField {
 
     // Set localized text on the update selection so it re-localizes on language change.
     $typeItem.selectAll('.structure-label-type')
-      .text(l10n.t('inspector.type'));
+      .text(l10n.t('text.type'));
 
     if (this._typeField) {
       $typeItem.selectAll('.structure-input-type-wrap')
@@ -406,7 +406,7 @@ export class UiFieldRadio extends UiField {
     const selection = this.$radios.filter(function(this: HTMLInputElement) { return this.checked; });
 
     if (selection.empty()) {
-      this.$placeholder.text(l10n.t('inspector.none'));
+      this.$placeholder.text(l10n.t('text.none'));
     } else {
       this.$placeholder.text(selection.attr('value'));
       this._oldType[selection.datum()] = t[selection.datum()];

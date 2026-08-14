@@ -91,11 +91,11 @@ export class UiDetectionDetails {
     $details = $details.merge($$details);
 
     $details.select('.detection-details-title')
-      .text(l10n.t('inspector.details') + ':');
+      .text(l10n.t('text.details') + ':');
 
     const $type = $details.select('.detection-type');
     $type.select('strong')
-      .text(l10n.t('inspector.type') + ':');
+      .text(l10n.t('text.type') + ':');
     $type.select('span')
       .text((d: MapillaryDetection) => d.props.value);
 
@@ -103,12 +103,12 @@ export class UiDetectionDetails {
     $firstseen.select('strong')
       .text(l10n.t('inspector.first_seen') + ':');
     $firstseen.select('span')
-      .text((d: MapillaryDetection) => d.props.first_seen_at ? l10n.displayShortDate(d.props.first_seen_at) : l10n.t('inspector.unknown'));
+      .text((d: MapillaryDetection) => d.props.first_seen_at ? l10n.displayShortDate(d.props.first_seen_at) : l10n.t('text.unknown'));
 
     const $lastseen = $details.select('.detection-last-seen');
     $lastseen.select('strong')
       .text(l10n.t('inspector.last_seen') + ':');
     $lastseen.select('span')
-      .text((d: MapillaryDetection) => d.props.last_seen_at ? l10n.displayShortDate(d.props.last_seen_at) : l10n.t('inspector.unknown'));
+      .text((d: MapillaryDetection) => d.props.last_seen_at ? l10n.displayShortDate(d.props.last_seen_at) : l10n.t('text.unknown'));
   }
 }

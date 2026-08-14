@@ -86,6 +86,6 @@ export class UiMapRouletteHeader {
     // update
     $header = $header.merge($$header);
     $header.select('.qa-header-label')
-      .text((d: MapRouletteTask) => d.props.parentName || l10n.t('inspector.unknown'));
+      .text((d: MapRouletteTask) => d.props.parentName || l10n.t('text.unknown'));
   }
 }

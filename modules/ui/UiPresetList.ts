@@ -143,7 +143,7 @@ export class UiPresetList extends EventEmitter {
     // update
     $search = $search.merge($$search);
     this.$input = $search.selectAll('.preset-search-input');
-    this.$input.attr('placeholder', l10n.t('inspector.search'));
+    this.$input.attr('placeholder', l10n.t('text.search'));
 
     if (this._autofocus) {
       // Safari 14 doesn't always like to focus immediately, so schedule it with setTimeout

@@ -86,7 +86,7 @@ export class UiDetectionHeader {
     } else {
       const value = d.props.value || '';
       const stringID = value.replace(/--/g, '.');
-      return l10n.t(`mapillary_detections.${stringID}`, { default: l10n.t('inspector.unknown') });
+      return l10n.t(`mapillary_detections.${stringID}`, { default: l10n.t('text.unknown') });
     }
   }
 

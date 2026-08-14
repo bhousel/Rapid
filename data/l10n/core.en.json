@@ -1,5 +1,46 @@
 {
   "en": {
+    "text": {
+      "no": "No",
+      "yes": "Yes",
+      "add": "Add",
+      "cancel": "Cancel",
+      "comment": "Comment",
+      "created": "Created",
+      "custom": "Custom",
+      "date": "Date",
+      "default": "Default",
+      "deleted": "Deleted",
+      "description": "Description",
+      "details": "Details",
+      "download": "Download",
+      "errors": "Errors",
+      "features": "Features",
+      "fields": "Fields",
+      "help": "Help",
+      "label": "Label",
+      "location": "Location",
+      "members": "Members",
+      "modified": "Modified",
+      "more": "More",
+      "name": "Name",
+      "node": "Node",
+      "none": "None",
+      "note": "Note",
+      "okay": "OK",
+      "relation": "Relation",
+      "relations": "Relations",
+      "remove": "Remove",
+      "role": "Role",
+      "save": "Save",
+      "search": "Search",
+      "tags": "Tags",
+      "type": "Type",
+      "unknown": "Unknown",
+      "upload": "Upload",
+      "warnings": "Warnings",
+      "way": "Way"
+    },
     "icons": {
       "download": "download",
       "information": "info",
@@ -760,15 +801,8 @@
       "upload_explanation_with_user": "The changes you upload as {user} will be visible on all maps that use OpenStreetMap data.",
       "request_review": "I would like someone to review my edits.",
       "request_review_info": "Unsure about something? Invite an experienced mapper to check your work once it's live.",
-      "save": "Upload",
-      "cancel": "Cancel",
       "changes": "Changes",
       "download_changes": "Download osmChange file",
-      "errors": "Errors",
-      "warnings": "Warnings",
-      "modified": "Modified",
-      "deleted": "Deleted",
-      "created": "Created",
       "outstanding_errors_message": "Please resolve all errors first. {count} remaining.",
       "comment_needed_message": "Please add a changeset comment first.",
       "about_changeset_comments": "About changeset comments",
@@ -814,7 +848,6 @@
         "note_link_text": "Note on openstreetmap.org"
       },
       "location": {
-        "title": "Location",
         "unknown_location": "Unknown Location"
       },
       "measurement": {
@@ -863,16 +896,10 @@
       "view_on_keepright": "View on keepright.at",
       "view_on_maproulette": "View on maproulette.org",
       "feature_type": "Feature Type",
-      "fields": "Fields",
-      "tags": "Tags",
-      "members": "Members",
-      "relations": "Relations",
-      "features": "Features",
       "title_count": "{title} ({count})",
       "add_to_relation": "Add to a relation",
       "new_relation": "New relation...",
       "choose_relation": "Choose a parent relation",
-      "role": "Role",
       "multiple_roles": "Multiple Roles",
       "choose": "Select feature type",
       "results": {
@@ -888,11 +915,6 @@
       "multiple_types": "Multiple Types",
       "unshared_value_tooltip": "not shared by all features",
       "back_tooltip": "Change feature type",
-      "type": "Type",
-      "details": "Details",
-      "remove": "Remove",
-      "search": "Search",
-      "unknown": "Unknown",
       "incomplete": "<not downloaded>",
       "feature_list": "Search features",
       "multiselect": "Multiple Selection",
@@ -907,12 +929,6 @@
           "layer": "Layer"
         }
       },
-      "add": "Add",
-      "none": "None",
-      "node": "Node",
-      "way": "Way",
-      "relation": "Relation",
-      "location": "Location",
       "add_fields": "Add field:",
       "lock": {
         "suggestion": "The \"{label}\" field is locked because there is a Wikidata tag. You can delete it or edit the tags in the \"Tags\" section."
@@ -943,10 +959,8 @@
       "title": "Background",
       "description": "Background Settings",
       "backgrounds": "Backgrounds",
-      "none": "None",
       "best_imagery": "Best known imagery source for this location",
       "switch": "Switch back to this background",
-      "custom": "Custom",
       "overlays": "Overlays",
       "grid": {
         "grids": "Grids",
@@ -960,8 +974,7 @@
       "display_options": "Display Options",
       "wayback": {
         "name": "Esri Wayback",
-        "description": "Esri Wayback contains archived snapshots of Esri World Imagery created over time.",
-        "date": "Date"
+        "description": "Esri Wayback contains archived snapshots of Esri World Imagery created over time."
       },
       "brightness": "Brightness",
       "contrast": "Contrast",
@@ -1013,7 +1026,6 @@
           },
           "loading_task_details": "Loading Task Details...",
           "error_loading_task_details": "Error while loading the task details. Try waiting and selecting it again.",
-          "detail_title": "Details",
           "id_title": "Challenge Id / Task Id",
           "id_placeholder": "Challenge IDs",
           "instruction_title": "Instructions",
@@ -1287,7 +1299,6 @@
       "reset": "Discard my changes"
     },
     "save": {
-      "title": "Save",
       "help": "Review your changes and upload them to OpenStreetMap, making them visible to other users.",
       "no_changes": "No changes to save.",
       "error": "Errors occurred while trying to save",
@@ -1311,7 +1322,6 @@
       }
     },
     "download_osc": {
-      "title": "Download",
       "help": "Download current changes to the map in an osc file.",
       "no_changes": "No changes to download."
     },
@@ -1338,15 +1348,10 @@
       "view_on_osm": "View Changes on OSM",
       "your_changeset_id": "Your changeset #:",
       "like_osm": "Like OpenStreetMap? Connect with others:",
-      "more": "More",
       "events": "Events",
       "languages": "Languages: {languages}",
       "missing": "Is something missing from this list?",
       "tell_us": "Tell us!"
-    },
-    "confirm": {
-      "okay": "OK",
-      "cancel": "Cancel"
     },
     "splash": {
       "welcome": "Welcome to {rapidicon} {version}!",
@@ -1385,7 +1390,6 @@
       "notice": {
         "open_data": "This dataset is comprised of open data. See our [license]({url}) for more details."
       },
-      "tags": "Tags",
       "option_accept": {
         "label": "Add This Feature",
         "description": "Does this look like an accurate feature? Select this to start editing it so that you can connect, tag, and save it to OpenStreetMap. 👍",
@@ -1502,6 +1506,12 @@
     },
     "rapid_add_dataset": {
       "heading": "Add Custom Data",
+      "identifier": {
+        "label": "DatasetID",
+        "instructions": "Choose a DatasetID",
+        "help": "The DatasetID must be 36 characters or less, and use only letters, numbers, and dashes.",
+        "taken": "This DatasetID is already in use. Please choose another."
+      },
       "instructions": "Custom map data can be added either of two ways:",
       "file": {
         "heading": "Local Data File",
@@ -1525,9 +1535,8 @@
       "heading": "Dataset Settings",
       "details": {
         "heading": "Dataset Details",
+        "identifier": "DatasetID",
         "source": "Source",
-        "name": "Name",
-        "description": "Description",
         "url": "URL"
       },
       "thumbnail": {
@@ -1571,15 +1580,11 @@
     "QA": {
       "osmose": {
         "title": "Osmose Issue",
-        "detail_title": "Details",
-        "elems_title": "Features",
         "fix_title": "Fix Guidelines",
         "trap_title": "Common Mistakes"
       },
       "keepRight": {
         "title": "KeepRight Issue",
-        "detail_description": "Description",
-        "comment": "Comment",
         "comment_placeholder": "Enter a comment to share with other users.",
         "close": "Close (Issue Fixed)",
         "ignore": "Remove (False Positive)",
@@ -1990,7 +1995,6 @@
       "tooltip": "Street-level photos from KartaView"
     },
     "note": {
-      "note": "Note",
       "title": "Edit note",
       "anonymous": "anonymous",
       "closed": "(Closed)",
@@ -2005,7 +2009,6 @@
       "inputPlaceholder": "Enter a comment to share with other users.",
       "close": "Close Note",
       "open": "Reopen Note",
-      "comment": "Comment",
       "close_comment": "Close and Comment",
       "open_comment": "Reopen and Comment",
       "report": "Report",
@@ -2017,7 +2020,6 @@
       "upload_explanation_with_user": "Your comments as {user} will be publicly visible to all OpenStreetMap users."
     },
     "help": {
-      "title": "Help",
       "help": {
         "title": "Help",
         "welcome": "Welcome to the {rapidicon} editor for [OpenStreetMap](https://www.openstreetmap.org/). With this editor you can update OpenStreetMap right from your web browser.",
@@ -2817,7 +2819,6 @@
     },
     "intro": {
       "done": "done",
-      "ok": "OK",
       "graph": {
         "block_number": "<value for addr:block_number>",
         "city": "Three Rivers",
@@ -3482,7 +3483,6 @@
     },
     "wikidata": {
       "identifier": "Identifier",
-      "label": "Label",
       "description": "Description"
     },
     "languageNames": {

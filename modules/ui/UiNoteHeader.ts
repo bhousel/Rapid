@@ -90,7 +90,7 @@ export class UiNoteHeader {
         if (d.isNew) {
           return l10n.t('note.new');
         } else {
-          return l10n.t('note.note') + ' ' + d.id + ' ' +
+          return l10n.t('text.note') + ' ' + d.id + ' ' +
             (d.props.status === 'closed' ? l10n.t('note.closed') : '');
         }
       });

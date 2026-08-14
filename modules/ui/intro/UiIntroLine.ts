@@ -275,7 +275,7 @@ export class UiIntroLine extends AbstractIntroChapter {
       curtain.reveal({
         revealExtent: new Extent(this._tulipRoadIntersection).padByMeters(15),
         tipHtml: helpHtml(context, 'intro.lines.retry_intersect', { name: l10n.t('intro.graph.name.flower-street') }),
-        buttonText: l10n.t('intro.ok'),
+        buttonText: l10n.t('text.okay'),
         buttonCallback: () => resolve(this._addLineAsync)
       });
     });
@@ -541,7 +541,7 @@ export class UiIntroLine extends AbstractIntroChapter {
       curtain.reveal({
         revealSelector: '.main-map',
         tipHtml: helpHtml(context, 'intro.lines.did_name_road'),
-        buttonText: l10n.t('intro.ok'),
+        buttonText: l10n.t('text.okay'),
         buttonCallback: () => resolve(this._updateLineAsync)
       });
     });
@@ -577,7 +577,7 @@ export class UiIntroLine extends AbstractIntroChapter {
       curtain.reveal({
         revealExtent: this._woodStreetExtent,
         tipHtml: helpHtml(context, 'intro.lines.update_line'),
-        buttonText: l10n.t('intro.ok'),
+        buttonText: l10n.t('text.okay'),
         buttonCallback: () => resolve(this._addNodeAsync)
       });
     });
@@ -761,7 +761,7 @@ export class UiIntroLine extends AbstractIntroChapter {
       curtain.reveal({
         revealExtent: this._woodStreetExtent,
         tipHtml: helpHtml(context, 'intro.lines.continue_drag_midpoint'),
-        buttonText: l10n.t('intro.ok'),
+        buttonText: l10n.t('text.okay'),
         buttonCallback: () => {
           editor.setCheckpoint('doneUpdateLine');
           resolve(this._deleteLinesAsync);
@@ -800,7 +800,7 @@ export class UiIntroLine extends AbstractIntroChapter {
       curtain.reveal({
         revealExtent: this._deleteLinesExtent,
         tipHtml: helpHtml(context, 'intro.lines.delete_lines', { street: l10n.t('intro.graph.name.12th-avenue') }),
-        buttonText: l10n.t('intro.ok'),
+        buttonText: l10n.t('text.okay'),
         buttonCallback: () => resolve(this._rightClickIntersectionAsync)
       });
     });
@@ -938,7 +938,7 @@ export class UiIntroLine extends AbstractIntroChapter {
       curtain.reveal({
         revealExtent: this._deleteLinesExtent,
         tipHtml: helpHtml(context, 'intro.lines.retry_split'),
-        buttonText: l10n.t('intro.ok'),
+        buttonText: l10n.t('text.okay'),
         buttonCallback: () => resolve(this._rightClickIntersectionAsync)
       });
     });
@@ -1171,7 +1171,7 @@ export class UiIntroLine extends AbstractIntroChapter {
       curtain.reveal({
         revealExtent: this._deleteLinesExtent,
         tipHtml: helpHtml(context, 'intro.lines.retry_delete'),
-        buttonText: l10n.t('intro.ok'),
+        buttonText: l10n.t('text.okay'),
         buttonCallback: () => resolve(this._multiSelectAsync)
       });
     });
@@ -1190,7 +1190,7 @@ export class UiIntroLine extends AbstractIntroChapter {
       revealSelector: '.ideditor',
       tipSelector: '.intro-nav-wrap .chapter-building',
       tipHtml: helpHtml(context, 'intro.lines.play', { next: l10n.t('intro.buildings.title') }),
-      buttonText: l10n.t('intro.ok'),
+      buttonText: l10n.t('text.okay'),
       buttonCallback: () => curtain.reveal({ revealSelector: '.ideditor' })  // re-reveal but without the tooltip
     });
     return;

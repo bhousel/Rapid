@@ -138,7 +138,7 @@ export class UiOsmoseDetails {
     // update — set localized subsection titles here so they re-localize on language change
     $details = $details.merge($$details);
     $details.select('.qa-details-description-title')
-      .text(l10n.t('QA.keepRight.detail_description'));
+      .text(l10n.t('text.description'));
     $details.select('.qa-details-fix-title')
       .text(l10n.t('QA.osmose.fix_title'));
     $details.select('.qa-details-trap-title')
@@ -159,7 +159,7 @@ export class UiOsmoseDetails {
         if (d.props.detail) {
           $$detailsDiv
             .append('h4')
-            .text(l10n.t('QA.osmose.detail_title'));
+            .text(l10n.t('text.details'));
 
           $$detailsDiv
             .append('p')
@@ -172,7 +172,7 @@ export class UiOsmoseDetails {
         // Create list of linked issue elements
         $$elemsDiv
           .append('h4')
-          .text(l10n.t('QA.osmose.elems_title'));
+          .text(l10n.t('text.features'));
 
         $$elemsDiv
           .append('ul').selectAll('li')

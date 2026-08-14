@@ -177,13 +177,13 @@ export class UiConflicts extends EventEmitter {
       .append('button')
       .attr('disabled', this._conflictList!.length > 1)
       .attr('class', 'action conflicts-button col6')
-      .text(l10n.t('save.title'))
+      .text(l10n.t('text.save'))
       .on('click.try_again', this._tryAgain);
 
     $$buttons
       .append('button')
       .attr('class', 'secondary-action conflicts-button col6')
-      .text(l10n.t('confirm.cancel'))
+      .text(l10n.t('text.cancel'))
       .on('click.cancel', this._cancel);
   }
 

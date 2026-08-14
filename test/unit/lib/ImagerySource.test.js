@@ -77,10 +77,10 @@ describe('ImagerySource', () => {
         assert.strictEqual(_bing.props.nameStringID, '_imagery.imagery.Bing.name');
         assert.strictEqual(_bing.props.descriptionStringID, '_imagery.imagery.Bing.description');
 
-        assert.strictEqual(_none.props.nameStringID, 'background.none');
+        assert.strictEqual(_none.props.nameStringID, 'text.none');
         assert.strictEqual(_none.props.descriptionStringID, '');
 
-        assert.strictEqual(_custom.props.nameStringID, 'background.custom');
+        assert.strictEqual(_custom.props.nameStringID, 'text.custom');
         assert.strictEqual(_custom.props.descriptionStringID, '');
       });
 

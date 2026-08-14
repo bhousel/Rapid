@@ -106,7 +106,7 @@ export class UiOsmoseHeader {
     const l10n = this.context.systems.l10n!;
     const osmose = this.context.services.osmose;
 
-    const unknown = l10n.t('inspector.unknown');
+    const unknown = l10n.t('text.unknown');
     if (!osmose || !d) return unknown;
 
     // Issue titles supplied by Osmose

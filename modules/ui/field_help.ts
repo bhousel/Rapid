@@ -164,7 +164,7 @@
 //
 //    function updatePosition() {
 //        var wrap = _wrap.node();
-//        var inspector = _inspector.node();
+//        var inspector = _text.node();
 //        var wRect = wrap.getBoundingClientRect();
 //        var iRect = inspector.getBoundingClientRect();
 //
