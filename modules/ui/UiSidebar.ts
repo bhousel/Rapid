@@ -75,7 +75,7 @@ export class UiSidebar {
   protected _lastCoord: Vec2 | null;
   protected _lastWidth: number | null;
   protected _expandWidth: number;
-
+  protected _customRender: (($selection: D3Selection) => void) | null;
 
   /**
    * @param  context - Global shared application context
@@ -114,6 +114,7 @@ export class UiSidebar {
     this._lastCoord = null;
     this._lastWidth = null;
     this._expandWidth = DEFAULT_WIDTH;
+    this._customRender = null;
 
     // Ensure methods used as callbacks always have `this` bound correctly.
     // (This is also necessary when using `d3-selection.call`)
@@ -125,6 +126,7 @@ export class UiSidebar {
     this._pointermove = this._pointermove.bind(this);
     this._pointerdown = this._pointerdown.bind(this);
     this._eventCancel = this._eventCancel.bind(this);
+    this._localechange = this._localechange.bind(this);
     this._setupKeybinding = this._setupKeybinding.bind(this);
 
     const scheduler = context.systems.scheduler;  // optional
@@ -147,7 +149,7 @@ export class UiSidebar {
     context.behaviors.hover!.on('hoverchange', this._hoverchange);
 
     const l10n = context.systems.l10n!;
-    l10n.on('localechange', this._setupKeybinding);
+    l10n.on('localechange', this._localechange);
     this._setupKeybinding();
   }
 
@@ -220,6 +222,11 @@ export class UiSidebar {
 
     this.$featureList = $sidebar.select('.feature-list-wrap');
     this.$inspector = $sidebar.select('.inspector-wrap');
+
+    // custom content is showing
+    if (this.$custom && this._customRender) {
+      this.$custom.call(this._customRender);
+    }
   }
 
 
@@ -467,6 +474,7 @@ export class UiSidebar {
       $inspector.classed('inspector-hidden', true);
       this.Inspector.entityIDs([]).state('hide');
 
+      this._customRender = renderFn;
       this.$custom = $sidebar
         .append('div')
         .attr('class', 'sidebar-component')
@@ -621,6 +629,7 @@ export class UiSidebar {
     if (this.$custom) {
       this.$custom.remove();
       this.$custom = null;
+      this._customRender = null;
     }
 
     this.DataEditor.datum = null;
@@ -774,6 +783,15 @@ export class UiSidebar {
     settings?.set('ui.inspector.width', String(preferWidth));
   }
 
+
+  /**
+   * Handles locale changes.
+   * Adjusts the keybinding and rerenders the content.
+   */
+  protected _localechange(): void {
+    this._setupKeybinding();
+    this.render();
+  }
 
   /**
    * This sets up the keybinding, replacing existing if needed.
