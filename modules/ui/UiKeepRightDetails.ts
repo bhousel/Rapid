@@ -56,8 +56,10 @@ export class UiKeepRightDetails {
     const schema = context.systems.schema!;
     const scene = gfx.scene!;
 
+    const datum = this.datum;
+
     let $details: D3Selection = $parent.selectAll('.sidebar-details')
-      .data(this.datum ? [this.datum] : [], (d: KeepRightIssue) => d.key);
+      .data(datum ? [datum] : [], (d: KeepRightIssue) => d.key);
 
     $details.exit()
       .remove();
@@ -76,18 +78,33 @@ export class UiKeepRightDetails {
 
     $$description
       .append('div')
-      .attr('class', 'qa-details-description-text')
+      .attr('class', 'qa-details-description-text');
+
+    // update
+    $details = $details.merge($$details);
+
+    const $description = $details.selectAll('.qa-details-subsection');
+
+    $description.selectAll('h4')
+      .text(l10n.t('text.description'));
+
+    $description.selectAll('.qa-details-description-text')
       .html((d: KeepRightIssue) => utilSanitizeHTML(this._issueDetailHTML(d)));
+
 
     // If there are entity links in the error message..
     const relatedEntities: string[] = [];
     $$description.selectAll('.error_entity_link, .error_object_link')
       .attr('href', '#')
-      .each((d: KeepRightIssue, i: number, nodes: any) => {
+      .each((d: any, i: number, nodes: any) => {
+        // Note that in here, we are selecting links within the detail text.
+        // We won't have the bound datum passed to us in `d`, so rely on the closure `datum` instead.
+        if (!datum) return;
+
         const node = nodes[i];
         const $link: D3Selection = select(node);
         const isObjectLink = $link.classed('error_object_link');
-        const entityID = isObjectLink ? (d.props.objectType.charAt(0) + d.props.objectId) : node.textContent;
+        const entityID = isObjectLink ? (datum.props.objectType.charAt(0) + datum.props.objectId) : node.textContent;
         const graph = editor.staging.graph;
         const entity = graph.hasEntity(entityID);
 
@@ -126,10 +143,6 @@ export class UiKeepRightDetails {
         }
       });
 
-    // update — set localized title here so it re-localizes on language change
-    $details = $details.merge($$details);
-    $details.select('h4')
-      .text(l10n.t('text.description'));
 
     // Don't hide entities related to this issue - iD#5880
     filters.forceVisible(relatedEntities);
