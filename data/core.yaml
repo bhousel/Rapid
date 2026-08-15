@@ -4,41 +4,87 @@ en:
     "yes": "Yes"
     add: Add
     cancel: Cancel
-    comment: Comment
+    changeset:
+      one: Changeset
+      other: Changesets
+    comment:
+      one: Comment
+      other: Comments
     created: Created
     custom: Custom
-    date: Date
+    date:
+      one: Date
+      other: Dates
     default: Default
     deleted: Deleted
-    description: Description
-    details: Details
+    description:
+      one: Description
+      other: Descriptions
+    detail:
+      one: Detail
+      other: Details
     download: Download
-    errors: Errors
-    features: Features
-    fields: Fields
+    error:
+      one: Error
+      other: Errors
+    feature:
+      one: Feature
+      other: Features
+    field:
+      one: Field
+      other: Fields
     help: Help
-    label: Label
-    location: Location
-    members: Members
+    issue:
+      one: Issue
+      other: Issues
+    label:
+      one: Label
+      other: Labels
+    location:
+      one: Location
+      other: Locations
+    member:
+      one: Member
+      other: Members
     modified: Modified
     more: More
-    name: Name
-    node: Node
+    name:
+      one: Name
+      other: Names
+    node:
+      one: Node
+      other: Nodes
     none: None
-    note: Note
+    note:
+      one: Note
+      other: Notes
     okay: OK
-    relation: Relation
-    relations: Relations
+    relation:
+      one: Relation
+      other: Relations
     remove: Remove
-    role: Role
+    role:
+      one: Role
+      other: Roles
     save: Save
     search: Search
-    tags: Tags
-    type: Type
+    suggestion:
+      one: Suggestion
+      other: Suggestions
+    tag:
+      one: Tag
+      other: Tags
+    type:
+      one: Type
+      other: Types
     unknown: Unknown
     upload: Upload
-    warnings: Warnings
-    way: Way
+    warning:
+      one: Warning
+      other: Warnings
+    way:
+      one: Way
+      other: Ways
 
   icons:
     download: download
@@ -652,10 +698,8 @@ en:
       version: Version
       last_edit: Last Edit
       edited_by: Edited By
-      changeset: Changeset
       link_text: History on openstreetmap.org
       note_no_history: "No History (New Note)"
-      note_comments: Comments
       note_created_date: Created Date
       note_created_user: Created By
       note_link_text: Note on openstreetmap.org
@@ -1073,7 +1117,6 @@ en:
       format: "{place}{separator}{region}"
       separator: ", "
     your_changes: Your changes should appear on OpenStreetMap within a few minutes. It may take longer for maps elsewhere to receive updates.
-    help_link_text: Details
     help_link_url: "https://wiki.openstreetmap.org/wiki/FAQ#I_have_just_made_some_changes_to_the_map._How_do_I_get_to_see_my_changes.3F"
     view_on_osm: "View Changes on OSM"
     your_changeset_id: "Your changeset #:"
@@ -1188,7 +1231,6 @@ en:
     filter_datasets: filter datasets    # placeholder text for the filter text
     any_type: any type                  # placeholder text for the filter type dropdown
     add_dataset: Add Dataset
-    remove: Remove
     clear_filters: Clear Filters
     dataset_added: Dataset added
     no_datasets: No datasets available.
@@ -1613,7 +1655,6 @@ en:
     title: Edit note
     anonymous: anonymous
     closed: "(Closed)"
-    commentTitle: Comments
     status:
       opened: "opened {when}"
       reopened: "reopened {when}"
@@ -1860,10 +1901,6 @@ en:
           indirect_example: "These restrictions exist because of another nearby restriction. For example, an \"Only Straight On\" restriction will indirectly create \"No Turn\" restrictions for all other paths through the intersection."
           indirect_noedit: "You may not edit indirect restrictions. Instead, edit the nearby direct restriction."
   issues:
-    title: Issues
-    errors: Errors
-    warnings: Warnings
-    suggestions: Suggestions
     rules: Rules
     open_tooltip: Detected errors, warnings, and suggestions
     resolved_tooltip: Issues resolved by your edits

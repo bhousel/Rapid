@@ -192,7 +192,7 @@ export class UiSuccess extends EventEmitter {
       .attr('href', l10n.t('success.help_link_url'))
       .call(uiIcon('#rapid-icon-out-link', 'inline'))
       .append('span')
-      .text(l10n.t('success.help_link_text'));
+      .text(l10n.t('text.detail', { n: 100 }));  // force plural, i.e. "details"
 
     const osm = context.services.osm;
     if (!osm) return;

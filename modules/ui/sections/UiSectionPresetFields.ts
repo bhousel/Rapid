@@ -45,7 +45,7 @@ export class UiSectionPresetFields extends AbstractUiSection {
    */
   public override label(): string {
     const l10n = this.context.systems.l10n!;
-    return l10n.t('text.fields');
+    return l10n.t('text.field', { n: 100 });   // force plural, i.e. "fields"
   }
 
 

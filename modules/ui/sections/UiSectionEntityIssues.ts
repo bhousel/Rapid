@@ -59,7 +59,9 @@ export class UiSectionEntityIssues extends AbstractUiSection {
    */
   public override label(): string {
     const l10n = this.context.systems.l10n!;
-    return l10n.t('inspector.title_count', { title: l10n.t('issues.title'), count: this._issues.length });
+    const n = this._issues.length;
+    const title = l10n.t('text.issue', { n });
+    return l10n.t('inspector.title_count', { title, count: n });
   }
 
 

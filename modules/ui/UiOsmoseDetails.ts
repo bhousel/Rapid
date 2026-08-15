@@ -159,7 +159,7 @@ export class UiOsmoseDetails {
         if (d.props.detail) {
           $$detailsDiv
             .append('h4')
-            .text(l10n.t('text.details'));
+            .text(l10n.t('text.detail', { n: 100 }));   // force plural, i.e. "Details"
 
           $$detailsDiv
             .append('p')
@@ -172,7 +172,7 @@ export class UiOsmoseDetails {
         // Create list of linked issue elements
         $$elemsDiv
           .append('h4')
-          .text(l10n.t('text.features'));
+          .text(l10n.t('text.feature', { n: 100 }));  // force plural, i.e. "features"
 
         $$elemsDiv
           .append('ul').selectAll('li')

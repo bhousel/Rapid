@@ -62,9 +62,10 @@ export class UiSectionValidationIssues extends AbstractUiSection {
    */
   public override label(): string {
     const l10n = this.context.systems.l10n!;
-    const countText = this._issues.length > MAX_ISSUES ? `${MAX_ISSUES}+` : String(this._issues.length);
-    const titleText = l10n.t(`issues.${this._severity}s`);
-    return l10n.t('inspector.title_count', { title: titleText, count: countText });
+    const n = this._issues.length;
+    const count = n > MAX_ISSUES ? `>${MAX_ISSUES}` : String(n);
+    const title = l10n.t(`text.${this._severity}`, { n });
+    return l10n.t('inspector.title_count', { title, count });
   }
 
 

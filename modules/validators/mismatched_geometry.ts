@@ -342,7 +342,7 @@ export function validateMismatchedGeometry(context: Context): ValidatorFunction 
       message: function(this: any) {
         const graph = editor.staging.graph;
         const entity = graph.hasEntity(this.entityIds[0]);
-        return entity ? l10n.t('issues.' + referenceId + '.message', {
+        return entity ? l10n.t(`issues.${referenceId}.message`, {
           feature: l10n.displayLabel(entity, targetGeom!, true /* verbose */)
         }) : '';
       },

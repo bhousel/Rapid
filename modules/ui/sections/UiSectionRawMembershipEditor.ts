@@ -87,9 +87,10 @@ export class UiSectionRawMembershipEditor extends AbstractUiSection {
   public override label(): string {
     const l10n = this.context.systems.l10n!;
     const parents = this._getSharedParentRelations();
-    const gt = parents.length > MAX_MEMBERSHIPS ? '>' : '';
-    const count = gt + parents.slice(0, MAX_MEMBERSHIPS).length;
-    return l10n.t('inspector.title_count', { title: l10n.t('text.relations'), count: count });
+    const n = parents.length;
+    const count = n > MAX_MEMBERSHIPS ? `>${MAX_MEMBERSHIPS}` : String(n);
+    const title = l10n.t('text.relation', { n });
+    return l10n.t('inspector.title_count', { title, count });
   }
 
 

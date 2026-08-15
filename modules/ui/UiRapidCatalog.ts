@@ -464,7 +464,7 @@ export class UiRapidCatalog extends EventEmitter {
 
     $datasets.selectAll('.rapid-catalog-dataset-action')
       .classed('secondary', d => d.added)
-      .text(d => d.added ? l10n.t('rapid_catalog.remove') : l10n.t('rapid_catalog.add_dataset'));
+      .text(d => d.added ? l10n.t('text.remove') : l10n.t('rapid_catalog.add_dataset'));
 
     // update the count
     const n = datasets.filter(d => !d.filtered).length;

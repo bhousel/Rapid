@@ -265,10 +265,11 @@ export class UiPaneHelp extends UiPane {
     super(context, 'help');
 
     const l10n = context.systems.l10n!;
+    const help = l10n.t('text.help');
 
     this.key = l10n.t('shortcuts.command.toggle_help.key');
-    this.label = l10n.t('text.help');
-    this.description = l10n.t('text.help');
+    this.label = help;
+    this.description = help;
     this.iconName = 'rapid-icon-help';
 
     this._$content = null;

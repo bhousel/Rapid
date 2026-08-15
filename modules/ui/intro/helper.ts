@@ -147,9 +147,9 @@ export function helpHtml(context: Context, stringID: string, replacements?: Reco
 
       map_data: l10n.t('map_data.title'),
       osm_notes: l10n.t('map_data.layers.notes.title'),
-      fields: l10n.t('text.fields'),
-      tags: l10n.t('text.tags'),
-      relations: l10n.t('text.relations'),
+      fields: l10n.t('text.field', { n: 100 }),   // force plural, i.e. "fields"
+      tags: l10n.t('text.tag', { n: 100 }),   // force plural, i.e. "tags"
+      relations: l10n.t('text.relation', { n: 100 }),   // force plural, i.e. "relations"
       new_relation: l10n.t('inspector.new_relation'),
       turn_restrictions: l10n.t('_tagging.presets.fields.restrictions.label'),
       background_settings: l10n.t('background.description'),

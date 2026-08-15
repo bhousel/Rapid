@@ -112,8 +112,9 @@ export class UiSectionRawTagEditor extends AbstractUiSection {
    */
   public override label(): string {
     const l10n = this.context.systems.l10n!;
-    const count = Object.keys(this._tags ?? {}).filter(Boolean).length;
-    return l10n.t('inspector.title_count', { title: l10n.t('text.tags'), count: count });
+    const n = Object.keys(this._tags ?? {}).filter(Boolean).length;
+    const title = l10n.t('text.tag', { n });
+    return l10n.t('inspector.title_count', { title, count: n });
   }
 
 

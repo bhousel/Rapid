@@ -91,7 +91,7 @@ export class UiDetectionDetails {
     $details = $details.merge($$details);
 
     $details.select('.detection-details-title')
-      .text(l10n.t('text.details') + ':');
+      .text(l10n.t('text.detail', { n: 100 }) + ':');   // force plural, i.e. "Details"
 
     const $type = $details.select('.detection-type');
     $type.select('strong')

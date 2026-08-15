@@ -55,7 +55,9 @@ export class UiSectionSelectionList extends AbstractUiSection {
    */
   public override label(): string {
     const l10n = this.context.systems.l10n!;
-    return l10n.t('inspector.title_count', { title: l10n.t('text.features'), count: this._selectedIDs.length });
+    const n = this._selectedIDs.length;
+    const title = l10n.t('text.feature', { n });
+    return l10n.t('inspector.title_count', { title: title, count: n });
   }
 
 

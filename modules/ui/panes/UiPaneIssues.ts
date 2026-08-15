@@ -12,10 +12,11 @@ export class UiPaneIssues extends UiPane {
     super(context, 'issues');
 
     const l10n = context.systems.l10n!;
+    const issues = l10n.t('text.issue', { n: 100 });  // force plural, i.e. "issues"
 
     this.key = l10n.t('shortcuts.command.toggle_issues.key');
-    this.label = l10n.t('issues.title');
-    this.description = l10n.t('issues.title');
+    this.label = issues;
+    this.description = issues;
     this.iconName = 'rapid-icon-alert';
     this.sections = [
       new UiSectionValidationOptions(context),

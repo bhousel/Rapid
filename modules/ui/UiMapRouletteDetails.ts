@@ -210,7 +210,7 @@ export class UiMapRouletteDetails {
 
         $descriptionHeader
           .append('h4')
-          .text(l10n.t('text.details'));
+          .text(l10n.t('text.detail', { n: 100 }));   // force plural, i.e. "Details"
 
         const $descriptionContent = $description
           .append('section')

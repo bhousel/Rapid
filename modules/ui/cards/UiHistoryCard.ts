@@ -190,7 +190,7 @@ export class UiHistoryCard extends AbstractUiCard {
 
     $list
       .append('li')
-      .text(l10n.t('info_panels.history.note_comments') + ':')
+      .text(l10n.t('text.comment', { n: comments.length } ) + ':')
       .append('span')
       .text(comments.length);
 
@@ -281,7 +281,7 @@ export class UiHistoryCard extends AbstractUiCard {
 
     $list
       .append('li')
-      .text(l10n.t('info_panels.history.changeset') + ':')
+      .text(l10n.t('text.changeset') + ':')
       .call(this.renderChangeset, entity.props.changeset);
   }
 

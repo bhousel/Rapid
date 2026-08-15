@@ -73,9 +73,10 @@ export class UiSectionRawMemberEditor extends AbstractUiSection {
     const entity = graph.hasEntity(this._entityIDs[0]) as OsmRelation | undefined;
     if (!entity) return '';
 
-    const gt = entity.members.length > MAX_MEMBERS ? '>' : '';
-    const count = gt + entity.members.slice(0, MAX_MEMBERS).length;
-    return l10n.t('inspector.title_count', { title: l10n.t('text.members'), count: count });
+    const n = entity.members.length;
+    const count = n > MAX_MEMBERS ? `>${MAX_MEMBERS}` : String(n);
+    const title = l10n.t('text.member', { n });
+    return l10n.t('inspector.title_count', { title, count });
   }
 
 
