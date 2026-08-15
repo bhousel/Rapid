@@ -396,7 +396,7 @@ export class UiRapidInspector {
     $tagInfo = $tagInfo.merge($$tagInfo);
 
     $tagInfo.selectAll('.tag-heading')
-      .text(l10n.t('rapid_text.tags'));
+      .text(l10n.t('text.tags'));
   }
 
 
