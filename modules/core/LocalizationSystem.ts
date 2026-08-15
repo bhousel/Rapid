@@ -529,14 +529,14 @@ export class LocalizationSystem extends AbstractSystem {
    * Note: If the `stringID` starts with an underscore, the first part is used as the "resourceID".
    * Otherwise, the default `core` resource will be used.
    *
-   * @param origStringID  - string identifier
-   * @param replacements  - token replacements and default string
-   * @param searchLocales - locales to search (defaults to currentLocales)
+   * @param origStringID    - string identifier
+   * @param [replacements]  - token replacements and default string
+   * @param [searchLocales] - locales to search (defaults to currentLocales)
    * @return result containing the localized string and chosen locale
    */
   protected _resolveString(
     origStringID: StringID,
-    replacements?: StringReplacements,
+    replacements: StringReplacements = {},
     searchLocales?: LocaleCode[]
   ): ResolvedString {
 
@@ -590,47 +590,43 @@ export class LocalizationSystem extends AbstractSystem {
     let result: any = this._store.peek([tryLocale, resourceID, ...segments]);
 
     if (result !== undefined) {
-      if (replacements) {
-        if (typeof result === 'object' && Object.keys(result).length) {
-          // If plural forms are provided, dig one level deeper based on the
-          // first numeric token replacement provided.
-          const number = Object.values(replacements).find(val => (typeof val === 'number'));
-          if (number !== undefined) {
-            const rule = this.pluralRule(number, locale);
-            if (result[rule]) {
-              result = result[rule];
-            } else {
-              // We're pretty sure this should be a plural but no string
-              // could be found for the given rule. Just pick the first
-              // string and hope it makes sense.
-              result = Object.values(result)[0];
-            }
-          }
+      // If we found an 'object', look for plural forms one level deeper.
+      if (typeof result === 'object' && Object.keys(result).length) {
+        // Look in replacements object for a numeric value, use that as the cardianality, fallback to 1.
+        const number = Object.values(replacements).find(val => (typeof val === 'number')) ?? 1;
+        const rule = this.pluralRule(number, locale);  // 'one', 'other', 'many', etc.
+        if (result[rule]) {
+          result = result[rule];
+        } else {
+          // No string avaible for the current plural rule.
+          // Just pick the first string and hope it makes sense.
+          result = Object.values(result)[0];
         }
+      }
 
-        if (typeof result === 'string') {
-          for (const [key, value] of Object.entries(replacements)) {
-            let strValue: string;
-            if (typeof value === 'number') {
-              if (value.toLocaleString) {
-                // format numbers for the locale
-                strValue = value.toLocaleString(locale, {
-                  style: 'decimal',
-                  useGrouping: true,
-                  minimumFractionDigits: 0
-                });
-              } else {
-                strValue = value.toString();
-              }
-            } else if (typeof value === 'string') {
-              strValue = value;
+      // We have a string to localize - replace tokens here
+      if (typeof result === 'string') {
+        for (const [key, value] of Object.entries(replacements)) {
+          let strValue: string;
+          if (typeof value === 'number') {
+            if (value.toLocaleString) {
+              // format numbers for the locale
+              strValue = value.toLocaleString(locale, {
+                style: 'decimal',
+                useGrouping: true,
+                minimumFractionDigits: 0
+              });
             } else {
-              continue;  // skip undefined values
+              strValue = value.toString();
             }
-            const token = `{${key}}`;
-            const regex = new RegExp(token, 'g');
-            result = result.replace(regex, strValue);
+          } else if (typeof value === 'string') {
+            strValue = value;
+          } else {
+            continue;  // skip undefined values
           }
+          const token = `{${key}}`;
+          const regex = new RegExp(token, 'g');
+          result = result.replace(regex, strValue);
         }
       }
 
@@ -673,12 +669,12 @@ export class LocalizationSystem extends AbstractSystem {
 
   /**
    * Returns only the localized text, discarding the locale info
-   * @param stringID      - string identifier
-   * @param replacements  - token replacements and default string
-   * @param locale        - locale to use (defaults to currentLocale)
+   * @param stringID        - string identifier
+   * @param [replacements]  - token replacements and default string
+   * @param [locale]        - locale to use (defaults to currentLocale)
    * @return the localized string
    */
-  public t(stringID: StringID, replacements?: StringReplacements, locale?: string | string[]): string {
+  public t(stringID: StringID, replacements: StringReplacements = {}, locale?: string | string[]): string {
     let localeParam: string[] | undefined;
     if (typeof locale === 'string') localeParam = [locale];
     else if (Array.isArray(locale)) localeParam = locale;
@@ -690,12 +686,12 @@ export class LocalizationSystem extends AbstractSystem {
   /**
    * t.html
    * Returns the localized text wrapped in an HTML span element encoding the locale info
-   * @param stringID      - string identifier
-   * @param replacements  - token replacements and default string
-   * @param locale        - locale to use (defaults to currentLocale)
+   * @param stringID        - string identifier
+   * @param [replacements]  - token replacements and default string
+   * @param [locale]        - locale to use (defaults to currentLocale)
    * @return localized string wrapped in a HTML span, or empty string ''
    */
-  public tHtml(stringID: StringID, replacements?: StringReplacements, locale?: string | string[]): string {
+  public tHtml(stringID: StringID, replacements: StringReplacements = {}, locale?: string | string[]): string {
     let localeParam: string[] | undefined;
     if (typeof locale === 'string') localeParam = [locale];
     else if (Array.isArray(locale)) localeParam = locale;
@@ -709,32 +705,33 @@ export class LocalizationSystem extends AbstractSystem {
   /**
    * t.append
    * Safer version of t.html that instead uses a function that appends the localized text to the given d3 selection
-   * @param stringID      - string identifier
-   * @param replacements  - token replacements and default string
-   * @param locale        - locale to use (defaults to currentLocale)
+   * @param stringID        - string identifier
+   * @param [replacements]  - token replacements and default string
+   * @param [locale]        - locale to use (defaults to currentLocale)
    * @return Function that accepts a d3 selection and appends the localized text
    */
-  public tAppend(stringID: StringID, replacements?: StringReplacements, locale?: string | string[]): AppendFunction {
+  public tAppend(stringID: StringID, replacements: StringReplacements = {}, locale?: string | string[]): AppendFunction {
     let localeParam: string[] | undefined;
     if (typeof locale === 'string') localeParam = [locale];
     else if (Array.isArray(locale)) localeParam = locale;
 
-    const ret = ((selection: D3Selection) => {
+    const result = ((selection: D3Selection) => {
       const info = this._resolveString(stringID, replacements, localeParam);
       return selection.append('span')
         .attr('class', 'localized-text')
         .attr('lang', info.locale || 'und')
-        .text((replacements?.prefix || '') + info.text + (replacements?.suffix || ''));
+        .text((replacements.prefix || '') + info.text + (replacements.suffix || ''));
     }) as AppendFunction;
-    ret.stringID = stringID;
-    return ret;
+
+    result.stringID = stringID;
+    return result;
   }
 
 
   /**
    * Just returns the given text wrapped in an HTML span element encoding the locale
-   * @param text       - the text content for the span
-   * @param localeCode - the locale code for the span
+   * @param text         - the text content for the span
+   * @param [localeCode] - the locale code for the span
    * @return text wrapped in a HTML span
    */
   public htmlForLocalizedText(text: string, localeCode?: string | null): string {
@@ -745,8 +742,8 @@ export class LocalizationSystem extends AbstractSystem {
   /**
    * Returns a display-ready string for a given language code
    * @param code    - the language code (e.g. 'de')
-   * @param options - options object with optional `localOnly` property
-   * @param options.localOnly
+   * @param [options] - options object with optional `localOnly` property
+   * @param [options.localOnly]
    * @return the language string to display (e.g. "Deutsch (de)")
    */
   public languageName(code: LanguageCode, options?: { localOnly?: boolean }): string | null {
@@ -786,8 +783,8 @@ export class LocalizationSystem extends AbstractSystem {
 
   /**
    * Get a localized display name for a map feature
-   * @param tags        - OSM tags object
-   * @param hideNetwork - If true, the `network` tag will not be used in the name to prevent
+   * @param tags  - OSM tags object
+   * @param [hideNetwork=false] - If true, the `network` tag will not be used in the name to prevent
    *   it being shown twice (see PR iD#8707#discussion_r712658175)
    * @return A name string suitable for display
    */
@@ -898,8 +895,8 @@ export class LocalizationSystem extends AbstractSystem {
    * @param entity          - The entity to get the label for
    * @param entity.id
    * @param entity.tags
-   * @param graphOrGeometry - Either a Graph or geometry string
-   * @param verbose         - Whether to include both preset and feature name
+   * @param graphOrGeometry  - Either a Graph or geometry string
+   * @param [verbose=false]  - Whether to include both preset and feature name
    * @return A name string suitable for display
    */
   public displayLabel(entity: { id: EntityID; tags: OsmTags }, graphOrGeometry: Graph | string, verbose?: boolean): string {
