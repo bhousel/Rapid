@@ -195,7 +195,7 @@ export class PixiLayerRapid extends AbstractPixiLayer {
   public render(frame: number, viewport: Viewport): void {
     const rapid = this.context.systems.rapid!;
     const viewZoom = viewport.transform.zoom;
-    if (!this.enabled || !rapid.datasets.size || viewZoom < MINZOOM) return;
+    if (!this.enabled || viewZoom < MINZOOM) return;
 
 // shader experiment
 //const offset = this.gfx.pixi.stage.position;
@@ -204,6 +204,7 @@ export class PixiLayerRapid extends AbstractPixiLayer {
 //this._uniforms.u_time = frame/10;
 
     for (const dataset of rapid.datasets.values()) {
+      if (!rapid.enabledDatasetIDs.has(dataset.id)) continue;  // on menu but not checked
       this.renderDataset(dataset, frame, viewport);
     }
   }
@@ -219,9 +220,6 @@ export class PixiLayerRapid extends AbstractPixiLayer {
     const context = this.context;
     const rapid = context.systems.rapid!;
     const viewZoom = viewport.transform.zoom;
-
-    const dsEnabled = (dataset.added && dataset.enabled);
-    if (!dsEnabled) return;
 
     const service = context.services[dataset.serviceID] as any;  // 'mapwithai', 'esri', 'overture'
     if (!service?.started) return;

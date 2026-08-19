@@ -207,6 +207,16 @@ export class UrlHashSystem extends AbstractSystem {
 
 
   /**
+   * Returns true if a urlhash param is in use
+   * @param k - The parameter key to check
+   * @return `true` if the urlhash param is in use
+   */
+  public hasParam(k: string): boolean {
+    return this._currParams.has(k);
+  }
+
+
+  /**
    * Gets the current parameter value for a given key.
    * @param k - The parameter key to get
    * @return The parameter's current value, or `undefined`

@@ -14,6 +14,7 @@ export interface RapidDatasetProps {
   id: DatasetID;
   /** Service providing this dataset: 'esri', 'mapwithai', 'overture' */
   serviceID: ServiceID;
+
   /** Categories this dataset belongs to (e.g. 'buildings', 'addresses') */
   categories: Set<string>;
   /** Display color for this dataset */
@@ -32,12 +33,9 @@ export interface RapidDatasetProps {
   licenseUrl: string;
   /** URL for thumbnail image */
   thumbnailUrl: string;
-  /** Whether this dataset appears in the list */
-  added: boolean;
+
   /** Whether this is a beta/preview dataset */
   beta: boolean;
-  /** Whether the user has enabled this dataset */
-  enabled: boolean;
   /** Whether this is a featured dataset */
   featured: boolean;
   /** Whether this dataset is filtered from the catalog display */
@@ -46,6 +44,7 @@ export interface RapidDatasetProps {
   hidden: boolean;
   /** Whether this dataset uses conflation */
   conflated: boolean;
+
   /** Localization string ID for the label */
   labelStringID: StringID;
   /** Localization string ID for the description */
@@ -59,8 +58,8 @@ export interface RapidDatasetProps {
 
 /**
  * A `RapidDataset` represents an external source of data that can be loaded into Rapid.
- * Datasets come from various services (Esri, MapWithAI, Overture, etc.)
- * and contain features like buildings, roads, addresses, etc.
+ * Datasets may be provided from various services (Esri, MapWithAI, Overture, etc.)
+ * or be a custom dataset without a `serviceID`.
  */
 export class RapidDataset {
 
@@ -70,7 +69,8 @@ export class RapidDataset {
   public id: DatasetID;
   /** Service providing this dataset (e.g. 'esri', 'mapwithai', 'overture') */
   public serviceID: ServiceID;
-  /** Categories this dataset belongs to (e.g. 'buildings', 'addresses') */
+
+  /** Free-form categories this dataset belongs to (e.g. 'buildings', 'addresses') */
   public categories: Set<string>;
   /** Display color for features from this dataset */
   public color: string;
@@ -78,8 +78,7 @@ export class RapidDataset {
   public dataUsed: string[];
   /** Geographic bounding extent of this dataset, if known */
   public extent: Extent | undefined;
-  /** Whether this dataset is rendered as an overlay on top of the base map */
-  public overlay: boolean | undefined;
+
   /** URL for the data */
   public sourceUrl: string;
   /** URL for a landing page with more information about this dataset */
@@ -88,12 +87,9 @@ export class RapidDataset {
   public licenseUrl: string;
   /** URL for a thumbnail image representing this dataset */
   public thumbnailUrl: string;
-  /** Whether this dataset has been added to the active dataset list by the user */
-  public added: boolean;
+
   /** Whether this dataset is in beta/preview status */
   public beta: boolean;
-  /** Whether the user has enabled this dataset for display */
-  public enabled: boolean;
   /** Whether this dataset is featured/promoted in the catalog */
   public featured: boolean;
   /** Whether this dataset is currently hidden by an active catalog filter */
@@ -102,6 +98,9 @@ export class RapidDataset {
   public hidden: boolean;
   /** Whether this dataset uses conflation when merging features into the OSM graph */
   public conflated: boolean;
+  /** Whether this dataset is rendered as an overlay on top of the base map */
+  public overlay: boolean;
+
   /** Localization string key for the dataset display name */
   public labelStringID: StringID | undefined;
   /** Localization string key for the dataset description */
@@ -131,7 +130,6 @@ export class RapidDataset {
     this.color = props.color ?? RAPID_MAGENTA;
     this.dataUsed = props.dataUsed ?? [];
     this.extent = props.extent;
-    this.overlay = props.overlay;
 
     this.sourceUrl = props.sourceUrl ?? '';
     this.itemUrl = props.itemUrl ?? '';
@@ -139,13 +137,12 @@ export class RapidDataset {
     this.thumbnailUrl = props.thumbnailUrl ?? this.getThumbnail();
 
     // flags
-    this.added = props.added ?? false;
     this.beta = props.beta ?? this.categories.has('preview');
-    this.enabled = props.enabled ?? false;
     this.filtered = props.filtered ?? false;
     this.featured = props.featured ?? this.categories.has('featured');
     this.hidden = props.hidden ?? false;
     this.conflated = props.conflated ?? false;
+    this.overlay = props.overlay ?? false;
 
     this.labelStringID = props.labelStringID;
     this.descriptionStringID = props.descriptionStringID;
@@ -156,6 +153,36 @@ export class RapidDataset {
     this._description = props.description;
     this.label = this.getLabel();
     this.description = this.getDescription();
+  }
+
+
+  /**
+   * Unique string to identify this dataset
+   * @return  This data element's unique ID
+   * @readonly
+   */
+  public get datasetID(): DatasetID {
+    return this.id;
+  }
+
+  /**
+   * Returns `true` if the dataset has been added to the Rapid menu.
+   * @return  `true` if the dataset has been added to the Rapid menu.
+   * @readonly
+   */
+  public get added(): boolean {
+    const rapid = this.context.systems.rapid!;
+    return rapid.addedDatasetIDs.has(this.id);
+  }
+
+  /**
+   * Returns `true` if the dataset has been checked enabled.
+   * @return  `true` if the dataset has been checked enabled.
+   * @readonly
+   */
+  public get enabled(): boolean {
+    const rapid = this.context.systems.rapid!;
+    return rapid.enabledDatasetIDs.has(this.id);
   }
 
 

@@ -7,7 +7,8 @@ describe('RapidDataset', () => {
   const context = new Rapid.MockContext();
   context.systems = {
     assets:  new Rapid.AssetSystem(context),
-    network: new Rapid.NetworkSystem(context)
+    network: new Rapid.NetworkSystem(context),
+    rapid:   new Rapid.RapidSystem(context)
   };
 
 
@@ -20,8 +21,6 @@ describe('RapidDataset', () => {
 
     assert.equal(result.id, 'test-dataset');
     assert.equal(result.serviceID, '');
-    assert.isFalse(result.added);
-    assert.isFalse(result.enabled);
     assert.isFalse(result.conflated);
   });
 
@@ -29,8 +28,6 @@ describe('RapidDataset', () => {
     const props = {
       id: 'full-dataset',
       serviceID: 'esri',
-      added: true,
-      enabled: true,
       conflated: true,
       color: '#ff0000',
       dataUsed: ['imagery'],
@@ -43,8 +40,6 @@ describe('RapidDataset', () => {
 
     assert.equal(result.id, 'full-dataset');
     assert.equal(result.serviceID, 'esri');
-    assert.isTrue(result.added);
-    assert.isTrue(result.enabled);
     assert.isTrue(result.conflated);
     assert.equal(result.color, '#ff0000');
     assert.deepEqual(result.dataUsed, ['imagery']);

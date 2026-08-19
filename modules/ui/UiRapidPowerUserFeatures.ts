@@ -315,7 +315,6 @@ export class UiRapidPowerUserFeatures extends EventEmitter {
    */
   public toggleFeature(e?: Event, featureFlag?: string): void {
     const context = this.context;
-    const gfx = context.systems.gfx;
     const rapid = context.systems.rapid!;
     const settings = context.systems.settings;
 
@@ -325,14 +324,16 @@ export class UiRapidPowerUserFeatures extends EventEmitter {
 
     // custom on-toggle behaviors can go here
     if (featureFlag === 'previewDatasets' && !enabled) {   // if user unchecked previewDatasets feature
+      const toRemove = new Set<DatasetID>();
       for (const dataset of rapid.datasets.values()) {
         if (dataset.beta) {
-          dataset.added = false;
-          dataset.enabled = false;
+          toRemove.add(dataset.id);
         }
       }
-      context.enter('browse');   // return to browse mode (in case something was selected)
-      gfx?.immediateRedraw();
+      if (toRemove.size) {
+        rapid.removeDatasets(toRemove);
+        context.enter('browse');   // return to browse mode (in case something was selected)
+      }
     }
   }
 

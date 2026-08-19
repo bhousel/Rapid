@@ -155,14 +155,12 @@ export class UiRapidInspector {
   public isAcceptFeatureDisabled(): boolean {
     const context = this.context;
     const rapid = context.systems.rapid!;
-    const urlhash = context.systems.urlhash!;
 
     // If Rapid is working with on a task, "add roads" is always enabled
     if (rapid.taskExtent) return false;
 
     // Power users aren't limited by the max features limit
-    const isPowerUser = urlhash.getParam('poweruser') === 'true';
-    if (isPowerUser) return false;
+    if (rapid.isPoweruser()) return false;
 
     return rapid.acceptIDs.size >= ACCEPT_FEATURES_LIMIT;
   }

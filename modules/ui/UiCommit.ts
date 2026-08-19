@@ -149,7 +149,7 @@ export class UiCommit extends EventEmitter {
 
     // Sync up the `rapid:poweruser` tag
     // Set to true if the user had poweruser on at any point during their editing
-    if (rapid.hadPoweruser) {
+    if (rapid.hadPoweruser()) {
       tags['rapid:poweruser'] = 'true';
     } else {
       delete tags['rapid:poweruser'];

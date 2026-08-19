@@ -310,9 +310,9 @@ export class UiRapidDatasetToggle extends EventEmitter {
     const settings = context.systems.settings;
 
     const isRapidEnabled = scene.layers.get('rapid')?.enabled;
-    const showPreview = settings?.get('poweruser.previewDatasets') === 'true';
+    const showPreview = rapid.isPoweruser() && settings?.get('poweruser.previewDatasets') === 'true';
     const datasets = [...rapid.datasets.values()]
-      .filter(d => d.added && (showPreview || !d.beta));    // exclude preview datasets unless user has opted into them
+      .filter(d => (showPreview || !d.beta));    // exclude preview datasets unless user has opted into them
 
     let $rows: D3Selection = $selection.selectAll('.rapid-checkbox-dataset')
       .data(datasets, (d: RapidDataset) => d.id);
@@ -513,22 +513,24 @@ export class UiRapidDatasetToggle extends EventEmitter {
 
 
   /**
-   * Called when a user has selected a color with the colorpicker
-   * @param  dataset  - the RapidDataset to update
-   * @param  color    - hexstring for the color e.g. '#da26d3'
+   * Called when a user has selected a color with the colorpicker.
+   * @param  ds  - the RapidDataset to update
+   * @param  color - hexstring for the color e.g. '#da26d3'
    */
-  public changeColor(dataset: RapidDataset, color: string): void {
+  public changeColor(ds: RapidDataset, color: string): void {
     const context = this.context;
     const gfx = context.systems.gfx!;
+    const rapid = context.systems.rapid!;
     const scene = gfx.scene!;
 
-    dataset.color = color;
+    ds.color = color;
+    rapid.saveDatasetSettings(ds);
 
     scene.dirtyLayers(['rapid', 'rapidoverlay']);
     gfx.immediateRedraw();
     this.render();
 
-    // In case a Rapid feature is already selected, reselect it to update sidebar too
+    // In case a Rapid feature is already selected, reselect it to update sidebar too.
     const mode = context.mode;
     if (mode?.id === 'select') {  // new (not legacy) select mode
       const selection = new Map(mode.selectedData);

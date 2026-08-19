@@ -7,6 +7,7 @@ import { utilNoAuto, utilSafeURL, utilSanitizeHTML } from '../util/index.ts';
 
 import type { Context } from '../Context.ts';
 import type { D3EnterSelection, D3Selection } from 'd3-selection';
+import type { RapidDataset } from '../lib/RapidDataset.ts';
 
 const MAXRESULTS = 100;
 
@@ -174,7 +175,7 @@ export class UiRapidCatalog extends EventEmitter {
       .append('input')
       .attr('class', 'rapid-catalog-filter-search')
       .call(utilNoAuto)
-      .on('input', e => {
+      .on('input', (e: InputEvent) => {
         const element = e.currentTarget as HTMLInputElement;
         const val = (element && element.value) || '';
         this._filterText = val.trim().toLowerCase();
@@ -194,14 +195,14 @@ export class UiRapidCatalog extends EventEmitter {
       .attr('class', 'rapid-catalog-filter-type')
       .call(utilNoAuto)
       .call(this.CategoryCombo.attach)
-      .on('blur change', e => {
+      .on('blur change', (e: Event) => {
         const element = e.currentTarget as HTMLInputElement;
         const val = (element && element.value) || '';
         const data = this.CategoryCombo.data();
-        if (data.some((item: any) => item.value === val)) {  // only allow picking values from the list
+        if (data.some(item => item.value === val)) {  // only allow picking values from the list
           this._filterCategory = val;
         } else {
-          (e.currentTarget as HTMLInputElement).value = '';
+          element.value = '';
           this._filterCategory = null;
         }
         $datasets.call(this.renderDatasets);
@@ -298,7 +299,7 @@ export class UiRapidCatalog extends EventEmitter {
     const settings = context.systems.settings;
     const $content = this.Modal.$content!;
 
-    const showPreview = settings?.get('poweruser.previewDatasets') === 'true';
+    const showPreview = rapid.isPoweruser() && settings?.get('poweruser.previewDatasets') === 'true';
 
     const $status: D3Selection = $selection.selectAll('.rapid-catalog-datasets-status');
     const $results: D3Selection = $selection.selectAll('.rapid-catalog-datasets');
@@ -315,22 +316,25 @@ export class UiRapidCatalog extends EventEmitter {
     // Update categories combo
     // (redo it every time, in case the user toggles preview datasets on/off)
     const categories = new Set(rapid.categories);  // make copy
-    if (!showPreview) categories.delete('preview');
+    if (!showPreview) {
+      categories.delete('preview');
+    }
 
-    const comboData = Array.from(categories).sort().map(d => {
+    const comboData = [...categories].sort().map(d => {
       const display = l10n.t(`rapid_catalog.category.${d}`, { default: d });
       const item = { display: display, title: d, value: d };
-      if (d === 'preview') item.display = `${display} <span class="rapid-catalog-dataset-beta beta"></span>`;
+      if (d === 'preview') {
+        item.display = `${display} <span class="rapid-catalog-dataset-beta beta"></span>`;
+      }
       return item;
     });
 
     this.CategoryCombo.data(comboData);
 
-
     // Gather datasets..
     let count = 0;
     const datasets = [...rapid.catalog.values()]
-      .filter(d => !d.hidden)
+      .filter(d => !d.hidden && (showPreview || !d.beta))
       .sort(this.sortDatasets);
 
     // Apply filters..
@@ -357,7 +361,7 @@ export class UiRapidCatalog extends EventEmitter {
 
     // The datasets
     let $datasets: D3Selection = $results.selectAll('.rapid-catalog-dataset')
-      .data(datasets, d => d.id);
+      .data(datasets, (d: RapidDataset) => d.id);
 
     // exit
     $datasets.exit()
@@ -381,14 +385,14 @@ export class UiRapidCatalog extends EventEmitter {
       .attr('class', 'dataset-categories');
 
     $$categories.selectAll('.dataset-category')
-      .data((d: any) => {
+      .data((d: RapidDataset) => {
         const categories = new Set(d.categories);  // make copy
         if (d.beta) categories.add('preview');     // make sure beta datasets have 'preview' category
-        return Array.from(categories).sort(this.sortCategories);
+        return [...categories].sort(this.sortCategories);
       }, (d: any) => d)
       .enter()
       .append('div')
-      .attr('class', d => {
+      .attr('class', (d: string) => {
         // include 'beta' class for preview category
         return `dataset-category dataset-category-${d}` + (d === 'preview' ? ' beta' : '');
       });
@@ -398,13 +402,13 @@ export class UiRapidCatalog extends EventEmitter {
       .attr('class', 'rapid-catalog-dataset-snippet');
 
     const $$link: D3EnterSelection = $$label
-      .filter(d => d.itemUrl)
+      .filter((d: RapidDataset) => !!d.itemUrl)
       .append('div')
       .attr('class', 'rapid-catalog-dataset-more-info')
       .append('a')
       .attr('class', 'rapid-catalog-dataset-link')
       .attr('target', '_blank')
-      .attr('href', d => utilSafeURL(d.itemUrl));
+      .attr('href', (d: RapidDataset) => utilSafeURL(d.itemUrl));
 
     $$link
       .append('span')
@@ -429,15 +433,15 @@ export class UiRapidCatalog extends EventEmitter {
     $$thumbnail
       .append('img')
       .attr('class', 'rapid-catalog-dataset-thumbnail')
-      .classed('inverted', d => d.categories.has('esri'))  // invert colors from light->dark
-      .attr('src', d => utilSafeURL(d.thumbnailUrl));
+      .classed('inverted', (d: RapidDataset) => d.categories.has('esri'))  // invert colors from light->dark
+      .attr('src', (d: RapidDataset) => utilSafeURL(d.thumbnailUrl));
 
     // update
     $datasets = $datasets.merge($$datasets).order();
 
     $datasets
-      .classed('added', d => d.added)
-      .classed('hide', d => d.filtered);
+      .classed('added', (d: RapidDataset) => d.added)
+      .classed('hide', (d: RapidDataset) => d.filtered);
 
     $datasets.selectAll('.rapid-catalog-dataset-name')
       .html(d => this.highlight(this._filterText, d.getLabel()));
@@ -446,7 +450,7 @@ export class UiRapidCatalog extends EventEmitter {
       .text(l10n.t('rapid_catalog.more_info'));
 
     $datasets.selectAll('.dataset-category')
-      .text(d => {
+      .text((d: string) => {
         if (d === 'preview') return '';
         const star = (d === 'featured') ? '\u2b50 ' : '';   // 2b50 = emoji star
         const text = l10n.t(`rapid_catalog.category.${d}`, { default: d });
@@ -463,11 +467,11 @@ export class UiRapidCatalog extends EventEmitter {
       .text(d => d.added ? '\u2705 ' + l10n.t('rapid_catalog.dataset_added') : '');  // 2705 = emoji check
 
     $datasets.selectAll('.rapid-catalog-dataset-action')
-      .classed('secondary', d => d.added)
-      .text(d => d.added ? l10n.t('text.remove') : l10n.t('rapid_catalog.add_dataset'));
+      .classed('secondary', (d: RapidDataset) => d.added)
+      .text((d: RapidDataset) => d.added ? l10n.t('text.remove') : l10n.t('rapid_catalog.add_dataset'));
 
     // update the count
-    const n = datasets.filter(d => !d.filtered).length;
+    const n = datasets.filter((d: RapidDataset) => !d.filtered).length;
     const gt = (count > MAXRESULTS) ? '>' : '';
     $content.selectAll('.rapid-catalog-filter-results')
       .text(l10n.t('rapid_catalog.datasets_found', { n: n, gt: gt }));
@@ -481,7 +485,7 @@ export class UiRapidCatalog extends EventEmitter {
    * @param  a - first dataset to compare
    * @param  b - second dataset to compare
    */
-  public sortDatasets(a: any, b: any) {
+  public sortDatasets(a: RapidDataset, b: RapidDataset) {
     return a.added && !b.added ? -1
       : b.added && !a.added ? 1
       : a.featured && !b.featured ? -1
@@ -497,7 +501,7 @@ export class UiRapidCatalog extends EventEmitter {
    * @param  a - first category to compare
    * @param  b - second category to compare
    */
-  public sortCategories(a: any, b: any) {
+  public sortCategories(a: string, b: string) {
     return a === 'featured' && b !== 'featured' ? -1
       : b === 'featured' && a !== 'featured' ? 1
       : a === 'preview' && b !== 'preview' ? 1
@@ -511,7 +515,7 @@ export class UiRapidCatalog extends EventEmitter {
    * @param  [e] - the triggering event, if any
    * @param  d - bound datum (the dataset in this case)
    */
-  public toggleDataset(e: any, d: any) {
+  public toggleDataset(e: Event, d: RapidDataset) {
     const context = this.context;
     const rapid = context.systems.rapid!;
     const added = rapid.datasets;

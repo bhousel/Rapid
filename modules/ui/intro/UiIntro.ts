@@ -163,9 +163,9 @@ export class UiIntro {
       brightness: imagery.brightness,
       baseLayer: imagery.baseLayerSource(),
       overlayLayers: imagery.overlayLayerSources(),
-      layersEnabled: new Set(),                             // Set<layerID>
-      datasetsAdded: new Set((rapid as any)._addedDatasetIDs),       // Set<datasetID>
-      datasetsEnabled: new Set((rapid as any)._enabledDatasetIDs),   // Set<datasetID>
+      layersEnabled: new Set(),                            // Set<layerID>
+      datasetsAdded: new Set(rapid.addedDatasetIDs),       // Set<datasetID>
+      datasetsEnabled: new Set(rapid.enabledDatasetIDs),   // Set<datasetID>
       edits: editor.toJSON()
     };
 
@@ -178,7 +178,7 @@ export class UiIntro {
     scene.onlyLayers(['background', 'osm', 'labels']);
 
     // Show only a fake walkthrough dataset
-    rapid.removeDatasets((rapid as any)._addedDatasetIDs);
+    rapid.removeDatasets(rapid.addedDatasetIDs);
     rapid.addDatasets('rapid_intro_graph');
 
     // Setup imagery

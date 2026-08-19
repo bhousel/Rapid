@@ -195,11 +195,15 @@ export class EsriService extends AbstractSystem {
         categories.add(c.toLowerCase().replace('/categories/', ''));
       }
 
+      // Default these to the gold color.  Historically, the first 2 datasets in the menu
+      // were Facebook Roads and Microsoft Buildings, and gold happened to be the 3rd color.
+      // Today, we let users change the color and persist their preference.
       const dataset = new RapidDataset(this.context, {
         id: d.id,
         conflated: false,
         serviceID: 'esri',
         categories: categories,
+        color: '#ffd700',  // gold
         dataUsed: ['esri', this.getDataUsed(d.title)],
         label: d.title,
         description: d.snippet,

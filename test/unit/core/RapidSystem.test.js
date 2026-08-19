@@ -1,4 +1,4 @@
-import { beforeAll, describe, it } from 'bun:test';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, it, mock, spyOn } from 'bun:test';
 import { assert } from 'chai';
 import { DOMParser } from '@xmldom/xmldom';
 import * as Rapid from '../../../modules/headless.js';
@@ -6,8 +6,32 @@ import * as sample from './RapidSystem.sample.js';
 
 
 describe('RapidSystem', () => {
+
+  let _currParams = new Map();
+
+  class MockUrlHashSystem extends Rapid.MockSystem {
+    constructor(context) {
+      super(context);
+      this.id = 'urlhash';
+    }
+    hasParam(k) { return _currParams.has(k); }
+    getParam(k) { return _currParams.get(k); }
+    setParam(k, v) {
+      if (typeof k !== 'string') return;
+      if (v === undefined || v === null || v === 'undefined' || v === 'null') {
+        _currParams.delete(k);
+      } else {
+        _currParams.set(k, v);
+      }
+    }
+  }
+
   // Setup context..
   const context = new Rapid.MockContext();
+  context.systems = {
+    urlhash:  new MockUrlHashSystem(context)
+  };
+
 
   // Test construction and startup of the system..
   describe('lifecycle', () => {
@@ -67,27 +91,61 @@ describe('RapidSystem', () => {
 
   // Test an already-constructed instance of the system..
   describe('methods', () => {
+    const spyDatasetChange = mock();
     let _rapid;
 
     beforeAll(() => {
       _rapid = new Rapid.RapidSystem(context);
-      return _rapid.initAsync().then(() => _rapid.startAsync());
+      context.systems.rapid = _rapid;
+
+      return _rapid.initAsync()
+        .then(() => _rapid.on('datasetchange', spyDatasetChange))
+        .then(() => _rapid.startAsync())
+        .then(() => {
+          // load sample datasets into the catalog
+          const toLoad = [
+            new Rapid.RapidDataset(context, sample.msBuildings),
+            new Rapid.RapidDataset(context, sample.overturePlaces),
+          ];
+          for (const dataset of toLoad) {
+            _rapid.catalog.set(dataset.id, dataset);
+            for (const category of dataset.categories) {
+              _rapid.categories.add(category);
+            }
+          }
+        });
     });
 
 
     it('has a catalog of datasets', () => {
       assert.instanceOf(_rapid.catalog, Map);
-      // Catalog may be empty in test environment if services aren't available
+      assert.lengthOf(_rapid.catalog, 2);
+      assert.hasAllKeys(_rapid.catalog, ['msBuildings', 'overture-places']);
     });
 
     it('has a set of categories', () => {
       assert.instanceOf(_rapid.categories, Set);
-      // Categories may be empty in test environment if services aren't available
+      assert.lengthOf(_rapid.categories, 5);
+      assert.hasAllKeys(_rapid.categories, ['microsoft', 'buildings', 'overture', 'places', 'featured']);
     });
 
-    it('has acceptIDs and ignoreIDs sets', () => {
+    it('has addedDatasetIDs and enabledDatasetIDs sets, default empty', () => {
+      assert.instanceOf(_rapid.addedDatasetIDs, Set);
+      assert.instanceOf(_rapid.enabledDatasetIDs, Set);
+      assert.isEmpty(_rapid.addedDatasetIDs);
+      assert.isEmpty(_rapid.enabledDatasetIDs);
+    });
+
+    it('has a datasets Map, defaults empty', () => {
+      assert.instanceOf(_rapid.datasets, Map);
+      assert.isEmpty(_rapid.datasets);
+    });
+
+    it('has acceptIDs and ignoreIDs sets, default empty', () => {
       assert.instanceOf(_rapid.acceptIDs, Set);
       assert.instanceOf(_rapid.ignoreIDs, Set);
+      assert.isEmpty(_rapid.acceptIDs);
+      assert.isEmpty(_rapid.ignoreIDs);
     });
 
     it('gets colors', () => {
@@ -97,119 +155,161 @@ describe('RapidSystem', () => {
       assert.strictEqual(colors[0], '#ff0000');  // red
     });
 
-    it('gets datasets', () => {
-      const datasets = _rapid.datasets;
-      assert.instanceOf(datasets, Map);
-      // Should return currently added datasets
+    describe('isTaskRectangular', () => {
+      it('initializes with null taskExtent', () => {
+        assert.isNull(_rapid.taskExtent);
+        assert.isFalse(_rapid.isTaskRectangular());
+      });
     });
 
-    it('initializes with null taskExtent', () => {
-      assert.isNull(_rapid.taskExtent);
-      assert.isFalse(_rapid.isTaskRectangular());
+    describe('hadPoweruser', () => {
+      it('gets value of _hadPoweruser internal variable', () => {
+        _rapid._hadPoweruser = true;
+        assert.isTrue(_rapid.hadPoweruser());
+        _rapid._hadPoweruser = false;
+        assert.isFalse(_rapid.hadPoweruser());
+      });
     });
 
-    it('initializes with hadPoweruser false', () => {
-      assert.isFalse(_rapid.hadPoweruser);
+    describe('isPoweruser', () => {
+      it('gets current poweruser state from urlhash', () => {
+        _currParams.set('poweruser', 'true');
+        assert.isTrue(_rapid.isPoweruser());
+        _currParams.set('poweruser', '');
+        assert.isFalse(_rapid.isPoweruser());
+        _currParams.delete('poweruser');
+      });
     });
 
 
     describe('dataset management', () => {
-      it('addDatasets adds datasets to menu', () => {
-        if (_rapid.catalog.size === 0) {
-          // Skip if no datasets available in test environment
-          return;
-        }
-
-        const testDatasetID = [..._rapid.catalog.keys()][0];
-        _rapid.addDatasets(testDatasetID);
-
-        const datasets = _rapid.datasets;
-        assert.isTrue(datasets.has(testDatasetID));
+      beforeEach(() => {
+        spyDatasetChange.mockClear();
+        _rapid.addedDatasetIDs.clear();
+        _rapid.enabledDatasetIDs.clear();
       });
 
-      it('addDatasets accepts array of dataset IDs', () => {
-        if (_rapid.catalog.size < 2) {
-          // Skip if not enough datasets available
-          return;
-        }
-
-        const datasetIDs = [..._rapid.catalog.keys()].slice(0, 2);
-        _rapid.addDatasets(datasetIDs);
-
-        const datasets = _rapid.datasets;
-        for (const id of datasetIDs) {
-          assert.isTrue(datasets.has(id));
-        }
+      afterEach(() => {
+        spyDatasetChange.mockClear();
+        _rapid.addedDatasetIDs.clear();
+        _rapid.enabledDatasetIDs.clear();
       });
 
-      it('removeDatasets removes datasets from menu', () => {
-        if (_rapid.catalog.size === 0) {
-          // Skip if no datasets available
-          return;
-        }
+      describe('addDatasets', () => {
+        it('addDatasets adds a single dataset to the addedDatasetIDs set only', () => {
+          _rapid.addDatasets('msBuildings');
 
-        const testDatasetID = [..._rapid.catalog.keys()][0];
+          assert.hasAllKeys(_rapid.datasets, ['msBuildings'], `added datasets appear in 'datasets' Map`);
+          assert.hasAllKeys(_rapid.addedDatasetIDs, ['msBuildings'], `added to addedDatasetIDs`);
+          assert.isEmpty(_rapid.enabledDatasetIDs, `does not affect enabledDatasetIDs`);
+          assert.lengthOf(spyDatasetChange.mock.calls, 1, `'datasetchange' emitted once`);
+        });
 
-        _rapid.addDatasets(testDatasetID);
-        assert.isTrue(_rapid.datasets.has(testDatasetID));
+        it('addDatasets adds multiple datasets to the addedDatasetIDs set only', () => {
+          _rapid.addDatasets(['msBuildings', 'overture-places']);
 
-        _rapid.removeDatasets(testDatasetID);
-        assert.isFalse(_rapid.datasets.has(testDatasetID));
+          assert.hasAllKeys(_rapid.datasets, ['msBuildings', 'overture-places'], `added datasets appear in 'datasets' Map`);
+          assert.hasAllKeys(_rapid.addedDatasetIDs, ['msBuildings', 'overture-places'], `added to addedDatasetIDs`);
+          assert.isEmpty(_rapid.enabledDatasetIDs, `does not affect enabledDatasetIDs`);
+          assert.lengthOf(spyDatasetChange.mock.calls, 1, `'datasetchange' emitted once`);
+        });
       });
 
-      it('enableDatasets adds and enables datasets', () => {
-        if (_rapid.catalog.size === 0) {
-          // Skip if no datasets available
-          return;
-        }
+      describe('enableDatasets', () => {
+        it('enableDatasets adds a single dataset to both addedDatasetIDs and enabledDatasetIDs sets', () => {
+          _rapid.enableDatasets('msBuildings');
 
-        const testDatasetID = [..._rapid.catalog.keys()][0];
+          assert.hasAllKeys(_rapid.datasets, ['msBuildings'], `added datasets appear in 'datasets' Map`);
+          assert.hasAllKeys(_rapid.addedDatasetIDs, ['msBuildings'], `added to addedDatasetIDs`);
+          assert.hasAllKeys(_rapid.enabledDatasetIDs, ['msBuildings'], `added to enabledDatasetIDs`);
+          assert.lengthOf(spyDatasetChange.mock.calls, 1, `'datasetchange' emitted once`);
+        });
 
-        _rapid.enableDatasets(testDatasetID);
+        it('enableDatasets adds multiple datasets to both addedDatasetIDs and enabledDatasetIDs sets', () => {
+          _rapid.enableDatasets(['msBuildings', 'overture-places']);
 
-        const dataset = _rapid.datasets.get(testDatasetID);
-        assert.isDefined(dataset);
+          assert.hasAllKeys(_rapid.datasets, ['msBuildings', 'overture-places'], `added datasets appear in 'datasets' Map`);
+          assert.hasAllKeys(_rapid.addedDatasetIDs, ['msBuildings', 'overture-places'], `added to addedDatasetIDs`);
+          assert.hasAllKeys(_rapid.enabledDatasetIDs, ['msBuildings', 'overture-places'], `added to enabledDatasetIDs`);
+          assert.lengthOf(spyDatasetChange.mock.calls, 1, `'datasetchange' emitted once`);
+        });
       });
 
-      it('disableDatasets unchecks dataset', () => {
-        if (_rapid.catalog.size === 0) {
-          // Skip if no datasets available
-          return;
-        }
+      describe('removeDatasets', () => {
+        it('removeDatasets removes a single dataset from both addedDatasetIDs and enabledDatasetIDs sets', () => {
+          _rapid.addedDatasetIDs.add('msBuildings').add('overture-places');
+          _rapid.enabledDatasetIDs.add('msBuildings').add('overture-places');
+          _rapid.removeDatasets('msBuildings');
 
-        const testDatasetID = [..._rapid.catalog.keys()][0];
+          assert.hasAllKeys(_rapid.datasets, ['overture-places'], `removed datasets do not appear in 'datasets' Map`);
+          assert.hasAllKeys(_rapid.addedDatasetIDs, ['overture-places'], `removed from addedDatasetIDs`);
+          assert.hasAllKeys(_rapid.enabledDatasetIDs, ['overture-places'], `removed from enabledDatasetIDs`);
+          assert.lengthOf(spyDatasetChange.mock.calls, 1, `'datasetchange' emitted once`);
+        });
 
-        _rapid.enableDatasets(testDatasetID);
-        const dataset1 = _rapid.datasets.get(testDatasetID);
-        assert.isDefined(dataset1);
+        it('removeDatasets removes multiple datasets from both addedDatasetIDs and enabledDatasetIDs sets', () => {
+          _rapid.addedDatasetIDs.add('msBuildings').add('overture-places');
+          _rapid.enabledDatasetIDs.add('msBuildings').add('overture-places');
+          _rapid.removeDatasets(['msBuildings', 'overture-places']);
 
-        _rapid.disableDatasets(testDatasetID);
-        // Dataset is still in datasets map because it's added, but enabled flag should be false
-        const dataset2 = _rapid.catalog.get(testDatasetID);
-        if (dataset2) {
-          assert.isFalse(dataset2.enabled);
-        }
+          assert.isEmpty(_rapid.datasets, `removed datasets do not appear in 'datasets' Map`);
+          assert.isEmpty(_rapid.addedDatasetIDs, `removed from addedDatasetIDs`);
+          assert.isEmpty(_rapid.enabledDatasetIDs, `removed from enabledDatasetIDs`);
+          assert.lengthOf(spyDatasetChange.mock.calls, 1, `'datasetchange' emitted once`);
+        });
       });
 
-      it('toggleDatasets toggles enabled state', () => {
-        if (_rapid.catalog.size === 0) {
-          // Skip if no datasets available
-          return;
-        }
+      describe('disableDatasets', () => {
+        it('disableDatasets removes a single dataset from the enabledDatasetIDs set only', () => {
+          _rapid.addedDatasetIDs.add('msBuildings').add('overture-places');
+          _rapid.enabledDatasetIDs.add('msBuildings').add('overture-places');
+          _rapid.disableDatasets('msBuildings');
 
-        const testDatasetID = [..._rapid.catalog.keys()][0];
+          assert.hasAllKeys(_rapid.datasets, ['msBuildings', 'overture-places'], `disabled datasets still appear in 'datasets' Map`);
+          assert.hasAllKeys(_rapid.addedDatasetIDs, ['msBuildings', 'overture-places'], `does not affect addedDatasetIDs`);
+          assert.hasAllKeys(_rapid.enabledDatasetIDs, ['overture-places'], `removed from enabledDatasetIDs`);
+          assert.lengthOf(spyDatasetChange.mock.calls, 1, `'datasetchange' emitted once`);
+        });
 
-        _rapid.disableDatasets(testDatasetID);
-        const dataset = _rapid.catalog.get(testDatasetID);
-        if (!dataset) return;
+        it('disableDatasets removes multiple datasets from both addedDatasetIDs and enabledDatasetIDs sets', () => {
+          _rapid.addedDatasetIDs.add('msBuildings').add('overture-places');
+          _rapid.enabledDatasetIDs.add('msBuildings').add('overture-places');
+          _rapid.disableDatasets(['msBuildings', 'overture-places']);
 
-        const initialState = dataset.enabled;
+          assert.hasAllKeys(_rapid.datasets, ['msBuildings', 'overture-places'], `disabled datasets still appear in 'datasets' Map`);
+          assert.hasAllKeys(_rapid.addedDatasetIDs, ['msBuildings', 'overture-places'], `does not affect addedDatasetIDs`);
+          assert.isEmpty(_rapid.enabledDatasetIDs, `removed from enabledDatasetIDs`);
+          assert.lengthOf(spyDatasetChange.mock.calls, 1, `'datasetchange' emitted once`);
+        });
+      });
 
-        _rapid.toggleDatasets(testDatasetID);
-        assert.notStrictEqual(dataset.enabled, initialState);
+      describe('toggleDatasets', () => {
+        it('toggles enabled state for a single dataset', () => {
+          // Start with MS Buildings added/enabled only
+          _rapid.addedDatasetIDs.add('msBuildings');
+          _rapid.enabledDatasetIDs.add('msBuildings');
+          // Toggle both (in two calls)
+          _rapid.toggleDatasets('msBuildings');
+          _rapid.toggleDatasets('overture-places');
 
-        _rapid.toggleDatasets(testDatasetID);
-        assert.strictEqual(dataset.enabled, initialState);
+          assert.hasAllKeys(_rapid.datasets, ['msBuildings', 'overture-places'], `disabled datasets still appear in 'datasets' Map`);
+          assert.hasAllKeys(_rapid.addedDatasetIDs, ['msBuildings', 'overture-places'], `disabled datasets still appear in addedDatasetIDs`);
+          assert.hasAllKeys(_rapid.enabledDatasetIDs, ['overture-places'], `both datasets enabled state has toggled`);
+          assert.lengthOf(spyDatasetChange.mock.calls, 2, `'datasetchange' emitted twice`);
+        });
+
+        it('toggles enabled state for multiple datasets', () => {
+          // Start with MS Buildings added/enabled only
+          _rapid.addedDatasetIDs.add('msBuildings');
+          _rapid.enabledDatasetIDs.add('msBuildings');
+          // Toggle both (in a single call)
+          _rapid.toggleDatasets(['msBuildings', 'overture-places']);
+
+          assert.hasAllKeys(_rapid.datasets, ['msBuildings', 'overture-places'], `disabled datasets still appear in 'datasets' Map`);
+          assert.hasAllKeys(_rapid.addedDatasetIDs, ['msBuildings', 'overture-places'], `disabled datasets still appear in addedDatasetIDs`);
+          assert.hasAllKeys(_rapid.enabledDatasetIDs, ['overture-places'], `both datasets enabled state has toggled`);
+          assert.lengthOf(spyDatasetChange.mock.calls, 1, `'datasetchange' emitted once`);
+        });
       });
     });
 
