@@ -5,11 +5,12 @@ import { UiModal } from './UiModal.ts';
 import { utilNoAuto } from '../util/index.ts';
 
 import type { Context } from '../Context.ts';
-import type { D3Selection } from 'd3-selection';
+import type { D3EnterSelection, D3Selection } from 'd3-selection';
+import type { RapidDataset } from '../lib/RapidDataset.ts';
 
 
 /**
- * This is the modal where the user can add a custom dataset to Rapid.
+ * This is the Modal where the user can add a custom dataset to Rapid.
  *
  * Events available:
  * - `done` - Fires when the user is finished, emits the new datasetID if one was added.
@@ -25,6 +26,11 @@ export class UiRapidAddDataset extends EventEmitter {
 
   /** The datasetID for the newly added RapidDataset. */
   protected _datasetID: DatasetID | null;
+  /** style for the datasetID field (warning class?) */
+  protected _datasetIDClass: string | null;
+  /** stringID for the datasetID feedback (warning text?) */
+  protected _datasetIDStringID: string | null;
+
 
 
   /**
@@ -37,6 +43,8 @@ export class UiRapidAddDataset extends EventEmitter {
     this._currFileList = null;
     this._currUrl = null;
     this._datasetID = null;
+    this._datasetIDClass = null;
+    this._datasetIDStringID = null;
 
     // Child components
     this.Modal = null;
@@ -49,6 +57,7 @@ export class UiRapidAddDataset extends EventEmitter {
     this.show = this.show.bind(this);
     this.close = this.close.bind(this);
     this.render = this.render.bind(this);
+    this.renderFields = this.renderFields.bind(this);
   }
 
 
@@ -151,31 +160,34 @@ export class UiRapidAddDataset extends EventEmitter {
     ];
 
     /* Heading section */
-    let $heading: D3Selection = $content.selectAll('.rapid-add-dataset-heading')
+    let $heading: D3Selection = $content.selectAll('.modal-heading')
       .data([0]);
 
-    const $$heading = $heading.enter()
+    // enter
+    const $$heading: D3EnterSelection = $heading
+      .enter()
       .append('div')
-      .attr('class', 'modal-section rapid-add-dataset-heading');
+      .attr('class', 'modal-section modal-heading');
 
-    const $$line1 = $$heading
-      .append('div');
-
-    $$line1
+    $$heading
       .append('div')
-      .attr('class', 'rapid-add-dataset-heading-icon')
+      .attr('class', 'modal-heading-icon')
       .call(uiIcon('#rapid-icon-data', 'icon-30'));
 
-    $$line1
-      .append('div')
-      .attr('class', 'rapid-add-dataset-heading-text');
-
+    $$heading
+      .append('h1')
+      .attr('class', 'modal-heading-text');
 
     // update
-    $heading = $heading.merge($$heading) as D3Selection;
+    $heading = $heading.merge($$heading);
 
-    $heading.selectAll('.rapid-add-dataset-heading-text')
+    $heading.selectAll('.modal-heading-text')
       .text(l10n.t(`${prefix}.heading`));
+
+
+    /* Fields section */
+    $content
+      .call(this.renderFields);
 
 
     /* Text section */
@@ -187,25 +199,25 @@ export class UiRapidAddDataset extends EventEmitter {
       .append('div')
       .attr('class', 'modal-section rapid-add-dataset-text');
 
-    $$textSection
-      .append('div')
-      .attr('class', 'instructions-file');
-
-    $$textSection
-      .append('input')
-      .attr('class', 'field-file')
-      .attr('type', 'file')
-      .attr('accept', accept.join())
-      .on('change', (d3_event: Event) => {
-        const files = (d3_event.target as HTMLInputElement).files;
-        if (files?.length) {
-          this._currFileList = files;
-          this._currUrl = '';
-          $textSection.select('.field-url').property('value', '');
-        } else {
-          this._currFileList = null;
-        }
-      });
+//    $$textSection
+//      .append('div')
+//      .attr('class', 'instructions-file');
+//
+//    $$textSection
+//      .append('input')
+//      .attr('class', 'field-file')
+//      .attr('type', 'file')
+//      .attr('accept', accept.join())
+//      .on('change', (d3_event: Event) => {
+//        const files = (d3_event.target as HTMLInputElement).files;
+//        if (files?.length) {
+//          this._currFileList = files;
+//          this._currUrl = '';
+//          $textSection.select('.field-url').property('value', '');
+//        } else {
+//          this._currFileList = null;
+//        }
+//      });
 
     $$textSection
       .append('div')
@@ -221,29 +233,28 @@ export class UiRapidAddDataset extends EventEmitter {
     // update
     $textSection = $textSection.merge($$textSection) as D3Selection;
 
-    const data_instructions = l10n.t(`${prefix}.instructions`);
-    const file_heading = l10n.t(`${prefix}.file.heading`);
-    const file_instructions = l10n.t(`${prefix}.file.instructions`);
-    const file_types = l10n.t(`${prefix}.file.types`);
-
-    const fileHtml = marked.parse(`
-${data_instructions}
-&nbsp;<br>
-&nbsp;<br>
-### ${file_heading}
-${file_instructions}
-* ${file_types}
-&nbsp;<br>
-&nbsp;<br>
-`);
-
-    $textSection.selectAll('.instructions-file')
-      .html(fileHtml as string);
-
-    $textSection.selectAll('.field-file')
-      .property('files', this._currFileList);  // works for all except IE11
-
-    const data_or = l10n.t(`${prefix}.or`);
+//     const data_instructions = l10n.t(`${prefix}.instructions`);
+//     const file_heading = l10n.t(`${prefix}.file.heading`);
+//     const file_instructions = l10n.t(`${prefix}.file.instructions`);
+//     const file_types = l10n.t(`${prefix}.file.types`);
+//     const fileHtml = marked.parse(`
+// ${data_instructions}
+// &nbsp;<br>
+// &nbsp;<br>
+// ### ${file_heading}
+// ${file_instructions}
+// * ${file_types}
+// &nbsp;<br>
+// &nbsp;<br>
+// `);
+//
+//    $textSection.selectAll('.instructions-file')
+//      .html(fileHtml as string);
+//
+//    $textSection.selectAll('.field-file')
+//      .property('files', this._currFileList);  // works for all except IE11
+//
+//    const data_or = l10n.t(`${prefix}.or`);
     const url_heading = l10n.t(`${prefix}.url.heading`);
     const url_instructions = l10n.t(`${prefix}.url.instructions`);
     const url_tokens = l10n.t(`${prefix}.url.tokens`);
@@ -253,8 +264,8 @@ ${file_instructions}
     const url_example_pmtiles = l10n.t(`${prefix}.url.example_pmtiles`);
     const example = l10n.t('example');
 
+//### ${ data_or }
     const urlHtml = marked.parse(`
-### ${data_or}
 ### ${url_heading}
 ${url_instructions}
 &nbsp;<br>
@@ -300,10 +311,120 @@ ${url_tokens}
     $buttons = $buttons.merge($$buttons) as D3Selection;
 
     $buttons.selectAll('.ok-button')
+      .classed('disabled', this._datasetIDClass === 'warning')
       .text(l10n.t('text.okay'));
 
     $buttons.selectAll('.cancel-button')
       .text(l10n.t('text.cancel'));
+  }
+
+
+  /**
+   * Renders the fields section.
+   * @param $selection - A d3-selection to a HTMLElement that this component should render itself into
+   */
+  public renderFields($selection: D3Selection): void {
+    const context = this.context;
+    const l10n = context.systems.l10n!;
+    const rapid = context.systems.rapid!;
+
+    const prefix = 'rapid_add_dataset';  // prefix for text strings
+    const fields = ['name', 'identifier'];
+
+    let $fields: D3Selection = $selection.selectAll('.rapid-add-dataset-fields')
+      .data([0]);
+
+    // enter
+    const $$fields: D3EnterSelection = $fields
+      .enter()
+      .append('div')
+      .attr('class', 'modal-section rapid-add-dataset-fields');
+
+    const $$rows = $$fields.selectAll('.dataset-field-row')
+      .data(fields)
+      .enter()
+      .append('div')
+      .attr('class', (d: string) => `dataset-field-row row-${d}`);
+
+    const $$wraps: D3EnterSelection = $$rows
+      .append('div')
+      .attr('class', 'dataset-field-wrap');
+
+    $$wraps
+      .append('label')
+      .attr('for', (d: string) => `dataset-field-${d}`)
+      .attr('class', 'dataset-field-label');
+
+    $$wraps
+      .append('input')
+      .attr('id', (d: string) => `dataset-field-${d}`)
+      .attr('class', 'dataset-field-input')
+      .call(utilNoAuto);
+
+    $$wraps
+      .append('div')
+      .attr('class', 'dataset-field-instruction');
+
+    $$wraps
+      .append('div')
+      .attr('class', 'dataset-field-feedback');
+
+    // Add special handling for the identifier field..
+    const $$identifier = $$fields.selectAll('.row-identifier .dataset-field-input');
+
+    // validate input
+    $$identifier
+      .attr('maxlength', 36)
+      .on('input', (e: InputEvent) => {
+        const el = e.currentTarget as HTMLInputElement;
+        const val = el.value;
+
+        if (val && rapid.catalog.has(val)) {
+          this._datasetID = null;
+          this._datasetIDClass = 'warning';
+          this._datasetIDStringID = `${prefix}.identifier.taken`;
+
+        } else if (val && !/^[\w\-]+$/.test(val)) {
+          this._datasetID = null;
+          this._datasetIDClass = 'warning';
+          this._datasetIDStringID = `${prefix}.identifier.invalid`;
+
+        } else {
+          this._datasetID = val;
+          this._datasetIDClass = null;
+          this._datasetIDStringID = null;
+        }
+
+        this.render();
+      });
+
+    // set focus on enter
+    const inputNode = $$identifier.node() as HTMLElement | null;
+    inputNode?.focus();
+
+
+    // update
+    $fields = $fields.merge($$fields);
+
+    $fields.selectAll('.dataset-field-label')
+      .text((d: string) => l10n.t(`${prefix}.${d}.label`));
+
+    $fields.selectAll('.dataset-field-input')
+      .attr('placeholder', (d: string) => l10n.t(`${prefix}.${d}.placeholder`));
+
+
+    $fields.selectAll('.row-identifier .dataset-field-input')
+      .classed('warning', this._datasetIDClass === 'warning');
+
+    $fields.selectAll('.row-identifier .dataset-field-instruction')
+      .text(l10n.t(`${prefix}.identifier.instruction`));
+
+    // U+26A0 U+FE0F = emoji warning
+    // U+00A0 = non breaking space &nbsp;  (we want the div always drawn, so layout doesn't jump around)
+    $fields.selectAll('.row-identifier .dataset-field-feedback')
+      .classed('warning', this._datasetIDClass === 'warning')
+      .text(this._datasetIDStringID ? '\u26a0\ufe0f ' + l10n.t(this._datasetIDStringID) : '\u00a0');
+
   }
 
 }

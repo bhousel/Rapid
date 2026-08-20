@@ -79,7 +79,7 @@ export class UiRapidDatasetToggle extends EventEmitter {
 
     this.Modal = new UiModal(context).show();
     this.Modal.$modal!
-      .attr('class', 'modal rapid-modal');
+      .attr('class', 'modal rapid-modal modal-dataset-toggle');
 
     // Handle the various ways of closing the modal ('X' button, Esc, OK Button, etc.)
     this.Modal.once('close', this._done);
@@ -269,7 +269,7 @@ export class UiRapidDatasetToggle extends EventEmitter {
     $addCustomOption = $addCustomOption.merge($$addCustomOption);
 
     $addCustomOption.selectAll('.rapid-feature-label')
-      .text(l10n.t('rapid_menu.add_custom_data'));
+      .text(l10n.t('rapid_menu.add_custom_dataset'));
 
     $addCustomOption.selectAll('.rapid-checkbox-label use')
       .attr('xlink:href', l10n.isRTL ? '#rapid-icon-backward' : '#rapid-icon-forward');

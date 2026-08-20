@@ -1471,8 +1471,8 @@
       }
     },
     "rapid_menu": {
-      "browse_data_catalog": "Browse Open Data Catalog",
-      "add_custom_data": "Add Custom Data",
+      "browse_data_catalog": "Browse Dataset Catalog",
+      "add_custom_dataset": "Add Custom Dataset",
       "center_map": "Center map here",
       "license": "License",
       "toggle_all": "Toggle all {rapidicon} data",
@@ -1540,7 +1540,7 @@
       }
     },
     "rapid_catalog": {
-      "heading": "Open Data Catalog",
+      "heading": "Dataset Catalog",
       "about_the_catalog": "These datasets have been provided as open data by various organizations for the purpose of improving OpenStreetMap.<br/>You can learn more by clicking the links below, or visiting [the Rapid Guide](https://github.com/facebookmicrosites/Open-Mapping-At-Facebook/wiki/Esri-ArcGIS-FAQ) or [Esri/ArcGIS dataset page on the OSM Wiki](https://wiki.openstreetmap.org/wiki/Esri/ArcGIS_Datasets).",
       "filter_datasets": "filter datasets",
       "any_type": "any type",
@@ -1569,11 +1569,16 @@
       }
     },
     "rapid_add_dataset": {
-      "heading": "Add Custom Data",
+      "heading": "Add Custom Dataset",
+      "name": {
+        "label": "Dataset Name",
+        "placeholder": "Choose a Dataset Name"
+      },
       "identifier": {
-        "label": "DatasetID",
-        "instructions": "Choose a DatasetID",
-        "help": "The DatasetID must be 36 characters or less, and use only letters, numbers, and dashes.",
+        "label": "Dataset ID",
+        "placeholder": "Choose a Dataset ID",
+        "instruction": "Must be 36 characters or less, and use only letters, numbers, and dashes.",
+        "invalid": "This DatasetID contains invalid characters.",
         "taken": "This DatasetID is already in use. Please choose another."
       },
       "instructions": "Custom map data can be added either of two ways:",

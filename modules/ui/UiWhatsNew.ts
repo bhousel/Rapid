@@ -3,7 +3,7 @@ import { icon } from './intro/helper.ts';
 import { UiModal } from './UiModal.ts';
 
 import type { Context } from '../Context.ts';
-import type { D3Selection } from 'd3-selection';
+import type { D3EnterSelection, D3Selection } from 'd3-selection';
 
 
 /**
@@ -34,17 +34,32 @@ export class UiWhatsNew {
     const l10n = context.systems.l10n!;
     const settings = context.systems.settings;
 
-    const modal = new UiModal(context).show();
+    const Modal = new UiModal(context).show();
     const rtl = l10n.isRTL ? '-rtl' : '';
 
-    modal.$modal!
+    Modal.$modal!
       .attr('class', 'modal rapid-modal modal-whatsnew');
 
-    const $content: D3Selection = modal.$content!;
-    $content
+    const $content: D3Selection = Modal.$content!;
+
+    /* Heading section */
+    let $heading: D3Selection = $content.selectAll('.modal-heading')
+      .data([0]);
+
+    // enter
+    const $$heading: D3EnterSelection = $heading
+      .enter()
       .append('div')
-      .attr('class', 'modal-section')
-      .append('h2')
+      .attr('class', 'modal-section modal-heading');
+
+    $$heading
+      .append('h1')
+      .attr('class', 'modal-heading-text');
+
+    // update
+    $heading = $heading.merge($$heading);
+
+    $heading.selectAll('.modal-heading-text')
       .html(l10n.t('splash.welcome', {
         rapidicon: icon(`#rapid-logo-rapid-wordmark${rtl}`, 'pre-text rapid'),
         version: `v${context.version}`
@@ -134,7 +149,7 @@ Big changes are coming soon to Rapid. including:
       .append('button')
       .attr('class', 'button ok-button action')
       .text(l10n.t('text.okay'))
-      .on('click', modal.close);
+      .on('click', Modal.close);
 
     const node = $okButton.node() as HTMLElement | null;
     node?.focus();

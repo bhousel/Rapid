@@ -4,7 +4,7 @@ import { utilSanitizeHTML } from '../util/sanitize.ts';
 import { utilSafeURL } from '../util/url.ts';
 
 import type { Context } from '../Context.ts';
-import type { D3EnterSelection, D3Selection } from 'd3-selection';
+import type { D3Selection } from 'd3-selection';
 
 
 /**

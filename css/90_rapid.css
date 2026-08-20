@@ -411,7 +411,8 @@ button.overture-inspector-close:hover {
 ------------------------------------------------------- */
 .modal.rapid-modal {
   top: 80px;
-  min-width: 650px;
+  width: 80%;
+  min-width: 200px;
   max-width: 650px;
   max-height: 85%;
   background: rgba(25, 25, 25, 0.9);
@@ -423,6 +424,10 @@ button.overture-inspector-close:hover {
   border: 1px solid #888a;
 }
 
+.modal.rapid-modal.wide {
+  max-width: 1000px;
+  min-height: 85%;
+}
 .modal.rapid-modal h1,
 .modal.rapid-modal h2,
 .modal.rapid-modal h3,
@@ -438,25 +443,22 @@ button.overture-inspector-close:hover {
 }
 
 .modal.rapid-modal .modal-section {
-  border-bottom: 1px solid #aaaa;
+  border-bottom: 1px solid #888a;
 }
 .modal.rapid-modal .modal-section:last-child {
   border-bottom: 0;
 }
-
 .modal.rapid-modal .modal-section .logo-rapid {
   fill: white;
   margin: 4px 9px 0 9px;
-}
-.modal.rapid-modal p {
-  font-size: 14px;
 }
 .modal.rapid-modal button.close {
   position: absolute;
   right: 0;
   top: 0;
   background: transparent;
-  height: 40px;
+  height: 60px;
+  padding-bottom: 5px;
   border-radius: 0;
 }
 .ideditor[dir='rtl'] .modal.rapid-modal button.close {
@@ -470,6 +472,48 @@ button.overture-inspector-close:hover {
 .modal.rapid-modal button.close:hover {
   background: #8885;
 }
+
+.modal.rapid-modal .modal-heading {
+  display: flex;
+  flex-flow: row nowrap;
+  flex: 1;
+  align-items: center;
+  padding: 10px;
+  color: #fff;
+  width: 100%;
+}
+.modal.rapid-modal .modal-heading-icon {
+  flex: 0 0 40px;
+  padding: 0 5px;
+}
+.modal.rapid-modal .modal-heading-text {
+  flex: 1 1 auto;
+  font-size: 24px;
+  padding: 0 10px;
+}
+
+.modal.rapid-modal .modal-actions > button {
+  width: 100%;
+  margin: 20px;
+}
+
+/* Dark scrollbars */
+.modal.rapid-modal ::-webkit-scrollbar {
+  width: 8px;
+}
+.modal.rapid-modal ::-webkit-scrollbar-track {
+  background: #444;
+}
+.modal.rapid-modal ::-webkit-scrollbar-thumb {
+  background-color: #da26d3;
+  border-radius: 6px;
+  border: 0;
+}
+.modal.rapid-modal ::-webkit-scrollbar-thumb:hover {
+  background-color: #c6d;
+  cursor: pointer;
+}
+
 
 /* Splash, Whats New, Login to OSM
 ------------------------------------------------------- */
@@ -492,32 +536,33 @@ button.overture-inspector-close:hover {
   width: 60px;
   margin: 0 2px;
 }
-.modal.rapid-modal .modal-actions > button {
-  width: 100%;
-  margin: 20px;
-}
+
 .modal.rapid-modal.modal-splash .modal-actions > button {
   height: unset;  /* big buttons */
   padding: 10px;
+}
+
+.modal.rapid-modal.modal-whatsnew p {
+  font-size: 14px;
+}
+.modal.rapid-modal.modal-whatsnew .modal-heading-text {
+  font-weight: bold;  /* bold text looks closer to the "Rapid" logo wordmark text */
 }
 .modal.rapid-modal.modal-whatsnew .modal-actions > button {
   height: 50px;
   width: 25%;
   min-height: unset;
 }
-
 .modal.rapid-modal.modal-whatsnew .whatsnew-images {
   margin-top: 20px;
   display: flex;
   justify-content: space-around;
   width: 100%;
 }
-
 .modal.rapid-modal.modal-whatsnew .whatsnew-image {
   max-height: 350px;
   align-items: center;
 }
-
 .modal.rapid-modal.modal-whatsnew .whatsnew-dontshow {
   margin-top: 20px;
   font-size: 16px;
@@ -536,26 +581,13 @@ button.overture-inspector-close:hover {
   flex: 0 0 36px;
 }
 
-/* Dark scrollbars */
-.modal.rapid-modal ::-webkit-scrollbar {
-  width: 8px;
-}
-.modal.rapid-modal ::-webkit-scrollbar-track {
-  background: #444;
-}
-.modal.rapid-modal ::-webkit-scrollbar-thumb {
-  background-color: #da26d3;
-  border-radius: 6px;
-  border: 0;
-}
-.modal.rapid-modal ::-webkit-scrollbar-thumb:hover {
-  background-color: #c6d;
-  cursor: pointer;
-}
 
-
-/* Rapid Menu (Add/remove datasets)
+/* Rapid Menu (Dataset Toggle)
 ------------------------------------------------------- */
+.modal.rapid-modal.modal-dataset-toggle button.close {
+  height: 45px;
+}
+
 .rapid-checkbox {
   font-size: 20px;
   display: flex;
@@ -763,36 +795,36 @@ hide this one and style something on top of it.  */
 
 /* Rapid Poweruser features
 ------------------------------------------------------- */
-.poweruser .modal-section-heading {
+.modal-poweruser .modal-section-heading {
   display: flex;
   flex-flow: column;
   padding: 10px 20px;
   width: 100%;
 }
-
-.poweruser .modal-section-heading h3 {
-  font-size: 24px
+.modal-poweruser .modal-heading-icon .beta {
+  width: 40px;
+  height: 40px;
+  font-size: 22px;
 }
-.poweruser .modal-heading-desc {
-  font-size: 16px;
+.modal-poweruser .modal-heading-desc {
+  font-size: 14px;
   font-style: italic;
 }
-.poweruser .modal-heading-desc .smile {
+.modal-poweruser .modal-heading-desc .smile {
   font-style: normal;
   margin: 0 10px;
 }
-.poweruser .rapid-features-container {
+.modal-poweruser .rapid-features-container {
   width: 100%;
   border-top: 1px solid #888a;
 }
-.poweruser .rapid-features-container > .rapid-checkbox:last-of-type {
+.modal-poweruser .rapid-features-container > .rapid-checkbox:last-of-type {
   padding-bottom: 15px;
 }
-.poweruser .rapid-features-container .rapid-feature-label {
+.modal-poweruser .rapid-features-container .rapid-feature-label {
   margin: 0 5px;
 }
-
-.poweruser .rapid-features-container .rapid-feature-description {
+.modal-poweruser .rapid-features-container .rapid-feature-description {
   font-size: 14px;
   font-style: italic;
   margin: -5px 5px 5px 5px;
@@ -800,14 +832,8 @@ hide this one and style something on top of it.  */
 }
 
 
-/* Dataset Catalog (secondary modal)
+/* Dataset Catalog
 ------------------------------------------------------- */
-.modal.rapid-modal.modal-catalog {
-  width: 80%;
-  min-width: 675px;   /* should be wider than .rapid-modal */
-  max-width: 1000px;
-  min-height: 85%;
-}
 .modal.rapid-modal.modal-catalog p {
   font-size: 12px;
   padding-bottom: unset;
@@ -821,31 +847,7 @@ hide this one and style something on top of it.  */
   padding: 0;
 }
 
-.modal-catalog .modal-section.rapid-catalog-header {
-  display: flex;
-  flex-flow: column nowrap;
-  padding: 10px 20px;
-  border-bottom: 1px solid #aaaa;
-  color: #fff;
-}
-.modal-catalog .modal-section.rapid-catalog-header > div {
-  display: flex;
-  flex: 1;
-  width: 100%;
-  align-items: center;
-}
-
-.rapid-catalog-header-icon,
-.rapid-add-dataset-heading-icon {
-  flex: 0 0 40px;
-}
-.rapid-catalog-header-text,
-.rapid-add-dataset-heading-text {
-  flex: 1 1 auto;
-  font-size: 24px;
-  padding: 0 5px;
-}
-.rapid-catalog-header-about {
+.rapid-catalog-heading-about {
   color: #ddd;
 }
 
@@ -853,7 +855,6 @@ hide this one and style something on top of it.  */
   display: flex;
   flex-flow: row nowrap;
   padding: 10px 20px;
-  border-bottom: 1px solid #aaaa;
   color: #fff;
 }
 .rapid-catalog-filter-search-wrap,
@@ -1000,9 +1001,14 @@ img.rapid-catalog-dataset-thumbnail.inverted {
   margin-bottom: 3px;
 }
 
-.dataset-categories {
+.rapid-catalog-dataset-snippet {
+  font-size: 11px;
+  line-height: 1.5;
+}
+.rapid-catalog-dataset-categories {
   display: flex;
   flex-flow: row wrap;
+  margin-bottom: 5px
 }
 .dataset-category {
   display: inline-block;
@@ -1039,50 +1045,42 @@ img.rapid-catalog-dataset-thumbnail.inverted {
 }
 
 
-/* Add Custom Dataset (secondary modal)
+/* Add Custom Dataset
 ------------------------------------------------------- */
-.modal.rapid-modal.modal-add-dataset {
-  width: 80%;
-  min-width: 675px;   /* should be wider than .rapid-modal */
-  max-width: 675px;
-}
-
 .modal.rapid-modal.modal-add-dataset p {
   font-size: 12px;
   padding-bottom: unset;
 }
 
-.modal-add-dataset .modal-section {
-  display: flex;
-  flex-flow: row nowrap;
-  align-items: center;
-  width: 100%;
-  padding: 0;
-}
-
-.modal-add-dataset .modal-section.rapid-add-dataset-heading {
+.modal-add-dataset .modal-section.rapid-add-dataset-fields {
   display: flex;
   flex-flow: column nowrap;
   padding: 10px 20px;
-  border-bottom: 1px solid #aaaa;
+}
+.modal-add-dataset .dataset-field-row {
+  display: flex;
+  flex-flow: row nowrap;
+}
+.modal-add-dataset .dataset-field-row {
+  margin-bottom: 10px;
+}
+.modal-add-dataset .dataset-field-wrap {
+  width: 100%;
+}
+.modal-add-dataset label.dataset-field-label {
+  display: block;
+  font-size: 16px;
+  font-weight: bold;
   color: #fff;
 }
-
-.modal-add-dataset .modal-section.rapid-add-dataset-heading > div {
-  display: flex;
-  flex: 1;
-  width: 100%;
-  align-items: center;
+.modal-add-dataset input.dataset-field-input {
+  display: block;
+  padding: 2px 5px;
+  width: 300px;
 }
-
-.modal-add-datset .rapid-add-dataset-heading-icon {
-  flex: 0 0 40px;
-}
-
-.modal-add-datset .rapid-add-dataset-heading-text {
-  flex: 1 1 auto;
-  font-size: 24px;
-  padding: 0 5px;
+.modal-add-dataset input.dataset-field-input.warning {
+  border-color: #fb2;
+  background-color: #ffc;
 }
 
 .modal-add-dataset .rapid-add-dataset-text {
@@ -1090,7 +1088,6 @@ img.rapid-catalog-dataset-thumbnail.inverted {
   align-items: flex-start;
   padding: 20px;
 }
-
 .modal-add-dataset .instructions-url {
   padding: 20px 0;
 }
@@ -1099,38 +1096,19 @@ img.rapid-catalog-dataset-thumbnail.inverted {
   width: 100%;
 }
 
-/* Dataset Settings (secondary modal)
+.modal-add-dataset .dataset-field-feedback.warning {
+  color: #f90;
+}
+
+/* Dataset Settings
 ------------------------------------------------------- */
-.modal-catalog .modal-section.dataset-settings-header {
-  display: flex;
-  flex-flow: row nowrap;
-  flex: 1;
-  align-items: center;
-  padding: 10px;
-  border-bottom: 1px solid #aaaa;
-  color: #fff;
-  width: 100%;
-}
-
-.dataset-settings-header-icon {
-  flex: 0 0 40px;
-  padding: 0 5px;
-}
-
-.dataset-settings-header-text {
-  flex: 1 1 auto;
-  font-size: 24px;
-  padding: 0 10px;
-}
-
-.modal-catalog .modal-section.dataset-settings-wrap {
+.modal-dataset-settings .modal-section.dataset-settings-wrap {
   display: flex;
   flex-flow: row wrap;
-  border-bottom: 1px solid #aaaa;
   color: #fff;
 }
 
-.dataset-details {
+.modal-dataset-settings .dataset-details {
   display: flex;
   flex: 0 0 60%;
   flex-flow: column nowrap;
@@ -1138,7 +1116,7 @@ img.rapid-catalog-dataset-thumbnail.inverted {
   padding: 20px;
 }
 
-.dataset-details-row {
+.modal-dataset-settings .dataset-details-row {
   display: flex;
   flex-flow: row nowrap;
   flex: 0;
@@ -1146,14 +1124,14 @@ img.rapid-catalog-dataset-thumbnail.inverted {
   justify-content: flex-start;
 }
 
-.dataset-details-label {
+.modal-dataset-settings .dataset-details-label {
   display: flex;
   flex: 0 0 100px;
   flex-flow: row nowrap;
   font-weight: bold;
 }
 
-.dataset-details-value {
+.modal-dataset-settings .dataset-details-value {
   display: flex;
   flex: 1 0 65%;
   flex-flow: row nowrap;
@@ -1161,11 +1139,11 @@ img.rapid-catalog-dataset-thumbnail.inverted {
   word-wrap: break-word;
   word-break: break-word;     /* break URL if needed */
 }
-.dataset-details-value.disabled {
+.modal-dataset-settings .dataset-details-value.disabled {
   color: #aaa;
 }
 
-.dataset-thumbnail {
+.modal-dataset-settings .dataset-thumbnail {
   display: flex;
   flex: 0 0 40%;
   flex-flow: column nowrap;
@@ -1173,8 +1151,8 @@ img.rapid-catalog-dataset-thumbnail.inverted {
   padding: 20px;
 }
 
-.dataset-conflation,
-.dataset-dictionary {
+.modal-dataset-settings .dataset-conflation,
+.modal-dataset-settings .dataset-dictionary {
   flex: 0 0 100%;
   display: flex;
   flex-flow: column nowrap;

@@ -68,9 +68,7 @@ export class UiRapidPowerUserFeatures extends EventEmitter {
     this.Modal = new UiModal(context).show();
 
     this.Modal.$modal!
-      .attr('class', 'modal rapid-modal');
-    this.Modal.$content!
-      .attr('class', 'content poweruser');
+      .attr('class', 'modal rapid-modal modal-poweruser');
 
     // Handle the various ways of closing the modal ('X' button, Esc, OK Button, etc.)
     this.Modal.once('close', this._done);
@@ -121,19 +119,28 @@ export class UiRapidPowerUserFeatures extends EventEmitter {
     const $content = this.Modal.$content!;   // legacy render body, typed loosely
 
     /* Heading */
-    let $heading: D3Selection = $content.selectAll('.modal-section-heading')
+    let $heading: D3Selection = $content.selectAll('.modal-heading')
       .data([0]);
 
     // enter
     const $$heading: D3EnterSelection = $heading.enter()
       .append('div')
-      .attr('class', 'modal-section-heading');
+      .attr('class', 'modal-section modal-heading');
 
     $$heading
-      .append('h3')
-      .attr('class', 'modal-heading');
+      .append('div')
+      .attr('class', 'modal-heading-icon')
+      .append('div')
+      .attr('class', 'beta');
 
-    const $$description: D3EnterSelection = $$heading
+    const $$headingText: D3EnterSelection = $$heading
+      .append('div')
+      .attr('class', 'modal-heading-text');
+
+    $$headingText
+      .append('h1');
+
+    const $$description: D3EnterSelection = $$headingText
       .append('div')
       .attr('class', 'modal-heading-desc');
 
@@ -149,7 +156,7 @@ export class UiRapidPowerUserFeatures extends EventEmitter {
     // update
     $heading = $heading.merge($$heading);
 
-    $heading.selectAll('.modal-heading')
+    $heading.selectAll('.modal-heading h1')
       .text(l10n.t('rapid_poweruser.heading.label'));
 
     $heading.selectAll('.modal-heading-desc-text')

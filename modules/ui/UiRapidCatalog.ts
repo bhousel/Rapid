@@ -72,7 +72,7 @@ export class UiRapidCatalog extends EventEmitter {
 
     this.Modal = new UiModal(context).show();
     this.Modal.$modal!
-      .attr('class', 'modal rapid-modal modal-catalog');
+      .attr('class', 'modal rapid-modal wide modal-catalog');
 
     // Handle the various ways of closing the modal ('X' button, Esc, OK Button, etc.)
     this.Modal.once('close', this._done);
@@ -115,43 +115,40 @@ export class UiRapidCatalog extends EventEmitter {
     const l10n = context.systems.l10n!;
     const $content = this.Modal.$content!;
 
-    /* Header section */
-    let $header: D3Selection = $content.selectAll('.rapid-catalog-header')
+    /* Heading section */
+    let $heading: D3Selection = $content.selectAll('.modal-heading')
       .data([0]);
 
-    const $$header: D3EnterSelection = $header.enter()
+    const $$heading: D3EnterSelection = $heading.enter()
       .append('div')
-      .attr('class', 'modal-section rapid-catalog-header');
+      .attr('class', 'modal-section modal-heading');
 
-    const $$line1: D3EnterSelection = $$header
-      .append('div');
-
-    $$line1
+    $$heading
       .append('div')
-      .attr('class', 'rapid-catalog-header-icon')
+      .attr('class', 'modal-heading-icon')
       .call(uiIcon('#rapid-icon-data', 'icon-30'));
 
-    $$line1
+    const $$headingText: D3EnterSelection = $$heading
       .append('div')
-      .attr('class', 'rapid-catalog-header-text');
+      .attr('class', 'modal-heading-text');
 
-    const $$line2: D3EnterSelection = $$header
-      .append('div');
+    $$headingText
+      .append('h1');
 
-    $$line2
+    $$headingText
       .append('div')
-      .attr('class', 'rapid-catalog-header-about');
+      .attr('class', 'rapid-catalog-heading-about');
 
     // update
-    $header = $header.merge($$header);
+    $heading = $heading.merge($$heading);
 
-    $header.selectAll('.rapid-catalog-header-text')
+    $heading.selectAll('.modal-heading-text h1')
       .text(l10n.t('rapid_catalog.heading'));
 
-    $header.selectAll('.rapid-catalog-header-about')
+    $heading.selectAll('.rapid-catalog-heading-about')
       .html(utilSanitizeHTML(marked.parse(l10n.t('rapid_catalog.about_the_catalog')) as string));
 
-    $header.selectAll('.rapid-catalog-header-about a')
+    $heading.selectAll('.rapid-catalog-heading-about a')
       .attr('target', '_blank');   // make sure the markdown links go to a new page
 
 
@@ -382,7 +379,7 @@ export class UiRapidCatalog extends EventEmitter {
 
     const $$categories: D3EnterSelection = $$label
       .append('div')
-      .attr('class', 'dataset-categories');
+      .attr('class', 'rapid-catalog-dataset-categories');
 
     $$categories.selectAll('.dataset-category')
       .data((d: RapidDataset) => {

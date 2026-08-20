@@ -87,7 +87,7 @@ export class UiRapidDatasetSettings extends EventEmitter {
 
     this.Modal = new UiModal(context).show();
     this.Modal.$modal!
-      .attr('class', 'modal rapid-modal modal-catalog');
+      .attr('class', 'modal rapid-modal wide modal-dataset-settings');
 
     // Handle the various ways of closing the modal ('X' button, Esc, OK Button, etc.)
     this.Modal.once('close', this._done);
@@ -138,28 +138,28 @@ export class UiRapidDatasetSettings extends EventEmitter {
     const ds = this.dataset;
     if (!ds) return;   // need a dataset to do anything
 
-    /* Header section */
-    let $header: D3Selection = $content.selectAll('.dataset-settings-header')
+    /* Heading section */
+    let $heading: D3Selection = $content.selectAll('.modal-heading')
       .data([0]);
 
-    const $$header: D3EnterSelection = $header
+    const $$heading: D3EnterSelection = $heading
       .enter()
       .append('div')
-      .attr('class', 'modal-section dataset-settings-header');
+      .attr('class', 'modal-section modal-heading');
 
-    $$header
+    $$heading
       .append('div')
-      .attr('class', 'dataset-settings-header-icon')
+      .attr('class', 'modal-heading-icon')
       .call(uiIcon('#fas-gear', 'icon-30'));
 
-    $$header
+    $$heading
       .append('h1')
-      .attr('class', 'dataset-settings-header-text');
+      .attr('class', 'modal-heading-text');
 
     // update
-    $header = $header.merge($$header);
+    $heading = $heading.merge($$heading);
 
-    $header.selectAll('.dataset-settings-header-text')
+    $heading.selectAll('.modal-heading-text')
       .text(l10n.t('rapid_dataset_settings.heading'));
 
 
@@ -240,7 +240,7 @@ export class UiRapidDatasetSettings extends EventEmitter {
       .append('h3')
       .attr('class', 'dataset-details-heading');
 
-    const $$identifier = $$details
+    const $$identifier: D3EnterSelection = $$details
       .append('div')
       .attr('class', 'dataset-details-row');
     $$identifier
@@ -250,7 +250,7 @@ export class UiRapidDatasetSettings extends EventEmitter {
       .append('div')
       .attr('class', 'dataset-details-value identifier-value');
 
-    const $$source = $$details
+    const $$source: D3EnterSelection = $$details
       .append('div')
       .attr('class', 'dataset-details-row');
     $$source
@@ -260,7 +260,7 @@ export class UiRapidDatasetSettings extends EventEmitter {
       .append('div')
       .attr('class', 'dataset-details-value source-value');
 
-    const $$name = $$details
+    const $$name: D3EnterSelection = $$details
       .append('div')
       .attr('class', 'dataset-details-row');
     $$name
@@ -270,7 +270,7 @@ export class UiRapidDatasetSettings extends EventEmitter {
       .append('div')
       .attr('class', 'dataset-details-value name-value');
 
-    const $$description = $$details
+    const $$description: D3EnterSelection = $$details
       .append('div')
       .attr('class', 'dataset-details-row');
     $$description
@@ -280,7 +280,7 @@ export class UiRapidDatasetSettings extends EventEmitter {
       .append('div')
       .attr('class', 'dataset-details-value description-value');
 
-    const $$url = $$details
+    const $$url: D3EnterSelection = $$details
       .append('div')
       .attr('class', 'dataset-details-row');
     $$url
@@ -290,7 +290,7 @@ export class UiRapidDatasetSettings extends EventEmitter {
       .append('div')
       .attr('class', 'dataset-details-value url-value');
 
-    const $$conflation = $$details
+    const $$conflation: D3EnterSelection = $$details
       .append('div')
       .attr('class', 'dataset-details-row');
     $$conflation
