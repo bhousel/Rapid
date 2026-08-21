@@ -7,7 +7,7 @@ import type { D3Selection } from 'd3-selection';
 
 
 /**
- * This component adds the validator status control to the footer.
+ * `UiValidatorStatus` adds the validation badges and counts to the footer section.
  * (was named "issues_info")
  */
 export class UiValidatorStatus {

@@ -7,7 +7,7 @@ import type { D3Selection } from 'd3-selection';
 
 
 /**
- * The Attribution compnoent shows attribution for the imagery layers.
+ * `UiAttribution` shows attribution for the imagery layers.
  */
 export class UiAttribution {
   public context: Context;

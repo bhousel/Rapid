@@ -5,7 +5,7 @@ import type { D3Selection } from 'd3-selection';
 
 
 /**
- * The `UiCommitWarnings` renders the list of validation errors and warnings
+ * `UiCommitWarnings` renders the list of validation errors and warnings
  * shown in the commit sidebar. Call `.render($selection)` to draw it.
  */
 export class UiCommitWarnings {

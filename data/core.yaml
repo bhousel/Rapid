@@ -51,6 +51,7 @@ en:
     name:
       one: Name
       other: Names
+    next: Next
     node:
       one: Node
       other: Nodes
@@ -59,6 +60,7 @@ en:
       one: Note
       other: Notes
     okay: OK
+    previous: Previous
     relation:
       one: Relation
       other: Relations
@@ -622,21 +624,26 @@ en:
       select_from: "Click to select a {from} segment"
       select_from_name: "Click to select {from} {fromName}"
       toggle: "Click for \"{turn}\""
+
   undo:
     title: Undo
     tooltip: "Undo: {action}"
     nothing: Nothing to undo.
+
   redo:
     title: Redo
     tooltip: "Redo: {action}"
     nothing: Nothing to redo.
+
   tooltip_keyhint: "Key:"
+
   translate:
     translate: Add multilingual name
     localized_translation_label: Multilingual Name
     localized_translation_language: Choose language
     localized_translation_name: Name
     language_and_code: "{language} ({code})"
+
   zoom_in_edit: Zoom in to edit
   login: Log In
   logout: Log Out
@@ -648,6 +655,7 @@ en:
     hidden_warning:
       one: "{count} hidden feature"
       other: "{count} hidden features"
+
   status:
     message:
       error: Unable to reach the OpenStreetMap API. Your edits are safe locally. Check your network connection.
@@ -1087,8 +1095,6 @@ en:
     conflict:
       header: Resolve conflicting edits
       count: 'Conflict {num} of {total}'
-      previous: '< Previous'
-      next: 'Next >'
       keep_local: Keep mine
       keep_remote: Use theirs
       restore: Restore
@@ -1133,11 +1139,13 @@ en:
     privacy: "By using this software, you agree to do so in accordance with the [Rapid privacy policy](https://github.com/facebook/Rapid/blob/main/PRIVACY.md)."  # This string may contain markdown
     walkthrough: Start the Tutorial
     start: "Edit now"
+
   whats_new:
     text_v24: "This release improves Rapid's text localization, and makes it easier to work with street-level data like Mapillary. Now you can inspect detected objects, such as traffic signs, crosswalks, bike racks, and more!\n\nFor all the details check out our [changelog](https://github.com/facebook/Rapid/blob/main/CHANGELOG.md#whats-new) and [issue tracker](https://github.com/facebook/Rapid/issues) on GitHub. Happy Mapping! 👍" # This string may contain markdown
     text_v25: "This release includes a new validation to make mapping curbs easier, new datasets in the data catalog, and upgrades to the renderer for better performance." # This string may contain markdown
     project_links: "For all the details check out our [changelog](https://github.com/facebook/Rapid/blob/main/CHANGELOG.md#whats-new) and [issue tracker](https://github.com/facebook/Rapid/issues) on GitHub. Happy Mapping! 👍" # This string may contain markdown
     dontshowagain: "Hide this screen until the next version"
+
   source_switch:
     dev: dev
     live: live
@@ -1291,11 +1299,6 @@ en:
 
   version:
     whats_new: "What's new in Rapid {version}"
-
-  tag_reference:
-    description: Description
-    on_wiki: "{tag} on wiki.osm.org"
-    used_with: "used with {type}"
 
   zoom:
     in: Zoom In

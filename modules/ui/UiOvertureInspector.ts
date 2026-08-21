@@ -10,7 +10,7 @@ const OVERTURE_CYAN = '#00ffff';
 
 
 /**
- * The OvertureInspector is a UI component for viewing Overture Entities in the sidebar.
+ * `UiOvertureInspector` is a UI component for viewing Overture Entities in the sidebar.
  * Because Overture entities conform to a certain schema, we might at some point build a JSON-Schema-aware
  * version of this code that modifies the display of the data.
  *

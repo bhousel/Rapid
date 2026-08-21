@@ -6,8 +6,9 @@ import type { D3Selection } from 'd3-selection';
 
 
 /**
- * A standalone `svg` and `defs` to contain the icon spritesheets for the user interface.
- * It is attached to the main rapid container so the icons can be used anywhere.
+ * `UiDefs` renders a standalone `svg` and `defs` to contain the icon spritesheets
+ * used throughout the user interface.  It is attached to the main rapid container
+ * so the icons can be used anywhere.
  *
  * @example
  *  <svg id='#rapid-defs'>

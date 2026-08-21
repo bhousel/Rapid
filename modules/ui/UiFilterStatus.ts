@@ -7,7 +7,7 @@ import type { D3Selection } from 'd3-selection';
 
 
 /**
- * This component adds the filter status control to the footer.
+ * `UiFilterStatus` adds the filtering badge and counts to the footer section.
  * (was named "feature_info")
  */
 export class UiFilterStatus {

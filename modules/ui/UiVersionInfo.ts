@@ -7,10 +7,9 @@ import type { D3EnterSelection, D3Selection } from 'd3-selection';
 
 
 /**
- * This component adds a link that shows the current version of Rapid
- *  and links to the Rapid changelog.
- * It will also display a "new version" badge (gift icon) when the user has
- *  previously used a different version of Rapid.
+ * `UiVersionInfo` renders the current version of Rapid and link to the Rapid
+ * changelog in the footer. It will also display a "new version" badge (gift icon)
+ * when the user has previously used a different version of Rapid.
  */
 export class UiVersionInfo {
   public context: Context;

@@ -6,7 +6,7 @@ import type { D3Selection } from 'd3-selection';
 
 
 /**
- * This component displays a status message in a bar across the bottom of the map,
+ * `UiApiStatus` displays a status message in a bar across the bottom of the map,
  * for example with the OSM API is unavailable.
  */
 export class UiApiStatus {

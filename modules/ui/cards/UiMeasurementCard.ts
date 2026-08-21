@@ -40,9 +40,8 @@ function asLineString(feature: any): any {
 }
 
 
-
 /**
- * The `UiMeasurementCard` shows measurements (length, area, distance, coordinates) for the selection.
+ * `UiMeasurementCard` shows measurements (length, area, distance, coordinates) for the selection.
  */
 export class UiMeasurementCard extends AbstractUiCard {
   public id: string;

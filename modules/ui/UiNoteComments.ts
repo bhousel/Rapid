@@ -16,7 +16,7 @@ interface NoteComment {
 
 
 /**
- * The `UiNoteComments` renders the comment thread for an OSM Note (with avatars).
+ * `UiNoteComments` renders the comment thread for an OSM Note (with avatars).
  * Set the note to display via the public `datum` property, then call `.render($parent)`.
  */
 export class UiNoteComments {

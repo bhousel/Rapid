@@ -8,7 +8,8 @@ import type { UiField } from './UiField.ts';
 
 
 /**
- * Renders a list of shown fields, plus a "more fields" combobox for adding hidden ones.
+ * `UiFormFields` renders the fields section of the sidebar,
+ * also a "more fields" combobox for adding additional fields.
  */
 export class UiFormFields {
   public context: Context;

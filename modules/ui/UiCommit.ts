@@ -37,7 +37,7 @@ const hashtagRegex = /(#[^\u2000-\u206F\u2E00-\u2E7F\s\\'!"#$%()*,.\/:;<=>?@\[\]
 
 
 /**
- * The `UiCommit` renders the commit/upload sidebar: changeset editor, warnings,
+ * `UiCommit` renders the commit/upload sidebar: changeset editor, warnings,
  * upload explanation, request-review checkbox, save/cancel buttons, raw tag
  * editor, and change summary. Call `.render($selection)` to draw it. Emits
  * `cancel` when the user cancels.

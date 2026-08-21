@@ -10,7 +10,7 @@ import type { Preset } from '../lib/Preset.ts';
 
 
 /**
- * The Inspector is a UI component for viewing/editing OSM Entities in the sidebar.
+ * `UiInspector` is the component for viewing/editing OSM Entities in the sidebar.
  * It consists of two divs that can slide side to side (only one will be visible at a time).
  * (The order may be swapped depending on `l10n.isRTL`)
  *

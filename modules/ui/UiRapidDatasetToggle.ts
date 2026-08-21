@@ -16,7 +16,7 @@ import type { RapidDataset } from '../lib/RapidDataset.ts';
 
 
 /**
- * This is the Modal where the user can toggle on and off datasets.
+ * `UiRapidDatasetToggle` is a Modal control where the user can toggle on and off datasets.
  * It is shown by clicking the main "Rapid" button in the top menu.
  *
  * Events available:

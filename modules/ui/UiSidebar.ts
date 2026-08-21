@@ -27,7 +27,7 @@ const DEFAULT_WIDTH = 400;  // needs to match the flex-basis in our css file
 
 
 /**
- * The Sidebar is positioned to the side of the map and can show various information.
+ * `UiSidebar` is positioned to the side of the map and can show various information.
  * It can appear either on the left or right side of the map (depending on `l10n.isRTL`)
  * While editing and interacting with the map, the sidebar will control which child
  * component is visible.

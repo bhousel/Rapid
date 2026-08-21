@@ -17,7 +17,7 @@ let _tooltipID = 0;
 
 
 /**
- * The `UiTooltip` component attaches a hover/focus tooltip to one or more anchor elements.
+ * `UiTooltip` attaches a hover/focus tooltip to one or more anchor elements.
  * Tooltips position themselves relative to their anchor and show on hover or focus
  * (see `displayType`). A parent owns the instance, configures it with the fluent setters
  * (`.title()`, `.heading()`, `.shortcut()`, `.placement()`, …), then attaches it via

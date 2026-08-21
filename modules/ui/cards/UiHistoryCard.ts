@@ -10,7 +10,7 @@ import type { D3Selection } from 'd3-selection';
 
 
 /**
- * The `UiHistoryCard` shows OSM edit history details for the selected entity or note.
+ * `UiHistoryCard` shows OSM edit history details for the selected entity or note.
  */
 export class UiHistoryCard extends AbstractUiCard {
   public id: string;

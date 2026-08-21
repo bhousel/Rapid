@@ -15,7 +15,7 @@ export class UiIntroStartEditing extends AbstractIntroChapter {
 
   /**
    * @param context - Global shared application context
-   * @param curtain - The `UiCurtain` used to reveal parts of the UI during the walkthrough
+   * @param curtain - `UiCurtain` used to reveal parts of the UI during the walkthrough
    */
   public constructor(context: Context, curtain: UiCurtain) {
     super(context, curtain);

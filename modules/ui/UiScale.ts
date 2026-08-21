@@ -9,7 +9,7 @@ const TICKHEIGHT = 8;
 
 
 /**
- * This component adds the scale bar.
+ * `UiScale` renders the scale bar into the footer.
  */
 export class UiScale {
   public context: Context;

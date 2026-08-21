@@ -6,8 +6,7 @@ import type { D3Selection } from 'd3-selection';
 
 
 /**
- * Spector.js is a WebGL debugging tool
- * This is just a wrapper for the Spector.js debugger
+ * `UiSpector` is a wrapper for the `Spector.js` WebGL debugging tool.
  * Is is only available on the development build of Rapid.
  */
 export class UiSpector {

@@ -12,7 +12,7 @@ import type { KeepRightIssue } from '../services/KeepRightService.ts';
 
 
 /**
- * The `UiKeepRightEditor` renders the sidebar editor for a KeepRight QA issue
+ * `UiKeepRightEditor` renders the sidebar editor for a KeepRight QA issue
  * (header, details, comment + action buttons). Set the issue via the public `datum`
  * property, then call `.render($parent)`. Emits `change` when the issue is updated.
  */

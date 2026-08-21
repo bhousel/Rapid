@@ -13,7 +13,7 @@ import type { OsmNote } from '../services/OsmService.ts';
 
 
 /**
- * The `UiNoteEditor` renders the sidebar editor for an OSM Note (header, comments,
+ * `UiNoteEditor` renders the sidebar editor for an OSM Note (header, comments,
  * comment/status actions, report link). Set the note via the public `datum` property
  * (and `newNote` to autofocus a fresh note), then call `.render($parent)`.
  * Emits `change` when the note is created/updated/cancelled.

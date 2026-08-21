@@ -32,7 +32,7 @@ function getActionColor(action: string): string {
 
 
 /**
- * The `UiMapRouletteEditor` renders the sidebar editor for a MapRoulette task
+ * `UiMapRouletteEditor` renders the sidebar editor for a MapRoulette task
  * (header, details, action buttons, comment + submit). Set the task via the public
  * `datum` property, then call `.render($parent)`. Emits `change` when the task is updated.
  */

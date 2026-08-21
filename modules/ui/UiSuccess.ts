@@ -50,7 +50,7 @@ const MAXEVENTS = 2;
 
 
 /**
- * The `UiSuccess` renders the "just edited" success screen shown after a save,
+ * `UiSuccess` renders the "just edited" success screen shown after a save,
  * including a changeset summary and OSM community links. Set the changeset via the
  * public `changeset()` setter (and optionally `location()`), then call `.render($selection)`.
  * Emits `cancel` when the user closes the screen.

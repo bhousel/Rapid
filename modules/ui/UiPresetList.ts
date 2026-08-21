@@ -18,7 +18,7 @@ const MAXSEARCH = 50;   // how many search results to show
 
 
 /**
- * The `UiPresetList` renders a searchable list of Presets/Categories that the user can
+ * `UiPresetList` renders a searchable list of Presets/Categories that the user can
  * choose from to assign a feature type to the selected entities.
  */
 export class UiPresetList extends EventEmitter {

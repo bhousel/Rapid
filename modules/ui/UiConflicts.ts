@@ -34,7 +34,7 @@ interface ConflictItem {
 
 
 /**
- * The `UiConflicts` renders the conflict-resolution screen shown when a save fails
+ * `UiConflicts` renders the conflict-resolution screen shown when a save fails
  * because of upstream edits. Set the conflict list and original changes via the public
  * `conflictList()` / `origChanges()` setters, then call `.render($selection)`.
  * Emits `cancel` and `save`.
@@ -268,7 +268,7 @@ export class UiConflicts extends EventEmitter {
       .data(['previous', 'next'])
       .enter()
       .append('button')
-      .text((d: string) => l10n.t(`save.conflict.${d}`))
+      .text((d: string) => l10n.t(`text.${d}`))
       .attr('class', 'conflict-nav-button action col6')
       .attr('disabled', (d: string, i: number) => {
         return (i === 0 && index === 0) || (i === 1 && index === this._conflictList!.length - 1) || null;

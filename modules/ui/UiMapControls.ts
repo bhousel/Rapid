@@ -6,7 +6,7 @@ import type { D3Selection } from 'd3-selection';
 
 
 /**
- * This component creates the map controls bar
+ * `UiMapControls` renders the map controls bar on the side of the map.
  * (bearing, zoom in, zoom out, zoom to selection, geolocate)
  */
 export class UiMapControls {

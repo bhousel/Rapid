@@ -13,7 +13,7 @@ import type { UiField } from './UiField.ts';
 
 
 /**
- * The `UiChangesetEditor` renders the changeset comment / source / hashtags
+ * `UiChangesetEditor` renders the changeset comment / source / hashtags
  * fields in the commit sidebar. Set the changeset via `.changesetID(id)` and
  * `.tags(tags)`, then call `.render($selection)`. Emits `change` on edits.
  */

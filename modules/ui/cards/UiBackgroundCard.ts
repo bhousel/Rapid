@@ -12,7 +12,7 @@ const METADATA_KEYS = ['zoom', 'vintage', 'source', 'description', 'resolution',
 
 
 /**
- * The `UiBackgroundCard` shows information about the current background imagery source.
+ * `UiBackgroundCard` shows information about the current background imagery source.
  */
 export class UiBackgroundCard extends AbstractUiCard {
   public id: string;

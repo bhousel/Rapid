@@ -13,7 +13,8 @@ const MAXRESULTS = 100;
 
 
 /**
- * This is the Modal where the user can browse the catalog of datasets.
+ * `UiRapidCatalog` is a Modal control where the user can browse the
+ * catalog of Rapid datasets.
  *
  * Events available:
  * - `done`:  Fires when the user is finished and they are closing this Modal

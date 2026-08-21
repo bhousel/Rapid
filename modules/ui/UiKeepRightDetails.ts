@@ -8,7 +8,7 @@ import type { KeepRightIssue } from '../services/KeepRightService.ts';
 
 
 /**
- * The `UiKeepRightDetails` renders the description/details for a KeepRight QA issue,
+ * `UiKeepRightDetails` renders the description/details for a KeepRight QA issue,
  * including any linked OSM entities. Set the issue via the public `datum` property,
  * then call `.render($parent)`.
  */

@@ -11,7 +11,8 @@ import type { RapidDataset } from '../lib/RapidDataset.ts';
 
 
 /**
- * This is the Modal where the user can change a dataset's settings.
+ * `UiRapidDatasetSettings` is a Modal control where the user can change
+ * a dataset's settings.
  *
  * Events available:
  * - `done`:  Fires when the user is finished and they are closing this Modal

@@ -8,7 +8,7 @@ const MAXUSERS = 4;
 
 
 /**
- * This component adds the nearby contributors list to the footer.
+ * `UiContributors` renders the nearby contributors list to the footer.
  */
 export class UiContributors {
   public context: Context;
@@ -18,7 +18,7 @@ export class UiContributors {
 
   public deferredRender: () => void;
 
-  protected _lastv: any;
+  protected _lastv: number | null;
 
 
   /**

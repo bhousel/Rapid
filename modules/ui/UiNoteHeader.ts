@@ -7,7 +7,7 @@ import type { OsmNote } from '../services/OsmService.ts';
 
 
 /**
- * The `UiNoteHeader` renders the header (icon + title) for an OSM Note.
+ * `UiNoteHeader` renders the header (icon + title) for an OSM Note.
  * Set the note to display via the public `datum` property, then call `.render($parent)`.
  */
 export class UiNoteHeader {

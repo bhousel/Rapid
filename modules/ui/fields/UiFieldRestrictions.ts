@@ -8,7 +8,7 @@ import type { UiFieldOptions } from '../UiField.ts';
 
 
 /**
- * The `UiFieldRestrictions` field lets the user view and edit turn restrictions at a
+ * `UiFieldRestrictions` field lets the user view and edit turn restrictions at a
  * highway intersection.
  *
  * NOTE: The interactive mini-map this field used to render was built on the old SVG layer

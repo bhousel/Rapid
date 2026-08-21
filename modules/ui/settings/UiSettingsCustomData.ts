@@ -17,7 +17,7 @@ const ACCEPT = [
 
 
 /**
- * The `UiSettingsCustomData` renders a modal for supplying a custom data file or URL.
+ * `UiSettingsCustomData` renders a modal for supplying a custom data file or URL.
  * Call `.render()` to open it; emits `change` with the new settings on save.
  */
 export class UiSettingsCustomData extends EventEmitter {

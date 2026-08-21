@@ -6,8 +6,9 @@ import type { D3EnterSelection, D3Selection } from 'd3-selection';
 
 
 /**
- * This component adds a link near the bottom
- * of the inspectorlike "View On OSM".
+ * `UiViewOn` renders a link near the bottom of the inspector, like "View On OSM".
+ * It can work with different inspectors for linking to various services, such as
+ * Mapillary, KeepRight, MapRoulette, etc.
  */
 export class UiViewOn {
   public context: Context;

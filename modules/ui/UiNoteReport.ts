@@ -7,7 +7,7 @@ import type { OsmNote } from '../services/OsmService.ts';
 
 
 /**
- * The `UiNoteReport` renders a "report this note" out-link for an OSM Note.
+ * `UiNoteReport` renders a "report this note" out-link for an OSM Note.
  * Set the note to display via the public `datum` property, then call `.render($parent)`.
  */
 export class UiNoteReport {

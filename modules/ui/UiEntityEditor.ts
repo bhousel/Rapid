@@ -28,7 +28,7 @@ let _wasSelectedIDs: EntityID[] = [];
 
 
 /**
- * The `UiEntityEditor` renders the editing UI for the currently selected OSM entities.
+ * `UiEntityEditor` renders the editing UI for the currently selected OSM entities.
  * It gathers the various inspector sections (feature type, fields, raw tags, members, etc.)
  * and renders them into the sidebar.
  */

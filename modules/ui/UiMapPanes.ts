@@ -7,7 +7,7 @@ import type { UiPane } from './UiPane.ts';
 
 
 /**
- * This component the map panes section for drawers like:
+ * `UiMapPanes` wraps map panes section for drawers like:
  *  Background, Map Data, Issues, Preferences, Help
  */
 export class UiMapPanes {

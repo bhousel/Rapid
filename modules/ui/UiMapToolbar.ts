@@ -6,7 +6,7 @@ import type { D3Selection } from 'd3-selection';
 
 
 /**
- * This component creates the toolbar section at the top of the map.
+ * `UiMapToolbar` renders the toolbar section at the top of the map.
  *
  * @example
  * <div class='map-toolbar'>

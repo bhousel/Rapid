@@ -71,7 +71,7 @@ modal" logic) forces ugly hacks whenever a second modal must sit on top of a fir
   build simply has no `ui` system, so modals no-op) and matches the reality that there is exactly one
   active/top modal at a time.
 - `UiConfirm extends UiModal` (thin: header + message + `okButton()`), converted **after** `UiModal`.
-- The `UiRapidCatalog`/`UiRapidAddDataset` hacks delete entirely once nesting is native.
+- `UiRapidCatalog`/`UiRapidAddDataset` hacks delete entirely once nesting is native.
 - **Sequencing:** `tooltip` first (independent, no unknowns), then `modal` + `confirm` together once
   the `UiSystem`-owned stack is in place.
 

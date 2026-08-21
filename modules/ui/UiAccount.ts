@@ -6,7 +6,7 @@ import type { D3Selection } from 'd3-selection';
 
 
 /**
- * This component adds the user account info to the footer.
+ * `UiAccount` adds the user account info to the footer.
  */
 export class UiAccount {
   public context: Context;

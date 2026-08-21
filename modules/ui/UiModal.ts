@@ -6,7 +6,7 @@ import type { D3Selection } from 'd3-selection';
 
 
 /**
- * The `UiModal` component is a modal dialog: a shaded backdrop containing a `.modal` box.
+ * `UiModal` is a reusable modal dialog: a shaded backdrop containing a `.modal` box.
  * A parent owns the instance, shows it into a parent selection, renders content into
  * `$content`, and hides it again with `close()`. Multiple modals can be stacked — each owns
  * its own backdrop layer, and `UiSystem` tracks the stack so that Esc/Backspace only dismisses

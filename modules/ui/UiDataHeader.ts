@@ -6,7 +6,7 @@ import type { D3Selection } from 'd3-selection';
 
 
 /**
- * The `UiDataHeader` renders a small header describing a piece of custom/vector map data.
+ * `UiDataHeader` renders a small header describing a piece of custom/vector map data.
  * Set the data to display via the public `datum` property, then call `.render($parent)`.
  */
 export class UiDataHeader {

@@ -13,7 +13,7 @@ const ACCEPT_FEATURES_LIMIT = 50;
 
 
 /**
- * The RapidInspector is a UI component for viewing/editing Rapid Entities in the sidebar.
+ * `UiRapidInspector` is a UI component for viewing/editing Rapid Entities in the sidebar.
  *
  * @example
  *  <div class='rapid-inspector'>

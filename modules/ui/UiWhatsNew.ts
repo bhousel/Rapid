@@ -7,7 +7,7 @@ import type { D3EnterSelection, D3Selection } from 'd3-selection';
 
 
 /**
- * This is the "whats new" screen we show to the users if:
+ * `UiWhatsNew` is a Modal component that we show to the users at startup if:
  * - They have used Rapid before and seen the welcome screen
  * - They do not have backup changes to restore
  */

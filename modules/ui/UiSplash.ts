@@ -8,7 +8,7 @@ import type { D3EnterSelection, D3Selection } from 'd3-selection';
 
 
 /**
- * This is the screen we show to the users if:
+ * `UiSplash` is a Modal component that we show to the users at startup if:
  * - They have never used Rapid before, or
  * - We have an updated privacy policy to tell them about
  */

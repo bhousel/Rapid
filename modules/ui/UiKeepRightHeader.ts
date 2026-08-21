@@ -8,7 +8,7 @@ import type { KeepRightIssue } from '../services/KeepRightService.ts';
 
 
 /**
- * The `UiKeepRightHeader` renders the header (icon + title) for a KeepRight QA issue.
+ * `UiKeepRightHeader` renders the header (icon + title) for a KeepRight QA issue.
  * Set the issue to display via the public `datum` property, then call `.render($parent)`.
  */
 export class UiKeepRightHeader {

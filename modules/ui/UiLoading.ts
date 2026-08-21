@@ -5,7 +5,7 @@ import type { D3EnterSelection, D3Selection } from 'd3-selection';
 
 
 /**
- * The `UiLoading` component is a reusable loading modal: a spinner over an optional
+ * `UiLoading` is a reusable loading modal: a spinner over an optional
  * message that can block interaction with the rest of the UI. A parent owns the
  * instance, configures it with the fluent `.message()` / `.blocking()` setters, shows
  * it by rendering into a parent selection, and hides it again with `.close()`.

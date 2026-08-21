@@ -8,9 +8,11 @@ import type { D3EnterSelection, D3Selection } from 'd3-selection';
 
 
 /**
- * The `UiRapidColorpicker` renders a small color swatch,
+ * `UiRapidColorpicker` renders a small popup color swatch,
  * and manages a Modal popup allowing the user to change color.
- * Emits 'change' on any change in color.
+ *
+ * Events available:
+ * - 'change':  Fires when the user picks a new color, also closing the popup
  */
 export class UiRapidColorpicker extends EventEmitter {
   public context: Context;

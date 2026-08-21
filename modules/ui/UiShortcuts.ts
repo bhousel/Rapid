@@ -11,8 +11,7 @@ import type { D3EnterSelection, D3Selection } from 'd3-selection';
 
 
 /**
- * This is a UI component for displaying the keyboard shortcuts (when the user presses '?')
- * It is a modal component built on `UiModal`.
+ * `UiShortcuts` is Modal component for displaying the keyboard shortcuts (when the user presses '?').
  * We load the data from 'shortcuts.json' to populate this screen.
  *
  * Events available:

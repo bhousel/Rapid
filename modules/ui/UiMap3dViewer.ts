@@ -4,8 +4,8 @@ import type { Context } from '../Context.ts';
 import type { D3Selection } from 'd3-selection';
 
 /**
- * A wrapper for the 3dMap
- * Someday we should make this more like the photoviewer
+ * `UiMap3dViewer` is a wrapper for the MapLibre viewer.
+ * (Someday we should make this more like the photoviewer)
  */
 export class UiMap3dViewer {
   public context: Context;

@@ -101,7 +101,7 @@ function transformId(id: string): string {
 
 
 /**
- * The `UiMapRouletteDetails` renders the description/instructions for a MapRoulette task,
+ * `UiMapRouletteDetails` renders the description/instructions for a MapRoulette task,
  * with mustache/short-code templating and clickable OSM entity links (loaded lazily).
  * Set the task via the public `datum` property, then call `.render($parent)`.
  */

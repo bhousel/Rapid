@@ -5,8 +5,8 @@ import type { D3Selection } from 'd3-selection';
 
 
 /**
- * The `UiRestore` component is a modal component that offers the user
- * choices to restore or clear their saved edits from a previous session.
+ * `UiRestore` is a Modal component that offers the user choices to
+ * restore or clear their saved edits from a previous session.
  */
 export class UiRestore {
   public context: Context;

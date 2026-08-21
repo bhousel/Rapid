@@ -7,7 +7,7 @@ import type { OsmoseIssue } from '../services/OsmoseService.ts';
 
 
 /**
- * The `UiOsmoseHeader` renders the header (icon + title) for an Osmose QA issue.
+ * `UiOsmoseHeader` renders the header (icon + title) for an Osmose QA issue.
  * Set the issue to display via the public `datum` property, then call `.render($parent)`.
  */
 export class UiOsmoseHeader {

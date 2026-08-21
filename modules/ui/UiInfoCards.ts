@@ -11,7 +11,7 @@ import type { D3Selection } from 'd3-selection';
 
 
 /**
- * This component acts as the container for the information cards.
+ * `UiInfoCards` acts as the container for the information cards.
  * "Cards" are user interface elements that can float on top of the map
  * and provide extra information about the map or the selection.
  */

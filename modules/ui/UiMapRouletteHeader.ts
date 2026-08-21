@@ -6,7 +6,7 @@ import type { MapRouletteTask } from '../services/MapRouletteService.ts';
 
 
 /**
- * The `UiMapRouletteHeader` renders the header (icon + challenge name) for a MapRoulette task.
+ * `UiMapRouletteHeader` renders the header (icon + challenge name) for a MapRoulette task.
  * Set the task via the public `datum` property, then call `.render($parent)`.
  */
 export class UiMapRouletteHeader {

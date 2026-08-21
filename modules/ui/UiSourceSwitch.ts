@@ -5,7 +5,8 @@ import type { D3Selection } from 'd3-selection';
 
 
 /**
- * This component adds the source switcher control to the footer.
+ * `UiSourceSwitch` adds the source switcher control to the footer.
+ * It allows the user to switch between "dev" and "live" map instance.
  */
 export class UiSourceSwitch {
   public context: Context;

@@ -8,7 +8,7 @@ import type { D3Selection } from 'd3-selection';
 
 
 /**
- * The `UiSettingsCustomBackground` renders a modal for entering a custom imagery template.
+ * `UiSettingsCustomBackground` renders a modal for entering a custom imagery template.
  * Call `.render()` to open it; emits `change` with the new settings on save.
  */
 export class UiSettingsCustomBackground extends EventEmitter {

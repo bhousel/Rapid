@@ -18,7 +18,7 @@ export interface UiFlashOptions {
 
 
 /**
- * The `UiFlash` component briefly slides a transient message over the map footer,
+ * `UiFlash` slides a transient message over the map footer,
  * then automatically hides it again after a short duration.
  *
  * @example

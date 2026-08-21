@@ -7,7 +7,7 @@ import type { MapillaryService, MapillaryDetection } from '../services/Mapillary
 
 
 /**
- * The `UiDetectionHeader` renders the header (icon + title) for a Mapillary detection.
+ * `UiDetectionHeader` renders the header (icon + title) for a Mapillary detection.
  * Set the detection via the public `datum` property, then call `.render($parent)`.
  */
 export class UiDetectionHeader {

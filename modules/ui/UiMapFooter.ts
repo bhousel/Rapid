@@ -10,7 +10,7 @@ import type { D3Selection } from 'd3-selection';
 
 
 /**
- * This component creates the footer section at the bottom of the map.
+ * `UiMapFooter` renders the footer section at the bottom of the map.
  *
  * @example
  * <div class='map-footer'>        // '.map-footer' contains 2 divs:

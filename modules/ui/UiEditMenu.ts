@@ -30,7 +30,7 @@ const TOOLTIP_WIDTH = 210;      // see also `.edit-menu .tooltip` CSS; include m
 
 
 /**
- * The `UiEditMenu` renders the context menu of operations shown when the user
+ * `UiEditMenu` renders the context menu of operations shown when the user
  * right-clicks / long-presses a selected feature. Set `anchorLoc()`, `triggerType()`,
  * and `operations()`, then call `.render($selection)`. Call `close()` to dismiss it.
  * Emits `toggled`.

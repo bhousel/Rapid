@@ -10,7 +10,8 @@ import type { RapidDataset } from '../lib/RapidDataset.ts';
 
 
 /**
- * This is the Modal where the user can add a custom dataset to Rapid.
+ * `UiRapidAddDataset` is a modal control where the user can
+ * add a custom dataset to Rapid.
  *
  * Events available:
  * - `done` - Fires when the user is finished, emits the new datasetID if one was added.

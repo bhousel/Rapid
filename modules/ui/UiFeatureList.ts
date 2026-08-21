@@ -37,7 +37,7 @@ interface GeocodeResult {
 
 
 /**
- * The feature list allows users to search for features and display the search results.
+ * `UiFeatureList` allows users to search for features and display the search results.
  *
  * @example
  *  <div class='feature-list-wrap'>

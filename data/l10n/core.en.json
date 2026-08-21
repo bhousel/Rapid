@@ -65,6 +65,7 @@
         "one": "Name",
         "other": "Names"
       },
+      "next": "Next",
       "node": {
         "one": "Node",
         "other": "Nodes"
@@ -75,6 +76,7 @@
         "other": "Notes"
       },
       "okay": "OK",
+      "previous": "Previous",
       "relation": {
         "one": "Relation",
         "other": "Relations"
@@ -1376,8 +1378,6 @@
       "conflict": {
         "header": "Resolve conflicting edits",
         "count": "Conflict {num} of {total}",
-        "previous": "< Previous",
-        "next": "Next >",
         "keep_local": "Keep mine",
         "keep_remote": "Use theirs",
         "restore": "Restore",
@@ -1613,11 +1613,6 @@
     },
     "version": {
       "whats_new": "What's new in Rapid {version}"
-    },
-    "tag_reference": {
-      "description": "Description",
-      "on_wiki": "{tag} on wiki.osm.org",
-      "used_with": "used with {type}"
     },
     "zoom": {
       "in": "Zoom In",

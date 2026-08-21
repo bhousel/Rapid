@@ -11,7 +11,7 @@ import type { OsmoseIssue } from '../services/OsmoseService.ts';
 
 
 /**
- * The `UiOsmoseEditor` renders the sidebar editor for an Osmose QA issue
+ * `UiOsmoseEditor` renders the sidebar editor for an Osmose QA issue
  * (header, details, action buttons). Set the issue via the public `datum` property,
  * then call `.render($parent)`. Emits `change` when the issue is updated.
  */

@@ -6,6 +6,10 @@ import type { Context } from '../Context.ts';
 import type { D3Selection } from 'd3-selection';
 
 
+/**
+ * `UiRapidFirstEditDialog` is a Modal that appears when the user makes their first Rapid edit.
+ * Note it's currently commented out, needs a refresh / we might get rid of this.
+ */
 export class UiRapidFirstEditDialog {
   public context: Context;
 

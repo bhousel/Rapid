@@ -11,7 +11,7 @@ const [trimW, trimH] = [45, 105];  // trim amounts to allow for toolbars
 
 
 /**
- * The photo viewer is absolutely positioned in the `over-map` div (it floats over the map).
+ * `UiPhotoViewer` is absolutely positioned in the `over-map` div (it floats over the map).
  * It creates a "nine slice" frame like below to allow for resize handles be placed around the edges:
  * (aside: we should extract this into its own component and use it other places
  *  where we want a resizable, movable window - minimap, 3dmap, maybe others)

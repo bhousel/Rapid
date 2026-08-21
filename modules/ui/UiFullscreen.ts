@@ -5,7 +5,8 @@ import type { D3Selection } from 'd3-selection';
 
 
 /**
- * This component just adds fullscreen key bindings.
+ * `UiFullscreen` just adds fullscreen key bindings.
+ * There is commented out code for a fullscreen button, not currently shown.
  */
 export class UiFullscreen {
   public context: Context;

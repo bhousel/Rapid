@@ -8,8 +8,8 @@ import type { D3Selection } from 'd3-selection';
 
 
 /**
- * This component adds the validator status control to the footer.
- * (was named "issues_info")
+ * `UiProjectLinks` renders links for "help translate" and "report a bug"
+ * into the footer section.
  */
 export class UiProjectLinks {
   public context: Context;

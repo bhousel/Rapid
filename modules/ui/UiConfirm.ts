@@ -5,7 +5,7 @@ import type { D3Selection } from 'd3-selection';
 
 
 /**
- * The `UiConfirm` component is a simple alert-style modal (header, message, buttons) built on
+ * `UiConfirm` is a simple alert-style modal (header, message, buttons) built on
  * top of `UiModal`. After `show()`, render into `$header` / `$message` and add action buttons;
  * `okButton()` appends a focused "Okay" button that dismisses the dialog.
  */

@@ -63,7 +63,7 @@ import type { D3EnterSelection, D3Selection } from 'd3-selection';
 
 
 /**
- * The `UiFoo` component renders the Foo section of the interface.
+ * `UiFoo` component renders the Foo section of the interface.
  *
  * @example
  * <div class='foo'>…</div>
@@ -628,7 +628,7 @@ Start the Tutorial, and the Rapid-splash "skip to Rapid" path).
   `UiSectionDataLayers` consumers now do `new UiSettingsX(context)`, wire `.on('change', …)` on a
   separate line, and call `.render`.
 - **Gotcha (historical, now resolved):** the old typed `uiTooltip().title(…)` factory needed
-  `(uiTooltip(context) as any)` when passing a datum function `.title(d => …)`. The `UiTooltip`
+  `(uiTooltip(context) as any)` when passing a datum function `.title(d => …)`. `UiTooltip`
   class (2026-08-09) fixed this with proper getter/setter overloads, and all those `as any` casts
   were removed.
 - Consumers updated: `sections/index.js`, `panes/index.js`, `settings/index.js`, `ui/index.js`

@@ -24,7 +24,7 @@ export type UiComboboxFetcher = (this: any, val: string, cb: (results: UiCombobo
 
 
 /**
- * The `UiCombobox` component attaches autocomplete/suggestion behavior to an
+ * `UiCombobox` attaches autocomplete/suggestion behavior to an
  * `<input>` or `<textarea>`. A parent owns the instance, configures it with the
  * fluent setters (`.data()`, `.fetcher()`, `.minItems()`, …), then attaches it via
  * `input.call(combobox.attach)`. Emits `accept` and `cancel` events.

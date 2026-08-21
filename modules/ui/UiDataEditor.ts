@@ -9,7 +9,7 @@ import type { D3Selection } from 'd3-selection';
 
 
 /**
- * The `UiDataEditor` renders the sidebar editor for custom/vector map data features.
+ * `UiDataEditor` renders the sidebar editor for custom/vector map data features.
  * Set the feature to display via the public `datum` property, then call `.render($parent)`.
  */
 export class UiDataEditor {

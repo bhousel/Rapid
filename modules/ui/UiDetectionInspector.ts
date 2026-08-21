@@ -10,7 +10,7 @@ import type { MapillaryService, MapillaryDetection } from '../services/Mapillary
 
 
 /**
- * The `UiDetectionInspector` renders the sidebar inspector for a Mapillary detection
+ * `UiDetectionInspector` renders the sidebar inspector for a Mapillary detection
  * (header, details, "view on Mapillary" footer). Set the detection via the public `datum`
  * property, then call `.render($parent)`.
  */

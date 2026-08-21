@@ -8,7 +8,7 @@ import type { OsmoseIssue } from '../services/OsmoseService.ts';
 
 
 /**
- * The `UiOsmoseDetails` renders the description/details for an Osmose QA issue,
+ * `UiOsmoseDetails` renders the description/details for an Osmose QA issue,
  * including any linked OSM entities (loaded lazily from the Osmose API). Set the issue
  * via the public `datum` property, then call `.render($parent)`.
  */

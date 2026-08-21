@@ -9,7 +9,7 @@ import type { D3Selection } from 'd3-selection';
 
 
 /**
- * The `UiLocationCard` shows the coordinates and reverse-geocoded place name at the mouse location.
+ * `UiLocationCard` shows the coordinates and reverse-geocoded place name at the mouse location.
  */
 export class UiLocationCard extends AbstractUiCard {
   public id: string;

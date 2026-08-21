@@ -13,7 +13,7 @@ import type { D3Selection } from 'd3-selection';
 
 
 /**
- * This component creates the middle section for any UI elements that float over the map
+ * `UiOvermap` renders container for any UI elements that float over the map
  *
  * @example
  * <div class='over-map'>

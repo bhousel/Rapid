@@ -18,7 +18,7 @@ const VERTICAL_PADDING = 4;
 
 
 /**
- * The `UiMapRouletteMenu` renders the radial-style action menu for a MapRoulette task
+ * `UiMapRouletteMenu` renders the right-click action menu for a MapRoulette task.
  * (Fixed / Can't Complete / Already Fixed / Not an Issue). Set `datum`, `anchorLoc`, and
  * `triggerType`, then call `.render($selection)`. Emits `toggled` and `change`.
  */

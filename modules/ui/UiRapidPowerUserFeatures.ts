@@ -6,7 +6,7 @@ import type { D3EnterSelection, D3Selection } from 'd3-selection';
 
 
 /**
- * This is the Modal where the user can toggle on and off poweruser features.
+ * `UiRapidPowerUserFeatures` is a Modal that allows the user to toggle on and off poweruser features.
  * It is shown by clicking the "Beta" button in the top menu, if `&poweruser=true` is in the url.
  *
  * Events available:
@@ -151,6 +151,7 @@ export class UiRapidPowerUserFeatures extends EventEmitter {
     $$description
       .append('span')
       .attr('class', 'smile')
+      .attr('aria-hidden', 'true')
       .text('😎');
 
     // update

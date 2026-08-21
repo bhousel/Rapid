@@ -6,7 +6,7 @@ import type { MapillaryDetection } from '../services/MapillaryService.ts';
 
 
 /**
- * The `UiDetectionDetails` renders the details (type, first/last seen) for a Mapillary detection.
+ * `UiDetectionDetails` renders the details (type, first/last seen) for a Mapillary detection.
  * Set the detection via the public `datum` property, then call `.render($parent)`.
  */
 export class UiDetectionDetails {

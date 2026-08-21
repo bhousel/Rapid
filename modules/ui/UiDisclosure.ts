@@ -15,7 +15,7 @@ export type UiDisclosureContent = ($selection: D3Selection) => void;
 
 
 /**
- * The `UiDisclosure` component is a toggleable label over collapsible content.
+ * `UiDisclosure` component is a toggleable label over collapsible content.
  * Clicking the label toggles the visibility of the content below it:
  *
  * ```
