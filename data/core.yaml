@@ -1142,12 +1142,7 @@ en:
     dev: dev
     live: live
     lose_changes: "You have unsaved changes. Switching the map server will discard them. Are you sure you want to switch servers?"
-  rapid_splash:
-    welcome: Introducing AI-assisted mapping!
-    text: "Select the {rapidicon} option to start the Rapid walkthrough. If you're new to OSM and haven't mapped before, select the first {walkthrough} option. Finally, click the last {edit} option if you want to get straight to mapping. You can always access the walkthrough later from the help menu."
-    walkthrough: "Start the whole walkthrough"
-    skip_to_rapid: "Learn about Rapid!"
-    start: "No thanks, just start mapping"
+
   rapid_first_edit:
     nice: You just added your first {rapidicon} AI-Assisted feature, nice.
     text: You'll need an OpenStreetMap account to save your work. Would you like to log in with OSM now or keep exploring?

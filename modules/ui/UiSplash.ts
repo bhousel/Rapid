@@ -4,13 +4,13 @@ import { UiIntro } from './intro/UiIntro.ts';
 import { UiModal } from './UiModal.ts';
 
 import type { Context } from '../Context.ts';
-import type { D3Selection } from 'd3-selection';
+import type { D3EnterSelection, D3Selection } from 'd3-selection';
 
 
 /**
  * This is the screen we show to the users if:
- *   - They have never used Rapid before, or
- *   - We have an updated privacy policy to tell them about
+ * - They have never used Rapid before, or
+ * - We have an updated privacy policy to tell them about
  */
 export class UiSplash {
   public context: Context;
@@ -48,16 +48,32 @@ export class UiSplash {
       .attr('class', 'modal rapid-modal modal-splash');
 
     const $content: D3Selection = Modal.$content!;
-    $content
+
+    /* Heading section */
+    let $heading: D3Selection = $content.selectAll('.modal-heading')
+      .data([0]);
+
+    // enter
+    const $$heading: D3EnterSelection = $heading
+      .enter()
       .append('div')
-      .attr('class', 'modal-section')
-      .append('h2')
+      .attr('class', 'modal-section modal-heading');
+
+    $$heading
+      .append('h1')
+      .attr('class', 'modal-heading-text');
+
+    // update
+    $heading = $heading.merge($$heading);
+
+    $heading.selectAll('.modal-heading-text')
       .html(l10n.t('splash.welcome', {
         rapidicon: icon(`#rapid-logo-rapid-wordmark${rtl}`, 'pre-text rapid'),
         version: `v${context.version}`
       }));
 
 
+    /* Main section */
     let markdown = l10n.t('splash.text') + '\n\n';
 
     // If they have seen some privacy version, but not the current one,
@@ -78,6 +94,7 @@ export class UiSplash {
       .attr('target', '_blank');
 
 
+    /* Button section */
     const $buttonWrap = $content
       .append('div')
       .attr('class', 'modal-actions');

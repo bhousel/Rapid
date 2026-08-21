@@ -369,11 +369,11 @@ export class UiRapidDatasetSettings extends EventEmitter {
 
     const $$thumbnail: D3EnterSelection = $$thumbnailSection
       .append('div')
-      .attr('class', 'rapid-catalog-dataset-thumb');
+      .attr('class', 'dataset-thumb');
 
     $$thumbnail
       .append('img')
-      .attr('class', 'rapid-catalog-dataset-thumbnail');
+      .attr('class', 'dataset-thumbnail');
     $$thumbnail
       .append('div')
       .attr('class', 'dataset-thumbnail-instruction');
@@ -381,7 +381,7 @@ export class UiRapidDatasetSettings extends EventEmitter {
     // update
     $thumbnailSection = $thumbnailSection.merge($$thumbnailSection);
 
-    $thumbnailSection.selectAll('.rapid-catalog-dataset-thumbnail')
+    $thumbnailSection.selectAll('.dataset-thumbnail')
       .classed('inverted', ds.serviceID === 'esri')  // invert colors from light->dark
       .attr('src', utilSafeURL(ds.thumbnailUrl));
 

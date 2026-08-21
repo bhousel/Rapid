@@ -66,6 +66,7 @@ export class UiWhatsNew {
       }));
 
 
+    /* Main section */
     const markdown = `
 Big changes are coming soon to Rapid. including:
 

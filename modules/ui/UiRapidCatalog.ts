@@ -40,7 +40,7 @@ export class UiRapidCatalog extends EventEmitter {
     this._filterCategory = null;
 
     // Child components
-    this.CategoryCombo = new UiCombobox(context, 'dataset-categories');
+    this.CategoryCombo = new UiCombobox(context, 'rapid-dark');
     this.Modal = null;
 
     // Ensure methods used as callbacks always have `this` bound correctly.
@@ -321,7 +321,7 @@ export class UiRapidCatalog extends EventEmitter {
       const display = l10n.t(`rapid_catalog.category.${d}`, { default: d });
       const item = { display: display, title: d, value: d };
       if (d === 'preview') {
-        item.display = `${display} <span class="rapid-catalog-dataset-beta beta"></span>`;
+        item.display = `${display} <span class="dataset-beta beta"></span>`;
       }
       return item;
     });
@@ -371,15 +371,15 @@ export class UiRapidCatalog extends EventEmitter {
 
     const $$label: D3EnterSelection = $$datasets
       .append('div')
-      .attr('class', 'rapid-catalog-dataset-label');
+      .attr('class', 'dataset-label');
 
     $$label
       .append('div')
-      .attr('class', 'rapid-catalog-dataset-name');
+      .attr('class', 'dataset-name');
 
     const $$categories: D3EnterSelection = $$label
       .append('div')
-      .attr('class', 'rapid-catalog-dataset-categories');
+      .attr('class', 'dataset-categories');
 
     $$categories.selectAll('.dataset-category')
       .data((d: RapidDataset) => {
@@ -396,20 +396,20 @@ export class UiRapidCatalog extends EventEmitter {
 
     $$label
       .append('div')
-      .attr('class', 'rapid-catalog-dataset-snippet');
+      .attr('class', 'dataset-snippet');
 
     const $$link: D3EnterSelection = $$label
       .filter((d: RapidDataset) => !!d.itemUrl)
       .append('div')
-      .attr('class', 'rapid-catalog-dataset-more-info')
+      .attr('class', 'dataset-more-info')
       .append('a')
-      .attr('class', 'rapid-catalog-dataset-link')
+      .attr('class', 'dataset-link')
       .attr('target', '_blank')
       .attr('href', (d: RapidDataset) => utilSafeURL(d.itemUrl));
 
     $$link
       .append('span')
-      .attr('class', 'rapid-catalog-dataset-link-text');
+      .attr('class', 'dataset-link-text');
 
     $$link
       .call(uiIcon('#rapid-icon-out-link', 'inline'));
@@ -420,16 +420,16 @@ export class UiRapidCatalog extends EventEmitter {
 
     $$label
       .append('button')
-      .attr('class', 'rapid-catalog-dataset-action')
+      .attr('class', 'dataset-action')
       .on('click', this.toggleDataset);
 
     const $$thumbnail: D3EnterSelection = $$datasets
       .append('div')
-      .attr('class', 'rapid-catalog-dataset-thumb');
+      .attr('class', 'dataset-thumb');
 
     $$thumbnail
       .append('img')
-      .attr('class', 'rapid-catalog-dataset-thumbnail')
+      .attr('class', 'dataset-thumbnail')
       .classed('inverted', (d: RapidDataset) => d.categories.has('esri'))  // invert colors from light->dark
       .attr('src', (d: RapidDataset) => utilSafeURL(d.thumbnailUrl));
 
@@ -440,10 +440,10 @@ export class UiRapidCatalog extends EventEmitter {
       .classed('added', (d: RapidDataset) => d.added)
       .classed('hide', (d: RapidDataset) => d.filtered);
 
-    $datasets.selectAll('.rapid-catalog-dataset-name')
+    $datasets.selectAll('.dataset-name')
       .html(d => this.highlight(this._filterText, d.getLabel()));
 
-    $datasets.selectAll('.rapid-catalog-dataset-link-text')
+    $datasets.selectAll('.dataset-link-text')
       .text(l10n.t('rapid_catalog.more_info'));
 
     $datasets.selectAll('.dataset-category')
@@ -457,13 +457,13 @@ export class UiRapidCatalog extends EventEmitter {
     $datasets.selectAll('.dataset-category-preview')
       .attr('title', l10n.t('rapid_poweruser.beta'));  // alt text
 
-    $datasets.selectAll('.rapid-catalog-dataset-snippet')
+    $datasets.selectAll('.dataset-snippet')
       .html(d => this.highlight(this._filterText, d.getDescription()));
 
     $datasets.selectAll('.dataset-added-text')
       .text(d => d.added ? '\u2705 ' + l10n.t('rapid_catalog.dataset_added') : '');  // 2705 = emoji check
 
-    $datasets.selectAll('.rapid-catalog-dataset-action')
+    $datasets.selectAll('.dataset-action')
       .classed('secondary', (d: RapidDataset) => d.added)
       .text((d: RapidDataset) => d.added ? l10n.t('text.remove') : l10n.t('rapid_catalog.add_dataset'));
 

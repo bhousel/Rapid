@@ -359,9 +359,9 @@ adds structure to make the chapters uniform and extensible.
    interdependencies (only import `helper`), so they're parallelizable.
 5. **`UiIntro.ts`** — orchestrator → class. Chapter registry becomes a map of constructors
    (`new UiIntroX(context, curtain)`); keeps the pause/resume, save/restore, nav-bar, and
-   enter/finish logic. Preserve the `skipToRapid` option (used by `UiRapidSplash`). Entry method
-   `start($parent, { skipToRapid })` (or bound `render`); wire the 5 consumers: `UiSystem`, `UiSplash`,
-   `UiRapidSplash`, `UiPaneHelp`, `ui/index.js` barrel.
+   enter/finish logic. Preserve the legacy `skipToRapid` option (was used by `UiRapidSplash`, now removed). Entry method
+   `start($parent, { skipToRapid })` (or bound `render`); wire the 4 consumers: `UiSystem`, `UiSplash`,
+   `UiPaneHelp`, `ui/index.js` barrel.
 
 **Conventions intentionally NOT applied here** (documented departures): no `render($parent)` capture
 (chapters use `enter()`/`exit()`); relocalization-on-update N/A (one-shot walkthrough that fully
@@ -448,7 +448,7 @@ Start the Tutorial, and the Rapid-splash "skip to Rapid" path).
   bound property, and `UiSystem` routes Esc through `modal.close()`, so a disabled close is respected.
 - **Consumers converted:** owned modals (`UiShortcuts`, `UiRapidPowerUserFeatures`,
   `UiRapidDatasetToggle`) hold a `UiModal` (renamed `_modal`, deduped via `this._modal?.isShown`);
-  one-shot modals (`UiSplash`, `UiRapidSplash`, `UiWhatsNew`, `UiRestore`, `UiRapidFirstEditDialog`,
+  one-shot modals (`UiSplash`, `UiWhatsNew`, `UiRestore`, `UiRapidFirstEditDialog`,
   `UiIntroStartEditing`) do `new UiModal(context).show()` and render into `.$content`; `UiLoading`
   owns a blocking `UiModal`; confirm consumers (`SaveMode`, `UiSettingsCustomBackground/Data`) do
   `new UiConfirm(context).show().okButton()` and read `.$header`/`.$message`/`.$buttons`/`.$shaded`.

@@ -73,7 +73,6 @@ export { UiRapidDatasetSettings } from './UiRapidDatasetSettings.ts';
 export { UiRapidFirstEditDialog } from './UiRapidFirstEditDialog.ts';
 export { UiRapidInspector } from './UiRapidInspector.ts';
 export { UiRapidPowerUserFeatures } from './UiRapidPowerUserFeatures.ts';
-export { UiRapidSplash } from './UiRapidSplash.ts';
 export { UiRestore } from './UiRestore.ts';
 export { UiScale } from './UiScale.ts';
 export { UiShortcuts } from './UiShortcuts.ts';

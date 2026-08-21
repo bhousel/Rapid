@@ -1,6 +1,6 @@
 import { icon } from './intro/helper.ts';
 import { UiModal } from './UiModal.ts';
-import { UiRapidSplash } from './UiRapidSplash.ts';
+import { UiSplash } from './UiSplash.ts';
 
 import type { Context } from '../Context.ts';
 import type { D3Selection } from 'd3-selection';
@@ -69,7 +69,7 @@ export class UiRapidFirstEditDialog {
         Modal.close();
         const osm = context.services.osm;
         if (!osm) return;
-        osm.authenticate(() => new UiRapidSplash(context).render() );
+        osm.authenticate(() => new UiSplash(context).render() );
       });
 
     $loginToOsm

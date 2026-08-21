@@ -186,6 +186,54 @@ button.rapid-features.layer-off use {
   fill: #eee8;
 }
 
+/* Dark Input fields */
+.modal.rapid-modal input,
+.modal.rapid-modal textarea {
+  background: #444;
+  color: #ddd;
+  padding: 4px 12px;
+  border-radius: 5px;
+  border: 1px solid #333;
+  font-size: 16px;
+  width: 90%;
+}
+
+.modal.rapid-modal input:focus,
+.modal.rapid-modal input:active,
+.modal.rapid-modal textarea:focus,
+.modal.rapid-modal textarea:active {
+  background: #444;
+  color: #eee;
+  outline: none;
+  border: 1px solid #aaa;
+}
+
+/* Comboboxes live under container, so target '.combobox-rapid-dark' class. */
+div.combobox.combobox-rapid-dark {
+  background: #333;
+  color: #ddd;
+  border: 1px solid #222;
+}
+
+div.combobox.combobox-rapid-dark a {
+  color: #ddd;
+  border-top: 1px solid #222;
+}
+
+div.combobox.combobox-rapid-dark a.selected,
+div.combobox.combobox-rapid-dark a:active,
+div.combobox.combobox-rapid-dark a:focus {
+  color: #eee;
+  background: #3c3c3c;
+}
+
+@media (hover: hover) {
+  div.combobox.combobox-rapid-dark a:hover {
+    color: #eee;
+    background: #3c3c3c;
+  }
+}
+
 
 /* Sidebar - Rapid/Overture Inspectors
 ------------------------------------------------------- */
@@ -492,11 +540,6 @@ button.overture-inspector-close:hover {
   padding: 0 10px;
 }
 
-.modal.rapid-modal .modal-actions > button {
-  width: 100%;
-  margin: 20px;
-}
-
 /* Dark scrollbars */
 .modal.rapid-modal ::-webkit-scrollbar {
   width: 8px;
@@ -537,46 +580,46 @@ button.overture-inspector-close:hover {
   margin: 0 2px;
 }
 
-.modal.rapid-modal.modal-splash .modal-actions > button {
+/* Modals that use '.modal-actions' for the button section should have big buttons */
+.modal.rapid-modal .modal-actions > button {
   height: unset;  /* big buttons */
-  padding: 10px;
+  margin: 20px;
 }
 
-.modal.rapid-modal.modal-whatsnew p {
-  font-size: 14px;
-}
+.modal.rapid-modal.modal-splash .modal-heading-text,
 .modal.rapid-modal.modal-whatsnew .modal-heading-text {
   font-weight: bold;  /* bold text looks closer to the "Rapid" logo wordmark text */
 }
-.modal.rapid-modal.modal-whatsnew .modal-actions > button {
-  height: 50px;
-  width: 25%;
-  min-height: unset;
+
+.modal.rapid-modal.modal-splash p,
+.modal.rapid-modal.modal-whatsnew p {
+  font-size: 14px;
 }
-.modal.rapid-modal.modal-whatsnew .whatsnew-images {
+
+.modal-whatsnew .whatsnew-images {
   margin-top: 20px;
   display: flex;
   justify-content: space-around;
   width: 100%;
 }
-.modal.rapid-modal.modal-whatsnew .whatsnew-image {
+.modal-whatsnew .whatsnew-image {
   max-height: 350px;
   align-items: center;
 }
-.modal.rapid-modal.modal-whatsnew .whatsnew-dontshow {
+.modal-whatsnew .whatsnew-dontshow {
   margin-top: 20px;
   font-size: 16px;
 }
-.modal.rapid-modal.modal-whatsnew .rapid-checkbox-label {
+.modal-whatsnew .rapid-checkbox-label {
   width: 100%;
 }
-.modal.rapid-modal.modal-whatsnew .rapid-checkbox-text {
+.modal-whatsnew .rapid-checkbox-text {
   flex: 1 1 auto;
   display: flex;
   justify-content: flex-end;
   margin: 0px 20px;
 }
-.modal.rapid-modal.modal-whatsnew .rapid-checkbox-custom {
+.modal-whatsnew .rapid-checkbox-custom {
   display: flex;
   flex: 0 0 36px;
 }
@@ -847,23 +890,29 @@ hide this one and style something on top of it.  */
   padding: 0;
 }
 
-.rapid-catalog-heading-about {
+.modal-catalog .rapid-catalog-heading-about {
   color: #ddd;
 }
 
-.modal-section.rapid-catalog-filter {
-  display: flex;
-  flex-flow: row nowrap;
+.modal-catalog .modal-section.rapid-catalog-filter {
   padding: 10px 20px;
   color: #fff;
 }
-.rapid-catalog-filter-search-wrap,
-.rapid-catalog-filter-type-wrap {
+.modal-catalog .rapid-catalog-filter-search-wrap,
+.modal-catalog .rapid-catalog-filter-type-wrap {
   position: relative;
   flex: 1;
   padding: 0 5px;
 }
-.rapid-catalog-filter-search-wrap > .icon {
+
+.modal-catalog input.rapid-catalog-filter-search {
+  padding: 4px 12px 4px 40px;    /* leave space for filter icon */
+}
+.ideditor[dir='rtl'] .modal-catalog input.rapid-catalog-filter-search {
+  padding: 4px 40px 4px 12px;    /* leave space for filter icon */
+}
+
+.modal-catalog .rapid-catalog-filter-search-wrap > .icon {
   position: absolute;
   left: 16px;
   top: 11px;
@@ -871,65 +920,17 @@ hide this one and style something on top of it.  */
   width: 16px;
   height: 16px;
 }
-.ideditor[dir='rtl'] .rapid-catalog-filter-search-wrap > .icon {
+.ideditor[dir='rtl'] .modal-catalog .rapid-catalog-filter-search-wrap > .icon {
   left: unset;
   right: 16px;
 }
 
-.rapid-catalog-filter-search,
-.rapid-catalog-filter-type {
-  background: #444;
-  color: #ddd;
-  padding: 4px 12px;
-  border-radius: 10px;
-  border: 1px solid #333;
-  font-size: 16px;
-  width: 90%;
-}
-.rapid-catalog-filter-search {
-  padding: 4px 12px 4px 40px;
-}
-.ideditor[dir='rtl'] .rapid-catalog-filter-search {
-  padding: 4px 40px 4px 12px;
-}
-.rapid-catalog-filter-search:focus,
-.rapid-catalog-filter-search:active,
-.rapid-catalog-filter-type:focus,
-.rapid-catalog-filter-type:active {
-  background: #444;
-  color: #eee;
-  outline: none;
-  border: 1px solid #aaa;
-}
-
-div.combobox.combobox-dataset-categories {
-  background: #333;
-  color: #ddd;
-  border: 1px solid #222;
-}
-div.combobox.combobox-dataset-categories a {
-  color: #ddd;
-  border-top: 1px solid #222;
-}
-div.combobox.combobox-dataset-categories a.selected,
-div.combobox.combobox-dataset-categories a:active,
-div.combobox.combobox-dataset-categories a:focus {
-  color: #eee;
-  background: #3c3c3c;
-}
-@media (hover: hover) {
-  div.combobox.combobox-dataset-categories a:hover {
-    color: #eee;
-    background: #3c3c3c;
-  }
-}
-
-.rapid-catalog-filter-clear a {
+.modal-catalog .rapid-catalog-filter-clear a {
   padding: 15px;
   font-size: 14px;
 }
 
-.rapid-catalog-filter-results {
+.modal-catalog .rapid-catalog-filter-results {
   flex: 1 1 200px;
   padding: 0 5px;
   text-align: end;
@@ -944,18 +945,18 @@ div.combobox.combobox-dataset-categories a:focus {
 }
 
 /* give this section height, even when its contents are hidden */
-.rapid-catalog-datasets-status,
-.rapid-catalog-datasets {
+.modal-catalog .rapid-catalog-datasets-status,
+.modal-catalog .rapid-catalog-datasets {
   flex: 1 1 9999px;
 }
 
-.rapid-catalog-datasets-status {
+.modal-catalog .rapid-catalog-datasets-status {
   font-size: 20px;
   text-align: center;
   margin: 50px;
 }
 
-.rapid-catalog-datasets {
+.modal-catalog .rapid-catalog-datasets {
   display: flex;
   flex-flow: row wrap;
   justify-content: space-between;
@@ -964,7 +965,7 @@ div.combobox.combobox-dataset-categories a:focus {
   padding: 5px;
   width: 100%;
 }
-.rapid-catalog-dataset {
+.modal-catalog .rapid-catalog-dataset {
   display: flex;
   flex: 0 0 48%;
   flex-flow: row nowrap;
@@ -974,38 +975,39 @@ div.combobox.combobox-dataset-categories a:focus {
   height: 220px;
   color: #eee;
 }
-.rapid-catalog-dataset.added {
+.modal-catalog .rapid-catalog-dataset.added {
   background: rgba(55, 55, 55, 0.9);
 }
 
-.rapid-catalog-dataset-label {
+.dataset-label {
   flex: 1;
   padding: 0 8px;
 }
-.rapid-catalog-dataset-thumb {
+
+.dataset-thumb {
   flex: 0;
 }
-img.rapid-catalog-dataset-thumbnail {
+img.dataset-thumbnail {
   border-radius: 10px;
   object-fit: cover;
   height: 130px;
   width: 180px;
 }
-img.rapid-catalog-dataset-thumbnail.inverted {
+img.dataset-thumbnail.inverted {
   filter: invert(1) brightness(2) contrast(0.75);
 }
 
-.rapid-catalog-dataset-name {
+.dataset-name {
   font-weight: bold;
   font-size: 14px;
   margin-bottom: 3px;
 }
 
-.rapid-catalog-dataset-snippet {
+.dataset-snippet {
   font-size: 11px;
   line-height: 1.5;
 }
-.rapid-catalog-dataset-categories {
+.dataset-categories {
   display: flex;
   flex-flow: row wrap;
   margin-bottom: 5px
@@ -1036,7 +1038,7 @@ img.rapid-catalog-dataset-thumbnail.inverted {
   color: #16da16;
 }
 
-.rapid-catalog-dataset button.rapid-catalog-dataset-action {
+.rapid-catalog-dataset button.dataset-action {
   font-size: 12px;
   height: 28px;
   border-radius: 14px;
@@ -1065,22 +1067,26 @@ img.rapid-catalog-dataset-thumbnail.inverted {
   margin-bottom: 10px;
 }
 .modal-add-dataset .dataset-field-wrap {
+  display: flex;
+  flex-flow: column nowrap;
   width: 100%;
 }
 .modal-add-dataset label.dataset-field-label {
-  display: block;
+  display: flex;
   font-size: 16px;
   font-weight: bold;
   color: #fff;
-}
-.modal-add-dataset input.dataset-field-input {
-  display: block;
-  padding: 2px 5px;
-  width: 300px;
+  margin-bottom: 2px;
 }
 .modal-add-dataset input.dataset-field-input.warning {
-  border-color: #fb2;
-  background-color: #ffc;
+  border-color: #f90;
+  background-color: #440;
+}
+.modal-add-dataset .dataset-field-instruction {
+  margin: 5px 0px;
+}
+.modal-add-dataset .dataset-field-feedback.warning {
+  color: #f90;
 }
 
 .modal-add-dataset .rapid-add-dataset-text {
@@ -1096,9 +1102,6 @@ img.rapid-catalog-dataset-thumbnail.inverted {
   width: 100%;
 }
 
-.modal-add-dataset .dataset-field-feedback.warning {
-  color: #f90;
-}
 
 /* Dataset Settings
 ------------------------------------------------------- */
