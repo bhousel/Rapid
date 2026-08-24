@@ -900,8 +900,11 @@ hide this one and style something on top of it.  */
 }
 .modal-catalog .rapid-catalog-filter-search-wrap,
 .modal-catalog .rapid-catalog-filter-type-wrap {
-  position: relative;
   flex: 1;
+  display: flex;
+  flex-flow: row nowrap;
+  position: relative;
+  align-items: center;
   padding: 0 5px;
 }
 
@@ -913,12 +916,10 @@ hide this one and style something on top of it.  */
 }
 
 .modal-catalog .rapid-catalog-filter-search-wrap > .icon {
+  flex: 0 0 16px;
   position: absolute;
   left: 16px;
-  top: 11px;
   color: #aaa;
-  width: 16px;
-  height: 16px;
 }
 .ideditor[dir='rtl'] .modal-catalog .rapid-catalog-filter-search-wrap > .icon {
   left: unset;
