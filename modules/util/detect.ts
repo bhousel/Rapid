@@ -2,21 +2,25 @@
 /** Browser/platform detection results */
 export interface DetectResult {
   /** Is Rapid supported? (basically - not Internet Explorer) */
-  support: boolean;
+  isSupported: boolean;
+  /** Is Rapid running in a secure context */
+  isSecureContext: boolean;
+  /** Whether running in a test environment */
+  isTestEnvironment: boolean;
+
   /** Browser name, e.g. 'Edge', 'msie', 'Opera', 'Chrome', 'Safari', 'Firefox' */
   browser: string;
   /** Reported browser version, e.g. '133.0' */
   version: string;
-  /** Array of locale codes from navigator.languages */
-  locales: string[];
   /** Host URL including pathname */
   host?: string;
   /** Operating system: 'mac', 'win', or 'linux' */
   os: 'mac' | 'win' | 'linux';
   /** Platform name: 'Macintosh', 'Windows', 'Linux', or 'Unknown' */
   platform: string;
-  /** Whether running in a test environment */
-  isTestEnvironment: boolean;
+  /** Array of locale codes from navigator.languages */
+  locales: string[];
+
   /** User's preferred color scheme: 'light' or 'dark' */
   prefersColorScheme?: 'light' | 'dark';
   /** User's preferred contrast: 'more', 'less', or null */
@@ -29,9 +33,10 @@ export interface DetectResult {
 
 let _cached: DetectResult | undefined;
 
+
 /**
- * `utilDetect` detects things from the user's browser.
- * @param refresh - If true, refresh the cached result
+ * `utilDetect` detects things in the user's browser context.
+ * @param   [refresh] - If true, refresh the cached result
  * @returns Detection results object
  */
 export function utilDetect(refresh?: boolean): DetectResult {
@@ -42,7 +47,7 @@ export function utilDetect(refresh?: boolean): DetectResult {
   const ua = globalThis.navigator?.userAgent ?? '';
   let m: RegExpMatchArray | null;
 
-  /* Browser */
+  // Detect browser..
   m = ua.match(/(edg)\/?\s*(\.?\d+(\.\d+)*)/i);   // Edge
   if (m !== null) {
     result.browser = 'Edge';
@@ -76,16 +81,15 @@ export function utilDetect(refresh?: boolean): DetectResult {
     result.version = globalThis.navigator?.appVersion ?? '';
   }
 
-  // Keep major.minor version only..
+  // Detect browser version - keep major.minor version only..
   result.version = (result.version ?? '').split(/\W/).slice(0, 2).join('.');
 
-  if (result.browser.toLowerCase() === 'msie') {
-    result.support = false;
-  } else {
-    result.support = true;
-  }
+  // Determine support flags
+  result.isSupported = (result.browser.toLowerCase() !== 'msie');
+  result.isSecureContext = globalThis.isSecureContext;
+  result.isTestEnvironment = (!('window' in globalThis)) || ('assert' in globalThis) || ('expect' in globalThis);
 
-  /* Platform */
+  // Detect OS, platform..
   if (/Win/.test(ua)) {
     result.os = 'win';
     result.platform = 'Windows';
@@ -100,14 +104,12 @@ export function utilDetect(refresh?: boolean): DetectResult {
     result.platform = 'Unknown';
   }
 
-  /* Locale */
+  // Detect locale..
   result.locales = globalThis.navigator?.languages?.slice() ?? ['en-US'];  // shallow copy
 
-  result.isTestEnvironment = (!('window' in globalThis)) || ('assert' in globalThis) || ('expect' in globalThis);
-
-  // test environment will not have `window`
+  // Test environment will not have `window`
   if (!result.isTestEnvironment) {
-    /* Host */
+    // Detect host..
     const loc = window.top?.location ?? window.location;
     let origin = loc.origin;
     if (!origin) {  // for unpatched IE11
@@ -116,6 +118,7 @@ export function utilDetect(refresh?: boolean): DetectResult {
 
     result.host = origin + loc.pathname;
 
+    // Detect preferences..
     result.prefersColorScheme = window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
     result.prefersContrast = window.matchMedia?.('(prefers-contrast: more)').matches ? 'more'
       : window.matchMedia?.('(prefers-contrast: less)').matches ? 'less' : null;

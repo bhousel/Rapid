@@ -48,8 +48,8 @@ You can adjust the URLs elsewhere in this file if you want to limit Rapid to a s
       const container = document.getElementById('rapid-container');
       const newScript = document.createElement('script');
       newScript.type = 'text/javascript';
-      newScript.onload = checkScript;
-      newScript.onerror = checkScript;
+      newScript.onload = startRapid;
+      newScript.onerror = startRapid;
 
       newScript.src = '../../js/rapid-dev.js';   // local development
 //      newScript.src = 'https://cdn.jsdelivr.net/npm/@rapideditor/rapid@2/dist/rapid.js';       // CDN debug
@@ -57,9 +57,18 @@ You can adjust the URLs elsewhere in this file if you want to limit Rapid to a s
 
       document.getElementsByTagName('head')[0].appendChild(newScript);
 
-      function checkScript() {
-        if (typeof Rapid === 'undefined' || !Rapid.utilDetect().support) {
-          container.innerHTML = 'Sorry, your browser is not currently supported.';
+      function startRapid() {
+        var error;
+        if (typeof Rapid === 'undefined') {
+          error = 'Rapid script was not loaded.';
+        } else if (!globalThis.isSecureContext) {
+          error = 'Rapid requires a secure context (https: or localhost).';
+        } else if (!Rapid.utilDetect().isSupported) {
+          error = 'Your browser is currently unsupported.';
+        }
+
+        if (error) {
+          container.innerHTML = error;
           container.style.padding = '20px';
 
         } else {
@@ -84,7 +93,7 @@ You can adjust the URLs elsewhere in this file if you want to limit Rapid to a s
             }
           ];
 
-          window.rapidContext = context;
+          globalThis.rapidContext = context;
           context.runAsync();
         }
       }
