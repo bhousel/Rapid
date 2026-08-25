@@ -126,6 +126,8 @@ async function buildData() {
     'fas-arrow-rotate-left',
     'fas-arrow-rotate-right',
     'fas-backward-step',
+    'fas-eye',
+    'fas-eye-slash',
     'fas-filter',
     'fas-forward-step',
     'fas-gear',
@@ -134,6 +136,7 @@ async function buildData() {
     'fas-palette',
     'fas-question',
     'fas-star',
+    'fas-trash',
     'fas-th-list',
     'fas-triangle-exclamation',
     'fas-user-cog'

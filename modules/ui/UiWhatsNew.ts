@@ -111,7 +111,7 @@ Big changes are coming soon to Rapid. including:
 
     const $checkbox: D3Selection= $mainSection
       .append('div')
-      .attr('class', 'rapid-checkbox whatsnew-dontshow')
+      .attr('class', 'rapid-row whatsnew-dontshow')
       .append('label')
       .attr('class', 'rapid-checkbox-label');
 
@@ -123,7 +123,7 @@ Big changes are coming soon to Rapid. including:
     $checkbox
       .append('input')
       .attr('type', 'checkbox')
-      .attr('class', 'rapid-feature-checkbox')
+      .attr('class', 'rapid-checkbox-input')
       .on('click', (d3_event: Event) => {
         if ((d3_event.target as HTMLInputElement).checked) {
           settings?.set('ui.sawWhatsNewVersion', String(context.whatsNewVersion));

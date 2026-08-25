@@ -165,13 +165,13 @@ export class UiRapidPowerUserFeatures extends EventEmitter {
 
 
     /* Features */
-    let $features: D3Selection = $content.selectAll('.rapid-features-container')
+    let $features: D3Selection = $content.selectAll('.rapid-feature-rows')
       .data([0]);
 
     // enter
     const $$features: D3EnterSelection = $features.enter()
       .append('div')
-      .attr('class', 'modal-section rapid-features-container');
+      .attr('class', 'modal-section rapid-feature-rows');
 
     $features = $features.merge($$features);
 
@@ -206,36 +206,36 @@ export class UiRapidPowerUserFeatures extends EventEmitter {
 
 
   /**
-   * Renders the list of feature flag checkboxes into the `.rapid-features-container` div.
+   * Renders the list of feature flag checkboxes into the `.rapid-feature-rows` div.
    * @param $selection - A d3-selection to a HTMLElement that this component should render itself into
    */
   public renderFeatures($selection: D3Selection): void {
     const context = this.context;
     const l10n = context.systems.l10n!;
 
-    let $rows: D3Selection = $selection.selectAll('.rapid-checkbox-feature')
+    let $rows: D3Selection = $selection.selectAll('.rapid-row-feature')
       .data(this._featureFlags, d => d);
 
     // enter
     const $$rows: D3EnterSelection = $rows.enter()
       .append('div')
-      .attr('class', 'rapid-checkbox rapid-checkbox-feature');
+      .attr('class', 'rapid-row rapid-row-feature');
 
-    const $$descriptions: D3EnterSelection = $$rows
+    const $$texts: D3EnterSelection = $$rows
       .append('div')
-      .attr('class', 'rapid-feature');
+      .attr('class', 'rapid-row-text');
 
-    $$descriptions
+    $$texts
       .append('div')
       .attr('class', 'rapid-feature-label');
 
-    $$descriptions
+    $$texts
       .append('div')
       .attr('class', 'rapid-feature-description');
 
     const $$inputs: D3EnterSelection = $$rows
       .append('div')
-      .attr('class', 'rapid-checkbox-inputs');
+      .attr('class', 'rapid-row-actions');
 
     const $$checkboxes: D3EnterSelection = $$inputs
       .append('label')
@@ -244,7 +244,7 @@ export class UiRapidPowerUserFeatures extends EventEmitter {
     $$checkboxes
       .append('input')
       .attr('type', 'checkbox')
-      .attr('class', 'rapid-feature-checkbox')
+      .attr('class', 'rapid-checkbox-input')
       .on('click', this.toggleFeature);
 
     $$checkboxes
@@ -262,7 +262,7 @@ export class UiRapidPowerUserFeatures extends EventEmitter {
     $rows.selectAll('.rapid-feature-description')
       .text(d => l10n.t(`rapid_poweruser.${d}.description`));
 
-    $rows.selectAll('.rapid-feature-checkbox')
+    $rows.selectAll('.rapid-checkbox-input')
       .property('checked', this.isFeatureEnabled);
   }
 

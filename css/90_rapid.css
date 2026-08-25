@@ -498,7 +498,7 @@ button.overture-inspector-close:hover {
 }
 .modal.rapid-modal .modal-section .logo-rapid {
   fill: white;
-  margin: 4px 9px 0 9px;
+  margin: 0 5px;
 }
 .modal.rapid-modal button.close {
   position: absolute;
@@ -538,6 +538,76 @@ button.overture-inspector-close:hover {
   flex: 1 1 auto;
   font-size: 24px;
   padding: 0 10px;
+}
+
+/* For modals that display rows of items (datasets, poweruser features, etc.) */
+.rapid-row {
+  font-size: 20px;
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+  padding: 2px 15px;
+  width: 100%;
+}
+.rapid-row:last-of-type {
+  padding-bottom: 5px;
+}
+.rapid-row.disabled {
+  opacity: .5;
+}
+.rapid-row-text {
+  display: flex;
+  flex-flow: column nowrap;
+}
+.rapid-row-actions {
+  display: flex;
+  flex: 1 1 auto;
+  justify-content: flex-end;
+  align-items: center;
+}
+.rapid-row-actions label {
+  display: flex;
+}
+
+/* Checkboxes */
+/* since checkboxes can't be styled easily, hide and style something on top of it.  */
+.rapid-checkbox-label {
+  display: flex;
+  align-items: center;
+}
+.rapid-checkbox-label:not(.disabled) {
+  cursor: pointer;
+}
+.rapid-checkbox-label input {
+  position: absolute;
+  opacity: 0;
+  cursor: pointer;
+}
+.rapid-checkbox-label .rapid-checkbox-custom {
+  height: 36px;
+  width: 36px;
+  background-color: transparent;
+  border-radius: 5px;
+  border: 2px solid #fff;
+}
+.rapid-checkbox-label .rapid-checkbox-custom::after {
+  content: "";
+  height: 0px;
+  width: 0px;
+}
+.rapid-checkbox-label input:checked~.rapid-checkbox-custom::after {
+  content: "";
+  display: block;
+  padding: 2px;
+  border-radius: 0;
+  border: solid #da26d3;
+  background-color: transparent;
+  border-width: 0 4px 4px 0;
+  transform: rotate(45deg);
+  opacity: 1;
+  margin: 3px 9px;
+  height: 12px;
+  width: 6px;
 }
 
 /* Dark scrollbars */
@@ -619,10 +689,6 @@ button.overture-inspector-close:hover {
   justify-content: flex-end;
   margin: 0px 20px;
 }
-.modal-whatsnew .rapid-checkbox-custom {
-  display: flex;
-  flex: 0 0 36px;
-}
 
 
 /* Rapid Menu (Dataset Toggle)
@@ -631,117 +697,64 @@ button.overture-inspector-close:hover {
   height: 45px;
 }
 
-.rapid-checkbox {
-  font-size: 20px;
-  display: flex;
-  justify-content: flex-start;
-  align-items: center;
-  padding: 5px 10px;
-  width: 100%;
+.rapid-row.rapid-toggle-all {
+  padding: 50px 15px 15px 15px;  /* leave space on top for close 'x' */
+}
+.rapid-row.rapid-toggle-all .rapid-hotkey {
+  margin: 0 5px;
+  font-size: 14px;
 }
 
-.rapid-datasets-container {
+.modal-dataset-toggle .rapid-dataset-rows {
   display: flex;
   flex-flow: column;
   width: 100%;
   padding: unset;
 }
-.rapid-datasets-container > .rapid-checkbox:last-of-type {
-  padding-bottom: 15px;
-}
-.rapid-checkbox.rapid-toggle-all {
-  padding: 50px 10px 15px 10px;  /* leave space on top for close 'x' */
-}
-.rapid-checkbox.rapid-browse-catalog,
-.rapid-checkbox.rapid-add-custom-data {
-  padding: 10px;
+
+.rapid-row.rapid-browse-catalog,
+.rapid-row.rapid-add-custom-data {
+  padding: 10px 15px;
   cursor: pointer;
 }
-.rapid-checkbox.rapid-browse-catalog:hover,
-.rapid-checkbox.rapid-add-custom-data:hover {
+.rapid-row.rapid-browse-catalog:hover,
+.rapid-row.rapid-add-custom-data:hover {
   color: #ddd;
   background: #8885;
 }
 
-.modal.rapid-modal .rapid-feature {
-  display: flex;
-  flex-flow: column nowrap;
-}
-
-.rapid-feature-label,
-.rapid-feature-label-container,
-.rapid-feature-extent-container {
+.rapid-row-description-wrap {
   display: flex;
   align-items: center;
 }
-.rapid-feature-label-container > div,
-.rapid-feature-extent-container > div {
-  margin: 0 5px;
-}
-.rapid-feature-extent-container {
+.rapid-row-description-wrap {
   font-size: 14px;
   font-style: italic;
-  margin: -5px 5px 5px 5px;
+  margin: -5px 5px 5px 0px;
   color: #aaa;
 }
 
-.rapid-feature-label-container .rapid-feature-label-beta {
+.rapid-row-label-wrap .rapid-dataset-label-beta {
   font-size: 14px;
 }
-.rapid-feature-label > svg.icon.logo-rapid {
+.rapid-row-label-wrap svg.icon.logo-rapid {
   width: 4em;
   height: 1.3em;
   margin: -5px;
 }
-.rapid-feature-label-divider {
+.rapid-license-divider {
   width: 1px;
-  height: 20px;
+  height: 28px;
+  margin: 0 8px;
   background: #888a;
 }
-
-.rapid-feature-description {
-  font-size: 14px;
-  margin: 4px;
-}
-.rapid-feature-license {
+.rapid-license-wrap {
   font-size: 12px;
 }
-.rapid-checkbox.disabled {
-  opacity: .5;
-}
-.rapid-feature-checkbox {
-  margin-left: auto;
-}
 
-.rapid-checkbox.section-divider {
-  width: 100%;
-  height: 1px;
-  background: #888a;
-  padding: 1px;
-  align-self: center;
-  margin-top: 3px;
-  margin-bottom: 3px;
-}
-
-.rapid-checkbox.section-divider.strong {
-  background: #fffa;
-}
-
-.rapid-feature-hotkey {
-  margin: 0 5px;
-  font-size: 14px;
-}
-
-.rapid-checkbox-inputs {
-  display: flex;
-  flex: 1 1 auto;
-  justify-content: flex-end;
-  align-items: center;
-}
-
-.rapid-checkbox-label {
-  display: flex;
-  align-items: center;
+.modal-dataset-toggle .rapid-row-actions .icon  {
+  width: 20px;
+  height: 20px;
 }
 
 .rapid-colorpicker-label,
@@ -749,12 +762,9 @@ button.overture-inspector-close:hover {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 40px;
-  height: 40px;
-  margin-right: 15px;
+  margin-right: 5px;
 }
 .rapid-colorpicker-label:not(.disabled),
-.rapid-checkbox-label:not(.disabled),
 .rapid-settings-label:not(.disabled) {
   cursor: pointer;
 }
@@ -763,22 +773,13 @@ button.overture-inspector-close:hover {
   opacity: 0.5;
 }
 
-.rapid-feature-settings {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: 2px solid #fff;
-  border-radius: 6px;
-  width: 36px;
-  height: 36px;
-}
 .rapid-colorpicker {
   padding: 2px;
   border: none;
   background: #fff;
   border-radius: 6px;
-  width: 36px;
-  height: 36px;
+  width: 30px;
+  height: 30px;
 }
 .rapid-colorpicker-label:not(.disabled):hover,
 .rapid-settings-label:not(.disabled):hover {
@@ -791,48 +792,11 @@ button.overture-inspector-close:hover {
   justify-content: center;
   border: none;
   border-radius: 4px;
-  width: 32px;
-  height: 32px;
+  width: 26px;
+  height: 26px;
 }
 .rapid-colorpicker-fill .icon {
   pointer-events: none;
-}
-
-/* since checkboxes can't be styled, we'll
-hide this one and style something on top of it.  */
-.rapid-checkbox-label input {
-  position: absolute;
-  opacity: 0;
-  cursor: pointer;
-}
-
-.rapid-checkbox-label .rapid-checkbox-custom {
-  height: 36px;
-  width: 36px;
-  background-color: transparent;
-  border-radius: 5px;
-  border: 2px solid #fff;
-}
-
-.rapid-checkbox-label .rapid-checkbox-custom::after {
-  content: "";
-  height: 0px;
-  width: 0px;
-}
-
-.rapid-checkbox-label input:checked ~ .rapid-checkbox-custom::after {
-  content: "";
-  display: block;
-  padding: 2px;
-  border-radius: 0;
-  border: solid #da26d3;
-  background-color: transparent;
-  border-width: 0 4px 4px 0;
-  transform: rotate(45deg);
-  opacity: 1;
-  margin: 3px 9px;
-  height: 12px;
-  width: 6px;
 }
 
 
@@ -857,20 +821,13 @@ hide this one and style something on top of it.  */
   font-style: normal;
   margin: 0 10px;
 }
-.modal-poweruser .rapid-features-container {
-  width: 100%;
-  border-top: 1px solid #888a;
+.modal-poweruser .modal-section.rapid-feature-rows {
+  padding: 10px;
 }
-.modal-poweruser .rapid-features-container > .rapid-checkbox:last-of-type {
-  padding-bottom: 15px;
-}
-.modal-poweruser .rapid-features-container .rapid-feature-label {
-  margin: 0 5px;
-}
-.modal-poweruser .rapid-features-container .rapid-feature-description {
+.modal-poweruser .rapid-feature-rows .rapid-feature-description {
   font-size: 14px;
   font-style: italic;
-  margin: -5px 5px 5px 5px;
+  margin: -5px 5px 5px 0px;
   color: #aaa;
 }
 

@@ -371,7 +371,7 @@ ${url_tokens}
       .attr('class', 'dataset-field-feedback');
 
     // Add special handling for the identifier field..
-    const $$identifier = $$fields.selectAll('.row-identifier .dataset-field-input');
+    const $$identifier: D3EnterSelection = $$fields.selectAll('.row-identifier .dataset-field-input');
 
     // validate input
     $$identifier
@@ -400,7 +400,8 @@ ${url_tokens}
       });
 
     // set focus on enter
-    const inputNode = $$identifier.node() as HTMLElement | null;
+    const $$name: D3EnterSelection = $$fields.selectAll('.row-name .dataset-field-input');
+    const inputNode = $$name.node() as HTMLElement | null;
     inputNode?.focus();
 
 
