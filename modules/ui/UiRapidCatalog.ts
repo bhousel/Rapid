@@ -340,17 +340,12 @@ export class UiRapidCatalog extends EventEmitter {
       const label = d.getLabel().toLowerCase();
       const description = d.getDescription().toLowerCase();
 
-      if (d.added) {  // always show added datasets at the top of the list
-        d.filtered = false;
-        ++count;
-        continue;
-      }
       if (this._filterText && !label.includes(this._filterText) && !description.includes(this._filterText)) {
         d.filtered = true;   // filterText not found anywhere in `label` or `description`
         continue;
       }
       if (this._filterCategory && !(d.categories.has(this._filterCategory))) {
-        d.filtered = true;   // filterCategory not found anywhere in `categories``
+        d.filtered = true;   // filterCategory not found anywhere in `categories`
         continue;
       }
 
@@ -477,33 +472,31 @@ export class UiRapidCatalog extends EventEmitter {
 
 
   /**
-   * Added datasets to the beginning
-   * Featured datasets next
-   * All others sort by name
+   * Sort the datasets in the catalog.
+   * Featured datasets first, all others sort by name.
    * @param  a - first dataset to compare
    * @param  b - second dataset to compare
+   * @return comparison result: -1, 0, 1
    */
-  public sortDatasets(a: RapidDataset, b: RapidDataset) {
-    return a.added && !b.added ? -1
-      : b.added && !a.added ? 1
-      : a.featured && !b.featured ? -1
-      : b.featured && !a.featured ? 1
+  public sortDatasets(a: RapidDataset, b: RapidDataset): number {
+    return (a.featured && !b.featured) ? -1
+      : (b.featured && !a.featured) ? 1
       : a.label.localeCompare(b.label);
   }
 
 
   /**
-   * Featured before everything else
-   * Preview after everything else
-   * All others sort alphabetically
+   * Sort the categories that appear on a dataset card.
+   * Featured before everything else, preview after everything else, all others sort alphabetically.
    * @param  a - first category to compare
    * @param  b - second category to compare
+   * @return comparison result: -1, 0, 1
    */
-  public sortCategories(a: string, b: string) {
-    return a === 'featured' && b !== 'featured' ? -1
-      : b === 'featured' && a !== 'featured' ? 1
-      : a === 'preview' && b !== 'preview' ? 1
-      : b === 'preview' && a !== 'preview' ? -1
+  public sortCategories(a: string, b: string): number {
+    return (a === 'featured' && b !== 'featured') ? -1
+      : (b === 'featured' && a !== 'featured') ? 1
+      : (a === 'preview' && b !== 'preview') ? 1
+      : (b === 'preview' && a !== 'preview') ? -1
       : a.localeCompare(b);
   }
 
@@ -516,14 +509,14 @@ export class UiRapidCatalog extends EventEmitter {
   public toggleDataset(e: Event, d: RapidDataset) {
     const context = this.context;
     const rapid = context.systems.rapid!;
-    const added = rapid.datasets;
+    const addedIDs = rapid.addedDatasetIDs;
 
-    if (added.has(d.id)) {
+    if (addedIDs.has(d.id)) {
       rapid.removeDatasets(d.id);  // remove from menu and disable/uncheck
     } else {
       rapid.enableDatasets(d.id);  // add to menu and enable/check
       // If adding an Esri building dataset, disable the Microsoft buildings to avoid clutter
-      if (d.categories.has('esri') && d.categories.has('buildings') && added.has('msBuildings')) {
+      if (d.categories.has('esri') && d.categories.has('buildings') && addedIDs.has('msBuildings')) {
         rapid.disableDatasets('msBuildings');
       }
     }
