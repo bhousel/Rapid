@@ -567,16 +567,13 @@ button.overture-inspector-close:hover {
 .rapid-row-text.disabled {
   opacity: .5;
 }
-.rapid-row-actions label {
+.rapid-row-action {
   display: flex;
-  margin-left: 8px;
-}
-.ideditor[dir='rtl'] .rapid-row-actions label {
-  margin-left: unset;
-  margin-right: 8px;
-}
-.rapid-row:not(.disabled) .rapid-row-actions label {
-  cursor: pointer;
+  width: 32px;
+  height: 32px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
 }
 
 /* Checkboxes */
@@ -722,17 +719,6 @@ button.overture-inspector-close:hover {
   padding: unset;
 }
 
-.rapid-row.row-search-catalog,
-.rapid-row.row-custom-dataset {
-  padding: 10px 15px;
-  cursor: pointer;
-}
-.rapid-row.row-search-catalog:hover,
-.rapid-row.row-custom-dataset:hover {
-  color: #ddd;
-  background: #8885;
-}
-
 .rapid-row-description-wrap {
   display: flex;
   align-items: center;
@@ -762,12 +748,24 @@ button.overture-inspector-close:hover {
   font-size: 12px;
 }
 
-.modal-dataset-toggle .rapid-row-actions .icon  {
+.modal-dataset-toggle .rapid-row-actions .icon {
   width: 20px;
   height: 20px;
 }
-
-.rapid-colorpicker-label:not(.disabled),
+.rapid-dataset-rows .rapid-row:not(.disabled) .rapid-row-action {
+  cursor: pointer;
+}
+.row-search-catalog,
+.row-custom-dataset {
+  padding: 10px 15px;
+  cursor: pointer;
+}
+.rapid-dataset-rows .rapid-row:not(.disabled) .rapid-row-action:hover,
+.row-search-catalog:hover,
+.row-custom-dataset:hover {
+  background: #8885;
+}
+/* .rapid-colorpicker-label:not(.disabled),
 .rapid-settings-label:not(.disabled) {
   cursor: pointer;
 }
@@ -779,7 +777,7 @@ button.overture-inspector-close:hover {
 .rapid-colorpicker-label:not(.disabled):hover,
 .rapid-settings-label:not(.disabled):hover {
   opacity: 0.9;
-}
+} */
 
 
 /* Rapid Poweruser features

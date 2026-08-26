@@ -64,6 +64,7 @@ export class UiRapidDatasetToggle extends EventEmitter {
     this.renderDatasets = this.renderDatasets.bind(this);
     this.changeColor = this.changeColor.bind(this);
     this.toggleDataset = this.toggleDataset.bind(this);
+    this.removeDataset = this.removeDataset.bind(this);
     this.toggleRapid = this.toggleRapid.bind(this);
   }
 
@@ -230,7 +231,7 @@ export class UiRapidDatasetToggle extends EventEmitter {
       .append('div')
       .attr('class', 'rapid-row-actions')
       .append('div')
-      .attr('class', 'rapid-action-label')
+      .attr('class', 'rapid-row-action')
       .call(uiIcon('#fas-plus', 'icon-30'));
 
     // update
@@ -263,7 +264,7 @@ export class UiRapidDatasetToggle extends EventEmitter {
       .append('div')
       .attr('class', 'rapid-row-actions')
       .append('div')
-      .attr('class', 'rapid-action-label')
+      .attr('class', 'rapid-row-action')
       .call(uiIcon('#fas-plus', 'icon-30'));
 
     // update
@@ -402,7 +403,7 @@ export class UiRapidDatasetToggle extends EventEmitter {
 
     const $$colorpickers: D3EnterSelection = $$actions
       .append('div')
-      .attr('class', 'rapid-colorpicker-wrap');
+      .attr('class', 'rapid-row-action rapid-colorpicker-wrap');
 
     $$colorpickers.each((d: RapidDataset) => {
       const control = new UiRapidColorpicker(context);
@@ -412,7 +413,7 @@ export class UiRapidDatasetToggle extends EventEmitter {
 
     $$actions
       .append('label')
-      .attr('class', 'rapid-dataset-settings')
+      .attr('class', 'rapid-row-action rapid-dataset-settings')
       .on('click', (e: Event, d: RapidDataset) => {
         const SettingsModal = new UiRapidDatasetSettings(context).on('done', this.render);
         SettingsModal.dataset = d;
@@ -422,14 +423,14 @@ export class UiRapidDatasetToggle extends EventEmitter {
 
     $$actions
       .append('label')
-      .attr('class', 'rapid-dataset-visible')
+      .attr('class', 'rapid-row-action rapid-dataset-visible')
       .on('click', this.toggleDataset)
       .call(uiIcon(''));
 
     $$actions
       .append('label')
-      .attr('class', 'rapid-dataset-trash')
-      .on('click', this.toggleDataset)
+      .attr('class', 'rapid-row-action rapid-dataset-trash')
+      .on('click', this.removeDataset)
       .call(uiIcon('#fas-trash'));
 
 
@@ -473,7 +474,6 @@ export class UiRapidDatasetToggle extends EventEmitter {
     $rows.selectAll('.rapid-dataset-extent-worldwide')
       .text(l10n.t('rapid_menu.worldwide'));
 
-
     $rows.selectAll('.rapid-dataset-visible')
       .select('use')  // propagate bound data
       .attr('href', (d: RapidDataset) => d.enabled ? '#fas-eye' : '#fas-eye-slash');
@@ -508,7 +508,7 @@ export class UiRapidDatasetToggle extends EventEmitter {
 
 
   /**
-   * Called when a user has clicked the checkbox to toggle a dataset on/off.
+   * Called when a user has clicked the checkbox to toggle a dataset enabled/disabled.
    * @param  [e] - the triggering event, if any
    * @param  ds - bound datum (the RapidDataset in this case)
    */
@@ -518,6 +518,21 @@ export class UiRapidDatasetToggle extends EventEmitter {
 
     context.enter('browse');   // return to browse mode (in case something was selected)
     rapid.toggleDatasets(ds.id);
+    this.render();
+  }
+
+
+  /**
+   * Called when a user has clicked the checkbox to toggle a dataset enabled/disabled.
+   * @param  [e] - the triggering event, if any
+   * @param  ds - bound datum (the RapidDataset in this case)
+   */
+  public removeDataset(e: Event, ds: RapidDataset): void {
+    const context = this.context;
+    const rapid = context.systems.rapid!;
+
+    context.enter('browse');   // return to browse mode (in case something was selected)
+    rapid.removeDatasets(ds.id);
     this.render();
   }
 
