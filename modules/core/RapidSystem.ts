@@ -54,19 +54,17 @@ export interface RapidSettings {
 };
 
 
-const RAPID_MAGENTA = '#da26d3';
-const OVERTURE_CYAN = '#00ffff';
 const RAPID_COLORS: readonly string[] = [
-  '#ff0000',  // red
-  '#ffa500',  // orange
-  '#ffd700',  // gold
-  '#00ff00',  // lime
-  '#00ffff',  // cyan
-  '#1e90ff',  // dodgerblue
-  '#da26d3',  // rapid magenta
-  '#ffc0cb',  // pink
-  '#d3d3d3',  // lightgray
-  '#faf0e6'   // linen
+  '#ff0000', // Pure Red
+  '#ff8c00', // Dark Orange
+  '#ffff00', // Pure Yellow
+  '#adff2f', // Green Yellow
+  '#00dd00', // Pure Green
+  '#00ffff', // Pure Cyan
+  '#00bbff', // Sky Blue
+  '#bb88ff', // Amethyst
+  '#da26d3', // Rapid Magenta
+  '#ff88aa'  // Hot Pink
 ];
 
 
