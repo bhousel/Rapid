@@ -240,7 +240,7 @@ export class ValidationSystem extends AbstractSystem {
     return result;
 
     /**
-     *
+     * Convert a regexp-like string to a true RegExp.
      * @param str
      */
     function makeRegExp(str: string): RegExp {

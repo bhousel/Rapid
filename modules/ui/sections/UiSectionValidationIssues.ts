@@ -5,7 +5,7 @@ import { AbstractUiSection } from './AbstractUiSection.ts';
 import { utilHighlightEntities } from '../../util/util.ts';
 
 import type { Context } from '../../Context.ts';
-import type { D3Selection } from 'd3-selection';
+import type { D3EnterSelection, D3Selection } from 'd3-selection';
 import type { IssuesBySeverity } from '../../core/ValidationSystem.ts';
 import type { ValidationIssue } from '../../lib/ValidationIssue.ts';
 
@@ -15,6 +15,7 @@ const MAX_ISSUES = 1000;
 export class UiSectionValidationIssues extends AbstractUiSection {
   protected _severity: string;    // 'error', 'warning', or 'suggestion'
   protected _issues: ValidationIssue[];
+
 
   /**
    * @param  context - Global shared application context
@@ -33,13 +34,15 @@ export class UiSectionValidationIssues extends AbstractUiSection {
 
     // event handlers to refresh the lists
     const map = context.systems.map!;
-    const scheduler = context.systems.scheduler;  // optional
-    const urlhash = context.systems.urlhash!;
-    const validator = context.systems.validator!;
+    const settings = context.systems.settings;
+    const scheduler = context.systems.scheduler;
+    const urlhash = context.systems.urlhash;
+    const validator = context.systems.validator;
 
-    validator.on('validated', this._renderWhenIdle);
+    settings?.on('settingschange', this._renderWhenIdle);
+    validator?.on('validated', this._renderWhenIdle);
 
-    urlhash.on('hashchange', (currParams: URLSearchParams, prevParams: URLSearchParams) => {
+    urlhash?.on('hashchange', (currParams: Map<string,string>, prevParams: Map<string,string>) => {
       if (currParams.get('poweruser') !== prevParams.get('poweruser')) {   // change in poweruser status
         this._renderWhenIdle();
       }
@@ -134,16 +137,16 @@ export class UiSectionValidationIssues extends AbstractUiSection {
       .remove();
 
     // Enter
-    const $$items = $items.enter()
+    const $$items: D3EnterSelection = $items.enter()
       .append('li')
       .attr('class', (d: ValidationIssue) => `issue severity-${d.severity}`);
 
     const $$labels = $$items
       .append('button')
       .attr('class', 'issue-label')
-      .on('click',     (d3_event, d: ValidationIssue) => validator.focusIssue(d))
-      .on('mouseover', (d3_event, d: ValidationIssue) => utilHighlightEntities(context, d.entityIds, true))
-      .on('mouseout',  (d3_event, d: ValidationIssue) => utilHighlightEntities(context, d.entityIds, false));
+      .on('click',     (e: PointerEvent, d: ValidationIssue) => validator.focusIssue(d))
+      .on('mouseover', (e: MouseEvent, d: ValidationIssue) => utilHighlightEntities(context, d.entityIds, true))
+      .on('mouseout',  (e: MouseEvent, d: ValidationIssue) => utilHighlightEntities(context, d.entityIds, false));
 
     const $$text = $$labels
       .append('span')
@@ -152,7 +155,7 @@ export class UiSectionValidationIssues extends AbstractUiSection {
     $$text
       .append('span')
       .attr('class', 'issue-icon')
-      .each((d: ValidationIssue, i, nodes) => {
+      .each((d: ValidationIssue, i: number, nodes: HTMLElement[]) => {
         select(nodes[i])
           .call(uiIcon(validator.getSeverityIcon(d.severity)));
       });
@@ -192,11 +195,11 @@ export class UiSectionValidationIssues extends AbstractUiSection {
       .remove();
 
     // enter
-    const $$autoFixAll = $autoFixAll.enter()
+    const $$autoFixAll: D3EnterSelection = $autoFixAll.enter()
       .insert('div', '.issues-list')
       .attr('class', 'autofix-all');
 
-    const $$link = $$autoFixAll
+    const $$link: D3EnterSelection = $$autoFixAll
       .append('a')
       .attr('class', 'autofix-all-link')
       .attr('href', '#');
@@ -219,20 +222,20 @@ export class UiSectionValidationIssues extends AbstractUiSection {
       .text(l10n.t('issues.fix_all.title'));
 
     $autoFixAll.selectAll('.autofix-all-link')
-      .on('click', (d3_event) => this._clickAutoFixAll(d3_event, autofixable));
+      .on('click', (e: PointerEvent) => this._clickAutoFixAll(e, autofixable));
   }
 
 
   /**
    * User clicked "Autofix": fixes a single issue.
-   * @param d3_event - the triggering click event
+   * @param e - the triggering click event
    * @param issue - the issue to fix
    */
-  protected _clickAutoFix(d3_event: Event, issue: ValidationIssue): void {
+  protected _clickAutoFix(e: PointerEvent, issue: ValidationIssue): void {
     const editor = this.context.systems.editor!;
-    if (d3_event) {
-      d3_event.preventDefault();
-      d3_event.stopPropagation();
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
     }
 
     utilHighlightEntities(this.context, issue.entityIds, false);  // unhighlight
@@ -243,16 +246,16 @@ export class UiSectionValidationIssues extends AbstractUiSection {
 
   /**
    * User clicked "Autofix All": fixes all the autofixable issues in one transaction.
-   * @param d3_event - the triggering click event
+   * @param e - the triggering click event
    * @param issues - the autofixable issues to fix
    */
-  protected _clickAutoFixAll(d3_event: Event, issues: ValidationIssue[]): void {
-    const editor = this.context.systems.editor!;
-    const l10n = this.context.systems.l10n!;
-    if (d3_event) {
-      d3_event.preventDefault();
-      d3_event.stopPropagation();
-    }
+  protected _clickAutoFixAll(e: PointerEvent, issues: ValidationIssue[]): void {
+    const context = this.context;
+    const editor = context.systems.editor!;
+    const l10n = context.systems.l10n!;
+
+    e.preventDefault();
+    e.stopPropagation();
 
     editor.beginTransaction();
 

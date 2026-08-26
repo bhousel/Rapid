@@ -2,7 +2,7 @@ import { uiIcon } from '../icon.ts';
 import { AbstractUiSection } from './AbstractUiSection.ts';
 
 import type { Context } from '../../Context.ts';
-import type { D3Selection } from 'd3-selection';
+import type { D3EnterSelection, D3Selection } from 'd3-selection';
 
 
 export class UiSectionValidationStatus extends AbstractUiSection {
@@ -18,9 +18,11 @@ export class UiSectionValidationStatus extends AbstractUiSection {
     this._renderWhenIdle = this._renderWhenIdle.bind(this);
 
     const map = context.systems.map!;
-    const scheduler = context.systems.scheduler;  // optional
+    const scheduler = context.systems.scheduler;
+    const settings = context.systems.settings;
     const validator = context.systems.validator!;
 
+    settings?.on('settingschange', this._renderWhenIdle);
     validator.on('validated', this._renderWhenIdle);
 
     map.on('draw', () => {
@@ -63,10 +65,10 @@ export class UiSectionValidationStatus extends AbstractUiSection {
    * @param $selection - A d3-selection to the HTMLElement this content renders into
    */
   public renderContent($selection: D3Selection): void {
-    const $box = $selection.selectAll('.box')
+    const $box: D3Selection = $selection.selectAll('.box')
       .data([0]);
 
-    const $$box = $box.enter()
+    const $$box: D3EnterSelection = $box.enter()
       .append('div')
       .attr('class', 'box');
 
@@ -74,7 +76,7 @@ export class UiSectionValidationStatus extends AbstractUiSection {
       .append('div')
       .call(uiIcon('#rapid-icon-apply', 'pre-text'));
 
-    const $$noIssuesMessage = $$box
+    const $$noIssuesMessage: D3EnterSelection = $$box
       .append('span');
 
     $$noIssuesMessage
@@ -111,7 +113,7 @@ export class UiSectionValidationStatus extends AbstractUiSection {
       .remove();
 
     // enter
-    const $$resetIgnored = $resetIgnored.enter()
+    const $$resetIgnored: D3EnterSelection = $resetIgnored.enter()
       .append('div')
       .attr('class', 'reset-ignored section-footer');
 
