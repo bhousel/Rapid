@@ -1175,7 +1175,7 @@ en:
       tooltip: Ignore this feature.
 
   rapid_menu:
-    browse_data_catalog: Browse Dataset Catalog
+    search_dataset_catalog: Search Dataset Catalog
     add_custom_dataset: Add Custom Dataset
     center_map: Center map here
     license: License

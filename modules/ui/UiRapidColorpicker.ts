@@ -66,30 +66,41 @@ export class UiRapidColorpicker extends EventEmitter {
       return;   // no parent - called too early?
     }
 
-    const currColor = this._color;
-    let $colorpicker: D3Selection = $parent.selectAll('.rapid-colorpicker')
+    let $colorpicker: D3Selection = $parent.selectAll('.colorpicker-label')
       .data([0]);
 
     // enter
     const $$colorpicker: D3EnterSelection = $colorpicker.enter()
-      .append('div')
-      .attr('class', 'rapid-colorpicker')
+      .append('label')
+      .attr('class', 'colorpicker-label')
       .on('click', this.toggle);
 
     $$colorpicker
-      .append('div')
-      .attr('class', 'rapid-colorpicker-fill')
       .call(uiIcon('#fas-palette'));
+
+    $$colorpicker
+      .append('input')
+      .attr('class', 'colorpicker-input');
 
     // update
     this.$colorpicker = $colorpicker = $colorpicker
       .merge($$colorpicker);
 
     $colorpicker
-      .selectAll('.rapid-colorpicker-fill')
-      .style('background', currColor)
-      .select('.icon')  // propagate bound data
-      .style('color', this._getBrightness(currColor) > 140.5 ? '#333' : '#fff');
+      .attr('title', 'choose a color')
+      .attr('aria-label', 'choose a color');
+
+    $colorpicker.selectAll('.colorpicker-input')
+      .property('value', this._color);
+
+    $colorpicker.selectAll('.icon')
+      .style('color', this._color);
+
+//    $colorpicker
+//      .selectAll('.rapid-colorpicker-fill')
+//      .style('background', currColor)
+//      .select('.icon')  // propagate bound data
+//      .style('color', this._getBrightness(currColor) > 140.5 ? '#333' : '#fff');
   }
 
 

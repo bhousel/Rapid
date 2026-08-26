@@ -23,13 +23,15 @@ import type { RapidDataset } from '../lib/RapidDataset.ts';
  * - `done`:  Fires when the user is finished and they are closing this Modal
  *
  * @example
- * <div class='modal rapid-modal'>
+ * <div class='modal rapid-modal modal-dataset-toggle'>
  *   <button class='close'/>
  *   <div class='content'>
  *     <div class='modal-section rapid-toggle-all'/>       // "Toggle All Rapid Features"
- *     <div class='rapid-dataset-rows'> … </div>     //   …list of datasets…
- *     <div class='modal-section rapid-browse-catalog'/>   // "Browse Data Catalog"
- *     <div class='modal-section rapid-add-custom-data'/>  // "Add Custom Data"
+ *     <div class='modal-section rapid-dataset-rows'>
+ *         …                                                //   …list of datasets…
+ *     </div>
+ *     <div class='modal-section row-search-catalog'/>     // "Search Dataset Catalog"
+ *     <div class='modal-section row-custom-dataset'/>     // "Add Custom Dataset"
  *     <div class='modal-section buttons'/>                // "OK" button
  *   </div>
  * </div>
@@ -205,14 +207,14 @@ export class UiRapidDatasetToggle extends EventEmitter {
       .call(this.renderDatasets);
 
 
-    /* Browse Data Catalog */
-    let $catalogOption: D3Selection = $content.selectAll('.rapid-browse-catalog')
+    /* Search Data Catalog */
+    let $catalogOption: D3Selection = $content.selectAll('.row-search-catalog')
       .data([0]);
 
     // enter
     const $$catalogOption: D3EnterSelection = $catalogOption.enter()
       .append('div')
-      .attr('class', 'modal-section rapid-row rapid-browse-catalog')
+      .attr('class', 'modal-section rapid-row row-search-catalog')
       .on('click', () => {
         const CatalogModal = new UiRapidCatalog(context).on('done', this.render);
         CatalogModal.show();
@@ -228,53 +230,47 @@ export class UiRapidDatasetToggle extends EventEmitter {
       .append('div')
       .attr('class', 'rapid-row-actions')
       .append('div')
-      .attr('class', 'rapid-checkbox-label')
-      .call(uiIcon('', 'icon-30'));
+      .attr('class', 'rapid-action-label')
+      .call(uiIcon('#fas-plus', 'icon-30'));
 
     // update
     $catalogOption = $catalogOption.merge($$catalogOption);
 
     $catalogOption.selectAll('.rapid-row-label')
-      .text(l10n.t('rapid_menu.browse_data_catalog'));
-
-    $catalogOption.selectAll('.rapid-checkbox-label use')
-      .attr('xlink:href', l10n.isRTL ? '#rapid-icon-backward' : '#rapid-icon-forward');
+      .text(l10n.t('rapid_menu.search_dataset_catalog'));
 
 
-    /* Add Custom Data */
-    let $addCustomOption: D3Selection = $content.selectAll('.rapid-add-custom-data')
+    /* Add Custom Dataset */
+    let $customOption: D3Selection = $content.selectAll('.row-custom-dataset')
       .data([0]);
 
     // enter
-    const $$addCustomOption: D3EnterSelection = $addCustomOption.enter()
+    const $$customOption: D3EnterSelection = $customOption.enter()
       .append('div')
-      .attr('class', 'modal-section rapid-row rapid-add-custom-data')
+      .attr('class', 'modal-section rapid-row row-custom-dataset')
       .on('click', () => {
         const AddDatasetModal = new UiRapidAddDataset(context).on('done', this.render);
         AddDatasetModal.show();
       });
 
-    $$addCustomOption
+    $$customOption
       .append('div')
       .attr('class', 'rapid-row-text')
       .append('span')
       .attr('class', 'rapid-row-label');
 
-    $$addCustomOption
+    $$customOption
       .append('div')
       .attr('class', 'rapid-row-actions')
       .append('div')
-      .attr('class', 'rapid-checkbox-label')
-      .call(uiIcon('', 'icon-30'));
+      .attr('class', 'rapid-action-label')
+      .call(uiIcon('#fas-plus', 'icon-30'));
 
     // update
-    $addCustomOption = $addCustomOption.merge($$addCustomOption);
+    $customOption = $customOption.merge($$customOption);
 
-    $addCustomOption.selectAll('.rapid-row-label')
+    $customOption.selectAll('.rapid-row-label')
       .text(l10n.t('rapid_menu.add_custom_dataset'));
-
-    $addCustomOption.selectAll('.rapid-checkbox-label use')
-      .attr('xlink:href', l10n.isRTL ? '#rapid-icon-backward' : '#rapid-icon-forward');
 
 
     /* OK Button */
@@ -405,15 +401,14 @@ export class UiRapidDatasetToggle extends EventEmitter {
       .attr('class', 'rapid-row-actions');
 
     const $$colorpickers: D3EnterSelection = $$actions
-      .append('label')
-      .attr('class', 'rapid-colorpicker-label');
+      .append('div')
+      .attr('class', 'rapid-colorpicker-wrap');
 
     $$colorpickers.each((d: RapidDataset) => {
       const control = new UiRapidColorpicker(context);
       control.on('change', (val: string) => this.changeColor(d, val));
       this._colorpickers[d.id] = control;
     });
-
 
     $$actions
       .append('label')
@@ -425,13 +420,11 @@ export class UiRapidDatasetToggle extends EventEmitter {
       })
       .call(uiIcon('#fas-gear'));
 
-
     $$actions
       .append('label')
       .attr('class', 'rapid-dataset-visible')
       .on('click', this.toggleDataset)
-      .call(uiIcon('#fas-eye'));
-
+      .call(uiIcon(''));
 
     $$actions
       .append('label')
@@ -465,6 +458,9 @@ export class UiRapidDatasetToggle extends EventEmitter {
     $rows.selectAll('.rapid-row-label')
       .text(d => d.getLabel());
 
+    $rows.selectAll('.rapid-row-text')
+      .classed('disabled', (d: RapidDataset) => !d.enabled);
+
     $rows.selectAll('.rapid-dataset-label-beta')
       .attr('title', l10n.t('rapid_poweruser.beta'));   // alt text
 
@@ -477,8 +473,12 @@ export class UiRapidDatasetToggle extends EventEmitter {
     $rows.selectAll('.rapid-dataset-extent-worldwide')
       .text(l10n.t('rapid_menu.worldwide'));
 
-    $rows.selectAll('.rapid-colorpicker-label')
-      .attr('disabled', isRapidEnabled ? null : true)
+
+    $rows.selectAll('.rapid-dataset-visible')
+      .select('use')  // propagate bound data
+      .attr('href', (d: RapidDataset) => d.enabled ? '#fas-eye' : '#fas-eye-slash');
+
+    $rows.selectAll('.rapid-colorpicker-wrap')
       .each((d: RapidDataset, i: number, nodes: HTMLElement[]) => {
         const $selection: D3Selection = select(nodes[i]);
         const control = this._colorpickers[d.id];
@@ -510,14 +510,15 @@ export class UiRapidDatasetToggle extends EventEmitter {
   /**
    * Called when a user has clicked the checkbox to toggle a dataset on/off.
    * @param  [e] - the triggering event, if any
-   * @param  d - bound datum (the RapidDataset in this case)
+   * @param  ds - bound datum (the RapidDataset in this case)
    */
-  public toggleDataset(e: Event, d: RapidDataset): void {
+  public toggleDataset(e: Event, ds: RapidDataset): void {
     const context = this.context;
     const rapid = context.systems.rapid!;
 
     context.enter('browse');   // return to browse mode (in case something was selected)
-    rapid.toggleDatasets(d.id);
+    rapid.toggleDatasets(ds.id);
+    this.render();
   }
 
 

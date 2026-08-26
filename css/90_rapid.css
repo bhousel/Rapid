@@ -552,9 +552,7 @@ button.overture-inspector-close:hover {
 .rapid-row:last-of-type {
   padding-bottom: 5px;
 }
-.rapid-row.disabled {
-  opacity: .5;
-}
+
 .rapid-row-text {
   display: flex;
   flex-flow: column nowrap;
@@ -565,8 +563,20 @@ button.overture-inspector-close:hover {
   justify-content: flex-end;
   align-items: center;
 }
+.rapid-row.disabled,
+.rapid-row-text.disabled {
+  opacity: .5;
+}
 .rapid-row-actions label {
   display: flex;
+  margin-left: 8px;
+}
+.ideditor[dir='rtl'] .rapid-row-actions label {
+  margin-left: unset;
+  margin-right: 8px;
+}
+.rapid-row:not(.disabled) .rapid-row-actions label {
+  cursor: pointer;
 }
 
 /* Checkboxes */
@@ -712,13 +722,13 @@ button.overture-inspector-close:hover {
   padding: unset;
 }
 
-.rapid-row.rapid-browse-catalog,
-.rapid-row.rapid-add-custom-data {
+.rapid-row.row-search-catalog,
+.rapid-row.row-custom-dataset {
   padding: 10px 15px;
   cursor: pointer;
 }
-.rapid-row.rapid-browse-catalog:hover,
-.rapid-row.rapid-add-custom-data:hover {
+.rapid-row.row-search-catalog:hover,
+.rapid-row.row-custom-dataset:hover {
   color: #ddd;
   background: #8885;
 }
@@ -757,13 +767,6 @@ button.overture-inspector-close:hover {
   height: 20px;
 }
 
-.rapid-colorpicker-label,
-.rapid-settings-label {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-right: 5px;
-}
 .rapid-colorpicker-label:not(.disabled),
 .rapid-settings-label:not(.disabled) {
   cursor: pointer;
@@ -773,30 +776,9 @@ button.overture-inspector-close:hover {
   opacity: 0.5;
 }
 
-.rapid-colorpicker {
-  padding: 2px;
-  border: none;
-  background: #fff;
-  border-radius: 6px;
-  width: 30px;
-  height: 30px;
-}
 .rapid-colorpicker-label:not(.disabled):hover,
 .rapid-settings-label:not(.disabled):hover {
   opacity: 0.9;
-}
-
-.rapid-colorpicker-fill {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: none;
-  border-radius: 4px;
-  width: 26px;
-  height: 26px;
-}
-.rapid-colorpicker-fill .icon {
-  pointer-events: none;
 }
 
 
@@ -1122,8 +1104,14 @@ img.dataset-thumbnail.inverted {
 }
 
 
-/* Colorpicker popup
+/* Colorpicker control
 ------------------------------------------------------- */
+.colorpicker-label {
+  display: flex;
+}
+.colorpicker-input {
+  display: none;
+}
 .colorpicker-popup {
   position: absolute;
   padding: 10px;
