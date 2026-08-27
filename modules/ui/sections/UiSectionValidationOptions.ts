@@ -15,6 +15,14 @@ interface OptionValue {
 }
 
 
+/**
+ * `UiSectionValidationOptions` renders a list of validation filtering options.
+ * It lives at the top of the Issues Pane.
+ * ```
+ *   Check:   ○ My Edits    ○ Everything
+ *   Where:   ○ In View     ○ Everywhere
+ * ```
+ */
 export class UiSectionValidationOptions extends AbstractUiSection {
 
   /**

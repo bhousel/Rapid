@@ -8,11 +8,11 @@ import type { Context } from '../../Context.ts';
 import type { D3Selection } from 'd3-selection';
 
 
-/** UiSectionPhotoOverlays
- *  This collapsable section displays various checkboxes for toggleable photo layers.
+/**
+ * `UiSectionPhotoOverlays` renders various checkboxes for toggleable photo layers.
  *  (and some other fields below it to set filtering options)
  *  It lives in the Map Data pane.
- *
+ *  ```
  *  ⋁ Photo Overlays
  *    ◻ Bing Streetside
  *    ◻ Mapillary
@@ -25,6 +25,7 @@ import type { D3Selection } from 'd3-selection';
  *
  *    From  mm/dd/yyyy
  *    To    mm/dd/yyyy
+ *  ```
  */
 export class UiSectionPhotoOverlays extends AbstractUiSection {
 

@@ -9,6 +9,10 @@ import type { D3Selection } from 'd3-selection';
 import type { Preset } from '../../lib/Preset.ts';
 
 
+/**
+ * `UiSectionFeatureType` renders the preset icon and associated documentation block
+ *  for the current entity selection.  It lives at the very top of the `UiEntityEditor`.
+ */
 export class UiSectionFeatureType extends AbstractUiSection {
   protected _entityIDs: EntityID[];
   protected _presets: Preset[];

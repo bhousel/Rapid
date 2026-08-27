@@ -36,6 +36,10 @@ interface NearbyRelationItem {
 }
 
 
+/**
+ * `UiSectionRawMembershipEditor` renders parent member information for the
+ * current entity selection. It lives in the `UiEntityEditor`.
+ */
 export class UiSectionRawMembershipEditor extends AbstractUiSection {
   protected _nearbyCombo: any;
   protected _inChange: boolean;

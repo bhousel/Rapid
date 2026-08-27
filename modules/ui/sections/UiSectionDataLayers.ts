@@ -19,12 +19,11 @@ interface BaseLayerItem {
 }
 
 
-/** UiSectionDataLayers
- *  This collapsable section displays various checkboxes for toggleable data layers.
- *  (and some other checkboxes below it)
- *  There was some attempt made at grouping them logically.
- *  It lives in the Map Data pane.
- *
+/**
+ *  `UiSectionDataLayers` renders a list of checkboxes to toggle the data layers,
+ *  and some other checkboxes below it.  There was some attempt made at grouping
+ *  them thematically. It lives in the Map Data pane.
+ *  ```
  *  ⋁ Data Layers
  *    ◻ OpenStreetMap Data
  *    ◻ OpenStreetMap Notes
@@ -37,6 +36,7 @@ interface BaseLayerItem {
  *
  *    ◻ Show History Panel
  *    ◻ Show Measurement Panel
+ *  ```
  */
 export class UiSectionDataLayers extends AbstractUiSection {
   protected _previousLayerStates: Map<string, boolean>;

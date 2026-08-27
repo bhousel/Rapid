@@ -8,15 +8,16 @@ import type { D3Selection } from 'd3-selection';
 import type { ImagerySource } from '../../lib/ImagerySource.ts';
 
 
-/** UiSectionOverlayList
- *  This collapsable section displays a checkbox list of background overlays
+/**
+ * `UiSectionOverlayList` renders a checkbox list of background overlays.
  *  It lives in the Background Settings pane.
- *
+ *  ```
  *  ⋁ Overlays
  *    ◻ Locator Overlay
  *    ◻ OpenRailwayMap Maxspeeds
  *    ◻ TIGER Roads 2022
  *    …
+ *  ```
  */
 export class UiSectionOverlayList extends AbstractUiSection {
   protected _overlayList: D3Selection;

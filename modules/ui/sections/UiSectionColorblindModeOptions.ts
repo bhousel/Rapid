@@ -9,8 +9,12 @@ import type { Context } from '../../Context.ts';
 import type { D3Selection } from 'd3-selection';
 
 
-// This was an experiment that is currently commented out and won't work.
-// We'd need to replace the "ColorSystem" with something more permanent.
+/**
+ * `UiSectionColorblindModeOptions` renders colorblind test options.
+ * The user can apply a filter to the renderer to simulate various kinds of color blindness.
+ * This was an experiment that is currently commented out and won't work.
+ * We'd need to replace the "ColorSystem" with something more permanent.
+ */
 export class UiSectionColorblindModeOptions extends AbstractUiSection {
   protected _mapDataContainer: any;
   protected _comboData: any[];
@@ -64,7 +68,7 @@ export class UiSectionColorblindModeOptions extends AbstractUiSection {
    */
   public override label(): string {
     const l10n = this.context.systems.l10n!;
-    return l10n.tHtml('preferences.colorblind_options.title');
+    return l10n.t('preferences.colorblind_options.title');
   }
 
 
@@ -110,7 +114,7 @@ export class UiSectionColorblindModeOptions extends AbstractUiSection {
       .append('div')
       .attr('class', 'layer-list preferences-colorblind-mode-options-list')
       .call(new UiTooltip(context)
-        .title(l10n.tHtml('preferences.colorblind_options.tooltip')).attach);
+        .title(l10n.t('preferences.colorblind_options.tooltip')).attach);
 
 
     const $$pickerCombo = $$colorOptionsListEnter.append('div');

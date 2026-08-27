@@ -3,7 +3,7 @@ import { AbstractUiSection } from './AbstractUiSection.ts';
 import { uiIcon } from '../icon.ts';
 
 import type { Context } from '../../Context.ts';
-import type { D3Selection } from 'd3-selection';
+import type { D3EnterSelection, D3Selection } from 'd3-selection';
 
 
 const MINVAL = 0;
@@ -11,6 +11,10 @@ const MAXVAL = 3;
 const SETTINGS = ['brightness', 'contrast', 'saturation', 'sharpness'];
 
 
+/**
+ * `UiSectionBackgroundDisplayOptions` renders the display options for background imagery.
+ *  These are slider controls to adjust the brightness, contrast, saturation, sharpness.
+ */
 export class UiSectionBackgroundDisplayOptions extends AbstractUiSection {
   protected _options: Record<string, number>;
 
@@ -88,7 +92,7 @@ export class UiSectionBackgroundDisplayOptions extends AbstractUiSection {
       .attr('class', 'display-options-container controls-list');
 
     // add slider controls
-    const $$sliders = $$container.selectAll('.display-control')
+    const $$sliders: D3EnterSelection = $$container.selectAll('.display-control')
       .data(SETTINGS)
       .enter()
       .append('div')

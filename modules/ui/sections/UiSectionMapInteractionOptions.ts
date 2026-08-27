@@ -2,12 +2,18 @@ import { AbstractUiSection } from './AbstractUiSection.ts';
 import { UiTooltip } from '../UiTooltip.ts';
 
 import type { Context } from '../../Context.ts';
-import type { D3Selection } from 'd3-selection';
+import type { D3EnterSelection, D3Selection } from 'd3-selection';
 
 
 const MOUSE_WHEEL_OPTIONS = ['auto', 'zoom', 'pan'];
 
 
+/**
+ * `UiSectionMapInteractionOptions` renders the list of options for map interaction.
+ * Currently it only includes "mouse wheel behavior" and allows the user to select
+ * "automatic", "zoom the map", and "pan the map".
+ * It lives on the Preferences pane.
+ */
 export class UiSectionMapInteractionOptions extends AbstractUiSection {
 
 
@@ -43,7 +49,7 @@ export class UiSectionMapInteractionOptions extends AbstractUiSection {
       .data([0]);
 
     // Enter
-    const $$options = $options.enter()
+    const $$options: D3EnterSelection = $options.enter()
       .append('div')
       .attr('class', 'mouse-wheel-options');
 
@@ -89,7 +95,7 @@ export class UiSectionMapInteractionOptions extends AbstractUiSection {
       .remove();
 
     // Enter
-    const $$items = $items.enter()
+    const $$items: D3EnterSelection = $items.enter()
       .append('li')
       .call(new UiTooltip(context)
         .title((d: string) => l10n.t(`preferences.map_interaction.mouse_wheel.${d}.tooltip`))
@@ -97,7 +103,7 @@ export class UiSectionMapInteractionOptions extends AbstractUiSection {
         .attach
       );
 
-    const $$label = $$items
+    const $$label: D3EnterSelection = $$items
       .append('label');
 
     $$label

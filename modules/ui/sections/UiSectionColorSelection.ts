@@ -7,8 +7,12 @@ import type { Context } from '../../Context.ts';
 import type { D3Selection } from 'd3-selection';
 
 
-// This was an experiment that is currently commented out and won't work.
-// We'd need to replace the "ColorSystem" with something more permanent.
+/**
+ * `UiSectionColorSelection` renders a radio button to select the map theme.
+ * The user can switch the map between regular and high contrast.
+ * This was an experiment that is currently commented out and won't work.
+ * We'd need to replace the "ColorSystem" with something more permanent.
+ */
 export class UiSectionColorSelection extends AbstractUiSection {
   protected _comboData: any[];
   protected _colorCombo: any;

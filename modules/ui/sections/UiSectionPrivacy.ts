@@ -3,9 +3,14 @@ import { UiTooltip } from '../UiTooltip.ts';
 import { uiIcon } from '../icon.ts';
 
 import type { Context } from '../../Context.ts';
-import type { D3Selection } from 'd3-selection';
+import type { D3EnterSelection, D3Selection } from 'd3-selection';
 
 
+/**
+ * `UiSectionPrivacy` renders the list of options for user privacy.
+ * Currently it only includes "show third party icons" checkbox.
+ * It lives on the Preferences pane.
+ */
 export class UiSectionPrivacy extends AbstractUiSection {
   protected _showThirdPartyIcons: string;
 
@@ -47,13 +52,13 @@ export class UiSectionPrivacy extends AbstractUiSection {
     };
 
     // enter
-    const $$privacyOptionsList = $selection.selectAll('.privacy-options-list')
+    const $$privacyOptionsList: D3EnterSelection = $selection.selectAll('.privacy-options-list')
       .data([0])
       .enter()
       .append('ul')
       .attr('class', 'layer-list privacy-options-list');
 
-    const $$thirdPartyIcons = $$privacyOptionsList
+    const $$thirdPartyIcons: D3EnterSelection = $$privacyOptionsList
       .append('li')
       .attr('class', 'privacy-third-party-icons-item')
       .append('label')

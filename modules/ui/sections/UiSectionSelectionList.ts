@@ -4,10 +4,14 @@ import { AbstractUiSection } from './AbstractUiSection.ts';
 import { utilHighlightEntities } from '../../util/util.ts';
 
 import type { Context } from '../../Context.ts';
-import type { D3Selection } from 'd3-selection';
+import type { D3EnterSelection, D3Selection } from 'd3-selection';
 import type { OsmEntity } from '../../data/index.ts';
 
 
+/**
+ * `UiSectionSelectionList` appears when the user has multiple
+ * entities selected.  It lives in the `UiEntityEditor`.
+ */
 export class UiSectionSelectionList extends AbstractUiSection {
   protected _selectedIDs: EntityID[];
 
@@ -116,7 +120,7 @@ export class UiSectionSelectionList extends AbstractUiSection {
       .remove();
 
     // Enter
-    const $$items = $items.enter()
+    const $$items: D3EnterSelection = $items.enter()
       .append('li')
       .attr('class', 'feature-list-item')
       .each((d: OsmEntity, i, nodes) => {
@@ -125,7 +129,7 @@ export class UiSectionSelectionList extends AbstractUiSection {
           .on('mouseout', () => utilHighlightEntities(context, [d.id], false));
       });
 
-    const $$label = $$items
+    const $$label: D3EnterSelection = $$items
       .append('button')
       .attr('class', 'label')
       .on('click', this._selectEntity);

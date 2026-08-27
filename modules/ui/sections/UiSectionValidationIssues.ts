@@ -12,6 +12,12 @@ import type { ValidationIssue } from '../../lib/ValidationIssue.ts';
 const MAX_ISSUES = 1000;
 
 
+/**
+ * `UiSectionValidationIssues` renders a list of detected issues,
+ * sorted by distance to the viewer.
+ * Multiple copies of this are created for the Issues Pane,
+ * showing the groups "errors", "warnings", and "suggestions".
+ */
 export class UiSectionValidationIssues extends AbstractUiSection {
   protected _severity: string;    // 'error', 'warning', or 'suggestion'
   protected _issues: ValidationIssue[];

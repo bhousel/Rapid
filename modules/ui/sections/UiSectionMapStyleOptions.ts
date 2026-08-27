@@ -5,6 +5,12 @@ import type { Context } from '../../Context.ts';
 import type { D3Selection } from 'd3-selection';
 
 
+/**
+ * `UiSectionMapStyleOptions` renders the list of options for map styling.
+ * Currently it shows options for "no fill", "partial fill", and "full fill",
+ * and a checkbox for highlighting changes that the user has made.
+ * It lives on the Map Data pane.
+ */
 export class UiSectionMapStyleOptions extends AbstractUiSection {
 
 

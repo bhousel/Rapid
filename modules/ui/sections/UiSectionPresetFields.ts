@@ -11,6 +11,11 @@ import type { Tags } from '../fields/types.ts';
 import type { UiField } from '../UiField.ts';
 
 
+/**
+ * `UiSectionPresetFields` renders the list of preset fields
+ * for the current entity selection. It lives in the `UiEntityEditor`.
+ * See also the `UiFormFields` component, which renders the fields.
+ */
 export class UiSectionPresetFields extends AbstractUiSection {
   // Child Compnoents
   public FormFields: UiFormFields;

@@ -3,7 +3,7 @@ import { EventEmitter } from 'tseep/lib/ee-safe';
 import { UiDisclosure } from '../UiDisclosure.ts';
 
 import type { Context } from '../../Context.ts';
-import type { D3Selection } from 'd3-selection';
+import type { D3EnterSelection, D3Selection } from 'd3-selection';
 
 
 /**
@@ -72,7 +72,7 @@ export abstract class AbstractUiSection extends EventEmitter {
       .data([0]);
 
     // enter
-    const $$container = this.$container
+    const $$container: D3EnterSelection = this.$container
       .enter()
       .append('div')
       .attr('class', `section section-${this.id} ${this._classes}`.trim());
@@ -127,7 +127,7 @@ export abstract class AbstractUiSection extends EventEmitter {
 
 
   /**
-   * The section's heading label. Subclasses override this.
+   * The section's heading label. Subclasses may override this.
    */
   public label(): string {
     return '';
@@ -135,7 +135,7 @@ export abstract class AbstractUiSection extends EventEmitter {
 
 
   /**
-   * Whether the section should be displayed at all. Subclasses override this.
+   * Whether the section should be displayed at all. Subclasses may override this.
    */
   public shouldDisplay(): boolean {
     return true;

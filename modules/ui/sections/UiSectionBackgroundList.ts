@@ -15,12 +15,12 @@ import type { ImagerySourceCustom } from '../../lib/ImagerySource.ts';
 import type { Vec2 } from '@rapid-sdk/math';
 
 
-/** UiSectionBackgroundList
- *  This collapsable section displays a radio button list of background imagery.
- *  (and some other checkboxes below it)
+/**
+ *  `UiSectionBackgroundList` renders a radio button list of background imagery,
+ *  and some other checkboxes below it.
  *  Each list item also adds star buttons so users can select their favorite items.
  *  It lives in the Background Settings pane.
- *
+ *  ```
  *  ⋁ Backgrounds
  *    ○ Bing Maps Aerial    ☆
  *    ○ Esri Wayback        ☆
@@ -32,6 +32,7 @@ import type { Vec2 } from '@rapid-sdk/math';
  *    ◻ Show Minimap
  *    ◻ Show 3d Map
  *    …
+ *  ```
  */
 export class UiSectionBackgroundList extends AbstractUiSection {
   protected _backgroundList: D3Selection;

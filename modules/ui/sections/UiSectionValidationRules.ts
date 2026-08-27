@@ -1,16 +1,29 @@
 import { select } from 'd3-selection';
 import { UiTooltip } from '../UiTooltip.ts';
 import { AbstractUiSection } from './AbstractUiSection.ts';
-import { utilGetSetValue, utilNoAuto } from '../../util/index.ts';
+import { utilNoAuto } from '../../util/index.ts';
 
 import type { Context } from '../../Context.ts';
-import type { D3Selection } from 'd3-selection';
+import type { D3EnterSelection, D3Selection } from 'd3-selection';
 
 const MINSQUARE = 0;
 const MAXSQUARE = 20;
 const DEFAULTSQUARE = 5;  // see also `validators/unsquare_way.ts`
 
 
+/**
+ * `UiSectionValidationRules` renders a checkbox list of validation
+ * rulesets that can be toggled on and off.
+ * It lives in the Issues pane.
+ *  ```
+ *  ⋁ Rules
+ *    ◻ Almost Junctions
+ *    ◻ Ambiguous Crossing Tags
+ *    ◻ Crossing Ways
+ *    ◻ Curb Nodes
+ *    …
+ *  ```
+ */
 export class UiSectionValidationRules extends AbstractUiSection {
   protected _validatorIDs: string[];
 
@@ -62,7 +75,7 @@ export class UiSectionValidationRules extends AbstractUiSection {
     let $container: D3Selection = $selection.selectAll('.issues-rulelist-container')
       .data([0]);
 
-    const $$container = $container.enter()
+    const $$container: D3EnterSelection = $container.enter()
       .append('div')
       .attr('class', 'issues-rulelist-container');
 
@@ -70,7 +83,7 @@ export class UiSectionValidationRules extends AbstractUiSection {
       .append('ul')
       .attr('class', 'layer-list issue-rules-list');
 
-    const $$ruleLinks = $$container
+    const $$ruleLinks: D3EnterSelection = $$container
       .append('div')
       .attr('class', 'issue-rules-links section-footer');
 
@@ -122,7 +135,7 @@ export class UiSectionValidationRules extends AbstractUiSection {
       .remove();
 
     // Enter
-    const $$items = $items.enter()
+    const $$items: D3EnterSelection = $items.enter()
       .append('li')
       .call(new UiTooltip(context)
         .title((d: ValidatorID) => l10n.t(`issues.${d}.tip`))
@@ -130,7 +143,7 @@ export class UiSectionValidationRules extends AbstractUiSection {
         .attach
       );
 
-    const $$label = $$items
+    const $$label: D3EnterSelection = $$items
       .append('label');
 
     $$label
@@ -176,13 +189,13 @@ export class UiSectionValidationRules extends AbstractUiSection {
       .attr('step', '0.5')
       .attr('class', 'square-degrees-input')
       .call(utilNoAuto)
-      .on('click', function (this: HTMLInputElement, d3_event: Event) {
-        d3_event.preventDefault();
-        d3_event.stopPropagation();
+      .on('click', function (this: HTMLInputElement, e: PointerEvent) {
+        e.preventDefault();
+        e.stopPropagation();
         this.select();
       })
-      .on('keyup', function (this: HTMLInputElement, d3_event: KeyboardEvent) {
-        if (d3_event.keyCode === 13) { // ↩ Return
+      .on('keyup', function (this: HTMLInputElement, e: KeyboardEvent) {
+        if (e.keyCode === 13) { // ↩ Return
           this.blur();
           this.select();
         }
@@ -195,14 +208,16 @@ export class UiSectionValidationRules extends AbstractUiSection {
 
   /**
    * Handles editing the unsquare-way degree threshold (clamps and persists it).
-   * @param d3_event - the triggering blur event
+   * @param e - the triggering blur event
    */
-  protected _changeSquare(d3_event: Event): void {
-    const settings = this.context.systems.settings;
-    const validator = this.context.systems.validator!;
+  protected _changeSquare(e: FocusEvent): void {
+    const context = this.context;
+    const settings = context.systems.settings;
+    const validator = context.systems.validator!;
 
-    const $input = select(d3_event.currentTarget as HTMLElement);
-    let degStr = (utilGetSetValue($input) as string).trim();
+    const node = e.currentTarget as HTMLInputElement;
+    const $input = select(node);
+    let degStr = node.value.trim();
     let degNum = parseFloat(degStr);
 
     if (!isFinite(degNum)) {

@@ -5,6 +5,11 @@ import type { Context } from '../../Context.ts';
 import type { D3Selection } from 'd3-selection';
 
 
+/**
+ * `UiSectionMapFeatures` renders the list of filtering checkboxes.
+ *  It should really be renamed to have something to do with "filters".
+ *  It lives on the Map Data panel, but should probably be on it's own panel.
+ */
 export class UiSectionMapFeatures extends AbstractUiSection {
 
 

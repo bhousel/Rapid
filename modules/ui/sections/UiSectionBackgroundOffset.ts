@@ -16,7 +16,14 @@ const DIRECTIONS: [string, Vec2][] = [
 ];
 
 
+/**
+ * `UiSectionBackgroundOffset` renders the the control for adjusting imagery offset.
+ * It contains an input field for entering the offset directly, a drag target for
+ * dragging the imagery offset, and up/down/left/right buttons.
+ */
 export class UiSectionBackgroundOffset extends AbstractUiSection {
+
+
   /**
    * @param context - Global shared application context
    */

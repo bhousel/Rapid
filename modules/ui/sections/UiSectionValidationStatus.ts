@@ -5,6 +5,15 @@ import type { Context } from '../../Context.ts';
 import type { D3EnterSelection, D3Selection } from 'd3-selection';
 
 
+/**
+ * `UiSectionValidationStatus` renders a status message on the Issues pane.
+ * This content only appears to give the user some feedback if they have set
+ * the validation filering options so that no issues appear.
+ * ```
+ *  ✓  You have no edits yet
+ *     Issues with everything else:  nn
+ * ```
+ */
 export class UiSectionValidationStatus extends AbstractUiSection {
 
 

@@ -5,6 +5,11 @@ import type { Context } from '../../Context.ts';
 import type { D3Selection } from 'd3-selection';
 
 
+/**
+ * `UiSectionGridDisplayOptions` renders options to draw a task grid over the map,
+ * but only if `RapidSystem` was started with a rectangular task boundary.
+ * This was an experiment that seems to be not used currently.
+ */
 export class UiSectionGridDisplayOptions extends AbstractUiSection {
   protected _taskWired: boolean;
   protected _$content: D3Selection;

@@ -27,6 +27,11 @@ interface MemberRowData {
 }
 
 
+/**
+ * `UiSectionRawMemberEditor` renders child member information for the current entity.
+ * It is only shown if the current selections contains a single Relation.
+ * It lives in the `UiEntityEditor`.
+ */
 export class UiSectionRawMemberEditor extends AbstractUiSection {
   protected _entityIDs: EntityID[];
 

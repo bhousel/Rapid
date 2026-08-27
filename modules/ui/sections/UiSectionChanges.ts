@@ -8,10 +8,14 @@ import { uiIcon } from '../icon.ts';
 import { utilHighlightEntities } from '../../util/util.ts';
 
 import type { Context } from '../../Context.ts';
-import type { D3Selection } from 'd3-selection';
+import type { D3EnterSelection, D3Selection } from 'd3-selection';
 import type { SummaryEntry } from '../../lib/Difference.ts';
 
 
+/**
+ * `UiSectionChanges` renders the summary of changes on the `UiCommit` component.
+ * This allows users to review their changes before uploading.
+ */
 export class UiSectionChanges extends AbstractUiSection {
   protected _discardTags: Record<string, unknown>;
 
@@ -71,7 +75,7 @@ export class UiSectionChanges extends AbstractUiSection {
     let $container: D3Selection = $selection.selectAll('.commit-section')
       .data([0]);
 
-    const $$containerEnter = $container.enter()
+    const $$containerEnter: D3EnterSelection = $container.enter()
       .append('div')
       .attr('class', 'commit-section');
 
@@ -86,11 +90,11 @@ export class UiSectionChanges extends AbstractUiSection {
     let $items: D3Selection = $container.select('ul').selectAll('li')
       .data(summary);
 
-    const $$itemsEnter = $items.enter()
+    const $$itemsEnter: D3EnterSelection = $items.enter()
       .append('li')
       .attr('class', 'change-item');
 
-    const $$buttons = $$itemsEnter
+    const $$buttons: D3EnterSelection = $$itemsEnter
       .append('button')
       .on('mouseover', (e: Event, d: SummaryEntry) => utilHighlightEntities(context, [d.entity.id], true))
       .on('mouseout', () => utilHighlightEntities(context, [], false))

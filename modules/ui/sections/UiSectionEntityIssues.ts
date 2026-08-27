@@ -10,6 +10,10 @@ import type { ValidationFix } from '../../lib/ValidationFix.ts';
 import type { ValidationIssue } from '../../lib/ValidationIssue.ts';
 
 
+/**
+ * `UiSectionEntityIssues` renders the list of issues detected
+ *  for the current entity selection.  It lives in the `UiEntityEditor`.
+ */
 export class UiSectionEntityIssues extends AbstractUiSection {
   protected _isExpanded: boolean;
   protected _entityIDs: EntityID[];

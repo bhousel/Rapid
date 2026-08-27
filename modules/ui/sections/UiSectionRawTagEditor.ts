@@ -51,7 +51,13 @@ function unstringify(s: string): string {
   return JSON.parse(leading + s + trailing);
 }
 
-
+/**
+ * `UiSectionRawTagEditor` renders the tag editor for the current entity selection.
+ * This includes a button to switch between list view and text view, and the
+ * components and code to support both views.  The raw tag editor appears on several
+ * other components, mostly `UiEntityEditor`, but also `UiCommit`, `UiDataEditor` for
+ * displaying raw tags on changesets and other data elements.
+ */
 export class UiSectionRawTagEditor extends AbstractUiSection {
   protected _discardKeys: Set<string>;
   protected _tagView: string;    // 'list', 'text'
