@@ -534,7 +534,7 @@ export class KartaviewService extends AbstractSystem {
       .append('input')
       .attr('type', 'checkbox')
       .attr('id', 'osc-hires-input')
-      .on('click', e => {
+      .on('click', (e: PointerEvent) => {
         e.stopPropagation();
 
         this._hires = !this._hires;
@@ -681,10 +681,10 @@ export class KartaviewService extends AbstractSystem {
   /**
    * Handler for zoom/pan events in the viewer.
    * The user can drag and zoom in on the image.
-   * @param  d3_event
+   * @param  e
    */
-  protected _zoomPan(d3_event: any): void {
-    const t = d3_event.transform;
+  protected _zoomPan(e: any): void {
+    const t = e.transform;
     const $container: D3Selection = this.context.container();
     const $imageWrap: D3Selection = $container.select('.photoviewer .osc-image-wrap');
 

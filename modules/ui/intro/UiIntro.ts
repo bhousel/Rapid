@@ -260,7 +260,7 @@ export class UiIntro {
         editor.merge(Object.values(this._introGraph));
         mapwithai?.merge('rapid_intro_graph', Object.values(this._rapidGraph));
         editor.setCheckpoint('initial');
-        this._enterChapter(null, chapters[skipToRapid ? 6 : 0]);
+        this._enterChapter(undefined, chapters[skipToRapid ? 6 : 0]);
       });
   }
 
@@ -268,10 +268,10 @@ export class UiIntro {
   /**
    * Call this to enter a new chapter.
    * Either called explicitly or by clicking a button in the chapter navigation bar.
-   * @param e           - If clicked on a button, the click event (not used)
+   * @param [e]           - If clicked on a button, the click event (not used)
    * @param newChapter  - The chapter to enter
    */
-  protected _enterChapter(e: any, newChapter: AbstractIntroChapter): void {
+  protected _enterChapter(e: Event | undefined, newChapter: AbstractIntroChapter): void {
     const context = this.context;
 
     if (this._currChapter) this._currChapter.exit();

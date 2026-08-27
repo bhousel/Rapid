@@ -183,7 +183,7 @@ export class UiBackgroundCard extends AbstractUiCard {
       .text(l10n.t(`info_panels.background.${toggleTiles}`))
       .attr('href', '#')
       .attr('class', 'button button-toggle-tiles')
-      .on('click', e => {
+      .on('click', (e: PointerEvent) => {
         e.preventDefault();
         context.setDebug('tile', !context.getDebug('tile'));
         this.render();

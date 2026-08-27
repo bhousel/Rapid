@@ -137,8 +137,8 @@ export class UiSectionValidationStatus extends AbstractUiSection {
     $resetIgnored.select('a')
       .text(l10n.t('inspector.title_count', { title: l10n.t('issues.reset_ignored'), count: ignoredIssues.length }));
 
-    $resetIgnored.on('click', (d3_event: Event) => {
-      d3_event.preventDefault();
+    $resetIgnored.on('click', (e: PointerEvent) => {
+      e.preventDefault();
       validator.resetIgnoredIssues();
     });
   }

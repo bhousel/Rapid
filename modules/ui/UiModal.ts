@@ -89,8 +89,8 @@ export class UiModal extends EventEmitter {
       .on('focus.keytrap', this._moveFocusToLast);
 
     if (!this._blocking) {
-      $shaded.on('click.remove-modal', (d3_event: MouseEvent) => {
-        if (d3_event.target === $shaded.node()) {
+      $shaded.on('click', (e: PointerEvent) => {
+        if (e.target === $shaded.node()) {
           this.close();
         }
       });
@@ -154,9 +154,9 @@ export class UiModal extends EventEmitter {
 
   /**
    * Focus-trap handler: moves focus to the first focusable element in the modal.
-   * @param d3_event - the triggering focus event (on the trailing keytrap input)
+   * @param e - the triggering focus event (on the trailing keytrap input)
    */
-  protected _moveFocusToFirst(d3_event: FocusEvent): void {
+  protected _moveFocusToFirst(e: FocusEvent): void {
     const $modal = this.$modal;
     if (!$modal) return;
 
@@ -168,16 +168,16 @@ export class UiModal extends EventEmitter {
     if (node) {
       node.focus();
     } else {
-      (d3_event.currentTarget as HTMLElement).blur();
+      (e.currentTarget as HTMLElement).blur();
     }
   }
 
 
   /**
    * Focus-trap handler: moves focus to the last focusable element in the modal.
-   * @param d3_event - the triggering focus event (on the leading keytrap input)
+   * @param e - the triggering focus event (on the leading keytrap input)
    */
-  protected _moveFocusToLast(d3_event: FocusEvent): void {
+  protected _moveFocusToLast(e: FocusEvent): void {
     const $modal = this.$modal;
     if (!$modal) return;
 
@@ -188,7 +188,7 @@ export class UiModal extends EventEmitter {
     if (nodes.length) {
       nodes[nodes.length - 1].focus();
     } else {
-      (d3_event.currentTarget as HTMLElement).blur();
+      (e.currentTarget as HTMLElement).blur();
     }
   }
 }

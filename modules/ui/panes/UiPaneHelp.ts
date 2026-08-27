@@ -334,8 +334,8 @@ export class UiPaneHelp extends UiPane {
       .append('a')
       .attr('href', '#')
       .text((d: any) => d.title)
-      .on('click', (d3_event: Event, d: any) => {
-        d3_event.preventDefault();
+      .on('click', (e: PointerEvent, d: any) => {
+        e.preventDefault();
         this._clickChapter(d, this._docs.indexOf(d));
       });
 
@@ -433,8 +433,8 @@ export class UiPaneHelp extends UiPane {
         .append('a')
         .attr('href', '#')
         .attr('class', 'next')
-        .on('click', (d3_event: Event) => {
-          d3_event.preventDefault();
+        .on('click', (e: PointerEvent) => {
+          e.preventDefault();
           this._clickChapter(docs[i + 1], i + 1);
         });
 
@@ -451,8 +451,8 @@ export class UiPaneHelp extends UiPane {
         .append('a')
         .attr('href', '#')
         .attr('class', 'previous')
-        .on('click', (d3_event: Event) => {
-          d3_event.preventDefault();
+        .on('click', (e: PointerEvent) => {
+          e.preventDefault();
           this._clickChapter(docs[i - 1], i - 1);
         });
 
@@ -474,13 +474,13 @@ export class UiPaneHelp extends UiPane {
 
   /**
    * Starts the interactive walkthrough (intro) and closes the panes.
-   * @param d3_event - triggering event
+   * @param e - triggering event
    */
-  protected _clickWalkthrough(d3_event: Event): void {
+  protected _clickWalkthrough(e: PointerEvent): void {
     const context = this.context;
     const ui = context.systems.ui;
 
-    d3_event.preventDefault();
+    e.preventDefault();
     if (context.inIntro) return;
     new UiIntro(context).start();
     ui?.togglePanes();
@@ -489,11 +489,11 @@ export class UiPaneHelp extends UiPane {
 
   /**
    * Opens the keyboard shortcuts dialog.
-   * @param d3_event - triggering event
+   * @param e - triggering event
    */
-  protected _clickShortcuts(d3_event: Event): void {
+  protected _clickShortcuts(e: PointerEvent): void {
     const ui = this.context.systems.ui;
-    d3_event.preventDefault();
+    e.preventDefault();
     ui?.Shortcuts?.toggle();
   }
 }

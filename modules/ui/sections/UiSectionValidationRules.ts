@@ -91,8 +91,8 @@ export class UiSectionValidationRules extends AbstractUiSection {
       .append('a')
       .attr('class', 'issue-rules-link')
       .attr('href', '#')
-      .on('click', (d3_event: Event) => {
-        d3_event.preventDefault();
+      .on('click', (e: PointerEvent) => {
+        e.preventDefault();
         validator.disableValidators(this._validatorIDs);
       });
 
@@ -100,8 +100,8 @@ export class UiSectionValidationRules extends AbstractUiSection {
       .append('a')
       .attr('class', 'issue-rules-link')
       .attr('href', '#')
-      .on('click', (d3_event: Event) => {
-        d3_event.preventDefault();
+      .on('click', (e: PointerEvent) => {
+        e.preventDefault();
         validator.disableValidators([]);
       });
 
@@ -252,10 +252,10 @@ export class UiSectionValidationRules extends AbstractUiSection {
 
   /**
    * Toggles the given validator on/off.
-   * @param d3_event - the triggering change event
+   * @param e - the triggering change event
    * @param d - the validator id
    */
-  protected _toggleValidator(d3_event: Event, d: ValidatorID): void {
+  protected _toggleValidator(e: Event, d: ValidatorID): void {
     const validator = this.context.systems.validator!;
     validator.toggleValidator(d);
   }

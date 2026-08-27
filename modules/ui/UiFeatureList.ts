@@ -320,8 +320,9 @@ export class UiFeatureList {
 
   /**
    * Handler for input events - on typing redraw the list
+   * @param e - the input event
    */
-  protected _input(): void {
+  protected _input(e: InputEvent): void {
     this._geocodeResults = undefined;
     this._drawList();
   }
@@ -354,7 +355,7 @@ export class UiFeatureList {
    * @param  e - the mouseover event
    * @param  d - data bound to the list item
    */
-  protected _mouseover(e: Event, d: SearchResult): void {
+  protected _mouseover(e: MouseEvent, d: SearchResult): void {
     if (!d.id || d.id === -1) return;
     utilHighlightEntities(this.context, [d.id as EntityID], true);
   }
@@ -365,7 +366,7 @@ export class UiFeatureList {
    * @param  e - the mouseout event
    * @param  d - data bound to the list item
    */
-  protected _mouseout(e: Event, d: SearchResult): void {
+  protected _mouseout(e: MouseEvent, d: SearchResult): void {
     if (!d.id || d.id === -1) return;
     utilHighlightEntities(this.context, [d.id as EntityID], false);
   }

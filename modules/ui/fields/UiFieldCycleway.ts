@@ -128,13 +128,13 @@ export class UiFieldCycleway extends UiField {
 
   /**
    * Handles a change to one of the cycleway inputs and dispatches the tag change.
-   * @param d3_event - The triggering DOM event
+   * @param e - The triggering DOM event
    * @param key - The cycleway key being changed ('cycleway:left' or 'cycleway:right')
    */
-  protected _change(d3_event: Event, key: string): void {
+  protected _change(e: Event, key: string): void {
     const context = this.context;
 
-    let newValue: string | undefined = context.cleanTagValue(utilGetSetValue(select(d3_event.currentTarget as HTMLInputElement)) as string);
+    let newValue: string | undefined = context.cleanTagValue(utilGetSetValue(select(e.currentTarget as HTMLInputElement)) as string);
 
     // don't override multiple values with blank string
     if (!newValue && (Array.isArray(this._tags.cycleway) || Array.isArray(this._tags[key]))) return;

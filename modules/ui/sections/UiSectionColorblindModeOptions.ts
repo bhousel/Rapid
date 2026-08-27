@@ -123,8 +123,8 @@ export class UiSectionColorblindModeOptions extends AbstractUiSection {
       .attr('class', 'color-select')
       .call(utilNoAuto)
       .call(this._colorblindCombo.attach)
-      .on('blur change', (d3_event: any) => {
-        const element = d3_event.currentTarget;
+      .on('blur change', (e: any) => {
+        const element = e.currentTarget;
         const val = element.value;
         if (val in this._filtersObject && val !== 'Default') {
           const filterToApply = this._filtersObject[val];

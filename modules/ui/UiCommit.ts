@@ -363,7 +363,7 @@ export class UiCommit extends EventEmitter {
     headerTitle
       .append('button')
       .attr('class', 'close')
-      .on('click', (d3_event: Event) => {
+      .on('click', (e: PointerEvent) => {
         this.emit('cancel');
       })
       .call(uiIcon('#rapid-icon-close'));
@@ -541,14 +541,14 @@ export class UiCommit extends EventEmitter {
       .text(l10n.t('text.upload'));
 
     buttonSection.selectAll('.cancel-button')
-      .on('click.cancel', (d3_event: Event) => {
+      .on('click.cancel', (e: PointerEvent) => {
         this.emit('cancel');
       });
 
     buttonSection.selectAll('.save-button')
       .classed('disabled', uploadBlockerTooltipText !== null)
-      .on('click.save', (d3_event: Event) => {
-        const el = d3_event.currentTarget as HTMLElement;
+      .on('click.save', (e: PointerEvent) => {
+        const el = e.currentTarget as HTMLElement;
         if (!select(el).classed('disabled')) {
           el.blur();    // avoid keeping focus on the button - iD#4641
 

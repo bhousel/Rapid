@@ -131,8 +131,8 @@ export class UiFieldCheck extends UiField {
     this.$text.text(this._texts[0]);
 
     this.$input
-      .on('click', (d3_event: MouseEvent) => {
-        d3_event.stopPropagation();
+      .on('click', (e: PointerEvent) => {
+        e.stopPropagation();
         const key = this.key;
         const tagChange: TagChange = {};
 
@@ -161,9 +161,9 @@ export class UiFieldCheck extends UiField {
 
       this.$reverser
         .call(this._reverserSetText)
-        .on('click', (d3_event: MouseEvent) => {
-          d3_event.preventDefault();
-          d3_event.stopPropagation();
+        .on('click', (e: PointerEvent) => {
+          e.preventDefault();
+          e.stopPropagation();
           if (!this.entityIDs.length) return;
 
           const combinedAction = (graph: any) => {
@@ -179,7 +179,7 @@ export class UiFieldCheck extends UiField {
             selectedIDs: this.entityIDs
           });
 
-          select(d3_event.currentTarget as any)
+          select(e.currentTarget as any)
             .call(this._reverserSetText);
         });
     }

@@ -147,9 +147,9 @@ export class UiSectionPresetFields extends AbstractUiSection {
 
 
     $selection.selectAll('.wrap-form-field input')
-      .on('keydown', function(d3_event: KeyboardEvent) {
+      .on('keydown', function(e: KeyboardEvent) {
         // if user presses enter, and combobox is not active, accept edits..
-        if (d3_event.keyCode === 13 && context.container().select('.combobox').empty()) {   // ↩ Return
+        if (e.keyCode === 13 && context.container().select('.combobox').empty()) {   // ↩ Return
           context.enter('browse');
         }
       });

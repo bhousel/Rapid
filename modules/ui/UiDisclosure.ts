@@ -226,7 +226,7 @@ export class UiDisclosure extends EventEmitter {
    * stored preference (unless overridden), animates the content, and emits `toggled`.
    * @param e - the triggering click event
    */
-  protected _onClick(e: Event): void {
+  protected _onClick(e: PointerEvent): void {
     const context = this.context;
     const l10n = context.systems.l10n!;
     const settings = context.systems.settings;   // optional

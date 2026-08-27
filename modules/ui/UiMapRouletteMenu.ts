@@ -121,7 +121,7 @@ export class UiMapRouletteMenu extends EventEmitter {
       .append('button')
       .attr('class', (d: string) => `maproulette-menu-item maproulette-menu-item-${d}`)
       .style('height', `${buttonHeight}px`)
-      .on('click', (d3_event: Event, actionId: string) => {
+      .on('click', (e: PointerEvent, actionId: string) => {
         if (!this._mapRouletteApiKey) {
           this._getApiKey((err: any, apiKey?: string) => {
             if (err) {
@@ -129,10 +129,10 @@ export class UiMapRouletteMenu extends EventEmitter {
               return;
             }
             this._mapRouletteApiKey = apiKey ?? null;
-            this._executeAction(actionId, d3_event);
+            this._executeAction(actionId, e);
           });
         } else {
-          this._executeAction(actionId, d3_event);
+          this._executeAction(actionId, e);
         }
         this.close();
       });
@@ -155,19 +155,19 @@ export class UiMapRouletteMenu extends EventEmitter {
 
 
   /** Executes the specified action based on the user's selection. */
-  protected _executeAction(actionId: string, d3_event: Event): void {
+  protected _executeAction(actionId: string, e: Event): void {
     switch (actionId) {
       case 'fixed':
-        this._fixedIt(d3_event, this.datum!);
+        this._fixedIt(e, this.datum!);
         break;
       case 'cantComplete':
-        this._cantComplete(d3_event, this.datum!);
+        this._cantComplete(e, this.datum!);
         break;
       case 'alreadyFixed':
-        this._alreadyFixed(d3_event, this.datum!);
+        this._alreadyFixed(e, this.datum!);
         break;
       case 'notAnIssue':
-        this._notAnIssue(d3_event, this.datum!);
+        this._notAnIssue(e, this.datum!);
         break;
     }
   }
@@ -240,29 +240,29 @@ export class UiMapRouletteMenu extends EventEmitter {
   }
 
 
-  protected _fixedIt(d3_event: Event, d: MapRouletteTask): void {
+  protected _fixedIt(e: Event, d: MapRouletteTask): void {
     d.props._status = 1;
-    this._submitTask(d3_event, d);
+    this._submitTask(e, d);
   }
 
-  protected _cantComplete(d3_event: Event, d: MapRouletteTask): void {
+  protected _cantComplete(e: Event, d: MapRouletteTask): void {
     d.props._status = 6;
-    this._submitTask(d3_event, d);
+    this._submitTask(e, d);
   }
 
-  protected _alreadyFixed(d3_event: Event, d: MapRouletteTask): void {
+  protected _alreadyFixed(e: Event, d: MapRouletteTask): void {
     d.props._status = 5;
-    this._submitTask(d3_event, d);
+    this._submitTask(e, d);
   }
 
-  protected _notAnIssue(d3_event: Event, d: MapRouletteTask): void {
+  protected _notAnIssue(e: Event, d: MapRouletteTask): void {
     d.props._status = 2;
-    this._submitTask(d3_event, d);
+    this._submitTask(e, d);
   }
 
 
   /** Submits the task to MapRoulette with the updated status. */
-  protected _submitTask(d3_event: Event, d: MapRouletteTask): void {
+  protected _submitTask(e: Event, d: MapRouletteTask): void {
     const context = this.context;
     const maproulette = context.services.maproulette!;
     const osm = context.services.osm!;

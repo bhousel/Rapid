@@ -174,7 +174,7 @@ export class UiSectionRawTagEditor extends AbstractUiSection {
     $$option
       .append('button')
       .attr('class', (d: ViewOption) => `raw-tag-option raw-tag-option-${d.id}` + (this._tagView === d.id ? ' selected' : ''))
-      .on('click', (d3_event: Event, clicked: ViewOption) => {
+      .on('click', (e: PointerEvent, clicked: ViewOption) => {
         this._tagView = clicked.id;
         settings?.set('ui.rawTagEditorView', clicked.id);
 
@@ -214,7 +214,7 @@ export class UiSectionRawTagEditor extends AbstractUiSection {
       .attr('placeholder', l10n.t('inspector.key_value'))
       .call(utilGetSetValue, textData)
       .each((d, i, nodes) => this._setTextareaHeight(nodes[i] as HTMLTextAreaElement))
-      .on('input', (d3_event: Event) => this._setTextareaHeight(d3_event.currentTarget as HTMLTextAreaElement))
+      .on('input', (e: InputEvent) => this._setTextareaHeight(e.currentTarget as HTMLTextAreaElement))
       .on('focus', this._onFocus)
       .on('blur', this._textChanged)
       .on('change', this._textChanged);
@@ -408,11 +408,11 @@ export class UiSectionRawTagEditor extends AbstractUiSection {
 
   /**
    * Handles edits in the text view, diffing the parsed tags against the current tags.
-   * @param d3_event - the triggering blur/change event
+   * @param e - the triggering blur/change event
    */
-  protected _textChanged(d3_event: Event): void {
+  protected _textChanged(e: Event): void {
     const context = this.context;
-    const newText = (d3_event.currentTarget as HTMLTextAreaElement).value.trim();
+    const newText = (e.currentTarget as HTMLTextAreaElement).value.trim();
     const newTags: Record<string, string> = {};
     newText.split('\n').forEach((row: string) => {
       const m = row.match(/^\s*([^=]+)=(.*)$/);
@@ -452,14 +452,14 @@ export class UiSectionRawTagEditor extends AbstractUiSection {
 
   /**
    * Adds a blank row when Tab is pressed on the last (non-empty) value field.
-   * @param d3_event - the triggering keydown event
+   * @param e - the triggering keydown event
    */
-  protected _pushMore(d3_event: KeyboardEvent): void {
+  protected _pushMore(e: KeyboardEvent): void {
     if (!this.$container) return;  // called too early?
 
-    const el = d3_event.currentTarget as HTMLElement;
+    const el = e.currentTarget as HTMLElement;
     // if pressing Tab on the last value field with content, add a blank row
-    if (d3_event.keyCode === 9 && !d3_event.shiftKey &&
+    if (e.keyCode === 9 && !e.shiftKey &&
       this.$container.selectAll('.tag-list li:last-child input.value').node() === el &&
       utilGetSetValue(select(el))) {
       this._addTag();
@@ -553,12 +553,12 @@ export class UiSectionRawTagEditor extends AbstractUiSection {
 
   /**
    * Handles editing a tag key (renaming, dedupe, ordering).
-   * @param d3_event - the triggering blur/change event
+   * @param e - the triggering blur/change event
    * @param d - the row datum
    */
-  protected _keyChange(d3_event: Event, d: TagRow): void {
+  protected _keyChange(e: Event, d: TagRow): void {
     const context = this.context;
-    const el = d3_event.currentTarget as HTMLInputElement;
+    const el = e.currentTarget as HTMLInputElement;
     if (select(el).attr('readonly')) return;
 
     const kOld = d.key;
@@ -617,12 +617,12 @@ export class UiSectionRawTagEditor extends AbstractUiSection {
 
   /**
    * Handles editing a tag value.
-   * @param d3_event - the triggering blur/change event
+   * @param e - the triggering blur/change event
    * @param d - the row datum
    */
-  protected _valueChange(d3_event: Event, d: TagRow): void {
+  protected _valueChange(e: Event, d: TagRow): void {
     const context = this.context;
-    const el = d3_event.currentTarget as HTMLInputElement;
+    const el = e.currentTarget as HTMLInputElement;
     if (this._isReadOnlyTag(d)) return;
 
     // exit if this is a multiselection and no value was entered
@@ -639,10 +639,10 @@ export class UiSectionRawTagEditor extends AbstractUiSection {
 
   /**
    * Removes a tag row (or clears the blank row).
-   * @param d3_event - the triggering pointer/mouse event
+   * @param e - the triggering pointer/mouse event
    * @param d - the row datum
    */
-  protected _removeTag(d3_event: Event, d: TagRow): void {
+  protected _removeTag(e: Event, d: TagRow): void {
     if (this._isReadOnlyTag(d)) return;
 
     if (d.key === '') {    // removing the blank row

@@ -499,8 +499,8 @@ export class UiRapidInspector {
       .append('button')
       .attr('class', 'tag-reference-button')
       .attr('tabindex', '-1')
-      .on('click', (e) => {
-        e.currentTarget.blur();
+      .on('click', (e: PointerEvent) => {
+        (e.currentTarget as HTMLElement).blur();    // avoid keeping focus on the button - iD#4641
         const $tagReference = $choice.selectAll('.tag-reference-body');
         $tagReference.classed('expanded', !$tagReference.classed('expanded'));
       })

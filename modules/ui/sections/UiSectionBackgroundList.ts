@@ -203,8 +203,8 @@ export class UiSectionBackgroundList extends AbstractUiSection {
     $$minimapLabel
       .append('input')
       .attr('type', 'checkbox')
-      .on('change', (d3_event: Event) => {
-        d3_event.preventDefault();
+      .on('change', (e: Event) => {
+        e.preventDefault();
         ui.Minimap.toggle();
       });
 
@@ -227,9 +227,9 @@ export class UiSectionBackgroundList extends AbstractUiSection {
       .append('input')
       .attr('type', 'checkbox')
       .attr('class', 'map3d-toggle-checkbox')
-      .on('change', (d3_event: Event) => {
-        d3_event.preventDefault();
-        const input = d3_event.currentTarget as HTMLInputElement;
+      .on('change', (e: Event) => {
+        e.preventDefault();
+        const input = e.currentTarget as HTMLInputElement;
         map3d.visible = input.checked;
       });
 
@@ -517,10 +517,10 @@ export class UiSectionBackgroundList extends AbstractUiSection {
 
   /**
    * Chooses a background imagery source.
-   * @param d3_event         - change event, if called from a change handler (unused)
+   * @param e         - change event, if called from a change handler (unused)
    * @param sourceOrSourceID - `string` or `ImagerySource` being chosen
    */
-  protected _chooseBackground(d3_event: Event | undefined, sourceOrSourceID: ImagerySource | string): void {
+  protected _chooseBackground(e: Event | undefined, sourceOrSourceID: ImagerySource | string): void {
     const context = this.context;
     const imagery = context.systems.imagery!;
     const settings = context.systems.settings;
@@ -570,7 +570,7 @@ export class UiSectionBackgroundList extends AbstractUiSection {
    * Opens the custom background settings dialog.
    * @param [e] - the triggering event, if any
    */
-  protected _clickCustom(e?: Event): void {
+  protected _clickCustom(e?: PointerEvent): void {
     e?.preventDefault();
     this.CustomBackgroundSettings.render();
   }
@@ -593,16 +593,16 @@ export class UiSectionBackgroundList extends AbstractUiSection {
 
   /**
    * Toggles whether an imagery source is a favorite.
-   * @param d3_event - click event, if called from a click handler
-   * @param d        - ImagerySource being toggled
+   * @param e - click event
+   * @param d - ImagerySource being toggled
    */
-  protected _toggleFavorite(d3_event: Event, d: ImagerySource): void {
+  protected _toggleFavorite(e: PointerEvent, d: ImagerySource): void {
     const context = this.context;
     const settings = context.systems.settings;
 
-    d3_event.preventDefault();
+    e.preventDefault();
 
-    const target = d3_event.currentTarget as HTMLElement;
+    const target = e.currentTarget as HTMLElement;
     const $selection = select(target);
     ($selection.node() as HTMLElement).blur();  // remove focus after click
 

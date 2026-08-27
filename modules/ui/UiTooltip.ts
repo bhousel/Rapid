@@ -389,15 +389,15 @@ export class UiTooltip extends EventEmitter {
 
     if (display === 'hover') {
       let _lastNonMouseEnterTime: number | undefined;
-      $anchor.on('pointerenter.popover', (d3_event: PointerEvent) => {
+      $anchor.on('pointerenter.popover', (e: PointerEvent) => {
 
-        if (d3_event.pointerType) {
-          if (d3_event.pointerType !== 'mouse') {
-            _lastNonMouseEnterTime = d3_event.timeStamp;
+        if (e.pointerType) {
+          if (e.pointerType !== 'mouse') {
+            _lastNonMouseEnterTime = e.timeStamp;
             // only allow hover behavior for mouse input
             return;
           } else if (_lastNonMouseEnterTime &&
-            d3_event.timeStamp - _lastNonMouseEnterTime < 1500) {
+            e.timeStamp - _lastNonMouseEnterTime < 1500) {
             // HACK: iOS 13.4 sends an erroneous `mouse` type pointerenter
             // event for non-mouse interactions right after sending
             // the correct type pointerenter event. Workaround by discarding
@@ -407,33 +407,33 @@ export class UiTooltip extends EventEmitter {
         }
 
         // don't show if buttons are pressed, e.g. during click and drag of map
-        if (d3_event.buttons !== 0) return;
+        if (e.buttons !== 0) return;
 
-        this._show(d3_event.currentTarget as Element);
+        this._show(e.currentTarget as Element);
       })
-      .on('pointerleave.popover', (d3_event: PointerEvent) => {
-        this._hide(d3_event.currentTarget as Element);
+      .on('pointerleave.popover', (e: PointerEvent) => {
+        this._hide(e.currentTarget as Element);
       })
       // show on focus too for better keyboard navigation support
-      .on('focus.popover', (d3_event: FocusEvent) => {
-        this._show(d3_event.currentTarget as Element);
+      .on('focus.popover', (e: FocusEvent) => {
+        this._show(e.currentTarget as Element);
       })
-      .on('blur.popover', (d3_event: FocusEvent) => {
-        this._hide(d3_event.currentTarget as Element);
+      .on('blur.popover', (e: FocusEvent) => {
+        this._hide(e.currentTarget as Element);
       });
 
     } else if (display === 'clickFocus') {
       $anchor
-        .on('pointerdown.popover', (d3_event: PointerEvent) => {
-          d3_event.preventDefault();
-          d3_event.stopPropagation();
+        .on('pointerdown.popover', (e: PointerEvent) => {
+          e.preventDefault();
+          e.stopPropagation();
         })
-        .on('pointerup.popover', (d3_event: PointerEvent) => {
-          d3_event.preventDefault();
-          d3_event.stopPropagation();
+        .on('pointerup.popover', (e: PointerEvent) => {
+          e.preventDefault();
+          e.stopPropagation();
         })
-        .on('click.popover', (d3_event: MouseEvent) => {
-          this._toggle(d3_event.currentTarget as Element);
+        .on('click.popover', (e: PointerEvent) => {
+          this._toggle(e.currentTarget as Element);
         });
 
       $tooltip

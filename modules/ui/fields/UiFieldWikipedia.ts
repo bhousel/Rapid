@@ -190,8 +190,8 @@ export class UiFieldWikipedia extends UiField {
 
     $link
       .attr('title', l10n.t('icons.view_on', { domain: 'wikipedia.org' }))
-      .on('click', (d3_event: Event) => {
-        d3_event.preventDefault();
+      .on('click', (e: PointerEvent) => {
+        e.preventDefault();
         if (this._wikiURL) window.open(this._wikiURL, '_blank');
       });
   }

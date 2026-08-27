@@ -198,8 +198,8 @@ export class UiOsmoseDetails {
               .on('mouseleave', () => {
                 utilHighlightEntities(context, [entityID], false);
               })
-              .on('click', (d3_event: Event) => {
-                d3_event.preventDefault();
+              .on('click', (e: PointerEvent) => {
+                e.preventDefault();
 
                 utilHighlightEntities(context, [entityID], false);
 

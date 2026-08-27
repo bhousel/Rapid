@@ -67,12 +67,12 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
     // drag and drop
     /**
      *
-     * @param d3_event
+     * @param e
      */
-    function over(d3_event: DragEvent): void {
-      d3_event.stopPropagation();
-      d3_event.preventDefault();
-      d3_event.dataTransfer!.dropEffect = 'copy';
+    function over(e: DragEvent): void {
+      e.stopPropagation();
+      e.preventDefault();
+      e.dataTransfer!.dropEffect = 'copy';
     }
 
     const context = this.context;
@@ -81,10 +81,10 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
       .on('dragenter.draganddrop', over)
       .on('dragexit.draganddrop', over)
       .on('dragover.draganddrop', over)
-      .on('drop.draganddrop', (d3_event: DragEvent) => {
-        d3_event.stopPropagation();
-        d3_event.preventDefault();
-        this.setFileList(d3_event.dataTransfer!.files);
+      .on('drop.draganddrop', (e: DragEvent) => {
+        e.stopPropagation();
+        e.preventDefault();
+        this.setFileList(e.dataTransfer!.files);
       });
 
     // hashchange - pick out the 'gpx' param

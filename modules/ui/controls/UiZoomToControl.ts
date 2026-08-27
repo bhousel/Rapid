@@ -118,7 +118,7 @@ export class UiZoomToControl {
 
   /**
    * This zooms in on the selected feature(s), or unzooms out from them
-   * @param  e - triggering event (if any)
+   * @param  [e] - triggering event (if any)
    */
   public zoomTo(e?: Event): void {
     e?.preventDefault();

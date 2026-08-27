@@ -302,7 +302,7 @@ export class UiMeasurementCard extends AbstractUiCard {
         .text(l10n.t(`info_panels.measurement.${toggle}`))
         .attr('href', '#')
         .attr('class', 'button button-toggle-units')
-        .on('click', e => {
+        .on('click', (e: PointerEvent) => {
           e.preventDefault();
           this._isImperial = !this._isImperial;
           this.render();

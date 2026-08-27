@@ -110,7 +110,7 @@ export class UiSectionMapInteractionOptions extends AbstractUiSection {
       .append('input')
       .attr('type', 'radio')
       .attr('name', 'mouse_wheel')
-      .on('change', (d3_event: Event, d: string) => {
+      .on('change', (e: Event, d: string) => {
         settings?.set('ui.mouseWheelInteraction', d);
         this.renderInner();
       });

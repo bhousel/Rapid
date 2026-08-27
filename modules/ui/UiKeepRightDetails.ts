@@ -118,9 +118,8 @@ export class UiKeepRightDetails {
           .on('mouseleave', () => {
             utilHighlightEntities(context, [entityID], false);
           })
-          .on('click', (d3_event: Event) => {
-            d3_event.preventDefault();
-
+          .on('click', (e: PointerEvent) => {
+            e.preventDefault();
             utilHighlightEntities(context, [entityID], false);
 
             scene.enableLayers('osm');  // make sure osm layer is even on
@@ -131,7 +130,7 @@ export class UiKeepRightDetails {
         // Replace with friendly name if possible
         // (The entity may not yet be loaded into the graph)
         if (entity) {
-          let name: any = l10n.displayName(entity.tags);  // try to use common name
+          let name: string | false | null = l10n.displayName(entity.tags);  // try to use common name
           if (!name && !isObjectLink) {
             const preset = schema.match(entity, graph);
             name = preset && !preset.isFallback() && preset.name;  // fallback to preset name

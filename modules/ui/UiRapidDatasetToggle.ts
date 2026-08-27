@@ -363,7 +363,7 @@ export class UiRapidDatasetToggle extends EventEmitter {
             .append('a')
             .attr('class', 'rapid-dataset-extent-center-map')
             .attr('href', '#')
-            .on('click', (e: Event) => {
+            .on('click', (e: PointerEvent) => {
               e.preventDefault();
               map.extent(d.extent);
             });
@@ -414,7 +414,7 @@ export class UiRapidDatasetToggle extends EventEmitter {
     $$actions
       .append('label')
       .attr('class', 'rapid-row-action rapid-dataset-settings')
-      .on('click', (e: Event, d: RapidDataset) => {
+      .on('click', (e: PointerEvent, d: RapidDataset) => {
         const SettingsModal = new UiRapidDatasetSettings(context).on('done', this.render);
         SettingsModal.dataset = d;
         SettingsModal.show();

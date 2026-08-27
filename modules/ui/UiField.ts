@@ -182,11 +182,11 @@ export class UiField extends EventEmitter {
 
   /**
    * Reverts the field's tags to their original values.
-   * @param d3_event - The triggering DOM event
+   * @param e - The triggering DOM event
    */
-  public revert(d3_event: Event): void {
-    d3_event.stopPropagation();
-    d3_event.preventDefault();
+  public revert(e: Event): void {
+    e.stopPropagation();
+    e.preventDefault();
     if (!this.entityIDs?.length || this._locked) return;
 
     // Crossings.. :-(  If reverting any of these, revert the related ones.  Rapid#1260
@@ -205,11 +205,11 @@ export class UiField extends EventEmitter {
 
   /**
    * Removes the field's tags from the entity.
-   * @param d3_event - The triggering DOM event
+   * @param e - The triggering DOM event
    */
-  public remove(d3_event: Event): void {
-    d3_event.stopPropagation();
-    d3_event.preventDefault();
+  public remove(e: Event): void {
+    e.stopPropagation();
+    e.preventDefault();
     if (this._locked) return;
 
     // Crossings.. :(  If removing any of these, remove the related ones.  Rapid#1260

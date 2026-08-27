@@ -122,12 +122,12 @@ export class UiSectionEntityIssues extends AbstractUiSection {
     const $$items = $$containers
       .append('div')
       .attr('class', (d: ValidationIssue) => `issue severity-${d.severity}`)
-      .on('mouseover.highlight', (d3_event: Event, d: ValidationIssue) => {
+      .on('mouseover.highlight', (e: MouseEvent, d: ValidationIssue) => {
         // don't hover-highlight the selected entity
         const otherIDs = d.entityIds.filter((id: EntityID) => !this._entityIDs.includes(id));
         utilHighlightEntities(context, otherIDs, true);
       })
-      .on('mouseout.highlight', (d3_event: Event, d: ValidationIssue) => {
+      .on('mouseout.highlight', (e: MouseEvent, d: ValidationIssue) => {
         const otherIDs = d.entityIds.filter((id: EntityID) => !this._entityIDs.includes(id));
         utilHighlightEntities(context, otherIDs, false);
       });
@@ -139,7 +139,7 @@ export class UiSectionEntityIssues extends AbstractUiSection {
     const $$text = $$labels
       .append('button')
       .attr('class', 'issue-text')
-      .on('click', (d3_event: Event, d: ValidationIssue) => {
+      .on('click', (e: PointerEvent, d: ValidationIssue) => {
         this._makeActiveIssue(d.id);    // expand only the clicked item
         const graph = editor.staging.graph;
         const extent = d.extent(graph);
@@ -167,10 +167,10 @@ export class UiSectionEntityIssues extends AbstractUiSection {
       .call(uiIcon('#rapid-icon-inspect'));
 
     $$infoButton
-      .on('click', (d3_event: Event) => {
-        const button = d3_event.currentTarget as any;
-        d3_event.stopPropagation();
-        d3_event.preventDefault();
+      .on('click', (e: PointerEvent) => {
+        const button = e.currentTarget as any;
+        e.stopPropagation();
+        e.preventDefault();
         button.blur();    // avoid keeping focus on the button - iD#4641
 
         const $container = select(button.parentNode.parentNode.parentNode);
@@ -239,9 +239,9 @@ export class UiSectionEntityIssues extends AbstractUiSection {
 
     const $$buttons = $$fixes
       .append('button')
-      .on('click', (d3_event: Event, d: ValidationFix) => {
+      .on('click', (e: PointerEvent, d: ValidationFix) => {
         // not all fixes are actionable
-        if (select(d3_event.currentTarget as Element).attr('disabled') || !d.onClick) return;
+        if (select(e.currentTarget as Element).attr('disabled') || !d.onClick) return;
 
         // Don't run another fix for this issue within a second of running one
         // (Necessary for "Select a feature type" fix. Most fixes should only ever run once)
@@ -251,8 +251,8 @@ export class UiSectionEntityIssues extends AbstractUiSection {
         utilHighlightEntities(context, d.issue!.entityIds.concat(d.entityIds), false);  // remove hover-highlighting
         d.onClick();
       })
-      .on('mouseover.highlight', (d3_event: Event, d: ValidationFix) => utilHighlightEntities(context, d.issue!.entityIds, true))
-      .on('mouseout.highlight', (d3_event: Event, d: ValidationFix) => utilHighlightEntities(context, d.issue!.entityIds, false));
+      .on('mouseover.highlight', (e: MouseEvent, d: ValidationFix) => utilHighlightEntities(context, d.issue!.entityIds, true))
+      .on('mouseout.highlight', (e: MouseEvent, d: ValidationFix) => utilHighlightEntities(context, d.issue!.entityIds, false));
 
     $$buttons
       .each((d: ValidationFix, i, nodes) => {

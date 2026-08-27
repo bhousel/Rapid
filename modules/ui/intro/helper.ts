@@ -24,11 +24,11 @@ export function icon(name: string, klass?: string): string {
 
 /**
  * Event handler that just cancels the event
- * @param d3_event  the event to cancel
+ * @param e  the event to cancel
  */
-export function eventCancel(d3_event: Event): void {
-  d3_event.stopPropagation();
-  d3_event.preventDefault();
+export function eventCancel(e: Event): void {
+  e.stopPropagation();
+  e.preventDefault();
 }
 
 

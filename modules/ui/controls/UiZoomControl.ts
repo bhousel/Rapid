@@ -99,8 +99,8 @@ export class UiZoomControl {
     // enter
     const $$buttons = $buttons.enter()
       .append('button')
-      .attr('class', d => d.id)
-      .on('click', (e, d) => {
+      .attr('class', (d: any) => d.id)
+      .on('click', (e: PointerEvent, d: any) => {
         if (!d.isDisabled()) {
           d.action(e);
         }
@@ -134,7 +134,8 @@ export class UiZoomControl {
 
 
   /**
-   * @param e - triggering event (if any)
+   * Zoom in.
+   * @param [e] - triggering event (if any)
    */
   public zoomIn(e?: Event): void {
     e?.preventDefault();
@@ -143,7 +144,8 @@ export class UiZoomControl {
   }
 
   /**
-   * @param e - triggering event (if any)
+   * Zoom out.
+   * @param [e] - triggering event (if any)
    */
   public zoomOut(e?: Event): void {
     e?.preventDefault();
@@ -152,7 +154,8 @@ export class UiZoomControl {
   }
 
   /**
-   * @param e - triggering event (if any)
+   * Zoom in further.
+   * @param [e] - triggering event (if any)
    */
   public zoomInFurther(e?: Event): void {
     e?.preventDefault();
@@ -161,7 +164,8 @@ export class UiZoomControl {
   }
 
   /**
-   * @param e - triggering event (if any)
+   * Zoom out further.
+   * @param [e] - triggering event (if any)
    */
   public zoomOutFurther(e?: Event): void {
     e?.preventDefault();

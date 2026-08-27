@@ -66,8 +66,8 @@ export class UiSectionMapFeatures extends AbstractUiSection {
       .append('a')
       .attr('class', 'feature-list-link disable-all')
       .attr('href', '#')
-      .on('click', (d3_event: Event) => {
-        d3_event.preventDefault();
+      .on('click', (e: PointerEvent) => {
+        e.preventDefault();
         filters.disableAll();
       });
 
@@ -75,8 +75,8 @@ export class UiSectionMapFeatures extends AbstractUiSection {
       .append('a')
       .attr('class', 'feature-list-link enable-all')
       .attr('href', '#')
-      .on('click', (d3_event: Event) => {
-        d3_event.preventDefault();
+      .on('click', (e: PointerEvent) => {
+        e.preventDefault();
         filters.enableAll();
       });
 
@@ -129,7 +129,7 @@ export class UiSectionMapFeatures extends AbstractUiSection {
       .append('input')
       .attr('type', 'checkbox')
       .attr('name', 'feature')
-      .on('change', (d3_event: Event, d: string) => filters.toggle(d));
+      .on('change', (e: Event, d: string) => filters.toggle(d));
 
     $$label
       .append('span')

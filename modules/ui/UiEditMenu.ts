@@ -143,15 +143,15 @@ export class UiEditMenu extends EventEmitter {
       .on('click', this._click)
       // don't listen for `mouseup` because we only care about non-mouse pointer types
       .on('pointerup', this._pointerup)
-      .on('pointerdown mousedown', (d3_event: Event) => {
+      .on('pointerdown mousedown', (e: PointerEvent) => {
         // don't let button presses also act as map input - iD#1869
-        d3_event.stopPropagation();
+        e.stopPropagation();
       })
-      .on('mouseenter.highlight', (d3_event: Event, d: Operation) => {
-        if (!d.relatedEntityIds || select(d3_event.currentTarget as HTMLElement).classed('disabled')) return;
+      .on('mouseenter.highlight', (e: MouseEvent, d: Operation) => {
+        if (!d.relatedEntityIds || select(e.currentTarget as HTMLElement).classed('disabled')) return;
         utilHighlightEntities(context, d.relatedEntityIds(), true);
       })
-      .on('mouseleave.highlight', (d3_event: Event, d: Operation) => {
+      .on('mouseleave.highlight', (e: MouseEvent, d: Operation) => {
         if (!d.relatedEntityIds) return;
         utilHighlightEntities(context, d.relatedEntityIds(), false);
       });
@@ -214,23 +214,23 @@ export class UiEditMenu extends EventEmitter {
 
   /**
    * Records the pointer type of the last `pointerup` (called before `click`).
-   * @param d3_event - the `pointerup` event
+   * @param e - the `pointerup` event
    */
-  protected _pointerup(d3_event: PointerEvent): void {
-    this._lastPointerUpType = d3_event.pointerType;
+  protected _pointerup(e: PointerEvent): void {
+    this._lastPointerUpType = e.pointerType;
   }
 
 
   /**
    * Handles a click on a menu item, running the operation (or flashing feedback if disabled).
-   * @param d3_event - the triggering event
+   * @param e - the triggering event
    * @param operation - the operation bound to the clicked item
    */
-  protected _click(d3_event: Event, operation: Operation): void {
+  protected _click(e: PointerEvent, operation: Operation): void {
     const context = this.context;
     const ui = context.systems.ui;
 
-    d3_event.stopPropagation();
+    e.stopPropagation();
 
     if (operation.relatedEntityIds) {
       utilHighlightEntities(context, operation.relatedEntityIds(), false);

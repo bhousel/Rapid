@@ -124,8 +124,8 @@ Big changes are coming soon to Rapid. including:
       .append('input')
       .attr('type', 'checkbox')
       .attr('class', 'rapid-checkbox-input')
-      .on('click', (d3_event: Event) => {
-        if ((d3_event.target as HTMLInputElement).checked) {
+      .on('click', (e: PointerEvent) => {
+        if ((e.target as HTMLInputElement).checked) {
           settings?.set('ui.sawWhatsNewVersion', String(context.whatsNewVersion));
         } else {
           settings?.unset('ui.sawWhatsNewVersion');

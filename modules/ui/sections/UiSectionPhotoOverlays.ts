@@ -173,7 +173,7 @@ export class UiSectionPhotoOverlays extends AbstractUiSection {
     $$label
       .append('input')
       .attr('type', 'checkbox')
-      .on('change', (d3_event: Event, d: AbstractPixiLayer) => this._toggleLayer(d.id));
+      .on('change', (e: Event, d: AbstractPixiLayer) => this._toggleLayer(d.id));
 
     $$label
       .append('span')
@@ -242,7 +242,7 @@ export class UiSectionPhotoOverlays extends AbstractUiSection {
     $$label
       .append('input')
       .attr('type', 'checkbox')
-      .on('change', (d3_event: Event, d: PhotoType) => photos.togglePhotoType(d));
+      .on('change', (e: Event, d: PhotoType) => photos.togglePhotoType(d));
 
     $$label
       .append('span')
@@ -318,8 +318,8 @@ export class UiSectionPhotoOverlays extends AbstractUiSection {
       .each((d: string, i, nodes) => {
         utilGetSetValue(select(nodes[i]), photos.dateFilterValue(d as any) || '');
       })
-      .on('change', (d3_event: Event, d: string) => {
-        const value = (utilGetSetValue(select(d3_event.currentTarget as HTMLInputElement)) as string).trim();
+      .on('change', (e: Event, d: string) => {
+        const value = (utilGetSetValue(select(e.currentTarget as HTMLInputElement)) as string).trim();
         photos.setDateFilter(d as any, value);
         // reload the displayed dates
         $li.selectAll('input')

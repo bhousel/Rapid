@@ -74,12 +74,18 @@ export class UiMapRouletteEditor extends EventEmitter {
 
     // Ensure methods used as callbacks always have `this` bound correctly.
     this.render = this.render.bind(this);
-    this._saveSection = this._saveSection.bind(this);
+    this._alreadyFixed = this._alreadyFixed.bind(this);
+    this._cantComplete = this._cantComplete.bind(this);
+    this._clickCancel = this._clickCancel.bind(this);
+    this._clickSubmit = this._clickSubmit.bind(this);
     this._commentSaveSection = this._commentSaveSection.bind(this);
-    this._userDetails = this._userDetails.bind(this);
-    this._saveButtons = this._saveButtons.bind(this);
-    this._submitButtons = this._submitButtons.bind(this);
+    this._fixedIt = this._fixedIt.bind(this);
     this._nearbyTaskChanged = this._nearbyTaskChanged.bind(this);
+    this._notAnIssue = this._notAnIssue.bind(this);
+    this._saveButtons = this._saveButtons.bind(this);
+    this._saveSection = this._saveSection.bind(this);
+    this._submitButtons = this._submitButtons.bind(this);
+    this._userDetails = this._userDetails.bind(this);
   }
 
 
@@ -221,8 +227,8 @@ export class UiMapRouletteEditor extends EventEmitter {
     let $commentSave: D3Selection = $selection.selectAll('.note-save')
       .data(isSelected && this._actionTaken ? [this.datum!] : [], (d: MapRouletteTask) => d.key!);
 
-    const changeInput = (d3_event: Event): void => {
-      const $input = select(d3_event.currentTarget as HTMLTextAreaElement);
+    const changeInput = (e: Event): void => {
+      const $input = select(e.currentTarget as HTMLTextAreaElement);
       const val = ($input.property('value') as string).trim() || undefined;
 
       this.datum!.props.newComment = val;
@@ -335,8 +341,8 @@ export class UiMapRouletteEditor extends EventEmitter {
             .call(uiIcon('#rapid-icon-out-link', 'inline'))
             .append('span')
             .text(l10n.t('login'))
-            .on('click.note-login', (d3_event: Event) => {
-              d3_event.preventDefault();
+            .on('click', (e: PointerEvent) => {
+              e.preventDefault();
               osm.authenticate();
             });
         }
@@ -465,32 +471,32 @@ export class UiMapRouletteEditor extends EventEmitter {
         $buttons.select('.fixedIt-button')
           .attr('disabled', isSaveDisabled(this.datum!))
           .text(l10n.t('map_data.layers.maproulette.fixed'))
-          .on('click.fixedIt', (d3_event: Event, d: MapRouletteTask) => this._fixedIt(d3_event, d, $selection));
+          .on('click', this._fixedIt);
 
         $buttons.select('.cantComplete-button')
           .attr('disabled', isSaveDisabled(this.datum!))
           .text(l10n.t('map_data.layers.maproulette.cantComplete'))
-          .on('click.cantComplete', (d3_event: Event, d: MapRouletteTask) => this._cantComplete(d3_event, d, $selection));
+          .on('click', this._cantComplete);
 
         $buttons.select('.alreadyFixed-button')
           .attr('disabled', isSaveDisabled(this.datum!))
           .text(l10n.t('map_data.layers.maproulette.alreadyFixed'))
-          .on('click.alreadyFixed', (d3_event: Event, d: MapRouletteTask) => this._alreadyFixed(d3_event, d, $selection));
+          .on('click', this._alreadyFixed);
 
         $buttons.select('.notAnIssue-button')
           .attr('disabled', isSaveDisabled(this.datum!))
           .text(l10n.t('map_data.layers.maproulette.notAnIssue'))
-          .on('click.notAnIssue', (d3_event: Event, d: MapRouletteTask) => this._notAnIssue(d3_event, d, $selection));
+          .on('click', this._notAnIssue);
       });
   }
 
 
   /**
    * Handle toggling the "fly to nearby task" checkbox.
-   * @param d3_event - the triggering change event
+   * @param e - the triggering change event
    */
-  protected _nearbyTaskChanged(d3_event: Event): void {
-    const isChecked = (d3_event.target as HTMLInputElement).checked;
+  protected _nearbyTaskChanged(e: Event): void {
+    const isChecked = (e.target as HTMLInputElement).checked;
     const maproulette = this.context.services.maproulette!;
     if (maproulette) {
       maproulette.nearbyTaskEnabled = isChecked;
@@ -533,7 +539,7 @@ export class UiMapRouletteEditor extends EventEmitter {
       .remove();
 
     // enter
-    const $$buttons = $buttons.enter()
+    const $$buttons: D3EnterSelection = $buttons.enter()
       .append('div')
       .attr('class', 'buttons');
 
@@ -551,96 +557,92 @@ export class UiMapRouletteEditor extends EventEmitter {
 
     $buttons.select('.cancel-button')
       .text(l10n.t('map_data.layers.maproulette.cancel'))
-      .on('click.cancel', (d3_event: Event, d: MapRouletteTask) => this._clickCancel(d3_event, d, $selection));
+      .on('click', this._clickCancel);
 
     $buttons.select('.submit-button')
       .text(l10n.t('map_data.layers.maproulette.submit'))
-      .on('click.submit', (d3_event: Event, d: MapRouletteTask) => this._clickSubmit(d3_event, d));
+      .on('click', this._clickSubmit);
   }
 
 
   /**
    * Handle the "I Fixed It" action.
-   * @param d3_event - the triggering click event
+   * @param e - the triggering click event
    * @param d - the bound task datum
    * @param $selection - the save section selection to re-render
    */
-  protected _fixedIt(d3_event: Event, d: MapRouletteTask, $selection: D3Selection): void {
-    (d3_event.currentTarget as HTMLElement).blur();    // avoid keeping focus on the button - iD#4641
+  protected _fixedIt(e: PointerEvent, d: MapRouletteTask): void {
+    (e.currentTarget as HTMLElement).blur();    // avoid keeping focus on the button - iD#4641
     d.props._status = 1;
     this._actionTaken = 'FIXED';
     this._setSaveButtonVisibility(true);
-    $selection.call(this._commentSaveSection);
+    this.render();
   }
 
 
   /**
    * Handle the "Can't Complete" action.
-   * @param d3_event - the triggering click event
+   * @param e - the triggering click event
    * @param d - the bound task datum
-   * @param $selection - the save section selection to re-render
    */
-  protected _cantComplete(d3_event: Event, d: MapRouletteTask, $selection: D3Selection): void {
-    (d3_event.currentTarget as HTMLElement).blur();    // avoid keeping focus on the button - iD#4641
+  protected _cantComplete(e: PointerEvent, d: MapRouletteTask): void {
+    (e.currentTarget as HTMLElement).blur();    // avoid keeping focus on the button - iD#4641
     d.props._status = 6;
     this._actionTaken = `CAN'T COMPLETE`;
     this._setSaveButtonVisibility(true);
-    $selection.call(this._commentSaveSection);
+    this.render();
   }
 
   /**
    * Handle the "Already Fixed" action.
-   * @param d3_event - the triggering click event
+   * @param e - the triggering click event
    * @param d - the bound task datum
-   * @param $selection - the save section selection to re-render
    */
-  protected _alreadyFixed(d3_event: Event, d: MapRouletteTask, $selection: D3Selection): void {
-    (d3_event.currentTarget as HTMLElement).blur();    // avoid keeping focus on the button - iD#4641
+  protected _alreadyFixed(e: PointerEvent, d: MapRouletteTask): void {
+    (e.currentTarget as HTMLElement).blur();    // avoid keeping focus on the button - iD#4641
     d.props._status = 5;
     this._actionTaken = 'ALREADY FIXED';
     this._setSaveButtonVisibility(true);
-    $selection.call(this._commentSaveSection);
+    this.render();
   }
 
   /**
    * Handle the "Not an Issue" action.
-   * @param d3_event - the triggering click event
+   * @param e - the triggering click event
    * @param d - the bound task datum
-   * @param $selection - the save section selection to re-render
    */
-  protected _notAnIssue(d3_event: Event, d: MapRouletteTask, $selection: D3Selection): void {
-    (d3_event.currentTarget as HTMLElement).blur();    // avoid keeping focus on the button - iD#4641
+  protected _notAnIssue(e: PointerEvent, d: MapRouletteTask): void {
+    (e.currentTarget as HTMLElement).blur();    // avoid keeping focus on the button - iD#4641
     d.props._status = 2;
     this._actionTaken = 'NOT AN ISSUE';
     this._setSaveButtonVisibility(true);
-    $selection.call(this._commentSaveSection);
+    this.render();
   }
 
   /**
    * Handle the "Cancel" button - reset the pending action.
-   * @param d3_event - the triggering click event
+   * @param e - the triggering click event
    * @param d - the bound task datum
-   * @param $selection - the save section selection to re-render
    */
-  protected _clickCancel(d3_event: Event, d: MapRouletteTask, $selection: D3Selection): void {
-    (d3_event.currentTarget as HTMLElement).blur();    // avoid keeping focus on the button - iD#4641
+  protected _clickCancel(e: PointerEvent, d: MapRouletteTask): void {
+    (e.currentTarget as HTMLElement).blur();    // avoid keeping focus on the button - iD#4641
     this._actionTaken = '';
     d.props._status = '';
     this._setSaveButtonVisibility(false);
-    $selection.call(this._commentSaveSection);
+    this.render();
   }
 
   /**
    * Handle the "Submit" button - post the task update to MapRoulette.
-   * @param d3_event - the triggering click event
+   * @param e - the triggering click event
    * @param d - the bound task datum
    */
-  protected _clickSubmit(d3_event: Event, d: MapRouletteTask): void {
+  protected _clickSubmit(e: PointerEvent, d: MapRouletteTask): void {
     const context = this.context;
     const maproulette = context.services.maproulette!;
     const osm = context.services.osm!;
 
-    (d3_event.currentTarget as HTMLElement).blur();    // avoid keeping focus on the button - iD#4641
+    (e.currentTarget as HTMLElement).blur();    // avoid keeping focus on the button - iD#4641
     const userID = (osm as any)._userDetails.id;
 
     const props = d.props as any;

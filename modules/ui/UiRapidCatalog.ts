@@ -211,7 +211,7 @@ export class UiRapidCatalog extends EventEmitter {
       .attr('class', 'rapid-catalog-filter-clear')
       .append('a')
       .attr('href', '#')
-      .on('click', (e: Event) => {
+      .on('click', (e: PointerEvent) => {
         e.preventDefault();
         const element = e.currentTarget as HTMLElement;
         element.blur();

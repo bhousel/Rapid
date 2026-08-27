@@ -96,8 +96,8 @@ ${file_tip}
       .attr('type', 'file')
       .attr('accept', ACCEPT.join())
       .property('files', _currFileList)  // works for all except IE11
-      .on('change', (d3_event: Event) => {
-        const files = (d3_event.target as HTMLInputElement).files;
+      .on('change', (e: Event) => {
+        const files = (e.target as HTMLInputElement).files;
         if (files?.length) {
           _currFileList = files;
           _currUrl = '';
@@ -155,15 +155,15 @@ ${url_tokens}
       .text(l10n.t('text.cancel'));
 
     // Restore the original settings
-    const clickCancel = (d3_event: Event): void => {
+    const clickCancel = (e: PointerEvent): void => {
       $textSection.select('.field-url').property('value', origUrl);
       settings?.set('ui.customData.url', origUrl || '');
-      (d3_event.currentTarget as HTMLElement).blur();
+      (e.currentTarget as HTMLElement).blur();
       Modal.close();
     };
 
     // Accept the current settings
-    const clickSave = (d3_event: Event): void => {
+    const clickSave = (e: PointerEvent): void => {
       _currUrl = $textSection.select('.field-url').property('value').trim();
 
       let currSettings = {};
@@ -176,16 +176,16 @@ ${url_tokens}
         currSettings = { url: null, fileList: _currFileList };
       }
 
-      (d3_event.currentTarget as HTMLElement).blur();
+      (e.currentTarget as HTMLElement).blur();
       Modal.close();
       this.emit('change', currSettings);
     };
 
     $buttonSection.select('.cancel-button')
-      .on('click.cancel', clickCancel);
+      .on('click', clickCancel);
 
     $buttonSection.select('.ok-button')
       .attr('disabled', null)  // why is this here?
-      .on('click.save', clickSave);
+      .on('click', clickSave);
   }
 }

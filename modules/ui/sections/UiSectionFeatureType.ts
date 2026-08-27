@@ -134,12 +134,12 @@ export class UiSectionFeatureType extends AbstractUiSection {
     }
 
     $selection.selectAll('.preset-reset')
-      .on('click', (d3_event: Event) => {
+      .on('click', (e: PointerEvent) => {
          this.emit('choose', this._presets);
       })
-      .on('pointerdown pointerup mousedown mouseup', function(d3_event: Event) {
-        d3_event.preventDefault();
-        d3_event.stopPropagation();
+      .on('pointerdown pointerup mousedown mouseup', function(e: MouseEvent) {
+        e.preventDefault();
+        e.stopPropagation();
       });
 
     const geometries = this._entityGeometries();

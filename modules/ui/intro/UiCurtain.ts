@@ -414,7 +414,7 @@ export class UiCurtain {
 
         if (opts.buttonText && opts.buttonCallback) {
           this.$tooltip.selectAll('button.action')
-            .on('click', e => {
+            .on('click', (e: PointerEvent) => {
               e.preventDefault();
               opts.buttonCallback();
             });

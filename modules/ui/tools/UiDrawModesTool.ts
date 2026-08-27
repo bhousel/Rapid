@@ -242,7 +242,7 @@ export class UiDrawModesTool {
     const currMode = context.mode?.id;
 
     // When drawing, ignore accidental clicks on mode buttons - iD#4042
-    if (e && /^draw/.test(currMode as string)) return;   // d3_event will be defined if user clicked
+    if (e && /^draw/.test(currMode as string)) return;   // e will be defined if user clicked
 
     if (d.id === currMode) {
       context.enter('browse');

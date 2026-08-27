@@ -61,7 +61,7 @@ export class UiSectionChanges extends AbstractUiSection {
     const map = context.systems.map!;
     const schema = context.systems.schema!;
 
-    const click = (d3_event: Event, change: SummaryEntry): void => {
+    const click = (e: PointerEvent, change: SummaryEntry): void => {
       if (change.changeType !== 'deleted') {
         const entity = change.entity;
         map.fitEntitiesEase(entity);
@@ -96,7 +96,7 @@ export class UiSectionChanges extends AbstractUiSection {
 
     const $$buttons: D3EnterSelection = $$itemsEnter
       .append('button')
-      .on('mouseover', (e: Event, d: SummaryEntry) => utilHighlightEntities(context, [d.entity.id], true))
+      .on('mouseover', (e: MouseEvent, d: SummaryEntry) => utilHighlightEntities(context, [d.entity.id], true))
       .on('mouseout', () => utilHighlightEntities(context, [], false))
       .on('click', click);
 

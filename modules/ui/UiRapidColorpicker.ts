@@ -158,7 +158,7 @@ export class UiRapidColorpicker extends EventEmitter {
       .append('div')
       .attr('class', 'colorpicker-option')
       .style('color', (d: string) => d)
-      .on('click', (e: Event, val: string) => {
+      .on('click', (e: PointerEvent, val: string) => {
         this.color = val;
         this.emit('change', val);
         $colorOptions.classed('selected', (d: string) => d === val);

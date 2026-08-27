@@ -183,12 +183,12 @@ export class UiMinimap {
 
   /**
    * d3-zoom callback that receives zoom/pan events
-   * @param  d3_event - A d3-zoom event, transform contains details about what changed
+   * @param  e - A d3-zoom event, transform contains details about what changed
    */
-  protected _zoomed(d3_event: any): void {
+  protected _zoomed(e: any): void {
     if (this._skipEvents) return;
 
-    const {x, y, k} = d3_event.transform;
+    const {x, y, k} = e.transform;
     const z = geoScaleToZoom(k);
 
     if (!this._gesture) {

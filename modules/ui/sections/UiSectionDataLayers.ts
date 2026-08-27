@@ -407,8 +407,8 @@ export class UiSectionDataLayers extends AbstractUiSection {
         .placement(isRTL ? 'right' : 'left')
         .attach
       )
-      .on('click', (d3_event: Event) => {
-        d3_event.preventDefault();
+      .on('click', (e: PointerEvent) => {
+        e.preventDefault();
         this._editCustom();
       })
       .call(uiIcon('#rapid-icon-more'));
@@ -421,11 +421,11 @@ export class UiSectionDataLayers extends AbstractUiSection {
         .placement(isRTL ? 'right' : 'left')
         .attach
       )
-      .on('click', (d3_event: Event) => {
-        const target = d3_event.currentTarget as HTMLElement;
+      .on('click', (e: PointerEvent) => {
+        const target = e.currentTarget as HTMLElement;
         if (select(target).classed('disabled')) return;
-        d3_event.preventDefault();
-        d3_event.stopPropagation();
+        e.preventDefault();
+        e.stopPropagation();
         const customLayer = scene.layers.get('custom-data') as PixiLayerCustomData;
         customLayer?.fitZoom();
       })
@@ -478,11 +478,11 @@ export class UiSectionDataLayers extends AbstractUiSection {
 
   /**
    * Handles a change to the MapRoulette challenge IDs input.
-   * @param d3_event - change event, if called from a change handler
+   * @param e - change event, if called from a change handler
    */
-  protected _mapRouletteIDsChanged(d3_event: Event): void {
+  protected _mapRouletteIDsChanged(e: Event): void {
     const maproulette = this.context.services.maproulette;
-    maproulette!.challengeIDs = (d3_event.target as HTMLInputElement).value;
+    maproulette!.challengeIDs = (e.target as HTMLInputElement).value;
   }
 
 

@@ -610,7 +610,7 @@ export class StreetsideService extends AbstractSystem {
       .append('input')
       .attr('type', 'checkbox')
       .attr('id', 'ms-hires-input')
-      .on('click', e => {
+      .on('click', (e: PointerEvent) => {
         e.stopPropagation();
 
         this._hires = !this._hires;

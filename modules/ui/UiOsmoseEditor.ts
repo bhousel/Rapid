@@ -189,8 +189,8 @@ export class UiOsmoseEditor extends EventEmitter {
 
     $buttons.select('.close-button')
       .text(l10n.t('QA.keepRight.close'))
-      .on('click.close', (d3_event: Event, d: OsmoseIssue) => {
-        (d3_event.currentTarget as HTMLElement).blur();    // avoid keeping focus on the button - iD#4641
+      .on('click', (e: PointerEvent, d: OsmoseIssue) => {
+        (e.currentTarget as HTMLElement).blur();    // avoid keeping focus on the button - iD#4641
         if (osmose2) {
           d.props.newStatus = 'done';
           d.touch();
@@ -200,8 +200,8 @@ export class UiOsmoseEditor extends EventEmitter {
 
     $buttons.select('.ignore-button')
       .text(l10n.t('QA.keepRight.ignore'))
-      .on('click.ignore', (d3_event: Event, d: OsmoseIssue) => {
-        (d3_event.currentTarget as HTMLElement).blur();    // avoid keeping focus on the button - iD#4641
+      .on('click', (e: PointerEvent, d: OsmoseIssue) => {
+        (e.currentTarget as HTMLElement).blur();    // avoid keeping focus on the button - iD#4641
         if (osmose2) {
           d.props.newStatus = 'false';
           d.touch();

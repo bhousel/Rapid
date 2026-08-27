@@ -104,8 +104,8 @@ export class UiFieldWikidata extends UiField {
       .attr('id', this.uid)
       .style('flex', '1')
       .call(utilNoAuto)
-      .on('focus', (d3_event: Event) => {
-        const node = select(d3_event.currentTarget as HTMLInputElement).node() as HTMLInputElement;
+      .on('focus', (e: Event) => {
+        const node = select(e.currentTarget as HTMLInputElement).node() as HTMLInputElement;
         node.setSelectionRange(0, node.value.length);
       })
       .on('blur', () => {
@@ -126,8 +126,8 @@ export class UiFieldWikidata extends UiField {
       .append('button')
       .attr('class', 'form-field-button wiki-link')
       .call(uiIcon('#rapid-icon-out-link'))
-      .on('click', (d3_event: Event) => {
-        d3_event.preventDefault();
+      .on('click', (e: PointerEvent) => {
+        e.preventDefault();
         if (this._wikiURL) window.open(this._wikiURL, '_blank');
       });
 
@@ -161,9 +161,9 @@ export class UiFieldWikidata extends UiField {
       .append('button')
       .attr('class', 'form-field-button')
       .call(uiIcon('#rapid-operation-copy'))
-      .on('click', (d3_event: Event) => {
-        d3_event.preventDefault();
-        (select((d3_event.currentTarget as HTMLElement).parentNode as HTMLElement)
+      .on('click', (e: PointerEvent) => {
+        e.preventDefault();
+        (select((e.currentTarget as HTMLElement).parentNode as HTMLElement)
           .select('input')
           .node() as HTMLInputElement)
           .select();

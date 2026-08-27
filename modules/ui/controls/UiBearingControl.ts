@@ -140,7 +140,8 @@ export class UiBearingControl {
 
 
   /**
-   * @param e - triggering event (if any)
+   * Reset the bearing (map rotation) to north-up.
+   * @param [e] - triggering event (if any)
    */
   public resetBearing(e?: Event): void {
     e?.preventDefault();

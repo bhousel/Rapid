@@ -248,17 +248,17 @@ export class UiMapRouletteDetails {
 
       // Attach hover and click event listeners
       $parent.selectAll('.highlight-link')
-        .on('mouseover', (d3_event: Event) => {
-          const osmId = transformId(select(d3_event.currentTarget as any).attr('data-osm-id'));
+        .on('mouseover', (e: MouseEvent) => {
+          const osmId = transformId(select(e.currentTarget as any).attr('data-osm-id'));
           utilHighlightEntities(context, [osmId], true);
         })
-        .on('mouseout', (d3_event: Event) => {
-          const osmId = transformId(select(d3_event.currentTarget as any).attr('data-osm-id'));
+        .on('mouseout', (e: MouseEvent) => {
+          const osmId = transformId(select(e.currentTarget as any).attr('data-osm-id'));
           utilHighlightEntities(context, [osmId], false);
         })
-        .on('click', (d3_event: Event) => {
-          d3_event.preventDefault();
-          const osmId = transformId(select(d3_event.currentTarget as any).attr('data-osm-id'));
+        .on('click', (e: PointerEvent) => {
+          e.preventDefault();
+          const osmId = transformId(select(e.currentTarget as any).attr('data-osm-id'));
           utilHighlightEntities(context, [osmId], false);
           this._highlightFeature(osmId);
         });

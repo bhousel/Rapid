@@ -48,10 +48,10 @@ export class UiSectionMapStyleOptions extends AbstractUiSection {
     const map = this.context.systems.map!;
 
     const isActiveFill = (d: string): boolean => map.areaFillMode === d;
-    const setFill = (d3_event: Event, d: string): void => { map.areaFillMode = d as any; };
+    const setFill = (e: Event, d: string): void => { map.areaFillMode = d as any; };
     const isHighlightChecked = (): boolean => map.highlightEdits;
-    const setHighlighted = (d3_event: Event): void => {
-      map.highlightEdits = (d3_event.currentTarget as HTMLInputElement).checked;
+    const setHighlighted = (e: Event): void => {
+      map.highlightEdits = (e.currentTarget as HTMLInputElement).checked;
     };
 
     const $container: D3Selection = $selection.selectAll('.layer-fill-list')
@@ -88,7 +88,7 @@ export class UiSectionMapStyleOptions extends AbstractUiSection {
     data: string[],
     type: string,
     name: string,
-    change: (d3_event: Event, d: string) => void,
+    change: (e: Event, d: string) => void,
     active: (d: string) => boolean
   ): void {
     const context = this.context;

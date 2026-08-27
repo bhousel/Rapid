@@ -294,8 +294,8 @@ export class SaveMode extends AbstractMode {
       .attr('href', '#')
       .classed('hide-toggle', true)
       .text(d => d?.msg || l10n.t('save.unknown_error_details'))
-      .on('click', function(this: Element, d3_event: Event) {
-        d3_event.preventDefault();
+      .on('click', function(this: Element, e: Event) {
+        e.preventDefault();
 
         const $error: D3Selection = select(this);
         const $detail: D3Selection = select((this as HTMLElement).nextElementSibling);

@@ -113,8 +113,8 @@ export class UiSectionColorSelection extends AbstractUiSection {
       .attr('class', 'color-select')
       .call(utilNoAuto)
       .call(this._colorCombo.attach)
-      .on('blur change', (d3_event: any) => {
-        const element = d3_event.currentTarget;
+      .on('blur change', (e: any) => {
+        const element = e.currentTarget;
         const val = (element && element.value) || '';
         const data = this._colorCombo.data();
         if (data.some((item: any) => item.value === val)) {
@@ -128,7 +128,7 @@ export class UiSectionColorSelection extends AbstractUiSection {
           }
 
         } else {
-          d3_event.currentTarget.value = '';
+          e.currentTarget.value = '';
           this._colorSelectedId = null;
         }
       });

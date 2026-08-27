@@ -118,7 +118,7 @@ export class UiShortcuts extends EventEmitter {
       .append('a')
       .attr('class', 'nav-item')
       .attr('href', '#')
-      .on('click', (e, d) => {
+      .on('click', (e: PointerEvent, d: any) => {
         e.preventDefault();
         this._activeTab = this._dataShortcuts.indexOf(d);
         this.render();

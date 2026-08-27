@@ -111,7 +111,7 @@ export class UiApiStatus {
         .append('a')
         .attr('href', '#')
         .text(l10n.t('status.dismiss'))
-        .on('click.dismiss', e => {
+        .on('click.dismiss', (e: PointerEvent) => {
           e.preventDefault();
           this._gfxStatus = null;
           this.render();
@@ -134,7 +134,7 @@ export class UiApiStatus {
           .call(uiIcon('#rapid-icon-out-link', 'inline'))
           .append('span')
           .text(l10n.t('login'))
-          .on('click.login', e => {
+          .on('click.login', (e: PointerEvent) => {
             e.preventDefault();
             osm.authenticate();
             this._apiStatus = 'online';
@@ -149,7 +149,7 @@ export class UiApiStatus {
           .append('a')
           .attr('href', '#')
           .text(l10n.t('status.retry'))
-          .on('click.retry', e => {
+          .on('click.retry', (e: PointerEvent) => {
             e.preventDefault();
             osm.deferredReloadApiStatus();
           });

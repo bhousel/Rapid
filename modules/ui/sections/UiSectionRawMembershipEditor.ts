@@ -66,10 +66,10 @@ export class UiSectionRawMembershipEditor extends AbstractUiSection {
     this._nearbyCombo = new UiCombobox(context, 'parent-relation')
       .minItems(1)
       .fetcher(this._fetchNearbyRelations)
-      .itemsMouseEnter((d3_event: Event, d: NearbyRelationItem) => {
+      .itemsMouseEnter((e: Event, d: NearbyRelationItem) => {
         if (d.relation) utilHighlightEntities(context, [d.relation.id], true);
       })
-      .itemsMouseLeave((d3_event: Event, d: NearbyRelationItem) => {
+      .itemsMouseLeave((e: Event, d: NearbyRelationItem) => {
         if (d.relation) utilHighlightEntities(context, [d.relation.id], false);
       });
   }
@@ -176,12 +176,12 @@ export class UiSectionRawMembershipEditor extends AbstractUiSection {
 
   /**
    * Selects the parent relation for a membership row.
-   * @param d3_event - the triggering click event
+   * @param e - the triggering click event
    * @param d - the membership row datum
    */
-  protected _selectRelation(d3_event: Event, d: MembershipRow): void {
+  protected _selectRelation(e: Event, d: MembershipRow): void {
     const context = this.context;
-    d3_event.preventDefault();
+    e.preventDefault();
 
     // remove the hover-highlight styling
     utilHighlightEntities(context, [d.relation.id], false);
@@ -192,14 +192,14 @@ export class UiSectionRawMembershipEditor extends AbstractUiSection {
 
   /**
    * Zooms the map to a parent relation and highlights it.
-   * @param d3_event - the triggering click event
+   * @param e - the triggering click event
    * @param d - the membership row datum
    */
-  protected _zoomToRelation(d3_event: Event, d: MembershipRow): void {
+  protected _zoomToRelation(e: Event, d: MembershipRow): void {
     const context = this.context;
     const editor = context.systems.editor!;
     const map = context.systems.map!;
-    d3_event.preventDefault();
+    e.preventDefault();
 
     const graph = editor.staging.graph;
     const entity = graph.entity(d.relation.id);
@@ -223,10 +223,10 @@ export class UiSectionRawMembershipEditor extends AbstractUiSection {
 
   /**
    * Changes the role for the selected entities within a relation and commits.
-   * @param d3_event - the triggering blur/change event
+   * @param e - the triggering blur/change event
    * @param d - the membership row datum
    */
-  protected _changeRole(d3_event: Event, d: MembershipRow): void {
+  protected _changeRole(e: Event, d: MembershipRow): void {
     const context = this.context;
     const editor = context.systems.editor!;
     const l10n = context.systems.l10n!;
@@ -234,7 +234,7 @@ export class UiSectionRawMembershipEditor extends AbstractUiSection {
     if ((d as any) === 0) return;    // called on newrow (shouldn't happen)
     if (this._inChange) return;  // avoid accidental recursive call iD#5731
 
-    const newRole = context.cleanRelationRole(select(d3_event.currentTarget as HTMLElement).property('value'));
+    const newRole = context.cleanRelationRole(select(e.currentTarget as HTMLElement).property('value'));
 
     if (!newRole.trim() && typeof d.role !== 'string') return;
 
@@ -312,15 +312,15 @@ const membersToUpdate = d.members.filter(function(member: IndexedMember) {
 
   /**
    * Removes the selected entities' memberships from a relation and commits.
-   * @param d3_event - the triggering click event
+   * @param e - the triggering click event
    * @param d - the membership row datum
    */
-  protected _deleteMembership(d3_event: Event, d: MembershipRow): void {
+  protected _deleteMembership(e: Event, d: MembershipRow): void {
     const context = this.context;
     const editor = context.systems.editor!;
     const l10n = context.systems.l10n!;
 
-    (d3_event.currentTarget as HTMLElement).blur();   // avoid keeping focus on the button
+    (e.currentTarget as HTMLElement).blur();   // avoid keeping focus on the button
     if ((d as any) === 0) return;   // called on newrow (shouldn't happen)
 
     // remove the hover-highlight styling
@@ -474,10 +474,10 @@ const indexes = d.members.map(function(member: IndexedMember) {
 
     // highlight the relation in the map while hovering on the list item
     $$items
-      .on('mouseover', function(d3_event: Event, d: MembershipRow) {
+      .on('mouseover', function(e: Event, d: MembershipRow) {
         utilHighlightEntities(context, [d.relation.id], true);
       })
-      .on('mouseout', function(d3_event: Event, d: MembershipRow) {
+      .on('mouseout', function(e: Event, d: MembershipRow) {
         utilHighlightEntities(context, [d.relation.id], false);
       });
 

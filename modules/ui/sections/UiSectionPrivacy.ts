@@ -71,8 +71,8 @@ export class UiSectionPrivacy extends AbstractUiSection {
     $$thirdPartyIcons
       .append('input')
       .attr('type', 'checkbox')
-      .on('change', (d3_event: Event) => {
-        d3_event.preventDefault();
+      .on('change', (e: Event) => {
+        e.preventDefault();
         this._showThirdPartyIcons = (this._showThirdPartyIcons === 'true') ? 'false' : 'true';
         settings?.set('ui.privacy.thirdPartyIcons', this._showThirdPartyIcons);
         update();

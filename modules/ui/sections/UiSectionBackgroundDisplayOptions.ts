@@ -115,16 +115,16 @@ export class UiSectionBackgroundDisplayOptions extends AbstractUiSection {
       .attr('min', MINVAL)
       .attr('max', MAXVAL)
       .attr('step', '0.05')
-      .on('input', (d3_event: Event, d: string) => {
-        this._updateValue(d, ((d3_event.target as HTMLInputElement).value as any || 1));
+      .on('input', (e: InputEvent, d: string) => {
+        this._updateValue(d, ((e.target as HTMLInputElement).value as any || 1));
       });
 
     $$slidersControl
       .append('button')
       .attr('title', l10n.t('background.reset'))
       .attr('class', (d: string) => `display-option-reset display-option-reset-${d}`)
-      .on('click', (d3_event: MouseEvent, d: string) => {
-        if (d3_event.button !== 0) return;  // left click only
+      .on('click', (e: PointerEvent, d: string) => {
+        if (e.button !== 0) return;  // left click only
         this._updateValue(d, 1);
       })
       .call(uiIcon('#rapid-icon-' + (l10n.isRTL ? 'redo' : 'undo')));
@@ -134,8 +134,8 @@ export class UiSectionBackgroundDisplayOptions extends AbstractUiSection {
       .append('a')
       .attr('class', 'display-option-resetlink')
       .attr('href', '#')
-      .on('click', (d3_event: Event) => {
-        d3_event.preventDefault();
+      .on('click', (e: PointerEvent) => {
+        e.preventDefault();
         for (const s of SETTINGS) {
           this._updateValue(s, 1);
         }

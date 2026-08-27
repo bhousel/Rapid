@@ -237,8 +237,8 @@ export class UiConflicts extends EventEmitter {
       .attr('class', 'conflict-description')
       .attr('href', '#')
       .text((d: ConflictItem) => d.name)
-      .on('click', (d3_event: Event, d: ConflictItem) => {
-        d3_event.preventDefault();
+      .on('click', (e: PointerEvent, d: ConflictItem) => {
+        e.preventDefault();
         this._showEntityID(d.id);
       });
 
@@ -273,8 +273,8 @@ export class UiConflicts extends EventEmitter {
       .attr('disabled', (d: string, i: number) => {
         return (i === 0 && index === 0) || (i === 1 && index === this._conflictList!.length - 1) || null;
       })
-      .on('click', (d3_event: Event, d: string) => {
-        d3_event.preventDefault();
+      .on('click', (e: PointerEvent, d: string) => {
+        e.preventDefault();
 
         const $container = $parent.selectAll('.conflict-container');
         const sign = (d === 'previous') ? -1 : 1;
@@ -312,10 +312,10 @@ export class UiConflicts extends EventEmitter {
       .append('input')
       .attr('type', 'radio')
       .attr('name', (d: ChoiceOption) => d.id)
-      .on('change', (d3_event: Event, d: ChoiceOption) => {
-        const ul = (d3_event.currentTarget as HTMLElement).parentNode!.parentNode!.parentNode as HTMLUListElement;
+      .on('change', (e: Event, d: ChoiceOption) => {
+        const ul = (e.currentTarget as HTMLElement).parentNode!.parentNode!.parentNode as HTMLUListElement;
         (ul as any).__data__.chosen = d.id;
-        this._choose(d3_event, ul, d);
+        this._choose(e, ul, d);
       });
 
     $$label
@@ -336,15 +336,15 @@ export class UiConflicts extends EventEmitter {
 
   /**
    * Applies the selected resolution choice and highlights the affected entity.
-   * @param d3_event - the triggering event, or `null` when applied programmatically
+   * @param e - the triggering event, or `null` when applied programmatically
    * @param ul - the `<ul>` element holding the choices
    * @param datum - the chosen resolution datum
    */
-  protected _choose(d3_event: Event | null, ul: HTMLUListElement, datum: ChoiceOption): void {
+  protected _choose(e: Event | null, ul: HTMLUListElement, datum: ChoiceOption): void {
     const context = this.context;
     const editor = context.systems.editor!;
 
-    if (d3_event) d3_event.preventDefault();
+    if (e) e.preventDefault();
 
     select(ul)
       .selectAll('li')

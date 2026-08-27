@@ -105,8 +105,8 @@ export class UiSectionGridDisplayOptions extends AbstractUiSection {
       .attr('type', 'radio')
       .attr('name', 'grids')
       .property('checked', (d: any) => d.numSplit === imagery.numGridSplits)
-      .on('change', (d3_event: Event, d: any) => {
-        d3_event.preventDefault();
+      .on('change', (e: Event, d: any) => {
+        e.preventDefault();
         imagery.numGridSplits = d.numSplit;
       });
 

@@ -488,10 +488,10 @@ export class SelectOsmMode extends AbstractMode {
 
   /**
    *  jump to the first vertex along a way
-   * @param d3_event
+   * @param e
    */
-  protected _firstVertex(d3_event: Event): void {
-    d3_event.preventDefault();
+  protected _firstVertex(e: Event): void {
+    e.preventDefault();
 
     const way = this._chooseParentWay(this._singularDatum);
     if (!way) return;
@@ -513,10 +513,10 @@ export class SelectOsmMode extends AbstractMode {
 
   /**
    *  jump to the first vertex along a way
-   * @param d3_event
+   * @param e
    */
-  protected _lastVertex(d3_event: Event): void {
-    d3_event.preventDefault();
+  protected _lastVertex(e: Event): void {
+    e.preventDefault();
 
     const way = this._chooseParentWay(this._singularDatum);
     if (!way) return;
@@ -538,10 +538,10 @@ export class SelectOsmMode extends AbstractMode {
 
   /**
    *  jump to the previous vertex
-   * @param d3_event
+   * @param e
    */
-  protected _previousVertex(d3_event: Event): void {
-    d3_event.preventDefault();
+  protected _previousVertex(e: Event): void {
+    e.preventDefault();
 
     const entity = this._singularDatum;
     if (entity?.type !== 'node') return;
@@ -577,10 +577,10 @@ export class SelectOsmMode extends AbstractMode {
 
   /**
    *  jump to the next vertex
-   * @param d3_event
+   * @param e
    */
-  protected _nextVertex(d3_event: Event): void {
-    d3_event.preventDefault();
+  protected _nextVertex(e: Event): void {
+    e.preventDefault();
 
     const entity = this._singularDatum;
     if (entity?.type !== 'node') return;
@@ -616,10 +616,10 @@ export class SelectOsmMode extends AbstractMode {
 
   /**
    *  If the user is at a junction, focus on a different parent way
-   * @param d3_event
+   * @param e
    */
-  protected _focusNextParent(d3_event: Event): void {
-    d3_event.preventDefault();
+  protected _focusNextParent(e: Event): void {
+    e.preventDefault();
 
     const entity = this._singularDatum;
     if (entity?.type !== 'node') return;

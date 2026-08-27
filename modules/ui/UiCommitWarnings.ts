@@ -87,7 +87,7 @@ export class UiCommitWarnings {
 
       const buttons = itemsEnter
         .append('button')
-//        .on('mouseover', (d3_event, d) => {
+//        .on('mouseover', (e, d) => {
 //// todo replace legacy surface css class .hover
 //          if (d.entityIds) {
 //            const graph = editor.staging.graph;
@@ -100,7 +100,7 @@ export class UiCommitWarnings {
 //          context.surface().selectAll('.hover')
 //            .classed('hover', false);
 //        })
-        .on('click', (d3_event: Event, d: any) => {
+        .on('click', (e: PointerEvent, d: any) => {
           validator.focusIssue(d);
         });
 

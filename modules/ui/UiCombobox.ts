@@ -268,14 +268,14 @@ export class UiCombobox extends EventEmitter {
           .enter()
           .insert('div', () => sibling)
           .attr('class', 'combobox-caret')
-          .on('mousedown.combo-caret', (d3_event: MouseEvent) => {
-            d3_event.preventDefault();  // don't steal focus from input
+          .on('mousedown.combo-caret', (e: MouseEvent) => {
+            e.preventDefault();  // don't steal focus from input
             $input.node().focus();      // focus the input as if it was clicked
-            this._mousedown(d3_event);
+            this._mousedown(e);
           })
-          .on('mouseup.combo-caret', (d3_event: MouseEvent) => {
-            d3_event.preventDefault();  // don't steal focus from input
-            this._mouseup(d3_event);
+          .on('mouseup.combo-caret', (e: MouseEvent) => {
+            e.preventDefault();  // don't steal focus from input
+            this._mouseup(e);
           });
       });
   }
@@ -284,12 +284,12 @@ export class UiCombobox extends EventEmitter {
   /**
    * On mouse-button down: records the timestamp (for double-click detection) and
    * clears any text selection that would interfere with the caret toggle.
-   * @param d3_event - the triggering mouse event
+   * @param e - the triggering mouse event
    */
-  protected _mousedown(d3_event: MouseEvent): void {
+  protected _mousedown(e: MouseEvent): void {
     const $input = this.$input;
     if (!$input) return;
-    if (d3_event.button !== 0) return;    // left click only
+    if (e.button !== 0) return;    // left click only
     this._tDown = +new Date();
 
     // clear selection
@@ -307,16 +307,16 @@ export class UiCombobox extends EventEmitter {
 
   /**
    * On mouse-button up: shows or hides the dropdown, debounced to ignore double-clicks.
-   * @param d3_event - the triggering mouse event
+   * @param e - the triggering mouse event
    */
-  protected _mouseup(d3_event: MouseEvent): void {
+  protected _mouseup(e: MouseEvent): void {
     const scheduler = this.context.systems.scheduler;   // optional
     const $container = this.$container;
     const $input = this.$input;
     if (!$input) return;
 
     $input.on('mouseup.combo-input', null);
-    if (d3_event.button !== 0) return;    // left click only
+    if (e.button !== 0) return;    // left click only
     if ($input.node() !== document.activeElement) return;   // exit if this input is not focused
 
     const start = $input.property('selectionStart');
@@ -385,9 +385,9 @@ export class UiCombobox extends EventEmitter {
       .style('position', 'absolute')
       .style('display', 'block')
       .style('left', '0px')
-      .on('mousedown.combo-container', (d3_event: MouseEvent) => {
+      .on('mousedown.combo-container', (e: MouseEvent) => {
         // prevent moving focus out of the input field
-        d3_event.preventDefault();
+        e.preventDefault();
       });
 
     $container
@@ -414,9 +414,9 @@ export class UiCombobox extends EventEmitter {
 
   /**
    * Handles keyboard navigation (arrows, Tab, Return, Backspace/Delete) while the input is focused.
-   * @param d3_event - the triggering keyboard event
+   * @param e - the triggering keyboard event
    */
-  protected _keydown(d3_event: KeyboardEvent): void {
+  protected _keydown(e: KeyboardEvent): void {
     const $container = this.$container;
     const $input = this.$input;
     if (!$input) return;
@@ -424,10 +424,10 @@ export class UiCombobox extends EventEmitter {
     const shown = !$container.selectAll('.combobox').empty();
     const tagName = $input.node() ? $input.node().tagName.toLowerCase() : '';
 
-    switch (d3_event.keyCode) {
+    switch (e.keyCode) {
       case 8:   // ⌫ Backspace
       case 46:  // ⌦ Delete
-        d3_event.stopPropagation();
+        e.stopPropagation();
         this._selected = null;
         this._render();
         $input.on('input.combo-input', () => {
@@ -438,17 +438,17 @@ export class UiCombobox extends EventEmitter {
         break;
 
       case 9:   // ⇥ Tab
-        this._accept(d3_event);
+        this._accept(e);
         break;
 
       case 13:  // ↩ Return
-        d3_event.preventDefault();
-        d3_event.stopPropagation();
+        e.preventDefault();
+        e.stopPropagation();
         break;
 
       case 38:  // ↑ Up arrow
         if (tagName === 'textarea' && !shown) return;
-        d3_event.preventDefault();
+        e.preventDefault();
         if (tagName === 'input' && !shown) {
           this._show();
         }
@@ -457,7 +457,7 @@ export class UiCombobox extends EventEmitter {
 
       case 40:  // ↓ Down arrow
         if (tagName === 'textarea' && !shown) return;
-        d3_event.preventDefault();
+        e.preventDefault();
         if (tagName === 'input' && !shown) {
           this._show();
         }
@@ -469,16 +469,16 @@ export class UiCombobox extends EventEmitter {
 
   /**
    * Handles Escape (cancel) and Return (accept) on key-up.
-   * @param d3_event - the triggering keyboard event
+   * @param e - the triggering keyboard event
    */
-  protected _keyup(d3_event: KeyboardEvent): void {
-    switch (d3_event.keyCode) {
+  protected _keyup(e: KeyboardEvent): void {
+    switch (e.keyCode) {
       case 27:  // ⎋ Escape
         this._cancel();
         break;
 
       case 13:  // ↩ Return
-        this._accept(d3_event);
+        this._accept(e);
         break;
     }
   }
@@ -717,10 +717,10 @@ export class UiCombobox extends EventEmitter {
   /**
    * Commits the current value: writes it back to the input, emits `accept` with the
    * matching datum, and hides the dropdown.
-   * @param d3_event - the triggering event (Tab, Return, or option click)
-   * @param d        - the suggestion datum if the user clicked an option directly
+   * @param e - the triggering event (Tab, Return, or option click)
+   * @param [d] - the suggestion datum if the user clicked an option directly
    */
-  protected _accept(d3_event: Event, d?: UiComboboxDatum): void {
+  protected _accept(e: Event, d?: UiComboboxDatum): void {
     const $input = this.$input!;
 
     this._cancelFetch = true;

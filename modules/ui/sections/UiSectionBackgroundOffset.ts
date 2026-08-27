@@ -95,12 +95,12 @@ export class UiSectionBackgroundOffset extends AbstractUiSection {
 
   /**
    * Handles manual entry of an offset in the input field.
-   * @param d3_event - the input change event
+   * @param e - the input change event
    */
-  protected _inputOffset(d3_event: Event): void {
+  protected _inputOffset(e: Event): void {
     const imagery = this.context.systems.imagery!;
 
-    const $input = select(d3_event.target as any);
+    const $input = select(e.target as any);
     let val: any = ($input.node() as HTMLInputElement).value;
 
     if (val === '') return this._resetOffset();
@@ -122,26 +122,26 @@ export class UiSectionBackgroundOffset extends AbstractUiSection {
 
   /**
    * Begins a drag-to-nudge gesture on the outer rect.
-   * @param d3_event - the pointerdown event
+   * @param e - the pointerdown event
    */
-  protected _pointerdown(d3_event: PointerEvent): void {
+  protected _pointerdown(e: PointerEvent): void {
     const context = this.context;
 
-    if (d3_event.button !== 0) return;
+    if (e.button !== 0) return;
     const input = context.container().selectAll('.nudge-inner-rect > input').node();
-    if (d3_event.target === input) return;   // we are dragging in the input field, not the outer rect
+    if (e.target === input) return;   // we are dragging in the input field, not the outer rect
 
-    let origin: Vec2 = [d3_event.clientX, d3_event.clientY];
-    const pointerId = d3_event.pointerId || 'mouse';
+    let origin: Vec2 = [e.clientX, e.clientY];
+    const pointerId = e.pointerId || 'mouse';
 
     context.container()
       .append('div')
       .attr('class', 'nudge-surface');
 
-    const pointermove = (d3_event: PointerEvent): void => {
-      if (pointerId !== (d3_event.pointerId || 'mouse')) return;
+    const pointermove = (e: PointerEvent): void => {
+      if (pointerId !== (e.pointerId || 'mouse')) return;
 
-      const latest: Vec2 = [d3_event.clientX, d3_event.clientY];
+      const latest: Vec2 = [e.clientX, e.clientY];
       const delta: Vec2 = [
         -(origin[0] - latest[0]) / 4,
         -(origin[1] - latest[1]) / 4
@@ -151,9 +151,9 @@ export class UiSectionBackgroundOffset extends AbstractUiSection {
       this._nudge(delta);
     };
 
-    const pointerup = (d3_event: PointerEvent): void => {
-      if (pointerId !== (d3_event.pointerId || 'mouse')) return;
-      if (d3_event.button !== 0) return;
+    const pointerup = (e: PointerEvent): void => {
+      if (pointerId !== (e.pointerId || 'mouse')) return;
+      if (e.button !== 0) return;
 
       context.container().selectAll('.nudge-surface')
         .remove();
@@ -210,13 +210,13 @@ export class UiSectionBackgroundOffset extends AbstractUiSection {
       .append('button')
       .attr('class', (d: any) => `${d[0]} nudge`)
       .attr('tabindex', -1)
-      .on('click', (d3_event: Event, d: any) => this._nudge(d[1]));
+      .on('click', (e: PointerEvent, d: any) => this._nudge(d[1]));
 
     $$nudgeWrap
       .append('button')
       .attr('class', 'nudge-reset disabled')
-      .on('click', (d3_event: Event) => {
-        d3_event.preventDefault();
+      .on('click', (e: PointerEvent) => {
+        e.preventDefault();
         this._resetOffset();
       })
       .call(uiIcon('#rapid-icon-' + (l10n.isRTL ? 'redo' : 'undo')));

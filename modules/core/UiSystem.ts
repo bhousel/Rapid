@@ -243,12 +243,12 @@ export class UiSystem extends AbstractSystem {
       });
 
 // not sure what these were for
-//    $container.on('click.ui', d3_event => {
-//      if (d3_event.button !== 0) return;  // we're only concerned with the primary mouse button
-//      if (!d3_event.composedPath) return;
+//    $container.on('click.ui', e => {
+//      if (e.button !== 0) return;  // we're only concerned with the primary mouse button
+//      if (!e.composedPath) return;
 //
 //      // some targets have default click events we don't want to override
-//      const isOkayTarget = d3_event.composedPath().some(node => {
+//      const isOkayTarget = e.composedPath().some(node => {
 //        return node.nodeType === 1 && (  // we only care about element nodes
 //          node.nodeName === 'INPUT' ||   // clicking <input> focuses it and/or changes a value
 //          node.nodeName === 'LABEL' ||   // clicking <label> affects its <input> by default
@@ -256,7 +256,7 @@ export class UiSystem extends AbstractSystem {
 //       });
 //      if (isOkayTarget) return;
 //
-//      d3_event.preventDefault();   // disable double-tap-to-zoom on touchscreens
+//      e.preventDefault();   // disable double-tap-to-zoom on touchscreens
 //    });
 //
 //    // only WebKit supports gesture events
@@ -266,9 +266,9 @@ export class UiSystem extends AbstractSystem {
 //      // On iOS we disable pinch-to-zoom of the UI via the `touch-action`
 //      // CSS property, but on desktop Safari we need to manually cancel the
 //      // default gesture events.
-//      $container.on('gesturestart.ui gesturechange.ui gestureend.ui', d3_event => {
+//      $container.on('gesturestart.ui gesturechange.ui gestureend.ui', e => {
 //        // disable pinch-to-zoom of the UI via multitouch trackpads on macOS Safari
-//        d3_event.preventDefault();
+//        e.preventDefault();
 //      });
 //    }
 

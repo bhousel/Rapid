@@ -67,20 +67,20 @@ export class UiSectionSelectionList extends AbstractUiSection {
 
   /**
    * Selects a single feature from the list.
-   * @param d3_event - the triggering click event
+   * @param e - the triggering click event
    * @param entity - the entity to select
    */
-  protected _selectEntity(d3_event: Event, entity: OsmEntity): void {
+  protected _selectEntity(e: PointerEvent, entity: OsmEntity): void {
     this.context.enter('select-osm', { selection: { osm: [entity.id] }} );
   }
 
 
   /**
    * Removes a feature from the current selection.
-   * @param d3_event - the triggering click event
+   * @param e - the triggering click event
    * @param entity - the entity to deselect
    */
-  protected _deselectEntity(d3_event: Event, entity: OsmEntity): void {
+  protected _deselectEntity(e: PointerEvent, entity: OsmEntity): void {
     const selectedIDs = this._selectedIDs.slice();
     const index = selectedIDs.indexOf(entity.id);
     if (index > -1) {

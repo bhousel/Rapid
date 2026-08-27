@@ -250,9 +250,9 @@ export class MapSystem extends AbstractSystem {
       .append('div')
       .attr('class', 'main-map')
       // Suppress the native right-click context menu
-      .on('contextmenu', (e: Event) => e.preventDefault())
+      .on('contextmenu', (e: PointerEvent) => e.preventDefault())
       // Suppress swipe-to-navigate browser pages on trackpad/magic mouse – iD#5552
-      .on('wheel.map mousewheel.map', (e: Event) => e.preventDefault());
+      .on('wheel.map mousewheel.map', (e: WheelEvent) => e.preventDefault());
 
     // The `supersurface` is a wrapper div that we temporarily transform as the user zooms and pans.
     // This allows us to defer actual rendering until the browser has more time to do it.

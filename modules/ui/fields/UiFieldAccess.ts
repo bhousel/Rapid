@@ -230,14 +230,14 @@ export class UiFieldAccess extends UiField {
 
   /**
    * Handles a change to one of the access inputs and dispatches the tag change.
-   * @param d3_event - The triggering DOM event
+   * @param e - The triggering DOM event
    * @param d - The access type key (e.g. 'foot', 'bicycle')
    */
-  protected _change(d3_event: Event, d: string): void {
+  protected _change(e: Event, d: string): void {
     const context = this.context;
 
     const tagChange: TagChange = {};
-    const value = context.cleanTagValue(utilGetSetValue(select(d3_event.currentTarget as any)) as string);
+    const value = context.cleanTagValue(utilGetSetValue(select(e.currentTarget as any)) as string);
 
     // don't override multiple values with blank string
     if (!value && typeof this._tags[d] !== 'string') return;

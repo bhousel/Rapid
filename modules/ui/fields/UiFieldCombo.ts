@@ -195,11 +195,11 @@ export class UiFieldCombo extends UiField {
       .on('blur', this._change);
 
     this.$input
-      .on('keydown.field', (d3_event: KeyboardEvent) => {
-        switch (d3_event.keyCode) {
+      .on('keydown.field', (e: KeyboardEvent) => {
+        switch (e.keyCode) {
           case 13: // ↩ Return
             this?.$input?.node()?.blur(); // blurring also enters the value
-            d3_event.stopPropagation();
+            e.stopPropagation();
             break;
         }
       });
@@ -526,14 +526,14 @@ export class UiFieldCombo extends UiField {
 
   /**
    * Removes a multi/semi combo value and dispatches the tag change.
-   * @param d3_event - The triggering DOM event
+   * @param e - The triggering DOM event
    * @param d        - The chip datum to remove
    */
-  protected _removeMultikey(d3_event: Event, d: ComboItem): void {
+  protected _removeMultikey(e: Event, d: ComboItem): void {
     const key = this.key;
 
-    d3_event.preventDefault();
-    d3_event.stopPropagation();
+    e.preventDefault();
+    e.stopPropagation();
 
     // Don't allow user to remove source of a rapid feature
     if (key === 'source' && this._isRapidFeature()) return;
@@ -722,14 +722,14 @@ export class UiFieldCombo extends UiField {
         .attr('title', isMixed ? (mixedValues as string[]).join('\n') : null)
         .attr('placeholder', isMixed ? l10n.t('inspector.multiple_values') : this._staticPlaceholder || '')
         .classed('mixed', isMixed)
-        .on('keydown.deleteCapture', (d3_event: KeyboardEvent) => {
+        .on('keydown.deleteCapture', (e: KeyboardEvent) => {
           if (isReadOnly &&
             isKnownValue &&
-            (d3_event.keyCode === utilKeybinding.keyCodes['⌫'] ||
-            d3_event.keyCode === utilKeybinding.keyCodes['⌦'])) {
+            (e.keyCode === utilKeybinding.keyCodes['⌫'] ||
+            e.keyCode === utilKeybinding.keyCodes['⌦'])) {
 
-            d3_event.preventDefault();
-            d3_event.stopPropagation();
+            e.preventDefault();
+            e.stopPropagation();
 
             const t: Tags = {};
             t[key] = undefined;
@@ -755,16 +755,16 @@ export class UiFieldCombo extends UiField {
     // allow drag and drop re-ordering of chips
     let dragOrigin: { x: number; y: number } | null, targetIndex: number | null;
     $selection.call(drag<any, any>()
-      .on('start', function(d3_event: any) {
+      .on('start', function(e: any) {
         dragOrigin = {
-          x: d3_event.x,
-          y: d3_event.y
+          x: e.x,
+          y: e.y
         };
         targetIndex = null;
       })
-      .on('drag', function(this: HTMLElement, d3_event: any) {
-        const x = d3_event.x - dragOrigin!.x,
-          y = d3_event.y - dragOrigin!.y;
+      .on('drag', function(this: HTMLElement, e: any) {
+        const x = e.x - dragOrigin!.x,
+          y = e.y - dragOrigin!.y;
 
         if (!select(this).classed('dragging') &&
           // don't display drag until dragging beyond a distance threshold
@@ -788,13 +788,13 @@ export class UiFieldCombo extends UiField {
               if (index === index2) {
                 return 'translate(' + x + 'px, ' + y + 'px)';
               // move the dragged tag up the order
-              } else if (index2 > index && d3_event.y > node.offsetTop) {
+              } else if (index2 > index && e.y > node.offsetTop) {
                 if (targetIndex === null || index2 > targetIndex) {
                   targetIndex = index2;
                 }
                 return 'translateY(-100%)';
               // move the dragged tag down the order
-              } else if (index2 < index && d3_event.y < node.offsetTop + node.offsetHeight) {
+              } else if (index2 < index && e.y < node.offsetTop + node.offsetHeight) {
                 if (targetIndex === null || index2 < targetIndex) {
                   targetIndex = index2;
                 }
@@ -811,10 +811,10 @@ export class UiFieldCombo extends UiField {
               // check the cursor is in the bounding box
               if (
                 index !== index2 &&
-                d3_event.x < node.offsetLeft + node.offsetWidth + 5 &&
-                d3_event.x > node.offsetLeft &&
-                d3_event.y < node.offsetTop + node.offsetHeight &&
-                d3_event.y > node.offsetTop
+                e.x < node.offsetLeft + node.offsetWidth + 5 &&
+                e.x > node.offsetLeft &&
+                e.y < node.offsetTop + node.offsetHeight &&
+                e.y > node.offsetTop
               ) {
                 targetIndex = index2;
                 targetIndexOffsetTop = node.offsetTop;

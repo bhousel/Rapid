@@ -87,14 +87,14 @@ export class UiSectionRawMemberEditor extends AbstractUiSection {
 
   /**
    * Downloads an incomplete member entity, then re-renders.
-   * @param d3_event - the triggering click event
+   * @param e - the triggering click event
    * @param d - the member row datum
    */
-  protected _downloadMember(d3_event: Event, d: MemberRowData): void {
-    d3_event.preventDefault();
+  protected _downloadMember(e: Event, d: MemberRowData): void {
+    e.preventDefault();
 
     // display the loading indicator
-    select((d3_event.currentTarget as HTMLElement).parentNode as HTMLElement).classed('tag-reference-loading', true);
+    select((e.currentTarget as HTMLElement).parentNode as HTMLElement).classed('tag-reference-loading', true);
     this.context.loadEntityAsync(d.id)
       .then(() => this.renderInner());
   }
@@ -102,14 +102,14 @@ export class UiSectionRawMemberEditor extends AbstractUiSection {
 
   /**
    * Zooms the map to a member entity and highlights it.
-   * @param d3_event - the triggering click event
+   * @param e - the triggering click event
    * @param d - the member row datum
    */
-  protected _zoomToMember(d3_event: Event, d: MemberRowData): void {
+  protected _zoomToMember(e: Event, d: MemberRowData): void {
     const context = this.context;
     const editor = context.systems.editor!;
     const map = context.systems.map!;
-    d3_event.preventDefault();
+    e.preventDefault();
 
     const graph = editor.staging.graph;
     const entity = graph.entity(d.id);
@@ -122,15 +122,15 @@ export class UiSectionRawMemberEditor extends AbstractUiSection {
 
   /**
    * Selects a member entity (zooming to it if off-screen).
-   * @param d3_event - the triggering click event
+   * @param e - the triggering click event
    * @param d - the member row datum
    */
-  protected _selectMember(d3_event: Event, d: MemberRowData): void {
+  protected _selectMember(e: Event, d: MemberRowData): void {
     const context = this.context;
     const editor = context.systems.editor!;
     const map = context.systems.map!;
     const viewport = context.viewport;
-    d3_event.preventDefault();
+    e.preventDefault();
 
     // remove the hover-highlight styling
     utilHighlightEntities(context, [d.id], false);
@@ -149,15 +149,15 @@ export class UiSectionRawMemberEditor extends AbstractUiSection {
 
   /**
    * Changes a member's role and commits the edit.
-   * @param d3_event - the triggering blur/change event
+   * @param e - the triggering blur/change event
    * @param d - the member row datum
    */
-  protected _changeRole(d3_event: Event, d: MemberRowData): void {
+  protected _changeRole(e: Event, d: MemberRowData): void {
     const context = this.context;
     const editor = context.systems.editor!;
     const l10n = context.systems.l10n!;
     const oldRole = d.role;
-    const newRole = context.cleanRelationRole(select(d3_event.currentTarget as HTMLElement).property('value'));
+    const newRole = context.cleanRelationRole(select(e.currentTarget as HTMLElement).property('value'));
 
     if (oldRole !== newRole) {
       const member = { id: d.id, type: d.type, role: newRole };
@@ -172,10 +172,10 @@ export class UiSectionRawMemberEditor extends AbstractUiSection {
 
   /**
    * Deletes a member from the relation (may delete the relation and exit select mode).
-   * @param d3_event - the triggering click event
+   * @param e - the triggering click event
    * @param d - the member row datum
    */
-  protected _deleteMember(d3_event: Event, d: MemberRowData): void {
+  protected _deleteMember(e: Event, d: MemberRowData): void {
     const context = this.context;
     const editor = context.systems.editor!;
     const l10n = context.systems.l10n!;
@@ -354,13 +354,13 @@ export class UiSectionRawMemberEditor extends AbstractUiSection {
     let x0: number, y0: number, targetIndex: number | null;
 
     $items.call(drag()
-      .on('start', function(this: any, d3_event: any) {
-        x0 = d3_event.x as number;
-        y0 = d3_event.y as number;
+      .on('start', function(this: any, e: any) {
+        x0 = e.x as number;
+        y0 = e.y as number;
         targetIndex = null;
       })
-      .on('drag', function(this: any, d3_event: any) {
-        const [x1, y1] = [d3_event.x, d3_event.y];
+      .on('drag', function(this: any, e: any) {
+        const [x1, y1] = [e.x, e.y];
         const [dx, dy] = vecSubtract([x1, y1], [x0, y0]);
 
         // don't display drag until dragging beyond a distance threshold
@@ -392,7 +392,7 @@ export class UiSectionRawMemberEditor extends AbstractUiSection {
             return null;
           });
       })
-      .on('end', function(this: any, d3_event: any, d: any) {
+      .on('end', function(this: any, e: any, d: any) {
         if (!select(this).classed('dragging')) return;
 
         const index = $items.nodes().indexOf(this);

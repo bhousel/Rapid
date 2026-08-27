@@ -150,9 +150,9 @@
 //            .attr('class', 'field-help-button')
 //            .call(uiIcon('#rapid-icon-help'))
 //            .merge(button)
-//            .on('click', function (d3_event) {
-//                d3_event.stopPropagation();
-//                d3_event.preventDefault();
+//            .on('click', function (e) {
+//                e.stopPropagation();
+//                e.preventDefault();
 //                if (_body.classed('hide')) {
 //                    show();
 //                } else {
@@ -202,9 +202,9 @@
 //        titleEnter
 //            .append('button')
 //            .attr('class', 'fr close')
-//            .on('click', function(d3_event) {
-//                d3_event.stopPropagation();
-//                d3_event.preventDefault();
+//            .on('click', function(e) {
+//                e.stopPropagation();
+//                e.preventDefault();
 //                hide();
 //            })
 //            .call(uiIcon('#rapid-icon-close'));
@@ -220,9 +220,9 @@
 //            .append('div')
 //            .attr('class', 'field-help-nav-item')
 //            .text((d: string) => d)
-//            .on('click', function(d3_event, d) {
-//                d3_event.stopPropagation();
-//                d3_event.preventDefault();
+//            .on('click', function(e, d) {
+//                e.stopPropagation();
+//                e.preventDefault();
 //                clickHelp(titles.indexOf(d));
 //            });
 //

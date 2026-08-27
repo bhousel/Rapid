@@ -174,13 +174,13 @@ export class UiSectionOverlayList extends AbstractUiSection {
 
   /**
    * Toggles an overlay layer on or off.
-   * @param d3_event - the change event
+   * @param e - the change event
    * @param d        - ImagerySource being toggled
    */
-  protected _chooseOverlay(d3_event: Event, d: ImagerySource): void {
+  protected _chooseOverlay(e: Event, d: ImagerySource): void {
     const imagery = this.context.systems.imagery!;
 
-    d3_event.preventDefault();
+    e.preventDefault();
     imagery.toggleOverlayLayer(d);
     this._overlayList.call(this._updateLayerSelections);
   }

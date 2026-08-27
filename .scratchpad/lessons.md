@@ -39,7 +39,7 @@ Things that went wrong once and shouldn't go wrong again.
 
 - **`git mv`, never new-file-plus-leftover.** A rename done as "create `UiFoo.ts` + forget to delete `foo.ts`" leaves the old file as an **untracked** dead duplicate that still imports now-removed symbols. After any rename pass, grep for stale sibling files (`entity_editor.ts` next to `UiEntityEditor.ts`) and check `git status` for `??` orphans.
 - **`$`-selection props must be `public`, not `protected`.** eslint `naming-convention` forces `protected` members to be `_`-prefixed, which collides with the `$var` selection convention. Declare selection state as `public $foo: D3Selection` (matches `UiInspector`/`AbstractUiSection`); keep non-selection protected state `_`-prefixed.
-- **Element-`this` d3 handlers → class methods.** `.on('click', function(){ d3_select(this) })` → arrow using `d3_event.currentTarget`. `.each(function(this){ d3_select(this) })` → `.each((_, i, nodes) => d3_select(nodes[i]))`. Leave self-contained element-`this` value/each callbacks as `function(this: any)` when they need no field state.
+- **Element-`this` d3 handlers → class methods.** `.on('click', function(){ d3_select(this) })` → arrow using `e.currentTarget`. `.each(function(this){ d3_select(this) })` → `.each((_, i, nodes) => d3_select(nodes[i]))`. Leave self-contained element-`this` value/each callbacks as `function(this: any)` when they need no field state.
 - **Async re-render guards.** Original factories often used `if (_tags)` (undefined until `tags()` called) to skip a re-render before render. Class fields initialized to `{}` make that guard always-true — guard on render state instead (`if (!this.$input.empty())`).
 
 ## Testing

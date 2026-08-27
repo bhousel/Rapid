@@ -431,7 +431,7 @@ Start the Tutorial, and the Rapid-splash "skip to Rapid" path).
 
 - **`modal.ts` → `UiModal.ts`**: now a `UiModal` class (`EventEmitter`). Each instance owns its own
   `.shaded` backdrop (`$shaded`/`$modal`/`$content`), `show($parent)` / `close()` (emits `close`),
-  focus-trap handlers read the keytrap via `d3_event.currentTarget`. The old "replace the one existing
+  focus-trap handlers read the keytrap via `e.currentTarget`. The old "replace the one existing
   modal" logic is gone — modals stack natively (`.shaded` is `z-index: 5000; position: absolute`, so
   later-in-DOM paints on top).
 - **`confirm.ts` → `UiConfirm.ts`**: `UiConfirm extends UiModal`, adding the `.modal-alert`
@@ -468,7 +468,7 @@ Start the Tutorial, and the Rapid-splash "skip to Rapid" path).
 - **`tooltip.ts` → `UiTooltip.ts`**: now a `UiTooltip` class extending `EventEmitter` (for family
   consistency; no events emitted yet). The element-`this` internals (`setup`/`show`/`hide`/`toggle`/
   `updateContent`/`updatePosition`) became protected methods taking the anchor **node**; hover/focus
-  handlers read the anchor via `d3_event.currentTarget` (arrows, no `function(this)`). Fluent setters
+  handlers read the anchor via `e.currentTarget` (arrows, no `function(this)`). Fluent setters
   (`displayType`/`hasArrow`/`placement`/`alignment`/`scrollContainer`/`content`/`title`/`heading`/
   `shortcut`) use getter/setter **overloads** (setter returns `this`). `attach`/`show`/`hide`/`toggle`/
   `updateContent`/`destroy`/`destroyAny` are bound in the ctor for `.call()` use.
@@ -578,7 +578,7 @@ Start the Tutorial, and the Rapid-splash "skip to Rapid" path).
   (`entity_editor.ts`, `preset_list.ts`, `preset_icon.ts`, `data_editor.ts`, `data_header.ts`) were
   removed. Always `git mv`, and after a rename pass grep for stale sibling files.
 - **Element-`this` d3 handlers → class methods.** Convert `.on('click', function(){ d3_select(this) })`
-  to arrows using `d3_event.currentTarget`; convert `.each(function(this){ d3_select(this) })` to
+  to arrows using `e.currentTarget`; convert `.each(function(this){ d3_select(this) })` to
   `.each((_, i, nodes) => d3_select(nodes[i]))`; keep self-contained element-`this` value/each
   callbacks as `function(this: any)` where no field state is needed.
 
@@ -607,7 +607,7 @@ Start the Tutorial, and the Rapid-splash "skip to Rapid" path).
   a wired-once `authchange` rerender), and `detection_*` (`datum` property replaces the old `datum(…)`
   accessor). Consumer branches in `SelectMode.ts`, the `this.XEditor`/`this.show(...)` sites in
   `UiSidebar.ts`, `UiSystem.ts` (menu), and the `ui/index.js` barrel were all updated. Latent
-  `this.blur()` bugs in the old element-`this` button handlers were fixed via `d3_event.currentTarget`.
+  `this.blur()` bugs in the old element-`this` button handlers were fixed via `e.currentTarget`.
 
 ### Phase 5 complete (2026-07-31) — panes & their sections + settings
 

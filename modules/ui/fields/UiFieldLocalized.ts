@@ -278,14 +278,14 @@ export class UiFieldLocalized extends UiField {
 
   /**
    * Adds a new empty multilingual entry and re-renders the multilingual inputs.
-   * @param d3_event - The triggering DOM event
+   * @param e - The triggering DOM event
    */
-  protected _addNew(d3_event: Event): void {
+  protected _addNew(e: Event): void {
     if (!this.$localizedInputs) return;   // called too early?
 
     const l10n = this.context.systems.l10n!;
 
-    d3_event.preventDefault();
+    e.preventDefault();
     if (this.locked()) return;
 
     let defaultLang = l10n.languageCode.toLowerCase();
@@ -311,16 +311,16 @@ export class UiFieldLocalized extends UiField {
    * @param onInput - When true, treats the change as a live input event (no tag-value cleaning)
    * @returns An event handler that dispatches the tag change
    */
-  protected _change(onInput?: boolean): (d3_event: Event) => void {
-    return (d3_event: Event) => {
+  protected _change(onInput?: boolean): (e: Event) => void {
+    return (e: Event) => {
       const context = this.context;
 
       if (this.locked()) {
-        d3_event.preventDefault();
+        e.preventDefault();
         return;
       }
 
-      let val = utilGetSetValue(select(d3_event.currentTarget as HTMLInputElement)) as string;
+      let val = utilGetSetValue(select(e.currentTarget as HTMLInputElement)) as string;
       if (!onInput) val = context.cleanTagValue(val);
 
       // don't override multiple values with blank string
@@ -346,10 +346,10 @@ export class UiFieldLocalized extends UiField {
 
   /**
    * Handles a change to a multilingual entry's language, updating the corresponding tags.
-   * @param d3_event - The triggering DOM event
+   * @param e - The triggering DOM event
    * @param d        - The multilingual entry datum being edited
    */
-  protected _changeLang(d3_event: Event, d: MultilingualItem): void {
+  protected _changeLang(e: Event, d: MultilingualItem): void {
     const context = this.context;
 
     // Ensure languages array is built
@@ -358,7 +358,7 @@ export class UiFieldLocalized extends UiField {
     const tags: Tags = {};
 
     // make sure unrecognized suffixes are lowercase - iD#7156
-    let lang = (utilGetSetValue(select(d3_event.currentTarget as HTMLInputElement)) as string).toLowerCase();
+    let lang = (utilGetSetValue(select(e.currentTarget as HTMLInputElement)) as string).toLowerCase();
 
     const language = this._languagesArray.find(function(d) {
       return d.label.toLowerCase() === lang ||
@@ -373,7 +373,7 @@ export class UiFieldLocalized extends UiField {
 
     const newKey = lang && context.cleanTagKey(this._key(lang));
 
-    const value = utilGetSetValue(select((d3_event.currentTarget as HTMLElement).parentNode as HTMLElement).selectAll('.localized-value'));
+    const value = utilGetSetValue(select((e.currentTarget as HTMLElement).parentNode as HTMLElement).selectAll('.localized-value'));
 
     if (newKey && value) {
       tags[newKey] = value;
@@ -388,14 +388,14 @@ export class UiFieldLocalized extends UiField {
 
   /**
    * Handles a change to a multilingual entry's value, updating the corresponding tag.
-   * @param d3_event - The triggering DOM event
+   * @param e - The triggering DOM event
    * @param d        - The multilingual entry datum being edited
    */
-  protected _changeValue(d3_event: Event, d: MultilingualItem): void {
+  protected _changeValue(e: Event, d: MultilingualItem): void {
     const context = this.context;
 
     if (!d.lang) return;
-    const value = context.cleanTagValue(utilGetSetValue(select(d3_event.currentTarget as HTMLInputElement)) as string) || undefined;
+    const value = context.cleanTagValue(utilGetSetValue(select(e.currentTarget as HTMLInputElement)) as string) || undefined;
 
     // don't override multiple values with blank string
     if (!value && Array.isArray(d.value)) return;
@@ -495,9 +495,9 @@ export class UiFieldLocalized extends UiField {
         $label
           .append('button')
           .attr('class', 'remove-icon-multilingual')
-          .on('click', (d3_event: Event, d: MultilingualItem) => {
+          .on('click', (e: PointerEvent, d: MultilingualItem) => {
             if (this.locked()) return;
-            d3_event.preventDefault();
+            e.preventDefault();
 
             // remove the UI item manually
             this._multilingual.splice(this._multilingual.indexOf(d), 1);

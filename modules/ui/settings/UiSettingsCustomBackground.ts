@@ -110,26 +110,26 @@ ${info}
       .text(l10n.t('text.cancel'));
 
     // restore the original template
-    const clickCancel = (d3_event: Event): void => {
+    const clickCancel = (e: PointerEvent): void => {
       $textSection.select('.field-template').property('value', _origSettings.template);
       settings?.set('imagery.custom[0].template', _origSettings.template);
-      (d3_event.currentTarget as HTMLElement).blur();
+      (e.currentTarget as HTMLElement).blur();
       Modal.close();
     };
 
     // accept the current template
-    const clickSave = (d3_event: Event): void => {
+    const clickSave = (e: PointerEvent): void => {
       _currSettings.template = $textSection.select('.field-template').property('value');
       settings?.set('imagery.custom[0].template', _currSettings.template);
-      (d3_event.currentTarget as HTMLElement).blur();
+      (e.currentTarget as HTMLElement).blur();
       Modal.close();
       this.emit('change', _currSettings);
     };
 
     $buttonSection.select('.cancel-button')
-      .on('click.cancel', clickCancel);
+      .on('click', clickCancel);
 
     $buttonSection.select('.ok-button')
-      .on('click.save', clickSave);
+      .on('click', clickSave);
   }
 }

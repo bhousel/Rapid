@@ -62,12 +62,12 @@ export class UiPane {
 
   /**
    * Toggles this pane open/closed, rerendering its content when shown.
-   * @param d3_event - triggering event (if any)
+   * @param [e] - triggering click or key event (if any)
    */
-  public togglePane(d3_event?: Event): void {
+  public togglePane(e?: Event): void {
     const ui = this.context.systems.ui;
 
-    if (d3_event) d3_event.preventDefault();
+    e?.preventDefault();
     this._paneTooltip?.hide();
 
     const show = !this.$pane.classed('shown');

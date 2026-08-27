@@ -134,7 +134,7 @@ export class UiAccount {
         .classed('hide', false)
         .select('a')
         .text(l10n.t('logout'))
-        .on('click', e => {
+        .on('click', (e: PointerEvent) => {
           e.preventDefault();
           osm.logout();
           this.tryLogout();
@@ -145,7 +145,7 @@ export class UiAccount {
         .classed('hide', false)
         .select('a')
         .text(l10n.t('login'))
-        .on('click', e => {
+        .on('click', (e: PointerEvent) => {
           e.preventDefault();
           osm.authenticate();
         });

@@ -209,8 +209,8 @@ export class UiRapidAddDataset extends EventEmitter {
 //      .attr('class', 'field-file')
 //      .attr('type', 'file')
 //      .attr('accept', accept.join())
-//      .on('change', (d3_event: Event) => {
-//        const files = (d3_event.target as HTMLInputElement).files;
+//      .on('change', (e: Event) => {
+//        const files = (e.target as HTMLInputElement).files;
 //        if (files?.length) {
 //          this._currFileList = files;
 //          this._currUrl = '';

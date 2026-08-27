@@ -134,8 +134,8 @@ export class UiFieldText extends UiField {
           return `form-field-button ${which}`;
         })
         .merge($buttons)
-        .on('click', (d3_event: Event, d: number) => {
-          d3_event.preventDefault();
+        .on('click', (e: PointerEvent, d: number) => {
+          e.preventDefault();
           const raw_vals = this.$input!.node().value || '0';
           let vals = raw_vals.split(';');
           vals = vals.map((v: string) => {
@@ -156,8 +156,8 @@ export class UiFieldText extends UiField {
         .append('button')
         .call(uiIcon('#rapid-icon-out-link'))
         .attr('class', 'form-field-button foreign-id-permalink')
-        .on('click', (d3_event: Event) => {
-          d3_event.preventDefault();
+        .on('click', (e: PointerEvent) => {
+          e.preventDefault();
           const value = this._validIdentifierValueForLink();
           if (value) {
             const url = presetField.props.urlFormat.replace(/{value}/, encodeURIComponent(value));
@@ -187,8 +187,8 @@ export class UiFieldText extends UiField {
         .append('button')
         .call(uiIcon('#rapid-icon-out-link'))
         .attr('class', 'form-field-button foreign-id-permalink')
-        .on('click', (d3_event: Event) => {
-          d3_event.preventDefault();
+        .on('click', (e: PointerEvent) => {
+          e.preventDefault();
           const value = this._validIdentifierValueForLink();
           if (value) window.open(value, '_blank');
         })

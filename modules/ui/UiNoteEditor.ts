@@ -164,27 +164,27 @@ export class UiNoteEditor extends EventEmitter {
       .data((isSelected ? [this.datum] : []), (d: OsmNote) => d.key!);
 
     // fast submit if user presses cmd+enter
-    const keydown = (d3_event: KeyboardEvent): void => {
-      if (!(d3_event.keyCode === 13 && d3_event.metaKey)) return; // ↩ Return
+    const keydown = (e: KeyboardEvent): void => {
+      if (!(e.keyCode === 13 && e.metaKey)) return; // ↩ Return
 
       const osm = context.services.osm!;
       if (!osm) return;
       if (!osm.authenticated()) return;
       if (!this.datum!.props.newComment) return;
 
-      d3_event.preventDefault();
+      e.preventDefault();
 
-      select(d3_event.currentTarget as HTMLTextAreaElement)
+      select(e.currentTarget as HTMLTextAreaElement)
         .on('keydown.note-input', null);
 
       // focus on button and submit (scheduler defers a tick; without it, do it now)
       const submit = () => {
         if (this.datum!.isNew) {
           ($noteSave.selectAll('.save-button').node() as HTMLElement).focus();
-          this._clickSave(this.datum as any);
+          this._clickSave(undefined, this.datum!);
         } else {
           ($noteSave.selectAll('.comment-button').node() as HTMLElement).focus();
-          this._clickComment(this.datum as any);
+          this._clickComment(undefined, this.datum!);
         }
       };
       if (scheduler) {
@@ -194,8 +194,8 @@ export class UiNoteEditor extends EventEmitter {
       }
     };
 
-    const changeInput = (d3_event: Event): void => {
-      const $input: D3Selection = select(d3_event.currentTarget as HTMLTextAreaElement);
+    const changeInput = (e: Event): void => {
+      const $input: D3Selection = select(e.currentTarget as HTMLTextAreaElement);
       const val = ($input.property('value') as string).trim() || undefined;
 
       // store the unsaved comment with the note itself
@@ -299,7 +299,7 @@ export class UiNoteEditor extends EventEmitter {
       .call(uiIcon('#rapid-icon-out-link', 'inline'))
       .append('span')
       .text(l10n.t('login'))
-      .on('click.note-login', (e: Event) => {
+      .on('click', (e: PointerEvent) => {
         e.preventDefault();
         osm.authenticate();
       });
@@ -402,12 +402,12 @@ export class UiNoteEditor extends EventEmitter {
 
     $buttons.select('.cancel-button')   // select and propagate data
       .text(l10n.t('text.cancel'))
-      .on('click.cancel', this._clickCancel);
+      .on('click', this._clickCancel);
 
     $buttons.select('.save-button')     // select and propagate data
       .attr('disabled', isSaveDisabled)
       .text(l10n.t('note.save'))
-      .on('click.save', this._clickSave);
+      .on('click', this._clickSave);
 
     $buttons.select('.status-button')   // select and propagate data
       .attr('disabled', (hasAuth ? null : true))
@@ -416,22 +416,22 @@ export class UiNoteEditor extends EventEmitter {
         const andComment = (d.props.newComment ? '_comment' : '');
         return l10n.t('note.' + action + andComment);
       })
-      .on('click.status', this._clickStatus);
+      .on('click', this._clickStatus);
 
     $buttons.select('.comment-button')   // select and propagate data
       .attr('disabled', isSaveDisabled)
       .text(l10n.t('text.comment'))
-      .on('click.comment', this._clickComment);
+      .on('click', this._clickComment);
   }
 
 
   /**
    * Handles clicking the cancel button (removes a new note and returns to browse).
-   * @param d3_event - the triggering click event
-   * @param d - the bound note datum
+   * @param  [e] - the triggering click event, if any
+   * @param  d - the OsmNote datum
    */
-  protected _clickCancel(d3_event: Event, d: OsmNote): void {
-    (d3_event?.currentTarget as HTMLElement | undefined)?.blur();    // avoid keeping focus on the button - iD#4641
+  protected _clickCancel(e: PointerEvent | undefined, d: OsmNote): void {
+    (e?.currentTarget as HTMLElement | undefined)?.blur();    // avoid keeping focus on the button - iD#4641
     const osm = this.context.services.osm!;
     if (osm) {
       osm.removeNote(d);
@@ -443,14 +443,14 @@ export class UiNoteEditor extends EventEmitter {
 
   /**
    * Handles clicking the save button (creates a new note).
-   * @param d3_event - the triggering click event
-   * @param d - the bound note datum
+   * @param  [e] - the triggering click event, if any
+   * @param  d - the OsmNote datum
    */
-  protected _clickSave(d3_event: Event, d?: OsmNote): void {
-    (d3_event?.currentTarget as HTMLElement | undefined)?.blur();    // avoid keeping focus on the button - iD#4641
+  protected _clickSave(e: PointerEvent | undefined, d: OsmNote): void {
+    (e?.currentTarget as HTMLElement | undefined)?.blur();    // avoid keeping focus on the button - iD#4641
     const osm = this.context.services.osm!;
     if (osm) {
-      osm.postNoteCreate(d!, (err: any, note: any) => {
+      osm.postNoteCreate(d, (err: any, note: OsmNote) => {
         this.emit('change', note);
       });
     }
@@ -459,11 +459,11 @@ export class UiNoteEditor extends EventEmitter {
 
   /**
    * Handles clicking the status button (toggles the note open/closed).
-   * @param d3_event - the triggering click event
+   * @param e - the triggering click event
    * @param d - the bound note datum
    */
-  protected _clickStatus(d3_event: Event, d: OsmNote): void {
-    (d3_event?.currentTarget as HTMLElement | undefined)?.blur();    // avoid keeping focus on the button - iD#4641
+  protected _clickStatus(e: PointerEvent, d: OsmNote): void {
+    (e?.currentTarget as HTMLElement | undefined)?.blur();    // avoid keeping focus on the button - iD#4641
     const osm = this.context.services.osm!;
     if (osm) {
       const setStatus = (d.props.status === 'open' ? 'closed' : 'open');
@@ -476,14 +476,14 @@ export class UiNoteEditor extends EventEmitter {
 
   /**
    * Handles clicking the comment button (posts a comment to the note).
-   * @param d3_event - the triggering click event
+   * @param e - the triggering click event, if any
    * @param d - the bound note datum
    */
-  protected _clickComment(d3_event: Event, d?: OsmNote): void {
-    (d3_event?.currentTarget as HTMLElement | undefined)?.blur();    // avoid keeping focus on the button - iD#4641
+  protected _clickComment(e: PointerEvent | undefined, d: OsmNote): void {
+    (e?.currentTarget as HTMLElement | undefined)?.blur();    // avoid keeping focus on the button - iD#4641
     const osm = this.context.services.osm!;
     if (osm) {
-      osm.postNoteUpdate(d!, d!.props.status!, (err: any, note: any) => {
+      osm.postNoteUpdate(d, d.props.status!, (err: any, note: any) => {
         this.emit('change', note);
       });
     }

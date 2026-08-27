@@ -79,10 +79,10 @@ export class UiTagReference {
 
     this.$button
       .attr('title', l10n.t('icons.information'))
-      .on('click', (d3_event: any) => {
-        d3_event.stopPropagation();
-        d3_event.preventDefault();
-        d3_event.currentTarget.blur();    // avoid keeping focus on the button - iD#4641
+      .on('click', (e: PointerEvent) => {
+        e.stopPropagation();
+        e.preventDefault();
+        (e.currentTarget as HTMLElement).blur();    // avoid keeping focus on the button - iD#4641
         if (this._showing) {
           this._hide();
         } else if (this._loaded) {
@@ -173,8 +173,8 @@ export class UiTagReference {
         .attr('class', 'tag-reference-wiki-image')
         .attr('src', utilSafeURL(docs.imageURL))
         .on('load', () => this._done())
-        .on('error', (d3_event: any) => {
-          select(d3_event.currentTarget).remove();
+        .on('error', (e: any) => {
+          select(e.currentTarget).remove();
           this._done();
         });
     } else {

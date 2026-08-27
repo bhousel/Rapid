@@ -143,8 +143,8 @@ export class UiKeepRightEditor extends EventEmitter {
     let $saveSection: D3Selection = $selection.selectAll('.qa-save')
       .data(isShown ? [this.datum!] : [], (d: KeepRightIssue) => d.key!);
 
-    const changeInput = (d3_event: Event): void => {
-      const $input = select(d3_event.currentTarget as HTMLTextAreaElement);
+    const changeInput = (e: Event): void => {
+      const $input = select(e.currentTarget as HTMLTextAreaElement);
       let val: string | undefined = ($input.property('value') as string).trim();
 
       if (val === this.datum!.props.comment) {
@@ -241,8 +241,8 @@ export class UiKeepRightEditor extends EventEmitter {
     $buttons.select('.comment-button')   // select and propagate data
       .attr('disabled', (d: KeepRightIssue) => d.props.newComment ? null : true)
       .text(l10n.t('QA.keepRight.save_comment'))
-      .on('click.comment', (d3_event: Event, d: KeepRightIssue) => {
-        (d3_event.currentTarget as HTMLElement).blur();    // avoid keeping focus on the button - iD#4641
+      .on('click.comment', (e: PointerEvent, d: KeepRightIssue) => {
+        (e.currentTarget as HTMLElement).blur();    // avoid keeping focus on the button - iD#4641
         if (keepright) {
           keepright.postUpdate(d, (err: any, item: any) => this.emit('change', item));
         }
@@ -253,8 +253,8 @@ export class UiKeepRightEditor extends EventEmitter {
         const andComment = (d.props.newComment ? '_comment' : '');
         return l10n.t(`QA.keepRight.close${andComment}`);
       })
-      .on('click.close', (d3_event: Event, d: KeepRightIssue) => {
-        (d3_event.currentTarget as HTMLElement).blur();    // avoid keeping focus on the button - iD#4641
+      .on('click.close', (e: PointerEvent, d: KeepRightIssue) => {
+        (e.currentTarget as HTMLElement).blur();    // avoid keeping focus on the button - iD#4641
         if (keepright) {
           d.props.newStatus = 'ignore_t';   // ignore temporarily (item fixed)
           keepright.postUpdate(d, (err: any, item: any) => this.emit('change', item));
@@ -266,8 +266,8 @@ export class UiKeepRightEditor extends EventEmitter {
         const andComment = (d.props.newComment ? '_comment' : '');
         return l10n.t(`QA.keepRight.ignore${andComment}`);
       })
-      .on('click.ignore', (d3_event: Event, d: KeepRightIssue) => {
-        (d3_event.currentTarget as HTMLElement).blur();    // avoid keeping focus on the button - iD#4641
+      .on('click.ignore', (e: PointerEvent, d: KeepRightIssue) => {
+        (e.currentTarget as HTMLElement).blur();    // avoid keeping focus on the button - iD#4641
         if (keepright) {
           d.props.newStatus = 'ignore';   // ignore permanently (false positive)
           keepright.postUpdate(d, (err: any, item: any) => this.emit('change', item));
