@@ -11,17 +11,24 @@ describe('utilDetect', () => {
   });
 
   afterAll(() => {
-    globalThis.navigator = origNavigator;  // restore original
+    Object.defineProperty(globalThis, 'navigator', {
+      value: origNavigator,  // restore original
+      configurable: true,
+      writable: true
+    });
   });
 
   beforeEach(() => {
-    const mock = {
-      languages: ['en-US', 'en'],
-      platform: 'MacIntel',
-      userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36'
-    };
-    // Copy the original navigator, so we can safely change things.
-    globalThis.navigator = Object.assign(origNavigator || mock);
+    // Bypass the read-only restriction by redefining the property
+    Object.defineProperty(globalThis, 'navigator', {
+      value: {
+        languages: ['en-US', 'en'],
+        platform: 'MacIntel',
+        userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36'
+      },
+      configurable: true, // Allows it to be changed or deleted again later
+      writable: true
+    });
   });
 
   it('should detect the browser and version', () => {
