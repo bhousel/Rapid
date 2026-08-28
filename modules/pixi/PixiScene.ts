@@ -16,7 +16,6 @@ import { PixiLayerOsm } from './PixiLayerOsm.ts';
 import { PixiLayerOsmNotes } from './PixiLayerOsmNotes.ts';
 import { PixiLayerOsmose } from './PixiLayerOsmose.ts';
 import { PixiLayerRapid } from './PixiLayerRapid.ts';
-import { PixiLayerRapidOverlay } from './PixiLayerRapidOverlay.ts';
 import { PixiLayerStreetsidePhotos } from './PixiLayerStreetsidePhotos.ts';
 import { PixiLayerGeoScribble } from './PixiLayerGeoScribble.ts';
 import { utilIterable, type OneOrMore } from '../util/iterable.ts';
@@ -89,7 +88,6 @@ export class PixiScene extends EventEmitter {
 
       new PixiLayerOsm(this),
       new PixiLayerRapid(this),
-      new PixiLayerRapidOverlay(this),
 
       new PixiLayerMapillaryDetections(this),
       new PixiLayerMapillarySigns(this),

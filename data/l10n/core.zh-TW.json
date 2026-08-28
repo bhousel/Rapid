@@ -526,10 +526,6 @@
       "any_type": "任何類型",
       "category": {
         "roads": "道路"
-      },
-      "omdFootways": {
-        "label": "人行道的開放資料",
-        "description": "開啟從不同地方政府收集的人行道資料。"
       }
     },
     "tag_reference": {

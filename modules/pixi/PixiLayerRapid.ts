@@ -260,11 +260,7 @@ export class PixiLayerRapid extends AbstractPixiLayer {
 
       // MapWithAIService gives us roads and buildings together,
       // so filter further according to which dataset we're drawing
-      if (dataset.id === 'fbRoads'
-        || dataset.id === 'omdFootways'
-        || dataset.id === 'metaSyntheticFootways'
-        || dataset.id === 'rapid_intro_graph'
-      ) {
+      if (dataset.id === 'fbRoads' || dataset.id === 'rapid_intro_graph') {
         renderData.lines = entities.filter((d: OsmWay) => d.geometry(dsGraph) === 'line' && !!d.tags.highway) as OsmWay[];
 
         // Gather endpoint vertices, we will render these also

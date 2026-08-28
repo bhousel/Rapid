@@ -29,5 +29,4 @@ export { PixiLayerOsm } from './PixiLayerOsm.ts';
 export { PixiLayerOsmNotes } from './PixiLayerOsmNotes.ts';
 export { PixiLayerOsmose } from './PixiLayerOsmose.ts';
 export { PixiLayerRapid } from './PixiLayerRapid.ts';
-export { PixiLayerRapidOverlay } from './PixiLayerRapidOverlay.ts';
 export { PixiLayerStreetsidePhotos } from './PixiLayerStreetsidePhotos.ts';

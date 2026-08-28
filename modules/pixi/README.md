@@ -41,7 +41,6 @@ Rapid uses Pixi.js for hardware-accelerated 2D rendering. The rendering is organ
 | `PixiLayerOsm.ts` | OpenStreetMap data |
 | `PixiLayerOsmNotes.ts` | OSM notes |
 | `PixiLayerRapid.ts` | Rapid AI suggestions |
-| `PixiLayerRapidOverlay.ts` | Rapid overlay features |
 | `PixiLayerLabels.ts` | Text labels |
 | `PixiLayerMapUI.ts` | Map UI elements (cursors, selection, etc.) |
 | `PixiLayerCustomData.ts` | User-imported custom data |

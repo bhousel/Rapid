@@ -162,42 +162,6 @@ export class MapWithAIService extends AbstractSystem {
       descriptionStringID: 'rapid_menu.msBuildings.description'
     });
 
-//    const omdFootways = new RapidDataset(context, {
-//      id: 'omdFootways',
-//      conflated: true,
-//      serviceID: 'mapwithai',
-//      categories: new Set<string>(['meta', 'footways', 'featured']),
-//      tags: new Set<string>(['opendata']),
-//      overlay: {
-//        url: 'https://external.xx.fbcdn.net/maps/vtp/rapid_overlay_footways/2/{z}/{x}/{y}/',
-//        minZoom: 1,
-//        maxZoom: 15,
-//      },
-//      color: '#da26d3',
-//      dataUsed: ['mapwithai', 'Open Footways'],
-//      sourceUrl: sourceUrl,
-//      itemUrl: 'https://github.com/facebookmicrosites/Open-Mapping-At-Facebook/wiki/Footways-FAQ',
-//      licenseUrl: 'https://github.com/facebookmicrosites/Open-Mapping-At-Facebook/wiki/Footways-FAQ#attribution-and-license',
-//      labelStringID: 'rapid_menu.omdFootways.label',
-//      descriptionStringID: 'rapid_menu.omdFootways.description'
-//    });
-//
-//
-//    const metaSyntheticFootways = new RapidDataset(context, {
-//      id: 'metaSyntheticFootways',
-//      conflated: true,
-//      serviceID: 'mapwithai',
-//      categories: new Set<string>(['meta', 'footways', 'featured', 'preview']),
-//      tags: new Set<string>(['opendata']),
-//      color: '#da26d3',
-//      dataUsed: ['mapwithai', 'Meta Synthetic Footways'],
-//      sourceUrl: sourceUrl,
-//      itemUrl: 'https://github.com/facebookmicrosites/Open-Mapping-At-Facebook/wiki/Footways-FAQ',
-//      licenseUrl: 'https://github.com/facebookmicrosites/Open-Mapping-At-Facebook/wiki/Footways-FAQ#attribution-and-license',
-//      labelStringID: 'rapid_menu.metaSyntheticFootways.label',
-//      descriptionStringID: 'rapid_menu.metaSyntheticFootways.description'
-//    });
-//
     const introGraph = new RapidDataset(context, {
       id: 'rapid_intro_graph',
       hidden: true,
@@ -209,7 +173,7 @@ export class MapWithAIService extends AbstractSystem {
       label: 'Rapid Walkthrough'
     });
 
-    return [fbRoads, msBuildings, /*omdFootways, metaSyntheticFootways,*/ introGraph];
+    return [fbRoads, msBuildings, introGraph];
   }
 
 
@@ -453,12 +417,6 @@ export class MapWithAIService extends AbstractSystem {
 
     if (datasetID === 'fbRoads') {
       qs.result_type = 'road_vector_xml';
-    } else if (datasetID === 'metaSyntheticFootways' ) {
-      qs.result_type = 'extended_osc';
-      qs.sources = 'META_SYNTHETIC_FOOTWAYS';
-    } else if (datasetID === 'omdFootways' ) {
-      qs.result_type = 'extended_osc';
-      qs.sources = 'OPEN_MAP_DATA_FOOTWAYS';
     } else if (datasetID === 'msBuildings') {
       qs.result_type = 'road_building_vector_xml';
       qs.building_source = 'microsoft';

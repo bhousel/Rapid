@@ -23,8 +23,6 @@ export interface RapidDatasetProps {
   dataUsed: string[];
   /** Geographic extent of the dataset */
   extent: Extent;
-  /** Whether this is an overlay dataset */
-  overlay: boolean;
   /** URL for the data */
   sourceUrl: string;
   /** URL for more information about this dataset */
@@ -98,8 +96,6 @@ export class RapidDataset {
   public hidden: boolean;
   /** Whether this dataset uses conflation when merging features into the OSM graph */
   public conflated: boolean;
-  /** Whether this dataset is rendered as an overlay on top of the base map */
-  public overlay: boolean;
 
   /** Localization string key for the dataset display name */
   public labelStringID: StringID | undefined;
@@ -142,7 +138,6 @@ export class RapidDataset {
     this.featured = props.featured ?? this.categories.has('featured');
     this.hidden = props.hidden ?? false;
     this.conflated = props.conflated ?? false;
-    this.overlay = props.overlay ?? false;
 
     this.labelStringID = props.labelStringID;
     this.descriptionStringID = props.descriptionStringID;
