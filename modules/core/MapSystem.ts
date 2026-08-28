@@ -45,8 +45,9 @@ export class MapSystem extends AbstractSystem {
   protected _toggleFillMode: AreaFillMode;
   /** Keyboard shortcut strings for map operations (populated during startAsync) */
   protected _keys: string[] | null;
+
   /** D3 selection of the parent container element that holds the map canvas */
-  protected _$parent: D3Selection | null;
+  public $parent: D3Selection | null;
 
 
   /**
@@ -68,14 +69,14 @@ export class MapSystem extends AbstractSystem {
     this._keys = null;
 
     // D3 selections
-    this._$parent = null;
+    this.$parent = null;
 
     // Ensure methods used as callbacks always have `this` bound correctly.
     // (This is also necessary when using `d3-selection.call`)
+    this.render = this.render.bind(this);
     this._hashChanged = this._hashChanged.bind(this);
     this._updateHash = this._updateHash.bind(this);
     this._setupKeybinding = this._setupKeybinding.bind(this);
-    this.render = this.render.bind(this);
   }
 
 
@@ -125,7 +126,7 @@ export class MapSystem extends AbstractSystem {
           })
           .on('draw', () => {
             this._updateHash();
-            this.emit('draw', { full: true });  // pass {full: true} for legacy receivers
+            this.emit('draw');
           });
 
         editor
@@ -232,9 +233,9 @@ export class MapSystem extends AbstractSystem {
    * (The parent selection is required the first time, but can be inferred on subsequent renders)
    * @param  $parent - A d3-selection to a HTMLElement that this component should render itself into
    */
-  public render($parent: D3Selection | null = this._$parent): void {
+  public render($parent: D3Selection | null = this.$parent): void {
     if ($parent instanceof selection) {
-      this._$parent = $parent;
+      this.$parent = $parent;
     } else {
       return;   // no parent - called too early?
     }
