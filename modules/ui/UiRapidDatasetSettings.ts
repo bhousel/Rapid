@@ -357,7 +357,7 @@ export class UiRapidDatasetSettings extends EventEmitter {
     if (!ds) return;   // need a dataset to do anything
 
     // You can't change the details for datasets that are provided by one of the services.
-    const isLocked = !!ds.serviceID;
+    const isLocked = !ds.custom;
 
     /* Thumbnail */
     let $thumbnailSection: D3Selection = $parent.selectAll('.dataset-thumbnail')

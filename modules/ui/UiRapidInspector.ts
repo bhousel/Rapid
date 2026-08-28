@@ -511,8 +511,7 @@ export class UiRapidInspector {
     $choiceWrap = $choiceWrap.merge($$choiceWrap);
 
     $choiceWrap.selectAll('button')
-      .classed('secondary', isDisabled)
-      .classed('disabled', isDisabled);
+      .classed('secondary disabled', isDisabled);
 
     $choiceWrap.selectAll('.choice-label')
       .text(l10n.t(d.labelStringID));

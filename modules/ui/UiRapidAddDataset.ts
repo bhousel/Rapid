@@ -1,37 +1,49 @@
 import { EventEmitter } from 'tseep/lib/ee-safe';
 import { marked } from 'marked';
+import { RapidDataset } from '../lib/RapidDataset.ts';
 import { uiIcon } from './icon.ts';
 import { UiModal } from './UiModal.ts';
+import { UiRapidDatasetSettings } from './UiRapidDatasetSettings.ts';
 import { utilNoAuto } from '../util/index.ts';
 
 import type { Context } from '../Context.ts';
 import type { D3EnterSelection, D3Selection } from 'd3-selection';
-import type { RapidDataset } from '../lib/RapidDataset.ts';
+import type { RapidDatasetProps } from '../lib/RapidDataset.ts';
 
 
 /**
- * `UiRapidAddDataset` is a modal control where the user can
- * add a custom dataset to Rapid.
+ * The values collected on this screen, along with information about whether
+ * the field values are all present and have passed validation.
+ */
+export interface FieldInfo {
+  /* `true` if we can continue (no errors), false if not */
+  isOk: boolean
+  /* If there is a dataset validation error, the stringID for the error */
+  datasetIDStringID?: StringID;
+
+  /** Dataset ID */
+  datasetID?: DatasetID;
+  /** Dataset Name */
+  datasetName?: string;
+  /** Dataset Url */
+  datasetUrl?: string;
+}
+
+
+/**
+ * `UiRapidAddDataset` is a Modal control where the user can add a custom dataset to Rapid.
+ * On this screen we collect the "Dataset Name", "Dataset ID", and "Dataset URL".
+ * When these fields are acceptable, the user can press "Next" to add the Dataset to the
+ * RapidSystem catalog and continue to the Dataset Settings Modal.
  *
  * Events available:
- * - `done` - Fires when the user is finished, emits the new datasetID if one was added.
+ * - `done` - Fires when the user is finished
  */
 export class UiRapidAddDataset extends EventEmitter {
   public context: Context;
 
   // Child components
   public Modal: UiModal | null;
-
-  protected _currFileList: FileList | null;
-  protected _currUrl: string | null;
-
-  /** The datasetID for the newly added RapidDataset. */
-  protected _datasetID: DatasetID | null;
-  /** style for the datasetID field (warning class?) */
-  protected _datasetIDClass: string | null;
-  /** stringID for the datasetID feedback (warning text?) */
-  protected _datasetIDStringID: string | null;
-
 
 
   /**
@@ -41,24 +53,18 @@ export class UiRapidAddDataset extends EventEmitter {
     super();
     this.context = context;
 
-    this._currFileList = null;
-    this._currUrl = null;
-    this._datasetID = null;
-    this._datasetIDClass = null;
-    this._datasetIDStringID = null;
-
     // Child components
     this.Modal = null;
 
     // Ensure methods used as callbacks always have `this` bound correctly.
     // (This is also necessary when using `d3-selection.call`)
-    this._clickedOk = this._clickedOk.bind(this);
-    this._clickedCancel = this._clickedCancel.bind(this);
+    this._clickedNext = this._clickedNext.bind(this);
     this._done = this._done.bind(this);
     this.show = this.show.bind(this);
     this.close = this.close.bind(this);
     this.render = this.render.bind(this);
     this.renderFields = this.renderFields.bind(this);
+    this.checkFields = this.checkFields.bind(this);
   }
 
 
@@ -104,42 +110,85 @@ export class UiRapidAddDataset extends EventEmitter {
     const context = this.context;
     const l10n = context.systems.l10n!;
 
-//    if (this._datasetID) {
-//        // do the thing
-//    }
-
-    this.emit('done', this._datasetID);
+    this.emit('done');
     this.Modal = null;
-    this._currFileList = null;
-    this._currUrl = null;
-    this._datasetID = null;
 
     l10n.off('localechange', this.render);
   }
 
 
   /**
-   * When clicking "cancel", remove any partially entered data, and close.
+   * When clicking "Next", test dataset for validity.  If it all looks ok,
+   * create the RapidDataset and continue to the Dataset Settings Modal.
+   * If there are problems just return without doing anything.
    * @param [e] - the triggering event, if any
    */
-  protected _clickedCancel(e?: Event): void {
+  protected _clickedNext(e?: Event): void {
     e?.preventDefault();
-    this._currFileList = null;
-    this._currUrl = null;
-    this._datasetID = null;
-    this.close();
+
+    const fieldInfo = this.checkFields();
+    if (!fieldInfo.isOk) return;  // one last check
+
+    const context = this.context;
+    const rapid = context.systems.rapid!;
+
+    // Instantiate the custom dataset and add it to the catalog.
+    const props: Partial<RapidDatasetProps> = {
+      id: fieldInfo.datasetID,
+      label: fieldInfo.datasetName,
+      sourceUrl: fieldInfo.datasetUrl,
+      custom: true
+    };
+
+    const ds = new RapidDataset(context, props);
+    rapid.catalog.set(ds.id, ds);
+    rapid.enableDatasets(ds.id);  // add it to the menu
+
+    // Continue to the Dataset Settings modal, wire up 'done' handler too.
+    const SettingsModal = new UiRapidDatasetSettings(context).once('done', this.close);
+    SettingsModal.dataset = ds;
+    SettingsModal.show();
   }
 
 
   /**
-   * When clicking "ok", test dataset for validity, create a RapidDataset, then close.
-   * @param [e] - the triggering event, if any
+   * Run all field validations.  Returns an object containing the field values
+   * and information about whether validation has passed or failed.
+   * @returns a FieldInfo result set
    */
-  protected _clickedOk(e?: Event): void {
-    e?.preventDefault();
+  public checkFields(): FieldInfo {
+    const result: FieldInfo = { isOk: false };
+    if (!this.Modal) return result;
 
-    // todo: do the stuff
-    this.close();
+    const context = this.context;
+    const rapid = context.systems.rapid!;
+    const $content = this.Modal.$content!;
+
+    // check dataset ID
+    const idNode = $content.selectAll('.row-identifier .dataset-field-input').node() as HTMLInputElement | null;
+    const idVal = idNode?.value || '';
+    const datasetID = idVal.trim();
+    if (datasetID && rapid.catalog.has(datasetID)) {
+      result.datasetIDStringID = 'rapid_add_dataset.identifier.taken';
+    } else if (datasetID && !/^[\w\-]+$/.test(datasetID)) {
+      result.datasetIDStringID = 'rapid_add_dataset.identifier.invalid';
+    } else {
+      result.datasetID = datasetID;
+    }
+
+    // check dataset name
+    const nameNode = $content.selectAll('.row-name .dataset-field-input').node() as HTMLInputElement | null;
+    const nameVal = nameNode?.value || '';
+    result.datasetName = nameVal.trim();
+
+    // check source url
+    const urlNode = $content.selectAll('.field-url').node() as HTMLTextAreaElement | null;
+    const urlVal = urlNode?.value || '';
+    result.datasetUrl = urlVal.trim();
+
+    // all three must be present
+    result.isOk = !!(result.datasetID && result.datasetName && result.datasetUrl);
+    return result;
   }
 
 
@@ -183,7 +232,7 @@ export class UiRapidAddDataset extends EventEmitter {
     $heading = $heading.merge($$heading);
 
     $heading.selectAll('.modal-heading-text')
-      .text(l10n.t(`${prefix}.heading`));
+      .text(l10n.t('rapid_add_dataset.heading'));
 
 
     /* Fields section */
@@ -228,7 +277,7 @@ export class UiRapidAddDataset extends EventEmitter {
       .append('textarea')
       .attr('class', 'field-url')
       .call(utilNoAuto)
-      .property('value', this._currUrl);
+      .on('input', (e: InputEvent) => this.render());  // rerendering will also run validation
 
 
     // update
@@ -285,11 +334,13 @@ ${url_tokens}
       .html(urlHtml as string);
 
     $textSection.selectAll('.field-url')
-      .attr('placeholder', l10n.t(`${prefix}.url.placeholder`))
-      .property('value', this._currUrl);
+      .attr('placeholder', l10n.t(`${prefix}.url.placeholder`));
 
 
-    /* OK/Cancel Buttons */
+    const fieldInfo = this.checkFields();
+
+
+    /* Next/Cancel Buttons */
     let $buttons: D3Selection = $content.selectAll('.modal-section.buttons')
       .data([0]);
 
@@ -300,20 +351,20 @@ ${url_tokens}
 
     $$buttons
       .append('button')
-      .attr('class', 'button ok-button action')
-      .on('click', this._clickedOk);
+      .attr('class', 'button next-button action')
+      .on('click', this._clickedNext);
 
     $$buttons
       .append('button')
       .attr('class', 'button cancel-button action')
-      .on('click', this._clickedCancel);
+      .on('click', this.close);
 
     // update
     $buttons = $buttons.merge($$buttons) as D3Selection;
 
-    $buttons.selectAll('.ok-button')
-      .classed('disabled', this._datasetIDClass === 'warning')
-      .text(l10n.t('text.okay'));
+    $buttons.selectAll('.next-button')
+      .classed('secondary disabled', !fieldInfo.isOk)
+      .text(l10n.t('text.next'));
 
     $buttons.selectAll('.cancel-button')
       .text(l10n.t('text.cancel'));
@@ -327,7 +378,6 @@ ${url_tokens}
   public renderFields($selection: D3Selection): void {
     const context = this.context;
     const l10n = context.systems.l10n!;
-    const rapid = context.systems.rapid!;
 
     const prefix = 'rapid_add_dataset';  // prefix for text strings
     const fields = ['name', 'identifier'];
@@ -360,7 +410,8 @@ ${url_tokens}
       .append('input')
       .attr('id', (d: string) => `dataset-field-${d}`)
       .attr('class', 'dataset-field-input')
-      .call(utilNoAuto);
+      .call(utilNoAuto)
+      .on('input', (e: InputEvent) => this.render());  // rerendering will also run validation
 
     $$wraps
       .append('div')
@@ -372,32 +423,8 @@ ${url_tokens}
 
     // Add special handling for the identifier field..
     const $$identifier: D3EnterSelection = $$fields.selectAll('.row-identifier .dataset-field-input');
-
-    // validate input
     $$identifier
-      .attr('maxlength', 36)
-      .on('input', (e: InputEvent) => {
-        const el = e.currentTarget as HTMLInputElement;
-        const val = el.value;
-
-        if (val && rapid.catalog.has(val)) {
-          this._datasetID = null;
-          this._datasetIDClass = 'warning';
-          this._datasetIDStringID = `${prefix}.identifier.taken`;
-
-        } else if (val && !/^[\w\-]+$/.test(val)) {
-          this._datasetID = null;
-          this._datasetIDClass = 'warning';
-          this._datasetIDStringID = `${prefix}.identifier.invalid`;
-
-        } else {
-          this._datasetID = val;
-          this._datasetIDClass = null;
-          this._datasetIDStringID = null;
-        }
-
-        this.render();
-      });
+      .attr('maxlength', 36);
 
     // set focus on enter
     const $$name: D3EnterSelection = $$fields.selectAll('.row-name .dataset-field-input');
@@ -408,15 +435,16 @@ ${url_tokens}
     // update
     $fields = $fields.merge($$fields);
 
+    const fieldInfo = this.checkFields();
+
     $fields.selectAll('.dataset-field-label')
       .text((d: string) => l10n.t(`${prefix}.${d}.label`));
 
     $fields.selectAll('.dataset-field-input')
       .attr('placeholder', (d: string) => l10n.t(`${prefix}.${d}.placeholder`));
 
-
     $fields.selectAll('.row-identifier .dataset-field-input')
-      .classed('warning', this._datasetIDClass === 'warning');
+      .classed('warning', !!fieldInfo.datasetIDStringID);
 
     $fields.selectAll('.row-identifier .dataset-field-instruction')
       .text(l10n.t(`${prefix}.identifier.instruction`));
@@ -424,9 +452,7 @@ ${url_tokens}
     // U+26A0 U+FE0F = emoji warning
     // U+00A0 = non breaking space &nbsp;  (we want the div always drawn, so layout doesn't jump around)
     $fields.selectAll('.row-identifier .dataset-field-feedback')
-      .classed('warning', this._datasetIDClass === 'warning')
-      .text(this._datasetIDStringID ? '\u26a0\ufe0f ' + l10n.t(this._datasetIDStringID) : '\u00a0');
-
+      .classed('warning', !!fieldInfo.datasetIDStringID)
+      .text(fieldInfo.datasetIDStringID ? '\u26a0\ufe0f ' + l10n.t(fieldInfo.datasetIDStringID) : '\u00a0');
   }
-
 }

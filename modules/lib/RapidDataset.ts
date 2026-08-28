@@ -42,6 +42,8 @@ export interface RapidDatasetProps {
   hidden: boolean;
   /** Whether this dataset uses conflation */
   conflated: boolean;
+  /** Whether this dataset is a "custom" dataset (i.e. setup by the user) */
+  custom: boolean;
 
   /** Localization string ID for the label */
   labelStringID: StringID;
@@ -96,6 +98,8 @@ export class RapidDataset {
   public hidden: boolean;
   /** Whether this dataset uses conflation when merging features into the OSM graph */
   public conflated: boolean;
+  /** Whether this dataset is a "custom" dataset (i.e. setup by the user) */
+  public custom: boolean;
 
   /** Localization string key for the dataset display name */
   public labelStringID: StringID | undefined;
@@ -138,6 +142,7 @@ export class RapidDataset {
     this.featured = props.featured ?? this.categories.has('featured');
     this.hidden = props.hidden ?? false;
     this.conflated = props.conflated ?? false;
+    this.custom = props.custom ?? false;
 
     this.labelStringID = props.labelStringID;
     this.descriptionStringID = props.descriptionStringID;

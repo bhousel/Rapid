@@ -415,7 +415,7 @@ export class RapidSystem extends AbstractSystem {
     if (!settings || !ds) return;
 
     // A service-provided dataset..
-    if (ds.serviceID) {
+    if (!ds.custom) {
       const prefs: RapidDatasetSettings = {};
       if (ds.color) prefs.color = ds.color;
 
@@ -424,11 +424,11 @@ export class RapidSystem extends AbstractSystem {
       // A user-provided custom dataset..
     } else {
       const prefs: RapidCustomDatasetSettings = {};
-      if (ds.categories.size) prefs.categories = [...ds.categories];
-      if (ds.dataUsed.length) prefs.dataUsed = ds.dataUsed.slice();
-      if (ds.color) prefs.color = ds.color;
-      if (ds.sourceUrl) prefs.sourceUrl = ds.sourceUrl;
-      if (ds.thumbnailUrl) prefs.thumbnailUrl = ds.thumbnailUrl;
+      if (ds.categories.size)  prefs.categories = [...ds.categories];
+      if (ds.dataUsed.length)  prefs.dataUsed = ds.dataUsed.slice();
+      if (ds.color)            prefs.color = ds.color;
+      if (ds.sourceUrl)        prefs.sourceUrl = ds.sourceUrl;
+      if (ds.thumbnailUrl)     prefs.thumbnailUrl = ds.thumbnailUrl;
 
       settings.set(`rapid.custom.${ds.id}`, prefs as SettingsValue);
     }
@@ -579,7 +579,7 @@ export class RapidSystem extends AbstractSystem {
       }
       let ds = this.catalog.get(datasetID);
       if (ds) {   // added already
-        if (ds.serviceID) {   // Custom datasetID should not collide with service-provided datasetID
+        if (!ds.custom) {   // Custom datasetID should not collide with service-provided datasetID
           settings.unset(`rapid.custom.${datasetID}`);
         }
         continue;
@@ -587,7 +587,8 @@ export class RapidSystem extends AbstractSystem {
 
       // Instantiate the custom dataset and add it to the catalog.
       const props: Partial<RapidDatasetProps> = {
-        id: datasetID
+        id: datasetID,
+        custom: true
       };
 
       if (Array.isArray(prefs.categories))          props.categories = new Set<string>(prefs.categories);
