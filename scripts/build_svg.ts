@@ -22,8 +22,9 @@ async function buildSVG(): Promise<void> {
     { name: 'maki-sprite',       idPrefix: 'maki-',       glob: 'node_modules/@mapbox/maki/icons/*.svg' },
     { name: 'mapillary-sprite',  idPrefix: null,          glob: 'node_modules/@rapideditor/mapillary_sprite_source/package_signs/*.svg' },
     // { name: 'mapillary-object-sprite', idPrefix: null,    glob: 'node_modules/@rapideditor/mapillary_sprite_source/package_objects/*.svg' },
+    { name: 'pinhead-sprite',    idPrefix: 'pinhead-',    glob: 'node_modules/@waysidemapping/pinhead/dist/icons/*.svg' },
     { name: 'rapid-sprite',      idPrefix: 'rapid-',      glob: 'svg/rapid-sprite/**/*.svg' },
-    { name: 'roentgen-sprite',   idPrefix: 'roentgen-',   glob: 'svg/roentgen/*.svg' },
+    { name: 'roentgen-sprite',   idPrefix: 'roentgen-',   glob: 'node_modules/@enzet/roentgen/icons/*.svg' },
     { name: 'temaki-sprite',     idPrefix: 'temaki-',     glob: 'node_modules/@rapideditor/temaki/icons/*.svg' },
   ];
 

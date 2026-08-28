@@ -207,8 +207,8 @@ async function writeIcons(icons: Set<string>): Promise<void> {
     const [prefix, ...rest] = icon.split('-');
     const name = rest.join('-');
 
-    if (['iD', 'rapid', 'maki', 'temaki', 'roentgen'].includes(prefix)) {
-      continue;  // These are expected to live in an existing spritesheet..
+    if (['iD', 'rapid', 'maki', 'temaki', 'pinhead', 'roentgen'].includes(prefix)) {
+      continue;  // These are expected to be found in an existing spritesheet..
 
     } else if (['fas', 'far', 'fab'].includes(prefix)) {   // FontAwesome..
       const folderMap: Record<string, string> = {

@@ -36,7 +36,7 @@ export class UiDefs {
     this.context = context;
 
     this.spritesheetIDs = [
-      'rapid', 'maki', 'temaki', 'fa', 'roentgen', 'community', /*'mapillary-object',*/ 'mapillary'
+      'rapid', 'maki', 'temaki', 'fa', 'roentgen', 'pinhead', 'community', /*'mapillary-object',*/ 'mapillary'
     ];
 
     // D3 selections
@@ -94,6 +94,7 @@ export class UiDefs {
 
 
   /**
+   * Callback that runs after fetching a spritesheet, to insert it into the document and prepare the icons.
    * @param  $selection      - A d3-selection to a `g` element that the icons should render themselves into
    * @param  spritesheetID   - the spritesheet id to use
    * @param  spritesheetSvg  - Document containing the fetched spritesheet
@@ -106,7 +107,7 @@ export class UiDefs {
     group.appendChild(element);
 
     // For some spritesheets, allow icon fill colors to be overridden..
-    if (['maki', 'temaki', 'fa', 'roentgen', 'community'].includes(spritesheetID)) {
+    if (['maki', 'temaki', 'fa', 'pinhead', 'roentgen', 'community'].includes(spritesheetID)) {
       $selection.selectAll('path')
         .attr('fill', 'currentColor');
     }
@@ -119,7 +120,7 @@ export class UiDefs {
     }
 
     $selection.selectAll('symbol')
-      .each((d, i, nodes) => {
+      .each((d: unknown, i: number, nodes: ArrayLike<SVGSymbolElement>) => {
         const symbol = nodes[i] as SVGSymbolElement;
         const iconID = symbol.getAttribute('id') as string;
         textureManager.registerSvgIcon(iconID, symbol);
