@@ -89,7 +89,7 @@ export abstract class AbstractIntroChapter extends EventEmitter {
   public enter(): void {
     const context = this.context;
     const editor = context.systems.editor!;
-    const map = context.systems.map!;
+    const gfx = context.systems.gfx!;
 
     this._cancelled = false;
     this._rejectStep = null;
@@ -101,7 +101,7 @@ export abstract class AbstractIntroChapter extends EventEmitter {
     context.on('modechange', this._modeChangeListener);
     editor.on('stablechange', this._stableChangeListener);
     editor.on('stagingchange', this._stagingChangeListener);
-    map.on('move', this._mapMoveListener);
+    gfx.on('move', this._mapMoveListener);
 
     this._runAsync(this._firstStep())
       .catch(e => { if (e instanceof Error) console.error(e); })   // eslint-disable-line no-console
@@ -109,7 +109,7 @@ export abstract class AbstractIntroChapter extends EventEmitter {
         context.off('modechange', this._modeChangeListener);
         editor.off('stablechange', this._stableChangeListener);
         editor.off('stagingchange', this._stagingChangeListener);
-        map.off('move', this._mapMoveListener);
+        gfx.off('move', this._mapMoveListener);
       });
   }
 

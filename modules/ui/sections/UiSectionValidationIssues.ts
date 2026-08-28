@@ -39,7 +39,7 @@ export class UiSectionValidationIssues extends AbstractUiSection {
     this._renderWhenIdle = this._renderWhenIdle.bind(this);
 
     // event handlers to refresh the lists
-    const map = context.systems.map!;
+    const gfx = context.systems.gfx!;
     const settings = context.systems.settings;
     const scheduler = context.systems.scheduler;
     const urlhash = context.systems.urlhash;
@@ -54,7 +54,7 @@ export class UiSectionValidationIssues extends AbstractUiSection {
       }
     });
 
-    map.on('draw', () => {
+    gfx.on('draw', () => {
       // scheduler debounces the redraw; without it, just redraw immediately
       if (scheduler) {
         scheduler.debounce('ValidationIssues-render', this._renderWhenIdle, { ms: 500 });

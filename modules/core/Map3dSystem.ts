@@ -141,8 +141,8 @@ export class Map3dSystem extends AbstractSystem {
         });
 
         // Setup event handlers..
-        gfx!.on('draw', this.deferredRedraw);  // respond to changes in the main map
-        gfx!.on('move', this.deferredRedraw);
+        gfx.on('draw', this.deferredRedraw);  // respond to changes in the main map
+        gfx.on('move', this.deferredRedraw);
         maplibre.on('move', this._map3dmoved);   // respond to changes in the 3d map
         maplibre.on('moveend', this._map3dmoved);
 

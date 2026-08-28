@@ -73,6 +73,7 @@ let _rapidStarted = false;
 // Rapid systems we can work with
 let _context;
 let _editor;
+let _gfx;
 let _map;
 let _imagery;
 
@@ -94,10 +95,11 @@ function iframeLoaded() {
     .then(() => {
       _rapidStarted = true;
       _editor = _context.systems.editor;
+      _gfx = _context.systems.gfx;
       _map = _context.systems.map;
       _imagery = _context.systems.imagery;
 
-      _map.on('draw', () => {
+      _gfx.on('draw', () => {
         syncHashes();
         updateSidebar()
       });

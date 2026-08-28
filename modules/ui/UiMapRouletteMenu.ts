@@ -80,8 +80,8 @@ export class UiMapRouletteMenu extends EventEmitter {
     }
 
     const context = this.context;
+    const gfx = context.systems.gfx!;
     const l10n = context.systems.l10n!;
-    const map = context.systems.map!;
     const viewport = context.viewport;
 
     if (this.triggerType === undefined) {
@@ -147,10 +147,11 @@ export class UiMapRouletteMenu extends EventEmitter {
 
     this._updatePosition();
 
-    map.off('move', this._updatePosition);
-    map.on('move', this._updatePosition);
-
-    this.emit('toggled', true);
+    // When creating the menu only, `$$wrap` will have something in it.
+    if ($$menu.size()) {
+      gfx.on('move', this._updatePosition);
+      this.emit('toggled', true);
+    }
   }
 
 
@@ -181,7 +182,6 @@ export class UiMapRouletteMenu extends EventEmitter {
     const gfx = context.systems.gfx!;
     const l10n = context.systems.l10n!;
     const viewport = context.viewport;
-
 
     if (this._oldz !== viewport.transform.zoom) {
       this.close();
@@ -320,10 +320,13 @@ export class UiMapRouletteMenu extends EventEmitter {
   /** Closes the MapRoulette menu and cleans up event listeners. */
   public close(): void {
     const context = this.context;
-    const map = context.systems.map!;
+    const gfx = context.systems.gfx!;
 
-    map.off('move', this._updatePosition);
+    gfx.off('move', this._updatePosition);
+
     this.$menu?.remove();
+    this.$menu = null;
+
     this.emit('toggled', false);
 
     (context.systems.ui as any)._showsMapRouletteMenu = false; // Reset state

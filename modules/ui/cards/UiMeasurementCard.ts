@@ -58,8 +58,8 @@ export class UiMeasurementCard extends AbstractUiCard {
     super(context);
     this.id = 'measurement';
 
+    const gfx = context.systems.gfx!;
     const l10n = context.systems.l10n!;
-    const map = context.systems.map!;
 
     this._isImperial = !l10n.isMetric;
     this._keys = null;
@@ -70,7 +70,7 @@ export class UiMeasurementCard extends AbstractUiCard {
     this._setupKeybinding = this._setupKeybinding.bind(this);
 
     // Event listeners
-    map.on('draw', this.render);
+    gfx.on('draw', this.render);
     context.on('modechange', this.render);
     l10n.on('localechange', this._setupKeybinding);
 

@@ -26,7 +26,7 @@ export class UiSectionValidationStatus extends AbstractUiSection {
     // Ensure methods used as callbacks always have `this` bound correctly.
     this._renderWhenIdle = this._renderWhenIdle.bind(this);
 
-    const map = context.systems.map!;
+    const gfx = context.systems.gfx!;
     const scheduler = context.systems.scheduler;
     const settings = context.systems.settings;
     const validator = context.systems.validator!;
@@ -34,7 +34,7 @@ export class UiSectionValidationStatus extends AbstractUiSection {
     settings?.on('settingschange', this._renderWhenIdle);
     validator.on('validated', this._renderWhenIdle);
 
-    map.on('draw', () => {
+    gfx.on('draw', () => {
       // scheduler debounces the redraw; without it, just redraw immediately
       if (scheduler) {
         scheduler.debounce('ValidationStatus-render', this._renderWhenIdle, { ms: 1000 });

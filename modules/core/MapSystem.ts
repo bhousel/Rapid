@@ -27,9 +27,6 @@ const MAX_Z = 24;
  * - `wireframeMode`   `true` if fill mode is 'wireframe', `false` otherwise
  *
  * Events available:
- * - `draw`       Fires after a full redraw
- * - `move`       Fires after the map's transform has changed (can fire frequently)
- *                 ('move' is mostly for when you want to update some content that floats over the map)
  * - `mapchange`  Fires on any change in map display options (wireframe/areafill, highlightedits)
  */
 export class MapSystem extends AbstractSystem {
@@ -119,14 +116,9 @@ export class MapSystem extends AbstractSystem {
         // because so many other parts of Rapid rely on the map location being set correctly.
         urlhash?.prependListener('hashchange', this._hashChanged);
 
-        // Forward the 'move' and 'draw' events from the GraphicsSystem
         gfx
-          .on('move', () => {
-            this.emit('move');
-          })
           .on('draw', () => {
             this._updateHash();
-            this.emit('draw');
           });
 
         editor

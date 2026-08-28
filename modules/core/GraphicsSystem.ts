@@ -890,9 +890,9 @@ export class GraphicsSystem extends AbstractSystem {
 
   /**
    * Handler for webglcontextrestored events on the canvas.
-   * @param  _e  - The WebGLContextEvent (unused)
+   * @param  e  - The WebGLContextEvent (unused)
    */
-  protected _handleGLContextRestored(_e: Event): void {
+  protected _handleGLContextRestored(e: Event): void {
     const context = this.context;
     const scheduler = context.systems.scheduler!;
 

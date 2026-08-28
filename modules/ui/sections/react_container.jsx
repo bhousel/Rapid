@@ -5,8 +5,8 @@ import { uiSection } from './section.ts';
 
 
 export function uiSectionReactContainer(context) {
+  const gfx = context.systems.gfx;
   const imagery = context.systems.imagery;
-  const map = context.systems.map;
   const scheduler = context.systems.scheduler;
   let reRenderCount = 0;
 
@@ -34,7 +34,7 @@ export function uiSectionReactContainer(context) {
   };
 
 
-  map.on('draw', () => {
+  gfx.on('draw', () => {
     scheduler?.debounce('ReactContainer-render', () => {
       reRenderCount++;
       if (scheduler) {

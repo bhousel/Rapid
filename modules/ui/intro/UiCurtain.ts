@@ -97,7 +97,7 @@ export class UiCurtain {
       .attr('class', 'popover-inner');
 
     // register event handlers
-    this.context.systems.map!.on('move', this.redraw);
+    this.context.systems.gfx!.on('move', this.redraw);
     this.context.systems.ui!.on('uichange', this.resize);
 
     this.resize();   // get the width/height
@@ -121,7 +121,7 @@ export class UiCurtain {
     this._revealPolygon = [];
 
     // unregister event handlers
-    this.context.systems.map!.off('move', this.redraw);
+    this.context.systems.gfx!.off('move', this.redraw);
     this.context.systems.ui!.off('uichange', this.resize);
   }
 

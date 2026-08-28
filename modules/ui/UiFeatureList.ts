@@ -88,8 +88,6 @@ export class UiFeatureList {
 
     // Setup event listeners
     context.on('modechange', this._clearSearch);
-//    context.systems.map
-//     .on('drawn.feature-list', mapDrawn);
 
     const key = utilCmd('⌘F');
     context.keybinding().on(key, this._focusSearch);
@@ -413,13 +411,6 @@ export class UiFeatureList {
       this._drawList();
     });
   }
-
-
-//   _mapDrawn(e) {
-//    if (e.full) {
-//      this._drawList();
-//    }
-//  }
 
 
   /**

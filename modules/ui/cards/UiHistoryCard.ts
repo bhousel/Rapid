@@ -27,9 +27,9 @@ export class UiHistoryCard extends AbstractUiCard {
     super(context);
     this.id = 'history';
 
+    const gfx = context.systems.gfx!;
     const l10n = context.systems.l10n!;
-    const map = context.systems.map!;
-    const scheduler = context.systems.scheduler;  // optional
+    const scheduler = context.systems.scheduler;
 
     this._keys = null;
 
@@ -52,7 +52,7 @@ export class UiHistoryCard extends AbstractUiCard {
     this._setupKeybinding = this._setupKeybinding.bind(this);
 
     // Event listeners
-    map.on('draw', this.deferredRender);
+    gfx.on('draw', this.deferredRender);
     context.on('modechange', this.render);
 //    context.behaviors.hover.on('hoverchange', this.render);   //Rapid#1575
     l10n.on('localechange', this._setupKeybinding);

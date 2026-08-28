@@ -44,7 +44,7 @@ export class UiBearingControl {
     this.updateBearing = this.updateBearing.bind(this);
 
     // Event listeners
-    context.systems.map!
+    context.systems.gfx!
       .on('draw', this.updateBearing);
   }
 

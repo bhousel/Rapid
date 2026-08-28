@@ -97,6 +97,7 @@ let _rapidStarted = false;
 // Rapid systems we can work with
 let _context;
 let _assets;
+let _gfx;
 let _map;
 let _styles;
 let _schema;
@@ -123,6 +124,7 @@ function iframeLoaded() {
     .then(() => {
       // capture variables so we can use the systems
       _assets = _context.systems.assets;
+      _gfx = _context.systems.gfx;
       _map = _context.systems.map;
       _rapid = _context.systems.rapid;
       _styles = _context.systems.styles;
@@ -142,7 +144,7 @@ function iframeLoaded() {
       _assets.registerAsset('custom_schema', { preferred: './examples/customization/custom_schema.json' });
 
       _map.setMapParams([-74.91763, 38.93067], 18.75, 0.131, 0);  // go to Cape May, NJ
-      _map.on('draw', () => syncHashes());
+      _gfx.on('draw', () => syncHashes());
 
       // Enable the controls
       toggleStyles.disabled = false;

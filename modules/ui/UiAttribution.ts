@@ -24,9 +24,9 @@ export class UiAttribution {
   public constructor(context: Context) {
     this.context = context;
 
+    const gfx = context.systems.gfx!;
     const imagery = context.systems.imagery!;
-    const map = context.systems.map!;
-    const scheduler = context.systems.scheduler;  // optional
+    const scheduler = context.systems.scheduler;
 
     // D3 selections
     this.$parent = null;
@@ -44,7 +44,7 @@ export class UiAttribution {
     };
 
     imagery.on('imagerychange', this.render);
-    map.on('draw', this.throttledRender);
+    gfx.on('draw', this.throttledRender);
   }
 
 

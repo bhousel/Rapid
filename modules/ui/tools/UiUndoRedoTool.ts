@@ -31,9 +31,9 @@ export class UiUndoRedoTool {
     this.stringID = 'toolbar.undo_redo';
 
     const editor = context.systems.editor!;
+    const gfx = context.systems.gfx!;
     const l10n = context.systems.l10n!;
-    const map = context.systems.map!;
-    const scheduler = context.systems.scheduler;  // optional
+    const scheduler = context.systems.scheduler;
 
     // Create child components
     this.Tooltip = new UiTooltip(context)
@@ -86,7 +86,7 @@ export class UiUndoRedoTool {
     for (const d of this.commands) {
       context.keybinding().on(d.key, e => this.choose(e, d));
     }
-    map.on('draw', this.debouncedRender);
+    gfx.on('draw', this.debouncedRender);
     editor.on('stablechange', this.render);
     context.on('modechange', this.render);
   }

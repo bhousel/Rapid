@@ -28,8 +28,8 @@ export class UiSectionOverlayList extends AbstractUiSection {
   public constructor(context: Context) {
     super(context, 'overlay-list');
 
+    const gfx = context.systems.gfx!;
     const imagery = context.systems.imagery!;
-    const map = context.systems.map!;
 
     this._overlayList = select(null);
 
@@ -42,7 +42,7 @@ export class UiSectionOverlayList extends AbstractUiSection {
     this._deferredOnMapDraw = this._deferredOnMapDraw.bind(this);
 
     imagery.on('imagerychange', this.renderInner);
-    map.on('draw', this._deferredOnMapDraw);
+    gfx.on('draw', this._deferredOnMapDraw);
   }
 
 

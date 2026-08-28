@@ -40,7 +40,6 @@ export class UiEditMenu extends EventEmitter {
 
   // Menu state, these are locked in when menu is initially shown
   // but needed later if the menu is repositioned
-  protected _menu: D3Selection;
   protected _operations: Operation[];
   protected _tooltips: Map<OperationID, UiTooltip>;   // Map(id -> tooltip)
   protected _anchorLoc: Vec2;              // Array [lon,lat] wgs84 coordinate where the menu should be anchored
@@ -51,6 +50,9 @@ export class UiEditMenu extends EventEmitter {
   protected _menuWidth: number;
   protected _lastPointerUpType: string | null;
 
+  // D3 Selections
+  public $menu: D3Selection | null;
+
 
   /**
    * @param  context - Global shared application context
@@ -59,7 +61,6 @@ export class UiEditMenu extends EventEmitter {
     super();
     this.context = context;
 
-    this._menu = select(null);
     this._operations = [];
     this._tooltips = new Map();
     this._anchorLoc = [0, 0];
@@ -69,6 +70,9 @@ export class UiEditMenu extends EventEmitter {
     this._menuHeight = 0;
     this._menuWidth = 0;
     this._lastPointerUpType = null;
+
+    // D3 Selections
+    this.$menu = null;
 
     // Ensure methods used as callbacks always have `this` bound correctly.
     this.render = this.render.bind(this);
@@ -87,7 +91,7 @@ export class UiEditMenu extends EventEmitter {
    */
   public render($selection: D3Selection): void {
     const context = this.context;
-    const map = context.systems.map!;
+    const gfx = context.systems.gfx!;
     const viewport = context.viewport;
 
     if (this._triggerType === undefined) {
@@ -120,15 +124,18 @@ export class UiEditMenu extends EventEmitter {
     const $wrap: D3Selection = $selection.selectAll('.edit-menu')
       .data([0]);
 
+    // enter
     const $$wrap = $wrap.enter()
       .append('div')
       .attr('class', 'edit-menu')
       .classed('touch-menu', isTouchMenu)
       .style('padding', VERTICAL_PADDING + 'px 0');
 
-    this._menu = $wrap.merge($$wrap);
+    // update
+    this.$menu = $wrap.merge($$wrap);
 
-    let $buttons: D3Selection = this._menu.selectAll('.edit-menu-item')
+
+    let $buttons: D3Selection = this.$menu.selectAll('.edit-menu-item')
       .data(ops, (d: Operation) => d.id);
 
     // Exit
@@ -203,12 +210,14 @@ export class UiEditMenu extends EventEmitter {
       }
     });
 
-    // Update menu position (and keep it updated as the map moves)
+    // Set menu position
     this._updatePosition();
-    map.off('move', this._updatePosition);
-    map.on('move', this._updatePosition);
 
-    this.emit('toggled', true);
+    // When creating the menu only, `$$wrap` will have something in it.
+    if ($$wrap.size()) {
+      gfx.on('move', this._updatePosition);
+      this.emit('toggled', true);
+    }
   }
 
 
@@ -267,12 +276,12 @@ export class UiEditMenu extends EventEmitter {
    * Called whenever the map moves so that the menu can be repostioned to match the map.
    */
   protected _updatePosition(): void {
+    if (!this.$menu || this.$menu.empty()) return;   // called too soon?
+
     const context = this.context;
     const gfx = context.systems.gfx!;
     const l10n = context.systems.l10n!;
     const viewport = context.viewport;
-
-    if (!this._menu || this._menu.empty()) return;
 
     // close the menu if the zoom has changed
     // (this is because the menu will scale with the supersurface and look wrong)
@@ -356,7 +365,7 @@ export class UiEditMenu extends EventEmitter {
     }
 
     const [left, top] = vecAdd(anchor, offset);
-    this._menu
+    this.$menu
       .style('left', `${left}px`)
       .style('top', `${top}px`);
 
@@ -375,11 +384,13 @@ export class UiEditMenu extends EventEmitter {
    */
   public close(): void {
     const context = this.context;
-    const map = context.systems.map!;
+    const gfx = context.systems.gfx!;
 
-    map.off('move', this._updatePosition);
+    gfx.off('move', this._updatePosition);
 
-    this._menu.remove();
+    this.$menu?.remove();
+    this.$menu = null;
+
     this._tooltips.clear();
 
     this.emit('toggled', false);

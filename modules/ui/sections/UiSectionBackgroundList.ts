@@ -54,7 +54,7 @@ export class UiSectionBackgroundList extends AbstractUiSection {
 
     const imagery = context.systems.imagery!;
     const l10n = context.systems.l10n!;
-    const map = context.systems.map!;
+    const gfx = context.systems.gfx!;
     const settings = context.systems.settings;
 
     this._backgroundList = select(null);
@@ -93,11 +93,8 @@ export class UiSectionBackgroundList extends AbstractUiSection {
     this._favoriteIDs = new Set<string>(vals);
 
     // Event listeners
-    imagery.off('imagerychange', this._renderIfVisible);
     imagery.on('imagerychange', this._renderIfVisible);
-    map.off('draw', this._deferredOnMapDraw);
-    map.on('draw', this._deferredOnMapDraw);
-    l10n.off('localechange', this._setupKeybinding);
+    gfx.on('draw', this._deferredOnMapDraw);
     l10n.on('localechange', this._setupKeybinding);
 
     this._setupKeybinding();

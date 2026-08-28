@@ -29,6 +29,7 @@ export class UiZoomControl {
   public constructor(context: Context) {
     this.context = context;
 
+    const gfx = context.systems.gfx!;
     const l10n = context.systems.l10n!;
     const map = context.systems.map!;
 
@@ -75,7 +76,7 @@ export class UiZoomControl {
       context.keybinding().on(utilCmd('⌥' + key), this.zoomOutFurther);
     });
 
-    map.on('draw', this.render);
+    gfx.on('draw', this.render);
   }
 
   /**

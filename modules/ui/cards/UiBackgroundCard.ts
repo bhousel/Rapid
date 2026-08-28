@@ -32,8 +32,8 @@ export class UiBackgroundCard extends AbstractUiCard {
     super(context);
     this.id = 'background';
 
+    const gfx = context.systems.gfx!;
     const l10n = context.systems.l10n!;
-    const map = context.systems.map!;
     const scheduler = context.systems.scheduler;  // optional
 
     this._currSourceID = null;
@@ -63,9 +63,8 @@ export class UiBackgroundCard extends AbstractUiCard {
     this._setupKeybinding = this._setupKeybinding.bind(this);
 
     // Setup event handlers..
-    map
-      .on('draw', this.deferredRender)
-      .on('move', this.deferredUpdateMetadata);
+    gfx.on('draw', this.deferredRender);
+    gfx.on('move', this.deferredUpdateMetadata);
 
     l10n
       .on('localechange', this._setupKeybinding);
