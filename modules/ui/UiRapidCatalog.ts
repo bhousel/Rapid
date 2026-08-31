@@ -460,8 +460,7 @@ export class UiRapidCatalog extends EventEmitter {
       .text(d => d.added ? '\u2705 ' + l10n.t('rapid_catalog.dataset_added') : '');  // 2705 = emoji check
 
     $datasets.selectAll('.dataset-action')
-      .classed('secondary', (d: RapidDataset) => d.added)
-      .text((d: RapidDataset) => d.added ? l10n.t('text.remove') : l10n.t('rapid_catalog.add_dataset'));
+      .text((d: RapidDataset) => d.added ? l10n.t('rapid_catalog.remove_dataset') : l10n.t('rapid_catalog.add_dataset'));
 
     // update the count
     const n = datasets.filter((d: RapidDataset) => !d.filtered).length;

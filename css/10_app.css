@@ -4870,6 +4870,7 @@ li.issue-fix-item button:not(.actionable) .fix-icon {
 
 .modal-section.buttons button {
   min-width: 130px;
+  padding: 0 15px;
 }
 
 .modal-section.buttons .action {

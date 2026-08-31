@@ -1227,7 +1227,8 @@ en:
     about_the_catalog: "These datasets have been provided as open data by various organizations for the purpose of improving OpenStreetMap.<br/>You can learn more by clicking the links below, or visiting [the Rapid Guide](https://github.com/facebookmicrosites/Open-Mapping-At-Facebook/wiki/Esri-ArcGIS-FAQ) or [Esri/ArcGIS dataset page on the OSM Wiki](https://wiki.openstreetmap.org/wiki/Esri/ArcGIS_Datasets)."  # This string may contain markdown
     filter_datasets: filter datasets    # placeholder text for the filter text
     any_type: any type                  # placeholder text for the filter type dropdown
-    add_dataset: Add Dataset
+    add_dataset: Add to Rapid
+    remove_dataset: Remove from Rapid
     clear_filters: Clear Filters
     dataset_added: Dataset added
     no_datasets: No datasets available.
@@ -1279,13 +1280,23 @@ en:
 
   rapid_dataset_settings:
     heading: Dataset Settings
-    details:
+    delete_permanently: Delete Permanently
+    fields:
       heading: Dataset Details
-      identifier: DatasetID
-      source: Source
-      url: URL
-    thumbnail:
-      instruction: Click to Change
+      source:
+        label: Source
+      identifier:
+        label: Dataset ID
+      name:
+        label: Dataset Name
+        placeholder: Enter a Dataset Name    # placeholder text for the name field
+      sourceurl:
+        label: Source URL
+      thumbnailurl:
+        label: Thumbnail URL
+      description:
+        label: Description
+        placeholder: Enter a Dataset Description    # placeholder text for the description field
     conflation:
       heading: Conflation Settings
     dictionary:

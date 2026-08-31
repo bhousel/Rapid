@@ -11,11 +11,20 @@ import type { D3EnterSelection, D3Selection } from 'd3-selection';
 import type { RapidDatasetProps } from '../lib/RapidDataset.ts';
 
 
+
+/** Definitions for the fields that we will create on this screen */
+interface FieldDefinition {
+  /* The identifier for the field */
+  key: string;
+  /* The type of the field */
+  type: 'input' | 'textarea';
+}
+
 /**
  * The values collected on this screen, along with information about whether
  * the field values are all present and have passed validation.
  */
-export interface FieldInfo {
+interface FieldInfo {
   /* `true` if we can continue (no errors), false if not */
   isOk: boolean
   /* If there is a dataset validation error, the stringID for the error */
@@ -45,6 +54,9 @@ export class UiRapidAddDataset extends EventEmitter {
   // Child components
   public Modal: UiModal | null;
 
+  /** Unique ID for field identifiers */
+  protected _uuid: string;
+
 
   /**
    * @param  context - Global shared application context
@@ -53,18 +65,23 @@ export class UiRapidAddDataset extends EventEmitter {
     super();
     this.context = context;
 
+    this._uuid = crypto.randomUUID().slice(0, 8);
+
     // Child components
     this.Modal = null;
 
     // Ensure methods used as callbacks always have `this` bound correctly.
     // (This is also necessary when using `d3-selection.call`)
-    this._clickedNext = this._clickedNext.bind(this);
-    this._done = this._done.bind(this);
     this.show = this.show.bind(this);
     this.close = this.close.bind(this);
     this.render = this.render.bind(this);
-    this.renderFields = this.renderFields.bind(this);
-    this.checkFields = this.checkFields.bind(this);
+    this._checkFields = this._checkFields.bind(this);
+    this._clickedNext = this._clickedNext.bind(this);
+    this._done = this._done.bind(this);
+    this._renderHeading = this._renderHeading.bind(this);
+    this._renderFields = this._renderFields.bind(this);
+    this._renderUrl = this._renderUrl.bind(this);
+    this._renderButtons = this._renderButtons.bind(this);
   }
 
 
@@ -103,6 +120,20 @@ export class UiRapidAddDataset extends EventEmitter {
 
 
   /**
+   * Renders the content inside the Modal component.
+   */
+  public render(): void {
+    if (!this.Modal) return;  // need to call `show()` first to create the modal.
+
+    this.Modal.$content!
+      .call(this._renderHeading)
+      .call(this._renderFields)
+      .call(this._renderUrl)
+      .call(this._renderButtons);
+  }
+
+
+  /**
    * Emits a 'done' event and cleans up the Modal.
    * All the various ways of closing the Modal end up here.
    */
@@ -120,14 +151,17 @@ export class UiRapidAddDataset extends EventEmitter {
   /**
    * When clicking "Next", test dataset for validity.  If it all looks ok,
    * create the RapidDataset and continue to the Dataset Settings Modal.
-   * If there are problems just return without doing anything.
+   * If there are problems, `render()` again to surface the errors and return early.
    * @param [e] - the triggering event, if any
    */
   protected _clickedNext(e?: Event): void {
     e?.preventDefault();
 
-    const fieldInfo = this.checkFields();
-    if (!fieldInfo.isOk) return;  // one last check
+    const fieldInfo = this._checkFields();
+    if (!fieldInfo.isOk) {
+      this.render();
+      return;
+    }
 
     const context = this.context;
     const rapid = context.systems.rapid!;
@@ -142,7 +176,8 @@ export class UiRapidAddDataset extends EventEmitter {
 
     const ds = new RapidDataset(context, props);
     rapid.catalog.set(ds.id, ds);
-    rapid.enableDatasets(ds.id);  // add it to the menu
+    rapid.enableDatasets(ds.id);    // add it to the menu
+    rapid.saveDatasetSettings(ds);  // persist settings
 
     // Continue to the Dataset Settings modal, wire up 'done' handler too.
     const SettingsModal = new UiRapidDatasetSettings(context).once('done', this.close);
@@ -152,65 +187,15 @@ export class UiRapidAddDataset extends EventEmitter {
 
 
   /**
-   * Run all field validations.  Returns an object containing the field values
-   * and information about whether validation has passed or failed.
-   * @returns a FieldInfo result set
+   * Renders the heading section.
+   * @param $parent - Parent D3Selection that this content should render itself into
    */
-  public checkFields(): FieldInfo {
-    const result: FieldInfo = { isOk: false };
-    if (!this.Modal) return result;
-
-    const context = this.context;
-    const rapid = context.systems.rapid!;
-    const $content = this.Modal.$content!;
-
-    // check dataset ID
-    const idNode = $content.selectAll('.row-identifier .dataset-field-input').node() as HTMLInputElement | null;
-    const idVal = idNode?.value || '';
-    const datasetID = idVal.trim();
-    if (datasetID && rapid.catalog.has(datasetID)) {
-      result.datasetIDStringID = 'rapid_add_dataset.identifier.taken';
-    } else if (datasetID && !/^[\w\-]+$/.test(datasetID)) {
-      result.datasetIDStringID = 'rapid_add_dataset.identifier.invalid';
-    } else {
-      result.datasetID = datasetID;
-    }
-
-    // check dataset name
-    const nameNode = $content.selectAll('.row-name .dataset-field-input').node() as HTMLInputElement | null;
-    const nameVal = nameNode?.value || '';
-    result.datasetName = nameVal.trim();
-
-    // check source url
-    const urlNode = $content.selectAll('.field-url').node() as HTMLTextAreaElement | null;
-    const urlVal = urlNode?.value || '';
-    result.datasetUrl = urlVal.trim();
-
-    // all three must be present
-    result.isOk = !!(result.datasetID && result.datasetName && result.datasetUrl);
-    return result;
-  }
-
-
-  /**
-   * Renders the content inside the Modal component.
-   */
-  public render(): void {
-    if (!this.Modal) return;  // need to call `show()` first to create the modal.
-
+  protected _renderHeading($parent: D3Selection): void {
     const context = this.context;
     const l10n = context.systems.l10n!;
-    const $content = this.Modal.$content!;
-
-    const prefix = 'rapid_add_dataset';  // prefix for text strings
-    const accept = [
-      '.gpx', 'application/gpx', 'application/gpx+xml',
-      '.kml', 'application/vnd.google-earth.kml+xml', 'application/kml', 'application/kml+xml',
-      '.geojson', '.json', 'application/geo+json', 'application/json', 'application/vnd.geo+json', 'text/x-json'
-    ];
 
     /* Heading section */
-    let $heading: D3Selection = $content.selectAll('.modal-heading')
+    let $heading: D3Selection = $parent.selectAll('.modal-heading')
       .data([0]);
 
     // enter
@@ -233,15 +218,118 @@ export class UiRapidAddDataset extends EventEmitter {
 
     $heading.selectAll('.modal-heading-text')
       .text(l10n.t('rapid_add_dataset.heading'));
+  }
 
 
-    /* Fields section */
-    $content
-      .call(this.renderFields);
+  /**
+   * Renders the fields section.
+   * @param $parent - Parent D3Selection that this content should render itself into
+   */
+  protected _renderFields($parent: D3Selection): void {
+    const context = this.context;
+    const l10n = context.systems.l10n!;
 
+    const uuid = this._uuid;
+    const prefix = 'rapid_add_dataset';  // prefix for text strings
+    const fields: FieldDefinition[] = [
+      { key: 'name', type: 'input' },
+      { key: 'identifier', type: 'input' }
+    ];
+
+    let $fields: D3Selection = $parent.selectAll('.rapid-add-dataset-fields')
+      .data([0]);
+
+    // enter
+    const $$fields: D3EnterSelection = $fields
+      .enter()
+      .append('div')
+      .attr('class', 'modal-section rapid-add-dataset-fields');
+
+    const $$rows = $$fields.selectAll('.dataset-field-row')
+      .data(fields, (d: FieldDefinition) => d.key)
+      .enter()
+      .append('div')
+      .attr('class', (d: string) => `dataset-field-row row-${d}`);
+
+    const $$wraps: D3EnterSelection = $$rows
+      .append('div')
+      .attr('class', 'dataset-field-wrap');
+
+    $$wraps
+      .append('label')
+      .attr('for', (d: FieldDefinition) => `${d.key}-${uuid}`)
+      .attr('class', 'dataset-field-label');
+
+    $$wraps
+      .append((d: FieldDefinition) => document.createElement(d.type))
+      .attr('id', (d: FieldDefinition) => `${d.key}-${uuid}`)
+      .attr('class', 'dataset-field-input')
+      .call(utilNoAuto)
+      .on('input', (e: InputEvent) => this.render());  // rerendering will also run validation
+
+    $$wraps
+      .append('div')
+      .attr('class', 'dataset-field-instruction');
+
+    $$wraps
+      .append('div')
+      .attr('class', 'dataset-field-feedback');
+
+    // Add special handling for the identifier field..
+    const $$identifier: D3EnterSelection = $$fields.selectAll('.row-identifier .dataset-field-input');
+    $$identifier
+      .attr('maxlength', 36);
+
+    // set focus on enter
+    const $$name: D3EnterSelection = $$fields.selectAll(`#name-${uuid}`);
+    const node = $$name.node() as HTMLElement | null;
+    node?.focus();
+
+
+    // update
+    $fields = $fields.merge($$fields);
+
+    const fieldInfo = this._checkFields();
+
+    $fields.selectAll('.dataset-field-label')
+      .text((d: FieldDefinition) => l10n.t(`${prefix}.${d.key}.label`));
+
+    $fields.selectAll('.dataset-field-input')
+      .attr('placeholder', (d: FieldDefinition) => l10n.t(`${prefix}.${d.key}.placeholder`));
+
+    $fields.selectAll('.row-identifier .dataset-field-input')
+      .classed('warning', !!fieldInfo.datasetIDStringID);
+
+    $fields.selectAll('.row-identifier .dataset-field-instruction')
+      .text(l10n.t(`${prefix}.identifier.instruction`));
+
+    // U+26A0 U+FE0F = emoji warning
+    // U+00A0 = non breaking space &nbsp;  (we want the div always drawn, so layout doesn't jump around)
+    $fields.selectAll('.row-identifier .dataset-field-feedback')
+      .classed('warning', !!fieldInfo.datasetIDStringID)
+      .text(fieldInfo.datasetIDStringID ? '\u26a0\ufe0f ' + l10n.t(fieldInfo.datasetIDStringID) : '\u00a0');
+  }
+
+
+  /**
+   * Renders the Url section.
+   * @param $parent - Parent D3Selection that this content should render itself into
+   */
+  protected _renderUrl($parent: D3Selection): void {
+    const context = this.context;
+    const l10n = context.systems.l10n!;
+
+    const prefix = 'rapid_add_dataset';  // prefix for text strings
+    const uuid = this._uuid;
+
+    // const accept = [
+    //   '.gpx', 'application/gpx', 'application/gpx+xml',
+    //   '.kml', 'application/vnd.google-earth.kml+xml', 'application/kml', 'application/kml+xml',
+    //   '.geojson', '.json', 'application/geo+json', 'application/json', 'application/vnd.geo+json', 'text/x-json'
+    // ];
 
     /* Text section */
-    let $textSection: D3Selection = $content.selectAll('.rapid-add-dataset-text')
+    let $textSection: D3Selection = $parent.selectAll('.rapid-add-dataset-text')
       .data([0]);
 
     // enter
@@ -249,25 +337,26 @@ export class UiRapidAddDataset extends EventEmitter {
       .append('div')
       .attr('class', 'modal-section rapid-add-dataset-text');
 
-//    $$textSection
-//      .append('div')
-//      .attr('class', 'instructions-file');
-//
-//    $$textSection
-//      .append('input')
-//      .attr('class', 'field-file')
-//      .attr('type', 'file')
-//      .attr('accept', accept.join())
-//      .on('change', (e: Event) => {
-//        const files = (e.target as HTMLInputElement).files;
-//        if (files?.length) {
-//          this._currFileList = files;
-//          this._currUrl = '';
-//          $textSection.select('.field-url').property('value', '');
-//        } else {
-//          this._currFileList = null;
-//        }
-//      });
+    //    $$textSection
+    //      .append('div')
+    //      .attr('class', 'instructions-file');
+    //
+    //    $$textSection
+    //      .append('input')
+    //      .attr('id', `file-${uuid}`)
+    //      .attr('class', 'field-file')
+    //      .attr('type', 'file')
+    //      .attr('accept', accept.join())
+    //      .on('change', (e: Event) => {
+    //        const files = (e.target as HTMLInputElement).files;
+    //        if (files?.length) {
+    //          this._currFileList = files;
+    //          this._currUrl = '';
+    //          $textSection.select('.field-url').property('value', '');
+    //        } else {
+    //          this._currFileList = null;
+    //        }
+    //      });
 
     $$textSection
       .append('div')
@@ -275,6 +364,7 @@ export class UiRapidAddDataset extends EventEmitter {
 
     $$textSection
       .append('textarea')
+      .attr('id', `url-${uuid}`)
       .attr('class', 'field-url')
       .call(utilNoAuto)
       .on('input', (e: InputEvent) => this.render());  // rerendering will also run validation
@@ -283,28 +373,28 @@ export class UiRapidAddDataset extends EventEmitter {
     // update
     $textSection = $textSection.merge($$textSection) as D3Selection;
 
-//     const data_instructions = l10n.t(`${prefix}.instructions`);
-//     const file_heading = l10n.t(`${prefix}.file.heading`);
-//     const file_instructions = l10n.t(`${prefix}.file.instructions`);
-//     const file_types = l10n.t(`${prefix}.file.types`);
-//     const fileHtml = marked.parse(`
-// ${data_instructions}
-// &nbsp;<br>
-// &nbsp;<br>
-// ### ${file_heading}
-// ${file_instructions}
-// * ${file_types}
-// &nbsp;<br>
-// &nbsp;<br>
-// `);
-//
-//    $textSection.selectAll('.instructions-file')
-//      .html(fileHtml as string);
-//
-//    $textSection.selectAll('.field-file')
-//      .property('files', this._currFileList);  // works for all except IE11
-//
-//    const data_or = l10n.t(`${prefix}.or`);
+    //     const data_instructions = l10n.t(`${prefix}.instructions`);
+    //     const file_heading = l10n.t(`${prefix}.file.heading`);
+    //     const file_instructions = l10n.t(`${prefix}.file.instructions`);
+    //     const file_types = l10n.t(`${prefix}.file.types`);
+    //     const fileHtml = marked.parse(`
+    // ${data_instructions}
+    // &nbsp;<br>
+    // &nbsp;<br>
+    // ### ${file_heading}
+    // ${file_instructions}
+    // * ${file_types}
+    // &nbsp;<br>
+    // &nbsp;<br>
+    // `);
+    //
+    //    $textSection.selectAll('.instructions-file')
+    //      .html(fileHtml as string);
+    //
+    //    $textSection.selectAll('.field-file')
+    //      .property('files', this._currFileList);  // works for all except IE11
+    //
+    //    const data_or = l10n.t(`${prefix}.or`);
     const url_heading = l10n.t(`${prefix}.url.heading`);
     const url_instructions = l10n.t(`${prefix}.url.instructions`);
     const url_tokens = l10n.t(`${prefix}.url.tokens`);
@@ -314,7 +404,7 @@ export class UiRapidAddDataset extends EventEmitter {
     const url_example_pmtiles = l10n.t(`${prefix}.url.example_pmtiles`);
     const example = l10n.t('example');
 
-//### ${ data_or }
+    //### ${ data_or }
     const urlHtml = marked.parse(`
 ### ${url_heading}
 ${url_instructions}
@@ -335,13 +425,21 @@ ${url_tokens}
 
     $textSection.selectAll('.field-url')
       .attr('placeholder', l10n.t(`${prefix}.url.placeholder`));
+  }
 
 
-    const fieldInfo = this.checkFields();
+  /**
+   * Renders the buttons section.
+   * @param $parent - Parent D3Selection that this content should render itself into
+   */
+  protected _renderButtons($parent: D3Selection): void {
+    const context = this.context;
+    const l10n = context.systems.l10n!;
 
+    const fieldInfo = this._checkFields();
 
     /* Next/Cancel Buttons */
-    let $buttons: D3Selection = $content.selectAll('.modal-section.buttons')
+    let $buttons: D3Selection = $parent.selectAll('.modal-section.buttons')
       .data([0]);
 
     // enter
@@ -372,87 +470,44 @@ ${url_tokens}
 
 
   /**
-   * Renders the fields section.
-   * @param $selection - A d3-selection to a HTMLElement that this component should render itself into
+   * Run all field validations.  Returns an object containing the field values
+   * and information about whether validation has passed or failed.
+   * @returns a FieldInfo result set
    */
-  public renderFields($selection: D3Selection): void {
+  protected _checkFields(): FieldInfo {
+    const result: FieldInfo = { isOk: false };
+    if (!this.Modal) return result;
+
     const context = this.context;
-    const l10n = context.systems.l10n!;
+    const rapid = context.systems.rapid!;
+    const $content = this.Modal.$content!;
+    const uuid = this._uuid;
 
-    const prefix = 'rapid_add_dataset';  // prefix for text strings
-    const fields = ['name', 'identifier'];
+    // check dataset ID
+    const idNode = $content.selectAll(`#identifier-${uuid}`).node() as HTMLInputElement | null;
+    const idVal = idNode?.value || '';
+    const datasetID = idVal.trim();
+    if (datasetID && rapid.catalog.has(datasetID)) {
+      result.datasetIDStringID = 'rapid_add_dataset.identifier.taken';
+    } else if (datasetID && !/^[\w\-]+$/.test(datasetID)) {
+      result.datasetIDStringID = 'rapid_add_dataset.identifier.invalid';
+    } else {
+      result.datasetID = datasetID;
+    }
 
-    let $fields: D3Selection = $selection.selectAll('.rapid-add-dataset-fields')
-      .data([0]);
+    // check dataset name
+    const nameNode = $content.selectAll(`#name-${uuid}`).node() as HTMLInputElement | null;
+    const nameVal = nameNode?.value || '';
+    result.datasetName = nameVal.trim();
 
-    // enter
-    const $$fields: D3EnterSelection = $fields
-      .enter()
-      .append('div')
-      .attr('class', 'modal-section rapid-add-dataset-fields');
+    // check source url
+    const urlNode = $content.selectAll(`#url-${uuid}`).node() as HTMLTextAreaElement | null;
+    const urlVal = urlNode?.value || '';
+    result.datasetUrl = urlVal.trim();
 
-    const $$rows = $$fields.selectAll('.dataset-field-row')
-      .data(fields)
-      .enter()
-      .append('div')
-      .attr('class', (d: string) => `dataset-field-row row-${d}`);
-
-    const $$wraps: D3EnterSelection = $$rows
-      .append('div')
-      .attr('class', 'dataset-field-wrap');
-
-    $$wraps
-      .append('label')
-      .attr('for', (d: string) => `dataset-field-${d}`)
-      .attr('class', 'dataset-field-label');
-
-    $$wraps
-      .append('input')
-      .attr('id', (d: string) => `dataset-field-${d}`)
-      .attr('class', 'dataset-field-input')
-      .call(utilNoAuto)
-      .on('input', (e: InputEvent) => this.render());  // rerendering will also run validation
-
-    $$wraps
-      .append('div')
-      .attr('class', 'dataset-field-instruction');
-
-    $$wraps
-      .append('div')
-      .attr('class', 'dataset-field-feedback');
-
-    // Add special handling for the identifier field..
-    const $$identifier: D3EnterSelection = $$fields.selectAll('.row-identifier .dataset-field-input');
-    $$identifier
-      .attr('maxlength', 36);
-
-    // set focus on enter
-    const $$name: D3EnterSelection = $$fields.selectAll('.row-name .dataset-field-input');
-    const inputNode = $$name.node() as HTMLElement | null;
-    inputNode?.focus();
-
-
-    // update
-    $fields = $fields.merge($$fields);
-
-    const fieldInfo = this.checkFields();
-
-    $fields.selectAll('.dataset-field-label')
-      .text((d: string) => l10n.t(`${prefix}.${d}.label`));
-
-    $fields.selectAll('.dataset-field-input')
-      .attr('placeholder', (d: string) => l10n.t(`${prefix}.${d}.placeholder`));
-
-    $fields.selectAll('.row-identifier .dataset-field-input')
-      .classed('warning', !!fieldInfo.datasetIDStringID);
-
-    $fields.selectAll('.row-identifier .dataset-field-instruction')
-      .text(l10n.t(`${prefix}.identifier.instruction`));
-
-    // U+26A0 U+FE0F = emoji warning
-    // U+00A0 = non breaking space &nbsp;  (we want the div always drawn, so layout doesn't jump around)
-    $fields.selectAll('.row-identifier .dataset-field-feedback')
-      .classed('warning', !!fieldInfo.datasetIDStringID)
-      .text(fieldInfo.datasetIDStringID ? '\u26a0\ufe0f ' + l10n.t(fieldInfo.datasetIDStringID) : '\u00a0');
+    // required values must be present
+    result.isOk = !!(result.datasetID && result.datasetName && result.datasetUrl);
+    return result;
   }
+
 }

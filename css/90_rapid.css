@@ -198,10 +198,17 @@ button.rapid-features.layer-off use {
   width: 90%;
 }
 
-.modal.rapid-modal input:focus,
-.modal.rapid-modal input:active,
-.modal.rapid-modal textarea:focus,
-.modal.rapid-modal textarea:active {
+.modal.rapid-modal input.disabled,
+.modal.rapid-modal textarea.disabled {
+  background: #222;
+  color: #aaa;
+  cursor: default;
+}
+
+.modal.rapid-modal input:focus:not(.disabled),
+.modal.rapid-modal input:active:not(.disabled),
+.modal.rapid-modal textarea:focus:not(.disabled),
+.modal.rapid-modal textarea:active:not(.disabled) {
   background: #444;
   color: #eee;
   outline: none;
@@ -472,10 +479,15 @@ button.overture-inspector-close:hover {
   border: 1px solid #888a;
 }
 
+/* Larger modals that should take up a bunch more space */
 .modal.rapid-modal.wide {
   max-width: 1000px;
   min-height: 85%;
 }
+.modal.rapid-modal.wide .content {
+  flex: 1;
+}
+
 .modal.rapid-modal h1,
 .modal.rapid-modal h2,
 .modal.rapid-modal h3,
@@ -524,7 +536,7 @@ button.overture-inspector-close:hover {
 .modal.rapid-modal .modal-heading {
   display: flex;
   flex-flow: row nowrap;
-  flex: 1;
+  flex: 0;
   align-items: center;
   padding: 10px;
   color: #fff;
@@ -535,7 +547,7 @@ button.overture-inspector-close:hover {
   padding: 0 5px;
 }
 .modal.rapid-modal .modal-heading-text {
-  flex: 1 1 auto;
+  flex: 1;
   font-size: 24px;
   padding: 0 10px;
 }
@@ -902,6 +914,7 @@ button.overture-inspector-close:hover {
 }
 .modal-catalog .rapid-catalog-dataset.added {
   background: rgba(55, 55, 55, 0.9);
+  border: 1px solid #888a;
 }
 
 .dataset-label {
@@ -909,9 +922,6 @@ button.overture-inspector-close:hover {
   padding: 0 8px;
 }
 
-.dataset-thumb {
-  flex: 0;
-}
 img.dataset-thumbnail {
   border-radius: 10px;
   object-fit: cover;
@@ -1030,64 +1040,76 @@ img.dataset-thumbnail.inverted {
 
 /* Dataset Settings
 ------------------------------------------------------- */
-.modal-dataset-settings .modal-section.dataset-settings-wrap {
+.modal-dataset-settings .dataset-settings-wrap {
   display: flex;
-  flex-flow: row wrap;
-  color: #fff;
+  flex: 1;
+  flex-flow: column nowrap;
+  width: 100%;
+  overflow-y: auto;
+}
+
+/* smaller fields on this screen - lots of information to display */
+.modal.rapid-modal.modal-dataset-settings input,
+.modal.rapid-modal.modal-dataset-settings textarea {
+  padding: 2px 8px;
+  font-size: 12px;
 }
 
 .modal-dataset-settings .dataset-details {
   display: flex;
-  flex: 0 0 60%;
+  flex: 0;
+  flex-flow: row nowrap;
+}
+.modal-dataset-settings .dataset-detail-fields {
+  display: flex;
+  flex: 1;
   flex-flow: column nowrap;
   align-items: flex-start;
-  padding: 20px;
+}
+.modal-dataset-settings .dataset-thumbnail-wrap {
+  display: flex;
+  flex: 0 0 250px;
+  flex-flow: column nowrap;
+  align-items: center;
+  margin-top: 30px;
 }
 
-.modal-dataset-settings .dataset-details-row {
+.modal-dataset-settings .dataset-field-row {
   display: flex;
   flex-flow: row nowrap;
-  flex: 0;
+  flex: 1;
   align-items: flex-start;
-  justify-content: flex-start;
+  width: 100%;
 }
 
-.modal-dataset-settings .dataset-details-label {
+.modal-dataset-settings .dataset-field-label {
   display: flex;
-  flex: 0 0 100px;
+  flex: 0 0 125px;
   flex-flow: row nowrap;
+  align-items: flex-start;
   font-weight: bold;
 }
 
-.modal-dataset-settings .dataset-details-value {
+.modal-dataset-settings .dataset-field-input {
   display: flex;
-  flex: 1 0 65%;
+  flex: 1;
   flex-flow: row nowrap;
-  overflow-wrap: break-word;
-  word-wrap: break-word;
-  word-break: break-word;     /* break URL if needed */
-}
-.modal-dataset-settings .dataset-details-value.disabled {
-  color: #aaa;
-}
-
-.modal-dataset-settings .dataset-thumbnail {
-  display: flex;
-  flex: 0 0 40%;
-  flex-flow: column nowrap;
-  align-items: center;
-  padding: 20px;
-}
-
-.modal-dataset-settings .dataset-conflation,
-.modal-dataset-settings .dataset-dictionary {
-  flex: 0 0 100%;
-  display: flex;
-  flex-flow: column nowrap;
   align-items: flex-start;
-  padding: 20px;
 }
 
+/* set the delete button apart from neighbor buttons */
+.modal.modal-dataset-settings .delete-button.action {
+  background: #a00;
+  margin-left: 150px;
+}
+.modal.modal-dataset-settings .delete-button.action:focus,
+.modal.modal-dataset-settings .delete-button.action:hover {
+  background: #c33;
+}
+.ideditor[dir='rtl'] .modal.modal-dataset-settings .delete-button.action {
+  margin-left: unset;
+  margin-right: 150px;
+}
 
 /* Colorpicker control
 ------------------------------------------------------- */

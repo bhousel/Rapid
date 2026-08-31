@@ -81,6 +81,10 @@ declare module 'd3-selection' {
       key?: (datum: any, index: number, groups: any) => string | number
     ): Selection<GElement, NewDatum, PElement, PDatum>;
 
+    /** Permissive append with value function - datum can be typed by caller. */
+    append(value: D3CallbackValue): this;
+    /** Permissive insert with value function - datum can be typed by caller. */
+    insert(value: D3CallbackValue): this;
     /** Permissive attr with value function - datum can be typed by caller. */
     attr(name: string, value: D3CallbackValue): this;
     /** Permissive style with value function - datum can be typed by caller. */
