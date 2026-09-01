@@ -15,10 +15,8 @@ const STAC_CATALOG_URL = 'https://stac.overturemaps.org/catalog.json';
 /** STAC themes to fetch PMTiles URLs for */
 const WANTED_THEMES = new Set(['buildings', 'places', 'transportation']);
 
-/** Minimum zoom level for loading building data (prevents slowdown at low zooms) */
-const MIN_BUILDING_ZOOM = 17;
-/** Minimum zoom level for loading transportation data */
-const MIN_TRANSPORTATION_ZOOM = 16;
+/** Minimum zoom level for loading data */
+const MINZOOM = 14;
 
 
 /**
@@ -176,12 +174,12 @@ export class OvertureService extends VectorTileService {
       if (url) super.loadTiles(url, datasetID);
 
     } else if (datasetID === 'overture-buildings') {
-      if (zoom < MIN_BUILDING_ZOOM) return;
+      if (zoom < MINZOOM) return;
       const url = this._pmtilesUrls.get('buildings');
       if (url) super.loadTiles(url, datasetID);
 
     } else if (datasetID === 'overture-tomtom-roads') {
-      if (zoom < MIN_TRANSPORTATION_ZOOM) return;
+      if (zoom < MINZOOM) return;
       const url = this._pmtilesUrls.get('transportation');
       if (url) super.loadTiles(url, datasetID);
     }
@@ -202,7 +200,7 @@ export class OvertureService extends VectorTileService {
       if (url) return super.getData(url);
 
     } else if (datasetID === 'overture-buildings') {
-      if (zoom < MIN_BUILDING_ZOOM) return [];
+      if (zoom < MINZOOM) return [];
       const url = this._pmtilesUrls.get('buildings');
       if (url) return super.getData(url);
 
