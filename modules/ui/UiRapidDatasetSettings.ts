@@ -596,7 +596,7 @@ export class UiRapidDatasetSettings extends EventEmitter {
     const rapid = context.systems.rapid!;
 
     // All datasets allow these things to be changed:
-    // ds.color = (fieldInfo.conflation === 'true');
+    // ds.color = (fieldInfo.color === 'true');
     ds.conflated = (fieldInfo.conflation === 'true');
 
     // Custom datasets allow more things to be changed:

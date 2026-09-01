@@ -200,10 +200,9 @@ export class EsriService extends AbstractSystem {
       // Today, we let users change the color and persist their preference.
       const dataset = new RapidDataset(this.context, {
         id: d.id,
-        conflated: false,
         serviceID: 'esri',
         categories: [...categories],
-        color: '#ffd700',  // gold
+        color: '#ffff00',  // pure yellow
         dataUsed: ['esri', this.getDataUsed(d.title)],
         label: d.title,
         description: d.snippet,
@@ -216,12 +215,6 @@ export class EsriService extends AbstractSystem {
       if (d.extent) {
         dataset.extent = new Extent(d.extent[0], d.extent[1]);
       }
-
-//      // experiment: process building layers through MapWithAI conflation service
-//      if (categories.has('buildings')) {
-//        dataset.conflated = true;
-//        dataset.serviceID = 'mapwithai';
-//      }
 
       return dataset;
     });

@@ -103,7 +103,7 @@ export class UiAttribution {
         attribution: l10n.t('map_data.layers.rapid.license'),
         props: {
           overlay: true,
-          terms_url: 'https://mapwith.ai/doc/license/MapWithAILicense.pdf'
+          terms_url: 'https://rapideditor.org/doc/license/MapWithAILicense.pdf'
         }
       });
     }

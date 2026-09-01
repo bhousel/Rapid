@@ -203,35 +203,26 @@ export class PixiLayerRapid extends AbstractPixiLayer {
 //this._uniforms.translationMatrix = transform.clone().translate(-offset.x, -offset.y);
 //this._uniforms.u_time = frame/10;
 
-    for (const dataset of rapid.datasets.values()) {
-      if (!rapid.enabledDatasetIDs.has(dataset.id)) continue;  // on menu but not checked
-      this.renderDataset(dataset, frame, viewport);
+    for (const ds of rapid.datasets.values()) {
+      if (!rapid.enabledDatasetIDs.has(ds.id)) continue;  // on menu but not checked
+      this.renderDataset(ds, frame, viewport);
     }
   }
 
 
   /**
    * Render any data we have, and schedule fetching more of it to cover the view.
-   * @param dataset - Dataset Object
+   * @param ds - RapidDataset Object
    * @param frame - Integer frame being rendered
    * @param viewport - Pixi viewport to use for rendering
    */
-  public renderDataset(dataset: RapidDataset, frame: number, viewport: Viewport): void {
+  public renderDataset(ds: RapidDataset, frame: number, viewport: Viewport): void {
     const context = this.context;
     const rapid = context.systems.rapid!;
     const viewZoom = viewport.transform.zoom;
 
-    const service = context.services[dataset.serviceID] as any;  // 'mapwithai', 'esri', 'overture'
+    const service = context.services[ds.serviceID] as any;  // 'mapwithai', 'esri', 'overture'
     if (!service?.started) return;
-
-    const useConflation = dataset.conflated;
-//    const conflationOverride = utilStringQs(window.location.hash).conflation;
-//    if (conflationOverride === 'false' || conflationOverride === 'no') {
-//      useConflation = false;
-//    }
-
-    // Adjust the dataset id for whether we want the data conflated or not
-    const datasetID = dataset.id + (useConflation ? '-conflated' : '');
 
     // Filter out features that have already been accepted or ignored by the user.
     const isAcceptedOrIgnored = (dataID: DataID): boolean => {
@@ -247,20 +238,20 @@ export class PixiLayerRapid extends AbstractPixiLayer {
     };
 
     /* Facebook MapWithAI */
-    if (dataset.serviceID === 'mapwithai') {
+    if (ds.serviceID === 'mapwithai') {
       const mapwithai = context.services.mapwithai!;
       if (viewZoom >= 15) {  // avoid firing off too many API requests
-        mapwithai.loadTiles(datasetID);
+        mapwithai.loadTiles(ds.id);
       }
 
       // Gather data in view - we only want OsmWays here
-      const dsGraph = mapwithai.graph(datasetID);
-      const entities = mapwithai.getData(datasetID)
+      const dsGraph = mapwithai.graph(ds.id);
+      const entities = mapwithai.getData(ds.id)
         .filter((entity: OsmEntity) => entity.type === 'way' && !isAcceptedOrIgnored(entity.id)) as OsmWay[];
 
       // MapWithAIService gives us roads and buildings together,
       // so filter further according to which dataset we're drawing
-      if (dataset.id === 'fbRoads' || dataset.id === 'rapid_intro_graph') {
+      if (ds.id === 'fbRoads' || ds.id === 'rapid_intro_graph') {
         renderData.lines = entities.filter((d: OsmWay) => d.geometry(dsGraph) === 'line' && !!d.tags.highway) as OsmWay[];
 
         // Gather endpoint vertices, we will render these also
@@ -271,21 +262,21 @@ export class PixiLayerRapid extends AbstractPixiLayer {
           renderData.vertices.add(last);
         }
 
-      } else {  // Microsoft or Esri buildings retrieved through the MapWithAI conflation service
+      } else {  // Legacy: Microsoft or Esri buildings retrieved through the MapWithAI conflation service
         renderData.polygons = entities.filter((d: OsmWay) => d.geometry(dsGraph) === 'area');
       }
 
     /* ESRI ArcGIS */
-    } else if (dataset.serviceID === 'esri') {
+    } else if (ds.serviceID === 'esri') {
       const esri = context.services.esri!;
       if (viewZoom >= 15) {  // avoid firing off too many API requests
-        esri.loadTiles(datasetID);
+        esri.loadTiles(ds.id);
       }
 
       // Gather data in view
-      const dsGraph = esri.graph(datasetID);
+      const dsGraph = esri.graph(ds.id);
       if (!dsGraph) return;
-      const entities = esri.getData(datasetID);
+      const entities = esri.getData(ds.id);
 
       for (const entity of entities) {
         if (isAcceptedOrIgnored(entity.id)) continue;
@@ -301,13 +292,13 @@ export class PixiLayerRapid extends AbstractPixiLayer {
       }
 
     /* Overture */
-    } else if (dataset.serviceID === 'overture') {
+    } else if (ds.serviceID === 'overture') {
       const overture = context.services.overture!;
       if (viewZoom >= 15) {  // avoid firing off too many API requests
-        overture.loadTiles(datasetID);
+        overture.loadTiles(ds.id);
       }
 
-      const data = overture.getData(datasetID);   // GeoJSONData from the VectorTileService
+      const data = overture.getData(ds.id);   // GeoJSONData from the VectorTileService
       for (const d of data) {
         if (isAcceptedOrIgnored(d.id)) continue;
 
@@ -320,7 +311,7 @@ export class PixiLayerRapid extends AbstractPixiLayer {
 
         // The TomTom Roads dataset includes standalone points at all junctions.
         // These do not seem to have useful information in them.
-        if (dataset.id !== 'overture-tomtom-roads') {
+        if (ds.id !== 'overture-tomtom-roads') {
           if (d.geoms.parts.some(part => part.type === 'Point')) {
             renderData.points.push(d);
           }
@@ -330,8 +321,8 @@ export class PixiLayerRapid extends AbstractPixiLayer {
 
     const pointsContainer = this.scene.groups.get('points')!;
     const basemapContainer = this.scene.groups.get('basemap')!;
-    const areasID = `${this.layerID}-${dataset.id}-areas`;
-    const linesID = `${this.layerID}-${dataset.id}-lines`;
+    const areasID = `${this.layerID}-${ds.id}-areas`;
+    const linesID = `${this.layerID}-${ds.id}-lines`;
 
     let areasContainer = basemapContainer.getChildByLabel(areasID) as PIXI.Container | undefined;
     if (!areasContainer) {
@@ -349,9 +340,9 @@ export class PixiLayerRapid extends AbstractPixiLayer {
       basemapContainer.addChild(linesContainer);
     }
 
-    this.renderPolygons(areasContainer, dataset, renderData, frame, viewport);
-    this.renderLines(linesContainer, dataset, renderData, frame, viewport);
-    this.renderPoints(pointsContainer, dataset, renderData, frame, viewport);
+    this.renderPolygons(areasContainer, ds, renderData, frame, viewport);
+    this.renderLines(linesContainer, ds, renderData, frame, viewport);
+    this.renderPoints(pointsContainer, ds, renderData, frame, viewport);
   }
 
 

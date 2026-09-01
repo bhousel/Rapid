@@ -10,7 +10,9 @@ import type { ParserResult, ParsedWay } from '../data/parsers/types.ts';
 
 
 /** Base URL for the MapWithAI vector tile API endpoint */
-const MWAI_API = 'https://mapwith.ai/maps/ml_roads';
+// at some point the `mapwith.ai` domain became insecure, but `rapideditor.org` seems to work for now.
+//const MWAI_API = 'https://mapwith.ai/maps/ml_roads';
+const MWAI_API = 'https://rapideditor.org/maps/ml_roads';
 /** Zoom level used for tiling MapWithAI data requests */
 const TILEZOOM = 16;
 
@@ -134,11 +136,9 @@ export class MapWithAIService extends AbstractSystem {
 
     const fbRoads = new RapidDataset(context, {
       id: 'fbRoads',
-//      conflated: true,
-      conflated: false,
       serviceID: 'mapwithai',
       categories: ['meta', 'roads', 'featured'],
-      color: '#da26d3',
+      color: '#da26d3',  // rapid magenta
       dataUsed: ['mapwithai', 'Facebook Roads'],
       sourceUrl: sourceUrl,
       itemUrl: 'https://github.com/facebookmicrosites/Open-Mapping-At-Facebook',
@@ -149,11 +149,9 @@ export class MapWithAIService extends AbstractSystem {
 
     const msBuildings = new RapidDataset(context, {
       id: 'msBuildings',
-//      conflated: true,
-      conflated: false,
       serviceID: 'mapwithai',
       categories: ['microsoft', 'buildings', 'featured'],
-      color: '#da26d3',
+      color: '#da26d3',  // rapid magenta
       dataUsed: ['mapwithai', 'Microsoft Buildings'],
       sourceUrl: sourceUrl,
       itemUrl: 'https://github.com/microsoft/GlobalMLBuildingFootprints',
@@ -168,7 +166,7 @@ export class MapWithAIService extends AbstractSystem {
       conflated: false,
       serviceID: 'mapwithai',
       categories: ['meta', 'roads'],
-      color: '#da26d3',
+      color: '#da26d3',  // rapid magenta
       dataUsed: [],
       label: 'Rapid Walkthrough'
     });
@@ -394,35 +392,31 @@ export class MapWithAIService extends AbstractSystem {
 
   /**
    * Returns the MapWithAI URL used to get available data for a given dataset and extent.
-   * @param dataset - the dataset to fetch data for
+   * @param ds - the dataset to fetch data for
    * @param tile - the tile to fetch the data for
    * @return the fully-qualified API URL
    */
-  protected _tileURL(dataset: MapWithAIDataset, tile: Tile): string {
+  protected _tileURL(ds: MapWithAIDataset, tile: Tile): string {
     const context = this.context;
     const rapid = context.systems.rapid;
     const urlhash = context.systems.urlhash;
 
-    // Conflated datasets have a different ID, so they get stored in their own graph/tree
-    const isConflated = /-conflated$/.test(dataset.id);
-    const datasetID = dataset.id.replace('-conflated', '');
-
     const qs: Record<string, string | boolean> = {
-      conflate_with_osm: isConflated,
+      conflate_with_osm: false,
       theme: 'ml_road_vector',
       collaborator: 'fbid',
       token: 'ASZUVdYpCkd3M6ZrzjXdQzHulqRMnxdlkeBJWEKOeTUoY_Gwm9fuEd2YObLrClgDB_xfavizBsh0oDfTWTF7Zb4C',
       hash: 'ASYM8LPNy8k1XoJiI7A'
     };
 
-    if (datasetID === 'fbRoads') {
+    if (ds.id === 'fbRoads') {
       qs.result_type = 'road_vector_xml';
-    } else if (datasetID === 'msBuildings') {
+    } else if (ds.id === 'msBuildings') {
       qs.result_type = 'road_building_vector_xml';
       qs.building_source = 'microsoft';
-    } else {
+    } else {   // Legacy code: Retrieve Esri buildings through MapWithAI conflation service - shouldn't happen.
       qs.result_type = 'osm_xml';
-      qs.sources = `esri_building.${datasetID}`;
+      qs.sources = `esri_building.${ds.id}`;
     }
 
     qs.bbox = tile.wgs84Extent.toParam();

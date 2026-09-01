@@ -122,10 +122,9 @@ export class OvertureService extends VectorTileService {
   public getAvailableDatasets(): RapidDataset[] {
     const places = new RapidDataset(this.context, {
       id: 'overture-places',
-      conflated: false,
       serviceID: 'overture',
       categories: ['overture', 'places'],
-      color: '#00ffff',
+      color: '#00ffff',   // pure cyan
       dataUsed: ['overture', 'Overture Places'],
       sourceUrl: this._pmtilesUrls.get('places'),
       itemUrl: 'https://docs.overturemaps.org/guides/places/',
@@ -136,10 +135,9 @@ export class OvertureService extends VectorTileService {
 
     const buildings = new RapidDataset(this.context, {
       id: 'overture-buildings',
-      conflated: false,
       serviceID: 'overture',
       categories: ['overture', 'buildings'],
-      color: '#00ffff', // '#00bfff',  // Deep sky blue for Esri community maps
+      color: '#00ffff',  // pure cyan
       dataUsed: ['overture', 'Overture Buildings'],
       sourceUrl: this._pmtilesUrls.get('buildings'),
       itemUrl: 'https://docs.overturemaps.org/guides/buildings/',
@@ -150,10 +148,9 @@ export class OvertureService extends VectorTileService {
 
     const tomtomRoads = new RapidDataset(this.context, {
       id: 'overture-tomtom-roads',
-      conflated: false,
       serviceID: 'overture',
       categories: ['overture', 'tomtom', 'roads', 'featured'],
-      color: '#00ffff',  // '#da26d3',  // Rapid magenta
+      color: '#00ffff',  // pure cyan
       dataUsed: ['overture', 'TomTom'],
       sourceUrl: this._pmtilesUrls.get('transportation'),
       itemUrl: 'https://docs.overturemaps.org/guides/transportation/',

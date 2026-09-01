@@ -6,7 +6,7 @@ import { UiTooltip } from './UiTooltip.ts';
 import { utilKeybinding } from '../util/keybinding.ts';
 
 import type { Context } from '../Context.ts';
-import type { D3Selection } from 'd3-selection';
+import type { D3EnterSelection, D3Selection } from 'd3-selection';
 import type { OsmEntity } from '../data/OsmEntity.ts';
 
 const ACCEPT_FEATURES_LIMIT = 50;
@@ -106,13 +106,13 @@ export class UiRapidInspector {
     let $inspector: D3Selection = $parent.selectAll('.rapid-inspector')
       .data([0]);
 
-    const $$inspector = $inspector.enter()
+    const $$inspector: D3EnterSelection = $inspector.enter()
       .append('div')
       .attr('class', 'rapid-inspector');
 
 
     // add `.header`
-    const $$header = $$inspector
+    const $$header: D3EnterSelection = $$inspector
       .append('div')
       .attr('class', 'header');
 
@@ -197,7 +197,7 @@ export class UiRapidInspector {
     const serviceID = datum.props.serviceID as ServiceID;
     const service = context.services[serviceID] as any;
     const graph = service.graph(datum.props.datasetID);
-    const datasetID = (datum.props.datasetID as DatasetID).replace('-conflated', '');
+    const datasetID = datum.props.datasetID as DatasetID;
     const dataset = rapid.datasets.get(datasetID);
 
     const action = actionRapidAcceptFeature(datum.id, graph);
@@ -320,15 +320,17 @@ export class UiRapidInspector {
     const l10n = context.systems.l10n!;
     const rapid = context.systems.rapid!;
 
-    const datasetID = (datum.props.datasetID as DatasetID).replace('-conflated', '');
-    const dataset = rapid.datasets.get(datasetID) as any;
-    const color = dataset.color;
+    const datasetID = datum.props.datasetID as DatasetID;
+    const ds = rapid.datasets.get(datasetID);
+    if (!ds) return;   // Need a dataset to do anything
+
+    const color = ds.color;
 
     let $featureInfo: D3Selection = $selection.selectAll('.feature-info')
       .data([0]);
 
     // enter
-    const $$featureInfo = $featureInfo.enter()
+    const $$featureInfo: D3EnterSelection = $featureInfo.enter()
       .append('div')
       .attr('class', 'feature-info');
 
@@ -336,7 +338,7 @@ export class UiRapidInspector {
       .append('div')
       .attr('class', 'dataset-label');
 
-    if (dataset.beta) {
+    if (ds.beta) {
       $$featureInfo
         .append('div')
         .attr('class', 'dataset-beta beta');
@@ -350,7 +352,7 @@ export class UiRapidInspector {
       .style('color', this.getBrightness(color) > 140.5 ? '#333' : '#fff');
 
     $featureInfo.selectAll('.dataset-label')
-      .text(dataset.getLabel());
+      .text(ds.getLabel());
 
     $featureInfo.selectAll('.dataset-beta')
       .attr('title', l10n.t('rapid_poweruser.beta'));   // alt text
@@ -372,11 +374,11 @@ export class UiRapidInspector {
       .data([0]);
 
     // enter
-    const $$tagInfo = $tagInfo.enter()
+    const $$tagInfo: D3EnterSelection = $tagInfo.enter()
       .append('div')
       .attr('class', 'tag-info');
 
-    const $$tagBag = $$tagInfo
+    const $$tagBag: D3EnterSelection = $$tagInfo
       .append('div')
       .attr('class', 'tag-bag');
 
@@ -428,7 +430,7 @@ export class UiRapidInspector {
       .data([0]);
 
     // enter
-    const $$choices = $choices.enter()
+    const $$choices: D3EnterSelection = $choices.enter()
       .append('div')
       .attr('class', 'rapid-inspector-choices');
 
@@ -473,12 +475,12 @@ export class UiRapidInspector {
       .data([d]);
 
     // enter
-    const $$choiceWrap = $choiceWrap.enter()
+    const $$choiceWrap: D3EnterSelection = $choiceWrap.enter()
       .append('div')
       .attr('class', 'choice-wrap');
 
     // action button
-    const $$choiceActionButton = $$choiceWrap
+    const $$choiceActionButton: D3EnterSelection = $$choiceWrap
       .append('button')
       .attr('class', 'choice-button')
       .on('click', d.onClick)
@@ -542,7 +544,7 @@ export class UiRapidInspector {
       .data([d]);
 
     // enter
-    const $$tagReference = $tagReference.enter()
+    const $$tagReference: D3EnterSelection = $tagReference.enter()
       .append('div')
       .attr('class', 'tag-reference-body');
 
