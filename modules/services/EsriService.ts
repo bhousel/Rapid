@@ -202,7 +202,7 @@ export class EsriService extends AbstractSystem {
         id: d.id,
         conflated: false,
         serviceID: 'esri',
-        categories: categories,
+        categories: [...categories],
         color: '#ffd700',  // gold
         dataUsed: ['esri', this.getDataUsed(d.title)],
         label: d.title,

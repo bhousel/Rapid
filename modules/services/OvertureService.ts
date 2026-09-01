@@ -124,7 +124,7 @@ export class OvertureService extends VectorTileService {
       id: 'overture-places',
       conflated: false,
       serviceID: 'overture',
-      categories: new Set<string>(['overture', 'places']),
+      categories: ['overture', 'places'],
       color: '#00ffff',
       dataUsed: ['overture', 'Overture Places'],
       sourceUrl: this._pmtilesUrls.get('places'),
@@ -138,7 +138,7 @@ export class OvertureService extends VectorTileService {
       id: 'overture-buildings',
       conflated: false,
       serviceID: 'overture',
-      categories: new Set<string>(['overture', 'buildings']),
+      categories: ['overture', 'buildings'],
       color: '#00ffff', // '#00bfff',  // Deep sky blue for Esri community maps
       dataUsed: ['overture', 'Overture Buildings'],
       sourceUrl: this._pmtilesUrls.get('buildings'),
@@ -152,7 +152,7 @@ export class OvertureService extends VectorTileService {
       id: 'overture-tomtom-roads',
       conflated: false,
       serviceID: 'overture',
-      categories: new Set<string>(['overture', 'tomtom', 'roads', 'featured']),
+      categories: ['overture', 'tomtom', 'roads', 'featured'],
       color: '#00ffff',  // '#da26d3',  // Rapid magenta
       dataUsed: ['overture', 'TomTom'],
       sourceUrl: this._pmtilesUrls.get('transportation'),

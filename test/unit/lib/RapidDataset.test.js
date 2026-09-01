@@ -77,4 +77,44 @@ describe('RapidDataset', () => {
     const result = new Rapid.RapidDataset(context, props);
     assert.equal(result.getDescription(), 'My Description');
   });
+
+  describe('toJSON', () => {
+    it('serializes boolean flags as strings', () => {
+      const ds = new Rapid.RapidDataset(context, { id: 'bool-test', conflated: true, custom: false });
+      const json = ds.toJSON();
+
+      assert.strictEqual(json.conflated, 'true');
+      assert.strictEqual(json.custom, 'false');
+    });
+  });
+
+  describe('fromJSON', () => {
+    it('coerces stringified boolean flags back to booleans', () => {
+      // Simulates values arriving from the string-only settings store after a reload.
+      const json = { id: 'reload-test', conflated: 'true', custom: 'false', beta: 'true' };
+      const ds = Rapid.RapidDataset.fromJSON(context, json);
+
+      assert.isTrue(ds.conflated);
+      assert.isFalse(ds.custom);
+      assert.isTrue(ds.beta);
+    });
+
+    it('round-trips a dataset through toJSON/fromJSON preserving boolean types', () => {
+      const original = new Rapid.RapidDataset(context, {
+        id: 'roundtrip-test',
+        color: '#ff0000',
+        conflated: true,
+        custom: true,
+        featured: false
+      });
+
+      const restored = Rapid.RapidDataset.fromJSON(context, original.toJSON());
+
+      assert.equal(restored.id, 'roundtrip-test');
+      assert.equal(restored.color, '#ff0000');
+      assert.isTrue(restored.conflated);
+      assert.isTrue(restored.custom);
+      assert.isFalse(restored.featured);
+    });
+  });
 });

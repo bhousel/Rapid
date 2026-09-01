@@ -366,4 +366,65 @@ describe('RapidSystem', () => {
     });
   });
 
+
+  // Test that dataset settings survive a save -> load round-trip through the
+  // string-only `SettingsSystem` with their types intact (e.g. `conflated` stays a boolean).
+  describe('dataset settings persistence', () => {
+    let ctx, storage, settings, rapid;
+
+    function cleanStorage() {
+      for (const key of storage.keys()) {
+        if (key.startsWith('rapid.settings.')) storage.removeItem(key);
+      }
+    }
+
+    beforeEach(() => {
+      ctx = new Rapid.MockContext();
+      storage = new Rapid.StorageSystem(ctx);
+      settings = new Rapid.SettingsSystem(ctx);
+      rapid = new Rapid.RapidSystem(ctx);
+      ctx.systems.storage = storage;
+      ctx.systems.settings = settings;
+      ctx.systems.rapid = rapid;
+      cleanStorage();
+      return settings.initAsync();
+    });
+
+    afterEach(() => {
+      cleanStorage();
+    });
+
+
+    it('round-trips a service dataset conflated flag as a boolean', () => {
+      const ds = new Rapid.RapidDataset(ctx, { id: 'msBuildings', serviceID: 'mapwithai', conflated: true });
+      rapid.catalog.set(ds.id, ds);
+
+      rapid.saveDatasetSettings(ds);
+
+      // Simulate a fresh load: reset the in-memory flag, then load from settings.
+      ds.conflated = false;
+      rapid._loadDatasetSettings();
+
+      assert.strictEqual(ds.conflated, true);   // strict, so 'true' string would fail here
+    });
+
+
+    it('round-trips a custom dataset through save/load preserving types', () => {
+      const custom = new Rapid.RapidDataset(ctx, { id: 'my-custom', custom: true, conflated: true, color: '#00ff00' });
+      rapid.catalog.set(custom.id, custom);
+
+      rapid.saveDatasetSettings(custom);
+
+      // Simulate a fresh load: drop it from the catalog so `_loadDatasetSettings` reconstructs it.
+      rapid.catalog.delete(custom.id);
+      rapid._loadDatasetSettings();
+
+      const restored = rapid.catalog.get('my-custom');
+      assert.instanceOf(restored, Rapid.RapidDataset);
+      assert.strictEqual(restored.custom, true);
+      assert.strictEqual(restored.conflated, true);
+      assert.strictEqual(restored.color, '#00ff00');
+    });
+  });
+
 });

@@ -7,35 +7,26 @@ import { utilIterable } from '../util/iterable.ts';
 
 import type { Context } from '../Context.ts';
 import type { OneOrMore } from '../util/iterable.ts';
-import type { RapidDatasetProps } from '../lib/RapidDataset.ts';
 import type { SettingsValue } from './SettingsSystem.ts';
+import type { TreeValue } from '../lib/TreeStore.ts';
 
 
 /**
  * Persisted settings for a single service-provided dataset,
- * stored under `rapid.dataset.<DatasetID>`.
+ * stored under `rapid.dataset.<DatasetID>`. Leaves are strings (the settings store
+ * is string-only), so `conflated` is persisted as `'true'`/`'false'`.
  */
 export interface RapidDatasetSettings {
-  /** Display color the user picked for this dataset */
   color?: string;
+  conflated?: string;
 }
 
 /**
  * Persisted settings for a single user-added custom dataset,
- * stored under `rapid.custom.<DatasetID>`.
+ * stored under `rapid.custom.<DatasetID>`. This is the string-only JSON produced by
+ * `RapidDataset.toJSON()` and consumed by `RapidDataset.fromJSON()`.
  */
-export interface RapidCustomDatasetSettings {
-  /** Free-text categories attached to the dataset */
-  categories?: string[];
-  /** Display color for this dataset */
-  color?: string;
-  /** Source attribution strings shown in the changeset */
-  dataUsed?: string[];
-  /** URL for the data */
-  sourceUrl?: string;
-  /** URL for a thumbnail image representing this dataset */
-  thumbnailUrl?: string;
-}
+export type RapidCustomDatasetSettings = Record<string, TreeValue>;
 
 /**
  * The structured view of the `rapid.*` settings subtree owned by `RapidSystem`.
@@ -95,8 +86,6 @@ export class RapidSystem extends AbstractSystem {
   /** DatasetIDs that the user has enabled for display, a subset of addedDatasetIDs */
   public enabledDatasetIDs = new Set<DatasetID>();
 
-  /** Index into `RAPID_COLORS` for the next auto-assigned dataset color */
-  protected _nextColorIndex = 2;  // see note in _datasetsChanged()
   /** Bounding extent of the current MapRoulette / task boundary, if any */
   protected _taskExtent: Extent | null = null;
   /** Whether the task boundary is a simple rectangle (null = not yet determined) */
@@ -206,7 +195,7 @@ export class RapidSystem extends AbstractSystem {
 
 
   /**
-   * Add datasets to the menu.  (Does not set their checked 'enabled' state)
+   * Add datasets to the Rapid menu.  (Does not set their checked 'enabled' state)
    * @param datasetIDs - datasetIDs to add
    */
   public addDatasets(datasetIDs: OneOrMore<DatasetID>): void {
@@ -218,7 +207,7 @@ export class RapidSystem extends AbstractSystem {
 
 
   /**
-   * Checks the dataset as enabled. (Also ensures that the dataset is 'added' to the menu).
+   * Checks the dataset as enabled. (Also ensures that the dataset is 'added' to the Rapid menu).
    * @param datasetIDs - datasetIDs to enable
    */
   public enableDatasets(datasetIDs: OneOrMore<DatasetID>): void {
@@ -231,7 +220,7 @@ export class RapidSystem extends AbstractSystem {
 
 
   /**
-   * Remove datasets from the menu. (Also unchecks their 'enabled' state)
+   * Remove datasets from the Rapid menu. (Also unchecks their 'enabled' state)
    * @param datasetIDs - datasetIDs to remove
    */
   public removeDatasets(datasetIDs: OneOrMore<DatasetID>): void {
@@ -244,7 +233,7 @@ export class RapidSystem extends AbstractSystem {
 
 
   /**
-   * Unchecks the dataset as disabled. (Does not affect whether the dataset is 'added' to the menu)
+   * Unchecks the dataset as disabled. (Does not affect whether the dataset is 'added' to the Rapid menu)
    * @param datasetIDs - datasetIDs to disable
    */
   public disableDatasets(datasetIDs: OneOrMore<DatasetID>): void {
@@ -413,23 +402,19 @@ export class RapidSystem extends AbstractSystem {
     const context = this.context;
     const settings = context.systems.settings;
     if (!settings || !ds) return;
+    if (ds.hidden) return;   // skip reserved datasets (e.g. for the walkthrough)
 
-    // A service-provided dataset..
+    // A service-provided dataset - save the subset of things that the user can customize..
     if (!ds.custom) {
-      const prefs: RapidDatasetSettings = {};
-      if (ds.color) prefs.color = ds.color;
-
+      const prefs: RapidDatasetSettings = {
+        color: ds.color,
+        conflated: String(ds.conflated)
+      };
       settings.set(`rapid.dataset.${ds.id}`, prefs as SettingsValue);
 
-      // A user-provided custom dataset..
+    // A user-provided custom dataset - save everything..
     } else {
-      const prefs: RapidCustomDatasetSettings = {};
-      if (ds.categories.size)  prefs.categories = [...ds.categories];
-      if (ds.dataUsed.length)  prefs.dataUsed = ds.dataUsed.slice();
-      if (ds.color)            prefs.color = ds.color;
-      if (ds.sourceUrl)        prefs.sourceUrl = ds.sourceUrl;
-      if (ds.thumbnailUrl)     prefs.thumbnailUrl = ds.thumbnailUrl;
-
+      const prefs = ds.toJSON();
       settings.set(`rapid.custom.${ds.id}`, prefs as SettingsValue);
     }
   }
@@ -558,9 +543,13 @@ export class RapidSystem extends AbstractSystem {
         continue;
       }
 
-      // Apply the preferences.
+      // Only apply the subset of preferences that the user can customize.
+      // Leaves come back from the string-only settings store as strings.
       if (typeof prefs.color === 'string') {
         ds.color = prefs.color;
+      }
+      if (typeof prefs.conflated === 'string') {
+        ds.conflated = (prefs.conflated === 'true');
       }
     }
 
@@ -586,18 +575,8 @@ export class RapidSystem extends AbstractSystem {
       }
 
       // Instantiate the custom dataset and add it to the catalog.
-      const props: Partial<RapidDatasetProps> = {
-        id: datasetID,
-        custom: true
-      };
-
-      if (Array.isArray(prefs.categories))          props.categories = new Set<string>(prefs.categories);
-      if (Array.isArray(prefs.dataUsed))            props.dataUsed = prefs.dataUsed;
-      if (typeof prefs.color === 'string')          props.color = prefs.color;
-      if (typeof prefs.sourceUrl === 'string')      props.sourceUrl = prefs.sourceUrl;
-      if (typeof prefs.thumbnailUrl === 'string')   props.thumbnailUrl = prefs.thumbnailUrl;
-
-      ds = new RapidDataset(context, props);
+      // `fromJSON` coerces the string-only settings leaves (e.g. boolean flags) back to their real types.
+      ds = RapidDataset.fromJSON(context, { ...prefs, custom: 'true' });
       this.catalog.set(datasetID, ds);
     }
   }

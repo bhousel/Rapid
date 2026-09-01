@@ -1,9 +1,18 @@
 import { Extent } from '@rapid-sdk/math';
 
 import type { Context } from '../Context.ts';
+import type { TreeValue } from './TreeStore.ts';
 
 
 const RAPID_MAGENTA = '#da26d3';
+
+/**
+ * Prop keys whose values are booleans. The settings store is string-only, so these
+ * are persisted as `'true'`/`'false'` strings by `toJSON()` and coerced back to real
+ * booleans by `fromJSON()`. Add new boolean props here so they round-trip correctly.
+ */
+type RapidDatasetBooleanProp = 'beta' | 'conflated' | 'custom' | 'featured' | 'filtered' | 'hidden';
+const BOOLEAN_PROPS: RapidDatasetBooleanProp[] = ['beta', 'conflated', 'custom', 'featured', 'filtered', 'hidden'];
 
 
 /**
@@ -16,7 +25,7 @@ export interface RapidDatasetProps {
   serviceID: ServiceID;
 
   /** Categories this dataset belongs to (e.g. 'buildings', 'addresses') */
-  categories: Set<string>;
+  categories: string[];
   /** Display color for this dataset */
   color: string;
   /** Data usage information */
@@ -126,7 +135,7 @@ export class RapidDataset {
 
     this.id = props.id ?? '';
     this.serviceID = props.serviceID ?? '';
-    this.categories = props.categories ?? new Set<string>();
+    this.categories = new Set<string>(props.categories ?? []);
     this.color = props.color ?? RAPID_MAGENTA;
     this.dataUsed = props.dataUsed ?? [];
     this.extent = props.extent;
@@ -219,5 +228,57 @@ export class RapidDataset {
   public getDescription(): string {
     const l10n = this.context.systems.l10n;
     return (l10n && this.descriptionStringID) ? l10n.t(this.descriptionStringID) : (this._description || '');
+  }
+
+  /**
+   * Returns a settings-safe JSON representation of this data element.
+   * Boolean flags are serialized as `'true'`/`'false'` strings because the settings
+   * store only holds string leaves. Use `fromJSON()` to reconstruct a `RapidDataset`.
+   * @return JSON representation of this data element
+   */
+  public toJSON(): Record<string, TreeValue> {
+    const result: Record<string, TreeValue> = { id: this.id };
+
+    if (this.categories.size)      result.categories = [...this.categories];
+    if (this.dataUsed.length)      result.dataUsed = this.dataUsed.slice();
+    if (this.color)                result.color = this.color;
+    if (this.sourceUrl)            result.sourceUrl = this.sourceUrl;
+    if (this.itemUrl)              result.itemUrl = this.itemUrl;
+    if (this.thumbnailUrl)         result.thumbnailUrl = this.thumbnailUrl;
+    if (this.licenseUrl)           result.licenseUrl = this.licenseUrl;
+    if (this.labelStringID)        result.labelStringID = this.labelStringID;
+    if (this.descriptionStringID)  result.descriptionStringID = this.descriptionStringID;
+
+    // The settings store is string-only, so persist boolean flags as 'true'/'false' strings.
+    for (const key of BOOLEAN_PROPS) {
+      result[key] = String(this[key]);
+    }
+
+    result.label = this.getLabel();
+    result.description = this.getDescription();
+
+    return result;
+  }
+
+
+  /**
+   * Reconstructs a `RapidDataset` from its persisted JSON form (see `toJSON`).
+   * The settings store is string-only, so boolean flags arrive as `'true'`/`'false'`
+   * strings and are coerced back to real booleans here.
+   * @param context - Global shared application context
+   * @param json - The persisted settings object
+   * @return A new `RapidDataset`
+   */
+  public static fromJSON(context: Context, json: Record<string, TreeValue>): RapidDataset {
+    const props = { ...json } as Partial<RapidDatasetProps>;
+
+    for (const key of BOOLEAN_PROPS) {
+      const val = json[key];
+      if (typeof val === 'string') {
+        props[key] = (val === 'true');
+      }
+    }
+
+    return new RapidDataset(context, props);
   }
 }
