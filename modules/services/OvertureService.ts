@@ -205,7 +205,7 @@ export class OvertureService extends VectorTileService {
       if (url) return super.getData(url);
 
     } else if (datasetID === 'overture-tomtom-roads') {
-      if (zoom < MIN_TRANSPORTATION_ZOOM) return [];
+      if (zoom < MINZOOM) return [];
       const url = this._pmtilesUrls.get('transportation');
       if (url) return super.getData(url);
     }
