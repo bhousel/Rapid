@@ -185,7 +185,7 @@ export class MapSystem extends AbstractSystem {
         });
 
         rapid?.on('datasetchange', () => {
-          scene.dirtyLayers(['rapid', 'rapidoverlay']);
+          scene.dirtyLayers('rapid');
         });
 
         schema?.on('schemachange', () => {

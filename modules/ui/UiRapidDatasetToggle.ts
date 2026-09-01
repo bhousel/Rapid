@@ -551,7 +551,7 @@ export class UiRapidDatasetToggle extends EventEmitter {
     ds.color = color;
     rapid.saveDatasetSettings(ds);
 
-    scene.dirtyLayers(['rapid', 'rapidoverlay']);
+    scene.dirtyLayers('rapid');
     gfx.immediateRedraw();
     this.render();
 
