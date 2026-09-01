@@ -1055,6 +1055,7 @@ img.dataset-thumbnail.inverted {
   font-size: 12px;
 }
 
+/* Details section */
 .modal-dataset-settings .dataset-details {
   display: flex;
   flex: 0;
@@ -1095,6 +1096,25 @@ img.dataset-thumbnail.inverted {
   flex: 1;
   flex-flow: row nowrap;
   align-items: flex-start;
+}
+
+/* Conflation section */
+.modal-dataset-settings .dataset-conflation {
+  display: flex;
+  flex: 0;
+  flex-flow: column nowrap;
+}
+.modal-dataset-settings .dataset-field-row.row-conflation {
+  flex: 0;   /* don't grow */
+  width: unset;
+  align-items: center;
+}
+
+/* Data Dictionary section */
+.modal-dataset-settings .dataset-dictionary {
+  display: flex;
+  flex: 0;
+  flex-flow: column nowrap;
 }
 
 /* set the delete button apart from neighbor buttons */

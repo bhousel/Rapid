@@ -1613,7 +1613,10 @@
         }
       },
       "conflation": {
-        "heading": "Conflation Settings"
+        "heading": "Conflation Settings",
+        "conflation": {
+          "label": "Conflation?"
+        }
       },
       "dictionary": {
         "heading": "Data Mapping"

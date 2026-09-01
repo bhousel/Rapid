@@ -1299,6 +1299,8 @@ en:
         placeholder: Enter a Dataset Description    # placeholder text for the description field
     conflation:
       heading: Conflation Settings
+      conflation:
+        label: "Conflation?"
     dictionary:
       heading: Data Mapping
 

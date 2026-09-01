@@ -425,9 +425,7 @@ export class UiRapidCatalog extends EventEmitter {
 
     $$thumbnail
       .append('img')
-      .attr('class', 'dataset-thumbnail')
-      .classed('inverted', (d: RapidDataset) => d.categories.has('esri'))  // invert colors from light->dark
-      .attr('src', (d: RapidDataset) => utilSafeURL(d.thumbnailUrl));
+      .attr('class', 'dataset-thumbnail');
 
     // update
     $datasets = $datasets.merge($$datasets).order();
@@ -456,8 +454,13 @@ export class UiRapidCatalog extends EventEmitter {
     $datasets.selectAll('.dataset-snippet')
       .html(d => this.highlight(this._filterText, d.getDescription()));
 
+    $datasets.selectAll('.dataset-thumbnail')
+      .classed('inverted', (d: RapidDataset) => d.categories.has('esri'))  // invert colors from light->dark
+      .style('background', (d: RapidDataset) => d.categories.has('esri') ? null : d.color)
+      .attr('src', (d: RapidDataset) => utilSafeURL(d.thumbnailUrl));
+
     $datasets.selectAll('.dataset-added-text')
-      .text(d => d.added ? '\u2705 ' + l10n.t('rapid_catalog.dataset_added') : '');  // 2705 = emoji check
+      .text((d: RapidDataset) => d.added ? '\u2705 ' + l10n.t('rapid_catalog.dataset_added') : '');  // 2705 = emoji check
 
     $datasets.selectAll('.dataset-action')
       .text((d: RapidDataset) => d.added ? l10n.t('rapid_catalog.remove_dataset') : l10n.t('rapid_catalog.add_dataset'));

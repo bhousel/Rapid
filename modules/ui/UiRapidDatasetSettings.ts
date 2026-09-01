@@ -321,20 +321,37 @@ export class UiRapidDatasetSettings extends EventEmitter {
       .call(utilNoAuto)
       .on('input', (e: InputEvent) => this.render());  // rerendering will also run validation
 
-  // // todo move
-  //   const $$conflation: D3EnterSelection = $$fields
-  //     .append('div')
-  //     .attr('class', 'dataset-details-row');
-  //   $$conflation
-  //     .append('label')
-  //     .attr('for', `conflation-${uuid}`)
-  //     .attr('class', 'dataset-details-label conflation-label');
-  //   $$conflation
-  //     .append('input')
-  //     .attr('id', `conflation-${uuid}`)
-  //     .attr('type', 'checkbox')
-  //     .attr('class', 'dataset-details-value conflation-value')
-  //     .call(utilNoAuto);
+    // some fields are disabled, some are editable
+    $$rows.selectAll(`#source-${uuid}`)
+      .property('disabled', true)
+      .classed('disabled', true)
+      .property('value', ds.serviceID || '');
+
+    $$rows.selectAll(`#identifier-${uuid}`)
+      .property('disabled', true)
+      .classed('disabled', true)
+      .property('value', ds.id || '');
+
+    $$rows.selectAll(`#name-${uuid}`)
+      .property('disabled', isLocked)
+      .classed('disabled', isLocked)
+      .property('value', ds.getLabel() || '');
+
+    $$rows.selectAll(`#sourceurl-${uuid}`)
+      .property('disabled', true)
+      .classed('disabled', true)
+      .property('value', ds.sourceUrl || '');
+
+    $$rows.selectAll(`#thumbnailurl-${uuid}`)
+      .property('disabled', true)
+      .classed('disabled', true)
+      .property('value', ds.thumbnailUrl || '');
+
+    $$rows.selectAll(`#description-${uuid}`)
+      .property('disabled', isLocked)
+      .classed('disabled', isLocked)
+      .property('value', ds.getDescription() || '');
+
 
 
     // update
@@ -346,46 +363,11 @@ export class UiRapidDatasetSettings extends EventEmitter {
     $fields.selectAll('.dataset-field-label')
       .text((d: FieldDefinition) => l10n.t(`${prefix}.${d.key}.label`));
 
-    // some fields are disabled, some are editable
-    $$fields.selectAll(`#source-${uuid}`)
-      .property('disabled', true)
-      .classed('disabled', true)
-      .property('value', ds.serviceID || '');
+    $fields.selectAll(`#name-${uuid}`)
+      .attr('placeholder', (d: FieldDefinition) => l10n.t(`${prefix}.${d.key}.placeholder`));
 
-    $$fields.selectAll(`#identifier-${uuid}`)
-      .property('disabled', true)
-      .classed('disabled', true)
-      .property('value', ds.id || '');
-
-    $$fields.selectAll(`#name-${uuid}`)
-      .property('disabled', isLocked)
-      .classed('disabled', isLocked)
-      .attr('placeholder', (d: FieldDefinition) => l10n.t(`${prefix}.${d.key}.placeholder`))
-      .property('value', ds.getLabel() || '');
-
-    $$fields.selectAll(`#sourceurl-${uuid}`)
-      .property('disabled', true)
-      .classed('disabled', true)
-      .property('value', ds.sourceUrl || '');
-
-    $$fields.selectAll(`#thumbnailurl-${uuid}`)
-      .property('disabled', true)
-      .classed('disabled', true)
-      .property('value', ds.thumbnailUrl || '');
-
-    $$fields.selectAll(`#description-${uuid}`)
-      .property('disabled', isLocked)
-      .classed('disabled', isLocked)
-      .attr('placeholder', (d: FieldDefinition) => l10n.t(`${prefix}.${d.key}.placeholder`))
-      .property('value', ds.getDescription() || '');
-
-
-///
-///    $fields.selectAll('.conflation-label')
-///      .text('Conflation?');
-///    $fields.selectAll('.conflation-value')
-///      .property('checked', !!ds.conflated)
-///      .property('value', ds.conflated ? 'true' : 'false');
+    $fields.selectAll(`#description-${uuid}`)
+      .attr('placeholder', (d: FieldDefinition) => l10n.t(`${prefix}.${d.key}.placeholder`));
   }
 
 
@@ -414,7 +396,8 @@ export class UiRapidDatasetSettings extends EventEmitter {
     $wrap = $wrap.merge($$wrap);
 
     $wrap.selectAll('.dataset-thumbnail')
-      .classed('inverted', ds.serviceID === 'esri')  // invert colors from light->dark
+      .classed('inverted', ds.categories.has('esri'))  // invert colors from light->dark
+      .style('background', () => ds.categories.has('esri') ? null : ds.color)
       .attr('src', utilSafeURL(ds.thumbnailUrl));
   }
 
@@ -430,7 +413,9 @@ export class UiRapidDatasetSettings extends EventEmitter {
     const ds = this.dataset;
     if (!ds) return;   // need a dataset to do anything
 
-    /* Conflation Settings */
+    const prefix = 'rapid_dataset_settings.conflation';  // prefix for text strings
+    const uuid = this._uuid;
+
     let $conflation: D3Selection = $parent.selectAll('.dataset-conflation')
       .data([0]);
 
@@ -440,22 +425,53 @@ export class UiRapidDatasetSettings extends EventEmitter {
       .append('div')
       .attr('class', 'modal-section dataset-conflation');
 
-    $$conflation
-      .append('h3')
-      .attr('class', 'dataset-conflation-heading');
-
-    $$conflation
-      .append('div')
-      .attr('class', 'dataset-conflation-content');
-
     // update
     $conflation = $conflation.merge($$conflation);
 
-    $conflation.selectAll('.dataset-conflation-heading')
-      .text(l10n.t('rapid_dataset_settings.conflation.heading'));
 
-    $conflation.selectAll('.dataset-conflation-content')
-      .text('conflation settings goes here');
+    let $fields: D3Selection = $conflation.selectAll('.dataset-detail-fields')
+      .data([0]);
+
+    const $$fields: D3EnterSelection = $fields
+      .enter()
+      .append('div')
+      .attr('class', 'dataset-detail-fields');
+
+    $$fields
+      .append('h3')
+      .attr('class', 'dataset-details-heading');
+
+    const $$rows = $$fields.selectAll('.dataset-field-row')
+      .data(['conflation'])     // only one field for now
+      .enter()
+      .append('div')
+      .attr('class', (d: string) => `dataset-field-row row-${d}`);
+
+    $$rows
+      .append('label')
+      .attr('for', (d: string) => `${d}-${uuid}`)
+      .attr('class', 'dataset-field-label');
+
+    $$rows
+      .append('input')
+      .attr('id', (d: string) => `${d}-${uuid}`)
+      .attr('class', 'dataset-field-input')
+      .attr('type', 'checkbox')
+      .call(utilNoAuto)
+      .on('input', (e: InputEvent) => this.render());  // rerendering will also run validation
+
+    $$rows.selectAll(`#conflation-${uuid}`)
+      .property('checked', !!ds.conflated)
+      .property('value', ds.conflated ? 'true' : 'false');
+
+    // update
+    $fields = $fields.merge($$fields);
+
+    $fields.selectAll('.dataset-details-heading')
+      .text(l10n.t(`${prefix}.heading`));
+
+    $fields.selectAll('.dataset-field-label')
+      .text((d: string) => l10n.t(`${prefix}.${d}.label`));
   }
 
 
@@ -578,51 +594,23 @@ export class UiRapidDatasetSettings extends EventEmitter {
 
     const context = this.context;
     const rapid = context.systems.rapid!;
-    const settings = context.systems.settings;
 
-    const oldID = ds.id;
-    let newID: DatasetID | undefined;
+    // All datasets allow these things to be changed:
+    // ds.color = (fieldInfo.conflation === 'true');
+    ds.conflated = (fieldInfo.conflation === 'true');
 
-    // custom datasets allow more things to be changed
+    // Custom datasets allow more things to be changed:
     if (ds.custom) {
-      // User wants to change the datasetID...
-      if (oldID !== fieldInfo.id) {
-        newID = fieldInfo.id!;
-        ds.id = newID;
-      }
-
       ds.label = fieldInfo.name!;
       ds.description = fieldInfo.description || '';
       (ds as any)._label = fieldInfo.name!;                       // todo avoid this duplication
       (ds as any)._description = fieldInfo.description || '';     // todo avoid this duplication
-      ds.sourceUrl = fieldInfo.sourceUrl!;
       ds.thumbnailUrl = fieldInfo.thumbnailUrl ?? ds.getThumbnail();
-
-      ds.conflated = (fieldInfo.conflation === 'true');
-
-    } else {
-      ds.conflated = (fieldInfo.conflation === 'true');
     }
-
 
     rapid.saveDatasetSettings(ds);  // persist settings
-
-    // If user wants to change the datasetID...
-    // Do this last, as it will emit some events.
-    if (newID && newID !== oldID) {
-      settings?.unset(`rapid.custom.${oldID}`);
-      rapid.catalog.delete(oldID);
-
-      ds.id = newID;
-      rapid.catalog.set(newID, ds);
-
-      if (rapid.enabledDatasetIDs.has(oldID)) {  // was checked (and added) before
-        rapid.enableDatasets(newID);
-      } else if (rapid.addedDatasetIDs.has(oldID)) {  // was added before
-        rapid.addDatasets(newID);
-      }
-    }
-
+    // maybe need some more things to happen here to trigger a redraw?
+    // see UiRapidDatasetToggle changeColor
     this.close();
   }
 
