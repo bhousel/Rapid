@@ -109,7 +109,7 @@ export class UiRapidColorpicker extends EventEmitter {
    * This is an unstyled Modal that opens when the colorpicker is clicked.
    */
   public renderPopup(): void {
-    if (!this.Modal || !this.$colorpicker || this.$colorpicker.empty()) return;  // not open
+    if (!this.Modal?.$content || !this.$colorpicker || this.$colorpicker.empty()) return;  // not open
 
     const context = this.context;
     const l10n = context.systems.l10n!;

@@ -3,20 +3,15 @@ import { EventEmitter } from 'tseep/lib/ee-safe';
 import { uiIcon } from './icon.ts';
 import { UiCombobox } from './UiCombobox.ts';
 import { UiModal } from './UiModal.ts';
+import { UiRapidColorpicker } from './UiRapidColorpicker.ts';
 import { utilNoAuto, utilSafeURL } from '../util/index.ts';
 
 import type { Context } from '../Context.ts';
 import type { D3EnterSelection, D3Selection } from 'd3-selection';
 import type { RapidDataset } from '../lib/RapidDataset.ts';
 
+const RAPID_MAGENTA = '#da26d3';
 
-/** Definitions for the fields that we will create on this screen */
-interface FieldDefinition {
-  /* The identifier for the field */
-  key: string;
-  /* The type of the field */
-  type: 'input' | 'textarea';
-}
 
 /**
  * The values collected on this screen, along with information about whether
@@ -40,10 +35,11 @@ export interface FieldInfo {
   sourceUrl?: string;
   /** Thumbnail Url */
   thumbnailUrl?: string;
+  /** Color */
+  color?: string;
   /** Conflation? */
   conflation?: string;
 }
-
 
 
 /**
@@ -57,7 +53,8 @@ export class UiRapidDatasetSettings extends EventEmitter {
   public context: Context;
 
   // Child components
-  // public CategoryCombo: UiCombobox;
+  public ThumbnailCombo: UiCombobox;
+  public Colorpicker: UiRapidColorpicker;
   public Modal: UiModal | null;
 
   /** The dataset being setup */
@@ -77,9 +74,9 @@ export class UiRapidDatasetSettings extends EventEmitter {
     this._uuid = crypto.randomUUID().slice(0, 8);
 
     // Child components
-    // this.CategoryCombo = new UiCombobox(context, 'dataset-categories');
+    this.ThumbnailCombo = new UiCombobox(context, 'rapid-dark');
+    this.Colorpicker = new UiRapidColorpicker(context);
     this.Modal = null;
-
 
     // Ensure methods used as callbacks always have `this` bound correctly.
     // (This is also necessary when using `d3-selection.call`)
@@ -101,6 +98,7 @@ export class UiRapidDatasetSettings extends EventEmitter {
     // Setup event handlers
     const l10n = context.systems.l10n!;
     l10n.on('localechange', this.render);
+    this.Colorpicker.on('change', this.render);
   }
 
 
@@ -281,15 +279,6 @@ export class UiRapidDatasetSettings extends EventEmitter {
     const prefix = 'rapid_dataset_settings.fields';  // prefix for text strings
     const isLocked = !ds.custom;     // Can only change these details for custom datasets
     const uuid = this._uuid;
-    const fields: FieldDefinition[] = [
-      { key: 'source', type: 'input' },
-      { key: 'identifier', type: 'input' },
-      { key: 'name', type: 'input' },
-      { key: 'sourceurl', type: 'textarea' },
-      { key: 'thumbnailurl', type: 'textarea' },
-      { key: 'description', type: 'textarea' },
-    ];
-
 
     let $fields: D3Selection = $parent.selectAll('.dataset-detail-fields')
       .data([0]);
@@ -304,56 +293,136 @@ export class UiRapidDatasetSettings extends EventEmitter {
       .attr('class', 'dataset-details-heading');
 
 
-    const $$rows = $$fields.selectAll('.dataset-field-row')
-      .data(fields, (d: FieldDefinition) => d.key)
-      .enter()
+    // Create the fields and set `.property('value', …)`
+    // to their initial values, gathered from the dataset.
+    // We'll avoid D3.js metaprogramming here, as each field has unique needs.
+
+    /* SourceID */
+    const $$source: D3EnterSelection = $$fields
       .append('div')
-      .attr('class', (d: FieldDefinition) => `dataset-field-row row-${d.key}`);
+      .attr('class', 'dataset-field-row row-source');
 
-    $$rows
+    $$source
       .append('label')
-      .attr('for', (d: FieldDefinition) => `${d.key}-${uuid}`)
+      .attr('for', `source-${uuid}`)
       .attr('class', 'dataset-field-label');
-
-    $$rows
-      .append((d: FieldDefinition) => document.createElement(d.type))
-      .attr('id', (d: FieldDefinition) => `${d.key}-${uuid}`)
+    $$source
+      .append('input')
+      .attr('id', `source-${uuid}`)
       .attr('class', 'dataset-field-input')
       .call(utilNoAuto)
-      .on('input', (e: InputEvent) => this.render());  // rerendering will also run validation
-
-    // some fields are disabled, some are editable
-    $$rows.selectAll(`#source-${uuid}`)
       .property('disabled', true)
       .classed('disabled', true)
       .property('value', ds.serviceID || '');
 
-    $$rows.selectAll(`#identifier-${uuid}`)
-      .property('disabled', true)
-      .classed('disabled', true)
-      .property('value', ds.id || '');
+    /* SourceURL */
+    const $$sourceUrl: D3EnterSelection = $$fields
+      .append('div')
+      .attr('class', 'dataset-field-row row-sourceurl');
 
-    $$rows.selectAll(`#name-${uuid}`)
-      .property('disabled', isLocked)
-      .classed('disabled', isLocked)
-      .property('value', ds.getLabel() || '');
-
-    $$rows.selectAll(`#sourceurl-${uuid}`)
+    $$sourceUrl
+      .append('label')
+      .attr('for', `sourceurl-${uuid}`)
+      .attr('class', 'dataset-field-label');
+    $$sourceUrl
+      .append('input')
+      .attr('id', `sourceurl-${uuid}`)
+      .attr('class', 'dataset-field-input')
+      .call(utilNoAuto)
       .property('disabled', true)
       .classed('disabled', true)
       .property('value', ds.sourceUrl || '');
 
-    $$rows.selectAll(`#thumbnailurl-${uuid}`)
+    /* DatasetID */
+    const $$identifier: D3EnterSelection = $$fields
+      .append('div')
+      .attr('class', 'dataset-field-row row-identifier');
+
+    $$identifier
+      .append('label')
+      .attr('for', `identifier-${uuid}`)
+      .attr('class', 'dataset-field-label');
+    $$identifier
+      .append('input')
+      .attr('id', `identifier-${uuid}`)
+      .attr('class', 'dataset-field-input')
+      .call(utilNoAuto)
       .property('disabled', true)
       .classed('disabled', true)
-      .property('value', ds.thumbnailUrl || '');
+      .property('value', ds.id || '');
 
-    $$rows.selectAll(`#description-${uuid}`)
+    /* Name */
+    const $$name: D3EnterSelection = $$fields
+      .append('div')
+      .attr('class', 'dataset-field-row row-name');
+
+    $$name
+      .append('label')
+      .attr('for', `name-${uuid}`)
+      .attr('class', 'dataset-field-label');
+    $$name
+      .append('input')
+      .attr('id', `name-${uuid}`)
+      .attr('class', 'dataset-field-input')
+      .call(utilNoAuto)
       .property('disabled', isLocked)
       .classed('disabled', isLocked)
-      .property('value', ds.getDescription() || '');
+      .property('value', ds.getLabel() || '')
+      .on('input', (e: InputEvent) => this.render());  // rerendering will also run validation
 
+    /* Thumbnail URL */
+    // Set data for thumbnail combo:  a fixed list of thumbnails + the current value if any.
+    const thumbOptions = new Set<string>();
+    for (const s of ['buildings', 'footways', 'roads', 'points']) {
+      thumbOptions.add(`img/data-${s}.png`);
+    }
+    if (ds.thumbnailUrl) {
+      thumbOptions.add(ds.thumbnailUrl);
+    }
+    const comboData = [...thumbOptions].map((s: string) => ({ value: s }));
+    this.ThumbnailCombo.data(comboData);
 
+    const $$thumbnailUrl: D3EnterSelection = $$fields
+      .append('div')
+      .attr('class', 'dataset-field-row row-thumbnailurl');
+
+    $$thumbnailUrl
+      .append('label')
+      .attr('for', `thumbnailurl-${uuid}`)
+      .attr('class', 'dataset-field-label');
+    $$thumbnailUrl
+      .append('input')
+      .attr('id', `thumbnailurl-${uuid}`)
+      .attr('class', 'dataset-field-input')
+      .call(utilNoAuto)
+      .property('disabled', isLocked)
+      .classed('disabled', isLocked)
+      .property('value', ds.thumbnailUrl || '');
+
+    if (!isLocked) {   // Add thumbnail url picker, if not locked.
+      $$thumbnailUrl.select(`#thumbnailurl-${uuid}`)
+        .call(this.ThumbnailCombo.attach)
+        .on('change', (e: Event) => this.render());
+    }
+
+    /* Description */
+    const $$description: D3EnterSelection = $$fields
+      .append('div')
+      .attr('class', 'dataset-field-row row-description');
+
+    $$description
+      .append('label')
+      .attr('for', `description-${uuid}`)
+      .attr('class', 'dataset-field-label');
+    $$description
+      .append('textarea')
+      .attr('id', `description-${uuid}`)
+      .attr('class', 'dataset-field-input')
+      .call(utilNoAuto)
+      .property('disabled', isLocked)
+      .classed('disabled', isLocked)
+      .property('value', ds.getDescription() || '')
+      .on('input', (e: InputEvent) => this.render());  // rerendering will also run validation
 
     // update
     $fields = $fields.merge($$fields);
@@ -361,14 +430,25 @@ export class UiRapidDatasetSettings extends EventEmitter {
     $fields.selectAll('.dataset-details-heading')
       .text(l10n.t(`${prefix}.heading`));
 
-    $fields.selectAll('.dataset-field-label')
-      .text((d: FieldDefinition) => l10n.t(`${prefix}.${d.key}.label`));
+    $fields.selectAll('.row-source .dataset-field-label')
+      .text(l10n.t(`${prefix}.source.label`));
+    $fields.selectAll('.row-sourceurl .dataset-field-label')
+      .text(l10n.t(`${prefix}.sourceurl.label`));
+    $fields.selectAll('.row-identifier .dataset-field-label')
+      .text(l10n.t(`${prefix}.identifier.label`));
+    $fields.selectAll('.row-name .dataset-field-label')
+      .text(l10n.t(`${prefix}.name.label`));
+    $fields.selectAll('.row-thumbnailurl .dataset-field-label')
+      .text(l10n.t(`${prefix}.thumbnailurl.label`));
+    $fields.selectAll('.row-description .dataset-field-label')
+      .text(l10n.t(`${prefix}.description.label`));
 
     $fields.selectAll(`#name-${uuid}`)
-      .attr('placeholder', (d: FieldDefinition) => l10n.t(`${prefix}.${d.key}.placeholder`));
-
+      .attr('placeholder', l10n.t(`${prefix}.name.placeholder`));
     $fields.selectAll(`#description-${uuid}`)
-      .attr('placeholder', (d: FieldDefinition) => l10n.t(`${prefix}.${d.key}.placeholder`));
+      .attr('placeholder', l10n.t(`${prefix}.description.placeholder`));
+    $fields.selectAll(`#thumbnailurl-${uuid}`)
+      .attr('placeholder', l10n.t(`${prefix}.thumbnailurl.placeholder`));
   }
 
 
@@ -390,30 +470,31 @@ export class UiRapidDatasetSettings extends EventEmitter {
 
     $$wrap
       .append('img')
-      .attr('class', 'dataset-thumbnail')
-      .on('load', (e: Event) => {
-        select(e.currentTarget as HTMLImageElement).call(setBackground);
-      });
+      .attr('class', 'dataset-thumbnail');
+
+    $$wrap
+      .append('div')
+      .attr('class', 'rapid-colorpicker-wrap')
+      .each(() => this.Colorpicker.color = ds.color);  // seed with starting ds.color on enter
+
 
     // update
+    const fieldInfo = this._checkFields();
+
     $wrap = $wrap.merge($$wrap);
 
     $wrap.selectAll('.dataset-thumbnail')
       .classed('inverted', ds.categories.has('esri'))  // invert colors from light->dark
-      .attr('src', utilSafeURL(ds.thumbnailUrl))
-      .call(setBackground);
+      .on('load', (e: Event) => {  // rewire this on update, so it captures the current fieldInfo closure
+        const $selection = select(e.currentTarget as HTMLImageElement);
+        const img = $selection.node() as HTMLImageElement;
+        const isLoaded = (img.complete && img.naturalWidth !== 0);
+        $selection.style('background', () => isLoaded ? fieldInfo.color : null);
+      })
+      .attr('src', utilSafeURL(fieldInfo.thumbnailUrl));
 
-
-    /**
-     * Update the image background, if the image has loaded.
-     * This allows the dataset color to show through a transparent image.
-     * @param $selection - D3Selection to the image thumbnail.
-     */
-    function setBackground($selection: D3Selection) {
-      const img = $selection.node() as HTMLImageElement;
-      const isLoaded = (img.complete && img.naturalWidth !== 0);
-      $selection.style('background', () => isLoaded ? ds!.color : null);
-    };
+    $wrap.selectAll('.rapid-colorpicker-wrap')
+      .call(this.Colorpicker.render);
   }
 
 
@@ -503,7 +584,6 @@ export class UiRapidDatasetSettings extends EventEmitter {
 
     // You can only change these details for custom datasets
     const isLocked = !ds.custom;
-
 
     /* Data Dictionary */
     let $dictionary: D3Selection = $parent.selectAll('.dataset-dictionary')
@@ -608,15 +688,17 @@ export class UiRapidDatasetSettings extends EventEmitter {
     }
 
     const context = this.context;
+    const gfx = context.systems.gfx!;
     const rapid = context.systems.rapid!;
+    const scene = gfx.scene!;
 
     // All datasets allow these things to be changed:
-    // ds.color = (fieldInfo.color === 'true');
+    ds.color = fieldInfo.color ?? RAPID_MAGENTA;
     ds.conflated = (fieldInfo.conflation === 'true');
 
     // Custom datasets allow more things to be changed:
     if (ds.custom) {
-      ds.label = fieldInfo.name!;
+      ds.label = fieldInfo.name || '';
       ds.description = fieldInfo.description || '';
       (ds as any)._label = fieldInfo.name!;                       // todo avoid this duplication
       (ds as any)._description = fieldInfo.description || '';     // todo avoid this duplication
@@ -624,8 +706,20 @@ export class UiRapidDatasetSettings extends EventEmitter {
     }
 
     rapid.saveDatasetSettings(ds);  // persist settings
-    // maybe need some more things to happen here to trigger a redraw?
-    // see UiRapidDatasetToggle changeColor
+
+    // need some more things to happen here to trigger redraws..
+    // see also UiRapidDatasetToggle changeColor()
+    scene.dirtyLayers('rapid');
+    gfx.immediateRedraw();
+    this.render();
+
+    // In case a Rapid feature is already selected, reselect it to update sidebar too.
+    const mode = context.mode;
+    if (mode?.id === 'select') {  // new (not legacy) select mode
+      const selection = new Map(mode.selectedData);
+      context.enter('select', { selection: selection });
+    }
+
     this.close();
   }
 
@@ -653,7 +747,7 @@ export class UiRapidDatasetSettings extends EventEmitter {
 
 
   /**
-   * Run all field validations.  Returns an object containing the field values
+   * Run all field validations.  Returns an object containing the current field values
    * and information about whether validation has passed or failed.
    * @returns a FieldInfo result set
    */
@@ -682,30 +776,35 @@ export class UiRapidDatasetSettings extends EventEmitter {
       result.id = datasetID;
     }
 
-    // check dataset name
-    const nameNode = $content.selectAll(`#name-${uuid}`).node() as HTMLInputElement | null;
-    const nameVal = nameNode?.value || '';
-    result.name = nameVal.trim();
-
     // check source type
     const sourceNode = $content.selectAll(`#source-${uuid}`).node() as HTMLInputElement | null;
     const sourceVal = sourceNode?.value || '';
     result.sourceID = sourceVal.trim();
-
-    // check dataset description
-    const descriptionNode = $content.selectAll(`#description-${uuid}`).node() as HTMLTextAreaElement | null;
-    const descriptionVal = descriptionNode?.value || '';
-    result.description = descriptionVal.trim();
 
     // check source url
     const sourceUrlNode = $content.selectAll(`#sourceurl-${uuid}`).node() as HTMLTextAreaElement | null;
     const sourceUrlVal = sourceUrlNode?.value || '';
     result.sourceUrl = sourceUrlVal.trim();
 
+    // check dataset name
+    const nameNode = $content.selectAll(`#name-${uuid}`).node() as HTMLInputElement | null;
+    const nameVal = nameNode?.value || '';
+    result.name = nameVal.trim();
+
+    // check dataset description
+    const descriptionNode = $content.selectAll(`#description-${uuid}`).node() as HTMLTextAreaElement | null;
+    const descriptionVal = descriptionNode?.value || '';
+    result.description = descriptionVal.trim();
+
     // check thumbnail url
     const thumbnailUrlNode = $content.selectAll(`#thumbnailurl-${uuid}`).node() as HTMLTextAreaElement | null;
     const thumbnailUrlVal = thumbnailUrlNode?.value || '';
     result.thumbnailUrl = thumbnailUrlVal.trim();
+
+    // check color
+    const colorNode = $content.selectAll('.rapid-colorpicker-wrap .colorpicker-input').node() as HTMLInputElement | null;
+    const colorVal = colorNode?.value || '';
+    result.color = colorVal.trim();
 
     // check conflation
     const conflationNode = $content.selectAll(`#conflation-${uuid}`).node() as HTMLInputElement | null;

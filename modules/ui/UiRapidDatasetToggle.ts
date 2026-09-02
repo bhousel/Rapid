@@ -551,6 +551,8 @@ export class UiRapidDatasetToggle extends EventEmitter {
     ds.color = color;
     rapid.saveDatasetSettings(ds);
 
+    // need some more things to happen here to trigger redraws..
+    // see also UiRapidDatasetSettings _clickedOk()
     scene.dirtyLayers('rapid');
     gfx.immediateRedraw();
     this.render();

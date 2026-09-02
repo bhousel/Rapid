@@ -1254,10 +1254,10 @@ en:
     heading: Add Custom Dataset
     name:
       label: Dataset Name
-      placeholder: Choose a Dataset Name    # placeholder text for the name field
+      placeholder: Enter a Dataset Name    # placeholder text for the Name field
     identifier:
       label: Dataset ID
-      placeholder: Choose a Dataset ID      # placeholder text for the identifier field
+      placeholder: Enter a Dataset ID      # placeholder text for the Dataset ID field
       instruction: Must be 36 characters or less, and use only letters, numbers, and dashes.
       invalid: This DatasetID contains invalid characters.
       taken: This DatasetID is already in use. Please choose another.
@@ -1285,18 +1285,19 @@ en:
       heading: Dataset Details
       source:
         label: Source
+      sourceurl:
+        label: Source URL
       identifier:
         label: Dataset ID
       name:
         label: Dataset Name
-        placeholder: Enter a Dataset Name    # placeholder text for the name field
-      sourceurl:
-        label: Source URL
+        placeholder: Enter a Dataset Name    # placeholder text for the Name field
       thumbnailurl:
         label: Thumbnail URL
+        placeholder: Enter a Thumbnail URL    # placeholder text for the Thumbnail URL field
       description:
         label: Description
-        placeholder: Enter a Dataset Description    # placeholder text for the description field
+        placeholder: Enter a Dataset Description    # placeholder text for the Description field
     conflation:
       heading: Conflation Settings
       conflation:

@@ -11,15 +11,6 @@ import type { D3EnterSelection, D3Selection } from 'd3-selection';
 import type { RapidDatasetProps } from '../lib/RapidDataset.ts';
 
 
-
-/** Definitions for the fields that we will create on this screen */
-interface FieldDefinition {
-  /* The identifier for the field */
-  key: string;
-  /* The type of the field */
-  type: 'input' | 'textarea';
-}
-
 /**
  * The values collected on this screen, along with information about whether
  * the field values are all present and have passed validation.
@@ -231,10 +222,6 @@ export class UiRapidAddDataset extends EventEmitter {
 
     const uuid = this._uuid;
     const prefix = 'rapid_add_dataset';  // prefix for text strings
-    const fields: FieldDefinition[] = [
-      { key: 'name', type: 'input' },
-      { key: 'identifier', type: 'input' }
-    ];
 
     let $fields: D3Selection = $parent.selectAll('.rapid-add-dataset-fields')
       .data([0]);
@@ -245,45 +232,57 @@ export class UiRapidAddDataset extends EventEmitter {
       .append('div')
       .attr('class', 'modal-section rapid-add-dataset-fields');
 
-    const $$rows = $$fields.selectAll('.dataset-field-row')
-      .data(fields, (d: FieldDefinition) => d.key)
-      .enter()
-      .append('div')
-      .attr('class', (d: string) => `dataset-field-row row-${d}`);
 
-    const $$wraps: D3EnterSelection = $$rows
-      .append('div')
-      .attr('class', 'dataset-field-wrap');
+    // Create the fields and set `.property('value', …)`
+    // to their initial values, gathered from the dataset.
+    // We'll avoid D3.js metaprogramming here, as each field has unique needs.
 
-    $$wraps
+    /* Name */
+    const $$name: D3EnterSelection = $$fields
+      .append('div')
+      .attr('class', 'dataset-field-row row-name');
+
+    $$name
       .append('label')
-      .attr('for', (d: FieldDefinition) => `${d.key}-${uuid}`)
+      .attr('for', `name-${uuid}`)
       .attr('class', 'dataset-field-label');
 
-    $$wraps
-      .append((d: FieldDefinition) => document.createElement(d.type))
-      .attr('id', (d: FieldDefinition) => `${d.key}-${uuid}`)
+    const $$nameInput: D3EnterSelection = $$name
+      .append('input')
+      .attr('id', `name-${uuid}`)
       .attr('class', 'dataset-field-input')
       .call(utilNoAuto)
       .on('input', (e: InputEvent) => this.render());  // rerendering will also run validation
 
-    $$wraps
+    // set focus on enter
+    const node = $$nameInput.node() as HTMLElement | null;
+    node?.focus();
+
+    /* Identifier */
+    const $$identifier: D3EnterSelection = $$fields
+      .append('div')
+      .attr('class', 'dataset-field-row row-identifier');
+
+    $$identifier
+      .append('label')
+      .attr('for', `identifier-${uuid}`)
+      .attr('class', 'dataset-field-label');
+
+    $$identifier
+      .append('input')
+      .attr('maxlength', 36)
+      .attr('id', `identifier-${uuid}`)
+      .attr('class', 'dataset-field-input')
+      .call(utilNoAuto)
+      .on('input', (e: InputEvent) => this.render());  // rerendering will also run validation
+
+    $$identifier
       .append('div')
       .attr('class', 'dataset-field-instruction');
 
-    $$wraps
+    $$identifier
       .append('div')
       .attr('class', 'dataset-field-feedback');
-
-    // Add special handling for the identifier field..
-    const $$identifier: D3EnterSelection = $$fields.selectAll('.row-identifier .dataset-field-input');
-    $$identifier
-      .attr('maxlength', 36);
-
-    // set focus on enter
-    const $$name: D3EnterSelection = $$fields.selectAll(`#name-${uuid}`);
-    const node = $$name.node() as HTMLElement | null;
-    node?.focus();
 
 
     // update
@@ -291,14 +290,17 @@ export class UiRapidAddDataset extends EventEmitter {
 
     const fieldInfo = this._checkFields();
 
-    $fields.selectAll('.dataset-field-label')
-      .text((d: FieldDefinition) => l10n.t(`${prefix}.${d.key}.label`));
+    $fields.selectAll('.row-name label')
+      .text(l10n.t(`${prefix}.name.label`));
+    $fields.selectAll('.row-identifier label')
+      .text(l10n.t(`${prefix}.identifier.label`));
 
-    $fields.selectAll('.dataset-field-input')
-      .attr('placeholder', (d: FieldDefinition) => l10n.t(`${prefix}.${d.key}.placeholder`));
+    $fields.selectAll('.row-name input')
+      .attr('placeholder', l10n.t(`${prefix}.name.placeholder`));
 
-    $fields.selectAll('.row-identifier .dataset-field-input')
-      .classed('warning', !!fieldInfo.datasetIDStringID);
+    $fields.selectAll('.row-identifier input')
+      .classed('warning', !!fieldInfo.datasetIDStringID)
+      .attr('placeholder', l10n.t(`${prefix}.identifier.placeholder`));
 
     $fields.selectAll('.row-identifier .dataset-field-instruction')
       .text(l10n.t(`${prefix}.identifier.instruction`));
@@ -470,7 +472,7 @@ ${url_tokens}
 
 
   /**
-   * Run all field validations.  Returns an object containing the field values
+   * Run all field validations.  Returns an object containing the current field values
    * and information about whether validation has passed or failed.
    * @returns a FieldInfo result set
    */

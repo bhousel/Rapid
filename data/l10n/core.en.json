@@ -1558,11 +1558,11 @@
       "heading": "Add Custom Dataset",
       "name": {
         "label": "Dataset Name",
-        "placeholder": "Choose a Dataset Name"
+        "placeholder": "Enter a Dataset Name"
       },
       "identifier": {
         "label": "Dataset ID",
-        "placeholder": "Choose a Dataset ID",
+        "placeholder": "Enter a Dataset ID",
         "instruction": "Must be 36 characters or less, and use only letters, numbers, and dashes.",
         "invalid": "This DatasetID contains invalid characters.",
         "taken": "This DatasetID is already in use. Please choose another."
@@ -1594,6 +1594,9 @@
         "source": {
           "label": "Source"
         },
+        "sourceurl": {
+          "label": "Source URL"
+        },
         "identifier": {
           "label": "Dataset ID"
         },
@@ -1601,11 +1604,9 @@
           "label": "Dataset Name",
           "placeholder": "Enter a Dataset Name"
         },
-        "sourceurl": {
-          "label": "Source URL"
-        },
         "thumbnailurl": {
-          "label": "Thumbnail URL"
+          "label": "Thumbnail URL",
+          "placeholder": "Enter a Thumbnail URL"
         },
         "description": {
           "label": "Description",
