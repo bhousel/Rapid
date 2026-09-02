@@ -1,3 +1,4 @@
+import { select } from 'd3-selection';
 import { EventEmitter } from 'tseep/lib/ee-safe';
 import { uiIcon } from './icon.ts';
 import { UiCombobox } from './UiCombobox.ts';
@@ -379,7 +380,6 @@ export class UiRapidDatasetSettings extends EventEmitter {
     const ds = this.dataset;
     if (!ds) return;   // need a dataset to do anything
 
-    /* Thumbnail */
     let $wrap: D3Selection = $parent.selectAll('.dataset-thumbnail-wrap')
       .data([0]);
 
@@ -390,15 +390,30 @@ export class UiRapidDatasetSettings extends EventEmitter {
 
     $$wrap
       .append('img')
-      .attr('class', 'dataset-thumbnail');
+      .attr('class', 'dataset-thumbnail')
+      .on('load', (e: Event) => {
+        select(e.currentTarget as HTMLImageElement).call(setBackground);
+      });
 
     // update
     $wrap = $wrap.merge($$wrap);
 
     $wrap.selectAll('.dataset-thumbnail')
       .classed('inverted', ds.categories.has('esri'))  // invert colors from light->dark
-      .style('background', () => ds.categories.has('esri') ? null : ds.color)
-      .attr('src', utilSafeURL(ds.thumbnailUrl));
+      .attr('src', utilSafeURL(ds.thumbnailUrl))
+      .call(setBackground);
+
+
+    /**
+     * Update the image background, if the image has loaded.
+     * This allows the dataset color to show through a transparent image.
+     * @param $selection - D3Selection to the image thumbnail.
+     */
+    function setBackground($selection: D3Selection) {
+      const img = $selection.node() as HTMLImageElement;
+      const isLoaded = (img.complete && img.naturalWidth !== 0);
+      $selection.style('background', () => isLoaded ? ds!.color : null);
+    };
   }
 
 

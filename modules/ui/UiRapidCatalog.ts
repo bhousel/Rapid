@@ -1,4 +1,5 @@
 import { EventEmitter } from 'tseep/lib/ee-safe';
+import { select } from 'd3-selection';
 import { marked } from 'marked';
 import { uiIcon } from './icon.ts';
 import { UiCombobox } from './UiCombobox.ts';
@@ -425,7 +426,11 @@ export class UiRapidCatalog extends EventEmitter {
 
     $$thumbnail
       .append('img')
-      .attr('class', 'dataset-thumbnail');
+      .attr('class', 'dataset-thumbnail')
+      .on('load', (e: Event) => {
+        select(e.currentTarget as HTMLImageElement)
+          .call(setBackground);
+      });
 
     // update
     $datasets = $datasets.merge($$datasets).order();
@@ -456,8 +461,11 @@ export class UiRapidCatalog extends EventEmitter {
 
     $datasets.selectAll('.dataset-thumbnail')
       .classed('inverted', (d: RapidDataset) => d.categories.has('esri'))  // invert colors from light->dark
-      .style('background', (d: RapidDataset) => d.categories.has('esri') ? null : d.color)
-      .attr('src', (d: RapidDataset) => utilSafeURL(d.thumbnailUrl));
+      .attr('src', (d: RapidDataset) => utilSafeURL(d.thumbnailUrl))
+      .each((d: RapidDataset, i: number, nodes: ArrayLike<HTMLImageElement>) => {
+        select(nodes[i] as HTMLImageElement)
+          .call(setBackground);
+      });
 
     $datasets.selectAll('.dataset-added-text')
       .text((d: RapidDataset) => d.added ? '\u2705 ' + l10n.t('rapid_catalog.dataset_added') : '');  // 2705 = emoji check
@@ -470,6 +478,20 @@ export class UiRapidCatalog extends EventEmitter {
     const gt = (count > MAXRESULTS) ? '>' : '';
     $content.selectAll('.rapid-catalog-filter-results')
       .text(l10n.t('rapid_catalog.datasets_found', { n: n, gt: gt }));
+
+
+    /**
+     * Update the image background, if the image has loaded.
+     * This allows the dataset color to show through a transparent image.
+     * @param $selection - D3Selection to the image thumbnail.
+     */
+    function setBackground($selection: D3Selection) {
+      const img = $selection.node() as HTMLImageElement;
+      const ds = $selection.datum() as RapidDataset;
+      const isLoaded = (img.complete && img.naturalWidth !== 0);
+      $selection.style('background', () => isLoaded ? ds.color : null);
+    };
+
   }
 
 
