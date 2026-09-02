@@ -491,7 +491,7 @@ export class RapidSystem extends AbstractSystem {
     // Take from `datasets` url param if available, fallback to stored setting.
     let addedVals = urlVals;
     if (!addedVals.length) {
-      addedVals = settings?.get<DatasetID[]>('rapid.addedDatasetIDs') ?? ['fbRoads', 'msBuildings', 'overture-places'];
+      addedVals = settings?.get<DatasetID[]>('rapid.addedDatasetIDs') ?? ['fbRoads', 'overture-buildings', 'overture-places'];
     }
     this.addedDatasetIDs = new Set<DatasetID>(addedVals);
 
