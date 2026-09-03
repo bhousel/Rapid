@@ -1,12 +1,13 @@
 import { AbstractSystem } from '../core/AbstractSystem.ts';
 import { Extent, Tiler } from '@rapid-sdk/math';
-import { Graph, RapidDataset } from '../lib/index.ts';
+import { Graph, RapidDataDictionary, RapidDataset } from '../lib/index.ts';
 import { OsmNode, OsmRelation, OsmWay } from '../data/index.ts';
 import { utilQsString } from '@rapid-sdk/util';
 
 import type { Context } from '../Context.ts';
 import type { OsmEntity } from '../data/OsmEntity.ts';
 import type { OsmNodeProps, OsmRelationProps, OsmWayProps, OsmTags } from '../data/types.ts';
+import type { RapidDataTransform } from '../lib/RapidDataDictionary.ts';
 import type { Tile, Vec2 } from '@rapid-sdk/math';
 
 
@@ -202,7 +203,7 @@ export class EsriService extends AbstractSystem {
         id: d.id,
         serviceID: 'esri',
         categories: [...categories],
-        color: '#ffff00',  // pure yellow
+        color: '#ffd600',  // gold
         dataUsed: ['esri', this.getDataUsed(d.title)],
         label: d.title,
         description: d.snippet,
@@ -218,6 +219,38 @@ export class EsriService extends AbstractSystem {
 
       return dataset;
     });
+  }
+
+
+  /**
+   * Called by `RapidSystem` to get the data dictionary for a given dataset.
+   * @param  datasetID - the datasetID get the dictionary for
+   * @return The data dictionary for the given dataset
+   */
+  public getDataDictionaryAsync(datasetID: DatasetID): Promise<RapidDataDictionary> {
+    const ds = this._datasets.get(datasetID);
+    if (!ds) return Promise.reject(`Unknown datasetID "${datasetID}"`);
+
+    return this._loadDatasetLayersAsync(ds)
+      .then(() => {
+        // loadDatasetLayersAsync should have thrown if no layer information was found.
+        const dictionary = new RapidDataDictionary(this.context);
+        let counter = 0;
+
+        // For each layer and field, setup data mapping.
+        for (const layer of ds.layers!) {
+          for (const f of layer.fields) {
+            const transform: RapidDataTransform = {
+              order: counter++,
+              function: f.editable ? 'copy' : 'ignore',
+              source: f.name,
+              target: f.editable ? f.alias : undefined
+            };
+            dictionary.transforms.push(transform);
+          }
+        }
+        return dictionary;
+      });
   }
 
 

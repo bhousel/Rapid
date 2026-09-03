@@ -2,7 +2,7 @@ import { Extent } from '@rapid-sdk/math';
 
 import type { Context } from '../Context.ts';
 import type { TreeValue } from './TreeStore.ts';
-
+import type { RapidDataDictionary } from './RapidDataDictionary.ts';
 
 const RAPID_MAGENTA = '#da26d3';
 
@@ -78,6 +78,8 @@ export class RapidDataset {
   public id: DatasetID;
   /** Service providing this dataset (e.g. 'esri', 'mapwithai', 'overture') */
   public serviceID: ServiceID;
+  /** The data dictionary for this dataset, can be setup once the dataset is added to Rapid */
+  public dictionary: RapidDataDictionary | null;
 
   /** Free-form categories this dataset belongs to (e.g. 'buildings', 'addresses') */
   public categories: Set<string>;
@@ -126,12 +128,12 @@ export class RapidDataset {
 
 
   /**
-   * @constructor
    * @param context - Global shared application context
    * @param props - Properties for this RapidDataset
    */
   public constructor(context: Context, props: Partial<RapidDatasetProps>) {
     this.context = context;
+    this.dictionary = null;    // set up if the dataset is added to Rapid.
 
     this.id = props.id ?? '';
     this.serviceID = props.serviceID ?? '';

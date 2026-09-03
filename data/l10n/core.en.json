@@ -1589,28 +1589,30 @@
     "rapid_dataset_settings": {
       "heading": "Dataset Settings",
       "delete_permanently": "Delete Permanently",
-      "fields": {
+      "details": {
         "heading": "Dataset Details",
-        "source": {
-          "label": "Source"
-        },
-        "sourceurl": {
-          "label": "Source URL"
-        },
-        "identifier": {
-          "label": "Dataset ID"
-        },
-        "name": {
-          "label": "Dataset Name",
-          "placeholder": "Enter a Dataset Name"
-        },
-        "thumbnailurl": {
-          "label": "Thumbnail URL",
-          "placeholder": "Enter a Thumbnail URL"
-        },
-        "description": {
-          "label": "Description",
-          "placeholder": "Enter a Dataset Description"
+        "fields": {
+          "source": {
+            "label": "Source"
+          },
+          "sourceurl": {
+            "label": "Source URL"
+          },
+          "identifier": {
+            "label": "Dataset ID"
+          },
+          "name": {
+            "label": "Dataset Name",
+            "placeholder": "Enter a Dataset Name"
+          },
+          "thumbnailurl": {
+            "label": "Thumbnail URL",
+            "placeholder": "Enter a Thumbnail URL"
+          },
+          "description": {
+            "label": "Description",
+            "placeholder": "Enter a Dataset Description"
+          }
         }
       },
       "conflation": {
@@ -1620,7 +1622,24 @@
         }
       },
       "dictionary": {
-        "heading": "Data Mapping"
+        "heading": "Data Mapping",
+        "fields": {
+          "order": {
+            "label": "Order"
+          },
+          "source": {
+            "label": "Source"
+          },
+          "function": {
+            "label": "Function",
+            "ignore": "Ignore",
+            "copy": "Copy",
+            "constant": "Constant"
+          },
+          "target": {
+            "label": "Target"
+          }
+        }
       }
     },
     "version": {

@@ -215,6 +215,47 @@ button.rapid-features.layer-off use {
   border: 1px solid #aaa;
 }
 
+/* Dark Tables */
+.modal.rapid-modal table {
+  background-color: unset;  /* unset ideditor styles */
+  color: unset;
+}
+.modal.rapid-modal th,
+.modal.rapid-modal td {
+  padding: 2px 5px;
+  border: 1px solid #888a;
+}
+.modal.rapid-modal th {
+  background: #333;
+  color: #fff;
+  font-weight: bold;
+}
+.modal.rapid-modal td {
+  background: #444;
+  color: #ddd;
+  font-weight: normal;
+}
+
+.modal.rapid-modal table.disabled th,
+.modal.rapid-modal table.disabled td {
+  border: 1px solid #333
+}
+.modal.rapid-modal table.disabled th {
+  background: #333;
+  color: #aaa;
+}
+.modal.rapid-modal table.disabled td {
+  background: #222;
+  color: #999;
+}
+
+/* footer row, remove background and border */
+.modal.rapid-modal tfoot td,
+.modal.rapid-modal table.disabled tfoot td {
+  border: unset;
+  background: unset;
+  text-align: end;
+}
 
 /* Comboboxes live under container, so target '.combobox-rapid-dark' class. */
 div.combobox.combobox-rapid-dark {
@@ -995,28 +1036,28 @@ img.dataset-thumbnail.inverted {
   flex-flow: column nowrap;
   padding: 10px 20px;
 }
-.modal-add-dataset .dataset-field-row {
+.modal-add-dataset .field-row {
   display: flex;
   flex-flow: column nowrap;
 }
-.modal-add-dataset .dataset-field-row {
+.modal-add-dataset .field-row {
   margin-bottom: 10px;
 }
-.modal-add-dataset label.dataset-field-label {
+.modal-add-dataset label.field-label {
   display: flex;
   font-size: 16px;
   font-weight: bold;
   color: #fff;
   margin-bottom: 2px;
 }
-.modal-add-dataset input.dataset-field-input.warning {
+.modal-add-dataset input.field-input.warning {
   border-color: #f90 !important;
   background-color: #440 !important;
 }
-.modal-add-dataset .dataset-field-instruction {
+.modal-add-dataset .field-instruction {
   margin: 5px 0px;
 }
-.modal-add-dataset .dataset-field-feedback.warning {
+.modal-add-dataset .field-feedback.warning {
   color: #f90;
 }
 
@@ -1057,27 +1098,27 @@ img.dataset-thumbnail.inverted {
   flex: 0;
   flex-flow: row nowrap;
 }
-.modal-dataset-settings .dataset-detail-fields {
+.modal-dataset-settings .dataset-details-wrap {
   display: flex;
   flex: 1;
   flex-flow: column nowrap;
   align-items: flex-start;
 }
-.modal-dataset-settings .dataset-field-row {
+.modal-dataset-settings .field-row {
   display: flex;
   flex-flow: row nowrap;
   flex: 1;
   align-items: flex-start;
   width: 100%;
 }
-.modal-dataset-settings .dataset-field-label {
+.modal-dataset-settings .field-label {
   display: flex;
   flex: 0 0 125px;
   flex-flow: row nowrap;
   align-items: flex-start;
   font-weight: bold;
 }
-.modal-dataset-settings .dataset-field-input {
+.modal-dataset-settings .field-input {
   display: flex;
   flex: 1;
   flex-flow: row nowrap;
@@ -1116,10 +1157,11 @@ img.dataset-thumbnail.inverted {
   flex: 0;
   flex-flow: column nowrap;
 }
-.modal-dataset-settings .dataset-field-row.row-conflation {
-  flex: 0;   /* don't grow */
-  width: unset;
+.modal-dataset-settings .field-row.row-conflation {
   align-items: center;
+}
+.modal-dataset-settings .field-row.row-conflation .field-input {
+  flex: 0;   /* don't grow */
 }
 
 /* Data Dictionary section */

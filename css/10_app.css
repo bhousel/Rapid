@@ -246,9 +246,7 @@ textarea.mixed::placeholder {
 /* tables */
 table {
   background-color: #fff;
-  border-collapse: collapse;
   width: 100%;
-  border-spacing: 0;
 }
 table th {
   text-align: left;
@@ -1274,8 +1272,8 @@ The parts of a field:
 +------------------+                             |
 |  Starbucks   | + |  <- .form-field-input-wrap   >  .form-field
 '------------------'                             |
-tag reference       <- .tag-reference-body    |
--
+tag reference         <- .tag-reference-body    |
+                                               -
 */
 
 .form-field {
@@ -1292,7 +1290,7 @@ tag reference       <- .tag-reference-body    |
 }
 
 /* A `label` element that wraps the top section */
-.field-label {
+.form-field .field-label {
   display: flex;
   flex-flow: row nowrap;
   flex: 1 1 100%;
@@ -1304,18 +1302,18 @@ tag reference       <- .tag-reference-body    |
   border-radius: 4px 4px 0 0;
   overflow: hidden;
 }
-.field-label .label-text {
+.form-field .label-text {
   overflow: hidden;
   text-overflow: ellipsis;
   flex: 1 1 auto;
   padding: 5px 0 4px 10px;
   white-space: nowrap;
 }
-.ideditor[dir='rtl'] .field-label .label-text {
+.ideditor[dir='rtl'] .form-field .label-text {
   padding: 5px 10px 4px 0;
 }
 
-.label-text .label-textannotation svg.icon {
+.form-field .label-textannotation svg.icon {
   margin: 0 8px;
   color: #333;
   opacity: 0.5;
@@ -1324,27 +1322,27 @@ tag reference       <- .tag-reference-body    |
   vertical-align: text-top;
 }
 
-.field-label button {
+.form-field .field-label button {
   flex: 0 0 auto;
   border-left: 1px solid #ccc;
   width: 32px;
   border-radius: 0;
 }
-.ideditor[dir='rtl'] .field-label button {
+.ideditor[dir='rtl'] .form-field .field-label button {
   border-left: none;
   border-right: 1px solid #ccc;
 }
-.field-label button:not(:hover):not(:active):not(:focus) {
+.form-field .field-label button:not(:hover):not(:active):not(:focus) {
   background: none;
 }
-.field-label .icon {
+.form-field .field-label .icon {
   opacity: .5;
 
 }
 
-.field-label .modified-icon,
-.field-label .remove-icon,
-.field-label .remove-icon-multilingual {
+.form-field .field-label .modified-icon,
+.form-field .field-label .remove-icon,
+.form-field .field-label .remove-icon-multilingual {
   display: none;
 }
 .modified:not(.locked) .field-label .modified-icon,

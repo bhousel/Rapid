@@ -9,6 +9,7 @@ import { utilNoAuto, utilSafeURL } from '../util/index.ts';
 import type { Context } from '../Context.ts';
 import type { D3EnterSelection, D3Selection } from 'd3-selection';
 import type { RapidDataset } from '../lib/RapidDataset.ts';
+import type { RapidDataDictionary, RapidDataTransform } from '../lib/RapidDataDictionary.ts';
 
 const RAPID_MAGENTA = '#da26d3';
 
@@ -59,6 +60,8 @@ export class UiRapidDatasetSettings extends EventEmitter {
 
   /** The dataset being setup */
   protected _dataset: RapidDataset | null;
+  /** A copy of the dataset dictionary transforms */
+  protected _transforms: RapidDataTransform[] | null;
   /** Unique ID for field identifiers */
   protected _uuid: string;
 
@@ -71,6 +74,7 @@ export class UiRapidDatasetSettings extends EventEmitter {
     this.context = context;
 
     this._dataset = null;
+    this._transforms = null;
     this._uuid = crypto.randomUUID().slice(0, 8);
 
     // Child components
@@ -276,19 +280,19 @@ export class UiRapidDatasetSettings extends EventEmitter {
     const ds = this.dataset;
     if (!ds) return;   // need a dataset to do anything
 
-    const prefix = 'rapid_dataset_settings.fields';  // prefix for text strings
+    const prefix = 'rapid_dataset_settings.details';  // prefix for text strings
     const isLocked = !ds.custom;     // Can only change these details for custom datasets
     const uuid = this._uuid;
 
-    let $fields: D3Selection = $parent.selectAll('.dataset-detail-fields')
+    let $wrap: D3Selection = $parent.selectAll('.dataset-details-wrap')
       .data([0]);
 
-    const $$fields: D3EnterSelection = $fields
+    const $$wrap: D3EnterSelection = $wrap
       .enter()
       .append('div')
-      .attr('class', 'dataset-detail-fields');
+      .attr('class', 'dataset-details-wrap');
 
-    $$fields
+    $$wrap
       .append('h3')
       .attr('class', 'dataset-details-heading');
 
@@ -298,72 +302,72 @@ export class UiRapidDatasetSettings extends EventEmitter {
     // We'll avoid D3.js metaprogramming here, as each field has unique needs.
 
     /* SourceID */
-    const $$source: D3EnterSelection = $$fields
+    const $$source: D3EnterSelection = $$wrap
       .append('div')
-      .attr('class', 'dataset-field-row row-source');
+      .attr('class', 'field-row row-source');
 
     $$source
       .append('label')
       .attr('for', `source-${uuid}`)
-      .attr('class', 'dataset-field-label');
+      .attr('class', 'field-label');
     $$source
       .append('input')
       .attr('id', `source-${uuid}`)
-      .attr('class', 'dataset-field-input')
+      .attr('class', 'field-input')
       .call(utilNoAuto)
       .property('disabled', true)
       .classed('disabled', true)
       .property('value', ds.serviceID || '');
 
     /* SourceURL */
-    const $$sourceUrl: D3EnterSelection = $$fields
+    const $$sourceUrl: D3EnterSelection = $$wrap
       .append('div')
-      .attr('class', 'dataset-field-row row-sourceurl');
+      .attr('class', 'field-row row-sourceurl');
 
     $$sourceUrl
       .append('label')
       .attr('for', `sourceurl-${uuid}`)
-      .attr('class', 'dataset-field-label');
+      .attr('class', 'field-label');
     $$sourceUrl
       .append('input')
       .attr('id', `sourceurl-${uuid}`)
-      .attr('class', 'dataset-field-input')
+      .attr('class', 'field-input')
       .call(utilNoAuto)
       .property('disabled', true)
       .classed('disabled', true)
       .property('value', ds.sourceUrl || '');
 
     /* DatasetID */
-    const $$identifier: D3EnterSelection = $$fields
+    const $$identifier: D3EnterSelection = $$wrap
       .append('div')
-      .attr('class', 'dataset-field-row row-identifier');
+      .attr('class', 'field-row row-identifier');
 
     $$identifier
       .append('label')
       .attr('for', `identifier-${uuid}`)
-      .attr('class', 'dataset-field-label');
+      .attr('class', 'field-label');
     $$identifier
       .append('input')
       .attr('id', `identifier-${uuid}`)
-      .attr('class', 'dataset-field-input')
+      .attr('class', 'field-input')
       .call(utilNoAuto)
       .property('disabled', true)
       .classed('disabled', true)
       .property('value', ds.id || '');
 
     /* Name */
-    const $$name: D3EnterSelection = $$fields
+    const $$name: D3EnterSelection = $$wrap
       .append('div')
-      .attr('class', 'dataset-field-row row-name');
+      .attr('class', 'field-row row-name');
 
     $$name
       .append('label')
       .attr('for', `name-${uuid}`)
-      .attr('class', 'dataset-field-label');
+      .attr('class', 'field-label');
     $$name
       .append('input')
       .attr('id', `name-${uuid}`)
-      .attr('class', 'dataset-field-input')
+      .attr('class', 'field-input')
       .call(utilNoAuto)
       .property('disabled', isLocked)
       .classed('disabled', isLocked)
@@ -382,18 +386,18 @@ export class UiRapidDatasetSettings extends EventEmitter {
     const comboData = [...thumbOptions].map((s: string) => ({ value: s }));
     this.ThumbnailCombo.data(comboData);
 
-    const $$thumbnailUrl: D3EnterSelection = $$fields
+    const $$thumbnailUrl: D3EnterSelection = $$wrap
       .append('div')
-      .attr('class', 'dataset-field-row row-thumbnailurl');
+      .attr('class', 'field-row row-thumbnailurl');
 
     $$thumbnailUrl
       .append('label')
       .attr('for', `thumbnailurl-${uuid}`)
-      .attr('class', 'dataset-field-label');
+      .attr('class', 'field-label');
     $$thumbnailUrl
       .append('input')
       .attr('id', `thumbnailurl-${uuid}`)
-      .attr('class', 'dataset-field-input')
+      .attr('class', 'field-input')
       .call(utilNoAuto)
       .property('disabled', isLocked)
       .classed('disabled', isLocked)
@@ -406,18 +410,18 @@ export class UiRapidDatasetSettings extends EventEmitter {
     }
 
     /* Description */
-    const $$description: D3EnterSelection = $$fields
+    const $$description: D3EnterSelection = $$wrap
       .append('div')
-      .attr('class', 'dataset-field-row row-description');
+      .attr('class', 'field-row row-description');
 
     $$description
       .append('label')
       .attr('for', `description-${uuid}`)
-      .attr('class', 'dataset-field-label');
+      .attr('class', 'field-label');
     $$description
       .append('textarea')
       .attr('id', `description-${uuid}`)
-      .attr('class', 'dataset-field-input')
+      .attr('class', 'field-input')
       .call(utilNoAuto)
       .property('disabled', isLocked)
       .classed('disabled', isLocked)
@@ -425,30 +429,30 @@ export class UiRapidDatasetSettings extends EventEmitter {
       .on('input', (e: InputEvent) => this.render());  // rerendering will also run validation
 
     // update
-    $fields = $fields.merge($$fields);
+    $wrap = $wrap.merge($$wrap);
 
-    $fields.selectAll('.dataset-details-heading')
+    $wrap.selectAll('.dataset-details-heading')
       .text(l10n.t(`${prefix}.heading`));
 
-    $fields.selectAll('.row-source .dataset-field-label')
-      .text(l10n.t(`${prefix}.source.label`));
-    $fields.selectAll('.row-sourceurl .dataset-field-label')
-      .text(l10n.t(`${prefix}.sourceurl.label`));
-    $fields.selectAll('.row-identifier .dataset-field-label')
-      .text(l10n.t(`${prefix}.identifier.label`));
-    $fields.selectAll('.row-name .dataset-field-label')
-      .text(l10n.t(`${prefix}.name.label`));
-    $fields.selectAll('.row-thumbnailurl .dataset-field-label')
-      .text(l10n.t(`${prefix}.thumbnailurl.label`));
-    $fields.selectAll('.row-description .dataset-field-label')
-      .text(l10n.t(`${prefix}.description.label`));
+    $wrap.selectAll('.row-source .field-label')
+      .text(l10n.t(`${prefix}.fields.source.label`));
+    $wrap.selectAll('.row-sourceurl .field-label')
+      .text(l10n.t(`${prefix}.fields.sourceurl.label`));
+    $wrap.selectAll('.row-identifier .field-label')
+      .text(l10n.t(`${prefix}.fields.identifier.label`));
+    $wrap.selectAll('.row-name .field-label')
+      .text(l10n.t(`${prefix}.fields.name.label`));
+    $wrap.selectAll('.row-thumbnailurl .field-label')
+      .text(l10n.t(`${prefix}.fields.thumbnailurl.label`));
+    $wrap.selectAll('.row-description .field-label')
+      .text(l10n.t(`${prefix}.fields.description.label`));
 
-    $fields.selectAll(`#name-${uuid}`)
-      .attr('placeholder', l10n.t(`${prefix}.name.placeholder`));
-    $fields.selectAll(`#description-${uuid}`)
-      .attr('placeholder', l10n.t(`${prefix}.description.placeholder`));
-    $fields.selectAll(`#thumbnailurl-${uuid}`)
-      .attr('placeholder', l10n.t(`${prefix}.thumbnailurl.placeholder`));
+    $wrap.selectAll(`#name-${uuid}`)
+      .attr('placeholder', l10n.t(`${prefix}.fields.name.placeholder`));
+    $wrap.selectAll(`#description-${uuid}`)
+      .attr('placeholder', l10n.t(`${prefix}.fields.description.placeholder`));
+    $wrap.selectAll(`#thumbnailurl-${uuid}`)
+      .attr('placeholder', l10n.t(`${prefix}.fields.thumbnailurl.placeholder`));
   }
 
 
@@ -521,37 +525,25 @@ export class UiRapidDatasetSettings extends EventEmitter {
       .append('div')
       .attr('class', 'modal-section dataset-conflation');
 
-    // update
-    $conflation = $conflation.merge($$conflation);
-
-
-    let $fields: D3Selection = $conflation.selectAll('.dataset-detail-fields')
-      .data([0]);
-
-    const $$fields: D3EnterSelection = $fields
-      .enter()
-      .append('div')
-      .attr('class', 'dataset-detail-fields');
-
-    $$fields
+    $$conflation
       .append('h3')
-      .attr('class', 'dataset-details-heading');
+      .attr('class', 'dataset-conflation-heading');
 
-    const $$rows = $$fields.selectAll('.dataset-field-row')
+    const $$rows = $$conflation.selectAll('.field-row')
       .data(['conflation'])     // only one field for now
       .enter()
       .append('div')
-      .attr('class', (d: string) => `dataset-field-row row-${d}`);
+      .attr('class', (d: string) => `field-row row-${d}`);
 
     $$rows
       .append('label')
       .attr('for', (d: string) => `${d}-${uuid}`)
-      .attr('class', 'dataset-field-label');
+      .attr('class', 'field-label');
 
     $$rows
       .append('input')
       .attr('id', (d: string) => `${d}-${uuid}`)
-      .attr('class', 'dataset-field-input')
+      .attr('class', 'field-input')
       .attr('type', 'checkbox')
       .call(utilNoAuto)
       .on('input', (e: InputEvent) => this.render());  // rerendering will also run validation
@@ -561,12 +553,12 @@ export class UiRapidDatasetSettings extends EventEmitter {
       .property('value', ds.conflated ? 'true' : 'false');
 
     // update
-    $fields = $fields.merge($$fields);
+    $conflation = $conflation.merge($$conflation);
 
-    $fields.selectAll('.dataset-details-heading')
+    $conflation.selectAll('.dataset-conflation-heading')
       .text(l10n.t(`${prefix}.heading`));
 
-    $fields.selectAll('.dataset-field-label')
+    $conflation.selectAll('.field-label')
       .text((d: string) => l10n.t(`${prefix}.${d}.label`));
   }
 
@@ -582,10 +574,17 @@ export class UiRapidDatasetSettings extends EventEmitter {
     const ds = this.dataset;
     if (!ds) return;   // need a dataset to do anything
 
+    // Make a copy of the dataset dictionary transforms before any changes.
+    if (!this._transforms) {
+      const orig = ds.dictionary?.transforms;
+      this._transforms = orig ? structuredClone(orig) : [];
+    }
+
+    const prefix = 'rapid_dataset_settings.dictionary';  // prefix for text strings
+
     // You can only change these details for custom datasets
     const isLocked = !ds.custom;
 
-    /* Data Dictionary */
     let $dictionary: D3Selection = $parent.selectAll('.dataset-dictionary')
       .data([0]);
 
@@ -599,18 +598,91 @@ export class UiRapidDatasetSettings extends EventEmitter {
       .append('h3')
       .attr('class', 'dataset-dictionary-heading');
 
-    $$dictionary
-      .append('div')
-      .attr('class', 'dataset-dictionary-content');
+    const $$table: D3EnterSelection = $$dictionary
+      .append('table')
+      .classed('disabled', isLocked);
+
+    /* Table Heading */
+    const $$headRow = $$table
+      .append('thead')
+      .append('tr');
+
+    $$headRow
+      .append('th')
+      .attr('class', 'dict-order');
+    $$headRow
+      .append('th')
+      .attr('class', 'dict-source');
+    $$headRow
+      .append('th')
+      .attr('class', 'dict-function');
+    $$headRow
+      .append('th')
+      .attr('class', 'dict-target');
+    $$headRow
+      .append('th')
+      .attr('class', 'dict-actions');
+
+    /* Table Body */
+    const $$tbody = $$table
+      .append('tbody');
+
+    const $$bodyRows: D3EnterSelection = $$tbody.selectAll('.dataset-dictionary-row')
+      .data(this._transforms, (d: RapidDataTransform) => d.order)
+      .enter()
+      .append('tr')
+      .attr('class', 'dataset-dictionary-row');
+
+    $$bodyRows
+      .append('td')
+      .attr('class', 'dict-order')
+      .text((d: RapidDataTransform) => d.order);
+
+    $$bodyRows
+      .append('td')
+      .attr('class', 'dict-source')
+      .text((d: RapidDataTransform) => d.source);
+
+    $$bodyRows
+      .append('td')
+      .attr('class', 'dict-function')
+      .text((d: RapidDataTransform) => d.function);
+
+    $$bodyRows
+      .append('td')
+      .attr('class', 'dict-target')
+      .text((d: RapidDataTransform) => d.target);
+
+    $$bodyRows
+      .append('td')
+      .attr('class', 'dict-actions')
+      .text('actions');
+
+    /* Table Footer */
+    $$table
+      .append('tfoot')
+      .append('tr')
+      .append('td')
+      .attr('colspan', '999');   // span all columns
+
 
     // update
     $dictionary = $dictionary.merge($$dictionary);
 
     $dictionary.selectAll('.dataset-dictionary-heading')
-      .text(l10n.t('rapid_dataset_settings.dictionary.heading'));
+      .text(l10n.t(`${prefix}.heading`));
 
-    $dictionary.selectAll('.dataset-dictionary-content')
-      .text('data mapping goes here');
+    $dictionary.selectAll('thead th.dict-order')
+      .text(l10n.t(`${prefix}.fields.order.label`));
+    $dictionary.selectAll('thead th.dict-source')
+      .text(l10n.t(`${prefix}.fields.source.label`));
+    $dictionary.selectAll('thead th.dict-function')
+      .text(l10n.t(`${prefix}.fields.function.label`));
+    $dictionary.selectAll('thead th.dict-target')
+      .text(l10n.t(`${prefix}.fields.target.label`));
+
+    $dictionary.selectAll('tfoot td')
+      .text('add more');
   }
 
 
@@ -665,7 +737,6 @@ export class UiRapidDatasetSettings extends EventEmitter {
 
     $buttons.selectAll('.delete-button')
       .text(l10n.t('rapid_dataset_settings.delete_permanently'));
-
   }
 
 

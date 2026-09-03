@@ -1,5 +1,5 @@
 import { AbstractSystem } from '../core/AbstractSystem.ts';
-import { Graph, RapidDataset } from '../lib/index.ts';
+import { Graph, RapidDataset, RapidDataDictionary } from '../lib/index.ts';
 import { Tiler } from '@rapid-sdk/math';
 import { OsmNode, OsmWay } from '../data/index.ts';
 
@@ -172,6 +172,24 @@ export class MapWithAIService extends AbstractSystem {
     });
 
     return [fbRoads, msBuildings, introGraph];
+  }
+
+
+  /**
+   * Called by `RapidSystem` to get the data dictionary for a given dataset.
+   * For the MapWithAI datasets, they already come with the correct OSM tags,
+   * so we can just setup the dictionary to copy all fields from source to target.
+   * @param  datasetID - the datasetID get the dictionary for
+   * @return The data dictionary for the given dataset
+   */
+  public getDataDictionaryAsync(datasetID: DatasetID): Promise<RapidDataDictionary> {
+    const context = this.context;
+
+    const dictionary = new RapidDataDictionary(context);
+    dictionary.transforms = [
+      { order: 0, function: 'copy', source: '*', target: '*' }   // just copy everything
+    ];
+    return Promise.resolve(dictionary);
   }
 
 

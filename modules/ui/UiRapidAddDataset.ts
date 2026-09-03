@@ -240,17 +240,17 @@ export class UiRapidAddDataset extends EventEmitter {
     /* Name */
     const $$name: D3EnterSelection = $$fields
       .append('div')
-      .attr('class', 'dataset-field-row row-name');
+      .attr('class', 'field-row row-name');
 
     $$name
       .append('label')
       .attr('for', `name-${uuid}`)
-      .attr('class', 'dataset-field-label');
+      .attr('class', 'field-label');
 
     const $$nameInput: D3EnterSelection = $$name
       .append('input')
       .attr('id', `name-${uuid}`)
-      .attr('class', 'dataset-field-input')
+      .attr('class', 'field-input')
       .call(utilNoAuto)
       .on('input', (e: InputEvent) => this.render());  // rerendering will also run validation
 
@@ -261,28 +261,28 @@ export class UiRapidAddDataset extends EventEmitter {
     /* Identifier */
     const $$identifier: D3EnterSelection = $$fields
       .append('div')
-      .attr('class', 'dataset-field-row row-identifier');
+      .attr('class', 'field-row row-identifier');
 
     $$identifier
       .append('label')
       .attr('for', `identifier-${uuid}`)
-      .attr('class', 'dataset-field-label');
+      .attr('class', 'field-label');
 
     $$identifier
       .append('input')
       .attr('maxlength', 36)
       .attr('id', `identifier-${uuid}`)
-      .attr('class', 'dataset-field-input')
+      .attr('class', 'field-input')
       .call(utilNoAuto)
       .on('input', (e: InputEvent) => this.render());  // rerendering will also run validation
 
     $$identifier
       .append('div')
-      .attr('class', 'dataset-field-instruction');
+      .attr('class', 'field-instruction');
 
     $$identifier
       .append('div')
-      .attr('class', 'dataset-field-feedback');
+      .attr('class', 'field-feedback');
 
 
     // update
@@ -302,12 +302,12 @@ export class UiRapidAddDataset extends EventEmitter {
       .classed('warning', !!fieldInfo.datasetIDStringID)
       .attr('placeholder', l10n.t(`${prefix}.identifier.placeholder`));
 
-    $fields.selectAll('.row-identifier .dataset-field-instruction')
+    $fields.selectAll('.row-identifier .field-instruction')
       .text(l10n.t(`${prefix}.identifier.instruction`));
 
     // U+26A0 U+FE0F = emoji warning
     // U+00A0 = non breaking space &nbsp;  (we want the div always drawn, so layout doesn't jump around)
-    $fields.selectAll('.row-identifier .dataset-field-feedback')
+    $fields.selectAll('.row-identifier .field-feedback')
       .classed('warning', !!fieldInfo.datasetIDStringID)
       .text(fieldInfo.datasetIDStringID ? '\u26a0\ufe0f ' + l10n.t(fieldInfo.datasetIDStringID) : '\u00a0');
   }

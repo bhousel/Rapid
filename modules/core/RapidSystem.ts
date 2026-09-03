@@ -1,7 +1,7 @@
 import { AbstractSystem } from './AbstractSystem.ts';
 import { gpx } from '@tmcw/togeojson';
 import { Extent } from '@rapid-sdk/math';
-import { RapidDataset } from '../lib/RapidDataset.ts';
+import { RapidDataset, RapidDataDictionary } from '../lib/index.ts';
 import { utilExtractValues } from '../util/string.ts';
 import { utilIterable } from '../util/iterable.ts';
 
@@ -48,7 +48,7 @@ export interface RapidSettings {
 const RAPID_COLORS: readonly string[] = [
   '#ff0000', // Pure Red
   '#ff8c00', // Dark Orange
-  '#ffff00', // Pure Yellow
+  '#ffd600', // Gold
   '#adff2f', // Green Yellow
   '#00dd00', // Pure Green
   '#00ffff', // Pure Cyan
@@ -586,6 +586,7 @@ export class RapidSystem extends AbstractSystem {
    * Called whenever the datasets change.
    * This will:
    * - Update `UrlHashSystem`/`SettingsSystem` to persist the lists of datasets added/enabled.
+   * - Try to setup a RapidDataDictionary for each added dataset.
    * - trigger a redraw.
    * - emit a 'datasetchange' event.
    */
@@ -625,6 +626,21 @@ export class RapidSystem extends AbstractSystem {
       } else {
         settings?.set('rapid.addedDatasetIDs', addedVals);
         settings?.set('rapid.enabledDatasetIDs', enabledVals);
+      }
+    }
+
+
+    // Schedule data dictionary setup if needed.
+    // If this is not setup, Rapid can still display the data, but Accept/Ignore will be unavailable.
+    for (const datasetID of this.addedDatasetIDs) {
+      const ds = this.catalog.get(datasetID);
+      if (!ds || !ds.serviceID || ds.custom) continue;
+      if (!ds.dictionary) {
+        const service = context.services[ds.serviceID] as any;
+        if (!service || typeof service.getDataDictionaryAsync !== 'function') continue;
+
+        service.getDataDictionaryAsync(ds.id)
+          .then((dict: RapidDataDictionary) => ds.dictionary = dict);
       }
     }
 

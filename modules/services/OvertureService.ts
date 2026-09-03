@@ -1,4 +1,4 @@
-import { RapidDataset } from '../lib/RapidDataset.ts';
+import { RapidDataset, RapidDataDictionary } from '../lib/index.ts';
 import { utilFetchResponse } from '../util/fetch_response.ts';
 import { VectorTileService } from './VectorTileService.ts';
 
@@ -159,6 +159,23 @@ export class OvertureService extends VectorTileService {
 
     return [places, buildings, tomtomRoads];
   }
+
+
+//  /**
+//   * Called by `RapidSystem` to get the data dictionary for a given dataset.
+//   * For overture, todo.
+//   * @param  datasetID - the datasetID get the dictionary for
+//   * @return The data dictionary for the given dataset
+//   */
+//  public getDataDictionaryAsync(datasetID: DatasetID): Promise<RapidDataDictionary> {
+//    const context = this.context;
+//
+//    const dictionary = new RapidDataDictionary(context);
+//    dictionary.transforms = [
+//      { order: 0, function: 'copy', source: '*', target: '*' }   // just copy everything
+//    ];
+//    return Promise.resolve(dictionary);
+//  }
 
 
   /**
