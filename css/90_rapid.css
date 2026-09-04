@@ -90,6 +90,14 @@ button.rapid-features.layer-off use {
   color: #eee;
   fill: #da26d3;
 }
+.rapid-inspector button.minor,
+.modal.rapid-modal button.minor {
+  font-size: 12px;
+  height: 28px;
+  border-radius: 14px;
+  margin: 10px 0;
+  padding: 0 15px;
+}
 .rapid-inspector button:focus,
 .rapid-inspector button:hover,
 .modal.rapid-modal button:focus,
@@ -224,6 +232,7 @@ button.rapid-features.layer-off use {
 .modal.rapid-modal td {
   padding: 2px 5px;
   border: 1px solid #888a;
+  vertical-align: middle;
 }
 .modal.rapid-modal th {
   background: #333;
@@ -617,17 +626,23 @@ button.overture-inspector-close:hover {
   justify-content: flex-end;
   align-items: center;
 }
-.rapid-row.disabled,
-.rapid-row-text.disabled {
+.rapid-row-text.disabled,
+.rapid-row-actions.disabled {
   opacity: .5;
 }
-.rapid-row-action {
+.rapid-row-actions .rapid-row-action {
   display: flex;
   width: 32px;
   height: 32px;
   align-items: center;
   justify-content: center;
   border-radius: 4px;
+}
+.rapid-row-actions:not(.disabled) .rapid-row-action {
+  cursor: pointer;
+}
+.rapid-row-actions:not(.disabled) .rapid-row-action:hover {
+  background: #8885;
 }
 
 /* Checkboxes */
@@ -806,15 +821,11 @@ button.overture-inspector-close:hover {
   width: 20px;
   height: 20px;
 }
-.rapid-dataset-rows .rapid-row:not(.disabled) .rapid-row-action {
-  cursor: pointer;
-}
 .row-search-catalog,
 .row-custom-dataset {
   padding: 10px 15px;
   cursor: pointer;
 }
-.rapid-dataset-rows .rapid-row:not(.disabled) .rapid-row-action:hover,
 .row-search-catalog:hover,
 .row-custom-dataset:hover {
   background: #8885;
@@ -1015,14 +1026,6 @@ img.dataset-thumbnail.inverted {
   color: #16da16;
 }
 
-.rapid-catalog-dataset button.dataset-action {
-  font-size: 12px;
-  height: 28px;
-  border-radius: 14px;
-  margin: 10px 0;
-  padding: 0 15px;
-}
-
 
 /* Add Custom Dataset
 ------------------------------------------------------- */
@@ -1083,9 +1086,10 @@ img.dataset-thumbnail.inverted {
   flex-flow: column nowrap;
   width: 100%;
   overflow-y: auto;
+  border-bottom: 1px solid #888a;
 }
 
-/* smaller fields on this screen - lots of information to display */
+/* smaller input fields on this screen - lots of information to display */
 .modal.rapid-modal.modal-dataset-settings input,
 .modal.rapid-modal.modal-dataset-settings textarea {
   padding: 2px 8px;
@@ -1170,6 +1174,14 @@ img.dataset-thumbnail.inverted {
   flex: 0;
   flex-flow: column nowrap;
 }
+.modal-dataset-settings .dictionary-table {
+  margin-top: 20px;
+}
+.dict-actions .rapid-row-action {
+  width: 25px;
+  height: 25px;
+}
+
 
 /* set the delete button apart from neighbor buttons */
 .modal.modal-dataset-settings .delete-button.action {

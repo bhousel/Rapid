@@ -16,6 +16,7 @@ import type { D3EnterSelection, D3Selection } from 'd3-selection';
  */
 export class UiRapidColorpicker extends EventEmitter {
   public context: Context;
+  public disabled: boolean;
 
   // D3 selections
   public $parent: D3Selection | null;
@@ -35,6 +36,7 @@ export class UiRapidColorpicker extends EventEmitter {
   public constructor(context: Context) {
     super();
     this.context = context;
+    this.disabled = false;
 
     // D3 selections
     this.$parent = null;
@@ -73,7 +75,10 @@ export class UiRapidColorpicker extends EventEmitter {
     const $$colorpicker: D3EnterSelection = $colorpicker.enter()
       .append('label')
       .attr('class', 'colorpicker-label')
-      .on('click', this.toggle);
+      .on('click', (e: PointerEvent) => {
+        if (this.disabled) return;
+        this.toggle(e);
+      });
 
     $$colorpicker
       .call(uiIcon('#fas-palette'));
@@ -91,6 +96,7 @@ export class UiRapidColorpicker extends EventEmitter {
       .attr('aria-label', 'choose a color');
 
     $colorpicker.selectAll('.colorpicker-input')
+      .property('disabled', this.disabled)
       .property('value', this._color);
 
     $colorpicker.selectAll('.icon')

@@ -63,8 +63,7 @@ export class UiRapidDatasetToggle extends EventEmitter {
     this.render = this.render.bind(this);
     this.renderDatasets = this.renderDatasets.bind(this);
     this.changeColor = this.changeColor.bind(this);
-    this.toggleDataset = this.toggleDataset.bind(this);
-    this.removeDataset = this.removeDataset.bind(this);
+    this.isRapidEnabled = this.isRapidEnabled.bind(this);
     this.toggleRapid = this.toggleRapid.bind(this);
   }
 
@@ -405,18 +404,19 @@ export class UiRapidDatasetToggle extends EventEmitter {
       .append('div')
       .attr('class', 'rapid-row-action rapid-colorpicker-wrap');
 
-    $$colorpickers.each((d: RapidDataset) => {
+    $$colorpickers.each((ds: RapidDataset) => {
       const control = new UiRapidColorpicker(context);
-      control.on('change', (val: string) => this.changeColor(d, val));
-      this._colorpickers[d.id] = control;
+      control.on('change', (val: string) => this.changeColor(ds, val));
+      this._colorpickers[ds.id] = control;
     });
 
     $$actions
       .append('label')
       .attr('class', 'rapid-row-action rapid-dataset-settings')
-      .on('click', (e: PointerEvent, d: RapidDataset) => {
+      .on('click', (e: PointerEvent, ds: RapidDataset) => {
+        if (!this.isRapidEnabled())  return;  // check it - don't capture the closure variable
         const SettingsModal = new UiRapidDatasetSettings(context).on('done', this.render);
-        SettingsModal.dataset = d;
+        SettingsModal.dataset = ds;
         SettingsModal.show();
       })
       .call(uiIcon('#fas-gear'));
@@ -424,43 +424,37 @@ export class UiRapidDatasetToggle extends EventEmitter {
     $$actions
       .append('label')
       .attr('class', 'rapid-row-action rapid-dataset-visible')
-      .on('click', this.toggleDataset)
+      .on('click', (e: PointerEvent, ds: RapidDataset) => {
+        if (!this.isRapidEnabled())  return;  // check it - don't capture the closure variable
+        context.enter('browse');   // return to browse mode (in case something was selected)
+        rapid.toggleDatasets(ds.id);
+        this.render();
+      })
       .call(uiIcon(''));
 
     $$actions
       .append('label')
       .attr('class', 'rapid-row-action rapid-dataset-trash')
-      .on('click', this.removeDataset)
-      .call(uiIcon('#fas-trash'));
-
-
-//    const $$checkboxes: D3EnterSelection = $$actions
-//      .append('label')
-//      .attr('class', 'rapid-checkbox-label');
-//
-//    $$checkboxes
-//      .append('input')
-//      .attr('type', 'checkbox')
-//      .attr('class', 'rapid-checkbox-input')
-//      .on('click', this.toggleDataset);
-//
-//    $$checkboxes
-//      .append('div')
-//      .attr('class', 'rapid-checkbox-custom');
+      .on('click', (e: PointerEvent, ds: RapidDataset) => {
+        if (!this.isRapidEnabled())  return;  // check it - don't capture the closure variable
+        context.enter('browse');   // return to browse mode (in case something was selected)
+        rapid.removeDatasets(ds.id);
+        this.render();
+      })
+      .call(uiIcon('#fas-trash-can'));
 
 
     // update
     $rows = $rows.merge($$rows);
-
-    $rows
-      .classed('disabled', !isRapidEnabled);
 
     // localize and style everything...
     $rows.selectAll('.rapid-row-label')
       .text(d => d.getLabel());
 
     $rows.selectAll('.rapid-row-text')
-      .classed('disabled', (d: RapidDataset) => !d.enabled);
+      .classed('disabled', (d: RapidDataset) => !d.enabled || !isRapidEnabled);
+    $rows.selectAll('.rapid-row-actions')
+      .classed('disabled', (d: RapidDataset) => !isRapidEnabled);
 
     $rows.selectAll('.rapid-dataset-label-beta')
       .attr('title', l10n.t('rapid_poweruser.beta'));   // alt text
@@ -476,7 +470,7 @@ export class UiRapidDatasetToggle extends EventEmitter {
 
     $rows.selectAll('.rapid-dataset-visible')
       .select('use')  // propagate bound data
-      .attr('href', (d: RapidDataset) => d.enabled ? '#fas-eye' : '#fas-eye-slash');
+      .attr('href', (ds: RapidDataset) => ds.enabled ? '#fas-eye' : '#fas-eye-slash');
 
     $rows.selectAll('.rapid-colorpicker-wrap')
       .each((d: RapidDataset, i: number, nodes: HTMLElement[]) => {
@@ -484,6 +478,7 @@ export class UiRapidDatasetToggle extends EventEmitter {
         const control = this._colorpickers[d.id];
         if (control) {
           control.color = d.color;
+          control.disabled = !isRapidEnabled;
           $selection.call(control.render);
         }
       });
@@ -498,42 +493,22 @@ export class UiRapidDatasetToggle extends EventEmitter {
 
 
   /**
+   * Is Rapid currently enabled?
+   * This state is currently stored in - whether the rapid layer is enabled.
+   * @return  `true` if rapid is enabled, `false` if not.
+   */
+  public isRapidEnabled(): boolean {
+    const scene = this.context.systems.gfx!.scene!;
+    return !!scene.layers.get('rapid')?.enabled;
+  }
+
+  /**
    * Called when a user has clicked the checkbox to toggle all Rapid layers on/off.
    * @param [e] - the triggering event, if any
    */
   public toggleRapid(): void {
     const scene = this.context.systems.gfx!.scene!;
     scene.toggleLayers('rapid');
-  }
-
-
-  /**
-   * Called when a user has clicked the checkbox to toggle a dataset enabled/disabled.
-   * @param  [e] - the triggering event, if any
-   * @param  ds - bound datum (the RapidDataset in this case)
-   */
-  public toggleDataset(e: Event, ds: RapidDataset): void {
-    const context = this.context;
-    const rapid = context.systems.rapid!;
-
-    context.enter('browse');   // return to browse mode (in case something was selected)
-    rapid.toggleDatasets(ds.id);
-    this.render();
-  }
-
-
-  /**
-   * Called when a user has clicked the checkbox to toggle a dataset enabled/disabled.
-   * @param  [e] - the triggering event, if any
-   * @param  ds - bound datum (the RapidDataset in this case)
-   */
-  public removeDataset(e: Event, ds: RapidDataset): void {
-    const context = this.context;
-    const rapid = context.systems.rapid!;
-
-    context.enter('browse');   // return to browse mode (in case something was selected)
-    rapid.removeDatasets(ds.id);
-    this.render();
   }
 
 

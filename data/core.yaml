@@ -681,11 +681,13 @@ en:
     about_changeset_comments_link: //wiki.openstreetmap.org/wiki/Good_changeset_comments
     google_warning: "You mentioned Google in this comment: remember that copying from Google Maps is strictly forbidden."
     google_warning_link: https://www.openstreetmap.org/copyright
+
   contributors:
     list: "Edits by {users}"
     truncated_list:
       one: "Edits by {users} and {count} other"
       other: "Edits by {users} and {count} others"
+
   info_panels:
     selected:
       one: "{n} selected"
@@ -728,6 +730,7 @@ en:
       metric: Metric
       imperial: Imperial
       node_count: Number of nodes
+
   geometry:
     point: point
     vertex: vertex
@@ -735,13 +738,16 @@ en:
     area: area
     relation: relation
     note: note
+
   geocoder:
     search: Search worldwide...
     no_results_worldwide: No results found
+
   geolocate:
     title: Show My Location
     locating: "Locating, please wait..."
     location_unavailable: Your location is unavailable.
+
   inspector:
     tooltip: Toggle the feature inspector.
     zoom_to:
@@ -1151,6 +1157,28 @@ en:
     live: live
     lose_changes: "You have unsaved changes. Switching the map server will discard them. Are you sure you want to switch servers?"
 
+  version:
+    whats_new: "What's new in Rapid {version}"
+
+  zoom:
+    in: Zoom In
+    out: Zoom Out
+    disabled:
+      in: Cannot zoom in further.
+      out: Cannot zoom out further.
+
+  bearing:
+    reset_bearing: Reset Bearing
+    rotate_the_map: "Rotate the map:"
+    n: 'N'     # This is the North 'N' that appears on the rotation control
+
+  full_screen: Toggle Full Screen
+
+  self_intersection:
+    error:
+      lines: Lines cannot cross over themselves.
+      areas: Areas cannot cross over themselves.
+
   rapid_first_edit:
     nice: You just added your first {rapidicon} AI-Assisted feature, nice.
     text: You'll need an OpenStreetMap account to save your work. Would you like to log in with OSM now or keep exploring?
@@ -1305,40 +1333,24 @@ en:
         label: "Conflation?"
     dictionary:
       heading: Data Mapping
+      instruction: The data mapping controls how Rapid accepts data from this dataset.
+      locked: This section is locked because this dataset is provided by {name}.
+      is_missing: There is no data mapping for this dataset. Rapid can still show the data, but you will not be able to accept it.
+      add_default: Add a default data mapping
+      is_default: This is a default data mapping - it simply copies all source attributes into target tags.
+      add_more: Add More
       fields:
         order:
           label: Order
         source:
-          label: Source
+          label: Source Attribute
         function:
           label: Function
           ignore: Ignore
           copy: Copy
           constant: Constant
         target:
-          label: Target
-
-  version:
-    whats_new: "What's new in Rapid {version}"
-
-  zoom:
-    in: Zoom In
-    out: Zoom Out
-    disabled:
-      in: Cannot zoom in further.
-      out: Cannot zoom out further.
-
-  bearing:
-    reset_bearing: Reset Bearing
-    rotate_the_map: "Rotate the map:"
-    n: 'N'     # This is the North 'N' that appears on the rotation control
-
-  full_screen: Toggle Full Screen
-
-  self_intersection:
-    error:
-      lines: Lines cannot cross over themselves.
-      areas: Areas cannot cross over themselves.
+          label: Target Tag
 
   QA:
     osmose:

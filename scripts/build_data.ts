@@ -121,8 +121,8 @@ async function buildData() {
   // Gather icons from various places that we need assembled into a spritesheet.
   // Start with icons we want to use in the UI that aren't tied to other data.
   const icons = new Set<string>([
-    'fas-plus',
     'far-star',
+    'fas-plus',
     'fas-circle-arrow-up',
     'fas-arrow-rotate-left',
     'fas-arrow-rotate-right',
@@ -138,8 +138,8 @@ async function buildData() {
     'fas-palette',
     'fas-question',
     'fas-star',
-    'fas-trash',
     'fas-th-list',
+    'fas-trash-can',
     'fas-triangle-exclamation',
     'fas-user-cog'
   ]);

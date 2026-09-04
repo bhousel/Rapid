@@ -417,7 +417,7 @@ export class UiRapidCatalog extends EventEmitter {
 
     $$label
       .append('button')
-      .attr('class', 'dataset-action')
+      .attr('class', 'minor dataset-action')
       .on('click', this.toggleDataset);
 
     const $$thumbnail: D3EnterSelection = $$datasets
@@ -531,6 +531,8 @@ export class UiRapidCatalog extends EventEmitter {
    * @param  d - bound datum (the dataset in this case)
    */
   public toggleDataset(e: Event, d: RapidDataset) {
+    (e?.currentTarget as HTMLElement).blur();    // avoid keeping focus on the button - iD#4641
+
     const context = this.context;
     const rapid = context.systems.rapid!;
     const addedIDs = rapid.addedDatasetIDs;

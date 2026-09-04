@@ -4,6 +4,7 @@ import { uiIcon } from './icon.ts';
 import { UiCombobox } from './UiCombobox.ts';
 import { UiModal } from './UiModal.ts';
 import { UiRapidColorpicker } from './UiRapidColorpicker.ts';
+import { utilHashcode } from '@rapid-sdk/util';
 import { utilNoAuto, utilSafeURL } from '../util/index.ts';
 
 import type { Context } from '../Context.ts';
@@ -13,6 +14,11 @@ import type { RapidDataDictionary, RapidDataTransform } from '../lib/RapidDataDi
 
 const RAPID_MAGENTA = '#da26d3';
 
+
+/**
+ * We create a "partial" type because on this screen the values may not be filled in completely.
+ * The 'order' field is guaranteed by running the transforms through `_checkDictionary` */
+type PartialDataTransform = Partial<RapidDataTransform> & Pick<RapidDataTransform, 'order'>;
 
 /**
  * The values collected on this screen, along with information about whether
@@ -42,6 +48,17 @@ export interface FieldInfo {
   conflation?: string;
 }
 
+/**
+ * Information about the dictionary, along with information about whether
+ * the field values are all present and have passed validation.
+ */
+export interface DictionaryInfo {
+  /* `true` if we can continue (no errors), false if not */
+  isOk: boolean
+  /* `true` if this is a "default" dictionary that simply copies all source data to target tags */
+  isDefault: boolean
+}
+
 
 /**
  * `UiRapidDatasetSettings` is a Modal control where the user can change
@@ -61,7 +78,7 @@ export class UiRapidDatasetSettings extends EventEmitter {
   /** The dataset being setup */
   protected _dataset: RapidDataset | null;
   /** A copy of the dataset dictionary transforms */
-  protected _transforms: RapidDataTransform[] | null;
+  protected _transforms: PartialDataTransform[] | null;
   /** Unique ID for field identifiers */
   protected _uuid: string;
 
@@ -568,22 +585,19 @@ export class UiRapidDatasetSettings extends EventEmitter {
    * @param $parent - Parent D3Selection that this content should render itself into
    */
   protected _renderDictionary($parent: D3Selection): void {
-    const context = this.context;
-    const l10n = context.systems.l10n!;
-
     const ds = this.dataset;
     if (!ds) return;   // need a dataset to do anything
 
-    // Make a copy of the dataset dictionary transforms before any changes.
-    if (!this._transforms) {
-      const orig = ds.dictionary?.transforms;
-      this._transforms = orig ? structuredClone(orig) : [];
-    }
+    const context = this.context;
+    const l10n = context.systems.l10n!;
 
     const prefix = 'rapid_dataset_settings.dictionary';  // prefix for text strings
+    const isLocked = !ds.custom;     // Can only change these details for custom datasets
 
-    // You can only change these details for custom datasets
-    const isLocked = !ds.custom;
+    // Check the data dictionary (also makes a copy before changing anything).
+    const dictInfo = this._checkDictionary();
+    const transforms = this._transforms!;
+    const hasTransforms = transforms.length > 0;
 
     let $dictionary: D3Selection = $parent.selectAll('.dataset-dictionary')
       .data([0]);
@@ -598,18 +612,85 @@ export class UiRapidDatasetSettings extends EventEmitter {
       .append('h3')
       .attr('class', 'dataset-dictionary-heading');
 
-    const $$table: D3EnterSelection = $$dictionary
+    $$dictionary
+      .append('div')
+      .attr('class', 'dictionary-instructions-wrap');
+
+    // update
+    $dictionary = $dictionary.merge($$dictionary);
+
+    $dictionary.selectAll('.dataset-dictionary-heading')
+      .text(l10n.t(`${prefix}.heading`));
+
+
+    // Render the data dictionary instructions..
+    // Replace content on each render (makes control flow and localization easier)
+    const $instructionsWrap: D3Selection = $dictionary.selectAll('.dictionary-instructions-wrap');
+    $instructionsWrap.html('');  // clear
+
+    $instructionsWrap
+      .append('div')
+      .text(l10n.t(`${prefix}.instruction`));
+
+    if (isLocked) {
+      const providerStringID = (
+        ds.serviceID === 'esri' ? 'rapid_catalog.category.esri' :
+        ds.serviceID === 'mapwithai' ? 'rapid_catalog.category.meta' :
+        ds.serviceID === 'overture' ? 'rapid_catalog.category.overture' :
+        'text.unknown'
+      );
+      $instructionsWrap
+        .append('div')
+        .text(l10n.t(`${prefix}.locked`, { name: l10n.t(providerStringID) }));
+    }
+
+    if (!hasTransforms) {
+      $instructionsWrap
+        .append('div')
+        .text(l10n.t(`${prefix}.is_missing`));
+
+      if (!isLocked) {
+        $instructionsWrap
+          .append('div')
+          .append('a')
+          .attr('href', '#')
+          .on('click', (e: PointerEvent) => {
+            e.preventDefault();
+            this._transforms?.push({ order: 0, source: '*', function: 'copy', target: '*' });
+            this.render();
+          })
+          .text(l10n.t(`${prefix}.add_default`));
+      }
+
+    } else if (dictInfo.isDefault) {
+      $instructionsWrap
+        .append('div')
+        .text(l10n.t(`${prefix}.is_default`));
+    }
+
+
+    // Render the data dictionary table..
+    let $table: D3Selection = $dictionary.selectAll('.dictionary-table')
+      .data(hasTransforms ? [0] : []);
+
+    // exit
+    $table.exit()
+      .remove();
+
+    // enter
+    const $$table: D3EnterSelection = $table.enter()
       .append('table')
+      .attr('class', 'dictionary-table')
       .classed('disabled', isLocked);
 
     /* Table Heading */
-    const $$headRow = $$table
+    const $$headRow: D3EnterSelection = $$table
       .append('thead')
       .append('tr');
 
     $$headRow
       .append('th')
-      .attr('class', 'dict-order');
+      .attr('class', 'dict-order shrink');
     $$headRow
       .append('th')
       .attr('class', 'dict-source');
@@ -619,70 +700,107 @@ export class UiRapidDatasetSettings extends EventEmitter {
     $$headRow
       .append('th')
       .attr('class', 'dict-target');
-    $$headRow
-      .append('th')
-      .attr('class', 'dict-actions');
+
+    if (!isLocked) {
+      $$headRow
+        .append('th')
+        .attr('class', 'dict-actions shrink');
+    }
 
     /* Table Body */
-    const $$tbody = $$table
+    $$table
       .append('tbody');
 
-    const $$bodyRows: D3EnterSelection = $$tbody.selectAll('.dataset-dictionary-row')
-      .data(this._transforms, (d: RapidDataTransform) => d.order)
-      .enter()
-      .append('tr')
-      .attr('class', 'dataset-dictionary-row');
-
-    $$bodyRows
-      .append('td')
-      .attr('class', 'dict-order')
-      .text((d: RapidDataTransform) => d.order);
-
-    $$bodyRows
-      .append('td')
-      .attr('class', 'dict-source')
-      .text((d: RapidDataTransform) => d.source);
-
-    $$bodyRows
-      .append('td')
-      .attr('class', 'dict-function')
-      .text((d: RapidDataTransform) => d.function);
-
-    $$bodyRows
-      .append('td')
-      .attr('class', 'dict-target')
-      .text((d: RapidDataTransform) => d.target);
-
-    $$bodyRows
-      .append('td')
-      .attr('class', 'dict-actions')
-      .text('actions');
-
     /* Table Footer */
-    $$table
-      .append('tfoot')
-      .append('tr')
-      .append('td')
-      .attr('colspan', '999');   // span all columns
-
+    if (!isLocked) {   // Add "Add More" button, if not locked.
+      $$table
+        .append('tfoot')
+        .append('tr')
+        .append('td')
+        .attr('colspan', '9999')   // span all columns
+        .append('button')
+        .attr('class', 'minor dict-add-more')
+        .on('click', (e: PointerEvent) => {
+          (e?.currentTarget as HTMLElement).blur();    // avoid keeping focus on the button - iD#4641
+          this._transforms!.push({ order: 9999 } as PartialDataTransform);
+          this.render();
+        });
+    }
 
     // update
-    $dictionary = $dictionary.merge($$dictionary);
+    $table = $table.merge($$table);
 
-    $dictionary.selectAll('.dataset-dictionary-heading')
-      .text(l10n.t(`${prefix}.heading`));
-
-    $dictionary.selectAll('thead th.dict-order')
+    $table.selectAll('thead th.dict-order')
       .text(l10n.t(`${prefix}.fields.order.label`));
-    $dictionary.selectAll('thead th.dict-source')
+    $table.selectAll('thead th.dict-source')
       .text(l10n.t(`${prefix}.fields.source.label`));
-    $dictionary.selectAll('thead th.dict-function')
+    $table.selectAll('thead th.dict-function')
       .text(l10n.t(`${prefix}.fields.function.label`));
-    $dictionary.selectAll('thead th.dict-target')
+    $table.selectAll('thead th.dict-target')
       .text(l10n.t(`${prefix}.fields.target.label`));
 
-    $dictionary.selectAll('tfoot td')
-      .text('add more');
+    $table.selectAll('tfoot .dict-add-more')
+      .text(l10n.t(`${prefix}.add_more`));
+
+
+    // Render the rows of the table..
+    const $tbody: D3Selection = $table.selectAll('tbody');
+    let $rows: D3Selection = $tbody.selectAll('.dict-row')
+      .data(transforms, (d: PartialDataTransform) => d.order);
+
+    // exit
+    $rows.exit()
+      .remove();
+
+    // enter
+    const $$rows: D3EnterSelection = $rows
+      .enter()
+      .append('tr')
+      .attr('class', 'dict-row');
+
+    $$rows
+      .append('td')
+      .attr('class', 'dict-order');
+    $$rows
+      .append('td')
+      .attr('class', 'dict-source');
+    $$rows
+      .append('td')
+      .attr('class', 'dict-function');
+    $$rows
+      .append('td')
+      .attr('class', 'dict-target');
+
+    if (!isLocked) {
+      const $$actions: D3EnterSelection = $$rows
+        .append('td')
+        .attr('class', 'dict-actions')
+        .append('div')
+        .attr('class', 'rapid-row-actions');
+
+      $$actions
+        .append('label')
+        .attr('class', 'dict-action-trash rapid-row-action')
+        .on('click', (e: PointerEvent, d: PartialDataTransform) => {
+          e.preventDefault();
+          this._transforms = this._transforms!
+            .filter((item: PartialDataTransform) => item.order !== d.order);   // remove current row
+          this.render();
+        })
+        .call(uiIcon('#fas-trash-can'));
+    }
+
+    // update
+    $rows = $rows.merge($$rows);
+
+    $rows.selectAll('.dict-order')
+      .text((d: PartialDataTransform) => d.order);
+    $rows.selectAll('.dict-source')
+      .text((d: PartialDataTransform) => d.source);
+    $rows.selectAll('.dict-function')
+      .text((d: PartialDataTransform) => d.function);
+    $rows.selectAll('.dict-target')
+      .text((d: PartialDataTransform) => d.target);
   }
 
 
@@ -698,6 +816,7 @@ export class UiRapidDatasetSettings extends EventEmitter {
     if (!ds) return;   // need a dataset to do anything
 
     const fieldInfo = this._checkFields();
+    const dictionaryInfo = this._checkDictionary();
 
     /* Ok/Cancel/Delete Buttons */
     let $buttons: D3Selection = $parent.selectAll('.modal-section.buttons')
@@ -729,7 +848,7 @@ export class UiRapidDatasetSettings extends EventEmitter {
     $buttons = $buttons.merge($$buttons) as D3Selection;
 
     $buttons.selectAll('.ok-button')
-      .classed('secondary disabled', !fieldInfo.isOk)
+      .classed('secondary disabled', !fieldInfo.isOk || !dictionaryInfo.isOk)
       .text(l10n.t('text.okay'));
 
     $buttons.selectAll('.cancel-button')
@@ -753,7 +872,8 @@ export class UiRapidDatasetSettings extends EventEmitter {
     if (!ds) return;   // need a dataset to do anything
 
     const fieldInfo = this._checkFields();
-    if (!fieldInfo.isOk) {
+    const dictionaryInfo = this._checkDictionary();
+    if (!fieldInfo.isOk || !dictionaryInfo.isOk) {
       this.render();
       return;
     }
@@ -885,6 +1005,77 @@ export class UiRapidDatasetSettings extends EventEmitter {
     // required values must be present
     result.isOk = !!(result.id && result.name && result.sourceUrl);
     return result;
-
   }
+
+
+  /**
+   * Checks the data dictionary.
+   * @returns a DictionaryInfo result set
+   */
+  protected _checkDictionary(): DictionaryInfo {
+    const result: DictionaryInfo = { isOk: false, isDefault: false };
+    if (!this.Modal) return result;
+
+    const ds = this.dataset;
+    if (!ds) return result;   // need a dataset to do anything
+
+    // Make a copy of the dataset dictionary transforms before any changes.
+    if (!this._transforms) {
+      const orig = ds.dictionary?.transforms;
+      this._transforms = orig ? structuredClone(orig) : [];
+    }
+
+    // Sort the rows by order ascending, then check each row.
+    let counter = 0;
+    const seen = new Set<number>();
+    const rows = this._transforms   // sort in-place
+      .sort((a: PartialDataTransform, b: PartialDataTransform) => a.order - b.order);
+
+    for (const row of rows) {
+      // recompute order
+      row.order = counter++;
+
+      // check function
+      if (row.function === 'copy') {
+        // "copy" should have a 'source' and 'target'
+        // default target = source if needed
+        if (!row.target) {
+          row.target = row.source;
+        }
+
+      } else if (row.function === 'ignore') {
+        // "ignore" should have a 'source' only
+        // remove target and params if present
+        row.target = undefined;
+        row.params = undefined;
+
+      } else if (row.function === 'constant') {
+        // "constant" should have no source,
+        // and a 'target' and 'params'
+        row.source = undefined;
+      }
+
+      // check for duplicate rows
+      const template = `${row.source ?? ''}:${row.function ?? ''}:${row.target ?? ''}`;
+      const hash = utilHashcode(template);
+      if (seen.has(hash)) {
+        // warn
+      } else {
+        seen.add(hash);
+      }
+    }
+
+    // Is this a "default" data dictionary (one that copies source attributes directly to target tags)?
+    result.isDefault = (
+      rows.length === 1
+      && rows[0].source === '*'
+      && rows[0].function === 'copy'
+      && rows[0].target === '*'
+    );
+
+    result.isOk = true;  // for now
+
+    return result;
+  }
+
 }

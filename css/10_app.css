@@ -251,6 +251,10 @@ table {
 table th {
   text-align: left;
 }
+table th.shrink {
+  width: 1px;   /* take up as little space as possible */
+  white-space: nowrap;
+}
 table.tags, table.tags td, table.tags th {
   border: 1px solid #ccc;
   padding: 4px;
