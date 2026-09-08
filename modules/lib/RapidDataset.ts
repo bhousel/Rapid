@@ -1,8 +1,14 @@
+import { DOMParser } from '@xmldom/xmldom';
 import { Extent } from '@rapid-sdk/math';
+import { GeoJSONData } from '../data/GeoJSONData.ts';
+import { geojsonFeatures } from '../util/util.ts';
+import { gpx, kml } from '@tmcw/togeojson';
 
 import type { Context } from '../Context.ts';
 import type { TreeValue } from './TreeStore.ts';
 import type { RapidDataDictionary } from './RapidDataDictionary.ts';
+import type { Document as XmlDocument } from '@xmldom/xmldom';
+import type { Vec2 } from '@rapid-sdk/math';
 
 const RAPID_MAGENTA = '#da26d3';
 
@@ -283,4 +289,259 @@ export class RapidDataset {
 
     return new RapidDataset(context, props);
   }
+
+
+
+  //---------------------------------------------------------------------------------------------
+  // NOTE: CODE BELOW HERE IS MOSTLY COPIED FROM `PixiLayerCustomData` and `VectorTileService`!!
+  // It is used for custom datasets.
+  // We chould clean this up
+
+  /**
+   * This checks the url that was entered in the url field.
+   * It decides whether the url looks like a single file to load or a vector tile template url.
+   * NOTE: CODE COPIED FROM `PixiLayerCustomData` !!!
+   * @return  Promise resolved when this custom source is ready, or rejected if errors
+   */
+  public setupCustomDatasetAsync(): Promise<void> {
+    if (!this.custom) return Promise.reject('not a custom source');
+    if (!this.sourceUrl) return Promise.reject('no source url');
+
+    const context = this.context;
+    const gfx = context.systems.gfx;
+    const network = context.systems.network!;
+    const spatial = context.systems.spatial!;
+    const spatialID = `rapid-${this.id}`;
+
+    // reset
+    spatial.clearCache(spatialID);
+    // this._template = null;
+    gfx?.deferredRedraw();
+
+
+    // Strip off any querystring/hash from the url before checking extension
+    const url = this.sourceUrl;
+    const testUrl = url.toLowerCase().split(/[?#]/)[0];
+    const extension = this._getExtension(testUrl);
+
+    if (extension) {   // Looks like a gpx, kml, geojson file.. load it!
+      return network.fetch<string | XmlDocument | GeoJSON.GeoJsonObject | null>(url)
+        .then(data => {
+          this._setFile(data, extension);
+        })
+        .catch(e => console.error(e));  // eslint-disable-line
+
+    } else {   // Looks like a vector tile url template
+      //this._setCustomUrlTemplate(url);
+      return Promise.reject('vector tile data not supported yet');
+    }
+  }
+
+
+  /**
+   * A url template is something we can pass to the Vector Tile service. It can be:
+   * - Mapbox Vector Tiles (MVT) made available from a z/x/y tileserver
+   * - Protomaps .pmtiles single-file archive containing MVT
+   * NOTE: CODE COPIED FROM `PixiLayerCustomData` !!!
+   * @param url - The URL template
+   */
+  protected _setCustomUrlTemplate(url: string): void {
+    // Test source against OSM imagery blocklists..
+    const osm = this.context.services.osm;
+    if (osm) {
+      const blocklists = osm.imageryBlocklists ?? [];
+      let fail: boolean;
+      let tested = 0;
+      let regex;
+
+      for (regex of blocklists) {
+        fail = regex.test(url);
+        tested++;
+        if (fail) return;   // a banned source
+      }
+
+      // ensure at least one test was run.
+      if (!tested) {
+        regex = /.*\.google(apis)?\..*\/(vt|kh)[\?\/].*([xyz]=.*){3}.*/;
+        fail = regex.test(url);
+        if (fail) return;   // a banned source
+      }
+    }
+
+    // this._template = url;
+
+    // strip off the querystring/hash from the template, it often includes the access token
+    // this._dataUsed = 'vectortile:' + url.split(/[?#]/)[0];
+    // this.scene.enableLayers(this.layerID);  // emits 'layerchange', so UI gets updated
+  }
+
+
+  /**
+   * This function is either called from the `FileReader` onload callback, or the `fetch` then chain.
+   * It can accept:
+   *  - a `string` of text data, in which case it will be parsed according to the given extension.
+   *  - a `Document` parsed by `xmldom.DOMParser` (like we would receive from `utilFetchResponse`),
+   *  - an `Object`, in the case of JSON/GeoJSON.
+   * All files get converted to GeoJSON.
+   * NOTE: CODE COPIED FROM `PixiLayerCustomData` !!!
+   * @param data - The file data
+   * @param extension - The file extension
+   */
+  protected _setFile(data: string | XmlDocument | GeoJSON.GeoJsonObject | null, extension: string | null | undefined): void {
+    if (!data) {
+      throw new Error('no data');
+    }
+
+    const context = this.context;
+    const gfx = context.systems.gfx;
+    const spatial = context.systems.spatial!;
+    const spatialID = `rapid-${this.id}`;
+
+    const isString = (typeof data === 'string');
+    let geojson: GeoJSON.GeoJsonObject | undefined;
+    switch (extension) {
+      case '.gpx':
+        geojson = gpx(isString ? _parseXML(data as string) : data as XmlDocument);
+        break;
+      case '.kml':
+        geojson = kml(isString ? _parseXML(data as string) : data as XmlDocument);
+        break;
+      case '.geojson':
+      case '.json':
+        geojson = isString ? JSON.parse(data as string) : data as GeoJSON.GeoJsonObject;
+        break;
+    }
+
+    geojson = geojson || {} as GeoJSON.GeoJsonObject;
+
+    if (!Object.keys(geojson).length) {
+      throw new Error('no geojson');
+    }
+
+    // this._dataUsed = `${extension} data file`;
+    const newFeatures = [];
+    this.extent = new Extent();
+
+    // We may have a Feature or a FeatureCollection, coax it to an array of Features.
+    const features = geojsonFeatures(geojson as GeoJSON.Feature | GeoJSON.FeatureCollection);
+    for (const feature of features) {
+      // We may have a MultiPolygon/MultiLineString/MultiPoint..
+      // For our purposes, we really want to work with them as single part features..
+      for (const part of this._toSingleFeatures(feature)) {
+        const extent = this._calcExtent(part);   // sanity check
+        if (!isFinite(extent.min[0])) continue;  // invalid - no coordinates?
+
+        const d = new GeoJSONData(this.context, { geojson: feature });
+        newFeatures.push(d);
+        this.extent.extendSelf(extent);
+      }
+    }
+
+    if (newFeatures.length) {
+      spatial.addData(spatialID, newFeatures);
+      gfx?.deferredRedraw();
+    }
+    // this.scene.enableLayers(this.layerID);  // emits 'layerchange', so UI gets updated
+
+
+    /**
+     * Create a DOMParser and parse the given string as an XML Document.
+     * @param text
+     */
+    function _parseXML(text: string): XmlDocument {
+      return (new DOMParser()).parseFromString(text.trimStart(), 'text/xml');
+    }
+  }
+
+
+  /**
+   * Return the extension at the end of a filename or url.
+   * This only returns the extension if it one of the recognized file types:
+   *   '.gpx', '.kml', '.json', '.geojson'
+   * NOTE: CODE COPIED FROM `PixiLayerCustomData` !!!
+   * @param name - A filename or url
+   * @return The extension including the dot '.'
+   */
+  protected _getExtension(name: string): string | null {
+    if (!name) return null;
+    const regex = /\.(gpx|kml|(geo)?json)$/i;
+    const match = name.match(regex);
+    return match?.[0] ?? null;
+  }
+
+
+  /**
+   * Call this to convert a multi feature to an array of single features
+   * (e.g. convert MultiPolygon to array of Polygons)
+   * (If passed a single feature, this will just return the single feature in an array)
+   * NOTE: CODE COPIED FROM `VectorTileService` !!!
+   * @param  geojson - any GeoJSON Feature
+   * @return array of single GeoJSON Features
+   */
+  protected _toSingleFeatures(geojson: GeoJSON.Feature): GeoJSON.Feature[] {
+    const result: GeoJSON.Feature[] = [];
+    const geometry = geojson?.geometry;
+    if (!geojson || !geometry) return result;
+    if (geometry.type === 'GeometryCollection') return result;  // pacify TypeScript
+
+    const type = geometry.type;
+    const coords = geometry.coordinates;
+
+    // Treat single types as multi types to keep the code simple
+    const parts = /^Multi/.test(type) ? coords : [coords];
+
+    for (const part of parts) {
+      result.push({
+        type: 'Feature',
+        geometry: {
+          type: type.replace('Multi', ''),
+          coordinates: part
+        },
+        properties: { ...geojson.properties }   // shallow copy
+      } as GeoJSON.Feature);
+    }
+    return result;
+  }
+
+  /**
+   * Computes the geographic extent covering a GeoJSON feature's geometry.
+   * NOTE: CODE COPIED FROM `VectorTileService` !!!
+   * @param  geojson - a GeoJSON Feature
+   * @return the extent
+   */
+  protected _calcExtent(geojson: GeoJSON.Feature): Extent {
+    const extent = new Extent();
+    const geometry = geojson?.geometry;
+    if (!geojson || !geometry) return extent;
+
+    const type = geometry.type;
+    if (type === 'GeometryCollection') return extent;  // pacify TypeScript
+
+    const coords = geometry.coordinates;
+
+    // Treat single types as multi types to keep the code simple
+    const parts = /^Multi/.test(type) ? coords : [coords];
+
+    if (/Polygon$/.test(type)) {
+      for (const polygon of parts as Vec2[][][]) {
+        const outer = polygon[0];  // No need to iterate over inners
+        for (const point of outer) {
+          extent.extendSelf(point);
+        }
+      }
+    } else if (/LineString$/.test(type)) {
+      for (const line of parts as Vec2[][]) {
+        for (const point of line) {
+          extent.extendSelf(point);
+        }
+      }
+    } else if (/Point$/.test(type)) {
+      for (const point of parts as Vec2[]) {
+        extent.extendSelf(point);
+      }
+    }
+
+    return extent;
+  }
+
 }

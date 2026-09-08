@@ -114,7 +114,7 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
   public render(frame: number, viewport: Viewport): void {
     if (!this.enabled || !(this.hasData())) return;
 
-    const vtService = this.context.services.vectortile as any;
+    const vtService = this.context.services.vectortile;
     const viewZoom = viewport.transform.zoom;
 
     let geoData: GeoJSONData[];
@@ -532,7 +532,7 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
    */
   protected _setUrlTemplate(url: string): void {
     // Test source against OSM imagery blocklists..
-    const osm = this.context.services.osm as any;
+    const osm = this.context.services.osm;
     if (osm) {
       const blocklists = osm.imageryBlocklists ?? [];
       let fail: boolean;
@@ -611,7 +611,7 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
     }
 
     /**
-     *
+     * Create a DOMParser and parse the given string as an XML Document.
      * @param text
      */
     function _parseXML(text: string): XmlDocument {

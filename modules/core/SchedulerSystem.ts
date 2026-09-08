@@ -683,9 +683,9 @@ export class SchedulerSystem extends AbstractSystem {
       workID,
       fn,
       resolve: () => {},
-      reject: (e: any) => {
-        if (e?.name === 'AbortError') return;  // expected cancellation
-        console.error(`SchedulerSystem: task '${workID ?? 'anonymous'}' threw:`, e);  // eslint-disable-line no-console
+      reject: (err: any) => {
+        if (err?.name === 'AbortError') return;  // expected cancellation
+        console.error(`SchedulerSystem: task '${workID ?? 'anonymous'}' threw:`, err);  // eslint-disable-line no-console
       },
     };
     switch (priority) {
@@ -787,8 +787,8 @@ export class SchedulerSystem extends AbstractSystem {
     for (const [id, fn] of this._frameCallbacks) {
       try {
         fn(deltaMS);
-      } catch (e) {
-        console.error(`SchedulerSystem: frame callback '${id}' threw:`, e);  // eslint-disable-line no-console
+      } catch (err) {
+        console.error(`SchedulerSystem: frame callback '${id}' threw:`, err);  // eslint-disable-line no-console
       }
     }
 

@@ -544,8 +544,13 @@ export class UiRapidDatasetSettings extends EventEmitter {
 
     $$conflation
       .append('h3')
-      .attr('class', 'dataset-conflation-heading');
+      .attr('class', 'conflation-heading');
 
+    $$conflation
+      .append('div')
+      .attr('class', 'conflation-instructions');
+
+    // Render the conflation fields
     const $$rows = $$conflation.selectAll('.field-row')
       .data(['conflation'])     // only one field for now
       .enter()
@@ -572,8 +577,10 @@ export class UiRapidDatasetSettings extends EventEmitter {
     // update
     $conflation = $conflation.merge($$conflation);
 
-    $conflation.selectAll('.dataset-conflation-heading')
+    $conflation.selectAll('.conflation-heading')
       .text(l10n.t(`${prefix}.heading`));
+    $conflation.selectAll('.conflation-instructions')
+      .text(l10n.t(`${prefix}.instruction`));
 
     $conflation.selectAll('.field-label')
       .text((d: string) => l10n.t(`${prefix}.${d}.label`));

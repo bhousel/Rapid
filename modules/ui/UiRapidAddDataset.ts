@@ -1,6 +1,7 @@
 import { EventEmitter } from 'tseep/lib/ee-safe';
 import { marked } from 'marked';
 import { RapidDataset } from '../lib/RapidDataset.ts';
+import { UiCombobox } from './UiCombobox.ts';
 import { uiIcon } from './icon.ts';
 import { UiModal } from './UiModal.ts';
 import { UiRapidDatasetSettings } from './UiRapidDatasetSettings.ts';
@@ -44,6 +45,7 @@ export class UiRapidAddDataset extends EventEmitter {
 
   // Child components
   public Modal: UiModal | null;
+  public SampleCombo: UiCombobox;
 
   /** Unique ID for field identifiers */
   protected _uuid: string;
@@ -60,6 +62,15 @@ export class UiRapidAddDataset extends EventEmitter {
 
     // Child components
     this.Modal = null;
+    this.SampleCombo = new UiCombobox(context, 'rapid-dark');
+
+    // Sample datasets
+    const sampleData = [
+      { value: 'http://bryanhousel.com/osm/STL_TREES_min.geojson' },
+      { value: 'http://bryanhousel.com/osm/stops.geojson' }
+    ];
+    this.SampleCombo.data(sampleData);
+
 
     // Ensure methods used as callbacks always have `this` bound correctly.
     // (This is also necessary when using `d3-selection.call`)
@@ -166,14 +177,24 @@ export class UiRapidAddDataset extends EventEmitter {
     };
 
     const ds = new RapidDataset(context, props);
-    rapid.catalog.set(ds.id, ds);
-    rapid.enableDatasets(ds.id);    // add it to the menu
-    rapid.saveDatasetSettings(ds);  // persist settings
 
-    // Continue to the Dataset Settings modal, wire up 'done' handler too.
-    const SettingsModal = new UiRapidDatasetSettings(context).once('done', this.close);
-    SettingsModal.dataset = ds;
-    SettingsModal.show();
+    // Does it work?
+    ds.setupCustomDatasetAsync()
+      .then(() => {
+        rapid.catalog.set(ds.id, ds);
+        rapid.enableDatasets(ds.id);    // add it to the menu
+        rapid.saveDatasetSettings(ds);  // persist settings
+
+        // Continue to the Dataset Settings modal, wire up 'done' handler too.
+        const SettingsModal = new UiRapidDatasetSettings(context).once('done', this.close);
+        SettingsModal.dataset = ds;
+        SettingsModal.show();
+      })
+      .catch((err: any) => {
+        console.error(`Dataset setup failed for ${ds.id}:  `, err);  // eslint-disable-line no-console
+        // handle the error?
+        this.render();
+      });
   }
 
 
@@ -369,8 +390,9 @@ export class UiRapidAddDataset extends EventEmitter {
       .attr('id', `url-${uuid}`)
       .attr('class', 'field-url')
       .call(utilNoAuto)
-      .on('input', (e: InputEvent) => this.render());  // rerendering will also run validation
-
+      .call(this.SampleCombo.attach)                    // sample data
+      .on('change', (e: Event) => this.render());
+      // .on('input', (e: InputEvent) => this.render());  // rerendering will also run validation
 
     // update
     $textSection = $textSection.merge($$textSection) as D3Selection;

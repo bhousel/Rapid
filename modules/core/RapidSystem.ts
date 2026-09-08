@@ -12,9 +12,9 @@ import type { TreeValue } from '../lib/TreeStore.ts';
 
 
 /**
- * Persisted settings for a single service-provided dataset,
- * stored under `rapid.dataset.<DatasetID>`. Leaves are strings (the settings store
- * is string-only), so `conflated` is persisted as `'true'`/`'false'`.
+ * Persisted settings for a service-provided dataset,
+ * stored by `SettingsSystem` under `rapid.dataset.<DatasetID>`.
+ * Note that these settings must be stringified.
  */
 export interface RapidDatasetSettings {
   color?: string;
@@ -22,16 +22,15 @@ export interface RapidDatasetSettings {
 }
 
 /**
- * Persisted settings for a single user-added custom dataset,
- * stored under `rapid.custom.<DatasetID>`. This is the string-only JSON produced by
- * `RapidDataset.toJSON()` and consumed by `RapidDataset.fromJSON()`.
+ * Persisted settings for a user-added custom dataset,
+ * stored by `SettingsSystem` under `rapid.custom.<DatasetID>`.
+ * JSON produced by `RapidDataset.toJSON()` and consumed by `RapidDataset.fromJSON()`.
  */
 export type RapidCustomDatasetSettings = Record<string, TreeValue>;
 
 /**
- * The structured view of the `rapid.*` settings subtree owned by `RapidSystem`.
- * The engine stores leaves as strings (or arrays of strings); this interface
- * documents the shape `RapidSystem` reads and writes on top of that.
+ * All persisted settings used by `RapidSystem`,
+ * stored by `SettingsSystem` under `rapid.*`.
  */
 export interface RapidSettings {
   /** DatasetIDs that should appear on the Rapid menu */
@@ -544,7 +543,6 @@ export class RapidSystem extends AbstractSystem {
       }
 
       // Only apply the subset of preferences that the user can customize.
-      // Leaves come back from the string-only settings store as strings.
       if (typeof prefs.color === 'string') {
         ds.color = prefs.color;
       }
@@ -575,9 +573,15 @@ export class RapidSystem extends AbstractSystem {
       }
 
       // Instantiate the custom dataset and add it to the catalog.
-      // `fromJSON` coerces the string-only settings leaves (e.g. boolean flags) back to their real types.
       ds = RapidDataset.fromJSON(context, { ...prefs, custom: 'true' });
-      this.catalog.set(datasetID, ds);
+      this.catalog.set(ds.id, ds);
+      ds.setupCustomDatasetAsync()
+        .then(() => {
+          // everything looks ok
+        })
+        .catch((err: any) => {
+          console.error(`Dataset setup failed for ${ds.id}:  `, err);  // eslint-disable-line no-console
+        });
     }
   }
 

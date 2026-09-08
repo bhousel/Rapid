@@ -1313,7 +1313,6 @@ export class VectorTileService extends AbstractSystem {
   }
 
 
-
   /**
    * Return a tile for the given tileID.
    * @param   tileID - the tileID

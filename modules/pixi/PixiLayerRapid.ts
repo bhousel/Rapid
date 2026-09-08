@@ -222,7 +222,7 @@ export class PixiLayerRapid extends AbstractPixiLayer {
     const viewZoom = viewport.transform.zoom;
 
     const service = context.services[ds.serviceID] as any;  // 'mapwithai', 'esri', 'overture'
-    if (!service?.started) return;
+    if (ds.serviceID && !service?.started) return;
 
     // Filter out features that have already been accepted or ignored by the user.
     const isAcceptedOrIgnored = (dataID: DataID): boolean => {
@@ -315,6 +315,26 @@ export class PixiLayerRapid extends AbstractPixiLayer {
           if (d.geoms.parts.some(part => part.type === 'Point')) {
             renderData.points.push(d);
           }
+        }
+      }
+
+    /* Custom */
+    /* for now, custom data needs to be a data file at a url that is loaded with Rapid starts up */
+    } else if (ds.custom) {
+      const spatial = this.context.systems.spatial!;
+      const spatialID = `rapid-${ds.id}`;
+      const data = spatial.getVisibleItems(spatialID).map(hit => hit.contents as GeoJSONData);
+      for (const d of data) {
+        if (isAcceptedOrIgnored(d.id)) continue;
+
+        if (d.geoms.parts.some(part => part.type === 'Polygon')) {
+          renderData.polygons.push(d);
+        }
+        if (d.geoms.parts.some(part => part.type === 'LineString')) {
+          renderData.lines.push(d);
+        }
+        if (d.geoms.parts.some(part => part.type === 'Point')) {
+          renderData.points.push(d);
         }
       }
     }

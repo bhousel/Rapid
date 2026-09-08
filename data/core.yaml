@@ -1329,11 +1329,12 @@ en:
           placeholder: Enter a Dataset Description    # placeholder text for the Description field
     conflation:
       heading: Conflation Settings
+      instruction: This section controls how new data is merged or filtered where it overlaps existing data.
       conflation:
         label: "Conflation?"
     dictionary:
       heading: Data Mapping
-      instruction: The data mapping controls how Rapid accepts data from this dataset.
+      instruction: This section controls how Rapid accepts new data from this dataset.
       locked: This section is locked because this dataset is provided by {name}.
       is_missing: There is no data mapping for this dataset. Rapid can still show the data, but you will not be able to accept it.
       add_default: Add a default data mapping
