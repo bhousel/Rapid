@@ -67,7 +67,7 @@ a:focus {
 }
 
 #viewer {
-  flex: 1;
+  flex: 1 1 0px;
   background-image: url('../iframe/loader-black.gif');
   background-size: 100px 100px;
   background-position: center;

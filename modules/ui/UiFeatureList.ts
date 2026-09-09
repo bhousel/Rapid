@@ -41,8 +41,8 @@ interface GeocodeResult {
  *
  * @example
  *  <div class='feature-list-wrap'>
- *    <div class='header'/>           // Contains the text "Search Features"
- *    <div class='search-header'/>    // Contains the `input` search field
+ *    <div class='heading'/>          // Contains the text "Search Features"
+ *    <div class='search-heading'/>    // Contains the `input` search field
  *    <div class='inspector-body'/>   // Contains the search results
  *  </div>
  */
@@ -120,25 +120,25 @@ export class UiFeatureList {
     this.$featureList = $featureList = $featureList.merge($$featureList);
 
 
-    // add .header
-    $featureList.selectAll('.header')
+    // add .heading
+    $featureList.selectAll('.heading')
       .data([0])
       .enter()
       .append('div')
-      .attr('class', 'header fillL')
+      .attr('class', 'heading fillL')
       .append('h3');
 
     // update
-    $featureList.selectAll('.header h3')
+    $featureList.selectAll('.heading h3')
       .text(l10n.t('inspector.feature_list'));
 
 
-    // add .search-header
-    const $$searchWrap = $featureList.selectAll('.search-header')
+    // add .search-heading
+    const $$searchWrap = $featureList.selectAll('.search-heading')
       .data([0])
       .enter()
       .append('div')
-      .attr('class', 'search-header');
+      .attr('class', 'search-heading');
 
     $$searchWrap
       .call(uiIcon('#rapid-icon-search'));
@@ -151,7 +151,7 @@ export class UiFeatureList {
       .on('keydown', this._keydown)
       .on('input', this._input);
 
-    this.$search = $featureList.selectAll('.search-header input');
+    this.$search = $featureList.selectAll('.search-heading input');
 
     // update
     this.$search
@@ -209,7 +209,7 @@ export class UiFeatureList {
         .data([0])
         .enter()
         .append('button')
-        .attr('class', 'geocode-item secondary-action')
+        .attr('class', 'geocode-item action')
         .on('click', this._nominatimSearch)
         .append('div')
         .attr('class', 'label')

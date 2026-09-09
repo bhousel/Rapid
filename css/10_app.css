@@ -33,7 +33,6 @@ For now we'll keep the UI intentionally familiar for users who are switching fro
   background-color: #333;
 
   touch-action: none;
-  -ms-user-select: none;
   -ms-content-zooming: none;
 }
 
@@ -48,7 +47,6 @@ For now we'll keep the UI intentionally familiar for users who are switching fro
   width: 0;
   height: 0;
 }
-
 
 div, textarea, label, input, form, span, ul, li, ol, a, button, h1, h2, h3, h4, h5, p, img {
   box-sizing: border-box;
@@ -625,18 +623,18 @@ button.add-note svg.icon {
 
 /* Header for modals / panes
 ------------------------------------------------------- */
-.header {
+.heading {
   display: flex;
   flex: 0 0 0px;
   align-items: center;
   justify-content: center;
 
   border-bottom: 1px solid #ccc;
-  padding: 20px 40px;
+  padding: 15px 40px;
   position: relative;
 }
 
-.header h3 {
+.heading h3 {
   text-align: center;
   margin-bottom: 0;
   text-overflow: ellipsis;
@@ -644,7 +642,7 @@ button.add-note svg.icon {
   padding: 0;
 }
 
-.header button,
+.heading button,
 .modal > button {
   border-radius: 0;
   width: 40px;
@@ -652,31 +650,31 @@ button.add-note svg.icon {
   overflow: hidden;
 }
 
-.header button {
+.heading button {
   position: relative;
   height: 100%;
 }
 
 .field-help-title button.close,
-.sidebar .header button.close,
-.preset-list-pane .header button.preset-choose {
+.sidebar .heading button.close,
+.preset-list-pane .heading button.preset-choose {
   position: absolute;
   right: 0;
   top: 0;
 }
 .ideditor[dir='rtl'] .field-help-title button.close,
-.ideditor[dir='rtl'] .sidebar .header button.close,
-.ideditor[dir='rtl'] .preset-list-pane .header button.preset-choose {
+.ideditor[dir='rtl'] .sidebar .heading button.close,
+.ideditor[dir='rtl'] .preset-list-pane .heading button.preset-choose {
   left: 0;
   right: auto;
 }
 
-.entity-editor-pane .header button.preset-choose {
+.entity-editor-pane .heading button.preset-choose {
   position: absolute;
   left: 0;
   top: 0;
 }
-.ideditor[dir='rtl'] .entity-editor-pane .header button.preset-choose {
+.ideditor[dir='rtl'] .entity-editor-pane .heading button.preset-choose {
   left: auto;
   right: 0;
 }
@@ -727,7 +725,6 @@ a.hide-toggle {
 
   z-index: 10;
   background: #f6f6f6;
-  -ms-user-select: element;
   overflow: hidden;
 }
 
@@ -839,24 +836,24 @@ set some opacity and hide the child contents */
   margin-bottom: 150px;
 }
 
-.sidebar .search-header {
+.sidebar .search-heading {
   flex: 0 0 auto;
   position: relative;
   overflow: hidden;
 }
-.sidebar .search-header .icon {
+.sidebar .search-heading .icon {
   display: inline-block;
   position: absolute;
   left: 10px;
   height: 100%;
   pointer-events: none;
 }
-.ideditor[dir='rtl'] .sidebar .search-header .icon {
+.ideditor[dir='rtl'] .sidebar .search-heading .icon {
   left: auto;
   right: 10px;
 }
 
-.sidebar .search-header input {
+.sidebar .search-heading input {
   width: 100%;
   padding: 0 10px;
   height: 3em;
@@ -2125,7 +2122,6 @@ div.combobox {
   padding: 5px 10px;
   border-top: 1px solid #ccc;
   line-height: 0.95rem;
-  break: all;
 }
 
 .combobox a.selected,
@@ -2502,8 +2498,6 @@ button.raw-tag-option svg.icon {
   padding-bottom: 10px;
   display: unset;
 }
-.tag-reference-description {
-}
 .tag-reference-link {
   display: block;
 }
@@ -2819,7 +2813,7 @@ img.tag-reference-wiki-image {
   padding-top: 20px;
 }
 
-.qa-details-header {
+.qa-details-heading {
   display: flex;
   flex-direction: row;
   justify-content: space-between;
@@ -2827,7 +2821,7 @@ img.tag-reference-wiki-image {
   padding: 0 10px;
 }
 /* Specify margin when one is followed by the other */
-.qa-details-header+.qa-details-container {
+.qa-details-heading+.qa-details-container {
   margin-top: 8px;
 }
 .qa-details-container {
@@ -3190,7 +3184,7 @@ div.full-screen > button:focus {
 
 .layer-list label > span.background-name {
   display: flex;
-  flex: 1;
+  flex: 1 1 0px;
   padding: 0 5px;
 }
 
@@ -4083,7 +4077,7 @@ li.issue-fix-item button:not(.actionable) .fix-icon {
 
 /* hide but preserve in layout */
 .inspector-hover .combobox-caret,
-.inspector-hover .header button,
+.inspector-hover .heading button,
 .inspector-hover .form-field-input-multicombo .chip .remove,
 .inspector-hover .hide-toggle:before,
 .inspector-hover .more-fields,
@@ -4367,7 +4361,6 @@ li.issue-fix-item button:not(.actionable) .fix-icon {
 
   width: 100%;
   z-index: 10;
-  -ms-user-select: element;
   pointer-events: none;
   overflow: hidden;
 }
@@ -4872,7 +4865,7 @@ li.issue-fix-item button:not(.actionable) .fix-icon {
 
 .modal-section.buttons button {
   min-width: 130px;
-  padding: 0 15px;
+  padding: 10px 15px;
 }
 
 .modal-section.buttons .action {
@@ -5095,9 +5088,6 @@ li.issue-fix-item button:not(.actionable) .fix-icon {
   width: auto;
   height: 0;
   margin-bottom: 20px;
-}
-
-.shortcut-row {
 }
 
 .shortcut-row > td {

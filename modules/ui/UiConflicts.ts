@@ -107,21 +107,21 @@ export class UiConflicts extends EventEmitter {
 
     this._keybindingOn();
 
-    const $$header = $selection.selectAll('.header')
+    const $$heading = $selection.selectAll('.heading')
       .data([0])
       .enter()
       .append('div')
-      .attr('class', 'header fillL');
+      .attr('class', 'heading fillL');
 
-    $$header
+    $$heading
       .append('button')
       .attr('class', 'fr')
       .on('click', this._cancel)
       .call(uiIcon('#rapid-icon-close'));
 
-    $$header
+    $$heading
       .append('h3')
-      .text(l10n.t('save.conflict.header'));
+      .text(l10n.t('save.conflict.heading'));
 
     const $$body = $selection.selectAll('.body')
       .data([0])

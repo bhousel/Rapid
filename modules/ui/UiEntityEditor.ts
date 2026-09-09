@@ -113,37 +113,37 @@ export class UiEntityEditor extends EventEmitter {
     const combinedTags = this._getCombinedTags(this._entityIDs, editor.staging.graph);
     const isRTL = l10n.isRTL;
 
-    // Header
-    let $header: D3Selection = this.$parent.selectAll('.header')
+    // Heading
+    let $heading: D3Selection = this.$parent.selectAll('.heading')
       .data([0]);
 
     // Enter
-    const $$header = $header.enter()
+    const $$heading = $heading.enter()
       .append('div')
-      .attr('class', 'header fillL');
+      .attr('class', 'heading fillL');
 
-    $$header
+    $$heading
       .append('button')
       .attr('class', 'preset-reset preset-choose')
       .call(uiIcon(isRTL ? '#rapid-icon-forward' : '#rapid-icon-backward'));
 
-    $$header
+    $$heading
       .append('button')
       .attr('class', 'close')
       .on('click', () => context.enter('browse'))
       .call(uiIcon('#rapid-icon-close'));
 
-    $$header
+    $$heading
       .append('h3');
 
     // Update
-    $header = $header
-      .merge($$header);
+    $heading = $heading
+      .merge($$heading);
 
-    $header.selectAll('h3')
+    $heading.selectAll('h3')
       .text(this._entityIDs.length === 1 ? l10n.t('map_data.layers.osm.feature') : l10n.t('inspector.multiselect'));
 
-    $header.selectAll('.preset-reset')
+    $heading.selectAll('.preset-reset')
       .on('click', () => this.emit('choose', this._selectedPresets));
 
     // Body

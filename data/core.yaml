@@ -1005,7 +1005,7 @@ en:
   settings:
     custom_background:
       tooltip: Edit custom background
-      header: Custom Background Settings
+      heading: Custom Background Settings
       instructions:
         info: Enter a tile URL template below.
         wms:
@@ -1027,7 +1027,7 @@ en:
         placeholder: Enter a url template
     custom_data:
       tooltip: Edit custom data layer
-      header: Custom Map Data Settings
+      heading: Custom Map Data Settings
       instructions: "Custom map data can be added to the map as a reference layer either of two ways:"
       file:
         heading: "Local Data File"
@@ -1099,7 +1099,7 @@ en:
     conflict_progress: "Checking for conflicts: {num} of {total}"
     unsaved_changes: You have unsaved changes
     conflict:
-      header: Resolve conflicting edits
+      heading: Resolve conflicting edits
       count: 'Conflict {num} of {total}'
       keep_local: Keep mine
       keep_remote: Use theirs

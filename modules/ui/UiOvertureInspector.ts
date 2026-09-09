@@ -16,7 +16,7 @@ const OVERTURE_CYAN = '#00ffff';
  *
  * @example
  *  <div class='overture-inspector'>
- *    <div class='header'>…</div>
+ *    <div class='heading'>…</div>
  *    <div class='body'>
  *      <div class='feature-info'>
  *        <div class='dataset-label'/>             // Dataset name, e.g. "Places" or "Buildings"
@@ -95,17 +95,17 @@ export class UiOvertureInspector {
       .attr('class', 'overture-inspector');
 
 
-    // add `.header`
-    const $$header = $$inspector
+    // add `.heading`
+    const $$heading = $$inspector
       .append('div')
-      .attr('class', 'header');
+      .attr('class', 'heading');
 
-    $$header
+    $$heading
       .append('h3')
       .append('img')
       .attr('class', 'wordmark-overture');
 
-    $$header
+    $$heading
       .append('button')
       .attr('class', 'overture-inspector-close')
       .on('click', () => context.enter('browse'))

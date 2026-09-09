@@ -108,24 +108,24 @@ export class UiMapRouletteEditor extends EventEmitter {
 
     if (!osm || !maproulette) return;
 
-    const $header: D3Selection = $parent.selectAll('.header')
+    const $heading: D3Selection = $parent.selectAll('.heading')
       .data([0]);
 
-    const $$header: D3EnterSelection = $header.enter()
+    const $$heading: D3EnterSelection = $heading.enter()
       .append('div')
-      .attr('class', 'header fillL');
+      .attr('class', 'heading fillL');
 
-    $$header
+    $$heading
       .append('button')
       .attr('class', 'close')
       .on('click', () => context.enter('browse'))
       .call(uiIcon('#rapid-icon-close'));
 
-    $$header
+    $$heading
       .append('h3');
 
     // update
-    $header.merge($$header)
+    $heading.merge($$heading)
       .select('h3')
       .text(l10n.t('map_data.layers.maproulette.title', { n: 1 }));
 

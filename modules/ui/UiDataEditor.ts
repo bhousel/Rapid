@@ -16,8 +16,9 @@ export class UiDataEditor {
   public context: Context;
   public datum: any;
 
-  protected _dataHeader: UiDataHeader;
-  protected _rawTagEditor: UiSectionRawTagEditor;
+  // Child components
+  public DataHeader: UiDataHeader;
+  public RawTagEditor: UiSectionRawTagEditor;
 
   // D3 selections
   public $parent: D3Selection | null;
@@ -30,8 +31,8 @@ export class UiDataEditor {
     this.context = context;
     this.datum = null;
 
-    this._dataHeader = new UiDataHeader(context);
-    this._rawTagEditor = new UiSectionRawTagEditor(context, 'custom-data-tag-editor')
+    this.DataHeader = new UiDataHeader(context);
+    this.RawTagEditor = new UiSectionRawTagEditor(context, 'custom-data-tag-editor')
       .readOnlyTags([/./]);
 
     // D3 selections
@@ -57,25 +58,26 @@ export class UiDataEditor {
     const context = this.context;
     const l10n = context.systems.l10n!;
 
-    let $header: D3Selection = $parent.selectAll('.header')
+    let $heading: D3Selection = $parent.selectAll('.heading')
       .data([0]);
 
-    const $$header = $header.enter()
+    const $$heading = $heading.enter()
       .append('div')
-      .attr('class', 'header fillL');
+      .attr('class', 'heading fillL');
 
-    $$header
+    $$heading
       .append('button')
       .attr('class', 'close')
       .on('click', () => context.enter('browse'))
       .call(uiIcon('#rapid-icon-close'));
 
-    $$header
+    $$heading
       .append('h3');
 
     // update
-    $header = $header.merge($$header);
-    $header.select('h3')
+    $heading = $heading.merge($$heading);
+
+    $heading.select('h3')
       .text(l10n.t('map_data.title'));
 
 
@@ -91,12 +93,12 @@ export class UiDataEditor {
       .data([0]);
 
     // enter/update
-    this._dataHeader.datum = this.datum;
+    this.DataHeader.datum = this.datum;
     $editor.enter()
       .append('div')
       .attr('class', 'modal-section data-editor')
       .merge($editor)
-      .call(this._dataHeader.render);
+      .call(this.DataHeader.render);
 
     const $rawTagEditor: D3Selection = $body.selectAll('.data-tag-editor')
       .data([0]);
@@ -106,7 +108,7 @@ export class UiDataEditor {
       .append('div')
       .attr('class', 'data-tag-editor')
       .merge($rawTagEditor)
-      .call(this._rawTagEditor
+      .call(this.RawTagEditor
         .tags((this.datum?.properties) || {})
         .state('hover')
         .render

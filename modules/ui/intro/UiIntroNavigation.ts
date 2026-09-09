@@ -581,14 +581,14 @@ export class UiIntroNavigation extends AbstractIntroChapter {
       return await new Promise<IntroStep>((resolve, reject) => {
         this._rejectStep = reject;
         curtain.reveal({
-          revealSelector: '.search-header input',
+          revealSelector: '.search-heading input',
           tipHtml: helpHtml(context, 'intro.navigation.search_street', { name: l10n.t('intro.graph.name.spring-street') })
         });
 
-        container.select('.search-header input').on('keyup.intro', () => resolve(this._checkSearchResultAsync));
+        container.select('.search-heading input').on('keyup.intro', () => resolve(this._checkSearchResultAsync));
       });
     } finally {
-      container.select('.search-header input').on('keyup.intro', null);
+      container.select('.search-heading input').on('keyup.intro', null);
     }
   }
 
@@ -608,7 +608,7 @@ export class UiIntroNavigation extends AbstractIntroChapter {
         this._rejectStep = reject;
         this._onModeChange = () => resolve(this._selectedStreetAsync);
 
-        container.select('.search-header input').on('keyup.intro', () => {
+        container.select('.search-heading input').on('keyup.intro', () => {
           const first = container.select('.feature-list-item:nth-child(0n+2)');  // skip "No Results" item
           const firstName = first.select('.entity-name');
           const name = l10n.t('intro.graph.name.spring-street');
@@ -620,7 +620,7 @@ export class UiIntroNavigation extends AbstractIntroChapter {
               tipHtml: helpHtml(context, 'intro.navigation.choose_street', { name: name })
             });
             // no more typing
-            container.select('.search-header input')
+            container.select('.search-heading input')
               .on('keydown.intro', eventCancel, true)
               .on('keyup.intro', null);
           }
@@ -628,7 +628,7 @@ export class UiIntroNavigation extends AbstractIntroChapter {
       });
     } finally {
       this._onModeChange = null;
-      container.select('.search-header input')
+      container.select('.search-heading input')
         .on('keydown.intro', null)
         .on('keyup.intro', null);
     }

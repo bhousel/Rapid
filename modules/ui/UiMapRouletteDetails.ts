@@ -179,8 +179,8 @@ export class UiMapRouletteDetails {
       // Display Challenge ID and Task ID
       if (task.id) {
         const $header = $qaDetails
-          .append('header')
-          .attr('class', 'qa-details-header');
+          .append('div')
+          .attr('class', 'qa-details-heading');
 
         $header
           .append('h4')
@@ -205,8 +205,8 @@ export class UiMapRouletteDetails {
           .append('article');
 
         const $descriptionHeader = $description
-          .append('header')
-          .attr('class', 'qa-details-header');
+          .append('div')
+          .attr('class', 'qa-details-heading');
 
         $descriptionHeader
           .append('h4')
@@ -228,8 +228,8 @@ export class UiMapRouletteDetails {
           .append('article');
 
         const $instructionHeader = $instruction
-          .append('header')
-          .attr('class', 'qa-details-header');
+          .append('div')
+          .attr('class', 'qa-details-heading');
 
         $instructionHeader
           .append('h4')

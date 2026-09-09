@@ -43,9 +43,9 @@ export class UiSettingsCustomBackground extends EventEmitter {
     Modal.$shaded!
       .classed('settings-modal settings-custom-background', true);
 
-    Modal.$header!
+    Modal.$heading!
       .append('h3')
-      .text(l10n.t('settings.custom_background.header'));
+      .text(l10n.t('settings.custom_background.heading'));
 
     const prefix = 'settings.custom_background.instructions';
     const info = l10n.t(`${prefix}.info`);

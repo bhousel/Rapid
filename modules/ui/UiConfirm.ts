@@ -5,13 +5,13 @@ import type { D3Selection } from 'd3-selection';
 
 
 /**
- * `UiConfirm` is a simple alert-style modal (header, message, buttons) built on
- * top of `UiModal`. After `show()`, render into `$header` / `$message` and add action buttons;
+ * `UiConfirm` is a simple alert-style modal (heading, message, buttons) built on
+ * top of `UiModal`. After `show()`, render into `$heading` / `$message` and add action buttons;
  * `okButton()` appends a focused "Okay" button that dismisses the dialog.
  */
 export class UiConfirm extends UiModal {
   // D3 selections
-  public $header: D3Selection | null;
+  public $heading: D3Selection | null;
   public $message: D3Selection | null;
   public $buttons: D3Selection | null;
 
@@ -24,7 +24,7 @@ export class UiConfirm extends UiModal {
     super(context, blocking);
 
     // D3 selections
-    this.$header = null;
+    this.$heading = null;
     this.$message = null;
     this.$buttons = null;
 
@@ -41,9 +41,9 @@ export class UiConfirm extends UiModal {
 
     this.$modal.classed('modal-alert', true);
 
-    this.$header = this.$content
+    this.$heading = this.$content
       .append('div')
-      .attr('class', 'modal-section header');
+      .attr('class', 'modal-section heading');
 
     this.$message = this.$content
       .append('div')

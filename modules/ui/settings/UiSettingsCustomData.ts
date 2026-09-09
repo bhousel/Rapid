@@ -6,9 +6,6 @@ import { utilNoAuto } from '../../util/index.ts';
 import type { Context } from '../../Context.ts';
 import type { D3Selection } from 'd3-selection';
 
-
-const PREFIX = 'settings.custom_data';  // prefix for text strings
-
 const ACCEPT = [
   '.gpx', 'application/gpx', 'application/gpx+xml',
   '.kml', 'application/vnd.google-earth.kml+xml', 'application/kml', 'application/kml+xml',
@@ -47,6 +44,7 @@ export class UiSettingsCustomData extends EventEmitter {
     const urlhash = context.systems.urlhash!;
 
     const dataLayer = scene.layers.get('custom-data') as any;
+    const prefix = 'settings.custom_data';  // prefix for text strings
 
     // Keep separate copies of original and current settings
     // Take initial values from urlhash first, stored settings second
@@ -60,18 +58,18 @@ export class UiSettingsCustomData extends EventEmitter {
     Modal.$shaded!
       .classed('settings-modal settings-custom-data', true);
 
-    Modal.$header!
+    Modal.$heading!
       .append('h3')
-      .text(l10n.t(`${PREFIX}.header`));
+      .text(l10n.t(`${prefix}.heading`));
 
 
     const $textSection: D3Selection = Modal.$message!;
 
-    const data_instructions = l10n.t(`${PREFIX}.instructions`);
-    const file_heading = l10n.t(`${PREFIX}.file.heading`);
-    const file_instructions = l10n.t(`${PREFIX}.file.instructions`);
-    const file_types = l10n.t(`${PREFIX}.file.types`);
-    const file_tip = l10n.t(`${PREFIX}.file.tip`);
+    const data_instructions = l10n.t(`${prefix}.instructions`);
+    const file_heading = l10n.t(`${prefix}.file.heading`);
+    const file_instructions = l10n.t(`${prefix}.file.instructions`);
+    const file_types = l10n.t(`${prefix}.file.types`);
+    const file_tip = l10n.t(`${prefix}.file.tip`);
 
     const fileHtml = marked.parse(`
 ${data_instructions}
@@ -107,14 +105,14 @@ ${file_tip}
         }
       });
 
-    const data_or = l10n.t(`${PREFIX}.or`);
-    const url_heading = l10n.t(`${PREFIX}.url.heading`);
-    const url_instructions = l10n.t(`${PREFIX}.url.instructions`);
-    const url_tokens = l10n.t(`${PREFIX}.url.tokens`);
-    const url_xyz = l10n.t(`${PREFIX}.url.xyz`);
-    const url_example_file = l10n.t(`${PREFIX}.url.example_file`);
-    const url_example_xyz = l10n.t(`${PREFIX}.url.example_xyz`);
-    const url_example_pmtiles = l10n.t(`${PREFIX}.url.example_pmtiles`);
+    const data_or = l10n.t(`${prefix}.or`);
+    const url_heading = l10n.t(`${prefix}.url.heading`);
+    const url_instructions = l10n.t(`${prefix}.url.instructions`);
+    const url_tokens = l10n.t(`${prefix}.url.tokens`);
+    const url_xyz = l10n.t(`${prefix}.url.xyz`);
+    const url_example_file = l10n.t(`${prefix}.url.example_file`);
+    const url_example_xyz = l10n.t(`${prefix}.url.example_xyz`);
+    const url_example_pmtiles = l10n.t(`${prefix}.url.example_pmtiles`);
     const example = l10n.t('example');
 
     const urlHtml = marked.parse(`
@@ -141,7 +139,7 @@ ${url_tokens}
     $textSection
       .append('textarea')
       .attr('class', 'field-url')
-      .attr('placeholder', l10n.t(`${PREFIX}.url.placeholder`))
+      .attr('placeholder', l10n.t(`${prefix}.url.placeholder`))
       .call(utilNoAuto)
       .property('value', _currUrl);
 

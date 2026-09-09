@@ -24,9 +24,9 @@ describe('UiConfirm', () => {
     assert.isTrue(modal.isShown);
   });
 
-  it('has a header section', () => {
+  it('has a heading section', () => {
     const modal = new Rapid.UiConfirm(context).show();
-    assert.strictEqual(modal.$shaded.selectAll('div.content div.header').size(), 1);
+    assert.strictEqual(modal.$shaded.selectAll('div.content div.heading').size(), 1);
   });
 
   it('has a message section', () => {

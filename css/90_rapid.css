@@ -302,17 +302,26 @@ div.combobox.combobox-rapid-dark a:focus {
   flex-flow: column nowrap;
 }
 
-.rapid-inspector .header {
-  flex: 0 0 0px;
+.rapid-inspector .heading {
   background: #f6f6f6;
   color: #333;
   border-bottom: 1px solid #aaaa;
 }
-.rapid-inspector .header h3 {
+.rapid-inspector .heading h3 {
   display: flex;
+  align-items: center;
 }
-.rapid-inspector .header svg.logo-rapid {
-  height: 35px;
+.rapid-inspector .heading svg.logo-rapid {
+  height: 30px;
+}
+
+.overture-inspector .heading {
+  padding: 10px 40px;
+}
+.overture-inspector .heading img.wordmark-overture {
+  object-fit: contain;
+  width: 100%;
+  height: 50px
 }
 
 button.rapid-inspector-close,
@@ -372,7 +381,7 @@ button.overture-inspector-close:hover {
 
 .rapid-inspector .feature-info .dataset-label,
 .overture-inspector .feature-info .dataset-label  {
-  flex: 1;
+  flex: 1 1 0px;
   font-size: 14px;
   font-weight: bold;
 }
@@ -506,12 +515,6 @@ button.overture-inspector-close:hover {
   padding: 15px;
 }
 
-.overture-inspector img.wordmark-overture {
-  width: 100%;
-  max-width: 225px;
-  object-fit: contain;
-}
-
 
 /* Rapid modal dialogs
 ------------------------------------------------------- */
@@ -536,7 +539,7 @@ button.overture-inspector-close:hover {
   min-height: 85%;
 }
 .modal.rapid-modal.wide .content {
-  flex: 1;
+  flex: 1 1 0px;
 }
 
 .modal.rapid-modal h1,
@@ -587,7 +590,7 @@ button.overture-inspector-close:hover {
 .modal.rapid-modal .modal-heading {
   display: flex;
   flex-flow: row nowrap;
-  flex: 0;
+  flex: 0 0 0px;
   align-items: center;
   padding: 10px;
   color: #fff;
@@ -598,7 +601,7 @@ button.overture-inspector-close:hover {
   padding: 0 5px;
 }
 .modal.rapid-modal .modal-heading-text {
-  flex: 1;
+  flex: 1 1 0px;
   font-size: 24px;
   padding: 0 10px;
 }
@@ -889,7 +892,7 @@ button.overture-inspector-close:hover {
 }
 .modal-catalog .rapid-catalog-filter-search-wrap,
 .modal-catalog .rapid-catalog-filter-type-wrap {
-  flex: 1;
+  flex: 1 1 0px;
   display: flex;
   flex-flow: row nowrap;
   position: relative;
@@ -971,7 +974,7 @@ button.overture-inspector-close:hover {
 }
 
 .dataset-label {
-  flex: 1;
+  flex: 1 1 0px;
   padding: 0 8px;
 }
 
@@ -1083,7 +1086,7 @@ img.dataset-thumbnail.inverted {
 ------------------------------------------------------- */
 .modal-dataset-settings .dataset-settings-wrap {
   display: flex;
-  flex: 1;
+  flex: 1 1 0px;
   flex-flow: column nowrap;
   width: 100%;
   overflow-y: auto;
@@ -1100,19 +1103,19 @@ img.dataset-thumbnail.inverted {
 /* Details section */
 .modal-dataset-settings .dataset-details {
   display: flex;
-  flex: 0;
+  flex: 0 0 0px;
   flex-flow: row nowrap;
 }
 .modal-dataset-settings .dataset-details-wrap {
   display: flex;
-  flex: 1;
+  flex: 1 1 0px;
   flex-flow: column nowrap;
   align-items: flex-start;
 }
 .modal-dataset-settings .field-row {
   display: flex;
   flex-flow: row nowrap;
-  flex: 1;
+  flex: 1 1 0px;
   align-items: flex-start;
   width: 100%;
 }
@@ -1125,7 +1128,7 @@ img.dataset-thumbnail.inverted {
 }
 .modal-dataset-settings .field-input {
   display: flex;
-  flex: 1;
+  flex: 1 1 0px;
   flex-flow: row nowrap;
   align-items: flex-start;
 }
@@ -1133,7 +1136,7 @@ img.dataset-thumbnail.inverted {
 /* Thumbnail section */
 .modal-dataset-settings .dataset-thumbnail-wrap {
   display: flex;
-  flex: 0;
+  flex: 0 0 0px;
   flex-flow: column nowrap;
   align-items: flex-start;
   margin: 30px 10px 0 30px;
@@ -1159,20 +1162,20 @@ img.dataset-thumbnail.inverted {
 /* Conflation section */
 .modal-dataset-settings .dataset-conflation {
   display: flex;
-  flex: 0;
+  flex: 0 0 0px;
   flex-flow: column nowrap;
 }
 .modal-dataset-settings .field-row.row-conflation {
   align-items: center;
 }
 .modal-dataset-settings .field-row.row-conflation .field-input {
-  flex: 0;   /* don't grow */
+  flex: 0 0 0px;   /* don't grow */
 }
 
 /* Data Dictionary section */
 .modal-dataset-settings .dataset-dictionary {
   display: flex;
-  flex: 0;
+  flex: 0 0 0px;
   flex-flow: column nowrap;
 }
 .modal-dataset-settings .dictionary-table {

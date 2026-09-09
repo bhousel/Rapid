@@ -349,50 +349,48 @@ export class UiCommit extends EventEmitter {
     const osm = context.services.osm;
     if (!osm) return;
 
-    let header: D3Selection = $selection.selectAll('.header')
+    let $heading: D3Selection = $selection.selectAll('.heading')
       .data([0]);
 
-    const headerTitle = header.enter()
+    const $$heading = $heading.enter()
       .append('div')
-      .attr('class', 'header fillL');
+      .attr('class', 'heading fillL');
 
-    headerTitle
+    $$heading
       .append('div')
       .append('h3');
 
-    headerTitle
+    $$heading
       .append('button')
       .attr('class', 'close')
-      .on('click', (e: PointerEvent) => {
-        this.emit('cancel');
-      })
+      .on('click', (e: PointerEvent) => this.emit('cancel'))
       .call(uiIcon('#rapid-icon-close'));
 
     // update
-    header = header.merge(headerTitle);
+    $heading = $heading.merge($$heading);
 
-    header.select('h3')
+    $heading.select('h3')
       .text(l10n.t('commit.title'));
 
-    let body: D3Selection = $selection.selectAll('.body')
+    let $body: D3Selection = $selection.selectAll('.body')
       .data([0]);
 
-    body = body.enter()
+    $body = $body.enter()
       .append('div')
       .attr('class', 'body')
-      .merge(body);
+      .merge($body);
 
 
     // Changeset Section
-    let changesetSection: D3Selection = body.selectAll('.changeset-editor')
+    let $changesetSection: D3Selection = $body.selectAll('.changeset-editor')
       .data([0]);
 
-    changesetSection = changesetSection.enter()
+    $changesetSection = $changesetSection.enter()
       .append('div')
       .attr('class', 'modal-section changeset-editor')
-      .merge(changesetSection);
+      .merge($changesetSection);
 
-    changesetSection
+    $changesetSection
       .call(this._changesetEditor
         .changesetID(uploader.changeset!.id)
         .tags(uploader.changeset!.tags)
@@ -401,30 +399,30 @@ export class UiCommit extends EventEmitter {
 
 
     // Warnings
-    body.call(this._commitWarnings.render);
+    $body.call(this._commitWarnings.render);
 
 
     // Upload Explanation
-    let saveSection: D3Selection = body.selectAll('.save-section')
+    let $saveSection: D3Selection = $body.selectAll('.save-section')
       .data([0]);
 
-    saveSection = saveSection.enter()
+    $saveSection = $saveSection.enter()
       .append('div')
       .attr('class','modal-section save-section fillL')
-      .merge(saveSection);
+      .merge($saveSection);
 
-    let prose: D3Selection = saveSection.selectAll('.commit-info')
+    let $prose: D3Selection = $saveSection.selectAll('.commit-info')
       .data([0]);
 
-    if (prose.enter().size()) {   // first time, make sure to update user details in prose
+    if ($prose.enter().size()) {   // first time, make sure to update user details in prose
       this._userDetails = null;
     }
 
-    prose = prose.enter()
+    $prose = $prose.enter()
       .append('p')
       .attr('class', 'commit-info')
       .text(l10n.t('commit.upload_explanation'))
-      .merge(prose);
+      .merge($prose);
 
     // Always check if this has changed, but only update prose.html()
     // if needed, because it can trigger a style recalculation
@@ -433,119 +431,119 @@ export class UiCommit extends EventEmitter {
         if (this._userDetails === user) return;  // no change
         this._userDetails = user;
 
-        const userLink = select(document.createElement('div'));
+        const $userLink = select(document.createElement('div'));
 
         const href = user?.img?.href;
         if (href) {
-          userLink
+          $userLink
             .append('img')
             .attr('src', href)
             .attr('class', 'icon pre-text user-icon');
         }
 
-        userLink
+        $userLink
           .append('a')
           .attr('class', 'user-info')
           .text(user.display_name)
           .attr('href', osm.userURL(user.display_name))
           .attr('target', '_blank');
 
-        prose
-          .html(l10n.tHtml('commit.upload_explanation_with_user', { user: userLink.html() }));
+        $prose
+          .html(l10n.tHtml('commit.upload_explanation_with_user', { user: $userLink.html() }));
       });
 
 
     // Request Review
-    let requestReview: D3Selection = saveSection.selectAll('.request-review')
+    let $requestReview: D3Selection = $saveSection.selectAll('.request-review')
       .data([0]);
 
     // Enter
-    const requestReviewEnter = requestReview.enter()
+    const $$requestReview = $requestReview.enter()
       .append('div')
       .attr('class', 'request-review');
 
     const requestReviewDomId = utilUniqueString('commit-input-request-review');
 
-    const labelEnter = requestReviewEnter
+    const $$label = $$requestReview
       .append('label')
       .attr('for', requestReviewDomId);
 
-    if (!labelEnter.empty()) {
-      labelEnter
+    if (!$$label.empty()) {
+      $$label
         .call(new UiTooltip(context).title(l10n.t('commit.request_review_info')).placement('top').attach);
     }
 
-    labelEnter
+    $$label
       .append('input')
       .attr('type', 'checkbox')
       .attr('id', requestReviewDomId);
 
-    labelEnter
+    $$label
       .append('span');
 
     // Update
-    requestReview = requestReview
-      .merge(requestReviewEnter);
+    $requestReview = $requestReview
+      .merge($$requestReview);
 
-    requestReview.selectAll('span')
+    $requestReview.selectAll('span')
       .text(l10n.t('commit.request_review'));
 
     const toggleRequestReview = (): void => {
-      const rr = requestReviewInput.property('checked');
+      const rr = $requestReviewInput.property('checked');
       this._updateChangeset({ review_requested: (rr ? 'yes' : undefined) });
 
-      tagSection
+      $tags
         .call(this._rawTagEditor
           .tags({ ...uploader.changeset!.tags })   // shallow copy
           .render
         );
     };
 
-    const requestReviewInput = requestReview.selectAll('input')
+    const $requestReviewInput = $requestReview.selectAll('input')
       .property('checked', this._isReviewRequested(uploader.changeset!.tags))
       .on('change', toggleRequestReview);
 
 
     // Buttons
-    let buttonSection: D3Selection = saveSection.selectAll('.buttons')
+    let $buttons: D3Selection = $saveSection.selectAll('.buttons')
       .data([0]);
 
     // enter
-    const buttonEnter = buttonSection.enter()
+    const $$buttons = $buttons.enter()
       .append('div')
       .attr('class', 'buttons fillL');
 
-    buttonEnter
+    $$buttons
       .append('button')
       .attr('class', 'secondary-action button cancel-button')
       .append('span')
       .attr('class', 'label');
 
-    const uploadButton = buttonEnter
+    const $$uploadButton = $$buttons
       .append('button')
       .attr('class', 'action button save-button');
 
-    uploadButton.append('span')
+    $$uploadButton.append('span')
       .attr('class', 'label');
 
     const uploadBlockerTooltipText = this._getUploadBlockerMessage();
 
     // update
-    buttonSection = buttonSection
-      .merge(buttonEnter);
+    $buttons = $buttons
+      .merge($$buttons);
 
-    buttonSection.selectAll('.cancel-button .label')
+    $buttons.selectAll('.cancel-button .label')
       .text(l10n.t('text.cancel'));
 
-    buttonSection.selectAll('.save-button .label')
+    $buttons.selectAll('.save-button .label')
       .text(l10n.t('text.upload'));
 
-    buttonSection.selectAll('.cancel-button')
+    $buttons.selectAll('.cancel-button')
       .on('click.cancel', (e: PointerEvent) => {
         this.emit('cancel');
       });
 
-    buttonSection.selectAll('.save-button')
+    $buttons.selectAll('.save-button')
       .classed('disabled', uploadBlockerTooltipText !== null)
       .on('click.save', (e: PointerEvent) => {
         const el = e.currentTarget as HTMLElement;
@@ -564,38 +562,38 @@ export class UiCommit extends EventEmitter {
       });
 
     // remove any existing tooltip
-    new UiTooltip(context).destroyAny(buttonSection.selectAll('.save-button'));
+    new UiTooltip(context).destroyAny($buttons.selectAll('.save-button'));
 
     if (uploadBlockerTooltipText) {
-      buttonSection.selectAll('.save-button')
+      $buttons.selectAll('.save-button')
         .call(new UiTooltip(context).title(uploadBlockerTooltipText).placement('top').attach);
     }
 
     // Raw Tag Editor
-    let tagSection: D3Selection = body.selectAll('.tag-section.raw-tag-editor')
+    let $tags: D3Selection = $body.selectAll('.tag-section.raw-tag-editor')
       .data([0]);
 
-    tagSection = tagSection.enter()
+    $tags = $tags.enter()
       .append('div')
       .attr('class', 'modal-section tag-section raw-tag-editor')
-      .merge(tagSection);
+      .merge($tags);
 
-    tagSection
+    $tags
       .call(this._rawTagEditor
         .tags({ ...uploader.changeset!.tags })   // shallow copy
         .render
       );
 
-    let changesSection: D3Selection = body.selectAll('.commit-changes-section')
+    let $changes: D3Selection = $body.selectAll('.commit-changes-section')
       .data([0]);
 
-    changesSection = changesSection.enter()
+    $changes = $changes.enter()
       .append('div')
       .attr('class', 'modal-section commit-changes-section')
-      .merge(changesSection);
+      .merge($changes);
 
     // Change summary
-    changesSection.call(this._commitChanges.render);
+    $changes.call(this._commitChanges.render);
   }
 
 

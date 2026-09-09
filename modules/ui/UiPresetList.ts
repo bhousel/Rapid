@@ -89,38 +89,38 @@ export class UiPresetList extends EventEmitter {
 
     const isRTL = l10n.isRTL;
 
-    // Header
-    let $header: D3Selection = $selection.selectAll('.header')
+    // Heading
+    let $heading: D3Selection = $selection.selectAll('.heading')
       .data([0]);
 
     // Enter
-    const $$header = $header.enter()
+    const $$heading = $heading.enter()
       .append('div')
-      .attr('class', 'header fillL');
+      .attr('class', 'heading fillL');
 
-    $$header
+    $$heading
       .append('h3')
       .attr('class', 'preset-list-message');
 
-    $$header
+    $$heading
       .append('button')
       .attr('class', 'preset-choose')
       .on('click', () => this.emit('cancel'))
       .call(uiIcon(isRTL ? '#rapid-icon-backward' : '#rapid-icon-forward'));
 
     // update
-    $header = $header.merge($$header);
-    $header.select('.preset-list-message')
+    $heading = $heading.merge($$heading);
+    $heading.select('.preset-list-message')
       .text(l10n.t('inspector.choose'));
 
 
     // Search box
-    let $search: D3Selection = $selection.selectAll('.search-header')
+    let $search: D3Selection = $selection.selectAll('.search-heading')
       .data([0]);
 
     const $$search = $search.enter()
       .append('div')
-      .attr('class', 'search-header');
+      .attr('class', 'search-heading');
 
     $$search
       .call(uiIcon('#rapid-icon-search'));

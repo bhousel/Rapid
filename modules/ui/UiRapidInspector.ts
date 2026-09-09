@@ -13,11 +13,30 @@ const ACCEPT_FEATURES_LIMIT = 50;
 
 
 /**
- * `UiRapidInspector` is a UI component for viewing/editing Rapid Entities in the sidebar.
+ * The Accept/Ignore choices on the inspector view.
+ */
+interface ChoiceData {
+  /** Identifying key for this choice */
+  key: 'accept' | 'ignore';
+  /** Icon name to use for this choice */
+  iconName: string;
+  /** StringID to use for the label "Add This Feature" / "Ignore This Feature" */
+  labelStringID: StringID;
+  /** StringID to use for the popup reference, if the user presses the 'i' info button */
+  referenceStringID: StringID,
+  /** Tooltip component to attach to the button */
+  tooltip: UiTooltip;
+  /** Handler to call when pressing the button */
+  onClick: (e?: Event, d?: ChoiceData, nextMode?: ModeID) => void;
+}
+
+
+/**
+ * `UiRapidInspector` is a UI component for viewing/editing Rapid data in the sidebar.
  *
  * @example
  *  <div class='rapid-inspector'>
- *    <div class='header'>…</div>
+ *    <div class='heading'>…</div>
  *    <div class='body'>
  *      <div class='feature-info'/>              // Dataset name, e.g. "Microsoft Buildings"
  *      <div class='tag-info'/>                  // List of tags on this feature
@@ -40,8 +59,8 @@ export class UiRapidInspector {
   public IgnoreTooltip: UiTooltip;
 
   // accept and enter one of these modes:
-  public moveFeature: (e: any, d: any) => void;
-  public rotateFeature: (e: any, d: any) => void;
+  public moveFeature: (e: Event, d: any) => void;
+  public rotateFeature: (e: Event, d: any) => void;
 
 
   /**
@@ -67,13 +86,13 @@ export class UiRapidInspector {
 
     // Ensure methods used as callbacks always have `this` bound correctly.
     // (This is also necessary when using `d3-selection.call`)
-    this.render = this.render.bind(this);
-    this.renderFeatureInfo = this.renderFeatureInfo.bind(this);
-    this.renderTagInfo = this.renderTagInfo.bind(this);
-    this.renderChoices = this.renderChoices.bind(this);
-    this.renderChoice = this.renderChoice.bind(this);
     this.acceptFeature = this.acceptFeature.bind(this);
     this.ignoreFeature = this.ignoreFeature.bind(this);
+    this.render = this.render.bind(this);
+    this._renderFeatureInfo = this._renderFeatureInfo.bind(this);
+    this._renderTagInfo = this._renderTagInfo.bind(this);
+    this._renderChoices = this._renderChoices.bind(this);
+    this._renderChoice = this._renderChoice.bind(this);
     this._setupKeybinding = this._setupKeybinding.bind(this);
 
     // accept and enter one of these modes:
@@ -111,21 +130,21 @@ export class UiRapidInspector {
       .attr('class', 'rapid-inspector');
 
 
-    // add `.header`
-    const $$header: D3EnterSelection = $$inspector
+    // add `.heading`
+    const $$heading: D3EnterSelection = $$inspector
       .append('div')
-      .attr('class', 'header');
+      .attr('class', 'heading');
 
-    $$header
+    $$heading
       .append('h3')
       .append('svg')
       .attr('class', 'logo-rapid')
       .append('use');
 
-    $$header
+    $$heading
       .append('button')
       .attr('class', 'rapid-inspector-close')
-      .on('click', () => context.enter('browse'))
+      .on('click', (e: PointerEvent) => context.enter('browse'))
       .call(uiIcon('#rapid-icon-close'));
 
     // add `.body`
@@ -141,9 +160,256 @@ export class UiRapidInspector {
       .attr('xlink:href', `#rapid-logo-rapid-wordmark${rtl}`);
 
     $inspector.selectAll('.body')
-      .call(this.renderFeatureInfo)
-      .call(this.renderTagInfo)
-      .call(this.renderChoices);
+      .call(this._renderFeatureInfo)
+      .call(this._renderTagInfo)
+      .call(this._renderChoices);
+  }
+
+
+  /**
+   * Renders the 'feature-info' section (the dataset name)
+   * @param $selection - A d3-selection to a HTMLElement that this content should render itself into
+   */
+  public _renderFeatureInfo($selection: D3Selection): void {
+    const datum = this.datum;
+    if (!datum) return;
+
+    const context = this.context;
+    const l10n = context.systems.l10n!;
+    const rapid = context.systems.rapid!;
+
+    const datasetID = datum.props.datasetID as DatasetID;
+    const ds = rapid.datasets.get(datasetID);
+    if (!ds) return;   // Need a dataset to do anything
+
+    const color = ds.color;
+
+    let $featureInfo: D3Selection = $selection.selectAll('.feature-info')
+      .data([0]);
+
+    // enter
+    const $$featureInfo: D3EnterSelection = $featureInfo.enter()
+      .append('div')
+      .attr('class', 'feature-info');
+
+    $$featureInfo
+      .append('div')
+      .attr('class', 'dataset-label');
+
+    if (ds.beta) {
+      $$featureInfo
+        .append('div')
+        .attr('class', 'dataset-beta beta');
+    }
+
+    // update
+    $featureInfo = $featureInfo.merge($$featureInfo);
+
+    $featureInfo
+      .style('background', color)
+      .style('color', this.getBrightness(color) > 140.5 ? '#333' : '#fff');
+
+    $featureInfo.selectAll('.dataset-label')
+      .text(ds.getLabel());
+
+    $featureInfo.selectAll('.dataset-beta')
+      .attr('title', l10n.t('rapid_poweruser.beta'));   // alt text
+  }
+
+
+  /**
+   * Renders the 'tag-info' section
+   * @param $selection - A d3-selection to a HTMLElement that this content should render itself into
+   */
+  public _renderTagInfo($selection: D3Selection): void {
+    const tags = this.datum?.tags;
+    if (!tags) return;
+
+    const context = this.context;
+    const l10n = context.systems.l10n!;
+
+    let $tagInfo: D3Selection = $selection.selectAll('.tag-info')
+      .data([0]);
+
+    // enter
+    const $$tagInfo: D3EnterSelection = $tagInfo.enter()
+      .append('div')
+      .attr('class', 'tag-info');
+
+    const $$tagBag: D3EnterSelection = $$tagInfo
+      .append('div')
+      .attr('class', 'tag-bag');
+
+    $$tagBag
+      .append('div')
+      .attr('class', 'tag-heading');
+
+    for (const [k, v] of Object.entries(tags) as [string, string][]) {
+      const $$tagEntry = $$tagBag.append('div').attr('class', 'tag-entry');
+      $$tagEntry.append('div').attr('class', 'tag-key').text(k);
+      $$tagEntry.append('div').attr('class', 'tag-value').text(v);
+    }
+
+    // update
+    $tagInfo = $tagInfo.merge($$tagInfo);
+
+    $tagInfo.selectAll('.tag-heading')
+      .text(l10n.t('text.tag'));
+  }
+
+
+  /**
+   * Renders the 'rapid-inspector-choices' section
+   * @param $selection - A d3-selection to a HTMLElement that this content should render itself into
+   */
+  public _renderChoices($selection: D3Selection): void {
+    const context = this.context;
+    const l10n = context.systems.l10n!;
+
+    const choiceData: ChoiceData[] = [
+      {
+        key: 'accept',
+        iconName: '#rapid-icon-rapid-plus-circle',
+        labelStringID: 'rapid_inspector.option_accept.label',
+        referenceStringID: 'rapid_inspector.option_accept.description',
+        tooltip: this.AcceptTooltip,
+        onClick: this.acceptFeature
+      }, {
+        key: 'ignore',
+        iconName: '#rapid-icon-rapid-minus-circle',
+        labelStringID: 'rapid_inspector.option_ignore.label',
+        referenceStringID: 'rapid_inspector.option_ignore.description',
+        tooltip: this.IgnoreTooltip,
+        onClick: this.ignoreFeature
+      }
+    ];
+
+    let $choices: D3Selection = $selection.selectAll('.rapid-inspector-choices')
+      .data([0]);
+
+    // enter
+    const $$choices: D3EnterSelection = $choices.enter()
+      .append('div')
+      .attr('class', 'rapid-inspector-choices');
+
+    $$choices
+      .append('p')
+      .attr('class', 'rapid-inspector-prompt');
+
+    $$choices.selectAll('.rapid-inspector-choice')
+      .data(choiceData, (d: ChoiceData) => d.key)
+      .enter()
+      .append('div')
+      .attr('class', (d: ChoiceData) => `rapid-inspector-choice rapid-inspector-choice-${d.key}`);
+
+    // update
+    $choices = $choices.merge($$choices);
+
+    $choices.selectAll('.rapid-inspector-prompt')
+      .text(l10n.t('rapid_inspector.prompt'));
+
+    $choices.selectAll('.rapid-inspector-choice')
+      .each(this._renderChoice);
+  }
+
+
+  /**
+   * Renders a choice - This should be called within a d3-selection.each
+   * @param  d - bound datum
+   * @param  i - iterator
+   * @param  nodes - the nodes in the selection
+   */
+  public _renderChoice(d: ChoiceData, i: number, nodes: ArrayLike<HTMLElement>): void {
+    const context = this.context;
+    const l10n = context.systems.l10n!;
+
+    const $choice = select(nodes[i]);
+    const isDisabled = (d.key === 'accept' && this.isAcceptFeatureDisabled());
+
+    // .choice-wrap
+    let $choiceWrap: D3Selection = $choice.selectAll('.choice-wrap')
+      .data([d]);
+
+    // enter
+    const $$choiceWrap: D3EnterSelection = $choiceWrap.enter()
+      .append('div')
+      .attr('class', 'choice-wrap');
+
+    // action button
+    const $$choiceActionButton: D3EnterSelection = $$choiceWrap
+      .append('button')
+      .attr('class', 'choice-button')
+      .on('click', d.onClick)
+      .call(d.tooltip.attach);
+
+    $$choiceActionButton
+      .append('svg')
+      .attr('class', 'choice-icon icon')
+      .append('use')
+      .attr('xlink:href', d.iconName);
+
+    $$choiceActionButton
+      .append('div')
+      .attr('class', 'choice-label');
+
+    // reference button
+    $$choiceWrap
+      .append('button')
+      .attr('class', 'tag-reference-button')
+      .attr('tabindex', '-1')
+      .on('click', (e: PointerEvent) => {
+        (e.currentTarget as HTMLElement).blur();    // avoid keeping focus on the button - iD#4641
+        const $tagReference = $choice.selectAll('.tag-reference-body');
+        $tagReference.classed('expanded', !$tagReference.classed('expanded'));
+      })
+      .call(uiIcon('#rapid-icon-inspect'));
+
+
+    // update
+    $choiceWrap = $choiceWrap.merge($$choiceWrap);
+
+    $choiceWrap.selectAll('button')
+      .classed('secondary disabled', isDisabled);
+
+    $choiceWrap.selectAll('.choice-label')
+      .text(l10n.t(d.labelStringID));
+
+    $choiceWrap.selectAll('.tag-reference-button')
+      .attr('title', l10n.t('icons.information'));  // localize alt text
+
+    // Localize tooltips
+    let title: string | null = null;
+    let shortcut: string | null = null;
+    if (d.key === 'accept') {
+      if (isDisabled) {
+        title = l10n.t('rapid_inspector.option_accept.disabled', { n: ACCEPT_FEATURES_LIMIT } );
+        shortcut = '';
+      } else {
+        title = l10n.t('rapid_inspector.option_accept.tooltip');
+        shortcut = l10n.t('shortcuts.command.accept_feature.key');
+      }
+    } else if (d.key === 'ignore') {
+      title = l10n.t('rapid_inspector.option_ignore.tooltip');
+      shortcut = l10n.t('shortcuts.command.ignore_feature.key');
+    }
+
+    d.tooltip.title(title).shortcut(shortcut);
+
+
+    // .tag-reference-body
+    let $tagReference: D3Selection = $choice.selectAll('.tag-reference-body')
+      .data([d]);
+
+    // enter
+    const $$tagReference: D3EnterSelection = $tagReference.enter()
+      .append('div')
+      .attr('class', 'tag-reference-body');
+
+    // update
+    $tagReference = $tagReference.merge($$tagReference);
+
+    $tagReference
+      .text(l10n.t(d.referenceStringID));
   }
 
 
@@ -172,7 +438,7 @@ export class UiRapidInspector {
    * @param  [d] - object bound to the selection (i.e. the command) (not used)
    * @param  [nextMode] - optional next mode to enter after accepting ('move' or 'rotate')
    */
-  public acceptFeature(e?: any, d?: any, nextMode?: string): void {
+  public acceptFeature(e?: Event, d?: ChoiceData, nextMode?: ModeID): void {
     const datum = this.datum;
     if (!datum) return;
 
@@ -228,7 +494,7 @@ export class UiRapidInspector {
     }
 
     if (nextMode) {   // should be one of 'select-osm', 'move', or 'rotate'
-      context.enter(nextMode, { selection: { osm: [datum.id] }} );
+      context.enter(nextMode, { selection: { osm: [datum.id] } });
 
     } else {  // if it was hovered, hover the newly added item (this is hacky):
       // 1. get the `lastMove` event, and make it appear to target the new entity on the 'osm' layer
@@ -256,13 +522,13 @@ export class UiRapidInspector {
     if (window.sessionStorage.getItem('acknowledgedLogin') === 'true') return;
     window.sessionStorage.setItem('acknowledgedLogin', 'true');
 
-// This dialog box looks kind of old and could use a refresh
-// It it to tell new users that they need to log into OSM.
-//    const osm = context.services.osm;
-//    if (!osm.authenticated()) {
-//      context.container()
-//        .call(uiRapidFirstEditDialog(context));
-//    }
+    // This dialog box looks kind of old and could use a refresh
+    // It it to tell new users that they need to log into OSM.
+    //    const osm = context.services.osm;
+    //    if (!osm.authenticated()) {
+    //      context.container()
+    //        .call(uiRapidFirstEditDialog(context));
+    //    }
   }
 
 
@@ -270,8 +536,9 @@ export class UiRapidInspector {
    * Called when the user presses "Ignore Feature".
    * @param  [e] - the triggering event, if any
    * @param  [d] - object bound to the selection (i.e. the command) (not used)
+   * @param  [nextMode] - optional next mode (not used)
    */
-  public ignoreFeature(e?: Event): void {
+  public ignoreFeature(e?: Event, d?: ChoiceData, nextMode?: ModeID): void {
     const datum = this.datum;
     if (!datum) return;
 
@@ -305,254 +572,6 @@ export class UiRapidInspector {
     const g = parseInt(short ? color[2] + color[2] : color[3] + color[4], 16);
     const b = parseInt(short ? color[3] + color[3] : color[5] + color[6], 16);
     return ((r * 299) + (g * 587) + (b * 114)) / 1000;
-  }
-
-
-  /**
-   * Renders the 'feature-info' section (the dataset name)
-   * @param $selection - A d3-selection to a HTMLElement that this content should render itself into
-   */
-  public renderFeatureInfo($selection: D3Selection): void {
-    const datum = this.datum;
-    if (!datum) return;
-
-    const context = this.context;
-    const l10n = context.systems.l10n!;
-    const rapid = context.systems.rapid!;
-
-    const datasetID = datum.props.datasetID as DatasetID;
-    const ds = rapid.datasets.get(datasetID);
-    if (!ds) return;   // Need a dataset to do anything
-
-    const color = ds.color;
-
-    let $featureInfo: D3Selection = $selection.selectAll('.feature-info')
-      .data([0]);
-
-    // enter
-    const $$featureInfo: D3EnterSelection = $featureInfo.enter()
-      .append('div')
-      .attr('class', 'feature-info');
-
-    $$featureInfo
-      .append('div')
-      .attr('class', 'dataset-label');
-
-    if (ds.beta) {
-      $$featureInfo
-        .append('div')
-        .attr('class', 'dataset-beta beta');
-    }
-
-    // update
-    $featureInfo = $featureInfo.merge($$featureInfo);
-
-    $featureInfo
-      .style('background', color)
-      .style('color', this.getBrightness(color) > 140.5 ? '#333' : '#fff');
-
-    $featureInfo.selectAll('.dataset-label')
-      .text(ds.getLabel());
-
-    $featureInfo.selectAll('.dataset-beta')
-      .attr('title', l10n.t('rapid_poweruser.beta'));   // alt text
-  }
-
-
-  /**
-   * Renders the 'tag-info' section
-   * @param $selection - A d3-selection to a HTMLElement that this content should render itself into
-   */
-  public renderTagInfo($selection: D3Selection): void {
-    const tags = this.datum?.tags;
-    if (!tags) return;
-
-    const context = this.context;
-    const l10n = context.systems.l10n!;
-
-    let $tagInfo: D3Selection = $selection.selectAll('.tag-info')
-      .data([0]);
-
-    // enter
-    const $$tagInfo: D3EnterSelection = $tagInfo.enter()
-      .append('div')
-      .attr('class', 'tag-info');
-
-    const $$tagBag: D3EnterSelection = $$tagInfo
-      .append('div')
-      .attr('class', 'tag-bag');
-
-    $$tagBag
-      .append('div')
-      .attr('class', 'tag-heading');
-
-    for (const [k, v] of Object.entries(tags) as [string, string][]) {
-      const $$tagEntry = $$tagBag.append('div').attr('class', 'tag-entry');
-      $$tagEntry.append('div').attr('class', 'tag-key').text(k);
-      $$tagEntry.append('div').attr('class', 'tag-value').text(v);
-    }
-
-    // update
-    $tagInfo = $tagInfo.merge($$tagInfo);
-
-    $tagInfo.selectAll('.tag-heading')
-      .text(l10n.t('text.tag'));
-  }
-
-
-  /**
-   * Renders the 'rapid-inspector-choices' section
-   * @param $selection - A d3-selection to a HTMLElement that this content should render itself into
-   */
-  public renderChoices($selection: D3Selection): void {
-    const context = this.context;
-    const l10n = context.systems.l10n!;
-
-    const choiceData = [
-      {
-        key: 'accept',
-        iconName: '#rapid-icon-rapid-plus-circle',
-        labelStringID: 'rapid_inspector.option_accept.label',
-        referenceStringID: 'rapid_inspector.option_accept.description',
-        tooltip: this.AcceptTooltip,
-        onClick: this.acceptFeature
-      }, {
-        key: 'ignore',
-        iconName: '#rapid-icon-rapid-minus-circle',
-        labelStringID: 'rapid_inspector.option_ignore.label',
-        referenceStringID: 'rapid_inspector.option_ignore.description',
-        tooltip: this.IgnoreTooltip,
-        onClick: this.ignoreFeature
-      }
-    ];
-
-    let $choices: D3Selection = $selection.selectAll('.rapid-inspector-choices')
-      .data([0]);
-
-    // enter
-    const $$choices: D3EnterSelection = $choices.enter()
-      .append('div')
-      .attr('class', 'rapid-inspector-choices');
-
-    $$choices
-      .append('p')
-      .attr('class', 'rapid-inspector-prompt');
-
-    $$choices.selectAll('.rapid-inspector-choice')
-      .data(choiceData, (d: any) => d.key)
-      .enter()
-      .append('div')
-      .attr('class', (d: any) => `rapid-inspector-choice rapid-inspector-choice-${d.key}`);
-
-    // update
-    $choices = $choices.merge($$choices);
-
-    $choices.selectAll('.rapid-inspector-prompt')
-      .text(l10n.t('rapid_inspector.prompt'));
-
-    $choices.selectAll('.rapid-inspector-choice')
-      .each(this.renderChoice);
-  }
-
-
-
-  /**
-   * Renders a choice - This should be called within a d3-selection.each
-   * @param  d - bound datum
-   * @param  i - iterator
-   * @param  nodes - the nodes in the selection
-   */
-  public renderChoice(d: any, i: number, nodes: any): void {
-    const $choice = select(nodes[i]);
-
-    const context = this.context;
-    const l10n = context.systems.l10n!;
-
-    const isDisabled = (d.key === 'accept' && this.isAcceptFeatureDisabled());
-
-    // .choice-wrap
-    let $choiceWrap: D3Selection = $choice.selectAll('.choice-wrap')
-      .data([d]);
-
-    // enter
-    const $$choiceWrap: D3EnterSelection = $choiceWrap.enter()
-      .append('div')
-      .attr('class', 'choice-wrap');
-
-    // action button
-    const $$choiceActionButton: D3EnterSelection = $$choiceWrap
-      .append('button')
-      .attr('class', 'choice-button')
-      .on('click', d.onClick)
-      .call(d.tooltip.attach);
-
-    $$choiceActionButton
-      .append('svg')
-      .attr('class', 'choice-icon icon')
-      .append('use')
-      .attr('xlink:href', d.iconName);
-
-    $$choiceActionButton
-      .append('div')
-      .attr('class', 'choice-label');
-
-    // reference button
-    $$choiceWrap
-      .append('button')
-      .attr('class', 'tag-reference-button')
-      .attr('tabindex', '-1')
-      .on('click', (e: PointerEvent) => {
-        (e.currentTarget as HTMLElement).blur();    // avoid keeping focus on the button - iD#4641
-        const $tagReference = $choice.selectAll('.tag-reference-body');
-        $tagReference.classed('expanded', !$tagReference.classed('expanded'));
-      })
-      .call(uiIcon('#rapid-icon-inspect'));
-
-
-    // update
-    $choiceWrap = $choiceWrap.merge($$choiceWrap);
-
-    $choiceWrap.selectAll('button')
-      .classed('secondary disabled', isDisabled);
-
-    $choiceWrap.selectAll('.choice-label')
-      .text(l10n.t(d.labelStringID));
-
-    $choiceWrap.selectAll('.tag-reference-button')
-      .attr('title', l10n.t('icons.information'));  // localize alt text
-
-    // localize tooltip
-    let title: string | undefined, shortcut: string | undefined;
-    if (d.key === 'accept') {
-      if (isDisabled) {
-        title = l10n.t('rapid_inspector.option_accept.disabled', { n: ACCEPT_FEATURES_LIMIT } );
-        shortcut = '';
-      } else {
-        title = l10n.t('rapid_inspector.option_accept.tooltip');
-        shortcut = l10n.t('shortcuts.command.accept_feature.key');
-      }
-    } else if (d.key === 'ignore') {
-      title = l10n.t('rapid_inspector.option_ignore.tooltip');
-      shortcut = l10n.t('shortcuts.command.ignore_feature.key');
-    }
-
-    d.tooltip.title(title).shortcut(shortcut);
-
-
-    // .tag-reference-body
-    let $tagReference: D3Selection = $choice.selectAll('.tag-reference-body')
-      .data([d]);
-
-    // enter
-    const $$tagReference: D3EnterSelection = $tagReference.enter()
-      .append('div')
-      .attr('class', 'tag-reference-body');
-
-    // update
-    $tagReference = $tagReference.merge($$tagReference);
-
-    $tagReference
-      .text(l10n.t(d.referenceStringID));
   }
 
 
