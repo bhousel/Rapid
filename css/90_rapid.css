@@ -1053,7 +1053,8 @@ img.dataset-thumbnail.inverted {
   color: #fff;
   margin-bottom: 2px;
 }
-.modal-add-dataset input.field-input.warning {
+.modal-add-dataset input.field-input.warning,
+.modal-add-dataset textarea.field-url.warning {
   border-color: #f90 !important;
   background-color: #440 !important;
 }

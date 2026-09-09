@@ -304,8 +304,8 @@ export class RapidDataset {
    * @return  Promise resolved when this custom source is ready, or rejected if errors
    */
   public setupCustomDatasetAsync(): Promise<void> {
-    if (!this.custom) return Promise.reject('not a custom source');
-    if (!this.sourceUrl) return Promise.reject('no source url');
+    if (!this.custom) return Promise.reject(new Error('Not a custom source'));
+    if (!this.sourceUrl) return Promise.reject(new Error('No source url'));
 
     const context = this.context;
     const gfx = context.systems.gfx;
@@ -318,7 +318,6 @@ export class RapidDataset {
     // this._template = null;
     gfx?.deferredRedraw();
 
-
     // Strip off any querystring/hash from the url before checking extension
     const url = this.sourceUrl;
     const testUrl = url.toLowerCase().split(/[?#]/)[0];
@@ -328,12 +327,11 @@ export class RapidDataset {
       return network.fetch<string | XmlDocument | GeoJSON.GeoJsonObject | null>(url)
         .then(data => {
           this._setFile(data, extension);
-        })
-        .catch(e => console.error(e));  // eslint-disable-line
+        });
 
     } else {   // Looks like a vector tile url template
       //this._setCustomUrlTemplate(url);
-      return Promise.reject('vector tile data not supported yet');
+      return Promise.reject(new Error('Unsupported type (currently only support .geojson, .json, .gpx, .kml)'));
     }
   }
 
@@ -389,7 +387,7 @@ export class RapidDataset {
    */
   protected _setFile(data: string | XmlDocument | GeoJSON.GeoJsonObject | null, extension: string | null | undefined): void {
     if (!data) {
-      throw new Error('no data');
+      throw new Error('No data');
     }
 
     const context = this.context;
@@ -415,7 +413,7 @@ export class RapidDataset {
     geojson = geojson || {} as GeoJSON.GeoJsonObject;
 
     if (!Object.keys(geojson).length) {
-      throw new Error('no geojson');
+      throw new Error('Empty geojson');
     }
 
     // this._dataUsed = `${extension} data file`;

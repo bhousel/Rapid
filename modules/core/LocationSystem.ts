@@ -181,7 +181,7 @@ export class LocationSystem extends AbstractSystem {
    * @return Promise resolved with the objects (this function used to be slow/async, now it's faster and sync)
    */
   public mergeLocationSets(objects: HasLocationSet[]): Promise<HasLocationSetID[]> {
-    if (!Array.isArray(objects)) return Promise.reject('nothing to do');
+    if (!Array.isArray(objects)) return Promise.reject(new Error('nothing to do'));
 
     const registered = this._resolver.registerLocationSets(objects);
     this.emit('locationchange');

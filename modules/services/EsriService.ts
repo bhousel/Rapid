@@ -229,7 +229,7 @@ export class EsriService extends AbstractSystem {
    */
   public getDataDictionaryAsync(datasetID: DatasetID): Promise<RapidDataDictionary> {
     const ds = this._datasets.get(datasetID);
-    if (!ds) return Promise.reject(`Unknown datasetID "${datasetID}"`);
+    if (!ds) return Promise.reject(new Error(`Unknown datasetID "${datasetID}"`));
 
     return this._loadDatasetLayersAsync(ds)
       .then(() => {

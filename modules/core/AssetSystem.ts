@@ -304,7 +304,7 @@ export class AssetSystem extends AbstractSystem {
     try {
       url = this.getAssetURL(assetID);
     } catch (err) {
-      return Promise.reject((err as Error).message);
+      return Promise.reject(err as Error);
     }
 
     const network = this.context.systems.network!;
@@ -338,7 +338,7 @@ export class AssetSystem extends AbstractSystem {
 
     const bundle = this.bundles[assetID];
     if (!bundle) {
-      return Promise.reject(`AssetSystem: Unknown bundle assetID "${assetID}"`);
+      return Promise.reject(new Error(`AssetSystem: Unknown bundle assetID "${assetID}"`));
     }
 
     const network = this.context.systems.network!;
@@ -347,7 +347,7 @@ export class AssetSystem extends AbstractSystem {
       const source = bundle.parts[partID];
       const path = source.preferred ?? source[this.origin];
       if (!path) {
-        return Promise.reject(`No asset path found for bundle part "${partID}"`);
+        return Promise.reject(new Error(`No asset path found for bundle part "${partID}"`));
       }
 
       const url = this.getFileURL(path);

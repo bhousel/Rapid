@@ -112,7 +112,7 @@ describe('LocationSystem', () => {
         assert.instanceOf(prom, Promise);
         return prom
           .then(data => assert.fail(`This was supposed to fail, but somehow succeeded`))
-          .catch(err => assert.match(err, /^nothing to do/));
+          .catch(err => assert.match(err, /nothing to do/));
       });
 
       it('resolves locationSets, assigning locationSetID', () => {

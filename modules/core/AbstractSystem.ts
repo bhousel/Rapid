@@ -159,7 +159,7 @@ export class AbstractSystem extends EventEmitter {
 
     for (const requiredID of this.requiredDependencies) {
       if (!this.context.systems[requiredID]) {
-        return Promise.reject(`Cannot init:  ${this.id} requires ${requiredID}`);
+        return Promise.reject(new Error(`Cannot init:  ${this.id} requires ${requiredID}`));
       }
     }
     return this._initPromise = Promise.resolve();

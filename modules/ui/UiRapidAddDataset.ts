@@ -19,8 +19,6 @@ import type { RapidDatasetProps } from '../lib/RapidDataset.ts';
 interface FieldInfo {
   /* `true` if we can continue (no errors), false if not */
   isOk: boolean
-  /* If there is a dataset validation error, the stringID for the error */
-  datasetIDStringID?: StringID;
 
   /** Dataset ID */
   datasetID?: DatasetID;
@@ -49,6 +47,10 @@ export class UiRapidAddDataset extends EventEmitter {
 
   /** Unique ID for field identifiers */
   protected _uuid: string;
+  /* If there is a field error, the stringID for the error */
+  protected _fieldStringID: StringID | null;
+  /* If there is a url error, the error */
+  protected _urlError: string | null;
 
 
   /**
@@ -59,6 +61,8 @@ export class UiRapidAddDataset extends EventEmitter {
     this.context = context;
 
     this._uuid = crypto.randomUUID().slice(0, 8);
+    this._fieldStringID = null;
+    this._urlError = null;
 
     // Child components
     this.Modal = null;
@@ -160,7 +164,8 @@ export class UiRapidAddDataset extends EventEmitter {
     e?.preventDefault();
 
     const fieldInfo = this._checkFields();
-    if (!fieldInfo.isOk) {
+    const hasError = !!this._fieldStringID || !!this._urlError || !fieldInfo.isOk;
+    if (hasError) {
       this.render();
       return;
     }
@@ -190,9 +195,9 @@ export class UiRapidAddDataset extends EventEmitter {
         SettingsModal.dataset = ds;
         SettingsModal.show();
       })
-      .catch((err: any) => {
+      .catch((err: unknown) => {
         console.error(`Dataset setup failed for ${ds.id}:  `, err);  // eslint-disable-line no-console
-        // handle the error?
+        this._urlError = 'Error: ' + (err as Error)?.message;
         this.render();
       });
   }
@@ -309,7 +314,8 @@ export class UiRapidAddDataset extends EventEmitter {
     // update
     $fields = $fields.merge($$fields);
 
-    const fieldInfo = this._checkFields();
+    // perform field validation
+    this._checkFields();
 
     $fields.selectAll('.row-name label')
       .text(l10n.t(`${prefix}.name.label`));
@@ -320,7 +326,7 @@ export class UiRapidAddDataset extends EventEmitter {
       .attr('placeholder', l10n.t(`${prefix}.name.placeholder`));
 
     $fields.selectAll('.row-identifier input')
-      .classed('warning', !!fieldInfo.datasetIDStringID)
+      .classed('warning', !!this._fieldStringID)
       .attr('placeholder', l10n.t(`${prefix}.identifier.placeholder`));
 
     $fields.selectAll('.row-identifier .field-instruction')
@@ -329,8 +335,8 @@ export class UiRapidAddDataset extends EventEmitter {
     // U+26A0 U+FE0F = emoji warning
     // U+00A0 = non breaking space &nbsp;  (we want the div always drawn, so layout doesn't jump around)
     $fields.selectAll('.row-identifier .field-feedback')
-      .classed('warning', !!fieldInfo.datasetIDStringID)
-      .text(fieldInfo.datasetIDStringID ? '\u26a0\ufe0f ' + l10n.t(fieldInfo.datasetIDStringID) : '\u00a0');
+      .classed('warning', !!this._fieldStringID)
+      .text(this._fieldStringID ? '\u26a0\ufe0f ' + l10n.t(this._fieldStringID) : '\u00a0');
   }
 
 
@@ -391,8 +397,16 @@ export class UiRapidAddDataset extends EventEmitter {
       .attr('class', 'field-url')
       .call(utilNoAuto)
       .call(this.SampleCombo.attach)                    // sample data
-      .on('change', (e: Event) => this.render());
+      .on('change', (e: Event) => {
+        this._urlError = null;  // clear any error, clicking "next" will try again.
+        this.render();
+      });
       // .on('input', (e: InputEvent) => this.render());  // rerendering will also run validation
+
+    $$textSection
+      .append('div')
+      .attr('class', 'field-feedback');
+
 
     // update
     $textSection = $textSection.merge($$textSection) as D3Selection;
@@ -448,7 +462,14 @@ ${url_tokens}
       .html(urlHtml as string);
 
     $textSection.selectAll('.field-url')
+      .classed('warning', !!this._urlError)
       .attr('placeholder', l10n.t(`${prefix}.url.placeholder`));
+
+    // U+26A0 U+FE0F = emoji warning
+    // U+00A0 = non breaking space &nbsp;  (we want the div always drawn, so layout doesn't jump around)
+    $textSection.selectAll('.field-feedback')
+      .classed('warning', !!this._urlError)
+      .text(this._urlError ? '\u26a0\ufe0f ' + this._urlError : '\u00a0');
   }
 
 
@@ -461,6 +482,7 @@ ${url_tokens}
     const l10n = context.systems.l10n!;
 
     const fieldInfo = this._checkFields();
+    const hasError = !!this._fieldStringID || !!this._urlError || !fieldInfo.isOk;
 
     /* Next/Cancel Buttons */
     let $buttons: D3Selection = $parent.selectAll('.modal-section.buttons')
@@ -485,7 +507,7 @@ ${url_tokens}
     $buttons = $buttons.merge($$buttons) as D3Selection;
 
     $buttons.selectAll('.next-button')
-      .classed('secondary disabled', !fieldInfo.isOk)
+      .classed('secondary disabled', hasError)
       .text(l10n.t('text.next'));
 
     $buttons.selectAll('.cancel-button')
@@ -512,10 +534,11 @@ ${url_tokens}
     const idVal = idNode?.value || '';
     const datasetID = idVal.trim();
     if (datasetID && rapid.catalog.has(datasetID)) {
-      result.datasetIDStringID = 'rapid_add_dataset.identifier.taken';
+      this._fieldStringID = 'rapid_add_dataset.identifier.taken';
     } else if (datasetID && !/^[\w\-]+$/.test(datasetID)) {
-      result.datasetIDStringID = 'rapid_add_dataset.identifier.invalid';
+      this._fieldStringID = 'rapid_add_dataset.identifier.invalid';
     } else {
+      this._fieldStringID = null;
       result.datasetID = datasetID;
     }
 
