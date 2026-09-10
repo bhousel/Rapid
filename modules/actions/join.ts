@@ -23,7 +23,7 @@ export interface JoinOptions {
 /**
  * Extended Action for join operations that includes additional methods.
  */
-interface JoinAction extends Action {
+export interface JoinAction extends Action {
   /** Returns the number of nodes the resultant way is expected to have */
   resultingWayNodesLength(graph: Graph): number;
 }
