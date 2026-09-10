@@ -1668,6 +1668,9 @@
           },
           "target": {
             "label": "Target Tag"
+          },
+          "params": {
+            "label": "Parameters"
           }
         }
       }

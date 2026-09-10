@@ -1,3 +1,5 @@
+import { TreeStore } from '../lib/TreeStore.ts';
+
 import type { Context } from '../Context.ts';
 import type { TreeValue } from './TreeStore.ts';
 
@@ -13,13 +15,13 @@ export interface RapidDataTransform {
   /** The order to apply the transformation */
   order: number;
   /** The function that should be performed */
-  function: 'ignore' | 'copy' | 'constant';
+  function: string;
   /** The name of the source field, if any */
   source?: string;
   /** The name of the target field, if any */
   target?: string;
   /** Parameters used to perform the function, if any */
-  params?: any[];
+  params?: string;
 }
 
 
@@ -58,13 +60,61 @@ export class RapidDataDictionary {
 
 
   /**
-   * Returns a settings-safe JSON representation of this data dictionary.
+   * Returns a settings-safe JSON representation of this `RapidDataDictionary`.
    * @return JSON representation of this data element
    */
   public toJSON(): Record<string, TreeValue> {
-    const result: Record<string, TreeValue> = { };
+    const result: Record<string, TreeValue> = {};
+
+    if (this.transforms.length > 0) {
+      result.transforms = this.transforms.map((t: RapidDataTransform) => {
+        const item: TreeValue = {
+          order: t.order.toString(),
+          function: t.function
+        };
+        if (t.source)  item.source = t.source;
+        if (t.target)  item.target = t.target;
+        if (t.params)  item.params = t.params;
+
+        return item;
+      });
+    }
+
     return result;
   }
+
+
+  /**
+   * Reconstructs a `RapidDataDictionary` from its persisted JSON form (see `toJSON`).
+   * The settings store is string-only, so non-string data is restored here.
+   * @param context - Global shared application context
+   * @param json - The persisted settings object
+   * @return A new `RapidDataDictionary`
+   */
+  public static fromJSON(context: Context, json: Record<string, TreeValue>): RapidDataDictionary {
+    const dict = new RapidDataDictionary(context);
+    const transforms = json.transforms;
+
+    if (Array.isArray(transforms)) {
+      for (const t of transforms) {
+        if (!TreeStore.isPlainObject(t)) continue;
+        if (typeof t.function !== 'string') continue;
+        if (typeof t.order !== 'string') continue;
+
+        const item: RapidDataTransform = {
+          function:  t.function,
+          order:     parseInt(t.order, 10),
+        };
+        if (typeof t.source === 'string')  item.source = t.source;
+        if (typeof t.target === 'string')  item.target = t.target;
+        if (typeof t.params === 'string')  item.params = t.params;
+
+        dict.transforms.push(item);
+      }
+    }
+    return dict;
+  }
+
 
   /**
    * Applies the transforms in order to convert the source data into the target data.
@@ -95,6 +145,12 @@ export class RapidDataDictionary {
             }
           }
         }
+      }
+
+      // 'constant':  make a target row, use the value in params as the value
+      if (row.function === 'constant') {
+        if (!row.params || !row.target) continue;
+        results[row.target] = row.params;
       }
 
       // no other functions implemented yet.

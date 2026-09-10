@@ -1181,9 +1181,13 @@ img.dataset-thumbnail.inverted {
 .modal-dataset-settings .dictionary-table {
   margin-top: 20px;
 }
-.dict-actions .rapid-row-action {
-  width: 25px;
-  height: 25px;
+.modal.rapid-modal .dict-row td {
+  background: #333;
+}
+.modal.rapid-modal .dict-row input {
+  display: inline;
+  margin: 0;
+  width: 100%;
 }
 
 

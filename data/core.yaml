@@ -1352,6 +1352,8 @@ en:
           constant: Constant
         target:
           label: Target Tag
+        params:
+          label: Parameters
 
   QA:
     osmose:

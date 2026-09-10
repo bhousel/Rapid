@@ -10,15 +10,18 @@ import { utilNoAuto, utilSafeURL } from '../util/index.ts';
 import type { Context } from '../Context.ts';
 import type { D3EnterSelection, D3Selection } from 'd3-selection';
 import type { RapidDataset } from '../lib/RapidDataset.ts';
-import type { RapidDataDictionary, RapidDataTransform } from '../lib/RapidDataDictionary.ts';
+import { RapidDataDictionary, RapidDataTransform } from '../lib/RapidDataDictionary.ts';
 
 const RAPID_MAGENTA = '#da26d3';
 
 
 /**
  * We create a "partial" type because on this screen the values may not be filled in completely.
- * The 'order' field is guaranteed by running the transforms through `_checkDictionary` */
-type PartialDataTransform = Partial<RapidDataTransform> & Pick<RapidDataTransform, 'order'>;
+ * The 'order' and 'key' fields are guaranteed by running the transforms through `_checkDictionary` */
+interface PartialDataTransform extends Partial<RapidDataTransform> {
+  uuid?:  string | undefined;   // unique identifier
+  order:  number;   // required order
+}
 
 /**
  * The values collected on this screen, along with information about whether
@@ -601,7 +604,7 @@ export class UiRapidDatasetSettings extends EventEmitter {
     const prefix = 'rapid_dataset_settings.dictionary';  // prefix for text strings
     const isLocked = !ds.custom;     // Can only change these details for custom datasets
 
-    // Check the data dictionary (also makes a copy before changing anything).
+    // Check the data dictionary (this also makes a copy before changing anything).
     const dictInfo = this._checkDictionary();
     const transforms = this._transforms!;
     const hasTransforms = transforms.length > 0;
@@ -707,6 +710,9 @@ export class UiRapidDatasetSettings extends EventEmitter {
     $$headRow
       .append('th')
       .attr('class', 'dict-target');
+    $$headRow
+      .append('th')
+      .attr('class', 'dict-params');
 
     if (!isLocked) {
       $$headRow
@@ -745,6 +751,8 @@ export class UiRapidDatasetSettings extends EventEmitter {
       .text(l10n.t(`${prefix}.fields.function.label`));
     $table.selectAll('thead th.dict-target')
       .text(l10n.t(`${prefix}.fields.target.label`));
+    $table.selectAll('thead th.dict-params')
+      .text(l10n.t(`${prefix}.fields.params.label`));
 
     $table.selectAll('tfoot .dict-add-more')
       .text(l10n.t(`${prefix}.add_more`));
@@ -753,7 +761,7 @@ export class UiRapidDatasetSettings extends EventEmitter {
     // Render the rows of the table..
     const $tbody: D3Selection = $table.selectAll('tbody');
     let $rows: D3Selection = $tbody.selectAll('.dict-row')
-      .data(transforms, (d: PartialDataTransform) => d.order);
+      .data(transforms, (d: PartialDataTransform) => d.uuid!);
 
     // exit
     $rows.exit()
@@ -768,15 +776,68 @@ export class UiRapidDatasetSettings extends EventEmitter {
     $$rows
       .append('td')
       .attr('class', 'dict-order');
+
     $$rows
       .append('td')
-      .attr('class', 'dict-source');
+      .attr('class', 'dict-source')
+      .append('input')
+      .attr('id', (d: PartialDataTransform) => `dict-source-${d.uuid}`)
+      .attr('class', 'field-input')
+      .call(utilNoAuto)
+      .on('change', (e: Event, d: PartialDataTransform) => {
+        const val = (e.currentTarget as HTMLInputElement).value;
+        const row = this._transforms!.find(item => item.uuid === d.uuid);
+        if (row) row.source = val;
+        this.render();  // rerendering will also run validation
+      });
+
     $$rows
       .append('td')
-      .attr('class', 'dict-function');
+      .attr('class', 'dict-function')
+      .append('input')
+      .attr('id', (d: PartialDataTransform) => `dict-function-${d.uuid}`)
+      .attr('class', 'field-input')
+      .call(utilNoAuto)
+      .each((d: PartialDataTransform, i: number, nodes: ArrayLike<HTMLInputElement>) => {
+        const comboData = ['ignore','copy','constant'].map((s: string) => ({ value: s }));
+        const combo = new UiCombobox(context, 'rapid-dark').data(comboData);
+        select(nodes[i])
+          .call(combo.attach)
+          .on('change', (e: Event, d: PartialDataTransform) => {
+            const val = (e.currentTarget as HTMLInputElement).value;
+            const row = this._transforms!.find(item => item.uuid === d.uuid);
+            if (row) row.function = val;
+            this.render();  // rerendering will also run validation
+          });
+      });
+
     $$rows
       .append('td')
-      .attr('class', 'dict-target');
+      .attr('class', 'dict-target')
+      .append('input')
+      .attr('id', (d: PartialDataTransform) => `dict-target-${d.uuid}`)
+      .attr('class', 'field-input')
+      .call(utilNoAuto)
+      .on('change', (e: Event, d: PartialDataTransform) => {
+        const val = (e.currentTarget as HTMLInputElement).value;
+        const row = this._transforms!.find(item => item.uuid === d.uuid);
+        if (row) row.target = val;
+        this.render();  // rerendering will also run validation
+      });
+
+    $$rows
+      .append('td')
+      .attr('class', 'dict-params')
+      .append('input')
+      .attr('id', (d: PartialDataTransform) => `dict-params-${d.uuid}`)
+      .attr('class', 'field-input')
+      .call(utilNoAuto)
+      .on('change', (e: Event, d: PartialDataTransform) => {
+        const val = (e.currentTarget as HTMLInputElement).value;
+        const row = this._transforms!.find(item => item.uuid === d.uuid);
+        if (row) row.params = val;
+        this.render();  // rerendering will also run validation
+      });
 
     if (!isLocked) {
       const $$actions: D3EnterSelection = $$rows
@@ -791,23 +852,37 @@ export class UiRapidDatasetSettings extends EventEmitter {
         .on('click', (e: PointerEvent, d: PartialDataTransform) => {
           e.preventDefault();
           this._transforms = this._transforms!
-            .filter((item: PartialDataTransform) => item.order !== d.order);   // remove current row
+            .filter((row: PartialDataTransform) => row.uuid !== d.uuid);   // remove current row
           this.render();
         })
         .call(uiIcon('#fas-trash-can'));
     }
 
     // update
-    $rows = $rows.merge($$rows);
+    $rows = $rows.merge($$rows).order();
 
     $rows.selectAll('.dict-order')
       .text((d: PartialDataTransform) => d.order);
-    $rows.selectAll('.dict-source')
-      .text((d: PartialDataTransform) => d.source);
-    $rows.selectAll('.dict-function')
-      .text((d: PartialDataTransform) => d.function);
-    $rows.selectAll('.dict-target')
-      .text((d: PartialDataTransform) => d.target);
+
+    $rows.selectAll('.dict-source .field-input')
+      .property('disabled', (d: PartialDataTransform) => isLocked || d.function === 'constant')
+      .classed('disabled', (d: PartialDataTransform) => isLocked || d.function === 'constant')
+      .property('value', (d: PartialDataTransform) => d.source);
+
+    $rows.selectAll('.dict-function .field-input')
+      .property('disabled', isLocked)
+      .classed('disabled', isLocked)
+      .property('value', (d: PartialDataTransform) => d.function);
+
+    $rows.selectAll('.dict-target .field-input')
+      .property('disabled', (d: PartialDataTransform) => isLocked || d.function === 'ignore')
+      .classed('disabled', (d: PartialDataTransform) => isLocked || d.function === 'ignore')
+      .property('value', (d: PartialDataTransform) => d.target);
+
+    $rows.selectAll('.dict-params .field-input')
+      .property('disabled', (d: PartialDataTransform) => isLocked || d.function !== 'constant')
+      .classed('disabled', (d: PartialDataTransform) => isLocked || d.function !== 'constant')
+      .property('value', (d: PartialDataTransform) => d.params);
   }
 
 
@@ -901,6 +976,15 @@ export class UiRapidDatasetSettings extends EventEmitter {
       (ds as any)._label = fieldInfo.name!;                       // todo avoid this duplication
       (ds as any)._description = fieldInfo.description || '';     // todo avoid this duplication
       ds.thumbnailUrl = fieldInfo.thumbnailUrl ?? ds.getThumbnail();
+
+      // update data dictionary, create/delete if needed
+      if (this._transforms!.length > 0) {
+        ds.dictionary ||= new RapidDataDictionary(context);
+        // assume dictionary is valid, for now
+        ds.dictionary.transforms = this._transforms as RapidDataTransform[];
+      } else {
+        ds.dictionary = null;
+      }
     }
 
     rapid.saveDatasetSettings(ds);  // persist settings
@@ -1026,10 +1110,10 @@ export class UiRapidDatasetSettings extends EventEmitter {
     const ds = this.dataset;
     if (!ds) return result;   // need a dataset to do anything
 
-    // Make a copy of the dataset dictionary transforms before any changes.
+    // Make a copy of the original dataset dictionary transforms before any changes.
     if (!this._transforms) {
       const orig = ds.dictionary?.transforms;
-      this._transforms = orig ? structuredClone(orig) : [];
+      this._transforms = (orig ? structuredClone(orig) : []);
     }
 
     // Sort the rows by order ascending, then check each row.
@@ -1041,6 +1125,11 @@ export class UiRapidDatasetSettings extends EventEmitter {
     for (const row of rows) {
       // recompute order
       row.order = counter++;
+
+      // generate row uuid
+      if (!row.uuid) {
+        row.uuid = crypto.randomUUID().slice(0, 8);
+      }
 
       // check function
       if (row.function === 'copy') {

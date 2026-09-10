@@ -3,11 +3,12 @@ import { Extent } from '@rapid-sdk/math';
 import { GeoJSONData } from '../data/GeoJSONData.ts';
 import { geojsonFeatures } from '../util/util.ts';
 import { gpx, kml } from '@tmcw/togeojson';
+import { RapidDataDictionary } from './RapidDataDictionary.ts';
+import { TreeStore } from '../lib/TreeStore.ts';
 
 import type { Context } from '../Context.ts';
 import type { Document as XmlDocument } from '@xmldom/xmldom';
 import type { GeoJSONProps } from '../data/GeoJSONData.ts';
-import type { RapidDataDictionary } from './RapidDataDictionary.ts';
 import type { TreeValue } from './TreeStore.ts';
 import type { Vec2 } from '@rapid-sdk/math';
 
@@ -271,6 +272,13 @@ export class RapidDataset {
     result.label = this.getLabel();
     result.description = this.getDescription();
 
+    if (this.dictionary) {
+      const dictJSON = this.dictionary.toJSON();
+      if (Object.keys(dictJSON).length > 0) {
+        result.dictionary = dictJSON;
+      }
+    }
+
     return result;
   }
 
@@ -284,6 +292,10 @@ export class RapidDataset {
    * @return A new `RapidDataset`
    */
   public static fromJSON(context: Context, json: Record<string, TreeValue>): RapidDataset {
+    // Handle `dictionary` property separately from other props
+    const dictJSON = json.dictionary;
+    delete json.dictionary;
+
     const props = { ...json } as Partial<RapidDatasetProps>;
 
     for (const key of BOOLEAN_PROPS) {
@@ -293,9 +305,14 @@ export class RapidDataset {
       }
     }
 
-    return new RapidDataset(context, props);
-  }
+    const ds = new RapidDataset(context, props);
 
+    if (TreeStore.isPlainObject(dictJSON) && Object.keys(dictJSON).length > 0) {
+      ds.dictionary = RapidDataDictionary.fromJSON(context, dictJSON);
+    }
+
+    return ds;
+  }
 
 
   //---------------------------------------------------------------------------------------------
