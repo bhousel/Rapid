@@ -65,4 +65,42 @@ export class RapidDataDictionary {
     const result: Record<string, TreeValue> = { };
     return result;
   }
+
+  /**
+   * Applies the transforms in order to convert the source data into the target data.
+   * Input data that is not strings will be converted to strings.
+   * Empty, null, undefined, data will be ignored.
+   * Returns a new object, does not modify source.
+   * @param   source - source tags, as key=value pairs - will not be modified
+   * @return  target tags, as key=value pairs
+   */
+  public applyTransforms(source: Record<string, unknown>): Record<string, string> {
+    const results: Record<string, string> = {};
+    const rows = this.transforms   // sort without modifying
+      .toSorted((a: RapidDataTransform, b: RapidDataTransform) => a.order - b.order);
+
+    for (const row of rows) {
+      // 'ignore':  Information only, can be ignored
+      if (row.function === 'ignore') continue;
+
+      // 'copy':  copy the source row to the target row, '*' means match all
+      if (row.function === 'copy') {
+        if (!row.source || !row.target) continue;
+        for (const [kIn, vIn] of Object.entries(source)) {
+          if (row.source === kIn || row.source === '*') {
+            const kOut = (row.target === '*') ? kIn : row.target;
+            const vOut = (typeof vIn === 'string' ? vIn : String(vIn)).trim();
+            if (vOut !== '' && vOut !== 'null' && vOut !== 'undefined') {
+              results[kOut] = vOut;
+            }
+          }
+        }
+      }
+
+      // no other functions implemented yet.
+    }
+
+    return results;
+  }
+
 }

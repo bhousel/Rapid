@@ -18,6 +18,7 @@ import { UiTooltip } from './UiTooltip.ts';
 
 import type { Context } from '../Context.ts';
 import type { D3Selection } from 'd3-selection';
+import type { EventData } from '../behaviors/AbstractBehavior.ts';
 import type { Vec2 } from '@rapid-sdk/math';
 
 
@@ -234,7 +235,7 @@ export class UiSidebar {
    * Respond to any change in hover
    * @param eventData - data about what is being hovered
    */
-  protected _hoverchange(eventData: any): void {
+  protected _hoverchange(eventData: EventData): void {
     const context = this.context;
     const editor = context.systems.editor!;
     const graph = editor.staging.graph;
@@ -244,8 +245,8 @@ export class UiSidebar {
     const modeID = context.mode?.id;
     const target = eventData.target;
     const layer = target?.layer;
-    let dataID = target?.dataID;
-    let data = target?.data;
+    let dataID = target?.dataID ?? null;
+    let data = target?.data ?? null;
 
     // Note: This code probably doesn't really belong here.  The Sidebar shouldn't "own" this problem.
     // When hovering on a line, its vertexes will appear.
@@ -302,17 +303,18 @@ export class UiSidebar {
     const graph = editor.staging.graph;
     let datum: any = target;
     const serviceID = (datum?.props?.serviceID || '') as ServiceID;
+    const datasetID = (datum?.props?.datasetID || '') as DatasetID;
 
     // Start by clearing out any custom state.
     this.reset();
 
-    // Hovering on MapWithAI/Esri data..
-    if (serviceID === 'mapwithai' || serviceID === 'esri') {
-      this.RapidInspector.datum = datum as OsmEntity;
+    // Hovering on Rapid data..
+    if (datasetID && serviceID !== 'overture') {
+      this.RapidInspector.datum = datum as OsmEntity | GeoJSONData;
       this.show(this.RapidInspector.render);
 
     // Hovering on Overture data..
-    } else if (serviceID === 'overture') {
+    } else if (datasetID && serviceID === 'overture') {
       this.OvertureInspector.datum = datum as GeoJSONData;
       this.show(this.OvertureInspector.render);
 

@@ -24,6 +24,8 @@ const TILEZOOM = 16;
 interface MapWithAIDataset {
   /** Unique identifier for this dataset */
   id: DatasetID;
+  /** Identifier for the spatial cache where the data is stored */
+  spatialID: SpatialID;
   /** Graph instance holding the loaded MapWithAI entity data */
   graph: Graph;
   /** Set of entity IDs already seen, to avoid processing duplicates */
@@ -137,6 +139,7 @@ export class MapWithAIService extends AbstractSystem {
     const fbRoads = new RapidDataset(context, {
       id: 'fbRoads',
       serviceID: 'mapwithai',
+      spatialID: 'mapwithai-fbRoads-data',
       categories: ['meta', 'roads', 'featured'],
       color: '#da26d3',  // rapid magenta
       dataUsed: ['mapwithai', 'Facebook Roads'],
@@ -150,6 +153,7 @@ export class MapWithAIService extends AbstractSystem {
     const msBuildings = new RapidDataset(context, {
       id: 'msBuildings',
       serviceID: 'mapwithai',
+      spatialID: 'mapwithai-msBuildings-data',
       categories: ['microsoft', 'buildings', 'featured'],
       color: '#da26d3',  // rapid magenta
       dataUsed: ['mapwithai', 'Microsoft Buildings'],
@@ -165,6 +169,7 @@ export class MapWithAIService extends AbstractSystem {
       hidden: true,
       conflated: false,
       serviceID: 'mapwithai',
+      spatialID: 'mapwithai-rapid_intro_graph-data',
       categories: ['meta', 'roads'],
       color: '#da26d3',  // rapid magenta
       dataUsed: [],
@@ -204,6 +209,7 @@ export class MapWithAIService extends AbstractSystem {
     if (!ds) {
       ds = {
         id: datasetID,
+        spatialID: `mapwithai-${datasetID}-data`,
         graph: new Graph(this.context),
         seen: new Set<EntityID>(),
         seenFirstNodeID: new Set<EntityID>(),
@@ -226,8 +232,7 @@ export class MapWithAIService extends AbstractSystem {
     if (!ds) return [];
 
     const spatial = this.context.systems.spatial!;
-    const spatialID = `mapwithai-${ds.id}-data`;
-    return spatial.getVisibleItems(spatialID).map(hit => hit.contents as OsmEntity);
+    return spatial.getVisibleItems(ds.spatialID).map(hit => hit.contents as OsmEntity);
   }
 
 
@@ -371,8 +376,7 @@ export class MapWithAIService extends AbstractSystem {
     // important: `graph.rebase` will call `.updateGeometry()`
     graph.rebase(entities, [graph], true);   // true = force replace entities
 
-    const spatialID = `mapwithai-${ds.id}-data`;
-    spatial.addData(spatialID, entities);
+    spatial.addData(ds.spatialID, entities);
     gfx?.deferredRedraw();
   }
 
@@ -403,8 +407,7 @@ export class MapWithAIService extends AbstractSystem {
     // important: `graph.rebase` will call `.updateGeometry()`
     ds.graph.rebase(entities);
 
-    const spatialID = `mapwithai-${ds.id}-data`;
-    spatial.addData(spatialID, entities);
+    spatial.addData(ds.spatialID, entities);
   }
 
 

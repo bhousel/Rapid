@@ -1,5 +1,6 @@
 import { select, selection } from 'd3-selection';
 import { actionNoop, actionRapidAcceptFeature } from '../actions/index.ts';
+import { GeoJSONData, OsmEntity } from '../data/index.ts';
 import { uiIcon } from './icon.ts';
 //import { uiRapidFirstEditDialog } from './rapid_first_edit_dialog.ts';
 import { UiTooltip } from './UiTooltip.ts';
@@ -7,7 +8,6 @@ import { utilKeybinding } from '../util/keybinding.ts';
 
 import type { Context } from '../Context.ts';
 import type { D3EnterSelection, D3Selection } from 'd3-selection';
-import type { OsmEntity } from '../data/OsmEntity.ts';
 
 const ACCEPT_FEATURES_LIMIT = 50;
 
@@ -45,8 +45,11 @@ interface ChoiceData {
  *  </div>
  */
 export class UiRapidInspector {
+  /** Global shared application context */
   public context: Context;
-  public datum: OsmEntity | null;
+  /** The data element that was selected */
+  public datum: OsmEntity | GeoJSONData | null;
+
   protected _keys: string[] | null;
   protected _keybinding: any;
 
@@ -120,6 +123,7 @@ export class UiRapidInspector {
 
     const context = this.context;
     const l10n = context.systems.l10n!;
+    const rapid = context.systems.rapid!;
     const rtl = l10n.isRTL ? '-rtl' : '';
 
     let $inspector: D3Selection = $parent.selectAll('.rapid-inspector')
@@ -147,19 +151,33 @@ export class UiRapidInspector {
       .on('click', (e: PointerEvent) => context.enter('browse'))
       .call(uiIcon('#rapid-icon-close'));
 
-    // add `.body`
-    $$inspector
-      .append('div')
-      .attr('class', 'body');
-
     // update
-    this.$inspector = $inspector = $inspector.merge($$inspector) as D3Selection;
+    this.$inspector = $inspector = $inspector
+      .merge($$inspector);
 
     // localize logo
     $inspector.selectAll('.logo-rapid > use')
       .attr('xlink:href', `#rapid-logo-rapid-wordmark${rtl}`);
 
-    $inspector.selectAll('.body')
+
+    // Require datum and dataset to show anything in the 'body' section.
+    const datum = this.datum;
+    const datasetID = datum?.props?.datasetID as DatasetID;
+    const ds = datasetID ? rapid.catalog.get(datasetID) : undefined;
+
+    // add `.body`
+    let $body: D3Selection = $inspector.selectAll('.body')
+      .data(ds ? [0] : []);
+
+    $body.exit()
+      .remove();
+
+    $body = $body.enter()
+      .append('div')
+      .attr('class', 'body')
+      .merge($body);
+
+    $body
       .call(this._renderFeatureInfo)
       .call(this._renderTagInfo)
       .call(this._renderChoices);
@@ -168,9 +186,9 @@ export class UiRapidInspector {
 
   /**
    * Renders the 'feature-info' section (the dataset name)
-   * @param $selection - A d3-selection to a HTMLElement that this content should render itself into
+   * @param $parent - Parent D3Selection that this content should render itself into
    */
-  public _renderFeatureInfo($selection: D3Selection): void {
+  public _renderFeatureInfo($parent: D3Selection): void {
     const datum = this.datum;
     if (!datum) return;
 
@@ -179,12 +197,12 @@ export class UiRapidInspector {
     const rapid = context.systems.rapid!;
 
     const datasetID = datum.props.datasetID as DatasetID;
-    const ds = rapid.datasets.get(datasetID);
+    const ds = rapid.catalog.get(datasetID);
     if (!ds) return;   // Need a dataset to do anything
 
     const color = ds.color;
 
-    let $featureInfo: D3Selection = $selection.selectAll('.feature-info')
+    let $featureInfo: D3Selection = $parent.selectAll('.feature-info')
       .data([0]);
 
     // enter
@@ -219,16 +237,35 @@ export class UiRapidInspector {
 
   /**
    * Renders the 'tag-info' section
-   * @param $selection - A d3-selection to a HTMLElement that this content should render itself into
+   * @param $parent - Parent D3Selection that this content should render itself into
    */
-  public _renderTagInfo($selection: D3Selection): void {
-    const tags = this.datum?.tags;
-    if (!tags) return;
+  public _renderTagInfo($parent: D3Selection): void {
+    const datum = this.datum;
+    if (!datum) return;
 
     const context = this.context;
     const l10n = context.systems.l10n!;
+    const rapid = context.systems.rapid!;
 
-    let $tagInfo: D3Selection = $selection.selectAll('.tag-info')
+    const datasetID = datum.props.datasetID as DatasetID;
+    const ds = rapid.catalog.get(datasetID);
+    if (!ds) return;   // Need a dataset to do anything
+
+    // Try to find "tags" on the selected datum.
+    let tags = datum instanceof OsmEntity ? datum.tags    // OSM-like data has `tags`
+      : datum instanceof GeoJSONData ? datum.properties   // GeoJSON-like data has `properties`
+      : {} as Record<string, unknown>;
+
+    // If we have a data dictionary, apply it.
+    const dictionary = ds.dictionary;
+    if (dictionary) {
+      tags = dictionary.applyTransforms(tags);
+    }
+
+    const tagData = Object.entries(tags);
+
+    // Render the tag wrapper
+    let $tagInfo: D3Selection = $parent.selectAll('.tag-info')
       .data([0]);
 
     // enter
@@ -244,27 +281,53 @@ export class UiRapidInspector {
       .append('div')
       .attr('class', 'tag-heading');
 
-    for (const [k, v] of Object.entries(tags) as [string, string][]) {
-      const $$tagEntry = $$tagBag.append('div').attr('class', 'tag-entry');
-      $$tagEntry.append('div').attr('class', 'tag-key').text(k);
-      $$tagEntry.append('div').attr('class', 'tag-value').text(v);
-    }
-
     // update
     $tagInfo = $tagInfo.merge($$tagInfo);
 
     $tagInfo.selectAll('.tag-heading')
-      .text(l10n.t('text.tag'));
+      .text(l10n.t('text.tag', { n: tagData.length }));
+
+
+    // Render the tags
+    const $bag: D3Selection = $tagInfo.selectAll('.tag-bag');
+    const $items: D3Selection = $bag.selectAll('.tag-entry')
+      .data(tagData, (d: [string, unknown]) => d[0]);
+
+    // exit
+    $items.exit()
+      .remove();
+
+    // enter
+    const $$items: D3EnterSelection = $items.enter()
+      .append('div')
+      .attr('class', 'tag-entry');
+
+    $$items
+      .append('div')
+      .attr('class', 'tag-key')
+      .text((d: [string, unknown]) => d[0]);
+    $$items
+      .append('div')
+      .attr('class', 'tag-value')
+      .text((d: [string, unknown]) => d[1]);
   }
 
 
   /**
    * Renders the 'rapid-inspector-choices' section
-   * @param $selection - A d3-selection to a HTMLElement that this content should render itself into
+   * @param $parent - Parent D3Selection that this content should render itself into
    */
-  public _renderChoices($selection: D3Selection): void {
+  public _renderChoices($parent: D3Selection): void {
+    const datum = this.datum;
+    if (!datum) return;
+
     const context = this.context;
     const l10n = context.systems.l10n!;
+    const rapid = context.systems.rapid!;
+
+    const datasetID = datum.props.datasetID as DatasetID;
+    const ds = rapid.catalog.get(datasetID);
+    if (!ds) return;   // Need a dataset to do anything
 
     const choiceData: ChoiceData[] = [
       {
@@ -284,8 +347,14 @@ export class UiRapidInspector {
       }
     ];
 
-    let $choices: D3Selection = $selection.selectAll('.rapid-inspector-choices')
-      .data([0]);
+    // Only datasets with a data dictionary will allow accept/ignore buttons.
+    const dictionary = ds.dictionary;
+    let $choices: D3Selection = $parent.selectAll('.rapid-inspector-choices')
+      .data(dictionary ? [0] : []);
+
+    // exit
+    $choices.exit()
+      .remove();
 
     // enter
     const $$choices: D3EnterSelection = $choices.enter()
@@ -336,19 +405,19 @@ export class UiRapidInspector {
       .attr('class', 'choice-wrap');
 
     // action button
-    const $$choiceActionButton: D3EnterSelection = $$choiceWrap
+    const $$choiceButton: D3EnterSelection = $$choiceWrap
       .append('button')
       .attr('class', 'choice-button')
       .on('click', d.onClick)
       .call(d.tooltip.attach);
 
-    $$choiceActionButton
+    $$choiceButton
       .append('svg')
       .attr('class', 'choice-icon icon')
       .append('use')
       .attr('xlink:href', d.iconName);
 
-    $$choiceActionButton
+    $$choiceButton
       .append('div')
       .attr('class', 'choice-label');
 
@@ -449,6 +518,9 @@ export class UiRapidInspector {
     const scene = context.systems.gfx!.scene;
     const ui = context.systems.ui;
 
+    const datasetID = datum.props.datasetID as DatasetID;
+    const dataset = rapid.catalog.get(datasetID);
+
     if (this.isAcceptFeatureDisabled()) {
       ui?.Flash.show({
         duration: 5000,
@@ -460,13 +532,7 @@ export class UiRapidInspector {
       return;
     }
 
-    const serviceID = datum.props.serviceID as ServiceID;
-    const service = context.services[serviceID] as any;
-    const graph = service.graph(datum.props.datasetID);
-    const datasetID = datum.props.datasetID as DatasetID;
-    const dataset = rapid.datasets.get(datasetID);
-
-    const action = actionRapidAcceptFeature(datum.id, graph);
+    const action = actionRapidAcceptFeature(datum);
     editor.perform(action);
     const allIDs = [...action.getAllIDs()];
 

@@ -118,6 +118,11 @@ export class OvertureService extends VectorTileService {
    * @return  The datasets this service provides
    */
   public getAvailableDatasets(): RapidDataset[] {
+    // TODO:  spatialID is a problem here.
+    // We are leveraging the VectorTileService, which has spatialID and cache per zoom.
+    // This won't break anything obvious, but could cause issues when attempting to
+    // autoconnect on accept, if we ever unlock that feature for the Overture data.
+
     const places = new RapidDataset(this.context, {
       id: 'overture-places',
       serviceID: 'overture',

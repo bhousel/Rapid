@@ -85,10 +85,11 @@ export class SelectMode extends AbstractMode {
     // It's hacky and we should remove this, maybe by including layerID in the `options` passed in.
     scene.clearClass('select');
     for (const datum of selection.values()) {
+      const datasetID = (datum.props?.datasetID ?? '') as DatasetID;
       const serviceID = (datum.props?.serviceID ?? '') as ServiceID;
       let layerID = null;
 
-      if (['mapwithai', 'esri', 'overture'].includes(serviceID)) {
+      if (datasetID) {
         layerID = 'rapid';
       } else if (datum instanceof MarkerData && datum.type === 'detection') {
         if (serviceID === 'mapillary' && datum.props.object_type === 'point') {
@@ -118,9 +119,11 @@ export class SelectMode extends AbstractMode {
     Sidebar?.reset();
  // The update handlers feel like they should live with the sidebar content components, not here
     let sidebarContent: any = null;
+    const datasetID = (datum.props?.datasetID ?? '') as DatasetID;
+    const serviceID = (datum.props?.serviceID ?? '') as ServiceID;
 
     // Selected a note...
-    if (datum instanceof MarkerData && datum.serviceID === 'osm' && datum.type === 'note') {
+    if (datum instanceof MarkerData && serviceID === 'osm' && datum.type === 'note') {
       const noteEditor = new UiNoteEditor(context);
       noteEditor.datum = datum;
       noteEditor.on('change', () => {
@@ -134,7 +137,7 @@ export class SelectMode extends AbstractMode {
       });
       sidebarContent = noteEditor.render;
 
-    } else if (datum instanceof MarkerData && datum.serviceID === 'keepright') {
+    } else if (datum instanceof MarkerData && serviceID === 'keepright') {
       const keepRightEditor = new UiKeepRightEditor(context);
       keepRightEditor.datum = datum;
       keepRightEditor.on('change', () => {
@@ -148,7 +151,7 @@ export class SelectMode extends AbstractMode {
       });
       sidebarContent = keepRightEditor.render;
 
-    } else if (datum instanceof MarkerData && datum.serviceID === 'osmose') {
+    } else if (datum instanceof MarkerData && serviceID === 'osmose') {
       const osmoseEditor = new UiOsmoseEditor(context);
       osmoseEditor.datum = datum;
       osmoseEditor.on('change', () => {
@@ -162,7 +165,7 @@ export class SelectMode extends AbstractMode {
       });
       sidebarContent = osmoseEditor.render;
 
-    } else if (datum instanceof MarkerData && datum.serviceID === 'maproulette') {
+    } else if (datum instanceof MarkerData && serviceID === 'maproulette') {
       const maprouletteEditor = new UiMapRouletteEditor(context);
       maprouletteEditor.datum = datum;
       const menu = ui?.MapRouletteMenu;
@@ -188,16 +191,16 @@ export class SelectMode extends AbstractMode {
       photos.selectDetection(layerID, datum.id);
 
     // Selected Overture feature...
-    } else if (datum.props.serviceID === 'overture') {
+    } else if (datasetID && serviceID === 'overture') {
       if (Sidebar) {
         Sidebar.OvertureInspector.datum = datum as GeoJSONData;
         sidebarContent = Sidebar.OvertureInspector.render;
       }
 
-    // Selected MapWithAI/Esri feature...
-    } else if (datum.props.serviceID === 'mapwithai' || datum.props.serviceID === 'esri') {
+    // Selected Rapid feature...
+    } else if (datasetID && serviceID !== 'overture') {
       if (Sidebar) {
-        Sidebar.RapidInspector.datum = datum as OsmEntity;
+        Sidebar.RapidInspector.datum = datum as OsmEntity | GeoJSONData;
         sidebarContent = Sidebar.RapidInspector.render;
       }
 

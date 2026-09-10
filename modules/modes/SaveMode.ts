@@ -261,7 +261,7 @@ export class SaveMode extends AbstractMode {
     this._keybindingOn();
 
     const confirm = new UiConfirm(context).show();
-    confirm.$header!
+    confirm.$heading!
       .append('h3')
       .text(l10n.t('save.error'));
 

@@ -5,9 +5,10 @@ import { geojsonFeatures } from '../util/util.ts';
 import { gpx, kml } from '@tmcw/togeojson';
 
 import type { Context } from '../Context.ts';
-import type { TreeValue } from './TreeStore.ts';
-import type { RapidDataDictionary } from './RapidDataDictionary.ts';
 import type { Document as XmlDocument } from '@xmldom/xmldom';
+import type { GeoJSONProps } from '../data/GeoJSONData.ts';
+import type { RapidDataDictionary } from './RapidDataDictionary.ts';
+import type { TreeValue } from './TreeStore.ts';
 import type { Vec2 } from '@rapid-sdk/math';
 
 const RAPID_MAGENTA = '#da26d3';
@@ -29,6 +30,8 @@ export interface RapidDatasetProps {
   id: DatasetID;
   /** Service providing this dataset: 'esri', 'mapwithai', 'overture' */
   serviceID: ServiceID;
+  /** Identifier for the spatial cache where the data is stored */
+  spatialID: SpatialID;
 
   /** Categories this dataset belongs to (e.g. 'buildings', 'addresses') */
   categories: string[];
@@ -84,6 +87,8 @@ export class RapidDataset {
   public id: DatasetID;
   /** Service providing this dataset (e.g. 'esri', 'mapwithai', 'overture') */
   public serviceID: ServiceID;
+  /** Identifier for the spatial cache where the data is stored */
+  public spatialID: SpatialID;
   /** The data dictionary for this dataset, can be setup once the dataset is added to Rapid */
   public dictionary: RapidDataDictionary | null;
 
@@ -143,6 +148,7 @@ export class RapidDataset {
 
     this.id = props.id ?? '';
     this.serviceID = props.serviceID ?? '';
+    this.spatialID = props.spatialID ?? `${this.serviceID ?? 'rapid'}-${this.id}-data`;
     this.categories = new Set<string>(props.categories ?? []);
     this.color = props.color ?? RAPID_MAGENTA;
     this.dataUsed = props.dataUsed ?? [];
@@ -311,10 +317,9 @@ export class RapidDataset {
     const gfx = context.systems.gfx;
     const network = context.systems.network!;
     const spatial = context.systems.spatial!;
-    const spatialID = `rapid-${this.id}`;
 
     // reset
-    spatial.clearCache(spatialID);
+    spatial.clearCache(this.spatialID);
     // this._template = null;
     gfx?.deferredRedraw();
 
@@ -393,7 +398,6 @@ export class RapidDataset {
     const context = this.context;
     const gfx = context.systems.gfx;
     const spatial = context.systems.spatial!;
-    const spatialID = `rapid-${this.id}`;
 
     const isString = (typeof data === 'string');
     let geojson: GeoJSON.GeoJsonObject | undefined;
@@ -429,14 +433,20 @@ export class RapidDataset {
         const extent = this._calcExtent(part);   // sanity check
         if (!isFinite(extent.min[0])) continue;  // invalid - no coordinates?
 
-        const d = new GeoJSONData(this.context, { geojson: feature });
+        const props: GeoJSONProps = {
+          serviceID:  this.serviceID,
+          datasetID:  this.id,
+          geojson:    part
+        };
+
+        const d = new GeoJSONData(this.context, props);
         newFeatures.push(d);
         this.extent.extendSelf(extent);
       }
     }
 
     if (newFeatures.length) {
-      spatial.addData(spatialID, newFeatures);
+      spatial.addData(this.spatialID, newFeatures);
       gfx?.deferredRedraw();
     }
     // this.scene.enableLayers(this.layerID);  // emits 'layerchange', so UI gets updated

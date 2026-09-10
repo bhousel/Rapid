@@ -38,6 +38,8 @@ interface EsriDataCache {
 interface EsriDataset {
   /** Unique dataset identifier from ArcGIS */
   id: DatasetID;
+  /** Identifier for the spatial cache where the data is stored */
+  spatialID: SpatialID;
   /** Human-readable title of the dataset */
   title: string;
   /** Short description/summary of the dataset */
@@ -58,7 +60,7 @@ interface EsriDataset {
   graph: Graph;
   /** Last viewport version number, used to skip redundant tile loads */
   lastv: number | null;
-  /** Layer schema info (fields, tagmap) loaded from the feature server */
+  /** Layer schema info loaded from the feature server */
   layers: EsriLayer[] | null;
   /** Inflight promise for loading layer schema info */
   _layersPromise: Promise<void> | null;
@@ -78,8 +80,9 @@ interface EsriLayer {
   displayField: string;
   /** Name of the field holds the object identifier */
   objectIdField: string;
-  /** Our internal mapping from Esri field names to OSM tag keys */
-  _tagmap: Record<string, string>;
+// TODO: remove - RapidDataDictionary replaces this!
+//  /** Our internal mapping from Esri field names to OSM tag keys */
+//  _tagmap: Record<string, string>;
   /** Our internal cache of state for this layer */
   _cache: EsriDataCache;
 }
@@ -94,7 +97,7 @@ interface EsriField {
   alias: string;
   /** Esri field type (e.g. 'esriFieldTypeOID', 'esriFieldTypeString') */
   type: string;
-  /** Whether this field is editable; non-editable fields are skipped in the tagmap */
+  /** Whether this field is editable; non-editable fields are ignored when building the data dictionary */
   editable: boolean;
 }
 
@@ -189,10 +192,10 @@ export class EsriService extends AbstractSystem {
     // Convert the internal `EsriDataset` objects into `RapidDataset`s for the catalog.
     // We expect them to be all loaded now because `_loadDatasetsAsync` is called by `initAsync`
     //  and `getAvailableDatasets` is called by RapidSystem's `startAsync`.
-    return [...this._datasets.values()].map(d => {
+    return [...this._datasets.values()].map(ds => {
       // gather categories
       const categories = new Set<string>(['esri']);
-      for (const c of d.groupCategories) {
+      for (const c of ds.groupCategories) {
         categories.add(c.toLowerCase().replace('/categories/', ''));
       }
 
@@ -200,21 +203,22 @@ export class EsriService extends AbstractSystem {
       // were Facebook Roads and Microsoft Buildings, and gold happened to be the 3rd color.
       // Today, we let users change the color and persist their preference.
       const dataset = new RapidDataset(this.context, {
-        id: d.id,
+        id: ds.id,
         serviceID: 'esri',
+        spatialID: ds.spatialID,
         categories: [...categories],
         color: '#ffd600',  // gold
-        dataUsed: ['esri', this.getDataUsed(d.title)],
-        label: d.title,
-        description: d.snippet,
-        sourceUrl: d.url,
-        itemUrl: `${HOMEROOT}/item.html?id=${d.id}`,
+        dataUsed: ['esri', this.getDataUsed(ds.title)],
+        label: ds.title,
+        description: ds.snippet,
+        sourceUrl: ds.url,
+        itemUrl: `${HOMEROOT}/item.html?id=${ds.id}`,
         licenseUrl: 'https://wiki.openstreetmap.org/wiki/Esri/ArcGIS_Datasets#License',
-        thumbnailUrl: `${APIROOT}/items/${d.id}/info/${d.thumbnail}?w=400`
+        thumbnailUrl: `${APIROOT}/items/${ds.id}/info/${ds.thumbnail}?w=400`
       });
 
-      if (d.extent) {
-        dataset.extent = new Extent(d.extent[0], d.extent[1]);
+      if (ds.extent) {
+        dataset.extent = new Extent(ds.extent[0], ds.extent[1]);
       }
 
       return dataset;
@@ -264,8 +268,7 @@ export class EsriService extends AbstractSystem {
     if (!ds) return [];
 
     const spatial = this.context.systems.spatial!;
-    const spatialID = `esri-${ds.id}-data`;
-    return spatial.getVisibleItems(spatialID).map(hit => hit.contents as OsmEntity);
+    return spatial.getVisibleItems(ds.spatialID).map(hit => hit.contents as OsmEntity);
  }
 
 
@@ -416,7 +419,6 @@ export class EsriService extends AbstractSystem {
    */
   protected _gotTile(ds: EsriDataset, layer: EsriLayer, geojson: GeoJSON.FeatureCollection): void {
     const spatial = this.context.systems.spatial!;
-    const spatialID = `esri-${ds.id}-data`;
 
     const results: OsmEntity[] = [];
     for (const feature of geojson.features ?? []) {
@@ -428,7 +430,7 @@ export class EsriService extends AbstractSystem {
 
     if (results.length) {
       ds.graph.rebase(results);   // important: `graph.rebase` will call `.updateGeometry()`
-      spatial.addData(spatialID, results);
+      spatial.addData(ds.spatialID, results);
     }
   }
 
@@ -542,19 +544,20 @@ export class EsriService extends AbstractSystem {
 
     /**
      * Convert the properties into OSM tags.
-     * Only keys present in the `_tagmap` will be accepted as OSM tags.
      * @param properties
      */
     function parseTags(properties: GeoJSON.GeoJsonProperties): OsmTags {
-      properties ??= {};
-      const tags: Record<string, string> = {};
-      for (const [k, v] of Object.entries(properties)) {
-        const tagk = clean(layer._tagmap[k]);
-        const tagv = clean(v);
-        if (tagk && tagv) {
-          tags[tagk] = tagv;
-        }
-      }
+      const tags = structuredClone(properties ?? {});  // copy all
+
+// TODO: remove - RapidDataDictionary replaces this!
+//      const tags: Record<string, string> = {};
+//      for (const [k, v] of Object.entries(properties)) {
+//        const tagk = clean(layer._tagmap[k]);
+//        const tagv = clean(v);
+//        if (tagk && tagv) {
+//          tags[tagk] = tagv;
+//        }
+//      }
 
       // Since ESRI had to split the massive google open buildings dataset into multiple countries,
       // They asked us to aggregate them all under the same 'Google Open Buildings' dataset - Rapid#1300
@@ -567,13 +570,13 @@ export class EsriService extends AbstractSystem {
       return tags;
     }
 
-    /**
-     * Coerce values into strings and trim whitespace
-     * @param val
-     */
-    function clean(val: any): string | null {
-      return val ? val.toString().trim() : null;
-    }
+//    /**
+//     * Coerce values into strings and trim whitespace
+//     * @param val
+//     */
+//    function clean(val: any): string | null {
+//      return val ? val.toString().trim() : null;
+//    }
   }
 
 
@@ -619,6 +622,7 @@ export class EsriService extends AbstractSystem {
     if (this._datasets.has(ds.id)) return;  // we've seen it already
 
     this._datasets.set(ds.id, ds);
+    ds.spatialID = `esri-${ds.id}-data`;
     ds.graph = new Graph(this.context);
     ds.lastv = null;
     ds.layers = null;   // the schema info will live here
@@ -665,13 +669,14 @@ export class EsriService extends AbstractSystem {
 
           // For each layer, setup:
           for (const layer of json.layers as EsriLayer[]) {
-            // `_tagmap`: mapping of Esri field -> OSM Tag.
-            const tagmap: Record<string, string> = {};
-            for (const f of layer.fields) {
-              if (!f.editable) continue;   // 1. keep "editable" fields only
-              tagmap[f.name] = f.alias;    // 2. field `name` -> OSM tag (stored in `alias`)
-            }
-            layer._tagmap = tagmap;
+// TODO: remove - RapidDataDictionary replaces this!
+//            // `_tagmap`: mapping of Esri field -> OSM Tag.
+//            const tagmap: Record<string, string> = {};
+//            for (const f of layer.fields) {
+//              if (!f.editable) continue;   // 1. keep "editable" fields only
+//              tagmap[f.name] = f.alias;    // 2. field `name` -> OSM tag (stored in `alias`)
+//            }
+//            layer._tagmap = tagmap;
 
             // `_cache`: cache of seen data and loaded pages
             layer._cache = {

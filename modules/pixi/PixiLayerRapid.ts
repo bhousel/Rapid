@@ -322,8 +322,7 @@ export class PixiLayerRapid extends AbstractPixiLayer {
     /* for now, custom data needs to be a data file at a url that is loaded with Rapid starts up */
     } else if (ds.custom) {
       const spatial = this.context.systems.spatial!;
-      const spatialID = `rapid-${ds.id}`;
-      const data = spatial.getVisibleItems(spatialID).map(hit => hit.contents as GeoJSONData);
+      const data = spatial.getVisibleItems(ds.spatialID).map(hit => hit.contents as GeoJSONData);
       for (const d of data) {
         if (isAcceptedOrIgnored(d.id)) continue;
 
@@ -548,7 +547,7 @@ export class PixiLayerRapid extends AbstractPixiLayer {
         feature.label = l10n.displayName(tags);
 
         // experiment: label addresses
-        const housenumber = tags['addr:unit'] ?? tags['addr:housenumber'];
+        const housenumber = tags['addr_unit'] ?? tags['addr_housenumber'];
         if (!feature.label && housenumber) {
           feature.label = housenumber;
         }
@@ -582,7 +581,7 @@ export class PixiLayerRapid extends AbstractPixiLayer {
         feature.label = l10n.displayName(tags);
 
         // experiment: label addresses
-        const housenumber = tags['addr:unit'] ?? tags['addr:housenumber'];
+        const housenumber = tags['addr_unit'] ?? tags['addr_housenumber'];
         if (!feature.label && housenumber) {
           feature.label = housenumber;
         }
