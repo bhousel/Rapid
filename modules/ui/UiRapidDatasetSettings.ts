@@ -725,17 +725,28 @@ export class UiRapidDatasetSettings extends EventEmitter {
       .append('tbody');
 
     /* Table Footer */
-    if (!isLocked) {   // Add "Add More" button, if not locked.
-      $$table
+    if (!isLocked) {   // Add "Add More", "Remove All" buttons, if not locked.
+      const $$tableActions: D3EnterSelection = $$table
         .append('tfoot')
         .append('tr')
         .append('td')
-        .attr('colspan', '9999')   // span all columns
+        .attr('colspan', '9999');   // span all columns
+
+      $$tableActions
         .append('button')
         .attr('class', 'minor dict-add-more')
         .on('click', (e: PointerEvent) => {
           (e?.currentTarget as HTMLElement).blur();    // avoid keeping focus on the button - iD#4641
           this._transforms!.push({ order: 9999 } as PartialDataTransform);
+          this.render();
+        });
+
+      $$tableActions
+        .append('button')
+        .attr('class', 'minor dict-remove-all')
+        .on('click', (e: PointerEvent) => {
+          (e?.currentTarget as HTMLElement).blur();    // avoid keeping focus on the button - iD#4641
+          this._transforms = [];
           this.render();
         });
     }
@@ -756,6 +767,8 @@ export class UiRapidDatasetSettings extends EventEmitter {
 
     $table.selectAll('tfoot .dict-add-more')
       .text(l10n.t(`${prefix}.add_more`));
+    $table.selectAll('tfoot .dict-remove-all')
+      .text(l10n.t(`${prefix}.remove_all`));
 
 
     // Render the rows of the table..

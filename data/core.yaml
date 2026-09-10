@@ -1340,6 +1340,7 @@ en:
       add_default: Add a default data mapping
       is_default: This is a default data mapping - it simply copies all source attributes into target tags.
       add_more: Add More
+      remove_all: Remove All
       fields:
         order:
           label: Order

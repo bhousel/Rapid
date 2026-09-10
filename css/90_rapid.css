@@ -95,7 +95,7 @@ button.rapid-features.layer-off use {
   font-size: 12px;
   height: 28px;
   border-radius: 14px;
-  margin: 10px 0;
+  margin: 10px 5px;
   padding: 0 15px;
 }
 .rapid-inspector button:focus,
