@@ -14,8 +14,10 @@ import type { Vec2 } from '@rapid-sdk/math';
  * Extended Action that includes additional methods.
  */
 export interface RapidAcceptAction extends Action {
-  /** Returns the full set of entityIDs accepted */
-  getAllIDs(): Set<EntityID>;
+  /** Returns the set of _original_ dataIDs that were accepted */
+  getAcceptedIDs(): Set<DataID>;
+  /** Returns the id of the newly-accepted feature - used to select it */
+  getNewID(): EntityID | undefined;
 }
 
 
@@ -27,9 +29,19 @@ export interface RapidAcceptAction extends Action {
  */
 export function actionRapidAcceptFeature(datum: OsmEntity | GeoJSONData): RapidAcceptAction {
 
-  const old2new = new Map<EntityID, EntityID>();  // oldid to newid
-  const allIDs = new Set<EntityID>();
+  // Mapping of oldid -> newid.  Not all old ids will be in here!
+  // (e.g. In the case of a GeoJSON line, we will create a lot of new OsmNodes for the coordinates.)
+  const old2new = new Map<DataID, EntityID>();  // oldid to newid
+  // All original IDs that were accepted
+  const acceptedIDs = new Set<DataID>();
+  // The newID of the accepted feature, if any.
+  let newID: EntityID | undefined;
 
+  /**
+   * Accepts a Rapid feature from an external dataset into the main graph.
+   * @param   graph - the starting Graph
+   * @return  The modified Graph
+   */
   const action: RapidAcceptAction = ((graph: Graph): Graph => {
 
     const context = graph.context;
@@ -42,7 +54,6 @@ export function actionRapidAcceptFeature(datum: OsmEntity | GeoJSONData): RapidA
     if (!dataset || !dictionary || !spatialID) return graph;
 
     // If we end up accepting a new way, trigger the autoconnect code below.
-    let newWay: OsmWay | undefined;
     let newEntities: OsmEntity[] | undefined | null;
 
     // Data is "GeoJSON-like".  Convert it to OSM Entities.
@@ -71,12 +82,11 @@ export function actionRapidAcceptFeature(datum: OsmEntity | GeoJSONData): RapidA
     if (!newEntities?.length) return graph;  // nothing to do
     graph.replace(newEntities);
 
-    if (newEntities.at(-1) instanceof OsmWay) {
-      newWay = newEntities.at(-1) as OsmWay;
-    }
+    const newEntity = newEntities.at(-1);   // the last one is the main one.
+    newID = newEntity?.id;
 
-    if (newWay) {
-      attemptAutoconnect(newWay, graph);
+    if (newEntity instanceof OsmWay) {
+      attemptAutoconnect(newEntity, graph);
     }
 
     return graph.commit();
@@ -89,9 +99,9 @@ export function actionRapidAcceptFeature(datum: OsmEntity | GeoJSONData): RapidA
      * @return  Array containing the newly-created node
      */
     function acceptNode(extNode: OsmNode, extGraph: Graph): OsmEntity[] {
-      const n = new OsmNode(extNode);   // copy external node
+      acceptedIDs.add(extNode.id);
+      const n = new OsmNode(extNode, { id: undefined });   // copy external node, generate new ID
       old2new.set(extNode.id, n.id);
-      allIDs.add(n.id);
       n.props.tags = dictionary!.applyTransforms(extNode.tags);
       removeMetadata(n);
       return [n];
@@ -105,9 +115,9 @@ export function actionRapidAcceptFeature(datum: OsmEntity | GeoJSONData): RapidA
      * @return  Array containing newly-created nodes and ways
      */
     function acceptWay(extWay: OsmWay, extGraph: Graph): OsmEntity[] {
-      const w = new OsmWay(extWay);   // copy external way
+      acceptedIDs.add(extWay.id);
+      const w = new OsmWay(extWay, { id: undefined });   // copy external way, generate new ID
       old2new.set(extWay.id, w.id);
-      allIDs.add(w.id);
       w.props.tags = dictionary!.applyTransforms(extWay.tags);
       removeMetadata(w);
 
@@ -134,9 +144,9 @@ export function actionRapidAcceptFeature(datum: OsmEntity | GeoJSONData): RapidA
     function acceptRelation(extRelation: OsmRelation, extGraph: Graph): OsmEntity[] {
       if (old2new.has(extRelation.id)) return [];   // done already, avoid recursion
 
-      const r = new OsmRelation(extRelation);  // copy external relation
+      acceptedIDs.add(extRelation.id);
+      const r = new OsmRelation(extRelation, { id: undefined });  // copy external relation, generate new ID
       old2new.set(extRelation.id, r.id);
-      allIDs.add(r.id);
       r.props.tags = dictionary!.applyTransforms(extRelation.tags);
       removeMetadata(r);
 
@@ -155,9 +165,9 @@ export function actionRapidAcceptFeature(datum: OsmEntity | GeoJSONData): RapidA
           continue;  // skip unknown types
         }
 
-        const newID = old2new.get(extMember.id);
-        if (newID) {
-          newMembers.push(Object.assign(extMember, { id: newID }));
+        const replaceID = old2new.get(extMember.id);
+        if (replaceID) {
+          newMembers.push(Object.assign(extMember, { id: replaceID }));
         }
       }
 
@@ -196,16 +206,17 @@ export function actionRapidAcceptFeature(datum: OsmEntity | GeoJSONData): RapidA
           const otherID = other.id;
           // TODO this should work for geojson-like data too
           if (other.type !== 'node') continue;
-          if (rapid.acceptIDs.has(otherID) || rapid.ignoreIDs.has(otherID) || allIDs.has(otherID)) continue;
+          if (rapid.acceptIDs.has(otherID) || rapid.ignoreIDs.has(otherID) || acceptedIDs.has(otherID)) continue;
 
+          // Treat this node as accepted, but not actually accept it into the graph.
+          // We only really want it for its tags.
           const extNode = other as OsmNode;
-          const copy = new OsmNode(extNode);   // copy node before modifying
-          old2new.set(extNode.id, copy.id);
-          allIDs.add(copy.id);
+          acceptedIDs.add(extNode.id);
+          const copy = new OsmNode(extNode);
           copy.props.tags = dictionary!.applyTransforms(extNode.tags);
           removeMetadata(copy);
-          // merge the tags into the existing node
-          for (const [k, v] of Object.entries(copy.props?.tags ?? {})) {
+          // merge the external node's tags into the existing node
+          for (const [k, v] of Object.entries(copy.props.tags ?? {})) {
             node.props.tags![k] = v;
           }
           node.touch();
@@ -240,7 +251,13 @@ export function actionRapidAcceptFeature(datum: OsmEntity | GeoJSONData): RapidA
    * When autoconnecting, we also try to accept other nodes that are in the same place as the accepted nodes.
    * @return  Set of all ids that were accepted (not just the Entity that the user clicked on)
    */
-  action.getAllIDs = () => allIDs;
+  action.getAcceptedIDs = () => acceptedIDs;
+
+  /**
+   * Accessor to get the new id that the action created.
+   * @return  The newID of the accepted feature, if any.
+   */
+  action.getNewID = () => newID;
 
   return action;
 
@@ -281,13 +298,15 @@ export function actionRapidAcceptFeature(datum: OsmEntity | GeoJSONData): RapidA
     const newEntities: OsmEntity[] = [];
     const nodemap = new Map<string, OsmNode>();
 
+    // Accept the original id
+    acceptedIDs.add(data.id);
+
     // Convert source properties to target tags
     const tags = dictionary.applyTransforms(data.properties ?? {});
 
     // Point:  make a single node
     if (geom.type === 'Point') {
       const n = new OsmNode(context, { loc: orig.coords as Vec2, tags: tags });
-      allIDs.add(n.id);
       return [n];
 
     // LineString:  make nodes, single way
@@ -296,7 +315,6 @@ export function actionRapidAcceptFeature(datum: OsmEntity | GeoJSONData): RapidA
       if (nodelist.length < 2) return null;
 
       const w = new OsmWay(context, { nodes: nodelist, tags: tags });
-      allIDs.add(w.id);
       newEntities.push(w);
       return newEntities;
 
@@ -320,11 +338,9 @@ export function actionRapidAcceptFeature(datum: OsmEntity | GeoJSONData): RapidA
       if (ways.length === 1) {  // single ring, assign tags and return
         const w = ways[0];
         w.props.tags = tags;
-        allIDs.add(w.id);
         newEntities.push(w);
       } else {  // multiple rings, make a multipolygon relation with inner/outer members
         const members = ways.map((w, i) => {
-          allIDs.add(w.id);
           newEntities.push(w);
           return {
             id: w.id,
@@ -334,7 +350,6 @@ export function actionRapidAcceptFeature(datum: OsmEntity | GeoJSONData): RapidA
         });
         tags.type = 'multipolygon';
         const r = new OsmRelation(context, { members: members, tags: tags });
-        allIDs.add(r.id);
         newEntities.push(r);
       }
 
@@ -356,7 +371,6 @@ export function actionRapidAcceptFeature(datum: OsmEntity | GeoJSONData): RapidA
         let n = nodemap.get(key);
         if (!n) {
           n = new OsmNode(context, { loc: coord as Vec2 });
-          allIDs.add(n.id);
           newEntities.push(n);
           nodemap.set(key, n);
         }
@@ -365,8 +379,6 @@ export function actionRapidAcceptFeature(datum: OsmEntity | GeoJSONData): RapidA
       return nodelist;
     }
   }
-
-
 
 }
 

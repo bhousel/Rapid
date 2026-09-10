@@ -224,11 +224,6 @@ export class PixiLayerRapid extends AbstractPixiLayer {
     const service = context.services[ds.serviceID] as any;  // 'mapwithai', 'esri', 'overture'
     if (ds.serviceID && !service?.started) return;
 
-    // Filter out features that have already been accepted or ignored by the user.
-    const isAcceptedOrIgnored = (dataID: DataID): boolean => {
-      return rapid.acceptIDs.has(dataID) || rapid.ignoreIDs.has(dataID);
-    };
-
     // Gather data
     const renderData: RenderData = {
       points: [],
@@ -247,7 +242,7 @@ export class PixiLayerRapid extends AbstractPixiLayer {
       // Gather data in view - we only want OsmWays here
       const dsGraph = mapwithai.graph(ds.id);
       const entities = mapwithai.getData(ds.id)
-        .filter((entity: OsmEntity) => entity.type === 'way' && !isAcceptedOrIgnored(entity.id)) as OsmWay[];
+        .filter((entity: OsmEntity) => entity.type === 'way' && !rapid.isAcceptedOrIgnored(entity.id)) as OsmWay[];
 
       // MapWithAIService gives us roads and buildings together,
       // so filter further according to which dataset we're drawing
@@ -279,7 +274,7 @@ export class PixiLayerRapid extends AbstractPixiLayer {
       const entities = esri.getData(ds.id);
 
       for (const entity of entities) {
-        if (isAcceptedOrIgnored(entity.id)) continue;
+        if (rapid.isAcceptedOrIgnored(entity.id)) continue;
 
         const geom = entity.geometry(dsGraph);
         if (geom === 'point') {   // standalone points only (not vertices/childnodes)
@@ -300,7 +295,7 @@ export class PixiLayerRapid extends AbstractPixiLayer {
 
       const data = overture.getData(ds.id);   // GeoJSONData from the VectorTileService
       for (const d of data) {
-        if (isAcceptedOrIgnored(d.id)) continue;
+        if (rapid.isAcceptedOrIgnored(d.id)) continue;
 
         if (d.geoms.parts.some(part => part.type === 'Polygon')) {
           renderData.polygons.push(d);
@@ -324,7 +319,7 @@ export class PixiLayerRapid extends AbstractPixiLayer {
       const spatial = this.context.systems.spatial!;
       const data = spatial.getVisibleItems(ds.spatialID).map(hit => hit.contents as GeoJSONData);
       for (const d of data) {
-        if (isAcceptedOrIgnored(d.id)) continue;
+        if (rapid.isAcceptedOrIgnored(d.id)) continue;
 
         if (d.geoms.parts.some(part => part.type === 'Polygon')) {
           renderData.polygons.push(d);

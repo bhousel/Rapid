@@ -534,7 +534,8 @@ export class UiRapidInspector {
 
     const action = actionRapidAcceptFeature(datum);
     editor.perform(action);
-    const allIDs = [...action.getAllIDs()];
+    const acceptIDs = [...action.getAcceptedIDs()];
+    const newID = action.getNewID();
 
     // In place of a string annotation, this introduces an "object-style"
     // annotation, where "type" and "description" are standard keys,
@@ -543,12 +544,14 @@ export class UiRapidInspector {
     const annotation = {
       type: 'rapid_accept_feature',
       description: l10n.t('rapid_inspector.option_accept.annotation'),
-      entityID: datum.id,
-      allIDs: allIDs,
+      acceptIDs: acceptIDs,
       dataUsed: dataset?.dataUsed || [datasetID]
     };
 
-    editor.commit({ annotation: annotation, selectedIDs: [datum.id] });
+    editor.commit({
+      annotation: annotation,
+      selectedIDs: newID ? [newID] : undefined
+    });
 
     // What next
     // - If we were in select mode, stay in select mode
@@ -560,7 +563,7 @@ export class UiRapidInspector {
     }
 
     if (nextMode) {   // should be one of 'select-osm', 'move', or 'rotate'
-      context.enter(nextMode, { selection: { osm: [datum.id] } });
+      context.enter(nextMode, { selection: { osm: [newID] } });
 
     } else {  // if it was hovered, hover the newly added item (this is hacky):
       // 1. get the `lastMove` event, and make it appear to target the new entity on the 'osm' layer
@@ -568,7 +571,7 @@ export class UiRapidInspector {
       const hover = context.behaviors.hover as any;
       const lastMove = hover.lastMove;
       const graph = editor.staging.graph;
-      const entity = graph.entity(datum.id);  // get the newly accepted entity
+      const entity = newID && graph.hasEntity(newID);  // get the newly accepted entity
       const layer = (scene as any).layers.get('osm');
       lastMove.target = {
         container: null,
@@ -576,8 +579,8 @@ export class UiRapidInspector {
         featureID: null,
         layer: layer,
         layerID: layer.id,
-        data: entity,
-        dataID: entity.id
+        data: entity ?? null,
+        dataID: newID ?? null
       };
       hover._doHover();
     }
@@ -615,7 +618,7 @@ export class UiRapidInspector {
     const annotation = {
       type: 'rapid_ignore_feature',
       description: l10n.t('rapid_inspector.option_ignore.annotation'),
-      entityID: datum.id
+      ignoreID: datum.id
     };
     editor.perform(actionNoop());
     editor.commit({ annotation: annotation });

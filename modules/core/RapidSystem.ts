@@ -106,6 +106,8 @@ export class RapidSystem extends AbstractSystem {
     this._hashChanged = this._hashChanged.bind(this);
     this._stablechange = this._stablechange.bind(this);
     this._datasetsChanged = this._datasetsChanged.bind(this);
+    this.isAcceptedOrIgnored = this.isAcceptedOrIgnored.bind(this);
+    this.isTaskRectangular = this.isTaskRectangular.bind(this);
   }
 
 
@@ -285,20 +287,28 @@ export class RapidSystem extends AbstractSystem {
 
   /**
    * The geographic extent of the current task (e.g. from a loaded GPX task boundary).
-   * @return The current task extent, or null
+   * @return The current task extent, or `null`
    */
   public get taskExtent(): Extent | null {
     return this._taskExtent;
   }
 
   /**
+   * Returns `true` if the given dataID is an accepted or ignored feature.
+   * These features are hidden from the renderer.
+   * @return `true` if the given dataID is an accepted or ignored feature
+   */
+  public isAcceptedOrIgnored(dataID: DataID): boolean {
+    return this.acceptIDs.has(dataID) || this.ignoreIDs.has(dataID);
+  }
+
+  /**
    * Whether the current task boundary forms a rectangle.
-   * @return true if the task bounds form a rectangle
+   * @return `true` if the task bounds form a rectangle
    */
   public isTaskRectangular(): boolean {
     return (!!this._taskExtent && !!this._isTaskBoundsRect);
   }
-
 
   /**
    * Returns `true` if the user had poweruser mode at any point in their editing.
@@ -309,7 +319,6 @@ export class RapidSystem extends AbstractSystem {
   public hadPoweruser(): boolean {
     return this._hadPoweruser;
   }
-
 
   /**
    * Returns `true` if the user has poweruser mode on right now.
@@ -421,7 +430,7 @@ export class RapidSystem extends AbstractSystem {
 
   /**
    * This is called anytime the history changes, we recompute the accepted/ignored sets.
-   * This can run on history change, undo, redo, or history restore.
+   * This will run on history change, undo, redo, or history restore.
    */
   protected _stablechange(): void {
     const context = this.context;
@@ -441,13 +450,13 @@ export class RapidSystem extends AbstractSystem {
       const annotation = edit.annotation as Record<string, unknown> | undefined;
 
       if (annotation?.type === 'rapid_accept_feature') {
-        const ids = (annotation.allIDs ?? []) as EntityID[];
+        const ids = (annotation.acceptIDs ?? []) as DataID[];
         for (const id of ids) {
           this.acceptIDs.add(id);
         }
       } else if (annotation?.type === 'rapid_ignore_feature') {
-        if (annotation.entityID) {
-          this.ignoreIDs.add(annotation.entityID as string);
+        if (annotation.ignoreID) {
+          this.ignoreIDs.add(annotation.ignoreID as DataID);
         }
       }
     }
