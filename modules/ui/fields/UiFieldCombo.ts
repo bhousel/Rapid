@@ -516,27 +516,16 @@ export class UiFieldCombo extends UiField {
   }
 
 
-  /** Returns true if the current entity is a Rapid (AI-suggested) feature. */
-  protected _isRapidFeature(): boolean {
-    const rapid = this.context.systems.rapid!;
-    const entityID = this.entityIDs?.length && this.entityIDs[0];
-    return !!entityID && rapid.acceptIDs.has(entityID);
-  }
-
-
   /**
    * Removes a multi/semi combo value and dispatches the tag change.
    * @param e - The triggering DOM event
-   * @param d        - The chip datum to remove
+   * @param d - The chip datum to remove
    */
   protected _removeMultikey(e: Event, d: ComboItem): void {
     const key = this.key;
 
     e.preventDefault();
     e.stopPropagation();
-
-    // Don't allow user to remove source of a rapid feature
-    if (key === 'source' && this._isRapidFeature()) return;
 
     const t: Tags = {};
     if (this._isMulti) {
@@ -695,14 +684,11 @@ export class UiFieldCombo extends UiField {
       $chips.select('span')
         .text((d: ComboItem) => d.value);
 
-      // Don't show delete '×' on the source chip for rapid features
-      if (!(this.key === 'source' && this._isRapidFeature())) {
-        $chips.select('a')
-          .attr('href', '#')
-          .on('click', this._removeMultikey)
-          .attr('class', 'remove')
-          .text('×');
-      }
+      $chips.select('a')
+        .attr('href', '#')
+        .on('click', this._removeMultikey)
+        .attr('class', 'remove')
+        .text('×');
 
     } else {
       const v = tags[key];
