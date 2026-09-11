@@ -1,5 +1,6 @@
 import { select } from 'd3-selection';
 import { EventEmitter } from 'tseep/lib/ee-safe';
+import { RapidDataDictionary } from '../lib/RapidDataDictionary.ts';
 import { uiIcon } from './icon.ts';
 import { UiCombobox } from './UiCombobox.ts';
 import { UiModal } from './UiModal.ts';
@@ -9,8 +10,9 @@ import { utilNoAuto, utilSafeURL } from '../util/index.ts';
 
 import type { Context } from '../Context.ts';
 import type { D3EnterSelection, D3Selection } from 'd3-selection';
+import type { GeoJSONData } from '../data/GeoJSONData.ts';
 import type { RapidDataset } from '../lib/RapidDataset.ts';
-import { RapidDataDictionary, RapidDataTransform } from '../lib/RapidDataDictionary.ts';
+import type { RapidDataTransform } from '../lib/RapidDataDictionary.ts';
 
 const RAPID_MAGENTA = '#da26d3';
 
@@ -666,7 +668,7 @@ export class UiRapidDatasetSettings extends EventEmitter {
           .attr('href', '#')
           .on('click', (e: PointerEvent) => {
             e.preventDefault();
-            this._transforms?.push({ order: 0, source: '*', function: 'copy', target: '*' });
+            this._createDefaultDictionary();
             this.render();
           })
           .text(l10n.t(`${prefix}.add_default`));
@@ -1181,13 +1183,13 @@ export class UiRapidDatasetSettings extends EventEmitter {
       } else if (row.function === 'ignore') {
         // "ignore" should have a 'source' only
         // remove target and params if present
-        row.target = undefined;
-        row.params = undefined;
+        row.target = '';
+        row.params = '';
 
       } else if (row.function === 'constant') {
         // "constant" should have no source,
         // and a 'target' and 'params'
-        row.source = undefined;
+        row.source = '';
       }
 
       // check for duplicate rows
@@ -1211,6 +1213,83 @@ export class UiRapidDatasetSettings extends EventEmitter {
     result.isOk = true;  // for now
 
     return result;
+  }
+
+  /**
+   * Create a default data dictionary.
+   * If there is data, make a field for each data attribute.
+   * Otherwise, just create a default dictionary that copies all source fields to target tags.
+   */
+  protected _createDefaultDictionary(): void {
+    const ds = this.dataset;
+    if (!ds) return;   // need a dataset to do anything
+
+    // This function should be called after `_checkDictionary()` has run once.
+    // Expect `this._transforms` to contain a working copy of the dictionary.
+    if (!this._transforms) return;   // caled too early?
+    if (this._transforms.length > 0) return;   // dictionary exists already
+
+    const context = this.context;
+    const spatial = context.systems.spatial!;
+    const data = spatial.getAllItems<GeoJSONData>(ds.spatialID);
+
+    // We have data, so we'll take a look at it.
+    // Gather whatever fields we find in the data.
+    if (data.length) {
+      const seen = new Set<string>();
+      let identifier = '';
+      let counter = 0;
+      let iterSinceChange = 0;
+
+      for (const d of data) {
+        // First, look for an identifier property if we haven't found one yet..
+        if (!identifier) {
+          // Make lowercased versions of all the property keys: `Map<lowercase, original>`
+          const lowerKeys = new Map<string, string>(Object.keys(d.properties).map(k => [k.toLowerCase(), k]));
+          // Try common identifier field names - pick the first one that we find, in this order.
+          for (const k of ['objectid', 'oid', 'fid', 'guid', 'id']) {
+            const found = lowerKeys.get(k);
+            if (found) {
+              identifier = found;
+              break;
+            }
+          }
+        }
+
+        // Next, create data dictionary rows for each property key..
+        const startSize = seen.size;
+        for (const k of Object.keys(d.properties)) {
+          if (seen.has(k)) continue;
+          seen.add(k);
+
+          const transform: RapidDataTransform = {
+            order: counter++,
+            function: 'copy',
+            source: k,
+            target: k,
+            isID: (k === identifier)
+          };
+          this._transforms.push(transform);
+        }
+
+        // Have we gathered any new fields on this iteration?
+        const endSize = seen.size;
+        if (startSize !== endSize) {
+          iterSinceChange = 0;
+        } else {
+          iterSinceChange++;
+        }
+
+        // Stop looking - don't need to look at 1000s of features if they are all the same.
+        if (iterSinceChange > 50) {
+          break;
+        }
+      }
+
+    // No data, just push a default transform that copies the source fields to the target tags.
+    } else {
+      this._transforms.push({ order: 0, source: '*', function: 'copy', target: '*' });
+    }
   }
 
 }
