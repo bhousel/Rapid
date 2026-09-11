@@ -442,6 +442,7 @@ export class RapidDataset {
     this.extent = new Extent();
 
     // We may have a Feature or a FeatureCollection, coax it to an array of Features.
+    let counter = 0;
     const features = geojsonFeatures(geojson as GeoJSON.Feature | GeoJSON.FeatureCollection);
     for (const feature of features) {
       // We may have a MultiPolygon/MultiLineString/MultiPoint..
@@ -450,7 +451,9 @@ export class RapidDataset {
         const extent = this._calcExtent(part);   // sanity check
         if (!isFinite(extent.min[0])) continue;  // invalid - no coordinates?
 
+        const dataID = `${this.id}-${counter}`;
         const props: GeoJSONProps = {
+          id:         dataID,
           serviceID:  this.serviceID,
           datasetID:  this.id,
           geojson:    part
@@ -459,6 +462,7 @@ export class RapidDataset {
         const d = new GeoJSONData(this.context, props);
         newFeatures.push(d);
         this.extent.extendSelf(extent);
+        counter++;
       }
     }
 
@@ -466,7 +470,6 @@ export class RapidDataset {
       spatial.addData(this.spatialID, newFeatures);
       gfx?.deferredRedraw();
     }
-    // this.scene.enableLayers(this.layerID);  // emits 'layerchange', so UI gets updated
 
 
     /**

@@ -205,12 +205,18 @@ button.rapid-features.layer-off use {
   font-size: 14px;
   width: 90%;
 }
+.modal.rapid-modal input[type="checkbox"] {
+  accent-color: #da26d3;
+}
 
 .modal.rapid-modal input.disabled,
 .modal.rapid-modal textarea.disabled {
   background: #222;
   color: #aaa;
   cursor: default;
+}
+.modal.rapid-modal input[type="checkbox"]:disabled {
+  accent-color: #222;
 }
 
 .modal.rapid-modal input:focus:not(.disabled),
@@ -460,7 +466,7 @@ button.overture-inspector-close:hover {
   flex: 0 0 0px;
   flex-flow: column nowrap;
   text-align: center;
-
+  margin-top: 15px;
   background: #ddd;
   border-radius: 5px;
 }

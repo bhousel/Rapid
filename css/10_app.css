@@ -821,7 +821,7 @@ set some opacity and hide the child contents */
   display: flex;
   flex: 1 1 0px;
   flex-flow: column nowrap;
-  overflow-y: scroll;
+  overflow-y: auto;
   overflow-x: hidden;
 }
 

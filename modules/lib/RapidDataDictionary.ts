@@ -22,6 +22,8 @@ export interface RapidDataTransform {
   target?: string;
   /** Parameters used to perform the function, if any */
   params?: string;
+  /** true if this field is the identifier field */
+  isID?: boolean;
 }
 
 
@@ -32,7 +34,7 @@ export class RapidDataDictionary {
 
   /** Global shared application context */
   public context: Context;
-  /** Data transformation rules  */
+  /** Data transformation rules */
   public transforms: RapidDataTransform[];
 
 
@@ -45,7 +47,7 @@ export class RapidDataDictionary {
 
     // // sample data
     // this.transforms = [
-    //   { order: 0, source: 'OBJECTID',         function: 'ignore' },
+    //   { order: 0, source: 'OBJECTID',         function: 'ignore',   isID: true },
     //   { order: 1, source: 'addr:housenumber', function: 'copy',     target: 'addr:housenumber'  },
     //   { order: 2, source: 'addr:street',      function: 'copy',     target: 'addr:street'       },
     //   { order: 3, source: 'addr:unit',        function: 'copy',     target: 'addr:unit'         },
@@ -75,6 +77,7 @@ export class RapidDataDictionary {
         if (t.source)  item.source = t.source;
         if (t.target)  item.target = t.target;
         if (t.params)  item.params = t.params;
+        if (t.isID)    item.isID = 'true';
 
         return item;
       });
@@ -93,10 +96,9 @@ export class RapidDataDictionary {
    */
   public static fromJSON(context: Context, json: Record<string, TreeValue>): RapidDataDictionary {
     const dict = new RapidDataDictionary(context);
-    const transforms = json.transforms;
 
-    if (Array.isArray(transforms)) {
-      for (const t of transforms) {
+    if (Array.isArray(json.transforms)) {
+      for (const t of json.transforms) {
         if (!TreeStore.isPlainObject(t)) continue;
         if (typeof t.function !== 'string') continue;
         if (typeof t.order !== 'string') continue;
@@ -108,6 +110,7 @@ export class RapidDataDictionary {
         if (typeof t.source === 'string')  item.source = t.source;
         if (typeof t.target === 'string')  item.target = t.target;
         if (typeof t.params === 'string')  item.params = t.params;
+        if (typeof t.isID === 'string')    item.isID   = (t.isID === 'true');
 
         dict.transforms.push(item);
       }

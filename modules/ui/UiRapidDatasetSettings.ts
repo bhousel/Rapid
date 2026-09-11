@@ -19,8 +19,8 @@ const RAPID_MAGENTA = '#da26d3';
  * We create a "partial" type because on this screen the values may not be filled in completely.
  * The 'order' and 'key' fields are guaranteed by running the transforms through `_checkDictionary` */
 interface PartialDataTransform extends Partial<RapidDataTransform> {
-  uuid?:  string | undefined;   // unique identifier
-  order:  number;   // required order
+  /** Unique row identifier for the html table */
+  uuid?:  string | undefined;
 }
 
 /**
@@ -48,7 +48,7 @@ export interface FieldInfo {
   /** Color */
   color?: string;
   /** Conflation? */
-  conflation?: string;
+  conflation?: boolean;
 }
 
 /**
@@ -703,6 +703,9 @@ export class UiRapidDatasetSettings extends EventEmitter {
       .attr('class', 'dict-order shrink');
     $$headRow
       .append('th')
+      .attr('class', 'dict-isid shrink');
+    $$headRow
+      .append('th')
       .attr('class', 'dict-source');
     $$headRow
       .append('th')
@@ -756,6 +759,8 @@ export class UiRapidDatasetSettings extends EventEmitter {
 
     $table.selectAll('thead th.dict-order')
       .text(l10n.t(`${prefix}.fields.order.label`));
+    $table.selectAll('thead th.dict-isid')
+      .text(l10n.t(`${prefix}.fields.isid.label`));
     $table.selectAll('thead th.dict-source')
       .text(l10n.t(`${prefix}.fields.source.label`));
     $table.selectAll('thead th.dict-function')
@@ -792,6 +797,22 @@ export class UiRapidDatasetSettings extends EventEmitter {
 
     $$rows
       .append('td')
+      .attr('class', 'dict-isid')
+      .append('input')
+      .attr('id', (d: PartialDataTransform) => `dict-isid-${d.uuid}`)
+      .attr('class', 'field-input')
+      .attr('type', 'checkbox')
+      .call(utilNoAuto)
+      .on('change', (e: Event, d: PartialDataTransform) => {
+        const isChecked = (e.currentTarget as HTMLInputElement).checked;
+        for (const row of this._transforms!) {  // uncheck all other rows
+          row.isID = (isChecked && row.uuid === d.uuid);
+        }
+        this.render();  // rerendering will also run validation
+      });
+
+    $$rows
+      .append('td')
       .attr('class', 'dict-source')
       .append('input')
       .attr('id', (d: PartialDataTransform) => `dict-source-${d.uuid}`)
@@ -799,7 +820,7 @@ export class UiRapidDatasetSettings extends EventEmitter {
       .call(utilNoAuto)
       .on('change', (e: Event, d: PartialDataTransform) => {
         const val = (e.currentTarget as HTMLInputElement).value;
-        const row = this._transforms!.find(item => item.uuid === d.uuid);
+        const row = this._transforms!.find(row => row.uuid === d.uuid);
         if (row) row.source = val;
         this.render();  // rerendering will also run validation
       });
@@ -818,7 +839,7 @@ export class UiRapidDatasetSettings extends EventEmitter {
           .call(combo.attach)
           .on('change', (e: Event, d: PartialDataTransform) => {
             const val = (e.currentTarget as HTMLInputElement).value;
-            const row = this._transforms!.find(item => item.uuid === d.uuid);
+            const row = this._transforms!.find(row => row.uuid === d.uuid);
             if (row) row.function = val;
             this.render();  // rerendering will also run validation
           });
@@ -833,7 +854,7 @@ export class UiRapidDatasetSettings extends EventEmitter {
       .call(utilNoAuto)
       .on('change', (e: Event, d: PartialDataTransform) => {
         const val = (e.currentTarget as HTMLInputElement).value;
-        const row = this._transforms!.find(item => item.uuid === d.uuid);
+        const row = this._transforms!.find(row => row.uuid === d.uuid);
         if (row) row.target = val;
         this.render();  // rerendering will also run validation
       });
@@ -847,7 +868,7 @@ export class UiRapidDatasetSettings extends EventEmitter {
       .call(utilNoAuto)
       .on('change', (e: Event, d: PartialDataTransform) => {
         const val = (e.currentTarget as HTMLInputElement).value;
-        const row = this._transforms!.find(item => item.uuid === d.uuid);
+        const row = this._transforms!.find(row => row.uuid === d.uuid);
         if (row) row.params = val;
         this.render();  // rerendering will also run validation
       });
@@ -876,6 +897,12 @@ export class UiRapidDatasetSettings extends EventEmitter {
 
     $rows.selectAll('.dict-order')
       .text((d: PartialDataTransform) => d.order);
+
+    $rows.selectAll('.dict-isid .field-input')
+      .property('disabled', (d: PartialDataTransform) => isLocked || d.source === '*')
+      .classed('disabled', (d: PartialDataTransform) => isLocked || d.source === '*')
+      .property('checked', (d: PartialDataTransform) => d.isID)
+      .property('value', (d: PartialDataTransform) => d.isID ? 'true': 'false');
 
     $rows.selectAll('.dict-source .field-input')
       .property('disabled', (d: PartialDataTransform) => isLocked || d.function === 'constant')
@@ -980,7 +1007,7 @@ export class UiRapidDatasetSettings extends EventEmitter {
 
     // All datasets allow these things to be changed:
     ds.color = fieldInfo.color ?? RAPID_MAGENTA;
-    ds.conflated = (fieldInfo.conflation === 'true');
+    ds.conflated = !!fieldInfo.conflation;
 
     // Custom datasets allow more things to be changed:
     if (ds.custom) {
@@ -1103,8 +1130,7 @@ export class UiRapidDatasetSettings extends EventEmitter {
 
     // check conflation
     const conflationNode = $content.selectAll(`#conflation-${uuid}`).node() as HTMLInputElement | null;
-    const conflationVal = conflationNode?.value || '';
-    result.conflation = conflationVal.trim() || 'false';
+    result.conflation = conflationNode?.checked;
 
     // required values must be present
     result.isOk = !!(result.id && result.name && result.sourceUrl);
@@ -1132,8 +1158,8 @@ export class UiRapidDatasetSettings extends EventEmitter {
     // Sort the rows by order ascending, then check each row.
     let counter = 0;
     const seen = new Set<number>();
-    const rows = this._transforms   // sort in-place
-      .sort((a: PartialDataTransform, b: PartialDataTransform) => a.order - b.order);
+    const rows = this._transforms   // sort in-place, send unordered rows to the end
+      .sort((a: PartialDataTransform, b: PartialDataTransform) => (a.order ?? 9999) - (b.order ?? 9999));
 
     for (const row of rows) {
       // recompute order

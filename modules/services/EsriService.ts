@@ -239,20 +239,38 @@ export class EsriService extends AbstractSystem {
       .then(() => {
         // loadDatasetLayersAsync should have thrown if no layer information was found.
         const dictionary = new RapidDataDictionary(this.context);
+        const seen = new Map<string, string>();
         let counter = 0;
 
-        // For each layer and field, setup data mapping.
+        // Gather fields from all layers for the data dictionary.
         for (const layer of ds.layers!) {
           for (const f of layer.fields) {
+            // Check if the same field appers on multiple layers.
+            // `renton_test` is the only multi-layer dataset currently.
+            // (not sure whether this is a real issue or not yet.)
+            const existing = seen.get(f.name);
+            if (existing) {
+              if (f.editable && existing !== f.alias) {
+                console.warn(`EsriService: ${f.name} appears on multiple layers targeting ${existing} and ${f.alias}`);    // eslint-disable-line
+              }
+              continue;
+            }
+            seen.set(f.name, f.alias);
+
+            // Assumption: an `objectIdField` will always be present
+            // when we are talking to an ArcGIS featureserver.
+
             const transform: RapidDataTransform = {
               order: counter++,
               function: f.editable ? 'copy' : 'ignore',
               source: f.name,
-              target: f.editable ? f.alias : undefined
+              target: f.editable ? f.alias : undefined,
+              isID: (layer.objectIdField === f.name)
             };
             dictionary.transforms.push(transform);
           }
         }
+
         return dictionary;
       });
   }
@@ -442,13 +460,13 @@ export class EsriService extends AbstractSystem {
    * @param feature - the GeoJSON feature that we fetched
    * @return An array of OSMEntities for that feature, or `null` if we skipped it
    */
-  protected _parseFeature( ds: EsriDataset, layer: EsriLayer, feature: GeoJSON.Feature): OsmEntity[] | null {
+  protected _parseFeature(ds: EsriDataset, layer: EsriLayer, feature: GeoJSON.Feature): OsmEntity[] | null {
     const context = this.context;
     const geom = feature.geometry;
     const properties = feature.properties ?? {};
     if (!geom) return null;
 
-    // Try to determine an identifier for the feature
+    // Try to pick a stable identifier for the feature
     const datasetID = ds.id;
     const layerID = layer.id;
     const featureID = properties[layer.objectIdField] ?? properties.OBJECTID ?? properties.FID ?? properties.id;
