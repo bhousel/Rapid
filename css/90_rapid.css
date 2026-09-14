@@ -181,6 +181,20 @@ button.rapid-features.layer-off use {
   fill: #8888;
 }
 
+
+/* A more "dangerous" button, e.g. for deleting */
+.rapid-inspector button.danger,
+.modal.rapid-modal button.danger {
+  background: #a00;
+}
+.rapid-inspector button.danger:focus,
+.rapid-inspector button.danger:hover,
+.modal.rapid-modal button.danger:focus,
+.modal.rapid-modal button.danger:hover {
+  background: #c33;
+}
+
+/* Do we put the rapid logo on a button anywhere?  maybe not needed */
 .modal.rapid-modal button svg.logo-rapid,
 .modal.rapid-modal button svg.logo-rapid:focus,
 .modal.rapid-modal button svg.logo-rapid:hover {
@@ -1199,12 +1213,7 @@ img.dataset-thumbnail.inverted {
 
 /* set the delete button apart from neighbor buttons */
 .modal.modal-dataset-settings .delete-button.action {
-  background: #a00;
   margin-left: 150px;
-}
-.modal.modal-dataset-settings .delete-button.action:focus,
-.modal.modal-dataset-settings .delete-button.action:hover {
-  background: #c33;
 }
 .ideditor[dir='rtl'] .modal.modal-dataset-settings .delete-button.action {
   margin-left: unset;

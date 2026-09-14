@@ -1611,7 +1611,13 @@
     },
     "rapid_dataset_settings": {
       "heading": "Dataset Settings",
-      "delete_permanently": "Delete Permanently",
+      "delete": {
+        "label": "Delete Dataset",
+        "heading": "Are you sure?",
+        "instructions": "This dataset will be removed from the Rapid menu and dataset catalog.  Any stored settings and data mapping will be removed too.",
+        "ok": "Yes, delete it",
+        "cancel": "No, keep it"
+      },
       "details": {
         "heading": "Dataset Details",
         "fields": {
@@ -1650,7 +1656,9 @@
         "instruction": "This section controls how Rapid accepts new data from this dataset.",
         "locked": "This section is locked because this dataset is provided by {name}.",
         "is_missing": "There is no data mapping for this dataset. Rapid can still show the data, but you will not be able to accept it.",
-        "add_default": "Add a default data mapping",
+        "add_data_mapping": "To get started, you can:",
+        "default_data_mapping": "Create a default data mapping (copy all)",
+        "detect_data_mapping": "Detect the fields present in the data",
         "is_default": "This is a default data mapping - it simply copies all source attributes into target tags.",
         "add_more": "Add More",
         "remove_all": "Remove All",

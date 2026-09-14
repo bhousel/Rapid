@@ -79,6 +79,7 @@ export class UiRapidDatasetSettings extends EventEmitter {
   public ThumbnailCombo: UiCombobox;
   public Colorpicker: UiRapidColorpicker;
   public Modal: UiModal | null;
+  public AreYouSureModal: UiModal | null;
 
   /** The dataset being setup */
   protected _dataset: RapidDataset | null;
@@ -103,6 +104,7 @@ export class UiRapidDatasetSettings extends EventEmitter {
     this.ThumbnailCombo = new UiCombobox(context, 'rapid-dark');
     this.Colorpicker = new UiRapidColorpicker(context);
     this.Modal = null;
+    this.AreYouSureModal = null;
 
     // Ensure methods used as callbacks always have `this` bound correctly.
     // (This is also necessary when using `d3-selection.call`)
@@ -112,7 +114,9 @@ export class UiRapidDatasetSettings extends EventEmitter {
     this._checkFields = this._checkFields.bind(this);
     this._clickedOk = this._clickedOk.bind(this);
     this._clickedDelete = this._clickedDelete.bind(this);
+    this._clickedIAmSure = this._clickedIAmSure.bind(this);
     this._done = this._done.bind(this);
+
     this._renderHeading = this._renderHeading.bind(this);
     this._renderDetails = this._renderDetails.bind(this);
     this._renderFields = this._renderFields.bind(this);
@@ -120,6 +124,7 @@ export class UiRapidDatasetSettings extends EventEmitter {
     this._renderConflation = this._renderConflation.bind(this);
     this._renderDictionary = this._renderDictionary.bind(this);
     this._renderButtons = this._renderButtons.bind(this);
+    this._renderAreYouSure = this._renderAreYouSure.bind(this);
 
     // Setup event handlers
     const l10n = context.systems.l10n!;
@@ -177,6 +182,7 @@ export class UiRapidDatasetSettings extends EventEmitter {
   public close(e?: Event): void {
     e?.preventDefault();
     this.Modal?.close();
+    this.AreYouSureModal?.close();
   }
 
 
@@ -190,6 +196,7 @@ export class UiRapidDatasetSettings extends EventEmitter {
 
     this.emit('done');
     this.Modal = null;
+    this.AreYouSureModal = null;
     l10n.off('localechange', this.render);
   }
 
@@ -664,14 +671,32 @@ export class UiRapidDatasetSettings extends EventEmitter {
       if (!isLocked) {
         $instructionsWrap
           .append('div')
+          .text(l10n.t(`${prefix}.add_data_mapping`));
+
+        const $list: D3Selection = $instructionsWrap
+          .append('ul');
+
+        $list
+          .append('li')
           .append('a')
           .attr('href', '#')
           .on('click', (e: PointerEvent) => {
             e.preventDefault();
-            this._createDefaultDictionary();
+            this._createDefaultMapping();
             this.render();
           })
-          .text(l10n.t(`${prefix}.add_default`));
+          .text(l10n.t(`${prefix}.default_data_mapping`));
+
+        $list
+          .append('li')
+          .append('a')
+          .attr('href', '#')
+          .on('click', (e: PointerEvent) => {
+            e.preventDefault();
+            this._detectDataMapping();
+            this.render();
+          })
+          .text(l10n.t(`${prefix}.detect_data_mapping`));
       }
 
     } else if (dictInfo.isDefault) {
@@ -964,7 +989,7 @@ export class UiRapidDatasetSettings extends EventEmitter {
     if (ds.custom) {   // only available for custom datasets
       $$buttons
         .append('button')
-        .attr('class', 'button delete-button action')
+        .attr('class', 'button delete-button action danger')
         .on('click', this._clickedDelete);
     }
 
@@ -979,7 +1004,12 @@ export class UiRapidDatasetSettings extends EventEmitter {
       .text(l10n.t('text.cancel'));
 
     $buttons.selectAll('.delete-button')
-      .text(l10n.t('rapid_dataset_settings.delete_permanently'));
+      .text(l10n.t('rapid_dataset_settings.delete.label'));
+
+    // relocalize the "are you sure" modal, if it happens to be showing.
+    if (this.AreYouSureModal?.isShown) {
+      this._renderAreYouSure();
+    }
   }
 
 
@@ -1049,11 +1079,38 @@ export class UiRapidDatasetSettings extends EventEmitter {
 
 
   /**
-   * Callback when user clicks "Delete".
-   * Only a custom dataset can be deleted.
+   * Callback when user clicks "Delete Dataset".  Only a custom dataset can be deleted.
+   * This is somewhat destructive, so we show an extra "Are you Sure" modal popup.
    * @param [e] - the triggering event, if any
    */
   protected _clickedDelete(e?: Event): void {
+    e?.preventDefault();
+
+    const ds = this.dataset;
+    if (!ds?.custom) return;   // need a dataset to do anything
+
+    if (this.AreYouSureModal?.isShown) return;  // already showing
+
+    const context = this.context;
+    this.AreYouSureModal = new UiModal(context, true /*isBlocking*/ ).show();
+    this.AreYouSureModal.$modal!
+      .attr('class', 'modal rapid-modal');
+
+    // Cleanup on close
+    this.AreYouSureModal.once('close', () => {
+      this.AreYouSureModal = null;
+    });
+
+    this._renderAreYouSure();
+  }
+
+
+  /**
+   * The user is sure they want to delete the current dataset.
+   * Remove all persisted settings, the dataset, and close all the modals.
+   * @param [e] - the triggering event, if any
+   */
+  protected _clickedIAmSure(e?: Event): void {
     e?.preventDefault();
 
     const ds = this.dataset;
@@ -1066,7 +1123,96 @@ export class UiRapidDatasetSettings extends EventEmitter {
     settings?.unset(`rapid.custom.${ds.id}`);
     rapid.catalog.delete(ds.id);
     rapid.removeDatasets(ds.id);
+
+    this.AreYouSureModal?.close();
     this.close();
+  }
+
+
+  /**
+   * Renders the additional "Are you sure?" modal
+   * when the user chooses to delete the dataset.
+   */
+  protected _renderAreYouSure(): void {
+    const context = this.context;
+    const l10n = context.systems.l10n!;
+
+    if (!this.AreYouSureModal?.isShown) return;
+
+    const prefix = 'rapid_dataset_settings.delete';  // prefix for text strings
+
+    const Modal = this.AreYouSureModal;
+    const $content: D3Selection = Modal.$content!;
+
+    /* Heading */
+    let $heading: D3Selection = $content.selectAll('.modal-heading')
+      .data([0]);
+
+    // enter
+    const $$heading: D3EnterSelection = $heading
+      .enter()
+      .append('div')
+      .attr('class', 'modal-section modal-heading');
+
+    $$heading
+      .append('h1')
+      .attr('class', 'modal-heading-text');
+
+    // update
+    $heading = $heading.merge($$heading);
+
+    $heading.selectAll('.modal-heading-text')
+      .text(l10n.t(`${prefix}.heading`));
+
+
+    /* Text section */
+    let $text: D3Selection = $content.selectAll('.modal-text')
+      .data([0]);
+
+    // enter
+    const $$text: D3EnterSelection = $text
+      .enter()
+      .append('div')
+      .attr('class', 'modal-section modal-text');
+
+    // update
+    $text = $text.merge($$text);
+
+    $text
+      .text(l10n.t(`${prefix}.instructions`));
+
+
+    /* Ok/Cancel Buttons */
+    let $buttons: D3Selection = $content.selectAll('.modal-section.buttons')
+      .data([0]);
+
+    // enter
+    const $$buttons = $buttons.enter()
+      .append('div')
+      .attr('class', 'modal-section buttons');
+
+    $$buttons
+      .append('button')
+      .attr('class', 'button ok-button action danger')
+      .on('click', this._clickedIAmSure);
+
+    $$buttons
+      .append('button')
+      .attr('class', 'button cancel-button action')
+      .on('click', () => this.AreYouSureModal!.close());
+
+    // focus cancel
+    const node = $$buttons.selectAll('.cancel-button').node() as HTMLElement | null;
+    node?.focus();
+
+    // update
+    $buttons = $buttons.merge($$buttons) as D3Selection;
+
+    $buttons.selectAll('.ok-button')
+      .text(l10n.t(`${prefix}.ok`));
+
+    $buttons.selectAll('.cancel-button')
+      .text(l10n.t(`${prefix}.cancel`));
   }
 
 
@@ -1215,12 +1361,31 @@ export class UiRapidDatasetSettings extends EventEmitter {
     return result;
   }
 
+
   /**
-   * Create a default data dictionary.
-   * If there is data, make a field for each data attribute.
-   * Otherwise, just create a default dictionary that copies all source fields to target tags.
+   * Create a default data mapping.
+   * This just adds a transform row that copies all source attributes directly to target tags.
    */
-  protected _createDefaultDictionary(): void {
+  protected _createDefaultMapping(): void {
+    const ds = this.dataset;
+    if (!ds) return;   // need a dataset to do anything
+
+    // This function should be called after `_checkDictionary()` has run once.
+    // Expect `this._transforms` to contain a working copy of the dictionary.
+    if (!this._transforms) return;   // caled too early?
+    if (this._transforms.length > 0) return;   // dictionary exists already
+    this._transforms.push({ order: 0, source: '*', function: 'copy', target: '*' });
+  }
+
+
+  /**
+   * Detect the data dictionary by scanning the data to look for whatever attributes are present.
+   * Add a transform row for each source data attribute that we find.
+   * By default, each source attribute will be copied directly to a target tag.
+   * We also look for common "identifier" fields, and set the `isID` flag if we find one.
+   * Note that this currently only works with "GeoJSON"-like data.
+   */
+  protected _detectDataMapping(): void {
     const ds = this.dataset;
     if (!ds) return;   // need a dataset to do anything
 
@@ -1232,64 +1397,58 @@ export class UiRapidDatasetSettings extends EventEmitter {
     const context = this.context;
     const spatial = context.systems.spatial!;
     const data = spatial.getAllItems<GeoJSONData>(ds.spatialID);
+    if (!data.length) return;  // no data to look at
 
     // We have data, so we'll take a look at it.
     // Gather whatever fields we find in the data.
-    if (data.length) {
-      const seen = new Set<string>();
-      let identifier = '';
-      let counter = 0;
-      let iterSinceChange = 0;
+    const seen = new Set<string>();
+    let identifier = '';
+    let counter = 0;
+    let iterSinceChange = 0;
 
-      for (const d of data) {
-        // First, look for an identifier property if we haven't found one yet..
-        if (!identifier) {
-          // Make lowercased versions of all the property keys: `Map<lowercase, original>`
-          const lowerKeys = new Map<string, string>(Object.keys(d.properties).map(k => [k.toLowerCase(), k]));
-          // Try common identifier field names - pick the first one that we find, in this order.
-          for (const k of ['objectid', 'oid', 'fid', 'guid', 'id']) {
-            const found = lowerKeys.get(k);
-            if (found) {
-              identifier = found;
-              break;
-            }
+    for (const d of data) {
+      // First, look for an identifier property if we haven't found one yet..
+      if (!identifier) {
+        // Make lowercased versions of all the property keys: `Map<lowercase, original>`
+        const lowerKeys = new Map<string, string>(Object.keys(d.properties).map(k => [k.toLowerCase(), k]));
+        // Try common identifier field names - pick the first one that we find, in this order.
+        for (const k of ['objectid', 'oid', 'fid', 'guid', 'id']) {
+          const found = lowerKeys.get(k);
+          if (found) {
+            identifier = found;
+            break;
           }
-        }
-
-        // Next, create data dictionary rows for each property key..
-        const startSize = seen.size;
-        for (const k of Object.keys(d.properties)) {
-          if (seen.has(k)) continue;
-          seen.add(k);
-
-          const transform: RapidDataTransform = {
-            order: counter++,
-            function: 'copy',
-            source: k,
-            target: k,
-            isID: (k === identifier)
-          };
-          this._transforms.push(transform);
-        }
-
-        // Have we gathered any new fields on this iteration?
-        const endSize = seen.size;
-        if (startSize !== endSize) {
-          iterSinceChange = 0;
-        } else {
-          iterSinceChange++;
-        }
-
-        // Stop looking - don't need to look at 1000s of features if they are all the same.
-        if (iterSinceChange > 50) {
-          break;
         }
       }
 
-    // No data, just push a default transform that copies the source fields to the target tags.
-    } else {
-      this._transforms.push({ order: 0, source: '*', function: 'copy', target: '*' });
+      // Next, create transform rows for each property key that we haven't seen yet..
+      const startSize = seen.size;
+      for (const k of Object.keys(d.properties)) {
+        if (seen.has(k)) continue;
+        seen.add(k);
+
+        const transform: RapidDataTransform = {
+          order: counter++,
+          function: 'copy',
+          source: k,
+          target: k,
+          isID: (k === identifier)
+        };
+        this._transforms.push(transform);
+      }
+
+      // Have we gathered any new fields on this iteration?
+      const endSize = seen.size;
+      if (startSize !== endSize) {
+        iterSinceChange = 0;
+      } else {
+        iterSinceChange++;
+      }
+
+      // Stop looking - don't need to look at 1000s of features if they are all the same.
+      if (iterSinceChange > 50) {
+        break;
+      }
     }
   }
-
 }
