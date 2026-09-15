@@ -16,32 +16,32 @@ article, aside, canvas, details, embed,
 figure, figcaption, footer, header, hgroup,
 menu, nav, output, ruby, section, summary,
 time, mark, audio, video {
-	margin: 0;
-	padding: 0;
-	border: 0;
-	font-size: 100%;
-	font: inherit;
-	vertical-align: baseline;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  font-size: 100%;
+  font: inherit;
+  vertical-align: baseline;
 }
 /* HTML5 display-role reset for older browsers */
 article, aside, details, figcaption, figure,
 footer, header, hgroup, menu, nav, section {
-	display: block;
+  display: block;
 }
 ol, ul {
-	list-style: none;
+  list-style: none;
 }
 blockquote, q {
-	quotes: none;
+  quotes: none;
 }
 blockquote:before, blockquote:after,
 q:before, q:after {
-	content: '';
-	content: none;
+  content: '';
+  content: none;
 }
 table {
-	border-collapse: collapse;
-	border-spacing: 0;
+  border-collapse: collapse;
+  border-spacing: 0;
 }
 a { text-decoration: none;}
 /*
@@ -54,10 +54,10 @@ button,
 input,
 select,
 textarea {
-    font-family: inherit; /* 1 */
-    font-size: 100%; /* 2 */
-    margin: 0; /* 3 */
-    padding: 0;
+  font-family: inherit; /* 1 */
+  font-size: 100%; /* 2 */
+  margin: 0; /* 3 */
+  padding: 0;
 }
 
 /*
@@ -67,17 +67,17 @@ textarea {
 
 button,
 input {
-    line-height: inherit;
-	letter-spacing: inherit;
+  line-height: inherit;
+  letter-spacing: inherit;
 }
 
 /* Hide default number spinner controls */
 input[type="number"]::-webkit-inner-spin-button,
 input[type="number"]::-webkit-outer-spin-button {
-	display: none;
+  display: none;
 }
 input[type=number] {
-    -moz-appearance: textfield;
+  -moz-appearance: textfield;
 }
 
 /*
@@ -90,17 +90,16 @@ button,
 input[type="button"],
 input[type="reset"],
 input[type="submit"] {
-    -webkit-appearance: button; /* 1 */
-    cursor: pointer; /* 2 */
+  -webkit-appearance: button; /* 1 */
+  cursor: pointer; /* 2 */
 }
 
 /*
- * Re-set default cursor for disabled elements.
+ * Reset default cursor for disabled elements.
  */
-
 button[disabled],
 input[disabled] {
-    cursor: default;
+  cursor: default;
 }
 
 /*
@@ -110,8 +109,8 @@ input[disabled] {
 
 input[type="checkbox"],
 input[type="radio"] {
-    box-sizing: border-box; /* 1 */
-    padding: 0; /* 2 */
+  box-sizing: border-box; /* 1 */
+  padding: 0; /* 2 */
 }
 
 /*
@@ -121,8 +120,8 @@ input[type="radio"] {
  */
 
 input[type="search"] {
-    -webkit-appearance: none; /* 1 */
-    box-sizing: border-box;
+  -webkit-appearance: none; /* 1 */
+  box-sizing: border-box;
 }
 
 /*
@@ -132,15 +131,5 @@ input[type="search"] {
 
 input[type="search"]::-webkit-search-cancel-button,
 input[type="search"]::-webkit-search-decoration {
-    -webkit-appearance: none;
-}
-
-/*
- * Removes inner padding and border in Firefox 4+.
- */
-
-button::-moz-focus-inner,
-input::-moz-focus-inner {
-    border: 0;
-    padding: 0;
+  -webkit-appearance: none;
 }

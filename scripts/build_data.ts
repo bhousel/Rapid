@@ -141,7 +141,8 @@ async function buildData() {
     'fas-th-list',
     'fas-trash-can',
     'fas-triangle-exclamation',
-    'fas-user-cog'
+    'fas-user-cog',
+    'fas-xmark',
   ]);
 
   gatherQAIssueIcons(icons);

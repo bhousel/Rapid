@@ -88,7 +88,6 @@ export class UiVersionInfo {
     $$wrap
       .append('a')
       .attr('target', '_blank')
-      .attr('tabindex', -1)
       .attr('href', 'https://github.com/facebook/Rapid/blob/main/CHANGELOG.md')
       .text(currVersion);
 
@@ -98,7 +97,6 @@ export class UiVersionInfo {
         .append('a')
         .attr('class', 'badge')
         .attr('target', '_blank')
-        .attr('tabindex', -1)
         .attr('href', 'https://github.com/facebook/Rapid/blob/main/CHANGELOG.md')
         .call(uiIcon('#maki-gift'))
         .call(this.Tooltip.attach);

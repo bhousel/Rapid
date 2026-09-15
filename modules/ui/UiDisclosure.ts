@@ -181,7 +181,7 @@ export class UiDisclosure extends EventEmitter {
       .append('a')
       .attr('href', '#')
       .attr('class', `hide-toggle hide-toggle-${key}`)
-      .call(uiIcon('', 'pre-text hide-toggle-icon'));
+      .call(uiIcon('', 'hide-toggle-icon'));
 
     $$hideToggle
       .append('span')

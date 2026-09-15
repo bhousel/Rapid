@@ -76,8 +76,17 @@ button.rapid-features.layer-off use {
 /* UI Buttons */
 /* There are a lot of rules here to cover all permutations of primary, secondary, disabled */
 /* We can not just add an `opacity: 0.5` .disabled rule because that affects children too including tooltips */
+
 .rapid-inspector button,
 .modal.rapid-modal button {
+  display: flex;
+  min-width: unset;
+  flex: 0 0 130px;
+  flex-flow: row nowrap;
+  text-wrap: nowrap;
+  align-items: center;
+  justify-content: center;
+
   border: 0;
   background: #c000c0;  /* rapid magenta is just too bold for giant buttons: #da26d3;*/
   color: #eee;
@@ -85,6 +94,19 @@ button.rapid-features.layer-off use {
   border-radius: 30px;
   height: 3rem;
 }
+
+.rapid-inspector button.action .icon,
+.modal.rapid-modal button.action .icon {
+  width: 20px;
+  height: 20px;
+  margin-right: 10px;
+}
+.ideditor[dir='rtl'] .rapid-inspector button.action .icon,
+.ideditor[dir='rtl'] .modal.rapid-modal button.action .icon {
+  margin-right: unset;
+  margin-left: 10px;
+}
+
 .rapid-inspector button svg,
 .modal.rapid-modal button svg {
   color: #eee;
@@ -98,15 +120,11 @@ button.rapid-features.layer-off use {
   margin: 10px 5px;
   padding: 0 15px;
 }
-.rapid-inspector button:focus,
 .rapid-inspector button:hover,
-.modal.rapid-modal button:focus,
 .modal.rapid-modal button:hover {
   background: #c6d;
 }
-.rapid-inspector button:focus svg,
 .rapid-inspector button:hover svg,
-.modal.rapid-modal button:focus svg,
 .modal.rapid-modal button:hover svg {
   fill: #c6d;
 }
@@ -121,15 +139,11 @@ button.rapid-features.layer-off use {
   color: #eee8;
   fill: #da26d388;
 }
-.rapid-inspector button.disabled:focus,
 .rapid-inspector button.disabled:hover,
-.modal.rapid-modal button.disabled:focus,
 .modal.rapid-modal button.disabled:hover {
   background: #c6d8;
 }
-.rapid-inspector button.disabled:focus svg,
 .rapid-inspector button.disabled:hover svg,
-.modal.rapid-modal button.disabled:focus svg,
 .modal.rapid-modal button.disabled:hover svg {
   fill: #c6d8;
 }
@@ -145,15 +159,11 @@ button.rapid-features.layer-off use {
   color: #eee;
   fill: #666;
 }
-.rapid-inspector button.secondary:focus,
 .rapid-inspector button.secondary:hover,
-.modal.rapid-modal button.secondary:focus,
 .modal.rapid-modal button.secondary:hover {
   background: #888;
 }
-.rapid-inspector button.secondary:focus svg,
 .rapid-inspector button.secondary:hover svg,
-.modal.rapid-modal button.secondary:focus svg,
 .modal.rapid-modal button.secondary:hover svg {
   fill: #888;
 }
@@ -168,41 +178,32 @@ button.rapid-features.layer-off use {
   color: #eee8;
   fill: #6668;
 }
-.rapid-inspector button.secondary.disabled:focus,
 .rapid-inspector button.secondary.disabled:hover,
-.modal.rapid-modal button.secondary.disabled:focus,
 .modal.rapid-modal button.secondary.disabled:hover {
   background: #8888;
 }
-.rapid-inspector button.secondary.disabled:focus svg,
 .rapid-inspector button.secondary.disabled:hover svg,
-.modal.rapid-modal button.secondary.disabled:focus svg,
 .modal.rapid-modal button.secondary.disabled:hover svg {
   fill: #8888;
 }
-
 
 /* A more "dangerous" button, e.g. for deleting */
 .rapid-inspector button.danger,
 .modal.rapid-modal button.danger {
   background: #a00;
 }
-.rapid-inspector button.danger:focus,
 .rapid-inspector button.danger:hover,
-.modal.rapid-modal button.danger:focus,
 .modal.rapid-modal button.danger:hover {
   background: #c33;
 }
 
 /* Do we put the rapid logo on a button anywhere?  maybe not needed */
 .modal.rapid-modal button svg.logo-rapid,
-.modal.rapid-modal button svg.logo-rapid:focus,
 .modal.rapid-modal button svg.logo-rapid:hover {
   color: #eee;
   fill: #eee;
 }
 .modal.rapid-modal button.disabled svg.logo-rapid,
-.modal.rapid-modal button.disabled svg.logo-rapid:focus,
 .modal.rapid-modal button.disabled svg.logo-rapid:hover {
   color: #eee8;
   fill: #eee8;
@@ -233,9 +234,7 @@ button.rapid-features.layer-off use {
   accent-color: #222;
 }
 
-.modal.rapid-modal input:focus:not(.disabled),
 .modal.rapid-modal input:active:not(.disabled),
-.modal.rapid-modal textarea:focus:not(.disabled),
 .modal.rapid-modal textarea:active:not(.disabled) {
   background: #444;
   color: #eee;
@@ -285,6 +284,22 @@ button.rapid-features.layer-off use {
   background: unset;
   text-align: end;
 }
+.modal.rapid-modal tfoot button {
+  display: inline-block;   /* don't flex these */
+}
+
+/* focus rings */
+.modal.rapid-modal button:focus-visible,
+.modal.rapid-modal input:focus-visible,
+.modal.rapid-modal textarea:focus-visible {
+  outline: 2px solid #da26d3;
+  box-shadow: 0 0 3px 1px #c6d;
+}
+.modal.rapid-modal button.action:focus-visible,
+.modal.rapid-modal button.minor:focus-visible {
+  outline: 2px solid #eee;
+  box-shadow: 0 0 3px 1px #c6d;
+}
 
 /* Comboboxes live under container, so target '.combobox-rapid-dark' class. */
 div.combobox.combobox-rapid-dark {
@@ -299,8 +314,7 @@ div.combobox.combobox-rapid-dark a {
 }
 
 div.combobox.combobox-rapid-dark a.selected,
-div.combobox.combobox-rapid-dark a:active,
-div.combobox.combobox-rapid-dark a:focus {
+div.combobox.combobox-rapid-dark a:active {
   color: #eee;
   background: #3c3c3c;
 }
@@ -366,11 +380,12 @@ button.rapid-inspector-close svg,
 button.overture-inspector-close svg {
   color: #000000;
 }
-button.rapid-inspector-close:hover,
-button.overture-inspector-close:hover {
-  background: #8885;
+@media (hover: hover) {
+  button.rapid-inspector-close:hover,
+  button.overture-inspector-close:hover {
+    background: #8885;
+  }
 }
-
 .rapid-inspector .tooltip .popover-inner {
   border: 1px solid #aaaa;
 }
@@ -499,20 +514,17 @@ button.overture-inspector-close:hover {
 }
 
 .rapid-inspector-choice .choice-wrap > button {
-  display: flex;
   flex: 1 1 0px;
-
-  border: 0;
-  align-items: center;
+  justify-content: flex-start;
 }
 
 .rapid-inspector-choice .choice-wrap > button.choice-button {
-  border-right: 1px solid #333a;
+  border-right: 1px solid #ddd8;
   border-radius: 25px 0 0 25px;
 }
 .ideditor[dir='rtl'] .rapid-inspector-choice .choice-wrap > button.choice-button {
   border-right: unset;
-  border-left: 1px solid #333a;
+  border-left: 1px solid #ddd8;
   border-radius: 0 25px 25px 0;
 }
 .rapid-inspector-choice .choice-wrap > button.tag-reference-button {
@@ -527,6 +539,7 @@ button.overture-inspector-close:hover {
   width: 30px;
   height: 30px;
   margin: 0 15px;
+  fill: #0000;  /* fully transparent */
 }
 .rapid-inspector-choice .tag-reference-button .icon {
   margin: 0 5px;
@@ -593,18 +606,21 @@ button.overture-inspector-close:hover {
   background: transparent;
   height: 60px;
   padding-bottom: 5px;
-  border-radius: 0;
+  border-radius: 0 15px 0 0;
 }
 .ideditor[dir='rtl'] .modal.rapid-modal button.close {
    right: unset;
    left: 0;
+   border-radius: 15px 0 0 0;
  }
 
 .modal.rapid-modal button.close svg {
   color: #da26d3;
 }
-.modal.rapid-modal button.close:hover {
-  background: #8885;
+@media (hover: hover) {
+  .modal.rapid-modal button.close:hover {
+    background: #8885;
+  }
 }
 
 .modal.rapid-modal .modal-heading {
@@ -664,8 +680,10 @@ button.overture-inspector-close:hover {
 .rapid-row-actions:not(.disabled) .rapid-row-action {
   cursor: pointer;
 }
-.rapid-row-actions:not(.disabled) .rapid-row-action:hover {
-  background: #8885;
+@media (hover: hover) {
+  .rapid-row-actions:not(.disabled) .rapid-row-action:hover {
+    background: #8885;
+  }
 }
 
 /* Checkboxes */
@@ -721,9 +739,11 @@ button.overture-inspector-close:hover {
   border-radius: 6px;
   border: 0;
 }
-.modal.rapid-modal ::-webkit-scrollbar-thumb:hover {
-  background-color: #c6d;
-  cursor: pointer;
+@media (hover: hover) {
+  .modal.rapid-modal ::-webkit-scrollbar-thumb:hover {
+    background-color: #c6d;
+    cursor: pointer;
+  }
 }
 
 
@@ -811,17 +831,6 @@ button.overture-inspector-close:hover {
   padding: unset;
 }
 
-.rapid-row-description-wrap {
-  display: flex;
-  align-items: center;
-}
-.rapid-row-description-wrap {
-  font-size: 14px;
-  font-style: italic;
-  margin: -5px 5px 5px 0px;
-  color: #aaa;
-}
-
 .rapid-row-label-wrap .rapid-dataset-label-beta {
   font-size: 14px;
 }
@@ -830,14 +839,20 @@ button.overture-inspector-close:hover {
   height: 1.3em;
   margin: -5px;
 }
+
+.rapid-row-description-wrap {
+  display: flex;
+  align-items: center;
+  font-size: 12px;
+  font-style: italic;
+  margin: -5px 5px 5px 0px;
+  color: #aaa;
+}
 .rapid-license-divider {
   width: 1px;
-  height: 28px;
-  margin: 0 8px;
+  height: 16px;
+  margin: 0 7px;
   background: #888a;
-}
-.rapid-license-wrap {
-  font-size: 12px;
 }
 
 .modal-dataset-toggle .rapid-row-actions .icon {
@@ -849,9 +864,11 @@ button.overture-inspector-close:hover {
   padding: 10px 15px;
   cursor: pointer;
 }
-.row-search-catalog:hover,
-.row-custom-dataset:hover {
-  background: #8885;
+@media (hover: hover) {
+  .row-search-catalog:hover,
+  .row-custom-dataset:hover {
+    background: #8885;
+  }
 }
 
 
@@ -1175,8 +1192,10 @@ img.dataset-thumbnail.inverted {
   margin-top: 10px;
   border-radius: 4px;
 }
-.modal-dataset-settings .rapid-colorpicker-wrap:hover {
-  background: #8885;
+@media (hover: hover) {
+  .modal-dataset-settings .rapid-colorpicker-wrap:hover {
+    background: #8885;
+  }
 }
 
 /* Conflation section */
@@ -1210,7 +1229,6 @@ img.dataset-thumbnail.inverted {
   width: 100%;
 }
 
-
 /* set the delete button apart from neighbor buttons */
 .modal.modal-dataset-settings .delete-button.action {
   margin-left: 150px;
@@ -1220,10 +1238,33 @@ img.dataset-thumbnail.inverted {
   margin-right: 150px;
 }
 
+/* .modal.modal-dataset-settings button.action {
+  display: flex;
+  min-width: unset;
+  flex: 0 0 130px;
+  flex-flow: row nowrap;
+  text-wrap: nowrap;
+  align-items: center;
+  justify-content: center;
+}
+
+.modal.modal-dataset-settings .delete-button .icon {
+  width: 20px;
+  height: 20px;
+  margin-right: 10px;
+}
+
+.ideditor[dir='rtl'] .modal.modal-dataset-settings .delete-button .icon {
+  margin-right: unset;
+  margin-left: 10px;
+} */
+
+
 /* Colorpicker control
 ------------------------------------------------------- */
 .colorpicker-label {
   display: flex;
+  cursor: pointer;
 }
 .colorpicker-input {
   display: none;
@@ -1257,8 +1298,11 @@ img.dataset-thumbnail.inverted {
   background: #444;
   border-radius: 6px;
 }
-.colorpicker-option:hover {
-  border: 2px solid #ddd;
+
+@media (hover: hover) {
+  .colorpicker-option:hover {
+    border: 2px solid #ddd;
+  }
 }
 .colorpicker-option.selected {
   border: 2px solid #aaa;

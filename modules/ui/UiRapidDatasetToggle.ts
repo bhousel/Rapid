@@ -287,6 +287,10 @@ export class UiRapidDatasetToggle extends EventEmitter {
       .attr('class', 'button ok-button action')
       .on('click', this.close);
 
+    // set focus (but only on enter)
+    const buttonNode = $$buttons.selectAll('button').node() as HTMLElement | null;
+    buttonNode?.focus();
+
     // update
     $buttons = $buttons.merge($$buttons);
 
@@ -381,8 +385,6 @@ export class UiRapidDatasetToggle extends EventEmitter {
       .attr('class', 'rapid-license-divider');
 
     const $$link: D3EnterSelection = $$license
-      .append('span')
-      .attr('class', 'rapid-license-wrap')
       .append('a')
       .attr('class', 'rapid-license-link')
       .attr('target', '_blank')
@@ -441,7 +443,7 @@ export class UiRapidDatasetToggle extends EventEmitter {
         rapid.removeDatasets(ds.id);
         this.render();
       })
-      .call(uiIcon('#fas-trash-can'));
+      .call(uiIcon('#fas-xmark'));
 
 
     // update

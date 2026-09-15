@@ -90,17 +90,24 @@ h4, h5 {
   padding-bottom: 10px;
 }
 
+/* Focus */
+/* Turn off the old, heavy-handed focus style for all */
 button:focus,
-textarea:focus,
-input[type=text]:focus,
-input[type=search]:focus,
-input[type=number]:focus,
-input[type=url]:focus,
-input[type=tel]:focus,
-input[type=email]:focus,
-input[type=date]:focus {
-  outline-color: transparent;
-  outline-style: none;
+a:focus,
+input:focus,
+textarea:focus {
+  outline: none;
+}
+/* focus-visible shows the focus ring, but only when tabbing */
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid #597be7;
+  outline-offset: -2px;
+  box-shadow: 0 0 3px 1px #acf;
+  overflow: visible !important;
+  z-index: 5;
 }
 
 ::placeholder {
@@ -126,9 +133,6 @@ a,
 a:visited,
 a:active {
   color: #7092ff;
-}
-a:focus {
-  color: #597be7;
 }
 @media (hover: hover) {
   a:hover {
@@ -197,9 +201,7 @@ textarea  {
 }
 
 textarea:active,
-input:active,
-textarea:focus,
-input:focus {
+input:active {
   background-color: #f1f1f1;
 }
 
@@ -212,8 +214,8 @@ input.disabled {
 
 input[type="checkbox"],
 input[type="radio"] {
-  width: 14px;
-  height: 14px;
+  width: 16px;
+  height: 16px;
   margin-right: 5px;
   cursor: pointer;
   vertical-align: middle;
@@ -223,8 +225,8 @@ input[type="checkbox"]:indeterminate {
 }
 .ideditor[dir='rtl'] input[type="checkbox"],
 .ideditor[dir='rtl'] input[type="radio"] {
+  margin-right: unset;
   margin-left: 5px;
-  margin-right: 0;
 }
 
 input.mixed::placeholder,
@@ -331,10 +333,7 @@ button {
   border-radius: 4px;
 }
 
-button:focus,
-button:active,
-/* we want to fake hovering sometimes */
-button.hover {
+button:active {
   background-color: #ececec;
 }
 @media (hover: hover) {
@@ -385,7 +384,6 @@ button.action {
   color: #fff;
   font-weight: bold;
 }
-button.action:focus,
 button.action:active {
   background: #597be7;
 }
@@ -393,7 +391,6 @@ button.secondary-action {
   background: #ececec;
   font-weight: bold;
 }
-button.secondary-action:focus,
 button.secondary-action:active {
   background: #cccccc;
 }
@@ -443,7 +440,6 @@ viewbox, so we default size them at 16px.
 .icon.icon-fas {
   width: 16px;
   height: 16px;
-  margin: 2px;
 }
 
 .icon.operation use {
@@ -621,7 +617,7 @@ button.add-note svg.icon {
 }
 
 
-/* Header for modals / panes
+/* Headings for modals / panes
 ------------------------------------------------------- */
 .heading {
   display: flex;
@@ -700,8 +696,7 @@ button.add-note svg.icon {
 
 /* Hide/Toggle collapsible sections (aka Disclosure)
 ------------------------------------------------------- */
-.hide-toggle .icon.pre-text {
-  vertical-align: middle;
+.hide-toggle .icon {
   width: 16px;
   height: 16px;
   margin-top: -3px;
@@ -714,7 +709,9 @@ a.hide-toggle {
   font-weight: bold;
   margin-bottom: 5px;
 }
-
+.hide-toggle-text {
+  margin: 0 5px;
+}
 
 /* Sidebar / Inspector
 ------------------------------------------------------- */
@@ -933,8 +930,7 @@ set some opacity and hide the child contents */
   color: #7092ff;
   font-weight: bold;
 }
-.feature-list-item:active .entity-type,
-.feature-list-item:focus .entity-type {
+.feature-list-item:active .entity-type {
   color: #597be7;
 }
 @media (hover: hover) {
@@ -1162,7 +1158,6 @@ set some opacity and hide the child contents */
   font-weight: bold;
 }
 
-.preset-list-button:focus .label,
 .preset-list-button:active .label,
 .preset-list-button.disabled,
 .preset-list-button.disabled .label {
@@ -1178,7 +1173,7 @@ set some opacity and hide the child contents */
   width: 32px;
   flex: 0 0 auto;
 }
-.preset-list-button-wrap button.tag-reference-button:not(:hover):not(:active):not(:focus) {
+.preset-list-button-wrap button.tag-reference-button:not(:hover):not(:active) {
   background: #f6f6f6;
 }
 .ideditor[dir='ltr'] .preset-list-button-wrap button.tag-reference-button {
@@ -1301,7 +1296,6 @@ tag reference         <- .tag-reference-body    |
   background: #f6f6f6;
   border: 1px solid #ccc;
   border-radius: 4px 4px 0 0;
-  overflow: hidden;
 }
 .form-field .label-text {
   overflow: hidden;
@@ -1333,7 +1327,7 @@ tag reference         <- .tag-reference-body    |
   border-left: none;
   border-right: 1px solid #ccc;
 }
-.form-field .field-label button:not(:hover):not(:active):not(:focus) {
+.form-field .field-label button:not(:hover):not(:active) {
   background: none;
 }
 .form-field .field-label .icon {
@@ -1397,8 +1391,7 @@ tag reference         <- .tag-reference-body    |
   border-left-width: 1px;
   border-right-width: 0;
 }
-.form-field-button:active,
-.form-field-button:focus {
+.form-field-button:active {
   background-color: #f1f1f1;
 }
 @media (hover: hover) {
@@ -1615,11 +1608,6 @@ tag reference         <- .tag-reference-body    |
   border: none;
   width: 100%;
 }
-
-.form-field-input-multicombo input:focus {
-  border-radius: 4px !important;
-}
-
 .form-field-input-multicombo .full-line-chips li.chip {
   width: 100%;
 }
@@ -1698,8 +1686,6 @@ tag reference         <- .tag-reference-body    |
 }
 .form-field-input-check > input[type="checkbox"] {
   flex: 0 1 auto;
-  width: 20px;
-  margin-top: 0;
 }
 .form-field-input-check > span {
   flex: 1 1 auto;
@@ -1721,20 +1707,18 @@ tag reference         <- .tag-reference-body    |
 .ideditor[dir='rtl'] .form-field-input-check > .reverser {
   padding-left: 2px;
 }
-.form-field-input-check > .reverser:active,
-.form-field-input-check > .reverser:focus {
+.form-field-input-check .reverser:active {
   background: #e3e8ef;
 }
 @media (hover: hover) {
-  .form-field-input-check > .reverser:hover {
+  .form-field-input-check .reverser:hover {
     background: #e3e8ef;
   }
 }
 .form-field-input-check > .reverser.hide {
   display: none;
 }
-.form-field-input-check:active,
-.form-field-input-check:focus {
+.form-field-input-check:active {
   background: #f1f1f1;
 }
 @media (hover: hover) {
@@ -1774,8 +1758,7 @@ tag reference         <- .tag-reference-body    |
 .form-field-input-radio > label:last-child {
   border-radius: 0 0 4px 4px;
 }
-.form-field-input-radio > label:active,
-.form-field-input-radio > label:focus {
+.form-field-input-radio > label:active {
   background-color: #ececec;
 }
 @media (hover: hover) {
@@ -1791,7 +1774,6 @@ tag reference         <- .tag-reference-body    |
 }
 .form-field-input-radio > label > input[type="radio"] {
   flex: 0 1 auto;
-  width: 20px;
 }
 .form-field-input-radio > label > span {
   flex: 1 1 auto;
@@ -2125,8 +2107,7 @@ div.combobox {
 }
 
 .combobox a.selected,
-.combobox a:active,
-.combobox a:focus {
+.combobox a:active {
   background: #ececec;
 }
 @media (hover: hover) {
@@ -2149,6 +2130,7 @@ div.combobox {
   align-self: center;
   vertical-align: middle;
   cursor: pointer;
+  z-index: 20;
 }
 .ideditor[dir='rtl'] .combobox-caret {
   margin-left: 0;
@@ -2216,8 +2198,7 @@ div.combobox {
   color: #7092ff;
   border-bottom: 2px solid;
 }
-.field-help-nav-item:active,
-.field-help-nav-item:focus {
+.field-help-nav-item:active {
   color: #597be7;
   background-color: #efefef;
 }
@@ -2320,12 +2301,11 @@ div.combobox {
 }
 button.raw-tag-option {
   flex: 0 0 auto;
-  padding: 3px;
+  padding: 5px;
   background: #aaa;
   color: #eee;
   margin: 0 3px;
 }
-button.raw-tag-option:focus,
 button.raw-tag-option.active {
   color: #fff;
   background: #597be7;
@@ -2438,8 +2418,7 @@ button.raw-tag-option svg.icon {
   border-right-width: 0;
 }
 
-.tag-row button:active,
-.tag-row button:focus {
+.tag-row button:active {
   background: #f1f1f1;
 }
 @media (hover: hover) {
@@ -2627,7 +2606,6 @@ img.tag-reference-wiki-image {
   padding: 5px;
   background: rgba(0,0,0,.5);
 }
-.add-row button:focus,
 .add-row button:active {
   background: rgba(0,0,0,.8);
 }
@@ -2973,7 +2951,6 @@ img.tag-reference-wiki-image {
   pointer-events: auto;
 }
 
-.map-control > button:not(.disabled):focus,
 .map-control > button:not(.disabled):active {
   background: rgba(0, 0, 0, .8);
 }
@@ -3029,33 +3006,6 @@ button.bearing .tooltip-keys svg.icon {
 .map-control > button.zoom-to-selection .icon {
   width: 22px;
   height: 22px;
-}
-
-/* Fullscreen Button (disabled) */
-div.full-screen {
-  display: inline-block;
-  width: 40px;
-  margin-right: 10px;
-  display: none;
-}
-
-div.full-screen .tooltip {
-  min-width: 160px;
-}
-
-div.full-screen > button, div.full-screen > button.active {
-  width: 40px;
-  height: 40px;
-  background: transparent;
-}
-div.full-screen > button:active,
-div.full-screen > button:focus {
-  background-color: rgba(0, 0, 0, .8);
-}
-@media (hover: hover) {
-  div.full-screen > button:hover {
-    background-color: rgba(0, 0, 0, .8);
-  }
 }
 
 
@@ -3309,8 +3259,6 @@ button.autofix.action {
   color: #fff;
   padding: 0;
 }
-button.autofix.action:focus,
-button.autofix.action:active,
 button.autofix.action.active {
   background: #597be7;
 }
@@ -3367,15 +3315,11 @@ button.autofix.action.active {
   color: #dd1400;
 }
 .error-list .issue.severity-error .issue-label:active,
-.error-list .issue.severity-error .issue-label:focus,
-.issue.severity-error .issue-fix-item button.actionable:active,
-.issue.severity-error .issue-fix-item button.actionable:focus {
+.issue.severity-error .issue-fix-item button.actionable:active {
   background: #ffb6b6;
 }
 .issue.severity-error .issue-fix-item button.actionable:active,
-.issue.severity-error .issue-fix-item button.actionable:focus,
-.issue-container.active .issue.severity-error .issue-info-button:active,
-.issue-container.active .issue.severity-error .issue-info-button:focus {
+.issue-container.active .issue.severity-error .issue-info-button:active {
   color: #840c00;
   fill: #840c00;
 }
@@ -3419,15 +3363,11 @@ button.autofix.action.active {
   fill: #b15500;
 }
 .warning-list .issue.severity-warning .issue-label:active,
-.warning-list .issue.severity-warning .issue-label:focus,
-.issue.severity-warning .issue-fix-item button.actionable:active,
-.issue.severity-warning .issue-fix-item button.actionable:focus {
+.issue.severity-warning .issue-fix-item button.actionable:active {
   background: #fafa30;
 }
 .issue.severity-warning .issue-fix-item button.actionable:active,
-.issue.severity-warning .issue-fix-item button.actionable:focus,
-.issue-container.active .issue.severity-warning .issue-info-button:active,
-.issue-container.active .issue.severity-warning .issue-info-button:focus {
+.issue-container.active .issue.severity-warning .issue-info-button:active {
   color: #7f3d00;
   fill: #7f3d00;
 }
@@ -3472,15 +3412,11 @@ button.autofix.action.active {
   fill: #098787;
 }
 .suggestion-list .issue.severity-suggestion .issue-label:active,
-.suggestion-list .issue.severity-suggestion .issue-label:focus,
-.issue.severity-suggestion .issue-fix-item button.actionable:active,
-.issue.severity-suggestion .issue-fix-item button.actionable:focus {
+.issue.severity-suggestion .issue-fix-item button.actionable:active {
   background: #7cfafa;
 }
 .issue.severity-suggestion .issue-fix-item button.actionable:active,
-.issue.severity-suggestion .issue-fix-item button.actionable:focus,
-.issue-container.active .issue.severity-suggestion .issue-info-button:active,
-.issue-container.active .issue.severity-suggestion .issue-info-button:focus {
+.issue-container.active .issue.severity-suggestion .issue-info-button:active {
   color: #066262;
   fill: #066262;
 }
@@ -3568,9 +3504,7 @@ input.square-degrees-input {
   background: #f6f6f6;
 }
 .section-entity-issues .issue-container:not(.active) .issue-text:active,
-.section-entity-issues .issue-container:not(.active) .issue-text:focus,
-.section-entity-issues .issue-container:not(.active) .issue-info-button:active,
-.section-entity-issues .issue-container:not(.active) .issue-info-button:focus {
+.section-entity-issues .issue-container:not(.active) .issue-info-button:active {
   background: #f1f1f1;
 }
 @media (hover: hover) {
@@ -3956,8 +3890,6 @@ li.issue-fix-item button:not(.actionable) .fix-icon {
 .help-pane .toc li a {
   border-bottom: 0;
 }
-.help-pane .toc li a:focus,
-.help-pane .nav a:focus,
 .help-pane .toc li a:active,
 .help-pane .nav a:active {
   background: #ececec;
@@ -4410,7 +4342,6 @@ li.issue-fix-item button:not(.actionable) .fix-icon {
 .ideditor[dir='rtl'] .card-title button.close {
   float: left;
 }
-.card-title button.close:focus,
 .card-title button.close:active {
   color: #fff;
 }
@@ -4538,7 +4469,6 @@ li.issue-fix-item button:not(.actionable) .fix-icon {
 .attribution-section a:visited {
   color: #ccf;
 }
-.attribution-section a:focus,
 .attribution-section a:hover {
   color: #aaf;
 }
@@ -4581,7 +4511,6 @@ li.issue-fix-item button:not(.actionable) .fix-icon {
   color: #ccc;
   pointer-events: all;
 }
-.api-status a:focus,
 .api-status a:active {
   color: inherit;
 }
@@ -4806,7 +4735,6 @@ li.issue-fix-item button:not(.actionable) .fix-icon {
   max-height: 90%;
   position: relative;
   border-radius: 3px;
-  overflow: hidden;
   margin: auto;
   z-index: 50;
   width: 80%;
@@ -4839,6 +4767,7 @@ li.issue-fix-item button:not(.actionable) .fix-icon {
   left: 0;
   right: 0;
   overflow: auto;
+  backdrop-filter: blur(2px);
 }
 .shaded:before {
   content: '';
@@ -4865,11 +4794,10 @@ li.issue-fix-item button:not(.actionable) .fix-icon {
 
 .modal-section.buttons button {
   min-width: 130px;
-  padding: 10px 15px;
+  padding: 10px 20px;
 }
 
 .modal-section.buttons .action {
-  display: inline-block;
   margin: 0 10px;
 }
 
@@ -5066,7 +4994,6 @@ li.issue-fix-item button:not(.actionable) .fix-icon {
   color: #7092ff;
   border-bottom: 2px solid;
 }
-.modal-shortcuts a.nav-item:focus,
 .modal-shortcuts a.nav-item:active {
   color: #597be7;
   background-color: #efefef;
@@ -5500,7 +5427,7 @@ li:first-of-type .badge .tooltip .popover-arrow {
 ------------------------------------------------------- */
 .maproulette-menu {
   position: absolute;
-  z-index: 1000; /* Ensure the menu is above other elements */
+  z-index: 1000;
   display: flex;
   flex-direction: column;
   background: #fff;
@@ -5913,8 +5840,7 @@ inset reserves space around it to allow the user plenty of space to resize.
   pointer-events: initial;
 }
 
-.photo-controls button,
-.photo-controls button:focus {
+.photo-controls button {
   height: 18px;
   width: 18px;
   background: rgba(0,0,0,0.65);

@@ -916,7 +916,7 @@ export class UiRapidDatasetSettings extends EventEmitter {
             .filter((row: PartialDataTransform) => row.uuid !== d.uuid);   // remove current row
           this.render();
         })
-        .call(uiIcon('#fas-trash-can'));
+        .call(uiIcon('#fas-xmark'));
     }
 
     // update
@@ -972,7 +972,7 @@ export class UiRapidDatasetSettings extends EventEmitter {
       .data([0]);
 
     // enter
-    const $$buttons = $buttons.enter()
+    const $$buttons: D3EnterSelection = $buttons.enter()
       .append('div')
       .attr('class', 'modal-section buttons');
 
@@ -987,10 +987,17 @@ export class UiRapidDatasetSettings extends EventEmitter {
       .on('click', this.close);
 
     if (ds.custom) {   // only available for custom datasets
-      $$buttons
+      const $$deleteButton: D3EnterSelection = $$buttons
         .append('button')
         .attr('class', 'button delete-button action danger')
         .on('click', this._clickedDelete);
+
+      $$deleteButton
+        .call(uiIcon('#fas-trash-can'));
+
+      $$deleteButton
+        .append('div')
+        .attr('class', 'button-label');
     }
 
     // update
@@ -1003,7 +1010,7 @@ export class UiRapidDatasetSettings extends EventEmitter {
     $buttons.selectAll('.cancel-button')
       .text(l10n.t('text.cancel'));
 
-    $buttons.selectAll('.delete-button')
+    $buttons.selectAll('.delete-button .button-label')
       .text(l10n.t('rapid_dataset_settings.delete.label'));
 
     // relocalize the "are you sure" modal, if it happens to be showing.
@@ -1187,19 +1194,30 @@ export class UiRapidDatasetSettings extends EventEmitter {
       .data([0]);
 
     // enter
-    const $$buttons = $buttons.enter()
+    const $$buttons: D3EnterSelection = $buttons.enter()
       .append('div')
       .attr('class', 'modal-section buttons');
 
-    $$buttons
+    const $$okButton: D3EnterSelection = $$buttons
       .append('button')
       .attr('class', 'button ok-button action danger')
       .on('click', this._clickedIAmSure);
 
-    $$buttons
+    $$okButton
+      .call(uiIcon('#fas-trash-can'));
+
+    $$okButton
+      .append('div')
+      .attr('class', 'button-label');
+
+    const $$cancelButton: D3EnterSelection = $$buttons
       .append('button')
       .attr('class', 'button cancel-button action')
       .on('click', () => this.AreYouSureModal!.close());
+
+    $$cancelButton
+      .append('div')
+      .attr('class', 'button-label');
 
     // focus cancel
     const node = $$buttons.selectAll('.cancel-button').node() as HTMLElement | null;
@@ -1208,10 +1226,10 @@ export class UiRapidDatasetSettings extends EventEmitter {
     // update
     $buttons = $buttons.merge($$buttons) as D3Selection;
 
-    $buttons.selectAll('.ok-button')
+    $buttons.selectAll('.ok-button .button-label')
       .text(l10n.t(`${prefix}.ok`));
 
-    $buttons.selectAll('.cancel-button')
+    $buttons.selectAll('.cancel-button .button-label')
       .text(l10n.t(`${prefix}.cancel`));
   }
 
