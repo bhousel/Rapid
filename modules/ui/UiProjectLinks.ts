@@ -67,24 +67,34 @@ export class UiProjectLinks {
 
     $$wrap
       .append('a')
+      .attr('class', 'project-link-bug')
+      .attr('href', '#')   // allows keyboard navigation to hit this link
       .attr('target', '_blank')
+      .attr('rel', 'noopener noreferrer')
       .on('click', this.reportIssue)
       .call(uiIcon('#rapid-icon-bug', 'light'))
       .call(this.BugTooltip.attach);
 
     $$wrap
       .append('a')
-      .attr('target', '_blank')
+      .attr('class', 'project-link-translate')
       .attr('href', 'https://github.com/facebook/Rapid/blob/main/CONTRIBUTING.md#translations')
+      .attr('target', '_blank')
+      .attr('rel', 'noopener noreferrer')
       .call(uiIcon('#rapid-icon-translate', 'light'))
       .call(this.TranslateTooltip.attach);
 
     // update
     $wrap = $wrap.merge($$wrap);
 
-    // localize tooltips
+    // localize
     this.BugTooltip.title(l10n.t('report_a_bug'));
+    $wrap.selectAll('.project-link-bug')
+      .attr('aria-label', l10n.t('report_a_bug'));
+
     this.TranslateTooltip.title(l10n.t('help_translate'));
+    $wrap.selectAll('.project-link-translate')
+      .attr('aria-label', l10n.t('help_translate'));
   }
 
 
