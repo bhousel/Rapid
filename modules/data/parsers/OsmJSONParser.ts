@@ -75,7 +75,6 @@ export class OsmJSONParser {
 
 
   /**
-   * @constructor
    */
   public constructor() {
     this._seen = new Set<string>();

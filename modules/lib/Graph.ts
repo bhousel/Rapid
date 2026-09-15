@@ -65,7 +65,6 @@ export class Graph {
 
 
   /**
-   * @constructor
    * @param  otherOrContext  - copy another Graph, or pass application context
    * @param  propsOrEntities - optional properties or base Entities to include in the graph.
    */

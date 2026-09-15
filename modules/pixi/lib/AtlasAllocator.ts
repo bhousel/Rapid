@@ -65,7 +65,6 @@ export class AtlasAllocator {
 
   /**
    * Creates an atlas allocator.
-   * @constructor
    * @param options - options for the Atlas Allocator
    */
   public constructor(options: Partial<AtlasOptions> = {}) {

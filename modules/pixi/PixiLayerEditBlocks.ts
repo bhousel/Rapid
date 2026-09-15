@@ -17,7 +17,6 @@ const MINZOOM = 4;
 export class PixiLayerEditBlocks extends AbstractPixiLayer {
 
   /**
-   * @constructor
    * @param scene - The Scene that owns this Layer
    */
   public constructor(scene: PixiScene) {

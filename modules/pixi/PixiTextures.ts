@@ -54,7 +54,6 @@ export class PixiTextures {
 
 
   /**
-   * @constructor
    * @param gfx - The GraphicsSystem that owns the texture manager
    */
   public constructor(gfx: GraphicsSystem) {

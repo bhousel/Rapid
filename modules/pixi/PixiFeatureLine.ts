@@ -39,7 +39,6 @@ export class PixiFeatureLine extends AbstractPixiFeature {
 
 
   /**
-   * @constructor
    * @param layer - The Layer that owns this Feature
    * @param featureID - Unique string to use for the name of this Feature
    */

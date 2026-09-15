@@ -41,7 +41,6 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
   protected _geoDataExtent: Extent | null;
 
   /**
-   * @constructor
    * @param scene - The Scene that owns this Layer
    */
   public constructor(scene: PixiScene) {

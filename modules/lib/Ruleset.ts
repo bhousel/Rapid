@@ -90,7 +90,6 @@ export class Ruleset {
 
 
   /**
-   * @constructor
    * @param context - Global shared application context
    * @param props - Properties defining the ruleset
    * @throws Error if `id` property is missing

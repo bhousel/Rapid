@@ -36,7 +36,6 @@ export class UiFieldCheck extends UiField {
 
 
   /**
-   * @constructor
    * @param context - Global shared application context
    * @param presetField - The preset field definition this field renders
    * @param entityIDs - The entities this field applies to

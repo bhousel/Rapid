@@ -35,7 +35,6 @@ export class FetchError extends Error {
 
 
   /**
-   * @constructor
    * @param init - The failed Fetch API `Response`, or plain `FetchErrorInit` properties
    */
   public constructor(init: Response | FetchErrorInit) {

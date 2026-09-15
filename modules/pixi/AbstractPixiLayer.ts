@@ -58,7 +58,6 @@ export class AbstractPixiLayer {
 
 
   /**
-   * @constructor
    * @param scene - The Scene that owns this Layer
    */
   public constructor(scene: PixiScene) {

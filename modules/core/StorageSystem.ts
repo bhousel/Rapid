@@ -40,7 +40,6 @@ export class StorageSystem extends AbstractSystem {
   protected _mock: Map<string, string> | null;
 
   /**
-   * @constructor
    * @param context - Global shared application context
    */
   public constructor(context: Context) {

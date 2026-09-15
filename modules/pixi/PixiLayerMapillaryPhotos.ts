@@ -39,7 +39,6 @@ export class PixiLayerMapillaryPhotos extends AbstractPixiLayer {
   protected _viewerFov: number;
 
   /**
-   * @constructor
    * @param scene - The Scene that owns this Layer
    */
   public constructor(scene: PixiScene) {

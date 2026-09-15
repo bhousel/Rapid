@@ -17,7 +17,6 @@ export class KeyOperationBehavior extends AbstractBehavior {
 
 
   /**
-   * @constructor
    * @param  context - Global shared application context
    * @param  operation - The operation this behavior is associated with
    */

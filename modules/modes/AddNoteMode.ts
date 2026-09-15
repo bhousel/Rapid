@@ -14,7 +14,6 @@ const DEBUG = false;
 export class AddNoteMode extends AbstractMode {
 
   /**
-   * @constructor
    * @param  context - Global shared application context
    */
   public constructor(context: Context) {

@@ -66,7 +66,6 @@ export class Variable {
 
 
   /**
-   * @constructor
    * @param context - Global shared application context
    * @param props - Properties defining the variable
    * @throws Error if `id` property is missing

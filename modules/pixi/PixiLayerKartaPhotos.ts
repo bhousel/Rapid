@@ -30,7 +30,6 @@ const MARKERSTYLE: Partial<MatchedStyle> = {
 export class PixiLayerKartaPhotos extends AbstractPixiLayer {
 
   /**
-   * @constructor
    * @param scene - The Scene that owns this Layer
    */
   public constructor(scene: PixiScene) {

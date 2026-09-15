@@ -98,7 +98,6 @@ export class WorkerSystem extends AbstractSystem {
 
 
   /**
-   * @constructor
    * @param context - Global shared application context
    */
   public constructor(context: Context) {

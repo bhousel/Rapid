@@ -75,7 +75,6 @@ export class OsmXMLParser {
 
 
   /**
-   * @constructor
    */
   public constructor() {
     this._seen = new Set<string>();

@@ -100,7 +100,6 @@ export class StyleSelector {
 
 
   /**
-   * @constructor
    * @param context
    * @param props - Properties defining the selector
    * @throws Error if `id` property is missing

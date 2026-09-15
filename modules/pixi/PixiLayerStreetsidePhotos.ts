@@ -35,7 +35,6 @@ const fovLengthInterp: ScaleLinear<number, number> = scaleLinear([90, 10], [0.7,
 export class PixiLayerStreetsidePhotos extends AbstractPixiLayer {
 
   /**
-   * @constructor
    * @param scene - The Scene that owns this Layer
    */
   public constructor(scene: PixiScene) {

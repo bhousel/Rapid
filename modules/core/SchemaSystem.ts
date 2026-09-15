@@ -205,7 +205,6 @@ export class SchemaSystem extends AbstractSystem {
 
 
   /**
-   * @constructor
    * @param context - Global shared application context
    */
   public constructor(context: Context) {

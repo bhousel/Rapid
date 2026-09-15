@@ -221,7 +221,6 @@ export class Category {
   }
 
   /**
-   * @constructor
    * @param props - Properties defining the matcher
    * @throws Error if `key` property is missing
    */

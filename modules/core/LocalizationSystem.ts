@@ -119,7 +119,6 @@ export class LocalizationSystem extends AbstractSystem {
 
 
   /**
-   * @constructor
    * @param context - Global shared application context
    */
   public constructor(context: Context) {

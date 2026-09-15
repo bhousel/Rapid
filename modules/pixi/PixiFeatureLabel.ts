@@ -80,7 +80,6 @@ export class PixiFeatureLabel extends AbstractPixiFeature {
 
 
   /**
-   * @constructor
    * @param layer - The `PixiLayerLabels` layer that owns this Feature
    * @param featureID - Unique string identifier for this label
    */

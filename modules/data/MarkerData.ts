@@ -38,7 +38,6 @@ export class MarkerData<P extends MarkerProps = MarkerProps> extends AbstractDat
 
 
   /**
-   * @constructor
    * Data elements may be constructed by passing an application context or another data element.
    * They can also accept an optional properties object.
    * @param otherOrContext - copy another data element, or pass application context

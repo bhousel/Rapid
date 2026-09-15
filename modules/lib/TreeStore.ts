@@ -205,7 +205,6 @@ export class TreeStore {
 
 
   /**
-   * @constructor
    * @param initial - An optional tree to seed the store (deep-copied)
    */
   public constructor(initial?: TreeNode) {

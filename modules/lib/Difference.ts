@@ -69,7 +69,6 @@ export class Difference {
 
 
   /**
-   * @constructor
    * @param  base - Base Graph (null for fresh head graph)
    * @param  head - Head Graph
    */

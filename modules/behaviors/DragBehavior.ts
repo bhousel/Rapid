@@ -39,7 +39,6 @@ export class DragBehavior extends AbstractBehavior {
 
 
   /**
-   * @constructor
    * @param  context - Global shared application context
    */
   public constructor(context: Context) {

@@ -141,7 +141,6 @@ export class PropMatcher {
 
 
   /**
-   * @constructor
    * @param props - Properties defining the match condition
    * @throws Error if `key` property is missing
    * @throws Error if regex pattern is invalid (for `~` or `!~` operators)

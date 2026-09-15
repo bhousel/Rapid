@@ -17,7 +17,6 @@ const SELECTED = 0xffee00;
 export class PixiLayerMapillaryDetections extends AbstractPixiLayer {
 
   /**
-   * @constructor
    * @param  scene - The Scene that owns this Layer
    */
   public constructor(scene: PixiScene) {

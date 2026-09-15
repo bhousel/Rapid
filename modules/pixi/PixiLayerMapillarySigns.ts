@@ -15,7 +15,6 @@ const MINZOOM = 12;
 export class PixiLayerMapillarySigns extends AbstractPixiLayer {
 
   /**
-   * @constructor
    * @param  scene - The Scene that owns this Layer
    */
   public constructor(scene: PixiScene) {

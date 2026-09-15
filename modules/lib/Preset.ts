@@ -132,7 +132,6 @@ export class Preset {
 
 
   /**
-   * @constructor
    * @param context - Global shared application context
    * @param props - Properties for this Preset
    */

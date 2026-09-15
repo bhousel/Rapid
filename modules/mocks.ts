@@ -16,7 +16,6 @@ import type { Systems } from './core/types.ts';
  */
 export class MockSystem extends AbstractSystem {
   /**
-   * @constructor
    * @param context
    */
   public constructor(context: Context) {
@@ -62,7 +61,6 @@ export class MockContext {
   protected _resetPromise: Promise<void> | null;
 
 
-  /** @constructor */
   public constructor() {
     this.sequences = {};
     this.services = {};

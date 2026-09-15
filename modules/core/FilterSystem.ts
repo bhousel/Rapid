@@ -43,7 +43,6 @@ class Filter {
   public count: number;
 
   /**
-   * @constructor
    * @param  fn  The match function for this Filter
    */
   public constructor(fn: FilterMatchFn) {
@@ -75,7 +74,6 @@ export class FilterSystem extends AbstractSystem {
 
 
   /**
-   * @constructor
    * @param context - Global shared application context
    */
   public constructor(context: Context) {

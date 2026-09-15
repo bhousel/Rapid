@@ -36,7 +36,6 @@ export class ValidationCache {
 
 
   /**
-   * @constructor
    * @param context - Global shared application context
    * @param which - 'base' or 'head' (to identify the cache)
    */

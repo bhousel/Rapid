@@ -178,7 +178,6 @@ export class Context extends EventEmitter {
   public editable!: () => boolean;
 
   /**
-   * @constructor
    */
   public constructor() {
     super();

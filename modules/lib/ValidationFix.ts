@@ -41,7 +41,6 @@ export class ValidationFix {
 
 
   /**
-   * @constructor
    * @param props - Properties for this ValidationFix
    */
   public constructor(props: Partial<ValidationFixProps>) {

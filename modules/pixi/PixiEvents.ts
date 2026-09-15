@@ -79,7 +79,6 @@ export class PixiEvents extends EventEmitter {
   protected _wheelDefault: 'auto' | 'zoom';
 
   /**
-   * @constructor
    * @param gfx - The GraphicsSystem that owns this event manager
    */
   public constructor(gfx: GraphicsSystem) {

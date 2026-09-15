@@ -35,7 +35,6 @@ export class UiFieldRadio extends UiField {
 
 
   /**
-   * @constructor
    * @param context - Global shared application context
    * @param presetField - the original Field tracked by the SchemaSystem
    * @param entityIDs - the entities this field applies to

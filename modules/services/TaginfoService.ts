@@ -96,7 +96,6 @@ export class TaginfoService extends AbstractSystem {
 
 
   /**
-   * @constructor
    * @param context - Global shared application context
    */
   public constructor(context: Context) {

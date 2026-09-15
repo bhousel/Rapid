@@ -128,7 +128,6 @@ export class ImagerySource {
 
 
   /**
-   * @constructor
    * @param context - Global shared application context
    * @param props - Object containing the properties for this ImagerySource
    */
@@ -483,7 +482,6 @@ export class ImagerySource {
  */
 export class ImagerySourceNone extends ImagerySource {
   /**
-   * @constructor
    * @param context - Global shared application context
    */
   public constructor(context: Context) {
@@ -522,7 +520,6 @@ export class ImagerySourceNone extends ImagerySource {
  */
 export class ImagerySourceCustom extends ImagerySource {
   /**
-   * @constructor
    * @param context - Global shared application context
    * @param template - the url teplate to use for this custom imagery
    */
@@ -598,7 +595,6 @@ export class ImagerySourceCustom extends ImagerySource {
  */
 export class ImagerySourceBing extends ImagerySource {
   /**
-   * @constructor
    * @param context - Global shared application context
    * @param props - Object containing the properties for this ImagerySource
    */
@@ -628,7 +624,6 @@ export class ImagerySourceEsri extends ImagerySource {
   protected _prevLoc: Vec2 | null;
 
   /**
-   * @constructor
    * @param context - Global shared application context
    * @param props - Object containing the properties for this ImagerySource
    */
@@ -835,7 +830,6 @@ export class ImagerySourceEsri extends ImagerySource {
  */
 export class ImagerySourceEsriWayback extends ImagerySourceEsri {
   /**
-   * @constructor
    * @param context - Global shared application context
    * @param props - Object containing the properties for this ImagerySource
    */

@@ -37,7 +37,6 @@ export class Edit {
 
 
   /**
-   * @constructor
    * @param props - Properties to initialize the Edit
    */
   public constructor(props: Partial<EditProps> = {}) {

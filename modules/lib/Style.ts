@@ -226,7 +226,6 @@ export class Style {
 
 
   /**
-   * @constructor
    * @param context
    * @param props - Properties defining the visual style
    * @throws Error if `id` property is missing

@@ -65,7 +65,6 @@ export class PixiScene extends EventEmitter {
 
 
   /**
-   * @constructor
    * @param gfx - The GraphicsSystem that owns this Scene
    */
   public constructor(gfx: GraphicsSystem) {

@@ -15,7 +15,6 @@ const DEBUG = false;
 export class BrowseMode extends AbstractMode {
 
   /**
-   * @constructor
    * @param  context - Global shared application context
    */
   public constructor(context: Context) {

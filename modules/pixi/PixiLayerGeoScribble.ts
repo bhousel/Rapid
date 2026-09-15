@@ -21,7 +21,6 @@ export class PixiLayerGeoScribble extends AbstractPixiLayer {
   public scribblesContainer: PIXI.Container | null;
 
   /**
-   * @constructor
    * @param scene - The Scene that owns this Layer
    */
   public constructor(scene: PixiScene) {
