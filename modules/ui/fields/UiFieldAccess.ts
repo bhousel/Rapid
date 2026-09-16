@@ -1,13 +1,13 @@
 import { select, selection } from 'd3-selection';
+import { AbstractUiField } from './AbstractUiField.ts';
 import { UiCombobox } from '../UiCombobox.ts';
-import { UiField } from '../UiField.ts';
 import { utilGetSetValue, utilNoAuto } from '../../util/index.ts';
 
 import type { Context } from '../../Context.ts';
 import type { D3Selection } from 'd3-selection';
 import type { Field } from '../../lib/index.ts';
 import type { TagChange, Tags } from './types.ts';
-import type { UiFieldOptions } from '../UiField.ts';
+import type { UiFieldOptions } from './AbstractUiField.ts';
 
 
 const placeholdersByHighway: Record<string, Record<string, string>> = {
@@ -124,7 +124,7 @@ const placeholdersByHighway: Record<string, Record<string, string>> = {
  * It includes subfields for different modes of transport:
  *  "all", "foot", "motor vehicle", "bicycle", "horse"
  */
-export class UiFieldAccess extends UiField {
+export class UiFieldAccess extends AbstractUiField {
   // D3 selections
   public $parent: D3Selection | null;
   public $items: D3Selection | null;

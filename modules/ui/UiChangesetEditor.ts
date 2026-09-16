@@ -9,7 +9,7 @@ import type { Context } from '../Context.ts';
 import type { D3Selection, D3EnterSelection } from 'd3-selection';
 import type { SchemaScope } from '../core/SchemaSystem.ts';
 import type { OsmTags } from '../data/types.ts';
-import type { UiField } from './UiField.ts';
+import type { AbstractUiField } from './fields/AbstractUiField.ts';
 
 
 /**
@@ -28,7 +28,7 @@ export class UiChangesetEditor extends EventEmitter {
 
   protected _scope: SchemaScope;
   protected _commentCombo: any;
-  protected _uifields: UiField[] | null | undefined;
+  protected _uifields: AbstractUiField[] | null | undefined;
   protected _tags: OsmTags | undefined;
   protected _changesetID: string | undefined;
 

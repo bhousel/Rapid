@@ -3,7 +3,7 @@ import { drag } from 'd3-drag';
 import { utilArrayUniq, utilUnicodeCharsCount } from '@rapid-sdk/util';
 import { iso1A2Code } from '@rapideditor/country-coder';
 
-import { UiField } from '../UiField.ts';
+import { AbstractUiField } from './AbstractUiField.ts';
 import { UiCombobox } from '../UiCombobox.ts';
 import { utilKeybinding } from '../../util/keybinding.ts';
 import { utilGetSetValue, utilNoAuto } from '../../util/index.ts';
@@ -12,7 +12,7 @@ import type { Context } from '../../Context.ts';
 import type { D3Selection } from 'd3-selection';
 import type { Field } from '../../lib/index.ts';
 import type { Tags } from './types.ts';
-import type { UiFieldOptions } from '../UiField.ts';
+import type { UiFieldOptions } from './AbstractUiField.ts';
 
 export {
   UiFieldCombo as UiFieldManyCombo,
@@ -43,7 +43,7 @@ interface ComboItem {
  * - 'networkCombo':
  * - 'typeCombo':
  */
-export class UiFieldCombo extends UiField {
+export class UiFieldCombo extends AbstractUiField {
   // D3 selections
   public $parent: D3Selection | null;
   public $container: D3Selection | null;

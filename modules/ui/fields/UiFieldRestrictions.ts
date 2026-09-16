@@ -1,10 +1,10 @@
 import { selection } from 'd3-selection';
-import { UiField } from '../UiField.ts';
+import { AbstractUiField } from './AbstractUiField.ts';
 
 import type { Context } from '../../Context.ts';
 import type { D3Selection } from 'd3-selection';
 import type { Field } from '../../lib/index.ts';
-import type { UiFieldOptions } from '../UiField.ts';
+import type { UiFieldOptions } from './AbstractUiField.ts';
 
 
 /**
@@ -17,7 +17,7 @@ import type { UiFieldOptions } from '../UiField.ts';
  * The field is registered in `uiFields`, but is intentionally not yet instantiated by
  * `UiSectionPresetFields`.
  */
-export class UiFieldRestrictions extends UiField {
+export class UiFieldRestrictions extends AbstractUiField {
   // D3 selections
   public $parent: D3Selection | null;
   public $wrap: D3Selection | null;

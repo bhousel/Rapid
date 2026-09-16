@@ -27,7 +27,7 @@ export { UiDisclosure } from './UiDisclosure.ts';
 export { UiEditMenu } from './UiEditMenu.ts';
 export { UiEntityEditor } from './UiEntityEditor.ts';
 export { UiFeatureList } from './UiFeatureList.ts';
-export { UiField } from './UiField.ts';
+export { AbstractUiField } from './fields/AbstractUiField.ts';
 export { UiFilterStatus } from './UiFilterStatus.ts';
 // export { uiFieldHelp } from './field_help.ts';
 export { UiFlash } from './UiFlash.ts';

@@ -8,7 +8,7 @@ import type { D3Selection } from 'd3-selection';
 import type { Field } from '../../lib/index.ts';
 import type { Preset } from '../../lib/Preset.ts';
 import type { Tags } from '../fields/types.ts';
-import type { UiField } from '../UiField.ts';
+import type { AbstractUiField } from '../fields/AbstractUiField.ts';
 
 
 /**
@@ -21,7 +21,7 @@ export class UiSectionPresetFields extends AbstractUiSection {
   public FormFields: UiFormFields;
 
   protected _state: string | undefined;    // can be 'hide', 'hover', or 'select'
-  protected _uifields: UiField[] | null;
+  protected _uifields: AbstractUiField[] | null;
   protected _presets: Preset[];
   protected _tags: Tags | undefined;
   protected _entityIDs: EntityID[];
@@ -101,15 +101,9 @@ export class UiSectionPresetFields extends AbstractUiSection {
 
       this._uifields = [];
       for (const field of sharedFields) {
-        if (!(allGeometries as any).isSubsetOf(field.geometries)) continue;  // skip fields that don't support all geometries needed
+        if (!allGeometries.isSubsetOf(field.geometries)) continue;  // skip fields that don't support all geometries needed
         this._uifields.push(createUiField(context, field, this._entityIDs));
       }
-
-//    let singularEntity = _entityIDs.length === 1 && graph.hasEntity(_entityIDs[0]);
-//    const restrictions = scope?.fields.get('restrictions');
-//    if (restrictions && singularEntity?.isHighwayIntersection(graph)) {
-//      this._uifields.push(new UiField(context, restrictions, this._entityIDs));
-//    }
 
       const additionalFields = utilArrayUnion(sharedMoreFields, [...(scope?.universal?.values() ?? [])]);
       additionalFields.sort((field1, field2) => {
@@ -118,23 +112,23 @@ export class UiSectionPresetFields extends AbstractUiSection {
 
       for (const field of additionalFields) {
         if (sharedFields.includes(field)) continue;                 // skip fields that were already included above
-        if (!(allGeometries as any).isSubsetOf(field.geometries)) continue;  // skip fields that don't support all geometries needed
+        if (!allGeometries.isSubsetOf(field.geometries)) continue;  // skip fields that don't support all geometries needed
         this._uifields.push(createUiField(context, field, this._entityIDs, { show: false }) );
       }
 
       const ids = this._entityIDs.slice();  // make copy (eslint warning)
-      for (const uifield of this._uifields) {
-        uifield.on('change', (t: Tags, onInput: boolean) => {
+      for (const UiField of this._uifields) {
+        UiField.on('change', (t: Tags, onInput: boolean) => {
           this.emit('change', ids, t, onInput);
         });
-        uifield.on('revert', (keys: string[]) => {
+        UiField.on('revert', (keys: string[]) => {
           this.emit('revert', keys);
         });
       }
     }
 
-    for (const uifield of this._uifields) {
-      uifield.state(this._state).tags(this._tags);
+    for (const UiField of this._uifields) {
+      UiField.state(this._state).tags(this._tags);
     }
 
     // update

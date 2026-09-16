@@ -1,6 +1,6 @@
 import { select, selection } from 'd3-selection';
 import { utilArrayUnion } from '@rapid-sdk/util';
-import { UiField } from '../UiField.ts';
+import { AbstractUiField } from './AbstractUiField.ts';
 import { createUiField } from './index.ts';
 
 import type { Context } from '../../Context.ts';
@@ -8,7 +8,7 @@ import type { D3Selection } from 'd3-selection';
 import type { Field } from '../../lib/index.ts';
 import type { SchemaScope } from '../../core/SchemaSystem.ts';
 import type { Tags } from './types.ts';
-import type { UiFieldOptions } from '../UiField.ts';
+import type { UiFieldOptions } from './AbstractUiField.ts';
 
 export { UiFieldRadio as UiFieldStructureRadio };
 
@@ -19,7 +19,7 @@ export { UiFieldRadio as UiFieldStructureRadio };
  * - 'radio':
  * - 'structureRadio':
  */
-export class UiFieldRadio extends UiField {
+export class UiFieldRadio extends AbstractUiField {
   // D3 selections
   public $parent: D3Selection | null;
   public $placeholder: D3Selection | null;
@@ -29,8 +29,8 @@ export class UiFieldRadio extends UiField {
 
   protected _scope: SchemaScope;
   protected _radioData: string[];
-  protected _typeField: UiField | null;
-  protected _layerField: UiField | null;
+  protected _typeField: AbstractUiField | null;
+  protected _layerField: AbstractUiField | null;
   protected _oldType: Record<string, string | string[] | undefined>;
 
 

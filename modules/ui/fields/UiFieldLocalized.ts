@@ -1,7 +1,7 @@
 import { select, selection } from 'd3-selection';
 import { utilArrayUniq, utilUniqueString } from '@rapid-sdk/util';
 import { iso1A2Code } from '@rapideditor/country-coder';
-import { UiField } from '../UiField.ts';
+import { AbstractUiField } from './AbstractUiField.ts';
 import { uiIcon } from '../icon.ts';
 import { UiTooltip } from '../UiTooltip.ts';
 import { UiCombobox } from '../UiCombobox.ts';
@@ -11,7 +11,7 @@ import type { Context } from '../../Context.ts';
 import type { D3Selection } from 'd3-selection';
 import type { Field } from '../../lib/index.ts';
 import type { Tags } from './types.ts';
-import type { UiFieldOptions } from '../UiField.ts';
+import type { UiFieldOptions } from './AbstractUiField.ts';
 
 import { LANGUAGE_SUFFIX_REGEX } from './types.ts';
 
@@ -34,7 +34,7 @@ interface MultilingualItem {
  * It includes a primary field, a button for "add multilingual",
  * and additional fields for any localized tags such as `name:en`, `name:de`, etc.
  */
-export class UiFieldLocalized extends UiField {
+export class UiFieldLocalized extends AbstractUiField {
   // D3 selections
   public $parent: D3Selection | null;
   public $input: D3Selection | null;

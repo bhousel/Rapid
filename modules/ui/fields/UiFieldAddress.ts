@@ -3,7 +3,7 @@ import { Extent, projWgs84ToWorld, geoSphericalDistance, vecProject } from '@rap
 import { utilArrayUniqBy } from '@rapid-sdk/util';
 import { iso1A2Code } from '@rapideditor/country-coder';
 import { UiCombobox } from '../UiCombobox.ts';
-import { UiField } from '../UiField.ts';
+import { AbstractUiField } from './AbstractUiField.ts';
 import { utilGetSetValue, utilNoAuto } from '../../util/index.ts';
 
 import type { Vec2 } from '@rapid-sdk/math';
@@ -13,7 +13,7 @@ import type { Field } from '../../lib/index.ts';
 import type { OsmEntity } from '../../data/index.ts';
 import type { SpatialItem } from '../../core/SpatialSystem.ts';
 import type { TagChange, Tags } from './types.ts';
-import type { UiFieldOptions } from '../UiField.ts';
+import type { UiFieldOptions } from './AbstractUiField.ts';
 
 
 interface AddressFormat {
@@ -47,7 +47,7 @@ const DEFAULTFORMAT = {
  * It determines the appropriate country code and adjust the subfields to
  * match the address format of the country where the feature is located.
  */
-export class UiFieldAddress extends UiField {
+export class UiFieldAddress extends AbstractUiField {
   // D3 selections
   public $parent: D3Selection | null;
   public $wrap: D3Selection | null;

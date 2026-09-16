@@ -1,13 +1,13 @@
 import { select, selection } from 'd3-selection';
 import { actionReverse } from '../../actions/reverse.ts';
 import { uiIcon } from '../icon.ts';
-import { UiField } from '../UiField.ts';
+import { AbstractUiField } from './AbstractUiField.ts';
 
 import type { Context } from '../../Context.ts';
 import type { D3Selection } from 'd3-selection';
 import type { Field } from '../../lib/index.ts';
 import type { TagChange, Tags } from './types.ts';
-import type { UiFieldOptions } from '../UiField.ts';
+import type { UiFieldOptions } from './AbstractUiField.ts';
 
 export { UiFieldCheck as UiFieldDefaultCheck };
 export { UiFieldCheck as UiFieldOnewayCheck };
@@ -20,7 +20,7 @@ export { UiFieldCheck as UiFieldOnewayCheck };
  * - 'defaultcheck':
  * - 'onewaycheck':
  */
-export class UiFieldCheck extends UiField {
+export class UiFieldCheck extends AbstractUiField {
   // D3 selections
   public $parent: D3Selection | null;
   public $input: D3Selection | null;

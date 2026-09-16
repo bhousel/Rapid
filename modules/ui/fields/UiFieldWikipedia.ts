@@ -2,7 +2,7 @@ import { selection } from 'd3-selection';
 import { actionChangeTags } from '../../actions/change_tags.ts';
 import { uiIcon } from '../icon.ts';
 import { UiCombobox } from '../UiCombobox.ts';
-import { UiField } from '../UiField.ts';
+import { AbstractUiField } from './AbstractUiField.ts';
 import { utilGetSetValue, utilNoAuto } from '../../util/index.ts';
 
 import type { Context } from '../../Context.ts';
@@ -10,7 +10,7 @@ import type { D3Selection } from 'd3-selection';
 import type { Field } from '../../lib/index.ts';
 import type { Tags } from './types.ts';
 import type { OsmTags } from '../../data/types.ts';
-import type { UiFieldOptions } from '../UiField.ts';
+import type { UiFieldOptions } from './AbstractUiField.ts';
 
 /** Wikipedia language entry: [displayName, nativeName, apiCode] */
 type WikipediaLanguage = [string, string, string];
@@ -20,7 +20,7 @@ type WikipediaLanguage = [string, string, string];
  * This UI component displays a wikidata field.
  * It includes subfields for the value, the language, and a button to open Wikipedia.
  */
-export class UiFieldWikipedia extends UiField {
+export class UiFieldWikipedia extends AbstractUiField {
   // D3 selections
   public $parent: D3Selection | null;
   public $langInput: D3Selection | null;

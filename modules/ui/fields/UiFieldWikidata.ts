@@ -1,7 +1,7 @@
 import { select, selection } from 'd3-selection';
 import { actionChangeTags } from '../../actions/change_tags.ts';
 import { uiIcon } from '../icon.ts';
-import { UiField } from '../UiField.ts';
+import { AbstractUiField } from './AbstractUiField.ts';
 import { utilGetSetValue, utilNoAuto } from '../../util/index.ts';
 import { UiCombobox } from '../UiCombobox.ts';
 
@@ -9,14 +9,14 @@ import type { Context } from '../../Context.ts';
 import type { D3Selection } from 'd3-selection';
 import type { Field } from '../../lib/index.ts';
 import type { Tags } from './types.ts';
-import type { UiFieldOptions } from '../UiField.ts';
+import type { UiFieldOptions } from './AbstractUiField.ts';
 
 
 /**
  * This UI component displays a wikidata field.
  * It includes subfields for the value and a button to open Wikidata.
  */
-export class UiFieldWikidata extends UiField {
+export class UiFieldWikidata extends AbstractUiField {
   // D3 selections
   public $parent: D3Selection | null;
   public $searchInput: D3Selection | null;

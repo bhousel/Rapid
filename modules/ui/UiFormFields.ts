@@ -4,7 +4,7 @@ import { utilGetSetValue, utilNoAuto } from '../util/index.ts';
 
 import type { Context } from '../Context.ts';
 import type { D3Selection } from 'd3-selection';
-import type { UiField } from './UiField.ts';
+import type { AbstractUiField } from './fields/AbstractUiField.ts';
 
 
 /**
@@ -13,7 +13,7 @@ import type { UiField } from './UiField.ts';
  */
 export class UiFormFields {
   public context: Context;
-  public fieldsArr: UiField[];
+  public fieldsArr: AbstractUiField[];
   public state: string;
   public klass: string;
 
@@ -74,7 +74,7 @@ export class UiFormFields {
 
 
     let $fields: D3Selection = $container.selectAll('.wrap-form-field')
-      .data(shown, (d: UiField) => (d.id + (d.entityIDs ? d.entityIDs.join() : '')));
+      .data(shown, (d: AbstractUiField) => (d.id + (d.entityIDs ? d.entityIDs.join() : '')));
 
     $fields.exit()
       .remove();
@@ -82,7 +82,7 @@ export class UiFormFields {
     // Enter
     const $$fields = $fields.enter()
       .append('div')
-      .attr('class', (d: UiField) => `wrap-form-field wrap-form-field-${d.safeid}`);
+      .attr('class', (d: AbstractUiField) => `wrap-form-field wrap-form-field-${d.safeid}`);
 
     // Update
     $fields = $fields
@@ -90,7 +90,7 @@ export class UiFormFields {
 
     $fields
       .order()
-      .each((d: UiField, i, nodes) => {
+      .each((d: AbstractUiField, i, nodes) => {
         select(nodes[i]).call(d.render);
       });
 

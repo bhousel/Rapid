@@ -1,6 +1,6 @@
 import { selection } from 'd3-selection';
 import { roadSpeedUnit } from '@rapideditor/country-coder';
-import { UiField } from '../UiField.ts';
+import { AbstractUiField } from './AbstractUiField.ts';
 import { UiCombobox } from '../UiCombobox.ts';
 import { utilGetSetValue, utilNoAuto } from '../../util/index.ts';
 
@@ -8,7 +8,7 @@ import type { Context } from '../../Context.ts';
 import type { D3Selection } from 'd3-selection';
 import type { Field } from '../../lib/index.ts';
 import type { Tags } from './types.ts';
-import type { UiFieldOptions } from '../UiField.ts';
+import type { UiFieldOptions } from './AbstractUiField.ts';
 
 
 const metricValues = [20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120];
@@ -27,7 +27,7 @@ function comboValues(d: any): { value: string; title: string } {
  * This UI component displays a roadspeed field.
  * It includes a main field for the speed value, and a combo for the units (mph or kph).
  */
-export class UiFieldRoadspeed extends UiField {
+export class UiFieldRoadspeed extends AbstractUiField {
   // D3 selections
   public $parent: D3Selection | null;
   public $input: D3Selection | null;

@@ -1,6 +1,6 @@
 import { selection } from 'd3-selection';
 import { iso1A2Code } from '@rapideditor/country-coder';
-import { UiField } from '../UiField.ts';
+import { AbstractUiField } from './AbstractUiField.ts';
 import { utilGetSetValue, utilNoAuto } from '../../util/index.ts';
 import { uiIcon } from '../icon.ts';
 
@@ -8,7 +8,7 @@ import type { Context } from '../../Context.ts';
 import type { D3Selection } from 'd3-selection';
 import type { Field } from '../../lib/index.ts';
 import type { TagChange, Tags } from './types.ts';
-import type { UiFieldOptions } from '../UiField.ts';
+import type { UiFieldOptions } from './AbstractUiField.ts';
 
 export {
   UiFieldText as UiFieldUrl,
@@ -29,7 +29,7 @@ export {
  * - 'identifier':
  * - 'number':
  */
-export class UiFieldText extends UiField {
+export class UiFieldText extends AbstractUiField {
   // D3 selections
   public $parent: D3Selection | null;
   public $input: D3Selection | null;

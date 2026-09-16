@@ -1,3 +1,4 @@
+export * from './AbstractUiField.ts';
 export * from './UiFieldCheck.ts';
 export * from './UiFieldCombo.ts';
 export * from './UiFieldText.ts';
@@ -42,6 +43,7 @@ import {
   UiFieldStructureRadio
 } from './UiFieldRadio.ts';
 
+import { AbstractUiField } from './AbstractUiField.ts';
 import { UiFieldAccess } from './UiFieldAccess.ts';
 import { UiFieldAddress } from './UiFieldAddress.ts';
 import { UiFieldCycleway } from './UiFieldCycleway.ts';
@@ -54,16 +56,15 @@ import { UiFieldWikidata } from './UiFieldWikidata.ts';
 import { UiFieldWikipedia } from './UiFieldWikipedia.ts';
 
 import type { Context } from '../../Context.ts';
-import type { UiField } from '../UiField.ts';
 
 
-/** A field constructor: creates a `UiField` subclass for a given field type. */
+/** A field constructor: creates an `AbstractUiField` subclass for a given field type. */
 export type UiFieldConstructor = (new (
   context: Context,
   presetField: any,
   entityIDs?: EntityID[],
   options?: any
-) => UiField) & {
+) => AbstractUiField) & {
   supportsMultiselection?: boolean;
 };
 
@@ -101,12 +102,12 @@ export const uiFields: Record<string, UiFieldConstructor> = {
 
 
 /**
- * Creates the `UiField` for a preset field, choosing the subclass by `presetField.type`.
+ * Creates the `AbstractUiField` for a preset field, choosing the subclass by `presetField.type`.
  * @param context - Global shared application context
  * @param presetField - the Field definition tracked by the SchemaSystem
  * @param entityIDs - the entities this field applies to
  * @param options - field display options
- * @return the constructed `UiField` subclass instance
+ * @return the constructed `AbstractUiField` subclass instance
  * @throws Error if there is no field type registered for `presetField.type`
  */
 export function createUiField(
@@ -114,7 +115,7 @@ export function createUiField(
   presetField: any,
   entityIDs: EntityID[] = [],
   options: any = {}
-): UiField {
+): AbstractUiField {
   const ctor = uiFields[presetField.type];
   if (!ctor) {
     throw new Error(`No field type registered for "${presetField.type}"`);

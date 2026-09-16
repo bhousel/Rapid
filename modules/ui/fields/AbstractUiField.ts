@@ -1,21 +1,21 @@
 import { EventEmitter } from 'tseep/lib/ee-safe';
 import { select } from 'd3-selection';
 import { utilUniqueString } from '@rapid-sdk/util';
-import { uiIcon } from './icon.ts';
-import { UiTooltip } from './UiTooltip.ts';
+import { uiIcon } from '../icon.ts';
+import { UiTooltip } from '../UiTooltip.ts';
 // import { uiFieldHelp } from './field_help.ts';
-import { UiTagReference } from './UiTagReference.ts';
-import { utilTotalExtent } from '../util/index.ts';
-import { LANGUAGE_SUFFIX_REGEX } from './fields/types.ts';
+import { UiTagReference } from '../UiTagReference.ts';
+import { utilTotalExtent } from '../../util/index.ts';
+import { LANGUAGE_SUFFIX_REGEX } from './types.ts';
 
-import type { Context } from '../Context.ts';
+import type { Context } from '../../Context.ts';
 import type { D3Selection } from 'd3-selection';
 import type { Extent } from '@rapid-sdk/math';
-import type { Field } from '../lib/index.ts';
-import type { Tags } from './fields/types.ts';
+import type { Field } from '../../lib/index.ts';
+import type { Tags } from './types.ts';
 
 
-/** Display options controlling how a `UiField` renders its chrome. */
+/** Display options controlling how an `AbstractUiField` renders its chrome. */
 export interface UiFieldOptions {
   /** Whether the field is shown, or tucked away in the "Add field" list */
   show: boolean;
@@ -31,14 +31,14 @@ export interface UiFieldOptions {
 
 
 /**
- * `UiField` is the base class for a field in the entity editor. It renders the shared
+ * `AbstractUiField` is the base class for a field in the entity editor. It renders the shared
  * field "chrome" (label, lock, remove/revert buttons, tag reference) and delegates the
  * field-specific input UI to a `UiFieldX` subclass via `renderContent()` / `syncTags()`.
  *
  * Construct a concrete field with `createUiField(context, presetField, …)` from `fields/index.ts`,
  * which picks the subclass by `presetField.type`.
  */
-export class UiField extends EventEmitter {
+export class AbstractUiField extends EventEmitter {
   public context: Context;
   public presetField: Field;
   public entityIDs: EntityID[];
@@ -452,7 +452,7 @@ export class UiField extends EventEmitter {
     if (!this.entityIDs?.length) return true;
 
     // Does this field support multiselection?
-    if (this.entityIDs.length > 1 && (this.constructor as typeof UiField).supportsMultiselection === false) {
+    if (this.entityIDs.length > 1 && (this.constructor as typeof AbstractUiField).supportsMultiselection === false) {
       return false;
     }
 

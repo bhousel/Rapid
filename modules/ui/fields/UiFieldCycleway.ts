@@ -1,13 +1,13 @@
 import { select, selection } from 'd3-selection';
 import { UiCombobox } from '../UiCombobox.ts';
-import { UiField } from '../UiField.ts';
+import { AbstractUiField } from './AbstractUiField.ts';
 import { utilGetSetValue, utilNoAuto } from '../../util/index.ts';
 
 import type { Context } from '../../Context.ts';
 import type { D3Selection } from 'd3-selection';
 import type { Field } from '../../lib/index.ts';
 import type { Tags } from './types.ts';
-import type { UiFieldOptions } from '../UiField.ts';
+import type { UiFieldOptions } from './AbstractUiField.ts';
 
 
 function stripcolon(s: string): string {
@@ -19,7 +19,7 @@ function stripcolon(s: string): string {
  * This UI component displays a cycleway field.
  * This includes subfields for `cycleway:left` and `cycleway:right` and `cycleway:both` values.
  */
-export class UiFieldCycleway extends UiField {
+export class UiFieldCycleway extends AbstractUiField {
   // D3 selections
   public $parent: D3Selection | null;
   public $items: D3Selection | null;
