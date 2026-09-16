@@ -2,7 +2,7 @@ import { EventEmitter } from 'tseep/lib/ee-safe';
 import { select, selection } from 'd3-selection';
 import { actionChangePreset } from '../actions/change_preset.ts';
 import { Category, Preset } from '../lib/index.ts';
-import { operationDelete } from '../operations/delete.js';
+import { DeleteOperation } from '../operations/DeleteOperation.ts';
 import { uiIcon } from './icon.ts';
 import { UiPresetIcon } from './UiPresetIcon.ts';
 import { UiTagReference } from './UiTagReference.ts';
@@ -194,7 +194,7 @@ export class UiPresetList extends EventEmitter {
        e.keyCode === utilKeybinding.keyCodes['⌦'])) {
       e.preventDefault();
       e.stopPropagation();
-      operationDelete(context, this._entityIDs)();
+      new DeleteOperation(context, this._entityIDs).run();
 
     // hack to let undo work when search is autofocused
     } else if (val.length === 0 &&

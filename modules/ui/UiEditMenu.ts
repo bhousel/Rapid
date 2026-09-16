@@ -5,20 +5,10 @@ import { UiTooltip } from './UiTooltip.ts';
 import { uiIcon } from './icon.ts';
 import { utilHighlightEntities } from '../util/index.ts';
 
+import type { AbstractOperation } from '../operations/AbstractOperation.ts';
 import type { Context } from '../Context.ts';
 import type { D3Selection } from 'd3-selection';
 import type { Vec2 } from '@rapid-sdk/math';
-
-/** Minimal interface for an operation bound as data in the edit menu */
-interface Operation {
-  id: OperationID;
-  title: string;
-  mouseOnly?: boolean;
-  disabled(): string | null | false;
-  tooltip(): string;
-  keys?: string[];
-  relatedEntityIds?(): EntityID[];
-}
 
 
 const VIEW_TOP_MARGIN = 85;     // viewport top margin
@@ -40,7 +30,7 @@ export class UiEditMenu extends EventEmitter {
 
   // Menu state, these are locked in when menu is initially shown
   // but needed later if the menu is repositioned
-  protected _operations: Operation[];
+  protected _operations: AbstractOperation[];
   protected _tooltips: Map<OperationID, UiTooltip>;   // Map(id -> tooltip)
   protected _anchorLoc: Vec2;              // Array [lon,lat] wgs84 coordinate where the menu should be anchored
   protected _oldz: number;
@@ -99,7 +89,7 @@ export class UiEditMenu extends EventEmitter {
     }
 
     const isTouchMenu = this._triggerType.includes('touch') || this._triggerType.includes('pen');
-    const ops = this._operations.filter((op: Operation) => !isTouchMenu || !op.mouseOnly);
+    const ops = this._operations.filter((op: AbstractOperation) => !isTouchMenu || !op.mouseOnly);
     if (!ops.length) return;
 
     // Position the menu above the anchor for stylus and finger input
@@ -113,7 +103,7 @@ export class UiEditMenu extends EventEmitter {
     const buttonHeight = showLabels ? 32 : 34;
     if (showLabels) {
       // Get a general idea of the width based on the length of the label
-      this._menuWidth = 52 + Math.min(120, 6 * Math.max(...ops.map((op: Operation) => op.title.length)));
+      this._menuWidth = 52 + Math.min(120, 6 * Math.max(...ops.map((op: AbstractOperation) => op.title.length)));
     } else {
       this._menuWidth = 44;
     }
@@ -136,7 +126,7 @@ export class UiEditMenu extends EventEmitter {
 
 
     let $buttons: D3Selection = this.$menu.selectAll('.edit-menu-item')
-      .data(ops, (d: Operation) => d.id);
+      .data(ops, (d: AbstractOperation) => d.id);
 
     // Exit
     $buttons.exit()
@@ -145,7 +135,7 @@ export class UiEditMenu extends EventEmitter {
     // Enter
     const $$buttons = $buttons.enter()
       .append('button')
-      .attr('class', (d: Operation) => `edit-menu-item edit-menu-item-${d.id}`)
+      .attr('class', (d: AbstractOperation) => `edit-menu-item edit-menu-item-${d.id}`)
       .style('height', `${buttonHeight}px`)
       .on('click', this._click)
       // don't listen for `mouseup` because we only care about non-mouse pointer types
@@ -154,17 +144,16 @@ export class UiEditMenu extends EventEmitter {
         // don't let button presses also act as map input - iD#1869
         e.stopPropagation();
       })
-      .on('mouseenter.highlight', (e: MouseEvent, d: Operation) => {
-        if (!d.relatedEntityIds || select(e.currentTarget as HTMLElement).classed('disabled')) return;
+      .on('mouseenter.highlight', (e: MouseEvent, d: AbstractOperation) => {
+        if (select(e.currentTarget as HTMLElement).classed('disabled')) return;
         utilHighlightEntities(context, d.relatedEntityIds(), true);
       })
-      .on('mouseleave.highlight', (e: MouseEvent, d: Operation) => {
-        if (!d.relatedEntityIds) return;
+      .on('mouseleave.highlight', (e: MouseEvent, d: AbstractOperation) => {
         utilHighlightEntities(context, d.relatedEntityIds(), false);
       });
 
     // create placeholder icon, label, tooltip
-    $$buttons.each((d: Operation, i: number, nodes: ArrayLike<HTMLElement>) => {
+    $$buttons.each((d: AbstractOperation, i: number, nodes: ArrayLike<HTMLElement>) => {
       const $button = select(nodes[i]);
 
       $button
@@ -189,17 +178,17 @@ export class UiEditMenu extends EventEmitter {
     $buttons = $buttons.merge($$buttons);
 
     // refresh with current data
-    $buttons.each((d: Operation, i: number, nodes: ArrayLike<HTMLElement>) => {
+    $buttons.each((d: AbstractOperation, i: number, nodes: ArrayLike<HTMLElement>) => {
       const $button = select(nodes[i]);
 
       $button
-        .classed('disabled', (d: Operation) => !!d.disabled());
+        .classed('disabled', (d: AbstractOperation) => !!d.disabled());
 
       $button.selectAll('.icon-wrap use')
         .attr('href', `#rapid-operation-${d.id}`);
 
       $button.selectAll('.label')
-        .text((d: Operation) => d.title);
+        .text((d: AbstractOperation) => d.title);
 
       const tooltip = this._tooltips.get(d.id);
       if (tooltip) {
@@ -235,15 +224,13 @@ export class UiEditMenu extends EventEmitter {
    * @param e - the triggering event
    * @param operation - the operation bound to the clicked item
    */
-  protected _click(e: PointerEvent, operation: Operation): void {
+  protected _click(e: PointerEvent, operation: AbstractOperation): void {
     const context = this.context;
     const ui = context.systems.ui;
 
     e.stopPropagation();
 
-    if (operation.relatedEntityIds) {
-      utilHighlightEntities(context, operation.relatedEntityIds(), false);
-    }
+    utilHighlightEntities(context, operation.relatedEntityIds(), false);
 
     if (operation.disabled()) {
       if (this._lastPointerUpType === 'touch' || this._lastPointerUpType === 'pen') {
@@ -261,11 +248,11 @@ export class UiEditMenu extends EventEmitter {
           duration: 2000,
           iconName: `#rapid-operation-${operation.id}`,
           iconClass: 'operation',
-          label: (operation as any).annotation() || operation.title
+          label: operation.annotation() || operation.title
         });
       }
 
-      (operation as any)();
+      operation.run();
       this.close();
     }
     this._lastPointerUpType = null;
@@ -424,7 +411,7 @@ export class UiEditMenu extends EventEmitter {
    * Some operations may be skipped if we've detected pen/touch input
    * @param val - the operations to set; omit to get the current value
    */
-  public operations(val?: Operation[]): any {
+  public operations(val?: AbstractOperation[]): any {
     if (val === undefined) return this._operations;
     this._operations = val;
     return this;

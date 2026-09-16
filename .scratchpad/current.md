@@ -12,7 +12,9 @@ a reverse-chronological history. The `modules/ui/` conversion table in `AGENTS.m
   Figure out a way to exercise `UiSystem`-owned behavior (headless browser? a testable stack seam?).
 - **Manual smoke-test** the nested Rapid dataset modals (catalog / add-custom-data / colorpicker) in a
   real browser to confirm stacking, Esc, and close behavior.
-- **`modules/operations/`** — the only folder still showing ❌ in the conversion table; has not been started.
+- **`CycleHighwayTagOperation`'s module-level `_lastSelectedIDs`.** Now that `operations/` is classes, this is the
+  one remaining module-level mutable global there. Consider moving it onto a system (edit/undo state?) per
+  the system-ownership rule — out of scope for the conversion, left with a comment.
 
 ## Open questions
 - Delete the 2 dead quarantined `sections/*.jsx` React demo files + `section.ts`/`uiSection`?

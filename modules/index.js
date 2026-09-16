@@ -6,7 +6,7 @@ export * from './data/index.ts';
 export * from './geo/index.ts';
 export * from './lib/index.ts';
 export * from './modes/index.ts';
-export * from './operations/index.js';
+export * from './operations/index.ts';
 export * from './pixi/index.ts';
 export * from './services/index.ts';
 export * from './types/ids.ts';

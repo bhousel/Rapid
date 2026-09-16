@@ -1,6 +1,6 @@
 import { Extent, geoSphericalDistance } from '@rapid-sdk/math';
 
-import { operationDelete } from '../operations/delete.js';
+import { DeleteOperation } from '../operations/DeleteOperation.ts';
 import { ValidationIssue } from '../lib/ValidationIssue.ts';
 import { ValidationFix } from '../lib/ValidationFix.ts';
 
@@ -115,16 +115,16 @@ export function validateShortRoad(context: Context): ValidatorFunction {
       }));
     }
 
-    if (!operationDelete(context, [way.id]).disabled()) {
+    if (!new DeleteOperation(context, [way.id]).disabled()) {
       fixes.push(new ValidationFix({
         icon: 'rapid-operation-delete',
         title: l10n.t('issues.fix.delete_feature.title'),
         entityIds: [way.id],
         onClick: function(this: any) {
           const id = this.issue.entityIds[0];
-          const operation = operationDelete(context, [id]);
+          const operation = new DeleteOperation(context, [id]);
           if (!operation.disabled()) {
-            operation();
+            operation.run();
           }
         }
       }));

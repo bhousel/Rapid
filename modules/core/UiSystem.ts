@@ -566,10 +566,8 @@ dims = vecAdd(dims, [overscan * 2, overscan * 2]);
       surface.focus();
     }
 
-    for (const operation of operations as any[]) {
-      if (typeof operation.point === 'function') {
-        operation.point(anchorPoint);  // let the operation know where the menu is
-      }
+    for (const operation of operations) {
+      operation.point(anchorPoint);  // let the operation know where the menu is
     }
 
     this.EditMenu
@@ -600,7 +598,7 @@ dims = vecAdd(dims, [overscan * 2, overscan * 2]);
     const operations = context.mode?.operations ?? [];
 
     if (operations.length && context.editable()) {
-      this.EditMenu.operations(operations as any[]);
+      this.EditMenu.operations(operations);
       $overlay.call(this.EditMenu.render);   // redraw it
     } else {
       this.EditMenu.close();

@@ -1,5 +1,5 @@
 import { AbstractMode } from './AbstractMode.ts';
-import { operationPaste } from '../operations/paste.js';
+import { PasteOperation } from '../operations/PasteOperation.ts';
 
 import type { Context } from '../Context.ts';
 import type { EventData } from '../behaviors/AbstractBehavior.ts';
@@ -40,7 +40,7 @@ export class BrowseMode extends AbstractMode {
 
     this._active = true;
 
-    this.operations = [ operationPaste(context) ];
+    this.operations = [ new PasteOperation(context) ];
     context.enableBehaviors(['hover', 'select', 'drag', 'paste', 'lasso', 'mapInteraction']);
 
     context.behaviors.hover!

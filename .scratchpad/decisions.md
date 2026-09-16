@@ -2,6 +2,27 @@
 
 Non-obvious choices where "why did we do it this way?" isn't captured in the code.
 
+## Operations are classes named `ThingOperation` (not factory functions like actions)
+
+Operations were factory functions returning an augmented callable (like `actions`), but were
+converted to `AbstractOperation` **classes** named `ThingOperation` (e.g. `CircularizeOperation`,
+`DeleteOperation`). This follows the same naming convention as `ThingMode`, `ThingBehavior`,
+`ThingSystem`, and `ThingService`. Rationale for classes: they sit alongside `AbstractMode`/
+`AbstractBehavior` in the interaction layer (each op already spins up a `KeyOperationBehavior`), and
+the expando idiom scales badly for their ~10 bolted-on props + real derived state (e.g.
+`DisconnectOperation`'s `_wayIDs`/`_actions`). The base class is **not** an `EventEmitter` —
+operations are one-shot commands and emit nothing, unlike modes/behaviors. The shared shape is a
+superset base class with optional hooks (`relatedEntityIds`/`availableForKeypress`/`point`/
+`mouseOnly`) rather than per-op sub-interfaces, because operations are consumed polymorphically
+through one `AbstractOperation[]` menu array. The old callable `operation()` became `operation.run()`.
+
+Classes did **not** by themselves fix non-idempotency: the per-op derived fields are recomputed on
+every menu setup, so they were never the issue. The genuinely persistent state is
+`CycleHighwayTagOperation`'s module-level `_lastSelectedIDs` — a per-click class instance can't
+remember the *previous* cycle's selection, so it stays module-scoped (with a comment). The "correct"
+fix per the system-ownership rule would move it onto a system; deferred as out-of-scope for the
+conversion.
+
 ## UI fields: inheritance over composition
 
 Each concrete field (`UiFieldCheck`, `UiFieldCombo`, …) **`extends UiField`** rather than being an

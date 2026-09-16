@@ -1,4 +1,4 @@
-import { operationDelete } from '../operations/delete.js';
+import { DeleteOperation } from '../operations/DeleteOperation.ts';
 import { RAD2DEG, geoSphericalDistance, vecAngle } from '@rapid-sdk/math';
 import { ValidationIssue } from '../lib/ValidationIssue.ts';
 import { ValidationFix } from '../lib/ValidationFix.ts';
@@ -72,7 +72,7 @@ export function validateYShapedConnection(context: Context): ValidatorFunction {
    * @returns A validation issue with appropriate fixes
    */
   function createIssueAndFixForNode(node: OsmNode): ValidationIssue {
-    const deletable = !operationDelete(context, [node.id]).disabled();
+    const deletable = !new DeleteOperation(context, [node.id]).disabled();
     let fix;
     if (deletable) {
       fix = new ValidationFix({
@@ -81,9 +81,9 @@ export function validateYShapedConnection(context: Context): ValidatorFunction {
         entityIds: [node.id],
         onClick: function(this: any) {
           const id = this.entityIds[0];
-          const operation = operationDelete(context, [id]);
+          const operation = new DeleteOperation(context, [id]);
           if (!operation.disabled()) {
-            operation();
+            operation.run();
           }
         }
       });

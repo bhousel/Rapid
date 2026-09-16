@@ -546,7 +546,7 @@ Track TypeScript conversion progress here:
 | `modules/modes/` | ✅ Complete | All files converted |
 | `modules/data/` | ✅ Complete | All files converted |
 | `modules/geo/` | ✅ Complete | All files converted |
-| `modules/operations/` | ❌ Not started | |
+| `modules/operations/` | ✅ Complete | All 17 operations are `AbstractOperation` subclasses named `ThingOperation` (e.g. `CircularizeOperation`, `DeleteOperation`). Files are `ThingOperation.ts`. `index.ts` holds the `operations.available` registry. `run()` replaced the old callable factory. `CycleHighwayTagOperation` keeps a documented module-level `_lastSelectedIDs` (persists across per-click instances). |
 | `modules/services/` | ✅ Complete | All files converted |
 | `modules/ui/` | ✅ Complete | All 9 phases done — every component is a TS class (with a documented departure for the intro/walkthrough state machines); barrels are `index.ts`. A couple of stateless/inline-attached primitives stay typed functions by design (`icon`, `section`/`uiSection`). Only the quarantined React demo (`sections/*.jsx`) and disabled `UiFieldRestrictions`/`field_help` remain non-standard. See `.github/design/ui-system.md` progress log. |
 | `modules/validators/` | ✅ Complete | All files converted |

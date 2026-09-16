@@ -1,4 +1,4 @@
-describe('operationExtract', () => {
+describe('ExtractOperation', () => {
 
   const context = new Rapid.MockContext();
 
@@ -48,52 +48,52 @@ describe('operationExtract', () => {
     });
 
     it('is not available for no selected ids', () => {
-      const result = Rapid.operationExtract(context, []).available();
+      const result = new Rapid.ExtractOperation(context, []).available();
       assert.isNotOk(result);
     });
 
     it('is not available for unknown selected id', () => {
-      const result = Rapid.operationExtract(context, ['z']).available();
+      const result = new Rapid.ExtractOperation(context, ['z']).available();
       assert.isNotOk(result);
     });
 
     it('is not available for selected way', () => {
-      const result = Rapid.operationExtract(context, ['x']).available();
+      const result = new Rapid.ExtractOperation(context, ['x']).available();
       assert.isNotOk(result);
     });
 
     it('is not available for selected node with tags, no parent way', () => {
-      const result = Rapid.operationExtract(context, ['e']).available();
+      const result = new Rapid.ExtractOperation(context, ['e']).available();
       assert.isNotOk(result);
     });
 
     it('is not available for selected node with no tags, no parent way', () => {
-      const result = Rapid.operationExtract(context, ['f']).available();
+      const result = new Rapid.ExtractOperation(context, ['f']).available();
       assert.isNotOk(result);
     });
 
     it('is not available for selected node with no tags, parent way', () => {
-      const result = Rapid.operationExtract(context, ['c']).available();
+      const result = new Rapid.ExtractOperation(context, ['c']).available();
       assert.isNotOk(result);
     });
 
     it('is not available for selected node with no tags, two parent ways', () => {
-      const result = Rapid.operationExtract(context, ['d']).available();
+      const result = new Rapid.ExtractOperation(context, ['d']).available();
       assert.isNotOk(result);
     });
 
     it('is available for selected node with tags, parent way', () => {
-      const result = Rapid.operationExtract(context, ['a']).available();
+      const result = new Rapid.ExtractOperation(context, ['a']).available();
       assert.isOk(result);
     });
 
     it('is available for selected node with tags, two parent ways', () => {
-      const result = Rapid.operationExtract(context, ['b']).available();
+      const result = new Rapid.ExtractOperation(context, ['b']).available();
       assert.isOk(result);
     });
 
     it('is available for two selected nodes with tags and parent ways', () => {
-      const result = Rapid.operationExtract(context, ['a', 'b']).available();
+      const result = new Rapid.ExtractOperation(context, ['a', 'b']).available();
       assert.isOk(result);
     });
   });
@@ -108,7 +108,7 @@ describe('operationExtract', () => {
         new Rapid.OsmWay(context, { id: 'x', nodes: ['a', 'b', 'c'] })
       ]);
 
-      const result = Rapid.operationExtract(context, ['b']).disabled();
+      const result = new Rapid.ExtractOperation(context, ['b']).disabled();
       assert.isNotOk(result);
     });
 
@@ -120,7 +120,7 @@ describe('operationExtract', () => {
         new Rapid.OsmWay(context, { id: 'x', nodes: ['a', 'b', 'c'] }),
         new Rapid.OsmRelation(context, { id: 'r', members: [{ id: 'b', role: 'label' }] })
       ]);
-      const result = Rapid.operationExtract(context, ['b']).disabled();
+      const result = new Rapid.ExtractOperation(context, ['b']).disabled();
       assert.isNotOk(result);
     });
 
@@ -145,7 +145,7 @@ describe('operationExtract', () => {
           ]
         })
       ]);
-      const result = Rapid.operationExtract(context, ['d']).disabled();
+      const result = new Rapid.ExtractOperation(context, ['d']).disabled();
       assert.isNotOk(result);
     });
 
@@ -171,7 +171,7 @@ describe('operationExtract', () => {
           ]
         })
       ]);
-      const result = Rapid.operationExtract(context, ['d']).disabled();
+      const result = new Rapid.ExtractOperation(context, ['d']).disabled();
       assert.isNotOk(result);
     });
   });

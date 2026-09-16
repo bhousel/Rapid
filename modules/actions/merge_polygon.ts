@@ -35,7 +35,7 @@ interface MergePolygon extends Array<OsmRelationMember | OsmWay> {
  * @param   newRelationID  - EntityID for the new relation if one needs to be created
  * @return  An Action function that merges the polygons
  */
-export function actionMergePolygon(ids: EntityID[], newRelationID: EntityID): Action {
+export function actionMergePolygon(ids: EntityID[], newRelationID?: EntityID): Action {
 
   /**
    * Categorizes the selected entities into closed ways, multipolygon relations,

@@ -1,5 +1,6 @@
 import { AbstractBehavior } from './AbstractBehavior.ts';
 
+import type { AbstractOperation } from '../operations/AbstractOperation.ts';
 import type { Context } from '../Context.ts';
 import type { Keybinding } from '../util/keybinding.ts';
 
@@ -11,7 +12,7 @@ import type { Keybinding } from '../util/keybinding.ts';
 export class KeyOperationBehavior extends AbstractBehavior {
 
   /** The operation this behavior is associated with */
-  protected _operation: any;
+  protected _operation: AbstractOperation;
   /** The keybinding handler for document-level key events */
   protected _keybinding: Keybinding | null;
 
@@ -20,7 +21,7 @@ export class KeyOperationBehavior extends AbstractBehavior {
    * @param  context - Global shared application context
    * @param  operation - The operation this behavior is associated with
    */
-  public constructor(context: Context, operation: any) {
+  public constructor(context: Context, operation: AbstractOperation) {
     super(context);
     this.id = `key-${operation.id}`;
 
@@ -74,7 +75,7 @@ export class KeyOperationBehavior extends AbstractBehavior {
     const operation = this._operation;
     const ui = context.systems.ui!;
 
-    if (operation.availableForKeypress && !operation.availableForKeypress()) return;  // copy paste detail 😕
+    if (!operation.availableForKeypress()) return;  // copy paste detail 😕
 
     e.preventDefault();
 
@@ -96,11 +97,8 @@ export class KeyOperationBehavior extends AbstractBehavior {
         label: operation.annotation() || operation.title
       });
 
-      if (operation.point) {
-        operation.point(null);  // copy-paste detail 😕
-      }
-
-      operation();  // do the thing
+      operation.point(null);  // copy-paste detail 😕
+      operation.run();  // do the thing
     }
   }
 

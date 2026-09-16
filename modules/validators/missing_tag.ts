@@ -1,4 +1,4 @@
-import { operationDelete } from '../operations/delete.js';
+import { DeleteOperation } from '../operations/DeleteOperation.ts';
 import { ValidationIssue } from '../lib/ValidationIssue.ts';
 import { ValidationFix } from '../lib/ValidationFix.ts';
 
@@ -134,15 +134,15 @@ export function validateMissingTag(context: Context): ValidatorFunction {
           }));
 
           const id = this.entityIds[0];
-          const operation = operationDelete(context, [id]);
+          const operation = new DeleteOperation(context, [id]);
           const disabledReasonID = operation.disabled();
           let deleteOnClick;
           if (!disabledReasonID) {
             deleteOnClick = function(this: any) {
               const id = this.issue.entityIds[0];
-              const operation = operationDelete(context, [id]);
+              const operation = new DeleteOperation(context, [id]);
               if (!operation.disabled()) {
-                operation();
+                operation.run();
               }
             };
           }

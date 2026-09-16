@@ -1,24 +1,48 @@
 import { Extent, projWgs84ToWorld, vecSubtract } from '@rapid-sdk/math';
+
 import { actionCopyEntities } from '../actions/copy_entities.ts';
 import { actionMove } from '../actions/move.ts';
+import { AbstractOperation } from './AbstractOperation.ts';
 import { utilCmd } from '../util/cmd.ts';
 
+import type { Context } from '../Context.ts';
 
-// see also `PasteBehavior`
-export function operationPaste(context) {
-  const editor = context.systems.editor;
-  const gfx = context.systems.gfx;
-  const l10n = context.systems.l10n;
-  const map = context.systems.map;
 
-  let operation = function() {
+/**
+ * `PasteOperation` pastes the previously-copied features near the pointer.
+ * See also `PasteBehavior`.
+ */
+export class PasteOperation extends AbstractOperation {
+
+  /**
+   * @param  context - Global shared application context
+   */
+  public constructor(context: Context) {
+    super(context);
+
+    const l10n = context.systems.l10n!;
+
+    this.id = 'paste';
+    this.keys = [ utilCmd('⌘V') ];
+    this.title = l10n.t('operations.paste.title');
+    // Note: paste has no `KeyOperationBehavior` - it is bound via `PasteBehavior`.
+  }
+
+
+  public run(): void {
+    const context = this.context;
+    const editor = context.systems.editor!;
+    const gfx = context.systems.gfx!;
+    const l10n = context.systems.l10n!;
+    const map = context.systems.map!;
+
     // Note: nearly the same code appears in both PasteBehavior and PasteOperation
     const copyGraph = context.copyGraph;
     const copyIDs = context.copyIDs;
-    if (!copyIDs.length) return;   // Nothing to copy..
+    if (!copyIDs.length || !copyGraph) return;   // Nothing to copy..
 
     // Prevent paste if the pasted object would be invisible (see iD#10000)
-    const osmLayer = gfx.scene.layers.get('osm');
+    const osmLayer = gfx.scene?.layers.get('osm');
     if (!osmLayer?.enabled) return;
 
     const action = actionCopyEntities(copyIDs, copyGraph);
@@ -28,17 +52,20 @@ export function operationPaste(context) {
     const currGraph = editor.staging.graph;
     const copies = action.copies();
 
-    const originalIDs = new Set();
+    const originalIDs = new Set<EntityID>();
     for (const entity of Object.values(copies)) {
       originalIDs.add(entity.id);
     }
 
     let extent = new Extent();
-    let newIDs = [];
+    const newIDs: EntityID[] = [];
     for (const [entityID, newEntity] of Object.entries(copies)) {
       const oldEntity = copyGraph.entity(entityID);
 
-      extent = extent.extend(oldEntity.extent(copyGraph));
+      const oldExtent = oldEntity.extent();
+      if (oldExtent) {
+        extent = extent.extend(oldExtent);
+      }
 
       // Exclude child nodes from newIDs if their parent way was also copied.
       const parents = currGraph.parentWays(newEntity);
@@ -62,41 +89,37 @@ export function operationPaste(context) {
 
     // Put the user in move mode so they can place the pasted features
     context.enter('move', { selection: { osm: newIDs }} );
-  };
+  }
 
 
-  operation.available = function() {
-    return context.mode?.id === 'browse';
-  };
+  public available(): boolean {
+    return this.context.mode?.id === 'browse';
+  }
 
 
-  operation.disabled = function() {
-    return !context.copyIDs.length;
-  };
+  public disabled(): string | false {
+    return !this.context.copyIDs.length ? 'nothing_copied' : false;
+  }
 
 
-  operation.tooltip = function() {
-    const oldGraph = context.copyGraph;
-    const ids = context.copyIDs;
-    if (!ids.length) {
+  public tooltip(): string {
+    const l10n = this.context.systems.l10n!;
+
+    const oldGraph = this.context.copyGraph;
+    const ids = this.context.copyIDs;
+    if (!ids.length || !oldGraph) {
       return l10n.t('operations.paste.nothing_copied');
     }
     return l10n.t('operations.paste.description', {
       feature: l10n.displayLabel(oldGraph.entity(ids[0]), oldGraph),
       n: ids.length
     });
-  };
+  }
 
 
-  operation.annotation = function() {
-    const ids = context.copyIDs;
+  public annotation(): string {
+    const l10n = this.context.systems.l10n!;
+    const ids = this.context.copyIDs;
     return l10n.t('operations.paste.annotation', { n: ids.length });
-  };
-
-
-  operation.id = 'paste';
-  operation.keys = [ utilCmd('⌘V') ];
-  operation.title = l10n.t('operations.paste.title');
-
-  return operation;
+  }
 }

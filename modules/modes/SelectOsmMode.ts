@@ -1,4 +1,4 @@
-import * as Operations from '../operations/index.js';
+import * as Operations from '../operations/index.ts';
 import { AbstractMode } from './AbstractMode.ts';
 import { actionDeleteRelation } from '../actions/delete_relation.ts';
 import { actionMove, actionRotate } from '../actions/index.ts';
@@ -11,6 +11,8 @@ import type { Context } from '../Context.ts';
 import type { EventData } from '../behaviors/AbstractBehavior.ts';
 import type { Extent, Vec2 } from '@rapid-sdk/math';
 import type { OsmEntity, OsmNode, OsmRelation, OsmWay } from '../data/types.ts';
+import type { Action } from '../actions/types.ts';
+import type { AbstractOperation } from '../operations/AbstractOperation.ts';
 import type { Keybinding } from '../util/keybinding.ts';
 
 
@@ -212,10 +214,8 @@ export class SelectOsmMode extends AbstractMode {
     this._lastSelectedIDs = [];
 
     // disable operations
-    for (const operation of this.operations as any[]) {
-      if (operation.behavior) {
-        operation.behavior.disable();
-      }
+    for (const operation of this.operations) {
+      operation.behavior?.disable();
     }
     this.operations = [];
 
@@ -275,8 +275,8 @@ export class SelectOsmMode extends AbstractMode {
       this._lastSelectedIDs = selectedIDs.slice();  // take copy
     }
 
-    let operation: any;
-    let action: any;
+    let operation: AbstractOperation | undefined;
+    let action: Action | undefined;
 
     // rotate
     if (e.shiftKey && ['ArrowLeft', 'ArrowRight'].includes(e.key)) {
@@ -310,7 +310,7 @@ export class SelectOsmMode extends AbstractMode {
 
         const pivot = vecScale(sum, 1 / count);
 
-        operation = Operations.operationRotate(context, selectedIDs);
+        operation = new Operations.RotateOperation(context, selectedIDs);
         action = actionRotate(selectedIDs, pivot, delta);
       }
 
@@ -338,7 +338,7 @@ export class SelectOsmMode extends AbstractMode {
         // Pixel delta -> world delta.  The scale factor is `2^z`.
         const k = Math.pow(2, t.z);
         const worldDelta = vecScale(delta, 1 / k);
-        operation = Operations.operationMove(context, selectedIDs);
+        operation = new Operations.MoveOperation(context, selectedIDs);
         action = actionMove(selectedIDs, worldDelta);
       }
     }
@@ -417,10 +417,8 @@ export class SelectOsmMode extends AbstractMode {
     const ui = context.systems.ui!;
 
     // disable any that were available before
-    for (const operation of this.operations as any[]) {
-      if (operation.behavior) {
-        operation.behavior.disable();
-      }
+    for (const operation of this.operations) {
+      operation.behavior?.disable();
     }
 
     if (Array.isArray(entityIDs) && entityIDs.length) {
@@ -430,8 +428,8 @@ export class SelectOsmMode extends AbstractMode {
         delete: 3
       };
 
-      this.operations = Object.values(Operations)
-        .map(op => op(context, entityIDs))
+      this.operations = [...Operations.operations.available.values()]
+        .map(Op => new Op(context, entityIDs))
         .filter(op => op.available())
         .sort((a, b) => {
           const aOrder = order[a.id] || 0;
@@ -440,10 +438,8 @@ export class SelectOsmMode extends AbstractMode {
         });
 
       // enable all available
-      for (const operation of this.operations as any[]) {
-        if (operation.behavior) {
-          operation.behavior.enable();
-        }
+      for (const operation of this.operations) {
+        operation.behavior?.enable();
       }
     }
 

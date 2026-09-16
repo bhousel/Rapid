@@ -1,6 +1,7 @@
 import { EventEmitter } from 'tseep/lib/ee-safe';
 
 import type { AbstractData } from '../data/AbstractData.ts';
+import type { AbstractOperation } from '../operations/AbstractOperation.ts';
 import type { Context } from '../Context.ts';
 
 
@@ -23,9 +24,8 @@ export class AbstractMode extends EventEmitter {
   public id: ModeID;
   /** Global shared application context */
   public context: Context;
-  // Operations are still untyped (modules/operations not yet converted)
   /** Operations allowed in this mode; shown in the right-click edit menu */
-  public operations: object[];
+  public operations: AbstractOperation[];
 
   /** Whether this mode is currently active */
   protected _active: boolean;
