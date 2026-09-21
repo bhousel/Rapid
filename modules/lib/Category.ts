@@ -60,11 +60,11 @@ interface CategoryStrings {
  * See: https://github.com/ideditor/schema-builder/blob/main/schemas/preset_category.json
  *
  * Properties available:
- * - `id` (or `categoryID`)  Unique string to identify this Category.
- * - `safeid`                The id, but safe for use in classes, DOM element ids, css selectors..
- * - `props`                 Properties object
- * - `geometries`            `Set<GeometryType>` Geometries that this Category works with
- * - `presets`               `Array<Preset>` Presets in this Category
+ * - `id` (or `categoryID`) - Unique string to identify this Category.
+ * - `safeid`               - The id, but safe for use in classes, DOM element ids, CSS selectors..
+ * - `props`                - Properties object
+ * - `geometries`           - `Set<GeometryType>` Geometries that this Category works with
+ * - `presets`              - `Array<Preset>` Presets in this Category
  */
 export class Category {
 

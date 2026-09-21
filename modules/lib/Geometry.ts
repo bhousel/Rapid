@@ -23,9 +23,9 @@ export interface GeometryWorldData {
  * The geometry data should be passed to `setData()` as a GeoJSON object.
  *
  * Properties available:
- * - `orig`    Original GeoJSON Geometry data (in WGS84 lon,lat)
- * - `world`   Projected world coordinate data (world z16, range 0..16,777,216)
- * - `parts`   Array of GeometryParts
+ * - `orig`  - Original GeoJSON Geometry data (in WGS84 lon,lat)
+ * - `world` - Projected world coordinate data (world z16, range 0..16,777,216)
+ * - `parts` - Array of GeometryParts
  */
 export class Geometry {
 

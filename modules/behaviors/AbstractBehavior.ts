@@ -56,8 +56,8 @@ export interface EventData {
  * All behaviors are event emitters.
  *
  * Properties available:
- *   `id` (or `behaviorID`)  String identifier for the behavior (e.g. 'draw')
- *   `enabled`               `true` if the event handlers are enabled, `false` if not.
+ * - `id` (or `behaviorID`) - String identifier for the behavior (e.g. 'draw')
+ * - `enabled`              - `true` if the event handlers are enabled, `false` if not.
  */
 export class AbstractBehavior extends EventEmitter {
 

@@ -13,10 +13,10 @@ import type { Context } from '../Context.ts';
  * All modes are event emitters.
  *
  * Properties available:
- * -  `id` (or `modeID`)   String identifier for the mode (e.g. 'browse')
- * -  `active`             `true` if the mode is active, `false` if not.
- * -  `operations`         Array of operations allowed on the right-click edit menu
- * -  `selectedData`       `Map<DataID, AbstractData>` containing selected data
+ * -  `id` (or `modeID`) - String identifier for the mode (e.g. 'browse')
+ * -  `active`           - `true` if the mode is active, `false` if not.
+ * -  `operations`       - Array of operations allowed on the right-click edit menu
+ * -  `selectedData`     - `Map<DataID, AbstractData>` containing selected data
  */
 export class AbstractMode extends EventEmitter {
 

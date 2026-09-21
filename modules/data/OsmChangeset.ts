@@ -27,9 +27,9 @@ export interface OsmChanges {
  * @see https://wiki.openstreetmap.org/wiki/Changeset
  *
  * Properties available:
- * - `geoms`   Geometry object (inherited from `AbstractData`)
- * - `props`   Properties object (inherited from `AbstractData`)
- * - `tags`    Object containing key-value string pairs for the OSM tags (inherited from `OsmEntity`)
+ * - `geoms` - Geometry object (inherited from `AbstractData`)
+ * - `props` - Properties object (inherited from `AbstractData`)
+ * - `tags`  - Object containing key-value string pairs for the OSM tags (inherited from `OsmEntity`)
  */
 export class OsmChangeset extends OsmEntity {
 

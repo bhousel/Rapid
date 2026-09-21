@@ -120,13 +120,13 @@ interface EntityCopy {
  *     The `staging` Edit is used throughout the application to determine the current map state.
  *
  *  The history might look like this:
- *
+ *  ```
  *   `base`           …undo    `stable`   redo…
  *  [ Edit0 --> … --> Edit1 --> Edit2 --> Edit3 ]
  *                                 \
  *                                  \-->  EditN
  *                                       `staging` (WIP after `stable`)
- *
+ * ```
  * Code elsewhere in the application can use these methods to make edits and manipulate the history:
  * - `perform(action)` - This performs a bit of work.  Perform accepts a varible number of
  *      "action" arguments. Actions are functions that accept a Graph and return a modified Graph.
@@ -148,15 +148,15 @@ interface EntityCopy {
  *      events will be emitted that cover the difference from the beginning -> end of the transaction.
  *
  * Events available:
- *   'stagingchange' - Fires on every edit performed (i.e. when `staging` changes),
+ * - 'stagingchange' - Fires on every edit performed (i.e. when `staging` changes),
  *      Receives Difference between old `staging` Graph and new `staging` Graph.
- *   'stablechange' - Fires only when the history actually changes (i.e. when `stable` changes)
+ * - 'stablechange' - Fires only when the history actually changes (i.e. when `stable` changes)
  *      Receives Difference between old `stable` Graph and new `stable` Graph.
- *   'historyjump' - Fires on undo/redo/restore.  This is for situations when we may need to
+ * - 'historyjump' - Fires on undo/redo/restore.  This is for situations when we may need to
  *      jump the user to a different part of the map and restore a different selection.
  *      Receives `prevIndex` and `currIndex`
- *   'merge'  - Fires when new base entities are merged into the base graph
- *   'backupstatuschange' - Fires when backup status changes, receives `true` if ok, `false` if failed
+ * - 'merge'  - Fires when new base entities are merged into the base graph
+ * - 'backupstatuschange' - Fires when backup status changes, receives `true` if ok, `false` if failed
  */
 export class EditSystem extends AbstractSystem {
 
@@ -493,20 +493,21 @@ export class EditSystem extends AbstractSystem {
    *  - Finally, create a new empty `staging` work-in-progress Edit
    *
    * Before calling `commit()`:
-   *
+   * ```
    *   `base`           …undo    `stable`   redo…
    *  [ Edit0 --> … --> Edit1 --> Edit2 --> Edit3 ]
    *                                 \
    *                                  \-->  EditN0
    *                                       `staging` (WIP after Edit2)
+   * ```
    * After calling `commit()`:
-   *
+   * ```
    *   `base`                     …undo    `stable`
    *  [ Edit0 --> … --> Edit1 --> Edit2 --> EditN0 ]
    *                                           \
    *                                            \-->  EditN1
    *                                                 `staging` (WIP after EditN0)
-   *
+   * ```
    * @param options - Optional `Object` of options passed
    * @param options.annotation - A String saying what the Edit did. e.g. "Started a Line".
    *   Note that Rapid edits pass an Object as the annotation including more info about the edit.
@@ -545,20 +546,21 @@ export class EditSystem extends AbstractSystem {
    * Note:  You can't do this if there are no edits yet - it will throw if you try to append to the `base` edit.
    *
    * Before calling `commitAppend()`:
-   *
+   * ```
    *   `base`           …undo    `stable`   redo…
    *  [ Edit0 --> … --> Edit1 --> Edit2 --> Edit3 ]
    *                                 \
    *                                  \-->  EditN0
    *                                       `staging` (WIP after Edit2)
+   * ```
    * After calling `commitAppend()`:
-   *
+   * ```
    *   `base`           …undo    `stable`
    *  [ Edit0 --> … --> Edit1 --> EditN0 ]
    *                                 \
    *                                  \-->  EditN1
    *                                       `staging` (WIP after EditN0)
-   *
+   * ```
    * @param options - Optional `Object` of options passed
    * @param options.annotation - A String saying what the Edit did. e.g. "Started a Line".
    *   Note that Rapid edits pass an Object as the annotation including more info about the edit.
@@ -596,19 +598,21 @@ export class EditSystem extends AbstractSystem {
    * Note that all work-in-progress in the `staging` Edit is lost when calling `undo()`.
    *
    * Before calling `undo()`:
-   *
+   * ```
    *   `base`           …undo    `stable`   redo…
    *  [ Edit0 --> … --> Edit1 --> Edit2 --> Edit3 ]
    *                                 \
    *                                  \-->  EditN0
    *                                       `staging` (WIP after Edit2)
+   * ```
    * After calling `undo()`:
-   *
+   * ```
    *   `base`  …undo   `stable`   redo…
    *  [ Edit0 --> … --> Edit1 --> Edit2 --> Edit3 ]
    *                       \
    *                        \-->  EditN1
    *                             `staging` (WIP after Edit1)
+   * ```
    */
   public undo(): void {
     select(document).interrupt('editTransition');    // complete any transition already in progress
@@ -638,19 +642,21 @@ export class EditSystem extends AbstractSystem {
    * Note that all work-in-progress in the `staging` Edit is lost when calling `redo()`.
    *
    * Before calling `redo()`:
-   *
+   * ```
    *   `base`           …undo    `stable`   redo…
    *  [ Edit0 --> … --> Edit1 --> Edit2 --> Edit3 ]
    *                                 \
    *                                  \-->  EditN0
    *                                       `staging` (WIP after Edit2)
+   * ```
    * After calling `redo()`:
-   *
+   * ```
    *   `base`                     …undo    `stable`
    *  [ Edit0 --> … --> Edit1 --> Edit2 --> Edit3 ]
    *                                           \
    *                                            \-->  EditN1
    *                                                 `staging` (WIP after Edit3)
+   * ```
    */
   public redo(): void {
     select(document).interrupt('editTransition');    // complete any transition already in progress
@@ -757,7 +763,7 @@ export class EditSystem extends AbstractSystem {
 
 
     // Note: I'd like to try to find a way to avoid seenIDs, but we probably need it for now.
-    // The emit('merge', seenIDs) below triggers a re-render of all features on a tile,
+    // The `emit('merge', seenIDs)` below triggers a re-render of all features on a tile,
     // even the previously seen ones. The reason is because new information could cause
     // features to render differently.  An example would be: ways that are members of
     // a large multipolygon could be part of the outer or a hole, and those ways need to
@@ -1155,9 +1161,8 @@ export class EditSystem extends AbstractSystem {
     });
 
 
-    // Return a simplified copy of the Entity to save space.
     /**
-     *
+     * Return a simplified copy of the Entity to save space.
      * @param entity
      */
     function _copyEntity(entity: OsmEntity): EntityCopy {

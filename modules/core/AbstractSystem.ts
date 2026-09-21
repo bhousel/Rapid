@@ -53,12 +53,12 @@ import type { Context } from '../Context.ts';
  *   Emits `'paused'` / `'resumed'` events on state transitions.
  *
  * Properties available:
- *   `id`         `String`   Identifier for the system (e.g. 'l10n')
- *   `autoStart`  `Boolean`  True to start automatically when initializing the Context
+ * - `id`        - `String`   Identifier for the system (e.g. 'l10n')
+ * - `autoStart` - `Boolean`  True to start automatically when initializing the Context
  *
  * Events available:
- *   `paused`     Fires when the system transitions from unpaused to paused
- *   `resumed`    Fires when the system transitions from paused to unpaused
+ * - `paused`  -  Fires when the system transitions from unpaused to paused
+ * - `resumed` -  Fires when the system transitions from paused to unpaused
  */
 export class AbstractSystem extends EventEmitter {
 

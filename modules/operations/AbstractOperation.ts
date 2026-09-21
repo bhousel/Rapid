@@ -15,12 +15,12 @@ import type { KeyOperationBehavior } from '../behaviors/KeyOperationBehavior.ts'
  * derived state it needs up front, and exposes that state through its methods.
  *
  * Properties available:
- * -  `id` (or `operationID`)  String identifier for the operation (e.g. 'delete')
- * -  `title`                  Localized display title shown on the edit menu
- * -  `keys`                   Keyboard shortcuts that trigger the operation
- * -  `behavior`              `KeyOperationBehavior` that binds those shortcuts (if any)
- * -  `mouseOnly`             `true` if the operation should be hidden from touch/pen menus
- * -  `selectedIDs`           The entityIDs the operation was constructed against
+ * -  `id` (or `operationID`) - String identifier for the operation (e.g. 'delete')
+ * -  `title`                 - Localized display title shown on the edit menu
+ * -  `keys`                  - Keyboard shortcuts that trigger the operation
+ * -  `behavior`              - `KeyOperationBehavior` that binds those shortcuts (if any)
+ * -  `mouseOnly`             - `true` if the operation should be hidden from touch/pen menus
+ * -  `selectedIDs`           - The entityIDs the operation was constructed against
  */
 export class AbstractOperation {
 

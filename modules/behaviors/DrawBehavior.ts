@@ -15,18 +15,18 @@ const FAR_TOLERANCE = 12;
  * `DrawBehavior` listens to pointer and click events and translates those into drawing events
  *
  * Properties available:
- *   `enabled`    `true` if the event handlers are enabled, `false` if not.
- *   `lastDown`   `eventData` Object for the most recent down event
- *   `lastMove`   `eventData` Object for the most recent move event
- *   `lastSpace`  `eventData` Object for the most recent move event used to trigger a spacebar click
- *   `lastClick`  `eventData` Object for the most recent click event
+ * - `enabled`   - `true` if the event handlers are enabled, `false` if not.
+ * - `lastDown`  - `eventData` Object for the most recent down event
+ * - `lastMove`  - `eventData` Object for the most recent move event
+ * - `lastSpace` - `eventData` Object for the most recent move event used to trigger a spacebar click
+ * - `lastClick` - `eventData` Object for the most recent click event
  *
  * Events available:
- *   `down`      Fires on initial pointerdown, receives `eventData` Object
- *   `move`      Fires on _any_ pointermove (or change of modifier key), receives `eventData` Object
- *   `cancel`    Fires if the user presses Delete or Backspace
- *   `click`     Fires on a successful click (or spacebar), receives `eventData` for the event that triggered the click
- *   `finish`    Fires if user presses return, enter, or escape
+ * - `down`   - Fires on initial pointerdown, receives `eventData` Object
+ * - `move`   - Fires on _any_ pointermove (or change of modifier key), receives `eventData` Object
+ * - `cancel` - Fires if the user presses Delete or Backspace
+ * - `click`  - Fires on a successful click (or spacebar), receives `eventData` for the event that triggered the click
+ * - `finish` - Fires if user presses return, enter, or escape
  */
 export class DrawBehavior extends AbstractBehavior {
 

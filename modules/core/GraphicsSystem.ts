@@ -33,15 +33,15 @@ interface TransformEase {
  * (formerly named PixiRenderer)
  *
  * Properties available:
- * - `supersurface`   The parent `div` for temporary transforms between redraws
- * - `surface`        The sibling `canvas` map drawing surface
- * - `overlay`        The sibling `div` overlay, offsets the supersurface transform
- * - `pixi`           PIXI.Application() created to render to the canvas
- * - `stage`          PIXI.Container() that lives at the root of this scene
- * - `origin`         PIXI.Container() that lives beneath the stage; maps world coordinates to screen
- * - `scene`          PixiScene manages the layers and features in the scene
- * - `eventManager`   PixiEvents manages the events that other code might want to listen for
- * - `textureManager` PixiTextures manages the textures
+ * - `supersurface`   - The parent `div` for temporary transforms between redraws
+ * - `surface`        - The sibling `canvas` map drawing surface
+ * - `overlay`        - The sibling `div` overlay, offsets the supersurface transform
+ * - `pixi`           - `PIXI.Application()` created to render to the canvas
+ * - `stage`          - `PIXI.Container()` that lives at the root of this scene
+ * - `origin`         - `PIXI.Container()` that lives beneath the stage; maps world coordinates to screen
+ * - `scene`          - `PixiScene` manages the layers and features in the scene
+ * - `eventManager`   - `PixiEvents` manages the events that other code might want to listen for
+ * - `textureManager` - `PixiTextures` manages the textures
  *
  * Events available:
  * - `draw`            Fires after a full redraw

@@ -29,6 +29,10 @@ export interface RapidDataTransform {
 
 /**
  * A `RapidDataDictionary` contains a mapping from source attributes to target attributes.
+ *
+ * Properties available:
+ * - `transforms` - `Array` of `RapidDataTransform` objects,
+ *    applied in order to convert source attributes to target tags
  */
 export class RapidDataDictionary {
 

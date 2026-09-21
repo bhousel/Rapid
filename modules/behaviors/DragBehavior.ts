@@ -17,16 +17,16 @@ const FAR_TOLERANCE = 4;
  * `DragBehavior` listens to pointer events and converts those into start/move/end drag events
  *
  * Properties available:
- *   `enabled`     `true` if the event handlers are enabled, `false` if not.
- *   `dragTarget`   After the drag has started, `Object` that contains details about the feature being dragged
- *   `lastDown`    `eventData` Object for the most recent down event
- *   `lastMove`    `eventData` Object for the most recent move event
+ * - `enabled`     `true` if the event handlers are enabled, `false` if not.
+ * - `dragTarget`   After the drag has started, `Object` that contains details about the feature being dragged
+ * - `lastDown`    `eventData` Object for the most recent down event
+ * - `lastMove`    `eventData` Object for the most recent move event
  *
  * Events available:
- *   `start`    Fires on pointermove when dragging starts, receives the down `eventData` Object
- *   `move`     Fires on pointermove as dragging continues, receives the move `eventData` Object
- *   `end`      Fires on pointerup when dragging is done, receives the up `eventData` Object
- *   `cancel`   Fires on pointercancel -or- pointerup outside, receives the cancel `eventData` Object
+ * - `start`    Fires on pointermove when dragging starts, receives the down `eventData` Object
+ * - `move`     Fires on pointermove as dragging continues, receives the move `eventData` Object
+ * - `end`      Fires on pointerup when dragging is done, receives the up `eventData` Object
+ * - `cancel`   Fires on pointercancel -or- pointerup outside, receives the cancel `eventData` Object
  */
 export class DragBehavior extends AbstractBehavior {
 

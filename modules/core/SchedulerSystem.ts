@@ -134,9 +134,9 @@ const PRESSURE_RECOVER = {
  * `maxWorkers` and terminated on `resetAsync()`.
  *
  * Events available:
- * - `paused`          Fires when the system transitions from unpaused to paused
- * - `resumed`         Fires when the system transitions from paused to unpaused
- * - `pressurechange`  Fires when backpressure level changes
+ * - `paused`         - Fires when the system transitions from unpaused to paused
+ * - `resumed`        - Fires when the system transitions from paused to unpaused
+ * - `pressurechange` - Fires when backpressure level changes
  */
 export class SchedulerSystem extends AbstractSystem {
 

@@ -55,8 +55,8 @@ export interface IssuesBySeverity {
  * have easy access to things like the Graph or Edits/History.
  *
  * Events available:
- * - `validated`       Fires after some validation has occurred
- * - `focusedIssue`    Fires after an issue has received focus, receives the issue
+ * - `validated`    - Fires after some validation has occurred
+ * - `focusedIssue` - Fires after an issue has received focus, receives the issue
  */
 export class ValidationSystem extends AbstractSystem {
 

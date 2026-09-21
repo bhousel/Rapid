@@ -22,10 +22,10 @@ export interface OsmNodeProps extends OsmEntityProps {
  * @see https://wiki.openstreetmap.org/wiki/Node
  *
  * Properties available:
- * - `geoms`   Geometry object (inherited from `AbstractData`)
- * - `props`   Properties object (inherited from `AbstractData`)
- * - `tags`    Object containing key-value string pairs for the OSM tags (inherited from `OsmEntity`)
- * - `loc`     Accessor for the `loc` property, used to get WGS84 coordinate for this Node
+ * - `geoms` - Geometry object (inherited from `AbstractData`)
+ * - `props` - Properties object (inherited from `AbstractData`)
+ * - `tags`  - Object containing key-value string pairs for the OSM tags (inherited from `OsmEntity`)
+ * - `loc`   - Accessor for the `loc` property, used to get WGS84 coordinate for this Node
  */
 export class OsmNode extends OsmEntity {
 

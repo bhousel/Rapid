@@ -59,7 +59,7 @@ interface SpatialCache {
  * @see https://github.com/mourner/rbush
  *
  * This system replaces older code from:
- * - `Tree.js` which only indexed the OSM data
+ * - `Tree.js`, which only indexed the OSM data
  * - Various rbushes scattered around the service code
  */
 export class SpatialSystem extends AbstractSystem {

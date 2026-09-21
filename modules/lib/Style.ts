@@ -195,13 +195,13 @@ export const styleDefaults: MinimalStyleProps = {
  * A `Style` describes *what a feature should look like*.
  *
  * Properties available:
- * - `id`          Unique identifier for this style
- * - `props`       The full props object
- * - `fill`        Fill style properties (areas)
- * - `casing`      Casing style properties (line outline)
- * - `stroke`      Stroke style properties (line)
- * - `marker`      Marker style properties (point background)
- * - `icon`        Icon style properties (rendered in marker)
+ * - `id`     - Unique identifier for this style
+ * - `props`  - The full props object
+ * - `fill`   - Fill style properties (areas)
+ * - `casing` - Casing style properties (line outline)
+ * - `stroke` - Stroke style properties (line)
+ * - `marker` - Marker style properties (point background)
+ * - `icon`   - Icon style properties (rendered in marker)
  */
 
 /** Describes what a map feature should look like (fill, casing, stroke, markers, icons, labels). */

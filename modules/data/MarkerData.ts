@@ -22,10 +22,11 @@ export interface MarkerProps extends AbstractDataProps {
  * This is a wrapper for any kind of arbitrary point data that appears on the map.
  * Markers are associated with a service where we fetched them from.
  * This used to be called "QAItem".
+ * (Note: We could maybe get rid of this and just use GeoJSON Points in its place)
  *
  * Properties available:
- * - `geoms`   Geometry object (inherited from `AbstractData`)
- * - `props`   Properties object (inherited from `AbstractData`)
+ * - `geoms` - Geometry object (inherited from `AbstractData`)
+ * - `props` - Properties object (inherited from `AbstractData`)
  */
 export class MarkerData<P extends MarkerProps = MarkerProps> extends AbstractData<P> {
 

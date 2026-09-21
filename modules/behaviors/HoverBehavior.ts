@@ -11,12 +11,12 @@ import type { MapInteractionBehavior } from './MapInteractionBehavior.ts';
  * `HoverBehavior` listens to pointer events emits `hoverchange` events as the user hovers over stuff
  *
  * Properties available:
- *   `enabled`      `true` if the event handlers are enabled, `false` if not.
- *   `lastMove`     `eventData` Object for the most recent move event
- *   `hoverTarget`  `Object` that contains details about the feature being hovered, or `null`
+ * - `enabled`     - `true` if the event handlers are enabled, `false` if not.
+ * - `lastMove`    - `eventData` Object for the most recent move event
+ * - `hoverTarget` - `Object` that contains details about the feature being hovered, or `null`
  *
  * Events available:
- *   `hoverchange`  Fires whenever the hover target has changed, receives `eventData` Object
+ * - `hoverchange` - Fires whenever the hover target has changed, receives `eventData` Object
  */
 export class HoverBehavior extends AbstractBehavior {
 

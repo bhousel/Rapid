@@ -89,10 +89,10 @@ interface ResolvedFields {
  * See:  https://github.com/ideditor/schema-builder/blob/main/schemas/preset.json
  *
  * Properties available:
- * - `id` (or `presetID`)   Unique string to identify this Preset.
- * - `safeid`               The id, but safe for use in classes, DOM element ids, css selectors..
- * - `props`                Properties object
- * - `geometries`           `Set<GeometryType>` Geometries that this Preset works with
+ * - `id` (or `presetID`) - Unique string to identify this Preset.
+ * - `safeid`             - The id, but safe for use in classes, DOM element ids, CSS selectors..
+ * - `props`              - Properties object
+ * - `geometries`         - `Set<GeometryType>` Geometries that this Preset works with
  */
 export class Preset {
 

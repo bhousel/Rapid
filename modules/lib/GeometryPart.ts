@@ -105,9 +105,9 @@ export interface GeometryPartLocalData {
  * This class deals with singular geometry elements only: 'Point', 'LineString', 'Polygon'.
  *
  * Properties available:
- * - `orig`    Original GeoJSON Geometry data (in WGS84 lon,lat)
- * - `world`   Projected world coordinate data (world z16, range 0..16,777,216)
- * - `local`   Projected local coordinate data (relative to `world.origin`)
+ * - `orig`  - Original GeoJSON Geometry data (in WGS84 lon,lat)
+ * - `world` - Projected world coordinate data (world z16, range 0..16,777,216)
+ * - `local` - Projected local coordinate data (relative to `world.origin`)
  */
 export class GeometryPart {
 

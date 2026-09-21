@@ -38,9 +38,9 @@ type TransientCache = Map<string, Map<string, unknown>>;
  * (A lot of this was carried over from the previous `osmEntity` and similar classes.)
  *
  * Properties available:
- *   `geoms`   Geometry object (inherited from `AbstractData`)
- *   `props`   Properties object (inherited from `AbstractData`)
- *   `tags`    Object containing key-value string pairs for the OSM tags
+ *   `geoms` - Geometry object (inherited from `AbstractData`)
+ *   `props` - Properties object (inherited from `AbstractData`)
+ *   `tags`  - Object containing key-value string pairs for the OSM tags
  */
 export class OsmEntity extends AbstractData<OsmEntityProps> {
 

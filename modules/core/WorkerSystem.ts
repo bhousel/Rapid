@@ -43,10 +43,10 @@ export interface DispatchOptions {
    * the scheduler's drain loop, allowing the frame to yield between
    * results.
    *
-   * When SchedulerSystem is unavailable (tests, CLI), the result
+   * When `SchedulerSystem` is unavailable (tests, CLI), the result
    * resolves immediately — no worse than the current behavior.
    *
-   * If SchedulerSystem later cancels queued deferred work (for example,
+   * If `SchedulerSystem` later cancels queued deferred work (for example,
    * during reset), the dispatch promise rejects with `AbortError`.
    * Callers should treat this as an expected cancellation path.
    */
@@ -73,8 +73,8 @@ const DEFAULT_MAX_WORKERS = 2;
  * - `NetworkSystem` = network I/O (fetch lifecycle, inflight tracking, dedup, concurrency)
  *
  * Events available:
- * - `paused`     Fires when the system transitions from unpaused to paused
- * - `resumed`    Fires when the system transitions from paused to unpaused
+ * - `paused`  - Fires when the system transitions from unpaused to paused
+ * - `resumed` - Fires when the system transitions from paused to unpaused
  */
 export class WorkerSystem extends AbstractSystem {
 

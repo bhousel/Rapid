@@ -33,11 +33,11 @@ export interface AbstractDataProps {
  * (A lot of this was carried over from the previous `osmEntity` and similar classes.)
  *
  * Properties available:
- * - `id` (or `dataID`)  Unique string to identify this data element.
- * - `type`              String describing what kind of data element this is (e.g. 'node', 'way', 'relation')
- * - `v`                 Internal version of the data element, can be used to detect changes
- * - `geoms`             Geometry object
- * - `props`             Properties object
+ * - `id` (or `dataID`) - Identifier this data element - should be unique system-wide.
+ * - `type`             - String describing what kind of data element this is (e.g. 'node', 'way', 'relation')
+ * - `v`                - Internal version of the data element, can be used to detect changes
+ * - `geoms`            - Geometry object
+ * - `props`            - Properties object
  *
  * @template P - The props interface for this data element (must extend AbstractDataProps)
  */

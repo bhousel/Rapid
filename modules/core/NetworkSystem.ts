@@ -129,8 +129,8 @@ export const STATUS_ERROR = 0;
  * Queued requests are abortable for free (no network request started yet).
  *
  * Events available:
- * - `paused`   Fires when the system transitions from unpaused to paused
- * - `resumed`  Fires when the system transitions from paused to unpaused
+ * - `paused`  - Fires when the system transitions from unpaused to paused
+ * - `resumed` - Fires when the system transitions from paused to unpaused
  */
 export class NetworkSystem extends AbstractSystem {
   /**

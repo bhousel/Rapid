@@ -108,10 +108,10 @@ export interface PropMatcherProps {
  * Supports various comparison operators: equals, not equals, exists, regex, numeric comparisons, etc.
  *
  * Properties available:
- * - `key`    The property key to match
- * - `op`     The comparison operator
- * - `value`  The value to compare against (if applicable)
- * - `props`  The full props object
+ * - `key`   - The property key to match
+ * - `op`    - The comparison operator
+ * - `value` - The value to compare against (if applicable)
+ * - `props` - The full props object
  */
 export class PropMatcher {
 

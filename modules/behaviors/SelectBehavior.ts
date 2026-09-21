@@ -20,12 +20,12 @@ const FAR_TOLERANCE = 12;
  * `SelectBehavior` listens to pointer events and selects items that are clicked on.
  *
  * Properties available:
- *   `enabled`      `true` if the event handlers are enabled, `false` if not.
- *   `lastDown`     `eventData` Object for the most recent down event
- *   `lastUp`       `eventData` Object for the most recent up event (to detect dbl clicks)
- *   `lastMove`     `eventData` Object for the most recent move event
- *   `lastSpace`    `eventData` Object for the most recent move event used to trigger a spacebar click
- *   `lastClick`    `eventData` Object for the most recent click event
+ * - `enabled`   - `true` if the event handlers are enabled, `false` if not.
+ * - `lastDown`  - `eventData` Object for the most recent down event
+ * - `lastUp`    - `eventData` Object for the most recent up event (to detect dbl clicks)
+ * - `lastMove`  - `eventData` Object for the most recent move event
+ * - `lastSpace` - `eventData` Object for the most recent move event used to trigger a spacebar click
+ * - `lastClick` - `eventData` Object for the most recent click event
  */
 export class SelectBehavior extends AbstractBehavior {
 

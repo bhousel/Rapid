@@ -61,12 +61,19 @@ const RAPID_COLORS: readonly string[] = [
 /**
  * `RapidSystem` maintains the catalog of available Rapid datasets,
  * and keeps track of which features have been accepted or ignored.
- *
  * Rapid allows users to work with third party datasets external to OpenStreetMap.
- * These datasets may be derived from authorative sources or AI-detected suggestions.
+ *
+ * Properties available:
+ * - `catalog`     - `Map<DatasetID, RapidDataset>` data structure of all known datasets
+ * - `categories`  - `Set<string>` of all known dataset categories (free-text keywords)
+ * - `acceptIDs`   - `Set<DataID>` of Data IDs for features accepted by the user
+ * - `ignoreIDs`   - `Set<DataID>` of Data IDs for features ignored by the user
+ * - `addedDatasetIDs`   - `Set<DatasetID>` of Dataset IDs added to the Rapid menu
+ * - `enabledDatasetIDs` - `Set<DatasetID>` of Dataset IDs that are checked as 'visible'
+ * - `datasets`    - computed subset of `catalog` - only the datasets that are added to the Rapid menu
  *
  * Events available:
- * - `datasetchange`   Fires when datasets are added/removed from the list
+ * - `datasetchange` - Fires when datasets are added/removed from the list
  * - `taskchanged`
  */
 export class RapidSystem extends AbstractSystem {

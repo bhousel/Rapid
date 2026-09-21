@@ -35,16 +35,16 @@ export interface GraphCache {
  * Each graph contains a "base" state (uneditied) and "local" state (edited).
  * The graph also contains all the caches and methods needed to manage OSM topology.
  *
- * In previous versions of the code, Graph was written in an immutable style,
- * so that calls to `replace`/`remove`/`revert` would return a new Graph.
- * This became a performance concern, so now Graphs are transactional.
- * You can call these methods anytme to make modifications to the Graph,
- * but then you must call `commit` to update any Entities that rely on the Graph.
+ * In previous versions of the code, `Graph` was written in an immutable style,
+ * so that calls to `replace`/`remove`/`revert` would return a new `Graph`.
+ * This became a performance concern, so now `Graphs` are transactional.
+ * You can call these methods anytme to make modifications to the `Graph`,
+ * but then you must call `commit` to update any Entities that rely on the `Graph`.
  *
  * Properties available:
- * - `id`      Unique string to identify this Graph
- * - `v`       Internal version of the Graph, can be used to detect changes
- * - `props`   Properties object
+ * - `id`    - Unique string to identify this Graph
+ * - `v`     - Internal version of the Graph, can be used to detect changes
+ * - `props` - Properties object
  */
 export class Graph {
 

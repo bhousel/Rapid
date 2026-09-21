@@ -25,13 +25,13 @@ interface TouchData {
 }
 
 /**
- * `MapInteractionBehavior` listens to pointer events and converts those into zoom/pan map interactions
+ * `MapInteractionBehavior` listens to pointer events and converts those into zoom/pan map interactions.
  *
  * Properties available:
- *   `enabled`             `true` if the event handlers are enabled, `false` if not.
- *   `doubleClickEnabled`  `true` if double clicks can zoom, `false` if not.
- *   `lastDown`            `eventData` Object for the most recent down event
- *   `gesture`             String containing the current detected gesture ('pan' or 'rotate')
+ * - `enabled`            - `true` if the event handlers are enabled, `false` if not.
+ * - `doubleClickEnabled` - `true` if double clicks can zoom, `false` if not.
+ * - `lastDown`           - `eventData` Object for the most recent down event
+ * - `gesture`            - String containing the current detected gesture ('pan' or 'rotate')
  */
 export class MapInteractionBehavior extends AbstractBehavior {
 

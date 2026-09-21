@@ -16,7 +16,7 @@ const MAP_NUDGE_INTERVAL = 16;
  *  Useful during drawing and dragging modes.
  *
  * Events available:
- *   `nudge`    Fires when the map nudges - receives the [x,y] amount panned in pixels
+ * - `nudge` - Fires when the map nudges - receives the [x,y] amount panned in pixels
  */
 export class MapNudgeBehavior extends AbstractBehavior {
 

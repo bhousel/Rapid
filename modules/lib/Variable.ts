@@ -41,6 +41,11 @@ export interface VariableProps {
  *
  * For array values, Variable pre-compiles a `Set` for O(1) lookups.
  *
+ * Properties available:
+ * - `id`     - Unique identifier for this variable
+ * - `value`  - The value stored by the variable
+ * - `props`  - The full props object
+ *
  * @example
  * const v = new Variable(context, {
  *   id: 'lifecycle_prefixes',

@@ -277,7 +277,7 @@ const SETTINGS_MIGRATIONS: SettingsMigration[] = [
  * `rapid.settings.*` namespace, engine metadata, and legacy-key migrations.
  *
  * Events available:
- * - `settingschange`   Fires after any change in the persisted settings
+ * - `settingschange` - Fires after any change in the persisted settings
  */
 export class SettingsSystem extends AbstractSystem {
 

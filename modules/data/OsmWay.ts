@@ -46,10 +46,10 @@ export interface Segment {
  * @see https://wiki.openstreetmap.org/wiki/Way
  *
  * Properties available:
- * - `geoms`   Geometry object (inherited from `AbstractData`)
- * - `props`   Properties object (inherited from `AbstractData`)
- * - `tags`    Object containing key-value string pairs for the OSM tags (inherited from `OsmEntity`)
- * - `nodes`   Accessor for the `nodes` property, an Array of node ids
+ * - `geoms` - Geometry object (inherited from `AbstractData`)
+ * - `props` - Properties object (inherited from `AbstractData`)
+ * - `tags`  - Object containing key-value string pairs for the OSM tags (inherited from `OsmEntity`)
+ * - `nodes` - Accessor for the `nodes` property, an `Array` of node ids
  */
 export class OsmWay extends OsmEntity {
 

@@ -43,10 +43,10 @@ export interface OsmRelationProps extends OsmEntityProps {
  * @see https://wiki.openstreetmap.org/wiki/Relation
  *
  * Properties available:
- * - `geoms`    Geometry object (inherited from `AbstractData`)
- * - `props`    Properties object (inherited from `AbstractData`)
- * - `tags`     Object containing key-value string pairs for the OSM tags (inherited from `OsmEntity`)
- * - `members`  Accessor for the members property, an Array of Objects with properties, `id`, `type`, `role`
+ * - `geoms`   - Geometry object (inherited from `AbstractData`)
+ * - `props`   - Properties object (inherited from `AbstractData`)
+ * - `tags`    - Object containing key-value string pairs for the OSM tags (inherited from `OsmEntity`)
+ * - `members` - Accessor for the `members` property, an `Array` of Objects with properties, `id`, `type`, `role`
  */
 export class OsmRelation extends OsmEntity {
 
