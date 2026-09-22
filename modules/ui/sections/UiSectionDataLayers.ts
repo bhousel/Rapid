@@ -6,7 +6,7 @@ import { UiSettingsCustomData } from '../settings/UiSettingsCustomData.ts';
 import { utilCmd } from '../../util/cmd.ts';
 
 import type { Context } from '../../Context.ts';
-import type { D3Selection } from 'd3-selection';
+import type { D3EnterSelection, D3Selection } from 'd3-selection';
 import type { AbstractPixiLayer } from '../../pixi/AbstractPixiLayer.ts';
 import type { PixiLayerCustomData } from '../../pixi/PixiLayerCustomData.ts';
 
@@ -70,9 +70,7 @@ export class UiSectionDataLayers extends AbstractUiSection {
     this._settingsCustomData.on('change', this._customChanged);
 
     // Add or replace event handlers
-    scene.off('layerchange', this.renderInner);
     scene.on('layerchange', this.renderInner);
-    l10n.off('localechange', this._setupKeybinding);
     l10n.on('localechange', this._setupKeybinding);
 
     this._setupKeybinding();
@@ -120,11 +118,11 @@ export class UiSectionDataLayers extends AbstractUiSection {
       'custom-data', 'mapillary', 'streetside', 'kartaview'
     ];
 
-    const anyLayerEnabled = allLayerIDs.some(layerID => this._showsLayer(layerID));
+    const anyLayerEnabled = allLayerIDs.some(layerID => this._isEnabled(layerID));
     if (anyLayerEnabled) {
       // Save current state and disable all layers
       allLayerIDs.forEach(layerID => {
-        this._previousLayerStates.set(layerID, this._showsLayer(layerID));
+        this._previousLayerStates.set(layerID, this._isEnabled(layerID));
         this._setLayer(layerID, false);
       });
     } else {
@@ -152,10 +150,10 @@ export class UiSectionDataLayers extends AbstractUiSection {
    * @param layerID - the layer to test
    * @return `true` if the layer is enabled
    */
-  protected _showsLayer(layerID: string): boolean {
+  protected _isEnabled(layerID: string): boolean {
     const scene = this.context.systems.gfx!.scene!;
     const layer = scene.layers.get(layerID);
-    return !!layer?.enabled;
+    return !!(layer?.supported && layer?.enabled);
   }
 
 
@@ -188,7 +186,7 @@ export class UiSectionDataLayers extends AbstractUiSection {
    * @param layerID - the layer to toggle
    */
   protected _toggleLayer(layerID: string): void {
-    this._setLayer(layerID, !this._showsLayer(layerID));
+    this._setLayer(layerID, !this._isEnabled(layerID));
   }
 
 
@@ -229,11 +227,20 @@ export class UiSectionDataLayers extends AbstractUiSection {
     const l10n = context.systems.l10n!;
     const scene = context.systems.gfx!.scene!;
 
-    const items = [
-      { id: 'osm',   layer: scene.layers.get('osm'),   key: 'shortcuts.command.toggle_osm_data.key' },
-      { id: 'notes', layer: scene.layers.get('notes'), key: 'shortcuts.command.toggle_osm_notes.key' },
-      { id: 'rapid', layer: scene.layers.get('rapid'), key: 'shortcuts.command.toggle_rapid_data.key' }
-    ];
+    // Just check all three, they use different key shortcut formulas.
+    const items: BaseLayerItem[] = [];
+    const osmLayer = scene.layers.get('osm');
+    if (osmLayer?.supported) {
+      items.push({ id: 'osm', layer: osmLayer, key: 'shortcuts.command.toggle_osm_data.key' });
+    }
+    const notesLayer = scene.layers.get('notes');
+    if (notesLayer?.supported) {
+      items.push({ id: 'notes', layer: notesLayer, key: 'shortcuts.command.toggle_osm_notes.key' });
+    }
+    const rapidLayer = scene.layers.get('rapid');
+    if (rapidLayer?.supported) {
+      items.push({ id: 'rapid', layer: rapidLayer, key: 'shortcuts.command.toggle_rapid_data.key' });
+    }
 
     let $ul: D3Selection = $selection
       .selectAll('.layer-list-osm')
@@ -250,11 +257,11 @@ export class UiSectionDataLayers extends AbstractUiSection {
     $li.exit()
       .remove();
 
-    const $$li = $li.enter()
+    const $$li: D3EnterSelection = $li.enter()
       .append('li')
       .attr('class', (d: BaseLayerItem) => `list-item list-item-${d.id}`);
 
-    const $$label = $$li
+    const $$label: D3EnterSelection = $$li
       .append('label')
       .each((d: BaseLayerItem, i, nodes) => {
         select(nodes[i])
@@ -278,9 +285,9 @@ export class UiSectionDataLayers extends AbstractUiSection {
     // Update
     $li
       .merge($$li)
-      .classed('active', (d: BaseLayerItem) => this._showsLayer(d.id))
+      .classed('active', (d: BaseLayerItem) => this._isEnabled(d.id))
       .selectAll('input')
-      .property('checked', (d: BaseLayerItem) => this._showsLayer(d.id));
+      .property('checked', (d: BaseLayerItem) => this._isEnabled(d.id));
   }
 
 
@@ -291,11 +298,16 @@ export class UiSectionDataLayers extends AbstractUiSection {
   protected _drawQAItems($selection: D3Selection): void {
     const context = this.context;
     const l10n = context.systems.l10n!;
+    const maproulette = context.services.maproulette;
     const scene = context.systems.gfx!.scene!;
 
-    const qaKeys = ['maproulette', 'keepright', 'osmose', 'geoscribble'];
-    const qaLayers = qaKeys.map(layerID => scene.layers.get(layerID)).filter(Boolean) as AbstractPixiLayer[];
-    const maproulette = context.services.maproulette;
+    const items: AbstractPixiLayer[] = [];
+    for (const layerID of ['maproulette', 'keepright', 'osmose', 'geoscribble']) {
+      const layer = scene.layers.get(layerID);
+      if (layer?.supported) {
+        items.push(layer);
+      }
+    }
 
     let $ul: D3Selection = $selection
       .selectAll('.layer-list-qa')
@@ -307,16 +319,16 @@ export class UiSectionDataLayers extends AbstractUiSection {
       .merge($ul);
 
     let $li: D3Selection = $ul.selectAll('.list-item')
-      .data(qaLayers);
+      .data(items);
 
     $li.exit()
       .remove();
 
-    const $$li = $li.enter()
+    const $$li: D3EnterSelection = $li.enter()
       .append('li')
       .attr('class', (d: AbstractPixiLayer) => `list-item list-item-${d.id}`);
 
-    const $$label = $$li
+    const $$label: D3EnterSelection = $$li
       .append('label')
       .attr('class', 'content-label');
 
@@ -362,27 +374,27 @@ export class UiSectionDataLayers extends AbstractUiSection {
     const l10n = context.systems.l10n!;
     const scene = context.systems.gfx!.scene!;
 
-    const customLayer = scene.layers.get('custom-data');
+    const customLayer = scene.layers.get('custom-data') as PixiLayerCustomData | undefined;
     const isRTL = l10n.isRTL;
 
     let $ul: D3Selection = $selection
       .selectAll('.layer-list-data')
-      .data(customLayer ? [customLayer] : []);
+      .data(customLayer?.supported ? [customLayer] : []);
 
     // Exit
     $ul.exit()
       .remove();
 
     // Enter
-    const $$ul = $ul.enter()
+    const $$ul: D3EnterSelection = $ul.enter()
       .append('ul')
       .attr('class', 'layer-list layer-list-data');
 
-    const $$li = $$ul
+    const $$li: D3EnterSelection = $$ul
       .append('li')
       .attr('class', 'list-item-data');
 
-    const $$label = $$li
+    const $$label: D3EnterSelection = $$li
       .append('label')
       .call(new UiTooltip(context)
         .title(l10n.t('map_data.layers.custom.tooltip'))
@@ -421,13 +433,12 @@ export class UiSectionDataLayers extends AbstractUiSection {
         .placement(isRTL ? 'right' : 'left')
         .attach
       )
-      .on('click', (e: PointerEvent) => {
+      .on('click', (e: PointerEvent, layer: PixiLayerCustomData) => {
         const target = e.currentTarget as HTMLElement;
         if (select(target).classed('disabled')) return;
         e.preventDefault();
         e.stopPropagation();
-        const customLayer = scene.layers.get('custom-data') as PixiLayerCustomData;
-        customLayer?.fitZoom();
+        layer.fitZoom();
       })
       .call(uiIcon('#rapid-icon-framed-dot', 'monochrome'));
 

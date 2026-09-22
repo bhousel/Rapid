@@ -198,7 +198,7 @@ export class PhotoSystem extends AbstractSystem {
 
     // Update detections
     // If there is a currently selected detection, return to browse mode.
-    for (const layerID of this.LayerIDs) {
+    for (const layerID of this.detectionLayerIDs) {
       const layer = scene.layers.get(layerID);
       if (layer && !layer.enabled && this._currLayerID === layerID) {
         context.enter('browse');
@@ -338,7 +338,7 @@ export class PhotoSystem extends AbstractSystem {
    * @return  All available detection layerIDs
    * @readonly
    */
-  public get LayerIDs(): LayerID[] {
+  public get detectionLayerIDs(): LayerID[] {
     return ['mapillary-detections', 'mapillary-signs'];
   }
 
@@ -487,7 +487,7 @@ export class PhotoSystem extends AbstractSystem {
     const scene = gfx?.scene;
 
     // If we're selecting a detection then make sure its layer is enabled too.
-    if (scene && layerID && this.LayerIDs.includes(layerID) && !this.isLayerEnabled(layerID)) {
+    if (scene && layerID && this.detectionLayerIDs.includes(layerID) && !this.isLayerEnabled(layerID)) {
       scene.enableLayers(layerID);
       return;  // exit to avoid infinite loop, we will be right back in here via `_layerChanged` handler.
     }
@@ -499,7 +499,7 @@ export class PhotoSystem extends AbstractSystem {
     scene?.clearClass('highlightphoto');
 
     // Apply the new selection..
-    if (detectionID && layerID && this.LayerIDs.includes(layerID)) {
+    if (detectionID && layerID && this.detectionLayerIDs.includes(layerID)) {
       const photoLayerID = layerID.split('-')[0] as PhotoLayerID;     // e.g. 'mapillary-signs' -> 'mapillary'
       const service = context.services[photoLayerID];
       if (!service) return;

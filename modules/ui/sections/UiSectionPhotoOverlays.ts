@@ -5,7 +5,7 @@ import { utilGetSetValue, utilNoAuto } from '../../util/index.ts';
 
 import type { AbstractPixiLayer } from '../../pixi/AbstractPixiLayer.ts';
 import type { Context } from '../../Context.ts';
-import type { D3Selection } from 'd3-selection';
+import type { D3EnterSelection, D3Selection } from 'd3-selection';
 
 
 /**
@@ -45,9 +45,7 @@ export class UiSectionPhotoOverlays extends AbstractUiSection {
     this._drawDateFilter = this._drawDateFilter.bind(this);
 
     // Add or replace event handlers
-    scene.off('layerchange', this.renderInner);
     scene.on('layerchange', this.renderInner);
-    photos.off('photochange', this.renderInner);
     photos.on('photochange', this.renderInner);
   }
 
@@ -64,11 +62,17 @@ export class UiSectionPhotoOverlays extends AbstractUiSection {
 
   /**
    * Render the photo overlay list and its filter options.
+   * Show this section if there is a `PhotoSystem`.
    * @param $selection - A d3-selection to the disclosure content, owned by the parent `UiDisclosure`
    */
   public renderDisclosureContent($selection: D3Selection): void {
+    const photos = this.context.systems.photos;
+
     const $container: D3Selection = $selection.selectAll('.photo-overlay-container')
-      .data([0]);
+      .data(photos ? [0] : []);
+
+    $container.exit()
+      .remove();
 
     $container.enter()
       .append('div')
@@ -85,7 +89,7 @@ export class UiSectionPhotoOverlays extends AbstractUiSection {
    * @param layerID - the layer to change
    * @param val     - `true` to enable, `false` to disable
    */
-  protected _setLayer(layerID: string, val: boolean): void {
+  protected _setLayer(layerID: LayerID, val: boolean): void {
     const context = this.context;
     const scene = context.systems.gfx!.scene!;
 
@@ -105,7 +109,7 @@ export class UiSectionPhotoOverlays extends AbstractUiSection {
    * Toggles the given photo layer's enabled state.
    * @param layerID - the layer to toggle
    */
-  protected _toggleLayer(layerID: string): void {
+  protected _toggleLayer(layerID: LayerID): void {
     const photos = this.context.systems.photos!;
     this._setLayer(layerID, !photos.isLayerEnabled(layerID));
   }
@@ -121,16 +125,12 @@ export class UiSectionPhotoOverlays extends AbstractUiSection {
     const photos = context.systems.photos!;
     const scene = context.systems.gfx!.scene!;
 
-    const allLayerIDs = photos.layerIDs as string[];
-    const LayerIDs = photos.LayerIDs;
-    const layers = allLayerIDs.map(layerID => scene.layers.get(layerID)).filter(Boolean) as AbstractPixiLayer[];
-    const data = layers.filter(layer => layer.supported);
-
-    function layerSupported(d: AbstractPixiLayer): boolean {
-      return d && d.supported;
-    }
-    function layerEnabled(d: AbstractPixiLayer): boolean {
-      return layerSupported(d) && d.enabled;
+    const items: AbstractPixiLayer[] = [];
+    for (const layerID of photos.layerIDs) {
+      const layer = scene.layers.get(layerID);
+      if (layer?.supported) {
+        items.push(layer);
+      }
     }
 
     let $ul: D3Selection = $selection
@@ -143,22 +143,22 @@ export class UiSectionPhotoOverlays extends AbstractUiSection {
       .merge($ul);
 
     const $li: D3Selection = $ul.selectAll('.list-item-photos')
-      .data(data);
+      .data(items);
 
     $li.exit()
       .remove();
 
-    const $$li = $li.enter()
+    const $$li: D3EnterSelection = $li.enter()
       .append('li')
       .attr('class', (d: AbstractPixiLayer) => {
         let classes = `list-item-photos list-item-${d.id}`;
-        if (LayerIDs.includes(d.id)) {
-          classes += ' indented';
+        if (photos.detectionLayerIDs.includes(d.id)) {
+          classes += ' indented';   // indent the rows for the detections
         }
         return classes;
       });
 
-    const $$label = $$li
+    const $$label: D3EnterSelection = $$li
       .append('label')
       .each((d: AbstractPixiLayer, i, nodes) => {
         const stringID = d.id.replace(/-/g, '_') + '.tooltip';
@@ -185,9 +185,9 @@ export class UiSectionPhotoOverlays extends AbstractUiSection {
     // Update
     $li
       .merge($$li)
-      .classed('active', layerEnabled)
+      .classed('active', (d: AbstractPixiLayer) => d.enabled)
       .selectAll('input')
-      .property('checked', layerEnabled);
+      .property('checked', (d: AbstractPixiLayer) => d.enabled);
   }
 
 
@@ -202,7 +202,7 @@ export class UiSectionPhotoOverlays extends AbstractUiSection {
 
     const photoTypes = photos.photoTypes;
 
-    function typeEnabled(d: PhotoType): boolean {
+    function isTypeEnabled(d: PhotoType): boolean {
       return photos.showsPhotoType(d);
     }
 
@@ -224,11 +224,11 @@ export class UiSectionPhotoOverlays extends AbstractUiSection {
     $li.exit()
       .remove();
 
-    const $$li = $li.enter()
+    const $$li: D3EnterSelection = $li.enter()
       .append('li')
       .attr('class', (d: PhotoType) => `list-item-photo-types list-item-${d}`);
 
-    const $$label = $$li
+    const $$label: D3EnterSelection = $$li
       .append('label')
       .each((d: PhotoType, i, nodes) => {
         select(nodes[i])
@@ -251,9 +251,9 @@ export class UiSectionPhotoOverlays extends AbstractUiSection {
     // Update
     $li
       .merge($$li)
-      .classed('active', typeEnabled)
+      .classed('active', isTypeEnabled)
       .selectAll('input')
-      .property('checked', typeEnabled);
+      .property('checked', isTypeEnabled);
   }
 
 
@@ -268,7 +268,7 @@ export class UiSectionPhotoOverlays extends AbstractUiSection {
 
     const dateFilterTypes = photos.dateFilters;
 
-    function filterEnabled(d: string): boolean {
+    function isFilterEnabled(d: string): boolean {
       return !!photos.dateFilterValue(d as any);
     }
 
@@ -290,11 +290,11 @@ export class UiSectionPhotoOverlays extends AbstractUiSection {
     $li.exit()
       .remove();
 
-    const $$li = $li.enter()
+    const $$li: D3EnterSelection = $li.enter()
       .append('li')
       .attr('class', 'list-item-date-filter');
 
-    const $$label = $$li
+    const $$label: D3EnterSelection = $$li
       .append('label')
       .each((d: string, i, nodes) => {
         select(nodes[i])
@@ -330,6 +330,6 @@ export class UiSectionPhotoOverlays extends AbstractUiSection {
 
     $li = $li
       .merge($$li)
-      .classed('active', filterEnabled);
+      .classed('active', isFilterEnabled);
   }
 }
