@@ -62,9 +62,6 @@ export class UiApiStatus {
         osm.reloadApiStatus();
       }, { ms: 90000 });
 
-      // Load the initial status in case no OSM data was loaded yet
-      osm.reloadApiStatus();
-
       osm.on('apistatuschange', this._onApiStatusChange);
     }
   }
@@ -93,13 +90,11 @@ export class UiApiStatus {
     let $apiStatus: D3Selection = $parent.selectAll('.api-status')
       .data([0]);
 
-    // enter
-    const $$apiStatus = $apiStatus.enter()
+    // enter/update
+    $apiStatus = $apiStatus.enter()
       .append('div')
-      .attr('class', 'api-status');
-
-    // update
-    $apiStatus = $apiStatus.merge($$apiStatus);
+      .attr('class', 'api-status')
+      .merge($apiStatus);
 
     // Empty out the DOM content and rebuild from scratch..
     $apiStatus.html('');
