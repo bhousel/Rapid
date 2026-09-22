@@ -65,8 +65,8 @@ export type PixiFeatureLabelProps = TextLabelProps | RopeLabelProps;
  * Labels do not participate in hit testing and do not draw halos.
  *
  * Properties available:
- * - `props`   The label generation properties (text or rope) including its placement
- * - `display` The child display object (Sprite, BitmapText, or MeshRope), or null until built
+ * - `props`   - The label generation properties (text or rope) including its placement
+ * - `display` - The child display object (Sprite, BitmapText, or MeshRope), or null until built
  * - (also all properties inherited from `AbstractPixiFeature`)
  */
 export class PixiFeatureLabel extends AbstractPixiFeature {
