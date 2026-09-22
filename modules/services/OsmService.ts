@@ -1021,12 +1021,9 @@ export class OsmService extends AbstractSystem {
 
       const options = { skipSeen: false, filter: new Set<ParserDataType>(['preferences']) };
       const json = (this.preferJSON ? '.json' : '');
+      const path = `/api/0.6/user/preferences${json}`;
 
-      this.loadFromAPI(
-        `/api/0.6/user/preferences${json}`,
-        errback,
-        options
-      );
+      this.loadFromAPI(path, errback, options);
     });
   }
 
@@ -1255,11 +1252,9 @@ export class OsmService extends AbstractSystem {
 
       const options = { skipSeen: false, filter: new Set<ParserDataType>(['api', 'policy']) };
       const json = (this.preferJSON ? '.json' : '');
-      this.loadFromAPI(
-        this._apiroot + `/api/capabilities${json}`,  // note, no '0.6'
-        errback,
-        options
-      );
+      const path = `/api/capabilities${json}`;  // note, no '0.6'
+
+      this.loadFromAPI(path, errback, options);
     });
   }
 
@@ -1841,6 +1836,7 @@ export class OsmService extends AbstractSystem {
       const options = { skipSeen: false, filter: new Set<ParserDataType>(['note']) };
       const json = (this.preferJSON ? '.json' : '');
       const path = `/api/0.6/notes/${noteID}${json}`;
+
       this.loadFromAPI(path, errback, options);
     });
   }
