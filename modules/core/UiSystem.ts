@@ -644,6 +644,8 @@ dims = vecAdd(dims, [overscan * 2, overscan * 2]);
    */
   protected _checkEnvironment(): void {
     const context = this.context;
+    if (context.embed()) return;   // skip this if we are embedded in another app
+
     const assets = context.systems.assets!;
     const urlhash = context.systems.urlhash!;
     const detected = utilDetect();
