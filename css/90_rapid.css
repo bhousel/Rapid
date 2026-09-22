@@ -711,6 +711,12 @@ button.overture-inspector-close svg {
   content: "";
   height: 0px;
   width: 0px;
+  /*
+   * I don't understand why we need 'content-box' here.
+   * My best guess is that the '::after' rule doesn't set to 'border-box' like everything else
+   * in `reset.css`, so we ended up sizing this control for 'content-box' inadvertantly.
+   */
+  box-sizing: content-box;
 }
 .rapid-checkbox-label input:checked~.rapid-checkbox-custom::after {
   content: "";
