@@ -22,6 +22,7 @@ export class UiDownloadTool {
 
   // D3 selections
   public $parent: D3Selection | null;
+  public rerender: () => void;
 
 
   /**
@@ -44,10 +45,11 @@ export class UiDownloadTool {
     // (This is also necessary when using `d3-selection.call`)
     this.choose = this.choose.bind(this);
     this.render = this.render.bind(this);
+    this.rerender = () => this.render();
 
     // Event listeners
-    context.on('modechange', this.render);
-    editor.on('stablechange', this.render);
+    context.on('modechange', this.rerender);
+    editor.on('stablechange', this.rerender);
   }
 
 

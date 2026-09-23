@@ -19,6 +19,7 @@ export class UiValidatorStatus {
 
   // D3 selections
   public $parent: D3Selection | null;
+  public rerender: () => void;
 
 
   /**
@@ -37,11 +38,12 @@ export class UiValidatorStatus {
     // Ensure methods used as callbacks always have `this` bound correctly.
     // (This is also necessary when using `d3-selection.call`)
     this.render = this.render.bind(this);
+    this.rerender = () => this.render();
     this.click = this.click.bind(this);
 
     // Event listeners
     const validator = context.systems.validator!;
-    validator.on('validated', this.render);
+    validator.on('validated', this.rerender);
   }
 
 

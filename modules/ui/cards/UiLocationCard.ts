@@ -16,6 +16,7 @@ export class UiLocationCard extends AbstractUiCard {
 
   protected _currLocation: string | null;
   protected _keys: string[] | null;
+  public rerender: () => void;
   protected _deferredUpdateLocation: (loc: any) => void;
 
 
@@ -36,6 +37,7 @@ export class UiLocationCard extends AbstractUiCard {
     // Ensure methods used as callbacks always have `this` bound correctly.
     // (This is also necessary when using `d3-selection.call`)
     this.render = this.render.bind(this);
+    this.rerender = () => this.render();
     this.updateLocation = this.updateLocation.bind(this);
     this._deferredUpdateLocation = (loc) => {
       // scheduler throttles to no more than 1/sec; without it, just update immediately
@@ -48,7 +50,7 @@ export class UiLocationCard extends AbstractUiCard {
     this._setupKeybinding = this._setupKeybinding.bind(this);
 
     // Event listeners
-    eventManager.on('pointermove', this.render);
+    eventManager.on('pointermove', this.rerender);
     l10n.on('localechange', this._setupKeybinding);
 
     this._setupKeybinding();

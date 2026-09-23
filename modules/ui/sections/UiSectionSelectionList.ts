@@ -14,6 +14,7 @@ import type { OsmEntity } from '../../data/index.ts';
  */
 export class UiSectionSelectionList extends AbstractUiSection {
   protected _selectedIDs: EntityID[];
+  public rerender: () => void;
 
 
   /**
@@ -26,9 +27,10 @@ export class UiSectionSelectionList extends AbstractUiSection {
     // Ensure methods used as callbacks always have `this` bound correctly.
     this._selectEntity = this._selectEntity.bind(this);
     this._deselectEntity = this._deselectEntity.bind(this);
+    this.rerender = () => this.renderInner();
 
     const editor = context.systems.editor!;
-    editor.on('stablechange', this.renderInner);
+    editor.on('stablechange', this.rerender);
   }
 
 

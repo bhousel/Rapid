@@ -22,6 +22,7 @@ export class UiRapidTool {
 
   // D3 selections
   public $parent: D3Selection | null;
+  public rerender: () => void;
 
 
   /**
@@ -49,11 +50,12 @@ export class UiRapidTool {
     // (This is also necessary when using `d3-selection.call`)
     this.choose = this.choose.bind(this);
     this.render = this.render.bind(this);
+    this.rerender = () => this.render();
 
-    ui?.on('uichange', this.render);
-    urlhash.on('hashchange', this.render);
-    scene.on('layerchange', this.render);
-    context.on('modechange', this.render);
+    ui?.on('uichange', this.rerender);
+    urlhash.on('hashchange', this.rerender);
+    scene.on('layerchange', this.rerender);
+    context.on('modechange', this.rerender);
   }
 
 

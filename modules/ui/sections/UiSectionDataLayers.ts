@@ -41,6 +41,7 @@ interface BaseLayerItem {
 export class UiSectionDataLayers extends AbstractUiSection {
   protected _previousLayerStates: Map<string, boolean>;
   protected _keys: string[] | null;
+  public rerender: () => void;
   protected _settingsCustomData: UiSettingsCustomData;
 
 
@@ -65,12 +66,13 @@ export class UiSectionDataLayers extends AbstractUiSection {
     this._customChanged = this._customChanged.bind(this);
     this._mapRouletteIDsChanged = this._mapRouletteIDsChanged.bind(this);
     this._setupKeybinding = this._setupKeybinding.bind(this);
+    this.rerender = () => this.renderInner();
 
     this._settingsCustomData = new UiSettingsCustomData(context);
     this._settingsCustomData.on('change', this._customChanged);
 
     // Add or replace event handlers
-    scene.on('layerchange', this.renderInner);
+    scene.on('layerchange', this.rerender);
     l10n.on('localechange', this._setupKeybinding);
 
     this._setupKeybinding();

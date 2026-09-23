@@ -51,6 +51,7 @@ export class UiRapidAddDataset extends EventEmitter {
   protected _fieldStringID: StringID | null;
   /* If there is a url error, the error */
   protected _urlError: string | null;
+  public rerender: () => void;
 
 
   /**
@@ -81,6 +82,7 @@ export class UiRapidAddDataset extends EventEmitter {
     this.show = this.show.bind(this);
     this.close = this.close.bind(this);
     this.render = this.render.bind(this);
+    this.rerender = () => this.render();
     this._checkFields = this._checkFields.bind(this);
     this._clickedNext = this._clickedNext.bind(this);
     this._done = this._done.bind(this);
@@ -111,7 +113,7 @@ export class UiRapidAddDataset extends EventEmitter {
     this.render();
 
     // Setup event handlers
-    l10n.on('localechange', this.render);
+    l10n.on('localechange', this.rerender);
   }
 
 
@@ -150,7 +152,7 @@ export class UiRapidAddDataset extends EventEmitter {
     this.emit('done');
     this.Modal = null;
 
-    l10n.off('localechange', this.render);
+    l10n.off('localechange', this.rerender);
   }
 
 

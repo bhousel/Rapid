@@ -12,6 +12,7 @@ import type { D3Selection } from 'd3-selection';
  * It lives on the Map Data pane.
  */
 export class UiSectionMapStyleOptions extends AbstractUiSection {
+  public rerender: () => void;
 
 
   /**
@@ -24,9 +25,10 @@ export class UiSectionMapStyleOptions extends AbstractUiSection {
 
     // Ensure methods used as callbacks always have `this` bound correctly.
     this._drawListItems = this._drawListItems.bind(this);
+    this.rerender = () => this.renderInner();
 
-    map.off('mapchange', this.renderInner);
-    map.on('mapchange', this.renderInner);
+    map.off('mapchange', this.rerender);
+    map.on('mapchange', this.rerender);
   }
 
 

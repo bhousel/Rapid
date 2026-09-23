@@ -11,6 +11,7 @@ import type { D3Selection } from 'd3-selection';
  *  It lives on the Map Data panel, but should probably be on it's own panel.
  */
 export class UiSectionMapFeatures extends AbstractUiSection {
+  public rerender: () => void;
 
 
   /**
@@ -23,8 +24,9 @@ export class UiSectionMapFeatures extends AbstractUiSection {
 
     // Ensure methods used as callbacks always have `this` bound correctly.
     this._drawListItems = this._drawListItems.bind(this);
+    this.rerender = () => this.renderInner();
 
-    filters.on('filterchange', this.renderInner);
+    filters.on('filterchange', this.rerender);
   }
 
 

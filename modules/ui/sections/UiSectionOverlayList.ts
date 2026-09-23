@@ -21,6 +21,7 @@ import type { ImagerySource } from '../../lib/ImagerySource.ts';
  */
 export class UiSectionOverlayList extends AbstractUiSection {
   protected _overlayList: D3Selection;
+  public rerender: () => void;
 
   /**
    * @param context - Global shared application context
@@ -40,8 +41,9 @@ export class UiSectionOverlayList extends AbstractUiSection {
     this._chooseOverlay = this._chooseOverlay.bind(this);
     this._onMapDraw = this._onMapDraw.bind(this);
     this._deferredOnMapDraw = this._deferredOnMapDraw.bind(this);
+    this.rerender = () => this.renderInner();
 
-    imagery.on('imagerychange', this.renderInner);
+    imagery.on('imagerychange', this.rerender);
     gfx.on('draw', this._deferredOnMapDraw);
   }
 

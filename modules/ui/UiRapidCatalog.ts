@@ -29,6 +29,7 @@ export class UiRapidCatalog extends EventEmitter {
 
   protected _filterText: string | null;
   protected _filterCategory: string | null;
+  public rerender: () => void;
 
 
   /**
@@ -51,6 +52,7 @@ export class UiRapidCatalog extends EventEmitter {
     this.show = this.show.bind(this);
     this.close = this.close.bind(this);
     this.render = this.render.bind(this);
+    this.rerender = () => this.render();
     this.renderDatasets = this.renderDatasets.bind(this);
     this.sortCategories = this.sortCategories.bind(this);
     this.sortDatasets = this.sortDatasets.bind(this);
@@ -59,7 +61,7 @@ export class UiRapidCatalog extends EventEmitter {
 
     // Setup event handlers
     const l10n = context.systems.l10n!;
-    l10n.on('localechange', this.render);
+    l10n.on('localechange', this.rerender);
   }
 
 

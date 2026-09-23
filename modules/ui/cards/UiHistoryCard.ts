@@ -14,6 +14,7 @@ import type { D3Selection } from 'd3-selection';
  */
 export class UiHistoryCard extends AbstractUiCard {
   public id: string;
+  public rerender: () => void;
   public deferredRender: () => void;
 
   protected _keys: string[] | null;
@@ -35,12 +36,13 @@ export class UiHistoryCard extends AbstractUiCard {
     // Ensure methods used as callbacks always have `this` bound correctly.
     // (This is also necessary when using `d3-selection.call`)
     this.render = this.render.bind(this);
+    this.rerender = () => this.render();
     this.deferredRender = () => {
       // scheduler debounces the redraw; without it, just redraw immediately
       if (scheduler) {
-        scheduler.debounce('UiHistoryCard-render', () => this.render(), { ms: 250 });
+        scheduler.debounce('UiHistoryCard-render', this.rerender, { ms: 250 });
       } else {
-        this.render();
+        this.rerender();
       }
     };
     this.renderEntity = this.renderEntity.bind(this);
@@ -52,7 +54,7 @@ export class UiHistoryCard extends AbstractUiCard {
 
     // Event listeners
     gfx.on('draw', this.deferredRender);
-    context.on('modechange', this.render);
+    context.on('modechange', this.rerender);
 //    context.behaviors.hover.on('hoverchange', this.render);   //Rapid#1575
     l10n.on('localechange', this._setupKeybinding);
 

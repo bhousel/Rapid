@@ -28,6 +28,7 @@ export class UiDrawModesTool {
   // D3 selections
   public $parent: D3Selection | null;
 
+  public rerender: () => void;
   public debouncedRender: () => void;
 
   protected _keys: string | string[] | null;
@@ -92,21 +93,22 @@ export class UiDrawModesTool {
     // (This is also necessary when using `d3-selection.call`)
     this.choose = this.choose.bind(this);
     this.render = this.render.bind(this);
+    this.rerender = () => this.render();
     this.debouncedRender = () => {
       // scheduler throttles the redraw; without it, just redraw immediately
       if (scheduler) {
-        scheduler.throttle('UiDrawModesTool-render', () => this.render(), { ms: 500 });
+        scheduler.throttle('UiDrawModesTool-render', this.rerender, { ms: 500 });
       } else {
-        this.render();
+        this.rerender();
       }
     };
     this._setupKeybinding = this._setupKeybinding.bind(this);
 
     // Event listeners
     gfx.on('draw', this.debouncedRender);
-    gfx.scene!.on('layerchange', this.render);
-    context.on('modechange', this.render);
-    ui?.on('uichange', this.render);
+    gfx.scene!.on('layerchange', this.rerender);
+    context.on('modechange', this.rerender);
+    ui?.on('uichange', this.rerender);
     l10n.on('localechange', this._setupKeybinding);
 
     this._setupKeybinding();

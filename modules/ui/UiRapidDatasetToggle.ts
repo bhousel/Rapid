@@ -42,6 +42,7 @@ export class UiRapidDatasetToggle extends EventEmitter {
   // Child components
   public Modal: UiModal | null;
   protected _colorpickers: Record<DatasetID, UiRapidColorpicker>;
+  public rerender: () => void;
 
 
   /**
@@ -61,6 +62,7 @@ export class UiRapidDatasetToggle extends EventEmitter {
     this.show = this.show.bind(this);
     this.close = this.close.bind(this);
     this.render = this.render.bind(this);
+    this.rerender = () => this.render();
     this.renderDatasets = this.renderDatasets.bind(this);
     this.changeColor = this.changeColor.bind(this);
     this.isRapidEnabled = this.isRapidEnabled.bind(this);
@@ -89,8 +91,8 @@ export class UiRapidDatasetToggle extends EventEmitter {
     this.render();
 
     // Setup event handlers
-    scene.on('layerchange', this.render);
-    l10n.on('localechange', this.render);
+    scene.on('layerchange', this.rerender);
+    l10n.on('localechange', this.rerender);
   }
 
 
@@ -117,8 +119,8 @@ export class UiRapidDatasetToggle extends EventEmitter {
     this.Modal = null;
     this._colorpickers = {};
 
-    scene.off('layerchange', this.render);
-    l10n.off('localechange', this.render);
+    scene.off('layerchange', this.rerender);
+    l10n.off('localechange', this.rerender);
   }
 
 
@@ -216,7 +218,7 @@ export class UiRapidDatasetToggle extends EventEmitter {
       .append('div')
       .attr('class', 'modal-section rapid-row row-search-catalog')
       .on('click', () => {
-        const CatalogModal = new UiRapidCatalog(context).on('done', this.render);
+        const CatalogModal = new UiRapidCatalog(context).on('done', this.rerender);
         CatalogModal.show();
       });
 
@@ -249,7 +251,7 @@ export class UiRapidDatasetToggle extends EventEmitter {
       .append('div')
       .attr('class', 'modal-section rapid-row row-custom-dataset')
       .on('click', () => {
-        const AddDatasetModal = new UiRapidAddDataset(context).on('done', this.render);
+        const AddDatasetModal = new UiRapidAddDataset(context).on('done', this.rerender);
         AddDatasetModal.show();
       });
 
@@ -417,7 +419,7 @@ export class UiRapidDatasetToggle extends EventEmitter {
       .attr('class', 'rapid-row-action rapid-dataset-settings')
       .on('click', (e: PointerEvent, ds: RapidDataset) => {
         if (!this.isRapidEnabled())  return;  // check it - don't capture the closure variable
-        const SettingsModal = new UiRapidDatasetSettings(context).on('done', this.render);
+        const SettingsModal = new UiRapidDatasetSettings(context).on('done', this.rerender);
         SettingsModal.dataset = ds;
         SettingsModal.show();
       })

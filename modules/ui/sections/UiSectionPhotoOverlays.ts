@@ -28,6 +28,7 @@ import type { D3EnterSelection, D3Selection } from 'd3-selection';
  *  ```
  */
 export class UiSectionPhotoOverlays extends AbstractUiSection {
+  public rerender: () => void;
 
 
   /**
@@ -43,10 +44,11 @@ export class UiSectionPhotoOverlays extends AbstractUiSection {
     this._drawPhotoItems = this._drawPhotoItems.bind(this);
     this._drawPhotoTypeItems = this._drawPhotoTypeItems.bind(this);
     this._drawDateFilter = this._drawDateFilter.bind(this);
+    this.rerender = () => this.renderInner();
 
     // Add or replace event handlers
-    scene.on('layerchange', this.renderInner);
-    photos.on('photochange', this.renderInner);
+    scene.on('layerchange', this.rerender);
+    photos.on('photochange', this.rerender);
   }
 
 

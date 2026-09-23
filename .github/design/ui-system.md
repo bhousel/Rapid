@@ -91,7 +91,7 @@ export class UiFoo {
 
     // Event wiring (render on relevant changes)
     const l10n = context.systems.l10n!;
-    l10n.on('localechange', this.render);
+    l10n.on('localechange', () => this.render());
   }
 
 

@@ -30,6 +30,7 @@ export class UiMapToolbar {
 
   // D3 selections
   public $parent: D3Selection | null;
+  public rerender: () => void;
 
 
   /**
@@ -51,9 +52,10 @@ export class UiMapToolbar {
     // Ensure methods used as callbacks always have `this` bound correctly.
     // (This is also necessary when using `d3-selection.call`)
     this.render = this.render.bind(this);
+    this.rerender = () => this.render();
 
     const urlhash = context.systems.urlhash!;
-    urlhash.on('hashchange', this.render);
+    urlhash.on('hashchange', this.rerender);
   }
 
 

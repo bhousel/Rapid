@@ -87,6 +87,7 @@ export class UiRapidDatasetSettings extends EventEmitter {
   protected _transforms: PartialDataTransform[] | null;
   /** Unique ID for field identifiers */
   protected _uuid: string;
+  public rerender: () => void;
 
 
   /**
@@ -111,6 +112,7 @@ export class UiRapidDatasetSettings extends EventEmitter {
     this.show = this.show.bind(this);
     this.close = this.close.bind(this);
     this.render = this.render.bind(this);
+    this.rerender = () => this.render();
     this._checkFields = this._checkFields.bind(this);
     this._clickedOk = this._clickedOk.bind(this);
     this._clickedDelete = this._clickedDelete.bind(this);
@@ -128,8 +130,8 @@ export class UiRapidDatasetSettings extends EventEmitter {
 
     // Setup event handlers
     const l10n = context.systems.l10n!;
-    l10n.on('localechange', this.render);
-    this.Colorpicker.on('change', this.render);
+    l10n.on('localechange', this.rerender);
+    this.Colorpicker.on('change', this.rerender);
   }
 
 
@@ -171,7 +173,7 @@ export class UiRapidDatasetSettings extends EventEmitter {
     this.render();
 
     // Setup event handlers
-    l10n.on('localechange', this.render);
+    l10n.on('localechange', this.rerender);
   }
 
 
@@ -197,7 +199,7 @@ export class UiRapidDatasetSettings extends EventEmitter {
     this.emit('done');
     this.Modal = null;
     this.AreYouSureModal = null;
-    l10n.off('localechange', this.render);
+    l10n.off('localechange', this.rerender);
   }
 
 

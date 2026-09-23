@@ -33,6 +33,7 @@ export class UiNoteEditor extends EventEmitter {
   public ViewOn: UiViewOn;
 
   protected _authWired: boolean;
+  public rerender: () => void;
 
 
   /**
@@ -56,6 +57,7 @@ export class UiNoteEditor extends EventEmitter {
 
     // Ensure methods used as callbacks always have `this` bound correctly.
     this.render = this.render.bind(this);
+    this.rerender = () => this.render();
     this._saveSection = this._saveSection.bind(this);
     this._userDetails = this._userDetails.bind(this);
     this._buttons = this._buttons.bind(this);
@@ -145,7 +147,7 @@ export class UiNoteEditor extends EventEmitter {
     // rerender the note editor on any auth change (wire once to avoid leaking listeners)
     if (osm && !this._authWired) {
       this._authWired = true;
-      osm.on('authchange', this.render);
+      osm.on('authchange', this.rerender);
     }
   }
 

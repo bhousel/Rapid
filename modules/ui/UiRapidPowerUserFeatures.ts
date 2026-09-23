@@ -15,6 +15,7 @@ import type { D3EnterSelection, D3Selection } from 'd3-selection';
 export class UiRapidPowerUserFeatures extends EventEmitter {
   public context: Context;
   protected _featureFlags: string[];
+  public rerender: () => void;
 
   // Child components
   public Modal: UiModal | null;
@@ -45,6 +46,7 @@ export class UiRapidPowerUserFeatures extends EventEmitter {
     this.show = this.show.bind(this);
     this.close = this.close.bind(this);
     this.render = this.render.bind(this);
+    this.rerender = () => this.render();
     this.renderFeatures = this.renderFeatures.bind(this);
     this.updateFeatureFlags = this.updateFeatureFlags.bind(this);
     this.isFeatureEnabled = this.isFeatureEnabled.bind(this);
@@ -76,7 +78,7 @@ export class UiRapidPowerUserFeatures extends EventEmitter {
     this.render();
 
     // Setup event handlers
-    l10n.on('localechange', this.render);
+    l10n.on('localechange', this.rerender);
     urlhash.on('hashchange', this.updateFeatureFlags);
   }
 
@@ -103,7 +105,7 @@ export class UiRapidPowerUserFeatures extends EventEmitter {
     this.emit('done');
     this.Modal = null;
 
-    l10n.off('localechange', this.render);
+    l10n.off('localechange', this.rerender);
     urlhash.off('hashchange', this.updateFeatureFlags);
   }
 
