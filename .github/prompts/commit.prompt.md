@@ -21,5 +21,4 @@ You are performing a git commit for this repo. Do the following steps in order:
      ```
      printf '%s\n' 'First line' '' 'closes #123' > /tmp/commitmsg.txt
      ```
-5. Run `git push` to push commits up to the origin
 
