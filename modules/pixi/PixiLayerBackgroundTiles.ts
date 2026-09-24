@@ -493,8 +493,12 @@ export class PixiLayerBackgroundTiles extends AbstractPixiLayer {
         }
       });
 
-      this.convolutionFilter = new ConvolutionFilter(convolutionArray);
-      sourceContainer.filters= [...sourceContainer.filters, this.convolutionFilter];
+      this.convolutionFilter = new ConvolutionFilter({
+        matrix: Float32Array.from(convolutionArray),
+        width: 3,
+        height: 3
+      });
+      sourceContainer.filters = [...sourceContainer.filters, this.convolutionFilter];
 
     } else if (this.filters.sharpness < 1) {
       const blurFactor = interpolateNumber(1, 8)(1 - this.filters.sharpness);
