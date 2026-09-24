@@ -72,7 +72,24 @@ export class UiRapidAddDataset extends EventEmitter {
     // Sample datasets
     const sampleData = [
       { value: 'http://bryanhousel.com/osm/STL_TREES_min.geojson' },
-      { value: 'http://bryanhousel.com/osm/stops.geojson' }
+      { value: 'http://bryanhousel.com/osm/Hawaii_Sidewalks_and_Paths.geojson' },
+      { value: 'http://bryanhousel.com/osm/King_County_Stops.geojson' },
+      { value: 'http://bryanhousel.com/ODOT/freight_terminals/Freight_Terminals_osw_clean_7.nodes.geojson' },
+      { value: 'http://bryanhousel.com/ODOT/crashes_osw_clean/Crashes_osw_clean_3.points.geojson' },
+      { value: 'http://bryanhousel.com/ODOT/crossings_ped_bike_sanitized_validated/crossings_ped_bike_osw_tags_full_precision.edges.geojson' },
+      { value: 'http://bryanhousel.com/ODOT/crossings_ped_bike_sanitized_validated/crossings_ped_bike.nodes.geojson' },
+      { value: 'http://bryanhousel.com/ODOT/bike_paths_osw_tags_sanitized_validated/bike_paths_osw_tags.edges.geojson' },
+      { value: 'http://bryanhousel.com/ODOT/bike_paths_osw_tags_sanitized_validated/bike_paths.nodes.geojson' },
+      { value: 'http://bryanhousel.com/ODOT/union_roads_sidewalks_bikepaths_crossings/osw.edges.geojson' },
+      { value: 'http://bryanhousel.com/ODOT/union_roads_sidewalks_bikepaths_crossings/osw.nodes.geojson' },
+      { value: 'http://bryanhousel.com/ODOT/pedestrian_sidewalks_osw_tags/Pedestrian_Sidewalks_osw_tags.edges.geojson' },
+      { value: 'http://bryanhousel.com/ODOT/pedestrian_sidewalks_osw_tags/Pedestrian_Sidewalks_osw_tags.nodes.geojson' },
+      { value: 'http://bryanhousel.com/ODOT/freight_routes_cleaned/Freight_Routes_osw.edges.geojson' },
+      { value: 'http://bryanhousel.com/ODOT/freight_routes_cleaned/Freight_Routes_osw.nodes.geojson' },
+      { value: 'http://bryanhousel.com/ODOT/transit_osw_tags_sanitized_validated/Transit_odot_osw_tags.edges.geojson' },
+      { value: 'http://bryanhousel.com/ODOT/transit_osw_tags_sanitized_validated/Transit_odot.nodes.geojson' },
+      { value: 'http://bryanhousel.com/ODOT/roads_osw_tags_sanitized_validated/roads_osw_tags.edges.geojson' },
+      { value: 'http://bryanhousel.com/ODOT/roads_osw_tags_sanitized_validated/roads.nodes.geojson' },
     ];
     this.SampleCombo.data(sampleData);
 
