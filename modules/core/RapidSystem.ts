@@ -106,7 +106,16 @@ export class RapidSystem extends AbstractSystem {
   public constructor(context: Context) {
     super(context);
     this.id = 'rapid';
-    this.optionalDependencies = new Set<SystemID>(['editor', 'gfx', 'settings', 'urlhash']);
+
+    // The addition of "custom" datasets means that RapidSystem needs more dependencies
+    // See `RapidDataset.ts` for details.
+    // 'assets' - for thumnailurl,
+    // 'spatial' - for the custom data,
+    // 'network' - to fetch the data,
+    // 'l10n' - to localize RapidDataset
+
+    this.requiredDependencies = new Set<SystemID>(['network', 'spatial']);
+    this.optionalDependencies = new Set<SystemID>(['assets', 'editor', 'gfx', 'l10n', 'settings', 'urlhash']);
 
     // Ensure methods used as callbacks always have `this` bound correctly.
     this._hashChanged = this._hashChanged.bind(this);

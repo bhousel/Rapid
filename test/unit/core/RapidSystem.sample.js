@@ -24,6 +24,51 @@ export const overturePlaces = {
   description: 'Points of interest'
 };
 
+export const customDataset = {
+  id: 'my-custom',
+  custom: true,
+  conflated: true,
+  color: '#00ff00',
+  sourceUrl: 'https://example.com/data/trees.geojson',
+  label: 'Custom Data',
+  description: 'My Custom Dataset'
+};
+
+// Sample data near [10°, 0°]
+export const data10 = {
+  type: 'FeatureCollection',
+  features: [{
+    type: 'Feature',
+    properties: {
+      OBJECTID: 1,
+      natural: 'tree'
+    },
+    geometry: {
+      type: 'Point',
+      coordinates: [10.001, 0]
+    }
+  }, {
+    type: 'Feature',
+    properties: {
+      OBJECTID: 2,
+      natural: 'tree'
+    },
+    geometry: {
+      type: 'Point',
+      coordinates: [10.002, 0]
+    }
+  }, {
+    type: 'Feature',
+    properties: {
+      OBJECTID: 3,
+      natural: 'tree'
+    },
+    geometry: {
+      type: 'Point',
+      coordinates: [10.003, 0]
+    }
+  }]
+};
 
 
 export const gpxWithPoints = `<?xml version="1.0"?>

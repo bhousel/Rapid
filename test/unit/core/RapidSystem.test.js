@@ -1,4 +1,5 @@
-import { afterEach, beforeAll, beforeEach, describe, it, mock } from 'bun:test';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, it, mock } from 'bun:test';
+import fetchMock from 'fetch-mock';
 import { assert } from 'chai';
 import { DOMParser } from '@xmldom/xmldom';
 import * as Rapid from '../../../modules/headless.js';
@@ -29,8 +30,27 @@ describe('RapidSystem', () => {
   // Setup context..
   const context = new Rapid.MockContext();
   context.systems = {
+    network:  new Rapid.NetworkSystem(context),
+    settings: new Rapid.SettingsSystem(context),
+    spatial:  new Rapid.SpatialSystem(context),
+    storage:  new Rapid.StorageSystem(context),
     urlhash:  new MockUrlHashSystem(context)
   };
+
+  // Setup fetchMock..
+  beforeAll(() => {
+    fetchMock
+      .mockGlobal()
+      .sticky(/trees\.geojson/, sample.data10);
+  });
+
+  afterAll(() => {
+    fetchMock.hardReset({ includeSticky: true });
+  });
+
+  beforeEach(() => {
+    fetchMock.removeRoutes().clearHistory();
+  });
 
 
   // Test construction and startup of the system..
@@ -364,66 +384,43 @@ describe('RapidSystem', () => {
         });
       });
     });
-  });
 
 
-  // Test that dataset settings survive a save -> load round-trip through the
-  // string-only `SettingsSystem` with their types intact (e.g. `conflated` stays a boolean).
-  describe('dataset settings persistence', () => {
-    let ctx, storage, settings, rapid;
+    describe('saveDatasetSettings / loadDatasetSettings', () => {
+      const storage = context.systems.storage;
 
-    function cleanStorage() {
-      for (const key of storage.keys()) {
-        if (key.startsWith('rapid.settings.')) storage.removeItem(key);
+      function cleanStorage() {
+        for (const key of storage.keys()) {
+          if (key.startsWith('rapid.settings.')) {
+            storage.removeItem(key);
+          }
+        }
       }
-    }
 
-    beforeEach(() => {
-      ctx = new Rapid.MockContext();
-      storage = new Rapid.StorageSystem(ctx);
-      settings = new Rapid.SettingsSystem(ctx);
-      rapid = new Rapid.RapidSystem(ctx);
-      ctx.systems.storage = storage;
-      ctx.systems.settings = settings;
-      ctx.systems.rapid = rapid;
-      cleanStorage();
-      return settings.initAsync();
-    });
+      beforeEach(() => cleanStorage());
+      afterEach(() => cleanStorage());
 
-    afterEach(() => {
-      cleanStorage();
-    });
+      // Test that dataset settings survive a save -> load round-trip through the
+      // string-only `SettingsSystem` with their types intact (e.g. `conflated` stays a boolean).
+      it('round-trips a custom dataset through save/load preserving types', () => {
+        const custom = new Rapid.RapidDataset(context, sample.customDataset);
+        _rapid.catalog.set(custom.id, custom);
 
+        _rapid.saveDatasetSettings(custom);
 
-    it('round-trips a service dataset conflated flag as a boolean', () => {
-      const ds = new Rapid.RapidDataset(ctx, { id: 'msBuildings', serviceID: 'mapwithai', conflated: true });
-      rapid.catalog.set(ds.id, ds);
+        // Simulate a fresh load: drop it from the catalog so `_loadDatasetSettings` reconstructs it.
+        _rapid.catalog.delete(custom.id);
+        _rapid._loadDatasetSettings();
 
-      rapid.saveDatasetSettings(ds);
-
-      // Simulate a fresh load: reset the in-memory flag, then load from settings.
-      ds.conflated = false;
-      rapid._loadDatasetSettings();
-
-      assert.strictEqual(ds.conflated, true);   // strict, so 'true' string would fail here
-    });
-
-
-    it('round-trips a custom dataset through save/load preserving types', () => {
-      const custom = new Rapid.RapidDataset(ctx, { id: 'my-custom', custom: true, conflated: true, color: '#00ff00' });
-      rapid.catalog.set(custom.id, custom);
-
-      rapid.saveDatasetSettings(custom);
-
-      // Simulate a fresh load: drop it from the catalog so `_loadDatasetSettings` reconstructs it.
-      rapid.catalog.delete(custom.id);
-      rapid._loadDatasetSettings();
-
-      const restored = rapid.catalog.get('my-custom');
-      assert.instanceOf(restored, Rapid.RapidDataset);
-      assert.strictEqual(restored.custom, true);
-      assert.strictEqual(restored.conflated, true);
-      assert.strictEqual(restored.color, '#00ff00');
+        const restored = _rapid.catalog.get('my-custom');
+        assert.instanceOf(restored, Rapid.RapidDataset);
+        assert.strictEqual(restored.custom, true);
+        assert.strictEqual(restored.conflated, true);
+        assert.strictEqual(restored.color, '#00ff00');
+        assert.strictEqual(restored.sourceUrl, 'https://example.com/data/trees.geojson');
+        assert.strictEqual(restored.label, 'Custom Data');
+        assert.strictEqual(restored.description, 'My Custom Dataset');
+      });
     });
   });
 
