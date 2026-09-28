@@ -374,6 +374,88 @@ export class WorkerSystem extends AbstractSystem {
 
 
   /**
+   * Resolves the configured `workerURL` into a URL that is safe to pass to the
+   * `Worker` constructor, transparently handling cross-origin worker hosting.
+   *
+   * ## Why this is needed
+   * The browser lets a page load its *main* script bundle (`rapid.js`) from any
+   * origin via `<script src>`, but the `Worker` constructor requires the
+   * worker's **top-level** script to be **same-origin** with the document —
+   * for both classic *and* module workers.  This is a hard rule and is **not**
+   * relaxable with CORS response headers.
+   *
+   * That matters because host apps commonly serve the Rapid bundle from a CDN /
+   * object store (Azure Blob Storage, S3, etc.) on a *different* origin than the
+   * app itself.  In that setup `workerURL` is auto-detected (see the
+   * constructor) as `https://<cdn-origin>/…/rapid-worker.js`, and
+   * `new Worker(thatURL, { type: 'module' })` throws a SecurityError.
+   *
+   * ## The fix
+   * When (and only when) `workerURL` resolves to a **cross-origin http(s)** URL,
+   * we build a tiny **same-origin** module via `Blob` + `URL.createObjectURL`
+   * whose entire body is a single static `import` of the real cross-origin
+   * worker module:
+   *
+   * ```js
+   * import "https://<cdn-origin>/…/rapid-worker.js";
+   * ```
+   *
+   * The `Worker` top-level script is now same-origin (a `blob:` URL, which
+   * inherits the document's origin), satisfying the constructor.  Because it's a
+   * **module** worker, the cross-origin `import` inside it *is* permitted
+   * (subject to normal CORS on the CDN response), and — crucially — the imported
+   * module's own relative imports, `import.meta.url`, and any wasm/asset fetches
+   * all resolve against the **real** CDN origin, exactly as intended.
+   *
+   * ## What the host still needs
+   * - **CORS** on the asset origin (e.g. `Access-Control-Allow-Origin`) so the
+   *   `import` and downstream asset fetches succeed.
+   * - A **CSP** that permits `worker-src blob:` and `script-src`/`connect-src`
+   *   for the CDN origin.  (Rapid's own example pages already ship
+   *   `worker-src 'self' blob:` — see `scripts/content_security_policy.ts`.)
+   *
+   * ## What is intentionally left untouched
+   * Same-origin URLs and non-http(s) schemes (`file:`, `blob:`, `data:`) are
+   * returned as-is — they are already valid worker top-level scripts and need no
+   * shim.  This also keeps the behavior a no-op for the test/headless harness,
+   * which spawns workers from a local `file:` URL.
+   *
+   * Note: the created `blob:` URL is intentionally **not** revoked here.  A
+   * module worker fetches its top-level script asynchronously, so revoking
+   * eagerly would risk a "Failed to fetch" race.  At most `maxWorkers` (default
+   * 2) such URLs are ever created per session, so the leak is negligible.
+   *
+   * @param   workerURL - The configured worker script URL
+   * @return  A same-origin-safe URL to hand to the `Worker` constructor
+   */
+  protected _resolveWorkerURL(workerURL: string): string {
+    // Without a document origin to compare against (non-browser/headless host)
+    // we can't classify cross-origin, so pass the URL through unchanged.
+    if (typeof location === 'undefined' || !location.href) {
+      return workerURL;
+    }
+
+    let abs: URL;
+    try {
+      abs = new URL(workerURL, location.href);
+    } catch {
+      return workerURL;  // not a URL we can reason about; leave it alone
+    }
+
+    const isSameOrigin = abs.origin === location.origin;
+    const isHttp = abs.protocol === 'http:' || abs.protocol === 'https:';
+
+    // Only cross-origin http(s) workers hit the same-origin restriction.
+    if (isSameOrigin || !isHttp) {
+      return workerURL;
+    }
+
+    const shim = `import ${JSON.stringify(abs.href)};`;
+    return URL.createObjectURL(new Blob([shim], { type: 'text/javascript' }));
+  }
+
+
+  /**
    * Creates a new Worker and wires up message/error handlers.
    *
    * Deferred result delivery failures (including scheduler-triggered `AbortError` cancellations)
@@ -382,7 +464,7 @@ export class WorkerSystem extends AbstractSystem {
    */
   protected _spawnWorker(): Worker {
     const scheduler = this.context.systems.scheduler;
-    const worker = new Worker(this._workerURL!, { type: 'module' });
+    const worker = new Worker(this._resolveWorkerURL(this._workerURL!), { type: 'module' });
 
     worker.onmessage = (event: MessageEvent<WorkerResponse>) => {
       const { id, result, error } = event.data;
