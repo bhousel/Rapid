@@ -130,6 +130,53 @@ describe('WorkerSystem', () => {
         });
       });
 
+      describe('_resolveWorkerURL (cross-origin worker shim)', () => {
+        it('returns a same-origin http(s) URL unchanged', () => {
+          // The headless harness runs at about:blank (origin `null`), so give it
+          // a real http origin for this same-origin comparison, then restore.
+          const restoreURL = globalThis.location.href;
+          try {
+            globalThis.happyDOM.setURL('http://localhost:8080/app/');
+            const sameOrigin = new URL('/js/rapid-worker.js', globalThis.location.href).href;
+            assert.strictEqual(_worker._resolveWorkerURL(sameOrigin), sameOrigin);
+          } finally {
+            globalThis.happyDOM.setURL(restoreURL);
+          }
+        });
+
+        it('leaves non-http(s) schemes (e.g. file:) untouched', () => {
+          // The test harness itself spawns workers from a file: URL — it must
+          // never be wrapped in a blob.
+          assert.strictEqual(_worker._resolveWorkerURL(workerURL), workerURL);
+        });
+
+        it('wraps a cross-origin worker in a same-origin blob that imports it', async () => {
+          const restoreURL = globalThis.location.href;
+          const spy = spyOn(URL, 'createObjectURL').mockReturnValue('blob:sentinel');
+          let capturedBlob;
+          const realBlob = globalThis.Blob;
+          const blobSpy = spyOn(globalThis, 'Blob').mockImplementation((parts, opts) => {
+            capturedBlob = new realBlob(parts, opts);
+            return capturedBlob;
+          });
+
+          try {
+            globalThis.happyDOM.setURL('http://localhost:8080/app/');
+            const crossOrigin = 'https://cdn.example.com/js/rapid-worker.js';
+            const resolved = _worker._resolveWorkerURL(crossOrigin);
+
+            assert.strictEqual(resolved, 'blob:sentinel');
+            assert.strictEqual(spy.mock.calls.length, 1);
+            const text = await capturedBlob.text();
+            assert.strictEqual(text, `import "https://cdn.example.com/js/rapid-worker.js";`);
+          } finally {
+            spy.mockRestore();
+            blobSpy.mockRestore();
+            globalThis.happyDOM.setURL(restoreURL);
+          }
+        });
+      });
+
       describe('maxWorkers', () => {
         it('defaults to 2', () => {
           assert.strictEqual(_worker.maxWorkers, 2);
