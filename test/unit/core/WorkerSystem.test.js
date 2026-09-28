@@ -131,16 +131,34 @@ describe('WorkerSystem', () => {
       });
 
       describe('_resolveWorkerURL (cross-origin worker shim)', () => {
+        const setMockLocation = (href) => {
+          const previous = Object.getOwnPropertyDescriptor(globalThis, 'location');
+          const url = new URL(href);
+
+          Object.defineProperty(globalThis, 'location', {
+            configurable: true,
+            value: {
+              href: url.href,
+              origin: url.origin
+            }
+          });
+
+          return () => {
+            if (previous) {
+              Object.defineProperty(globalThis, 'location', previous);
+            } else {
+              Reflect.deleteProperty(globalThis, 'location');
+            }
+          };
+        };
+
         it('returns a same-origin http(s) URL unchanged', () => {
-          // The headless harness runs at about:blank (origin `null`), so give it
-          // a real http origin for this same-origin comparison, then restore.
-          const restoreURL = globalThis.location.href;
+          const restoreLocation = setMockLocation('http://localhost:8080/app/');
           try {
-            globalThis.happyDOM.setURL('http://localhost:8080/app/');
             const sameOrigin = new URL('/js/rapid-worker.js', globalThis.location.href).href;
             assert.strictEqual(_worker._resolveWorkerURL(sameOrigin), sameOrigin);
           } finally {
-            globalThis.happyDOM.setURL(restoreURL);
+            restoreLocation();
           }
         });
 
@@ -151,7 +169,7 @@ describe('WorkerSystem', () => {
         });
 
         it('wraps a cross-origin worker in a same-origin blob that imports it', async () => {
-          const restoreURL = globalThis.location.href;
+          const restoreLocation = setMockLocation('http://localhost:8080/app/');
           const spy = spyOn(URL, 'createObjectURL').mockReturnValue('blob:sentinel');
           let capturedBlob;
           const realBlob = globalThis.Blob;
@@ -161,7 +179,6 @@ describe('WorkerSystem', () => {
           });
 
           try {
-            globalThis.happyDOM.setURL('http://localhost:8080/app/');
             const crossOrigin = 'https://cdn.example.com/js/rapid-worker.js';
             const resolved = _worker._resolveWorkerURL(crossOrigin);
 
@@ -172,7 +189,7 @@ describe('WorkerSystem', () => {
           } finally {
             spy.mockRestore();
             blobSpy.mockRestore();
-            globalThis.happyDOM.setURL(restoreURL);
+            restoreLocation();
           }
         });
       });
