@@ -5,6 +5,7 @@ import { UiCombobox } from './UiCombobox.ts';
 import { uiIcon } from './icon.ts';
 import { UiModal } from './UiModal.ts';
 import { UiRapidDatasetSettings } from './UiRapidDatasetSettings.ts';
+import { utilDetect } from '../util/detect.ts';
 import { utilNoAuto } from '../util/index.ts';
 
 import type { Context } from '../Context.ts';
@@ -91,7 +92,11 @@ export class UiRapidAddDataset extends EventEmitter {
       { value: 'http://bryanhousel.com/ODOT/roads_osw_tags_sanitized_validated/roads_osw_tags.edges.geojson' },
       { value: 'http://bryanhousel.com/ODOT/roads_osw_tags_sanitized_validated/roads.nodes.geojson' },
     ];
-    this.SampleCombo.data(sampleData);
+
+    const detected = utilDetect();
+    if (/(localhost|127\.0\.0\.1)/.test(detected.host ?? '')) {
+      this.SampleCombo.data(sampleData);
+    }
 
 
     // Ensure methods used as callbacks always have `this` bound correctly.
