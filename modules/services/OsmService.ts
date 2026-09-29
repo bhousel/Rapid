@@ -969,6 +969,10 @@ export class OsmService extends AbstractSystem {
 
     return this.getUserDetailsAsync()
       .then(user => {
+        if (!user?.id) {
+          this._userChangesets = null;
+          return Promise.reject(new Error('No user'));
+        }
         return new Promise((resolve, reject) => {
           const errback = (err: any, results?: ParserResult): void => {
             if (err) {
