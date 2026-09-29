@@ -154,7 +154,6 @@ export class SaveMode extends AbstractMode {
     this.Commit?.removeAllListeners();
     this.Commit = null;
 
-    this.Success?.removeAllListeners();
     this.Success = null;
 
     uploader.removeAllListeners();
@@ -347,13 +346,12 @@ export class SaveMode extends AbstractMode {
 
     this.Success = new UiSuccess(this.context);
 
-    const successContent = this.Success
+    this.Success
       .changeset(changeset)
-      .location(this._location)
-      .on('cancel', () => Sidebar.hide());
+      .location(this._location);
 
     this._wasSuccessfulSave = true;
-    Sidebar.show(successContent.render);
+    Sidebar.show(this.Success.render);
 
     // Add delay before resetting to allow for postgres replication iD#1646 iD#2678
     globalThis.setTimeout(() => {

@@ -179,7 +179,7 @@ export class LocationSystem extends AbstractSystem {
    * @param objects - Objects to check - they should have `locationSet` property
    * @return Promise resolved with the objects (this function used to be slow/async, now it's faster and sync)
    */
-  public mergeLocationSets(objects: HasLocationSet[]): Promise<HasLocationSetID[]> {
+  public mergeLocationSets<T extends HasLocationSet>(objects: T[]): Promise<(T & HasLocationSetID)[]> {
     if (!Array.isArray(objects)) return Promise.reject(new Error('nothing to do'));
 
     const registered = this._resolver.registerLocationSets(objects);
