@@ -24,15 +24,26 @@
   a session-list modal (date / reverse-geocoded location / summary / Restore+Delete / Skip). New
   `SessionID` id type; `DatabaseSystem.getAllKeysFromIndex` added. Tests:
   `test/unit/core/EditSystemSessions.test.js`. `immediateBackup()` now returns its write promise.
-- **Phase 2.1 done (uncommitted, working tree):** liveness heartbeat / "in use" flag. `heartbeatAt`
+- **Phase 2.1 done (committed `f726a1628`):** liveness heartbeat / "in use" flag. `heartbeatAt`
   on each session record, refreshed on backup + a 20s timer (`_startHeartbeat`/`_heartbeatAsync`, via
   scheduler or `setInterval`); `listRestorableSessionsAsync` excludes sessions live in another tab
   (`_isLiveElsewhere`, 60s window). Own session recognized across **reloads** via `sessionStorage`
   (`_ownedSessionID`) so reloading never hides your own work. Heartbeat re-writes the cached
   `_activeSession` (no read) → race-free with backups. Tests in the `liveness heartbeat` describe.
+- **Phase 3 done (committed):** generic `files` store + typed file API **on
+  `DatabaseSystem`** (`putFileAsync`/`getFileAsync`/`listFilesAsync`/`deleteFileAsync`). Blobs stored
+  **natively** (structured clone), no base64/ArrayBuffer. New `FileID` id type; `FileRecord`
+  (id/name/extension/type/size/createdAt/updatedAt/blob). `estimateBytes` fixed to sum real blob
+  bytes so `usageByStoreAsync` reports true file sizes. **DB schema v1→v2** (new store needs a
+  versionchange tx; manifest-driven, no migration code) — verified existing v1 DBs upgrade + keep
+  sessions. Ownership decision confirmed: `DatabaseSystem` is the persistent store for anything
+  beyond localStorage, so it owns the generic file API (sessions stay domain-owned by EditSystem).
+  See `decisions.md`. Tests: `files` describe in `DatabaseSystem.test.js`.
 
 ## Next up
-- **Phase 3:** persist dropped-in data files (`RapidSystem`/`PixiLayerCustomData`) as blobs.
+- **Drag-drop / data-file system (future):** wire file input + reload-on-startup on top of the
+  `files` API; likely a new system that owns the drag-and-drop handler (currently in
+  `PixiLayerCustomData`) and the domain semantics.
 - Open questions at the bottom of the design doc (data-file reload UX; DB name/scoping; codifying
   graceful degradation in agent instructions).
 

@@ -29,10 +29,12 @@ describe('DatabaseSystem', () => {
     context.systems.database = database;
     await database.initAsync();
     await database.clear('sessions');
+    await database.clear('files');
   });
 
   afterEach(async () => {
     await database.clear('sessions');
+    await database.clear('files');
   });
 
 
@@ -45,8 +47,9 @@ describe('DatabaseSystem', () => {
     });
 
     it('reports the schema version and store names', () => {
-      assert.strictEqual(database.databaseVersion, 1);
+      assert.strictEqual(database.databaseVersion, 2);
       assert.include(database.storeNames, 'sessions');
+      assert.include(database.storeNames, 'files');
     });
 
     it('is available when IndexedDB is present', () => {
@@ -217,6 +220,84 @@ describe('DatabaseSystem', () => {
   });
 
 
+  describe('files', () => {
+    function makeFile(name = 'buildings.geojson', body = '{"type":"FeatureCollection","features":[]}') {
+      return new File([body], name, { type: 'application/geo+json' });
+    }
+
+    it('stores a File and captures its metadata', async () => {
+      const record = await database.putFileAsync(makeFile());
+      assert.isString(record.id);
+      assert.strictEqual(record.name, 'buildings.geojson');
+      assert.strictEqual(record.extension, '.geojson');
+      assert.strictEqual(record.type, 'application/geo+json');
+      assert.isAbove(record.size, 0);
+      assert.isNumber(record.createdAt);
+      assert.instanceOf(record.blob, Blob);
+    });
+
+    it('round-trips the blob natively (no base64/arraybuffer)', async () => {
+      const record = await database.putFileAsync(makeFile('a.json', '{"hello":"world"}'));
+      const got = await database.getFileAsync(record.id);
+      assert.instanceOf(got.blob, Blob);
+      assert.strictEqual(await got.blob.text(), '{"hello":"world"}');
+    });
+
+    it('stores a plain Blob with an explicit name/type', async () => {
+      const blob = new Blob(['<gpx/>'], { type: 'application/gpx+xml' });
+      const record = await database.putFileAsync(blob, { name: 'track.gpx' });
+      assert.strictEqual(record.name, 'track.gpx');
+      assert.strictEqual(record.extension, '.gpx');
+      assert.strictEqual(record.type, 'application/gpx+xml');
+    });
+
+    it('defaults the name to "untitled" for a nameless blob', async () => {
+      const record = await database.putFileAsync(new Blob(['x']));
+      assert.strictEqual(record.name, 'untitled');
+      assert.strictEqual(record.extension, '');
+    });
+
+    it('upserts when given a stable id, preserving createdAt', async () => {
+      const first = await database.putFileAsync(makeFile('v1.json', 'one'), { id: 'fixed' });
+      await new Promise(r => { setTimeout(r, 5); });
+      const second = await database.putFileAsync(makeFile('v2.json', 'two'), { id: 'fixed' });
+
+      assert.strictEqual(second.id, 'fixed');
+      assert.strictEqual(second.createdAt, first.createdAt);   // preserved
+      assert.isAtLeast(second.updatedAt, first.updatedAt);
+
+      const all = await database.listFilesAsync();
+      assert.lengthOf(all.filter(f => f.id === 'fixed'), 1);   // replaced, not duplicated
+      assert.strictEqual(await (await database.getFileAsync('fixed')).blob.text(), 'two');
+    });
+
+    it('lists files newest first', async () => {
+      await database.putFileAsync(makeFile('old.json'), { id: 'old' });
+      await new Promise(r => { setTimeout(r, 5); });
+      await database.putFileAsync(makeFile('new.json'), { id: 'new' });
+
+      const list = await database.listFilesAsync();
+      assert.deepEqual(list.map(f => f.id), ['new', 'old']);
+    });
+
+    it('deletes a file', async () => {
+      const record = await database.putFileAsync(makeFile());
+      await database.deleteFileAsync(record.id);
+      assert.isUndefined(await database.getFileAsync(record.id));
+    });
+
+    it('usageByStoreAsync reflects real blob bytes for the files store', async () => {
+      const body = 'x'.repeat(10000);
+      await database.putFileAsync(new Blob([body]), { name: 'big.bin' });
+
+      const usage = await database.usageByStoreAsync();
+      const files = usage.get('files');
+      assert.strictEqual(files.count, 1);
+      assert.isAtLeast(files.bytes, 10000);   // counts the actual blob bytes, not a placeholder
+    });
+  });
+
+
   describe('graceful degradation (no IndexedDB)', () => {
     let mockContext;
     let mockDatabase;
@@ -255,6 +336,15 @@ describe('DatabaseSystem', () => {
       ]);
       const byTime = await mockDatabase.getAllFromIndex('sessions', 'by-updatedAt');
       assert.deepEqual(byTime.map(s => s.id), ['b', 'a']);
+    });
+
+    it('still stores and retrieves files in memory', async () => {
+      const record = await mockDatabase.putFileAsync(
+        new File(['{"a":1}'], 'x.json', { type: 'application/json' })
+      );
+      const got = await mockDatabase.getFileAsync(record.id);
+      assert.strictEqual(got.name, 'x.json');
+      assert.strictEqual(await got.blob.text(), '{"a":1}');
     });
   });
 });

@@ -2,6 +2,31 @@
 
 Non-obvious choices where "why did we do it this way?" isn't captured in the code.
 
+## `DatabaseSystem` owns the generic file API (but not the `sessions` domain logic)
+
+`DatabaseSystem` (wraps IndexedDB) gained a typed file API — `putFileAsync` / `getFileAsync` /
+`listFilesAsync` / `deleteFileAsync` over a generic `files` store — storing `File`/`Blob` **natively**
+via structured clone (no base64/ArrayBuffer). This *seems* to break the "domain-agnostic engine,
+consumers own their stores" rule that `sessions` follows (owned by `EditSystem`), but the asymmetry
+is deliberate:
+
+- **Sessions encode domain knowledge** (backup schema v3, graph entities, edit history) → owned by
+  the domain system (`EditSystem`).
+- **A file is generic** (a `Blob` + name/type/size) → storage infrastructure. `DatabaseSystem`
+  already owns storage *management* (quota/usage/cleanup — "how much space"), so generic file
+  put/get/list/delete is a natural extension, not a domain leak.
+- Mental model (bhousel): *`DatabaseSystem` is the persistent store for anything more complicated
+  than localStorage.* The browser offers no other general mechanism to stash a user's files for
+  later, so the methods belong here.
+- A future drag-drop / data-file system will own the **domain** semantics (which dataset a file
+  belongs to, reload-on-startup policy, parsing) **on top of** these generic primitives. The
+  drag-drop handler currently lives in `PixiLayerCustomData` and is the natural thing to lift out.
+
+Related: adding the `files` store bumped the DB schema v1→v2. That is *not* a data migration — a new
+IndexedDB object store simply requires a versionchange transaction, and the manifest-driven `_upgrade`
+creates it with zero migration code. `estimateBytes` was fixed to sum real blob bytes so
+`usageByStoreAsync` reports true file sizes rather than a short `blob:<size>` placeholder.
+
 ## Operations are classes named `ThingOperation` (not factory functions like actions)
 
 Operations were factory functions returning an augmented callable (like `actions`), but were

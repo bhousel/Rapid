@@ -392,34 +392,60 @@ session that another tab is actively editing, each session record carries a `hea
 > mutex exposed that latent DOM dependency. Fixed properly by guarding those calls behind a
 > `_interruptTransition()` helper (no-op when there is no DOM) — also correct for a future CLI.
 
-## Use Case 2 — Persisted Data Files (dropped-in GeoJSON/GPX/KML)
+## Use Case 2 — Persisted Files (generic Blob storage) ✅ done (Phase 3)
 
-**Today:** `PixiLayerCustomData` reads dropped/selected files via `FileReader.readAsText()` and
+**Motivation:** files the user works with (e.g. dropped-in GeoJSON/GPX/KML) are read via
+`FileReader` / `RapidDataset.loadFileAsync()` but nothing is persisted — a reload loses them. We want
+to keep the original bytes so they survive a restart.
 
-## Use Case 2 — Persisted Data Files (dropped-in GeoJSON/GPX/KML)
+**Implemented:** a generic `files` object store plus a small typed **file API on `DatabaseSystem`**
+itself (not a consumer-owned store like `sessions`). Rationale for the asymmetry:
 
-**Today:** `PixiLayerCustomData` reads dropped/selected files via `FileReader.readAsText()` and
-`RapidDataset.loadFileAsync()` parses them, but nothing is persisted — reload loses them.
-
-**Proposed:** a `dataFiles` store keyed by a generated `dataFileID`:
+- **Sessions encode domain knowledge** (backup schema v3, graph entities, edit history) → owned by
+  `EditSystem`. **A file is generic** (a `Blob` + name/type/size) → storage infrastructure, which is
+  already `DatabaseSystem`'s remit (it owns quota/usage/cleanup — "how much space" is its job).
+- A future drag-and-drop / data-file system owns the *domain* semantics (which dataset a file belongs
+  to, reload-on-startup policy, parsing) **on top of** these generic primitives. This matches the
+  intended layering: persistence here, input-handling + meaning above.
 
 ```ts
-interface DataFileRecord {
-  id: DataFileID;
-  name: string;              // original filename
-  extension: string;         // '.geojson' | '.gpx' | '.kml' | '.json'
-  mimeType?: string;
-  addedAt: number;
-  size: number;              // bytes, for storage management
-  blob: Blob;                // stored natively via structured clone
+interface FileRecord {
+  id: FileID;          // crypto.randomUUID, or a caller-supplied stable id for upsert
+  name: string;        // original filename, e.g. 'buildings.geojson'
+  extension: string;   // lowercased, incl. dot, e.g. '.geojson' (derived from name)
+  type: string;        // MIME type (blob.type), may be '' if unknown
+  size: number;        // bytes (blob.size)
+  createdAt: number;
+  updatedAt: number;
+  blob: Blob;          // stored NATIVELY via structured clone — no base64 / ArrayBuffer conversion
 }
 ```
 
-- When the user drops a file, `RapidSystem`/`PixiLayerCustomData` also writes a `DataFileRecord`
-  (the raw `Blob`) so it persists.
-- On startup, offer to reload previously added files (or auto-reload, TBD) without re-dragging.
-- Storing the raw `Blob` (not the parsed GeoJSON) keeps the original bytes and lets us re-parse with
-  updated logic later. This is exactly the "blob-storage-ify a file" capability requested.
+API (all `async`):
+- `putFileAsync(input: File | Blob, opts?: { id?, name?, type? }) → FileRecord` — stores the blob
+  as-is; pass `opts.id` to upsert (preserves `createdAt`), else a new id is minted.
+- `getFileAsync(id) → FileRecord | undefined`
+- `listFilesAsync() → FileRecord[]` — newest first; blobs are lazy on-disk refs (reading `.text()` /
+  `.arrayBuffer()` is deferred).
+- `deleteFileAsync(id)`
+
+Efficiency: modern IndexedDB stores `Blob`/`File` via structured clone natively, so we **never**
+base64- or ArrayBuffer-encode. Verified that `File instanceof Blob`, `structuredClone(blob)`, and a
+round-trip through both real IDB (`idb`/`fake-indexeddb`) and the in-memory mock all preserve the
+bytes and `type`.
+
+Storage accounting: `estimateBytes` was fixed to **sum real blob bytes** (including a blob nested in
+a record) so `usageByStoreAsync()` reports the `files` store's true size rather than a short
+placeholder.
+
+**Schema version bump (v1 → v2).** Adding an object store requires an IndexedDB *versionchange*
+transaction, so `CURRENT_DB_VERSION` went to `2` with `files` at `sinceVersion: 2`. This is **not** a
+data migration (no transform code) — the manifest-driven `_upgrade` creates the store automatically.
+Verified end-to-end that an existing v1 DB (sessions only) upgrades to v2, keeps its sessions, and
+gains a working `files` store; and that a fresh DB opens at v2 with both stores.
+
+**Not done yet (deferred):** wiring drag-and-drop/file-input to actually populate the store, and a
+reload-on-startup flow. Those belong to a future input/data-file system that consumes this API.
 
 ## Use Case 3 — Storage Management (first-class)
 
@@ -563,8 +589,17 @@ the initial phases, but the async, worker-portable API is designed with this in 
 - Tests: `test/unit/core/EditSystemSessions.test.js` (multi-session, legacy upgrade, delete, dismiss,
   metadata, heartbeat liveness + reload) and an extra `DatabaseSystem` index-keys test.
 
-### Phase 3 — Data files store
-- Persist dropped-in files as `DataFileRecord` blobs; offer reload on startup.
+### Phase 3 — Files store ✅ done
+- Generic `files` object store (keyed by id; indexes `by-updatedAt`, `by-name`) + typed file API on
+  `DatabaseSystem`: `putFileAsync` / `getFileAsync` / `listFilesAsync` / `deleteFileAsync`. Blobs
+  stored **natively** (structured clone) — no base64/ArrayBuffer. New `FileID` id type.
+- `estimateBytes` fixed to sum real blob bytes so `usageByStoreAsync` reflects true file sizes.
+- **Schema v1 → v2** (adding a store needs a versionchange tx); manifest-driven upgrade, no migration
+  code. Verified existing v1 DBs upgrade and keep their sessions.
+- Tests: `files` describe in `test/unit/core/DatabaseSystem.test.js` (put/get/list/delete, metadata
+  capture, native blob round-trip, upsert-by-id, usage bytes, mock fallback).
+- **Deferred:** drag-and-drop wiring + reload-on-startup belong to a future input/data-file system
+  that consumes this API.
 
 ### Phase 4 — Storage management
 - Surface `estimateQuotaAsync` / `usageByStoreAsync`, retention/cleanup policies, and (later) a
@@ -585,10 +620,17 @@ the initial phases, but the async, worker-portable API is designed with this in 
   hot path); keep `backupVersion` for the existing restore/upgrade logic.
 - **`database` dependency strength** → **optional everywhere**, with `localStorage` as the degraded
   fallback during rollout. `DatabaseSystem` is an optional system (graceful degradation).
+- **File API lives on `DatabaseSystem`** (not a consumer-owned store like `sessions`). Confirmed in
+  review: `DatabaseSystem` is "the persistent store for *anything* more complicated than
+  localStorage," and the browser offers no other general mechanism for stashing a user's files, so
+  gaining generic file methods fits its remit. Sessions stay owned by `EditSystem` because they
+  encode *domain* knowledge; files are generic infrastructure. A future drag-drop/data-file system
+  will own the *domain* semantics on top of this API.
 
 ## Open Questions (for review)
 
-1. **Data-file reload:** auto-reload persisted files on startup, or prompt the user? (Phase 3.)
+1. **Reload flow for persisted files:** once a drag-drop/data-file system exists, should it
+   auto-reload persisted files on startup or prompt the user?
 2. **Database name/scoping:** single `Rapid` database with `origin` stored per-record (proposed), or
    a per-origin database name?
 3. **Codify graceful degradation** as a general principle in the agent instructions / a top-level

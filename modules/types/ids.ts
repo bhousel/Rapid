@@ -34,6 +34,8 @@ export type DetectionID = string;
 export type EntityID = string;
 /** Feature ID - identifier for a rendered feature */
 export type FeatureID = string;
+/** File ID - identifier for a stored file in the `DatabaseSystem` 'files' store */
+export type FileID = string;
 /** Field ID - identifier for a preset field */
 export type FieldID = string;
 /** Filter ID - identifier for a filter (e.g. 'points', 'traffic_roads') */
@@ -123,6 +125,7 @@ declare global {
   type DetectionID = string;
   type EntityID = string;
   type FeatureID = string;
+  type FileID = string;
   type FieldID = string;
   type FilterID = string;
   type GeometryType = 'point' | 'vertex' | 'line' | 'area' | 'relation';

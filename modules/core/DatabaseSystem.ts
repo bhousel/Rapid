@@ -11,8 +11,12 @@ import type { Context } from '../Context.ts';
 
 /** Name of the single IndexedDB database that holds all of Rapid's durable data. */
 const DATABASE_NAME = 'Rapid';
-/** The latest database schema version. Bump this when adding a store or migration. */
-const CURRENT_DB_VERSION = 1;
+/**
+ * The latest database schema version. Bump this when adding a store or migration.
+ * - v1: `sessions` store (edit-history sessions, owned by `EditSystem`)
+ * - v2: `files` store (arbitrary user files stored as native Blobs)
+ */
+const CURRENT_DB_VERSION = 2;
 
 
 // ---------------------------------------------------------------------------
@@ -21,6 +25,41 @@ const CURRENT_DB_VERSION = 1;
 
 /** Name of an object store ("table") within the Rapid database. */
 export type StoreName = string;
+
+/**
+ * A file stored in the `files` object store. The file's bytes are kept as a **native `Blob`**
+ * (structured clone) — no base64 / `ArrayBuffer` conversion — so writes and reads are cheap and the
+ * browser can stream large files from disk. The metadata fields make the store queryable and let a
+ * UI show name / type / size without reading the blob.
+ */
+export interface FileRecord {
+  /** Unique id (a generated `crypto.randomUUID`, or a caller-supplied stable id for upsert). */
+  id: FileID;
+  /** Original filename, e.g. `'buildings.geojson'`. */
+  name: string;
+  /** Lowercased file extension including the dot, e.g. `'.geojson'` (derived from `name`). */
+  extension: string;
+  /** MIME type (`blob.type`), e.g. `'application/geo+json'`; may be `''` if the browser didn't set one. */
+  type: string;
+  /** Size in bytes (`blob.size`). */
+  size: number;
+  /** When the file was first stored (ms since epoch). */
+  createdAt: number;
+  /** When the file was last written (ms since epoch). */
+  updatedAt: number;
+  /** The file's bytes, stored natively as a `Blob` (a `File` is a `Blob` and round-trips as-is). */
+  blob: Blob;
+}
+
+/** Options for `putFileAsync`. */
+export interface PutFileOptions {
+  /** Stable id to store under (enables upsert); a new `crypto.randomUUID` is generated if omitted. */
+  id?: FileID;
+  /** Override the filename; defaults to a `File`'s `.name`, else `'untitled'`. */
+  name?: string;
+  /** Override the MIME type; defaults to the blob's `.type`. */
+  type?: string;
+}
 
 /** Definition of a single index on an object store. */
 export interface StoreIndexDefinition {
@@ -136,6 +175,15 @@ const STORE_MANIFEST: StoreDefinition[] = [
       { name: 'by-origin', keyPath: 'origin' }
     ],
     sinceVersion: 1
+  },
+  {
+    name: 'files',
+    keyPath: 'id',
+    indexes: [
+      { name: 'by-updatedAt', keyPath: 'updatedAt' },
+      { name: 'by-name', keyPath: 'name' }
+    ],
+    sinceVersion: 2
   }
 ];
 
@@ -160,13 +208,28 @@ function compareKeys(a: unknown, b: unknown): number {
   return (a as number | string) < (b as number | string) ? -1 : 1;
 }
 
-/** Estimates the byte size of a stored value (`Blob` size, else stringified length). */
+/**
+ * Estimates the byte size of a stored value. Counts real `Blob` bytes (including blobs nested
+ * inside a record, e.g. a `FileRecord.blob`) plus the length of the record's other JSON, so the
+ * `files` store's usage reflects actual file sizes rather than a short placeholder.
+ * @param value - The stored value to size
+ * @return The estimated size in bytes
+ */
 function estimateBytes(value: unknown): number {
   if (value instanceof Blob) return value.size;
+
+  let blobBytes = 0;
   try {
-    return JSON.stringify(value, (_key, v) => (v instanceof Blob ? `blob:${v.size}` : v))?.length ?? 0;
+    const jsonLength = JSON.stringify(value, (_key, v) => {
+      if (v instanceof Blob) {
+        blobBytes += v.size;
+        return `blob:${v.size}`;   // keep the serialized form small; real bytes counted separately
+      }
+      return v;
+    })?.length ?? 0;
+    return jsonLength + blobBytes;
   } catch {
-    return 0;
+    return blobBytes;
   }
 }
 
@@ -622,6 +685,76 @@ export class DatabaseSystem extends AbstractSystem {
 
 
   // -------------------------------------------------------------------------
+  // Files — a convenient typed API over the generic `files` store.
+  // Blobs are stored natively (structured clone), never base64/ArrayBuffer.
+  // -------------------------------------------------------------------------
+
+  /**
+   * Store a file, keeping its bytes as a native `Blob`. Pass a stable `id` in `opts` to upsert an
+   * existing file (preserving its `createdAt`); otherwise a new id is generated.
+   * @param input - The file or blob to store (a `File` supplies its own `name`/`type`)
+   * @param opts - Optional id / name / type overrides
+   * @return The stored `FileRecord` (with its id and derived metadata)
+   */
+  public async putFileAsync(input: File | Blob, opts: PutFileOptions = {}): Promise<FileRecord> {
+    const now = Date.now();
+    const id = opts.id ?? this._newID();
+    const name = opts.name ?? (input instanceof File ? input.name : undefined) ?? 'untitled';
+    const type = opts.type ?? input.type ?? '';
+
+    let createdAt = now;
+    if (opts.id) {
+      const existing = await this.get<FileRecord>('files', opts.id);
+      if (existing) createdAt = existing.createdAt;
+    }
+
+    const record: FileRecord = {
+      id,
+      name,
+      extension: fileExtension(name),
+      type,
+      size: input.size,
+      createdAt,
+      updatedAt: now,
+      blob: input
+    };
+    await this.put('files', record);
+    return record;
+  }
+
+
+  /**
+   * Retrieve a stored file by id.
+   * @param id - The file id
+   * @return The `FileRecord`, or `undefined` if not found
+   */
+  public async getFileAsync(id: FileID): Promise<FileRecord | undefined> {
+    return this.get<FileRecord>('files', id);
+  }
+
+
+  /**
+   * List all stored files, newest first. Records include the `blob` (a lazy on-disk reference in
+   * real IndexedDB — reading its contents via `.text()` / `.arrayBuffer()` is deferred until asked).
+   * @return The stored files, sorted by `updatedAt` descending
+   */
+  public async listFilesAsync(): Promise<FileRecord[]> {
+    const files = await this.getAll<FileRecord>('files');
+    files.sort((a, b) => b.updatedAt - a.updatedAt);
+    return files;
+  }
+
+
+  /**
+   * Delete a stored file by id.
+   * @param id - The file id
+   */
+  public async deleteFileAsync(id: FileID): Promise<void> {
+    return this.delete('files', id);
+  }
+
+
+  // -------------------------------------------------------------------------
   // Internal
   // -------------------------------------------------------------------------
 
@@ -748,6 +881,27 @@ export class DatabaseSystem extends AbstractSystem {
     }
     return keyPath;
   }
+
+
+  /**
+   * Mint a new unique id.
+   * @return A `crypto.randomUUID`, or a timestamp-based fallback if unavailable
+   */
+  protected _newID(): string {
+    return globalThis.crypto?.randomUUID?.() ??
+      `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+  }
+}
+
+
+/**
+ * Derives a lowercased file extension (including the leading dot) from a filename.
+ * @param name - The filename, e.g. `'Buildings.GeoJSON'`
+ * @return The extension, e.g. `'.geojson'`, or `''` if there is none
+ */
+function fileExtension(name: string): string {
+  const dot = name.lastIndexOf('.');
+  return (dot > 0) ? name.slice(dot).toLowerCase() : '';
 }
 
 
