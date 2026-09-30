@@ -318,42 +318,62 @@ key and offers restore/discard. Two long-standing pain points:
   holds the lock, then days later (tabs closed) surfaces a forgotten session. Moving to a listed set
   of sessions with clear timestamps and an explicit restore/remove choice removes this class of bug.
 
-**Proposed:** a `sessions` object store keyed by a generated `sessionID`, each record wrapping the
-structured history object plus metadata:
+**Implemented:** a `sessions` object store keyed by a generated `sessionID`, each record wrapping the
+structured history object plus metadata (as shipped in Phase 2):
 
 ```ts
 interface SessionRecord {
-  id: SessionID;             // generated
+  id: SessionID;             // crypto.randomUUID (or the legacy backup key for a localStorage session)
   origin: string;            // window.location.origin (replaces the key-name scoping hack)
-  label: string;             // user-facing name (default: derived from timestamp / edit count)
   createdAt: number;
-  updatedAt: number;
+  updatedAt: number;         // 0 if unknown (legacy)
   editCount: number;         // for the list UI
+  bbox?: { minX; minY; maxX; maxY };  // geographic extent of the edits (for the list + geocoding)
+  summary: string[];         // most common feature tag keys, e.g. ['building', 'highway']
   backupVersion: number;     // the existing EditSystem backup schema version (currently 3)
-  data: BackupObject;        // the STRUCTURED backup object (not a JSON string) — stored via
+  legacy?: boolean;          // true for a synthetic localStorage-backed record (not yet upgraded)
+  data: BackupJSON;          // the STRUCTURED backup object (not a JSON string) — stored via
                              // IndexedDB structured clone; no JSON.stringify on the hot path
 }
 ```
 
-- `EditSystem` writes/updates its current session record (debounced, as today) instead of the single
-  localStorage key. Because IDB is async and much larger, quota failures become rare, the write no
-  longer blocks the main thread, and — critically — we **store the structured object directly**,
-  avoiding the costly `JSON.stringify` on every backup. (We keep `backupVersion` so the existing
-  `fromJSONAsync` restore/upgrade logic still applies; that path can accept the structured object
-  directly rather than re-parsing a string.)
-- **On startup, list all sessions for this origin** and present them to the user: restore one, remove
-  one, or start fresh. This is the headline feature — moving from "one restorable backup" to "pick
-  from a list" — and it fixes the unreliable single-slot/multi-tab prompt described above.
-- **Retention: keep sessions indefinitely; evict only on explicit user action.** We do *not*
-  auto-cap or auto-expire. A session is removed only when the user restores it (it becomes the active
-  session) or explicitly clears it from the startup list. Surfacing the list with timestamps and edit
-  counts lets users prune naturally. (The storage-management API can later *surface* large/old
-  sessions to help, but never deletes without user intent.)
-- The existing `backupVersion`/`fromJSONAsync` machinery is reused; only the *storage backend* moves
-  from `StorageSystem` to `DatabaseSystem`, and the payload becomes a structured object.
-- **Migration from localStorage:** on first run with `DatabaseSystem`, if the legacy
-  `Rapid_<origin>_saved_history` key exists, import it as a `SessionRecord` and then remove the
-  legacy key (one-time bootstrap, mirroring the settings v0→v1 import).
+- `EditSystem` mints a unique `crypto.randomUUID` session id per editing session (cleared on reset,
+  set when restoring an existing session) and writes/updates that record (debounced, as before).
+  Because IDB is async and much larger, quota failures become rare, the write no longer blocks the
+  main thread, and — critically — we **store the structured object directly**, avoiding the costly
+  `JSON.stringify` on every backup. Restore uses `fromBackupAsync()` (structured) — `fromJSONAsync()`
+  is now a thin string-parsing wrapper over it.
+- **On startup, list all sessions for this origin** (`listRestorableSessionsAsync`) and present them
+  in the restore UI: restore one, delete one, or skip. This is the headline feature — moving from
+  "one restorable backup" to "pick from a list" — and it fixes the unreliable single-slot/multi-tab
+  prompt described above.
+- **Retention: keep sessions indefinitely; evict only on explicit user action.** No auto-cap or
+  auto-expiry. A session is removed only when the user deletes it from the list (or `clearBackup()`
+  on source-switch / after upload removes the *active* session).
+- **localStorage is read-only now.** Rapid no longer writes edits to `localStorage`. A legacy
+  `Rapid_<origin>_saved_history` backup is still *read* and surfaced as a restore candidate; when the
+  user restores it, it is **upgraded** to a fresh IndexedDB session and the legacy key is removed.
+- **Session metadata** (`editCount`, `bbox`, `summary`) is computed from the backup at write time
+  (and on the fly for the synthetic legacy record). The restore UI reverse-geocodes each `bbox`
+  center via the `nominatim` service to show a place name.
+
+### Multi-tab & the retired mutex
+
+Phase 2 **retired `utilSessionMutex`**. It previously enforced a single writer across tabs (and
+gated the single localStorage slot). With per-session unique ids, two tabs write independent session
+records and never clobber each other, so the mutex's guarantee is unnecessary. Trade-off: a second
+tab can now list (and fork) another tab's *live* session; acceptable for now — a future refinement
+could mark a session "in use" via a recent-`updatedAt` heartbeat.
+
+> **Gotcha uncovered (recorded as a lesson):** the EditSystem unit tests only ran under bare Bun
+> because constructing `utilSessionMutex('lock')` had a **side effect of polyfilling `document`**.
+> `EditSystem` calls `select(document).interrupt('editTransition')` in ~10 hot paths; removing the
+> mutex exposed that latent DOM dependency. Fixed properly by guarding those calls behind a
+> `_interruptTransition()` helper (no-op when there is no DOM) — also correct for a future CLI.
+
+## Use Case 2 — Persisted Data Files (dropped-in GeoJSON/GPX/KML)
+
+**Today:** `PixiLayerCustomData` reads dropped/selected files via `FileReader.readAsText()` and
 
 ## Use Case 2 — Persisted Data Files (dropped-in GeoJSON/GPX/KML)
 
@@ -501,9 +521,23 @@ the initial phases, but the async, worker-portable API is designed with this in 
 - Tests in [`test/unit/core/EditSystem.test.js`](../../test/unit/core/EditSystem.test.js) cover the
   `toBackup`/`fromBackupAsync` seam.
 
-### Phase 2 — Multi-session restore UI
-- Startup lists all sessions for the origin; user restores/removes/starts-fresh. Retire the
-  single-slot `localStorage` backup path once IDB is proven.
+### Phase 2 — Multi-session restore UI ✅ done
+- **Multiple concurrent sessions:** `EditSystem` mints a unique `crypto.randomUUID` per session
+  (`_sessionID`, cleared on reset, set on restore, minted lazily on first backup). Sessions are keyed
+  by uuid in the `sessions` store (indexed `by-origin` and `by-updatedAt`).
+- **localStorage read-only:** Rapid no longer writes edits to localStorage; the legacy key is read
+  and offered as a restore candidate, and **upgraded** to an IndexedDB session on restore.
+- **Retired `utilSessionMutex`** and all its gates. Guarded the exposed `select(document)` calls
+  behind `_interruptTransition()` (headless-safe).
+- **Restore UI** (`UiRestore`) rewritten as a session list: date / location (reverse-geocoded via
+  `nominatim`) / summary / per-row Restore + Delete, with a "Skip for now" footer, plus a
+  no-permanent-storage notice. New `restore.*` l10n strings.
+- **EditSystem API:** `listRestorableSessionsAsync`, `restoreSessionAsync(id)`, `deleteSessionAsync(id)`,
+  `dismissRestore`, plus `_computeSessionMeta`/`_backupBBox`/`_backupSummary`. `immediateBackup()`
+  now returns its write promise (awaitable in tests). `DatabaseSystem.getAllKeysFromIndex` added for
+  a cheap startup existence check.
+- Tests: `test/unit/core/EditSystemSessions.test.js` (multi-session, legacy upgrade, delete, dismiss,
+  metadata) and an extra `DatabaseSystem` index-keys test.
 
 ### Phase 3 — Data files store
 - Persist dropped-in files as `DataFileRecord` blobs; offer reload on startup.

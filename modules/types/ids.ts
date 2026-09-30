@@ -84,6 +84,8 @@ export type ScriptCode = string;
 export type SequenceID = string;
 /** Service ID (e.g. 'osm', 'mapillary', 'streetside') */
 export type ServiceID = string;
+/** Session ID - identifier for a stored editing session */
+export type SessionID = string;
 /** Spatial ID - identifier for a spatial index cache */
 export type SpatialID = string;
 /** String ID - identifier for a localized string (e.g. 'toolbar.undo', 'modes.add_area') */
@@ -146,6 +148,7 @@ declare global {
   type ScriptCode = string;
   type SequenceID = string;
   type ServiceID = string;
+  type SessionID = string;
   type SpatialID = string;
   type StringID = string;
   type StyleID = string;

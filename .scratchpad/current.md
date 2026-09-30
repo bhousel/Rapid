@@ -16,12 +16,19 @@
   IndexedDB (no `JSON.stringify` on that path) alongside the localStorage fallback; `toJSON`/
   `fromJSONAsync` are now thin wrappers over new `toBackup`/`fromBackupAsync`. Restore prefers the
   IDB session, imports the legacy localStorage key once. `database` is optional on `EditSystem`.
+- **Phase 2 done (committed separately? no — uncommitted, in working tree):** multi-session support.
+  Unique `crypto.randomUUID` per session; `localStorage` is now **read-only** (legacy restore only,
+  upgraded to IDB on restore); **`utilSessionMutex` retired** (see lesson below). New EditSystem API:
+  `listRestorableSessionsAsync` / `restoreSessionAsync(id)` / `deleteSessionAsync(id)` /
+  `dismissRestore`, plus session metadata (`bbox`, `summary`, `editCount`). `UiRestore` rewritten as
+  a session-list modal (date / reverse-geocoded location / summary / Restore+Delete / Skip). New
+  `SessionID` id type; `DatabaseSystem.getAllKeysFromIndex` added. Tests:
+  `test/unit/core/EditSystemSessions.test.js`. `immediateBackup()` now returns its write promise.
 
 ## Next up
-- **Phase 2:** multi-session restore UI (list sessions at startup; restore/remove/start-fresh;
-  retire the single-slot localStorage prompt). Retention = keep indefinitely, evict only on explicit
-  user action.
 - **Phase 3:** persist dropped-in data files (`RapidSystem`/`PixiLayerCustomData`) as blobs.
+- **Multi-tab refinement:** mark a session "in use" (recent-`updatedAt` heartbeat) so a second tab
+  doesn't offer to fork another tab's live session.
 - Open questions at the bottom of the design doc (data-file reload UX; DB name/scoping; codifying
   graceful degradation in agent instructions).
 

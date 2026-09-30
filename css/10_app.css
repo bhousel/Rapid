@@ -4862,6 +4862,49 @@ li.issue-fix-item button:not(.actionable) .fix-icon {
   color: #e06c5e;
 }
 
+.restore-modal .restore-no-storage p {
+  color: #e06c5e;
+}
+
+.restore-modal .restore-list {
+  max-height: 40vh;
+  overflow-y: auto;
+}
+
+.restore-sessions {
+  width: 100%;
+  border-collapse: collapse;
+}
+.restore-sessions th,
+.restore-sessions td {
+  text-align: left;
+  padding: 8px 10px;
+  vertical-align: middle;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+}
+.restore-sessions th {
+  font-weight: bold;
+  white-space: nowrap;
+}
+.restore-sessions .restore-date,
+.restore-sessions .restore-location {
+  white-space: nowrap;
+}
+.restore-sessions .restore-actions {
+  white-space: nowrap;
+  text-align: right;
+}
+.restore-sessions .restore-actions button {
+  margin-left: 6px;
+  padding: 4px 10px;
+}
+.restore-sessions .restore-session {
+  color: #7092ff;
+}
+.restore-sessions .delete-session {
+  color: #e06c5e;
+}
+
 /* Success Screen / Community Index
 ------------------------------------------------------- */
 .save-success.body {

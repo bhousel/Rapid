@@ -156,6 +156,14 @@ describe('DatabaseSystem', () => {
       const one = await database.getFromIndex('sessions', 'by-origin', 'https://b.test');
       assert.strictEqual(one.id, 'b');
     });
+
+    it('getAllKeysFromIndex returns primary keys without loading values', async () => {
+      const all = await database.getAllKeysFromIndex('sessions', 'by-updatedAt');
+      assert.sameMembers(all, ['a', 'b', 'c']);
+
+      const forOrigin = await database.getAllKeysFromIndex('sessions', 'by-origin', 'https://a.test');
+      assert.sameMembers(forOrigin, ['a', 'c']);
+    });
   });
 
 

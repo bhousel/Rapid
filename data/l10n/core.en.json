@@ -1364,7 +1364,19 @@
       "heading": "You have unsaved changes",
       "description": "Do you wish to restore unsaved changes from a previous editing session?",
       "restore": "Restore my changes",
-      "reset": "Discard my changes"
+      "reset": "Discard my changes",
+      "heading_multi": "We found some previous unsaved edit sessions",
+      "description_multi": "Choose a session to restore, or skip for now to start fresh.",
+      "column_date": "Date",
+      "column_location": "Location",
+      "column_summary": "Summary",
+      "restore_session": "Restore",
+      "delete_session": "Delete",
+      "skip": "Skip for now",
+      "edits": "{n} edits",
+      "unknown_date": "Unknown date",
+      "unknown_location": "Unknown location",
+      "no_storage": "Heads up — permanent storage isn't available right now (for example in a private window). You can keep working, but your edits won't be saved when you close Rapid."
     },
     "save": {
       "help": "Review your changes and upload them to OpenStreetMap, making them visible to other users.",

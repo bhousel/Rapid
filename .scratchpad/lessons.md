@@ -51,6 +51,17 @@ Things that went wrong once and shouldn't go wrong again.
 - **`_isWater` vs `_isPoint`** — When testing filterScene water counts, use way entities. Point nodes with waterway tags match `_isPoint` first.
 - **Validator tests: create after schema init** — Validators hoist schema prerequisites at construction time. Create the validator inside `beforeAll` after `schema.merge()`.
 - **Inline schema init pattern for tests** — Import `osm_rulesets.json5` directly (Bun native JSON5 import), create real `SchemaSystem`, init + merge in `beforeAll`. Single source of truth.
+- **A removed dependency can silently break unrelated tests via a global side effect.** EditSystem's
+  unit tests only passed under bare Bun because constructing `utilSessionMutex('lock')` had a side
+  effect of **polyfilling a global `document`**. `EditSystem` calls `select(document).interrupt(...)`
+  in ~10 hot paths (perform/commit/undo/redo/checkpoint/reset); once the mutex was retired in the
+  DatabaseSystem Phase 2 work, every one of those threw `document is not defined`. Fix: guard DOM
+  access (`if (globalThis.document)` / a `_interruptTransition()` helper) — which is the right thing
+  for a future headless/CLI build anyway. Lesson: when removing code, watch for *incidental* global
+  side effects it was providing; a green test suite may be leaning on one.
+- **Fire-and-forget async is hard to assert.** `immediateBackup()` kicked off an un-awaited IndexedDB
+  write, so tests that read the record immediately raced it. Making the method **return its write
+  promise** (callers still ignore it) makes the async work awaitable without changing behavior.
 
 ## Network
 

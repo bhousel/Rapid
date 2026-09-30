@@ -493,6 +493,31 @@ export class DatabaseSystem extends AbstractSystem {
   }
 
 
+  /**
+   * Retrieves the primary keys of all records matching one of a store's indexes, without loading
+   * the record values. Useful for cheap existence/count checks.
+   * @param store - Store to read from
+   * @param index - Name of the index to query
+   * @param key - Optional exact index key to filter by; omit to return all matching primary keys
+   * @return An array of primary keys
+   */
+  public async getAllKeysFromIndex(
+    store: StoreName, index: string, key?: IDBValidKey
+  ): Promise<IDBValidKey[]> {
+    if (this._db) {
+      return this._db.getAllKeysFromIndex(store, index, key);
+    }
+    const keyPath = this._indexKeyPath(store, index);
+    const out: IDBValidKey[] = [];
+    for (const [primaryKey, value] of this._mockStore(store)) {
+      if (key === undefined || readPath(value, keyPath) === key) {
+        out.push(primaryKey);
+      }
+    }
+    return out;
+  }
+
+
   // -------------------------------------------------------------------------
   // Transactions
   // -------------------------------------------------------------------------
