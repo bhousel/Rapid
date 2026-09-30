@@ -4,7 +4,7 @@ import { actionDeleteRelation } from '../actions/delete_relation.ts';
 import { actionMove, actionRotate } from '../actions/index.ts';
 import { DEG2RAD, vecAdd, vecRotate, vecScale } from '@rapid-sdk/math';
 import { select } from 'd3-selection';
-import { utilCmd, utilKeybinding, utilTotalExtent } from '../util/index.ts';
+import { utilCmd, utilTotalExtent } from '../util/index.ts';
 import { utilArrayIdentical } from '@rapid-sdk/util';
 
 import type { Context } from '../Context.ts';
@@ -13,7 +13,7 @@ import type { Extent, Vec2 } from '@rapid-sdk/math';
 import type { OsmEntity, OsmNode, OsmRelation, OsmWay } from '../data/types.ts';
 import type { Action } from '../actions/types.ts';
 import type { AbstractOperation } from '../operations/AbstractOperation.ts';
-import type { Keybinding } from '../util/keybinding.ts';
+import type { KeyBindingScope } from '../core/KeyboardSystem.ts';
 
 
 /** Options for entering `SelectOsmMode` */
@@ -36,8 +36,8 @@ export interface SelectOsmModeOptions {
  */
 export class SelectOsmMode extends AbstractMode {
 
-  /** Keybinding handler for this mode */
-  public keybinding: Keybinding | null;
+  /** Keyboard scope for this mode's vertex-navigation shortcuts */
+  protected _selectScope: KeyBindingScope | null;
   /** The total extent of selected features */
   public extent: Extent | null;
 
@@ -61,7 +61,7 @@ export class SelectOsmMode extends AbstractMode {
     super(context);
     this.id = 'select-osm';
 
-    this.keybinding = null;
+    this._selectScope = null;
     this.extent = null;
 
     this._newFeature = false;
@@ -92,6 +92,7 @@ export class SelectOsmMode extends AbstractMode {
     const filters = context.systems.filters!;
     const gfx = context.systems.gfx!;
     const hover = context.behaviors.hover!;
+    const keyboard = context.systems.keyboard!;
     const locations = context.systems.locations;
     const ui = context.systems.ui!;
     const urlhash = context.systems.urlhash!;
@@ -146,16 +147,14 @@ export class SelectOsmMode extends AbstractMode {
     filters.forceVisible(entityIDs);                  // Exclude entityIDs from being filtered
     this._setupOperations(entityIDs);                 // Determine available operations on the edit menu
 
-    this.keybinding = utilKeybinding('select');
-    this.keybinding
+    this._selectScope = keyboard.scope('select');
+    this._selectScope
       .on(['[', 'pgup'], this._previousVertex)
       .on([']', 'pgdown'], this._nextVertex)
       .on(['{', utilCmd('⌘['), 'home'], this._firstVertex)
       .on(['}', utilCmd('⌘]'), 'end'], this._lastVertex)
-      .on(['\\', 'pause'], this._focusNextParent);
-
-    select(document)
-      .call(this.keybinding);
+      .on(['\\', 'pause'], this._focusNextParent)
+      .enable();
 
     eventManager.on('keydown', this._keydown);
     editor.on('merge', this._merge);
@@ -225,9 +224,9 @@ export class SelectOsmMode extends AbstractMode {
     urlhash.setParam('id', null);
     filters.forceVisible([]);
 
-    if (this.keybinding) {
-      select(document).call(this.keybinding.unbind);
-      this.keybinding = null;
+    if (this._selectScope) {
+      this._selectScope.disable();
+      this._selectScope = null;
     }
 
     editor.off('merge', this._merge);

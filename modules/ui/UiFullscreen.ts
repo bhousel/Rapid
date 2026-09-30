@@ -59,9 +59,10 @@ export class UiFullscreen {
     //   .attr('class', 'icon full-screen');
 
     const detected = utilDetect();
+    const keyboard = context.systems.keyboard!;
     const keys = (detected.os === 'mac' ? [utilCmd('⌃⌘F'), 'f11'] : ['f11']);
-    context.keybinding().off(keys);
-    context.keybinding().on(keys, this.toggle);
+    keyboard.global.off(keys);
+    keyboard.global.on(keys, this.toggle);
   }
 
 

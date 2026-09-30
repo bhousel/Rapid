@@ -18,7 +18,6 @@ import type { Services } from './services/types.ts';
 import type { Systems } from './core/types.ts';
 import type { Vec2 } from '@rapid-sdk/math';
 import { utilIterable, type OneOrMore } from './util/iterable.ts';
-import { utilKeybinding, type Keybinding } from './util/keybinding.ts';
 
 const MINZOOM = 15;
 
@@ -148,8 +147,6 @@ export class Context extends EventEmitter {
 
   /** Last pointer device type used */
   public lastPointerType: string;
-  /** Keybinding manager */
-  protected _keybinding: Keybinding;
 
   /** OAuth/preauth credentials */
   protected _preauth: PreauthOptions | null;
@@ -238,8 +235,6 @@ export class Context extends EventEmitter {
     // AFAICT `lastPointerType` is just used to localize the intro? for now - instead get this from pixi?
     // this.lastPointerType = () => _uiSystem.lastPointerType;
     this.lastPointerType = 'mouse';
-    this._keybinding = utilKeybinding('context');
-    select(document).call(this._keybinding);
 
     // Connection
     this._preauth = null;
@@ -406,16 +401,6 @@ export class Context extends EventEmitter {
       .then(() => Promise.all( allServices.map(s => s.resetAsync()) ))
       .then(() => {})  // void return
       .finally(() => { this._resetPromise = null; });
-  }
-
-
-  /**
-   * Returns the keybinding manager for the application.
-   * (not a System yet, but should be one)
-   * @return  The keybinding manager
-   */
-  public keybinding(): Keybinding {
-    return this._keybinding;
   }
 
 

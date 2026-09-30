@@ -2,6 +2,24 @@
 
 Items planned but not yet started.
 
+## Remappable keyboard shortcuts (KeyboardSystem phases 2 & 3)
+Phase 1 (the `KeyboardSystem` conversion + command scaffolding) is done — see
+[`.github/design/keyboard-system.md`](../.github/design/keyboard-system.md) and
+[facebook/Rapid#1076](https://github.com/facebook/Rapid/issues/1076). Remaining phases:
+
+- **Phase 2 — persistence via SettingsSystem.** Make `settings` an optional dependency of
+  `KeyboardSystem`. On start, hydrate a user overrides map (e.g. under a `keyboard.bindings`
+  settings path: `{ [commandID]: combo }`) by calling `keyboard.rebind(commandID, combo)`; persist
+  back on change. Resolution order is `userOverride ?? default`. Absent `SettingsSystem`
+  (CLI/tests), fall back to defaults. Then start migrating existing `keyboard.global.on('⌘Z', …)`
+  call sites to pass a `commandID` so their combos become remappable/persistable (incremental).
+- **Phase 3 — UI.** Extend `UiShortcuts` (and/or a preferences pane) to capture a new combo,
+  detect conflicts, reset-to-default, and call `keyboard.rebind(commandID, combo)`. Reflect changes
+  live via the `bindingschange` event `KeyboardSystem` already emits.
+- **Possible enhancement:** layout-independent matching via `KeyboardEvent.code` (physical key),
+  for non-Latin keyboard layouts — the `event.key`-only matching dropped the old `keyCode`
+  physical-key fallback.
+
 ## Pixi rendering follow-ups
 - **Text rasterization without Pixi.Text**: move text drawing onto an `OffscreenCanvas` worker, or bypass `Pixi.Text` with main-thread canvas2D rasterization first. Main thread can feed the resulting `HTMLCanvasElement`, `ImageBitmap`, or `ImageData` to `PixiTextures.allocate('text', ...)`, avoiding both nested `renderer.generateTexture()` and `readPixels`. Worker font loading needs the same fonts; use `FontFace` API + transferable `ArrayBuffer`.
 - **Direct mesh generation for polygons / lines**: replace the `PIXI.GpuGraphicsContext` + `PIXI.buildContextBatches()` round-trip in `PixiFeaturePolygon.ts` with direct `earcut` tessellation, or consider a shared mesh-generator path for polygons and lines. Meshes are batchable, so this could reduce draw calls while avoiding renderer-internal geometry extraction.

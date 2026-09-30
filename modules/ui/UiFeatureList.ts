@@ -90,7 +90,7 @@ export class UiFeatureList {
     context.on('modechange', this._clearSearch);
 
     const key = utilCmd('⌘F');
-    context.keybinding().on(key, this._focusSearch);
+    context.systems.keyboard!.global.on(key, this._focusSearch);
   }
 
 

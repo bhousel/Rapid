@@ -12,6 +12,7 @@ import type { EditSystem } from './EditSystem.ts';
 import type { FilterSystem } from './FilterSystem.ts';
 import type { GraphicsSystem } from './GraphicsSystem.ts';
 import type { ImagerySystem } from './ImagerySystem.ts';
+import type { KeyboardSystem } from './KeyboardSystem.ts';
 import type { LocalizationSystem } from './LocalizationSystem.ts';
 import type { LocationSystem } from './LocationSystem.ts';
 import type { MapSystem } from './MapSystem.ts';
@@ -50,6 +51,7 @@ export interface Systems {
   filters?: FilterSystem;
   gfx?: GraphicsSystem;
   imagery?: ImagerySystem;
+  keyboard?: KeyboardSystem;
   l10n?: LocalizationSystem;
   locations?: LocationSystem;
   map?: MapSystem;

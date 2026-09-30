@@ -5,11 +5,9 @@ import { UiConfirm } from '../ui/UiConfirm.ts';
 import { UiConflicts } from '../ui/UiConflicts.ts';
 import { UiLoading } from '../ui/UiLoading.ts';
 import { UiSuccess } from '../ui/UiSuccess.ts';
-import { utilKeybinding } from '../util/index.ts';
 
 import type { Context } from '../Context.ts';
 import type { D3Selection, D3EnterSelection } from 'd3-selection';
-import type { Keybinding } from '../util/keybinding.ts';
 
 const DEBUG = false;
 
@@ -19,8 +17,6 @@ const DEBUG = false;
  */
 export class SaveMode extends AbstractMode {
 
-  /** Keybinding handler for this mode */
-  protected _keybinding: Keybinding;
   /** Current location string for success message */
   protected _location: string | null;
   /** Whether the save was successful */
@@ -42,8 +38,6 @@ export class SaveMode extends AbstractMode {
   public constructor(context: Context) {
     super(context);
     this.id = 'save';
-
-    this._keybinding = utilKeybinding('SaveMode');
 
     this._location = null;
     this._wasSuccessfulSave = false;
@@ -415,7 +409,10 @@ export class SaveMode extends AbstractMode {
    * Enable keyboard shortcuts for the save mode (Escape to cancel).
    */
   protected _keybindingOn(): void {
-    select(document).call(this._keybinding.on('⎋', this._cancel, true));
+    const keyboard = this.context.systems.keyboard!;
+    keyboard.scope('save')
+      .on('⎋', this._cancel, { capture: true })
+      .enable();
   }
 
 
@@ -423,7 +420,8 @@ export class SaveMode extends AbstractMode {
    * Disable keyboard shortcuts for the save mode.
    */
   protected _keybindingOff(): void {
-    select(document).call(this._keybinding.unbind);
+    const keyboard = this.context.systems.keyboard!;
+    keyboard.scope('save').disable();
   }
 
 

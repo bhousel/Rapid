@@ -1,6 +1,6 @@
 /**
  * Utilities module barrel file.
- * Exports utility functions for various purposes: keybinding, detection, dates, etc.
+ * Exports utility functions for various purposes: detection, dates, etc.
  * @module util
  */
 export * from './cmd.ts';
@@ -13,7 +13,6 @@ export * from './get_set_value.ts';
 export * from './iterable.ts';
 export * from './jsonp_request.ts';
 export * from './jxon.ts';
-export * from './keybinding.ts';
 export * from './sanitize.ts';
 export * from './string.ts';
 export * from './url.ts';

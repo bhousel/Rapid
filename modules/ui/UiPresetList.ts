@@ -7,7 +7,7 @@ import { uiIcon } from './icon.ts';
 import { UiPresetIcon } from './UiPresetIcon.ts';
 import { UiTagReference } from './UiTagReference.ts';
 import { UiTooltip } from './UiTooltip.ts';
-import { utilKeybinding, utilNoAuto, utilTotalExtent } from '../util/index.ts';
+import { utilNoAuto, utilTotalExtent } from '../util/index.ts';
 
 import type { Context } from '../Context.ts';
 import type { D3Selection } from 'd3-selection';
@@ -190,8 +190,7 @@ export class UiPresetList extends EventEmitter {
 
     // hack to let delete shortcut work when search is autofocused
     if (val.length === 0 &&
-      (e.keyCode === utilKeybinding.keyCodes['⌫'] ||
-       e.keyCode === utilKeybinding.keyCodes['⌦'])) {
+      (e.key === 'Backspace' || e.key === 'Delete')) {
       e.preventDefault();
       e.stopPropagation();
       new DeleteOperation(context, this._entityIDs).run();
@@ -199,7 +198,7 @@ export class UiPresetList extends EventEmitter {
     // hack to let undo work when search is autofocused
     } else if (val.length === 0 &&
       (e.ctrlKey || e.metaKey) &&
-      e.keyCode === utilKeybinding.keyCodes.z) {
+      e.key === 'z') {
       e.preventDefault();
       e.stopPropagation();
       editor.undo();
@@ -220,7 +219,7 @@ export class UiPresetList extends EventEmitter {
   protected _searchKeydown(e: KeyboardEvent): void {
     if (!this.$input || !this.$list) return;  // called too soon?
 
-    if (e.keyCode === utilKeybinding.keyCodes['↓'] &&       // down arrow
+    if (e.key === 'ArrowDown' &&       // down arrow
       // if insertion point is at the end of the string
       (this.$input.node() as HTMLInputElement).selectionStart === this.$input.property('value').length
     ) {
@@ -362,7 +361,7 @@ export class UiPresetList extends EventEmitter {
     const isRTL = l10n.isRTL;
 
     // arrow down, move focus to the next, lower item
-    if (e.keyCode === utilKeybinding.keyCodes['↓']) {
+    if (e.key === 'ArrowDown') {
       e.preventDefault();
       e.stopPropagation();
 
@@ -384,7 +383,7 @@ export class UiPresetList extends EventEmitter {
       }
 
     // arrow up, move focus to the previous, higher item
-    } else if (e.keyCode === utilKeybinding.keyCodes['↑']) {
+    } else if (e.key === 'ArrowUp') {
       e.preventDefault();
       e.stopPropagation();
 
@@ -409,7 +408,7 @@ export class UiPresetList extends EventEmitter {
       }
 
     // arrow left, move focus to the parent item if there is one
-    } else if (e.keyCode === utilKeybinding.keyCodes[isRTL ? '→' : '←']) {
+    } else if (e.key === (isRTL ? 'ArrowRight' : 'ArrowLeft')) {
       e.preventDefault();
       e.stopPropagation();
       if (!$parentItem.empty()) {     // if there is a parent item, focus on the parent item
@@ -417,7 +416,7 @@ export class UiPresetList extends EventEmitter {
       }
 
     // arrow right, choose this item
-    } else if (e.keyCode === utilKeybinding.keyCodes[isRTL ? '←' : '→']) {
+    } else if (e.key === (isRTL ? 'ArrowLeft' : 'ArrowRight')) {
       e.preventDefault();
       e.stopPropagation();
       ($item.datum() as ListItem).choose();
@@ -679,13 +678,13 @@ class CategoryItem {
     const l10n = this.list.context.systems.l10n!;
     const target = e.currentTarget as HTMLElement;
     const $selection = select(target);
-    if (e.keyCode === utilKeybinding.keyCodes[l10n.isRTL ? '←' : '→']) {  // right arrow, expand the focused item
+    if (e.key === (l10n.isRTL ? 'ArrowLeft' : 'ArrowRight')) {  // right arrow, expand the focused item
       e.preventDefault();
       e.stopPropagation();
       if (!$selection.classed('expanded')) {  // if the item isn't expanded
         this._click(e);                       // toggle expansion (expand the item)
       }
-    } else if (e.keyCode === utilKeybinding.keyCodes[l10n.isRTL ? '→' : '←']) {   // left arrow, collapse the focused item
+    } else if (e.key === (l10n.isRTL ? 'ArrowRight' : 'ArrowLeft')) {   // left arrow, collapse the focused item
       e.preventDefault();
       e.stopPropagation();
       if ($selection.classed('expanded')) {   // if the item is expanded

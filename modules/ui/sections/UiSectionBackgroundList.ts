@@ -760,11 +760,11 @@ export class UiSectionBackgroundList extends AbstractUiSection {
    */
   protected _setupKeybinding(): void {
     const context = this.context;
+    const keyboard = context.systems.keyboard!;
     const l10n = context.systems.l10n!;
-    const keybinding = context.keybinding();
 
     if (Array.isArray(this._keys)) {
-      keybinding.off(this._keys);
+      keyboard.global.off(this._keys);
     }
 
     const swapBackgroundKey = utilCmd('⌘' + l10n.t('shortcuts.command.background_switch.key'));
@@ -773,7 +773,7 @@ export class UiSectionBackgroundList extends AbstractUiSection {
 
     this._keys = [swapBackgroundKey, nextBackgroundKey, prevBackgroundKey];
 
-    keybinding
+    keyboard.global
       .on(swapBackgroundKey, this._swapBackground)
       .on(nextBackgroundKey, this._nextBackground)
       .on(prevBackgroundKey, this._prevBackground);

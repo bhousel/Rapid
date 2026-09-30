@@ -34,8 +34,18 @@ describe('UiCombobox', () => {
     { title: 'test', value: 'test' }
   ];
 
+  // Map the symbols/keys this test simulates to legacy numeric keyCodes.
+  // (UiCombobox still switches on `event.keyCode`; letters/digits map to their uppercase char code.)
+  const KEYCODES = {
+    '⇥': 9, '⌫': 8, '↩': 13, '⎋': 27,
+    '←': 37, '↑': 38, '→': 39, '↓': 40, '⌦': 46
+  };
+  function keyCodeFor(key) {
+    return KEYCODES[key] ?? key.toUpperCase().charCodeAt(0);
+  }
+
   function simulateKeypress(key) {
-    const keyCode = Rapid.utilKeybinding.keyCodes[key];
+    const keyCode = keyCodeFor(key);
     let value = $input.property('value');
     let start = $input.property('selectionStart');
     let finis = $input.property('selectionEnd');

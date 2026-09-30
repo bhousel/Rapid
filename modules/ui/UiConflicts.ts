@@ -4,11 +4,10 @@ import { Extent, numWrap } from '@rapid-sdk/math';
 import { JXON } from '../util/jxon.ts';
 import { OsmChangeset } from '../data/OsmChangeset.ts';
 import { uiIcon } from './icon.ts';
-import { utilHighlightEntities, utilKeybinding, utilSanitizeHTML } from '../util/index.ts';
+import { utilHighlightEntities, utilSanitizeHTML } from '../util/index.ts';
 
 import type { Context } from '../Context.ts';
 import type { D3Selection } from 'd3-selection';
-import type { Keybinding } from '../util/keybinding.ts';
 import type { OsmChanges } from '../data/OsmChangeset.ts';
 
 
@@ -42,7 +41,6 @@ interface ConflictItem {
 export class UiConflicts extends EventEmitter {
   public context: Context;
 
-  protected _keybinding: Keybinding;
   protected _origChanges: OsmChanges | null;
   protected _conflictList: ConflictItem[] | null;
   protected _shownConflictIndex: number | null;
@@ -58,8 +56,6 @@ export class UiConflicts extends EventEmitter {
     this._conflictList = null;
     this._shownConflictIndex = null;
 
-    this._keybinding = utilKeybinding('conflicts');
-
     // Ensure methods used as callbacks always have `this` bound correctly.
     this.render = this.render.bind(this);
     this._cancel = this._cancel.bind(this);
@@ -71,14 +67,16 @@ export class UiConflicts extends EventEmitter {
 
   /** Binds the keyboard shortcuts used by the conflict screen. */
   protected _keybindingOn(): void {
-    select(document)
-      .call(this._keybinding.on('⎋', this._cancel, true));
+    const keyboard = this.context.systems.keyboard!;
+    keyboard.scope('conflicts')
+      .on('⎋', this._cancel, { capture: true })
+      .enable();
   }
 
   /** Unbinds the keyboard shortcuts used by the conflict screen. */
   protected _keybindingOff(): void {
-    select(document)
-      .call(this._keybinding.unbind);
+    const keyboard = this.context.systems.keyboard!;
+    keyboard.scope('conflicts').disable();
   }
 
   /** Dismisses the conflict screen and retries the save. */

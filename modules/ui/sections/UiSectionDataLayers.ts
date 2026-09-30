@@ -580,11 +580,11 @@ export class UiSectionDataLayers extends AbstractUiSection {
    */
   protected _setupKeybinding(): void {
     const context = this.context;
-    const keybinding = context.keybinding() as any;
+    const keyboard = context.systems.keyboard!;
     const l10n = context.systems.l10n!;
 
     if (Array.isArray(this._keys)) {
-      keybinding.off(this._keys);
+      keyboard.global.off(this._keys);
     }
 
     // setup key shortcuts
@@ -601,7 +601,7 @@ export class UiSectionDataLayers extends AbstractUiSection {
       toggleMapillaryKey, toggleStreetsideKey, toggleKartaviewKey
     ];
 
-    keybinding
+    keyboard.global
       .on(toggleAllKey, (e: Event) => this._toggleAllLayers(e))
       .on(toggleOsmKey, (e: Event) => this._toggleLayerKey(e, 'osm'))
       .on(toggleNotesKey, (e: Event) => this._toggleLayerKey(e, 'notes'))

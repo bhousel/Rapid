@@ -5,7 +5,6 @@ import { AbstractSystem } from './core/AbstractSystem.ts';
 import type { TransformProps } from '@rapid-sdk/math';
 import type { Context } from './Context.ts';
 import type { D3Selection } from 'd3-selection';
-import type { Keybinding } from './util/keybinding.ts';
 import type { Systems } from './core/types.ts';
 
 
@@ -51,8 +50,6 @@ export class MockContext {
   public $container: D3Selection;
 
 
-  /** Stub keybinding manager (backed by a MockSystem cast) */
-  protected _keybinding: Keybinding;
   /** Promise for init phase */
   protected _initPromise: Promise<void> | null;
   /** Promise for start phase */
@@ -66,7 +63,6 @@ export class MockContext {
     this.services = {};
     this.systems = {};
     this.viewport = new Viewport();
-    this._keybinding = (new MockSystem(this as unknown as Context) as unknown as Keybinding);
 
     // An empty D3 selection (assume no DOM in tests, though they may set up their own)
     this.$container = select(null);
@@ -153,8 +149,6 @@ export class MockContext {
   public on()          { return this; }
   /** Stub event emitter — no-ops and returns `this` for chaining */
   public off()         { return this; }
-  /** Returns the stub keybinding manager */
-  public keybinding()  { return this._keybinding; }
 
   /**
    * Gets or sets the container element as a D3 selection.

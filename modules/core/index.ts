@@ -9,6 +9,7 @@ import { EditSystem } from './EditSystem.ts';
 import { FilterSystem } from './FilterSystem.ts';
 import { GraphicsSystem } from './GraphicsSystem.ts';
 import { ImagerySystem } from './ImagerySystem.ts';
+import { KeyboardSystem } from './KeyboardSystem.ts';
 import { LocalizationSystem } from './LocalizationSystem.ts';
 import { LocationSystem } from './LocationSystem.ts';
 import { Map3dSystem } from './Map3dSystem.ts';
@@ -35,6 +36,7 @@ export {
   FilterSystem,
   GraphicsSystem,
   ImagerySystem,
+  KeyboardSystem,
   LocalizationSystem,
   LocationSystem,
   Map3dSystem,
@@ -82,6 +84,7 @@ systems.available.set('editor', EditSystem);
 systems.available.set('filters', FilterSystem);
 systems.available.set('gfx', GraphicsSystem);
 systems.available.set('imagery', ImagerySystem);
+systems.available.set('keyboard', KeyboardSystem);
 systems.available.set('l10n', LocalizationSystem);
 systems.available.set('locations', LocationSystem);
 systems.available.set('map', MapSystem);

@@ -19,7 +19,6 @@ This module contains helper functions that don't belong to any specific domain. 
 | `iterable.ts` | Utilities for working with iterables |
 | `jsonp_request.ts` | JSONP request helper for cross-origin APIs |
 | `jxon.ts` | XML ↔ JSON conversion (JXON format) |
-| `keybinding.ts` | Keyboard shortcut binding system |
 | `rebind.ts` | D3-style method rebinding |
 | `string.ts` | String manipulation utilities |
 | `util.ts` | Miscellaneous utilities |
@@ -31,14 +30,6 @@ This module contains helper functions that don't belong to any specific domain. 
 import { utilCmd } from './util/cmd.ts';
 // Returns '⌘A' on Mac, 'Ctrl+A' elsewhere
 const shortcut = utilCmd('⌘A');
-```
-
-### keybinding.ts
-```javascript
-import { utilKeybinding } from './util/keybinding.ts';
-const keybinding = utilKeybinding('my-component');
-keybinding.on('⌘S', save);
-d3.select(document).call(keybinding);
 ```
 
 ### detect.ts

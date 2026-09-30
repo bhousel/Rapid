@@ -153,8 +153,9 @@ export class UiPane {
       .call(this.renderContent);
 
     if (this.key) {
-      context.keybinding().off(this.key);
-      context.keybinding().on(this.key, this.togglePane);
+      const keyboard = context.systems.keyboard!;
+      keyboard.global.off(this.key);
+      keyboard.global.on(this.key, this.togglePane);
     }
   }
 }

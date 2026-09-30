@@ -279,19 +279,19 @@ export class MapSystem extends AbstractSystem {
    */
   protected _setupKeybinding(): void {
     const context = this.context;
-    const keybinding = context.keybinding();
+    const keyboard = context.systems.keyboard!;
     const l10n = context.systems.l10n;
     if (!l10n) return;
 
     if (Array.isArray(this._keys)) {
-      keybinding.off(this._keys);
+      keyboard.global.off(this._keys);
     }
 
     const wireframeKey = l10n.t('shortcuts.command.wireframe.key');
     const highlightEditsKey = l10n.t('shortcuts.command.highlight_edits.key');
     this._keys = [wireframeKey, highlightEditsKey];
 
-    context.keybinding()
+    keyboard.global
       .on(wireframeKey, (e: KeyboardEvent) => {
         e.preventDefault();
         e.stopPropagation();

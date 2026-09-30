@@ -545,14 +545,14 @@ export class UiMinimap {
    */
   protected _setupKeybinding(): void {
     const context = this.context;
-    const keybinding = context.keybinding();
+    const keyboard = context.systems.keyboard!;
     const l10n = context.systems.l10n!;
 
     if (Array.isArray(this._keys)) {
-      keybinding.off(this._keys);
+      keyboard.global.off(this._keys);
     }
 
     this._keys = [l10n.t('shortcuts.command.toggle_minimap.key')];
-    context.keybinding().on(this._keys, this.toggle);
+    keyboard.global.on(this._keys, this.toggle);
   }
 }

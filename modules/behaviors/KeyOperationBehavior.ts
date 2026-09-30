@@ -2,7 +2,7 @@ import { AbstractBehavior } from './AbstractBehavior.ts';
 
 import type { AbstractOperation } from '../operations/AbstractOperation.ts';
 import type { Context } from '../Context.ts';
-import type { Keybinding } from '../util/keybinding.ts';
+import type { KeyboardSystem } from '../core/KeyboardSystem.ts';
 
 
 /**
@@ -13,8 +13,8 @@ export class KeyOperationBehavior extends AbstractBehavior {
 
   /** The operation this behavior is associated with */
   protected _operation: AbstractOperation;
-  /** The keybinding handler for document-level key events */
-  protected _keybinding: Keybinding | null;
+  /** The keyboard system, for document-level key events */
+  protected _keyboard: KeyboardSystem | null;
 
 
   /**
@@ -26,11 +26,11 @@ export class KeyOperationBehavior extends AbstractBehavior {
     this.id = `key-${operation.id}`;
 
     this._operation = operation;
-    this._keybinding = null;
+    this._keyboard = null;
 
     const isTestEnvironment = (!('window' in globalThis)) || ('assert' in globalThis) || ('expect' in globalThis);
     if (!isTestEnvironment) {
-      this._keybinding = this.context.keybinding(); // "global" keybinding (on document)
+      this._keyboard = this.context.systems.keyboard ?? null; // "global" keybinding (on document)
     }
 
     // Make sure the event handlers have `this` bound correctly
@@ -45,8 +45,8 @@ export class KeyOperationBehavior extends AbstractBehavior {
     if (this._enabled) return;
 
     const operation = this._operation;
-    if (operation.available() && operation.keys && this._keybinding) {
-      this._keybinding.on(operation.keys, this._keydown);
+    if (operation.available() && operation.keys && this._keyboard) {
+      this._keyboard.global.on(operation.keys, this._keydown);
       this._enabled = true;
     }
   }
@@ -60,8 +60,8 @@ export class KeyOperationBehavior extends AbstractBehavior {
     this._enabled = false;
 
     const operation = this._operation;
-    if (operation.keys && this._keybinding) {
-      this._keybinding.off(operation.keys);
+    if (operation.keys && this._keyboard) {
+      this._keyboard.global.off(operation.keys);
     }
   }
 

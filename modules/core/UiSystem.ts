@@ -1,7 +1,6 @@
 import { AbstractSystem } from './AbstractSystem.ts';
 import { select } from 'd3-selection';
 import { utilDetect } from '../util/detect.ts';
-import { utilKeybinding } from '../util/keybinding.ts';
 import { vecAdd } from '@rapid-sdk/math';
 import {
   UiApiStatus, UiDefs, UiEditMenu, UiFlash, UiFullscreen, UiIntro,
@@ -11,7 +10,7 @@ import {
 
 import type { Context } from '../Context.ts';
 import type { D3EnterSelection, D3Selection } from 'd3-selection';
-import type { Keybinding } from '../util/keybinding.ts';
+import type { KeyBindingScope } from './KeyboardSystem.ts';
 import type { UiInfoCards } from '../ui/UiInfoCards.ts';
 import type { UiMinimap } from '../ui/UiMinimap.ts';
 import type { UiModal } from '../ui/UiModal.ts';
@@ -44,8 +43,8 @@ export class UiSystem extends AbstractSystem {
   protected _showsMapRouletteMenu: boolean;
   /** Stack of currently-open modals; the last entry is the topmost */
   protected _modals: UiModal[];
-  /** Document keybinding that routes Esc/Backspace to the top modal */
-  protected _modalKeybinding: Keybinding;
+  /** Keyboard scope that routes Esc/Backspace to the top modal */
+  protected _modalScope: KeyBindingScope;
 
   // Child UI components, created during initAsync
   /** API status indicator component */
@@ -91,7 +90,7 @@ export class UiSystem extends AbstractSystem {
     super(context);
     this.id = 'ui';
     // Require any systems that might be required by any UI component.
-    this.requiredDependencies = new Set<SystemID>(['assets', 'editor', 'gfx', 'imagery', 'l10n', 'map', 'network', 'spatial', 'urlhash']);
+    this.requiredDependencies = new Set<SystemID>(['assets', 'editor', 'gfx', 'imagery', 'keyboard', 'l10n', 'map', 'network', 'spatial', 'urlhash']);
     this.optionalDependencies = new Set<SystemID>(['scheduler', 'settings']);
 
     this._mapRect = null;
@@ -100,7 +99,7 @@ export class UiSystem extends AbstractSystem {
     this._showsMapRouletteMenu = false;
 
     this._modals = [];
-    this._modalKeybinding = utilKeybinding('modal');
+    this._modalScope = null!;   // set up in initAsync, once the keyboard system is available
 
     // Child components, we will defer creating these until after some other things have initted.
     this.ApiStatus = null!;
@@ -128,11 +127,6 @@ export class UiSystem extends AbstractSystem {
     this.render = this.render.bind(this);
     this.resize = this.resize.bind(this);
     this._closeTopModal = this._closeTopModal.bind(this);
-
-    // Esc/Backspace dismiss the top (non-blocking) modal on the stack.
-    this._modalKeybinding
-      .on('⌫', this._closeTopModal)
-      .on('⎋', this._closeTopModal);
   }
 
 
@@ -199,8 +193,13 @@ export class UiSystem extends AbstractSystem {
       .then(() => {
         window.addEventListener('resize', this.resize);
 
-        // Route Esc/Backspace to the top modal on the stack.
-        select(document).call(this._modalKeybinding);
+        // Esc/Backspace dismiss the top (non-blocking) modal on the stack.
+        const keyboard = context.systems.keyboard!;
+        this._modalScope = keyboard.scope('modal');
+        this._modalScope
+          .on('⌫', this._closeTopModal)
+          .on('⎋', this._closeTopModal)
+          .enable();
 
         this._checkEnvironment();  // are we in a dev or staging environment?
 

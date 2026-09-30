@@ -17,6 +17,7 @@ export { AssetSystem } from './core/AssetSystem.ts';
 export { EditSystem } from './core/EditSystem.ts';
 export { FilterSystem } from './core/FilterSystem.ts';
 export { ImagerySystem } from './core/ImagerySystem.ts';
+export { KeyboardSystem } from './core/KeyboardSystem.ts';
 export { LocalizationSystem } from './core/LocalizationSystem.ts';
 export { LocationSystem } from './core/LocationSystem.ts';
 export { MapSystem } from './core/MapSystem.ts';

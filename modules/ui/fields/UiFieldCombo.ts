@@ -5,7 +5,6 @@ import { iso1A2Code } from '@rapideditor/country-coder';
 
 import { AbstractUiField } from './AbstractUiField.ts';
 import { UiCombobox } from '../UiCombobox.ts';
-import { utilKeybinding } from '../../util/keybinding.ts';
 import { utilGetSetValue, utilNoAuto } from '../../util/index.ts';
 
 import type { Context } from '../../Context.ts';
@@ -710,8 +709,7 @@ export class UiFieldCombo extends AbstractUiField {
         .on('keydown.deleteCapture', (e: KeyboardEvent) => {
           if (isReadOnly &&
             isKnownValue &&
-            (e.keyCode === utilKeybinding.keyCodes['⌫'] ||
-            e.keyCode === utilKeybinding.keyCodes['⌦'])) {
+            (e.key === 'Backspace' || e.key === 'Delete')) {
 
             e.preventDefault();
             e.stopPropagation();

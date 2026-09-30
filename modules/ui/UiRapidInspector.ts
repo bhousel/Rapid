@@ -4,10 +4,10 @@ import { GeoJSONData, OsmEntity } from '../data/index.ts';
 import { uiIcon } from './icon.ts';
 //import { uiRapidFirstEditDialog } from './rapid_first_edit_dialog.ts';
 import { UiTooltip } from './UiTooltip.ts';
-import { utilKeybinding } from '../util/keybinding.ts';
 
 import type { Context } from '../Context.ts';
 import type { D3EnterSelection, D3Selection } from 'd3-selection';
+import type { KeyBindingScope } from '../core/KeyboardSystem.ts';
 
 const ACCEPT_FEATURES_LIMIT = 50;
 
@@ -48,10 +48,15 @@ export class UiRapidInspector {
   /** Global shared application context */
   public context: Context;
   /** The data element that was selected */
-  public datum: OsmEntity | GeoJSONData | null;
+  protected _datum: OsmEntity | GeoJSONData | null;
 
   protected _keys: string[] | null;
-  protected _keybinding: any;
+  /**
+   * Isolated keyboard scope.  Its keys ('A','D','M','R') collide with the OSM operation
+   * shortcuts, so this scope is enabled only while a Rapid feature is being inspected
+   * (see the `datum` setter).
+   */
+  protected _scope: KeyBindingScope | null;
 
   // D3 selections
   public $parent: D3Selection | null;
@@ -62,8 +67,8 @@ export class UiRapidInspector {
   public IgnoreTooltip: UiTooltip;
 
   // accept and enter one of these modes:
-  public moveFeature: (e: Event, d: any) => void;
-  public rotateFeature: (e: Event, d: any) => void;
+  public moveFeature: (e?: Event, d?: any) => void;
+  public rotateFeature: (e?: Event, d?: any) => void;
 
 
   /**
@@ -72,12 +77,13 @@ export class UiRapidInspector {
   public constructor(context: Context) {
     this.context = context;
 
-    this.datum = null;
+    // Need a "private" keyboard scope for this component because these keys conflict with
+    // the main keys used by the operations when editing OSM. ('A','D','M','R').
+    // The scope is enabled only while a Rapid feature is being inspected (see the `datum` setter).
+    this._scope = context.systems.keyboard?.scope('rapid-inspector') ?? null;
+
+    this._datum = null;
     this._keys = null;
-    // Need a "private" keybinding for this component because these keys conflict with
-    // the main keys used by the operations when editing OSM. ('A','D','M','R')
-    this._keybinding = utilKeybinding('UiRapidInspector');
-    select(document).call(this._keybinding);
 
     // D3 selections
     this.$parent = null;
@@ -106,6 +112,29 @@ export class UiRapidInspector {
     const l10n = context.systems.l10n!;
     l10n.on('localechange', this._setupKeybinding);
     this._setupKeybinding();
+  }
+
+
+  /**
+   * The data element currently being inspected.
+   * @return The inspected data element, or `null` when nothing is inspected
+   */
+  public get datum(): OsmEntity | GeoJSONData | null {
+    return this._datum;
+  }
+
+  /**
+   * Set the inspected data element.  Enables this component's isolated keyboard scope only while a
+   * feature is being inspected, so its shortcuts don't collide with the OSM operation shortcuts.
+   * @param val - The data element being inspected, or `null` when nothing is inspected
+   */
+  public set datum(val: OsmEntity | GeoJSONData | null) {
+    this._datum = val;
+    if (val) {
+      this._scope?.enable();
+    } else {
+      this._scope?.disable();
+    }
   }
 
 
@@ -649,11 +678,12 @@ export class UiRapidInspector {
    */
   protected _setupKeybinding(): void {
     const context = this.context;
-    const keybinding = this._keybinding;
     const l10n = context.systems.l10n!;
+    const scope = this._scope;
+    if (!scope) return;
 
     if (Array.isArray(this._keys)) {
-      keybinding.off(this._keys);
+      scope.off(this._keys);
     }
 
     const acceptKey = l10n.t('shortcuts.command.accept_feature.key');
@@ -662,10 +692,10 @@ export class UiRapidInspector {
     const rotateKey = l10n.t('shortcuts.command.rotate.key');
     this._keys = [acceptKey, ignoreKey, moveKey, rotateKey];
 
-    keybinding.on(acceptKey, this.acceptFeature);
-    keybinding.on(ignoreKey, this.ignoreFeature);
-    keybinding.on(moveKey, this.moveFeature);
-    keybinding.on(rotateKey, this.rotateFeature);
+    scope.on(acceptKey, this.acceptFeature);
+    scope.on(ignoreKey, this.ignoreFeature);
+    scope.on(moveKey, this.moveFeature);
+    scope.on(rotateKey, this.rotateFeature);
   }
 
 }

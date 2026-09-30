@@ -52,7 +52,7 @@ export class UiSaveTool {
     const editor = context.systems.editor!;
     context.on('modechange', this.rerender);
     editor.on('stablechange', this.rerender);
-    context.keybinding().on(this.key, this.choose, true /* capture */);
+    context.systems.keyboard!.global.on(this.key, this.choose, { capture: true });
   }
 
 

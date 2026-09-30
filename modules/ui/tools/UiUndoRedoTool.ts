@@ -86,7 +86,7 @@ export class UiUndoRedoTool {
 
     // Event listeners
     for (const d of this.commands) {
-      context.keybinding().on(d.key, e => this.choose(e, d));
+      context.systems.keyboard!.global.on(d.key, e => this.choose(e, d));
     }
     gfx.on('draw', this.debouncedRender);
     editor.on('stablechange', this.rerender);

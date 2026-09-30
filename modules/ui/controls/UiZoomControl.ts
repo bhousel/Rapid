@@ -2,7 +2,7 @@ import { select, selection } from 'd3-selection';
 
 import { uiIcon } from '../icon.ts';
 import { UiTooltip } from '../UiTooltip.ts';
-import { utilCmd, utilKeybinding } from '../../util/index.ts';
+import { utilCmd } from '../../util/index.ts';
 
 import type { Context } from '../../Context.ts';
 import type { D3Selection } from 'd3-selection';
@@ -31,6 +31,7 @@ export class UiZoomControl {
     this.context = context;
 
     const gfx = context.systems.gfx!;
+    const keyboard = context.systems.keyboard!;
     const l10n = context.systems.l10n!;
     const map = context.systems.map!;
 
@@ -68,14 +69,14 @@ export class UiZoomControl {
     }];
 
     // Event listeners
-    utilKeybinding.plusKeys.forEach(key => {
-      context.keybinding().on(key, this.zoomIn);
-      context.keybinding().on(utilCmd('⌥' + key), this.zoomInFurther);
+    keyboard.plusKeys.forEach(key => {
+      keyboard.global.on(key, this.zoomIn);
+      keyboard.global.on(utilCmd('⌥' + key), this.zoomInFurther);
     });
 
-    utilKeybinding.minusKeys.forEach(key => {
-      context.keybinding().on(key, this.zoomOut);
-      context.keybinding().on(utilCmd('⌥' + key), this.zoomOutFurther);
+    keyboard.minusKeys.forEach(key => {
+      keyboard.global.on(key, this.zoomOut);
+      keyboard.global.on(utilCmd('⌥' + key), this.zoomOutFurther);
     });
 
     gfx.on('draw', this.rerender);

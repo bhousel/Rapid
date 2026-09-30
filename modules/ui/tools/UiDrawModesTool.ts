@@ -259,17 +259,17 @@ export class UiDrawModesTool {
    */
   protected _setupKeybinding(): void {
     const context = this.context;
-    const keybinding = context.keybinding();
+    const keyboard = context.systems.keyboard!;
 
     if (Array.isArray(this._keys)) {
-      keybinding.off(this._keys);
+      keyboard.global.off(this._keys);
     }
 
     this._keys = [];
     for (const d of this.commands) {
       const key = d.getKey();
       this._keys.push(key);
-      keybinding.on(key, e => this.choose(e, d));
+      keyboard.global.on(key, e => this.choose(e, d));
     }
   }
 }

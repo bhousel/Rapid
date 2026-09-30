@@ -22,6 +22,8 @@ export type CategoryID = string;
 export type CheckpointID = string;
 /** Class ID - identifier for a styling class (e.g. 'hovered', 'selected', 'drawing') */
 export type ClassID = string;
+/** Command ID - identifier for a remappable keyboard command (e.g. 'zoom-in', 'undo') */
+export type CommandID = string;
 /** Data ID - identifier for any AbstractData subclass */
 export type DataID = string;
 /** Dataset ID (e.g. 'fbRoads', 'msBuildings') */
@@ -113,6 +115,7 @@ declare global {
   type CategoryID = string;
   type CheckpointID = string;
   type ClassID = string;
+  type CommandID = string;
   type DataID = string;
   type DatasetID = string;
   type DetectionID = string;

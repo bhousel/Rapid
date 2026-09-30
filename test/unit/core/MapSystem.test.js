@@ -9,6 +9,7 @@ describe('MapSystem', () => {
   context.systems = {
     editor:   new Rapid.MockSystem(context),
     gfx:      new Rapid.MockGfxSystem(context),
+    keyboard: new Rapid.KeyboardSystem(context),
     l10n:     new Rapid.LocalizationSystem(context),
     map:      new Rapid.MapSystem(context)
   };
