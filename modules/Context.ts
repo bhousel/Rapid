@@ -231,7 +231,7 @@ export class Context extends EventEmitter {
     this._startPromise = null;
     this._resetPromise = null;
 
-    // User interface and keybinding
+    // User interface
     // AFAICT `lastPointerType` is just used to localize the intro? for now - instead get this from pixi?
     // this.lastPointerType = () => _uiSystem.lastPointerType;
     this.lastPointerType = 'mouse';

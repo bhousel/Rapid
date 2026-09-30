@@ -1,20 +1,26 @@
 # Current Work
 
-## UI module refactor — branch `ui_refactors`
+No active in-progress task. Working tree is clean on `main`.
 
-All major refactor waves on this branch are now committed and pushed. See `completed.md` for
-a reverse-chronological history. The `modules/ui/` conversion table in `AGENTS.md` is current.
+## Last landed
+`KeyboardSystem` phase 1 — `util/keybinding.ts` is now `core/KeyboardSystem.ts`, an
+`AbstractSystem` reachable via `context.systems.keyboard`. See `completed.md`,
+[`.github/design/keyboard-system.md`](../.github/design/keyboard-system.md), and
+[facebook/Rapid#1076](https://github.com/facebook/Rapid/issues/1076).
 
-## Future work
-- **Automated testing of `UiSystem` + `UiWhatever` components.** The modal stack + Esc/Backspace routing
-  now live on `UiSystem`; we can't unit-test that under bun without instantiating a full `UiSystem`
-  (currently needs a browser). The raw standalone Esc/Backspace modal tests were dropped for this reason.
-  Figure out a way to exercise `UiSystem`-owned behavior (headless browser? a testable stack seam?).
-- **Manual smoke-test** the nested Rapid dataset modals (catalog / add-custom-data / colorpicker) in a
-  real browser to confirm stacking, Esc, and close behavior.
-- **`CycleHighwayTagOperation`'s module-level `_lastSelectedIDs`.** Now that `operations/` is classes, this is the
-  one remaining module-level mutable global there. Consider moving it onto a system (edit/undo state?) per
-  the system-ownership rule — out of scope for the conversion, left with a comment.
+## Next up
+- **KeyboardSystem phases 2 & 3** (remappable shortcuts — SettingsSystem persistence, then UI).
+  Full plan in `backlog.md`.
+
+## Still-open future work
+- **Automated testing of `UiSystem` + `UiWhatever` components.** The modal stack + Esc/Backspace
+  routing (and now the `KeyboardSystem` document listeners) can't be unit-tested under bun without a
+  browser. Figure out a headless-browser or testable-seam approach.
+- **Manual smoke-test** the nested Rapid dataset modals (catalog / add-custom-data / colorpicker) in
+  a real browser to confirm stacking, Esc, and close behavior.
+- **`CycleHighwayTagOperation`'s module-level `_lastSelectedIDs`.** The one remaining module-level
+  mutable global in `operations/`. Consider moving it onto a system per the system-ownership rule —
+  left with a comment for now.
 
 ## Open questions
 - Delete the 2 dead quarantined `sections/*.jsx` React demo files + `section.ts`/`uiSection`?
