@@ -201,4 +201,79 @@ describe('EditSystem sessions (Phase 2)', () => {
       assert.isDefined(await database.get('sessions', 's-1'));   // session is kept
     });
   });
+
+
+  describe('liveness heartbeat', () => {
+    const OWN_KEY = 'Rapid_headless_active_session';
+    let savedSessionStorage;
+
+    beforeEach(() => {
+      // bare Bun has no sessionStorage — install a minimal in-memory mock
+      savedSessionStorage = globalThis.sessionStorage;
+      const map = new Map();
+      globalThis.sessionStorage = {
+        getItem: (k) => (map.has(k) ? map.get(k) : null),
+        setItem: (k, v) => { map.set(k, String(v)); },
+        removeItem: (k) => { map.delete(k); },
+        clear: () => map.clear()
+      };
+    });
+
+    afterEach(() => {
+      globalThis.sessionStorage = savedSessionStorage;
+    });
+
+    it('bumps heartbeatAt on the active session without clobbering its data', async () => {
+      editor.perform(actionAddTaggedNode('n-1', [1, 2], { building: 'yes' }));
+      editor.commit({ annotation: 'building', selectedIDs: ['n-1'] });
+      await editor.immediateBackup();
+
+      const before = (await database.get('sessions', editor._sessionID)).heartbeatAt;
+      await new Promise(r => { setTimeout(r, 5); });
+      await editor._heartbeatAsync();
+
+      const after = await database.get('sessions', editor._sessionID);
+      assert.isAbove(after.heartbeatAt, before);
+      assert.isOk(after.data);                        // data preserved
+      assert.include(after.summary, 'building');      // metadata preserved
+    });
+
+    it('excludes a session that is live in another tab (fresh heartbeat)', async () => {
+      await seedSession('s-live', { heartbeatAt: Date.now(), updatedAt: 5000 });
+      const list = await editor.listRestorableSessionsAsync();
+      assert.notInclude(list.map(s => s.id), 's-live');
+    });
+
+    it('offers a session whose heartbeat is stale', async () => {
+      await seedSession('s-stale', { heartbeatAt: Date.now() - 5 * 60 * 1000, updatedAt: 5000 });
+      const list = await editor.listRestorableSessionsAsync();
+      assert.include(list.map(s => s.id), 's-stale');
+    });
+
+    it('still offers this tab\'s own session after a reload, despite a fresh heartbeat', async () => {
+      await seedSession('s-mine', { heartbeatAt: Date.now(), updatedAt: 5000 });
+      globalThis.sessionStorage.setItem(OWN_KEY, 's-mine');   // simulate this tab having owned it pre-reload
+
+      const list = await editor.listRestorableSessionsAsync();
+      assert.include(list.map(s => s.id), 's-mine');
+    });
+
+    it('records the owned session id in sessionStorage on backup', async () => {
+      editor.perform(actionAddTaggedNode('n-1', [1, 2], { building: 'yes' }));
+      editor.commit({ annotation: 'building', selectedIDs: ['n-1'] });
+      await editor.immediateBackup();
+
+      assert.strictEqual(globalThis.sessionStorage.getItem(OWN_KEY), editor._sessionID);
+    });
+
+    it('clears the owned session id when the active session is deleted', async () => {
+      editor.perform(actionAddTaggedNode('n-1', [1, 2], { building: 'yes' }));
+      editor.commit({ annotation: 'building', selectedIDs: ['n-1'] });
+      await editor.immediateBackup();
+      const id = editor._sessionID;
+
+      await editor.deleteSessionAsync(id);
+      assert.isNull(globalThis.sessionStorage.getItem(OWN_KEY));
+    });
+  });
 });

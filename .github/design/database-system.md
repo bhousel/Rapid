@@ -327,6 +327,7 @@ interface SessionRecord {
   origin: string;            // window.location.origin (replaces the key-name scoping hack)
   createdAt: number;
   updatedAt: number;         // 0 if unknown (legacy)
+  heartbeatAt?: number;      // liveness: last time the owning tab proved this session is still open
   editCount: number;         // for the list UI
   bbox?: { minX; minY; maxX; maxY };  // geographic extent of the edits (for the list + geocoding)
   summary: string[];         // most common feature tag keys, e.g. ['building', 'highway']
@@ -361,9 +362,29 @@ interface SessionRecord {
 
 Phase 2 **retired `utilSessionMutex`**. It previously enforced a single writer across tabs (and
 gated the single localStorage slot). With per-session unique ids, two tabs write independent session
-records and never clobber each other, so the mutex's guarantee is unnecessary. Trade-off: a second
-tab can now list (and fork) another tab's *live* session; acceptable for now — a future refinement
-could mark a session "in use" via a recent-`updatedAt` heartbeat.
+records and never clobber each other, so the mutex's exclusion guarantee is unnecessary.
+
+**Liveness heartbeat ("in use" flag).** To stop a *new* tab from offering to restore (and fork) a
+session that another tab is actively editing, each session record carries a `heartbeatAt` timestamp:
+
+- The active tab refreshes `heartbeatAt` on every backup and via a periodic timer
+  (`SESSION_HEARTBEAT_MS`, 20s) started in `startAsync` — using `SchedulerSystem.setInterval` when
+  present, else a `globalThis.setInterval` fallback. The heartbeat re-writes the **cached**
+  `_activeSession` record (no read), so it can't race `immediateBackup` and clobber fresher data.
+- `listRestorableSessionsAsync` **excludes** any session whose `heartbeatAt` is within
+  `SESSION_LIVE_MS` (60s, 3× the interval so one missed beat doesn't flip it) — that session is
+  "in use" by a live tab. Legacy localStorage snapshots have no heartbeat and are always offered.
+- **Reload vs. another tab.** A heartbeat alone can't distinguish "another live tab" from "my own tab
+  just reloaded" — and we must not hide your own session when you reload. So the tab records the
+  session id it owns in **`sessionStorage`** (per-tab, survives reload, absent in a new/duplicate
+  tab). `_isLiveElsewhere` never excludes the tab's own current or just-reloaded session; a genuinely
+  different tab's fresh session is excluded.
+- Cleared on discard/delete of the active session. If a tab closes without clearing, its heartbeat
+  simply goes stale after `SESSION_LIVE_MS` and the session becomes restorable again.
+
+> Note: the heartbeat re-writes the full session record (including `data`) every 20s while a session
+> is open but idle. Fine for typical sessions; if very large sessions make this costly, a future
+> refinement could move liveness to a separate tiny `heartbeats` store.
 
 > **Gotcha uncovered (recorded as a lesson):** the EditSystem unit tests only ran under bare Bun
 > because constructing `utilSessionMutex('lock')` had a **side effect of polyfilling `document`**.
@@ -534,10 +555,13 @@ the initial phases, but the async, worker-portable API is designed with this in 
   no-permanent-storage notice. New `restore.*` l10n strings.
 - **EditSystem API:** `listRestorableSessionsAsync`, `restoreSessionAsync(id)`, `deleteSessionAsync(id)`,
   `dismissRestore`, plus `_computeSessionMeta`/`_backupBBox`/`_backupSummary`. `immediateBackup()`
-  now returns its write promise (awaitable in tests). `DatabaseSystem.getAllKeysFromIndex` added for
-  a cheap startup existence check.
+  now returns its write promise (awaitable in tests). `DatabaseSystem.getAllKeysFromIndex` added.
+- **Liveness heartbeat ("in use" flag):** `heartbeatAt` on each record, refreshed on backup and by a
+  periodic timer (`_startHeartbeat` / `_heartbeatAsync`, 20s); `listRestorableSessionsAsync` excludes
+  sessions live in another tab (`_isLiveElsewhere`, 60s window). The tab's own session is recognized
+  across reloads via `sessionStorage` (`_ownedSessionID`), so reloading never hides your own work.
 - Tests: `test/unit/core/EditSystemSessions.test.js` (multi-session, legacy upgrade, delete, dismiss,
-  metadata) and an extra `DatabaseSystem` index-keys test.
+  metadata, heartbeat liveness + reload) and an extra `DatabaseSystem` index-keys test.
 
 ### Phase 3 — Data files store
 - Persist dropped-in files as `DataFileRecord` blobs; offer reload on startup.

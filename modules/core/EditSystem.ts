@@ -15,6 +15,15 @@ import type { SpatialItem } from './SpatialSystem.ts';
 import type { TransformProps, Vec2 } from '@rapid-sdk/math';
 
 
+/** How often (ms) the active tab refreshes its session's liveness heartbeat while open. */
+const SESSION_HEARTBEAT_MS = 20000;
+/**
+ * How recent (ms) a session's heartbeat must be to count as "in use" by a live tab.
+ * A few times the heartbeat interval, so a single missed beat doesn't flag a session as free.
+ */
+const SESSION_LIVE_MS = 60000;
+
+
 /** Options for commit/commitAppend */
 export interface CommitOptions {
   /** Annotation describing the edit */
@@ -96,6 +105,13 @@ export interface SessionRecord {
   createdAt: number;
   /** When the session was last written (ms since epoch); `0` if unknown (legacy). */
   updatedAt: number;
+  /**
+   * When the active tab last proved this session is still open ("liveness" heartbeat, ms since
+   * epoch). Refreshed on every backup and by a periodic timer while the tab is open. A session
+   * whose `heartbeatAt` is recent is considered in use by a live tab and is not offered for restore
+   * in *other* tabs. Absent/`0` for legacy localStorage sessions.
+   */
+  heartbeatAt?: number;
   /** Number of edits applied in the session. */
   editCount: number;
   /** Bounding box of the session's edits (`undefined` if no locations were found). */
@@ -211,6 +227,16 @@ export class EditSystem extends AbstractSystem {
   protected _canRestoreBackup: boolean;
   /** The id of the active editing session, minted lazily on first backup (see `_saveSessionAsync`) */
   protected _sessionID: SessionID | null;
+  /**
+   * The last `SessionRecord` written for the active session, cached so the liveness heartbeat can
+   * re-write it (with a fresh `heartbeatAt`) without a read — avoiding a read-modify-write race
+   * with `immediateBackup`.
+   */
+  protected _activeSession: SessionRecord | null;
+  /** Whether the periodic liveness heartbeat has been started (idempotency guard) */
+  protected _heartbeatStarted: boolean;
+  /** Fallback interval handle when no `SchedulerSystem` is available */
+  protected _heartbeatHandle: ReturnType<typeof globalThis.setInterval> | null;
   /** Whether there are unsaved edits relative to the last stable state */
   protected _hasWorkInProgress: boolean;
 
@@ -256,6 +282,9 @@ export class EditSystem extends AbstractSystem {
 
     this._canRestoreBackup = false;
     this._sessionID = null;
+    this._activeSession = null;
+    this._heartbeatStarted = false;
+    this._heartbeatHandle = null;
     this._hasWorkInProgress = false;
 
     this._history = [];
@@ -332,6 +361,7 @@ export class EditSystem extends AbstractSystem {
    * @return Promise resolved when this component has completed startup
    */
   public startAsync(): Promise<void> {
+    this._startHeartbeat();
     return super.startAsync();
   }
 
@@ -398,6 +428,7 @@ export class EditSystem extends AbstractSystem {
 
     this._backupStatus = true;
     this._sessionID = null;
+    this._activeSession = null;
     this._checkpoints.clear();
     this._inTransition = false;
     this._inTransaction = false;
@@ -1553,6 +1584,7 @@ export class EditSystem extends AbstractSystem {
     const database = context.systems.database;   // optional
     const storage = context.systems.storage!;
     const origin = this._origin();
+    const now = Date.now();
 
     const out: SessionRecord[] = [];
     const seen = new Set<SessionID>();
@@ -1561,8 +1593,9 @@ export class EditSystem extends AbstractSystem {
       try {
         const records = await database.getAllFromIndex<SessionRecord>('sessions', 'by-origin', origin);
         for (const record of records) {
-          out.push(record);
           seen.add(record.id);
+          if (this._isLiveElsewhere(record, now)) continue;   // open in another live tab — don't offer it
+          out.push(record);
         }
       } catch {
         // ignore — treat as no IndexedDB sessions
@@ -1597,12 +1630,13 @@ export class EditSystem extends AbstractSystem {
 
     // Resolve the backup data. Prefer an IndexedDB record; fall back to the legacy localStorage key.
     let backup: BackupJSON | undefined;
+    let existingRecord: SessionRecord | undefined;
     let isLegacy = false;
 
     if (database) {
       try {
-        const record = await database.get<SessionRecord>('sessions', id);
-        backup = record?.data;
+        existingRecord = await database.get<SessionRecord>('sessions', id);
+        backup = existingRecord?.data;
       } catch {
         backup = undefined;
       }
@@ -1630,11 +1664,15 @@ export class EditSystem extends AbstractSystem {
       this._sessionID = this._newSessionID();
       storage.removeItem(this._backupKey());
       if (database) {
-        await this._saveSessionAsync(database, this._sessionID, backup);
+        await this._saveSessionAsync(database, this._sessionID, backup);   // caches `_activeSession`
       }
     } else {
-      this._sessionID = id;   // continue the existing IndexedDB session
+      this._sessionID = id;                 // continue the existing IndexedDB session
+      this._activeSession = existingRecord ?? null;   // cache for the liveness heartbeat
     }
+
+    this._setOwnedSessionID(this._sessionID);   // this tab now owns this session (survives reload)
+    this._heartbeatNow();                       // immediately mark it live so other tabs back off
   }
 
 
@@ -1654,6 +1692,8 @@ export class EditSystem extends AbstractSystem {
     }
     if (id === this._sessionID) {
       this._sessionID = null;
+      this._activeSession = null;
+      this._setOwnedSessionID(null);
     }
     if (database) {
       try {
@@ -1695,6 +1735,8 @@ export class EditSystem extends AbstractSystem {
 
     const id = this._sessionID;
     this._sessionID = null;
+    this._activeSession = null;
+    this._setOwnedSessionID(null);
 
     if (id && database) {
       database.delete('sessions', id).catch(() => { /* best effort */ });
@@ -1725,6 +1767,7 @@ export class EditSystem extends AbstractSystem {
         origin: this._origin(),
         createdAt: existing?.createdAt ?? now,
         updatedAt: now,
+        heartbeatAt: now,   // a fresh backup also proves the session is live
         editCount: meta.editCount,
         bbox: meta.bbox,
         summary: meta.summary,
@@ -1732,6 +1775,8 @@ export class EditSystem extends AbstractSystem {
         data: backup
       };
       await database.put('sessions', record);
+      this._activeSession = record;             // cache for the liveness heartbeat (no re-read)
+      this._setOwnedSessionID(id);              // this tab owns this session (survives reload)
       this._setBackupStatus(true);
     } catch {
       this._setBackupStatus(false);
@@ -1771,26 +1816,125 @@ export class EditSystem extends AbstractSystem {
 
 
   /**
-   * Whether any restorable sessions exist for this origin (IndexedDB or legacy localStorage).
-   * Uses a keys-only index query so it doesn't load session data at startup.
+   * Whether any *restorable* sessions exist for this origin — i.e. sessions not currently open in
+   * another live tab. Delegates to `listRestorableSessionsAsync` so the liveness filter is applied
+   * consistently with what the restore UI will show.
    * @return Promise resolving to `true` if there is at least one restorable session
    */
   protected async _hasRestorableSessionsAsync(): Promise<boolean> {
-    const context = this.context;
-    const database = context.systems.database;   // optional
-    const storage = context.systems.storage!;
+    const list = await this.listRestorableSessionsAsync();
+    return list.length > 0;
+  }
 
-    if (storage.hasItem(this._backupKey())) return true;   // legacy localStorage session
 
-    if (database) {
-      try {
-        const keys = await database.getAllKeysFromIndex('sessions', 'by-origin', this._origin());
-        if (keys.length > 0) return true;
-      } catch {
-        // ignore
-      }
+  /**
+   * Whether a session record is currently open in **another** live tab (a recent heartbeat), and so
+   * should not be offered for restore here. Never true for the session this tab already owns (the
+   * active session, or the one it owned before a reload — tracked in `sessionStorage`), nor for a
+   * legacy localStorage snapshot (which no tab heartbeats).
+   * @param record - The session record to test
+   * @param now - The current time (ms since epoch)
+   * @return `true` if the session appears to be in use by another live tab
+   */
+  protected _isLiveElsewhere(record: SessionRecord, now: number): boolean {
+    if (record.legacy) return false;
+    if (record.id === this._sessionID) return false;        // our active session
+    if (record.id === this._ownedSessionID()) return false; // our own session from before a reload
+    return (now - (record.heartbeatAt ?? 0)) < SESSION_LIVE_MS;
+  }
+
+
+  /**
+   * Start the periodic liveness heartbeat that keeps the active session marked "in use" so other
+   * tabs don't offer to restore it. Idempotent, browser-only (skipped in headless/CLI/tests), and
+   * prefers the `SchedulerSystem` when present, falling back to `globalThis.setInterval`.
+   */
+  protected _startHeartbeat(): void {
+    if (this._heartbeatStarted) return;
+
+    const isTestEnvironment = (!('window' in globalThis)) || ('assert' in globalThis) || ('expect' in globalThis);
+    if (isTestEnvironment) return;
+
+    const scheduler = this.context.systems.scheduler;   // optional
+
+    this._heartbeatStarted = true;
+    if (scheduler) {
+      scheduler.setInterval('edit-heartbeat', () => this._heartbeatNow(), { ms: SESSION_HEARTBEAT_MS });
+    } else {
+      this._heartbeatHandle = globalThis.setInterval(() => this._heartbeatNow(), SESSION_HEARTBEAT_MS);
     }
-    return false;
+  }
+
+
+  /**
+   * Refresh the active session's liveness heartbeat now (fire-and-forget).
+   * No-op when there is no active session or no database.
+   */
+  protected _heartbeatNow(): void {
+    this._heartbeatAsync();
+  }
+
+
+  /**
+   * Re-write the active session record with a fresh `heartbeatAt`, proving to other tabs that this
+   * session is still open. Uses the cached `_activeSession` record (no read) so it cannot race with
+   * `immediateBackup`. Best-effort — errors are swallowed and do not flap the backup status.
+   * @return Promise resolved when the heartbeat write completes (or is skipped)
+   */
+  protected async _heartbeatAsync(): Promise<void> {
+    const database = this.context.systems.database;   // optional
+    const record = this._activeSession;
+    if (!database || !record) return;
+
+    record.heartbeatAt = Date.now();
+    try {
+      await database.put('sessions', record);
+    } catch {
+      // best effort — a missed heartbeat just means another tab might offer this session sooner
+    }
+  }
+
+
+  /**
+   * The session id this tab owns, persisted in `sessionStorage` so it survives a page reload (but
+   * not a new/duplicate tab). Used to distinguish "my own session, just reloaded" from "a session
+   * open in another tab" when deciding what to offer for restore.
+   * @return The owned session id, or `null` if none / `sessionStorage` is unavailable
+   */
+  protected _ownedSessionID(): SessionID | null {
+    try {
+      return (globalThis.sessionStorage?.getItem(this._ownSessionKey()) as SessionID | null) ?? null;
+    } catch {
+      return null;
+    }
+  }
+
+
+  /**
+   * Record (or clear) the session id this tab owns in `sessionStorage`.
+   * @param id - The owned session id, or `null` to clear it
+   */
+  protected _setOwnedSessionID(id: SessionID | null): void {
+    try {
+      const ss = globalThis.sessionStorage;
+      if (!ss) return;
+      if (id) {
+        ss.setItem(this._ownSessionKey(), id);
+      } else {
+        ss.removeItem(this._ownSessionKey());
+      }
+    } catch {
+      // ignore — sessionStorage may be unavailable (private mode / non-browser)
+    }
+  }
+
+
+  /**
+   * The `sessionStorage` key under which this tab records the session it owns.
+   * @return The per-origin owned-session key
+   */
+  protected _ownSessionKey(): string {
+    return `Rapid_${this._origin()}_active_session`;
   }
 
 

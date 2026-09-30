@@ -16,7 +16,7 @@
   IndexedDB (no `JSON.stringify` on that path) alongside the localStorage fallback; `toJSON`/
   `fromJSONAsync` are now thin wrappers over new `toBackup`/`fromBackupAsync`. Restore prefers the
   IDB session, imports the legacy localStorage key once. `database` is optional on `EditSystem`.
-- **Phase 2 done (committed separately? no — uncommitted, in working tree):** multi-session support.
+- **Phase 2 done (committed `c28f834fd`):** multi-session support.
   Unique `crypto.randomUUID` per session; `localStorage` is now **read-only** (legacy restore only,
   upgraded to IDB on restore); **`utilSessionMutex` retired** (see lesson below). New EditSystem API:
   `listRestorableSessionsAsync` / `restoreSessionAsync(id)` / `deleteSessionAsync(id)` /
@@ -24,11 +24,15 @@
   a session-list modal (date / reverse-geocoded location / summary / Restore+Delete / Skip). New
   `SessionID` id type; `DatabaseSystem.getAllKeysFromIndex` added. Tests:
   `test/unit/core/EditSystemSessions.test.js`. `immediateBackup()` now returns its write promise.
+- **Phase 2.1 done (uncommitted, working tree):** liveness heartbeat / "in use" flag. `heartbeatAt`
+  on each session record, refreshed on backup + a 20s timer (`_startHeartbeat`/`_heartbeatAsync`, via
+  scheduler or `setInterval`); `listRestorableSessionsAsync` excludes sessions live in another tab
+  (`_isLiveElsewhere`, 60s window). Own session recognized across **reloads** via `sessionStorage`
+  (`_ownedSessionID`) so reloading never hides your own work. Heartbeat re-writes the cached
+  `_activeSession` (no read) → race-free with backups. Tests in the `liveness heartbeat` describe.
 
 ## Next up
 - **Phase 3:** persist dropped-in data files (`RapidSystem`/`PixiLayerCustomData`) as blobs.
-- **Multi-tab refinement:** mark a session "in use" (recent-`updatedAt` heartbeat) so a second tab
-  doesn't offer to fork another tab's live session.
 - Open questions at the bottom of the design doc (data-file reload UX; DB name/scoping; codifying
   graceful degradation in agent instructions).
 
