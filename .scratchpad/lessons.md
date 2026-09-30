@@ -62,6 +62,17 @@ Things that went wrong once and shouldn't go wrong again.
 - **Fire-and-forget async is hard to assert.** `immediateBackup()` kicked off an un-awaited IndexedDB
   write, so tests that read the record immediately raced it. Making the method **return its write
   promise** (callers still ignore it) makes the async work awaitable without changing behavior.
+- **`fake-indexeddb` must be imported with `'fake-indexeddb/auto'`** (not just `'fake-indexeddb'`) to
+  polyfill the global `indexedDB`/`IDBKeyRange`/etc. that the `idb` library looks up at runtime.
+  Import this at the top of any unit test file that exercises IndexedDB code — it installs into
+  `globalThis` as a side effect. Each `openDB` call gets its own in-memory database; use a fixed
+  database name + explicit `clear()` calls in `beforeEach`/`afterEach` to prevent state leaking
+  between tests.
+- **Verify Blob round-trips before building on them.** `structuredClone(blob)` preserves `size` and
+  `type`; `fake-indexeddb` round-trips a `File`/`Blob` including its `text()` content; and the
+  in-memory mock using `structuredClone` also works. This is NOT universally true for all test runtimes
+  and all browsers — especially private-browsing/locked-down contexts — so the graceful-degradation
+  path matters. Verified experimentally before relying on it in production code.
 
 ## Network
 
