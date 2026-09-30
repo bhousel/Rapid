@@ -9,6 +9,7 @@ import type { Context } from '../Context.ts';
 import type { AbstractSystem } from './AbstractSystem.ts';
 import type { AssetSystem } from './AssetSystem.ts';
 import type { DatabaseSystem } from './DatabaseSystem.ts';
+import type { DragAndDropSystem } from './DragAndDropSystem.ts';
 import type { EditSystem } from './EditSystem.ts';
 import type { FilterSystem } from './FilterSystem.ts';
 import type { GraphicsSystem } from './GraphicsSystem.ts';
@@ -49,6 +50,7 @@ export interface Systems {
 
   assets?: AssetSystem;
   database?: DatabaseSystem;
+  dragdrop?: DragAndDropSystem;
   editor?: EditSystem;
   filters?: FilterSystem;
   gfx?: GraphicsSystem;

@@ -1360,6 +1360,9 @@
         "placeholder": "Select colorblind mode"
       }
     },
+    "dragdrop": {
+      "drop_files": "Drop files here to add them to Rapid"
+    },
     "restore": {
       "heading": "You have unsaved changes",
       "description": "Do you wish to restore unsaved changes from a previous editing session?",

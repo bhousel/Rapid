@@ -41,10 +41,18 @@
   See `decisions.md`. Tests: `files` describe in `DatabaseSystem.test.js`.
 
 ## Next up
-- **Drag-drop / data-file system (future):** wire file input + reload-on-startup on top of the
-  `files` API; likely a new system that owns the drag-and-drop handler (currently in
-  `PixiLayerCustomData`) and the domain semantics.
-- Open questions at the bottom of the design doc (data-file reload UX; DB name/scoping; codifying
+- **`DragAndDropSystem` done (uncommitted, working tree):** new `core/DragAndDropSystem.ts` — central
+  owner of the container drop handler, claim-based registry (`register`/`unregister`, priority, async
+  `handle`, sync `accepts` pre-filter), file categorization (data/image/other), single drop overlay,
+  ignores concurrent drops, `dropFilesAsync()` programmatic entry. Domain-agnostic — **no
+  `DatabaseSystem` dep**; persistence is the claiming consumer's job. Migrated `PixiLayerCustomData`
+  off its own container DOM handlers to a low-priority consumer. Registered in index/types/headless;
+  `dragdrop.drop_files` l10n + `.dragdrop-overlay` CSS. Tests: `DragAndDropSystem.test.js` (17).
+  `UiRapidAddDataset` high-priority consumer **deferred** (its file flow is commented-out/URL-only).
+- **Follow-ups:** move the custom-data consumer's ownership off the Pixi layer into a real system;
+  revive `UiRapidAddDataset` file→dataset flow as a high-priority consumer; reload-on-startup of
+  persisted files; stretch: images → EXIF → photo markers.
+- Open questions at the bottom of the DatabaseSystem design doc (reload UX; DB name/scoping; codifying
   graceful degradation in agent instructions).
 
 ## Last landed

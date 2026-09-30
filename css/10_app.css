@@ -4853,6 +4853,32 @@ li.issue-fix-item button:not(.actionable) .fix-icon {
   border-bottom: 0;
 }
 
+/* Drag-and-drop overlay
+------------------------------------------------------- */
+.dragdrop-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 3000;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.4);
+  border: 4px dashed rgba(255, 255, 255, 0.8);
+  pointer-events: none;   /* never intercept the drop — the listener is on the container */
+}
+.dragdrop-overlay.active {
+  display: flex;
+}
+.dragdrop-overlay-message {
+  padding: 20px 30px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  font-size: 20px;
+  font-weight: bold;
+}
+
+
 /* Restore Modal
 ------------------------------------------------------- */
 .modal-actions .logo-restore {

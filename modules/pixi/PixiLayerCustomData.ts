@@ -62,29 +62,19 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
     this._setFile = this._setFile.bind(this);
     this.setFileList = this.setFileList.bind(this);
 
-    // Setup event handlers..
-    // drag and drop
-    /**
-     *
-     * @param e
-     */
-    function over(e: DragEvent): void {
-      e.stopPropagation();
-      e.preventDefault();
-      e.dataTransfer!.dropEffect = 'copy';
-    }
-
+    // Drag-and-drop is owned centrally by `DragAndDropSystem`. Register a low-priority consumer
+    // that claims dropped geo-data files and loads them (the default when no higher-priority
+    // consumer, e.g. an open "Add Dataset" modal, takes them first).
     const context = this.context;
-    context.container()
-      .attr('dropzone', 'copy')
-      .on('dragenter.draganddrop', over)
-      .on('dragexit.draganddrop', over)
-      .on('dragover.draganddrop', over)
-      .on('drop.draganddrop', (e: DragEvent) => {
-        e.stopPropagation();
-        e.preventDefault();
-        this.setFileList(e.dataTransfer!.files);
-      });
+    context.systems.dragdrop?.register({
+      id: 'custom-data',
+      priority: 0,
+      accepts: (payload) => payload.data.length > 0,
+      handle: (payload) => {
+        payload.claim();
+        this.setFileList(payload.fileList);   // same FileList the old drop handler received
+      }
+    });
 
     // hashchange - pick out the 'gpx' param
     this.context.systems.urlhash!

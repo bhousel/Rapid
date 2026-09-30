@@ -15,6 +15,7 @@ export * from './mocks.ts';
 export { AbstractSystem } from './core/AbstractSystem.ts';
 export { AssetSystem } from './core/AssetSystem.ts';
 export { DatabaseSystem } from './core/DatabaseSystem.ts';
+export { DragAndDropSystem } from './core/DragAndDropSystem.ts';
 export { EditSystem } from './core/EditSystem.ts';
 export { FilterSystem } from './core/FilterSystem.ts';
 export { ImagerySystem } from './core/ImagerySystem.ts';
