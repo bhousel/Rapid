@@ -5,6 +5,7 @@
  */
 import { AbstractSystem } from './AbstractSystem.ts';
 import { AssetSystem } from './AssetSystem.ts';
+import { DatabaseSystem } from './DatabaseSystem.ts';
 import { EditSystem } from './EditSystem.ts';
 import { FilterSystem } from './FilterSystem.ts';
 import { GraphicsSystem } from './GraphicsSystem.ts';
@@ -32,6 +33,7 @@ import { WorkerSystem } from './WorkerSystem.ts';
 export {
   AbstractSystem,
   AssetSystem,
+  DatabaseSystem,
   EditSystem,
   FilterSystem,
   GraphicsSystem,
@@ -80,6 +82,7 @@ export const systems: SystemRegistry = {
 };
 
 systems.available.set('assets', AssetSystem);
+systems.available.set('database', DatabaseSystem);
 systems.available.set('editor', EditSystem);
 systems.available.set('filters', FilterSystem);
 systems.available.set('gfx', GraphicsSystem);

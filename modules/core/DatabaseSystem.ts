@@ -1,0 +1,745 @@
+import { openDB } from 'idb';
+import { AbstractSystem } from './AbstractSystem.ts';
+
+import type { IDBPDatabase, IDBPTransaction } from 'idb';
+import type { Context } from '../Context.ts';
+
+
+// ---------------------------------------------------------------------------
+// Database constants
+// ---------------------------------------------------------------------------
+
+/** Name of the single IndexedDB database that holds all of Rapid's durable data. */
+const DATABASE_NAME = 'Rapid';
+/** The latest database schema version. Bump this when adding a store or migration. */
+const CURRENT_DB_VERSION = 1;
+
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
+/** Name of an object store ("table") within the Rapid database. */
+export type StoreName = string;
+
+/** Definition of a single index on an object store. */
+export interface StoreIndexDefinition {
+  /** Index name, used to look the index up later. */
+  name: string;
+  /** The record property (or properties) the index is built on. */
+  keyPath: string | string[];
+  /** Standard IndexedDB index options (`unique`, `multiEntry`). */
+  options?: IDBIndexParameters;
+}
+
+/** Definition of a single object store in the database manifest. */
+export interface StoreDefinition {
+  /** Store name. */
+  name: StoreName;
+  /** In-line key path, or omit for out-of-line keys supplied at write time. */
+  keyPath?: string | string[];
+  /** Whether the store generates auto-incrementing keys. */
+  autoIncrement?: boolean;
+  /** Indexes to create on the store. */
+  indexes?: StoreIndexDefinition[];
+  /** Schema version that first introduced this store. */
+  sinceVersion: number;
+}
+
+/** A single ordered data-migration step (store creation is manifest-driven, see `_upgrade`). */
+export interface DatabaseMigration {
+  /** The schema version this step upgrades the database to. */
+  toVersion: number;
+  /**
+   * Transforms records during an `upgrade` transaction. Runs only when crossing this
+   * step's version boundary. Store/index creation is handled separately from the manifest.
+   * @param db - The database being upgraded
+   * @param tx - The active version-change transaction
+   * @param oldVersion - The version the database is upgrading from
+   */
+  migrate(
+    db: IDBPDatabase,
+    tx: IDBPTransaction<unknown, string[], 'versionchange'>,
+    oldVersion: number
+  ): void | Promise<void>;
+}
+
+/** Per-store usage statistics reported by `usageByStoreAsync`. */
+export interface StoreUsage {
+  /** Number of records in the store. */
+  count: number;
+  /** Approximate size of the store's records, in bytes. */
+  bytes: number;
+}
+
+/** A single entry for a bulk `putMany` write. */
+export interface PutManyEntry<T = unknown> {
+  /** The record to store. */
+  value: T;
+  /** Out-of-line key, omitted for stores that use an in-line `keyPath`. */
+  key?: IDBValidKey;
+}
+
+/** A minimal transactional facade passed to `transaction()` callbacks. */
+export interface DatabaseTransaction {
+  /**
+   * Reads a single record within the transaction.
+   * @param store - Store to read from
+   * @param key - Key to look up
+   * @return The stored record, or `undefined` if absent
+   */
+  get(store: StoreName, key: IDBValidKey): Promise<any>;
+  /**
+   * Reads all records from a store within the transaction.
+   * @param store - Store to read from
+   * @return An array of all stored records
+   */
+  getAll(store: StoreName): Promise<any[]>;
+  /**
+   * Writes a single record within the transaction.
+   * @param store - Store to write to
+   * @param value - The record to store
+   * @param key - Out-of-line key, omitted for in-line `keyPath` stores
+   * @return The key the record was stored under
+   */
+  put(store: StoreName, value: unknown, key?: IDBValidKey): Promise<IDBValidKey>;
+  /**
+   * Deletes a single record within the transaction.
+   * @param store - Store to delete from
+   * @param key - Key to delete
+   */
+  delete(store: StoreName, key: IDBValidKey): Promise<void>;
+}
+
+/** The subset of an IndexedDB object store the transaction facade uses. */
+interface FacadeStore {
+  get(key: IDBValidKey): Promise<unknown>;
+  getAll(): Promise<unknown[]>;
+  put(value: unknown, key?: IDBValidKey): Promise<IDBValidKey>;
+  delete(key: IDBValidKey): Promise<void>;
+}
+
+
+// ---------------------------------------------------------------------------
+// Store manifest — the one place that carries the schema layout.
+// `DatabaseSystem` owns this and asserts it at startup (see review decision in
+// `.github/design/database-system.md`). Consuming systems reference stores by
+// name and own only their record shapes, not the schema.
+// ---------------------------------------------------------------------------
+
+const STORE_MANIFEST: StoreDefinition[] = [
+  {
+    name: 'sessions',
+    keyPath: 'id',
+    indexes: [
+      { name: 'by-updatedAt', keyPath: 'updatedAt' },
+      { name: 'by-origin', keyPath: 'origin' }
+    ],
+    sinceVersion: 1
+  }
+];
+
+/** Ordered data migrations. Empty for v1 — store creation is manifest-driven. */
+const DATABASE_MIGRATIONS: DatabaseMigration[] = [];
+
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+/** Deep-clones a value for the in-memory mock so callers can't mutate stored state. */
+function clone<T>(value: T): T {
+  return (value === undefined) ? value : structuredClone(value);
+}
+
+/** Compares two index keys for ascending sort in the in-memory mock. */
+function compareKeys(a: unknown, b: unknown): number {
+  if (a === b) return 0;
+  if (a === undefined) return 1;
+  if (b === undefined) return -1;
+  return (a as number | string) < (b as number | string) ? -1 : 1;
+}
+
+/** Estimates the byte size of a stored value (`Blob` size, else stringified length). */
+function estimateBytes(value: unknown): number {
+  if (value instanceof Blob) return value.size;
+  try {
+    return JSON.stringify(value, (_key, v) => (v instanceof Blob ? `blob:${v.size}` : v))?.length ?? 0;
+  } catch {
+    return 0;
+  }
+}
+
+
+/**
+ * The `DatabaseSystem` wraps the browser's asynchronous
+ * [IndexedDB](https://developer.mozilla.org/en-US/docs/Web/API/IndexedDB_API) API. It is the
+ * high-capacity, worker-accessible counterpart to `StorageSystem` (which wraps the small,
+ * synchronous `localStorage`), and is the home for large durable data such as the user's edit
+ * sessions and dropped-in data files.
+ *
+ * It is a **domain-agnostic** engine: it stores and retrieves records in named stores and knows
+ * nothing about their meaning. The set of stores and indexes lives in a single central manifest
+ * that this system owns and asserts at startup; consuming systems own only their record shapes.
+ *
+ * `DatabaseSystem` is an **optional system**. When IndexedDB is unavailable (private/incognito
+ * windows, locked-down browsers, a future CLI, or tests without a polyfill), it falls back to an
+ * in-memory mock that satisfies the same API — the app keeps working, but writes are not durable.
+ * Callers should treat it like any optional system: capture it at the top of a function, branch on
+ * presence, and always keep a working path when it is absent.
+ *
+ * See `.github/design/database-system.md` for the full design.
+ */
+export class DatabaseSystem extends AbstractSystem {
+
+  /** The open IndexedDB database, or `null` when running on the in-memory mock. */
+  protected _db: IDBPDatabase | null;
+  /** In-memory fallback store used when IndexedDB is unavailable. */
+  protected _mock: Map<StoreName, Map<IDBValidKey, unknown>> | null;
+
+
+  /**
+   * @param context - Global shared application context
+   */
+  public constructor(context: Context) {
+    super(context);
+    this.id = 'database';
+
+    this._db = null;
+    this._mock = null;
+  }
+
+
+  /**
+   * Called after all core objects have been constructed.
+   * Opens the database and asserts the store manifest, falling back to an in-memory mock
+   * if IndexedDB is unavailable.
+   * @return  Promise resolved when this component has completed initialization
+   */
+  public initAsync(): Promise<void> {
+    return super.initAsync()
+      .then(() => this._openAsync());
+  }
+
+
+  /**
+   * Called after completing an edit session to reset any internal state.
+   * Durable data (sessions, files) is intentionally preserved across resets — this only
+   * clears transient in-memory caches (currently none), so it is a no-op.
+   * @return  Promise resolved immediately
+   */
+  public resetAsync(): Promise<void> {
+    return Promise.resolve();
+  }
+
+
+  /**
+   * The current database schema version.
+   * @readonly
+   */
+  public get databaseVersion(): number {
+    return CURRENT_DB_VERSION;
+  }
+
+
+  /**
+   * Whether durable IndexedDB storage is available. `false` means the system is running on the
+   * in-memory mock and writes will not survive the session.
+   * @readonly
+   */
+  public get isAvailable(): boolean {
+    return !!this._db;
+  }
+
+
+  /**
+   * The names of all object stores defined in the manifest.
+   * @readonly
+   */
+  public get storeNames(): StoreName[] {
+    return STORE_MANIFEST.map(def => def.name);
+  }
+
+
+  // -------------------------------------------------------------------------
+  // Single-record CRUD
+  // -------------------------------------------------------------------------
+
+  /**
+   * Retrieves a single record by key.
+   * @param store - Store to read from
+   * @param key - Key to look up
+   * @return The stored record, or `undefined` if not found
+   */
+  public async get<T = unknown>(store: StoreName, key: IDBValidKey): Promise<T | undefined> {
+    if (this._db) {
+      return this._db.get(store, key) as Promise<T | undefined>;
+    }
+    return clone(this._mockStore(store).get(key)) as T | undefined;
+  }
+
+
+  /**
+   * Stores a single record, overwriting any existing record with the same key.
+   * @param store - Store to write to
+   * @param value - The record to store
+   * @param key - Out-of-line key, omitted for stores that use an in-line `keyPath`
+   * @return The key the record was stored under
+   */
+  public async put<T = unknown>(store: StoreName, value: T, key?: IDBValidKey): Promise<IDBValidKey> {
+    if (this._db) {
+      return this._db.put(store, value, key);
+    }
+    const k = this._keyFor(store, value, key);
+    this._mockStore(store).set(k, clone(value));
+    return k;
+  }
+
+
+  /**
+   * Removes a single record by key.
+   * @param store - Store to delete from
+   * @param key - Key to delete
+   */
+  public async delete(store: StoreName, key: IDBValidKey): Promise<void> {
+    if (this._db) {
+      return this._db.delete(store, key);
+    }
+    this._mockStore(store).delete(key);
+  }
+
+
+  /**
+   * Tests whether a record exists for the given key.
+   * @param store - Store to check
+   * @param key - Key to look up
+   * @return `true` if a record exists
+   */
+  public async has(store: StoreName, key: IDBValidKey): Promise<boolean> {
+    if (this._db) {
+      return (await this._db.getKey(store, key)) !== undefined;
+    }
+    return this._mockStore(store).has(key);
+  }
+
+
+  // -------------------------------------------------------------------------
+  // Bulk / iteration
+  // -------------------------------------------------------------------------
+
+  /**
+   * Retrieves all records in a store.
+   * @param store - Store to read from
+   * @return An array of all stored records
+   */
+  public async getAll<T = unknown>(store: StoreName): Promise<T[]> {
+    if (this._db) {
+      return this._db.getAll(store) as Promise<T[]>;
+    }
+    return [...this._mockStore(store).values()].map(v => clone(v)) as T[];
+  }
+
+
+  /**
+   * Retrieves all keys in a store.
+   * @param store - Store to read from
+   * @return An array of all keys
+   */
+  public async getAllKeys(store: StoreName): Promise<IDBValidKey[]> {
+    if (this._db) {
+      return this._db.getAllKeys(store);
+    }
+    return [...this._mockStore(store).keys()];
+  }
+
+
+  /**
+   * Writes many records in a single transaction.
+   * @param store - Store to write to
+   * @param entries - The records (with optional out-of-line keys) to store
+   */
+  public async putMany<T = unknown>(store: StoreName, entries: PutManyEntry<T>[]): Promise<void> {
+    if (this._db) {
+      const tx = this._db.transaction(store, 'readwrite');
+      await Promise.all([
+        ...entries.map(entry => tx.store.put(entry.value, entry.key)),
+        tx.done
+      ]);
+      return;
+    }
+    const mock = this._mockStore(store);
+    for (const entry of entries) {
+      mock.set(this._keyFor(store, entry.value, entry.key), clone(entry.value));
+    }
+  }
+
+
+  /**
+   * Deletes many records by key in a single transaction.
+   * @param store - Store to delete from
+   * @param keys - The keys to delete
+   */
+  public async deleteMany(store: StoreName, keys: IDBValidKey[]): Promise<void> {
+    if (this._db) {
+      const tx = this._db.transaction(store, 'readwrite');
+      await Promise.all([
+        ...keys.map(key => tx.store.delete(key)),
+        tx.done
+      ]);
+      return;
+    }
+    const mock = this._mockStore(store);
+    for (const key of keys) {
+      mock.delete(key);
+    }
+  }
+
+
+  /**
+   * Counts the records in a store.
+   * @param store - Store to count
+   * @return The number of records
+   */
+  public async count(store: StoreName): Promise<number> {
+    if (this._db) {
+      return this._db.count(store);
+    }
+    return this._mockStore(store).size;
+  }
+
+
+  /**
+   * Removes all records from a store.
+   * @param store - Store to clear
+   */
+  public async clear(store: StoreName): Promise<void> {
+    if (this._db) {
+      return this._db.clear(store);
+    }
+    this._mockStore(store).clear();
+  }
+
+
+  /**
+   * Iterates over every record in a store, invoking a callback for each.
+   * @param store - Store to iterate
+   * @param fn - Callback receiving each record and its key
+   */
+  public async iterate<T = unknown>(
+    store: StoreName,
+    fn: (value: T, key: IDBValidKey) => void
+  ): Promise<void> {
+    if (this._db) {
+      const tx = this._db.transaction(store, 'readonly');
+      let cursor = await tx.store.openCursor();
+      while (cursor) {
+        fn(cursor.value as T, cursor.key);
+        cursor = await cursor.continue();
+      }
+      await tx.done;
+      return;
+    }
+    for (const [key, value] of this._mockStore(store)) {
+      fn(clone(value) as T, key);
+    }
+  }
+
+
+  // -------------------------------------------------------------------------
+  // Index queries
+  // -------------------------------------------------------------------------
+
+  /**
+   * Retrieves a single record via one of a store's indexes.
+   * @param store - Store to read from
+   * @param index - Name of the index to query
+   * @param key - Index key to look up
+   * @return The first matching record, or `undefined`
+   */
+  public async getFromIndex<T = unknown>(
+    store: StoreName, index: string, key: IDBValidKey
+  ): Promise<T | undefined> {
+    if (this._db) {
+      return this._db.getFromIndex(store, index, key) as Promise<T | undefined>;
+    }
+    const keyPath = this._indexKeyPath(store, index);
+    for (const value of this._mockStore(store).values()) {
+      if (readPath(value, keyPath) === key) return clone(value) as T;
+    }
+    return undefined;
+  }
+
+
+  /**
+   * Retrieves all records via one of a store's indexes, sorted ascending by the index key.
+   * @param store - Store to read from
+   * @param index - Name of the index to query
+   * @param key - Optional exact index key to filter by; omit to return all records sorted
+   * @return An array of matching records, sorted by the index key
+   */
+  public async getAllFromIndex<T = unknown>(
+    store: StoreName, index: string, key?: IDBValidKey
+  ): Promise<T[]> {
+    if (this._db) {
+      return this._db.getAllFromIndex(store, index, key) as Promise<T[]>;
+    }
+    const keyPath = this._indexKeyPath(store, index);
+    let values = [...this._mockStore(store).values()];
+    if (key !== undefined) {
+      values = values.filter(v => readPath(v, keyPath) === key);
+    }
+    values.sort((a, b) => compareKeys(readPath(a, keyPath), readPath(b, keyPath)));
+    return values.map(v => clone(v)) as T[];
+  }
+
+
+  // -------------------------------------------------------------------------
+  // Transactions
+  // -------------------------------------------------------------------------
+
+  /**
+   * Runs a set of operations against one or more stores as an atomic transaction.
+   * @param stores - The stores participating in the transaction
+   * @param mode - `'readonly'` or `'readwrite'`
+   * @param fn - Callback that performs work using the provided transaction facade
+   * @return The value returned by `fn`
+   */
+  public async transaction<R>(
+    stores: StoreName[],
+    mode: IDBTransactionMode,
+    fn: (tx: DatabaseTransaction) => Promise<R>
+  ): Promise<R> {
+    if (this._db) {
+      const tx = this._db.transaction(stores, mode);
+      const objectStore = (store: StoreName): FacadeStore => tx.objectStore(store) as unknown as FacadeStore;
+      const facade: DatabaseTransaction = {
+        get: (store, key) => objectStore(store).get(key),
+        getAll: (store) => objectStore(store).getAll(),
+        put: (store, value, key) => objectStore(store).put(value, key),
+        delete: (store, key) => objectStore(store).delete(key)
+      };
+      const result = await fn(facade);
+      await tx.done;
+      return result;
+    }
+
+    // Mock facade — best effort, no real atomicity.
+    const facade: DatabaseTransaction = {
+      get: async (store, key) => clone(this._mockStore(store).get(key)),
+      getAll: async (store) => [...this._mockStore(store).values()].map(v => clone(v)),
+      put: async (store, value, key) => {
+        const k = this._keyFor(store, value, key);
+        this._mockStore(store).set(k, clone(value));
+        return k;
+      },
+      delete: async (store, key) => { this._mockStore(store).delete(key); }
+    };
+    return fn(facade);
+  }
+
+
+  // -------------------------------------------------------------------------
+  // Storage management
+  // -------------------------------------------------------------------------
+
+  /**
+   * Estimates the origin's overall storage usage and quota via `navigator.storage.estimate()`.
+   * @return A `StorageEstimate`, or `null` if the API is unavailable
+   */
+  public async estimateQuotaAsync(): Promise<StorageEstimate | null> {
+    const storageManager = globalThis.navigator?.storage;
+    if (storageManager?.estimate) {
+      try {
+        return await storageManager.estimate();
+      } catch {
+        return null;
+      }
+    }
+    return null;
+  }
+
+
+  /**
+   * Estimates per-store usage (record count and approximate byte size). Sizes are approximate
+   * because IndexedDB does not report per-store usage directly.
+   * @return A map of store name to its usage statistics
+   */
+  public async usageByStoreAsync(): Promise<Map<StoreName, StoreUsage>> {
+    const out = new Map<StoreName, StoreUsage>();
+    for (const def of STORE_MANIFEST) {
+      const values = await this.getAll(def.name);
+      let bytes = 0;
+      for (const value of values) {
+        bytes += estimateBytes(value);
+      }
+      out.set(def.name, { count: values.length, bytes });
+    }
+    return out;
+  }
+
+
+  /**
+   * Asks the browser to make the origin's storage persistent (resistant to eviction) via
+   * `navigator.storage.persist()`.
+   * @return `true` if storage is now persistent
+   */
+  public async requestPersistentAsync(): Promise<boolean> {
+    const storageManager = globalThis.navigator?.storage;
+    if (storageManager?.persist) {
+      try {
+        return await storageManager.persist();
+      } catch {
+        return false;
+      }
+    }
+    return false;
+  }
+
+
+  // -------------------------------------------------------------------------
+  // Internal
+  // -------------------------------------------------------------------------
+
+  /**
+   * Opens the IndexedDB database and asserts the store manifest, or falls back to the in-memory
+   * mock. Idempotent — safe to call more than once.
+   * @return  Promise resolved when the database (or mock) is ready
+   */
+  protected async _openAsync(): Promise<void> {
+    if (this._db || this._mock) return;  // already opened
+
+    try {
+      if (!('indexedDB' in globalThis) || !globalThis.indexedDB) {
+        throw new Error('IndexedDB not available');
+      }
+      this._db = await openDB(DATABASE_NAME, CURRENT_DB_VERSION, {
+        upgrade: (db, oldVersion, newVersion, tx) => {
+          this._upgrade(db, oldVersion, newVersion ?? CURRENT_DB_VERSION, tx);
+        }
+      });
+    } catch (e) {
+      console.error('DatabaseSystem: IndexedDB unavailable, using in-memory fallback', e);  // eslint-disable-line no-console
+      this._db = null;
+      this._initMock();
+    }
+  }
+
+
+  /**
+   * Runs the schema upgrade: creates any stores/indexes introduced between `oldVersion` and
+   * `newVersion` from the manifest, then applies any ordered data migrations.
+   * @param db - The database being upgraded
+   * @param oldVersion - The version being upgraded from
+   * @param newVersion - The version being upgraded to
+   * @param tx - The active version-change transaction
+   */
+  protected _upgrade(
+    db: IDBPDatabase,
+    oldVersion: number,
+    newVersion: number,
+    tx: IDBPTransaction<unknown, string[], 'versionchange'>
+  ): void {
+    // Create stores/indexes from the manifest.
+    for (const def of STORE_MANIFEST) {
+      if (def.sinceVersion > oldVersion && def.sinceVersion <= newVersion) {
+        const store = db.createObjectStore(def.name, {
+          keyPath: def.keyPath,
+          autoIncrement: def.autoIncrement ?? false
+        });
+        for (const idx of def.indexes ?? []) {
+          store.createIndex(idx.name, idx.keyPath, idx.options);
+        }
+      }
+    }
+
+    // Apply ordered data migrations.
+    for (const migration of DATABASE_MIGRATIONS) {
+      if (migration.toVersion > oldVersion && migration.toVersion <= newVersion) {
+        migration.migrate(db, tx, oldVersion);
+      }
+    }
+  }
+
+
+  /** Initializes the in-memory mock stores from the manifest. */
+  protected _initMock(): void {
+    this._mock = new Map<StoreName, Map<IDBValidKey, unknown>>();
+    for (const def of STORE_MANIFEST) {
+      this._mock.set(def.name, new Map<IDBValidKey, unknown>());
+    }
+  }
+
+
+  /**
+   * Returns the mock backing map for a store.
+   * @param store - Store name
+   * @return The store's in-memory map
+   * @throws Error if the mock is not initialized or the store is unknown
+   */
+  protected _mockStore(store: StoreName): Map<IDBValidKey, unknown> {
+    const mock = this._mock?.get(store);
+    if (!mock) {
+      throw new Error(`DatabaseSystem: unknown store '${store}'`);
+    }
+    return mock;
+  }
+
+
+  /**
+   * Determines the storage key for a value in the mock, using the store's in-line `keyPath`
+   * when no explicit key is supplied.
+   * @param store - Store name
+   * @param value - The record being stored
+   * @param key - Optional explicit out-of-line key
+   * @return The key to store the record under
+   * @throws Error if no key can be determined
+   */
+  protected _keyFor(store: StoreName, value: unknown, key?: IDBValidKey): IDBValidKey {
+    if (key !== undefined) return key;
+
+    const keyPath = STORE_MANIFEST.find(def => def.name === store)?.keyPath;
+    if (typeof keyPath === 'string') {
+      return readPath(value, keyPath) as IDBValidKey;
+    } else if (Array.isArray(keyPath)) {
+      return keyPath.map(k => readPath(value, k)) as IDBValidKey;
+    }
+    throw new Error(`DatabaseSystem: no key for store '${store}'`);
+  }
+
+
+  /**
+   * Looks up the key path for one of a store's indexes.
+   * @param store - Store name
+   * @param index - Index name
+   * @return The index's key path
+   * @throws Error if the index is unknown
+   */
+  protected _indexKeyPath(store: StoreName, index: string): string | string[] {
+    const keyPath = STORE_MANIFEST
+      .find(def => def.name === store)?.indexes
+      ?.find(idx => idx.name === index)?.keyPath;
+    if (keyPath === undefined) {
+      throw new Error(`DatabaseSystem: unknown index '${index}' on store '${store}'`);
+    }
+    return keyPath;
+  }
+}
+
+
+/**
+ * Reads a (possibly nested) property from a record for mock key/index resolution.
+ * @param value - The record to read from
+ * @param keyPath - A dotted property path or array of property names
+ * @return The value at the path, or `undefined`
+ */
+function readPath(value: unknown, keyPath: string | string[]): unknown {
+  if (value === null || typeof value !== 'object') return undefined;
+
+  const parts = Array.isArray(keyPath) ? keyPath : keyPath.split('.');
+  let current: unknown = value;
+  for (const part of parts) {
+    if (current === null || typeof current !== 'object') return undefined;
+    current = (current as Record<string, unknown>)[part];
+  }
+  return current;
+}

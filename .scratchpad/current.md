@@ -1,6 +1,29 @@
 # Current Work
 
-No active in-progress task. Working tree is clean on `main`.
+## In progress
+**`DatabaseSystem`** ([facebook/Rapid#1078](https://github.com/facebook/Rapid/issues/1078)) — new
+`AbstractSystem` wrapping IndexedDB. Design doc:
+[`.github/design/database-system.md`](../.github/design/database-system.md).
+
+- **Phase 0 done:** [`core/DatabaseSystem.ts`](../modules/core/DatabaseSystem.ts) wraps the `idb`
+  library (1.4 KB, chosen over Dexie/localForage/idb-keyval/rxdb). Domain-agnostic engine owning a
+  central store manifest + manifest-driven schema `upgrade`; CRUD/bulk/iterate/index/transaction
+  helpers; quota/estimate/usage/persist API; in-memory mock fallback when IndexedDB is unavailable
+  (graceful degradation — it's an **optional** system). Registered as `context.systems.database`,
+  exported from `headless.js`. Deps added: `idb`, `fake-indexeddb` (dev). Tests:
+  `test/unit/core/DatabaseSystem.test.js`.
+- **Phase 1 done:** `sessions` store. `EditSystem` dual-writes the structured backup object to
+  IndexedDB (no `JSON.stringify` on that path) alongside the localStorage fallback; `toJSON`/
+  `fromJSONAsync` are now thin wrappers over new `toBackup`/`fromBackupAsync`. Restore prefers the
+  IDB session, imports the legacy localStorage key once. `database` is optional on `EditSystem`.
+
+## Next up
+- **Phase 2:** multi-session restore UI (list sessions at startup; restore/remove/start-fresh;
+  retire the single-slot localStorage prompt). Retention = keep indefinitely, evict only on explicit
+  user action.
+- **Phase 3:** persist dropped-in data files (`RapidSystem`/`PixiLayerCustomData`) as blobs.
+- Open questions at the bottom of the design doc (data-file reload UX; DB name/scoping; codifying
+  graceful degradation in agent instructions).
 
 ## Last landed
 `KeyboardSystem` phase 1 — `util/keybinding.ts` is now `core/KeyboardSystem.ts`, an

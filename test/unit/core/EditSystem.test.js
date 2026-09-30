@@ -955,5 +955,46 @@ describe('EditSystem', () => {
       });
     });
 
+
+    describe('toBackup / #fromBackupAsync', () => {
+      it('toBackup returns the structured object that toJSON stringifies', () => {
+        prepareTestHistory();
+
+        const backup = _editor.toBackup();
+        assert.isObject(backup);
+        assert.strictEqual(backup.version, 3);
+        // The structured object must match the parsed JSON string exactly.
+        assert.deepEqual(backup, JSON.parse(_editor.toJSON()));
+      });
+
+      it('toBackup returns undefined when there are no changes', () => {
+        assert.isUndefined(_editor.toBackup());
+      });
+
+      it('fromBackupAsync restores directly from a structured object (no JSON string)', () => {
+        const backup = {
+          version: 3,
+          entities: [{ id: 'n-1', loc: [1, 2], v: 0 }],
+          baseEntities: [],
+          stack: [
+            { },
+            { modified: ['n-1v0'], annotation: 'Added a point.' }
+          ],
+          nextIDs: { node: 2 },
+          index: 1
+        };
+        return _editor.fromBackupAsync(backup)
+          .then(() => {
+            const restored = _editor.staging.graph.entity('n-1');
+            assert.instanceOf(restored, Rapid.OsmNode);
+            assert.deepEqual(restored.loc, [1, 2]);
+          });
+      });
+
+      it('fromBackupAsync throws on an unsupported backup version', () => {
+        assert.throws(() => _editor.fromBackupAsync({ version: 2 }), /version 2 not supported/i);
+      });
+    });
+
   });
 });

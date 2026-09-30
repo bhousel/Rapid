@@ -9,6 +9,7 @@ import { utilArrayGroupBy, utilObjectOmit, utilSessionMutex } from '@rapid-sdk/u
 
 import type { Context } from '../Context.ts';
 import type { Action } from '../actions/types.ts';
+import type { DatabaseSystem } from './DatabaseSystem.ts';
 import type { OsmEntityProps, OsmNode, OsmRelation, OsmTags, OsmWay, Segment } from '../data/types.ts';
 import type { SpatialItem } from './SpatialSystem.ts';
 import type { TransformProps, Vec2 } from '@rapid-sdk/math';
@@ -61,6 +62,30 @@ interface BackupJSON {
   nextIDs: Record<string, number>;
   index: number;
   timestamp: number;
+}
+
+/**
+ * A stored editing session, persisted to the `DatabaseSystem` 'sessions' store.
+ * The `data` payload is the structured backup object (not a JSON string) so it can be
+ * written via IndexedDB structured clone without an expensive `JSON.stringify` on the hot path.
+ */
+interface SessionRecord {
+  /** Stable per-origin session id (see `_backupKey`). */
+  id: string;
+  /** The `window.location.origin` this session belongs to. */
+  origin: string;
+  /** User-facing label (defaults to the creation timestamp). */
+  label: string;
+  /** When the session was first created (ms since epoch). */
+  createdAt: number;
+  /** When the session was last written (ms since epoch). */
+  updatedAt: number;
+  /** Number of committed edits, for the future session-list UI. */
+  editCount: number;
+  /** The backup schema version of `data` (currently 3). */
+  backupVersion: number;
+  /** The structured backup object. */
+  data: BackupJSON;
 }
 
 /** Entity copy - as bag of properties */
@@ -164,6 +189,8 @@ export class EditSystem extends AbstractSystem {
   protected _mutex: ReturnType<typeof utilSessionMutex>;
   /** Whether there is a backup available to restore from localStorage */
   protected _canRestoreBackup: boolean;
+  /** A restorable session loaded from the `DatabaseSystem`, if any (preferred over localStorage) */
+  protected _restorableSession: SessionRecord | null;
   /** Whether there are unsaved edits relative to the last stable state */
   protected _hasWorkInProgress: boolean;
 
@@ -205,10 +232,11 @@ export class EditSystem extends AbstractSystem {
 
     this.id = 'editor';     // was 'history'
     this.requiredDependencies = new Set<SystemID>(['spatial', 'storage']);
-    this.optionalDependencies = new Set<SystemID>(['gfx', 'imagery', 'photos', 'scheduler']);
+    this.optionalDependencies = new Set<SystemID>(['database', 'gfx', 'imagery', 'photos', 'scheduler']);
 
     this._mutex = utilSessionMutex('lock');
     this._canRestoreBackup = false;
+    this._restorableSession = null;
     this._hasWorkInProgress = false;
 
     this._history = [];
@@ -241,18 +269,20 @@ export class EditSystem extends AbstractSystem {
     if (this._initPromise) return this._initPromise;
 
     const context = this.context;
+    const database = context.systems.database;   // optional
     const spatial = context.systems.spatial!;
     const storage = context.systems.storage!;
 
     return this._initPromise = super.initAsync()
       .then(() => {
         const prerequisites = [
+          database?.initAsync(),
           spatial.initAsync(),
           storage.initAsync()
         ];
         return Promise.all(prerequisites.filter(Boolean) as Promise<void>[]);
       })
-      .then(() => {
+      .then(async () => {
         this._reset();
 
         const isTestEnvironment = (!('window' in globalThis)) || ('assert' in globalThis) || ('expect' in globalThis);
@@ -269,8 +299,32 @@ export class EditSystem extends AbstractSystem {
 
         window.addEventListener('unload', () => this._mutex.unlock());
 
-        // changes are restorable if Rapid is not open in another window/tab and a backup exists in localStorage
-        this._canRestoreBackup = this._mutex.lock() && storage!.hasItem(this._backupKey());
+        // Changes are restorable only if Rapid is not open in another window/tab.
+        if (!this._mutex.lock()) return;
+
+        // Prefer a session stored in IndexedDB; fall back to the legacy localStorage backup.
+        // (During rollout we dual-write both; the localStorage copy is the degraded fallback.)
+        let idbSession: SessionRecord | null = null;
+        if (database) {
+          try {
+            idbSession = (await database.get<SessionRecord>('sessions', this._backupKey())) ?? null;
+          } catch {
+            idbSession = null;
+          }
+        }
+
+        const hasLegacyBackup = storage.hasItem(this._backupKey());
+
+        if (idbSession) {
+          this._restorableSession = idbSession;
+          this._canRestoreBackup = true;
+        } else if (hasLegacyBackup) {
+          this._canRestoreBackup = true;
+          // One-time import of the legacy localStorage backup into IndexedDB.
+          if (database) {
+            await this._importLegacyBackupAsync();
+          }
+        }
       });
   }
 
@@ -1080,10 +1134,12 @@ export class EditSystem extends AbstractSystem {
 
 
   /**
-   * Save the edit history to JSON.
-   * @return A String containing the JSON, or `undefined` if nothing to save
+   * Build the structured backup object representing the edit history.
+   * This is the expensive part of a backup (it walks and copies the whole history), so callers
+   * that persist to IndexedDB should store the returned object directly rather than re-stringifying.
+   * @return The structured backup object, or `undefined` if nothing to save
    */
-  public toJSON(): string | undefined {
+  public toBackup(): BackupJSON | undefined {
     if (!this.hasChanges()) return;
 
     const OSM_PRECISION = 7;
@@ -1150,7 +1206,7 @@ export class EditSystem extends AbstractSystem {
       historyData.push(item);
     }
 
-    return JSON.stringify({
+    return {
       version: 3,
       entities: [...modifiedEntities.values()],
       baseEntities: [...baseEntities.values()],
@@ -1158,7 +1214,7 @@ export class EditSystem extends AbstractSystem {
       nextIDs: this.context.sequences,
       index: this._index,
       timestamp: (new Date()).getTime()
-    });
+    };
 
 
     /**
@@ -1190,6 +1246,16 @@ export class EditSystem extends AbstractSystem {
 
 
   /**
+   * Save the edit history to a JSON string.
+   * @return A string containing the JSON, or `undefined` if nothing to save
+   */
+  public toJSON(): string | undefined {
+    const backup = this.toBackup();
+    return backup ? JSON.stringify(backup) : undefined;
+  }
+
+
+  /**
    * Restore the edit history from a JSON string.
    * Because the restore process can involve fetching additional information from the OSM API,
    *  this function needs to be async, and should be chained after a `context.resetAsync()` to ensure
@@ -1199,11 +1265,26 @@ export class EditSystem extends AbstractSystem {
    * @return Promise resolved when the restore process is complete
    */
   public fromJSONAsync(json: string): Promise<void> {
+    return this.fromBackupAsync(JSON.parse(json) as BackupJSON);
+  }
+
+
+  /**
+   * Restore the edit history from a structured backup object.
+   * This is the shared restore path; `fromJSONAsync` parses a string and delegates here, while
+   * IndexedDB-backed sessions pass their structured `data` object directly (no re-parse).
+   * Because the restore process can involve fetching additional information from the OSM API,
+   *  this function needs to be async, and should be chained after a `context.resetAsync()` to ensure
+   *  that we are starting with a clean slate in regards to validation and rendering.
+   *
+   * @param backup - The structured backup object to restore
+   * @return Promise resolved when the restore process is complete
+   * @throws Error if the backup version is not supported
+   */
+  public fromBackupAsync(backup: BackupJSON): Promise<void> {
     const context = this.context;
     const gfx = context.systems.gfx;
     const osm = context.services.osm as any;
-
-    const backup: BackupJSON = JSON.parse(json);
 
     if (backup.version !== 3) {
       throw new Error(`Backup version ${backup.version} not supported.`);
@@ -1390,11 +1471,16 @@ export class EditSystem extends AbstractSystem {
 
 
   /**
-   * Backup the user's edits to a JSON string in localStorage.
-   * This code runs occasionally as the user edits.
+   * Backup the user's edits.
+   * This code runs occasionally as the user edits. During rollout it dual-writes: the structured
+   * backup object goes to the `DatabaseSystem` (IndexedDB, no `JSON.stringify` on the hot path),
+   * and the stringified copy goes to `localStorage` as the degraded fallback.
    */
   public immediateBackup(): void {
     const context = this.context;
+    const database = context.systems.database;   // optional
+    const storage = context.systems.storage!;
+
     if (context.inIntro) return;               // Don't backup edits made in the walkthrough
     if (context.mode?.id === 'save') return;   // Edits made in save mode may be conflict resolutions
     if (this._canRestoreBackup) return;        // Wait to see if the user wants to restore other edits
@@ -1402,15 +1488,21 @@ export class EditSystem extends AbstractSystem {
     if (this._inTransaction) return;           // Don't backup edits mid-transaction
     if (!this._mutex.locked()) return;         // Another browser tab owns the history
 
-    const storage = context.systems.storage!;
-    const json = this.toJSON();
-    if (json) {
-      // status will be `true` if the backup succeeded
-      const status = storage.setItem(this._backupKey(), json);
-      if (status !== this._backupStatus) {
-        this._backupStatus = status;
-        this.emit('backupstatuschange', this._backupStatus);
-      }
+    // Build the (expensive) structured backup object once and share it between backends.
+    const backup = this.toBackup();
+    if (!backup) return;
+
+    // localStorage backup (synchronous; the degraded fallback).
+    // status will be `true` if the backup succeeded
+    const status = storage.setItem(this._backupKey(), JSON.stringify(backup));
+    if (status !== this._backupStatus) {
+      this._backupStatus = status;
+      this.emit('backupstatuschange', this._backupStatus);
+    }
+
+    // IndexedDB backup (async; best-effort dual-write of the structured object).
+    if (database) {
+      this._saveSessionAsync(database, backup);
     }
   }
 
@@ -1441,9 +1533,12 @@ export class EditSystem extends AbstractSystem {
 
 
   /**
-   * Restore the user's backup from localStorage.
+   * Restore the user's backup.
    * This happens when:
    * - The user chooses to "Restore my changes" from the restore screen
+   *
+   * Prefers a session stored in IndexedDB (restored from its structured `data` object); falls
+   * back to the legacy localStorage backup when no database session is available.
    */
   public restoreBackup(): void {
     this._canRestoreBackup = false;
@@ -1452,6 +1547,16 @@ export class EditSystem extends AbstractSystem {
 
     const context = this.context;
     const storage = context.systems.storage!;
+
+    const session = this._restorableSession;
+    this._restorableSession = null;
+
+    if (session) {
+      context.resetAsync()
+        .then(() => this.fromBackupAsync(session.data));
+      return;
+    }
+
     const json = storage.getItem(this._backupKey());
     if (json) {
       context.resetAsync()
@@ -1461,27 +1566,86 @@ export class EditSystem extends AbstractSystem {
 
 
   /**
-   * Remove any backup stored in localStorage.
+   * Remove any stored backup.
    * This happens when:
    * - The user chooses to "Discard my changes" from the restore screen
    * - The user switches sources with the source switcher
    * - A changeset is inflight, we remove it to prevent the user from restoring duplicate edits
+   *
+   * Removes both the localStorage backup and the IndexedDB session (best-effort).
    */
   public clearBackup(): void {
     const context = this.context;
+    const database = context.systems.database;   // optional
     const scheduler = context.systems.scheduler;
     const storage = context.systems.storage!;
     const uploader = context.systems.uploader;
 
     this._canRestoreBackup = false;
+    this._restorableSession = null;
     scheduler?.cancel('edit-backup');
 
     if (!this._mutex.locked()) return;  // another browser tab owns the history
 
     storage.removeItem(this._backupKey());
+    database?.delete('sessions', this._backupKey()).catch(() => { /* best effort */ });
 
     // clear the draft changeset metadata associated with the saved history
     uploader?.clearDraft();
+  }
+
+
+  /**
+   * Persist the current editing session to the `DatabaseSystem` 'sessions' store.
+   * Stores the structured backup object directly (no `JSON.stringify`). Best-effort — a failure
+   * here does not affect the localStorage fallback written by `immediateBackup`.
+   * @param database - The database system to write to
+   * @param backup - The structured backup object to store
+   * @return Promise resolved when the write completes (or is skipped on error)
+   */
+  protected async _saveSessionAsync(database: DatabaseSystem, backup: BackupJSON): Promise<void> {
+    const id = this._backupKey();
+    const now = Date.now();
+    try {
+      const existing = await database.get<SessionRecord>('sessions', id);
+      const record: SessionRecord = {
+        id,
+        origin: globalThis?.location?.origin || 'headless',
+        label: existing?.label ?? new Date(now).toLocaleString(),
+        createdAt: existing?.createdAt ?? now,
+        updatedAt: now,
+        editCount: Math.max(0, this._history.length - 1),
+        backupVersion: backup.version,
+        data: backup
+      };
+      await database.put('sessions', record);
+    } catch {
+      // best effort — the localStorage backup remains the fallback
+    }
+  }
+
+
+  /**
+   * One-time import of a legacy localStorage backup into the IndexedDB 'sessions' store.
+   * Leaves the localStorage key in place (it remains the degraded fallback during rollout).
+   * @return Promise resolved when the import completes (or is skipped on error)
+   */
+  protected async _importLegacyBackupAsync(): Promise<void> {
+    const context = this.context;
+    const database = context.systems.database;
+    const storage = context.systems.storage!;
+    if (!database) return;
+
+    const json = storage.getItem(this._backupKey());
+    if (!json) return;
+
+    try {
+      const backup = JSON.parse(json) as BackupJSON;
+      await this._saveSessionAsync(database, backup);
+      this._restorableSession = (await database.get<SessionRecord>('sessions', this._backupKey())) ?? null;
+    } catch {
+      // best effort — the localStorage backup remains the fallback
+    }
   }
 
 

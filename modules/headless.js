@@ -14,6 +14,7 @@ export * from './mocks.ts';
 // These Systems and Services can work without browser and UI.
 export { AbstractSystem } from './core/AbstractSystem.ts';
 export { AssetSystem } from './core/AssetSystem.ts';
+export { DatabaseSystem } from './core/DatabaseSystem.ts';
 export { EditSystem } from './core/EditSystem.ts';
 export { FilterSystem } from './core/FilterSystem.ts';
 export { ImagerySystem } from './core/ImagerySystem.ts';
