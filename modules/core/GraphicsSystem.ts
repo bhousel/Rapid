@@ -402,10 +402,16 @@ export class GraphicsSystem extends AbstractSystem {
       const now = window.performance.now();
 
       const { time0, time1, xform0, xform1, resolve } = this._transformEase;
-//      const [x0, y0, k0] = [xform0.x, xform0.y, xform0.k];
-//      const [x1, y1, k1] = [xform1.x, xform1.y, xform1.k];
       const [x0, y0, z0] = [xform0.x, xform0.y, xform0.z];
       const [x1, y1, z1] = [xform1.x, xform1.y, xform1.z];
+
+      // `x`,`y` translation is in linear screen pixels, but `z` zoom is logarithmic
+      // (the scale factor is 2^z). To keep the two consistent during the tween, we
+      // interpolate the linear scale factor `k = 2^z` and derive `z` back from it.
+      // Interpolating `z` directly would move the translation linearly while the scale
+      // moved exponentially, drifting the focus point far off screen mid-transition.
+      const k0 = Math.pow(2, z0);
+      const k1 = Math.pow(2, z1);
 
       // For rotation, pick whichever direction is shorter
       const r0 = numWrap(xform0.r, 0, TAU);
@@ -418,10 +424,9 @@ export class GraphicsSystem extends AbstractSystem {
       const tween = Math.max(0, Math.min(1, (now - time0) / (time1 - time0)));
       const xNow = x0 + ((x1 - x0) * tween);
       const yNow = y0 + ((y1 - y0) * tween);
-//       const kNow = k0 + ((k1 - k0) * tween);
-      const zNow = z0 + ((z1 - z0) * tween);
+      const kNow = k0 + ((k1 - k0) * tween);
+      const zNow = Math.log2(kNow);
       const rNow = r0 + ((r1 - r0) * tween);
-      // const tNow = { x: xNow, y: yNow, k: kNow, r: rNow };
       const tNow = { x: xNow, y: yNow, z: zNow, r: rNow };
       mapViewport.transform = tNow;  // set
 
@@ -449,7 +454,6 @@ export class GraphicsSystem extends AbstractSystem {
         if (!firstTime) {
           const [dw, dh] = vecScale(vecSubtract(mapDims, pixiDims), 0.5);
           const t = mapViewport.transform;
-//          mapViewport.transform = { x: t.x + dw, y: t.y + dh, k: t.k, r: t.r };
           mapViewport.transform = { x: t.x + dw, y: t.y + dh, z: t.z, r: t.r };
         }
 
@@ -464,13 +468,12 @@ export class GraphicsSystem extends AbstractSystem {
     }
 
     // Here we calculate a temporary CSS transform that includes
-    // whatever user interaction has occurred between full redraws.
+    // whatever map movements have occurred between full redraws.
     // We apply this temporary transform to the supersurface and overlay.
     const tCurr = mapViewport.transform.props;
     const tPrev = this._prevTransform;
 
     const hasChanges = this._isTempTransformed || (
-//      tPrev.x !== tCurr.x || tPrev.y !== tCurr.y || tPrev.k !== tCurr.k || tPrev.r !== tCurr.r
       tPrev.x !== tCurr.x || tPrev.y !== tCurr.y || tPrev.z !== tCurr.z || tPrev.r !== tCurr.r
     );
 
@@ -480,10 +483,9 @@ export class GraphicsSystem extends AbstractSystem {
       const center = mapViewport.center();
       const currxy = vecSubtract([tCurr.x, tCurr.y], center);
       const prevxy = vecSubtract([tPrev.x, tPrev.y], center);
-//      const scale = tCurr.k / tPrev.k;
 
-// todo fix: this does not work correctly with the worldcoordinate changes
-      const scale = Math.pow(2, tCurr.z) / Math.pow(2, tPrev.z);
+      // The scale factor is 2^z, so the relative scale between the two transforms is 2^(Δz).
+      const scale = Math.pow(2, tCurr.z - tPrev.z);
       let dx = (currxy[0] / scale - prevxy[0]) * scale;
       let dy = (currxy[1] / scale - prevxy[1]) * scale;
       const dr = tCurr.r - tPrev.r;
