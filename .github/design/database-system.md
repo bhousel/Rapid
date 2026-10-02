@@ -601,9 +601,19 @@ the initial phases, but the async, worker-portable API is designed with this in 
 - **Deferred:** drag-and-drop wiring + reload-on-startup belong to a future input/data-file system
   that consumes this API.
 
-### Phase 4 — Storage management
-- Surface `estimateQuotaAsync` / `usageByStoreAsync`, retention/cleanup policies, and (later) a
-  storage/file-browser UI.
+### Phase 4 — Storage management ✅ done
+- `estimateQuotaAsync()` (raw `navigator.storage.estimate()` passthrough) and `requestPersistentAsync()`
+  (`navigator.storage.persist()`).
+- **`usageByStoreAsync()` is now O(1)** — replaced the `getAll + JSON.stringify` scan (which
+  serialized entire session graphs at read time) with in-memory stats counters (`_stats`) maintained
+  at **write time**: incremented on `put`/`putMany`, count-decremented on `delete`/`deleteMany`,
+  zeroed on `clear`. Counts are seeded from IDB on `initAsync()` via a lightweight `count()` call
+  (no record data loaded); bytes start at 0 per session and accumulate as writes happen.
+  Tradeoff: bytes may be 0 on the very first `usageByStoreAsync()` call after a cold page load (before
+  any writes). For "is there quota available?" use `estimateQuotaAsync()` (browser native, always
+  accurate). `usageByStoreAsync` is for the informational per-store breakdown (a storage UI).
+- `usedBytesAsync` / `availableBytesAsync` were added then **removed** — they were thin wrappers
+  around `estimateQuotaAsync()` and callers can call it directly.
 
 ### Phase 5 — Worker offload (optional, later)
 - Move edit serialization / bulk data handling into `WorkerSystem`, leveraging IDB's worker access.

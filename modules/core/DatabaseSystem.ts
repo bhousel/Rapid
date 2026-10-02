@@ -259,6 +259,12 @@ export class DatabaseSystem extends AbstractSystem {
   protected _db: IDBPDatabase | null;
   /** In-memory fallback store used when IndexedDB is unavailable. */
   protected _mock: Map<StoreName, Map<IDBValidKey, unknown>> | null;
+  /**
+   * In-memory stats counters updated at write time so reads are O(1) with no serialization.
+   * Counts are seeded from IDB on `initAsync()`; bytes start at 0 each session and accumulate
+   * as writes happen (they are not persisted across page reloads).
+   */
+  protected _stats: Map<StoreName, StoreUsage>;
 
 
   /**
@@ -270,6 +276,7 @@ export class DatabaseSystem extends AbstractSystem {
 
     this._db = null;
     this._mock = null;
+    this._stats = this._freshStats();
   }
 
 
@@ -281,7 +288,8 @@ export class DatabaseSystem extends AbstractSystem {
    */
   public initAsync(): Promise<void> {
     return super.initAsync()
-      .then(() => this._openAsync());
+      .then(() => this._openAsync())
+      .then(() => this._seedStatsAsync());
   }
 
 
@@ -351,10 +359,13 @@ export class DatabaseSystem extends AbstractSystem {
    */
   public async put<T = unknown>(store: StoreName, value: T, key?: IDBValidKey): Promise<IDBValidKey> {
     if (this._db) {
-      return this._db.put(store, value, key);
+      const k = await this._db.put(store, value, key);
+      this._statsAdd(store, value);
+      return k;
     }
     const k = this._keyFor(store, value, key);
     this._mockStore(store).set(k, clone(value));
+    this._statsAdd(store, value);
     return k;
   }
 
@@ -366,9 +377,12 @@ export class DatabaseSystem extends AbstractSystem {
    */
   public async delete(store: StoreName, key: IDBValidKey): Promise<void> {
     if (this._db) {
-      return this._db.delete(store, key);
+      await this._db.delete(store, key);
+      this._statsRemove(store, 1);
+      return;
     }
     this._mockStore(store).delete(key);
+    this._statsRemove(store, 1);
   }
 
 
@@ -428,11 +442,14 @@ export class DatabaseSystem extends AbstractSystem {
         ...entries.map(entry => tx.store.put(entry.value, entry.key)),
         tx.done
       ]);
-      return;
+    } else {
+      const mock = this._mockStore(store);
+      for (const entry of entries) {
+        mock.set(this._keyFor(store, entry.value, entry.key), clone(entry.value));
+      }
     }
-    const mock = this._mockStore(store);
     for (const entry of entries) {
-      mock.set(this._keyFor(store, entry.value, entry.key), clone(entry.value));
+      this._statsAdd(store, entry.value);
     }
   }
 
@@ -449,12 +466,13 @@ export class DatabaseSystem extends AbstractSystem {
         ...keys.map(key => tx.store.delete(key)),
         tx.done
       ]);
-      return;
+    } else {
+      const mock = this._mockStore(store);
+      for (const key of keys) {
+        mock.delete(key);
+      }
     }
-    const mock = this._mockStore(store);
-    for (const key of keys) {
-      mock.delete(key);
-    }
+    this._statsRemove(store, keys.length);
   }
 
 
@@ -477,9 +495,13 @@ export class DatabaseSystem extends AbstractSystem {
    */
   public async clear(store: StoreName): Promise<void> {
     if (this._db) {
-      return this._db.clear(store);
+      await this._db.clear(store);
+    } else {
+      this._mockStore(store).clear();
     }
-    this._mockStore(store).clear();
+    // Reset this store's stats to zero — clear is the one operation where bytes are accurate.
+    const s = this._stats.get(store);
+    if (s) { s.count = 0; s.bytes = 0; }
   }
 
 
@@ -648,19 +670,19 @@ export class DatabaseSystem extends AbstractSystem {
 
 
   /**
-   * Estimates per-store usage (record count and approximate byte size). Sizes are approximate
-   * because IndexedDB does not report per-store usage directly.
+   * Returns per-store usage statistics (record count and estimated byte size).
+   *
+   * This is an **O(1) in-memory read** — counters are maintained at write time so there is no
+   * record scanning or serialization on the read path. Counts are seeded from IDB on
+   * `initAsync()`; bytes start at 0 each session and accumulate as writes happen (they are not
+   * persisted, so bytes may undercount on the first query after a cold page load). Use
+   * `estimateQuotaAsync()` when you need the precise total usage reported by the browser.
    * @return A map of store name to its usage statistics
    */
   public async usageByStoreAsync(): Promise<Map<StoreName, StoreUsage>> {
     const out = new Map<StoreName, StoreUsage>();
-    for (const def of STORE_MANIFEST) {
-      const values = await this.getAll(def.name);
-      let bytes = 0;
-      for (const value of values) {
-        bytes += estimateBytes(value);
-      }
-      out.set(def.name, { count: values.length, bytes });
+    for (const [store, s] of this._stats) {
+      out.set(store, { count: s.count, bytes: s.bytes });
     }
     return out;
   }
@@ -890,6 +912,60 @@ export class DatabaseSystem extends AbstractSystem {
   protected _newID(): string {
     return globalThis.crypto?.randomUUID?.() ??
       `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+  }
+
+
+  /**
+   * Build a zeroed stats map for all stores in the manifest.
+   * @return A fresh zeroed `StoreUsage` map
+   */
+  protected _freshStats(): Map<StoreName, StoreUsage> {
+    return new Map(STORE_MANIFEST.map(def => [def.name, { count: 0, bytes: 0 }]));
+  }
+
+
+  /**
+   * Seed stats counts from IDB after opening. Uses the lightweight `count()` call (no record
+   * data loaded) so this is fast even for large stores. Bytes start at 0 — they accumulate as
+   * writes happen during this session.
+   * @return  Promise resolved when seeding completes
+   */
+  protected async _seedStatsAsync(): Promise<void> {
+    for (const def of STORE_MANIFEST) {
+      const s = this._stats.get(def.name);
+      if (!s) continue;
+      try {
+        s.count = await this.count(def.name);
+      } catch {
+        // best effort — stats stay at 0 if the count fails
+      }
+    }
+  }
+
+
+  /**
+   * Update stats when a record is added or overwritten. Called at write time so reads are free.
+   * @param store - Store being written to
+   * @param value - The value being stored
+   */
+  protected _statsAdd(store: StoreName, value: unknown): void {
+    const s = this._stats.get(store);
+    if (!s) return;
+    s.count++;
+    s.bytes += estimateBytes(value);
+  }
+
+
+  /**
+   * Update stats when records are deleted. We decrement count accurately but do not adjust bytes
+   * (we don't have the deleted value at hand). Bytes are reset to 0 on `clear()`.
+   * @param store - Store being deleted from
+   * @param n - Number of records removed
+   */
+  protected _statsRemove(store: StoreName, n: number): void {
+    const s = this._stats.get(store);
+    if (!s) return;
+    s.count = Math.max(0, s.count - n);
   }
 }
 

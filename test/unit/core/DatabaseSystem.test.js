@@ -197,7 +197,8 @@ describe('DatabaseSystem', () => {
 
 
   describe('storage management', () => {
-    it('usageByStoreAsync reports per-store counts and bytes', async () => {
+    it('usageByStoreAsync is O(1) — counts and bytes updated at write time', async () => {
+      // Counts should reflect writes immediately (stats updated at write, not read).
       await database.putMany('sessions', [
         { value: makeSession('a') },
         { value: makeSession('b') }
@@ -206,6 +207,34 @@ describe('DatabaseSystem', () => {
       const sessions = usage.get('sessions');
       assert.strictEqual(sessions.count, 2);
       assert.isAbove(sessions.bytes, 0);
+    });
+
+    it('usageByStoreAsync count decrements on delete', async () => {
+      await database.put('sessions', makeSession('a'));
+      await database.put('sessions', makeSession('b'));
+      await database.delete('sessions', 'a');
+      const usage = await database.usageByStoreAsync();
+      assert.strictEqual(usage.get('sessions').count, 1);
+    });
+
+    it('usageByStoreAsync resets count and bytes on clear', async () => {
+      await database.put('sessions', makeSession('a'));
+      await database.clear('sessions');
+      const usage = await database.usageByStoreAsync();
+      const sessions = usage.get('sessions');
+      assert.strictEqual(sessions.count, 0);
+      assert.strictEqual(sessions.bytes, 0);
+    });
+
+    it('usageByStoreAsync seeded count reflects records already in IDB at init', async () => {
+      // Pre-populate via the existing `database` instance, then open a fresh one on the same DB.
+      await database.put('sessions', makeSession('x'));
+      await database.put('sessions', makeSession('y'));
+
+      const db2 = new Rapid.DatabaseSystem(context);
+      await db2.initAsync();
+      const usage = await db2.usageByStoreAsync();
+      assert.strictEqual(usage.get('sessions').count, 2);
     });
 
     it('estimateQuotaAsync returns null or an estimate object', async () => {
@@ -345,6 +374,13 @@ describe('DatabaseSystem', () => {
       const got = await mockDatabase.getFileAsync(record.id);
       assert.strictEqual(got.name, 'x.json');
       assert.strictEqual(await got.blob.text(), '{"a":1}');
+    });
+
+    it('usageByStoreAsync returns stats from the in-memory mock (bytes/count from writes)', async () => {
+      await mockDatabase.put('sessions', makeSession('a'));
+      const usage = await mockDatabase.usageByStoreAsync();
+      assert.strictEqual(usage.get('sessions').count, 1);
+      assert.isAtLeast(usage.get('sessions').bytes, 0);
     });
   });
 });
