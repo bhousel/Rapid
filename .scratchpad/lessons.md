@@ -100,6 +100,23 @@ Things that went wrong once and shouldn't go wrong again.
 - **`hasTileAtLoc`/`hasItemAtLoc` with WGS84 point queries can miss point data** — `hasItemAtLoc([10,0])` uses a tiny epsilon to query spatial items near `[10,0]`. Photo/marker data is stored at the actual marker location, not the viewport center — a tile at lon=10 has bubbles at `10.001`, `10.002`, etc. The query point rarely coincides with any stored item. Use `network.isCompleted(requestID)` for tile-load verification in tests, not spatial point queries.
 ## Runtime
 
+- **A read-time cost moved to write-time can be a net regression — check the write frequency first.**
+  `DatabaseSystem.usageByStoreAsync` was "optimized" from a per-call `getAll + JSON.stringify` scan to
+  write-time stats counters. But the counter update called `estimateBytes(record)` → `JSON.stringify`
+  on *every* `put`, and the dominant writer (`EditSystem` debounced backup + 20s heartbeat) re-`put`s
+  the whole session backup constantly — re-introducing exactly the full-history serialization Phase 1
+  removed from the hot path. Moving work off a *rare* read (storage UI open) onto a *constant* write
+  is backwards. Before caching/precomputing at write time, confirm writes aren't hotter than reads.
+- **Incremental counters drift on overwrite.** The same stats counters did `count++`/`bytes +=` on
+  every `put`, treating overwrites as inserts. Rapid's main write pattern is re-`put`ting the *same*
+  session id, so counts/bytes grew without bound (1 real record reported as ~65 after a minute). If
+  you must track counts, either diff against a known key set or just call IndexedDB's native
+  `count(store)` on demand (cheap, exact, no drift) — don't hand-roll an insert-only counter.
+- **Prefer native cheap primitives over hand-maintained caches.** `navigator.storage.estimate()`
+  (total usage/quota) and `IDBObjectStore.count()` (record count, no data loaded) are both cheap and
+  always accurate. Reach for them before building a `_stats`/manifest side-table. File sizes for a
+  management UI come free from the already-stored `FileRecord.size`.
+
 - **`geomCoverageBoxes` vs `geomLineSegments` — two different samplers** — Despite both "putting points along a line", they are NOT interchangeable. `geomLineSegments(coords, spacing)` is a *uniform path-distance sampler* (a.k.a. arc-length sampler): it walks the whole polyline continuously, carrying the leftover offset across vertices, emitting points exactly `spacing` apart as measured along the path. `geomCoverageBoxes(coords, radius, step)` is a *coverage sampler*: it processes each segment independently, using `n = ceil(len/step)` and places `n+1` points at `len/n` spacing (which is ≤ `step` and lands on every vertex). Coverage boxes are denser and vertex-aligned — great for "does this segment overlap something in OSM", bad for rope labels (the `scaleX = lWidth / ((numBoxes-1)*boxsize)` math assumes exactly `boxsize` path-distance between successive boxes). Use `geomLineSegments` for rope placement; `geomCoverageBoxes` for spatial coverage/conflation.
 - **`SpatialSystem` needs a secondary feature→box index when one item spans many boxes** — `PixiLayerLabels` keeps `_featureBoxes: Map<FeatureID, Set<BoxID>>` alongside the spatial caches. `SpatialSystem` is domain-agnostic and only provides bbox→item lookup; it has no way to answer "which boxes belong to this feature?" without scanning the whole cache. When a single logical entity is covered by N boxes (rope labels, avoid boxes), you need this secondary index locally.
 - **`SpatialSystem` cache names collide across long sessions** — `clearCache('labels')` wipes everything in that spatialID. Don't share a single spatialID between the label layer and anything else; keep cache names scoped to the layer that owns them.

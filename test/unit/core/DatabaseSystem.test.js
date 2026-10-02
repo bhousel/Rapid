@@ -197,49 +197,19 @@ describe('DatabaseSystem', () => {
 
 
   describe('storage management', () => {
-    it('usageByStoreAsync is O(1) — counts and bytes updated at write time', async () => {
-      // Counts should reflect writes immediately (stats updated at write, not read).
-      await database.putMany('sessions', [
-        { value: makeSession('a') },
-        { value: makeSession('b') }
-      ]);
-      const usage = await database.usageByStoreAsync();
-      const sessions = usage.get('sessions');
-      assert.strictEqual(sessions.count, 2);
-      assert.isAbove(sessions.bytes, 0);
-    });
-
-    it('usageByStoreAsync count decrements on delete', async () => {
-      await database.put('sessions', makeSession('a'));
-      await database.put('sessions', makeSession('b'));
-      await database.delete('sessions', 'a');
-      const usage = await database.usageByStoreAsync();
-      assert.strictEqual(usage.get('sessions').count, 1);
-    });
-
-    it('usageByStoreAsync resets count and bytes on clear', async () => {
-      await database.put('sessions', makeSession('a'));
-      await database.clear('sessions');
-      const usage = await database.usageByStoreAsync();
-      const sessions = usage.get('sessions');
-      assert.strictEqual(sessions.count, 0);
-      assert.strictEqual(sessions.bytes, 0);
-    });
-
-    it('usageByStoreAsync seeded count reflects records already in IDB at init', async () => {
-      // Pre-populate via the existing `database` instance, then open a fresh one on the same DB.
-      await database.put('sessions', makeSession('x'));
-      await database.put('sessions', makeSession('y'));
-
-      const db2 = new Rapid.DatabaseSystem(context);
-      await db2.initAsync();
-      const usage = await db2.usageByStoreAsync();
-      assert.strictEqual(usage.get('sessions').count, 2);
-    });
-
     it('estimateQuotaAsync returns null or an estimate object', async () => {
       const estimate = await database.estimateQuotaAsync();
       assert.isTrue(estimate === null || typeof estimate === 'object');
+    });
+
+    it('canStoreAsync returns a viability verdict with the raw figures', async () => {
+      const result = await database.canStoreAsync(1000);
+      assert.strictEqual(result.requested, 1000);
+      assert.isBoolean(result.ok);
+      assert.include(['ok', 'insufficient', 'unavailable'], result.reason);
+      assert.isNumber(result.available);
+      assert.isNumber(result.quota);
+      assert.isNumber(result.usage);
     });
 
     it('requestPersistentAsync resolves to a boolean', async () => {
@@ -315,14 +285,15 @@ describe('DatabaseSystem', () => {
       assert.isUndefined(await database.getFileAsync(record.id));
     });
 
-    it('usageByStoreAsync reflects real blob bytes for the files store', async () => {
+    it('listFilesAsync exposes each file size (for summing in a management UI)', async () => {
       const body = 'x'.repeat(10000);
       await database.putFileAsync(new Blob([body]), { name: 'big.bin' });
 
-      const usage = await database.usageByStoreAsync();
-      const files = usage.get('files');
-      assert.strictEqual(files.count, 1);
-      assert.isAtLeast(files.bytes, 10000);   // counts the actual blob bytes, not a placeholder
+      const files = await database.listFilesAsync();
+      assert.lengthOf(files, 1);
+      assert.isAtLeast(files[0].size, 10000);
+      const totalBytes = files.reduce((sum, f) => sum + f.size, 0);
+      assert.isAtLeast(totalBytes, 10000);
     });
   });
 
@@ -376,11 +347,11 @@ describe('DatabaseSystem', () => {
       assert.strictEqual(await got.blob.text(), '{"a":1}');
     });
 
-    it('usageByStoreAsync returns stats from the in-memory mock (bytes/count from writes)', async () => {
-      await mockDatabase.put('sessions', makeSession('a'));
-      const usage = await mockDatabase.usageByStoreAsync();
-      assert.strictEqual(usage.get('sessions').count, 1);
-      assert.isAtLeast(usage.get('sessions').bytes, 0);
+    it('canStoreAsync reports unavailable when mocked', async () => {
+      const result = await mockDatabase.canStoreAsync(1000);
+      assert.isFalse(result.ok);
+      assert.strictEqual(result.reason, 'unavailable');
+      assert.strictEqual(result.available, 0);
     });
   });
 });

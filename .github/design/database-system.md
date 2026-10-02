@@ -602,18 +602,34 @@ the initial phases, but the async, worker-portable API is designed with this in 
   that consumes this API.
 
 ### Phase 4 — Storage management ✅ done
-- `estimateQuotaAsync()` (raw `navigator.storage.estimate()` passthrough) and `requestPersistentAsync()`
-  (`navigator.storage.persist()`).
-- **`usageByStoreAsync()` is now O(1)** — replaced the `getAll + JSON.stringify` scan (which
-  serialized entire session graphs at read time) with in-memory stats counters (`_stats`) maintained
-  at **write time**: incremented on `put`/`putMany`, count-decremented on `delete`/`deleteMany`,
-  zeroed on `clear`. Counts are seeded from IDB on `initAsync()` via a lightweight `count()` call
-  (no record data loaded); bytes start at 0 per session and accumulate as writes happen.
-  Tradeoff: bytes may be 0 on the very first `usageByStoreAsync()` call after a cold page load (before
-  any writes). For "is there quota available?" use `estimateQuotaAsync()` (browser native, always
-  accurate). `usageByStoreAsync` is for the informational per-store breakdown (a storage UI).
-- `usedBytesAsync` / `availableBytesAsync` were added then **removed** — they were thin wrappers
-  around `estimateQuotaAsync()` and callers can call it directly.
+Scoped to the real driving flow: the user drops a ~20 MB data file on `UiRapidAddDataset`; the
+drag-drop handler validates + claims it, then asks `DatabaseSystem` whether it can be persisted
+("plenty of space" / "not enough — manage your files" / "storage unavailable"). If space is tight, a
+management UI lists stored files (with sizes) so the user can delete ones they no longer need.
+
+The API that serves this:
+- **`estimateQuotaAsync()`** — raw `navigator.storage.estimate()` passthrough (`{ usage, quota }`),
+  native and cheap; the basis for "how much is used / free overall."
+- **`canStoreAsync(bytes)`** — best-effort verdict for the "can we persist this file?" check. Returns
+  `{ ok, reason: 'ok' | 'insufficient' | 'unavailable', requested, available, quota, usage }`.
+  `unavailable` when mocked (no durable storage); `insufficient` when `estimate()` says it won't fit;
+  optimistic `ok` (zeroed figures) when IDB works but the estimate API is absent. Documented as
+  approximate — quota is a soft cap, so the actual write still needs a `QuotaExceededError` guard.
+- **`requestPersistentAsync()`** — `navigator.storage.persist()`.
+- **File sizes for the management UI** come from `listFilesAsync()` — each `FileRecord` already
+  carries an exact `.size`, so the UI lists files and sums as needed. No separate per-store byte
+  tracking.
+
+**Course-correction (see the git history around this phase):** an earlier take added
+`usageByStoreAsync()` backed by in-memory stats counters updated at write time, plus
+`usedBytesAsync`/`availableBytesAsync` wrappers. That was reverted because (1) the write-time
+`estimateBytes()` re-introduced a full `JSON.stringify` of the session backup on **every** debounced
+backup + heartbeat — exactly the hot-path cost Phase 1 removed — and (2) the counters drifted without
+bound, since the dominant write pattern (re-`put`ting the same session id) is an *overwrite* that the
+"treat every put as an insert" counter mis-counted. Per-store byte figures aren't needed for the
+driving flow: total usage comes from `estimate()`, and file sizes come from `FileRecord.size`. If
+per-store **counts** are ever wanted, IndexedDB's native `count(store)` is cheap and exact on demand —
+no incremental tracking required.
 
 ### Phase 5 — Worker offload (optional, later)
 - Move edit serialization / bulk data handling into `WorkerSystem`, leveraging IDB's worker access.
