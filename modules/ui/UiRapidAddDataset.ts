@@ -20,13 +20,15 @@ import type { RapidDatasetProps } from '../lib/RapidDataset.ts';
 interface FieldInfo {
   /* `true` if we can continue (no errors), false if not */
   isOk: boolean
+  /* Mapping of input element IDs to raw localized error strings, if any. */
+  errors?: Record<string, string[]>;
 
   /** Dataset ID */
   datasetID?: DatasetID;
   /** Dataset Name */
   datasetName?: string;
-  /** Dataset Url */
-  datasetUrl?: string;
+  /** Dataset Source */
+  datasetSource?: string;
 }
 
 
@@ -48,10 +50,15 @@ export class UiRapidAddDataset extends EventEmitter {
 
   /** Unique ID for field identifiers */
   protected _uuid: string;
-  /* If there is a field error, the stringID for the error */
-  protected _fieldStringID: StringID | null;
-  /* If there is a url error, the error */
-  protected _urlError: string | null;
+  /** Seen names (to avoid duplicates) */
+  protected _seenNames: Set<string> | null;
+  /** Seen identifiers (to avoid duplicates) */
+  protected _seenIDs: Set<string> | null;
+  /** The current file list, if any */
+  protected _currFileList: FileList | null;
+  /** Error with dataset creation, if any */
+  protected _dsError: string | null;
+
   public rerender: () => void;
 
 
@@ -63,8 +70,10 @@ export class UiRapidAddDataset extends EventEmitter {
     this.context = context;
 
     this._uuid = crypto.randomUUID().slice(0, 8);
-    this._fieldStringID = null;
-    this._urlError = null;
+    this._seenNames = null;
+    this._seenIDs = null;
+    this._currFileList = null;
+    this._dsError = null;
 
     // Child components
     this.Modal = null;
@@ -110,7 +119,7 @@ export class UiRapidAddDataset extends EventEmitter {
     this._done = this._done.bind(this);
     this._renderHeading = this._renderHeading.bind(this);
     this._renderFields = this._renderFields.bind(this);
-    this._renderUrl = this._renderUrl.bind(this);
+    this._renderSource = this._renderSource.bind(this);
     this._renderButtons = this._renderButtons.bind(this);
   }
 
@@ -155,10 +164,21 @@ export class UiRapidAddDataset extends EventEmitter {
   public render(): void {
     if (!this.Modal) return;  // need to call `show()` first to create the modal.
 
-    this.Modal.$content!
-      .call(this._renderHeading)
+    const $content = this.Modal.$content!;
+
+    $content
+      .call(this._renderHeading);
+
+    /* Wrapper for main section */
+    const $wrap = $content.selectAll('.add-dataset-wrap')
+      .data([0])
+      .join($$enter => $$enter.append('div').attr('class', 'add-dataset-wrap'));
+
+    $wrap
       .call(this._renderFields)
-      .call(this._renderUrl)
+      .call(this._renderSource);
+
+    $content
       .call(this._renderButtons);
   }
 
@@ -188,8 +208,7 @@ export class UiRapidAddDataset extends EventEmitter {
     e?.preventDefault();
 
     const fieldInfo = this._checkFields();
-    const hasError = !!this._fieldStringID || !!this._urlError || !fieldInfo.isOk;
-    if (hasError) {
+    if (!fieldInfo.isOk) {
       this.render();
       return;
     }
@@ -201,7 +220,7 @@ export class UiRapidAddDataset extends EventEmitter {
     const props: Partial<RapidDatasetProps> = {
       id: fieldInfo.datasetID,
       label: fieldInfo.datasetName,
-      sourceUrl: fieldInfo.datasetUrl,
+      sourceUrl: fieldInfo.datasetSource,
       custom: true
     };
 
@@ -220,8 +239,8 @@ export class UiRapidAddDataset extends EventEmitter {
         SettingsModal.show();
       })
       .catch((err: unknown) => {
-        console.error(`Dataset setup failed for ${ds.id}:  `, err);  // eslint-disable-line no-console
-        this._urlError = 'Error: ' + (err as Error)?.message;
+        console.error(`Dataset setup failed for ${ds.id}: `, err);  // eslint-disable-line no-console
+        this._dsError = 'Error: ' + (err as Error)?.message;
         this.render();
       });
   }
@@ -302,11 +321,16 @@ export class UiRapidAddDataset extends EventEmitter {
       .attr('id', `name-${uuid}`)
       .attr('class', 'field-input')
       .call(utilNoAuto)
-      .on('input', (e: InputEvent) => this.render());  // rerendering will also run validation
+      .on('input', this.rerender);  // rerendering will also run validation
 
     // set focus on enter
     const node = $$nameInput.node() as HTMLElement | null;
     node?.focus();
+
+    $$name
+      .append('div')
+      .attr('class', 'field-feedback');
+
 
     /* Identifier */
     const $$identifier: D3EnterSelection = $$fields
@@ -324,7 +348,7 @@ export class UiRapidAddDataset extends EventEmitter {
       .attr('id', `identifier-${uuid}`)
       .attr('class', 'field-input')
       .call(utilNoAuto)
-      .on('input', (e: InputEvent) => this.render());  // rerendering will also run validation
+      .on('input', this.rerender);  // rerendering will also run validation
 
     $$identifier
       .append('div')
@@ -339,28 +363,50 @@ export class UiRapidAddDataset extends EventEmitter {
     $fields = $fields.merge($$fields);
 
     // perform field validation
-    this._checkFields();
+    const fieldInfo = this._checkFields();
+    const errors = fieldInfo.errors || {};
+
+    $fields.selectAll('.row-name')
+      .classed('has-warning', !!errors.name?.length);
+    $fields.selectAll('.row-identifier')
+      .classed('has-warning', !!errors.identifier?.length);
 
     $fields.selectAll('.row-name label')
       .text(l10n.t(`${prefix}.name.label`));
     $fields.selectAll('.row-identifier label')
       .text(l10n.t(`${prefix}.identifier.label`));
-
-    $fields.selectAll('.row-name input')
-      .attr('placeholder', l10n.t(`${prefix}.name.placeholder`));
-
-    $fields.selectAll('.row-identifier input')
-      .classed('warning', !!this._fieldStringID)
-      .attr('placeholder', l10n.t(`${prefix}.identifier.placeholder`));
-
     $fields.selectAll('.row-identifier .field-instruction')
       .text(l10n.t(`${prefix}.identifier.instruction`));
 
-    // U+26A0 U+FE0F = emoji warning
-    // U+00A0 = non breaking space &nbsp;  (we want the div always drawn, so layout doesn't jump around)
+    $fields.selectAll(`#name-${uuid}`)
+      .attr('placeholder', l10n.t(`${prefix}.name.placeholder`));
+    $fields.selectAll(`#identifier-${uuid}`)
+      .attr('placeholder', l10n.t(`${prefix}.identifier.placeholder`));
+
+    // Show errors
+    $fields.selectAll('.row-name .field-feedback')
+      .selectAll('.feedback-item')
+      .data(errors.name || [], (d: string) => d)
+      .join(
+        $$enter => $$enter
+          .append('div')
+          .attr('class', 'feedback-item')
+          .text((d: string) => `\u26a0\ufe0f ${d}`),   // U+26A0 U+FE0F = emoji warning
+        $update => $update,
+        $exit => $exit.remove()
+      );
+
     $fields.selectAll('.row-identifier .field-feedback')
-      .classed('warning', !!this._fieldStringID)
-      .text(this._fieldStringID ? '\u26a0\ufe0f ' + l10n.t(this._fieldStringID) : '\u00a0');
+      .selectAll('.feedback-item')
+      .data(errors.identifier || [], (d: string) => d)
+      .join(
+        $$enter => $$enter
+          .append('div')
+          .attr('class', 'feedback-item')
+          .text((d: string) => `\u26a0\ufe0f ${d}`),   // U+26A0 U+FE0F = emoji warning
+        $update => $update,
+        $exit => $exit.remove()
+      );
   }
 
 
@@ -368,132 +414,144 @@ export class UiRapidAddDataset extends EventEmitter {
    * Renders the Url section.
    * @param $parent - Parent D3Selection that this content should render itself into
    */
-  protected _renderUrl($parent: D3Selection): void {
+  protected _renderSource($parent: D3Selection): void {
     const context = this.context;
     const l10n = context.systems.l10n!;
 
     const prefix = 'rapid_add_dataset';  // prefix for text strings
     const uuid = this._uuid;
 
-    // const accept = [
-    //   '.gpx', 'application/gpx', 'application/gpx+xml',
-    //   '.kml', 'application/vnd.google-earth.kml+xml', 'application/kml', 'application/kml+xml',
-    //   '.geojson', '.json', 'application/geo+json', 'application/json', 'application/vnd.geo+json', 'text/x-json'
-    // ];
+    const accept = [
+      '.gpx', 'application/gpx', 'application/gpx+xml',
+      '.kml', 'application/vnd.google-earth.kml+xml', 'application/kml', 'application/kml+xml',
+      '.geojson', '.json', 'application/geo+json', 'application/json', 'application/vnd.geo+json', 'text/x-json'
+    ];
 
-    /* Text section */
-    let $textSection: D3Selection = $parent.selectAll('.rapid-add-dataset-text')
+    /* Dataset Source section */
+    let $source: D3Selection = $parent.selectAll('.rapid-add-dataset-source')
       .data([0]);
 
     // enter
-    const $$textSection = $textSection.enter()
+    const $$source = $source.enter()
       .append('div')
-      .attr('class', 'modal-section rapid-add-dataset-text');
+      .attr('class', 'modal-section rapid-add-dataset-source');
 
-    //    $$textSection
-    //      .append('div')
-    //      .attr('class', 'instructions-file');
-    //
-    //    $$textSection
-    //      .append('input')
-    //      .attr('id', `file-${uuid}`)
-    //      .attr('class', 'field-file')
-    //      .attr('type', 'file')
-    //      .attr('accept', accept.join())
-    //      .on('change', (e: Event) => {
-    //        const files = (e.target as HTMLInputElement).files;
-    //        if (files?.length) {
-    //          this._currFileList = files;
-    //          this._currUrl = '';
-    //          $textSection.select('.field-url').property('value', '');
-    //        } else {
-    //          this._currFileList = null;
-    //        }
-    //      });
+    $$source
+      .append('div')
+      .attr('class', 'source-instructions');
 
-    $$textSection
+    /* File */
+    const $$file: D3EnterSelection = $$source
+      .append('div')
+      .attr('class', 'field-row row-file');
+
+    $$file
+      .append('input')
+      .attr('id', `file-${uuid}`)
+      .attr('class', 'field-file')
+      .attr('type', 'file')
+      .attr('accept', accept.join())
+      .on('change', (e: Event) => {
+        const files = (e.target as HTMLInputElement).files;
+        if (files?.length) {
+          this._currFileList = files;
+          // const urlNode = $parent.selectAll(`#url-${uuid}`).node() as HTMLTextAreaElement | null;
+          // if (urlNode) {
+          //   urlNode.value = URL.createObjectURL(files[0]);
+          // }
+        } else {
+          this._currFileList = null;
+        }
+        this._dsError = null;   // clear any error, clicking "next" will try again.
+        this.render();          // rerendering will also run validation
+      });
+
+    $$file
+      .append('button')
+      .attr('class', 'file-remove')
+      .on('click', (e: PointerEvent) => {
+        e.preventDefault();
+        const fileNode = $parent.selectAll(`#file-${uuid}`).node() as HTMLTextAreaElement | null;
+        if (fileNode) {
+          fileNode.value = '';
+        }
+        this._currFileList = null;
+        this._dsError = null;   // clear any error, clicking "next" will try again.
+        this.render();          // rerendering will also run validation
+      })
+      .call(uiIcon('#fas-xmark'));
+
+    $$source
       .append('div')
       .attr('class', 'instructions-url');
 
-    $$textSection
+    $$source
       .append('textarea')
       .attr('id', `url-${uuid}`)
       .attr('class', 'field-url')
       .call(utilNoAuto)
-      .call(this.SampleCombo.attach)                    // sample data
+      .call(this.SampleCombo.attach)   // sample data
       .on('change', (e: Event) => {
-        this._urlError = null;  // clear any error, clicking "next" will try again.
-        this.render();
+        this._dsError = null;   // clear any error, clicking "next" will try again.
+        this.render();          // rerendering will also run validation
       });
-      // .on('input', (e: InputEvent) => this.render());  // rerendering will also run validation
 
-    $$textSection
+    $$source
       .append('div')
       .attr('class', 'field-feedback');
 
 
     // update
-    $textSection = $textSection.merge($$textSection) as D3Selection;
+    $source = $source.merge($$source) as D3Selection;
 
-    //     const data_instructions = l10n.t(`${prefix}.instructions`);
-    //     const file_heading = l10n.t(`${prefix}.file.heading`);
-    //     const file_instructions = l10n.t(`${prefix}.file.instructions`);
-    //     const file_types = l10n.t(`${prefix}.file.types`);
-    //     const fileHtml = marked.parse(`
-    // ${data_instructions}
-    // &nbsp;<br>
-    // &nbsp;<br>
-    // ### ${file_heading}
-    // ${file_instructions}
-    // * ${file_types}
-    // &nbsp;<br>
-    // &nbsp;<br>
-    // `);
-    //
-    //    $textSection.selectAll('.instructions-file')
-    //      .html(fileHtml as string);
-    //
-    //    $textSection.selectAll('.field-file')
-    //      .property('files', this._currFileList);  // works for all except IE11
-    //
-    //    const data_or = l10n.t(`${prefix}.or`);
-    const url_heading = l10n.t(`${prefix}.url.heading`);
-    const url_instructions = l10n.t(`${prefix}.url.instructions`);
-    const url_tokens = l10n.t(`${prefix}.url.tokens`);
-    const url_xyz = l10n.t(`${prefix}.url.xyz`);
-    const url_example_file = l10n.t(`${prefix}.url.example_file`);
-    const url_example_xyz = l10n.t(`${prefix}.url.example_xyz`);
-    const url_example_pmtiles = l10n.t(`${prefix}.url.example_pmtiles`);
-    const example = l10n.t('example');
+    // perform field validation
+    const fieldInfo = this._checkFields();
+    const errors = fieldInfo.errors || {};
 
-    //### ${ data_or }
-    const urlHtml = marked.parse(`
-### ${url_heading}
-${url_instructions}
+    $source
+      .classed('has-warning', !!errors.url?.length);
+
+    const source_heading = l10n.t(`${prefix}.source.label`);
+    const source_instructions = l10n.t(`${prefix}.source.instructions`);
+    const source_supported = l10n.t(`${prefix}.source.supported`);
+    const file_types = l10n.t(`${prefix}.source.types`);
+    const instructionsHtml = marked.parse(`
+### ${source_heading}
+${source_instructions}
+&nbsp;<br>
+${source_supported} ${file_types}
 &nbsp;<br>
 &nbsp;<br>
-${url_tokens}
-* ${url_xyz}
-&nbsp;<br>
-&nbsp;<br>
-#### ${example}
-* \`${url_example_file}\`
-* \`${url_example_xyz}\`
-* \`${url_example_pmtiles}\`
 `);
 
-    $textSection.selectAll('.instructions-url')
-      .html(urlHtml as string);
+    $source.selectAll('.source-instructions')
+      .html(instructionsHtml as string);
+    $source.selectAll('.instructions-url')
+      .text(l10n.t(`${prefix}.url.instructions`));
 
-    $textSection.selectAll('.field-url')
-      .classed('warning', !!this._urlError)
+    $source.selectAll(`#file-${uuid}`)
+      .property('files', this._currFileList);
+
+    $source.selectAll('.file-remove')
+      .classed('hide', !this._currFileList);
+
+    $source.selectAll(`#url-${uuid}`)
+      .property('disabled', !!this._currFileList)
+      .classed('disabled', !!this._currFileList)
       .attr('placeholder', l10n.t(`${prefix}.url.placeholder`));
 
-    // U+26A0 U+FE0F = emoji warning
-    // U+00A0 = non breaking space &nbsp;  (we want the div always drawn, so layout doesn't jump around)
-    $textSection.selectAll('.field-feedback')
-      .classed('warning', !!this._urlError)
-      .text(this._urlError ? '\u26a0\ufe0f ' + this._urlError : '\u00a0');
+    // Show errors
+    $source.selectAll('.field-feedback')
+      .selectAll('.feedback-item')
+      .data(errors.url || [], (d: string) => d)
+      .join(
+        $$enter => $$enter
+          .append('div')
+          .attr('class', 'feedback-item')
+          .text((d: string) => `\u26a0\ufe0f ${d}`),   // U+26A0 U+FE0F = emoji warning
+        $update => $update,
+        $exit => $exit.remove()
+      );
   }
 
 
@@ -506,7 +564,6 @@ ${url_tokens}
     const l10n = context.systems.l10n!;
 
     const fieldInfo = this._checkFields();
-    const hasError = !!this._fieldStringID || !!this._urlError || !fieldInfo.isOk;
 
     /* Next/Cancel Buttons */
     let $buttons: D3Selection = $parent.selectAll('.modal-section.buttons')
@@ -531,7 +588,7 @@ ${url_tokens}
     $buttons = $buttons.merge($$buttons) as D3Selection;
 
     $buttons.selectAll('.next-button')
-      .classed('secondary disabled', hasError)
+      .classed('secondary disabled', !fieldInfo.isOk)
       .text(l10n.t('text.next'));
 
     $buttons.selectAll('.cancel-button')
@@ -549,35 +606,62 @@ ${url_tokens}
     if (!this.Modal) return result;
 
     const context = this.context;
+    const l10n = context.systems.l10n!;
     const rapid = context.systems.rapid!;
     const $content = this.Modal.$content!;
     const uuid = this._uuid;
 
-    // check dataset ID
-    const idNode = $content.selectAll(`#identifier-${uuid}`).node() as HTMLInputElement | null;
-    const idVal = idNode?.value || '';
-    const datasetID = idVal.trim();
-    if (datasetID && rapid.catalog.has(datasetID)) {
-      this._fieldStringID = 'rapid_add_dataset.identifier.taken';
-    } else if (datasetID && !/^[\w\-]+$/.test(datasetID)) {
-      this._fieldStringID = 'rapid_add_dataset.identifier.invalid';
-    } else {
-      this._fieldStringID = null;
-      result.datasetID = datasetID;
+    result.errors = {};
+
+    // Gather existing Dataset Names and IDs if we haven't done this already.
+    if (!this._seenNames || !this._seenIDs) {
+      this._seenNames = new Set<string>();
+      this._seenIDs = new Set<string>();
+      for (const [dsID, ds] of rapid.catalog) {
+        this._seenNames.add(ds.getLabel().toLowerCase());
+        this._seenIDs.add(dsID.toLowerCase());
+      }
     }
 
-    // check dataset name
-    const nameNode = $content.selectAll(`#name-${uuid}`).node() as HTMLInputElement | null;
-    const nameVal = nameNode?.value || '';
-    result.datasetName = nameVal.trim();
+    // Check Dataset ID
+    const idErrors = result.errors.identifier = [] as string[];
+    const idNode = $content.selectAll(`#identifier-${uuid}`).node() as HTMLInputElement | null;
+    const idVal = (idNode?.value || '').trim();
+    if (idVal && this._seenIDs.has(idVal.toLowerCase())) {
+      idErrors.push(l10n.t('rapid_add_dataset.identifier.taken'));
+    }
+    if (idVal && !/^[\w\-]+$/.test(idVal)) {
+      idErrors.push(l10n.t('rapid_add_dataset.identifier.invalid'));
+    }
+    if (idVal && !idErrors.length) {
+      result.datasetID = idVal;
+    }
 
-    // check source url
+    // Check Dataset Name
+    const nameErrors = result.errors.name = [] as string[];
+    const nameNode = $content.selectAll(`#name-${uuid}`).node() as HTMLInputElement | null;
+    const nameVal = (nameNode?.value || '').trim();
+    if (nameVal && this._seenNames.has(nameVal.toLowerCase())) {
+      nameErrors.push(l10n.t('rapid_add_dataset.name.taken'));
+    }
+    if (nameVal && !nameErrors.length) {
+      result.datasetName = nameVal;
+    }
+
+    // Check Dataset Source
+    const urlErrors = result.errors.url = [] as string[];
     const urlNode = $content.selectAll(`#url-${uuid}`).node() as HTMLTextAreaElement | null;
     const urlVal = urlNode?.value || '';
-    result.datasetUrl = urlVal.trim();
+    result.datasetSource = urlVal.trim();
+    if (this._dsError) {
+      urlErrors.push(this._dsError);
+    }
+    if (urlVal && !urlErrors.length) {
+      result.datasetSource = urlVal;
+    }
 
     // required values must be present
-    result.isOk = !!(result.datasetID && result.datasetName && result.datasetUrl);
+    result.isOk = !!(result.datasetID && result.datasetName && result.datasetSource);
     return result;
   }
 

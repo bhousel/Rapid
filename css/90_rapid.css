@@ -220,7 +220,9 @@ button.rapid-features.layer-off use {
   font-size: 14px;
   width: 90%;
 }
+
 .modal.rapid-modal input[type="checkbox"] {
+  width: unset;
   accent-color: #da26d3;
 }
 
@@ -240,6 +242,55 @@ button.rapid-features.layer-off use {
   color: #eee;
   outline: none;
   border: 1px solid #aaa;
+}
+
+/* File picker */
+.modal.rapid-modal input[type="file"] {
+  width: unset;
+  padding: 0 75px 0 0;   /* leave space for remove 'x' */
+}
+.ideditor[dir='rtl'] .modal.rapid-modal input[type="file"] {
+  width: unset;
+  padding: 0 0 0 75px;
+}
+.modal.rapid-modal input[type="file"]::file-selector-button {
+  font-size: 12px;
+  height: 28px;
+  border-radius: 14px;
+  margin: 10px 10px;
+  padding: 0 15px;
+  border: 0;
+  background: #c000c0;
+  color: #eee;
+}
+.modal.rapid-modal .file-remove {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  height: 30px;
+  width: 30px;
+  background: unset;
+  cursor: pointer;
+  border-radius: 4px;
+  z-index: 10;
+}
+@media (hover: hover) {
+  .modal.rapid-modal .file-remove:hover {
+    background: #8885;
+  }
+}
+.ideditor[dir='rtl'] .modal.rapid-modal .file-remove {
+  left: 0;
+}
+.modal.rapid-modal input[type="file"]::file-selector-button:hover {
+  background: #c6d;
+}
+.modal.rapid-modal input[type="file"].disabled::file-selector-button {
+  background: #6668;
+  color: #eee8;
+}
+.modal.rapid-modal input[type="file"].disabled::file-selector-button:hover {
+  background: #8888;
 }
 
 /* Dark Tables */
@@ -292,13 +343,10 @@ button.rapid-features.layer-off use {
 .modal.rapid-modal button:focus-visible,
 .modal.rapid-modal input:focus-visible,
 .modal.rapid-modal textarea:focus-visible {
-  outline: 2px solid #da26d3;
-  box-shadow: 0 0 3px 1px #c6d;
-}
-.modal.rapid-modal button.action:focus-visible,
-.modal.rapid-modal button.minor:focus-visible {
   outline: 2px solid #eee;
-  box-shadow: 0 0 3px 1px #c6d;
+  box-shadow: 0 0 3px 1px #ddd;
+  /* outline: 2px solid #da26d3; */
+  /* box-shadow: 0 0 3px 1px #c6d; */
 }
 
 /* Comboboxes live under container, so target '.combobox-rapid-dark' class. */
@@ -1077,21 +1125,30 @@ img.dataset-thumbnail.inverted {
 
 /* Add Custom Dataset
 ------------------------------------------------------- */
+.modal-add-dataset .add-dataset-wrap {
+  display: flex;
+  flex: 1 1 auto;
+  flex-flow: column nowrap;
+  width: 100%;
+  overflow-y: auto;
+  border-bottom: 1px solid #888a;
+}
+
 .modal.rapid-modal.modal-add-dataset p {
   font-size: 12px;
   padding-bottom: unset;
 }
 
-.modal-add-dataset .modal-section.rapid-add-dataset-fields {
+.modal-add-dataset .rapid-add-dataset-fields {
   display: flex;
+  flex: 0 0 0px;
   flex-flow: column nowrap;
   padding: 10px 20px;
 }
 .modal-add-dataset .field-row {
   display: flex;
+  position: relative;
   flex-flow: column nowrap;
-}
-.modal-add-dataset .field-row {
   margin-bottom: 10px;
 }
 .modal-add-dataset label.field-label {
@@ -1101,25 +1158,27 @@ img.dataset-thumbnail.inverted {
   color: #fff;
   margin-bottom: 2px;
 }
-.modal-add-dataset input.field-input.warning,
-.modal-add-dataset textarea.field-url.warning {
+.modal-add-dataset .has-warning input,
+.modal-add-dataset .has-warning textarea {
   border-color: #f90 !important;
   background-color: #440 !important;
+}
+.modal-add-dataset .has-warning .field-feedback {
+  color: #f90;
 }
 .modal-add-dataset .field-instruction {
   margin: 5px 0px;
 }
-.modal-add-dataset .field-feedback.warning {
-  color: #f90;
-}
 
-.modal-add-dataset .rapid-add-dataset-text {
+.modal-add-dataset .rapid-add-dataset-source {
+  display: flex;
+  flex: 0 0 0px;
   flex-flow: column nowrap;
   align-items: flex-start;
   padding: 20px;
 }
 .modal-add-dataset .instructions-url {
-  padding: 20px 0;
+  padding-bottom: 20px;
 }
 .modal-add-dataset textarea.field-url {
   height: 90px;
@@ -1161,6 +1220,7 @@ img.dataset-thumbnail.inverted {
   display: flex;
   flex-flow: row nowrap;
   flex: 1 1 0px;
+  position: relative;
   align-items: flex-start;
   width: 100%;
 }
