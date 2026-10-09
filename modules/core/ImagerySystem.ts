@@ -12,7 +12,7 @@ import type { Context } from '../Context.ts';
 import type { ImagerySourceProps } from '../lib/ImagerySource.ts';
 import type { OneOrMore } from '../util/iterable.ts';
 import type { PixiLayerBackgroundTiles } from '../pixi/PixiLayerBackgroundTiles.ts';
-import type { Vec2, Vec4 } from '@rapid-sdk/math';
+import type { Vec2 } from '@rapid-sdk/math';
 
 
 /**
@@ -515,7 +515,7 @@ export class ImagerySystem extends AbstractSystem {
 
 
   /**
-   * Returns array of known imagery sources that are valid at the given extent and zoom
+   * Returns array of known imagery sources that are valid at the given location and zoom.
    * @return Visible imagery sources
    */
   public visibleSources(): ImagerySource[] {
@@ -523,12 +523,11 @@ export class ImagerySystem extends AbstractSystem {
 
     const context = this.context;
     const viewport = context.viewport;
-    const extent = viewport.visibleExtent();
+    const loc = viewport.centerLoc();
     const zoom = viewport.transform.zoom;
 
     const visible = new Set<ImagerySourceID>();
-    const bbox = extent.rectangle() as Vec4;
-    (this._whichPolygon.bbox(bbox, true) || [])
+    (this._whichPolygon(loc, true) || [])
       .forEach((d: { id: ImagerySourceID }) => visible.add(d.id));
 
     const currSource = this._baseLayer;
@@ -596,26 +595,34 @@ export class ImagerySystem extends AbstractSystem {
 
   /**
    * When we haven't been told to use a specific background imagery,
-   * this tries several options to pick an appropriate imagery to use.
+   * try several options to pick an appropriate imagery to use.
    * @return The chosen default ImagerySource
    */
   public chooseDefaultSource(): ImagerySource {
     const context = this.context;
     const settings = context.systems.settings;
 
-    const available = this.visibleSources();
-    const first = available[0];
-    const best = available.find(s => s.props.best);
+    // Exclude overlays, 'none', or Custom with empty template,
+    // Only real background imagery worth looking at.
+    const visible = this.visibleSources().filter(s => {
+      if (s.props.overlay) return false;
+      if (s.id === 'none') return false;
+      if ((s instanceof ImagerySourceCustom) && !s.template) return false;
+      return true;
+    });
 
-    // Consider previously chosen imagery unless it was 'none'
+    const first = visible[0];
+    const best = visible.find(s => s.props.best);
+
+    // Consider previously used imagery, if visible, unless it was 'none'
     const previousID = settings?.get('imagery.lastUsed') || 'none';
-    const previous = (previousID !== 'none') && this.getSourceByID(previousID);
+    const previous = (previousID !== 'none') && visible.find(s => s.id === previousID);
 
     return best ||
       previous ||
-      this.getSourceByID('Bing') ||
-      first ||    // maybe this is a custom Rapid that doesn't include Bing?
-      this.getSourceByID('none')!;
+      first ||
+      this.getSourceByID('Bing') ||  // fallback to Bing
+      this.getSourceByID('none')!;   // maybe this is a custom Rapid that doesn't include Bing?
   }
 
 

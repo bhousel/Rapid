@@ -25,6 +25,17 @@ describe('ImagerySystem', () => {
     }
   };
 
+  function setViewport(loc2, z2) {
+    const center = context.viewport.center();
+    const world = Rapid.sdk.projWgs84ToWorld(loc2);
+    const k2 = 2 ** z2;
+    const x2 = -((world[0] - Rapid.sdk.WORLD_HALF) * k2 / Rapid.sdk.WORLD_SCALE) + center[0];
+    const y2 = -((world[1] - Rapid.sdk.WORLD_HALF) * k2 / Rapid.sdk.WORLD_SCALE) + center[1];
+
+    context.viewport.transform.props = { x: x2, y: y2, z: z2 };
+  }
+
+
   // Test construction and startup of the system..
   describe('lifecycle', () => {
     describe('constructor', () => {
@@ -222,6 +233,7 @@ describe('ImagerySystem', () => {
         });
 
         it('adds sources to the sources Map', () => {
+          // note that the sources are keyed on lowercased ids.
           assert.isTrue(_imagery.sources.has('nj-2015'));
           assert.isTrue(_imagery.sources.has('nj-2020'));
           assert.isTrue(_imagery.sources.has('ca-imagery'));
@@ -229,12 +241,12 @@ describe('ImagerySystem', () => {
           assert.isTrue(_imagery.sources.has('foo-source1'));
           assert.isTrue(_imagery.sources.has('foo-source2'));
           assert.isTrue(_imagery.sources.has('bar-source'));
-          assert.isTrue(_imagery.sources.has('testbing'));
+          assert.isTrue(_imagery.sources.has('bing'));
           assert.isTrue(_imagery.sources.has('esriworldimagerytest'));
         });
 
         it('creates ImagerySourceBing for type=bing sources', () => {
-          const bing = _imagery.sources.get('testbing');
+          const bing = _imagery.sources.get('bing');
           assert.instanceOf(bing, Rapid.ImagerySourceBing);
           assert.strictEqual(bing.props.type, 'bing');
         });
@@ -554,16 +566,16 @@ describe('ImagerySystem', () => {
 
 
     describe('visibleSources', () => {
-      let origViewport;
+      let origProps;
 
       beforeAll(() => {
-        origViewport = context.viewport;
+        origProps = structuredClone(context.viewport.transform.props);
       });
 
       afterEach(() => {
         _imagery.setSourceByID('none');
         context.services.osm.imageryBlocklists = [];
-        context.viewport = origViewport;
+        context.viewport.transform.props = origProps;
       });
 
       it('returns empty array when called too soon (no sources)', () => {
@@ -581,14 +593,8 @@ describe('ImagerySystem', () => {
         assert.isEmpty(visible);
       });
 
-      it('returns sources visible in current viewport extent', () => {
-        // Mock viewport with extent covering New Jersey
-        context.viewport = {
-          visibleExtent: () => ({
-            rectangle: () => [-75.5, 39.5, -74.0, 41.0]  // NJ area
-          }),
-          transform: { zoom: 10 }
-        };
+      it('returns sources visible at current viewport location', () => {
+        setViewport([-74.75, 40.25], 10);   // New Jersey
 
         const visible = _imagery.visibleSources();
         assert.isArray(visible);
@@ -600,13 +606,8 @@ describe('ImagerySystem', () => {
 
       it('always includes current base layer source', () => {
         // Set CA imagery as base layer, but viewport is in NJ
+        setViewport([-74.75, 40.25], 10);   // New Jersey
         _imagery.setSourceByID('ca-imagery');
-        context.viewport = {
-          visibleExtent: () => ({
-            rectangle: () => [-75.5, 39.5, -74.0, 41.0]  // NJ area
-          }),
-          transform: { zoom: 10 }
-        };
 
         const visible = _imagery.visibleSources();
         const ids = visible.map(s => s.id);
@@ -615,17 +616,11 @@ describe('ImagerySystem', () => {
       });
 
       it('excludes blocked sources', () => {
-        // Add a blocklist that matches test-overlay's template
+        setViewport([0, 0], 10);   // Null Island
         const overlay = _imagery.source('test-overlay');
         const template = overlay.template;
+        // Add a blocklist that matches test-overlay's template
         context.services.osm.imageryBlocklists = [new RegExp(template.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))];
-
-        context.viewport = {
-          visibleExtent: () => ({
-            rectangle: () => [-180, -90, 180, 90]  // worldwide
-          }),
-          transform: { zoom: 10 }
-        };
 
         const visible = _imagery.visibleSources();
         const ids = visible.map(s => s.id);
@@ -633,15 +628,8 @@ describe('ImagerySystem', () => {
         assert.isFalse(ids.includes('test-overlay'));
       });
 
-      it('includes sources with worldwide coverage regardless of extent', () => {
-        // Sources without a 'feature' property have worldwide coverage
-        context.viewport = {
-          visibleExtent: () => ({
-            rectangle: () => [-75.5, 39.5, -74.0, 41.0]  // NJ area
-          }),
-          transform: { zoom: 10 }
-        };
-
+      it('includes sources with worldwide coverage regardless of viewport location', () => {
+        setViewport([-74.75, 40.25], 10);   // New Jersey
         const visible = _imagery.visibleSources();
         // Should include sources without geographic restrictions
         // Check for sources that don't have a feature property
@@ -650,13 +638,7 @@ describe('ImagerySystem', () => {
       });
 
       it('excludes local imagery at low zoom levels', () => {
-        context.viewport = {
-          visibleExtent: () => ({
-            rectangle: () => [-75.5, 39.5, -74.0, 41.0]  // NJ area
-          }),
-          transform: { zoom: 5 }  // Low zoom
-        };
-
+        setViewport([-74.75, 40.25], 5);   // New Jersey, but low zoom
         const visible = _imagery.visibleSources();
         const ids = visible.map(s => s.id);
         // Should exclude local sources at zoom < 6
@@ -665,12 +647,7 @@ describe('ImagerySystem', () => {
       });
 
       it('rechecks blocked sources when blocklists change', () => {
-        context.viewport = {
-          visibleExtent: () => ({
-            rectangle: () => [-180, -90, 180, 90]
-          }),
-          transform: { zoom: 10 }
-        };
+        setViewport([0, 0], 10);   // Null Island
 
         // Get first visible source
         context.services.osm.imageryBlocklists = [];
@@ -695,33 +672,28 @@ describe('ImagerySystem', () => {
 
 
     describe('chooseDefaultSource', () => {
-      let origViewport;
+      let origProps;
 
       beforeAll(() => {
-        origViewport = context.viewport;
+        origProps = structuredClone(context.viewport.transform.props);
       });
 
       afterEach(() => {
         _imagery.setSourceByID('none');
         delete context.systems.settings;
-        context.viewport = origViewport;
+        context.viewport.transform.props = origProps;
       });
 
-      it('returns source marked as best when available', () => {
+      it(`returns visible source marked as 'best' `, () => {
+        setViewport([-74.75, 40.25], 10);   // New Jersey
         // nj-2015 was updated with best:true in updateImageryData
-        context.viewport = {
-          visibleExtent: () => ({
-            rectangle: () => [-75.5, 39.5, -74.0, 41.0]  // NJ area
-          }),
-          transform: { zoom: 10 }
-        };
-
         const chosen = _imagery.chooseDefaultSource();
+        assert.instanceOf(chosen, Rapid.ImagerySource);
         assert.strictEqual(chosen.props.id, 'nj-2015');
         assert.isTrue(chosen.props.best);
       });
 
-      it('returns previously used source from storage', () => {
+      it('returns previously used source if visible', () => {
         // Mock settings with previously used source
         context.systems.settings = {
           get: (path) => {
@@ -730,15 +702,25 @@ describe('ImagerySystem', () => {
           }
         };
 
-        context.viewport = {
-          visibleExtent: () => ({
-            rectangle: () => [-122, 37, -121, 38]  // CA area
-          }),
-          transform: { zoom: 10 }
+        setViewport([-121.5, 37.5], 10);   // CA area
+        const chosen = _imagery.chooseDefaultSource();
+        assert.instanceOf(chosen, Rapid.ImagerySource);
+        assert.strictEqual(chosen.props.id, 'ca-imagery');
+      });
+
+      it('ignores previously used source if not visible', () => {
+        // Mock settings with previously used source
+        context.systems.settings = {
+          get: (path) => {
+            if (path === 'imagery.lastUsed') return 'ca-imagery';
+            return undefined;
+          }
         };
 
+        setViewport([0, 0], 10);   // Null Island
         const chosen = _imagery.chooseDefaultSource();
-        assert.strictEqual(chosen.props.id, 'ca-imagery');
+        assert.instanceOf(chosen, Rapid.ImagerySource);
+        assert.strictEqual(chosen.props.id, 'Bing');   // 'ca-imagery' not visible, fallback to 'Bing'
       });
 
       it('ignores previously used "none" source', () => {
@@ -750,52 +732,10 @@ describe('ImagerySystem', () => {
           }
         };
 
-        context.viewport = {
-          visibleExtent: () => ({
-            rectangle: () => [-180, -90, 180, 90]
-          }),
-          transform: { zoom: 10 }
-        };
-
+        setViewport([0, 0], 10);   // Null Island
         const chosen = _imagery.chooseDefaultSource();
-        // Should not return 'none', should return best source (nj-2015) or fallback
-        assert.notStrictEqual(chosen.props.id, 'none');
-      });
-
-      it('falls back through priority chain: best, previous, Bing, first, none', () => {
-        context.viewport = {
-          visibleExtent: () => ({
-            rectangle: () => [-180, -90, 180, 90]
-          }),
-          transform: { zoom: 3 }  // Low zoom, no local imagery
-        };
-
-        const chosen = _imagery.chooseDefaultSource();
-        // Should return some valid source
-        assert.isDefined(chosen);
         assert.instanceOf(chosen, Rapid.ImagerySource);
-      });
-
-      it('returns first available source if Bing not available', () => {
-        // Remove Bing from the 'osm' scope temporarily
-        const osmScope = _imagery.getScope('osm');
-        const bing = osmScope.sources.get('testbing');
-        osmScope.sources.delete('testbing');
-
-        context.viewport = {
-          visibleExtent: () => ({
-            rectangle: () => [-180, -90, 180, 90]
-          }),
-          transform: { zoom: 3 }
-        };
-
-        const chosen = _imagery.chooseDefaultSource();
-        assert.isDefined(chosen);
-        // Should be some available source
-        assert.isTrue(_imagery.sources.has(chosen.id));
-
-        // Restore Bing
-        if (bing) osmScope.sources.set('testbing', bing);
+        assert.strictEqual(chosen.props.id, 'Bing');   // ignore 'none', fallback to 'Bing'
       });
 
       it('returns "none" source as last resort', () => {
@@ -806,15 +746,9 @@ describe('ImagerySystem', () => {
         const custom = commonScope.sources.get('custom');
         osmScope.sources.clear();
         commonScope.sources.delete('custom');
-
-        context.viewport = {
-          visibleExtent: () => ({
-            rectangle: () => [-180, -90, 180, 90]
-          }),
-          transform: { zoom: 10 }
-        };
-
+        setViewport([0, 0], 10);
         const chosen = _imagery.chooseDefaultSource();
+        assert.instanceOf(chosen, Rapid.ImagerySource);
         assert.strictEqual(chosen.props.id, 'none');
 
         // Restore sources
@@ -911,22 +845,16 @@ describe('ImagerySystem', () => {
       });
 
       describe('nudge', () => {
-        let origViewport;
+        let origProps;
 
         beforeAll(() => {
-          origViewport = context.viewport;
-          context.viewport = {
-            visibleExtent: () => ({ rectangle: () => [-180, -90, 180, 90] }),
-            transform: { zoom: 10 }
-          };
-        });
-
-        afterEach(() => {
-          _imagery.setSourceByID('none');
+          origProps = structuredClone(context.viewport.transform.props);
+          setViewport([0, 0], 10);
         });
 
         afterAll(() => {
-          context.viewport = origViewport;
+          context.viewport.transform.props = origProps;
+          _imagery.setSourceByID('none');
         });
 
         it('adjusts offset when base layer is set', () => {
@@ -999,14 +927,15 @@ describe('ImagerySystem', () => {
 
 
     describe('_hashChanged', () => {
-      let origViewport;
+      let origProps;
 
       beforeAll(() => {
-        origViewport = context.viewport;
-        context.viewport = {
-          visibleExtent: () => ({ rectangle: () => [-180, -90, 180, 90] }),
-          transform: { zoom: 10 }
-        };
+        origProps = structuredClone(context.viewport.transform.props);
+        setViewport([0, 0], 10);
+      });
+
+      afterAll(() => {
+        context.viewport.transform.props = origProps;
       });
 
       beforeEach(() => {
@@ -1015,10 +944,6 @@ describe('ImagerySystem', () => {
 
       afterEach(() => {
         _imagery.requestedAssetIDs = null;
-      });
-
-      afterAll(() => {
-        context.viewport = origViewport;
       });
 
       it('does nothing when schema param is unchanged', () => {

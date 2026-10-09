@@ -109,13 +109,13 @@ export const addImageryData = {
         template: 'https://example.com/bar/{zoom}/{x}/{y}.png',
         zoomExtent: [1, 18]
       },
-      'TestBing': {
-        id: 'TestBing',
-        name: 'Test Bing Imagery',
+      'Bing': {
+        id: 'Bing',
+        name: 'Bing Imagery',
         type: 'bing',
         template: 'https://www.bing.com/maps',
         zoomExtent: [1, 22],
-        description: 'Test Bing satellite and aerial imagery.'
+        description: 'Bing satellite and aerial imagery.'
       },
       'EsriWorldImageryTest': {
         id: 'EsriWorldImageryTest',
