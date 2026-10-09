@@ -18,6 +18,7 @@ async function buildJS(): Promise<void> {
       entrypoints: ['./modules/main_prod.js'],
       outdir: outdir,
       target: 'browser',
+      format: 'iife',
       sourcemap: 'linked',
       naming: 'rapid.[ext]',  // .js
       metafile: true
@@ -29,6 +30,7 @@ async function buildJS(): Promise<void> {
       entrypoints: ['./modules/main_prod.js'],
       outdir: outdir,
       target: 'browser',
+      format: 'iife',
       sourcemap: 'linked',
       naming: 'rapid.min.[ext]',  // .js
       minify: true
@@ -38,6 +40,7 @@ async function buildJS(): Promise<void> {
       entrypoints: ['./modules/main_dev.js'],
       outdir: outdir,
       target: 'browser',
+      format: 'iife',
       sourcemap: 'linked',
       naming: 'rapid-dev.[ext]',  // .js
       metafile: true
@@ -49,16 +52,18 @@ async function buildJS(): Promise<void> {
       entrypoints: ['./modules/main_dev.js'],
       outdir: outdir,
       target: 'browser',
+      format: 'iife',
       sourcemap: 'linked',
       naming: 'rapid-dev.min.[ext]',  // .js
       minify: true
     }),
 
-    // Worker script — loaded by SchedulerSystem via `new Worker(url)`
+    // Worker script — loaded by WorkerSystem via `new Worker(url)`
     Bun.build({
       entrypoints: ['./modules/worker.ts'],
       outdir: outdir,
       target: 'browser',
+      format: 'iife',
       sourcemap: 'linked',
       naming: 'rapid-worker.[ext]',  // .js
     }),
@@ -67,6 +72,7 @@ async function buildJS(): Promise<void> {
       entrypoints: ['./modules/worker.ts'],
       outdir: outdir,
       target: 'browser',
+      format: 'iife',
       sourcemap: 'linked',
       naming: 'rapid-worker.min.[ext]',  // .js
       minify: true
