@@ -4858,7 +4858,7 @@ li.issue-fix-item button:not(.actionable) .fix-icon {
 .dragdrop-overlay {
   position: absolute;
   inset: 0;
-  z-index: 3000;
+  z-index: 6000;   /* above .shaded modal container */
   display: none;
   align-items: center;
   justify-content: center;

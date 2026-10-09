@@ -55,7 +55,7 @@ export class UiRapidAddDataset extends EventEmitter {
   /** Seen identifiers (to avoid duplicates) */
   protected _seenIDs: Set<string> | null;
   /** The current file list, if any */
-  protected _currFileList: FileList | null;
+  protected _fileList: FileList | null;
   /** Error with dataset creation, if any */
   protected _dsError: string | null;
 
@@ -72,7 +72,7 @@ export class UiRapidAddDataset extends EventEmitter {
     this._uuid = crypto.randomUUID().slice(0, 8);
     this._seenNames = null;
     this._seenIDs = null;
-    this._currFileList = null;
+    this._fileList = null;
     this._dsError = null;
 
     // Child components
@@ -130,6 +130,7 @@ export class UiRapidAddDataset extends EventEmitter {
    */
   public show(): void {
     const context = this.context;
+    const dragdrop = context.systems.dragdrop;
     const l10n = context.systems.l10n!;
 
     if (this.Modal?.isShown) return;
@@ -145,6 +146,20 @@ export class UiRapidAddDataset extends EventEmitter {
 
     // Setup event handlers
     l10n.on('localechange', this.rerender);
+
+    // Drag-and-drop is owned centrally by `DragAndDropSystem`.
+    // `priority: 1` places this above other drag and drop handlers.
+    dragdrop?.register({
+      id: 'ui-add-dataset',
+      priority: 1,
+      accepts: (payload) => payload.data.length > 0,
+      handle: (payload) => {
+        payload.claim();
+        this._fileList = payload.fileList;
+        this._dsError = null;   // clear any error, clicking "next" will try again.
+        this.render();          // rerendering will also run validation
+      }
+    });
   }
 
 
@@ -189,12 +204,14 @@ export class UiRapidAddDataset extends EventEmitter {
    */
   protected _done(): void {
     const context = this.context;
+    const dragdrop = context.systems.dragdrop;
     const l10n = context.systems.l10n!;
 
     this.emit('done');
     this.Modal = null;
 
     l10n.off('localechange', this.rerender);
+    dragdrop?.unregister('ui-add-dataset');
   }
 
 
@@ -454,13 +471,13 @@ export class UiRapidAddDataset extends EventEmitter {
       .on('change', (e: Event) => {
         const files = (e.target as HTMLInputElement).files;
         if (files?.length) {
-          this._currFileList = files;
+          this._fileList = files;
           // const urlNode = $parent.selectAll(`#url-${uuid}`).node() as HTMLTextAreaElement | null;
           // if (urlNode) {
           //   urlNode.value = URL.createObjectURL(files[0]);
           // }
         } else {
-          this._currFileList = null;
+          this._fileList = null;
         }
         this._dsError = null;   // clear any error, clicking "next" will try again.
         this.render();          // rerendering will also run validation
@@ -475,7 +492,7 @@ export class UiRapidAddDataset extends EventEmitter {
         if (fileNode) {
           fileNode.value = '';
         }
-        this._currFileList = null;
+        this._fileList = null;
         this._dsError = null;   // clear any error, clicking "next" will try again.
         this.render();          // rerendering will also run validation
       })
@@ -530,14 +547,14 @@ ${source_supported} ${file_types}
       .text(l10n.t(`${prefix}.url.instructions`));
 
     $source.selectAll(`#file-${uuid}`)
-      .property('files', this._currFileList);
+      .property('files', this._fileList);
 
     $source.selectAll('.file-remove')
-      .classed('hide', !this._currFileList);
+      .classed('hide', !this._fileList);
 
     $source.selectAll(`#url-${uuid}`)
-      .property('disabled', !!this._currFileList)
-      .classed('disabled', !!this._currFileList)
+      .property('disabled', !!this._fileList)
+      .classed('disabled', !!this._fileList)
       .attr('placeholder', l10n.t(`${prefix}.url.placeholder`));
 
     // Show errors
