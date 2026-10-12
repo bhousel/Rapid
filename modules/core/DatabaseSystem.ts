@@ -650,27 +650,27 @@ export class DatabaseSystem extends AbstractSystem {
    * a `QuotaExceededError`. Returns `'unavailable'` when running on the in-memory mock (there is no
    * durable storage). When IndexedDB is present but the estimate API is not, proceeds optimistically
    * (`reason: 'ok'`) with zeroed figures, leaving the write to surface any real failure.
-   * @param bytes - The size of the prospective write, in bytes
+   * @param size - The size of the prospective write, in bytes
    * @return A `StorageViability` verdict with the raw estimate figures
    */
-  public async canStoreAsync(bytes: number): Promise<StorageViability> {
+  public async canStoreAsync(size: number): Promise<StorageViability> {
     if (!this._db) {
-      return { ok: false, reason: 'unavailable', requested: bytes, available: 0, quota: 0, usage: 0 };
+      return { ok: false, reason: 'unavailable', requested: size, available: 0, quota: 0, usage: 0 };
     }
 
     const estimate = await this.estimateQuotaAsync();
     if (!estimate) {   // IndexedDB works but we can't measure — proceed optimistically
-      return { ok: true, reason: 'ok', requested: bytes, available: 0, quota: 0, usage: 0 };
+      return { ok: true, reason: 'ok', requested: size, available: 0, quota: 0, usage: 0 };
     }
 
     const quota = estimate.quota ?? 0;
     const usage = estimate.usage ?? 0;
     const available = Math.max(0, quota - usage);
-    const ok = available >= bytes;
+    const ok = available >= size;
     return {
       ok,
       reason: ok ? 'ok' : 'insufficient',
-      requested: bytes,
+      requested: size,
       available,
       quota,
       usage
