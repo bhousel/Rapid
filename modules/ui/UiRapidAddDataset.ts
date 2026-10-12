@@ -11,6 +11,7 @@ import { utilNoAuto } from '../util/index.ts';
 import type { Context } from '../Context.ts';
 import type { D3EnterSelection, D3Selection } from 'd3-selection';
 import type { RapidDatasetProps } from '../lib/RapidDataset.ts';
+import type { StorageViability } from '../core/DatabaseSystem.ts';
 
 
 /**
@@ -27,8 +28,10 @@ interface FieldInfo {
   datasetID?: DatasetID;
   /** Dataset Name */
   datasetName?: string;
-  /** Dataset Source */
-  datasetSource?: string;
+  /** Dataset File */
+  datasetFile?: File;
+  /** Dataset Url */
+  datasetUrl?: string;
 }
 
 
@@ -56,8 +59,13 @@ export class UiRapidAddDataset extends EventEmitter {
   protected _seenIDs: Set<string> | null;
   /** The current file list, if any */
   protected _fileList: FileList | null;
+
   /** Error with dataset creation, if any */
   protected _dsError: string | null;
+  /** Error with file storage, if any */
+  protected _fileError: string | null;
+  /** Data about the file storage viability, if any */
+  protected _storageViability: StorageViability | null;
 
   public rerender: () => void;
 
@@ -74,6 +82,8 @@ export class UiRapidAddDataset extends EventEmitter {
     this._seenIDs = null;
     this._fileList = null;
     this._dsError = null;
+    this._fileError = null;
+    this._storageViability = null;
 
     // Child components
     this.Modal = null;
@@ -114,6 +124,7 @@ export class UiRapidAddDataset extends EventEmitter {
     this.close = this.close.bind(this);
     this.render = this.render.bind(this);
     this.rerender = () => this.render();
+    this._setFileList = this._setFileList.bind(this);
     this._checkFields = this._checkFields.bind(this);
     this._clickedNext = this._clickedNext.bind(this);
     this._done = this._done.bind(this);
@@ -155,9 +166,7 @@ export class UiRapidAddDataset extends EventEmitter {
       accepts: (payload) => payload.data.length > 0,
       handle: (payload) => {
         payload.claim();
-        this._fileList = payload.fileList;
-        this._dsError = null;   // clear any error, clicking "next" will try again.
-        this.render();          // rerendering will also run validation
+        this._setFileList(payload.fileList);
       }
     });
   }
@@ -216,8 +225,8 @@ export class UiRapidAddDataset extends EventEmitter {
 
 
   /**
-   * When clicking "Next", test dataset for validity.  If it all looks ok,
-   * create the RapidDataset and continue to the Dataset Settings Modal.
+   * When clicking "Next", test dataset for validity.
+   * If it all looks ok, create the `RapidDataset` and continue to the Dataset Settings Modal.
    * If there are problems, `render()` again to surface the errors and return early.
    * @param [e] - the triggering event, if any
    */
@@ -232,21 +241,37 @@ export class UiRapidAddDataset extends EventEmitter {
 
     const context = this.context;
     const rapid = context.systems.rapid!;
+    const database = context.systems.database;
 
-    // Instantiate the custom dataset and add it to the catalog.
+    const datasetID = fieldInfo.datasetID;
     const props: Partial<RapidDatasetProps> = {
-      id: fieldInfo.datasetID,
+      id: datasetID,
       label: fieldInfo.datasetName,
-      sourceUrl: fieldInfo.datasetSource,
       custom: true
     };
 
-    const ds = new RapidDataset(context, props);
+    Promise.resolve()
+      .then((): Promise<any> => {
+        if (database && fieldInfo.datasetFile instanceof File) {  // source is a File
+          const file = fieldInfo.datasetFile;
+          const fileID = `${this._uuid}:${datasetID}:${file.name}`;
+          props.sourceFileID = fileID;
+          return database.putFileAsync(file, { id: fileID });
 
-    // Does it work?
-    ds.setupCustomDatasetAsync()
-      .then(() => {
-        rapid.catalog.set(ds.id, ds);
+        } else if (fieldInfo.datasetUrl) {  // source is a Url
+          props.sourceUrl = fieldInfo.datasetUrl;
+          return Promise.resolve();
+
+        } else {
+          return Promise.reject(new Error('no source'));   // shouldn't happen
+        }
+      })
+      .then((): Promise<RapidDataset> => {
+        const ds = new RapidDataset(context, props);
+        return ds.setupCustomDatasetAsync().then(() => ds);   // does it work?
+      })
+      .then((ds: RapidDataset) => {
+        rapid.catalog.set(ds.id, ds);   // add it to the catalog
         rapid.enableDatasets(ds.id);    // add it to the menu
         rapid.saveDatasetSettings(ds);  // persist settings
 
@@ -256,7 +281,7 @@ export class UiRapidAddDataset extends EventEmitter {
         SettingsModal.show();
       })
       .catch((err: unknown) => {
-        console.error(`Dataset setup failed for ${ds.id}: `, err);  // eslint-disable-line no-console
+        console.error(`Dataset setup failed for ${datasetID}: `, err);  // eslint-disable-line no-console
         this._dsError = 'Error: ' + (err as Error)?.message;
         this.render();
       });
@@ -428,7 +453,7 @@ export class UiRapidAddDataset extends EventEmitter {
 
 
   /**
-   * Renders the Url section.
+   * Renders the "Dataset Source" section.
    * @param $parent - Parent D3Selection that this content should render itself into
    */
   protected _renderSource($parent: D3Selection): void {
@@ -449,13 +474,22 @@ export class UiRapidAddDataset extends EventEmitter {
       .data([0]);
 
     // enter
-    const $$source = $source.enter()
+    const $$source: D3EnterSelection = $source.enter()
       .append('div')
       .attr('class', 'modal-section rapid-add-dataset-source');
 
     $$source
+      .append('h3')
+      .attr('class', 'source-heading');
+
+    $$source
       .append('div')
-      .attr('class', 'source-instructions');
+      .attr('class', 'file-instructions');
+
+    $$source
+      .append('div')
+      .attr('class', 'file-filetypes');
+
 
     /* File */
     const $$file: D3EnterSelection = $$source
@@ -470,17 +504,7 @@ export class UiRapidAddDataset extends EventEmitter {
       .attr('accept', accept.join())
       .on('change', (e: Event) => {
         const files = (e.target as HTMLInputElement).files;
-        if (files?.length) {
-          this._fileList = files;
-          // const urlNode = $parent.selectAll(`#url-${uuid}`).node() as HTMLTextAreaElement | null;
-          // if (urlNode) {
-          //   urlNode.value = URL.createObjectURL(files[0]);
-          // }
-        } else {
-          this._fileList = null;
-        }
-        this._dsError = null;   // clear any error, clicking "next" will try again.
-        this.render();          // rerendering will also run validation
+        this._setFileList(files);
       });
 
     $$file
@@ -488,21 +512,25 @@ export class UiRapidAddDataset extends EventEmitter {
       .attr('class', 'file-remove')
       .on('click', (e: PointerEvent) => {
         e.preventDefault();
-        const fileNode = $parent.selectAll(`#file-${uuid}`).node() as HTMLTextAreaElement | null;
-        if (fileNode) {
-          fileNode.value = '';
-        }
-        this._fileList = null;
-        this._dsError = null;   // clear any error, clicking "next" will try again.
-        this.render();          // rerendering will also run validation
+        this._setFileList(null);
       })
       .call(uiIcon('#fas-xmark'));
 
-    $$source
+    $$file
       .append('div')
-      .attr('class', 'instructions-url');
+      .attr('class', 'file-error');
+
 
     $$source
+      .append('div')
+      .attr('class', 'url-instructions');
+
+    /* Url */
+    const $$url: D3EnterSelection = $$source
+      .append('div')
+      .attr('class', 'field-row row-url');
+
+    $$url
       .append('textarea')
       .attr('id', `url-${uuid}`)
       .attr('class', 'field-url')
@@ -513,54 +541,61 @@ export class UiRapidAddDataset extends EventEmitter {
         this.render();          // rerendering will also run validation
       });
 
-    $$source
+    $$url
       .append('div')
       .attr('class', 'field-feedback');
 
 
     // update
-    $source = $source.merge($$source) as D3Selection;
+    $source = $source.merge($$source);
 
     // perform field validation
     const fieldInfo = this._checkFields();
     const errors = fieldInfo.errors || {};
+    const hasFile = !!this._fileList;
+    const hasUrl = !!fieldInfo.datasetUrl;
+    const isStorageUnavailable = this._storageViability?.reason === 'unavailable';
 
-    $source
-      .classed('has-warning', !!errors.url?.length);
+    $source.selectAll('.row-file')
+      .classed('has-warning', hasFile && !!errors.source?.length);
 
-    const source_heading = l10n.t(`${prefix}.source.label`);
-    const source_instructions = l10n.t(`${prefix}.source.instructions`);
-    const source_supported = l10n.t(`${prefix}.source.supported`);
-    const file_types = l10n.t(`${prefix}.source.types`);
-    const instructionsHtml = marked.parse(`
-### ${source_heading}
-${source_instructions}
-&nbsp;<br>
-${source_supported} ${file_types}
-&nbsp;<br>
-&nbsp;<br>
-`);
+    $source.selectAll('.source-heading')
+      .text(l10n.t(`${prefix}.source.label`));
 
-    $source.selectAll('.source-instructions')
-      .html(instructionsHtml as string);
-    $source.selectAll('.instructions-url')
+    $source.selectAll('.file-instructions')
+      .text(l10n.t(`${prefix}.file.instructions`));
+
+    const source_supported = l10n.t(`${prefix}.file.supported`);
+    const file_types = l10n.t(`${prefix}.file.types`);
+    $source.selectAll('.file-filetypes')
+      .html(marked.parse(`${source_supported} ${file_types}`) as string);
+
+    $source.selectAll('.file-error')
+      .text(this._fileError);  // if storage unavailable, a notice will appear here
+
+    $source.selectAll('.url-instructions')
       .text(l10n.t(`${prefix}.url.instructions`));
 
     $source.selectAll(`#file-${uuid}`)
+      .property('disabled', isStorageUnavailable || hasUrl)
+      .classed('disabled', isStorageUnavailable || hasUrl)
       .property('files', this._fileList);
 
     $source.selectAll('.file-remove')
-      .classed('hide', !this._fileList);
+      .classed('hide', !hasFile);
+
+    $source.selectAll('.row-url')
+      .classed('has-warning', !!errors.source?.length);
 
     $source.selectAll(`#url-${uuid}`)
-      .property('disabled', !!this._fileList)
-      .classed('disabled', !!this._fileList)
-      .attr('placeholder', l10n.t(`${prefix}.url.placeholder`));
+      .property('disabled', hasFile)
+      .classed('disabled', hasFile)
+      .attr('placeholder', !hasFile ? l10n.t(`${prefix}.url.placeholder`) : null);
 
     // Show errors
     $source.selectAll('.field-feedback')
       .selectAll('.feedback-item')
-      .data(errors.url || [], (d: string) => d)
+      .data(errors.source || [], (d: string) => d)
       .join(
         $$enter => $$enter
           .append('div')
@@ -614,6 +649,38 @@ ${source_supported} ${file_types}
 
 
   /**
+   * Accepts a `FileList`, either from the drag and drop handler or the file input.
+   * Also check whether the `DatabaseSystem` exists and has the quota needed to store this file.
+   * @param fileList - Files to process (only first one is used), or `null` to reset
+   */
+  protected _setFileList(fileList: FileList | null): void {
+    const context = this.context;
+    const database = context.systems.database;
+
+    this._fileList = fileList;
+
+    Promise.resolve()
+      .then(() => {
+        if (database && fileList?.length) {
+          // Hack to make a new `FileList` with only a single file in it.
+          // This handles the situation where the user might have dragged multiple files here.
+          const file = fileList[0];
+          const dataTransfer = new DataTransfer();
+          dataTransfer.items.add(file);   // keep only the first one
+          this._fileList = dataTransfer.files;
+
+          return database.canStoreAsync(file.size)
+            .then((result: StorageViability) => this._storageViability = result);
+        }
+      })
+      .finally(() => {
+        this._dsError = null;   // clear any error, clicking "next" will try again.
+        this.render();          // rerendering will also run validation
+      });
+  }
+
+
+  /**
    * Run all field validations.  Returns an object containing the current field values
    * and information about whether validation has passed or failed.
    * @returns a FieldInfo result set
@@ -623,6 +690,7 @@ ${source_supported} ${file_types}
     if (!this.Modal) return result;
 
     const context = this.context;
+    const database = context.systems.database;
     const l10n = context.systems.l10n!;
     const rapid = context.systems.rapid!;
     const $content = this.Modal.$content!;
@@ -665,20 +733,53 @@ ${source_supported} ${file_types}
       result.datasetName = nameVal;
     }
 
-    // Check Dataset Source
-    const urlErrors = result.errors.url = [] as string[];
-    const urlNode = $content.selectAll(`#url-${uuid}`).node() as HTMLTextAreaElement | null;
-    const urlVal = urlNode?.value || '';
-    result.datasetSource = urlVal.trim();
+    // Check Dataset Source (File or URL string)
+    const sourceErrors = result.errors.source = [] as string[];
     if (this._dsError) {
-      urlErrors.push(this._dsError);
+      sourceErrors.push(this._dsError);
     }
-    if (urlVal && !urlErrors.length) {
-      result.datasetSource = urlVal;
+
+    // For files, we will warn the user and not proceed if we can not store the file.
+    // Storage viability data may have already been set by `_setFileList()`.
+    if (!database) {
+      this._storageViability = { ok: false, reason: 'unavailable', requested: 0, available: 0, quota: 0, usage: 0 };
+    }
+    const sv = this._storageViability;
+    if (sv?.reason === 'unavailable') {
+      this._fileError = l10n.t('rapid_add_dataset.file.unavailable');
+    } else if (sv?.reason === 'insufficient') {
+      this._fileError = l10n.t('rapid_add_dataset.file.insufficient', {
+        requested: sv.requested || 0,
+        available: sv.available || 0
+      });
+    } else {
+      this._fileError = null;
+    }
+
+    const urlNode = $content.selectAll(`#url-${uuid}`).node() as HTMLTextAreaElement | null;
+    const fileNode = $content.selectAll(`#file-${uuid}`).node() as HTMLInputElement | null;
+    const file = this._fileList && this._fileList[0];
+
+    if (file) {  // We have a File, use that
+      if (urlNode) {
+        urlNode.value = '';
+      }
+      if (!sourceErrors.length && !this._fileError) {
+        result.datasetFile = file;
+      }
+
+    } else {   // Look for a URL string
+      if (fileNode) {
+        fileNode.value = '';
+      }
+      const urlVal = (urlNode?.value || '').trim();
+      if (urlVal && !sourceErrors.length) {
+        result.datasetUrl = urlVal;
+      }
     }
 
     // required values must be present
-    result.isOk = !!(result.datasetID && result.datasetName && result.datasetSource);
+    result.isOk = !!(result.datasetID && result.datasetName && (result.datasetUrl || result.datasetFile));
     return result;
   }
 

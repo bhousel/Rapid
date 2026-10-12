@@ -5,9 +5,11 @@ import { geojsonFeatures } from '../util/util.ts';
 import { gpx, kml } from '@tmcw/togeojson';
 import { RapidDataDictionary } from './RapidDataDictionary.ts';
 import { TreeStore } from '../lib/TreeStore.ts';
+import { utilFetchResponse } from '../util/fetch_response.ts';
 
 import type { Context } from '../Context.ts';
 import type { Document as XmlDocument } from '@xmldom/xmldom';
+import type { FileRecord } from '../core/DatabaseSystem.ts';
 import type { GeoJSONProps } from '../data/GeoJSONData.ts';
 import type { TreeValue } from './TreeStore.ts';
 import type { Vec2 } from '@rapid-sdk/math';
@@ -42,8 +44,12 @@ export interface RapidDatasetProps {
   dataUsed: string[];
   /** Geographic extent of the dataset */
   extent: Extent;
+
   /** URL for the data */
   sourceUrl: string;
+  /** FileID for the data. If set, we will look in the `DatabaseSystem` for this data */
+  sourceFileID: FileID;
+
   /** URL for more information about this dataset */
   itemUrl: string;
   /** URL for license information */
@@ -104,6 +110,9 @@ export class RapidDataset {
 
   /** URL for the data */
   public sourceUrl: string;
+  /** FileID for the data. If set, we will look in the `DatabaseSystem` for this data */
+  public sourceFileID: FileID;
+
   /** URL for a landing page with more information about this dataset */
   public itemUrl: string;
   /** URL for the license governing use of this dataset */
@@ -155,7 +164,10 @@ export class RapidDataset {
     this.dataUsed = props.dataUsed ?? [];
     this.extent = props.extent;
 
+    // For custom datasets, we can retrieve them from a URL or a File.
     this.sourceUrl = props.sourceUrl ?? '';
+    this.sourceFileID = props.sourceFileID ?? '';
+
     this.itemUrl = props.itemUrl ?? '';
     this.licenseUrl = props.licenseUrl ?? '';
     this.thumbnailUrl = props.thumbnailUrl ?? this.getThumbnail();
@@ -258,6 +270,7 @@ export class RapidDataset {
     if (this.dataUsed.length)      result.dataUsed = this.dataUsed.slice();
     if (this.color)                result.color = this.color;
     if (this.sourceUrl)            result.sourceUrl = this.sourceUrl;
+    if (this.sourceFileID)         result.sourceFileID = this.sourceFileID;
     if (this.itemUrl)              result.itemUrl = this.itemUrl;
     if (this.thumbnailUrl)         result.thumbnailUrl = this.thumbnailUrl;
     if (this.licenseUrl)           result.licenseUrl = this.licenseUrl;
@@ -327,34 +340,65 @@ export class RapidDataset {
    * @return  Promise resolved when this custom source is ready, or rejected if errors
    */
   public setupCustomDatasetAsync(): Promise<void> {
-    if (!this.custom) return Promise.reject(new Error('Not a custom source'));
-    if (!this.sourceUrl) return Promise.reject(new Error('No source url'));
+    if (!this.custom) {
+      return Promise.reject(new Error('Not a custom source'));
+    }
 
     const context = this.context;
-    const gfx = context.systems.gfx;
+    const database = context.systems.database;
     const network = context.systems.network!;
     const spatial = context.systems.spatial!;
 
     // reset
     spatial.clearCache(this.spatialID);
-    // this._template = null;
-    gfx?.deferredRedraw();
 
-    // Strip off any querystring/hash from the url before checking extension
-    const url = this.sourceUrl;
-    const testUrl = url.toLowerCase().split(/[?#]/)[0];
-    const extension = this._getExtension(testUrl);
+    let promise: Promise<void>;
 
-    if (extension) {   // Looks like a gpx, kml, geojson file.. load it!
-      return network.fetch<string | XmlDocument | GeoJSON.GeoJsonObject | null>(url)
-        .then(data => {
-          this._setFile(data, extension);
-        });
+    // Load the custom data from `sourceUrl`
+    if (this.sourceUrl) {
+      // Strip off any querystring/hash from the url before checking extension
+      const url = this.sourceUrl;
+      const testUrl = url.toLowerCase().split(/[?#]/)[0];
+      const extension = this._getExtension(testUrl);
 
-    } else {   // Looks like a vector tile url template
-      //this._setCustomUrlTemplate(url);
-      return Promise.reject(new Error('Unsupported type (currently only support .geojson, .json, .gpx, .kml)'));
+      if (extension) {   // Looks like a gpx, kml, geojson file.. load it!
+        promise = network.fetch<string | XmlDocument | GeoJSON.GeoJsonObject | null>(url)
+          .then(data => this._gotData(data, extension));
+
+      } else {   // Looks like a vector tile url template
+        return Promise.reject(new Error('Unsupported type (currently only .geojson, .json, .gpx, .kml)'));
+      }
+
+    // Load the custom data from `sourceFileID` - we expect to find it in `DatabaseSystem`.
+    } else if (this.sourceFileID) {
+      if (!database) {
+        return Promise.reject(new Error('No database'));
+      } else {
+        let extension: string | undefined;
+        promise = database.getFileAsync(this.sourceFileID)
+          .then((result: FileRecord | undefined): Promise<Response> => {
+            if (!result) {
+              return Promise.reject(new Error('File not found'));
+            }
+            extension = result.extension;
+            const response = new Response(result.blob, {
+              status: 200,
+              headers: new Headers({
+                'Content-Type': result.type,
+                'Content-Length': result.size.toString()
+              })
+            });
+            return Promise.resolve(response);
+          })
+          .then(response => utilFetchResponse(response))
+          .then(data => this._gotData(data, extension));
+      }
+
+    } else {
+      return Promise.reject(new Error('No source url or file'));
     }
+
+    return promise;
   }
 
 
@@ -397,7 +441,7 @@ export class RapidDataset {
 
 
   /**
-   * This function is either called from the `FileReader` onload callback, or the `fetch` then chain.
+   * This function is either called from setupCustomDatasetAsync().
    * It can accept:
    *  - a `string` of text data, in which case it will be parsed according to the given extension.
    *  - a `Document` parsed by `xmldom.DOMParser` (like we would receive from `utilFetchResponse`),
@@ -407,7 +451,7 @@ export class RapidDataset {
    * @param data - The file data
    * @param extension - The file extension
    */
-  protected _setFile(data: string | XmlDocument | GeoJSON.GeoJsonObject | null, extension: string | null | undefined): void {
+  protected _gotData(data: string | XmlDocument | GeoJSON.GeoJsonObject | null, extension: string | null | undefined): void {
     if (!data) {
       throw new Error('No data');
     }

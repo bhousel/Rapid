@@ -1126,9 +1126,13 @@ export class UiRapidDatasetSettings extends EventEmitter {
     if (!ds?.custom) return;   // need a dataset to do anything
 
     const context = this.context;
+    const database = context.systems.database;
     const rapid = context.systems.rapid!;
     const settings = context.systems.settings;
 
+    if (ds.sourceFileID) {
+      database?.deleteFileAsync(ds.sourceFileID);
+    }
     settings?.unset(`rapid.custom.${ds.id}`);
     rapid.catalog.delete(ds.id);
     rapid.removeDatasets(ds.id);

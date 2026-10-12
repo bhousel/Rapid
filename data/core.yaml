@@ -1307,9 +1307,12 @@ en:
       taken: This DatasetID is already in use. Please choose another.
     source:
       label: Dataset Source
+    file:
       instructions: Select a local file, or drag and drop a file onto Rapid.
       supported: "Supported types:"
       types: "`.gpx`, `.kml`, `.geojson`, `.json`"  # This string may contain markdown
+      unavailable: File storage is not supported.
+      insufficient:  "Insufficient storage: {requested} requested, {available} available."
     url:
       instructions: Or, enter a URL to any of the above file types.
       tokens: "Supported replacement tokens:"

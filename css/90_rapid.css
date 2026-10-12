@@ -1139,7 +1139,8 @@ img.dataset-thumbnail.inverted {
   padding-bottom: unset;
 }
 
-.modal-add-dataset .rapid-add-dataset-fields {
+.modal-add-dataset .rapid-add-dataset-fields,
+.modal-add-dataset .rapid-add-dataset-source {
   display: flex;
   flex: 0 0 0px;
   flex-flow: column nowrap;
@@ -1169,13 +1170,9 @@ img.dataset-thumbnail.inverted {
 .modal-add-dataset .field-instruction {
   margin: 5px 0px;
 }
-
-.modal-add-dataset .rapid-add-dataset-source {
-  display: flex;
-  flex: 0 0 0px;
-  flex-flow: column nowrap;
-  align-items: flex-start;
-  padding: 20px;
+.modal-add-dataset .file-filetypes,
+.modal-add-dataset .url-instructions {
+  margin-bottom: 5px;
 }
 .modal-add-dataset .instructions-url {
   padding-bottom: 20px;
