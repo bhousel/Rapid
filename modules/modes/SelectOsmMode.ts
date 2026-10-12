@@ -3,7 +3,6 @@ import { AbstractMode } from './AbstractMode.ts';
 import { actionDeleteRelation } from '../actions/delete_relation.ts';
 import { actionMove, actionRotate } from '../actions/index.ts';
 import { DEG2RAD, vecAdd, vecRotate, vecScale } from '@rapid-sdk/math';
-import { select } from 'd3-selection';
 import { utilCmd, utilTotalExtent } from '../util/index.ts';
 import { utilArrayIdentical } from '@rapid-sdk/util';
 
