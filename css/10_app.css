@@ -4881,11 +4881,21 @@ li.issue-fix-item button:not(.actionable) .fix-icon {
 
 /* Restore Modal
 ------------------------------------------------------- */
-.modal-actions .logo-restore {
-  color: #7092ff;
+
+.modal.restore-modal {
+  top: 80px;
+  width: 80%;
+  min-width: 200px;
+  max-width: 650px;
+  max-height: 85%;
 }
-.modal-actions .logo-reset {
-  color: #e06c5e;
+.modal.restore-modal .content {
+  flex: 1 0 0%;
+}
+.restore-modal .modal-section.buttons {
+  justify-content: center;
+  padding: 20px;
+  width: 100%;
 }
 
 .restore-modal .restore-no-storage p {
@@ -4893,14 +4903,9 @@ li.issue-fix-item button:not(.actionable) .fix-icon {
 }
 
 .restore-modal .restore-list {
-  max-height: 40vh;
-  overflow-y: auto;
+  border-bottom: unset;
 }
 
-.restore-sessions {
-  width: 100%;
-  border-collapse: collapse;
-}
 .restore-sessions th,
 .restore-sessions td {
   text-align: left;

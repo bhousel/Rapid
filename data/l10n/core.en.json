@@ -1364,12 +1364,8 @@
       "drop_files": "Drop files here to add them to Rapid"
     },
     "restore": {
-      "heading": "You have unsaved changes",
-      "description": "Do you wish to restore unsaved changes from a previous editing session?",
-      "restore": "Restore my changes",
-      "reset": "Discard my changes",
-      "heading_multi": "We found some previous unsaved edit sessions",
-      "description_multi": "Choose a session to restore, or skip for now to start fresh.",
+      "heading": "We found some previous unsaved edit sessions",
+      "description": "Choose a session to restore, or skip for now to start fresh.",
       "column_date": "Date",
       "column_location": "Location",
       "column_summary": "Summary",

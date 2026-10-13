@@ -49,13 +49,13 @@ export class UiRestore {
       .append('div')
       .attr('class', 'modal-section')
       .append('h3')
-      .text(l10n.t('restore.heading_multi'));
+      .text(l10n.t('restore.heading'));
 
     $content
       .append('div')
       .attr('class', 'modal-section')
       .append('p')
-      .text(l10n.t('restore.description_multi'));
+      .text(l10n.t('restore.description'));
 
     // Warn if there is no durable storage (incognito / locked-down) — restores won't persist.
     if (!database?.isAvailable) {
@@ -72,11 +72,11 @@ export class UiRestore {
 
     const $actions = $content
       .append('div')
-      .attr('class', 'modal-actions');
+      .attr('class', 'modal-section buttons');
 
     $actions
       .append('button')
-      .attr('class', 'restore-skip')
+      .attr('class', 'action restore-skip')
       .on('click', () => {
         editor.dismissRestore();
         Modal.close();
