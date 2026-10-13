@@ -695,6 +695,8 @@ export class UiRapidAddDataset extends EventEmitter {
     const rapid = context.systems.rapid!;
     const $content = this.Modal.$content!;
     const uuid = this._uuid;
+    const file = this._fileList && this._fileList[0];
+    const filename = file?.name || '';
 
     result.errors = {};
 
@@ -711,7 +713,10 @@ export class UiRapidAddDataset extends EventEmitter {
     // Check Dataset ID
     const idErrors = result.errors.identifier = [] as string[];
     const idNode = $content.selectAll(`#identifier-${uuid}`).node() as HTMLInputElement | null;
-    const idVal = (idNode?.value || '').trim();
+    let idVal = (idNode?.value || '').trim();
+    if (idNode && !idVal && filename) {
+      idNode.value = idVal = filename.replace(/[^\w\-]+/g, '_');  // fallback to slugified filename, if we have one
+    }
     if (idVal && this._seenIDs.has(idVal.toLowerCase())) {
       idErrors.push(l10n.t('rapid_add_dataset.identifier.taken'));
     }
@@ -725,7 +730,10 @@ export class UiRapidAddDataset extends EventEmitter {
     // Check Dataset Name
     const nameErrors = result.errors.name = [] as string[];
     const nameNode = $content.selectAll(`#name-${uuid}`).node() as HTMLInputElement | null;
-    const nameVal = (nameNode?.value || '').trim();
+    let nameVal = (nameNode?.value || '').trim();
+    if (nameNode && !nameVal && filename) {
+      nameNode.value = nameVal = filename;  // fallback to filename, if we have one
+    }
     if (nameVal && this._seenNames.has(nameVal.toLowerCase())) {
       nameErrors.push(l10n.t('rapid_add_dataset.name.taken'));
     }
@@ -758,7 +766,6 @@ export class UiRapidAddDataset extends EventEmitter {
 
     const urlNode = $content.selectAll(`#url-${uuid}`).node() as HTMLTextAreaElement | null;
     const fileNode = $content.selectAll(`#file-${uuid}`).node() as HTMLInputElement | null;
-    const file = this._fileList && this._fileList[0];
 
     if (file) {  // We have a File, use that
       if (urlNode) {
