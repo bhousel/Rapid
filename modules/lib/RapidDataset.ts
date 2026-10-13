@@ -45,7 +45,7 @@ export interface RapidDatasetProps {
   /** Geographic extent of the dataset */
   extent: Extent;
 
-  /** URL for the data */
+  /** URL for the data. */
   sourceUrl: string;
   /** FileID for the data. If set, we will look in the `DatabaseSystem` for this data */
   sourceFileID: FileID;

@@ -1638,13 +1638,16 @@
       "details": {
         "heading": "Dataset Details",
         "fields": {
-          "source": {
-            "label": "Source"
+          "serviceid": {
+            "label": "Service ID"
           },
           "sourceurl": {
             "label": "Source URL"
           },
-          "identifier": {
+          "sourcefileid": {
+            "label": "Source File ID"
+          },
+          "datasetid": {
             "label": "Dataset ID"
           },
           "name": {

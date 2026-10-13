@@ -1,7 +1,7 @@
 /*
-This file contains the "Rapid" styling overrides for the parts of the UI that are not iD.
-It generally uses a dark theme with magenta highlight colors.
-*/
+ * This file contains the "Rapid" styling overrides for the parts of the UI that are not iD.
+ * It generally uses a dark theme with magenta highlight colors.
+ */
 
 /* possibly existed before and was removed? */
 svg.icon.icon-30 {
@@ -1302,27 +1302,6 @@ img.dataset-thumbnail.inverted {
   margin-left: unset;
   margin-right: 150px;
 }
-
-/* .modal.modal-dataset-settings button.action {
-  display: flex;
-  min-width: unset;
-  flex: 0 0 130px;
-  flex-flow: row nowrap;
-  text-wrap: nowrap;
-  align-items: center;
-  justify-content: center;
-}
-
-.modal.modal-dataset-settings .delete-button .icon {
-  width: 20px;
-  height: 20px;
-  margin-right: 10px;
-}
-
-.ideditor[dir='rtl'] .modal.modal-dataset-settings .delete-button .icon {
-  margin-right: unset;
-  margin-left: 10px;
-} */
 
 
 /* Colorpicker control

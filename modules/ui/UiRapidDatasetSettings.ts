@@ -39,12 +39,14 @@ export interface FieldInfo {
   id?: DatasetID;
   /** Name */
   name?: string;
-  /** Source type */
-  sourceID?: string;
+  /** ServiceID (e.g. 'esri', 'overture', 'mapwithai') */
+  serviceID?: ServiceID;
   /** Description */
   description?: string;
   /** Source Url */
   sourceUrl?: string;
+  /** Source FileID */
+  sourceFileID?: FileID;
   /** Thumbnail Url */
   thumbnailUrl?: string;
   /** Color */
@@ -332,28 +334,30 @@ export class UiRapidDatasetSettings extends EventEmitter {
     // to their initial values, gathered from the dataset.
     // We'll avoid D3.js metaprogramming here, as each field has unique needs.
 
-    /* SourceID */
-    const $$source: D3EnterSelection = $$wrap
+    /* serviceID */
+    const $$service: D3EnterSelection = $$wrap
       .append('div')
-      .attr('class', 'field-row row-source');
+      .attr('class', 'field-row row-serviceid')
+      .classed('hide', !ds.serviceID);   // only show if a value exists
 
-    $$source
+    $$service
       .append('label')
-      .attr('for', `source-${uuid}`)
+      .attr('for', `serviceid-${uuid}`)
       .attr('class', 'field-label');
-    $$source
+    $$service
       .append('input')
-      .attr('id', `source-${uuid}`)
+      .attr('id', `serviceid-${uuid}`)
       .attr('class', 'field-input')
       .call(utilNoAuto)
       .property('disabled', true)
       .classed('disabled', true)
-      .property('value', ds.serviceID || '');
+      .property('value', this._serviceIDString(ds.serviceID));
 
-    /* SourceURL */
+    /* sourceURL */
     const $$sourceUrl: D3EnterSelection = $$wrap
       .append('div')
-      .attr('class', 'field-row row-sourceurl');
+      .attr('class', 'field-row row-sourceurl')
+      .classed('hide', !ds.sourceUrl);   // only show if a value exists
 
     $$sourceUrl
       .append('label')
@@ -368,18 +372,38 @@ export class UiRapidDatasetSettings extends EventEmitter {
       .classed('disabled', true)
       .property('value', ds.sourceUrl || '');
 
-    /* DatasetID */
-    const $$identifier: D3EnterSelection = $$wrap
+    /* sourceFileID */
+    const $$sourceFileID: D3EnterSelection = $$wrap
       .append('div')
-      .attr('class', 'field-row row-identifier');
+      .attr('class', 'field-row row-sourcefileid')
+      .classed('hide', !ds.sourceFileID);   // only show if a value exists
 
-    $$identifier
+    $$sourceFileID
       .append('label')
-      .attr('for', `identifier-${uuid}`)
+      .attr('for', `sourcefileid-${uuid}`)
       .attr('class', 'field-label');
-    $$identifier
+    $$sourceFileID
       .append('input')
-      .attr('id', `identifier-${uuid}`)
+      .attr('id', `sourcefileid-${uuid}`)
+      .attr('class', 'field-input')
+      .call(utilNoAuto)
+      .property('disabled', true)
+      .classed('disabled', true)
+      .property('value', ds.sourceFileID || '');
+
+
+    /* DatasetID */
+    const $$datasetID: D3EnterSelection = $$wrap
+      .append('div')
+      .attr('class', 'field-row row-datasetid');
+
+    $$datasetID
+      .append('label')
+      .attr('for', `datasetid-${uuid}`)
+      .attr('class', 'field-label');
+    $$datasetID
+      .append('input')
+      .attr('id', `datasetid-${uuid}`)
       .attr('class', 'field-input')
       .call(utilNoAuto)
       .property('disabled', true)
@@ -465,12 +489,14 @@ export class UiRapidDatasetSettings extends EventEmitter {
     $wrap.selectAll('.dataset-details-heading')
       .text(l10n.t(`${prefix}.heading`));
 
-    $wrap.selectAll('.row-source .field-label')
-      .text(l10n.t(`${prefix}.fields.source.label`));
+    $wrap.selectAll('.row-serviceid .field-label')
+      .text(l10n.t(`${prefix}.fields.serviceid.label`));
     $wrap.selectAll('.row-sourceurl .field-label')
       .text(l10n.t(`${prefix}.fields.sourceurl.label`));
-    $wrap.selectAll('.row-identifier .field-label')
-      .text(l10n.t(`${prefix}.fields.identifier.label`));
+    $wrap.selectAll('.row-sourcefileid .field-label')
+      .text(l10n.t(`${prefix}.fields.sourcefileid.label`));
+    $wrap.selectAll('.row-datasetid .field-label')
+      .text(l10n.t(`${prefix}.fields.datasetid.label`));
     $wrap.selectAll('.row-name .field-label')
       .text(l10n.t(`${prefix}.fields.name.label`));
     $wrap.selectAll('.row-thumbnailurl .field-label')
@@ -654,15 +680,9 @@ export class UiRapidDatasetSettings extends EventEmitter {
       .text(l10n.t(`${prefix}.instruction`));
 
     if (isLocked) {
-      const providerStringID = (
-        ds.serviceID === 'esri' ? 'rapid_catalog.category.esri' :
-        ds.serviceID === 'mapwithai' ? 'rapid_catalog.category.meta' :
-        ds.serviceID === 'overture' ? 'rapid_catalog.category.overture' :
-        'text.unknown'
-      );
       $instructionsWrap
         .append('div')
-        .text(l10n.t(`${prefix}.locked`, { name: l10n.t(providerStringID) }));
+        .text(l10n.t(`${prefix}.locked`, { name: this._serviceIDString(ds.serviceID) }));
     }
 
     if (!hasTransforms) {
@@ -1252,33 +1272,14 @@ export class UiRapidDatasetSettings extends EventEmitter {
     const ds = this.dataset;
     if (!ds) return result;   // need a dataset to do anything
 
-    const context = this.context;
-    const rapid = context.systems.rapid!;
     const $content = this.Modal.$content!;
     const uuid = this._uuid;
 
-    // check dataset ID
-    const idNode = $content.selectAll(`#identifier-${uuid}`).node() as HTMLInputElement | null;
-    const idVal = idNode?.value || '';
-    const datasetID = idVal.trim();
-    const existing = rapid.catalog.get(datasetID);
-    if (existing && existing !== ds) {  // id belongs to another dataset
-      result.datasetIDStringID = 'rapid_add_dataset.identifier.taken';
-    } else if (datasetID && !/^[\w\-]+$/.test(datasetID)) {
-      result.datasetIDStringID = 'rapid_add_dataset.identifier.invalid';
-    } else {
-      result.id = datasetID;
-    }
-
-    // check source type
-    const sourceNode = $content.selectAll(`#source-${uuid}`).node() as HTMLInputElement | null;
-    const sourceVal = sourceNode?.value || '';
-    result.sourceID = sourceVal.trim();
-
-    // check source url
-    const sourceUrlNode = $content.selectAll(`#sourceurl-${uuid}`).node() as HTMLTextAreaElement | null;
-    const sourceUrlVal = sourceUrlNode?.value || '';
-    result.sourceUrl = sourceUrlVal.trim();
+    // These can not be changed
+    result.id = ds.id;
+    result.serviceID = ds.serviceID;
+    result.sourceUrl = ds.sourceUrl;
+    result.sourceFileID = ds.sourceFileID;
 
     // check dataset name
     const nameNode = $content.selectAll(`#name-${uuid}`).node() as HTMLInputElement | null;
@@ -1305,7 +1306,7 @@ export class UiRapidDatasetSettings extends EventEmitter {
     result.conflation = conflationNode?.checked;
 
     // required values must be present
-    result.isOk = !!(result.id && result.name && result.sourceUrl);
+    result.isOk = !!(result.id && result.name && (result.sourceUrl || result.sourceFileID));
     return result;
   }
 
@@ -1475,4 +1476,25 @@ export class UiRapidDatasetSettings extends EventEmitter {
       }
     }
   }
+
+
+  /**
+   * Return a localized string for the given `serviceID` string.
+   * @param    serviceID  - the serviceID to get the display name for
+   * @returns  the localized display name
+   */
+  protected _serviceIDString(serviceID: ServiceID): string {
+    const context = this.context;
+    const l10n = context.systems.l10n;
+
+    const stringID = (
+      serviceID === 'esri' ? 'rapid_catalog.category.esri' :
+      serviceID === 'mapwithai' ? 'rapid_catalog.category.meta' :
+      serviceID === 'overture' ? 'rapid_catalog.category.overture' :
+      'text.unknown'
+    );
+
+    return l10n?.t(stringID) || serviceID;
+  }
+
 }
