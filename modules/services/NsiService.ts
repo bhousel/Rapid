@@ -132,6 +132,9 @@ export class NsiService extends AbstractSystem {
 
   /** Internal NSI data cache */
   protected _nsi: Partial<NsiServiceCache>;
+  /** Internal NSI setup promise */
+  protected _nsiPromise: Promise<void> | null;
+
 
 
   /**
@@ -145,6 +148,7 @@ export class NsiService extends AbstractSystem {
     this.status = 'loading';  // 'loading', 'ok', 'failed'
 
     this._nsi = {};
+    this._nsiPromise = null;
   }
 
 
@@ -203,13 +207,20 @@ export class NsiService extends AbstractSystem {
    */
   public startAsync(): Promise<void> {
     return super.startAsync()
-      .then(() => this._loadNsiDataAsync())
-      .then(() => this._generateNsiPresetsAsync())
-      .then(() => { this.status = 'ok'; })
-      .catch(err => {
-        console.error(err);  // eslint-disable-line
-        this.status = 'failed';
-        throw err;  // rethrow, promise chain should reject
+      .then(() => {
+        // Schedule NSI startup as a separate Promise chain.
+        // This should not block Rapid startup.
+        if (!this._nsiPromise) {
+          this._nsiPromise = Promise.resolve()
+            .then(() => this._loadNsiDataAsync())
+            .then(() => this._generateNsiPresetsAsync())
+            .then(() => { this.status = 'ok'; })
+            .catch(err => {
+              console.error(err);  // eslint-disable-line
+              this.status = 'failed';
+            });
+        }
+        return Promise.resolve();
       });
   }
 
