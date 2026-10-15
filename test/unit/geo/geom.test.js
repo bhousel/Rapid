@@ -125,6 +125,25 @@ describe('geoHasSelfIntersections', () => {
 });
 
 
+describe('geoMetersToWorld', () => {
+  it('converts meters to world units at the equator', () => {
+    // At the equator, the world (WORLD_SIZE units) spans the equatorial circumference.
+    const expected = Rapid.sdk.WORLD_SIZE / (2 * Math.PI * 6378137);
+    assert.ok(Math.abs(Rapid.geoMetersToWorld(1, 0) - expected) < 1e-9);
+  });
+
+  it('scales by sec(lat) away from the equator', () => {
+    const atEquator = Rapid.geoMetersToWorld(10, 0);
+    assert.ok(Math.abs(Rapid.geoMetersToWorld(10, 60) - 2 * atEquator) < 1e-9);
+    assert.ok(Math.abs(Rapid.geoMetersToWorld(10, -60) - 2 * atEquator) < 1e-9);
+  });
+
+  it('returns 0 at the poles', () => {
+    assert.equal(Rapid.geoMetersToWorld(10, 90), 0);
+  });
+});
+
+
 describe('geomCoverageBoxes', () => {
   it('returns an empty array for empty coords', () => {
     assert.deepEqual(Rapid.geomCoverageBoxes([], 1), []);

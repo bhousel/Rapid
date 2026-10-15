@@ -21,6 +21,7 @@ Note: The code here should probably be moved into either `/util` or into [`@rapi
 
 The `geom.ts` file includes:
 - `geomCoverageBoxes` - Cover a point or polyline with a chain of square boxes (a fast approximate buffer, used for conflation coverage and label placement)
+- `geoMetersToWorld` - Convert a distance in meters to world units at a given latitude (used for conflation buffer radii)
 - `geomLineSegments` - Break a line into evenly-spaced positions that share a heading (used to place oneway arrows and sided markers)
 - `geoHasSelfIntersections` - Test whether a way being dragged or drawn intersects itself
 

@@ -1,4 +1,4 @@
-import { geomLineIntersection, vecAdd, vecAngle, vecEqual, vecInterp, vecLength } from '@rapid-sdk/math';
+import { geoMetersToLon, geomLineIntersection, vecAdd, vecAngle, vecEqual, vecInterp, vecLength, WORLD_SIZE } from '@rapid-sdk/math';
 
 import type { BBox } from 'rbush';
 import type { OsmNode } from '../data/OsmNode.ts';
@@ -88,6 +88,20 @@ export function geomCoverageBoxes(coords: Vec2[], radius: number, step: number =
   }
 
   return boxes;
+}
+
+
+/**
+ * Converts a distance in meters to world units (z16 pre-scaled Mercator) at a given latitude.
+ * Web Mercator is conformal, so the scale is the same along x and y. It grows with latitude
+ * (by `1/cos(lat)`), so the result is only valid near `atLat`. That is accurate enough for
+ * the short distances used in conflation, such as a buffer of a few meters around one feature.
+ * @param  m - Distance in meters
+ * @param  atLat - Latitude (degrees) where the distance is measured
+ * @return Distance in world units (`0` at the poles)
+ */
+export function geoMetersToWorld(m: number, atLat: number): number {
+  return geoMetersToLon(m, atLat) / 360 * WORLD_SIZE;
 }
 
 

@@ -36,6 +36,17 @@ Phase 1 (the `KeyboardSystem` conversion + command scaffolding) is done — see
 - Have PixiLayerRapid call `styleMatch()` with a dataset/scope ID
 - Per-dataset schema querying (different presets for Rapid vs OSM data)
 
+## External data styling (usability)
+- Today each Rapid dataset is drawn in a **single color** (`dataset.color`), a holdover from the original
+  Rapid. External data can be hard to tell apart from OSM features: for example, a yellow dataset looks
+  like OSM tertiary roads.
+- Make external data obviously "not yet in OSM". Ideas: an animated WebGL shader effect (shimmer,
+  sparkle, marching dashes), a distinct casing or halo treatment, or an overlay pattern that no OSM style uses.
+- Styles for the matching bands: "Already mapped" (muted), "Needs review" (highlighted), and "New" (the
+  default external-data look). See `design/conflation-system.md`.
+- Related to the deferred styling work above: move `PixiLayerRapid`'s hardcoded styles into style data, so
+  these treatments go through `StyleSystem`.
+
 ## Conflation / buffers follow-ups (beyond Step 3)
 - **Internalize / replace `lineToPoly` offset-curve generation** — `lineToPoly` (used for halos) repurposes `PIXI.buildLine`, coupling halo generation to Pixi internals and a fragile triangle-walk. If we ever need *precise* buffer polygons (not just coverage boxes), internalizing the offset-curve math would unify halos + buffers and drop the Pixi coupling. Left alone for now; coverage boxes cover the conflation use case.
 - **Precise buffer polygons** — only if a consumer needs the actual buffer polygon rather than coverage boxes + a distance/overlap predicate. Likely unnecessary given the two-phase query.

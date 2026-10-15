@@ -1,8 +1,10 @@
 import { Extent, geomGetDominantSurroundingRectangle, geomToOrigin, projWgs84ToWorld, vecAdd, vecInterp } from '@rapid-sdk/math';
+import { geoMetersToWorld, geomCoverageBoxes } from '../geo/geom.ts';
 import { polygonCentroid, polygonHull } from 'd3-polygon';
 import polylabel from '@mapbox/polylabel';
 
 import type { Context } from '../Context.ts';
+import type { CoverageBox } from '../geo/geom.ts';
 import type { SurroundingRectangle, Vec2 } from '@rapid-sdk/math';
 import type { SingularGeometry, SingularGeometryType } from './types.ts';
 
@@ -120,6 +122,11 @@ export class GeometryPart {
   /** Local coordinate data (also EPSG:3857, but relative to `world.origin`) */
   public local: GeometryPartLocalData | null;
 
+  /** Coverage boxes from the last `computeCoverage()` call */
+  protected _coverage: CoverageBox[] | null;
+  /** The radius (meters) that `_coverage` was computed for */
+  protected _coverageRadius: number;
+
 
   /**
    * @param  context - Global shared application context
@@ -129,6 +136,8 @@ export class GeometryPart {
     this.orig = null;
     this.world = null;
     this.local = null;
+    this._coverage = null;
+    this._coverageRadius = 0;
   }
 
 
@@ -149,6 +158,8 @@ export class GeometryPart {
     this.orig = null;
     this.world = null;
     this.local = null;
+    this._coverage = null;
+    this._coverageRadius = 0;
   }
 
 
@@ -431,6 +442,54 @@ export class GeometryPart {
 
     this.world = world;
     this.local = local;
+  }
+
+
+  /**
+   * Covers this geometry with axis-aligned boxes, in world coordinates. This is a fast,
+   * approximate buffer that conflation uses as RBush query boxes.
+   *
+   * The shape of the coverage depends on the geometry type:
+   * - **Point**: one box of half-size `radius`, centered on the point.
+   * - **LineString**: boxes of half-size `radius`, spaced about `radius` apart along the line.
+   *   Each box is a separate unit, so conflation can tell which parts of a line already exist.
+   * - **Polygon**: one box, the outer ring's extent grown by `radius`. Filling a 2D area with
+   *   boxes would be wasteful, so precise polygon overlap tests happen later, in the refine step.
+   *
+   * The radius is a recompute parameter: users can tune it, so it is not part of `setData()`.
+   * The result for the most recent radius is cached, so repeated calls are cheap.
+   * @param  radius - Buffer distance, in meters
+   * @return Coverage boxes in world coordinates (empty if there is no data or `radius <= 0`)
+   */
+  public computeCoverage(radius: number): CoverageBox[] {
+    if (!this.orig || !this.world || radius <= 0) return [];
+    if (this._coverage && this._coverageRadius === radius) return this._coverage;
+
+    // Convert meters to world units at this geometry's latitude.
+    const lat = this.orig.extent.center()[1];
+    const r = geoMetersToWorld(radius, lat);
+    const type = this.type;
+    let boxes: CoverageBox[];
+
+    if (type === 'Point') {
+      boxes = geomCoverageBoxes([this.world.coords as Vec2], r);
+    } else if (type === 'LineString') {
+      boxes = geomCoverageBoxes(this.world.outer!, r);
+    } else {
+      const extent = this.world.extent;
+      boxes = [{
+        minX: extent.min[0] - r,
+        minY: extent.min[1] - r,
+        maxX: extent.max[0] + r,
+        maxY: extent.max[1] + r,
+        coord: extent.center(),
+        angle: 0
+      }];
+    }
+
+    this._coverage = boxes;
+    this._coverageRadius = radius;
+    return boxes;
   }
 
 }
