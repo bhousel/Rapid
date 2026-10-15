@@ -103,6 +103,7 @@ collected, sorted by specificity, and their referenced styles are deep-merged.
 |------|-------------|
 | `AbstractSystem.ts` | Base class for all systems with lifecycle management |
 | `AssetSystem.ts` | Manages loading and caching of assets (images, data files) |
+| `ConflationSystem.ts` | Matches Rapid dataset features against OSM and triages them (already mapped, needs review, new) |
 | `DatabaseSystem.ts` | Durable storage wrapping IndexedDB (`sessions` and `files` stores), with an in-memory fallback |
 | `DragAndDropSystem.ts` | Owns file drag-and-drop and routes dropped files to registered consumers |
 | `EditSystem.ts` | Manages edit history, undo/redo, and staging changes |

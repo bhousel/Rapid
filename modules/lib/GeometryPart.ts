@@ -483,7 +483,9 @@ export class GeometryPart {
         maxX: extent.max[0] + r,
         maxY: extent.max[1] + r,
         coord: extent.center(),
-        angle: 0
+        angle: 0,
+        index: 0,
+        t: 0
       }];
     }
 

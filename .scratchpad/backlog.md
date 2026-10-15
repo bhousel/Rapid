@@ -42,7 +42,7 @@ Phase 1 (the `KeyboardSystem` conversion + command scaffolding) is done — see
   like OSM tertiary roads.
 - Make external data obviously "not yet in OSM". Ideas: an animated WebGL shader effect (shimmer,
   sparkle, marching dashes), a distinct casing or halo treatment, or an overlay pattern that no OSM style uses.
-- Styles for the matching bands: "Already mapped" (muted), "Needs review" (highlighted), and "New" (the
+- Styles for the matching statuses: "Already mapped" (muted), "Needs review" (highlighted), and "New" (the
   default external-data look). See `design/conflation-system.md`.
 - Related to the deferred styling work above: move `PixiLayerRapid`'s hardcoded styles into style data, so
   these treatments go through `StyleSystem`.

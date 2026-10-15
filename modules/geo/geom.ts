@@ -15,6 +15,10 @@ export interface CoverageBox extends BBox {
   coord: Vec2;
   /** Heading angle (radians) of the geometry at this point; `0` for a single point */
   angle: number;
+  /** Index of the line segment the center lies on (from `coords[index]` to `coords[index + 1]`); `0` for a single point */
+  index: number;
+  /** Position of the center along that segment, from `0` (start) to `1` (end); `0` for a single point */
+  t: number;
 }
 
 
@@ -48,20 +52,22 @@ export function geomCoverageBoxes(coords: Vec2[], radius: number, step: number =
   const boxes: CoverageBox[] = [];
   if (!coords.length || radius <= 0) return boxes;
 
-  const makeBox = (p: Vec2, angle: number): CoverageBox => {
+  const makeBox = (p: Vec2, angle: number, index: number, t: number): CoverageBox => {
     return {
       minX: p[0] - radius,
       minY: p[1] - radius,
       maxX: p[0] + radius,
       maxY: p[1] + radius,
       coord: p,
-      angle: angle
+      angle: angle,
+      index: index,
+      t: t
     };
   };
 
   // Single point - just one box.
   if (coords.length === 1) {
-    boxes.push(makeBox([coords[0][0], coords[0][1]], 0));
+    boxes.push(makeBox([coords[0][0], coords[0][1]], 0, 0, 0));
     return boxes;
   }
 
@@ -78,13 +84,13 @@ export function geomCoverageBoxes(coords: Vec2[], radius: number, step: number =
     const n = Math.max(1, Math.ceil(len / stepLen));
     for (let k = 0; k <= n; k++) {
       if (i > 0 && k === 0) continue;   // shared vertex already covered by the previous segment
-      boxes.push(makeBox(vecInterp(a, b, k / n), angle));
+      boxes.push(makeBox(vecInterp(a, b, k / n), angle, i, k / n));
     }
   }
 
   // Degenerate polyline (all coincident points) - fall back to a single box.
   if (!boxes.length) {
-    boxes.push(makeBox([coords[0][0], coords[0][1]], 0));
+    boxes.push(makeBox([coords[0][0], coords[0][1]], 0, 0, 0));
   }
 
   return boxes;

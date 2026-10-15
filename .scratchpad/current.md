@@ -5,12 +5,17 @@ Top priority. Design: [`design/conflation-system.md`](../design/conflation-syste
 awaiting a final review. Guiding use case: *accept the part of the sidewalk that is missing, and join it
 to the part that exists.*
 - ✅ Step 1: `GeometryPart.computeCoverage(radius)` (meters, caches the most recent radius) + `geoMetersToWorld`.
-- 🔄 Step 2: design doc, revision 3. The stages are Match → Score → Triage → Act. In the UI, "conflation"
-  appears only as the "Conflation Settings" heading, defined right below it in stage words. The bands
+- ✅ Step 2: design doc. The stages are Match → Score → Triage → Act. In the UI, "conflation"
+  appears only as the "Conflation Settings" heading, defined right below it in stage words. The statuses
   are "Already mapped", "Needs review" and "New". Code keeps "conflation" (`ConflationSystem`).
   The review queue covers the viewport only. See "Resolved Decisions" in the doc.
-- Next: Step 3, the `ConflationSystem` core for **lines first** (rules, measures, provisional scoring,
-  triage bands, runs, segment `index`/`t` on `CoverageBox`).
+- ✅ Step 3: `modules/core/ConflationSystem.ts` matches LineStrings from GeoJSON-backed datasets.
+  `RapidDataset.conflation` holds the rules (`conflationDefaults()`), which aren't persisted yet (Step 6).
+  Triage is per coverage box: matched within `buffer`/`maxAngle`, needs review within
+  `reviewFactor`× those, otherwise new. Runs, join points, and invalidation on `stablechange`/`merge`
+  are all in place. Tests: `test/unit/core/ConflationSystem.test.js` (synthetic street grid).
+- Next: Step 4, drawing in `PixiLayerRapid` (hide matched, draw runs, highlight needs-review), then
+  Step 5, accepting a run with its joins.
 - **Test data is synthetic only.** Generate a small street grid in code. Agency sidewalk data typically
   runs about 1–2 m off OSM, so the default buffer is 3 m.
 - The scoring formula should eventually match the server-side matching tools. That's being gathered and

@@ -8,10 +8,11 @@ Conflation runs entirely in the browser, on top of [`SpatialSystem`](./spatial-s
 Step 3d of the spatial design, which said the match semantics would live in a dedicated module. This
 doc is that module's design.
 
-> **Status:** Proposed, revision 2. The building blocks are in place: two-phase queries
-> (`getItemsAtBoxes` + `refineItems`), the `editor_*` caches with their `segments` index,
-> and `GeometryPart.computeCoverage(radius)`. Nothing below is implemented yet. The scoring model is
-> provisional until it is aligned with the external matching tools (see [Scoring](#scoring)).
+> **Status:** In progress. Step 3 is done: `ConflationSystem` matches LineStrings from GeoJSON-backed
+> datasets, with measures, scoring, triage, runs and join points (see [Rollout Plan](#rollout-plan)).
+> It builds on `SpatialSystem` box queries, the `editor_*` caches with their `segments` index, and
+> `GeometryPart.computeCoverage(radius)`. The scoring model is provisional until it is aligned with
+> the external matching tools (see [Scoring](#scoring)).
 
 ## Match → Score → Triage → Act
 
@@ -22,7 +23,7 @@ stages, and uses these names everywhere instead:
 |---|---|---|
 | **1. Match** | Which existing features could each new feature be the same as? | Candidate pairs, plus **measures**: distance, angle, overlap, intersection, tags |
 | **2. Score** | How confident are we that a pair is the same thing? | A score from 0 to 1 for each pair and each feature |
-| **3. Triage** | Hide it, review it, or offer it? | A **band**: `matched`, `uncertain`, or `unmatched` (plus *partial* geometry for lines) |
+| **3. Triage** | Hide it, review it, or offer it? | A **status**: `matched`, `uncertain`, or `unmatched` (plus *partial* geometry for lines) |
 | **4. Act** | What does the user do about it? | Accept new data (maybe part of a line, joined to what exists), skip duplicates, and later merge attributes |
 
 We call stage 3 *triage* rather than *filter*, because it does more than hide things. It sorts each
@@ -31,7 +32,7 @@ feature into one of three outcomes, and the uncertain ones go to a person.
 **Words in the UI.** "Conflation" appears in exactly one place: the **Conflation Settings** heading
 in `UiRapidDatasetSettings`. The text right under the heading defines the word using the four stages
 (see [Settings UI](#settings-ui-uirapiddatasetsettings)). Every other user-facing string uses the stage
-words, and the bands appear as **Already mapped**, **Needs review** and **New**. In code, "conflation"
+words, and the statuses appear as **Already mapped**, **Needs review** and **New**. In code, "conflation"
 is fine (`ConflationSystem`, `ds.conflation`), since it matches the existing spatial design.
 
 Stages 1 and 2 can also run outside Rapid, for example as server-side matching over whole datasets.
@@ -145,38 +146,45 @@ interface ConflationSettings {
 interface ConflationRule {
   geometry: 'point' | 'line' | 'area';     // which third-party geometry type this rule applies to
 
-  // Which OSM features are candidates. Same shape as a StyleSelector's `match`, checked with PropMatcher.
+  // Which features this rule is about. Same shape as a StyleSelector's `match`, checked with PropMatcher.
   match: {
-    geometry?: GeometryType | GeometryType[];
+    geometry?: GeometryType | GeometryType[];   // OSM geometry types that can match
     tags?: PropMatcherProps[];             // all must match (AND)
   };
 
-  // Measure parameters (named to line up with the external matching tools)
+  // "Already mapped" limits (named to line up with the external matching tools)
   buffer: number;                          // proximity, in meters
   maxAngle?: number;                       // lines: max heading difference, in degrees (default 30)
-  minOverlap?: number;                     // 0–1: overlap needed to count as a match at all
-  requireIntersect?: boolean;              // areas: geometries must intersect
 
-  // Triage thresholds on the final score
-  matchAbove: number;                      // score >= this means matched (default 0.8)
-  reviewAbove: number;                     // score >= this (and below matchAbove) means uncertain (default 0.3)
+  // "Needs review" limits are this multiple of the limits above (default 2)
+  reviewFactor?: number;
 }
 ```
+
+Areas will add `minOverlap` and `requireIntersect` when the polygon matcher lands.
+
+**`match.tags` applies to both sides.** A rule applies to a new feature when the feature's geometry
+type is `geometry` and its tags satisfy `match.tags`. The rule then looks for OSM features that
+satisfy all of `match`. So a dataset with both sidewalks and crossings can have one rule for each,
+and a new crossing is only compared with OSM crossings. A feature that no rule applies to gets no
+result and is drawn as it is today.
 
 **Tags are compared after the data dictionary.** The dataset's data dictionary maps source attributes
 to OSM tags, the same way it does when a feature is accepted. Rule `match` blocks are then checked
 against those tags, so both sides use the same vocabulary. For agency sidewalk data, that means
 `highway=footway` + `footway=sidewalk` on both sides, however the source attributes were named.
+A dataset without a dictionary is compared using its raw properties.
 
 `match` is also how a user answers questions like "does a road tagged `sidewalk=both` count as a
 sidewalk?" That kind of match can't be joined to, because there is no sidewalk geometry to connect to
 (see Open Questions).
 
-**Defaults:** a new custom dataset gets one rule per geometry type: `buffer` 3 m for lines and
-points and 0 m for areas, `maxAngle` 30°, `matchAbove` 0.8, `reviewAbove` 0.3. Conflation starts
-disabled, so existing behavior doesn't change until the user turns it on.
+**Defaults** (`conflationDefaults()`): one rule per geometry type, with no tag conditions. `buffer` is
+3 m for lines and points and 0 m for areas, `maxAngle` is 30°, and `reviewFactor` is 2. Conflation
+starts disabled, so existing behavior doesn't change until the user turns it on.
 
-**Persistence:** custom datasets already save everything through `toJSON()`. Service-provided
+**Persistence** (Step 6): the settings store only holds string leaves, so `toJSON()`/`fromJSON()`
+need to encode the rules. Custom datasets will save `conflation` with everything else. Service-provided
 datasets save a subset that the user can customize, which gains `conflation` and loses `conflated`.
 The old `conflated` value is dropped when settings load. It never had any effect, so there is
 nothing to migrate.
@@ -184,14 +192,17 @@ nothing to migrate.
 ### Stage 1: candidates and measures
 
 Each third-party feature calls `part.computeCoverage(rule.buffer)`, which is cached for each radius.
-The coverage boxes go through the two-phase query: a quick bounding-box check over the RBush index,
-then a precise test, using `geom*` and `vec*` helpers from `@rapid-sdk/math`. The precise test applies
-the rule's `match` first, so OSM features of the wrong kind are never considered.
+The boxes are spaced by the strict `buffer`, which sets the resolution of runs. Each query grows its
+box to the review limit (`buffer × reviewFactor`), so "needs review" candidates are found too.
+The query has two phases: a quick bounding-box search over the RBush index (`SpatialSystem`), then
+a precise test in `ConflationSystem` (a plain filter), using `vec*` and `geom*` helpers from
+`@rapid-sdk/math`. The precise test applies the rule's `match` first, so OSM features of the wrong
+kind are never considered.
 
-| Third-party | Phase 1: coverage boxes vs. | Phase 2: kept per box or feature |
+| Third-party | Phase 1: query boxes vs. | Phase 2: kept per box or feature |
 |---|---|---|
-| **Point** | data index | OSM nodes within `buffer` (`vecLength`), and OSM areas that contain the point (`geomPointInPolygon`) |
-| **LineString** | `segments` index, **one query per box** | segments within `buffer` of the box center (point-to-segment distance) whose heading is within `maxAngle` of the box's `angle`. Opposite directions count as the same heading. |
+| **Point** | data index | OSM nodes within the limits (`vecLength`), and OSM areas that contain the point (`geomPointInPolygon`) |
+| **LineString** | `segments` index, **one query per box** | for each OSM way, its closest segment to the box center (point-to-segment distance via `vecProject`) and that segment's heading difference from the box's `angle`. Opposite directions count as the same heading. |
 | **Polygon** | data index (extent grown by `buffer`) | OSM areas that intersect the polygon (`geomPolygonIntersectsPolygon`) |
 
 Each candidate pair (new feature, OSM entity) gets these **measures**:
@@ -219,59 +230,80 @@ the same conversion `computeCoverage` uses.
 > anything: until we have them, Rapid uses the simple formula below, behind a single function, so it
 > can be swapped out.
 
+**Two sets of limits.** The user's parameters are the "already mapped" limits. The "needs review"
+limits are the same parameters multiplied by `reviewFactor`. Each coverage box is triaged by the
+best OSM way near it:
+
+| Box status | Condition (closest segment of a way that satisfies the rule) |
+|---|---|
+| `matched` | distance ≤ `buffer` **and** heading difference ≤ `maxAngle` |
+| `uncertain` | distance ≤ `buffer × reviewFactor` **and** heading difference ≤ `maxAngle × reviewFactor` (at most 90°) |
+| `unmatched` | neither |
+
 ```text
-pair score =
-  0                                 if the angle or intersect test fails, or overlap < minOverlap
-  overlap × (1 − distance / buffer) for lines and polygons
-  1 − distance / buffer             for points
-feature score = the best pair score
+box score       = 1 (matched), 0.5 (uncertain), 0 (unmatched)
+feature score   = mean box score
+candidate score = (its matched boxes + 0.5 × its uncertain boxes) ÷ all boxes
 ```
 
-### Stage 3: triage bands
+The score is for ranking and reporting. Triage comes from the box statuses, not from a threshold on
+the score.
 
-| Band | UI label | Condition | Shown as |
+*Why not a threshold on a combined score?* An earlier draft used `overlap × (1 − distance/buffer)`
+with "matched above 0.8" and "review above 0.3". With agency sidewalks running 1–2 m off OSM and a
+3 m buffer, true matches scored about 0.5 and would all have gone to review. A sidewalk that is half
+mapped would also have gone to review, instead of showing its missing half as new. Limits per box
+avoid both problems and are easy to explain: "within 3 m and 30° is already mapped, within twice
+that needs review."
+
+### Stage 3: triage status
+
+| Status | UI label | Feature condition | Shown as |
 |---|---|---|---|
-| `matched` | Already mapped | feature score ≥ `matchAbove` | hidden (muted if `showMatched` is on) |
-| `uncertain` | Needs review | `reviewAbove` ≤ score < `matchAbove` | highlighted, and listed in the review queue |
-| `unmatched` | New | score < `reviewAbove` | shown as today, offered for accept |
-| `unknown` | — | OSM data isn't loaded here | shown as today |
+| `matched` | Already mapped | every box is matched | hidden (muted if `showMatched` is on) |
+| `uncertain` | Needs review | any box is uncertain | highlighted, and listed in the review queue |
+| `unmatched` | New | otherwise: some boxes are unmatched | shown as today (partial lines as their runs), offered for accept |
+| `unknown` | — | OSM data isn't loaded at one of the boxes | shown as today, and not cached |
 
-**Partial lines are about geometry, not confidence.** For lines, each coverage box is matched or not,
-which splits the line into **runs**. A line whose boxes are all matched is `matched`. A line with no
-matched boxes is `unmatched`. A line with both is **partial**. Its unmatched runs are offered as new
-data, and its matched runs are treated like a matched feature. If a partial line also scores in the
-`uncertain` band (for example, the matched stretch is borderline), the whole line goes to the review
-queue instead.
+**Partial lines are about geometry, not confidence.** Consecutive boxes with the same status form
+**runs**. A line with matched runs and unmatched runs is **partial**: its status is `unmatched` (there is
+new data to offer), its unmatched runs are offered as new, and its matched runs are treated like an
+already-mapped feature. If any run is uncertain, the whole line goes to the review queue.
+
+**Short runs are absorbed.** A run that isn't matched, is shorter than `buffer`, and sits next to a
+matched run is treated as matched. These are almost always misalignment at the ends of a match,
+such as a new sidewalk that overshoots the OSM one by a meter or two.
 
 ### Match records
 
 ```ts
-type ConflationBand = 'unknown' | 'unmatched' | 'uncertain' | 'matched';
+type ConflationStatus = 'unknown' | 'unmatched' | 'uncertain' | 'matched';
 
 interface ConflationResult {
   dataID: DataID;
-  band: ConflationBand;
+  status: ConflationStatus;
   score: number;                      // feature score, 0–1
-  partial: boolean;                   // LineString: some boxes matched, some didn't
+  partial: boolean;                   // LineString: some runs matched, some not
   candidates: ConflationCandidate[];  // sorted best first
   boxes?: BoxMatch[];                 // LineString only: one entry per coverage box, in order
-  runs?: LineRun[];                   // LineString only: maximal runs of unmatched boxes
+  runs?: LineRun[];                   // LineString only: every run, in order along the line
 }
 
 interface ConflationCandidate {
   entityID: EntityID;
   score: number;
-  measures: { distance: number; angle?: number; overlap?: number; intersects: boolean; tags: boolean };
+  measures: { distance: number; angle: number; overlap: number; intersects: boolean; tags: boolean };
 }
 
 interface BoxMatch {
-  matched: boolean;
-  wayIDs: EntityID[];                 // OSM ways whose segments matched this box
+  status: ConflationStatus;           // matched, uncertain, or unmatched
+  wayIDs: EntityID[];                 // OSM ways that matched this box at its status, closest first
 }
 
 interface LineRun {
+  status: ConflationStatus;           // matched, uncertain, or unmatched
   coords: Vec2[];                     // WGS84 sub-line of the original geometry
-  startJoin?: JoinPoint;              // set when this end meets a matched portion
+  startJoin?: JoinPoint;              // set when this end meets a matched run
   endJoin?: JoinPoint;
 }
 
@@ -283,11 +315,13 @@ interface JoinPoint {
 ```
 
 **Cutting runs out of a line.** A run is cut from the original geometry, not rebuilt from box centers.
-To make that possible, `CoverageBox` gains the segment `index` and parameter `t` of its center, so
-the start and end of a run map to exact positions on the source line. Boxes are about `buffer`
-apart, so where a run meets a matched portion, the run is extended to the first matched box. The
-end is then projected onto the matched OSM segment. The projection is the `JoinPoint`. If an
-existing node is within a small tolerance of it, the run joins at that node and no new node is added.
+`CoverageBox` carries the segment `index` and parameter `t` of its center, so the start and end of a
+run map to exact positions on the source line. Boxes are about `buffer` apart, so where a run that
+isn't matched meets a matched run, it is extended to the nearest matched box. That end is then
+projected onto the OSM way that matched there (the closest one). The projection is the `JoinPoint`.
+If an existing node of that way is within 1 m of it, the run joins at that node and no new node is
+added. In practice, a run joins an existing node where the OSM way ends, and joins mid-segment
+where the new line leaves an OSM way and comes back to it.
 
 ### Inputs
 
@@ -403,9 +437,9 @@ The final wording goes through normal string review (`rapid_dataset_settings.con
 it, the single "Conflation?" checkbox is replaced by:
 - an "enabled" switch and a "show matched features" switch
 - for each rule: the geometry type, the match tags (a simple `key=value` list to start, since
-  `PropMatcher.from` already parses that format), `buffer`, `maxAngle`, `minOverlap`, and the two
-  thresholds
-- a live count of features in each band in the current view, so users can tune parameters and see
+  `PropMatcher.from` already parses that format), `buffer`, `maxAngle`, and `reviewFactor`
+  (worded as "needs review within N× these limits")
+- a live count of features in each status in the current view, so users can tune parameters and see
   the effect right away
 
 Changing a parameter invalidates the dataset's results, and they're recomputed on the next draw.
@@ -413,7 +447,7 @@ Changing a parameter invalidates the dataset's results, and they're recomputed o
 ## Retiring the prototype
 
 `PixiLayerDebug`'s conflation code (the Microsoft-buildings check) is deleted. The polygon matcher
-replaces it. The debug layer can show coverage boxes, measures and bands as an overlay, which is
+replaces it. The debug layer can show coverage boxes, measures and statuses as an overlay, which is
 useful when tuning parameters.
 
 ## Rollout Plan
@@ -421,9 +455,11 @@ useful when tuning parameters.
 Lines come first throughout. Points and polygons follow the same pipeline at a lower priority.
 
 1. **Coverage.** `GeometryPart.computeCoverage(radius)` + `geoMetersToWorld`. ✅ Done.
-2. **Design.** This document.
-3. **Core, lines.** `ConflationSystem` with the rules model, the line matcher, measures, scoring, bands
-   and runs. Add segment `index`/`t` to `CoverageBox`. Unit tests against a real `EditSystem`.
+2. **Design.** This document. ✅ Done.
+3. **Core, lines.** `ConflationSystem` with the rules model, the line matcher, measures, scoring, statuses,
+   runs and join points. Add segment `index`/`t` to `CoverageBox`. Unit tests against a real
+   `EditSystem`. ✅ Done. Only GeoJSON-backed datasets for now: OSM-backed ones (MapWithAI,
+   Esri) keep their geometry in a separate graph and will follow.
 4. **Drawing.** `PixiLayerRapid` hides matched lines, draws partial lines as runs, and highlights
    uncertain ones. Remove the prototype from `PixiLayerDebug`.
 5. **Accepting and joining.** Accept with a run, plus joins for partial runs and for line ends. Test
@@ -443,8 +479,8 @@ Lines come first throughout. Points and polygons follow the same pipeline at a l
   1 m), a perpendicular crossing (rejected by the angle test), a sidewalk that is partly mapped (one
   matched run, one unmatched run, and a `JoinPoint` on the OSM way), and crossings whose ends meet
   sidewalks. No real agency data goes in the repo.
-- Scoring: confirm the bands fall where the thresholds say, and that the score function can be
-  replaced.
+- Triage: a 1.5 m offset is already mapped at a 3 m buffer, needs review at 1 m (review limit 2 m),
+  and is new at 1 m with no review margin. Short overshoots at the end of a match are absorbed.
 - Invalidation: `stablechange` and `merge` flush results, and a rule change flushes one dataset.
 - `unknown`: no result says `unmatched` or `matched` where OSM data isn't loaded.
 - Accepting: a partial run shares its end node with the matched OSM way, and a crossing joins the
@@ -461,15 +497,17 @@ Lines come first throughout. Points and polygons follow the same pipeline at a l
 - **The scoring formula follows the server-side tools,** once we have their definition. That work
   doesn't block anything; the provisional formula is in one function that can be replaced.
 - **Lines come first.** Points and polygons follow the same pipeline later.
+- **Triage uses limits per box, not thresholds on a score** (decided during Step 3, see [Scoring](#scoring)).
+  "Needs review" is the same limits multiplied by `reviewFactor`.
+- **Minimum run length.** A run that isn't matched, is shorter than `buffer`, and sits next to a
+  matched run is treated as matched.
 
 ## Open Questions (for review)
 
 - **Scoring details** (being gathered): is the buffer drawn around the source or the target? Is
   overlap measured one way or both ways? How are the parameters combined into a score?
 - **`sidewalk=*` on roads.** Should a sidewalk rule also match roads tagged `sidewalk=*`? Those
-  features would be `matched` without anything to join to. They might belong in the `uncertain` band.
+  features would be `matched` without anything to join to. They might belong in the `uncertain` status.
 - **Polygon threshold.** Is intersection ÷ smaller area the right overlap measure for buildings?
-- **Minimum run length.** Unmatched runs shorter than about one box (around `buffer`) are probably
-  noise from slight misalignment. Drop them below some length?
 - **Which graph.** `editor_stable` is proposed. Is there a case where conflation must reflect
   edits still in progress (`editor_staging`)?

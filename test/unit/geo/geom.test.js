@@ -208,6 +208,12 @@ describe('geomCoverageBoxes', () => {
     assert.ok(northBoxes.length > 0);
   });
 
+  it('records the segment index and position along it for each box', () => {
+    // length 10 each, step 5 -> segment 0 at t=0, 0.5, 1; segment 1 at t=0.5, 1 (its t=0 is the shared vertex)
+    const boxes = Rapid.geomCoverageBoxes([[0, 0], [10, 0], [10, 10]], 1, 5);
+    assert.deepEqual(boxes.map(b => [b.index, b.t]), [[0, 0], [0, 0.5], [0, 1], [1, 0.5], [1, 1]]);
+  });
+
   it('does not double-cover shared vertices between segments', () => {
     // corner at [10,0] is shared; it should appear exactly once
     const boxes = Rapid.geomCoverageBoxes([[0, 0], [10, 0], [10, 10]], 1, 5);

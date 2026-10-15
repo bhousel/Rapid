@@ -1,3 +1,4 @@
+import { conflationDefaults } from '../core/ConflationSystem.ts';
 import { DOMParser } from '@xmldom/xmldom';
 import { Extent } from '@rapid-sdk/math';
 import { GeoJSONData } from '../data/GeoJSONData.ts';
@@ -7,6 +8,7 @@ import { RapidDataDictionary } from './RapidDataDictionary.ts';
 import { TreeStore } from '../lib/TreeStore.ts';
 import { utilFetchResponse } from '../util/fetch_response.ts';
 
+import type { ConflationSettings } from '../core/ConflationSystem.ts';
 import type { Context } from '../Context.ts';
 import type { Document as XmlDocument } from '@xmldom/xmldom';
 import type { FileRecord } from '../core/DatabaseSystem.ts';
@@ -69,6 +71,8 @@ export interface RapidDatasetProps {
   conflated: boolean;
   /** Whether this dataset is a "custom" dataset (i.e. setup by the user) */
   custom: boolean;
+  /** Conflation settings: whether to match this dataset against OSM, and the matching rules */
+  conflation: ConflationSettings;
 
   /** Localization string ID for the label */
   labelStringID: StringID;
@@ -132,6 +136,8 @@ export class RapidDataset {
   public conflated: boolean;
   /** Whether this dataset is a "custom" dataset (i.e. setup by the user) */
   public custom: boolean;
+  /** Conflation settings: whether to match this dataset against OSM, and the matching rules */
+  public conflation: ConflationSettings;
 
   /** Localization string key for the dataset display name */
   public labelStringID: StringID | undefined;
@@ -179,6 +185,7 @@ export class RapidDataset {
     this.hidden = props.hidden ?? false;
     this.conflated = props.conflated ?? false;
     this.custom = props.custom ?? false;
+    this.conflation = props.conflation ?? conflationDefaults();
 
     this.labelStringID = props.labelStringID;
     this.descriptionStringID = props.descriptionStringID;
