@@ -91,7 +91,7 @@ export interface DropConsumer {
  * It is an **optional system**: in a non-browser/CLI build or tests without a DOM, `startAsync`
  * attaches nothing and the system simply never sees a drop.
  *
- * See `.github/design/draganddrop-system.md` for the full design.
+ * See `design/draganddrop-system.md` for the full design.
  *
  * Events available:
  * - `dragstart` - Fires when a file drag enters the container (overlay shown)

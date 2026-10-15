@@ -203,6 +203,8 @@ export class KeyBindingScope {
  *
  * Events available:
  * - `bindingschange` - Fires when a command is rebound via `rebind()`
+ *
+ * See `design/keyboard-system.md` for the full design.
  */
 export class KeyboardSystem extends AbstractSystem {
 

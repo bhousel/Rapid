@@ -133,7 +133,7 @@ collected, sorted by specificity, and their referenced styles are deep-merged.
 | `index.worker.ts` | Barrel that collects core worker listeners for bundling into `worker.ts` |
 | `types.ts` | TypeScript type definitions for core systems |
 
-Design notes for several systems (database, drag-and-drop, keyboard, network, scheduler, settings, spatial, style, UI) are in [`.github/design/`](../../.github/design/).
+Design notes for several systems (database, drag-and-drop, keyboard, network, scheduler, settings, spatial, style, UI) are in [`design/`](../../design/).
 
 ## Accessing Systems
 

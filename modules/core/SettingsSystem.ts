@@ -278,6 +278,8 @@ const SETTINGS_MIGRATIONS: SettingsMigration[] = [
  *
  * Events available:
  * - `settingschange` - Fires after any change in the persisted settings
+ *
+ * See `design/settings-system.md` for the full design.
  */
 export class SettingsSystem extends AbstractSystem {
 

@@ -4,7 +4,7 @@ Items planned but not yet started.
 
 ## Remappable keyboard shortcuts (KeyboardSystem phases 2 & 3)
 Phase 1 (the `KeyboardSystem` conversion + command scaffolding) is done — see
-[`.github/design/keyboard-system.md`](../.github/design/keyboard-system.md) and
+[`design/keyboard-system.md`](../design/keyboard-system.md) and
 [facebook/Rapid#1076](https://github.com/facebook/Rapid/issues/1076). Remaining phases:
 
 - **Phase 2 — persistence via SettingsSystem.** Make `settings` an optional dependency of

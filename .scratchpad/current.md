@@ -17,7 +17,7 @@ No active in-progress task.
   `PixiLayerCustomData` (rendering layer, mild smell) into a proper system.
 - **Stretch: images → EXIF → photo markers** (future local-photos consumer, wires into `PhotoSystem`).
 - **KeyboardSystem phases 2 & 3** (remappable shortcuts).
-- Open questions in `.github/design/database-system.md` (DB name/scoping, graceful-degradation doc).
+- Open questions in `design/database-system.md` (DB name/scoping, graceful-degradation doc).
 - **agent-practices:** consider adding the "folder-specific `AGENTS.md`" convention to the shared template.
 - **Report upstream to Bun:** the transpiler cache key ignores whether a file was compiled as a test (see `quirks.md`).
 

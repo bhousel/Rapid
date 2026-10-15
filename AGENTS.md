@@ -62,6 +62,10 @@ This project has reusable agent skills in `.claude/skills/`: one folder per skil
 
 ## Working in the Rapid Codebase
 
+### Design docs
+- [`design/`](design/README.md) holds design docs for the core systems: database, drag-and-drop, keyboard, network, scheduler, settings, spatial, style and UI. [`design/README.md`](design/README.md) lists each one with its status.
+- **Before changing one of those systems, read its design doc.** The class JSDoc of each system points to it. If your change alters the design, update the doc in the same change.
+
 ### Folder-specific instructions
 - Some folders have their own `AGENTS.md` with rules that apply only there (currently [`modules/ui/`](modules/ui/AGENTS.md) and [`modules/pixi/`](modules/pixi/AGENTS.md)). Agents that support nested `AGENTS.md` files load them automatically when working in that folder. If yours doesn't, read the folder's `AGENTS.md` before editing files there.
 - Guidance that only applies to one folder belongs in that folder's `AGENTS.md`, not in this file and not in editor-specific locations like `.github/instructions/`.

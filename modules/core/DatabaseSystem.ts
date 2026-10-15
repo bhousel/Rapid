@@ -180,7 +180,7 @@ interface FacadeStore {
 // ---------------------------------------------------------------------------
 // Store manifest — the one place that carries the schema layout.
 // `DatabaseSystem` owns this and asserts it at startup (see review decision in
-// `.github/design/database-system.md`). Consuming systems reference stores by
+// `design/database-system.md`). Consuming systems reference stores by
 // name and own only their record shapes, not the schema.
 // ---------------------------------------------------------------------------
 
@@ -244,7 +244,7 @@ function compareKeys(a: unknown, b: unknown): number {
  * Callers should treat it like any optional system: capture it at the top of a function, branch on
  * presence, and always keep a working path when it is absent.
  *
- * See `.github/design/database-system.md` for the full design.
+ * See `design/database-system.md` for the full design.
  */
 export class DatabaseSystem extends AbstractSystem {
 

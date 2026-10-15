@@ -31,6 +31,8 @@ We're available to chat!  Ping us on the `#rapid_feedback` channel on either:
 Folders under `dist/examples/` contain example code to help you learn how to integrate Rapid editor into your project.
 * https://github.com/facebook/Rapid/tree/main/dist/examples
 
+Design docs for Rapid's core systems (database, network, scheduler, settings, and more) are in [`design/`](design/README.md).
+
 
 ## Contributing
 

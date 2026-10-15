@@ -6,9 +6,13 @@ persisted through `SettingsSystem`.
 
 Tracked upstream as [facebook/Rapid#1076](https://github.com/facebook/Rapid/issues/1076).
 
+> **Status:** Phase 1 implemented (Sep 2026). `utilKeybinding` became
+> [`KeyboardSystem`](../modules/core/KeyboardSystem.ts). Phases 2–3 (persisted, user-remappable
+> shortcuts) are in the backlog. The Problem section below describes the code as it was before.
+
 ## Problem
 
-Keyboard shortcuts are managed by [`modules/util/keybinding.ts`](../../modules/util/keybinding.ts),
+Keyboard shortcuts are managed by `modules/util/keybinding.ts`,
 an old d3-style closure module ported from iD (which itself borrowed from
 [jwerty](https://github.com/keithamus/jwerty)). It carries a literal `//TODO: make a core system
 class for utilKeybinding` note.
@@ -74,11 +78,11 @@ Five components create their own namespaced instance and manage its `document` b
 
 | Component | Namespace | Lifecycle | Notes |
 |-----------|-----------|-----------|-------|
-| [`UiSystem`](../../modules/core/UiSystem.ts) | `modal` | bound once in `initAsync` | Esc/Backspace → close top modal |
-| [`SelectOsmMode`](../../modules/modes/SelectOsmMode.ts) | `select` | bound on `enter`, unbound on `exit` | vertex nav (`[`, `]`, `{`, `}`, `\`) |
-| [`SaveMode`](../../modules/modes/SaveMode.ts) | `SaveMode` | toggled on/off during save flow | Esc (capture) to cancel |
-| [`UiRapidInspector`](../../modules/ui/UiRapidInspector.ts) | `UiRapidInspector` | bound in constructor, re-registered on `localechange` | accept/ignore/move/rotate — keys deliberately isolated from the global set |
-| [`UiConflicts`](../../modules/ui/UiConflicts.ts) | `conflicts` | toggled on/off | Esc (capture) to cancel |
+| [`UiSystem`](../modules/core/UiSystem.ts) | `modal` | bound once in `initAsync` | Esc/Backspace → close top modal |
+| [`SelectOsmMode`](../modules/modes/SelectOsmMode.ts) | `select` | bound on `enter`, unbound on `exit` | vertex nav (`[`, `]`, `{`, `}`, `\`) |
+| [`SaveMode`](../modules/modes/SaveMode.ts) | `SaveMode` | toggled on/off during save flow | Esc (capture) to cancel |
+| [`UiRapidInspector`](../modules/ui/UiRapidInspector.ts) | `UiRapidInspector` | bound in constructor, re-registered on `localechange` | accept/ignore/move/rotate — keys deliberately isolated from the global set |
+| [`UiConflicts`](../modules/ui/UiConflicts.ts) | `conflicts` | toggled on/off | Esc (capture) to cancel |
 
 Every one of these binds to `document`. They coexist today only because each uses a distinct d3
 event namespace (`keydown.capture.<namespace>`). This is the key fact that makes a single
@@ -263,11 +267,11 @@ These are truly-constant platform/browser data, so per `AGENTS.md` they're fine 
 ## Stretch Goal: Remappable, Persisted Shortcuts
 
 Delivered in phases; only **phase 1 (scaffolding)** is in scope for the initial PR. Phases 2 and 3
-are recorded in [`.scratchpad/backlog.md`](../../.scratchpad/backlog.md).
+are recorded in [`.scratchpad/backlog.md`](../.scratchpad/backlog.md).
 
 ### Phase 1 — command scaffolding (this effort, behind the scenes)
 
-- Add a `CommandID` string-ID type to [`modules/types/ids.ts`](../../modules/types/ids.ts)
+- Add a `CommandID` string-ID type to [`modules/types/ids.ts`](../modules/types/ids.ts)
   (runtime-validated, globally-declared, like the other ID types).
 - Introduce an optional **`commandID`** on bindings (`KeyBindingOpts.commandID`). A command is a
   stable, remappable identity (e.g. `'zoom-in'`, `'undo'`) with a *default* combo — distinct from
@@ -294,7 +298,7 @@ it can land incrementally after the scaffolding exists.
 
 ## Testing
 
-- Port [`test/unit/util/keybinding.test.js`](../../test/unit/util/keybinding.test.js) to a
+- Port `test/unit/util/keybinding.test.js` (now [`test/unit/core/KeyboardSystem.test.js`](../test/unit/core/KeyboardSystem.test.js)) to a
   `KeyboardSystem` unit test: construct the system, register via `on`/`scope`, drive with
   `trigger`, assert callbacks. Existing cases (basic match, wrong-key, last-wins, modifiers,
   shift priority) map directly.

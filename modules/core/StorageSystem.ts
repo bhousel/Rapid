@@ -29,7 +29,7 @@ type InternalStorage = Storage | MockStorage;
  * n.b.:  `localStorage` is a _synchronous_ API.
  * For large, asynchronous, or worker-shared data, use `DatabaseSystem` (which wraps the
  * `indexedDB` API) instead. The user's edit history is migrating there — see
- * `.github/design/database-system.md` and `DatabaseSystem.ts`.
+ * `design/database-system.md` and `DatabaseSystem.ts`.
  */
 export class StorageSystem extends AbstractSystem {
 

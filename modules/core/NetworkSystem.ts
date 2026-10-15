@@ -131,6 +131,8 @@ export const STATUS_ERROR = 0;
  * Events available:
  * - `paused`  - Fires when the system transitions from unpaused to paused
  * - `resumed` - Fires when the system transitions from paused to unpaused
+ *
+ * See `design/network-system.md` for the full design.
  */
 export class NetworkSystem extends AbstractSystem {
   /**

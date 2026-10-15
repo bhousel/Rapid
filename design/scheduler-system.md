@@ -369,7 +369,7 @@ Migration notes:
 
 ### Phase 6a — Network offloading to workers
 
-**Full design**: See `.github/design/network-system.md`.
+**Full design**: See [`network-system.md`](network-system.md).
 
 Move fetch-and-parse work from services into the worker pool via a new
 `NetworkSystem` that centralizes fetch lifecycle management — request

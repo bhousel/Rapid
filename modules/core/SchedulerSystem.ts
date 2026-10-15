@@ -134,6 +134,8 @@ const PRESSURE_RECOVER = {
  * - `paused`         - Fires when the system transitions from unpaused to paused
  * - `resumed`        - Fires when the system transitions from paused to unpaused
  * - `pressurechange` - Fires when backpressure level changes
+ *
+ * See `design/scheduler-system.md` for the full design.
  */
 export class SchedulerSystem extends AbstractSystem {
 

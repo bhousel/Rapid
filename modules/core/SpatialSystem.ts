@@ -61,6 +61,8 @@ interface SpatialCache {
  * This system replaces older code from:
  * - `Tree.js`, which only indexed the OSM data
  * - Various rbushes scattered around the service code
+ *
+ * See `design/spatial-system.md` for the full design.
  */
 export class SpatialSystem extends AbstractSystem {
 

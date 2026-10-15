@@ -5,7 +5,7 @@ file drag-and-drop handling. Today the drop handler is buried in a Pixi renderin
 components have to fight for (or comment out) their own handlers. Centralizing it gives us one place
 to accept dropped files and route them — via a **claim-based registry** — to whichever component
 wants them, the same "one owner, everyone else subscribes" pattern we use for
-[`UrlHashSystem`](../../modules/core/UrlHashSystem.ts) and
+[`UrlHashSystem`](../modules/core/UrlHashSystem.ts) and
 [`KeyboardSystem`](./keyboard-system.md).
 
 The system is deliberately **domain-agnostic**: it knows nothing about GeoJSON, datasets, photos, or
@@ -26,7 +26,7 @@ Tracking issue: _TBD_.
 
 ## Problem
 
-Drag-and-drop is currently owned by [`PixiLayerCustomData`](../../modules/pixi/PixiLayerCustomData.ts),
+Drag-and-drop is currently owned by [`PixiLayerCustomData`](../modules/pixi/PixiLayerCustomData.ts),
 a *rendering layer*. In its constructor it reaches out and claims the global container:
 
 ```ts
@@ -44,7 +44,7 @@ Problems with this:
   The layer can't be the single source of truth for "a file was dropped on Rapid."
 - **Resource contention.** Anything else that wants dropped files must register its own
   `drop.*`-namespaced handler on the same container and hope the namespacing doesn't collide.
-  [`UiRapidAddDataset`](../../modules/ui/UiRapidAddDataset.ts) wanted this and its file-drop code is
+  [`UiRapidAddDataset`](../modules/ui/UiRapidAddDataset.ts) wanted this and its file-drop code is
   **commented out** — evidence of exactly this fight.
 - **No routing.** When a file is dropped, *who* should receive it depends on app state (is the
   "Add Dataset" modal open? the custom-data settings screen? neither?). There's nowhere to make that
@@ -103,8 +103,8 @@ proper owner of the drop interaction.
 ### Ownership and lifecycle
 
 - `DragAndDropSystem extends AbstractSystem`, id `'dragdrop'`, registered in
-  [`modules/core/index.ts`](../../modules/core/index.ts) and typed in
-  [`modules/core/types.ts`](../../modules/core/types.ts) as `context.systems.dragdrop`.
+  [`modules/core/index.ts`](../modules/core/index.ts) and typed in
+  [`modules/core/types.ts`](../modules/core/types.ts) as `context.systems.dragdrop`.
 - It attaches its listeners to `context.container()` in **`startAsync`** (after `UiSystem` has built
   the container) and detaches in `destroy()`. The drop target is the **entire container**, as today.
 - Optional dependencies: `gfx`/`map` (to convert a drop's screen point to a map coordinate, for image

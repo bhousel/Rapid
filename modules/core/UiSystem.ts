@@ -29,6 +29,8 @@ type DOMRectData = Pick<DOMRectReadOnly, 'x' | 'y' | 'width' | 'height' | 'top' 
  *
  * Events available:
  * - `uichange` - Fires on any change in the user interface (such as resize)
+ *
+ * See `design/ui-system.md` for the UI component design.
  */
 export class UiSystem extends AbstractSystem {
 

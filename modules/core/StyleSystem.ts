@@ -119,6 +119,8 @@ function getTag(tags: OsmTags, key: string): string | undefined {
  *
  * Events available:
  * - `stylechange`  Fires on any change in style
+ *
+ * See `design/style-system.md` for the full design.
  */
 export class StyleSystem extends AbstractSystem {
 

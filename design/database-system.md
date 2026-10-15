@@ -11,14 +11,15 @@ core refactor [facebook/Rapid#961](https://github.com/facebook/Rapid/pull/961)).
 [facebook/Rapid#187](https://github.com/facebook/Rapid/issues/187) (localStorage quota limits on the
 edit history).
 
-> **Status:** Phases 0 and 1 implemented (see Rollout Plan below). Later phases (multi-session
-> restore UI, data files, storage-management UI, worker offload) are still design proposals. The API
-> sketches in this doc describe the shipped `DatabaseSystem` interface plus proposed future additions.
+> **Status:** Phases 0–4 implemented (see Rollout Plan below): sessions store, multi-session
+> restore, `files` store, and the storage-check API. Still open: the stored-files management UI
+> and Phase 5 (worker offload). The API sketches in this doc describe the shipped `DatabaseSystem`
+> interface plus proposed future additions.
 
 ## Problem
 
 Rapid currently abuses `StorageSystem` / `localStorage` to store the user's entire edit history as a
-single serialized JSON blob (see [`EditSystem.immediateBackup()`](../../modules/core/EditSystem.ts)).
+single serialized JSON blob (see [`EditSystem.immediateBackup()`](../modules/core/EditSystem.ts)).
 `localStorage` is the wrong tool for this:
 
 - **It's tiny.** Most browsers cap `localStorage` at ~5 MB per origin. A moderately large edit
@@ -483,8 +484,8 @@ Boundary guidance:
 ## Lifecycle & Dependencies
 
 - `DatabaseSystem extends AbstractSystem`, registered in
-  [`modules/core/index.ts`](../../modules/core/index.ts) and typed in
-  [`modules/core/types.ts`](../../modules/core/types.ts) as `context.systems.database`. New
+  [`modules/core/index.ts`](../modules/core/index.ts) and typed in
+  [`modules/core/types.ts`](../modules/core/types.ts) as `context.systems.database`. New
   `SystemID` `'database'`.
 - `initAsync()` opens the `Rapid` database (running migrations). `DatabaseSystem` is an **optional**
   dependency everywhere it's used — `EditSystem`, `RapidSystem`, and any future consumer capture it
@@ -546,12 +547,12 @@ the initial phases, but the async, worker-portable API is designed with this in 
 ## Rollout Plan
 
 ### Phase 0 — Design + scaffolding ✅ done
-- Landed the `DatabaseSystem` skeleton in [`modules/core/DatabaseSystem.ts`](../../modules/core/DatabaseSystem.ts):
+- Landed the `DatabaseSystem` skeleton in [`modules/core/DatabaseSystem.ts`](../modules/core/DatabaseSystem.ts):
   `AbstractSystem` lifecycle, `idb` open + version, the central store manifest, manifest-driven
   schema `upgrade`, an in-memory mock fallback, CRUD/bulk/iterate/index/transaction helpers, and the
   quota/estimate/usage/persist API. Registered as `context.systems.database` (new `'database'`
   `SystemID`) and exported from `headless.js`. Added `idb` (dependency) and `fake-indexeddb`
-  (dev). Unit tests in [`test/unit/core/DatabaseSystem.test.js`](../../test/unit/core/DatabaseSystem.test.js)
+  (dev). Unit tests in [`test/unit/core/DatabaseSystem.test.js`](../test/unit/core/DatabaseSystem.test.js)
   cover CRUD, bulk, index queries, transactions, blob round-trips, storage management, and the
   no-IndexedDB fallback. No behavior change to existing systems.
 
@@ -565,7 +566,7 @@ the initial phases, but the async, worker-portable API is designed with this in 
 - On init (outside the test/CLI early-return), restore detection **prefers the IndexedDB session**,
   falling back to the legacy `localStorage` backup; the legacy key is imported into IndexedDB once.
   `restoreBackup()` restores from the structured session when present; `clearBackup()` removes both.
-- Tests in [`test/unit/core/EditSystem.test.js`](../../test/unit/core/EditSystem.test.js) cover the
+- Tests in [`test/unit/core/EditSystem.test.js`](../test/unit/core/EditSystem.test.js) cover the
   `toBackup`/`fromBackupAsync` seam.
 
 ### Phase 2 — Multi-session restore UI ✅ done
