@@ -1,10 +1,7 @@
----
-applyTo: "modules/pixi/**"
----
-
 # Pixi Module Guidelines
 
-Guidelines for working with the `modules/pixi/` folder during TypeScript conversion.
+Guidelines for working with the `modules/pixi/` folder.
+(For an overview of what's in this folder, see [`README.md`](README.md).)
 
 ## Working with Services
 

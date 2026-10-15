@@ -22,6 +22,9 @@ If you want to contribute to Rapid, you'll probably need to:
 As you change things, you'll want to `bun run all` to ensure that things are working.
 (This command runs `clean`, `check`, and `build`.)
 
+To run the unit and browser tests:
+- `bun run test`
+
 You can also type-check the project without emitting files:
 - `bun run check:ts` — runs `tsc --noEmit` across the source, scripts, and test files.
 

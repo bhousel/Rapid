@@ -16,23 +16,25 @@ This module contains a mix of data structures, schema classes, and utility funct
 | `Field.ts` | Form fields for editing entity properties |
 | `Preset.ts` | Feature presets (templates for map features) |
 
-### Styling Classes
+### Styling and Rule Classes
 
 | File | Description |
 |------|-------------|
 | `Style.ts` | Visual style properties for map features (fill, stroke, marker, etc.) |
 | `StyleSelector.ts` | Matching rules that determine when styles apply |
 | `PropMatcher.ts` | Declarative tag/property matching conditions |
+| `Ruleset.ts` | Group of `PropMatcher` rules with include/exclude semantics |
+| `Variable.ts` | Named reusable data (e.g. lists of tag values), referenced from rules via `var()` |
 
 ### Data Structures
 
 | File | Description |
 |------|-------------|
 | `Difference.ts` | Calculates differences between two graphs |
-| `Edit.ts` | Represents an edit operation with undo support |
+| `Edit.ts` | The state of a single edit in the history (graph, annotation, selection, etc.) |
 | `Geometry.ts` | Geometry wrapper for data elements |
 | `GeometryPart.ts` | Individual parts of multi-part geometries |
-| `Graph.ts` | Immutable graph structure holding all entities |
+| `Graph.ts` | Transactional graph structure holding all entities |
 | `TreeStore.ts` | Generic nested key/value tree store: path access (`get`/`peek`/`set`/`has`/`unset`) plus flat-key (de)serialization (`toFlat`/`fromFlat`) |
 
 ### Imagery & Datasets
@@ -40,12 +42,14 @@ This module contains a mix of data structures, schema classes, and utility funct
 | File | Description |
 |------|-------------|
 | `ImagerySource.ts` | Background imagery source configuration |
-| `RapidDataset.ts` | Rapid AI dataset configuration |
+| `RapidDataset.ts` | External dataset that can be loaded into Rapid (Esri, MapWithAI, Overture, custom) |
+| `RapidDataDictionary.ts` | Mapping from a dataset's source attributes to OSM tags |
 
 ### Validation
 
 | File | Description |
 |------|-------------|
+| `ValidationCache.ts` | Stores validation state for a graph (`base` or `head`) |
 | `ValidationFix.ts` | A fix that can be applied to resolve a validation issue |
 | `ValidationIssue.ts` | A validation problem detected in the map data |
 
@@ -57,13 +61,17 @@ This module contains a mix of data structures, schema classes, and utility funct
 | `lanes.ts` | Lane tagging utilities |
 | `multipolygon.ts` | Multipolygon relation handling |
 | `types.ts` | Shared TypeScript type definitions |
+| `index.ts` | Barrel export file |
 
 ## Graph
 
-The `Graph` class is central to Rapid's data model. It's an immutable structure that holds all entities and their relationships:
+The `Graph` class is central to Rapid's data model. It holds all entities and their relationships, with a "base" (unedited) state and a "local" (edited) state.
+
+Graphs are transactional: `replace`/`remove`/`revert` modify the graph in place, then `commit` updates any entities that rely on the graph:
 
 ```typescript
-// Graphs are immutable - modifications return new graphs
-const newGraph = graph.replace(entity);
-const newerGraph = newGraph.remove(entityId);
+graph
+  .replace(entity)
+  .remove(otherEntity)
+  .commit();
 ```

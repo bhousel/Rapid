@@ -1,5 +1,6 @@
 ---
-description: Review the codebase and suggest improvements
+name: suggest
+description: Review the codebase and suggest improvements, without making edits. Use when asked for a review, an audit, or ideas for what to improve.
 argument-hint: additional optional context
 ---
 

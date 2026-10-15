@@ -16,7 +16,7 @@ See: https://developers.transifex.com/reference/api-authentication for informati
 
 ## Prepare the release
 
-Use the `/release` prompt in Copilot Chat — it will:
+Use the `/release` skill in your agent (Claude Code, Copilot Chat, etc.) — it will:
 - Validate the version number
 - Identify commits since the last release and look up PR numbers
 - Update `CHANGELOG.md` with a new entry

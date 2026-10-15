@@ -2,6 +2,16 @@
 
 Non-obvious choices where "why did we do it this way?" isn't captured in the code.
 
+## Folder-specific agent rules live in nested `AGENTS.md`, not `.github/instructions/`
+
+`.github/instructions/*.instructions.md` with `applyTo:` globs only work in Copilot. Claude Code never loaded
+them, and `pixi.instructions.md` wasn't linked from anywhere. Folder READMEs aren't a good home either:
+no agent loads a README automatically, so rules there only get read if the agent happens to open it. Nested
+`AGENTS.md` is the cross-tool convention (Claude Code, Codex, Cursor, the Copilot coding agent). Claude Code
+was confirmed (Oct 2026) to load `modules/<dir>/AGENTS.md` as soon as it reads a file in that folder.
+In VS Code Copilot Chat, nested `AGENTS.md` sits behind an experimental setting (`chat.useNestedAgentsMdFiles`).
+The two files were moved with `git mv` (history preserved) and their `applyTo` frontmatter was dropped.
+
 ## `DatabaseSystem` owns the generic file API (but not the `sessions` domain logic)
 
 `DatabaseSystem` (wraps IndexedDB) gained a typed file API — `putFileAsync` / `getFileAsync` /

@@ -1,9 +1,9 @@
 /**
- * Actions module - Pure functions that transform a Graph.
+ * Actions module - Functions that transform a Graph.
  *
- * Actions are the building blocks of all edits in Rapid. They are pure functions
- * that take a Graph and return a modified Graph. Actions should call `graph.commit()`
- * at the end to finalize changes.
+ * Actions are the building blocks of all edits in Rapid. They are functions that take
+ * a Graph, modify it in place (`graph.replace()` / `graph.remove()`), and return it.
+ * Actions should call `graph.commit()` at the end to finalize changes.
  *
  * Some actions support transitions (smooth animations) via an optional `t` parameter.
  * Some actions can be disabled, reporting a reason string via a `disabled()` method.

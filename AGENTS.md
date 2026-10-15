@@ -2,7 +2,7 @@
 
 This file contains agent-specific guidance only.
 
-Read [`README.md`](README.md) and [`CONTRIBUTING.md`](CONTRIBUTING.md) first for general project information.
+At session start, skim [`README.md`](README.md) and [`CONTRIBUTING.md`](CONTRIBUTING.md) for general project information.
 
 ---
 
@@ -17,9 +17,9 @@ At the start of a session, read `.scratchpad/current.md` for active work context
 
 As you work, update these files. When work completes: add a one-liner to `completed.md`, move the "why" to `decisions.md`, lessons to `lessons.md`, and delete the rest from `current.md`. See `.scratchpad/README.md` for conventions.
 
-## Prompt Files
+## Skills
 
-This project has reusable Copilot prompt files in `.github/prompts/`. Your editor surfaces them via the `/` menu (or equivalent). When a task matches an existing prompt, prefer invoking it over improvising — the prompts encode project-specific conventions.
+This project has reusable agent skills in `.claude/skills/`: one folder per skill, each with a `SKILL.md` in the open Agent Skills format. Claude Code and VS Code Copilot both find them there and list them in the `/` menu (or equivalent). When a task matches an existing skill, prefer invoking it over improvising — the skills encode project-specific conventions.
 
 ## General Guidelines
 
@@ -48,19 +48,24 @@ This project has reusable Copilot prompt files in `.github/prompts/`. Your edito
 - Also **don't add unsolicited comments or docstrings** to code you're modifying. Only add explanatory comments when the user asks, when documenting a non-obvious decision (magic numbers, workarounds), or when the code is genuinely confusing without them.
 
 ### Lint warnings
-- **Never circumvent lint warnings** by renaming, reformatting, or otherwise disguising the triggering code (e.g. rewriting `todo` as `@TODO` to dodge `no-warning-comments`).
-- Lint warnings like `todo`/`fixme` are intentional project health signals — they should remain visible.
+- **Never circumvent lint warnings** by renaming, reformatting, or otherwise disguising the triggering code to silence a rule (e.g. rewriting `todo` as `@TODO` to dodge `no-warning-comments`).
+- Lint warnings (like `todo`/`fixme`) are intentional project health signals — they should remain visible.
 - If your change introduces a new lint warning, mention it; don't silently suppress it.
 
 ### File Operations
-- Use VS Code file tools (`create_file`, `replace_string_in_file`, `multi_replace_string_in_file`) instead of terminal commands. This shows changes in VS Code's diff view for easier review.
-- For bulk/repetitive edits across multiple files, use `multi_replace_string_in_file` with explicit before/after context in each replacement. The exact-match requirement prevents silent damage that regex-based tools can cause.
-- **Do not use `sed`, `perl -i`, or inline Python/Node scripts to edit source files.** Greedy regexes (especially around whitespace and line boundaries) can collapse or corrupt code in ways that are hard to spot without a full re-read. If an edit feels too repetitive for `multi_replace_string_in_file`, that's a signal to slow down, not to reach for a script.
+- **Edit files using the structured file-editing operations exposed by your host environment** — e.g. the `create_file` / `replace_string_in_file` / `multi_replace_string_in_file` tools in VS Code Copilot, the equivalent `Edit` / `Write` tools in Claude Code, Cursor's edit tools, an MCP filesystem server, or whatever your runtime offers. These show changes in a reviewable diff and (where applicable) require exact-match context, which prevents silent damage that regex-based tools can cause.
+- For bulk/repetitive edits across multiple files, prefer a multi-edit operation (e.g. `multi_replace_string_in_file`) over many separate calls when your environment supports it.
+- **Do not** mutate files via shell stream-editing tools like `sed`, `perl -i`, `awk -i`, or inline `python -c` / `node -e` scripts. Greedy regexes (especially around whitespace and line boundaries) can collapse or corrupt code in ways that are hard to spot without a full re-read. If an edit feels too repetitive for the structured edit tools, that's a signal to slow down, not to reach for a script.
 - Avoid `cat` with heredoc or other terminal-based file writing.
 
 ---
 
 ## Working in the Rapid Codebase
+
+### Folder-specific instructions
+- Some folders have their own `AGENTS.md` with rules that apply only there (currently [`modules/ui/`](modules/ui/AGENTS.md) and [`modules/pixi/`](modules/pixi/AGENTS.md)). Agents that support nested `AGENTS.md` files load them automatically when working in that folder. If yours doesn't, read the folder's `AGENTS.md` before editing files there.
+- Guidance that only applies to one folder belongs in that folder's `AGENTS.md`, not in this file and not in editor-specific locations like `.github/instructions/`.
+- `README.md` describes what a folder contains, for humans. `AGENTS.md` holds the rules and checklists. Each one links to the other.
 
 ### Code Style
 - Use ES module syntax (`import`/`export`)
@@ -126,10 +131,6 @@ This project has reusable Copilot prompt files in `.github/prompts/`. Your edito
 - Do not use `private` for class members in this codebase; use `protected` instead.
 - Protected member names must be prefixed with `_`.
 - If outside code needs access to internal state, prefer exposing a `public` getter over directly reading a protected `_member`.
-
-### File Conversion
-- Use `git mv` to rename `.js` → `.ts` (preserves git history)
-- Update barrel `index.js` to export from `.ts` file
 
 ### Class Property Initialization
 - **Initialize class properties inside the constructor**, not as field initializers
@@ -503,7 +504,7 @@ import type { OsmNode, OsmWay } from '../core/index.ts';
 ### Relocalization (d3 render)
 - **Set localized strings on the UPDATE (merged) selection, never on an enter-only (`$$`) selection.** Enter runs once; anything set there won't re-localize when the user changes language.
 - `.text(...)`, `.html(...)`, and `.attr('title' | 'placeholder' | 'aria-label' | 'alt', …)` derived from `l10n.t(...)` / `l10n.tHtml(...)` belong on `$foo` **after** `.merge($$foo)`. Enter (`$$`) is for structure only — `.append(...)`, static `.attr('class', …)`, static `.on(...)`.
-- For the full UI component checklist (render `$parent` capture, optional-system fallbacks, `@param` coverage, relocalization), see [`.github/instructions/ui-components.instructions.md`](.github/instructions/ui-components.instructions.md) — it is auto-applied to `modules/ui/**`.
+- For the full UI component checklist (render `$parent` capture, optional-system fallbacks, `@param` coverage, relocalization), see [`modules/ui/AGENTS.md`](modules/ui/AGENTS.md).
 
 ### GeoJSON Types
 - **`@types/geojson`** is installed as a dev dependency and exposes a global `GeoJSON` namespace via UMD declaration
@@ -518,10 +519,6 @@ import type { OsmNode, OsmWay } from '../core/index.ts';
   - `SingularGeometryType` = `'Point' | 'LineString' | 'Polygon'`
   - `GeoJSONFeature`, `GeoJSONObject` - slightly looser versions that allow optional `geometry` for easier construction
 
-### Working with Untyped JavaScript Components
-- It's OK to assert `as any` for parts of the codebase that haven't been converted to TypeScript yet
-- This pattern keeps code readable while allowing gradual TypeScript adoption
-
 ### headless.js
 - **Never import from `headless.js`** in main application code
 - `headless.js` is a test-only build - import from actual source files instead
@@ -531,41 +528,24 @@ import type { OsmNode, OsmWay } from '../core/index.ts';
 - When using browser-only APIs (like `KeyboardEvent`), check if they exist first
 - Unit tests run without DOM globals unless using the happy-dom preload
 
-## Conversion Status
-
-Track TypeScript conversion progress here:
-
-| Folder | Status | Notes |
-|--------|--------|-------|
-| `modules/util/` | ✅ Complete | All files converted |
-| `modules/lib/` | ✅ Complete | All files converted |
-| `modules/pixi/` | ✅ Complete | All files converted |
-| `modules/core/` | ✅ Complete | All files converted |
-| `modules/behaviors/` | ✅ Complete | All files converted |
-| `modules/actions/` | ✅ Complete | All files converted |
-| `modules/modes/` | ✅ Complete | All files converted |
-| `modules/data/` | ✅ Complete | All files converted |
-| `modules/geo/` | ✅ Complete | All files converted |
-| `modules/operations/` | ✅ Complete | All 17 operations are `AbstractOperation` subclasses named `ThingOperation` (e.g. `CircularizeOperation`, `DeleteOperation`). Files are `ThingOperation.ts`. `index.ts` holds the `operations.available` registry. `run()` replaced the old callable factory. `CycleHighwayTagOperation` keeps a documented module-level `_lastSelectedIDs` (persists across per-click instances). |
-| `modules/services/` | ✅ Complete | All files converted |
-| `modules/ui/` | ✅ Complete | All 9 phases done — every component is a TS class (with a documented departure for the intro/walkthrough state machines); barrels are `index.ts`. A couple of stateless/inline-attached primitives stay typed functions by design (`icon`, `section`/`uiSection`). Only the quarantined React demo (`sections/*.jsx`) and disabled `UiFieldRestrictions`/`field_help` remain non-standard. See `.github/design/ui-system.md` progress log. |
-| `modules/validators/` | ✅ Complete | All files converted |
-
 ## Testing
 
 After making changes:
-1. Run `bun tsc --noEmit` to check types
+1. Run `bun run check:ts` to check types
 2. Run `bun run check:lint` to perform linting
 3. Run `bun run build:js` to verify build
-4. Run `bun run test` for full test suite (or the sub-commands below for faster iteration)
+4. Run `bun run test` to run the unit and browser tests (or the sub-commands below for faster iteration)
 5. Run `bun run check:json` to validate data files against JSON schemas
 
 ### Test Commands
-- `bun run test` — runs lint + unit + browser + type-check (the full suite)
+- `bun run test` — unit + browser tests (`test:unit` and `test:browser`). It does **not** lint or type-check.
 - `bun run test:unit` — unit tests only (`test/unit/`)
 - `bun run test:browser` — browser tests with happy-dom preload (`test/browser/`)
+- `bun run check` — all static checks: `check:csp`, `check:json`, `check:lint`, `check:ts`
 - `bun run check:ts` — type-check via `tsc --noEmit`
+- `bun run all` — `clean` + `check` + `build` (no tests)
 - **Do NOT use bare `bun test`** — it skips the `--preload ./test/test_setup.js` that provides happy-dom globals. Browser tests will fail with misleading errors about missing DOM APIs.
+- If a test fails at line 1 with `describe is not defined`, suspect Bun's transpiler cache before the test (see `.scratchpad/quirks.md`).
 
 ### JSON Schemas
 - Data files in `data/` are validated by JSON Schema definitions in `data/schema/`

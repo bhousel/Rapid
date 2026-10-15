@@ -4,7 +4,7 @@ Services are extension components that connect to external web services and fetc
 
 ## Overview
 
-Services handle communication with various APIs to fetch map data, imagery, QA issues, and other information. They manage caching, rate limiting, and data parsing.
+Services handle communication with various APIs to fetch map data, imagery, QA issues, and other information. Most services route their requests through `NetworkSystem` (inflight tracking, dedup, concurrency limits) and keep their tile and data caches in `SpatialSystem`. Heavy parsing (OSM XML/JSON, vector tiles) can be dispatched to a web worker via `WorkerSystem`.
 
 ## Key Files
 
@@ -12,19 +12,19 @@ Services handle communication with various APIs to fetch map data, imagery, QA i
 
 | File | Description |
 |------|-------------|
-| `EsriService.ts` | Esri feature services |
+| `EsriService.ts` | Esri-hosted datasets (ArcGIS feature services) |
 | `MapWithAIService.ts` | Meta's MapWithAI road and building data |
-| `OsmService.ts` | OpenStreetMap API (editing, data fetching) |
-| `OvertureService.ts` | Overture Maps Foundation data |
-| `VectorTileService.ts` | Vector tile fetching and parsing |
+| `OsmService.ts` | OpenStreetMap API (authentication, data fetching, changeset upload) |
+| `OvertureService.ts` | Overture Maps Foundation data (PMTiles, extends `VectorTileService`) |
+| `VectorTileService.ts` | Vector tile fetching and parsing (MVT tileservers and PMTiles archives) |
 
 ### Photo Services
 
 | File | Description |
 |------|-------------|
-| `MapillaryService.ts` | Mapillary street-level imagery |
+| `MapillaryService.ts` | Mapillary street-level imagery and detections (with the Mapillary-JS viewer) |
 | `KartaviewService.ts` | KartaView (OpenStreetCam) imagery |
-| `StreetsideService.ts` | Bing Streetside imagery |
+| `StreetsideService.ts` | Bing Streetside imagery (with the Pannellum panoramic viewer) |
 
 ### QA Services
 
@@ -32,16 +32,16 @@ Services handle communication with various APIs to fetch map data, imagery, QA i
 |------|-------------|
 | `KeepRightService.ts` | KeepRight QA tool |
 | `OsmoseService.ts` | Osmose QA tool |
-| `MapRouletteService.ts` | MapRoulette challenges |
+| `MapRouletteService.ts` | MapRoulette challenges and tasks |
 
 ### Reference Data Services
 
 | File | Description |
 |------|-------------|
 | `NominatimService.ts` | Nominatim geocoding/search |
-| `NsiService.ts` | Name Suggestion Index |
+| `NsiService.ts` | Name Suggestion Index (NSI presets and tag upgrade suggestions) |
 | `TaginfoService.ts` | Taginfo tag statistics |
-| `OsmWikibaseService.ts` | OSM Wikibase (Data Items) |
+| `OsmWikibaseService.ts` | OSM Wikibase (Data Items) for tag documentation |
 | `WikidataService.ts` | Wikidata entities |
 | `WikipediaService.ts` | Wikipedia articles |
 
@@ -51,6 +51,13 @@ Services handle communication with various APIs to fetch map data, imagery, QA i
 |------|-------------|
 | `GeoScribbleService.ts` | GeoScribble annotations |
 | `WaybackService.ts` | Esri Wayback imagery |
+
+### Module Files
+
+| File | Description |
+|------|-------------|
+| `index.ts` | Barrel export and the `services.available` registry |
+| `types.ts` | `Services` instances interface and `ServiceConstructor` type |
 
 ### Worker Companion Files
 
@@ -63,7 +70,7 @@ Services handle communication with various APIs to fetch map data, imagery, QA i
 
 Services follow the same lifecycle as systems:
 
-```javascript
+```typescript
 await service.initAsync();   // Set up connections
 await service.startAsync();  // Begin fetching data
 await service.resetAsync();  // Clear caches
@@ -73,7 +80,7 @@ await service.resetAsync();  // Clear caches
 
 Services are accessed through the context, just like systems:
 
-```javascript
+```typescript
 const osm = context.services.osm;
 const mapillary = context.services.mapillary;
 ```

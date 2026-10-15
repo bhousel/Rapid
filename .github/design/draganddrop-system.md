@@ -18,10 +18,11 @@ happens next — parsing, loading, and (if it wants) persisting to
 Follow-on from the `DatabaseSystem` work ([facebook/Rapid#1078](https://github.com/facebook/Rapid/issues/1078)).
 Tracking issue: _TBD_.
 
-> **Status:** Implemented (core). `DragAndDropSystem` ships with the claim registry, file
-> categorization, container listeners + overlay, and the migrated custom-data consumer. The
-> `UiRapidAddDataset` high-priority consumer is **deferred** — that modal's file→dataset flow is
-> currently commented-out/URL-only, so wiring a consumer there is a separate feature.
+> **Status:** Implemented. `DragAndDropSystem` ships with the claim registry, file
+> categorization, container listeners + overlay, and the migrated custom-data consumer. Since
+> Oct 2026, `UiRapidAddDataset` also registers a high-priority (`priority: 1`) consumer while its
+> modal is open. Dropped data files feed its file→dataset flow, which persists the file through
+> `DatabaseSystem` (see Migration step 3).
 
 ## Problem
 
@@ -244,8 +245,11 @@ isn't present. (File routing is done entirely through the claim registry, **not*
    `setFileList(payload.fileList)` — behavior-identical to the old handler. Parsing unchanged.
    (For today the Pixi layer registers directly; moving that ownership to a real system later is the
    open question below — a mild smell we accepted for now.)
-3. ⏸ **`UiRapidAddDataset` (deferred):** its file→dataset flow is commented-out/URL-only today, so a
-   high-priority consumer there is a separate feature. Left untouched.
+3. ✅ **`UiRapidAddDataset`** (Oct 2026): the file picker is restored, and `show()` registers an
+   `ui-add-dataset` consumer (`priority: 1`, accepts data drops) that `_done()` unregisters. The file
+   input and drag-and-drop both go through `_setFileList`. On "Next", the modal checks
+   `DatabaseSystem.canStoreAsync()`, stores the file with `putFileAsync()`, and creates a custom
+   `RapidDataset` whose `sourceFileID` points at it.
 4. **`UiSettingsCustomData`:** unchanged (its `<input type=file>` still works); later it can share the
    system's accept ruleset and could route its `FileList` through `dragdrop.dropFilesAsync`.
 5. ✅ **Accept/classification ruleset:** centralized on the system (`DATA_EXTENSIONS` /

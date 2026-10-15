@@ -26,16 +26,16 @@ exposes that state through its methods.
 | `CopyOperation.ts` | Copy selected features to clipboard |
 | `CycleHighwayTagOperation.ts` | Cycle through highway/crossing presets |
 | `DeleteOperation.ts` | Delete selected features |
-| `DisconnectOperation.ts` | Disconnect a node from connected ways |
-| `DowngradeOperation.ts` | Remove tags from a feature |
+| `DisconnectOperation.ts` | Disconnect a node from connected ways, or ways from each other |
+| `DowngradeOperation.ts` | Remove most tags from a feature (keeping address/building/generic tags) |
 | `ExtractOperation.ts` | Extract a point from a way |
 | `MergeOperation.ts` | Merge selected features together |
-| `MoveOperation.ts` | Move selected features |
-| `OrthogonalizeOperation.ts` | Square the corners of a building |
-| `PasteOperation.ts` | Paste features from clipboard |
+| `MoveOperation.ts` | Enter move mode to reposition selected features |
+| `OrthogonalizeOperation.ts` | Square the corners of a way or vertex |
+| `PasteOperation.ts` | Paste copied features near the pointer |
 | `ReflectOperation.ts` | Reflect features across an axis — base class + `ReflectShortOperation` / `ReflectLongOperation` subclasses |
-| `ReverseOperation.ts` | Reverse the direction of a way |
-| `RotateOperation.ts` | Rotate selected features |
+| `ReverseOperation.ts` | Reverse the direction of a way or node |
+| `RotateOperation.ts` | Enter rotate mode to spin selected features |
 | `SplitOperation.ts` | Split a way at a node |
 | `StraightenOperation.ts` | Straighten a way or line of nodes |
 
@@ -52,7 +52,9 @@ operation.run();          // Perform the operation
 operation.id;             // Operation identifier
 operation.keys;           // Keyboard shortcuts
 operation.title;          // Display title
+operation.tooltip();      // Tooltip text (explains why, if disabled)
 operation.annotation();   // Undo annotation text
+operation.behavior;       // KeyOperationBehavior that binds the shortcuts (if any)
 ```
 
 Some operations override optional hooks from the base class:

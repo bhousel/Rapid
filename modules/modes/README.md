@@ -6,10 +6,14 @@ Modes represent the current editing task the user is performing. Only one mode c
 
 All modes extend `AbstractMode` and manage the editing state for a particular task. Modes control which behaviors are enabled and what operations are available.
 
+Modes use a registry pattern: `index.ts` holds a `modes.available` Map of mode IDs to constructors, and at init time `Context` instantiates each one into `context.modes` (typed by the `Modes` interface in `types.ts`).
+
 ## Key Files
 
 | File | Description |
 |------|-------------|
+| `index.ts` | Barrel exports + the `modes.available` registry |
+| `types.ts` | `Modes` instance container and `ModeConstructor` types |
 | `AbstractMode.ts` | Base class for all modes with enter/exit lifecycle |
 | `AddNoteMode.ts` | Adding a new OSM note |
 | `AddPointMode.ts` | Adding a new point feature |
@@ -17,11 +21,11 @@ All modes extend `AbstractMode` and manage the editing state for a particular ta
 | `DragNodeMode.ts` | Dragging a node to a new position |
 | `DragNoteMode.ts` | Dragging an OSM note |
 | `DrawAreaMode.ts` | Drawing a new area (polygon) |
-| `DrawLineMode.ts` | Drawing a new line (way) |
+| `DrawLineMode.ts` | Drawing a new line (way), or continuing an existing one |
 | `MoveMode.ts` | Moving selected features |
 | `RotateMode.ts` | Rotating selected features |
 | `SaveMode.ts` | Saving/uploading changes to OSM |
-| `SelectMode.ts` | Features are selected (base class) |
+| `SelectMode.ts` | Non-OSM features are selected |
 | `SelectOsmMode.ts` | OSM features are selected |
 
 ## Properties
@@ -36,8 +40,8 @@ Each mode has:
 
 The application context manages mode transitions:
 
-```javascript
-context.enter('select-osm', { selection: { osm: selectedIds } });
+```typescript
+context.enter('select-osm', { selection: { osm: selectedIDs } });
 context.enter('browse');
-context.mode();   // returns BrowseMode
+context.mode;   // returns BrowseMode
 ```

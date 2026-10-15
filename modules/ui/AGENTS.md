@@ -1,10 +1,7 @@
----
-applyTo: "modules/ui/**"
----
-
 # UI Component Checklist
 
 These are the conventions most often missed when writing or editing a `modules/ui/` component.
+(For an overview of what's in this folder, see [`README.md`](README.md).)
 **Verify every item below on any component you touch** — this list exists because these keep slipping through review.
 
 ## 1. Render method — capture the parent selection

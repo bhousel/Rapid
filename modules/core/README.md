@@ -9,7 +9,9 @@ All systems extend `AbstractSystem` and follow a standard lifecycle:
 2. `initAsync()` - Called after all systems are constructed, set up dependencies
 3. `startAsync()` - Called after initialization, start doing work
 4. `resetAsync()` - Called to reset state (e.g., after completing an edit session)
-5. `pause()` / `resume()` - Temporarily pause/resume system activity
+5. `pause()` - Temporarily pause system activity; returns a release token, and the system resumes once all outstanding pauses are released
+
+Systems declare `requiredDependencies` and `optionalDependencies`; an optional system (e.g. `DatabaseSystem`, `DragAndDropSystem`) may be absent, so callers should branch on its presence and keep a working fallback.
 
 ## Scoped Architecture
 
@@ -101,12 +103,15 @@ collected, sorted by specificity, and their referenced styles are deep-merged.
 |------|-------------|
 | `AbstractSystem.ts` | Base class for all systems with lifecycle management |
 | `AssetSystem.ts` | Manages loading and caching of assets (images, data files) |
+| `DatabaseSystem.ts` | Durable storage wrapping IndexedDB (`sessions` and `files` stores), with an in-memory fallback |
+| `DragAndDropSystem.ts` | Owns file drag-and-drop and routes dropped files to registered consumers |
 | `EditSystem.ts` | Manages edit history, undo/redo, and staging changes |
 | `FilterSystem.ts` | Controls visibility filtering of map features |
 | `GraphicsSystem.ts` | Manages Pixi.js rendering pipeline |
 | `ImagerySystem.ts` | Manages background imagery layers |
+| `KeyboardSystem.ts` | Keyboard shortcuts, dispatched through enable/disable-able binding scopes |
 | `LocalizationSystem.ts` | Handles internationalization (i18n) and translations |
-| `LocationSystem.ts` | Geocoding and location services |
+| `LocationSystem.ts` | Resolves locationSets and tracks blocked regions (wraps location-conflation) |
 | `Map3dSystem.ts` | Manages the 3D map view (MapLibre) |
 | `MapSystem.ts` | Core map state (zoom, pan, projection) |
 | `NetworkSystem.ts` | Central fetch lifecycle — inflight tracking, dedup, timeout, concurrency, worker dispatch |
@@ -115,15 +120,20 @@ collected, sorted by specificity, and their referenced styles are deep-merged.
 | `RapidSystem.ts` | Manages Rapid AI features and datasets |
 | `SchedulerSystem.ts` | Game-loop, task queues, timers, and backpressure for deferred work |
 | `SchemaSystem.ts` | Loads and provides access to presets, fields, rulesets, and variables |
-| `SpatialSystem.ts` | Spatial indexing for fast geographic queries |
-| `StorageSystem.ts` | Persistent storage (localStorage wrapper) |
+| `SettingsSystem.ts` | Durable user preferences, stored as a tree of string settings |
+| `SpatialSystem.ts` | Data-agnostic spatial caches (RBush) for fast geographic queries |
+| `StorageSystem.ts` | Small synchronous storage (localStorage wrapper) |
 | `StyleSystem.ts` | Manages feature styling, selectors, and variables |
 | `UiSystem.ts` | Manages the user interface components |
 | `UploaderSystem.ts` | Handles uploading changes to OSM |
 | `UrlHashSystem.ts` | Manages URL hash state (bookmarkable URLs) |
 | `ValidationSystem.ts` | Runs validation checks on map data |
 | `WorkerSystem.ts` | Worker pool (lazy spawn, round-robin), task dispatch, and listener registry |
+| `index.ts` | Barrel export and the `systems.available` registry |
+| `index.worker.ts` | Barrel that collects core worker listeners for bundling into `worker.ts` |
 | `types.ts` | TypeScript type definitions for core systems |
+
+Design notes for several systems (database, drag-and-drop, keyboard, network, scheduler, settings, spatial, style, UI) are in [`.github/design/`](../../.github/design/).
 
 ## Accessing Systems
 

@@ -599,7 +599,9 @@ the initial phases, but the async, worker-portable API is designed with this in 
 - Tests: `files` describe in `test/unit/core/DatabaseSystem.test.js` (put/get/list/delete, metadata
   capture, native blob round-trip, upsert-by-id, usage bytes, mock fallback).
 - **Deferred:** drag-and-drop wiring + reload-on-startup belong to a future input/data-file system
-  that consumes this API.
+  that consumes this API. *(Update, Oct 2026: the first consumer landed. `UiRapidAddDataset` stores
+  dropped or picked files, and custom `RapidDataset`s reference them by `sourceFileID`. See Open
+  Question 1.)*
 
 ### Phase 4 — Storage management ✅ done
 Scoped to the real driving flow: the user drops a ~20 MB data file on `UiRapidAddDataset`; the
@@ -657,6 +659,12 @@ no incremental tracking required.
 
 1. **Reload flow for persisted files:** once a drag-drop/data-file system exists, should it
    auto-reload persisted files on startup or prompt the user?
+   *Partly answered (Oct 2026):* files that back a custom Rapid dataset reload **automatically**.
+   The dataset's settings (`rapid.custom.<id>`, including `sourceFileID`) persist through
+   `SettingsSystem`, and `RapidDataset.setupCustomDatasetAsync()` fetches the file with
+   `getFileAsync()`. Deleting the dataset in `UiRapidDatasetSettings` also deletes its file. Still
+   open: the stored-files management UI from Phase 4 (only `canStoreAsync` has a caller so far), and
+   files that aren't tied to a dataset.
 2. **Database name/scoping:** single `Rapid` database with `origin` stored per-record (proposed), or
    a per-origin database name?
 3. **Codify graceful degradation** as a general principle in the agent instructions / a top-level

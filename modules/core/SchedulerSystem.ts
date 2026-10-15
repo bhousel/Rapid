@@ -126,12 +126,9 @@ const PRESSURE_RECOVER = {
  * directly.  All managed timers are automatically cancelled on
  * `resetAsync()`.
  *
- * **Worker management** — Spawns, pools, and messages web workers so
- * that CPU-heavy work (validation, spatial indexing, etc.) can be
- * offloaded from the main thread.  Host app sets `workerURL` to the
- * built worker script, then calls `dispatch(listenerID, data)`
- * to dispatch serializable tasks.  Workers are spawned lazily up to
- * `maxWorkers` and terminated on `resetAsync()`.
+ * Web workers are managed by `WorkerSystem`, not here. When `WorkerSystem.dispatch()`
+ * is given a `resultPriority`, the worker results are handed back through this
+ * system's priority queue so they stay within the frame budget.
  *
  * Events available:
  * - `paused`         - Fires when the system transitions from unpaused to paused

@@ -172,7 +172,7 @@ export class UiFoo {
 
 > **Note (2026-08-10):** The inventory below reflects the **initial state** of `modules/ui/` at the
 > start of this project. The conversion is now complete — all components are TypeScript classes.
-> For current state, see the `## Progress log` section below and the conversion table in `AGENTS.md`.
+> For current state, see the `## Progress log` section below and `.scratchpad/completed.md`.
 
 Counts are approximate line counts. **Level** is the current level; all targets are **Level 4 (TS class)**.
 

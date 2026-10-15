@@ -1,9 +1,12 @@
 ---
-description: Reflect on recent work and bring all project documentation up to date
+name: reflect
+description: Reflect on recent work and bring all project documentation up to date. Use after landing a chunk of work, or when asked to update docs, agent instructions, or working memory.
 argument-hint: additional optional context
 ---
 
 Update all project documentation to match the current state of the code. Fix gaps, stale content, spelling mistakes, and anything unclear. Make all edits — do not just list findings. Do not commit; the user will review first.
+
+If the user provided additional context with the prompt, treat it as a focus area (e.g. "only README", "check AGENTS.md is accurate").
 
 ## Steps
 
@@ -16,5 +19,5 @@ Update all project documentation to match the current state of the code. Fix gap
 
 - Inline documentation (JSDoc, comments)
 - Markdown files (`README`, design docs, contributing guides)
-- Agent instructions (`AGENTS.md`, `copilot-instructions`, etc.)
+- Agent instructions and skills (`AGENTS.md`, `.claude/skills/`, `copilot-instructions`, etc.)
 - Working memory — e.g. `SCRATCHPAD.md`, `.scratchpad/*`, or whatever convention this project uses (see `AGENTS.md`)
