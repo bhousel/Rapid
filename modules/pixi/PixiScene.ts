@@ -127,6 +127,7 @@ export class PixiScene extends EventEmitter {
       'debug-under',  // Debug that appears under everything
       'basemap',      // Editable basemap (OSM/Rapid)
       'points',       // Editable points (OSM/Rapid)
+      'debug-over',   // Debug that appears over the basemap
       'streetview',   // Streetview imagery, sequences
       'qa',           // Q/A items, issues, notes
       'labels',       // Text labels

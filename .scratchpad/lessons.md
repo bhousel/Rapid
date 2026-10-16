@@ -45,6 +45,7 @@ Things that went wrong once and shouldn't go wrong again.
 ## Testing
 
 - **MockContext has no services by default** — Guard clauses needed when testing service-dependent features.
+- **Pixi layers can be checked in a real browser, WebGL included** — Headless Chromium through Playwright renders the map with SwiftShader (`--use-angle=swiftshader --enable-unsafe-swiftshader`). The project's Playwright may expect a newer browser build than the one in `~/Library/Caches/ms-playwright`; pass `executablePath` to the installed `chrome-headless-shell` rather than downloading. To debug what the developer sees, attach to their Chrome with `chromium.connectOverCDP('http://127.0.0.1:9222')` (started with `--remote-debugging-port=9222 --user-data-dir=…`) and query `globalThis.rapidContext`. Querying state beats reading screenshots.
 - **DOMParser in unit tests** — Use `import { DOMParser } from '@xmldom/xmldom'`, not the browser global. Tests run without happy-dom unless using browser preload.
 - **Test sample data** — `*.sample.js` files alongside the test. Import as `import * as SAMPLE from './Foo.sample.js'`.
 - **FilterSystem cache keyed by `entity.key`** (includes version), not `entity.id`.
@@ -128,6 +129,11 @@ Things that went wrong once and shouldn't go wrong again.
 - **PIXI color formats** — CSS hex `"#FF6600"` and numeric `0xFF6600` work. String `"0xFF6600"` may also work (unverified).
 - **TaginfoService `_clean()` strips `debounce` from params** — When migrating `doRequest = params.debounce ? debouncedVersion : directVersion`, capture `shouldDebounce` BEFORE calling `_clean()`. The same pattern applies to OsmWikibaseService.
 - **`scheduler?.debounce()` silently drops calls** — Optional chaining on the scheduler means the debounced function never fires if scheduler is absent. Fix: `if (shouldDebounce && scheduler) { scheduler.debounce(...) } else { request() }`. Only matters for service request paths; UI render deferrals are safe to no-op.
+
+## OSM Data Model
+
+- **An untagged way in a multipolygon is really the relation** — Multipolygon outer and inner ways usually carry no tags; the tags (e.g. `building=retail`) sit on the relation. Such a way is closed, but `way.geometry(graph)` returns `'line'` because `isArea()` finds no area-suggesting tag. Anything that asks "is this an area?" or "what is this?" about a way must check parent multipolygons, or it will treat building outlines as lines. A building can even be several closed outers in one relation. Several places handle this separately today (see `backlog.md`, `OsmWay.asFeature`).
+- **`isArea()` needs the schema** — `tagSuggestingArea()` reads area keys from `SchemaSystem` rulesets. In unit tests without a schema, `building=yes` alone doesn't make a closed way an area; add `area=yes` to the fixture.
 
 ## Pixi Rendering
 

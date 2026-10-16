@@ -4,11 +4,11 @@ import { geoMetersToWorld } from '../geo/geom.ts';
 import { geomPathIntersections, projWgs84ToWorld, projWorldToWgs84, vecAngle, vecEqual, vecInterp, vecLength, vecProject } from '@rapid-sdk/math';
 import { PropMatcher } from '../lib/PropMatcher.ts';
 
+import type { AbstractData } from '../data/AbstractData.ts';
 import type { Context } from '../Context.ts';
 import type { CoverageBox } from '../geo/geom.ts';
 import type { GeometryPart } from '../lib/GeometryPart.ts';
 import type { Graph } from '../lib/Graph.ts';
-import type { OsmEntity } from '../data/OsmEntity.ts';
 import type { OsmNode } from '../data/OsmNode.ts';
 import type { OsmWay, Segment } from '../data/OsmWay.ts';
 import type { PropMatcherProps } from '../lib/PropMatcher.ts';
@@ -16,17 +16,23 @@ import type { RapidDataset } from '../lib/RapidDataset.ts';
 import type { Vec2 } from '@rapid-sdk/math';
 
 
-/** Default looseness of the "needs review" limits, as a multiple of the "already mapped" limits. */
+/** Default "needs review" distance limit, as a multiple of the "already mapped" buffer. */
 const DEFAULT_REVIEW_FACTOR = 2;
 /** Default max heading difference (degrees) between a new line and an existing one. */
 const DEFAULT_MAX_ANGLE = 30;
 /** An end of a run snaps to an existing OSM node if it is within this distance (meters). */
 const JOIN_SNAP_METERS = 1;
+/** Which OSM geometry a rule can match when its `match.geometry` isn't set: the same kind as the rule's own. */
+const DEFAULT_OSM_GEOMETRY: Record<ConflationRule['geometry'], GeometryType[]> = {
+  point: ['point', 'vertex'],
+  line: ['line'],
+  area: ['area']
+};
 
 
 /** Which OSM features count as "already mapped" for a rule. Same shape as a `StyleSelector`'s `match`. */
 export interface ConflationMatch {
-  /** OSM geometry type(s) that can match */
+  /** OSM geometry type(s) that can match (default: the same kind as the rule's `geometry`) */
   geometry?: GeometryType | GeometryType[];
   /** Tag conditions, all must match (AND) */
   tags?: PropMatcherProps[];
@@ -46,7 +52,10 @@ export interface ConflationRule {
   buffer: number;
   /** Lines: "already mapped" heading limit, in degrees (default 30) */
   maxAngle?: number;
-  /** The "needs review" limits are this multiple of the "already mapped" limits (default 2) */
+  /**
+   * The "needs review" distance limit is this multiple of `buffer` (default 2).
+   * The angle limit is the same for both: a line heading somewhere else isn't "almost the same".
+   */
   reviewFactor?: number;
 }
 
@@ -95,6 +104,8 @@ export interface ConflationCandidate {
 
 /** Triage of one coverage box along a new line. */
 export interface BoxMatch {
+  /** Box center, in world coordinates */
+  coord: Vec2;
   /** `matched`, `uncertain`, or `unmatched` */
   status: ConflationStatus;
   /** OSM ways that matched this box at its status, closest first */
@@ -167,9 +178,9 @@ export function conflationDefaults(): ConflationSettings {
     enabled: false,
     showMatched: false,
     rules: [
-      { geometry: 'line', match: { geometry: 'line' }, buffer: 3, maxAngle: DEFAULT_MAX_ANGLE, reviewFactor: DEFAULT_REVIEW_FACTOR },
+      { geometry: 'line', match: {}, buffer: 3, maxAngle: DEFAULT_MAX_ANGLE, reviewFactor: DEFAULT_REVIEW_FACTOR },
       { geometry: 'point', match: {}, buffer: 3, reviewFactor: DEFAULT_REVIEW_FACTOR },
-      { geometry: 'area', match: { geometry: 'area' }, buffer: 0, reviewFactor: DEFAULT_REVIEW_FACTOR }
+      { geometry: 'area', match: {}, buffer: 0, reviewFactor: DEFAULT_REVIEW_FACTOR }
     ]
   };
 }
@@ -268,7 +279,7 @@ export class ConflationSystem extends AbstractSystem {
    * @param datum - The new feature
    * @return The result, or `undefined` if conflation is off for the dataset or no rule applies
    */
-  public getResult(ds: RapidDataset, datum: GeoJSONData | OsmEntity): ConflationResult | undefined {
+  public getResult(ds: RapidDataset, datum: AbstractData): ConflationResult | undefined {
     if (!this.isEnabled(ds)) return undefined;
 
     let cache = this._results.get(ds.id);
@@ -335,7 +346,7 @@ export class ConflationSystem extends AbstractSystem {
    * @param datum - The new feature
    * @return The result, or `undefined` if no rule applies
    */
-  protected _compute(ds: RapidDataset, datum: GeoJSONData | OsmEntity): ConflationResult | undefined {
+  protected _compute(ds: RapidDataset, datum: AbstractData): ConflationResult | undefined {
     if (!(datum instanceof GeoJSONData)) return undefined;   // OSM-backed datasets: not yet
 
     const part = datum.geoms.parts[0];   // single part only, like `actionRapidAcceptFeature`
@@ -386,18 +397,18 @@ export class ConflationSystem extends AbstractSystem {
 
   /**
    * Whether an existing OSM way satisfies a rule's `match`.
+   * The OSM geometry must be one of `match.geometry`. If that isn't set, it must be the same kind of
+   * geometry as the rule's own, so a line never matches an area (OSM represents both as ways).
    * @param rule - The rule
    * @param way - The OSM way
    * @param graph - The graph the way belongs to
    * @return `true` if the way can match
    */
   protected _wayMatches(rule: ConflationRule, way: OsmWay, graph: Graph): boolean {
-    const want = rule.match.geometry;
-    if (want) {
-      const geometry = way.geometry(graph);
-      const wants = Array.isArray(want) ? want : [want];
-      if (!wants.includes(geometry)) return false;
-    }
+    const want = rule.match.geometry ?? DEFAULT_OSM_GEOMETRY[rule.geometry];
+    const wants = Array.isArray(want) ? want : [want];
+    if (!wants.includes(way.geometry(graph))) return false;
+
     return PropMatcher.matchAll(this._tagMatchers(rule), way.tags);
   }
 
@@ -419,8 +430,9 @@ export class ConflationSystem extends AbstractSystem {
    * Matches a new LineString against existing OSM ways.
    *
    * Each coverage box is triaged on its own: *matched* if an OSM way that satisfies the rule is
-   * within `buffer` meters and `maxAngle` degrees, *uncertain* if one is within the looser review
-   * limits, and *unmatched* otherwise. Consecutive boxes with the same status form runs.
+   * within `buffer` meters and `maxAngle` degrees, *uncertain* if one is within `maxAngle` degrees
+   * but only within the looser `buffer × reviewFactor` distance, and *unmatched* otherwise.
+   * Consecutive boxes with the same status form runs.
    * @param dataID - The new feature's id
    * @param rule - The rule that applies
    * @param part - The new feature's geometry
@@ -436,7 +448,6 @@ export class ConflationSystem extends AbstractSystem {
 
     const factor = rule.reviewFactor ?? DEFAULT_REVIEW_FACTOR;
     const maxAngle = rule.maxAngle ?? DEFAULT_MAX_ANGLE;
-    const looseAngle = Math.min(90, maxAngle * factor);
     const lat = part.orig!.extent.center()[1];
     const metersPerWorld = 1 / geoMetersToWorld(1, lat);
     const looseR = geoMetersToWorld(rule.buffer * factor, lat);
@@ -507,7 +518,7 @@ export class ConflationSystem extends AbstractSystem {
           strictIDs.push([wayID, m.distance]);
           tally ??= { strict: 0, loose: 0, distance: 0, angle: 0 };
           tally.strict++;
-        } else if (m.distance <= rule.buffer * factor && m.angle <= looseAngle) {
+        } else if (m.distance <= rule.buffer * factor && m.angle <= maxAngle) {
           looseIDs.push([wayID, m.distance]);
           tally ??= { strict: 0, loose: 0, distance: 0, angle: 0 };
           tally.loose++;
@@ -521,11 +532,11 @@ export class ConflationSystem extends AbstractSystem {
 
       const byDistance = (a: [EntityID, number], b: [EntityID, number]) => a[1] - b[1];
       if (strictIDs.length) {
-        boxMatches.push({ status: 'matched', wayIDs: strictIDs.sort(byDistance).map(d => d[0]) });
+        boxMatches.push({ coord: box.coord, status: 'matched', wayIDs: strictIDs.sort(byDistance).map(d => d[0]) });
       } else if (looseIDs.length) {
-        boxMatches.push({ status: 'uncertain', wayIDs: looseIDs.sort(byDistance).map(d => d[0]) });
+        boxMatches.push({ coord: box.coord, status: 'uncertain', wayIDs: looseIDs.sort(byDistance).map(d => d[0]) });
       } else {
-        boxMatches.push({ status: 'unmatched', wayIDs: [] });
+        boxMatches.push({ coord: box.coord, status: 'unmatched', wayIDs: [] });
       }
     }
 

@@ -1,21 +1,41 @@
 import { AbstractPixiLayer } from './AbstractPixiLayer.ts';
 import { GeometryPart } from '../lib/GeometryPart.ts';
 import { PixiFeaturePoint } from './PixiFeaturePoint.ts';
-import { PixiFeaturePolygon } from './PixiFeaturePolygon.ts';
 import { projWorldToWgs84 } from '@rapid-sdk/math';
 
-import type { BBox } from 'rbush';
-import type { OsmEntity } from '../data/OsmEntity.ts';
+import type { AbstractData } from '../data/AbstractData.ts';
+import type { AbstractPixiFeature } from './AbstractPixiFeature.ts';
+import type { ConflationStatus } from '../core/ConflationSystem.ts';
 import type { PixiScene } from './PixiScene.ts';
 import type { StyleProps } from '../lib/Style.ts';
-import type { Viewport } from '@rapid-sdk/math';
+import type { Vec2, Viewport } from '@rapid-sdk/math';
+
+
+/** Marker colors for each conflation status */
+const STATUS_COLORS: Record<ConflationStatus, number> = {
+  matched:   0x00cc44,   // green
+  uncertain: 0xffc400,   // amber
+  unmatched: 0xff3333,   // red
+  unknown:   0x999999    // gray
+};
+
+/** Marker color for join points */
+const JOIN_COLOR = 0x3399ff;   // blue
 
 
 /**
  * This class renders debug map data.
  * The debug layer is disabled by default.
+ *
+ * It currently shows how conflation sees each Rapid dataset that has conflation turned on:
+ * a dot at each coverage box, colored by its status, and a larger blue dot where each
+ * run would join an existing OSM way. This is useful when tuning a dataset's matching rules.
  */
 export class PixiLayerDebug extends AbstractPixiLayer {
+
+  /** What each marker was last drawn as (its kind and location). When this changes, the marker is rebuilt. */
+  protected _drawnAs: WeakMap<AbstractPixiFeature, string>;
+
 
   /**
    * @param scene - The Scene that owns this Layer
@@ -24,6 +44,7 @@ export class PixiLayerDebug extends AbstractPixiLayer {
     super(scene);
     this.id = 'debug';
     this.enabled = false;
+    this._drawnAs = new WeakMap<AbstractPixiFeature, string>();
   }
 
 
@@ -34,8 +55,10 @@ export class PixiLayerDebug extends AbstractPixiLayer {
     super.reset();
 
     // Items in this layer don't actually need to be interactive
-    const groupContainer = this.scene.groups.get('debug-under')!;
-    groupContainer.eventMode = 'none';
+    for (const groupID of ['debug-under', 'debug-over']) {
+      const groupContainer = this.scene.groups.get(groupID)!;
+      groupContainer.eventMode = 'none';
+    }
   }
 
 
@@ -47,116 +70,74 @@ export class PixiLayerDebug extends AbstractPixiLayer {
   public render(frame: number, viewport: Viewport): void {
     if (!this.enabled) return;
 
-    /**
-     *
-     * @param entity
-     */
-    function _isBuilding(entity: OsmEntity): boolean {
-      return entity.type === 'way' && (!!entity.tags.building && entity.tags.building !== 'no');
-    }
-
     const context = this.context;
-    const editor = context.systems.editor!;
+    const conflation = context.systems.conflation;   // optional
+    const rapid = context.systems.rapid;             // optional
     const spatial = context.systems.spatial!;
-    const graph = editor.staging.graph;
 
-    const DEFAULTSTYLE = {
-      fill: { color: 0xffff00, opacity: 0.5, width: 1, type: 'full' },  // always fill fully
-      casing: { opacity: 0 },  // disable
-      stroke: { opacity: 0 }   // disable
-    } as Partial<StyleProps>;
+    if (!conflation || !rapid) return;
 
-    const POISTYLE = {
-      marker: { color: 0xffff00, image: 'smallCircle' }
-    } as Partial<StyleProps>;
+    for (const ds of rapid.datasets.values()) {
+      if (!rapid.enabledDatasetIDs.has(ds.id) || !conflation.isEnabled(ds)) continue;
 
+      for (const item of spatial.getVisibleItems(ds.spatialID)) {
+        const d = item.contents as AbstractData;
+        const result = conflation.getResult(ds, d);
+        if (!result) continue;
 
-    const parentContainer = this.scene.groups.get('debug-under')!;
+        const prefix = `${this.layerID}-${ds.id}-${d.id}`;
+        result.boxes?.forEach((box, i) => {
+          const loc = projWorldToWgs84(box.coord);
+          this._renderMarker(`${prefix}-box${i}`, loc, box.status, frame, viewport);
+        });
 
-    const msSpatialID = 'mapwithai-msBuildings-data';
-    const osmSpatialID = editor.spatialIDForGraph(graph);
-
-    // Gather visible Microsoft Buildings
-    const search = context.viewport.visibleWorldExtent().bbox();
-    const msData = spatial.getItemsAtBox(msSpatialID, search)
-      .filter(hit => _isBuilding(hit.contents as OsmEntity));
-
-    for (const hit of msData) {
-      if (!spatial.hasItemsAtBox(osmSpatialID, hit)) continue;  // Is osm data loaded here?
-
-      const data = hit.contents as OsmEntity;
-      // if (data.type !== 'way') continue;  // consider ways only (not the nodes at the corners)
-
-      const dataID = data.id;
-      const version = data.v || 0;
-      const parts = data.geoms.parts;
-
-      for (let i = 0; i < parts.length; i++) {
-        const part = parts[i];
-        if (!part.orig || !part.world) continue;  // invalid?
-
-        const origExtent = part.orig.extent;
-        const worldPoi = part.world?.poi;  // Pole of Inaccessability (world coordinates for rbush query)
-
-        // bounding box
-        const bboxFeatureID = `${this.layerID}-${dataID}-${i}`;
-        let bboxFeature = this.features.get(bboxFeatureID);
-        if (worldPoi && !bboxFeature) {
-          bboxFeature = new PixiFeaturePolygon(this, bboxFeatureID);
-          bboxFeature.allowInteraction = false;
-          bboxFeature.parentContainer = parentContainer;
-          bboxFeature.v = version;
-
-          const bboxGeometry = new GeometryPart(context);
-          bboxGeometry.setData({ type: 'Polygon', coordinates: [origExtent.polygon()] });
-          bboxFeature.geometry = bboxGeometry;
-
-          // Start with default style, and apply adjustments
-          // set style = red if collides, green if not
-          const style = structuredClone(DEFAULTSTYLE);
-          const box: BBox = { minX: worldPoi![0], minY: worldPoi![1], maxX: worldPoi![0], maxY: worldPoi![1] };
-          // does this test point hit an OSM building?
-          const didHitBuilding = spatial.getItemsAtBox(osmSpatialID, box).some(hit => _isBuilding(hit.contents as OsmEntity));
-
-          if (didHitBuilding) {
-            // console.log(`${dataID} id hit osm building ${didHitBuilding.contents.id}`);
-            style.fill!.color = 0xff0000;  // red
-          } else {
-            style.fill!.color = 0x00ff00;  // green
-          }
-          bboxFeature.style = style;
-        }
-
-        if (bboxFeature) {
-          // this.syncFeatureClasses(feature);
-          bboxFeature.update(viewport);
-          this.retainFeature(bboxFeature, frame);
-        }
-
-        // visualize test point
-        if (worldPoi) {
-          const poiFeatureID = `${this.layerID}-${dataID}-${i}-poi`;
-          let poiFeature = this.features.get(poiFeatureID);
-          if (!poiFeature) {
-            poiFeature = new PixiFeaturePoint(this, poiFeatureID);
-            poiFeature.allowInteraction = false;
-            poiFeature.parentContainer = parentContainer;
-            poiFeature.v = version;
-
-            const poiGeometry = new GeometryPart(context);
-            poiGeometry.setData({ type: 'Point', coordinates: projWorldToWgs84(worldPoi) });
-            poiFeature.geometry = poiGeometry;
-
-            poiFeature.style = POISTYLE;
-          }
-
-          // this.syncFeatureClasses(poifeature);
-          poiFeature.update(viewport);
-          this.retainFeature(poiFeature, frame);
-        }
+        result.runs?.forEach((run, i) => {
+          if (run.startJoin) this._renderMarker(`${prefix}-run${i}-start`, run.startJoin.loc, 'join', frame, viewport);
+          if (run.endJoin)   this._renderMarker(`${prefix}-run${i}-end`, run.endJoin.loc, 'join', frame, viewport);
+        });
       }
-
     }
+  }
+
+
+  /**
+   * Draws one debug marker.
+   * @param featureID - Unique id for the marker
+   * @param loc - Where to draw it (WGS84)
+   * @param kind - A conflation status, or `'join'`
+   * @param frame - Integer frame being rendered
+   * @param viewport - Pixi viewport to use for rendering
+   */
+  protected _renderMarker(featureID: string, loc: Vec2, kind: ConflationStatus | 'join', frame: number, viewport: Viewport): void {
+    let feature = this.features.get(featureID) as PixiFeaturePoint | undefined;
+    if (!feature) {
+      feature = new PixiFeaturePoint(this, featureID);
+      feature.allowInteraction = false;
+      feature.parentContainer = this.scene.groups.get('debug-over')!;   // above the Rapid lines
+    }
+
+    // Box locations change when the buffer changes, and statuses change after edits.
+    const drawnAs = `${kind}@${loc[0]},${loc[1]}`;
+    if (this._drawnAs.get(feature) !== drawnAs) {
+      this._drawnAs.set(feature, drawnAs);
+
+      const part = new GeometryPart(this.context);
+      part.setData({ type: 'Point', coordinates: loc });
+      feature.geometry = part;
+
+      const isJoin = (kind === 'join');
+      feature.style = {
+        marker: {
+          color: isJoin ? JOIN_COLOR : STATUS_COLORS[kind],
+          image: isJoin ? 'mediumCircle' : 'smallCircle'
+        }
+      } as Partial<StyleProps>;
+    }
+
+    if (feature.dirty) {
+      feature.update(viewport);
+    }
+    this.retainFeature(feature, frame);
   }
 
 }

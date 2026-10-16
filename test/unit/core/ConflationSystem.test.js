@@ -30,9 +30,17 @@ describe('ConflationSystem', () => {
   let context, editor, conflation, ds;
 
   // Adds an OSM way to the editor's base graph, with nodes at the given [x, y] positions.
+  // If the last point repeats the first, the way is closed (it reuses the first node).
   function osmWay(id, points, tags) {
-    const nodes = points.map((p, i) => new Rapid.OsmNode(context, { id: `n${id}-${i}`, loc: loc(...p) }));
-    const way = new Rapid.OsmWay(context, { id: `w${id}`, nodes: nodes.map(n => n.id), tags: tags });
+    const last = points.at(-1);
+    const isClosed = points.length > 2 && last[0] === points[0][0] && last[1] === points[0][1];
+    const unique = isClosed ? points.slice(0, -1) : points;
+
+    const nodes = unique.map((p, i) => new Rapid.OsmNode(context, { id: `n${id}-${i}`, loc: loc(...p) }));
+    const nodeIDs = nodes.map(n => n.id);
+    if (isClosed) nodeIDs.push(nodeIDs[0]);
+
+    const way = new Rapid.OsmWay(context, { id: `w${id}`, nodes: nodeIDs, tags: tags });
     editor.merge([...nodes, way]);
     return way;
   }
@@ -145,6 +153,31 @@ describe('ConflationSystem', () => {
       enable([sidewalkRule({ buffer: 1, reviewFactor: 1 })]);
       conflation.invalidate();
       assert.strictEqual(conflation.getResult(ds, feature('a', [[0, 1.5], [100, 1.5]], SIDEWALK)).status, 'unmatched');
+    });
+
+    it('lines never match OSM areas unless the rule asks for them, like building edges along a sidewalk', () => {
+      // A building whose south edge runs along y = 0, 1.5 m from the new sidewalk.
+      // (`area=yes` because there is no schema here to say that `building` suggests an area.)
+      osmWay(1, [[0, 0], [100, 0], [100, 20], [0, 20], [0, 0]], { building: 'yes', area: 'yes' });
+      const a = feature('a', [[0, -1.5], [100, -1.5]], SIDEWALK);
+
+      enable([sidewalkRule({ match: {} })]);   // no geometry or tag conditions
+      assert.strictEqual(conflation.getResult(ds, a).status, 'unmatched');
+
+      enable([sidewalkRule({ match: { geometry: 'area' } })]);   // explicitly asked for
+      conflation.invalidate();
+      assert.strictEqual(conflation.getResult(ds, a).status, 'matched');
+    });
+
+    it('the review margin loosens distance only, not the angle limit', () => {
+      enable([sidewalkRule()]);
+      osmWay(1, [[0, 0], [100, 0]], SIDEWALK);
+
+      // Within 6 m (the review distance) the whole way, but at 40° (over the 30° limit).
+      const dy = 6 * Math.tan(40 * Math.PI / 180);
+      const result = conflation.getResult(ds, feature('a', [[40, 0.5], [46, 0.5 + dy]], SIDEWALK));
+      assert.strictEqual(result.status, 'unmatched');
+      assert.isFalse(result.boxes.some(b => b.status === 'uncertain'));
     });
 
     it('matches regardless of line direction', () => {

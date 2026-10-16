@@ -14,8 +14,24 @@ to the part that exists.*
   Triage is per coverage box: matched within `buffer`/`maxAngle`, needs review within
   `reviewFactor`× those, otherwise new. Runs, join points, and invalidation on `stablechange`/`merge`
   are all in place. Tests: `test/unit/core/ConflationSystem.test.js` (synthetic street grid).
-- Next: Step 4, drawing in `PixiLayerRapid` (hide matched, draw runs, highlight needs-review), then
-  Step 5, accepting a run with its joins.
+- ✅ Step 4: `PixiLayerRapid` hides matched lines (or mutes them with `showMatched`), draws partial lines
+  as their runs (`…-run${i}` features bound to the original datum), and gives needs-review lines an amber
+  casing. `PixiLayerDebug` now shows conflation boxes and join points in a new `debug-over` group
+  (console: `rapidContext.systems.gfx.scene.enableLayers('debug')`).
+  Checked in headless Chromium against live OSM sidewalks; the driver script stays outside the repo.
+  That testing showed corners producing needs-review stretches, so `reviewFactor` now loosens the
+  distance only, not the angle.
+  Follow-up: line rules only match OSM lines unless `match.geometry` says otherwise (sidewalks were
+  matching building edges).
+- 🔄 Step 4b, found while debugging a live session over CDP (see `backlog.md`, "Debugging loop"):
+  - Untagged multipolygon outer ways report `geometry() === 'line'`, so sidewalks still matched buildings
+    drawn as multipolygons. Fix in progress: `OsmWay.asFeature(graph)` resolves an untagged multipolygon
+    member to its relation (as an area, with the relation's tags), and the matcher uses it.
+  - Rules without tag conditions match roads, railways and waterways. Decided: no default tag condition;
+    the user sets one. Conflation still runs without a data mapping for now (useful for showing the
+    difference a mapping makes). Whether to require a mapping or just warn is still open.
+- Next: Step 5, accepting a run with its joins. Run features are bound to the whole datum today, so the
+  accept path needs to know which run was clicked.
 - **Test data is synthetic only.** Generate a small street grid in code. Agency sidewalk data typically
   runs about 1–2 m off OSM, so the default buffer is 3 m.
 - The scoring formula should eventually match the server-side matching tools. That's being gathered and

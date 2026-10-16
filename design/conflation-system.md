@@ -8,8 +8,9 @@ Conflation runs entirely in the browser, on top of [`SpatialSystem`](./spatial-s
 Step 3d of the spatial design, which said the match semantics would live in a dedicated module. This
 doc is that module's design.
 
-> **Status:** In progress. Step 3 is done: `ConflationSystem` matches LineStrings from GeoJSON-backed
-> datasets, with measures, scoring, triage, runs and join points (see [Rollout Plan](#rollout-plan)).
+> **Status:** In progress. Steps 3 and 4 are done: `ConflationSystem` matches LineStrings from
+> GeoJSON-backed datasets, with measures, scoring, triage, runs and join points, and `PixiLayerRapid`
+> draws the results (see [Rollout Plan](#rollout-plan)).
 > It builds on `SpatialSystem` box queries, the `editor_*` caches with their `segments` index, and
 > `GeometryPart.computeCoverage(radius)`. The scoring model is provisional until it is aligned with
 > the external matching tools (see [Scoring](#scoring)).
@@ -132,6 +133,24 @@ it shows up in stable right away.
 the feature's status is `unknown`. It is drawn the way it is drawn today, and recomputed when the data
 arrives. We must never hide a feature, or show it as missing, because of a gap in what we've downloaded.
 
+### Target features
+
+The matcher should compare against *features*, not raw OSM ways. OSM spreads one feature across
+several entities. The usual case is a multipolygon: its outer and inner ways are untagged closed ways
+that report `geometry() === 'line'`, while the tags (`building=retail`) sit on the relation. Taken at
+face value, a sidewalk along a building drawn this way "matches a line" with no tags.
+
+`OsmWay.asFeature(graph)` answers "what is this way, really?" It returns `{ entity, geometry, tags }`:
+the way itself if it has interesting tags, otherwise the parent multipolygon it belongs to (geometry
+`'area'`, the relation's tags). The matcher checks geometry and tags against that feature and records
+candidates under the feature's ID. So a building made of two closed outers is one candidate, the
+building relation, which is also what a later merge step needs.
+
+Other parts of Rapid answer the same question on their own today (styling, filtering, several
+validators), each slightly differently; moving them to `asFeature` is tracked separately. Longer
+term, the matcher should see generic `{ kind, tags, coords }` features from an index built for that
+purpose, with OSM as one adapter. That would also allow matching one dataset against another.
+
 ### Rules
 
 Each dataset gets a `conflation` settings object. It replaces the `conflated` boolean.
@@ -148,7 +167,7 @@ interface ConflationRule {
 
   // Which features this rule is about. Same shape as a StyleSelector's `match`, checked with PropMatcher.
   match: {
-    geometry?: GeometryType | GeometryType[];   // OSM geometry types that can match
+    geometry?: GeometryType | GeometryType[];   // OSM geometry types that can match (default: same kind as `geometry`)
     tags?: PropMatcherProps[];             // all must match (AND)
   };
 
@@ -156,7 +175,7 @@ interface ConflationRule {
   buffer: number;                          // proximity, in meters
   maxAngle?: number;                       // lines: max heading difference, in degrees (default 30)
 
-  // "Needs review" limits are this multiple of the limits above (default 2)
+  // "Needs review" distance limit is this multiple of `buffer` (default 2). The angle limit doesn't change.
   reviewFactor?: number;
 }
 ```
@@ -168,6 +187,13 @@ type is `geometry` and its tags satisfy `match.tags`. The rule then looks for OS
 satisfy all of `match`. So a dataset with both sidewalks and crossings can have one rule for each,
 and a new crossing is only compared with OSM crossings. A feature that no rule applies to gets no
 result and is drawn as it is today.
+
+**Geometry has to agree.** OSM represents both lines and areas as ways, so without a check a sidewalk
+would match the edge of a building it runs along. When `match.geometry` isn't set, it defaults to the
+same kind of geometry as the rule: line rules match OSM lines, area rules match OSM areas, and point
+rules match OSM points and vertices. Setting `match.geometry` explicitly overrides this, for the rare
+case where matching across geometry types is intended (for example, a footpath against a pedestrian
+plaza mapped as an area).
 
 **Tags are compared after the data dictionary.** The dataset's data dictionary maps source attributes
 to OSM tags, the same way it does when a feature is accepted. Rule `match` blocks are then checked
@@ -230,15 +256,22 @@ the same conversion `computeCoverage` uses.
 > anything: until we have them, Rapid uses the simple formula below, behind a single function, so it
 > can be swapped out.
 
-**Two sets of limits.** The user's parameters are the "already mapped" limits. The "needs review"
-limits are the same parameters multiplied by `reviewFactor`. Each coverage box is triaged by the
-best OSM way near it:
+**Two distance limits, one angle limit.** The user's parameters are the "already mapped" limits. The
+"needs review" limit loosens only the distance, to `buffer × reviewFactor`. Each coverage box is
+triaged by the best OSM way near it:
 
 | Box status | Condition (closest segment of a way that satisfies the rule) |
 |---|---|
 | `matched` | distance ≤ `buffer` **and** heading difference ≤ `maxAngle` |
-| `uncertain` | distance ≤ `buffer × reviewFactor` **and** heading difference ≤ `maxAngle × reviewFactor` (at most 90°) |
+| `uncertain` | distance ≤ `buffer × reviewFactor` **and** heading difference ≤ `maxAngle` |
 | `unmatched` | neither |
+
+*Why not loosen the angle too?* An earlier version also multiplied `maxAngle` by `reviewFactor` (30° to
+60°). Trying it on real sidewalk data in the browser showed that every corner then produced a
+"needs review" stretch: the crossing and the next sidewalk are 3–4 m away at 30–40°. Any stretch that
+needs review sends the whole line to the review queue, so partly mapped sidewalks went to review
+instead of offering their new part. A line heading 40° away is going somewhere else, so it isn't
+"almost the same".
 
 ```text
 box score       = 1 (matched), 0.5 (uncertain), 0 (unmatched)
@@ -253,8 +286,8 @@ the score.
 with "matched above 0.8" and "review above 0.3". With agency sidewalks running 1–2 m off OSM and a
 3 m buffer, true matches scored about 0.5 and would all have gone to review. A sidewalk that is half
 mapped would also have gone to review, instead of showing its missing half as new. Limits per box
-avoid both problems and are easy to explain: "within 3 m and 30° is already mapped, within twice
-that needs review."
+avoid both problems and are easy to explain: "within 3 m and 30° is already mapped, within 6 m and
+30° needs review."
 
 ### Stage 3: triage status
 
@@ -296,6 +329,7 @@ interface ConflationCandidate {
 }
 
 interface BoxMatch {
+  coord: Vec2;                        // box center, world coordinates
   status: ConflationStatus;           // matched, uncertain, or unmatched
   wayIDs: EntityID[];                 // OSM ways that matched this box at its status, closest first
 }
@@ -353,7 +387,7 @@ Conflation has to work no matter what the dataset already went through:
 ```ts
 class ConflationSystem extends AbstractSystem {
   // results
-  getResult(ds: RapidDataset, datum: GeoJSONData | OsmEntity): ConflationResult | undefined;
+  getResult(ds: RapidDataset, datum: AbstractData): ConflationResult | undefined;
   isEnabled(ds: RapidDataset): boolean;
 
   // review queue
@@ -372,14 +406,21 @@ today's behavior.
 ### Drawing (`PixiLayerRapid`)
 
 When conflation is on for a dataset:
-- `matched` features are skipped, or drawn in a muted style if `showMatched` is on.
-- `uncertain` features are drawn with a "needs review" highlight.
+- `matched` features are skipped, or drawn in a muted style (35% opacity, no casing) if `showMatched`
+  is on.
+- `uncertain` features are drawn with a "needs review" highlight: a wider amber casing.
 - `unmatched` and `unknown` features are drawn as they are today.
-- Partial lines are drawn as their `runs`, one Pixi feature per run, with IDs like
-  `${dataID}-run${i}`. The matched runs are drawn muted if `showMatched` is on.
+- A line with more than one run is drawn as its `runs`, one Pixi feature per run, with IDs like
+  `rapid-${datasetID}-${dataID}-run${i}`. Each run is styled by its own status. Every run feature
+  is bound to the original datum, so selecting a run selects the line (Step 5 adds run-aware accept).
+- Already-mapped points and areas are hidden the same way, once their matchers exist (Step 8).
 
-This takes the place of the current `isAcceptedOrIgnored` filter for these datasets. That filter
+The layer remembers, for each Pixi feature, which result (or run) it was last drawn from, and rebuilds
+the feature when that changes. It redraws on `conflationchange`. The `isAcceptedOrIgnored` filter
 still applies to features accepted or ignored as a whole.
+
+Styles are constants in `PixiLayerRapid` for now, like the rest of the Rapid layer's styles. Moving
+them into style data is in the backlog, with the other external-data styling ideas.
 
 ### Review queue
 
@@ -438,17 +479,20 @@ it, the single "Conflation?" checkbox is replaced by:
 - an "enabled" switch and a "show matched features" switch
 - for each rule: the geometry type, the match tags (a simple `key=value` list to start, since
   `PropMatcher.from` already parses that format), `buffer`, `maxAngle`, and `reviewFactor`
-  (worded as "needs review within N× these limits")
+  (worded as "needs review within N× this distance")
 - a live count of features in each status in the current view, so users can tune parameters and see
   the effect right away
 
 Changing a parameter invalidates the dataset's results, and they're recomputed on the next draw.
 
-## Retiring the prototype
+## Debug overlay (replaces the prototype)
 
-`PixiLayerDebug`'s conflation code (the Microsoft-buildings check) is deleted. The polygon matcher
-replaces it. The debug layer can show coverage boxes, measures and statuses as an overlay, which is
-useful when tuning parameters.
+`PixiLayerDebug`'s Microsoft-buildings check is gone; the polygon matcher (Step 8) replaces it. The
+debug layer now shows how conflation sees each enabled dataset that has conflation on: a small dot at
+every coverage box, colored by status (green matched, amber uncertain, red unmatched, gray
+unknown), and a larger blue dot at every join point. The dots draw in a new `debug-over` scene
+group, above the basemap, so lines don't hide them. The layer is off by default. Turn it on from the
+console with `rapidContext.systems.gfx.scene.enableLayers('debug')`.
 
 ## Rollout Plan
 
@@ -461,7 +505,8 @@ Lines come first throughout. Points and polygons follow the same pipeline at a l
    `EditSystem`. ✅ Done. Only GeoJSON-backed datasets for now: OSM-backed ones (MapWithAI,
    Esri) keep their geometry in a separate graph and will follow.
 4. **Drawing.** `PixiLayerRapid` hides matched lines, draws partial lines as runs, and highlights
-   uncertain ones. Remove the prototype from `PixiLayerDebug`.
+   uncertain ones. Replace the `PixiLayerDebug` prototype with the debug overlay. ✅ Done, and
+   checked in the browser against real OSM sidewalks with a generated in-memory dataset.
 5. **Accepting and joining.** Accept with a run, plus joins for partial runs and for line ends. Test
    the guiding use case from start to finish on the synthetic street-grid fixture.
 6. **Settings UI.** In the Conflation Settings section, add the stage-word definition and replace the
@@ -480,7 +525,10 @@ Lines come first throughout. Points and polygons follow the same pipeline at a l
   matched run, one unmatched run, and a `JoinPoint` on the OSM way), and crossings whose ends meet
   sidewalks. No real agency data goes in the repo.
 - Triage: a 1.5 m offset is already mapped at a 3 m buffer, needs review at 1 m (review limit 2 m),
-  and is new at 1 m with no review margin. Short overshoots at the end of a match are absorbed.
+  and is new at 1 m with no review margin. A line within the review distance but at 40° is new, not
+  needs review. Short overshoots at the end of a match are absorbed.
+- Drawing: no automated tests (Pixi needs WebGL). Checked in headless Chromium against live OSM data,
+  with an in-memory dataset generated from the OSM sidewalks in view. Nothing was committed.
 - Invalidation: `stablechange` and `merge` flush results, and a rule change flushes one dataset.
 - `unknown`: no result says `unmatched` or `matched` where OSM data isn't loaded.
 - Accepting: a partial run shares its end node with the matched OSM way, and a crossing joins the
@@ -498,9 +546,18 @@ Lines come first throughout. Points and polygons follow the same pipeline at a l
   doesn't block anything; the provisional formula is in one function that can be replaced.
 - **Lines come first.** Points and polygons follow the same pipeline later.
 - **Triage uses limits per box, not thresholds on a score** (decided during Step 3, see [Scoring](#scoring)).
-  "Needs review" is the same limits multiplied by `reviewFactor`.
+  "Needs review" loosens only the distance limit, by `reviewFactor`. The angle limit stays the same
+  (decided during Step 4 testing).
 - **Minimum run length.** A run that isn't matched, is shorter than `buffer`, and sits next to a
   matched run is treated as matched.
+- **No default tag condition.** Without one, a sidewalk rule matches roads, railways and waterways
+  (seen on real data). Only the user can say which OSM features are "the same kind of thing", so the
+  default rules leave `match.tags` empty and the settings UI (Step 6) asks for one.
+- **Conflation runs even without a data mapping, for now.** Without a mapping, the new features' tags
+  are their raw properties, and rules with no tag conditions match everything nearby. That makes the
+  difference a mapping makes easy to show. Whether to require a mapping or only warn is open.
+- **OSM targets are resolved to the feature they represent.** An untagged way in a multipolygon is
+  really the relation (an area, with the relation's tags). See [Target features](#target-features).
 
 ## Open Questions (for review)
 
@@ -509,5 +566,7 @@ Lines come first throughout. Points and polygons follow the same pipeline at a l
 - **`sidewalk=*` on roads.** Should a sidewalk rule also match roads tagged `sidewalk=*`? Those
   features would be `matched` without anything to join to. They might belong in the `uncertain` status.
 - **Polygon threshold.** Is intersection ÷ smaller area the right overlap measure for buildings?
+- **Data mapping: require or warn?** Should conflation refuse to run without a data mapping, or run
+  and show a warning in the settings UI?
 - **Which graph.** `editor_stable` is proposed. Is there a case where conflation must reflect
   edits still in progress (`editor_staging`)?

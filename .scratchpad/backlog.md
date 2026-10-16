@@ -47,6 +47,32 @@ Phase 1 (the `KeyboardSystem` conversion + command scaffolding) is done — see
 - Related to the deferred styling work above: move `PixiLayerRapid`'s hardcoded styles into style data, so
   these treatments go through `StyleSystem`.
 
+## Rapid dataset UI: live tuning instead of nested modals
+- `UiRapidDatasetToggle` → `UiRapidDatasetSettings` (→ colorpicker, etc.) is a stack of modals, a holdover from
+  earlier designs. The modals cover the map, so a user can't tweak conflation parameters and watch the result
+  on the map at the same time.
+- Explore: a separate, non-modal panel for conflation tuning (sidebar or docked pane, live counts of
+  "Already mapped" / "Needs review" / "New" in view), or rethink the modals-on-modals design overall.
+
+## One "what is this way, really?" answer (`OsmWay.asFeature`)
+- An untagged way that belongs to a multipolygon really is that relation (an area, with the relation's
+  tags). At least 7 places work this out on their own, each slightly differently: `PixiLayerOsm`
+  (styling), `FilterSystem` (filter matches), and the validators `crossing_ways` (`getTaggedEntityForWay`),
+  `close_nodes`, `unsquare_way`, `disconnected_way`, `impossible_oneway`.
+- `ConflationSystem` needs the same answer, so it adds `OsmWay.asFeature(graph)` first. Then move the others
+  over one at a time, watching for their small differences (untagged-only or not, inner roles, more than one
+  parent multipolygon).
+- Longer term: index generic features (`{ kind, tags, coords }`) rather than OSM ways, so conflation (and
+  maybe validation) can work against non-OSM targets. See `design/conflation-system.md`.
+
+## Debugging loop: `bun run start:cdp`
+- One command that starts the local server and launches Chrome with `--remote-debugging-port=9222` and a
+  separate profile (`--user-data-dir`), opened to the dev build. Agents can then attach with Playwright's
+  `connectOverCDP` to take screenshots and query `rapidContext` in the developer's own session.
+- Also: a small checked-in helper for `shot` / `eval` against that session, a re-runnable setup snippet
+  (conflation settings aren't persisted yet), and a project skill that documents the loop.
+- Do this once the current conflation phase is committed.
+
 ## Conflation / buffers follow-ups (beyond Step 3)
 - **Internalize / replace `lineToPoly` offset-curve generation** — `lineToPoly` (used for halos) repurposes `PIXI.buildLine`, coupling halo generation to Pixi internals and a fragile triangle-walk. If we ever need *precise* buffer polygons (not just coverage boxes), internalizing the offset-curve math would unify halos + buffers and drop the Pixi coupling. Left alone for now; coverage boxes cover the conflation use case.
 - **Precise buffer polygons** — only if a consumer needs the actual buffer polygon rather than coverage boxes + a distance/overlap predicate. Likely unnecessary given the two-phase query.

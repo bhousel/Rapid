@@ -58,7 +58,7 @@ Rapid uses Pixi.js for hardware-accelerated 2D rendering. The rendering is organ
 | `PixiLayerMapRoulette.ts` | MapRoulette tasks |
 | `PixiLayerGeoScribble.ts` | GeoScribble annotations |
 | `PixiLayerEditBlocks.ts` | Blocked regions where editing is not allowed (from `LocationSystem`) |
-| `PixiLayerDebug.ts` | Debug visualization (disabled by default) |
+| `PixiLayerDebug.ts` | Debug visualization (disabled by default). Currently shows conflation coverage boxes and join points |
 
 ### lib/
 
