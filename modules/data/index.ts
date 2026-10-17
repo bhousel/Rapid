@@ -29,7 +29,7 @@ export type { OsmChangesetProps, OsmChanges } from './OsmChangeset.ts';
 export type { OsmEntityProps } from './OsmEntity.ts';
 export type { OsmNodeProps } from './OsmNode.ts';
 export type { OsmRelationProps, IndexedMember } from './OsmRelation.ts';
-export type { OsmWayProps, Segment } from './OsmWay.ts';
+export type { OsmFeature, OsmWayProps, Segment } from './OsmWay.ts';
 export type * from './types.ts';
 
 

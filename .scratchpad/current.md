@@ -11,29 +11,33 @@ to the part that exists.*
   The review queue covers the viewport only. See "Resolved Decisions" in the doc.
 - ✅ Step 3: `modules/core/ConflationSystem.ts` matches LineStrings from GeoJSON-backed datasets.
   `RapidDataset.conflation` holds the rules (`conflationDefaults()`), which aren't persisted yet (Step 6).
-  Triage is per coverage box: matched within `buffer`/`maxAngle`, needs review within
-  `reviewFactor`× those, otherwise new. Runs, join points, and invalidation on `stablechange`/`merge`
-  are all in place. Tests: `test/unit/core/ConflationSystem.test.js` (synthetic street grid).
+  Triage is per coverage box ("same", "near", or neither). Runs, join points, and invalidation on
+  `stablechange`/`merge` are all in place. Tests: `test/unit/core/ConflationSystem.test.js` (synthetic street grid).
 - ✅ Step 4: `PixiLayerRapid` hides matched lines (or mutes them with `showMatched`), draws partial lines
   as their runs (`…-run${i}` features bound to the original datum), and gives needs-review lines an amber
   casing. `PixiLayerDebug` now shows conflation boxes and join points in a new `debug-over` group
   (console: `rapidContext.systems.gfx.scene.enableLayers('debug')`).
   Checked in headless Chromium against live OSM sidewalks; the driver script stays outside the repo.
-  That testing showed corners producing needs-review stretches, so `reviewFactor` now loosens the
-  distance only, not the angle.
-  Follow-up: line rules only match OSM lines unless `match.geometry` says otherwise (sidewalks were
-  matching building edges).
-- 🔄 Step 4b, found while debugging a live session over CDP (see `backlog.md`, "Debugging loop"):
+  That testing showed corners producing needs-review stretches, so the "near" angle defaults to the
+  "same" angle. Follow-up: line rules only match OSM lines (sidewalks were matching building edges).
+- ✅ Step 4b, found while debugging a live session over CDP (see `backlog.md`, "Debugging loop"):
   - Untagged multipolygon outer ways report `geometry() === 'line'`, so sidewalks still matched buildings
-    drawn as multipolygons. Fix in progress: `OsmWay.asFeature(graph)` resolves an untagged multipolygon
-    member to its relation (as an area, with the relation's tags), and the matcher uses it.
+    drawn as multipolygons. Fixed: `OsmWay.asFeature(graph)` resolves an untagged multipolygon member to
+    its relation (as an area, with the relation's tags). The matcher checks rules against that feature and
+    records candidates by feature ID, so two outers of one building are one candidate. Boxes keep both
+    `entityIDs` (features) and `wayIDs` (for joins); runs only join ways whose feature is a line.
   - Rules without tag conditions match roads, railways and waterways. Decided: no default tag condition;
     the user sets one. Conflation still runs without a data mapping for now (useful for showing the
     difference a mapping makes). Whether to require a mapping or just warn is still open.
+  - `invalidate()` now also drops compiled property matchers, so rules edited in place are picked up.
+- ✅ Step 4c: new rule shape, worked out with Bryan against real data. `source`/`target` sides (geometry +
+  `props`), `sameKeys`, and "same"/"near" distances and angles (`sameDist`, `sameAngle`, `nearDist`,
+  `nearAngle`). Every source feature is tested; rules combine with OR; failing `source.props` means that
+  rule can't say "same" (not "no result"). See the request-to-rule table in the design doc's Rules section.
 - Next: Step 5, accepting a run with its joins. Run features are bound to the whole datum today, so the
   accept path needs to know which run was clicked.
 - **Test data is synthetic only.** Generate a small street grid in code. Agency sidewalk data typically
-  runs about 1–2 m off OSM, so the default buffer is 3 m.
+  runs about 1–2 m off OSM, so the default `sameDist` is 3 m.
 - The scoring formula should eventually match the server-side matching tools. That's being gathered and
   doesn't block the work.
 

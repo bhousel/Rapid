@@ -10,53 +10,59 @@ import type { CoverageBox } from '../geo/geom.ts';
 import type { GeometryPart } from '../lib/GeometryPart.ts';
 import type { Graph } from '../lib/Graph.ts';
 import type { OsmNode } from '../data/OsmNode.ts';
-import type { OsmWay, Segment } from '../data/OsmWay.ts';
+import type { OsmFeature, OsmWay, Segment } from '../data/OsmWay.ts';
 import type { PropMatcherProps } from '../lib/PropMatcher.ts';
 import type { RapidDataset } from '../lib/RapidDataset.ts';
 import type { Vec2 } from '@rapid-sdk/math';
 
 
-/** Default "needs review" distance limit, as a multiple of the "already mapped" buffer. */
-const DEFAULT_REVIEW_FACTOR = 2;
-/** Default max heading difference (degrees) between a new line and an existing one. */
+/** Default max heading difference (degrees) between a source line and a target line. */
 const DEFAULT_MAX_ANGLE = 30;
+/** Lines are sampled at least this far apart (meters), so a `sameDist` of 0 still gives a usable spacing. */
+const MIN_SAMPLE_METERS = 1;
 /** An end of a run snaps to an existing OSM node if it is within this distance (meters). */
 const JOIN_SNAP_METERS = 1;
-/** Which OSM geometry a rule can match when its `match.geometry` isn't set: the same kind as the rule's own. */
-const DEFAULT_OSM_GEOMETRY: Record<ConflationRule['geometry'], GeometryType[]> = {
+/** Which OSM geometries count as each kind of geometry named in a rule. */
+const TARGET_GEOMETRY: Record<ConflationGeometry, GeometryType[]> = {
   point: ['point', 'vertex'],
   line: ['line'],
   area: ['area']
 };
 
 
-/** Which OSM features count as "already mapped" for a rule. Same shape as a `StyleSelector`'s `match`. */
-export interface ConflationMatch {
-  /** OSM geometry type(s) that can match (default: the same kind as the rule's `geometry`) */
-  geometry?: GeometryType | GeometryType[];
-  /** Tag conditions, all must match (AND) */
-  tags?: PropMatcherProps[];
+/** A kind of geometry, as named in a conflation rule. */
+export type ConflationGeometry = 'point' | 'line' | 'area';
+
+/** Conditions on one side of a rule: the source (the dataset's feature) or the target (the OSM feature). */
+export interface ConflationSide {
+  /** The geometry this side must have */
+  geometry: ConflationGeometry;
+  /** Property conditions this side must meet, all of them (AND). Source props are checked after the data mapping. */
+  props?: PropMatcherProps[];
 }
 
 /**
- * One matching rule for a dataset. A rule applies to a new feature when the feature's geometry type
- * is `geometry` and its tags (after the data dictionary) satisfy `match.tags`. It then looks for
- * existing OSM features that satisfy `match`.
+ * A `ConflationRule` defines when a source feature and a target feature are the same thing.
+ * - All of a rule's conditions must hold (AND).
+ * - A dataset can have several rules, and any one of them saying "same" is enough (OR).
+ * - Source props are checked after the dataset's data mapping has been applied.
+ * - Distances are measured from the source to the target.
  */
 export interface ConflationRule {
-  /** Which geometry type of new feature this rule applies to */
-  geometry: 'point' | 'line' | 'area';
-  /** Which OSM features count as "already mapped" */
-  match: ConflationMatch;
-  /** "Already mapped" proximity limit, in meters */
-  buffer: number;
-  /** Lines: "already mapped" heading limit, in degrees (default 30) */
-  maxAngle?: number;
-  /**
-   * The "needs review" distance limit is this multiple of `buffer` (default 2).
-   * The angle limit is the same for both: a line heading somewhere else isn't "almost the same".
-   */
-  reviewFactor?: number;
+  /** Conditions on the source feature */
+  source: ConflationSide;
+  /** Conditions on the target feature */
+  target: ConflationSide;
+  /** Property keys whose values must be present and equal on both source and target */
+  sameKeys?: string[];
+  /** "Same": the target is within this distance of the source, in meters (0 means touching or inside) */
+  sameDist: number;
+  /** "Same", lines only: the heading difference is at most this, in degrees (default 30) */
+  sameAngle?: number;
+  /** "Near" (needs review): the target is within this distance, in meters (default `sameDist`, no review band) */
+  nearDist?: number;
+  /** "Near", lines only: the heading difference is at most this, in degrees (default `sameAngle`) */
+  nearAngle?: number;
 }
 
 /** Per-dataset conflation settings, stored on `RapidDataset.conflation`. */
@@ -65,7 +71,7 @@ export interface ConflationSettings {
   enabled: boolean;
   /** Whether to draw "already mapped" features in a muted style, instead of hiding them */
   showMatched: boolean;
-  /** The matching rules, checked in order. The first rule that applies to a feature is used. */
+  /** The rules that decide sameness. Any one rule saying "same" is enough. */
   rules: ConflationRule[];
 }
 
@@ -94,7 +100,7 @@ export interface ConflationMeasures {
 
 /** An existing OSM feature that may be the same as the new feature. */
 export interface ConflationCandidate {
-  /** The OSM entity */
+  /** The OSM feature: a way, or a relation such as a multipolygon (see `OsmWay.asFeature`) */
   entityID: EntityID;
   /** Score for this pair, 0–1 */
   score: number;
@@ -108,7 +114,9 @@ export interface BoxMatch {
   coord: Vec2;
   /** `matched`, `uncertain`, or `unmatched` */
   status: ConflationStatus;
-  /** OSM ways that matched this box at its status, closest first */
+  /** OSM features that matched this box at its status, closest first */
+  entityIDs: EntityID[];
+  /** For each of `entityIDs`, the OSM way whose segment matched (the way that a run can join) */
   wayIDs: EntityID[];
 }
 
@@ -160,17 +168,28 @@ interface BoxRange {
   end: number;     // last box index
 }
 
-/** Running totals for one candidate way (internal). */
-interface WayTally {
+/** The best match of one feature to one box, across all rules (internal). */
+interface BoxHit {
+  entityID: EntityID;   // the feature
+  wayID: EntityID;      // the way that the segment is on
+  distance: number;     // meters
+  angle: number;        // degrees
+  level: 1 | 2;         // 2 = same, 1 = near
+}
+
+/** Running totals for one candidate feature (internal). */
+interface FeatureTally {
   strict: number;
   loose: number;
   distance: number;
   angle: number;
+  wayIDs: Set<EntityID>;   // the feature's ways that matched (more than one for a multipolygon)
 }
 
 
 /**
- * Returns new default conflation settings: disabled, with one rule per geometry type.
+ * Returns new default conflation settings: disabled, with one rule per geometry type and no property
+ * conditions (so a nearby target counts regardless of its tags, until the user adds conditions).
  * @return Default settings
  */
 export function conflationDefaults(): ConflationSettings {
@@ -178,9 +197,9 @@ export function conflationDefaults(): ConflationSettings {
     enabled: false,
     showMatched: false,
     rules: [
-      { geometry: 'line', match: {}, buffer: 3, maxAngle: DEFAULT_MAX_ANGLE, reviewFactor: DEFAULT_REVIEW_FACTOR },
-      { geometry: 'point', match: {}, buffer: 3, reviewFactor: DEFAULT_REVIEW_FACTOR },
-      { geometry: 'area', match: {}, buffer: 0, reviewFactor: DEFAULT_REVIEW_FACTOR }
+      { source: { geometry: 'line' }, target: { geometry: 'line' }, sameDist: 3, sameAngle: DEFAULT_MAX_ANGLE, nearDist: 6, nearAngle: DEFAULT_MAX_ANGLE },
+      { source: { geometry: 'point' }, target: { geometry: 'point' }, sameDist: 3, nearDist: 6 },
+      { source: { geometry: 'area' }, target: { geometry: 'area' }, sameDist: 0 }
     ]
   };
 }
@@ -196,6 +215,9 @@ export function conflationDefaults(): ConflationSettings {
  * finishes an edit. Results are computed lazily, cached per feature, and flushed on `stablechange`
  * and `merge`.
  *
+ * Every source feature whose geometry some rule covers is tested. Rules decide "same" (all of a rule's
+ * conditions hold) and "near" (needs review); any one rule saying "same" is enough.
+ *
  * Only LineStrings from GeoJSON-backed datasets are matched so far. Points and areas follow.
  *
  * See `design/conflation-system.md` for the full design.
@@ -205,10 +227,10 @@ export function conflationDefaults(): ConflationSettings {
  */
 export class ConflationSystem extends AbstractSystem {
 
-  /** Cached results, by datasetID then dataID. `null` means no rule applies to that feature. */
+  /** Cached results, by datasetID then dataID. `null` means no rule covers that feature's geometry. */
   protected _results: Map<DatasetID, Map<DataID, ConflationResult | null>>;
-  /** Compiled tag matchers, per rule */
-  protected _matchers: WeakMap<ConflationRule, PropMatcher[]>;
+  /** Compiled property matchers, per rule side */
+  protected _matchers: WeakMap<ConflationSide, PropMatcher[]>;
 
 
   /**
@@ -220,7 +242,7 @@ export class ConflationSystem extends AbstractSystem {
     this.requiredDependencies = new Set<SystemID>(['editor', 'rapid', 'spatial']);
 
     this._results = new Map<DatasetID, Map<DataID, ConflationResult | null>>();
-    this._matchers = new WeakMap<ConflationRule, PropMatcher[]>();
+    this._matchers = new WeakMap<ConflationSide, PropMatcher[]>();
   }
 
 
@@ -259,6 +281,7 @@ export class ConflationSystem extends AbstractSystem {
    */
   public resetAsync(): Promise<void> {
     this._results.clear();
+    this._matchers = new WeakMap<ConflationSide, PropMatcher[]>();
     return Promise.resolve();
   }
 
@@ -277,7 +300,7 @@ export class ConflationSystem extends AbstractSystem {
    * Returns the conflation result for one feature of a dataset, computing it if needed.
    * @param ds - The dataset that the feature belongs to
    * @param datum - The new feature
-   * @return The result, or `undefined` if conflation is off for the dataset or no rule applies
+   * @return The result, or `undefined` if conflation is off for the dataset or no rule covers the feature's geometry
    */
   public getResult(ds: RapidDataset, datum: AbstractData): ConflationResult | undefined {
     if (!this.isEnabled(ds)) return undefined;
@@ -328,7 +351,8 @@ export class ConflationSystem extends AbstractSystem {
 
   /**
    * Flushes cached results so they are recomputed on next access, and emits `conflationchange`.
-   * @param datasetID - Flush only this dataset (default: all datasets)
+   * Call this after changing a dataset's rules (including editing a rule in place).
+   * @param datasetID - Flush only this dataset's results (default: all datasets)
    */
   public invalidate(datasetID?: DatasetID): void {
     if (datasetID) {
@@ -336,6 +360,8 @@ export class ConflationSystem extends AbstractSystem {
     } else {
       this._results.clear();
     }
+    // Rules may have been edited in place, so recompile their property matchers too (it's cheap).
+    this._matchers = new WeakMap<ConflationSide, PropMatcher[]>();
     this.emit('conflationchange');
   }
 
@@ -344,7 +370,7 @@ export class ConflationSystem extends AbstractSystem {
    * Computes the result for one feature.
    * @param ds - The dataset that the feature belongs to
    * @param datum - The new feature
-   * @return The result, or `undefined` if no rule applies
+   * @return The result, or `undefined` if no rule covers the feature's geometry
    */
   protected _compute(ds: RapidDataset, datum: AbstractData): ConflationResult | undefined {
     if (!(datum instanceof GeoJSONData)) return undefined;   // OSM-backed datasets: not yet
@@ -352,64 +378,50 @@ export class ConflationSystem extends AbstractSystem {
     const part = datum.geoms.parts[0];   // single part only, like `actionRapidAcceptFeature`
     if (!part?.orig || !part.world) return undefined;
 
-    const geometry = part.type === 'LineString' ? 'line' : part.type === 'Polygon' ? 'area' : 'point';
-    const tags = ds.dictionary ? ds.dictionary.applyTransforms(datum.properties) : datum.properties;
-    const rule = this._ruleFor(ds, geometry, tags);
-    if (!rule) return undefined;
+    const geometry: ConflationGeometry = part.type === 'LineString' ? 'line' : part.type === 'Polygon' ? 'area' : 'point';
+    const rules = (ds.conflation?.rules ?? []).filter(rule => rule.source.geometry === geometry);
+    if (!rules.length) return undefined;
 
+    const tags = ds.dictionary ? ds.dictionary.applyTransforms(datum.properties) : datum.properties;
     if (geometry === 'line') {
-      return this._conflateLine(datum.id, rule, part);
+      return this._conflateLine(datum.id, rules, tags, part);
     }
     return undefined;   // points and areas: not yet
   }
 
 
   /**
-   * Finds the first rule that applies to a new feature.
-   * @param ds - The dataset
-   * @param geometry - The new feature's geometry type
-   * @param tags - The new feature's tags, after the data dictionary
-   * @return The rule, or `undefined` if none applies
+   * Returns the compiled property matchers for one side of a rule.
+   * @param side - The rule's source or target
+   * @return PropMatchers for `side.props`
    */
-  protected _ruleFor(ds: RapidDataset, geometry: string, tags: Record<string, unknown>): ConflationRule | undefined {
-    for (const rule of ds.conflation?.rules ?? []) {
-      if (rule.geometry !== geometry) continue;
-      if (PropMatcher.matchAll(this._tagMatchers(rule), tags)) return rule;
-    }
-    return undefined;
-  }
-
-
-  /**
-   * Returns the compiled tag matchers for a rule.
-   * @param rule - The rule
-   * @return PropMatchers for `rule.match.tags`
-   */
-  protected _tagMatchers(rule: ConflationRule): PropMatcher[] {
-    let matchers = this._matchers.get(rule);
+  protected _propMatchers(side: ConflationSide): PropMatcher[] {
+    let matchers = this._matchers.get(side);
     if (!matchers) {
-      matchers = (rule.match.tags ?? []).map(props => PropMatcher.from(props));
-      this._matchers.set(rule, matchers);
+      matchers = (side.props ?? []).map(props => PropMatcher.from(props));
+      this._matchers.set(side, matchers);
     }
     return matchers;
   }
 
 
   /**
-   * Whether an existing OSM way satisfies a rule's `match`.
-   * The OSM geometry must be one of `match.geometry`. If that isn't set, it must be the same kind of
-   * geometry as the rule's own, so a line never matches an area (OSM represents both as ways).
+   * Whether a target feature meets a rule's target conditions, and agrees with the source on `sameKeys`.
    * @param rule - The rule
-   * @param way - The OSM way
-   * @param graph - The graph the way belongs to
-   * @return `true` if the way can match
+   * @param feature - The target feature (see `OsmWay.asFeature`)
+   * @param sourceTags - The source feature's tags, after the data mapping
+   * @return `true` if the rule allows this pair to be the same thing
    */
-  protected _wayMatches(rule: ConflationRule, way: OsmWay, graph: Graph): boolean {
-    const want = rule.match.geometry ?? DEFAULT_OSM_GEOMETRY[rule.geometry];
-    const wants = Array.isArray(want) ? want : [want];
-    if (!wants.includes(way.geometry(graph))) return false;
+  protected _targetMatches(rule: ConflationRule, feature: OsmFeature, sourceTags: Record<string, unknown>): boolean {
+    if (!TARGET_GEOMETRY[rule.target.geometry].includes(feature.geometry)) return false;
+    if (!PropMatcher.matchAll(this._propMatchers(rule.target), feature.tags)) return false;
 
-    return PropMatcher.matchAll(this._tagMatchers(rule), way.tags);
+    for (const k of rule.sameKeys ?? []) {
+      const sourceVal = sourceTags[k];
+      if (sourceVal === undefined || sourceVal === null || sourceVal === '') return false;
+      if (String(sourceVal) !== feature.tags[k]) return false;
+    }
+    return true;
   }
 
 
@@ -427,18 +439,27 @@ export class ConflationSystem extends AbstractSystem {
 
 
   /**
-   * Matches a new LineString against existing OSM ways.
+   * Matches a source LineString against target (OSM) features.
+   * The segment index holds OSM ways; each one is resolved to the feature it represents
+   * (`OsmWay.asFeature`), so an untagged multipolygon edge counts as its relation.
    *
-   * Each coverage box is triaged on its own: *matched* if an OSM way that satisfies the rule is
-   * within `buffer` meters and `maxAngle` degrees, *uncertain* if one is within `maxAngle` degrees
-   * but only within the looser `buffer × reviewFactor` distance, and *unmatched* otherwise.
-   * Consecutive boxes with the same status form runs.
-   * @param dataID - The new feature's id
-   * @param rule - The rule that applies
-   * @param part - The new feature's geometry
+   * The source is sampled at points along its length, and each sample (coverage box) is triaged on
+   * its own: *matched* if some rule says a target feature is the same there (within `sameDist` and
+   * `sameAngle`, and all the rule's conditions hold), *uncertain* if some rule says one is near
+   * (within `nearDist` and `nearAngle`), and *unmatched* otherwise. Consecutive boxes with the same
+   * status form runs.
+   * @param dataID - The source feature's id
+   * @param rules - The rules whose source geometry is 'line'
+   * @param sourceTags - The source feature's tags, after the data mapping
+   * @param part - The source feature's geometry
    * @return The result
    */
-  protected _conflateLine(dataID: DataID, rule: ConflationRule, part: GeometryPart): ConflationResult {
+  protected _conflateLine(
+    dataID: DataID,
+    rules: ConflationRule[],
+    sourceTags: Record<string, unknown>,
+    part: GeometryPart
+  ): ConflationResult {
     const context = this.context;
     const editor = context.systems.editor!;
     const spatial = context.systems.spatial!;
@@ -446,15 +467,19 @@ export class ConflationSystem extends AbstractSystem {
     const graph = editor.stable.graph!;
     const segSpatialID = editor.spatialIDForGraph(graph) + '-segments';
 
-    const factor = rule.reviewFactor ?? DEFAULT_REVIEW_FACTOR;
-    const maxAngle = rule.maxAngle ?? DEFAULT_MAX_ANGLE;
+    // Rules whose source conditions this feature fails can't say "same" or "near" for it.
+    const active = rules.filter(rule => PropMatcher.matchAll(this._propMatchers(rule.source), sourceTags));
+
     const lat = part.orig!.extent.center()[1];
     const metersPerWorld = 1 / geoMetersToWorld(1, lat);
-    const looseR = geoMetersToWorld(rule.buffer * factor, lat);
+    const nearDistOf = (rule: ConflationRule) => Math.max(rule.nearDist ?? rule.sameDist, rule.sameDist);
+    const queryMeters = Math.max(0, ...active.map(nearDistOf));
+    const queryR = geoMetersToWorld(queryMeters, lat);
 
-    // Boxes are spaced by the strict buffer, so runs have that resolution.
-    // Each query box is grown to the loose radius, so "needs review" candidates are found too.
-    const boxes = part.computeCoverage(rule.buffer);
+    // Samples are spaced by the smallest `sameDist`, so runs have that resolution.
+    // Each query box reaches out to the largest `nearDist`, so "near" targets are found too.
+    const spacing = Math.max(MIN_SAMPLE_METERS, Math.min(...rules.map(rule => rule.sameDist)));
+    const boxes = part.computeCoverage(spacing);
     const source = part.world!.outer!;
 
     if (boxes.some(box => !this._isLoaded(box.coord))) {
@@ -462,8 +487,9 @@ export class ConflationSystem extends AbstractSystem {
     }
 
     const nodeCoords = new Map<EntityID, Vec2>();
-    const wayOK = new Map<EntityID, boolean>();
-    const tallies = new Map<EntityID, WayTally>();
+    const features = new Map<EntityID, OsmFeature | null>();   // by wayID; `null` if the way is missing
+    const allowed = new Map<string, boolean>();                // by `${ruleIndex}:${entityID}`
+    const tallies = new Map<EntityID, FeatureTally>();         // by feature entityID
     const boxMatches: BoxMatch[] = [];
 
     const coordOf = (nodeID: EntityID): Vec2 | undefined => {
@@ -478,65 +504,90 @@ export class ConflationSystem extends AbstractSystem {
     };
 
     for (const box of boxes) {
+      // For each target feature near this box, keep its best match across all rules:
+      // "same" beats "near", and a closer segment beats a farther one.
+      const best = new Map<EntityID, BoxHit>();
       const query = {
-        minX: box.coord[0] - looseR, minY: box.coord[1] - looseR,
-        maxX: box.coord[0] + looseR, maxY: box.coord[1] + looseR
+        minX: box.coord[0] - queryR, minY: box.coord[1] - queryR,
+        maxX: box.coord[0] + queryR, maxY: box.coord[1] + queryR
       };
+      const hits = active.length ? spatial.getItemsAtBox(segSpatialID, query) : [];
 
-      // For each way near this box, keep its closest segment.
-      const best = new Map<EntityID, { distance: number; angle: number }>();
-      for (const hit of spatial.getItemsAtBox(segSpatialID, query)) {
+      for (const hit of hits) {
         const seg = hit.contents as Segment;
         const wayID = seg.wayID;
 
-        let ok = wayOK.get(wayID);
-        if (ok === undefined) {
+        let feature = features.get(wayID);
+        if (feature === undefined) {
           const way = graph.hasEntity(wayID) as OsmWay | undefined;
-          ok = !!way && this._wayMatches(rule, way, graph);
-          wayOK.set(wayID, ok);
+          feature = way?.asFeature(graph) ?? null;
+          features.set(wayID, feature);
         }
-        if (!ok) continue;
+        if (!feature) continue;
 
         const a = coordOf(seg.edge[0]);
         const b = coordOf(seg.edge[1]);
         if (!a || !b) continue;
 
+        const entityID = feature.entity.id;
         const distance = (vecProject(box.coord, [a, b])?.distance ?? Infinity) * metersPerWorld;
         const angle = headingDiff(box.angle, vecAngle(a, b));
-        const prev = best.get(wayID);
-        if (!prev || distance < prev.distance) {
-          best.set(wayID, { distance: distance, angle: angle });
+
+        for (let r = 0; r < active.length; r++) {
+          const rule = active[r];
+          const key = `${r}:${entityID}`;
+          let ok = allowed.get(key);
+          if (ok === undefined) {
+            ok = this._targetMatches(rule, feature, sourceTags);
+            allowed.set(key, ok);
+          }
+          if (!ok) continue;
+
+          const sameAngle = rule.sameAngle ?? DEFAULT_MAX_ANGLE;
+          const nearAngle = rule.nearAngle ?? sameAngle;
+          let level: 0 | 1 | 2 = 0;
+          if (distance <= rule.sameDist && angle <= sameAngle) {
+            level = 2;
+          } else if (distance <= nearDistOf(rule) && angle <= nearAngle) {
+            level = 1;
+          }
+          if (!level) continue;
+
+          const prev = best.get(entityID);
+          if (!prev || level > prev.level || (level === prev.level && distance < prev.distance)) {
+            best.set(entityID, { entityID: entityID, wayID: wayID, distance: distance, angle: angle, level: level });
+          }
         }
       }
 
-      // Triage the box by its best way.
-      const strictIDs: Array<[EntityID, number]> = [];
-      const looseIDs: Array<[EntityID, number]> = [];
-      for (const [wayID, m] of best) {
-        let tally = tallies.get(wayID);
-        if (m.distance <= rule.buffer && m.angle <= maxAngle) {
-          strictIDs.push([wayID, m.distance]);
-          tally ??= { strict: 0, loose: 0, distance: 0, angle: 0 };
+      // Triage the box by its best target features.
+      const strictHits: BoxHit[] = [];
+      const looseHits: BoxHit[] = [];
+      for (const h of best.values()) {
+        const tally = tallies.get(h.entityID) ?? { strict: 0, loose: 0, distance: 0, angle: 0, wayIDs: new Set<EntityID>() };
+        if (h.level === 2) {
+          strictHits.push(h);
           tally.strict++;
-        } else if (m.distance <= rule.buffer * factor && m.angle <= maxAngle) {
-          looseIDs.push([wayID, m.distance]);
-          tally ??= { strict: 0, loose: 0, distance: 0, angle: 0 };
-          tally.loose++;
         } else {
-          continue;
+          looseHits.push(h);
+          tally.loose++;
         }
-        tally.distance += m.distance;
-        tally.angle += m.angle;
-        tallies.set(wayID, tally);
+        tally.distance += h.distance;
+        tally.angle += h.angle;
+        tally.wayIDs.add(h.wayID);
+        tallies.set(h.entityID, tally);
       }
 
-      const byDistance = (a: [EntityID, number], b: [EntityID, number]) => a[1] - b[1];
-      if (strictIDs.length) {
-        boxMatches.push({ coord: box.coord, status: 'matched', wayIDs: strictIDs.sort(byDistance).map(d => d[0]) });
-      } else if (looseIDs.length) {
-        boxMatches.push({ coord: box.coord, status: 'uncertain', wayIDs: looseIDs.sort(byDistance).map(d => d[0]) });
+      const boxMatch = (status: ConflationStatus, hits: BoxHit[]): BoxMatch => {
+        hits.sort((a, b) => a.distance - b.distance);
+        return { coord: box.coord, status: status, entityIDs: hits.map(h => h.entityID), wayIDs: hits.map(h => h.wayID) };
+      };
+      if (strictHits.length) {
+        boxMatches.push(boxMatch('matched', strictHits));
+      } else if (looseHits.length) {
+        boxMatches.push(boxMatch('uncertain', looseHits));
       } else {
-        boxMatches.push({ coord: box.coord, status: 'unmatched', wayIDs: [] });
+        boxMatches.push(boxMatch('unmatched', []));
       }
     }
 
@@ -547,20 +598,23 @@ export class ConflationSystem extends AbstractSystem {
 
     // Candidates, with their measures.
     const candidates: ConflationCandidate[] = [];
-    for (const [wayID, tally] of tallies) {
+    for (const [entityID, tally] of tallies) {
       const count = tally.strict + tally.loose;
-      const wayCoords = (graph.hasEntity(wayID) as OsmWay | undefined)?.nodes
-        .map(nodeID => coordOf(nodeID))
-        .filter((c): c is Vec2 => !!c) ?? [];
+      const intersects = [...tally.wayIDs].some(wayID => {
+        const wayCoords = (graph.hasEntity(wayID) as OsmWay | undefined)?.nodes
+          .map(nodeID => coordOf(nodeID))
+          .filter((c): c is Vec2 => !!c) ?? [];
+        return geomPathIntersections(source, wayCoords).length > 0;
+      });
 
       candidates.push({
-        entityID: wayID,
+        entityID: entityID,
         score: n ? (tally.strict + 0.5 * tally.loose) / n : 0,
         measures: {
           distance: tally.distance / count,
           angle: tally.angle / count,
           overlap: count / n,
-          intersects: geomPathIntersections(source, wayCoords).length > 0,
+          intersects: intersects,
           tags: true
         }
       });
@@ -568,7 +622,7 @@ export class ConflationSystem extends AbstractSystem {
     candidates.sort((a, b) => b.score - a.score);
 
     // Runs.
-    const ranges = this._lineRanges(boxMatches, boxes, source, metersPerWorld, rule.buffer);
+    const ranges = this._lineRanges(boxMatches, boxes, source, metersPerWorld, spacing);
     const toWgs84 = (coords: Vec2[]) => coords.map(coord => projWorldToWgs84(coord));
     const runs = ranges.map((range, i): LineRun => {
       const prev = ranges[i - 1];
@@ -578,16 +632,19 @@ export class ConflationSystem extends AbstractSystem {
       }
 
       // A run that isn't already mapped extends into a neighboring already-mapped stretch,
-      // and joins the OSM way that matched there.
+      // and joins the OSM way that matched there (if that way is a line, not an area's edge).
       const startBox = prev?.status === 'matched' ? boxes[prev.end] : boxes[range.start];
       const endBox = next?.status === 'matched' ? boxes[next.start] : boxes[range.end];
       const run: LineRun = { status: range.status, coords: toWgs84(subLine(source, startBox, endBox)) };
 
+      const lineWayAt = (boxIndex: number): EntityID | undefined =>
+        boxMatches[boxIndex].wayIDs.find(wayID => features.get(wayID)?.geometry === 'line');
+
       if (prev?.status === 'matched') {
-        run.startJoin = this._joinPoint(boxMatches[prev.end].wayIDs[0], startBox.coord, graph, coordOf, metersPerWorld);
+        run.startJoin = this._joinPoint(lineWayAt(prev.end), startBox.coord, graph, coordOf, metersPerWorld);
       }
       if (next?.status === 'matched') {
-        run.endJoin = this._joinPoint(boxMatches[next.start].wayIDs[0], endBox.coord, graph, coordOf, metersPerWorld);
+        run.endJoin = this._joinPoint(lineWayAt(next.start), endBox.coord, graph, coordOf, metersPerWorld);
       }
       return run;
     });

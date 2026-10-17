@@ -23,7 +23,10 @@ function meters(a, b) {
 
 const SIDEWALK = { highway: 'footway', footway: 'sidewalk' };
 const CROSSING = { highway: 'footway', footway: 'crossing' };
+const LIVING_STREET = { highway: 'living_street' };
+const PATH = { highway: 'path' };
 const RESIDENTIAL = { highway: 'residential' };
+const RAILWAY = { railway: 'rail' };
 
 
 describe('ConflationSystem', () => {
@@ -45,7 +48,7 @@ describe('ConflationSystem', () => {
     return way;
   }
 
-  // Makes a new feature, as a custom dataset would load it.
+  // Makes a source feature, as a custom dataset would load it.
   function feature(id, points, properties) {
     const geojson = {
       type: 'Feature',
@@ -56,14 +59,16 @@ describe('ConflationSystem', () => {
     return new Rapid.GeoJSONData(context, { id: id, geojson: geojson });
   }
 
-  // A sidewalk rule like a user might set up.
-  function sidewalkRule(overrides = {}) {
+  // A line rule like a user might set up: "same" within 3 m / 30°, "near" within 6 m / 30°.
+  // By default the target must be a footway.
+  function lineRule(overrides = {}) {
     return Object.assign({
-      geometry: 'line',
-      match: { geometry: 'line', tags: [{ key: 'highway', value: 'footway' }] },
-      buffer: 3,
-      maxAngle: 30,
-      reviewFactor: 2
+      source: { geometry: 'line' },
+      target: { geometry: 'line', props: [{ key: 'highway', value: 'footway' }] },
+      sameDist: 3,
+      sameAngle: 30,
+      nearDist: 6,
+      nearAngle: 30
     }, overrides);
   }
 
@@ -107,9 +112,14 @@ describe('ConflationSystem', () => {
 
 
   describe('defaults', () => {
-    it('datasets start with conflation disabled, and one rule per geometry type', () => {
+    it('datasets start with conflation disabled, and one rule per geometry type with no property conditions', () => {
       assert.isFalse(ds.conflation.enabled);
-      assert.sameMembers(ds.conflation.rules.map(r => r.geometry), ['line', 'point', 'area']);
+      assert.sameMembers(ds.conflation.rules.map(r => r.source.geometry), ['line', 'point', 'area']);
+      for (const rule of ds.conflation.rules) {
+        assert.strictEqual(rule.target.geometry, rule.source.geometry);
+        assert.isUndefined(rule.source.props);
+        assert.isUndefined(rule.target.props);
+      }
     });
 
     it('returns undefined when conflation is disabled', () => {
@@ -117,17 +127,102 @@ describe('ConflationSystem', () => {
       assert.isUndefined(conflation.getResult(ds, feature('a', [[0, 1.5], [100, 1.5]], SIDEWALK)));
     });
 
-    it('returns undefined when no rule applies to the feature', () => {
-      enable([sidewalkRule({ match: { tags: [{ key: 'footway', value: 'sidewalk' }] } })]);
+    it('returns undefined when no rule covers the source geometry', () => {
+      enable([{ source: { geometry: 'point' }, target: { geometry: 'point' }, sameDist: 3 }]);
       osmWay(1, [[0, 0], [100, 0]], SIDEWALK);
-      assert.isUndefined(conflation.getResult(ds, feature('a', [[0, 1.5], [100, 1.5]], CROSSING)));
+      assert.isUndefined(conflation.getResult(ds, feature('a', [[0, 1.5], [100, 1.5]], SIDEWALK)));
+    });
+  });
+
+
+  describe('rules', () => {
+    // The three requests that the rule shape was designed around, from least to most specific.
+
+    it('"a nearby line counts, regardless of tagging"', () => {
+      enable([lineRule({ target: { geometry: 'line' } })]);
+      osmWay(1, [[0, 0], [100, 0]], RAILWAY);
+      assert.strictEqual(conflation.getResult(ds, feature('a', [[0, 1.5], [100, 1.5]], SIDEWALK)).status, 'matched');
+    });
+
+    it('"both have a highway tag, any value"', () => {
+      const both = [{ key: 'highway' }];
+      enable([lineRule({ source: { geometry: 'line', props: both }, target: { geometry: 'line', props: both } })]);
+      osmWay(1, [[0, 0], [100, 0]], LIVING_STREET);
+      osmWay(2, [[0, 50], [100, 50]], RAILWAY);
+
+      // sidewalk vs living street: both have `highway`, so this is a positive match
+      assert.strictEqual(conflation.getResult(ds, feature('a', [[0, 1.5], [100, 1.5]], SIDEWALK)).status, 'matched');
+      // sidewalk vs railway: the railway has no `highway`
+      assert.strictEqual(conflation.getResult(ds, feature('b', [[0, 51.5], [100, 51.5]], SIDEWALK)).status, 'unmatched');
+    });
+
+    it('"both have the same highway value"', () => {
+      enable([lineRule({ target: { geometry: 'line' }, sameKeys: ['highway'] })]);
+      osmWay(1, [[0, 0], [100, 0]], LIVING_STREET);
+      osmWay(2, [[0, 50], [100, 50]], SIDEWALK);
+
+      // sidewalk vs living street: different `highway` values, so a negative match
+      assert.strictEqual(conflation.getResult(ds, feature('a', [[0, 1.5], [100, 1.5]], SIDEWALK)).status, 'unmatched');
+      // sidewalk vs sidewalk
+      assert.strictEqual(conflation.getResult(ds, feature('b', [[0, 51.5], [100, 51.5]], SIDEWALK)).status, 'matched');
+      // a source without `highway` can't agree with anything on it
+      assert.strictEqual(conflation.getResult(ds, feature('c', [[0, 51.5], [100, 51.5]], {})).status, 'unmatched');
+    });
+
+    it('sameKeys can require several keys to agree, so a crossing never matches a sidewalk', () => {
+      enable([lineRule({ target: { geometry: 'line' }, sameKeys: ['highway', 'footway'] })]);
+      osmWay(1, [[0, 0], [100, 0]], SIDEWALK);
+      assert.strictEqual(conflation.getResult(ds, feature('a', [[0, 1.5], [100, 1.5]], CROSSING)).status, 'unmatched');
+      assert.strictEqual(conflation.getResult(ds, feature('b', [[0, 1.5], [100, 1.5]], SIDEWALK)).status, 'matched');
+    });
+
+    it('a source that fails the source conditions is still tested, and comes out new', () => {
+      enable([lineRule({ source: { geometry: 'line', props: [{ key: 'highway', value: 'footway' }] } })]);
+      osmWay(1, [[0, 0], [100, 0]], SIDEWALK);
+      const result = conflation.getResult(ds, feature('a', [[0, 1.5], [100, 1.5]], LIVING_STREET));
+      assert.isOk(result);
+      assert.strictEqual(result.status, 'unmatched');
+    });
+
+    it('any one rule saying "same" is enough (OR across rules)', () => {
+      enable([
+        lineRule({ target: { geometry: 'line' }, sameKeys: ['highway'] }),
+        lineRule({   // the source's `living_street` counts as the target's `path` or `footway`
+          source: { geometry: 'line', props: [{ key: 'highway', value: 'living_street' }] },
+          target: { geometry: 'line', props: [{ key: 'highway', op: 'in', value: ['path', 'footway'] }] }
+        })
+      ]);
+      osmWay(1, [[0, 0], [100, 0]], PATH);
+
+      assert.strictEqual(conflation.getResult(ds, feature('a', [[0, 1.5], [100, 1.5]], LIVING_STREET)).status, 'matched');
+      assert.strictEqual(conflation.getResult(ds, feature('b', [[0, 1.5], [100, 1.5]], SIDEWALK)).status, 'unmatched');
+    });
+
+    it('target conditions can exclude features, like private ways', () => {
+      enable([lineRule({ target: { geometry: 'line', props: [{ key: 'access', op: '!=', value: 'private' }] } })]);
+      osmWay(1, [[0, 0], [100, 0]], { ...SIDEWALK, access: 'private' });
+      assert.strictEqual(conflation.getResult(ds, feature('a', [[0, 1.5], [100, 1.5]], SIDEWALK)).status, 'unmatched');
+    });
+
+    it('target conditions use the OSM feature\'s tags', () => {
+      enable([lineRule()]);
+      osmWay(1, [[0, 0], [100, 0]], RESIDENTIAL);   // a road, not a footway
+      assert.strictEqual(conflation.getResult(ds, feature('a', [[0, 1.5], [100, 1.5]], SIDEWALK)).status, 'unmatched');
+    });
+
+    it('source conditions use the tags after the data mapping', () => {
+      ds.dictionary = new Rapid.RapidDataDictionary(context);
+      ds.dictionary.transforms = [{ order: 0, function: 'copy', source: 'TYPE', target: 'highway' }];
+      enable([lineRule({ source: { geometry: 'line', props: [{ key: 'highway', value: 'footway' }] } })]);
+      osmWay(1, [[0, 0], [100, 0]], SIDEWALK);
+      assert.strictEqual(conflation.getResult(ds, feature('a', [[0, 1.5], [100, 1.5]], { TYPE: 'footway' })).status, 'matched');
     });
   });
 
 
   describe('lines', () => {
-    it('a sidewalk offset 1.5 m from an OSM sidewalk is already mapped at a 3 m buffer', () => {
-      enable([sidewalkRule()]);
+    it('a sidewalk offset 1.5 m from an OSM sidewalk is the same at sameDist 3', () => {
+      enable([lineRule()]);
       osmWay(1, [[0, 0], [100, 0]], SIDEWALK);
 
       const result = conflation.getResult(ds, feature('a', [[0, 1.5], [100, 1.5]], SIDEWALK));
@@ -144,50 +239,93 @@ describe('ConflationSystem', () => {
       assert.isFalse(best.measures.intersects);
     });
 
-    it('the same sidewalk needs review at a 1 m buffer, and is new without review margin', () => {
+    it('the same sidewalk is near at sameDist 1 / nearDist 2, and new with no near band', () => {
       osmWay(1, [[0, 0], [100, 0]], SIDEWALK);
 
-      enable([sidewalkRule({ buffer: 1 })]);   // review limit is 2 m
+      enable([lineRule({ sameDist: 1, nearDist: 2 })]);
       assert.strictEqual(conflation.getResult(ds, feature('a', [[0, 1.5], [100, 1.5]], SIDEWALK)).status, 'uncertain');
 
-      enable([sidewalkRule({ buffer: 1, reviewFactor: 1 })]);
+      enable([lineRule({ sameDist: 1, nearDist: undefined })]);   // nearDist defaults to sameDist
       conflation.invalidate();
       assert.strictEqual(conflation.getResult(ds, feature('a', [[0, 1.5], [100, 1.5]], SIDEWALK)).status, 'unmatched');
     });
 
-    it('lines never match OSM areas unless the rule asks for them, like building edges along a sidewalk', () => {
+    it('lines never match OSM areas unless the target asks for them, like building edges along a sidewalk', () => {
       // A building whose south edge runs along y = 0, 1.5 m from the new sidewalk.
       // (`area=yes` because there is no schema here to say that `building` suggests an area.)
       osmWay(1, [[0, 0], [100, 0], [100, 20], [0, 20], [0, 0]], { building: 'yes', area: 'yes' });
       const a = feature('a', [[0, -1.5], [100, -1.5]], SIDEWALK);
 
-      enable([sidewalkRule({ match: {} })]);   // no geometry or tag conditions
+      enable([lineRule({ target: { geometry: 'line' } })]);
       assert.strictEqual(conflation.getResult(ds, a).status, 'unmatched');
 
-      enable([sidewalkRule({ match: { geometry: 'area' } })]);   // explicitly asked for
+      enable([lineRule({ target: { geometry: 'area' } })]);   // explicitly asked for
       conflation.invalidate();
       assert.strictEqual(conflation.getResult(ds, a).status, 'matched');
     });
 
-    it('the review margin loosens distance only, not the angle limit', () => {
-      enable([sidewalkRule()]);
+    it('treats untagged multipolygon outers as their relation, an area', () => {
+      // A building drawn as one multipolygon with two untagged closed outers, side by side.
+      osmWay(1, [[0, 0], [50, 0], [50, 20], [0, 20], [0, 0]]);
+      osmWay(2, [[50, 0], [100, 0], [100, 20], [50, 20], [50, 0]]);
+      const mp = new Rapid.OsmRelation(context, {
+        id: 'r1',
+        tags: { type: 'multipolygon', building: 'retail' },
+        members: [{ id: 'w1', type: 'way', role: 'outer' }, { id: 'w2', type: 'way', role: 'outer' }]
+      });
+      editor.merge([mp]);
+      const a = feature('a', [[0, -1.5], [100, -1.5]], SIDEWALK);
+
+      enable([lineRule({ target: { geometry: 'line' } })]);   // a line target, no tag conditions
+      assert.strictEqual(conflation.getResult(ds, a).status, 'unmatched');
+
+      enable([lineRule({ target: { geometry: 'area' } })]);   // explicitly asked for areas
+      conflation.invalidate();
+      const result = conflation.getResult(ds, a);
+      assert.strictEqual(result.status, 'matched');
+      assert.lengthOf(result.candidates, 1);   // both outers count as one feature, the relation
+      assert.strictEqual(result.candidates[0].entityID, 'r1');
+      assert.strictEqual(result.candidates[0].measures.overlap, 1);
+      assert.sameMembers([...new Set(result.boxes.flatMap(b => b.wayIDs))], ['w1', 'w2']);
+    });
+
+    it('does not join a new run to the edge of an area', () => {
+      osmWay(1, [[0, 0], [50, 0], [50, 20], [0, 20], [0, 0]], { building: 'yes', area: 'yes' });
+      const a = feature('a', [[0, -1.5], [150, -1.5]], SIDEWALK);
+
+      enable([lineRule({ target: { geometry: 'area' } })]);
+      const result = conflation.getResult(ds, a);
+      assert.isTrue(result.partial);
+      const run = result.runs.find(r => r.status === 'unmatched');
+      assert.isUndefined(run.startJoin);   // matched an area, so nothing to connect to
+    });
+
+    it('nearAngle defaults to sameAngle, so a line within nearDist but at 40° is new', () => {
+      enable([lineRule({ nearAngle: undefined })]);
       osmWay(1, [[0, 0], [100, 0]], SIDEWALK);
 
-      // Within 6 m (the review distance) the whole way, but at 40° (over the 30° limit).
+      // Within 6 m (nearDist) the whole way, but at 40° (over the 30° limit).
       const dy = 6 * Math.tan(40 * Math.PI / 180);
-      const result = conflation.getResult(ds, feature('a', [[40, 0.5], [46, 0.5 + dy]], SIDEWALK));
+      const a = feature('a', [[40, 0.5], [46, 0.5 + dy]], SIDEWALK);
+      let result = conflation.getResult(ds, a);
       assert.strictEqual(result.status, 'unmatched');
       assert.isFalse(result.boxes.some(b => b.status === 'uncertain'));
+
+      // A looser nearAngle makes it near.
+      enable([lineRule({ nearAngle: 60 })]);
+      conflation.invalidate();
+      result = conflation.getResult(ds, a);
+      assert.isTrue(result.boxes.some(b => b.status === 'uncertain'));
     });
 
     it('matches regardless of line direction', () => {
-      enable([sidewalkRule()]);
+      enable([lineRule()]);
       osmWay(1, [[0, 0], [100, 0]], SIDEWALK);
       assert.strictEqual(conflation.getResult(ds, feature('a', [[100, 1.5], [0, 1.5]], SIDEWALK)).status, 'matched');
     });
 
     it('a crossing perpendicular to an OSM sidewalk is not matched to it', () => {
-      enable([sidewalkRule()]);
+      enable([lineRule()]);
       osmWay(1, [[0, 0], [100, 0]], SIDEWALK);
 
       const result = conflation.getResult(ds, feature('x', [[50, -10], [50, 10]], CROSSING));
@@ -195,14 +333,8 @@ describe('ConflationSystem', () => {
       assert.isEmpty(result.candidates);
     });
 
-    it('OSM features that fail the rule\'s tag conditions are ignored', () => {
-      enable([sidewalkRule()]);
-      osmWay(1, [[0, 0], [100, 0]], RESIDENTIAL);   // a road, not a footway
-      assert.strictEqual(conflation.getResult(ds, feature('a', [[0, 1.5], [100, 1.5]], SIDEWALK)).status, 'unmatched');
-    });
-
     it('a partly mapped sidewalk splits into runs, and the new run joins the existing way', () => {
-      enable([sidewalkRule()]);
+      enable([lineRule()]);
       const way = osmWay(1, [[0, 0], [60, 0]], SIDEWALK);   // OSM sidewalk covers x = 0..60
 
       const result = conflation.getResult(ds, feature('a', [[0, 1.5], [150, 1.5]], SIDEWALK));
@@ -223,7 +355,7 @@ describe('ConflationSystem', () => {
     });
 
     it('a new run between two mapped stretches of different ways joins both, reusing their end nodes', () => {
-      enable([sidewalkRule()]);
+      enable([lineRule()]);
       const w1 = osmWay(1, [[0, 0], [40, 0]], SIDEWALK);
       const w2 = osmWay(2, [[100, 0], [200, 0]], SIDEWALK);
 
@@ -238,7 +370,7 @@ describe('ConflationSystem', () => {
     });
 
     it('where a new line detours away from an OSM way and back, the run joins mid-way', () => {
-      enable([sidewalkRule()]);
+      enable([lineRule()]);
       osmWay(1, [[0, 0], [200, 0]], SIDEWALK);   // nodes only at x = 0 and x = 200
 
       const points = [[0, 1.5], [60, 1.5], [62, 20], [78, 20], [80, 1.5], [150, 1.5]];
@@ -255,17 +387,17 @@ describe('ConflationSystem', () => {
     });
 
     it('short misalignment at the end of a match is not reported as new', () => {
-      enable([sidewalkRule()]);
+      enable([lineRule()]);
       osmWay(1, [[0, 0], [100, 0]], SIDEWALK);
 
-      // The new sidewalk overshoots the OSM one by 2 m, less than the buffer.
+      // The new sidewalk overshoots the OSM one by 2 m, less than sameDist.
       const result = conflation.getResult(ds, feature('a', [[0, 1.5], [102, 1.5]], SIDEWALK));
       assert.strictEqual(result.status, 'matched');
       assert.isFalse(result.partial);
     });
 
-    it('scores a partial line by the share of its boxes that are already mapped', () => {
-      enable([sidewalkRule()]);
+    it('scores a partial line by the share of its samples that are already mapped', () => {
+      enable([lineRule()]);
       osmWay(1, [[0, 0], [60, 0]], SIDEWALK);
 
       const result = conflation.getResult(ds, feature('a', [[0, 1.5], [150, 1.5]], SIDEWALK));
@@ -279,7 +411,7 @@ describe('ConflationSystem', () => {
 
   describe('unknown', () => {
     it('reports unknown, and does not cache it, where OSM data is not loaded', () => {
-      enable([sidewalkRule()]);
+      enable([lineRule()]);
       osmWay(1, [[0, 0], [100, 0]], SIDEWALK);
       const a = feature('a', [[0, 1.5], [100, 1.5]], SIDEWALK);
 
@@ -295,14 +427,14 @@ describe('ConflationSystem', () => {
 
   describe('caching and invalidation', () => {
     it('caches results', () => {
-      enable([sidewalkRule()]);
+      enable([lineRule()]);
       osmWay(1, [[0, 0], [100, 0]], SIDEWALK);
       const a = feature('a', [[0, 1.5], [100, 1.5]], SIDEWALK);
       assert.strictEqual(conflation.getResult(ds, a), conflation.getResult(ds, a));
     });
 
     it('recomputes after an edit: accepting the missing part makes it already mapped, and undo brings it back', () => {
-      enable([sidewalkRule()]);
+      enable([lineRule()]);
       osmWay(1, [[0, 0], [60, 0]], SIDEWALK);
       const a = feature('a', [[0, 1.5], [150, 1.5]], SIDEWALK);
       assert.isTrue(conflation.getResult(ds, a).partial);
@@ -326,8 +458,20 @@ describe('ConflationSystem', () => {
       assert.isTrue(conflation.getResult(ds, a).partial);
     });
 
+    it('picks up a rule edited in place after invalidate()', () => {
+      enable([lineRule({ target: { geometry: 'line' } })]);   // no tag conditions yet
+      osmWay(1, [[0, 0], [100, 0]], RESIDENTIAL);
+      const a = feature('a', [[0, 1.5], [100, 1.5]], SIDEWALK);
+      assert.strictEqual(conflation.getResult(ds, a).status, 'matched');   // matches the road
+
+      // Edit the same rule object, the way a user might in the console or settings UI.
+      ds.conflation.rules[0].target.props = [{ key: 'highway', value: 'footway' }];
+      conflation.invalidate();
+      assert.strictEqual(conflation.getResult(ds, a).status, 'unmatched');
+    });
+
     it('invalidate(datasetID) flushes only that dataset', () => {
-      enable([sidewalkRule()]);
+      enable([lineRule()]);
       osmWay(1, [[0, 0], [100, 0]], SIDEWALK);
       const a = feature('a', [[0, 1.5], [100, 1.5]], SIDEWALK);
       const first = conflation.getResult(ds, a);
@@ -343,7 +487,7 @@ describe('ConflationSystem', () => {
 
   describe('getQueue', () => {
     it('lists features in view that need review', () => {
-      enable([sidewalkRule({ buffer: 1 })]);   // 1.5 m offsets need review
+      enable([lineRule({ sameDist: 1, nearDist: 2 })]);   // 1.5 m offsets are near
       osmWay(1, [[0, 0], [100, 0]], SIDEWALK);
       const a = feature('a', [[0, 1.5], [100, 1.5]], SIDEWALK);     // needs review
       const b = feature('b', [[0, 50], [100, 50]], SIDEWALK);       // new

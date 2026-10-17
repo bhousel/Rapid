@@ -162,52 +162,71 @@ interface ConflationSettings {
   rules: ConflationRule[];
 }
 
+// A ConflationRule defines the conditions under which a source feature (from the dataset)
+// and a target feature (from OSM) are considered the same thing.
 interface ConflationRule {
-  geometry: 'point' | 'line' | 'area';     // which third-party geometry type this rule applies to
-
-  // Which features this rule is about. Same shape as a StyleSelector's `match`, checked with PropMatcher.
-  match: {
-    geometry?: GeometryType | GeometryType[];   // OSM geometry types that can match (default: same kind as `geometry`)
-    tags?: PropMatcherProps[];             // all must match (AND)
-  };
-
-  // "Already mapped" limits (named to line up with the external matching tools)
-  buffer: number;                          // proximity, in meters
-  maxAngle?: number;                       // lines: max heading difference, in degrees (default 30)
-
-  // "Needs review" distance limit is this multiple of `buffer` (default 2). The angle limit doesn't change.
-  reviewFactor?: number;
+  source: { geometry: 'point' | 'line' | 'area'; props?: PropMatcherProps[] };
+  target: { geometry: 'point' | 'line' | 'area'; props?: PropMatcherProps[] };
+  sameKeys?: string[];   // property keys whose values must be present and equal on both sides
+  sameDist: number;      // "same": target within this many meters of the source (0 = touching or inside)
+  sameAngle?: number;    // "same", lines only: heading difference in degrees (default 30)
+  nearDist?: number;     // "near" (needs review): within this many meters (default sameDist, no review band)
+  nearAngle?: number;    // "near", lines only (default sameAngle)
 }
 ```
 
-Areas will add `minOverlap` and `requireIntersect` when the polygon matcher lands.
+The words **source** and **target** match the data dictionary's terms: the source is the dataset's
+feature, the target is the feature already in the basemap (OSM today). Keeping the rule in these terms,
+rather than OSM's, leaves room to match one dataset against another later.
 
-**`match.tags` applies to both sides.** A rule applies to a new feature when the feature's geometry
-type is `geometry` and its tags satisfy `match.tags`. The rule then looks for OSM features that
-satisfy all of `match`. So a dataset with both sidewalks and crossings can have one rule for each,
-and a new crossing is only compared with OSM crossings. A feature that no rule applies to gets no
-result and is drawn as it is today.
+**How the fields combine:**
+1. **Within a rule, every condition must hold (AND)** for "same": geometry and props on each side,
+   `sameKeys`, and the distance and angle limits.
+2. **Across rules, any one rule saying "same" is enough (OR).** Rules are alternative definitions of
+   "the same thing". A dataset with sidewalks and crossings can have a rule for each, and one rule can
+   say that the source's `living_street` counts as the target's `path`.
+3. **Every source feature is tested**, if some rule covers its geometry. Failing a rule's
+   `source.props` means that rule can't say "same" for it; it doesn't mean "no result". A feature no
+   rule could call "same" comes out New. Only a feature whose geometry no rule covers gets no result.
+4. **Source props are checked after the data mapping.** The data mapping translates source attributes
+   into the target's vocabulary, the same way it does when a feature is accepted. Vocabulary fixes can
+   go there, or in a second rule. A dataset without a mapping uses its raw properties.
+5. **Distances are measured from the source to the target.** Lines are sampled along their length, so
+   this measures how much of the source is already mapped. For an area target, the distance is to its
+   edge, and 0 if the source is inside. So `sameDist: 0` means "touching or inside".
+6. **Geometry has to agree with `target.geometry`.** OSM represents both lines and areas as ways; the
+   target's geometry comes from `OsmWay.asFeature`, so a building edge (even an untagged multipolygon
+   outer) is an area, and a `line` target never matches it. `point` targets match OSM points and vertices.
 
-**Geometry has to agree.** OSM represents both lines and areas as ways, so without a check a sidewalk
-would match the edge of a building it runs along. When `match.geometry` isn't set, it defaults to the
-same kind of geometry as the rule: line rules match OSM lines, area rules match OSM areas, and point
-rules match OSM points and vertices. Setting `match.geometry` explicitly overrides this, for the rare
-case where matching across geometry types is intended (for example, a footpath against a pedestrian
-plaza mapped as an area).
+**What rules can express**, from least to most specific (columns show what differs from a plain
+line-to-line rule with `sameDist: 3, sameAngle: 30, nearDist: 6, nearAngle: 30`):
 
-**Tags are compared after the data dictionary.** The dataset's data dictionary maps source attributes
-to OSM tags, the same way it does when a feature is accepted. Rule `match` blocks are then checked
-against those tags, so both sides use the same vocabulary. For agency sidewalk data, that means
-`highway=footway` + `footway=sidewalk` on both sides, however the source attributes were named.
-A dataset without a dictionary is compared using its raw properties.
+| Request | `source` | `target` | `sameKeys` | Distances |
+|---|---|---|---|---|
+| A nearby line counts, regardless of tagging | `{ geometry: 'line' }` | `{ geometry: 'line' }` | | |
+| Both have `highway`, any value | `props: [{ key: 'highway' }]` | `props: [{ key: 'highway' }]` | | |
+| Both have the same `highway` value | | | `['highway']` | |
+| Both are footways | `props: [{ key: 'highway', value: 'footway' }]` | same as source | | |
+| Same `highway`, but never match private OSM ways | | `props: [{ key: 'access', op: '!=', value: 'private' }]` | `['highway']` | |
+| A crossing never matches a sidewalk | | | `['highway', 'footway']` | |
+| Source `living_street` counts as target `path` or `footway` | `props: [{ key: 'highway', value: 'living_street' }]` | `props: [{ key: 'highway', op: 'in', value: ['path', 'footway'] }]` | | (a second rule) |
+| An address point counts if it falls inside a building | `{ geometry: 'point' }` | `{ geometry: 'area', props: [{ key: 'building' }] }` | `['addr:housenumber']` | `sameDist: 0` |
+| A POI counts if it's within 25 m of the same kind of POI | `{ geometry: 'point' }` | `{ geometry: 'point' }` | `['amenity']` | `sameDist: 25` |
 
-`match` is also how a user answers questions like "does a road tagged `sidewalk=both` count as a
+The point and area rows are part of the design, but only lines are matched so far.
+
+**Room to grow** without changing this shape: a `minOverlap` field for percent overlap (on the
+external tools' list, and useful for area-to-area), and fuzzy `sameKeys` entries such as
+`{ key: 'name', similarity: 0.8 }` for POI names.
+
+`target.props` is also how a user answers questions like "does a road tagged `sidewalk=both` count as a
 sidewalk?" That kind of match can't be joined to, because there is no sidewalk geometry to connect to
 (see Open Questions).
 
-**Defaults** (`conflationDefaults()`): one rule per geometry type, with no tag conditions. `buffer` is
-3 m for lines and points and 0 m for areas, `maxAngle` is 30°, and `reviewFactor` is 2. Conflation
-starts disabled, so existing behavior doesn't change until the user turns it on.
+**Defaults** (`conflationDefaults()`): one rule per geometry type, source and target the same kind,
+with no property conditions. Lines: `sameDist` 3, `sameAngle` 30, `nearDist` 6, `nearAngle` 30.
+Points: `sameDist` 3, `nearDist` 6. Areas: `sameDist` 0. Conflation starts disabled, so existing
+behavior doesn't change until the user turns it on.
 
 **Persistence** (Step 6): the settings store only holds string leaves, so `toJSON()`/`fromJSON()`
 need to encode the rules. Custom datasets will save `conflation` with everything else. Service-provided
@@ -217,19 +236,20 @@ nothing to migrate.
 
 ### Stage 1: candidates and measures
 
-Each third-party feature calls `part.computeCoverage(rule.buffer)`, which is cached for each radius.
-The boxes are spaced by the strict `buffer`, which sets the resolution of runs. Each query grows its
-box to the review limit (`buffer × reviewFactor`), so "needs review" candidates are found too.
+Each source line is sampled with `part.computeCoverage(spacing)` (cached for each radius), where the
+spacing is the smallest `sameDist` among the line rules (at least 1 m). That sets the resolution of
+runs. Each sample's query box reaches out to the largest `nearDist`, so "near" targets are found too.
 The query has two phases: a quick bounding-box search over the RBush index (`SpatialSystem`), then
 a precise test in `ConflationSystem` (a plain filter), using `vec*` and `geom*` helpers from
-`@rapid-sdk/math`. The precise test applies the rule's `match` first, so OSM features of the wrong
-kind are never considered.
+`@rapid-sdk/math`. Each segment's distance and angle are computed once, then checked against every
+rule whose source conditions the feature passes, and the target's geometry, props and `sameKeys`
+are checked per rule (cached per target feature).
 
 | Third-party | Phase 1: query boxes vs. | Phase 2: kept per box or feature |
 |---|---|---|
 | **Point** | data index | OSM nodes within the limits (`vecLength`), and OSM areas that contain the point (`geomPointInPolygon`) |
 | **LineString** | `segments` index, **one query per box** | for each OSM way, its closest segment to the box center (point-to-segment distance via `vecProject`) and that segment's heading difference from the box's `angle`. Opposite directions count as the same heading. |
-| **Polygon** | data index (extent grown by `buffer`) | OSM areas that intersect the polygon (`geomPolygonIntersectsPolygon`) |
+| **Polygon** | data index (extent grown by `nearDist`) | OSM areas that intersect the polygon (`geomPolygonIntersectsPolygon`) |
 
 Each candidate pair (new feature, OSM entity) gets these **measures**:
 
@@ -239,13 +259,13 @@ Each candidate pair (new feature, OSM entity) gets these **measures**:
 | `angle` (°) | mean heading difference over matched boxes | n/a | n/a |
 | `overlap` (0–1) | share of the new line's length whose boxes match this OSM way | intersection area ÷ smaller area | n/a |
 | `intersects` | the two geometries cross | the two areas intersect | inside the area |
-| `tags` | the rule's `match` passed (always true for kept candidates) | same | same |
+| `tags` | some rule's conditions passed (always true for kept candidates) | same | same |
 
-**The angle test matters for sidewalks.** At a corner, the crossing sidewalk lies within the buffer of
+**The angle test matters for sidewalks.** At a corner, the crossing sidewalk lies within `sameDist` of
 every sidewalk that meets it. Without the angle test, the end of every sidewalk would look matched.
 Each `CoverageBox` already carries its `angle` for this reason.
 
-The buffer is converted from meters to world units with `geoMetersToWorld` at the feature's latitude,
+Distances are converted from meters to world units with `geoMetersToWorld` at the feature's latitude,
 the same conversion `computeCoverage` uses.
 
 ### Scoring
@@ -256,22 +276,20 @@ the same conversion `computeCoverage` uses.
 > anything: until we have them, Rapid uses the simple formula below, behind a single function, so it
 > can be swapped out.
 
-**Two distance limits, one angle limit.** The user's parameters are the "already mapped" limits. The
-"needs review" limit loosens only the distance, to `buffer × reviewFactor`. Each coverage box is
-triaged by the best OSM way near it:
+**"Same" and "near".** Each coverage box is triaged by the best target near it, across all rules:
 
-| Box status | Condition (closest segment of a way that satisfies the rule) |
+| Box status | Condition (some rule whose other conditions hold, for the closest segment of a target) |
 |---|---|
-| `matched` | distance ≤ `buffer` **and** heading difference ≤ `maxAngle` |
-| `uncertain` | distance ≤ `buffer × reviewFactor` **and** heading difference ≤ `maxAngle` |
+| `matched` | distance ≤ `sameDist` **and** heading difference ≤ `sameAngle` |
+| `uncertain` | otherwise, distance ≤ `nearDist` **and** heading difference ≤ `nearAngle` |
 | `unmatched` | neither |
 
-*Why not loosen the angle too?* An earlier version also multiplied `maxAngle` by `reviewFactor` (30° to
-60°). Trying it on real sidewalk data in the browser showed that every corner then produced a
+*Why does `nearAngle` default to `sameAngle`?* An earlier version loosened the angle for "near" too
+(30° to 60°). Trying it on real sidewalk data in the browser showed that every corner then produced a
 "needs review" stretch: the crossing and the next sidewalk are 3–4 m away at 30–40°. Any stretch that
 needs review sends the whole line to the review queue, so partly mapped sidewalks went to review
-instead of offering their new part. A line heading 40° away is going somewhere else, so it isn't
-"almost the same".
+instead of offering their new part. A line heading 40° away is going somewhere else, so by default
+it isn't "almost the same". A rule can still set a looser `nearAngle`.
 
 ```text
 box score       = 1 (matched), 0.5 (uncertain), 0 (unmatched)
@@ -282,7 +300,7 @@ candidate score = (its matched boxes + 0.5 × its uncertain boxes) ÷ all boxes
 The score is for ranking and reporting. Triage comes from the box statuses, not from a threshold on
 the score.
 
-*Why not a threshold on a combined score?* An earlier draft used `overlap × (1 − distance/buffer)`
+*Why not a threshold on a combined score?* An earlier draft used `overlap × (1 − distance/sameDist)`
 with "matched above 0.8" and "review above 0.3". With agency sidewalks running 1–2 m off OSM and a
 3 m buffer, true matches scored about 0.5 and would all have gone to review. A sidewalk that is half
 mapped would also have gone to review, instead of showing its missing half as new. Limits per box
@@ -303,7 +321,7 @@ avoid both problems and are easy to explain: "within 3 m and 30° is already map
 new data to offer), its unmatched runs are offered as new, and its matched runs are treated like an
 already-mapped feature. If any run is uncertain, the whole line goes to the review queue.
 
-**Short runs are absorbed.** A run that isn't matched, is shorter than `buffer`, and sits next to a
+**Short runs are absorbed.** A run that isn't matched, is shorter than the sample spacing, and sits next to a
 matched run is treated as matched. These are almost always misalignment at the ends of a match,
 such as a new sidewalk that overshoots the OSM one by a meter or two.
 
@@ -323,7 +341,7 @@ interface ConflationResult {
 }
 
 interface ConflationCandidate {
-  entityID: EntityID;
+  entityID: EntityID;                 // the OSM feature: a way, or e.g. a multipolygon relation
   score: number;
   measures: { distance: number; angle: number; overlap: number; intersects: boolean; tags: boolean };
 }
@@ -331,7 +349,8 @@ interface ConflationCandidate {
 interface BoxMatch {
   coord: Vec2;                        // box center, world coordinates
   status: ConflationStatus;           // matched, uncertain, or unmatched
-  wayIDs: EntityID[];                 // OSM ways that matched this box at its status, closest first
+  entityIDs: EntityID[];              // OSM features that matched this box at its status, closest first
+  wayIDs: EntityID[];                 // for each feature, the way whose segment matched (what a run can join)
 }
 
 interface LineRun {
@@ -350,9 +369,10 @@ interface JoinPoint {
 
 **Cutting runs out of a line.** A run is cut from the original geometry, not rebuilt from box centers.
 `CoverageBox` carries the segment `index` and parameter `t` of its center, so the start and end of a
-run map to exact positions on the source line. Boxes are about `buffer` apart, so where a run that
+run map to exact positions on the source line. Boxes are about one sample spacing apart, so where a run that
 isn't matched meets a matched run, it is extended to the nearest matched box. That end is then
-projected onto the OSM way that matched there (the closest one). The projection is the `JoinPoint`.
+projected onto the OSM way that matched there (the closest one whose feature is a line; a run never
+joins the edge of an area). The projection is the `JoinPoint`.
 If an existing node of that way is within 1 m of it, the run joins at that node and no new node is
 added. In practice, a run joins an existing node where the OSM way ends, and joins mid-segment
 where the new line leaves an OSM way and comes back to it.
@@ -372,7 +392,8 @@ Conflation has to work no matter what the dataset already went through:
 ### Caching and invalidation
 
 - Results are cached by `(datasetID, dataID)`. Coverage is cached on each `GeometryPart` (one slot per
-  buffer radius).
+  sample spacing). Compiled property matchers are cached per rule side, and dropped by `invalidate()`,
+  so a rule edited in place is picked up.
 - **`stablechange` and `merge`** from `EditSystem` flush results whose coverage overlaps the extent
   that changed. A first version can simply flush everything and rely on lazy recomputation.
 - **A rule change** flushes that dataset's results.
@@ -443,8 +464,8 @@ and the system never has to load OSM for an entire city.
 - Otherwise, add a new node to the OSM way at `loc`, between the two nodes of the segment it
   projects onto, and use that new node as the endpoint.
 
-**All accepted lines.** Any end of an accepted line that has no `JoinPoint` but lies within `buffer`
-of an OSM way matching the dataset's rules is joined the same way. This is how an accepted crossing
+**All accepted lines.** Any end of an accepted line that has no `JoinPoint` but lies within `sameDist`
+of an OSM way that some rule allows as a target is joined the same way. This is how an accepted crossing
 connects to the sidewalks at its ends, including sidewalks accepted a moment ago, since those are in
 `editor_stable` by then. It replaces the autoconnect step's role for these datasets. Autoconnect
 itself is optional (a power-user setting) and only handles exactly matching nodes and validator
@@ -459,7 +480,7 @@ without any new state in `RapidSystem`. The source feature goes into `acceptIDs`
 accepted whole. Undo needs nothing special either: undoing removes the way, `stablechange` fires,
 and the run reappears.
 
-*Caveat:* this works only if the accepted way satisfies the rule's `match`. If the data mapping gives
+*Caveat:* this works only if the accepted way satisfies some rule's target conditions and `sameKeys`. If the data mapping gives
 the new way tags that don't match, the run would reappear after it's accepted. The
 `UiRapidDatasetSettings` page should warn when a dataset's mapped tags don't satisfy its own rules.
 
@@ -477,9 +498,9 @@ it overlaps existing data" to a definition in stage words, roughly:
 The final wording goes through normal string review (`rapid_dataset_settings.conflation.*`). Below
 it, the single "Conflation?" checkbox is replaced by:
 - an "enabled" switch and a "show matched features" switch
-- for each rule: the geometry type, the match tags (a simple `key=value` list to start, since
-  `PropMatcher.from` already parses that format), `buffer`, `maxAngle`, and `reviewFactor`
-  (worded as "needs review within N× this distance")
+- for each rule: source and target geometry, source and target property conditions (a simple
+  `key=value` list to start, since `PropMatcher.from` already parses that format), the keys that must
+  agree (`sameKeys`), and the "same" and "near" distances and angles
 - a live count of features in each status in the current view, so users can tune parameters and see
   the effect right away
 
@@ -524,8 +545,11 @@ Lines come first throughout. Points and polygons follow the same pipeline at a l
   1 m), a perpendicular crossing (rejected by the angle test), a sidewalk that is partly mapped (one
   matched run, one unmatched run, and a `JoinPoint` on the OSM way), and crossings whose ends meet
   sidewalks. No real agency data goes in the repo.
-- Triage: a 1.5 m offset is already mapped at a 3 m buffer, needs review at 1 m (review limit 2 m),
-  and is new at 1 m with no review margin. A line within the review distance but at 40° is new, not
+- Rules: the three requests the shape was designed around (any tagging; both have `highway`; same
+  `highway` value), several `sameKeys`, OR across rules, source conditions that fail (New, not "no
+  result"), target exclusions, and source conditions checked after the data mapping.
+- Triage: a 1.5 m offset is already mapped at `sameDist` 3, near at `sameDist` 1 / `nearDist` 2,
+  and new with no near band. A line within `nearDist` but at 40° is new, not
   needs review. Short overshoots at the end of a match are absorbed.
 - Drawing: no automated tests (Pixi needs WebGL). Checked in headless Chromium against live OSM data,
   with an in-memory dataset generated from the OSM sidewalks in view. Nothing was committed.
@@ -546,13 +570,18 @@ Lines come first throughout. Points and polygons follow the same pipeline at a l
   doesn't block anything; the provisional formula is in one function that can be replaced.
 - **Lines come first.** Points and polygons follow the same pipeline later.
 - **Triage uses limits per box, not thresholds on a score** (decided during Step 3, see [Scoring](#scoring)).
-  "Needs review" loosens only the distance limit, by `reviewFactor`. The angle limit stays the same
-  (decided during Step 4 testing).
-- **Minimum run length.** A run that isn't matched, is shorter than `buffer`, and sits next to a
-  matched run is treated as matched.
+  "Near" (needs review) has its own distance and angle; `nearAngle` defaults to `sameAngle` (decided
+  during Step 4 testing).
+- **Minimum run length.** A run that isn't matched, is shorter than the sample spacing, and sits next
+  to a matched run is treated as matched.
+- **Rule shape: source and target, "same" and "near"** (decided after testing on real data). Rules
+  name conditions for each side, `sameKeys` for values that must agree, and two sets of distance and
+  angle limits. Every source feature is tested; rules combine with OR. This replaced an earlier
+  `match` block that also acted as a filter on the source, which left features that failed it with no
+  result at all.
 - **No default tag condition.** Without one, a sidewalk rule matches roads, railways and waterways
   (seen on real data). Only the user can say which OSM features are "the same kind of thing", so the
-  default rules leave `match.tags` empty and the settings UI (Step 6) asks for one.
+  default rules have no property conditions and the settings UI (Step 6) asks for them.
 - **Conflation runs even without a data mapping, for now.** Without a mapping, the new features' tags
   are their raw properties, and rules with no tag conditions match everything nearby. That makes the
   difference a mapping makes easy to show. Whether to require a mapping or only warn is open.

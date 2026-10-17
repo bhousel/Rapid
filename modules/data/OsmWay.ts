@@ -30,6 +30,18 @@ export interface OsmWayProps extends OsmEntityProps {
 }
 
 /**
+ * The map feature that an OSM way represents (see `OsmWay.asFeature`).
+ */
+export interface OsmFeature {
+  /** The entity that carries the feature's tags: the way itself, or its parent multipolygon */
+  entity: OsmEntity;
+  /** The feature's geometry */
+  geometry: 'area' | 'line';
+  /** The feature's tags */
+  tags: OsmTags;
+}
+
+/**
  * Segment data for a way.
  */
 export interface Segment {
@@ -452,6 +464,25 @@ export class OsmWay extends OsmEntity {
       }
     }
     return false;
+  }
+
+  /**
+   * Returns the map feature that this way represents.
+   * Usually that's the way itself. But an untagged way in a multipolygon relation (an outer or
+   * inner ring) is really part of that relation: an area, with the relation's tags.
+   * If the way belongs to more than one multipolygon, the first one is used.
+   * Not cached: it depends on the graph's relations, not just on this way.
+   * @param graph - the Graph that holds the topology needed
+   * @return The feature: the entity that carries its tags, its geometry, and its tags
+   */
+  public asFeature(graph: Graph): OsmFeature {
+    if (!this.hasInterestingTags()) {
+      const parent = graph.parentRelations(this).find(relation => relation.isMultipolygon());
+      if (parent) {
+        return { entity: parent, geometry: 'area', tags: parent.tags };
+      }
+    }
+    return { entity: this, geometry: this.geometry(graph), tags: this.tags };
   }
 
   /**

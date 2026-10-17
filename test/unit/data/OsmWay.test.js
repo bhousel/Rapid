@@ -823,6 +823,61 @@ describe('OsmWay', () => {
   });
 
 
+  describe('asFeature', () => {
+    // A square ring a-b-c-d-a, which can be used as a standalone way or a multipolygon outer.
+    const nodes = [
+      new Rapid.OsmNode(context, { id: 'a', loc: [0, 0] }),
+      new Rapid.OsmNode(context, { id: 'b', loc: [0, 1] }),
+      new Rapid.OsmNode(context, { id: 'c', loc: [1, 1] }),
+      new Rapid.OsmNode(context, { id: 'd', loc: [1, 0] })
+    ];
+    const ring = ['a', 'b', 'c', 'd', 'a'];
+
+    it('returns the way itself for a tagged way', () => {
+      const way = new Rapid.OsmWay(context, { id: 'w1', nodes: ring, tags: { building: 'yes' } });
+      const graph = new Rapid.Graph(context, [...nodes, way]);
+      const feature = way.asFeature(graph);
+      assert.strictEqual(feature.entity, way);
+      assert.strictEqual(feature.geometry, 'area');
+      assert.deepEqual(feature.tags, { building: 'yes' });
+    });
+
+    it('returns the way itself for an untagged way with no multipolygon parent', () => {
+      const way = new Rapid.OsmWay(context, { id: 'w1', nodes: ring });
+      const route = new Rapid.OsmRelation(context, {
+        id: 'r1', tags: { type: 'route' }, members: [{ id: 'w1', type: 'way', role: '' }]
+      });
+      const graph = new Rapid.Graph(context, [...nodes, way, route]);
+      const feature = way.asFeature(graph);
+      assert.strictEqual(feature.entity, way);
+      assert.strictEqual(feature.geometry, 'line');
+    });
+
+    it('returns the parent multipolygon, as an area, for an untagged member way', () => {
+      const way = new Rapid.OsmWay(context, { id: 'w1', nodes: ring });
+      const mp = new Rapid.OsmRelation(context, {
+        id: 'r1', tags: { type: 'multipolygon', building: 'retail' }, members: [{ id: 'w1', type: 'way', role: 'outer' }]
+      });
+      const graph = new Rapid.Graph(context, [...nodes, way, mp]);
+      assert.strictEqual(way.geometry(graph), 'line');   // what the way says about itself
+
+      const feature = way.asFeature(graph);
+      assert.strictEqual(feature.entity, mp);
+      assert.strictEqual(feature.geometry, 'area');
+      assert.deepEqual(feature.tags, { type: 'multipolygon', building: 'retail' });
+    });
+
+    it('returns the way itself for a tagged member of a multipolygon', () => {
+      const way = new Rapid.OsmWay(context, { id: 'w1', nodes: ring, tags: { barrier: 'wall' } });
+      const mp = new Rapid.OsmRelation(context, {
+        id: 'r1', tags: { type: 'multipolygon', building: 'retail' }, members: [{ id: 'w1', type: 'way', role: 'outer' }]
+      });
+      const graph = new Rapid.Graph(context, [...nodes, way, mp]);
+      assert.strictEqual(way.asFeature(graph).entity, way);
+    });
+  });
+
+
   describe('segments', () => {
     it('returns segments for the given way', () => {
       //     a

@@ -59,9 +59,9 @@ Phase 1 (the `KeyboardSystem` conversion + command scaffolding) is done — see
   tags). At least 7 places work this out on their own, each slightly differently: `PixiLayerOsm`
   (styling), `FilterSystem` (filter matches), and the validators `crossing_ways` (`getTaggedEntityForWay`),
   `close_nodes`, `unsquare_way`, `disconnected_way`, `impossible_oneway`.
-- `ConflationSystem` needs the same answer, so it adds `OsmWay.asFeature(graph)` first. Then move the others
-  over one at a time, watching for their small differences (untagged-only or not, inner roles, more than one
-  parent multipolygon).
+- `OsmWay.asFeature(graph)` now exists, and `ConflationSystem` uses it. Next, move the others over one at a
+  time, watching for their small differences (untagged-only or not, inner roles, more than one parent
+  multipolygon).
 - Longer term: index generic features (`{ kind, tags, coords }`) rather than OSM ways, so conflation (and
   maybe validation) can work against non-OSM targets. See `design/conflation-system.md`.
 
