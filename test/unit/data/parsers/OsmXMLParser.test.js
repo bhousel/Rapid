@@ -194,6 +194,22 @@ describe('OsmXMLParser', () => {
       assert.lengthOf(data2, 7);   // bounds + elements
     });
 
+    it('optionally skips seen elements without remembering new ones', () => {
+      const results1 = parser.parse(sample.mapXML, { markSeen: false });
+      assert.lengthOf(results1.data, 7);   // bounds + elements
+
+      const results2 = parser.parse(sample.mapXML, { markSeen: false });
+      assert.lengthOf(results2.data, 7);   // not remembered, so returned again
+    });
+
+    it('skips elements remembered with markSeen', () => {
+      parser.markSeen(['n1', 'w1']);
+      const results = parser.parse(sample.mapXML);
+      assert.lengthOf(results.data, 5);   // bounds + elements, less n1 and w1
+      assert.notInclude(results.data.map(d => d.id), 'n1');
+      assert.notInclude(results.data.map(d => d.id), 'w1');
+    });
+
     it('skips already-seen users by default', () => {
       const results1 = parser.parse(sample.usersXML);
       const data1 = results1.data;

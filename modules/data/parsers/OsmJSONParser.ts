@@ -108,6 +108,17 @@ export class OsmJSONParser {
 
 
   /**
+   * Remember these identifiers as seen, so that parsing with `skipSeen` excludes them.
+   * @param  ids - the identifiers to remember
+   */
+  public markSeen(ids: Iterable<string>): void {
+    for (const id of ids) {
+      this._seen.add(id);
+    }
+  }
+
+
+  /**
    * Parse the given content and extract whatatever OSM data we find in it.
    * @param   content - the content to parse
    * @param   options - parsing options
@@ -121,6 +132,7 @@ export class OsmJSONParser {
 
     // exclude results that we have seen before
     const skipSeen = options.skipSeen ?? true;
+    const markSeen = options.markSeen ?? true;
 
     // include only these in the results (e.g. ['node','way','relation'])
     let filter: Set<ParserDataType>;
@@ -227,7 +239,7 @@ export class OsmJSONParser {
 
         if (skipSeen) {  // skip things we've seen before
           if (this._seen.has(id)) continue;
-          this._seen.add(id);
+          if (markSeen) this._seen.add(id);
         }
 
         const parsed = parser(obj, id);
@@ -245,7 +257,7 @@ export class OsmJSONParser {
 
         if (skipSeen) {  // skip things we've seen before
           if (this._seen.has(id)) continue;
-          this._seen.add(id);
+          if (markSeen) this._seen.add(id);
         }
 
         const parsed = this._parseChangeset(obj, id);
@@ -263,7 +275,7 @@ export class OsmJSONParser {
 
         if (skipSeen) {  // skip things we've seen before
           if (this._seen.has(id)) continue;
-          this._seen.add(id);
+          if (markSeen) this._seen.add(id);
         }
 
         const parsed = this._parseUser(obj, id);
