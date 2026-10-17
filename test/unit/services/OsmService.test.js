@@ -3,6 +3,7 @@ import { promisify } from 'bun:util';
 import { assert } from 'chai';
 import fetchMock from 'fetch-mock';
 import * as Rapid from '../../../modules/headless.js';
+import * as WORKER from '../../../modules/services/OsmService.worker.ts';
 import * as sample from './OsmService.sample.js';
 
 
@@ -338,6 +339,40 @@ describe('OsmService', () => {
             assert.lengthOf(calls, 2);
             assert.property((calls[0].options.headers || {}), 'authorization');
             assert.notProperty((calls[1].options.headers || {}), 'authorization');
+          });
+      });
+
+      const entitiesIn = result => result.data.filter(d => ['node', 'way', 'relation'].includes(d.type));
+
+      it('skips entities already delivered by an earlier call', () => {
+        const loadFromAPI = promisify(_osm.loadFromAPI).bind(_osm);
+        fetchMock.route(/map\.json/, sample.mapJSON);
+
+        return loadFromAPI(path)
+          .then(result => {
+            assert.isNotEmpty(entitiesIn(result));
+            return loadFromAPI(path);
+          })
+          .then(result => {
+            assert.isEmpty(entitiesIn(result));
+          });
+      });
+
+      it('does not skip entities that were parsed but never delivered', () => {
+        const loadFromAPI = promisify(_osm.loadFromAPI).bind(_osm);
+        fetchMock.route(/map\.json/, sample.mapJSON);
+
+        // Parse a response the way `loadFromAPI` does, but drop the results,
+        // as happens when the request is cancelled or times out after the
+        // worker has parsed it.
+        const url = `${_osm._apiroot}${path}`;
+        return WORKER.fetchAndParse({ url, format: 'json', parserOptions: { skipSeen: true, markSeen: false } }, new AbortController().signal)
+          .then(parsed => {
+            assert.isNotEmpty(entitiesIn(parsed.value));
+            return loadFromAPI(path);
+          })
+          .then(result => {
+            assert.isNotEmpty(entitiesIn(result));
           });
       });
 

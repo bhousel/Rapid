@@ -55,8 +55,22 @@ export function reset(_data: unknown, _signal: AbortSignal): void {
 }
 
 
+/**
+ * Remembers identifiers as seen by the long-lived parser instances.
+ * @param data  Message data - expects an Array of identifiers
+ * @param _signal
+ * @listens `osmService:markSeen`
+ */
+export function markSeen(data: unknown, _signal: AbortSignal): void {
+  const ids = data as string[];
+  osmJsonParser.markSeen(ids);
+  osmXmlParser.markSeen(ids);
+}
+
+
 /** Listeners provided by this file */
 export const osmServiceListeners: ListenerRegistry = {
   'osmService:fetchAndParse': fetchAndParse,
+  'osmService:markSeen':      markSeen,
   'osmService:reset':         reset,
 };

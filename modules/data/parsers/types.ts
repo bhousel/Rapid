@@ -13,6 +13,11 @@ export type ParserDataType =
 export interface ParserOptions {
   /** Whether to skip results that have been seen before (default: true) */
   skipSeen: boolean;
+  /**
+   * Whether to remember results as seen while parsing (default: true).
+   * Pass `false` to remember them later with `markSeen()`, once they've been used.
+   */
+  markSeen: boolean;
   /** Filter to include only these types in the results */
   filter: Set<ParserDataType> | ParserDataType[];
 }

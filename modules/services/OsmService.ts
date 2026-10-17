@@ -591,6 +591,13 @@ export class OsmService extends AbstractSystem {
     const cid = this._connectionID;
     options.skipSeen ??= true;
 
+    // Remember results as seen only once they're delivered (below). The worker
+    // parses a response even when its request is then cancelled (e.g. a tile no
+    // longer in view) or times out, and results remembered then would be skipped
+    // by every later request, so they'd never load.
+    options.markSeen ??= false;
+    const markSeenOnDelivery = options.skipSeen && !options.markSeen;
+
     const format: 'json' | 'xml' = path.includes('.json') ? 'json' : 'xml';
 
     // Accept absolute or relative paths
@@ -655,6 +662,10 @@ export class OsmService extends AbstractSystem {
           this.deferredReloadApiStatus();    // reload status / clear warning
         }
 
+        if (markSeenOnDelivery) {
+          this._markSeen(env.value);
+        }
+
         callback?.(null, env.value);
       })
       .catch((err: any) => {
@@ -670,6 +681,30 @@ export class OsmService extends AbstractSystem {
       });
 
     return computedID;
+  }
+
+
+  /**
+   * Remembers the identifiers in delivered results as seen by the parsers,
+   * so that later requests using `skipSeen` exclude them.
+   * @param  results - the parsed results that were delivered
+   */
+  protected _markSeen(results: ParserResult): void {
+    const context = this.context;
+    const worker = context.systems.worker;
+
+    const ids: string[] = [];
+    for (const d of results?.data ?? []) {
+      const id = (d as { id?: unknown }).id;
+      if (typeof id === 'string' && id) ids.push(id);
+    }
+    if (!ids.length) return;
+
+    if (worker?.workerURL) {
+      worker.dispatch<void>('osmService:markSeen', ids).catch(() => {});
+    } else {
+      osmServiceListeners['osmService:markSeen'](ids, new AbortController().signal);
+    }
   }
 
 

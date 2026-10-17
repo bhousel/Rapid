@@ -2,6 +2,17 @@
 
 Non-obvious choices where "why did we do it this way?" isn't captured in the code.
 
+## OSM parsers remember "seen" entities only once results are delivered
+
+`skipSeen` keeps the worker from re-sending entities we already have, but the parser used to remember an
+entity as soon as it parsed it. When a request is cancelled (`loadTiles` aborts tiles no longer in view)
+or times out after the worker has parsed the response, the main thread drops the result while the worker
+keeps the IDs, so every later request skips those entities and they never load until a reset. Now
+`loadFromAPI` parses with `markSeen: false` and sends the delivered IDs back with `osmService:markSeen`.
+Checking the abort signal inside the worker doesn't work: the cancel message is only handled after the
+synchronous parse finishes. Overlapping requests in flight together may both return an entity, and
+`EditSystem.merge` already ignores ones it has.
+
 ## Folder-specific agent rules live in nested `AGENTS.md`, not `.github/instructions/`
 
 `.github/instructions/*.instructions.md` with `applyTo:` globs only work in Copilot. Claude Code never loaded

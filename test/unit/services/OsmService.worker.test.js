@@ -23,6 +23,7 @@ describe('OsmService.worker listeners', () => {
     it('exports listener IDs', () => {
       assert.hasAllKeys(WORKER.osmServiceListeners, [
         'osmService:fetchAndParse',
+        'osmService:markSeen',
         'osmService:reset'
       ]);
     });
@@ -190,6 +191,28 @@ describe('OsmService.worker listeners', () => {
       assert.strictEqual(result.status, 500);
       // body should fall back to empty string when body is unreadable
       assert.strictEqual(result.body, '');
+    });
+  });
+
+
+  describe('markSeen', () => {
+    it('makes later parses that skip seen elements exclude them', async () => {
+      const osmResponse = { elements: [jsonN1, jsonN2] };
+      originalFetch = globalThis.fetch;
+      globalThis.fetch = mock(() =>
+        Promise.resolve(new Response(JSON.stringify(osmResponse), {
+          headers: { 'content-type': 'application/json' },
+        }))
+      );
+
+      WORKER.markSeen(['n1'], signal);
+      const result = await WORKER.fetchAndParse({
+        url: 'https://api.openstreetmap.org/api/0.6/map.json',
+        format: 'json',
+      }, signal);
+
+      assert.isTrue(result.ok);
+      assert.deepEqual(result.value.data.map(d => d.id), ['n2']);
     });
   });
 
