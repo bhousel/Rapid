@@ -1,10 +1,14 @@
+import { actionAddMidpoint } from './add_midpoint.ts';
 import { GeoJSONData, OsmEntity, OsmNode, OsmRelation, OsmWay } from '../data/index.ts';
+import { geoMetersToWorld } from '../geo/geom.ts';
 import { Graph } from '../lib/Graph.ts';
+import { projWgs84ToWorld, vecProject } from '@rapid-sdk/math';
 import { validateAlmostJunction } from '../validators/almost_junction.ts';
 import { validateCrossingWays } from '../validators/crossing_ways.ts';
 
 import type { Action } from './types.ts';
 import type { Context } from '../Context.ts';
+import type { JoinPoint, LineJoins } from '../core/ConflationSystem.ts';
 import type { EntityType, OsmRelationMember, OsmTags } from '../data/types.ts';
 import type { RapidDataDictionary } from '../lib/index.ts';
 import type { Vec2 } from '@rapid-sdk/math';
@@ -25,9 +29,11 @@ export interface RapidAcceptAction extends Action {
  * Accepts a Rapid feature from an external dataset into the main graph.
  * Handles nodes, ways, and relations, including connection points to existing ways.
  * @param   datum  - Data to accept - should be OSMEntity-like or GeoJSONData-like.
+ * @param   joins  - Optional: where the ends of an accepted line should connect to existing ways
+ *                   (see `ConflationSystem.getJoins`). A join that no longer fits the graph is skipped.
  * @return  An Action function that adds the given Rapid feature to the main graph
  */
-export function actionRapidAcceptFeature(datum: OsmEntity | GeoJSONData): RapidAcceptAction {
+export function actionRapidAcceptFeature(datum: OsmEntity | GeoJSONData, joins?: LineJoins): RapidAcceptAction {
 
   // Mapping of oldid -> newid.  Not all old ids will be in here!
   // (e.g. In the case of a GeoJSON line, we will create a lot of new OsmNodes for the coordinates.)
@@ -86,10 +92,68 @@ export function actionRapidAcceptFeature(datum: OsmEntity | GeoJSONData): RapidA
     newID = newEntity?.id;
 
     if (newEntity instanceof OsmWay) {
-      attemptAutoconnect(newEntity, graph);
+      if (joins?.start) applyJoin(newEntity.id, 'start', joins.start);
+      if (joins?.end) applyJoin(newEntity.id, 'end', joins.end);
+      attemptAutoconnect(graph.entity(newEntity.id) as OsmWay, graph);
     }
 
     return graph.commit();
+
+
+    /**
+     * Connects one end of the newly accepted way to an existing way.
+     * Either the end reuses an existing node of that way, or the end node moves onto the way's
+     * segment and is inserted there. If the graph no longer matches the join (the way or node is
+     * gone, or the segment was changed), the join is skipped and the end stays where it is.
+     * @param  wayID - The newly accepted way
+     * @param  which - Which end of it to connect
+     * @param  join  - Where to connect it
+     */
+    function applyJoin(wayID: EntityID, which: 'start' | 'end', join: JoinPoint): void {
+      const way = graph.entity(wayID) as OsmWay;
+      const target = graph.hasEntity(join.wayID) as OsmWay | undefined;
+      if (!target) return;
+
+      const endNodeID = (which === 'start' ? way.first() : way.last())!;
+      if (way.isClosed()) return;   // don't join the ends of a ring
+
+      if (join.nodeID && target.nodes.includes(join.nodeID)) {
+        // Reuse the existing node, and drop the end node we created for this end.
+        graph.replace(way.replaceNode(endNodeID, join.nodeID));
+        graph.remove(graph.entity(endNodeID));
+
+      } else {
+        // Move our end node onto the existing way's segment, and insert it there.
+        // The recorded edge may have been split already (e.g. by the other end's join),
+        // so fall back to the segment that `loc` lies on now.
+        const edge = (join.edge && target.isAdjacent(join.edge[0], join.edge[1])) ? join.edge : edgeAt(target, join.loc);
+        if (!edge) return;
+        const endNode = graph.entity(endNodeID) as OsmNode;
+        actionAddMidpoint({ loc: join.loc, edge: edge }, endNode)(graph);
+      }
+    }
+
+
+    /**
+     * Finds the segment of a way that a location lies on.
+     * @param  way - The way to search
+     * @param  loc - The location (WGS84)
+     * @return The segment's node ids, or `undefined` if `loc` isn't on the way (within 0.5 m)
+     */
+    function edgeAt(way: OsmWay, loc: Vec2): [EntityID, EntityID] | undefined {
+      const point = projWgs84ToWorld(loc);
+      const tolerance = geoMetersToWorld(0.5, loc[1]);
+      for (let i = 0; i < way.nodes.length - 1; i++) {
+        const a = graph.hasEntity(way.nodes[i]) as OsmNode | undefined;
+        const b = graph.hasEntity(way.nodes[i + 1]) as OsmNode | undefined;
+        if (!a?.loc || !b?.loc) continue;
+        const closest = vecProject(point, [projWgs84ToWorld(a.loc), projWgs84ToWorld(b.loc)]);
+        if (closest && closest.distance <= tolerance) {
+          return [a.id, b.id];
+        }
+      }
+      return undefined;
+    }
 
 
     /**

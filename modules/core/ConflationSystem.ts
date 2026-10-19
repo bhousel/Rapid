@@ -7,6 +7,7 @@ import { PropMatcher } from '../lib/PropMatcher.ts';
 import type { AbstractData } from '../data/AbstractData.ts';
 import type { Context } from '../Context.ts';
 import type { CoverageBox } from '../geo/geom.ts';
+import type { GeoJSONProps } from '../data/GeoJSONData.ts';
 import type { GeometryPart } from '../lib/GeometryPart.ts';
 import type { Graph } from '../lib/Graph.ts';
 import type { OsmNode } from '../data/OsmNode.ts';
@@ -128,6 +129,29 @@ export interface JoinPoint {
   loc: Vec2;
   /** An existing node within snapping distance of `loc`, if any (reuse it instead of adding one) */
   nodeID?: EntityID;
+  /** When there is no `nodeID`: the segment of the way that `loc` is on (add a node there) */
+  edge?: [EntityID, EntityID];
+}
+
+/** Where the ends of a line being accepted should connect (see `ConflationSystem.getJoins`). */
+export interface LineJoins {
+  /** Join for the line's first node */
+  start?: JoinPoint;
+  /** Join for the line's last node */
+  end?: JoinPoint;
+}
+
+/**
+ * Props for the data element that stands for one run of a partly mapped line.
+ * The run can be selected and accepted on its own, and carries where its ends should join.
+ */
+export interface ConflationRunProps extends GeoJSONProps {
+  /** The source feature that this run is part of */
+  sourceID: DataID;
+  /** Join for the run's first node */
+  startJoin?: JoinPoint;
+  /** Join for the run's last node */
+  endJoin?: JoinPoint;
 }
 
 /** A maximal stretch of a new line whose boxes share a status. */
@@ -136,10 +160,15 @@ export interface LineRun {
   status: ConflationStatus;
   /** WGS84 sub-line of the original geometry */
   coords: Vec2[];
-  /** Set when the start of this run meets an already-mapped stretch */
+  /** Set when the start of this run meets an already-mapped stretch, or an allowed target line */
   startJoin?: JoinPoint;
-  /** Set when the end of this run meets an already-mapped stretch */
+  /** Set when the end of this run meets an already-mapped stretch, or an allowed target line */
   endJoin?: JoinPoint;
+  /**
+   * For runs that aren't already mapped, when the line has more than one run: a data element for just
+   * this stretch, so it can be drawn, selected, and accepted on its own.
+   */
+  datum?: GeoJSONData<ConflationRunProps>;
 }
 
 /** The result of matching one new feature against OSM. */
@@ -350,6 +379,27 @@ export class ConflationSystem extends AbstractSystem {
 
 
   /**
+   * Returns where the ends of a line should connect when it is accepted.
+   * - For the data element of one run of a partly mapped line, its own joins.
+   * - For a whole source line that is a single run (not already mapped), that run's joins.
+   * @param ds - The dataset that the data belongs to
+   * @param datum - A source feature, or the data element of one run (see `LineRun.datum`)
+   * @return The joins, or `undefined` if there are none to make
+   */
+  public getJoins(ds: RapidDataset, datum: AbstractData): LineJoins | undefined {
+    const props = datum.props as Partial<ConflationRunProps>;
+    if (props.sourceID) {
+      return { start: props.startJoin, end: props.endJoin };
+    }
+
+    const result = this.getResult(ds, datum);
+    const run = (result?.runs?.length === 1) ? result.runs[0] : undefined;
+    if (!run || run.status === 'matched') return undefined;
+    return { start: run.startJoin, end: run.endJoin };
+  }
+
+
+  /**
    * Flushes cached results so they are recomputed on next access, and emits `conflationchange`.
    * Call this after changing a dataset's rules (including editing a rule in place).
    * @param datasetID - Flush only this dataset's results (default: all datasets)
@@ -384,7 +434,7 @@ export class ConflationSystem extends AbstractSystem {
 
     const tags = ds.dictionary ? ds.dictionary.applyTransforms(datum.properties) : datum.properties;
     if (geometry === 'line') {
-      return this._conflateLine(datum.id, rules, tags, part);
+      return this._conflateLine(datum, rules, tags, part);
     }
     return undefined;   // points and areas: not yet
   }
@@ -406,6 +456,18 @@ export class ConflationSystem extends AbstractSystem {
 
 
   /**
+   * Whether a target feature meets a rule's target conditions (geometry and props).
+   * @param rule - The rule
+   * @param feature - The target feature (see `OsmWay.asFeature`)
+   * @return `true` if the feature is the kind of target the rule is about
+   */
+  protected _targetAllowed(rule: ConflationRule, feature: OsmFeature): boolean {
+    if (!TARGET_GEOMETRY[rule.target.geometry].includes(feature.geometry)) return false;
+    return PropMatcher.matchAll(this._propMatchers(rule.target), feature.tags);
+  }
+
+
+  /**
    * Whether a target feature meets a rule's target conditions, and agrees with the source on `sameKeys`.
    * @param rule - The rule
    * @param feature - The target feature (see `OsmWay.asFeature`)
@@ -413,8 +475,7 @@ export class ConflationSystem extends AbstractSystem {
    * @return `true` if the rule allows this pair to be the same thing
    */
   protected _targetMatches(rule: ConflationRule, feature: OsmFeature, sourceTags: Record<string, unknown>): boolean {
-    if (!TARGET_GEOMETRY[rule.target.geometry].includes(feature.geometry)) return false;
-    if (!PropMatcher.matchAll(this._propMatchers(rule.target), feature.tags)) return false;
+    if (!this._targetAllowed(rule, feature)) return false;
 
     for (const k of rule.sameKeys ?? []) {
       const sourceVal = sourceTags[k];
@@ -448,14 +509,14 @@ export class ConflationSystem extends AbstractSystem {
    * `sameAngle`, and all the rule's conditions hold), *uncertain* if some rule says one is near
    * (within `nearDist` and `nearAngle`), and *unmatched* otherwise. Consecutive boxes with the same
    * status form runs.
-   * @param dataID - The source feature's id
+   * @param datum - The source feature
    * @param rules - The rules whose source geometry is 'line'
    * @param sourceTags - The source feature's tags, after the data mapping
    * @param part - The source feature's geometry
    * @return The result
    */
   protected _conflateLine(
-    dataID: DataID,
+    datum: GeoJSONData,
     rules: ConflationRule[],
     sourceTags: Record<string, unknown>,
     part: GeometryPart
@@ -464,6 +525,7 @@ export class ConflationSystem extends AbstractSystem {
     const editor = context.systems.editor!;
     const spatial = context.systems.spatial!;
 
+    const dataID = datum.id;
     const graph = editor.stable.graph!;
     const segSpatialID = editor.spatialIDForGraph(graph) + '-segments';
 
@@ -503,6 +565,16 @@ export class ConflationSystem extends AbstractSystem {
       return coord;
     };
 
+    const featureOf = (wayID: EntityID): OsmFeature | null => {
+      let feature = features.get(wayID);
+      if (feature === undefined) {
+        const way = graph.hasEntity(wayID) as OsmWay | undefined;
+        feature = way?.asFeature(graph) ?? null;
+        features.set(wayID, feature);
+      }
+      return feature;
+    };
+
     for (const box of boxes) {
       // For each target feature near this box, keep its best match across all rules:
       // "same" beats "near", and a closer segment beats a farther one.
@@ -517,12 +589,7 @@ export class ConflationSystem extends AbstractSystem {
         const seg = hit.contents as Segment;
         const wayID = seg.wayID;
 
-        let feature = features.get(wayID);
-        if (feature === undefined) {
-          const way = graph.hasEntity(wayID) as OsmWay | undefined;
-          feature = way?.asFeature(graph) ?? null;
-          features.set(wayID, feature);
-        }
+        const feature = featureOf(wayID);
         if (!feature) continue;
 
         const a = coordOf(seg.edge[0]);
@@ -621,6 +688,36 @@ export class ConflationSystem extends AbstractSystem {
     }
     candidates.sort((a, b) => b.score - a.score);
 
+    // A line end that isn't next to an already-mapped stretch can still join a target line that some
+    // rule allows (ignoring `sameKeys`), within `sameDist` and at any angle. This is how an accepted
+    // crossing connects to the sidewalks at its ends.
+    const endJoinMeters = Math.max(0, ...active.map(rule => rule.sameDist));
+    const endJoinAt = (coord: Vec2): JoinPoint | undefined => {
+      if (endJoinMeters <= 0) return undefined;
+      const r = geoMetersToWorld(endJoinMeters, lat);
+      const query = { minX: coord[0] - r, minY: coord[1] - r, maxX: coord[0] + r, maxY: coord[1] + r };
+
+      let bestWayID: EntityID | undefined;
+      let bestDistance = Infinity;
+      for (const hit of spatial.getItemsAtBox(segSpatialID, query)) {
+        const seg = hit.contents as Segment;
+        const feature = featureOf(seg.wayID);
+        if (feature?.geometry !== 'line') continue;
+        if (!active.some(rule => this._targetAllowed(rule, feature))) continue;
+
+        const a = coordOf(seg.edge[0]);
+        const b = coordOf(seg.edge[1]);
+        if (!a || !b) continue;
+
+        const distance = (vecProject(coord, [a, b])?.distance ?? Infinity) * metersPerWorld;
+        if (distance <= endJoinMeters && distance < bestDistance) {
+          bestDistance = distance;
+          bestWayID = seg.wayID;
+        }
+      }
+      return this._joinPoint(bestWayID, coord, graph, coordOf, metersPerWorld);
+    };
+
     // Runs.
     const ranges = this._lineRanges(boxMatches, boxes, source, metersPerWorld, spacing);
     const toWgs84 = (coords: Vec2[]) => coords.map(coord => projWorldToWgs84(coord));
@@ -642,12 +739,38 @@ export class ConflationSystem extends AbstractSystem {
 
       if (prev?.status === 'matched') {
         run.startJoin = this._joinPoint(lineWayAt(prev.end), startBox.coord, graph, coordOf, metersPerWorld);
+      } else if (!prev) {
+        run.startJoin = endJoinAt(source[0]);
       }
       if (next?.status === 'matched') {
         run.endJoin = this._joinPoint(lineWayAt(next.start), endBox.coord, graph, coordOf, metersPerWorld);
+      } else if (!next) {
+        run.endJoin = endJoinAt(source.at(-1)!);
       }
       return run;
     });
+
+    // When the line has more than one run, each run that isn't already mapped gets its own data element,
+    // so it can be drawn, selected and accepted on its own. Its id is based on where the run starts
+    // along the line, so it stays the same when other parts of the line change.
+    if (runs.length > 1) {
+      runs.forEach((run, i) => {
+        if (run.status === 'matched') return;
+        run.datum = new GeoJSONData<ConflationRunProps>(context, {
+          id: `${dataID}~${ranges[i].start}`,
+          datasetID: datum.props.datasetID,
+          serviceID: datum.props.serviceID,
+          sourceID: dataID,
+          startJoin: run.startJoin,
+          endJoin: run.endJoin,
+          geojson: {
+            type: 'Feature',
+            properties: datum.properties,
+            geometry: { type: 'LineString', coordinates: run.coords }
+          }
+        });
+      });
+    }
 
     const statuses = new Set<ConflationStatus>(ranges.map(r => r.status));
     let status: ConflationStatus;
@@ -759,6 +882,9 @@ export class ConflationSystem extends AbstractSystem {
         join.loc = projWorldToWgs84(nodeCoord);
         break;
       }
+    }
+    if (!join.nodeID) {   // no node close enough, so a new one goes on this segment
+      join.edge = [nodeIDs[closest.index - 1], nodeIDs[closest.index]];
     }
     return join;
   }

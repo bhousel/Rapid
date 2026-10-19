@@ -7,7 +7,7 @@ They record the "why" that the code alone doesn't show.
 
 | Doc | Covers | Status |
 |-----|--------|--------|
-| [`conflation-system.md`](conflation-system.md) | `ConflationSystem`: client-side matching of third-party data against OSM, partial-line accept | In progress: Steps 1–3 done (line matching) |
+| [`conflation-system.md`](conflation-system.md) | `ConflationSystem`: client-side matching of third-party data against OSM, partial-line accept | In progress: Steps 1–5 done (line matching, drawing, partial accept with joins) |
 | [`database-system.md`](database-system.md) | `DatabaseSystem`: IndexedDB wrapper with `sessions` and `files` stores | Phases 0–4 done; files-management UI + worker offload open |
 | [`draganddrop-system.md`](draganddrop-system.md) | `DragAndDropSystem`: claim-based router for dropped files | Implemented |
 | [`keyboard-system.md`](keyboard-system.md) | `KeyboardSystem`: key binding scopes and commands | Phase 1 done; remappable shortcuts in backlog |

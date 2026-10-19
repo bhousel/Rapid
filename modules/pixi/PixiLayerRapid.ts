@@ -536,7 +536,8 @@ export class PixiLayerRapid extends AbstractPixiLayer {
 
   /**
    * Draws a partly mapped line as its separate runs, one feature per run.
-   * Each run feature is bound to the original data, so selecting a run selects the line's datum.
+   * A run that isn't already mapped is bound to its own data (`LineRun.datum`), so selecting it selects
+   * just that stretch, and accepting it adds just that stretch. Already-mapped runs are bound to the line.
    * @param parentContainer - The Pixi container to draw the runs into
    * @param dataset - The Rapid dataset being drawn
    * @param d - The line's data
@@ -554,6 +555,7 @@ export class PixiLayerRapid extends AbstractPixiLayer {
   ): void {
     const context = this.context;
     const l10n = context.systems.l10n!;
+    const rapid = context.systems.rapid!;
 
     const colorNum = new PIXI.Color(dataset.color).toNumber();
     const showMatched = dataset.conflation.showMatched;
@@ -561,6 +563,7 @@ export class PixiLayerRapid extends AbstractPixiLayer {
     for (let i = 0; i < runs.length; i++) {
       const run = runs[i];
       if (run.status === 'matched' && !showMatched) continue;
+      if (run.datum && rapid.isAcceptedOrIgnored(run.datum.id)) continue;
 
       const featureID = `${this.layerID}-${dataset.id}-${d.id}-run${i}`;
       let feature = this.features.get(featureID) as PixiFeatureLine | undefined;
@@ -568,15 +571,17 @@ export class PixiLayerRapid extends AbstractPixiLayer {
       if (!feature) {
         feature = new PixiFeatureLine(this, featureID);
         feature.parentContainer = parentContainer;
-        feature.data = d;
       }
 
       // Results are recomputed after edits, so the run at this index may have changed.
+      // A run that isn't already mapped is bound to its own data, so it can be selected and accepted
+      // on its own. An already-mapped run is bound to the whole line.
       if (this._drawnFrom.get(feature) !== run) {
         this._drawnFrom.set(feature, run);
         const part = new GeometryPart(context);
         part.setData({ type: 'LineString', coordinates: run.coords });
         feature.geometry = part;
+        feature.data = run.datum ?? d;
         feature.dirty = true;
       }
 

@@ -26,6 +26,9 @@ transifex.auth
 .DS_Store
 Thumbs.db
 
+# Debugging browser profile (`bun run start:chrome`)
+.chrome-debug/
+
 # Editor
 coverage/
 .vscode/

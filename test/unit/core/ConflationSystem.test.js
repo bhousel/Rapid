@@ -56,7 +56,7 @@ describe('ConflationSystem', () => {
       properties: properties,
       geometry: { type: 'LineString', coordinates: points.map(p => loc(...p)) }
     };
-    return new Rapid.GeoJSONData(context, { id: id, geojson: geojson });
+    return new Rapid.GeoJSONData(context, { id: id, datasetID: 'test', geojson: geojson });
   }
 
   // A line rule like a user might set up: "same" within 3 m / 30°, "near" within 6 m / 30°.
@@ -405,6 +405,121 @@ describe('ConflationSystem', () => {
       assert.isBelow(result.score, 0.5);
       assert.isAbove(result.candidates[0].measures.overlap, 0.35);
       assert.isBelow(result.candidates[0].measures.overlap, 0.5);
+    });
+  });
+
+
+  describe('accepting', () => {
+    // The accept action looks the dataset up in the Rapid catalog, and needs a data mapping.
+    function setupAccept() {
+      ds.dictionary = new Rapid.RapidDataDictionary(context);
+      ds.dictionary.transforms = [{ order: 0, function: 'copy', source: '*', target: '*' }];
+      context.systems.rapid.catalog = new Map([[ds.id, ds]]);
+    }
+
+    // Accepts a datum the way the Rapid inspector does, and returns the new way.
+    function accept(datum) {
+      const action = Rapid.actionRapidAcceptFeature(datum, conflation.getJoins(ds, datum));
+      editor.perform(action);
+      editor.commit({ annotation: 'accepted' });
+      return editor.stable.graph.entity(action.getNewID());
+    }
+
+    it('a new run of a partly mapped line has its own data, carrying its joins', () => {
+      enable([lineRule()]);
+      osmWay(1, [[0, 0], [60, 0]], SIDEWALK);
+      const a = feature('a', [[0, 1.5], [150, 1.5]], SIDEWALK);
+
+      const result = conflation.getResult(ds, a);
+      const [matchedRun, newRun] = result.runs;
+      assert.isUndefined(matchedRun.datum);
+      assert.instanceOf(newRun.datum, Rapid.GeoJSONData);
+      assert.match(newRun.datum.id, /^a~\d+$/);
+      assert.strictEqual(newRun.datum.props.sourceID, 'a');
+      assert.strictEqual(newRun.datum.props.datasetID, 'test');
+      assert.deepEqual(newRun.datum.properties, SIDEWALK);
+      assert.deepEqual(conflation.getJoins(ds, newRun.datum), { start: newRun.startJoin, end: newRun.endJoin });
+    });
+
+    it('accepting the missing part of a sidewalk joins it to the part that exists', () => {
+      setupAccept();
+      enable([lineRule()]);
+      const existing = osmWay(1, [[0, 0], [60, 0]], SIDEWALK);
+      const a = feature('a', [[0, 1.5], [150, 1.5]], SIDEWALK);
+      const newRun = conflation.getResult(ds, a).runs[1];
+
+      const way = accept(newRun.datum);
+      assert.strictEqual(way.first(), existing.nodes.at(-1));   // reuses the existing sidewalk's end node
+      assert.deepEqual(way.tags, SIDEWALK);
+      const lastNode = editor.stable.graph.entity(way.last());
+      assert.isBelow(meters(lastNode.loc, loc(150, 1.5)), 0.01);
+
+      // Now the whole line is already mapped.
+      const after = conflation.getResult(ds, a);
+      assert.strictEqual(after.status, 'matched');
+      assert.isFalse(after.partial);
+    });
+
+    it('where there is no node to reuse, the join adds one to the existing way', () => {
+      setupAccept();
+      enable([lineRule()]);
+      osmWay(1, [[0, 0], [200, 0]], SIDEWALK);   // nodes only at x = 0 and x = 200
+
+      const points = [[0, 1.5], [60, 1.5], [62, 20], [78, 20], [80, 1.5], [150, 1.5]];
+      const a = feature('a', points, SIDEWALK);
+      const detour = conflation.getResult(ds, a).runs[1];
+      assert.isOk(detour.startJoin.edge);
+
+      const way = accept(detour.datum);
+      const existing = editor.stable.graph.entity('w1');
+      assert.lengthOf(existing.nodes, 4);   // two new nodes on the existing sidewalk
+      assert.include(existing.nodes, way.first());
+      assert.include(existing.nodes, way.last());
+      assert.isBelow(meters(editor.stable.graph.entity(way.first()).loc, loc(60, 0)), 0.01);
+    });
+
+    it('a crossing joins the sidewalks at both of its ends', () => {
+      setupAccept();
+      enable([lineRule()]);
+      osmWay(1, [[0, 0], [100, 0]], SIDEWALK);
+      osmWay(2, [[0, 20], [100, 20]], SIDEWALK);
+      const x = feature('x', [[50, 0.5], [50, 19.5]], CROSSING);
+
+      const result = conflation.getResult(ds, x);
+      assert.strictEqual(result.status, 'unmatched');
+      assert.lengthOf(result.runs, 1);
+      assert.strictEqual(result.runs[0].startJoin.wayID, 'w1');
+      assert.strictEqual(result.runs[0].endJoin.wayID, 'w2');
+
+      const way = accept(x);   // the whole line, joins from `getJoins`
+      const graph = editor.stable.graph;
+      assert.include(graph.entity('w1').nodes, way.first());
+      assert.include(graph.entity('w2').nodes, way.last());
+      assert.isBelow(meters(graph.entity(way.first()).loc, loc(50, 0)), 0.01);
+      assert.isBelow(meters(graph.entity(way.last()).loc, loc(50, 20)), 0.01);
+    });
+
+    it('line ends only join target lines that some rule allows', () => {
+      enable([lineRule()]);   // targets must be footways
+      osmWay(1, [[0, 0], [100, 0]], RESIDENTIAL);
+      const x = feature('x', [[50, 0.5], [50, 19.5]], CROSSING);
+      assert.isUndefined(conflation.getResult(ds, x).runs[0].startJoin);
+    });
+
+    it('a join that no longer fits the graph is skipped, and the line is still accepted', () => {
+      setupAccept();
+      enable([lineRule()]);
+      osmWay(1, [[0, 0], [60, 0]], SIDEWALK);
+      const a = feature('a', [[0, 1.5], [150, 1.5]], SIDEWALK);
+      const newRun = conflation.getResult(ds, a).runs[1];
+
+      editor.perform(Rapid.actionDeleteWay('w1'));   // the existing sidewalk goes away first
+      editor.commit({ annotation: 'deleted w1' });
+
+      const way = accept(newRun.datum);
+      assert.isOk(way);
+      assert.lengthOf(way.nodes, 2);
+      assert.notInclude(way.nodes, 'n1-1');
     });
   });
 

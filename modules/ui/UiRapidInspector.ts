@@ -541,6 +541,7 @@ export class UiRapidInspector {
     if (!datum) return;
 
     const context = this.context;
+    const conflation = context.systems.conflation;   // optional
     const editor = context.systems.editor!;
     const l10n = context.systems.l10n!;
     const rapid = context.systems.rapid!;
@@ -561,7 +562,10 @@ export class UiRapidInspector {
       return;
     }
 
-    const action = actionRapidAcceptFeature(datum);
+    // If conflation found where this line meets existing ways, connect it there.
+    // (Without conflation, the feature is accepted as-is.)
+    const joins = (conflation && dataset) ? conflation.getJoins(dataset, datum) : undefined;
+    const action = actionRapidAcceptFeature(datum, joins);
     editor.perform(action);
     const acceptIDs = [...action.getAcceptedIDs()];
     const newID = action.getNewID();

@@ -8,9 +8,10 @@ Conflation runs entirely in the browser, on top of [`SpatialSystem`](./spatial-s
 Step 3d of the spatial design, which said the match semantics would live in a dedicated module. This
 doc is that module's design.
 
-> **Status:** In progress. Steps 3 and 4 are done: `ConflationSystem` matches LineStrings from
-> GeoJSON-backed datasets, with measures, scoring, triage, runs and join points, and `PixiLayerRapid`
-> draws the results (see [Rollout Plan](#rollout-plan)).
+> **Status:** In progress. Steps 1–5 are done: `ConflationSystem` matches LineStrings from
+> GeoJSON-backed datasets, with measures, scoring, triage, runs and join points; `PixiLayerRapid`
+> draws the results; and the missing part of a line can be accepted and joined to what exists
+> (see [Rollout Plan](#rollout-plan)).
 > It builds on `SpatialSystem` box queries, the `editor_*` caches with their `segments` index, and
 > `GeometryPart.computeCoverage(radius)`. The scoring model is provisional until it is aligned with
 > the external matching tools (see [Scoring](#scoring)).
@@ -356,7 +357,15 @@ interface BoxMatch {
 interface LineRun {
   status: ConflationStatus;           // matched, uncertain, or unmatched
   coords: Vec2[];                     // WGS84 sub-line of the original geometry
-  startJoin?: JoinPoint;              // set when this end meets a matched run
+  startJoin?: JoinPoint;              // set when this end meets a matched run, or an allowed target line
+  endJoin?: JoinPoint;
+  datum?: GeoJSONData<ConflationRunProps>;   // runs that aren't matched, when there are several runs:
+                                             // just this stretch, to draw, select and accept on its own
+}
+
+interface ConflationRunProps extends GeoJSONProps {   // plus id, datasetID, serviceID, geojson
+  sourceID: DataID;                   // the source feature this run is part of
+  startJoin?: JoinPoint;
   endJoin?: JoinPoint;
 }
 
@@ -364,8 +373,12 @@ interface JoinPoint {
   wayID: EntityID;                    // the OSM way to connect to
   loc: Vec2;                          // the endpoint projected onto that way
   nodeID?: EntityID;                  // an existing node within tolerance, if any (reuse it)
+  edge?: [EntityID, EntityID];        // otherwise, the segment that `loc` is on (add a node there)
 }
 ```
+
+A run's data element has an id based on where the run starts along the line
+(`${dataID}~${firstBoxIndex}`), so it stays the same when other parts of the line change.
 
 **Cutting runs out of a line.** A run is cut from the original geometry, not rebuilt from box centers.
 `CoverageBox` carries the segment `index` and parameter `t` of its center, so the start and end of a
@@ -411,6 +424,9 @@ class ConflationSystem extends AbstractSystem {
   getResult(ds: RapidDataset, datum: AbstractData): ConflationResult | undefined;
   isEnabled(ds: RapidDataset): boolean;
 
+  // accepting
+  getJoins(ds: RapidDataset, datum: AbstractData): LineJoins | undefined;   // where an accepted line's ends connect
+
   // review queue
   getQueue(ds: RapidDataset): ConflationResult[];   // `uncertain` results in the viewport, in a stable spatial order
 
@@ -432,8 +448,9 @@ When conflation is on for a dataset:
 - `uncertain` features are drawn with a "needs review" highlight: a wider amber casing.
 - `unmatched` and `unknown` features are drawn as they are today.
 - A line with more than one run is drawn as its `runs`, one Pixi feature per run, with IDs like
-  `rapid-${datasetID}-${dataID}-run${i}`. Each run is styled by its own status. Every run feature
-  is bound to the original datum, so selecting a run selects the line (Step 5 adds run-aware accept).
+  `rapid-${datasetID}-${dataID}-run${i}`. Each run is styled by its own status. A run that isn't
+  already mapped is bound to its own data (`LineRun.datum`), so it can be selected and accepted on
+  its own; already-mapped runs are bound to the line.
 - Already-mapped points and areas are hidden the same way, once their matchers exist (Step 8).
 
 The layer remembers, for each Pixi feature, which result (or run) it was last drawn from, and rebuilds
@@ -459,26 +476,39 @@ and the system never has to load OSM for an entire city.
 
 ### Accepting and joining
 
-**Partial runs.** Accepting a run builds a way from `run.coords` and joins each end that has a `JoinPoint`:
-- If `nodeID` is set, the new way uses that existing node as its endpoint.
-- Otherwise, add a new node to the OSM way at `loc`, between the two nodes of the segment it
-  projects onto, and use that new node as the endpoint.
+**Selecting a run.** When a line has more than one run, each run that isn't already mapped carries
+its own `GeoJSONData` (`LineRun.datum`): the run's geometry, the source's properties, and its joins.
+`PixiLayerRapid` binds the run's Pixi feature to that data, so clicking it selects just that stretch,
+the Rapid inspector shows it like any other feature, and **Add This Feature** adds just that stretch.
+The selection and inspector code didn't need to change.
 
-**All accepted lines.** Any end of an accepted line that has no `JoinPoint` but lies within `sameDist`
-of an OSM way that some rule allows as a target is joined the same way. This is how an accepted crossing
-connects to the sidewalks at its ends, including sidewalks accepted a moment ago, since those are in
-`editor_stable` by then. It replaces the autoconnect step's role for these datasets. Autoconnect
-itself is optional (a power-user setting) and only handles exactly matching nodes and validator
-fixes.
+**Partial runs.** Accepting builds a way from the run's coordinates and joins each end that has a
+`JoinPoint`:
+- If `nodeID` is set, the new way uses that existing node as its endpoint (the end node it would have
+  created is dropped).
+- Otherwise, the end node moves to `loc` and is inserted into the OSM way's segment (`edge`), using
+  `actionAddMidpoint`. If that segment no longer exists, for example because the run's other end was
+  just inserted into the same segment, the segment that `loc` lies on now is used instead.
+- A join that no longer fits the graph (the way was deleted, or `loc` isn't on it anymore) is skipped,
+  and the line is still accepted.
 
-The geometry-building part of `actionRapidAcceptFeature` (`acceptGeoJSON` and `acceptWay`) gains an
-optional run argument and the join step.
+**Line ends.** An end of a line that isn't next to an already-mapped stretch also gets a `JoinPoint`
+if it lies within `sameDist` of a target line that some rule allows (`target.geometry` and
+`target.props`, ignoring `sameKeys`), at any angle. This is how an accepted crossing connects to the
+sidewalks at its ends, including sidewalks accepted a moment ago, since those are in `editor_stable`
+by then. It does for these datasets what the optional autoconnect step (a power-user setting) does
+only for exactly matching nodes and validator fixes; autoconnect still runs afterwards if enabled.
+
+**Plumbing.** `ConflationSystem.getJoins(ds, datum)` returns `{ start, end }` for a run's data, or for
+a whole source line that is a single run. `UiRapidInspector` passes that to
+`actionRapidAcceptFeature(datum, joins)`. Without `ConflationSystem`, features are accepted as before.
 
 **Bookkeeping falls out of re-matching.** After a run is accepted, the new OSM way is in
 `editor_stable`. Recomputing then marks that part of the source line as matched, so it disappears
-without any new state in `RapidSystem`. The source feature goes into `acceptIDs` only when it is
+without any new state in `RapidSystem`. The run's id goes into `acceptIDs` (as with any accepted
+feature), which also hides it right away; the source feature's own id goes in only when it is
 accepted whole. Undo needs nothing special either: undoing removes the way, `stablechange` fires,
-and the run reappears.
+and the run reappears. **Ignore** works on a run's data the same way.
 
 *Caveat:* this works only if the accepted way satisfies some rule's target conditions and `sameKeys`. If the data mapping gives
 the new way tags that don't match, the run would reappear after it's accepted. The
@@ -529,7 +559,7 @@ Lines come first throughout. Points and polygons follow the same pipeline at a l
    uncertain ones. Replace the `PixiLayerDebug` prototype with the debug overlay. ✅ Done, and
    checked in the browser against real OSM sidewalks with a generated in-memory dataset.
 5. **Accepting and joining.** Accept with a run, plus joins for partial runs and for line ends. Test
-   the guiding use case from start to finish on the synthetic street-grid fixture.
+   the guiding use case from start to finish on the synthetic street-grid fixture. ✅ Done.
 6. **Settings UI.** In the Conflation Settings section, add the stage-word definition and replace the
    `conflated` checkbox with the rule fields.
 7. **Review queue.** List, navigation, inspector comparison, and the "Same as existing" action.
@@ -555,8 +585,12 @@ Lines come first throughout. Points and polygons follow the same pipeline at a l
   with an in-memory dataset generated from the OSM sidewalks in view. Nothing was committed.
 - Invalidation: `stablechange` and `merge` flush results, and a rule change flushes one dataset.
 - `unknown`: no result says `unmatched` or `matched` where OSM data isn't loaded.
-- Accepting: a partial run shares its end node with the matched OSM way, and a crossing joins the
-  sidewalks at both ends. Runs disappear after recompute, and undo brings them back.
+- Accepting, through the real accept action and a real `EditSystem`: a partial run's data carries its
+  joins; accepting the missing part of a sidewalk reuses the existing sidewalk's end node and leaves
+  the whole line already mapped; a detour's run adds two nodes to the existing way (both ends on the
+  same segment); a crossing joins the sidewalks at both ends; line ends only join allowed targets;
+  and a join that no longer fits the graph is skipped. Runs disappear after recompute, and undo
+  brings them back.
 
 ## Resolved Decisions (from review)
 

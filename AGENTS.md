@@ -551,6 +551,33 @@ After making changes:
 - **Do NOT use bare `bun test`** — it skips the `--preload ./test/test_setup.js` that provides happy-dom globals. Browser tests will fail with misleading errors about missing DOM APIs.
 - If a test fails at line 1 with `describe is not defined`, suspect Bun's transpiler cache before the test (see `.scratchpad/quirks.md`).
 
+### Testing in a Real Browser
+Unit tests can't cover rendering (Pixi needs WebGL) or most UI behavior. **You can run Rapid in a real
+Chrome and drive it yourself.** Do this to check rendering, UI, or behavior on real data, and to see
+what the developer is seeing when they report a problem.
+
+1. Start the server: `bun run start` (builds, then serves `dist/` on `http://127.0.0.1:8080`).
+2. Start Chrome with remote debugging: `bun run start:chrome`. It opens the dev build, using its own
+   profile in `.chrome-debug/` (gitignored). The developer may already have this running.
+3. Drive the Rapid tab with `bun run cdp`. It attaches to the running Chrome (port 9222), so it sees
+   exactly what the developer sees:
+   - `bun run cdp shot <out.png>`: screenshot the tab, then read the image
+   - `bun run cdp eval -e "<code>"` or `bun run cdp eval <file.js>`: run a snippet in the page; `return`
+     a value to get it back as JSON
+   - `bun run cdp reload [setup.js]`: reload, wait for Rapid to start, then run an optional setup snippet
+   - `bun run cdp press <key>`: press a key (e.g. `Escape` closes the welcome screen after a reload)
+
+Tips:
+- **Query state rather than squinting at screenshots.** Rapid's context is `globalThis.rapidContext`
+  (systems under `rapidContext.systems`, the dev build also exposes `globalThis.Rapid`). A query like
+  "which features matched, and what are their tags?" settles more than any screenshot.
+- **Ask before reloading the developer's tab.** A reload picks up a new build but loses state that isn't
+  saved, such as console-applied settings. Put that setup in a snippet and pass it to `reload`.
+- **Keep snippets, screenshots, and any data from the session out of the repo.** Use your scratch area.
+- **No Chrome attached?** Launch headless with Playwright instead (`chromium.launch()` from
+  `@playwright/test`, with `--use-angle=swiftshader --enable-unsafe-swiftshader` so WebGL works). If it
+  wants a browser build that isn't downloaded, pass `executablePath` to one in `~/Library/Caches/ms-playwright`.
+
 ### JSON Schemas
 - Data files in `data/` are validated by JSON Schema definitions in `data/schema/`
 - The main data file schema is `main.schema.json` (includes `assetID`, `assetVersion`, `scopes[]`)

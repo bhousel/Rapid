@@ -66,12 +66,13 @@ Phase 1 (the `KeyboardSystem` conversion + command scaffolding) is done — see
   maybe validation) can work against non-OSM targets. See `design/conflation-system.md`.
 
 ## Debugging loop: `bun run start:cdp`
-- One command that starts the local server and launches Chrome with `--remote-debugging-port=9222` and a
-  separate profile (`--user-data-dir`), opened to the dev build. Agents can then attach with Playwright's
-  `connectOverCDP` to take screenshots and query `rapidContext` in the developer's own session.
-- Also: a small checked-in helper for `shot` / `eval` against that session, a re-runnable setup snippet
-  (conflation settings aren't persisted yet), and a project skill that documents the loop.
-- Do this once the current conflation phase is committed.
+- ✅ `bun run start:chrome` (`scripts/chrome.ts`, using `chrome-launcher`) launches Chrome with remote
+  debugging on port 9222 and its own profile in `.chrome-debug/` (gitignored; extensions persist), opened
+  to the dev build. Agents attach with Playwright's `connectOverCDP` to take screenshots and query
+  `rapidContext` in the developer's own session.
+- ✅ `bun run cdp` (`scripts/cdp.ts`) drives that tab: `shot`, `eval`, `reload [setup.js]`, `press`.
+  Documented for agents in `AGENTS.md` → Testing → "Testing in a Real Browser".
+- Still to do: one command that also starts the server, and maybe a project skill for the `run` skill to find.
 
 ## Conflation / buffers follow-ups (beyond Step 3)
 - **Internalize / replace `lineToPoly` offset-curve generation** — `lineToPoly` (used for halos) repurposes `PIXI.buildLine`, coupling halo generation to Pixi internals and a fragile triangle-walk. If we ever need *precise* buffer polygons (not just coverage boxes), internalizing the offset-curve math would unify halos + buffers and drop the Pixi coupling. Left alone for now; coverage boxes cover the conflation use case.

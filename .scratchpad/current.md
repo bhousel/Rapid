@@ -14,7 +14,7 @@ to the part that exists.*
   Triage is per coverage box ("same", "near", or neither). Runs, join points, and invalidation on
   `stablechange`/`merge` are all in place. Tests: `test/unit/core/ConflationSystem.test.js` (synthetic street grid).
 - ✅ Step 4: `PixiLayerRapid` hides matched lines (or mutes them with `showMatched`), draws partial lines
-  as their runs (`…-run${i}` features bound to the original datum), and gives needs-review lines an amber
+  as their runs (`…-run${i}` features), and gives needs-review lines an amber
   casing. `PixiLayerDebug` now shows conflation boxes and join points in a new `debug-over` group
   (console: `rapidContext.systems.gfx.scene.enableLayers('debug')`).
   Checked in headless Chromium against live OSM sidewalks; the driver script stays outside the repo.
@@ -34,8 +34,13 @@ to the part that exists.*
   `props`), `sameKeys`, and "same"/"near" distances and angles (`sameDist`, `sameAngle`, `nearDist`,
   `nearAngle`). Every source feature is tested; rules combine with OR; failing `source.props` means that
   rule can't say "same" (not "no result"). See the request-to-rule table in the design doc's Rules section.
-- Next: Step 5, accepting a run with its joins. Run features are bound to the whole datum today, so the
-  accept path needs to know which run was clicked.
+- ✅ Step 5: accepting a run with its joins. Runs that aren't matched get their own `GeoJSONData`
+  (`LineRun.datum`, id `${dataID}~${firstBoxIndex}`), which `PixiLayerRapid` binds to the run's feature,
+  so selection and the inspector work unchanged. `ConflationSystem.getJoins()` →
+  `actionRapidAcceptFeature(datum, joins)` reuses the end node, or inserts a node into the target
+  segment (re-finding the segment if the other end's join split it). Line ends also join allowed
+  target lines within `sameDist` (crossings connect to sidewalks). Stale joins are skipped.
+- Next: Step 6, the Conflation Settings UI (rule editing, persistence of `ds.conflation`).
 - **Test data is synthetic only.** Generate a small street grid in code. Agency sidewalk data typically
   runs about 1–2 m off OSM, so the default `sameDist` is 3 m.
 - The scoring formula should eventually match the server-side matching tools. That's being gathered and
