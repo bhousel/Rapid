@@ -386,6 +386,42 @@ describe('ConflationSystem', () => {
       assert.isBelow(meters(run.startJoin.loc, loc(60, 0)), 0.01);
     });
 
+    it('a run is trimmed to its join, so it never reaches past where it connects', () => {
+      // An OSM sidewalk heading north-northeast from J = (60,0), with a node M 1.1 m along it.
+      // u is its direction, and n the normal on the west side.
+      const u = [1 / Math.sqrt(5), 2 / Math.sqrt(5)];
+      const n = [-2 / Math.sqrt(5), 1 / Math.sqrt(5)];
+      const along = (s, offset = 0) => [60 + s * u[0] + offset * n[0], s * u[1] + offset * n[1]];
+      const way = osmWay(1, [along(0), along(1.1), along(33.5)], SIDEWALK);   // nodes J, M, K
+
+      // A new sidewalk runs east, then turns to run beside the OSM one, 1 m to the west.
+      // The turn is at s = -1; the first already-mapped sample is at s = 2.
+      enable([lineRule()]);
+      const a = feature('a', [[0, along(-1, 1)[1]], along(-1, 1), along(20, 1)], SIDEWALK);
+      const result = conflation.getResult(ds, a);
+      assert.deepEqual(result.runs.map(r => r.status), ['unmatched', 'matched']);
+
+      const run = result.runs[0];
+      assert.strictEqual(run.endJoin.nodeID, way.nodes[1]);   // snapped back to M
+      // The run ends beside M (at s = 1.1), not at the first matched sample (s = 2).
+      assert.isBelow(meters(run.coords.at(-1), loc(...along(1.1, 1))), 0.05);
+      assert.isAbove(meters(run.coords.at(-1), loc(...along(2, 1))), 0.5);
+    });
+
+    it('a stub shorter than sameDist is judged by distance only, since its heading means nothing', () => {
+      enable([lineRule()]);
+      osmWay(1, [[0, 0], [100, 0]], SIDEWALK);
+
+      // A 1 cm stub, perpendicular to the OSM sidewalk, at a junction 0.3 m from it.
+      const stub = conflation.getResult(ds, feature('s', [[50, 0.3], [50, 0.31]], SIDEWALK));
+      assert.strictEqual(stub.status, 'matched');
+      assert.isUndefined(stub.runs[0].startJoin);
+
+      // Stubs aren't thrown away: one with nothing nearby is still new.
+      const far = conflation.getResult(ds, feature('f', [[50, 20], [50, 20.01]], SIDEWALK));
+      assert.strictEqual(far.status, 'unmatched');
+    });
+
     it('short misalignment at the end of a match is not reported as new', () => {
       enable([lineRule()]);
       osmWay(1, [[0, 0], [100, 0]], SIDEWALK);

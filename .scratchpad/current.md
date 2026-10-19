@@ -40,6 +40,10 @@ to the part that exists.*
   `actionRapidAcceptFeature(datum, joins)` reuses the end node, or inserts a node into the target
   segment (re-finding the segment if the other end's join split it). Line ends also join allowed
   target lines within `sameDist` (crossings connect to sidewalks). Stale joins are skipped.
+- ✅ Step 5b, from live testing on real data: runs are trimmed to their joins (a join that snapped to a
+  corner node left the run reaching ~2 m around the corner), and lines shorter than `sameDist` skip the
+  angle test (OSW data is full of junction stubs; ~9% of lines are under 1 m). No minimum line length:
+  some short edges are real. Open: such a real stub next to a matching sidewalk now counts as mapped.
 - Next: Step 6, the Conflation Settings UI (rule editing, persistence of `ds.conflation`).
 - **Test data is synthetic only.** Generate a small street grid in code. Agency sidewalk data typically
   runs about 1–2 m off OSM, so the default `sameDist` is 3 m.

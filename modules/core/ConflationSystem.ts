@@ -543,6 +543,7 @@ export class ConflationSystem extends AbstractSystem {
     const spacing = Math.max(MIN_SAMPLE_METERS, Math.min(...rules.map(rule => rule.sameDist)));
     const boxes = part.computeCoverage(spacing);
     const source = part.world!.outer!;
+    const sourceMeters = lineLength(source) * metersPerWorld;
 
     if (boxes.some(box => !this._isLoaded(box.coord))) {
       return { dataID: dataID, status: 'unknown', score: 0, partial: false, candidates: [] };
@@ -610,12 +611,15 @@ export class ConflationSystem extends AbstractSystem {
           }
           if (!ok) continue;
 
+          // A source line shorter than `sameDist` (a stub) has no reliable heading, so it is judged
+          // by distance only. Many datasets are split into short edges at every junction.
+          const isStub = sourceMeters < rule.sameDist;
           const sameAngle = rule.sameAngle ?? DEFAULT_MAX_ANGLE;
           const nearAngle = rule.nearAngle ?? sameAngle;
           let level: 0 | 1 | 2 = 0;
-          if (distance <= rule.sameDist && angle <= sameAngle) {
+          if (distance <= rule.sameDist && (isStub || angle <= sameAngle)) {
             level = 2;
-          } else if (distance <= nearDistOf(rule) && angle <= nearAngle) {
+          } else if (distance <= nearDistOf(rule) && (isStub || angle <= nearAngle)) {
             level = 1;
           }
           if (!level) continue;
@@ -732,7 +736,8 @@ export class ConflationSystem extends AbstractSystem {
       // and joins the OSM way that matched there (if that way is a line, not an area's edge).
       const startBox = prev?.status === 'matched' ? boxes[prev.end] : boxes[range.start];
       const endBox = next?.status === 'matched' ? boxes[next.start] : boxes[range.end];
-      const run: LineRun = { status: range.status, coords: toWgs84(subLine(source, startBox, endBox)) };
+      let coords = subLine(source, startBox, endBox);
+      const run: LineRun = { status: range.status, coords: [] };
 
       const lineWayAt = (boxIndex: number): EntityID | undefined =>
         boxMatches[boxIndex].wayIDs.find(wayID => features.get(wayID)?.geometry === 'line');
@@ -747,6 +752,17 @@ export class ConflationSystem extends AbstractSystem {
       } else if (!next) {
         run.endJoin = endJoinAt(source.at(-1)!);
       }
+
+      // Trim the run to its joins: it ends at the point on the source line nearest each join.
+      // The extension above, or a join that snapped to a nearby node, can otherwise leave the run
+      // reaching past where it connects (e.g. around a corner), which would add a hook on accept.
+      if (run.endJoin) {
+        coords = trimEnd(coords, projWgs84ToWorld(run.endJoin.loc));
+      }
+      if (run.startJoin) {
+        coords = trimStart(coords, projWgs84ToWorld(run.startJoin.loc));
+      }
+      run.coords = toWgs84(coords);
       return run;
     });
 
@@ -938,6 +954,42 @@ function subLine(source: Vec2[], from: CoverageBox, to: CoverageBox): Vec2[] {
     result.push(coord);
   }
   return result;
+}
+
+
+/**
+ * Cuts a line so it ends at the point on it nearest to `point`.
+ * Leaves the line as it is if cutting would leave nothing of it.
+ * @param coords - The line, in world coordinates
+ * @param point - The point to cut at (projected onto the line)
+ * @return The trimmed line, in world coordinates
+ */
+function trimEnd(coords: Vec2[], point: Vec2): Vec2[] {
+  const closest = vecProject(point, coords);
+  if (!closest) return coords;
+  const trimmed = coords.slice(0, closest.index);   // the points before the closest segment's end
+  if (!vecEqual(trimmed.at(-1)!, closest.point, 1e-9)) {
+    trimmed.push(closest.point);
+  }
+  return (trimmed.length >= 2 && lineLength(trimmed) > 0) ? trimmed : coords;
+}
+
+
+/**
+ * Cuts a line so it starts at the point on it nearest to `point`.
+ * Leaves the line as it is if cutting would leave nothing of it.
+ * @param coords - The line, in world coordinates
+ * @param point - The point to cut at (projected onto the line)
+ * @return The trimmed line, in world coordinates
+ */
+function trimStart(coords: Vec2[], point: Vec2): Vec2[] {
+  const closest = vecProject(point, coords);
+  if (!closest) return coords;
+  const trimmed = coords.slice(closest.index);   // the points after the closest segment's start
+  if (!vecEqual(trimmed[0], closest.point, 1e-9)) {
+    trimmed.unshift(closest.point);
+  }
+  return (trimmed.length >= 2 && lineLength(trimmed) > 0) ? trimmed : coords;
 }
 
 

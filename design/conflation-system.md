@@ -266,6 +266,14 @@ Each candidate pair (new feature, OSM entity) gets these **measures**:
 every sidewalk that meets it. Without the angle test, the end of every sidewalk would look matched.
 Each `CoverageBox` already carries its `angle` for this reason.
 
+**Except for stubs.** A source line shorter than a rule's `sameDist` is judged by distance only for
+that rule (and its other conditions, like `sameKeys`, still apply). Its heading is unreliable: a
+1 cm line has a meaningless one. Network datasets like OSW split lines into an edge at every
+junction, curb ramp and crossing node, so stubs are common: in the agency sidewalk data we tested,
+about 9% of the lines are under 1 m and 2% under 10 cm. Stubs are never thrown away by length, since
+some short edges are real (a curb-ramp connector carrying tactile-paving information); one with
+nothing allowed nearby still comes out New.
+
 Distances are converted from meters to world units with `geoMetersToWorld` at the feature's latitude,
 the same conversion `computeCoverage` uses.
 
@@ -389,6 +397,14 @@ joins the edge of an area). The projection is the `JoinPoint`.
 If an existing node of that way is within 1 m of it, the run joins at that node and no new node is
 added. In practice, a run joins an existing node where the OSM way ends, and joins mid-segment
 where the new line leaves an OSM way and comes back to it.
+
+**Runs are trimmed to their joins.** After its joins are found, each end of a run is cut at the point
+on the run nearest its `JoinPoint`. Without this, the run could reach past where it connects: the
+extension into the matched stretch, or a join that snapped to a node up to 1 m back, leaves extra
+geometry beyond the connection. Found on real data at a street corner: the new sidewalk's run went
+~2 m around the corner past the corner node it joined, which would have added a hook on accept.
+In the straight, partly mapped case the trim changes almost nothing. Trimming only ever shortens a
+run, and never cuts it down to nothing.
 
 ### Inputs
 
@@ -591,6 +607,9 @@ Lines come first throughout. Points and polygons follow the same pipeline at a l
   same segment); a crossing joins the sidewalks at both ends; line ends only join allowed targets;
   and a join that no longer fits the graph is skipped. Runs disappear after recompute, and undo
   brings them back.
+- Real-data cases, rebuilt synthetically: a run whose join snapped to a node behind a corner is
+  trimmed to end beside that node; a 1 cm stub at a junction is already mapped (distance only), and
+  a stub with nothing nearby is still new.
 
 ## Resolved Decisions (from review)
 
@@ -608,6 +627,12 @@ Lines come first throughout. Points and polygons follow the same pipeline at a l
   during Step 4 testing).
 - **Minimum run length.** A run that isn't matched, is shorter than the sample spacing, and sits next
   to a matched run is treated as matched.
+- **No minimum line length; stubs are judged by distance only.** Short source lines are kept (some
+  are real, like curb-ramp connectors), but a line shorter than `sameDist` skips the angle test.
+- **Runs are trimmed to their joins,** so an accepted run ends where it connects.
+- **Join points are the most useful part of the visual feedback** (from live testing). The "needs
+  review" band stays for now, but may not be needed in the end; `nearDist` equal to `sameDist`
+  turns it off.
 - **Rule shape: source and target, "same" and "near"** (decided after testing on real data). Rules
   name conditions for each side, `sameKeys` for values that must agree, and two sets of distance and
   angle limits. Every source feature is tested; rules combine with OR. This replaced an earlier
@@ -631,5 +656,14 @@ Lines come first throughout. Points and polygons follow the same pipeline at a l
 - **Polygon threshold.** Is intersection ÷ smaller area the right overlap measure for buildings?
 - **Data mapping: require or warn?** Should conflation refuse to run without a data mapping, or run
   and show a warning in the settings UI?
+- **Stubs next to a matching line.** Because stubs are judged by distance only, a real stub that sits
+  within `sameDist` of an allowed target (e.g. a 2 m curb-ramp connector running from an OSM sidewalk
+  to the curb, tagged like a sidewalk) counts as already mapped. Options: skip the angle test only
+  where the heading is truly meaningless (well under 1 m), or tell such stubs apart by tags with
+  `sameKeys` or `target.props`.
+- **Merging short edges.** Network data split at every node loses context when matched edge by edge.
+  Matching chains of consecutive edges with the same tags might be more robust.
+- **Debug dots for absorbed boxes.** The overlay shows each box's raw status, so a box absorbed into
+  a matched run still shows yellow or red. Color it like its run, or mark it distinctly?
 - **Which graph.** `editor_stable` is proposed. Is there a case where conflation must reflect
   edits still in progress (`editor_staging`)?
