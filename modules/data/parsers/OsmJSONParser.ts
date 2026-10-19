@@ -117,7 +117,7 @@ export class OsmJSONParser {
       filter = this.types;
     }
 
-    const results: ParserResult = { osm: {}, data: [], seenIDs: new Set<string>() };
+    const results: ParserResult = { osm: {}, data: [] };
     const json: Record<string, any> = (typeof content === 'string' ? JSON.parse(content) : content);
 
     if (!isObject(json)) {
@@ -194,17 +194,14 @@ export class OsmJSONParser {
 
         if (obj.type === 'node' && filter.has('node')) {
           id = 'n' + obj.id;
-          results.seenIDs.add(id);
           parser = this._parseNode;
 
         } else if (obj.type === 'way' && filter.has('way')) {
           id = 'w' + obj.id;
-          results.seenIDs.add(id);
           parser = this._parseWay;
 
         } else if (obj.type === 'relation' && filter.has('relation')) {
           id = 'r' + obj.id;
-          results.seenIDs.add(id);
           parser = this._parseRelation;
         }
 

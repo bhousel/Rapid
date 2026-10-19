@@ -57,6 +57,6 @@ const xmlParser = new OsmXMLParser();
 const xmlResults = xmlParser.parse(xmlText);
 ```
 
-Parsers keep no state between calls, so every call returns everything in its content. Each result also lists the IDs of all the entities it found in `seenIDs`.
+Parsers keep no state between calls, so every call returns everything in its content.
 
 Rapid's `OsmService` prefers JSON when available (`preferJSON = true`) for better performance.

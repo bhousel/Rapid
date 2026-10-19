@@ -467,7 +467,7 @@ export class Context extends EventEmitter {
 
     osm.loadTiles((err: Error | null, results: any) => {
       if (Array.isArray(results?.data)) {
-        editor?.merge(results.data, results.seenIDs);
+        editor?.merge(results.data);
       }
     });
   }
@@ -484,7 +484,7 @@ export class Context extends EventEmitter {
 
     osm.loadTileAtLoc(loc, (err: Error | null, results: any) => {
       if (Array.isArray(results?.data)) {
-        editor?.merge(results.data, results.seenIDs);
+        editor?.merge(results.data);
       }
     });
   }
@@ -505,13 +505,13 @@ export class Context extends EventEmitter {
     return osm.loadEntityAsync(entityID)
       .then((results: any) => {
       if (Array.isArray(results?.data)) {
-          editor?.merge(results.data, results.seenIDs);
+          editor?.merge(results.data);
         }
       })
       .then(() => osm.loadEntityRelationsAsync(entityID))
       .then((results: any) => {
       if (Array.isArray(results?.data)) {
-          editor?.merge(results.data, results.seenIDs);
+          editor?.merge(results.data);
         }
       });
   }

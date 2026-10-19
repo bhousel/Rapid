@@ -118,8 +118,7 @@ export class OsmXMLParser {
       filter = this.types;
     }
 
-    // Note: I'd like to try to find a way to avoid seenIDs, See note in EditSystem.merge()..
-    const results: ParserResult = { osm: {}, data: [], seenIDs: new Set<string>() };
+    const results: ParserResult = { osm: {}, data: [] };
     const xml: XmlDocument = (typeof content === 'string' ? new DOMParser().parseFromString(content.trimStart(), 'application/xml') : content);
 
     if (!xml?.childNodes) {
@@ -150,22 +149,18 @@ export class OsmXMLParser {
 
       if (child.nodeName === 'node' && filter.has('node')) {
         id = 'n' + (child as Element).getAttribute('id');
-        results.seenIDs.add(id);
         parser = this._parseNode;
 
       } else if (child.nodeName === 'way' && filter.has('way')) {
         id = 'w' + (child as Element).getAttribute('id');
-        results.seenIDs.add(id);
         parser = this._parseWay;
 
       } else if (child.nodeName === 'relation' && filter.has('relation')) {
         id = 'r' + (child as Element).getAttribute('id');
-        results.seenIDs.add(id);
         parser = this._parseRelation;
 
       } else if (child.nodeName === 'changeset' && filter.has('changeset')) {
         id = 'c' + (child as Element).getAttribute('id');
-        results.seenIDs.add(id);
         parser = this._parseChangeset;
 
       } else if (child.nodeName === 'note' && filter.has('note')) {

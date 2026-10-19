@@ -22,8 +22,6 @@ export interface ParserResult {
   osm: Record<string, unknown>;
   /** Array of parsed data objects */
   data: ParsedData[];
-  /** Set of entity IDs seen during parsing */
-  seenIDs: Set<string>;
 }
 
 

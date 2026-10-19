@@ -11,8 +11,9 @@ the result while the worker kept the IDs, so those features never loaded until a
 return everything, and `merge` skips entities already in the base graph before building them or adding
 them to the spatial caches (where the extra time went). Benchmarked on 6×6 overlapping tiles of the Tokyo
 data: about the same total as `skipSeen` (~170 ms), against ~228 ms for parsing everything without the
-merge change. `seenIDs` is still returned and emitted, because features already loaded may need to
-re-render when new ones arrive (see the note in `EditSystem.merge`).
+merge change. With nothing skipped, the separate `seenIDs` set in parser results was redundant, so it's
+gone too: `merge` emits the IDs of everything it was given, because features already loaded may need
+to re-render when new ones arrive (see the note in `EditSystem.merge`).
 
 ## Folder-specific agent rules live in nested `AGENTS.md`, not `.github/instructions/`
 

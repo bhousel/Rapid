@@ -825,19 +825,26 @@ export class EditSystem extends AbstractSystem {
    *  (Sorry, but this one is not like what `git merge` does.)
    *
    *  This function is called when we have parsed a new tile of OSM data, we will
-   *   receive the new entities and a list of all entity ids that the tile contains.
+   *   receive every entity the tile contains, including ones we already have.
    *  Can also be called in other situations, like restoring history from
    *    storage, or loading specific entities from the OSM API.
    *  This function can accept an Array of Entities or an Array of props to construct.
    *
    *  @param toMerge - Entities (or props) to merge into base graph (ones already there are skipped)
-   *  @param seenIDs - Optional set of all entity IDs on the tile (including previously seen ones)
    */
-  public merge(toMerge: (OsmEntity | OsmEntityProps)[], seenIDs?: Set<EntityID>): void {
+  public merge(toMerge: (OsmEntity | OsmEntityProps)[]): void {
     const context = this.context;
     const baseGraph = this.base.graph!;
     const stagingGraph = this.staging.graph!;
     const newIDs = new Set<EntityID>();
+
+    // The `emit('merge', mergedIDs)` below triggers a re-render of everything we were given,
+    // even the entities we already had. The reason is because new information could cause
+    // features to render differently.  An example would be: ways that are members of
+    // a large multipolygon could be part of the outer or a hole, and those ways need to
+    // redraw even if different ways appear.
+    // see https://github.com/facebook/Rapid/commit/4223385
+    const mergedIDs = new Set<EntityID>();
 
     // Collect the Entities that are really new (not in the Base Graph), create if necessary...
     // Responses often repeat entities we already have (e.g. ones spanning several tiles).
@@ -845,6 +852,7 @@ export class EditSystem extends AbstractSystem {
     const entities: OsmEntity[] = [];
     for (const entityOrProps of toMerge) {
       const id = entityOrProps.id;
+      if (id) mergedIDs.add(id);
       if (id && (baseGraph.hasEntity(id) || newIDs.has(id))) continue;
 
       let entity: OsmEntity;
@@ -855,26 +863,12 @@ export class EditSystem extends AbstractSystem {
       }
       entities.push(entity);
       newIDs.add(entity.id);
+      mergedIDs.add(entity.id);
     }
     if (!entities.length) return;  // nothing to do
 
-
-    // Note: I'd like to try to find a way to avoid seenIDs, but we probably need it for now.
-    // The `emit('merge', seenIDs)` below triggers a re-render of all features on a tile,
-    // even the previously seen ones. The reason is because new information could cause
-    // features to render differently.  An example would be: ways that are members of
-    // a large multipolygon could be part of the outer or a hole, and those ways need to
-    // redraw even if different ways appear.
-    // see https://github.com/facebook/Rapid/commit/4223385
-    let effectiveSeenIDs: Set<EntityID>;
-    if (seenIDs instanceof Set) {
-      effectiveSeenIDs = seenIDs;
-    } else {
-      effectiveSeenIDs = new Set<EntityID>(entities.map(entity => entity.id));
-    }
-
     // If we are merging in new relation members, bump the relation's version.
-    for (const id of effectiveSeenIDs) {
+    for (const id of mergedIDs) {
       const entity = stagingGraph.hasEntity(id);
       if (entity?.type !== 'relation') continue;
 
@@ -898,7 +892,7 @@ export class EditSystem extends AbstractSystem {
     this._mergeIntoCache('editor_stable', this.stable.graph!, entities);
     this._mergeIntoCache('editor_staging', this.staging.graph!, entities);
 
-    this.emit('merge', effectiveSeenIDs);
+    this.emit('merge', mergedIDs);
   }
 
 
