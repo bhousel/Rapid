@@ -68,8 +68,6 @@ import type {
  */
 export class OsmJSONParser {
 
-  /** Unique identifiers already seen by this parser instance (avoids duplicates) */
-  protected _seen: Set<string>;
   /** Accumulates the types of parsed data elements encountered (e.g. 'node', 'way', 'relation') */
   public types: Set<ParserDataType>;
 
@@ -77,8 +75,6 @@ export class OsmJSONParser {
   /**
    */
   public constructor() {
-    this._seen = new Set<string>();
-
     this._parseNode = this._parseNode.bind(this);
     this._parseWay = this._parseWay.bind(this);
     this._parseRelation = this._parseRelation.bind(this);
@@ -100,25 +96,6 @@ export class OsmJSONParser {
 
 
   /**
-   * Call reset to clear the caches.
-   */
-  public reset(): void {
-    this._seen.clear();
-  }
-
-
-  /**
-   * Remember these identifiers as seen, so that parsing with `skipSeen` excludes them.
-   * @param  ids - the identifiers to remember
-   */
-  public markSeen(ids: Iterable<string>): void {
-    for (const id of ids) {
-      this._seen.add(id);
-    }
-  }
-
-
-  /**
    * Parse the given content and extract whatatever OSM data we find in it.
    * @param   content - the content to parse
    * @param   options - parsing options
@@ -129,10 +106,6 @@ export class OsmJSONParser {
     if (!content)  {
       throw new Error('No content');
     }
-
-    // exclude results that we have seen before
-    const skipSeen = options.skipSeen ?? true;
-    const markSeen = options.markSeen ?? true;
 
     // include only these in the results (e.g. ['node','way','relation'])
     let filter: Set<ParserDataType>;
@@ -237,11 +210,6 @@ export class OsmJSONParser {
 
         if (!parser || !id) continue;
 
-        if (skipSeen) {  // skip things we've seen before
-          if (this._seen.has(id)) continue;
-          if (markSeen) this._seen.add(id);
-        }
-
         const parsed = parser(obj, id);
         if (parsed) {
           results.data.push(parsed);
@@ -254,12 +222,6 @@ export class OsmJSONParser {
     if (changesets.length && filter.has('changeset')) {
       for (const obj of changesets) {
         const id = 'c' + obj.id;
-
-        if (skipSeen) {  // skip things we've seen before
-          if (this._seen.has(id)) continue;
-          if (markSeen) this._seen.add(id);
-        }
-
         const parsed = this._parseChangeset(obj, id);
         if (parsed) {
           results.data.push(parsed);
@@ -272,12 +234,6 @@ export class OsmJSONParser {
     if (users.length && filter.has('user')) {
       for (const obj of users) {
         const id = 'user' + obj.id;
-
-        if (skipSeen) {  // skip things we've seen before
-          if (this._seen.has(id)) continue;
-          if (markSeen) this._seen.add(id);
-        }
-
         const parsed = this._parseUser(obj, id);
         if (parsed) {
           results.data.push(parsed);

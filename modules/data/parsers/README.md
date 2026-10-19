@@ -57,6 +57,6 @@ const xmlParser = new OsmXMLParser();
 const xmlResults = xmlParser.parse(xmlText);
 ```
 
-Each parser instance remembers the IDs it has already seen and skips them by default (`skipSeen: true`). Call `reset()` to clear that cache.
+Parsers keep no state between calls, so every call returns everything in its content. Each result also lists the IDs of all the entities it found in `seenIDs`.
 
 Rapid's `OsmService` prefers JSON when available (`preferJSON = true`) for better performance.

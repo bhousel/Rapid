@@ -830,7 +830,7 @@ export class EditSystem extends AbstractSystem {
    *    storage, or loading specific entities from the OSM API.
    *  This function can accept an Array of Entities or an Array of props to construct.
    *
-   *  @param toMerge - Entities (or props) to merge into base graph (usually only the new ones)
+   *  @param toMerge - Entities (or props) to merge into base graph (ones already there are skipped)
    *  @param seenIDs - Optional set of all entity IDs on the tile (including previously seen ones)
    */
   public merge(toMerge: (OsmEntity | OsmEntityProps)[], seenIDs?: Set<EntityID>): void {
@@ -839,9 +839,14 @@ export class EditSystem extends AbstractSystem {
     const stagingGraph = this.staging.graph!;
     const newIDs = new Set<EntityID>();
 
-    // Collect the Entities, create if necessary...
+    // Collect the Entities that are really new (not in the Base Graph), create if necessary...
+    // Responses often repeat entities we already have (e.g. ones spanning several tiles).
+    // `rebase` would skip them anyway, so skip them here before building or indexing them.
     const entities: OsmEntity[] = [];
     for (const entityOrProps of toMerge) {
+      const id = entityOrProps.id;
+      if (id && (baseGraph.hasEntity(id) || newIDs.has(id))) continue;
+
       let entity: OsmEntity;
       if (entityOrProps instanceof OsmEntity) {
         entity = entityOrProps;
@@ -849,11 +854,7 @@ export class EditSystem extends AbstractSystem {
         entity = createOsmEntity(context, entityOrProps);
       }
       entities.push(entity);
-
-      // Which ones are really new (not in the Base Graph)?
-      if (!baseGraph.hasEntity(entity.id)) {
-        newIDs.add(entity.id);
-      }
+      newIDs.add(entity.id);
     }
     if (!entities.length) return;  // nothing to do
 

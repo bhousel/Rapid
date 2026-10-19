@@ -15,16 +15,13 @@ describe('OsmService.worker listeners', () => {
       globalThis.fetch = originalFetch;
       originalFetch = undefined;
     }
-    WORKER.reset(undefined, signal);
   });
 
 
   describe('osmServiceListeners export', () => {
     it('exports listener IDs', () => {
       assert.hasAllKeys(WORKER.osmServiceListeners, [
-        'osmService:fetchAndParse',
-        'osmService:markSeen',
-        'osmService:reset'
+        'osmService:fetchAndParse'
       ]);
     });
   });
@@ -63,7 +60,6 @@ describe('OsmService.worker listeners', () => {
       const result = await WORKER.fetchAndParse({
         url: 'https://api.openstreetmap.org/api/0.6/map.json',
         format: 'json',
-        parserOptions: { skipSeen: false },
       }, signal);
 
       assert.isTrue(result.ok);
@@ -195,77 +191,27 @@ describe('OsmService.worker listeners', () => {
   });
 
 
-  describe('markSeen', () => {
-    it('makes later parses that skip seen elements exclude them', async () => {
-      const osmResponse = { elements: [jsonN1, jsonN2] };
-      originalFetch = globalThis.fetch;
-      globalThis.fetch = mock(() =>
-        Promise.resolve(new Response(JSON.stringify(osmResponse), {
-          headers: { 'content-type': 'application/json' },
-        }))
-      );
-
-      WORKER.markSeen(['n1'], signal);
-      const result = await WORKER.fetchAndParse({
-        url: 'https://api.openstreetmap.org/api/0.6/map.json',
-        format: 'json',
-      }, signal);
-
-      assert.isTrue(result.ok);
-      assert.deepEqual(result.value.data.map(d => d.id), ['n2']);
-    });
-  });
-
-
-  describe('reset', () => {
-    it('resets internal parser state without throwing', () => {
-      assert.doesNotThrow(() => WORKER.reset(undefined, signal));
-    });
-
-    it('allows re-parsing previously seen elements after reset', async () => {
+  describe('repeated requests', () => {
+    it('returns previously parsed elements on every request', async () => {
       const osmResponse = { elements: [jsonN1] };
       originalFetch = globalThis.fetch;
-      globalThis.fetch = mock(() =>
-        Promise.resolve(new Response(JSON.stringify(osmResponse), {
-          headers: { 'content-type': 'application/json' },
-        }))
-      );
 
-      // First parse — parser sees node 1
-      const first = await WORKER.fetchAndParse({
-        url: 'https://api.openstreetmap.org/api/0.6/map.json',
-        format: 'json',
-      }, signal);
-      assert.isTrue(first.ok);
-      const firstCount = first.value.data.length;
+      const counts = [];
+      for (let i = 0; i < 2; i++) {
+        globalThis.fetch = mock(() =>
+          Promise.resolve(new Response(JSON.stringify(osmResponse), {
+            headers: { 'content-type': 'application/json' },
+          }))
+        );
+        const result = await WORKER.fetchAndParse({
+          url: 'https://api.openstreetmap.org/api/0.6/map.json',
+          format: 'json',
+        }, signal);
+        assert.isTrue(result.ok);
+        counts.push(result.value.data.length);
+      }
 
-      // Second parse without reset — parser may skip seen elements
-      globalThis.fetch = mock(() =>
-        Promise.resolve(new Response(JSON.stringify(osmResponse), {
-          headers: { 'content-type': 'application/json' },
-        }))
-      );
-      const second = await WORKER.fetchAndParse({
-        url: 'https://api.openstreetmap.org/api/0.6/map.json',
-        format: 'json',
-      }, signal);
-      assert.isTrue(second.ok);
-
-      // Reset the parsers
-      WORKER.reset(undefined, signal);
-
-      // Third parse after reset — parser should return elements again
-      globalThis.fetch = mock(() =>
-        Promise.resolve(new Response(JSON.stringify(osmResponse), {
-          headers: { 'content-type': 'application/json' },
-        }))
-      );
-      const third = await WORKER.fetchAndParse({
-        url: 'https://api.openstreetmap.org/api/0.6/map.json',
-        format: 'json',
-      }, signal);
-      assert.isTrue(third.ok);
-      assert.strictEqual(third.value.data.length, firstCount, 'should re-parse elements after reset');
+      assert.deepEqual(counts, [1, 1]);
     });
   });
 });

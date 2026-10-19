@@ -14,7 +14,6 @@ describe('NetworkSystem.worker listeners', () => {
       globalThis.fetch = originalFetch;
       originalFetch = undefined;
     }
-    WORKER.reset(undefined, signal);
   });
 
 
@@ -24,8 +23,7 @@ describe('NetworkSystem.worker listeners', () => {
         'network:fetchAndParse',
         'network:fetchAndParseMVT',
         'network:fetchAndParseOsmJson',
-        'network:fetchAndParseOsmXml',
-        'network:reset'
+        'network:fetchAndParseOsmXml'
       ]);
     });
   });
@@ -100,14 +98,14 @@ describe('NetworkSystem.worker listeners', () => {
         }))
       );
 
-      // skipSeen=false ensures previously-seen nodes are not skipped
       const result = await WORKER.fetchAndParseOsmJson({
         url: 'https://api.openstreetmap.org/api/0.6/map.json',
-        parserOptions: { skipSeen: false },
+        parserOptions: { filter: ['way'] },
       }, signal);
 
       assert.isTrue(result.ok);
       assert.isArray(result.value.data);
+      assert.lengthOf(result.value.data, 0);   // the response only has nodes
     });
   });
 
@@ -198,14 +196,6 @@ describe('NetworkSystem.worker listeners', () => {
 
       const seqFeatures = results.filter(r => r.layerID === 'sequence');
       assert.isAbove(seqFeatures.length, 0, 'should have sequence features');
-    });
-  });
-
-
-  describe('reset', () => {
-    it('resets internal parser state without throwing', () => {
-      // Just verify it doesn't throw — parser internal state is opaque
-      assert.doesNotThrow(() => WORKER.reset(undefined, signal));
     });
   });
 });
