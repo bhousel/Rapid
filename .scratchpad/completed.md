@@ -2,6 +2,8 @@
 
 Reverse-chronological one-liners. Details live in git history — these are just breadcrumbs.
 
+- **OSM features lost after a cancelled request** (Oct 2026) — Removed `skipSeen` and the parsers' seen cache (and the `osmService:reset` / `network:reset` listeners that cleared it); `EditSystem.merge` now skips entities already in the base graph instead. A tile request cancelled or timed out after the worker parsed it no longer hides its features until reload. See `decisions.md`.
+
 - **Agent tooling for Claude Code + Copilot** (Oct 2026) — Prompts → Agent Skills in `.claude/skills/` (agent-practices PR #1, then `/sync` to AGENTS.md v4). `.github/instructions/` → nested `modules/{ui,pixi}/AGENTS.md`. Corrected the AGENTS.md Testing section (`bun run test` = unit + browser only). See `decisions.md`.
 
 - **File-backed custom Rapid datasets** (Oct 2026, facebook/Rapid#1078) — `UiRapidAddDataset` file picker restored, plus a `priority: 1` `DragAndDropSystem` consumer. Files are stored through `DatabaseSystem` (`canStoreAsync` + `putFileAsync`) and referenced by `RapidDataset.sourceFileID`. The ID shows on `UiRapidDatasetSettings`, and the file is deleted with its dataset. The filename is the default dataset id/name. Also cleaned up `UiRestore` CSS and strings.

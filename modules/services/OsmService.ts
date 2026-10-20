@@ -401,7 +401,6 @@ export class OsmService extends AbstractSystem {
     const context = this.context;
     const network = context.systems.network!;
     const spatial = context.systems.spatial!;
-    const worker = context.systems.worker;
 
     this._tileCache = { lastv: null };
     this._noteCache = { lastv: null, toLoad: new Set<string>(), closed: {} };
@@ -411,13 +410,7 @@ export class OsmService extends AbstractSystem {
     network.clearMatching(id => id.startsWith('osm-'));
     spatial.clearMatching(id => id.startsWith('osm-'));
 
-    // Reset the worker-side parser instances
-    if (worker?.workerURL) {
-      return worker.dispatch<void>('osmService:reset');
-    } else {
-      osmServiceListeners['osmService:reset'](undefined, new AbortController().signal);
-      return Promise.resolve();
-    }
+    return Promise.resolve();
   }
 
 
@@ -589,7 +582,6 @@ export class OsmService extends AbstractSystem {
     const network = context.systems.network!;
 
     const cid = this._connectionID;
-    options.skipSeen ??= true;
 
     const format: 'json' | 'xml' = path.includes('.json') ? 'json' : 'xml';
 
@@ -684,7 +676,7 @@ export class OsmService extends AbstractSystem {
   public loadEntityAsync(entityID: EntityID): Promise<ParserResult> {
     const type = OsmEntity.type(entityID);    // 'node', 'way', 'relation'
     const osmID = OsmEntity.toOSM(entityID);
-    const options = { skipSeen: false, filter: new Set<ParserDataType>(['node', 'way', 'relation']) };
+    const options = { filter: new Set<ParserDataType>(['node', 'way', 'relation']) };
     const full = (type !== 'node' ? '/full' : '');
     const json = (this.preferJSON ? '.json' : '');
 
@@ -712,7 +704,7 @@ export class OsmService extends AbstractSystem {
   public loadEntityVersionAsync(entityID: EntityID, version: string | number): Promise<ParserResult> {
     const type = OsmEntity.type(entityID);    // 'node', 'way', 'relation'
     const osmID = OsmEntity.toOSM(entityID);
-    const options = { skipSeen: false, filter: new Set<ParserDataType>(['node', 'way', 'relation']) };
+    const options = { filter: new Set<ParserDataType>(['node', 'way', 'relation']) };
     const json = (this.preferJSON ? '.json' : '');
 
     return new Promise((resolve, reject) => {
@@ -739,7 +731,7 @@ export class OsmService extends AbstractSystem {
   public loadEntityRelationsAsync(entityID: EntityID): Promise<ParserResult> {
     const type = OsmEntity.type(entityID);
     const osmID = OsmEntity.toOSM(entityID);
-    const options = { skipSeen: false, filter: new Set<ParserDataType>(['relation']) };
+    const options = { filter: new Set<ParserDataType>(['relation']) };
     const json = (this.preferJSON ? '.json' : '');
 
     return new Promise((resolve, reject) => {
@@ -793,7 +785,7 @@ export class OsmService extends AbstractSystem {
           };
 
           const type = k + 's';   // nodes, ways, relations
-          const options = { skipSeen: false, filter: new Set<ParserDataType>([k]) };
+          const options = { filter: new Set<ParserDataType>([k]) };
           const json = (this.preferJSON ? '.json' : '');
           this.loadFromAPI(`/api/0.6/${type}${json}?${type}=` + chunk.join(), errback, options);
         });
@@ -843,7 +835,7 @@ export class OsmService extends AbstractSystem {
         }
       };
 
-      const options = { skipSeen: false, filter: new Set<ParserDataType>(['user']) };
+      const options = { filter: new Set<ParserDataType>(['user']) };
       const json = (this.preferJSON ? '.json' : '');
       this.loadFromAPI(`/api/0.6/user/${uid}${json}`, errback, options);
     });
@@ -876,7 +868,7 @@ export class OsmService extends AbstractSystem {
       return Promise.resolve(loaded);
     }
 
-    const options = { skipSeen: false, filter: new Set<ParserDataType>(['user']) };
+    const options = { filter: new Set<ParserDataType>(['user']) };
     const json = (this.preferJSON ? '.json' : '');
     const chunks = utilArrayChunk(toLoad, 150);
 
@@ -944,7 +936,7 @@ export class OsmService extends AbstractSystem {
         }
       };
 
-      const options = { skipSeen: false, filter: new Set<ParserDataType>(['user']) };
+      const options = { filter: new Set<ParserDataType>(['user']) };
       const json = (this.preferJSON ? '.json' : '');
 
       this.loadFromAPI(`/api/0.6/user/details${json}`, errback, options);
@@ -983,7 +975,7 @@ export class OsmService extends AbstractSystem {
             }
           };
 
-          const options = { skipSeen: false, filter: new Set<ParserDataType>(['changeset']) };
+          const options = { filter: new Set<ParserDataType>(['changeset']) };
           const json = (this.preferJSON ? '.json' : '');
           this.loadFromAPI(`/api/0.6/changesets${json}?user=${user.id}`, errback, options);
         });
@@ -1024,7 +1016,7 @@ export class OsmService extends AbstractSystem {
         }
       };
 
-      const options = { skipSeen: false, filter: new Set<ParserDataType>(['preferences']) };
+      const options = { filter: new Set<ParserDataType>(['preferences']) };
       const json = (this.preferJSON ? '.json' : '');
       const path = `/api/0.6/user/preferences${json}`;
 
@@ -1255,7 +1247,7 @@ export class OsmService extends AbstractSystem {
         }
       };
 
-      const options = { skipSeen: false, filter: new Set<ParserDataType>(['api', 'policy']) };
+      const options = { filter: new Set<ParserDataType>(['api', 'policy']) };
       const json = (this.preferJSON ? '.json' : '');
       const path = `/api/capabilities${json}`;  // note, no '0.6'
 
@@ -1634,11 +1626,10 @@ export class OsmService extends AbstractSystem {
       }
     };
 
-    const options = { skipSeen: true };
     const json = (this.preferJSON ? '.json' : '');
     const path = `/api/0.6/map${json}?bbox=` + tile.wgs84Extent.toParam();
 
-    this.loadFromAPI(path, done, options, requestID);
+    this.loadFromAPI(path, done, {}, requestID);
   }
 
 
@@ -1800,7 +1791,7 @@ export class OsmService extends AbstractSystem {
     };
 
     const json = (this.preferJSON ? '.json' : '');
-    const options = { skipSeen: true, filter: new Set<ParserDataType>(['note']) };
+    const options = { filter: new Set<ParserDataType>(['note']) };
     const path = `/api/0.6/notes${json}?limit=` + noteOptions.limit + '&closed='
       + noteOptions.closed + '&bbox=' + tile.wgs84Extent.toParam();
 
@@ -1838,7 +1829,7 @@ export class OsmService extends AbstractSystem {
         }
       };
 
-      const options = { skipSeen: false, filter: new Set<ParserDataType>(['note']) };
+      const options = { filter: new Set<ParserDataType>(['note']) };
       const json = (this.preferJSON ? '.json' : '');
       const path = `/api/0.6/notes/${noteID}${json}`;
 
@@ -1889,7 +1880,7 @@ export class OsmService extends AbstractSystem {
       }
     };
 
-    const parserOptions = { skipSeen: false, filter: new Set<ParserDataType>(['note']) };
+    const parserOptions = { filter: new Set<ParserDataType>(['note']) };
     const errback = this._wrapcb(done);
     const resource = this._apiroot + '/api/0.6/notes?' +
       utilQsString({ lon: note.loc[0], lat: note.loc[1], text: note.props.newComment }, false);
@@ -1975,7 +1966,7 @@ export class OsmService extends AbstractSystem {
       }
     };
 
-    const parserOptions = { skipSeen: false, filter: new Set<ParserDataType>(['note']) };
+    const parserOptions = { filter: new Set<ParserDataType>(['note']) };
     const errback = this._wrapcb(done);
     let resource = this._apiroot + `/api/0.6/notes/${noteID}/${action}`;
     if (note.props.newComment) {

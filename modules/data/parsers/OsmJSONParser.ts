@@ -68,8 +68,6 @@ import type {
  */
 export class OsmJSONParser {
 
-  /** Unique identifiers already seen by this parser instance (avoids duplicates) */
-  protected _seen: Set<string>;
   /** Accumulates the types of parsed data elements encountered (e.g. 'node', 'way', 'relation') */
   public types: Set<ParserDataType>;
 
@@ -77,8 +75,6 @@ export class OsmJSONParser {
   /**
    */
   public constructor() {
-    this._seen = new Set<string>();
-
     this._parseNode = this._parseNode.bind(this);
     this._parseWay = this._parseWay.bind(this);
     this._parseRelation = this._parseRelation.bind(this);
@@ -100,14 +96,6 @@ export class OsmJSONParser {
 
 
   /**
-   * Call reset to clear the caches.
-   */
-  public reset(): void {
-    this._seen.clear();
-  }
-
-
-  /**
    * Parse the given content and extract whatatever OSM data we find in it.
    * @param   content - the content to parse
    * @param   options - parsing options
@@ -119,9 +107,6 @@ export class OsmJSONParser {
       throw new Error('No content');
     }
 
-    // exclude results that we have seen before
-    const skipSeen = options.skipSeen ?? true;
-
     // include only these in the results (e.g. ['node','way','relation'])
     let filter: Set<ParserDataType>;
     if (options.filter instanceof Set) {
@@ -132,7 +117,7 @@ export class OsmJSONParser {
       filter = this.types;
     }
 
-    const results: ParserResult = { osm: {}, data: [], seenIDs: new Set<string>() };
+    const results: ParserResult = { osm: {}, data: [] };
     const json: Record<string, any> = (typeof content === 'string' ? JSON.parse(content) : content);
 
     if (!isObject(json)) {
@@ -209,26 +194,18 @@ export class OsmJSONParser {
 
         if (obj.type === 'node' && filter.has('node')) {
           id = 'n' + obj.id;
-          results.seenIDs.add(id);
           parser = this._parseNode;
 
         } else if (obj.type === 'way' && filter.has('way')) {
           id = 'w' + obj.id;
-          results.seenIDs.add(id);
           parser = this._parseWay;
 
         } else if (obj.type === 'relation' && filter.has('relation')) {
           id = 'r' + obj.id;
-          results.seenIDs.add(id);
           parser = this._parseRelation;
         }
 
         if (!parser || !id) continue;
-
-        if (skipSeen) {  // skip things we've seen before
-          if (this._seen.has(id)) continue;
-          this._seen.add(id);
-        }
 
         const parsed = parser(obj, id);
         if (parsed) {
@@ -242,12 +219,6 @@ export class OsmJSONParser {
     if (changesets.length && filter.has('changeset')) {
       for (const obj of changesets) {
         const id = 'c' + obj.id;
-
-        if (skipSeen) {  // skip things we've seen before
-          if (this._seen.has(id)) continue;
-          this._seen.add(id);
-        }
-
         const parsed = this._parseChangeset(obj, id);
         if (parsed) {
           results.data.push(parsed);
@@ -260,12 +231,6 @@ export class OsmJSONParser {
     if (users.length && filter.has('user')) {
       for (const obj of users) {
         const id = 'user' + obj.id;
-
-        if (skipSeen) {  // skip things we've seen before
-          if (this._seen.has(id)) continue;
-          this._seen.add(id);
-        }
-
         const parsed = this._parseUser(obj, id);
         if (parsed) {
           results.data.push(parsed);

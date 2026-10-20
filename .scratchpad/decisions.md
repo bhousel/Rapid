@@ -2,6 +2,19 @@
 
 Non-obvious choices where "why did we do it this way?" isn't captured in the code.
 
+## OSM parsers keep no "seen" state; `EditSystem.merge` skips entities it already has
+
+The parsers used to remember every ID they parsed and leave it out of later results (`skipSeen`). That
+saved real work back when responses were XML, but it broke when a request was cancelled (`loadTiles` aborts
+tiles no longer in view) or timed out after the worker had parsed the response: the main thread dropped
+the result while the worker kept the IDs, so those features never loaded until a reload. Now the parsers
+return everything, and `merge` skips entities already in the base graph before building them or adding
+them to the spatial caches (where the extra time went). Benchmarked on 6×6 overlapping tiles of the Tokyo
+data: about the same total as `skipSeen` (~170 ms), against ~228 ms for parsing everything without the
+merge change. With nothing skipped, the separate `seenIDs` set in parser results was redundant, so it's
+gone too: `merge` emits the IDs of everything it was given, because features already loaded may need
+to re-render when new ones arrive (see the note in `EditSystem.merge`).
+
 ## Folder-specific agent rules live in nested `AGENTS.md`, not `.github/instructions/`
 
 `.github/instructions/*.instructions.md` with `applyTo:` globs only work in Copilot. Claude Code never loaded
@@ -259,10 +272,10 @@ Call sites pass a **world-space delta** (a `Vec2` difference of two `projWgs84To
 - **Folder-level `index.worker.ts` barrels** — Each module folder with worker companions has an `index.worker.ts` that re-exports them alongside the main-thread `index.ts` barrel.
 - **Worker-safe by construction** — `.worker.ts` files must only import worker-safe code (parsers, utilities). They cannot import `Context`, systems, or anything DOM-dependent.
 - **`Listener` and `ListenerRegistry` types** in `global.d.ts` — `Listener = (data: unknown, signal: AbortSignal) => unknown | Promise<unknown>`. Declared globally for convenience since they're used across bundle boundaries (worker entry point, companion files, main-thread systems). Avoids cross-bundle import concerns. `ListenerRegistry = Record<ListenerID, Listener>` is the barrel export type for `index.worker.ts` files.
-- **Long-lived instances** — Companion files may instantiate stateful objects (e.g. `OsmXMLParser`) at module scope. These persist for the lifetime of their execution context (worker or main thread). A `'service:reset'` listener clears accumulated state (e.g. `_seen` caches) when needed.
+- **Long-lived instances** — Companion files may instantiate stateful objects (e.g. `OsmXMLParser`) at module scope. These persist for the lifetime of their execution context (worker or main thread). Keep them stateless between calls (the OSM parsers no longer cache seen IDs, so there's nothing to reset).
 - **NetworkSystem owns inflight tracking** — Services pass `task` + `taskData` in `NetworkFetchOptions`. NetworkSystem routes to worker or calls the registered listener directly. No local `inflight` Map needed in services — `isInflight()`, `abortMatching()`, and `hasMatching()` all work transparently.
 - **Structured-clone constraint** — Worker task results must be structured-clone safe: plain objects, arrays, Sets, Maps, typed arrays. No DOM nodes, no prototype methods. Parse XML in the worker, return `ParserResult` (not `Document`).
-- **`resetAsync` does not terminate workers** — Workers are long-lived and persist across resets. Each system dispatches its own reset message to its listener functions (e.g. `'network:reset'`). Terminating workers on reset would race with reset messages and is expensive (script re-parse + re-compile on respawn). Workers only terminate on explicit `terminateWorkers()` calls or system destruction.
+- **`resetAsync` does not terminate workers** — Workers are long-lived and persist across resets. If a system ever needs worker-side state cleared, it should dispatch its own reset message to its listener functions. Terminating workers on reset would race with those messages and is expensive (script re-parse + re-compile on respawn). Workers only terminate on explicit `terminateWorkers()` calls or system destruction.
 
 ## Architecture
 

@@ -1,4 +1,4 @@
-import { beforeEach, describe, it } from 'bun:test';
+import { describe, it } from 'bun:test';
 import { assert } from 'chai';
 import * as Rapid from '../../../../modules/headless.js';
 import * as sample from './OsmJSONParser.sample.js';
@@ -7,21 +7,9 @@ import * as sample from './OsmJSONParser.sample.js';
 describe('OsmJSONParser', () => {
   const parser = new Rapid.OsmJSONParser();
 
-  beforeEach(() => {
-    parser.reset();
-  });
-
   describe('constructor', () => {
     it('constructs an OsmJSONParser', () => {
       assert.instanceOf(parser, Rapid.OsmJSONParser);
-    });
-  });
-
-  describe('reset', () => {
-    it('resets the seen cache', () => {
-      parser._seen.add('user1');
-      parser.reset();
-      assert.isEmpty(parser._seen);
     });
   });
 
@@ -190,7 +178,7 @@ describe('OsmJSONParser', () => {
       assert.deepEqual(data[1], sample.policyResult);
     });
 
-    it('skips already-seen elements by default', () => {
+    it('returns already-seen elements on every parse', () => {
       const results1 = parser.parse(sample.mapJSON);
       const data1 = results1.data;
       assert.isArray(data1);
@@ -199,23 +187,10 @@ describe('OsmJSONParser', () => {
       const results2 = parser.parse(sample.mapJSON);
       const data2 = results2.data;
       assert.isArray(data2);
-      assert.lengthOf(data2, 1);
-      assert.deepEqual(data2[0], sample.boundsResult);  // only bounds
-    });
-
-    it('optionally returns already-seen elements', () => {
-      const results1 = parser.parse(sample.mapJSON, { skipSeen: false });
-      const data1 = results1.data;
-      assert.isArray(data1);
-      assert.lengthOf(data1, 7);   // bounds + elements
-
-      const results2 = parser.parse(sample.mapJSON, { skipSeen: false });
-      const data2 = results2.data;
-      assert.isArray(data2);
       assert.lengthOf(data2, 7);   // bounds + elements
     });
 
-    it('skips already-seen users by default', () => {
+    it('returns already-seen users on every parse', () => {
       const results1 = parser.parse(sample.usersJSON);
       const data1 = results1.data;
       assert.isArray(data1);
@@ -224,40 +199,16 @@ describe('OsmJSONParser', () => {
       const results2 = parser.parse(sample.usersJSON);
       const data2 = results2.data;
       assert.isArray(data2);
-      assert.lengthOf(data2, 0);
-    });
-
-    it('optionally returns already-seen users', () => {
-      const results1 = parser.parse(sample.usersJSON, { skipSeen: false });
-      const data1 = results1.data;
-      assert.isArray(data1);
-      assert.lengthOf(data1, 2);
-
-      const results2 = parser.parse(sample.usersJSON, { skipSeen: false });
-      const data2 = results2.data;
-      assert.isArray(data2);
       assert.lengthOf(data2, 2);
     });
 
-    it('skips already-seen changesets by default', () => {
+    it('returns already-seen changesets on every parse', () => {
       const results1 = parser.parse(sample.changesetsJSON);
       const data1 = results1.data;
       assert.isArray(data1);
       assert.lengthOf(data1, 3);
 
       const results2 = parser.parse(sample.changesetsJSON);
-      const data2 = results2.data;
-      assert.isArray(data2);
-      assert.lengthOf(data2, 0);
-    });
-
-    it('optionally returns already-seen changesets', () => {
-      const results1 = parser.parse(sample.changesetsJSON, { skipSeen: false });
-      const data1 = results1.data;
-      assert.isArray(data1);
-      assert.lengthOf(data1, 3);
-
-      const results2 = parser.parse(sample.changesetsJSON, { skipSeen: false });
       const data2 = results2.data;
       assert.isArray(data2);
       assert.lengthOf(data2, 3);

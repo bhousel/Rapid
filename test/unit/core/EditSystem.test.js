@@ -221,6 +221,33 @@ describe('EditSystem', () => {
         assert.lengthOf(onMerge.mock.calls, 1);
         assert.deepEqual(onMerge.mock.lastCall[0], new Set([n.id]));  // first argument
       });
+
+      it('keeps entities it already has, and merges only the new ones', () => {
+        const n1 = new Rapid.OsmNode(context, { id: 'n1', loc: [0, 0] });
+        _editor.merge([n1]);
+
+        const n1again = new Rapid.OsmNode(context, { id: 'n1', loc: [1, 1] });
+        const n2 = new Rapid.OsmNode(context, { id: 'n2', loc: [2, 2] });
+        const onMerge = mock();
+        _editor.on('merge', onMerge);
+        _editor.merge([n1again, n2]);
+
+        assert.strictEqual(_editor.base.graph.entity('n1'), n1);
+        assert.strictEqual(_editor.base.graph.entity('n2'), n2);
+        assert.deepEqual(onMerge.mock.lastCall[0], new Set(['n1', 'n2']));  // ones it already had still re-render
+      });
+
+      it('does nothing when every entity is already there', () => {
+        const n1 = new Rapid.OsmNode(context, { id: 'n1' });
+        _editor.merge([n1]);
+
+        const onMerge = mock();
+        _editor.on('merge', onMerge);
+        _editor.merge([new Rapid.OsmNode(context, { id: 'n1' })]);
+
+        assert.strictEqual(_editor.base.graph.entity('n1'), n1);
+        assert.lengthOf(onMerge.mock.calls, 0);
+      });
     });
 
 

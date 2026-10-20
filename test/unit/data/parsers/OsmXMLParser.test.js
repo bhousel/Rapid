@@ -1,4 +1,4 @@
-import { beforeEach, describe, it } from 'bun:test';
+import { describe, it } from 'bun:test';
 import { assert } from 'chai';
 import { DOMParser } from '@xmldom/xmldom';
 import * as Rapid from '../../../../modules/headless.js';
@@ -8,21 +8,9 @@ import * as sample from './OsmXMLParser.sample.js';
 describe('OsmXMLParser', () => {
   const parser = new Rapid.OsmXMLParser();
 
-  beforeEach(() => {
-    parser.reset();
-  });
-
   describe('constructor', () => {
     it('constructs an OsmXMLParser', () => {
       assert.instanceOf(parser, Rapid.OsmXMLParser);
-    });
-  });
-
-  describe('reset', () => {
-    it('resets the seen cache', () => {
-      parser._seen.add('user1');
-      parser.reset();
-      assert.isEmpty(parser._seen);
     });
   });
 
@@ -169,7 +157,7 @@ describe('OsmXMLParser', () => {
       assert.deepEqual(data[1], sample.policyResult);
     });
 
-    it('skips already-seen elements by default', () => {
+    it('returns already-seen elements on every parse', () => {
       const results1 = parser.parse(sample.mapXML);
       const data1 = results1.data;
       assert.isArray(data1);
@@ -178,23 +166,10 @@ describe('OsmXMLParser', () => {
       const results2 = parser.parse(sample.mapXML);
       const data2 = results2.data;
       assert.isArray(data2);
-      assert.lengthOf(data2, 1);
-      assert.deepEqual(data2[0], sample.boundsResult);  // only bounds
-    });
-
-    it('optionally returns already-seen elements', () => {
-      const results1 = parser.parse(sample.mapXML, { skipSeen: false });
-      const data1 = results1.data;
-      assert.isArray(data1);
-      assert.lengthOf(data1, 7);   // bounds + elements
-
-      const results2 = parser.parse(sample.mapXML, { skipSeen: false });
-      const data2 = results2.data;
-      assert.isArray(data2);
       assert.lengthOf(data2, 7);   // bounds + elements
     });
 
-    it('skips already-seen users by default', () => {
+    it('returns already-seen users on every parse', () => {
       const results1 = parser.parse(sample.usersXML);
       const data1 = results1.data;
       assert.isArray(data1);
@@ -203,40 +178,16 @@ describe('OsmXMLParser', () => {
       const results2 = parser.parse(sample.usersXML);
       const data2 = results2.data;
       assert.isArray(data2);
-      assert.lengthOf(data2, 0);
-    });
-
-    it('optionally returns already-seen users', () => {
-      const results1 = parser.parse(sample.usersXML, { skipSeen: false });
-      const data1 = results1.data;
-      assert.isArray(data1);
-      assert.lengthOf(data1, 2);
-
-      const results2 = parser.parse(sample.usersXML, { skipSeen: false });
-      const data2 = results2.data;
-      assert.isArray(data2);
       assert.lengthOf(data2, 2);
     });
 
-    it('skips already-seen changesets by default', () => {
+    it('returns already-seen changesets on every parse', () => {
       const results1 = parser.parse(sample.changesetsXML);
       const data1 = results1.data;
       assert.isArray(data1);
       assert.lengthOf(data1, 3);
 
       const results2 = parser.parse(sample.changesetsXML);
-      const data2 = results2.data;
-      assert.isArray(data2);
-      assert.lengthOf(data2, 0);
-    });
-
-    it('optionally returns already-seen changesets', () => {
-      const results1 = parser.parse(sample.changesetsXML, { skipSeen: false });
-      const data1 = results1.data;
-      assert.isArray(data1);
-      assert.lengthOf(data1, 3);
-
-      const results2 = parser.parse(sample.changesetsXML, { skipSeen: false });
       const data2 = results2.data;
       assert.isArray(data2);
       assert.lengthOf(data2, 3);

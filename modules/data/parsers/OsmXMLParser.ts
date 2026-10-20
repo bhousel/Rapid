@@ -68,8 +68,6 @@ import type { OsmTags } from '../types.ts';
  */
 export class OsmXMLParser {
 
-  /** Unique identifiers already seen by this parser instance (avoids duplicates) */
-  protected _seen: Set<string>;
   /** Accumulates the types of parsed data elements encountered (e.g. 'node', 'way', 'relation') */
   public types: Set<ParserDataType>;
 
@@ -77,8 +75,6 @@ export class OsmXMLParser {
   /**
    */
   public constructor() {
-    this._seen = new Set<string>();
-
     this._parseNode = this._parseNode.bind(this);
     this._parseWay = this._parseWay.bind(this);
     this._parseRelation = this._parseRelation.bind(this);
@@ -101,14 +97,6 @@ export class OsmXMLParser {
 
 
   /**
-   * Call reset to clear the caches.
-   */
-  public reset(): void {
-    this._seen.clear();
-  }
-
-
-  /**
    * Parse the given content and extract whatatever OSM data we find in it.
    * @param   content - the content to parse
    * @param   options - parsing options
@@ -120,9 +108,6 @@ export class OsmXMLParser {
       throw new Error('No content');
     }
 
-    // exclude results that we have seen before
-    const skipSeen = options.skipSeen ?? true;
-
     // include only these in the results (e.g. ['node','way','relation'])
     let filter: Set<ParserDataType>;
     if (options.filter instanceof Set) {
@@ -133,8 +118,7 @@ export class OsmXMLParser {
       filter = this.types;
     }
 
-    // Note: I'd like to try to find a way to avoid seenIDs, See note in EditSystem.merge()..
-    const results: ParserResult = { osm: {}, data: [], seenIDs: new Set<string>() };
+    const results: ParserResult = { osm: {}, data: [] };
     const xml: XmlDocument = (typeof content === 'string' ? new DOMParser().parseFromString(content.trimStart(), 'application/xml') : content);
 
     if (!xml?.childNodes) {
@@ -165,22 +149,18 @@ export class OsmXMLParser {
 
       if (child.nodeName === 'node' && filter.has('node')) {
         id = 'n' + (child as Element).getAttribute('id');
-        results.seenIDs.add(id);
         parser = this._parseNode;
 
       } else if (child.nodeName === 'way' && filter.has('way')) {
         id = 'w' + (child as Element).getAttribute('id');
-        results.seenIDs.add(id);
         parser = this._parseWay;
 
       } else if (child.nodeName === 'relation' && filter.has('relation')) {
         id = 'r' + (child as Element).getAttribute('id');
-        results.seenIDs.add(id);
         parser = this._parseRelation;
 
       } else if (child.nodeName === 'changeset' && filter.has('changeset')) {
         id = 'c' + (child as Element).getAttribute('id');
-        results.seenIDs.add(id);
         parser = this._parseChangeset;
 
       } else if (child.nodeName === 'note' && filter.has('note')) {
@@ -208,11 +188,6 @@ export class OsmXMLParser {
       }
 
       if (!parser) continue;
-
-      if (skipSeen && id !== undefined) {  // skip things we've seen before
-        if (this._seen.has(id)) continue;
-        this._seen.add(id);
-      }
 
       const parsed = parser(child as Element, id ?? '');
       if (parsed) {
