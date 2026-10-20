@@ -2,13 +2,51 @@ import { AbstractSystem } from './AbstractSystem.ts';
 import { gpx } from '@tmcw/togeojson';
 import { Extent } from '@rapid-sdk/math';
 import { RapidDataset, RapidDataDictionary } from '../lib/index.ts';
-import { utilExtractValues } from '../util/string.ts';
+import { utilExtractValues, utilWildcardDelete } from '../util/string.ts';
 import { utilIterable } from '../util/iterable.ts';
 
 import type { Context } from '../Context.ts';
 import type { OneOrMore } from '../util/iterable.ts';
+import type { RapidDataTransform } from '../lib/RapidDataDictionary.ts';
+import type { RapidDatasetProps } from '../lib/RapidDataset.ts';
 import type { SettingsValue } from './SettingsSystem.ts';
 import type { TreeValue } from '../lib/TreeStore.ts';
+import type { Vec2 } from '@rapid-sdk/math';
+
+
+/**
+ * Input format for dataset asset data (see `RapidSystem.merge`).
+ */
+export interface DatasetInput {
+  /** An asset identifier, e.g. 'rapid_datasets' (required) */
+  assetID: AssetID;
+  /** A string version specifier, e.g. '2026-01-01' */
+  assetVersion?: string;
+  /** Array of scoped dataset input data, each must contain a scope identifier */
+  scopes?: DatasetInputScope[];
+}
+
+/**
+ * Input format for a single scope of dataset data.
+ * Datasets aren't specific to a scope yet; the scopes are applied in order.
+ */
+export interface DatasetInputScope {
+  /** Scope identifier that this input data applies to */
+  scope: ScopeID;
+  /** Object mapping DatasetID to dataset properties (or null to delete) */
+  datasets?: Record<DatasetID, DatasetInputProps | null>;
+}
+
+/**
+ * A dataset as defined in an asset file: the `RapidDataset` properties in plain JSON types,
+ * plus an optional data dictionary. The datasetID is the key it's stored under.
+ */
+export interface DatasetInputProps extends Omit<Partial<RapidDatasetProps>, 'id' | 'assetID' | 'custom' | 'extent'> {
+  /** Bounding extent of the dataset, as `[[minLon, minLat], [maxLon, maxLat]]` */
+  extent?: [Vec2, Vec2];
+  /** Data dictionary: how the source attributes become OSM tags */
+  dictionary?: { transforms?: Partial<RapidDataTransform>[] };
+}
 
 
 /**
@@ -63,6 +101,10 @@ const RAPID_COLORS: readonly string[] = [
  * and keeps track of which features have been accepted or ignored.
  * Rapid allows users to work with third party datasets external to OpenStreetMap.
  *
+ * The catalog is built in layers: the datasets provided by services, then the datasets
+ * defined in asset files (see `merge` and the `datasets=` url parameter), then the
+ * custom datasets that the user added themselves.
+ *
  * Properties available:
  * - `catalog`     - `Map<DatasetID, RapidDataset>` data structure of all known datasets
  * - `categories`  - `Set<string>` of all known dataset categories (free-text keywords)
@@ -75,6 +117,8 @@ const RAPID_COLORS: readonly string[] = [
  * Events available:
  * - `datasetchange` - Fires when datasets are added/removed from the list
  * - `taskchanged`
+ *
+ * See `design/rapid-system.md` for the full design.
  */
 export class RapidSystem extends AbstractSystem {
 
@@ -99,6 +143,21 @@ export class RapidSystem extends AbstractSystem {
   /** Whether the poweruser setting was active at the last dataset change check */
   protected _hadPoweruser = false;
 
+  /** The assetIDs that Rapid loads datasets from by default */
+  protected _defaultAssetIDs: Set<AssetID>;
+  /** The assetIDs merged so far, with their versions */
+  protected _loadedAssetIDs: Map<AssetID, string>;
+  /** The assetIDs requested instead of the defaults, or `null` to use the defaults */
+  protected _requestedAssetIDs: Set<AssetID> | null;
+  /** The dataset inputs merged so far, in order (applied again whenever the catalog is rebuilt) */
+  protected _inputs: DatasetInput[];
+  /** The datasets provided by services, gathered at startup */
+  protected _serviceDatasets: RapidDataset[];
+  /** The `datasets` url parameter that the current dataset assets were loaded for */
+  protected _datasetsParam: string | undefined;
+  /** Datasets from asset files whose data has started loading */
+  protected _setupDatasets: WeakSet<RapidDataset>;
+
 
   /**
    * @param context - Global shared application context
@@ -106,6 +165,14 @@ export class RapidSystem extends AbstractSystem {
   public constructor(context: Context) {
     super(context);
     this.id = 'rapid';
+
+    this._defaultAssetIDs = new Set<AssetID>(['rapid_datasets']);
+    this._loadedAssetIDs = new Map<AssetID, string>();
+    this._requestedAssetIDs = null;
+    this._inputs = [];
+    this._serviceDatasets = [];
+    this._datasetsParam = undefined;
+    this._setupDatasets = new WeakSet<RapidDataset>();
 
     // The addition of "custom" datasets means that RapidSystem needs more dependencies
     // See `RapidDataset.ts` for details.
@@ -135,6 +202,7 @@ export class RapidSystem extends AbstractSystem {
     if (this._initPromise) return this._initPromise;
 
     const context = this.context;
+    const assets = context.systems.assets;
     const editor = context.systems.editor;
     const settings = context.systems.settings;
     const urlhash = context.systems.urlhash;
@@ -142,6 +210,7 @@ export class RapidSystem extends AbstractSystem {
     return this._initPromise = super.initAsync()
       .then(() => {
         const prerequisites = [
+          assets?.initAsync(),
           editor?.initAsync(),
           settings?.initAsync(),
           urlhash?.initAsync()
@@ -151,6 +220,18 @@ export class RapidSystem extends AbstractSystem {
       .then(() => {
         urlhash?.on('hashchange', this._hashChanged);
         editor?.on('stablechange', this._stablechange);
+
+        // Tell AssetSystem about the default dataset file, if it's available.
+        assets?.registerAsset('rapid_datasets', { preferred: 'data/rapid_datasets.min.json5' });
+
+        // Honor the `datasets` param now, so that its datasets are in the catalog by the time
+        // the lists of added and enabled datasets are set up at startup.
+        const param = urlhash?.getParam('datasets');
+        if (param !== undefined) {
+          this.requestedAssetIDs = utilExtractValues(param).filter(Boolean);
+        }
+        this._datasetsParam = param;
+        return this.loadDatasetAssetsAsync();
      });
   }
 
@@ -180,16 +261,16 @@ export class RapidSystem extends AbstractSystem {
 
     return this._startPromise = prerequisites
       .then(() => {
-        // Gather all available datasets and categories into the dataset catalog..
+        // Gather all available datasets from the services,
+        // then build the catalog with the dataset assets on top.
+        this._serviceDatasets = [];
         for (const service of services) {
           const datasets = service.getAvailableDatasets();
           for (const dataset of datasets) {
-            this.catalog.set(dataset.id, dataset);
-            for (const category of dataset.categories) {
-              this.categories.add(category);
-            }
+            this._serviceDatasets.push(dataset);
           }
         }
+        this._rebuildCatalog();
 
         this._setupDatasetLists();
         this._loadDatasetSettings();
@@ -300,6 +381,236 @@ export class RapidSystem extends AbstractSystem {
   public get colors(): readonly string[] {
     return RAPID_COLORS;
   }
+
+  /**
+   * Returns the default assetIDs. These are the dataset assets that Rapid will load by default.
+   * @return  Default assetIDs
+   * @readonly
+   */
+  public get defaultAssetIDs(): Set<AssetID> {
+    return this._defaultAssetIDs;
+  }
+
+  /**
+   * Returns the loaded assetIDs, along with their version numbers if known.
+   * @return  Loaded assetIDs
+   * @readonly
+   */
+  public get loadedAssetIDs(): Map<AssetID, string> {
+    return this._loadedAssetIDs;
+  }
+
+  /**
+   * Allows user to request different dataset asset files than what Rapid uses by default.
+   *
+   * If set before init time, these assets will be loaded at init time when init calls `loadDatasetAssetsAsync`.
+   * You can also change this after init time, but then you'll need to call `loadDatasetAssetsAsync` again.
+   *
+   * The 'default' keyword is special - if found in the list, it will expand to all the default IDs.
+   *
+   * You can also pass `null` - in this case the `requestedAssetIDs` list is not used,
+   *   and subsequent calls to `loadDatasetAssetsAsync` will use the `defaultAssetIDs` Set.
+   * @param vals - A `string`, `Array<string>` or `Set<string>` of assetIDs to load (or `null` to disable)
+   */
+  public set requestedAssetIDs(vals: OneOrMore<AssetID> | null) {
+    if (vals === null || vals === undefined) {
+      this._requestedAssetIDs = null;
+      return;
+    }
+
+    this._requestedAssetIDs = new Set<AssetID>();
+    for (const assetID of utilIterable(vals)) {
+      if (!assetID) continue;
+      if (assetID === 'default') {
+        for (const defaultID of this._defaultAssetIDs) {
+          this._requestedAssetIDs.add(defaultID);
+        }
+      } else {
+        this._requestedAssetIDs.add(assetID);
+      }
+    }
+  }
+  /** Returns the currently requested dataset asset IDs, or null if using defaults.
+   * @return  The requested asset IDs, or `null` when using defaults
+   */
+  public get requestedAssetIDs(): Set<AssetID> | null {
+    return this._requestedAssetIDs;
+  }
+
+
+  /**
+   * Loads the dataset definitions from the requested asset files (see `requestedAssetIDs`).
+   * This replaces everything merged before, including data passed to `merge()` directly.
+   * An assetID that can't be loaded is skipped with a warning. (For example, an old link
+   * might still use `datasets=` for the datasetIDs, which are now `dataset_ids=`.)
+   * @return Promise resolved when the datasets have been loaded
+   */
+  public loadDatasetAssetsAsync(): Promise<void> {
+    const context = this.context;
+    const assets = context.systems.assets;
+
+    // Clear out whatever was merged before.
+    this._loadedAssetIDs.clear();
+    this._inputs = [];
+
+    const updateCatalog = (): void => {
+      this._rebuildCatalog();
+      if (this._started) {
+        this._loadDatasetSettings();
+        this._datasetsChanged();
+      }
+    };
+
+    // Without AssetSystem, there are no dataset files to load.
+    if (!assets) {
+      updateCatalog();
+      return Promise.resolve();
+    }
+
+    const which = this._requestedAssetIDs ?? this._defaultAssetIDs;
+    const assetIDs = [...which];
+
+    return Promise.allSettled(
+      assetIDs.map(assetID => assets.loadAssetAsync(assetID))
+    )
+    .then(results => {
+      results.forEach((result, i) => {
+        if (result.status === 'fulfilled') {
+          try {
+            this._mergeInput(result.value as DatasetInput);
+          } catch (err) {
+            console.error(err);   // eslint-disable-line no-console
+          }
+        } else {
+          console.warn(`RapidSystem: skipping dataset asset '${assetIDs[i]}':`, result.reason);  // eslint-disable-line no-console
+        }
+      });
+      updateCatalog();
+    });
+  }
+
+
+  /**
+   * Accepts dataset definitions contained in scope blocks:
+   * ```
+   * {
+   *   assetID: 'my_datasets',
+   *   scopes: [{
+   *     scope: '*',
+   *     datasets: { ... }
+   *   }]
+   * }
+   * ```
+   *
+   * When merging:
+   *  - Items are processed in the order they appear.
+   *  - New items will replace existing items that have the same `id`, including datasets from services.
+   *     `"my_sidewalks": { label: 'My Sidewalks', sourceUrl: … }`   <-- `my_sidewalks` dataset added
+   *  - If no new data supplied (null), this is treated as a delete.
+   *     `"fbRoads": null`                     <-- `fbRoads` dataset deleted
+   *  - Wildcard characters '*' and '?' are allowed when deleting.
+   *     `"overture-*": null`                  <-- all `overture-*` datasets deleted
+   *
+   * A dataset without a `serviceID` loads its data from its `sourceUrl`, once it's added to the Rapid menu.
+   *
+   * @param input - dataset data to merge
+   * @throws Will throw if given data does not contain an `assetID`, or if the `assetID` has already been merged
+   */
+  public merge(input: DatasetInput): void {
+    this._mergeInput(input);
+    this._rebuildCatalog();
+    if (this._started) {
+      this._loadDatasetSettings();
+      this._datasetsChanged();
+    }
+  }
+
+
+  /**
+   * Records a dataset input, to be applied when the catalog is rebuilt.
+   * @param input - dataset data to merge
+   * @throws Will throw if given data does not contain an `assetID`, or if the `assetID` has already been merged
+   */
+  protected _mergeInput(input: DatasetInput): void {
+    const assetID = input.assetID;
+    if (!assetID) {
+      throw new Error('Datasets missing assetID property');
+    }
+    if (this._loadedAssetIDs.has(assetID)) {
+      throw new Error(`Datasets "${assetID}" already merged`);
+    }
+
+    this._loadedAssetIDs.set(assetID, input.assetVersion ?? 'unknown');
+    this._inputs.push(input);
+  }
+
+
+  /**
+   * Rebuilds the catalog in layers: the datasets from services, then the merged dataset inputs
+   * in order, then the user's own custom datasets (unless an asset already uses the datasetID).
+   * A dataset that's still defined the same way keeps its instance, and any data it has loaded.
+   *
+   * The user's custom datasets are carried over from the previous catalog, not read here.
+   * `_loadDatasetSettings()` creates them from the stored settings, so callers run it after this
+   * (the first rebuild, at startup, has none to carry over yet).
+   */
+  protected _rebuildCatalog(): void {
+    const previous = new Map(this.catalog);
+    this.catalog.clear();
+
+    for (const ds of this._serviceDatasets) {
+      this.catalog.set(ds.id, ds);
+    }
+
+    for (const input of this._inputs) {
+      const assetID = input.assetID;
+      for (const inputScope of input.scopes ?? []) {
+        for (const [datasetID, props] of Object.entries(inputScope.datasets ?? {})) {
+          if (props) {   // add or replace
+            const existing = previous.get(datasetID);
+            const ds = (existing?.assetID === assetID) ? existing : this._datasetFromInput(datasetID, props, assetID);
+            this.catalog.set(datasetID, ds);
+          } else {   // remove
+            utilWildcardDelete(this.catalog, datasetID);
+          }
+        }
+      }
+    }
+
+    for (const ds of previous.values()) {
+      if (ds.custom && !this.catalog.has(ds.id)) {
+        this.catalog.set(ds.id, ds);
+      }
+    }
+
+    this.categories.clear();
+    for (const ds of this.catalog.values()) {
+      for (const category of ds.categories) {
+        this.categories.add(category);
+      }
+    }
+  }
+
+
+  /**
+   * Creates a `RapidDataset` from its definition in an asset file.
+   * @param datasetID - The datasetID it's defined under
+   * @param props - The dataset definition
+   * @param assetID - The asset file it came from
+   * @return A new `RapidDataset`
+   */
+  protected _datasetFromInput(datasetID: DatasetID, props: DatasetInputProps, assetID: AssetID): RapidDataset {
+    const { extent, ...rest } = props;
+
+    // Not `custom`: the user didn't add it, so they can't edit or delete it.
+    // (Without a `serviceID`, Rapid still loads the data itself, like a custom dataset.)
+    const ds = RapidDataset.fromJSON(this.context, { ...rest, id: datasetID, assetID, custom: false });
+    if (Array.isArray(extent)) {
+      ds.extent = new Extent(extent[0], extent[1]);
+    }
+    return ds;
+  }
+
 
   /**
    * The geographic extent of the current task (e.g. from a loaded GPX task boundary).
@@ -428,7 +739,7 @@ export class RapidSystem extends AbstractSystem {
     if (!settings || !ds) return;
     if (ds.hidden) return;   // skip reserved datasets (e.g. for the walkthrough)
 
-    // A service-provided dataset - save the subset of things that the user can customize..
+    // A dataset from a service or an asset file - save the subset of things that the user can customize..
     if (!ds.custom) {
       const prefs: RapidDatasetSettings = {
         color: ds.color,
@@ -491,16 +802,33 @@ export class RapidSystem extends AbstractSystem {
       this._hadPoweruser = true;
     }
 
-    // datasets (optional) - if using, it overrides the user's stored dataset settings.
-    if (currParams.has('datasets')) {
-      this._setupDatasetLists();
-      this._datasetsChanged();
+    // datasets
+    // AssetIDs to load datasets from, e.g. `datasets=default,my_datasets`
+    // (Compared with the value the current datasets were loaded for, since init already used it.)
+    let loadPromise = Promise.resolve();
+    const newDatasets = currParams.get('datasets');
+    if (newDatasets !== this._datasetsParam) {
+      this._datasetsParam = newDatasets;
+      if (typeof newDatasets === 'string') {
+        this.requestedAssetIDs = utilExtractValues(newDatasets).filter(Boolean);
+      } else {
+        this.requestedAssetIDs = null;
+      }
+      loadPromise = this.loadDatasetAssetsAsync();
     }
+
+    // dataset_ids (optional) - if using, it overrides the user's stored dataset settings.
+    loadPromise.then(() => {
+      if (currParams.has('dataset_ids')) {
+        this._setupDatasetLists();
+        this._datasetsChanged();
+      }
+    });
   }
 
 
   /**
-   * Setup dataset lists - this runs on startup and anytime the urlhash 'datasets' param changes.
+   * Setup dataset lists - this runs on startup and anytime the urlhash 'dataset_ids' param changes.
    * We'll check both `UrlHashSystem` and `SettingsSystem` to decide what appears on the menu.
    * (The urlhash overrides the stored settings)
    */
@@ -509,10 +837,10 @@ export class RapidSystem extends AbstractSystem {
     const settings = context.systems.settings;
     const urlhash = context.systems.urlhash;
 
-    const urlVals = utilExtractValues(urlhash?.getParam('datasets') || '').filter(Boolean);
+    const urlVals = utilExtractValues(urlhash?.getParam('dataset_ids') || '').filter(Boolean);
 
     // Added datasetIDs  (datasets that appear on the menu)
-    // Take from `datasets` url param if available, fallback to stored setting.
+    // Take from `dataset_ids` url param if available, fallback to stored setting.
     let addedVals = urlVals;
     if (!addedVals.length) {
       addedVals = settings?.get<DatasetID[]>('rapid.addedDatasetIDs') ?? ['fbRoads', 'overture-buildings', 'overture-places'];
@@ -520,7 +848,7 @@ export class RapidSystem extends AbstractSystem {
     this.addedDatasetIDs = new Set<DatasetID>(addedVals);
 
     // Enabled datasetIDs  (datasets on the menu that are checked)
-    // Take from `datasets` url param if available, fallback to stored setting.
+    // Take from `dataset_ids` url param if available, fallback to stored setting.
     // Note that we won't enable the default datasets anymore - this is a change from earlier
     // versions of Rapid which enabled Facebook Roads and Microsoft Buildings by default.
     // Going forward, we'll default them to disabled, until the user enables them.
@@ -544,7 +872,7 @@ export class RapidSystem extends AbstractSystem {
     const settings = context.systems.settings;
     if (!settings) return;
 
-    // Apply the settings for the service-provided datasets:
+    // Apply the settings for the datasets from services and asset files:
     // dataset: {
     //   fbRoads: { … },
     //   msBuildings: { … },
@@ -591,15 +919,18 @@ export class RapidSystem extends AbstractSystem {
       }
       let ds = this.catalog.get(datasetID);
       if (ds) {   // added already
-        if (!ds.custom) {   // Custom datasetID should not collide with service-provided datasetID
+        if (!ds.custom && !ds.assetID) {   // Custom datasetID should not collide with service-provided datasetID
           settings.unset(`rapid.custom.${datasetID}`);
         }
+        // (If an asset file uses the datasetID, keep the setting; the asset may not be loaded next time.)
         continue;
       }
 
       // Instantiate the custom dataset and add it to the catalog.
       ds = RapidDataset.fromJSON(context, { ...prefs, custom: 'true' });
       this.catalog.set(ds.id, ds);
+      if (ds.serviceID) continue;   // a service will load its data, not Rapid
+
       ds.setupCustomDatasetAsync()
         .then(() => {
           // everything looks ok
@@ -649,9 +980,9 @@ export class RapidSystem extends AbstractSystem {
         }
       }
 
-      // 'datasets' (optional) - if using, it overrides the user's stored dataset settings.
-      if (urlhash?.hasParam('datasets')) {
-        urlhash?.setParam('datasets', enabledVals.length ? enabledVals.join(',') : null);
+      // 'dataset_ids' (optional) - if using, it overrides the user's stored dataset settings.
+      if (urlhash?.hasParam('dataset_ids')) {
+        urlhash?.setParam('dataset_ids', enabledVals.length ? enabledVals.join(',') : null);
       } else {
         settings?.set('rapid.addedDatasetIDs', addedVals);
         settings?.set('rapid.enabledDatasetIDs', enabledVals);
@@ -671,6 +1002,19 @@ export class RapidSystem extends AbstractSystem {
         service.getDataDictionaryAsync(ds.id)
           .then((dict: RapidDataDictionary) => ds.dictionary = dict);
       }
+    }
+
+    // Start loading the data for datasets from asset files, once they're added to the Rapid menu.
+    // (A custom dataset that the user added loads its data at startup, see `_loadDatasetSettings`.)
+    for (const datasetID of this.addedDatasetIDs) {
+      const ds = this.catalog.get(datasetID);
+      if (!ds?.assetID || ds.serviceID || this._setupDatasets.has(ds)) continue;
+
+      this._setupDatasets.add(ds);
+      ds.setupCustomDatasetAsync()
+        .catch((err: any) => {
+          console.error(`Dataset setup failed for ${ds.id}:  `, err);  // eslint-disable-line no-console
+        });
     }
 
     gfx?.immediateRedraw();

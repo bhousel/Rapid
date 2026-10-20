@@ -63,7 +63,8 @@ This project has reusable agent skills in `.claude/skills/`: one folder per skil
 ## Working in the Rapid Codebase
 
 ### Design docs
-- [`design/`](design/README.md) holds design docs for the core systems: database, drag-and-drop, keyboard, network, scheduler, settings, spatial, style and UI. [`design/README.md`](design/README.md) lists each one with its status.
+- [`design/`](design/README.md) holds design docs for the core systems: conflation, database, drag-and-drop, keyboard, network, Rapid datasets, scheduler, settings, spatial, style and UI. [`design/README.md`](design/README.md) lists each one with its status.
+- **When you make a substantial change to a system that has no design doc yet, start one** (what it owns, the decisions behind it, where it's heading), and point to it from the class JSDoc. These docs are a running record of where each system is going.
 - **Before changing one of those systems, read its design doc.** The class JSDoc of each system points to it. If your change alters the design, update the doc in the same change.
 
 ### Folder-specific instructions

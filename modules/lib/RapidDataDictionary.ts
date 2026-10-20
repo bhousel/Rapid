@@ -92,29 +92,35 @@ export class RapidDataDictionary {
 
 
   /**
-   * Reconstructs a `RapidDataDictionary` from its persisted JSON form (see `toJSON`).
-   * The settings store is string-only, so non-string data is restored here.
+   * Reconstructs a `RapidDataDictionary` from its persisted JSON form (see `toJSON`), or from a
+   * data dictionary in an asset file. The settings store is string-only, so numbers and booleans
+   * may arrive as strings and are restored here. Real numbers and booleans are used as they are.
    * @param context - Global shared application context
    * @param json - The persisted settings object
    * @return A new `RapidDataDictionary`
    */
-  public static fromJSON(context: Context, json: Record<string, TreeValue>): RapidDataDictionary {
+  public static fromJSON(context: Context, json: Record<string, unknown>): RapidDataDictionary {
     const dict = new RapidDataDictionary(context);
 
     if (Array.isArray(json.transforms)) {
       for (const t of json.transforms) {
         if (!TreeStore.isPlainObject(t)) continue;
         if (typeof t.function !== 'string') continue;
-        if (typeof t.order !== 'string') continue;
 
+        const order: unknown = t.order;
+        const orderNum = (typeof order === 'string') ? parseInt(order, 10) : order;
+        if (typeof orderNum !== 'number' || !Number.isFinite(orderNum)) continue;
+
+        const isID: unknown = t.isID;
         const item: RapidDataTransform = {
           function:  t.function,
-          order:     parseInt(t.order, 10),
+          order:     orderNum,
         };
         if (typeof t.source === 'string')  item.source = t.source;
         if (typeof t.target === 'string')  item.target = t.target;
         if (typeof t.params === 'string')  item.params = t.params;
-        if (typeof t.isID === 'string')    item.isID   = (t.isID === 'true');
+        if (typeof isID === 'boolean')     item.isID   = isID;
+        if (typeof isID === 'string')      item.isID   = (isID === 'true');
 
         dict.transforms.push(item);
       }

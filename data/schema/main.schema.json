@@ -44,6 +44,17 @@
           }
         },
 
+        "datasets": {
+          "description": "Rapid dataset definitions, keyed by dataset ID. Set to null to delete (supports wildcard keys).",
+          "type": "object",
+          "additionalProperties": {
+            "oneOf": [
+              { "$ref": "dataset.schema.json" },
+              { "type": "null" }
+            ]
+          }
+        },
+
         "imagery": {
           "description": "Imagery source definitions, keyed by imagery source ID. Set to null to delete.",
           "type": "object",

@@ -47,8 +47,9 @@ to the part that exists.*
 - Next: Step 6, the Conflation Settings UI (rule editing, persistence of `ds.conflation`).
   Persistence waits on settings v2 Step 2 (datasets as content, stored in `DatabaseSystem`), not on
   more `rapid.custom.*` keys. See [`design/settings-system.md`](../design/settings-system.md),
-  "Layered Settings (v2)". Its Step 1 (make OSM sync safe) is done, but not yet tried against a real
-  OSM account. Next is its Step 2.
+  "Layered Settings (v2)". Step 1 (safe OSM sync) is done and tried on a real account. Step 2 is half
+  done: asset files can define datasets (`datasets=` param, `dataset_ids=` for enabling). Next: the
+  user's custom datasets, with their conflation settings, stored in `DatabaseSystem`.
 - **Test data is synthetic only.** Generate a small street grid in code. Agency sidewalk data typically
   runs about 1–2 m off OSM, so the default `sameDist` is 3 m.
 - The scoring formula should eventually match the server-side matching tools. That's being gathered and

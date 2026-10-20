@@ -620,6 +620,11 @@ modeled on how VS Code documents its settings and extension points.
 2. **Datasets as content.** A `datasets` collection in asset files, custom datasets in the user layer
    (in `DatabaseSystem`), and migrating `rapid.custom.*` out of settings. Conflation settings are
    saved here.
+   - ✅ Asset files can define datasets (`datasets: {…}` in a scope, `data/schema/dataset.schema.json`),
+     loaded by the `datasets=` url parameter (assetIDs, like `imagery=`) or `RapidSystem.merge()`.
+     The old `datasets=` (datasetIDs to enable) is now `dataset_ids=`. Default asset: `rapid_datasets`
+     (empty). `RapidDataset.fromJSON` accepts real JSON types as well as the settings strings.
+   - Still to do: the user's custom datasets in `DatabaseSystem`, and their conflation settings.
 3. **Settings in `DatabaseSystem`.** A sparse user layer, settings registered by their systems, real
    types, and the lifecycle fixes.
 4. **Export / import.**

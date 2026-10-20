@@ -37,6 +37,8 @@ export interface RapidDatasetProps {
   serviceID: ServiceID;
   /** Identifier for the spatial cache where the data is stored */
   spatialID: SpatialID;
+  /** The asset file that defined this dataset, if any (see `RapidSystem.merge`) */
+  assetID: AssetID;
 
   /** Categories this dataset belongs to (e.g. 'buildings', 'addresses') */
   categories: string[];
@@ -69,7 +71,7 @@ export interface RapidDatasetProps {
   hidden: boolean;
   /** Whether this dataset uses conflation */
   conflated: boolean;
-  /** Whether this dataset is a "custom" dataset (i.e. setup by the user) */
+  /** Whether this dataset is a "custom" dataset (i.e. setup by the user, who can edit or delete it) */
   custom: boolean;
   /** Conflation settings: whether to match this dataset against OSM, and the matching rules */
   conflation: ConflationSettings;
@@ -100,6 +102,8 @@ export class RapidDataset {
   public serviceID: ServiceID;
   /** Identifier for the spatial cache where the data is stored */
   public spatialID: SpatialID;
+  /** The asset file that defined this dataset, if any (see `RapidSystem.merge`) */
+  public assetID: AssetID;
   /** The data dictionary for this dataset, can be setup once the dataset is added to Rapid */
   public dictionary: RapidDataDictionary | null;
 
@@ -165,6 +169,7 @@ export class RapidDataset {
     this.id = props.id ?? '';
     this.serviceID = props.serviceID ?? '';
     this.spatialID = props.spatialID ?? `${this.serviceID ?? 'rapid'}-${this.id}-data`;
+    this.assetID = props.assetID ?? '';
     this.categories = new Set<string>(props.categories ?? []);
     this.color = props.color ?? RAPID_MAGENTA;
     this.dataUsed = props.dataUsed ?? [];
@@ -304,19 +309,18 @@ export class RapidDataset {
 
 
   /**
-   * Reconstructs a `RapidDataset` from its persisted JSON form (see `toJSON`).
-   * The settings store is string-only, so boolean flags arrive as `'true'`/`'false'`
-   * strings and are coerced back to real booleans here.
+   * Reconstructs a `RapidDataset` from its persisted JSON form (see `toJSON`), or from a
+   * dataset definition in an asset file. The settings store is string-only, so boolean flags
+   * may arrive as `'true'`/`'false'` strings and are coerced back to real booleans here.
+   * Real booleans (as in asset files) are used as they are.
    * @param context - Global shared application context
-   * @param json - The persisted settings object
+   * @param json - The persisted settings object, or the dataset definition (not modified)
    * @return A new `RapidDataset`
    */
-  public static fromJSON(context: Context, json: Record<string, TreeValue>): RapidDataset {
+  public static fromJSON(context: Context, json: Record<string, unknown>): RapidDataset {
     // Handle `dictionary` property separately from other props
-    const dictJSON = json.dictionary;
-    delete json.dictionary;
-
-    const props = { ...json } as Partial<RapidDatasetProps>;
+    const { dictionary: dictJSON, ...rest } = json;
+    const props = rest as Partial<RapidDatasetProps>;
 
     for (const key of BOOLEAN_PROPS) {
       const val = json[key];
@@ -347,7 +351,7 @@ export class RapidDataset {
    * @return  Promise resolved when this custom source is ready, or rejected if errors
    */
   public setupCustomDatasetAsync(): Promise<void> {
-    if (!this.custom) {
+    if (this.serviceID) {   // the service provides the data
       return Promise.reject(new Error('Not a custom source'));
     }
 

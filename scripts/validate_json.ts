@@ -38,6 +38,7 @@ async function validateJSON(): Promise<void> {
   const toValidate = [
     './data/editor_layer_index.json',
     './data/osm_rulesets.json5',
+    './data/rapid_datasets.json5',
     './data/rapid_imagery.json5',
     './data/rapid_schema.json5',
     './data/rapid_style.json5'

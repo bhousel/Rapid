@@ -1,0 +1,234 @@
+{
+  "$id": "dataset.schema.json",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "RapidDataset",
+  "description": "A Rapid dataset definition: third party data that the user can review and add to OpenStreetMap. The datasetID is the key the definition is stored under. A dataset without a serviceID is loaded by Rapid from its sourceUrl. (This schema is still changing along with the conflation work.)",
+  "type": "object",
+  "properties": {
+    "serviceID": {
+      "description": "The service that provides this dataset's data (e.g. 'mapwithai', 'esri', 'overture'). Omit it for a dataset that Rapid loads from its sourceUrl.",
+      "type": "string"
+    },
+    "spatialID": {
+      "description": "Identifier for the spatial cache where the data is stored. Defaults to one derived from the serviceID and datasetID.",
+      "type": "string"
+    },
+    "label": {
+      "description": "Display name for the dataset (used when labelStringID isn't set or can't be localized).",
+      "type": "string"
+    },
+    "labelStringID": {
+      "description": "Localization string ID for the display name.",
+      "type": "string"
+    },
+    "description": {
+      "description": "Longer description of the dataset (used when descriptionStringID isn't set or can't be localized).",
+      "type": "string"
+    },
+    "descriptionStringID": {
+      "description": "Localization string ID for the description.",
+      "type": "string"
+    },
+    "categories": {
+      "description": "Free-text keywords used to filter the dataset catalog (e.g. 'buildings', 'footways', 'featured', 'preview').",
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "color": {
+      "description": "Display color for this dataset's features, as a CSS hex color (e.g. '#da26d3').",
+      "type": "string",
+      "pattern": "^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$"
+    },
+    "dataUsed": {
+      "description": "Source attribution strings, added to the changeset when features from this dataset are accepted.",
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "extent": {
+      "description": "Bounding extent of the dataset, as [[minLon, minLat], [maxLon, maxLat]].",
+      "type": "array",
+      "items": {
+        "type": "array",
+        "items": { "type": "number" },
+        "minItems": 2,
+        "maxItems": 2
+      },
+      "minItems": 2,
+      "maxItems": 2
+    },
+    "sourceUrl": {
+      "description": "URL for the data (currently .geojson, .json, .gpx, or .kml).",
+      "type": "string"
+    },
+    "sourceFileID": {
+      "description": "ID of a file stored in the browser's database. Only meaningful in the browser that stored the file.",
+      "type": "string"
+    },
+    "itemUrl": {
+      "description": "URL for a page with more information about this dataset.",
+      "type": "string"
+    },
+    "licenseUrl": {
+      "description": "URL for the license governing use of this dataset.",
+      "type": "string"
+    },
+    "thumbnailUrl": {
+      "description": "URL for a thumbnail image. Defaults to one chosen from the categories.",
+      "type": "string"
+    },
+    "beta": {
+      "description": "Whether this is a beta/preview dataset. Defaults to true if categories includes 'preview'.",
+      "type": "boolean"
+    },
+    "featured": {
+      "description": "Whether this dataset is featured in the catalog. Defaults to true if categories includes 'featured'.",
+      "type": "boolean"
+    },
+    "hidden": {
+      "description": "Whether this dataset is hidden from the catalog (e.g. walkthrough data).",
+      "type": "boolean"
+    },
+    "conflated": {
+      "description": "Whether the service already removes features that are mapped in OpenStreetMap (server-side conflation).",
+      "type": "boolean"
+    },
+    "conflation": {
+      "description": "Settings for matching this dataset against OpenStreetMap in the browser.",
+      "$ref": "#/definitions/conflation"
+    },
+    "dictionary": {
+      "description": "Data dictionary: how the source attributes become OpenStreetMap tags.",
+      "$ref": "#/definitions/dictionary"
+    }
+  },
+  "additionalProperties": false,
+
+  "definitions": {
+    "conflation": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "description": "Whether to match this dataset against OpenStreetMap.",
+          "type": "boolean"
+        },
+        "showMatched": {
+          "description": "Whether to show features that are already mapped (muted), instead of hiding them.",
+          "type": "boolean"
+        },
+        "rules": {
+          "description": "Rules for when a source feature is the same as an OpenStreetMap feature. Any one rule is enough.",
+          "type": "array",
+          "items": { "$ref": "#/definitions/conflationRule" }
+        }
+      },
+      "additionalProperties": false
+    },
+
+    "conflationRule": {
+      "description": "A rule for when a source feature is the same as an OpenStreetMap feature. Every condition in the rule must hold.",
+      "type": "object",
+      "properties": {
+        "source": {
+          "description": "Which source features this rule tests.",
+          "$ref": "#/definitions/conflationSide"
+        },
+        "target": {
+          "description": "Which OpenStreetMap features this rule compares them with.",
+          "$ref": "#/definitions/conflationSide"
+        },
+        "sameKeys": {
+          "description": "Tag keys whose values must be the same on both features.",
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "sameDist": {
+          "description": "Distance in meters within which the features are the same.",
+          "type": "number",
+          "minimum": 0
+        },
+        "sameAngle": {
+          "description": "Largest difference in direction, in degrees, for lines to be the same.",
+          "type": "number",
+          "minimum": 0,
+          "maximum": 180
+        },
+        "nearDist": {
+          "description": "Distance in meters within which the match needs review. Defaults to sameDist.",
+          "type": "number",
+          "minimum": 0
+        },
+        "nearAngle": {
+          "description": "Largest difference in direction, in degrees, for a match that needs review. Defaults to sameAngle.",
+          "type": "number",
+          "minimum": 0,
+          "maximum": 180
+        }
+      },
+      "required": ["source", "target", "sameDist"],
+      "additionalProperties": false
+    },
+
+    "conflationSide": {
+      "type": "object",
+      "properties": {
+        "geometry": {
+          "description": "The geometry type on this side.",
+          "type": "string",
+          "enum": ["point", "line", "area"]
+        },
+        "props": {
+          "description": "Property conditions on this side. All must match.",
+          "type": "array",
+          "items": { "$ref": "matcher.schema.json" }
+        }
+      },
+      "required": ["geometry"],
+      "additionalProperties": false
+    },
+
+    "dictionary": {
+      "type": "object",
+      "properties": {
+        "transforms": {
+          "description": "The source attributes, and what happens to each when a feature is accepted. Applied in order.",
+          "type": "array",
+          "items": { "$ref": "#/definitions/transform" }
+        }
+      },
+      "additionalProperties": false
+    },
+
+    "transform": {
+      "type": "object",
+      "properties": {
+        "order": {
+          "description": "The order to apply this transform.",
+          "type": "number"
+        },
+        "function": {
+          "description": "'ignore' drops the source attribute, 'copy' copies its value to the target tag, 'constant' sets the target tag to a fixed value (params).",
+          "type": "string",
+          "enum": ["ignore", "copy", "constant"]
+        },
+        "source": {
+          "description": "The source attribute name.",
+          "type": "string"
+        },
+        "target": {
+          "description": "The target tag key.",
+          "type": "string"
+        },
+        "params": {
+          "description": "Parameters for the function (e.g. the value for 'constant').",
+          "type": "string"
+        },
+        "isID": {
+          "description": "Whether this source attribute identifies the feature.",
+          "type": "boolean"
+        }
+      },
+      "required": ["order", "function"],
+      "additionalProperties": false
+    }
+  }
+}

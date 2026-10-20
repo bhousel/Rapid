@@ -93,6 +93,20 @@ works if each external feature gets the same ID every time it loads.
 - Related: an `isID` row in a data mapping should normally use `ignore`, not `copy`, so the source ID
   isn't copied into OSM tags on accept. The settings UI could warn about `copy` + `isID`.
 
+## Custom datasets backed by a service
+People have asked to point Rapid at their own data on a server, not just a file: a `sourceUrl` to an
+Esri FeatureServer (`serviceID: 'esri'`, and `EsriService` walks the server's layers and loads tiles), or
+to another OSM-like API (`serviceID: 'osm'`, to conflate it against the main OSM API, or an
+OpenStreetMap ↔ OpenHistoricalMap bridge).
+- The model already allows it: `custom` says who owns the definition (the user can edit or delete
+  it), `serviceID` says who loads the data (a service, or Rapid itself from the file). They're independent.
+- Done: `_loadDatasetSettings` doesn't call `setupCustomDatasetAsync()` for a custom dataset that has a
+  `serviceID`. `setupCustomDatasetAsync()` and `PixiLayerRapid` test `serviceID`, not `custom`.
+- Still assumes custom means no service: `_datasetsChanged` skips custom datasets when fetching a data
+  dictionary from the service (a custom Esri dataset may want the service's dictionary as a start);
+  the services find datasets by `datasetID` in their own catalogs, so they'd need to take a `sourceUrl`;
+  `UiRapidAddDataset` only makes file and URL datasets.
+
 ## MapRoulette authentication
 - `UiMapRouletteMenu` and `UiMapRouletteEditor` read the user's MapRoulette API key from the
   `maproulette_apikey_v2` OSM user preference. MapRoulette is moving away from storing the key there

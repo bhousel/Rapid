@@ -335,7 +335,8 @@ export class PixiLayerRapid extends AbstractPixiLayer {
 
     /* Custom */
     /* for now, custom data needs to be a data file at a url that is loaded with Rapid starts up */
-    } else if (ds.custom) {
+    /* (this includes datasets from asset files without a serviceID) */
+    } else if (!ds.serviceID) {
       const spatial = this.context.systems.spatial!;
       const data = spatial.getVisibleItems(ds.spatialID).map(hit => hit.contents as GeoJSONData);
       for (const d of data) {

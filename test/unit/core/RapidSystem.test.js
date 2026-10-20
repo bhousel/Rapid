@@ -424,4 +424,205 @@ describe('RapidSystem', () => {
     });
   });
 
+
+  // Dataset assets get their own RapidSystem instances, since merging rebuilds the catalog.
+  describe('dataset assets', () => {
+    const storage = context.systems.storage;
+
+    // A minimal stand-in for AssetSystem, serving the given assets by assetID.
+    function makeMockAssets(served) {
+      return {
+        id: 'assets',
+        initAsync: () => Promise.resolve(),
+        registerAsset: () => {},
+        getFileURL: (path) => path,
+        loadAssetAsync: (assetID) => served[assetID] ? Promise.resolve(served[assetID]) : Promise.reject(new Error(`unknown asset ${assetID}`))
+      };
+    }
+
+    function makeRapid() {
+      const rapid = new Rapid.RapidSystem(context);
+      context.systems.rapid = rapid;
+      return rapid;
+    }
+
+    const sidewalks = {
+      assetID: 'my_datasets',
+      scopes: [{
+        scope: '*',
+        datasets: {
+          'my-sidewalks': {
+            label: 'My Sidewalks',
+            categories: ['footways'],
+            sourceUrl: 'https://example.com/data/trees.geojson',
+            extent: [[9, -1], [11, 1]],
+            dictionary: { transforms: [{ order: 0, function: 'copy', source: 'highway', target: 'highway' }] }
+          }
+        }
+      }]
+    };
+
+    const origWarn = console.warn;
+    const spyWarn = mock();
+
+    beforeEach(() => {
+      _currParams.clear();
+      spyWarn.mockClear();
+      console.warn = spyWarn;
+      for (const key of storage.keys()) {
+        if (key.startsWith('rapid.settings.')) storage.removeItem(key);
+      }
+    });
+
+    afterEach(() => {
+      console.warn = origWarn;
+      delete context.systems.assets;
+      _currParams.clear();
+    });
+
+    it('merges datasets from an asset into the catalog', () => {
+      const rapid = makeRapid();
+      return rapid.initAsync()
+        .then(() => rapid.startAsync())
+        .then(() => {
+          rapid.merge(sidewalks);
+          const ds = rapid.catalog.get('my-sidewalks');
+          assert.instanceOf(ds, Rapid.RapidDataset);
+          assert.strictEqual(ds.label, 'My Sidewalks');
+          assert.strictEqual(ds.assetID, 'my_datasets');
+          assert.isFalse(ds.custom);       // the user didn't add it, so they can't edit or delete it
+          assert.deepEqual([...ds.extent.min, ...ds.extent.max], [9, -1, 11, 1]);
+          assert.strictEqual(ds.dictionary.transforms[0].order, 0);
+          assert.isTrue(rapid.categories.has('footways'));
+          assert.strictEqual(rapid.loadedAssetIDs.get('my_datasets'), 'unknown');
+        });
+    });
+
+    it('keeps a dataset with a serviceID as a service dataset', () => {
+      const rapid = makeRapid();
+      return rapid.initAsync()
+        .then(() => {
+          rapid.merge({ assetID: 'svc', scopes: [{ scope: '*', datasets: { 'my-roads': { serviceID: 'mapwithai', label: 'Roads' } } }] });
+          assert.isFalse(rapid.catalog.get('my-roads').custom);
+        });
+    });
+
+    it('replaces and deletes service datasets, with wildcards', () => {
+      const rapid = makeRapid();
+      return rapid.initAsync()
+        .then(() => {
+          rapid._serviceDatasets = [
+            new Rapid.RapidDataset(context, sample.msBuildings),
+            new Rapid.RapidDataset(context, sample.overturePlaces)
+          ];
+          rapid.merge({ assetID: 'edits', scopes: [{ scope: '*', datasets: {
+            'msBuildings': { label: 'Renamed', serviceID: 'mapwithai' },
+            'overture-*': null
+          } }] });
+          assert.hasAllKeys(rapid.catalog, ['msBuildings']);
+          assert.strictEqual(rapid.catalog.get('msBuildings').label, 'Renamed');
+        });
+    });
+
+    it('throws when the assetID is missing or already merged', () => {
+      const rapid = makeRapid();
+      assert.throws(() => rapid.merge({ scopes: [] }), /missing assetID/);
+      rapid.merge(sidewalks);
+      assert.throws(() => rapid.merge(sidewalks), /already merged/);
+    });
+
+    it('keeps the same instance for a dataset when another asset is merged', () => {
+      const rapid = makeRapid();
+      rapid.merge(sidewalks);
+      const before = rapid.catalog.get('my-sidewalks');
+      rapid.merge({ assetID: 'other', scopes: [{ scope: '*', datasets: { 'other-ds': { label: 'Other' } } }] });
+      assert.strictEqual(rapid.catalog.get('my-sidewalks'), before);
+    });
+
+    it('keeps the custom datasets that the user added when the catalog is rebuilt', () => {
+      const rapid = makeRapid();
+      const mine = new Rapid.RapidDataset(context, sample.customDataset);
+      rapid.catalog.set(mine.id, mine);
+      rapid.merge(sidewalks);
+      assert.strictEqual(rapid.catalog.get('my-custom'), mine);
+    });
+
+    it('loads the default and requested assets, and skips unknown assetIDs with a warning', () => {
+      context.systems.assets = makeMockAssets({
+        rapid_datasets: { assetID: 'rapid_datasets', scopes: [{ scope: '*', datasets: {} }] },
+        my_datasets: sidewalks
+      });
+      _currParams.set('datasets', 'default,my_datasets,fbRoads');   // e.g. an old link
+
+      const rapid = makeRapid();
+      return rapid.initAsync()
+        .then(() => {
+          assert.hasAllKeys(rapid.loadedAssetIDs, ['rapid_datasets', 'my_datasets']);
+          assert.isTrue(rapid.catalog.has('my-sidewalks'));
+          assert.strictEqual(spyWarn.mock.calls.length, 1);
+          assert.match(spyWarn.mock.calls[0][0], /fbRoads/);
+        });
+    });
+
+    it('enables the datasets listed in `dataset_ids`, including ones from assets', () => {
+      context.systems.assets = makeMockAssets({ my_datasets: sidewalks });
+      _currParams.set('datasets', 'my_datasets');
+      _currParams.set('dataset_ids', 'my-sidewalks');
+
+      const rapid = makeRapid();
+      return rapid.initAsync()
+        .then(() => {
+          // Don't actually fetch the data
+          rapid.catalog.get('my-sidewalks').setupCustomDatasetAsync = mock(() => Promise.resolve());
+          return rapid.startAsync();
+        })
+        .then(() => {
+          assert.hasAllKeys(rapid.enabledDatasetIDs, ['my-sidewalks']);
+          assert.strictEqual(_currParams.get('dataset_ids'), 'my-sidewalks');
+        });
+    });
+
+    it('starts loading the data for an asset dataset only once it is added', () => {
+      const rapid = makeRapid();
+      return rapid.initAsync()
+        .then(() => rapid.startAsync())
+        .then(() => {
+          rapid.merge(sidewalks);
+          const ds = rapid.catalog.get('my-sidewalks');
+          ds.setupCustomDatasetAsync = mock(() => Promise.resolve());
+
+          rapid.toggleDatasets('overture-places');   // some other change
+          assert.strictEqual(ds.setupCustomDatasetAsync.mock.calls.length, 0);
+
+          rapid.addDatasets('my-sidewalks');
+          rapid.enableDatasets('my-sidewalks');
+          assert.strictEqual(ds.setupCustomDatasetAsync.mock.calls.length, 1);
+        });
+    });
+
+    it('keeps the stored settings of a user dataset whose datasetID an asset also uses', () => {
+      const settings = context.systems.settings;
+      settings.set('rapid.custom.my-sidewalks', { id: 'my-sidewalks', label: 'Mine', sourceUrl: 'https://example.com/data/trees.geojson' });
+
+      const rapid = makeRapid();
+      rapid.merge(sidewalks);       // the asset's `my-sidewalks` wins while it's loaded..
+      rapid._loadDatasetSettings();
+      assert.strictEqual(rapid.catalog.get('my-sidewalks').assetID, 'my_datasets');
+      assert.isDefined(settings.get('rapid.custom.my-sidewalks'));   // ..but the user's definition is kept
+      settings.unset('rapid.custom.my-sidewalks');
+    });
+
+    it('saves only the color and conflated settings for an asset dataset', () => {
+      const rapid = makeRapid();
+      rapid.merge(sidewalks);
+      const ds = rapid.catalog.get('my-sidewalks');
+      ds.color = '#123456';
+      rapid.saveDatasetSettings(ds);
+
+      const settings = context.systems.settings;
+      assert.deepEqual(settings.get('rapid.dataset.my-sidewalks'), { color: '#123456', conflated: 'false' });
+      assert.isUndefined(settings.get('rapid.custom.my-sidewalks'));
+    });
+  });
+
 });
