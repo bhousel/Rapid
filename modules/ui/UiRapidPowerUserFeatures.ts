@@ -27,6 +27,7 @@ export class UiRapidPowerUserFeatures extends EventEmitter {
   public constructor(context: Context) {
     super();
     this.context = context;
+    const settings = context.systems.settings;  // optional
 
     this._featureFlags = [
       'autoConnect',
@@ -36,6 +37,9 @@ export class UiRapidPowerUserFeatures extends EventEmitter {
       'showAutoFix',
       'allowLargeEdits'
     ];
+
+    // The flags follow the user to other browsers (but not the `poweruser.was.*` backups)
+    settings?.registerSync(this._featureFlags.map(featureFlag => `poweruser.${featureFlag}`));
 
     // Child components
     this.Modal = null;

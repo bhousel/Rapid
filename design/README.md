@@ -13,7 +13,7 @@ They record the "why" that the code alone doesn't show.
 | [`keyboard-system.md`](keyboard-system.md) | `KeyboardSystem`: key binding scopes and commands | Phase 1 done; remappable shortcuts in backlog |
 | [`network-system.md`](network-system.md) | `NetworkSystem`: fetch lifecycle, dedup, timeouts, worker fetches | Implemented |
 | [`scheduler-system.md`](scheduler-system.md) | `SchedulerSystem`: frame-budgeted task queue, timers, backpressure | Implemented |
-| [`settings-system.md`](settings-system.md) | `SettingsSystem`: typed, versioned settings with optional OSM sync | Phases 0–3 done; later phases open |
+| [`settings-system.md`](settings-system.md) | `SettingsSystem`: typed, versioned settings with optional OSM sync | Phases 0–3 done; v2 (layered settings in `DatabaseSystem`, sync allowlist) agreed |
 | [`spatial-system.md`](spatial-system.md) | `SpatialSystem`: one home for all spatial indexes (`Tree` retired) | Steps 1–3c done; 3d continues in `conflation-system.md` |
 | [`style-system.md`](style-system.md) | `StyleSystem`: style data model, matching, external style files | Implemented (reference) |
 | [`ui-system.md`](ui-system.md) | `modules/ui/` modernization to TypeScript class components | Complete |

@@ -45,6 +45,10 @@ to the part that exists.*
   angle test (OSW data is full of junction stubs; ~9% of lines are under 1 m). No minimum line length:
   some short edges are real. Open: such a real stub next to a matching sidewalk now counts as mapped.
 - Next: Step 6, the Conflation Settings UI (rule editing, persistence of `ds.conflation`).
+  Persistence waits on settings v2 Step 2 (datasets as content, stored in `DatabaseSystem`), not on
+  more `rapid.custom.*` keys. See [`design/settings-system.md`](../design/settings-system.md),
+  "Layered Settings (v2)". Its Step 1 (make OSM sync safe) is done, but not yet tried against a real
+  OSM account. Next is its Step 2.
 - **Test data is synthetic only.** Generate a small street grid in code. Agency sidewalk data typically
   runs about 1–2 m off OSM, so the default `sameDist` is 3 m.
 - The scoring formula should eventually match the server-side matching tools. That's being gathered and

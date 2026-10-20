@@ -2,6 +2,12 @@
 
 This document proposes a new `SettingsSystem` for Rapid that replaces ad-hoc localStorage keys with a versioned, typed settings model, and supports optional account-backed sync.
 
+> **Status:** Phases 0–3 and v2 Step 1 (safe sync of registered settings) are implemented. The guiding
+> principle: make Rapid's settings work more like VS Code's. In October 2026 we agreed on a new direction: layered settings
+> stored in `DatabaseSystem`, a short list of settings that sync, export/import as JSON files, and
+> datasets as content. See [Layered Settings (v2)](#layered-settings-v2). It replaces Phases 4–5 and
+> some of the Resolved Decisions below.
+
 ## Problem
 
 Rapid currently persists preferences as many independent key/value entries via `StorageSystem`.
@@ -212,10 +218,12 @@ interface SettingsSystem {
   toJSON(): RapidSettingsEnvelope;
   fromJSON(envelope: RapidSettingsEnvelope): void;
 
-  // Sync controls
-  pullRemoteAsync(): Promise<SyncResult>;
-  pushRemoteAsync(): Promise<SyncResult>;
+  // Sync (v2 Step 1: replaced pullRemoteAsync / pushRemoteAsync)
+  registerSync(paths: string[]): void;
   syncRemote(): Promise<SyncResult>;
+
+  // A clean slate, here and on the OSM account (for testing and the developer console)
+  clearAllAsync(): Promise<SyncResult>;
 }
 ```
 
@@ -434,6 +442,189 @@ key names verbatim — do not rename the *source* keys, only the destination set
 Notes:
 - Legacy keys are read (never re-written) during a limited deprecation window.
 
+## Layered Settings (v2)
+
+**Status:** agreed direction (October 2026), not started. Rapid's settings should work more like
+VS Code's or Sublime Text's: built-in defaults, with the user's changes layered on top, a deployment
+layer for embedding apps, and the user's layer exportable as a JSON file.
+
+### Problems with v1
+
+Found while adding custom datasets with data mappings and conflation rules:
+
+- **Too much syncs, one request per key.** Every setting syncs to the OSM account, and a push sends one
+  PUT or DELETE per changed key, all at once. A custom dataset with a 3-row data mapping is about 25
+  keys. With a longer data mapping and conflation rules it is more like 150. Arrays are stored by index
+  (`transforms[3].source`), so removing an early element rewrites every element after it.
+- **Sync can delete the user's settings** (fixed in v2 Step 1). From reading the code:
+  - The only thing that starts a sync is a local change (`_touch()` → `_deferredSyncRemote()`).
+    Nothing pulls at startup or when the user signs in.
+  - The pull applies the remote copy only if it is newer, compared over the whole tree
+    (last-write-wins). The push then deletes every remote key that the local copy doesn't have.
+  - In a new browser, the v0→v1 migration and the settings written during startup make the local
+    copy "newer". So the first change after signing in deletes the user's synced settings instead of
+    restoring them.
+- **Values over 255 characters stay local without a warning.** A synced custom dataset can arrive
+  without its `sourceUrl`.
+- **Secrets.** Custom imagery templates and dataset URLs may carry access tokens (Resolved Decision 1),
+  and under v1 those sync to the user's OSM account.
+- **Strings only.** Every value is a string, a limit that came from localStorage and the OSM API.
+  Conflation rules are mostly numbers.
+- **No defaults layer.** `get(path, fallback)` repeats the default at every call site. What's stored
+  is the full value, not what the user changed. For example, `RapidDataset.toJSON()` saves
+  `beta=false` and `hidden=false`, so a default we change later never reaches users who already have
+  the old value stored.
+- **Reads before settings load.** `UiSystem.initAsync` builds its UI components without waiting for
+  `settings.initAsync()`. Six constructors read settings and only get values because loading l10n and
+  assets usually takes longer:
+  - `UiVersionInfo`
+  - `UiSectionBackgroundList`
+  - `UiSectionBackgroundDisplayOptions`
+  - `UiSectionPrivacy`
+  - `UiSectionEntityIssues`
+  - `UiSectionRawTagEditor` (the copy built by `UiEntityEditor`)
+- `SchemaSystem.resetAll()` has a `// HACK for demo` that clears `schema.presetRecents` on every startup.
+
+### Preferences and content
+
+These are two kinds of data, and VS Code keeps them apart the same way (`settings.json` vs.
+keybindings, snippets and extensions):
+
+- **Preferences** are values at known paths, each with a default: inspector width, selected
+  background, power-user flags, validation options.
+- **Content** is a collection of documents keyed by ID, which layers add to, replace or delete:
+  imagery sources, styles, presets, and Rapid datasets with their data mappings and conflation rules.
+  Content already goes through the asset files (`main.json` format, `null` deletes, applied in order).
+
+Rapid datasets are content: an asset file can contain a `datasets` collection, next to `imagery` and
+`styles`. That lets an embedding app or a URL preload datasets the way imagery and styles are loaded today.
+
+### One format, one merge rule
+
+The longer-term idea is to bring asset files and settings closer together: both are JSON trees keyed
+by systemID, and both are combined in layers by the same rule. That rule is
+[JSON Merge Patch (RFC 7396)](https://www.rfc-editor.org/rfc/rfc7396): objects merge recursively, `null`
+deletes, and scalars and arrays replace. That is `TreeStore.merge` plus `null` deletes.
+
+- Collections of content are **objects keyed by ID, never arrays**, so one layer can add, replace or
+  delete a single item.
+- Open: whether a layer may change a single field of an item (deep merge), or must replace the whole
+  item, as asset `merge()` does today.
+
+### Layers
+
+From lowest to highest; the effective value merges all four in order:
+
+1. **Built-in defaults.** Preferences: the defaults each system registers. Content: Rapid's default
+   asset files, plus the dataset catalogs from services.
+2. **Deployment.** Supplied by an embedding app: preferences and content in the same formats. It
+   overrides defaults but doesn't lock anything; a user can still change a setting.
+3. **User.** Sparse: only what the user changed. Stored in `DatabaseSystem`. Writes from the UI go
+   here, and "reset to default" removes the key.
+4. **Session.** URL parameters (`background=`, `datasets=`, …). Never saved.
+
+A deployment layer, or a shared file loaded later, must not be able to set the OSM API connection or
+anything else to do with authentication.
+
+### Storage and lifecycle
+
+- The user layer is a JSON document in a `DatabaseSystem` store. Values keep their real types.
+- `SettingsSystem.initAsync` reads the whole document once. From then on, reads are synchronous,
+  served from memory, and writes are saved in the background.
+- **Lifecycle contract:** during `initAsync`, systems connect to each other. A system that reads
+  settings in `initAsync` waits for `settings.initAsync()` first. From `startAsync` on, settings are
+  ready for everyone. The six UI constructors listed above must move their reads to render time (or
+  `UiSystem.initAsync` must wait for settings).
+- **Fallback:** if IndexedDB is unavailable, fall back to localStorage for as much as fits, and then to
+  memory, as `StorageSystem` does now. In most private-browsing modes both exist but are discarded
+  when the window closes, so losing settings there is expected.
+- **Several tabs:** the last tab to save wins. No `BroadcastChannel` for now.
+- **Migration:** a one-time import of the `rapid.settings.*` localStorage keys into the user layer.
+  `rapid.custom.*` becomes dataset content.
+
+### What syncs to the OSM account
+
+The experience we want: sign in from another browser, and within a moment Rapid looks and behaves the
+way you left it (the background, panel sizes, power-user flags, and so on). That needs only a short,
+explicit list of small values, the way VS Code separates synced settings from machine-scoped ones.
+
+- **Systems declare which of their settings sync, and `SettingsSystem` enforces it.** For example, in
+  `ImagerySystem.initAsync`: `settings?.registerSync(['imagery.lastUsed', 'imagery.opacity'])`.
+  Later, the same registration can also declare defaults (the defaults layer).
+- **No async `get`.** Remote values arrive as an ordinary change (`settingschange`), and the systems
+  that care already react to changes. Pull when Rapid starts with the user already signed in, and when
+  the user signs in.
+- **Merge one key at a time, using the last synced copy as the base,** saved locally:
+  - If only the remote changed, take it.
+  - If only the local changed, push it.
+  - Never delete a remote key just because the local side doesn't have it.
+- Content (datasets, custom imagery) never syncs this way.
+- Cleanup: once the allowlist is in place, delete the `rapid.settings.*` keys that v1 pushed but that
+  no longer sync.
+
+### Export and import
+
+- **Export** writes the user layer (preferences and content) as one JSON file. **Import** merges a
+  file into the user layer.
+- Possibly later: named profiles to share with a team (a dataset with its data mapping, its rules
+  and its imagery), and a `profile=` URL parameter.
+- File-backed datasets export their `sourceFileID` but not the file. When the file is missing, at
+  startup or after the browser evicts it under storage pressure (unless
+  `DatabaseSystem.requestPersistentAsync()` was granted), `setupCustomDatasetAsync` already copes.
+  Rapid should tell the user, not fail quietly.
+- Warn on export that URLs and templates may contain access tokens.
+
+### Embedding apps
+
+Embedding apps configure Rapid today by reaching into systems between lifecycle phases. One real
+integration does all of these:
+- removes services from `Rapid.services.available`;
+- adds a network request interceptor for its auth headers;
+- replaces OSM service and `UiSuccess` methods;
+- writes string overrides into the `LocalizationSystem` store;
+- merges imagery and styles;
+- fakes a `hashchange` to switch projects.
+
+Most of that should be configuration supplied as the deployment layer: disabled services, string
+overrides, imagery, styles and datasets. A few things are real extension points, such as the request
+interceptor and an auth provider. Both kinds belong in a customization guide (`docs/` or `API.md`),
+modeled on how VS Code documents its settings and extension points.
+
+### Open questions (v2)
+
+- **The URL parameter name for dataset assets.** `imagery=` picks asset IDs, but `datasets=` already
+  means "dataset IDs to enable" (like `background=`). Rename one, or let datasets ride on `assets=`?
+- Deep merge vs. whole-item replace within a collection (see above).
+- The asset load order bug: Imagery, Style and Schema register their default asset IDs *after*
+  `assets.initAsync()`. This overwrites an `assets=` override of a default ID, and `merge()` throws if
+  the same assetID is merged twice. A user layer gets merged again on every asset reload, so this has
+  to be fixed first.
+- Asset files have `scopes`; does the user layer need them too?
+
+### Rollout (v2)
+
+1. **Make sync safe.** ✅ Done.
+   - Systems register the settings that sync (`settings.registerSync(paths)`), and only those sync.
+     Each path syncs as one unit, so an array never arrives half-written.
+   - `syncRemote()` merges each one against the last synced copy (`meta.syncBase` in localStorage,
+     scoped to the OSM site and user). If the remote changed, it wins; otherwise a local change is
+     sent. Requests go one at a time, and only one sync runs at once.
+   - Rapid syncs at startup when the user is already signed in, on every `authchange`, and after a
+     change to a synced setting. Remote `rapid.settings.*` keys that aren't synced are removed.
+   - Synced so far: imagery favorites and opacity; area fill; disabled filters; validator options;
+     privacy and raw tag editor view; the "seen" flags; and the power-user flags. Device-specific
+     settings (inspector width, mouse wheel) and content stay local.
+   - Few systems listen for `settingschange` yet. A value pulled after startup shows up the next time
+     it's read (render time, or the next reload).
+   - `UiSystem.initAsync` now waits for `settings`, which fixes the six constructor reads.
+2. **Datasets as content.** A `datasets` collection in asset files, custom datasets in the user layer
+   (in `DatabaseSystem`), and migrating `rapid.custom.*` out of settings. Conflation settings are
+   saved here.
+3. **Settings in `DatabaseSystem`.** A sparse user layer, settings registered by their systems, real
+   types, and the lifecycle fixes.
+4. **Export / import.**
+5. **Deployment layer and a customization guide.**
+
 ## Rollout Plan
 
 ### Phase 0: Design + scaffolding ✅ done
@@ -516,7 +707,10 @@ of the system keeps using normal dotted keys.
   `getUserPreferencesAsync` reverses it (`decodePreferenceKey`) so callers always see dotted keys.
   `~` is chosen because it's a URL-safe unreserved char (never percent-encoded by
   `encodeURIComponent`, never path-normalized) and no known preference key uses it, so the mapping
-  is reversible. **Current implementation note:** `putUserPreferencesAsync` also encodes keys with
+  is reversible. Only keys starting with `rapid~settings` are decoded, since other applications'
+  keys may contain a `~` of their own. `rapid.settings.*` keys stored with real dots (written by
+  early development code) are left out of the cache, because the single-key routes can't address
+  them; only the bulk PUT can remove them. **Current implementation note:** `putUserPreferencesAsync` also encodes keys with
   `encodePreferenceKey` when building the XML, so bulk and single-key writes both persist the same
   `~`-substituted key form for Rapid's dotted keys.
 - All validate the OSM limits (key/value **1–255 chars**, reject empty).
@@ -531,6 +725,9 @@ of the system keeps using normal dotted keys.
   `OsmService.test.js`.
 
 #### Remote adapter + sync triggers (`SettingsSystem`)
+
+> Replaced in v2 Step 1 by the three-way merge of registered settings. See
+> [Rollout (v2)](#rollout-v2). Kept here for history.
 - `pushRemoteAsync()` uses **single-key PUT/DELETE for just the deltas** since the last known
   remote state (`_remote` snapshot). Non-destructive by construction — only `rapid.settings.*`
   keys are ever touched. **Empty values** (OSM requires length ≥ 1) and over-limit key/values
@@ -553,11 +750,15 @@ Still TODO (later): telemetry/logging, a settings UI for sync status/controls, a
 
 ### Phase 4: Expand domain coverage
 
+> Superseded by [Layered Settings (v2)](#layered-settings-v2).
+
 - Move remaining suitable preferences into typed settings tree.
 - Add settings UI for sync controls and account state.
 - Deprecate direct ad-hoc storage key usage in code review guidance.
 
 ### Phase 5: Optional backend upgrades
+
+> Superseded by [Layered Settings (v2)](#layered-settings-v2).
 
 - Evaluate IndexedDB local adapter for larger payloads.
 - Optionally partition local docs by domain when payload size grows.
@@ -594,8 +795,10 @@ Still TODO (later): telemetry/logging, a settings UI for sync status/controls, a
 Resolved direction:
 
 1. Custom imagery/data entries may include auth metadata as part of the template/config payload (matching current behavior).
-2. Remote sync should cover all settings domains by default once authenticated.
-3. OSM limits are treated as hard constraints: 255-char key/value, max 150 keys per PUT request.
+2. ~~Remote sync should cover all settings domains by default once authenticated.~~ Reversed in v2: only
+   settings that their systems register for sync go to the OSM account.
+3. OSM limits are treated as hard constraints: 255-char key/value. (The 150-keys-per-PUT limit turned
+   out not to exist; see Phase 3.)
 4. Add `toJSON`/`fromJSON` methods on `SettingsSystem` now to enable future manual export/import in a later sprint.
 
 ## Summary

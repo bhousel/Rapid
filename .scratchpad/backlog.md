@@ -93,6 +93,14 @@ works if each external feature gets the same ID every time it loads.
 - Related: an `isID` row in a data mapping should normally use `ignore`, not `copy`, so the source ID
   isn't copied into OSM tags on accept. The settings UI could warn about `copy` + `isID`.
 
+## MapRoulette authentication
+- `UiMapRouletteMenu` and `UiMapRouletteEditor` read the user's MapRoulette API key from the
+  `maproulette_apikey_v2` OSM user preference. MapRoulette is moving away from storing the key there
+  (security incident, October 2026:
+  https://community.openstreetmap.org/t/maproulette-security-incident-october-2026/148566).
+- Today, without the key, Rapid carries on unauthenticated, which is fine for now. Adopt whatever
+  MapRoulette moves to once it's settled. Auth should probably move from the UI into `MapRouletteService`.
+
 ## Conflation / buffers follow-ups (beyond Step 3)
 - **Internalize / replace `lineToPoly` offset-curve generation** — `lineToPoly` (used for halos) repurposes `PIXI.buildLine`, coupling halo generation to Pixi internals and a fragile triangle-walk. If we ever need *precise* buffer polygons (not just coverage boxes), internalizing the offset-curve math would unify halos + buffers and drop the Pixi coupling. Left alone for now; coverage boxes cover the conflation use case.
 - **Precise buffer polygons** — only if a consumer needs the actual buffer polygon rather than coverage boxes + a distance/overlap predicate. Likely unnecessary given the two-phase query.

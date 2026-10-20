@@ -177,9 +177,21 @@ export class UiSystem extends AbstractSystem {
     const gfx = context.systems.gfx!;
     const l10n = context.systems.l10n!;
     const network = context.systems.network!;
+    const settings = context.systems.settings;  // optional
     const urlhash = context.systems.urlhash!;
 
+    // Settings that follow the user to other browsers
+    settings?.registerSync([
+      'ui.privacy.thirdPartyIcons',
+      'ui.rawTagEditorView',
+      'ui.sawPrivacyVersion',
+      'ui.sawRapidSplash',
+      'ui.sawVersion',
+      'ui.sawWhatsNewVersion'
+    ]);
+
     // Many UI components require l10n and gfx (for scene/layers)
+    // Some UI components read settings when they're constructed
 
     return this._initPromise = super.initAsync()
       .then(() => {
@@ -188,6 +200,7 @@ export class UiSystem extends AbstractSystem {
           gfx.initAsync(),
           l10n.initAsync(),
           network.initAsync(),
+          settings?.initAsync(),
           urlhash.initAsync()
         ];
         return Promise.all(prerequisites.filter(Boolean));

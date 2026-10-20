@@ -149,6 +149,56 @@ describe('TreeStore', () => {
   });
 
 
+  describe('flat entry helpers (static)', () => {
+    const flat = new Map([
+      ['imagery.favorites[0]', 'A'],
+      ['imagery.favorites[1]', 'B'],
+      ['imagery.favoritesOld', 'C'],
+      ['imagery.opacity', '0.5'],
+      ['a.b%2Ec', 'dotted']
+    ]);
+
+    it('pathToFlatKey accepts a path string or segments', () => {
+      assert.strictEqual(TreeStore.pathToFlatKey('imagery.favorites[0]'), 'imagery.favorites[0]');
+      assert.strictEqual(TreeStore.pathToFlatKey(['a', 'b.c']), 'a.b%2Ec');
+    });
+
+    it('isFlatKeyWithin matches the path itself and keys beneath it', () => {
+      assert.isTrue(TreeStore.isFlatKeyWithin('imagery.favorites', 'imagery.favorites'));
+      assert.isTrue(TreeStore.isFlatKeyWithin('imagery.favorites[0]', 'imagery.favorites'));
+      assert.isTrue(TreeStore.isFlatKeyWithin('imagery.custom[0].template', 'imagery.custom'));
+      assert.isFalse(TreeStore.isFlatKeyWithin('imagery.favoritesOld', 'imagery.favorites'));
+      assert.isFalse(TreeStore.isFlatKeyWithin('imagery', 'imagery.favorites'));
+    });
+
+    it('isFlatKeyWithin compares encoded keys with paths given as segments', () => {
+      assert.isTrue(TreeStore.isFlatKeyWithin('a.b%2Ec', ['a', 'b.c']));
+      assert.isFalse(TreeStore.isFlatKeyWithin('a.b%2Ec', 'a.b'));
+    });
+
+    it('flatEntriesWithin returns only the entries at or under a path', () => {
+      const result = TreeStore.flatEntriesWithin(flat, 'imagery.favorites');
+      assert.deepEqual([...result], [['imagery.favorites[0]', 'A'], ['imagery.favorites[1]', 'B']]);
+    });
+
+    it('replaceFlatEntriesWithin swaps the entries under a path and leaves the rest', () => {
+      const copy = new Map(flat);
+      TreeStore.replaceFlatEntriesWithin(copy, 'imagery.favorites', new Map([['imagery.favorites[0]', 'Z']]));
+      assert.strictEqual(copy.get('imagery.favorites[0]'), 'Z');
+      assert.isFalse(copy.has('imagery.favorites[1]'));
+      assert.strictEqual(copy.get('imagery.favoritesOld'), 'C');
+      assert.strictEqual(copy.get('imagery.opacity'), '0.5');
+    });
+
+    it('sameFlat compares keys and values, ignoring order', () => {
+      const a = new Map([['x', '1'], ['y', '2']]);
+      assert.isTrue(TreeStore.sameFlat(a, new Map([['y', '2'], ['x', '1']])));
+      assert.isFalse(TreeStore.sameFlat(a, new Map([['x', '1'], ['y', '3']])));
+      assert.isFalse(TreeStore.sameFlat(a, new Map([['x', '1']])));
+    });
+  });
+
+
   describe('merge', () => {
     it('merges plain objects key-by-key with override winning', () => {
       const result = TreeStore.merge({ a: '1', b: '2' }, { b: '9', c: '3' });

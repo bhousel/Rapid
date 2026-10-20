@@ -387,6 +387,8 @@ export const preferencesXML =
     <preference k="foo" v="bar"/>
     <preference k="hello" v="world"/>
     <preference k="empty"/>
+    <preference k="other~app" v="tilde"/>
+    <preference k="rapid.settings.meta.updatedAt" v="2026-07-09T00:00:00.000Z"/>
     <preference k="rapid~settings~areaFill" v="partial"/>
     <preference v="ignoreme"/>
   </preferences>
@@ -909,6 +911,8 @@ export const preferencesResult = {
     foo: 'bar',
     hello: 'world',
     empty: '',
+    'other~app': 'tilde',
+    'rapid.settings.meta.updatedAt': '2026-07-09T00:00:00.000Z',
     'rapid~settings~areaFill': 'partial'
   }
 };

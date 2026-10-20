@@ -626,6 +626,23 @@ describe('OsmService', () => {
             assert.isUndefined(result['rapid~settings~areaFill']);
           });
       });
+
+      it('leaves other applications\' keys with `~` alone', () => {
+        return loginAsync()
+          .then(() => _osm.getUserPreferencesAsync())
+          .then(result => {
+            assert.strictEqual(result['other~app'], 'tilde');
+            assert.isUndefined(result['other.app']);
+          });
+      });
+
+      it('skips Rapid settings keys stored with dots, which the single-key API cannot address', () => {
+        return loginAsync()
+          .then(() => _osm.getUserPreferencesAsync())
+          .then(result => {
+            assert.isUndefined(result['rapid.settings.meta.updatedAt']);
+          });
+      });
     });
 
 

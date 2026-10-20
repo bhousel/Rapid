@@ -143,6 +143,9 @@ export class ValidationSystem extends AbstractSystem {
     const settings = context.systems.settings;
     const urlhash = context.systems.urlhash;
 
+    // Settings that follow the user to other browsers
+    settings?.registerSync(['validator.disabledRules', 'validator.squareDegrees', 'validator.what', 'validator.where']);
+
     return this._initPromise = super.initAsync()
       .then(() => {
         const prerequisites = [

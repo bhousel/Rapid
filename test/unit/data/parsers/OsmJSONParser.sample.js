@@ -605,6 +605,8 @@ export const preferencesJSON = {
     "foo": "bar",
     "hello": "world",
     "empty": "",
+    "other~app": "tilde",
+    "rapid.settings.meta.updatedAt": "2026-07-09T00:00:00.000Z",
     "rapid~settings~areaFill": "partial"
    }
 };

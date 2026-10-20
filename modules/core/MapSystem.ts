@@ -93,6 +93,9 @@ export class MapSystem extends AbstractSystem {
     const settings = context.systems.settings;
     const urlhash = context.systems.urlhash;
 
+    // Settings that follow the user to other browsers
+    settings?.registerSync(['map.areaFill', 'map.areaFillToggle']);
+
     return this._initPromise = super.initAsync()
       .then(() => {
         const prerequisites = [

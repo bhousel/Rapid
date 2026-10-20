@@ -122,6 +122,9 @@ export class FilterSystem extends AbstractSystem {
     const settings = context.systems.settings;
     const urlhash = context.systems.urlhash;
 
+    // Settings that follow the user to other browsers
+    settings?.registerSync(['filters.disabledFilters']);
+
     return this._initPromise = super.initAsync()
       .then(() => {
         const prerequisites = [ settings?.initAsync(), urlhash?.initAsync() ];

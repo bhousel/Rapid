@@ -165,6 +165,9 @@ export class ImagerySystem extends AbstractSystem {
     const settings = context.systems.settings;
     const urlhash = context.systems.urlhash;
 
+    // Settings that follow the user to other browsers
+    settings?.registerSync(['imagery.favorites', 'imagery.opacity']);
+
     return this._initPromise = super.initAsync()
       .then(() => {
         const prerequisites = [

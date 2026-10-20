@@ -35,11 +35,12 @@ function encodePreferenceKey(key: string): string {
 
 /**
  * Inverse of `encodePreferenceKey`: maps a stored `~` back to `.`.
+ * Only Rapid's own keys are decoded; other applications' keys may contain a `~` of their own.
  * @param key - the stored key
  * @return  the caller-facing (dotted) key
  */
 function decodePreferenceKey(key: string): string {
-  return key.replace(/~/g, '.');
+  return key.startsWith('rapid~settings') ? key.replace(/~/g, '.') : key;
 }
 
 
@@ -1017,6 +1018,9 @@ export class OsmService extends AbstractSystem {
           const parsed: any = results!.data[0];
           const raw: Record<string, unknown> = parsed?.preferences ?? {};
           for (const [rawk, v] of Object.entries(raw)) {
+            // Skip Rapid settings keys stored with real dots (written by early development code).
+            // The single-key routes can't address them, so they can't be updated or deleted.
+            if (rawk.startsWith('rapid.settings')) continue;
             const k = decodePreferenceKey(rawk);
             this._userPreferences[k] = String(v);
           }

@@ -371,12 +371,14 @@ export class TreeStore {
 
 
   /**
-   * Serializes path segments into a flat key.
+   * Serializes a path into a flat key.
    * Object keys are percent-encoded; array indices use `[n]`.
-   * @param parts - The path segments
+   * @param path - A dotted/bracketed path or pre-parsed segments
    * @return The flat key
+   * @throws Error if a string path is malformed
    */
-  public static pathToFlatKey(parts: KeyPathPart[]): string {
+  public static pathToFlatKey(path: string | KeyPathPart[]): string {
+    const parts = toParts(path);
     let key = '';
     for (const part of parts) {
       if (typeof part === 'number') {
@@ -431,6 +433,77 @@ export class TreeStore {
 
     flush();
     return parts.length ? parts : null;
+  }
+
+
+  /**
+   * Tests whether a flat key is at a path, or somewhere beneath it.
+   * ```ts
+   * TreeStore.isFlatKeyWithin('imagery.favorites[0]', 'imagery.favorites');   // true
+   * TreeStore.isFlatKeyWithin('imagery.favoritesOld', 'imagery.favorites');   // false
+   * ```
+   * @param flatKey - A flat key, as produced by `toFlat`
+   * @param path - A dotted/bracketed path or pre-parsed segments
+   * @return `true` if the flat key is at or under the path
+   * @throws Error if a string path is malformed
+   */
+  public static isFlatKeyWithin(flatKey: string, path: string | KeyPathPart[]): boolean {
+    const root = TreeStore.pathToFlatKey(path);
+    return flatKey === root || flatKey.startsWith(`${root}.`) || flatKey.startsWith(`${root}[`);
+  }
+
+
+  /**
+   * Returns the flat entries that are at a path, or somewhere beneath it.
+   * @param flat - Flat keys and values, as produced by `toFlat`
+   * @param path - A dotted/bracketed path or pre-parsed segments
+   * @return A new map of just the matching entries
+   * @throws Error if a string path is malformed
+   */
+  public static flatEntriesWithin(flat: Map<string, string>, path: string | KeyPathPart[]): Map<string, string> {
+    const parts = toParts(path);
+    const result = new Map<string, string>();
+    for (const [key, value] of flat) {
+      if (TreeStore.isFlatKeyWithin(key, parts)) result.set(key, value);
+    }
+    return result;
+  }
+
+
+  /**
+   * Replaces the flat entries at a path, or beneath it, with new ones.
+   * @param flat - Flat keys and values, modified in place
+   * @param path - A dotted/bracketed path or pre-parsed segments
+   * @param entries - The new entries for that path
+   * @throws Error if a string path is malformed
+   */
+  public static replaceFlatEntriesWithin(
+    flat: Map<string, string>,
+    path: string | KeyPathPart[],
+    entries: Map<string, string>
+  ): void {
+    const parts = toParts(path);
+    for (const key of [...flat.keys()]) {
+      if (TreeStore.isFlatKeyWithin(key, parts)) flat.delete(key);
+    }
+    for (const [key, value] of entries) {
+      flat.set(key, value);
+    }
+  }
+
+
+  /**
+   * Tests whether two sets of flat entries hold the same keys and values.
+   * @param a - Flat keys and values
+   * @param b - Flat keys and values
+   * @return `true` if they hold the same entries
+   */
+  public static sameFlat(a: Map<string, string>, b: Map<string, string>): boolean {
+    if (a.size !== b.size) return false;
+    for (const [key, value] of a) {
+      if (b.get(key) !== value) return false;
+    }
+    return true;
   }
 
 
