@@ -377,10 +377,12 @@ export class SettingsSystem extends AbstractSystem {
    * @return  Promise resolved when this component has completed initialization
    */
   public initAsync(): Promise<void> {
+    if (this._initPromise) return this._initPromise;
+
     const context = this.context;
     const storage = context.systems.storage!;
 
-    return super.initAsync()
+    return this._initPromise = super.initAsync()
       .then(() => storage.initAsync())
       .then(() => {
         const loaded = this._loadLocal();

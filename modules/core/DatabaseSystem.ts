@@ -273,7 +273,9 @@ export class DatabaseSystem extends AbstractSystem {
    * @return  Promise resolved when this component has completed initialization
    */
   public initAsync(): Promise<void> {
-    return super.initAsync()
+    if (this._initPromise) return this._initPromise;   // several systems wait on this, open once
+
+    return this._initPromise = super.initAsync()
       .then(() => this._openAsync());
   }
 

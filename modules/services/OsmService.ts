@@ -385,7 +385,9 @@ export class OsmService extends AbstractSystem {
    * @return  Promise resolved when this component has completed startup
    */
   public startAsync(): Promise<void> {
-    return super.startAsync()
+    if (this._startPromise) return this._startPromise;
+
+    return this._startPromise = super.startAsync()
       .then(() => this.reloadApiStatus());  /* good time to check on the API */
   }
 

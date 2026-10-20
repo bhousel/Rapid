@@ -206,7 +206,9 @@ export class NsiService extends AbstractSystem {
    * @return Promise resolved when this component has completed startup
    */
   public startAsync(): Promise<void> {
-    return super.startAsync()
+    if (this._startPromise) return this._startPromise;
+
+    return this._startPromise = super.startAsync()
       .then(() => {
         // Schedule NSI startup as a separate Promise chain.
         // This should not block Rapid startup.

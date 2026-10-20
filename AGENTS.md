@@ -165,6 +165,23 @@ This project has reusable agent skills in `.claude/skills/`: one folder per skil
   }
   ```
 
+### Lifecycle Methods Run Once (`initAsync` / `startAsync`)
+- Many callers await the same system's `initAsync()` / `startAsync()` (e.g. 7+ systems wait on `settings.initAsync()`), so each must do its work **once** and return the same promise every time.
+- `AbstractSystem` provides `_initPromise` / `_startPromise`, but it can't enforce this: **an override that does any work must start with the guard and assign the chained promise.** Without it, every caller re-runs the work (re-reading storage, re-opening a database, re-sending requests).
+  ```typescript
+  public initAsync(): Promise<void> {
+    if (this._initPromise) return this._initPromise;
+
+    const context = this.context;
+    const storage = context.systems.storage!;
+
+    return this._initPromise = super.initAsync()
+      .then(() => storage.initAsync())
+      .then(() => { /* the work */ });
+  }
+  ```
+- Overrides that only `return super.initAsync()` or `return Promise.resolve()` don't need the guard.
+
 ### Props Interfaces
 - Define `FooProps` interface in the same file as the `Foo` class (not in a shared `types.ts`)
 - `FooProps` should have **all required properties**
