@@ -387,7 +387,8 @@ export class SelectBehavior extends AbstractBehavior {
 
     // Clicked a selectable non-OSM feature..
     } else if (
-      ['mapwithai', 'esri', 'overture'].includes(serviceID) ||    // Clicked Rapid data..
+      (layerID === 'rapid' && !!data?.props?.datasetID) ||       // Clicked Rapid data (from any service)..
+      ['mapwithai', 'esri', 'overture'].includes(serviceID) ||
       data instanceof GeoJSONData ||  // Clicked Custom Data (e.g. gpx track)..
       data instanceof MarkerData      // Clicked a MarkerData (OSM Note, KeepRight, Osmose, Maproulette)..
     ) {

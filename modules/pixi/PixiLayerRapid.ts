@@ -312,6 +312,31 @@ export class PixiLayerRapid extends AbstractPixiLayer {
         }
       }
 
+    /* Any other service that provides OSM-like data, e.g. one registered by a host app */
+    /* It should offer `loadTiles(datasetID)`, `getData(datasetID)`, and `graph(datasetID)`, like EsriService */
+    } else if (typeof service?.getData === 'function' && typeof service?.graph === 'function') {
+      if (viewZoom >= 15 && typeof service.loadTiles === 'function') {  // avoid firing off too many requests
+        service.loadTiles(ds.id);
+      }
+
+      // Gather data in view
+      const dsGraph = service.graph(ds.id);
+      if (!dsGraph) return;
+      const entities = service.getData(ds.id) as OsmEntity[];
+
+      for (const entity of entities) {
+        if (rapid.isAcceptedOrIgnored(entity.id)) continue;
+
+        const geom = entity.geometry(dsGraph);
+        if (geom === 'point') {   // standalone points only (not vertices/childnodes)
+          renderData.points.push(entity as OsmNode);
+        } else if (geom === 'line') {
+          renderData.lines.push(entity as OsmWay);
+        } else if (geom === 'area') {
+          renderData.polygons.push(entity);
+        }
+      }
+
     /* Custom */
     /* for now, custom data needs to be a data file at a url that is loaded with Rapid starts up */
     } else if (ds.custom) {
