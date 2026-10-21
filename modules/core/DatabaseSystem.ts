@@ -15,8 +15,9 @@ const DATABASE_NAME = 'Rapid';
  * The latest database schema version. Bump this when adding a store or migration.
  * - v1: `sessions` store (edit-history sessions, owned by `EditSystem`)
  * - v2: `files` store (arbitrary user files stored as native Blobs)
+ * - v3: `datasets` store (custom datasets the user added, owned by `RapidSystem`)
  */
-const CURRENT_DB_VERSION = 2;
+const CURRENT_DB_VERSION = 3;
 
 
 // ---------------------------------------------------------------------------
@@ -202,6 +203,14 @@ const STORE_MANIFEST: StoreDefinition[] = [
       { name: 'by-name', keyPath: 'name' }
     ],
     sinceVersion: 2
+  },
+  {
+    name: 'datasets',
+    keyPath: 'id',
+    indexes: [
+      { name: 'by-updatedAt', keyPath: 'updatedAt' }
+    ],
+    sinceVersion: 3
   }
 ];
 

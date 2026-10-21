@@ -5,6 +5,10 @@
   "description": "A Rapid dataset definition: third party data that the user can review and add to OpenStreetMap. The datasetID is the key the definition is stored under. A dataset without a serviceID is loaded by Rapid from its sourceUrl. (This schema is still changing along with the conflation work.)",
   "type": "object",
   "properties": {
+    "id": {
+      "description": "The datasetID. Optional here, since it's the key the definition is stored under; if present, it must match that key.",
+      "type": "string"
+    },
     "serviceID": {
       "description": "The service that provides this dataset's data (e.g. 'mapwithai', 'esri', 'overture'). Omit it for a dataset that Rapid loads from its sourceUrl.",
       "type": "string"

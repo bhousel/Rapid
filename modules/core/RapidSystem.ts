@@ -1,7 +1,7 @@
 import { AbstractSystem } from './AbstractSystem.ts';
 import { gpx } from '@tmcw/togeojson';
 import { Extent } from '@rapid-sdk/math';
-import { RapidDataset, RapidDataDictionary } from '../lib/index.ts';
+import { RapidDataset, RapidDataDictionary, TreeStore } from '../lib/index.ts';
 import { utilExtractValues, utilWildcardDelete } from '../util/string.ts';
 import { utilIterable } from '../util/iterable.ts';
 
@@ -10,7 +10,6 @@ import type { OneOrMore } from '../util/iterable.ts';
 import type { RapidDataTransform } from '../lib/RapidDataDictionary.ts';
 import type { RapidDatasetProps } from '../lib/RapidDataset.ts';
 import type { SettingsValue } from './SettingsSystem.ts';
-import type { TreeValue } from '../lib/TreeStore.ts';
 import type { Vec2 } from '@rapid-sdk/math';
 
 
@@ -60,13 +59,6 @@ export interface RapidDatasetSettings {
 }
 
 /**
- * Persisted settings for a user-added custom dataset,
- * stored by `SettingsSystem` under `rapid.custom.<DatasetID>`.
- * JSON produced by `RapidDataset.toJSON()` and consumed by `RapidDataset.fromJSON()`.
- */
-export type RapidCustomDatasetSettings = Record<string, TreeValue>;
-
-/**
  * All persisted settings used by `RapidSystem`,
  * stored by `SettingsSystem` under `rapid.*`.
  */
@@ -75,11 +67,21 @@ export interface RapidSettings {
   addedDatasetIDs?: DatasetID[];
   /** DatasetIDs that the user has enabled for display, a subset of addedDatasetIDs */
   enabledDatasetIDs?: DatasetID[];
-  /** Per-dataset settings for service-provided datasets, keyed by DatasetID */
+  /** Per-dataset settings for datasets from services and asset files, keyed by DatasetID */
   dataset?: Record<DatasetID, RapidDatasetSettings>;
-  /** Per-dataset settings for user-added custom datasets, keyed by DatasetID */
-  custom?: Record<DatasetID, RapidCustomDatasetSettings>;
 };
+
+/**
+ * A custom dataset that the user added, as stored in the `DatabaseSystem` `datasets` store.
+ */
+export interface CustomDatasetRecord {
+  /** The datasetID (the store's key) */
+  id: DatasetID;
+  /** When the record was last written (ms since epoch) */
+  updatedAt: number;
+  /** The dataset's definition, from `RapidDataset.toJSON()`: plain JSON types */
+  dataset: Record<string, unknown>;
+}
 
 
 const RAPID_COLORS: readonly string[] = [
@@ -157,6 +159,8 @@ export class RapidSystem extends AbstractSystem {
   protected _datasetsParam: string | undefined;
   /** Datasets from asset files whose data has started loading */
   protected _setupDatasets: WeakSet<RapidDataset>;
+  /** The custom datasets that the user added, as last read from or written to `DatabaseSystem` */
+  protected _customRecords: Map<DatasetID, CustomDatasetRecord>;
 
 
   /**
@@ -173,6 +177,7 @@ export class RapidSystem extends AbstractSystem {
     this._serviceDatasets = [];
     this._datasetsParam = undefined;
     this._setupDatasets = new WeakSet<RapidDataset>();
+    this._customRecords = new Map<DatasetID, CustomDatasetRecord>();
 
     // The addition of "custom" datasets means that RapidSystem needs more dependencies
     // See `RapidDataset.ts` for details.
@@ -203,6 +208,7 @@ export class RapidSystem extends AbstractSystem {
 
     const context = this.context;
     const assets = context.systems.assets;
+    const database = context.systems.database;
     const editor = context.systems.editor;
     const settings = context.systems.settings;
     const urlhash = context.systems.urlhash;
@@ -211,6 +217,7 @@ export class RapidSystem extends AbstractSystem {
       .then(() => {
         const prerequisites = [
           assets?.initAsync(),
+          database?.initAsync(),
           editor?.initAsync(),
           settings?.initAsync(),
           urlhash?.initAsync()
@@ -231,8 +238,13 @@ export class RapidSystem extends AbstractSystem {
           this.requestedAssetIDs = utilExtractValues(param).filter(Boolean);
         }
         this._datasetsParam = param;
-        return this.loadDatasetAssetsAsync();
-     });
+
+        return Promise.all([
+          this.loadDatasetAssetsAsync(),
+          this._readCustomDatasetsAsync()
+        ]);
+      })
+      .then(() => {});
   }
 
 
@@ -729,15 +741,21 @@ export class RapidSystem extends AbstractSystem {
 
 
   /**
-   * Save dataset settings to the `SettingsSystem`.
+   * Saves what the user can change about a dataset.
+   * - For a dataset from a service or an asset file: its color and `conflated` flag, in `SettingsSystem`.
+   * - For a custom dataset the user added: its whole definition (including its data dictionary and
+   *   conflation settings), in the `DatabaseSystem` `datasets` store. Without `DatabaseSystem`,
+   *   it lasts for this session only.
    * The code in here should match the settings loaded in `_loadDatasetSettings()`
    * @param  ds  The Rapid Dataset to save
+   * @return Promise resolved when the dataset has been saved
    */
-  public saveDatasetSettings(ds: RapidDataset): void {
+  public saveDatasetSettings(ds: RapidDataset): Promise<void> {
     const context = this.context;
+    const database = context.systems.database;
     const settings = context.systems.settings;
-    if (!settings || !ds) return;
-    if (ds.hidden) return;   // skip reserved datasets (e.g. for the walkthrough)
+    if (!ds) return Promise.resolve();
+    if (ds.hidden) return Promise.resolve();   // skip reserved datasets (e.g. for the walkthrough)
 
     // A dataset from a service or an asset file - save the subset of things that the user can customize..
     if (!ds.custom) {
@@ -745,12 +763,72 @@ export class RapidSystem extends AbstractSystem {
         color: ds.color,
         conflated: String(ds.conflated)
       };
-      settings.set(`rapid.dataset.${ds.id}`, prefs as SettingsValue);
+      settings?.set(`rapid.dataset.${ds.id}`, prefs as SettingsValue);
+      return Promise.resolve();
+    }
 
     // A user-provided custom dataset - save everything..
-    } else {
-      const prefs = ds.toJSON();
-      settings.set(`rapid.custom.${ds.id}`, prefs as SettingsValue);
+    const record: CustomDatasetRecord = { id: ds.id, updatedAt: Date.now(), dataset: ds.toJSON() };
+    this._customRecords.set(ds.id, record);
+    if (!database) return Promise.resolve();
+
+    return database.put('datasets', record)
+      .then(() => {})
+      .catch((err: any) => {
+        console.error(`Couldn't save dataset ${ds.id}:  `, err);  // eslint-disable-line no-console
+      });
+  }
+
+
+  /**
+   * Deletes a custom dataset that the user added: its saved definition, its stored file (if any),
+   * and its place in the catalog and on the Rapid menu.
+   * @param  datasetID - The custom dataset to delete
+   * @return Promise resolved when the saved data has been deleted
+   */
+  public deleteCustomDatasetAsync(datasetID: DatasetID): Promise<void> {
+    const context = this.context;
+    const database = context.systems.database;
+
+    const ds = this.catalog.get(datasetID);
+    if (!ds?.custom) return Promise.resolve();   // only the user's own datasets can be deleted
+
+    this.catalog.delete(datasetID);
+    this._customRecords.delete(datasetID);
+    this.removeDatasets(datasetID);
+    if (!database) return Promise.resolve();
+
+    const work: Promise<void>[] = [database.delete('datasets', datasetID)];
+    if (ds.sourceFileID) {
+      work.push(database.deleteFileAsync(ds.sourceFileID));
+    }
+    return Promise.all(work)
+      .then(() => {})
+      .catch((err: any) => {
+        console.error(`Couldn't delete dataset ${datasetID}:  `, err);  // eslint-disable-line no-console
+      });
+  }
+
+
+  /**
+   * Reads the custom datasets that the user added from the `DatabaseSystem` `datasets` store.
+   * Without `DatabaseSystem` there are none to read.
+   * Errors are logged; the user's datasets just won't appear.
+   * @return Promise resolved when the datasets have been read
+   */
+  protected async _readCustomDatasetsAsync(): Promise<void> {
+    const context = this.context;
+    const database = context.systems.database;
+    if (!database) return;
+
+    try {
+      this._customRecords.clear();
+      for (const record of await database.getAll<CustomDatasetRecord>('datasets')) {
+        if (typeof record?.id !== 'string' || !TreeStore.isPlainObject(record.dataset)) continue;
+        this._customRecords.set(record.id, record);
+      }
+    } catch (err) {
+      console.error(`Couldn't read the custom datasets:  `, err);  // eslint-disable-line no-console
     }
   }
 
@@ -861,16 +939,16 @@ export class RapidSystem extends AbstractSystem {
 
 
   /**
-   * Load dataset settings from the `SettingsSystem`.
-   * We'll expect to find two subtrees of settings indexed by DatasetID.
-   * One for normal datasets provided by a service, one for custom datasets added by the user.
-   * If we've never stored anything in `SettingsSystem`, the settings will be empty.
-   * The code in here should match the settings loaded in `saveDatasetSettings()`
+   * Applies the saved dataset settings, and creates the custom datasets that the user added.
+   * - The datasets from services and asset files get their saved settings (color, `conflated`)
+   *   from the `SettingsSystem`, indexed by DatasetID.
+   * - The user's custom datasets are created from their records (see `_readCustomDatasetsAsync`).
+   * The code in here should match the settings saved in `saveDatasetSettings()`
    */
   protected _loadDatasetSettings(): void {
     const context = this.context;
+    const database = context.systems.database;
     const settings = context.systems.settings;
-    if (!settings) return;
 
     // Apply the settings for the datasets from services and asset files:
     // dataset: {
@@ -878,20 +956,20 @@ export class RapidSystem extends AbstractSystem {
     //   msBuildings: { … },
     //   …
     // }
-    const datasetSettings = settings.get<Record<DatasetID, RapidDatasetSettings>>('rapid.dataset') ?? {};
+    const datasetSettings = settings?.get<Record<DatasetID, RapidDatasetSettings>>('rapid.dataset') ?? {};
     for (const [datasetID, prefs] of Object.entries(datasetSettings)) {
       const hasValidPrefs = (typeof prefs === 'object' && !Array.isArray(prefs) && prefs !== null);
       if (!hasValidPrefs ) {   // `prefs` should be an object
-        settings.unset(`rapid.dataset.${datasetID}`);
+        settings?.unset(`rapid.dataset.${datasetID}`);
         continue;
       }
       const ds = this.catalog.get(datasetID);
       if (!ds) {   // unknown dataset
-        settings.unset(`rapid.dataset.${datasetID}`);
+        settings?.unset(`rapid.dataset.${datasetID}`);
         continue;
       }
       if (ds.hidden) {   // a reserved dataset (e.g. for the walkthrough)
-        settings.unset(`rapid.dataset.${datasetID}`);
+        settings?.unset(`rapid.dataset.${datasetID}`);
         continue;
       }
 
@@ -904,30 +982,22 @@ export class RapidSystem extends AbstractSystem {
       }
     }
 
-    // Instantiate user-provided custom datasets:
-    // custom: {
-    //   custom_a: { … },
-    //   custom_b: { … },
-    //   …
-    // }
-    const customSettings = settings.get<Record<DatasetID, RapidCustomDatasetSettings>>('rapid.custom') ?? {};
-    for (const [datasetID, prefs] of Object.entries(customSettings)) {
-      const hasValidPrefs = (typeof prefs === 'object' && !Array.isArray(prefs) && prefs !== null);
-      if (!hasValidPrefs) {   // `prefs` should be an object
-        settings.unset(`rapid.custom.${datasetID}`);
-        continue;
-      }
+    // Instantiate user-provided custom datasets from their records.
+    for (const record of this._customRecords.values()) {
+      const datasetID = record.id;
       let ds = this.catalog.get(datasetID);
       if (ds) {   // added already
         if (!ds.custom && !ds.assetID) {   // Custom datasetID should not collide with service-provided datasetID
-          settings.unset(`rapid.custom.${datasetID}`);
+          this._customRecords.delete(datasetID);
+          database?.delete('datasets', datasetID)
+            .catch((err: any) => console.error(`Couldn't delete dataset ${datasetID}:  `, err));  // eslint-disable-line no-console
         }
-        // (If an asset file uses the datasetID, keep the setting; the asset may not be loaded next time.)
+        // (If an asset file uses the datasetID, keep the record; the asset may not be loaded next time.)
         continue;
       }
 
       // Instantiate the custom dataset and add it to the catalog.
-      ds = RapidDataset.fromJSON(context, { ...prefs, custom: 'true' });
+      ds = RapidDataset.fromJSON(context, { ...record.dataset, id: datasetID, custom: true });
       this.catalog.set(ds.id, ds);
       if (ds.serviceID) continue;   // a service will load its data, not Rapid
 

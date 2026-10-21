@@ -107,6 +107,21 @@ OpenStreetMap ↔ OpenHistoricalMap bridge).
   the services find datasets by `datasetID` in their own catalogs, so they'd need to take a `sourceUrl`;
   `UiRapidAddDataset` only makes file and URL datasets.
 
+## DatabaseSystem: schema upgrades with other tabs open
+- `openDB` is called without `blocked` / `blocking` handlers. A schema bump (v2 → v3 added
+  `datasets`) can't run while another tab still holds the older version open: the open waits, or
+  fails over to the in-memory mock, and the session's data isn't durable.
+- Add a `blocking` handler that closes our connection (and tells the user to reload) when a newer
+  version wants to upgrade, and a `blocked` handler that tells the user to close their other Rapid tabs.
+- Lesson from the dropped `rapid.custom.*` migration: never delete the source data unless the
+  destination is durable (`database.isAvailable`).
+
+## Flaky tests
+- `EditSystem` › `toBackup returns the structured object that toJSON stringifies`: builds two backups
+  and expects them to be identical, so it fails when the clock ticks between the two calls.
+- `DatabaseSystem` blob tests fail when that file runs alone (Blob through the in-memory clone),
+  but pass in the full suite.
+
 ## MapRoulette authentication
 - `UiMapRouletteMenu` and `UiMapRouletteEditor` read the user's MapRoulette API key from the
   `maproulette_apikey_v2` OSM user preference. MapRoulette is moving away from storing the key there

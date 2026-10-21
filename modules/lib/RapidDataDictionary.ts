@@ -1,7 +1,6 @@
 import { TreeStore } from '../lib/TreeStore.ts';
 
 import type { Context } from '../Context.ts';
-import type { TreeValue } from './TreeStore.ts';
 
 
 /**
@@ -66,22 +65,22 @@ export class RapidDataDictionary {
 
 
   /**
-   * Returns a settings-safe JSON representation of this `RapidDataDictionary`.
+   * Returns a JSON representation of this `RapidDataDictionary`, in plain JSON types.
    * @return JSON representation of this data element
    */
-  public toJSON(): Record<string, TreeValue> {
-    const result: Record<string, TreeValue> = {};
+  public toJSON(): Record<string, unknown> {
+    const result: Record<string, unknown> = {};
 
     if (this.transforms.length > 0) {
       result.transforms = this.transforms.map((t: RapidDataTransform) => {
-        const item: TreeValue = {
-          order: t.order.toString(),
+        const item: Partial<RapidDataTransform> = {
+          order: t.order,
           function: t.function
         };
         if (t.source)  item.source = t.source;
         if (t.target)  item.target = t.target;
         if (t.params)  item.params = t.params;
-        if (t.isID)    item.isID = 'true';
+        if (t.isID)    item.isID = true;
 
         return item;
       });
@@ -92,11 +91,10 @@ export class RapidDataDictionary {
 
 
   /**
-   * Reconstructs a `RapidDataDictionary` from its persisted JSON form (see `toJSON`), or from a
-   * data dictionary in an asset file. The settings store is string-only, so numbers and booleans
-   * may arrive as strings and are restored here. Real numbers and booleans are used as they are.
+   * Reconstructs a `RapidDataDictionary` from its JSON form (see `toJSON`), or from a
+   * data dictionary in an asset file.
    * @param context - Global shared application context
-   * @param json - The persisted settings object
+   * @param json - The data dictionary, in plain JSON types
    * @return A new `RapidDataDictionary`
    */
   public static fromJSON(context: Context, json: Record<string, unknown>): RapidDataDictionary {
@@ -108,19 +106,17 @@ export class RapidDataDictionary {
         if (typeof t.function !== 'string') continue;
 
         const order: unknown = t.order;
-        const orderNum = (typeof order === 'string') ? parseInt(order, 10) : order;
-        if (typeof orderNum !== 'number' || !Number.isFinite(orderNum)) continue;
+        if (typeof order !== 'number' || !Number.isFinite(order)) continue;
 
         const isID: unknown = t.isID;
         const item: RapidDataTransform = {
           function:  t.function,
-          order:     orderNum,
+          order:     order,
         };
         if (typeof t.source === 'string')  item.source = t.source;
         if (typeof t.target === 'string')  item.target = t.target;
         if (typeof t.params === 'string')  item.params = t.params;
         if (typeof isID === 'boolean')     item.isID   = isID;
-        if (typeof isID === 'string')      item.isID   = (isID === 'true');
 
         dict.transforms.push(item);
       }

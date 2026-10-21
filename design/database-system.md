@@ -12,7 +12,8 @@ core refactor [facebook/Rapid#961](https://github.com/facebook/Rapid/pull/961)).
 edit history).
 
 > **Status:** Phases 0–4 implemented (see Rollout Plan below): sessions store, multi-session
-> restore, `files` store, and the storage-check API. Still open: the stored-files management UI
+> restore, `files` store, and the storage-check API. Schema v3 adds the `datasets` store (custom
+> dataset definitions, owned by `RapidSystem`). Still open: the stored-files management UI
 > and Phase 5 (worker offload). The API sketches in this doc describe the shipped `DatabaseSystem`
 > interface plus proposed future additions.
 
@@ -448,6 +449,18 @@ gains a working `files` store; and that a fresh DB opens at v2 with both stores.
 **Not done yet (deferred):** wiring drag-and-drop/file-input to actually populate the store, and a
 reload-on-startup flow. Those belong to a future input/data-file system that consumes this API.
 
+## Use Case 2b — Custom Dataset Definitions ✅ done (schema v3)
+
+A `datasets` store (`keyPath: 'id'`, index `by-updatedAt`, `sinceVersion: 3`) holds the custom
+datasets that the user added in the Rapid menu: one record per dataset,
+`{ id, updatedAt, dataset }`, where `dataset` is the definition from `RapidDataset.toJSON()` (with its
+data mapping and conflation settings, in plain JSON types). `RapidSystem` owns the record shape; see
+[`rapid-system.md`](rapid-system.md). These used to live in `SettingsSystem` as dozens of flat
+`rapid.custom.*` keys each. They weren't migrated (that code never shipped); users add them again.
+
+Also: `initAsync` is now memoized, so the systems that wait on it (`EditSystem`, `RapidSystem`) don't
+each start their own `openDB` before the first one finishes.
+
 ## Use Case 3 — Storage Management (first-class)
 
 Because sessions and files can consume real space, `DatabaseSystem` treats storage as something to
@@ -480,6 +493,7 @@ Boundary guidance:
 | One-off small key/value | `StorageSystem` |
 | Edit history / sessions (large, multi) | **`DatabaseSystem`** |
 | Dropped data files / blobs | **`DatabaseSystem`** |
+| Custom dataset definitions | **`DatabaseSystem`** |
 
 ## Lifecycle & Dependencies
 
@@ -661,8 +675,8 @@ no incremental tracking required.
 1. **Reload flow for persisted files:** once a drag-drop/data-file system exists, should it
    auto-reload persisted files on startup or prompt the user?
    *Partly answered (Oct 2026):* files that back a custom Rapid dataset reload **automatically**.
-   The dataset's settings (`rapid.custom.<id>`, including `sourceFileID`) persist through
-   `SettingsSystem`, and `RapidDataset.setupCustomDatasetAsync()` fetches the file with
+   The dataset's definition (including `sourceFileID`) persists in the `datasets` store,
+   and `RapidDataset.setupCustomDatasetAsync()` fetches the file with
    `getFileAsync()`. Deleting the dataset in `UiRapidDatasetSettings` also deletes its file. Still
    open: the stored-files management UI from Phase 4 (only `canStoreAsync` has a caller so far), and
    files that aren't tied to a dataset.

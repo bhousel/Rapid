@@ -2,11 +2,12 @@
 
 This document proposes a new `SettingsSystem` for Rapid that replaces ad-hoc localStorage keys with a versioned, typed settings model, and supports optional account-backed sync.
 
-> **Status:** Phases 0–3 and v2 Step 1 (safe sync of registered settings) are implemented. The guiding
-> principle: make Rapid's settings work more like VS Code's. In October 2026 we agreed on a new direction: layered settings
-> stored in `DatabaseSystem`, a short list of settings that sync, export/import as JSON files, and
-> datasets as content. See [Layered Settings (v2)](#layered-settings-v2). It replaces Phases 4–5 and
-> some of the Resolved Decisions below.
+> **Status:** Phases 0–3 and v2 Steps 1–2 (safe sync of registered settings; datasets as a collection)
+> are implemented. The guiding principle: make Rapid's settings work more like VS Code's. In October
+> 2026 we agreed on a new direction: **everything the user can change becomes a document**, layered and
+> merged like the asset files, with a `settings.json` the user can open and edit, a short list of
+> settings that sync, and export/import as JSON files. See [Layered Settings (v2)](#layered-settings-v2).
+> It replaces Phases 4–5 and some of the Resolved Decisions below.
 
 ## Problem
 
@@ -444,9 +445,13 @@ Notes:
 
 ## Layered Settings (v2)
 
-**Status:** agreed direction (October 2026), not started. Rapid's settings should work more like
+**Status:** agreed direction (October 2026); Steps 1–2 done. Rapid's settings should work more like
 VS Code's or Sublime Text's: built-in defaults, with the user's changes layered on top, a deployment
 layer for embedding apps, and the user's layer exportable as a JSON file.
+
+**The tangible target:** a "Settings (JSON)" editor in Rapid, like VS Code's user `settings.json`,
+showing only what the user changed, next to a read-only "Default Settings (JSON)". See
+[The target: `settings.json`](#the-target-settingsjson).
 
 ### Problems with v1
 
@@ -485,19 +490,72 @@ Found while adding custom datasets with data mappings and conflation rules:
   - `UiSectionRawTagEditor` (the copy built by `UiEntityEditor`)
 - `SchemaSystem.resetAll()` has a `// HACK for demo` that clears `schema.presetRecents` on every startup.
 
-### Preferences and content
+### Vocabulary: everything is a document
 
-These are two kinds of data, and VS Code keeps them apart the same way (`settings.json` vs.
-keybindings, snippets and extensions):
+- **Document** (or "content"): any JSON that Rapid reads, layers and merges, like the asset files
+  (`main.json` format, `null` deletes, applied in order). This is the one mechanism for everything the
+  user can change, as opposed to loose keys in localStorage.
+- Inside documents there are three kinds of data. VS Code has the same three:
 
-- **Preferences** are values at known paths, each with a default: inspector width, selected
-  background, power-user flags, validation options.
-- **Content** is a collection of documents keyed by ID, which layers add to, replace or delete:
-  imagery sources, styles, presets, and Rapid datasets with their data mappings and conflation rules.
-  Content already goes through the asset files (`main.json` format, `null` deletes, applied in order).
+| Kind | What it is | The user… | Rapid examples | VS Code |
+|---|---|---|---|---|
+| **Settings** | Preferences at known keys, each with a default | changes a value | area fill, validator options, power-user flags | `settings.json` |
+| **Collections** | Items keyed by ID | adds items, or changes fields of existing ones | `imagery`, `styles`, `presets`, `datasets` | keybindings, snippets, tasks |
+| **State** | What the app remembers | doesn't edit it directly | seen-splash flags, panel widths, recents, enabled datasets, last background | `globalState` (`setKeysForSync`) |
 
-Rapid datasets are content: an asset file can contain a `datasets` collection, next to `imagery` and
-`styles`. That lets an embedding app or a URL preload datasets the way imagery and styles are loaded today.
+- **Not documents:** stored files (blobs) and edit sessions. Those are records in `DatabaseSystem`,
+  outside the layering.
+
+So settings, collections and state differ only in what's inside, not in how they're stored or merged.
+localStorage becomes a fallback.
+
+Rapid datasets are a collection: an asset file can contain `datasets`, next to `imagery` and `styles`.
+That lets an embedding app or a URL preload datasets the way imagery and styles are loaded today.
+
+### The target: `settings.json`
+
+What the user sees when they open "Settings (JSON)": only what they changed, with flat dotted keys
+(VS Code's style, which are already our paths) and real JSON types:
+
+```jsonc
+// Rapid user settings: only what you've changed. See "Default Settings (JSON)" for everything else.
+{
+  "map.areaFill": "wireframe",
+  "imagery.opacity": 0.8,
+  "imagery.favorites": ["EsriWorldImagery", "Bing"],
+  "filters.disabledFilters": ["boundaries", "landuse"],
+  "validator.what": "all",
+  "validator.where": "visible",
+  "validator.squareDegrees": 7,
+  "validator.disabledRules": ["crossing_ways/highway-railway"],
+  "poweruser.allowLargeEdits": true,
+  "poweruser.showAutoFix": true,
+  "ui.privacy.thirdPartyIcons": false,
+  "ui.mouseWheelInteraction": "zoom"
+}
+```
+
+Of the 40 paths in `SettingsSystem` today, only about 15 are settings. Sorted by kind:
+
+| Kind | Paths today |
+|---|---|
+| **Settings** | `map.areaFill`, `imagery.opacity`, `imagery.favorites`, `filters.disabledFilters`, `validator.*`, `poweruser.*` (not `poweruser.was.*`), `ui.privacy.thirdPartyIcons`, `ui.mouseWheelInteraction` |
+| **State** | `ui.saw*`, `ui.walkthrough.*`, `ui.inspector.*`, `ui.disclosure.*`, `ui.entityIssues.*`, `ui.restrictions.*`, `ui.rawTagEditorView`, `ui.customData.url`, `imagery.lastUsed*`, `map.areaFillToggle`, `schema.presetRecents`, `rapid.addedDatasetIDs`, `rapid.enabledDatasetIDs`, `poweruser.was.*` |
+| **Collections** | `imagery.custom[0].template` (a user imagery source), `rapid.dataset.<id>` (the user's changes to a dataset), and the `DatabaseSystem` `datasets` store (the user's own datasets) |
+
+How it works:
+- **Systems register their settings**: path, default, type, description, allowed values, and whether
+  it syncs (`registerSync` becomes one field of this). The registry generates "Default Settings
+  (JSON)" and a JSON Schema to validate the user's file.
+- **The user's `settings.json` is one sparse document**, stored as one record in `DatabaseSystem`,
+  read once at init. `settings.get()` returns the effective value (defaults, then deployment, then
+  user, then session), so most callers barely change.
+- **An asset file can carry a `settings` block**, so an embedding app sets preferences the same way it
+  sets imagery or datasets (the deployment layer).
+- **State moves into its own document**, not shown in the editor. `registerSync` matters most there:
+  seen-splash flags sync, panel widths don't.
+- **Collections stay their own documents.** Later, the user's datasets and imagery can open in the same
+  editor as their own JSON files, the way VS Code shows `keybindings.json`.
 
 ### One format, one merge rule
 
@@ -506,21 +564,24 @@ by systemID, and both are combined in layers by the same rule. That rule is
 [JSON Merge Patch (RFC 7396)](https://www.rfc-editor.org/rfc/rfc7396): objects merge recursively, `null`
 deletes, and scalars and arrays replace. That is `TreeStore.merge` plus `null` deletes.
 
-- Collections of content are **objects keyed by ID, never arrays**, so one layer can add, replace or
-  delete a single item.
-- Open: whether a layer may change a single field of an item (deep merge), or must replace the whole
-  item, as asset `merge()` does today.
+- Collections are **objects keyed by ID, never arrays**, so one layer can add, replace or delete a
+  single item.
+- **The deciding open question:** whether a layer may change a single field of an item (deep merge),
+  or must replace the whole item, as asset `merge()` does today. With deep merge, the user's change to
+  a dataset's color is just `datasets: { fbRoads: { color: '#ff8800' } }` in their layer, the same
+  collection that holds their own datasets. Then `rapid.dataset.*` settings and the `datasets` store
+  become one thing, and the same goes for custom imagery.
 
 ### Layers
 
 From lowest to highest; the effective value merges all four in order:
 
-1. **Built-in defaults.** Preferences: the defaults each system registers. Content: Rapid's default
+1. **Built-in defaults.** Settings: the defaults each system registers. Collections: Rapid's default
    asset files, plus the dataset catalogs from services.
-2. **Deployment.** Supplied by an embedding app: preferences and content in the same formats. It
+2. **Deployment.** Supplied by an embedding app: settings and collections in the same formats. It
    overrides defaults but doesn't lock anything; a user can still change a setting.
-3. **User.** Sparse: only what the user changed. Stored in `DatabaseSystem`. Writes from the UI go
-   here, and "reset to default" removes the key.
+3. **User.** Sparse: only what the user changed (`settings.json`, the user's collections, state).
+   Stored in `DatabaseSystem`. Writes from the UI go here, and "reset to default" removes the key.
 4. **Session.** URL parameters (`background=`, `datasets=`, …). Never saved.
 
 A deployment layer, or a shared file loaded later, must not be able to set the OSM API connection or
@@ -528,9 +589,13 @@ anything else to do with authentication.
 
 ### Storage and lifecycle
 
-- The user layer is a JSON document in a `DatabaseSystem` store. Values keep their real types.
-- `SettingsSystem.initAsync` reads the whole document once. From then on, reads are synchronous,
-  served from memory, and writes are saved in the background.
+- The user layer is a few JSON documents in `DatabaseSystem` (`settings.json`, state, and the
+  collections). Values keep their real types.
+- `SettingsSystem.initAsync` reads them once. From then on, reads are synchronous, served from memory,
+  and writes are saved in the background.
+- **Systems update live.** A change from the editor, an import or a sync arrives as `settingschange`,
+  and the systems that read a setting must react to it. Today only two UI components listen, so this
+  is most of the work of the editor.
 - **Lifecycle contract:** during `initAsync`, systems connect to each other. A system that reads
   settings in `initAsync` waits for `settings.initAsync()` first. From `startAsync` on, settings are
   ready for everyone. The six UI constructors listed above must move their reads to render time (or
@@ -540,7 +605,7 @@ anything else to do with authentication.
   when the window closes, so losing settings there is expected.
 - **Several tabs:** the last tab to save wins. No `BroadcastChannel` for now.
 - **Migration:** a one-time import of the `rapid.settings.*` localStorage keys into the user layer.
-  `rapid.custom.*` becomes dataset content.
+  (`rapid.custom.*` isn't migrated: custom datasets now live in the `DatabaseSystem` `datasets` store.)
 
 ### What syncs to the OSM account
 
@@ -558,14 +623,14 @@ explicit list of small values, the way VS Code separates synced settings from ma
   - If only the remote changed, take it.
   - If only the local changed, push it.
   - Never delete a remote key just because the local side doesn't have it.
-- Content (datasets, custom imagery) never syncs this way.
+- Collections (datasets, custom imagery) never sync this way.
 - Cleanup: once the allowlist is in place, delete the `rapid.settings.*` keys that v1 pushed but that
   no longer sync.
 
 ### Export and import
 
-- **Export** writes the user layer (preferences and content) as one JSON file. **Import** merges a
-  file into the user layer.
+- **Export** writes the user layer (settings and collections) as one JSON file. **Import** merges a
+  file into the user layer. Open: whether state is exported too (VS Code profiles leave most of it out).
 - Possibly later: named profiles to share with a team (a dataset with its data mapping, its rules
   and its imagery), and a `profile=` URL parameter.
 - File-backed datasets export their `sourceFileID` but not the file. When the file is missing, at
@@ -592,9 +657,12 @@ modeled on how VS Code documents its settings and extension points.
 
 ### Open questions (v2)
 
-- **The URL parameter name for dataset assets.** `imagery=` picks asset IDs, but `datasets=` already
-  means "dataset IDs to enable" (like `background=`). Rename one, or let datasets ride on `assets=`?
-- Deep merge vs. whole-item replace within a collection (see above).
+- ~~The URL parameter name for dataset assets.~~ Resolved: the old `datasets=` became `dataset_ids=`,
+  and `datasets=` now lists asset IDs.
+- **Deep merge vs. whole-item replace within a collection** (see above). This decides where the user's
+  changes to collection items live.
+- Where the user's own collection items are kept: one document per collection (like the `datasets`
+  store today, one record per item), or one user document with all of them.
 - The asset load order bug: Imagery, Style and Schema register their default asset IDs *after*
   `assets.initAsync()`. This overwrites an `assets=` override of a default ID, and `merge()` throws if
   the same assetID is merged twice. A user layer gets merged again on every asset reload, so this has
@@ -613,22 +681,34 @@ modeled on how VS Code documents its settings and extension points.
      change to a synced setting. Remote `rapid.settings.*` keys that aren't synced are removed.
    - Synced so far: imagery favorites and opacity; area fill; disabled filters; validator options;
      privacy and raw tag editor view; the "seen" flags; and the power-user flags. Device-specific
-     settings (inspector width, mouse wheel) and content stay local.
+     settings (inspector width, mouse wheel) and collections stay local.
    - Few systems listen for `settingschange` yet. A value pulled after startup shows up the next time
      it's read (render time, or the next reload).
    - `UiSystem.initAsync` now waits for `settings`, which fixes the six constructor reads.
-2. **Datasets as content.** A `datasets` collection in asset files, custom datasets in the user layer
-   (in `DatabaseSystem`), and migrating `rapid.custom.*` out of settings. Conflation settings are
-   saved here.
-   - ✅ Asset files can define datasets (`datasets: {…}` in a scope, `data/schema/dataset.schema.json`),
+2. **Datasets as a collection.** ✅ Done. A `datasets` collection in asset files, and custom datasets
+   in `DatabaseSystem`, with their conflation settings.
+   - Asset files can define datasets (`datasets: {…}` in a scope, `data/schema/dataset.schema.json`),
      loaded by the `datasets=` url parameter (assetIDs, like `imagery=`) or `RapidSystem.merge()`.
      The old `datasets=` (datasetIDs to enable) is now `dataset_ids=`. Default asset: `rapid_datasets`
-     (empty). `RapidDataset.fromJSON` accepts real JSON types as well as the settings strings.
-   - Still to do: the user's custom datasets in `DatabaseSystem`, and their conflation settings.
-3. **Settings in `DatabaseSystem`.** A sparse user layer, settings registered by their systems, real
-   types, and the lifecycle fixes.
-4. **Export / import.**
-5. **Deployment layer and a customization guide.**
+     (empty).
+   - The user's custom datasets are records in the `DatabaseSystem` `datasets` store (schema v3),
+     with their data mapping and conflation settings, in plain JSON types. The old `rapid.custom.*`
+     settings aren't migrated (they never shipped). See [`rapid-system.md`](rapid-system.md).
+3. **`settings.json`, first version.**
+   - A settings registry: each system registers its settings (path, default, type, description,
+     allowed values, sync) in `initAsync`. It generates "Default Settings (JSON)" and a JSON Schema.
+   - The user's `settings.json` as one sparse record in `DatabaseSystem`, with real types; a one-time
+     import of the settings among today's `rapid.settings.*` keys.
+   - A modal with a JSON5 text editor (the `json5` package is already a dependency) and a "Default
+     Settings" view. It validates on save, and applies the changes.
+   - Systems that read settings update live on `settingschange`.
+4. **State moves out of settings** into its own document, not shown in the editor, with
+   `registerSync` choosing what syncs.
+5. **Collections in the user layer:** decide deep merge, then move `rapid.dataset.*` and custom
+   imagery into the user's collections.
+6. **Export / import.**
+7. **Deployment layer** (a `settings` block in asset files) **and a customization guide.**
+8. Later: a settings form view, like VS Code's settings UI.
 
 ## Rollout Plan
 

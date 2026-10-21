@@ -45,11 +45,17 @@ to the part that exists.*
   angle test (OSW data is full of junction stubs; ~9% of lines are under 1 m). No minimum line length:
   some short edges are real. Open: such a real stub next to a matching sidewalk now counts as mapped.
 - Next: Step 6, the Conflation Settings UI (rule editing, persistence of `ds.conflation`).
-  Persistence waits on settings v2 Step 2 (datasets as content, stored in `DatabaseSystem`), not on
-  more `rapid.custom.*` keys. See [`design/settings-system.md`](../design/settings-system.md),
-  "Layered Settings (v2)". Step 1 (safe OSM sync) is done and tried on a real account. Step 2 is half
-  done: asset files can define datasets (`datasets=` param, `dataset_ids=` for enabling). Next: the
-  user's custom datasets, with their conflation settings, stored in `DatabaseSystem`.
+  Persistence: done via settings v2 Steps 1–2 (see [`design/settings-system.md`](../design/settings-system.md)
+  and [`design/rapid-system.md`](../design/rapid-system.md)). A custom dataset's conflation settings are
+  saved with it in the `DatabaseSystem` `datasets` store whenever `rapid.saveDatasetSettings(ds)` runs.
+  ✅ Verified live (Oct 21): Bryan re-added both datasets (sidewalks and crossings), set up their data
+  mappings, applied the conflation rules; they persist in IndexedDB across reloads, and accepted lines
+  join the OSM basemap at the blue join points. Next for Step 6: the settings UI, which calls
+  `saveDatasetSettings` (today the rules are applied from a console snippet).
+- Settings direction (agreed Oct 21): "everything the user can change is a document", with three kinds
+  inside: settings, collections, state. Target: a VS Code-style `settings.json` editor. Written up in
+  `design/settings-system.md` (Vocabulary, The target: `settings.json`, Rollout v2 Steps 3–8).
+  Planned for after the conflation demo.
 - **Test data is synthetic only.** Generate a small street grid in code. Agency sidewalk data typically
   runs about 1–2 m off OSM, so the default `sameDist` is 3 m.
 - The scoring formula should eventually match the server-side matching tools. That's being gathered and

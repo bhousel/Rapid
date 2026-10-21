@@ -47,9 +47,10 @@ describe('DatabaseSystem', () => {
     });
 
     it('reports the schema version and store names', () => {
-      assert.strictEqual(database.databaseVersion, 2);
+      assert.strictEqual(database.databaseVersion, 3);
       assert.include(database.storeNames, 'sessions');
       assert.include(database.storeNames, 'files');
+      assert.include(database.storeNames, 'datasets');
     });
 
     it('is available when IndexedDB is present', () => {

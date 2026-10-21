@@ -80,42 +80,48 @@ describe('RapidDataset', () => {
   });
 
   describe('toJSON', () => {
-    it('serializes boolean flags as strings', () => {
-      const ds = new Rapid.RapidDataset(context, { id: 'bool-test', conflated: true, custom: false });
+    it('writes real JSON types, and leaves out runtime state', () => {
+      const ds = new Rapid.RapidDataset(context, { id: 'bool-test', conflated: true, custom: true, filtered: true });
+      ds.dictionary = Rapid.RapidDataDictionary.fromJSON(context, { transforms: [{ order: 0, function: 'copy', source: 'a', target: 'a', isID: true }] });
       const json = ds.toJSON();
 
-      assert.strictEqual(json.conflated, 'true');
-      assert.strictEqual(json.custom, 'false');
+      assert.strictEqual(json.conflated, true);
+      assert.strictEqual(json.hidden, false);
+      assert.notProperty(json, 'custom');
+      assert.notProperty(json, 'filtered');
+      assert.deepEqual(json.dictionary, { transforms: [{ order: 0, function: 'copy', source: 'a', target: 'a', isID: true }] });
+    });
+
+    it('includes a copy of the conflation settings', () => {
+      const ds = new Rapid.RapidDataset(context, { id: 'conflation-test' });
+      ds.conflation.enabled = true;
+      ds.conflation.rules[0].sameDist = 5;
+      const json = ds.toJSON();
+
+      assert.isTrue(json.conflation.enabled);
+      assert.strictEqual(json.conflation.rules[0].sameDist, 5);
+      json.conflation.rules[0].sameDist = 99;
+      assert.strictEqual(ds.conflation.rules[0].sameDist, 5);   // a copy
     });
   });
 
   describe('fromJSON', () => {
-    it('coerces stringified boolean flags back to booleans', () => {
-      // Simulates values arriving from the string-only settings store after a reload.
-      const json = { id: 'reload-test', conflated: 'true', custom: 'false', beta: 'true' };
-      const ds = Rapid.RapidDataset.fromJSON(context, json);
-
-      assert.isTrue(ds.conflated);
-      assert.isFalse(ds.custom);
-      assert.isTrue(ds.beta);
-    });
-
-    it('round-trips a dataset through toJSON/fromJSON preserving boolean types', () => {
+    it('round-trips a dataset through toJSON/fromJSON preserving types', () => {
       const original = new Rapid.RapidDataset(context, {
         id: 'roundtrip-test',
         color: '#ff0000',
         conflated: true,
-        custom: true,
         featured: false
       });
+      original.conflation.enabled = true;
 
       const restored = Rapid.RapidDataset.fromJSON(context, original.toJSON());
 
       assert.equal(restored.id, 'roundtrip-test');
       assert.equal(restored.color, '#ff0000');
       assert.isTrue(restored.conflated);
-      assert.isTrue(restored.custom);
       assert.isFalse(restored.featured);
+      assert.deepEqual(restored.conflation, original.conflation);
     });
 
     it('accepts real JSON types, as in asset files', () => {

@@ -400,8 +400,8 @@ describe('RapidSystem', () => {
       beforeEach(() => cleanStorage());
       afterEach(() => cleanStorage());
 
-      // Test that dataset settings survive a save -> load round-trip through the
-      // string-only `SettingsSystem` with their types intact (e.g. `conflated` stays a boolean).
+      // Test that a custom dataset survives a save -> load round-trip with its types intact
+      // (e.g. `conflated` stays a boolean). There's no DatabaseSystem here, so it's kept for the session.
       it('round-trips a custom dataset through save/load preserving types', () => {
         const custom = new Rapid.RapidDataset(context, sample.customDataset);
         _rapid.catalog.set(custom.id, custom);
@@ -600,16 +600,16 @@ describe('RapidSystem', () => {
         });
     });
 
-    it('keeps the stored settings of a user dataset whose datasetID an asset also uses', () => {
-      const settings = context.systems.settings;
-      settings.set('rapid.custom.my-sidewalks', { id: 'my-sidewalks', label: 'Mine', sourceUrl: 'https://example.com/data/trees.geojson' });
-
+    it('keeps the saved definition of a user dataset whose datasetID an asset also uses', async () => {
       const rapid = makeRapid();
+      const mine = new Rapid.RapidDataset(context, { id: 'my-sidewalks', custom: true, label: 'Mine' });
+      rapid.catalog.set(mine.id, mine);
+      await rapid.saveDatasetSettings(mine);   // no DatabaseSystem here, so it's kept for the session
+
       rapid.merge(sidewalks);       // the asset's `my-sidewalks` wins while it's loaded..
       rapid._loadDatasetSettings();
       assert.strictEqual(rapid.catalog.get('my-sidewalks').assetID, 'my_datasets');
-      assert.isDefined(settings.get('rapid.custom.my-sidewalks'));   // ..but the user's definition is kept
-      settings.unset('rapid.custom.my-sidewalks');
+      assert.isTrue(rapid._customRecords.has('my-sidewalks'));   // ..but the user's definition is kept
     });
 
     it('saves only the color and conflated settings for an asset dataset', () => {
@@ -621,7 +621,91 @@ describe('RapidSystem', () => {
 
       const settings = context.systems.settings;
       assert.deepEqual(settings.get('rapid.dataset.my-sidewalks'), { color: '#123456', conflated: 'false' });
-      assert.isUndefined(settings.get('rapid.custom.my-sidewalks'));
+      assert.isFalse(rapid._customRecords.has('my-sidewalks'));
+    });
+  });
+
+
+  // The custom datasets that the user added are kept in the DatabaseSystem `datasets` store.
+  describe('custom datasets', () => {
+    const settings = context.systems.settings;
+    let database;
+
+    // A RapidSystem whose custom datasets don't fetch their data.
+    function makeRapid() {
+      const rapid = new Rapid.RapidSystem(context);
+      context.systems.rapid = rapid;
+      return rapid;
+    }
+
+    beforeEach(async () => {
+      database = new Rapid.DatabaseSystem(context);
+      context.systems.database = database;
+      await database.initAsync();
+      await database.clear('datasets');
+      settings.unset('rapid');
+    });
+
+    afterEach(() => {
+      delete context.systems.database;
+      settings.unset('rapid');
+    });
+
+    it('saves a custom dataset, with its conflation settings, in the datasets store', async () => {
+      const rapid = makeRapid();
+      await rapid.initAsync();
+
+      const ds = new Rapid.RapidDataset(context, sample.customDataset);
+      ds.conflation.enabled = true;
+      ds.conflation.rules[0].sameDist = 4;
+      rapid.catalog.set(ds.id, ds);
+      await rapid.saveDatasetSettings(ds);
+
+      const record = await database.get('datasets', 'my-custom');
+      assert.strictEqual(record.id, 'my-custom');
+      assert.isNumber(record.updatedAt);
+      assert.strictEqual(record.dataset.conflated, true);   // a real boolean
+      assert.isTrue(record.dataset.conflation.enabled);
+      assert.strictEqual(record.dataset.conflation.rules[0].sameDist, 4);
+    });
+
+    it('creates the saved custom datasets at startup', async () => {
+      const saved = new Rapid.RapidDataset(context, sample.customDataset);
+      saved.conflation.enabled = true;
+      await database.put('datasets', { id: 'my-custom', updatedAt: 1, dataset: saved.toJSON() });
+
+      const rapid = makeRapid();
+      await rapid.initAsync();
+      await rapid.startAsync();
+
+      const ds = rapid.catalog.get('my-custom');
+      assert.instanceOf(ds, Rapid.RapidDataset);
+      assert.isTrue(ds.custom);
+      assert.strictEqual(ds.color, '#00ff00');
+      assert.isTrue(ds.conflation.enabled);
+    });
+
+    it('deletes a custom dataset: its record, and its place in the catalog and the menu', async () => {
+      const rapid = makeRapid();
+      await rapid.initAsync();
+
+      const ds = new Rapid.RapidDataset(context, sample.customDataset);
+      rapid.catalog.set(ds.id, ds);
+      rapid.enableDatasets(ds.id);
+      await rapid.saveDatasetSettings(ds);
+      await rapid.deleteCustomDatasetAsync(ds.id);
+
+      assert.isFalse(rapid.catalog.has('my-custom'));
+      assert.isFalse(rapid.addedDatasetIDs.has('my-custom'));
+      assert.isUndefined(await database.get('datasets', 'my-custom'));
+    });
+
+    it('does not delete a dataset that the user did not add', async () => {
+      const rapid = makeRapid();
+      const ds = new Rapid.RapidDataset(context, sample.msBuildings);
+      rapid.catalog.set(ds.id, ds);
+      await rapid.deleteCustomDatasetAsync(ds.id);
+      assert.isTrue(rapid.catalog.has('msBuildings'));
     });
   });
 

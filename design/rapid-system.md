@@ -6,11 +6,12 @@ user has added to the Rapid menu and enabled, and works out which features the u
 accepted or ignored.
 
 This system is older than the design docs. This doc started in October 2026, when datasets
-became content that asset files can define, and records where it's heading from here.
+became a collection that asset files can define, and records where it's heading from here.
 
-> **Status:** Dataset assets are done (`datasets=` / `dataset_ids=`, `merge()`, `dataset.schema.json`).
-> Next: storing the user's custom datasets, with their data mapping and conflation settings, in
-> `DatabaseSystem` (see [`settings-system.md`](settings-system.md), Layered Settings v2, Step 2).
+> **Status:** Dataset assets are done (`datasets=` / `dataset_ids=`, `merge()`, `dataset.schema.json`),
+> and the user's custom datasets, with their data mapping and conflation settings, are kept in
+> `DatabaseSystem`. Next: export and import of a dataset definition (see
+> [`settings-system.md`](settings-system.md), Layered Settings v2, Step 4).
 
 ## What it owns
 
@@ -34,7 +35,7 @@ The catalog is built in layers, each able to replace or delete what the earlier 
 |---|---|---|---|---|
 | 1. Services | `MapWithAIService`, `EsriService`, `OvertureService` (`getAvailableDatasets()`) | The service | Color, `conflated` | `rapid.dataset.<id>` |
 | 2. Asset files | `rapid_datasets` (empty), `datasets=`, or `RapidSystem.merge()` | The service if `serviceID` is set, otherwise Rapid, from `sourceUrl` | Color, `conflated` | `rapid.dataset.<id>` |
-| 3. The user | `UiRapidAddDataset` (a URL or a dropped file) | Rapid, from `sourceUrl` or `sourceFileID` | Everything; can delete | `rapid.custom.<id>` (moving to `DatabaseSystem`) |
+| 3. The user | `UiRapidAddDataset` (a URL or a dropped file) | Rapid, from `sourceUrl` or `sourceFileID` | Everything; can delete | `DatabaseSystem` `datasets` store |
 
 Asset files use the same format as imagery, styles and schema (`assetID`, `scopes[]`), with a
 `datasets` collection keyed by datasetID, and `null` to delete. The merge rules are the same too (see
@@ -60,7 +61,9 @@ places that still assume a custom dataset has no service.
 - **`initAsync`:** registers the `rapid_datasets` asset and reads the `datasets=` url parameter
   *now*, then loads the requested dataset assets. Doing this at init means those datasets are already
   in the catalog when the menu lists are set up at startup. (Otherwise `_datasetsChanged()` would
-  drop their IDs from `dataset_ids=` as unknown.)
+  drop their IDs from `dataset_ids=` as unknown.) At the same time it reads the user's custom datasets
+  from the `DatabaseSystem` `datasets` store (`_readCustomDatasetsAsync()`). The records are kept in
+  memory, so the rest of startup stays synchronous.
 - **`startAsync`:** starts the services and gathers their datasets, then:
   1. `_rebuildCatalog()`: services, then the merged asset inputs in order.
   2. `_setupDatasetLists()`: the added and enabled lists, from `dataset_ids=` or from settings.
@@ -86,10 +89,14 @@ already loaded isn't fetched again.
 
 ## Decisions
 
-- **Datasets are content, not preferences.** A dataset with its data mapping and conflation rules is a
-  document, and asset files already handle documents (layers, `null` deletes, embedding apps
-  supplying their own). This replaced saving the full definition as dozens of flat settings keys,
-  which all synced to the OSM account. See [`settings-system.md`](settings-system.md).
+- **Datasets are a collection, not settings.** A dataset with its data mapping and conflation rules is
+  an item in the `datasets` collection of a document, and asset files already handle documents
+  (layers, `null` deletes, embedding apps supplying their own). This replaced saving the full
+  definition as dozens of flat settings keys, which all synced to the OSM account. See the vocabulary
+  in [`settings-system.md`](settings-system.md) (documents hold settings, collections and state).
+- **`addedDatasetIDs` / `enabledDatasetIDs` are state**, and `rapid.dataset.<id>` (color, `conflated`)
+  is the user's change to a collection item. Both still live in `SettingsSystem` until settings v2
+  moves state out and decides deep merge for collections.
 - **An asset file can replace or delete a service's dataset.** That's what an embedding app needs to
   hide datasets that don't apply to its users, the same way it can delete imagery today.
 - **Datasets from asset files load their data only once added to the Rapid menu.** That lets an
@@ -97,15 +104,21 @@ already loaded isn't fetched again.
   startup; that should probably become lazy too.)
 - **A user dataset whose datasetID an asset also uses** is hidden while that asset is loaded, but
   its saved definition is kept, since the asset may not be loaded next time.
-- **`RapidDataset.fromJSON` accepts real JSON types** (asset files), as well as the
-  `'true'`/`'false'` strings that the settings store produced. `toJSON` still writes strings until the
-  user's custom datasets move out of `SettingsSystem`.
+- **A custom dataset is saved as one record**, `{ id, updatedAt, dataset }` in the `DatabaseSystem`
+  `datasets` store, written whole by `saveDatasetSettings()`. `dataset` is `RapidDataset.toJSON()`: the
+  asset file shape (plus `id`), in plain JSON types, including the data mapping and the conflation
+  settings. Without `DatabaseSystem` (a CLI, some tests), a custom dataset lasts for the session only.
+  Deleting one goes through `deleteCustomDatasetAsync()`, which also deletes its stored file.
+- **No migration from the old `rapid.custom.*` settings.** That storage never shipped, so the user
+  adds those datasets again; `fromJSON` only takes plain JSON types.
+- **Only the user's own datasets save their conflation settings.** For a dataset from a service or
+  an asset file, only the color and `conflated` flag are saved. Saving changes to the conflation
+  settings of those is the user layer in settings v2.
 
 ## Next
 
-1. **The user's custom datasets in `DatabaseSystem`**, one record each, with real JSON types, and their
-   conflation settings saved with them. Migrate `rapid.custom.*` out of settings. Export and import a
-   dataset definition as a JSON file. (Settings v2, Steps 2 and 4.)
+1. **Export and import a dataset definition** as a JSON file, in the asset file format, so a team can
+   share a dataset with its data mapping and conflation rules. (Settings v2, Step 4.)
 2. **Stable IDs for external features**, so that accepted and ignored features survive a restart:
    a content hash or `isID` value plus a part index for features, and linear referencing for pieces
    of lines. See the backlog item "Stable IDs for external data".

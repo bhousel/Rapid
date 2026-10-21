@@ -13,18 +13,9 @@ import type { Context } from '../Context.ts';
 import type { Document as XmlDocument } from '@xmldom/xmldom';
 import type { FileRecord } from '../core/DatabaseSystem.ts';
 import type { GeoJSONProps } from '../data/GeoJSONData.ts';
-import type { TreeValue } from './TreeStore.ts';
 import type { Vec2 } from '@rapid-sdk/math';
 
 const RAPID_MAGENTA = '#da26d3';
-
-/**
- * Prop keys whose values are booleans. The settings store is string-only, so these
- * are persisted as `'true'`/`'false'` strings by `toJSON()` and coerced back to real
- * booleans by `fromJSON()`. Add new boolean props here so they round-trip correctly.
- */
-type RapidDatasetBooleanProp = 'beta' | 'conflated' | 'custom' | 'featured' | 'filtered' | 'hidden';
-const BOOLEAN_PROPS: RapidDatasetBooleanProp[] = ['beta', 'conflated', 'custom', 'featured', 'filtered', 'hidden'];
 
 
 /**
@@ -270,14 +261,16 @@ export class RapidDataset {
   }
 
   /**
-   * Returns a settings-safe JSON representation of this data element.
-   * Boolean flags are serialized as `'true'`/`'false'` strings because the settings
-   * store only holds string leaves. Use `fromJSON()` to reconstruct a `RapidDataset`.
-   * @return JSON representation of this data element
+   * Returns the definition of this dataset in plain JSON types, the same shape as a dataset in
+   * an asset file (see `data/schema/dataset.schema.json`), plus its `id`.
+   * Runtime state (`custom`, `filtered`, the loaded `extent`) is left out.
+   * Use `fromJSON()` to reconstruct a `RapidDataset`.
+   * @return JSON representation of this dataset
    */
-  public toJSON(): Record<string, TreeValue> {
-    const result: Record<string, TreeValue> = { id: this.id };
+  public toJSON(): Record<string, unknown> {
+    const result: Record<string, unknown> = { id: this.id };
 
+    if (this.serviceID)            result.serviceID = this.serviceID;
     if (this.categories.size)      result.categories = [...this.categories];
     if (this.dataUsed.length)      result.dataUsed = this.dataUsed.slice();
     if (this.color)                result.color = this.color;
@@ -289,10 +282,10 @@ export class RapidDataset {
     if (this.labelStringID)        result.labelStringID = this.labelStringID;
     if (this.descriptionStringID)  result.descriptionStringID = this.descriptionStringID;
 
-    // The settings store is string-only, so persist boolean flags as 'true'/'false' strings.
-    for (const key of BOOLEAN_PROPS) {
-      result[key] = String(this[key]);
-    }
+    result.beta = this.beta;
+    result.featured = this.featured;
+    result.hidden = this.hidden;
+    result.conflated = this.conflated;
 
     result.label = this.getLabel();
     result.description = this.getDescription();
@@ -304,30 +297,23 @@ export class RapidDataset {
       }
     }
 
+    result.conflation = structuredClone(this.conflation);
+
     return result;
   }
 
 
   /**
-   * Reconstructs a `RapidDataset` from its persisted JSON form (see `toJSON`), or from a
-   * dataset definition in an asset file. The settings store is string-only, so boolean flags
-   * may arrive as `'true'`/`'false'` strings and are coerced back to real booleans here.
-   * Real booleans (as in asset files) are used as they are.
+   * Reconstructs a `RapidDataset` from its JSON form (see `toJSON`), or from a dataset definition
+   * in an asset file.
    * @param context - Global shared application context
-   * @param json - The persisted settings object, or the dataset definition (not modified)
+   * @param json - The dataset definition, in plain JSON types (not modified)
    * @return A new `RapidDataset`
    */
   public static fromJSON(context: Context, json: Record<string, unknown>): RapidDataset {
     // Handle `dictionary` property separately from other props
     const { dictionary: dictJSON, ...rest } = json;
     const props = rest as Partial<RapidDatasetProps>;
-
-    for (const key of BOOLEAN_PROPS) {
-      const val = json[key];
-      if (typeof val === 'string') {
-        props[key] = (val === 'true');
-      }
-    }
 
     const ds = new RapidDataset(context, props);
 
