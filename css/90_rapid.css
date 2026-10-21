@@ -1269,11 +1269,39 @@ img.dataset-thumbnail.inverted {
   flex: 0 0 0px;
   flex-flow: column nowrap;
 }
-.modal-dataset-settings .field-row.row-conflation {
+.modal-dataset-settings .field-row.row-conflated,
+.modal-dataset-settings .field-row.row-showmatched {
   align-items: center;
+  margin-top: 5px;
 }
-.modal-dataset-settings .field-row.row-conflation .field-input {
+.modal-dataset-settings .field-row.row-conflated .field-label,
+.modal-dataset-settings .field-row.row-showmatched .field-label {
+  flex: 0 0 auto;   /* these labels are long, don't wrap them */
+  margin-right: 10px;
+}
+.ideditor[dir='rtl'] .modal-dataset-settings .field-row.row-conflated .field-label,
+.ideditor[dir='rtl'] .modal-dataset-settings .field-row.row-showmatched .field-label {
+  margin-right: 0;
+  margin-left: 10px;
+}
+.modal-dataset-settings .field-row.row-conflated .field-input,
+.modal-dataset-settings .field-row.row-showmatched .field-input {
   flex: 0 0 0px;   /* don't grow */
+}
+.modal-dataset-settings .conflation-rules-instructions {
+  margin-top: 10px;
+}
+.modal.rapid-modal .conflation-row td {
+  background: #333;
+}
+.modal.rapid-modal .conflation-row input {
+  display: inline;
+  margin: 0;
+  width: 100%;
+}
+.modal.rapid-modal .conflation-row input.invalid {
+  outline: 2px solid #e06e5f;
+  outline-offset: -2px;
 }
 
 /* Data Dictionary section */

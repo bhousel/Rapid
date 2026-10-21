@@ -553,8 +553,8 @@ to the Rapid menu.  The user can change its color, but not its definition.
         },
 
         // Matching against OSM: features that are already mapped are hidden
+        conflated: true,           // the on/off switch; the user can turn it off to see the raw data
         conflation: {
-          enabled: true,
           showMatched: false,
           rules: [{
             source: { geometry: 'line' },
@@ -586,6 +586,8 @@ is in `data/schema/dataset.schema.json`.
 * `extent` — Bounding extent, as `[[minLon, minLat], [maxLon, maxLat]]`
 * `itemUrl`, `licenseUrl`, `thumbnailUrl` — Links for more information, the license, and a thumbnail
 * `beta`, `featured`, `hidden` — Catalog flags
+* `conflated` — Whether to match the data against OSM using the `conflation` rules (the user can
+  turn this off to see the raw data)
 * `dictionary` — How the source attributes become OSM tags (`ignore`, `copy`, or `constant`)
 * `conflation` — Settings for matching the data against OSM (see `design/conflation-system.md`)
 

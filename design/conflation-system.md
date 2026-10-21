@@ -154,11 +154,12 @@ purpose, with OSM as one adapter. That would also allow matching one dataset aga
 
 ### Rules
 
-Each dataset gets a `conflation` settings object. It replaces the `conflated` boolean.
+Each dataset gets a `conflation` settings object. The dataset's `conflated` boolean is the on/off
+switch: the user (or a service) sets up the rules, then the user can switch it off to see the raw
+data, and back on to see the result of the rules.
 
 ```ts
 interface ConflationSettings {
-  enabled: boolean;
   showMatched: boolean;           // draw matched features in a muted style (off by default)
   rules: ConflationRule[];
 }
@@ -543,14 +544,32 @@ it overlaps existing data" to a definition in stage words, roughly:
 
 The final wording goes through normal string review (`rapid_dataset_settings.conflation.*`). Below
 it, the single "Conflation?" checkbox is replaced by:
-- an "enabled" switch and a "show matched features" switch
-- for each rule: source and target geometry, source and target property conditions (a simple
-  `key=value` list to start, since `PropMatcher.from` already parses that format), the keys that must
-  agree (`sameKeys`), and the "same" and "near" distances and angles
-- a live count of features in each status in the current view, so users can tune parameters and see
-  the effect right away
+- a "Match against OpenStreetMap" switch (`ds.conflated`) and a "Show features that are already
+  mapped" switch (`showMatched`) ✅
+- a table of rules, one row per rule, read like the data mapping table: source → target geometry,
+  "Same Tags" (`sameKeys`), and the "same" and "near" distances and angles. "Add Rule" and "Restore
+  Defaults" below it. Invalid fields are outlined, and OK stays disabled until they're fixed. ✅
+- still to do: source and target property conditions per rule (a simple `key=value` list to start,
+  since `PropMatcher.from` already parses that format). Until then, a rule's `props` are kept as they
+  are when the row is edited.
+- still to do: a live count of features in each status in the current view, so users can tune
+  parameters and see the effect right away (the modal covers the map, see the backlog item about
+  live tuning)
 
-Changing a parameter invalidates the dataset's results, and they're recomputed on the next draw.
+**Every dataset's rules can be changed, including datasets from services.** The services used to
+send data that was already conflated on their servers; that's buggy, and it's being shut down, so
+matching in the browser has to work for their datasets too. A custom dataset saves its rules with its
+definition; for a dataset from a service or an asset file, the user's changes (color, `conflated`, and
+`conflation`) are saved as a `changes` record in the `DatabaseSystem` `datasets` store (see
+[`rapid-system.md`](rapid-system.md)).
+
+Clicking OK invalidates the dataset's results, and they're recomputed on the next draw.
+
+Later kinds of matching, beyond line to line (Steps 8 and later):
+- **point → point or area:** a source point matches a target point, or a target area by its centroid
+  or by containment.
+- **area → line:** a source polygon (for example a sidewalk drawn as an area) is reduced to its
+  centerline, and that line is matched against target lines.
 
 ## Debug overlay (replaces the prototype)
 

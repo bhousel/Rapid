@@ -33,8 +33,8 @@ The catalog is built in layers, each able to replace or delete what the earlier 
 
 | Layer | Defined by | Data loaded by | User can change | Saved in |
 |---|---|---|---|---|
-| 1. Services | `MapWithAIService`, `EsriService`, `OvertureService` (`getAvailableDatasets()`) | The service | Color, `conflated` | `rapid.dataset.<id>` |
-| 2. Asset files | `rapid_datasets` (empty), `datasets=`, or `RapidSystem.merge()` | The service if `serviceID` is set, otherwise Rapid, from `sourceUrl` | Color, `conflated` | `rapid.dataset.<id>` |
+| 1. Services | `MapWithAIService`, `EsriService`, `OvertureService` (`getAvailableDatasets()`) | The service | Color, `conflated`, the conflation rules | `DatabaseSystem` `datasets` store (`changes`) |
+| 2. Asset files | `rapid_datasets` (empty), `datasets=`, or `RapidSystem.merge()` | The service if `serviceID` is set, otherwise Rapid, from `sourceUrl` | Color, `conflated`, the conflation rules | `DatabaseSystem` `datasets` store (`changes`) |
 | 3. The user | `UiRapidAddDataset` (a URL or a dropped file) | Rapid, from `sourceUrl` or `sourceFileID` | Everything; can delete | `DatabaseSystem` `datasets` store |
 
 Asset files use the same format as imagery, styles and schema (`assetID`, `scopes[]`), with a
@@ -94,9 +94,8 @@ already loaded isn't fetched again.
   (layers, `null` deletes, embedding apps supplying their own). This replaced saving the full
   definition as dozens of flat settings keys, which all synced to the OSM account. See the vocabulary
   in [`settings-system.md`](settings-system.md) (documents hold settings, collections and state).
-- **`addedDatasetIDs` / `enabledDatasetIDs` are state**, and `rapid.dataset.<id>` (color, `conflated`)
-  is the user's change to a collection item. Both still live in `SettingsSystem` until settings v2
-  moves state out and decides deep merge for collections.
+- **`addedDatasetIDs` / `enabledDatasetIDs` are state.** They still live in `SettingsSystem` until
+  settings v2 moves state out.
 - **An asset file can replace or delete a service's dataset.** That's what an embedding app needs to
   hide datasets that don't apply to its users, the same way it can delete imagery today.
 - **Datasets from asset files load their data only once added to the Rapid menu.** That lets an
@@ -104,16 +103,25 @@ already loaded isn't fetched again.
   startup; that should probably become lazy too.)
 - **A user dataset whose datasetID an asset also uses** is hidden while that asset is loaded, but
   its saved definition is kept, since the asset may not be loaded next time.
-- **A custom dataset is saved as one record**, `{ id, updatedAt, dataset }` in the `DatabaseSystem`
-  `datasets` store, written whole by `saveDatasetSettings()`. `dataset` is `RapidDataset.toJSON()`: the
-  asset file shape (plus `id`), in plain JSON types, including the data mapping and the conflation
-  settings. Without `DatabaseSystem` (a CLI, some tests), a custom dataset lasts for the session only.
-  Deleting one goes through `deleteCustomDatasetAsync()`, which also deletes its stored file.
-- **No migration from the old `rapid.custom.*` settings.** That storage never shipped, so the user
-  adds those datasets again; `fromJSON` only takes plain JSON types.
-- **Only the user's own datasets save their conflation settings.** For a dataset from a service or
-  an asset file, only the color and `conflated` flag are saved. Saving changes to the conflation
-  settings of those is the user layer in settings v2.
+- **What the user saved about a dataset is one record** in the `DatabaseSystem` `datasets` store,
+  `{ id, updatedAt, dataset?, changes? }`, written by `saveDatasetSettings()`:
+  - `dataset`: the whole definition of a custom dataset the user added, from `RapidDataset.toJSON()`
+    (the asset file shape plus `id`, in plain JSON types, including the data mapping and the
+    conflation settings).
+  - `changes`: the user's changes to a dataset from a service or an asset file: its color,
+    `conflated`, and `conflation` (the whole rules object). `_loadDatasetSettings()` applies them
+    over the definition. A record whose dataset isn't in the catalog right now is kept.
+  - A record can have both, when the user's own dataset shares a datasetID with an asset's dataset.
+
+  This is the "user's changes to collection items" from settings v2, decided field by field (a
+  changed field replaces the definition's). Without `DatabaseSystem` (a CLI, some tests), these last
+  for the session only. Deleting a custom dataset goes through `deleteCustomDatasetAsync()`, which
+  also deletes its stored file.
+- **No migration from the old `rapid.custom.*` or `rapid.dataset.*` settings.** That storage never
+  shipped, so the user sets those datasets up again; `fromJSON` only takes plain JSON types.
+- **The conflation rules of every dataset can be changed**, including datasets from services, whose
+  server-side conflation is buggy and being shut down. `conflated` is the on/off switch: the user
+  can switch it off to see the raw data, then on again to see the result of the rules.
 
 ## Next
 

@@ -541,7 +541,7 @@ Of the 40 paths in `SettingsSystem` today, only about 15 are settings. Sorted by
 |---|---|
 | **Settings** | `map.areaFill`, `imagery.opacity`, `imagery.favorites`, `filters.disabledFilters`, `validator.*`, `poweruser.*` (not `poweruser.was.*`), `ui.privacy.thirdPartyIcons`, `ui.mouseWheelInteraction` |
 | **State** | `ui.saw*`, `ui.walkthrough.*`, `ui.inspector.*`, `ui.disclosure.*`, `ui.entityIssues.*`, `ui.restrictions.*`, `ui.rawTagEditorView`, `ui.customData.url`, `imagery.lastUsed*`, `map.areaFillToggle`, `schema.presetRecents`, `rapid.addedDatasetIDs`, `rapid.enabledDatasetIDs`, `poweruser.was.*` |
-| **Collections** | `imagery.custom[0].template` (a user imagery source), `rapid.dataset.<id>` (the user's changes to a dataset), and the `DatabaseSystem` `datasets` store (the user's own datasets) |
+| **Collections** | `imagery.custom[0].template` (a user imagery source), and the `DatabaseSystem` `datasets` store (the user's own datasets, and their changes to other datasets; formerly `rapid.dataset.<id>`) |
 
 How it works:
 - **Systems register their settings**: path, default, type, description, allowed values, and whether
@@ -571,6 +571,10 @@ deletes, and scalars and arrays replace. That is `TreeStore.merge` plus `null` d
   a dataset's color is just `datasets: { fbRoads: { color: '#ff8800' } }` in their layer, the same
   collection that holds their own datasets. Then `rapid.dataset.*` settings and the `datasets` store
   become one thing, and the same goes for custom imagery.
+  - Datasets have taken the first step (October 2026): the user's changes to a dataset from a service
+    or an asset file are a `changes` record in the `datasets` store, next to their own datasets, and
+    `rapid.dataset.*` is gone. A changed field (color, `conflated`, `conflation`) replaces the
+    definition's; `conflation` is replaced as a whole. See [`rapid-system.md`](rapid-system.md).
 
 ### Layers
 
@@ -704,8 +708,8 @@ modeled on how VS Code documents its settings and extension points.
    - Systems that read settings update live on `settingschange`.
 4. **State moves out of settings** into its own document, not shown in the editor, with
    `registerSync` choosing what syncs.
-5. **Collections in the user layer:** decide deep merge, then move `rapid.dataset.*` and custom
-   imagery into the user's collections.
+5. **Collections in the user layer:** decide deep merge, then move custom imagery into the user's
+   collections. (Datasets: done, as `changes` records in the `datasets` store.)
 6. **Export / import.**
 7. **Deployment layer** (a `settings` block in asset files) **and a customization guide.**
 8. Later: a settings form view, like VS Code's settings UI.

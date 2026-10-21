@@ -50,8 +50,16 @@ to the part that exists.*
   saved with it in the `DatabaseSystem` `datasets` store whenever `rapid.saveDatasetSettings(ds)` runs.
   ✅ Verified live (Oct 21): Bryan re-added both datasets (sidewalks and crossings), set up their data
   mappings, applied the conflation rules; they persist in IndexedDB across reloads, and accepted lines
-  join the OSM basemap at the blue join points. Next for Step 6: the settings UI, which calls
-  `saveDatasetSettings` (today the rules are applied from a console snippet).
+  join the OSM basemap at the blue join points.
+- Step 6 (Conflation Settings UI) first version, in `UiRapidDatasetSettings`: the definition text, a
+  "Match against OpenStreetMap" switch (`ds.conflated` is now THE on/off switch; `conflation.enabled`
+  is gone), "Show features that are already mapped", and a rules table like the data mapping table.
+  Every dataset is editable, service ones too (their server-side conflation is going away); changes to
+  service/asset datasets are `changes` records in the `datasets` store (`rapid.dataset.*` is gone).
+  ✅ Tried in the browser on real data (Oct 21): validation, add/remove/restore, OK re-matches and saves
+  (0.5 m vs 3 m moved 65 sidewalks in view from matched to needs review), Cancel discards, service
+  datasets editable. Still to do: per-side `props` editing, live counts, live tuning; column widths
+  in the rules table are uneven (browser auto layout).
 - Settings direction (agreed Oct 21): "everything the user can change is a document", with three kinds
   inside: settings, collections, state. Target: a VS Code-style `settings.json` editor. Written up in
   `design/settings-system.md` (Vocabulary, The target: `settings.json`, Rollout v2 Steps 3–8).

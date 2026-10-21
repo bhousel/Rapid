@@ -1662,9 +1662,40 @@
       },
       "conflation": {
         "heading": "Conflation Settings",
-        "instruction": "This section controls how new data is merged or filtered where it overlaps existing data.",
-        "conflation": {
-          "label": "Conflation?"
+        "instruction": "Conflation compares this dataset with the OpenStreetMap data already on the map. Rapid matches each new feature with nearby existing features, and sorts them into Already mapped (hidden), Needs review, or New. Then you add what's new, and decide on the rest.",
+        "conflated": {
+          "label": "Match against OpenStreetMap"
+        },
+        "showmatched": {
+          "label": "Show features that are already mapped"
+        },
+        "rules_instruction": "Each rule says when a feature from this dataset is the same as an OpenStreetMap feature. Any one rule is enough. Distances are in meters, and angles in degrees. A feature within the review distance and angle, but not the same, needs review.",
+        "no_rules": "There are no rules, so nothing will be matched.",
+        "add_rule": "Add Rule",
+        "restore_defaults": "Restore Defaults",
+        "fields": {
+          "source": {
+            "label": "Source"
+          },
+          "target": {
+            "label": "OpenStreetMap"
+          },
+          "samekeys": {
+            "label": "Same Tags",
+            "placeholder": "e.g. highway"
+          },
+          "samedist": {
+            "label": "Distance"
+          },
+          "sameangle": {
+            "label": "Angle"
+          },
+          "neardist": {
+            "label": "Review Distance"
+          },
+          "nearangle": {
+            "label": "Review Angle"
+          }
         }
       },
       "dictionary": {

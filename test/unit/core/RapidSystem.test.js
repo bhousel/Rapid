@@ -609,19 +609,29 @@ describe('RapidSystem', () => {
       rapid.merge(sidewalks);       // the asset's `my-sidewalks` wins while it's loaded..
       rapid._loadDatasetSettings();
       assert.strictEqual(rapid.catalog.get('my-sidewalks').assetID, 'my_datasets');
-      assert.isTrue(rapid._customRecords.has('my-sidewalks'));   // ..but the user's definition is kept
+      assert.isDefined(rapid._datasetRecords.get('my-sidewalks').dataset);   // ..but the user's definition is kept
+
+      // Changing the asset's dataset keeps the user's own definition too
+      const asset = rapid.catalog.get('my-sidewalks');
+      asset.color = '#123456';
+      await rapid.saveDatasetSettings(asset);
+      const record = rapid._datasetRecords.get('my-sidewalks');
+      assert.isDefined(record.dataset);
+      assert.strictEqual(record.changes.color, '#123456');
     });
 
-    it('saves only the color and conflated settings for an asset dataset', () => {
+    it('saves the changes to an asset dataset, not its definition', async () => {
       const rapid = makeRapid();
       rapid.merge(sidewalks);
       const ds = rapid.catalog.get('my-sidewalks');
       ds.color = '#123456';
-      rapid.saveDatasetSettings(ds);
+      ds.conflated = true;
+      await rapid.saveDatasetSettings(ds);
 
-      const settings = context.systems.settings;
-      assert.deepEqual(settings.get('rapid.dataset.my-sidewalks'), { color: '#123456', conflated: 'false' });
-      assert.isFalse(rapid._customRecords.has('my-sidewalks'));
+      const record = rapid._datasetRecords.get('my-sidewalks');
+      assert.isUndefined(record.dataset);
+      assert.deepInclude(record.changes, { color: '#123456', conflated: true });
+      assert.deepEqual(record.changes.conflation, ds.conflation);
     });
   });
 
@@ -656,7 +666,7 @@ describe('RapidSystem', () => {
       await rapid.initAsync();
 
       const ds = new Rapid.RapidDataset(context, sample.customDataset);
-      ds.conflation.enabled = true;
+      ds.conflation.showMatched = true;
       ds.conflation.rules[0].sameDist = 4;
       rapid.catalog.set(ds.id, ds);
       await rapid.saveDatasetSettings(ds);
@@ -665,13 +675,14 @@ describe('RapidSystem', () => {
       assert.strictEqual(record.id, 'my-custom');
       assert.isNumber(record.updatedAt);
       assert.strictEqual(record.dataset.conflated, true);   // a real boolean
-      assert.isTrue(record.dataset.conflation.enabled);
+      assert.isTrue(record.dataset.conflation.showMatched);
       assert.strictEqual(record.dataset.conflation.rules[0].sameDist, 4);
+      assert.isUndefined(record.changes);
     });
 
     it('creates the saved custom datasets at startup', async () => {
       const saved = new Rapid.RapidDataset(context, sample.customDataset);
-      saved.conflation.enabled = true;
+      saved.conflation.showMatched = true;
       await database.put('datasets', { id: 'my-custom', updatedAt: 1, dataset: saved.toJSON() });
 
       const rapid = makeRapid();
@@ -681,8 +692,50 @@ describe('RapidSystem', () => {
       const ds = rapid.catalog.get('my-custom');
       assert.instanceOf(ds, Rapid.RapidDataset);
       assert.isTrue(ds.custom);
+      assert.isTrue(ds.conflated);
       assert.strictEqual(ds.color, '#00ff00');
-      assert.isTrue(ds.conflation.enabled);
+      assert.isTrue(ds.conflation.showMatched);
+    });
+
+    it('saves the changes to a dataset from a service, and applies them at startup', async () => {
+      const rapid = makeRapid();
+      await rapid.initAsync();
+      const svc = new Rapid.RapidDataset(context, sample.msBuildings);
+      rapid.catalog.set(svc.id, svc);
+
+      svc.color = '#123456';
+      svc.conflated = true;
+      svc.conflation.rules[0].sameDist = 7;
+      await rapid.saveDatasetSettings(svc);
+
+      const record = await database.get('datasets', 'msBuildings');
+      assert.isUndefined(record.dataset);
+      assert.deepInclude(record.changes, { color: '#123456', conflated: true });
+      assert.strictEqual(record.changes.conflation.rules[0].sameDist, 7);
+
+      // A new session, where the service provides a fresh `msBuildings`
+      const next = makeRapid();
+      await next.initAsync();
+      next._serviceDatasets = [new Rapid.RapidDataset(context, sample.msBuildings)];
+      next._rebuildCatalog();
+      next._loadDatasetSettings();
+
+      const ds = next.catalog.get('msBuildings');
+      assert.strictEqual(ds.color, '#123456');
+      assert.isTrue(ds.conflated);
+      assert.strictEqual(ds.conflation.rules[0].sameDist, 7);
+      assert.isFalse(ds.custom);
+    });
+
+    it('keeps the changes to a dataset that is not in the catalog now', async () => {
+      await database.put('datasets', { id: 'not-loaded', updatedAt: 1, changes: { color: '#123456' } });
+
+      const rapid = makeRapid();
+      await rapid.initAsync();
+      await rapid.startAsync();
+
+      assert.isFalse(rapid.catalog.has('not-loaded'));
+      assert.isDefined(await database.get('datasets', 'not-loaded'));
     });
 
     it('deletes a custom dataset: its record, and its place in the catalog and the menu', async () => {

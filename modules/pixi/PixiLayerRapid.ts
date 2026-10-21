@@ -606,18 +606,24 @@ export class PixiLayerRapid extends AbstractPixiLayer {
    * @return The style
    */
   protected _lineStyle(colorNum: number, status?: ConflationStatus): Partial<MatchedStyle> {
-    if (status === 'matched') {   // only drawn if the dataset shows already-mapped features
-      return {
-        casing: { opacity: 0 },
-        stroke: { color: colorNum, width: 3, opacity: MATCHED_OPACITY, cap: 'round', join: 'round' },
-        label: { color: colorNum, opacity: MATCHED_OPACITY }
-      };
-    }
-
-    const casingColor = (status === 'uncertain') ? NEEDS_REVIEW_COLOR : 0x444444;
-    const casingWidth = (status === 'uncertain') ? 7 : 5;
+// for now, don't adjust style per conflation status
+//    if (status === 'matched') {   // only drawn if the dataset shows already-mapped features
+//      return {
+//        casing: { opacity: 0 },
+//        stroke: { color: colorNum, width: 3, opacity: MATCHED_OPACITY, cap: 'round', join: 'round' },
+//        label: { color: colorNum, opacity: MATCHED_OPACITY }
+//      };
+//    }
+//
+//    const casingColor = (status === 'uncertain') ? NEEDS_REVIEW_COLOR : 0x444444;
+//    const casingWidth = (status === 'uncertain') ? 7 : 5;
+//    return {
+//      casing: { color: casingColor, width: casingWidth, cap: 'round', join: 'round' },
+//      stroke: { color: colorNum, width: 3, cap: 'round', join: 'round' },
+//      label: { color: colorNum }
+//    };
     return {
-      casing: { color: casingColor, width: casingWidth, cap: 'round', join: 'round' },
+      casing: { color: 0x444444, width: 5, cap: 'round', join: 'round' },
       stroke: { color: colorNum, width: 3, cap: 'round', join: 'round' },
       label: { color: colorNum }
     };

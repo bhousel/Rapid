@@ -93,7 +93,7 @@
       "type": "boolean"
     },
     "conflated": {
-      "description": "Whether the service already removes features that are mapped in OpenStreetMap (server-side conflation).",
+      "description": "Whether to match this dataset against OpenStreetMap in the browser, using the rules in `conflation`. The user can switch it off to see the raw data.",
       "type": "boolean"
     },
     "conflation": {
@@ -111,10 +111,6 @@
     "conflation": {
       "type": "object",
       "properties": {
-        "enabled": {
-          "description": "Whether to match this dataset against OpenStreetMap.",
-          "type": "boolean"
-        },
         "showMatched": {
           "description": "Whether to show features that are already mapped (muted), instead of hiding them.",
           "type": "boolean"

@@ -66,10 +66,12 @@ export interface ConflationRule {
   nearAngle?: number;
 }
 
-/** Per-dataset conflation settings, stored on `RapidDataset.conflation`. */
+/**
+ * Per-dataset conflation settings, stored on `RapidDataset.conflation`.
+ * Whether conflation runs at all is `RapidDataset.conflated`, a switch the user can flip to compare
+ * the raw data with the result of the rules.
+ */
 export interface ConflationSettings {
-  /** Whether conflation runs for this dataset */
-  enabled: boolean;
   /** Whether to draw "already mapped" features in a muted style, instead of hiding them */
   showMatched: boolean;
   /** The rules that decide sameness. Any one rule saying "same" is enough. */
@@ -223,7 +225,6 @@ interface FeatureTally {
  */
 export function conflationDefaults(): ConflationSettings {
   return {
-    enabled: false,
     showMatched: false,
     rules: [
       { source: { geometry: 'line' }, target: { geometry: 'line' }, sameDist: 3, sameAngle: DEFAULT_MAX_ANGLE, nearDist: 6, nearAngle: DEFAULT_MAX_ANGLE },
@@ -321,7 +322,7 @@ export class ConflationSystem extends AbstractSystem {
    * @return `true` if enabled
    */
   public isEnabled(ds: RapidDataset): boolean {
-    return !!ds.conflation?.enabled;
+    return !!ds.conflated;
   }
 
 

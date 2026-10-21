@@ -1,3 +1,4 @@
+import { conflationDefaults } from '../core/ConflationSystem.ts';
 import { select } from 'd3-selection';
 import { EventEmitter } from 'tseep/lib/ee-safe';
 import { RapidDataDictionary } from '../lib/RapidDataDictionary.ts';
@@ -8,6 +9,7 @@ import { UiRapidColorpicker } from './UiRapidColorpicker.ts';
 import { utilHashcode } from '@rapid-sdk/util';
 import { utilNoAuto, utilSafeURL } from '../util/index.ts';
 
+import type { ConflationRule } from '../core/ConflationSystem.ts';
 import type { Context } from '../Context.ts';
 import type { D3EnterSelection, D3Selection } from 'd3-selection';
 import type { GeoJSONData } from '../data/GeoJSONData.ts';
@@ -23,6 +25,45 @@ const RAPID_MAGENTA = '#da26d3';
 interface PartialDataTransform extends Partial<RapidDataTransform> {
   /** Unique row identifier for the html table */
   uuid?:  string | undefined;
+}
+
+/**
+ * A row in the conflation rules table, as the user is editing it.
+ * The fields hold what was typed, which may not be valid yet; `_checkConflation` validates them.
+ * `rule` is the rule the row started from, so that the parts this table doesn't show
+ * (the property conditions on each side) are kept.
+ */
+interface ConflationRow {
+  /** Unique row identifier for the html table */
+  uuid: string;
+  /** The rule this row started from */
+  rule: ConflationRule;
+  /** Source geometry: 'point', 'line', or 'area' */
+  source: string;
+  /** Target (OpenStreetMap) geometry: 'point', 'line', or 'area' */
+  target: string;
+  /** Tag keys that must have the same values, comma-separated */
+  sameKeys: string;
+  /** Distance (meters) within which features are the same */
+  sameDist: string;
+  /** Largest difference in direction (degrees) for lines to be the same */
+  sameAngle: string;
+  /** Distance (meters) within which a match needs review */
+  nearDist: string;
+  /** Largest difference in direction (degrees) for a match that needs review */
+  nearAngle: string;
+  /** The fields of this row that aren't valid, if any */
+  invalid?: Set<string>;
+}
+
+/**
+ * The conflation rules collected on this screen, along with whether they have passed validation.
+ */
+export interface ConflationInfo {
+  /* `true` if we can continue (no errors), false if not */
+  isOk: boolean
+  /* The rules, built from the rows that passed validation */
+  rules: ConflationRule[];
 }
 
 /**
@@ -51,8 +92,10 @@ export interface FieldInfo {
   thumbnailUrl?: string;
   /** Color */
   color?: string;
-  /** Conflation? */
-  conflation?: boolean;
+  /** Whether the dataset is matched against OpenStreetMap */
+  conflated?: boolean;
+  /** Whether to show features that are already mapped */
+  showMatched?: boolean;
 }
 
 /**
@@ -87,6 +130,8 @@ export class UiRapidDatasetSettings extends EventEmitter {
   protected _dataset: RapidDataset | null;
   /** A copy of the dataset dictionary transforms */
   protected _transforms: PartialDataTransform[] | null;
+  /** A copy of the dataset conflation rules, as rows of the rules table */
+  protected _conflationRows: ConflationRow[] | null;
   /** Unique ID for field identifiers */
   protected _uuid: string;
   public rerender: () => void;
@@ -101,6 +146,7 @@ export class UiRapidDatasetSettings extends EventEmitter {
 
     this._dataset = null;
     this._transforms = null;
+    this._conflationRows = null;
     this._uuid = crypto.randomUUID().slice(0, 8);
 
     // Child components
@@ -126,6 +172,7 @@ export class UiRapidDatasetSettings extends EventEmitter {
     this._renderFields = this._renderFields.bind(this);
     this._renderThumbnail = this._renderThumbnail.bind(this);
     this._renderConflation = this._renderConflation.bind(this);
+    this._renderConflationRules = this._renderConflationRules.bind(this);
     this._renderDictionary = this._renderDictionary.bind(this);
     this._renderButtons = this._renderButtons.bind(this);
     this._renderAreYouSure = this._renderAreYouSure.bind(this);
@@ -560,7 +607,8 @@ export class UiRapidDatasetSettings extends EventEmitter {
 
 
   /**
-   * Renders the conflation settings section.
+   * Renders the conflation settings section: the switches, and the table of rules.
+   * Every dataset can have its conflation settings changed, including ones from a service.
    * @param $parent - Parent D3Selection that this content should render itself into
    */
   protected _renderConflation($parent: D3Selection): void {
@@ -590,29 +638,30 @@ export class UiRapidDatasetSettings extends EventEmitter {
       .append('div')
       .attr('class', 'conflation-instructions');
 
-    // Render the conflation fields
-    const $$rows = $$conflation.selectAll('.field-row')
-      .data(['conflation'])     // only one field for now
+    // Render the switches, seeded from the dataset
+    const $$switches = $$conflation.selectAll('.field-row')
+      .data(['conflated', 'showmatched'])
       .enter()
       .append('div')
       .attr('class', (d: string) => `field-row row-${d}`);
 
-    $$rows
+    $$switches
       .append('label')
       .attr('for', (d: string) => `${d}-${uuid}`)
       .attr('class', 'field-label');
 
-    $$rows
+    $$switches
       .append('input')
       .attr('id', (d: string) => `${d}-${uuid}`)
       .attr('class', 'field-input')
       .attr('type', 'checkbox')
       .call(utilNoAuto)
+      .property('checked', (d: string) => (d === 'conflated') ? ds.conflated : ds.conflation.showMatched)
       .on('input', (e: InputEvent) => this.render());  // rerendering will also run validation
 
-    $$rows.selectAll(`#conflation-${uuid}`)
-      .property('checked', !!ds.conflated)
-      .property('value', ds.conflated ? 'true' : 'false');
+    $$conflation
+      .append('div')
+      .attr('class', 'conflation-rules-instructions');
 
     // update
     $conflation = $conflation.merge($$conflation);
@@ -621,9 +670,177 @@ export class UiRapidDatasetSettings extends EventEmitter {
       .text(l10n.t(`${prefix}.heading`));
     $conflation.selectAll('.conflation-instructions')
       .text(l10n.t(`${prefix}.instruction`));
+    $conflation.selectAll('.row-conflated .field-label')
+      .text(l10n.t(`${prefix}.conflated.label`));
+    $conflation.selectAll('.row-showmatched .field-label')
+      .text(l10n.t(`${prefix}.showmatched.label`));
 
-    $conflation.selectAll('.field-label')
-      .text((d: string) => l10n.t(`${prefix}.${d}.label`));
+    // Check the rules (this also makes a copy before changing anything).
+    this._checkConflation();
+    const rows = this._conflationRows!;
+
+    $conflation.selectAll('.conflation-rules-instructions')
+      .text(l10n.t(`${prefix}.rules_instruction`) + (rows.length ? '' : ' ' + l10n.t(`${prefix}.no_rules`)));
+
+    $conflation
+      .call(this._renderConflationRules);
+  }
+
+
+  /**
+   * Renders the table of conflation rules, one row per rule.
+   * It works like the data mapping table: each row reads source → target.
+   * @param $parent - Parent D3Selection that this content should render itself into
+   */
+  protected _renderConflationRules($parent: D3Selection): void {
+    const context = this.context;
+    const l10n = context.systems.l10n!;
+
+    const prefix = 'rapid_dataset_settings.conflation';  // prefix for text strings
+    const rows = this._conflationRows ?? [];
+    const columns = ['source', 'target', 'samekeys', 'samedist', 'sameangle', 'neardist', 'nearangle'];
+
+    let $table: D3Selection = $parent.selectAll('.conflation-table')
+      .data([0]);
+
+    // enter
+    const $$table: D3EnterSelection = $table.enter()
+      .append('table')
+      .attr('class', 'dictionary-table conflation-table');
+
+    /* Table Heading */
+    const $$headRow: D3EnterSelection = $$table
+      .append('thead')
+      .append('tr');
+
+    for (const column of columns) {
+      $$headRow
+        .append('th')
+        .attr('class', `conflation-${column}`);
+    }
+    $$headRow
+      .append('th')
+      .attr('class', 'conflation-actions shrink');
+
+    /* Table Body */
+    $$table
+      .append('tbody');
+
+    /* Table Footer */
+    const $$tableActions: D3EnterSelection = $$table
+      .append('tfoot')
+      .append('tr')
+      .append('td')
+      .attr('colspan', '9999');   // span all columns
+
+    $$tableActions
+      .append('button')
+      .attr('class', 'minor conflation-add-rule')
+      .on('click', (e: PointerEvent) => {
+        (e?.currentTarget as HTMLElement).blur();    // avoid keeping focus on the button - iD#4641
+        const rule: ConflationRule = { source: { geometry: 'line' }, target: { geometry: 'line' }, sameDist: 3 };
+        this._conflationRows!.push(this._rowFromRule(rule));
+        this.render();
+      });
+
+    $$tableActions
+      .append('button')
+      .attr('class', 'minor conflation-restore-defaults')
+      .on('click', (e: PointerEvent) => {
+        (e?.currentTarget as HTMLElement).blur();    // avoid keeping focus on the button - iD#4641
+        this._conflationRows = conflationDefaults().rules.map(rule => this._rowFromRule(rule));
+        this.render();
+      });
+
+    // update
+    $table = $table.merge($$table);
+
+    for (const column of columns) {
+      $table.selectAll(`thead th.conflation-${column}`)
+        .text(l10n.t(`${prefix}.fields.${column}.label`));
+    }
+    $table.selectAll('tfoot .conflation-add-rule')
+      .text(l10n.t(`${prefix}.add_rule`));
+    $table.selectAll('tfoot .conflation-restore-defaults')
+      .text(l10n.t(`${prefix}.restore_defaults`));
+
+
+    // Render the rows of the table..
+    const $tbody: D3Selection = $table.selectAll('tbody');
+    let $rows: D3Selection = $tbody.selectAll('.conflation-row')
+      .data(rows, (d: ConflationRow) => d.uuid);
+
+    // exit
+    $rows.exit()
+      .remove();
+
+    // enter
+    const $$rows: D3EnterSelection = $rows
+      .enter()
+      .append('tr')
+      .attr('class', 'conflation-row');
+
+    // Each cell holds an input that edits one field of the row.
+    // Geometry cells get a combobox, distance and angle cells take numbers.
+    const fields: Array<[string, keyof ConflationRow]> = [
+      ['source', 'source'], ['target', 'target'], ['samekeys', 'sameKeys'],
+      ['samedist', 'sameDist'], ['sameangle', 'sameAngle'], ['neardist', 'nearDist'], ['nearangle', 'nearAngle']
+    ];
+    for (const [column, field] of fields) {
+      const $$input: D3EnterSelection = $$rows
+        .append('td')
+        .attr('class', `conflation-${column}`)
+        .append('input')
+        .attr('class', 'field-input')
+        .call(utilNoAuto)
+        .on('change', (e: Event, d: ConflationRow) => {
+          const val = (e.currentTarget as HTMLInputElement).value;
+          const row = this._conflationRows!.find(row => row.uuid === d.uuid);
+          if (row) (row[field] as string) = val;
+          this.render();  // rerendering will also run validation
+        });
+
+      if (column === 'source' || column === 'target') {
+        $$input.each((d: ConflationRow, i: number, nodes: ArrayLike<HTMLInputElement>) => {
+          const comboData = ['point', 'line', 'area'].map((s: string) => ({ value: s }));
+          const combo = new UiCombobox(context, 'rapid-dark').data(comboData);
+          select(nodes[i]).call(combo.attach);
+        });
+      } else if (column !== 'samekeys') {
+        $$input
+          .attr('type', 'number')
+          .attr('min', '0')
+          .attr('max', column.endsWith('angle') ? '180' : null);
+      }
+    }
+
+    const $$actions: D3EnterSelection = $$rows
+      .append('td')
+      .attr('class', 'conflation-actions')
+      .append('div')
+      .attr('class', 'rapid-row-actions');
+
+    $$actions
+      .append('label')
+      .attr('class', 'conflation-action-trash rapid-row-action')
+      .on('click', (e: PointerEvent, d: ConflationRow) => {
+        e.preventDefault();
+        this._conflationRows = this._conflationRows!
+          .filter((row: ConflationRow) => row.uuid !== d.uuid);   // remove current row
+        this.render();
+      })
+      .call(uiIcon('#fas-xmark'));
+
+    // update
+    $rows = $rows.merge($$rows).order();
+
+    for (const [column, field] of fields) {
+      $rows.selectAll(`.conflation-${column} .field-input`)
+        .classed('invalid', (d: ConflationRow) => !!d.invalid?.has(field))
+        .property('value', (d: ConflationRow) => d[field] as string);
+    }
+    $rows.selectAll('.conflation-samekeys .field-input')
+      .attr('placeholder', l10n.t(`${prefix}.fields.samekeys.placeholder`));
   }
 
 
@@ -988,6 +1205,7 @@ export class UiRapidDatasetSettings extends EventEmitter {
 
     const fieldInfo = this._checkFields();
     const dictionaryInfo = this._checkDictionary();
+    const conflationInfo = this._checkConflation();
 
     /* Ok/Cancel/Delete Buttons */
     let $buttons: D3Selection = $parent.selectAll('.modal-section.buttons')
@@ -1026,7 +1244,7 @@ export class UiRapidDatasetSettings extends EventEmitter {
     $buttons = $buttons.merge($$buttons) as D3Selection;
 
     $buttons.selectAll('.ok-button')
-      .classed('secondary disabled', !fieldInfo.isOk || !dictionaryInfo.isOk)
+      .classed('secondary disabled', !fieldInfo.isOk || !dictionaryInfo.isOk || !conflationInfo.isOk)
       .text(l10n.t('text.okay'));
 
     $buttons.selectAll('.cancel-button')
@@ -1056,19 +1274,23 @@ export class UiRapidDatasetSettings extends EventEmitter {
 
     const fieldInfo = this._checkFields();
     const dictionaryInfo = this._checkDictionary();
-    if (!fieldInfo.isOk || !dictionaryInfo.isOk) {
+    const conflationInfo = this._checkConflation();
+    if (!fieldInfo.isOk || !dictionaryInfo.isOk || !conflationInfo.isOk) {
       this.render();
       return;
     }
 
     const context = this.context;
+    const conflation = context.systems.conflation;   // optional
     const gfx = context.systems.gfx!;
     const rapid = context.systems.rapid!;
     const scene = gfx.scene!;
 
     // All datasets allow these things to be changed:
     ds.color = fieldInfo.color ?? RAPID_MAGENTA;
-    ds.conflated = !!fieldInfo.conflation;
+    ds.conflated = !!fieldInfo.conflated;
+    ds.conflation = { showMatched: !!fieldInfo.showMatched, rules: conflationInfo.rules };
+    conflation?.invalidate(ds.id);   // match again with the new rules
 
     // Custom datasets allow more things to be changed:
     if (ds.custom) {
@@ -1294,9 +1516,11 @@ export class UiRapidDatasetSettings extends EventEmitter {
     const colorVal = colorNode?.value || '';
     result.color = colorVal.trim();
 
-    // check conflation
-    const conflationNode = $content.selectAll(`#conflation-${uuid}`).node() as HTMLInputElement | null;
-    result.conflation = conflationNode?.checked;
+    // check conflation switches
+    const conflatedNode = $content.selectAll(`#conflated-${uuid}`).node() as HTMLInputElement | null;
+    result.conflated = conflatedNode?.checked;
+    const showMatchedNode = $content.selectAll(`#showmatched-${uuid}`).node() as HTMLInputElement | null;
+    result.showMatched = showMatchedNode?.checked;
 
     // required values must be present
     result.isOk = !!(result.id && result.name && (result.sourceUrl || result.sourceFileID));
@@ -1377,6 +1601,83 @@ export class UiRapidDatasetSettings extends EventEmitter {
     result.isOk = true;  // for now
 
     return result;
+  }
+
+
+  /**
+   * Checks the conflation rules. On the first call this makes a working copy of the dataset's rules,
+   * as rows of the rules table. Each row is validated, and the invalid fields are noted on the row.
+   * @returns a ConflationInfo result set
+   */
+  protected _checkConflation(): ConflationInfo {
+    const result: ConflationInfo = { isOk: false, rules: [] };
+
+    const ds = this.dataset;
+    if (!ds) return result;   // need a dataset to do anything
+
+    // Make a copy of the original dataset rules before any changes.
+    if (!this._conflationRows) {
+      this._conflationRows = ds.conflation.rules.map(rule => this._rowFromRule(rule));
+    }
+
+    const geometries = new Set(['point', 'line', 'area']);
+    const isNumber = (s: string, max: number): boolean => {
+      const n = Number(s);
+      return s.trim() !== '' && Number.isFinite(n) && n >= 0 && n <= max;
+    };
+
+    result.isOk = true;
+    for (const row of this._conflationRows) {
+      row.invalid = new Set<string>();
+      if (!geometries.has(row.source.trim()))  row.invalid.add('source');
+      if (!geometries.has(row.target.trim()))  row.invalid.add('target');
+      if (!isNumber(row.sameDist, Infinity))   row.invalid.add('sameDist');   // required
+      if (row.sameAngle.trim() && !isNumber(row.sameAngle, 180))  row.invalid.add('sameAngle');
+      if (row.nearDist.trim() && !isNumber(row.nearDist, Infinity))  row.invalid.add('nearDist');
+      if (row.nearAngle.trim() && !isNumber(row.nearAngle, 180))  row.invalid.add('nearAngle');
+
+      if (row.invalid.size) {
+        result.isOk = false;
+        continue;
+      }
+
+      // Start from the original rule, so that the parts this table doesn't edit are kept.
+      const rule: ConflationRule = structuredClone(row.rule);
+      rule.source = { ...rule.source, geometry: row.source.trim() as ConflationRule['source']['geometry'] };
+      rule.target = { ...rule.target, geometry: row.target.trim() as ConflationRule['target']['geometry'] };
+      rule.sameDist = Number(row.sameDist);
+
+      const sameKeys = row.sameKeys.split(',').map(s => s.trim()).filter(Boolean);
+      if (sameKeys.length) rule.sameKeys = sameKeys;            else delete rule.sameKeys;
+      if (row.sameAngle.trim()) rule.sameAngle = Number(row.sameAngle); else delete rule.sameAngle;
+      if (row.nearDist.trim())  rule.nearDist = Number(row.nearDist);   else delete rule.nearDist;
+      if (row.nearAngle.trim()) rule.nearAngle = Number(row.nearAngle); else delete rule.nearAngle;
+
+      result.rules.push(rule);
+    }
+
+    return result;
+  }
+
+
+  /**
+   * Makes a row of the rules table from a conflation rule.
+   * @param rule - The conflation rule
+   * @returns a row for the table
+   */
+  protected _rowFromRule(rule: ConflationRule): ConflationRow {
+    const str = (n: number | undefined): string => (n === undefined ? '' : String(n));
+    return {
+      uuid: crypto.randomUUID().slice(0, 8),
+      rule: structuredClone(rule),
+      source: rule.source.geometry,
+      target: rule.target.geometry,
+      sameKeys: (rule.sameKeys ?? []).join(', '),
+      sameDist: str(rule.sameDist),
+      sameAngle: str(rule.sameAngle),
+      nearDist: str(rule.nearDist),
+      nearAngle: str(rule.nearAngle)
+    };
   }
 
 

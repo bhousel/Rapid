@@ -94,11 +94,11 @@ describe('RapidDataset', () => {
 
     it('includes a copy of the conflation settings', () => {
       const ds = new Rapid.RapidDataset(context, { id: 'conflation-test' });
-      ds.conflation.enabled = true;
+      ds.conflation.showMatched = true;
       ds.conflation.rules[0].sameDist = 5;
       const json = ds.toJSON();
 
-      assert.isTrue(json.conflation.enabled);
+      assert.isTrue(json.conflation.showMatched);
       assert.strictEqual(json.conflation.rules[0].sameDist, 5);
       json.conflation.rules[0].sameDist = 99;
       assert.strictEqual(ds.conflation.rules[0].sameDist, 5);   // a copy
@@ -113,7 +113,7 @@ describe('RapidDataset', () => {
         conflated: true,
         featured: false
       });
-      original.conflation.enabled = true;
+      original.conflation.showMatched = true;
 
       const restored = Rapid.RapidDataset.fromJSON(context, original.toJSON());
 

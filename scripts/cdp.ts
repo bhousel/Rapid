@@ -30,9 +30,10 @@ if (!page) {
   process.exit(1);
 }
 
-// The snippet is sent to the page as a string and runs there, wrapped as a function body.
+// The snippet is sent to the page as a string and runs there, wrapped as an async function body
+// (so it can `await`, and `return` a value or a promise).
 const run = async (body: string): Promise<void> => {
-  const result = await page.evaluate(`(() => {\n${body}\n})()`);
+  const result = await page.evaluate(`(async () => {\n${body}\n})()`);
   console.log(JSON.stringify(result, null, 2));
 };
 

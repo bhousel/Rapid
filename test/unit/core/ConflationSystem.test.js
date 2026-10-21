@@ -73,7 +73,8 @@ describe('ConflationSystem', () => {
   }
 
   function enable(rules) {
-    ds.conflation = { enabled: true, showMatched: false, rules: rules };
+    ds.conflated = true;
+    ds.conflation = { showMatched: false, rules: rules };
   }
 
 
@@ -113,7 +114,8 @@ describe('ConflationSystem', () => {
 
   describe('defaults', () => {
     it('datasets start with conflation disabled, and one rule per geometry type with no property conditions', () => {
-      assert.isFalse(ds.conflation.enabled);
+      assert.isFalse(ds.conflated);
+      assert.isFalse(conflation.isEnabled(ds));
       assert.sameMembers(ds.conflation.rules.map(r => r.source.geometry), ['line', 'point', 'area']);
       for (const rule of ds.conflation.rules) {
         assert.strictEqual(rule.target.geometry, rule.source.geometry);

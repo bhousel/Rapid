@@ -581,7 +581,7 @@ what the developer is seeing when they report a problem.
    exactly what the developer sees:
    - `bun run cdp shot <out.png>`: screenshot the tab, then read the image
    - `bun run cdp eval -e "<code>"` or `bun run cdp eval <file.js>`: run a snippet in the page; `return`
-     a value to get it back as JSON
+     a value to get it back as JSON (the snippet is an async function body, so it can `await`)
    - `bun run cdp reload [setup.js]`: reload, wait for Rapid to start, then run an optional setup snippet
    - `bun run cdp press <key>`: press a key (e.g. `Escape` closes the welcome screen after a reload)
 
@@ -589,6 +589,9 @@ Tips:
 - **Query state rather than squinting at screenshots.** Rapid's context is `globalThis.rapidContext`
   (systems under `rapidContext.systems`, the dev build also exposes `globalThis.Rapid`). A query like
   "which features matched, and what are their tags?" settles more than any screenshot.
+- **Rebuild what you changed.** `build:js` doesn't rebuild CSS (`build:css`) or strings from
+  `data/core.yaml` (`build:data`). After a CSS-only change, you can swap the stylesheet in place
+  instead of reloading: set a new `?v=` on the `rapid.css` `<link>`.
 - **Ask before reloading the developer's tab.** A reload picks up a new build but loses state that isn't
   saved, such as console-applied settings. Put that setup in a snippet and pass it to `reload`.
 - **Keep snippets, screenshots, and any data from the session out of the repo.** Use your scratch area.

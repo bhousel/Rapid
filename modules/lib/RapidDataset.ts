@@ -60,7 +60,7 @@ export interface RapidDatasetProps {
   filtered: boolean;
   /** Whether this dataset is hidden from the catalog (e.g. walkthrough data) */
   hidden: boolean;
-  /** Whether this dataset uses conflation */
+  /** Whether this dataset is matched against OpenStreetMap, using the rules in `conflation` */
   conflated: boolean;
   /** Whether this dataset is a "custom" dataset (i.e. setup by the user, who can edit or delete it) */
   custom: boolean;
@@ -127,7 +127,7 @@ export class RapidDataset {
   public filtered: boolean;
   /** Whether this dataset is hidden from the catalog (e.g. internal walkthrough data) */
   public hidden: boolean;
-  /** Whether this dataset uses conflation when merging features into the OSM graph */
+  /** Whether this dataset is matched against OpenStreetMap, using the rules in `conflation` */
   public conflated: boolean;
   /** Whether this dataset is a "custom" dataset (i.e. setup by the user) */
   public custom: boolean;
