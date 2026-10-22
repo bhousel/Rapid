@@ -267,9 +267,9 @@ export function conflationDefaults(): ConflationSettings {
   return {
     showMatched: false,
     rules: [
-      { source: { geometry: 'line' }, target: { geometry: 'line' }, sameDist: 3, sameAngle: DEFAULT_MAX_ANGLE, nearDist: 6, nearAngle: DEFAULT_MAX_ANGLE },
-      { source: { geometry: 'point' }, target: { geometry: 'point' }, sameDist: 3, nearDist: 6 },
-      { source: { geometry: 'area' }, target: { geometry: 'area' }, sameDist: 0 }
+      { source: { geometry: 'line' }, target: { geometry: 'line' }, sameDist: 3, sameAngle: DEFAULT_MAX_ANGLE, nearDist: 3, nearAngle: DEFAULT_MAX_ANGLE },
+      // { source: { geometry: 'point' }, target: { geometry: 'point' }, sameDist: 3, nearDist: 6 },
+      // { source: { geometry: 'area' }, target: { geometry: 'area' }, sameDist: 0 }
     ]
   };
 }

@@ -698,7 +698,7 @@ export class UiRapidDatasetSettings extends EventEmitter {
 
     const prefix = 'rapid_dataset_settings.conflation';  // prefix for text strings
     const rows = this._conflationRows ?? [];
-    const columns = ['source', 'target', 'samekeys', 'samedist', 'sameangle', 'neardist', 'nearangle'];
+    const columns = ['source', 'target', 'samekeys', 'samedist', 'sameangle' /*'neardist', 'nearangle'*/];
 
     let $table: D3Selection = $parent.selectAll('.conflation-table')
       .data([0]);
@@ -783,8 +783,13 @@ export class UiRapidDatasetSettings extends EventEmitter {
     // Each cell holds an input that edits one field of the row.
     // Geometry cells get a combobox, distance and angle cells take numbers.
     const fields: Array<[string, keyof ConflationRow]> = [
-      ['source', 'source'], ['target', 'target'], ['samekeys', 'sameKeys'],
-      ['samedist', 'sameDist'], ['sameangle', 'sameAngle'], ['neardist', 'nearDist'], ['nearangle', 'nearAngle']
+      ['source', 'source'],
+      ['target', 'target'],
+      ['samekeys', 'sameKeys'],
+      ['samedist', 'sameDist'],
+      ['sameangle', 'sameAngle'],
+      // ['neardist', 'nearDist'],
+      // ['nearangle', 'nearAngle']
     ];
     for (const [column, field] of fields) {
       const $$input: D3EnterSelection = $$rows
