@@ -1,12 +1,12 @@
 import { AbstractSystem } from './AbstractSystem.ts';
 import { GeoJSONData } from '../data/GeoJSONData.ts';
-import { geoMetersToWorld } from '../geo/geom.ts';
+import { geoMetersToWorld, geomHeadingAlong, geomLineDistances, geomPositionAlong } from '../geo/geom.ts';
 import { geomPathIntersections, projWgs84ToWorld, projWorldToWgs84, vecAngle, vecEqual, vecInterp, vecLength, vecProject } from '@rapid-sdk/math';
 import { PropMatcher } from '../lib/PropMatcher.ts';
 
 import type { AbstractData } from '../data/AbstractData.ts';
 import type { Context } from '../Context.ts';
-import type { CoverageBox } from '../geo/geom.ts';
+import type { CoverageBox, LinePosition } from '../geo/geom.ts';
 import type { GeoJSONProps } from '../data/GeoJSONData.ts';
 import type { GeometryPart } from '../lib/GeometryPart.ts';
 import type { Graph } from '../lib/Graph.ts';
@@ -23,6 +23,8 @@ const DEFAULT_MAX_ANGLE = 30;
 const MIN_SAMPLE_METERS = 1;
 /** An end of a run snaps to an existing OSM node if it is within this distance (meters). */
 const JOIN_SNAP_METERS = 1;
+/** Where the status changes along a line, the boundary between runs is found to within this distance (meters). */
+const BOUNDARY_METERS = 0.1;
 /** Which OSM geometries count as each kind of geometry named in a rule. */
 const TARGET_GEOMETRY: Record<ConflationGeometry, GeometryType[]> = {
   point: ['point', 'vertex'],
@@ -197,6 +199,12 @@ interface BoxRange {
   status: ConflationStatus;
   start: number;   // first box index
   end: number;     // last box index
+}
+
+/** Where one run ends and the next begins, along the source line (internal). */
+interface RunBoundary {
+  pos: LinePosition;     // the boundary
+  match?: BoxMatch;      // what matched there, if one side is already mapped (its last or first matched point)
 }
 
 /** The best match of one feature to one box, across all rules (internal). */
@@ -577,13 +585,13 @@ export class ConflationSystem extends AbstractSystem {
       return feature;
     };
 
-    for (const box of boxes) {
-      // For each target feature near this box, keep its best match across all rules:
-      // "same" beats "near", and a closer segment beats a farther one.
+    // For each target feature near a point on the source line, finds its best match across all rules:
+    // "same" beats "near", and a closer segment beats a farther one.
+    const hitsAt = (coord: Vec2, heading: number): Map<EntityID, BoxHit> => {
       const best = new Map<EntityID, BoxHit>();
       const query = {
-        minX: box.coord[0] - queryR, minY: box.coord[1] - queryR,
-        maxX: box.coord[0] + queryR, maxY: box.coord[1] + queryR
+        minX: coord[0] - queryR, minY: coord[1] - queryR,
+        maxX: coord[0] + queryR, maxY: coord[1] + queryR
       };
       const hits = active.length ? spatial.getItemsAtBox(segSpatialID, query) : [];
 
@@ -599,8 +607,8 @@ export class ConflationSystem extends AbstractSystem {
         if (!a || !b) continue;
 
         const entityID = feature.entity.id;
-        const distance = (vecProject(box.coord, [a, b])?.distance ?? Infinity) * metersPerWorld;
-        const angle = headingDiff(box.angle, vecAngle(a, b));
+        const distance = (vecProject(coord, [a, b])?.distance ?? Infinity) * metersPerWorld;
+        const angle = headingDiff(heading, vecAngle(a, b));
 
         for (let r = 0; r < active.length; r++) {
           const rule = active[r];
@@ -631,17 +639,28 @@ export class ConflationSystem extends AbstractSystem {
           }
         }
       }
+      return best;
+    };
 
-      // Triage the box by its best target features.
-      const strictHits: BoxHit[] = [];
-      const looseHits: BoxHit[] = [];
+    // Triages a point by its best target features.
+    const matchOf = (coord: Vec2, best: Map<EntityID, BoxHit>): BoxMatch => {
+      const strictHits = [...best.values()].filter(h => h.level === 2);
+      const looseHits = [...best.values()].filter(h => h.level === 1);
+      const hits = strictHits.length ? strictHits : looseHits;
+      const status: ConflationStatus = strictHits.length ? 'matched' : looseHits.length ? 'uncertain' : 'unmatched';
+      hits.sort((a, b) => a.distance - b.distance);
+      return { coord: coord, status: status, entityIDs: hits.map(h => h.entityID), wayIDs: hits.map(h => h.wayID) };
+    };
+
+    for (const box of boxes) {
+      const best = hitsAt(box.coord, box.angle);
+
+      // Tally the candidates, then triage the box by its best target features.
       for (const h of best.values()) {
         const tally = tallies.get(h.entityID) ?? { strict: 0, loose: 0, distance: 0, angle: 0, wayIDs: new Set<EntityID>() };
         if (h.level === 2) {
-          strictHits.push(h);
           tally.strict++;
         } else {
-          looseHits.push(h);
           tally.loose++;
         }
         tally.distance += h.distance;
@@ -649,18 +668,7 @@ export class ConflationSystem extends AbstractSystem {
         tally.wayIDs.add(h.wayID);
         tallies.set(h.entityID, tally);
       }
-
-      const boxMatch = (status: ConflationStatus, hits: BoxHit[]): BoxMatch => {
-        hits.sort((a, b) => a.distance - b.distance);
-        return { coord: box.coord, status: status, entityIDs: hits.map(h => h.entityID), wayIDs: hits.map(h => h.wayID) };
-      };
-      if (strictHits.length) {
-        boxMatches.push(boxMatch('matched', strictHits));
-      } else if (looseHits.length) {
-        boxMatches.push(boxMatch('uncertain', looseHits));
-      } else {
-        boxMatches.push(boxMatch('unmatched', []));
-      }
+      boxMatches.push(matchOf(box.coord, best));
     }
 
     // Score: matched boxes count 1, uncertain boxes count 0.5.
@@ -725,31 +733,71 @@ export class ConflationSystem extends AbstractSystem {
 
     // Runs.
     const ranges = this._lineRanges(boxMatches, boxes, source, metersPerWorld, spacing);
+
+    // Samples are a spacing apart, so where the status changes between two of them, find where it
+    // changes more precisely: test points in between, halving the gap until it is under BOUNDARY_METERS.
+    // Each boundary is on the already-mapped side, if there is one, so that a run that isn't mapped
+    // reaches exactly to where the mapped stretch ends, and joins it there.
+    const dist = geomLineDistances(source);
+    const window = geoMetersToWorld(spacing, lat);   // the same heading window as the samples
+    const distOf = (pos: { index: number; t: number }) => dist[pos.index] + pos.t * (dist[pos.index + 1] - dist[pos.index]);
+
+    const boundaries: RunBoundary[] = [];   // `boundaries[i]` is between `ranges[i]` and `ranges[i + 1]`
+    for (let i = 0; i < ranges.length - 1; i++) {
+      const before = ranges[i];
+      const after = ranges[i + 1];
+      let lo = distOf(boxes[before.end]);
+      let hi = distOf(boxes[after.start]);
+      let loMatch = boxMatches[before.end];
+      let hiMatch = boxMatches[after.start];
+
+      while ((hi - lo) * metersPerWorld > BOUNDARY_METERS) {
+        const mid = (lo + hi) / 2;
+        const pos = geomPositionAlong(source, dist, mid);
+        const match = matchOf(pos.coord, hitsAt(pos.coord, geomHeadingAlong(source, dist, mid, window)));
+        if (match.status === before.status) {
+          lo = mid;
+          loMatch = match;
+        } else {
+          hi = mid;
+          hiMatch = match;
+        }
+      }
+
+      if (before.status === 'matched') {
+        boundaries.push({ pos: geomPositionAlong(source, dist, lo), match: loMatch });
+      } else if (after.status === 'matched') {
+        boundaries.push({ pos: geomPositionAlong(source, dist, hi), match: hiMatch });
+      } else {
+        boundaries.push({ pos: geomPositionAlong(source, dist, (lo + hi) / 2) });
+      }
+    }
+
     const toWgs84 = (coords: Vec2[]) => coords.map(coord => projWorldToWgs84(coord));
+    const lineWayOf = (match: BoxMatch | undefined): EntityID | undefined =>
+      match?.wayIDs.find(wayID => features.get(wayID)?.geometry === 'line');
+
     const runs = ranges.map((range, i): LineRun => {
       const prev = ranges[i - 1];
       const next = ranges[i + 1];
+      const start = boundaries[i - 1]?.pos ?? boxes[range.start];
+      const end = boundaries[i]?.pos ?? boxes[range.end];
       if (range.status === 'matched') {
-        return { status: range.status, coords: toWgs84(subLine(source, boxes[range.start], boxes[range.end])) };
+        return { status: range.status, coords: toWgs84(subLine(source, start, end)) };
       }
 
-      // A run that isn't already mapped extends into a neighboring already-mapped stretch,
+      // A run that isn't already mapped reaches to where a neighboring already-mapped stretch ends,
       // and joins the OSM way that matched there (if that way is a line, not an area's edge).
-      const startBox = prev?.status === 'matched' ? boxes[prev.end] : boxes[range.start];
-      const endBox = next?.status === 'matched' ? boxes[next.start] : boxes[range.end];
-      let coords = subLine(source, startBox, endBox);
+      let coords = subLine(source, start, end);
       const run: LineRun = { status: range.status, coords: [] };
 
-      const lineWayAt = (boxIndex: number): EntityID | undefined =>
-        boxMatches[boxIndex].wayIDs.find(wayID => features.get(wayID)?.geometry === 'line');
-
       if (prev?.status === 'matched') {
-        run.startJoin = this._joinPoint(lineWayAt(prev.end), startBox.coord, graph, coordOf, metersPerWorld);
+        run.startJoin = this._joinPoint(lineWayOf(boundaries[i - 1].match), positionOf(source, start), graph, coordOf, metersPerWorld);
       } else if (!prev) {
         run.startJoin = endJoinAt(source[0]);
       }
       if (next?.status === 'matched') {
-        run.endJoin = this._joinPoint(lineWayAt(next.start), endBox.coord, graph, coordOf, metersPerWorld);
+        run.endJoin = this._joinPoint(lineWayOf(boundaries[i].match), positionOf(source, end), graph, coordOf, metersPerWorld);
       } else if (!next) {
         run.endJoin = endJoinAt(source.at(-1)!);
       }
@@ -923,26 +971,26 @@ function headingDiff(a: number, b: number): number {
 
 
 /**
- * Returns the position of a box center along a line.
+ * Returns the point at a position along a line (a box center, or a run boundary).
  * @param source - The line, in world coordinates
- * @param box - The box
+ * @param pos - The position: a segment index, and how far along it
  * @return World coordinate
  */
-function positionOf(source: Vec2[], box: CoverageBox): Vec2 {
-  const a = source[box.index];
-  const b = source[box.index + 1] ?? a;
-  return vecInterp(a, b, box.t);
+function positionOf(source: Vec2[], pos: { index: number; t: number }): Vec2 {
+  const a = source[pos.index];
+  const b = source[pos.index + 1] ?? a;
+  return vecInterp(a, b, pos.t);
 }
 
 
 /**
- * Cuts the stretch of a line between two box centers.
+ * Cuts the stretch of a line between two positions along it (box centers, or run boundaries).
  * @param source - The line, in world coordinates
- * @param from - The box where the stretch starts
- * @param to - The box where the stretch ends
+ * @param from - The position where the stretch starts
+ * @param to - The position where the stretch ends
  * @return The sub-line, in world coordinates
  */
-function subLine(source: Vec2[], from: CoverageBox, to: CoverageBox): Vec2[] {
+function subLine(source: Vec2[], from: { index: number; t: number }, to: { index: number; t: number }): Vec2[] {
   const coords: Vec2[] = [positionOf(source, from)];
   for (let i = from.index + 1; i <= to.index; i++) {
     coords.push(source[i]);

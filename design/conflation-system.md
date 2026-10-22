@@ -239,8 +239,18 @@ nothing to migrate.
 ### Stage 1: candidates and measures
 
 Each source line is sampled with `part.computeCoverage(spacing)` (cached for each radius), where the
-spacing is the smallest `sameDist` among the line rules (at least 1 m). That sets the resolution of
-runs. Each sample's query box reaches out to the largest `nearDist`, so "near" targets are found too.
+spacing is the smallest `sameDist` among the line rules (at least 1 m). Each sample's query box
+reaches out to the largest `nearDist`, so "near" targets are found too.
+
+**Samples are evenly spaced along the whole line** (`geomCoverageBoxes`), at most `spacing` apart and
+including both ends, however many vertices the line has. (An earlier version sampled each segment
+separately, with a sample at every vertex, so curves drawn with many short segments were sampled two
+or three times as densely as straight stretches, and counted for more in the measures.) Each sample's
+heading is measured over a window about one spacing long, centered on it (`geomHeadingAlong`), not
+taken from the one segment it sits on. That ignores the noise of short segments on a curve, which
+used to fail the angle test and leave "needs review" samples at corners. Right at a sharp turn, the
+heading is in between the two directions, so a boundary there lands a little before the vertex
+(about 0.4 m for a 90° turn at 3 m spacing).
 The query has two phases: a quick bounding-box search over the RBush index (`SpatialSystem`), then
 a precise test in `ConflationSystem` (a plain filter), using `vec*` and `geom*` helpers from
 `@rapid-sdk/math`. Each segment's distance and angle are computed once, then checked against every
@@ -391,10 +401,15 @@ A run's data element has an id based on where the run starts along the line
 
 **Cutting runs out of a line.** A run is cut from the original geometry, not rebuilt from box centers.
 `CoverageBox` carries the segment `index` and parameter `t` of its center, so the start and end of a
-run map to exact positions on the source line. Boxes are about one sample spacing apart, so where a run that
-isn't matched meets a matched run, it is extended to the nearest matched box. That end is then
-projected onto the OSM way that matched there (the closest one whose feature is a line; a run never
-joins the edge of an area). The projection is the `JoinPoint`.
+run map to exact positions on the source line.
+
+**Run boundaries are refined.** Boxes are about one sample spacing apart, so where two neighboring boxes
+differ in status, the point where the status changes is found by testing points in between, halving the
+gap until it is under 10 cm (`BOUNDARY_METERS`; about 5 extra tests at 3 m spacing). Neighboring runs
+meet exactly at that boundary, with no gap. Where one side is matched, the boundary is its last (or
+first) matched point, so a run that isn't matched reaches exactly to where the mapped stretch ends.
+That end is then projected onto the OSM way that matched there (the closest one whose feature is a
+line; a run never joins the edge of an area). The projection is the `JoinPoint`.
 If an existing node of that way is within 1 m of it, the run joins at that node and no new node is
 added. In practice, a run joins an existing node where the OSM way ends, and joins mid-segment
 where the new line leaves an OSM way and comes back to it.

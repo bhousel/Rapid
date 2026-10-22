@@ -25,19 +25,24 @@ export interface CoverageBox extends BBox {
 /**
  * Covers a geometry (point or polyline) with a chain of square boxes — a fast,
  * quantized approximation of a buffer.  This is the building block for conflation
- * coverage (e.g. "which parts of this sidewalk already exist in OSM") and is also
- * used for rope-label placement along lines.
+ * coverage (e.g. "which parts of this sidewalk already exist in OSM").
  *
  * Behavior by input:
  * - **Single point** (`coords.length === 1`): one box centered on the point.
- * - **Polyline** (`coords.length >= 2`): boxes placed every `step` units along each
- *   segment (including segment endpoints), each carrying that segment's heading angle.
- *   Shared vertices between consecutive segments are not double-covered.
+ * - **Polyline** (`coords.length >= 2`): box centers evenly spaced along the whole line,
+ *   at most `step` apart, including both ends. The spacing doesn't depend on where the
+ *   vertices are, so a curve drawn with many short segments gets no more boxes than a
+ *   straight line of the same length. (Like `geomLineSegments`, which is for markers
+ *   along a line, but this one includes the ends and records where each box is.)
+ *
+ * Each box's `angle` is the heading of the line over a window about one `step` long,
+ * centered on the box (shifted to stay on the line at its ends). That smooths out the
+ * noise of short segments on a curve, and follows the line around real turns. Right at a
+ * sharp corner, the heading is in between the two directions.
  *
  * The function is unit-agnostic: `radius` and `step` are interpreted in the same planar
  * units as `coords`.  For metric conflation in world coordinates, the caller converts a
- * meters radius to world units first; for pixel-space label placement, callers pass pixel
- * sizes directly.
+ * meters radius to world units first.
  *
  * Coverage guarantee: a box of half-size `radius` centered at points spaced `step` apart
  * fully covers the line between centers when `step <= 2 * radius`.  The default `step`
@@ -45,7 +50,7 @@ export interface CoverageBox extends BBox {
  *
  * @param  coords - The point (1 coord) or polyline (2+ coords) to cover
  * @param  radius - Half-size of each square box, in the same units as `coords`
- * @param  step   - Spacing between box centers along the line (defaults to `radius`)
+ * @param  step   - Most spacing between box centers along the line (defaults to `radius`)
  * @return An array of coverage boxes (empty if `coords` is empty or `radius <= 0`)
  */
 export function geomCoverageBoxes(coords: Vec2[], radius: number, step: number = radius): CoverageBox[] {
@@ -71,29 +76,112 @@ export function geomCoverageBoxes(coords: Vec2[], radius: number, step: number =
     return boxes;
   }
 
-  const stepLen = step > 0 ? step : radius;
-
-  // Walk each segment, placing box centers every `stepLen` units (including endpoints).
-  for (let i = 0; i < coords.length - 1; i++) {
-    const a = coords[i];
-    const b = coords[i + 1];
-    const len = vecLength(a, b);
-    if (len === 0) continue;   // skip zero-length segments (covered by neighbors)
-
-    const angle = vecAngle(a, b);
-    const n = Math.max(1, Math.ceil(len / stepLen));
-    for (let k = 0; k <= n; k++) {
-      if (i > 0 && k === 0) continue;   // shared vertex already covered by the previous segment
-      boxes.push(makeBox(vecInterp(a, b, k / n), angle, i, k / n));
-    }
-  }
+  const dist = geomLineDistances(coords);
+  const total = dist.at(-1)!;
 
   // Degenerate polyline (all coincident points) - fall back to a single box.
-  if (!boxes.length) {
+  if (total === 0) {
     boxes.push(makeBox([coords[0][0], coords[0][1]], 0, 0, 0));
+    return boxes;
+  }
+
+  // Evenly spaced along the whole line, at most `stepLen` apart, including both ends.
+  const stepLen = step > 0 ? step : radius;
+  const n = Math.max(1, Math.ceil(total / stepLen));
+
+  for (let k = 0; k <= n; k++) {
+    const d = (k === n) ? total : total * k / n;
+    const pos = geomPositionAlong(coords, dist, d);
+    const angle = geomHeadingAlong(coords, dist, d, stepLen);
+    boxes.push(makeBox(pos.coord, angle, pos.index, pos.t));
   }
 
   return boxes;
+}
+
+
+/** A position along a line. */
+export interface LinePosition {
+  /** Index of the segment the position is on (from `coords[index]` to `coords[index + 1]`) */
+  index: number;
+  /** How far along that segment, from `0` (start) to `1` (end) */
+  t: number;
+  /** The point itself */
+  coord: Vec2;
+}
+
+
+/**
+ * Returns the distance along a line to each of its vertices.
+ * Pass the result to `geomPositionAlong` and `geomHeadingAlong`.
+ * @param  coords - The line
+ * @return Distances, one per vertex, starting at `0`
+ */
+export function geomLineDistances(coords: Vec2[]): number[] {
+  const dist: number[] = [0];
+  for (let i = 1; i < coords.length; i++) {
+    dist.push(dist[i - 1] + vecLength(coords[i - 1], coords[i]));
+  }
+  return dist;
+}
+
+
+/**
+ * Finds the position at a distance along a line. It is never on a zero-length segment, and a
+ * position right on a vertex is at the start of the segment that follows it (or at the end of the
+ * last segment).
+ * @param  coords - The line (2 or more coords, not all the same point)
+ * @param  dist - The distance to each vertex, from `geomLineDistances(coords)`
+ * @param  d - The distance along the line (clamped to the line)
+ * @return The position
+ */
+export function geomPositionAlong(coords: Vec2[], dist: number[], d: number): LinePosition {
+  const lastSegment = coords.length - 2;
+  let lo = 0;
+  let hi = lastSegment;
+  while (lo < hi) {   // the last segment that starts at or before `d`
+    const mid = (lo + hi + 1) >> 1;
+    if (dist[mid] <= d) lo = mid; else hi = mid - 1;
+  }
+  let index = lo;
+  while (index > 0 && dist[index + 1] === dist[index]) index--;
+  while (index < lastSegment && dist[index + 1] === dist[index]) index++;
+
+  const len = dist[index + 1] - dist[index];
+  const t = (len > 0) ? Math.min(1, Math.max(0, (d - dist[index]) / len)) : 0;
+
+  const a = coords[index];
+  const b = coords[index + 1];
+  const coord: Vec2 = (t === 0) ? [a[0], a[1]] : (t === 1) ? [b[0], b[1]] : vecInterp(a, b, t);
+  return { index: index, t: t, coord: coord };
+}
+
+
+/**
+ * Returns the heading of a line around a distance along it: the direction from the point half a
+ * window behind to the point half a window ahead. Near an end of the line, the window is shifted to
+ * stay on the line. Measuring over a window smooths out the noise of short segments on a curve.
+ * @param  coords - The line (2 or more coords, not all the same point)
+ * @param  dist - The distance to each vertex, from `geomLineDistances(coords)`
+ * @param  d - The distance along the line
+ * @param  window - The length of the window, in the same units as `coords`
+ * @return Heading angle, in radians
+ */
+export function geomHeadingAlong(coords: Vec2[], dist: number[], d: number, window: number): number {
+  const total = dist.at(-1)!;
+  let lo = d - window / 2;
+  let hi = d + window / 2;
+  if (lo < 0) {
+    hi = Math.min(total, hi - lo);
+    lo = 0;
+  }
+  if (hi > total) {
+    lo = Math.max(0, lo - (hi - total));
+    hi = total;
+  }
+  const a = geomPositionAlong(coords, dist, lo).coord;
+  const b = geomPositionAlong(coords, dist, hi).coord;
+  return vecAngle(a, b);
 }
 
 

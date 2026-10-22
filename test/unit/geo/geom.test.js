@@ -199,7 +199,7 @@ describe('geomCoverageBoxes', () => {
     assert.deepEqual(boxes[boxes.length - 1].coord, [10, 0]);
   });
 
-  it('records the heading angle of each segment', () => {
+  it('records the heading of the line at each box', () => {
     // first segment goes east (angle 0), second goes north (angle +PI/2 in y-up math space)
     const boxes = Rapid.geomCoverageBoxes([[0, 0], [10, 0], [10, 10]], 1, 5);
     const eastBoxes = boxes.filter(b => b.angle === 0);
@@ -208,10 +208,45 @@ describe('geomCoverageBoxes', () => {
     assert.ok(northBoxes.length > 0);
   });
 
-  it('records the segment index and position along it for each box', () => {
-    // length 10 each, step 5 -> segment 0 at t=0, 0.5, 1; segment 1 at t=0.5, 1 (its t=0 is the shared vertex)
+  it('measures the heading over a window, so a box right at a sharp corner gets the direction in between', () => {
     const boxes = Rapid.geomCoverageBoxes([[0, 0], [10, 0], [10, 10]], 1, 5);
-    assert.deepEqual(boxes.map(b => [b.index, b.t]), [[0, 0], [0, 0.5], [0, 1], [1, 0.5], [1, 1]]);
+    const corner = boxes.find(b => b.coord[0] === 10 && b.coord[1] === 0);
+    assert.ok(Math.abs(corner.angle - Math.PI / 4) < 1e-9);
+  });
+
+  it('smooths the heading of a line made of short, noisy segments', () => {
+    // A line heading east, drawn as 0.5-long segments that wiggle up and down by 0.1 (about ±11°).
+    const coords = [];
+    for (let i = 0; i <= 40; i++) {
+      coords.push([i * 0.5, (i % 2) ? 0.1 : 0]);
+    }
+    const boxes = Rapid.geomCoverageBoxes(coords, 2, 4);
+    for (const box of boxes) {
+      assert.ok(Math.abs(box.angle) < 0.03);   // under 2°
+    }
+  });
+
+  it('spaces the boxes evenly along the whole line, however many vertices it has', () => {
+    // A line of length 20 drawn with 40 short segments still gets boxes at 0, 5, 10, 15, 20.
+    const coords = [];
+    for (let i = 0; i <= 40; i++) {
+      coords.push([i * 0.5, 0]);
+    }
+    const boxes = Rapid.geomCoverageBoxes(coords, 1, 5);
+    assert.deepEqual(boxes.map(b => b.coord[0]), [0, 5, 10, 15, 20]);
+  });
+
+  it('spaces the boxes evenly across vertices, not segment by segment', () => {
+    // Segments of length 3 and 3, step 4: the whole line is 6 long, so 2 intervals of 3, not 2 per segment.
+    const boxes = Rapid.geomCoverageBoxes([[0, 0], [3, 0], [6, 0]], 1, 4);
+    assert.deepEqual(boxes.map(b => b.coord), [[0, 0], [3, 0], [6, 0]]);
+  });
+
+  it('records the segment index and position along it for each box', () => {
+    // length 10 each, step 5 -> boxes at 0, 5, 10, 15, 20 along the line.
+    // A box right on a vertex is at the start of the segment that follows it (t = 0).
+    const boxes = Rapid.geomCoverageBoxes([[0, 0], [10, 0], [10, 10]], 1, 5);
+    assert.deepEqual(boxes.map(b => [b.index, b.t]), [[0, 0], [0, 0.5], [1, 0], [1, 0.5], [1, 1]]);
   });
 
   it('does not double-cover shared vertices between segments', () => {
@@ -241,6 +276,13 @@ describe('geomCoverageBoxes', () => {
     const boxes = Rapid.geomCoverageBoxes([[5, 5], [5, 5], [5, 5]], 2);
     assert.equal(boxes.length, 1);
     assert.deepEqual(boxes[0].coord, [5, 5]);
+  });
+
+  it('includes both ends of the line exactly', () => {
+    const coords = [[0.1, 0.2], [3.7, 1.1], [9.3, 4.4]];
+    const boxes = Rapid.geomCoverageBoxes(coords, 1, 2);
+    assert.deepEqual(boxes[0].coord, coords[0]);
+    assert.deepEqual(boxes.at(-1).coord, coords[2]);
   });
 
   it('covers a closed ring (first vertex == last vertex)', () => {

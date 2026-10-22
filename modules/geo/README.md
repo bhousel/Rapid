@@ -20,7 +20,8 @@ Note: The code here should probably be moved into either `/util` or into [`@rapi
 ## Common Functions
 
 The `geom.ts` file includes:
-- `geomCoverageBoxes` - Cover a point or polyline with a chain of square boxes (a fast approximate buffer, used for conflation coverage and label placement)
+- `geomCoverageBoxes` - Cover a point or polyline with a chain of square boxes, evenly spaced along the whole line (a fast approximate buffer, used for conflation coverage)
+- `geomLineDistances`, `geomPositionAlong`, `geomHeadingAlong` - Find the position at a distance along a line, and the line's heading there measured over a window (used by `geomCoverageBoxes` and conflation)
 - `geoMetersToWorld` - Convert a distance in meters to world units at a given latitude (used for conflation buffer radii)
 - `geomLineSegments` - Break a line into evenly-spaced positions that share a heading (used to place oneway arrows and sided markers)
 - `geoHasSelfIntersections` - Test whether a way being dragged or drawn intersects itself

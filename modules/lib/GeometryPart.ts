@@ -451,8 +451,9 @@ export class GeometryPart {
    *
    * The shape of the coverage depends on the geometry type:
    * - **Point**: one box of half-size `radius`, centered on the point.
-   * - **LineString**: boxes of half-size `radius`, spaced about `radius` apart along the line.
-   *   Each box is a separate unit, so conflation can tell which parts of a line already exist.
+   * - **LineString**: boxes of half-size `radius`, evenly spaced at most `radius` apart along the
+   *   whole line, including both ends (see `geomCoverageBoxes`). Each box is a separate unit, so
+   *   conflation can tell which parts of a line already exist.
    * - **Polygon**: one box, the outer ring's extent grown by `radius`. Filling a 2D area with
    *   boxes would be wasteful, so precise polygon overlap tests happen later, in the refine step.
    *

@@ -60,6 +60,11 @@ to the part that exists.*
   (0.5 m vs 3 m moved 65 sidewalks in view from matched to needs review), Cancel discards, service
   datasets editable. Still to do: per-side `props` editing, live counts, live tuning; column widths
   in the rules table are uneven (browser auto layout).
+- Sampling fix (Oct 21): `geomCoverageBoxes` now spaces samples evenly along the whole line (ends
+  included), with headings measured over a ~1-spacing window (`geomHeadingAlong`); run boundaries are
+  refined by bisection to 10 cm. Checked live: curves sampled evenly with no "needs review" at corners
+  (the old per-segment sampler took 2.2× the samples on curvy sidewalks, 11% more overall); the
+  remaining needs-review lines are whole lines 3–6 m from an OSM sidewalk, as intended.
 - Settings direction (agreed Oct 21): "everything the user can change is a document", with three kinds
   inside: settings, collections, state. Target: a VS Code-style `settings.json` editor. Written up in
   `design/settings-system.md` (Vocabulary, The target: `settings.json`, Rollout v2 Steps 3–8).
