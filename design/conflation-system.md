@@ -375,10 +375,11 @@ interface BoxMatch {
 
 interface LineRun {
   status: ConflationStatus;           // matched, uncertain, or unmatched
+  range: [number, number];            // the stretch it covers, as fractions of the line's length
   coords: Vec2[];                     // WGS84 sub-line of the original geometry
   startJoin?: JoinPoint;              // set when this end meets a matched run, or an allowed target line
   endJoin?: JoinPoint;
-  datum?: GeoJSONData<ConflationRunProps>;   // runs that aren't matched, when there are several runs:
+  datum?: GeoJSONData<ConflationRunProps>;   // runs that aren't matched, unless the run is the whole line:
                                              // just this stretch, to draw, select and accept on its own
 }
 
@@ -396,8 +397,17 @@ interface JoinPoint {
 }
 ```
 
-A run's data element has an id based on where the run starts along the line
-(`${dataID}~${firstBoxIndex}`), so it stays the same when other parts of the line change.
+A run's data element has the id `pieceID(dataID, range)`, like `test:k1:0@0.4-1`: the line's id and
+the stretch the run covers, following the linear referencing that Overture uses. It's the same each
+time it's computed from the same data, so accepting or ignoring it is remembered across restarts.
+See "Feature IDs" in [`rapid-system.md`](rapid-system.md) for how the line's own id is made.
+
+**What the user acted on is left out.** `RapidSystem.actedRanges(dataID)` lists the stretches of the
+line that the user accepted or ignored. They are cut out of every run, matched ones included, so a
+stretch the user accepted doesn't come back as "already mapped" when it matches the new way. A run
+that was cut doesn't join anything where it was cut, and a sliver left over that is shorter than the
+sample spacing is dropped. A line acted on in full has no runs at all. The result's status is
+triaged from the runs that are left.
 
 **Cutting runs out of a line.** A run is cut from the original geometry, not rebuilt from box centers.
 `CoverageBox` carries the segment `index` and parameter `t` of its center, so the start and end of a
@@ -479,15 +489,16 @@ When conflation is on for a dataset:
   is on.
 - `uncertain` features are drawn with a "needs review" highlight: a wider amber casing.
 - `unmatched` and `unknown` features are drawn as they are today.
-- A line with more than one run is drawn as its `runs`, one Pixi feature per run, with IDs like
-  `rapid-${datasetID}-${dataID}-run${i}`. Each run is styled by its own status. A run that isn't
-  already mapped is bound to its own data (`LineRun.datum`), so it can be selected and accepted on
-  its own; already-mapped runs are bound to the line.
+- A line is drawn as its `runs` unless it's one run over the whole line: one Pixi feature per run,
+  with IDs like `rapid-${datasetID}-${dataID}-run${i}`. That covers partly mapped lines, and lines
+  the user acted on part of; a line with no runs left isn't drawn. Each run is styled by its own
+  status. A run that isn't already mapped is bound to its own data (`LineRun.datum`), so it can be
+  selected and accepted on its own; already-mapped runs are bound to the line.
 - Already-mapped points and areas are hidden the same way, once their matchers exist (Step 8).
 
 The layer remembers, for each Pixi feature, which result (or run) it was last drawn from, and rebuilds
 the feature when that changes. It redraws on `conflationchange`. The `isAcceptedOrIgnored` filter
-still applies to features accepted or ignored as a whole.
+still applies to features accepted or ignored as a whole; pieces are left out by conflation itself.
 
 Styles are constants in `PixiLayerRapid` for now, like the rest of the Rapid layer's styles. Moving
 them into style data is in the backlog, with the other external-data styling ideas.
@@ -535,16 +546,20 @@ only for exactly matching nodes and validator fixes; autoconnect still runs afte
 a whole source line that is a single run. `UiRapidInspector` passes that to
 `actionRapidAcceptFeature(datum, joins)`. Without `ConflationSystem`, features are accepted as before.
 
-**Bookkeeping falls out of re-matching.** After a run is accepted, the new OSM way is in
-`editor_stable`. Recomputing then marks that part of the source line as matched, so it disappears
-without any new state in `RapidSystem`. The run's id goes into `acceptIDs` (as with any accepted
-feature), which also hides it right away; the source feature's own id goes in only when it is
-accepted whole. Undo needs nothing special either: undoing removes the way, `stablechange` fires,
-and the run reappears. **Ignore** works on a run's data the same way.
+**Bookkeeping.** The run's id goes into `acceptIDs` (as with any accepted feature); the source
+feature's own id goes in only when it is accepted whole. `RapidSystem` turns these into acted ranges,
+and conflation leaves those stretches out of the line, so the run disappears right away. After a run
+is accepted, the new OSM way is also in `editor_stable`, so the rest of the line is matched against it,
+and the run next to it joins it. Undo needs nothing special: undoing removes the way and the
+annotation, `stablechange` fires, and the run reappears. **Ignore** works on a run's data the same way.
 
-*Caveat:* this works only if the accepted way satisfies some rule's target conditions and `sameKeys`. If the data mapping gives
-the new way tags that don't match, the run would reappear after it's accepted. The
-`UiRapidDatasetSettings` page should warn when a dataset's mapped tags don't satisfy its own rules.
+Since the acted range hides the accepted run, it stays hidden even if the accepted way doesn't satisfy
+any rule's target conditions or `sameKeys`. But then the rest of the line won't join it, and the run
+next to it is drawn as new right up to it. The `UiRapidDatasetSettings` page should warn when a
+dataset's mapped tags don't satisfy its own rules.
+
+Acted ranges only apply while conflation is on for the dataset. With it off, a line the user accepted
+part of is drawn whole again.
 
 ### Settings UI (`UiRapidDatasetSettings`)
 
@@ -641,6 +656,10 @@ Lines come first throughout. Points and polygons follow the same pipeline at a l
   same segment); a crossing joins the sidewalks at both ends; line ends only join allowed targets;
   and a join that no longer fits the graph is skipped. Runs disappear after recompute, and undo
   brings them back.
+- Piece IDs and acted ranges: a run's id is the same each time it's computed; an accepted run stays
+  out after the line matches the new way; the rest of a partly ignored line is its own run, which
+  joins nothing where it was cut; a line acted on in full has no runs; slivers are dropped.
+  `RapidSystem.actedRanges` and the feature ids from `RapidDataset` have their own tests.
 - Real-data cases, rebuilt synthetically: a run whose join snapped to a node behind a corner is
   trimmed to end beside that node; a 1 cm stub at a junction is already mapped (distance only), and
   a stub with nothing nearby is still new.

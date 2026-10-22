@@ -7,6 +7,7 @@ import { gpx, kml } from '@tmcw/togeojson';
 import { RapidDataDictionary } from './RapidDataDictionary.ts';
 import { TreeStore } from '../lib/TreeStore.ts';
 import { utilFetchResponse } from '../util/fetch_response.ts';
+import { utilHash53, utilStableStringify } from '../util/string.ts';
 
 import type { ConflationSettings } from '../core/ConflationSystem.ts';
 import type { Context } from '../Context.ts';
@@ -16,6 +17,40 @@ import type { GeoJSONProps } from '../data/GeoJSONData.ts';
 import type { Vec2 } from '@rapid-sdk/math';
 
 const RAPID_MAGENTA = '#da26d3';
+
+
+/**
+ * Returns the stable key for a feature, the middle part of its data ID
+ * (`${datasetID}:${key}:${partIndex}`). Keys stay the same when the same data is loaded again,
+ * in any order, so what the user accepted or ignored still matches after a restart.
+ * - If the data mapping names an ID field (`isID`), the key is that field's value.
+ * - Otherwise, the key is a hash of the feature's geometry and properties.
+ * - If two features would get the same key (a repeated ID value, or identical features),
+ *   the later ones get the hash (and then a counter) added, so keys are never shared.
+ * @param feature - The GeoJSON feature
+ * @param idField - The property that identifies features, if the data mapping names one
+ * @param usedKeys - The keys given so far in this dataset (added to)
+ * @return The key
+ */
+function featureKey(feature: GeoJSON.Feature, idField: string | undefined, usedKeys: Set<string>): string {
+  const properties = feature.properties ?? {};
+  const hash = utilHash53(utilStableStringify({ geometry: feature.geometry, properties: properties }));
+
+  const idVal = idField ? properties[idField] : undefined;
+  const hasID = (idVal !== undefined && idVal !== null && idVal !== '');
+  let key = hasID ? String(idVal) : hash;
+
+  if (usedKeys.has(key) && hasID) {
+    key = `${key}.${hash}`;
+  }
+  const base = key;
+  for (let n = 1; usedKeys.has(key); n++) {
+    key = `${base}.${n}`;
+  }
+
+  usedKeys.add(key);
+  return key;
+}
 
 
 /**
@@ -222,6 +257,18 @@ export class RapidDataset {
   public get enabled(): boolean {
     const rapid = this.context.systems.rapid!;
     return rapid.enabledDatasetIDs.has(this.id);
+  }
+
+  /**
+   * The source property that identifies features, if the data mapping names one (`isID`).
+   * Data IDs are built from it when the data is loaded (see `featureKey`), so if it changes,
+   * the data has to be loaded again.
+   * @return  The property name, or `undefined`
+   * @readonly
+   */
+  public get idField(): string | undefined {
+    const transform = this.dictionary?.transforms.find(t => t.isID && t.source && t.source !== '*');
+    return transform?.source;
   }
 
 
@@ -482,17 +529,25 @@ export class RapidDataset {
     const newFeatures = [];
     this.extent = new Extent();
 
+    // Each feature gets a stable id, so that what the user accepted or ignored still matches it
+    // after the data is loaded again (see `featureKey`).
+    const idField = this.idField;
+    const usedKeys = new Set<string>();
+
     // We may have a Feature or a FeatureCollection, coax it to an array of Features.
-    let counter = 0;
     const features = geojsonFeatures(geojson as GeoJSON.Feature | GeoJSON.FeatureCollection);
     for (const feature of features) {
+      const key = featureKey(feature, idField, usedKeys);
+
       // We may have a MultiPolygon/MultiLineString/MultiPoint..
       // For our purposes, we really want to work with them as single part features..
-      for (const part of this._toSingleFeatures(feature)) {
+      const parts = this._toSingleFeatures(feature);
+      for (let partIndex = 0; partIndex < parts.length; partIndex++) {
+        const part = parts[partIndex];
         const extent = this._calcExtent(part);   // sanity check
         if (!isFinite(extent.min[0])) continue;  // invalid - no coordinates?
 
-        const dataID = `${this.id}-${counter}`;
+        const dataID = `${this.id}:${key}:${partIndex}`;
         const props: GeoJSONProps = {
           id:         dataID,
           serviceID:  this.serviceID,
@@ -503,7 +558,6 @@ export class RapidDataset {
         const d = new GeoJSONData(this.context, props);
         newFeatures.push(d);
         this.extent.extendSelf(extent);
-        counter++;
       }
     }
 

@@ -14,7 +14,7 @@ export * from './mocks.ts';
 // These Systems and Services can work without browser and UI.
 export { AbstractSystem } from './core/AbstractSystem.ts';
 export { AssetSystem } from './core/AssetSystem.ts';
-export { ConflationSystem, conflationDefaults } from './core/ConflationSystem.ts';
+export { ConflationSystem, conflationDefaults, parsePieceID, pieceID } from './core/ConflationSystem.ts';
 export { DatabaseSystem } from './core/DatabaseSystem.ts';
 export { DragAndDropSystem } from './core/DragAndDropSystem.ts';
 export { EditSystem } from './core/EditSystem.ts';

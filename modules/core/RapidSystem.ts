@@ -1,4 +1,5 @@
 import { AbstractSystem } from './AbstractSystem.ts';
+import { parsePieceID } from './ConflationSystem.ts';
 import { gpx } from '@tmcw/togeojson';
 import { Extent } from '@rapid-sdk/math';
 import { RapidDataset, RapidDataDictionary, TreeStore } from '../lib/index.ts';
@@ -167,6 +168,8 @@ export class RapidSystem extends AbstractSystem {
   protected _setupDatasets: WeakSet<RapidDataset>;
   /** What the user saved about each dataset, as last read from or written to `DatabaseSystem` */
   protected _datasetRecords: Map<DatasetID, DatasetRecord>;
+  /** The ranges of each line that the user accepted or ignored, as fractions of its length (see `actedRanges`) */
+  protected _actedRanges: Map<DataID, Array<[number, number]>>;
 
 
   /**
@@ -175,6 +178,7 @@ export class RapidSystem extends AbstractSystem {
   public constructor(context: Context) {
     super(context);
     this.id = 'rapid';
+    this._actedRanges = new Map<DataID, Array<[number, number]>>();
 
     this._defaultAssetIDs = new Set<AssetID>(['rapid_datasets']);
     this._loadedAssetIDs = new Map<AssetID, string>();
@@ -306,6 +310,7 @@ export class RapidSystem extends AbstractSystem {
   public resetAsync(): Promise<void> {
     this.acceptIDs.clear();
     this.ignoreIDs.clear();
+    this._actedRanges.clear();
     return Promise.resolve();
   }
 
@@ -888,6 +893,40 @@ export class RapidSystem extends AbstractSystem {
         }
       }
     }
+
+    // Gather the ranges of lines that the user acted on: a piece's ID carries its range,
+    // and a whole feature's ID covers all of it.
+    this._actedRanges.clear();
+    for (const id of [...this.acceptIDs, ...this.ignoreIDs]) {
+      const piece = parsePieceID(id);
+      const dataID = piece?.dataID ?? id;
+      const ranges = this._actedRanges.get(dataID) ?? [];
+      ranges.push(piece?.range ?? [0, 1]);
+      this._actedRanges.set(dataID, ranges);
+    }
+  }
+
+
+  /**
+   * Returns the ranges of a line that the user accepted or ignored, as fractions of its length,
+   * sorted and merged. Accepting or ignoring a whole feature covers `[0, 1]`.
+   * Conflation leaves these ranges out of the line's runs, so that what the user acted on drops out,
+   * even after the line is matched again (see `ConflationSystem`).
+   * @param dataID - The line's data ID
+   * @return The ranges, or an empty array if the user hasn't acted on any of it
+   */
+  public actedRanges(dataID: DataID): Array<[number, number]> {
+    const ranges = [...(this._actedRanges.get(dataID) ?? [])].sort((a, b) => a[0] - b[0]);
+    const merged: Array<[number, number]> = [];
+    for (const [start, end] of ranges) {
+      const last = merged.at(-1);
+      if (last && start <= last[1]) {
+        last[1] = Math.max(last[1], end);
+      } else {
+        merged.push([start, end]);
+      }
+    }
+    return merged;
   }
 
 

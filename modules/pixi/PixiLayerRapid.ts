@@ -471,9 +471,13 @@ export class PixiLayerRapid extends AbstractPixiLayer {
     const showMatched = dataset.conflation.showMatched;
 
     for (const d of data.lines) {
+      // A line is drawn as its runs unless it's one run that covers all of it. That includes a line
+      // the user has acted on part of (what's left of it), or all of it (no runs, so nothing is drawn).
       const result = conflation?.getResult(dataset, d);
-      if (result?.runs && result.runs.length > 1) {
-        this._renderRuns(parentContainer, dataset, d, result.runs, frame, viewport);
+      const runs = result?.runs;
+      const isWhole = runs?.length === 1 && runs[0].range[0] === 0 && runs[0].range[1] === 1;
+      if (runs && !isWhole) {
+        this._renderRuns(parentContainer, dataset, d, runs, frame, viewport);
         continue;
       }
 
@@ -536,7 +540,7 @@ export class PixiLayerRapid extends AbstractPixiLayer {
 
 
   /**
-   * Draws a partly mapped line as its separate runs, one feature per run.
+   * Draws a partly mapped (or partly accepted) line as its separate runs, one feature per run.
    * A run that isn't already mapped is bound to its own data (`LineRun.datum`), so selecting it selects
    * just that stretch, and accepting it adds just that stretch. Already-mapped runs are bound to the line.
    * @param parentContainer - The Pixi container to draw the runs into
@@ -556,15 +560,14 @@ export class PixiLayerRapid extends AbstractPixiLayer {
   ): void {
     const context = this.context;
     const l10n = context.systems.l10n!;
-    const rapid = context.systems.rapid!;
 
     const colorNum = new PIXI.Color(dataset.color).toNumber();
     const showMatched = dataset.conflation.showMatched;
 
+    // (Runs that the user already accepted or ignored aren't here, see `ConflationSystem._conflateLine`.)
     for (let i = 0; i < runs.length; i++) {
       const run = runs[i];
       if (run.status === 'matched' && !showMatched) continue;
-      if (run.datum && rapid.isAcceptedOrIgnored(run.datum.id)) continue;
 
       const featureID = `${this.layerID}-${dataset.id}-${d.id}-run${i}`;
       let feature = this.features.get(featureID) as PixiFeatureLine | undefined;

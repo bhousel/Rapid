@@ -386,6 +386,44 @@ describe('RapidSystem', () => {
     });
 
 
+    describe('actedRanges', () => {
+      // Replays an edit history the way `EditSystem` reports it after an edit.
+      function replay(annotations) {
+        context.systems.editor = { history: [{}, ...annotations.map(a => ({ annotation: a }))], index: annotations.length };
+        _rapid._stablechange();
+        delete context.systems.editor;
+      }
+
+      afterEach(() => _rapid.resetAsync());
+
+      it('is empty for a line the user has not acted on', () => {
+        replay([]);
+        assert.deepEqual(_rapid.actedRanges('test:k1:0'), []);
+      });
+
+      it('gathers accepted and ignored pieces of a line from the edit history, sorted and merged', () => {
+        replay([
+          { type: 'rapid_accept_feature', acceptIDs: ['test:k1:0@0.6-1'] },
+          { type: 'rapid_ignore_feature', ignoreID: 'test:k1:0@0-0.25' },
+          { type: 'rapid_accept_feature', acceptIDs: ['test:k1:0@0.2-0.4', 'test:k2:0@0-0.5'] }
+        ]);
+        assert.deepEqual(_rapid.actedRanges('test:k1:0'), [[0, 0.4], [0.6, 1]]);
+        assert.deepEqual(_rapid.actedRanges('test:k2:0'), [[0, 0.5]]);
+      });
+
+      it('a whole feature that was accepted or ignored covers all of it', () => {
+        replay([{ type: 'rapid_ignore_feature', ignoreID: 'test:k1:0' }]);
+        assert.deepEqual(_rapid.actedRanges('test:k1:0'), [[0, 1]]);
+      });
+
+      it('resetAsync clears them', () => {
+        replay([{ type: 'rapid_ignore_feature', ignoreID: 'test:k1:0' }]);
+        return _rapid.resetAsync()
+          .then(() => assert.deepEqual(_rapid.actedRanges('test:k1:0'), []));
+      });
+    });
+
+
     describe('saveDatasetSettings / loadDatasetSettings', () => {
       const storage = context.systems.storage;
 

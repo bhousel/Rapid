@@ -162,6 +162,8 @@ export interface ConflationRunProps extends GeoJSONProps {
 export interface LineRun {
   /** `matched`, `uncertain`, or `unmatched` */
   status: ConflationStatus;
+  /** The stretch of the line that this run covers, as fractions of its length (see `pieceID`) */
+  range: [number, number];
   /** WGS84 sub-line of the original geometry */
   coords: Vec2[];
   /** Set when the start of this run meets an already-mapped stretch, or an allowed target line */
@@ -169,8 +171,8 @@ export interface LineRun {
   /** Set when the end of this run meets an already-mapped stretch, or an allowed target line */
   endJoin?: JoinPoint;
   /**
-   * For runs that aren't already mapped, when the line has more than one run: a data element for just
-   * this stretch, so it can be drawn, selected, and accepted on its own.
+   * For runs that aren't already mapped, when the run isn't the whole line: a data element for just
+   * this stretch, so it can be drawn, selected, and accepted on its own. Its id is `pieceID(dataID, range)`.
    */
   datum?: GeoJSONData<ConflationRunProps>;
 }
@@ -223,6 +225,36 @@ interface FeatureTally {
   distance: number;
   angle: number;
   wayIDs: Set<EntityID>;   // the feature's ways that matched (more than one for a multipolygon)
+}
+
+
+/**
+ * Returns the data ID of a piece of a line: the line's data ID, and the range along the line that the
+ * piece covers, as fractions of the line's length (like the linear referencing `between: [start, end]`
+ * that Overture uses). For example `odot_sidewalks:12345:0@0.85-1`. The fractions are rounded to 4
+ * decimals, about 10 cm on a 1 km line.
+ * @param dataID - The line's data ID
+ * @param range - The piece's start and end, as fractions of the line's length
+ * @return The piece's data ID
+ */
+export function pieceID(dataID: DataID, range: [number, number]): DataID {
+  const fmt = (n: number) => String(Math.round(n * 10000) / 10000);
+  return `${dataID}@${fmt(range[0])}-${fmt(range[1])}`;
+}
+
+
+/**
+ * Splits the data ID of a piece of a line into the line's data ID and the range (see `pieceID`).
+ * @param id - A data ID
+ * @return The line's data ID and the range, or `undefined` if `id` isn't a piece's ID
+ */
+export function parsePieceID(id: DataID): { dataID: DataID; range: [number, number] } | undefined {
+  const match = /^(.+)@(\d+(?:\.\d+)?)-(\d+(?:\.\d+)?)$/.exec(id);
+  if (!match) return undefined;
+  const start = Number(match[2]);
+  const end = Number(match[3]);
+  if (!(start >= 0 && end <= 1 && start < end)) return undefined;
+  return { dataID: match[1], range: [start, end] };
 }
 
 
@@ -403,7 +435,7 @@ export class ConflationSystem extends AbstractSystem {
 
     const result = this.getResult(ds, datum);
     const run = (result?.runs?.length === 1) ? result.runs[0] : undefined;
-    if (!run || run.status === 'matched') return undefined;
+    if (!run || run.datum || run.status === 'matched') return undefined;
     return { start: run.startJoin, end: run.endJoin };
   }
 
@@ -532,6 +564,7 @@ export class ConflationSystem extends AbstractSystem {
   ): ConflationResult {
     const context = this.context;
     const editor = context.systems.editor!;
+    const rapid = context.systems.rapid!;
     const spatial = context.systems.spatial!;
 
     const dataID = datum.id;
@@ -777,52 +810,74 @@ export class ConflationSystem extends AbstractSystem {
     const lineWayOf = (match: BoxMatch | undefined): EntityID | undefined =>
       match?.wayIDs.find(wayID => features.get(wayID)?.geometry === 'line');
 
-    const runs = ranges.map((range, i): LineRun => {
+    // The stretches of the line that the user already accepted or ignored are left out of the runs,
+    // so they drop out even when the line matches again afterward (it now matches what was accepted).
+    // A run cut this way doesn't join anything where it was cut, and a sliver left over shorter than
+    // the sample spacing is dropped, like the short runs in `_lineRanges`.
+    const total = dist.at(-1)!;
+    const fracOf = (pos: { index: number; t: number }) => (total > 0 ? distOf(pos) / total : 0);
+    const acted = rapid.actedRanges(dataID);
+
+    const runs: LineRun[] = [];
+    ranges.forEach((range, i) => {
       const prev = ranges[i - 1];
       const next = ranges[i + 1];
       const start = boundaries[i - 1]?.pos ?? boxes[range.start];
       const end = boundaries[i]?.pos ?? boxes[range.end];
-      if (range.status === 'matched') {
-        return { status: range.status, coords: toWgs84(subLine(source, start, end)) };
-      }
+      const whole: [number, number] = [fracOf(start), fracOf(end)];
 
-      // A run that isn't already mapped reaches to where a neighboring already-mapped stretch ends,
-      // and joins the OSM way that matched there (if that way is a line, not an area's edge).
-      let coords = subLine(source, start, end);
-      const run: LineRun = { status: range.status, coords: [] };
+      for (const piece of subtractRanges(whole, acted)) {
+        const isStart = piece[0] === whole[0];
+        const isEnd = piece[1] === whole[1];
+        if (!(isStart && isEnd) && (piece[1] - piece[0]) * total * metersPerWorld < spacing) continue;
 
-      if (prev?.status === 'matched') {
-        run.startJoin = this._joinPoint(lineWayOf(boundaries[i - 1].match), positionOf(source, start), graph, coordOf, metersPerWorld);
-      } else if (!prev) {
-        run.startJoin = endJoinAt(source[0]);
-      }
-      if (next?.status === 'matched') {
-        run.endJoin = this._joinPoint(lineWayOf(boundaries[i].match), positionOf(source, end), graph, coordOf, metersPerWorld);
-      } else if (!next) {
-        run.endJoin = endJoinAt(source.at(-1)!);
-      }
+        const pieceStart = isStart ? start : geomPositionAlong(source, dist, piece[0] * total);
+        const pieceEnd = isEnd ? end : geomPositionAlong(source, dist, piece[1] * total);
+        if (range.status === 'matched') {
+          runs.push({ status: range.status, range: piece, coords: toWgs84(subLine(source, pieceStart, pieceEnd)) });
+          continue;
+        }
 
-      // Trim the run to its joins: it ends at the point on the source line nearest each join.
-      // The extension above, or a join that snapped to a nearby node, can otherwise leave the run
-      // reaching past where it connects (e.g. around a corner), which would add a hook on accept.
-      if (run.endJoin) {
-        coords = trimEnd(coords, projWgs84ToWorld(run.endJoin.loc));
+        // A run that isn't already mapped reaches to where a neighboring already-mapped stretch ends,
+        // and joins the OSM way that matched there (if that way is a line, not an area's edge).
+        let coords = subLine(source, pieceStart, pieceEnd);
+        const run: LineRun = { status: range.status, range: piece, coords: [] };
+
+        if (isStart && prev?.status === 'matched') {
+          run.startJoin = this._joinPoint(lineWayOf(boundaries[i - 1].match), positionOf(source, start), graph, coordOf, metersPerWorld);
+        } else if (isStart && !prev) {
+          run.startJoin = endJoinAt(source[0]);
+        }
+        if (isEnd && next?.status === 'matched') {
+          run.endJoin = this._joinPoint(lineWayOf(boundaries[i].match), positionOf(source, end), graph, coordOf, metersPerWorld);
+        } else if (isEnd && !next) {
+          run.endJoin = endJoinAt(source.at(-1)!);
+        }
+
+        // Trim the run to its joins: it ends at the point on the source line nearest each join.
+        // The extension above, or a join that snapped to a nearby node, can otherwise leave the run
+        // reaching past where it connects (e.g. around a corner), which would add a hook on accept.
+        if (run.endJoin) {
+          coords = trimEnd(coords, projWgs84ToWorld(run.endJoin.loc));
+        }
+        if (run.startJoin) {
+          coords = trimStart(coords, projWgs84ToWorld(run.startJoin.loc));
+        }
+        run.coords = toWgs84(coords);
+        runs.push(run);
       }
-      if (run.startJoin) {
-        coords = trimStart(coords, projWgs84ToWorld(run.startJoin.loc));
-      }
-      run.coords = toWgs84(coords);
-      return run;
     });
 
-    // When the line has more than one run, each run that isn't already mapped gets its own data element,
-    // so it can be drawn, selected and accepted on its own. Its id is based on where the run starts
-    // along the line, so it stays the same when other parts of the line change.
-    if (runs.length > 1) {
-      runs.forEach((run, i) => {
+    // Each run that isn't already mapped and isn't the whole line gets its own data element,
+    // so it can be drawn, selected and accepted on its own. Its id is the line's id and the stretch
+    // the run covers (see `pieceID`), so it is the same each time it's computed from the same data,
+    // and accepting or ignoring it can be remembered across restarts.
+    const isWhole = runs.length === 1 && runs[0].range[0] === 0 && runs[0].range[1] === 1;
+    if (!isWhole) {
+      runs.forEach(run => {
         if (run.status === 'matched') return;
         run.datum = new GeoJSONData<ConflationRunProps>(context, {
-          id: `${dataID}~${ranges[i].start}`,
+          id: pieceID(dataID, run.range),
           datasetID: datum.props.datasetID,
           serviceID: datum.props.serviceID,
           sourceID: dataID,
@@ -837,7 +892,8 @@ export class ConflationSystem extends AbstractSystem {
       });
     }
 
-    const statuses = new Set<ConflationStatus>(ranges.map(r => r.status));
+    // Triage what's left for the user to act on (all of it, if they've acted on all of it).
+    const statuses = new Set<ConflationStatus>((runs.length ? runs : ranges).map(r => r.status));
     let status: ConflationStatus;
     if (statuses.has('uncertain')) {
       status = 'uncertain';
@@ -1039,6 +1095,27 @@ function trimStart(coords: Vec2[], point: Vec2): Vec2[] {
     trimmed.unshift(closest.point);
   }
   return (trimmed.length >= 2 && lineLength(trimmed) > 0) ? trimmed : coords;
+}
+
+
+/**
+ * Removes ranges from a range, leaving the pieces that none of them cover.
+ * Pieces that aren't cut keep their exact ends.
+ * @param range - The range, `[start, end]`
+ * @param cuts - The ranges to remove
+ * @return The pieces left, in order
+ */
+function subtractRanges(range: [number, number], cuts: Array<[number, number]>): Array<[number, number]> {
+  let pieces: Array<[number, number]> = [range];
+  for (const [c0, c1] of cuts) {
+    pieces = pieces.flatMap(([p0, p1]): Array<[number, number]> => {
+      if (c1 <= p0 || c0 >= p1) return [[p0, p1]];
+      const left: Array<[number, number]> = (c0 > p0) ? [[p0, c0]] : [];
+      const right: Array<[number, number]> = (c1 < p1) ? [[c1, p1]] : [];
+      return [...left, ...right];
+    });
+  }
+  return pieces;
 }
 
 

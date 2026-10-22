@@ -30,7 +30,7 @@ const RAILWAY = { railway: 'rail' };
 
 
 describe('ConflationSystem', () => {
-  let context, editor, conflation, ds;
+  let context, editor, conflation, ds, acted;
 
   // Adds an OSM way to the editor's base graph, with nodes at the given [x, y] positions.
   // If the last point repeats the first, the way is closed (it reuses the first node).
@@ -88,6 +88,10 @@ describe('ConflationSystem', () => {
     };
     editor = context.systems.editor = new Rapid.EditSystem(context);
     conflation = context.systems.conflation = new Rapid.ConflationSystem(context);
+
+    // The ranges of lines that the user accepted or ignored, by data ID (see `RapidSystem.actedRanges`)
+    acted = new Map();
+    context.systems.rapid.actedRanges = (dataID) => acted.get(dataID) ?? [];
     ds = new Rapid.RapidDataset(context, { id: 'test', custom: true });
 
     return conflation.initAsync()
@@ -474,7 +478,7 @@ describe('ConflationSystem', () => {
       const [matchedRun, newRun] = result.runs;
       assert.isUndefined(matchedRun.datum);
       assert.instanceOf(newRun.datum, Rapid.GeoJSONData);
-      assert.match(newRun.datum.id, /^a~\d+$/);
+      assert.strictEqual(newRun.datum.id, Rapid.pieceID('a', newRun.range));
       assert.strictEqual(newRun.datum.props.sourceID, 'a');
       assert.strictEqual(newRun.datum.props.datasetID, 'test');
       assert.deepEqual(newRun.datum.properties, SIDEWALK);
@@ -636,6 +640,92 @@ describe('ConflationSystem', () => {
 
       conflation.invalidate('test');
       assert.notStrictEqual(conflation.getResult(ds, a), first);
+    });
+  });
+
+
+  describe('piece IDs', () => {
+    it('pieceID adds the range along the line, rounded to 4 decimals, and parsePieceID splits it again', () => {
+      const id = Rapid.pieceID('test:k1:0', [0.123456, 1]);
+      assert.strictEqual(id, 'test:k1:0@0.1235-1');
+      assert.deepEqual(Rapid.parsePieceID(id), { dataID: 'test:k1:0', range: [0.1235, 1] });
+    });
+
+    it('parsePieceID rejects ids that are not pieces, or have a range that makes no sense', () => {
+      assert.isUndefined(Rapid.parsePieceID('test:k1:0'));
+      assert.isUndefined(Rapid.parsePieceID('test:k1:0@0.5-0.2'));
+      assert.isUndefined(Rapid.parsePieceID('test:k1:0@0-1.5'));
+      assert.isUndefined(Rapid.parsePieceID('test:k1:0@0.5-0.5'));
+    });
+
+    it('a new line is one run over all of it, with no data of its own (the line itself is accepted)', () => {
+      enable([lineRule()]);
+      const result = conflation.getResult(ds, feature('a', [[0, 0], [100, 0]], SIDEWALK));
+      assert.lengthOf(result.runs, 1);
+      assert.deepEqual(result.runs[0].range, [0, 1]);
+      assert.isUndefined(result.runs[0].datum);
+    });
+
+    it('a run\'s id is the same each time it is computed from the same data', () => {
+      enable([lineRule()]);
+      osmWay(1, [[0, 0], [60, 0]], SIDEWALK);
+      const a = feature('a', [[0, 1.5], [150, 1.5]], SIDEWALK);
+
+      const first = conflation.getResult(ds, a).runs[1];
+      assert.closeTo(first.range[0], 60 / 150, 0.02);
+      assert.strictEqual(first.range[1], 1);
+
+      conflation.invalidate();
+      const second = conflation.getResult(ds, a).runs[1];
+      assert.notStrictEqual(second, first);
+      assert.strictEqual(second.datum.id, first.datum.id);
+    });
+  });
+
+
+  describe('acted ranges', () => {
+    it('a run the user accepted drops out, even though the line now matches there', () => {
+      enable([lineRule()]);
+      osmWay(1, [[0, 0], [60, 0]], SIDEWALK);
+      const a = feature('a', [[0, 1.5], [150, 1.5]], SIDEWALK);
+      const newRun = conflation.getResult(ds, a).runs[1];
+
+      // Accepted: the new run is in OSM now, and the user acted on its range.
+      osmWay(2, [[60, 0], [150, 0]], SIDEWALK);
+      acted.set('a', [newRun.range]);
+      conflation.invalidate();
+
+      const after = conflation.getResult(ds, a);
+      assert.deepEqual(after.runs.map(r => r.status), ['matched']);
+      assert.isBelow(after.runs[0].range[1], newRun.range[0] + 1e-9);
+    });
+
+    it('the rest of a partly ignored line is its own run, which joins nothing where it was cut', () => {
+      enable([lineRule()]);
+      const a = feature('a', [[0, 0], [100, 0]], SIDEWALK);
+      acted.set('a', [[0.5, 1]]);
+
+      const runs = conflation.getResult(ds, a).runs;
+      assert.lengthOf(runs, 1);
+      assert.deepEqual(runs[0].range, [0, 0.5]);
+      assert.strictEqual(runs[0].datum.id, 'a@0-0.5');
+      assert.isUndefined(runs[0].endJoin);
+      assert.isBelow(meters(runs[0].coords.at(-1), loc(50, 0)), 0.01);
+    });
+
+    it('a line acted on in full has no runs, matched or not', () => {
+      enable([lineRule()]);
+      osmWay(1, [[0, 0], [60, 0]], SIDEWALK);
+      const a = feature('a', [[0, 1.5], [150, 1.5]], SIDEWALK);
+      acted.set('a', [[0, 1]]);
+      assert.lengthOf(conflation.getResult(ds, a).runs, 0);
+    });
+
+    it('drops a sliver left over that is shorter than the sample spacing', () => {
+      enable([lineRule()]);   // sameDist 3, so samples are 3 m apart
+      const a = feature('a', [[0, 0], [100, 0]], SIDEWALK);
+      acted.set('a', [[0, 0.99]]);   // leaves 1 m
+      assert.lengthOf(conflation.getResult(ds, a).runs, 0);
     });
   });
 

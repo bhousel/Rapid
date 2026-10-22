@@ -1301,12 +1301,23 @@ export class UiRapidDatasetSettings extends EventEmitter {
       ds.thumbnailUrl = fieldInfo.thumbnailUrl ?? ds.getThumbnail();
 
       // update data dictionary, create/delete if needed
+      const prevIDField = ds.idField;
       if (this._transforms!.length > 0) {
         ds.dictionary ||= new RapidDataDictionary(context);
         // assume dictionary is valid, for now
         ds.dictionary.transforms = this._transforms as RapidDataTransform[];
       } else {
         ds.dictionary = null;
+      }
+
+      // The features' ids come from the `isID` field (see `RapidDataset._gotData`), so if that changed,
+      // load the data again to give them their new ids, then match them again.
+      if (ds.idField !== prevIDField && !ds.serviceID) {
+        ds.setupCustomDatasetAsync()
+          .then(() => conflation?.invalidate(ds.id))
+          .catch((err: any) => {
+            console.error(`Dataset setup failed for ${ds.id}:  `, err);  // eslint-disable-line no-console
+          });
       }
     }
 

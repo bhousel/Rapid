@@ -74,24 +74,17 @@ Phase 1 (the `KeyboardSystem` conversion + command scaffolding) is done — see
   Documented for agents in `AGENTS.md` → Testing → "Testing in a Real Browser".
 - Still to do: one command that also starts the server, and maybe a project skill for the `run` skill to find.
 
-## Stable IDs for external data (accepted / ignored features across sessions)
-`acceptIDs` / `ignoreIDs` are saved in the edit history (see `f4678e43a`), so restoring a session only
-works if each external feature gets the same ID every time it loads.
-- **Feature IDs:** today `RapidDataset` uses `${datasetID}-${counter}` in file order. That is stable for
-  an unchanged file, but not for tiled or streamed sources (MVT, PMTiles, GeoParquet), where features
-  arrive in whatever order the tiles load. The `isID` dictionary flag (`6978fef12`) isn't used yet, partly
-  because multi-part geometries are split into single parts that would share one ID.
-  Plan: `${datasetID}:${idValue ?? contentHash}:${partIndex}`, where `idValue` comes from the `isID`
-  field, `contentHash` hashes the feature's geometry and properties (order-independent, and changes
-  only if the feature changes), and `partIndex` numbers the parts of a split multi-geometry. If `isID`
-  values turn out not to be unique, number the repeats deterministically and warn in the dataset settings.
-- **Piece IDs (partial lines):** today `${dataID}~${firstBoxIndex}`, which changes with `sameDist` or
-  sampling. Use position along the source line instead, following the linear referencing convention
-  that Overture uses (from TomTom's OpenLR): normalized `between: [start, end]` fractions of the
-  source's length (https://docs.overturemaps.org/guides/transportation/linear-referencing/). That makes
-  "Ignore" on a piece survive a restart, as long as the basemap there hasn't changed.
-- Related: an `isID` row in a data mapping should normally use `ignore`, not `copy`, so the source ID
+## Stable IDs for external data: follow-ups
+Done (Oct 22): `${datasetID}:${isID value ?? content hash}:${partIndex}` for features, `${dataID}@${start}-${end}`
+for pieces of lines, and acted ranges. See "Feature IDs" in `design/rapid-system.md`. Still to do:
+- **Lock the `isID` field** of a dataset with accepted or ignored features in the current edit session
+  (proposed in the design doc; otherwise earlier accepts are orphaned under the old IDs).
+- **Warn about repeated `isID` values** in the dataset settings (they're numbered, so IDs stay unique,
+  but the data probably isn't keyed the way the user thinks).
+- **Restore the selection after a restart**, now that the IDs are stable.
+- An `isID` row in a data mapping should normally use `ignore`, not `copy`, so the source ID
   isn't copied into OSM tags on accept. The settings UI could warn about `copy` + `isID`.
+- Service datasets (Esri, Overture, MapWithAI) bring their own IDs; check that they're stable too.
 
 ## Custom datasets backed by a service
 People have asked to point Rapid at their own data on a server, not just a file: a `sourceUrl` to an

@@ -153,6 +153,84 @@ describe('RapidDataset', () => {
     });
   });
 
+  describe('feature ids', () => {
+    // A line feature with the given properties, `x` meters east of an arbitrary origin.
+    function line(x, properties) {
+      const lon = 10 + x * 0.00001;
+      return { type: 'Feature', properties: properties, geometry: { type: 'LineString', coordinates: [[lon, 40], [lon, 40.001]] } };
+    }
+
+    // Loads features into the dataset, the way it loads a data file, and returns the loaded data.
+    function load(ds, features) {
+      const spatial = context.systems.spatial;
+      spatial.clearCache(ds.spatialID);
+      ds._gotData({ type: 'FeatureCollection', features: features }, '.geojson');
+      const all = { minX: -Infinity, minY: -Infinity, maxX: Infinity, maxY: Infinity };
+      return spatial.getItemsAtBox(ds.spatialID, all).map(item => item.contents);
+    }
+
+    // The id of the loaded data with the given `name` property.
+    function idOf(data, name) {
+      return data.find(d => d.properties.name === name)?.id;
+    }
+
+    it('idField is the source of the data mapping\'s `isID` transform, if any', () => {
+      const ds = new Rapid.RapidDataset(context, { id: 'idfield' });
+      assert.isUndefined(ds.idField);
+      ds.dictionary = Rapid.RapidDataDictionary.fromJSON(context, { transforms: [{ order: 0, function: 'copy', source: '*', target: '*' }] });
+      assert.isUndefined(ds.idField);
+      ds.dictionary = Rapid.RapidDataDictionary.fromJSON(context, { transforms: [{ order: 0, function: 'copy', source: 'GID', target: 'ref', isID: true }] });
+      assert.strictEqual(ds.idField, 'GID');
+    });
+
+    it('uses the `isID` field\'s value, so ids survive changes to the data', () => {
+      const ds = new Rapid.RapidDataset(context, { id: 'keyed' });
+      ds.dictionary = Rapid.RapidDataDictionary.fromJSON(context, { transforms: [{ order: 0, function: 'copy', source: 'GID', target: 'ref', isID: true }] });
+      const data = load(ds, [line(0, { name: 'a', GID: 7 }), line(10, { name: 'b', GID: 'x-8' })]);
+      assert.strictEqual(idOf(data, 'a'), 'keyed:7:0');
+      assert.strictEqual(idOf(data, 'b'), 'keyed:x-8:0');
+    });
+
+    it('without an `isID` field, hashes the feature, so the same data always gets the same ids, in any order', () => {
+      const ds = new Rapid.RapidDataset(context, { id: 'hashed' });
+      const first = load(ds, [line(0, { name: 'a', width: 2 }), line(10, { name: 'b' })]);
+      assert.match(idOf(first, 'a'), /^hashed:[0-9a-z]+:0$/);
+      assert.notStrictEqual(idOf(first, 'a'), idOf(first, 'b'));
+
+      const again = load(ds, [line(10, { name: 'b' }), line(0, { width: 2, name: 'a' })]);
+      assert.strictEqual(idOf(again, 'a'), idOf(first, 'a'));
+      assert.strictEqual(idOf(again, 'b'), idOf(first, 'b'));
+    });
+
+    it('gives each feature its own id when `isID` values repeat, or features are identical', () => {
+      const ds = new Rapid.RapidDataset(context, { id: 'dupes' });
+      ds.dictionary = Rapid.RapidDataDictionary.fromJSON(context, { transforms: [{ order: 0, function: 'copy', source: 'GID', target: 'ref', isID: true }] });
+      const data = load(ds, [
+        line(0, { name: 'a', GID: 7 }),
+        line(10, { name: 'b', GID: 7 }),    // same GID, different feature
+        line(20, { name: 'c' }),            // no GID, so hashed
+        line(20, { name: 'c' })             // identical to the one before
+      ]);
+      const ids = data.map(d => d.id);
+      assert.lengthOf(ids, 4);
+      assert.lengthOf(new Set(ids), 4);
+      assert.include(ids, 'dupes:7:0');
+    });
+
+    it('numbers the parts of a multi-part feature', () => {
+      const ds = new Rapid.RapidDataset(context, { id: 'multi' });
+      ds.dictionary = Rapid.RapidDataDictionary.fromJSON(context, { transforms: [{ order: 0, function: 'copy', source: 'GID', target: 'ref', isID: true }] });
+      const multi = {
+        type: 'Feature',
+        properties: { GID: 'm1' },
+        geometry: { type: 'MultiLineString', coordinates: [[[10, 40], [10, 40.001]], [[10.001, 40], [10.001, 40.001]]] }
+      };
+      const ids = load(ds, [multi]).map(d => d.id).sort();
+      assert.deepEqual(ids, ['multi:m1:0', 'multi:m1:1']);
+    });
+  });
+
+
   describe('setupCustomDatasetAsync', () => {
     it('rejects for a dataset whose data comes from a service', () => {
       const ds = new Rapid.RapidDataset(context, { id: 'svc', serviceID: 'mapwithai' });
