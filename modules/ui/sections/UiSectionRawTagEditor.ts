@@ -4,6 +4,7 @@ import { uiIcon } from '../icon.ts';
 import { UiCombobox } from '../UiCombobox.ts';
 import { AbstractUiSection } from './AbstractUiSection.ts';
 import { UiTagReference } from '../UiTagReference.ts';
+import { valueOptionItem } from '../fields/UiFieldCombo.ts';
 import { utilGetSetValue, utilNoAuto } from '../../util/index.ts';
 
 import type { TagDiff } from '@rapid-sdk/util';
@@ -132,6 +133,7 @@ export class UiSectionRawTagEditor extends AbstractUiSection {
     const context = this.context;
     const l10n = context.systems.l10n!;
     const settings = context.systems.settings;
+    const schema = context.systems.schema!;
     const taginfo = context.services.taginfo;
 
     // remove deleted keys
@@ -314,7 +316,7 @@ export class UiSectionRawTagEditor extends AbstractUiSection {
         $row.select('input.key');      // propagate bound data
         $row.select('input.value');    // propagate bound data
 
-        if (this._entityIDs.length && taginfo && this._state !== 'hover') {
+        if (this._entityIDs.length && (taginfo || schema.hasValueProviders()) && this._state !== 'hover') {
           this._addComboboxes($row);
         }
 
@@ -347,6 +349,21 @@ export class UiSectionRawTagEditor extends AbstractUiSection {
       .attr('readonly', (d: TagRow) => this._isReadOnlyTag(d) || null)
       .attr('placeholder', (d: TagRow) => isMultiValueTag(d) ? l10n.t('inspector.multiple_values') : null);
     utilGetSetValue($values, (d: TagRow) => isMultiValueTag(d) ? '' : d.value as string);
+
+    // Show what a value means, e.g. "Walkway" beside `pathway_mode = 1` (see `SchemaSystem.addValueProvider`)
+    const graph = context.systems.editor!.staging.graph;
+    const valueLabel = (d: TagRow) => isMultiValueTag(d) ? undefined :
+      schema.getValueLabel(d.key, d.value as string, this._entityIDs, graph);
+    $items.selectAll('.value-wrap')
+      .classed('has-value-label', (d: TagRow) => !!valueLabel(d))
+      .selectAll('.value-label')
+      .data((d: any) => {
+        const label = valueLabel(d);
+        return label ? [label] : [];
+      })
+      .join('span')
+      .attr('class', 'value-label')
+      .text((label: string) => label);
 
     $items.selectAll('button.remove')
       .attr('title', l10n.t('icons.remove'))
@@ -468,12 +485,14 @@ export class UiSectionRawTagEditor extends AbstractUiSection {
 
 
   /**
-   * Attaches key/value comboboxes (taginfo autocomplete) to a tag row.
+   * Attaches key/value comboboxes to a tag row: taginfo autocomplete, and the
+   * values a value provider offers (see `SchemaSystem.addValueProvider`).
    * @param $row - a d3-selection to the tag row
    */
   protected _addComboboxes($row: D3Selection): void {
     const context = this.context;
     const editor = context.systems.editor!;
+    const schema = context.systems.schema!;
     const taginfo = context.services.taginfo;
 
     const d = $row.datum();
@@ -504,30 +523,46 @@ export class UiSectionRawTagEditor extends AbstractUiSection {
     const entity = graph.hasEntity(this._entityIDs[0]);
     const geometry = entity?.geometry(graph);
 
-    $key.call(new UiCombobox(context, 'tag-key')
-      .fetcher((value: string, callback: (data: any[]) => void) => {
-        taginfo!.keys({
-          debounce: true,
-          geometry: geometry,
-          query: value
-        }, (err: any, data: any) => {
-          if (!err) {
-            const filtered = data.filter((d: any) => {
-              if (/_\d$/.test(d.value)) return false;          // tag like `_1`, see iD#9422
-              if (this._discardKeys.has(d.value)) return false;     // discardable, see iD#9817
-              if (this._tags[d.value] !== undefined) return false;  // already used as a tag
-              return true;
-            });
-            callback(sort(value, filtered));
-          }
-        });
-      }).attach);
+    if (taginfo) {
+      $key.call(new UiCombobox(context, 'tag-key')
+        .fetcher((value: string, callback: (data: any[]) => void) => {
+          taginfo.keys({
+            debounce: true,
+            geometry: geometry,
+            query: value
+          }, (err: any, data: any) => {
+            if (!err) {
+              const filtered = data.filter((d: any) => {
+                if (/_\d$/.test(d.value)) return false;          // tag like `_1`, see iD#9422
+                if (this._discardKeys.has(d.value)) return false;     // discardable, see iD#9817
+                if (this._tags[d.value] !== undefined) return false;  // already used as a tag
+                return true;
+              });
+              callback(sort(value, filtered));
+            }
+          });
+        }).attach);
+    }
 
-    $value.call(new UiCombobox(context, 'tag-value')
+    const valueCombo = new UiCombobox(context, 'tag-value');
+    $value.call(valueCombo
       .fetcher((value: string, callback: (data: any[]) => void) => {
-        taginfo!.values({
+        const key = utilGetSetValue($key) as string;
+        const options = schema.getValueOptions(key, this._entityIDs, editor.staging.graph);
+        if (options) {
+          valueCombo.minItems(1);    // a single allowed value is still worth offering
+          const query = value.toLowerCase();
+          callback(options
+            .filter(o => !query || [o.value, o.label, o.description].some(t => t?.toLowerCase().includes(query)))
+            .map(valueOptionItem));
+          return;
+        }
+        valueCombo.minItems(2);
+        if (!taginfo) return callback([]);
+
+        taginfo.values({
           debounce: true,
-          key: utilGetSetValue($key) as string,
+          key: key,
           geometry: geometry,
           query: value
         }, (err: any, data: any) => {

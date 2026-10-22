@@ -10,6 +10,7 @@ import { utilGetSetValue, utilNoAuto } from '../../util/index.ts';
 import type { Context } from '../../Context.ts';
 import type { D3Selection } from 'd3-selection';
 import type { Field } from '../../lib/index.ts';
+import type { TagValueOption } from '../../core/SchemaSystem.ts';
 import type { Tags } from './types.ts';
 import type { UiFieldOptions } from './AbstractUiField.ts';
 
@@ -22,11 +23,11 @@ export {
 };
 
 
-interface ComboItem {
+export interface ComboItem {
   key: string;
   value: string;
   title?: string;
-  display?: string;
+  display?: string | (($selection: D3Selection) => void);
   klass?: string;
   isMixed?: boolean;
 }
@@ -297,7 +298,10 @@ export class UiFieldCombo extends AbstractUiField {
     }
 
     const taginfo = context.services.taginfo as any;
-    if (taginfo && this._showTagInfoSuggestions) {
+    const schema = context.systems.schema!;
+    const graph = context.systems.editor!.staging.graph;
+    const provided = !!schema.getValueOptions(this.key, this.entityIDs, graph);
+    if ((taginfo && this._showTagInfoSuggestions) || provided) {
       $selection.call(this._combobox.fetcher(this._setTaginfoValues).attach, $attachTo);
       this._setTaginfoValues('', this._setPlaceholder);
     } else {
@@ -333,7 +337,9 @@ export class UiFieldCombo extends AbstractUiField {
 
 
   /**
-   * Populates the combobox from taginfo suggestions for the given query.
+   * Populates the combobox for the given query: from a value provider's options
+   * if one offers values for this key (see `SchemaSystem.addValueProvider`),
+   * otherwise from taginfo suggestions.
    * @param q        - The query text to look up
    * @param callback - Optional callback receiving the computed combo data
    */
@@ -345,6 +351,20 @@ export class UiFieldCombo extends AbstractUiField {
 
     const taginfo = context.services.taginfo as any;
     const graph = editor.staging.graph;
+
+    const options = this._isMulti ? undefined : schema.getValueOptions(this.key, this.entityIDs, graph);
+    if (options) {
+      this._combobox.minItems(1);    // a single allowed value is still worth offering
+      const query = q.toLowerCase();
+      const items: ComboItem[] = options
+        .filter(o => !query || [o.value, o.label, o.description].some(t => t?.toLowerCase().includes(query)))
+        .map(o => valueOptionItem(o));
+      this.$container?.classed('empty-combobox', items.length === 0);
+      this._comboData = this._objectDifference(items, this._multiData);
+      callback?.(this._comboData);
+      return;
+    }
+    this._combobox.minItems(this._isMulti || this._isSemi ? 1 : 2);
 
     if (!taginfo) {
       this._comboData = [];
@@ -865,4 +885,27 @@ export class UiFieldCombo extends AbstractUiField {
     const node = this.$input.node() as HTMLInputElement | null;
     node?.focus();
   }
+}
+
+
+/**
+ * A combobox item for a value offered by a value provider. The item's value is
+ * the tag value itself (so it's what gets entered), shown with its label and
+ * description beside it, e.g. "1  Walkway".
+ * @param option - the provider's option
+ * @return a combobox item
+ */
+export function valueOptionItem(option: TagValueOption): ComboItem {
+  const note = [option.label, option.description].filter(Boolean).join(' – ');
+  return {
+    key: option.value,
+    value: option.value,
+    title: note ? `${option.value}: ${note}` : option.value,
+    display: ($option: D3Selection) => {
+      $option.text(option.value);
+      if (note) {
+        $option.append('span').attr('class', 'combobox-option-note').text(note);
+      }
+    }
+  };
 }

@@ -204,6 +204,38 @@ describe('EditSystem', () => {
     });
 
 
+    describe('dataVersion', () => {
+      it('changes when loaded data is merged into the base graph, which keeps its key', () => {
+        const before = _editor.dataVersion;
+        const baseKey = _editor.base.graph.key;
+        _editor.merge([new Rapid.OsmNode(context, { id: 'n1' })]);
+        assert.strictEqual(_editor.base.graph.key, baseKey);
+        assert.isAbove(_editor.dataVersion, before);
+      });
+
+      it('does not change when a merge brings nothing new', () => {
+        _editor.merge([new Rapid.OsmNode(context, { id: 'n1' })]);
+        const before = _editor.dataVersion;
+        _editor.merge([new Rapid.OsmNode(context, { id: 'n1' })]);
+        assert.strictEqual(_editor.dataVersion, before);
+      });
+
+      it('changes on an edit, undo and reset', () => {
+        let version = _editor.dataVersion;
+        _editor.perform(Rapid.actionAddEntity(new Rapid.OsmNode(context, { id: 'n-1' })));
+        _editor.commit({ annotation: 'added n-1' });
+        assert.isAbove(_editor.dataVersion, version);
+
+        version = _editor.dataVersion;
+        _editor.undo();
+        assert.isAbove(_editor.dataVersion, version);
+
+        version = _editor.dataVersion;
+        return _editor.resetAsync()
+          .then(() => assert.isAbove(_editor.dataVersion, version));
+      });
+    });
+
     describe('merge', () => {
       it('merges the entities into all graph versions', () => {
         const n = new Rapid.OsmNode(context, { id: 'n1' });

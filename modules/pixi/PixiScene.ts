@@ -15,6 +15,7 @@ import { PixiLayerMapUI } from './PixiLayerMapUI.ts';
 import { PixiLayerOsm } from './PixiLayerOsm.ts';
 import { PixiLayerOsmNotes } from './PixiLayerOsmNotes.ts';
 import { PixiLayerOsmose } from './PixiLayerOsmose.ts';
+import { PixiLayerOverlay } from './PixiLayerOverlay.ts';
 import { PixiLayerRapid } from './PixiLayerRapid.ts';
 import { PixiLayerStreetsidePhotos } from './PixiLayerStreetsidePhotos.ts';
 import { PixiLayerGeoScribble } from './PixiLayerGeoScribble.ts';
@@ -103,7 +104,8 @@ export class PixiScene extends EventEmitter {
 
       new PixiLayerLabels(this),
       new PixiLayerEditBlocks(this),
-      new PixiLayerMapUI(this)
+      new PixiLayerMapUI(this),
+      new PixiLayerOverlay(this)
     ].forEach(layer => this.layers.set(layer.id, layer));
 
     this.reset();

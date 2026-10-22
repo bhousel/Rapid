@@ -268,6 +268,8 @@ export class EditSystem extends AbstractSystem {
   protected _stagingSnapshot: Graph | null;
   /** Accumulated Difference across the entire open transaction (if any) */
   protected _fullDifference: Difference;
+  /** Incremented whenever the data in any graph may have changed (see `dataVersion`) */
+  protected _dataVersion: number;
 
 
   /**
@@ -302,6 +304,7 @@ export class EditSystem extends AbstractSystem {
     this._stagingKey = null;
     this._stagingSnapshot = null;
     this._fullDifference = null!;
+    this._dataVersion = 0;
 
     // Make sure the event handlers have `this` bound correctly
     this.immediateBackup = this.immediateBackup.bind(this);
@@ -425,6 +428,7 @@ export class EditSystem extends AbstractSystem {
     this._stagingKey = currGraph.key;
     this._stagingSnapshot = currGraph.snapshot();
     this._fullDifference = new Difference(baseGraph, baseGraph);
+    this._dataVersion++;
 
     this._backupStatus = true;
     this._sessionID = null;
@@ -479,6 +483,18 @@ export class EditSystem extends AbstractSystem {
    */
   public get index(): number {
     return this._index;
+  }
+
+  /**
+   * A number that changes whenever the data in any graph may have changed:
+   * an edit, undo or redo, newly loaded data merged into the base graph, a
+   * restored backup, or a reset. Merging changes the base graph in place
+   * without changing its `key`, so caches of derived data (e.g. a validator's
+   * results) can't rely on graph keys alone; they can use this instead.
+   * @return The current data version
+   */
+  public get dataVersion(): number {
+    return this._dataVersion;
   }
 
   /**
@@ -892,6 +908,7 @@ export class EditSystem extends AbstractSystem {
     this._mergeIntoCache('editor_stable', this.stable.graph!, entities);
     this._mergeIntoCache('editor_staging', this.staging.graph!, entities);
 
+    this._dataVersion++;
     this.emit('merge', mergedIDs);
   }
 
@@ -1496,6 +1513,7 @@ export class EditSystem extends AbstractSystem {
       loading?.close();   // unblock ui
 
       // emit events
+      this._dataVersion++;
       this.emit('merge', baseEntityIDs);
       this._emitChanges();
       this.emit('historyjump', 0, this._index);  // send 0 in prevIndex, we are replacing history completely
@@ -2305,6 +2323,7 @@ export class EditSystem extends AbstractSystem {
       this._syncCacheFromDiff('editor_staging', stagingGraph, stagingDifference);
       this._stagingKey = stagingGraph.key;
       this._stagingSnapshot = stagingGraph.snapshot();
+      this._dataVersion++;
       this.emit('stagingchange', stagingDifference);
     }
 

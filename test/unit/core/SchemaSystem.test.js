@@ -1737,4 +1737,50 @@ describe('SchemaSystem', () => {
     });
   });
 
+
+  describe('value providers', () => {
+    const graph = new Rapid.Graph(context);
+    const pathwayModes = [{ value: '1', label: 'Walkway' }, { value: '2', label: 'Stairs' }];
+    let schema;
+
+    beforeEach(() => {
+      schema = new Rapid.SchemaSystem(context);
+    });
+
+    it('has none to start', () => {
+      assert.isFalse(schema.hasValueProviders());
+      assert.isUndefined(schema.getValueOptions('pathway_mode', ['n1'], graph));
+      assert.isUndefined(schema.getValueLabel('pathway_mode', '1', ['n1'], graph));
+    });
+
+    it('offers the values a provider gives for a key', () => {
+      const provider = mock((key) => key === 'pathway_mode' ? pathwayModes : undefined);
+      schema.addValueProvider('gtfs', provider);
+      assert.isTrue(schema.hasValueProviders());
+      assert.deepEqual(schema.getValueOptions('pathway_mode', ['n1'], graph), pathwayModes);
+      assert.isUndefined(schema.getValueOptions('highway', ['n1'], graph));
+      assert.deepEqual(provider.mock.calls[0], ['pathway_mode', ['n1'], graph]);
+    });
+
+    it('uses the first provider that offers values', () => {
+      schema.addValueProvider('none', () => undefined);
+      schema.addValueProvider('first', () => [{ value: 'a' }]);
+      schema.addValueProvider('second', () => [{ value: 'b' }]);
+      assert.deepEqual(schema.getValueOptions('k', [], graph), [{ value: 'a' }]);
+    });
+
+    it('labels a value it offers', () => {
+      schema.addValueProvider('gtfs', () => pathwayModes);
+      assert.strictEqual(schema.getValueLabel('pathway_mode', '2', [], graph), 'Stairs');
+      assert.isUndefined(schema.getValueLabel('pathway_mode', '9', [], graph));
+    });
+
+    it('stops offering values once the provider is removed', () => {
+      schema.addValueProvider('gtfs', () => pathwayModes);
+      schema.removeValueProvider('gtfs');
+      assert.isFalse(schema.hasValueProviders());
+      assert.isUndefined(schema.getValueOptions('pathway_mode', [], graph));
+    });
+  });
+
 });

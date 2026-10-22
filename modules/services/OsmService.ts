@@ -570,13 +570,15 @@ export class OsmService extends AbstractSystem {
    * @param   callback - errback-style callback function to call with results
    * @param   options - parsing options
    * @param   requestID - optional requestID for NetworkSystem tracking
+   * @param   fetchOptions - optional `timeout` (ms) for this request, e.g. a large area
    * @return  the RequestID used for this request
    */
   public loadFromAPI(
     path: string,
     callback: Errback | null,
     options: Partial<ParserOptions> = {},
-    requestID?: RequestID
+    requestID?: RequestID,
+    fetchOptions: { timeout?: number } = {}
   ): RequestID {
     const context = this.context;
     const network = context.systems.network!;
@@ -594,6 +596,7 @@ export class OsmService extends AbstractSystem {
       listenerID: 'osmService:fetchAndParse',
       listenerData: { format, parserOptions: options },
       resultPriority: 'normal',
+      ...(fetchOptions.timeout !== undefined ? { timeout: fetchOptions.timeout } : {})
     })
       .then((env: FetchEnvelope<ParserResult>) => {
         // The user switched connection while the request was inflight.
@@ -612,7 +615,7 @@ export class OsmService extends AbstractSystem {
           const isAuthenticated = this.authenticated();
           if (isAuthenticated && (status === 400 || status === 401 || status === 403)) {
             this.logout();
-            this.loadFromAPI(path, callback, options);  // retry
+            this.loadFromAPI(path, callback, options, undefined, fetchOptions);  // retry
             return;
           }
 
@@ -690,6 +693,32 @@ export class OsmService extends AbstractSystem {
       };
 
       this.loadFromAPI(`/api/0.6/${type}/${osmID}${full}${json}`, errback, options);
+    });
+  }
+
+
+  /**
+   * Load everything in an extent in one request (like a map data tile, but any size).
+   * GET /api/0.6/map?bbox=
+   * @param   extent - the area to load
+   * @param   options.timeout - request timeout in ms (large areas can take longer than the default)
+   * @return  Promise resolved with the parsed api results
+   */
+  public loadExtentAsync(extent: Extent, options: { timeout?: number } = {}): Promise<ParserResult> {
+    const json = (this.preferJSON ? '.json' : '');
+    const bbox = extent.toParam();
+    const requestID = `osm-extent-${bbox}` as RequestID;
+
+    return new Promise((resolve, reject) => {
+      const errback = (err: any, results?: ParserResult): void => {
+        if (err) {
+          reject(err);
+        } else {
+          resolve(results!);
+        }
+      };
+
+      this.loadFromAPI(`/api/0.6/map${json}?bbox=${bbox}`, errback, {}, requestID, options);
     });
   }
 
