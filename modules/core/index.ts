@@ -65,6 +65,7 @@ export {
 import type { SystemConstructor } from './types.ts';
 export type { Systems, SystemConstructor } from './types.ts';
 export type { HideRuleFn } from './FilterSystem.ts';
+export type { TagValueOption, TagValueProvider } from './SchemaSystem.ts';
 
 /**
  * Registry interface for available systems.
