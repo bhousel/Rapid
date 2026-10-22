@@ -57,6 +57,7 @@ export interface IssuesBySeverity {
  * Events available:
  * - `validated`    - Fires after some validation has occurred
  * - `focusedIssue` - Fires after an issue has received focus, receives the issue
+ * - `validatorschange` - Fires after a validator is registered or unregistered
  */
 export class ValidationSystem extends AbstractSystem {
 
@@ -84,6 +85,10 @@ export class ValidationSystem extends AbstractSystem {
   protected _disableOverrides: SeverityOverride[];
   /** Promise fulfilled when validation caught up to `stable` snapshot */
   protected _validationPromise: Promise<void> | null;
+  /** Validators rerun over all loaded data after each validation (see `registerValidator`) */
+  protected _revalidateAllIDs: Set<ValidatorID>;
+  /** For each cache, the data version and validators its last "revalidate all" run covered */
+  protected _revalidatedAll: WeakMap<ValidationCache, string>;
 
 
   /**
@@ -96,6 +101,8 @@ export class ValidationSystem extends AbstractSystem {
     this.optionalDependencies = new Set<SystemID>(['map', 'settings', 'ui', 'urlhash']);
 
     this._validators = new Map<ValidatorID, ValidatorFunction>();
+    this._revalidateAllIDs = new Set<ValidatorID>();
+    this._revalidatedAll = new WeakMap<ValidationCache, string>();
     this._base = new ValidationCache(context, 'base');
     this._head = new ValidationCache(context, 'head');
 
@@ -265,32 +272,114 @@ export class ValidationSystem extends AbstractSystem {
    * It reruns just the "unsquare_way" validation on all buildings.
    */
   public revalidateUnsquare(): void {
-    const checkUnsquareWay = this._validators.get('unsquare_way');
-    if (typeof checkUnsquareWay !== 'function') return;
+    this.revalidate(['unsquare_way'], entity => entity.type === 'way' && !!entity.tags.building && entity.tags.building !== 'no');
+  }
 
-    const revalidate = (cache: ValidationCache): void => {
-      if (!cache.graph) return;
 
-      cache.uncacheIssuesOfType('unsquare_way');   // uncache existing
+  /**
+   * Adds a validator, e.g. one an app embedding Rapid provides, and validates
+   * the data already loaded with it. Its issues show in the Issues pane, and
+   * it gets a toggle in the pane's Rules list like the built-in validators
+   * (which needs `issues.<type>.title` and related strings, see `l10n`).
+   * Replaces any validator with the same `type`.
+   * @param validator - The validator function; `validator.type` is its ValidatorID
+   * @param options.revalidateAll - Whether its results for a feature can depend on
+   *   features anywhere else (e.g. a reference to another feature by id). Rapid
+   *   normally revalidates only the features an edit touched and their
+   *   neighbors; these are rerun over all loaded data after each validation.
+   */
+  public registerValidator(validator: ValidatorFunction, options: { revalidateAll?: boolean } = {}): void {
+    const validatorID = validator.type;
+    this._validators.set(validatorID, validator);
+    if (options.revalidateAll) {
+      this._revalidateAllIDs.add(validatorID);
+    } else {
+      this._revalidateAllIDs.delete(validatorID);
+    }
+    this.emit('validatorschange');
+    this.revalidate([validatorID]);
+  }
 
-      // rerun for all buildings
-      const editor = this.context.systems.editor!;
-      const spatial = this.context.systems.spatial!;
-      const spatialID = editor.spatialIDForGraph(cache.graph);
 
-      const buildings = spatial.getAllItems<OsmEntity>(spatialID)
-        .filter(entity => (entity.type === 'way' && entity.tags.building && entity.tags.building !== 'no'));
-
-      for (const entity of buildings) {
-        const detected = checkUnsquareWay(entity, cache.graph);
-        if (!detected.issues.length) continue;
-        cache.cacheIssues(detected.issues);
-      }
-    };
-
-    revalidate(this._head);
-    revalidate(this._base);
+  /**
+   * Removes a validator added with `registerValidator`, and its issues.
+   * @param validatorID - The validator's type
+   */
+  public unregisterValidator(validatorID: ValidatorID): void {
+    if (!this._validators.delete(validatorID)) return;
+    this._revalidateAllIDs.delete(validatorID);
+    for (const cache of [this._head, this._base]) {
+      cache.uncacheIssuesOfType(validatorID);
+    }
+    this.emit('validatorschange');
     this.emit('validated');
+  }
+
+
+  /**
+   * Reruns the given validators over all loaded data (in the base and head
+   * caches), replacing their issues, e.g. after a setting they read changed.
+   * @param validatorIDs - The validators to rerun
+   * @param filter - Optionally, only the entities to rerun them on
+   */
+  public revalidate(validatorIDs: Iterable<ValidatorID>, filter?: (entity: OsmEntity) => boolean): void {
+    const validators = [...validatorIDs]
+      .map(id => [id, this._validators.get(id)] as const)
+      .filter((pair): pair is readonly [ValidatorID, ValidatorFunction] => typeof pair[1] === 'function');
+    if (!validators.length) return;
+
+    for (const cache of [this._head, this._base]) {
+      this._revalidateCache(cache, validators, filter);
+    }
+    this.emit('validated');
+  }
+
+
+  /**
+   * Reruns validators over all entities in a cache's graph, replacing their issues.
+   * @param cache - The cache to revalidate
+   * @param validators - [ValidatorID, validator] pairs to rerun
+   * @param filter - Optionally, only the entities to rerun them on
+   */
+  protected _revalidateCache(
+    cache: ValidationCache,
+    validators: (readonly [ValidatorID, ValidatorFunction])[],
+    filter?: (entity: OsmEntity) => boolean
+  ): void {
+    if (!cache.graph) return;
+    const editor = this.context.systems.editor!;
+    const spatial = this.context.systems.spatial!;
+    const spatialID = editor.spatialIDForGraph(cache.graph);
+    const entities = spatial.getAllItems<OsmEntity>(spatialID).filter(entity => !filter || filter(entity));
+
+    for (const [validatorID, validator] of validators) {
+      cache.uncacheIssuesOfType(validatorID);
+      for (const entity of entities) {
+        const detected = validator(entity, cache.graph);
+        const issues = detected.issues.filter(issue => this._applySeverityOverrides(issue));
+        if (issues.length) cache.cacheIssues(issues);
+      }
+    }
+  }
+
+
+  /**
+   * Reruns the "revalidate all" validators (see `registerValidator`) over a
+   * cache, unless neither the data nor those validators changed since last time.
+   * @param cache - The cache that was just validated
+   */
+  protected _revalidateAllIn(cache: ValidationCache): void {
+    if (!this._revalidateAllIDs.size || !cache.graph) return;
+    const editor = this.context.systems.editor!;
+    const ids = [...this._revalidateAllIDs];
+    const runKey = `${editor.dataVersion}|${ids.join(',')}`;
+    if (this._revalidatedAll.get(cache) === runKey) return;
+    this._revalidatedAll.set(cache, runKey);
+
+    const validators = ids
+      .map(id => [id, this._validators.get(id)] as const)
+      .filter((pair): pair is readonly [ValidatorID, ValidatorFunction] => typeof pair[1] === 'function');
+    this._revalidateCache(cache, validators);
   }
 
 
@@ -610,6 +699,7 @@ export class ValidationSystem extends AbstractSystem {
     }
 
     this._validationPromise = this._validateEntitiesAsync(this._head, entityIDs)
+      .then(() => this._revalidateAllIn(this._head))
       .then(() => this._updateResolvedIssues(entityIDs))
       .then(() => this.emit('validated'))
       .catch(e => console.error(e))  // eslint-disable-line
@@ -649,6 +739,7 @@ export class ValidationSystem extends AbstractSystem {
     const expandedEntityIDs = this._base.withAllRelatedEntities(entityIDs);  // expand set
 
     return this._validateEntitiesAsync(this._base, expandedEntityIDs)
+      .then(() => this._revalidateAllIn(this._base))
       .then(() => this._updateResolvedIssues(expandedEntityIDs))
       .then(() => { this.emit('validated'); })
       .catch((e: Error) => console.error(e));  // eslint-disable-line
@@ -673,34 +764,6 @@ export class ValidationSystem extends AbstractSystem {
    *   }
    */
   protected _validateEntity(entity: OsmEntity, graph: Graph): ValidatorResult {
-
-    // If there are any override rules that match the issue type/subtype,
-    // adjust severity (or disable it) and keep/discard as quickly as possible.
-    const applySeverityOverrides = (issue: ValidationIssue): boolean => {
-      const type = issue.type;
-      const subtype = issue.subtype ?? '';
-
-      for (const error of this._errorOverrides) {
-        if (error.type.test(type) && error.subtype.test(subtype)) {
-          issue.severity = 'error';
-          return true;
-        }
-      }
-      for (const warning of this._warningOverrides) {
-        if (warning.type.test(type) && warning.subtype.test(subtype)) {
-          issue.severity = 'warning';
-          return true;
-        }
-      }
-      for (const disable of this._disableOverrides) {
-        if (disable.type.test(type) && disable.subtype.test(subtype)) {
-          return false;
-        }
-      }
-      return true;
-    };
-
-
     const result: ValidatorResult = { issues: [], provisional: false };
     for (const [validatorID, validator] of this._validators) {   // run all validators
       if (typeof validator !== 'function') {
@@ -712,11 +775,41 @@ export class ValidationSystem extends AbstractSystem {
         result.provisional = true;
       }
 
-      const filtered = detected.issues.filter(applySeverityOverrides);
+      const filtered = detected.issues.filter(issue => this._applySeverityOverrides(issue));
       result.issues = result.issues.concat(filtered);
     }
 
     return result;
+  }
+
+
+  /**
+   * Applies the severity override rules (from url params) to an issue.
+   * @param issue - The issue to adjust (its severity may change)
+   * @return `false` if the issue is disabled and should be dropped, `true` to keep it
+   */
+  protected _applySeverityOverrides(issue: ValidationIssue): boolean {
+    const type = issue.type;
+    const subtype = issue.subtype ?? '';
+
+    for (const error of this._errorOverrides) {
+      if (error.type.test(type) && error.subtype.test(subtype)) {
+        issue.severity = 'error';
+        return true;
+      }
+    }
+    for (const warning of this._warningOverrides) {
+      if (warning.type.test(type) && warning.subtype.test(subtype)) {
+        issue.severity = 'warning';
+        return true;
+      }
+    }
+    for (const disable of this._disableOverrides) {
+      if (disable.type.test(type) && disable.subtype.test(subtype)) {
+        return false;
+      }
+    }
+    return true;
   }
 
 
