@@ -64,6 +64,7 @@ export {
 // Re-export types from types.ts for convenience
 import type { SystemConstructor } from './types.ts';
 export type { Systems, SystemConstructor } from './types.ts';
+export type { HideRuleFn } from './FilterSystem.ts';
 
 /**
  * Registry interface for available systems.

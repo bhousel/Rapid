@@ -936,4 +936,53 @@ describe('FilterSystem', () => {
 
   });
 
+
+  describe('hide rules', () => {
+    // A way on floor 1 with two nodes, and a point on floor 2.
+    const n1 = new Rapid.OsmNode(context, { id: 'n1', version: '1', loc: [0, 0] });
+    const n2 = new Rapid.OsmNode(context, { id: 'n2', version: '1', loc: [1, 0] });
+    const w1 = new Rapid.OsmWay(context, { id: 'w1', version: '1', nodes: ['n1', 'n2'], tags: { highway: 'footway', level: '1' } });
+    const p1 = new Rapid.OsmNode(context, { id: 'n3', version: '1', loc: [2, 0], tags: { amenity: 'bench', level: '2' } });
+    const graph = new Rapid.Graph(context, [n1, n2, w1, p1]);
+    const onFloor2 = (entity) => entity.tags?.level !== undefined && entity.tags.level !== '2';
+
+    it('hides what a rule returns true for, reporting the rule', () => {
+      const filters = new Rapid.FilterSystem(context);
+      filters.addHideRule('floor', onFloor2);
+      assert.strictEqual(filters.isHidden(w1, graph, 'line'), 'floor');
+      assert.isNull(filters.isHidden(p1, graph, 'point'));
+    });
+
+    it('hides vertices whose parent ways a rule hides', () => {
+      const filters = new Rapid.FilterSystem(context);
+      filters.addHideRule('floor', onFloor2);
+      assert.strictEqual(filters.isHidden(n1, graph, 'vertex'), 'floor');
+    });
+
+    it('filters a scene by rules even with no user filter on', () => {
+      const filters = new Rapid.FilterSystem(context);
+      filters.addHideRule('floor', onFloor2);
+      const shown = filters.filterScene([n1, n2, w1, p1], graph).map(e => e.id);
+      assert.deepEqual(shown, ['n3']);
+    });
+
+    it('never hides force-visible entities', () => {
+      const filters = new Rapid.FilterSystem(context);
+      filters.addHideRule('floor', onFloor2);
+      filters._forceVisible = new Set(['w1']);
+      assert.isNull(filters.isHidden(w1, graph, 'line'));
+    });
+
+    it('emits filterchange when rules are added, refreshed or removed', () => {
+      const filters = new Rapid.FilterSystem(context);
+      const onChange = mock();
+      filters.on('filterchange', onChange);
+      filters.addHideRule('floor', onFloor2);
+      filters.refreshHideRules();
+      filters.removeHideRule('floor');
+      filters.removeHideRule('floor');   // not there: no event
+      assert.strictEqual(onChange.mock.calls.length, 3);
+      assert.isNull(filters.isHidden(w1, graph, 'line'));
+    });
+  });
 });
