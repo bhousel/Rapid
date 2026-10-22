@@ -450,6 +450,35 @@ describe('OsmService', () => {
 //  });
 
 
+    describe('loadExtentAsync', () => {
+      it('loads everything in an extent in one request', () => {
+        fetchMock.route(/map\.json\?bbox=-74\.1,40\.6,-74,40\.7/, sample.nodeJSON);
+
+        const extent = new Rapid.sdk.Extent([-74.1, 40.6], [-74, 40.7]);
+        return _osm.loadExtentAsync(extent)
+          .then(results => {
+            assert.lengthOf(results.data, 1);
+            assert.strictEqual(results.data[0].id, 'n1');
+          });
+      });
+
+      it('passes a timeout to the request', () => {
+        fetchMock.route(/map\.json/, sample.nodeJSON);
+        const network = _osm.context.systems.network;
+        const fetchEnvelope = network.fetchEnvelope.bind(network);
+        let options;
+        network.fetchEnvelope = (url, opts) => {
+          options = opts;
+          return fetchEnvelope(url, opts);
+        };
+
+        const extent = new Rapid.sdk.Extent([-74.1, 40.6], [-74, 40.7]);
+        return _osm.loadExtentAsync(extent, { timeout: 120000 })
+          .finally(() => { network.fetchEnvelope = fetchEnvelope; })
+          .then(() => assert.strictEqual(options.timeout, 120000));
+      });
+    });
+
     describe('loadEntityAsync', () => {
       it('loads a node', () => {
         fetchMock.route(/node\/1\.json/, sample.nodeJSON);

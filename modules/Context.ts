@@ -16,7 +16,7 @@ import type { Graph } from './lib/Graph.ts';
 import type { Modes } from './modes/types.ts';
 import type { Services } from './services/types.ts';
 import type { Systems } from './core/types.ts';
-import type { Vec2 } from '@rapid-sdk/math';
+import type { Extent, Vec2 } from '@rapid-sdk/math';
 import { utilIterable, type OneOrMore } from './util/iterable.ts';
 
 const MINZOOM = 15;
@@ -144,6 +144,8 @@ export class Context extends EventEmitter {
   protected _startPromise: Promise<void> | null;
   /** Promise for reset */
   protected _resetPromise: Promise<void> | null;
+  /** Extents loaded with `loadExtentAsync({ keep: true })`, loaded again after each reset */
+  protected _keptExtents: Map<string, { extent: Extent; timeout?: number }>;
 
   /** Last pointer device type used */
   public lastPointerType: string;
@@ -230,6 +232,7 @@ export class Context extends EventEmitter {
     this._initPromise = null;
     this._startPromise = null;
     this._resetPromise = null;
+    this._keptExtents = new Map();
 
     // User interface
     // AFAICT `lastPointerType` is just used to localize the intro? for now - instead get this from pixi?
@@ -399,7 +402,13 @@ export class Context extends EventEmitter {
     return this._resetPromise = Promise.resolve()
       .then(() => Promise.all( allSystems.map(s => s.resetAsync()) ))
       .then(() => Promise.all( allServices.map(s => s.resetAsync()) ))
-      .then(() => {})  // void return
+      .then(() => {
+        // A reset drops all loaded data: load the kept extents again (in the background).
+        for (const { extent, timeout } of this._keptExtents.values()) {
+          this.loadExtentAsync(extent, { timeout })
+            .catch(e => console.error('Reloading a kept extent failed', e));  // eslint-disable-line no-console
+        }
+      })
       .finally(() => { this._resetPromise = null; });
   }
 
@@ -487,6 +496,46 @@ export class Context extends EventEmitter {
         editor?.merge(results.data);
       }
     });
+  }
+
+
+  /**
+   * Loads everything in an extent from OSM and merges it into the editor, in one
+   * request: e.g. a whole small dataset, so lists and checks that span it don't
+   * depend on which areas the user has viewed. Data loaded as the map moves skips
+   * what's already loaded.
+   * @param  extent - The area to load
+   * @param  options.keep - Load it again after every reset (which drops loaded data,
+   *   e.g. on restoring saved edits), until `clearKeptExtents`
+   * @param  options.timeout - Request timeout in ms (large areas can take longer than the default)
+   * @return Promise resolved when the data is loaded and merged
+   */
+  public loadExtentAsync(extent: Extent, options: { keep?: boolean; timeout?: number } = {}): Promise<void> {
+    const editor = this.systems.editor;
+    const osm = this.services.osm as any;
+    if (!osm) {
+      return Promise.resolve();
+    }
+
+    if (options.keep) {
+      this._keptExtents.set(extent.toParam(), { extent, timeout: options.timeout });
+    }
+
+    return osm.loadExtentAsync(extent, { timeout: options.timeout })
+      .then((results: any) => {
+        if (Array.isArray(results?.data)) {
+          editor?.merge(results.data);
+        }
+      });
+  }
+
+
+  /**
+   * Stops loading again after resets the extents loaded with `keep`
+   * (e.g. before switching to other data).
+   */
+  public clearKeptExtents(): void {
+    this._keptExtents.clear();
   }
 
 
