@@ -577,6 +577,8 @@ what the developer is seeing when they report a problem.
 1. Start the server: `bun run start` (builds, then serves `dist/` on `http://127.0.0.1:8080`).
 2. Start Chrome with remote debugging: `bun run start:chrome`. It opens the dev build, using its own
    profile in `.chrome-debug/` (gitignored). The developer may already have this running.
+   Both start commands replace a copy of themselves that's already running (whoever starts it last
+   wins), so it's fine to start them in the background; the developer can restart them from a terminal.
 3. Drive the Rapid tab with `bun run cdp`. It attaches to the running Chrome (port 9222), so it sees
    exactly what the developer sees:
    - `bun run cdp shot <out.png>`: screenshot the tab, then read the image

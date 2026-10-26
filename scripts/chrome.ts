@@ -2,6 +2,7 @@ import { launch } from 'chrome-launcher';
 import { mkdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { styleText } from 'node:util';
+import { stopListenerAsync } from './stop_listener.ts';
 
 //
 // Launches Chrome with the remote debugging protocol enabled, opened to the local dev build.
@@ -12,6 +13,8 @@ import { styleText } from 'node:util';
 //   Settings and extensions you add to it (e.g. Pixi devtools) are kept between runs.
 // - Start the local server first (`bun run start`), so the page has something to load.
 // - Close the browser window, or press Ctrl-C here, to stop.
+// - Running this again replaces a debug Chrome that is already running (e.g. one a coding agent
+//   started in the background), so whoever starts it last gets the window to control.
 //
 const port = 9222;
 const startingUrl = 'http://127.0.0.1:8080/dist/index-dev.html';
@@ -19,7 +22,10 @@ const userDataDir = resolve(import.meta.dir, '../.chrome-debug');
 
 mkdirSync(userDataDir, { recursive: true });
 
-// If a Chrome is already listening on this port, chrome-launcher reuses it instead of starting another.
+// Stop the debug Chrome that's already running, if any. Otherwise chrome-launcher would reuse it,
+// and this script couldn't stop it. Only a Chrome using our profile folder is stopped.
+await stopListenerAsync(port, /\.chrome-debug/);
+
 const chrome = await launch({
   port: port,
   startingUrl: startingUrl,
