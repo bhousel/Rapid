@@ -1369,10 +1369,6 @@ en:
           label: Same Distance (m)
         sameangle:
           label: Same Angle (°)
-        neardist:
-          label: Review Distance (m)
-        nearangle:
-          label: Review Angle (°)
     dictionary:
       heading: Data Mapping
       instruction: This section controls how Rapid accepts new data from this dataset.

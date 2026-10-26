@@ -1269,24 +1269,20 @@ img.dataset-thumbnail.inverted {
   flex: 0 0 0px;
   flex-flow: column nowrap;
 }
-.modal-dataset-settings .field-row.row-conflated,
-.modal-dataset-settings .field-row.row-showmatched {
+.modal-dataset-settings .dataset-conflation .field-row {
   align-items: center;
-  margin-top: 5px;
 }
-.modal-dataset-settings .field-row.row-conflated .field-label,
-.modal-dataset-settings .field-row.row-showmatched .field-label {
-  flex: 0 0 auto;   /* these labels are long, don't wrap them */
-  margin-right: 10px;
+.modal-dataset-settings .dataset-conflation .field-label {
+  flex: 0 0 270px;
 }
-.ideditor[dir='rtl'] .modal-dataset-settings .field-row.row-conflated .field-label,
-.ideditor[dir='rtl'] .modal-dataset-settings .field-row.row-showmatched .field-label {
-  margin-right: 0;
-  margin-left: 10px;
-}
-.modal-dataset-settings .field-row.row-conflated .field-input,
-.modal-dataset-settings .field-row.row-showmatched .field-input {
+.modal-dataset-settings .dataset-conflation .field-input {
   flex: 0 0 0px;   /* don't grow */
+}
+.modal-dataset-settings .conflation-table {
+  margin-top: 20px;
+}
+.modal-dataset-settings .conflation-table.disabled {
+  opacity: 0.5;
 }
 .modal-dataset-settings .conflation-rules-instructions {
   margin-top: 10px;

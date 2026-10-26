@@ -1689,12 +1689,6 @@
           },
           "sameangle": {
             "label": "Same Angle (°)"
-          },
-          "neardist": {
-            "label": "Review Distance (m)"
-          },
-          "nearangle": {
-            "label": "Review Angle (°)"
           }
         }
       },

@@ -123,6 +123,20 @@ OpenStreetMap ↔ OpenHistoricalMap bridge).
 - Today, without the key, Rapid carries on unauthenticated, which is fine for now. Adopt whatever
   MapRoulette moves to once it's settled. Auth should probably move from the UI into `MapRouletteService`.
 
+## Conflation: what JOSM users will ask for
+From reading JOSM's Conflation plugin (see "Prior art" in `design/conflation-system.md`). Roughly in
+the order people are likely to ask:
+- **What's left, with counts:** a per-status count for the dataset and next/previous through it.
+- **Tag merging into already-mapped features** (e.g. `surface` onto an existing sidewalk), with per-key
+  policies (fill in missing / overwrite / keep existing), not a dialog per feature.
+- **Batch accept** in one undo step.
+- **"Why is this already mapped?"**: show the matching OSM way, distance and angle.
+- Later: an "OSM only" view, a tag-difference badge on matched features, value normalization for
+  `sameKeys`, mutual-best pairing for points and areas.
+- `uncertain` / the review queue have no source since the "near" band went away. Decide whether a
+  `sameKeys` disagreement (same place and direction, different tags) should become "needs review",
+  or remove the status.
+
 ## Conflation / buffers follow-ups (beyond Step 3)
 - **Internalize / replace `lineToPoly` offset-curve generation** — `lineToPoly` (used for halos) repurposes `PIXI.buildLine`, coupling halo generation to Pixi internals and a fragile triangle-walk. If we ever need *precise* buffer polygons (not just coverage boxes), internalizing the offset-curve math would unify halos + buffers and drop the Pixi coupling. Left alone for now; coverage boxes cover the conflation use case.
 - **Precise buffer polygons** — only if a consumer needs the actual buffer polygon rather than coverage boxes + a distance/overlap predicate. Likely unnecessary given the two-phase query.

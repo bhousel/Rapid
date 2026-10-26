@@ -62,10 +62,6 @@ export interface ConflationRule {
   sameDist: number;
   /** "Same", lines only: the heading difference is at most this, in degrees (default 30) */
   sameAngle?: number;
-  /** "Near" (needs review): the target is within this distance, in meters (default `sameDist`, no review band) */
-  nearDist?: number;
-  /** "Near", lines only: the heading difference is at most this, in degrees (default `sameAngle`) */
-  nearAngle?: number;
 }
 
 /**
@@ -215,13 +211,11 @@ interface BoxHit {
   wayID: EntityID;      // the way that the segment is on
   distance: number;     // meters
   angle: number;        // degrees
-  level: 1 | 2;         // 2 = same, 1 = near
 }
 
 /** Running totals for one candidate feature (internal). */
 interface FeatureTally {
-  strict: number;
-  loose: number;
+  count: number;        // boxes where it's the same
   distance: number;
   angle: number;
   wayIDs: Set<EntityID>;   // the feature's ways that matched (more than one for a multipolygon)
@@ -267,8 +261,8 @@ export function conflationDefaults(): ConflationSettings {
   return {
     showMatched: false,
     rules: [
-      { source: { geometry: 'line' }, target: { geometry: 'line' }, sameDist: 3, sameAngle: DEFAULT_MAX_ANGLE, nearDist: 3, nearAngle: DEFAULT_MAX_ANGLE },
-      // { source: { geometry: 'point' }, target: { geometry: 'point' }, sameDist: 3, nearDist: 6 },
+      { source: { geometry: 'line' }, target: { geometry: 'line' }, sameDist: 3, sameAngle: DEFAULT_MAX_ANGLE },
+      // { source: { geometry: 'point' }, target: { geometry: 'point' }, sameDist: 3 },
       // { source: { geometry: 'area' }, target: { geometry: 'area' }, sameDist: 0 }
     ]
   };
@@ -278,15 +272,15 @@ export function conflationDefaults(): ConflationSettings {
 /**
  * The `ConflationSystem` compares features from a Rapid dataset with the OSM data loaded in the
  * editor. For each new feature it runs the four stages: **match** (find nearby OSM features and
- * measure them), **score**, **triage** (already mapped, needs review, or new), and it prepares what the
+ * measure them), **score**, **triage** (already mapped or new), and it prepares what the
  * **act** stage needs, such as the runs of a partly mapped line and where they join existing ways.
  *
  * It compares against the `editor_stable` spatial caches, so results only change when the user
  * finishes an edit. Results are computed lazily, cached per feature, and flushed on `stablechange`
  * and `merge`.
  *
- * Every source feature whose geometry some rule covers is tested. Rules decide "same" (all of a rule's
- * conditions hold) and "near" (needs review); any one rule saying "same" is enough.
+ * Every source feature whose geometry some rule covers is tested. A rule says "same" when all of its
+ * conditions hold, and any one rule saying "same" is enough.
  *
  * Only LineStrings from GeoJSON-backed datasets are matched so far. Points and areas follow.
  *
@@ -547,9 +541,8 @@ export class ConflationSystem extends AbstractSystem {
    *
    * The source is sampled at points along its length, and each sample (coverage box) is triaged on
    * its own: *matched* if some rule says a target feature is the same there (within `sameDist` and
-   * `sameAngle`, and all the rule's conditions hold), *uncertain* if some rule says one is near
-   * (within `nearDist` and `nearAngle`), and *unmatched* otherwise. Consecutive boxes with the same
-   * status form runs.
+   * `sameAngle`, and all the rule's conditions hold), and *unmatched* otherwise. Consecutive boxes
+   * with the same status form runs.
    * @param datum - The source feature
    * @param rules - The rules whose source geometry is 'line'
    * @param sourceTags - The source feature's tags, after the data mapping
@@ -571,17 +564,16 @@ export class ConflationSystem extends AbstractSystem {
     const graph = editor.stable.graph!;
     const segSpatialID = editor.spatialIDForGraph(graph) + '-segments';
 
-    // Rules whose source conditions this feature fails can't say "same" or "near" for it.
+    // Rules whose source conditions this feature fails can't say "same" for it.
     const active = rules.filter(rule => PropMatcher.matchAll(this._propMatchers(rule.source), sourceTags));
 
     const lat = part.orig!.extent.center()[1];
     const metersPerWorld = 1 / geoMetersToWorld(1, lat);
-    const nearDistOf = (rule: ConflationRule) => Math.max(rule.nearDist ?? rule.sameDist, rule.sameDist);
-    const queryMeters = Math.max(0, ...active.map(nearDistOf));
+    const queryMeters = Math.max(0, ...active.map(rule => rule.sameDist));
     const queryR = geoMetersToWorld(queryMeters, lat);
 
     // Samples are spaced by the smallest `sameDist`, so runs have that resolution.
-    // Each query box reaches out to the largest `nearDist`, so "near" targets are found too.
+    // Each query box reaches out to the largest `sameDist`, so every rule's targets are found.
     const spacing = Math.max(MIN_SAMPLE_METERS, Math.min(...rules.map(rule => rule.sameDist)));
     const boxes = part.computeCoverage(spacing);
     const source = part.world!.outer!;
@@ -618,8 +610,8 @@ export class ConflationSystem extends AbstractSystem {
       return feature;
     };
 
-    // For each target feature near a point on the source line, finds its best match across all rules:
-    // "same" beats "near", and a closer segment beats a farther one.
+    // For each target feature that some rule says is the same at a point on the source line,
+    // finds its closest segment there.
     const hitsAt = (coord: Vec2, heading: number): Map<EntityID, BoxHit> => {
       const best = new Map<EntityID, BoxHit>();
       const query = {
@@ -657,18 +649,11 @@ export class ConflationSystem extends AbstractSystem {
           // by distance only. Many datasets are split into short edges at every junction.
           const isStub = sourceMeters < rule.sameDist;
           const sameAngle = rule.sameAngle ?? DEFAULT_MAX_ANGLE;
-          const nearAngle = rule.nearAngle ?? sameAngle;
-          let level: 0 | 1 | 2 = 0;
-          if (distance <= rule.sameDist && (isStub || angle <= sameAngle)) {
-            level = 2;
-          } else if (distance <= nearDistOf(rule) && (isStub || angle <= nearAngle)) {
-            level = 1;
-          }
-          if (!level) continue;
+          if (distance > rule.sameDist || (!isStub && angle > sameAngle)) continue;
 
           const prev = best.get(entityID);
-          if (!prev || level > prev.level || (level === prev.level && distance < prev.distance)) {
-            best.set(entityID, { entityID: entityID, wayID: wayID, distance: distance, angle: angle, level: level });
+          if (!prev || distance < prev.distance) {
+            best.set(entityID, { entityID: entityID, wayID: wayID, distance: distance, angle: angle });
           }
         }
       }
@@ -677,10 +662,8 @@ export class ConflationSystem extends AbstractSystem {
 
     // Triages a point by its best target features.
     const matchOf = (coord: Vec2, best: Map<EntityID, BoxHit>): BoxMatch => {
-      const strictHits = [...best.values()].filter(h => h.level === 2);
-      const looseHits = [...best.values()].filter(h => h.level === 1);
-      const hits = strictHits.length ? strictHits : looseHits;
-      const status: ConflationStatus = strictHits.length ? 'matched' : looseHits.length ? 'uncertain' : 'unmatched';
+      const hits = [...best.values()];
+      const status: ConflationStatus = hits.length ? 'matched' : 'unmatched';
       hits.sort((a, b) => a.distance - b.distance);
       return { coord: coord, status: status, entityIDs: hits.map(h => h.entityID), wayIDs: hits.map(h => h.wayID) };
     };
@@ -690,12 +673,8 @@ export class ConflationSystem extends AbstractSystem {
 
       // Tally the candidates, then triage the box by its best target features.
       for (const h of best.values()) {
-        const tally = tallies.get(h.entityID) ?? { strict: 0, loose: 0, distance: 0, angle: 0, wayIDs: new Set<EntityID>() };
-        if (h.level === 2) {
-          tally.strict++;
-        } else {
-          tally.loose++;
-        }
+        const tally = tallies.get(h.entityID) ?? { count: 0, distance: 0, angle: 0, wayIDs: new Set<EntityID>() };
+        tally.count++;
         tally.distance += h.distance;
         tally.angle += h.angle;
         tally.wayIDs.add(h.wayID);
@@ -704,15 +683,14 @@ export class ConflationSystem extends AbstractSystem {
       boxMatches.push(matchOf(box.coord, best));
     }
 
-    // Score: matched boxes count 1, uncertain boxes count 0.5.
+    // Score: the share of boxes that are already mapped.
     const n = boxMatches.length;
-    const boxScore = (bm: BoxMatch) => (bm.status === 'matched' ? 1 : bm.status === 'uncertain' ? 0.5 : 0);
-    const score = n ? boxMatches.reduce((sum, bm) => sum + boxScore(bm), 0) / n : 0;
+    const score = n ? boxMatches.filter(bm => bm.status === 'matched').length / n : 0;
 
     // Candidates, with their measures.
     const candidates: ConflationCandidate[] = [];
     for (const [entityID, tally] of tallies) {
-      const count = tally.strict + tally.loose;
+      const count = tally.count;
       const intersects = [...tally.wayIDs].some(wayID => {
         const wayCoords = (graph.hasEntity(wayID) as OsmWay | undefined)?.nodes
           .map(nodeID => coordOf(nodeID))
@@ -722,7 +700,7 @@ export class ConflationSystem extends AbstractSystem {
 
       candidates.push({
         entityID: entityID,
-        score: n ? (tally.strict + 0.5 * tally.loose) / n : 0,
+        score: n ? count / n : 0,
         measures: {
           distance: tally.distance / count,
           angle: tally.angle / count,

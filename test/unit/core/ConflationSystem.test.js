@@ -59,16 +59,14 @@ describe('ConflationSystem', () => {
     return new Rapid.GeoJSONData(context, { id: id, datasetID: 'test', geojson: geojson });
   }
 
-  // A line rule like a user might set up: "same" within 3 m / 30°, "near" within 6 m / 30°.
+  // A line rule like a user might set up: "same" within 3 m / 30°.
   // By default the target must be a footway.
   function lineRule(overrides = {}) {
     return Object.assign({
       source: { geometry: 'line' },
       target: { geometry: 'line', props: [{ key: 'highway', value: 'footway' }] },
       sameDist: 3,
-      sameAngle: 30,
-      nearDist: 6,
-      nearAngle: 30
+      sameAngle: 30
     }, overrides);
   }
 
@@ -117,10 +115,10 @@ describe('ConflationSystem', () => {
 
 
   describe('defaults', () => {
-    it('datasets start with conflation disabled, and one rule per geometry type with no property conditions', () => {
+    it('datasets start with conflation disabled, and a line rule with no property conditions', () => {
       assert.isFalse(ds.conflated);
       assert.isFalse(conflation.isEnabled(ds));
-      assert.sameMembers(ds.conflation.rules.map(r => r.source.geometry), ['line', 'point', 'area']);
+      assert.sameMembers(ds.conflation.rules.map(r => r.source.geometry), ['line']);   // points and areas: not yet
       for (const rule of ds.conflation.rules) {
         assert.strictEqual(rule.target.geometry, rule.source.geometry);
         assert.isUndefined(rule.source.props);
@@ -245,15 +243,13 @@ describe('ConflationSystem', () => {
       assert.isFalse(best.measures.intersects);
     });
 
-    it('the same sidewalk is near at sameDist 1 / nearDist 2, and new with no near band', () => {
+    it('the same sidewalk is new at sameDist 1', () => {
+      enable([lineRule({ sameDist: 1 })]);
       osmWay(1, [[0, 0], [100, 0]], SIDEWALK);
-
-      enable([lineRule({ sameDist: 1, nearDist: 2 })]);
-      assert.strictEqual(conflation.getResult(ds, feature('a', [[0, 1.5], [100, 1.5]], SIDEWALK)).status, 'uncertain');
-
-      enable([lineRule({ sameDist: 1, nearDist: undefined })]);   // nearDist defaults to sameDist
-      conflation.invalidate();
-      assert.strictEqual(conflation.getResult(ds, feature('a', [[0, 1.5], [100, 1.5]], SIDEWALK)).status, 'unmatched');
+      const result = conflation.getResult(ds, feature('a', [[0, 1.5], [100, 1.5]], SIDEWALK));
+      assert.strictEqual(result.status, 'unmatched');
+      assert.strictEqual(result.score, 0);
+      assert.isEmpty(result.candidates);
     });
 
     it('lines never match OSM areas unless the target asks for them, like building edges along a sidewalk', () => {
@@ -306,22 +302,22 @@ describe('ConflationSystem', () => {
       assert.isUndefined(run.startJoin);   // matched an area, so nothing to connect to
     });
 
-    it('nearAngle defaults to sameAngle, so a line within nearDist but at 40° is new', () => {
-      enable([lineRule({ nearAngle: undefined })]);
+    it('a line within sameDist but at 40° is new, unless sameAngle allows it', () => {
+      enable([lineRule()]);
       osmWay(1, [[0, 0], [100, 0]], SIDEWALK);
 
-      // Within 6 m (nearDist) the whole way, but at 40° (over the 30° limit).
+      // Starts 0.5 m from the OSM way and leaves it at 40° (over the 30° limit).
       const dy = 6 * Math.tan(40 * Math.PI / 180);
       const a = feature('a', [[40, 0.5], [46, 0.5 + dy]], SIDEWALK);
       let result = conflation.getResult(ds, a);
       assert.strictEqual(result.status, 'unmatched');
-      assert.isFalse(result.boxes.some(b => b.status === 'uncertain'));
+      assert.isFalse(result.boxes.some(b => b.status === 'matched'));
 
-      // A looser nearAngle makes it near.
-      enable([lineRule({ nearAngle: 60 })]);
+      // A looser sameAngle makes the part within 3 m the same.
+      enable([lineRule({ sameAngle: 60 })]);
       conflation.invalidate();
       result = conflation.getResult(ds, a);
-      assert.isTrue(result.boxes.some(b => b.status === 'uncertain'));
+      assert.isTrue(result.boxes.some(b => b.status === 'matched'));
     });
 
     it('matches regardless of line direction', () => {
@@ -729,25 +725,5 @@ describe('ConflationSystem', () => {
     });
   });
 
-
-  describe('getQueue', () => {
-    it('lists features in view that need review', () => {
-      enable([lineRule({ sameDist: 1, nearDist: 2 })]);   // 1.5 m offsets are near
-      osmWay(1, [[0, 0], [100, 0]], SIDEWALK);
-      const a = feature('a', [[0, 1.5], [100, 1.5]], SIDEWALK);     // needs review
-      const b = feature('b', [[0, 50], [100, 50]], SIDEWALK);       // new
-      context.systems.spatial.replaceData(ds.spatialID, [a, b]);
-
-      // Center the viewport on the fixture.
-      const viewport = context.viewport;
-      viewport.dimensions = [2000, 2000];
-      viewport.transform = { x: 0, y: 0, z: 17 };
-      const p = viewport.project(loc(50, 25));
-      viewport.transform = { x: 1000 - p[0], y: 1000 - p[1], z: 17 };
-
-      const queue = conflation.getQueue(ds);
-      assert.deepEqual(queue.map(r => r.dataID), ['a']);
-    });
-  });
 
 });

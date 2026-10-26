@@ -172,8 +172,6 @@ interface ConflationRule {
   sameKeys?: string[];   // property keys whose values must be present and equal on both sides
   sameDist: number;      // "same": target within this many meters of the source (0 = touching or inside)
   sameAngle?: number;    // "same", lines only: heading difference in degrees (default 30)
-  nearDist?: number;     // "near" (needs review): within this many meters (default sameDist, no review band)
-  nearAngle?: number;    // "near", lines only (default sameAngle)
 }
 ```
 
@@ -201,7 +199,7 @@ rather than OSM's, leaves room to match one dataset against another later.
    outer) is an area, and a `line` target never matches it. `point` targets match OSM points and vertices.
 
 **What rules can express**, from least to most specific (columns show what differs from a plain
-line-to-line rule with `sameDist: 3, sameAngle: 30, nearDist: 6, nearAngle: 30`):
+line-to-line rule with `sameDist: 3, sameAngle: 30`):
 
 | Request | `source` | `target` | `sameKeys` | Distances |
 |---|---|---|---|---|
@@ -225,10 +223,10 @@ external tools' list, and useful for area-to-area), and fuzzy `sameKeys` entries
 sidewalk?" That kind of match can't be joined to, because there is no sidewalk geometry to connect to
 (see Open Questions).
 
-**Defaults** (`conflationDefaults()`): one rule per geometry type, source and target the same kind,
-with no property conditions. Lines: `sameDist` 3, `sameAngle` 30, `nearDist` 6, `nearAngle` 30.
-Points: `sameDist` 3, `nearDist` 6. Areas: `sameDist` 0. Conflation starts disabled, so existing
-behavior doesn't change until the user turns it on.
+**Defaults** (`conflationDefaults()`): one line rule, source and target both lines, with no property
+conditions: `sameDist` 3, `sameAngle` 30. Point (`sameDist` 3) and area (`sameDist` 0) rules will join it
+when those geometries are matched. Conflation starts disabled, so existing behavior doesn't change
+until the user turns it on.
 
 **Persistence** (Step 6): the settings store only holds string leaves, so `toJSON()`/`fromJSON()`
 need to encode the rules. Custom datasets will save `conflation` with everything else. Service-provided
@@ -240,7 +238,7 @@ nothing to migrate.
 
 Each source line is sampled with `part.computeCoverage(spacing)` (cached for each radius), where the
 spacing is the smallest `sameDist` among the line rules (at least 1 m). Each sample's query box
-reaches out to the largest `nearDist`, so "near" targets are found too.
+reaches out to the largest `sameDist`, so every rule's targets are found.
 
 **Samples are evenly spaced along the whole line** (`geomCoverageBoxes`), at most `spacing` apart and
 including both ends, however many vertices the line has. (An earlier version sampled each segment
@@ -248,7 +246,7 @@ separately, with a sample at every vertex, so curves drawn with many short segme
 or three times as densely as straight stretches, and counted for more in the measures.) Each sample's
 heading is measured over a window about one spacing long, centered on it (`geomHeadingAlong`), not
 taken from the one segment it sits on. That ignores the noise of short segments on a curve, which
-used to fail the angle test and leave "needs review" samples at corners. Right at a sharp turn, the
+used to fail the angle test and leave false samples at corners. Right at a sharp turn, the
 heading is in between the two directions, so a boundary there lands a little before the vertex
 (about 0.4 m for a 90° turn at 3 m spacing).
 The query has two phases: a quick bounding-box search over the RBush index (`SpatialSystem`), then
@@ -261,7 +259,7 @@ are checked per rule (cached per target feature).
 |---|---|---|
 | **Point** | data index | OSM nodes within the limits (`vecLength`), and OSM areas that contain the point (`geomPointInPolygon`) |
 | **LineString** | `segments` index, **one query per box** | for each OSM way, its closest segment to the box center (point-to-segment distance via `vecProject`) and that segment's heading difference from the box's `angle`. Opposite directions count as the same heading. |
-| **Polygon** | data index (extent grown by `nearDist`) | OSM areas that intersect the polygon (`geomPolygonIntersectsPolygon`) |
+| **Polygon** | data index (extent grown by `sameDist`) | OSM areas that intersect the polygon (`geomPolygonIntersectsPolygon`) |
 
 Each candidate pair (new feature, OSM entity) gets these **measures**:
 
@@ -296,25 +294,20 @@ the same conversion `computeCoverage` uses.
 > anything: until we have them, Rapid uses the simple formula below, behind a single function, so it
 > can be swapped out.
 
-**"Same" and "near".** Each coverage box is triaged by the best target near it, across all rules:
+**"Same".** Each coverage box is triaged across all rules:
 
 | Box status | Condition (some rule whose other conditions hold, for the closest segment of a target) |
 |---|---|
 | `matched` | distance ≤ `sameDist` **and** heading difference ≤ `sameAngle` |
-| `uncertain` | otherwise, distance ≤ `nearDist` **and** heading difference ≤ `nearAngle` |
-| `unmatched` | neither |
+| `unmatched` | otherwise |
 
-*Why does `nearAngle` default to `sameAngle`?* An earlier version loosened the angle for "near" too
-(30° to 60°). Trying it on real sidewalk data in the browser showed that every corner then produced a
-"needs review" stretch: the crossing and the next sidewalk are 3–4 m away at 30–40°. Any stretch that
-needs review sends the whole line to the review queue, so partly mapped sidewalks went to review
-instead of offering their new part. A line heading 40° away is going somewhere else, so by default
-it isn't "almost the same". A rule can still set a looser `nearAngle`.
+There used to be a "near" band too (`nearDist`, `nearAngle`), for boxes a little beyond "same" that
+needed review. It was removed after the first demo; see Resolved Decisions.
 
 ```text
-box score       = 1 (matched), 0.5 (uncertain), 0 (unmatched)
-feature score   = mean box score
-candidate score = (its matched boxes + 0.5 × its uncertain boxes) ÷ all boxes
+box score       = 1 (matched), 0 (unmatched)
+feature score   = mean box score: the share of the line that is already mapped
+candidate score = its matched boxes ÷ all boxes
 ```
 
 The score is for ranking and reporting. Triage comes from the box statuses, not from a threshold on
@@ -324,15 +317,14 @@ the score.
 with "matched above 0.8" and "review above 0.3". With agency sidewalks running 1–2 m off OSM and a
 3 m buffer, true matches scored about 0.5 and would all have gone to review. A sidewalk that is half
 mapped would also have gone to review, instead of showing its missing half as new. Limits per box
-avoid both problems and are easy to explain: "within 3 m and 30° is already mapped, within 6 m and
-30° needs review."
+avoid both problems and are easy to explain: "within 3 m and 30° is already mapped."
 
 ### Stage 3: triage status
 
 | Status | UI label | Feature condition | Shown as |
 |---|---|---|---|
 | `matched` | Already mapped | every box is matched | hidden (muted if `showMatched` is on) |
-| `uncertain` | Needs review | any box is uncertain | highlighted, and listed in the review queue |
+| `uncertain` | Needs review | any box is uncertain (*nothing produces this right now*) | highlighted, and listed in the review queue |
 | `unmatched` | New | otherwise: some boxes are unmatched | shown as today (partial lines as their runs), offered for accept |
 | `unknown` | — | OSM data isn't loaded at one of the boxes | shown as today, and not cached |
 
@@ -340,6 +332,10 @@ avoid both problems and are easy to explain: "within 3 m and 30° is already map
 **runs**. A line with matched runs and unmatched runs is **partial**: its status is `unmatched` (there is
 new data to offer), its unmatched runs are offered as new, and its matched runs are treated like an
 already-mapped feature. If any run is uncertain, the whole line goes to the review queue.
+
+**`uncertain` has no source right now.** It came from the "near" band, which was removed. The status,
+the review queue (`getQueue`) and the highlight are kept for now, for whatever needs a person next,
+such as a target that is the same by distance and angle but disagrees on `sameKeys`.
 
 **Short runs are absorbed.** A run that isn't matched, is shorter than the sample spacing, and sits next to a
 matched run is treated as matched. These are almost always misalignment at the ends of a match,
@@ -577,7 +573,7 @@ it, the single "Conflation?" checkbox is replaced by:
 - a "Match against OpenStreetMap" switch (`ds.conflated`) and a "Show features that are already
   mapped" switch (`showMatched`) ✅
 - a table of rules, one row per rule, read like the data mapping table: source → target geometry,
-  "Same Tags" (`sameKeys`), and the "same" and "near" distances and angles. "Add Rule" and "Restore
+  "Same Tags" (`sameKeys`), and the "same" distance and angle. "Add Rule" and "Restore
   Defaults" below it. Invalid fields are outlined, and OK stays disabled until they're fixed. ✅
 - still to do: source and target property conditions per rule (a simple `key=value` list to start,
   since `PropMatcher.from` already parses that format). Until then, a rule's `props` are kept as they
@@ -609,6 +605,63 @@ every coverage box, colored by status (green matched, amber uncertain, red unmat
 unknown), and a larger blue dot at every join point. The dots draw in a new `debug-over` scene
 group, above the basemap, so lines don't hide them. The layer is off by default. Turn it on from the
 console with `rapidContext.systems.gfx.scene.enableLayers('debug')`.
+
+## Prior art: JOSM's Conflation plugin
+
+Some power users know the [Conflation plugin](https://wiki.openstreetmap.org/wiki/JOSM/Plugins/Conflation)
+for JOSM, so it shapes what they expect. Notes from reading its source
+([github.com/JOSM/conflation](https://github.com/JOSM/conflation), plus the utilsplugin2 and jts
+plugins it uses) in October 2026. Its README still calls it experimental; since 2024 it has only had
+translation and build changes. The wiki is out of date in places.
+
+**How it works.** The user selects objects and "freezes" them as the *reference* (the better data)
+and the *subject* (usually OSM), then runs matching once over those selections. Results are three
+lists: **Matches** (with distance, score and a green/orange/red tag-conflict cell), **Reference only**
+and **Subject only**, with arrows drawn between matched pairs. **Conflate** acts on the selected rows
+in one undo step: for a match it merges tags and, by default, replaces the subject's geometry with the
+reference's (utilsplugin2's Replace Geometry, which keeps the OSM way's ID and history); for a
+reference-only object it copies it in as is.
+
+**Matching** comes from JCS/OpenJUMP and is built for whole features, mostly polygons. Each pair gets
+a score from distance (centroid, minimum or Hausdorff) plus optional tag similarity, and one-to-one
+pairs are picked greedily or as mutual best matches. Some things a user may not realize:
+- Distances are in the projection's units (Web Mercator by default), not meters.
+- Any closed way counts as a polygon, whatever its tags.
+- There's no angle test and no partial matching: a short sidewalk beside a long road scores as a
+  match, and a line is matched or not as a whole.
+- New features are never connected to the network. Replace Geometry drops junction nodes shared with
+  other ways (the code has a TODO about it), and its node-reuse limit is in degrees, so in practice
+  unlimited.
+
+| | JOSM Conflation | Rapid |
+|---|---|---|
+| What gets compared | A hand-picked selection, any two layers | A dataset's rules, always against OSM |
+| When | One batch run; results go stale after edits | Live, for what's in view; re-matched after every edit |
+| Geometry | Points, areas; lines only as whole features | Lines, including partly mapped ones (points and areas planned) |
+| Limits | Distance in projected units, tag similarity as a score, optional exact-tag filter | Distance in meters, angle, `sameKeys`, per-side conditions |
+| Matched pairs | A list of one-to-one pairs, with scores | Hidden or muted, no pair list |
+| New features | Copied as they are | Joined to the network at their ends |
+| Matched features | Merge tags, replace geometry | Nothing yet |
+| Ignoring | Remove a match (or send both sides back to unmatched) | Ignore, remembered across restarts |
+
+**What JOSM users will likely expect:**
+- **A list of what's left, with counts,** that they can step through. Our in-view model makes "what's
+  left" hard to see. A count per status for the dataset, with next/previous, would cover it.
+- **Merging tags into features that are already mapped,** e.g. adding `surface` to an existing
+  sidewalk. Many use the plugin for this alone, with Replace Geometry off. It's the most likely next
+  request; per-key policies (fill in missing, overwrite, keep existing) beat a conflict dialog per pair.
+- **Accepting many at once,** in one undo step.
+- **Seeing why something matched,** like the plugin's distance and score columns: "within 2.1 m and
+  12° of w123".
+
+**Where we should explain the difference, not copy it:** decisions are per sample, not per pair, so
+there's no pair list or single score; part of a line can be new; and results follow the live map.
+We don't replace OSM geometry, and shouldn't until it can keep junctions and tagged nodes.
+
+**Worth borrowing later:** an "OSM only" view (in OSM but not in the dataset: maybe gone or
+mis-tagged); a no conflict / difference / conflict badge on matched features, as a first step toward
+tag merging; normalizing values before comparing `sameKeys` (case, accents, `yes`/`true`/`1`);
+mutual-best pairing for points and areas.
 
 ## Rollout Plan
 
@@ -643,9 +696,9 @@ Lines come first throughout. Points and polygons follow the same pipeline at a l
 - Rules: the three requests the shape was designed around (any tagging; both have `highway`; same
   `highway` value), several `sameKeys`, OR across rules, source conditions that fail (New, not "no
   result"), target exclusions, and source conditions checked after the data mapping.
-- Triage: a 1.5 m offset is already mapped at `sameDist` 3, near at `sameDist` 1 / `nearDist` 2,
-  and new with no near band. A line within `nearDist` but at 40° is new, not
-  needs review. Short overshoots at the end of a match are absorbed.
+- Triage: a 1.5 m offset is already mapped at `sameDist` 3 and new at `sameDist` 1. A line leaving
+  at 40° is new at `sameAngle` 30, and partly mapped at 60. Short overshoots at the end of a match
+  are absorbed.
 - Drawing: no automated tests (Pixi needs WebGL). Checked in headless Chromium against live OSM data,
   with an in-memory dataset generated from the OSM sidewalks in view. Nothing was committed.
 - Invalidation: `stablechange` and `merge` flush results, and a rule change flushes one dataset.
@@ -676,19 +729,22 @@ Lines come first throughout. Points and polygons follow the same pipeline at a l
   doesn't block anything; the provisional formula is in one function that can be replaced.
 - **Lines come first.** Points and polygons follow the same pipeline later.
 - **Triage uses limits per box, not thresholds on a score** (decided during Step 3, see [Scoring](#scoring)).
-  "Near" (needs review) has its own distance and angle; `nearAngle` defaults to `sameAngle` (decided
-  during Step 4 testing).
 - **Minimum run length.** A run that isn't matched, is shorter than the sample spacing, and sits next
   to a matched run is treated as matched.
 - **No minimum line length; stubs are judged by distance only.** Short source lines are kept (some
   are real, like curb-ramp connectors), but a line shorter than `sameDist` skips the angle test.
 - **Runs are trimmed to their joins,** so an accepted run ends where it connects.
-- **Join points are the most useful part of the visual feedback** (from live testing). The "needs
-  review" band stays for now, but may not be needed in the end; `nearDist` equal to `sameDist`
-  turns it off.
-- **Rule shape: source and target, "same" and "near"** (decided after testing on real data). Rules
-  name conditions for each side, `sameKeys` for values that must agree, and two sets of distance and
-  angle limits. Every source feature is tested; rules combine with OR. This replaced an earlier
+- **Join points are the most useful part of the visual feedback** (from live testing, and again at
+  the first demo, where the debug view is what made the feature click for people).
+- **No "near" band** (removed after the first demo, Oct 26). Rules used to have a second, looser
+  distance and angle (`nearDist`, `nearAngle`): a box beyond "same" but within "near" needed review.
+  In practice it caused more trouble than it caught. Loosening the angle sent every corner to review
+  (the crossing and the next sidewalk are 3–4 m away at 30–40°), so `nearAngle` had to default to
+  `sameAngle`; and for the demo the band was turned off entirely to keep attention on "same". One
+  distance and one angle are easier to explain. The `uncertain` status stays, without a source for now.
+- **Rule shape: source and target, and "same"** (decided after testing on real data). Rules
+  name conditions for each side, `sameKeys` for values that must agree, and a distance and angle
+  limit. Every source feature is tested; rules combine with OR. This replaced an earlier
   `match` block that also acted as a filter on the source, which left features that failed it with no
   result at all.
 - **No default tag condition.** Without one, a sidewalk rule matches roads, railways and waterways

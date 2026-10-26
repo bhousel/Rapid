@@ -65,6 +65,12 @@ to the part that exists.*
   refined by bisection to 10 cm. Checked live: curves sampled evenly with no "needs review" at corners
   (the old per-segment sampler took 2.2× the samples on curvy sidewalks, 11% more overall); the
   remaining needs-review lines are whole lines 3–6 m from an OSM sidewalk, as intended.
+- First demo (Oct 22) went well; people got it once shown the debug view (blue join points). Still hard
+  to explain what the feature is. Follow-up (Oct 26): the "near" band (`nearDist`, `nearAngle`) is
+  removed, so rules have one distance and angle. `uncertain` / the review queue / the amber highlight
+  stay, but nothing produces them now (see the design doc). More feedback expected as people use it.
+- JOSM's Conflation plugin (Oct 26): read its source; findings are in "Prior art" in the design doc,
+  and likely requests are in `backlog.md` ("Conflation: what JOSM users will ask for").
 - Stable IDs (Oct 22): features are `${datasetID}:${isID value ?? hash}:${partIndex}`, pieces of lines
   are `${dataID}@${start}-${end}` (fractions of length, Overture-style). `RapidSystem.actedRanges()`
   gathers what the user accepted or ignored, and conflation cuts those stretches out of the runs, so an

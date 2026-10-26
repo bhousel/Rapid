@@ -48,10 +48,6 @@ interface ConflationRow {
   sameDist: string;
   /** Largest difference in direction (degrees) for lines to be the same */
   sameAngle: string;
-  /** Distance (meters) within which a match needs review */
-  nearDist: string;
-  /** Largest difference in direction (degrees) for a match that needs review */
-  nearAngle: string;
   /** The fields of this row that aren't valid, if any */
   invalid?: Set<string>;
 }
@@ -698,7 +694,7 @@ export class UiRapidDatasetSettings extends EventEmitter {
 
     const prefix = 'rapid_dataset_settings.conflation';  // prefix for text strings
     const rows = this._conflationRows ?? [];
-    const columns = ['source', 'target', 'samekeys', 'samedist', 'sameangle' /*'neardist', 'nearangle'*/];
+    const columns = ['source', 'target', 'samekeys', 'samedist', 'sameangle'];
 
     let $table: D3Selection = $parent.selectAll('.conflation-table')
       .data([0]);
@@ -706,7 +702,7 @@ export class UiRapidDatasetSettings extends EventEmitter {
     // enter
     const $$table: D3EnterSelection = $table.enter()
       .append('table')
-      .attr('class', 'dictionary-table conflation-table');
+      .attr('class', 'conflation-table');
 
     /* Table Heading */
     const $$headRow: D3EnterSelection = $$table
@@ -755,6 +751,11 @@ export class UiRapidDatasetSettings extends EventEmitter {
     // update
     $table = $table.merge($$table);
 
+    const fieldInfo = this._checkFields();
+
+    $table
+      .classed('disabled', !fieldInfo.conflated);
+
     for (const column of columns) {
       $table.selectAll(`thead th.conflation-${column}`)
         .text(l10n.t(`${prefix}.fields.${column}.label`));
@@ -787,9 +788,7 @@ export class UiRapidDatasetSettings extends EventEmitter {
       ['target', 'target'],
       ['samekeys', 'sameKeys'],
       ['samedist', 'sameDist'],
-      ['sameangle', 'sameAngle'],
-      // ['neardist', 'nearDist'],
-      // ['nearangle', 'nearAngle']
+      ['sameangle', 'sameAngle']
     ];
     for (const [column, field] of fields) {
       const $$input: D3EnterSelection = $$rows
@@ -1649,8 +1648,6 @@ export class UiRapidDatasetSettings extends EventEmitter {
       if (!geometries.has(row.target.trim()))  row.invalid.add('target');
       if (!isNumber(row.sameDist, Infinity))   row.invalid.add('sameDist');   // required
       if (row.sameAngle.trim() && !isNumber(row.sameAngle, 180))  row.invalid.add('sameAngle');
-      if (row.nearDist.trim() && !isNumber(row.nearDist, Infinity))  row.invalid.add('nearDist');
-      if (row.nearAngle.trim() && !isNumber(row.nearAngle, 180))  row.invalid.add('nearAngle');
 
       if (row.invalid.size) {
         result.isOk = false;
@@ -1666,8 +1663,6 @@ export class UiRapidDatasetSettings extends EventEmitter {
       const sameKeys = row.sameKeys.split(',').map(s => s.trim()).filter(Boolean);
       if (sameKeys.length) rule.sameKeys = sameKeys;            else delete rule.sameKeys;
       if (row.sameAngle.trim()) rule.sameAngle = Number(row.sameAngle); else delete rule.sameAngle;
-      if (row.nearDist.trim())  rule.nearDist = Number(row.nearDist);   else delete rule.nearDist;
-      if (row.nearAngle.trim()) rule.nearAngle = Number(row.nearAngle); else delete rule.nearAngle;
 
       result.rules.push(rule);
     }
@@ -1690,9 +1685,7 @@ export class UiRapidDatasetSettings extends EventEmitter {
       target: rule.target.geometry,
       sameKeys: (rule.sameKeys ?? []).join(', '),
       sameDist: str(rule.sameDist),
-      sameAngle: str(rule.sameAngle),
-      nearDist: str(rule.nearDist),
-      nearAngle: str(rule.nearAngle)
+      sameAngle: str(rule.sameAngle)
     };
   }
 

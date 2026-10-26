@@ -151,17 +151,6 @@
           "type": "number",
           "minimum": 0,
           "maximum": 180
-        },
-        "nearDist": {
-          "description": "Distance in meters within which the match needs review. Defaults to sameDist.",
-          "type": "number",
-          "minimum": 0
-        },
-        "nearAngle": {
-          "description": "Largest difference in direction, in degrees, for a match that needs review. Defaults to sameAngle.",
-          "type": "number",
-          "minimum": 0,
-          "maximum": 180
         }
       },
       "required": ["source", "target", "sameDist"],
