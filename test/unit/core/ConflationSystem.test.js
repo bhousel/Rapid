@@ -546,6 +546,18 @@ describe('ConflationSystem', () => {
       assert.isUndefined(conflation.getResult(ds, x).runs[0].startJoin);
     });
 
+    it('line ends only join target lines that agree on sameKeys, so a sidewalk never joins a stream', () => {
+      // No target conditions, just "the highway must be the same", like a user's sidewalk rule.
+      enable([lineRule({ target: { geometry: 'line' }, sameKeys: ['highway'] })]);
+      osmWay(1, [[0, 0], [100, 0]], { waterway: 'stream' });
+      osmWay(2, [[0, 20], [100, 20]], SIDEWALK);
+      const x = feature('x', [[50, 0.5], [50, 19.5]], CROSSING);   // highway=footway, like the sidewalk
+
+      const run = conflation.getResult(ds, x).runs[0];
+      assert.isUndefined(run.startJoin);               // the stream has no `highway`
+      assert.strictEqual(run.endJoin.wayID, 'w2');     // the sidewalk's `highway` is the same
+    });
+
     it('a join that no longer fits the graph is skipped, and the line is still accepted', () => {
       setupAccept();
       enable([lineRule()]);

@@ -79,11 +79,10 @@ export interface ConflationSettings {
 /**
  * Triage status.
  * - `matched` - already mapped
- * - `uncertain` - needs review
  * - `unmatched` - new
  * - `unknown` - OSM data isn't loaded here yet
  */
-export type ConflationStatus = 'matched' | 'uncertain' | 'unmatched' | 'unknown';
+export type ConflationStatus = 'matched' | 'unmatched' | 'unknown';
 
 /** Measures for one candidate pair (new feature, existing OSM feature). */
 export interface ConflationMeasures {
@@ -113,7 +112,7 @@ export interface ConflationCandidate {
 export interface BoxMatch {
   /** Box center, in world coordinates */
   coord: Vec2;
-  /** `matched`, `uncertain`, or `unmatched` */
+  /** `matched` or `unmatched` */
   status: ConflationStatus;
   /** OSM features that matched this box at its status, closest first */
   entityIDs: EntityID[];
@@ -156,7 +155,7 @@ export interface ConflationRunProps extends GeoJSONProps {
 
 /** A maximal stretch of a new line whose boxes share a status. */
 export interface LineRun {
-  /** `matched`, `uncertain`, or `unmatched` */
+  /** `matched` or `unmatched` */
   status: ConflationStatus;
   /** The stretch of the line that this run covers, as fractions of its length (see `pieceID`) */
   range: [number, number];
@@ -389,31 +388,6 @@ export class ConflationSystem extends AbstractSystem {
 
 
   /**
-   * Returns the features in the current viewport that need review, in a stable order
-   * (top to bottom, then left to right).
-   * @param ds - The dataset
-   * @return Results with status `uncertain`
-   */
-  public getQueue(ds: RapidDataset): ConflationResult[] {
-    const context = this.context;
-    const spatial = context.systems.spatial!;
-
-    if (!this.isEnabled(ds)) return [];
-
-    const queue: Array<{ result: ConflationResult; key: Vec2 }> = [];
-    for (const item of spatial.getVisibleItems(ds.spatialID)) {
-      const datum = item.contents as GeoJSONData;
-      const result = this.getResult(ds, datum);
-      if (result?.status !== 'uncertain') continue;
-      queue.push({ result: result, key: [item.minY, item.minX] });
-    }
-
-    queue.sort((a, b) => (a.key[0] - b.key[0]) || (a.key[1] - b.key[1]));
-    return queue.map(q => q.result);
-  }
-
-
-  /**
    * Returns where the ends of a line should connect when it is accepted.
    * - For the data element of one run of a partly mapped line, its own joins.
    * - For a whole source line that is a single run (not already mapped), that run's joins.
@@ -610,6 +584,17 @@ export class ConflationSystem extends AbstractSystem {
       return feature;
     };
 
+    // Whether the rule `active[r]` allows this target: its target conditions and `sameKeys` (cached).
+    const ruleAllows = (r: number, feature: OsmFeature): boolean => {
+      const key = `${r}:${feature.entity.id}`;
+      let ok = allowed.get(key);
+      if (ok === undefined) {
+        ok = this._targetMatches(active[r], feature, sourceTags);
+        allowed.set(key, ok);
+      }
+      return ok;
+    };
+
     // For each target feature that some rule says is the same at a point on the source line,
     // finds its closest segment there.
     const hitsAt = (coord: Vec2, heading: number): Map<EntityID, BoxHit> => {
@@ -637,13 +622,7 @@ export class ConflationSystem extends AbstractSystem {
 
         for (let r = 0; r < active.length; r++) {
           const rule = active[r];
-          const key = `${r}:${entityID}`;
-          let ok = allowed.get(key);
-          if (ok === undefined) {
-            ok = this._targetMatches(rule, feature, sourceTags);
-            allowed.set(key, ok);
-          }
-          if (!ok) continue;
+          if (!ruleAllows(r, feature)) continue;
 
           // A source line shorter than `sameDist` (a stub) has no reliable heading, so it is judged
           // by distance only. Many datasets are split into short edges at every junction.
@@ -713,8 +692,9 @@ export class ConflationSystem extends AbstractSystem {
     candidates.sort((a, b) => b.score - a.score);
 
     // A line end that isn't next to an already-mapped stretch can still join a target line that some
-    // rule allows (ignoring `sameKeys`), within `sameDist` and at any angle. This is how an accepted
-    // crossing connects to the sidewalks at its ends.
+    // rule allows, within that rule's `sameDist` and at any angle. This is how an accepted crossing
+    // connects to the sidewalks at its ends. `sameKeys` applies here too, so a sidewalk whose rule
+    // says the `highway` must be the same only joins highways, never a stream it ends beside.
     const endJoinMeters = Math.max(0, ...active.map(rule => rule.sameDist));
     const endJoinAt = (coord: Vec2): JoinPoint | undefined => {
       if (endJoinMeters <= 0) return undefined;
@@ -727,17 +707,17 @@ export class ConflationSystem extends AbstractSystem {
         const seg = hit.contents as Segment;
         const feature = featureOf(seg.wayID);
         if (feature?.geometry !== 'line') continue;
-        if (!active.some(rule => this._targetAllowed(rule, feature))) continue;
 
         const a = coordOf(seg.edge[0]);
         const b = coordOf(seg.edge[1]);
         if (!a || !b) continue;
 
         const distance = (vecProject(coord, [a, b])?.distance ?? Infinity) * metersPerWorld;
-        if (distance <= endJoinMeters && distance < bestDistance) {
-          bestDistance = distance;
-          bestWayID = seg.wayID;
-        }
+        if (distance >= bestDistance) continue;
+        if (!active.some((rule, i) => distance <= rule.sameDist && ruleAllows(i, feature))) continue;
+
+        bestDistance = distance;
+        bestWayID = seg.wayID;
       }
       return this._joinPoint(bestWayID, coord, graph, coordOf, metersPerWorld);
     };
@@ -872,14 +852,7 @@ export class ConflationSystem extends AbstractSystem {
 
     // Triage what's left for the user to act on (all of it, if they've acted on all of it).
     const statuses = new Set<ConflationStatus>((runs.length ? runs : ranges).map(r => r.status));
-    let status: ConflationStatus;
-    if (statuses.has('uncertain')) {
-      status = 'uncertain';
-    } else if (statuses.has('unmatched')) {
-      status = 'unmatched';
-    } else {
-      status = 'matched';
-    }
+    const status: ConflationStatus = statuses.has('unmatched') ? 'unmatched' : 'matched';
 
     return {
       dataID: dataID,

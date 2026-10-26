@@ -14,7 +14,6 @@ import type { Vec2, Viewport } from '@rapid-sdk/math';
 /** Marker colors for each conflation status */
 const STATUS_COLORS: Record<ConflationStatus, number> = {
   matched:   0x00cc44,   // green
-  uncertain: 0xffc400,   // amber
   unmatched: 0xff3333,   // red
   unknown:   0x999999    // gray
 };

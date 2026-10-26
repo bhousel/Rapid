@@ -18,8 +18,6 @@ import type { OsmTags } from '../data/types.ts';
 /** Minimum zoom level where Rapid data is rendered */
 const MINZOOM = 12;
 
-/** Casing color for features that need review */
-const NEEDS_REVIEW_COLOR = 0xffc400;
 /** Opacity of already-mapped features, when the dataset shows them */
 const MATCHED_OPACITY = 0.35;
 
@@ -617,14 +615,6 @@ export class PixiLayerRapid extends AbstractPixiLayer {
 //        label: { color: colorNum, opacity: MATCHED_OPACITY }
 //      };
 //    }
-//
-//    const casingColor = (status === 'uncertain') ? NEEDS_REVIEW_COLOR : 0x444444;
-//    const casingWidth = (status === 'uncertain') ? 7 : 5;
-//    return {
-//      casing: { color: casingColor, width: casingWidth, cap: 'round', join: 'round' },
-//      stroke: { color: colorNum, width: 3, cap: 'round', join: 'round' },
-//      label: { color: colorNum }
-//    };
     return {
       casing: { color: 0x444444, width: 5, cap: 'round', join: 'round' },
       stroke: { color: colorNum, width: 3, cap: 'round', join: 'round' },

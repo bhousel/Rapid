@@ -67,8 +67,9 @@ to the part that exists.*
   remaining needs-review lines are whole lines 3–6 m from an OSM sidewalk, as intended.
 - First demo (Oct 22) went well; people got it once shown the debug view (blue join points). Still hard
   to explain what the feature is. Follow-up (Oct 26): the "near" band (`nearDist`, `nearAngle`) is
-  removed, so rules have one distance and angle. `uncertain` / the review queue / the amber highlight
-  stay, but nothing produces them now (see the design doc). More feedback expected as people use it.
+  removed, so rules have one distance and angle, and "needs review" (`uncertain`, `getQueue`, the amber
+  highlight) is gone too; triage is already mapped or new. `sameKeys` now applies to line-end joins
+  (a sidewalk was joining a stream). More feedback expected as people use it.
 - JOSM's Conflation plugin (Oct 26): read its source; findings are in "Prior art" in the design doc,
   and likely requests are in `backlog.md` ("Conflation: what JOSM users will ask for").
 - Stable IDs (Oct 22): features are `${datasetID}:${isID value ?? hash}:${partIndex}`, pieces of lines

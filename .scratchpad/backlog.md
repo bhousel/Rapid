@@ -42,8 +42,8 @@ Phase 1 (the `KeyboardSystem` conversion + command scaffolding) is done — see
   like OSM tertiary roads.
 - Make external data obviously "not yet in OSM". Ideas: an animated WebGL shader effect (shimmer,
   sparkle, marching dashes), a distinct casing or halo treatment, or an overlay pattern that no OSM style uses.
-- Styles for the matching statuses: "Already mapped" (muted), "Needs review" (highlighted), and "New" (the
-  default external-data look). See `design/conflation-system.md`.
+- Styles for the matching statuses: "Already mapped" (muted) and "New" (the default external-data look).
+  The muted style is commented out in `PixiLayerRapid._lineStyle` for now. See `design/conflation-system.md`.
 - Related to the deferred styling work above: move `PixiLayerRapid`'s hardcoded styles into style data, so
   these treatments go through `StyleSystem`.
 
@@ -52,7 +52,7 @@ Phase 1 (the `KeyboardSystem` conversion + command scaffolding) is done — see
   earlier designs. The modals cover the map, so a user can't tweak conflation parameters and watch the result
   on the map at the same time.
 - Explore: a separate, non-modal panel for conflation tuning (sidebar or docked pane, live counts of
-  "Already mapped" / "Needs review" / "New" in view), or rethink the modals-on-modals design overall.
+  "Already mapped" / "New" in view), or rethink the modals-on-modals design overall.
 
 ## One "what is this way, really?" answer (`OsmWay.asFeature`)
 - An untagged way that belongs to a multipolygon really is that relation (an area, with the relation's
@@ -133,9 +133,8 @@ the order people are likely to ask:
 - **"Why is this already mapped?"**: show the matching OSM way, distance and angle.
 - Later: an "OSM only" view, a tag-difference badge on matched features, value normalization for
   `sameKeys`, mutual-best pairing for points and areas.
-- `uncertain` / the review queue have no source since the "near" band went away. Decide whether a
-  `sameKeys` disagreement (same place and direction, different tags) should become "needs review",
-  or remove the status.
+- "Needs review" and the review queue were removed (Oct 26). If they come back, a candidate source is
+  a `sameKeys` disagreement (same place and direction, different tags).
 
 ## Conflation / buffers follow-ups (beyond Step 3)
 - **Internalize / replace `lineToPoly` offset-curve generation** — `lineToPoly` (used for halos) repurposes `PIXI.buildLine`, coupling halo generation to Pixi internals and a fragile triangle-walk. If we ever need *precise* buffer polygons (not just coverage boxes), internalizing the offset-curve math would unify halos + buffers and drop the Pixi coupling. Left alone for now; coverage boxes cover the conflation use case.

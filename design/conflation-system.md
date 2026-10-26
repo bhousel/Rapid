@@ -2,7 +2,7 @@
 
 This document proposes a `ConflationSystem` for Rapid. It compares features from a third-party dataset
 against the OSM data loaded in the editor, measures how well they match, and helps the user decide
-what to do with each one: add it, skip it, or review it.
+what to do with each one: add it or skip it.
 
 Conflation runs entirely in the browser, on top of [`SpatialSystem`](./spatial-system.md). This is
 Step 3d of the spatial design, which said the match semantics would live in a dedicated module. This
@@ -25,16 +25,16 @@ stages, and uses these names everywhere instead:
 |---|---|---|
 | **1. Match** | Which existing features could each new feature be the same as? | Candidate pairs, plus **measures**: distance, angle, overlap, intersection, tags |
 | **2. Score** | How confident are we that a pair is the same thing? | A score from 0 to 1 for each pair and each feature |
-| **3. Triage** | Hide it, review it, or offer it? | A **status**: `matched`, `uncertain`, or `unmatched` (plus *partial* geometry for lines) |
+| **3. Triage** | Hide it or offer it? | A **status**: `matched` or `unmatched` (plus *partial* geometry for lines) |
 | **4. Act** | What does the user do about it? | Accept new data (maybe part of a line, joined to what exists), skip duplicates, and later merge attributes |
 
 We call stage 3 *triage* rather than *filter*, because it does more than hide things. It sorts each
-feature into one of three outcomes, and the uncertain ones go to a person.
+feature, or each stretch of a line, into already mapped or new.
 
 **Words in the UI.** "Conflation" appears in exactly one place: the **Conflation Settings** heading
 in `UiRapidDatasetSettings`. The text right under the heading defines the word using the four stages
 (see [Settings UI](#settings-ui-uirapiddatasetsettings)). Every other user-facing string uses the stage
-words, and the statuses appear as **Already mapped**, **Needs review** and **New**. In code, "conflation"
+words, and the statuses appear as **Already mapped** and **New**. In code, "conflation"
 is fine (`ConflationSystem`, `ds.conflation`), since it matches the existing spatial design.
 
 Stages 1 and 2 can also run outside Rapid, for example as server-side matching over whole datasets.
@@ -55,7 +55,7 @@ precomputed scores as input (see [Inputs](#inputs)).
 
 A transportation agency publishes sidewalk and crossing data (OSW-style: `highway=footway` +
 `footway=sidewalk|crossing`). Some of it is already in OSM, some partly, some not at all. The user
-should see only what's missing, plus a short list of cases that need a judgment call. Accepting a
+should see only what's missing. Accepting a
 missing piece should create an OSM way that connects to the existing network at its ends, not one
 that lies beside it or on top of it.
 
@@ -84,8 +84,9 @@ street grid:
 
 1. **Measures that match the external tools:** buffer distance, angle variance, percent overlap,
    intersection, and tag criteria, all configurable for each dataset.
-2. **Three-way triage.** Confident matches are hidden, confident misses are offered as new data, and
-   anything in between goes to a **review queue**.
+2. **Triage.** Matches are hidden, and the rest is offered as new data. (An earlier goal had a third
+   outcome, "needs review", with a review queue; it was dropped after the first demo, see Resolved
+   Decisions.)
 3. **Partial line matching.** Matching is decided for each coverage box, so the matched and unmatched
    stretches of a line are known separately.
 4. **Joining on accept.** The ends of any accepted line connect to the existing network: to the
@@ -324,18 +325,13 @@ avoid both problems and are easy to explain: "within 3 m and 30° is already map
 | Status | UI label | Feature condition | Shown as |
 |---|---|---|---|
 | `matched` | Already mapped | every box is matched | hidden (muted if `showMatched` is on) |
-| `uncertain` | Needs review | any box is uncertain (*nothing produces this right now*) | highlighted, and listed in the review queue |
 | `unmatched` | New | otherwise: some boxes are unmatched | shown as today (partial lines as their runs), offered for accept |
 | `unknown` | — | OSM data isn't loaded at one of the boxes | shown as today, and not cached |
 
 **Partial lines are about geometry, not confidence.** Consecutive boxes with the same status form
 **runs**. A line with matched runs and unmatched runs is **partial**: its status is `unmatched` (there is
 new data to offer), its unmatched runs are offered as new, and its matched runs are treated like an
-already-mapped feature. If any run is uncertain, the whole line goes to the review queue.
-
-**`uncertain` has no source right now.** It came from the "near" band, which was removed. The status,
-the review queue (`getQueue`) and the highlight are kept for now, for whatever needs a person next,
-such as a target that is the same by distance and angle but disagrees on `sameKeys`.
+already-mapped feature.
 
 **Short runs are absorbed.** A run that isn't matched, is shorter than the sample spacing, and sits next to a
 matched run is treated as matched. These are almost always misalignment at the ends of a match,
@@ -344,7 +340,7 @@ such as a new sidewalk that overshoots the OSM one by a meter or two.
 ### Match records
 
 ```ts
-type ConflationStatus = 'unknown' | 'unmatched' | 'uncertain' | 'matched';
+type ConflationStatus = 'unknown' | 'unmatched' | 'matched';
 
 interface ConflationResult {
   dataID: DataID;
@@ -364,13 +360,13 @@ interface ConflationCandidate {
 
 interface BoxMatch {
   coord: Vec2;                        // box center, world coordinates
-  status: ConflationStatus;           // matched, uncertain, or unmatched
-  entityIDs: EntityID[];              // OSM features that matched this box at its status, closest first
+  status: ConflationStatus;           // matched or unmatched
+  entityIDs: EntityID[];              // OSM features that matched this box, closest first
   wayIDs: EntityID[];                 // for each feature, the way whose segment matched (what a run can join)
 }
 
 interface LineRun {
-  status: ConflationStatus;           // matched, uncertain, or unmatched
+  status: ConflationStatus;           // matched or unmatched
   range: [number, number];            // the stretch it covers, as fractions of the line's length
   coords: Vec2[];                     // WGS84 sub-line of the original geometry
   startJoin?: JoinPoint;              // set when this end meets a matched run, or an allowed target line
@@ -451,8 +447,7 @@ Conflation has to work no matter what the dataset already went through:
 - **Compute lazily:** `getResult(ds, datum)` computes when first asked. The drawing code asks only for
   visible features. If `scheduler` is present, features just outside the viewport can be computed in
   idle time.
-- The system emits **`conflationchange`** after flushing, so the drawing code and the review queue
-  can update.
+- The system emits **`conflationchange`** after flushing, so the drawing code can update.
 
 ### API sketch
 
@@ -464,9 +459,6 @@ class ConflationSystem extends AbstractSystem {
 
   // accepting
   getJoins(ds: RapidDataset, datum: AbstractData): LineJoins | undefined;   // where an accepted line's ends connect
-
-  // review queue
-  getQueue(ds: RapidDataset): ConflationResult[];   // `uncertain` results in the viewport, in a stable spatial order
 
   // invalidation
   invalidate(datasetID?: DatasetID): void;          // flush one dataset, or all
@@ -481,9 +473,8 @@ today's behavior.
 ### Drawing (`PixiLayerRapid`)
 
 When conflation is on for a dataset:
-- `matched` features are skipped, or drawn in a muted style (35% opacity, no casing) if `showMatched`
-  is on.
-- `uncertain` features are drawn with a "needs review" highlight: a wider amber casing.
+- `matched` features are skipped, or drawn if `showMatched` is on. (A muted style for them, 35%
+  opacity and no casing, is turned off for now, so they look like any other feature.)
 - `unmatched` and `unknown` features are drawn as they are today.
 - A line is drawn as its `runs` unless it's one run over the whole line: one Pixi feature per run,
   with IDs like `rapid-${datasetID}-${dataID}-run${i}`. That covers partly mapped lines, and lines
@@ -498,20 +489,6 @@ still applies to features accepted or ignored as a whole; pieces are left out by
 
 Styles are constants in `PixiLayerRapid` for now, like the rest of the Rapid layer's styles. Moving
 them into style data is in the backlog, with the other external-data styling ideas.
-
-### Review queue
-
-`uncertain` features need a person. The queue is a list of them with next/previous navigation, like
-working through validation issues. For the current feature, the inspector shows:
-- the new feature and its best candidates, with their measures (distance, angle, overlap) and
-  the matched OSM geometry highlighted on the map;
-- actions: **Accept as new** (joined to the network), **Same as existing** (adds it to
-  `ignoreIDs`, so it's hidden from then on), and later **Merge into existing**.
-
-**The queue covers the viewport only.** It lists the `uncertain` features in the current view, and
-features in places where OSM data hasn't loaded yet (`unknown`) join it once the data arrives.
-Reviewing a whole dataset means panning across it. That keeps the work in line with what's on screen,
-and the system never has to load OSM for an entire city.
 
 ### Accepting and joining
 
@@ -532,10 +509,14 @@ The selection and inspector code didn't need to change.
   and the line is still accepted.
 
 **Line ends.** An end of a line that isn't next to an already-mapped stretch also gets a `JoinPoint`
-if it lies within `sameDist` of a target line that some rule allows (`target.geometry` and
-`target.props`, ignoring `sameKeys`), at any angle. This is how an accepted crossing connects to the
+if it lies within a rule's `sameDist` of a target line that the rule allows (`target.geometry`,
+`target.props` and `sameKeys`), at any angle. This is how an accepted crossing connects to the
 sidewalks at its ends, including sidewalks accepted a moment ago, since those are in `editor_stable`
-by then. It does for these datasets what the optional autoconnect step (a power-user setting) does
+by then. **`sameKeys` applies to joining, not just matching:** a sidewalk rule with
+`sameKeys: ['highway']` only joins ways with the same `highway`, so a sidewalk that ends beside a
+stream doesn't join the stream (found on real data). The flip side: with `sameKeys` of
+`['highway', 'footway']`, a crossing won't join the sidewalks at its ends either; joining them takes
+a second rule. It does for these datasets what the optional autoconnect step (a power-user setting) does
 only for exactly matching nodes and validator fixes; autoconnect still runs afterwards if enabled.
 
 **Plumbing.** `ConflationSystem.getJoins(ds, datum)` returns `{ start, end }` for a run's data, or for
@@ -565,8 +546,7 @@ it overlaps existing data" to a definition in stage words, roughly:
 
 > Conflation compares this dataset with the OpenStreetMap data already on the map. Rapid **matches**
 > each new feature with nearby existing features, **scores** how closely they agree, and **triages**
-> them as *Already mapped* (hidden), *Needs review*, or *New*. Then you **act**: add what's new,
-> and decide on the rest.
+> them as *Already mapped* (hidden) or *New*. Then you **act**: add what's new.
 
 The final wording goes through normal string review (`rapid_dataset_settings.conflation.*`). Below
 it, the single "Conflation?" checkbox is replaced by:
@@ -601,8 +581,8 @@ Later kinds of matching, beyond line to line (Steps 8 and later):
 
 `PixiLayerDebug`'s Microsoft-buildings check is gone; the polygon matcher (Step 8) replaces it. The
 debug layer now shows how conflation sees each enabled dataset that has conflation on: a small dot at
-every coverage box, colored by status (green matched, amber uncertain, red unmatched, gray
-unknown), and a larger blue dot at every join point. The dots draw in a new `debug-over` scene
+every coverage box, colored by status (green matched, red unmatched, gray unknown), and a larger
+blue dot at every join point. The dots draw in a new `debug-over` scene
 group, above the basemap, so lines don't hide them. The layer is off by default. Turn it on from the
 console with `rapidContext.systems.gfx.scene.enableLayers('debug')`.
 
@@ -673,14 +653,13 @@ Lines come first throughout. Points and polygons follow the same pipeline at a l
    runs and join points. Add segment `index`/`t` to `CoverageBox`. Unit tests against a real
    `EditSystem`. ✅ Done. Only GeoJSON-backed datasets for now: OSM-backed ones (MapWithAI,
    Esri) keep their geometry in a separate graph and will follow.
-4. **Drawing.** `PixiLayerRapid` hides matched lines, draws partial lines as runs, and highlights
-   uncertain ones. Replace the `PixiLayerDebug` prototype with the debug overlay. ✅ Done, and
+4. **Drawing.** `PixiLayerRapid` hides matched lines and draws partial lines as runs. Replace the `PixiLayerDebug` prototype with the debug overlay. ✅ Done, and
    checked in the browser against real OSM sidewalks with a generated in-memory dataset.
 5. **Accepting and joining.** Accept with a run, plus joins for partial runs and for line ends. Test
    the guiding use case from start to finish on the synthetic street-grid fixture. ✅ Done.
 6. **Settings UI.** In the Conflation Settings section, add the stage-word definition and replace the
    `conflated` checkbox with the rule fields.
-7. **Review queue.** List, navigation, inspector comparison, and the "Same as existing" action.
+7. ~~**Review queue.**~~ Dropped after the first demo (see Resolved Decisions).
 8. **Points and polygons.** Matchers for the other geometry types.
 9. **Pre-scored input, and measuring.** Use external scores. Profile a city-sized dataset, then decide
    on incremental invalidation, idle precompute, and moving work to a worker.
@@ -721,9 +700,7 @@ Lines come first throughout. Points and polygons follow the same pipeline at a l
 
 - **Vocabulary.** The stages are Match → Score → Triage → Act. In the UI, "conflation" appears only as
   the **Conflation Settings** heading, followed immediately by a definition in stage words. Everything
-  else says "Already mapped", "Needs review", "New", or uses the stage verbs. Code keeps "conflation".
-- **The review queue covers the viewport only,** and waits for OSM data to load. There is no
-  whole-dataset queue.
+  else says "Already mapped", "New", or uses the stage verbs. Code keeps "conflation".
 - **Test data is synthetic,** generated in code. No real agency data goes in the repo.
 - **The scoring formula follows the server-side tools,** once we have their definition. That work
   doesn't block anything; the provisional formula is in one function that can be replaced.
@@ -741,7 +718,15 @@ Lines come first throughout. Points and polygons follow the same pipeline at a l
   In practice it caused more trouble than it caught. Loosening the angle sent every corner to review
   (the crossing and the next sidewalk are 3–4 m away at 30–40°), so `nearAngle` had to default to
   `sameAngle`; and for the demo the band was turned off entirely to keep attention on "same". One
-  distance and one angle are easier to explain. The `uncertain` status stays, without a source for now.
+  distance and one angle are easier to explain.
+- **No "needs review" status and no review queue** (dropped with the "near" band, Oct 26). Triage is
+  just already mapped or new. They can come back if something turns out to need a person, such as a
+  target that is the same by distance and angle but disagrees on `sameKeys`. The design they had: an
+  `uncertain` status with an amber casing, and a queue of the uncertain features in view, with
+  next/previous and "Accept as new" / "Same as existing" actions.
+- **`sameKeys` applies to joining as well as matching** (found on real data, Oct 26: a new sidewalk
+  joined a stream it ended beside). A line end only joins a target that some rule would call the
+  same kind of thing. See [Accepting and joining](#accepting-and-joining).
 - **Rule shape: source and target, and "same"** (decided after testing on real data). Rules
   name conditions for each side, `sameKeys` for values that must agree, and a distance and angle
   limit. Every source feature is tested; rules combine with OR. This replaced an earlier
@@ -761,7 +746,7 @@ Lines come first throughout. Points and polygons follow the same pipeline at a l
 - **Scoring details** (being gathered): is the buffer drawn around the source or the target? Is
   overlap measured one way or both ways? How are the parameters combined into a score?
 - **`sidewalk=*` on roads.** Should a sidewalk rule also match roads tagged `sidewalk=*`? Those
-  features would be `matched` without anything to join to. They might belong in the `uncertain` status.
+  features would be `matched` without anything to join to.
 - **Polygon threshold.** Is intersection ÷ smaller area the right overlap measure for buildings?
 - **Data mapping: require or warn?** Should conflation refuse to run without a data mapping, or run
   and show a warning in the settings UI?
