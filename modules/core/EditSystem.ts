@@ -220,6 +220,8 @@ interface EntityCopy {
  *      Receives `prevIndex` and `currIndex`
  * - 'merge'  - Fires when new base entities are merged into the base graph
  * - 'backupstatuschange' - Fires when backup status changes, receives `true` if ok, `false` if failed
+ *
+ * See `design/edit-system.md` for where this system is heading (typed edit props, backup v4).
  */
 export class EditSystem extends AbstractSystem {
 
@@ -1191,7 +1193,10 @@ export class EditSystem extends AbstractSystem {
     const historyData: Record<string, unknown>[] = [];
 
     // Preserve the users history of edits..
-    for (const edit of this._history) {
+    // End at `_index` - don't save the redo part of the history. Edits the user undid aren't work
+    // they'd expect to get back when restoring a session.
+    for (let i = 0; i <= this._index; i++) {
+      const edit = this._history[i];
       const modified: string[] = [];
       const deleted: EntityID[] = [];
 
@@ -1537,7 +1542,12 @@ export class EditSystem extends AbstractSystem {
 
     // Build the (expensive) structured backup object once.
     const backup = this.toBackup();
-    if (!backup) return Promise.resolve();
+
+    // Nothing to save, e.g. the user undid all their edits. Remove what this session saved before,
+    // or it would be offered for restore later with the edits they undid.
+    if (!backup) {
+      return this._sessionID ? this.deleteSessionAsync(this._sessionID) : Promise.resolve();
+    }
 
     if (database) {
       this._sessionID ??= this._newSessionID();   // mint a session id on first write

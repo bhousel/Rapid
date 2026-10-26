@@ -973,6 +973,20 @@ describe('EditSystem', () => {
         assert.isUndefined(_editor.toBackup());
       });
 
+      it('toBackup leaves out the redo part of the history', () => {
+        _editor.perform(actionAddNode('n-1'));
+        _editor.commit({ annotation: 'added n-1', selectedIDs: ['n-1'] });
+        _editor.perform(actionAddNode('n-2'));
+        _editor.commit({ annotation: 'added n-2', selectedIDs: ['n-2'] });
+        _editor.undo();   // n-2 is only in the redo part now
+
+        const backup = _editor.toBackup();
+        assert.lengthOf(backup.stack, 2);   // the base edit, and adding n-1
+        assert.strictEqual(backup.index, 1);
+        assert.deepEqual(backup.stack.map(item => item.annotation), [undefined, 'added n-1']);
+        assert.isFalse(backup.entities.some(entity => entity.id === 'n-2'));
+      });
+
       it('fromBackupAsync restores directly from a structured object (no JSON string)', () => {
         const backup = {
           version: 3,

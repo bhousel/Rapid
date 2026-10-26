@@ -1,5 +1,15 @@
 # Current Work
 
+## Active: what an edit records (`EditSystem`)
+Design: [`design/edit-system.md`](../design/edit-system.md), started Oct 26. Edits need to record more
+than OSM graph changes: `Edit<P>` gets a Preset-like props bag with a `type` (e.g. Rapid ignores; chosen
+over a separate "effects" list), labels become l10n string IDs, a new `hasWork()`
+decides backups, the map should show where an undo/redo changed things, and backup v4 stores base
+versions (fetched on restore) instead of base entities. Done: undone (redo) edits aren't saved, and a
+session undone back to nothing is deleted. Found: v3 restore reads `result.data` from
+`loadMultipleAsync`, which returns an array now, so restoring missing child nodes is likely broken.
+PR #5's `EditSystem.dataVersion` fits here (the "did data change?" question).
+
 ## Active: matching third-party data against OSM (`ConflationSystem`)
 Top priority. Design: [`design/conflation-system.md`](../design/conflation-system.md), currently proposed and
 awaiting a final review. Guiding use case: *accept the part of the sidewalk that is missing, and join it

@@ -134,6 +134,31 @@ Proposed: **the user can't change the `isID` field of a dataset that has accepte
 in the current edit session.** The settings page would explain why, and the user can save or discard
 their edits first. Not done yet.
 
+### Later: accept and ignore that outlive the edit session
+
+Today, accepted and ignored IDs live only in the edit history. After the user uploads their changes,
+the history is cleared, so features they ignored come back in the next session. (Accepted ones are
+in OSM by then, so conflation hides them, but they come back too where conflation is off.) That has
+always been accepted, but with stable feature IDs and `DatabaseSystem`, Rapid could remember them.
+
+How it should feel:
+- **Within a session, nothing changes.** Ignoring a feature is an edit in the history, and `RapidSystem`
+  remembers its ID. Undoing the ignore draws the feature again, and `RapidSystem` forgets the ID.
+  The history stays the source of truth while the user is editing (see
+  [`edit-system.md`](edit-system.md)).
+- **When the session ends, the decisions are kept.** On a successful upload (and maybe when the user
+  discards their edits but wants to keep their decisions), the accepted and ignored IDs from the kept
+  history are added to a per-dataset record in `DatabaseSystem`. Features in that record stay hidden
+  in later sessions.
+
+Things to decide when this is built:
+- Where the record lives: a field on the dataset's record in the `datasets` store, or a store of its own
+  (a dataset can have many thousands of IDs).
+- How the user gets a feature back later: a "show ignored features" switch, or "forget my decisions"
+  in the dataset settings.
+- IDs that stop matching: a feature without an `isID` field gets a new ID if its data changes, so an old
+  decision just stops applying. Changing the `isID` field orphans all of them (see above).
+
 ## Decisions
 
 - **Datasets are a collection, not settings.** A dataset with its data mapping and conflation rules is
@@ -177,7 +202,8 @@ their edits first. Not done yet.
 2. **Lock the `isID` field once the user has acted on a dataset's features** (see "Feature IDs" above).
 3. **Restore the selection after a restart.** With stable IDs, Rapid could come back up with the same
    external feature (or piece of a line) selected.
-4. **Custom datasets backed by a service** (backlog).
+4. **Accept and ignore that outlive the edit session** (see "Feature IDs" above).
+5. **Custom datasets backed by a service** (backlog).
 
 ## Known rough edges
 

@@ -96,6 +96,21 @@ describe('EditSystem sessions (Phase 2)', () => {
       assert.lengthOf(records, 2);
     });
 
+    it('removes the session when the user undoes all of its edits', async () => {
+      editor.perform(actionAddTaggedNode('n-1', [1, 2], { building: 'yes' }));
+      editor.commit({ annotation: 'building', selectedIDs: ['n-1'] });
+      await editor.immediateBackup();
+      const sessionID = editor._sessionID;
+      assert.isOk(await database.get('sessions', sessionID));
+
+      editor.undo();   // the edit is only in the redo part of the history now
+      await editor.immediateBackup();
+
+      assert.isUndefined(await database.get('sessions', sessionID));
+      assert.isEmpty(await editor.listRestorableSessionsAsync());
+      assert.isNull(editor._sessionID);   // the next edit starts a new session
+    });
+
     it('no longer writes edits to localStorage', async () => {
       editor.perform(actionAddTaggedNode('n-1', [1, 2], { building: 'yes' }));
       editor.commit({ annotation: 'building', selectedIDs: ['n-1'] });
