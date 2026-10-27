@@ -16,8 +16,12 @@ Step 4 (Oct 27): edits record `extent`, `selection` and `selectionBefore` (by la
 selection before, redo the selection after (a Rapid feature is found again on the `rapid` layer); one
 more redo returns to where the user was (`EditSystem.returnEdit`, never in the history). Worked out
 with Bryan, with Steve Ruiz's undo/redo threads as prior art (in the doc). Checked live.
-Next: step 5 (backup v4). Found: v3 restore reads `result.data` from `loadMultipleAsync`, which returns
-an array now, so restoring missing child nodes is likely broken. Found: accepting from a custom dataset
+Step 5 (Oct 27): backups are v4, saving `baseVersions` instead of base entities; restore fetches them
+with `OsmService.loadEntityVersionsAsync` (versioned multi-fetch, splits a chunk on 404), falling back
+to the current version, then the version before a deletion. No API, no restore: it fails, keeps the
+session, and flashes `restore.failed` (also at the end of the walkthrough). v3 restore goes through the
+same fetch (the `result.data` bug is gone). Checked live with a v3 session in the debug Chrome.
+Next: step 6 (edits that use external data on OSM features), when Bryan picks it up. Found: accepting from a custom dataset
 records no data source (`ds.dataUsed` is `[]`, and `[] ?? [datasetID]` keeps `[]`; it was `||` before,
 same result). PR #5's `EditSystem.dataVersion` fits here (the "did data change?" question); not landed.
 

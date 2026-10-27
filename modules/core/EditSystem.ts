@@ -5,13 +5,14 @@ import { Extent, geoScaleToZoom, projWgs84ToWorld } from '@rapid-sdk/math';
 import { OsmEntity, createOsmEntity } from '../data/index.ts';
 import { select } from 'd3-selection';
 import { UiLoading } from '../ui/UiLoading.ts';
-import { utilArrayGroupBy, utilObjectOmit } from '@rapid-sdk/util';
+import { utilObjectOmit } from '@rapid-sdk/util';
 
 import type { Context } from '../Context.ts';
 import type { Action } from '../actions/types.ts';
 import type { DatabaseSystem } from './DatabaseSystem.ts';
 import type { EditProps, EditSources } from '../lib/Edit.ts';
 import type { OsmEntityProps, OsmNode, OsmRelation, OsmTags, OsmWay, Segment } from '../data/types.ts';
+import type { ParsedElement } from '../data/parsers/types.ts';
 import type { SpatialItem } from './SpatialSystem.ts';
 import type { TransformProps, Vec2 } from '@rapid-sdk/math';
 
@@ -47,7 +48,10 @@ export interface ChangesSummary {
 interface BackupJSON {
   version: number;
   entities: unknown[];
-  baseEntities: unknown[];
+  /** v4: the OSM version each edited entity (and its child nodes and parent ways) was edited from */
+  baseVersions?: Record<EntityID, number>;
+  /** v3: copies of those entities as they were before any edits */
+  baseEntities?: unknown[];
   stack: unknown[];
   nextIDs: Record<string, number>;
   index: number;
@@ -99,7 +103,7 @@ export interface SessionRecord {
   bbox?: SessionBBox;
   /** A short list of the most common feature tag keys, for the restore UI. */
   summary: string[];
-  /** The backup schema version of `data` (currently 3). */
+  /** The backup schema version of `data` (currently 4). */
   backupVersion: number;
   /** `true` for a synthetic record backed by the legacy localStorage key (not yet upgraded to IDB). */
   legacy?: boolean;
@@ -210,7 +214,10 @@ interface EntityCopy {
  * - 'merge'  - Fires when new base entities are merged into the base graph
  * - 'backupstatuschange' - Fires when backup status changes, receives `true` if ok, `false` if failed
  *
- * See `design/edit-system.md` for where this system is heading (typed edit props, backup v4).
+ * Backups (v4) save each edit's props and changed entities, and the OSM version that every base entity
+ * was edited from. Restoring fetches those versions from the OSM API, so it needs a network.
+ *
+ * See `design/edit-system.md` for the design behind this system and where it's heading.
  */
 export class EditSystem extends AbstractSystem {
 
@@ -1225,7 +1232,7 @@ export class EditSystem extends AbstractSystem {
     const OSM_PRECISION = 7;
     const baseGraph = this.base.graph!;   // The initial unedited graph
     const modifiedEntities = new Map<string, EntityCopy>();  // Map<entityKey, EntityCopy>
-    const baseEntities = new Map<EntityID, EntityCopy>();    // Map<entityID, EntityCopy>
+    const baseEntities = new Map<EntityID, OsmEntity>();     // Map<entityID, OsmEntity>
     const historyData: Record<string, unknown>[] = [];
 
     // Preserve the users history of edits..
@@ -1248,8 +1255,8 @@ export class EditSystem extends AbstractSystem {
 
         // Collect the original versions of edited Entities.
         const original = baseGraph.hasEntity(entityID);
-        if (original && !baseEntities.has(entityID)) {
-          baseEntities.set(entityID, _copyEntity(original));
+        if (original) {
+          baseEntities.set(entityID, original);
         }
 
         // For modified ways, collect originals of child nodes also. - iD#4108
@@ -1257,8 +1264,8 @@ export class EditSystem extends AbstractSystem {
         if (entity && (entity as any).nodes) {
           for (const childID of (entity as any).nodes) {
             const child = baseGraph.hasEntity(childID);
-            if (child && !baseEntities.has(child.id)) {
-              baseEntities.set(child.id, _copyEntity(child));
+            if (child) {
+              baseEntities.set(child.id, child);
             }
           }
         }
@@ -1268,9 +1275,7 @@ export class EditSystem extends AbstractSystem {
         //  behind the scenes, only the nodes were really modified)
         if (original) {
           for (const parent of baseGraph.parentWays(original)) {
-            if (!baseEntities.has(parent.id)) {
-              baseEntities.set(parent.id, _copyEntity(parent));
-            }
+            baseEntities.set(parent.id, parent);
           }
         }
       }
@@ -1284,10 +1289,29 @@ export class EditSystem extends AbstractSystem {
       historyData.push(item);
     }
 
+    // Collect the child nodes of those original ways also, so restore can fetch everything at once.
+    for (const entity of [...baseEntities.values()]) {
+      for (const childID of (entity as OsmWay).nodes ?? []) {
+        const child = baseGraph.hasEntity(childID);
+        if (child) {
+          baseEntities.set(child.id, child);
+        }
+      }
+    }
+
+    // Save the versions they were edited from, not copies of them. Restore fetches those versions
+    // from the OSM API. (Entities without a version didn't come from OSM, and can't be fetched.)
+    const baseVersions: Record<EntityID, number> = {};
+    for (const [entityID, entity] of baseEntities) {
+      if (entity.version) {
+        baseVersions[entityID] = entity.version;
+      }
+    }
+
     return {
-      version: 3,
+      version: 4,
       entities: [...modifiedEntities.values()],
-      baseEntities: [...baseEntities.values()],
+      baseVersions: baseVersions,
       stack: historyData,
       nextIDs: this.context.sequences,
       index: this._index,
@@ -1362,9 +1386,8 @@ export class EditSystem extends AbstractSystem {
   public fromBackupAsync(backup: BackupJSON): Promise<void> {
     const context = this.context;
     const gfx = context.systems.gfx;
-    const osm = context.services.osm as any;
 
-    if (backup.version !== 3) {
+    if (backup.version !== 3 && backup.version !== 4) {
       throw new Error(`Backup version ${backup.version} not supported.`);
     }
 
@@ -1382,7 +1405,7 @@ export class EditSystem extends AbstractSystem {
 
     const __baseEntities = new Map<EntityID, OsmEntity>();        // Map<entityID, Entity>
     const __modifiedEntities = new Map<string, OsmEntity>();      // Map<Entity.key, Entity>  (watch out: entity.key - e.g. 'n1v1')
-    const __missingEntityIDs = new Set<EntityID>();               // Set<entityID>
+    const __toFetch = new Map<EntityID, number | undefined>();    // Map<entityID, version>  (`undefined` for the current version)
 
     // Restore the nextIDs..
     // Old: OsmEntity.id.next = backup.nextIDs;
@@ -1393,18 +1416,25 @@ export class EditSystem extends AbstractSystem {
       (context.sequences as Record<string, number>)[k] = Math.abs(v);
     }
 
-    // Reconstruct base entities..
-    for (const props of backup.baseEntities) {
+    // v4: Fetch the base entities at the versions the edits were made from..
+    for (const [entityID, version] of Object.entries(backup.baseVersions ?? {})) {
+      __toFetch.set(entityID, version);
+    }
+
+    // v3: Reconstruct base entities..
+    for (const props of backup.baseEntities ?? []) {
       const entity = createOsmEntity(context, props as OsmEntityProps);
       __baseEntities.set(entity.id, entity);
     }
 
-    // Determine if any nodes are missing and need to be loaded separately..
+    // v3: Determine if any nodes are missing and need to be loaded separately..
+    // When we restore ways, we also need to fetch any missing childNodes
+    //  that would normally have been downloaded with those ways.. see iD#2142
     for (const entity of __baseEntities.values()) {
       if (!Array.isArray((entity as any).nodes)) continue;  // consider ways only
       for (const nodeID of (entity as any).nodes) {
         if (!__baseEntities.has(nodeID)) {
-          __missingEntityIDs.add(nodeID);
+          __toFetch.set(nodeID, undefined);
         }
       }
     }
@@ -1414,67 +1444,6 @@ export class EditSystem extends AbstractSystem {
       const entity = createOsmEntity(context, e as OsmEntityProps);
       __modifiedEntities.set(entity.key, entity);
     }
-
-    // Load missing entities from the OSM API
-    // When we restore ways, we also need to fetch any missing childNodes
-    //  that would normally have been downloaded with those ways.. see iD#2142
-    // As added challenges:
-    //  - We have to keep the UI blocked while this is happening, because it's destructive to the graphs/edits.
-    //  - Callback can be called multiple times, so we have to keep track of how many of the missing nodes we got.
-    //  - The child nodes may have been deleted, so we may have to fetch older non-deleted copies
-    //
-    // A thought I'm having is - if we need to do all this anyway, it might make more sense to just store the
-    // base version numbers rather than base entities, then use `loadEntityVersionAsync` to fetch exactly what we need.
-    // new: the OSM API now supports a "multi-fetch with version numbers" option.
-    const _loadMissingEntitiesAsync = (): Promise<void> => {
-      return new Promise((resolve, reject) => {
-
-        if (osm && __missingEntityIDs.size) {
-          // Watch out: this callback may be called multiple times..
-          // Since switching the osm service methods to async we shouldn't get errors anymore
-          //  it will always resolve to whatever was fetched.
-          // But: another potential problem is that we'll never actually fetch "redacted" entities
-          //  so potential infinite recursion scenerio.
-          const _missingEntitiesLoaded = (err: Error | null, result: { data: Array<{ id: string; version: number; visible: boolean }> }) => {
-            if (err) {
-              reject(err);
-
-            } else {
-              const visibleGroups = utilArrayGroupBy(result.data, 'visible');
-              const visibles = (visibleGroups as any).true ?? [];      // alive nodes
-              const invisibles = (visibleGroups as any).false ?? [];   // deleted nodes
-
-              // Visible (not deleted) are no longer missing and will be merged as base entities..
-              for (const props of visibles) {
-                const entity = createOsmEntity(context, props);
-                __missingEntityIDs.delete(entity.id);
-                __baseEntities.set(entity.id, entity);
-              }
-
-              // Recurse to load invisible (deleted) entities, need to go back a version to find them..
-              for (const props of invisibles) {
-                osm.loadEntityVersionAsync(props.id, +props.version - 1)
-                  .then((results: { data: Array<{ id: string; version: number; visible: boolean }> }) => _missingEntitiesLoaded(null, results))
-                  .catch((err: Error) => reject(err));
-              }
-            }
-
-            if (!__missingEntityIDs.size) {  // are we done?
-              resolve();
-            }
-          };
-
-          // continue loading missing entities until we have them all
-          osm.loadMultipleAsync(__missingEntityIDs)
-            .then((results: { data: Array<{ id: string; version: number; visible: boolean }> }) => _missingEntitiesLoaded(null, results))
-            .catch((err: Error) => reject(err));
-
-        } else {  // nothing to do
-          resolve();
-        }
-
-      });
-    };
 
 
     // Call _finish when we believe we have everything..
@@ -1531,8 +1500,70 @@ export class EditSystem extends AbstractSystem {
     };
 
 
-    return _loadMissingEntitiesAsync()
-      .finally(() => _finish());
+    // We have to keep the UI blocked while fetching, because restoring replaces the graphs and edits.
+    return this._fetchBaseEntitiesAsync(__toFetch)
+      .then(fetched => {
+        for (const entity of fetched) {
+          __baseEntities.set(entity.id, entity);
+        }
+        _finish();
+
+      }, err => {
+        // Without the base entities, the edits can't be restored. Leave the history empty (the caller
+        // reset it) and the session where it was, so it can be restored later.
+        unpause?.();
+        loading?.close();
+        throw err;
+      });
+  }
+
+
+  /**
+   * Fetch the base entities for a restore from the OSM API.
+   * Each entity is fetched at the version its edits were made from. If that version can't be found
+   * (redacted or missing), the current version is used instead, and if the entity has been deleted
+   * since, the version before it was deleted. Save-time conflict resolution sorts out any differences.
+   * @param versions - the version to fetch for each entityID (`undefined` to fetch the current version)
+   * @return Promise resolved with the entities that were found
+   * @throws Rejects if the OSM API can't be reached
+   */
+  protected async _fetchBaseEntitiesAsync(versions: Map<EntityID, number | undefined>): Promise<OsmEntity[]> {
+    const context = this.context;
+    const osm = context.services.osm;
+
+    const found: OsmEntity[] = [];
+    if (!osm || !versions.size) return found;
+
+    const triedCurrent = new Set<EntityID>();
+    let toFetch = versions;
+
+    while (toFetch.size) {
+      const results = await osm.loadEntityVersionsAsync(toFetch);
+      const resultByID = new Map<EntityID, ParsedElement>();
+      for (const props of results) {
+        resultByID.set(props.id as EntityID, props as ParsedElement);
+      }
+
+      const retry = new Map<EntityID, number | undefined>();
+      for (const [entityID, version] of toFetch) {
+        if (version === undefined) {
+          triedCurrent.add(entityID);
+        }
+
+        const props = resultByID.get(entityID);
+        const fetchedVersion = props?.version as number | undefined;
+        if (props?.visible) {
+          found.push(createOsmEntity(context, props as OsmEntityProps));
+        } else if (!triedCurrent.has(entityID)) {   // that version can't be found, try the current one
+          retry.set(entityID, undefined);
+        } else if (version === undefined && fetchedVersion && fetchedVersion > 1) {   // deleted since, try the version before
+          retry.set(entityID, fetchedVersion - 1);
+        }
+      }
+      toFetch = retry;
+    }
+
+    return found;
   }
 
 
@@ -2003,6 +2034,14 @@ export class EditSystem extends AbstractSystem {
 
     scan(backup.entities);
     scan(backup.baseEntities);
+
+    // Each edit's extent also covers what it deleted (v4 backups don't store deleted entities)
+    for (const item of backup.stack ?? []) {
+      const extent = (item as { props?: EditProps })?.props?.extent;
+      if (Array.isArray(extent) && extent.length === 4) {
+        scan([{ loc: [extent[0], extent[1]] }, { loc: [extent[2], extent[3]] }]);
+      }
+    }
 
     if (minX === Infinity) return undefined;
     return { minX, minY, maxX, maxY };

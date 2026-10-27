@@ -131,6 +131,18 @@ describe('EditSystem sessions (Phase 2)', () => {
       assert.strictEqual(record.bbox.minX, 1);
       assert.strictEqual(record.bbox.minY, 2);
     });
+
+    it('includes what was deleted in the bbox (from the edit\'s extent)', async () => {
+      editor.merge([ new Rapid.OsmNode(context, { id: 'n1', version: 1, loc: [5, 6] }) ]);
+      editor.perform(actionAddTaggedNode('n-1', [1, 2], { building: 'yes' }));
+      editor.commit({ stringID:'building', selection: { osm: ['n-1'] } });
+      editor.perform(Rapid.actionDeleteNode('n1'));
+      editor.commit({ stringID:'deleted', selection: {} });
+      await editor.immediateBackup();
+
+      const record = await database.get('sessions', editor._sessionID);
+      assert.deepEqual(record.bbox, { minX: 1, minY: 2, maxX: 5, maxY: 6 });
+    });
   });
 
 

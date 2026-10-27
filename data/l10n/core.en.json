@@ -1376,7 +1376,8 @@
       "edits": "{n} edits",
       "unknown_date": "Unknown date",
       "unknown_location": "Unknown location",
-      "no_storage": "Heads up — permanent storage isn't available right now (for example in a private window). You can keep working, but your edits won't be saved when you close Rapid."
+      "no_storage": "Heads up — permanent storage isn't available right now (for example in a private window). You can keep working, but your edits won't be saved when you close Rapid.",
+      "failed": "Couldn't restore your edits, because OpenStreetMap couldn't be reached. They're still saved, so you can try again after reloading Rapid."
     },
     "save": {
       "help": "Review your changes and upload them to OpenStreetMap, making them visible to other users.",

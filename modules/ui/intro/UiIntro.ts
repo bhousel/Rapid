@@ -293,10 +293,12 @@ export class UiIntro {
     const context = this.context;
     const editor = context.systems.editor!;
     const imagery = context.systems.imagery!;
+    const l10n = context.systems.l10n!;
     const map = context.systems.map!;
     const rapid = context.systems.rapid!;
     const scene = context.systems.gfx!.scene!;
     const settings = context.systems.settings;
+    const ui = context.systems.ui;   // optional
 
     // Store if walkthrough is completed..
     const incomplete = utilArrayDifference(chapterFlow, this._progress);
@@ -338,6 +340,11 @@ export class UiIntro {
         } else {
           return Promise.resolve();
         }
+      })
+      .catch(err => {
+        // Restoring needs the OSM API. The user's session is still saved, so it can be restored later.
+        console.error(err);  // eslint-disable-line no-console
+        ui?.Flash.show({ duration: 10000, label: l10n.t('restore.failed') });
       });
   }
 }

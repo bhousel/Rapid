@@ -11,8 +11,9 @@ that an edit has to record more than changes to the OSM graph, and records where
 > session the user undid back to nothing is removed, and edits are a graph plus props with translated
 > labels and a `type` (Rollout step 3), so a session of only Rapid ignores is backed up too. Undo and
 > redo now show where the change is, move the map only when needed, restore the selection from before
-> or after the edit, and one more redo returns the user to where they were (step 4).
-> Next: the v4 backup format (see [Rollout](#rollout)).
+> or after the edit, and one more redo returns the user to where they were (step 4). Backups are v4:
+> they save base versions instead of base entities, and restore fetches them (step 5).
+> Next: edits that use external data on OSM features (see [Rollout](#rollout)).
 
 ## Words used here
 
@@ -105,7 +106,7 @@ That assumption didn't hold up, and comments about it are scattered around the c
    redacted versions, and a UI that must stay blocked meanwhile. The base copies are also a snapshot of
    OSM at backup time, which can be older than what's on the server. And it has rotted: it reads
    `result.data` from `loadMultipleAsync`, which now returns a plain array (unnoticed because `osm` is
-   typed `any`), so restoring a backup that needs missing nodes probably doesn't work.
+   typed `any`), so restoring a backup that needs missing nodes probably doesn't work. (Fixed in step 5.)
 7. **No cheap way to know data changed.** Apps that embed Rapid want to cache things derived from the
    graph. Graph keys don't change on `merge()`, so they can't rely on them. PR #5 (APIs for embedding
    apps) proposes `EditSystem.dataVersion`, a number that changes whenever any graph's data may have
@@ -282,21 +283,44 @@ the next undo, which actually leaves the newest edit, does.
 
 ### Backup format v4
 
-- **Store base versions, not base entities.** For each entity the history touches, store its ID and
-  the version it was edited from. To restore, fetch exactly those versions from the OSM API in one
-  versioned multi-fetch (`/nodes?nodes=123v4,456v2`, and the same for ways and relations), with their
-  child nodes. That replaces the heuristics for collecting base copies and the version walking in
-  `_loadMissingEntitiesAsync`, and restored entities are exactly what the edits were made against.
+```ts
+{
+  version: 4,
+  entities: [ … ],                         // copies of every entity the kept edits changed (by key, e.g. 'n1v1')
+  baseVersions: { n1: 1, n2: 2, w1: 4 },   // the OSM version each base entity was edited from
+  stack: [ {}, { modified: ['n1v1'], deleted: ['n3'], props: { … } }, … ],
+  nextIDs: { … }, index: 1, timestamp: …
+}
+```
+
+- **Store base versions, not base entities.** The entities saved are the same as before (iD#4108):
+  each entity the history touches, the child nodes of edited ways, the parent ways of edited entities,
+  and now also the child nodes of those parent ways, so nothing is left to fetch afterward. Only the
+  ID and version of each is stored. Entities without a version didn't come from OSM and are left out.
+- **Restore fetches exactly those versions** in one versioned multi-fetch per type (`/nodes?nodes=123v4,456v2`,
+  `OsmService.loadEntityVersionsAsync`, in chunks of 150). That replaces `_loadMissingEntitiesAsync` and its
+  version walking, and restored entities are exactly what the edits were made against.
 - **Restoring needs a network,** like the rest of Rapid. Keeping everything in IndexedDB so Rapid works
-  offline may come someday, but not for this.
+  offline may come someday, but not for this. If the OSM API can't be reached, the restore fails before
+  touching the history: the session stays saved, and the user sees "Couldn't restore your edits…" with a
+  suggestion to reload and try again. Finishing anyway isn't an option: a way whose child nodes are
+  missing breaks drawing (`graph.childNodes()` throws).
 - **A version that can't be fetched** (redacted, or missing) is restored against the current version
-  of the entity instead, and save-time conflict resolution sorts out any differences.
+  of the entity instead, and save-time conflict resolution sorts out any differences. If the entity has
+  been deleted since, the version before the deletion is used. Anything still missing is left out.
+  The API answers 404 for a whole multi-fetch if any version in it can't be found (checked against the
+  live API; fetching a redacted version on its own is a 403), so the service splits a chunk that fails
+  that way in half and tries again, until only the versions that can't be found are left out.
+- **The restore list's location** (the session's bbox) comes from the changed entities and each edit's
+  `extent`, which also covers what was deleted, now that deleted entities aren't stored.
 - **Store each edit's `props` as they are,** next to what changed in its graph. Restore passes them
   back to the `Edit` constructor without knowing what any owner's props mean. (Done already: since
   step 3, each history item in a v3 backup has `props` in place of `annotation`, `selectedIDs`,
   `transform` and `*Used`. The version stayed 3, since only the items changed and restore reads both.)
 - **Only the kept history** (up to `index`); done for v3 already.
-- **v3 stays restorable, best effort,** for a while. An object annotation spreads into props (its
+- **v3 stays restorable, best effort,** for a while. Its base entities are used as saved, and child
+  nodes it's missing are fetched at their current version through the same path (which fixed the
+  `result.data` bug). An object annotation spreads into props (its
   `type`, `acceptIDs`, `ignoreID`, `dataUsed` keep their names). A string annotation, or an object
   annotation's `description`, was already translated, so it can't follow the user's language; it's
   kept as the plain-text `annotation` prop, which `label` falls back to. `selectedIDs` (on old items,
@@ -341,6 +365,11 @@ the next undo, which actually leaves the newest edit, does.
 - **A series of tag changes still merges into one undo step** (`commitAppend` when the label and
   selection match), however far apart in time. It's a bit unintuitive, and undoing it can take back
   changes the user can't see, but leave it alone for now.
+- **A restore that can't reach the OSM API fails** rather than restoring part of the session (October
+  2026). The session stays saved for another try. This applies to the walkthrough too, which saves the
+  user's edits as a backup when it starts and restores them when it ends, so that now fetches as well.
+- **v4 backups save the child nodes of parent ways too**, so a restore is one fetch per type, with no
+  second round for nodes that turn out to be missing.
 - **Undo and redo restore a non-OSM selection by finding the data on its layer** (`AbstractPixiLayer.getData`),
   so only data that's drawn can be selected again. Good enough for Rapid features, which come back on
   the next redraw.
@@ -385,6 +414,10 @@ None right now. Questions from the first draft are answered under Decisions.
    redo the selection after, and the return view takes the user back to where they were. Checked live:
    accept a sidewalk, pan away, undo (Rapid feature selected again), redo (no move), redo (back where
    they panned to).
-5. **Backup v4.** Base versions and a versioned multi-fetch on restore; v3 restore converted best effort.
+5. **Backup v4.** ✅ Backups save base versions (`baseVersions`), and restore fetches them with a
+   versioned multi-fetch (`OsmService.loadEntityVersionsAsync`), falling back to the current version.
+   v3 restore still works, best effort. A restore that can't reach the API fails and keeps the session.
+   Checked live: a v3 session restored, was backed up as v4 (3 versions instead of copies), and that
+   restored the same graph from one request; a failed fetch showed the message and left the session saved.
 6. **Later:** edits that copy from external data onto OSM features; accept and ignore that outlive the
    session (a `RapidSystem` change).

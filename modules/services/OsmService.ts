@@ -811,6 +811,66 @@ export class OsmService extends AbstractSystem {
 
 
   /**
+   * Load multiple elements at the given versions, in chunks.
+   * Like `loadMultipleAsync`, child nodes and members are not fetched automatically.
+   * The API answers 404 for a whole request if any version in it is missing or redacted, so a
+   * chunk that fails that way is split in half and tried again, until only those are left out.
+   * GET /api/0.6/[nodes|ways|relations]?#parameters   (e.g. `nodes=123v4,456v2,789`)
+   * @param   versions - the version to load for each entityID (`undefined` or `null` loads the current version)
+   * @return  Promise resolved with an Array of entity details (versions that can't be found are left out)
+   * @throws  Rejects if a request fails for any other reason, e.g. the API can't be reached
+   */
+  public loadEntityVersionsAsync(versions: Map<EntityID, Nullable<number>>): Promise<ParsedData[]> {
+    const loaded: ParsedData[] = [];
+    const toLoad = {} as Record<EntityType, string[]>;
+
+    // Group into lists by type, of the OSM ids with their versions, e.g. '123v4'
+    for (const [entityID, version] of versions) {
+      const k = OsmEntity.type(entityID) as EntityType;
+      if (!k) continue;
+      const osmID = OsmEntity.toOSM(entityID);
+      toLoad[k] ??= [];
+      toLoad[k].push(version ? `${osmID}v${version}` : osmID);
+    }
+
+    const _loadAsync = (k: 'node' | 'way' | 'relation', ids: string[]): Promise<void> => {
+      return new Promise<void>((resolve, reject) => {
+        const errback = (err: any, results?: ParserResult): void => {
+          if (!err) {
+            loaded.push(...(results?.data ?? []));
+            resolve();
+          } else if (err.status === 404 && ids.length > 1) {   // something in here can't be found, split and retry
+            const mid = Math.ceil(ids.length / 2);
+            Promise.all([_loadAsync(k, ids.slice(0, mid)), _loadAsync(k, ids.slice(mid))])
+              .then(() => resolve())
+              .catch(reject);
+          } else if (err.status === 404) {   // this one can't be found, leave it out
+            resolve();
+          } else {
+            reject(err);
+          }
+        };
+
+        const type = k + 's';   // nodes, ways, relations
+        const options = { skipSeen: false, filter: new Set<ParserDataType>([k]) };
+        const json = (this.preferJSON ? '.json' : '');
+        this.loadFromAPI(`/api/0.6/${type}${json}?${type}=` + ids.join(), errback, options);
+      });
+    };
+
+    const promises: Promise<void>[] = [];
+    for (const k of ['node', 'way', 'relation'] as const) {
+      for (const chunk of utilArrayChunk(toLoad[k] ?? [], 150)) {
+        promises.push(_loadAsync(k, chunk));
+      }
+    }
+
+    return Promise.all(promises)
+      .then(() => loaded);
+  }
+
+
+  /**
    * Load a given user by id.
    * Note that this call requires an auth connection and will return a cached result if unauth.
    * GET /api/0.6/user/#id

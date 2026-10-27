@@ -1,4 +1,4 @@
-import { beforeEach, describe, it, mock } from 'bun:test';
+import { afterEach, beforeEach, describe, it, mock } from 'bun:test';
 import { assert } from 'chai';
 import * as Rapid from '../../../modules/headless.js';
 
@@ -1038,7 +1038,7 @@ describe('EditSystem', () => {
         assert.isUndefined(_editor.toJSON());
       });
 
-      it('generates v3 JSON', () => {
+      it('generates v4 JSON', () => {
         prepareTestHistory();
 
         const node_1_json = { id: 'n-1' };  // without `visible: true`
@@ -1049,14 +1049,9 @@ describe('EditSystem', () => {
         const node2upd_json = { id: 'n2', tags: { natural: 'tree' }, v: node2upd.v };
 
         const json = JSON.parse(_editor.toJSON());
-        assert.strictEqual(json.version, 3);
-
-        // base entities - before all edits
-        assert.notDeepInclude(json.baseEntities, node_1_json);    // n-1 was not in the base
-        assert.notDeepInclude(json.baseEntities, node1_json);     // n1 was never edited
-        assert.deepInclude(json.baseEntities, node2_json);        // n2 is in base and was edited
-        assert.deepInclude(json.baseEntities, node3_json);        // n3 is in base and was edited
-        assert.notDeepInclude(json.baseEntities, node2upd_json);
+        assert.strictEqual(json.version, 4);
+        assert.notProperty(json, 'baseEntities');
+        assert.deepEqual(json.baseVersions, {});   // these test nodes have no OSM versions
 
         // edited entities
         assert.deepInclude(json.entities, node_1_json);     // n-1 was added
@@ -1064,6 +1059,35 @@ describe('EditSystem', () => {
         assert.notDeepInclude(json.entities, node1_json);   // n1 was never updated
         assert.notDeepInclude(json.entities, node2_json);   // n2 is in the base, not here
         assert.notDeepInclude(json.entities, node3_json);   // n3 is now deleted
+      });
+
+      it('saves the versions that edited entities, their child nodes and parent ways were edited from', () => {
+        // Base graph:  w1 [n1, n2],  w2 [n4, n5],  n3,  n6 (no version)
+        _editor.merge([
+          new Rapid.OsmNode(context, { id: 'n1', version: 1, loc: [0, 0] }),
+          new Rapid.OsmNode(context, { id: 'n2', version: 2, loc: [1, 0] }),
+          new Rapid.OsmNode(context, { id: 'n3', version: 3, loc: [2, 0] }),
+          new Rapid.OsmNode(context, { id: 'n4', version: 1, loc: [3, 0] }),
+          new Rapid.OsmNode(context, { id: 'n5', version: 1, loc: [4, 0] }),
+          new Rapid.OsmNode(context, { id: 'n6', loc: [5, 0] }),
+          new Rapid.OsmWay(context, { id: 'w1', version: 4, nodes: ['n1', 'n2'] }),
+          new Rapid.OsmWay(context, { id: 'w2', version: 1, nodes: ['n4', 'n5'] })
+        ]);
+
+        _editor.perform(Rapid.actionChangeTags('n2', { natural: 'tree' }));
+        _editor.commit({ stringID: 'updated n2' });
+        _editor.perform(Rapid.actionDeleteNode('n3'));
+        _editor.commit({ stringID: 'deleted n3' });
+        _editor.perform(Rapid.actionChangeTags('n6', { natural: 'tree' }));
+        _editor.commit({ stringID: 'updated n6' });
+        _editor.perform(actionAddNode('n-1'));
+        _editor.commit({ stringID: 'added n-1' });
+
+        const backup = _editor.toBackup();
+        // n2 and n3 were edited, w1 is n2's parent way, and n1 is w1's other child node.
+        // n6 has no version, n-1 is new, and w2, n4 and n5 weren't touched.
+        assert.deepEqual(backup.baseVersions, { n1: 1, n2: 2, n3: 3, w1: 4 });
+        assert.deepInclude(backup.entities, { id: 'n2', version: 2, loc: [1, 0], tags: { natural: 'tree' }, v: _editor.stable.graph.entity('n2').v });
       });
     });
 
@@ -1169,7 +1193,7 @@ describe('EditSystem', () => {
 
         const backup = _editor.toBackup();
         assert.isObject(backup);
-        assert.strictEqual(backup.version, 3);
+        assert.strictEqual(backup.version, 4);
         // The structured object must match the parsed JSON string exactly.
         assert.deepEqual(backup, JSON.parse(_editor.toJSON()));
       });
@@ -1296,6 +1320,133 @@ describe('EditSystem', () => {
             const props = _editor.stable.props;
             assert.deepEqual(props.selection, { osm: ['n1'] });
             assert.notProperty(props, 'selectedIDs');
+          });
+      });
+    });
+
+
+    describe('restoring base entities from the OSM API', () => {
+      // A fake OSM service. `elements` are what the API has, by id and version, with `current: true`
+      // on the current version. Like the real one, it leaves out versions it can't find.
+      let _calls;
+      function useOsm(elements, fail = false) {
+        _calls = [];
+        context.services.osm = {
+          loadEntityVersionsAsync: (versions) => {
+            _calls.push([...versions]);
+            if (fail) return Promise.reject(new Error('offline'));
+
+            const results = [];
+            for (const [entityID, version] of versions) {
+              const found = elements.find(e => e.id === entityID && (version === undefined ? e.current : e.version === version));
+              if (found) {
+                const props = { ...found };
+                delete props.current;
+                results.push(props);
+              }
+            }
+            return Promise.resolve(results);
+          }
+        };
+      }
+
+      afterEach(() => {
+        delete context.services.osm;
+      });
+
+      it('fetches the versions the edits were made from, all at once', () => {
+        useOsm([
+          { type: 'node', id: 'n1', version: 1, visible: true, loc: [0, 0], tags: {} },
+          { type: 'node', id: 'n2', version: 1, visible: true, loc: [1, 0], tags: {} },
+          { type: 'way', id: 'w1', version: 2, visible: true, nodes: ['n1', 'n2'], tags: { highway: 'path' } }
+        ]);
+        const backup = {
+          version: 4,
+          entities: [{ id: 'n1', version: 1, loc: [0, 1], v: 1 }],
+          baseVersions: { n1: 1, n2: 1, w1: 2 },
+          stack: [ {}, { modified: ['n1v1'], props: { stringID: 'moved a node' } } ],
+          nextIDs: {},
+          index: 1
+        };
+        return _editor.fromBackupAsync(backup)
+          .then(() => {
+            assert.deepEqual(_calls, [ [['n1', 1], ['n2', 1], ['w1', 2]] ]);
+            const base = _editor.base.graph;
+            assert.deepEqual(base.entity('n1').loc, [0, 0]);
+            assert.deepEqual(base.entity('w1').nodes, ['n1', 'n2']);
+            const graph = _editor.stable.graph;
+            assert.deepEqual(graph.entity('n1').loc, [0, 1]);
+            assert.deepEqual(graph.childNodes(graph.entity('w1')).map(n => n.id), ['n1', 'n2']);
+            assert.isTrue(_editor.hasChanges());
+          });
+      });
+
+      it('falls back to the current version, or to the version before it was deleted', () => {
+        useOsm([
+          { type: 'node', id: 'n1', version: 5, visible: true, loc: [0, 0], tags: {}, current: true },   // v3 is redacted
+          { type: 'node', id: 'n2', version: 4, visible: false, current: true },                     // deleted in v4
+          { type: 'node', id: 'n2', version: 3, visible: true, loc: [1, 0], tags: {} }
+        ]);                                                                                          // n3 can't be found at all
+        const backup = {
+          version: 4,
+          entities: [{ id: 'n-1', loc: [1, 2], v: 0 }],
+          baseVersions: { n1: 3, n2: 2, n3: 1 },
+          stack: [ {}, { modified: ['n-1v0'], props: { stringID: 'added a node' } } ],
+          nextIDs: {},
+          index: 1
+        };
+        return _editor.fromBackupAsync(backup)
+          .then(() => {
+            assert.deepEqual(_calls, [
+              [['n1', 3], ['n2', 2], ['n3', 1]],
+              [['n1', undefined], ['n2', undefined], ['n3', undefined]],
+              [['n2', 3]]
+            ]);
+            const base = _editor.base.graph;
+            assert.strictEqual(base.entity('n1').version, 5);
+            assert.strictEqual(base.entity('n2').version, 3);
+            assert.isUndefined(base.hasEntity('n3'));
+            assert.isOk(_editor.stable.graph.hasEntity('n-1'));
+          });
+      });
+
+      it('rejects if the OSM API can\'t be reached, leaving the history empty', () => {
+        useOsm([], true);
+        const backup = {
+          version: 4,
+          entities: [{ id: 'n1', version: 1, loc: [0, 1], v: 1 }],
+          baseVersions: { n1: 1 },
+          stack: [ {}, { modified: ['n1v1'], props: { stringID: 'moved a node' } } ],
+          nextIDs: {},
+          index: 1
+        };
+        return _editor.fromBackupAsync(backup)
+          .then(() => assert.fail('Promise was fulfilled but should have been rejected'))
+          .catch(err => {
+            assert.match(err.message, /offline/);
+            assert.lengthOf(_editor.history, 1);
+            assert.strictEqual(_editor.index, 0);
+          });
+      });
+
+      it('fetches the child nodes a v3 backup is missing, at their current version', () => {
+        useOsm([
+          { type: 'node', id: 'n2', version: 7, visible: true, loc: [1, 0], tags: {}, current: true }
+        ]);
+        const backup = {
+          version: 3,
+          entities: [{ id: 'w1', nodes: ['n1', 'n2'], tags: { highway: 'path' }, v: 1 }],
+          baseEntities: [{ id: 'n1', loc: [0, 0] }, { id: 'w1', nodes: ['n1', 'n2'] }],
+          stack: [ {}, { modified: ['w1v1'], annotation: 'Changed the tags.' } ],
+          nextIDs: {},
+          index: 1
+        };
+        return _editor.fromBackupAsync(backup)
+          .then(() => {
+            assert.deepEqual(_calls, [ [['n2', undefined]] ]);
+            assert.strictEqual(_editor.base.graph.entity('n2').version, 7);
+            const graph = _editor.stable.graph;
+            assert.deepEqual(graph.childNodes(graph.entity('w1')).map(n => n.id), ['n1', 'n2']);
           });
       });
     });

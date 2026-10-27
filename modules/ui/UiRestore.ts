@@ -103,6 +103,7 @@ export class UiRestore {
     const context = this.context;
     const editor = context.systems.editor!;
     const l10n = context.systems.l10n!;
+    const ui = context.systems.ui;   // optional
 
     $section.selectAll('*').remove();
 
@@ -163,7 +164,12 @@ export class UiRestore {
         .text(l10n.t('restore.restore_session'))
         .on('click', () => {
           Modal.close();
-          editor.restoreSessionAsync(session.id);
+          editor.restoreSessionAsync(session.id)
+            .catch(err => {
+              // Restoring needs the OSM API. The session is still saved, so it can be restored later.
+              console.error(err);  // eslint-disable-line no-console
+              ui?.Flash.show({ duration: 10000, label: l10n.t('restore.failed') });
+            });
         });
 
       $rowActions

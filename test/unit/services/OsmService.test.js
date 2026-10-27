@@ -580,6 +580,52 @@ describe('OsmService', () => {
     });
 
 
+    describe('loadEntityVersionsAsync', () => {
+      // Answers like the OSM API: 404 for the whole request if any version in it can't be found.
+      // (Here, that's node 2 version 9.)  Without a version, the current version is 5.
+      function nodesResponse(callLog) {
+        const ids = new URL(callLog.url).searchParams.get('nodes').split(',');
+        if (ids.includes('2v9')) return 404;
+        const elements = ids.map(s => {
+          const [id, version] = s.split('v');
+          return { type: 'node', id: +id, lat: 0, lon: 0, version: +(version ?? 5), visible: true };
+        });
+        return { version: '0.6', elements: elements };
+      }
+
+      it('loads entities at the given versions, or the current version', () => {
+        fetchMock.route(/nodes\.json\?nodes=/, nodesResponse);
+
+        const prom = _osm.loadEntityVersionsAsync(new Map([['n1', 3], ['n3', undefined]]));
+        assert.instanceOf(prom, Promise);
+
+        return prom
+          .then(data => {
+            assert.sameDeepMembers(data.map(d => [d.id, d.version]), [['n1', 3], ['n3', 5]]);
+            assert.lengthOf(fetchMock.callHistory.calls(), 1);   // in one request
+            assert.include(fetchMock.callHistory.lastCall().url, 'nodes=1v3,3');
+          });
+      });
+
+      it('leaves out versions that can\'t be found', () => {
+        fetchMock.route(/nodes\.json\?nodes=/, nodesResponse);
+
+        return _osm.loadEntityVersionsAsync(new Map([['n1', 3], ['n2', 9], ['n3', 1]]))
+          .then(data => {
+            assert.sameDeepMembers(data.map(d => [d.id, d.version]), [['n1', 3], ['n3', 1]]);
+          });
+      });
+
+      it('rejects if a request fails for another reason', () => {
+        fetchMock.route(/nodes\.json\?nodes=/, 500);
+
+        return _osm.loadEntityVersionsAsync(new Map([['n1', 3]]))
+          .then(() => assert.fail('Promise was fulfilled but should have been rejected'))
+          .catch(err => assert.strictEqual(err.status, 500));
+      });
+    });
+
+
     describe('getUserDetailsAsync', () => {
       it('rejects if not logged in', () => {
         const prom = _osm.getUserDetailsAsync();
