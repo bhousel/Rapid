@@ -932,6 +932,26 @@ describe('OsmService', () => {
           });
       });
 
+      it('waits for `beforeUpload` before uploading, and uploads even if it fails', () => {
+        fetchMock.route(/changeset\/123\/upload/, 409);
+        const seen = [];
+        const beforeUpload = (changeset) => {
+          const uploads = fetchMock.callHistory.calls().filter(c => /upload/.test(c.url));
+          seen.push([changeset.id, uploads.length]);
+          return new Promise((_, reject) => { setTimeout(() => reject(new Error('no database')), 10); });
+        };
+
+        return loginAsync()
+          .then(() => new Promise(resolve => {
+            const changeset = new Rapid.OsmChangeset(context, { tags: { comment: 'test' } });
+            _osm.sendChangeset(changeset, changes, (err) => resolve(err), beforeUpload);
+          }))
+          .then(err => {
+            assert.deepEqual(seen, [['123', 0]]);
+            assert.strictEqual(err.status, 409);   // it still uploaded
+          });
+      });
+
       it('reports a lost connection while creating the changeset', () => {
         fetchMock.removeRoutes();
         fetchMock.route(/changeset\/create/, { throws: new TypeError('Failed to fetch') });

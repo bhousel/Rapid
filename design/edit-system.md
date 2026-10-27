@@ -327,6 +327,16 @@ the next undo, which actually leaves the newest edit, does.
   kept as the plain-text `annotation` prop, which `label` falls back to. `selectedIDs` (on old items,
   or in props saved briefly before step 4) becomes `selection: { osm: selectedIDs }`.
 
+### Sessions during an upload
+
+A session is kept until its upload succeeds. Before uploading, the uploader backs it up with an
+`upload` mark (`markUploadAsync`: the changeset, the API, when it started, and the history index).
+If the tab closes during the upload, the next tab settles the session at startup
+(`_settleUploadsAsync`) by asking the API about the changeset, before offering anything: deleted
+quietly if the upload went through, offered normally if it didn't, held back if the server may still
+be working on it, and offered with a warning if we can't tell. Details are in
+[`uploader-system.md`](uploader-system.md#keeping-the-edits-during-a-save).
+
 ## Decisions
 
 - **Undone edits aren't saved** (October 2026). A backup stops at `index`, and a session undone back to

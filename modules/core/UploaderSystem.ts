@@ -585,7 +585,9 @@ export class UploaderSystem extends AbstractSystem {
       const changes = editor.changes(actionDiscardTags(editor.difference(), this._discardTags));
       if (changes.modified.length || changes.created.length || changes.deleted.length) {
         this.emit('willAttemptUpload');
-        osm!.sendChangeset(this.changeset!, changes, this._uploadCallback);
+        // Keep the backup, marked as uploading, so a closed tab doesn't lose the edits or upload them twice (iD#5200)
+        const beforeUpload = (changeset: OsmChangeset) => editor.markUploadAsync(changeset.id, osm!.apiroot);
+        osm!.sendChangeset(this.changeset!, changes, this._uploadCallback, beforeUpload);
       } else {
         // changes were insignificant or reverted by user
         this._didResultInNoChanges();
@@ -600,11 +602,18 @@ export class UploaderSystem extends AbstractSystem {
    * @param updatedChangeset - The changeset, which may have an id now
    */
   protected _uploadCallback(err: any, updatedChangeset?: any): void {
+    const editor = this.context.systems.editor!;
+
     if (updatedChangeset) {
       this.changeset = updatedChangeset;  // it may have a changeset id now
     }
 
     if (err) {
+      // Unless we can't tell (status -6), nothing was applied, so the backup is an ordinary one again
+      if (err.status !== -6) {
+        editor.clearUploadMarkAsync();
+      }
+
       if (err.status === 409) {  // 409 Conflict
         if (this._shouldCheckAgain(err)) {
           this.save(true, true);   // tryAgain = true, checkConflicts = true
@@ -617,6 +626,7 @@ export class UploaderSystem extends AbstractSystem {
       }
 
     } else {
+      editor.clearBackup();   // the edits are on OSM now, so restoring them would upload them twice
       this._didResultInSuccess();
     }
   }

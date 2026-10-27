@@ -7,8 +7,8 @@ This system is older than the design docs. This doc started in October 2026 with
 conflict handling, which had been broken for a long time (see [The October 2026 audit](#the-october-2026-audit)).
 
 > **Status:** Conflicts work again: checking them, merging other mappers' changes, the conflict
-> screen, and retrying. Upload errors end the save. Still open: losing the backup while a save is in
-> progress (see [Rollout](#rollout)).
+> screen, and retrying. Upload errors end the save, and the backup is kept until the upload succeeds
+> (see [Rollout](#rollout)).
 
 ## Words used here
 
@@ -90,6 +90,36 @@ the error says Rapid can't tell, and links to the changeset to check before uplo
 The upload timeout is 5 minutes, not the `NetworkSystem` default of 30 s, because a large upload can
 take the server longer than that, and giving up early is what leaves us not knowing.
 
+### Keeping the edits during a save
+
+iD deleted the session backup as soon as an upload started (iD#5200): users would click Save, close
+the tab right away, open a new one, and restore edits that were already on their way to OSM, so they
+were uploaded twice. That made any save that didn't finish lose the edits instead (Rapid#1480). Now that
+`DatabaseSystem` keeps several sessions and we own their shape, the session is kept and marked:
+
+1. **Mark before uploading.** After the changeset is created, `sendChangeset` waits for its
+   `beforeUpload` hook, where the uploader calls `editor.markUploadAsync`. That backs up the edits
+   (save mode skips ordinary backups) with `upload: { changesetID, apiURL, startedAt, index }`. A
+   session without the mark was never uploaded.
+2. **In the same tab:** success deletes the session (`clearBackup`). An error where we know nothing
+   was applied (any HTTP error, or `-5`) removes the mark, so it's an ordinary backup again, and the
+   draft comment is kept. When we can't tell (`-6`), the mark stays, and later backups keep it.
+3. **In the next tab:** a marked session that no live tab owns (the heartbeat covers a tab that's still
+   uploading) is settled by `EditSystem.startAsync`, before the restore screen, by asking the API for
+   the changeset (a public read, so no login needed). Uploads are all or nothing, so:
+   - **It has changes:** the upload went through, and the session is deleted quietly. If the user
+     edited more after the upload started (the history index moved), it's offered with a warning.
+   - **It has none, and it's closed or the upload started over 5 minutes ago:** it never landed. The
+     mark is removed and the session is offered as usual.
+   - **It has none, it's open, and the upload is recent:** the server may still be working on it, so
+     the session isn't offered this time.
+   - **The API can't be asked** (offline, no answer in 10 s, or the session was uploaded to a different
+     API): the restore screen warns that some edits may already be on OSM, with a link to the changeset.
+     Restoring it anyway removes the mark.
+
+The changeset's count can be trusted because Rapid only reuses an open changeset after an upload that
+failed, which applied nothing.
+
 ## The October 2026 audit
 
 Prompted by iD#7199 ("Endless conflict check loop", open since 2020), Rapid#1361, #1366 and #1480, and
@@ -109,7 +139,7 @@ conflict path had no tests, so each bug stayed hidden behind the one before it.
 | — | The "download osmChange file" link on the conflict screen was never created (`selectAll().append()` on nothing). iD has the same bug, which is why users had to dig the file out with the browser inspector. | Fixed |
 | — | Escape on the conflict screen went to save mode's own Escape, leaving the merges in `staging` and a stale conflict screen. | Fixed: Escape cancels the conflict screen; leaving save mode cancels it too |
 | 8 | Upload errors that aren't HTTP errors (offline, the 30 s default timeout) are swallowed by `sendChangeset`, and the save never finishes. A large upload can be cut off by that timeout while the server still applies it. | Fixed: every failure is reported, and with no answer the changeset is checked (see [When an upload gets no answer](#when-an-upload-gets-no-answer)) |
-| 9 | The session backup is deleted before uploading (iD#5200), and backups are skipped in save mode, so a reload during a stalled save or the conflict screen loses the edits (Rapid#1480). | Open |
+| 9 | The session backup is deleted before uploading (iD#5200), and backups are skipped in save mode, so a reload during a stalled save or the conflict screen loses the edits (Rapid#1480). | Fixed: the session is kept, marked while uploading, and settled with the API by the next tab (see [Keeping the edits during a save](#keeping-the-edits-during-a-save)) |
 | 10 | Results of an earlier attempt that arrive late could change a newer attempt's state. | Fixed: each `save()` is a numbered attempt |
 
 Found along the way, not fixed:
@@ -157,6 +187,9 @@ Found along the way, not fixed:
    ("Leave Deleted" deletes the server's version).
 3. **Upload errors** (finding 8): report every failure, give the upload a 5-minute timeout, and check
    the changeset when an upload gets no answer. ✅
-4. **Don't lose the edits during a save** (finding 9): keep the session until the upload succeeds, or
-   save it again on conflicts and errors.
+4. **Don't lose the edits during a save** (finding 9): keep the session until the upload succeeds,
+   marked while uploading, and settle interrupted uploads with the API in the next tab. ✅ Checked in a
+   headless Chromium with every OSM write intercepted: a tab closed mid-upload, then a new tab, with
+   the changeset answering "has changes" (deleted quietly), "no changes" (offered), and unreachable
+   (offered with the warning).
 5. **Later:** the "moved by both" false conflict; a new changeset when the old one was closed.

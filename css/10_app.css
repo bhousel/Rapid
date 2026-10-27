@@ -4935,6 +4935,13 @@ li.issue-fix-item button:not(.actionable) .fix-icon {
 .restore-sessions .delete-session {
   color: #e06c5e;
 }
+.restore-sessions .restore-warning {
+  margin-top: 4px;
+  color: #e06c5e;
+}
+.restore-sessions .restore-warning a {
+  margin-left: 4px;
+}
 
 /* Success Screen / Community Index
 ------------------------------------------------------- */

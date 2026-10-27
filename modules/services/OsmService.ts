@@ -474,6 +474,13 @@ export class OsmService extends AbstractSystem {
     return this._connectionID;
   }
 
+  /** The base URL of the OSM API
+   * @return  Base URL string (e.g. `'https://api.openstreetmap.org'`)
+   */
+  public get apiroot(): string {
+    return this._apiroot;
+  }
+
   /** The base URL of the OSM website
    * @return  Base URL string (e.g. `'https://www.openstreetmap.org'`)
    */
@@ -1434,7 +1441,6 @@ export class OsmService extends AbstractSystem {
     }
 
     const context = this.context;
-    const editor = context.systems.editor;
     const network = context.systems.network!;
 
     const uploadedChangeset = (err: any, /*result*/): void => {
@@ -1445,11 +1451,6 @@ export class OsmService extends AbstractSystem {
     const errback = this._wrapcb(uploadedChangeset);
     const requestID = `osm-changeset-upload-${changeset.id}` as RequestID;
     const resource = this._apiroot + `/api/0.6/changeset/${changeset.id}/upload`;
-
-    // Attempt to prevent user from creating duplicate changes - see iD#5200
-    // Some users will refresh their tab as soon as the changeset is inflight.
-    // We don't want to offer to restore these same changes when their browser refreshes.
-    editor?.clearBackup();
 
     network.fetch<any>(resource, {
       requestID,
@@ -1515,8 +1516,14 @@ export class OsmService extends AbstractSystem {
    * @param  changeset - the changeset to send
    * @param  changes - the entity changes to upload
    * @param  callback - errback-style callback called when the full send cycle completes
+   * @param  beforeUpload - optional, called with the created changeset; the upload waits for its promise
    */
-  public sendChangeset(changeset: OsmChangeset, changes: OsmChanges, callback: Errback): void {
+  public sendChangeset(
+    changeset: OsmChangeset,
+    changes: OsmChanges,
+    callback: Errback,
+    beforeUpload?: (changeset: OsmChangeset) => Promise<unknown>
+  ): void {
     const cid = this._connectionID;
 
     const uploaded = (): void => {
@@ -1534,32 +1541,38 @@ export class OsmService extends AbstractSystem {
       }
     };
 
+    const upload = (): void => this.uploadChangeset(changeset, changes, (err: any, updated: OsmChangeset) => {
+      changeset = updated;
+      if (!err) { return uploaded(); }
+
+      // The server answered (or we never sent it), so we know the upload wasn't applied.
+      if (typeof err.status === 'number') { return callback(err, changeset); }
+
+      // The user switched connection, so we can't ask the server that got the upload.
+      if (this._connectionID !== cid) {
+        return callback({ message: 'Connection Switched', status: -1 }, changeset);
+      }
+
+      this.loadChangesetAsync(changeset.id)
+        .then(result => {
+          if (Number(result.changes_count) > 0) {
+            uploaded();
+          } else {
+            callback({ message: err.message, status: -5 }, changeset);
+          }
+        })
+        .catch(() => callback({ message: err.message, status: -6 }, changeset));
+    });
+
     this.createChangeset(changeset, (err: any, updated: OsmChangeset) => {
       changeset = updated;
       if (err) { return callback(err, changeset); }
 
-      this.uploadChangeset(changeset, changes, (err: any, updated: OsmChangeset) => {
-        changeset = updated;
-        if (!err) { return uploaded(); }
-
-        // The server answered (or we never sent it), so we know the upload wasn't applied.
-        if (typeof err.status === 'number') { return callback(err, changeset); }
-
-        // The user switched connection, so we can't ask the server that got the upload.
-        if (this._connectionID !== cid) {
-          return callback({ message: 'Connection Switched', status: -1 }, changeset);
-        }
-
-        this.loadChangesetAsync(changeset.id)
-          .then(result => {
-            if (Number(result.changes_count) > 0) {
-              uploaded();
-            } else {
-              callback({ message: err.message, status: -5 }, changeset);
-            }
-          })
-          .catch(() => callback({ message: err.message, status: -6 }, changeset));
-      });
+      if (beforeUpload) {
+        beforeUpload(changeset).catch(() => {}).then(upload);   // upload even if it failed
+      } else {
+        upload();
+      }
     });
   }
 

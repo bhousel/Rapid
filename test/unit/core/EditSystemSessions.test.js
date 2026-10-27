@@ -303,4 +303,138 @@ describe('EditSystem sessions (Phase 2)', () => {
       assert.isNull(globalThis.sessionStorage.getItem(OWN_KEY));
     });
   });
+
+
+  // A session is marked while its edits are uploaded. If the tab closed during the upload, the next
+  // tab asks the OSM API about the changeset before offering the session (iD#5200).
+  describe('interrupted uploads', () => {
+    const API = 'https://api.example.com';
+    let _changesets, _requests;
+
+    function upload(overrides = {}) {
+      return { changesetID: '7', apiURL: API, startedAt: Date.now() - 1000, index: 1, ...overrides };
+    }
+
+    // Start a new tab's editor, which settles the marked sessions before offering them
+    async function startNewTabAsync() {
+      editor = new Rapid.EditSystem(context);
+      context.systems.editor = editor;
+      await editor.initAsync();
+      editor._canRestoreBackup = await editor._hasRestorableSessionsAsync();   // initAsync skips this in tests
+      await editor.startAsync();
+    }
+
+    beforeEach(() => {
+      _changesets = new Map();
+      _requests = [];
+      context.services.osm = {
+        apiroot: API,
+        initAsync: () => Promise.resolve(),
+        resetAsync: () => Promise.resolve(),
+        loadChangesetAsync: (id) => {
+          _requests.push(id);
+          const changeset = _changesets.get(id);
+          return changeset ? Promise.resolve(changeset) : Promise.reject(new TypeError('Failed to fetch'));
+        }
+      };
+    });
+
+    it('marks the session when uploading, and keeps the mark through later backups', async () => {
+      editor.perform(actionAddTaggedNode('n-1', [1, 2], { building: 'yes' }));
+      editor.commit({ stringID: 'building', selection: { osm: ['n-1'] } });
+      await editor.markUploadAsync('7', API);
+
+      let record = await database.get('sessions', editor._sessionID);
+      assert.include(record.upload, { changesetID: '7', apiURL: API, index: 1 });
+      assert.strictEqual(record.data.index, 1);
+
+      editor.perform(actionAddTaggedNode('n-2', [3, 4], { building: 'yes' }));
+      editor.commit({ stringID: 'building', selection: { osm: ['n-2'] } });
+      await editor.immediateBackup();
+      record = await database.get('sessions', editor._sessionID);
+      assert.strictEqual(record.upload.changesetID, '7');
+
+      await editor.clearUploadMarkAsync();
+      record = await database.get('sessions', editor._sessionID);
+      assert.isUndefined(record.upload);
+    });
+
+    it('deletes the session quietly if the upload went through', async () => {
+      await seedSession('s-up', { upload: upload() });
+      _changesets.set('7', { id: 'c7', open: false, changes_count: 3 });
+
+      await startNewTabAsync();
+
+      assert.isFalse(editor.canRestoreBackup);
+      assert.isUndefined(await database.get('sessions', 's-up'));
+    });
+
+    it('warns if the upload went through, but the user edited more after it started', async () => {
+      await seedSession('s-more', { upload: upload({ index: 0 }) });
+      _changesets.set('7', { id: 'c7', open: false, changes_count: 3 });
+
+      await startNewTabAsync();
+
+      const list = await editor.listRestorableSessionsAsync();
+      assert.deepEqual(list.map(s => s.id), ['s-more']);
+      assert.isOk(list[0].upload);   // the restore screen warns
+    });
+
+    it('offers the session normally if the upload never landed', async () => {
+      await seedSession('s-closed', { upload: upload() });
+      await seedSession('s-old', { upload: upload({ changesetID: '8', startedAt: Date.now() - 10 * 60 * 1000 }) });
+      _changesets.set('7', { id: 'c7', open: false, changes_count: 0 });
+      _changesets.set('8', { id: 'c8', open: 'true', changes_count: '0' });   // XML gives strings
+
+      await startNewTabAsync();
+
+      assert.isTrue(editor.canRestoreBackup);
+      const list = await editor.listRestorableSessionsAsync();
+      assert.sameMembers(list.map(s => s.id), ['s-closed', 's-old']);
+      assert.isTrue(list.every(s => !s.upload));
+    });
+
+    it('doesn\'t offer the session yet if the server may still be working on the upload', async () => {
+      await seedSession('s-pending', { upload: upload() });
+      _changesets.set('7', { id: 'c7', open: true, changes_count: 0 });
+
+      await startNewTabAsync();
+
+      assert.isFalse(editor.canRestoreBackup);
+      const record = await database.get('sessions', 's-pending');
+      assert.isOk(record.upload);   // checked again next time
+    });
+
+    it('warns if the API can\'t be asked, or it\'s a different API', async () => {
+      await seedSession('s-offline', { upload: upload() });
+      await seedSession('s-other', { upload: upload({ changesetID: '9', apiURL: 'https://api.other.example.com' }) });
+
+      await startNewTabAsync();
+
+      assert.deepEqual(_requests, ['7']);   // not the other API's changeset
+      const list = await editor.listRestorableSessionsAsync();
+      assert.sameMembers(list.map(s => s.id), ['s-offline', 's-other']);
+      assert.isTrue(list.every(s => s.upload));
+    });
+
+    it('doesn\'t check a session open in another tab', async () => {
+      await seedSession('s-live', { upload: upload(), heartbeatAt: Date.now() });
+      await seedSession('s-other', { updatedAt: 5000 });   // so there's something to restore
+
+      await startNewTabAsync();
+
+      assert.lengthOf(_requests, 0);
+      assert.isOk(await database.get('sessions', 's-live'));
+    });
+
+    it('clears the mark when the user restores the session anyway', async () => {
+      await seedSession('s-offline', { upload: upload() });
+      await startNewTabAsync();
+
+      await editor.restoreSessionAsync('s-offline');
+
+      const record = await database.get('sessions', 's-offline');
+      assert.isUndefined(record.upload);
+    });
+  });
 });

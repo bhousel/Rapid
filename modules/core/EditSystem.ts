@@ -24,6 +24,13 @@ const SESSION_HEARTBEAT_MS = 20000;
  * A few times the heartbeat interval, so a single missed beat doesn't flag a session as free.
  */
 const SESSION_LIVE_MS = 60000;
+/**
+ * How long (ms) after an upload started the server may still be working on it.
+ * Matches `OsmService`'s upload timeout.
+ */
+const UPLOAD_PENDING_MS = 5 * 60 * 1000;
+/** How long (ms) startup waits for the OSM API to say whether an interrupted upload went through. */
+const UPLOAD_CHECK_MS = 10000;
 
 
 /** Saved checkpoint state */
@@ -109,6 +116,24 @@ export interface SessionRecord {
   legacy?: boolean;
   /** The structured backup object. */
   data: BackupJSON;
+  /**
+   * Set while the session's edits are being uploaded. If the tab closes before the upload finishes,
+   * the next tab asks the OSM API whether it went through, instead of offering edits that may already
+   * be on OSM (iD#5200). See `design/uploader-system.md`.
+   */
+  upload?: SessionUpload;
+}
+
+/** An upload of a session's edits (see `SessionRecord.upload`). */
+export interface SessionUpload {
+  /** The changeset the edits are uploaded to */
+  changesetID: string;
+  /** The OSM API they are uploaded to */
+  apiURL: string;
+  /** When the upload started (ms since epoch) */
+  startedAt: number;
+  /** The backup's history index when the upload started, to tell whether the user edited more after */
+  index: number;
 }
 
 /** Entity copy - as bag of properties */
@@ -235,6 +260,8 @@ export class EditSystem extends AbstractSystem {
   protected _heartbeatStarted: boolean;
   /** Fallback interval handle when no `SchedulerSystem` is available */
   protected _heartbeatHandle: ReturnType<typeof globalThis.setInterval> | null;
+  /** Sessions whose upload the server may still be working on, so they aren't offered yet */
+  protected _pendingUploadIDs: Set<SessionID>;
   /** Whether there are unsaved edits relative to the last stable state */
   protected _hasWorkInProgress: boolean;
 
@@ -288,6 +315,7 @@ export class EditSystem extends AbstractSystem {
     this._activeSession = null;
     this._heartbeatStarted = false;
     this._heartbeatHandle = null;
+    this._pendingUploadIDs = new Set<SessionID>();
     this._hasWorkInProgress = false;
 
     this._history = [];
@@ -365,8 +393,23 @@ export class EditSystem extends AbstractSystem {
    * @return Promise resolved when this component has completed startup
    */
   public startAsync(): Promise<void> {
+    if (this._startPromise) return this._startPromise;
+
+    const context = this.context;
+    const osm = context.services.osm;   // optional
+
     this._startHeartbeat();
-    return super.startAsync();
+
+    // Sessions whose upload was interrupted are settled with the OSM API before we offer them.
+    // (Services are initialized, but not started, when systems start.)
+    return this._startPromise = super.startAsync()
+      .then(() => {
+        if (!this._canRestoreBackup) return;
+        return Promise.resolve(osm?.initAsync())
+          .then(() => this._settleUploadsAsync())
+          .then(() => this._hasRestorableSessionsAsync())
+          .then(canRestore => { this._canRestoreBackup = canRestore; });
+      });
   }
 
 
@@ -1682,6 +1725,7 @@ export class EditSystem extends AbstractSystem {
         for (const record of records) {
           seen.add(record.id);
           if (this._isLiveElsewhere(record, now)) continue;   // open in another live tab — don't offer it
+          if (this._pendingUploadIDs.has(record.id)) continue;   // the server may still be uploading it
           out.push(record);
         }
       } catch {
@@ -1756,6 +1800,7 @@ export class EditSystem extends AbstractSystem {
     } else {
       this._sessionID = id;                 // continue the existing IndexedDB session
       this._activeSession = existingRecord ?? null;   // cache for the liveness heartbeat
+      await this.clearUploadMarkAsync();    // the user chose to restore it, despite the warning
     }
 
     this._setOwnedSessionID(this._sessionID);   // this tab now owns this session (survives reload)
@@ -1806,7 +1851,7 @@ export class EditSystem extends AbstractSystem {
    * Remove the active editing session's backup.
    * This happens when:
    * - The user switches sources with the source switcher
-   * - A changeset is inflight, we remove it to prevent the user from restoring duplicate edits
+   * - The edits were uploaded, so restoring them would upload them twice
    *
    * Removes the active session from IndexedDB and clears the legacy localStorage key.
    */
@@ -1836,15 +1881,140 @@ export class EditSystem extends AbstractSystem {
 
 
   /**
+   * Back up the edits and mark the session as being uploaded to a changeset.
+   * The uploader calls this after creating the changeset and before uploading, and waits for it:
+   * if the tab closes during the upload, the next tab can ask the OSM API whether it went through.
+   * This writes even in save mode, where backups are otherwise skipped.
+   * @param changesetID - The changeset the edits are uploaded to
+   * @param apiURL - The OSM API they are uploaded to
+   * @return Promise resolved when the write completes (or fails silently)
+   */
+  public markUploadAsync(changesetID: string, apiURL: string): Promise<void> {
+    const context = this.context;
+    const database = context.systems.database;   // optional
+
+    const backup = this.toBackup();
+    if (!database || !backup) return Promise.resolve();
+
+    this._sessionID ??= this._newSessionID();
+    const upload: SessionUpload = { changesetID, apiURL, startedAt: Date.now(), index: backup.index };
+    return this._saveSessionAsync(database, this._sessionID, backup, upload);
+  }
+
+
+  /**
+   * Remove the active session's upload mark, because we know the upload wasn't applied
+   * (or the user chose to restore the session anyway).
+   * @return Promise resolved when the write completes (or fails silently)
+   */
+  public async clearUploadMarkAsync(): Promise<void> {
+    const context = this.context;
+    const database = context.systems.database;   // optional
+
+    const record = this._activeSession;
+    if (!database || !record?.upload) return;
+
+    delete record.upload;
+    try {
+      await database.put('sessions', record);
+    } catch {
+      // best effort
+    }
+  }
+
+
+  /**
+   * Settle the sessions whose upload was interrupted (their tab closed while uploading), by asking
+   * the OSM API about the changeset. Uploads are all or nothing, so:
+   * - if the changeset has changes, the upload went through: the session is deleted quietly, unless
+   *   the user edited more after it started (then it keeps its mark, and the restore screen warns)
+   * - if it has none and it's closed, or the upload started long ago, it never landed: the mark is removed
+   * - if it has none, is open, and the upload started recently, the server may still be working on it,
+   *   so the session isn't offered this time
+   * - if the API can't be asked, the session keeps its mark, and the restore screen warns
+   * @return Promise resolved when all marked sessions are settled
+   */
+  protected async _settleUploadsAsync(): Promise<void> {
+    const context = this.context;
+    const database = context.systems.database;   // optional
+    if (!database) return;
+
+    let records: SessionRecord[];
+    try {
+      records = await database.getAllFromIndex<SessionRecord>('sessions', 'by-origin', this._origin());
+    } catch {
+      return;
+    }
+
+    const now = Date.now();
+    const toSettle = records.filter(record => record.upload && !this._isLiveElsewhere(record, now));
+
+    await Promise.all(toSettle.map(async record => {
+      const upload = record.upload!;
+      const result = await this._checkUploadAsync(upload);
+
+      if (result === 'uploaded') {
+        if (record.data.index === upload.index) {
+          await this.deleteSessionAsync(record.id);
+        }
+      } else if (result === 'failed') {
+        delete record.upload;
+        try {
+          await database.put('sessions', record);
+        } catch {
+          // best effort
+        }
+      } else if (result === 'pending') {
+        this._pendingUploadIDs.add(record.id);
+      }
+    }));
+  }
+
+
+  /**
+   * Ask the OSM API whether an upload went through.
+   * @param upload - The session's upload mark
+   * @return `'uploaded'`, `'failed'`, `'pending'` (the server may still be working on it),
+   *   or `'unknown'` (the API couldn't be asked or didn't answer in time, or it's not the API we're connected to)
+   */
+  protected async _checkUploadAsync(upload: SessionUpload): Promise<'uploaded' | 'failed' | 'pending' | 'unknown'> {
+    const context = this.context;
+    const osm = context.services.osm;   // optional
+
+    if (!osm || osm.apiroot !== upload.apiURL) return 'unknown';
+
+    let handle: ReturnType<typeof globalThis.setTimeout> | undefined;
+    try {
+      const timeout = new Promise<never>((_, reject) => {
+        handle = globalThis.setTimeout(() => reject(new Error('Timed out')), UPLOAD_CHECK_MS);
+      });
+      const changeset = await Promise.race([osm.loadChangesetAsync(upload.changesetID), timeout]);
+      if (Number(changeset.changes_count) > 0) return 'uploaded';
+
+      const isOpen = String(changeset.open) === 'true';   // a boolean in JSON, a string in XML
+      if (isOpen && Date.now() - upload.startedAt < UPLOAD_PENDING_MS) return 'pending';
+      return 'failed';
+    } catch {
+      return 'unknown';
+    } finally {
+      globalThis.clearTimeout(handle);
+    }
+  }
+
+
+  /**
    * Persist an editing session to the `DatabaseSystem` 'sessions' store.
    * Stores the structured backup object directly (no `JSON.stringify`), along with lightweight
    * metadata (timestamps, edit count, bbox, tag summary) for the restore UI. Best-effort.
+   * An upload mark is kept until `clearUploadMarkAsync` removes it, so if we can't tell whether an
+   * upload went through, later backups don't hide that.
    * @param database - The database system to write to
    * @param id - The session id to write under
    * @param backup - The structured backup object to store
+   * @param upload - Optional, marks the session as being uploaded
    * @return Promise resolved when the write completes (or fails silently)
    */
-  protected async _saveSessionAsync(database: DatabaseSystem, id: SessionID, backup: BackupJSON): Promise<void> {
+  protected async _saveSessionAsync(database: DatabaseSystem, id: SessionID, backup: BackupJSON, upload?: SessionUpload): Promise<void> {
     const now = Date.now();
     try {
       const existing = await database.get<SessionRecord>('sessions', id);
@@ -1861,6 +2031,10 @@ export class EditSystem extends AbstractSystem {
         backupVersion: backup.version,
         data: backup
       };
+      const mark = upload ?? existing?.upload;
+      if (mark) {
+        record.upload = mark;
+      }
       await database.put('sessions', record);
       this._activeSession = record;             // cache for the liveness heartbeat (no re-read)
       this._setOwnedSessionID(id);              // this tab owns this session (survives reload)

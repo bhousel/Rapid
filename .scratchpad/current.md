@@ -35,8 +35,12 @@ restores deleted children); conflict choices are `'local'`/`'remote'`; `SaveMode
 the arguments the uploader emits (the screen never opened before); the download link exists; Escape and
 leaving save mode cancel the conflict screen. Checked in headless Chromium with faked upload and fetch.
 Finding 8 fixed: `sendChangeset` reports every failure, the upload timeout is 5 minutes, and an
-upload with no answer checks the changeset's `changes_count` (`loadChangesetAsync`). Next: finding 9
-(the backup is gone during a save). Default choice stays "Use theirs" (decided; reason in the design doc).
+upload with no answer checks the changeset's `changes_count` (`loadChangesetAsync`). Finding 9 fixed:
+the session is kept until the upload succeeds, marked while uploading (`markUploadAsync`, via
+`sendChangeset`'s `beforeUpload`), and the next tab settles interrupted uploads in `EditSystem.startAsync`
+(`_settleUploadsAsync`). Default choice stays "Use theirs" (decided; reason in the design doc).
+Left from the audit: the "moved by both" false conflict; a new changeset when the old one was closed.
+Testing tip: a fake `sendChangeset` must call its `beforeUpload` argument, or the mark is never written.
 
 ## Active: matching third-party data against OSM (`ConflationSystem`)
 Top priority. Design: [`design/conflation-system.md`](../design/conflation-system.md), currently proposed and

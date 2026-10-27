@@ -103,7 +103,7 @@ describe('UploaderSystem', () => {
         editor:  _editor,
         l10n:    { t: (stringID) => stringID, displayName: () => '', displayType: () => 'Point', initAsync: () => Promise.resolve() },
         spatial: new Rapid.SpatialSystem(_context),
-        storage: new Rapid.MockSystem(_context)
+        storage: new Rapid.StorageSystem(_context)
       };
 
       _server = new Map();
@@ -119,10 +119,11 @@ describe('UploaderSystem', () => {
           _loads.push([...versions.keys()]);
           return Promise.resolve([...versions.keys()].map(id => _server.get(id)).filter(Boolean));
         },
-        sendChangeset: (changeset, changes, callback) => {
+        sendChangeset: (changeset, changes, callback, beforeUpload) => {
           _uploads.push(changes);
           const err = _responses.shift() ?? null;
-          setTimeout(() => callback(err, changeset), 0);
+          Promise.resolve(beforeUpload?.(changeset))
+            .then(() => setTimeout(() => callback(err, changeset), 0));
         }
       };
 
@@ -309,6 +310,51 @@ describe('UploaderSystem', () => {
       assert.strictEqual(name, 'resultErrors');
       assert.strictEqual(args[0][0].msg, 'save.upload_unknown');
       assert.deepEqual(args[0][0].details, ['https://example.com/changeset/1', 'Failed to fetch']);
+    });
+
+    describe('the session backup', () => {
+      let _calls;
+
+      beforeEach(() => {
+        _calls = [];
+        _context.services.osm.apiroot = 'https://api.example.com';
+        _editor.markUploadAsync = (changesetID, apiURL) => { _calls.push(['mark', changesetID, apiURL]); return Promise.resolve(); };
+        _editor.clearUploadMarkAsync = () => { _calls.push(['unmark']); return Promise.resolve(); };
+        _editor.clearBackup = () => { _calls.push(['clear']); };
+
+        _editor.merge([ node('n1', 1, { name: 'A' }) ]);
+        _editor.perform(Rapid.actionChangeTags('n1', { name: 'B' }));
+        _editor.commit({ stringID: 'changed the name' });
+      });
+
+      it('is marked before uploading, and deleted once the upload succeeds', async () => {
+        const result = resultAsync();
+        _uploader.save();
+        const { name } = await result;
+
+        assert.strictEqual(name, 'resultSuccess');
+        assert.deepEqual(_calls, [['mark', '1', 'https://api.example.com'], ['clear']]);
+      });
+
+      it('is unmarked but kept when the upload fails', async () => {
+        _responses.push({ status: -5, message: 'Failed to fetch' });
+
+        const result = resultAsync();
+        _uploader.save();
+        await result;
+
+        assert.deepEqual(_calls, [['mark', '1', 'https://api.example.com'], ['unmark']]);
+      });
+
+      it('stays marked when we can\'t tell whether the upload went through', async () => {
+        _responses.push({ status: -6, message: 'Failed to fetch' });
+
+        const result = resultAsync();
+        _uploader.save();
+        await result;
+
+        assert.deepEqual(_calls, [['mark', '1', 'https://api.example.com']]);
+      });
     });
   });
 
