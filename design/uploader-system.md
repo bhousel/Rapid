@@ -7,8 +7,8 @@ This system is older than the design docs. This doc started in October 2026 with
 conflict handling, which had been broken for a long time (see [The October 2026 audit](#the-october-2026-audit)).
 
 > **Status:** Conflicts work again: checking them, merging other mappers' changes, the conflict
-> screen, and retrying. Still open: upload errors that hang the save, and losing the backup while a
-> save is in progress (see [Rollout](#rollout)).
+> screen, and retrying. Upload errors end the save. Still open: losing the backup while a save is in
+> progress (see [Rollout](#rollout)).
 
 ## Words used here
 
@@ -77,6 +77,19 @@ When the user deleted something another mapper changed:
 (iD#2085). For a way the user deleted along with its nodes, that undid part of the deletion, so it no
 longer applies there.
 
+### When an upload gets no answer
+
+`OsmService.sendChangeset` creates a changeset, uploads to it, and closes it. Every failure reaches the
+uploader, so the save always ends. An HTTP error means the server answered, and an upload is all or
+nothing, so nothing was applied. With no answer (offline, the connection dropped, or the upload's
+5-minute timeout), the server may have applied it anyway. So `sendChangeset` asks the API for the
+changeset (`loadChangesetAsync`): if it has changes, the upload went through and the save succeeds;
+if not, the error says the changes weren't saved (status `-5`); if the API can't be reached either,
+the error says Rapid can't tell, and links to the changeset to check before uploading again (`-6`).
+
+The upload timeout is 5 minutes, not the `NetworkSystem` default of 30 s, because a large upload can
+take the server longer than that, and giving up early is what leaves us not knowing.
+
 ## The October 2026 audit
 
 Prompted by iD#7199 ("Endless conflict check loop", open since 2020), Rapid#1361, #1366 and #1480, and
@@ -95,7 +108,7 @@ conflict path had no tests, so each bug stayed hidden behind the one before it.
 | — | The conflict screen never opened at all: `SaveMode._resultConflicts` took `(conflicts, origChanges)`, but the uploader emits `(changeset, conflicts, origChanges)`. Broken since at least June 2023. | Fixed |
 | — | The "download osmChange file" link on the conflict screen was never created (`selectAll().append()` on nothing). iD has the same bug, which is why users had to dig the file out with the browser inspector. | Fixed |
 | — | Escape on the conflict screen went to save mode's own Escape, leaving the merges in `staging` and a stale conflict screen. | Fixed: Escape cancels the conflict screen; leaving save mode cancels it too |
-| 8 | Upload errors that aren't HTTP errors (offline, the 30 s default timeout) are swallowed by `sendChangeset`, and the save never finishes. A large upload can be cut off by that timeout while the server still applies it. | Open |
+| 8 | Upload errors that aren't HTTP errors (offline, the 30 s default timeout) are swallowed by `sendChangeset`, and the save never finishes. A large upload can be cut off by that timeout while the server still applies it. | Fixed: every failure is reported, and with no answer the changeset is checked (see [When an upload gets no answer](#when-an-upload-gets-no-answer)) |
 | 9 | The session backup is deleted before uploading (iD#5200), and backups are skipped in save mode, so a reload during a stalled save or the conflict screen loses the edits (Rapid#1480). | Open |
 | 10 | Results of an earlier attempt that arrive late could change a newer attempt's state. | Fixed: each `save()` is a numbered attempt |
 
@@ -114,8 +127,9 @@ Found along the way, not fixed:
 - **Reuse the versioned multi-fetch.** The conflict check and backup restore both use
   `OsmService.loadEntityVersionsAsync`, which rejects on real failures and works around
   openstreetmap-website#5005 (one missing version makes the whole request 404) by splitting the request.
-- **The default choice stays "Use theirs"** (`chosen: 'remote'`), as it was. A user clicking through
-  doesn't overwrite another mapper's work. iD's PR #12814 switches to "Keep mine"; see Open questions.
+- **The default choice stays "Use theirs"** (`chosen: 'remote'`), as it was. The first thing a user
+  wants to see is what the other mapper did, and "Use theirs" shows it on the map. A user clicking
+  through also doesn't overwrite another mapper's work. iD's PR #12814 switches to "Keep mine".
 - **A deletion the user keeps is uploaded against the remote version**, by updating the base copy
   (`EditSystem.updateBase`), like iD's PR does with its rebaser.
 
@@ -131,7 +145,6 @@ Found along the way, not fixed:
 
 ## Open questions
 
-- **Default choice:** keep "Use theirs", or switch to "Keep mine" as iD's PR does?
 - **A closed changeset** stops the save with the API's message. Should it open a new changeset and
   upload again instead?
 
@@ -142,7 +155,8 @@ Found along the way, not fixed:
    Checked in a headless Chromium against the real app, with the OSM service's upload and fetch faked:
    a tag conflict ("Keep mine" uploads the user's value at the server's version), and a local deletion
    ("Leave Deleted" deletes the server's version).
-3. **Upload errors** (finding 8): report every failure, and give the upload a longer timeout (or none).
+3. **Upload errors** (finding 8): report every failure, give the upload a 5-minute timeout, and check
+   the changeset when an upload gets no answer. ✅
 4. **Don't lose the edits during a save** (finding 9): keep the session until the upload succeeds, or
    save it again on conflicts and errors.
 5. **Later:** the "moved by both" false conflict; a new changeset when the old one was closed.

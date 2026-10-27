@@ -612,17 +612,45 @@ export class UploaderSystem extends AbstractSystem {
           this._didResultInErrors();
         }
       } else {
-        const l10n = this.context.systems.l10n!;
-        this._errors.push({
-          msg: err.message || err.responseText,
-          details: [ l10n.t('save.status_code', { code: err.status }) ]
-        });
+        this._errors.push(this._describeUploadError(err));
         this._didResultInErrors();
       }
 
     } else {
       this._didResultInSuccess();
     }
+  }
+
+
+  /**
+   * Describe a failed upload for the error screen.
+   * `OsmService.sendChangeset` uses status `-5` when the upload got no answer and wasn't applied,
+   * and `-6` when we can't tell whether it was.
+   * @param err - The error from the upload
+   * @return The error message, with details
+   */
+  protected _describeUploadError(err: any): { msg: string, details: string[] } {
+    const context = this.context;
+    const l10n = context.systems.l10n!;
+    const osm = context.services.osm;
+
+    if (err.status === -5) {
+      return { msg: l10n.t('save.upload_failed'), details: [ err.message ].filter(Boolean) };
+    }
+    if (err.status === -6) {
+      const changesetID = this.changeset?.id;
+      return {
+        msg: l10n.t('save.upload_unknown'),
+        details: [ changesetID && osm ? osm.changesetURL(changesetID) : '', err.message ].filter(Boolean)
+      };
+    }
+    if (typeof err.status !== 'number') {   // never got an answer, e.g. offline
+      return { msg: l10n.t('save.unknown_error_details'), details: [ err.message ].filter(Boolean) };
+    }
+    return {
+      msg: err.message || err.responseText,
+      details: [ l10n.t('save.status_code', { code: err.status }) ]
+    };
   }
 
 

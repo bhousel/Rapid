@@ -34,8 +34,9 @@ merges stay in `staging` and are committed before uploading; 409 retries are lim
 restores deleted children); conflict choices are `'local'`/`'remote'`; `SaveMode._resultConflicts` takes
 the arguments the uploader emits (the screen never opened before); the download link exists; Escape and
 leaving save mode cancel the conflict screen. Checked in headless Chromium with faked upload and fetch.
-Next: finding 8 (upload errors and the 30 s timeout hang the save) and 9 (the backup is gone during a
-save). Open question for Bryan: default choice "Use theirs" vs "Keep mine" (iD's PR switches).
+Finding 8 fixed: `sendChangeset` reports every failure, the upload timeout is 5 minutes, and an
+upload with no answer checks the changeset's `changes_count` (`loadChangesetAsync`). Next: finding 9
+(the backup is gone during a save). Default choice stays "Use theirs" (decided; reason in the design doc).
 
 ## Active: matching third-party data against OSM (`ConflationSystem`)
 Top priority. Design: [`design/conflation-system.md`](../design/conflation-system.md), currently proposed and

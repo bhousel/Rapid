@@ -1108,6 +1108,8 @@ en:
     error: Errors occurred while trying to save
     status_code: "Server returned status code {code}"
     unknown_error_details: "Please ensure you are connected to the internet."
+    upload_failed: "The connection to OpenStreetMap was lost while uploading, and your changes weren't saved there. They're still here, so you can try again."
+    upload_unknown: "The connection to OpenStreetMap was lost while uploading, and Rapid can't tell whether your changes were saved there. Check your changeset on OpenStreetMap before uploading again, so your changes aren't uploaded twice."
     uploading: Uploading changes to OpenStreetMap...
     conflict_progress: "Checking for conflicts: {num} of {total}"
     unsaved_changes: You have unsaved changes

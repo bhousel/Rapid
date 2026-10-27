@@ -1,6 +1,7 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, it, mock } from 'bun:test';
 import { promisify } from 'bun:util';
 import { assert } from 'chai';
+import { DOMImplementation, XMLSerializer } from '@xmldom/xmldom';
 import fetchMock from 'fetch-mock';
 import * as Rapid from '../../../modules/headless.js';
 import * as sample from './OsmService.sample.js';
@@ -889,6 +890,85 @@ describe('OsmService', () => {
             assert.strictEqual(results[0].type, 'changeset');
             assert.strictEqual(results[0].id, 'c1');
           });
+      });
+    });
+
+
+    describe('sendChangeset', () => {
+      const changes = { created: [], modified: [], deleted: [] };
+      const sendAsync = () => new Promise(resolve => {
+        const changeset = new Rapid.OsmChangeset(context, { tags: { comment: 'test' } });
+        _osm.sendChangeset(changeset, changes, (err, updated) => resolve({ err, updated }));
+      });
+      const changesetJSON = (count) => ({ version: '0.6', changeset: { id: 123, open: true, changes_count: count, tags: {} } });
+
+      // Unit tests have no DOM, and JXON needs one to write the changeset XML.
+      let _document, _XMLSerializer;
+      beforeAll(() => {
+        _document = globalThis.document;
+        _XMLSerializer = globalThis.XMLSerializer;
+        globalThis.document = { implementation: new DOMImplementation() };
+        globalThis.XMLSerializer = XMLSerializer;
+      });
+      afterAll(() => {
+        globalThis.document = _document;
+        globalThis.XMLSerializer = _XMLSerializer;
+      });
+
+      beforeEach(() => {
+        fetchMock.route(/changeset\/create/, { body: '123', headers: { 'Content-Type': 'text/plain' } });
+        fetchMock.route(/changeset\/123\/close/, 200);
+      });
+
+      it('reports an error the server answers with', () => {
+        fetchMock.route(/changeset\/123\/upload/, 409);
+
+        return loginAsync()
+          .then(() => sendAsync())
+          .then(({ err }) => {
+            assert.strictEqual(err.status, 409);
+            const checks = fetchMock.callHistory.calls().filter(c => /changeset\/123\.json/.test(c.url));
+            assert.lengthOf(checks, 0);   // no need to ask whether it went through
+          });
+      });
+
+      it('reports a lost connection while creating the changeset', () => {
+        fetchMock.removeRoutes();
+        fetchMock.route(/changeset\/create/, { throws: new TypeError('Failed to fetch') });
+
+        return loginAsync()
+          .then(() => sendAsync())
+          .then(({ err }) => assert.strictEqual(err.message, 'Failed to fetch'));
+      });
+
+      it('succeeds if the upload got no answer, but the changeset has the changes', () => {
+        fetchMock.route(/changeset\/123\/upload/, { throws: new TypeError('Failed to fetch') });
+        fetchMock.route(/changeset\/123\.json/, changesetJSON(2));
+
+        return loginAsync()
+          .then(() => sendAsync())
+          .then(({ err, updated }) => {
+            assert.isNull(err);
+            assert.strictEqual(updated.id, '123');
+          });
+      });
+
+      it('reports status -5 if the upload got no answer, and the changeset has no changes', () => {
+        fetchMock.route(/changeset\/123\/upload/, { throws: new TypeError('Failed to fetch') });
+        fetchMock.route(/changeset\/123\.json/, changesetJSON(0));
+
+        return loginAsync()
+          .then(() => sendAsync())
+          .then(({ err }) => assert.strictEqual(err.status, -5));
+      });
+
+      it('reports status -6 if the upload got no answer, and the changeset can\'t be checked', () => {
+        fetchMock.route(/changeset\/123\/upload/, { throws: new TypeError('Failed to fetch') });
+        fetchMock.route(/changeset\/123\.json/, { throws: new TypeError('Failed to fetch') });
+
+        return loginAsync()
+          .then(() => sendAsync())
+          .then(({ err }) => assert.strictEqual(err.status, -6));
       });
     });
 

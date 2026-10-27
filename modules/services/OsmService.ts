@@ -11,7 +11,7 @@ import type { EntityType } from '../data/types.ts';
 import type { FetchEnvelope } from '../util/fetch_response.ts';
 import type { MarkerProps } from '../data/MarkerData.ts';
 import type { OsmChangeset, OsmChanges } from '../data/OsmChangeset.ts';
-import type { ParserDataType, ParserOptions, ParserResult, ParsedApi, ParsedData, ParsedPolicy } from '../data/parsers/types.ts';
+import type { ParserDataType, ParserOptions, ParserResult, ParsedApi, ParsedChangeset, ParsedData, ParsedPolicy } from '../data/parsers/types.ts';
 import type { Tile, Vec2, Vec3 } from '@rapid-sdk/math';
 
 
@@ -42,6 +42,12 @@ function encodePreferenceKey(key: string): string {
 function decodePreferenceKey(key: string): string {
   return key.startsWith('rapid~settings') ? key.replace(/~/g, '.') : key;
 }
+
+/**
+ * How long (ms) to wait for a changeset upload. A large upload can take the server longer than
+ * NetworkSystem's default 30 s, and giving up early leaves us not knowing whether it went through.
+ */
+const UPLOAD_TIMEOUT = 5 * 60 * 1000;
 
 
 /** Properties specific to OSM note markers */
@@ -1406,13 +1412,7 @@ export class OsmService extends AbstractSystem {
       mainThread: true
     })
       .then((result: any) => errback(null, result))
-      .catch((err: any) => {
-        if (err.name === 'AbortError') return;  // ok
-        if (err.name === 'FetchError') {
-          errback(err);
-          return;
-        }
-      });
+      .catch((err: any) => errback(err));   // the save is waiting on us, so report every failure
   }
 
 
@@ -1456,16 +1456,11 @@ export class OsmService extends AbstractSystem {
       method: 'POST',
       headers: { 'Content-Type': 'text/xml' },
       body: JXON.stringify(changeset.osmChangeJXON(changes)),
-      mainThread: true
+      mainThread: true,
+      timeout: UPLOAD_TIMEOUT
     })
       .then((result: any) => errback(null, result))
-      .catch((err: any) => {
-        if (err.name === 'AbortError') return;  // ok
-        if (err.name === 'FetchError') {
-          errback(err);
-          return;
-        }
-      });
+      .catch((err: any) => errback(err));   // the save is waiting on us, so report every failure
   }
 
 
@@ -1503,13 +1498,7 @@ export class OsmService extends AbstractSystem {
     // and the xmldom parser will raise a "missing root element" error on the empty document.
     network.fetchRaw(resource, { requestID, method: 'PUT' })
       .then((result: any) => errback(null, result))
-      .catch((err: any) => {
-        if (err.name === 'AbortError') return;  // ok
-        if (err.name === 'FetchError') {
-          errback(err);
-          return;
-        }
-      });
+      .catch((err: any) => errback(err));
   }
 
 
@@ -1518,6 +1507,11 @@ export class OsmService extends AbstractSystem {
    * PUT /api/0.6/changeset/create
    * POST /api/0.6/changeset/#id/upload
    * PUT /api/0.6/changeset/#id/close
+   * If the upload gets no answer (the connection was lost, or it timed out), the server may have
+   * applied it anyway. Uploads are all or nothing, so this asks the API how many changes the
+   * changeset has. Then the callback gets either success, or an error with status:
+   * - `-5` if the changeset has no changes, so the upload wasn't applied
+   * - `-6` if the API couldn't be asked either, so we can't tell
    * @param  changeset - the changeset to send
    * @param  changes - the entity changes to upload
    * @param  callback - errback-style callback called when the full send cycle completes
@@ -1525,27 +1519,71 @@ export class OsmService extends AbstractSystem {
   public sendChangeset(changeset: OsmChangeset, changes: OsmChanges, callback: Errback): void {
     const cid = this._connectionID;
 
+    const uploaded = (): void => {
+      // Upload was successful, it is safe to call the callback.
+      // Add delay to allow for postgres replication iD#1646 iD#2678
+      globalThis.setTimeout(() => {
+        this._changeset.openChangesetID = null;
+        callback(null, changeset);
+      }, 2500);
+
+      // Closing the changeset is optional, and we won't get a result.
+      // Only try to close the changeset if we're still talking to the same server.
+      if (this._connectionID === cid) {
+        this.closeChangeset(changeset, () => {});
+      }
+    };
+
     this.createChangeset(changeset, (err: any, updated: OsmChangeset) => {
       changeset = updated;
       if (err) { return callback(err, changeset); }
 
       this.uploadChangeset(changeset, changes, (err: any, updated: OsmChangeset) => {
         changeset = updated;
-        if (err) { return callback(err, changeset); }
+        if (!err) { return uploaded(); }
 
-        // Upload was successful, it is safe to call the callback.
-        // Add delay to allow for postgres replication iD#1646 iD#2678
-        globalThis.setTimeout(() => {
-          this._changeset.openChangesetID = null;
-          callback(null, changeset);
-        }, 2500);
+        // The server answered (or we never sent it), so we know the upload wasn't applied.
+        if (typeof err.status === 'number') { return callback(err, changeset); }
 
-        // Closing the changeset is optional, and we won't get a result.
-        // Only try to close the changeset if we're still talking to the same server.
-        if (this._connectionID === cid) {
-          this.closeChangeset(changeset, () => {});
+        // The user switched connection, so we can't ask the server that got the upload.
+        if (this._connectionID !== cid) {
+          return callback({ message: 'Connection Switched', status: -1 }, changeset);
         }
+
+        this.loadChangesetAsync(changeset.id)
+          .then(result => {
+            if (Number(result.changes_count) > 0) {
+              uploaded();
+            } else {
+              callback({ message: err.message, status: -5 }, changeset);
+            }
+          })
+          .catch(() => callback({ message: err.message, status: -6 }, changeset));
       });
+    });
+  }
+
+
+  /**
+   * Load a changeset's metadata, e.g. to see how many changes it has.
+   * GET /api/0.6/changeset/#id
+   * @param  changesetID - the changeset to load
+   * @return Promise resolved with the parsed changeset
+   */
+  public loadChangesetAsync(changesetID: string): Promise<ParsedChangeset> {
+    return new Promise((resolve, reject) => {
+      const errback = (err: any, results?: ParserResult): void => {
+        const changeset = results?.data.find(d => d.type === 'changeset') as ParsedChangeset | undefined;
+        if (changeset) {
+          resolve(changeset);
+        } else {
+          reject(err ?? new Error(`Changeset ${changesetID} not found`));
+        }
+      };
+
+      const options = { skipSeen: false, filter: new Set<ParserDataType>(['changeset']) };
+      const json = (this.preferJSON ? '.json' : '');
+      this.loadFromAPI(`/api/0.6/changeset/${changesetID}${json}`, errback, options);
     });
   }
 

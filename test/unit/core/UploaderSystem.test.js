@@ -113,6 +113,7 @@ describe('UploaderSystem', () => {
       _context.services.osm = {
         authenticated: () => true,
         authenticate: (callback) => callback(),
+        changesetURL: (changesetID) => `https://example.com/changeset/${changesetID}`,
         userURL: (user) => `https://example.com/user/${user}`,
         loadEntityVersionsAsync: (versions) => {
           _loads.push([...versions.keys()]);
@@ -293,6 +294,21 @@ describe('UploaderSystem', () => {
       assert.strictEqual(args[0][0].msg, closed);
       assert.lengthOf(_uploads, 1);
       assert.lengthOf(_loads, 0);
+    });
+
+    it('says when it can\'t tell whether a lost upload went through, with a link to the changeset', async () => {
+      _editor.merge([ node('n1', 1, { name: 'A' }) ]);
+      _editor.perform(Rapid.actionChangeTags('n1', { name: 'B' }));
+      _editor.commit({ stringID: 'changed the name' });
+      _responses.push({ status: -6, message: 'Failed to fetch' });
+
+      const result = resultAsync();
+      _uploader.save();
+      const { name, args } = await result;
+
+      assert.strictEqual(name, 'resultErrors');
+      assert.strictEqual(args[0][0].msg, 'save.upload_unknown');
+      assert.deepEqual(args[0][0].details, ['https://example.com/changeset/1', 'Failed to fetch']);
     });
   });
 
