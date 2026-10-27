@@ -97,7 +97,7 @@ export class UiSourceSwitch {
     if (context.mode?.id === 'save') return;
     if (!Array.isArray(keys) || keys.length !== 2) return;
 
-    if (editor.hasChanges() && !window.confirm(l10n.t('source_switch.lose_changes'))) return;
+    if (editor.hasWork() && !window.confirm(l10n.t('source_switch.lose_changes'))) return;
 
     this._isLive = !this._isLive;
 

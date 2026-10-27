@@ -388,8 +388,8 @@ describe('RapidSystem', () => {
 
     describe('actedRanges', () => {
       // Replays an edit history the way `EditSystem` reports it after an edit.
-      function replay(annotations) {
-        context.systems.editor = { history: [{}, ...annotations.map(a => ({ annotation: a }))], index: annotations.length };
+      function replay(editProps) {
+        context.systems.editor = { history: [{ props: {} }, ...editProps.map(props => ({ props }))], index: editProps.length };
         _rapid._stablechange();
         delete context.systems.editor;
       }

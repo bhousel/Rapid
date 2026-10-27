@@ -39,14 +39,7 @@ export class UiUndoRedoTool {
     // Create child components
     this.Tooltip = new UiTooltip(context)
       .title((d: any) => {
-        // Handle string- or object-style annotations. Object-style
-        // should include "type" and "description" keys, where
-        // "description" is used in place of a string-style annotation.
-        // See ui/UiRapidInspector.js for the motivating use case.
-        let str = d.annotation();
-        if (str?.description) {
-          str = str.description;
-        }
+        const str = d.label();
         return str ? l10n.t(`${d.id}.tooltip`, { action: str }) : l10n.t(`${d.id}.nothing`);
       })
       .shortcut((d: any) => d.key);
@@ -56,13 +49,13 @@ export class UiUndoRedoTool {
       id: 'undo',
       key: utilCmd('⌘Z'),
       action: () => editor.undo(),
-      annotation: () => editor.getUndoAnnotation(),
+      label: () => editor.getUndoEdit()?.label,
       getIcon: () => (l10n.isRTL ? 'redo' : 'undo')
     }, {
       id: 'redo',
       key: utilCmd('⌘⇧Z'),
       action: () => editor.redo(),
-      annotation: () => editor.getRedoAnnotation(),
+      label: () => editor.getRedoEdit()?.label,
       getIcon: () => (l10n.isRTL ? 'undo' : 'redo')
     }];
 
@@ -145,7 +138,7 @@ export class UiUndoRedoTool {
 
         // set class
         $selection
-          .classed('disabled', !context.editable() || !d.annotation());
+          .classed('disabled', !context.editable() || !d.label());
 
         // set icon
         const icon = '#rapid-icon-' + d.getIcon();
@@ -170,8 +163,7 @@ export class UiUndoRedoTool {
     if (!d) return;
 
     const context = this.context;
-    const annotation = d.annotation();
-    if (context.editable() && annotation) {
+    if (context.editable() && d.label()) {
       d.action();
     }
   }

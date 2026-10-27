@@ -4,6 +4,7 @@ import { AbstractOperation } from './AbstractOperation.ts';
 import { utilCmd } from '../util/cmd.ts';
 
 import type { Context } from '../Context.ts';
+import type { EditLabel } from '../lib/Edit.ts';
 import type { Graph } from '../lib/Graph.ts';
 import type { OsmTags } from '../data/types.ts';
 
@@ -65,9 +66,9 @@ export class DowngradeOperation extends AbstractOperation {
       return graph;
     };
 
-    const annotation = this.annotation();
+    const label = this.editLabel();
     editor.perform(combinedAction);
-    editor.commit({ annotation: annotation, selectedIDs: this.selectedIDs });
+    editor.commit({ ...label, selectedIDs: this.selectedIDs });
 
     // refresh the select mode to enable the delete operation
     this.context.enter('select-osm', { selection: { osm: this.selectedIDs }} );
@@ -105,11 +106,9 @@ export class DowngradeOperation extends AbstractOperation {
   }
 
 
-  public annotation(): string {
-    const l10n = this.context.systems.l10n!;
-
+  public editLabel(): EditLabel {
     const suffix = this._downgradeType === 'building_address' ? 'generic' : this._downgradeType;
-    return l10n.t(`operations.downgrade.annotation.${suffix}`, { n: this._affectedFeatureCount });
+    return { stringID: `operations.downgrade.annotation.${suffix}`, stringParams: { n: this._affectedFeatureCount } };
   }
 
 

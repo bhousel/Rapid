@@ -8,6 +8,7 @@ import { AbstractOperation } from './AbstractOperation.ts';
 import type { Action } from '../actions/types.ts';
 import type { JoinAction } from '../actions/join.ts';
 import type { Context } from '../Context.ts';
+import type { EditLabel } from '../lib/Edit.ts';
 
 
 /**
@@ -44,9 +45,9 @@ export class MergeOperation extends AbstractOperation {
 
     if (this.disabled()) return;
 
-    const annotation = this.annotation();
+    const label = this.editLabel();
     editor.perform(this._action);
-    editor.commit({ annotation: annotation, selectedIDs: this.selectedIDs });
+    editor.commit({ ...label, selectedIDs: this.selectedIDs });
 
     const graph = editor.staging.graph;  // after edit
     let successorIDs = this.selectedIDs.filter(entityID => graph.hasEntity(entityID));
@@ -106,9 +107,8 @@ export class MergeOperation extends AbstractOperation {
   }
 
 
-  public annotation(): string {
-    const l10n = this.context.systems.l10n!;
-    return l10n.t('operations.merge.annotation', { n: this.selectedIDs.length });
+  public editLabel(): EditLabel {
+    return { stringID: 'operations.merge.annotation', stringParams: { n: this.selectedIDs.length } };
   }
 
 

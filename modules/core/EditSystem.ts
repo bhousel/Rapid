@@ -10,6 +10,7 @@ import { utilArrayGroupBy, utilObjectOmit } from '@rapid-sdk/util';
 import type { Context } from '../Context.ts';
 import type { Action } from '../actions/types.ts';
 import type { DatabaseSystem } from './DatabaseSystem.ts';
+import type { EditProps, EditSources } from '../lib/Edit.ts';
 import type { OsmEntityProps, OsmNode, OsmRelation, OsmTags, OsmWay, Segment } from '../data/types.ts';
 import type { SpatialItem } from './SpatialSystem.ts';
 import type { TransformProps, Vec2 } from '@rapid-sdk/math';
@@ -23,26 +24,6 @@ const SESSION_HEARTBEAT_MS = 20000;
  */
 const SESSION_LIVE_MS = 60000;
 
-
-/** Options for commit/commitAppend */
-export interface CommitOptions {
-  /** Annotation describing the edit */
-  annotation?: string | Record<string, unknown>;
-  /** IDs of selected entities */
-  selectedIDs?: EntityID[];
-}
-
-/** Sources used during editing */
-export interface EditSources {
-  /** Imagery sources used */
-  imagery?: string[];
-  /** Photo sources used */
-  photos?: string[];
-  /** Data sources used */
-  data?: string[];
-  /** Index signature for compatibility with Record<string, unknown> */
-  [key: string]: unknown;
-}
 
 /** Saved checkpoint state */
 interface Checkpoint {
@@ -167,12 +148,15 @@ interface EntityCopy {
  *   and what they look like before any edits have occurred.
  * As more map is loaded, more map features get merged into the Base Graph.
  *
- * Each entry in the history stack is an `Edit`.  An Edit may contain:
- *  - `annotation`  - undo/redo annotation, a String saying what the Edit did. e.g. "Started a Line".
- *  - `graph`       - Graph at the time of the Edit
- *  - `selectedIDs` - ids that the user had selected at the time (assumed to be OSM)
- *  - `sources`     - sources being used to make the Edit (imagery, photos, data)
- *  - `transform`   - map transform at the time of the Edit
+ * Each entry in the history stack is an `Edit`.  An Edit contains:
+ *  - `graph` - Graph at the time of the Edit
+ *  - `props` - plain JSON describing the Edit (see `EditProps`), which may include:
+ *    - `type`        - what kind of edit it is, for edits that aren't classic OSM edits
+ *    - `stringID`    - undo/redo label, translated when shown. e.g. "Started a Line".
+ *    - `selectedIDs` - ids that the user had selected at the time (assumed to be OSM)
+ *    - `sources`     - sources being used to make the Edit (imagery, photos, data)
+ *    - `transform`   - map transform at the time of the Edit
+ *    - other props of the system that made the Edit (e.g. which feature the user ignored)
  *
  * Special named Edits:
  *  - `base` - The initial Edit, `history[0]`.
@@ -197,7 +181,7 @@ interface EntityCopy {
  * - `revert()` - This reverts all work in progress by replacing `staging` with a fresh copy of `stable`.
  * - `commit(options)` - This accepts the `staging` work-in-progress edit by adding
  *      it to the end of the history (removing any forward redo history, if any)
- *      Commit accepts an `annotation` (e.g. "Started a line") to say what the edit does.
+ *      Commit accepts the Edit's props, including a `stringID` (e.g. "Started a line") to say what the edit does.
  * - `commitAppend(options)` - This is just like `commit` but instead of
  *      adding `staging` after `stable`, `staging` replaces `stable`.
  * - `undo()` - Move the `stable` index back to the previous Edit (or `_index = 0`).
@@ -343,7 +327,7 @@ export class EditSystem extends AbstractSystem {
         // (IndexedDB writes are async and may not complete during unload, but the debounced
         //  writes during editing mean the last write is usually already persisted.)
         window.addEventListener('beforeunload', (e: BeforeUnloadEvent) => {
-          if (this._history.length > 1) {  // user did something
+          if (this.hasWork()) {  // user did something worth keeping
             e.preventDefault();
             this.immediateBackup();
             return (e.returnValue = '');  // show browser prompt
@@ -407,13 +391,13 @@ export class EditSystem extends AbstractSystem {
 
     // Create a new Base Graph / Base Edit.
     const baseGraph = new Graph(this.context);
-    const base = new Edit({ graph: baseGraph });
+    const base = new Edit(this.context, baseGraph);
     this._history = [ base ];
     this._index = 0;
 
     // Create a work-in-progress Edit derived from the base edit.
     const currGraph = new Graph(baseGraph);
-    const staging = new Edit({ graph: currGraph });
+    const staging = new Edit(this.context, currGraph);
     this._staging = staging;
     this._hasWorkInProgress = false;
 
@@ -439,7 +423,7 @@ export class EditSystem extends AbstractSystem {
 
   /**
    * The `base` edit is the initial edit in the history.  It contains the Base Graph.
-   * It will not contain any actual user edits, sources, annotation.
+   * It will not contain any actual user edits, sources, label.
    * @return The initial Edit containing the Base Graph
    */
   public get base(): Edit {
@@ -586,7 +570,7 @@ export class EditSystem extends AbstractSystem {
   /**
    * This finalizes the `staging` work-in-progress edit.
    * (It's somewhat like what `git commit` does.)
-   *  - Set annotation, sources, and other edit metadata properties
+   *  - Set the label, sources, and other edit props
    *  - Add the `staging` edit to the end of the history (at this point `staging` becomes `stable`)
    *  - Finally, create a new empty `staging` work-in-progress Edit
    *
@@ -606,25 +590,16 @@ export class EditSystem extends AbstractSystem {
    *                                            \-->  EditN1
    *                                                 `staging` (WIP after EditN0)
    * ```
-   * @param options - Optional `Object` of options passed
-   * @param options.annotation - A String saying what the Edit did. e.g. "Started a Line".
-   *   Note that Rapid edits pass an Object as the annotation including more info about the edit.
-   * @param options.selectedIDs - Array of selectedIDs
+   * @param props - Props describing the Edit, e.g. its `stringID` saying what it did ("Started a Line"),
+   *   and `selectedIDs`. Edits that aren't classic OSM edits also pass a `type` and their own props.
    */
-  public commit(options: CommitOptions = {}): void {
+  public commit<P extends EditProps = EditProps>(props?: P): void {
     this._interruptTransition();    // complete any transition already in progress
 
-    const context = this.context;
-    const staging = this.staging;
-
-    const annotation = options.annotation ?? '';
-    staging.annotation  = annotation as string;
-    staging.selectedIDs = options.selectedIDs ?? [];
-    staging.sources     = this._gatherSources(annotation);
-    staging.transform   = context.viewport.transform.props;
+    const edit = this._finishStaging(props);
 
     // Discard forward/redo history if any, and add `staging` after `stable`
-    this._history.splice(this._index + 1, Infinity, staging);
+    this._history.splice(this._index + 1, Infinity, edit);
     this._index++;
     // (At this point `stable` === `staging`)
 
@@ -637,7 +612,7 @@ export class EditSystem extends AbstractSystem {
    * This is like `commit`, but instead of adding `staging` after stable,
    *   it replaces `stable` with `staging` and does not advance the history.
    * (It's somewhat like what `git commit --append` does.)
-   *  - Set annotation, sources, and other edit metadata properties
+   *  - Set the label, sources, and other edit props
    *  - Replace the `stable` edit with the `staging` edit (at this point `staging` becomes `stable`)
    *  - Finally, create a new empty `staging` work-in-progress Edit
    *
@@ -659,30 +634,20 @@ export class EditSystem extends AbstractSystem {
    *                                  \-->  EditN1
    *                                       `staging` (WIP after EditN0)
    * ```
-   * @param options - Optional `Object` of options passed
-   * @param options.annotation - A String saying what the Edit did. e.g. "Started a Line".
-   *   Note that Rapid edits pass an Object as the annotation including more info about the edit.
-   * @param options.selectedIDs - Array of selectedIDs
+   * @param props - Props describing the Edit, as for `commit()`
    * @throws Will throw if you try to append to the `base` edit
    */
-  public commitAppend(options: CommitOptions = {}): void {
+  public commitAppend<P extends EditProps = EditProps>(props?: P): void {
     this._interruptTransition();    // complete any transition already in progress
-
-    const context = this.context;
-    const staging = this.staging;
 
     if (this._index === 0) {
       throw new Error(`Can not commitAppend to the base edit!`);
     }
 
-    const annotation = options.annotation ?? '';
-    staging.annotation  = annotation as string;
-    staging.selectedIDs = options.selectedIDs ?? [];
-    staging.sources     = this._gatherSources(annotation);
-    staging.transform   = context.viewport.transform.props;
+    const edit = this._finishStaging(props);
 
     // Discard forward/redo history if any, and replace `stable` with `staging`.
-    this._history.splice(this._index, Infinity, staging);
+    this._history.splice(this._index, Infinity, edit);
     // (At this point `stable` === `staging`)
 
     this._replaceStaging();
@@ -926,28 +891,28 @@ export class EditSystem extends AbstractSystem {
 
 
   /**
-   * Finds the annotation describing the edit that would be undone next.
-   * @return The previous undo annotation, or `undefined` if none
+   * Finds the edit that would be undone next, the latest kept edit with a label.
+   * @return The edit, or `undefined` if none
    */
-  public getUndoAnnotation(): string | undefined {
+  public getUndoEdit(): Edit | undefined {
     let i = this._index;
     while (i >= 0) {
       const edit = this._history[i];
-      if (edit.annotation) return edit.annotation;
+      if (edit.hasLabel) return edit;
       i--;
     }
   }
 
 
   /**
-   * Finds the annotation describing the edit that would be redone next.
-   * @return The next redo annotation, or `undefined` if none
+   * Finds the edit that would be redone next, the first edit after `stable` with a label.
+   * @return The edit, or `undefined` if none
    */
-  public getRedoAnnotation(): string | undefined {
+  public getRedoEdit(): Edit | undefined {
     let i = this._index + 1;
     while (i <= this._history.length - 1) {
       const edit = this._history[i];
-      if (edit.annotation) return edit.annotation;
+      if (edit.hasLabel) return edit;
       i++;
     }
   }
@@ -1056,6 +1021,24 @@ export class EditSystem extends AbstractSystem {
 
 
   /**
+   * Whether the user has done work they would hate to lose: the graph changed, or a kept edit
+   * has a `type` (e.g. ignoring a Rapid feature, which changes nothing in the graph).
+   * This decides whether to back up the history. Unlike `hasChanges()`, it isn't about uploading.
+   * @return `true` if there is work worth saving
+   */
+  public hasWork(): boolean {
+    if (this.hasChanges()) return true;
+
+    // Start at `1` - the `base` edit has no type..
+    // End at `_index` - don't continue into the redo part of the history..
+    for (let i = 1; i <= this._index; i++) {
+      if (this._history[i].props.type) return true;
+    }
+    return false;
+  }
+
+
+  /**
    * This prepares the list of all sources used during the user's editing session.
    * This is called by `commit.js` when preparing the changeset before uploading.
    * @return Object of all sources used during the user's editing session
@@ -1072,7 +1055,7 @@ export class EditSystem extends AbstractSystem {
     for (let i = 1; i <= this._index; i++) {
       const edit = this._history[i];
       for (const which of ['imagery', 'photos', 'data'] as const) {
-        for (const val of (edit.sources as EditSources)[which] ?? []) {
+        for (const val of edit.props.sources?.[which] ?? []) {
           result[which].add(val);
         }
       }
@@ -1184,7 +1167,7 @@ export class EditSystem extends AbstractSystem {
    * @return The structured backup object, or `undefined` if nothing to save
    */
   public toBackup(): BackupJSON | undefined {
-    if (!this.hasChanges()) return;
+    if (!this.hasWork()) return;
 
     const OSM_PRECISION = 7;
     const baseGraph = this.base.graph!;   // The initial unedited graph
@@ -1239,17 +1222,12 @@ export class EditSystem extends AbstractSystem {
         }
       }
 
-      const sources = (edit.sources ?? {}) as EditSources;
-
+      // The edit's props are plain JSON, saved as they are.
+      // (Before October 2026, items had `annotation`, `selectedIDs`, `transform` and `*Used` instead)
       const item: Record<string, unknown> = {};
-      if (modified.length)   item.modified = modified;
-      if (deleted.length)    item.deleted = deleted;
-      if (edit.annotation)   item.annotation = edit.annotation;
-      if (edit.selectedIDs)  item.selectedIDs = edit.selectedIDs;
-      if (edit.transform)    item.transform = edit.transform;
-      if (sources.imagery)   item.imageryUsed = sources.imagery;
-      if (sources.photos)    item.photosUsed = sources.photos;
-      if (sources.data)      item.dataUsed = sources.data;
+      if (modified.length)  item.modified = modified;
+      if (deleted.length)   item.deleted = deleted;
+      if (Object.keys(edit.props).length)  item.props = edit.props;
       historyData.push(item);
     }
 
@@ -1478,25 +1456,8 @@ export class EditSystem extends AbstractSystem {
         const graph = new Graph(prevGraph).load(entities);
         prevGraph = graph;
 
-        const sources: EditSources = {};
-        if (Array.isArray(item.imageryUsed))  sources.imagery = item.imageryUsed as string[];
-        if (Array.isArray(item.photosUsed))   sources.photos = item.photosUsed as string[];
-        if (Array.isArray(item.dataUsed))     sources.data = item.dataUsed as string[];
-
-        // Handle legacy transform scale parameter, if found
-        const transform = item.transform as (TransformProps & { k?: number });
-        if (transform?.k) {
-          transform.z = geoScaleToZoom(transform.k);
-          delete transform.k;
-        }
-
-        this._history.push(new Edit({
-          annotation:  item.annotation as string,
-          graph:       graph,
-          selectedIDs: item.selectedIDs as string[],
-          sources:     sources,
-          transform:   transform
-        }));
+        const props = (item.props ?? this._legacyEditProps(item)) as EditProps;
+        this._history.push(new Edit(context, graph, props));
       }
 
       this._index = backup.index;
@@ -2067,11 +2028,67 @@ export class EditSystem extends AbstractSystem {
 
 
   /**
+   * Finish the `staging` edit, so it can go into the history.
+   * @param props - Props describing the Edit, from the code that commits it
+   * @return A new Edit with the staging graph and the full props
+   */
+  protected _finishStaging<P extends EditProps>(props?: P): Edit<P> {
+    const context = this.context;
+
+    return new Edit<P>(context, this._staging.graph, {
+      ...props,
+      selectedIDs: props?.selectedIDs ?? [],
+      sources: this._gatherSources(props?.sources),
+      transform: context.viewport.transform.props
+    } as Partial<P>);
+  }
+
+
+  /**
+   * Convert a history item from a backup made before edits had props (before October 2026).
+   * Rapid edits stored an object annotation, its `type` and other keys become props.
+   * A label was already translated, so it's kept as the plain-text `annotation` prop.
+   * @param item - The history item from the backup
+   * @return Props for the Edit
+   */
+  protected _legacyEditProps(item: Record<string, unknown>): EditProps {
+    const props: EditProps & Record<string, unknown> = {};
+
+    const annotation = item.annotation;
+    if (typeof annotation === 'string') {
+      props.annotation = annotation;
+    } else if (annotation && typeof annotation === 'object') {
+      const { description, ...rest } = annotation as Record<string, unknown>;
+      Object.assign(props, rest);
+      if (typeof description === 'string') props.annotation = description;
+    }
+
+    if (Array.isArray(item.selectedIDs))  props.selectedIDs = item.selectedIDs as EntityID[];
+
+    const sources: EditSources = {};
+    if (Array.isArray(item.imageryUsed))  sources.imagery = item.imageryUsed as string[];
+    if (Array.isArray(item.photosUsed))   sources.photos = item.photosUsed as string[];
+    if (Array.isArray(item.dataUsed))     sources.data = item.dataUsed as string[];
+    props.sources = sources;
+
+    // Handle legacy transform scale parameter, if found
+    const transform = item.transform as (TransformProps & { k?: number }) | undefined;
+    if (transform?.k) {
+      transform.z = geoScaleToZoom(transform.k);
+      delete transform.k;
+    }
+    if (transform)  props.transform = transform;
+
+    return props;
+  }
+
+
+  /**
    * Get the sources used to make the `staging` edit.
-   * @param annotation - Rapid edits may optionally use an annotation that includes the data source used
+   * @param given - Sources passed by the code that commits the edit, e.g. the dataset of an accepted Rapid feature
    * @return sources Object containing `imagery`, `photos`, `data` properties
    */
-  protected _gatherSources(annotation: string | Record<string, unknown>): EditSources {
+  protected _gatherSources(given?: EditSources): EditSources {
     const context = this.context;
     const gfx = context.systems.gfx;
     const imagery = context.systems.imagery;
@@ -2093,14 +2110,13 @@ export class EditSystem extends AbstractSystem {
       }
     }
 
+    const dataUsed = [...(given?.data ?? [])];
     if (gfx?.scene) {
       const customLayer = gfx.scene.layers.get('custom-data') as any;
-      const customDataUsed = customLayer?.dataUsed() ?? [];
-      const rapidDataUsed = (annotation as Record<string, unknown>)?.dataUsed as string[] ?? [];
-      const dataUsed = [...rapidDataUsed, ...customDataUsed];
-      if (dataUsed.length) {
-        sources.data = dataUsed;
-      }
+      dataUsed.push(...(customLayer?.dataUsed() ?? []));
+    }
+    if (dataUsed.length) {
+      sources.data = dataUsed;
     }
 
     return sources;
@@ -2132,7 +2148,7 @@ export class EditSystem extends AbstractSystem {
    * Rolls back the edits and emits no events.
    */
   protected _replaceStaging(): void {
-    this._staging = new Edit({ graph: new Graph(this.stable.graph!) });
+    this._staging = new Edit(this.context, new Graph(this.stable.graph!));
     this._hasWorkInProgress = false;
   }
 

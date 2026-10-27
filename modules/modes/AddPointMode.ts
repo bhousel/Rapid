@@ -141,12 +141,11 @@ export class AddPointMode extends AbstractMode {
   protected _clickNothing(loc: Vec2): void {
     const context = this.context;
     const editor = context.systems.editor!;
-    const l10n = context.systems.l10n!;
 
     const node = new OsmNode(context, { loc: loc, tags: this.defaultTags });
 
     editor.perform(actionAddEntity(node));
-    editor.commit({ annotation: l10n.t('operations.add.annotation.point'), selectedIDs: [node.id] });
+    editor.commit({ stringID: 'operations.add.annotation.point', selectedIDs: [node.id] });
     context.enter('select-osm', { selection: { osm: [node.id] }, newFeature: true });
   }
 
@@ -159,11 +158,10 @@ export class AddPointMode extends AbstractMode {
   protected _clickWay(loc: Vec2, edge: [EntityID, EntityID]): void {
     const context = this.context;
     const editor = context.systems.editor!;
-    const l10n = context.systems.l10n!;
 
     const node = new OsmNode(context, { tags: this.defaultTags });
     editor.perform(actionAddMidpoint({ loc, edge } as Midpoint, node));
-    editor.commit({ annotation: l10n.t('operations.add.annotation.vertex'), selectedIDs: [node.id] });
+    editor.commit({ stringID: 'operations.add.annotation.vertex', selectedIDs: [node.id] });
     context.enter('select-osm', { selection: { osm: [node.id] }, newFeature: true });
   }
 
@@ -176,7 +174,6 @@ export class AddPointMode extends AbstractMode {
   protected _clickNode(_loc: Vec2, node: OsmNode): void {
     const context = this.context;
     const editor = context.systems.editor!;
-    const l10n = context.systems.l10n!;
 
     if (Object.keys(this.defaultTags).length === 0) {
       context.enter('select-osm', { selection: { osm: [node.id] }, newFeature: false });
@@ -189,7 +186,7 @@ export class AddPointMode extends AbstractMode {
     }
 
     editor.perform(actionChangeTags(node.id, tags));
-    editor.commit({ annotation: l10n.t('operations.add.annotation.point'), selectedIDs: [node.id] });
+    editor.commit({ stringID: 'operations.add.annotation.point', selectedIDs: [node.id] });
     context.enter('select-osm', { selection: { osm: [node.id] }, newFeature: false });
   }
 

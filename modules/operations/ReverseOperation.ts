@@ -4,6 +4,7 @@ import { AbstractOperation } from './AbstractOperation.ts';
 
 import type { ReverseAction } from '../actions/reverse.ts';
 import type { Context } from '../Context.ts';
+import type { EditLabel } from '../lib/Edit.ts';
 import type { Graph } from '../lib/Graph.ts';
 
 
@@ -53,9 +54,9 @@ export class ReverseOperation extends AbstractOperation {
       return graph;
     };
 
-    const annotation = this.annotation();
+    const label = this.editLabel();
     editor.perform(combinedAction);
-    editor.commit({ annotation: annotation, selectedIDs: this.selectedIDs });
+    editor.commit({ ...label, selectedIDs: this.selectedIDs });
   }
 
 
@@ -70,9 +71,8 @@ export class ReverseOperation extends AbstractOperation {
   }
 
 
-  public annotation(): string {
-    const l10n = this.context.systems.l10n!;
-    return l10n.t(`operations.reverse.annotation.${this._reverseType}`, { n: this._actions.length });
+  public editLabel(): EditLabel {
+    return { stringID: `operations.reverse.annotation.${this._reverseType}`, stringParams: { n: this._actions.length } };
   }
 
 

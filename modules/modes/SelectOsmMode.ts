@@ -177,7 +177,6 @@ export class SelectOsmMode extends AbstractMode {
     const filters = context.systems.filters!;
     const gfx = context.systems.gfx!;
     const hover = context.behaviors.hover!;
-    const l10n = context.systems.l10n!;
     const ui = context.systems.ui!;
     const urlhash = context.systems.urlhash!;
     const scene = gfx.scene!;
@@ -199,7 +198,7 @@ export class SelectOsmMode extends AbstractMode {
         // The user added this relation but didn't edit it at all, so just delete it
         editor.perform(actionDeleteRelation(entity.id, true, true));  // true = don't delete untagged members
         editor.commit({
-          annotation: l10n.t('operations.delete.annotation.relation'),
+          stringID: 'operations.delete.annotation.relation',
           selectedIDs: [entity.id]
         });
       }
@@ -357,14 +356,14 @@ export class SelectOsmMode extends AbstractMode {
       }
 
       // do it
-      const annotation = operation.annotation();
-      const options = { annotation: annotation, selectedIDs: selectedIDs };
+      const label = operation.editLabel();
+      const props = { ...label, selectedIDs: selectedIDs };
 
       editor.perform(action);
-      if (isSameSelection && editor.getUndoAnnotation() === annotation) {
-        editor.commitAppend(options);
+      if (isSameSelection && editor.getUndoEdit()?.isLabeled(label)) {
+        editor.commitAppend(props);
       } else {
-        editor.commit(options);
+        editor.commit(props);
       }
 
       // Update selected/active collections to contain the transformed entities

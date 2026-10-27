@@ -202,8 +202,8 @@ export class UiIntroRapid extends AbstractIntroChapter {
         });
       });
 
-      // check undo annotation to see what the user did
-      if ((editor.getUndoAnnotation() as any)?.type === 'rapid_accept_feature') {
+      // check the undo edit to see what the user did
+      if (editor.getUndoEdit()?.props.type === 'rapid_accept_feature') {
         return this._roadAcceptedAsync;
       } else {
         return this._selectRoadAsync;
@@ -417,8 +417,8 @@ export class UiIntroRapid extends AbstractIntroChapter {
         });
       });
 
-      // check undo annotation to see what the user did
-      if ((editor.getUndoAnnotation() as any)?.type === 'rapid_ignore_feature') {
+      // check the undo edit to see what the user did
+      if (editor.getUndoEdit()?.props.type === 'rapid_ignore_feature') {
         return this._playAsync;
       } else {
         return this._selectRoadAgainAsync;

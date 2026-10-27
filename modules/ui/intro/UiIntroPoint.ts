@@ -324,7 +324,6 @@ export class UiIntroPoint extends AbstractIntroChapter {
   protected async _hasPointAsync(): Promise<IntroStep | void> {
     const context = this.context;
     const editor = context.systems.editor!;
-    const l10n = context.systems.l10n!;
     const schema = context.systems.schema!;
 
     if (!this._doesPointExist()) return this._addPointAsync;
@@ -336,7 +335,7 @@ export class UiIntroPoint extends AbstractIntroChapter {
     if (preset !== this._cafePreset) {
       editor.perform(actionChangePreset(this._pointID!, preset, this._cafePreset));
       editor.commit({
-        annotation: l10n.t('operations.change_tags.annotation'),
+        stringID: 'operations.change_tags.annotation',
         selectedIDs: [this._pointID!]
       });
     }

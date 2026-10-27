@@ -229,7 +229,6 @@ export class UiSectionRawMembershipEditor extends AbstractUiSection {
   protected _changeRole(e: Event, d: MembershipRow): void {
     const context = this.context;
     const editor = context.systems.editor!;
-    const l10n = context.systems.l10n!;
 
     if ((d as any) === 0) return;    // called on newrow (shouldn't happen)
     if (this._inChange) return;  // avoid accidental recursive call iD#5731
@@ -256,7 +255,8 @@ const membersToUpdate = d.members.filter(function(member: IndexedMember) {
 
       editor.perform(changeMemberRoles);
       editor.commit({
-        annotation: l10n.t('operations.change_role.annotation', { n: membersToUpdate.length }),
+        stringID: 'operations.change_role.annotation',
+        stringParams: { n: membersToUpdate.length },
         selectedIDs: [d.relation.id]
       });
     }
@@ -272,7 +272,6 @@ const membersToUpdate = d.members.filter(function(member: IndexedMember) {
   protected _addMembership(d: NearbyRelationItem, role: string): void {
     const context = this.context;
     const editor = context.systems.editor!;
-    const l10n = context.systems.l10n!;
 
     (document.activeElement as HTMLElement | null)?.blur();   // avoid keeping focus on the button
     this._showBlank = false;
@@ -291,7 +290,8 @@ const membersToUpdate = d.members.filter(function(member: IndexedMember) {
     if (d.relation) {
       editor.perform(actionAddMembers(d.relation.id, entityIDs, role));
       editor.commit({
-        annotation: l10n.t('operations.add_member.annotation', { n: entityIDs.length }),
+        stringID: 'operations.add_member.annotation',
+        stringParams: { n: entityIDs.length },
         selectedIDs: [d.relation.id]
       });
 
@@ -302,7 +302,7 @@ const membersToUpdate = d.members.filter(function(member: IndexedMember) {
         actionAddMembers(relation.id, entityIDs, role)
       );
       editor.commit({
-        annotation: l10n.t('operations.add.annotation.relation'),
+        stringID: 'operations.add.annotation.relation',
         selectedIDs: [relation.id]
       });
       context.enter('select-osm', { selection: { osm: [relation.id] }, newFeature: true });
@@ -318,7 +318,6 @@ const membersToUpdate = d.members.filter(function(member: IndexedMember) {
   protected _deleteMembership(e: Event, d: MembershipRow): void {
     const context = this.context;
     const editor = context.systems.editor!;
-    const l10n = context.systems.l10n!;
 
     (e.currentTarget as HTMLElement).blur();   // avoid keeping focus on the button
     if ((d as any) === 0) return;   // called on newrow (shouldn't happen)
@@ -332,7 +331,8 @@ const indexes = d.members.map(function(member: IndexedMember) {
 
     editor.perform(actionDeleteMembers(d.relation.id, indexes));
     editor.commit({
-      annotation: l10n.t('operations.delete_member.annotation', { n: this._entityIDs.length }),
+      stringID: 'operations.delete_member.annotation',
+      stringParams: { n: this._entityIDs.length },
       selectedIDs: [d.relation.id]
     });
   }

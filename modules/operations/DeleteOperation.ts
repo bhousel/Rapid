@@ -9,6 +9,7 @@ import { utilCmd, utilTotalExtent } from '../util/index.ts';
 import type { Extent, Vec2 } from '@rapid-sdk/math';
 import type { Action } from '../actions/types.ts';
 import type { Context } from '../Context.ts';
+import type { EditLabel } from '../lib/Edit.ts';
 import type { OsmEntity, OsmNode, OsmRelation, OsmWay } from '../data/types.ts';
 
 
@@ -89,9 +90,9 @@ export class DeleteOperation extends AbstractOperation {
       }
     }
 
-    const annotation = this.annotation();  // watch out! calculate this _before_ we delete the stuff.
+    const label = this.editLabel();  // watch out! calculate this _before_ we delete the stuff.
     editor.perform(this._action);
-    editor.commit({ annotation: annotation, selectedIDs: this.selectedIDs });
+    editor.commit({ ...label, selectedIDs: this.selectedIDs });
 
     if (nextNode && nextLoc) {
       map.centerEase(nextLoc);
@@ -193,16 +194,15 @@ export class DeleteOperation extends AbstractOperation {
   }
 
 
-  public annotation(): string {
+  public editLabel(): EditLabel {
     const editor = this.context.systems.editor!;
-    const l10n = this.context.systems.l10n!;
 
     if (this.selectedIDs.length === 1) {
       const graph = editor.staging.graph;
       const entity = graph.entity(this.selectedIDs[0]);
-      return l10n.t('operations.delete.annotation.' + entity.geometry(graph));
+      return { stringID: 'operations.delete.annotation.' + entity.geometry(graph) };
     } else {
-      return l10n.t('operations.delete.annotation.feature', { n: this.selectedIDs.length });
+      return { stringID: 'operations.delete.annotation.feature', stringParams: { n: this.selectedIDs.length } };
     }
   }
 }

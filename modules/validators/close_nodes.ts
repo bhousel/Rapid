@@ -357,7 +357,7 @@ export function validateCloseNodes(context: Context): ValidatorFunction {
         loc: node1.loc,
         autoArgs: [
           actionTryMergeNodes([node1.id, node2.id]),
-          l10n.t('issues.fix.merge_close_vertices.annotation')
+          { stringID: 'issues.fix.merge_close_vertices.annotation' }
         ],
         dynamicFixes: function(this: any) {
           return [
@@ -368,7 +368,7 @@ export function validateCloseNodes(context: Context): ValidatorFunction {
                 const entityIds = this.issue.entityIds;
                 editor.perform(actionMergeNodes([entityIds[1], entityIds[2]]));
                 editor.commit({
-                  annotation: l10n.t('issues.fix.merge_close_vertices.annotation'),
+                  stringID: 'issues.fix.merge_close_vertices.annotation',
                   selectedIDs: [ entityIds[1], entityIds[2] ]
                 });
               }

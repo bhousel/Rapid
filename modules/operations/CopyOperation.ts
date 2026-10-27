@@ -6,6 +6,7 @@ import { utilCmd, utilTotalExtent } from '../util/index.ts';
 
 import type { Extent, Vec2 } from '@rapid-sdk/math';
 import type { Context } from '../Context.ts';
+import type { EditLabel } from '../lib/Edit.ts';
 import type { OsmEntity, OsmRelation, OsmWay } from '../data/types.ts';
 import type { Graph } from '../lib/Graph.ts';
 
@@ -143,9 +144,8 @@ export class CopyOperation extends AbstractOperation {
   }
 
 
-  public annotation(): string {
-    const l10n = this.context.systems.l10n!;
-    return l10n.t('operations.copy.annotation', { n: this.selectedIDs.length });
+  public editLabel(): EditLabel {
+    return { stringID: 'operations.copy.annotation', stringParams: { n: this.selectedIDs.length } };
   }
 
 

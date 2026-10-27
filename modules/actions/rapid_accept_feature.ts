@@ -292,7 +292,7 @@ export function actionRapidAcceptFeature(datum: OsmEntity | GeoJSONData, joins?:
       const checkAlmostJunction = validateAlmostJunction(context);
       for (const issue of checkAlmostJunction(way, graph).issues) {
         if (issue.autoArgs) {
-          graph = issue.autoArgs[0](graph);   // autoArgs = [action, annotation]
+          graph = issue.autoArgs[0](graph);   // autoArgs = [action, label]
         }
       }
 
@@ -300,7 +300,7 @@ export function actionRapidAcceptFeature(datum: OsmEntity | GeoJSONData, joins?:
       const checkCrossingWays = validateCrossingWays(context);
       for (const issue of checkCrossingWays(way, graph).issues) {
         if (issue.autoArgs) {
-          graph = issue.autoArgs[0](graph);   // autoArgs = [action, annotation]
+          graph = issue.autoArgs[0](graph);   // autoArgs = [action, label]
         }
       }
     }

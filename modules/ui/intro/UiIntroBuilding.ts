@@ -329,7 +329,6 @@ export class UiIntroBuilding extends AbstractIntroChapter {
   protected async _hasHouseAsync(): Promise<IntroStep | void> {
     const context = this.context;
     const editor = context.systems.editor!;
-    const l10n = context.systems.l10n!;
     const schema = context.systems.schema!;
 
     if (!this._doesHouseExist()) return this._addHouseAsync;
@@ -341,7 +340,7 @@ export class UiIntroBuilding extends AbstractIntroChapter {
     if (preset !== this._housePreset) {
       editor.perform(actionChangePreset(this._houseID!, preset, this._housePreset));
       editor.commit({
-        annotation: l10n.t('operations.change_tags.annotation'),
+        stringID: 'operations.change_tags.annotation',
         selectedIDs: [this._houseID!]
       });
     }
@@ -400,7 +399,6 @@ export class UiIntroBuilding extends AbstractIntroChapter {
     const context = this.context;
     const container = context.container();
     const editor = context.systems.editor!;
-    const l10n = context.systems.l10n!;
     const curtain = this._curtain;
 
     const buttonNode = container.select('.edit-menu-item-orthogonalize').node();
@@ -441,8 +439,9 @@ export class UiIntroBuilding extends AbstractIntroChapter {
 
       await delayAsync();   // wait for orthogonalize transtion to complete
 
-      // then check undo annotation to see what the user did
-      if (editor.getUndoAnnotation() === l10n.t('operations.orthogonalize.annotation.feature', { n: 1 })) {
+      // then check the undo edit to see what the user did
+      const label = { stringID: 'operations.orthogonalize.annotation.feature', stringParams: { n: 1 } };
+      if (editor.getUndoEdit()?.isLabeled(label)) {
         return this._doneSquareAsync;
       } else {
         return this._retryClickSquareAsync;
@@ -680,7 +679,6 @@ export class UiIntroBuilding extends AbstractIntroChapter {
   protected async _hasTankAsync(): Promise<IntroStep | void> {
     const context = this.context;
     const editor = context.systems.editor!;
-    const l10n = context.systems.l10n!;
     const schema = context.systems.schema!;
 
     if (!this._doesTankExist()) return this._addTankAsync;
@@ -692,7 +690,7 @@ export class UiIntroBuilding extends AbstractIntroChapter {
     if (preset !== this._tankPreset) {
       editor.perform(actionChangePreset(this._tankID!, preset, this._tankPreset));
       editor.commit({
-        annotation: l10n.t('operations.change_tags.annotation'),
+        stringID: 'operations.change_tags.annotation',
         selectedIDs: [this._tankID!]
       });
     }
@@ -744,7 +742,6 @@ export class UiIntroBuilding extends AbstractIntroChapter {
     const context = this.context;
     const container = context.container();
     const editor = context.systems.editor!;
-    const l10n = context.systems.l10n!;
     const curtain = this._curtain;
 
     const buttonNode = container.select('.edit-menu-item-circularize').node();
@@ -786,8 +783,9 @@ export class UiIntroBuilding extends AbstractIntroChapter {
 
       await delayAsync();   // wait for circularize transtion to complete
 
-      // then check undo annotation to see what the user did
-      if (editor.getUndoAnnotation() === l10n.t('operations.circularize.annotation.feature', { n: 1 })) {
+      // then check the undo edit to see what the user did
+      const label = { stringID: 'operations.circularize.annotation.feature', stringParams: { n: 1 } };
+      if (editor.getUndoEdit()?.isLabeled(label)) {
         return this._playAsync;
       } else {
         return this._retryClickCircleAsync;

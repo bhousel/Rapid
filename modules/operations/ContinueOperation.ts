@@ -4,6 +4,7 @@ import { KeyOperationBehavior } from '../behaviors/KeyOperationBehavior.ts';
 import { AbstractOperation } from './AbstractOperation.ts';
 
 import type { Context } from '../Context.ts';
+import type { EditLabel } from '../lib/Edit.ts';
 import type { OsmEntity, OsmNode, OsmWay } from '../data/types.ts';
 
 
@@ -98,9 +99,8 @@ export class ContinueOperation extends AbstractOperation {
   }
 
 
-  public annotation(): string {
-    const l10n = this.context.systems.l10n!;
-    return l10n.t('operations.continue.annotation.line');
+  public editLabel(): EditLabel {
+    return { stringID: 'operations.continue.annotation.line' };
   }
 
 

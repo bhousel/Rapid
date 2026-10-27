@@ -60,5 +60,5 @@ graph = action(graph);
 
 // More commonly, the EditSystem performs the action and commits the edit
 editor.perform(action);
-editor.commit({ annotation: 'Changed tags.', selectedIDs: [entityID] });
+editor.commit({ stringID: 'operations.change_tags.annotation', selectedIDs: [entityID] });
 ```

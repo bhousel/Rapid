@@ -5,6 +5,7 @@ import { ValidationFix } from './ValidationFix.ts';
 import type { Action } from '../actions/types.ts';
 import type { Context } from '../Context.ts';
 import type { D3Selection } from 'd3-selection';
+import type { EditLabel } from './Edit.ts';
 import type { Vec2 } from '@rapid-sdk/math';
 import type { Graph } from './Graph.ts';
 
@@ -31,8 +32,8 @@ export interface ValidationIssueProps {
   data: Record<string, unknown>;
   /** String to further differentiate the issue */
   hash: string;
-  /** If this issue can be autofixed, autoArgs will contain an [action, annotation] tuple. */
-  autoArgs?: [Action, unknown];
+  /** If this issue can be autofixed, autoArgs will contain an [action, label] tuple. */
+  autoArgs?: [Action, EditLabel];
   /** Function returning localized string for the issue message */
   message: () => string;
   /** Function to render reference information */
@@ -68,8 +69,8 @@ export class ValidationIssue {
   public data: Record<string, unknown> | undefined;
   /** String to further differentiate the issue */
   public hash: string | undefined;
-  /** If this issue can be autofixed, autoArgs will contain an [action, annotation] tuple. */
-  public autoArgs: [Action, unknown] | undefined;
+  /** If this issue can be autofixed, autoArgs will contain an [action, label] tuple. */
+  public autoArgs: [Action, EditLabel] | undefined;
   /** Function returning localized string for the issue message */
   public message: () => string;
   /** Function to render reference information */

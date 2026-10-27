@@ -825,7 +825,6 @@ class PresetItem {
     const list = this.list;
     const context = list.context;
     const editor = context.systems.editor!;
-    const l10n = context.systems.l10n!;
     const schema = context.systems.schema!;
     const item = this.item;
 
@@ -843,7 +842,7 @@ class PresetItem {
 
     editor.perform(combinedAction);
     editor.commit({
-      annotation: l10n.t('operations.change_tags.annotation'),
+      stringID: 'operations.change_tags.annotation',
       selectedIDs: list._entityIDs
     });
     list.emit('choose', item);

@@ -6,6 +6,7 @@ import { utilTotalExtent } from '../util/util.ts';
 
 import type { Extent, Vec2 } from '@rapid-sdk/math';
 import type { Context } from '../Context.ts';
+import type { EditLabel } from '../lib/Edit.ts';
 import type { OsmEntity, OsmNode, OsmRelation } from '../data/types.ts';
 
 
@@ -117,16 +118,15 @@ export class MoveOperation extends AbstractOperation {
   }
 
 
-  public annotation(): string {
+  public editLabel(): EditLabel {
     const editor = this.context.systems.editor!;
-    const l10n = this.context.systems.l10n!;
 
     if (this.selectedIDs.length === 1) {
       const graph = editor.staging.graph;
       const entity = graph.entity(this.selectedIDs[0]);
-      return l10n.t('operations.move.annotation.' + entity.geometry(graph));
+      return { stringID: 'operations.move.annotation.' + entity.geometry(graph) };
     } else {
-      return l10n.t('operations.move.annotation.feature', { n: this.selectedIDs.length });
+      return { stringID: 'operations.move.annotation.feature', stringParams: { n: this.selectedIDs.length } };
     }
   }
 }

@@ -8,6 +8,7 @@ import { Graph, ValidationIssue, ValidationFix } from '../lib/index.ts';
 import type { Action } from '../actions/types.ts';
 import type { Context } from '../Context.ts';
 import type { D3Selection } from 'd3-selection';
+import type { EditLabel } from '../lib/Edit.ts';
 import type { NsiUpgradeResult } from '../services/NsiService.ts';
 import type { OsmEntity, OsmNode, OsmTags } from '../data/types.ts';
 import type { TagDiff } from '@rapid-sdk/util';
@@ -157,9 +158,9 @@ export function validateOutdatedTags(context: Context): ValidatorFunction {
 
     // Allow autofix for simple upgrades..
     // `noncanonical_brand` upgrades may have false positives, so they should be reviewed manually.
-    let autoArgs: [Action, string] | undefined;
+    let autoArgs: [Action, EditLabel] | undefined;
     if (subtype !== 'noncanonical_brand') {
-      autoArgs = [actionDoTagUpgrade, l10n.t('issues.fix.upgrade_tags.annotation')];
+      autoArgs = [actionDoTagUpgrade, { stringID: 'issues.fix.upgrade_tags.annotation' }];
     }
 
     result.issues.push(new ValidationIssue(context, {
@@ -178,7 +179,7 @@ export function validateOutdatedTags(context: Context): ValidatorFunction {
             onClick: () => {
               editor.perform(actionDoTagUpgrade);
               editor.commit({
-                annotation: l10n.t('issues.fix.upgrade_tags.annotation'),
+                stringID: 'issues.fix.upgrade_tags.annotation',
                 selectedIDs: [entity.id]
               });
             }
@@ -193,7 +194,7 @@ export function validateOutdatedTags(context: Context): ValidatorFunction {
               onClick: () => {
                 editor.perform(actionAddNotTag);
                 editor.commit({
-                  annotation: l10n.t('issues.fix.tag_as_not.annotation'),
+                  stringID: 'issues.fix.tag_as_not.annotation',
                   selectedIDs: [entity.id]
                 });
               }

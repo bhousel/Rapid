@@ -159,7 +159,7 @@ export class MapSystem extends AbstractSystem {
 
             // Reposition the map if we've jumped to a different place.
             const t0 = context.viewport.transform.props;
-            const t1 = edit.transform;
+            const t1 = edit.props.transform;
             if (t1 && (t0.x !== t1.x || t0.y !== t1.y || t0.z !== t1.z || t0.r !== t1.r)) {
               this.transformEase(t1);
             }
@@ -173,7 +173,7 @@ export class MapSystem extends AbstractSystem {
             // For now these IDs are assumed to be OSM ids.
             // Check that they are actually in the stable graph.
             const graph = edit.graph;
-            const checkIDs = edit.selectedIDs ?? [];
+            const checkIDs = edit.props.selectedIDs ?? [];
             const selectedIDs = checkIDs.filter((entityID: EntityID) => graph.hasEntity(entityID));
             if (selectedIDs.length) {
               context.enter('select-osm', { selection: { osm: selectedIDs }} );

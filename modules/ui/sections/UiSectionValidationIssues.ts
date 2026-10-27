@@ -245,8 +245,8 @@ export class UiSectionValidationIssues extends AbstractUiSection {
     }
 
     utilHighlightEntities(this.context, issue.entityIds, false);  // unhighlight
-    editor.perform(issue.autoArgs![0]);   // autoArgs = [action, annotation]
-    editor.commit({ annotation: issue.autoArgs![1] as any, selectedIDs: issue.entityIds });
+    editor.perform(issue.autoArgs![0]);   // autoArgs = [action, label]
+    editor.commit({ ...issue.autoArgs![1], selectedIDs: issue.entityIds });
   }
 
 
@@ -258,7 +258,6 @@ export class UiSectionValidationIssues extends AbstractUiSection {
   protected _clickAutoFixAll(e: PointerEvent, issues: ValidationIssue[]): void {
     const context = this.context;
     const editor = context.systems.editor!;
-    const l10n = context.systems.l10n!;
 
     e.preventDefault();
     e.stopPropagation();
@@ -266,11 +265,11 @@ export class UiSectionValidationIssues extends AbstractUiSection {
     editor.beginTransaction();
 
     for (const issue of issues) {
-      const action = issue.autoArgs![0];  // autoArgs = [action, annotation]
+      const action = issue.autoArgs![0];  // autoArgs = [action, label]
       editor.perform(action);
     }
 
-    editor.commit({ annotation: l10n.t('issues.fix_all.annotation') });
+    editor.commit({ stringID: 'issues.fix_all.annotation' });
     editor.endTransaction();
   }
 

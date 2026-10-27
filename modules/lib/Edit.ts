@@ -1,54 +1,122 @@
-import type { TransformProps } from '@rapid-sdk/math';
+import type { Context } from '../Context.ts';
 import type { Graph } from './Graph.ts';
+import type { TransformProps } from '@rapid-sdk/math';
 
+
+/** Parameters for an edit's label, e.g. `{ n: 3 }` for "Moved {n} features". */
+export type EditLabelParams = Record<string, string | number>;
 
 /**
- * Properties that define an `Edit`.
+ * What the undo/redo menu says about an edit, as a string ID and its parameters.
+ * It's translated when shown, so it follows the user's language. Parameters should be values
+ * like counts, not translated words.
+ */
+export interface EditLabel {
+  /** The string to show, e.g. `'operations.delete.annotation.point'` */
+  stringID: StringID;
+  /** Parameters for the string */
+  stringParams?: EditLabelParams;
+}
+
+/** Imagery, photo and data sources used to make an edit (shown in the changeset comment) */
+export interface EditSources {
+  /** Imagery sources used */
+  imagery?: string[];
+  /** Photo sources used */
+  photos?: string[];
+  /** Data sources used */
+  data?: string[];
+}
+
+/**
+ * Properties that describe an `Edit`, everything about it except its graph.
+ * These are plain JSON, saved in backups as they are.
+ * Systems that make their own kinds of edits extend this with a `type` and their own props.
+ * See `design/edit-system.md`.
  */
 export interface EditProps {
-  /** Human-readable description of the edit */
-  annotation: string;
-  /** The graph state after this edit */
-  graph: Graph;
+  /** What kind of edit this is, set by whoever commits it. Classic OSM edits leave it unset. */
+  type?: string;
+  /** The undo/redo label, translated when shown */
+  stringID?: StringID;
+  /** Parameters for the label */
+  stringParams?: EditLabelParams;
+  /** A plain-text label, only for edits restored from a v3 backup (already translated) */
+  annotation?: string;
   /** IDs of entities selected when this edit was made */
-  selectedIDs: EntityID[];
-  /** Sources that contributed to this edit */
-  sources: Record<string, unknown>;
-  /** Map transform at time of edit */
-  transform: TransformProps;
+  selectedIDs?: EntityID[];
+  /** Sources used to make this edit */
+  sources?: EditSources;
+  /** Map transform at the time of the edit */
+  transform?: TransformProps;
 }
 
 
 /**
- * An `Edit` encapsulates the state of a single edit.
+ * An `Edit` is one step in the `EditSystem` history: the graph after the step,
+ * plus props that describe it.
  */
-export class Edit {
+export class Edit<P extends EditProps = EditProps> {
 
-  /** Human-readable description of what was changed (used for undo/redo menu) */
-  public annotation: string | undefined;
-  /** The Graph state after this edit was applied */
+  public context: Context;
+  /** The graph after this edit. It's runtime state, so it isn't one of the props. */
   public graph: Graph;
-  /** IDs of entities that were selected when this edit was committed */
-  public selectedIDs: EntityID[] | undefined;
-  /** Imagery, photo, and data sources used to make this edit (shown in changeset comment) */
-  public sources: Record<string, unknown>;
-  /** Map viewport transform at the time this edit was made */
-  public transform: TransformProps | undefined;
+  public props: P;
 
 
   /**
-   * @param props - Properties to initialize the Edit
+   * @param context - Global shared application context
+   * @param graph - The graph after this edit
+   * @param props - Properties that describe the edit, plain JSON
    */
-  public constructor(props: Partial<EditProps> = {}) {
-    if (!props.graph) {
-      throw new Error(`Edit missing 'graph' property`);
-    }
+  public constructor(context: Context, graph: Graph, props: Partial<P> = {}) {
+    this.context = context;
+    this.graph = graph;
+    this.props = structuredClone(props) as P;
+  }
 
-    this.annotation = props.annotation;
-    this.graph = props.graph;
-    this.selectedIDs = props.selectedIDs;
-    this.sources = props.sources ?? {};
-    this.transform = props.transform;
+
+  /**
+   * Whether this edit has a label for the undo/redo menu.
+   * @return `true` if the edit has a label
+   */
+  public get hasLabel(): boolean {
+    return !!(this.props.stringID || this.props.annotation);
+  }
+
+
+  /**
+   * The label for the undo/redo menu, in the user's current language.
+   * @return The localized label, or `''` if the edit has none
+   */
+  public get label(): string {
+    const l10n = this.context.systems.l10n;
+    const props = this.props;
+
+    if (props.stringID && l10n) {
+      return l10n.t(props.stringID, props.stringParams);
+    }
+    return props.annotation ?? props.stringID ?? '';
+  }
+
+
+  /**
+   * Whether this edit's label is the given one, e.g. to merge a repeated edit into this one.
+   * Compares string IDs and parameters, not translated text.
+   * @param label - The label to compare against
+   * @return `true` if the labels match
+   */
+  public isLabeled(label: Nullable<EditLabel>): boolean {
+    if (!label?.stringID) return false;
+    const props = this.props;
+    if (props.stringID !== label.stringID) return false;
+
+    const a = props.stringParams ?? {};
+    const b = label.stringParams ?? {};
+    const keys = new Set([...Object.keys(a), ...Object.keys(b)]);
+    for (const key of keys) {
+      if (a[key] !== b[key]) return false;
+    }
+    return true;
   }
 }
-

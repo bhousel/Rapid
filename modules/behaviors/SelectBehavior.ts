@@ -460,7 +460,6 @@ export class SelectBehavior extends AbstractBehavior {
 
     const context = this.context;
     const editor = context.systems.editor!;
-    const l10n = context.systems.l10n;
 
     const point = this.lastUp.coord.world;
     const data: any = this.lastUp.target?.data;
@@ -489,7 +488,7 @@ export class SelectBehavior extends AbstractBehavior {
     if (loc && edge) {
       editor.perform(actionAddMidpoint({ loc, edge } as Midpoint, new OsmNode(context)));
       editor.commit({
-        annotation: l10n!.t('operations.add.annotation.vertex'),
+        stringID: 'operations.add.annotation.vertex',
         selectedIDs: context.selectedIDs()   // keep the parent way selected
       });
     }

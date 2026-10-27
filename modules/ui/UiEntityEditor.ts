@@ -17,6 +17,7 @@ import type { Category } from '../lib/Category.ts';
 import type { Context } from '../Context.ts';
 import type { D3Selection } from 'd3-selection';
 import type { Difference } from '../lib/Difference.ts';
+import type { EditLabel } from '../lib/Edit.ts';
 import type { Graph } from '../lib/Graph.ts';
 import type { OsmEntity } from '../data/index.ts';
 import type { OsmTags } from '../data/types.ts';
@@ -313,7 +314,6 @@ export class UiEntityEditor extends EventEmitter {
   protected _changeTags(entityIDs: EntityID[], changed: Record<string, string | undefined>, onInput?: boolean, wasRawTagEditor = false): void {
     const context = this.context;
     const editor = context.systems.editor!;
-    const l10n = context.systems.l10n!;
     const crossingKeys = this._crossingKeys;
 
     // same selection as before?
@@ -357,12 +357,12 @@ export class UiEntityEditor extends EventEmitter {
     if (!onInput) {
       // If this is the same selection as before, and the previous edit was also a change_tags,
       // we can just replace the previous edit with this one.
-      const annotation = l10n.t('operations.change_tags.annotation');
-      const options = { annotation: annotation, selectedIDs: this._entityIDs };
-      if (isSameSelection && editor.getUndoAnnotation() === annotation) {
-        editor.commitAppend(options);
+      const label: EditLabel = { stringID: 'operations.change_tags.annotation' };
+      const props = { ...label, selectedIDs: this._entityIDs };
+      if (isSameSelection && editor.getUndoEdit()?.isLabeled(label)) {
+        editor.commitAppend(props);
       } else {
-        editor.commit(options);
+        editor.commit(props);
       }
     }
 
@@ -377,7 +377,6 @@ export class UiEntityEditor extends EventEmitter {
   protected _revertTags(keys: string[]): void {
     const context = this.context;
     const editor = context.systems.editor!;
-    const l10n = context.systems.l10n!;
     const crossingKeys = this._crossingKeys;
 
     // same selection as before?
@@ -423,12 +422,12 @@ export class UiEntityEditor extends EventEmitter {
 
     // If this is the same selection as before, and the previous edit was also a change_tags,
     // we can just replace the previous edit with this one.
-    const annotation = l10n.t('operations.change_tags.annotation');
-    const options = { annotation: annotation, selectedIDs: this._entityIDs };
-    if (isSameSelection && editor.getUndoAnnotation() === annotation) {
-      editor.commitAppend(options);
+    const label: EditLabel = { stringID: 'operations.change_tags.annotation' };
+    const props = { ...label, selectedIDs: this._entityIDs };
+    if (isSameSelection && editor.getUndoEdit()?.isLabeled(label)) {
+      editor.commitAppend(props);
     } else {
-      editor.commit(options);
+      editor.commit(props);
     }
 
     editor.endTransaction();

@@ -11,6 +11,7 @@ import { ValidationFix } from '../lib/ValidationFix.ts';
 import type { Action } from '../actions/types.ts';
 import type { Context } from '../Context.ts';
 import type { D3Selection } from 'd3-selection';
+import type { EditLabel } from '../lib/Edit.ts';
 import type { Graph } from '../lib/Graph.ts';
 import type { Midpoint } from '../actions/add_midpoint.ts';
 import type { OsmEntity, OsmRelation, OsmTags, OsmWay } from '../data/types.ts';
@@ -829,7 +830,7 @@ export function validateCrossingWays(context: Context): ValidatorFunction {
 
         editor.perform(actionAddStructure);
         editor.commit({
-          annotation: l10n.t(`issues.fix.${titleID}.annotation`),
+          stringID: `issues.fix.${titleID}.annotation`,
           selectedIDs: [selectedWayID]
         });
         context.enter('select-osm', { selection: { osm: resultWayIDs }} );
@@ -845,14 +846,14 @@ export function validateCrossingWays(context: Context): ValidatorFunction {
    * @param edges - Edge pairs that participate in the connection
    * @param crossingWayID - Optionally, a way whose crossing tags should be synced
    * @param tags - Tags to assign to the new connection node
-   * @returns A `[action, annotation]` tuple
+   * @returns A `[action, label]` tuple
    */
   function getConnectWaysAction(
     loc: Vec2,
     edges: [EntityID, EntityID][],
     crossingWayID: EntityID | null,
     tags: OsmTags
-  ): [Action, string] {
+  ): [Action, EditLabel] {
 
     const actionConnectCrossingWays = (graph: Graph): Graph => {
       // Create a new candidate junction node which will be inserted at the connection location..
@@ -899,7 +900,7 @@ export function validateCrossingWays(context: Context): ValidatorFunction {
       return graph;
     };
 
-    return [actionConnectCrossingWays, l10n.t('issues.fix.connect_crossing_features.annotation')];
+    return [actionConnectCrossingWays, { stringID: 'issues.fix.connect_crossing_features.annotation' }];
   }
 
 
@@ -926,12 +927,12 @@ export function validateCrossingWays(context: Context): ValidatorFunction {
         const loc = this.issue.loc;
         const edges = this.issue.data.edges;
         const crossingWayID = this.issue.data.crossingWayID;
-        const [action, annotation] = getConnectWaysAction(loc, edges, crossingWayID, connectionTags);
+        const [action, label] = getConnectWaysAction(loc, edges, crossingWayID, connectionTags);
 
-        // result contains [function, annotation]
+        // result contains [function, label]
         editor.perform(action);
         editor.commit({
-          annotation: annotation,
+          ...label,
           selectedIDs: this.issue.entityIds
         });
       }
@@ -979,7 +980,7 @@ export function validateCrossingWays(context: Context): ValidatorFunction {
         tags.layer = layer.toString();
         editor.perform(actionChangeTags(entity.id, tags));
         editor.commit({
-          annotation: l10n.t('operations.change_tags.annotation'),
+          stringID: 'operations.change_tags.annotation',
           selectedIDs: [selectedID]
         });
       }

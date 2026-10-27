@@ -7,6 +7,7 @@ import { projWorldToWgs84, vecAdd, vecProject, vecRotate, vecSubtract, WORLD_ZOO
 import { utilArrayIntersection } from '@rapid-sdk/util';
 
 import type { Context } from '../Context.ts';
+import type { EditLabel } from '../lib/Edit.ts';
 import type { EventData } from '../behaviors/AbstractBehavior.ts';
 import type { Midpoint } from '../actions/add_midpoint.ts';
 import type { OsmEntity, OsmWay } from '../data/types.ts';
@@ -34,7 +35,7 @@ export class DragNodeMode extends AbstractMode {
 
   /** When finished dragging, restore the selected ids from before */
   protected _reselectIDs: EntityID[];
-  /** Used to set the correct edit annotation */
+  /** Used to set the correct edit label */
   protected _wasMidpoint: boolean;
   /** Difference between where the pin is, and where on the pin the user clicked */
   protected _dragOffset: Vec2;
@@ -300,7 +301,6 @@ export class DragNodeMode extends AbstractMode {
 
     const context = this.context;
     const editor = context.systems.editor!;
-    const l10n = context.systems.l10n!;
     const viewport = context.viewport;
     const point = eventData.coord!.world;
     const graph = editor.staging.graph;
@@ -308,12 +308,12 @@ export class DragNodeMode extends AbstractMode {
     // Allow snapping only for OSM Entities in the actual graph (i.e. not Rapid features)
     const dataID = eventData?.target?.dataID;
     const target = dataID ? graph.hasEntity(dataID) : undefined;
-    let annotation: string | undefined;
+    let label: EditLabel | undefined;
 
     // Snap to a Node
     if (target?.type === 'node' && this._canSnapToNode(target)) {
       editor.perform(actionConnect([ target.id, this.dragNode.id ]));
-      annotation = this._connectAnnotation(target);
+      label = this._connectLabel(target);
 
     // Snap to a Way
     } else if (target?.type === 'way') {
@@ -338,19 +338,19 @@ export class DragNodeMode extends AbstractMode {
         const edge: [EntityID, EntityID] = [ way.nodes[choice.index - 1], way.nodes[choice.index] ];
         const loc = projWorldToWgs84(choice.point);
         editor.perform(actionAddMidpoint({ loc, edge }, this.dragNode));
-        annotation = this._connectAnnotation(way);
+        label = this._connectLabel(way);
       } else {
-        annotation = this._moveAnnotation();
+        label = this._moveLabel();
       }
 
     } else if (this._wasMidpoint) {
-      annotation = l10n.t('operations.add.annotation.vertex');
+      label = { stringID: 'operations.add.annotation.vertex' };
 
     } else {
-      annotation = this._moveAnnotation();
+      label = this._moveLabel();
     }
 
-    editor.commit({ annotation: annotation!, selectedIDs: [this.dragNode.id] });
+    editor.commit({ ...label, selectedIDs: [this.dragNode.id] });
 
     // Choose next mode
     // (Note that if the drag node is gone, select mode will fallback to browse mode)
@@ -363,35 +363,33 @@ export class DragNodeMode extends AbstractMode {
 
 
   /**
-   * Generate the annotation text for a move operation.
-   * @return The localized annotation string, or undefined if dragNode is missing
+   * Generate the edit label for a move operation.
+   * @return The label, or undefined if dragNode is missing
    */
-  protected _moveAnnotation(): string | undefined {
+  protected _moveLabel(): EditLabel | undefined {
     if (!this.dragNode) return undefined;
 
     const context = this.context;
     const editor = context.systems.editor!;
     const graph = editor.staging.graph;
-    const l10n = context.systems.l10n!;
 
     const geometry = this.dragNode.geometry(graph);
-    return l10n.t(`operations.move.annotation.${geometry}`);
+    return { stringID: `operations.move.annotation.${geometry}` };
   }
 
 
   /**
-   * Generate the annotation text for a connect operation.
-   * The annotation varies based on the geometries involved (vertex, point, line, etc.)
+   * Generate the edit label for a connect operation.
+   * The label varies based on the geometries involved (vertex, point, line, etc.)
    * @param  target - The entity we are connecting the dragNode to
-   * @return The localized annotation string, or undefined if dragNode/target is missing
+   * @return The label, or undefined if dragNode/target is missing
    */
-  protected _connectAnnotation(target: OsmEntity): string | undefined {
+  protected _connectLabel(target: OsmEntity): EditLabel | undefined {
     if (!this.dragNode || !target) return undefined;
 
     const context = this.context;
     const editor = context.systems.editor!;
     const graph = editor.staging.graph;
-    const l10n = context.systems.l10n!;
 
     const nodeGeometry = this.dragNode.geometry(graph);
     const targetGeometry = target.geometry(graph);
@@ -404,12 +402,12 @@ export class DragNodeMode extends AbstractMode {
       if (sharedParentWays.length !== 0) {
         // if the nodes are next to each other, they are merged
         if (sharedParentWays[0].isAdjacent(this.dragNode.id, target.id)) {
-          return l10n.t('operations.connect.annotation.from_vertex.to_adjacent_vertex');
+          return { stringID: 'operations.connect.annotation.from_vertex.to_adjacent_vertex' };
         }
-        return l10n.t('operations.connect.annotation.from_vertex.to_sibling_vertex');
+        return { stringID: 'operations.connect.annotation.from_vertex.to_sibling_vertex' };
       }
     }
-    return l10n.t(`operations.connect.annotation.from_${nodeGeometry}.to_${targetGeometry}`);
+    return { stringID: `operations.connect.annotation.from_${nodeGeometry}.to_${targetGeometry}` };
   }
 
 

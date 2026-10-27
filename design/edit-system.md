@@ -7,28 +7,30 @@ be restored after a restart.
 This system is older than the design docs. This doc started in October 2026, when it became clear
 that an edit has to record more than changes to the OSM graph, and records where it's heading.
 
-> **Status:** Design in progress. Done so far: a backup never includes the redo part of the history,
-> and a session the user undid back to nothing is removed instead of being offered for restore.
-> Next: edit props and labels, then the v4 backup format (see [Rollout](#rollout)).
+> **Status:** In progress. Done so far: a backup never includes the redo part of the history, a
+> session the user undid back to nothing is removed, and edits are a graph plus props with translated
+> labels and a `type` (Rollout step 3), so a session of only Rapid ignores is backed up too.
+> Next: the viewport on undo/redo/restore, then the v4 backup format (see [Rollout](#rollout)).
 
 ## Words used here
 
 - **Graph**: a collection of OSM entities (`modules/lib/Graph.ts`). Each graph holds its changes on
   top of the graph before it.
 - **Action**: a function that takes a graph and returns it changed, like "add a node" or "move a way".
-- **Edit**: one step in the history (`modules/lib/Edit.ts`): the graph after the step, plus a
-  description, what was selected, the map position, and the sources used.
+- **Edit**: one step in the history (`modules/lib/Edit.ts`): the graph after the step, plus props
+  (its label, what was selected, the map position, the sources used, and so on).
 - **History**: the list of edits. `history[0]` is **base** (OSM as loaded, before any edits), and
   `history[index]` is **stable** (the latest edit the user kept). Edits after `index` are the
   **redo** part: undone, but not thrown away until the user makes a new edit.
 - **Staging**: the edit in progress, not in the history yet. Actions are performed on it, and
   `commit()` adds it to the history.
-- **Edit props** (proposed): everything about an edit except its graph, as a plain JSON object, like the
+- **Edit props**: everything about an edit except its graph, as a plain JSON object, like the
   props of `Preset` and the other library classes.
-- **Edit type** (proposed): a prop saying what kind of edit it is, for edits that aren't classic OSM
+- **Edit type**: a prop saying what kind of edit it is, for edits that aren't classic OSM
   edits, like `'rapid_ignore_feature'`. Its other props record what it did that isn't in the OSM
   graph, like which external feature the user ignored.
-- **Label** (proposed): what the undo/redo menu says about an edit.
+- **Label**: what the undo/redo menu says about an edit. Stored as a string ID and parameters
+  (`EditLabel`), translated when shown.
 - **Backup** / **session**: the saved copy of the history, in the `DatabaseSystem` `sessions` store,
   that the restore dialog offers after a restart.
 
@@ -105,10 +107,15 @@ the fields it understands, which owners can extend with their own.
 
 ```ts
 // lib/Edit.ts: the fields EditSystem itself understands
+export interface EditLabel {
+  stringID: StringID;                 // e.g. 'operations.move.annotation.feature'
+  stringParams?: EditLabelParams;     // e.g. { n: 3 } for "Moved {n} features"
+}
+
 export interface EditProps {
   type?: string;            // kind of edit, set by whoever commits it; classic OSM edits leave it unset
   stringID?: StringID;      // undo/redo label, translated when shown (replaces `annotation`)
-  stringParams?: Record<string, string | number>;   // e.g. { n: 3 } for "Moved {n} features"
+  stringParams?: EditLabelParams;
   annotation?: string;      // plain-text label, only for edits restored from a v3 backup
   selectedIDs?: EntityID[];
   sources?: EditSources;
@@ -118,12 +125,18 @@ export interface EditProps {
 export class Edit<P extends EditProps = EditProps> {
   public context: Context;
   public graph: Graph;      // the OSM graph after this edit; runtime state, so not in `props`
-  public props: P;          // plain JSON, saved in backups as is
+  public props: P;          // plain JSON (copied on construction), saved in backups as is
   public constructor(context: Context, graph: Graph, props: Partial<P> = {}) { … }
-  public get label(): string { … }   // l10n.t(stringID, stringParams), or else `annotation`
+  public get label(): string { … }        // l10n.t(stringID, stringParams), or else `annotation`
+  public get hasLabel(): boolean { … }
+  public isLabeled(label: Nullable<EditLabel>): boolean { … }   // same string ID and params?
 }
 
 // RapidSystem.ts: Rapid's own kinds of edit, typed
+export interface RapidAcceptEditProps extends EditProps {
+  type: 'rapid_accept_feature';
+  acceptIDs: DataID[];
+}
 export interface RapidIgnoreEditProps extends EditProps {
   type: 'rapid_ignore_feature';
   ignoreID: DataID;
@@ -144,11 +157,13 @@ editor.commit<RapidIgnoreEditProps>({
 - **The code that commits picks the label,** as it picks the annotation today. Parameters should be
   values like counts, not translated words, or those words stay in the language they were made in.
 - **Comparing labels compares string IDs.** A few places merge a repeated edit into the previous undo
-  step when its annotation matches (`commitAppend` in `SelectOsmMode`, `UiEntityEditor`,
-  `CycleHighwayTagOperation`), and the walkthrough checks the last edit's annotation (`UiIntroBuilding`,
-  `UiIntroLine`, `UiIntroRapid`). Today they compare translated text; they'll compare `stringID` (and
-  params) or `type` instead, which is more reliable. Operations' `annotation()` methods return a string
-  ID and params instead of translated text.
+  step when its label matches (`commitAppend` in `SelectOsmMode`, `UiEntityEditor`,
+  `CycleHighwayTagOperation`), and the walkthrough checks the last edit (`UiIntroBuilding`,
+  `UiIntroLine`, `UiIntroRapid`). They used to compare translated text; now they use
+  `editor.getUndoEdit()?.isLabeled(label)` (string ID and params) or check `props.type`.
+  Operations have `editLabel()` (it was `annotation()`), which returns an `EditLabel`; callers spread it
+  into the commit props, and the edit menu translates it for its flash message. Validator autofixes
+  carry an `[action, EditLabel]` pair.
 - **`type` says what kind of edit it is.** Classic OSM edits leave it unset. Each kind of edit is
   defined by the system that makes it, with its own props interface, so code reads `edit.props.ignoreID`
   with a type instead of casting an annotation. The existing type strings stay
@@ -163,8 +178,9 @@ editor.commit<RapidIgnoreEditProps>({
   kind: copying tags from an external feature onto w123 would be a graph change plus
   `{ type: 'rapid_use_feature', dataID, entityID }`. If an edit ever needs to record several things,
   its props can hold arrays (as `acceptIDs` already does).
-- **`sources.data` comes from Rapid's edit props** (the dataset of what was accepted or used) instead
-  of the `annotation.dataUsed` cast.
+- **`sources.data` comes from the committed props.** The Rapid inspector passes
+  `sources: { data: [...] }` for the dataset it accepted from, and `commit()` adds the imagery, photos
+  and custom data in use, instead of reading `annotation.dataUsed`.
 
 *Why not a separate list of "effects" on each edit?* An earlier draft of this doc had
 `effects: EditEffect[]`, a list of typed records, so one edit could carry several. Nothing needs more
@@ -175,7 +191,7 @@ than one, and a props bag with a `type` is how the rest of the library works.
 | Question | Method | Used by |
 |---|---|---|
 | Is there anything to upload? | `hasChanges()`: the graph differs from base (unchanged) | Save and Download buttons, upload |
-| Is there work the user would hate to lose? | `hasWork()` (new): the graph changed, or a kept edit has a `type` | Backups, "you'll lose your changes" prompts (e.g. the source switcher) |
+| Is there work the user would hate to lose? | `hasWork()`: the graph changed, or a kept edit has a `type` | Backups, the browser's "leave this page?" prompt, the source switcher's warning |
 | Did any data change since I last looked? | `dataVersion` (PR #5): changes on any edit, undo/redo, merge, restore or reset | Caches of derived data, in Rapid and in embedding apps |
 
 `hasChanges()` keeps its meaning: an add-then-delete that cancels out still isn't saved, and an
@@ -200,7 +216,15 @@ to fit it, keeping the zoom where possible. `edit.transform` can stay as a fallb
 - **A version that can't be fetched** (redacted, or missing) is restored against the current version
   of the entity instead, and save-time conflict resolution sorts out any differences.
 - **Store each edit's `props` as they are,** next to what changed in its graph. Restore passes them
-  back to the `Edit` constructor without knowing what any owner's props mean.
+  back to the `Edit` constructor without knowing what any owner's props mean. (Done already: since
+  step 3, each history item in a v3 backup has `props` in place of `annotation`, `selectedIDs`,
+  `transform` and `*Used`. The version stayed 3, since only the items changed and restore reads both.)
+- **Selection by layer.** `selectedIDs: EntityID[]` becomes `selection?: Record<LayerID, DataID[]>`
+  (e.g. `{ osm: ['w1'], rapid: ['ds:abc:0'] }`), the shape `select-osm` already takes, so an edit can
+  leave a mixed selection of OSM and other data. Retyping the flat list as `DataID[]` wouldn't be
+  enough: restore needs to know which layer to look each ID up in. Undo, redo and restore read each
+  layer's IDs and ask that layer for them; OSM IDs come from the graph as now, and a layer that can't
+  look up its IDs yet drops them. Older items convert as `selection: { osm: selectedIDs }`.
 - **Only the kept history** (up to `index`); done for v3 already.
 - **v3 stays restorable, best effort,** for a while. An object annotation spreads into props (its
   `type`, `acceptIDs`, `ignoreID`, `dataUsed` keep their names). A string annotation, or an object
@@ -238,10 +262,12 @@ None right now. Questions from the first draft are answered under Decisions.
 
 1. **This doc.** ✅
 2. **Undone edits aren't saved.** ✅
-3. **Edit props, labels and `hasWork()`.** `Edit<P>` with `props` and a translating `label`; `commit()`
-   takes props instead of an annotation; move Rapid accept and ignore to typed props; use `hasWork()`
-   for backups. This fixes the ignore-only session. Consider landing `dataVersion` from PR #5 alongside.
+3. **Edit props, labels and `hasWork()`.** ✅ `Edit<P>` with `props` and a translating `label`;
+   `commit()` takes props; every caller commits a `stringID` (operations, modes, validators, UI, the
+   walkthrough); Rapid accept and ignore are typed props; backups use `hasWork()` and save props, so an
+   ignore-only session is backed up (checked live). `dataVersion` from PR #5 didn't land with it.
 4. **Viewport on undo, redo and restore.** Show where the change is.
-5. **Backup v4.** Base versions and a versioned multi-fetch on restore; v3 restore converted best effort.
+5. **Backup v4.** Base versions and a versioned multi-fetch on restore; selection by layer; v3 restore
+   converted best effort.
 6. **Later:** edits that copy from external data onto OSM features; accept and ignore that outlive the
    session (a `RapidSystem` change).

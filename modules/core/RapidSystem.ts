@@ -8,6 +8,7 @@ import { utilIterable } from '../util/iterable.ts';
 
 import type { ConflationSettings } from './ConflationSystem.ts';
 import type { Context } from '../Context.ts';
+import type { EditProps } from '../lib/Edit.ts';
 import type { OneOrMore } from '../util/iterable.ts';
 import type { RapidDataTransform } from '../lib/RapidDataDictionary.ts';
 import type { RapidDatasetProps } from '../lib/RapidDataset.ts';
@@ -88,6 +89,20 @@ export interface DatasetRecord {
   dataset?: Record<string, unknown>;
   /** The user's changes to a dataset from a service or an asset file */
   changes?: DatasetChanges;
+}
+
+/** Props of the edit made when the user accepts a Rapid feature (or pieces of one). */
+export interface RapidAcceptEditProps extends EditProps {
+  type: 'rapid_accept_feature';
+  /** IDs of the features or pieces accepted */
+  acceptIDs: DataID[];
+}
+
+/** Props of the edit made when the user ignores a Rapid feature. It changes nothing in the graph. */
+export interface RapidIgnoreEditProps extends EditProps {
+  type: 'rapid_ignore_feature';
+  /** ID of the feature or piece ignored */
+  ignoreID: DataID;
 }
 
 
@@ -879,17 +894,16 @@ export class RapidSystem extends AbstractSystem {
     // Start at `1` - there won't be sources on the `base` edit..
     // End at `index` - don't continue into the redo part of the history..
     for (let i = 1; i <= index; i++) {
-      const edit = history[i];
-      const annotation = edit.annotation as Record<string, unknown> | undefined;
+      const props = history[i].props;
 
-      if (annotation?.type === 'rapid_accept_feature') {
-        const ids = (annotation.acceptIDs ?? []) as DataID[];
-        for (const id of ids) {
+      if (props.type === 'rapid_accept_feature') {
+        for (const id of (props as RapidAcceptEditProps).acceptIDs ?? []) {
           this.acceptIDs.add(id);
         }
-      } else if (annotation?.type === 'rapid_ignore_feature') {
-        if (annotation.ignoreID) {
-          this.ignoreIDs.add(annotation.ignoreID as DataID);
+      } else if (props.type === 'rapid_ignore_feature') {
+        const ignoreID = (props as RapidIgnoreEditProps).ignoreID;
+        if (ignoreID) {
+          this.ignoreIDs.add(ignoreID);
         }
       }
     }

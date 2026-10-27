@@ -9,6 +9,7 @@ import { utilTotalExtent } from '../util/util.ts';
 import type { Extent, Vec2 } from '@rapid-sdk/math';
 import type { Action } from '../actions/types.ts';
 import type { Context } from '../Context.ts';
+import type { EditLabel } from '../lib/Edit.ts';
 import type { OsmEntity, OsmNode, OsmWay } from '../data/types.ts';
 
 
@@ -73,10 +74,10 @@ export class StraightenOperation extends AbstractOperation {
     const action = this._action;
     if (!action) return;
 
-    const annotation = this.annotation();
+    const label = this.editLabel();
     editor
       .performAsync(action)
-      .then(() => editor.commit({ annotation: annotation, selectedIDs: this.selectedIDs }));
+      .then(() => editor.commit({ ...label, selectedIDs: this.selectedIDs }));
   }
 
 
@@ -144,9 +145,11 @@ export class StraightenOperation extends AbstractOperation {
   }
 
 
-  public annotation(): string {
-    const l10n = this.context.systems.l10n!;
-    return l10n.t(`operations.straighten.annotation.${this._geometry}`, { n: this._ways.length || this._nodes.length });
+  public editLabel(): EditLabel {
+    return {
+      stringID: `operations.straighten.annotation.${this._geometry}`,
+      stringParams: { n: this._ways.length || this._nodes.length }
+    };
   }
 
 

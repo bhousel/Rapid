@@ -10,7 +10,7 @@ They record the "why" that the code alone doesn't show.
 | [`conflation-system.md`](conflation-system.md) | `ConflationSystem`: client-side matching of third-party data against OSM, partial-line accept | In progress: Steps 1–5 done (line matching, drawing, partial accept with joins) |
 | [`database-system.md`](database-system.md) | `DatabaseSystem`: IndexedDB wrapper with `sessions` and `files` stores | Phases 0–4 done; files-management UI + worker offload open |
 | [`draganddrop-system.md`](draganddrop-system.md) | `DragAndDropSystem`: claim-based router for dropped files | Implemented |
-| [`edit-system.md`](edit-system.md) | `EditSystem`: undo/redo history, edits beyond the OSM graph (typed edit props), backups and restore | Design in progress; undone edits no longer saved |
+| [`edit-system.md`](edit-system.md) | `EditSystem`: undo/redo history, edits beyond the OSM graph (typed edit props), backups and restore | In progress: undone edits not saved; edit props, translated labels and `hasWork()` done; next: viewport, backup v4 |
 | [`keyboard-system.md`](keyboard-system.md) | `KeyboardSystem`: key binding scopes and commands | Phase 1 done; remappable shortcuts in backlog |
 | [`network-system.md`](network-system.md) | `NetworkSystem`: fetch lifecycle, dedup, timeouts, worker fetches | Implemented |
 | [`rapid-system.md`](rapid-system.md) | `RapidSystem`: the dataset catalog, its layers (services, asset files, the user), accepted and ignored features | Dataset assets, the user's datasets in `DatabaseSystem`, and stable feature IDs done; export/import next |

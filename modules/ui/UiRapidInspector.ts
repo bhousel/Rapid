@@ -8,6 +8,7 @@ import { UiTooltip } from './UiTooltip.ts';
 import type { Context } from '../Context.ts';
 import type { D3EnterSelection, D3Selection } from 'd3-selection';
 import type { KeyBindingScope } from '../core/KeyboardSystem.ts';
+import type { RapidAcceptEditProps, RapidIgnoreEditProps } from '../core/RapidSystem.ts';
 
 const ACCEPT_FEATURES_LIMIT = 50;
 
@@ -570,20 +571,14 @@ export class UiRapidInspector {
     const acceptIDs = [...action.getAcceptedIDs()];
     const newID = action.getNewID();
 
-    // In place of a string annotation, this introduces an "object-style"
-    // annotation, where "type" and "description" are standard keys,
-    // and there may be additional properties. Note that this will be
-    // serialized to JSON while saving undo/redo state in editor.save().
-    const annotation = {
+    // The edit's `type` and `acceptIDs` record what the user accepted, `RapidSystem` reads them
+    // back from the history. These props are saved as JSON in backups.
+    editor.commit<RapidAcceptEditProps>({
       type: 'rapid_accept_feature',
-      description: l10n.t('rapid_inspector.option_accept.annotation'),
+      stringID: 'rapid_inspector.option_accept.annotation',
       acceptIDs: acceptIDs,
-      dataUsed: dataset?.dataUsed || [datasetID]
-    };
-
-    editor.commit({
-      annotation: annotation,
-      selectedIDs: newID ? [newID] : undefined
+      selectedIDs: newID ? [newID] : undefined,
+      sources: { data: dataset?.dataUsed ?? [datasetID] }
     });
 
     // What next
@@ -646,15 +641,13 @@ export class UiRapidInspector {
 
     const context = this.context;
     const editor = context.systems.editor!;
-    const l10n = context.systems.l10n!;
 
-    const annotation = {
-      type: 'rapid_ignore_feature',
-      description: l10n.t('rapid_inspector.option_ignore.annotation'),
-      ignoreID: datum.id
-    };
     editor.perform(actionNoop());
-    editor.commit({ annotation: annotation });
+    editor.commit<RapidIgnoreEditProps>({
+      type: 'rapid_ignore_feature',
+      stringID: 'rapid_inspector.option_ignore.annotation',
+      ignoreID: datum.id
+    });
     context.enter('browse');
     this.datum = null;
   }

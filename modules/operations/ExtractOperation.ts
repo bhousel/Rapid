@@ -8,6 +8,7 @@ import { utilTotalExtent } from '../util/util.ts';
 import type { Extent } from '@rapid-sdk/math';
 import type { ExtractAction } from '../actions/extract.ts';
 import type { Context } from '../Context.ts';
+import type { EditLabel } from '../lib/Edit.ts';
 import type { OsmEntity } from '../data/types.ts';
 import type { Graph } from '../lib/Graph.ts';
 
@@ -84,10 +85,10 @@ export class ExtractOperation extends AbstractOperation {
       return graph;
     };
 
-    const annotation = this.annotation();
+    const label = this.editLabel();
     editor.beginTransaction();
     editor.perform(combinedAction);
-    editor.commit({ annotation: annotation, selectedIDs: this.selectedIDs });
+    editor.commit({ ...label, selectedIDs: this.selectedIDs });
     editor.endTransaction();
 
     this.context.enter('select-osm', { selection: { osm: extractedNodeIDs }} );
@@ -136,8 +137,7 @@ export class ExtractOperation extends AbstractOperation {
   }
 
 
-  public annotation(): string {
-    const l10n = this.context.systems.l10n!;
-    return l10n.t('operations.extract.annotation', { n: this.selectedIDs.length });
+  public editLabel(): EditLabel {
+    return { stringID: 'operations.extract.annotation', stringParams: { n: this.selectedIDs.length } };
   }
 }

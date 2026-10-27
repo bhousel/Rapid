@@ -8,6 +8,7 @@ import { utilTotalExtent } from '../util/util.ts';
 import type { Extent, Vec2 } from '@rapid-sdk/math';
 import type { Action } from '../actions/types.ts';
 import type { Context } from '../Context.ts';
+import type { EditLabel } from '../lib/Edit.ts';
 import type { OsmEntity, OsmNode, OsmWay } from '../data/types.ts';
 import type { Graph } from '../lib/Graph.ts';
 
@@ -71,10 +72,10 @@ export class OrthogonalizeOperation extends AbstractOperation {
     };
     combinedAction.transitionable = true;
 
-    const annotation = this.annotation();
+    const label = this.editLabel();
     editor
       .performAsync(combinedAction)
-      .then(() => editor.commit({ annotation: annotation, selectedIDs: this.selectedIDs }));
+      .then(() => editor.commit({ ...label, selectedIDs: this.selectedIDs }));
   }
 
 
@@ -144,9 +145,8 @@ export class OrthogonalizeOperation extends AbstractOperation {
   }
 
 
-  public annotation(): string {
-    const l10n = this.context.systems.l10n!;
-    return l10n.t('operations.orthogonalize.annotation.' + this._type, { n: this._actions.length });
+  public editLabel(): EditLabel {
+    return { stringID: 'operations.orthogonalize.annotation.' + this._type, stringParams: { n: this._actions.length } };
   }
 
 

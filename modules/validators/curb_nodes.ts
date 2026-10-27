@@ -89,7 +89,7 @@ export function validateCurbNodes(context: Context): ValidatorFunction {
           onClick: () => {
             performCurbNodeFixes(wayID, tags);
             editor.commit({
-              annotation: l10n.t('issues.curb_nodes.fix.annotation'),
+              stringID: 'issues.curb_nodes.fix.annotation',
               selectedIDs: [wayID]
             });
           }

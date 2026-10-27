@@ -197,7 +197,7 @@ export function validateAmbiguousCrossingTags(context: Context): ValidatorFuncti
           updates: updates,
           choices: choices
         },
-        autoArgs: [ action, l10n.t('issues.ambiguous_crossing.annotation.changed') ],
+        autoArgs: [ action, { stringID: 'issues.ambiguous_crossing.annotation.changed' } ],
         message: getIssueTitle,
         reference: renderIssueReference,
         dynamicFixes: makeFixes
@@ -330,7 +330,7 @@ export function validateAmbiguousCrossingTags(context: Context): ValidatorFuncti
 
           editor.perform(action);
           editor.commit({
-            annotation: l10n.t('issues.ambiguous_crossing.annotation.changed'),
+            stringID: 'issues.ambiguous_crossing.annotation.changed',
             selectedIDs: [way.id]
           });
         }

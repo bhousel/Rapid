@@ -5,6 +5,7 @@ import { KeyOperationBehavior } from '../behaviors/KeyOperationBehavior.ts';
 import { AbstractOperation } from './AbstractOperation.ts';
 
 import type { Context } from '../Context.ts';
+import type { EditLabel } from '../lib/Edit.ts';
 import type { OsmEntity } from '../data/types.ts';
 
 
@@ -76,8 +77,8 @@ export class CycleHighwayTagOperation extends AbstractOperation {
   protected _entities: OsmEntity[];
   /** The preset cycle to move through, or `null` if the selection isn't eligible */
   protected _presetIDs: string[] | null;
-  /** The undo annotation */
-  protected _annotation: string;
+  /** The undo/redo label */
+  protected _label: EditLabel | undefined;
   /** Whether the same selection was cycled last time */
   protected _isSameSelection: boolean;
 
@@ -98,7 +99,7 @@ export class CycleHighwayTagOperation extends AbstractOperation {
     // Gather eligible entities and determine which list we are cycling through..
     let entities: OsmEntity[] = [];
     let presetIDs: string[] | null = null;
-    let annotation = '';
+    let label: EditLabel | undefined;
 
     for (const entityID of selectedIDs) {
       const entity = graph.hasEntity(entityID);
@@ -116,9 +117,9 @@ export class CycleHighwayTagOperation extends AbstractOperation {
         entities.push(entity);
         if (!presetIDs) {   // lock it in
           presetIDs = highwayLinePresetIDs;
-          annotation = l10n.t('operations.cycle_highway_tag.highway_annotation');
+          label = { stringID: 'operations.cycle_highway_tag.highway_annotation' };
         } else if (presetIDs !== highwayLinePresetIDs) {   // mix of types, bail out
-          entities = []; presetIDs = null; annotation = ''; break;
+          entities = []; presetIDs = null; label = undefined; break;
         }
       }
 
@@ -126,9 +127,9 @@ export class CycleHighwayTagOperation extends AbstractOperation {
         entities.push(entity);
         if (!presetIDs) {  // lock it in
           presetIDs = crossingLinePresetIDs;
-          annotation = l10n.t('operations.cycle_highway_tag.crosswalk_annotation');
+          label = { stringID: 'operations.cycle_highway_tag.crosswalk_annotation' };
         } else if (presetIDs !== crossingLinePresetIDs) {   // mix of types, bail out
-          entities = []; presetIDs = null; annotation = ''; break;
+          entities = []; presetIDs = null; label = undefined; break;
         }
       }
 
@@ -136,16 +137,16 @@ export class CycleHighwayTagOperation extends AbstractOperation {
         entities.push(entity);
         if (!presetIDs) {  // lock it in
           presetIDs = crossingVertexPresetIDs;
-          annotation = l10n.t('operations.cycle_highway_tag.crosswalk_annotation');
+          label = { stringID: 'operations.cycle_highway_tag.crosswalk_annotation' };
         } else if (presetIDs !== crossingVertexPresetIDs) {   // mix of types, bail out
-          entities = []; presetIDs = null; annotation = ''; break;
+          entities = []; presetIDs = null; label = undefined; break;
         }
       }
     }
 
     this._entities = entities;
     this._presetIDs = presetIDs;
-    this._annotation = annotation;
+    this._label = label;
 
     // If the user has the same selection as before, we continue through the cycle..
     this._isSameSelection = utilArrayIdentical(selectedIDs, _lastSelectedIDs);
@@ -185,11 +186,11 @@ export class CycleHighwayTagOperation extends AbstractOperation {
       editor.perform(action);
     }
 
-    const options = { annotation: this._annotation, selectedIDs: this.selectedIDs };
-    if (this._isSameSelection && editor.getUndoAnnotation() === this._annotation) {
-      editor.commitAppend(options);
+    const props = { ...this._label, selectedIDs: this.selectedIDs };
+    if (this._isSameSelection && editor.getUndoEdit()?.isLabeled(this._label)) {
+      editor.commitAppend(props);
     } else {
-      editor.commit(options);
+      editor.commit(props);
     }
 
     editor.endTransaction();
@@ -208,7 +209,7 @@ export class CycleHighwayTagOperation extends AbstractOperation {
   }
 
 
-  public annotation(): string {
-    return this._annotation;
+  public editLabel(): EditLabel | undefined {
+    return this._label;
   }
 }

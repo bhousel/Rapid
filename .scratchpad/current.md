@@ -2,13 +2,18 @@
 
 ## Active: what an edit records (`EditSystem`)
 Design: [`design/edit-system.md`](../design/edit-system.md), started Oct 26. Edits need to record more
-than OSM graph changes: `Edit<P>` gets a Preset-like props bag with a `type` (e.g. Rapid ignores; chosen
-over a separate "effects" list), labels become l10n string IDs, a new `hasWork()`
-decides backups, the map should show where an undo/redo changed things, and backup v4 stores base
-versions (fetched on restore) instead of base entities. Done: undone (redo) edits aren't saved, and a
-session undone back to nothing is deleted. Found: v3 restore reads `result.data` from
-`loadMultipleAsync`, which returns an array now, so restoring missing child nodes is likely broken.
-PR #5's `EditSystem.dataVersion` fits here (the "did data change?" question).
+than OSM graph changes. Done: undone (redo) edits aren't saved, and a session undone back to nothing
+is deleted (step 2). Step 3 (Oct 27): `Edit<P>` is a graph plus a props bag with an optional `type`;
+`commit(props)` everywhere passes a `stringID` (+ `stringParams`) instead of translated text, and
+`edit.label` translates it; `getUndoEdit()`/`getRedoEdit()` replace `get*Annotation()`, and
+`edit.isLabeled(label)` replaces comparing translated strings; operations have `editLabel()` (was
+`annotation()`); Rapid accept/ignore are `RapidAcceptEditProps`/`RapidIgnoreEditProps`; `hasWork()`
+decides backups, the beforeunload prompt and the source switcher warning. Backup items now hold `props`
+(still version 3; old items convert via `_legacyEditProps`). Checked live: an ignore-only session is
+backed up with its typed props, and undoing it deletes the session.
+Next: step 4 (viewport on undo/redo/restore), step 5 (backup v4). Found: v3 restore reads `result.data`
+from `loadMultipleAsync`, which returns an array now, so restoring missing child nodes is likely broken.
+PR #5's `EditSystem.dataVersion` fits here (the "did data change?" question); not landed.
 
 ## Active: matching third-party data against OSM (`ConflationSystem`)
 Top priority. Design: [`design/conflation-system.md`](../design/conflation-system.md), currently proposed and

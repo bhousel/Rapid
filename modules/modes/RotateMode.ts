@@ -3,6 +3,7 @@ import { actionRotate } from '../actions/rotate.ts';
 import { DEG2RAD, vecAdd, vecScale, vecSubtract } from '@rapid-sdk/math';
 
 import type { Context } from '../Context.ts';
+import type { EditLabel } from '../lib/Edit.ts';
 import type { OsmEntity, OsmNode } from '../data/types.ts';
 import type { Vec2 } from '@rapid-sdk/math';
 
@@ -109,7 +110,6 @@ export class RotateMode extends AbstractMode {
     const context = this.context;
     const editor = context.systems.editor!;
     const filters = context.systems.filters!;
-    const l10n = context.systems.l10n!;
     const eventManager = context.systems.gfx!.eventManager!;
 
     this._lastPoint = null;
@@ -125,17 +125,17 @@ export class RotateMode extends AbstractMode {
 
     // If there is work in progress, finalize it.
     if (editor.hasWorkInProgress) {
-      let annotation: string;
+      let label: EditLabel;
       if (this._entityIDs.length === 1) {
         const graph = editor.staging.graph;
         const entity = graph.entity(this._entityIDs[0]);
-        annotation = l10n.t('operations.rotate.annotation.' + entity.geometry(graph));
+        label = { stringID: 'operations.rotate.annotation.' + entity.geometry(graph) };
       } else {
-        annotation = l10n.t('operations.rotate.annotation.feature', { n: this._entityIDs.length });
+        label = { stringID: 'operations.rotate.annotation.feature', stringParams: { n: this._entityIDs.length } };
       }
 
       editor.commit({
-        annotation: annotation,
+        ...label,
         selectedIDs: this._entityIDs
       });
     }

@@ -155,7 +155,6 @@ export class UiSectionRawMemberEditor extends AbstractUiSection {
   protected _changeRole(e: Event, d: MemberRowData): void {
     const context = this.context;
     const editor = context.systems.editor!;
-    const l10n = context.systems.l10n!;
     const oldRole = d.role;
     const newRole = context.cleanRelationRole(select(e.currentTarget as HTMLElement).property('value'));
 
@@ -163,7 +162,8 @@ export class UiSectionRawMemberEditor extends AbstractUiSection {
       const member = { id: d.id, type: d.type, role: newRole };
       editor.perform(actionChangeMember(d.relation.id, member as OsmRelationMember, d.index));
       editor.commit({
-        annotation: l10n.t('operations.change_role.annotation', { n: 1 }),
+        stringID: 'operations.change_role.annotation',
+        stringParams: { n: 1 },
         selectedIDs: [d.relation.id]
       });
     }
@@ -178,12 +178,12 @@ export class UiSectionRawMemberEditor extends AbstractUiSection {
   protected _deleteMember(e: Event, d: MemberRowData): void {
     const context = this.context;
     const editor = context.systems.editor!;
-    const l10n = context.systems.l10n!;
     utilHighlightEntities(context, [d.id], false);  // remove the hover-highlight styling
 
     editor.perform(actionDeleteMember(d.relation.id, d.index));
     editor.commit({
-      annotation: l10n.t('operations.delete_member.annotation', { n: 1 }),
+      stringID: 'operations.delete_member.annotation',
+      stringParams: { n: 1 },
       selectedIDs: [d.relation.id]
     });
 
@@ -406,7 +406,7 @@ export class UiSectionRawMemberEditor extends AbstractUiSection {
         if (targetIndex !== null) {   // dragged to a new position, reorder
           editor.perform(actionMoveMember(d.relation.id, index, targetIndex));
           editor.commit({
-            annotation: l10n.t('operations.reorder_members.annotation'),
+            stringID: 'operations.reorder_members.annotation',
             selectedIDs: [d.relation.id]
           });
         }

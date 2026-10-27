@@ -245,7 +245,8 @@ export function validateImpossibleOneway(context: Context): ValidatorFunction {
                 const entityID = this.issue.entityIds[0];
                 editor.perform(actionReverse(entityID));
                 editor.commit({
-                  annotation: l10n.t('operations.reverse.annotation.line', { n: 1 }),
+                  stringID: 'operations.reverse.annotation.line',
+                  stringParams: { n: 1 },
                   selectedIDs: [entityID]
                 });
               }

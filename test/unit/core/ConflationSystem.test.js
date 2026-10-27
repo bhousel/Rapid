@@ -461,7 +461,7 @@ describe('ConflationSystem', () => {
     function accept(datum) {
       const action = Rapid.actionRapidAcceptFeature(datum, conflation.getJoins(ds, datum));
       editor.perform(action);
-      editor.commit({ annotation: 'accepted' });
+      editor.commit({ stringID:'accepted' });
       return editor.stable.graph.entity(action.getNewID());
     }
 
@@ -566,7 +566,7 @@ describe('ConflationSystem', () => {
       const newRun = conflation.getResult(ds, a).runs[1];
 
       editor.perform(Rapid.actionDeleteWay('w1'));   // the existing sidewalk goes away first
-      editor.commit({ annotation: 'deleted w1' });
+      editor.commit({ stringID:'deleted w1' });
 
       const way = accept(newRun.datum);
       assert.isOk(way);
@@ -614,7 +614,7 @@ describe('ConflationSystem', () => {
       const n2 = new Rapid.OsmNode(context, { id: 'n-new-2', loc: loc(150, 0) });
       const w = new Rapid.OsmWay(context, { id: 'w-new', nodes: ['n-new-1', 'n-new-2'], tags: SIDEWALK });
       editor.perform(Rapid.actionAddEntity(n1), Rapid.actionAddEntity(n2), Rapid.actionAddEntity(w));
-      editor.commit({ annotation: 'mapped the rest' });
+      editor.commit({ stringID:'mapped the rest' });
 
       assert.isAbove(onChange.mock.calls.length, 0);
       const after = conflation.getResult(ds, a);

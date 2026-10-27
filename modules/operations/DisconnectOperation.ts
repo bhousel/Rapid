@@ -8,6 +8,7 @@ import { utilTotalExtent } from '../util/util.ts';
 import type { Extent, Vec2 } from '@rapid-sdk/math';
 import type { DisconnectAction } from '../actions/disconnect.ts';
 import type { Context } from '../Context.ts';
+import type { EditLabel } from '../lib/Edit.ts';
 import type { OsmEntity, OsmNode, OsmWay } from '../data/types.ts';
 import type { Graph } from '../lib/Graph.ts';
 
@@ -188,7 +189,7 @@ export class DisconnectOperation extends AbstractOperation {
     };
 
     editor.perform(combinedAction);
-    editor.commit({ annotation: this.annotation(), selectedIDs: this.selectedIDs });
+    editor.commit({ ...this.editLabel(), selectedIDs: this.selectedIDs });
   }
 
 
@@ -276,8 +277,7 @@ export class DisconnectOperation extends AbstractOperation {
   }
 
 
-  public annotation(): string {
-    const l10n = this.context.systems.l10n!;
-    return l10n.t(`operations.disconnect.annotation.${this._annotationID}`);
+  public editLabel(): EditLabel {
+    return { stringID: `operations.disconnect.annotation.${this._annotationID}` };
   }
 }

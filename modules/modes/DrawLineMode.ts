@@ -8,6 +8,7 @@ import { OsmNode, OsmWay } from '../data/index.ts';
 
 import type { Action } from '../actions/types.ts';
 import type { Context } from '../Context.ts';
+import type { EditLabel } from '../lib/Edit.ts';
 import type { EventData } from '../behaviors/AbstractBehavior.ts';
 import type { Graph } from '../lib/Graph.ts';
 import type { Midpoint } from '../actions/add_midpoint.ts';
@@ -303,13 +304,12 @@ export class DrawLineMode extends AbstractMode {
 
 
   /**
-   * An annotation is a text associated with the edit, such as "Started a line".
-   * @return String such as "Started a line", or undefined if the drawWay is incomplete
+   * The label for the edit, such as "Started a line".
+   * @return Label such as "Started a line", or undefined if the drawWay is incomplete
    */
-  protected _getAnnotation(): string | undefined {
+  protected _getLabel(): EditLabel | undefined {
     const context = this.context;
     const editor = context.systems.editor!;
-    const l10n = context.systems.l10n!;
 
     const graph = editor.staging.graph;
     const drawWay = this.drawWayID ? graph.hasEntity(this.drawWayID) as OsmWay | undefined : undefined;
@@ -317,7 +317,7 @@ export class DrawLineMode extends AbstractMode {
     if (length < 2) return undefined;
 
     const which = length > 2 ? 'continue' : 'start';
-    return l10n.t(`operations.${which}.annotation.line`);
+    return { stringID: `operations.${which}.annotation.line` };
   }
 
 
@@ -549,9 +549,9 @@ export class DrawLineMode extends AbstractMode {
       }
 
       // If the line has enough segments, commit the work in progress so we can undo/redo to it.
-      const annotation = this._getAnnotation();
-      if (annotation) {
-        editor.commit({ annotation: annotation, selectedIDs: [drawWay.id] });
+      const label = this._getLabel();
+      if (label) {
+        editor.commit({ ...label, selectedIDs: [drawWay.id] });
         this._takeSnapshot(firstNode!.id, drawNode!.id);
       }
 
@@ -622,9 +622,9 @@ export class DrawLineMode extends AbstractMode {
       );
 
       // If the line has enough segments, commit the work in progress so we can undo/redo to it.
-      const annotation = this._getAnnotation();
-      if (annotation) {
-        editor.commit({ annotation: annotation, selectedIDs: [drawWay.id] });
+      const label = this._getLabel();
+      if (label) {
+        editor.commit({ ...label, selectedIDs: [drawWay.id] });
         this._takeSnapshot(firstNode!.id, drawNode!.id);
       }
 
@@ -697,9 +697,9 @@ export class DrawLineMode extends AbstractMode {
       );
 
       // If the line has enough segments, commit the work in progress so we can undo/redo to it.
-      const annotation = this._getAnnotation();
-      if (annotation) {
-        editor.commit({ annotation: annotation, selectedIDs: [drawWay.id] });
+      const label = this._getLabel();
+      if (label) {
+        editor.commit({ ...label, selectedIDs: [drawWay.id] });
         this._takeSnapshot(firstNode!.id, targetNode.id);
       }
 
@@ -862,7 +862,7 @@ export class DrawLineMode extends AbstractMode {
       this._refreshEntities();
 
     } else {   // Otherwise, return to select or browse mode (MapSystem has similar code to this)
-      const checkIDs = editor.stable.selectedIDs ?? [];
+      const checkIDs = editor.stable.props.selectedIDs ?? [];
       const selectedIDs = checkIDs.filter(entityID => graph.hasEntity(entityID));
       if (selectedIDs.length) {
         context.enter('select-osm', { selection: { osm: selectedIDs }} );

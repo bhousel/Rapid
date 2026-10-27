@@ -31,7 +31,7 @@ This module contains a mix of data structures, schema classes, and utility funct
 | File | Description |
 |------|-------------|
 | `Difference.ts` | Calculates differences between two graphs |
-| `Edit.ts` | The state of a single edit in the history (graph, annotation, selection, etc.) |
+| `Edit.ts` | One step in the edit history: its graph, plus props (label, type, selection, sources, etc.) |
 | `Geometry.ts` | Geometry wrapper for data elements |
 | `GeometryPart.ts` | Individual parts of multi-part geometries |
 | `Graph.ts` | Transactional graph structure holding all entities |

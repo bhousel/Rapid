@@ -93,7 +93,6 @@ export class UiFieldCheck extends AbstractUiField {
     }
     const context = this.context;
     const editor = context.systems.editor!;
-    const l10n = context.systems.l10n!;
 
     this._checkImpliedYes();
 
@@ -174,7 +173,8 @@ export class UiFieldCheck extends AbstractUiField {
 
           editor.perform(combinedAction);
           editor.commit({
-            annotation: l10n.t('operations.reverse.annotation.line', { n: 1 }),
+            stringID: 'operations.reverse.annotation.line',
+            stringParams: { n: 1 },
             selectedIDs: this.entityIDs
           });
 

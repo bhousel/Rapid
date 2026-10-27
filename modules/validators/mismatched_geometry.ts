@@ -97,7 +97,7 @@ export function validateMismatchedGeometry(context: Context): ValidatorFunction 
           const way = graph.entity(this.issue.entityIds[0]) as OsmWay;
           editor.perform(actionMergeNodes([way.nodes[0], way.nodes[way.nodes.length-1]], nodes[0].loc!));
           editor.commit({
-            annotation: l10n.t('issues.fix.connect_endpoints.annotation'),
+            stringID: 'issues.fix.connect_endpoints.annotation',
             selectedIDs: [way.id]
           });
         };
@@ -117,7 +117,7 @@ export function validateMismatchedGeometry(context: Context): ValidatorFunction 
         const index = way.nodes.length;
         editor.perform(actionAddVertex(wayID, nodeID, index));
         editor.commit({
-          annotation: l10n.t('issues.fix.connect_endpoints.annotation'),
+          stringID: 'issues.fix.connect_endpoints.annotation',
           selectedIDs: [wayID]
         });
       };
@@ -173,7 +173,7 @@ export function validateMismatchedGeometry(context: Context): ValidatorFunction 
             }
             editor.perform(actionChangeTags(entityID, tags));
             editor.commit({
-              annotation: l10n.t('issues.fix.remove_tag.annotation'),
+              stringID: 'issues.fix.remove_tag.annotation',
               selectedIDs: [entityID]
             });
           }
@@ -385,7 +385,7 @@ export function validateMismatchedGeometry(context: Context): ValidatorFunction 
         }
         editor.perform(actionChangeTags(entityID, tags));
         editor.commit({
-          annotation: l10n.t('issues.fix.convert_to_line.annotation'),
+          stringID: 'issues.fix.convert_to_line.annotation',
           selectedIDs: [entityID]
         });
       };
@@ -415,7 +415,8 @@ export function validateMismatchedGeometry(context: Context): ValidatorFunction 
         const action = actionExtract(entityID);
         editor.perform(action);
         editor.commit({
-          annotation: l10n.t('operations.extract.annotation', { n: 1 }),
+          stringID: 'operations.extract.annotation',
+          stringParams: { n: 1 },
           selectedIDs: [entityID]
         });
         // re-enter mode to trigger updates

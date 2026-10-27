@@ -78,7 +78,6 @@ export class PasteBehavior extends AbstractBehavior {
     const context = this.context;
     const editor = context.systems.editor!;
     const gfx = context.systems.gfx!;
-    const l10n = context.systems.l10n!;
     const map = context.systems.map!;
 
     // Note: nearly the same code appears in both PasteBehavior and PasteOperation
@@ -133,10 +132,12 @@ export class PasteBehavior extends AbstractBehavior {
     const copyLoc = context.copyLoc;
     const copyWorld = projWgs84ToWorld(copyLoc ?? extent.center());
     const delta = vecSubtract(map.mouseWorld(), copyWorld);
-    const annotation = l10n.t('operations.paste.annotation', { n: newIDs.length });
-
     editor.perform(actionMove(newIDs, delta));
-    editor.commit({ annotation: annotation, selectedIDs: newIDs });
+    editor.commit({
+      stringID: 'operations.paste.annotation',
+      stringParams: { n: newIDs.length },
+      selectedIDs: newIDs
+    });
     editor.endTransaction();
 
     // Put the user in move mode so they can place the pasted features

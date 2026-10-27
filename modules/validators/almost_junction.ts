@@ -13,6 +13,7 @@ import { ValidationFix } from '../lib/ValidationFix.ts';
 import type { Action } from '../actions/types.ts';
 import type { Context } from '../Context.ts';
 import type { D3Selection } from 'd3-selection';
+import type { EditLabel } from '../lib/Edit.ts';
 import type { Graph } from '../lib/Graph.ts';
 import type { Midpoint } from '../actions/add_midpoint.ts';
 import type { OsmEntity, OsmNode, OsmTags, OsmWay } from '../data/types.ts';
@@ -84,9 +85,9 @@ export function validateAlmostJunction(context: Context): ValidatorFunction {
 
     const extendableNodeInfos = findConnectableEndNodesByExtension(way, graph);
     for (const extendableNodeInfo of extendableNodeInfos) {
-      const autoArgs : [Action, string] = [
+      const autoArgs : [Action, EditLabel] = [
         actionExtendNode(extendableNodeInfo),
-        l10n.t('issues.fix.connect_almost_junction.annotation')
+        { stringID: 'issues.fix.connect_almost_junction.annotation' }
       ];
 
       const issue = new ValidationIssue(context, {
@@ -183,7 +184,7 @@ export function validateAlmostJunction(context: Context): ValidatorFunction {
         icon: 'rapid-icon-abutment',
         title: l10n.t('issues.fix.connect_features.title'),
         onClick: function(this: any) {
-          const annotation = l10n.t('issues.fix.connect_almost_junction.annotation');
+          const label: EditLabel = { stringID: 'issues.fix.connect_almost_junction.annotation' };
           const [, endNodeId, crossWayId] = this.issue.entityIds;
           const midNode = graph.entity(this.issue.data.midId) as OsmNode;
           const endNode = graph.entity(endNodeId) as OsmNode;
@@ -196,7 +197,7 @@ export function validateAlmostJunction(context: Context): ValidatorFunction {
             if (colinear) {
               editor.perform(actionMergeNodes([colinear.id, endNode.id], colinear.loc!));
               editor.commit({
-                annotation: annotation,
+                ...label,
                 selectedIDs: [colinear.id, endNode.id]
               });
               return;
@@ -214,13 +215,13 @@ export function validateAlmostJunction(context: Context): ValidatorFunction {
             const node = edgeNodes[closest.index] as OsmNode;
             editor.perform(actionMergeNodes([ node.id, endNode.id ], closest.point));
             editor.commit({
-              annotation: annotation,
+              ...label,
               selectedIDs: [node.id, endNode.id]
             });
           } else {   // create a midpoint on the target way
             editor.perform(actionAddMidpoint({ loc: crossLoc, edge: targetEdge } as Midpoint, endNode));
             editor.commit({
-              annotation: annotation,
+              ...label,
               selectedIDs: [endNode.id]
             });
           }
@@ -239,7 +240,7 @@ export function validateAlmostJunction(context: Context): ValidatorFunction {
             tags.noexit = 'yes';
             editor.perform(actionChangeTags(nodeID, tags));
             editor.commit({
-              annotation: l10n.t('issues.fix.tag_as_disconnected.annotation'),
+              stringID: 'issues.fix.tag_as_disconnected.annotation',
               selectedIDs: [nodeID]
             });
           }

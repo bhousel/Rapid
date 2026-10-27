@@ -910,8 +910,9 @@ export class UiIntroLine extends AbstractIntroChapter {
 
       await delayAsync();   // wait for any transtion to complete
 
-      // then check undo annotation to see what the user did
-      if (editor.getUndoAnnotation() === l10n.t('operations.split.annotation.line', { n: 1 })) {
+      // then check the undo edit to see what the user did
+      const label = { stringID: 'operations.split.annotation.line', stringParams: { n: 1 } };
+      if (editor.getUndoEdit()?.isLabeled(label)) {
         return this._didSplitAsync;
       } else {
         return this._retrySplitAsync;
