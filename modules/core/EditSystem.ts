@@ -838,6 +838,33 @@ export class EditSystem extends AbstractSystem {
    *  @param seenIDs - Optional set of all entity IDs on the tile (including previously seen ones)
    */
   public merge(toMerge: (OsmEntity | OsmEntityProps)[], seenIDs?: Set<EntityID>): void {
+    this._mergeEntities(toMerge, seenIDs, false);
+  }
+
+
+  /**
+   * Replace entities in the Base Graph with newer copies, from the OSM API.
+   * Unlike `merge`, this replaces entities that are already there. Every graph in the history sees
+   * the newer copy, except where the user changed or deleted that entity.
+   * The uploader uses this when the user keeps their deletion of something another user changed:
+   * the deletion has to be uploaded against the server's newest version.
+   * @param entities - The newer copies of the entities
+   */
+  public updateBase(entities: OsmEntity[]): void {
+    this._mergeEntities(entities, undefined, true);
+
+    // The full difference holds base copies of what changed, so it needs the newer ones.
+    this._fullDifference = new Difference(this.base.graph!, this.stable.graph!);
+  }
+
+
+  /**
+   * Merge entities into the Base Graph (shared by `merge` and `updateBase`).
+   * @param toMerge - Entities (or props) to merge into base graph
+   * @param seenIDs - Optional set of all entity IDs on the tile (including previously seen ones)
+   * @param force - If `true`, replace entities already in the base graph
+   */
+  protected _mergeEntities(toMerge: (OsmEntity | OsmEntityProps)[], seenIDs: Set<EntityID> | undefined, force: boolean): void {
     const context = this.context;
     const baseGraph = this.base.graph!;
     const stagingGraph = this.staging.graph!;
@@ -894,7 +921,7 @@ export class EditSystem extends AbstractSystem {
     const graphs = this._history.map(state => state.graph!);
     graphs.push(stagingGraph);
 
-    baseGraph.rebase(entities, graphs, false);  // force = false
+    baseGraph.rebase(entities, graphs, force);
 
     // Newly downloaded data should appear in every OSM cache (unless locally overridden).
     this._mergeIntoCache('editor_base', baseGraph, entities);

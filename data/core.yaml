@@ -1120,6 +1120,8 @@ en:
       delete: Leave Deleted
       download_changes: Or download osmChange file
       done: "All conflicts resolved!"
+      annotation: Merged changes from other mappers.
+      unresolved: "OpenStreetMap still reports a conflict that Rapid couldn't resolve. Your changes are still here, and you can download them as an osmChange file from the list of changes."
       help: "Another user changed some of the same map features you changed. Click on each feature below for more details about the conflict, and choose whether to keep your changes or the other user's changes."
 
   download_osc:
@@ -1129,6 +1131,7 @@ en:
   merge_remote_changes:
     conflict:
       deleted: 'This feature has been deleted by {user}.'
+      deleted_locally: '{user} changed this feature, but you deleted it.'
       location: 'This feature was moved by both you and {user}.'
       nodelist: 'Nodes were changed by both you and {user}.'
       memberlist: 'Relation members were changed by both you and {user}.'

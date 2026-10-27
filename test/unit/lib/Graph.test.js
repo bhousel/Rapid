@@ -714,6 +714,29 @@ describe('Graph', () => {
       assert.strictEqual(head.entity('n'), n);
     });
 
+    it('doesn\'t re-add the nodes of a way that was deleted along with them', () => {
+      const n = new Rapid.OsmNode(context, { id: 'n' });
+      const w1 = new Rapid.OsmWay(context, { id: 'w1', nodes: ['n'] });
+      const w1v2 = w1.update({ version: 2 });
+      const base = new Rapid.Graph(context, [n, w1]);
+      const head = new Rapid.Graph(base).remove([w1, n]);
+      base.rebase([w1v2], [base, head], true);   // a newer copy of the deleted way
+      assert.isUndefined(head.hasEntity('n'));
+      assert.isUndefined(head.hasEntity('w1'));
+      assert.strictEqual(base.entity('w1'), w1v2);
+    });
+
+    it('updates parentWays when force replaces a way with fewer nodes', () => {
+      const n1 = new Rapid.OsmNode(context, { id: 'n1' });
+      const n2 = new Rapid.OsmNode(context, { id: 'n2' });
+      const w1 = new Rapid.OsmWay(context, { id: 'w1', nodes: ['n1', 'n2'] });
+      const w1v2 = w1.removeNode('n2');
+      const base = new Rapid.Graph(context, [n1, n2, w1]);
+      base.rebase([w1v2], [], true);
+      assert.deepEqual(base.parentWays(n1), [w1v2]);
+      assert.deepEqual(base.parentWays(n2), []);
+    });
+
     it('updates parentRelations', () => {
       const n = new Rapid.OsmNode(context, { id: 'n' });
       const r1 = new Rapid.OsmRelation(context, { id: 'r1', members: [{ id: 'n'}] });

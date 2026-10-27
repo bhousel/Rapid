@@ -9,6 +9,14 @@ import { utilArrayUnion, utilArrayUniq } from '@rapid-sdk/util';
 import type { Context } from '../Context.ts';
 import type { OsmChangeset } from '../data/OsmChangeset.ts';
 import type { OsmEntity } from '../data/OsmEntity.ts';
+import type { OsmEntityProps, OsmWay } from '../data/types.ts';
+
+
+/**
+ * How many times one save may check for conflicts on its own, after the API answers 409 Conflict.
+ * (The user resolving conflicts starts the count again.)
+ */
+const MAX_CONFLICT_CHECKS = 3;
 
 
 /** Represents an error that occurred during the upload process */
@@ -19,10 +27,15 @@ export interface UploadError {
   details?: string[];
 }
 
+/** Which version of a conflicting entity to keep: the user's (`local`) or the other mapper's (`remote`) */
+export type ConflictChoiceType = 'local' | 'remote';
+
 /** Represents a choice option for resolving a conflict */
 export interface ConflictChoice {
   /** Entity ID this choice applies to */
-  id: string;
+  id: EntityID;
+  /** Which version this choice keeps */
+  type: ConflictChoiceType;
   /** Display text for this choice */
   text: string;
   /** Action to perform when this choice is selected */
@@ -32,13 +45,13 @@ export interface ConflictChoice {
 /** Represents a conflict that occurred during the upload process */
 export interface UploadConflict {
   /** Entity ID of the conflicting entity */
-  id: string;
+  id: EntityID;
   /** Display name of the entity */
   name: string;
   /** Details about the conflict */
-  details: any[];
-  /** Index of the currently chosen resolution (0 or 1) */
-  chosen: number;
+  details: string[];
+  /** Which choice is currently chosen */
+  chosen: ConflictChoiceType;
   /** Available choices for resolving the conflict */
   choices: ConflictChoice[];
 }
@@ -70,6 +83,8 @@ export interface UploadChanges {
  * - 'resultErrors'      - upload failed due to errors
  * - 'resultConflicts'   - upload failed due to data conflicts
  * - 'resultSuccess'     - upload completed without errors
+ *
+ * See `design/uploader-system.md` for how conflicts are checked and resolved, and where this is heading.
  */
 export class UploaderSystem extends AbstractSystem {
 
@@ -92,6 +107,8 @@ export class UploaderSystem extends AbstractSystem {
   protected _discardTags: Record<string, boolean>;
   /** Whether an upload is currently in progress */
   protected _isSaving: boolean;
+  /** Counts calls to `save`, so results of an earlier attempt that arrive late are ignored */
+  protected _attempt: number;
 
   // Variables for conflict checking
   /** Local graph snapshot taken at the start of the upload, used for conflict resolution */
@@ -100,10 +117,12 @@ export class UploaderSystem extends AbstractSystem {
   protected _remoteGraph: Graph | null;
   /** Entity IDs that need to be checked for server-side conflicts */
   protected _toCheckIDs: Set<EntityID>;
-  /** Entity IDs that still need to be fetched from the OSM API */
-  protected _toLoadIDs: Set<EntityID>;
   /** Entity IDs that have been successfully fetched from the OSM API */
   protected _loadedIDs: Set<EntityID>;
+  /** How many times this save has checked for conflicts on its own (see `MAX_CONFLICT_CHECKS`) */
+  protected _conflictChecks: number;
+  /** Entity IDs the API reported a version mismatch for, during this save */
+  protected _mismatchIDs: Set<EntityID>;
   /** Conflicts discovered during the upload, each with choices for resolution */
   protected _conflicts: UploadConflict[];
   /** Errors that occurred during the upload */
@@ -128,18 +147,19 @@ export class UploaderSystem extends AbstractSystem {
     this._origChanges = null;
     this._discardTags = {};
     this._isSaving = false;
+    this._attempt = 0;
 
     // variables for conflict checking
     this._localGraph = null;
     this._remoteGraph = null;
-    this._toCheckIDs = new Set<EntityID>;
-    this._toLoadIDs = new Set<EntityID>;
-    this._loadedIDs = new Set<EntityID>;
+    this._toCheckIDs = new Set<EntityID>();
+    this._loadedIDs = new Set<EntityID>();
+    this._conflictChecks = 0;
+    this._mismatchIDs = new Set<EntityID>();
     this._conflicts = [];
     this._errors = [];
 
     // Ensure methods used as callbacks always have `this` bound correctly.
-    this._loadedSome = this._loadedSome.bind(this);
     this._uploadCallback = this._uploadCallback.bind(this);
   }
 
@@ -232,7 +252,8 @@ export class UploaderSystem extends AbstractSystem {
     if (this._isSaving && !tryAgain) return;
 
     const context = this.context;
-    const osm = context.services.osm as any;
+    const editor = context.systems.editor!;
+    const osm = context.services.osm;
     if (!osm) return;
 
     // If user somehow got logged out mid-save, try to reauthenticate..
@@ -248,140 +269,154 @@ export class UploaderSystem extends AbstractSystem {
 
     if (!this._isSaving) {
       this._isSaving = true;
+      this._conflictChecks = 0;
+      this._mismatchIDs = new Set<EntityID>();
       this.emit('saveStarted');
     }
 
     // reset variables
+    this._attempt++;
     this._localGraph = null;
     this._remoteGraph = null;
-    this._toCheckIDs = new Set<EntityID>;
-    this._toLoadIDs = new Set<EntityID>;
-    this._loadedIDs = new Set<EntityID>;
+    this._toCheckIDs = new Set<EntityID>();
+    this._loadedIDs = new Set<EntityID>();
     this._conflicts = [];
     this._errors = [];
 
     // Store original changes, in case user wants to download them as an .osc file
-    const editor = context.systems.editor!;
     this._origChanges = editor.changes(actionDiscardTags(editor.difference(), this._discardTags));
 
     // Attempt a fast upload first.. If there are conflicts, re-enter with `checkConflicts = true`
     if (!checkConflicts) {
       this._tryUpload();
     } else {
-      this._startConflictCheck();
+      this._checkConflictsAsync();
     }
   }
 
 
   /**
-   * Start the conflict checking process before upload
+   * Check for conflicts before uploading.
+   * Fetches the current version of everything we'd upload as modified or deleted, compares it to
+   * what we have, and merges in other mappers' changes where it can. Merges are made in `staging`,
+   * so cancelling the conflict screen throws them away. Then either uploads, or shows the conflicts.
+   * @return Promise resolved when the check is done (the upload or the result happens after)
    */
-  protected _startConflictCheck(): void {
+  protected async _checkConflictsAsync(): Promise<void> {
     const context = this.context;
-    const osm = context.services.osm as any;
     const editor = context.systems.editor!;
-    const summary = editor.difference().summary();
-    const graph = editor.staging.graph!;
+    const l10n = context.systems.l10n!;
 
-    this._localGraph = graph;
-    this._remoteGraph = new Graph(editor.base.graph!);
+    const attempt = this._attempt;
+    const baseGraph = editor.base.graph!;
+    const localGraph = editor.stable.graph!;
 
-    // Gather entityIDs to check
+    this._conflictChecks++;
+    this._localGraph = localGraph;
+    this._remoteGraph = new Graph(baseGraph);
+
+    // Gather entityIDs to check: everything we'd upload as modified or deleted (each carries a version
+    // that the API checks), and anything the API told us has a version mismatch.
     // We will load these from the OSM API into the `remoteGraph`
-    this._toCheckIDs = new Set<EntityID>;
+    const difference = editor.difference();
+    const toCheckIDs = new Set<EntityID>();
+    for (const entity of [...difference.modified(), ...difference.deleted()]) {
+      if (entity.version) {
+        toCheckIDs.add(entity.id);
+      }
+    }
+    for (const entityID of this._mismatchIDs) {
+      if (localGraph.hasEntity(entityID) ?? baseGraph.hasEntity(entityID)) {
+        toCheckIDs.add(entityID);
+      }
+    }
 
-    for (const [entityID, item] of summary) {
-      if (item.changeType === 'modified') {
-        const entity = graph.entity(entityID);
-        this._toCheckIDs.add(entityID);   // The modified entity
-
-        for (const child of graph.childNodes(entity as any)) {  // and any children
-          if (child.version !== undefined) {
-            this._toCheckIDs.add(child.id);
-          }
+    // Also load the child nodes of those ways, to compare their versions too
+    const toLoadIDs = new Set<EntityID>(toCheckIDs);
+    for (const entityID of toCheckIDs) {
+      const entity = localGraph.hasEntity(entityID);
+      for (const childID of (entity as OsmWay | undefined)?.nodes ?? []) {
+        if (localGraph.hasEntity(childID)?.version) {
+          toLoadIDs.add(childID);
         }
       }
     }
 
-    this._toLoadIDs = new Set<EntityID>(this._toCheckIDs);
-    this._loadedIDs = new Set<EntityID>;
+    this._toCheckIDs = toCheckIDs;
+    this._loadedIDs = new Set<EntityID>();
+    let total = toLoadIDs.size;
+    this.emit('progressChanged', 0, total);
 
-    if (osm && this._toLoadIDs.size) {
-      this.emit('progressChanged', this._loadedIDs.size, this._toCheckIDs.size);
-      osm.loadMultipleAsync(Array.from(this._toLoadIDs))
-        .then((results: any) => this._loadedSome(null, results))
-        .catch((err: any) => this._loadedSome(err));
-    } else {
-      this._tryUpload();
-    }
-  }
+    try {
+      const remoteWays = (await this._loadRemoteAsync(toLoadIDs))
+        .filter(entity => entity.type === 'way' && entity.visible) as OsmWay[];
+      if (attempt !== this._attempt) return;   // a newer attempt started meanwhile
 
+      // `loadEntityVersionsAsync` doesn't load child nodes like `/full` does, and merging a way needs
+      // the remote way's child nodes, so load any we don't have yet.
+      const moreIDs = new Set<EntityID>();
+      for (const way of remoteWays) {
+        for (const childID of way.nodes) {
+          if (!this._loadedIDs.has(childID)) {
+            moreIDs.add(childID);
+          }
+        }
+      }
 
-  /**
-   * Errback-style callback that may be called multiple times.
-   * Here we load a batch of remote entities into `remoteGraph`,
-   * then expand the search set if needed and schedule more loading.
-   * @param  err - Error returned by the `loadMultipleAsync` call
-   * @param  results - Data returned by the `loadMultipleAsync` call
-   */
-  protected _loadedSome(err: any, results?: any): void {
-    if (this._errors.length) return;   // give up if there are errors
+      if (moreIDs.size) {
+        total += moreIDs.size;
+        this.emit('progressChanged', this._loadedIDs.size, total);
+        await this._loadRemoteAsync(moreIDs);
+        if (attempt !== this._attempt) return;
+      }
 
-    const l10n = this.context.systems.l10n!;
-    const osm = this.context.services.osm as any;
-
-    if (err) {
+    } catch (err: any) {
+      if (attempt !== this._attempt) return;
       this._errors.push({
-        msg: err.message || err.responseText,
-        details: [ l10n.t('save.status_code', { code: err.status }) ]
+        msg: err?.message || err?.responseText,
+        details: [ l10n.t('save.status_code', { code: err?.status }) ]
       });
       this._didResultInErrors();
       return;
     }
 
-    const loadMoreIDs = new Set<EntityID>();
+    this.emit('progressChanged', total, total);
+    this._detectConflicts();
 
-    for (const props of (results?.data || [])) {
-      const entity = createOsmEntity(props) as any;
-      this._remoteGraph!.replace(entity);
+    // Merged without conflicts? Commit the merges, so that they are what we upload.
+    if (!this._conflicts.length && editor.hasWorkInProgress) {
+      editor.commit({ stringID: 'save.conflict.annotation' });
+    }
+    this._tryUpload();
+  }
+
+
+  /**
+   * Load the current versions of the given entities from the OSM API into `remoteGraph`.
+   * @param entityIDs - The entities to load
+   * @return Promise resolved with the entities that were loaded (deleted ones included, with `visible: false`)
+   * @throws Rejects if the OSM API can't be reached
+   */
+  protected async _loadRemoteAsync(entityIDs: Set<EntityID>): Promise<OsmEntity[]> {
+    const context = this.context;
+    const osm = context.services.osm!;
+
+    const versions = new Map<EntityID, undefined>();
+    for (const entityID of entityIDs) {
+      versions.set(entityID, undefined);   // the current version
+    }
+
+    const results = await osm.loadEntityVersionsAsync(versions);
+
+    const entities: OsmEntity[] = [];
+    for (const props of results) {
+      const entity = createOsmEntity(context, props as OsmEntityProps);
+      entities.push(entity);
       this._loadedIDs.add(entity.id);
-      this._toLoadIDs.delete(entity.id);
-
-      if (!entity.visible) continue;
-
-      // Because `loadMultiple` doesn't download `/full` like `loadEntity`,
-      // expand `_toCheck` set to include children that aren't already being checked..
-      if (entity.type === 'way') {
-        for (const childID of entity.nodes) {
-          if (!this._toCheckIDs.has(childID)) {
-            this._toCheckIDs.add(childID);
-            this._toLoadIDs.add(childID);
-            loadMoreIDs.add(childID);
-          }
-        }
-      } else if (entity.type === 'relation' && entity.isMultipolygon()) {
-        for (const member of entity.members) {
-          if (!this._toCheckIDs.has(member.id)) {
-            this._toCheckIDs.add(member.id);
-            this._toLoadIDs.add(member.id);
-            loadMoreIDs.add(member.id);
-          }
-        }
-      }
     }
+    this._remoteGraph!.replace(entities);
 
-    this.emit('progressChanged', this._loadedIDs.size, this._toCheckIDs.size);
-
-    if (osm && loadMoreIDs.size) {
-      osm.loadMultipleAsync(Array.from(loadMoreIDs))
-        .then((results: any) => this._loadedSome(null, results))
-        .catch((err: any) => this._loadedSome(err));
-
-
-    } else if (!this._toLoadIDs.size) {  // we have loaded everything, continue to the next step
-      this._detectConflicts();
-      this._tryUpload();
-    }
+    return entities;
   }
 
 
@@ -390,19 +425,43 @@ export class UploaderSystem extends AbstractSystem {
    */
   protected _detectConflicts(): void {
     const context = this.context;
-    const l10n = context.systems.l10n!;
     const editor = context.systems.editor!;
-    const osm = context.services.osm as any;
+    const l10n = context.systems.l10n!;
+    const osm = context.services.osm;
     if (!osm) return;
 
+    const baseGraph = editor.base.graph!;
     const localGraph = this._localGraph!;
     const remoteGraph = this._remoteGraph!;
 
     for (const entityID of this._toCheckIDs) {
-      const local = localGraph.entity(entityID);
+      if (!this._loadedIDs.has(entityID)) continue;   // the API doesn't have it, there's nothing to compare
+
+      const local = localGraph.hasEntity(entityID);   // `undefined` if the user deleted it
+      const original = local ?? baseGraph.entity(entityID);
       const remote = remoteGraph.entity(entityID);
 
-      if (sameVersions(local, remote)) continue;
+      if (sameVersions(original, remote)) continue;
+
+      // Deleted locally but changed remotely.  To keep the deletion, it has to be uploaded against
+      // the remote version, so that version (with child nodes the user didn't change) replaces the base copy.
+      // (If a child node of the remote way couldn't be loaded, leave the base alone: a way can't be
+      // drawn without its nodes. Keeping the deletion then fails on upload, and the user sees why.)
+      if (!local && remote.visible) {
+        const children: OsmEntity[] = [];
+        let complete = true;
+        for (const childID of (remote as OsmWay).nodes ?? []) {
+          const child = this._loadedIDs.has(childID) ? remoteGraph.entity(childID) : undefined;
+          if (child?.visible && !this._toCheckIDs.has(childID)) {
+            children.push(child);
+          } else if (!baseGraph.hasEntity(childID)) {
+            complete = false;
+          }
+        }
+        if (complete) {
+          editor.updateBase([remote, ...children]);
+        }
+      }
 
       // Try a safe merge first
       const actionSafe = actionMergeRemoteChanges(entityID, {
@@ -438,47 +497,59 @@ export class UploaderSystem extends AbstractSystem {
         strategy: 'force_remote'
       });
 
-      const keepMine = l10n.t('save.conflict.' + (remote.visible ? 'keep_local' : 'restore'));
-      const keepTheirs = l10n.t('save.conflict.' + (remote.visible ? 'keep_remote' : 'delete'));
+      let keepMine, keepTheirs;
+      if (!local) {             // deleted by us, changed by them
+        keepMine = l10n.t('save.conflict.delete');
+        keepTheirs = l10n.t('save.conflict.restore');
+      } else if (!remote.visible) {   // changed by us, deleted by them
+        keepMine = l10n.t('save.conflict.restore');
+        keepTheirs = l10n.t('save.conflict.delete');
+      } else {
+        keepMine = l10n.t('save.conflict.keep_local');
+        keepTheirs = l10n.t('save.conflict.keep_remote');
+      }
 
       this._conflicts.push({
         id: entityID,
-        name: entityName(local),
+        name: entityName(original),
         details: mergeConflicts,
-        chosen: 1,
+        chosen: 'remote',
         choices: [
-          { id: entityID, text: keepMine, action: () => editor.perform(actionForceLocal) },
-          { id: entityID, text: keepTheirs, action: () => editor.perform(actionForceRemote) }
+          { id: entityID, type: 'local', text: keepMine, action: () => editor.perform(actionForceLocal) },
+          { id: entityID, type: 'remote', text: keepTheirs, action: () => editor.perform(actionForceRemote) }
         ]
       });
     }
 
 
     /**
-     *
-     * @param d
+     * Formats a username as a link to their OSM profile.
+     * @param d - The username
+     * @return HTML for the link
      */
     function formatUser(d: string): string {
-      return '<a href="' + osm.userURL(d) + '" target="_blank">' + d + '</a>';
+      return '<a href="' + osm!.userURL(d) + '" target="_blank">' + d + '</a>';
     }
 
     /**
-     *
-     * @param entity
+     * Returns a name for the entity to show in the conflict list.
+     * @param entity - The entity to name
+     * @return Its display name, or its type and ID
      */
-    function entityName(entity: any): string {
+    function entityName(entity: OsmEntity): string {
       return l10n.displayName(entity.tags) || (l10n.displayType(entity.id) + ' ' + entity.id);
     }
 
     /**
-     *
-     * @param local
-     * @param remote
+     * Whether the local and remote copies are the same version (for ways, their child nodes too).
+     * @param local - The local copy (the base copy, if the user deleted it)
+     * @param remote - The remote copy
+     * @return `true` if nothing changed remotely
      */
-    function sameVersions(local: any, remote: any): boolean {
+    function sameVersions(local: OsmEntity, remote: OsmEntity): boolean {
       if (local.version !== remote.version) return false;
-      if (local.type === 'way') {
-        for (const childID of utilArrayUnion(local.nodes, remote.nodes) as string[]) {
+      if (local.type === 'way' && localGraph.hasEntity(local.id)) {
+        for (const childID of utilArrayUnion((local as OsmWay).nodes, (remote as OsmWay).nodes ?? []) as EntityID[]) {
           const a = localGraph.hasEntity(childID);
           const b = remoteGraph.hasEntity(childID);
           if (a && b && a.version !== b.version) return false;
@@ -495,7 +566,7 @@ export class UploaderSystem extends AbstractSystem {
    */
   protected _tryUpload(): void {
     const context = this.context;
-    const osm = context.services.osm as any;
+    const osm = context.services.osm;
     if (!osm) {
       this._errors.push({ msg: 'No OSM Service' });
     }
@@ -514,7 +585,7 @@ export class UploaderSystem extends AbstractSystem {
       const changes = editor.changes(actionDiscardTags(editor.difference(), this._discardTags));
       if (changes.modified.length || changes.created.length || changes.deleted.length) {
         this.emit('willAttemptUpload');
-        osm.sendChangeset(this.changeset, changes, this._uploadCallback);
+        osm!.sendChangeset(this.changeset!, changes, this._uploadCallback);
       } else {
         // changes were insignificant or reverted by user
         this._didResultInNoChanges();
@@ -525,8 +596,8 @@ export class UploaderSystem extends AbstractSystem {
 
   /**
    * Callback for the changeset upload attempt
-   * @param err
-   * @param updatedChangeset
+   * @param err - The error, if the upload failed
+   * @param updatedChangeset - The changeset, which may have an id now
    */
   protected _uploadCallback(err: any, updatedChangeset?: any): void {
     if (updatedChangeset) {
@@ -535,7 +606,11 @@ export class UploaderSystem extends AbstractSystem {
 
     if (err) {
       if (err.status === 409) {  // 409 Conflict
-        this.save(true, true);   // tryAgain = true, checkConflicts = true
+        if (this._shouldCheckAgain(err)) {
+          this.save(true, true);   // tryAgain = true, checkConflicts = true
+        } else {
+          this._didResultInErrors();
+        }
       } else {
         const l10n = this.context.systems.l10n!;
         this._errors.push({
@@ -548,6 +623,46 @@ export class UploaderSystem extends AbstractSystem {
     } else {
       this._didResultInSuccess();
     }
+  }
+
+
+  /**
+   * After the API answers 409 Conflict, decide whether checking for conflicts again could help.
+   * The API's message names the entity whose version didn't match, e.g.
+   *  "Version mismatch: Provided 8, server had: 10 of Relation 123".
+   * Checking again can't help if the changeset was closed, if the same entity is reported again
+   * (the check didn't fix it), or after `MAX_CONFLICT_CHECKS`.  Then this records an error instead.
+   * @param err - The error from the upload
+   * @return `true` to check for conflicts again
+   */
+  protected _shouldCheckAgain(err: any): boolean {
+    const l10n = this.context.systems.l10n!;
+    const message = String(err.body || err.message || '');
+
+    // A closed changeset is a 409 too, and no conflict check will reopen it
+    if (/changeset \d+ was closed/i.test(message)) {
+      this._errors.push({ msg: message, details: [ l10n.t('save.status_code', { code: err.status }) ] });
+      return false;
+    }
+
+    let entityID: EntityID | undefined;
+    const match = message.match(/of (node|way|relation) (\d+)/i);
+    if (match) {
+      entityID = match[1].charAt(0).toLowerCase() + match[2];
+    }
+
+    if (this._conflictChecks >= MAX_CONFLICT_CHECKS || (entityID && this._mismatchIDs.has(entityID))) {
+      this._errors.push({
+        msg: l10n.t('save.conflict.unresolved'),
+        details: [ message, l10n.t('save.status_code', { code: err.status }) ].filter(Boolean)
+      });
+      return false;
+    }
+
+    if (entityID) {
+      this._mismatchIDs.add(entityID);
+    }
+    return true;
   }
 
 
@@ -602,6 +717,7 @@ export class UploaderSystem extends AbstractSystem {
 
   /**
    * Cancel the conflict resolution process and revert changes
+   * (The merges and choices are all in `staging`, so this throws them away.)
    */
   public cancelConflictResolution(): void {
     // this.context.systems.editor.pop();
@@ -617,7 +733,7 @@ export class UploaderSystem extends AbstractSystem {
     const editor = this.context.systems.editor!;
 
     for (const conflict of this._conflicts) {
-      if (conflict.chosen === 1) {   // user chose "use theirs"
+      if (conflict.chosen === 'remote') {   // user chose "use theirs"
         const graph = editor.staging.graph!;
         const entity = graph.hasEntity(conflict.id) as any;
         if (entity?.type === 'way') {
@@ -627,6 +743,11 @@ export class UploaderSystem extends AbstractSystem {
         }
         editor.perform(actionRevert(conflict.id));
       }
+    }
+
+    // Commit the merges and the user's choices, so that they are what we upload.
+    if (editor.hasWorkInProgress) {
+      editor.commit({ stringID: 'save.conflict.annotation' });
     }
 
     this.save(true, false);  // tryAgain = true, checkConflicts = false

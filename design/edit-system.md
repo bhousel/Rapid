@@ -306,7 +306,8 @@ the next undo, which actually leaves the newest edit, does.
   suggestion to reload and try again. Finishing anyway isn't an option: a way whose child nodes are
   missing breaks drawing (`graph.childNodes()` throws).
 - **A version that can't be fetched** (redacted, or missing) is restored against the current version
-  of the entity instead, and save-time conflict resolution sorts out any differences. If the entity has
+  of the entity instead, and save-time conflict resolution sorts out any differences (it was broken
+  until the uploader audit; see [`uploader-system.md`](uploader-system.md)). If the entity has
   been deleted since, the version before the deletion is used. Anything still missing is left out.
   The API answers 404 for a whole multi-fetch if any version in it can't be found (checked against the
   live API; fetching a redacted version on its own is a 403), so the service splits a chunk that fails

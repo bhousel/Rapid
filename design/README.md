@@ -19,6 +19,7 @@ They record the "why" that the code alone doesn't show.
 | [`spatial-system.md`](spatial-system.md) | `SpatialSystem`: one home for all spatial indexes (`Tree` retired) | Steps 1–3c done; 3d continues in `conflation-system.md` |
 | [`style-system.md`](style-system.md) | `StyleSystem`: style data model, matching, external style files | Implemented (reference) |
 | [`ui-system.md`](ui-system.md) | `modules/ui/` modernization to TypeScript class components | Complete |
+| [`uploader-system.md`](uploader-system.md) | `UploaderSystem`: uploading changesets, checking and resolving conflicts | Conflicts work again (October 2026 audit); upload errors and backups during a save open |
 
 New system designs go here as `thing-system.md`. Add a row to this table when you do.
 An older system gets a design doc when we make a substantial change to it, so the doc becomes a

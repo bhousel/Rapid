@@ -414,15 +414,19 @@ export class Graph {
       if (!entity.visible || (!force && base.entities.has(entity.id))) continue;
 
       // Merge data into the base graph
+      // (When forced, this may replace an older copy, so its caches need to be updated too)
+      const previous = base.entities.get(entity.id);
       base.entities.set(entity.id, entity);
-      this._updateCaches(undefined, entity, base);  // note 'base' here
+      this._updateCaches(previous, entity, base);  // note 'base' here
       newIDs.add(entity.id);
 
       // A weird thing we have to watch out for.. iD#2085
       // Sometimes an edit can remove a node, then we download more information and realize that
       // that Node was shared with another way.  If we detect this condition, restore the node.
       // (A "delete" is stored as: setting that entity = `undefined`)
-      if (head && entity.type === 'way') {
+      // This doesn't apply to a way the user deleted: its nodes were deleted along with it.
+      const wayDeleted = head?.has(entity.id) && head.get(entity.id) === undefined;
+      if (head && entity.type === 'way' && !wayDeleted) {
         for (const id of (entity as OsmWay).nodes) {
           if (head.has(id) && head.get(id) === undefined) {  // was deleted
             restoreIDs.add(id);

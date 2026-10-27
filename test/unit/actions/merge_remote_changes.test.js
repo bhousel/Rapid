@@ -464,6 +464,70 @@ describe('actionMergeRemoteChanges', () => {
   });
 
 
+  describe('local deletions', () => {
+    // The user deleted w10 (and its nodes); `remote` is what the server has now.
+    const deleted = ['w10', 'n10', 'n11', 'n12', 'n13'];
+    function deletedGraph() {
+      const graph = new Rapid.Graph(base);
+      return graph.remove(deleted.map(id => base.entity(id))).commit();
+    }
+
+    it('reports a conflict when another user changed it (safe)', () => {
+      const localGraph = deletedGraph();
+      const remote = base.entity('w10').update({ tags: { foo: 'foo_remote' }, version: '2' });
+      const remoteGraph = makeGraph([remote]);
+      const action = Rapid.actionMergeRemoteChanges('w10', { localGraph, remoteGraph, discardTags, localize: (s) => s });
+      const result = action(localGraph);
+
+      assert.strictEqual(result, localGraph);
+      assert.deepEqual(action.conflicts(), ['merge_remote_changes.conflict.deleted_locally']);
+      assert.isUndefined(result.hasEntity('w10'));
+    });
+
+    it('takes back the deletion when another user deleted it too', () => {
+      const localGraph = deletedGraph();
+      const remote = base.entity('w10').update({ visible: false, version: '2' });
+      const remoteGraph = makeGraph([remote]);
+      const action = Rapid.actionMergeRemoteChanges('w10', { localGraph, remoteGraph, discardTags });
+      const result = action(localGraph);
+
+      assert.deepEqual(action.conflicts(), []);
+      for (const entityID of deleted) {
+        assert.strictEqual(result.hasEntity(entityID), base.entity(entityID), `${entityID} restored`);
+      }
+    });
+
+    it('restores it and its nodes when keeping theirs (force_remote)', () => {
+      const localGraph = deletedGraph();
+      const remote = base.entity('w10').update({ tags: { foo: 'foo_remote' }, version: '2' });
+      const remoteGraph = makeGraph([remote]);
+      const action = Rapid.actionMergeRemoteChanges('w10', { localGraph, remoteGraph, discardTags, strategy: 'force_remote' });
+      const result = action(localGraph);
+
+      assert.deepEqual(action.conflicts(), []);
+      for (const entityID of deleted) {
+        assert.strictEqual(result.hasEntity(entityID), base.entity(entityID), `${entityID} restored`);
+      }
+    });
+
+    it('keeps it deleted when keeping mine (force_local), even after it was restored', () => {
+      const localGraph = deletedGraph();
+      const remote = base.entity('w10').update({ tags: { foo: 'foo_remote' }, version: '2' });
+      const remoteGraph = makeGraph([remote]);
+      const keepTheirs = Rapid.actionMergeRemoteChanges('w10', { localGraph, remoteGraph, discardTags, strategy: 'force_remote' });
+      const keepMine = Rapid.actionMergeRemoteChanges('w10', { localGraph, remoteGraph, discardTags, strategy: 'force_local' });
+
+      assert.strictEqual(keepMine(localGraph), localGraph);   // still deleted, nothing to do
+
+      const result = keepMine(keepTheirs(new Rapid.Graph(localGraph)));   // the user changed their mind
+      assert.deepEqual(keepMine.conflicts(), []);
+      for (const entityID of deleted) {
+        assert.isUndefined(result.hasEntity(entityID), `${entityID} deleted`);
+      }
+    });
+  });
+
+
   describe('destuctive merging', () => {
     describe('nodes', () => {
       it('merges nodes with \'force_local\' option', () => {

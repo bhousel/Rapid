@@ -74,6 +74,18 @@ Things that went wrong once and shouldn't go wrong again.
   in-memory mock using `structuredClone` also works. This is NOT universally true for all test runtimes
   and all browsers — especially private-browsing/locked-down contexts — so the graceful-degradation
   path matters. Verified experimentally before relying on it in production code.
+- **An untested path rots one layer at a time.** The upload conflict path had no tests, and broke
+  several times over years (a handler signature in 2023, a return shape in 2025, a staging/stable split
+  in between). Each bug hid the next: fixing one would only have shown the one behind it. Drive the
+  whole flow end to end (fake the service, not the system) before calling it fixed.
+- **Run flows that may throw in your own headless browser, not the developer's Chrome.** A page error
+  in the debug Chrome froze its tab (it stopped answering CDP entirely), probably DevTools pausing on
+  the exception. Playwright's headless Chromium reports `pageerror`s with stacks instead.
+- **Escape in a test snippet can trigger the mode's own Escape.** Pressing Escape to close a dialog in
+  save mode left save mode, which made later steps misleading.
+- **happy-dom's `document.implementation.createDocument` returns an HTML document with an element
+  already in it**, so `JXON.stringify` fails there. `test/browser/ui/UiConflicts.test.js` shims it with
+  an empty XML document from `DOMParser`.
 
 ## Network
 

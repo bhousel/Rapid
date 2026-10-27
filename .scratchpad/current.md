@@ -25,6 +25,18 @@ Next: step 6 (edits that use external data on OSM features), when Bryan picks it
 records no data source (`ds.dataUsed` is `[]`, and `[] ?? [datasetID]` keeps `[]`; it was `||` before,
 same result). PR #5's `EditSystem.dataVersion` fits here (the "did data change?" question); not landed.
 
+## Active: uploading and conflicts (`UploaderSystem`)
+Design: [`design/uploader-system.md`](../design/uploader-system.md), started Oct 27 with an audit (iD#7199,
+iD PR #12814, Rapid#1361/#1366/#1480). The conflict path had been broken for years, several bugs deep.
+Fixed (Oct 27): the check fetches with `loadEntityVersionsAsync` and checks modified + deleted entities;
+merges stay in `staging` and are committed before uploading; 409 retries are limited (same entity twice,
+3 checks, closed changeset); local deletions merge (`updateBase` for "Leave Deleted", `actionRevert`
+restores deleted children); conflict choices are `'local'`/`'remote'`; `SaveMode._resultConflicts` takes
+the arguments the uploader emits (the screen never opened before); the download link exists; Escape and
+leaving save mode cancel the conflict screen. Checked in headless Chromium with faked upload and fetch.
+Next: finding 8 (upload errors and the 30 s timeout hang the save) and 9 (the backup is gone during a
+save). Open question for Bryan: default choice "Use theirs" vs "Keep mine" (iD's PR switches).
+
 ## Active: matching third-party data against OSM (`ConflationSystem`)
 Top priority. Design: [`design/conflation-system.md`](../design/conflation-system.md), currently proposed and
 awaiting a final review. Guiding use case: *accept the part of the sidewalk that is missing, and join it

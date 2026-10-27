@@ -1,4 +1,5 @@
 import { actionDeleteMultiple } from './delete_multiple.ts';
+import { actionRevert } from './revert.ts';
 import { createOsmEntity } from '../data/index.ts';
 import deepEqual from 'fast-deep-equal';
 import { diff3Merge, MergeRegion } from 'node-diff3';
@@ -308,8 +309,28 @@ export function actionMergeRemoteChanges(id: EntityID, options: MergeRemoteChang
   const action: MergeRemoteChangesAction = ((graph: Graph): Graph => {
     const updates: ChildUpdates = { replacements: [], removeIDs: [] };
     const base = graph.base.entities.get(id) as OsmEntity;
-    const local = localGraph.entity(id);
+    const local = localGraph.hasEntity(id);
     const remote = remoteGraph.entity(id);
+
+    // deleted locally
+    if (!local) {
+      if (!remote.visible) {    // deleted by both: nothing to upload, so take back our deletion
+        return actionRevert(id)(graph);
+      }
+      if (strategy === 'force_local') {    // keep our deletion
+        // (It uploads against the base version, so the uploader replaces that with the remote version first)
+        // It may have been restored by choosing the other option first, so delete it again.
+        return graph.hasEntity(id) ? actionDeleteMultiple([id])(graph) : graph;
+      }
+      if (strategy === 'force_remote') {   // restore it (and anything deleted along with it)
+        return actionRevert(id)(graph);
+      }
+      _conflicts.push(
+        localize('merge_remote_changes.conflict.deleted_locally', { user: formatUser(remote.props.user ?? 'unknown') })
+      );
+      return graph;  // do nothing
+    }
+
     let target: OsmEntity = createOsmEntity(local, { version: remote.version });
 
     // delete/undelete

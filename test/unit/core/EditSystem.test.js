@@ -221,6 +221,32 @@ describe('EditSystem', () => {
         assert.lengthOf(onMerge.mock.calls, 1);
         assert.deepEqual(onMerge.mock.lastCall[0], new Set([n.id]));  // first argument
       });
+
+      it('doesn\'t replace entities already in the base graph', () => {
+        const n = new Rapid.OsmNode(context, { id: 'n1', version: 1 });
+        _editor.merge([n]);
+        _editor.merge([n.update({ version: 2 })]);
+        assert.strictEqual(_editor.base.graph.entity('n1'), n);
+      });
+    });
+
+    describe('updateBase', () => {
+      it('replaces entities in the base graph, where the user didn\'t change them', () => {
+        const n1 = new Rapid.OsmNode(context, { id: 'n1', version: 1 });
+        const n2 = new Rapid.OsmNode(context, { id: 'n2', version: 1 });
+        _editor.merge([n1, n2]);
+        _editor.perform(Rapid.actionDeleteNode('n2'));
+        _editor.commit({ stringID: 'deleted n2' });
+
+        const n1v2 = n1.update({ version: 2 });
+        const n2v2 = n2.update({ version: 2 });
+        _editor.updateBase([n1v2, n2v2]);
+
+        assert.strictEqual(_editor.base.graph.entity('n1'), n1v2);
+        assert.strictEqual(_editor.stable.graph.entity('n1'), n1v2);
+        assert.isUndefined(_editor.stable.graph.hasEntity('n2'));      // still deleted
+        assert.strictEqual(_editor.difference().deleted()[0].version, 2);   // deleted against the newer version
+      });
     });
 
 

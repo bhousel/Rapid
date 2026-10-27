@@ -126,7 +126,7 @@ collected, sorted by specificity, and their referenced styles are deep-merged.
 | `StorageSystem.ts` | Small synchronous storage (localStorage wrapper) |
 | `StyleSystem.ts` | Manages feature styling, selectors, and variables |
 | `UiSystem.ts` | Manages the user interface components |
-| `UploaderSystem.ts` | Handles uploading changes to OSM |
+| `UploaderSystem.ts` | Handles uploading changes to OSM, and checking and resolving conflicts (see [`design/uploader-system.md`](../../design/uploader-system.md)) |
 | `UrlHashSystem.ts` | Manages URL hash state (bookmarkable URLs) |
 | `ValidationSystem.ts` | Runs validation checks on map data |
 | `WorkerSystem.ts` | Worker pool (lazy spawn, round-robin), task dispatch, and listener registry |

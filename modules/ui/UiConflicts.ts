@@ -6,30 +6,10 @@ import { OsmChangeset } from '../data/OsmChangeset.ts';
 import { uiIcon } from './icon.ts';
 import { utilHighlightEntities, utilSanitizeHTML } from '../util/index.ts';
 
+import type { ConflictChoice, UploadConflict } from '../core/UploaderSystem.ts';
 import type { Context } from '../Context.ts';
 import type { D3Selection } from 'd3-selection';
 import type { OsmChanges } from '../data/OsmChangeset.ts';
-
-
-/**
- * A choice option within a conflict resolution (keep mine / keep theirs).
- */
-interface ChoiceOption {
-  id: EntityID;
-  text: string;
-  action: () => void;
-}
-
-/**
- * A single conflict to resolve.
- */
-interface ConflictItem {
-  id: EntityID;
-  name: string;
-  details?: string[];
-  chosen?: EntityID;
-  choices?: ChoiceOption[];
-}
 
 
 /**
@@ -42,7 +22,7 @@ export class UiConflicts extends EventEmitter {
   public context: Context;
 
   protected _origChanges: OsmChanges | null;
-  protected _conflictList: ConflictItem[] | null;
+  protected _conflictList: UploadConflict[] | null;
   protected _shownConflictIndex: number | null;
 
 
@@ -77,6 +57,11 @@ export class UiConflicts extends EventEmitter {
   protected _keybindingOff(): void {
     const keyboard = this.context.systems.keyboard!;
     keyboard.scope('conflicts').disable();
+  }
+
+  /** Releases the keyboard shortcuts, when the owner closes the conflict screen. */
+  public close(): void {
+    this._keybindingOff();
   }
 
   /** Dismisses the conflict screen and retries the save. */
@@ -141,7 +126,7 @@ export class UiConflicts extends EventEmitter {
     const blob = new Blob([data], { type: 'text/xml;charset=utf-8;' });
     const fileName = 'changes.osc';
 
-    const $$link = $$conflictsHelp.selectAll('.download-changes')
+    const $$link = $$conflictsHelp
       .append('a')
       .attr('class', 'download-changes');
 
@@ -234,8 +219,8 @@ export class UiConflicts extends EventEmitter {
       .append('a')
       .attr('class', 'conflict-description')
       .attr('href', '#')
-      .text((d: ConflictItem) => d.name)
-      .on('click', (e: PointerEvent, d: ConflictItem) => {
+      .text((d: UploadConflict) => d.name)
+      .on('click', (e: PointerEvent, d: UploadConflict) => {
         e.preventDefault();
         this._showEntityID(d.id);
       });
@@ -248,7 +233,7 @@ export class UiConflicts extends EventEmitter {
       .append('ul')
       .attr('class', 'conflict-detail-list')
       .selectAll('li')
-      .data((d: ConflictItem) => d.details || [])
+      .data((d: UploadConflict) => d.details || [])
       .enter()
       .append('li')
       .attr('class', 'conflict-detail-item')
@@ -296,7 +281,7 @@ export class UiConflicts extends EventEmitter {
       .append('ul')
       .attr('class', 'layer-list')
       .selectAll('li')
-      .data((d: ConflictItem) => d.choices || []);
+      .data((d: UploadConflict) => d.choices || []);
 
     // enter
     const $$choices = $choices.enter()
@@ -309,23 +294,23 @@ export class UiConflicts extends EventEmitter {
     $$label
       .append('input')
       .attr('type', 'radio')
-      .attr('name', (d: ChoiceOption) => d.id)
-      .on('change', (e: Event, d: ChoiceOption) => {
+      .attr('name', (d: ConflictChoice) => d.id)
+      .on('change', (e: Event, d: ConflictChoice) => {
         const ul = (e.currentTarget as HTMLElement).parentNode!.parentNode!.parentNode as HTMLUListElement;
-        (ul as any).__data__.chosen = d.id;
+        (ul as any).__data__.chosen = d.type;
         this._choose(e, ul, d);
       });
 
     $$label
       .append('span')
-      .text((d: ChoiceOption) => d.text);
+      .text((d: ConflictChoice) => d.text);
 
     // update
     $$choices
       .merge($choices)
-      .each((d: ChoiceOption, i: number, nodes: ArrayLike<HTMLElement>) => {
+      .each((d: ConflictChoice, i: number, nodes: ArrayLike<HTMLElement>) => {
         const ul = (nodes[i] as HTMLElement).parentNode as HTMLUListElement;
-        if ((ul as any).__data__.chosen === d.id) {
+        if ((ul as any).__data__.chosen === d.type) {
           this._choose(null, ul, d);
         }
       });
@@ -338,7 +323,7 @@ export class UiConflicts extends EventEmitter {
    * @param ul - the `<ul>` element holding the choices
    * @param datum - the chosen resolution datum
    */
-  protected _choose(e: Event | null, ul: HTMLUListElement, datum: ChoiceOption): void {
+  protected _choose(e: Event | null, ul: HTMLUListElement, datum: ConflictChoice): void {
     const context = this.context;
     const editor = context.systems.editor!;
 
@@ -346,9 +331,9 @@ export class UiConflicts extends EventEmitter {
 
     select(ul)
       .selectAll('li')
-      .classed('active', (d: ChoiceOption) => d === datum)
+      .classed('active', (d: ConflictChoice) => d === datum)
       .selectAll('input')
-      .property('checked', (d: ChoiceOption) => d === datum);
+      .property('checked', (d: ConflictChoice) => d === datum);
 
     // Gather the extent of the change (check entity pre- and post- action)
     const extent = new Extent();
@@ -403,17 +388,18 @@ export class UiConflicts extends EventEmitter {
   //   id: id,
   //   name: entityName(local),
   //   details: merge.conflicts(),
-  //   chosen: 1,
+  //   chosen: 'remote',
   //   choices: [
-  //     choice(id, keepMine, forceLocal),
-  //     choice(id, keepTheirs, forceRemote)
+  //     { id: id, type: 'local', text: keepMine, action: forceLocal },
+  //     { id: id, type: 'remote', text: keepTheirs, action: forceRemote }
   //   ]
   // }
+  // (`chosen` holds the `type` of the chosen option; both options share the entity `id`)
   /**
    * Gets or sets the list of conflicts to resolve.
    * @param val - the conflict list to set; omit to get the current value
    */
-  public conflictList(val?: ConflictItem[]): any {
+  public conflictList(val?: UploadConflict[]): any {
     if (val === undefined) return this._conflictList;
     this._conflictList = val;
     return this;
