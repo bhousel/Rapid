@@ -86,16 +86,67 @@ describe('PixiLayerOverlay', () => {
     assert.deepEqual(layer.getShapes('review'), []);
   });
 
-  it('only redraws when the shapes or zoom change', () => {
-    layer.setShapes('review', [{ id: 'tile', coordinates: ring }]);
+  // The stroke styles a Pixi Graphics was drawn with.
+  const strokes = (graphics) => graphics.context.instructions
+    .filter(i => i.action === 'stroke')
+    .map(i => i.data.style);
+
+  it('builds shapes only when they change; a zoom change restrokes scaled lines and rescales labels', () => {
+    layer.setShapes('review', [{ id: 'tile', coordinates: ring, label: 'Tile Extent' }]);
     layer.render(1, viewport);
-    const first = drawn('ui')[0];
+    const shape = drawn('ui')[0];
+    const line = shape.children[0];
+    assert.closeTo(strokes(line)[0].width, 2, 1e-9);   // 2px at zoom 16 (1 world unit per px)
 
     layer.render(2, viewport);
-    assert.strictEqual(drawn('ui')[0], first);
-
     layer.render(3, { transform: { zoom: 17 } });
-    assert.notStrictEqual(drawn('ui')[0], first);
+
+    assert.strictEqual(drawn('ui')[0], shape);   // not rebuilt
+    assert.closeTo(strokes(line)[0].width, 1, 1e-9);   // still 2px on screen
+    assert.closeTo(shape.getChildByLabel('label').scale.x, 0.5, 1e-9);
+  });
+
+  it('draws hairlines 1px at any zoom, built once', () => {
+    layer.setShapes('drawing', [{ id: 'walls', coordinates: ring, stroke: { color: 0xe040fb, hairline: true } }]);
+    layer.render(1, viewport);
+    const hairline = drawn('ui')[0].children[0];
+    assert.deepInclude(strokes(hairline)[0], { width: 1, pixelLine: true, color: 0xe040fb });
+    const instructions = hairline.context.instructions.length;
+
+    layer.render(2, { transform: { zoom: 19 } });
+
+    assert.strictEqual(drawn('ui')[0].children[0], hairline);
+    assert.lengthOf(hairline.context.instructions, instructions);   // not restroked
+  });
+
+  it('draws several paths in one shape', () => {
+    const other = ring.map(([lon, lat]) => [lon + 0.1, lat]);
+    layer.setShapes('drawing', [{ id: 'walls', coordinates: [ring, other, [ring[0]]], stroke: { hairline: true } }]);
+    layer.render(1, viewport);
+
+    assert.lengthOf(drawn('ui'), 1);
+    assert.lengthOf(strokes(drawn('ui')[0].children[0]), 2);   // the single-point path draws nothing
+  });
+
+  it('draws a fill only when the stroke is null', () => {
+    layer.setShapes('station', [{ id: 'extent', coordinates: ring, closed: true, fill: { color: 0x000000, opacity: 0.5 }, stroke: null }]);
+    layer.render(1, viewport);
+
+    const children = drawn('ui')[0].children;
+    assert.lengthOf(children, 1);
+    assert.lengthOf(strokes(children[0]), 0);
+    assert.isTrue(children[0].context.instructions.some(i => i.action === 'fill'));
+  });
+
+  it('orders shapes with the same placement by zIndex', () => {
+    layer.setShapes('drawing', [{ id: 'walls', coordinates: ring, placement: 'under', zIndex: 1 }]);
+    layer.setShapes('station', [{ id: 'extent', coordinates: ring, placement: 'under' }]);
+    layer.render(1, viewport);
+
+    const container = scene.groups.get('debug-under').children[0];
+    assert.isTrue(container.sortableChildren);
+    container.sortChildren();
+    assert.deepEqual(container.children.map(c => c.label), ['extent', 'walls']);
   });
 
   it('keeps its shapes across a reset', () => {

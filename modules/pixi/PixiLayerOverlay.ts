@@ -15,18 +15,27 @@ import type { Vec2, Viewport } from '@rapid-sdk/math';
 export interface OverlayShape {
   /** Identifies the shape among its owner's shapes */
   id: string;
-  /** The shape's points, as [lon, lat] */
-  coordinates: Vec2[];
-  /** Whether to join the last point back to the first (default `false`) */
+  /**
+   * The shape's points, as [lon, lat]: one path, or several paths drawn with
+   * the same style (e.g. all of a drawing's walls), which is much faster than
+   * a shape per path when there are many.
+   */
+  coordinates: Vec2[] | Vec2[][];
+  /** Whether to join each path's last point back to its first (default `false`) */
   closed?: boolean;
-  /** The outline (default: a 2px white line) */
+  /** The outline (default: a 2px white line), or `null` for none (e.g. a fill only) */
   stroke?: {
     color?: number;      // e.g. 0xff0000
     opacity?: number;    // 0-1 (default 1)
     width?: number;      // px (default 2)
     dash?: number[];     // px on/off, e.g. [6, 3] (default solid)
-  };
-  /** The fill, for a closed shape (default none) */
+    /**
+     * Draw 1px lines (ignoring `width` and `dash`). They're built once rather
+     * than again as the map zooms, so use this for large drawings.
+     */
+    hairline?: boolean;
+  } | null;
+  /** The fill, for a closed shape (default none); each path is filled on its own */
   fill?: {
     color?: number;
     opacity?: number;    // 0-1 (default 0.3)
@@ -35,6 +44,8 @@ export interface OverlayShape {
   label?: string;
   /** Draw under the map data, or over everything (the default) */
   placement?: 'under' | 'over';
+  /** Order among the shapes with the same placement: higher draws on top (default 0) */
+  zIndex?: number;
 }
 
 /** Style of overlay labels */
@@ -44,6 +55,19 @@ const LABEL_STYLE = new PIXI.TextStyle({
   fontWeight: '600',
   stroke: { color: 0x333333, width: 3 }
 });
+
+/** A shape as drawn: its container, and the parts redrawn when the zoom changes */
+interface DrawnShape {
+  shape: OverlayShape;
+  container: PIXI.Container;
+  /** Each path's points, flattened, relative to the container's position */
+  paths: number[][];
+  /** Width-scaled or dashed strokes, restroked when the zoom changes */
+  scaledStroke: PIXI.Graphics | null;
+  label: PIXI.Text | null;
+  /** The shape's top left, relative to the container's position */
+  topLeft: Vec2;
+}
 
 
 /**
@@ -64,7 +88,9 @@ export class PixiLayerOverlay extends AbstractPixiLayer {
   protected _over: PIXI.Container | null;
   /** The shapes to draw, by owner */
   protected _shapes: Map<string, OverlayShape[]>;
-  /** Whether the shapes need to be redrawn */
+  /** The shapes as drawn */
+  protected _drawn: DrawnShape[];
+  /** Whether the shapes need to be built again */
   protected _dirty: boolean;
   /** The zoom the shapes were last drawn at */
   protected _drawnZoom: number | null;
@@ -81,6 +107,7 @@ export class PixiLayerOverlay extends AbstractPixiLayer {
     this._under = null;
     this._over = null;
     this._shapes = new Map<string, OverlayShape[]>();
+    this._drawn = [];
     this._dirty = true;
     this._drawnZoom = null;
   }
@@ -113,6 +140,7 @@ export class PixiLayerOverlay extends AbstractPixiLayer {
 
     this._under = this._makeContainer('debug-under');
     this._over = this._makeContainer('ui');
+    this._drawn = [];
     this._dirty = true;
   }
 
@@ -150,8 +178,9 @@ export class PixiLayerOverlay extends AbstractPixiLayer {
 
 
   /**
-   * Draws the shapes, when they or the zoom have changed.
-   * They're drawn in world coordinates, so panning doesn't need a redraw.
+   * Draws the shapes when they've changed. They're drawn in world coordinates,
+   * so panning doesn't need a redraw; when the zoom changes, only what's sized
+   * in screen pixels is updated: width-scaled or dashed strokes, and labels.
    * @param frame - Integer frame being rendered
    * @param viewport - Pixi viewport to use for rendering
    */
@@ -162,24 +191,33 @@ export class PixiLayerOverlay extends AbstractPixiLayer {
 
     const zoom = viewport.transform.zoom;
     if (!this._dirty && zoom === this._drawnZoom) return;
-    this._dirty = false;
-    this._drawnZoom = zoom;
-
-    for (const container of [under, over]) {
-      for (const child of container.removeChildren()) {
-        child.destroy({ children: true });
-      }
-    }
 
     // Convert screen pixel values to world units
     const scale = 2 ** (WORLD_ZOOM - zoom);
+    this._drawnZoom = zoom;
 
-    for (const shapes of this._shapes.values()) {
-      for (const shape of shapes) {
-        const container = shape.placement === 'under' ? under : over;
-        const graphic = this._drawShape(shape, scale);
-        if (graphic) container.addChild(graphic);
+    if (this._dirty) {
+      this._dirty = false;
+      for (const container of [under, over]) {
+        for (const child of container.removeChildren()) {
+          child.destroy({ children: true });
+        }
       }
+      this._drawn = [];
+      for (const shapes of this._shapes.values()) {
+        for (const shape of shapes) {
+          const drawn = this._drawShape(shape, scale);
+          if (!drawn) continue;
+          this._drawn.push(drawn);
+          (shape.placement === 'under' ? under : over).addChild(drawn.container);
+        }
+      }
+      return;
+    }
+
+    for (const drawn of this._drawn) {
+      if (drawn.scaledStroke) this._strokeScaled(drawn, scale);
+      if (drawn.label) this._placeLabel(drawn, scale);
     }
   }
 
@@ -188,62 +226,113 @@ export class PixiLayerOverlay extends AbstractPixiLayer {
    * Draws one shape.
    * @param shape - The shape
    * @param scale - World units per screen pixel
-   * @return A container holding the shape's graphics, or `null` if it has no points
+   * @return The drawn shape, or `null` if it has no points
    */
-  protected _drawShape(shape: OverlayShape, scale: number): PIXI.Container | null {
-    const points = shape.coordinates.map(coord => projWgs84ToWorld(coord));
-    if (!points.length) return null;
+  protected _drawShape(shape: OverlayShape, scale: number): DrawnShape | null {
+    const coordinates = shape.coordinates ?? [];
+    const lonLatPaths = (Array.isArray(coordinates[0]?.[0]) ? coordinates : [coordinates]) as Vec2[][];
+    const worldPaths = lonLatPaths.map(path => path.map(coord => projWgs84ToWorld(coord))).filter(path => path.length);
+    if (!worldPaths.length) return null;
 
     // Draw relative to the first point, to keep the numbers small
-    const [ox, oy] = points[0];
-    const flat: number[] = [];
+    const [ox, oy] = worldPaths[0][0];
     let minX = Infinity;
     let minY = Infinity;
-    for (const [x, y] of points) {
-      flat.push(x - ox, y - oy);
-      minX = Math.min(minX, x - ox);
-      minY = Math.min(minY, y - oy);
-    }
-    if (shape.closed && points.length > 2) {
-      flat.push(0, 0);
-    }
+    const paths = worldPaths.map(path => {
+      const flat: number[] = [];
+      for (const [x, y] of path) {
+        flat.push(x - ox, y - oy);
+        minX = Math.min(minX, x - ox);
+        minY = Math.min(minY, y - oy);
+      }
+      if (shape.closed && path.length > 2) {
+        flat.push(flat[0], flat[1]);
+      }
+      return flat;
+    });
 
     const container = new PIXI.Container();
     container.label = shape.id;
     container.eventMode = 'none';
     container.position.set(ox, oy);
+    container.zIndex = shape.zIndex ?? 0;
 
-    if (shape.fill && shape.closed && points.length > 2) {
-      const fill = new PIXI.Graphics()
-        .poly(flat)
-        .fill({ color: shape.fill.color ?? 0xffffff, alpha: shape.fill.opacity ?? 0.3 });
+    if (shape.fill && shape.closed) {
+      const fill = new PIXI.Graphics();
+      for (const flat of paths) {
+        if (flat.length >= 8) {   // 3 points, closed
+          fill.poly(flat).fill({ color: shape.fill.color ?? 0xffffff, alpha: shape.fill.opacity ?? 0.3 });
+        }
+      }
       container.addChild(fill);
     }
 
-    if (points.length > 1) {
-      const stroke = shape.stroke ?? {};
-      const width = stroke.width ?? 2;
+    const drawn: DrawnShape = { shape, container, paths, scaledStroke: null, label: null, topLeft: [minX, minY] };
+
+    const stroke = shape.stroke === undefined ? {} : shape.stroke;
+    const lines = paths.filter(flat => flat.length >= 4);   // 2 points
+    if (stroke && lines.length) {
       const color = stroke.color ?? 0xffffff;
       const alpha = stroke.opacity ?? 1;
-      const line = new PIXI.Graphics();
-      if (stroke.dash?.length) {
-        new DashLine(this.gfx, line, { dash: stroke.dash, width, color, alpha, scale }).poly(flat);
+      if (stroke.hairline) {
+        // 1px at any zoom: built once
+        const hairline = new PIXI.Graphics();
+        for (const flat of lines) {
+          hairline.poly(flat, false).stroke({ width: 1, color, alpha, pixelLine: true });
+        }
+        container.addChild(hairline);
       } else {
-        line.poly(flat, false).stroke({ width: width * scale, color, alpha, join: 'round', cap: 'round' });
+        drawn.scaledStroke = new PIXI.Graphics();
+        container.addChild(drawn.scaledStroke);
+        this._strokeScaled(drawn, scale);
       }
-      container.addChild(line);
     }
 
     if (shape.label) {
-      const text = new PIXI.Text({ text: shape.label, style: LABEL_STYLE });
-      text.label = 'label';
-      text.anchor.set(0, 1);
-      text.position.set(minX, minY - 2 * scale);
-      text.scale.set(scale);
-      container.addChild(text);
+      drawn.label = new PIXI.Text({ text: shape.label, style: LABEL_STYLE });
+      drawn.label.label = 'label';
+      drawn.label.anchor.set(0, 1);
+      container.addChild(drawn.label);
+      this._placeLabel(drawn, scale);
     }
 
-    return container;
+    return drawn;
+  }
+
+
+  /**
+   * (Re)strokes a shape's width-scaled or dashed lines for the given scale.
+   * @param drawn - The drawn shape
+   * @param scale - World units per screen pixel
+   */
+  protected _strokeScaled(drawn: DrawnShape, scale: number): void {
+    const graphics = drawn.scaledStroke!;
+    const stroke = drawn.shape.stroke ?? {};
+    const width = stroke.width ?? 2;
+    const color = stroke.color ?? 0xffffff;
+    const alpha = stroke.opacity ?? 1;
+
+    graphics.clear();
+    for (const flat of drawn.paths) {
+      if (flat.length < 4) continue;
+      if (stroke.dash?.length) {
+        new DashLine(this.gfx, graphics, { dash: stroke.dash, width, color, alpha, scale }).poly(flat);
+      } else {
+        graphics.poly(flat, false).stroke({ width: width * scale, color, alpha, join: 'round', cap: 'round' });
+      }
+    }
+  }
+
+
+  /**
+   * Sizes and places a shape's label for the given scale, just above its top left.
+   * @param drawn - The drawn shape
+   * @param scale - World units per screen pixel
+   */
+  protected _placeLabel(drawn: DrawnShape, scale: number): void {
+    const [minX, minY] = drawn.topLeft;
+    drawn.label!.position.set(minX, minY - 2 * scale);
+    drawn.label!.scale.set(scale);
   }
 
 
@@ -259,7 +348,7 @@ export class PixiLayerOverlay extends AbstractPixiLayer {
     const container = new PIXI.Container();
     container.label = this.layerID;
     container.eventMode = 'none';
-    container.sortableChildren = false;
+    container.sortableChildren = true;   // by each shape's zIndex
     group.addChild(container);
     return container;
   }
