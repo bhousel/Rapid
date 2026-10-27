@@ -140,7 +140,7 @@ export class MoveMode extends AbstractMode {
 
       editor.commit({
         ...label,
-        selectedIDs: this._entityIDs
+        selection: { osm: this._entityIDs }
       });
     }
   }

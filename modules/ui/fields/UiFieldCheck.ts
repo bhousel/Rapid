@@ -175,7 +175,7 @@ export class UiFieldCheck extends AbstractUiField {
           editor.commit({
             stringID: 'operations.reverse.annotation.line',
             stringParams: { n: 1 },
-            selectedIDs: this.entityIDs
+            selection: { osm: this.entityIDs }
           });
 
           select(e.currentTarget as any)

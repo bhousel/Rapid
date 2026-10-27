@@ -1,6 +1,6 @@
 import type { Context } from '../Context.ts';
 import type { Graph } from './Graph.ts';
-import type { TransformProps } from '@rapid-sdk/math';
+import type { TransformProps, Vec4 } from '@rapid-sdk/math';
 
 
 /** Parameters for an edit's label, e.g. `{ n: 3 }` for "Moved {n} features". */
@@ -17,6 +17,12 @@ export interface EditLabel {
   /** Parameters for the string */
   stringParams?: EditLabelParams;
 }
+
+/**
+ * Selected data IDs, grouped by the layer they're drawn on, the same shape the select modes take.
+ * e.g. `{ osm: ['w1'] }` or `{ rapid: ['fbRoads:123:0'] }`
+ */
+export type EditSelection = Record<LayerID, DataID[]>;
 
 /** Imagery, photo and data sources used to make an edit (shown in the changeset comment) */
 export interface EditSources {
@@ -43,11 +49,19 @@ export interface EditProps {
   stringParams?: EditLabelParams;
   /** A plain-text label, only for edits restored from a v3 backup (already translated) */
   annotation?: string;
-  /** IDs of entities selected when this edit was made */
-  selectedIDs?: EntityID[];
+  /** What's selected after this edit; redo restores it */
+  selection?: EditSelection;
+  /** What was selected before this edit; undo restores it. `EditSystem` fills it in at commit. */
+  selectionBefore?: EditSelection;
+  /**
+   * Where the change is, as `[minLon, minLat, maxLon, maxLat]`. Undo and redo show it.
+   * `EditSystem` computes it from the graph at commit; an edit that changes no OSM data
+   * (like an ignore) passes its own.
+   */
+  extent?: Vec4;
   /** Sources used to make this edit */
   sources?: EditSources;
-  /** Map transform at the time of the edit */
+  /** Map transform at the time of the edit, where the user was looking */
   transform?: TransformProps;
 }
 

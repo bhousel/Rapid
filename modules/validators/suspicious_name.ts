@@ -118,7 +118,7 @@ export function validateSuspiciousName(context: Context): ValidatorFunction {
               editor.perform(actionChangeTags(entityID, tags));
               editor.commit({
                 stringID: 'issues.fix.remove_generic_name.annotation',
-                selectedIDs: [entityID]
+                selection: { osm: [entityID] }
               });
             }
           })
@@ -180,7 +180,7 @@ export function validateSuspiciousName(context: Context): ValidatorFunction {
               editor.perform(actionChangeTags(entityID, tags));
               editor.commit({
                 stringID: 'issues.fix.remove_mistaken_name.annotation',
-                selectedIDs: [entityID]
+                selection: { osm: [entityID] }
               });
             }
           })

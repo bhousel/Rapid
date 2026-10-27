@@ -177,5 +177,107 @@ describe('MapSystem', () => {
       });
     });
 
+
+    // Showing a change on undo/redo.  The map is 1000×800 at z17, centered on [0, 0].
+    describe('showing changes', () => {
+      const D = 360 / (256 * 2 ** 17);   // degrees per pixel at z17 (near the equator)
+      const box = (x, y, halfPx) => new Rapid.sdk.Extent([(x - halfPx) * D, (y - halfPx) * D], [(x + halfPx) * D, (y + halfPx) * D]);
+      const point = (x, y) => new Rapid.sdk.Extent([x * D, y * D]);
+
+      beforeEach(() => {
+        context.viewport.dimensions = [1000, 800];
+        _map.centerZoom([0, 0], 17);
+      });
+
+      describe('easeDuration', () => {
+        it('is 0 when nothing changes', () => {
+          assert.strictEqual(_map.easeDuration([0, 0], 17), 0);
+        });
+
+        it('is short within about a screen, longer within a few, longest beyond', () => {
+          assert.strictEqual(_map.easeDuration([200 * D, 0]), 250);
+          assert.strictEqual(_map.easeDuration([2000 * D, 0]), 500);
+          assert.strictEqual(_map.easeDuration([1, 0]), 1000);
+        });
+
+        it('counts zoom changes', () => {
+          assert.strictEqual(_map.easeDuration([0, 0], 17.5), 250);
+          assert.strictEqual(_map.easeDuration([0, 0], 20), 1000);
+        });
+      });
+
+      describe('showsExtent', () => {
+        it('shows a change near the center', () => {
+          assert.isTrue(_map.showsExtent(box(0, 0, 50)));
+        });
+
+        it('does not show a change off screen', () => {
+          assert.isFalse(_map.showsExtent(box(2000, 0, 50)));
+        });
+
+        it('does not show a small change when zoomed far out', () => {
+          _map.zoom(14);
+          assert.isFalse(_map.showsExtent(point(0, 0)));
+          _map.zoom(16);
+          assert.isTrue(_map.showsExtent(point(0, 0)));
+        });
+
+        it('shows a change bigger than the screen if any of it is in view', () => {
+          assert.isTrue(_map.showsExtent(box(2000, 0, 2500)));
+        });
+
+        it('checks a given view instead of the current one', () => {
+          const here = { ..._map.transform() };
+          _map.center([2000 * D, 0]);
+          const there = { ..._map.transform() };
+          _map.center([0, 0]);
+          assert.isFalse(_map.showsExtent(box(2000, 0, 50), here));
+          assert.isTrue(_map.showsExtent(box(2000, 0, 50), there));
+        });
+      });
+
+      describe('viewForExtent', () => {
+        it('returns null when the change is already in view', () => {
+          assert.isNull(_map.viewForExtent(box(0, 0, 50)));
+        });
+
+        it('centers on a change off screen, keeping the zoom', () => {
+          const t = _map.viewForExtent(box(2000, 0, 50));
+          assert.isObject(t);
+          assert.closeTo(t.z, 17, 1e-6);
+          _map.transform(t);
+          const [lon, lat] = _map.center();
+          assert.closeTo(lon, 2000 * D, 1e-6);
+          assert.closeTo(lat, 0, 1e-6);
+        });
+
+        it('prefers the given transform if it shows the change', () => {
+          _map.center([2010 * D, 0]);
+          const preferred = { ..._map.transform() };
+          _map.center([0, 0]);
+          assert.deepEqual(_map.viewForExtent(box(2000, 0, 50), preferred), preferred);
+        });
+
+        it('does not zoom out past z16 for a big change', () => {
+          const t = _map.viewForExtent(new Rapid.sdk.Extent([4, 4], [6, 6]));
+          assert.closeTo(t.z, 16, 1e-6);
+        });
+
+        it('zooms in to z16 for a small change seen from far out', () => {
+          _map.zoom(12);
+          const t = _map.viewForExtent(point(0, 0));
+          assert.closeTo(t.z, 16, 1e-6);
+        });
+      });
+
+      describe('showExtentAsync', () => {
+        it('moves the map only when needed', async () => {
+          assert.isFalse(await _map.showExtentAsync(box(0, 0, 50)));
+          assert.isTrue(await _map.showExtentAsync(box(2000, 0, 50)));
+          assert.closeTo(_map.center()[0], 2000 * D, 1e-6);
+        });
+      });
+    });
+
   });
 });

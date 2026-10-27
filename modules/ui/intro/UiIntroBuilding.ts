@@ -1,12 +1,11 @@
 import { Extent } from '@rapid-sdk/math';
 import { AbstractIntroChapter } from './AbstractIntroChapter.ts';
 import { actionChangePreset } from '../../actions/change_preset.ts';
-import { delayAsync, eventCancel, helpHtml, isMostlySquare, transitionTime } from './helper.ts';
+import { delayAsync, eventCancel, helpHtml, isMostlySquare } from './helper.ts';
 
 import type { Context } from '../../Context.ts';
 import type { IntroStep } from './AbstractIntroChapter.ts';
 import type { UiCurtain } from './UiCurtain.ts';
-import type { Vec2 } from '@rapid-sdk/math';
 
 
 /**
@@ -95,7 +94,7 @@ export class UiIntroBuilding extends AbstractIntroChapter {
     this._houseID = null;
 
     const loc = this._houseExtent.center();
-    const msec = transitionTime(loc, map.center() as Vec2);
+    const msec = map.easeDuration(loc, 19);
     if (msec > 0) curtain.hide();
 
     await map.setMapParamsAsync(loc, 19, 0, msec);
@@ -341,7 +340,7 @@ export class UiIntroBuilding extends AbstractIntroChapter {
       editor.perform(actionChangePreset(this._houseID!, preset, this._housePreset));
       editor.commit({
         stringID: 'operations.change_tags.annotation',
-        selectedIDs: [this._houseID!]
+        selection: { osm: [this._houseID!] }
       });
     }
 
@@ -510,7 +509,7 @@ export class UiIntroBuilding extends AbstractIntroChapter {
     this._tankID = null;
 
     const loc = this._tankExtent.center();
-    const msec = transitionTime(loc, map.center() as Vec2);
+    const msec = map.easeDuration(loc, 19.5);
     if (msec > 0) curtain.hide();
 
     await map.setMapParamsAsync(loc, 19.5, 0, msec);
@@ -691,7 +690,7 @@ export class UiIntroBuilding extends AbstractIntroChapter {
       editor.perform(actionChangePreset(this._tankID!, preset, this._tankPreset));
       editor.commit({
         stringID: 'operations.change_tags.annotation',
-        selectedIDs: [this._tankID!]
+        selection: { osm: [this._tankID!] }
       });
     }
 

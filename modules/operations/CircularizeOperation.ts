@@ -73,7 +73,7 @@ export class CircularizeOperation extends AbstractOperation {
     const label = this.editLabel();
     editor
       .performAsync(combinedAction)
-      .then(() => editor.commit({ ...label, selectedIDs: this.selectedIDs }));
+      .then(() => editor.commit({ ...label, selection: { osm: this.selectedIDs } }));
   }
 
 

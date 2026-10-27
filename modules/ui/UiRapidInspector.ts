@@ -577,7 +577,7 @@ export class UiRapidInspector {
       type: 'rapid_accept_feature',
       stringID: 'rapid_inspector.option_accept.annotation',
       acceptIDs: acceptIDs,
-      selectedIDs: newID ? [newID] : undefined,
+      selection: newID ? { osm: [newID] } : undefined,
       sources: { data: dataset?.dataUsed ?? [datasetID] }
     });
 
@@ -642,11 +642,13 @@ export class UiRapidInspector {
     const context = this.context;
     const editor = context.systems.editor!;
 
+    // An ignore changes nothing in the graph, so it gives its own extent for undo and redo to show.
     editor.perform(actionNoop());
     editor.commit<RapidIgnoreEditProps>({
       type: 'rapid_ignore_feature',
       stringID: 'rapid_inspector.option_ignore.annotation',
-      ignoreID: datum.id
+      ignoreID: datum.id,
+      extent: datum.extent()?.rectangle()
     });
     context.enter('browse');
     this.datum = null;

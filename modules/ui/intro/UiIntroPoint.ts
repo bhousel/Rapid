@@ -3,12 +3,11 @@ import { select } from 'd3-selection';
 
 import { AbstractIntroChapter } from './AbstractIntroChapter.ts';
 import { actionChangePreset } from '../../actions/change_preset.ts';
-import { delayAsync, eventCancel, helpHtml, icon, transitionTime } from './helper.ts';
+import { delayAsync, eventCancel, helpHtml, icon } from './helper.ts';
 
 import type { Context } from '../../Context.ts';
 import type { IntroStep } from './AbstractIntroChapter.ts';
 import type { UiCurtain } from './UiCurtain.ts';
-import type { Vec2 } from '@rapid-sdk/math';
 
 
 const buildingExtent = new Extent([-85.63261, 41.94391], [-85.63222, 41.94419]);
@@ -72,7 +71,7 @@ export class UiIntroPoint extends AbstractIntroChapter {
     this._pointID = null;
 
     const loc = buildingExtent.center();
-    const msec = transitionTime(loc, map.center() as Vec2);
+    const msec = map.easeDuration(loc, 20);
     if (msec > 0) curtain.hide();
 
     // bug: too hard to place a point in the building at z19 because of snapping to fill #719
@@ -336,7 +335,7 @@ export class UiIntroPoint extends AbstractIntroChapter {
       editor.perform(actionChangePreset(this._pointID!, preset, this._cafePreset));
       editor.commit({
         stringID: 'operations.change_tags.annotation',
-        selectedIDs: [this._pointID!]
+        selection: { osm: [this._pointID!] }
       });
     }
 
@@ -357,7 +356,7 @@ export class UiIntroPoint extends AbstractIntroChapter {
     editor.restoreCheckpoint('hasPoint');
 
     const loc = buildingExtent.center();
-    const msec = transitionTime(loc, map.center() as Vec2);
+    const msec = map.easeDuration(loc, 20);
     if (msec > 0) curtain.hide();
 
     // bug: too hard to place a point in the building at z19 because of snapping to fill #719

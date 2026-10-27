@@ -1,8 +1,45 @@
 import { EventEmitter } from 'tseep/lib/ee-safe';
+import { GeoJSONData, MarkerData, OsmEntity } from '../data/index.ts';
 
 import type { AbstractData } from '../data/AbstractData.ts';
 import type { AbstractOperation } from '../operations/AbstractOperation.ts';
 import type { Context } from '../Context.ts';
+import type { EditSelection } from '../lib/Edit.ts';
+
+
+/**
+ * Works out which layer draws the given data, from what kind of data it is.
+ * It's hacky, and could go away if selections carried their layerIDs.
+ * @param  datum - The data to find the layer for
+ * @return The layerID, or `null` if not known
+ */
+export function dataLayerID(datum: AbstractData): LayerID | null {
+  const datasetID = (datum.props?.datasetID ?? '') as DatasetID;
+  const serviceID = (datum.props?.serviceID ?? '') as ServiceID;
+
+  if (datum instanceof OsmEntity) {
+    return 'osm';
+  } else if (datasetID) {
+    return 'rapid';
+  } else if (datum instanceof MarkerData && datum.type === 'detection') {
+    if (serviceID === 'mapillary' && datum.props.object_type === 'point') {
+      return 'mapillary-detections';
+    } else if (serviceID === 'mapillary' && datum.props.object_type === 'traffic_sign') {
+      return 'mapillary-signs';
+    }
+  } else if (datum instanceof MarkerData) {   // in most cases the `serviceID` is the `layerID`
+    if (serviceID === 'osm') {
+      if (datum.type === 'note') {
+        return 'notes';   // OSM Notes
+      }
+    } else {
+      return serviceID;
+    }
+  } else if (datum instanceof GeoJSONData) {  // custom data
+    return 'custom-data';
+  }
+  return null;
+}
 
 
 /**
@@ -103,6 +140,23 @@ export class AbstractMode extends EventEmitter {
    */
   public get selectedIDs(): DataID[] {
     return Array.from(this._selectedData.keys());
+  }
+
+
+  /**
+   * Currently selected data IDs, grouped by the layer they're drawn on.
+   * Data whose layer isn't known is left out.
+   * @return  Selected `DataID`s by `LayerID`, e.g. `{ osm: ['w1'] }`
+   * @readonly
+   */
+  public get selection(): EditSelection {
+    const selection: EditSelection = {};
+    for (const [dataID, datum] of this._selectedData) {
+      const layerID = dataLayerID(datum);
+      if (!layerID) continue;
+      (selection[layerID] ??= []).push(dataID);
+    }
+    return selection;
   }
 
 }

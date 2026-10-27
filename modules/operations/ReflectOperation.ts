@@ -61,7 +61,7 @@ export class ReflectOperation extends AbstractOperation {
 
     editor
       .performAsync(action)
-      .then(() => editor.commit({ ...label, selectedIDs: this.selectedIDs }));
+      .then(() => editor.commit({ ...label, selection: { osm: this.selectedIDs } }));
   }
 
 

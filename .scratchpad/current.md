@@ -11,9 +11,15 @@ is deleted (step 2). Step 3 (Oct 27): `Edit<P>` is a graph plus a props bag with
 decides backups, the beforeunload prompt and the source switcher warning. Backup items now hold `props`
 (still version 3; old items convert via `_legacyEditProps`). Checked live: an ignore-only session is
 backed up with its typed props, and undoing it deletes the session.
-Next: step 4 (viewport on undo/redo/restore), step 5 (backup v4). Found: v3 restore reads `result.data`
-from `loadMultipleAsync`, which returns an array now, so restoring missing child nodes is likely broken.
-PR #5's `EditSystem.dataVersion` fits here (the "did data change?" question); not landed.
+Step 4 (Oct 27): edits record `extent`, `selection` and `selectionBefore` (by layer, `EditSelection`;
+`selectedIDs` is gone); `MapSystem` moves only when the change isn't in view; undo restores the
+selection before, redo the selection after (a Rapid feature is found again on the `rapid` layer); one
+more redo returns to where the user was (`EditSystem.returnEdit`, never in the history). Worked out
+with Bryan, with Steve Ruiz's undo/redo threads as prior art (in the doc). Checked live.
+Next: step 5 (backup v4). Found: v3 restore reads `result.data` from `loadMultipleAsync`, which returns
+an array now, so restoring missing child nodes is likely broken. Found: accepting from a custom dataset
+records no data source (`ds.dataUsed` is `[]`, and `[] ?? [datasetID]` keeps `[]`; it was `||` before,
+same result). PR #5's `EditSystem.dataVersion` fits here (the "did data change?" question); not landed.
 
 ## Active: matching third-party data against OSM (`ConflationSystem`)
 Top priority. Design: [`design/conflation-system.md`](../design/conflation-system.md), currently proposed and

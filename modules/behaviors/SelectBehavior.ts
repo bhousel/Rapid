@@ -489,7 +489,7 @@ export class SelectBehavior extends AbstractBehavior {
       editor.perform(actionAddMidpoint({ loc, edge } as Midpoint, new OsmNode(context)));
       editor.commit({
         stringID: 'operations.add.annotation.vertex',
-        selectedIDs: context.selectedIDs()   // keep the parent way selected
+        selection: { osm: context.selectedIDs() }   // keep the parent way selected
       });
     }
 

@@ -145,7 +145,7 @@ export class AddPointMode extends AbstractMode {
     const node = new OsmNode(context, { loc: loc, tags: this.defaultTags });
 
     editor.perform(actionAddEntity(node));
-    editor.commit({ stringID: 'operations.add.annotation.point', selectedIDs: [node.id] });
+    editor.commit({ stringID: 'operations.add.annotation.point', selection: { osm: [node.id] } });
     context.enter('select-osm', { selection: { osm: [node.id] }, newFeature: true });
   }
 
@@ -161,7 +161,7 @@ export class AddPointMode extends AbstractMode {
 
     const node = new OsmNode(context, { tags: this.defaultTags });
     editor.perform(actionAddMidpoint({ loc, edge } as Midpoint, node));
-    editor.commit({ stringID: 'operations.add.annotation.vertex', selectedIDs: [node.id] });
+    editor.commit({ stringID: 'operations.add.annotation.vertex', selection: { osm: [node.id] } });
     context.enter('select-osm', { selection: { osm: [node.id] }, newFeature: true });
   }
 
@@ -186,7 +186,7 @@ export class AddPointMode extends AbstractMode {
     }
 
     editor.perform(actionChangeTags(node.id, tags));
-    editor.commit({ stringID: 'operations.add.annotation.point', selectedIDs: [node.id] });
+    editor.commit({ stringID: 'operations.add.annotation.point', selection: { osm: [node.id] } });
     context.enter('select-osm', { selection: { osm: [node.id] }, newFeature: false });
   }
 

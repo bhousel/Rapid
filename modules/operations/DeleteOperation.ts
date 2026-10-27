@@ -92,7 +92,7 @@ export class DeleteOperation extends AbstractOperation {
 
     const label = this.editLabel();  // watch out! calculate this _before_ we delete the stuff.
     editor.perform(this._action);
-    editor.commit({ ...label, selectedIDs: this.selectedIDs });
+    editor.commit({ ...label, selection: { osm: this.selectedIDs } });
 
     if (nextNode && nextLoc) {
       map.centerEase(nextLoc);

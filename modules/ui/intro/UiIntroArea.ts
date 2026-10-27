@@ -2,12 +2,11 @@ import { Extent } from '@rapid-sdk/math';
 import { select } from 'd3-selection';
 import { interpolateNumber } from 'd3-interpolate';
 import { AbstractIntroChapter } from './AbstractIntroChapter.ts';
-import { delayAsync, eventCancel, helpHtml, icon, transitionTime } from './helper.ts';
+import { delayAsync, eventCancel, helpHtml, icon } from './helper.ts';
 
 import type { Context } from '../../Context.ts';
 import type { IntroStep } from './AbstractIntroChapter.ts';
 import type { UiCurtain } from './UiCurtain.ts';
-import type { Vec2 } from '@rapid-sdk/math';
 
 
 /**
@@ -76,7 +75,7 @@ export class UiIntroArea extends AbstractIntroChapter {
     this._areaID = null;
 
     const loc = this._playgroundExtent.center();
-    const msec = transitionTime(loc, map.center() as Vec2);
+    const msec = map.easeDuration(loc, 19.5);
     if (msec > 0) curtain.hide();
 
     await map.setMapParamsAsync(loc, 19.5, 0, msec);

@@ -369,7 +369,7 @@ export function validateCloseNodes(context: Context): ValidatorFunction {
                 editor.perform(actionMergeNodes([entityIds[1], entityIds[2]]));
                 editor.commit({
                   stringID: 'issues.fix.merge_close_vertices.annotation',
-                  selectedIDs: [ entityIds[1], entityIds[2] ]
+                  selection: { osm: [ entityIds[1], entityIds[2] ] }
                 });
               }
             }),

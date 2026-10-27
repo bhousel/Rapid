@@ -199,7 +199,7 @@ export class SelectOsmMode extends AbstractMode {
         editor.perform(actionDeleteRelation(entity.id, true, true));  // true = don't delete untagged members
         editor.commit({
           stringID: 'operations.delete.annotation.relation',
-          selectedIDs: [entity.id]
+          selection: { osm: [entity.id] }
         });
       }
     }
@@ -357,7 +357,7 @@ export class SelectOsmMode extends AbstractMode {
 
       // do it
       const label = operation.editLabel();
-      const props = { ...label, selectedIDs: selectedIDs };
+      const props = { ...label, selection: { osm: selectedIDs } };
 
       editor.perform(action);
       if (isSameSelection && editor.getUndoEdit()?.isLabeled(label)) {

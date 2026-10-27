@@ -70,7 +70,7 @@ describe('EditSystem sessions (Phase 2)', () => {
   describe('multiple concurrent sessions', () => {
     it('mints a unique session id on first backup', async () => {
       editor.perform(actionAddTaggedNode('n-1', [1, 2], { building: 'yes' }));
-      editor.commit({ stringID:'add building', selectedIDs: ['n-1'] });
+      editor.commit({ stringID:'add building', selection: { osm: ['n-1'] } });
       await editor.immediateBackup();
 
       assert.isString(editor._sessionID);
@@ -80,14 +80,14 @@ describe('EditSystem sessions (Phase 2)', () => {
     it('writes separate records for separate sessions', async () => {
       // First session
       editor.perform(actionAddTaggedNode('n-1', [1, 2], { building: 'yes' }));
-      editor.commit({ stringID:'building', selectedIDs: ['n-1'] });
+      editor.commit({ stringID:'building', selection: { osm: ['n-1'] } });
       await editor.immediateBackup();
       const firstID = editor._sessionID;
 
       // Reset clears the session id; the next edit starts a fresh session
       await editor.resetAsync();
       editor.perform(actionAddTaggedNode('n-2', [3, 4], { highway: 'residential' }));
-      editor.commit({ stringID:'road', selectedIDs: ['n-2'] });
+      editor.commit({ stringID:'road', selection: { osm: ['n-2'] } });
       await editor.immediateBackup();
       const secondID = editor._sessionID;
 
@@ -98,7 +98,7 @@ describe('EditSystem sessions (Phase 2)', () => {
 
     it('removes the session when the user undoes all of its edits', async () => {
       editor.perform(actionAddTaggedNode('n-1', [1, 2], { building: 'yes' }));
-      editor.commit({ stringID:'building', selectedIDs: ['n-1'] });
+      editor.commit({ stringID:'building', selection: { osm: ['n-1'] } });
       await editor.immediateBackup();
       const sessionID = editor._sessionID;
       assert.isOk(await database.get('sessions', sessionID));
@@ -113,7 +113,7 @@ describe('EditSystem sessions (Phase 2)', () => {
 
     it('no longer writes edits to localStorage', async () => {
       editor.perform(actionAddTaggedNode('n-1', [1, 2], { building: 'yes' }));
-      editor.commit({ stringID:'building', selectedIDs: ['n-1'] });
+      editor.commit({ stringID:'building', selection: { osm: ['n-1'] } });
       await editor.immediateBackup();
 
       assert.isFalse(context.systems.storage.hasItem(LEGACY_KEY));
@@ -121,7 +121,7 @@ describe('EditSystem sessions (Phase 2)', () => {
 
     it('stores metadata (editCount, bbox, summary) on the record', async () => {
       editor.perform(actionAddTaggedNode('n-1', [1, 2], { building: 'yes' }));
-      editor.commit({ stringID:'building', selectedIDs: ['n-1'] });
+      editor.commit({ stringID:'building', selection: { osm: ['n-1'] } });
       await editor.immediateBackup();
 
       const record = await database.get('sessions', editor._sessionID);
@@ -240,7 +240,7 @@ describe('EditSystem sessions (Phase 2)', () => {
 
     it('bumps heartbeatAt on the active session without clobbering its data', async () => {
       editor.perform(actionAddTaggedNode('n-1', [1, 2], { building: 'yes' }));
-      editor.commit({ stringID:'building', selectedIDs: ['n-1'] });
+      editor.commit({ stringID:'building', selection: { osm: ['n-1'] } });
       await editor.immediateBackup();
 
       const before = (await database.get('sessions', editor._sessionID)).heartbeatAt;
@@ -275,7 +275,7 @@ describe('EditSystem sessions (Phase 2)', () => {
 
     it('records the owned session id in sessionStorage on backup', async () => {
       editor.perform(actionAddTaggedNode('n-1', [1, 2], { building: 'yes' }));
-      editor.commit({ stringID:'building', selectedIDs: ['n-1'] });
+      editor.commit({ stringID:'building', selection: { osm: ['n-1'] } });
       await editor.immediateBackup();
 
       assert.strictEqual(globalThis.sessionStorage.getItem(OWN_KEY), editor._sessionID);
@@ -283,7 +283,7 @@ describe('EditSystem sessions (Phase 2)', () => {
 
     it('clears the owned session id when the active session is deleted', async () => {
       editor.perform(actionAddTaggedNode('n-1', [1, 2], { building: 'yes' }));
-      editor.commit({ stringID:'building', selectedIDs: ['n-1'] });
+      editor.commit({ stringID:'building', selection: { osm: ['n-1'] } });
       await editor.immediateBackup();
       const id = editor._sessionID;
 

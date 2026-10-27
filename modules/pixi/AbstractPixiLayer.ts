@@ -1,5 +1,6 @@
 import { type OneOrMore, utilIterable } from '../util/iterable.ts';
 
+import type { AbstractData } from '../data/AbstractData.ts';
 import type { AbstractPixiFeature } from './AbstractPixiFeature.ts';
 import type { Context } from '../Context.ts';
 import type { GraphicsSystem } from '../core/GraphicsSystem.ts';
@@ -470,6 +471,20 @@ export class AbstractPixiLayer {
   public getDataWithClass(classID: ClassID): Set<DataID> {
     const dataIDs = this._classHasData.get(classID) ?? new Set<DataID>();
     return new Set<DataID>(dataIDs);  // copy
+  }
+
+
+  /**
+   * Finds data drawn on this layer by its dataID, e.g. to select it again after undo.
+   * Only data that has been drawn can be found.
+   * @param dataID - dataID to look for
+   * @returns the data, or `undefined` if it isn't drawn on this layer
+   */
+  public getData(dataID: DataID): AbstractData | undefined {
+    for (const featureID of this._dataHasFeature.get(dataID) ?? []) {
+      const data = this.features.get(featureID)?.data;
+      if (data) return data;
+    }
   }
 
 

@@ -1,4 +1,4 @@
-import { AbstractMode } from './AbstractMode.ts';
+import { AbstractMode, dataLayerID } from './AbstractMode.ts';
 import { AbstractData, OsmEntity, GeoJSONData, MarkerData } from '../data/index.ts';
 import { Extent } from '@rapid-sdk/math';
 import { UiOsmoseEditor } from '../ui/UiOsmoseEditor.ts';
@@ -84,30 +84,7 @@ export class SelectMode extends AbstractMode {
     // It's hacky and we should remove this, maybe by including layerID in the `options` passed in.
     scene.clearClass('select');
     for (const datum of selection.values()) {
-      const datasetID = (datum.props?.datasetID ?? '') as DatasetID;
-      const serviceID = (datum.props?.serviceID ?? '') as ServiceID;
-      let layerID = null;
-
-      if (datasetID) {
-        layerID = 'rapid';
-      } else if (datum instanceof MarkerData && datum.type === 'detection') {
-        if (serviceID === 'mapillary' && datum.props.object_type === 'point') {
-          layerID = 'mapillary-detections';
-        } else if (serviceID === 'mapillary' && datum.props.object_type === 'traffic_sign') {
-          layerID = 'mapillary-signs';
-        }
-      } else if (datum instanceof MarkerData) {   // in most cases the `serviceID` is the `layerID`
-        if (serviceID === 'osm') {
-          if (datum.type === 'note') {
-            layerID = 'notes';   // OSM Notes
-          }
-        } else {
-          layerID = serviceID;
-        }
-      } else if (datum instanceof GeoJSONData) {  // custom data
-        layerID = 'custom-data';
-      }
-
+      const layerID = dataLayerID(datum);
       if (layerID) {
         scene.setClass('select', layerID, datumID);
       }

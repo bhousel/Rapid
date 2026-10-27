@@ -1,6 +1,6 @@
 import { Extent, geoSphericalDistance } from '@rapid-sdk/math';
 import { AbstractIntroChapter } from './AbstractIntroChapter.ts';
-import { delayAsync, eventCancel, helpHtml, icon, transitionTime } from './helper.ts';
+import { delayAsync, eventCancel, helpHtml, icon } from './helper.ts';
 
 import type { Context } from '../../Context.ts';
 import type { IntroStep } from './AbstractIntroChapter.ts';
@@ -163,7 +163,7 @@ export class UiIntroLine extends AbstractIntroChapter {
     this._lineID = null;
 
     const loc = this._tulipRoadStartExtent.center();
-    const msec = transitionTime(loc, map.center() as Vec2);
+    const msec = map.easeDuration(loc, 18.5);
     if (msec > 0) curtain.hide();
 
     await map.setMapParamsAsync(loc, 18.5, 0, msec);
@@ -237,7 +237,7 @@ export class UiIntroLine extends AbstractIntroChapter {
     const curtain = this._curtain;
 
     const loc = this._tulipRoadMidExtent.center();
-    const msec = transitionTime(loc, map.center() as Vec2);
+    const msec = map.easeDuration(loc, 18.5);
 
     await map.setMapParamsAsync(loc, 18.5, 0, msec);
 
@@ -291,7 +291,7 @@ export class UiIntroLine extends AbstractIntroChapter {
     const curtain = this._curtain;
 
     const loc = this._tulipRoadMidExtent.center();
-    const msec = transitionTime(loc, map.center() as Vec2);
+    const msec = map.easeDuration(loc, 18.5);
 
     await map.setMapParamsAsync(loc, 18.5, 0, msec);
 
@@ -567,7 +567,7 @@ export class UiIntroLine extends AbstractIntroChapter {
     if (!this._hasWoodStreetParts()) editor.restoreCheckpoint('initial');
 
     const loc = this._woodStreetExtent.center();
-    const msec = transitionTime(loc, map.center() as Vec2);
+    const msec = map.easeDuration(loc, 19);
     if (msec > 0) curtain.hide();
 
     await map.setMapParamsAsync(loc, 19, 0, msec);
@@ -790,7 +790,7 @@ export class UiIntroLine extends AbstractIntroChapter {
     if (!this._has12thAvenueParts()) editor.restoreCheckpoint('initial');
 
     const loc = this._deleteLinesExtent.center();
-    const msec = transitionTime(loc, map.center() as Vec2);
+    const msec = map.easeDuration(loc, 18);
     if (msec > 0) curtain.hide();
 
     await map.setMapParamsAsync(loc, 18, 0, msec);

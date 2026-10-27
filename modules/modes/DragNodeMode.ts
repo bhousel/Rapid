@@ -350,7 +350,7 @@ export class DragNodeMode extends AbstractMode {
       label = this._moveLabel();
     }
 
-    editor.commit({ ...label, selectedIDs: [this.dragNode.id] });
+    editor.commit({ ...label, selection: { osm: [this.dragNode.id] } });
 
     // Choose next mode
     // (Note that if the drag node is gone, select mode will fallback to browse mode)

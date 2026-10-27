@@ -843,7 +843,7 @@ class PresetItem {
     editor.perform(combinedAction);
     editor.commit({
       stringID: 'operations.change_tags.annotation',
-      selectedIDs: list._entityIDs
+      selection: { osm: list._entityIDs }
     });
     list.emit('choose', item);
   }

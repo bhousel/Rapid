@@ -35,6 +35,7 @@ Each mode has:
 - `active` - Whether the mode is currently active
 - `operations` - Array of operations available in this mode
 - `selectedData` - Map of currently selected data elements
+- `selection` - The selected data IDs grouped by layer, e.g. `{ osm: ['w1'] }` (what edits record, so undo/redo can restore it)
 
 ## Mode Transitions
 

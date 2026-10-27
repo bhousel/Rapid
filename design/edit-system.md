@@ -9,8 +9,10 @@ that an edit has to record more than changes to the OSM graph, and records where
 
 > **Status:** In progress. Done so far: a backup never includes the redo part of the history, a
 > session the user undid back to nothing is removed, and edits are a graph plus props with translated
-> labels and a `type` (Rollout step 3), so a session of only Rapid ignores is backed up too.
-> Next: the viewport on undo/redo/restore, then the v4 backup format (see [Rollout](#rollout)).
+> labels and a `type` (Rollout step 3), so a session of only Rapid ignores is backed up too. Undo and
+> redo now show where the change is, move the map only when needed, restore the selection from before
+> or after the edit, and one more redo returns the user to where they were (step 4).
+> Next: the v4 backup format (see [Rollout](#rollout)).
 
 ## Words used here
 
@@ -18,7 +20,8 @@ that an edit has to record more than changes to the OSM graph, and records where
   top of the graph before it.
 - **Action**: a function that takes a graph and returns it changed, like "add a node" or "move a way".
 - **Edit**: one step in the history (`modules/lib/Edit.ts`): the graph after the step, plus props
-  (its label, what was selected, the map position, the sources used, and so on).
+  (its label, what was selected before and after, where the change is, the map position, the sources
+  used, and so on).
 - **History**: the list of edits. `history[0]` is **base** (OSM as loaded, before any edits), and
   `history[index]` is **stable** (the latest edit the user kept). Edits after `index` are the
   **redo** part: undone, but not thrown away until the user makes a new edit.
@@ -33,6 +36,11 @@ that an edit has to record more than changes to the OSM graph, and records where
   (`EditLabel`), translated when shown.
 - **Backup** / **session**: the saved copy of the history, in the `DatabaseSystem` `sessions` store,
   that the restore dialog offers after a restart.
+- **Selection**: selected data IDs grouped by the layer that draws them (`EditSelection`), like
+  `{ osm: ['w1'] }` or `{ rapid: ['ds:abc:0'] }`. The same shape `select-osm` takes.
+- **Extent** (of an edit): where its change is, as `[minLon, minLat, maxLon, maxLat]`.
+- **Return view**: where the user was, and what they had selected, when they first undid away from
+  the newest edit. Offered as one more redo past the newest edit. It's never in the history.
 
 ## What it owns
 
@@ -41,8 +49,12 @@ that an edit has to record more than changes to the OSM graph, and records where
 - The `editor_base`, `editor_stable` and `editor_staging` spatial caches, kept in step with the graphs.
 - Merging newly loaded OSM data into the base graph, and into every graph in the history.
 - Backing up the history to a session and restoring it.
-- Events: `stagingchange`, `stablechange`, `historyjump` (undo, redo, restore), `merge`, and
-  `backupstatuschange`.
+- The return view (`returnEdit`).
+- Events: `stagingchange`, `stablechange`, `historyjump` (undo, redo, restore), `returnview`, `merge`,
+  and `backupstatuschange`.
+
+`MapSystem` owns the other half of undo and redo: moving the map and restoring the selection, in its
+`historyjump` and `returnview` handlers.
 
 ## How it got here
 
@@ -83,7 +95,8 @@ That assumption didn't hold up, and comments about it are scattered around the c
 5. **The map jumps around on undo, redo and restore.** `MapSystem` moves to `edit.transform`, which is
    where the map happened to be when the edit was committed, not where the change is. Undo uses the
    transform of the edit being undone. The result can be a jump to somewhere unrelated, or no move at
-   all when the change is off screen, so it's hard to see what an undo did.
+   all when the change is off screen, so it's hard to see what an undo did. And after the user looks
+   around, undoes and redoes, there's no way back to where they were. (Fixed in step 4.)
 6. **Backups store base entities, and restoring them is brittle.** A v3 backup stores the original
    (base) copy of every edited entity, plus their child nodes and parent ways, gathered with
    heuristics (iD#4108). To restore, `_loadMissingEntitiesAsync` works out which child nodes are still
@@ -117,10 +130,14 @@ export interface EditProps {
   stringID?: StringID;      // undo/redo label, translated when shown (replaces `annotation`)
   stringParams?: EditLabelParams;
   annotation?: string;      // plain-text label, only for edits restored from a v3 backup
-  selectedIDs?: EntityID[];
+  selection?: EditSelection;        // what's selected after the edit; redo restores it
+  selectionBefore?: EditSelection;  // what was selected before; undo restores it (filled in at commit)
+  extent?: Vec4;            // where the change is (computed at commit, or given by the committer)
   sources?: EditSources;
-  transform?: TransformProps;
+  transform?: TransformProps;   // where the user was looking when they made it
 }
+
+export type EditSelection = Record<LayerID, DataID[]>;   // e.g. { osm: ['w1'] }
 
 export class Edit<P extends EditProps = EditProps> {
   public context: Context;
@@ -148,7 +165,8 @@ export interface RapidIgnoreEditProps extends EditProps {
 editor.commit<RapidIgnoreEditProps>({
   type: 'rapid_ignore_feature',
   stringID: 'rapid_inspector.option_ignore.annotation',
-  ignoreID: datum.id
+  ignoreID: datum.id,
+  extent: datum.extent()?.rectangle()   // no graph change, so it says where it is
 });
 ```
 
@@ -197,12 +215,70 @@ than one, and a props bag with a `type` is how the rest of the library works.
 `hasChanges()` keeps its meaning: an add-then-delete that cancels out still isn't saved, and an
 ignore still can't be uploaded. `hasWork()` is what's missing for backups.
 
-### Showing what changed (viewport)
+### Showing what changed (viewport and selection)
 
-On undo, redo and restore, the map should show **where the change is**, not where the map happened to
-be. The difference between the two graphs (or, for edits with no graph change like an ignore, the
-location of what they're about) gives an extent. If it's already in view, don't move; otherwise ease
-to fit it, keeping the zoom where possible. `edit.transform` can stay as a fallback for edits with no location.
+On undo, redo and restore, the map shows **where the change is**, and moves only when it has to:
+jumping around on every undo is jarring.
+
+**Each edit records two places:**
+
+| Prop | What | Why |
+|---|---|---|
+| `transform` | where the user was looking when they made the edit | a familiar view to go back to |
+| `extent` | where the change is, as lon/lat bounds | works on any screen size or device, unlike a transform |
+
+`EditSystem` computes `extent` at commit from the difference between the graph before and after: the
+nodes, and the nodes of ways, that were created, modified or deleted (deleted ones where they were).
+An edit with no graph change passes its own, as an ignore passes the ignored feature's extent. Edits
+restored from older backups get one computed from their graphs. An edit with no extent falls back
+to its `transform`.
+
+**Moving only when needed** (`MapSystem.viewForExtent`, `showExtentAsync`):
+1. If the change is already in view, don't move. "In view" means most of it (80%) is in the part of
+   the map not covered by the header and footer, and the map isn't zoomed too far out to see it
+   (2 levels out from the zoom that fits it, but anything counts as visible at z16 or closer). A change
+   too big to fit counts if any of it is in view.
+2. Otherwise, if the edit's own `transform` shows it, go there.
+3. Otherwise, center on it, keeping the current zoom where possible: zoom out only to fit it, never
+   past z16 (or past where the user already is), and zoom in only as far as needed to see it.
+
+**How far and how fast** (`MapSystem.easeDuration`): by the distance in screens (measured at the lower
+of the two zooms) and the change in zoom. Within about a screen, ease 250 ms; within a few, 500 ms.
+Undo and redo jump to anything farther, since a long ease across the map is just a blur; the
+walkthrough, which used to measure in meters with its own `transitionTime`, uses the same durations
+and still eases far moves (1000 ms).
+
+**Which edit and which selection:** undo shows the edit it took back and restores what was selected
+**before** it (`selectionBefore`, recorded at commit from the current mode). Redo and restore show the
+edit they brought in and restore what was selected **after** it (`selection`, given by the committer).
+So undoing an accept selects the Rapid feature again, ready to accept or look at, and undoing a
+delete selects what was deleted. OSM IDs must be in the graph; other data is looked up on the layer
+that draws it, which can take a redraw or two after undo (the feature has to come back first), so
+`MapSystem` tries again after the next few redraws. The modes can't select OSM and other data
+together yet, so OSM wins.
+
+**The return view.** On the first undo away from the newest edit, `EditSystem` remembers where the user
+is and what they have selected (`returnEdit`). Redoing back to the newest edit shows that edit's change
+as usual; then **one more redo** returns the user to where they were before they started undoing, with
+their selection ("Redo: Return to where you were."). For example: accept a sidewalk, scroll to its
+other end to see what's there, undo (the map goes back to the sidewalk), redo (the sidewalk comes back),
+redo again (back at the other end).
+- It's an `Edit` that lives only in the redo slot, never in the history: it isn't backed up, can't
+  discard the redo stack, and `hasWork()` never sees it. `getRedoEdit()` returns it, so the undo/redo
+  tool's tooltip and shortcut work unchanged; `redo()` uses it up and emits `returnview`.
+- Further undos and redos keep the first place the user left from, even if they pan in between.
+- Any new commit, a reset, a restore, or restoring a checkpoint clears it.
+- If redo's move to the newest edit leaves the map about where the return view is (centers within a
+  quarter screen, zoom within one level), `MapSystem` clears it, so there's no extra redo that does
+  nothing. If the user pans there by hand afterward, the extra redo does nothing visible; that's
+  accepted.
+
+**Undo during a drag or draw** (work in progress) throws the work away and emits `historyjump` with the
+same index. The map doesn't move (nothing in the history changed), but `MapSystem` still enters a mode,
+which ends the drag. Draw modes handle `historyjump` themselves. It doesn't save the return view;
+the next undo, which actually leaves the newest edit, does.
+
+**Restore** shows the extent of the last kept edit.
 
 ### Backup format v4
 
@@ -219,17 +295,12 @@ to fit it, keeping the zoom where possible. `edit.transform` can stay as a fallb
   back to the `Edit` constructor without knowing what any owner's props mean. (Done already: since
   step 3, each history item in a v3 backup has `props` in place of `annotation`, `selectedIDs`,
   `transform` and `*Used`. The version stayed 3, since only the items changed and restore reads both.)
-- **Selection by layer.** `selectedIDs: EntityID[]` becomes `selection?: Record<LayerID, DataID[]>`
-  (e.g. `{ osm: ['w1'], rapid: ['ds:abc:0'] }`), the shape `select-osm` already takes, so an edit can
-  leave a mixed selection of OSM and other data. Retyping the flat list as `DataID[]` wouldn't be
-  enough: restore needs to know which layer to look each ID up in. Undo, redo and restore read each
-  layer's IDs and ask that layer for them; OSM IDs come from the graph as now, and a layer that can't
-  look up its IDs yet drops them. Older items convert as `selection: { osm: selectedIDs }`.
 - **Only the kept history** (up to `index`); done for v3 already.
 - **v3 stays restorable, best effort,** for a while. An object annotation spreads into props (its
   `type`, `acceptIDs`, `ignoreID`, `dataUsed` keep their names). A string annotation, or an object
   annotation's `description`, was already translated, so it can't follow the user's language; it's
-  kept as the plain-text `annotation` prop, which `label` falls back to.
+  kept as the plain-text `annotation` prop, which `label` falls back to. `selectedIDs` (on old items,
+  or in props saved briefly before step 4) becomes `selection: { osm: selectedIDs }`.
 
 ## Decisions
 
@@ -253,6 +324,47 @@ to fit it, keeping the zoom where possible. `edit.transform` can stay as a fallb
 - **Accept and ignore outliving the session is a Rapid question,** recorded in
   [`rapid-system.md`](rapid-system.md). Within a session they stay edits in the history, so undoing an
   ignore brings the feature back.
+- **Selection is grouped by layer** (`EditSelection`), not a flat `DataID[]`: restoring a selection
+  needs to know which layer to find each ID in. Moved up from the backup v4 step into step 4, since
+  undoing back to the selection before an edit is when it starts to matter. (October 2026)
+- **Each edit records the selection before and after.** Undo restores before, redo restores after.
+- **An edit records where the change is as an extent, not a transform**, so it can be shown on any
+  screen size or device. The `transform` (where the user was looking) is kept too; it's cheap.
+- **Move the map only when needed** on undo and redo, and jump instead of easing when it's far.
+- **No placeholder edits for map moves.** A "view" edit in the history would discard the redo stack
+  the moment the user panned after an undo, and undo would start stepping through map moves. The
+  return view gives the one thing that was wanted (redo back to where you were) without either.
+- **The return view keeps the first place the user left from**, through any panning, undos and redos,
+  until a new edit.
+- **Undo during a drag throws the drag away** (as before), rather than committing it first so redo could
+  bring it back. Some apps disable undo during drags instead; either is fine.
+- **A series of tag changes still merges into one undo step** (`commitAppend` when the label and
+  selection match), however far apart in time. It's a bit unintuitive, and undoing it can take back
+  changes the user can't see, but leave it alone for now.
+- **Undo and redo restore a non-OSM selection by finding the data on its layer** (`AbstractPixiLayer.getData`),
+  so only data that's drawn can be selected again. Good enough for Rapid features, which come back on
+  the next redraw.
+
+## Prior art
+
+Steve Ruiz (tldraw, a drawing app with many of the same problems) wrote up what he learned building
+undo/redo: [things I've learned](https://x.com/steveruizok/status/1566142910546038784), [a manager on
+JSON patches](https://x.com/steveruizok/status/1487052071685734410), and [edge
+cases](https://x.com/steveruizok/status/1487072814049943552). What applies here:
+- **Commands that do something different on redo than the first time** (his "soft delete"). Not a
+  problem for us: every edit is a whole graph, and owners like `RapidSystem` derive their state from
+  the kept history, so redo just goes back to it.
+- **Continuous interactions** (dragging, a color picker) make one history entry when they end. Ours
+  build up in `staging` and commit once.
+- **A change after undo drops the redo stack**, and you can never redo after a change. Same here; the
+  return view is cleared by any commit too.
+- **Figma records selection changes in the history, but only when there's nothing to redo**, so you can
+  undo, change the selection, and still redo. That's the idea behind restoring the selection from
+  before an edit, and behind the return view (one slot, never in the history).
+- **Undo during a continuous interaction must end it**, or the app gets stuck mid-drag (he shows apps
+  with this bug). Ours ends it by entering a mode, even when the map doesn't move.
+- **Timed coalescing** (from a reply): merge repeated changes only within a short time, as text
+  inputs do. We merge tag changes regardless of time; see Decisions.
 
 ## Open questions
 
@@ -266,8 +378,13 @@ None right now. Questions from the first draft are answered under Decisions.
    `commit()` takes props; every caller commits a `stringID` (operations, modes, validators, UI, the
    walkthrough); Rapid accept and ignore are typed props; backups use `hasWork()` and save props, so an
    ignore-only session is backed up (checked live). `dataVersion` from PR #5 didn't land with it.
-4. **Viewport on undo, redo and restore.** Show where the change is.
-5. **Backup v4.** Base versions and a versioned multi-fetch on restore; selection by layer; v3 restore
-   converted best effort.
+4. **Viewport and selection on undo, redo and restore.** ✅ Edits record their `extent` and the
+   selection before and after (`EditSelection`, by layer; `selectedIDs` is gone). `MapSystem` shows
+   the change only when it isn't already in view (`viewForExtent`, `showExtentAsync`, `easeDuration`,
+   which also replaced the walkthrough's `transitionTime`), undo restores the selection before and
+   redo the selection after, and the return view takes the user back to where they were. Checked live:
+   accept a sidewalk, pan away, undo (Rapid feature selected again), redo (no move), redo (back where
+   they panned to).
+5. **Backup v4.** Base versions and a versioned multi-fetch on restore; v3 restore converted best effort.
 6. **Later:** edits that copy from external data onto OSM features; accept and ignore that outlive the
    session (a `RapidSystem` change).

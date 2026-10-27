@@ -135,7 +135,7 @@ export function validateUnsquareWay(context: Context): ValidatorFunction {
                 .then(() => editor.commit({
                   stringID: 'operations.orthogonalize.annotation.feature',
                   stringParams: { n: 1 },
-                  selectedIDs: [entityID]
+                  selection: { osm: [entityID] }
                 }));
             }
           }),
@@ -151,7 +151,7 @@ export function validateUnsquareWay(context: Context): ValidatorFunction {
               editor.perform(actionChangeTags(entityID, tags));
               editor.commit({
                 stringID: 'issues.fix.tag_as_unsquare.annotation',
-                selectedIDs: [entityID]
+                selection: { osm: [entityID] }
               });
             }
           })

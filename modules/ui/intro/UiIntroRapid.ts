@@ -1,12 +1,11 @@
 import { Extent } from '@rapid-sdk/math';
 import { select } from 'd3-selection';
 import { AbstractIntroChapter } from './AbstractIntroChapter.ts';
-import { delayAsync, eventCancel, helpHtml, icon, transitionTime } from './helper.ts';
+import { delayAsync, eventCancel, helpHtml, icon } from './helper.ts';
 
 import type { Context } from '../../Context.ts';
 import type { IntroStep } from './AbstractIntroChapter.ts';
 import type { UiCurtain } from './UiCurtain.ts';
-import type { Vec2 } from '@rapid-sdk/math';
 
 
 const tulipLaneExtent = new Extent([-85.62991, 41.95568], [-85.62700, 41.95638]);
@@ -100,7 +99,7 @@ export class UiIntroRapid extends AbstractIntroChapter {
     rapid.enableDatasets('rapid_intro_graph');
 
     const loc = tulipLaneExtent.center();
-    const msec = transitionTime(loc, map.center() as Vec2);
+    const msec = map.easeDuration(loc, 18.5);
     if (msec > 0) curtain.hide();
 
     await map.setMapParamsAsync(loc, 18.5, 0, msec);
@@ -370,7 +369,7 @@ export class UiIntroRapid extends AbstractIntroChapter {
     rapid.enableDatasets('rapid_intro_graph');
 
     const loc = tulipLaneExtent.center();
-    const msec = transitionTime(loc, map.center() as Vec2);
+    const msec = map.easeDuration(loc, 18.5);
     if (msec > 0) curtain.hide();
 
     await map.setMapParamsAsync(loc, 18.5, 0, msec);

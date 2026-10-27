@@ -551,7 +551,7 @@ export class DrawLineMode extends AbstractMode {
       // If the line has enough segments, commit the work in progress so we can undo/redo to it.
       const label = this._getLabel();
       if (label) {
-        editor.commit({ ...label, selectedIDs: [drawWay.id] });
+        editor.commit({ ...label, selection: { osm: [drawWay.id] } });
         this._takeSnapshot(firstNode!.id, drawNode!.id);
       }
 
@@ -624,7 +624,7 @@ export class DrawLineMode extends AbstractMode {
       // If the line has enough segments, commit the work in progress so we can undo/redo to it.
       const label = this._getLabel();
       if (label) {
-        editor.commit({ ...label, selectedIDs: [drawWay.id] });
+        editor.commit({ ...label, selection: { osm: [drawWay.id] } });
         this._takeSnapshot(firstNode!.id, drawNode!.id);
       }
 
@@ -699,7 +699,7 @@ export class DrawLineMode extends AbstractMode {
       // If the line has enough segments, commit the work in progress so we can undo/redo to it.
       const label = this._getLabel();
       if (label) {
-        editor.commit({ ...label, selectedIDs: [drawWay.id] });
+        editor.commit({ ...label, selection: { osm: [drawWay.id] } });
         this._takeSnapshot(firstNode!.id, targetNode.id);
       }
 
@@ -862,7 +862,7 @@ export class DrawLineMode extends AbstractMode {
       this._refreshEntities();
 
     } else {   // Otherwise, return to select or browse mode (MapSystem has similar code to this)
-      const checkIDs = editor.stable.props.selectedIDs ?? [];
+      const checkIDs = editor.stable.props.selection?.osm ?? [];
       const selectedIDs = checkIDs.filter(entityID => graph.hasEntity(entityID));
       if (selectedIDs.length) {
         context.enter('select-osm', { selection: { osm: selectedIDs }} );

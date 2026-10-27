@@ -634,6 +634,7 @@ en:
     title: Redo
     tooltip: "Redo: {action}"
     nothing: Nothing to redo.
+    return_view: Return to where you were.
 
   tooltip_keyhint: "Key:"
 

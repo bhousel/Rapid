@@ -136,7 +136,7 @@ export class PasteBehavior extends AbstractBehavior {
     editor.commit({
       stringID: 'operations.paste.annotation',
       stringParams: { n: newIDs.length },
-      selectedIDs: newIDs
+      selection: { osm: newIDs }
     });
     editor.endTransaction();
 

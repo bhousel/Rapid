@@ -153,7 +153,9 @@ interface EntityCopy {
  *  - `props` - plain JSON describing the Edit (see `EditProps`), which may include:
  *    - `type`        - what kind of edit it is, for edits that aren't classic OSM edits
  *    - `stringID`    - undo/redo label, translated when shown. e.g. "Started a Line".
- *    - `selectedIDs` - ids that the user had selected at the time (assumed to be OSM)
+ *    - `selection`   - what's selected after the Edit, by layer (redo restores it)
+ *    - `selectionBefore` - what was selected before the Edit, by layer (undo restores it)
+ *    - `extent`      - where the change is (undo and redo show it)
  *    - `sources`     - sources being used to make the Edit (imagery, photos, data)
  *    - `transform`   - map transform at the time of the Edit
  *    - other props of the system that made the Edit (e.g. which feature the user ignored)
@@ -185,7 +187,8 @@ interface EntityCopy {
  * - `commitAppend(options)` - This is just like `commit` but instead of
  *      adding `staging` after `stable`, `staging` replaces `stable`.
  * - `undo()` - Move the `stable` index back to the previous Edit (or `_index = 0`).
- * - `redo()` - Move the `stable` index forward to the next Edit (if any)
+ * - `redo()` - Move the `stable` index forward to the next Edit (if any).
+ *      Past the newest Edit, one more redo returns the user to where they were before undoing.
  * - `setCheckpoint(checkpointID)` - Save `history` and `index` as a checkpoint to return to later.
  * - `restoreCheckpoint(checkpointID)` - Restore `history` and `index` identified by checkpointID.
  *
@@ -202,6 +205,8 @@ interface EntityCopy {
  * - 'historyjump' - Fires on undo/redo/restore.  This is for situations when we may need to
  *      jump the user to a different part of the map and restore a different selection.
  *      Receives `prevIndex` and `currIndex`
+ * - 'returnview' - Fires when redo takes the user back to where they were before they started
+ *      undoing (see `returnEdit`).  Receives the return Edit, with its `transform` and `selection`.
  * - 'merge'  - Fires when new base entities are merged into the base graph
  * - 'backupstatuschange' - Fires when backup status changes, receives `true` if ok, `false` if failed
  *
@@ -232,6 +237,11 @@ export class EditSystem extends AbstractSystem {
   protected _index: number;
   /** The work-in-progress Edit that accumulates changes before they are committed */
   protected _staging: Edit;
+  /**
+   * Where the user was when they first undid away from the newest edit, offered as one more redo.
+   * It's never in the history: it isn't backed up and can't discard the redo stack.
+   */
+  protected _returnEdit: Edit | null;
 
   /** Named snapshots of `_history` and `_index` that can be restored */
   protected _checkpoints: Map<CheckpointID, Checkpoint>;
@@ -276,6 +286,7 @@ export class EditSystem extends AbstractSystem {
     this._history = [];
     this._index = 0;
     this._staging = null!;
+    this._returnEdit = null;
 
     this._checkpoints = new Map<CheckpointID, Checkpoint>();
     this._inTransition = false;
@@ -400,6 +411,7 @@ export class EditSystem extends AbstractSystem {
     const staging = new Edit(this.context, currGraph);
     this._staging = staging;
     this._hasWorkInProgress = false;
+    this._returnEdit = null;
 
     // Clear the spatial caches.
     const spatial = this.context.systems.spatial!;
@@ -591,16 +603,17 @@ export class EditSystem extends AbstractSystem {
    *                                                 `staging` (WIP after EditN0)
    * ```
    * @param props - Props describing the Edit, e.g. its `stringID` saying what it did ("Started a Line"),
-   *   and `selectedIDs`. Edits that aren't classic OSM edits also pass a `type` and their own props.
+   *   and `selection`. Edits that aren't classic OSM edits also pass a `type` and their own props.
    */
   public commit<P extends EditProps = EditProps>(props?: P): void {
     this._interruptTransition();    // complete any transition already in progress
 
-    const edit = this._finishStaging(props);
+    const edit = this._finishStaging(props, this.stable);
 
     // Discard forward/redo history if any, and add `staging` after `stable`
     this._history.splice(this._index + 1, Infinity, edit);
     this._index++;
+    this._returnEdit = null;
     // (At this point `stable` === `staging`)
 
     this._replaceStaging();
@@ -644,10 +657,12 @@ export class EditSystem extends AbstractSystem {
       throw new Error(`Can not commitAppend to the base edit!`);
     }
 
-    const edit = this._finishStaging(props);
+    // The new edit covers the replaced one too, so it starts from the edit before it.
+    const edit = this._finishStaging(props, this._history[this._index - 1], this.stable);
 
     // Discard forward/redo history if any, and replace `stable` with `staging`.
     this._history.splice(this._index, Infinity, edit);
+    this._returnEdit = null;
     // (At this point `stable` === `staging`)
 
     this._replaceStaging();
@@ -689,6 +704,11 @@ export class EditSystem extends AbstractSystem {
     }
 
     if (this._index > 0) {
+      // Leaving the newest edit: remember where the user is, so one more redo can bring them back.
+      // Further undos and redos keep the first place they left from.
+      if (this._index === this._history.length - 1 && !this._returnEdit) {
+        this._returnEdit = this._makeReturnEdit();
+      }
       this._index--;
     }
 
@@ -702,6 +722,8 @@ export class EditSystem extends AbstractSystem {
 
   /**
    * Move the `stable` index forward to the next Edit (if any)
+   * Past the newest Edit, if the user undid away from it, emit `returnview` to take them back
+   * to where they were (see `returnEdit`).
    * Note that all work-in-progress in the `staging` Edit is lost when calling `redo()`.
    *
    * Before calling `redo()`:
@@ -727,6 +749,13 @@ export class EditSystem extends AbstractSystem {
     const prevIndex = this._index;
     if (this._index < this._history.length - 1) {
       this._index++;
+
+    // Past the newest edit, one more redo takes the user back to where they were
+    } else if (this._returnEdit && !this._hasWorkInProgress) {
+      const edit = this._returnEdit;
+      this._returnEdit = null;
+      this.emit('returnview', edit);
+      return;
     }
 
     if (this._index !== prevIndex) {
@@ -769,6 +798,7 @@ export class EditSystem extends AbstractSystem {
     if (checkpoint) {
       this._history = checkpoint.history.slice();   // shallow copy
       this._index = checkpoint.index;
+      this._returnEdit = null;
 
       this._replaceStaging();
       this._emitChanges();
@@ -906,6 +936,7 @@ export class EditSystem extends AbstractSystem {
 
   /**
    * Finds the edit that would be redone next, the first edit after `stable` with a label.
+   * Past the newest edit, this is the `returnEdit`, if there is one.
    * @return The edit, or `undefined` if none
    */
   public getRedoEdit(): Edit | undefined {
@@ -915,6 +946,28 @@ export class EditSystem extends AbstractSystem {
       if (edit.hasLabel) return edit;
       i++;
     }
+    if (this._index === this._history.length - 1 && !this._hasWorkInProgress) {
+      return this._returnEdit ?? undefined;
+    }
+  }
+
+
+  /**
+   * Where the user was when they first undid away from the newest edit, with what they had selected.
+   * Once they redo back to the newest edit, one more redo returns them there.
+   * It's not part of the history, so it isn't backed up, and any new edit clears it.
+   * @return The return Edit, or `null` if there is none
+   */
+  public get returnEdit(): Edit | null {
+    return this._returnEdit;
+  }
+
+
+  /**
+   * Forget the return Edit, e.g. because the map is already where it would return to.
+   */
+  public clearReturnEdit(): void {
+    this._returnEdit = null;
   }
 
 
@@ -1454,10 +1507,15 @@ export class EditSystem extends AbstractSystem {
         }
 
         const graph = new Graph(prevGraph).load(entities);
-        prevGraph = graph;
 
-        const props = (item.props ?? this._legacyEditProps(item)) as EditProps;
+        const props = this._upgradeEditProps((item.props ?? this._legacyEditProps(item)) as EditProps);
+        // Edits backed up before they had an extent get one from their graph
+        if (!props.extent) {
+          const extent = this._changeExtent(prevGraph, graph);
+          if (extent) props.extent = extent.rectangle();
+        }
         this._history.push(new Edit(context, graph, props));
+        prevGraph = graph;
       }
 
       this._index = backup.index;
@@ -2029,18 +2087,88 @@ export class EditSystem extends AbstractSystem {
 
   /**
    * Finish the `staging` edit, so it can go into the history.
+   * Fills in what was selected before it and where the change is, unless the committer gave them.
    * @param props - Props describing the Edit, from the code that commits it
+   * @param prev - The edit this one follows
+   * @param replaced - The edit this one replaces, for `commitAppend()`
    * @return A new Edit with the staging graph and the full props
    */
-  protected _finishStaging<P extends EditProps>(props?: P): Edit<P> {
+  protected _finishStaging<P extends EditProps>(props: P | undefined, prev: Edit, replaced?: Edit): Edit<P> {
     const context = this.context;
+    const graph = this._staging.graph;
 
-    return new Edit<P>(context, this._staging.graph, {
+    const selectionBefore = props?.selectionBefore ?? replaced?.props.selectionBefore ?? context.mode?.selection;
+    const extent = props?.extent ?? this._changeExtent(prev.graph, graph)?.rectangle();
+
+    return new Edit<P>(context, graph, {
       ...props,
-      selectedIDs: props?.selectedIDs ?? [],
+      ...(selectionBefore && { selectionBefore }),
+      ...(extent && { extent }),
       sources: this._gatherSources(props?.sources),
       transform: context.viewport.transform.props
     } as Partial<P>);
+  }
+
+
+  /**
+   * Make the return Edit, to take the user back to where they are now: what they're looking at,
+   * and what they have selected.
+   * @return The return Edit
+   */
+  protected _makeReturnEdit(): Edit {
+    const context = this.context;
+
+    return new Edit(context, this.stable.graph, {
+      stringID: 'redo.return_view',
+      selection: context.mode?.selection ?? {},
+      transform: context.viewport.transform.props
+    });
+  }
+
+
+  /**
+   * Find where the OSM data changed between two graphs: the nodes, and the nodes of the ways,
+   * that were created, modified or deleted. Relations changed on their own use their own extent.
+   * @param before - The graph before the change
+   * @param after - The graph after the change
+   * @return The Extent of the change, or `undefined` if no located OSM data changed
+   */
+  protected _changeExtent(before: Graph, after: Graph): Extent | undefined {
+    if (before === after) return;
+
+    const extent = new Extent();
+    let found = false;
+
+    const extendWith = (entity: OsmEntity, graph: Graph) => {
+      if (entity.type === 'node') {
+        const loc = (entity as OsmNode).loc;
+        if (loc) {
+          extent.extendSelf(loc);
+          found = true;
+        }
+      } else if (entity.type === 'way') {
+        for (const nodeID of (entity as OsmWay).nodes) {
+          const loc = (graph.hasEntity(nodeID) as OsmNode | undefined)?.loc;
+          if (loc) {
+            extent.extendSelf(loc);
+            found = true;
+          }
+        }
+      } else {
+        const other = entity.extent();
+        if (other) {
+          extent.extendSelf(other);
+          found = true;
+        }
+      }
+    };
+
+    const difference = new Difference(before, after);
+    for (const entity of difference.created())   extendWith(entity, after);
+    for (const entity of difference.modified())  extendWith(entity, after);
+    for (const entity of difference.deleted())   extendWith(entity, before);
+
+    return found ? extent : undefined;
   }
 
 
@@ -2063,7 +2191,7 @@ export class EditSystem extends AbstractSystem {
       if (typeof description === 'string') props.annotation = description;
     }
 
-    if (Array.isArray(item.selectedIDs))  props.selectedIDs = item.selectedIDs as EntityID[];
+    if (Array.isArray(item.selectedIDs))  props.selection = { osm: item.selectedIDs as EntityID[] };
 
     const sources: EditSources = {};
     if (Array.isArray(item.imageryUsed))  sources.imagery = item.imageryUsed as string[];
@@ -2080,6 +2208,21 @@ export class EditSystem extends AbstractSystem {
     if (transform)  props.transform = transform;
 
     return props;
+  }
+
+
+  /**
+   * Upgrade the props of an edit backed up by an older Rapid.
+   * For a short time in October 2026, edit props had `selectedIDs` (assumed OSM) instead of `selection`.
+   * @param props - The props from the backup
+   * @return The props, upgraded
+   */
+  protected _upgradeEditProps(props: EditProps & { selectedIDs?: EntityID[] }): EditProps {
+    const { selectedIDs, ...rest } = props;
+    if (Array.isArray(selectedIDs) && !rest.selection) {
+      rest.selection = { osm: selectedIDs };
+    }
+    return rest;
   }
 
 
