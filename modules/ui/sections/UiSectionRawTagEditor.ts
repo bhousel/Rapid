@@ -133,7 +133,7 @@ export class UiSectionRawTagEditor extends AbstractUiSection {
     const context = this.context;
     const l10n = context.systems.l10n!;
     const settings = context.systems.settings;
-    const schema = context.systems.schema!;
+    const schema = context.systems.schema;
     const taginfo = context.services.taginfo;
 
     // remove deleted keys
@@ -316,7 +316,7 @@ export class UiSectionRawTagEditor extends AbstractUiSection {
         $row.select('input.key');      // propagate bound data
         $row.select('input.value');    // propagate bound data
 
-        if (this._entityIDs.length && (taginfo || schema.hasValueProviders()) && this._state !== 'hover') {
+        if (this._entityIDs.length && (taginfo || schema?.hasValueProviders()) && this._state !== 'hover') {
           this._addComboboxes($row);
         }
 
@@ -351,9 +351,8 @@ export class UiSectionRawTagEditor extends AbstractUiSection {
     utilGetSetValue($values, (d: TagRow) => isMultiValueTag(d) ? '' : d.value as string);
 
     // Show what a value means, e.g. "Walkway" beside `pathway_mode = 1` (see `SchemaSystem.addValueProvider`)
-    const graph = context.systems.editor!.staging.graph;
-    const valueLabel = (d: TagRow) => isMultiValueTag(d) ? undefined :
-      schema.getValueLabel(d.key, d.value as string, this._entityIDs, graph);
+    const valueLabel = (d: TagRow) => (!schema || isMultiValueTag(d)) ? undefined :
+      schema.getValueLabel(d.key, d.value as string, this._entityIDs, context.systems.editor!.staging.graph);
     $items.selectAll('.value-wrap')
       .classed('has-value-label', (d: TagRow) => !!valueLabel(d))
       .selectAll('.value-label')
@@ -492,7 +491,7 @@ export class UiSectionRawTagEditor extends AbstractUiSection {
   protected _addComboboxes($row: D3Selection): void {
     const context = this.context;
     const editor = context.systems.editor!;
-    const schema = context.systems.schema!;
+    const schema = context.systems.schema;
     const taginfo = context.services.taginfo;
 
     const d = $row.datum();
@@ -548,7 +547,7 @@ export class UiSectionRawTagEditor extends AbstractUiSection {
     $value.call(valueCombo
       .fetcher((value: string, callback: (data: any[]) => void) => {
         const key = utilGetSetValue($key) as string;
-        const options = schema.getValueOptions(key, this._entityIDs, editor.staging.graph);
+        const options = schema?.getValueOptions(key, this._entityIDs, editor.staging.graph);
         if (options) {
           valueCombo.minItems(1);    // a single allowed value is still worth offering
           const query = value.toLowerCase();
