@@ -60,7 +60,7 @@ export class UiIntroBuilding extends AbstractIntroChapter {
   /** @return `true` if the tutorial house is the single selected feature */
   protected _isHouseSelected(): boolean {
     const context = this.context;
-    if (context.mode?.id !== 'select-osm') return false;
+    if (context.mode?.id !== 'select') return false;
     const ids = context.selectedIDs();
     return ids.length === 1 && ids[0] === this._houseID;
   }
@@ -75,7 +75,7 @@ export class UiIntroBuilding extends AbstractIntroChapter {
   /** @return `true` if the tutorial tank is the single selected feature */
   protected _isTankSelected(): boolean {
     const context = this.context;
-    if (context.mode?.id !== 'select-osm') return false;
+    if (context.mode?.id !== 'select') return false;
     const ids = context.selectedIDs();
     return ids.length === 1 && ids[0] === this._tankID;
   }
@@ -245,7 +245,7 @@ export class UiIntroBuilding extends AbstractIntroChapter {
         this._rejectStep = reject;
 
         if (!this._doesHouseExist()) { resolve(this._addHouseAsync); return; }
-        if (!this._isHouseSelected()) context.enter('select-osm', { selection: { osm: [this._houseID] }});
+        if (!this._isHouseSelected()) context.enter('select', { selection: [this._houseID] });
 
         this._onModeChange = reject;   // disallow mode change
 
@@ -288,7 +288,7 @@ export class UiIntroBuilding extends AbstractIntroChapter {
         this._rejectStep = reject;
 
         if (!this._doesHouseExist()) { resolve(this._addHouseAsync); return; }
-        if (!this._isHouseSelected()) context.enter('select-osm', { selection: { osm: [this._houseID] }});
+        if (!this._isHouseSelected()) context.enter('select', { selection: [this._houseID] });
 
         this._onModeChange = reject;   // disallow mode change
         this._onStableChange = (difference: any) => {
@@ -359,7 +359,7 @@ export class UiIntroBuilding extends AbstractIntroChapter {
     const EditMenu = ui.EditMenu;
     const curtain = this._curtain;
 
-    if (!['browse', 'select-osm'].includes(context.mode?.id ?? '')) context.enter('browse');
+    if (!['browse', 'select'].includes(context.mode?.id ?? '')) context.enter('browse');
     editor.restoreCheckpoint('hasHouse');
 
     // make sure user is zoomed in enough to actually see orthagonalize do something
@@ -620,7 +620,7 @@ export class UiIntroBuilding extends AbstractIntroChapter {
       return await new Promise<IntroStep>((resolve, reject) => {
         this._rejectStep = reject;
         if (!this._doesTankExist()) { resolve(this._addTankAsync); return; }
-        if (!this._isTankSelected()) context.enter('select-osm', { selection: { osm: [this._tankID] }});
+        if (!this._isTankSelected()) context.enter('select', { selection: [this._tankID] });
 
         this._onModeChange = reject;   // disallow mode change
         this._onStableChange = (difference: any) => {
@@ -708,7 +708,7 @@ export class UiIntroBuilding extends AbstractIntroChapter {
     const EditMenu = ui.EditMenu;
     const curtain = this._curtain;
 
-    if (!['browse', 'select-osm'].includes(context.mode?.id ?? '')) context.enter('browse');
+    if (!['browse', 'select'].includes(context.mode?.id ?? '')) context.enter('browse');
     editor.restoreCheckpoint('hasTank');
 
     let onToggled: ((open: boolean) => void) | undefined;

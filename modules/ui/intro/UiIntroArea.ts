@@ -56,7 +56,7 @@ export class UiIntroArea extends AbstractIntroChapter {
   /** @return `true` if the tutorial area is the single selected feature */
   protected _isAreaSelected(): boolean {
     const context = this.context;
-    if (context.mode?.id !== 'select-osm') return false;
+    if (context.mode?.id !== 'select') return false;
     const ids = context.selectedIDs();
     return ids.length === 1 && ids[0] === this._areaID;
   }
@@ -216,7 +216,7 @@ export class UiIntroArea extends AbstractIntroChapter {
       return await new Promise<IntroStep>((resolve, reject) => {
         this._rejectStep = reject;
         if (!this._doesAreaExist()) { resolve(this._addAreaAsync); return; }
-        if (!this._isAreaSelected()) context.enter('select-osm', { selection: { osm: [this._areaID] }} );
+        if (!this._isAreaSelected()) context.enter('select', { selection: [this._areaID] });
 
         this._onModeChange = reject;   // disallow mode change;
         this._onStagingChange = (difference: any) => {
@@ -288,7 +288,7 @@ export class UiIntroArea extends AbstractIntroChapter {
       return await new Promise<IntroStep>((resolve, reject) => {
         this._rejectStep = reject;
         if (!this._doesAreaExist()) { resolve(this._addAreaAsync); return; }
-        if (!this._isAreaSelected()) context.enter('select-osm', { selection: { osm: [this._areaID] }} );
+        if (!this._isAreaSelected()) context.enter('select', { selection: [this._areaID] });
 
         if (!container.select('.form-field-description').empty()) {  // has description field already
           resolve(this._describePlaygroundAsync);

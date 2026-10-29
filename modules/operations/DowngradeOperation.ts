@@ -71,7 +71,7 @@ export class DowngradeOperation extends AbstractOperation {
     editor.commit({ ...label, selection: this.selectedIDs });
 
     // refresh the select mode to enable the delete operation
-    this.context.enter('select-osm', { selection: { osm: this.selectedIDs }} );
+    this.context.enter('select', { selection: this.selectedIDs });
   }
 
 

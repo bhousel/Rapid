@@ -756,7 +756,7 @@ export class DrawAreaMode extends AbstractMode {
       if (DEBUG) {
         console.log(`DrawAreaMode: _finish, drawWay.id = ${drawWay.id}`);  // eslint-disable-line no-console
       }
-      context.enter('select-osm', { selection: { osm: [drawWay.id] }, newFeature: true });
+      context.enter('select', { selection: [drawWay.id], newFeature: true });
     } else {
       context.enter('browse');
     }
@@ -824,7 +824,7 @@ export class DrawAreaMode extends AbstractMode {
       const checkIDs = editor.stable.props.selection ?? [];
       const selectedIDs = checkIDs.filter(entityID => graph.hasEntity(entityID));
       if (selectedIDs.length) {
-        context.enter('select-osm', { selection: { osm: selectedIDs }} );
+        context.enter('select', { selection: selectedIDs });
       } else {
         context.enter('browse');
       }

@@ -5,6 +5,7 @@ import {
 import { MarkerData } from '../data/MarkerData.ts';
 import { osmEntityID } from '../data/dataID.ts';
 import { selection } from 'd3-selection';
+import { utilArrayIdentical } from '@rapid-sdk/util';
 import { utilTotalExtent } from '../util/util.ts';
 
 import type { Context } from '../Context.ts';
@@ -504,8 +505,7 @@ export class MapSystem extends AbstractSystem {
    * OSM entities must be in the stable graph.  Other data is found by its data ID
    * (`SpatialSystem.getData`). Data that comes back on undo may not be there yet (a Rapid feature
    * that's loaded again, or a piece of a line that conflation makes when the line is drawn), so this
-   * tries again after the next redraws.
-   * The modes can't select OSM and other data together yet, so OSM wins.
+   * tries again after the next redraws, adding what it finds to the selection.
    * @param  selection - Data IDs, e.g. `['w1', 'fbRoads:abc']`
    */
   protected _restoreSelection(selection: DataID[]): void {
@@ -516,32 +516,36 @@ export class MapSystem extends AbstractSystem {
 
     const count = ++this._selectCount;
     const graph = editor.stable.graph;
-    const osmIDs = selection.filter(dataID => osmEntityID(dataID) && graph.hasEntity(dataID));
-    if (osmIDs.length) {
-      context.enter('select-osm', { selection: { osm: osmIDs }} );
-      return;
+    const isFound = (dataID: DataID): boolean => {
+      return osmEntityID(dataID) ? !!graph.hasEntity(dataID) : !!spatial.getData(dataID);
+    };
+    const others = selection.filter(dataID => !osmEntityID(dataID));
+
+    let found = selection.filter(isFound);
+    if (found.length) {
+      context.enter('select', { selection: found });
+    } else {
+      context.enter('browse');
     }
 
-    context.enter('browse');
-
-    const others = selection.filter(dataID => !osmEntityID(dataID));
-    if (!others.length) return;
+    if (others.every(isFound)) return;   // OSM entities are in the graph or not, only other data can arrive later
 
     const MAX_TRIES = 5;
     let tries = 0;
     const trySelect = (): boolean => {
       // Give up if another selection was restored since, or the user moved on to something else
-      if (count !== this._selectCount || context.mode?.id !== 'browse') return true;
+      if (count !== this._selectCount) return true;
+      const modeID = found.length ? 'select' : 'browse';
+      if (context.mode?.id !== modeID || !utilArrayIdentical(context.selectedIDs(), found)) return true;
 
-      const found = others.filter(dataID => spatial.getData(dataID));
-      if (found.length) {
+      const nowFound = selection.filter(isFound);
+      if (nowFound.length > found.length) {
+        found = nowFound;
         context.enter('select', { selection: found });
-        return true;
       }
+      if (others.every(isFound)) return true;
       return (++tries >= MAX_TRIES);
     };
-
-    if (trySelect()) return;
 
     const onDraw = () => {
       if (trySelect()) gfx.off('draw', onDraw);
@@ -967,9 +971,9 @@ export class MapSystem extends AbstractSystem {
 
     const gotEntity = (entity: OsmEntity) => {
       const selectedIDs = context.selectedIDs();
-      if (context.mode?.id !== 'select-osm' || !selectedIDs.includes(entityID)) {
+      if (context.mode?.id !== 'select' || !selectedIDs.includes(entityID)) {
         scene.enableLayers('osm');
-        context.enter('select-osm', { selection: { osm: [entity.id] }} );
+        context.enter('select', { selection: [entity.id] });
       }
 
       const entityExtent = entity.extent();

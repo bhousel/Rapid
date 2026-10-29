@@ -1,19 +1,29 @@
 import { select } from 'd3-selection';
 import { uiIcon } from '../icon.ts';
 import { AbstractUiSection } from './AbstractUiSection.ts';
+import { osmEntityID, splitDataID } from '../../data/dataID.ts';
+import { OsmEntity } from '../../data/index.ts';
 import { utilHighlightEntities } from '../../util/util.ts';
 
+import type { AbstractData } from '../../data/AbstractData.ts';
 import type { Context } from '../../Context.ts';
 import type { D3EnterSelection, D3Selection } from 'd3-selection';
-import type { OsmEntity } from '../../data/index.ts';
+
+/** Icon names for the geometry types of data that isn't in the OSM graph */
+const GEOMETRY_ICONS: Record<string, string> = {
+  Point: 'point',
+  LineString: 'line',
+  Polygon: 'area'
+};
 
 
 /**
  * `UiSectionSelectionList` appears when the user has multiple
- * entities selected.  It lives in the `UiEntityEditor`.
+ * features selected.  It lives in the `UiEntityEditor` and the `UiSelectionInspector`.
+ * Features are identified by their data IDs, so the list can show data from any source.
  */
 export class UiSectionSelectionList extends AbstractUiSection {
-  protected _selectedIDs: EntityID[];
+  protected _selectedIDs: DataID[];
   public rerender: () => void;
 
 
@@ -25,8 +35,8 @@ export class UiSectionSelectionList extends AbstractUiSection {
     this._selectedIDs = [];
 
     // Ensure methods used as callbacks always have `this` bound correctly.
-    this._selectEntity = this._selectEntity.bind(this);
-    this._deselectEntity = this._deselectEntity.bind(this);
+    this._selectDatum = this._selectDatum.bind(this);
+    this._deselectDatum = this._deselectDatum.bind(this);
     this.rerender = () => this.renderInner();
 
     const editor = context.systems.editor!;
@@ -35,13 +45,13 @@ export class UiSectionSelectionList extends AbstractUiSection {
 
 
   /**
-   * Gets or sets the selected entity IDs.
-   * @param val - the new entity IDs, or omit to get the current value
-   * @return the current entity IDs (getter) or `this` (setter)
+   * Gets or sets the data IDs of the selected features.
+   * @param val - the new data IDs, or omit to get the current value
+   * @return the current data IDs (getter) or `this` (setter)
    */
-  public entityIDs(val?: EntityID[]): any {
+  public dataIDs(val?: DataID[]): any {
     if (!arguments.length) return this._selectedIDs;
-    this._selectedIDs = val as EntityID[];
+    this._selectedIDs = val as DataID[];
     return this;
   }
 
@@ -70,24 +80,23 @@ export class UiSectionSelectionList extends AbstractUiSection {
   /**
    * Selects a single feature from the list.
    * @param e - the triggering click event
-   * @param entity - the entity to select
+   * @param d - the feature to select
    */
-  protected _selectEntity(e: PointerEvent, entity: OsmEntity): void {
-    this.context.enter('select-osm', { selection: { osm: [entity.id] }} );
+  protected _selectDatum(e: PointerEvent, d: AbstractData): void {
+    this.context.enter('select', { selection: [d.dataID] });
   }
 
 
   /**
    * Removes a feature from the current selection.
    * @param e - the triggering click event
-   * @param entity - the entity to deselect
+   * @param d - the feature to deselect
    */
-  protected _deselectEntity(e: PointerEvent, entity: OsmEntity): void {
-    const selectedIDs = this._selectedIDs.slice();
-    const index = selectedIDs.indexOf(entity.id);
-    if (index > -1) {
-      selectedIDs.splice(index, 1);
-      this.context.enter('select-osm', { selection: { osm: selectedIDs }} );
+  protected _deselectDatum(e: PointerEvent, d: AbstractData): void {
+    const selectedIDs = this._selectedIDs.filter(dataID => dataID !== d.dataID);
+    utilHighlightEntities(this.context, [d.dataID], false);
+    if (selectedIDs.length < this._selectedIDs.length) {
+      this.context.enter('select', { selection: selectedIDs });
     }
   }
 
@@ -100,8 +109,30 @@ export class UiSectionSelectionList extends AbstractUiSection {
     const context = this.context;
     const editor = context.systems.editor!;
     const l10n = context.systems.l10n!;
+    const rapid = context.systems.rapid;
     const schema = context.systems.schema!;
+    const spatial = context.systems.spatial!;
     const graph = editor.staging.graph;
+
+    // OSM entities are described by their preset; other data by its dataset, or its namespace.
+    const isOsm = (d: AbstractData): boolean => (d instanceof OsmEntity && !!osmEntityID(d.dataID));
+
+    const geometryOf = (d: AbstractData): string => {
+      if (isOsm(d)) return (d as OsmEntity).geometry(graph);
+      return GEOMETRY_ICONS[d.geoms.parts[0]?.type ?? ''] ?? 'point';
+    };
+
+    const typeOf = (d: AbstractData): string => {
+      if (isOsm(d)) return schema.match(d as OsmEntity, graph)?.name ?? '';
+      const datasetID = d.props.datasetID as DatasetID | undefined;
+      const dataset = datasetID ? rapid?.catalog.get(datasetID) : undefined;
+      return dataset?.getLabel() ?? splitDataID(d.dataID)[0];
+    };
+
+    const nameOf = (d: AbstractData): string => {
+      const tags = (d as any).tags ?? (d as any).properties ?? {};
+      return l10n.displayName(tags);
+    };
 
     let $list: D3Selection = $selection.selectAll('.feature-list')
       .data([0]);
@@ -111,12 +142,12 @@ export class UiSectionSelectionList extends AbstractUiSection {
       .attr('class', 'feature-list')
       .merge($list);
 
-    const entities = this._selectedIDs
-      .map(d => graph.hasEntity(d))
-      .filter(Boolean);
+    const data = this._selectedIDs
+      .map(dataID => spatial.getData(dataID))
+      .filter(d => d !== undefined);
 
     let $items: D3Selection = $list.selectAll('.feature-list-item')
-      .data(entities, (d: OsmEntity) => d.key);
+      .data(data, (d: AbstractData) => `${d.dataID}v${d.v}`);
 
     $items.exit()
       .remove();
@@ -125,16 +156,16 @@ export class UiSectionSelectionList extends AbstractUiSection {
     const $$items: D3EnterSelection = $items.enter()
       .append('li')
       .attr('class', 'feature-list-item')
-      .each((d: OsmEntity, i, nodes) => {
+      .each((d: AbstractData, i, nodes) => {
         select(nodes[i])
-          .on('mouseover', () => utilHighlightEntities(context, [d.id], true))
-          .on('mouseout', () => utilHighlightEntities(context, [d.id], false));
+          .on('mouseover', () => utilHighlightEntities(context, [d.dataID], true))
+          .on('mouseout', () => utilHighlightEntities(context, [d.dataID], false));
       });
 
     const $$label: D3EnterSelection = $$items
       .append('button')
       .attr('class', 'label')
-      .on('click', this._selectEntity);
+      .on('click', this._selectDatum);
 
     $$label
       .append('span')
@@ -152,8 +183,7 @@ export class UiSectionSelectionList extends AbstractUiSection {
     $$items
       .append('button')
       .attr('class', 'close')
-      .attr('title', l10n.t('icons.deselect'))
-      .on('click', this._deselectEntity)
+      .on('click', this._deselectDatum)
       .call(uiIcon('#rapid-icon-close'));
 
     // Update
@@ -162,14 +192,17 @@ export class UiSectionSelectionList extends AbstractUiSection {
     $items.selectAll('.entity-geom-icon use')
       .attr('href', (d, i, nodes) => {
         const el = select(nodes[i]) as any;
-        const entity = el._groups[0][0].parentNode.parentNode.__data__;
-        return '#rapid-icon-' + entity.geometry(graph);
+        const datum = el._groups[0][0].parentNode.parentNode.__data__;
+        return '#rapid-icon-' + geometryOf(datum);
       });
 
     $items.selectAll('.entity-type')
-      .text((entity: OsmEntity) => schema.match(entity, graph)?.name);
+      .text((d: AbstractData) => typeOf(d));
 
     $items.selectAll('.entity-name')
-      .text((entity: OsmEntity) => l10n.displayName(entity.tags));
+      .text((d: AbstractData) => nameOf(d));
+
+    $items.selectAll('.close')
+      .attr('title', l10n.t('icons.deselect'));
   }
 }

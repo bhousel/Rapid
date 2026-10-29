@@ -143,7 +143,7 @@ export class UiSectionRawMemberEditor extends AbstractUiSection {
       map.fitEntitiesEase(entity);
     }
 
-    context.enter('select-osm', { selection: { osm: [d.id] }} );
+    context.enter('select', { selection: [d.id] });
   }
 
 

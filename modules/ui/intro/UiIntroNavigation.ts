@@ -55,7 +55,7 @@ export class UiIntroNavigation extends AbstractIntroChapter {
     const editor = context.systems.editor!;
     const graph = editor.staging.graph;
     if (!graph.hasEntity(this._townHallID)) return false;
-    if (context.mode?.id !== 'select-osm') return false;
+    if (context.mode?.id !== 'select') return false;
     const ids = context.selectedIDs();
     return ids.length === 1 && ids[0] === this._townHallID;
   }
@@ -73,7 +73,7 @@ export class UiIntroNavigation extends AbstractIntroChapter {
     const editor = context.systems.editor!;
     const graph = editor.staging.graph;
     if (!graph.hasEntity(this._springStreetID)) return false;
-    if (context.mode?.id !== 'select-osm') return false;
+    if (context.mode?.id !== 'select') return false;
     const ids = context.selectedIDs();
     return ids.length === 1 && ids[0] === this._springStreetID;
   }

@@ -291,7 +291,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
 
     this.renderVertices(frame, viewport, data, related);
 
-    if (context.mode?.id === 'select-osm') {
+    if (context.mode?.id === 'select') {
       this.renderMidpoints(frame, viewport, data, related);
     } else {
       this._midpoints.clear();

@@ -90,7 +90,7 @@ export class PasteOperation extends AbstractOperation {
     editor.endTransaction();
 
     // Put the user in move mode so they can place the pasted features
-    context.enter('move', { selection: { osm: newIDs }} );
+    context.enter('move', { selection: newIDs });
   }
 
 

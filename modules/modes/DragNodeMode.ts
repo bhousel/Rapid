@@ -353,9 +353,9 @@ export class DragNodeMode extends AbstractMode {
     // Choose next mode
     // (Note that if the drag node is gone, select mode will fallback to browse mode)
     if (this._reselectIDs.length) {
-      context.enter('select-osm', { selection: { osm: this._reselectIDs }} );
+      context.enter('select', { selection: this._reselectIDs });
     } else {
-      context.enter('select-osm', { selection: { osm: [this.dragNode.id] }} );
+      context.enter('select', { selection: [this.dragNode.id] });
     }
   }
 

@@ -162,6 +162,7 @@ export class UiEntityEditor extends EventEmitter {
 
     for (const section of this._sections) {
       if (section.entityIDs)  section.entityIDs(this._entityIDs);
+      if (section.dataIDs)    section.dataIDs(this._entityIDs);   // an OSM entity's data ID is its entity ID
       if (section.presets)    section.presets(this._selectedPresets);
       if (section.tags)       section.tags(combinedTags);
       if (section.state)      section.state(this._state);

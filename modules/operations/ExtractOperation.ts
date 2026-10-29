@@ -91,7 +91,7 @@ export class ExtractOperation extends AbstractOperation {
     editor.commit({ ...label, selection: this.selectedIDs });
     editor.endTransaction();
 
-    this.context.enter('select-osm', { selection: { osm: extractedNodeIDs }} );
+    this.context.enter('select', { selection: extractedNodeIDs });
   }
 
 

@@ -21,7 +21,7 @@ import type { Context } from '../Context.ts';
  */
 export class AbstractMode extends EventEmitter {
 
-  /** Unique string identifier for this mode (e.g. 'browse', 'select-osm') */
+  /** Unique string identifier for this mode (e.g. 'browse', 'select') */
   public id: ModeID;
   /** Global shared application context */
   public context: Context;

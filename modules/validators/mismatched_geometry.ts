@@ -420,7 +420,7 @@ export function validateMismatchedGeometry(context: Context): ValidatorFunction 
           selection: [entityID]
         });
         // re-enter mode to trigger updates
-        context.enter('select-osm', { selection: { osm: [ action.getExtractedNodeID() ] }} );
+        context.enter('select', { selection: [ action.getExtractedNodeID() ] });
       };
     }
 

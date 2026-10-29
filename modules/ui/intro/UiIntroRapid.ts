@@ -69,7 +69,7 @@ export class UiIntroRapid extends AbstractIntroChapter {
   /** @return `true` if the tutorial road is the single selected feature */
   protected _isTulipLaneSelected(): boolean {
     const context = this.context;
-    if (!['select', 'select-osm'].includes(context.mode?.id ?? '')) return false;
+    if (context.mode?.id !== 'select') return false;
     const ids = context.selectedIDs();
     return ids.length === 1 && (ids[0] === this._tulipLaneID || ids[0] === this._tulipLaneDataID);
   }
@@ -228,7 +228,7 @@ export class UiIntroRapid extends AbstractIntroChapter {
       return await new Promise<IntroStep>((resolve, reject) => {
         this._rejectStep = reject;
         if (!this._isTulipLaneAccepted()) { resolve(this._selectRoadAsync); return; }
-        if (!this._isTulipLaneSelected()) context.enter('select-osm', { selection: { osm: [this._tulipLaneID] }});
+        if (!this._isTulipLaneSelected()) context.enter('select', { selection: [this._tulipLaneID] });
 
         this._onModeChange = reject;   // disallow mode change
 
@@ -255,7 +255,7 @@ export class UiIntroRapid extends AbstractIntroChapter {
     const curtain = this._curtain;
 
     if (!this._isTulipLaneAccepted()) return this._selectRoadAsync;
-    if (!this._isTulipLaneSelected()) context.enter('select-osm', { selection: { osm: [this._tulipLaneID] }});
+    if (!this._isTulipLaneSelected()) context.enter('select', { selection: [this._tulipLaneID] });
 
     const issuesButton = select('div.map-control.issues-control > button');
 
@@ -289,7 +289,7 @@ export class UiIntroRapid extends AbstractIntroChapter {
     return new Promise<IntroStep>((resolve, reject) => {
       this._rejectStep = reject;
       if (!this._isTulipLaneAccepted()) { resolve(this._selectRoadAsync); return; }
-      if (!this._isTulipLaneSelected()) context.enter('select-osm', { selection: { osm: [this._tulipLaneID] }});
+      if (!this._isTulipLaneSelected()) context.enter('select', { selection: [this._tulipLaneID] });
 
       const label = select('li.issue.severity-warning');
       curtain.reveal({
@@ -310,7 +310,7 @@ export class UiIntroRapid extends AbstractIntroChapter {
     const curtain = this._curtain;
 
     if (!this._isTulipLaneAccepted()) return this._selectRoadAsync;
-    if (!this._isTulipLaneSelected()) context.enter('select-osm', { selection: { osm: [this._tulipLaneID] }});
+    if (!this._isTulipLaneSelected()) context.enter('select', { selection: [this._tulipLaneID] });
 
     const undoButton = select('.map-toolbar button.undo-button');
 

@@ -1,6 +1,7 @@
 import { EventEmitter } from 'tseep/lib/ee-safe';
 import { select } from 'd3-selection';
 import { icon } from './intro/helper.ts';
+import { osmEntityID } from '../data/dataID.ts';
 import { uiIcon } from './icon.ts';
 import { UiModal } from './UiModal.ts';
 import { UiRapidAddDataset } from './UiRapidAddDataset.ts';
@@ -538,7 +539,7 @@ export class UiRapidDatasetToggle extends EventEmitter {
 
     // In case a Rapid feature is already selected, reselect it to update sidebar too.
     const mode = context.mode;
-    if (mode?.id === 'select') {  // new (not legacy) select mode
+    if (mode?.id === 'select' && mode.selectedIDs.some(dataID => !osmEntityID(dataID))) {
       context.enter('select', { selection: mode.selectedIDs });
     }
   }

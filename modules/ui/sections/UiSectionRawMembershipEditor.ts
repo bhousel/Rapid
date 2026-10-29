@@ -186,7 +186,7 @@ export class UiSectionRawMembershipEditor extends AbstractUiSection {
     // remove the hover-highlight styling
     utilHighlightEntities(context, [d.relation.id], false);
 
-    context.enter('select-osm', { selection: { osm: [d.relation.id] }} );
+    context.enter('select', { selection: [d.relation.id] });
   }
 
 
@@ -305,7 +305,7 @@ const membersToUpdate = d.members.filter(function(member: IndexedMember) {
         stringID: 'operations.add.annotation.relation',
         selection: [relation.id]
       });
-      context.enter('select-osm', { selection: { osm: [relation.id] }, newFeature: true });
+      context.enter('select', { selection: [relation.id], newFeature: true });
     }
   }
 

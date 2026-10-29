@@ -14,6 +14,7 @@ import { UiOsmoseEditor } from './UiOsmoseEditor.ts';
 import { UiNoteEditor } from './UiNoteEditor.ts';
 import { UiRapidInspector } from './UiRapidInspector.ts';
 import { UiOvertureInspector } from './UiOvertureInspector.ts';
+import { UiSelectionInspector } from './UiSelectionInspector.ts';
 import { UiTooltip } from './UiTooltip.ts';
 
 import type { Context } from '../Context.ts';
@@ -56,6 +57,7 @@ export class UiSidebar {
   public OsmoseEditor: UiOsmoseEditor;
   public RapidInspector: UiRapidInspector;
   public OvertureInspector: UiOvertureInspector;
+  public SelectionInspector: UiSelectionInspector;
   public Tooltip: UiTooltip;
 
   // D3 selections
@@ -98,6 +100,7 @@ export class UiSidebar {
     this.OsmoseEditor = new UiOsmoseEditor(context);
     this.RapidInspector = new UiRapidInspector(context);
     this.OvertureInspector = new UiOvertureInspector(context);
+    this.SelectionInspector = new UiSelectionInspector(context);
     this.Tooltip = new UiTooltip(context);
 
     // D3 selections
@@ -266,7 +269,7 @@ export class UiSidebar {
     this._currTargetID = dataID;
 
     // Update the sidebar..
-    if (modeID !== 'select' && modeID !== 'select-osm') {
+    if (modeID !== 'select') {
       this.hover(data);
     }
 

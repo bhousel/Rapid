@@ -194,7 +194,7 @@ export class CycleHighwayTagOperation extends AbstractOperation {
     }
 
     editor.endTransaction();
-    context.enter('select-osm', { selection: { osm: this.selectedIDs } });  // reselect
+    context.enter('select', { selection: this.selectedIDs });  // reselect
   }
 
 

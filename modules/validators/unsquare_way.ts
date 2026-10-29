@@ -151,7 +151,7 @@ export function validateUnsquareWay(context: Context): ValidatorFunction {
               editor.perform(actionChangeTags(entityID, tags));
               editor.commit({
                 stringID: 'issues.fix.tag_as_unsquare.annotation',
-                selection: { osm: [entityID] }
+                selection: [entityID]
               });
             }
           })

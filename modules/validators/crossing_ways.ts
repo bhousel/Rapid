@@ -557,7 +557,7 @@ export function validateCrossingWays(context: Context): ValidatorFunction {
       autoArgs: autoArgs,
       dynamicFixes: function(this: any) {
         const selectedIDs = context.selectedIDs();
-        if (context.mode?.id !== 'select-osm' || selectedIDs.length !== 1) return [];
+        if (context.mode?.id !== 'select' || selectedIDs.length !== 1) return [];
 
         const selectedIndex = this.entityIds[0] === selectedIDs[0] ? 0 : 1;
         const selectedType = this.data.featureTypes[selectedIndex];
@@ -633,7 +633,7 @@ export function validateCrossingWays(context: Context): ValidatorFunction {
       icon: iconName,
       title: l10n.t(`issues.fix.${titleID}.title`),
       onClick: function(this: any) {
-        if (context.mode?.id !== 'select-osm') return;
+        if (context.mode?.id !== 'select') return;
 
         const selectedIDs = context.selectedIDs();
         if (selectedIDs.length !== 1) return;
@@ -833,7 +833,7 @@ export function validateCrossingWays(context: Context): ValidatorFunction {
           stringID: `issues.fix.${titleID}.annotation`,
           selection: [selectedWayID]
         });
-        context.enter('select-osm', { selection: { osm: resultWayIDs }} );
+        context.enter('select', { selection: resultWayIDs });
       }
     });
   }
@@ -950,7 +950,7 @@ export function validateCrossingWays(context: Context): ValidatorFunction {
       icon: 'rapid-icon-' + (higherOrLower === 'higher' ? 'up' : 'down'),
       title: l10n.t(`issues.fix.tag_this_as_${higherOrLower}.title`),
       onClick: function(this: any) {
-        if (context.mode?.id !== 'select-osm') return;
+        if (context.mode?.id !== 'select') return;
 
         const selectedIDs = context.selectedIDs();
         if (selectedIDs.length !== 1) return;

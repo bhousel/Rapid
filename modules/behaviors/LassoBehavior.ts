@@ -174,7 +174,7 @@ export class LassoBehavior extends AbstractBehavior {
     this._coords = [];
 
     if (ids.length) {
-      this.context.enter('select-osm', { selection: { osm: ids }} );
+      this.context.enter('select', { selection: ids });
     }
   }
 

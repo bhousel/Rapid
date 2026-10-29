@@ -50,7 +50,7 @@ export class MoveOperation extends AbstractOperation {
 
 
   public run(): void {
-    this.context.enter('move', { selection: { osm: this.selectedIDs }} );
+    this.context.enter('move', { selection: this.selectedIDs });
   }
 
 

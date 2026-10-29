@@ -283,8 +283,8 @@ export class UiMapRouletteDetails {
   protected _highlightFeature(osmIdentifier: string): void {
     const idPart = osmIdentifier.split('@')[0]; // Retains the 'n' or 'w' prefix and removes the version
     // Pass the full ID including the prefix to the selection context
-    this.context.enter('select-osm', {
-      selection: { osm: [idPart] }
+    this.context.enter('select', {
+      selection: [idPart]
     });
   }
 }

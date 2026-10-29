@@ -50,7 +50,7 @@ export class RotateOperation extends AbstractOperation {
 
 
   public run(): void {
-    this.context.enter('rotate', { selection: { osm: this.selectedIDs }} );
+    this.context.enter('rotate', { selection: this.selectedIDs });
   }
 
 

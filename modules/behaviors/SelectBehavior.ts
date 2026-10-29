@@ -353,9 +353,7 @@ export class SelectBehavior extends AbstractBehavior {
     // Determine what we clicked on and switch modes..
     const target = eventData.target;
     let data = target?.data;
-    let dataID = target?.dataID;
     const layerID = target?.layerID || null;
-    const serviceID = (data?.props?.serviceID || '') as ServiceID;
 
     // If we're clicking on something real, we want to pause doubleclick zooms
     if (data) {
@@ -369,7 +367,6 @@ export class SelectBehavior extends AbstractBehavior {
     if (data?.type === 'midpoint') {
       const wayID = data.props.wayID as EntityID;
       data = graph.hasEntity(wayID);
-      dataID = data?.id;
     }
 
     // Clicked on nothing, or an edit block polygon..
@@ -384,35 +381,32 @@ export class SelectBehavior extends AbstractBehavior {
       photos.selectPhoto(layerID, data.id);   // the photo's own ID, not its data ID
       return;
 
-    // Clicked a selectable non-OSM feature..
-    } else if (
-      ['mapwithai', 'esri', 'overture'].includes(serviceID) ||    // Clicked Rapid data..
-      data instanceof GeoJSONData ||  // Clicked Custom Data (e.g. gpx track)..
-      data instanceof MarkerData      // Clicked a MarkerData (OSM Note, KeepRight, Osmose, Maproulette)..
-    ) {
-      context.enter('select', { selection: [data.dataID] });
-      return;
-
-    // Clicked an OSM feature..
-    } else if (data instanceof OsmEntity) {
+    // Clicked a selectable feature..
+    // OSM or Rapid data, Custom Data (e.g. gpx track), or a MarkerData (OSM Note, KeepRight, Osmose, Maproulette)..
+    } else if (data instanceof OsmEntity || data instanceof GeoJSONData || data instanceof MarkerData) {
+      const clickedID = data.dataID;
       let selectedIDs = context.selectedIDs();
 
       if (!isMultiselect) {
-        if (!this._showsMenu || selectedIDs.length <= 1 || !selectedIDs.includes(dataID!)) {
+        if (!this._showsMenu || selectedIDs.length <= 1 || !selectedIDs.includes(clickedID)) {
           // Always re-enter select mode even if the entity is already
           // selected since listeners may expect `context.enter` events,
           // e.g. in the walkthrough
-          context.enter('select-osm', { selection: { osm: [dataID!] }} );
+          context.enter('select', { selection: [clickedID] });
         }
       } else {
-        if (selectedIDs.includes(dataID!)) {   // already in the selectedIDs..
+        if (selectedIDs.includes(clickedID)) {   // already in the selectedIDs..
           if (!this._showsMenu) {
-            selectedIDs = selectedIDs.filter(id => id !== dataID);      // deselect it..
-            context.enter('select-osm', { selection: { osm: selectedIDs }} );
+            selectedIDs = selectedIDs.filter(id => id !== clickedID);      // deselect it..
+            if (selectedIDs.length) {
+              context.enter('select', { selection: selectedIDs });
+            } else {
+              context.enter('browse');
+            }
           }
-        } else {                        // not already in selectedIDs...
-          selectedIDs.push(dataID!);    // select it..
-          context.enter('select-osm', { selection: { osm: selectedIDs }} );
+        } else {                          // not already in selectedIDs...
+          selectedIDs.push(clickedID);    // select it..
+          context.enter('select', { selection: selectedIDs });
         }
       }
       return;

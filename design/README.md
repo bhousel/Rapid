@@ -8,7 +8,7 @@ They record the "why" that the code alone doesn't show.
 | Doc | Covers | Status |
 |-----|--------|--------|
 | [`conflation-system.md`](conflation-system.md) | `ConflationSystem`: client-side matching of third-party data against OSM, partial-line accept | In progress: Steps 1–5 done (line matching, drawing, partial accept with joins) |
-| [`data-ids.md`](data-ids.md) | How data is named across sources: namespaced data IDs, looking data up, selecting any mix of data | Steps 1–3 of 6 done: `SpatialSystem.getData()`, caches renamed to namespaces, deterministic IDs (file datasets, pieces, Esri, custom data), selections and scene classes by `DataID` |
+| [`data-ids.md`](data-ids.md) | How data is named across sources: namespaced data IDs, looking data up, selecting any mix of data | Steps 1–4 of 6 done: `SpatialSystem.getData()`, caches renamed to namespaces, deterministic IDs (file datasets, pieces, Esri, custom data), selections and scene classes by `DataID`, one `SelectMode` for any mix of data |
 | [`database-system.md`](database-system.md) | `DatabaseSystem`: IndexedDB wrapper with `sessions` and `files` stores | Phases 0–4 done; files-management UI + worker offload open |
 | [`draganddrop-system.md`](draganddrop-system.md) | `DragAndDropSystem`: claim-based router for dropped files | Implemented |
 | [`edit-system.md`](edit-system.md) | `EditSystem`: undo/redo history, edits beyond the OSM graph (typed edit props), backups and restore | In progress: undone edits not saved; edit props, translated labels and `hasWork()`; viewport and selection on undo/redo, return view; backup v4 (base versions fetched on restore) |

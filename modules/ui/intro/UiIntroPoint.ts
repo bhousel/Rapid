@@ -52,7 +52,7 @@ export class UiIntroPoint extends AbstractIntroChapter {
   /** @return `true` if the tutorial point is the single selected feature */
   protected _isPointSelected(): boolean {
     const context = this.context;
-    if (context.mode?.id !== 'select-osm') return false;
+    if (context.mode?.id !== 'select') return false;
     const ids = context.selectedIDs();
     return ids.length === 1 && ids[0] === this._pointID;
   }
@@ -149,7 +149,7 @@ export class UiIntroPoint extends AbstractIntroChapter {
       return await new Promise<IntroStep>((resolve, reject) => {
         this._rejectStep = reject;
         if (!this._doesPointExist()) { resolve(this._addPointAsync); return; }
-        if (!this._isPointSelected()) context.enter('select-osm', { selection: { osm: [this._pointID] }});
+        if (!this._isPointSelected()) context.enter('select', { selection: [this._pointID] });
 
         this._onModeChange = reject;  // disallow mode change
         this._onStableChange = (difference: any) => {
@@ -215,7 +215,7 @@ export class UiIntroPoint extends AbstractIntroChapter {
       return await new Promise<IntroStep>((resolve, reject) => {
         this._rejectStep = reject;
         if (!this._doesPointExist()) { resolve(this._addPointAsync); return; }
-        if (!this._isPointSelected()) context.enter('select-osm', { selection: { osm: [this._pointID] }});
+        if (!this._isPointSelected()) context.enter('select', { selection: [this._pointID] });
 
         // If user leaves select mode here, just continue with the tutorial.
         this._onModeChange = () => resolve(this._addNameAsync);
@@ -251,7 +251,7 @@ export class UiIntroPoint extends AbstractIntroChapter {
       return await new Promise<IntroStep>((resolve, reject) => {
         this._rejectStep = reject;
         if (!this._doesPointExist()) { resolve(this._addPointAsync); return; }
-        if (!this._isPointSelected()) context.enter('select-osm', { selection: { osm: [this._pointID] }});
+        if (!this._isPointSelected()) context.enter('select', { selection: [this._pointID] });
 
         // If user leaves select mode here, just continue with the tutorial.
         this._onModeChange = () => resolve(this._hasPointAsync);
@@ -296,7 +296,7 @@ export class UiIntroPoint extends AbstractIntroChapter {
     const curtain = this._curtain;
 
     if (!this._doesPointExist()) return this._addPointAsync;
-    if (!this._isPointSelected()) context.enter('select-osm', { selection: { osm: [this._pointID] }});
+    if (!this._isPointSelected()) context.enter('select', { selection: [this._pointID] });
 
     try {
       return await new Promise<IntroStep>((resolve, reject) => {
@@ -446,7 +446,7 @@ export class UiIntroPoint extends AbstractIntroChapter {
     const curtain = this._curtain;
 
     if (!this._doesPointExist()) return this._reselectPointAsync;
-    if (!['browse', 'select-osm'].includes(context.mode?.id ?? '')) context.enter('browse');
+    if (!['browse', 'select'].includes(context.mode?.id ?? '')) context.enter('browse');
 
     let onToggled: ((open: boolean) => void) | undefined;
     try {

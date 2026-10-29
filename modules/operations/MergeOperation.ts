@@ -57,7 +57,7 @@ export class MergeOperation extends AbstractOperation {
         successorIDs = interestingIDs;
       }
     }
-    context.enter('select-osm', { selection: { osm: successorIDs }} );
+    context.enter('select', { selection: successorIDs });
   }
 
 

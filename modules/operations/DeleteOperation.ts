@@ -98,7 +98,7 @@ export class DeleteOperation extends AbstractOperation {
       map.centerEase(nextLoc);
       // Try to select the next node.
       // It may be deleted and that's ok, we'll fallback to browse mode automatically
-      context.enter('select-osm', { selection: { osm: [nextNode.id] }} );
+      context.enter('select', { selection: [nextNode.id] });
     } else {
       context.enter('browse');
     }

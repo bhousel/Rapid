@@ -1,6 +1,7 @@
 import { conflationDefaults } from '../core/ConflationSystem.ts';
 import { select } from 'd3-selection';
 import { EventEmitter } from 'tseep/lib/ee-safe';
+import { osmEntityID } from '../data/dataID.ts';
 import { RapidDataDictionary } from '../lib/RapidDataDictionary.ts';
 import { uiIcon } from './icon.ts';
 import { UiCombobox } from './UiCombobox.ts';
@@ -1335,7 +1336,7 @@ export class UiRapidDatasetSettings extends EventEmitter {
 
     // In case a Rapid feature is already selected, reselect it to update sidebar too.
     const mode = context.mode;
-    if (mode?.id === 'select') {  // new (not legacy) select mode
+    if (mode?.id === 'select' && mode.selectedIDs.some(dataID => !osmEntityID(dataID))) {
       context.enter('select', { selection: mode.selectedIDs });
     }
 

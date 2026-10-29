@@ -1,6 +1,7 @@
 import { AbstractMode } from './AbstractMode.ts';
 import { actionRotate } from '../actions/rotate.ts';
 import { DEG2RAD, vecAdd, vecScale, vecSubtract } from '@rapid-sdk/math';
+import { osmEntityID } from '../data/dataID.ts';
 
 import type { Context } from '../Context.ts';
 import type { EditLabel } from '../lib/Edit.ts';
@@ -10,8 +11,8 @@ import type { Vec2 } from '@rapid-sdk/math';
 
 /** Options for entering `RotateMode` */
 export interface RotateModeOptions {
-  /** Selection object where keys are layerIDs and values are arrays of dataIDs */
-  selection?: Record<string, EntityID[]>;
+  /** Data IDs of the data to rotate (only OSM entities can be rotated) */
+  selection?: DataID[];
 }
 
 
@@ -60,14 +61,13 @@ export class RotateMode extends AbstractMode {
     const locations = context.systems.locations;
     const eventManager = context.systems.gfx!.eventManager!;
 
-    const selection = options.selection ?? {};
-    const entityIDs = selection.osm ?? [];
-
     // Gather valid entities and entityIDs from selection.
     // For this mode, keep only the OSM data.
     const keepIDs: EntityID[] = [];
 
-    for (const entityID of entityIDs) {
+    for (const dataID of options.selection ?? []) {
+      const entityID = osmEntityID(dataID);
+      if (!entityID) continue;   // not OSM
       const entity = graph.hasEntity(entityID);
       if (!entity) continue;   // not in the osm graph
       if (entity.type === 'node') {
@@ -158,7 +158,7 @@ export class RotateMode extends AbstractMode {
 
     } else if (['m', 'M'].includes(e.key)) {
       e.preventDefault();
-      this.context.enter('move', { selection: { osm: this._entityIDs }} );
+      this.context.enter('move', { selection: this._entityIDs });
     }
   }
 
@@ -250,7 +250,7 @@ export class RotateMode extends AbstractMode {
    * Return to select mode - `exit()` will finalize the work in progress.
    */
   protected _finish(): void {
-    this.context.enter('select-osm', { selection: { osm: this._entityIDs }} );
+    this.context.enter('select', { selection: this._entityIDs });
   }
 
 
@@ -262,7 +262,7 @@ export class RotateMode extends AbstractMode {
     const editor = context.systems.editor!;
 
     editor.revert();
-    context.enter('select-osm', { selection: { osm: this._entityIDs }} );
+    context.enter('select', { selection: this._entityIDs });
   }
 
 }

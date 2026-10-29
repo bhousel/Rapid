@@ -278,15 +278,27 @@ Each step is its own commit, and leaves Rapid working with the tests passing.
 - Not done here: loading OSM entities that aren't loaded yet. On undo and redo they're always in the
   graph, so it moves to Step 5, where `id=` needs it.
 
-**Step 4: One select mode.** `'select-osm'` goes away.
-- `SelectMode` takes `{ selection: DataID[] }`. What's specific to OSM (vertex navigation,
-  parent and child selection, cleaning up empty relations, the merge listener, the check for
-  blocked locations) runs on the OSM part of the selection.
-- The 28 files that enter `'select-osm'` enter `'select'`.
-- `SelectBehavior`: shift-click adds or removes any data, not just OSM.
-- For now, the sidebar and the edit menu cover what they do today: one datum shows its inspector,
-  an all-OSM selection gets today's multiselection UI and operations, and a mixed selection gets a
-  plain list. Step 6 replaces this.
+**✅ Step 4: One select mode.** `'select-osm'` and `SelectOsmMode` are gone.
+- `SelectMode` takes `{ selection: DataID[], newFeature?, focusedParentID? }`. What's specific to
+  OSM (vertex navigation, parent and child selection, cleaning up an empty relation, the merge
+  listener, the check for blocked locations, `filters.forceVisible()`, `id=`) works on the OSM
+  entities in the selection (`_osmIDs`). An `osm:w1` data ID is kept as `w1`.
+- The edit menu's operations, and moving and rotating with the arrow keys, need everything selected
+  to be OSM; operations only take entity IDs. `MapInteractionBehavior` pans the map with the arrow
+  keys otherwise.
+- `MoveMode` and `RotateMode` take `{ selection: DataID[] }` too, and keep only the OSM entities.
+- The files that entered `'select-osm'` enter `'select'`.
+- `SelectBehavior`: clicking and shift-clicking work the same for any selectable data (OSM or
+  Rapid data, custom data, markers). Shift-clicking the last selected feature goes to browse mode.
+- The sidebar: an all-OSM selection gets the OSM inspector, as before. A single other datum gets its
+  editor or inspector. Several features that aren't all OSM get `UiSelectionInspector`, a list
+  of what's selected (`UiSectionSelectionList`, now by data ID, which the OSM inspector also uses).
+  Step 6 replaces this.
+- `MapSystem._restoreSelection()` restores a mix of OSM and other data, adding data that arrives
+  later to the selection.
+- `UiRapidDatasetSettings` and `UiRapidDatasetToggle` re-enter select mode to refresh the sidebar
+  only when the selection has data that isn't OSM, so the OSM inspector keeps its state
+  (`newFeature`).
 
 **Step 5: `id=` in the URL takes data IDs.**
 - `id=w1,fbRoads:abc,osm-notes:123` selects all of them, not just the first. OSM entities that

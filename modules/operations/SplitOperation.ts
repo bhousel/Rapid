@@ -102,7 +102,7 @@ export class SplitOperation extends AbstractOperation {
         }
       }
     }
-    context.enter('select-osm', { selection: { osm: idsToSelect }} );
+    context.enter('select', { selection: idsToSelect });
   }
 
 

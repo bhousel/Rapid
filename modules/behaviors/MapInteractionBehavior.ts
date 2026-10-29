@@ -1,6 +1,7 @@
 import { AbstractBehavior } from './AbstractBehavior.ts';
 import { DEG2RAD, numClamp, vecLength, vecSubtract } from '@rapid-sdk/math';
 import { OsmNode } from '../data/OsmNode.ts';
+import { osmEntityID } from '../data/dataID.ts';
 
 import type { Context } from '../Context.ts';
 import type { EventData } from './AbstractBehavior.ts';
@@ -155,7 +156,8 @@ export class MapInteractionBehavior extends AbstractBehavior {
     const EASE = 100;  // milliseconds
 
     // Skip if user is manipulating an OSM feature.
-    if (context.mode?.id === 'select-osm') return;
+    // (`SelectMode` moves and rotates with the arrow keys when everything selected is OSM)
+    if (context.mode?.id === 'select' && context.selectedIDs().every(dataID => osmEntityID(dataID))) return;
 
     // rotate
     if (e.shiftKey) {

@@ -25,8 +25,7 @@ Modes use a registry pattern: `index.ts` holds a `modes.available` Map of mode I
 | `MoveMode.ts` | Moving selected features |
 | `RotateMode.ts` | Rotating selected features |
 | `SaveMode.ts` | Saving/uploading changes to OSM |
-| `SelectMode.ts` | Non-OSM features are selected |
-| `SelectOsmMode.ts` | OSM features are selected |
+| `SelectMode.ts` | Features are selected, from any source (OSM, Rapid, notes, custom data, …) |
 
 ## Properties
 
@@ -42,7 +41,8 @@ Each mode has:
 The application context manages mode transitions:
 
 ```typescript
-context.enter('select-osm', { selection: { osm: selectedIDs } });
+context.enter('select', { selection: ['w1', 'fbRoads:abc'] });   // data IDs
+context.enter('move', { selection: selectedIDs });
 context.enter('browse');
 context.mode;   // returns BrowseMode
 ```

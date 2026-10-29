@@ -15,7 +15,6 @@ import { MoveMode } from './MoveMode.ts';
 import { RotateMode } from './RotateMode.ts';
 import { SaveMode } from './SaveMode.ts';
 import { SelectMode } from './SelectMode.ts';
-import { SelectOsmMode } from './SelectOsmMode.ts';
 
 export {
   AbstractMode,
@@ -29,8 +28,7 @@ export {
   MoveMode,
   RotateMode,
   SaveMode,
-  SelectMode,
-  SelectOsmMode  // someday, combine with SelectMode and have a single mode?
+  SelectMode
 };
 
 // Re-export types from types.ts for convenience
@@ -66,4 +64,3 @@ modes.available.set('move', MoveMode);
 modes.available.set('rotate', RotateMode);
 modes.available.set('save', SaveMode);
 modes.available.set('select', SelectMode);
-modes.available.set('select-osm', SelectOsmMode);

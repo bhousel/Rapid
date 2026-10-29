@@ -586,12 +586,12 @@ export class UiRapidInspector {
     // - Or, if we are passed a `nextMode` do that.
     // - Or, if the feature was hovered, keep it hovered
     const currMode = context.mode?.id || '';
-    if (!nextMode && /^select/.test(currMode)) {   // if it is selected, stay selected
-      nextMode = 'select-osm';
+    if (!nextMode && currMode === 'select') {   // if it is selected, stay selected
+      nextMode = 'select';
     }
 
-    if (nextMode) {   // should be one of 'select-osm', 'move', or 'rotate'
-      context.enter(nextMode, { selection: { osm: [newID] } });
+    if (nextMode) {   // should be one of 'select', 'move', or 'rotate'
+      context.enter(nextMode, { selection: newID ? [newID] : [] });
 
     } else {  // if it was hovered, hover the newly added item (this is hacky):
       // 1. get the `lastMove` event, and make it appear to target the new entity on the 'osm' layer

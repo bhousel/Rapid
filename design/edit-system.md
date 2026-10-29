@@ -174,7 +174,7 @@ editor.commit<RapidIgnoreEditProps>({
 - **The code that commits picks the label,** as it picks the annotation today. Parameters should be
   values like counts, not translated words, or those words stay in the language they were made in.
 - **Comparing labels compares string IDs.** A few places merge a repeated edit into the previous undo
-  step when its label matches (`commitAppend` in `SelectOsmMode`, `UiEntityEditor`,
+  step when its label matches (`commitAppend` in `SelectMode`, `UiEntityEditor`,
   `CycleHighwayTagOperation`), and the walkthrough checks the last edit (`UiIntroBuilding`,
   `UiIntroLine`, `UiIntroRapid`). They used to compare translated text; now they use
   `editor.getUndoEdit()?.isLabeled(label)` (string ID and params) or check `props.type`.
