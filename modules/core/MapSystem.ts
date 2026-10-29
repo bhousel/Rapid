@@ -5,7 +5,7 @@ import {
 import { MarkerData } from '../data/MarkerData.ts';
 import { osmEntityID } from '../data/dataID.ts';
 import { selection } from 'd3-selection';
-import { utilArrayIdentical } from '@rapid-sdk/util';
+import { utilArrayIdentical, utilArrayUniq } from '@rapid-sdk/util';
 import { utilTotalExtent } from '../util/util.ts';
 
 import type { Context } from '../Context.ts';
@@ -326,14 +326,9 @@ export class MapSystem extends AbstractSystem {
     // id
     const newIds = currParams.get('id');
     const oldIds = prevParams.get('id');
-    if (newIds !== oldIds) {
-      if (typeof newIds === 'string') {
-        const ids = newIds.split(',').map(s => s.trim()).filter(Boolean);
-        const modeID = context.mode?.id;
-        if (ids.length && modeID !== 'save') {
-          this.selectEntityID(ids[0]);  // for now, just the select first one
-        }
-      }
+    if (newIds !== oldIds && context.mode?.id !== 'save') {
+      const ids = (newIds ?? '').split(',').map(s => s.trim()).filter(Boolean);
+      this._restoreSelection(ids, true);   // no ids: browse
     }
 
     // note
@@ -506,45 +501,96 @@ export class MapSystem extends AbstractSystem {
    * (`SpatialSystem.getData`). Data that comes back on undo may not be there yet (a Rapid feature
    * that's loaded again, or a piece of a line that conflation makes when the line is drawn), so this
    * tries again after the next redraws, adding what it finds to the selection.
+   * A selection from a link (`id=` in the URL) also downloads the OSM entities that aren't loaded yet,
+   * turns on the OSM layer, and moves the map to them if they aren't in view.  Its other data is
+   * selected when it loads (for that, its layer must be on and the data in view), so it waits longer.
    * @param  selection - Data IDs, e.g. `['w1', 'fbRoads:abc']`
+   * @param  fromLink - `true` if the selection is from a link
    */
-  protected _restoreSelection(selection: DataID[]): void {
+  protected _restoreSelection(selection: DataID[], fromLink: boolean = false): void {
     const context = this.context;
     const editor = context.systems.editor!;
     const gfx = context.systems.gfx!;
+    const scene = gfx.scene!;
     const spatial = context.systems.spatial!;
 
     const count = ++this._selectCount;
-    const graph = editor.stable.graph;
+    selection = utilArrayUniq(selection.map(dataID => osmEntityID(dataID) ?? dataID));   // `osm:w1` is `w1`
     const isFound = (dataID: DataID): boolean => {
-      return osmEntityID(dataID) ? !!graph.hasEntity(dataID) : !!spatial.getData(dataID);
+      return osmEntityID(dataID) ? !!editor.stable.graph.hasEntity(dataID) : !!spatial.getData(dataID);
     };
-    const others = selection.filter(dataID => !osmEntityID(dataID));
 
-    let found = selection.filter(isFound);
-    if (found.length) {
+    // OSM entities are in the graph or not, so only other data can arrive later,
+    // unless the selection is from a link, which downloads the OSM entities it doesn't have.
+    // (Only entities from the OSM API: new ones, like `w-1`, can't be downloaded.)
+    const toLoad = fromLink ? selection.filter(dataID => /^[nwr][1-9]\d*$/.test(dataID) && !isFound(dataID)) : [];
+    const waiting = new Set<DataID>(selection.filter(dataID => {
+      return osmEntityID(dataID) ? toLoad.includes(dataID) : !isFound(dataID);
+    }));
+
+    // Whether this is still what's selected (nothing else was selected since, and the user didn't move on)
+    let found: DataID[] = [];
+    const isCurrent = (): boolean => {
+      if (count !== this._selectCount) return false;
+      const modeID = found.length ? 'select' : 'browse';
+      return context.mode?.id === modeID && utilArrayIdentical(context.selectedIDs(), found);
+    };
+
+    // Select what's found, if that's more than before
+    const selectFound = (): void => {
+      const nowFound = selection.filter(isFound);
+      for (const dataID of nowFound) {
+        waiting.delete(dataID);
+      }
+      if (nowFound.length <= found.length) return;
+
+      found = nowFound;
+      const graph = editor.staging.graph;
+      const entities = found
+        .map(dataID => osmEntityID(dataID) ? graph.hasEntity(dataID) : undefined)
+        .filter((entity): entity is OsmEntity => !!entity);
+      if (fromLink && entities.length) {
+        scene.enableLayers('osm');
+      }
+
       context.enter('select', { selection: found });
-    } else {
+
+      if (fromLink && entities.length) {
+        const extent = utilTotalExtent(entities, graph);
+        if (!this.showsExtent(extent)) {
+          this.fitEntities(entities);
+        }
+      }
+    };
+
+    selectFound();
+    if (!found.length) {
       context.enter('browse');
     }
 
-    if (others.every(isFound)) return;   // OSM entities are in the graph or not, only other data can arrive later
+    if (toLoad.length) {
+      Promise.allSettled(toLoad.map(entityID => context.loadEntityAsync(entityID)))
+        .then(() => {
+          for (const entityID of toLoad) {
+            waiting.delete(entityID);   // loaded, or not there to load
+          }
+          if (isCurrent()) selectFound();
+        });
+    }
 
-    const MAX_TRIES = 5;
+    if (!waiting.size) return;
+
+    const MAX_TRIES = 5;          // on undo, the data is in its cache already, or made when it's drawn
+    const MAX_WAIT_MS = 30000;    // from a link, the data may still be downloading
+    const giveUpAt = performance.now() + MAX_WAIT_MS;
     let tries = 0;
     const trySelect = (): boolean => {
       // Give up if another selection was restored since, or the user moved on to something else
-      if (count !== this._selectCount) return true;
-      const modeID = found.length ? 'select' : 'browse';
-      if (context.mode?.id !== modeID || !utilArrayIdentical(context.selectedIDs(), found)) return true;
+      if (!isCurrent()) return true;
 
-      const nowFound = selection.filter(isFound);
-      if (nowFound.length > found.length) {
-        found = nowFound;
-        context.enter('select', { selection: found });
-      }
-      if (others.every(isFound)) return true;
-      return (++tries >= MAX_TRIES);
+      selectFound();
+      if (!waiting.size) return true;
+      return fromLink ? (performance.now() > giveUpAt) : (++tries >= MAX_TRIES);
     };
 
     const onDraw = () => {

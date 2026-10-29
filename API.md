@@ -57,9 +57,13 @@ URL-encoding is therefore optional but can be used to encode URL-unsafe characte
 ### Responsive (you can change these anytime and Rapid will respond to the change)
 
 #### Selecting Features
-* __`id`__ - The character 'n', 'w', or 'r', followed by the OSM ID of a node, way or relation, respectively.
-  Selects the specified entity, and, unless a `map` parameter is also provided, centers the map on it.<br/>
-  _Example:_ `id=n1207480649`
+* __`id`__ - A comma-separated list of what's selected.  An OSM node, way or relation is the character
+  'n', 'w', or 'r', followed by its OSM ID.  Other data is `<namespace>:<id>`, e.g. a Rapid dataset's
+  feature or a note (`osm-notes:<id>`).  OSM entities that aren't loaded yet are downloaded, and the map
+  moves to show them if they aren't in view.  Other data is selected when it loads, so its layer
+  must be on (e.g. with `datasets`) and the data in view (with `map`).<br/>
+  _Example:_ `id=n1207480649`<br/>
+  _Example:_ `id=w123,fbRoads:abc`
 
 #### Map and Rendering
 * __`background`__ - The value of the `id` property of the source in Rapid's imagery list,

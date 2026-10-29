@@ -12,10 +12,13 @@ data; accept/ignore records use `dataID`. Step 3 (Oct 28): modes keep
 every layer binds `d.dataID`; the scene owns classes by data ID; edit props' `selection` is
 `DataID[]` (old by-layer backups flattened); `_restoreSelection` uses `getData()`. Fixes a Step 2
 regression (Rapid select halo, walkthrough road check). Checked live: select a Rapid road, accept,
-undo (Rapid road selected again), OSM select, notes. Step 4 (Oct 29, not yet committed):
+undo (Rapid road selected again), OSM select, notes. Step 4 (committed Oct 29):
 `SelectOsmMode` merged into `SelectMode` (OSM-only parts work on `_osmIDs`; operations and arrow-key
 move/rotate only when all OSM); move/rotate take `DataID[]`; shift-click any data; mixed selections
-get `UiSelectionInspector`. Next: Step 5 (`id=` takes data IDs, load missing OSM entities).
+get `UiSelectionInspector`. Step 5 (Oct 29, not yet committed): `id=` takes data IDs, through
+`MapSystem._restoreSelection(selection, fromLink)`, which downloads missing OSM entities; `SelectMode`
+writes every data ID to `id=`. Checked live: typed, removed, downloaded (map moves), and a reload with
+a mixed `id=`. Next: Step 6 (multiselection UI), which needs a design with mockups first.
 Found, not fixed: `attemptAutoconnect` (accept with `poweruser.autoConnect`) runs crossing-ways on
 the stale `way` after the almost-junction autofix changed its nodes, and throws `n-1 not found`.
 Bryan has seen it too; fix it separately, after the data ID steps are done.

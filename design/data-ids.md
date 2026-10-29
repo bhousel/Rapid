@@ -193,7 +193,8 @@ Known problems this causes:
   `${layer}-${objectid}`.
 - ✅ **A selection keyed by layer** (`EditSelection`, `{ rapid: ['fbRoads:abc:0'] }`) could only be
   found again through the layer that draws it, so only data that's drawn (fixed in Step 3).
-- **Selecting OSM and other data together isn't possible**, so `id=` in the URL only selects OSM.
+- ✅ **Selecting OSM and other data together wasn't possible**, so `id=` in the URL only selected
+  OSM (fixed in Steps 4 and 5).
 
 ## Legacy code
 
@@ -300,11 +301,17 @@ Each step is its own commit, and leaves Rapid working with the tests passing.
   only when the selection has data that isn't OSM, so the OSM inspector keeps its state
   (`newFeature`).
 
-**Step 5: `id=` in the URL takes data IDs.**
-- `id=w1,fbRoads:abc,osm-notes:123` selects all of them, not just the first. OSM entities that
-  aren't loaded yet are loaded first, and other data is selected once it loads.
-- The mode writes every selected data ID back to `id=`.
-- Update `API.md`.
+**✅ Step 5: `id=` in the URL takes data IDs.**
+- `id=w1,fbRoads:abc,osm-notes:123` selects all of them, not just the first. `SelectMode` writes
+  every selected data ID back to `id=`, and removing `id=` goes to browse mode.
+- `MapSystem._restoreSelection(selection, fromLink)` does this, as it does for undo and redo. From a
+  link, it downloads OSM entities that aren't loaded yet (only IDs from the OSM API; a new
+  entity like `w-1` can't be), turns on the OSM layer, and moves the map to them if they aren't in
+  view. Other data is selected when it loads, which needs its layer on (e.g. `datasets=`) and the
+  data in view, so a link waits up to 30 seconds instead of 5 redraws.
+- What's found is selected right away, and what arrives later is added, unless the user has
+  selected something else in the meantime.
+- A selected note is in both `id=` (`osm-notes:123`) and `note=`, which also turns on the notes layer.
 
 **Step 6: Sidebar and edit menu for a multiselection.** This needs its own design, with mockups:
 operations on the whole selection (geometric ones, split, merge, …), and an "edit all" choice that

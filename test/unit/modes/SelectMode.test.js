@@ -84,14 +84,14 @@ describe('SelectMode', () => {
       assert.deepEqual(mode.selectedIDs, ['n1']);
     });
 
-    it('puts only the OSM entities in `id=` and forces only them visible', () => {
+    it('puts every data ID in `id=`, and forces only the OSM entities visible', () => {
       mode.enter({ selection: ['notes-test:1', 'w1'] });
-      assert.strictEqual(urlParams.id, 'w1');
+      assert.strictEqual(urlParams.id, 'notes-test:1,w1');
       assert.deepEqual(visibleIDs, ['w1']);
 
       mode.exit();
       mode.enter({ selection: ['notes-test:1'] });
-      assert.isNull(urlParams.id);
+      assert.strictEqual(urlParams.id, 'notes-test:1');
     });
 
     it('offers operations only when everything selected is OSM', () => {

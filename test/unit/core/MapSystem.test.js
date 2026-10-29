@@ -280,4 +280,97 @@ describe('MapSystem', () => {
     });
 
   });
+
+
+  describe('restoring a selection from a link', () => {
+    let ctx, map, entities, onDraw, enabledLayers, loadedIDs, fitIDs, mode, selectedIDs;
+
+    function node(id) {
+      return new Rapid.OsmNode(ctx, { id: id, loc: [0, 0] });
+    }
+    function note(id) {
+      return new Rapid.MarkerData(ctx, { id: id, namespace: 'notes-test', loc: [0, 0] });
+    }
+    const tick = () => new Promise(resolve => { setTimeout(resolve, 0); });
+
+    beforeEach(() => {
+      ctx = new Rapid.MockContext();
+      entities = new Map();
+      onDraw = new Set();
+      enabledLayers = [];
+      loadedIDs = [];
+      fitIDs = null;
+      mode = 'browse';
+      selectedIDs = [];
+
+      const graph = { hasEntity: id => entities.get(id) };
+      ctx.systems = {
+        editor: { stable: { graph: graph }, staging: { graph: graph } },
+        gfx: {
+          scene: { enableLayers: layerID => enabledLayers.push(layerID) },
+          on: (eventName, fn) => onDraw.add(fn),
+          off: (eventName, fn) => onDraw.delete(fn)
+        },
+        spatial: new Rapid.SpatialSystem(ctx)
+      };
+      Object.defineProperty(ctx, 'mode', { get: () => ({ id: mode }) });
+      ctx.selectedIDs = () => selectedIDs;
+      ctx.enter = (modeID, options) => {
+        mode = modeID;
+        selectedIDs = options?.selection ?? [];
+      };
+      // The OSM API has `n2`, but not `n404`
+      ctx.loadEntityAsync = entityID => {
+        loadedIDs.push(entityID);
+        if (entityID === 'n2') entities.set('n2', node('n2'));
+        return Promise.resolve();
+      };
+
+      ctx.systems.spatial.registerResolver('osm', entityID => entities.get(entityID));
+      entities.set('n1', node('n1'));
+      ctx.systems.spatial.replaceData('notes-test', note('1'));
+
+      map = new Rapid.MapSystem(ctx);
+      map.showsExtent = () => false;
+      map.fitEntities = fitEntities => fitIDs = fitEntities.map(entity => entity.id);
+    });
+
+    it('downloads the OSM entities it doesn\'t have, and selects everything it finds', async () => {
+      map._restoreSelection(['n1', 'n2', 'osm:n1', 'notes-test:1', 'n404', 'w-1'], true);
+      assert.strictEqual(mode, 'select');
+      assert.deepEqual(selectedIDs, ['n1', 'notes-test:1']);
+      assert.sameMembers(loadedIDs, ['n2', 'n404']);   // not `w-1`, a new entity
+
+      await tick();
+      assert.deepEqual(selectedIDs, ['n1', 'n2', 'notes-test:1']);
+      assert.include(enabledLayers, 'osm');
+      assert.deepEqual(fitIDs, ['n1', 'n2']);
+    });
+
+    it('selects other data when it loads', () => {
+      map._restoreSelection(['notes-test:2'], true);
+      assert.strictEqual(mode, 'browse');
+
+      ctx.systems.spatial.replaceData('notes-test', note('2'));
+      for (const fn of onDraw) fn();
+      assert.strictEqual(mode, 'select');
+      assert.deepEqual(selectedIDs, ['notes-test:2']);
+      assert.strictEqual(onDraw.size, 0);
+    });
+
+    it('keeps what the user selected while it was downloading', async () => {
+      map._restoreSelection(['n2'], true);
+      ctx.enter('select', { selection: ['n1'] });
+
+      await tick();
+      assert.deepEqual(selectedIDs, ['n1']);
+    });
+
+    it('doesn\'t download anything when restoring an edit\'s selection', () => {
+      map._restoreSelection(['n1', 'n2']);
+      assert.deepEqual(selectedIDs, ['n1']);
+      assert.deepEqual(loadedIDs, []);
+      assert.deepEqual(enabledLayers, []);
+    });
+  });
 });

@@ -175,7 +175,7 @@ export class SelectMode extends AbstractMode {
       scene.setClass('select', dataID);
     }
 
-    urlhash.setParam('id', osmIDs.length ? osmIDs.join(',') : null);   // Put the OSM entityIDs into the url hash
+    urlhash.setParam('id', this._selectedIDs.join(',') || null);   // Put the data IDs into the url hash
     filters.forceVisible(osmIDs);                  // Exclude OSM entityIDs from being filtered
     this._setupOperations();                       // Determine available operations on the edit menu
 
