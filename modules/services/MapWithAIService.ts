@@ -110,9 +110,9 @@ export class MapWithAIService extends AbstractSystem {
     const urlRoot = customUrlRoot || MWAI_API;
 
     network.clearMatching(id => id.startsWith('mapwithai-') || id.includes(urlRoot));
-    spatial.clearMatching(id => id.startsWith('mapwithai-'));
 
     for (const ds of this._datasets.values()) {
+      spatial.clearCache(ds.spatialID);
       ds.graph = new Graph(context);
       ds.seen.clear();
       ds.seenFirstNodeID.clear();
@@ -138,7 +138,7 @@ export class MapWithAIService extends AbstractSystem {
     const fbRoads = new RapidDataset(context, {
       id: 'fbRoads',
       serviceID: 'mapwithai',
-      spatialID: 'mapwithai-fbRoads-data',
+      spatialID: 'fbRoads',
       categories: ['meta', 'roads', 'featured'],
       color: '#da26d3',  // rapid magenta
       dataUsed: ['mapwithai', 'Facebook Roads'],
@@ -152,7 +152,7 @@ export class MapWithAIService extends AbstractSystem {
     const msBuildings = new RapidDataset(context, {
       id: 'msBuildings',
       serviceID: 'mapwithai',
-      spatialID: 'mapwithai-msBuildings-data',
+      spatialID: 'msBuildings',
       categories: ['microsoft', 'buildings', 'featured'],
       color: '#da26d3',  // rapid magenta
       dataUsed: ['mapwithai', 'Microsoft Buildings'],
@@ -168,7 +168,7 @@ export class MapWithAIService extends AbstractSystem {
       hidden: true,
       conflated: false,
       serviceID: 'mapwithai',
-      spatialID: 'mapwithai-rapid_intro_graph-data',
+      spatialID: 'rapid_intro_graph',
       categories: ['meta', 'roads'],
       color: '#da26d3',  // rapid magenta
       dataUsed: [],
@@ -208,7 +208,7 @@ export class MapWithAIService extends AbstractSystem {
     if (!ds) {
       ds = {
         id: datasetID,
-        spatialID: `mapwithai-${datasetID}-data`,
+        spatialID: datasetID,   // also the namespace of its data (see `design/data-ids.md`)
         graph: new Graph(this.context),
         seen: new Set<EntityID>(),
         seenFirstNodeID: new Set<EntityID>(),
@@ -325,7 +325,7 @@ export class MapWithAIService extends AbstractSystem {
       const entityID = props.id as EntityID;
 
       // add some extra metadata properties
-      Object.assign(props, { fbID: entityID, serviceID: 'mapwithai', datasetID: ds.id });
+      Object.assign(props, { fbID: entityID, serviceID: 'mapwithai', datasetID: ds.id, namespace: ds.spatialID });
 
       if (props.type === 'node') {
         if (ds.seen.has(entityID)) continue;   // can skip seen nodes

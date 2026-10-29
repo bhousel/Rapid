@@ -182,6 +182,21 @@ describe('EditSystem', () => {
       });
     });
 
+    describe('finding OSM data by data ID', () => {
+      it('finds the current version of an entity in the staging graph', () => {
+        const spatial = context.systems.spatial;
+        const node1 = new Rapid.OsmNode(context, { id: 'n1' });
+        _editor.merge([node1]);
+        assert.strictEqual(spatial.getData('n1'), node1);
+
+        _editor.perform(Rapid.actionChangeTags('n1', { natural: 'tree' }));
+        assert.deepEqual(spatial.getData('n1').tags, { natural: 'tree' });   // staging, not base
+
+        _editor.perform(Rapid.actionDeleteNode('n1'));
+        assert.isUndefined(spatial.getData('n1'));
+      });
+    });
+
     describe('history', () => {
       it('returns the history', () => {
         assert.isArray(_editor.history, Array);

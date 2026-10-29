@@ -365,6 +365,10 @@ export class EditSystem extends AbstractSystem {
       .then(async () => {
         this._reset();
 
+        // Bare data IDs are OSM entities, and their current version is in the staging graph.
+        // (The OSM spatial caches hold several versions, see `spatialIDForGraph`.)
+        spatial.registerResolver('osm', entityID => this._staging.graph.hasEntity(entityID));
+
         const isTestEnvironment = (!('window' in globalThis)) || ('assert' in globalThis) || ('expect' in globalThis);
         if (isTestEnvironment) return;
 

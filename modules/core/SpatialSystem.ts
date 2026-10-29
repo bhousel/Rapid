@@ -1,9 +1,10 @@
+import { AbstractData } from '../data/AbstractData.ts';
 import { AbstractSystem } from './AbstractSystem.ts';
 import { projWgs84ToWorld, projWorldToWgs84, vecAdd, vecEqual, vecScale, WORLD_SCALE } from '@rapid-sdk/math';
 import RBush from 'rbush';
+import { splitDataID } from '../data/dataID.ts';
 import { type OneOrMore, utilIterable } from '../util/iterable.ts';
 
-import type { AbstractData } from '../data/AbstractData.ts';
 import type { BBox } from 'rbush';
 import type { Context } from '../Context.ts';
 import type { Tile, Vec2 } from '@rapid-sdk/math';
@@ -30,11 +31,19 @@ export interface SpatialItem extends BBox {
 interface SpatialCache {
   /** The identifier of this spatial cache */
   id: SpatialID;
-  /** Items tracked by the spatial index */
+  /** Items tracked by the spatial cache, including any without a valid box */
   items: Map<BoxID, SpatialItem>;
-  /** RBush index over the boxes */
+  /** RBush index over the items that have a valid box */
   rbush: RBush<SpatialItem>;
 }
+
+/**
+ * Finds a datum in a namespace whose data isn't simply in the cache of the same name
+ * (e.g. OSM, whose current version is in the staging graph).
+ * @param localID - The datum's ID within its namespace
+ * @return The datum, or `undefined` if not found
+ */
+export type DataResolver = (localID: string) => AbstractData | undefined;
 
 
 /**
@@ -50,7 +59,12 @@ interface SpatialCache {
  * be represented in a planar coordinate system (such as "world" or "screen" coordinates).
  *
  * Each spatial cache must be identified by a unique `spatialID` string.
- * For example: 'osm-data', 'osm-data-tiles', etc.
+ * For example: 'osm-notes', 'fbRoads', 'fbRoads.pieces', etc.
+ *
+ * All data lives in a spatial cache, and a cache that holds data names that data's namespace.
+ * So any datum can be found by its data ID (`${namespace}:${localID}`) with `getData()`.
+ * Namespaces whose data needs another lookup (OSM, vector tiles) register a resolver.
+ * See `design/data-ids.md`.
  *
  * Note that because the spatial system has no specialized knowledge about its contents, we don't
  * clear the caches on reset - calling code is responsible for managing any objects that it has stored!
@@ -68,6 +82,8 @@ export class SpatialSystem extends AbstractSystem {
 
   /** Spatial caches that the SpatialSystem is managing */
   protected _caches: Map<SpatialID, SpatialCache>;
+  /** Lookups for namespaces whose data isn't simply in the cache of the same name */
+  protected _resolvers: Map<SpatialID, DataResolver>;
 
 
   /**
@@ -78,6 +94,7 @@ export class SpatialSystem extends AbstractSystem {
     this.id = 'spatial';
 
     this._caches = new Map<SpatialID, SpatialCache>();
+    this._resolvers = new Map<SpatialID, DataResolver>();
   }
 
   /**
@@ -162,13 +179,29 @@ export class SpatialSystem extends AbstractSystem {
     const existing = cache.items.get(boxID);
     if (existing) {
       cache.items.delete(boxID);
-      cache.rbush.remove(existing);
+      if (this._hasValidBox(existing)) {
+        cache.rbush.remove(existing);
+      }
     }
   }
 
 
   /**
+   * Internal helper - whether an item has a box that can go in the RBush index.
+   * Items without one (e.g. data with no extent) are still tracked, and can be found by id.
+   * @param item - the item to check
+   * @return `true` if all the box coordinates are finite
+   */
+  protected _hasValidBox(item: SpatialItem): boolean {
+    return Number.isFinite(item.minX) && Number.isFinite(item.minY) &&
+      Number.isFinite(item.maxX) && Number.isFinite(item.maxY);
+  }
+
+
+  /**
    * Add or replace items in the given spatial cache.
+   * An item without a valid box replaces any existing item with its id, and can be found by id,
+   * but it's left out of the spatial index, so box and coordinate searches won't return it.
    * @param spatialID - spatialID of the cache to insert into
    * @param items - items to insert or replace
    */
@@ -180,7 +213,9 @@ export class SpatialSystem extends AbstractSystem {
       if (!item) continue;
       this._removeItem(cache, item.id);
       cache.items.set(item.id, item);
-      toInsert.push(item);
+      if (this._hasValidBox(item)) {
+        toInsert.push(item);
+      }
     }
 
     if (toInsert.length > 1) {
@@ -195,8 +230,10 @@ export class SpatialSystem extends AbstractSystem {
    * Add or replace data in the given spatial cache.
    * This is a convenience method to call `replaceItems()`, but with `OneOrMore<AbstractData>`.
    * We use the AbstractData's computed world.extent to get the box properties.
+   * Data with no extent (e.g. a relation whose members aren't loaded) is still stored, so it can be
+   * found by id and replaces any older version, but box and coordinate searches won't return it.
    * @param spatialID - spatialID of the cache to add items.
-   * @param items - items to insert or replace
+   * @param data - data to insert or replace
    */
   public replaceData(spatialID: SpatialID, data: OneOrMore<AbstractData>): void {
     const items: SpatialItem[] = [];
@@ -204,9 +241,8 @@ export class SpatialSystem extends AbstractSystem {
       if (!d) continue;
 
       const extent = d.geoms.world?.extent;
-      if (!extent) continue;
-
-      const item = Object.assign({ id: d.id, contents: d }, extent.bbox()) as SpatialItem;
+      const bbox = extent?.bbox() ?? { minX: NaN, minY: NaN, maxX: NaN, maxY: NaN };
+      const item = Object.assign({ id: d.id, contents: d }, bbox) as SpatialItem;
       items.push(item);
     }
 
@@ -263,6 +299,42 @@ export class SpatialSystem extends AbstractSystem {
     if (!spatialID || !boxID) return undefined;
     const cache = this.getCache(spatialID);
     return cache.items.get(boxID)?.contents as T | undefined;
+  }
+
+
+  /**
+   * Registers how to find the data in a namespace whose data isn't simply in the cache of the
+   * same name. For example, `EditSystem` registers `osm`, whose current data is in the staging graph.
+   * @param namespace - The namespace (`osm` for bare data IDs)
+   * @param resolver - Finds a datum by its local ID, or `null` to remove the resolver
+   */
+  public registerResolver(namespace: SpatialID, resolver: DataResolver | null): void {
+    if (resolver) {
+      this._resolvers.set(namespace, resolver);
+    } else {
+      this._resolvers.delete(namespace);
+    }
+  }
+
+
+  /**
+   * Finds any datum by its data ID (`${namespace}:${localID}`, or a bare OSM entity ID).
+   * Looks in the namespace's resolver if it has one, otherwise in the cache named by the namespace.
+   * See `design/data-ids.md`.
+   * @param dataID - The data ID to look up
+   * @return The datum, or `undefined` if it isn't loaded
+   */
+  public getData<T extends AbstractData = AbstractData>(dataID: Nullable<DataID>): T | undefined {
+    if (!dataID) return undefined;
+
+    const [namespace, localID] = splitDataID(dataID);
+    const resolver = this._resolvers.get(namespace);
+    if (resolver) {
+      return resolver(localID) as T | undefined;
+    }
+
+    const contents = this._caches.get(namespace)?.items.get(localID)?.contents;
+    return (contents instanceof AbstractData) ? contents as T : undefined;
   }
 
 

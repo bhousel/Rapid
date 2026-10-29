@@ -24,13 +24,13 @@ export type CheckpointID = string;
 export type ClassID = string;
 /** Command ID - identifier for a remappable keyboard command (e.g. 'zoom-in', 'undo') */
 export type CommandID = string;
-/** Data ID - identifier for any AbstractData subclass */
+/** Data ID - identifier for any AbstractData, unique across Rapid: `${namespace}:${localID}`, or a bare OSM entity ID (e.g. 'w123', 'osm-notes:123') */
 export type DataID = string;
 /** Dataset ID (e.g. 'fbRoads', 'msBuildings') */
 export type DatasetID = string;
 /** Detection ID - identifier for a photo detection (e.g. mapillary signs) */
 export type DetectionID = string;
-/** Entity ID (e.g. 'n123', 'w456', 'r789' for nodes, ways, relations) */
+/** Entity ID - identifier for an OSM entity, unique within its `Graph` (e.g. 'n123', 'w456', 'r789' for nodes, ways, relations) */
 export type EntityID = string;
 /** Feature ID - identifier for a rendered feature */
 export type FeatureID = string;
@@ -88,7 +88,7 @@ export type SequenceID = string;
 export type ServiceID = string;
 /** Session ID - identifier for a stored editing session */
 export type SessionID = string;
-/** Spatial ID - identifier for a spatial index cache */
+/** Spatial ID - identifier for a spatial index cache. A cache that holds data names that data's namespace (e.g. 'osm-notes', 'fbRoads') */
 export type SpatialID = string;
 /** String ID - identifier for a localized string (e.g. 'toolbar.undo', 'modes.add_area') */
 export type StringID = string;

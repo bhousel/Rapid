@@ -1,5 +1,15 @@
 # Current Work
 
+## Active: data IDs and selecting any mix of data
+Design: [`design/data-ids.md`](../design/data-ids.md), started Oct 28 with Bryan. A data ID is
+`${namespace}:${localID}` (bare = OSM); a namespace is a `SpatialSystem` cache ID; `.` suffixes name
+derived caches (`fbRoads.pieces`); the user's datasets start with `user-`. Step 1 (Oct 28, not yet
+committed): `modules/data/dataID.ts`, `AbstractDataProps.namespace`, `spatial.getData()` +
+`registerResolver()` (`osm` from `EditSystem`, each vector tile source), data with no extent kept by
+ID, caches renamed. Next: Step 2 (deterministic IDs: file datasets drop `:0`, pieces cache, Esri as
+GeoJSON, custom data into a cache, Overture GERS IDs). Found: Overture's GERS ID is the `id` property
+at z14 only, and `VectorTileService` was deleting it (details in the doc).
+
 ## Active: what an edit records (`EditSystem`)
 Design: [`design/edit-system.md`](../design/edit-system.md), started Oct 26. Edits need to record more
 than OSM graph changes. Done: undone (redo) edits aren't saved, and a session undone back to nothing

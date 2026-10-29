@@ -11,6 +11,7 @@ All data classes extend `AbstractData` and are designed to be **immutable**. Whe
 | File | Description |
 |------|-------------|
 | `AbstractData.ts` | Base class for all data elements |
+| `dataID.ts` | Helpers for data IDs (`${namespace}:${localID}`): build, split, and get the OSM entity ID |
 | `GeoJSONData.ts` | Wrapper for arbitrary GeoJSON data |
 | `MarkerData.ts` | Point markers from services (photos, notes, QA issues, etc.; formerly "QAItem") |
 | `OsmChangeset.ts` | Represents an OSM changeset |
@@ -34,7 +35,8 @@ See [`parsers/README.md`](parsers/README.md).
 ## Data Properties
 
 Each data element has:
-- `id` (or `dataID`) - Unique identifier (e.g., `n123` for node 123)
+- `id` - Identifier within its namespace (e.g., `n123` for node 123)
+- `dataID` - Identifier across all of Rapid, `${namespace}:${id}` (bare `id` for OSM). See [`design/data-ids.md`](../../design/data-ids.md).
 - `type` - What kind of element (e.g. `node`, `way`, `relation`)
 - `v` - Internal version for change detection
 - `geoms` - `Geometry` wrapper with original (WGS84) and projected (world) coordinates

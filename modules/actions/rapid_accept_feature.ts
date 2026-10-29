@@ -337,6 +337,7 @@ export function actionRapidAcceptFeature(datum: OsmEntity | GeoJSONData, joins?:
     delete props.fbID;
     delete props.serviceID;
     delete props.datasetID;
+    delete props.namespace;   // the accepted entity is OSM data now
     delete tags.conn;
     delete tags.orig_id;
     delete tags.debug_way_id;

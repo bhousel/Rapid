@@ -1,3 +1,4 @@
+export * from './dataID.ts';
 export * from './parsers/index.ts';
 
 import { AbstractData } from './AbstractData.ts';

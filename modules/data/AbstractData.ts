@@ -1,5 +1,6 @@
 import { Extent } from '@rapid-sdk/math';
 import { Geometry } from '../lib/Geometry.ts';
+import { makeDataID } from './dataID.ts';
 
 import type { Context } from '../Context.ts';
 import type { GeoJSONObject } from '../lib/types.ts';
@@ -12,8 +13,11 @@ import type { DataConstructor } from './types.ts';
  * Base properties shared by all data elements.
  */
 export interface AbstractDataProps {
-  /** Unique identifier for this data element */
+  /** Unique identifier for this data element, within its namespace */
   id?: string;
+  /** The namespace this data element's ID is unique within: the ID of the `SpatialSystem` cache that
+   *  holds it. Not set for OSM data. See `design/data-ids.md`. */
+  namespace?: SpatialID;
   /** String describing what kind of data element this is (e.g. 'node', 'way', 'relation') */
   type?: string;
   /** Internal version number, used to detect changes */
@@ -33,7 +37,8 @@ export interface AbstractDataProps {
  * (A lot of this was carried over from the previous `osmEntity` and similar classes.)
  *
  * Properties available:
- * - `id` (or `dataID`) - Identifier this data element - should be unique system-wide.
+ * - `id`               - Identifier for this data element, unique within its namespace
+ * - `dataID`           - Identifier unique across all of Rapid (see `design/data-ids.md`)
  * - `type`             - String describing what kind of data element this is (e.g. 'node', 'way', 'relation')
  * - `v`                - Internal version of the data element, can be used to detect changes
  * - `geoms`            - Geometry object
@@ -175,12 +180,13 @@ export class AbstractData<P extends AbstractDataProps = AbstractDataProps> {
   }
 
   /**
-   * Unique string to identify this data element
-   * @return  This data element's unique ID
+   * Unique string to identify this data element across all of Rapid: `${namespace}:${id}`,
+   * or the bare `id` for OSM data (see `design/data-ids.md`).
+   * @return  This data element's data ID
    * @readonly
    */
-  public get dataID(): string {
-    return this.id;
+  public get dataID(): DataID {
+    return makeDataID((this.props as Partial<AbstractDataProps>).namespace, this.id);
   }
 
   /**

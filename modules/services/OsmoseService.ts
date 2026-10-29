@@ -141,7 +141,7 @@ export class OsmoseService extends AbstractSystem {
     const spatial = context.systems.spatial!;
 
     network.clearMatching(id => id.startsWith('osmose-') || id.includes(OSMOSE_API));
-    spatial.clearMatching(id => id.startsWith('osmose-'));
+    spatial.clearCache('osmose');
 
     this._closed = {};
     this._lastv = null;
@@ -156,7 +156,7 @@ export class OsmoseService extends AbstractSystem {
    */
   public getData(): MarkerData[] {
     const spatial = this.context.systems.spatial!;
-    return spatial.getVisibleItems('osmose-data').map(hit => hit.contents) as MarkerData[];
+    return spatial.getVisibleItems('osmose').map(hit => hit.contents) as MarkerData[];
   }
 
 
@@ -217,7 +217,7 @@ export class OsmoseService extends AbstractSystem {
     const context = this.context;
     const gfx = context.systems.gfx;
     const spatial = context.systems.spatial!;
-    const spatialID = 'osmose-data';
+    const spatialID = 'osmose';
 
     for (const feature of (response.features ?? [])) {
       // Osmose issues are uniquely identified by a unique
@@ -232,6 +232,7 @@ export class OsmoseService extends AbstractSystem {
       const loc = spatial.getFreeLoc(spatialID, feature.geometry.coordinates);
       const props: Record<string, any> = {
         id:        id,
+        namespace: spatialID,
         class:     cl,
         item:      item,
         type:      itemType,
@@ -369,7 +370,7 @@ export class OsmoseService extends AbstractSystem {
    */
   public getError(dataID: DataID): OsmoseIssue | undefined {
     const spatial = this.context.systems.spatial!;
-    return spatial.getItem<OsmoseIssue>('osmose-data', dataID);
+    return spatial.getItem<OsmoseIssue>('osmose', dataID);
   }
 
 
@@ -382,7 +383,7 @@ export class OsmoseService extends AbstractSystem {
     if (!(item instanceof MarkerData) || !item.id) return null;
 
     const spatial = this.context.systems.spatial!;
-    spatial.replaceData('osmose-data', item);
+    spatial.replaceData('osmose', item);
     return item;
   }
 
@@ -395,7 +396,7 @@ export class OsmoseService extends AbstractSystem {
     if (!(item instanceof MarkerData) || !item.id) return;
 
     const spatial = this.context.systems.spatial!;
-    spatial.removeItems('osmose-data', item.id);
+    spatial.removeItems('osmose', item.id);
   }
 
 

@@ -73,7 +73,7 @@ export class GeoScribbleService extends AbstractSystem {
     const spatial = context.systems.spatial!;
 
     network.clearMatching(id => id.startsWith('geoscribble-') || id.includes(GEOSCRIBBLE_API));
-    spatial.clearMatching(id => id.startsWith('geoscribble-'));
+    spatial.clearCache('geoscribble');
 
     this._lastv = null;
 
@@ -87,7 +87,7 @@ export class GeoScribbleService extends AbstractSystem {
    */
   public getData(): GeoJSONData[] {
     const spatial = this.context.systems.spatial!;
-    return spatial.getVisibleItems('geoscribble-data').map(hit => hit.contents as GeoJSONData);
+    return spatial.getVisibleItems('geoscribble').map(hit => hit.contents as GeoJSONData);
   }
 
 
@@ -143,10 +143,10 @@ export class GeoScribbleService extends AbstractSystem {
 
     const toLoad: GeoJSONData[] = [];
     for (const feature of response.features) {
-      toLoad.push(new GeoJSONData(context, { serviceID: this.id, geojson: feature }));
+      toLoad.push(new GeoJSONData(context, { serviceID: this.id, namespace: 'geoscribble', geojson: feature }));
     }
 
-    spatial.addData('geoscribble-data', toLoad);
+    spatial.addData('geoscribble', toLoad);
     gfx?.deferredRedraw();
   }
 

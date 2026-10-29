@@ -81,7 +81,7 @@ export class AddNoteMode extends AbstractMode {
     if (!osm) return;
 
     // pass `null` to generate a new noteID
-    const props: Partial<OsmNoteProps> = { serviceID: 'osm' as ServiceID, loc: loc, isNew: true, status: 'open', comments: [] };
+    const props: Partial<OsmNoteProps> = { serviceID: 'osm' as ServiceID, namespace: 'osm-notes', loc: loc, isNew: true, status: 'open', comments: [] };
     const note: OsmNote = new MarkerData(context, props);
     osm.replaceNote(note);
 

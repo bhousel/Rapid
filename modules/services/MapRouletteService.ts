@@ -165,7 +165,7 @@ export class MapRouletteService extends AbstractSystem {
     const spatial = context.systems.spatial!;
 
     network.clearMatching(id => id.startsWith('maproulette-') || id.includes(MAPROULETTE_API));
-    spatial.clearMatching(id => id.startsWith('maproulette-'));
+    spatial.clearCache('maproulette');
 
     this._lastv = null;
     this._challenges.clear();
@@ -212,7 +212,7 @@ export class MapRouletteService extends AbstractSystem {
   public getData(): MapRouletteTask[] {
     const spatial = this.context.systems.spatial!;
 
-    return (spatial.getVisibleItems('maproulette-data')
+    return (spatial.getVisibleItems('maproulette')
       .map(hit => hit.contents) as MapRouletteTask[])
       .filter(task => {
         if (this._challengeIDs.size) {
@@ -231,7 +231,7 @@ export class MapRouletteService extends AbstractSystem {
    */
   public getTask(dataID: DataID): MapRouletteTask | undefined {
     const spatial = this.context.systems.spatial!;
-    return spatial.getItem<MapRouletteTask>('maproulette-data', dataID);
+    return spatial.getItem<MapRouletteTask>('maproulette', dataID);
   }
 
 
@@ -345,7 +345,7 @@ export class MapRouletteService extends AbstractSystem {
 
         // Update task details
         const toUpdate = [];
-        const allTasks = spatial.getAllItems<MapRouletteTask>('maproulette-data');
+        const allTasks = spatial.getAllItems<MapRouletteTask>('maproulette');
         for (const task of allTasks) {
           if (task.props.parentId !== challengeID) continue;
           if (task.props.instruction !== undefined) continue;   // done already
@@ -356,7 +356,7 @@ export class MapRouletteService extends AbstractSystem {
           task.touch();
           toUpdate.push(task);
         }
-        spatial.replaceData('maproulette-data', toUpdate);
+        spatial.replaceData('maproulette', toUpdate);
 
         return challenge;
       })
@@ -402,7 +402,7 @@ export class MapRouletteService extends AbstractSystem {
       .then(data => {
         task.props.features = data?.geometries?.features || [];
         task.touch();
-        spatial.replaceData('maproulette-data', task);
+        spatial.replaceData('maproulette', task);
         return task;
       });
   }
@@ -489,7 +489,7 @@ export class MapRouletteService extends AbstractSystem {
     if (!(item instanceof MarkerData) || !item.id) return null;
 
     const spatial = this.context.systems.spatial!;
-    spatial.replaceData('maproulette-data', item);
+    spatial.replaceData('maproulette', item);
     return item;
   }
 
@@ -502,7 +502,7 @@ export class MapRouletteService extends AbstractSystem {
     if (!(item instanceof MarkerData) || !item.id) return;
 
     const spatial = this.context.systems.spatial!;
-    spatial.removeItems('maproulette-data', item.id);
+    spatial.removeItems('maproulette', item.id);
   }
 
 
@@ -542,7 +542,7 @@ export class MapRouletteService extends AbstractSystem {
       maxY: Math.max(ay, by)
     };
 
-    const hits = spatial.getItemsAtBox('maproulette-data', search)
+    const hits = spatial.getItemsAtBox('maproulette', search)
       .map(hit => hit.contents as MarkerData<MapRouletteTaskProps>);
 
     const nearby = [];
@@ -599,7 +599,7 @@ export class MapRouletteService extends AbstractSystem {
     const taskID = props.id.toString();
     const challengeID = props.parentId.toString();
 
-    let task = spatial.getItem<MapRouletteTask>('maproulette-data', taskID);
+    let task = spatial.getItem<MapRouletteTask>('maproulette', taskID);
     if (task) return task;  // seen it already
 
     // Have we seen this challenge before?
@@ -615,12 +615,13 @@ export class MapRouletteService extends AbstractSystem {
 
     props.id = taskID;               // force to string
     props.parentId = challengeID;    // force to string
-    props.loc = spatial.getFreeLoc('maproulette-data', [props.point.lng, props.point.lat]);
+    props.loc = spatial.getFreeLoc('maproulette', [props.point.lng, props.point.lat]);
     props.serviceID = this.id;
+    props.namespace = 'maproulette';
 
     // Create a MarkerData for the task
     task = new MarkerData<MapRouletteTaskProps>(context, props as Partial<MapRouletteTaskProps>);
-    spatial.addData('maproulette-data', task);
+    spatial.addData('maproulette', task);
 
     return task;
   }

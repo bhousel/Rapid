@@ -165,9 +165,9 @@ export class EsriService extends AbstractSystem {
     const spatial = this.context.systems.spatial!;
 
     network.clearMatching(id => id.startsWith('esri-'));
-    spatial.clearMatching(id => id.startsWith('esri-'));
 
     for (const ds of this._datasets.values()) {
+      spatial.clearCache(ds.spatialID);
       ds.graph = new Graph(this.context);
       ds.lastv = null;
 
@@ -478,7 +478,8 @@ export class EsriService extends AbstractSystem {
     cache.seenIDs.add(featureIDString);
 
     const dataID = `esri-${datasetID}-${layerID}-${featureIDString}`;
-    const metadata = { fbID: dataID, serviceID: 'esri', datasetID: datasetID };
+    const namespace = ds.spatialID;
+    const metadata = { fbID: dataID, serviceID: 'esri', datasetID: datasetID, namespace: namespace };
     const entities: OsmEntity[] = [];
     const nodemap = new Map<string, OsmNode>();
 
@@ -510,7 +511,7 @@ export class EsriService extends AbstractSystem {
         const last = nodelist.at(-1)!;
         if (first !== last) nodelist.push(first);   // sanity check, ensure rings are closed
 
-        const w = new OsmWay(context, { nodes: nodelist });
+        const w = new OsmWay(context, { nodes: nodelist, namespace: namespace });
         ways.push(w);
       }
 
@@ -550,7 +551,7 @@ export class EsriService extends AbstractSystem {
         const key = coord.toString();
         let n = nodemap.get(key);
         if (!n) {
-          n = new OsmNode(context, { loc: coord as Vec2 });
+          n = new OsmNode(context, { loc: coord as Vec2, namespace: namespace });
           entities.push(n);
           nodemap.set(key, n);
         }
@@ -639,7 +640,7 @@ export class EsriService extends AbstractSystem {
     if (this._datasets.has(ds.id)) return;  // we've seen it already
 
     this._datasets.set(ds.id, ds);
-    ds.spatialID = `esri-${ds.id}-data`;
+    ds.spatialID = ds.id;   // also the namespace of its data (see `design/data-ids.md`)
     ds.graph = new Graph(this.context);
     ds.lastv = null;
     ds.layers = null;   // the schema info will live here

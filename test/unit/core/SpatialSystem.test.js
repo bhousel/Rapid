@@ -412,11 +412,73 @@ describe('SpatialSystem', () => {
         assert.strictEqual(_spatial.getItem(spatialID, 'd1'), data);
       });
 
-      it('ignores data without a world extent', () => {
+      it('stores data without a world extent, but leaves it out of searches', () => {
         const spatialID = 'test-replaceData-noextent';
         const data = new Rapid.AbstractData(context, { id: 'd2' });  // no geoms.world set
         _spatial.replaceData(spatialID, data);
-        assert.isFalse(_spatial.hasItem(spatialID, 'd2'));
+        assert.isTrue(_spatial.hasItem(spatialID, 'd2'));
+        assert.strictEqual(_spatial.getItem(spatialID, 'd2'), data);
+        assert.lengthOf(_spatial.getItemsAtBox(spatialID, worldBox([10, 0], 1000)), 0);
+      });
+
+      it('replaces an older version that had an extent with one that has none', () => {
+        const spatialID = 'test-replaceData-loseextent';
+        const before = createMockData('d3', [10, 0]);
+        _spatial.replaceData(spatialID, before);
+        assert.lengthOf(_spatial.getItemsAtBox(spatialID, worldBox([10, 0])), 1);
+
+        const after = new Rapid.AbstractData(context, { id: 'd3' });  // no geoms.world set
+        _spatial.replaceData(spatialID, after);
+        assert.strictEqual(_spatial.getItem(spatialID, 'd3'), after);
+        assert.lengthOf(_spatial.getItemsAtBox(spatialID, worldBox([10, 0])), 0);
+      });
+
+      it('can remove data without a world extent', () => {
+        const spatialID = 'test-replaceData-remove-noextent';
+        _spatial.replaceData(spatialID, new Rapid.AbstractData(context, { id: 'd4' }));
+        _spatial.removeItems(spatialID, 'd4');
+        assert.isFalse(_spatial.hasItem(spatialID, 'd4'));
+      });
+    });
+
+
+    describe('getData', () => {
+      it('finds data by its data ID, in the cache named by its namespace', () => {
+        const data = createMockData('123', [10, 0]);
+        data.props.namespace = 'test-notes';
+        _spatial.replaceData('test-notes', data);
+
+        assert.strictEqual(data.dataID, 'test-notes:123');
+        assert.strictEqual(_spatial.getData('test-notes:123'), data);
+      });
+
+      it('splits on the first colon only, so local IDs may contain colons', () => {
+        const data = createMockData('abc:1', [10, 0]);
+        _spatial.replaceData('test-dataset', data);
+        assert.strictEqual(_spatial.getData('test-dataset:abc:1'), data);
+      });
+
+      it('uses a resolver registered for the namespace', () => {
+        const data = createMockData('w1', [10, 0]);
+        _spatial.registerResolver('osm', localID => (localID === 'w1' ? data : undefined));
+
+        assert.strictEqual(_spatial.getData('w1'), data);       // bare IDs are OSM
+        assert.strictEqual(_spatial.getData('osm:w1'), data);   // so is `osm:`
+        assert.isUndefined(_spatial.getData('w2'));
+
+        _spatial.registerResolver('osm', null);
+        assert.isUndefined(_spatial.getData('w1'));
+      });
+
+      it('returns undefined for things in a cache that aren\'t data', () => {
+        _spatial.replaceItems('test-notdata', rawItem('t1', [0, 0]));
+        assert.isUndefined(_spatial.getData('test-notdata:t1'));
+      });
+
+      it('returns undefined for unknown namespaces and empty IDs', () => {
+        assert.isUndefined(_spatial.getData('nope:1'));
+        assert.isUndefined(_spatial.getData(''));
+        assert.isUndefined(_spatial.getData(null));
       });
     });
 

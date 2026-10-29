@@ -431,6 +431,7 @@ export class StreetsideService extends AbstractSystem {
       const props = {
         type: 'photo',
         serviceID: this.id,
+        namespace: spatialID,
         loc: loc,
         id: bubbleID,
         ca: bubble.he,
@@ -986,6 +987,7 @@ export class StreetsideService extends AbstractSystem {
           id:         sequenceID,
           type:       'sequence',
           serviceID:  this.id,
+          namespace:  'streetside-sequences',
           bubbleIDs:  [],
           isPano:     true,
           geojson: {

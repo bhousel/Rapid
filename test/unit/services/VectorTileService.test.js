@@ -53,7 +53,7 @@ describe('VectorTileService', () => {
   beforeEach(async () => {
     _service = new Rapid.VectorTileService(context);
     await _service.initAsync();
-    await _service.resetAsync();   // clear any `vt-` spatial caches left by a prior test
+    await _service.resetAsync();
 
     // Set up a viewport large enough that the tiler returns a 2x2+ block of tiles.
     // The absolute location doesn't matter - feature coords are derived from the tile extents.
@@ -86,7 +86,7 @@ describe('VectorTileService', () => {
 
   /** All GeoJSONData currently cached for the given zoom. */
   function cached(z) {
-    return context.systems.spatial.getAllItems(`vt-${_source.id}-z${z}`);
+    return context.systems.spatial.getAllItems(`${_source.id}.z${z}`);
   }
 
   /** WGS84 extent of a cached GeoJSONData feature. */
@@ -614,6 +614,27 @@ describe('VectorTileService', () => {
       const data = _service.getData(TEMPLATE);
       assert.lengthOf(data, 1);
       assert.instanceOf(data[0], Rapid.GeoJSONData);
+    });
+  });
+
+  describe('finding data by data ID', () => {
+    it('finds data in the source\'s zoom caches, namespaced by the source', () => {
+      const { TL } = getGrid();
+      feed(TL, [ subRect(TL, 0.4, 0.4, 0.6, 0.6, { leisure: 'park' }) ]);
+
+      const d = _service.getData(TEMPLATE)[0] ?? cached(TL.xyz[2])[0];
+      assert.exists(d);
+      assert.strictEqual(d.dataID, `${_source.id}:${d.id}`);
+      assert.strictEqual(context.systems.spatial.getData(d.dataID), d);
+    });
+
+    it('stops finding the data after a reset', async () => {
+      const { TL } = getGrid();
+      feed(TL, [ subRect(TL, 0.4, 0.4, 0.6, 0.6, { leisure: 'park' }) ]);
+      const d = cached(TL.xyz[2])[0];
+
+      await _service.resetAsync();
+      assert.isUndefined(context.systems.spatial.getData(d.dataID));
     });
   });
 

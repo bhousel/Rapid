@@ -574,6 +574,7 @@ export class MapillaryService extends AbstractSystem {
           const props = {
             id: sequenceID,
             serviceID: this.id as ServiceID,
+            namespace: 'mapillary-sequences',
             type: 'sequence',
             geojson: {
               type: 'FeatureCollection',
@@ -1290,6 +1291,7 @@ export class MapillaryService extends AbstractSystem {
       image = new MarkerData(this.context, {
         type:       'photo',
         serviceID:  this.id as ServiceID,
+        namespace:  'mapillary-images',
         id:         imageID,
         loc:        loc
       });
@@ -1328,6 +1330,7 @@ export class MapillaryService extends AbstractSystem {
       detection = new MarkerData<MapillaryDetectionProps>(this.context, {
         type:         'detection',
         serviceID:    this.id as ServiceID,
+        namespace:    'mapillary-detections',
         id:           detectionID,
         object_type:  source.object_type   // 'point' or 'traffic_sign'
       });

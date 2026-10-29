@@ -139,6 +139,10 @@ For lines this gives **partial matching for free** — each box is a spatial uni
   - **3c — Query plumbing:** ✅ Done. `SpatialSystem.getItemsAtBoxes(spatialID, boxes)` (phase-1 prefilter over many boxes, deduped by `boxID`). Phase-2, the precise refine, is a plain filter in the *calling* code using existing `geom*` / `vec*` primitives. (A `refineItems(candidates, predicate)` wrapper existed briefly, and was removed in `38ff948b9` because it added nothing over `Array.filter`.) The `buffers` index is a normal flat spatialID. After implementing 3c we simplified storage further: `SpatialSystem` is now flat (`Map<spatialID, RBush>`), and legacy `(spatialID, indexID)` overloads were removed. Callers use flat IDs like `editor_staging-segments` directly.
   - **3d — Conflation module:** replace the `PixiLayerDebug` hack with a real per-type conflation pass (POI dedup, building filter, partial-sidewalk suggestion). Owns the match semantics. Designed in [`conflation-system.md`](./conflation-system.md) as a `ConflationSystem`.
 - **Step 4:** Build richer cross-layer conflation/styling queries on top (incl. reverse "which OSM features overlap third-party data").
+- **Finding data by ID** (October 2026, from [`data-ids.md`](./data-ids.md)): ✅ Done.
+  - All data lives in a cache. A cache that holds data names that data's namespace, so `getData(dataID)` splits `${namespace}:${localID}` and looks in that cache.
+  - Namespaces whose data needs another lookup register a resolver with `registerResolver()`: `osm` (bare IDs, the staging graph, registered by `EditSystem`) and each vector tile source (its zoom caches).
+  - An item without a valid box (e.g. a relation whose members aren't loaded) is kept in `items` but left out of the RBush, so it can be found by ID and replaces any older version. Before, `replaceData()` skipped it and left the older version, with its old box, in the cache.
 
 ### Step 2 implementation notes
 
@@ -149,7 +153,7 @@ For lines this gives **partial matching for free** — each box is a spatial uni
 
 ## Boundary Summary
 
-- **`SpatialSystem`** — owns *where* things are and answers spatial questions. Generic bbox indexing (named indexes via `replaceItems`/`removeItems`/`getItemsAtBox`/`getItemsAtBoxes`) + two-phase precise refine driven by a caller-supplied predicate. No knowledge of OSM, segments, buffers, photos, or "match" semantics as concepts.
+- **`SpatialSystem`** — owns *where* things are and answers spatial questions. Generic bbox indexing (named indexes via `replaceItems`/`removeItems`/`getItemsAtBox`/`getItemsAtBoxes`) + two-phase precise refine driven by a caller-supplied predicate. Finds any datum by its data ID (`getData`), through the cache named by its namespace or a registered resolver. No knowledge of OSM, segments, buffers, photos, or "match" semantics as concepts.
 - **`EditSystem`** — owns OSM topology/history. Translates graph `Difference`s into spatial updates, generates segments, owns the `editor_base`/`editor_stable`/`editor_staging` caches, and exposes the OSM spatial queries.
 - **`GeometryPart`** — owns derived geometry (hull, centroid, poi, surround, **coverage/buffers**), computed lazily on first access (Step 3a) and re-computable for a given radius via `computeCoverage(r)`.
 - **`modules/geo`** — pure geometry helpers (e.g. `geomCoverageBoxes`, phase-2 predicates). May start here and migrate into `@rapid-sdk/math` later if generally useful.

@@ -174,7 +174,7 @@ export class KeepRightService extends AbstractSystem {
     const spatial = context.systems.spatial!;
 
     network.clearMatching(id => id.startsWith('keepright-'));
-    spatial.clearMatching(id => id.startsWith('keepright-'));
+    spatial.clearCache('keepright');
 
     this._closed.clear();
     this._lastv = null;
@@ -189,7 +189,7 @@ export class KeepRightService extends AbstractSystem {
    */
   public getData(): MarkerData[] {
     const spatial = this.context.systems.spatial!;
-    return spatial.getVisibleItems('keepright-data').map(hit => hit.contents) as MarkerData[];
+    return spatial.getVisibleItems('keepright').map(hit => hit.contents) as MarkerData[];
   }
 
 
@@ -252,7 +252,7 @@ export class KeepRightService extends AbstractSystem {
     const context = this.context;
     const gfx = context.systems.gfx;
     const spatial = context.systems.spatial!;
-    const spatialID = 'keepright-data';
+    const spatialID = 'keepright';
 
     if (!Array.isArray(response?.features)) {
       throw new Error('Invalid response');
@@ -316,6 +316,7 @@ export class KeepRightService extends AbstractSystem {
 
       const props: Record<string, any> = {
         id:              id,
+        namespace:       spatialID,
         loc:             loc,
         itemType:        itemType,
         comment:         comment,
@@ -396,7 +397,7 @@ export class KeepRightService extends AbstractSystem {
    */
   public getError(dataID: DataID): KeepRightIssue | undefined {
     const spatial = this.context.systems.spatial!;
-    return spatial.getItem<KeepRightIssue>('keepright-data', dataID);
+    return spatial.getItem<KeepRightIssue>('keepright', dataID);
   }
 
 
@@ -419,7 +420,7 @@ export class KeepRightService extends AbstractSystem {
     if (!(item instanceof MarkerData) || !item.id) return null;
 
     const spatial = this.context.systems.spatial!;
-    spatial.replaceData('keepright-data', item);
+    spatial.replaceData('keepright', item);
     return item;
   }
 
@@ -432,7 +433,7 @@ export class KeepRightService extends AbstractSystem {
     if (!(item instanceof MarkerData) || !item.id) return;
 
     const spatial = this.context.systems.spatial!;
-    spatial.removeItems('keepright-data', item.id);
+    spatial.removeItems('keepright', item.id);
   }
 
 
