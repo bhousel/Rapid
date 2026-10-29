@@ -8,8 +8,9 @@ This system is older than the design docs. This doc started in October 2026 with
 autoconnect (accepting a Rapid feature with `poweruser.autoConnect`) crashed with
 `OsmEntity n-2 not found` (see [The October 2026 audit](#the-october-2026-audit)).
 
-> **Status:** Audit done. The autoconnect crash and the split-edge problem in `actionAddMidpoint` are
-> fixed; the rest of the findings are open (see [Rollout](#rollout)).
+> **Status:** Audit done. Fixed: the autoconnect crash, the split-edge problem in `actionAddMidpoint`,
+> a throwing validator hiding other issues, Autofix All's transaction, the `curb_nodes` fix, and
+> `missing_tag`'s severity. The rest of the findings are open (see [Rollout](#rollout)).
 
 ## Words used here
 
@@ -79,19 +80,33 @@ the code; the repros were kept outside the repo.
    throws on a way that only exists in staging (`graph.entity(segmentInfo.wayID)`). `crossing_ways`
    checks with `hasEntity`, so it quietly misses crossings instead. `close_nodes` reads entities from
    the index rather than the graph.
-3. **One throw loses issues for the session** (traced). `_processQueue` runs a chunk of 50 jobs with no
-   try/catch. If one throws, the rest don't run, but their issues were already uncached and their IDs
-   stay in `queuedEntityIDs`, so they're never queued again. Validators that can throw: the index
-   mismatch above, `extent()!` in `outdated_tags`, `close_nodes` and `mismatched_geometry`.
-4. **Fixes assume the graph they were found on** (checked). Fixes keep edges, `way` objects and a
-   `graph` from detection. `curb_nodes`' fix splits the way, then uses an edge that's now in two
-   ways, and leaves a `barrier=kerb` node in no way. Autofix All applies the autofixes of one
-   validation run in sequence (now safer, with the `actionAddMidpoint` fix) inside
-   `beginTransaction()` with no `finally`: if a fix throws, the editor stays in the transaction and
-   stops sending change events.
-5. **`missing_tag` makes existing features errors** (traced). `canDelete` checks `entity.v !== undefined`,
-   which is always true (`v` defaults to `0`), so an untagged feature already in OSM is an error
-   instead of a warning. `help_request` has the same check, harmlessly.
+3. ✅ **One throw lost issues for the session** (traced; fixed). `_processQueue` ran a chunk of 50 jobs
+   with no try/catch. If one threw, the rest didn't run, but their issues were already uncached and
+   their IDs stayed in `queuedEntityIDs`, so they were never queued again. Now `_validateEntity`
+   catches a validator that throws (logs it and keeps the other validators' issues; not provisional,
+   or a validator that always fails would be retried every 5 seconds), and each job in a chunk is
+   caught too. Validators that can still throw: the index mismatch above, `extent()!` in
+   `outdated_tags`, `close_nodes` and `mismatched_geometry`.
+4. **Fixes assume the graph they were found on** (checked; partly fixed). Fixes keep edges, `way`
+   objects and a `graph` from detection.
+   - ✅ `curb_nodes`' fix split the crossing at the first curb node, then used the crossing as it was
+     before for the second, leaving a `barrier=kerb` node in no way. Now it looks up the node and the
+     part of the crossing that ends there before each step.
+   - ✅ Autofix All ran inside `beginTransaction()` with no `finally`: if a fix threw, the editor stayed
+     in the transaction and stopped sending change events. Now it skips an issue whose entities an
+     earlier fix removed, and if a fix throws, it drops all the fixes (`editor.revert()`) and always
+     ends the transaction. It still applies the autofixes of one validation run in sequence (safer
+     since the `actionAddMidpoint` fix); a shared one-at-a-time runner is item 4 below.
+   - Open: fix closures that capture the detection-time `graph` or `way` (`almost_junction`'s
+     `makeFixes`, `impossible_oneway`, `short_road`).
+5. ✅ **`missing_tag` made existing features errors** (traced; fixed). `canDelete` checked
+   `entity.v !== undefined`, which is always true in Rapid (`v` defaults to `0`; in iD it was set only
+   on edited entities), so an untagged feature already in OSM was an error instead of a warning. Now
+   it asks whether the entity differs from the one in the graph's base: a feature the user created
+   or changed is an error, one they didn't touch is a warning. (Decided: not `entity.isNew()`, so
+   that removing all the tags from an existing feature blocks the upload. The cost is that changing
+   an old untagged way, e.g. adding a vertex, makes its missing tags an error too.) `help_request`
+   has the same always-true check, harmlessly.
 6. **Features near data that isn't loaded are never checked again** (traced). `almost_junction`,
    `impossible_oneway`, `disconnected_way`, `unsquare_way` and `missing_tag` give up when the data
    around a node isn't loaded, and return an empty result instead of a provisional one, so the
@@ -123,11 +138,11 @@ What a validator needs, so it can be run on any graph (including one inside an a
 ## Rollout
 
 1. ✅ Autoconnect applies one autofix at a time; `actionAddMidpoint` handles a split edge (Oct 2026).
-2. Contain failures in `ValidationSystem` (finding 3) and Autofix All's transaction (finding 4).
-   Small, and it stops one bad validator from hiding other issues.
-3. `missing_tag`'s `canDelete` (finding 5) and the smaller items (finding 8).
+2. ✅ Contain failures in `ValidationSystem` (finding 3) and Autofix All's transaction (finding 4);
+   `curb_nodes`' fix; `missing_tag`'s `canDelete` (finding 5) (Oct 2026).
+3. The smaller items (finding 8).
 4. Validate with the right spatial index (finding 2), then fixes that find their place again
-   (finding 4, starting with `curb_nodes`).
+   (the rest of finding 4), with one runner for autoconnect and Autofix All.
 5. Geometry per graph (finding 1). The biggest change: it's about `Graph` and the data classes, not
    only validation, and needs its own design.
 6. Provisional results (finding 6) and no side effects while detecting (finding 7).

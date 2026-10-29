@@ -263,14 +263,24 @@ export class UiSectionValidationIssues extends AbstractUiSection {
     e.stopPropagation();
 
     editor.beginTransaction();
+    try {
+      for (const issue of issues) {
+        // An earlier fix may have removed what this issue is about
+        if (!issue.entityIds.every(entityID => editor.staging.graph.hasEntity(entityID))) continue;
 
-    for (const issue of issues) {
-      const action = issue.autoArgs![0];  // autoArgs = [action, label]
-      editor.perform(action);
+        const action = issue.autoArgs![0];  // autoArgs = [action, label]
+        editor.perform(action);
+      }
+      editor.commit({ stringID: 'issues.fix_all.annotation' });
+
+    } catch (err) {
+      // A fix that fails partway leaves the graph half changed, so drop all of the fixes
+      console.error(err);  // eslint-disable-line no-console
+      editor.revert();
+
+    } finally {
+      editor.endTransaction();   // or the editor would stop sending change events
     }
-
-    editor.commit({ stringID: 'issues.fix_all.annotation' });
-    editor.endTransaction();
   }
 
 

@@ -113,4 +113,20 @@ describe('validateMissingTag', () => {
     assert.deepInclude(issues[0], expected);
   });
 
+  it('is an error on a feature the user created or changed, and a warning on one they didn\'t touch', () => {
+    const existing = new Rapid.OsmWay(context, { id: 'w1', version: '1', tags: { name: 'Main Street' }});
+    const base = new Rapid.Graph(context, [existing]);
+    const graph = new Rapid.Graph(base);
+    assert.strictEqual(validator(existing, graph).issues[0].severity, 'warning');
+
+    // Removing the tags from a feature that's already in OSM is the user's problem
+    const stripped = existing.update({ tags: {} });
+    graph.replace(stripped);
+    assert.strictEqual(validator(stripped, graph).issues[0].severity, 'error');
+
+    const created = new Rapid.OsmWay(context, { tags: { name: 'New Street' }});
+    graph.replace(created);
+    assert.strictEqual(validator(created, graph).issues[0].severity, 'error');
+  });
+
 });

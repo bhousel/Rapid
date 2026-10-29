@@ -713,7 +713,15 @@ export class ValidationSystem extends AbstractSystem {
         console.error(`ValidationSystem: no such validatorID = ${validatorID}`);  // eslint-disable-line no-console
         continue;
       }
-      const detected = validator(entity, graph);
+      // One validator failing shouldn't lose the issues the others find.
+      // (Not provisional: a validator that always fails on this entity would be retried forever.)
+      let detected: ValidatorResult;
+      try {
+        detected = validator(entity, graph);
+      } catch (err) {
+        console.error(`ValidationSystem: validator '${validatorID}' failed on ${entity.id}`, err);  // eslint-disable-line no-console
+        continue;
+      }
       if (detected.provisional) {   // this validation should be run again later
         result.provisional = true;
       }
@@ -843,7 +851,14 @@ export class ValidationSystem extends AbstractSystem {
 
     return scheduler.scheduleIdleTask(() => {
         // const t0 = performance.now();
-        chunk.forEach(job => job());
+        // A job that throws mustn't stop the rest: their issues were uncached when they were queued.
+        for (const job of chunk) {
+          try {
+            job();
+          } catch (err) {
+            console.error(err);  // eslint-disable-line no-console
+          }
+        }
         // const t1 = performance.now();
         // console.log('chunk processed in ' + (t1 - t0) + ' ms');
       })

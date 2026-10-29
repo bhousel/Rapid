@@ -1,4 +1,4 @@
-import { beforeEach, describe, it } from 'bun:test';
+import { beforeAll, beforeEach, describe, it } from 'bun:test';
 import { assert } from 'chai';
 import * as Rapid from '../../../modules/headless.js';
 
@@ -112,4 +112,50 @@ describe('validateCurbNodes', () => {
     assert.deepEqual(issues, []);
   });
 
+});
+
+
+describe('validateCurbNodes fix', () => {
+  const context = new Rapid.MockContext();
+  context.systems = {
+    editor:   new Rapid.EditSystem(context),
+    l10n:     new Rapid.LocalizationSystem(context),
+    spatial:  new Rapid.SpatialSystem(context),
+    storage:  new Rapid.StorageSystem(context)
+  };
+
+  beforeAll(() => context.initAsync().then(() => context.startAsync()));
+
+  it('adds a curb node at each end of a crossing that is connected at both ends', () => {
+    const editor = context.systems.editor;
+    const sidewalk = { highway: 'footway', footway: 'sidewalk' };
+    editor.merge([
+      // sidewalks west and east of the road
+      new Rapid.OsmNode(context, { id: 's1', loc: [0, -0.001], version: '1' }),
+      new Rapid.OsmNode(context, { id: 'a',  loc: [0, 0], version: '1' }),
+      new Rapid.OsmNode(context, { id: 's2', loc: [0, 0.001], version: '1' }),
+      new Rapid.OsmWay(context, { id: 'w1', nodes: ['s1', 'a', 's2'], tags: sidewalk, version: '1' }),
+      new Rapid.OsmNode(context, { id: 't1', loc: [0.0002, -0.001], version: '1' }),
+      new Rapid.OsmNode(context, { id: 'b',  loc: [0.0002, 0], version: '1' }),
+      new Rapid.OsmNode(context, { id: 't2', loc: [0.0002, 0.001], version: '1' }),
+      new Rapid.OsmWay(context, { id: 'w2', nodes: ['t1', 'b', 't2'], tags: sidewalk, version: '1' }),
+      // a crossing from one sidewalk to the other, with no nodes in between
+      new Rapid.OsmWay(context, { id: 'w3', nodes: ['a', 'b'], tags: { highway: 'footway', footway: 'crossing' }, version: '1' })
+    ]);
+
+    const graph = editor.staging.graph;
+    const [issue] = Rapid.validateCurbNodes(context)(graph.entity('w3'), graph).issues;
+    const fix = issue.dynamicFixes()[1];   // flush
+    fix.onClick();
+
+    // Two curb nodes, each in the crossing and in the short piece that joins it to a sidewalk
+    const result = editor.stable.graph;
+    const kerbs = [...result.local.entities.values()].filter(entity => entity?.type === 'node' && entity.tags.barrier === 'kerb');
+    assert.lengthOf(kerbs, 2);
+    for (const kerb of kerbs) {
+      const parents = result.parentWays(kerb);
+      assert.lengthOf(parents, 2, `${kerb.id} is in two ways`);
+      assert.sameMembers(parents.map(way => way.tags.footway), ['crossing', 'sidewalk']);
+    }
+  });
 });

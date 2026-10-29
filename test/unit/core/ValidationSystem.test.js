@@ -128,6 +128,35 @@ describe('ValidationSystem', () => {
         });
     });
 
+    it('keeps the issues other validators find when one throws', () => {
+      // A validator that throws on `n-2` only
+      const throwing = (entity) => {
+        if (entity.id === 'n-2') throw new Error('validator failed');
+        return { issues: [] };
+      };
+      throwing.type = 'throwing';
+      _validator._validators.set('throwing', throwing);
+
+      const n_2 = new Rapid.OsmNode(context, { id: 'n-2', loc: [0, 0], tags: { building: 'house', phone: '555-1212' } });
+      const n_3 = new Rapid.OsmNode(context, { id: 'n-3', loc: [0, 0], tags: { building: 'house', phone: '555-1212' } });
+      const editor = context.systems.editor;
+      editor.perform(Rapid.actionAddEntity(n_2), Rapid.actionAddEntity(n_3));
+      editor.commit({ stringID:'added n-2 and n-3', selection: ['n-2', 'n-3'] });
+
+      const _error = console.error;
+      console.error = () => {};
+      return _validator.validateAsync()
+        .then(() => {
+          const issues = _validator.getIssues({ what: 'all', where: 'all' });
+          const entityIDs = issues.map(issue => issue.entityIds[0]);
+          assert.includeMembers(entityIDs, ['n-1', 'n-2', 'n-3']);
+        })
+        .finally(() => {
+          console.error = _error;
+          _validator._validators.delete('throwing');
+        });
+    });
+
   });
 
 });

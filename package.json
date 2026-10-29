@@ -39,7 +39,7 @@
     "stats:cloc:modules": "bunx cloc --skip-uniqueness --include-ext=css,js,ts,jsx,tsx  ./css ./data ./modules",
     "stats:cloc:tests": "bunx cloc --skip-uniqueness --include-ext=css,js,ts,jsx,tsx ./test",
     "test": "bun run --sequential 'test:*'",
-    "test:browser": "bun test --dots --preload ./test/test_setup.js ./test/browser/**/*.js",
+    "test:browser": "bun test --dots --preload ./test/test_setup.js ./test/browser",
     "test:unit": "bun test --dots --coverage ./test/unit",
     "translations": "node --experimental-strip-types ./scripts/tx_pull.ts",
     "translations_BUN": "bun ./scripts/tx_pull.ts"
