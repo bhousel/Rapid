@@ -56,7 +56,7 @@ describe('ConflationSystem', () => {
       properties: properties,
       geometry: { type: 'LineString', coordinates: points.map(p => loc(...p)) }
     };
-    return new Rapid.GeoJSONData(context, { id: id, datasetID: 'test', geojson: geojson });
+    return new Rapid.GeoJSONData(context, { id: id, namespace: 'test', datasetID: 'test', geojson: geojson });
   }
 
   // A line rule like a user might set up: "same" within 3 m / 30°.
@@ -474,8 +474,9 @@ describe('ConflationSystem', () => {
       const [matchedRun, newRun] = result.runs;
       assert.isUndefined(matchedRun.datum);
       assert.instanceOf(newRun.datum, Rapid.GeoJSONData);
-      assert.strictEqual(newRun.datum.id, Rapid.pieceID('a', newRun.range));
-      assert.strictEqual(newRun.datum.props.sourceID, 'a');
+      assert.strictEqual(newRun.datum.dataID, Rapid.pieceID('test:a', newRun.range));
+      assert.strictEqual(newRun.datum.props.sourceID, 'test:a');
+      assert.strictEqual(context.systems.spatial.getData(newRun.datum.dataID), newRun.datum);
       assert.strictEqual(newRun.datum.props.datasetID, 'test');
       assert.deepEqual(newRun.datum.properties, SIDEWALK);
       assert.deepEqual(conflation.getJoins(ds, newRun.datum), { start: newRun.startJoin, end: newRun.endJoin });
@@ -649,21 +650,42 @@ describe('ConflationSystem', () => {
       conflation.invalidate('test');
       assert.notStrictEqual(conflation.getResult(ds, a), first);
     });
+
+    it('invalidate() empties the pieces cache, and the next result fills it again', () => {
+      enable([lineRule()]);
+      osmWay(1, [[0, 0], [60, 0]], SIDEWALK);
+      const a = feature('a', [[0, 1.5], [150, 1.5]], SIDEWALK);
+      const spatial = context.systems.spatial;
+
+      const pieceID = conflation.getResult(ds, a).runs[1].datum.dataID;
+      assert.isOk(spatial.getData(pieceID));
+
+      conflation.invalidate('test');
+      assert.isUndefined(spatial.getData(pieceID));
+
+      conflation.getResult(ds, a);
+      assert.isOk(spatial.getData(pieceID));
+    });
   });
 
 
   describe('piece IDs', () => {
-    it('pieceID adds the range along the line, rounded to 4 decimals, and parsePieceID splits it again', () => {
-      const id = Rapid.pieceID('test:k1:0', [0.123456, 1]);
-      assert.strictEqual(id, 'test:k1:0@0.1235-1');
-      assert.deepEqual(Rapid.parsePieceID(id), { dataID: 'test:k1:0', range: [0.1235, 1] });
+    it('pieceID adds `.pieces` to the namespace and the range along the line, rounded to 4 decimals, and parsePieceID splits it again', () => {
+      const id = Rapid.pieceID('test:k1', [0.123456, 1]);
+      assert.strictEqual(id, 'test.pieces:k1@0.1235-1');
+      assert.deepEqual(Rapid.parsePieceID(id), { dataID: 'test:k1', range: [0.1235, 1] });
+
+      const part = Rapid.pieceID('test:k1:2', [0, 0.5]);   // a part of a Multi* feature
+      assert.strictEqual(part, 'test.pieces:k1:2@0-0.5');
+      assert.deepEqual(Rapid.parsePieceID(part), { dataID: 'test:k1:2', range: [0, 0.5] });
     });
 
     it('parsePieceID rejects ids that are not pieces, or have a range that makes no sense', () => {
-      assert.isUndefined(Rapid.parsePieceID('test:k1:0'));
-      assert.isUndefined(Rapid.parsePieceID('test:k1:0@0.5-0.2'));
-      assert.isUndefined(Rapid.parsePieceID('test:k1:0@0-1.5'));
-      assert.isUndefined(Rapid.parsePieceID('test:k1:0@0.5-0.5'));
+      assert.isUndefined(Rapid.parsePieceID('test:k1'));
+      assert.isUndefined(Rapid.parsePieceID('test:k1@0-0.5'));   // not in a pieces namespace
+      assert.isUndefined(Rapid.parsePieceID('test.pieces:k1@0.5-0.2'));
+      assert.isUndefined(Rapid.parsePieceID('test.pieces:k1@0-1.5'));
+      assert.isUndefined(Rapid.parsePieceID('test.pieces:k1@0.5-0.5'));
     });
 
     it('a new line is one run over all of it, with no data of its own (the line itself is accepted)', () => {
@@ -700,7 +722,7 @@ describe('ConflationSystem', () => {
 
       // Accepted: the new run is in OSM now, and the user acted on its range.
       osmWay(2, [[60, 0], [150, 0]], SIDEWALK);
-      acted.set('a', [newRun.range]);
+      acted.set('test:a', [newRun.range]);
       conflation.invalidate();
 
       const after = conflation.getResult(ds, a);
@@ -711,7 +733,7 @@ describe('ConflationSystem', () => {
     it('the rest of a partly ignored line is its own run, which joins nothing where it was cut', () => {
       enable([lineRule()]);
       const a = feature('a', [[0, 0], [100, 0]], SIDEWALK);
-      acted.set('a', [[0.5, 1]]);
+      acted.set('test:a', [[0.5, 1]]);
 
       const runs = conflation.getResult(ds, a).runs;
       assert.lengthOf(runs, 1);
@@ -725,14 +747,14 @@ describe('ConflationSystem', () => {
       enable([lineRule()]);
       osmWay(1, [[0, 0], [60, 0]], SIDEWALK);
       const a = feature('a', [[0, 1.5], [150, 1.5]], SIDEWALK);
-      acted.set('a', [[0, 1]]);
+      acted.set('test:a', [[0, 1]]);
       assert.lengthOf(conflation.getResult(ds, a).runs, 0);
     });
 
     it('drops a sliver left over that is shorter than the sample spacing', () => {
       enable([lineRule()]);   // sameDist 3, so samples are 3 m apart
       const a = feature('a', [[0, 0], [100, 0]], SIDEWALK);
-      acted.set('a', [[0, 0.99]]);   // leaves 1 m
+      acted.set('test:a', [[0, 0.99]]);   // leaves 1 m
       assert.lengthOf(conflation.getResult(ds, a).runs, 0);
     });
   });

@@ -16,7 +16,8 @@ const tulipLaneExtent = new Extent([-85.62991, 41.95568], [-85.62700, 41.95638])
  * showing/hiding the AI roads, accepting a road, reviewing the resulting issue, and ignoring a road.
  */
 export class UiIntroRapid extends AbstractIntroChapter {
-  protected _tulipLaneID: string;
+  protected _tulipLaneID: EntityID;
+  protected _tulipLaneDataID: DataID;
 
 
   /**
@@ -26,7 +27,8 @@ export class UiIntroRapid extends AbstractIntroChapter {
   public constructor(context: Context, curtain: UiCurtain) {
     super(context, curtain);
     this.title = 'intro.rapid.title';
-    this._tulipLaneID = 'w-516';
+    this._tulipLaneID = 'w-516';                          // once accepted into OSM
+    this._tulipLaneDataID = 'rapid_intro_graph:w-516';    // the AI-assisted road, before that
   }
 
 
@@ -69,7 +71,7 @@ export class UiIntroRapid extends AbstractIntroChapter {
     const context = this.context;
     if (!['select', 'select-osm'].includes(context.mode?.id ?? '')) return false;
     const ids = context.selectedIDs();
-    return ids.length === 1 && ids[0] === this._tulipLaneID;
+    return ids.length === 1 && (ids[0] === this._tulipLaneID || ids[0] === this._tulipLaneDataID);
   }
 
   /** @return `true` if the tutorial road currently exists in the working graph */
@@ -379,7 +381,7 @@ export class UiIntroRapid extends AbstractIntroChapter {
         this._rejectStep = reject;
 
         this._onModeChange = () => {
-          if (!context.selectedIDs().includes(this._tulipLaneID)) return;
+          if (!context.selectedIDs().includes(this._tulipLaneDataID)) return;
           resolve(this._ignoreRoadAsync);
         };
 

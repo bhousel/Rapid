@@ -38,7 +38,7 @@ that an edit has to record more than changes to the OSM graph, and records where
 - **Backup** / **session**: the saved copy of the history, in the `DatabaseSystem` `sessions` store,
   that the restore dialog offers after a restart.
 - **Selection**: selected data IDs grouped by the layer that draws them (`EditSelection`), like
-  `{ osm: ['w1'] }` or `{ rapid: ['ds:abc:0'] }`. The same shape `select-osm` takes.
+  `{ osm: ['w1'] }` or `{ rapid: ['ds:abc'] }`. The same shape `select-osm` takes.
 - **Extent** (of an edit): where its change is, as `[minLon, minLat, maxLon, maxLat]`.
 - **Return view**: where the user was, and what they had selected, when they first undid away from
   the newest edit. Offered as one more redo past the newest edit. It's never in the history.

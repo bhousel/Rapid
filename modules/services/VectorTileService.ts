@@ -464,6 +464,11 @@ export class VectorTileService extends AbstractSystem {
       // When neighbor features have the same properties, we'll consider them mergeable.
       const prophash = utilHashcode(JSON.stringify(sorted)).toString();
 
+      // Keep the feature's own `id` property, if it has one. Overture's is its GERS ID, which
+      // doesn't depend on the tile or zoom (but is only in z14 tiles). The pieces cut by tile edges
+      // share it, so it can't be the local ID until they're merged on it (see `design/data-ids.md`).
+      const stableID = sorted.id;
+
       // It's common for a vector tile to return 'Multi' GeoJSON features..
       // e.g. All the roads together in one `MultiLineString`.
       // For our purposes, we really want to work with them as single part features..
@@ -472,6 +477,7 @@ export class VectorTileService extends AbstractSystem {
         if (!isFinite(extent.min[0])) continue;  // invalid - no coordinates?
 
         // If it already has an ID, remove it.  We'll generate a unique one.
+        // (The `id` property is kept as `stableID`, so it doesn't become a tag.)
         delete part.id;
         delete part.properties?.id;
 
@@ -479,6 +485,7 @@ export class VectorTileService extends AbstractSystem {
           prophash:   prophash,
           layerID:    layerID,
           origID:     origID,
+          stableID:   stableID,
           tileID:     tile.id,
           serviceID:  this.id,
           namespace:  source.id,
@@ -859,6 +866,7 @@ export class VectorTileService extends AbstractSystem {
           prophash:    survivor.props.prophash,
           layerID:     survivor.props.layerID,
           origID:      survivor.props.origID,
+          stableID:    survivor.props.stableID,
           serviceID:   this.id,
           namespace:   survivor.props.namespace,
           datasetID:   survivor.props.datasetID,

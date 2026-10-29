@@ -205,6 +205,16 @@ export class PixiLayerRapid extends AbstractPixiLayer {
 
 
   /**
+   * This layer draws every enabled dataset, and their local IDs may clash, so it binds data IDs.
+   * @param d - The datum
+   * @return Its data ID
+   */
+  public override bindingID(d: AbstractData): DataID {
+    return d.dataID;
+  }
+
+
+  /**
    * Render any data we have, and schedule fetching more of it to cover the view
    * @param frame - Integer frame being rendered
    * @param viewport - Pixi viewport to use for rendering
@@ -260,7 +270,7 @@ export class PixiLayerRapid extends AbstractPixiLayer {
       // Gather data in view - we only want OsmWays here
       const dsGraph = mapwithai.graph(ds.id);
       const entities = mapwithai.getData(ds.id)
-        .filter((entity: OsmEntity) => entity.type === 'way' && !rapid.isAcceptedOrIgnored(entity.id)) as OsmWay[];
+        .filter((entity: OsmEntity) => entity.type === 'way' && !rapid.isAcceptedOrIgnored(entity.dataID)) as OsmWay[];
 
       // MapWithAIService gives us roads and buildings together,
       // so filter further according to which dataset we're drawing
@@ -287,20 +297,16 @@ export class PixiLayerRapid extends AbstractPixiLayer {
       }
 
       // Gather data in view
-      const dsGraph = esri.graph(ds.id);
-      if (!dsGraph) return;
-      const entities = esri.getData(ds.id);
+      for (const d of esri.getData(ds.id)) {   // GeoJSONData, one geometry each
+        if (rapid.isAcceptedOrIgnored(d.dataID)) continue;
 
-      for (const entity of entities) {
-        if (rapid.isAcceptedOrIgnored(entity.id)) continue;
-
-        const geom = entity.geometry(dsGraph);
-        if (geom === 'point') {   // standalone points only (not vertices/childnodes)
-          renderData.points.push(entity as OsmNode);
-        } else if (geom === 'line') {
-          renderData.lines.push(entity as OsmWay);
-        } else if (geom === 'area') {
-          renderData.polygons.push(entity);
+        const type = d.geoms.parts[0]?.type;
+        if (type === 'Point') {
+          renderData.points.push(d);
+        } else if (type === 'LineString') {
+          renderData.lines.push(d);
+        } else if (type === 'Polygon') {
+          renderData.polygons.push(d);
         }
       }
 
@@ -313,7 +319,7 @@ export class PixiLayerRapid extends AbstractPixiLayer {
 
       const data = overture.getData(ds.id);   // GeoJSONData from the VectorTileService
       for (const d of data) {
-        if (rapid.isAcceptedOrIgnored(d.id)) continue;
+        if (rapid.isAcceptedOrIgnored(d.dataID)) continue;
 
         if (d.geoms.parts.some(part => part.type === 'Polygon')) {
           renderData.polygons.push(d);
@@ -338,7 +344,7 @@ export class PixiLayerRapid extends AbstractPixiLayer {
       const spatial = this.context.systems.spatial!;
       const data = spatial.getVisibleItems(ds.spatialID).map(hit => hit.contents as GeoJSONData);
       for (const d of data) {
-        if (rapid.isAcceptedOrIgnored(d.id)) continue;
+        if (rapid.isAcceptedOrIgnored(d.dataID)) continue;
 
         if (d.geoms.parts.some(part => part.type === 'Polygon')) {
           renderData.polygons.push(d);

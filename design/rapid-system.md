@@ -97,19 +97,29 @@ external feature must get the same ID every time its data loads, or a restored s
 features the user already dealt with. The same IDs are used everywhere: in the spatial cache, the
 selection, the edit history, and conflation.
 
-- **A feature:** `${datasetID}:${key}:${partIndex}`, set in `RapidDataset._gotData`.
+These are data IDs (see [`data-ids.md`](data-ids.md)): the dataset's ID is the namespace, so the
+feature's `id` is just the part after the first colon, and its `dataID` is the whole thing.
+
+- **A feature from a file:** `${datasetID}:${key}`, or `${datasetID}:${key}:${part}` for the parts of
+  a multi-part feature, which is split into single parts. Set in `RapidDataset._gotData`, with
+  `featureKey` (in `modules/data/dataID.ts`).
   - `key` is the value of the data mapping's `isID` field (`RapidDataset.idField`), if the feature has
     one. The assumption is that a field marked `isID` holds a stable ID from the data's publisher.
+    Its `:` and `,` are replaced with `_`, so it can't look like a part number or split a URL's `id=`.
   - Otherwise `key` is a hash of the feature's geometry and properties (`utilHash53` of
     `utilStableStringify`, so the order of keys doesn't matter). It's the same each time the same
     feature loads, in any order, and changes only if the feature itself changes.
   - A repeated `isID` value gets the hash added (`7.k3j9x`); a repeat of that, or an exact duplicate
     feature, gets a counter (`.1`, `.2`).
-  - `partIndex` numbers the parts of a multi-part feature, which is split into single parts.
-- **A piece of a line:** `${dataID}@${start}-${end}` (`pieceID` in `ConflationSystem`), where
-  `start` and `end` are the stretch it covers as fractions of the line's length, rounded to 4 decimals.
-  This follows the linear referencing that Overture uses (`between: [start, end]`). Pieces are the
-  runs that conflation cuts a partly mapped line into, and the user can accept or ignore each one.
+- **An Esri feature:** `${datasetID}:${layer}-${objectid}`, since object IDs are only unique within a
+  layer. Esri data is kept as GeoJSON and converted to OSM when accepted, like a file's.
+- **A MapWithAI feature:** `${datasetID}:${entityID}`, with the server's entity IDs (`fbRoads:w-123`).
+- **A piece of a line:** `${datasetID}.pieces:${key}@${start}-${end}` (`pieceID` in
+  `ConflationSystem`), where `start` and `end` are the stretch it covers as fractions of the line's
+  length, rounded to 4 decimals. This follows the linear referencing that Overture uses
+  (`between: [start, end]`). Pieces are the runs that conflation cuts a partly mapped line into, and
+  the user can accept or ignore each one. They're kept in their own `SpatialSystem` cache, which
+  conflation empties and fills again after each edit.
 - **Acted ranges.** `actedRanges(dataID)` reads the ranges back out of the accepted and ignored IDs
   (`parsePieceID`; a whole feature's ID covers `[0, 1]`) and merges them. Conflation leaves these
   stretches out of a line's runs, matched runs included. Without this, an accepted piece came back

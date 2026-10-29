@@ -1,13 +1,13 @@
 import { conflationDefaults } from '../core/ConflationSystem.ts';
 import { DOMParser } from '@xmldom/xmldom';
 import { Extent } from '@rapid-sdk/math';
+import { featureKey } from '../data/dataID.ts';
 import { GeoJSONData } from '../data/GeoJSONData.ts';
 import { geojsonFeatures } from '../util/util.ts';
 import { gpx, kml } from '@tmcw/togeojson';
 import { RapidDataDictionary } from './RapidDataDictionary.ts';
 import { TreeStore } from '../lib/TreeStore.ts';
 import { utilFetchResponse } from '../util/fetch_response.ts';
-import { utilHash53, utilStableStringify } from '../util/string.ts';
 
 import type { ConflationSettings } from '../core/ConflationSystem.ts';
 import type { Context } from '../Context.ts';
@@ -24,40 +24,6 @@ const RAPID_MAGENTA = '#da26d3';
  * A datasetID is also the namespace of the dataset's data (see `design/data-ids.md`).
  */
 export const USER_DATASET_PREFIX = 'user-';
-
-
-/**
- * Returns the stable key for a feature, the middle part of its data ID
- * (`${datasetID}:${key}:${partIndex}`). Keys stay the same when the same data is loaded again,
- * in any order, so what the user accepted or ignored still matches after a restart.
- * - If the data mapping names an ID field (`isID`), the key is that field's value.
- * - Otherwise, the key is a hash of the feature's geometry and properties.
- * - If two features would get the same key (a repeated ID value, or identical features),
- *   the later ones get the hash (and then a counter) added, so keys are never shared.
- * @param feature - The GeoJSON feature
- * @param idField - The property that identifies features, if the data mapping names one
- * @param usedKeys - The keys given so far in this dataset (added to)
- * @return The key
- */
-function featureKey(feature: GeoJSON.Feature, idField: string | undefined, usedKeys: Set<string>): string {
-  const properties = feature.properties ?? {};
-  const hash = utilHash53(utilStableStringify({ geometry: feature.geometry, properties: properties }));
-
-  const idVal = idField ? properties[idField] : undefined;
-  const hasID = (idVal !== undefined && idVal !== null && idVal !== '');
-  let key = hasID ? String(idVal) : hash;
-
-  if (usedKeys.has(key) && hasID) {
-    key = `${key}.${hash}`;
-  }
-  const base = key;
-  for (let n = 1; usedKeys.has(key); n++) {
-    key = `${base}.${n}`;
-  }
-
-  usedKeys.add(key);
-  return key;
-}
 
 
 /**
@@ -554,9 +520,9 @@ export class RapidDataset {
         const extent = this._calcExtent(part);   // sanity check
         if (!isFinite(extent.min[0])) continue;  // invalid - no coordinates?
 
-        const dataID = `${this.id}:${key}:${partIndex}`;
         const props: GeoJSONProps = {
-          id:         dataID,
+          id:         parts.length > 1 ? `${key}:${partIndex}` : key,
+          namespace:  this.spatialID,
           serviceID:  this.serviceID,
           datasetID:  this.id,
           geojson:    part

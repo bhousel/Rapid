@@ -647,7 +647,7 @@ export class UiRapidInspector {
     editor.commit<RapidIgnoreEditProps>({
       type: 'rapid_ignore_feature',
       stringID: 'rapid_inspector.option_ignore.annotation',
-      ignoreID: datum.id,
+      ignoreID: datum.dataID,
       extent: datum.extent()?.rectangle()
     });
     context.enter('browse');

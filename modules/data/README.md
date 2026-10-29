@@ -11,7 +11,7 @@ All data classes extend `AbstractData` and are designed to be **immutable**. Whe
 | File | Description |
 |------|-------------|
 | `AbstractData.ts` | Base class for all data elements |
-| `dataID.ts` | Helpers for data IDs (`${namespace}:${localID}`): build, split, and get the OSM entity ID |
+| `dataID.ts` | Helpers for data IDs (`${namespace}:${localID}`): build, split, get the OSM entity ID, and make stable local IDs for GeoJSON features (`featureKey`) |
 | `GeoJSONData.ts` | Wrapper for arbitrary GeoJSON data |
 | `MarkerData.ts` | Point markers from services (photos, notes, QA issues, etc.; formerly "QAItem") |
 | `OsmChangeset.ts` | Represents an OSM changeset |

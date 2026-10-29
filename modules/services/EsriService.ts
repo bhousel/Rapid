@@ -1,12 +1,10 @@
 import { AbstractSystem } from '../core/AbstractSystem.ts';
 import { Extent, Tiler } from '@rapid-sdk/math';
-import { Graph, RapidDataDictionary, RapidDataset } from '../lib/index.ts';
-import { OsmNode, OsmRelation, OsmWay } from '../data/index.ts';
+import { GeoJSONData } from '../data/index.ts';
+import { RapidDataDictionary, RapidDataset } from '../lib/index.ts';
 import { utilQsString } from '@rapid-sdk/util';
 
 import type { Context } from '../Context.ts';
-import type { OsmEntity } from '../data/OsmEntity.ts';
-import type { OsmNodeProps, OsmRelationProps, OsmWayProps, OsmTags } from '../data/types.ts';
 import type { RapidDataTransform } from '../lib/RapidDataDictionary.ts';
 import type { Tile, Vec2 } from '@rapid-sdk/math';
 
@@ -25,7 +23,7 @@ const TILEZOOM = 14;
  * Internal cache structure for tracking seen data and loaded pages
  */
 interface EsriDataCache {
-  /** Set of feature IDs already parsed, to avoid duplicates across tiles */
+  /** Set of object IDs already parsed, to avoid duplicates across tiles */
   seenIDs: Set<string>;
   /** Next page of data to load for a given tile */
   nextPage: Map<TileID, number>;
@@ -56,8 +54,6 @@ interface EsriDataset {
   groupCategories: string[];
   /** License/attribution information HTML from ArcGIS */
   licenseInfo: string;
-  /** Local graph holding the parsed OSM entities for this dataset */
-  graph: Graph;
   /** Last viewport version number, used to skip redundant tile loads */
   lastv: number | null;
   /** Layer schema info loaded from the feature server */
@@ -168,7 +164,6 @@ export class EsriService extends AbstractSystem {
 
     for (const ds of this._datasets.values()) {
       spatial.clearCache(ds.spatialID);
-      ds.graph = new Graph(this.context);
       ds.lastv = null;
 
       // clear layer caches
@@ -278,26 +273,15 @@ export class EsriService extends AbstractSystem {
   /**
    * Get already loaded data that appears in the current map view.
    * @param datasetID - datasetID to get data for
-   * @return Array of data (OSM Entities)
+   * @return Array of data
    */
-  public getData(datasetID: DatasetID): OsmEntity[] {
+  public getData(datasetID: DatasetID): GeoJSONData[] {
     const ds = this._datasets.get(datasetID);
     if (!ds) return [];
 
     const spatial = this.context.systems.spatial!;
-    return spatial.getVisibleItems(ds.spatialID).map(hit => hit.contents as OsmEntity);
+    return spatial.getVisibleItems(ds.spatialID).map(hit => hit.contents as GeoJSONData);
  }
-
-
-  /**
-   * Returns the graph for the given datasetID.
-   * @param datasetID - datasetID to get data for
-   * @return The graph holding the data, or `undefined` if not found
-   */
-  public graph(datasetID: DatasetID): Graph | undefined {
-    const ds = this._datasets.get(datasetID);
-    return ds?.graph;
-  }
 
 
   /**
@@ -437,16 +421,15 @@ export class EsriService extends AbstractSystem {
   protected _gotTile(ds: EsriDataset, layer: EsriLayer, geojson: GeoJSON.FeatureCollection): void {
     const spatial = this.context.systems.spatial!;
 
-    const results: OsmEntity[] = [];
+    const results: GeoJSONData[] = [];
     for (const feature of geojson.features ?? []) {
-      const entities = this._parseFeature(ds, layer, feature);
-      if (entities) {
-        results.push(...entities);
+      const d = this._parseFeature(ds, layer, feature);
+      if (d) {
+        results.push(d);
       }
     }
 
     if (results.length) {
-      ds.graph.rebase(results);   // important: `graph.rebase` will call `.updateGeometry()`
       spatial.addData(ds.spatialID, results);
     }
   }
@@ -454,117 +437,50 @@ export class EsriService extends AbstractSystem {
 
   /**
    * Parse a single GeoJSON feature.
+   * The data stays GeoJSON, and accepting it converts it to OSM, like a file dataset's data.
+   * Its local ID is `${layer}-${objectid}`, since object IDs are only unique within a layer.
    * @param ds - the dataset we fetched
    * @param layer - the layer within the dataset we fetched
    * @param feature - the GeoJSON feature that we fetched
-   * @return An array of OSMEntities for that feature, or `null` if we skipped it
+   * @return The data for that feature, or `null` if we skipped it
    */
-  protected _parseFeature(ds: EsriDataset, layer: EsriLayer, feature: GeoJSON.Feature): OsmEntity[] | null {
+  protected _parseFeature(ds: EsriDataset, layer: EsriLayer, feature: GeoJSON.Feature): GeoJSONData | null {
     const context = this.context;
     const geom = feature.geometry;
     const properties = feature.properties ?? {};
     if (!geom) return null;
 
+    // NOTE:  No Multitypes for now (maybe not needed)
+    if (!['Point', 'LineString', 'Polygon'].includes(geom.type)) return null;
+
     // Try to pick a stable identifier for the feature
-    const datasetID = ds.id;
-    const layerID = layer.id;
-    const featureID = properties[layer.objectIdField] ?? properties.OBJECTID ?? properties.FID ?? properties.id;
-    if (featureID === null || featureID === undefined) return null;
-    const featureIDString = String(featureID);
+    const objectID = properties[layer.objectIdField] ?? properties.OBJECTID ?? properties.FID ?? properties.id;
+    if (objectID === null || objectID === undefined) return null;
+    const objectIDString = String(objectID);
 
     // Skip if we've seen this feature already on another tile
     const cache = layer._cache;
-    if (cache.seenIDs.has(featureIDString)) return null;
-    cache.seenIDs.add(featureIDString);
+    if (cache.seenIDs.has(objectIDString)) return null;
+    cache.seenIDs.add(objectIDString);
 
-    const dataID = `esri-${datasetID}-${layerID}-${featureIDString}`;
-    const namespace = ds.spatialID;
-    const metadata = { fbID: dataID, serviceID: 'esri', datasetID: datasetID, namespace: namespace };
-    const entities: OsmEntity[] = [];
-    const nodemap = new Map<string, OsmNode>();
-
-    // NOTE:  No Multitypes for now (maybe not needed)
-
-    // Point:  make a single node
-    if (geom.type === 'Point') {
-      const props = Object.assign({ loc: geom.coordinates as Vec2, tags: parseTags(properties) }, metadata) as OsmNodeProps;
-      return [ new OsmNode(context, props) ];
-
-    // LineString:  make nodes, single way
-    } else if (geom.type === 'LineString') {
-      const nodelist = parseCoordinates(geom.coordinates);
-      if (nodelist.length < 2) return null;
-
-      const props = Object.assign({ nodes: nodelist, tags: parseTags(properties) }, metadata) as OsmWayProps;
-      const w = new OsmWay(context, props);
-      entities.push(w);
-      return entities;
-
-    // Polygon:  make nodes, way(s), possibly a relation
-    } else if (geom.type === 'Polygon') {
-      const ways: OsmWay[] = [];
-      for (const ring of geom.coordinates ?? []) {
-        const nodelist = parseCoordinates(ring);
-        if (nodelist.length < 3) continue;
-
-        const first = nodelist.at(0)!;
-        const last = nodelist.at(-1)!;
-        if (first !== last) nodelist.push(first);   // sanity check, ensure rings are closed
-
-        const w = new OsmWay(context, { nodes: nodelist, namespace: namespace });
-        ways.push(w);
+    return new GeoJSONData(context, {
+      id: `${layer.id}-${objectIDString}`.replace(/[:,]/g, '_'),   // see `featureKey` in `RapidDataset`
+      namespace: ds.spatialID,
+      serviceID: 'esri',
+      datasetID: ds.id,
+      geojson: {
+        type: 'Feature',
+        geometry: geom,
+        properties: parseTags(properties)
       }
-
-      if (ways.length === 1) {  // single ring, assign tags and return
-        const w = ways[0];
-        Object.assign(w.props, { tags: parseTags(properties) }, metadata);
-        entities.push(w);
-      } else {  // multiple rings, make a multipolygon relation with inner/outer members
-        const members = ways.map((w, i) => {
-          entities.push(w);
-          return {
-            id: w.id,
-            role: (i === 0 ? 'outer' : 'inner'),
-            type: 'way'
-          };
-        });
-        const tags = Object.assign(parseTags(properties), { type: 'multipolygon' }) as OsmTags;
-        const props = Object.assign({ members: members, tags: tags }, metadata) as OsmRelationProps;
-        const r = new OsmRelation(context, props);
-        entities.push(r);
-      }
-
-      return entities;
-    }
-
-    return null;
+    });
 
 
     /**
-     * Parse GeoJSON coordinate data into OSM Nodes.
-     * Accepts a LineString coordinates or single Polygon coordinate ring
-     * @param coords
+     * Copy the properties, and add the `source` tag.
+     * @param properties - The feature's properties
      */
-    function parseCoordinates(coords: GeoJSON.Position[]): EntityID[] {
-      const nodelist: EntityID[] = [];
-      for (const coord of coords) {
-        const key = coord.toString();
-        let n = nodemap.get(key);
-        if (!n) {
-          n = new OsmNode(context, { loc: coord as Vec2, namespace: namespace });
-          entities.push(n);
-          nodemap.set(key, n);
-        }
-        nodelist.push(n.id);
-      }
-      return nodelist;
-    }
-
-    /**
-     * Convert the properties into OSM tags.
-     * @param properties
-     */
-    function parseTags(properties: GeoJSON.GeoJsonProperties): OsmTags {
+    function parseTags(properties: GeoJSON.GeoJsonProperties): Record<string, unknown> {
       const tags = structuredClone(properties ?? {});  // copy all
 
 // TODO: remove - RapidDataDictionary replaces this!
@@ -641,7 +557,6 @@ export class EsriService extends AbstractSystem {
 
     this._datasets.set(ds.id, ds);
     ds.spatialID = ds.id;   // also the namespace of its data (see `design/data-ids.md`)
-    ds.graph = new Graph(this.context);
     ds.lastv = null;
     ds.layers = null;   // the schema info will live here
     ds._layersPromise = null;

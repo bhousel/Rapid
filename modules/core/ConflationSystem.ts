@@ -2,6 +2,7 @@ import { AbstractSystem } from './AbstractSystem.ts';
 import { GeoJSONData } from '../data/GeoJSONData.ts';
 import { geoMetersToWorld, geomHeadingAlong, geomLineDistances, geomPositionAlong } from '../geo/geom.ts';
 import { geomPathIntersections, projWgs84ToWorld, projWorldToWgs84, vecAngle, vecEqual, vecInterp, vecLength, vecProject } from '@rapid-sdk/math';
+import { makeDataID, splitDataID } from '../data/dataID.ts';
 import { PropMatcher } from '../lib/PropMatcher.ts';
 
 import type { AbstractData } from '../data/AbstractData.ts';
@@ -167,7 +168,7 @@ export interface LineRun {
   endJoin?: JoinPoint;
   /**
    * For runs that aren't already mapped, when the run isn't the whole line: a data element for just
-   * this stretch, so it can be drawn, selected, and accepted on its own. Its id is `pieceID(dataID, range)`.
+   * this stretch, so it can be drawn, selected, and accepted on its own. Its data ID is `pieceID(dataID, range)`.
    */
   datum?: GeoJSONData<ConflationRunProps>;
 }
@@ -221,18 +222,24 @@ interface FeatureTally {
 }
 
 
+/** Pieces of lines go in a cache named after their line's namespace, with this suffix (`fbRoads.pieces`). */
+const PIECES_SUFFIX = '.pieces';
+
+
 /**
- * Returns the data ID of a piece of a line: the line's data ID, and the range along the line that the
- * piece covers, as fractions of the line's length (like the linear referencing `between: [start, end]`
- * that Overture uses). For example `odot_sidewalks:12345:0@0.85-1`. The fractions are rounded to 4
- * decimals, about 10 cm on a 1 km line.
+ * Returns the data ID of a piece of a line. Its namespace is the line's, with `.pieces` added, and its
+ * local ID is the line's, with the range along the line that the piece covers, as fractions of the
+ * line's length (like the linear referencing `between: [start, end]` that Overture uses).
+ * For example, a piece of `fbRoads:abc` is `fbRoads.pieces:abc@0.85-1`. The fractions are rounded to
+ * 4 decimals, about 10 cm on a 1 km line.
  * @param dataID - The line's data ID
  * @param range - The piece's start and end, as fractions of the line's length
  * @return The piece's data ID
  */
 export function pieceID(dataID: DataID, range: [number, number]): DataID {
   const fmt = (n: number) => String(Math.round(n * 10000) / 10000);
-  return `${dataID}@${fmt(range[0])}-${fmt(range[1])}`;
+  const [namespace, localID] = splitDataID(dataID);
+  return makeDataID(namespace + PIECES_SUFFIX, `${localID}@${fmt(range[0])}-${fmt(range[1])}`);
 }
 
 
@@ -242,12 +249,15 @@ export function pieceID(dataID: DataID, range: [number, number]): DataID {
  * @return The line's data ID and the range, or `undefined` if `id` isn't a piece's ID
  */
 export function parsePieceID(id: DataID): { dataID: DataID; range: [number, number] } | undefined {
-  const match = /^(.+)@(\d+(?:\.\d+)?)-(\d+(?:\.\d+)?)$/.exec(id);
+  const [namespace, localID] = splitDataID(id);
+  if (!namespace.endsWith(PIECES_SUFFIX)) return undefined;
+
+  const match = /^(.+)@(\d+(?:\.\d+)?)-(\d+(?:\.\d+)?)$/.exec(localID);
   if (!match) return undefined;
   const start = Number(match[2]);
   const end = Number(match[3]);
   if (!(start >= 0 && end <= 1 && start < end)) return undefined;
-  return { dataID: match[1], range: [start, end] };
+  return { dataID: makeDataID(namespace.slice(0, -PIECES_SUFFIX.length), match[1]), range: [start, end] };
 }
 
 
@@ -343,7 +353,11 @@ export class ConflationSystem extends AbstractSystem {
    * @return Promise resolved when this component has completed resetting
    */
   public resetAsync(): Promise<void> {
+    const context = this.context;
+    const spatial = context.systems.spatial!;
+
     this._results.clear();
+    spatial.clearMatching(spatialID => spatialID.endsWith(PIECES_SUFFIX));
     this._matchers = new WeakMap<ConflationSide, PropMatcher[]>();
     return Promise.resolve();
   }
@@ -374,7 +388,7 @@ export class ConflationSystem extends AbstractSystem {
       this._results.set(ds.id, cache);
     }
 
-    const dataID = datum.id;
+    const dataID = datum.dataID;
     if (cache.has(dataID)) {
       return cache.get(dataID) ?? undefined;
     }
@@ -414,10 +428,17 @@ export class ConflationSystem extends AbstractSystem {
    * @param datasetID - Flush only this dataset's results (default: all datasets)
    */
   public invalidate(datasetID?: DatasetID): void {
+    const context = this.context;
+    const spatial = context.systems.spatial!;
+
+    // The pieces of lines are made with the results, so they go with them.
+    // (A dataset's namespace is its datasetID.)
     if (datasetID) {
       this._results.delete(datasetID);
+      spatial.clearCache(datasetID + PIECES_SUFFIX);
     } else {
       this._results.clear();
+      spatial.clearMatching(spatialID => spatialID.endsWith(PIECES_SUFFIX));
     }
     // Rules may have been edited in place, so recompile their property matchers too (it's cheap).
     this._matchers = new WeakMap<ConflationSide, PropMatcher[]>();
@@ -534,7 +555,7 @@ export class ConflationSystem extends AbstractSystem {
     const rapid = context.systems.rapid!;
     const spatial = context.systems.spatial!;
 
-    const dataID = datum.id;
+    const dataID = datum.dataID;
     const graph = editor.stable.graph!;
     const segSpatialID = editor.spatialIDForGraph(graph) + '-segments';
 
@@ -830,12 +851,16 @@ export class ConflationSystem extends AbstractSystem {
     // so it can be drawn, selected and accepted on its own. Its id is the line's id and the stretch
     // the run covers (see `pieceID`), so it is the same each time it's computed from the same data,
     // and accepting or ignoring it can be remembered across restarts.
+    // The pieces go in their own cache, so they can be found by data ID like any other data.
     const isWhole = runs.length === 1 && runs[0].range[0] === 0 && runs[0].range[1] === 1;
     if (!isWhole) {
+      const pieces: GeoJSONData<ConflationRunProps>[] = [];
       runs.forEach(run => {
         if (run.status === 'matched') return;
+        const [namespace, localID] = splitDataID(pieceID(dataID, run.range));
         run.datum = new GeoJSONData<ConflationRunProps>(context, {
-          id: pieceID(dataID, run.range),
+          id: localID,
+          namespace: namespace,
           datasetID: datum.props.datasetID,
           serviceID: datum.props.serviceID,
           sourceID: dataID,
@@ -847,7 +872,11 @@ export class ConflationSystem extends AbstractSystem {
             geometry: { type: 'LineString', coordinates: run.coords }
           }
         });
+        pieces.push(run.datum);
       });
+      if (pieces.length) {
+        spatial.replaceData(splitDataID(dataID)[0] + PIECES_SUFFIX, pieces);
+      }
     }
 
     // Triage what's left for the user to act on (all of it, if they've acted on all of it).

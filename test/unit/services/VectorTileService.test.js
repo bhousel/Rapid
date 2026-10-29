@@ -220,6 +220,16 @@ describe('VectorTileService', () => {
 
       assert.lengthOf(cached(z), 2, 'MultiPolygon split into two single-part features');
     });
+
+    it('keeps a feature\'s `id` property (e.g. Overture\'s GERS ID) as `stableID`, not as a tag', () => {
+      const { TL, z } = getGrid();
+      feed(TL, [ subRect(TL, 0.4, 0.4, 0.6, 0.6, { id: '08b2a100d2c8dfff0200e7d1cd6f4d8e', building: 'yes' }) ]);
+
+      const [d] = cached(z);
+      assert.strictEqual(d.props.stableID, '08b2a100d2c8dfff0200e7d1cd6f4d8e');
+      assert.notProperty(d.properties, 'id');
+      assert.strictEqual(d.properties.building, 'yes');
+    });
   });
 
 

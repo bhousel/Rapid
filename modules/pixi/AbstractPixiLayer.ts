@@ -475,6 +475,19 @@ export class AbstractPixiLayer {
 
 
   /**
+   * Returns the ID that this layer binds a datum's features to (see `bindData`).
+   * Most layers draw one namespace and bind the datum's `id`. A layer that draws data from several
+   * namespaces, whose local IDs may clash, overrides this to bind the data ID instead.
+   * Step 3 of `design/data-ids.md` makes every layer bind the data ID, and removes this.
+   * @param d - The datum
+   * @return The ID to bind it to
+   */
+  public bindingID(d: AbstractData): DataID {
+    return d.id;
+  }
+
+
+  /**
    * Finds data drawn on this layer by its dataID, e.g. to select it again after undo.
    * Only data that has been drawn can be found.
    * @param dataID - dataID to look for

@@ -5,6 +5,7 @@
  * See `design/data-ids.md`.
  * @module
  */
+import { utilHash53, utilStableStringify } from '../util/string.ts';
 
 
 /**
@@ -40,4 +41,41 @@ export function splitDataID(dataID: DataID): [SpatialID, string] {
 export function osmEntityID(dataID: DataID): EntityID | undefined {
   const [namespace, localID] = splitDataID(dataID);
   return namespace === 'osm' ? localID : undefined;
+}
+
+
+/**
+ * Returns a stable local ID for a GeoJSON feature in a namespace (see `design/data-ids.md`).
+ * A Multi* feature that's split into parts adds a part number to it (`${key}:${part}`). Keys stay the
+ * same when the same data is loaded again, in any order, so what the user accepted or ignored still
+ * matches after a restart, and a data ID in a link still finds its data.
+ * - If the data names an ID field (e.g. a dataset's `isID` mapping), the key is that field's value,
+ *   with `:` and `,` replaced by `_` (a `:` would look like a part number, and `,` separates data
+ *   IDs in the URL).
+ * - Otherwise, the key is a hash of the feature's geometry and properties.
+ * - If two features would get the same key (a repeated ID value, or identical features),
+ *   the later ones get the hash (and then a counter) added, so keys are never shared.
+ * @param feature - The GeoJSON feature
+ * @param idField - The property that identifies features, if the data names one
+ * @param usedKeys - The keys given so far in this namespace (added to)
+ * @return The key
+ */
+export function featureKey(feature: GeoJSON.Feature, idField: string | undefined, usedKeys: Set<string>): string {
+  const properties = feature.properties ?? {};
+  const hash = utilHash53(utilStableStringify({ geometry: feature.geometry, properties: properties }));
+
+  const idVal = idField ? properties[idField] : undefined;
+  const hasID = (idVal !== undefined && idVal !== null && idVal !== '');
+  let key = hasID ? String(idVal).replace(/[:,]/g, '_') : hash;
+
+  if (usedKeys.has(key) && hasID) {
+    key = `${key}.${hash}`;
+  }
+  const base = key;
+  for (let n = 1; usedKeys.has(key); n++) {
+    key = `${base}.${n}`;
+  }
+
+  usedKeys.add(key);
+  return key;
 }

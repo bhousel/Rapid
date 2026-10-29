@@ -7,7 +7,7 @@ This isn't one system. It touches every service, `SpatialSystem`, `EditSystem`, 
 renderer. This doc started in October 2026, when we wanted to select data from more than one source
 at once, and found that Rapid had no single way to say which data a selection meant.
 
-> **Status:** Step 1 of 6 done (October 2026). The steps and open questions are at the end.
+> **Status:** Steps 1 and 2 of 6 done (October 2026). The steps and open questions are at the end.
 
 ## Terms
 
@@ -61,8 +61,9 @@ pointed at, it says which datum that is.
 4. **A namespace decides its own local IDs, but they must be deterministic** (same data, same ID).
    - OSM-like data (OSM itself, or an OSM-like service): the entity ID, e.g. `fbRoads:w-1000000000`.
    - Data that comes as GeoJSON: `key` is the publisher's ID if the data has one, else a hash of the
-     feature (see `featureKey` in `RapidDataset`). A publisher's ID has its colons replaced, so the
-     part number below can't be confused with it, and its commas, which separate IDs in `id=`.
+     feature (see `featureKey` in `modules/data/dataID.ts`). A publisher's ID has its colons replaced,
+     so the part number below can't be confused with it, and its commas, which separate IDs in `id=`.
+     Esri's is `${layer}-${objectid}`, since object IDs are only unique within a layer.
    - A Multi* geometry is split into separate data, one per part, numbered `${key}:${part}`. A
      single geometry has no part number.
    - Data derived from other data goes in a cache named after its parent's, with a `.` suffix, and
@@ -101,7 +102,8 @@ release could ship a dataset or a service cache with the same name. (Before this
 handled that clash at startup by deleting the user's saved dataset.) So every dataset the user
 adds gets an ID starting with `user-` (`USER_DATASET_PREFIX` in `RapidDataset.ts`), and nothing
 Rapid ships may start with `user-`. `UiRapidAddDataset` adds the prefix to what the user types, which
-may only have letters, digits, `_` and `-` (so no `:` or `.`).
+may only have letters, digits, `_` and `-` (so no `:` or `.`). Custom data's namespaces start with
+`custom-` (`CUSTOM_NAMESPACE_PREFIX` in `PixiLayerCustomData`), which is reserved the same way.
 
 **Two kinds of namespace need their own lookup** (a resolver registered with `SpatialSystem`):
 - **OSM.** The editable OSM data is special. It has three caches (`editor_base`, `editor_stable`,
@@ -113,13 +115,14 @@ may only have letters, digits, `_` and `-` (so no `:` or `.`).
   zoom. A data ID can't include the zoom, or the same building would have a different ID at z15
   and z16. See [Vector tiles](#vector-tiles) for a way to get back to one cache.
 
-**Not true yet** (things to change):
-- **Custom data** from a file is held by the renderer (`PixiLayerCustomData._geoData`), not a cache.
-  It should go in a cache. Its namespace should be a hash of its URL, or of the file's contents,
-  rather than a random UUID: the URL is saved in `data=`, so a link with both `data=` and `id=`
-  needs the same namespace every time it loads.
-- **Pieces of lines** are kept in `ConflationSystem`'s results. They should go in a
-  `${datasetID}.pieces` cache, which conflation clears and fills again after every edit.
+**What used to be missing** (all fixed now):
+- ✅ **Custom data** from a file was held by the renderer (`PixiLayerCustomData._geoData`), not a
+  cache (fixed in Step 2). Now it's in a cache whose namespace is `custom-` plus a hash of its URL,
+  its WKT, or the file's contents, rather than a random UUID: the URL is saved in `data=`, so a link
+  with both `data=` and `id=` needs the same namespace every time it loads.
+- ✅ **Pieces of lines** were kept only in `ConflationSystem`'s results (fixed in Step 2). Now they
+  also go in a `${datasetID}.pieces` cache, which conflation empties when it flushes its results
+  (after every edit) and fills again as it computes them.
 - ✅ **Data with no extent was dropped** (fixed in Step 1). `replaceData()` skipped a datum that had
   no extent (a relation whose members aren't loaded, or data whose geometry hasn't been worked out
   yet), so it couldn't be found by ID. Worse, if an older version of it was cached, that one
@@ -155,6 +158,12 @@ transportation PMTiles, which Rapid finds through Overture's STAC catalog):
   crossing tile edges is one clipped piece per tile (line stitching is commented out). Polygons are
   merged back only when their properties match.
 
+Since Step 2, `VectorTileService` keeps a feature's `id` property as `props.stableID` (and still
+leaves it out of the properties, so it never becomes a tag). It's in the property hash that decides
+which pieces cut by tile edges get merged, so two features with the same tags but different GERS IDs
+are no longer merged. The local ID is still made up per load (`geojson-12`), because the pieces of
+one feature share the GERS ID until they're merged.
+
 So the local ID for Overture data could be the GERS ID (at z14) plus a part number, with pieces cut
 by tile edges merged on it. When pieces are merged, the merged feature keeps the stable ID, the way
 `MapWithAIService` gives a merged way its `orig_id`. The `sources[].record_id` property also names
@@ -162,8 +171,8 @@ the OSM features Overture's data came from (e.g. `w240586483@6`), which may help
 
 ## What's there now (October 2026)
 
-As found when this doc started. Step 1 renamed the caches (see [Steps](#steps)), and the other
-steps fix the IDs.
+As found when this doc started. Step 1 renamed the caches and Step 2 fixed the IDs (see
+[Steps](#steps)), except for vector tiles and Streetside sequences.
 
 | Data | `datum.id` today | Deterministic? | Cache | Notes |
 |---|---|---|---|---|
@@ -178,10 +187,10 @@ steps fix the IDs.
 | Notes, KeepRight, Osmose, MapRoulette, Mapillary, … | The service's IDs | Yes | One per kind (`osm-notes`, …) | Not unique across services (notes and tasks are both numbers) |
 
 Known problems this causes:
-- **Accept and ignore for Esri data don't survive a restart.** They record `datum.id`, the `w-12`
-  that depends on load order, so a restored session can point at a different feature, or none.
-  When Esri data is kept as GeoJSON, its local ID is `${layer}-${objectid}`, since object IDs are
-  only unique within a layer.
+- ✅ **Accept and ignore for Esri data didn't survive a restart** (fixed in Step 2). They recorded
+  `datum.id`, the `w-12` that depends on load order, so a restored session could point at a
+  different feature, or none. Esri data is kept as GeoJSON now, with the local ID
+  `${layer}-${objectid}`.
 - **A selection keyed by layer** (`EditSelection`, `{ rapid: ['fbRoads:abc:0'] }`) can only be
   found again through the layer that draws it, so only data that's drawn. `MapSystem` retries on
   later redraws to cover for it.
@@ -219,25 +228,36 @@ Each step is its own commit, and leaves Rapid working with the tests passing.
   rather than by prefix.
 - The user's datasets get the `user-` prefix (see Reserved names). Services don't need to list
   their namespaces.
-- File datasets don't set `namespace` yet: their `id` is still the whole data ID
-  (`fbRoads:abc:0`), so `getData()` can't find them until Step 2.
+- File datasets didn't set `namespace` yet, since their `id` was still the whole data ID
+  (`fbRoads:abc:0`). Step 2 fixed that.
 
-**Step 2: Deterministic IDs everywhere.**
-- File datasets: the local ID is `key`, with `:${part}` only for Multi* geometries. Keys taken from
-  the publisher replace `:` and `,` (a comma would break `id=` in the URL).
-- Pieces of lines go in a `${datasetID}.pieces` cache, which `ConflationSystem` fills on each run.
-- Esri keeps its data as GeoJSON, keyed by `${layer}-${objectid}`. This is mostly deleting the
-  OSM-building code, since accept already handles `GeoJSONData` from file datasets.
-- Custom data moves from `PixiLayerCustomData` into a cache, namespaced by a hash of its URL or the
-  file's contents, with `featureKey` for local IDs.
-- Vector tiles: keep Overture's GERS ID instead of deleting it (see [Vector tiles](#vector-tiles)).
-  Until vector tile data has stable IDs, it can be selected but not saved in a selection that's
-  restored later.
+**✅ Step 2: Deterministic IDs everywhere.**
+- File datasets: the local ID is `key`, with `:${part}` only for Multi* geometries, and `namespace`
+  is the datasetID. Keys taken from the publisher replace `:` and `,` (a comma would break `id=` in
+  the URL). `featureKey` moved to `modules/data/dataID.ts`, since custom data uses it too.
+- Accept and ignore records, `isAcceptedOrIgnored()`, and conflation's results use data IDs
+  (`fbRoads:w-123`, `ds:abc`), not `datum.id`.
+- The `rapid` layer binds its features to data IDs, since it draws several datasets whose local IDs
+  may clash (`AbstractPixiLayer.bindingID()`, which the `rapid` layer overrides). So a selection of
+  Rapid data holds data IDs already. Other layers still bind `datum.id` until Step 3.
+- Pieces of lines go in a `${datasetID}.pieces` cache: `pieceID()` puts them there, and
+  `parsePieceID()` only reads IDs in a `.pieces` namespace.
+- Esri keeps its data as GeoJSON, keyed by `${layer}-${objectid}`. Its `Graph` and OSM-building code
+  are gone, and accept converts it like a file dataset's data. Multi* geometries are still skipped,
+  as before. Since Esri data is GeoJSON now, conflation could match it too.
+- Custom data from a file, a url or WKT goes in a `custom-${hash}` cache, with `featureKey` (by hash)
+  for local IDs. The layer draws what's visible in the cache, instead of all of it.
+- Vector tiles keep a feature's `id` property (Overture's GERS ID) as `props.stableID` (see
+  [Vector tiles](#vector-tiles)). Until vector tile data has stable IDs, it can be selected but not
+  saved in a selection that's restored later.
+- Left as is: `PixiLayerRapid._getTags()` only reads `@name` from GeoJSON data, so Esri features
+  aren't labeled with their raw properties anymore (they rarely had a `name` field anyway).
 
 **Step 3: Selections are `DataID[]`.**
 - Modes keep a `DataID[]`. `selectedIDs()` returns it, and `selectedData()` looks each one up
   with `getData()`, so it's always the current version.
 - Layers bind renderables to `d.dataID` (not `d.id`), so `EventTarget.dataID` is the data ID.
+  `AbstractPixiLayer.bindingID()` goes away.
 - The scene holds the classes (`select`, `hover`) by data ID, and drops its `layerID` argument:
   `scene.setClass('select', dataID)`. Layers ask the scene when they style. Today each layer keeps
   its own class maps, and a mode has to know which layer draws which data.
@@ -286,4 +306,4 @@ Settled:
 - A single geometry gets no part number. File datasets' current IDs (`fbRoads:abc:0`) haven't been
   in a release, so saved accept and ignore records don't need migrating.
 - Pieces of lines go in `${datasetID}.pieces`.
-- Esri keeps its data as GeoJSON (Step 2), which fixes the restart bug.
+- Esri keeps its data as GeoJSON (done in Step 2), which fixes the restart bug.

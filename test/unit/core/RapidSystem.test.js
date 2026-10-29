@@ -398,28 +398,28 @@ describe('RapidSystem', () => {
 
       it('is empty for a line the user has not acted on', () => {
         replay([]);
-        assert.deepEqual(_rapid.actedRanges('test:k1:0'), []);
+        assert.deepEqual(_rapid.actedRanges('test:k1'), []);
       });
 
       it('gathers accepted and ignored pieces of a line from the edit history, sorted and merged', () => {
         replay([
-          { type: 'rapid_accept_feature', acceptIDs: ['test:k1:0@0.6-1'] },
-          { type: 'rapid_ignore_feature', ignoreID: 'test:k1:0@0-0.25' },
-          { type: 'rapid_accept_feature', acceptIDs: ['test:k1:0@0.2-0.4', 'test:k2:0@0-0.5'] }
+          { type: 'rapid_accept_feature', acceptIDs: ['test.pieces:k1@0.6-1'] },
+          { type: 'rapid_ignore_feature', ignoreID: 'test.pieces:k1@0-0.25' },
+          { type: 'rapid_accept_feature', acceptIDs: ['test.pieces:k1@0.2-0.4', 'test.pieces:k2@0-0.5'] }
         ]);
-        assert.deepEqual(_rapid.actedRanges('test:k1:0'), [[0, 0.4], [0.6, 1]]);
-        assert.deepEqual(_rapid.actedRanges('test:k2:0'), [[0, 0.5]]);
+        assert.deepEqual(_rapid.actedRanges('test:k1'), [[0, 0.4], [0.6, 1]]);
+        assert.deepEqual(_rapid.actedRanges('test:k2'), [[0, 0.5]]);
       });
 
       it('a whole feature that was accepted or ignored covers all of it', () => {
-        replay([{ type: 'rapid_ignore_feature', ignoreID: 'test:k1:0' }]);
-        assert.deepEqual(_rapid.actedRanges('test:k1:0'), [[0, 1]]);
+        replay([{ type: 'rapid_ignore_feature', ignoreID: 'test:k1' }]);
+        assert.deepEqual(_rapid.actedRanges('test:k1'), [[0, 1]]);
       });
 
       it('resetAsync clears them', () => {
-        replay([{ type: 'rapid_ignore_feature', ignoreID: 'test:k1:0' }]);
+        replay([{ type: 'rapid_ignore_feature', ignoreID: 'test:k1' }]);
         return _rapid.resetAsync()
-          .then(() => assert.deepEqual(_rapid.actedRanges('test:k1:0'), []));
+          .then(() => assert.deepEqual(_rapid.actedRanges('test:k1'), []));
       });
     });
 

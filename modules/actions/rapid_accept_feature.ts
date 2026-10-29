@@ -163,7 +163,7 @@ export function actionRapidAcceptFeature(datum: OsmEntity | GeoJSONData, joins?:
      * @return  Array containing the newly-created node
      */
     function acceptNode(extNode: OsmNode, extGraph: Graph): OsmEntity[] {
-      acceptedIDs.add(extNode.id);
+      acceptedIDs.add(extNode.dataID);
       const n = new OsmNode(extNode, { id: undefined });   // copy external node, generate new ID
       old2new.set(extNode.id, n.id);
       n.props.tags = dictionary!.applyTransforms(extNode.tags);
@@ -179,7 +179,7 @@ export function actionRapidAcceptFeature(datum: OsmEntity | GeoJSONData, joins?:
      * @return  Array containing newly-created nodes and ways
      */
     function acceptWay(extWay: OsmWay, extGraph: Graph): OsmEntity[] {
-      acceptedIDs.add(extWay.id);
+      acceptedIDs.add(extWay.dataID);
       const w = new OsmWay(extWay, { id: undefined });   // copy external way, generate new ID
       old2new.set(extWay.id, w.id);
       w.props.tags = dictionary!.applyTransforms(extWay.tags);
@@ -208,7 +208,7 @@ export function actionRapidAcceptFeature(datum: OsmEntity | GeoJSONData, joins?:
     function acceptRelation(extRelation: OsmRelation, extGraph: Graph): OsmEntity[] {
       if (old2new.has(extRelation.id)) return [];   // done already, avoid recursion
 
-      acceptedIDs.add(extRelation.id);
+      acceptedIDs.add(extRelation.dataID);
       const r = new OsmRelation(extRelation, { id: undefined });  // copy external relation, generate new ID
       old2new.set(extRelation.id, r.id);
       r.props.tags = dictionary!.applyTransforms(extRelation.tags);
@@ -267,7 +267,7 @@ export function actionRapidAcceptFeature(datum: OsmEntity | GeoJSONData, joins?:
         const extHits = spatial.getItemsAtCoord(spatialID!, coord);
         for (const hit of extHits) {
           const other = hit.contents as OsmEntity | GeoJSONData;
-          const otherID = other.id;
+          const otherID = other.dataID;
           // TODO this should work for geojson-like data too
           if (other.type !== 'node') continue;
           if (rapid.acceptIDs.has(otherID) || rapid.ignoreIDs.has(otherID) || acceptedIDs.has(otherID)) continue;
@@ -275,7 +275,7 @@ export function actionRapidAcceptFeature(datum: OsmEntity | GeoJSONData, joins?:
           // Treat this node as accepted, but not actually accept it into the graph.
           // We only really want it for its tags.
           const extNode = other as OsmNode;
-          acceptedIDs.add(extNode.id);
+          acceptedIDs.add(extNode.dataID);
           const copy = new OsmNode(extNode);
           copy.props.tags = dictionary!.applyTransforms(extNode.tags);
           removeMetadata(copy);
@@ -364,7 +364,7 @@ export function actionRapidAcceptFeature(datum: OsmEntity | GeoJSONData, joins?:
     const nodemap = new Map<string, OsmNode>();
 
     // Accept the original id
-    acceptedIDs.add(data.id);
+    acceptedIDs.add(data.dataID);
 
     // Convert source properties to target tags
     const tags = dictionary.applyTransforms(data.properties ?? {});

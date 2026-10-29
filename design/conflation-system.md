@@ -389,9 +389,11 @@ interface JoinPoint {
 }
 ```
 
-A run's data element has the id `pieceID(dataID, range)`, like `test:k1:0@0.4-1`: the line's id and
-the stretch the run covers, following the linear referencing that Overture uses. It's the same each
-time it's computed from the same data, so accepting or ignoring it is remembered across restarts.
+A run's data element has the data ID `pieceID(dataID, range)`, like `test.pieces:k1@0.4-1`: the
+line's id and the stretch the run covers, following the linear referencing that Overture uses. It's
+the same each time it's computed from the same data, so accepting or ignoring it is remembered across
+restarts. The pieces go in a `${datasetID}.pieces` `SpatialSystem` cache as they're computed, so
+`spatial.getData()` finds them like any other data; `invalidate()` empties it along with the results.
 See "Feature IDs" in [`rapid-system.md`](rapid-system.md) for how the line's own id is made.
 
 **What the user acted on is left out.** `RapidSystem.actedRanges(dataID)` lists the stretches of the

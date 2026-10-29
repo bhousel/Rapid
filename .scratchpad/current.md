@@ -3,12 +3,15 @@
 ## Active: data IDs and selecting any mix of data
 Design: [`design/data-ids.md`](../design/data-ids.md), started Oct 28 with Bryan. A data ID is
 `${namespace}:${localID}` (bare = OSM); a namespace is a `SpatialSystem` cache ID; `.` suffixes name
-derived caches (`fbRoads.pieces`); the user's datasets start with `user-`. Step 1 (Oct 28, not yet
-committed): `modules/data/dataID.ts`, `AbstractDataProps.namespace`, `spatial.getData()` +
-`registerResolver()` (`osm` from `EditSystem`, each vector tile source), data with no extent kept by
-ID, caches renamed. Next: Step 2 (deterministic IDs: file datasets drop `:0`, pieces cache, Esri as
-GeoJSON, custom data into a cache, Overture GERS IDs). Found: Overture's GERS ID is the `id` property
-at z14 only, and `VectorTileService` was deleting it (details in the doc).
+derived caches (`fbRoads.pieces`); the user's datasets start with `user-`, custom data's namespaces
+with `custom-`. Step 1 (committed Oct 28): `modules/data/dataID.ts`, `AbstractDataProps.namespace`,
+`spatial.getData()` + `registerResolver()`, data with no extent kept by ID, caches renamed.
+Step 2 (Oct 28, not yet committed): file datasets drop `:0` and set `namespace`; accept/ignore
+records and conflation use `dataID`; the `rapid` layer binds data IDs (`bindingID()`, an interim
+hook that Step 3 removes); pieces in `${datasetID}.pieces`; Esri as GeoJSON; custom data in a
+`custom-${hash}` cache; vector tiles keep the `id` property as `props.stableID`. Checked live: file
+datasets, pieces, fbRoads, an Esri buildings dataset (accept + undo) and custom data all resolve with
+`getData()`. Next: Step 3 (selections are `DataID[]`).
 
 ## Active: what an edit records (`EditSystem`)
 Design: [`design/edit-system.md`](../design/edit-system.md), started Oct 26. Edits need to record more
