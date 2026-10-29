@@ -313,8 +313,9 @@ Each step is its own commit, and leaves Rapid working with the tests passing.
   selected something else in the meantime.
 - A selected note is in both `id=` (`osm-notes:123`) and `note=`, which also turns on the notes layer.
 
-**Step 6: Sidebar and edit menu for a multiselection.** This needs its own design, with mockups:
-operations on the whole selection (geometric ones, split, merge, …), and an "edit all" choice that
+**Step 6: Sidebar and edit menu for a multiselection.** This moved to its own design,
+[`multiselection.md`](multiselection.md): the selection list and the commands for it (replace
+geometry, copy tags, merge, …), with a command pane for each, and an "Edit tags" command that
 shows today's field and tag editor.
 
 Design docs to update along the way: `spatial-system.md` (`getData()`, resolvers, data with no

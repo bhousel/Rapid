@@ -8,11 +8,12 @@ They record the "why" that the code alone doesn't show.
 | Doc | Covers | Status |
 |-----|--------|--------|
 | [`conflation-system.md`](conflation-system.md) | `ConflationSystem`: client-side matching of third-party data against OSM, partial-line accept | In progress: Steps 1–5 done (line matching, drawing, partial accept with joins) |
-| [`data-ids.md`](data-ids.md) | How data is named across sources: namespaced data IDs, looking data up, selecting any mix of data | Steps 1–5 of 6 done: `SpatialSystem.getData()`, caches renamed to namespaces, deterministic IDs (file datasets, pieces, Esri, custom data), selections and scene classes by `DataID`, one `SelectMode` for any mix of data, `id=` takes data IDs |
+| [`data-ids.md`](data-ids.md) | How data is named across sources: namespaced data IDs, looking data up, selecting any mix of data | Steps 1–5 done: `SpatialSystem.getData()`, caches renamed to namespaces, deterministic IDs (file datasets, pieces, Esri, custom data), selections and scene classes by `DataID`, one `SelectMode` for any mix of data, `id=` takes data IDs. Step 6 moved to `multiselection.md` |
 | [`database-system.md`](database-system.md) | `DatabaseSystem`: IndexedDB wrapper with `sessions` and `files` stores | Phases 0–4 done; files-management UI + worker offload open |
 | [`draganddrop-system.md`](draganddrop-system.md) | `DragAndDropSystem`: claim-based router for dropped files | Implemented |
 | [`edit-system.md`](edit-system.md) | `EditSystem`: undo/redo history, edits beyond the OSM graph (typed edit props), backups and restore | In progress: undone edits not saved; edit props, translated labels and `hasWork()`; viewport and selection on undo/redo, return view; backup v4 (base versions fetched on restore) |
 | [`keyboard-system.md`](keyboard-system.md) | `KeyboardSystem`: key binding scopes and commands | Phase 1 done; remappable shortcuts in backlog |
+| [`multiselection.md`](multiselection.md) | Editing a multiselection: the selection list, commands (replace geometry, copy tags, merge, …) and their command panes | Proposed |
 | [`network-system.md`](network-system.md) | `NetworkSystem`: fetch lifecycle, dedup, timeouts, worker fetches | Implemented |
 | [`rapid-system.md`](rapid-system.md) | `RapidSystem`: the dataset catalog, its layers (services, asset files, the user), accepted and ignored features | Dataset assets, the user's datasets in `DatabaseSystem`, and stable feature IDs done; export/import next |
 | [`scheduler-system.md`](scheduler-system.md) | `SchedulerSystem`: frame-budgeted task queue, timers, backpressure | Implemented |

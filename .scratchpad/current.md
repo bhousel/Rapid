@@ -15,10 +15,12 @@ regression (Rapid select halo, walkthrough road check). Checked live: select a R
 undo (Rapid road selected again), OSM select, notes. Step 4 (committed Oct 29):
 `SelectOsmMode` merged into `SelectMode` (OSM-only parts work on `_osmIDs`; operations and arrow-key
 move/rotate only when all OSM); move/rotate take `DataID[]`; shift-click any data; mixed selections
-get `UiSelectionInspector`. Step 5 (Oct 29, not yet committed): `id=` takes data IDs, through
+get `UiSelectionInspector`. Step 5 (committed Oct 29): `id=` takes data IDs, through
 `MapSystem._restoreSelection(selection, fromLink)`, which downloads missing OSM entities; `SelectMode`
 writes every data ID to `id=`. Checked live: typed, removed, downloaded (map moves), and a reload with
-a mixed `id=`. Next: Step 6 (multiselection UI), which needs a design with mockups first.
+a mixed `id=`. Step 6 moved to its own design, `design/multiselection.md` (proposed Oct 29): a
+selection pane (list + commands) that slides to a command pane, like `UiInspector`; replace geometry
+first. Bryan wants to land this branch for testers before starting it, to keep conflation in focus.
 Found, not fixed: `attemptAutoconnect` (accept with `poweruser.autoConnect`) runs crossing-ways on
 the stale `way` after the almost-junction autofix changed its nodes, and throws `n-1 not found`.
 Bryan has seen it too; fix it separately, after the data ID steps are done.
