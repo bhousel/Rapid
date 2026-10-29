@@ -21,9 +21,14 @@ writes every data ID to `id=`. Checked live: typed, removed, downloaded (map mov
 a mixed `id=`. Step 6 moved to its own design, `design/multiselection.md` (proposed Oct 29): a
 selection pane (list + commands) that slides to a command pane, like `UiInspector`; replace geometry
 first. Bryan wants to land this branch for testers before starting it, to keep conflation in focus.
-Found, not fixed: `attemptAutoconnect` (accept with `poweruser.autoConnect`) runs crossing-ways on
-the stale `way` after the almost-junction autofix changed its nodes, and throws `n-1 not found`.
-Bryan has seen it too; fix it separately, after the data ID steps are done.
+Fixed (Oct 29, not yet committed): `attemptAutoconnect` (accept with `poweruser.autoConnect`) ran
+crossing-ways on the stale `way` after the almost-junction autofix merged its end node away
+(`n-2 not found`), and applied every fix found by one validation run, so a segment crossing two roads
+connected to only one. Now `autofix()` applies one fix, then looks the way up and validates again.
+`actionAddMidpoint` puts the node in the piece of a split edge that its loc lies on (a U-shaped road
+with both ends joining one road segment). Tests in `rapid_accept_feature.test.js`, `add_midpoint.test.js`.
+Audit of validators + `ValidationSystem` written up in `design/validation-system.md` (new); the
+rollout there is the plan. Biggest: way geometry lives on entity objects shared by all graphs.
 
 ## Active: what an edit records (`EditSystem`)
 Design: [`design/edit-system.md`](../design/edit-system.md), started Oct 26. Edits need to record more
@@ -162,8 +167,8 @@ to the part that exists.*
 - Fixed a stale Bun transpiler-cache entry that broke `extract.test.js` (see `quirks.md`).
 
 ## Next up (after conflation)
-- **Re-enable `crossing_ways` / `almost_junction` validator tests** (still `describe.todo`). They cover the
-  `segments` index that line conflation depends on.
+- **Validator tests:** `crossing_ways` / `almost_junction` tests run again; one `it.skip` is left in
+  `almost_junction.test.js` ("horizontal and tilted road"). See `design/validation-system.md` for the rest.
 - **Stored-files management UI** (`DatabaseSystem` Phase 4 design): list stored files with sizes so users
   can free space when `canStoreAsync()` says no. Only `UiRapidAddDataset` calls `canStoreAsync` today.
 - **Custom-data consumer ownership**: move the `DragAndDropSystem` consumer registration out of

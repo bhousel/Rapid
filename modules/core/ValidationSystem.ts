@@ -54,6 +54,9 @@ export interface IssuesBySeverity {
  * It would be even better to do this in a worker process, but workers don't
  * have easy access to things like the Graph or Edits/History.
  *
+ * See `design/validation-system.md` for what validators can rely on, the October 2026 audit,
+ * and where this is heading.
+ *
  * Events available:
  * - `validated`    - Fires after some validation has occurred
  * - `focusedIssue` - Fires after an issue has received focus, receives the issue

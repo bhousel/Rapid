@@ -146,6 +146,7 @@ Things that went wrong once and shouldn't go wrong again.
 
 - **An untagged way in a multipolygon is really the relation** — Multipolygon outer and inner ways usually carry no tags; the tags (e.g. `building=retail`) sit on the relation. Such a way is closed, but `way.geometry(graph)` returns `'line'` because `isArea()` finds no area-suggesting tag. Anything that asks "is this an area?" or "what is this?" about a way must check parent multipolygons, or it will treat building outlines as lines. A building can even be several closed outers in one relation. Several places handle this separately today (see `backlog.md`, `OsmWay.asFeature`).
 - **`isArea()` needs the schema** — `tagSuggestingArea()` reads area keys from `SchemaSystem` rulesets. In unit tests without a schema, `building=yes` alone doesn't make a closed way an area; add `area=yes` to the fixture.
+- **Apply validator autofixes one at a time** — An issue's `autoArgs` action was built from the graph as it was when the validator ran (edges, end nodes). Once one fix changes the graph, the other issues from that run may name nodes that were merged away or edges that were split, and a stale edge makes `actionAddMidpoint` add a node to no way. Apply one fix, `commit()`, look the entity up again, and validate again (`attemptAutoconnect`'s `autofix()`). Test fixtures for merges need `version` on existing nodes: `actionConnect` keeps the node with a version, otherwise the last one.
 
 ## Pixi Rendering
 

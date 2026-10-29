@@ -11,6 +11,8 @@ import type { Context } from '../Context.ts';
 import type { JoinPoint, LineJoins } from '../core/ConflationSystem.ts';
 import type { EntityType, OsmRelationMember, OsmTags } from '../data/types.ts';
 import type { RapidDataDictionary } from '../lib/index.ts';
+import type { ValidationIssue } from '../lib/ValidationIssue.ts';
+import type { ValidatorFunction } from '../validators/types.ts';
 import type { Vec2 } from '@rapid-sdk/math';
 
 
@@ -260,8 +262,7 @@ export function actionRapidAcceptFeature(datum: OsmEntity | GeoJSONData, joins?:
       // 1. If there are unaccepted nodes in the external dataset at the same location as
       // the node that we just added, mark them accepted also and import their tags.
       for (const nodeID of way.nodes) {
-        const node = graph.entity(nodeID) as OsmNode;
-        const coord = node.geoms.parts[0].world?.coords as Vec2;  // A node should have a single world coord
+        const coord = (graph.entity(nodeID) as OsmNode).geoms.parts[0].world?.coords as Vec2;  // A node should have a single world coord
         if (!coord) continue;
 
         const extHits = spatial.getItemsAtCoord(spatialID!, coord);
@@ -279,28 +280,42 @@ export function actionRapidAcceptFeature(datum: OsmEntity | GeoJSONData, joins?:
           const copy = new OsmNode(extNode);
           copy.props.tags = dictionary!.applyTransforms(extNode.tags);
           removeMetadata(copy);
-          // merge the external node's tags into the existing node
-          for (const [k, v] of Object.entries(copy.props.tags ?? {})) {
-            node.props.tags![k] = v;
-          }
-          node.touch();
-          graph.replace(node);
+          // merge the external node's tags into the existing node (a new node, entities aren't changed in place)
+          const node = graph.entity(nodeID) as OsmNode;
+          graph.replace(node.update({ tags: { ...node.tags, ...copy.tags } }));
         }
       }
 
       // 2. Run the validator for almost junction and autofix whatever it found.
-      const checkAlmostJunction = validateAlmostJunction(context);
-      for (const issue of checkAlmostJunction(way, graph).issues) {
-        if (issue.autoArgs) {
-          graph = issue.autoArgs[0](graph);   // autoArgs = [action, label]
-        }
-      }
+      autofix(way.id, validateAlmostJunction(context));
 
       // 3. Run the validator for crossing ways and autofix whatever it found.
-      const checkCrossingWays = validateCrossingWays(context);
-      for (const issue of checkCrossingWays(way, graph).issues) {
-        if (issue.autoArgs) {
-          graph = issue.autoArgs[0](graph);   // autoArgs = [action, label]
+      autofix(way.id, validateCrossingWays(context));
+
+
+      /**
+       * Applies a validator's autofixes to a way, one at a time.  A fix changes the graph (it may move,
+       * merge or remove nodes of the way, and splits segments), so the issues found before it may no
+       * longer fit.  After each fix, the way is looked up again and validated again.
+       * @param  wayID - The way to fix
+       * @param  validator - The validator to run on it
+       */
+      function autofix(wayID: EntityID, validator: ValidatorFunction): void {
+        const MAX_FIXES = 50;   // in case a fix doesn't make its issue go away
+        const tried = new Set<string>();
+
+        for (let i = 0; i < MAX_FIXES; i++) {
+          graph.commit();   // validators read geometry, which a fix leaves stale until a commit
+          const current = graph.hasEntity(wayID);
+          if (!(current instanceof OsmWay)) return;
+
+          // Issues are keyed by where they are too: crossings hash a rounded location, so two nearby share an id
+          const keyOf = (issue: ValidationIssue): string => `${issue.id}@${issue.loc}`;
+          const issue = validator(current, graph).issues.find(issue => issue.autoArgs && !tried.has(keyOf(issue)));
+          if (!issue) return;
+
+          tried.add(keyOf(issue));
+          graph = issue.autoArgs![0](graph);   // autoArgs = [action, label]
         }
       }
     }
