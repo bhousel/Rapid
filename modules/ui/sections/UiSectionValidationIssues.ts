@@ -246,7 +246,7 @@ export class UiSectionValidationIssues extends AbstractUiSection {
 
     utilHighlightEntities(this.context, issue.entityIds, false);  // unhighlight
     editor.perform(issue.autoArgs![0]);   // autoArgs = [action, label]
-    editor.commit({ ...issue.autoArgs![1], selection: { osm: issue.entityIds } });
+    editor.commit({ ...issue.autoArgs![1], selection: issue.entityIds });
   }
 
 

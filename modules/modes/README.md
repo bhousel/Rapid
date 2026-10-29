@@ -34,8 +34,8 @@ Each mode has:
 - `id` - Unique identifier (e.g., `browse`, `select`)
 - `active` - Whether the mode is currently active
 - `operations` - Array of operations available in this mode
-- `selectedData` - Map of currently selected data elements
-- `selection` - The selected data IDs grouped by layer, e.g. `{ osm: ['w1'] }` (what edits record, so undo/redo can restore it)
+- `selectedIDs` - The data IDs of the selected data, e.g. `['w1', 'fbRoads:abc']` (what edits record, so undo/redo can restore it; see [`design/data-ids.md`](../../design/data-ids.md))
+- `selectedData` - Map of the selected data, each looked up by its data ID (`SpatialSystem.getData`), so it's always the current version
 
 ## Mode Transitions
 

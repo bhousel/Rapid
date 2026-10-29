@@ -148,13 +148,13 @@ describe('EditSystem', () => {
       _editor.merge([node1, node2, node3]);   // merge base entities
 
       _editor.perform(Rapid.actionAddEntity(node_1));
-      _editor.commit({ stringID: 'added n-1', selection: { osm: ['n-1'] } });
+      _editor.commit({ stringID: 'added n-1', selection: ['n-1'] });
 
       _editor.perform(Rapid.actionChangeTags('n2', { natural: 'tree' } ));
-      _editor.commit({ stringID: 'updated n2', selection: { osm: ['n2'] } });
+      _editor.commit({ stringID: 'updated n2', selection: ['n2'] });
 
       _editor.perform(Rapid.actionDeleteNode('n3'));
-      _editor.commit({ stringID: 'deleted n3', selection: {} });
+      _editor.commit({ stringID: 'deleted n3', selection: []});
     }
 
 
@@ -462,7 +462,7 @@ describe('EditSystem', () => {
         assert.isUndefined(_editor.staging.graph.hasEntity('n-2'));
 
         _editor.perform(actionAddNode('n-1'));
-        _editor.commit({ stringID: 'added a node', selection: { osm: ['n-1'] } });
+        _editor.commit({ stringID: 'added a node', selection: ['n-1'] });
 
         assert.lengthOf(_editor.history, 2);
         assert.strictEqual(_editor.index, 1);
@@ -470,7 +470,7 @@ describe('EditSystem', () => {
         assert.isUndefined(_editor.staging.graph.hasEntity('n-2'));
 
         _editor.perform(actionAddNode('n-2'));
-        _editor.commit({ stringID: 'added a node', selection: { osm: ['n-2'] } });
+        _editor.commit({ stringID: 'added a node', selection: ['n-2'] });
 
         assert.lengthOf(_editor.history, 3);
         assert.strictEqual(_editor.index, 2);
@@ -488,7 +488,7 @@ describe('EditSystem', () => {
         assert.lengthOf(onStagingChange.mock.calls, 1);
         assert.lengthOf(onStableChange.mock.calls, 0);
 
-        _editor.commit({ stringID: 'added a node', selection: { osm: ['n-1'] } });
+        _editor.commit({ stringID: 'added a node', selection: ['n-1'] });
         assert.lengthOf(onStagingChange.mock.calls, 2);
         assert.lengthOf(onStableChange.mock.calls, 1);
 
@@ -496,7 +496,7 @@ describe('EditSystem', () => {
         assert.lengthOf(onStagingChange.mock.calls, 3);
         assert.lengthOf(onStableChange.mock.calls, 1);
 
-        _editor.commit({ stringID: 'added a node', selection: { osm: ['n-2'] } });
+        _editor.commit({ stringID: 'added a node', selection: ['n-2'] });
         assert.lengthOf(onStagingChange.mock.calls, 4);
         assert.lengthOf(onStableChange.mock.calls, 2);
       });
@@ -507,7 +507,7 @@ describe('EditSystem', () => {
           type: 'test_edit',
           stringID: 'added a node',
           stringParams: { n: 1 },
-          selection: { osm: ['n-1'] },
+          selection: ['n-1'],
           testID: 'abc'
         });
 
@@ -515,7 +515,7 @@ describe('EditSystem', () => {
         assert.strictEqual(props.type, 'test_edit');
         assert.strictEqual(props.stringID, 'added a node');
         assert.deepEqual(props.stringParams, { n: 1 });
-        assert.deepEqual(props.selection, { osm: ['n-1'] });
+        assert.deepEqual(props.selection, ['n-1']);
         assert.strictEqual(props.testID, 'abc');
         assert.isObject(props.transform);
       });
@@ -529,12 +529,12 @@ describe('EditSystem', () => {
       });
 
       it('copies the props, so later changes by the caller do not change the edit', () => {
-        const selection = { osm: ['n-1'] };
+        const selection = ['n-1'];
         _editor.perform(actionAddNode('n-1'));
         _editor.commit({ stringID: 'added a node', selection: selection });
-        selection.osm.push('n-2');
+        selection.push('n-2');
 
-        assert.deepEqual(_editor.stable.props.selection, { osm: ['n-1'] });
+        assert.deepEqual(_editor.stable.props.selection, ['n-1']);
       });
 
       it('records where the change is, from the nodes and ways that changed', () => {
@@ -566,15 +566,15 @@ describe('EditSystem', () => {
       });
 
       it('records what was selected before the edit', () => {
-        context.mode = { selection: { rapid: ['d1'] } };
+        context.mode = { selectedIDs: ['ds:d1'] };
         try {
           _editor.perform(actionAddNode('n-1'));
-          _editor.commit({ stringID: 'accepted a feature', selection: { osm: ['n-1'] } });
+          _editor.commit({ stringID: 'accepted a feature', selection: ['n-1'] });
         } finally {
           context.mode = undefined;
         }
-        assert.deepEqual(_editor.stable.props.selectionBefore, { rapid: ['d1'] });
-        assert.deepEqual(_editor.stable.props.selection, { osm: ['n-1'] });
+        assert.deepEqual(_editor.stable.props.selectionBefore, ['ds:d1']);
+        assert.deepEqual(_editor.stable.props.selection, ['n-1']);
       });
     });
 
@@ -594,7 +594,7 @@ describe('EditSystem', () => {
         assert.isUndefined(_editor.staging.graph.hasEntity('n-2'));
 
         _editor.perform(actionAddNode('n-1'));
-        _editor.commit({ stringID: 'added a node', selection: { osm: ['n-1'] } });
+        _editor.commit({ stringID: 'added a node', selection: ['n-1'] });
 
         assert.lengthOf(_editor.history, 2);
         assert.strictEqual(_editor.index, 1);
@@ -602,7 +602,7 @@ describe('EditSystem', () => {
         assert.isUndefined(_editor.staging.graph.hasEntity('n-2'));
 
         _editor.perform(actionAddNode('n-2'));
-        _editor.commitAppend({ stringID: 'added a node', selection: { osm: ['n-2'] } });  // commitAppend
+        _editor.commitAppend({ stringID: 'added a node', selection: ['n-2'] });  // commitAppend
 
         assert.lengthOf(_editor.history, 2);   // still 2
         assert.strictEqual(_editor.index, 1);  // still 1
@@ -620,7 +620,7 @@ describe('EditSystem', () => {
         assert.lengthOf(onStagingChange.mock.calls, 1);
         assert.lengthOf(onStableChange.mock.calls, 0);
 
-        _editor.commit({ stringID: 'added a node', selection: { osm: ['n-1'] } });
+        _editor.commit({ stringID: 'added a node', selection: ['n-1'] });
         assert.lengthOf(onStagingChange.mock.calls, 2);
         assert.lengthOf(onStableChange.mock.calls, 1);
 
@@ -628,7 +628,7 @@ describe('EditSystem', () => {
         assert.lengthOf(onStagingChange.mock.calls, 3);
         assert.lengthOf(onStableChange.mock.calls, 1);
 
-        _editor.commitAppend({ stringID: 'added a node', selection: { osm: ['n-2'] } });  // commitAppend
+        _editor.commitAppend({ stringID: 'added a node', selection: ['n-2'] });  // commitAppend
         assert.lengthOf(onStagingChange.mock.calls, 4);
         assert.lengthOf(onStableChange.mock.calls, 2);
       });
@@ -638,11 +638,11 @@ describe('EditSystem', () => {
     describe('undo / #redo', () => {
       it('can undo and redo edits', () => {
         _editor.perform(actionAddNode('n-1'));
-        _editor.commit({ stringID: 'added n-1', selection: { osm: ['n-1'] } });
+        _editor.commit({ stringID: 'added n-1', selection: ['n-1'] });
         _editor.perform(actionAddNode('n-2'));
-        _editor.commit({ stringID: 'added n-2', selection: { osm: ['n-2'] } });
+        _editor.commit({ stringID: 'added n-2', selection: ['n-2'] });
         _editor.perform(actionAddNode('n-3'));
-        _editor.commit({ stringID: 'added n-3', selection: { osm: ['n-3'] } });
+        _editor.commit({ stringID: 'added n-3', selection: ['n-3'] });
 
         assert.strictEqual(_editor.getUndoEdit()?.props.stringID, 'added n-3');
         assert.isUndefined(_editor.getRedoEdit()?.props.stringID);
@@ -674,7 +674,7 @@ describe('EditSystem', () => {
         assert.lengthOf(onStableChange.mock.calls, 0);
         assert.lengthOf(onHistoryJump.mock.calls, 0);
 
-        _editor.commit({ stringID: 'added n-1', selection: { osm: ['n-1'] } });
+        _editor.commit({ stringID: 'added n-1', selection: ['n-1'] });
         assert.lengthOf(onStagingChange.mock.calls, 2);
         assert.lengthOf(onStableChange.mock.calls, 1);
         assert.lengthOf(onHistoryJump.mock.calls, 0);
@@ -684,7 +684,7 @@ describe('EditSystem', () => {
         assert.lengthOf(onStableChange.mock.calls, 1);
         assert.lengthOf(onHistoryJump.mock.calls, 0);
 
-        _editor.commit({ stringID: 'added n-2', selection: { osm: ['n-2'] } });
+        _editor.commit({ stringID: 'added n-2', selection: ['n-2'] });
         assert.lengthOf(onStagingChange.mock.calls, 4);
         assert.lengthOf(onStableChange.mock.calls, 2);
         assert.lengthOf(onHistoryJump.mock.calls, 0);
@@ -694,7 +694,7 @@ describe('EditSystem', () => {
         assert.lengthOf(onStableChange.mock.calls, 2);
         assert.lengthOf(onHistoryJump.mock.calls, 0);
 
-        _editor.commit({ stringID: 'added n-3', selection: { osm: ['n-3'] } });
+        _editor.commit({ stringID: 'added n-3', selection: ['n-3'] });
         assert.lengthOf(onStagingChange.mock.calls, 6);
         assert.lengthOf(onStableChange.mock.calls, 3);
         assert.lengthOf(onHistoryJump.mock.calls, 0);
@@ -743,11 +743,11 @@ describe('EditSystem', () => {
     describe('return view', () => {
       function commitThree() {
         _editor.perform(actionAddNode('n-1'));
-        _editor.commit({ stringID: 'added n-1', selection: { osm: ['n-1'] } });
+        _editor.commit({ stringID: 'added n-1', selection: ['n-1'] });
         _editor.perform(actionAddNode('n-2'));
-        _editor.commit({ stringID: 'added n-2', selection: { osm: ['n-2'] } });
+        _editor.commit({ stringID: 'added n-2', selection: ['n-2'] });
         _editor.perform(actionAddNode('n-3'));
-        _editor.commit({ stringID: 'added n-3', selection: { osm: ['n-3'] } });
+        _editor.commit({ stringID: 'added n-3', selection: ['n-3'] });
       }
 
       it('remembers where the user was when they first undo away from the newest edit', () => {
@@ -755,7 +755,7 @@ describe('EditSystem', () => {
         assert.isNull(_editor.returnEdit);
 
         context.viewport.transform = { x: 10, y: 20, z: 17 };
-        context.mode = { selection: { rapid: ['d1'] } };
+        context.mode = { selectedIDs: ['ds:d1'] };
         try {
           _editor.undo();
         } finally {
@@ -765,7 +765,7 @@ describe('EditSystem', () => {
         const returnEdit = _editor.returnEdit;
         assert.instanceOf(returnEdit, Rapid.Edit);
         assert.strictEqual(returnEdit.props.stringID, 'redo.return_view');
-        assert.deepEqual(returnEdit.props.selection, { rapid: ['d1'] });
+        assert.deepEqual(returnEdit.props.selection, ['ds:d1']);
         assert.include(returnEdit.props.transform, { x: 10, y: 20, z: 17 });
       });
 
@@ -844,14 +844,14 @@ describe('EditSystem', () => {
     describe('setCheckpoint / #restoreCheckpoint', () => {
       it('can set and restore checkpoints', () => {
         _editor.perform(actionAddNode('n-1'));
-        _editor.commit({ stringID: 'added n-1', selection: { osm: ['n-1'] } });
+        _editor.commit({ stringID: 'added n-1', selection: ['n-1'] });
 
         _editor.setCheckpoint('checkpoint');
 
         _editor.perform(actionAddNode('n-2'));
-        _editor.commit({ stringID: 'added n-2', selection: { osm: ['n-2'] } });
+        _editor.commit({ stringID: 'added n-2', selection: ['n-2'] });
         _editor.perform(actionAddNode('n-3'));
-        _editor.commit({ stringID: 'added n-3', selection: { osm: ['n-3'] } });
+        _editor.commit({ stringID: 'added n-3', selection: ['n-3'] });
 
         _editor.restoreCheckpoint('checkpoint');
 
@@ -875,7 +875,7 @@ describe('EditSystem', () => {
         assert.lengthOf(onStableChange.mock.calls, 0);
         assert.lengthOf(onHistoryJump.mock.calls, 0);
 
-        _editor.commit({ stringID: 'added n-1', selection: { osm: ['n-1'] } });
+        _editor.commit({ stringID: 'added n-1', selection: ['n-1'] });
         _editor.setCheckpoint('checkpoint');
         assert.lengthOf(onStagingChange.mock.calls, 2);
         assert.lengthOf(onStableChange.mock.calls, 1);
@@ -886,7 +886,7 @@ describe('EditSystem', () => {
         assert.lengthOf(onStableChange.mock.calls, 1);
         assert.lengthOf(onHistoryJump.mock.calls, 0);
 
-        _editor.commit({ stringID: 'added n-2', selection: { osm: ['n-2'] } });
+        _editor.commit({ stringID: 'added n-2', selection: ['n-2'] });
         assert.lengthOf(onStagingChange.mock.calls, 4);
         assert.lengthOf(onStableChange.mock.calls, 2);
         assert.lengthOf(onHistoryJump.mock.calls, 0);
@@ -896,7 +896,7 @@ describe('EditSystem', () => {
         assert.lengthOf(onStableChange.mock.calls, 2);
         assert.lengthOf(onHistoryJump.mock.calls, 0);
 
-        _editor.commit({ stringID: 'added n-3', selection: { osm: ['n-3'] } });
+        _editor.commit({ stringID: 'added n-3', selection: ['n-3'] });
         assert.lengthOf(onStagingChange.mock.calls, 6);
         assert.lengthOf(onStableChange.mock.calls, 3);
         assert.lengthOf(onHistoryJump.mock.calls, 0);
@@ -937,7 +937,7 @@ describe('EditSystem', () => {
         assert.lengthOf(onStagingChange.mock.calls, 0);
         assert.lengthOf(onStableChange.mock.calls, 0);
 
-        _editor.commit({ stringID: 'added n-1', selection: { osm: ['n-1'] } });
+        _editor.commit({ stringID: 'added n-1', selection: ['n-1'] });
         assert.lengthOf(onStagingChange.mock.calls, 0);
         assert.lengthOf(onStableChange.mock.calls, 0);
 
@@ -945,7 +945,7 @@ describe('EditSystem', () => {
         assert.lengthOf(onStagingChange.mock.calls, 0);
         assert.lengthOf(onStableChange.mock.calls, 0);
 
-        _editor.commit({ stringID: 'added n-2', selection: { osm: ['n-2'] } });
+        _editor.commit({ stringID: 'added n-2', selection: ['n-2'] });
         assert.lengthOf(onStagingChange.mock.calls, 0);
         assert.lengthOf(onStableChange.mock.calls, 0);
 
@@ -972,7 +972,7 @@ describe('EditSystem', () => {
         assert.lengthOf(onStagingChange.mock.calls, 1);
         assert.lengthOf(onStableChange.mock.calls, 0);
 
-        _editor.commit({ stringID: 'added n-1', selection: { osm: ['n-1'] } });
+        _editor.commit({ stringID: 'added n-1', selection: ['n-1'] });
         assert.lengthOf(onStagingChange.mock.calls, 2);
         assert.lengthOf(onStableChange.mock.calls, 1);
       });
@@ -989,7 +989,7 @@ describe('EditSystem', () => {
         assert.lengthOf(onStagingChange.mock.calls, 0);
         assert.lengthOf(onStableChange.mock.calls, 0);
 
-        _editor.commit({ stringID: 'added n-1', selection: { osm: ['n-1'] } });
+        _editor.commit({ stringID: 'added n-1', selection: ['n-1'] });
         assert.lengthOf(onStagingChange.mock.calls, 0);
         assert.lengthOf(onStableChange.mock.calls, 0);
 
@@ -1000,7 +1000,7 @@ describe('EditSystem', () => {
         assert.lengthOf(onStagingChange.mock.calls, 0);
         assert.lengthOf(onStableChange.mock.calls, 0);
 
-        _editor.commit({ stringID: 'added n-2', selection: { osm: ['n-2'] } });
+        _editor.commit({ stringID: 'added n-2', selection: ['n-2'] });
         assert.lengthOf(onStagingChange.mock.calls, 0);
         assert.lengthOf(onStableChange.mock.calls, 0);
 
@@ -1072,9 +1072,9 @@ describe('EditSystem', () => {
     describe('toJSON', () => {
       it('doesn\'t generate unsaveable changes', () => {
         _editor.perform(actionAddNode('n-1'));
-        _editor.commit({ stringID: 'added n-1', selection: { osm: ['n-1'] } });
+        _editor.commit({ stringID: 'added n-1', selection: ['n-1'] });
         _editor.perform(Rapid.actionDeleteNode('n-1'));
-        _editor.commit({ stringID: 'deleted n-1', selection: {} });
+        _editor.commit({ stringID: 'deleted n-1', selection: []});
 
         assert.isUndefined(_editor.toJSON());
       });
@@ -1245,9 +1245,9 @@ describe('EditSystem', () => {
 
       it('toBackup leaves out the redo part of the history', () => {
         _editor.perform(actionAddNode('n-1'));
-        _editor.commit({ stringID: 'added n-1', selection: { osm: ['n-1'] } });
+        _editor.commit({ stringID: 'added n-1', selection: ['n-1'] });
         _editor.perform(actionAddNode('n-2'));
-        _editor.commit({ stringID: 'added n-2', selection: { osm: ['n-2'] } });
+        _editor.commit({ stringID: 'added n-2', selection: ['n-2'] });
         _editor.undo();   // n-2 is only in the redo part now
 
         const backup = _editor.toBackup();
@@ -1297,7 +1297,7 @@ describe('EditSystem', () => {
           type: 'test_edit',
           stringID: 'added a node',
           stringParams: { n: 1 },
-          selection: { osm: ['n-1'] },
+          selection: ['n-1'],
           sources: { data: ['Some dataset'] },
           testID: 'abc'
         });
@@ -1337,7 +1337,7 @@ describe('EditSystem', () => {
             assert.strictEqual(props.ignoreID, 'd1');
             assert.strictEqual(props.annotation, 'Ignored a feature.');
             assert.notProperty(props, 'description');
-            assert.deepEqual(props.selection, { osm: ['n1'] });
+            assert.deepEqual(props.selection, ['n1']);
             assert.deepEqual(props.sources.data, ['Some dataset']);
             assert.strictEqual(_editor.getUndoEdit().label, 'Ignored a feature.');
             assert.isTrue(_editor.hasWork());
@@ -1359,8 +1359,28 @@ describe('EditSystem', () => {
         return _editor.fromBackupAsync(backup)
           .then(() => {
             const props = _editor.stable.props;
-            assert.deepEqual(props.selection, { osm: ['n1'] });
+            assert.deepEqual(props.selection, ['n1']);
             assert.notProperty(props, 'selectedIDs');
+          });
+      });
+
+      it('flattens a selection grouped by layer into data IDs', () => {
+        const backup = {
+          version: 3,
+          entities: [],
+          baseEntities: [],
+          stack: [
+            { },
+            { props: { stringID: 'accepted a feature', selection: { osm: ['n1'] }, selectionBefore: { rapid: ['ds:d1'], osm: ['w1'] } } }
+          ],
+          nextIDs: {},
+          index: 1
+        };
+        return _editor.fromBackupAsync(backup)
+          .then(() => {
+            const props = _editor.stable.props;
+            assert.deepEqual(props.selection, ['n1']);
+            assert.sameMembers(props.selectionBefore, ['ds:d1', 'w1']);
           });
       });
     });

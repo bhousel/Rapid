@@ -105,7 +105,7 @@ export class SelectOsmMode extends AbstractMode {
 
     // Gather valid entities and entityIDs from selection.
     // For this mode, keep only the OSM data.
-    this._selectedData = new Map<EntityID, OsmEntity>();
+    const keepIDs: EntityID[] = [];
     this._singularDatum = null;
     this._lastSelectedIDs = [];
     this._focusedParentID = options.focusedParentID ?? null;
@@ -118,15 +118,16 @@ export class SelectOsmMode extends AbstractMode {
         if (loc && locations?.isBlockedAt(loc)) continue;  // editing is blocked
       }
 
-      this._selectedData.set(entityID, entity);
+      keepIDs.push(entityID);
 
       if (entityIDs.length === 1) {
         this._singularDatum = entity;  // if a single thing is selected
       }
     }
 
-    if (!this._selectedData.size) return false;  // found nothing to select
-    entityIDs = [...this._selectedData.keys()];  // the entities we ended up keeping
+    if (!keepIDs.length) return false;  // found nothing to select
+    entityIDs = keepIDs;  // the entities we ended up keeping
+    this._selectedIDs = [...keepIDs];
 
     this._active = true;
 
@@ -139,7 +140,7 @@ export class SelectOsmMode extends AbstractMode {
     // Handle select style class
     scene.clearClass('select');
     for (const entityID of entityIDs) {
-      scene.setClass('select', 'osm', entityID);
+      scene.setClass('select', entityID);
     }
 
     urlhash.setParam('id', entityIDs.join(','));      // Put entityIDs into the url hash
@@ -199,7 +200,7 @@ export class SelectOsmMode extends AbstractMode {
         editor.perform(actionDeleteRelation(entity.id, true, true));  // true = don't delete untagged members
         editor.commit({
           stringID: 'operations.delete.annotation.relation',
-          selection: { osm: [entity.id] }
+          selection: [entity.id]
         });
       }
     }
@@ -207,7 +208,7 @@ export class SelectOsmMode extends AbstractMode {
     this.extent = null;
     this._newFeature = false;
     this._singularDatum = null;
-    this._selectedData.clear();
+    this._selectedIDs = [];
     this._lastSelectedIDs = [];
 
     // disable operations
@@ -266,7 +267,7 @@ export class SelectOsmMode extends AbstractMode {
 
     // Does the user have the same selection and is doing same action as before?
     // If so, use `commitAppend` to avoid creating a new undo state.
-    const selectedIDs = [...this._selectedData.keys()];
+    const selectedIDs = this.selectedIDs;
     const isSameSelection = utilArrayIdentical(selectedIDs, this._lastSelectedIDs);
     if (!isSameSelection) {
       this._lastSelectedIDs = selectedIDs.slice();  // take copy
@@ -357,20 +358,13 @@ export class SelectOsmMode extends AbstractMode {
 
       // do it
       const label = operation.editLabel();
-      const props = { ...label, selection: { osm: selectedIDs } };
+      const props = { ...label, selection: selectedIDs };
 
       editor.perform(action);
       if (isSameSelection && editor.getUndoEdit()?.isLabeled(label)) {
         editor.commitAppend(props);
       } else {
         editor.commit(props);
-      }
-
-      // Update selected/active collections to contain the transformed entities
-      const graph2 = editor.staging.graph;  // after transform
-      this._selectedData.clear();
-      for (const entityID of selectedIDs) {
-        this._selectedData.set(entityID, graph2.entity(entityID));
       }
 
       // Recheck the available operations on menu here.
@@ -389,7 +383,7 @@ export class SelectOsmMode extends AbstractMode {
    */
   protected _merge(newIDs: Set<EntityID>): void {
     if (!(newIDs instanceof Set)) return;
-    const entityIDs = [...this._selectedData.keys()];
+    const entityIDs = this.selectedIDs;
 
     let needsRefresh = false;
     for (const entityID of entityIDs) {
@@ -653,7 +647,7 @@ export class SelectOsmMode extends AbstractMode {
     const graph = editor.staging.graph;
     const parentWayIDs = new Set<EntityID>();
 
-    for (const entity of this._selectedData.values()) {
+    for (const entity of this.selectedData.values()) {
       if (entity.type !== 'node') continue;
 
       for (const way of graph.parentWays(entity as OsmEntity)) {
@@ -678,7 +672,7 @@ export class SelectOsmMode extends AbstractMode {
     const context = this.context;
     const childNodeIDs = new Set<EntityID>();
 
-    for (const entity of this._selectedData.values()) {
+    for (const entity of this.selectedData.values()) {
       if (entity.type !== 'way') continue;
 
       for (const nodeID of (entity as OsmWay).nodes) {

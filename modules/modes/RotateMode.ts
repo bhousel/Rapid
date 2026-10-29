@@ -4,7 +4,7 @@ import { DEG2RAD, vecAdd, vecScale, vecSubtract } from '@rapid-sdk/math';
 
 import type { Context } from '../Context.ts';
 import type { EditLabel } from '../lib/Edit.ts';
-import type { OsmEntity, OsmNode } from '../data/types.ts';
+import type { OsmNode } from '../data/types.ts';
 import type { Vec2 } from '@rapid-sdk/math';
 
 
@@ -65,7 +65,7 @@ export class RotateMode extends AbstractMode {
 
     // Gather valid entities and entityIDs from selection.
     // For this mode, keep only the OSM data.
-    this._selectedData = new Map<EntityID, OsmEntity>();
+    const keepIDs: EntityID[] = [];
 
     for (const entityID of entityIDs) {
       const entity = graph.hasEntity(entityID);
@@ -75,12 +75,13 @@ export class RotateMode extends AbstractMode {
         if (loc && locations?.isBlockedAt(loc)) continue;  // editing is blocked
       }
 
-      this._selectedData.set(entityID, entity);
+      keepIDs.push(entityID);
     }
 
-    if (!this._selectedData.size) return false;  // nothing to select
+    if (!keepIDs.length) return false;  // nothing to select
 
-    this._entityIDs = [...this._selectedData.keys()];  // the ones we ended up keeping
+    this._entityIDs = keepIDs;  // the ones we ended up keeping
+    this._selectedIDs = [...keepIDs];
     this._active = true;
 
     filters.forceVisible(this._entityIDs);
@@ -136,7 +137,7 @@ export class RotateMode extends AbstractMode {
 
       editor.commit({
         ...label,
-        selection: { osm: this._entityIDs }
+        selection: this._entityIDs
       });
     }
   }
@@ -214,14 +215,6 @@ export class RotateMode extends AbstractMode {
     //   editor.perform(actionRotate(entityIDs, this._pivotWorld, angle));
     // }
     // this._lastAngle = currAngle;
-
-
-    // Update selected/active collections to contain the current moved entities
-    this._selectedData.clear();
-    const currGraph = editor.staging.graph;
-    for (const entityID of this._entityIDs) {
-      this._selectedData.set(entityID, currGraph.entity(entityID));
-    }
   }
 
 

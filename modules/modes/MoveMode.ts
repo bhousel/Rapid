@@ -5,7 +5,7 @@ import { projWgs84ToWorld, vecSubtract } from '@rapid-sdk/math';
 import type { Context } from '../Context.ts';
 import type { EditLabel } from '../lib/Edit.ts';
 import type { MoveCache } from '../actions/move.ts';
-import type { OsmEntity, OsmNode } from '../data/types.ts';
+import type { OsmNode } from '../data/types.ts';
 import type { Vec2 } from '@rapid-sdk/math';
 
 
@@ -68,7 +68,7 @@ export class MoveMode extends AbstractMode {
 
     // Gather valid entities and entityIDs from selection.
     // For this mode, keep only the OSM data.
-    this._selectedData = new Map<EntityID, OsmEntity>();
+    const keepIDs: EntityID[] = [];
 
     for (const entityID of entityIDs) {
       const entity = graph.hasEntity(entityID);
@@ -78,12 +78,13 @@ export class MoveMode extends AbstractMode {
         if (loc && locations?.isBlockedAt(loc)) continue;  // editing is blocked
       }
 
-      this._selectedData.set(entityID, entity);
+      keepIDs.push(entityID);
     }
 
-    if (!this._selectedData.size) return false;  // nothing to select
+    if (!keepIDs.length) return false;  // nothing to select
 
-    this._entityIDs = [...this._selectedData.keys()];  // the ones we ended up keeping
+    this._entityIDs = keepIDs;  // the ones we ended up keeping
+    this._selectedIDs = [...keepIDs];
     this._active = true;
 
     filters.forceVisible(this._entityIDs);
@@ -140,7 +141,7 @@ export class MoveMode extends AbstractMode {
 
       editor.commit({
         ...label,
-        selection: { osm: this._entityIDs }
+        selection: this._entityIDs
       });
     }
   }
@@ -189,13 +190,6 @@ export class MoveMode extends AbstractMode {
 
     editor.revert();  // moves are relative to the start location, so revert before applying movement
     editor.perform(actionMove(this._entityIDs, delta, this._movementCache!));
-    const graph = editor.staging.graph;  // after move
-
-    // Update selected/active collections to contain the moved entities
-    this._selectedData.clear();
-    for (const entityID of this._entityIDs) {
-      this._selectedData.set(entityID, graph.entity(entityID));
-    }
   }
 
 

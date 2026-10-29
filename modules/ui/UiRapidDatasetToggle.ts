@@ -539,8 +539,7 @@ export class UiRapidDatasetToggle extends EventEmitter {
     // In case a Rapid feature is already selected, reselect it to update sidebar too.
     const mode = context.mode;
     if (mode?.id === 'select') {  // new (not legacy) select mode
-      const selection = new Map(mode.selectedData);
-      context.enter('select', { selection: selection });
+      context.enter('select', { selection: mode.selectedIDs });
     }
   }
 

@@ -26,6 +26,9 @@ import type { Context } from '../Context.ts';
 import type { GraphicsSystem } from '../core/GraphicsSystem.ts';
 import type { Viewport } from '@rapid-sdk/math';
 
+/** Returned by `getClasses()` for data that has no classes */
+const EMPTY_CLASSES: ReadonlySet<ClassID> = new Set<ClassID>();
+
 
 /**
  * This class manages the collections of known `Layers` and `Features` in the scene.
@@ -63,6 +66,11 @@ export class PixiScene extends EventEmitter {
   /** All registered features, keyed by FeatureID */
   public features: Map<FeatureID, AbstractPixiFeature>;
 
+  /** Map of dataID to Set of classIDs */
+  protected _dataHasClass: Map<DataID, Set<ClassID>>;
+  /** Map of classID to Set of dataIDs */
+  protected _classHasData: Map<ClassID, Set<DataID>>;
+
 
   /**
    * @param gfx - The GraphicsSystem that owns this Scene
@@ -75,6 +83,13 @@ export class PixiScene extends EventEmitter {
     this.groups = new Map<GroupID, PIXI.Container>();
     this.layers = new Map<LayerID, AbstractPixiLayer>();
     this.features = new Map<FeatureID, AbstractPixiFeature>();
+
+    // Data <-> Class
+    // Data classes are strings (like what CSS classes used to do for us)
+    // Counterintuitively, the Scene needs to be the source of truth for these data classes,
+    // because a Feature can be 'selected' or 'drawing' even before it has been created, or after destroyed
+    this._dataHasClass = new Map<DataID, Set<ClassID>>();
+    this._classHasData = new Map<ClassID, Set<DataID>>();
 
     // Ensure methods used as callbacks always have `this` bound correctly.
     this._layerChanged = this._layerChanged.bind(this);
@@ -146,6 +161,9 @@ export class PixiScene extends EventEmitter {
         origin.addChild(container);
       }
     });
+
+    this._dataHasClass.clear();       // maybe don't clear this (should pseudo css survive a reset?)
+    this._classHasData.clear();       // maybe don't clear this (should pseudo css survive a reset?)
 
     // Reset/setup render layers.
     for (const layer of this.layers.values()) {
@@ -260,35 +278,83 @@ export class PixiScene extends EventEmitter {
 
 
   /**
-   * Sets a dataID as being classed a certain way (e.g. 'hover')
+   * Sets a dataID as being classed a certain way (e.g. 'hover').
+   * Data IDs are unique across Rapid, so whichever layer draws the data shows the class
+   * (see `design/data-ids.md`).
    * @param classID - classID (e.g. 'hover')
-   * @param layerID - layerID (e.g. 'osm')
-   * @param dataID - dataID (e.g. 'r123')
+   * @param dataID - dataID (e.g. 'r123', 'fbRoads:w-1')
    */
-  public setClass(classID: ClassID, layerID: LayerID, dataID: DataID): void {
-    this.layers.get(layerID)?.setClass(classID, dataID);
+  public setClass(classID: ClassID, dataID: DataID): void {
+    let classIDs = this._dataHasClass.get(dataID);
+    if (!classIDs) {
+      classIDs = new Set<ClassID>();
+      this._dataHasClass.set(dataID, classIDs);
+    }
+    classIDs.add(classID);
+
+    let dataIDs = this._classHasData.get(classID);
+    if (!dataIDs) {
+      dataIDs = new Set<DataID>();
+      this._classHasData.set(classID, dataIDs);
+    }
+    dataIDs.add(dataID);
   }
 
 
   /**
    * Unsets a dataID from being classed a certain way (e.g. 'hover')
    * @param classID - classID (e.g. 'hover')
-   * @param layerID - layerID (e.g. 'osm')
    * @param dataID - dataID (e.g. 'r123')
    */
-  public unsetClass(classID: ClassID, layerID: LayerID, dataID: DataID): void {
-    this.layers.get(layerID)?.unsetClass(classID, dataID);
+  public unsetClass(classID: ClassID, dataID: DataID): void {
+    const classIDs = this._dataHasClass.get(dataID);
+    if (classIDs) {
+      classIDs.delete(classID);
+      if (!classIDs.size) {
+        this._dataHasClass.delete(dataID);
+      }
+    }
+
+    const dataIDs = this._classHasData.get(classID);
+    if (dataIDs) {
+      dataIDs.delete(dataID);
+      if (!dataIDs.size) {
+        this._classHasData.delete(classID);
+      }
+    }
   }
 
 
   /**
-   * Clear out all uses of the given classID across all layers.
+   * Clear out all uses of the given classID.
    * @param classID - classID (e.g. 'hover')
    */
   public clearClass(classID: ClassID): void {
-    for (const layer of this.layers.values()) {
-      layer.clearClass(classID);
+    const dataIDs = this._classHasData.get(classID) ?? new Set<DataID>();
+    for (const dataID of dataIDs) {
+      this.unsetClass(classID, dataID);
     }
+  }
+
+
+  /**
+   * Returns the dataIDs that are currently classed with the given classID
+   * @param classID - classID to check (e.g. 'hover')
+   * @return The dataIDs that currently have this classID set (a copy)
+   */
+  public getDataWithClass(classID: ClassID): Set<DataID> {
+    const dataIDs = this._classHasData.get(classID) ?? new Set<DataID>();
+    return new Set<DataID>(dataIDs);  // copy
+  }
+
+
+  /**
+   * Returns the classIDs that the given dataID is classed with.
+   * @param dataID - dataID to check (e.g. 'r123')
+   * @return The classIDs (don't modify it)
+   */
+  public getClasses(dataID: DataID): ReadonlySet<ClassID> {
+    return this._dataHasClass.get(dataID) ?? EMPTY_CLASSES;
   }
 
 

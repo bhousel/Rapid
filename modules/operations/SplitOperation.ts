@@ -89,7 +89,7 @@ export class SplitOperation extends AbstractOperation {
 
     const label = this.editLabel();
     const difference = editor.perform(this._action);
-    editor.commit({ ...label, selection: { osm: this.selectedIDs } });
+    editor.commit({ ...label, selection: this.selectedIDs });
 
     const idsToSelect = this._vertexIDs.slice();  // copy
 

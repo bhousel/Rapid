@@ -577,7 +577,7 @@ export class UiRapidInspector {
       type: 'rapid_accept_feature',
       stringID: 'rapid_inspector.option_accept.annotation',
       acceptIDs: acceptIDs,
-      selection: newID ? { osm: [newID] } : undefined,
+      selection: newID ? [newID] : undefined,
       sources: { data: dataset?.dataUsed ?? [datasetID] }
     });
 

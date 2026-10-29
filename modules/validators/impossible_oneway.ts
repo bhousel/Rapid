@@ -247,7 +247,7 @@ export function validateImpossibleOneway(context: Context): ValidatorFunction {
                 editor.commit({
                   stringID: 'operations.reverse.annotation.line',
                   stringParams: { n: 1 },
-                  selection: { osm: [entityID] }
+                  selection: [entityID]
                 });
               }
             }));

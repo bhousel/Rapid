@@ -120,7 +120,7 @@ export class DrawAreaMode extends AbstractMode {
     this.lastNodeID = null;
     this.firstNodeID = null;
     this._lastScreen = null;
-    this._selectedData.clear();
+    this._selectedIDs = [];
 
     eventManager.setCursor('crosshair');
 
@@ -165,8 +165,8 @@ export class DrawAreaMode extends AbstractMode {
     const context = this.context;
     const editor = context.systems.editor!;
     const gfx = context.systems.gfx!;
-    const layer = gfx.scene!.layers.get('osm')!;
     const eventManager = gfx.eventManager!;
+    const scene = gfx.scene!;
 
     eventManager.setCursor('grab');
 
@@ -212,9 +212,9 @@ export class DrawAreaMode extends AbstractMode {
     this._editIndex = null;
     this._lastScreen = null;
 
-    this._selectedData.clear();
+    this._selectedIDs = [];
 
-    layer.clearClass('drawing');
+    scene.clearClass('drawing');
 
     globalThis.setTimeout(() => {
       context.behaviors.mapInteraction!.doubleClickEnabled = true;
@@ -226,17 +226,17 @@ export class DrawAreaMode extends AbstractMode {
 
   /**
    * Confirms that the drawing entities all exist in the graph after any modifications.
-   * Updates `selectedData` collection to include the draw way
+   * Updates `selectedIDs` to include the draw way
    * Updates `drawing` class for items that need it
    */
   protected _refreshEntities(): void {
     const context = this.context;
     const editor = context.systems.editor!;
     const gfx = context.systems.gfx!;
-    const layer = gfx.scene!.layers.get('osm')!;
+    const scene = gfx.scene!;
 
-    layer.clearClass('drawing');
-    this._selectedData.clear();
+    scene.clearClass('drawing');
+    this._selectedIDs = [];
 
     const graph = editor.staging.graph;
     const drawWay = this.drawWayID ? graph.hasEntity(this.drawWayID) : undefined;
@@ -252,14 +252,14 @@ export class DrawAreaMode extends AbstractMode {
 
     // `drawNode` may or may not exist, it will be recreated after the user moves the pointer.
     if (drawNode) {
-      layer.setClass('drawing', drawNode.id);
+      scene.setClass('drawing', drawNode.id);
 
       // Nudging at the edge of the map is allowed after the drawNode exists.
       context.behaviors.mapNudge!.allow();
     }
 
-    layer.setClass('drawing', drawWay.id);
-    this._selectedData.set(drawWay.id, drawWay);
+    scene.setClass('drawing', drawWay.id);
+    this._selectedIDs = [drawWay.id];
   }
 
 
@@ -511,7 +511,7 @@ export class DrawAreaMode extends AbstractMode {
       // If the area has enough segments, commit the work in progress so we can undo/redo to it.
       const label = this._getLabel();
       if (label) {
-        editor.commit({ ...label, selection: { osm: [drawWay.id] } });
+        editor.commit({ ...label, selection: [drawWay.id] });
         this._takeSnapshot(firstNode!.id, drawNode!.id);
       }
 
@@ -587,7 +587,7 @@ export class DrawAreaMode extends AbstractMode {
       // If the area has enough segments, commit the work in progress so we can undo/redo to it.
       const label = this._getLabel();
       if (label) {
-        editor.commit({ ...label, selection: { osm: [drawWay.id] } });
+        editor.commit({ ...label, selection: [drawWay.id] });
         this._takeSnapshot(firstNode!.id, drawNode!.id);
       }
 
@@ -665,7 +665,7 @@ export class DrawAreaMode extends AbstractMode {
       // If the area has enough segments, commit the work in progress so we can undo/redo to it.
       const label = this._getLabel();
       if (label) {
-        editor.commit({ ...label, selection: { osm: [drawWay.id] } });
+        editor.commit({ ...label, selection: [drawWay.id] });
         this._takeSnapshot(firstNode!.id, targetNode.id);
       }
 
@@ -821,7 +821,7 @@ export class DrawAreaMode extends AbstractMode {
       this._refreshEntities();
 
     } else {   // Otherwise, return to select or browse mode (MapSystem has similar code to this)
-      const checkIDs = editor.stable.props.selection?.osm ?? [];
+      const checkIDs = editor.stable.props.selection ?? [];
       const selectedIDs = checkIDs.filter(entityID => graph.hasEntity(entityID));
       if (selectedIDs.length) {
         context.enter('select-osm', { selection: { osm: selectedIDs }} );

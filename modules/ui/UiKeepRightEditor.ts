@@ -136,8 +136,8 @@ export class UiKeepRightEditor extends EventEmitter {
     const l10n = context.systems.l10n!;
     const keepright = context.services.keepright;
 
-    const errID = this.datum?.id;
-    const isSelected = errID && context.selectedData().has(errID);
+    const dataID = this.datum?.dataID;
+    const isSelected = dataID && context.selectedIDs().includes(dataID);
     const isShown = (this.datum && (isSelected || this.datum.props.newComment || this.datum.props.comment));
 
     let $saveSection: D3Selection = $selection.selectAll('.qa-save')
@@ -208,8 +208,8 @@ export class UiKeepRightEditor extends EventEmitter {
     const l10n = context.systems.l10n!;
     const keepright = context.services.keepright;
 
-    const errID = this.datum?.id;
-    const isSelected = errID && context.selectedData().has(errID);
+    const dataID = this.datum?.dataID;
+    const isSelected = dataID && context.selectedIDs().includes(dataID);
     let $buttons: D3Selection = $selection.selectAll('.buttons')
       .data(isSelected ? [this.datum] : [], (d: KeepRightIssue) => d.key!);
 

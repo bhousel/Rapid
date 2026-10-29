@@ -1,4 +1,5 @@
 import { AbstractPixiLayer } from './AbstractPixiLayer.ts';
+import { makeDataID } from '../data/dataID.ts';
 import { PixiFeatureLine } from './PixiFeatureLine.ts';
 import { PixiFeaturePoint } from './PixiFeaturePoint.ts';
 
@@ -232,7 +233,7 @@ export class PixiLayerKartaPhotos extends AbstractPixiLayer {
         feature.data = d;
 
         if (d.props.sequenceID) {
-          feature.addChildData(d.props.sequenceID as string, dataID);
+          feature.addChildData(makeDataID('kartaview-sequences', d.props.sequenceID as string), d.dataID);
         }
       }
 

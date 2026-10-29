@@ -6,12 +6,16 @@ Design: [`design/data-ids.md`](../design/data-ids.md), started Oct 28 with Bryan
 derived caches (`fbRoads.pieces`); the user's datasets start with `user-`, custom data's namespaces
 with `custom-`. Step 1 (committed Oct 28): `modules/data/dataID.ts`, `AbstractDataProps.namespace`,
 `spatial.getData()` + `registerResolver()`, data with no extent kept by ID, caches renamed.
-Step 2 (Oct 28, not yet committed): file datasets drop `:0` and set `namespace`; accept/ignore
-records and conflation use `dataID`; the `rapid` layer binds data IDs (`bindingID()`, an interim
-hook that Step 3 removes); pieces in `${datasetID}.pieces`; Esri as GeoJSON; custom data in a
-`custom-${hash}` cache; vector tiles keep the `id` property as `props.stableID`. Checked live: file
-datasets, pieces, fbRoads, an Esri buildings dataset (accept + undo) and custom data all resolve with
-`getData()`. Next: Step 3 (selections are `DataID[]`).
+Step 2 (committed Oct 28): deterministic IDs for file datasets, pieces, Esri (as GeoJSON), custom
+data; accept/ignore records use `dataID`. Step 3 (Oct 28): modes keep
+`_selectedIDs: DataID[]` and `selectedData` looks them up; `SelectMode` takes `{ selection: DataID[] }`;
+every layer binds `d.dataID`; the scene owns classes by data ID; edit props' `selection` is
+`DataID[]` (old by-layer backups flattened); `_restoreSelection` uses `getData()`. Fixes a Step 2
+regression (Rapid select halo, walkthrough road check). Checked live: select a Rapid road, accept,
+undo (Rapid road selected again), OSM select, notes. Next: Step 4 (one select mode).
+Found, not fixed: `attemptAutoconnect` (accept with `poweruser.autoConnect`) runs crossing-ways on
+the stale `way` after the almost-junction autofix changed its nodes, and throws `n-1 not found`.
+Bryan has seen it too; fix it separately, after the data ID steps are done.
 
 ## Active: what an edit records (`EditSystem`)
 Design: [`design/edit-system.md`](../design/edit-system.md), started Oct 26. Edits need to record more

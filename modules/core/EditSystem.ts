@@ -10,7 +10,7 @@ import { utilObjectOmit } from '@rapid-sdk/util';
 import type { Context } from '../Context.ts';
 import type { Action } from '../actions/types.ts';
 import type { DatabaseSystem } from './DatabaseSystem.ts';
-import type { EditProps, EditSources } from '../lib/Edit.ts';
+import type { EditProps, EditSources, LegacyEditSelection } from '../lib/Edit.ts';
 import type { OsmEntityProps, OsmNode, OsmRelation, OsmTags, OsmWay, Segment } from '../data/types.ts';
 import type { ParsedElement } from '../data/parsers/types.ts';
 import type { SpatialItem } from './SpatialSystem.ts';
@@ -2341,7 +2341,7 @@ export class EditSystem extends AbstractSystem {
     const context = this.context;
     const graph = this._staging.graph;
 
-    const selectionBefore = props?.selectionBefore ?? replaced?.props.selectionBefore ?? context.mode?.selection;
+    const selectionBefore = props?.selectionBefore ?? replaced?.props.selectionBefore ?? context.mode?.selectedIDs;
     const extent = props?.extent ?? this._changeExtent(prev.graph, graph)?.rectangle();
 
     return new Edit<P>(context, graph, {
@@ -2364,7 +2364,7 @@ export class EditSystem extends AbstractSystem {
 
     return new Edit(context, this.stable.graph, {
       stringID: 'redo.return_view',
-      selection: context.mode?.selection ?? {},
+      selection: context.mode?.selectedIDs ?? [],
       transform: context.viewport.transform.props
     });
   }
@@ -2435,7 +2435,7 @@ export class EditSystem extends AbstractSystem {
       if (typeof description === 'string') props.annotation = description;
     }
 
-    if (Array.isArray(item.selectedIDs))  props.selection = { osm: item.selectedIDs as EntityID[] };
+    if (Array.isArray(item.selectedIDs))  props.selection = item.selectedIDs as EntityID[];
 
     const sources: EditSources = {};
     if (Array.isArray(item.imageryUsed))  sources.imagery = item.imageryUsed as string[];
@@ -2456,16 +2456,30 @@ export class EditSystem extends AbstractSystem {
 
 
   /**
-   * Upgrade the props of an edit backed up by an older Rapid.
-   * For a short time in October 2026, edit props had `selectedIDs` (assumed OSM) instead of `selection`.
+   * Upgrade the props of an edit backed up by an older Rapid. For a short time in October 2026:
+   * - edit props had `selectedIDs` (assumed OSM) instead of `selection`.
+   * - `selection` and `selectionBefore` grouped the data IDs by layer (`{ osm: ['w1'] }`), they're a
+   *   plain `DataID[]` now (see `design/data-ids.md`).
    * @param props - The props from the backup
    * @return The props, upgraded
    */
   protected _upgradeEditProps(props: EditProps & { selectedIDs?: EntityID[] }): EditProps {
     const { selectedIDs, ...rest } = props;
     if (Array.isArray(selectedIDs) && !rest.selection) {
-      rest.selection = { osm: selectedIDs };
+      rest.selection = selectedIDs;
     }
+
+    // Flatten a selection grouped by layer
+    const flatten = (selection: unknown): DataID[] | undefined => {
+      if (!selection) return undefined;
+      if (Array.isArray(selection)) return selection as DataID[];
+      return Object.values(selection as LegacyEditSelection).flat();
+    };
+    rest.selection = flatten(rest.selection);
+    rest.selectionBefore = flatten(rest.selectionBefore);
+    if (!rest.selection) delete rest.selection;
+    if (!rest.selectionBefore) delete rest.selectionBefore;
+
     return rest;
   }
 

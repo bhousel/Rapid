@@ -77,7 +77,7 @@ export class StraightenOperation extends AbstractOperation {
     const label = this.editLabel();
     editor
       .performAsync(action)
-      .then(() => editor.commit({ ...label, selection: { osm: this.selectedIDs } }));
+      .then(() => editor.commit({ ...label, selection: this.selectedIDs }));
   }
 
 

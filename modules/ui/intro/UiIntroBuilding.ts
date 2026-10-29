@@ -340,7 +340,7 @@ export class UiIntroBuilding extends AbstractIntroChapter {
       editor.perform(actionChangePreset(this._houseID!, preset, this._housePreset));
       editor.commit({
         stringID: 'operations.change_tags.annotation',
-        selection: { osm: [this._houseID!] }
+        selection: [this._houseID!]
       });
     }
 
@@ -690,7 +690,7 @@ export class UiIntroBuilding extends AbstractIntroChapter {
       editor.perform(actionChangePreset(this._tankID!, preset, this._tankPreset));
       editor.commit({
         stringID: 'operations.change_tags.annotation',
-        selection: { osm: [this._tankID!] }
+        selection: [this._tankID!]
       });
     }
 

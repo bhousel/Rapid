@@ -1,4 +1,5 @@
 import { AbstractPixiLayer } from './AbstractPixiLayer.ts';
+import { makeDataID } from '../data/dataID.ts';
 import { PixiFeatureLine } from './PixiFeatureLine.ts';
 import { PixiFeaturePoint } from './PixiFeaturePoint.ts';
 import { scaleLinear, type ScaleLinear } from 'd3-scale';
@@ -278,7 +279,7 @@ export class PixiLayerMapillaryPhotos extends AbstractPixiLayer {
         feature.data = d;
 
         if (d.props.sequenceID) {
-          feature.addChildData(d.props.sequenceID as string, dataID);
+          feature.addChildData(makeDataID('mapillary-sequences', d.props.sequenceID as string), d.dataID);
         }
       }
 

@@ -129,8 +129,8 @@ export class UiOsmoseEditor extends EventEmitter {
    * @param $selection - A d3-selection to render the save section into
    */
   protected _saveSection($selection: D3Selection): void {
-    const errID = this.datum?.id;
-    const isSelected = errID && this.context.selectedData().has(errID);
+    const dataID = this.datum?.dataID;
+    const isSelected = dataID && this.context.selectedIDs().includes(dataID);
     const isShown = (this.datum && isSelected);
 
     let $saveSection: D3Selection = $selection.selectAll('.qa-save')
@@ -161,8 +161,8 @@ export class UiOsmoseEditor extends EventEmitter {
     const l10n = context.systems.l10n!;
     const osmose2 = context.services.osmose!;
 
-    const errID = this.datum?.id;
-    const isSelected = errID && context.selectedData().has(errID);
+    const dataID = this.datum?.dataID;
+    const isSelected = dataID && context.selectedIDs().includes(dataID);
     let $buttons: D3Selection = $selection.selectAll('.buttons')
       .data(isSelected ? [this.datum] : [], (d: OsmoseIssue) => d.key!);
 

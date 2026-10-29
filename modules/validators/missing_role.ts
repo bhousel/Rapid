@@ -103,7 +103,7 @@ export function validateMissingRole(context: Context): ValidatorFunction {
               editor.commit({
                 stringID: 'operations.delete_member.annotation',
                 stringParams: { n: 1 },
-                selection: { osm: [parentID] }
+                selection: [parentID]
               });
             }
           })
@@ -142,7 +142,7 @@ export function validateMissingRole(context: Context): ValidatorFunction {
         editor.commit({
           stringID: 'operations.change_role.annotation',
           stringParams: { n: 1 },
-          selection: { osm: [member.id] }
+          selection: [member.id]
         });
       }
     });

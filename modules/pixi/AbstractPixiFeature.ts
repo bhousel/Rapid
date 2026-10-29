@@ -360,7 +360,7 @@ export class AbstractPixiFeature {
    */
   public set data(val: AbstractData) {
     this._data = val;
-    this.layer.bindData(this.id, this.layer.bindingID(val));
+    this.layer.bindData(this.id, val.dataID);
     this.dirty = true;
   }
 

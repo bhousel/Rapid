@@ -37,8 +37,8 @@ that an edit has to record more than changes to the OSM graph, and records where
   (`EditLabel`), translated when shown.
 - **Backup** / **session**: the saved copy of the history, in the `DatabaseSystem` `sessions` store,
   that the restore dialog offers after a restart.
-- **Selection**: selected data IDs grouped by the layer that draws them (`EditSelection`), like
-  `{ osm: ['w1'] }` or `{ rapid: ['ds:abc'] }`. The same shape `select-osm` takes.
+- **Selection**: the selected data IDs, a `DataID[]` like `['w1', 'ds:abc']` (see
+  [`data-ids.md`](data-ids.md)).
 - **Extent** (of an edit): where its change is, as `[minLon, minLat, maxLon, maxLat]`.
 - **Return view**: where the user was, and what they had selected, when they first undid away from
   the newest edit. Offered as one more redo past the newest edit. It's never in the history.
@@ -131,14 +131,12 @@ export interface EditProps {
   stringID?: StringID;      // undo/redo label, translated when shown (replaces `annotation`)
   stringParams?: EditLabelParams;
   annotation?: string;      // plain-text label, only for edits restored from a v3 backup
-  selection?: EditSelection;        // what's selected after the edit; redo restores it
-  selectionBefore?: EditSelection;  // what was selected before; undo restores it (filled in at commit)
+  selection?: DataID[];        // what's selected after the edit; redo restores it
+  selectionBefore?: DataID[];  // what was selected before; undo restores it (filled in at commit)
   extent?: Vec4;            // where the change is (computed at commit, or given by the committer)
   sources?: EditSources;
   transform?: TransformProps;   // where the user was looking when they made it
 }
-
-export type EditSelection = Record<LayerID, DataID[]>;   // e.g. { osm: ['w1'] }
 
 export class Edit<P extends EditProps = EditProps> {
   public context: Context;
@@ -359,9 +357,11 @@ be working on it, and offered with a warning if we can't tell. Details are in
 - **Accept and ignore outliving the session is a Rapid question,** recorded in
   [`rapid-system.md`](rapid-system.md). Within a session they stay edits in the history, so undoing an
   ignore brings the feature back.
-- **Selection is grouped by layer** (`EditSelection`), not a flat `DataID[]`: restoring a selection
-  needs to know which layer to find each ID in. Moved up from the backup v4 step into step 4, since
-  undoing back to the selection before an edit is when it starts to matter. (October 2026)
+- **Selection is a flat `DataID[]`.** At first it was grouped by layer (`{ osm: ['w1'] }`), because
+  restoring a selection needed to know which layer to find each ID in. Since data IDs are unique
+  across Rapid and `SpatialSystem.getData()` finds any of them, the grouping went away (Step 3 of
+  [`data-ids.md`](data-ids.md)); `_upgradeEditProps()` flattens the old shape in backups.
+  (October 2026)
 - **Each edit records the selection before and after.** Undo restores before, redo restores after.
 - **An edit records where the change is as an extent, not a transform**, so it can be shown on any
   screen size or device. The `transform` (where the user was looking) is kept too; it's cheap.
@@ -419,7 +419,7 @@ None right now. Questions from the first draft are answered under Decisions.
    walkthrough); Rapid accept and ignore are typed props; backups use `hasWork()` and save props, so an
    ignore-only session is backed up (checked live). `dataVersion` from PR #5 didn't land with it.
 4. **Viewport and selection on undo, redo and restore.** ✅ Edits record their `extent` and the
-   selection before and after (`EditSelection`, by layer; `selectedIDs` is gone). `MapSystem` shows
+   selection before and after (by layer at first, a `DataID[]` since; `selectedIDs` is gone). `MapSystem` shows
    the change only when it isn't already in view (`viewForExtent`, `showExtentAsync`, `easeDuration`,
    which also replaced the walkthrough's `transitionTime`), undo restores the selection before and
    redo the selection after, and the return view takes the user back to where they were. Checked live:

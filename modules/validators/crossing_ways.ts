@@ -831,7 +831,7 @@ export function validateCrossingWays(context: Context): ValidatorFunction {
         editor.perform(actionAddStructure);
         editor.commit({
           stringID: `issues.fix.${titleID}.annotation`,
-          selection: { osm: [selectedWayID] }
+          selection: [selectedWayID]
         });
         context.enter('select-osm', { selection: { osm: resultWayIDs }} );
       }
@@ -933,7 +933,7 @@ export function validateCrossingWays(context: Context): ValidatorFunction {
         editor.perform(action);
         editor.commit({
           ...label,
-          selection: { osm: this.issue.entityIds }
+          selection: this.issue.entityIds
         });
       }
     });
@@ -981,7 +981,7 @@ export function validateCrossingWays(context: Context): ValidatorFunction {
         editor.perform(actionChangeTags(entity.id, tags));
         editor.commit({
           stringID: 'operations.change_tags.annotation',
-          selection: { osm: [selectedID] }
+          selection: [selectedID]
         });
       }
     });

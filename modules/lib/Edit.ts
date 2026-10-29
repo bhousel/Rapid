@@ -19,10 +19,10 @@ export interface EditLabel {
 }
 
 /**
- * Selected data IDs, grouped by the layer they're drawn on, the same shape the select modes take.
- * e.g. `{ osm: ['w1'] }` or `{ rapid: ['fbRoads:123:0'] }`
+ * The selection that an older Rapid saved: data IDs grouped by the layer they're drawn on,
+ * e.g. `{ osm: ['w1'] }`. Only for upgrading backups; edits now save a `DataID[]`.
  */
-export type EditSelection = Record<LayerID, DataID[]>;
+export type LegacyEditSelection = Record<LayerID, DataID[]>;
 
 /** Imagery, photo and data sources used to make an edit (shown in the changeset comment) */
 export interface EditSources {
@@ -49,10 +49,10 @@ export interface EditProps {
   stringParams?: EditLabelParams;
   /** A plain-text label, only for edits restored from a v3 backup (already translated) */
   annotation?: string;
-  /** What's selected after this edit; redo restores it */
-  selection?: EditSelection;
-  /** What was selected before this edit; undo restores it. `EditSystem` fills it in at commit. */
-  selectionBefore?: EditSelection;
+  /** Data IDs of what's selected after this edit, e.g. `['w1', 'fbRoads:abc']`; redo restores it */
+  selection?: DataID[];
+  /** Data IDs of what was selected before this edit; undo restores it. `EditSystem` fills it in at commit. */
+  selectionBefore?: DataID[];
   /**
    * Where the change is, as `[minLon, minLat, maxLon, maxLat]`. Undo and redo show it.
    * `EditSystem` computes it from the graph at commit; an edit that changes no OSM data

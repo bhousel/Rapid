@@ -135,7 +135,7 @@ export function validateUnsquareWay(context: Context): ValidatorFunction {
                 .then(() => editor.commit({
                   stringID: 'operations.orthogonalize.annotation.feature',
                   stringParams: { n: 1 },
-                  selection: { osm: [entityID] }
+                  selection: [entityID]
                 }));
             }
           }),

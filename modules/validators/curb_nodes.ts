@@ -90,7 +90,7 @@ export function validateCurbNodes(context: Context): ValidatorFunction {
             performCurbNodeFixes(wayID, tags);
             editor.commit({
               stringID: 'issues.curb_nodes.fix.annotation',
-              selection: { osm: [wayID] }
+              selection: [wayID]
             });
           }
         });

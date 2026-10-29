@@ -571,8 +571,7 @@ export class MapRouletteService extends AbstractSystem {
     }
 
     this.currentTask = other;
-    const selection = new Map<string, MarkerData>().set(other.id, other);
-    context.enter('select', { selection });
+    context.enter('select', { selection: [other.dataID] });
   }
 
 

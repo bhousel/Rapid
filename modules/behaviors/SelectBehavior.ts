@@ -5,7 +5,6 @@ import { actionAddMidpoint } from '../actions/add_midpoint.ts';
 import { projWorldToWgs84, vecLength, vecProject } from '@rapid-sdk/math';
 import { utilDetect } from '../util/detect.ts';
 
-import type { AbstractData } from '../data/AbstractData.ts';
 import type { Context } from '../Context.ts';
 import type { EventData } from './AbstractBehavior.ts';
 import type { FederatedPointerEvent } from 'pixi.js';
@@ -382,7 +381,7 @@ export class SelectBehavior extends AbstractBehavior {
 
     // Clicked on a photo..
     } else if (photos && data.type === 'photo') {
-      photos.selectPhoto(layerID, dataID);
+      photos.selectPhoto(layerID, data.id);   // the photo's own ID, not its data ID
       return;
 
     // Clicked a selectable non-OSM feature..
@@ -391,8 +390,7 @@ export class SelectBehavior extends AbstractBehavior {
       data instanceof GeoJSONData ||  // Clicked Custom Data (e.g. gpx track)..
       data instanceof MarkerData      // Clicked a MarkerData (OSM Note, KeepRight, Osmose, Maproulette)..
     ) {
-      const selection = new Map<DataID, AbstractData>().set(dataID!, data);
-      context.enter('select', { selection: selection });
+      context.enter('select', { selection: [data.dataID] });
       return;
 
     // Clicked an OSM feature..
@@ -489,7 +487,7 @@ export class SelectBehavior extends AbstractBehavior {
       editor.perform(actionAddMidpoint({ loc, edge } as Midpoint, new OsmNode(context)));
       editor.commit({
         stringID: 'operations.add.annotation.vertex',
-        selection: { osm: context.selectedIDs() }   // keep the parent way selected
+        selection: context.selectedIDs()   // keep the parent way selected
       });
     }
 

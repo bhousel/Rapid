@@ -205,16 +205,6 @@ export class PixiLayerRapid extends AbstractPixiLayer {
 
 
   /**
-   * This layer draws every enabled dataset, and their local IDs may clash, so it binds data IDs.
-   * @param d - The datum
-   * @return Its data ID
-   */
-  public override bindingID(d: AbstractData): DataID {
-    return d.dataID;
-  }
-
-
-  /**
    * Render any data we have, and schedule fetching more of it to cover the view
    * @param frame - Integer frame being rendered
    * @param viewport - Pixi viewport to use for rendering

@@ -1,5 +1,6 @@
 import { AbstractSystem } from './AbstractSystem.ts';
 import { Extent } from '@rapid-sdk/math';
+import { makeDataID } from '../data/dataID.ts';
 import { utilDate, utilDateString } from '../util/date.ts';
 import { utilExtractValues } from '../util/string.ts';
 import { utilIterable } from '../util/iterable.ts';
@@ -8,6 +9,18 @@ import type { Context } from '../Context.ts';
 import type { D3Selection } from 'd3-selection';
 import type { MarkerData } from '../data/MarkerData.ts';
 import type { OneOrMore } from '../util/iterable.ts';
+
+
+/**
+ * Returns the data ID of a photo. Each photo service keeps its images in a `${layerID}-images`
+ * cache, which is their namespace (see `design/data-ids.md`).
+ * @param layerID - The photo layer, e.g. 'mapillary'
+ * @param photoID - The photo's ID in that service
+ * @return The photo's data ID, e.g. 'mapillary-images:123'
+ */
+function photoDataID(layerID: PhotoLayerID, photoID: PhotoID): DataID {
+  return makeDataID(`${layerID}-images`, photoID);
+}
 
 
 /** Date filter types ('fromDate' or 'toDate') */
@@ -455,7 +468,7 @@ export class PhotoSystem extends AbstractSystem {
 
       this._currPhotoLayerID = layerID;
       this._currPhotoID = photoID;
-      scene?.setClass('selectphoto', layerID, photoID);
+      scene?.setClass('selectphoto', photoDataID(layerID, photoID));
 
       // Try to show the viewer with the image selected..
       (service as any).selectImageAsync(photoID)
@@ -506,7 +519,7 @@ export class PhotoSystem extends AbstractSystem {
 
       this._currLayerID = layerID;
       this._currDetectionID = detectionID;
-      scene?.setClass('selectdetection', layerID, detectionID);
+      scene?.setClass('selectdetection', makeDataID(`${photoLayerID}-detections`, detectionID));
 
       // Try to highlight any photos that show this detection,
       // And try to select a photo in the viewer that shows it.
@@ -518,9 +531,8 @@ export class PhotoSystem extends AbstractSystem {
           // Handle the situation where we want to select a detection,
           // but we haven't properly entered SelectMode yet.
           // This can happen if the detection arrived in the URL hash.
-          if (!context.selectedData().has(detection.id)) {
-            const selection = new Map<DetectionID, MarkerData>().set(detection.id, detection);
-            context.enter('select', { selection: selection });
+          if (!context.selectedIDs().includes(detection.dataID)) {
+            context.enter('select', { selection: [detection.dataID] });
             return;  // exit to avoid infinite loop - entering select mode will bring us right back in here.
           }
 
@@ -528,7 +540,7 @@ export class PhotoSystem extends AbstractSystem {
           const images = (detection.props.images ?? []) as { id: string }[];
           const highlightPhotoIDs = images.map(image => image.id);
           for (const photoID of highlightPhotoIDs) {
-            scene?.setClass('highlightphoto', photoLayerID, photoID);
+            scene?.setClass('highlightphoto', photoDataID(photoLayerID, photoID));
           }
 
           // Try to select a photo that shows this detection..

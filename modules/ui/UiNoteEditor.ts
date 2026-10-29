@@ -161,7 +161,7 @@ export class UiNoteEditor extends EventEmitter {
     const l10n = context.systems.l10n!;
     const scheduler = context.systems.scheduler;  // optional
 
-    const isSelected = (this.datum && this.datum.id === context.selectedIDs()[0]);
+    const isSelected = (this.datum && this.datum.dataID === context.selectedIDs()[0]);
     let $noteSave: D3Selection = $selection.selectAll('.note-save')
       .data((isSelected ? [this.datum] : []), (d: OsmNote) => d.key!);
 
@@ -360,7 +360,7 @@ export class UiNoteEditor extends EventEmitter {
     const osm = context.services.osm!;
 
     const hasAuth = osm && osm.authenticated();
-    const isSelected = (this.datum && this.datum.id === context.selectedIDs()[0]);
+    const isSelected = (this.datum && this.datum.dataID === context.selectedIDs()[0]);
 
     const isSaveDisabled = (d: OsmNote): true | null => {
       return (hasAuth && d.props.status === 'open' && d.props.newComment) ? null : true;

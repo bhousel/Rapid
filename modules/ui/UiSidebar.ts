@@ -274,9 +274,9 @@ export class UiSidebar {
     scene.clearClass('hover');
     if (layer && dataID) {
       // Only set hover class if this target isn't currently drawing
-      const drawingIDs = layer.getDataWithClass('drawing');
+      const drawingIDs = scene.getDataWithClass('drawing');
       if (!drawingIDs.has(dataID)) {
-        layer.setClass('hover', dataID);
+        scene.setClass('hover', dataID);
       }
     }
 

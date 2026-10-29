@@ -85,7 +85,7 @@ export class PasteOperation extends AbstractOperation {
     editor.commit({
       stringID: 'operations.paste.annotation',
       stringParams: { n: newIDs.length },
-      selection: { osm: newIDs }
+      selection: newIDs
     });
     editor.endTransaction();
 

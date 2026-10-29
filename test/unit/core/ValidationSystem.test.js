@@ -112,7 +112,7 @@ describe('ValidationSystem', () => {
 
       const editor = context.systems.editor;
       editor.perform(Rapid.actionAddEntity(n_1));
-      editor.commit({ stringID:'added n-1', selection: { osm: ['n-1'] } });
+      editor.commit({ stringID:'added n-1', selection: ['n-1'] });
 
       const prom = _validator.validateAsync();
       assert.instanceOf(prom, Promise);

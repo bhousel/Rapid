@@ -98,26 +98,25 @@ export function utilHighlightEntities(context: Context, entityIDs: EntityID[], h
   const editor = context.systems.editor;
   const gfx = context.systems.gfx;
   const scene = gfx?.scene;
-  const layer = scene?.layers.get('osm');
 
-  if (!editor || !scene || !layer) return;  // called too soon?
+  if (!editor || !scene) return;  // called too soon?
 
   if (highlighted) {
     for (const entityID of entityIDs) {
-      layer.setClass('highlight', entityID);
+      scene.setClass('highlight', entityID);
 
       // When highlighting a relation, try to highlight its members.
       if (entityID[0] === 'r') {
         const relation = editor.staging.graph.hasEntity(entityID) as OsmRelation;
         if (!relation) continue;
         for (const member of relation.members) {
-          layer.setClass('highlight', member.id);
+          scene.setClass('highlight', member.id);
         }
       }
     }
 
   } else {
-    layer.clearClass('highlight');
+    scene.clearClass('highlight');
   }
 
   gfx?.immediateRedraw();

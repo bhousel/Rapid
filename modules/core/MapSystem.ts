@@ -3,14 +3,14 @@ import {
   DEG2RAD, RAD2DEG, TAU, Extent, numClamp, numWrap, projWgs84ToWorld,
   vecLength, vecRotate, vecSubtract, Viewport, WORLD_HALF, WORLD_SCALE } from '@rapid-sdk/math';
 import { MarkerData } from '../data/MarkerData.ts';
+import { osmEntityID } from '../data/dataID.ts';
 import { selection } from 'd3-selection';
 import { utilTotalExtent } from '../util/util.ts';
 
-import type { AbstractData } from '../data/AbstractData.ts';
 import type { Context } from '../Context.ts';
 import type { D3EnterSelection, D3Selection } from 'd3-selection';
 import type { Difference } from '../lib/Difference.ts';
-import type { Edit, EditSelection } from '../lib/Edit.ts';
+import type { Edit } from '../lib/Edit.ts';
 import type { OsmEntity } from '../data/OsmEntity.ts';
 import type { TransformProps, Vec2 } from '@rapid-sdk/math';
 
@@ -407,10 +407,9 @@ export class MapSystem extends AbstractSystem {
     // note
     const layer = scene.layers.get('notes');
     let noteID;
-    const [pair] = context.selectedData();  // get the first thing in the Map()
-    const [datumID, datum] = pair || [];
+    const [datum] = context.selectedData().values();  // get the first thing in the Map()
     if (datum instanceof MarkerData && datum.serviceID === 'osm') {
-      noteID = datumID;
+      noteID = datum.id;   // the note's own ID, not its data ID
     }
 
     // `note=true` -or- `note=<noteID>`
@@ -475,7 +474,7 @@ export class MapSystem extends AbstractSystem {
     const modeID = context.mode?.id ?? '';
     if (/^draw/.test(modeID)) return;
 
-    const selection = (isUndo ? edit.props.selectionBefore : edit.props.selection) ?? {};
+    const selection = (isUndo ? edit.props.selectionBefore : edit.props.selection) ?? [];
     this._restoreSelection(selection);
   }
 
@@ -496,26 +495,28 @@ export class MapSystem extends AbstractSystem {
     const modeID = context.mode?.id ?? '';
     if (/^draw/.test(modeID)) return;
 
-    this._restoreSelection(edit.props.selection ?? {});
+    this._restoreSelection(edit.props.selection ?? []);
   }
 
 
   /**
    * Select what's in the given selection, or go to browse mode if none of it can be found.
-   * OSM entities must be in the stable graph.  Other data must be drawn on its layer, and data that
-   * comes back on undo (like a Rapid feature) isn't drawn yet, so this tries again after the next redraws.
+   * OSM entities must be in the stable graph.  Other data is found by its data ID
+   * (`SpatialSystem.getData`). Data that comes back on undo may not be there yet (a Rapid feature
+   * that's loaded again, or a piece of a line that conflation makes when the line is drawn), so this
+   * tries again after the next redraws.
    * The modes can't select OSM and other data together yet, so OSM wins.
-   * @param  selection - Data IDs by layer, e.g. `{ osm: ['w1'] }`
+   * @param  selection - Data IDs, e.g. `['w1', 'fbRoads:abc']`
    */
-  protected _restoreSelection(selection: EditSelection): void {
+  protected _restoreSelection(selection: DataID[]): void {
     const context = this.context;
     const editor = context.systems.editor!;
     const gfx = context.systems.gfx!;
-    const scene = gfx.scene;
+    const spatial = context.systems.spatial!;
 
     const count = ++this._selectCount;
     const graph = editor.stable.graph;
-    const osmIDs = (selection.osm ?? []).filter(entityID => graph.hasEntity(entityID));
+    const osmIDs = selection.filter(dataID => osmEntityID(dataID) && graph.hasEntity(dataID));
     if (osmIDs.length) {
       context.enter('select-osm', { selection: { osm: osmIDs }} );
       return;
@@ -523,8 +524,8 @@ export class MapSystem extends AbstractSystem {
 
     context.enter('browse');
 
-    const others = Object.entries(selection).filter(([layerID, dataIDs]) => layerID !== 'osm' && dataIDs.length);
-    if (!others.length || !scene) return;
+    const others = selection.filter(dataID => !osmEntityID(dataID));
+    if (!others.length) return;
 
     const MAX_TRIES = 5;
     let tries = 0;
@@ -532,15 +533,8 @@ export class MapSystem extends AbstractSystem {
       // Give up if another selection was restored since, or the user moved on to something else
       if (count !== this._selectCount || context.mode?.id !== 'browse') return true;
 
-      const found = new Map<DataID, AbstractData>();
-      for (const [layerID, dataIDs] of others) {
-        const layer = scene.layers.get(layerID);
-        for (const dataID of dataIDs) {
-          const data = layer?.getData(dataID);
-          if (data) found.set(dataID, data);
-        }
-      }
-      if (found.size) {
+      const found = others.filter(dataID => spatial.getData(dataID));
+      if (found.length) {
         context.enter('select', { selection: found });
         return true;
       }
@@ -1023,8 +1017,7 @@ export class MapSystem extends AbstractSystem {
       .then((note: MarkerData) => {
         if (!note.loc) return;
         scene.enableLayers('notes');
-        const selection = new Map<DataID, MarkerData>().set(note.id, note);
-        context.enter('select', { selection: selection });
+        context.enter('select', { selection: [note.dataID] });
         this.centerZoomEase(note.loc, 19);
       });
   }

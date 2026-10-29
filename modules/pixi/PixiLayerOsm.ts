@@ -245,9 +245,9 @@ export class PixiLayerOsm extends AbstractPixiLayer {
     // We can prepare vertices and midpoints.
 
     // Gather ids related to the selected/hovered/drawing features.
-    const selectedIDs = this.getDataWithClass('select');
-    const hoveredIDs = this.getDataWithClass('hover');
-    const drawingIDs = this.getDataWithClass('drawing');
+    const selectedIDs = this.scene.getDataWithClass('select');
+    const hoveredIDs = this.scene.getDataWithClass('hover');
+    const drawingIDs = this.scene.getDataWithClass('drawing');
     const dataIDs = new Set<EntityID>([...selectedIDs, ...hoveredIDs, ...drawingIDs]);
 
     // Experiment: avoid showing child vertices/midpoints for too small parents

@@ -188,8 +188,8 @@ export class UiMapRouletteEditor extends EventEmitter {
    * @param $selection - A d3-selection to the HTMLElement this section renders into
    */
   protected _saveSection($selection: D3Selection): void {
-    const errID = this.datum?.id;
-    const isSelected = errID && this.context.selectedData().has(errID);
+    const dataID = this.datum?.dataID;
+    const isSelected = dataID && this.context.selectedIDs().includes(dataID);
     const isShown = (this.datum && isSelected);
 
     let $saveSection: D3Selection = $selection.selectAll('.mr-save')
@@ -221,8 +221,8 @@ export class UiMapRouletteEditor extends EventEmitter {
     const l10n = context.systems.l10n!;
     const maproulette = context.services.maproulette!;
 
-    const errID = this.datum?.id;
-    const isSelected = errID && context.selectedData().has(errID);
+    const dataID = this.datum?.dataID;
+    const isSelected = dataID && context.selectedIDs().includes(dataID);
 
     let $commentSave: D3Selection = $selection.selectAll('.note-save')
       .data(isSelected && this._actionTaken ? [this.datum!] : [], (d: MapRouletteTask) => d.key!);
@@ -403,8 +403,8 @@ export class UiMapRouletteEditor extends EventEmitter {
     this._getApiKeyAsync()
       .then(() => {
         const hasAuth = (this._user && this._apikey);
-        const errID = this.datum?.id;
-        const isSelected = errID && context.selectedData().has(errID);
+        const dataID = this.datum?.dataID;
+        const isSelected = dataID && context.selectedIDs().includes(dataID);
 
         // Check if the MapRoulette menu is showing
         if ((ui as any)?._showsMapRouletteMenu) {
@@ -529,8 +529,8 @@ export class UiMapRouletteEditor extends EventEmitter {
     const context = this.context;
     const l10n = context.systems.l10n!;
 
-    const errID = this.datum?.id;
-    const isSelected = errID && context.selectedData().has(errID);
+    const dataID = this.datum?.dataID;
+    const isSelected = dataID && context.selectedIDs().includes(dataID);
     let $buttons: D3Selection = $selection.selectAll('.buttons')
       .data(isSelected ? [this.datum!] : [], (d: MapRouletteTask) => d.key!);
 

@@ -1,45 +1,8 @@
 import { EventEmitter } from 'tseep/lib/ee-safe';
-import { GeoJSONData, MarkerData, OsmEntity } from '../data/index.ts';
 
 import type { AbstractData } from '../data/AbstractData.ts';
 import type { AbstractOperation } from '../operations/AbstractOperation.ts';
 import type { Context } from '../Context.ts';
-import type { EditSelection } from '../lib/Edit.ts';
-
-
-/**
- * Works out which layer draws the given data, from what kind of data it is.
- * It's hacky, and could go away if selections carried their layerIDs.
- * @param  datum - The data to find the layer for
- * @return The layerID, or `null` if not known
- */
-export function dataLayerID(datum: AbstractData): LayerID | null {
-  const datasetID = (datum.props?.datasetID ?? '') as DatasetID;
-  const serviceID = (datum.props?.serviceID ?? '') as ServiceID;
-
-  if (datum instanceof OsmEntity) {
-    return 'osm';
-  } else if (datasetID) {
-    return 'rapid';
-  } else if (datum instanceof MarkerData && datum.type === 'detection') {
-    if (serviceID === 'mapillary' && datum.props.object_type === 'point') {
-      return 'mapillary-detections';
-    } else if (serviceID === 'mapillary' && datum.props.object_type === 'traffic_sign') {
-      return 'mapillary-signs';
-    }
-  } else if (datum instanceof MarkerData) {   // in most cases the `serviceID` is the `layerID`
-    if (serviceID === 'osm') {
-      if (datum.type === 'note') {
-        return 'notes';   // OSM Notes
-      }
-    } else {
-      return serviceID;
-    }
-  } else if (datum instanceof GeoJSONData) {  // custom data
-    return 'custom-data';
-  }
-  return null;
-}
 
 
 /**
@@ -53,7 +16,8 @@ export function dataLayerID(datum: AbstractData): LayerID | null {
  * -  `id` (or `modeID`) - String identifier for the mode (e.g. 'browse')
  * -  `active`           - `true` if the mode is active, `false` if not.
  * -  `operations`       - Array of operations allowed on the right-click edit menu
- * -  `selectedData`     - `Map<DataID, AbstractData>` containing selected data
+ * -  `selectedIDs`      - The data IDs of the selected data (see `design/data-ids.md`)
+ * -  `selectedData`     - `Map<DataID, AbstractData>` of the selected data, looked up by data ID
  */
 export class AbstractMode extends EventEmitter {
 
@@ -66,8 +30,8 @@ export class AbstractMode extends EventEmitter {
 
   /** Whether this mode is currently active */
   protected _active: boolean;
-  /** Currently selected data items keyed by their DataID */
-  protected _selectedData: Map<DataID, AbstractData>;
+  /** Data IDs of the currently selected data */
+  protected _selectedIDs: DataID[];
 
 
   /**
@@ -79,7 +43,7 @@ export class AbstractMode extends EventEmitter {
     this.context = context;
 
     this._active = false;
-    this._selectedData = new Map<DataID, AbstractData>();
+    this._selectedIDs = [];
     this.operations = [];
   }
 
@@ -124,39 +88,31 @@ export class AbstractMode extends EventEmitter {
 
 
   /**
-   * Map of currently selected data elements, keyed by their `DataID`
+   * Map of currently selected data elements, keyed by their `DataID`.
+   * Each one is looked up by its data ID (`SpatialSystem.getData`), so it's always the current
+   * version. Data that can't be found right now is left out.
    * @return  Map of selected data
    * @readonly
    */
   public get selectedData(): Map<DataID, AbstractData> {
-    return this._selectedData;
+    const spatial = this.context.systems.spatial!;
+
+    const result = new Map<DataID, AbstractData>();
+    for (const dataID of this._selectedIDs) {
+      const datum = spatial.getData(dataID);
+      if (datum) result.set(dataID, datum);
+    }
+    return result;
   }
 
 
   /**
    * Array of currently selected data IDs
-   * @return  Array of selected `DataID`s
+   * @return  Array of selected `DataID`s (a copy)
    * @readonly
    */
   public get selectedIDs(): DataID[] {
-    return Array.from(this._selectedData.keys());
-  }
-
-
-  /**
-   * Currently selected data IDs, grouped by the layer they're drawn on.
-   * Data whose layer isn't known is left out.
-   * @return  Selected `DataID`s by `LayerID`, e.g. `{ osm: ['w1'] }`
-   * @readonly
-   */
-  public get selection(): EditSelection {
-    const selection: EditSelection = {};
-    for (const [dataID, datum] of this._selectedData) {
-      const layerID = dataLayerID(datum);
-      if (!layerID) continue;
-      (selection[layerID] ??= []).push(dataID);
-    }
-    return selection;
+    return [...this._selectedIDs];
   }
 
 }

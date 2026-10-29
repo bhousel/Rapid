@@ -1,4 +1,5 @@
 import { AbstractPixiLayer } from './AbstractPixiLayer.ts';
+import { makeDataID } from '../data/dataID.ts';
 import { PixiFeatureLine } from './PixiFeatureLine.ts';
 import { PixiFeaturePoint } from './PixiFeaturePoint.ts';
 import { scaleLinear, type ScaleLinear } from 'd3-scale';
@@ -218,8 +219,8 @@ export class PixiLayerStreetsidePhotos extends AbstractPixiLayer {
         feature.v = version;
         feature.geometry = part;
         feature.data = d;
-        feature.clearChildData(dataID);
-        feature.addChildData(dataID, d.props.bubbleIDs as string);
+        feature.clearChildData(d.dataID);
+        feature.addChildData(d.dataID, (d.props.bubbleIDs as PhotoID[]).map(bubbleID => makeDataID('streetside-images', bubbleID)));
       }
 
       this.syncFeatureClasses(feature);

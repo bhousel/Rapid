@@ -56,7 +56,7 @@ export class ReverseOperation extends AbstractOperation {
 
     const label = this.editLabel();
     editor.perform(combinedAction);
-    editor.commit({ ...label, selection: { osm: this.selectedIDs } });
+    editor.commit({ ...label, selection: this.selectedIDs });
   }
 
 

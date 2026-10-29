@@ -1,5 +1,5 @@
-import { AbstractMode, dataLayerID } from './AbstractMode.ts';
-import { AbstractData, OsmEntity, GeoJSONData, MarkerData } from '../data/index.ts';
+import { AbstractMode } from './AbstractMode.ts';
+import { OsmEntity, GeoJSONData, MarkerData } from '../data/index.ts';
 import { Extent } from '@rapid-sdk/math';
 import { UiOsmoseEditor } from '../ui/UiOsmoseEditor.ts';
 import { UiDataEditor } from '../ui/UiDataEditor.ts';
@@ -15,8 +15,8 @@ const DEBUG = false;
 
 /** Options for entering `SelectMode` */
 export interface SelectModeOptions {
-  /** A Map of datumID -> datum for selected items */
-  selection?: Map<DataID, AbstractData>;
+  /** Data IDs of the data to select (see `design/data-ids.md`) */
+  selection?: DataID[];
 }
 
 
@@ -44,50 +44,46 @@ export class SelectMode extends AbstractMode {
 
 
   /**
-   * Expects a `selection` property in the options argument as a `Map<datumID, datum>`
+   * Expects a `selection` property in the options argument, the data IDs to select.
+   * Data that can't be found (`SpatialSystem.getData`) is left out.
    * @param  options - Optional options object
    * @return `true` if mode could be entered, `false` it not
    */
   public enter(options: SelectModeOptions = {}): boolean {
-    const selection = options.selection;
-    if (!(selection instanceof Map)) return false;
-    if (!selection.size) return false;
-    const [[datumID, datum]] = selection.entries();   // the first thing in the selection
-
-    if (DEBUG) {
-      console.log(`SelectMode: entering, selected ${datumID}`);  // eslint-disable-line no-console
-    }
-
-    this._selectedData = selection;
-    this._active = true;
-
     const context = this.context;
     const gfx = context.systems.gfx!;
     const photos = context.systems.photos!;
+    const spatial = context.systems.spatial!;
     const ui = context.systems.ui;
     const scene = gfx.scene!;
     const Sidebar = ui?.Sidebar;
+
+    const selection = (options.selection ?? []).filter(dataID => spatial.getData(dataID));
+    if (!selection.length) return false;
+    const datum = spatial.getData(selection[0])!;   // the first thing in the selection
+
+    if (DEBUG) {
+      console.log(`SelectMode: entering, selected ${datum.dataID}`);  // eslint-disable-line no-console
+    }
+
+    this._selectedIDs = selection;
+    this._active = true;
 
     context.enableBehaviors(['hover', 'select', 'drag', 'mapInteraction', 'lasso', 'paste']);
 
     // Compute the total extent of selected items
     this.extent = new Extent();
-    for (const datum of selection.values()) {
-      const other = datum.extent();
+    for (const d of this.selectedData.values()) {
+      const other = d.extent();
       if (other instanceof Extent) {
         this.extent.extendSelf(other);
       }
     }
 
     // Handle 'select' style class.
-    // This code chooses the layer that the data came from, so it can be 'select' classed.
-    // It's hacky and we should remove this, maybe by including layerID in the `options` passed in.
     scene.clearClass('select');
-    for (const datum of selection.values()) {
-      const layerID = dataLayerID(datum);
-      if (layerID) {
-        scene.setClass('select', layerID, datumID);
-      }
+    for (const dataID of selection) {
+      scene.setClass('select', dataID);
     }
 
 
@@ -105,11 +101,10 @@ export class SelectMode extends AbstractMode {
       noteEditor.on('change', () => {
         gfx?.immediateRedraw();  // force a redraw (there is no history change that would otherwise do this)
         const osm = context.services.osm;
-        const d = osm?.getNote(datumID);   // marker may contain stale data - get latest
+        const d = osm?.getNote(datum.id);   // marker may contain stale data - get latest
         if (!(d instanceof MarkerData)) return;  // or - go to browse mode
         noteEditor.datum = d;
         Sidebar?.show(noteEditor.render);
-        this._selectedData.set(datumID, d);  // update selectedData after a change happens?
       });
       sidebarContent = noteEditor.render;
 
@@ -119,11 +114,10 @@ export class SelectMode extends AbstractMode {
       keepRightEditor.on('change', () => {
         gfx?.immediateRedraw();  // force a redraw (there is no history change that would otherwise do this)
         const keepright = context.services.keepright;
-        const d = keepright?.getError(datumID);  // marker may contain stale data - get latest
+        const d = keepright?.getError(datum.id);  // marker may contain stale data - get latest
         if (!(d instanceof MarkerData)) return;  // or - go to browse mode?
         keepRightEditor.datum = d;
         Sidebar?.show(keepRightEditor.render);
-        this._selectedData.set(datumID, d);  // update selectedData after a change happens?
       });
       sidebarContent = keepRightEditor.render;
 
@@ -133,11 +127,10 @@ export class SelectMode extends AbstractMode {
       osmoseEditor.on('change', () => {
         gfx?.immediateRedraw();  // force a redraw (there is no history change that would otherwise do this)
         const osmose = context.services.osmose;
-        const d = osmose?.getError(datumID);     // marker may contain stale data - get latest
+        const d = osmose?.getError(datum.id);     // marker may contain stale data - get latest
         if (!(d instanceof MarkerData)) return;  // or - go to browse mode?
         osmoseEditor.datum = d;
         Sidebar?.show(osmoseEditor.render);
-        this._selectedData.set(datumID, d);  // update selectedData after a change happens?
       });
       sidebarContent = osmoseEditor.render;
 
@@ -149,11 +142,10 @@ export class SelectMode extends AbstractMode {
       maprouletteEditor.on('change', () => {
         gfx?.immediateRedraw();  // force a redraw (there is no history change that would otherwise do this)
         const maproulette = context.services.maproulette;
-        const d = maproulette?.getTask(datumID);  // marker may contain stale data - get latest
+        const d = maproulette?.getTask(datum.id);  // marker may contain stale data - get latest
         if (!(d instanceof MarkerData)) return;   // or - go to browse mode?
         maprouletteEditor.datum = d;
         Sidebar?.show(maprouletteEditor.render);
-        this._selectedData.set(datumID, d);  // update selectedData after a change happens?
       });
       sidebarContent = maprouletteEditor.render;
 
@@ -223,7 +215,7 @@ export class SelectMode extends AbstractMode {
       console.log('SelectMode: exiting');  // eslint-disable-line no-console
     }
 
-    this._selectedData.clear();
+    this._selectedIDs = [];
     scene.clearClass('select');
     Sidebar.hide();
     photos.selectDetection(null);

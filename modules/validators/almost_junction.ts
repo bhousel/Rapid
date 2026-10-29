@@ -198,7 +198,7 @@ export function validateAlmostJunction(context: Context): ValidatorFunction {
               editor.perform(actionMergeNodes([colinear.id, endNode.id], colinear.loc!));
               editor.commit({
                 ...label,
-                selection: { osm: [colinear.id, endNode.id] }
+                selection: [colinear.id, endNode.id]
               });
               return;
             }
@@ -216,13 +216,13 @@ export function validateAlmostJunction(context: Context): ValidatorFunction {
             editor.perform(actionMergeNodes([ node.id, endNode.id ], closest.point));
             editor.commit({
               ...label,
-              selection: { osm: [node.id, endNode.id] }
+              selection: [node.id, endNode.id]
             });
           } else {   // create a midpoint on the target way
             editor.perform(actionAddMidpoint({ loc: crossLoc, edge: targetEdge } as Midpoint, endNode));
             editor.commit({
               ...label,
-              selection: { osm: [endNode.id] }
+              selection: [endNode.id]
             });
           }
         }
@@ -241,7 +241,7 @@ export function validateAlmostJunction(context: Context): ValidatorFunction {
             editor.perform(actionChangeTags(nodeID, tags));
             editor.commit({
               stringID: 'issues.fix.tag_as_disconnected.annotation',
-              selection: { osm: [nodeID] }
+              selection: [nodeID]
             });
           }
         }));

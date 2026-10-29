@@ -117,17 +117,16 @@ export class DragNodeMode extends AbstractMode {
 
     this._active = true;
     this.dragNode = node;
-    this._selectedData.set(node.id, node);
+    this._selectedIDs = [node.id];
 
     // Calculate dragOffset, to correct for where "on the pin" the user grabbed the target.
     const startCoord = node.geoms.parts[0]!.world!.coords as Vec2;  // A node should have a single world coord
     const clickCoord = context.behaviors.drag!.lastDown!.coord.world;
     this._dragOffset = vecSubtract(startCoord, clickCoord);
 
-    const layer = scene!.layers.get('osm')!;
-    layer.setClass('drawing', this.dragNode.id);
+    scene!.setClass('drawing', this.dragNode.id);
     for (const parent of graph.parentWays(this.dragNode)) {
-      layer.setClass('drawing', parent.id);
+      scene!.setClass('drawing', parent.id);
     }
 
     context.enableBehaviors(['hover', 'drag', 'mapNudge']);
@@ -156,12 +155,11 @@ export class DragNodeMode extends AbstractMode {
     this._reselectIDs = [];
     this._wasMidpoint = false;
     this._dragOffset = [0, 0];
-    this._selectedData.clear();
+    this._selectedIDs = [];
 
     const context = this.context;
     const scene = context.systems.gfx!.scene!;
-    const layer = scene.layers.get('osm')!;
-    layer.clearClass('drawing');
+    scene.clearClass('drawing');
 
     context.behaviors.drag!
       .off('move', this._move)
@@ -175,14 +173,14 @@ export class DragNodeMode extends AbstractMode {
 
   /**
    *  Gets the latest version the drag node from the graph after any modifications.
-   *  Updates `selectedData` collection to include the dragging node
+   *  Updates `selectedIDs` to include the dragging node
    */
   protected _refreshEntities(): void {
     const context = this.context;
     const editor = context.systems.editor!;
     const graph = editor.staging.graph;
 
-    this._selectedData.clear();
+    this._selectedIDs = [];
     this.dragNode = this.dragNode && (graph.hasEntity(this.dragNode.id) as OsmNode | undefined) || null;
 
     // Bail out if drag node has gone missing
@@ -191,7 +189,7 @@ export class DragNodeMode extends AbstractMode {
       return;
     }
 
-    this._selectedData.set(this.dragNode.id, this.dragNode);
+    this._selectedIDs = [this.dragNode.id];
   }
 
 
@@ -350,7 +348,7 @@ export class DragNodeMode extends AbstractMode {
       label = this._moveLabel();
     }
 
-    editor.commit({ ...label, selection: { osm: [this.dragNode.id] } });
+    editor.commit({ ...label, selection: [this.dragNode.id] });
 
     // Choose next mode
     // (Note that if the drag node is gone, select mode will fallback to browse mode)

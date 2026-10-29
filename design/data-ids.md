@@ -7,7 +7,7 @@ This isn't one system. It touches every service, `SpatialSystem`, `EditSystem`, 
 renderer. This doc started in October 2026, when we wanted to select data from more than one source
 at once, and found that Rapid had no single way to say which data a selection meant.
 
-> **Status:** Steps 1 and 2 of 6 done (October 2026). The steps and open questions are at the end.
+> **Status:** Steps 1–3 of 6 done (October 2026). The steps and open questions are at the end.
 
 ## Terms
 
@@ -191,9 +191,8 @@ Known problems this causes:
   `datum.id`, the `w-12` that depends on load order, so a restored session could point at a
   different feature, or none. Esri data is kept as GeoJSON now, with the local ID
   `${layer}-${objectid}`.
-- **A selection keyed by layer** (`EditSelection`, `{ rapid: ['fbRoads:abc:0'] }`) can only be
-  found again through the layer that draws it, so only data that's drawn. `MapSystem` retries on
-  later redraws to cover for it.
+- ✅ **A selection keyed by layer** (`EditSelection`, `{ rapid: ['fbRoads:abc:0'] }`) could only be
+  found again through the layer that draws it, so only data that's drawn (fixed in Step 3).
 - **Selecting OSM and other data together isn't possible**, so `id=` in the URL only selects OSM.
 
 ## Legacy code
@@ -238,8 +237,10 @@ Each step is its own commit, and leaves Rapid working with the tests passing.
 - Accept and ignore records, `isAcceptedOrIgnored()`, and conflation's results use data IDs
   (`fbRoads:w-123`, `ds:abc`), not `datum.id`.
 - The `rapid` layer binds its features to data IDs, since it draws several datasets whose local IDs
-  may clash (`AbstractPixiLayer.bindingID()`, which the `rapid` layer overrides). So a selection of
-  Rapid data holds data IDs already. Other layers still bind `datum.id` until Step 3.
+  may clash (an interim `AbstractPixiLayer.bindingID()`, gone in Step 3). This broke the `select`
+  halo on Rapid data, and the walkthrough's check for the selected road, until Step 3:
+  `EventTarget.dataID` was still `datum.id`, so selections held local IDs that no longer matched
+  what the layer bound.
 - Pieces of lines go in a `${datasetID}.pieces` cache: `pieceID()` puts them there, and
   `parsePieceID()` only reads IDs in a `.pieces` namespace.
 - Esri keeps its data as GeoJSON, keyed by `${layer}-${objectid}`. Its `Graph` and OSM-building code
@@ -253,19 +254,29 @@ Each step is its own commit, and leaves Rapid working with the tests passing.
 - Left as is: `PixiLayerRapid._getTags()` only reads `@name` from GeoJSON data, so Esri features
   aren't labeled with their raw properties anymore (they rarely had a `name` field anyway).
 
-**Step 3: Selections are `DataID[]`.**
-- Modes keep a `DataID[]`. `selectedIDs()` returns it, and `selectedData()` looks each one up
-  with `getData()`, so it's always the current version.
-- Layers bind renderables to `d.dataID` (not `d.id`), so `EventTarget.dataID` is the data ID.
-  `AbstractPixiLayer.bindingID()` goes away.
-- The scene holds the classes (`select`, `hover`) by data ID, and drops its `layerID` argument:
-  `scene.setClass('select', dataID)`. Layers ask the scene when they style. Today each layer keeps
-  its own class maps, and a mode has to know which layer draws which data.
-- Edit props: `selection` and `selectionBefore` become `DataID[]`. `_upgradeEditProps()` flattens
-  an `EditSelection` record. File dataset IDs that end in `:0` aren't repaired; only dev builds
-  have those, and a stale ID just won't be selected.
-- `MapSystem._restoreSelection()` uses `getData()` instead of asking the layers, waits for data
-  to load rather than to be drawn, and loads OSM entities that aren't loaded yet.
+**✅ Step 3: Selections are `DataID[]`.**
+- Modes keep a `DataID[]` (`_selectedIDs`). `selectedIDs` returns a copy, and `selectedData` looks
+  each one up with `getData()`, so it's always the current version (a note with a new comment, a
+  moved node) and the modes no longer refresh it after each change. `AbstractMode.selection` and
+  `dataLayerID()` are gone.
+- `SelectMode` takes `{ selection: DataID[] }` and leaves out what `getData()` can't find. The
+  OSM-only modes (`select-osm`, `move`, `rotate`) still take `{ selection: { osm: [...] } }` until
+  Step 4.
+- Every layer binds features to `d.dataID`, and `EventTarget.dataID` is `data.dataID`.
+  `bindingID()` is gone. Code that needs a service's own ID uses `data.id`: `photos.selectPhoto()`,
+  the service editors' `getNote()`/`getError()`/`getTask()`, and `note=` in the URL.
+- The scene holds the classes (`select`, `hover`, `drawing`, `highlight`, `selectphoto`, …) by data
+  ID: `scene.setClass('select', dataID)`, `scene.getDataWithClass()`, and `getClasses(dataID)`,
+  which `syncFeatureClasses()` reads. Layers keep no class maps. `PhotoSystem` builds a photo's data
+  ID from its layer (`${layerID}-images`), and the photo layers' child data uses data IDs.
+- Edit props: `selection` and `selectionBefore` are `DataID[]`. `_upgradeEditProps()` flattens the
+  old by-layer shape (`LegacyEditSelection`) in backups. File dataset IDs that end in `:0` aren't
+  repaired; only dev builds have those, and a stale ID just won't be selected.
+- `MapSystem._restoreSelection()` uses `getData()` instead of asking the layers. Data that isn't
+  there yet (a Rapid feature still loading, a piece conflation makes when its line is drawn) is
+  tried again after the next redraws, as before.
+- Not done here: loading OSM entities that aren't loaded yet. On undo and redo they're always in the
+  graph, so it moves to Step 5, where `id=` needs it.
 
 **Step 4: One select mode.** `'select-osm'` goes away.
 - `SelectMode` takes `{ selection: DataID[] }`. What's specific to OSM (vertex navigation,
@@ -278,7 +289,8 @@ Each step is its own commit, and leaves Rapid working with the tests passing.
   plain list. Step 6 replaces this.
 
 **Step 5: `id=` in the URL takes data IDs.**
-- `id=w1,fbRoads:abc,osm-notes:123` selects all of them, not just the first.
+- `id=w1,fbRoads:abc,osm-notes:123` selects all of them, not just the first. OSM entities that
+  aren't loaded yet are loaded first, and other data is selected once it loads.
 - The mode writes every selected data ID back to `id=`.
 - Update `API.md`.
 

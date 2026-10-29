@@ -164,7 +164,7 @@ export class UiSectionRawMemberEditor extends AbstractUiSection {
       editor.commit({
         stringID: 'operations.change_role.annotation',
         stringParams: { n: 1 },
-        selection: { osm: [d.relation.id] }
+        selection: [d.relation.id]
       });
     }
   }
@@ -184,7 +184,7 @@ export class UiSectionRawMemberEditor extends AbstractUiSection {
     editor.commit({
       stringID: 'operations.delete_member.annotation',
       stringParams: { n: 1 },
-      selection: { osm: [d.relation.id] }
+      selection: [d.relation.id]
     });
 
     const graph = editor.staging.graph;  // the current graph, after the edit was performed
@@ -407,7 +407,7 @@ export class UiSectionRawMemberEditor extends AbstractUiSection {
           editor.perform(actionMoveMember(d.relation.id, index, targetIndex));
           editor.commit({
             stringID: 'operations.reorder_members.annotation',
-            selection: { osm: [d.relation.id] }
+            selection: [d.relation.id]
           });
         }
       })
