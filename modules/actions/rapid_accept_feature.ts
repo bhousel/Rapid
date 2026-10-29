@@ -22,6 +22,22 @@ export interface RapidAcceptAction extends Action {
 
 
 /**
+ * How a service accepts one of its own features, when copying it in as new
+ * entities isn't enough (e.g. it should reuse existing nodes, split existing
+ * ways, or add tags to existing entities).  A service opts in by implementing
+ * `acceptFeature(datasetID, entity)` and returning one of these.
+ */
+export interface RapidAcceptResult {
+  /** Edits to apply to the main graph */
+  action: Action;
+  /** The _original_ dataIDs that this accepts (they stop being offered) */
+  acceptedIDs: DataID[];
+  /** The id of the main feature in the main graph afterwards - used to select it */
+  newID?: EntityID;
+}
+
+
+/**
  * Accepts a Rapid feature from an external dataset into the main graph.
  * Handles nodes, ways, and relations, including connection points to existing ways.
  * @param   datum  - Data to accept - should be OSMEntity-like or GeoJSONData-like.
@@ -49,6 +65,21 @@ export function actionRapidAcceptFeature(datum: OsmEntity | GeoJSONData): RapidA
 
     const datasetID = datum.props.datasetID as DatasetID;
     const dataset = rapid.catalog.get(datasetID);
+
+    // A service can accept its own features its own way.
+    if (dataset && datum instanceof OsmEntity) {
+      const service = context.services[datum.props.serviceID as ServiceID] as any;
+      if (typeof service?.acceptFeature === 'function') {
+        const result = service.acceptFeature(datasetID, datum) as RapidAcceptResult | undefined;
+        if (!result) return graph;
+        for (const id of result.acceptedIDs) {
+          acceptedIDs.add(id);
+        }
+        newID = result.newID;
+        return result.action(graph);
+      }
+    }
+
     const dictionary = dataset?.dictionary;
     const spatialID = dataset?.spatialID;
     if (!dataset || !dictionary || !spatialID) return graph;

@@ -2153,6 +2153,12 @@ div.combobox {
   color: #333;
 }
 
+/* a value provider's label and description beside the value it offers */
+.combobox .combobox-option-note {
+  margin: 0 8px;
+  color: #777;
+}
+
 
 /* Field Help
 ------------------------------------------------------- */
@@ -2357,6 +2363,29 @@ button.raw-tag-option svg.icon {
 .tag-row .key-wrap,
 .tag-row .value-wrap {
   flex: 1 1 50%;
+}
+
+/* what a coded value means (from a value provider), shown over the value's right end */
+.tag-row .value-wrap.has-value-label {
+  position: relative;
+}
+.tag-row .value-wrap .value-label {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: 30px;
+  max-width: 50%;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: #777;
+  pointer-events: none;
+}
+.ideditor[dir='rtl'] .tag-row .value-wrap .value-label {
+  right: auto;
+  left: 30px;
 }
 
 .tag-text.readonly,

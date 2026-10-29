@@ -2,6 +2,7 @@
 
 Reverse-chronological one-liners. Details live in git history — these are just breadcrumbs.
 
+- **Rapid datasets from host-app services** (Oct 2026) — Any service with `getAvailableDatasets()` provides datasets; the Rapid layer draws and selects them; `acceptFeature` lets a service supply its own accept action (`RapidAcceptResult`). See `decisions.md`.
 - **OSM features lost after a cancelled request** (Oct 2026) — Removed `skipSeen` and the parsers' seen cache (and the `osmService:reset` / `network:reset` listeners that cleared it); `EditSystem.merge` now skips entities already in the base graph instead. A tile request cancelled or timed out after the worker parsed it no longer hides its features until reload. See `decisions.md`.
 
 - **Agent tooling for Claude Code + Copilot** (Oct 2026) — Prompts → Agent Skills in `.claude/skills/` (agent-practices PR #1, then `/sync` to AGENTS.md v4). `.github/instructions/` → nested `modules/{ui,pixi}/AGENTS.md`. Corrected the AGENTS.md Testing section (`bun run test` = unit + browser only). See `decisions.md`.

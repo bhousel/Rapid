@@ -2,6 +2,16 @@
 
 Non-obvious choices where "why did we do it this way?" isn't captured in the code.
 
+## Host apps can provide Rapid datasets through their own service
+
+`RapidSystem` used to ask only Esri, MapWithAI and Overture for datasets, and the Rapid layer and
+`SelectBehavior` had a branch for each. Now any service with `getAvailableDatasets()` provides datasets
+(a host app registers one in `services.available` before `prepareAsync`), the layer draws any service
+that offers `getData`/`graph` (and `loadTiles`) the way it draws Esri data, and clicking any Rapid-layer
+feature with a `datasetID` selects it. A service can also implement `acceptFeature(datasetID, entity)`
+returning a `RapidAcceptResult` (an Action plus accepted and new IDs). `actionRapidAcceptFeature` then
+applies that instead of copying the feature in as new entities, so a suggestion can reuse existing nodes,
+split existing ways or add tags. Built for TDEI Workspaces' conflation suggestions.
 ## OSM parsers keep no "seen" state; `EditSystem.merge` skips entities it already has
 
 The parsers used to remember every ID they parsed and leave it out of later results (`skipSeen`). That

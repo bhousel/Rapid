@@ -27,6 +27,25 @@ const MAXRECENTS = 30;       // how many recents to store in localstorage
 const MAXRECENTS_SHOW = 6;   // how many recents to show on the preset list
 
 
+/**
+ * A value an app offers for a tag (see `SchemaSystem.addValueProvider`).
+ */
+export interface TagValueOption {
+  /** The tag value */
+  value: string;
+  /** What the value means, shown beside it (e.g. `Walkway` for pathway_mode `1`) */
+  label?: string;
+  /** More detail, shown in the dropdown after the label (e.g. a level's name and stations) */
+  description?: string;
+}
+
+/**
+ * Offers the values allowed for a tag key, or `undefined` to leave the key to
+ * Rapid's usual suggestions (taginfo). Called with the entities being edited.
+ */
+export type TagValueProvider = (key: string, entityIDs: EntityID[], graph: Graph) => TagValueOption[] | undefined;
+
+
 /** Field types supported by Rapid's UI */
 export type FieldType =
   | 'access' | 'address' | 'check' | 'combo' | 'cycleway' | 'defaultCheck' | 'email'
@@ -203,6 +222,9 @@ export class SchemaSystem extends AbstractSystem {
   /** Locale code used when the current search index was built (null means not yet built) */
   protected _currLocaleCode: LocaleCode | null;
 
+  /** Tag value providers added with `addValueProvider`, by ID */
+  protected _valueProviders: Map<string, TagValueProvider>;
+
 
   /**
    * @param context - Global shared application context
@@ -210,6 +232,7 @@ export class SchemaSystem extends AbstractSystem {
   public constructor(context: Context) {
     super(context);
     this.id = 'schema';
+    this._valueProviders = new Map<string, TagValueProvider>();
     this.optionalDependencies = new Set<SystemID>(['assets', 'gfx', 'l10n', 'locations', 'settings', 'urlhash']);
 
     this.geometryTypes = new Set<GeometryType>(['point', 'vertex', 'line', 'area', 'relation']);
@@ -398,6 +421,69 @@ export class SchemaSystem extends AbstractSystem {
     .finally(() => {
       unpause?.();  // resume rendering
     });
+  }
+
+
+  /**
+   * Adds a provider of the values allowed for some tag keys, e.g. the IDs of
+   * features a tag can refer to, or coded values and what they mean. Combo
+   * fields and the raw tag editor offer its values (in place of taginfo's)
+   * with their labels or descriptions, opening with even a single value, and
+   * the raw tag editor labels a coded value beside it. Providers are asked in
+   * the order added; the first to return options for a key wins.
+   * Replaces any provider with the same ID.
+   * @param providerID - Identifies the provider
+   * @param provider - Returns the options for a key, or `undefined` to pass
+   */
+  public addValueProvider(providerID: string, provider: TagValueProvider): void {
+    this._valueProviders.set(providerID, provider);
+  }
+
+
+  /**
+   * Removes a provider added with `addValueProvider`.
+   * @param providerID - The provider to remove
+   */
+  public removeValueProvider(providerID: string): void {
+    this._valueProviders.delete(providerID);
+  }
+
+
+  /**
+   * Whether any value providers have been added.
+   * @return `true` if there are providers
+   */
+  public hasValueProviders(): boolean {
+    return this._valueProviders.size > 0;
+  }
+
+
+  /**
+   * The values offered for a tag key, from the first provider that offers any.
+   * @param key - The tag key
+   * @param entityIDs - The entities being edited
+   * @param graph - The graph they're in
+   * @return The options, or `undefined` if no provider offers any
+   */
+  public getValueOptions(key: string, entityIDs: EntityID[], graph: Graph): TagValueOption[] | undefined {
+    for (const provider of this._valueProviders.values()) {
+      const options = provider(key, entityIDs, graph);
+      if (options) return options;
+    }
+    return undefined;
+  }
+
+
+  /**
+   * The label a provider gives a tag value, e.g. `Walkway` for pathway_mode `1`.
+   * @param key - The tag key
+   * @param value - The tag value
+   * @param entityIDs - The entities being edited
+   * @param graph - The graph they're in
+   * @return The label, or `undefined` if there's none
+   */
+  public getValueLabel(key: string, value: string, entityIDs: EntityID[], graph: Graph): string | undefined {
+    return this.getValueOptions(key, entityIDs, graph)?.find(option => option.value === value)?.label;
   }
 
 

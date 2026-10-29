@@ -44,13 +44,16 @@ export class UiSectionValidationRules extends AbstractUiSection {
     const l10n = context.systems.l10n!;
     const validator = context.systems.validator!;
 
-    this._validatorIDs = validator.getValidatorIDs()
-      .sort((key1: string, key2: string) => {
-        // alphabetize by localized title
-        return l10n.t(`issues.${key1}.title`) < l10n.t(`issues.${key2}.title`) ? -1 : 1;
-      });
+    // alphabetize by localized title
+    const sortedIDs = () => validator.getValidatorIDs()
+      .sort((key1: string, key2: string) => l10n.t(`issues.${key1}.title`) < l10n.t(`issues.${key2}.title`) ? -1 : 1);
+    this._validatorIDs = sortedIDs();
 
     validator.on('validated', this._renderWhenIdle);
+    validator.on('validatorschange', () => {   // e.g. validators an embedding app registers
+      this._validatorIDs = sortedIDs();
+      this._renderWhenIdle();
+    });
   }
 
 

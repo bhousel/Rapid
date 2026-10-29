@@ -130,4 +130,92 @@ describe('ValidationSystem', () => {
 
   });
 
+
+  describe('validators added by an embedding app', () => {
+    // Its own context, so the data and validators don't mix with the tests above.
+    const ctx = new Rapid.MockContext();
+    ctx.systems = {
+      editor:     new Rapid.EditSystem(ctx),
+      l10n:       new Rapid.LocalizationSystem(ctx),
+      scheduler:  new Rapid.SchedulerSystem(ctx),
+      schema:     new Rapid.SchemaSystem(ctx),
+      spatial:    new Rapid.SpatialSystem(ctx),
+      storage:    new Rapid.StorageSystem(ctx)
+    };
+    let _validator;
+
+    // Flags every node tagged `ref` whose value isn't the `id` tag of some other node: its
+    // result for one node depends on nodes anywhere, so it needs `revalidateAll`.
+    const danglingRef = (entity, graph) => {
+      const ref = entity.tags?.ref;
+      if (entity.type !== 'node' || !ref) return { issues: [], provisional: false };
+      const found = ctx.systems.spatial.getAllItems(ctx.systems.editor.spatialIDForGraph(graph))
+        .some(other => other.tags?.id === ref);
+      if (found) return { issues: [], provisional: false };
+      return {
+        issues: [new Rapid.ValidationIssue(ctx, { type: 'dangling_ref', severity: 'warning', message: () => 'dangling', entityIds: [entity.id] })],
+        provisional: false
+      };
+    };
+    danglingRef.type = 'dangling_ref';
+
+    const issuesOfType = (type) => _validator.getIssues({ what: 'all', where: 'all' }).filter(i => i.type === type);
+
+    beforeAll(() => {
+      _validator = new Rapid.ValidationSystem(ctx);
+      ctx.systems.schema.requestedAssetIDs = '';
+      return Promise.all([ctx.systems.scheduler.initAsync(), ctx.systems.schema.initAsync()])
+        .then(() => Promise.all([ctx.systems.scheduler.startAsync(), ctx.systems.schema.startAsync()]))
+        .then(() => _validator.initAsync())
+        .then(() => _validator.startAsync())
+        .then(() => {
+          for (const validatorID of _validator.getValidatorIDs()) {
+            _validator._validators.delete(validatorID);   // just ours
+          }
+        });
+    });
+
+    it('registers a validator, lists it, and validates the data already loaded with it', () => {
+      const editor = ctx.systems.editor;
+      editor.merge([new Rapid.OsmNode(ctx, { id: 'n1', loc: [0, 0], tags: { ref: 'missing' } })]);
+
+      return Promise.resolve().then(() => {   // the base merge validates asynchronously
+        let changed = 0;
+        _validator.on('validatorschange', () => changed++);
+        _validator.registerValidator(danglingRef, { revalidateAll: true });
+
+        assert.strictEqual(changed, 1);
+        assert.include(_validator.getValidatorIDs(), 'dangling_ref');
+        assert.deepEqual(issuesOfType('dangling_ref').map(i => i.entityIds), [['n1']]);
+      });
+    });
+
+    it('reruns "revalidate all" validators over all data when other data loads', () => {
+      const editor = ctx.systems.editor;
+      // A node elsewhere now satisfies n1's reference, without touching n1.
+      editor.merge([new Rapid.OsmNode(ctx, { id: 'n2', loc: [1, 1], tags: { id: 'missing' } })]);
+
+      return _validator._validateBaseEntitiesAsync(['n2'])
+        .then(() => assert.deepEqual(issuesOfType('dangling_ref'), []));
+    });
+
+    it('revalidates on demand, optionally only some entities', () => {
+      const editor = ctx.systems.editor;
+      editor.merge([new Rapid.OsmNode(ctx, { id: 'n3', loc: [2, 2], tags: { ref: 'nowhere' } })]);
+      _validator._base.uncacheIssuesOfType('dangling_ref');
+
+      _validator.revalidate(['dangling_ref'], entity => entity.id === 'n3');
+      assert.deepEqual(issuesOfType('dangling_ref').map(i => i.entityIds), [['n3']]);
+    });
+
+    it('unregisters a validator, dropping its issues and listing', () => {
+      let changed = 0;
+      _validator.on('validatorschange', () => changed++);
+      _validator.unregisterValidator('dangling_ref');
+
+      assert.strictEqual(changed, 1);
+      assert.notInclude(_validator.getValidatorIDs(), 'dangling_ref');
+      assert.deepEqual(issuesOfType('dangling_ref'), []);
+    });
+  });
 });

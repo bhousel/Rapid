@@ -32,6 +32,13 @@ interface PresetLike {
 }
 
 /**
+ * A rule that hides features by more than their tags (see `FilterSystem.addHideRule`).
+ * Returns `true` to hide the entity.
+ */
+export type HideRuleFn = (entity: OsmEntity, graph: Graph, geometry: GeometryType) => boolean;
+
+
+/**
  * A filter with a match function, enabled state, and count.
  */
 class Filter {
@@ -58,8 +65,12 @@ class Filter {
  * Each `Filter` is basically a filter function that returns true if an entity matches.
  * The code in here is relatively "hot", as it gets run against every entity.
  *
+ * Besides the user's filters (by feature category, matched on tags), apps can add
+ * hide rules: functions that hide any entity they return `true` for, e.g. to show
+ * only one floor of a building (see `addHideRule`).
+ *
  * Events available:
- * - `filterchange`   Fires whenever user changes the enabled/disabled filters
+ * - `filterchange`   Fires whenever user changes the enabled/disabled filters, or the hide rules change
  */
 export class FilterSystem extends AbstractSystem {
 
@@ -69,6 +80,8 @@ export class FilterSystem extends AbstractSystem {
   protected _hidden: Set<FilterID>;
   /** Set of entityIDs to force visible */
   protected _forceVisible: Set<EntityID>;
+  /** Hide rules added with `addHideRule`, by ruleID */
+  protected _hideRules: Map<FilterID, HideRuleFn>;
   /** Cache of entity.key to matched filterIDs */
   protected _cache: Record<string, EntityCache>;
 
@@ -85,6 +98,7 @@ export class FilterSystem extends AbstractSystem {
     this._filters = new Map<FilterID, Filter>();
     this._hidden = new Set<FilterID>();
     this._forceVisible = new Set<EntityID>();
+    this._hideRules = new Map<FilterID, HideRuleFn>();
     this._cache = {};
 
     // Ensure methods used as callbacks always have `this` bound correctly.
@@ -189,6 +203,59 @@ export class FilterSystem extends AbstractSystem {
    */
   public get hidden(): Set<FilterID> {
     return this._hidden;
+  }
+
+
+  /**
+   * Adds a rule that hides any entity it returns `true` for, e.g. features not
+   * on the floor being edited. Unlike the user's filters, a rule can look at
+   * the whole entity and graph, not just tags. Force-visible entities (e.g.
+   * selected ones) are never hidden. Vertices are hidden when all of their
+   * parent ways are, as with filters, or when a rule hides them directly.
+   * Replaces any rule with the same ID, and redraws the map.
+   * @param ruleID - Identifies the rule; reported by `isHidden` for what it hides
+   * @param fn - Returns `true` to hide the entity
+   */
+  public addHideRule(ruleID: FilterID, fn: HideRuleFn): void {
+    this._hideRules.set(ruleID, fn);
+    this.refreshHideRules();
+  }
+
+
+  /**
+   * Removes a hide rule added with `addHideRule`, and redraws the map.
+   * @param ruleID - The rule to remove
+   */
+  public removeHideRule(ruleID: FilterID): void {
+    if (this._hideRules.delete(ruleID)) {
+      this.refreshHideRules();
+    }
+  }
+
+
+  /**
+   * Redraws the map after something a hide rule depends on changed
+   * (e.g. which floor is being edited).
+   */
+  public refreshHideRules(): void {
+    this.context.systems.gfx?.immediateRedraw();
+    this.emit('filterchange');
+  }
+
+
+  /**
+   * The first hide rule that hides an entity, if any.
+   * @param entity - The Entity to test
+   * @param graph - Graph
+   * @param geometry - geometry of the Entity
+   * @return The ruleID, or `null`
+   */
+  protected _hiddenByRule(entity: OsmEntity, graph: Graph, geometry: GeometryType): FilterID | null {
+    if (!this._hideRules.size || this._forceVisible.has(entity.id)) return null;
+    for (const [ruleID, fn] of this._hideRules) {
+      if (fn(entity, graph, geometry)) return ruleID;
+    }
+    return null;
   }
 
 
@@ -504,7 +571,7 @@ export class FilterSystem extends AbstractSystem {
    * @return The first `filterID` which causes the Entity to be hidden, or `null`
    */
   public isHiddenVertex(entity: OsmEntity, graph: Graph): FilterID | null {
-    if (!this._hidden.size) return null;
+    if (!this._hidden.size && !this._hideRules.size) return null;
     if (!entity.version) return null;
     if (this._forceVisible.has(entity.id)) return null;
 
@@ -528,7 +595,7 @@ export class FilterSystem extends AbstractSystem {
    * @return true/false
    */
   public hasHiddenConnections(entity: OsmEntity, graph: Graph): boolean {
-    if (!this._hidden.size) return false;
+    if (!this._hidden.size && !this._hideRules.size) return false;
 
     let childNodes: OsmEntity[];
     let connections: OsmEntity[];
@@ -558,7 +625,10 @@ export class FilterSystem extends AbstractSystem {
    * @return The first `filterID` which causes the Entity to be hidden, or `null`
    */
   public isHidden(entity: OsmEntity, graph: Graph, geometry: GeometryType): FilterID | null {
-    if (!this._hidden.size) return null;
+    const ruleID = this._hiddenByRule(entity, graph, geometry);
+    if (ruleID) return ruleID;
+
+    if (!this._hidden.size && !this._hideRules.size) return null;
     if (!entity.version) return null;
 
     if (geometry === 'vertex') {
@@ -582,7 +652,7 @@ export class FilterSystem extends AbstractSystem {
       filter.count = 0;
     }
 
-    if (!this._hidden.size) return entities;  // no filters enabled
+    if (!this._hidden.size && !this._hideRules.size) return entities;  // nothing hidden
 
     const results: OsmEntity[] = [];
     for (const entity of entities) {

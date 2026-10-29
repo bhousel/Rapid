@@ -12,6 +12,7 @@
  */
 
 // Types
+export type { RapidAcceptAction, RapidAcceptResult } from './rapid_accept_feature.ts';
 export type { Action } from './types.ts';
 export type { CopyEntitiesAction } from './copy_entities.ts';
 export type { DisconnectAction, DisconnectConnection } from './disconnect.ts';

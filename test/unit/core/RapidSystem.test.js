@@ -95,6 +95,29 @@ describe('RapidSystem', () => {
         return prom
           .then(() => assert.isTrue(rapid.started));
       });
+
+      it('adds datasets from any service that offers them', () => {
+        class HostService extends Rapid.MockSystem {
+          constructor(context) {
+            super(context);
+            this.id = 'host';
+          }
+          getAvailableDatasets() {
+            return [new Rapid.RapidDataset(context, { id: 'host-data', serviceID: 'host', categories: new Set(['conflation']) })];
+          }
+        }
+        const original = context.services;
+        context.services = { host: new HostService(context), photos: new Rapid.MockSystem(context) };
+
+        const rapid = new Rapid.RapidSystem(context);
+        return rapid.initAsync()
+          .then(() => rapid.startAsync())
+          .then(() => {
+            assert.isTrue(rapid.catalog.has('host-data'));
+            assert.isTrue(rapid.categories.has('conflation'));
+          })
+          .finally(() => { context.services = original; });
+      });
     });
 
     describe('resetAsync', () => {

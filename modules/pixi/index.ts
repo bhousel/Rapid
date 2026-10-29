@@ -28,5 +28,7 @@ export { PixiLayerMapUI } from './PixiLayerMapUI.ts';
 export { PixiLayerOsm } from './PixiLayerOsm.ts';
 export { PixiLayerOsmNotes } from './PixiLayerOsmNotes.ts';
 export { PixiLayerOsmose } from './PixiLayerOsmose.ts';
+export { PixiLayerOverlay } from './PixiLayerOverlay.ts';
+export type { OverlayShape } from './PixiLayerOverlay.ts';
 export { PixiLayerRapid } from './PixiLayerRapid.ts';
 export { PixiLayerStreetsidePhotos } from './PixiLayerStreetsidePhotos.ts';

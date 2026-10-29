@@ -165,16 +165,11 @@ export class RapidSystem extends AbstractSystem {
     // We wait until startAsync to create the dataset catalog because the services need to be initialized.
     const context = this.context;
 
-    const esri = context.services.esri;
-    const mapwithai = context.services.mapwithai;
-    const overture = context.services.overture;
-
     // This code is written in a way that we can work with whatever
-    // data-providing services are installed.
-    const services: any[] = [];
-    if (esri)      services.push(esri);
-    if (mapwithai) services.push(mapwithai);
-    if (overture)  services.push(overture);
+    // data-providing services are installed: any service that offers
+    // datasets (including ones a host app registers in `services.available`).
+    const services: any[] = Object.values(context.services)
+      .filter(service => typeof (service as any)?.getAvailableDatasets === 'function');
 
     const prerequisites = Promise.all(services.map(service => service.startAsync()));
 
