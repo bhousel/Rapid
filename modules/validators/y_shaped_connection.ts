@@ -1,5 +1,5 @@
-import { DeleteOperation } from '../operations/DeleteOperation.ts';
 import { RAD2DEG, geoSphericalDistance, vecAngle } from '@rapid-sdk/math';
+import { actionDeleteNode } from '../actions/delete_node.ts';
 import { ValidationIssue } from '../lib/ValidationIssue.ts';
 import { ValidationFix } from '../lib/ValidationFix.ts';
 
@@ -43,6 +43,7 @@ export function validateYShapedConnection(context: Context): ValidatorFunction {
    */
 
   const type = 'y_shaped_connection' as ValidatorID;
+  const editor = context.systems.editor!;
   const l10n = context.systems.l10n!;
   const schema = context.systems.schema!;
 
@@ -66,25 +67,39 @@ export function validateYShapedConnection(context: Context): ValidatorFunction {
   }
 
   /**
+   * Tests whether the node can be deleted to simplify the connection.
+   * It can't if another way shares it, because deleting it would change that way too.
+   * @param node - The node to check
+   * @param graph - The graph to check it in
+   * @returns `true` if the node is in only one way
+   */
+  function isDeletable(node: OsmNode, graph: Graph): boolean {
+    return graph.parentWays(node).length === 1;
+  }
+
+  /**
    * Creates a validation issue for a node near a Y-shaped connection,
    * with a fix to delete or move the node.
    * @param node - The problematic node
+   * @param graph - The graph the node was found in
    * @returns A validation issue with appropriate fixes
    */
-  function createIssueAndFixForNode(node: OsmNode): ValidationIssue {
-    const deletable = !new DeleteOperation(context, [node.id]).disabled();
+  function createIssueAndFixForNode(node: OsmNode, graph: Graph): ValidationIssue {
     let fix;
-    if (deletable) {
+    if (isDeletable(node, graph)) {
       fix = new ValidationFix({
         icon: 'rapid-operation-delete',
         title: l10n.t('issues.fix.delete_node_around_conn.title'),
         entityIds: [node.id],
         onClick: function(this: any) {
-          const id = this.entityIds[0];
-          const operation = new DeleteOperation(context, [id]);
-          if (!operation.disabled()) {
-            operation.run();
-          }
+          const graph = editor.staging.graph;
+          const nodeID = this.entityIds[0];
+          const node = graph.hasEntity(nodeID) as OsmNode | undefined;
+          if (!node || !isDeletable(node, graph)) return;
+
+          editor.perform(actionDeleteNode(nodeID));
+          editor.commit({ stringID: 'operations.delete.annotation.vertex', selection: [nodeID] });
+          context.enter('browse');
         }
       });
     } else {
@@ -197,7 +212,7 @@ export function validateYShapedConnection(context: Context): ValidatorFunction {
     const idx = way.nodes.indexOf(entity.id);
     if (idx <= 0) return result;  // not found?
     if (isCandidate(graph, way, idx - 1, idx) || isCandidate(graph, way, idx + 1, idx)) {
-      result.issues.push(createIssueAndFixForNode(node));
+      result.issues.push(createIssueAndFixForNode(node, graph));
     }
     return result;
   };

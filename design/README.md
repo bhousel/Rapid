@@ -22,7 +22,7 @@ They record the "why" that the code alone doesn't show.
 | [`style-system.md`](style-system.md) | `StyleSystem`: style data model, matching, external style files | Implemented (reference) |
 | [`ui-system.md`](ui-system.md) | `modules/ui/` modernization to TypeScript class components | Complete |
 | [`uploader-system.md`](uploader-system.md) | `UploaderSystem`: uploading changesets, checking and resolving conflicts | October 2026 audit done: conflicts work again, upload errors end the save, edits are kept until the upload succeeds |
-| [`validation-system.md`](validation-system.md) | `ValidationSystem` and the validators: running them on any graph, autofixes | October 2026 audit done; autoconnect fixed, a failing validator no longer hides other issues, Autofix All and `curb_nodes` fixes repaired; spatial index and shared geometry open |
+| [`validation-system.md`](validation-system.md) | `ValidationSystem` and the validators: running them on any graph, autofixes | October 2026 audit done; autoconnect fixed, a failing validator no longer hides other issues, Autofix All and `curb_nodes` fixes repaired, no side effects while detecting; spatial index and shared geometry open |
 
 New system designs go here as `thing-system.md`. Add a row to this table when you do.
 An older system gets a design doc when we make a substantial change to it, so the doc becomes a

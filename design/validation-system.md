@@ -9,8 +9,9 @@ autoconnect (accepting a Rapid feature with `poweruser.autoConnect`) crashed wit
 `OsmEntity n-2 not found` (see [The October 2026 audit](#the-october-2026-audit)).
 
 > **Status:** Audit done. Fixed: the autoconnect crash, the split-edge problem in `actionAddMidpoint`,
-> a throwing validator hiding other issues, Autofix All's transaction, the `curb_nodes` fix, and
-> `missing_tag`'s severity. The rest of the findings are open (see [Rollout](#rollout)).
+> a throwing validator hiding other issues, Autofix All's transaction, the `curb_nodes` fix,
+> `missing_tag`'s severity, and side effects while detecting. The rest of the findings are open (see
+> [Rollout](#rollout)).
 
 ## Words used here
 
@@ -111,9 +112,15 @@ the code; the repros were kept outside the repo.
    `impossible_oneway`, `disconnected_way`, `unsquare_way` and `missing_tag` give up when the data
    around a node isn't loaded, and return an empty result instead of a provisional one, so the
    feature isn't validated again when the data arrives.
-7. **Detecting has side effects** (traced). `short_road` and `y_shaped_connection` build a
-   `DeleteOperation` while detecting, which reads the staging graph and the viewport and can request
-   a map tile. Which fixes are offered depends on where the map was.
+7. ✅ **Detecting had side effects** (traced; fixed). `short_road` and `y_shaped_connection` built a
+   `DeleteOperation` while detecting, which read the staging graph and the viewport and could request
+   a map tile, so which fixes were offered depended on where the map was. Now they decide from the
+   graph they're given (`y_shaped_connection`: the node is in no other way; `short_road`: the way is in
+   no relation), and the fix runs `actionDeleteNode` / `actionDeleteWay` on the staging graph after
+   checking again. `DeleteOperation`'s other checks (in view, downloaded, hidden connections, wikidata)
+   are for a user deleting what they selected, not a fix for a road they just drew. (`short_road` is
+   commented out of `validators/index.ts`, too many false positives.) `missing_tag` and
+   `disconnected_way` still use `DeleteOperation`, but only when the issue is shown or the fix runs.
 8. Smaller ones:
    - `crossing_ways` hashes the crossing location rounded to 4 decimals (~11 m), so two crossings of
      the same ways within 11 m are one issue.
@@ -145,4 +152,4 @@ What a validator needs, so it can be run on any graph (including one inside an a
    (the rest of finding 4), with one runner for autoconnect and Autofix All.
 5. Geometry per graph (finding 1). The biggest change: it's about `Graph` and the data classes, not
    only validation, and needs its own design.
-6. Provisional results (finding 6) and no side effects while detecting (finding 7).
+6. Provisional results (finding 6). (✅ No side effects while detecting, finding 7, Oct 2026.)

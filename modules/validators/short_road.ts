@@ -1,6 +1,6 @@
 import { Extent, geoSphericalDistance } from '@rapid-sdk/math';
 
-import { DeleteOperation } from '../operations/DeleteOperation.ts';
+import { actionDeleteWay } from '../actions/delete_way.ts';
 import { ValidationIssue } from '../lib/ValidationIssue.ts';
 import { ValidationFix } from '../lib/ValidationFix.ts';
 
@@ -115,17 +115,21 @@ export function validateShortRoad(context: Context): ValidatorFunction {
       }));
     }
 
-    if (!new DeleteOperation(context, [way.id]).disabled()) {
+    // Deleting a way that's in a relation (e.g. a route) would change the relation too
+    if (!graph.parentRelations(way).length) {
       fixes.push(new ValidationFix({
         icon: 'rapid-operation-delete',
         title: l10n.t('issues.fix.delete_feature.title'),
         entityIds: [way.id],
         onClick: function(this: any) {
-          const id = this.issue.entityIds[0];
-          const operation = new DeleteOperation(context, [id]);
-          if (!operation.disabled()) {
-            operation.run();
-          }
+          const graph = editor.staging.graph;
+          const wayID = this.issue.entityIds[0];
+          const way = graph.hasEntity(wayID);
+          if (!way || graph.parentRelations(way).length) return;
+
+          editor.perform(actionDeleteWay(wayID));
+          editor.commit({ stringID: 'operations.delete.annotation.line', selection: [wayID] });
+          context.enter('browse');
         }
       }));
     }
