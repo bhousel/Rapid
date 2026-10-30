@@ -9,9 +9,10 @@ autoconnect (accepting a Rapid feature with `poweruser.autoConnect`) crashed wit
 `OsmEntity n-2 not found` (see [The October 2026 audit](#the-october-2026-audit)).
 
 > **Status:** Audit done. Fixed: the autoconnect crash, the split-edge problem in `actionAddMidpoint`,
-> a throwing validator hiding other issues, Autofix All's transaction, the `curb_nodes` fix,
-> `missing_tag`'s severity, side effects while detecting, the user's edits near data that wasn't
-> loaded, and the smaller items. The rest of the findings are open (see [Rollout](#rollout)).
+> a throwing validator hiding other issues, Autofix All's transaction, fixes that assumed the graph
+> they were found on, `missing_tag`'s severity, side effects while detecting, the user's edits near
+> data that wasn't loaded, and the smaller items. Open: shared geometry and the wrong spatial index
+> (see [Rollout](#rollout)).
 
 ## Words used here
 
@@ -45,8 +46,10 @@ committed.
 
 - `graph.replace()` / `remove()` change the graph in place and update its parent ways and relations at
   once. Node `loc`s are always current.
-- Geometry (`entity.geoms`, `extent()`) is updated only by `graph.commit()`, and only for what changed
-  since the last commit.
+- A node's geometry (`entity.geoms`, world coordinates) is always current: nodes are immutable, and
+  each new node computes its geometry when it's constructed. Validators can rely on it.
+- Way and relation geometry depends on their child nodes (and their tags: a way can change from line
+  to area), so it's updated only by `graph.commit()`, for what changed since the last commit.
 - **Way and relation geometry is kept on the entity objects, and the graphs share those objects.** A
   commit on one graph rewrites the geometry that base, stable and staging see (audit finding 1).
 - The OSM spatial indexes (`editor_base`, `editor_stable`, `editor_staging`, and their `-segments`
@@ -91,7 +94,7 @@ the code; the repros were kept outside the repo.
    or a validator that always fails would be retried every 5 seconds), and each job in a chunk is
    caught too. Validators that can still throw: the index mismatch above, `extent()!` in
    `outdated_tags`, `close_nodes` and `mismatched_geometry`.
-4. **Fixes assume the graph they were found on** (checked; partly fixed). Fixes keep edges, `way`
+4. ✅ **Fixes assumed the graph they were found on** (checked; fixed). Fixes kept edges, `way`
    objects and a `graph` from detection.
    - ✅ `curb_nodes`' fix split the crossing at the first curb node, then used the crossing as it was
      before for the second, leaving a `barrier=kerb` node in no way. Now it looks up the node and the
@@ -101,8 +104,17 @@ the code; the repros were kept outside the repo.
      earlier fix removed, and if a fix throws, it drops all the fixes (`editor.revert()`) and always
      ends the transaction. It still applies the autofixes of one validation run in sequence (safer
      since the `actionAddMidpoint` fix); a shared one-at-a-time runner is item 4 below.
-   - Open: fix closures that capture the detection-time `graph` or `way` (`almost_junction`'s
-     `makeFixes`, `impossible_oneway`, `short_road`).
+   - ✅ Fix buttons that used the detection-time `way`, or the staging graph from when the fixes were
+     shown. `perform` changes staging in place and `commit` starts a new one, so that graph misses
+     every edit after the next one. `almost_junction`'s connect fix connected the end node as it was
+     then, dropping later changes to it; `impossible_oneway`'s and `short_road`'s "continue" fixes
+     could start drawing from a node that wasn't the end of the road anymore. Now a fix keeps entity
+     IDs and looks them up in the graph it runs on, like `crossing_ways`' fixes already did.
+   - ✅ `almost_junction`'s fix and autofix now share one function, which changes nothing unless the
+     end node is where it was, still at the end of the road and not connected, and the target way still
+     has the edge (e.g. Autofix All, after an earlier fix connected it).
+   - Not checked: whether the edge's nodes moved. The node would still be connected, a bit off the
+     line.
 5. ✅ **`missing_tag` made existing features errors** (traced; fixed). `canDelete` checked
    `entity.v !== undefined`, which is always true in Rapid (`v` defaults to `0`; in iD it was set only
    on edited entities), so an untagged feature already in OSM was an error instead of a warning. Now
@@ -167,9 +179,9 @@ What a validator needs, so it can be run on any graph (including one inside an a
 2. ✅ Contain failures in `ValidationSystem` (finding 3) and Autofix All's transaction (finding 4);
    `curb_nodes`' fix; `missing_tag`'s `canDelete` (finding 5) (Oct 2026).
 3. ✅ The smaller items (finding 8) (Oct 2026).
-4. Validate with the right spatial index (finding 2), then fixes that find their place again
-   (the rest of finding 4), with one runner for autoconnect and Autofix All.
-5. Geometry per graph (finding 1). The biggest change: it's about `Graph` and the data classes, not
+4. ✅ Fixes look up their entities in the graph they run on (the rest of finding 4) (Oct 2026).
+5. Validate with the right spatial index (finding 2), with one runner for autoconnect and Autofix All.
+6. Geometry per graph (finding 1). The biggest change: it's about `Graph` and the data classes, not
    only validation, and needs its own design.
-6. ✅ Validate the user's edits again when data loads near them (finding 6), and no side effects while
+7. ✅ Validate the user's edits again when data loads near them (finding 6), and no side effects while
    detecting (finding 7) (Oct 2026).

@@ -15,18 +15,32 @@ import type { Context } from '../Context.ts';
 import type { D3Selection } from 'd3-selection';
 import type { EditLabel } from '../lib/Edit.ts';
 import type { Graph } from '../lib/Graph.ts';
-import type { Midpoint } from '../actions/add_midpoint.ts';
 import type { OsmEntity, OsmNode, OsmTags, OsmWay } from '../data/types.ts';
 import type { ValidatorFunction, ValidatorResult } from './types.ts';
 import type { Vec2 } from '@rapid-sdk/math';
 
 interface ConnectionInfo {
-  mid: OsmNode;
-  node: OsmNode;
-  wid: EntityID;
+  /** The way to extend */
+  wayID: EntityID;
+  /** Its end node */
+  nodeID: EntityID;
+  /** Where the end node was when the issue was found */
+  loc: Vec2;
+  /** The node next to the end node */
+  midID: EntityID;
+  /** The way to connect to */
+  targetID: EntityID;
+  /** The segment of that way to connect to */
   edge: [EntityID, EntityID],
+  /** Where the extended way crosses that segment */
   cross_loc: Vec2
 };
+
+/** How to connect the end node in a graph, and what to select afterward */
+interface ExtendPlan {
+  action: Action;
+  selection: EntityID[];
+}
 
 
 /**
@@ -112,14 +126,14 @@ export function validateAlmostJunction(context: Context): ValidatorFunction {
         reference: showReference as any,
         entityIds: [
           entity.id,
-          extendableNodeInfo.node.id,
-          extendableNodeInfo.wid,
+          extendableNodeInfo.nodeID,
+          extendableNodeInfo.targetID,
         ],
-        loc: extendableNodeInfo.node.loc,
-        hash: JSON.stringify(extendableNodeInfo.node.loc),
+        loc: extendableNodeInfo.loc,
+        hash: JSON.stringify(extendableNodeInfo.loc),
         autoArgs: autoArgs,
         data: {
-          midId: extendableNodeInfo.mid.id,
+          midId: extendableNodeInfo.midID,
           edge: extendableNodeInfo.edge,
           cross_loc: extendableNodeInfo.cross_loc
         },
@@ -134,42 +148,79 @@ export function validateAlmostJunction(context: Context): ValidatorFunction {
 
     /**
      * An action to perform the steps to extend the endpoint.
+     * @param info - What the issue found
      * @returns an Action function that accepts a graph and returns a modified graph.
      */
-    function actionExtendNode(info: ConnectionInfo) {
+    function actionExtendNode(info: ConnectionInfo): Action {
       return (graph: Graph) => {
-        const midNode = graph.hasEntity(info.mid.id) as OsmNode;
-        const endNode = graph.hasEntity(info.node.id) as OsmNode;
-        const crossWay = graph.hasEntity(info.wid) as OsmWay;
-        if (!midNode || !endNode || !crossWay) return graph;
-
-        // When endpoints are close, just join if resulting small change in angle (iD#7201)
-        const nearEndNodes = findNearbyEndNodes(endNode, crossWay, graph);
-        if (nearEndNodes.length > 0) {
-          const colinear = findSmallJoinAngle(midNode, endNode, nearEndNodes);
-          if (colinear) {
-            return actionMergeNodes([colinear.id, endNode.id], colinear.loc!)(graph);
-          }
-        }
-
-        const targetEdge = info.edge;
-        const crossLoc = info.cross_loc;
-        const edgeA = graph.hasEntity(info.edge[0]) as OsmNode;
-        const edgeB = graph.hasEntity(info.edge[1]) as OsmNode;
-        if (!edgeA || !edgeB) return graph;
-
-        const edgeNodes = [edgeA, edgeB];
-        const points = edgeNodes.map(node => node.loc!);
-        const closest = geoSphericalClosestPoint(points, crossLoc);
-
-        // already a point nearby, just connect to that
-        if (closest && closest.distance < WELD_TH_METERS) {
-          const node = edgeNodes[closest.index] as OsmNode;
-          return actionMergeNodes([node.id, endNode.id], closest.point)(graph);
-        } else {   // create a midpoint on the target way
-          return actionAddMidpoint({ loc: crossLoc, edge: targetEdge } as Midpoint, endNode)(graph);
-        }
+        const plan = planExtendNode(info, graph);
+        return plan ? plan.action(graph) : graph;
       };
+    }
+
+
+    /**
+     * Works out how to connect the end node in the graph as it is now, which may have changed
+     * since the issue was found (by the user, or an earlier fix in Autofix All).
+     * @param info - What the issue found
+     * @param graph - The graph to connect the end node in
+     * @returns How to connect it, or `null` if the graph doesn't fit the issue anymore
+     */
+    function planExtendNode(info: ConnectionInfo, graph: Graph): ExtendPlan | null {
+      const way = graph.hasEntity(info.wayID) as OsmWay | undefined;
+      const endNode = graph.hasEntity(info.nodeID) as OsmNode | undefined;
+      const crossWay = graph.hasEntity(info.targetID) as OsmWay | undefined;
+      if (!way || !endNode || !crossWay) return null;
+
+      // The end node must still be where it was, at the end of the way, and not connected to anything
+      if (!vecEqual(endNode.loc!, info.loc)) return null;
+      if (graph.parentWays(endNode).length !== 1) return null;
+      let midID;
+      if (way.first() === endNode.id) {
+        midID = way.nodes[1];
+      } else if (way.last() === endNode.id) {
+        midID = way.nodes[way.nodes.length - 2];
+      }
+      if (midID !== info.midID) return null;
+      const midNode = graph.hasEntity(midID) as OsmNode | undefined;
+      if (!midNode) return null;
+
+      // When endpoints are close, just join if resulting small change in angle (iD#7201)
+      const nearEndNodes = findNearbyEndNodes(endNode, crossWay, graph);
+      if (nearEndNodes.length > 0) {
+        const colinear = findSmallJoinAngle(midNode, endNode, nearEndNodes);
+        if (colinear) {
+          return {
+            action: actionMergeNodes([colinear.id, endNode.id], colinear.loc!),
+            selection: [colinear.id, endNode.id]
+          };
+        }
+      }
+
+      const targetEdge = info.edge;
+      const crossLoc = info.cross_loc;
+      const edgeA = graph.hasEntity(targetEdge[0]) as OsmNode | undefined;
+      const edgeB = graph.hasEntity(targetEdge[1]) as OsmNode | undefined;
+      if (!edgeA || !edgeB) return null;
+      if (!crossWay.nodes.includes(edgeA.id) || !crossWay.nodes.includes(edgeB.id)) return null;
+
+      const edgeNodes = [edgeA, edgeB];
+      const points = edgeNodes.map(node => node.loc!);
+      const closest = geoSphericalClosestPoint(points, crossLoc);  // note: using wgs84, should change this
+
+      // already a point nearby, just connect to that
+      if (closest && closest.distance < WELD_TH_METERS) {
+        const node = edgeNodes[closest.index];
+        return {
+          action: actionMergeNodes([node.id, endNode.id], closest.point),
+          selection: [node.id, endNode.id]
+        };
+      } else {   // create a midpoint on the target way
+        return {
+          action: actionAddMidpoint({ loc: crossLoc, edge: targetEdge }, endNode),
+          selection: [endNode.id]
+        };
+      }
     }
 
 
@@ -184,47 +235,18 @@ export function validateAlmostJunction(context: Context): ValidatorFunction {
         icon: 'rapid-icon-abutment',
         title: l10n.t('issues.fix.connect_features.title'),
         onClick: function(this: any) {
-          const label: EditLabel = { stringID: 'issues.fix.connect_almost_junction.annotation' };
-          const [, endNodeId, crossWayId] = this.issue.entityIds;
-          const midNode = graph.entity(this.issue.data.midId) as OsmNode;
-          const endNode = graph.entity(endNodeId) as OsmNode;
-          const crossWay = graph.entity(crossWayId) as OsmWay;
+          const [wayID, nodeID, targetID] = this.issue.entityIds;
+          const { midId, edge, cross_loc } = this.issue.data;
+          const info: ConnectionInfo = { wayID, nodeID, loc: this.issue.loc, midID: midId, targetID: targetID, edge, cross_loc };
 
-          // When endpoints are close, just join if resulting small change in angle (iD#7201)
-          const nearEndNodes = findNearbyEndNodes(endNode, crossWay, graph);
-          if (nearEndNodes.length > 0) {
-            const colinear = findSmallJoinAngle(midNode, endNode, nearEndNodes);
-            if (colinear) {
-              editor.perform(actionMergeNodes([colinear.id, endNode.id], colinear.loc!));
-              editor.commit({
-                ...label,
-                selection: [colinear.id, endNode.id]
-              });
-              return;
-            }
-          }
+          const plan = planExtendNode(info, editor.staging.graph);
+          if (!plan) return;
 
-          const targetEdge = this.issue.data.edge;
-          const crossLoc = this.issue.data.cross_loc;
-          const edgeNodes = [ graph.entity(targetEdge[0]) as OsmNode, graph.entity(targetEdge[1]) as OsmNode ];
-          const points = edgeNodes.map(node => node.loc!);
-          const closest = geoSphericalClosestPoint(points, crossLoc);  // note: using wgs84, should change this
-
-          // already a point nearby, just connect to that
-          if (closest && closest.distance < WELD_TH_METERS) {
-            const node = edgeNodes[closest.index] as OsmNode;
-            editor.perform(actionMergeNodes([ node.id, endNode.id ], closest.point));
-            editor.commit({
-              ...label,
-              selection: [node.id, endNode.id]
-            });
-          } else {   // create a midpoint on the target way
-            editor.perform(actionAddMidpoint({ loc: crossLoc, edge: targetEdge } as Midpoint, endNode));
-            editor.commit({
-              ...label,
-              selection: [endNode.id]
-            });
-          }
+          editor.perform(plan.action);
+          editor.commit({
+            stringID: 'issues.fix.connect_almost_junction.annotation',
+            selection: plan.selection
+          });
         }
       })];
 
@@ -236,7 +258,10 @@ export function validateAlmostJunction(context: Context): ValidatorFunction {
           title: l10n.t('issues.fix.tag_as_disconnected.title'),
           onClick: function(this: any) {
             const nodeID = this.issue.entityIds[1];
-            const tags = { ...graph.entity(nodeID).tags };
+            const node = editor.staging.graph.hasEntity(nodeID);
+            if (!node) return;
+
+            const tags = { ...node.tags };
             tags.noexit = 'yes';
             editor.perform(actionChangeTags(nodeID, tags));
             editor.commit({
@@ -463,9 +488,11 @@ export function validateAlmostJunction(context: Context): ValidatorFunction {
 
         if (crossLoc) {
           return {
-            mid: midNode,
-            node: tipNode,
-            wid: way2.id,
+            wayID: way.id,
+            nodeID: tipNodeID,
+            loc: tipNode.loc!,
+            midID: midNodeID,
+            targetID: way2.id,
             edge: [nA.id, nB.id],
             cross_loc: crossLoc
           };

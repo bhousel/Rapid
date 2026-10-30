@@ -243,6 +243,8 @@ export function validateImpossibleOneway(context: Context): ValidatorFunction {
               entityIds: [way.id],
               onClick: function(this: any) {
                 const entityID = this.issue.entityIds[0];
+                if (!editor.staging.graph.hasEntity(entityID)) return;
+
                 editor.perform(actionReverse(entityID));
                 editor.commit({
                   stringID: 'operations.reverse.annotation.line',
@@ -252,18 +254,15 @@ export function validateImpossibleOneway(context: Context): ValidatorFunction {
               }
             }));
           }
-          if (node.tags.noexit !== 'yes') {
+          const vertex = graph.hasEntity(this.entityIds[1]);
+          if (vertex && vertex.tags.noexit !== 'yes') {
             const isRTL = l10n.isRTL;
             const useLeftContinue = (isHead && !isRTL) || (!isHead && isRTL);
             fixes.push(new ValidationFix({
               icon: 'rapid-operation-continue' + (useLeftContinue ? '-left' : ''),
               title: l10n.t('issues.fix.continue_from_' + (isHead ? 'start' : 'end') + '.title'),
               onClick: function(this: any) {
-                const entityID = this.issue.entityIds[0];
-                const vertexID = this.issue.entityIds[1];
-                const way = graph.entity(entityID) as OsmWay;
-                const vertex = graph.entity(vertexID) as OsmNode;
-                continueDrawing(way, vertex, context);
+                continueDrawing(this.issue.entityIds[0], this.issue.entityIds[1]);
               }
             }));
           }
@@ -295,18 +294,25 @@ export function validateImpossibleOneway(context: Context): ValidatorFunction {
   /**
    * Activates draw-line mode to continue drawing from the given vertex.
    * Also attempts to pan the map if the vertex is not visible.
-   * @param way
-   * @param vertex
-   * @param context
+   * Does nothing if the vertex isn't at an end of the way anymore.
+   * @param wayID - The way to continue
+   * @param vertexID - The end node to continue it from
    */
-  function continueDrawing(way: OsmWay, vertex: OsmNode, context: Context): void {
-    // make sure the vertex is actually visible and editable
+  function continueDrawing(wayID: EntityID, vertexID: EntityID): void {
     const map = context.systems.map;
-    if (!context.editable() || !(map?.trimmedExtent() as Extent).contains(new Extent(vertex.loc!))) {
-      map?.fitEntitiesEase(vertex);
+
+    const graph = editor.staging.graph;
+    const way = graph.hasEntity(wayID) as OsmWay | undefined;
+    const vertex = graph.hasEntity(vertexID) as OsmNode | undefined;
+    if (!way || !vertex || way.isClosed()) return;
+    if (way.first() !== vertexID && way.last() !== vertexID) return;
+
+    // make sure the vertex is actually visible and editable
+    if (map && (!context.editable() || !(map.trimmedExtent() as Extent).contains(new Extent(vertex.loc!)))) {
+      map.fitEntitiesEase(vertex);
     }
 
-    context.enter('draw-line', { continueWayID: way.id, continueNodeID: vertex.id });
+    context.enter('draw-line', { continueWayID: wayID, continueNodeID: vertexID });
   }
 
 

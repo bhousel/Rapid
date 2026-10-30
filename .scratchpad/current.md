@@ -29,9 +29,9 @@ connected to only one. Now `autofix()` applies one fix, then looks the way up an
 with both ends joining one road segment). Tests in `rapid_accept_feature.test.js`, `add_midpoint.test.js`.
 Audit of validators + `ValidationSystem` written up in `design/validation-system.md` (new); the
 rollout there is the plan. Biggest: way geometry lives on entity objects shared by all graphs.
-Oct 29: audit findings 3, 4 (curb_nodes, Autofix All), 5 (missing_tag), 7 and 8 committed; finding 6
-fixed (not yet committed): a merge also validates the user's edits near the merged data. Still open:
-1, 2, the rest of 4.
+Oct 29–30: audit findings 3, 4 (curb_nodes, Autofix All), 5 (missing_tag), 6, 7 and 8 committed.
+Oct 30, not yet committed: the rest of 4 (fixes look their entities up when they run, and change
+nothing if the graph doesn't fit). Still open: 1, 2.
 
 ## Active: what an edit records (`EditSystem`)
 Design: [`design/edit-system.md`](../design/edit-system.md), started Oct 26. Edits need to record more
