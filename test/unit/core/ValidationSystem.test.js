@@ -195,6 +195,54 @@ describe('ValidationSystem', () => {
       }
     });
 
+    it('validates the user\'s edits again when map data loads near them', async () => {
+      const editor = context.systems.editor;
+      await _validator.validateAsync();
+
+      // Like `almost_junction`, a stand-in that gives up where the map isn't loaded
+      let loaded = false;
+      const osm = { isDataLoaded: () => loaded };
+      const checkedIDs = [];
+      const waits = (entity) => {
+        if (entity.type !== 'way') return { issues: [] };
+        checkedIDs.push(entity.id);
+        if (!osm.isDataLoaded()) return { issues: [] };
+        return { issues: [new Rapid.ValidationIssue(context, { type: 'waits', severity: 'warning', entityIds: [entity.id] })] };
+      };
+      waits.type = 'waits';
+      _validator._validators.set('waits', waits);
+      const services = context.services;
+      context.services = { ...services, osm };
+
+      try {
+        // The user draws a road that ends where the map isn't loaded
+        const a = new Rapid.OsmNode(context, { id: 'n-10', loc: [10, 10] });
+        const b = new Rapid.OsmNode(context, { id: 'n-11', loc: [10.001, 10] });
+        const way = new Rapid.OsmWay(context, { id: 'w-10', nodes: ['n-10', 'n-11'], tags: { highway: 'residential' } });
+        editor.perform(Rapid.actionAddEntity(a), Rapid.actionAddEntity(b), Rapid.actionAddEntity(way));
+        editor.commit({ stringID: 'added w-10', selection: ['w-10'] });
+        await _validator.validateAsync();
+        const waitsFor = () => _validator.getIssues().filter(issue => issue.type === 'waits').map(issue => issue.entityIds[0]);
+        assert.deepEqual(waitsFor(), []);
+
+        // Data loads far away: the road isn't checked again
+        loaded = true;
+        checkedIDs.length = 0;
+        editor.merge([new Rapid.OsmNode(context, { id: 'n100', loc: [20, 20], version: '1' })]);
+        await _validator._head.queuePromise;
+        assert.notInclude(checkedIDs, 'w-10');
+
+        // Data loads at the road's end: the road is checked again
+        editor.merge([new Rapid.OsmNode(context, { id: 'n101', loc: [10.001, 10.00001], version: '1' })]);
+        await _validator._head.queuePromise;
+        assert.include(checkedIDs, 'w-10');
+        assert.deepEqual(waitsFor(), ['w-10']);
+      } finally {
+        context.services = services;
+        _validator._validators.delete('waits');
+      }
+    });
+
   });
 
 });

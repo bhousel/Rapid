@@ -1,18 +1,23 @@
 import * as Validators from '../validators/index.ts';
 import { AbstractSystem } from './AbstractSystem.ts';
 import { Difference } from '../lib/Difference.ts';
+import { Extent } from '@rapid-sdk/math';
 import { utilArrayChunk, utilArrayGroupBy } from '@rapid-sdk/util';
 import { utilExtractValues } from '../util/string.ts';
 import { ValidationCache } from '../lib/ValidationCache.ts';
 
 import type { Context } from '../Context.ts';
 import type { OsmEntity } from '../data/OsmEntity.ts';
+import type { OsmNode } from '../data/OsmNode.ts';
 import type { Graph } from '../lib/Graph.ts';
 import type { ValidationIssue, ValidationSeverity } from '../lib/ValidationIssue.ts';
 import type { ValidatorFactory, ValidatorFunction, ValidatorResult } from '../validators/types.ts';
 
 /** Wait 5 sec before revalidating provisional entities */
 const RETRY = 5000;
+
+/** How far past newly loaded data to look for the user's edits (validators look a few meters around a feature) */
+const MERGE_PADDING_METERS = 10;
 
 /** Override for adjusting issue severity */
 interface SeverityOverride {
@@ -183,7 +188,10 @@ export class ValidationSystem extends AbstractSystem {
         // When to run validation:
         editor!
           .on('stablechange', () => this.validateAsync())
-          .on('merge', (entityIDs: EntityID[]) => this._validateBaseEntitiesAsync(entityIDs));
+          .on('merge', (entityIDs: EntityID[]) => {
+            this._validateBaseEntitiesAsync(entityIDs);
+            this._validateEditsNearAsync(entityIDs);
+          });
       });
   }
 
@@ -660,6 +668,52 @@ export class ValidationSystem extends AbstractSystem {
     const expandedEntityIDs = this._base.withAllRelatedEntities(entityIDs);  // expand set
 
     return this._validateEntitiesAsync(this._base, expandedEntityIDs)
+      .then(() => this._updateResolvedIssues(expandedEntityIDs))
+      .then(() => { this.emit('validated'); })
+      .catch((e: Error) => console.error(e));  // eslint-disable-line
+  }
+
+
+  /**
+   * Validates the user's edits near entities being merged into the base graph.
+   * Validators skip what they can't judge where the map isn't loaded yet (e.g. `almost_junction` at
+   * the end of a road), and a road the user drew or accepted can reach past the loaded map.
+   * Merging doesn't change the user's edits, so `validateAsync` wouldn't check them again.
+   * @param entityIDs - The entityIDs on the merged tile (including previously seen ones)
+   * @return Promise fulfilled when validation is completed.
+   */
+  protected _validateEditsNearAsync(entityIDs: Iterable<EntityID>): Promise<void> {
+    const context = this.context;
+    const editor = context.systems.editor!;
+
+    const graph = this._head.graph;
+    if (!graph || graph === editor.base.graph) return Promise.resolve();   // no edits validated yet
+    if (editor.canRestoreBackup) return Promise.resolve();   // Wait to see if the user wants to restore their backup
+
+    // Where the merged data is
+    const merged = new Extent();
+    for (const entityID of entityIDs) {
+      const entity = graph.hasEntity(entityID);
+      if (entity?.type === 'node') {
+        merged.extendSelf((entity as OsmNode).loc!);
+      }
+    }
+    if (!isFinite(merged.min[0])) return Promise.resolve();   // no nodes merged
+    const nearby = merged.padByMeters(MERGE_PADDING_METERS);
+
+    // The user's edits there
+    const editedIDs = new Set<EntityID>();
+    for (const entityID of editor.difference().complete().keys()) {
+      const extent = graph.hasEntity(entityID)?.extent();
+      if (extent && nearby.intersects(extent)) {
+        editedIDs.add(entityID);
+      }
+    }
+    if (!editedIDs.size) return Promise.resolve();
+
+    const expandedEntityIDs = this._head.withAllRelatedEntities(editedIDs);  // expand set
+
+    return this._validateEntitiesAsync(this._head, expandedEntityIDs)
       .then(() => this._updateResolvedIssues(expandedEntityIDs))
       .then(() => { this.emit('validated'); })
       .catch((e: Error) => console.error(e));  // eslint-disable-line

@@ -10,8 +10,8 @@ autoconnect (accepting a Rapid feature with `poweruser.autoConnect`) crashed wit
 
 > **Status:** Audit done. Fixed: the autoconnect crash, the split-edge problem in `actionAddMidpoint`,
 > a throwing validator hiding other issues, Autofix All's transaction, the `curb_nodes` fix,
-> `missing_tag`'s severity, side effects while detecting, and the smaller items. The rest of the
-> findings are open (see [Rollout](#rollout)).
+> `missing_tag`'s severity, side effects while detecting, the user's edits near data that wasn't
+> loaded, and the smaller items. The rest of the findings are open (see [Rollout](#rollout)).
 
 ## Words used here
 
@@ -29,6 +29,9 @@ autoconnect (accepting a Rapid feature with `poweruser.autoConnect`) crashed wit
 
 `ValidationSystem` validates the base and stable graphs, never staging, so nothing runs while the
 user drags. Entities to validate are queued in chunks of 50 and run in idle callbacks.
+- On `stablechange`, the head cache validates what the edit changed, and what's related to it.
+- On `merge` (a tile loaded), the base cache validates everything on the tile, and the head cache
+  validates the user's edits near it (finding 6).
 
 Validators also run outside `ValidationSystem`:
 - **Autoconnect** (`attemptAutoconnect` in `actions/rapid_accept_feature.ts`) runs `almost_junction` and
@@ -108,10 +111,22 @@ the code; the repros were kept outside the repo.
    that removing all the tags from an existing feature blocks the upload. The cost is that changing
    an old untagged way, e.g. adding a vertex, makes its missing tags an error too.) `help_request`
    has the same always-true check, harmlessly.
-6. **Features near data that isn't loaded are never checked again** (traced). `almost_junction`,
-   `impossible_oneway`, `disconnected_way`, `unsquare_way` and `missing_tag` give up when the data
-   around a node isn't loaded, and return an empty result instead of a provisional one, so the
-   feature isn't validated again when the data arrives.
+6. ✅ **The user's edits near data that wasn't loaded were never checked again** (checked; fixed).
+   `almost_junction`, `impossible_oneway`, `disconnected_way`, `unsquare_way`, `missing_tag` and
+   `outdated_tags` give up where the map isn't loaded (`osm.isDataLoaded`) and return no issues.
+   - For data nobody edited, that's fine: a merge emits every entity on the tile (`seenIDs`, including
+     ones seen before), and the base cache validates them and the ways connected to them again. A way
+     that reaches into a tile is in that tile's API response.
+   - For the user's edits it wasn't: the head cache was only validated on `stablechange`, for what
+     the edit changed. A merge rebases the stable graph in place, so the head cache looked caught up,
+     and a road the user drew or accepted isn't in any tile's response. A road accepted past the
+     loaded map (or drawn while a tile was slow) kept its empty result until the user edited it again.
+   - Now a merge also validates, in the head cache, the user's changed entities that overlap the merged
+     nodes (padded 10 m), and the entities related to them (`_validateEditsNearAsync`).
+   - Not provisional results: they're retried every 5 seconds, and every way crossing the edge of the
+     loaded map would be retried until the user loads the tile, maybe never.
+   - Autoconnect still gives up at an end in an unloaded tile, so it doesn't join there. When the tile
+     loads, the user sees an `almost_junction` issue instead.
 7. ✅ **Detecting had side effects** (traced; fixed). `short_road` and `y_shaped_connection` built a
    `DeleteOperation` while detecting, which read the staging graph and the viewport and could request
    a map tile, so which fixes were offered depended on where the map was. Now they decide from the
@@ -143,8 +158,8 @@ What a validator needs, so it can be run on any graph (including one inside an a
    finds the edge or node again when it runs; if the graph doesn't fit anymore, it changes nothing.
 4. **A runner that applies one fix at a time**, like `attemptAutoconnect`'s `autofix()`, shared by
    autoconnect and Autofix All.
-5. **`ValidationSystem` contains failures**: a try/catch per job, `queuedEntityIDs` released in a
-   `finally`, and a provisional result when the data isn't loaded.
+5. **`ValidationSystem` contains failures**: a try/catch per job, and `queuedEntityIDs` released in a
+   `finally`.
 
 ## Rollout
 
@@ -156,4 +171,5 @@ What a validator needs, so it can be run on any graph (including one inside an a
    (the rest of finding 4), with one runner for autoconnect and Autofix All.
 5. Geometry per graph (finding 1). The biggest change: it's about `Graph` and the data classes, not
    only validation, and needs its own design.
-6. Provisional results (finding 6). (✅ No side effects while detecting, finding 7, Oct 2026.)
+6. ✅ Validate the user's edits again when data loads near them (finding 6), and no side effects while
+   detecting (finding 7) (Oct 2026).
