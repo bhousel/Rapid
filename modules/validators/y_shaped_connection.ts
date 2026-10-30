@@ -210,7 +210,7 @@ export function validateYShapedConnection(context: Context): ValidatorFunction {
     // Check if either neighbor node on its parent way is a connection node.
     const way = pways[0];
     const idx = way.nodes.indexOf(entity.id);
-    if (idx <= 0) return result;  // not found?
+    if (idx < 0) return result;  // not found?
     if (isCandidate(graph, way, idx - 1, idx) || isCandidate(graph, way, idx + 1, idx)) {
       result.issues.push(createIssueAndFixForNode(node, graph));
     }

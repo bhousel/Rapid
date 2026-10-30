@@ -30,8 +30,8 @@ describe('validateYShapedConnection', () => {
     await context.systems.editor.resetAsync();
   });
 
-  // A new road `w-1` joins the existing road `w1` at `c`, through a node `e` about 8 m before it
-  function makeYShape(extraEntities = []) {
+  // A new road `w-1` joins the existing road `w1` at `c`, through a node `n-2` about 8 m before it
+  function makeYShape(extraEntities = [], newWayNodeIDs = ['n-1', 'n-2', 'c', 'n-3']) {
     const editor = context.systems.editor;
     const road = { highway: 'residential' };
     editor.merge([
@@ -44,7 +44,7 @@ describe('validateYShapedConnection', () => {
       graph.replace(new Rapid.OsmNode(context, { id: 'n-1', loc: [0, -0.001] }));
       graph.replace(new Rapid.OsmNode(context, { id: 'n-2', loc: [0.00005, -0.00005] }));
       graph.replace(new Rapid.OsmNode(context, { id: 'n-3', loc: [0.001, 0.0001] }));
-      graph.replace(new Rapid.OsmWay(context, { id: 'w-1', nodes: ['n-1', 'n-2', 'c', 'n-3'], tags: road }));
+      graph.replace(new Rapid.OsmWay(context, { id: 'w-1', nodes: newWayNodeIDs, tags: road }));
       for (const entity of extraEntities) {
         graph.replace(entity);
       }
@@ -62,6 +62,13 @@ describe('validateYShapedConnection', () => {
     assert.strictEqual(issues[0].dynamicFixes()[0].icon, 'rapid-operation-delete');
 
     assert.deepEqual(validator(graph.entity('n-1'), graph).issues, []);
+  });
+
+  it('flags the first node of the way too', () => {
+    const graph = makeYShape([], ['n-2', 'c', 'n-3']);
+    const issues = validator(graph.entity('n-2'), graph).issues;
+    assert.lengthOf(issues, 1);
+    assert.deepEqual(issues[0].entityIds, ['n-2']);
   });
 
   it('suggests moving the node instead when another way shares it', () => {

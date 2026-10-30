@@ -271,24 +271,29 @@ export class ValidationSystem extends AbstractSystem {
    * It reruns just the "unsquare_way" validation on all buildings.
    */
   public revalidateUnsquare(): void {
+    const editor = this.context.systems.editor!;
+    const spatial = this.context.systems.spatial!;
+
     const checkUnsquareWay = this._validators.get('unsquare_way');
     if (typeof checkUnsquareWay !== 'function') return;
 
     const revalidate = (cache: ValidationCache): void => {
-      if (!cache.graph) return;
+      const graph = cache.graph;
+      if (!graph) return;
 
       cache.uncacheIssuesOfType('unsquare_way');   // uncache existing
 
       // rerun for all buildings
-      const editor = this.context.systems.editor!;
-      const spatial = this.context.systems.spatial!;
-      const spatialID = editor.spatialIDForGraph(cache.graph);
+      // (The head cache's graph can be behind stable, and then gets the staging index.
+      //  Use the index only to find the buildings, and check each one as it is in this graph.)
+      const spatialID = editor.spatialIDForGraph(graph);
 
       const buildings = spatial.getAllItems<OsmEntity>(spatialID)
-        .filter(entity => (entity.type === 'way' && entity.tags.building && entity.tags.building !== 'no'));
+        .map(item => graph.hasEntity(item.id))
+        .filter((entity): entity is OsmEntity => Boolean(entity?.type === 'way' && entity.tags.building && entity.tags.building !== 'no'));
 
       for (const entity of buildings) {
-        const detected = checkUnsquareWay(entity, cache.graph);
+        const detected = checkUnsquareWay(entity, graph);
         if (!detected.issues.length) continue;
         cache.cacheIssues(detected.issues);
       }

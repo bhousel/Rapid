@@ -10,8 +10,8 @@ autoconnect (accepting a Rapid feature with `poweruser.autoConnect`) crashed wit
 
 > **Status:** Audit done. Fixed: the autoconnect crash, the split-edge problem in `actionAddMidpoint`,
 > a throwing validator hiding other issues, Autofix All's transaction, the `curb_nodes` fix,
-> `missing_tag`'s severity, and side effects while detecting. The rest of the findings are open (see
-> [Rollout](#rollout)).
+> `missing_tag`'s severity, side effects while detecting, and the smaller items. The rest of the
+> findings are open (see [Rollout](#rollout)).
 
 ## Words used here
 
@@ -121,11 +121,15 @@ the code; the repros were kept outside the repo.
    are for a user deleting what they selected, not a fix for a road they just drew. (`short_road` is
    commented out of `validators/index.ts`, too many false positives.) `missing_tag` and
    `disconnected_way` still use `DeleteOperation`, but only when the issue is shown or the fix runs.
-8. Smaller ones:
-   - `crossing_ways` hashes the crossing location rounded to 4 decimals (~11 m), so two crossings of
-     the same ways within 11 m are one issue.
-   - `y_shaped_connection` skips an edge node at index 0 (`idx <= 0` should be `idx < 0`).
-   - `revalidateUnsquare` checks staging's entities against the head graph when the head lags.
+8. ✅ Smaller ones (fixed):
+   - `crossing_ways` hashed the crossing location rounded to 4 decimals (~11 m), so two crossings of
+     the same ways within 11 m were one issue. Now it hashes the two crossing segments (two straight
+     segments cross only once). The ID now stays the same when a node of either segment moves, but
+     changes when one of the segments is split.
+   - `y_shaped_connection` skipped the first node of a way (`idx <= 0`, now `idx < 0`).
+   - `revalidateUnsquare` checked staging's entities against the head graph when the head lagged
+     (including buildings not in that graph). Now it takes only the IDs from the index and checks each
+     building as it is in that graph.
 
 ## Where this is heading
 
@@ -147,7 +151,7 @@ What a validator needs, so it can be run on any graph (including one inside an a
 1. ✅ Autoconnect applies one autofix at a time; `actionAddMidpoint` handles a split edge (Oct 2026).
 2. ✅ Contain failures in `ValidationSystem` (finding 3) and Autofix All's transaction (finding 4);
    `curb_nodes`' fix; `missing_tag`'s `canDelete` (finding 5) (Oct 2026).
-3. The smaller items (finding 8).
+3. ✅ The smaller items (finding 8) (Oct 2026).
 4. Validate with the right spatial index (finding 2), then fixes that find their place again
    (the rest of finding 4), with one runner for autoconnect and Autofix All.
 5. Geometry per graph (finding 1). The biggest change: it's about `Graph` and the data classes, not

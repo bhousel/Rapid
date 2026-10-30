@@ -560,4 +560,30 @@ describe('validateCrossingWays', () => {
     verifySingleCrossingIssue(validate(), {});
   });
 
+  //
+  //       n4  n5         w1:  [n1, n2]
+  //       |   |          w2:  [n3, n4, n5, n6]
+  //  n1---|---|---n2
+  //       |   |          (the crossings are about 2 m apart)
+  //       n3  n6
+  //
+  it('flags two crossings of the same ways a few meters apart as two issues', () => {
+    const road = { highway: 'residential' };
+    load([
+      new Rapid.OsmNode(context, { id: 'n1', loc: [-0.001, 0] }),
+      new Rapid.OsmNode(context, { id: 'n2', loc: [ 0.001, 0] }),
+      new Rapid.OsmWay(context, { id: 'w1', nodes: ['n1', 'n2'], tags: road }),
+      new Rapid.OsmNode(context, { id: 'n3', loc: [0, -0.0005] }),
+      new Rapid.OsmNode(context, { id: 'n4', loc: [0,  0.0005] }),
+      new Rapid.OsmNode(context, { id: 'n5', loc: [0.00002,  0.0005] }),
+      new Rapid.OsmNode(context, { id: 'n6', loc: [0.00002, -0.0005] }),
+      new Rapid.OsmWay(context, { id: 'w2', nodes: ['n3', 'n4', 'n5', 'n6'], tags: road })
+    ]);
+
+    const issues = validate();
+    assert.lengthOf(issues, 4);   // each crossing, found from each way
+    const issueIDs = new Set(issues.map(issue => issue.id));
+    assert.strictEqual(issueIDs.size, 2);
+  });
+
 });

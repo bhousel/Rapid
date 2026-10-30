@@ -520,8 +520,9 @@ export function validateCrossingWays(context: Context): ValidatorFunction {
       crossingTypeID += '_connectable';
     }
 
-    // Differentiate based on the loc rounded to 4 digits, since two ways can cross multiple times.
-    const uniqueID = '' + crossing.crossPoint[0].toFixed(4) + ',' + crossing.crossPoint[1].toFixed(4);
+    // Differentiate based on the crossing segments, since two ways can cross multiple times.
+    // (Two straight segments cross only once. Sorted so either way finds the same issue.)
+    const uniqueID = edges.map(edge => edge.toSorted().join('-')).sort().join(',');
 
     // Support autofix for some kinds of connections
     let autoArgs: any = null;

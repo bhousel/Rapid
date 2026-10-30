@@ -157,6 +157,44 @@ describe('ValidationSystem', () => {
         });
     });
 
+    it('revalidateUnsquare checks each building as it is in the graph being validated', async () => {
+      const editor = context.systems.editor;
+      await _validator.validateAsync();
+
+      // A stand-in for `unsquare_way` that records what it was given
+      let checked = [];
+      const unsquare = (entity, graph) => {
+        checked.push([entity.id, graph.hasEntity(entity.id) === entity]);
+        return { issues: [] };
+      };
+      unsquare.type = 'unsquare_way';
+      _validator._validators.set('unsquare_way', unsquare);
+
+      const square = (wayID, x) => {
+        const nodes = [[x, 0], [x + 0.0001, 0], [x + 0.0001, 0.0001], [x, 0.0001]]
+          .map(loc => new Rapid.OsmNode(context, { loc }));
+        const way = new Rapid.OsmWay(context, { id: wayID, nodes: [...nodes.map(node => node.id), nodes[0].id], tags: { building: 'yes' } });
+        return [...nodes, way].map(entity => Rapid.actionAddEntity(entity));
+      };
+
+      editor.perform(...square('w-1', 0));
+      editor.commit({ stringID: 'added w-1', selection: ['w-1'] });   // starts validating
+
+      // Commit again while that validation runs, so the head cache is a graph behind stable
+      editor.perform(Rapid.actionChangeTags('w-1', { building: 'house' }), ...square('w-2', 0.001));
+      editor.commit({ stringID: 'changed w-1, added w-2', selection: ['w-2'] });
+
+      checked = [];
+      try {
+        _validator.revalidateUnsquare();
+        // Only `w-1` is in the head cache's graph, and it's checked as it is there
+        assert.deepEqual(checked, [['w-1', true]]);
+      } finally {
+        await _validator.validateAsync();
+        _validator._validators.delete('unsquare_way');
+      }
+    });
+
   });
 
 });
