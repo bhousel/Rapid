@@ -182,6 +182,6 @@ What a validator needs, so it can be run on any graph (including one inside an a
 4. ✅ Fixes look up their entities in the graph they run on (the rest of finding 4) (Oct 2026).
 5. Validate with the right spatial index (finding 2), with one runner for autoconnect and Autofix All.
 6. Geometry per graph (finding 1). The biggest change: it's about `Graph` and the data classes, not
-   only validation, and needs its own design.
+   only validation. Designed in [`graph-geometry.md`](graph-geometry.md), with finding 2.
 7. ✅ Validate the user's edits again when data loads near them (finding 6), and no side effects while
    detecting (finding 7) (Oct 2026).

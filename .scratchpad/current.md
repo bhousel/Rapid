@@ -29,9 +29,13 @@ connected to only one. Now `autofix()` applies one fix, then looks the way up an
 with both ends joining one road segment). Tests in `rapid_accept_feature.test.js`, `add_midpoint.test.js`.
 Audit of validators + `ValidationSystem` written up in `design/validation-system.md` (new); the
 rollout there is the plan. Biggest: way geometry lives on entity objects shared by all graphs.
-Oct 29–30: audit findings 3, 4 (curb_nodes, Autofix All), 5 (missing_tag), 6, 7 and 8 committed.
-Oct 30, not yet committed: the rest of 4 (fixes look their entities up when they run, and change
-nothing if the graph doesn't fit). Still open: 1, 2.
+Oct 29–30: audit findings 3–8 committed. Findings 1 and 2 (shared geometry, wrong spatial index) are
+designed together in `design/graph-geometry.md` (not yet committed). Oct 30: two measurement rounds
+(survey, then three prototyped designs with critics) rewrote it: graphs share structure (lineage +
+slot table + persistent records), derived data per record with the base's on base objects, change
+journal first. Waiting on Bryan's decisions (open questions there). Step 0 includes a data-loss fix:
+straighten deletes a node just added to a bus route (stale `isInteresting` memo); and copy, delete,
+paste throws because `context.copyIDs` keeps the live staging graph.
 
 ## Active: what an edit records (`EditSystem`)
 Design: [`design/edit-system.md`](../design/edit-system.md), started Oct 26. Edits need to record more
