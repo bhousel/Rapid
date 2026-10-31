@@ -35,7 +35,7 @@ export function actionCircularize(wayID: EntityID, maxDegrees: number = 20): Act
 
     // The way already has a world-space centroid precomputed; use it as the
     // local origin so the math stays away from huge EPSG:3857 magnitudes.
-    const origin = way.geoms.parts[0]?.world?.centroid;
+    const origin = graph.geometry(way).parts[0]?.world?.centroid;
     if (!origin) return graph;
 
     // Gather the unique original nodes with their world coords (in local space).
@@ -47,7 +47,7 @@ export function actionCircularize(wayID: EntityID, maxDegrees: number = 20): Act
     const interesting: Vec2[] = [];
 
     for (const node of utilArrayUniq(graph.childNodes(way))) {
-      const coord = node.geoms.parts[0].world?.coords as Vec2 | undefined;
+      const coord = graph.geometry(node).parts[0].world?.coords as Vec2 | undefined;
       if (!coord) continue;
       const point = vecSubtract(coord, origin);  // world -> local
       origNodes.push(node);
@@ -65,7 +65,7 @@ export function actionCircularize(wayID: EntityID, maxDegrees: number = 20): Act
     if (!radius) return graph;
 
     // Winding direction: +1 = CCW, -1 = CW (in y-up math space).
-    const sign = way.geoms.parts[0]?.local?.winding ?? 1;
+    const sign = graph.geometry(way).parts[0]?.local?.winding ?? 1;
 
     // Arc-length parameterize the original boundary: cumulativeDist[i] is the distance
     // walked from origPoints[0] to origPoints[i].  This is the key idea — node
@@ -167,7 +167,7 @@ export function actionCircularize(wayID: EntityID, maxDegrees: number = 20): Act
    */
   action.disabled = (graph: Graph): string | false => {
     const way = graph.entity(wayID) as OsmWay;
-    const geom = way.geoms.parts[0]?.world;
+    const geom = graph.geometry(way).parts[0]?.world;
     const points = geom?.outer;
     const hull = geom?.hull;
     const centroid = geom?.centroid;

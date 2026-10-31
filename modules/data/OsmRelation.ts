@@ -1,10 +1,12 @@
 import { geoArea } from 'd3-geo';
 import { geomPolygonContainsPolygon, geomPolygonIntersectsPolygon } from '@rapid-sdk/math';
+import { Geometry } from '../lib/Geometry.ts';
 import { OsmEntity, OsmEntityProps } from './OsmEntity.ts';
 import { osmJoinWays } from '../lib/multipolygon.ts';
 
 import type { Context } from '../Context.ts';
 import type { GeoJSONObject } from '../lib/types.ts';
+import type { GeometryPart } from '../lib/GeometryPart.ts';
 import type { Graph } from '../lib/Graph.ts';
 import type { EntityType } from './types.ts';
 import type { Vec2 } from '@rapid-sdk/math';
@@ -96,7 +98,56 @@ export class OsmRelation extends OsmEntity {
     if (seen && !this.isMultipolygon()) {
       return this._buildGeoJSON(graph, seen);
     }
-    return this.transient('geojson', () => this._buildGeoJSON(graph, seen));
+    return this.memo(graph, 'geojson', () => this._buildGeoJSON(graph, seen));
+  }
+
+  /**
+   * Recomputes this relation's geometry.
+   * A multipolygon joins its member ways into rings. Any other relation references its members'
+   * geometry parts instead of copying them, so building it only gathers references.
+   * Member ways and nodes must already be current in the graph (`Graph.recomputeGeometry` builds
+   * ways first). Member relations are gathered down to their leaf members, so cycles and the order
+   * relations are built in don't matter.
+   * @param graph - the Graph that holds the topology needed
+   * @returns this same OsmRelation
+   */
+  public updateGeometry(graph?: Graph): this {
+    if (!graph || this.isMultipolygon()) {
+      return super.updateGeometry(graph);
+    }
+
+    this.clearMemos();
+    const parts = new Set<GeometryPart>();
+    this._gatherMemberParts(graph, new Set<EntityID>(), parts);
+    const geoms = new Geometry(this.context);
+    geoms.setParts([...parts]);
+    this.geoms = geoms;
+    return this;
+  }
+
+  /**
+   * Gathers the geometry parts of this relation's members, down through member relations
+   * (a multipolygon member contributes its own parts).
+   * @param graph - the Graph that holds the topology needed
+   * @param seen - relation IDs already gathered, to stop at cycles
+   * @param parts - receives the parts
+   */
+  protected _gatherMemberParts(graph: Graph, seen: Set<EntityID>, parts: Set<GeometryPart>): void {
+    if (seen.has(this.id)) return;
+    seen.add(this.id);
+
+    for (const member of this.members) {
+      const entity = graph.hasEntity(member.id);
+      if (!entity) continue;   // not downloaded
+
+      if (entity.type === 'relation' && !(entity as OsmRelation).isMultipolygon()) {
+        (entity as OsmRelation)._gatherMemberParts(graph, seen, parts);
+      } else {
+        for (const part of graph.geometry(entity).parts) {
+          parts.add(part);
+        }
+      }
+    }
   }
 
   /**
@@ -217,7 +268,7 @@ export class OsmRelation extends OsmEntity {
    * @return 'area' or 'relation'
    */
   public geometry(graph?: Graph): 'area' | 'relation' {
-    return this.transient('geometry', () => {
+    return this.memo(null, 'geometry', () => {
       return this.isMultipolygon() ? 'area' : 'relation';
     });
   }

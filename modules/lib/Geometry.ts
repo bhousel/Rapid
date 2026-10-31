@@ -66,11 +66,7 @@ export class Geometry {
   public reset(): void {
     this.orig = null;
     this.world = null;
-
-    for (const part of this.parts) {
-      part.reset();
-    }
-    this.parts = [];
+    this.parts = [];   // the parts aren't reset: they may be shared (see `setParts`)
   }
 
 
@@ -139,6 +135,34 @@ export class Geometry {
     }
 
     if (isValid) {   // At least one part was found to be valid
+      this.orig  = { extent: origExtent };
+      this.world = { extent: worldExtent };
+    }
+  }
+
+
+  /**
+   * Sets the parts of this Geometry to existing GeometryParts, without copying them.
+   * A relation uses this to reference its members' parts. Parts are never changed after they're
+   * made, so sharing them is safe; this Geometry doesn't own them.
+   * If there is any existing data, it is first removed.
+   * @param  parts - existing GeometryParts
+   */
+  public setParts(parts: GeometryPart[]): void {
+    this.orig = null;
+    this.world = null;
+    this.parts = [];
+
+    const origExtent = new Extent();
+    const worldExtent = new Extent();
+    for (const part of parts) {
+      if (!part.orig || !part.world) continue;
+      this.parts.push(part);
+      origExtent.extendSelf(part.orig.extent);
+      worldExtent.extendSelf(part.world.extent);
+    }
+
+    if (this.parts.length) {
       this.orig  = { extent: origExtent };
       this.world = { extent: worldExtent };
     }

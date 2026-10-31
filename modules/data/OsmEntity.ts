@@ -27,10 +27,6 @@ export interface OsmEntityProps extends AbstractDataProps {
 }
 
 
-/** Type for the transients cache - maps entity keys to their cached computed values */
-type TransientCache = Map<string, Map<string, unknown>>;
-
-
 /**
  * This class contains logic that is common to OSM data elements.
  * Aside from the `props`, OSM data elements all contain a special `tags` object.
@@ -45,8 +41,10 @@ type TransientCache = Map<string, Map<string, unknown>>;
  */
 export class OsmEntity extends AbstractData<OsmEntityProps> {
 
-  /** Cache for memoizing expensive calculations, shared between copies */
-  protected _transients: TransientCache;
+  /** Answers memoized on this object, see `memo()` (created when the first one is stored) */
+  protected _memos: Map<string, unknown> | null;
+  /** The schema generation that the memoized answers were computed with */
+  protected _memoGeneration: number;
 
 
   /**
@@ -58,19 +56,14 @@ export class OsmEntity extends AbstractData<OsmEntityProps> {
   public constructor(otherOrContext: OsmEntity | Context, props: Partial<OsmEntityProps> = {}) {
     super(otherOrContext, props);
 
-    // "transients" are a cache where we memoize expensive calculations.
+    // Memos are a cache where we memoize expensive calculations.
     // They previously lived in the Graph, however we churn through Graphs
     // pretty frequently, so they now live with the OsmEntities themselves.
-    // The transients cache is shared between entities that copy from other entities.
-    // For this to work, the Entity must be touched if there is a meaningful
-    // change in the Graph that will cause the computed property to change.
-    if (otherOrContext instanceof AbstractData) {  // copy other
-      const other = otherOrContext as OsmEntity;
-      this._transients = other._transients;
-
-    } else {
-      this._transients = new Map<string, Map<string, unknown>>() as TransientCache;
-    }
+    // Each object has its own: a copy is a new entity, and starts without any.
+    // Answers that depend on the Graph are only memoized while every Graph agrees on them,
+    // see `memo()` and `Graph.canShareAnswers()`.
+    this._memos = null;
+    this._memoGeneration = 0;
 
     // Idea: Store tags in a proto-less object to avoid collisions with
     //  reserved words in JavaScript objects, see iD#3044
@@ -91,7 +84,7 @@ export class OsmEntity extends AbstractData<OsmEntityProps> {
    */
   public destroy(): void {
     super.destroy();
-    this._transients = null!;
+    this._memos = null;
   }
 
   /**
@@ -105,7 +98,7 @@ export class OsmEntity extends AbstractData<OsmEntityProps> {
    */
   public updateGeometry(graph?: Graph): this {
     // this.touch();
-    this._transients.clear();
+    this.clearMemos();
     const geoms = new Geometry(this.context);
     geoms.setData(this.asGeoJSON(graph));
     this.geoms = geoms;
@@ -176,26 +169,39 @@ export class OsmEntity extends AbstractData<OsmEntityProps> {
   }
 
   /**
-   * Stores a computed property for this Entity.
-   * We're essentially implementing "memoization" for the provided function.
-   * @param k - String cache key to lookup the computed value (e.g. 'extent')
+   * Memoizes a computed property for this Entity.
+   * Memos are dropped when the schema changes (its `generation`), since many answers read it.
+   * An answer that depends on a Graph (the entity's parents, its shape) is memoized only while every
+   * Graph of the lineage agrees on it (`graph.canShareAnswers()`); otherwise it's computed each time.
+   * @param graph - The Graph the answer depends on, or `null` if it depends only on this object
+   * @param k - String cache key to lookup the computed value (e.g. 'geometry')
    * @param fn - Function that performs the computation
    * @returns The result of the function call
    */
-  public transient<T>(k: string, fn: () => T): T {
-    const entityKey = this.key;
-    let cache = this._transients.get(entityKey);
-    if (!cache) {
-      cache = new Map<string, Map<string, unknown>>() as TransientCache;
-      this._transients.set(entityKey, cache);
+  public memo<T>(graph: Graph | null, k: string, fn: () => T): T {
+    if (graph && !graph.canShareAnswers(this.id)) return fn();
+
+    const generation = this.context.systems.schema?.generation ?? 0;
+    if (generation !== this._memoGeneration) {
+      this._memos?.clear();
+      this._memoGeneration = generation;
     }
 
-    let v = cache.get(k);
+    let v = this._memos?.get(k);
     if (v !== undefined) return v as T;  // return cached
 
     v = fn();   // compute value
-    cache.set(k, v);
+    this._memos ??= new Map<string, unknown>();
+    this._memos.set(k, v);
     return v as T;
+  }
+
+  /**
+   * Drops the answers memoized on this object.
+   * Used when something they were computed from changed, e.g. a rebase gave it new parents.
+   */
+  public clearMemos(): void {
+    this._memos?.clear();
   }
 
   /**

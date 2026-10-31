@@ -132,7 +132,7 @@ export function validateOutdatedTags(context: Context): ValidatorFunction {
     if (nsi) {
       isWaitingForNsi = (nsi.status === 'loading');
       if (!isWaitingForNsi) {
-        const loc = entity.extent()!.center();
+        const loc = graph.extent(entity)!.center();
         nsiResult = nsi.upgradeTags(newTags, loc);
         if (nsiResult) {
           newTags = nsiResult.newTags;

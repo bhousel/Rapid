@@ -669,10 +669,10 @@ export function validateCrossingWays(context: Context): ValidatorFunction {
           if (!edgeNode0 || !edgeNode1 || !crossedNode0 || !crossedNode1 || !crossedWay) return graph;
 
           // World coordinates of the nodes involved.
-          const edge0 = edgeNode0.geoms.parts[0].world?.coords as Vec2;
-          const edge1 = edgeNode1.geoms.parts[0].world?.coords as Vec2;
-          const crossed0 = crossedNode0.geoms.parts[0].world?.coords as Vec2;
-          const crossed1 = crossedNode1.geoms.parts[0].world?.coords as Vec2;
+          const edge0 = graph.geometry(edgeNode0).parts[0].world?.coords as Vec2;
+          const edge1 = graph.geometry(edgeNode1).parts[0].world?.coords as Vec2;
+          const crossed0 = graph.geometry(crossedNode0).parts[0].world?.coords as Vec2;
+          const crossed1 = graph.geometry(crossedNode1).parts[0].world?.coords as Vec2;
           if (!edge0 || !edge1 || !crossed0 || !crossed1) return graph;
 
 

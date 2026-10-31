@@ -71,7 +71,7 @@ export class AbstractData<P extends AbstractDataProps = AbstractDataProps> {
       const other = otherOrContext;
       this.context = other.context;
       this.props = structuredClone(other.props) as Partial<P>;
-      this.geoms = other.geoms.clone();
+      this.geoms = other.geoms;   // shared: a recompute stores a new Geometry, it never changes this one
 
     } else {
       const context = otherOrContext;
@@ -93,8 +93,7 @@ export class AbstractData<P extends AbstractDataProps = AbstractDataProps> {
    * @abstract
    */
   public destroy(): void {
-    this.geoms.destroy();
-    this.geoms = null!;
+    this.geoms = null!;   // not destroyed: copies of this data element (and relations) may share it
     this.props = null!;
     this.context = null!;
   }

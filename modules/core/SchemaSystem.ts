@@ -203,6 +203,9 @@ export class SchemaSystem extends AbstractSystem {
   /** Locale code used when the current search index was built (null means not yet built) */
   protected _currLocaleCode: LocaleCode | null;
 
+  /** Bumped on every schema change, so answers memoized from the schema know they're stale */
+  protected _generation: number;
+
 
   /**
    * @param context - Global shared application context
@@ -238,6 +241,7 @@ export class SchemaSystem extends AbstractSystem {
     this._requestedAssetIDs = null;
     this._recentIDs = null;
     this._currLocaleCode = null;
+    this._generation = 0;
 
     // Ensure methods used as callbacks always have `this` bound correctly.
     this._hashChanged = this._hashChanged.bind(this);
@@ -484,6 +488,16 @@ gfx?.scene?.reset();  // throw it all away
    */
   public get defaultAssetIDs(): Set<AssetID> {
     return this._defaultAssetIDs;
+  }
+
+  /**
+   * A number that changes on every schema change (every `schemachange` event).
+   * Answers memoized from the schema (preset matches, line or area) compare it to know they're stale.
+   * @return  The schema generation
+   * @readonly
+   */
+  public get generation(): number {
+    return this._generation;
   }
 
   /**
@@ -896,21 +910,27 @@ gfx?.scene?.reset();  // throw it all away
 
   /**
    * Find the best matching Preset for the given entity.
-   * Results are cached as a transient on the entity.
+   * The geometry (point or vertex, line or area) comes from the graph; the match for each geometry
+   * is memoized on the entity, so it answers for whichever graph asks.
    * @param   entity  - the Entity to test
    * @param   graph   - the Graph containing this Entity
    * @return  Preset that best matches
    */
   public match(entity: OsmEntity, graph: Graph): Preset | null {
-    return entity.transient('presetMatch', () => {
-      let geometry = entity.geometry(graph) as GeometryType;
-      // Treat entities on addr:interpolation lines as points, not vertices - iD#3241
-      if (geometry === 'vertex' && (entity as OsmNode).isOnAddressLine?.(graph)) {
-        geometry = 'point';
-      }
-      const entityExtent = entity.extent();
-      return this.matchTags(entity.tags, geometry, entityExtent?.center());
-    });
+    let geometry = entity.geometry(graph) as GeometryType;
+    // Treat entities on addr:interpolation lines as points, not vertices - iD#3241
+    if (geometry === 'vertex' && (entity as OsmNode).isOnAddressLine?.(graph)) {
+      geometry = 'point';
+    }
+
+    const matches = entity.memo(null, 'presetMatch', () => new Map<GeometryType, Preset | null>());
+    let preset = matches.get(geometry);
+    if (preset === undefined) {
+      const entityExtent = graph.extent(entity);
+      preset = this.matchTags(entity.tags, geometry, entityExtent?.center());
+      matches.set(geometry, preset);
+    }
+    return preset;
   }
 
 
@@ -991,10 +1011,10 @@ gfx?.scene?.reset();  // throw it all away
     if (entity.type !== 'node') return false;
     if (Object.keys(entity.tags).length === 0) return true;
 
-    return entity.transient('vertexMatch', () => {
-      // address lines allow vertices to act as standalone points
-      if ((entity as OsmNode).isOnAddressLine(graph)) return true;
+    // address lines allow vertices to act as standalone points
+    if ((entity as OsmNode).isOnAddressLine(graph)) return true;
 
+    return entity.memo(null, 'vertexMatch', () => {
       const vertexMatch = this.matchTags(entity.tags, 'vertex');
       if (vertexMatch && !vertexMatch.isFallback()) return true;
       const pointMatch = this.matchTags(entity.tags, 'point');
@@ -1449,6 +1469,8 @@ gfx?.scene?.reset();  // throw it all away
   protected _schemaChanged(): void {
     const context = this.context;
     const gfx = context.systems.gfx;
+
+    this._generation++;
 
     // Reset and rebuild per-scope derived data
     for (const scope of this._scopes.values()) {

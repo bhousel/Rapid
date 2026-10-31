@@ -289,6 +289,11 @@ the next undo, which actually leaves the newest edit, does.
 
 ### Backup format v4
 
+> **Changing:** step 7 of [`graph-geometry.md`](graph-geometry.md) rewrites v4 so each history item
+> stores only its own edit's changes, and a restore is O(changes). It keeps the number 4: this Rapid
+> hasn't been released, and the only v4 backups (in the shared debug Chrome) get deleted then. The
+> base versions, edit props and session metadata below stay.
+
 ```ts
 {
   version: 4,

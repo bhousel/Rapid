@@ -987,7 +987,7 @@ export class MapSystem extends AbstractSystem {
     if (Array.isArray(entities)) {
       extent = utilTotalExtent(entities, graph);
     } else {
-      extent = entities.extent();
+      extent = graph.extent(entities);
     }
     if (!extent || !isFinite(extent.area())) return this;
 
@@ -1004,6 +1004,7 @@ export class MapSystem extends AbstractSystem {
   public selectEntityID(entityID: EntityID, fitEntity: boolean = false): void {
     const context = this.context;
     const editor = context.systems.editor!;
+    const graph = editor.staging.graph;
     const scene = context.systems.gfx!.scene!;
     const viewport = context.viewport;
 
@@ -1019,7 +1020,7 @@ export class MapSystem extends AbstractSystem {
         context.enter('select', { selection: [entity.id] });
       }
 
-      const entityExtent = entity.extent();
+      const entityExtent = graph.extent(entity);
       if (!entityExtent) return;
       const entityZoom = Math.min(this.trimmedExtentZoom(entityExtent), 20);  // the zoom that best shows the entity
       const isOffscreen = (entityExtent.percentContainedIn(viewport.visibleExtent()) < 0.8);
@@ -1031,14 +1032,13 @@ export class MapSystem extends AbstractSystem {
       }
     };
 
-    const currGraph = editor.staging.graph;
-    let entity = currGraph.hasEntity(entityID);
+    let entity = graph.hasEntity(entityID);
     if (entity) {   // have it already
       gotEntity(entity);
     } else {   // need to load it first
       context.loadEntityAsync(entityID)
         .then(() => {  // At this point we expect it to be merged..
-          entity = currGraph.hasEntity(entityID);
+          entity = graph.hasEntity(entityID);
           if (!entity) return;  // give up
           gotEntity(entity);
         });

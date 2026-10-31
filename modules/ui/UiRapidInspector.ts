@@ -641,6 +641,11 @@ export class UiRapidInspector {
 
     const context = this.context;
     const editor = context.systems.editor!;
+    const mapwithai = context.services.mapwithai;
+
+    // An OSM-like Rapid feature lives in its dataset's graph, not in staging.
+    const datasetID = datum.props.datasetID as DatasetID;
+    const extent = (datum instanceof OsmEntity && mapwithai) ? mapwithai.graph(datasetID).extent(datum) : datum.extent();
 
     // An ignore changes nothing in the graph, so it gives its own extent for undo and redo to show.
     editor.perform(actionNoop());
@@ -648,7 +653,7 @@ export class UiRapidInspector {
       type: 'rapid_ignore_feature',
       stringID: 'rapid_inspector.option_ignore.annotation',
       ignoreID: datum.dataID,
-      extent: datum.extent()?.rectangle()
+      extent: extent?.rectangle()
     });
     context.enter('browse');
     this.datum = null;

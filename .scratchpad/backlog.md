@@ -25,6 +25,18 @@ Phase 1 (the `KeyboardSystem` conversion + command scaffolding) is done — see
 - **Direct mesh generation for polygons / lines**: replace the `PIXI.GpuGraphicsContext` + `PIXI.buildContextBatches()` round-trip in `PixiFeaturePolygon.ts` with direct `earcut` tessellation, or consider a shared mesh-generator path for polygons and lines. Meshes are batchable, so this could reduce draw calls while avoiding renderer-internal geometry extraction.
 - **Tile padding off-thread if measurable**: `_fromEdgePaddedCanvas()` does two canvas draws per tile on the main thread. If profiles show it matters, build the edge-padded tile source on a worker `OffscreenCanvas` and transfer an `ImageBitmap` back; GPU upload still stays with the Pixi renderer unless the renderer itself moves off-thread.
 
+## Render relations (at least the selected one)
+Rapid doesn't draw relations today: `PixiLayerOsm` skips `'relation'` geometry (a commented-out
+branch), and only multipolygons show, as areas. Showing a relation would help mappers a lot, routes
+especially, which are hard to check today.
+- Start with the selected (or hovered) relation: draw its member ways as one highlighted path, like
+  the blue line on a car navigation map, with an animation (moving dashes or chevrons) to show
+  direction. Members that aren't ways (stops, platforms) as markers on it.
+- Direction needs ordered members: `osmJoinWays` gives the sequence; `forward`/`backward` roles and
+  gaps in the route should show.
+- The geometry is already there: per `design/graph-geometry.md` section 3, a relation's geometry
+  references its members' parts, so drawing it reuses them instead of building new shapes.
+
 ## Line marker placement (oneway arrows, sided markers)
 - Today `geomGetPositionsAlongLine` (moved from `pixi/helpers.ts` to `geo/geom.ts`) regenerates marker positions per-frame in the feature's update path, with an arbitrary 100-marker cap (`Rapid#544`, the `isLimited` param) to keep long lines from spawning thousands of sprites.
 - Better approach (mirrors the label system): compute marker placement once in stable world coordinates, store as a list of `{worldCoord, angle}` records on the feature, and emit sprites only for the subset whose world position intersects the viewport. The cap (and the `isLimited` param) goes away naturally — a 100km road only emits sprites for the ~few-dozen markers actually on screen.

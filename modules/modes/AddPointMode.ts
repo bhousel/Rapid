@@ -117,7 +117,7 @@ export class AddPointMode extends AbstractMode {
     if (target && target.type === 'way') {
       const way = target as OsmWay;
       // A way will have LineString or Polygon geometry. We can use 'outer' to get these points.
-      const line = way.geoms.parts[0]!.world!.outer as Vec2[];
+      const line = graph.geometry(way).parts[0]!.world!.outer as Vec2[];
 
       const choice = vecProject(point, line);
       const localScale = 2 ** (WORLD_ZOOM - viewport.transform.zoom);

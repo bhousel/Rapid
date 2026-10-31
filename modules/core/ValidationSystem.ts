@@ -734,7 +734,7 @@ export class ValidationSystem extends AbstractSystem {
     const editedIDs = new Set<EntityID>();
     const addIfNearby = (entity: OsmEntity | undefined): void => {
       if (!entity) return;
-      const extent = entity.extent();
+      const extent = graph.extent(entity);
       if (extent && nearby.intersects(extent)) {
         editedIDs.add(entity.id);
       }

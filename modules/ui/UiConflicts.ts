@@ -340,7 +340,7 @@ export class UiConflicts extends EventEmitter {
 
     let graph = editor.staging.graph;
     let entity = graph.hasEntity(datum.id);
-    let other = entity?.extent();
+    let other = entity ? graph.extent(entity) : undefined;
     if (other) {
       extent.extendSelf(other);
     }
@@ -349,7 +349,7 @@ export class UiConflicts extends EventEmitter {
 
     graph = editor.staging.graph;
     entity = graph.hasEntity(datum.id);
-    other = entity?.extent();
+    other = entity ? graph.extent(entity) : undefined;
     if (other) {
       extent.extendSelf(other);
     }

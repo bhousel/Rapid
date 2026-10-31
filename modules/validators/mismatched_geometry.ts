@@ -293,7 +293,7 @@ export function validateMismatchedGeometry(context: Context): ValidatorFunction 
     if (entity.type === 'node' && (entity as OsmNode).isOnAddressLine(graph)) return null;
 
     let sourceGeom = entity.geometry(graph);
-    const loc = (entity as any).extent(graph).center();
+    const loc = graph.extent(entity)!.center();
 
     const targetGeoms = entity.type === 'way' ? ['point', 'vertex'] : ['line', 'area'];
 

@@ -374,7 +374,7 @@ export class DrawLineMode extends AbstractMode {
     } else if (target?.type === 'way') {
       const way = target as OsmWay;
       // A way will have LineString or Polygon geometry. We can use 'outer' to get these points.
-      const line = way.geoms.parts[0]!.world!.outer as Vec2[];
+      const line = graph.geometry(way).parts[0]!.world!.outer as Vec2[];
 
       // Exclude snapping to segments adjacent to the drawNode itself.
       const skipSegments = new Set<number>();
@@ -485,7 +485,7 @@ export class DrawLineMode extends AbstractMode {
     } else if (target?.type === 'way') {
       const way = target as OsmWay;
       // A way will have LineString or Polygon geometry. We can use 'outer' to get these points.
-      const line = way.geoms.parts[0]!.world!.outer as Vec2[];
+      const line = graph.geometry(way).parts[0]!.world!.outer as Vec2[];
 
       // Exclude snapping to segments adjacent to the drawNode itself.
       const skipSegments = new Set<number>();

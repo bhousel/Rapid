@@ -120,7 +120,7 @@ export class DragNodeMode extends AbstractMode {
     this._selectedIDs = [node.id];
 
     // Calculate dragOffset, to correct for where "on the pin" the user grabbed the target.
-    const startCoord = node.geoms.parts[0]!.world!.coords as Vec2;  // A node should have a single world coord
+    const startCoord = graph.geometry(node).parts[0]!.world!.coords as Vec2;  // A node should have a single world coord
     const clickCoord = context.behaviors.drag!.lastDown!.coord.world;
     this._dragOffset = vecSubtract(startCoord, clickCoord);
 
@@ -221,7 +221,7 @@ export class DragNodeMode extends AbstractMode {
     } else if (target?.type === 'way') {
       const way = target as OsmWay;
       // A way will have LineString or Polygon geometry. We can use 'outer' to get these points.
-      const line = way.geoms.parts[0]!.world!.outer as Vec2[];
+      const line = graph.geometry(way).parts[0]!.world!.outer as Vec2[];
 
       // If the dragNode belongs to the way, exclude snapping to adjacent segments.
       const skipSegments = new Set<number>();
@@ -317,7 +317,7 @@ export class DragNodeMode extends AbstractMode {
     } else if (target?.type === 'way') {
       const way = target as OsmWay;
       // A way will have LineString or Polygon geometry. We can use 'outer' to get these points.
-      const line = way.geoms.parts[0]!.world!.outer as Vec2[];
+      const line = graph.geometry(way).parts[0]!.world!.outer as Vec2[];
 
       // If the dragNode belongs to the way, exclude snapping to adjacent segments.
       const skipSegments = new Set<number>();

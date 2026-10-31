@@ -262,7 +262,7 @@ export function actionRapidAcceptFeature(datum: OsmEntity | GeoJSONData, joins?:
       // 1. If there are unaccepted nodes in the external dataset at the same location as
       // the node that we just added, mark them accepted also and import their tags.
       for (const nodeID of way.nodes) {
-        const coord = (graph.entity(nodeID) as OsmNode).geoms.parts[0].world?.coords as Vec2;  // A node should have a single world coord
+        const coord = graph.geometry(graph.entity(nodeID)).parts[0].world?.coords as Vec2;  // A node should have a single world coord
         if (!coord) continue;
 
         const extHits = spatial.getItemsAtCoord(spatialID!, coord);

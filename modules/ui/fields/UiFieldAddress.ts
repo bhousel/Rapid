@@ -150,20 +150,22 @@ export class UiFieldAddress extends AbstractUiField {
   protected _getNearbyStreets(): AddressSuggestion[] {
     const context = this.context;
     const editor = context.systems.editor!;
+    const graph = editor.staging.graph;
     const spatial = context.systems.spatial!;
 
     const loc = this.entityExtent!.center();
     const point = projWgs84ToWorld(loc);
     const box = this._queryBox(loc, 200);
 
-    const spatialID = editor.spatialIDForGraph(editor.staging.graph);
+    const spatialID = editor.spatialIDForGraph(graph);
     const streets = (spatial.getItemsAtBox(spatialID, box)
-      .map((hit: SpatialItem) => hit.contents as OsmEntity)
+      .map((hit: SpatialItem) => graph.hasEntity(hit.id))   // the version in this graph
+      .filter((entity): entity is OsmEntity => !!entity)
       .filter(isAddressableStreet)
       .map((way: OsmEntity) => {
         // Sort by distance to the addressable streets in the query box.
         // A way will have LineString or Polygon geometry. We can use 'outer' to get these points.
-        const line = (way as any).geoms.parts[0]?.world?.outer;
+        const line = graph.geometry(way).parts[0]?.world?.outer;
         if (!line) return null;
 
         const choice = vecProject(point, line);
@@ -189,19 +191,21 @@ export class UiFieldAddress extends AbstractUiField {
   protected _getNearbyCities(): AddressSuggestion[] {
     const context = this.context;
     const editor = context.systems.editor!;
+    const graph = editor.staging.graph;
     const spatial = context.systems.spatial!;
 
     const loc = this.entityExtent!.center();
     const point = projWgs84ToWorld(loc);
     const box = this._queryBox(loc, 200);
 
-    const spatialID = editor.spatialIDForGraph(editor.staging.graph);
+    const spatialID = editor.spatialIDForGraph(graph);
     const cities = (spatial.getItemsAtBox(spatialID, box)
-      .map((hit: SpatialItem) => hit.contents as OsmEntity)
+      .map((hit: SpatialItem) => graph.hasEntity(hit.id))   // the version in this graph
+      .filter((entity): entity is OsmEntity => !!entity)
       .filter(isAddressableCity)
       .map((d: OsmEntity) => {
         // Sort by distance to the center of the cities in the query box
-        const center = (d as any).geoms.world?.extent?.center();
+        const center = graph.geometry(d).world?.extent?.center();
         if (!center) return null;
 
         return {
@@ -237,6 +241,7 @@ export class UiFieldAddress extends AbstractUiField {
   protected _getNearbyValues(key: string): AddressSuggestion[] {
     const context = this.context;
     const editor = context.systems.editor!;
+    const graph = editor.staging.graph;
     const spatial = context.systems.spatial!;
     const entityIDs = this.entityIDs;
 
@@ -244,13 +249,14 @@ export class UiFieldAddress extends AbstractUiField {
     const point = projWgs84ToWorld(loc);
     const box = this._queryBox(loc, 200);
 
-    const spatialID = editor.spatialIDForGraph(editor.staging.graph);
+    const spatialID = editor.spatialIDForGraph(graph);
     const results = (spatial.getItemsAtBox(spatialID, box)
-      .map((hit: SpatialItem) => hit.contents as OsmEntity)
+      .map((hit: SpatialItem) => graph.hasEntity(hit.id))   // the version in this graph
+      .filter((entity): entity is OsmEntity => !!entity)
       .filter(entityHasAddressTag)
       .map((d: OsmEntity) => {
         // Sort by distance to the center of the addressable OsmEntities in the query box
-        const center = (d as any).geoms.world?.extent?.center();
+        const center = graph.geometry(d).world?.extent?.center();
         if (!center) return null;
 
         return {

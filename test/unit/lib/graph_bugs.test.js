@@ -178,20 +178,20 @@ describe('Graph bugs pinned for later steps', () => {
       return { base, staging, b, d };
     }
 
-    it.todo('step 2: node geometry (point or vertex) answers for the graph asked', () => {
+    it('step 2: node geometry (point or vertex) answers for the graph asked', () => {
       const { base, staging, d } = setupVertex();
       assert.strictEqual(staging.entity('d'), d);
       assert.strictEqual(d.geometry(base), 'point');
       assert.strictEqual(d.geometry(staging), 'vertex');
     });
 
-    it.todo('step 2: isEndpoint answers for the graph asked', () => {
+    it('step 2: isEndpoint answers for the graph asked', () => {
       const { base, staging, b } = setupVertex();
       assert.isFalse(b.isEndpoint(base));
       assert.isTrue(b.isEndpoint(staging));
     });
 
-    it.todo('step 2: presetMatch answers for the graph asked', () => {
+    it('step 2: presetMatch answers for the graph asked', () => {
       const context = new Rapid.MockContext();
       const schema = new Rapid.SchemaSystem(context);
       context.systems.schema = schema;
@@ -212,7 +212,7 @@ describe('Graph bugs pinned for later steps', () => {
       assert.strictEqual(schema.match(x, staging)?.id, 'highway/crossing');
     });
 
-    it.todo('step 2: presetMatch sees a schema change', () => {
+    it('step 2: presetMatch sees a schema change', () => {
       const context = new Rapid.MockContext();
       const schema = new Rapid.SchemaSystem(context);
       context.systems.schema = schema;

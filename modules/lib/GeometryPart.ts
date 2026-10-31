@@ -30,6 +30,18 @@ function lazyValue<T>(fn: () => T): () => T {
 }
 
 /**
+ * Copies GeoJSON coordinates (a position, or arrays of them) into new arrays.
+ * @param coords - The coordinates to copy
+ * @return The copy
+ */
+function copyCoords<T extends GeoJSON.Position | GeoJSON.Position[] | GeoJSON.Position[][]>(coords: T): T {
+  if (typeof coords[0] === 'number') {
+    return (coords as GeoJSON.Position).slice() as T;
+  }
+  return (coords as GeoJSON.Position[][]).map(item => copyCoords(item)) as T;
+}
+
+/**
  * Defines enumerable lazy getter properties on a frame object (`world` / `local`).
  * Each getter computes its value on first access via the supplied memoized function.
  * @param  obj - The frame object to attach getters to
@@ -201,9 +213,10 @@ export class GeometryPart {
     const coords = geojson.coordinates;
     if (!(/^(Point|LineString|Polygon)$/.test(type ?? '')) || !coords) return;  // do nothing
 
-    // Clone the original geojson
+    // Copy the original geojson, with new coordinate pairs: the caller's arrays (e.g. a node's `loc`)
+    // must never be aliased. (This is much cheaper than a `structuredClone` of the whole object.)
     const orig = {
-      geojson: structuredClone(geojson)
+      geojson: { type: type, coordinates: copyCoords(coords) } as SingularGeometry
     } as Partial<GeometryPartOrigData>;
 
     orig.coords = orig.geojson!.coordinates;

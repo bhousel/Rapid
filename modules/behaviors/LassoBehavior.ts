@@ -217,10 +217,10 @@ export class LassoBehavior extends AbstractBehavior {
     const spatialID = editor.spatialIDForGraph(graph);
     const hits = spatial.getItemsAtBox(spatialID, this._extent.bbox());
     for (const hit of hits) {
-      const node = hit.contents as OsmNode;
-      if (node.type !== 'node') continue;
+      const node = graph.hasEntity(hit.id) as OsmNode | undefined;   // the version in this graph
+      if (node?.type !== 'node') continue;
 
-      const coord = node.geoms.parts[0].world?.coords as Vec2;  // A node should have a single world coord
+      const coord = graph.geometry(node).parts[0].world?.coords as Vec2;  // A node should have a single world coord
       if (!coord) continue;
 
       if (!geomPointInPolygon(coord, this._coords)) continue;

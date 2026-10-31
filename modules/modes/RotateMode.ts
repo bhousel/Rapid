@@ -233,7 +233,7 @@ export class RotateMode extends AbstractMode {
     for (const entityID of this._entityIDs) {
       const entity = graph.hasEntity(entityID);
       if (!entity) continue;
-      for (const part of entity.geoms.parts || []) {
+      for (const part of graph.geometry(entity).parts || []) {
         const centroid = part.world?.centroid;
         if (centroid) {
           sum = vecAdd(sum, centroid);

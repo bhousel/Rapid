@@ -486,7 +486,7 @@ export class UiFeatureList {
 
       const matched = schema.match(entity, graph);
       const type = (matched && matched.name) || l10n.displayType(entity.id);
-      const extent = (entity as any).extent(graph);   // extent(graph) not typed on the OSM class hierarchy
+      const extent = graph.extent(entity);
       const distance = extent ? geoSphericalDistance(centerLoc, extent.center()) : 0;
 
       localResults.push({

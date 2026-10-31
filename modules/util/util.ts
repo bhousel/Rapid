@@ -22,7 +22,7 @@ export function utilTotalExtent(vals: Iterable<OsmEntity | EntityID>, graph: Gra
 
   for (const val of vals) {
     const entity = (typeof val === 'string' ? graph.hasEntity(val) : val);
-    const other = entity?.extent();
+    const other = entity && graph.extent(entity);
     if (other) {
       extent.extendSelf(other);
     }

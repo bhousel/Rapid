@@ -452,6 +452,7 @@ export class SelectBehavior extends AbstractBehavior {
 
     const context = this.context;
     const editor = context.systems.editor!;
+    const graph = editor.staging.graph;
 
     const point = this.lastUp.coord.world;
     const data: any = this.lastUp.target?.data;
@@ -463,11 +464,11 @@ export class SelectBehavior extends AbstractBehavior {
     let edge: [EntityID, EntityID] | undefined;
 
     if (isOSMWay) {
-      const way = data as OsmWay;
+      const way = graph.hasEntity(data.id) as OsmWay | undefined;   // the version in this graph
       // A way will have LineString or Polygon geometry. We can use 'outer' to get these points.
-      const line = way.geoms.parts[0]!.world!.outer as Vec2[];
-      const choice = vecProject(point, line);
-      if (choice) {
+      const line = way && graph.geometry(way).parts[0]?.world?.outer as Vec2[] | undefined;
+      const choice = line && vecProject(point, line);
+      if (way && choice) {
         loc = projWorldToWgs84(choice.point);
         edge = [ way.nodes[choice.index - 1], way.nodes[choice.index] ];
       }

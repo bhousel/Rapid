@@ -138,7 +138,7 @@ export class UiSectionRawMemberEditor extends AbstractUiSection {
     const graph = editor.staging.graph;
     const entity = graph.entity(d.id);
     const extent = viewport.visibleExtent();
-    if (!entity.intersects(extent)) {
+    if (!(graph.extent(entity)?.intersects(extent) ?? false)) {
       // zoom to the entity if its extent is not visible now
       map.fitEntitiesEase(entity);
     }

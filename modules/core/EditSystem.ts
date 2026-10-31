@@ -2529,7 +2529,7 @@ export class EditSystem extends AbstractSystem {
           }
         }
       } else {
-        const other = entity.extent();
+        const other = graph.extent(entity);
         if (other) {
           extent.extendSelf(other);
           found = true;

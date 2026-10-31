@@ -8,6 +8,7 @@ import { GeometryPart } from '../lib/GeometryPart.ts';
 
 import type { AbstractPixiFeature } from './AbstractPixiFeature.ts';
 import type { ConflationResult, ConflationStatus, LineRun } from '../core/ConflationSystem.ts';
+import type { Geometry } from '../lib/Geometry.ts';
 import type { Viewport } from '@rapid-sdk/math';
 import type { MatchedStyle } from '../core/StyleSystem.ts';
 import type { RapidDataset } from '../lib/RapidDataset.ts';
@@ -402,8 +403,9 @@ export class PixiLayerRapid extends AbstractPixiLayer {
     const l10n = this.context.systems.l10n!;
 
     for (const d of data.polygons) {
-      for (let i = 0; i < d.geoms.parts.length; ++i) {
-        const part = d.geoms.parts[i];
+      const parts = this._geometry(dataset, d).parts;
+      for (let i = 0; i < parts.length; ++i) {
+        const part = parts[i];
         const featureID = `${this.layerID}-${dataset.id}-${d.id}-${i}`;
         let feature = this.features.get(featureID);
 
@@ -478,8 +480,9 @@ export class PixiLayerRapid extends AbstractPixiLayer {
       const status = result?.status;
       if (status === 'matched' && !showMatched) continue;
 
-      for (let i = 0; i < d.geoms.parts.length; i++) {
-        const part = d.geoms.parts[i];
+      const parts = this._geometry(dataset, d).parts;
+      for (let i = 0; i < parts.length; i++) {
+        const part = parts[i];
         const featureID = `${this.layerID}-${dataset.id}-${d.id}-${i}`;
         let feature = this.features.get(featureID) as PixiFeatureLine | undefined;
 
@@ -653,7 +656,7 @@ export class PixiLayerRapid extends AbstractPixiLayer {
       let feature = this.features.get(featureID) as PixiFeaturePoint | undefined;
 
       if (!feature) {
-        const part = d.geoms.parts[0];
+        const part = this._geometry(dataset, d).parts[0];
         if (!part.world) continue;  // invalid?
 
         feature = new PixiFeaturePoint(this, featureID);
@@ -687,7 +690,7 @@ export class PixiLayerRapid extends AbstractPixiLayer {
       let feature = this.features.get(featureID) as PixiFeaturePoint | undefined;
 
       if (!feature) {
-        const part = d.geoms.parts[0];
+        const part = this._geometry(dataset, d).parts[0];
         if (!part.world) continue;  // invalid?
 
         feature = new PixiFeaturePoint(this, featureID);
@@ -714,6 +717,25 @@ export class PixiLayerRapid extends AbstractPixiLayer {
 
       this.retainFeature(feature, frame);
     }
+  }
+
+
+  /**
+   * Returns the geometry of a Rapid feature.
+   * OSM entities (from the MapWithAI service) are read through their dataset's graph, not staging.
+   * Other data (GeoJSONData) has no graph and carries its own.
+   * @param dataset - The Rapid dataset that the feature belongs to
+   * @param d - The feature's data
+   * @return Its Geometry
+   */
+  protected _geometry(dataset: RapidDataset, d: AbstractData): Geometry {
+    const context = this.context;
+    const mapwithai = context.services.mapwithai;
+
+    if (d instanceof OsmEntity && mapwithai) {
+      return mapwithai.graph(dataset.id).geometry(d);
+    }
+    return d.geoms;
   }
 
 

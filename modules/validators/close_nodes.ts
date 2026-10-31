@@ -103,7 +103,7 @@ export function validateCloseNodes(context: Context): ValidatorFunction {
       if (way.nodes.length <= 2 || (way.isClosed() && way.nodes.length <= 4)) return false;
 
       // don't flag close nodes in very small ways
-      const bbox = way.extent()!.bbox();
+      const bbox = graph.extent(way)!.bbox();
       const hypotenuseMeters = geoSphericalDistance([bbox.minX, bbox.minY], [bbox.maxX, bbox.maxY]);
       if (hypotenuseMeters < 1.5) return false;
 

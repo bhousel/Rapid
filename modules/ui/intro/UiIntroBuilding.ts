@@ -178,10 +178,10 @@ export class UiIntroBuilding extends AbstractIntroChapter {
         this._onModeChange = () => {
           if (this._doesHouseExist() && this._isHouseSelected()) {
             const graph = editor.staging.graph;
-            const way = graph.entity(this._houseID!) as any;
+            const way = graph.entity(this._houseID!);
 
             // A way will have LineString or Polygon geometry. We can use 'outer' to get these points.
-            const points = way.geoms.parts[0]?.local?.outer;
+            const points = graph.geometry(way).parts[0]?.local?.outer;
 
             if (points && isMostlySquare(points)) {
               resolve(this._chooseCategoryBuildingAsync);

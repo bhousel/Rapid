@@ -781,6 +781,41 @@ describe('Graph', () => {
 
 
   describe('rebase', () => {
+    it('clears the memoized answers of nodes that a downloaded way passes through', () => {
+      const n1 = new Rapid.OsmNode(context, { id: 'n1', loc: [0, 0] });
+      const n2 = new Rapid.OsmNode(context, { id: 'n2', loc: [1, 0] });
+      const base = new Rapid.Graph(context, [n1, n2]);
+      assert.strictEqual(n1.geometry(base), 'point');
+
+      base.rebase([new Rapid.OsmWay(context, { id: 'w1', nodes: ['n1', 'n2'] })], [base]);
+      assert.strictEqual(n1.geometry(base), 'vertex');
+    });
+
+    it('answers for each graph about a downloaded way through a node a graph moved', () => {
+      const n1 = new Rapid.OsmNode(context, { id: 'n1', loc: [0, 0] });
+      const n2 = new Rapid.OsmNode(context, { id: 'n2', loc: [1, 0] });
+      const base = new Rapid.Graph(context, [n1, n2]);
+      const head = new Rapid.Graph(base).replace(n1.move([0, 5]));
+      head.commit();
+
+      base.rebase([new Rapid.OsmWay(context, { id: 'w1', nodes: ['n1', 'n2'] })], [head]);
+      const w1 = base.entity('w1');
+      assert.deepEqual(w1.asGeoJSON(base).geometry.coordinates, [[0, 0], [1, 0]]);
+      assert.deepEqual(w1.asGeoJSON(head).geometry.coordinates, [[0, 5], [1, 0]]);
+    });
+
+    it('clears the memoized answers of the nodes a forced update takes out of a way', () => {
+      const n1 = new Rapid.OsmNode(context, { id: 'n1', loc: [0, 0] });
+      const n2 = new Rapid.OsmNode(context, { id: 'n2', loc: [1, 0] });
+      const n3 = new Rapid.OsmNode(context, { id: 'n3', loc: [2, 0] });
+      const w1 = new Rapid.OsmWay(context, { id: 'w1', nodes: ['n1', 'n2', 'n3'], version: 1 });
+      const base = new Rapid.Graph(context, [n1, n2, n3, w1]);
+      assert.strictEqual(n3.geometry(base), 'vertex');
+
+      base.rebase([new Rapid.OsmWay(context, { id: 'w1', nodes: ['n1', 'n2'], version: 2 })], [base], true);
+      assert.strictEqual(n3.geometry(base), 'point');
+    });
+
     it('preserves existing entities', () => {
       const node = new Rapid.OsmNode(context, { id: 'n' });
       const base = new Rapid.Graph(context, [node]);

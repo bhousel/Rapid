@@ -37,8 +37,12 @@ journal first. Oct 30: committed. Oct 31: steps 0 and 1 done (uncommitted at fir
 fixes (straighten data loss, copy/delete/paste, in-place writes, …) and `todo` tests for later-step
 bugs in `test/unit/lib/graph_bugs.test.js`. Step 1: graph journal, savepoint rollback, frozen history,
 emits from candidate IDs, `SessionDifference`; randomized emit test in
-`test/unit/core/EditSystemJournal.test.js`. Next: step 2 (immutable geometry, memos, `graph.geometry()`).
-Open decisions for Bryan: relation geometry on first read, backup v5 compat, big multipolygon drags.
+`test/unit/core/EditSystemJournal.test.js`. Step 2 done Oct 31 (uncommitted at first): `entity.memo()`,
+schema generation, `graph.canShareAnswers()`, shared immutable `Geometry`, relations from member parts,
+readers on `graph.geometry()`/`graph.extent()`. Next: step 3 (persistent storage; benchmark in Chrome first).
+Decided Oct 31: relation geometry references its members' parts (step 2), multipolygon ring structure
+cached and reused (follow-up); lazy build only as a stopgap. Backups: step 7 rewrites v4 in place
+(no v5); when it lands, delete the v4 sessions in the debug Chrome (the only ones that exist).
 
 ## Active: what an edit records (`EditSystem`)
 Design: [`design/edit-system.md`](../design/edit-system.md), started Oct 26. Edits need to record more

@@ -112,6 +112,7 @@ export class SelectMode extends AbstractMode {
     const hover = context.behaviors.hover!;
     const keyboard = context.systems.keyboard!;
     const locations = context.systems.locations;
+    const mapwithai = context.services.mapwithai;
     const spatial = context.systems.spatial!;
     const ui = context.systems.ui;
     const urlhash = context.systems.urlhash!;
@@ -161,9 +162,17 @@ export class SelectMode extends AbstractMode {
     ui?.closeEditMenu();
 
     // Compute the total extent of selected items
+    // OSM entities are read through their graph: a Rapid feature's is its dataset's graph, not staging.
     this.extent = new Extent();
     for (const d of this.selectedData.values()) {
-      const other = d.extent();
+      let other: Extent | undefined;
+      if (d instanceof OsmEntity) {
+        const datasetID = d.props.datasetID as DatasetID | undefined;
+        const dataGraph = (datasetID && mapwithai) ? mapwithai.graph(datasetID) : graph;
+        other = dataGraph.extent(d);
+      } else {
+        other = d.extent();
+      }
       if (other instanceof Extent) {
         this.extent.extendSelf(other);
       }
@@ -474,7 +483,7 @@ export class SelectMode extends AbstractMode {
           const entity = graph.hasEntity(entityID);
           if (!entity) continue;
 
-          for (const part of entity.geoms.parts) {
+          for (const part of graph.geometry(entity).parts) {
             const centroid = part.world?.centroid;
             if (!centroid) continue;
             sum = vecAdd(sum, centroid);

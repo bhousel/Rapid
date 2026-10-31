@@ -87,7 +87,7 @@ export function actionOrthogonalize(
 
     // Gather world coordinates, choose a local origin for floating point stability.
     for (const node of nodes) {
-      const coord = node.geoms.parts[0].world?.coords as Vec2;  // A node should have a single world coord
+      const coord = graph.geometry(node).parts[0].world?.coords as Vec2;  // A node should have a single world coord
       if (!coord) continue;
       if (!origin) origin = coord;
       nodeCount[node.id] = (nodeCount[node.id] || 0) + 1;
@@ -292,7 +292,7 @@ export function actionOrthogonalize(
     let origin: Vec2 | undefined;
 
     for (const node of nodes) {
-      const coord = node.geoms.parts[0].world?.coords as Vec2;  // A node should have a single world coord
+      const coord = graph.geometry(node).parts[0].world?.coords as Vec2;  // A node should have a single world coord
       if (!coord)  continue;
       if (!origin) origin = coord;
       points.push(vecSubtract(coord, origin));  // world -> local

@@ -736,8 +736,8 @@ export function osmInferRestriction(graph: Graph, turn: Turn): string {
   const toOneWay = (toWay.tags.oneway === 'yes');
 
   let angle = (
-    vecAngle(fromVertex.geoms.parts[0]!.world!.coords as Vec2, fromNode.geoms.parts[0]!.world!.coords as Vec2) -
-    vecAngle(toVertex.geoms.parts[0]!.world!.coords as Vec2, toNode.geoms.parts[0]!.world!.coords as Vec2)
+    vecAngle(graph.geometry(fromVertex).parts[0]!.world!.coords as Vec2, graph.geometry(fromNode).parts[0]!.world!.coords as Vec2) -
+    vecAngle(graph.geometry(toVertex).parts[0]!.world!.coords as Vec2, graph.geometry(toNode).parts[0]!.world!.coords as Vec2)
   ) * RAD2DEG;
 
   while (angle < 0) {

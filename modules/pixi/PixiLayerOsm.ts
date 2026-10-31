@@ -255,7 +255,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
       const entity = graph.hasEntity(dataID);
       if (entity?.type === 'node') continue;  // ways, relations only
 
-      const extent = entity?.geoms?.world?.extent;
+      const extent = entity && graph.geometry(entity).world?.extent;
       if (!extent) continue;
 
       // Determine dimensions in screen pixels
@@ -336,7 +336,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
     const entities = data.polygons;
     for (const [entityID, entity] of entities) {
       const version = entity.v || 0;
-      const parts = entity.geoms.parts;
+      const parts = graph.geometry(entity).parts;
 
       for (let i = 0; i < parts.length; ++i) {
         const part = parts[i];
@@ -496,7 +496,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
       const zindex = getzIndex(way.tags);
       const version = way.v || 0;
 
-      const parts = way.geoms.parts;
+      const parts = graph.geometry(way).parts;
 
       for (let i = 0; i < parts.length; ++i) {
         const part = parts[i];
@@ -642,7 +642,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
       // If data has changed, replace it.
       if (feature.v !== version) {
         feature.v = version;
-        const part = node.geoms.parts[0];
+        const part = graph.geometry(node).parts[0];
         feature.geometry = part;
         feature.data = node;
       }
@@ -721,7 +721,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
       // If data has changed, replace it.
       if (feature.v !== version) {
         feature.v = version;
-        const part = node.geoms.parts[0];
+        const part = graph.geometry(node).parts[0];
         feature.geometry = part;
         feature.data = node;
       }
@@ -801,8 +801,8 @@ export class PixiLayerOsm extends AbstractPixiLayer {
         const node2 = isReverse ? nodes[i] : nodes[i + 1];
 
         // gather world coordinates of the nodes
-        const coord1 = node1.geoms.parts[0].world?.coords as Vec2;
-        const coord2 = node2.geoms.parts[0].world?.coords as Vec2;
+        const coord1 = graph.geometry(node1).parts[0].world?.coords as Vec2;
+        const coord2 = graph.geometry(node2).parts[0].world?.coords as Vec2;
         if (!coord1 || !coord2) continue;
 
         const dist = vecLength(coord1, coord2);

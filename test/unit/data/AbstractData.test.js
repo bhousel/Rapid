@@ -32,7 +32,7 @@ describe('AbstractData', () => {
       assert.instanceOf(b, Rapid.AbstractData);
       assert.strictEqual(b.context, context);
       assert.instanceOf(b.geoms, Rapid.Geometry);
-      assert.notStrictEqual(b.geoms, a.geoms);  // cloned, not ===
+      assert.strictEqual(b.geoms, a.geoms);  // shared, a Geometry is never changed in place
       assert.notStrictEqual(b.props, a.props);  // cloned, not ===
       assert.isObject(b.props);
     });
@@ -45,7 +45,7 @@ describe('AbstractData', () => {
       assert.instanceOf(b, Rapid.AbstractData);
       assert.strictEqual(b.context, context);
       assert.instanceOf(b.geoms, Rapid.Geometry);
-      assert.notStrictEqual(b.geoms, a.geoms);  // cloned, not ===
+      assert.strictEqual(b.geoms, a.geoms);  // shared, a Geometry is never changed in place
       assert.notStrictEqual(b.props, a.props);  // cloned, not ===
       assert.deepInclude(b.props, orig);
       assert.deepInclude(b.props, update);

@@ -7,7 +7,7 @@ of the change. This design fixes findings 1 (shared geometry) and 2 (the wrong s
 [validation audit](validation-system.md#the-october-2026-audit), the bugs listed below, and the cost of
 keeping versions. It gives Rapid one way to ask for anything's geometry: `graph.geometry(entity)`.
 
-> **Status:** In progress (October 2026): steps 0 and 1 done. Measured in two rounds: a survey of
+> **Status:** In progress (October 2026): steps 0, 1 and 2 done. Measured in two rounds: a survey of
 > today's costs and bugs, then three competing designs, each prototyped and reviewed for correctness
 > and for performance (in JavaScriptCore and V8). See [Open questions](#open-questions).
 
@@ -213,6 +213,23 @@ Each answer lives with what it depends on:
   arrays its caller just built (46-59% of a way's recompute). It copies the coordinate pairs instead,
   so a node's `loc` is never aliased. Coverage boxes move to a side table so dev builds can freeze
   parts. `OsmNode` computes its geometry once, not twice.
+- **Relation geometry is built from its members' geometry, never a copy of it** (decided October
+  2026). Today a relation's `Geometry` copies every member's coordinates, and `commit()` and
+  `rebase()` rebuild every relation whose members changed: dragging a vertex of a street in 70 bus
+  routes rebuilds all 70 on every pointermove (16 ms in V8), though route relations aren't drawn, and
+  each version would keep about 13 MB of route shapes for that street.
+  - A relation other than a multipolygon references its members' `GeometryPart`s (immutable from
+    step 2), and its extent and index box are the union of theirs. Building it means gathering
+    references, so the 70 routes cost about 70 box unions. Nested relations gather from their member
+    relations, members first.
+  - A multipolygon still joins its member ways into rings, from their coordinates. Which ways go in
+    which ring, in what order and direction, depends only on member and node IDs, so that ring
+    structure is cached and reused while only coordinates change: a vertex drag re-reads coordinates
+    instead of joining again. Today joining is nearly all of the Louvre's 42.7 ms per recompute (V8).
+  - Multipolygons stay computed at commit and rebase: they're drawn every frame, as areas with holes.
+  - If other relations still cost too much before composition lands, they can be built on first
+    read instead of at commit (index box from the members' boxes) as a stopgap. On shared objects
+    that's only safe for a graph whose shape nobody else reads, so prefer landing composition.
 - **`graph.geometry(entity)`** works for nodes, ways, relations and later any data. It takes the
   entity, like `parentWays` and `childNodes`, and answers for this graph's version of `entity.id` (dev
   builds assert it's the same object). Callers with only an ID use `graph.geometry(graph.entity(id))`.
@@ -319,10 +336,10 @@ today's `_updateRebased` alone takes 57-74 ms per merge.
 - `editor.changes(action)` runs on a derived graph.
 - Validation runs on base and the current stable (`_head.graph` advances when stable changes during a
   round).
-- Backups (v5) save each edit's own changes, taken from the entities in its records, never by
-  recomputing geometry or memos. The result is cached on the edit, and dropped when a rebase changes
-  that graph's entities (an iD#2085 restore, a forced update). Restore is O(changes). v3 and v4
-  backups still restore.
+- Backups (v4, rewritten in step 7) save each edit's own changes, taken from the entities in its
+  records, never by recomputing geometry or memos. The result is cached on the edit, and dropped when
+  a rebase changes that graph's entities (an iD#2085 restore, a forced update). Restore is
+  O(changes). v3 backups still restore.
 
 ### 9. Other data
 
@@ -464,6 +481,8 @@ Each step ships on its own and leaves the app working, with tests that pin what 
        save count). Making them incremental is the next step for long sessions.
 2. **Immutable geometry, memos without key strings, `graph.geometry()`.**
    - A recompute stores a new `Geometry`, without `structuredClone`; node geometry is built once.
+   - Relations other than multipolygons reference their members' parts instead of copying them
+     (section 3). Multipolygon ring reuse is a follow-up, measured on its own.
    - A schema generation, bumped on every `schemachange`. `transient()` goes. Object-only answers
      become fields stamped with the generation, and `presetMatch` and `vertexMatch` are keyed by their
      graph inputs and the generation.
@@ -477,6 +496,33 @@ Each step ships on its own and leaves the app working, with tests that pin what 
      `UiSectionSelectionList`, `UiRapidInspector`, the dataset's index) use their dataset's graph.
    - This fixes the memos that answer for the wrong graph, and should cut an APP pass by about a
      quarter (estimate).
+   - **Done.** Measured in Bun: memo reads (point or vertex, `isEndpoint`, line or area) 3.4× faster
+     (42k reads in 0.57 instead of 1.94 ms); a drag pointermove on a street in 70 bus routes from 4.03
+     to 0.20 ms. How it landed:
+     - `entity.memo(graph, key, fn)` replaces `transient()`. Each object has its own memos (a copy
+       starts without), dropped when the schema's `generation` changes. An answer that depends on a
+       graph is memoized only when `graph.canShareAnswers(id)`: the lineage's set of IDs whose
+       topology a commit changed doesn't have it, and the graph has no uncommitted writes.
+     - `presetMatch` is memoized per geometry (point, vertex, line, area), so it answers for whichever
+       graph asks; `vertexMatch` reads the address line from the graph each time.
+     - A rebase clears the memos of the children and members of what arrived (and of the copies a
+       forced rebase replaced), and of the ways and relations (recursively) that contain it. An
+       arrived way through a node some graph changed joins the set.
+     - Scratch copies that commit (`outdated_tags`, `ambiguous_crossing_tags`, `actionJoin.disabled`)
+       add their closures to the set for good, and become `geometryWriter`, which skips step 1's
+       fast path on the next undo or redo. Measured on a Tokyo tile, validating everything marked
+       36 IDs, so it's left as is; step 4 makes both go away.
+     - Copies share their `Geometry` (a recompute stores a new one); a node copied at the same
+       location keeps it. Destroying a data element doesn't destroy its `Geometry`, which copies and
+       relations may share.
+     - Readers moved, including Rapid features through `mapwithai.graph(datasetID)`. What still reads
+       `.geoms` directly is GeoJSON and markers (step 8) and `SpatialSystem.replaceData` (step 6).
+     - For step 4: `move`'s `removeDuplicateVertices` reads the geometry of a node it just removed,
+       and `outdated_tags`, `orthogonalize.disabled` and `move` read geometry from graphs with
+       uncommitted writes; records must cover those. `presetMatch` also depends on the entity's
+       location (preset location sets), which isn't in its key: today `updateGeometry` clears it,
+       but once a shared way can have different shapes per graph, key it by location too (or by
+       the location sets there).
 3. **Graphs share structure.**
    - Lineage, slot table, and records with entities and parent lists. Derive is O(1); diffs are
      structural; parent ways use the formula; `_updateRebased` goes (its iD#2085 restores stay).
@@ -502,8 +548,10 @@ Each step ships on its own and leaves the app working, with tests that pin what 
 6. **Spatial indexes for any graph.** One index per lineage, overlays for stable and staging, and the
    diff correction. `spatialIDForGraph` goes, and `_validateEditsNearAsync` queries the stable overlay.
    This fixes finding 2 by construction.
-7. **Backup v5.** Each edit's own changes, so restore is O(changes); v3 and v4 still restore. This
-   removes the 815 ms backup after 200 roads.
+7. **Backup v4, rewritten.** Each edit's own changes, so restore is O(changes); v3 still restores.
+   This removes the 815 ms backup after 200 roads. The format keeps the number 4 (decided October
+   2026): this Rapid hasn't been released, and the only v4 backups are in the shared debug Chrome,
+   which get deleted when this lands. Rapid 2.5.7 (rapideditor.org) writes v3, so v3 restore stays.
 8. **Other data.** Rapid datasets, then GeoJSON and markers, as lineages; services stop changing data
    in place.
 
@@ -516,7 +564,8 @@ Then, each measured on its own:
   update and 1.2-2.8× per way build (estimate).
 - **Parent lookups that don't allocate** (`forEachParentWay`, `hasParentWays`): 0.5 µs instead of
   1.0-1.1 µs.
-- **Big multipolygons:** see open questions.
+- **Multipolygon ring reuse** (section 3, "Relation geometry is built from its members'"): cache
+  the ring structure and re-read only coordinates while they're the only thing that changed.
 
 ## Testing
 
@@ -542,20 +591,6 @@ Then, each measured on its own:
 
 ## Open questions
 
-- **Compute relation geometry on first read?** `commit()` and `rebase()` would still decide what's
-  stale, but a relation's geometry would be built the first time something reads it. Its index box
-  would be the union of its members' boxes, which is cheap. Ways would still be computed at commit.
-  The case for it:
-  - Route relations aren't drawn (`PixiLayerOsm` skips `'relation'` geometry), yet dragging a vertex of
-    a street in 70 bus routes recomputes all 70: 16 ms per pointermove in V8.
-  - Each merge in a relation-dense area would spend an estimated 30-100 ms recomputing relations that
-    gained members.
-  - Keeping each version's route geometry costs about 13 MB per edit for that street.
-- **Backup v5:** an older Rapid can't read it. Write v4 alongside it for a release?
-- **Big multipolygons:** the Louvre's multipolygon takes 42.7 ms per recompute in V8, nearly all of it
-  joining rings (`multipolygon()`), so dragging one of its vertices stays that slow. The join depends
-  on node IDs, not locations, so it could be reused while only coordinates change. Or DragNodeMode
-  could commit ways during the drag and relations at the end.
 - **Memory of big shapes in the history:** each version keeps the geometry of what it changed (0.4 MB
   per edit of a 2,010-node multipolygon). Drop it from versions far back, and recompute it on undo?
 - **Which graphs to validate, after step 6:** once any graph is answered correctly, should validation

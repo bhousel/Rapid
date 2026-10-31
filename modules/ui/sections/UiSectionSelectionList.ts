@@ -109,6 +109,7 @@ export class UiSectionSelectionList extends AbstractUiSection {
     const context = this.context;
     const editor = context.systems.editor!;
     const l10n = context.systems.l10n!;
+    const mapwithai = context.services.mapwithai;
     const rapid = context.systems.rapid;
     const schema = context.systems.schema!;
     const spatial = context.systems.spatial!;
@@ -119,7 +120,9 @@ export class UiSectionSelectionList extends AbstractUiSection {
 
     const geometryOf = (d: AbstractData): string => {
       if (isOsm(d)) return (d as OsmEntity).geometry(graph);
-      return GEOMETRY_ICONS[d.geoms.parts[0]?.type ?? ''] ?? 'point';
+      // An OSM-like Rapid feature lives in its dataset's graph, not in staging.
+      const geoms = (d instanceof OsmEntity && mapwithai) ? mapwithai.graph(d.props.datasetID as DatasetID).geometry(d) : d.geoms;
+      return GEOMETRY_ICONS[geoms?.parts[0]?.type ?? ''] ?? 'point';
     };
 
     const typeOf = (d: AbstractData): string => {

@@ -35,7 +35,7 @@ export function actionReflect(entityIDs: EntityID[]): ReflectAction {
 
      // Gather all the nodes and their world coordinates, choose a local origin for floating point stability
     for (const node of collection) {
-      const coord = node.geoms.parts[0].world?.coords as Vec2;  // A node should have a single world coord
+      const coord = graph.geometry(node).parts[0].world?.coords as Vec2;  // A node should have a single world coord
       if (!coord)  continue;
       if (!origin) origin = coord;
       nodes.push(node);

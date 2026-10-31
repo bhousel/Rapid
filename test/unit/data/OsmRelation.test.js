@@ -45,7 +45,7 @@ describe('OsmRelation', () => {
       assert.instanceOf(b, Rapid.OsmRelation);
       assert.strictEqual(b.context, context);
       assert.instanceOf(b.geoms, Rapid.Geometry);
-      assert.notStrictEqual(b.geoms, a.geoms);  // cloned, not ===
+      assert.strictEqual(b.geoms, a.geoms);  // shared, a Geometry is never changed in place
       assert.notStrictEqual(b.props, a.props);  // cloned, not ===
       assert.isObject(b.props);
     });
@@ -58,7 +58,7 @@ describe('OsmRelation', () => {
       assert.instanceOf(b, Rapid.OsmRelation);
       assert.strictEqual(b.context, context);
       assert.instanceOf(b.geoms, Rapid.Geometry);
-      assert.notStrictEqual(b.geoms, a.geoms);  // cloned, not ===
+      assert.strictEqual(b.geoms, a.geoms);  // shared, a Geometry is never changed in place
       assert.notStrictEqual(b.props, a.props);  // cloned, not ===
       assert.deepInclude(b.props, orig);
       assert.deepInclude(b.props, update);
@@ -663,6 +663,26 @@ describe('OsmRelation', () => {
     });
   });
 
+
+  describe('updateGeometry', () => {
+    it('references its members\' geometry parts instead of copying them', () => {
+      const a = new Rapid.OsmNode(context, { id: 'a', loc: [0, 0] });
+      const b = new Rapid.OsmNode(context, { id: 'b', loc: [1, 0] });
+      const c = new Rapid.OsmNode(context, { id: 'c', loc: [2, 1] });
+      const w1 = new Rapid.OsmWay(context, { id: 'w1', nodes: ['a', 'b'] });
+      const r1 = new Rapid.OsmRelation(context, { id: 'r1', tags: { type: 'route' }, members: [
+        { id: 'w1', type: 'way' }, { id: 'c', type: 'node', role: 'stop' }
+      ]});
+      const r2 = new Rapid.OsmRelation(context, { id: 'r2', tags: { type: 'route_master' }, members: [{ id: 'r1', type: 'relation' }] });
+      const graph = new Rapid.Graph(context, [a, b, c, w1, r1, r2]);
+
+      assert.sameMembers(r1.geoms.parts, [...w1.geoms.parts, ...c.geoms.parts]);
+      assert.sameMembers(r2.geoms.parts, r1.geoms.parts);
+      assert.deepEqual(r2.geoms.orig.extent.min, [0, 0]);
+      assert.deepEqual(r2.geoms.orig.extent.max, [2, 1]);
+      assert.isOk(graph);
+    });
+  });
 
   describe('asGeoJSON', () => {
     //

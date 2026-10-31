@@ -188,7 +188,7 @@ export function validateAlmostJunction(context: Context): ValidatorFunction {
       // When endpoints are close, just join if resulting small change in angle (iD#7201)
       const nearEndNodes = findNearbyEndNodes(endNode, crossWay, graph);
       if (nearEndNodes.length > 0) {
-        const colinear = findSmallJoinAngle(midNode, endNode, nearEndNodes);
+        const colinear = findSmallJoinAngle(midNode, endNode, nearEndNodes, graph);
         if (colinear) {
           return {
             action: actionMergeNodes([colinear.id, endNode.id], colinear.loc!),
@@ -363,20 +363,21 @@ export function validateAlmostJunction(context: Context): ValidatorFunction {
      * @param midNode - The interior node of the extending edge
      * @param tipNode - The endpoint being extended
      * @param endNodes - Candidate nearby endpoints
+     * @param graph - The graph that holds these nodes
      * @returns The most colinear endpoint, or `null` if none within threshold
      */
-    function findSmallJoinAngle(midNode: OsmNode, tipNode: OsmNode, endNodes: OsmNode[]): OsmNode | null {
+    function findSmallJoinAngle(midNode: OsmNode, tipNode: OsmNode, endNodes: OsmNode[], graph: Graph): OsmNode | null {
       // Both nodes could be close, so want to join whichever is closest to colinear
       let joinTo: OsmNode | undefined;
       let minAngle = Infinity;
 
       // World coordinates of the nodes involved.
-      const mid = midNode.geoms.parts[0].world?.coords as Vec2;
-      const tip = tipNode.geoms.parts[0].world?.coords as Vec2;
+      const mid = graph.geometry(midNode).parts[0].world?.coords as Vec2;
+      const tip = graph.geometry(tipNode).parts[0].world?.coords as Vec2;
       if (!mid || !tip) return null;
 
       for (const endNode of endNodes) {
-        const end = endNode.geoms.parts[0].world?.coords as Vec2;
+        const end = graph.geometry(endNode).parts[0].world?.coords as Vec2;
         if (!end)  continue;
 
         const a1 = vecAngle(mid, tip) + Math.PI;

@@ -197,7 +197,7 @@ export class ValidationCache {
 
       if (entity.type === 'way' || entity.type === 'node') {
         // Gather nearby connectivity Issues (impossible oneway, disconnected way)
-        const extent = entity.extent();
+        const extent = graph.extent(entity);
         if (extent) {
           for (const hit of spatial.getItemsAtBox(this._spatialID, extent.bbox())) {
             relatedIssueIDs.add(hit.contents as IssueID);

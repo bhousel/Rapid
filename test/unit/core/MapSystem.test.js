@@ -335,7 +335,7 @@ describe('MapSystem', () => {
       mode = 'browse';
       selectedIDs = [];
 
-      const graph = { hasEntity: id => entities.get(id) };
+      const graph = { hasEntity: id => entities.get(id), extent: entity => entity.extent() };
       ctx.systems = {
         editor: { stable: { graph: graph }, staging: { graph: graph } },
         gfx: {

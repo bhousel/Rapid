@@ -44,6 +44,16 @@ describe('OsmNode', () => {
       assert.deepInclude(a.props, orig);
     });
 
+    it('shares the geometry of a node it copies at the same location, and builds new geometry when moved', () => {
+      const a = new Rapid.OsmNode(context, { loc: [1, 2] });
+      const b = a.update({ tags: { amenity: 'cafe' } });
+      assert.strictEqual(b.geoms, a.geoms);
+      const c = a.move([3, 4]);
+      assert.notStrictEqual(c.geoms, a.geoms);
+      assert.deepEqual(c.geoms.orig.extent.min, [3, 4]);
+      assert.deepEqual(a.geoms.orig.extent.min, [1, 2]);
+    });
+
     it('constructs an OsmNode from another OsmNode', () => {
       const a = new Rapid.OsmNode(context);
       const b = new Rapid.OsmNode(a);

@@ -3,6 +3,8 @@ import { utilIterable } from '../util/iterable.ts';
 
 import type { Context } from '../Context.ts';
 import type { DifferenceChange } from './Difference.ts';
+import type { Extent } from '@rapid-sdk/math';
+import type { Geometry } from './Geometry.ts';
 import type { Iterable, OneOrMore } from '../util/iterable.ts';
 import type { OsmEntity, OsmNode, OsmRelation, OsmWay } from '../data/types.ts';
 
@@ -17,6 +19,8 @@ type Before = OsmEntity | undefined | typeof NOT_LOCAL;
 interface GraphLineage {
   /** The Graph that recomputed geometry last */
   geometryWriter: Graph | null;
+  /** IDs whose topology some Graph has changed, so answers about them can differ between Graphs */
+  topologyChanged: Set<EntityID>;
 }
 
 
@@ -124,7 +128,7 @@ export class Graph {
       this.props = {} as GraphProps;
       this.isBaseGraph = true;
       this._pending = new Map<EntityID, Before>();
-      this._lineage = { geometryWriter: null };
+      this._lineage = { geometryWriter: null, topologyChanged: new Set<EntityID>() };
 
       this.base = {
         entities:    new Map<EntityID, OsmEntity | undefined>(),
@@ -255,6 +259,18 @@ export class Graph {
     return this._lineage.geometryWriter;
   }
 
+  /**
+   * Whether answers about an entity that depend on the Graph (its parents, its shape) are the same
+   * in this Graph as in every other Graph of its lineage, so they may be memoized on the entity.
+   * They aren't once any Graph has changed the entity's topology, or while this Graph has
+   * uncommitted writes. (Step 4 of the design stores them per Graph instead.)
+   * @param entityID - The entity's ID
+   * @return `true` if answers about it may be memoized on the entity
+   */
+  public canShareAnswers(entityID: EntityID): boolean {
+    return !this._pending.size && !this._lineage.topologyChanged.has(entityID);
+  }
+
 
   /**
    * Gets an OsmEntity, searches the local cache first, then the base cache.
@@ -281,6 +297,32 @@ export class Graph {
       throw new Error(`OsmEntity ${entityID} not found`);
     }
     return entity;
+  }
+
+
+  /**
+   * Returns the geometry of an entity, as it is in this Graph.
+   * Like `parentWays` and `childNodes`, it takes the entity, not its ID: callers with an ID use
+   * `graph.geometry(graph.entity(id))`.
+   * For now it returns the geometry stored on the entity, which every Graph holding that object
+   * shares; step 4 of design/graph-geometry.md gives each Graph its own. Read geometry through this
+   * method, so that change won't need the callers to change.
+   * @param   entity - The entity to get the geometry of
+   * @return  Its Geometry
+   */
+  public geometry(entity: OsmEntity): Geometry {
+    return entity.geoms;
+  }
+
+
+  /**
+   * Returns the extent (in WGS84 lon/lat) of an entity, as it is in this Graph.
+   * Like `entity.extent()`, it may be `undefined` (a way without nodes, a relation without members).
+   * @param   entity - The entity to get the extent of
+   * @return  Its Extent, or `undefined`
+   */
+  public extent(entity: OsmEntity): Extent | undefined {
+    return this.geometry(entity).orig?.extent;
   }
 
 
@@ -414,7 +456,9 @@ export class Graph {
     this._pending.clear();
 
     const closure = completeFrom(this, changes, true);   // true = only what needs new geometry
-    this.recomputeGeometry(new Set<EntityID>(closure.keys()));
+    const closureIDs = new Set<EntityID>(closure.keys());
+    this._markTopologyChanged(closureIDs);
+    this.recomputeGeometry(closureIDs);
     return this;
   }
 
@@ -463,7 +507,9 @@ export class Graph {
 
     this._pending.clear();
     savepoint.clear();
-    this.recomputeGeometry(new Set<EntityID>(completeFrom(this, changes, true).keys()));
+    const closureIDs = new Set<EntityID>(completeFrom(this, changes, true).keys());
+    this._markTopologyChanged(closureIDs);
+    this.recomputeGeometry(closureIDs);
     this.touch();
   }
 
@@ -555,6 +601,7 @@ export class Graph {
     const head = stack.at(-1)?.local?.entities;
     const restoreIDs = new Set<EntityID>();
     const newIDs = new Set<EntityID>();
+    const replaced: OsmEntity[] = [];   // older copies a forced rebase replaced
 
     const arr = [...utilIterable(entities)].sort(this._nodesFirst);
     for (const entity of arr) {
@@ -566,6 +613,9 @@ export class Graph {
       base.entities.set(entity.id, entity);
       this._updateCaches(previous, entity, base);  // note 'base' here
       newIDs.add(entity.id);
+      if (previous) {
+        replaced.push(previous);
+      }
 
       // A weird thing we have to watch out for.. iD#2085
       // Sometimes an edit can remove a node, then we download more information and realize that
@@ -590,8 +640,80 @@ export class Graph {
       }
     }
 
+    this._clearStaleAnswers(newIDs, replaced);
     this.recomputeGeometry(newIDs);
     return restored;
+  }
+
+
+  /**
+   * Internal function, clears the answers memoized on base entities whose topology a rebase changed:
+   * the children and members of what arrived (and of the older copies it replaced), and the ways and
+   * relations that contain it.
+   * An arrived way or relation with a child or member whose topology a graph changed (a node the
+   * user moved) can differ between graphs too, so it joins the lineage's `topologyChanged` set.
+   * @param arrivedIDs - IDs of the entities the rebase added to the base
+   * @param replaced - The older copies that a forced rebase replaced
+   */
+  protected _clearStaleAnswers(arrivedIDs: Set<EntityID>, replaced: OsmEntity[]): void {
+    const base = this.base;
+    const topologyChanged = this._lineage.topologyChanged;
+    const stale = new Set<EntityID>();
+
+    const addChildren = (entity: OsmEntity | undefined): boolean => {
+      let touchesChanged = false;
+      const childIDs = [
+        ...((entity as OsmWay | undefined)?.nodes ?? []),
+        ...((entity as OsmRelation | undefined)?.members ?? []).map(member => member.id)
+      ];
+      for (const childID of childIDs) {
+        stale.add(childID);
+        if (topologyChanged.has(childID)) {
+          touchesChanged = true;
+        }
+      }
+      return touchesChanged;
+    };
+
+    const addParents = (entityID: EntityID): void => {
+      for (const wayID of base.parentWays.get(entityID) ?? []) {
+        if (stale.has(wayID)) continue;
+        stale.add(wayID);
+        addParents(wayID);   // a way's parent relations include its shape
+      }
+      for (const relationID of base.parentRels.get(entityID) ?? []) {
+        if (stale.has(relationID)) continue;
+        stale.add(relationID);
+        addParents(relationID);   // a relation's shape includes its member relations'
+      }
+    };
+
+    for (const entity of replaced) {
+      addChildren(entity);
+    }
+    for (const entityID of arrivedIDs) {
+      if (addChildren(base.entities.get(entityID))) {
+        topologyChanged.add(entityID);
+      }
+      addParents(entityID);
+    }
+
+    for (const entityID of stale) {
+      base.entities.get(entityID)?.clearMemos();
+    }
+  }
+
+
+  /**
+   * Internal function, records that a commit changed the topology of these IDs, for every Graph
+   * of the lineage: answers about them aren't memoized on the shared entities any more.
+   * @param entityIDs - The IDs in a commit's closure
+   */
+  protected _markTopologyChanged(entityIDs: Set<EntityID>): void {
+    const topologyChanged = this._lineage.topologyChanged;
+    for (const entityID of entityIDs) {
+      topologyChanged.add(entityID);
+    }
   }
 
 
@@ -725,9 +847,10 @@ export class Graph {
     }
 
     // Multipolygons first: their shape comes only from their member ways, and other relations
-    // in a cycle with them read their memo.
-    // Then members first. Marking a relation done before its members stops at cycles,
-    // where `asGeoJSON` builds from the leaf members instead.
+    // (even in a cycle with them) take their parts.
+    // Then members first. Marking a relation done before its members stops at cycles.
+    // (Relations other than multipolygons gather their leaf members' parts, so for them
+    // the order matters less.)
     const done = new Set<EntityID>();
     for (const relation of relations.values()) {
       if (relation.isMultipolygon()) {

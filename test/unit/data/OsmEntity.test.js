@@ -65,7 +65,7 @@ describe('OsmEntity', () => {
       assert.instanceOf(b, Rapid.OsmEntity);
       assert.strictEqual(b.context, context);
       assert.instanceOf(b.geoms, Rapid.Geometry);
-      assert.notStrictEqual(b.geoms, a.geoms);  // cloned, not ===
+      assert.strictEqual(b.geoms, a.geoms);  // shared, a Geometry is never changed in place
       assert.notStrictEqual(b.props, a.props);  // cloned, not ===
       assert.isObject(b.props);
     });
@@ -78,7 +78,7 @@ describe('OsmEntity', () => {
       assert.instanceOf(b, Rapid.OsmEntity);
       assert.strictEqual(b.context, context);
       assert.instanceOf(b.geoms, Rapid.Geometry);
-      assert.notStrictEqual(b.geoms, a.geoms);  // cloned, not ===
+      assert.strictEqual(b.geoms, a.geoms);  // shared, a Geometry is never changed in place
       assert.notStrictEqual(b.props, a.props);  // cloned, not ===
       assert.deepInclude(b.props, orig);
       assert.deepInclude(b.props, update);
@@ -89,7 +89,7 @@ describe('OsmEntity', () => {
     it('destroys and frees the data', () => {
       const a = new Rapid.OsmEntity(context);
       a.destroy();
-      assert.isNull(a._transients);
+      assert.isNull(a._memos);
     });
   });
 
@@ -206,13 +206,42 @@ describe('OsmEntity', () => {
     });
   });
 
-  describe('transient', () => {
-    it('sets/gets transient values', () => {
+  describe('memo', () => {
+    it('memoizes a value', () => {
       const a = new Rapid.OsmEntity(context);
       const obj = {};
-      a.transient('test', () => obj);  // set
-      const v = a.transient('test');   // get
+      a.memo(null, 'test', () => obj);           // set
+      const v = a.memo(null, 'test', () => ({}));  // get
       assert.strictEqual(v, obj);
+    });
+
+    it('does not share memos with a copy', () => {
+      const a = new Rapid.OsmEntity(context);
+      a.memo(null, 'test', () => 1);
+      const b = a.update({ tags: { a: 'b' } });
+      assert.strictEqual(b.memo(null, 'test', () => 2), 2);
+    });
+
+    it('drops memos when the schema generation changes', () => {
+      const ctx = new Rapid.MockContext();
+      ctx.systems.schema = { generation: 1 };
+      const a = new Rapid.OsmEntity(ctx);
+      a.memo(null, 'test', () => 1);
+      ctx.systems.schema.generation = 2;
+      assert.strictEqual(a.memo(null, 'test', () => 2), 2);
+    });
+
+    it('computes an answer about the graph directly once a graph changed its topology', () => {
+      const n1 = new Rapid.OsmNode(context, { id: 'n1', loc: [0, 0] });
+      const n2 = new Rapid.OsmNode(context, { id: 'n2', loc: [1, 0] });
+      const base = new Rapid.Graph(context, [n1, n2]);
+      assert.strictEqual(n1.geometry(base), 'point');
+
+      const head = new Rapid.Graph(base).replace(new Rapid.OsmWay(context, { id: 'w1', nodes: ['n1', 'n2'] }));
+      assert.strictEqual(n1.geometry(head), 'vertex');   // uncommitted writes: computed directly
+      head.commit();
+      assert.strictEqual(n1.geometry(head), 'vertex');
+      assert.strictEqual(n1.geometry(base), 'point');
     });
   });
 

@@ -170,11 +170,13 @@ export class UiMeasurementCard extends AbstractUiCard {
         const allExtent = new Extent();
 
         for (const entity of selected) {
-          const extent = entity.extent(graph);
+          const extent = graph.extent(entity);   // undefined e.g. for a relation whose members aren't loaded
           // Rewind a copy: `asGeoJSON` returns the entity's memoized GeoJSON, shared by every graph
           const geojson = geojsonRewind(structuredClone(entity.asGeoJSON(graph)), true);  // true = outer ring clockwise (how D3 wants it)
 
-          allExtent.extendSelf(extent);
+          if (extent) {
+            allExtent.extendSelf(extent);
+          }
           geometry = entity.geometry(graph);
 
           if (geometry === 'line' || geometry === 'area') {
@@ -183,7 +185,7 @@ export class UiMeasurementCard extends AbstractUiCard {
             length += radiansToMeters(geoLength(asLineString(geojson)));
 
             centroid = geoCentroid(geojson);
-            if (!centroid  || !isFinite(centroid[0]) || !isFinite(centroid[1])) {
+            if ((!centroid  || !isFinite(centroid[0]) || !isFinite(centroid[1])) && extent) {
               centroid = extent.center();
             }
 

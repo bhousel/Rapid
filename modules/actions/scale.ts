@@ -27,7 +27,7 @@ export function actionScale(entityIDs: EntityID[], origin: Vec2, scaleFactor: nu
 
      // Gather all the nodes and their world coordinates
     for (const node of collection) {
-      const coord = node.geoms.parts[0].world?.coords as Vec2;  // A node should have a single world coord
+      const coord = graph.geometry(node).parts[0].world?.coords as Vec2;  // A node should have a single world coord
       if (!coord)  continue;
       nodes.push(node);
       points.push(coord);

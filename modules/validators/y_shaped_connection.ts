@@ -164,9 +164,9 @@ export function validateYShapedConnection(context: Context): ValidatorFunction {
     const otherNode = graph.entity(otherNodeID) as OsmNode;
 
     // World coordinates of the nodes involved.
-    const conn = connNode.geoms.parts[0].world?.coords as Vec2;
-    const edge = edgeNode.geoms.parts[0].world?.coords as Vec2;
-    const other = otherNode.geoms.parts[0].world?.coords as Vec2;
+    const conn = graph.geometry(connNode).parts[0].world?.coords as Vec2;
+    const edge = graph.geometry(edgeNode).parts[0].world?.coords as Vec2;
+    const other = graph.geometry(otherNode).parts[0].world?.coords as Vec2;
     if (!conn || !edge || !other) return false;
 
     let prevEdgeAngle;

@@ -61,7 +61,7 @@ export function validateUnsquareWay(context: Context): ValidatorFunction {
     if (!isClosed) return result;   // this building has bigger problems
 
     // A way will have LineString or Polygon geometry. We can use 'outer' to get these points.
-    const points = way.geoms.parts[0]?.local?.outer as Vec2[];
+    const points = graph.geometry(way).parts[0]?.local?.outer as Vec2[];
     if (!points) return result;
 
     // don't flag ways with lots of nodes since they are likely detail-mapped
