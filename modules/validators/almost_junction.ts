@@ -465,7 +465,8 @@ export function validateAlmostJunction(context: Context): ValidatorFunction {
       // Check if the test [nearLoc -> farLoc] intersects any other ways
       const segmentInfos = editor.waySegments(queryExtent, graph);
       for (const segmentInfo of segmentInfos) {
-        const way2 = graph.entity(segmentInfo.wayID) as OsmWay;
+        const way2 = graph.hasEntity(segmentInfo.wayID) as OsmWay | undefined;
+        if (!way2) continue;   // the index can be for another graph
 
         if (!isHighway(way2)) continue;
         if (!canConnectWays(way, way2)) continue;
@@ -473,8 +474,9 @@ export function validateAlmostJunction(context: Context): ValidatorFunction {
         const edge: [EntityID, EntityID] = segmentInfo.edge;
         if (edge[0] === tipNodeID || edge[1] === tipNodeID) continue;  // skip self
 
-        const nA = graph.entity(edge[0]) as OsmNode;
-        const nB = graph.entity(edge[1]) as OsmNode;
+        const nA = graph.hasEntity(edge[0]) as OsmNode | undefined;
+        const nB = graph.hasEntity(edge[1]) as OsmNode | undefined;
+        if (!nA || !nB) continue;
 
         // Check if nodes are coincident first (geomLineIntersection misses this!)
         let crossLoc: Vec2 | undefined | null;

@@ -7,9 +7,9 @@ of the change. This design fixes findings 1 (shared geometry) and 2 (the wrong s
 [validation audit](validation-system.md#the-october-2026-audit), the bugs listed below, and the cost of
 keeping versions. It gives Rapid one way to ask for anything's geometry: `graph.geometry(entity)`.
 
-> **Status:** Proposed (October 2026). Measured in two rounds: a survey of today's costs and bugs, then
-> three competing designs, each prototyped and reviewed for correctness and for performance (in
-> JavaScriptCore and V8). Nothing is implemented yet; see [Open questions](#open-questions).
+> **Status:** In progress (October 2026): steps 0 and 1 done. Measured in two rounds: a survey of
+> today's costs and bugs, then three competing designs, each prototyped and reviewed for correctness
+> and for performance (in JavaScriptCore and V8). See [Open questions](#open-questions).
 
 ## Words used here
 
@@ -18,7 +18,7 @@ keeping versions. It gives Rapid one way to ask for anything's geometry: `graph.
 - **Graph** (`modules/lib/Graph.ts`): a version of the OSM data. Every graph reads as one consistent
   version. Only staging and scratch graphs are written to.
 - **Base**: the downloaded data, shared by every graph of a data source.
-- **Derive**: make a graph from another (`new Graph(other)`, `snapshot()`).
+- **Derive**: make a graph from another (`new Graph(other)`).
 - **Commit** (`graph.commit()`): recompute what changed since the last commit. This is about the
   graph's caches, not `editor.commit()`, which adds an edit to the history.
 - **Rebase** (`graph.rebase()`): add downloaded entities to the base, as if every graph had them all
@@ -79,7 +79,7 @@ entity takes 5-6 ns (V8). An APP pass at z17.5 in central Paris makes about 88k 
 
 | Bug | What happens | Fixed in step |
 |---|---|---|
-| A stale `isInteresting` memo, and `complete()` leaving out the members of non-multipolygon relations | Straighten deletes a node just added to a bus route as a stop, and the route with it if that was its only member | 0 |
+| A stale `isInteresting` memo, and `complete()` leaving out the members of non-multipolygon relations | Straighten deletes a node just added to a bus route as a stop, and the route with it if that was its only member | 0 (memo), 1 (`complete()`) |
 | Shared geometry | Validators on stable judge staging's shapes; undo leaves a way's extent where its node was moved | 4 |
 | Graph-dependent memos on shared objects | `presetMatch`, point or vertex, `isEndpoint` answer for whichever graph asked first | 2 |
 | The staging index syncs before geometry is recomputed | After undo, revert or MoveMode a feature keeps a stale box and disappears | 1 |
@@ -160,17 +160,20 @@ L=100k.
 
 ### 2. Commit after the actions
 
-- `EditSystem._perform` runs the actions, then commits staging (today it commits *before* them, "for
-  now", and actions don't always commit at the end). `stagingchange` always arrives with staging's
-  derived data current, so `MapSystem` stops recomputing and touching.
-- If an action throws, `_perform` rolls staging back to its last commit (cheap with the journal) and
-  rethrows. Today the half-done action stays in staging, and the next perform commits it into the next
-  edit.
+- `EditSystem._perform` runs the actions, then commits staging (before step 1 it committed *before*
+  them, and actions don't always commit at the end). `stagingchange` always arrives with staging's
+  derived data current, so `MapSystem` stops recomputing, and in step 4 stops touching.
+- If an action throws, `_perform` rolls staging back to how it was when the perform began (a savepoint
+  in the journal; six actions commit partway through, so the last commit isn't enough) and rethrows.
+  Before step 1 the half-done action stayed in staging, and the next perform committed it into the
+  next edit.
 - `commit()` builds the closure from what changed in value since its last commit: the changed IDs;
-  the old and new nodes of changed ways; a changed relation's added and removed members, or all of its
-  members when its tags changed; the parent ways of changed IDs; and parent relations, recursively.
-  Today's `complete()` adds members only for multipolygons, which is the straighten data loss. A write
-  that changes nothing (an equal copy) keeps the previous geometry and answers.
+  the old and new nodes of changed ways; a changed relation's added, removed and re-roled members, or
+  all of its members when its tags changed or it is a multipolygon; the parent ways of changed IDs;
+  and parent relations, recursively. Before step 1, `complete()` added members only for
+  multipolygons, half of the straighten data loss. Only multipolygon members get new geometry: the
+  others' doesn't depend on the relation. A write that changes nothing (an equal copy) keeps the
+  previous geometry and answers.
 - Each ID in the closure gets a new record in this graph: geometry recomputed, memoized answers
   cleared, a new version.
 - **Relation geometry is built members first**, wherever it's computed: commit, rebase, a graph's
@@ -413,7 +416,8 @@ Each step ships on its own and leaves the app working, with tests that pin what 
    - `toBackup` and `toIntroGraph` copy locs before rounding, and `toIntroGraph` copies relation
      members before renaming their IDs. `UiMeasurementCard` rewinds a copy; `OsmRelation` sets `role`
      on a copy; `editor.changes(action)` runs on `new Graph(stable)`; `context.copyIDs` keeps
-     `new Graph(staging)` instead of the live staging graph.
+     `new Graph(staging)` instead of the live staging graph, and paste centers on the copied nodes'
+     locations rather than a way's shared extent.
    - `_connectSplitWays` uses `update()` and a forced rebase.
    - `updateGeometry()` stores a new `Geometry` instead of resetting the old one.
    - `MapSystem` clears the filter cache before touching; `PixiLayerOsm` keeps its midpoints.
@@ -433,6 +437,31 @@ Each step ships on its own and leaves the app working, with tests that pin what 
    - The session difference is kept up to date incrementally.
    - This removes the O(L) Differences per perform and edit and fixes the stale staging boxes. It
      also halves the history's maps (846 to 430 MB after 200 roads, measured in another harness).
+   - **Done.** At L=10k (Bun, no validation or backup), a DragNodeMode pointermove went from 3.2 to
+     0.03-0.07 ms and a discrete edit (perform and commit) from 7.5 to 0.1-0.2 ms. A MoveMode or
+     RotateMode frame reverts first, and each revert derives a new staging graph, an O(L) copy until
+     step 3: about 0.2-0.3 ms. Decisions made while landing it:
+     - A throwing action rolls staging back to the start of the perform (a savepoint), not to its
+       last commit: six actions commit partway through.
+     - `complete()` doesn't depend on the order of the changes any more (a parent already in the
+       result is still recursed from). A changed relation brings its added, removed and re-roled
+       members, or all of them when its tags changed. For a commit, members of relations other
+       than multipolygons aren't recomputed: their geometry doesn't depend on the relation.
+     - A nested `OsmRelation.asGeoJSON` call doesn't use the member relation's memo, so cycles are
+       right in any order.
+     - When staging is replaced (undo, redo, revert, commit), the emit recomputes what differs from
+       the graph whose shapes the shared objects hold. Graphs track which one recomputed last (the
+       lineage's `geometryWriter`): usually it's the graph emitted last, so a commit recomputes
+       nothing. Otherwise (a transaction that committed, then undid), it recomputes everything
+       written since the last emit.
+     - Multipolygons are built before other relations, since their shape comes only from ways.
+     - The rebase reaches every graph we may return to: the history, the checkpoints' histories,
+       the return edit and staging. Restores emit right away.
+     - `osmJoinWays` copies the graph only when it reverses a way, and `snapshot()` is gone.
+     - Still O(L): deriving a graph (each revert, undo, redo and commit), until step 3. Lazily and
+       at most once per stable change or merge: the session difference's
+       `complete()` (read by `ValidationSystem` to credit the user's issues) and `summary()` (the
+       save count). Making them incremental is the next step for long sessions.
 2. **Immutable geometry, memos without key strings, `graph.geometry()`.**
    - A recompute stores a new `Geometry`, without `structuredClone`; node geometry is built once.
    - A schema generation, bumped on every `schemachange`. `transient()` goes. Object-only answers

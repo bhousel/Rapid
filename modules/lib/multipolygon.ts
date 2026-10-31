@@ -1,9 +1,9 @@
 import { actionReverse } from '../actions/reverse.ts';
+import { Graph } from './Graph.ts';
 
 import { OsmNode } from '../data/OsmNode.ts';
 import { OsmWay } from '../data/OsmWay.ts';
 
-import type { Graph } from './Graph.ts';
 import type { OsmRelationMember } from '../data/types.ts';
 import type { Action } from '../actions/types.ts';
 
@@ -71,7 +71,15 @@ export function osmJoinWays<T extends OsmRelationMember | OsmWay>(toJoin: T[], g
   function reverse(item: T): T {
     const action = actionReverse(item.id, { reverseOneway: true });
     sequences.actions.push(action);
-    return (item instanceof OsmWay) ? action(graph).entity(item.id) as unknown as T : item;
+    if (!(item instanceof OsmWay)) return item;
+
+    // Reverse in a copy of the graph: we don't want any reverses applied to the caller's graph.
+    // Members are never reversed in the graph, so most calls never need the copy.
+    if (!isCopy) {
+      graph = new Graph(graph);
+      isCopy = true;
+    }
+    return action(graph).entity(item.id) as unknown as T;
   }
 
   // make a copy containing only the items to join
@@ -79,9 +87,8 @@ export function osmJoinWays<T extends OsmRelationMember | OsmWay>(toJoin: T[], g
     return member.type === 'way' && graph.hasEntity(member.id) !== undefined;
   });
 
-  // Make a copy of the graph before doing anything.
-  // We don't want any reverses to actually be applied to the caller's graph.
-  graph = graph.snapshot();
+  // `reverse` makes a copy of the graph the first time it reverses a way.
+  let isCopy = false;
 
   // Are the things we are joining relation members or `OsmWays`?
   // If `OsmWays`, skip the "prefer a forward path" code below (see iD#4872)

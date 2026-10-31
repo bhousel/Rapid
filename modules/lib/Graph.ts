@@ -1,9 +1,23 @@
-import { Difference } from './Difference.ts';
+import { compareEntities, completeFrom } from './Difference.ts';
 import { utilIterable } from '../util/iterable.ts';
 
 import type { Context } from '../Context.ts';
+import type { DifferenceChange } from './Difference.ts';
 import type { Iterable, OneOrMore } from '../util/iterable.ts';
 import type { OsmEntity, OsmNode, OsmRelation, OsmWay } from '../data/types.ts';
+
+
+/** Marks a journaled ID that had no local entry, so its value came from base */
+const NOT_LOCAL = Symbol('not-local');
+
+/** What a journaled ID held before a write: a local entity, a local deletion, or nothing local */
+type Before = OsmEntity | undefined | typeof NOT_LOCAL;
+
+/** What a base Graph and every Graph derived from it share */
+interface GraphLineage {
+  /** The Graph that recomputed geometry last */
+  geometryWriter: Graph | null;
+}
 
 
 /**
@@ -41,6 +55,11 @@ export interface GraphCache {
  * You can call these methods anytme to make modifications to the `Graph`,
  * but then you must call `commit` to update any Entities that rely on the `Graph`.
  *
+ * Each Graph keeps a journal of the IDs it writes, so `commit` and `EditSystem` work from
+ * what changed, not from everything the Graph has changed from base.
+ * Graphs in the edit history are frozen: only a rebase's iD#2085 restores may change them.
+ * @see design/graph-geometry.md
+ *
  * Properties available:
  * - `id`    - Unique string to identify this Graph
  * - `v`     - Internal version of the Graph, can be used to detect changes
@@ -56,12 +75,21 @@ export class Graph {
   public props: GraphProps;
   /** Whether this is the initial base Graph (vs a derived/edited Graph) */
   public isBaseGraph: boolean;
-  /** The preceding Graph in the edit chain (null for the base Graph) */
-  public previous: Graph | null;
   /** Shared base cache for unedited entities (shared with all descendant Graphs) */
   public base: GraphCache;
   /** Local (edited) entity cache, cloned from the predecessor Graph on construction */
   public local: GraphCache;
+
+  /** What each ID written since the last commit held before its first write */
+  protected _pending: Map<EntityID, Before>;
+  /** IDs written since this Graph was derived */
+  protected _journal: Set<EntityID>;
+  /** What each ID written since the savepoint began held before its first write, while one is active */
+  protected _savepoint: Map<EntityID, Before> | null;
+  /** Whether this Graph is in the edit history, so it may no longer change */
+  protected _frozen: boolean;
+  /** Shared by a base Graph and every Graph derived from it */
+  protected _lineage: GraphLineage;
 
 
   /**
@@ -77,7 +105,6 @@ export class Graph {
       this.context = other.context;
       this.props = {} as GraphProps;
       this.isBaseGraph = false;
-      this.previous = other;
 
       this.base = other.base;     // Base cache is shared among the chain of Graphs
       this.local = {              // Local data is a clone of the predecessor data
@@ -86,13 +113,18 @@ export class Graph {
         parentRels:  new Map<EntityID, Set<EntityID>>(other.local.parentRels)         // shallow clone
       };
 
+      // Uncommitted writes come along, so this Graph's first commit recomputes them.
+      this._pending = new Map<EntityID, Before>(other._pending);
+      this._lineage = other._lineage;
+
     // A fresh Graph
     } else {
       const context = otherOrContext as Context;
       this.context = context;
       this.props = {} as GraphProps;
       this.isBaseGraph = true;
-      this.previous = null;
+      this._pending = new Map<EntityID, Before>();
+      this._lineage = { geometryWriter: null };
 
       this.base = {
         entities:    new Map<EntityID, OsmEntity | undefined>(),
@@ -105,6 +137,10 @@ export class Graph {
         parentRels:  new Map<EntityID, Set<EntityID>>()
       };
     }
+
+    this._journal = new Set<EntityID>();
+    this._savepoint = null;
+    this._frozen = false;
 
     // Deal with extra argument
     if (Array.isArray(propsOrEntities)) {
@@ -132,7 +168,10 @@ export class Graph {
   public destroy(): void {
     this.base = null!;
     this.local = null!;
-    this.previous = null;
+    this._pending = null!;
+    this._journal = null!;
+    this._savepoint = null;
+    this._lineage = null!;
     this.props = null!;
     this.context = null!;
   }
@@ -176,6 +215,44 @@ export class Graph {
   public touch(): Graph {
     this.props.v = this.context.next('v');
     return this;
+  }
+
+  /**
+   * The IDs this Graph has written since it was derived (its journal).
+   * It may hold IDs whose entity ended up unchanged.
+   * @return  The journaled entity IDs
+   * @readonly
+   */
+  public get changedIDs(): ReadonlySet<EntityID> {
+    return this._journal;
+  }
+
+  /**
+   * Whether this Graph has writes that `commit` hasn't processed yet.
+   * @return  `true` if there are uncommitted writes
+   * @readonly
+   */
+  public get hasPendingChanges(): boolean {
+    return this._pending.size > 0;
+  }
+
+  /**
+   * Whether this Graph is frozen (it's in the edit history, so it may no longer change).
+   * @return  `true` if frozen
+   * @readonly
+   */
+  public get isFrozen(): boolean {
+    return this._frozen;
+  }
+
+  /**
+   * The Graph of this lineage that recomputed geometry last. Geometry still lives on the entity
+   * objects that every Graph shares, so their shapes are that Graph's (until step 4 of the design).
+   * @return  The Graph, or `null` if none has yet
+   * @readonly
+   */
+  public get geometryWriter(): Graph | null {
+    return this._lineage.geometryWriter;
   }
 
 
@@ -253,12 +330,10 @@ export class Graph {
    * Replace an OsmEntity in this Graph
    * @param   entities - entities to replace
    * @return  this Graph
-   * @throws  Will throw if called on a base graph
+   * @throws  Will throw if called on a base graph or a frozen graph
    */
   public replace(entities: OneOrMore<OsmEntity>): Graph {
-    if (this.isBaseGraph) {
-      throw new Error(`Do not call 'replace' on a base graph`);
-    }
+    this._assertWritable('replace');
 
     const arr = [...utilIterable(entities)].sort(this._nodesFirst);
     for (const entity of arr) {
@@ -266,6 +341,7 @@ export class Graph {
       const current = this.hasEntity(entityID);
       if (current === entity) continue;  // no change
 
+      this._record(entityID);
       this.local.entities.set(entityID, entity);
       this._updateCaches(current, entity);
     }
@@ -277,12 +353,10 @@ export class Graph {
    * Remove an OsmEntity from this Graph
    * @param   entities - entities to remove
    * @return  this Graph
-   * @throws  Will throw if called on a base graph
+   * @throws  Will throw if called on a base graph or a frozen graph
    */
   public remove(entities: OneOrMore<OsmEntity>): Graph {
-    if (this.isBaseGraph) {
-      throw new Error(`Do not call 'remove' on a base graph`);
-    }
+    this._assertWritable('remove');
 
     const arr = [...utilIterable(entities)].sort(this._nodesFirst);
     for (const entity of arr) {
@@ -290,6 +364,7 @@ export class Graph {
       const current = this.hasEntity(entityID);
       if (!current) continue;  // not in the graph
 
+      this._record(entityID);
       this.local.entities.set(entityID, undefined);
       this._updateCaches(current, undefined);
     }
@@ -301,18 +376,17 @@ export class Graph {
    * Revert an OsmEntity back to whatever state it had in the base graph
    * @param   entityIDs - the entityIDs of the Entities to revert
    * @return  this Graph
-   * @throws  Will throw if called on a base graph
+   * @throws  Will throw if called on a base graph or a frozen graph
    */
   public revert(entityIDs: OneOrMore<EntityID>): Graph {
-    if (this.isBaseGraph) {
-      throw new Error(`Do not call 'revert' on a base graph`);
-    }
+    this._assertWritable('revert');
 
     for (const entityID of utilIterable(entityIDs) as EntityID[]) {
       const original = this.base.entities.get(entityID);
       const current = this.hasEntity(entityID);
       if (current === original) continue;   // no change
 
+      this._record(entityID);
       this.local.entities.delete(entityID);
       this._updateCaches(current, original);
     }
@@ -321,34 +395,107 @@ export class Graph {
 
 
   /**
-   * Updates any Entities affected by the work in progress
+   * Updates any Entities affected by the work in progress.
+   * It works from the IDs written since the last commit, compared by value, so a write
+   * of an equal copy changes nothing.
    * @return  this Graph
    */
   public commit(): Graph {
-    // What changed between 'previous' and 'current'?
-    const diff = new Difference(this.previous, this);
-    const ids = [...diff.complete().keys()];
-    this._updateGeometries(ids);
+    if (!this._pending.size) return this;
 
-    // Replace 'previous' with a copy of the current graph.
-    // More changes can happen to this graph and `commit()` will detect them.
-    // This also allows the previous Graph to be garbage collected if it was temporary.
-    this.previous = this.snapshot();
+    const changes = new Map<EntityID, DifferenceChange>();
+    for (const [entityID, before] of this._pending) {
+      const b = (before === NOT_LOCAL) ? this.base.entities.get(entityID) : before;
+      const h = this.hasEntity(entityID);
+      if (compareEntities(b, h)) {
+        changes.set(entityID, { base: b, head: h });
+      }
+    }
+    this._pending.clear();
+
+    const closure = completeFrom(this, changes, true);   // true = only what needs new geometry
+    this.recomputeGeometry(new Set<EntityID>(closure.keys()));
     return this;
   }
 
 
   /**
-   * A Graph "snapshot" is a copy of the Graph that can be used to compute Differences.
-   * It's just a copy with a special `id` and with no `previous`.
-   * (The `previous = null` helps avoid leaking memory, we don't need to reference the previous Graph).
-   * @return  A new Graph
+   * Begins a savepoint: `rollbackToSavepoint` returns the Graph to how it is now.
+   * `EditSystem` uses this around the actions of a perform, which may commit midway.
+   * @throws  Will throw if the Graph has uncommitted writes, or is frozen
    */
-  public snapshot(): Graph {
-    const id = this.id + '-snapshot';
-    const snapshot = new Graph(this, { id: id });
-    snapshot.previous = null;
-    return snapshot;
+  public beginSavepoint(): void {
+    if (this._pending.size) {
+      throw new Error(`Do not begin a savepoint on a graph with uncommitted writes`);
+    }
+    this._assertWritable('beginSavepoint');
+    this._savepoint = new Map<EntityID, Before>();
+  }
+
+
+  /**
+   * Returns the Graph to how it was when the savepoint began, and recomputes what that changes.
+   * Only the Graph's entities are restored; the IDs stay in the journal.
+   * @throws  Will throw if no savepoint is active
+   */
+  public rollbackToSavepoint(): void {
+    const savepoint = this._savepoint;
+    if (!savepoint) {
+      throw new Error(`No savepoint to roll back to`);
+    }
+
+    const changes = new Map<EntityID, DifferenceChange>();
+    for (const [entityID, before] of savepoint) {
+      const current = this.hasEntity(entityID);
+      let restored: OsmEntity | undefined;
+      if (before === NOT_LOCAL) {
+        restored = this.base.entities.get(entityID);
+        this.local.entities.delete(entityID);
+      } else {
+        restored = before;
+        this.local.entities.set(entityID, before);
+      }
+      if (current === restored) continue;   // e.g. created and removed again
+
+      this._updateCaches(current, restored);
+      changes.set(entityID, { base: current, head: restored });
+    }
+
+    this._pending.clear();
+    savepoint.clear();
+    this.recomputeGeometry(new Set<EntityID>(completeFrom(this, changes, true).keys()));
+    this.touch();
+  }
+
+
+  /**
+   * Ends the savepoint, keeping the Graph as it is.
+   */
+  public endSavepoint(): void {
+    this._savepoint = null;
+  }
+
+
+  /**
+   * Freezes the Graph when it goes into the edit history: after this, `replace`, `remove`,
+   * `revert` and `load` throw. Uncommitted writes are committed first.
+   */
+  public freeze(): void {
+    this.commit();
+    this._savepoint = null;
+    this._frozen = true;
+  }
+
+
+  /**
+   * Adds another Graph's journal to this one's.
+   * Used when this Graph replaces the other one in the history (`commitAppend`).
+   * @param other - The Graph whose journal to add
+   */
+  public absorbJournal(other: Graph): void {
+    for (const entityID of other._journal) {
+      this._journal.add(entityID);
+    }
   }
 
 
@@ -359,16 +506,15 @@ export class Graph {
    * (The Entities passed in may be undefined, in the case of deletion)
    * @param   entities - Entities to load into the Graph
    * @return  this Graph
-   * @throws  Will throw if called on a base graph
+   * @throws  Will throw if called on a base graph or a frozen graph
    */
   public load(entities: Record<EntityID, OsmEntity | undefined> = {}): Graph {
-    if (this.isBaseGraph) {
-      throw new Error(`Do not call 'load' on a base graph`);
-    }
+    this._assertWritable('load');
 
     const _loadOne = (entityID: EntityID, entity: OsmEntity | undefined): void => {
       const current = this.hasEntity(entityID);
       const replacement = entity || undefined;
+      this._record(entityID);
       this.local.entities.set(entityID, replacement);
       this._updateCaches(current, replacement);
     };
@@ -397,9 +543,10 @@ export class Graph {
    * @param  entities - Entities to add to the base Graph
    * @param  stack - Stack of graphs that need updates after this rebase
    * @param  force - If `true`, always update, if `false` skip Entities that we've seen already
+   * @return The IDs restored in each Graph of the stack (iD#2085), only for Graphs that restored any
    * @throws  Will throw if _not_ called on a base graph
    */
-  public rebase(entities: OneOrMore<OsmEntity>, stack: Graph[] = [], force: boolean = false): void {
+  public rebase(entities: OneOrMore<OsmEntity>, stack: Graph[] = [], force: boolean = false): Map<Graph, Set<EntityID>> {
 //    if (!this.isBaseGraph) {
 //      throw new Error(`Must call 'rebase' on a base graph`);
 //    }
@@ -435,11 +582,16 @@ export class Graph {
       }
     }
 
+    const restored = new Map<Graph, Set<EntityID>>();
     for (const graph of stack) {
-      graph._updateRebased(restoreIDs);
+      const ids = graph._updateRebased(restoreIDs);
+      if (ids.size) {
+        restored.set(graph, ids);
+      }
     }
 
-    this._updateGeometries(newIDs);
+    this.recomputeGeometry(newIDs);
+    return restored;
   }
 
 
@@ -503,21 +655,27 @@ export class Graph {
    * Internal function, used to update a graph following a `rebase` (base graph has changed).
    * Check local `parentWays` and `parentRels` caches and make sure they are consistent
    *  with the data in the base caches.
-   * @param restoreIDs
+   * A restore is the one write a frozen Graph accepts. Other Graphs journal it, so their
+   *  next commit and `EditSystem`'s next emit include it.
+   * @param restoreIDs - IDs of deleted nodes to restore, if this Graph deleted them
+   * @return The IDs this Graph restored
    */
-  protected _updateRebased(restoreIDs: Set<EntityID> | EntityID[] = []): void {
+  protected _updateRebased(restoreIDs: Set<EntityID> | EntityID[] = []): Set<EntityID> {
     const base = this.base;
     const local = this.local;
 
-    let didChange = false;
+    const restored = new Set<EntityID>();
     // Restore deleted nodes that were discovered to belong to a parentWay.
     for (const id of restoreIDs) {
       if (local.entities.has(id) && local.entities.get(id) === undefined) {  // was deleted
+        if (!this._frozen) {
+          this._record(id);
+        }
         local.entities.delete(id);  // "delete the delete", aka restore.
-        didChange = true;
+        restored.add(id);
       }
     }
-    if (didChange) {
+    if (restored.size) {
       this.touch();
     }
 
@@ -540,20 +698,90 @@ export class Graph {
         }
       }
     }
+
+    return restored;
   }
 
 
   /**
-   * Internal function, used to update OsmEntity geometries affected by recent graph changes.
+   * Recomputes the geometry of the given ways and relations (nodes keep their own).
+   * Ways go first, then relations with their member relations before them,
+   * so a relation is never built from a member's stale shape.
    * This needs to be called after all `_updateCaches` calls have finished.
-   * @param entityIDs
+   * @param entityIDs - IDs of the entities to recompute
    */
-  protected _updateGeometries(entityIDs: Iterable<EntityID>): void {
+  public recomputeGeometry(entityIDs: Iterable<EntityID>): void {
+    this._lineage.geometryWriter = this;
+    const relations = new Map<EntityID, OsmRelation>();
     for (const entityID of entityIDs) {
       const entity = this.hasEntity(entityID);
       if (!entity) continue;                  // entity was deleted
       if (entity.type === 'node') continue;   // nodes don't need this
-      (entity as OsmWay | OsmRelation).updateGeometry(this);
+      if (entity.type === 'relation') {
+        relations.set(entityID, entity as OsmRelation);
+      } else {
+        entity.updateGeometry(this);
+      }
+    }
+
+    // Multipolygons first: their shape comes only from their member ways, and other relations
+    // in a cycle with them read their memo.
+    // Then members first. Marking a relation done before its members stops at cycles,
+    // where `asGeoJSON` builds from the leaf members instead.
+    const done = new Set<EntityID>();
+    for (const relation of relations.values()) {
+      if (relation.isMultipolygon()) {
+        relation.updateGeometry(this);
+        done.add(relation.id);
+      }
+    }
+
+    const visit = (relation: OsmRelation): void => {
+      if (done.has(relation.id)) return;
+      done.add(relation.id);
+      for (const member of relation.members) {
+        const child = relations.get(member.id);
+        if (child) visit(child);
+      }
+      relation.updateGeometry(this);
+    };
+
+    for (const relation of relations.values()) {
+      visit(relation);
+    }
+  }
+
+
+  /**
+   * Internal function, records a write to an ID before it happens:
+   * what it held before, for the next commit and the savepoint, and the ID in the journal.
+   * @param entityID - The ID about to be written
+   */
+  protected _record(entityID: EntityID): void {
+    const local = this.local.entities;
+    const before: Before = local.has(entityID) ? local.get(entityID) : NOT_LOCAL;
+
+    if (!this._pending.has(entityID)) {
+      this._pending.set(entityID, before);
+    }
+    if (this._savepoint && !this._savepoint.has(entityID)) {
+      this._savepoint.set(entityID, before);
+    }
+    this._journal.add(entityID);
+  }
+
+
+  /**
+   * Internal function, throws if this Graph may not be written to.
+   * @param method - The name of the method being called, for the error message
+   * @throws  Will throw if this is a base graph or a frozen graph
+   */
+  protected _assertWritable(method: string): void {
+    if (this.isBaseGraph) {
+      throw new Error(`Do not call '${method}' on a base graph`);
+    }
+    if (this._frozen) {
+      throw new Error(`Do not call '${method}' on a frozen graph`);
     }
   }
 

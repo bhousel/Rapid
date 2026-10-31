@@ -7,6 +7,7 @@ import { utilCmd } from '../util/cmd.ts';
 
 import type { Context } from '../Context.ts';
 import type { EditLabel } from '../lib/Edit.ts';
+import type { OsmNode } from '../data/OsmNode.ts';
 
 
 /**
@@ -62,9 +63,10 @@ export class PasteOperation extends AbstractOperation {
     for (const [entityID, newEntity] of Object.entries(copies)) {
       const oldEntity = copyGraph.entity(entityID);
 
-      const oldExtent = oldEntity.extent();
-      if (oldExtent) {
-        extent = extent.extend(oldExtent);
+      // Anchor on the copied nodes' locations. A way's `extent()` reads its shared geometry,
+      // which may have changed since the copy.
+      if (oldEntity.type === 'node') {
+        extent = extent.extend(new Extent((oldEntity as OsmNode).loc));
       }
 
       // Exclude child nodes from newIDs if their parent way was also copied.

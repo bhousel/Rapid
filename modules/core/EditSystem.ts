@@ -1,5 +1,5 @@
 import { AbstractSystem } from './AbstractSystem.ts';
-import { Difference, Edit, Graph } from '../lib/index.ts';
+import { completeFrom, Difference, Edit, Graph, SessionDifference } from '../lib/index.ts';
 import { easeLinear } from 'd3-ease';
 import { Extent, geoScaleToZoom, projWgs84ToWorld } from '@rapid-sdk/math';
 import { OsmEntity, createOsmEntity } from '../data/index.ts';
@@ -10,6 +10,7 @@ import { utilObjectOmit } from '@rapid-sdk/util';
 import type { Context } from '../Context.ts';
 import type { Action } from '../actions/types.ts';
 import type { DatabaseSystem } from './DatabaseSystem.ts';
+import type { DifferenceChange } from '../lib/Difference.ts';
 import type { EditProps, EditSources, LegacyEditSelection } from '../lib/Edit.ts';
 import type { OsmEntityProps, OsmNode, OsmRelation, OsmTags, OsmWay, Segment } from '../data/types.ts';
 import type { ParsedElement } from '../data/parsers/types.ts';
@@ -39,6 +40,20 @@ interface Checkpoint {
   history: Edit[];
   /** Index at checkpoint time */
   index: number;
+}
+
+/**
+ * What a change event last compared against, so the next one can compare from there
+ * without keeping a copy of the graph.
+ * The entity an ID had then is `values.get(id)` if `values` has it, else `from.hasEntity(id)`.
+ */
+interface EmitState {
+  /** The graph that was emitted */
+  graph: Graph;
+  /** A frozen graph that holds the emitted entities for every ID not in `values` */
+  from: Graph;
+  /** The emitted entities that `from` doesn't hold */
+  values: Map<EntityID, OsmEntity | undefined>;
 }
 
 /** Changes summary returned by changes() */
@@ -226,9 +241,13 @@ interface EntityCopy {
  * - `endTransaction()` - Marks transaction as complete.  Any `stagingchange` and `stablechange`
  *      events will be emitted that cover the difference from the beginning -> end of the transaction.
  *
+ * Graphs in the history are frozen, and each keeps a journal of what it changed, so the events
+ *  compare only the IDs that may have changed (see design/graph-geometry.md).
+ *
  * Events available:
  * - 'stagingchange' - Fires on every edit performed (i.e. when `staging` changes),
  *      Receives Difference between old `staging` Graph and new `staging` Graph.
+ *      Staging's geometry is current when it fires.
  * - 'stablechange' - Fires only when the history actually changes (i.e. when `stable` changes)
  *      Receives Difference between old `stable` Graph and new `stable` Graph.
  * - 'historyjump' - Fires on undo/redo/restore.  This is for situations when we may need to
@@ -290,14 +309,18 @@ export class EditSystem extends AbstractSystem {
   protected _backupStatus: boolean;
   /** Cache key used to detect when `stable` has changed and a new backup is needed */
   protected _stableKey: string | null;
-  /** Snapshot of the stable Graph captured at the last `stablechange` event */
-  protected _stableSnapshot: Graph | null;
+  /** What the last `stablechange` event compared against, see `EmitState` */
+  protected _emittedStable: EmitState;
+  /** IDs that may differ between the last emitted stable state and `stable` */
+  protected _stableCandidates: Set<EntityID>;
   /** Cache key used to detect when `staging` has changed */
   protected _stagingKey: string | null;
-  /** Snapshot of the staging Graph captured at the last `stagingchange` event */
-  protected _stagingSnapshot: Graph | null;
-  /** Accumulated Difference across the entire open transaction (if any) */
-  protected _fullDifference: Difference;
+  /** What the last `stagingchange` event compared against, see `EmitState` */
+  protected _emittedStaging: EmitState;
+  /** IDs that may differ between the last emitted staging state and `staging` */
+  protected _stagingCandidates: Set<EntityID>;
+  /** The difference from `base` to `stable`: all of the user's edits */
+  protected _fullDifference: SessionDifference;
 
 
   /**
@@ -330,9 +353,11 @@ export class EditSystem extends AbstractSystem {
 
     this._backupStatus = true;
     this._stableKey = null;
-    this._stableSnapshot = null;
+    this._emittedStable = null!;
+    this._stableCandidates = new Set<EntityID>();
     this._stagingKey = null;
-    this._stagingSnapshot = null;
+    this._emittedStaging = null!;
+    this._stagingCandidates = new Set<EntityID>();
     this._fullDifference = null!;
 
     // Make sure the event handlers have `this` bound correctly
@@ -473,10 +498,12 @@ export class EditSystem extends AbstractSystem {
     this._osmSegmentIDs = new Map();
 
     this._stableKey = baseGraph.key;
-    this._stableSnapshot = baseGraph.snapshot();
+    this._emittedStable = { graph: baseGraph, from: baseGraph, values: new Map() };
+    this._stableCandidates.clear();
     this._stagingKey = currGraph.key;
-    this._stagingSnapshot = currGraph.snapshot();
-    this._fullDifference = new Difference(baseGraph, baseGraph);
+    this._emittedStaging = { graph: currGraph, from: baseGraph, values: new Map() };
+    this._stagingCandidates.clear();
+    this._fullDifference = new SessionDifference(baseGraph, baseGraph);
 
     this._backupStatus = true;
     this._sessionID = null;
@@ -584,16 +611,37 @@ export class EditSystem extends AbstractSystem {
 
     const DURATION = 150;
 
-    return new Promise(resolve => {
+    return new Promise((resolve, reject) => {
+      // Perform one frame. If the action throws, the transition is over: without this,
+      // `_inTransition` would stay set (no more backups) and the promise would never settle.
+      const performFrame = (t: number): boolean => {
+        try {
+          this._replaceStaging();
+          this._perform([action], t);
+          this._emitChanges();
+          return true;
+        } catch (err) {
+          this._inTransition = false;
+          // Staging went back to `stable` before the action threw: emit that, so the indexes and
+          // shapes don't stay at the previous frame.
+          try {
+            this._emitChanges();
+          } catch (emitErr) {
+            console.error(emitErr);  // eslint-disable-line no-console
+          }
+          reject(err);
+          return false;
+        }
+      };
+
       select(document)
         .transition('editTransition')
         .duration(DURATION)
         .ease(easeLinear)
         .tween('edit.tween', () => {
           return (t: number) => {
-            this._replaceStaging();
-            this._perform([action], t);
-            this._emitChanges();
+            if (!this._inTransition) return;   // a frame threw
+            if (!performFrame(t)) return;
             if (t === 1) {  // mark as finished
               this._inTransition = false;
               resolve();
@@ -602,15 +650,11 @@ export class EditSystem extends AbstractSystem {
         })
         .on('start', () => {
           this._inTransition = true;
-          this._replaceStaging();
-          this._perform([action], 0);
-          this._emitChanges();
+          performFrame(0);
         })
         .on('end interrupt', () => {
-          if (this._inTransaction) {
-            this._replaceStaging();
-            this._perform([action], 1);
-            this._emitChanges();
+          if (this._inTransaction && this._inTransition) {
+            if (!performFrame(1)) return;
             this._inTransition = false;
             resolve();
           }
@@ -668,6 +712,7 @@ export class EditSystem extends AbstractSystem {
     this._history.splice(this._index + 1, Infinity, edit);
     this._index++;
     this._returnEdit = null;
+    this._addStableCandidates(edit.graph.changedIDs);
     // (At this point `stable` === `staging`)
 
     this._replaceStaging();
@@ -717,6 +762,7 @@ export class EditSystem extends AbstractSystem {
     // Discard forward/redo history if any, and replace `stable` with `staging`.
     this._history.splice(this._index, Infinity, edit);
     this._returnEdit = null;
+    this._addStableCandidates(edit.graph.changedIDs);   // it holds the replaced edit's changes too
     // (At this point `stable` === `staging`)
 
     this._replaceStaging();
@@ -767,6 +813,7 @@ export class EditSystem extends AbstractSystem {
     }
 
     if (this._index !== prevIndex) {
+      this._addHistoryPathCandidates(this._history, prevIndex);
       this._replaceStaging();
       this._emitChanges();
       this.emit('historyjump', prevIndex, this._index);
@@ -813,6 +860,7 @@ export class EditSystem extends AbstractSystem {
     }
 
     if (this._index !== prevIndex) {
+      this._addHistoryPathCandidates(this._history, prevIndex);
       this._replaceStaging();
       this._emitChanges();
       this.emit('historyjump', prevIndex, this._index);
@@ -850,9 +898,11 @@ export class EditSystem extends AbstractSystem {
     const checkpoint = this._checkpoints.get(checkpointID);
 
     if (checkpoint) {
+      const prevHistory = this._history;
       this._history = checkpoint.history.slice();   // shallow copy
       this._index = checkpoint.index;
       this._returnEdit = null;
+      this._addHistoryPathCandidates(prevHistory, prevIndex);
 
       this._replaceStaging();
       this._emitChanges();
@@ -901,7 +951,7 @@ export class EditSystem extends AbstractSystem {
     this._mergeEntities(entities, undefined, true);
 
     // The full difference holds base copies of what changed, so it needs the newer ones.
-    this._fullDifference = new Difference(this.base.graph!, this.stable.graph!);
+    this._fullDifference = new SessionDifference(this.base.graph!, this.stable.graph!);
   }
 
 
@@ -963,12 +1013,49 @@ export class EditSystem extends AbstractSystem {
       }
     }
 
-    // Append staging graph..
-    // It's not in the history yet, but it represents the current state of things.
-    const graphs = this._history.map(state => state.graph!);
-    graphs.push(stagingGraph);
+    // Every graph we may return to: the history, the histories saved in checkpoints,
+    // the return edit, and staging. Staging isn't in the history yet, but it represents
+    // the current state of things.
+    const graphs = new Set<Graph>(this._history.map(edit => edit.graph));
+    for (const checkpoint of this._checkpoints.values()) {
+      for (const edit of checkpoint.history) {
+        graphs.add(edit.graph);
+      }
+    }
+    if (this._returnEdit) {
+      graphs.add(this._returnEdit.graph);
+    }
+    graphs.add(stagingGraph);
 
-    baseGraph.rebase(entities, graphs, force);
+    const restored = baseGraph.rebase(entities, [...graphs], force);
+
+    // The new data can change `complete()` and `summary()`, and an edited entity that wasn't in
+    // base before (e.g. restored from a backup before its tile loaded) isn't "created" any more.
+    const stableGraph = this.stable.graph!;
+    const overridden = new Set<EntityID>();
+    for (const entity of entities) {
+      if (stableGraph.local.entities.has(entity.id)) {
+        overridden.add(entity.id);
+      }
+    }
+    this._fullDifference.update(stableGraph, overridden);
+
+    // iD#2085 restores change graphs that were already emitted, so the next emits must include them.
+    // What the emits compared against held the deleted node: keep that, unless they hold it already.
+    for (const [graph, restoredIDs] of restored) {
+      for (const entityID of restoredIDs) {
+        for (const emitted of [this._emittedStable, this._emittedStaging]) {
+          if (emitted.from === graph && !emitted.values.has(entityID)) {
+            emitted.values.set(entityID, undefined);
+          }
+        }
+        this._stableCandidates.add(entityID);
+        this._stagingCandidates.add(entityID);
+      }
+    }
+    if (restored.has(stagingGraph)) {
+      stagingGraph.commit();   // its geometry, for the parent ways of the restored nodes
+    }
 
     // Newly downloaded data should appear in every OSM cache (unless locally overridden).
     this._mergeIntoCache('editor_base', baseGraph, entities);
@@ -976,6 +1063,11 @@ export class EditSystem extends AbstractSystem {
     this._mergeIntoCache('editor_staging', this.staging.graph!, entities);
 
     this.emit('merge', effectiveSeenIDs);
+
+    // A restore changed stable and staging, so tell the listeners now (indexes included).
+    if (restored.size) {
+      this._emitChanges();
+    }
   }
 
 
@@ -1105,35 +1197,64 @@ export class EditSystem extends AbstractSystem {
       maxX: Math.max(ax, bx), maxY: Math.max(ay, by)
     };
 
+    // A graph that isn't base or stable is searched in staging's index, which may not match it.
+    // Keep the segments that the given graph still has. When a way's segment has changed in that
+    // graph (e.g. it was split earlier in the same action), take that way's segments from the graph.
     const segSpatialID = this.spatialIDForGraph(graph) + '-segments';
-    return spatial.getItemsAtBox(segSpatialID, box).map(hit => hit.contents as Segment);
+    const matched: Segment[] = [];
+    const staleWays = new Map<EntityID, OsmWay>();
+    for (const hit of spatial.getItemsAtBox(segSpatialID, box)) {
+      const segment = hit.contents as Segment;
+      const way = graph.hasEntity(segment.wayID) as OsmWay | undefined;
+      if (!way) continue;
+
+      const [nodeID0, nodeID1] = segment.edge;
+      if (way.nodes[segment.index] !== nodeID0 || way.nodes[segment.index + 1] !== nodeID1) {
+        staleWays.set(way.id, way);
+      } else if (graph.hasEntity(nodeID0) && graph.hasEntity(nodeID1)) {
+        matched.push(segment);
+      }
+    }
+
+    // A stale way's segments all come from the graph, so drop any of its hits that still matched.
+    const results = matched.filter(segment => !staleWays.has(segment.wayID));
+    for (const way of staleWays.values()) {
+      for (const current of way.segments(graph)) {
+        if (current.extent(graph)?.intersects(extent)) {
+          results.push(current);
+        }
+      }
+    }
+    return results;
   }
 
 
   /**
    * Returns a `Difference` containing all edits from `base` -> `stable`
-   * We use this pretty frequently, so it's cached in `this._fullDifference`
-   *  and recomputed by the `_emitChanges` function only when `stable` changes.
+   * We use this pretty frequently, so it's kept in `this._fullDifference`
+   *  and updated by the `_emitChanges` function when `stable` changes.
+   * It's the same object across changes, updated in place.
    * @return The total changes made by the user during their edit session
    */
-  public difference(): Difference {
+  public difference(): SessionDifference {
     return this._fullDifference;
   }
 
 
   /**
    * This returns a summery of all changes made from `base` -> `stable`
-   * Optionally includes a given action function to apply to the `stable` graph.
-   * @param action - Optional action to apply to the `stable` graph
+   * Optionally includes a given action function to apply to a copy of the `stable` graph.
+   * @param action - Optional action to apply to a copy of the `stable` graph
    * @return Object containing `modified`, `created`, `deleted` summary of changes
    */
   public changes(action?: Action): ChangesSummary {
-    let difference = this._fullDifference;
+    let difference: Difference = this._fullDifference;
 
     if (action) {
       const base = this.base.graph!;
-      const head = action(this.stable.graph!);
-      difference = new Difference(base, head);
+      const head = action(new Graph(this.stable.graph!));
+      const candidates = new Set<EntityID>(difference.changes.keys()).union(head.changedIDs);
+      difference = new Difference(base, head, candidates);
     }
 
     return {
@@ -1246,8 +1367,7 @@ export class EditSystem extends AbstractSystem {
       }
       if (Array.isArray(entity.members)) {
         entity.members = entity.members.map(member => {
-          member.id = permIDs[member.id] ?? member.id;
-          return member;
+          return { ...member, id: permIDs[member.id] ?? member.id };
         });
       }
     }
@@ -1273,9 +1393,9 @@ export class EditSystem extends AbstractSystem {
         delete copy.tags;
       }
 
+      // `asJSON` is a shallow copy, so make a new `loc` rather than rounding the live one.
       if (Array.isArray(copy.loc)) {
-        copy.loc[0] = +copy.loc[0].toFixed(6);
-        copy.loc[1] = +copy.loc[1].toFixed(6);
+        copy.loc = [+copy.loc[0].toFixed(6), +copy.loc[1].toFixed(6)];
       }
 
       const match = entity.id.match(/([nrw])-\d*/);  // temporary id
@@ -1411,8 +1531,8 @@ export class EditSystem extends AbstractSystem {
         if (entity.isDegenerate()) {
           delete copy.loc;
         } else {
-          copy.loc[0] = +copy.loc[0].toFixed(OSM_PRECISION);
-          copy.loc[1] = +copy.loc[1].toFixed(OSM_PRECISION);
+          // `asJSON` is a shallow copy, so make a new `loc` rather than rounding the live one.
+          copy.loc = [+copy.loc[0].toFixed(OSM_PRECISION), +copy.loc[1].toFixed(OSM_PRECISION)];
         }
       }
       return copy;
@@ -1550,11 +1670,12 @@ export class EditSystem extends AbstractSystem {
         }
 
         const graph = new Graph(prevGraph).load(entities);
+        graph.freeze();
 
         const props = this._upgradeEditProps((item.props ?? this._legacyEditProps(item)) as EditProps);
         // Edits backed up before they had an extent get one from their graph
         if (!props.extent) {
-          const extent = this._changeExtent(prevGraph, graph);
+          const extent = this._changeExtent(prevGraph, graph, graph.changedIDs);
           if (extent) props.extent = extent.rectangle();
         }
         this._history.push(new Edit(context, graph, props));
@@ -1562,6 +1683,7 @@ export class EditSystem extends AbstractSystem {
       }
 
       this._index = backup.index;
+      this._addHistoryPathCandidates([this._history[0]], 0);
       this._replaceStaging();
 
       unpause?.();        // unblock rendering, events will start firing now
@@ -2341,8 +2463,15 @@ export class EditSystem extends AbstractSystem {
     const context = this.context;
     const graph = this._staging.graph;
 
+    // The graph goes into the history, so it may no longer change.
+    // Its journal covers what changed since `prev`, including the replaced edit's changes.
+    if (replaced) {
+      graph.absorbJournal(replaced.graph);
+    }
+    graph.freeze();
+
     const selectionBefore = props?.selectionBefore ?? replaced?.props.selectionBefore ?? context.mode?.selectedIDs;
-    const extent = props?.extent ?? this._changeExtent(prev.graph, graph)?.rectangle();
+    const extent = props?.extent ?? this._changeExtent(prev.graph, graph, graph.changedIDs)?.rectangle();
 
     return new Edit<P>(context, graph, {
       ...props,
@@ -2375,9 +2504,10 @@ export class EditSystem extends AbstractSystem {
    * that were created, modified or deleted. Relations changed on their own use their own extent.
    * @param before - The graph before the change
    * @param after - The graph after the change
+   * @param candidateIDs - Every ID that may differ between the two graphs
    * @return The Extent of the change, or `undefined` if no located OSM data changed
    */
-  protected _changeExtent(before: Graph, after: Graph): Extent | undefined {
+  protected _changeExtent(before: Graph, after: Graph, candidateIDs: ReadonlySet<EntityID>): Extent | undefined {
     if (before === after) return;
 
     const extent = new Extent();
@@ -2407,7 +2537,7 @@ export class EditSystem extends AbstractSystem {
       }
     };
 
-    const difference = new Difference(before, after);
+    const difference = new Difference(before, after, candidateIDs);
     for (const entity of difference.created())   extendWith(entity, after);
     for (const entity of difference.modified())  extendWith(entity, after);
     for (const entity of difference.deleted())   extendWith(entity, before);
@@ -2531,15 +2661,28 @@ export class EditSystem extends AbstractSystem {
    * @param t - Eased time, should be in the range [0..1]
    */
   protected _perform(actions: Action[], t: number = 1): void {
-    // for now, call commit() before performing work.
-    let graph = this._staging.graph!.commit();
-    for (const fn of actions) {
-      if (typeof fn === 'function') {
-        graph = fn(graph, t);
+    const graph = this._staging.graph!;
+    graph.commit();   // writes made to staging outside of a perform (e.g. a merge's restores)
+
+    // The actions run inside a savepoint: if one throws, staging goes back to how it was,
+    // even if an action committed partway through.
+    graph.beginSavepoint();
+    let result = graph;
+    try {
+      for (const fn of actions) {
+        if (typeof fn === 'function') {
+          result = fn(result, t);
+        }
       }
+      result.commit();   // so `stagingchange` always arrives with staging's geometry current
+    } catch (err) {
+      graph.rollbackToSavepoint();
+      throw err;
+    } finally {
+      graph.endSavepoint();
     }
 
-    this._staging.graph = graph;
+    this._staging.graph = result;
     this._hasWorkInProgress = true;
   }
 
@@ -2549,8 +2692,52 @@ export class EditSystem extends AbstractSystem {
    * Rolls back the edits and emits no events.
    */
   protected _replaceStaging(): void {
+    // What the old staging graph wrote may differ in the new one.
+    const oldGraph = this._staging?.graph;
+    if (oldGraph) {
+      this._stagingCandidates = this._stagingCandidates.union(oldGraph.changedIDs);
+    }
+
     this._staging = new Edit(this.context, new Graph(this.stable.graph!));
     this._hasWorkInProgress = false;
+  }
+
+
+  /**
+   * Adds IDs that may have changed in `stable` (and so in `staging`) since the last emit.
+   * Called whenever `stable` moves: commit, undo, redo, checkpoints, restore.
+   * @param entityIDs - The IDs that may have changed
+   */
+  protected _addStableCandidates(entityIDs: ReadonlySet<EntityID>): void {
+    for (const entityID of entityIDs) {
+      this._stableCandidates.add(entityID);
+      this._stagingCandidates.add(entityID);
+    }
+  }
+
+
+  /**
+   * Adds the IDs that may differ between two places in the history, as candidates.
+   * Each graph's journal lists what it changed from the graph before it, so the IDs
+   * are the journals of the graphs after the place where the two histories split.
+   * @param oldHistory - The history before the move
+   * @param oldIndex - The index before the move
+   */
+  protected _addHistoryPathCandidates(oldHistory: Edit[], oldIndex: number): void {
+    const newHistory = this._history;
+    const newIndex = this._index;
+
+    let split = 0;   // the last index both histories share
+    const max = Math.min(oldIndex, newIndex);
+    while (split < max && oldHistory[split + 1] === newHistory[split + 1]) {
+      split++;
+    }
+    for (let i = split + 1; i <= oldIndex; i++) {
+      this._addStableCandidates(oldHistory[i].graph.changedIDs);
+    }
+    for (let i = split + 1; i <= newIndex; i++) {
+      this._addStableCandidates(newHistory[i].graph.changedIDs);
+    }
   }
 
 
@@ -2724,7 +2911,6 @@ export class EditSystem extends AbstractSystem {
   protected _emitChanges(): Difference | undefined {
     if (this._inTransaction) return;
 
-    const baseGraph = this.base.graph!;
     const stableGraph = this.stable.graph!;
     const stagingGraph = this.staging.graph!;
     let stagingDifference: Difference | undefined;
@@ -2733,19 +2919,59 @@ export class EditSystem extends AbstractSystem {
     // won't actually change - for example an Action that exits early or "performs" a no-op.
     // We still want to generate an empty Difference and emit 'stagingchange' in these situations.
     if (this._stagingKey !== stagingGraph.key || this._hasWorkInProgress) {
-      stagingDifference = new Difference(this._stagingSnapshot!, stagingGraph);
+      const emitted = this._emittedStaging;
+      const candidates = new Set<EntityID>(this._stagingCandidates)
+        .union(emitted.values)
+        .union(stagingGraph.changedIDs);
+      stagingDifference = new Difference(emitted.from, stagingGraph, candidates, emitted.values);
+
+      // A replaced staging graph (undo, redo, revert, commit, …) wasn't committed against,
+      // so the shared objects may hold another graph's shapes. Recompute everything written since
+      // the last emit, not only what differs from it: a commit in between (e.g. in a transaction
+      // that then undid it) may have left an intermediate version's shapes.
+      // When the last graph to recompute shapes is the one emitted last (a commit, undo, redo or
+      // revert after a perform), only what differs from that graph needs recomputing.
+      if (stagingGraph !== emitted.graph) {
+        const writer = stagingGraph.geometryWriter;
+        const shapesFrom = (writer === emitted.graph && !writer.hasPendingChanges) ? writer : null;
+        const written = new Map<EntityID, DifferenceChange>();
+        for (const entityID of candidates) {
+          const after = stagingGraph.hasEntity(entityID);
+          let before: OsmEntity | undefined;
+          if (shapesFrom) {
+            before = shapesFrom.hasEntity(entityID);
+            if (before === after) continue;
+          } else {
+            before = emitted.values.has(entityID) ? emitted.values.get(entityID) : emitted.from.hasEntity(entityID);
+          }
+          if (before || after) {
+            written.set(entityID, { base: before, head: after });
+          }
+        }
+        if (written.size) {
+          stagingGraph.recomputeGeometry(new Set<EntityID>(completeFrom(stagingGraph, written, true).keys()));
+        }
+      }
+
       this._syncCacheFromDiff('editor_staging', stagingGraph, stagingDifference);
       this._stagingKey = stagingGraph.key;
-      this._stagingSnapshot = stagingGraph.snapshot();
+      this._emittedStaging = {
+        graph: stagingGraph,
+        from: stableGraph,
+        values: new Map([...stagingGraph.changedIDs].map(entityID => [entityID, stagingGraph.hasEntity(entityID)]))
+      };
+      this._stagingCandidates.clear();
       this.emit('stagingchange', stagingDifference);
     }
 
     if (this._stableKey !== stableGraph.key) {
-      this._fullDifference = new Difference(baseGraph, stableGraph);
-      const stableDifference = new Difference(this._stableSnapshot!, stableGraph);
+      const emitted = this._emittedStable;
+      this._fullDifference.update(stableGraph, this._stableCandidates);
+      const stableDifference = new Difference(emitted.from, stableGraph, this._stableCandidates, emitted.values);
       this._syncCacheFromDiff('editor_stable', stableGraph, stableDifference);
       this._stableKey = stableGraph.key;
-      this._stableSnapshot = stableGraph.snapshot();
+      this._emittedStable = { graph: stableGraph, from: stableGraph, values: new Map() };
+      this._stableCandidates.clear();
       this.emit('stablechange', stableDifference);
       this.deferredBackup();
     }

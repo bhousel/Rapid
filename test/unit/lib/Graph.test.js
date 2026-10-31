@@ -53,7 +53,6 @@ describe('Graph', () => {
       g.destroy();
       assert.isNull(g.base);
       assert.isNull(g.local);
-      assert.isNull(g.previous);
       assert.isNull(g.props);
       assert.isNull(g.context);
     });
@@ -516,23 +515,202 @@ describe('Graph', () => {
       assert.strictEqual(result, head);
     });
 
-    it('updates previous', () => {
+    it('clears the pending writes', () => {
       const n1 = new Rapid.OsmNode(context, { id: 'n1' });
       const base = new Rapid.Graph(context);
       const head = new Rapid.Graph(base).replace(n1);
-      const previous = head.previous;
+      assert.isTrue(head.hasPendingChanges);
       head.commit();
-      assert.notStrictEqual(previous, head.previous);
+      assert.isFalse(head.hasPendingChanges);
+    });
+
+    it('recomputes the parent ways of a moved node', () => {
+      const n1 = new Rapid.OsmNode(context, { id: 'n1', loc: [0, 0] });
+      const n2 = new Rapid.OsmNode(context, { id: 'n2', loc: [1, 0] });
+      const w1 = new Rapid.OsmWay(context, { id: 'w1', nodes: ['n1', 'n2'] });
+      const base = new Rapid.Graph(context, [n1, n2, w1]);
+      const head = new Rapid.Graph(base).replace(n2.move([2, 0]));
+      head.commit();
+      assert.deepEqual(w1.geoms.orig.extent.max, [2, 0]);
+    });
+
+    it('does not recompute anything for a write of an equal copy', () => {
+      const n1 = new Rapid.OsmNode(context, { id: 'n1', loc: [0, 0] });
+      const n2 = new Rapid.OsmNode(context, { id: 'n2', loc: [1, 0] });
+      const w1 = new Rapid.OsmWay(context, { id: 'w1', nodes: ['n1', 'n2'] });
+      const base = new Rapid.Graph(context, [n1, n2, w1]);
+      const head = new Rapid.Graph(base).replace(n2.update({}));
+      const geoms = w1.geoms;
+      head.commit();
+      assert.strictEqual(w1.geoms, geoms);
+    });
+
+    it('recomputes the old and new nodes\' parent ways when a way changes', () => {
+      const n1 = new Rapid.OsmNode(context, { id: 'n1', loc: [0, 0] });
+      const n2 = new Rapid.OsmNode(context, { id: 'n2', loc: [1, 0] });
+      const n3 = new Rapid.OsmNode(context, { id: 'n3', loc: [5, 5] });
+      const w1 = new Rapid.OsmWay(context, { id: 'w1', nodes: ['n1', 'n2'] });
+      const base = new Rapid.Graph(context, [n1, n2, n3, w1]);
+      const head = new Rapid.Graph(base).replace(w1.update({ nodes: ['n1', 'n3'] }));
+      head.commit();
+      assert.deepEqual(head.entity('w1').geoms.orig.extent.max, [5, 5]);
+    });
+
+    it('builds nested relations members first', () => {
+      const n1 = new Rapid.OsmNode(context, { id: 'n1', loc: [0, 0] });
+      const n2 = new Rapid.OsmNode(context, { id: 'n2', loc: [1, 0] });
+      const w1 = new Rapid.OsmWay(context, { id: 'w1', nodes: ['n1', 'n2'] });
+      const r2 = new Rapid.OsmRelation(context, { id: 'r2', tags: { type: 'route' }, members: [{ id: 'w1', type: 'way' }] });
+      const r1 = new Rapid.OsmRelation(context, { id: 'r1', tags: { type: 'route_master' }, members: [{ id: 'r2', type: 'relation' }] });
+      const base = new Rapid.Graph(context, [n1, n2, w1, r1, r2]);
+
+      // r1 is written first, so it would come first without the members-first order.
+      const head = new Rapid.Graph(base);
+      head.replace(r1.update({ tags: { type: 'route_master', name: 'A' } }));
+      head.replace(n2.move([3, 0]));
+      head.commit();
+      assert.deepEqual(head.entity('r1').geoms.orig.extent.max, [3, 0]);
+      assert.deepEqual(r2.geoms.orig.extent.max, [3, 0]);
+    });
+
+    it('builds relations in a membership cycle from their leaf members', () => {
+      const n1 = new Rapid.OsmNode(context, { id: 'n1', loc: [0, 0] });
+      const n2 = new Rapid.OsmNode(context, { id: 'n2', loc: [1, 0] });
+      const n3 = new Rapid.OsmNode(context, { id: 'n3', loc: [0, 4] });
+      const r1 = new Rapid.OsmRelation(context, { id: 'r1', members: [{ id: 'n1', type: 'node' }, { id: 'r2', type: 'relation' }] });
+      const r2 = new Rapid.OsmRelation(context, { id: 'r2', members: [{ id: 'n3', type: 'node' }, { id: 'r1', type: 'relation' }] });
+      const base = new Rapid.Graph(context, [n1, n2, n3, r1, r2]);
+      const head = new Rapid.Graph(base).replace(n3.move([0, 6]));
+      head.commit();
+      assert.deepEqual(r1.geoms.orig.extent.max, [0, 6]);
+      assert.deepEqual(r2.geoms.orig.extent.max, [0, 6]);
+    });
+
+    it('builds a relation in a cycle with a multipolygon from the multipolygon\'s new shape', () => {
+      const a = new Rapid.OsmNode(context, { id: 'a', loc: [0, 0] });
+      const b = new Rapid.OsmNode(context, { id: 'b', loc: [1, 0] });
+      const c = new Rapid.OsmNode(context, { id: 'c', loc: [1, 1] });
+      const x = new Rapid.OsmNode(context, { id: 'x', loc: [0.5, 0.5] });
+      const w = new Rapid.OsmWay(context, { id: 'w', nodes: ['a', 'b', 'c', 'a'] });
+      const r3 = new Rapid.OsmRelation(context, { id: 'r3', tags: { type: 'multipolygon', natural: 'water' },
+        members: [{ id: 'w', type: 'way', role: 'outer' }, { id: 'r4', type: 'relation', role: '' }] });
+      const r4 = new Rapid.OsmRelation(context, { id: 'r4', tags: { type: 'collection' },
+        members: [{ id: 'r3', type: 'relation', role: '' }, { id: 'x', type: 'node', role: '' }] });
+      const base = new Rapid.Graph(context, [a, b, c, x, w, r3, r4]);
+      const head = new Rapid.Graph(base).replace(c.move([5, 5]));
+      head.commit();
+      assert.deepEqual(r3.geoms.orig.extent.max, [5, 5]);
+      assert.deepEqual(r4.geoms.orig.extent.max, [5, 5]);
     });
   });
 
 
-  describe('snapshot', () => {
-    it('returns a snapshot Graph', () => {
-      const g1 = new Rapid.Graph(context);
-      const g2 = g1.snapshot();
-      assert.notStrictEqual(g2, g1);
-      assert.isNull(g2.previous);
+  describe('journal', () => {
+    it('lists the IDs written since the graph was derived', () => {
+      const n1 = new Rapid.OsmNode(context, { id: 'n1' });
+      const n2 = new Rapid.OsmNode(context, { id: 'n2' });
+      const base = new Rapid.Graph(context, [n1]);
+      const g1 = new Rapid.Graph(base).replace(n2);
+      g1.commit();
+      g1.remove(n1);
+      assert.sameMembers([...g1.changedIDs], ['n1', 'n2']);
+
+      const g2 = new Rapid.Graph(g1);
+      assert.strictEqual(g2.changedIDs.size, 0);
+    });
+
+    it('carries uncommitted writes into a derived graph', () => {
+      const n1 = new Rapid.OsmNode(context, { id: 'n1', loc: [0, 0] });
+      const n2 = new Rapid.OsmNode(context, { id: 'n2', loc: [1, 0] });
+      const w1 = new Rapid.OsmWay(context, { id: 'w1', nodes: ['n1', 'n2'] });
+      const base = new Rapid.Graph(context, [n1, n2, w1]);
+      const g1 = new Rapid.Graph(base).replace(n2.move([2, 0]));
+      const g2 = new Rapid.Graph(g1);
+      assert.isTrue(g2.hasPendingChanges);
+      g2.commit();
+      assert.deepEqual(w1.geoms.orig.extent.max, [2, 0]);
+    });
+  });
+
+
+  describe('freeze', () => {
+    it('makes replace, remove, revert and load throw', () => {
+      const n1 = new Rapid.OsmNode(context, { id: 'n1' });
+      const base = new Rapid.Graph(context, [n1]);
+      const head = new Rapid.Graph(base);
+      head.freeze();
+      assert.isTrue(head.isFrozen);
+      assert.throws(() => head.replace(n1.update({ tags: { a: 'b' } })), /frozen/);
+      assert.throws(() => head.remove(n1), /frozen/);
+      assert.throws(() => head.revert('n1'), /frozen/);
+      assert.throws(() => head.load({ n1: n1 }), /frozen/);
+    });
+
+    it('commits uncommitted writes first', () => {
+      const n1 = new Rapid.OsmNode(context, { id: 'n1' });
+      const base = new Rapid.Graph(context);
+      const head = new Rapid.Graph(base).replace(n1);
+      head.freeze();
+      assert.isFalse(head.hasPendingChanges);
+    });
+
+    it('still accepts an iD#2085 restore from a rebase', () => {
+      const n1 = new Rapid.OsmNode(context, { id: 'n1', loc: [0, 0] });
+      const n2 = new Rapid.OsmNode(context, { id: 'n2', loc: [1, 0] });
+      const base = new Rapid.Graph(context, [n1]);
+      const head = new Rapid.Graph(base).remove(n1);
+      head.freeze();
+
+      const w1 = new Rapid.OsmWay(context, { id: 'w1', nodes: ['n1', 'n2'] });
+      const restored = base.rebase([n2, w1], [head]);
+      assert.strictEqual(head.hasEntity('n1'), n1);
+      assert.sameMembers([...restored.get(head)], ['n1']);
+    });
+  });
+
+
+  describe('savepoint', () => {
+    it('rolls back entities, parent ways and geometry', () => {
+      const n1 = new Rapid.OsmNode(context, { id: 'n1', loc: [0, 0] });
+      const n2 = new Rapid.OsmNode(context, { id: 'n2', loc: [1, 0] });
+      const n3 = new Rapid.OsmNode(context, { id: 'n3', loc: [9, 9] });
+      const w1 = new Rapid.OsmWay(context, { id: 'w1', nodes: ['n1', 'n2'] });
+      const base = new Rapid.Graph(context, [n1, n2, n3, w1]);
+      const head = new Rapid.Graph(base);
+
+      head.beginSavepoint();
+      head.replace(head.entity('w1').addNode('n3'));
+      head.commit();
+      head.remove(head.entity('n1'));
+      head.rollbackToSavepoint();
+      head.endSavepoint();
+
+      assert.strictEqual(head.hasEntity('w1'), w1);
+      assert.strictEqual(head.hasEntity('n1'), n1);
+      assert.isFalse(head.local.entities.has('w1'));
+      assert.isFalse(head.local.entities.has('n1'));
+      assert.deepEqual(head.parentWays(n3), []);
+      assert.deepEqual(w1.geoms.orig.extent.max, [1, 0]);
+      assert.isFalse(head.hasPendingChanges);
+    });
+
+    it('rolls back an entity created and removed again inside the savepoint', () => {
+      const base = new Rapid.Graph(context);
+      const head = new Rapid.Graph(base);
+      const n1 = new Rapid.OsmNode(context, { id: 'n1' });
+      head.beginSavepoint();
+      head.replace(n1).remove(n1);
+      head.rollbackToSavepoint();
+      head.endSavepoint();
+      assert.isUndefined(head.hasEntity('n1'));
+      assert.isFalse(head.local.entities.has('n1'));
+    });
+
+    it('throws if begun with uncommitted writes', () => {
+      const n1 = new Rapid.OsmNode(context, { id: 'n1' });
+      const base = new Rapid.Graph(context);
+      const head = new Rapid.Graph(base).replace(n1);
+      assert.throws(() => head.beginSavepoint(), /uncommitted/);
     });
   });
 

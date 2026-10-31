@@ -306,6 +306,64 @@ describe('EditSystem', () => {
         assert.isFalse(wayIDs.has('w1'));  // w1 segments gone
         assert.isTrue(wayIDs.has('w2'));   // w2 segments remain
       });
+
+      it('returns only segments that an older graph has, though it is searched in staging\'s index', () => {
+        mergeCrossingWays();
+        const n5 = new Rapid.OsmNode(context, { id: 'n-5', loc: [0.2, 1] });
+        const n6 = new Rapid.OsmNode(context, { id: 'n-6', loc: [0.2, -1] });
+        const w3 = new Rapid.OsmWay(context, { id: 'w-3', nodes: ['n-5', 'n-6'] });
+
+        _editor.perform(Rapid.actionChangeTags('w2', { highway: 'residential' }));
+        _editor.commit({ stringID: 'tagged w2' });
+        const older = _editor.stable.graph;
+
+        // Add a way, and change w1's nodes, after the older graph.
+        _editor.perform(Rapid.actionAddEntity(n5), Rapid.actionAddEntity(n6), Rapid.actionAddEntity(w3));
+        _editor.commit({ stringID: 'added w-3' });
+        _editor.perform(Rapid.actionReverse('w1'));
+        _editor.commit({ stringID: 'reversed w1' });
+        assert.strictEqual(_editor.spatialIDForGraph(older), 'editor_staging');
+
+        const extent = new Rapid.sdk.Extent([-0.5, -0.5], [0.5, 0.5]);
+        const segments = _editor.waySegments(extent, older);
+        for (const segment of segments) {
+          const way = older.entity(segment.wayID);   // throws if `older` doesn't have it
+          assert.deepEqual(segment.edge, way.nodes.slice(segment.index, segment.index + 2));
+        }
+        const wayIDs = segments.map(s => s.wayID);
+        assert.include(wayIDs, 'w1');   // its segment in staging's index is reversed, so it is rebuilt from `older`
+        assert.include(wayIDs, 'w2');
+        assert.notInclude(wayIDs, 'w-3');
+      });
+
+      it('returns each segment of a way once, when only some of its hits still match an older graph', () => {
+        const p1 = new Rapid.OsmNode(context, { id: 'p1', loc: [-0.2, 0.1] });
+        const p2 = new Rapid.OsmNode(context, { id: 'p2', loc: [0, 0.1] });
+        const p3 = new Rapid.OsmNode(context, { id: 'p3', loc: [0.2, 0.1] });
+        const w5 = new Rapid.OsmWay(context, { id: 'w5', nodes: ['p1', 'p2', 'p3'] });
+        _editor.merge([p1, p2, p3, w5]);
+
+        _editor.perform(Rapid.actionChangeTags('w5', { highway: 'residential' }));
+        _editor.commit({ stringID: 'tagged w5' });
+        const older = _editor.stable.graph;
+
+        // Insert a node between p2 and p3 after the older graph. Staging's index then has
+        // p1-p2 (which still matches `older`), p2-p4 and p4-p3 (which don't).
+        const p4 = new Rapid.OsmNode(context, { id: 'p-4', loc: [0.1, 0.2] });
+        _editor.perform(Rapid.actionAddEntity(p4), Rapid.actionAddVertex('w5', 'p-4', 2));
+        _editor.commit({ stringID: 'added p-4' });
+        assert.strictEqual(_editor.spatialIDForGraph(older), 'editor_staging');
+
+        const extent = new Rapid.sdk.Extent([-0.5, -0.5], [0.5, 0.5]);
+        const segments = _editor.waySegments(extent, older)
+          .filter(s => s.wayID === 'w5')
+          .map(s => ({ index: s.index, edge: s.edge }))
+          .sort((a, b) => a.index - b.index);
+        assert.deepEqual(segments, [
+          { index: 0, edge: ['p1', 'p2'] },
+          { index: 1, edge: ['p2', 'p3'] }
+        ]);
+      });
     });
 
 
@@ -1038,6 +1096,39 @@ describe('EditSystem', () => {
         assert.strictEqual(detail.modified[0], stable.entity('n2'));
         assert.strictEqual(detail.deleted[0], base.entity('n3'));
       });
+
+      it('changes(action) leaves the stable graph as it was', () => {
+        prepareTestHistory();
+        const stable = _editor.stable.graph;
+        const n1 = stable.entity('n1');
+
+        const detail = _editor.changes(graph => graph.remove(graph.entity('n1')).commit());
+        assert.include(detail.deleted.map(e => e.id), 'n1');
+        assert.strictEqual(_editor.stable.graph, stable);
+        assert.strictEqual(stable.hasEntity('n1'), n1);
+        assert.notInclude(_editor.changes().deleted.map(e => e.id), 'n1');
+      });
+    });
+
+
+    describe('toIntroGraph', () => {
+      it('leaves the live node locs and relation members as they were', () => {
+        const n1 = new Rapid.OsmNode(context, { id: 'n1', loc: [0.123456789, 0.987654321] });
+        _editor.merge([n1]);
+        const n_1 = new Rapid.OsmNode(context, { id: 'n-1', loc: [1.123456789, 1.987654321] });
+        const r_1 = new Rapid.OsmRelation(context, { id: 'r-1', members: [{ id: 'n-1', type: 'node', role: '' }] });
+        _editor.perform(Rapid.actionAddEntity(n_1), Rapid.actionAddEntity(r_1));
+        _editor.commit({ stringID: 'added n-1 and r-1' });
+
+        const intro = JSON.parse(_editor.toIntroGraph()).dataIntroGraph;
+        const relation = Object.values(intro).find(e => Array.isArray(e.members));
+        assert.notStrictEqual(relation.members[0].id, 'n-1');   // renamed to a permanent ID in the output
+
+        const graph = _editor.stable.graph;
+        assert.deepEqual(graph.entity('n1').loc, [0.123456789, 0.987654321]);
+        assert.deepEqual(graph.entity('n-1').loc, [1.123456789, 1.987654321]);
+        assert.strictEqual(graph.entity('r-1').members[0].id, 'n-1');
+      });
     });
 
 
@@ -1237,6 +1328,16 @@ describe('EditSystem', () => {
         assert.strictEqual(backup.version, 4);
         // The structured object must match the parsed JSON string exactly.
         assert.deepEqual(backup, JSON.parse(_editor.toJSON()));
+      });
+
+      it('toBackup leaves the live node locs as they were', () => {
+        const node = new Rapid.OsmNode(context, { id: 'n-1', loc: [0.123456789012, 0.987654321098] });
+        _editor.perform(Rapid.actionAddEntity(node));
+        _editor.commit({ stringID: 'added n-1' });
+
+        const backup = _editor.toBackup();
+        assert.deepInclude(backup.entities.find(e => e.id === 'n-1'), { loc: [0.1234568, 0.9876543] });
+        assert.deepEqual(_editor.stable.graph.entity('n-1').loc, [0.123456789012, 0.987654321098]);
       });
 
       it('toBackup returns undefined when there are no changes', () => {

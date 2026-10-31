@@ -271,7 +271,7 @@ export function actionOrthogonalize(
    *          `false` if the action is enabled
    */
   action.disabled = function(graph: Graph): string | false {
-    graph = graph.snapshot();    // make a copy
+    graph = new Graph(graph);    // make a copy
     let way = graph.entity(wayID) as OsmWay;
     way = way.removeNode('');    // sanity check - remove any consecutive duplicates
     graph.replace(way);

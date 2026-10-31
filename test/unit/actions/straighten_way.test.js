@@ -61,6 +61,31 @@ describe('actionStraightenWay', () => {
   });
 
 
+  it('does not delete a node that was just added to a relation', () => {
+    const base = new Rapid.Graph(context, [
+      new Rapid.OsmNode(context, { id: 'a', loc: [0, 0] }),
+      new Rapid.OsmNode(context, { id: 'b', loc: [1, 0.01] }),
+      new Rapid.OsmNode(context, { id: 'c', loc: [2, 0] }),
+      new Rapid.OsmWay(context, { id: '-', nodes: ['a', 'b', 'c'] }),
+      new Rapid.OsmRelation(context, { id: 'r1', tags: { type: 'route', route: 'bus' }, members: [{ id: '-', type: 'way' }] })
+    ]);
+
+    // Straighten once before `b` is a stop, so `b` is judged uninteresting in that graph.
+    const before = Rapid.actionStraightenWay(['-'])(new Rapid.Graph(base));
+    assert.isUndefined(before.hasEntity('b'));
+
+    // Add `b` to the route as a stop, then straighten again.
+    const graph = new Rapid.Graph(base);
+    const r1 = graph.entity('r1');
+    graph.replace(r1.addMember({ id: 'b', type: 'node', role: 'stop' }));
+
+    const result = Rapid.actionStraightenWay(['-'])(graph);
+    assert.deepEqual(result.entity('-').nodes, ['a', 'b', 'c']);
+    assert.isOk(result.hasEntity('b'));
+    assert.isOk(result.hasEntity('r1'));
+  });
+
+
   it('straightens multiple, connected ways', () => {
     const base = new Rapid.Graph(context, [
       new Rapid.OsmNode(context, { id: 'a', loc: [0, 0] }),

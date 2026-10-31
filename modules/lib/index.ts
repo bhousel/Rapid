@@ -19,6 +19,7 @@ export * from './PropMatcher.ts';
 export * from './RapidDataDictionary.ts';
 export * from './RapidDataset.ts';
 export * from './Ruleset.ts';
+export * from './SessionDifference.ts';
 export * from './Style.ts';
 export * from './StyleSelector.ts';
 export * from './TreeStore.ts';

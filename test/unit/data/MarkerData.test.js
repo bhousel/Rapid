@@ -81,6 +81,23 @@ describe('MarkerData', () => {
       assert.isObject(geoms.orig);
       assert.isObject(geoms.world);
     });
+
+    it('stores a new Geometry and leaves the old one and its parts untouched', () => {
+      const a = new Rapid.MarkerData(context, { loc: [0, 0] });
+      const oldGeoms = a.geoms;
+      const oldPart = oldGeoms.parts[0];
+
+      a.props.loc = [1, 1];
+      a.touch();
+      a.updateGeometry();
+
+      assert.notStrictEqual(a.geoms, oldGeoms);
+      assert.deepEqual(a.geoms.parts[0].orig.coords, [1, 1]);
+      assert.lengthOf(oldGeoms.parts, 1);
+      assert.isObject(oldGeoms.world);
+      assert.deepEqual(oldPart.orig.coords, [0, 0]);
+      assert.isObject(oldPart.world);
+    });
   });
 
   describe('asGeoJSON', () => {

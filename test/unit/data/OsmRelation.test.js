@@ -791,6 +791,24 @@ describe('OsmRelation', () => {
       assert.deepEqual(result, expected);
     });
 
+    it('does not write the role onto the member\'s own GeoJSON', () => {
+      const n1 = new Rapid.OsmNode(context, { id: 'n1', loc: [0, 0] });
+      const n2 = new Rapid.OsmNode(context, { id: 'n2', loc: [1, 1] });
+      const w1 = new Rapid.OsmWay(context, { id: 'w1', nodes: ['n1', 'n2'] });
+      const r1 = new Rapid.OsmRelation(context, {
+        id: 'r1',
+        tags: { type: 'route' },
+        members: [{ id: 'w1', type: 'way', role: 'forward' }]
+      });
+      const graph = new Rapid.Graph(context, [n1, n2, w1, r1]);
+      const way = w1.asGeoJSON(graph);   // memoized on w1
+      const result = r1.asGeoJSON(graph);
+
+      assert.strictEqual(result.features[0].role, 'forward');
+      assert.notProperty(way, 'role');
+      assert.notProperty(w1.asGeoJSON(graph), 'role');
+    });
+
     it('does not error on incomplete relations', () => {
       const r1 = new Rapid.OsmRelation(context, {
         id: 'r1',
@@ -841,7 +859,6 @@ describe('OsmRelation', () => {
       const expected = {
         type: 'FeatureCollection',
         id: 'r1',
-        role: 'other',
         properties: { type: 'foo' },
         features: [{
           type: 'FeatureCollection',

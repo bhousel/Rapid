@@ -322,11 +322,9 @@ export class OsmNode extends OsmEntity {
    * @returns `true` if this Node is interesting
    */
   public isInteresting(graph: Graph): boolean {
-    return this.transient('isInteresting', () => {
-      return graph.parentWays(this).length > 1 ||
-        graph.parentRelations(this).length > 0 ||
-        this.hasInterestingTags();
-    });
+    return graph.parentWays(this).length > 1 ||
+      graph.parentRelations(this).length > 0 ||
+      this.hasInterestingTags();
   }
 
   /**

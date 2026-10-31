@@ -34,7 +34,8 @@ This module contains a mix of data structures, schema classes, and utility funct
 | `Edit.ts` | One step in the edit history: its graph, plus props (label, type, selection before and after, extent, sources, etc.) |
 | `Geometry.ts` | Geometry wrapper for data elements |
 | `GeometryPart.ts` | Individual parts of multi-part geometries |
-| `Graph.ts` | Transactional graph structure holding all entities |
+| `Graph.ts` | Transactional graph structure holding all entities, with a journal of what each graph writes |
+| `SessionDifference.ts` | The difference between `base` and `stable` (all of the user's edits), kept up to date as `stable` changes |
 | `TreeStore.ts` | Generic nested key/value tree store: path access (`get`/`peek`/`set`/`has`/`unset`) plus flat-key (de)serialization (`toFlat`/`fromFlat`) |
 
 ### Imagery & Datasets

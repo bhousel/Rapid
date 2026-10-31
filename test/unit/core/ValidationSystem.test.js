@@ -187,13 +187,49 @@ describe('ValidationSystem', () => {
       checked = [];
       try {
         _validator.revalidateUnsquare();
-        // Only `w-1` is in the head cache's graph, and it's checked as it is there
-        assert.deepEqual(checked, [['w-1', true]]);
+        // The head cache's graph is the current stable, and each building is checked as it is there
+        assert.strictEqual(_validator._head.graph, editor.stable.graph);
+        assert.sameDeepMembers(checked, [['w-1', true], ['w-2', true]]);
       } finally {
         await _validator.validateAsync();
         _validator._validators.delete('unsquare_way');
       }
     });
+
+    it('validates the current stable graph when the user commits during a validation', async () => {
+      const editor = context.systems.editor;
+      await _validator.validateAsync();
+
+      // A stand-in that records which graph and spatial index each entity was validated with
+      const validated = [];
+      const recorder = (entity, graph) => {
+        validated.push([entity.id, graph === editor.stable.graph, editor.spatialIDForGraph(graph)]);
+        return { issues: [] };
+      };
+      recorder.type = 'recorder';
+      _validator._validators.set('recorder', recorder);
+
+      try {
+        editor.perform(Rapid.actionAddEntity(new Rapid.OsmNode(context, { id: 'n-20', loc: [30, 30] })));
+        editor.commit({ stringID: 'added n-20', selection: ['n-20'] });   // starts validating
+
+        // Commit again before the queued jobs run
+        editor.perform(Rapid.actionAddEntity(new Rapid.OsmNode(context, { id: 'n-21', loc: [30.001, 30] })));
+        editor.commit({ stringID: 'added n-21', selection: ['n-21'] });
+        assert.strictEqual(_validator._head.graph, editor.stable.graph);
+
+        await _validator.validateAsync();
+        await _validator.validateAsync();   // the round that catches up to the second commit
+
+        assert.sameDeepMembers(validated, [
+          ['n-20', true, 'editor_stable'],
+          ['n-21', true, 'editor_stable']
+        ]);
+      } finally {
+        _validator._validators.delete('recorder');
+      }
+    });
+
 
     it('validates the user\'s edits again when map data loads near them', async () => {
       const editor = context.systems.editor;

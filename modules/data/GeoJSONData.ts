@@ -1,4 +1,5 @@
 import { AbstractData, AbstractDataProps } from './AbstractData.ts';
+import { Geometry } from '../lib/Geometry.ts';
 
 import type { Context } from '../Context.ts';
 import type { GeoJSONObject } from '../lib/types.ts';
@@ -53,10 +54,13 @@ export class GeoJSONData<P extends GeoJSONProps = GeoJSONProps> extends Abstract
 
   /**
    * Forces a recomputation of the internal geometry data.
+   * It stores a new `Geometry` and leaves the old one untouched, because a renderer may still hold its parts.
    * @returns this same data element
    */
   public updateGeometry(): this {
-    this.geoms.setData(this.asGeoJSON());
+    const geoms = new Geometry(this.context);
+    geoms.setData(this.asGeoJSON());
+    this.geoms = geoms;
     return this;
   }
 

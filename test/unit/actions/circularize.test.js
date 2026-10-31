@@ -367,8 +367,8 @@ describe('actionCircularize', () => {
       ]);
 
       const graph = new Rapid.Graph(base);
-      const a0 = area('-', Rapid.actionCircularize('-')(base.snapshot(), 0));
-      const a1 = area('-', Rapid.actionCircularize('-')(base.snapshot(), 1));
+      const a0 = area('-', Rapid.actionCircularize('-')(new Rapid.Graph(base), 0));
+      const a1 = area('-', Rapid.actionCircularize('-')(new Rapid.Graph(base), 1));
       const result = Rapid.actionCircularize('-')(graph, 0.5);
       const aHalf = area('-', result);
       assert.isFalse(isCircular('-', result));          // not circular yet

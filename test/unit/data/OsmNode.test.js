@@ -330,6 +330,19 @@ describe('OsmNode', () => {
       const graph = new Rapid.Graph(context, [n1]);
       assert.isTrue(n1.isInteresting(graph));
     });
+
+    it('answers for the graph it is given, not the graph that asked first', () => {
+      const n1 = new Rapid.OsmNode(context, { id: 'n1' });
+      const r1 = new Rapid.OsmRelation(context, { id: 'r1', members: [] });
+      const base = new Rapid.Graph(context, [n1, r1]);
+      assert.isFalse(n1.isInteresting(base));
+
+      const graph = new Rapid.Graph(base);
+      graph.replace(r1.addMember({ id: 'n1', type: 'node', role: 'stop' }));
+      assert.strictEqual(graph.entity('n1'), n1);   // same node object in both graphs
+      assert.isTrue(n1.isInteresting(graph));
+      assert.isFalse(n1.isInteresting(base));
+    });
   });
 
 

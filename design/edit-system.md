@@ -53,6 +53,14 @@ that an edit has to record more than changes to the OSM graph, and records where
 - The return view (`returnEdit`).
 - Events: `stagingchange`, `stablechange`, `historyjump` (undo, redo, restore), `returnview`, `merge`,
   and `backupstatuschange`.
+- The session difference (`difference()`, base to stable), updated in place as `stable` changes.
+
+**How it emits** (October 2026, [`graph-geometry.md`](graph-geometry.md) step 1): every graph keeps a
+journal of the IDs it writes, and graphs in the history are frozen. `perform` commits staging after
+the actions (rolling back if one throws), so `stagingchange` arrives with staging's geometry current.
+The change events compare only candidate IDs: what staging wrote, and the journals of the history
+graphs that `stable` moved across. They keep no snapshots, so their cost follows the size of the
+change, not the size of the session.
 
 `MapSystem` owns the other half of undo and redo: moving the map and restoring the selection, in its
 `historyjump` and `returnview` handlers.

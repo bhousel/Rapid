@@ -111,4 +111,20 @@ describe('validateCloseNodes', () => {
     const issues = validate();
     assert.deepEqual(issues, []);
   });
+
+
+  it('ignores close points that are in the spatial index but not in the graph being validated', () => {
+    const editor = context.systems.editor;
+    load([
+      new Rapid.OsmNode(context, { id: 'n1', loc: [0, 0], tags: { amenity: 'bench' }})
+    ]);
+    const before = new Rapid.Graph(graph);   // an older graph, which gets the staging index
+
+    // The user adds a bench right next to `n1`
+    editor.perform(Rapid.actionAddEntity(new Rapid.OsmNode(context, { id: 'n-1', loc: [0, 0.000001], tags: { amenity: 'bench' }})));
+    assert.lengthOf(validator(before.entity('n1'), editor.staging.graph).issues, 1);
+
+    // `n-1` isn't in the older graph
+    assert.deepEqual(validator(before.entity('n1'), before).issues, []);
+  });
 });

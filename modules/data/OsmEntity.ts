@@ -1,4 +1,5 @@
 import { AbstractData, AbstractDataProps } from './AbstractData.ts';
+import { Geometry } from '../lib/Geometry.ts';
 import { utilArrayUnion, utilUnicodeCharsTruncated } from '@rapid-sdk/util';
 
 import type { Context } from '../Context.ts';
@@ -98,13 +99,16 @@ export class OsmEntity extends AbstractData<OsmEntityProps> {
    * Nodes are easy because they represent a single coordinate.
    * But the other data types require topology information from a Graph.
    * This function allows the calling code to recompute the geometry after the Graph has been updated.
+   * It stores a new `Geometry` and leaves the old one untouched, because a renderer may still hold its parts.
    * @param graph - the Graph that holds the topology needed
    * @returns this same OsmEntity
    */
   public updateGeometry(graph?: Graph): this {
     // this.touch();
     this._transients.clear();
-    this.geoms.setData(this.asGeoJSON(graph));
+    const geoms = new Geometry(this.context);
+    geoms.setData(this.asGeoJSON(graph));
+    this.geoms = geoms;
     return this;
   }
 

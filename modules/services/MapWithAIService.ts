@@ -577,8 +577,7 @@ export class MapWithAIService extends AbstractSystem {
         }
 
         ways.delete(candidate);            // remove candidate
-        survivor.props.nodes = nodeIDs;    // update nodelist in-place, hope this is ok.
-        survivor.updateGeometry(graph).touch();
+        survivor = survivor.update({ nodes: nodeIDs });  // a new way, so the forced rebase updates parentWays
       }
 
       if (survivor) {

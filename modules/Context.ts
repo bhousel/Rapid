@@ -4,6 +4,7 @@ import { Viewport } from '@rapid-sdk/math';
 import { utilUnicodeCharsTruncated } from '@rapid-sdk/util';
 
 import { behaviors } from './behaviors/index.ts';
+import { Graph } from './lib/Graph.ts';
 import { modes } from './modes/index.ts';
 import { services } from './services/index.ts';
 import { systems } from './core/index.ts';
@@ -12,7 +13,6 @@ import type { AbstractData } from './data/AbstractData.ts';
 import type { AbstractMode } from './modes/AbstractMode.ts';
 import type { Behaviors } from './behaviors/types.ts';
 import type { D3Selection } from 'd3-selection';
-import type { Graph } from './lib/Graph.ts';
 import type { Modes } from './modes/types.ts';
 import type { Services } from './services/types.ts';
 import type { Systems } from './core/types.ts';
@@ -682,17 +682,18 @@ export class Context extends EventEmitter {
 
   /**
    * Entity IDs that have been copied for paste operations.
-   * Setting this also captures the current staging graph as `copyGraph`.
+   * Setting this also captures a snapshot of the current staging graph as `copyGraph`.
    * @return  Array of copied entity IDs
    */
   public get copyIDs(): EntityID[] { return this._copyIDs; }
   /**
-   * Sets the entity IDs to paste and captures the current staging graph as `copyGraph`.
+   * Sets the entity IDs to paste and captures a snapshot of the current staging graph as `copyGraph`.
    * @param val - Array of entity IDs to paste
    */
   public set copyIDs(val: EntityID[]) {
     this._copyIDs = val;
-    this._copyGraph = this.systems.editor!.staging.graph!;
+    // Keep a snapshot: the staging graph keeps changing after the copy.
+    this._copyGraph = new Graph(this.systems.editor!.staging.graph!);
   }
 
   /**

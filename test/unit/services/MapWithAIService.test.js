@@ -278,6 +278,44 @@ describe('MapWithAIService', () => {
     });
 
 
+    describe('_connectSplitWays', () => {
+      function node(id, loc) {
+        return { type: 'node', id: id, visible: true, loc: loc, tags: {} };
+      }
+      function way(id, origID, nodes) {
+        return { type: 'way', id: id, visible: true, tags: { highway: 'residential' }, nodes: nodes, orig_id: origID };
+      }
+
+      it('extends a survivor already in the dataset graph without changing it in place', () => {
+        const ds = _mapwithai.getDataset('test_split');
+        const graph = ds.graph;
+
+        // First tile has the first piece of the split way
+        _mapwithai._gotTile(ds, {
+          osm: {},
+          seenIDs: new Set(),
+          data: [ node('n1', [10, 0]), node('n2', [10.001, 0]), way('w1', 'w100', ['n1', 'n2']) ]
+        });
+
+        const before = graph.entity('w100');
+        assert.deepEqual(before.nodes, ['n1', 'n2']);
+
+        // Second tile has another piece that connects to it
+        _mapwithai._gotTile(ds, {
+          osm: {},
+          seenIDs: new Set(),
+          data: [ node('n3', [10.002, 0]), way('w2', 'w100', ['n3', 'n2']) ]
+        });
+
+        const after = graph.entity('w100');
+        assert.deepEqual(after.nodes, ['n1', 'n2', 'n3']);
+        assert.notStrictEqual(after, before, 'survivor is a new way');
+        assert.deepEqual(before.nodes, ['n1', 'n2'], 'old survivor is unchanged');
+        assert.deepEqual(graph.parentWays(graph.entity('n3')).map(w => w.id), ['w100'], 'new node knows its parent way');
+      });
+    });
+
+
     describe('with data loaded', () => {
       beforeEach(() => {
         // load the data around [10°, 0°]

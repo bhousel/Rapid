@@ -91,50 +91,62 @@ export class OsmRelation extends OsmEntity {
    * @return GeoJSON representation of the OsmRelation
    */
   public asGeoJSON(graph: Graph, seen?: Set<EntityID>): GeoJSONObject {
-    return this.transient('geojson', () => {
+    // A nested call computes from the leaf members without the memo:
+    // its result is cut short by the caller's `seen` set, so it isn't this relation's whole shape.
+    if (seen && !this.isMultipolygon()) {
+      return this._buildGeoJSON(graph, seen);
+    }
+    return this.transient('geojson', () => this._buildGeoJSON(graph, seen));
+  }
 
-      if (this.isMultipolygon()) {
-        return {
-          type: 'Feature',
-          id: this.id,
-          properties: this.tags,
-          geometry: {
-            type: 'MultiPolygon',
-            coordinates: this.multipolygon(graph)
-          }
-        };
-
-      } else {  // Gather children into a FeatureCollection
-
-        if (!seen) {
-          seen = new Set<EntityID>();
+  /**
+   * Builds the GeoJSON representation that `asGeoJSON` returns.
+   * @param graph - the Graph that holds the topology needed
+   * @param seen - seen ids, used to avoid infinite loops and cycles.
+   * @return GeoJSON representation of the OsmRelation
+   */
+  protected _buildGeoJSON(graph: Graph, seen?: Set<EntityID>): GeoJSONObject {
+    if (this.isMultipolygon()) {
+      return {
+        type: 'Feature',
+        id: this.id,
+        properties: this.tags,
+        geometry: {
+          type: 'MultiPolygon',
+          coordinates: this.multipolygon(graph)
         }
-        if (seen.has(this.id)) {
-          return {} as GeoJSONObject;  // seen this already, avoid infinite loops and cycles
-        } else {
-          seen.add(this.id);
-        }
+      };
 
-        const features: any[] = [];
-        for (const member of this.members) {
-          const entity = graph.hasEntity(member.id) as any;
-          if (!entity) continue;
+    } else {  // Gather children into a FeatureCollection
 
-          const child = entity.asGeoJSON(graph, seen);
-          if (!Object.keys(child).length) continue;  // skip if empty
-
-          child.role = member.role;  // `role` here is not GeoJSON spec
-          features.push(child);
-        }
-
-        return {
-          type: 'FeatureCollection',
-          id: this.id,
-          properties: this.tags,  // `properties` here is not GeoJSON spec
-          features: features
-        };
+      if (!seen) {
+        seen = new Set<EntityID>();
       }
-    });
+      if (seen.has(this.id)) {
+        return {} as GeoJSONObject;  // seen this already, avoid infinite loops and cycles
+      } else {
+        seen.add(this.id);
+      }
+
+      const features: any[] = [];
+      for (const member of this.members) {
+        const entity = graph.hasEntity(member.id) as any;
+        if (!entity) continue;
+
+        const child = entity.asGeoJSON(graph, seen);
+        if (!Object.keys(child).length) continue;  // skip if empty
+
+        // Copy the child, its GeoJSON may be memoized on the member entity.
+        features.push({ ...child, role: member.role });  // `role` here is not GeoJSON spec
+      }
+
+      return {
+        type: 'FeatureCollection',
+        id: this.id,
+        properties: this.tags,  // `properties` here is not GeoJSON spec
+        features: features
+      } as GeoJSONObject;
+    }
   }
 
   /**

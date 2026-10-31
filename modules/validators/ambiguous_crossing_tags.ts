@@ -3,13 +3,13 @@ import { utilTagDiff } from '@rapid-sdk/util';
 
 import { actionChangePreset, actionChangeTags, actionSyncCrossingTags } from '../actions/index.ts';
 import { Difference } from '../lib/Difference.ts';
+import { Graph } from '../lib/Graph.ts';
 import { ValidationIssue } from '../lib/ValidationIssue.ts';
 import { ValidationFix } from '../lib/ValidationFix.ts';
 
 import type { Action } from '../actions/types.ts';
 import type { Context } from '../Context.ts';
 import type { D3Selection } from 'd3-selection';
-import type { Graph } from '../lib/Graph.ts';
 import type { OsmEntity, OsmTags, OsmWay } from '../data/types.ts';
 import type { TagDiff } from '@rapid-sdk/util';
 import type { ValidatorFunction, ValidatorResult } from './types.ts';
@@ -119,11 +119,10 @@ export function validateAmbiguousCrossingTags(context: Context): ValidatorFuncti
   function detectCrossingWayIssues(startWay: OsmWay, startGraph: Graph): ValidationIssue[] {
     const wayID = startWay.id;
     const startPreset = schema!.match(startWay, startGraph);
-    const snapshot = startGraph.snapshot();
-    const copyGraph = startGraph.snapshot();
+    const copyGraph = new Graph(startGraph);
     const action = actionUpdateCrossing(wayID);
     const endGraph = action(copyGraph);
-    const diff = new Difference(snapshot, endGraph);  // What changed?
+    const diff = new Difference(startGraph, endGraph, endGraph.changedIDs);  // What changed?
     if (!diff.changes.size) return [];  // no updates needed
 
     // What does the original way look like after the changes?

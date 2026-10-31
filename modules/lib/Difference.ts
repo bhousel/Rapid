@@ -69,10 +69,20 @@ export class Difference {
 
 
   /**
+   * Without `candidates`, every ID either graph has changed from base is checked.
+   * With `candidates`, only those IDs are checked: they must include every ID whose entity
+   * differs between "before" and `head`. Extra IDs are harmless, because values are compared.
    * @param  base - Base Graph (null for fresh head graph)
    * @param  head - Head Graph
+   * @param  candidates - Optional IDs to check, instead of scanning both graphs
+   * @param  before - Optional entities to compare against instead of `base`'s, for the IDs it has
    */
-  public constructor(base: Graph | null, head: Graph) {
+  public constructor(
+    base: Graph | null,
+    head: Graph,
+    candidates?: Iterable<EntityID> | ReadonlySet<EntityID>,
+    before?: ReadonlyMap<EntityID, OsmEntity | undefined>
+  ) {
     this._base = base;
     this._head = head;
     this._changes = new Map<EntityID, DifferenceChange>();
@@ -81,58 +91,29 @@ export class Difference {
     this.didChange = {};
 
     if (!head) return;           // no head graph, no difference
-    if (base === head) return;   // same Graph, no difference
+    if (base === head && !before) return;   // same Graph, no difference
 
     // Gather affected ids
-    let ids = new Set<EntityID>(head.local.entities.keys());
-    if (base) {                               // Note:  Maps are "Set-like"
-      ids = ids.union(base.local.entities);   // keys() will be invoked automatially
+    let ids: Iterable<EntityID> | ReadonlySet<EntityID>;
+    if (candidates) {
+      ids = candidates;
+    } else {
+      let all = new Set<EntityID>(head.local.entities.keys());
+      if (base) {                               // Note:  Maps are "Set-like"
+        all = all.union(base.local.entities);   // keys() will be invoked automatially
+      }
+      ids = all;
     }
 
     // Check each id to determine whether it has changed from base -> head..
     for (const id of ids) {
       const h = head.hasEntity(id);
-      const b = base?.hasEntity(id);
-      if (h === b) continue;  // no change
+      const b = before?.has(id) ? before.get(id) : base?.hasEntity(id);
+      const flags = compareEntities(b, h);
+      if (!flags) continue;  // no change
 
-      const type = h?.type || b?.type;
-
-      if (b && !h) {
-        this._changes.set(id, { base: b, head: h });
-        this.didChange.deletion = true;
-        continue;
-      }
-      if (!b && h) {
-        this._changes.set(id, { base: b, head: h });
-        this.didChange.addition = true;
-        continue;
-      }
-
-      if (h && b) {
-        if (type === 'relation') {
-          if (!deepEqual((h as OsmRelation).members, (b as OsmRelation).members)) {
-            this._changes.set(id, { base: b, head: h });
-            this.didChange.geometry = true;
-            this.didChange.properties = true;
-            continue;
-          }
-        } else if (type === 'way') {
-          if (!deepEqual((h as OsmWay).nodes, (b as OsmWay).nodes)) {
-            this._changes.set(id, { base: b, head: h });
-            this.didChange.geometry = true;
-          }
-        } else if (type === 'node') {
-          if (!deepEqual((h as OsmNode).loc, (b as OsmNode).loc)) {
-            this._changes.set(id, { base: b, head: h });
-            this.didChange.geometry = true;
-          }
-        }
-
-        if (!deepEqual(h.tags, b.tags)) {
-          this._changes.set(id, { base: b, head: h });
-          this.didChange.properties = true;
-        }
-      }
+      this._changes.set(id, { base: b, head: h });
+      Object.assign(this.didChange, flags);
     }
   }
 
@@ -264,54 +245,147 @@ export class Difference {
   public complete(): Map<EntityID, OsmEntity | undefined> {
     if (this._complete) return this._complete;  // done already
 
-    const head = this._head;
-    const result = new Map<EntityID, OsmEntity | undefined>();
+    this._complete = completeFrom(this._head, this._changes);
+    return this._complete;
+  }
 
-    for (const [entityID, change] of this._changes) {
-      const h = change.head;
-      const b = change.base;
-      const entity = h ?? b;
+}
 
-      result.set(entityID, h);
 
-      if (entity?.type === 'way') {
-        const headNodes = new Set<EntityID>((h as OsmWay | undefined)?.nodes);
-        const baseNodes = new Set<EntityID>((b as OsmWay | undefined)?.nodes);
-        for (const nodeID of headNodes.union(baseNodes)) {
-          result.set(nodeID as EntityID, head.hasEntity(nodeID as EntityID));
-        }
+/**
+ * Compares an entity before and after a change, by value: a node's `loc`, a way's `nodes`,
+ * a relation's `members`, and tags.
+ * @param  b - The entity before (undefined if added)
+ * @param  h - The entity after (undefined if deleted)
+ * @return The kinds of change, or `null` if nothing changed
+ */
+export function compareEntities(b: OsmEntity | undefined, h: OsmEntity | undefined): DifferenceFlags | null {
+  if (h === b) return null;  // no change
+
+  if (b && !h) return { deletion: true };
+  if (!b && h) return { addition: true };
+
+  const flags: DifferenceFlags = {};
+  if (h && b) {
+    const type = h.type;
+    if (type === 'relation') {
+      if (!deepEqual((h as OsmRelation).members, (b as OsmRelation).members)) {
+        return { geometry: true, properties: true };
       }
-
-      if (entity?.type === 'relation' && (entity as OsmRelation).isMultipolygon()) {
-        const headMembers = new Set<EntityID>((h as OsmRelation | undefined)?.members?.map((m: OsmRelationMember) => m.id));
-        const baseMembers = new Set<EntityID>((b as OsmRelation | undefined)?.members?.map((m: OsmRelationMember) => m.id));
-        for (const memberID of headMembers.union(baseMembers)) {
-          const member = head.hasEntity(memberID as EntityID);
-          if (!member) continue;   // not downloaded
-          result.set(memberID as EntityID, member);
-        }
+    } else if (type === 'way') {
+      if (!deepEqual((h as OsmWay).nodes, (b as OsmWay).nodes)) {
+        flags.geometry = true;
       }
-
-      _gatherParents(head.parentWays(entity!), result);
-      _gatherParents(head.parentRelations(entity!), result);
+    } else if (type === 'node') {
+      if (!deepEqual((h as OsmNode).loc, (b as OsmNode).loc)) {
+        flags.geometry = true;
+      }
     }
 
-    this._complete = result;
-    return result;
-
-
-    /**
-     *
-     * @param parents
-     * @param result
-     */
-    function _gatherParents(parents: Iterable<OsmEntity>, result: Map<EntityID, OsmEntity | undefined>): void {
-      for (const parent of parents) {
-        if (result.has(parent.id)) continue;
-        result.set(parent.id, parent);
-        _gatherParents(head.parentRelations(parent), result);  // recurse up to parent relations
-      }
+    if (!deepEqual(h.tags, b.tags)) {
+      flags.properties = true;
     }
   }
 
+  return (flags.geometry || flags.properties) ? flags : null;
+}
+
+
+/**
+ * Returns the complete set of Entities affected by some changes: what changed, the old and new nodes
+ * of changed ways, the members of changed relations, and all parent ways and relations, recursively.
+ * A changed relation brings its added and removed members, or all of them (before and after) when
+ * its tags changed or it is or was a multipolygon.
+ * @param  head - The Graph after the changes
+ * @param  changes - The changes, keyed by entity ID
+ * @param  forGeometry - `true` to leave out the members of changed relations that aren't
+ *   multipolygons: their own geometry doesn't depend on the relation.
+ * @return The affected entities, as they are in `head` (undefined if deleted)
+ */
+export function completeFrom(
+  head: Graph,
+  changes: ReadonlyMap<EntityID, DifferenceChange>,
+  forGeometry: boolean = false
+): Map<EntityID, OsmEntity | undefined> {
+  const result = new Map<EntityID, OsmEntity | undefined>();
+  const gathered = new Set<EntityID>();   // IDs whose parent relations have been gathered
+
+  for (const [entityID, change] of changes) {
+    const h = change.head;
+    const b = change.base;
+    const entity = h ?? b;
+    if (!entity) continue;   // created and removed again
+
+    result.set(entityID, h);
+
+    if (entity.type === 'way') {
+      const headNodes = new Set<EntityID>((h as OsmWay | undefined)?.nodes);
+      const baseNodes = new Set<EntityID>((b as OsmWay | undefined)?.nodes);
+      for (const nodeID of headNodes.union(baseNodes)) {
+        result.set(nodeID, head.hasEntity(nodeID));
+      }
+
+    } else if (entity.type === 'relation') {
+      const hr = h as OsmRelation | undefined;
+      const br = b as OsmRelation | undefined;
+      const isMultipolygon = !!(hr?.isMultipolygon() || br?.isMultipolygon());
+      const takeAll = isMultipolygon || !hr || !br || !deepEqual(hr.tags, br.tags);
+
+      if (isMultipolygon || !forGeometry) {
+        for (const memberID of _changedMembers(br?.members ?? [], hr?.members ?? [], takeAll)) {
+          const member = head.hasEntity(memberID);
+          if (!member) continue;   // not downloaded
+          result.set(memberID, member);
+        }
+      }
+    }
+
+    gathered.add(entityID);
+    _gatherParents(head.parentWays(entity));
+    _gatherParents(head.parentRelations(entity));
+  }
+
+  return result;
+
+
+  /**
+   * Adds parents to the result, and recurses up to their parent relations.
+   * @param parents - The parent ways or relations to add
+   */
+  function _gatherParents(parents: Iterable<OsmEntity>): void {
+    for (const parent of parents) {
+      result.set(parent.id, parent);
+      if (gathered.has(parent.id)) continue;
+      gathered.add(parent.id);
+      _gatherParents(head.parentRelations(parent));  // recurse up to parent relations
+    }
+  }
+}
+
+
+/**
+ * Returns the IDs of the members that differ between two member lists: added, removed, or with a
+ * changed role. Or every member of both, if `takeAll` is set.
+ * @param  before - The members before the change
+ * @param  after - The members after the change
+ * @param  takeAll - `true` to return every member of both lists
+ * @return Member IDs
+ */
+function _changedMembers(before: OsmRelationMember[], after: OsmRelationMember[], takeAll: boolean): Set<EntityID> {
+  const result = new Set<EntityID>();
+  if (takeAll) {
+    for (const m of before) result.add(m.id);
+    for (const m of after) result.add(m.id);
+    return result;
+  }
+
+  const beforeKeys = new Set<string>(before.map(m => `${m.id} ${m.role}`));
+  const afterKeys = new Set<string>(after.map(m => `${m.id} ${m.role}`));
+  for (const m of before) {
+    if (!afterKeys.has(`${m.id} ${m.role}`)) result.add(m.id);
+  }
+  for (const m of after) {
+    if (!beforeKeys.has(`${m.id} ${m.role}`)) result.add(m.id);
+  }
+  return result;
 }

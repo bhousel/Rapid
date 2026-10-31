@@ -92,6 +92,10 @@ export class ValidationSystem extends AbstractSystem {
   protected _disableOverrides: SeverityOverride[];
   /** Promise fulfilled when validation caught up to `stable` snapshot */
   protected _validationPromise: Promise<void> | null;
+  /** The stable graph whose changes the head cache has queued (`_head.graph` can be newer) */
+  protected _headQueuedGraph: Graph | null;
+  /** IDs that changed in `stable` since `_headQueuedGraph`, gathered from `stablechange` events */
+  protected _stableChangedIDs: Set<EntityID>;
 
 
   /**
@@ -117,6 +121,8 @@ export class ValidationSystem extends AbstractSystem {
     this._disableOverrides = [];
 
     this._validationPromise = null;
+    this._headQueuedGraph = null;
+    this._stableChangedIDs = new Set<EntityID>();
 
     // Ensure methods used as callbacks always have `this` bound correctly.
     this.validateAsync = this.validateAsync.bind(this);
@@ -187,7 +193,12 @@ export class ValidationSystem extends AbstractSystem {
         // Setup event handlers..
         // When to run validation:
         editor!
-          .on('stablechange', () => this.validateAsync())
+          .on('stablechange', (difference: Difference) => {
+            for (const entityID of difference.changes.keys()) {
+              this._stableChangedIDs.add(entityID);
+            }
+            this.validateAsync();
+          })
           .on('merge', (entityIDs: EntityID[]) => {
             this._validateBaseEntitiesAsync(entityIDs);
             this._validateEditsNearAsync(entityIDs);
@@ -228,6 +239,8 @@ export class ValidationSystem extends AbstractSystem {
     this._resolvedIssueIDs.clear();
     this._base = new ValidationCache(this.context, 'base');
     this._head = new ValidationCache(this.context, 'head');
+    this._headQueuedGraph = null;
+    this._stableChangedIDs.clear();
     this._completeDiff.clear();
 
     return Promise.resolve();
@@ -596,16 +609,26 @@ export class ValidationSystem extends AbstractSystem {
     this._completeDiff = editor.difference().complete();
 
     if (editor.canRestoreBackup) return Promise.resolve();   // Wait to see if the user wants to restore their backup
-    if (this._validationPromise) return this._validationPromise;   // Validation already in progress
 
     const baseGraph = editor.base.graph!;
     const stableGraph = editor.stable.graph!;
-    const previousGraph = this._head.graph ?? baseGraph;   // the previously validated graph
+
+    // Validation already in progress.
+    // If `stable` changed, the jobs still queued run on the current stable graph: an older one would
+    // get the staging spatial index. When this round finishes, what changed since it started is validated.
+    if (this._validationPromise) {
+      this._head.graph = stableGraph;
+      return this._validationPromise;
+    }
+
+    const previousGraph = this._headQueuedGraph ?? baseGraph;   // the previously validated graph
 
     // User has not edited, or undone back to the base state, reset head cache
     if (stableGraph === baseGraph) {
       this._head = new ValidationCache(context, 'head');
       this._head.graph = stableGraph;
+      this._headQueuedGraph = stableGraph;
+      this._stableChangedIDs.clear();
       this._resolvedIssueIDs.clear();
       this.emit('validated');
       return Promise.resolve();
@@ -613,13 +636,19 @@ export class ValidationSystem extends AbstractSystem {
 
     // We are caught up to the stable graph
     if (stableGraph === previousGraph) {
+      this._stableChangedIDs.clear();
       this.emit('validated');
       return Promise.resolve();
     }
 
     // If we get here, stable !== previous, so it's time to validate the stable graph..
+    // Only the IDs that changed since the previously validated graph need comparing.
+    // Before any graph was validated, compare them all.
+    const candidates = this._headQueuedGraph ? new Set<EntityID>(this._stableChangedIDs) : undefined;
     this._head.graph = stableGraph;   // take snapshot
-    const incrementalDiff = new Difference(previousGraph, stableGraph!);
+    this._headQueuedGraph = stableGraph;
+    this._stableChangedIDs.clear();
+    const incrementalDiff = new Difference(previousGraph, stableGraph, candidates);
     const diffKeys = [ ...incrementalDiff.complete().keys() ];
     const entityIDs = this._head.withAllRelatedEntities(diffKeys);  // expand set
 
@@ -637,7 +666,7 @@ export class ValidationSystem extends AbstractSystem {
 
         // Check if `stable` has changed while we were validating, and run it again to catch up if needed...
         const stableGraph = editor.stable.graph;
-        const previousGraph = this._head.graph;
+        const previousGraph = this._headQueuedGraph;
         if (stableGraph !== previousGraph) {
           this.validateAsync();  // recurse
         }
@@ -701,12 +730,22 @@ export class ValidationSystem extends AbstractSystem {
     if (!isFinite(merged.min[0])) return Promise.resolve();   // no nodes merged
     const nearby = merged.padByMeters(MERGE_PADDING_METERS);
 
-    // The user's edits there
+    // The user's edits there, and the ways of the edited nodes (a moved vertex changes its way)
     const editedIDs = new Set<EntityID>();
-    for (const entityID of editor.difference().complete().keys()) {
-      const extent = graph.hasEntity(entityID)?.extent();
+    const addIfNearby = (entity: OsmEntity | undefined): void => {
+      if (!entity) return;
+      const extent = entity.extent();
       if (extent && nearby.intersects(extent)) {
-        editedIDs.add(entityID);
+        editedIDs.add(entity.id);
+      }
+    };
+    for (const entityID of editor.difference().changes.keys()) {
+      const entity = graph.hasEntity(entityID);
+      addIfNearby(entity);
+      if (entity?.type === 'node') {
+        for (const way of graph.parentWays(entity)) {
+          addIfNearby(way);
+        }
       }
     }
     if (!editedIDs.size) return Promise.resolve();

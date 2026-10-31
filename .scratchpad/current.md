@@ -33,9 +33,12 @@ Oct 29–30: audit findings 3–8 committed. Findings 1 and 2 (shared geometry, 
 designed together in `design/graph-geometry.md` (not yet committed). Oct 30: two measurement rounds
 (survey, then three prototyped designs with critics) rewrote it: graphs share structure (lineage +
 slot table + persistent records), derived data per record with the base's on base objects, change
-journal first. Waiting on Bryan's decisions (open questions there). Step 0 includes a data-loss fix:
-straighten deletes a node just added to a bus route (stale `isInteresting` memo); and copy, delete,
-paste throws because `context.copyIDs` keeps the live staging graph.
+journal first. Oct 30: committed. Oct 31: steps 0 and 1 done (uncommitted at first). Step 0: bug
+fixes (straighten data loss, copy/delete/paste, in-place writes, …) and `todo` tests for later-step
+bugs in `test/unit/lib/graph_bugs.test.js`. Step 1: graph journal, savepoint rollback, frozen history,
+emits from candidate IDs, `SessionDifference`; randomized emit test in
+`test/unit/core/EditSystemJournal.test.js`. Next: step 2 (immutable geometry, memos, `graph.geometry()`).
+Open decisions for Bryan: relation geometry on first read, backup v5 compat, big multipolygon drags.
 
 ## Active: what an edit records (`EditSystem`)
 Design: [`design/edit-system.md`](../design/edit-system.md), started Oct 26. Edits need to record more

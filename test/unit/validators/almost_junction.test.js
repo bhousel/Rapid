@@ -304,6 +304,36 @@ describe('validateAlmostJunction', () => {
   });
 
 
+  it('skips way segments that are in the spatial index but not in the graph being validated', () => {
+    const editor = context.systems.editor;
+    load([
+      new Rapid.OsmNode(context, { id: 'n1', loc: [22.42357, 0] }),
+      new Rapid.OsmNode(context, { id: 'n2', loc: [22.42367, 0] }),
+      new Rapid.OsmWay(context, { id: 'w1', nodes: ['n1', 'n2'], tags: { highway: 'residential' }}),
+      new Rapid.OsmNode(context, { id: 'n3', loc: [22.42356, 0.001] }),
+      new Rapid.OsmNode(context, { id: 'n4', loc: [22.42356, -0.001] }),
+      new Rapid.OsmWay(context, { id: 'w2', nodes: ['n3', 'n4'], tags: { highway: 'residential' }})
+    ]);
+
+    // The index also returns a road (and nodes) that only another graph has
+    const waySegments = editor.waySegments;
+    editor.waySegments = (extent, g) => [
+      { wayID: 'w-10', edge: ['n-10', 'n-11'], index: 0 },
+      { wayID: 'w2', edge: ['n-12', 'n-13'], index: 0 },
+      ...waySegments.call(editor, extent, g)
+    ];
+
+    try {
+      const issues = validator(graph.entity('w1'), graph).issues;
+      assert.lengthOf(issues, 1);
+      assert.strictEqual(issues[0].type, 'almost_junction');
+      assert.deepEqual(issues[0].entityIds, ['w1', 'n1', 'w2']);
+    } finally {
+      editor.waySegments = waySegments;
+    }
+  });
+
+
   describe('fixes', () => {
     // `w1` ends about 1 m east of the vertical road `w2`
     function loadNearlyJoined() {

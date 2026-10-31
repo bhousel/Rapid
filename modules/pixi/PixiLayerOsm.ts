@@ -850,16 +850,21 @@ export class PixiLayerOsm extends AbstractPixiLayer {
     const mapUiLayer = this.scene.layers.get('map-ui') as PixiLayerMapUI;
     const selectedContainer = mapUiLayer.selected;
 
+    // Keep only the midpoints drawn this frame, so stale ones don't pile up
+    const prevMidpoints = this._midpoints;
+    this._midpoints = new Map<DataID, Midpoint>();
+
     // Gather midpoints in view
     const midpointData = this._gatherMidpoints(viewport, data, related);
     for (const props of midpointData) {
       if (props.dist < minDistance) continue;  // skip if points are too close at this zoom
 
       // Generate data element if needed
-      let midpoint = this._midpoints.get(props.id);
+      let midpoint = prevMidpoints.get(props.id);
       if (!midpoint) {
         midpoint = new MarkerData<MidpointProps>(context, props);
       }
+      this._midpoints.set(props.id, midpoint);
 
       // Check that this part has coordinates and is a Point
       const part = midpoint.geoms.parts[0];

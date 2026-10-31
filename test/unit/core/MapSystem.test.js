@@ -282,6 +282,38 @@ describe('MapSystem', () => {
   });
 
 
+  describe('stagingchange', () => {
+    it('clears the filter cache entries of the changed entities', async () => {
+      const ctx = new Rapid.MockContext();
+      const editor = new Rapid.MockSystem(ctx);
+      const filters = new Rapid.FilterSystem(ctx);
+      ctx.systems = {
+        editor:  editor,
+        filters: filters,
+        gfx:     new Rapid.MockGfxSystem(ctx)
+      };
+
+      const n1 = new Rapid.OsmNode(ctx, { id: 'n1', loc: [0, 0], tags: { amenity: 'bench' } });
+      const graph = new Rapid.Graph(ctx, [n1]);
+      editor.staging = { graph: graph };
+
+      const map = new Rapid.MapSystem(ctx);
+      await map.initAsync();
+
+      filters.getMatches(n1, graph, 'point');
+      const oldKey = n1.key;
+      assert.property(filters._cache, oldKey);
+
+      const difference = { complete: () => new Map([['n1', n1]]), didChange: {} };
+      editor.emit('stagingchange', difference);
+
+      assert.notStrictEqual(n1.key, oldKey);
+      assert.notProperty(filters._cache, oldKey);
+      assert.notProperty(filters._cache, n1.key);
+    });
+  });
+
+
   describe('restoring a selection from a link', () => {
     let ctx, map, entities, onDraw, enabledLayers, loadedIDs, fitIDs, mode, selectedIDs;
 

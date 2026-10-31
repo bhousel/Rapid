@@ -236,9 +236,13 @@ export function validateCloseNodes(context: Context): ValidatorFunction {
       const isNode1Stol = (node.tags['memorial:type'] === 'stolperstein' || node.tags['memorial'] === 'stolperstein');
 
       for (const hit of hits) {
-        const other = hit.contents as OsmNode;
-        if (other.id === node.id) continue;  // skip self
-        if (other.type !== 'node' || other.geometry(graph) !== 'point') continue;   // standalone points only
+        // The index can be for another graph, so look up each hit in this one.
+        const entity = graph.hasEntity(hit.id);
+        if (!entity) continue;
+        if (entity.id === node.id) continue;  // skip self
+        if (entity.type !== 'node' || entity.geometry(graph) !== 'point') continue;   // standalone points only
+
+        const other = entity as OsmNode;
 
         // Ignore stolperstein (https://wiki.openstreetmap.org/wiki/DE:Stolpersteine), they are expected to be close.
         const isNode2Stol = (other.tags['memorial:type'] === 'stolperstein' || other.tags['memorial'] === 'stolperstein');

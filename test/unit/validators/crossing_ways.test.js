@@ -586,4 +586,45 @@ describe('validateCrossingWays', () => {
     assert.strictEqual(issueIDs.size, 2);
   });
 
+  it('finds a crossing in an older graph, when the crossing way was changed after it', () => {
+    const editor = context.systems.editor;
+    createWaysWithOneCrossingPoint({ highway: 'residential' }, { highway: 'residential' });
+    editor.perform(Rapid.actionChangeTags('w1', { highway: 'residential', name: 'Main Street' }));
+    editor.commit({ stringID: 'named w1' });
+    const older = editor.stable.graph;
+
+    // Insert a node into w2 after the older graph. Staging's index then has w2's new segments,
+    // through a node that the older graph doesn't have.
+    const n5 = new Rapid.OsmNode(context, { id: 'n-5', loc: [0.5, 0.5] });
+    editor.perform(Rapid.actionAddEntity(n5), Rapid.actionAddVertex('w2', 'n-5', 1));
+    editor.commit({ stringID: 'added n-5' });
+    assert.strictEqual(editor.spatialIDForGraph(older), 'editor_staging');
+
+    const issues = validator(older.entity('w1'), older).issues;
+    assert.lengthOf(issues, 1);
+    assert.strictEqual(issues[0].type, 'crossing_ways');
+    assert.sameMembers(issues[0].entityIds, ['w1', 'w2']);
+    assert.deepEqual(issues[0].loc, [0, 0]);
+  });
+
+  // Regression guard for the `hasEntity` checks in crossing_ways (from before step 0).
+  it('skips way segments that are in the spatial index but not in the graph being validated', () => {
+    const editor = context.systems.editor;
+    createWaysWithOneCrossingPoint({ highway: 'residential' }, { highway: 'residential' });
+
+    // The index also returns a road (and nodes) that only another graph has
+    const waySegments = editor.waySegments;
+    editor.waySegments = (extent, g) => [
+      { wayID: 'w-10', edge: ['n-10', 'n-11'], index: 0 },
+      { wayID: 'w2', edge: ['n-12', 'n-13'], index: 0 },
+      ...waySegments.call(editor, extent, g)
+    ];
+
+    try {
+      verifySingleCrossingIssue(validate(), {});
+    } finally {
+      editor.waySegments = waySegments;
+    }
+  });
+
 });

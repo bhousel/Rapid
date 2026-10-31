@@ -154,6 +154,32 @@ describe('OsmEntity', () => {
       assert.isNull(geoms.orig);
       assert.isNull(geoms.world);
     });
+
+    it('stores a new Geometry and leaves the old one and its parts untouched', () => {
+      const n1 = new Rapid.OsmNode(context, { id: 'n1', loc: [0, 0] });
+      const n2 = new Rapid.OsmNode(context, { id: 'n2', loc: [1, 0] });
+      const w1 = new Rapid.OsmWay(context, { id: 'w1', nodes: ['n1', 'n2'] });
+      const base = new Rapid.Graph(context, [n1, n2, w1]);
+      w1.updateGeometry(base);
+
+      const oldGeoms = w1.geoms;
+      const oldPart = oldGeoms.parts[0];   // e.g. held by a Pixi feature
+      const oldWorld = oldPart.world;
+
+      const graph = new Rapid.Graph(base);
+      graph.replace(n2.move([5, 5]));
+      w1.updateGeometry(graph);
+
+      assert.notStrictEqual(w1.geoms, oldGeoms);
+      assert.notStrictEqual(w1.geoms.parts[0], oldPart);
+      assert.deepEqual(w1.geoms.parts[0].orig.coords, [[0, 0], [5, 5]]);
+
+      assert.lengthOf(oldGeoms.parts, 1);
+      assert.isObject(oldGeoms.world);
+      assert.strictEqual(oldPart.world, oldWorld);
+      assert.strictEqual(oldPart.type, 'LineString');
+      assert.deepEqual(oldPart.orig.coords, [[0, 0], [1, 0]]);
+    });
   });
 
   describe('extent', () => {

@@ -1,4 +1,5 @@
 import { utilHashcode, utilTagDiff } from '@rapid-sdk/util';
+import deepEqual from 'fast-deep-equal';
 
 import { actionChangePreset } from '../actions/change_preset.ts';
 import { actionChangeTags } from '../actions/change_tags.ts';
@@ -227,6 +228,7 @@ export function validateOutdatedTags(context: Context): ValidatorFunction {
         }
       }
 
+      if (deepEqual(currEntity.tags, newTags)) return graph;
       return actionChangeTags(currEntity.id, newTags)(graph);
     }
 
@@ -256,6 +258,7 @@ export function validateOutdatedTags(context: Context): ValidatorFunction {
         delete newTags[wp];        // remove `brand:wikipedia`
       }
 
+      if (deepEqual(currEntity.tags, newTags)) return graph;
       return actionChangeTags(currEntity.id, newTags)(graph);
     }
 

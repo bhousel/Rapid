@@ -171,7 +171,8 @@ export class UiMeasurementCard extends AbstractUiCard {
 
         for (const entity of selected) {
           const extent = entity.extent(graph);
-          const geojson = geojsonRewind(entity.asGeoJSON(graph), true);  // true = outer ring clockwise (how D3 wants it)
+          // Rewind a copy: `asGeoJSON` returns the entity's memoized GeoJSON, shared by every graph
+          const geojson = geojsonRewind(structuredClone(entity.asGeoJSON(graph)), true);  // true = outer ring clockwise (how D3 wants it)
 
           allExtent.extendSelf(extent);
           geometry = entity.geometry(graph);
