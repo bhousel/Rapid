@@ -43,7 +43,9 @@ readers on `graph.geometry()`/`graph.extent()`. Step 3 done Oct 31 (uncommitted 
 `PersistentVector`, `GraphRecord`s by slot, `graph.local` gone (`isLocal`, `localEntities`, `diffIDs`).
 Step 3 committed Nov 2 (`7c4bcb0f2`). Steps 4+ reordered Nov 2 (old numbers in the doc's Rollout):
 4 model test in the repo, 5 backups + incremental session difference, 6 geometry and versions in
-records, 7 memos in records, 8 rebase/schema, 9 spatial, 10 other data. Next: step 4.
+records, 7 memos in records, 8 rebase/schema, 9 spatial, 10 other data. Step 4 done Nov 2:
+`test/unit/lib/graph_model.test.js` (reference model, ~1 s; `GRAPH_MODEL_SEEDS=1000` for a long run).
+Next: step 5 (backups).
 Decided Oct 31: relation geometry references its members' parts (step 2), multipolygon ring structure
 cached and reused (follow-up); lazy build only as a stopgap. Backups: step 5 rewrites v4 in place
 (no v5); when it lands, delete the v4 sessions in the debug Chrome (the only ones that exist).

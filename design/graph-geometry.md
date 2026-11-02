@@ -7,7 +7,7 @@ of the change. This design fixes findings 1 (shared geometry) and 2 (the wrong s
 [validation audit](validation-system.md#the-october-2026-audit), the bugs listed below, and the cost of
 keeping versions. It gives Rapid one way to ask for anything's geometry: `graph.geometry(entity)`.
 
-> **Status:** In progress (October 2026): steps 0-3 done. After step 3 the rest was put in a new
+> **Status:** In progress (October 2026): steps 0-4 done. After step 3 the rest was put in a new
 > order (November 2026): backups first, then derived data in records in two steps. Measured in two rounds: a survey of
 > today's costs and bugs, then three competing designs, each prototyped and reviewed for correctness
 > and for performance (in JavaScriptCore and V8). See [Open questions](#open-questions).
@@ -600,6 +600,13 @@ records (now 6 and 7), 5 rebase (now 8), 6 spatial indexes (now 9), 7 backups (n
    writes, rollbacks, freezes, commits, forced rebases and restores, against Maps copied per version)
    ran from a scratch folder. It becomes a seeded unit test that runs in about a second, so steps 5-8
    are checked against it as they land. Steps 6 and 8 extend it with derived data.
+   - **Done.** `test/unit/lib/graph_model.test.js`: 25 histories of 150 steps on up to 10 graphs by
+     default (about 1 s); `GRAPH_MODEL_SEEDS`, `GRAPH_MODEL_STEPS` and `GRAPH_MODEL_SEED0` run longer
+     or replay one seed. 1,000 × 200 passes in 54 s. Each check compares `hasEntity`, `isLocal`,
+     parent ways and relations (exactly once each), `childNodes`, `localEntities`, `diffIDs` (never
+     missing a change) and `Difference` (exact) for every graph and pair of graphs. Broken on purpose,
+     it fails within the first seed: parent lists that count a graph's old versions, graphs sharing an
+     owner token, and a rebase without iD#2085 restores.
 5. **Backups and the session difference.**
    - Backup v4, rewritten: each edit's own changes (`diffIDs` against the edit before it, structural
      since step 3), cached on the edit, so a backup is O(changes since the last one) and restore is
@@ -652,8 +659,8 @@ Then, each measured on its own:
 
 ## Testing
 
-- **Property tests against a reference model.** The model is today's semantics, with Maps copied per
-  version. The tests run random replaces, removes, reverts, derives, commits, undos and redos,
+- **Property tests against a reference model** (`test/unit/lib/graph_model.test.js`, from step 4).
+  The model is today's semantics, with Maps copied per version. The tests run random replaces, removes, reverts, derives, commits, undos and redos,
   `commitAppend`, rebases (forced too) and restores. They compare `hasEntity`, parent ways and
   relations, and the `Difference`'s changes, `complete()` and `summary()`. The review of the prototype
   ran 22 million `hasEntity` checks against such a model, and 12,000 random edits, commits and
