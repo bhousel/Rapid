@@ -343,6 +343,8 @@ export class EditSystem extends AbstractSystem {
   protected _stagingCandidates: Set<EntityID>;
   /** The difference from `base` to `stable`: all of the user's edits */
   protected _fullDifference: SessionDifference;
+  /** The schema's `areaGeneration` that the shapes were last checked against */
+  protected _areaGeneration: number;
 
 
   /**
@@ -353,7 +355,7 @@ export class EditSystem extends AbstractSystem {
 
     this.id = 'editor';     // was 'history'
     this.requiredDependencies = new Set<SystemID>(['spatial', 'storage']);
-    this.optionalDependencies = new Set<SystemID>(['database', 'gfx', 'imagery', 'photos', 'scheduler']);
+    this.optionalDependencies = new Set<SystemID>(['database', 'gfx', 'imagery', 'photos', 'scheduler', 'schema']);
 
     this._canRestoreBackup = false;
     this._sessionID = null;
@@ -383,10 +385,12 @@ export class EditSystem extends AbstractSystem {
     this._emittedStaging = null!;
     this._stagingCandidates = new Set<EntityID>();
     this._fullDifference = null!;
+    this._areaGeneration = 0;
 
     // Make sure the event handlers have `this` bound correctly
     this.immediateBackup = this.immediateBackup.bind(this);
     this.deferredBackup = this.deferredBackup.bind(this);
+    this._checkAreas = this._checkAreas.bind(this);
   }
 
 
@@ -399,6 +403,7 @@ export class EditSystem extends AbstractSystem {
 
     const context = this.context;
     const database = context.systems.database;   // optional
+    const schema = context.systems.schema;       // optional
     const spatial = context.systems.spatial!;
     const storage = context.systems.storage!;
 
@@ -417,6 +422,9 @@ export class EditSystem extends AbstractSystem {
         // Bare data IDs are OSM entities, and their current version is in the staging graph.
         // (The OSM spatial caches hold several versions, see `spatialIDForGraph`.)
         spatial.registerResolver('osm', entityID => this._staging.graph.hasEntity(entityID));
+
+        // A schema change can change which ways are areas.
+        schema?.on('schemachange', this._checkAreas);
 
         const isTestEnvironment = (!('window' in globalThis)) || ('assert' in globalThis) || ('expect' in globalThis);
         if (isTestEnvironment) return;
@@ -1036,7 +1044,7 @@ export class EditSystem extends AbstractSystem {
     }
     graphs.add(stagingGraph);
 
-    const restored = baseGraph.rebase(entities, [...graphs], force);
+    const { restored, reshapedIDs } = baseGraph.rebase(entities, [...graphs], force);
 
     // Restores change edits that were already made, and a forced update changes what they were made
     // against, so what backups kept about them is out of date.
@@ -1072,12 +1080,28 @@ export class EditSystem extends AbstractSystem {
       stagingGraph.commit();   // its geometry, for the parent ways of the restored nodes
     }
 
-    // Newly downloaded data should appear in every OSM cache (unless locally overridden).
-    this._mergeIntoCache('editor_base', baseGraph, entities);
-    this._mergeIntoCache('editor_stable', this.stable.graph!, entities);
-    this._mergeIntoCache('editor_staging', this.staging.graph!, entities);
+    // Stable and staging catch up with base shapes that their own edits change (e.g. a downloaded
+    // way through a node the user moved). The other graphs catch up when they become current.
+    const stableReshapedIDs = stableGraph.syncWithBase();
+    const stagingReshapedIDs = stagingGraph.syncWithBase();
 
-    this.emit('merge', effectiveSeenIDs);
+    // Newly downloaded data should appear in every OSM cache (unless locally overridden),
+    // and what changed shape needs its new box.
+    const withReshaped = (graph: Graph, ...idSets: Set<EntityID>[]): OsmEntity[] => {
+      const result = new Map<EntityID, OsmEntity>(entities.map(entity => [entity.id, entity]));
+      for (const entityIDs of idSets) {
+        for (const entityID of entityIDs) {
+          const entity = graph.hasEntity(entityID);
+          if (entity) result.set(entityID, entity);
+        }
+      }
+      return [...result.values()];
+    };
+    this._mergeIntoCache('editor_base', baseGraph, withReshaped(baseGraph, reshapedIDs));
+    this._mergeIntoCache('editor_stable', stableGraph, withReshaped(stableGraph, reshapedIDs, stableReshapedIDs));
+    this._mergeIntoCache('editor_staging', stagingGraph, withReshaped(stagingGraph, reshapedIDs, stagingReshapedIDs));
+
+    this.emit('merge', effectiveSeenIDs.union(reshapedIDs).union(stableReshapedIDs).union(stagingReshapedIDs));
 
     // A restore changed stable and staging, so tell the listeners now (indexes included).
     if (restored.size) {
@@ -2753,6 +2777,24 @@ export class EditSystem extends AbstractSystem {
 
 
   /**
+   * Responds to a schema change: if what counts as an area changed, the base rebuilds the shapes of
+   * the ways that flipped between line and area (and the relations that contain them), and stable
+   * and staging check their own. The other graphs check theirs when they become current.
+   * A flip doesn't change a shape's extent, so the indexes stay as they are.
+   */
+  protected _checkAreas(): void {
+    const context = this.context;
+    const schema = context.systems.schema;
+    if (!schema || schema.areaGeneration === this._areaGeneration) return;
+
+    this._areaGeneration = schema.areaGeneration;
+    this.base.graph!.checkAreas();
+    this.stable.graph!.syncWithBase();
+    this.staging.graph!.syncWithBase();
+  }
+
+
+  /**
    * This replaces the `staging` work-in-progress edit with a fresh copy of `stable`.
    * Rolls back the edits and emits no events.
    */
@@ -2763,7 +2805,12 @@ export class EditSystem extends AbstractSystem {
       this._stagingCandidates = this._stagingCandidates.union(oldGraph.changedIDs);
     }
 
-    this._staging = new Edit(this.context, new Graph(this.stable.graph!));
+    // A graph from the history may have missed changes to the base while it wasn't current.
+    // (The shapes it rebuilds differ from what the indexes hold only where its edits differ from the
+    // graph before, and the next emit's `complete()` includes what contains those.)
+    const stableGraph = this.stable.graph!;
+    stableGraph.syncWithBase();
+    this._staging = new Edit(this.context, new Graph(stableGraph));
     this._hasWorkInProgress = false;
   }
 

@@ -205,6 +205,12 @@ export class SchemaSystem extends AbstractSystem {
 
   /** Bumped on every schema change, so answers memoized from the schema know they're stale */
   protected _generation: number;
+  /** Bumped when what counts as an area changes, see `areaGeneration` */
+  protected _areaGeneration: number;
+  /** What decided `areaGeneration` last: the area keys, rulesets and variables, as JSON */
+  protected _areaSignature: string;
+  /** How many schema loads are in progress (what counts as an area isn't settled until they finish) */
+  protected _loadingCount: number;
 
 
   /**
@@ -242,6 +248,9 @@ export class SchemaSystem extends AbstractSystem {
     this._recentIDs = null;
     this._currLocaleCode = null;
     this._generation = 0;
+    this._areaGeneration = 0;
+    this._areaSignature = '';
+    this._loadingCount = 0;
 
     // Ensure methods used as callbacks always have `this` bound correctly.
     this._hashChanged = this._hashChanged.bind(this);
@@ -330,6 +339,10 @@ export class SchemaSystem extends AbstractSystem {
     const gfx = context.systems.gfx;
 
     // Clear out whatever was loaded before.
+    // (While the assets load, what counts as an area isn't settled, see `areaGeneration`.)
+    if (assets) {
+      this._loadingCount++;
+    }
     this.resetAll();
 
     // If AssetSystem is not available, we can't load schema files.
@@ -400,6 +413,12 @@ export class SchemaSystem extends AbstractSystem {
       }
     })
     .finally(() => {
+      // Shapes may have been built while the schema had no area keys, so check them all again.
+      this._loadingCount--;
+      if (!this._loadingCount) {
+        this._updateAreaGeneration(true);
+        this.emit('schemachange');
+      }
       unpause?.();  // resume rendering
     });
   }
@@ -422,31 +441,6 @@ const settings = context.systems.settings;
 this._recentIDs = [];
 settings?.set('schema.presetRecents', this._recentIDs);
 
-// clear all entities cached transients
-const editor = context.systems.editor as any;
-if (editor) {
-  // Each graph recomputes its own shapes: the base's are on the objects, the others' in their records.
-  const base = editor.base?.graph;
-  if (base) {
-    for (const [_, v] of base.base.entities) {
-      v?.clearMemos();
-    }
-    base.recomputeGeometry(base.base.entities.keys());
-  }
-
-  const staging = editor.staging?.graph;
-  if (staging) {
-    staging.recomputeGeometry(staging.localEntities().keys());
-  }
-
-  const history = editor._history || [];
-  for (const edit of history) {
-    const graph = edit.graph;
-    if (graph) {
-      graph.recomputeGeometry(graph.localEntities().keys());
-    }
-  }
-}
 const gfx = context.systems.gfx as any;
 gfx?.scene?.reset();  // throw it all away
 
@@ -493,6 +487,19 @@ gfx?.scene?.reset();  // throw it all away
    */
   public get generation(): number {
     return this._generation;
+  }
+
+  /**
+   * A number that changes when what counts as an area may have changed: the area keys, the area
+   * rulesets, or the variables they read. It changes only once the schema is settled, not while a
+   * load is in progress (that would turn every area into a line and back), and once more after each
+   * load, since shapes built during it had no area keys. `EditSystem` rebuilds the shapes of the
+   * ways that flipped between line and area when it changes.
+   * @return  The area generation
+   * @readonly
+   */
+  public get areaGeneration(): number {
+    return this._areaGeneration;
   }
 
   /**
@@ -1544,8 +1551,32 @@ gfx?.scene?.reset();  // throw it all away
       scope.deprecatedValues = dvbk;
     }
 
+    if (!this._loadingCount) {
+      this._updateAreaGeneration(false);
+    }
+
     gfx?.immediateRedraw();
     this.emit('schemachange');
+  }
+
+
+  /**
+   * Bumps `areaGeneration` if what counts as an area changed since it was last bumped.
+   * @param force - `true` to bump it anyway (after a load)
+   */
+  protected _updateAreaGeneration(force: boolean): void {
+    const scope = this._scopes.get('osm');
+    const signature = JSON.stringify([
+      scope?.areaKeys ?? {},
+      scope?.rulesets.get('areakeys_force_true')?.props ?? null,
+      scope?.rulesets.get('areakeys_force_false')?.props ?? null,
+      [...(scope?.variables.values() ?? [])].map(variable => variable.props)
+    ]);
+
+    if (force || signature !== this._areaSignature) {
+      this._areaSignature = signature;
+      this._areaGeneration++;
+    }
   }
 
 }

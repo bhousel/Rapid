@@ -89,6 +89,17 @@ its harnesses lived in a session's scratch folder and are gone. Make it a suite:
 - Count operations where we can (copies per derive, recomputes per merge, O(L) scans per event), and
   keep wall-clock numbers for reports: timing limits in CI are flaky.
 - A baseline to compare a branch against, and a plan for which numbers each design doc tracks.
+- A drag frame, not only a full APP pass: a full pass is mostly restyling, which hides per-frame costs
+  (graph step 7 measured 5.7 vs 9.4 ms per drag frame where the full pass showed no difference).
+
+## Renderer: classify a node only when it's dirty
+`PixiLayerOsm` asks every visible entity for point, vertex, line or area, and every vertex for
+`isEndpoint` and `isIntersection`, on every frame (about 40k answers per drag frame on 13,600
+entities in Seattle). It always has: neither `.v` (rebinding) nor `feature.dirty` (restyling) ever
+gated it, only memos on the entities made it cheap. A drag frame is about 6 ms with them, about 10
+without (graph-geometry step 7). Keeping the answers in the layer for staging, recomputed when
+`dirtyData` names the entity, would let the graph memos (and the lineage's set) go. How much it saves
+over today's memos isn't measured.
 
 ## Debugging loop: `bun run start:cdp`
 - ✅ `bun run start:chrome` (`scripts/chrome.ts`, using `chrome-launcher`) launches Chrome with remote

@@ -265,6 +265,7 @@ describe('actionMergeRemoteChanges', () => {
         const remote = base.entity('w10').update({ tags: remoteTags, nodes: remoteNodes, version: '2' });
         const localGraph = makeGraph([local]);
         const remoteGraph = makeGraph([remote, n31, n32]);
+        base.rebase(remoteGraph.childNodes(remote));   // the remote way's nodes, merged first (as the uploader does)
         const opts = {
           localGraph: localGraph,
           remoteGraph: remoteGraph,
@@ -318,6 +319,7 @@ describe('actionMergeRemoteChanges', () => {
         const remote = base.entity('w10').update({ tags: remoteTags, nodes: remoteNodes, version: '2' });
         const localGraph = makeGraph([local, n30, n31]);
         const remoteGraph = makeGraph([remote, n32, n33]);
+        base.rebase(remoteGraph.childNodes(remote));   // the remote way's nodes, merged first (as the uploader does)
         const opts = {
           localGraph: localGraph,
           remoteGraph: remoteGraph,

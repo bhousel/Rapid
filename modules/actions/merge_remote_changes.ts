@@ -37,6 +37,8 @@ export interface MergeRemoteChangesAction extends Action {
  * Merges remote changes from the OSM API with local edits.
  * Handles conflicts in location, tags, nodes, and members.
  * Uses diff3 algorithm for tag merging when possible.
+ * For a way, the remote way's child nodes must be in the graph already: merge them into the base
+ * first (`editor.merge`), as `UploaderSystem` does.
  *
  * @param   id       - EntityID of the entity to merge
  * @param   options  - Merge options including local/remote graphs and strategy
@@ -358,8 +360,7 @@ export function actionMergeRemoteChanges(id: EntityID, options: MergeRemoteChang
       target = mergeLocation(remote as OsmNode, target as OsmNode);
 
     } else if (target.type === 'way') {
-      // pull in any child nodes that may not be present locally..
-      graph.rebase(remoteGraph.childNodes(remote as OsmWay), [graph], false);
+      // (Child nodes that aren't present locally were merged into the base before this runs.)
       target = mergeNodes(base as OsmWay, remote as OsmWay, target as OsmWay);
       target = mergeChildren(target as OsmWay, utilArrayUnion((local as OsmWay).nodes, (remote as OsmWay).nodes), updates, graph);
 

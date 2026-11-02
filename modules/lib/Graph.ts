@@ -23,6 +23,12 @@ interface GraphLineage {
   baseGraph: Graph;
   /** IDs whose topology some Graph has changed, so answers about them can differ between Graphs */
   topologyChanged: Set<EntityID>;
+  /** Counts the base changes that other Graphs may need to catch up with (`syncWithBase`) */
+  changeCount: number;
+  /** IDs whose base shape changed near something a Graph has written, with the last `changeCount` that did */
+  baseChanged: Map<EntityID, number>;
+  /** The `changeCount` of the last schema change that changed what counts as an area */
+  areaCheckCount: number;
   /** The slot of each ID that some Graph has a record for, given out on its first write */
   slots: Map<EntityID, number>;
   /** The ID of each slot */
@@ -44,6 +50,17 @@ interface GraphRecord {
   parentRels: EntityID[] | null;
   /** This Graph's shape of the way or relation, stored by its commits (else it's the base object's) */
   geometry: Geometry | null;
+}
+
+
+/**
+ * What a `rebase` changed besides the entities it was given
+ */
+export interface RebaseResult {
+  /** The IDs restored in each Graph of the stack (iD#2085), only for Graphs that restored any */
+  restored: Map<Graph, Set<EntityID>>;
+  /** Base ways and relations whose shape changed because they contain what arrived */
+  reshapedIDs: Set<EntityID>;
 }
 
 
@@ -126,10 +143,14 @@ export class Graph {
   protected _journal: Set<EntityID>;
   /** The records when the savepoint began, while one is active */
   protected _savepoint: PersistentVector<GraphRecord> | null;
+  /** The `_syncedCount` when the savepoint began: a rollback goes back to shapes that old */
+  protected _savepointSyncedCount: number;
   /** Whether this Graph is in the edit history, so it may no longer change */
   protected _frozen: boolean;
   /** Shared by a base Graph and every Graph derived from it */
   protected _lineage: GraphLineage;
+  /** The lineage's `changeCount` when this Graph last caught up with the base */
+  protected _syncedCount: number;
 
 
   /**
@@ -157,6 +178,7 @@ export class Graph {
       // Uncommitted writes come along, so this Graph's first commit recomputes them.
       this._pending = new Map<EntityID, Before>(other._pending);
       this._lineage = other._lineage;
+      this._syncedCount = other._syncedCount;   // its shapes are as up to date as the other's
 
     // A fresh Graph
     } else {
@@ -168,6 +190,9 @@ export class Graph {
       this._lineage = {
         baseGraph: this,
         topologyChanged: new Set<EntityID>(),
+        changeCount: 0,
+        baseChanged: new Map<EntityID, number>(),
+        areaCheckCount: 0,
         slots: new Map<EntityID, number>(),
         slotIDs: []
       };
@@ -179,10 +204,12 @@ export class Graph {
       };
       this._records = vectorEmpty<GraphRecord>();
       this._owner = {};
+      this._syncedCount = 0;
     }
 
     this._journal = new Set<EntityID>();
     this._savepoint = null;
+    this._savepointSyncedCount = 0;
     this._frozen = false;
 
     // Deal with extra argument
@@ -393,6 +420,7 @@ export class Graph {
    * `graph.geometry(graph.entity(id))`.
    * A node's geometry is its own. A way or a relation has this Graph's shape if one of its commits
    * stored one (it changed the entity, or something in it), else the shape the base built.
+   * (This Graph's own copy that equals the base's, by value, changed nothing: it has the base's shape.)
    * Uncommitted writes are committed first, so the answer is always current.
    * @param   entity - The entity to get the geometry of (this Graph's version of it)
    * @return  Its Geometry
@@ -403,7 +431,10 @@ export class Graph {
     if (this._pending.size) {
       this.commit();
     }
-    return this._getRecord(entity.id)?.geometry ?? entity.baseGeometry;
+    const record = this._getRecord(entity.id);
+    if (record?.geometry) return record.geometry;
+    const baseEntity = record?.isLocal ? this.base.entities.get(entity.id) : entity;
+    return (baseEntity ?? entity).baseGeometry;
   }
 
 
@@ -595,6 +626,7 @@ export class Graph {
     // Keep the records as they are. A new owner token makes the writes after this copy what they
     // change, so nothing changes the kept records in place.
     this._savepoint = this._records;
+    this._savepointSyncedCount = this._syncedCount;
     this._owner = {};
   }
 
@@ -612,6 +644,7 @@ export class Graph {
     }
 
     this._records = savepoint;
+    this._syncedCount = this._savepointSyncedCount;   // so it catches up again, if the base changed since
     this._owner = {};
     this._pending.clear();
     this.touch();
@@ -689,10 +722,10 @@ export class Graph {
    * @param  entities - Entities to add to the base Graph
    * @param  stack - Stack of graphs that need updates after this rebase
    * @param  force - If `true`, always update, if `false` skip Entities that we've seen already
-   * @return The IDs restored in each Graph of the stack (iD#2085), only for Graphs that restored any
+   * @return What the rebase changed besides the entities themselves (see `RebaseResult`)
    * @throws  Will throw if _not_ called on a base graph
    */
-  public rebase(entities: OneOrMore<OsmEntity>, stack: Graph[] = [], force: boolean = false): Map<Graph, Set<EntityID>> {
+  public rebase(entities: OneOrMore<OsmEntity>, stack: Graph[] = [], force: boolean = false): RebaseResult {
 //    if (!this.isBaseGraph) {
 //      throw new Error(`Must call 'rebase' on a base graph`);
 //    }
@@ -740,9 +773,202 @@ export class Graph {
       }
     }
 
-    this._clearStaleAnswers(newIDs, replaced);
-    this._lineage.baseGraph.recomputeGeometry(newIDs);   // shapes on base objects are the base's
-    return restored;
+    // The ways and relations that contain what arrived change shape too
+    // (e.g. a relation whose members arrive in a later tile).
+    const containers = this._clearStaleAnswers(newIDs, replaced);
+    const reshapedIDs = containers.difference(newIDs);
+    const rebasedIDs = newIDs.union(containers);
+    this._noteBaseChange(rebasedIDs, false);   // first: it decides which answers may be memoized
+    this._lineage.baseGraph.recomputeGeometry(rebasedIDs);   // shapes on base objects are the base's
+
+    // A frozen graph doesn't journal its restores, so nothing would rebuild the shapes that contain
+    // the restored nodes: it does that now, with the base's shapes current.
+    for (const [graph, restoredIDs] of restored) {
+      if (graph._frozen) {
+        graph._recomputeWithContainers(restoredIDs);
+      }
+    }
+    return { restored: restored, reshapedIDs: reshapedIDs };
+  }
+
+
+  /**
+   * Rebuilds the base shape of every way that flipped between line and area, after a schema change
+   * changed what counts as an area, and of the relations that contain it. Other Graphs check their
+   * own shapes when they catch up (`syncWithBase`).
+   * Important: call it on the base graph
+   * @return The IDs whose base shape was rebuilt
+   */
+  public checkAreas(): Set<EntityID> {
+    const flipped = new Set<EntityID>();
+    for (const [entityID, entity] of this.base.entities) {
+      if (entity?.type === 'way' && this._isFlipped(entity as OsmWay, entity.baseGeometry)) {
+        flipped.add(entityID);
+      }
+    }
+
+    const reshapedIDs = flipped.union(this._baseContainers(flipped));
+    this._noteBaseChange(reshapedIDs, true);   // first: it decides which answers may be memoized
+    this._lineage.baseGraph.recomputeGeometry(reshapedIDs);
+    return reshapedIDs;
+  }
+
+
+  /**
+   * Brings this Graph's shapes up to date with what changed in the base since it last did: the shapes
+   * it keeps of its own that depend on what a rebase brought (a downloaded way through a node the
+   * user moved, an edited relation gaining members), and its ways that flipped between line and area
+   * after a schema change. Shapes it doesn't keep are the base's, which are up to date already.
+   * `EditSystem` calls it for stable and staging after a merge or a schema change, and for any other
+   * Graph it keeps when that Graph becomes current (see "Rebase" in `design/graph-geometry.md`).
+   * @return The IDs whose shape this Graph rebuilt
+   */
+  public syncWithBase(): Set<EntityID> {
+    const lineage = this._lineage;
+    const synced = this._syncedCount;
+    if (this.isBaseGraph || synced === lineage.changeCount) return new Set<EntityID>();
+
+    const ids = new Set<EntityID>();
+    for (const [entityID, count] of lineage.baseChanged) {
+      if (count > synced && this._keepsShapeNear(entityID)) {
+        ids.add(entityID);
+      }
+    }
+    if (synced < lineage.areaCheckCount) {
+      const slotIDs = lineage.slotIDs;
+      vectorForEach(this._records, (slot, record) => {
+        const entity = this.hasEntity(slotIDs[slot]);
+        if (record.geometry && entity?.type === 'way' && this._isFlipped(entity as OsmWay, record.geometry)) {
+          ids.add(entity.id);
+        }
+      });
+    }
+    this._syncedCount = lineage.changeCount;
+    return ids.size ? this._recomputeWithContainers(ids) : ids;
+  }
+
+
+  /**
+   * Internal function, rebuilds the shapes of these IDs and of this Graph's ways and relations that
+   * contain them, recursively.
+   * @param entityIDs - The IDs
+   * @return The IDs whose shape was rebuilt (and nodes among `entityIDs`, which keep their own)
+   */
+  protected _recomputeWithContainers(entityIDs: Set<EntityID>): Set<EntityID> {
+    const result = new Set<EntityID>(entityIDs);
+    const addParents = (entity: OsmEntity): void => {
+      for (const parent of [...this.parentWays(entity), ...this.parentRelations(entity)]) {
+        if (result.has(parent.id)) continue;
+        result.add(parent.id);
+        addParents(parent);
+      }
+    };
+    for (const entityID of entityIDs) {
+      const entity = this.hasEntity(entityID);
+      if (entity) addParents(entity);
+    }
+
+    this.recomputeGeometry(result);
+    return result;
+  }
+
+
+  /**
+   * Internal function, records that the base changed the shapes of these IDs, for the Graphs that
+   * keep shapes of their own near them. Only IDs near something a Graph has written count (it or a
+   * child or member has a slot); usually there are none, and nothing needs to catch up.
+   * Answers about those IDs can differ between Graphs now (e.g. a node arrives that a Graph had
+   * deleted, so that Graph's way through it differs from the base's), so they join the lineage's
+   * `topologyChanged` set. Call this before the base rebuilds its shapes, which memoizes answers.
+   * @param entityIDs - The IDs whose base shape changed
+   * @param areasChanged - `true` after a schema change: every Graph checks its own shapes for flips
+   */
+  protected _noteBaseChange(entityIDs: Set<EntityID>, areasChanged: boolean): void {
+    const lineage = this._lineage;
+    const slots = lineage.slots;
+    const count = lineage.changeCount + 1;
+
+    let isNear = false;
+    for (const entityID of entityIDs) {
+      const entity = this.base.entities.get(entityID);
+      if (slots.has(entityID) || this._childIDs(entity).some(childID => slots.has(childID))) {
+        lineage.baseChanged.set(entityID, count);
+        lineage.topologyChanged.add(entityID);
+        isNear = true;
+      }
+    }
+    if (!isNear && !areasChanged) return;
+
+    lineage.changeCount = count;
+    lineage.baseGraph._syncedCount = count;   // the base's shapes are always current
+    if (areasChanged) {
+      lineage.areaCheckCount = count;
+    }
+  }
+
+
+  /**
+   * Internal function, whether this Graph keeps something of its own that an ID's shape depends on:
+   * a record for the ID itself, or for one of its children or members.
+   * @param entityID - The ID
+   * @return `true` if this Graph's shape of it may differ from the base's
+   */
+  protected _keepsShapeNear(entityID: EntityID): boolean {
+    if (this._getRecord(entityID)) return true;
+    return this._childIDs(this.hasEntity(entityID)).some(childID => !!this._getRecord(childID));
+  }
+
+
+  /**
+   * Internal function, whether a way's stored shape is a line where it should be an area, or the other
+   * way around (what counts as an area comes from the schema).
+   * @param way - The way
+   * @param geometry - Its stored shape
+   * @return `true` if the shape is the wrong kind
+   */
+  protected _isFlipped(way: OsmWay, geometry: Geometry): boolean {
+    const type = geometry.parts[0]?.type;
+    if (!type) return false;   // no shape, e.g. a way whose nodes aren't loaded
+    return (type === 'Polygon') !== (way.isArea() && way.isClosed());
+  }
+
+
+  /**
+   * Internal function, the IDs of an entity's nodes (a way) or members (a relation).
+   * @param entity - The entity, or `undefined`
+   * @return The child IDs
+   */
+  protected _childIDs(entity: OsmEntity | undefined): EntityID[] {
+    if (entity?.type === 'way') return (entity as OsmWay).nodes;
+    if (entity?.type === 'relation') return (entity as OsmRelation).members.map(member => member.id);
+    return [];
+  }
+
+
+  /**
+   * Internal function, the base's ways and relations that contain these IDs, recursively.
+   * @param entityIDs - The IDs
+   * @return The IDs of what contains them (not the IDs themselves, unless they contain each other)
+   */
+  protected _baseContainers(entityIDs: Iterable<EntityID>): Set<EntityID> {
+    const base = this.base;
+    const result = new Set<EntityID>();
+    const addParents = (entityID: EntityID): void => {
+      for (const wayID of base.parentWays.get(entityID) ?? []) {
+        if (result.has(wayID)) continue;
+        result.add(wayID);
+        addParents(wayID);   // a way's parent relations include its shape
+      }
+      for (const relationID of base.parentRels.get(entityID) ?? []) {
+        if (result.has(relationID)) continue;
+        result.add(relationID);
+        addParents(relationID);   // a relation's shape includes its member relations'
+      }
+    };
+    for (const entityID of entityIDs) {
+      addParents(entityID);
+    }
+    return result;
   }
 
 
@@ -754,8 +980,9 @@ export class Graph {
    * user moved) can differ between graphs too, so it joins the lineage's `topologyChanged` set.
    * @param arrivedIDs - IDs of the entities the rebase added to the base
    * @param replaced - The older copies that a forced rebase replaced
+   * @return The IDs of the ways and relations that contain what arrived
    */
-  protected _clearStaleAnswers(arrivedIDs: Set<EntityID>, replaced: OsmEntity[]): void {
+  protected _clearStaleAnswers(arrivedIDs: Set<EntityID>, replaced: OsmEntity[]): Set<EntityID> {
     const base = this.base;
     const topologyChanged = this._lineage.topologyChanged;
     const stale = new Set<EntityID>();
@@ -775,19 +1002,6 @@ export class Graph {
       return touchesChanged;
     };
 
-    const addParents = (entityID: EntityID): void => {
-      for (const wayID of base.parentWays.get(entityID) ?? []) {
-        if (stale.has(wayID)) continue;
-        stale.add(wayID);
-        addParents(wayID);   // a way's parent relations include its shape
-      }
-      for (const relationID of base.parentRels.get(entityID) ?? []) {
-        if (stale.has(relationID)) continue;
-        stale.add(relationID);
-        addParents(relationID);   // a relation's shape includes its member relations'
-      }
-    };
-
     for (const entity of replaced) {
       addChildren(entity);
     }
@@ -795,12 +1009,13 @@ export class Graph {
       if (addChildren(base.entities.get(entityID))) {
         topologyChanged.add(entityID);
       }
-      addParents(entityID);
     }
+    const containers = this._baseContainers(arrivedIDs);
 
-    for (const entityID of stale) {
+    for (const entityID of stale.union(containers)) {
       base.entities.get(entityID)?.clearMemos();
     }
+    return containers;
   }
 
 

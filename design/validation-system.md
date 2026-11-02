@@ -12,7 +12,7 @@ autoconnect (accepting a Rapid feature with `poweruser.autoConnect`) crashed wit
 > a throwing validator hiding other issues, Autofix All's transaction, fixes that assumed the graph
 > they were found on, `missing_tag`'s severity, side effects while detecting, the user's edits near
 > data that wasn't loaded, the smaller items, and shared geometry (each graph keeps its own shapes
-> since step 6 of [`graph-geometry.md`](graph-geometry.md); shapes after a rebase are its step 8).
+> since step 6 of [`graph-geometry.md`](graph-geometry.md), and after a rebase since its step 8).
 > Open: the wrong spatial index (see [Rollout](#rollout)).
 
 ## Words used here
@@ -86,7 +86,7 @@ the code; the repros were kept outside the repo.
    geometry of every edited entity (so validating one way costs as much as all edits; quadratic over a
    session) and rewrites geometry that staging sees.
    Now each graph keeps its own shapes in its records, so a snapshot's commit changes only the
-   snapshot. Shapes after a rebase are that design's step 8.
+   snapshot. Stable and staging catch up with a rebase at once (that design's step 8).
 2. **The wrong spatial index** (checked). Inside an action, `waySegments` returns the segments from
    before the action. In `ValidationSystem`, a queued job validates the graph that was stable when it
    was queued; once the user commits again, that graph gets the staging index, and `almost_junction`
@@ -189,6 +189,6 @@ What a validator needs, so it can be run on any graph (including one inside an a
 5. Validate with the right spatial index (finding 2), with one runner for autoconnect and Autofix All.
 6. ✅ Geometry per graph (finding 1). The biggest change: it's about `Graph` and the data classes, not
    only validation. Designed in [`graph-geometry.md`](graph-geometry.md), with finding 2; done in its
-   step 6 (Nov 2026), except shapes after a rebase (its step 8).
+   step 6 (Nov 2026), and shapes after a rebase in its step 8.
 7. ✅ Validate the user's edits again when data loads near them (finding 6), and no side effects while
    detecting (finding 7) (Oct 2026).

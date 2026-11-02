@@ -463,6 +463,12 @@ export class UploaderSystem extends AbstractSystem {
         }
       }
 
+      // A way may have gained nodes we don't have yet. They go into the base like downloaded data,
+      // so every graph and index has them, before the merge actions use them.
+      if (local && remote.visible && remote.type === 'way') {
+        editor.merge(remoteGraph.childNodes(remote as OsmWay));
+      }
+
       // Try a safe merge first
       const actionSafe = actionMergeRemoteChanges(entityID, {
         localGraph: localGraph,

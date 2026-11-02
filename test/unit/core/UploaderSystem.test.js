@@ -232,12 +232,24 @@ describe('UploaderSystem', () => {
       serverNode('n3', 1, {}, [1, 0]);
       _server.set('w1', { type: 'way', id: 'w1', version: 2, nodes: ['n1', 'n3', 'n2'], tags: { highway: 'path' }, visible: true, user: 'other' });
 
+      const mergedIDs = new Set();
+      _editor.on('merge', entityIDs => { for (const entityID of entityIDs) mergedIDs.add(entityID); });
+      let indexed;   // whether each OSM index has the new node, before the upload resets everything
+      _uploader.once('willAttemptUpload', () => {
+        const spatial = _context.systems.spatial;
+        const has = (spatialID) => spatial.getCache(spatialID).items.has('n3');
+        indexed = { base: has('editor_base'), stable: has('editor_stable'), staging: has('editor_staging') };
+      });
+
       const result = resultAsync();
       _uploader.save(false, true);
       const { name } = await result;
 
       assert.strictEqual(name, 'resultSuccess');
       assert.deepEqual(_loads, [['w1', 'n1', 'n2'], ['n3']]);   // the remote way's new node, loaded after
+      // The new node went into the base like downloaded data: a merge, and in every index.
+      assert.isTrue(mergedIDs.has('n3'));
+      assert.deepEqual(indexed, { base: true, stable: true, staging: true });
       const uploaded = _uploads[0].modified.find(e => e.id === 'w1');
       assert.strictEqual(uploaded.version, 2);
       assert.deepEqual(uploaded.nodes, ['n1', 'n3', 'n2']);

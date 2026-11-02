@@ -80,8 +80,6 @@ function runSeed(context, seed, steps, log) {
   const random = makeRandom(seed);
   const pick = arr => arr[Math.floor(random() * arr.length)];
   const chance = p => random() < p;
-  const allowRebase = (seed % 2 === 0);   // odd seeds check shapes throughout (see `check`)
-  let rebased = false;
 
   function makeEntity(id) {
     if (id[0] === 'n') {
@@ -196,10 +194,12 @@ function runSeed(context, seed, steps, log) {
         }
       }
 
-      // Each graph's shapes match shapes built from scratch. Reading them commits uncommitted
-      // writes, so only some checks look, leaving other graphs' writes pending into later steps.
-      // Shapes after a rebase are step 8 of the design: until then, only histories without one.
-      if (!rebased && chance(0.5)) {
+      // Each graph's shapes match shapes built from scratch, once it has caught up with the base
+      // (as `EditSystem` makes a graph catch up when it becomes current). Reading shapes commits
+      // uncommitted writes, so only some checks look, leaving other graphs' writes pending, and
+      // their rebases unsynced, into later steps.
+      if (chance(0.5)) {
+        graph.syncWithBase();
         const problems = graph.verify(ALL_IDS);
         if (problems.length) {
           assert.fail(`${where}: ${problems.join(', ')}`);
@@ -341,8 +341,6 @@ function runSeed(context, seed, steps, log) {
       model.savepoint = null;
 
     } else {   // rebase
-      if (!allowRebase) continue;
-      rebased = true;
       const force = chance(0.4);
       const byID = new Map();   // one version of each ID, to keep the model simple
       const count = 1 + Math.floor(random() * 4);

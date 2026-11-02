@@ -389,7 +389,7 @@ describe('Graph bugs pinned for later steps', () => {
 
 
   describe('step 8: rebase and schema changes', () => {
-    it.todo('step 8: a multipolygon gets the members that arrive in a later tile', () => {
+    it('step 8: a multipolygon gets the members that arrive in a later tile', () => {
       const context = new Rapid.MockContext();
       const base = new Rapid.Graph(context);
       // First tile: the relation and its first outer ring
@@ -421,7 +421,7 @@ describe('Graph bugs pinned for later steps', () => {
       }
     });
 
-    it.todo('step 8: a downloaded way through a node the user moved has the moved shape', async () => {
+    it('step 8: a downloaded way through a node the user moved has the moved shape', async () => {
       const { editor } = await makeEditor();
       const context = editor.context;
       editor.merge([
@@ -446,77 +446,69 @@ describe('Graph bugs pinned for later steps', () => {
       assert.deepEqual(rounded(extentIn(base, base.entity('w2'))), [0.001, 0, 0.003, 0]);
     });
 
-    it.todo('step 8: a building is an area after the schema reloads', () => {
+    it('step 8: a building is an area after the schema reloads', async () => {
       const context = new Rapid.MockContext();
       const schema = new Rapid.SchemaSystem(context);
-      context.systems.schema = schema;
+      const editor = new Rapid.EditSystem(context);
+      context.systems = {
+        editor: editor,
+        schema: schema,
+        spatial: new Rapid.SpatialSystem(context),
+        storage: new Rapid.MockSystem(context)
+      };
+      await editor.initAsync();
       const buildingSchema = (assetID) => ({ assetID: assetID, scopes: [{ scope: 'osm', presets: {
         'building': { tags: { building: '*' }, geometry: ['area'], name: 'Building' }
       }}]});
       schema.resetAll();
       schema.merge(buildingSchema('s1'));
 
-      const w = new Rapid.OsmWay(context, { id: 'w', nodes: ['a', 'b', 'c', 'a'], tags: { building: 'yes' } });
-      const base = new Rapid.Graph(context, [
-        new Rapid.OsmNode(context, { id: 'a', loc: [0, 0] }),
-        new Rapid.OsmNode(context, { id: 'b', loc: [1, 0] }),
-        new Rapid.OsmNode(context, { id: 'c', loc: [1, 1] }),
-        w
+      editor.merge([
+        new Rapid.OsmNode(context, { id: 'a', loc: [0, 0], version: 1 }),
+        new Rapid.OsmNode(context, { id: 'b', loc: [1, 0], version: 1 }),
+        new Rapid.OsmNode(context, { id: 'c', loc: [1, 1], version: 1 }),
+        new Rapid.OsmWay(context, { id: 'w', nodes: ['a', 'b', 'c', 'a'], tags: { building: 'yes' }, version: 1 }),
+        new Rapid.OsmWay(context, { id: 'v', nodes: ['c', 'a'], version: 1 })
       ]);
-      const staging = new Rapid.Graph(base);
-      // The parts of EditSystem that `SchemaSystem.resetAll` reads
-      context.systems.editor = { base: { graph: base }, staging: { graph: staging }, _history: [] };
-      assert.strictEqual(geometryIn(base, w).parts[0].type, 'Polygon');
+      const base = editor.base.graph;
+      assert.strictEqual(geometryIn(base, base.entity('w')).parts[0].type, 'Polygon');
 
       // A runtime schema reload (e.g. a locale change) resets, then the assets load again.
+      // Meanwhile the user edits the building, so that edit keeps a shape of its own, built without
+      // area keys, and then edits something else, so it isn't current when the schema loads.
+      // Also a new building, which only the edits have.
       schema.resetAll();
+      editor.perform(Rapid.actionChangeTags('w', { building: 'yes', name: 'Hall' }));
+      editor.perform(graph => graph.replace([
+        new Rapid.OsmNode(context, { id: 'n-1', loc: [5, 5] }),
+        new Rapid.OsmNode(context, { id: 'n-2', loc: [6, 5] }),
+        new Rapid.OsmNode(context, { id: 'n-3', loc: [6, 6] }),
+        new Rapid.OsmWay(context, { id: 'w-1', nodes: ['n-1', 'n-2', 'n-3', 'n-1'], tags: { building: 'yes' } })
+      ]));
+      editor.commit({ stringID: 'name it' });
+      editor.perform(Rapid.actionChangeTags('v', { highway: 'path' }));
+      editor.commit({ stringID: 'tag it' });
       schema.merge(buildingSchema('s2'));
 
-      assert.strictEqual(w.geometry(base), 'area');
-      assert.strictEqual(geometryIn(base, w).parts[0].type, 'Polygon');
+      for (const graph of [base, editor.stable.graph, editor.staging.graph]) {
+        for (const id of (graph === base) ? ['w'] : ['w', 'w-1']) {
+          const way = graph.entity(id);
+          assert.strictEqual(way.geometry(graph), 'area');
+          assert.strictEqual(geometryIn(graph, way).parts[0].type, 'Polygon', `${id} in ${graph.id}`);
+        }
+      }
+      // The edit in the history checks its own shapes when it becomes current.
+      editor.undo();
+      const stable = editor.stable.graph;
+      assert.strictEqual(stable.entity('w').tags.name, 'Hall');
+      for (const id of ['w', 'w-1']) {
+        assert.strictEqual(geometryIn(stable, stable.entity(id)).parts[0].type, 'Polygon', id);
+      }
     });
 
-    it.todo('step 8: merging remote changes into a way emits a merge for the nodes it pulls in', async () => {
-      const { editor, spatial } = await makeEditor();
-      const context = editor.context;
-      editor.merge([
-        new Rapid.OsmNode(context, { id: 'n1', loc: [0, 0], version: 1 }),
-        new Rapid.OsmNode(context, { id: 'n2', loc: [0.001, 0], version: 1 }),
-        new Rapid.OsmWay(context, { id: 'w1', nodes: ['n1', 'n2'], tags: { highway: 'residential' }, version: 1 })
-      ]);
-      editor.perform(Rapid.actionChangeTags('w1', { highway: 'residential', name: 'Main Street' }));
-      editor.commit({ stringID: 'name it' });
-
-      // Another mapper extended the way with a new node.
-      const n3 = new Rapid.OsmNode(context, { id: 'n3', loc: [0.002, 0], version: 1 });
-      const remoteGraph = new Rapid.Graph(context, [
-        editor.base.graph.entity('n1'),
-        editor.base.graph.entity('n2'),
-        n3,
-        new Rapid.OsmWay(context, { id: 'w1', nodes: ['n1', 'n2', 'n3'], tags: { highway: 'residential' }, version: 2 })
-      ]);
-
-      const mergedIDs = new Set();
-      editor.on('merge', ids => { for (const id of ids) mergedIDs.add(id); });
-      const action = Rapid.actionMergeRemoteChanges('w1', {
-        localGraph: editor.staging.graph,
-        remoteGraph: remoteGraph,
-        discardTags: { created_by: true }
-      });
-      editor.perform(action);
-
-      const staging = editor.staging.graph;
-      assert.deepEqual(action.conflicts(), []);
-      assert.deepEqual(staging.entity('w1').nodes, ['n1', 'n2', 'n3']);
-      assert.isTrue(mergedIDs.has('n3'));
-
-      // The rebase put n3 in the base graph, so the base and stable indexes should have it too.
-      assert.isOk(editor.base.graph.hasEntity('n3'));
-      assert.isNotNull(indexBox(spatial, 'editor_base', 'n3'));
-      assert.isNotNull(indexBox(spatial, 'editor_stable', 'n3'));
-      // The staging index has w1 where it's drawn now, reaching n3.
-      assert.deepEqual(indexBox(spatial, 'editor_staging', 'w1')[2], indexBox(spatial, 'editor_staging', 'n3')[2]);
-    });
+    // 'merging remote changes into a way emits a merge for the nodes it pulls in' is in
+    // `UploaderSystem.test.js` ("merges a way that gained a node only the server has"): the uploader
+    // merges the nodes through `editor.merge` before the merge action runs.
   });
 
 });

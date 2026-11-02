@@ -7,7 +7,7 @@ of the change. This design fixes findings 1 (shared geometry) and 2 (the wrong s
 [validation audit](validation-system.md#the-october-2026-audit), the bugs listed below, and the cost of
 keeping versions. It gives Rapid one way to ask for anything's geometry: `graph.geometry(entity)`.
 
-> **Status:** In progress (October 2026): steps 0-6 done. After step 3 the rest was put in a new
+> **Status:** In progress (October 2026): steps 0-6 and 8 done; step 7 measured and left for later. After step 3 the rest was put in a new
 > order (November 2026): backups first, then derived data in records in two steps. Measured in two rounds: a survey of
 > today's costs and bugs, then three competing designs, each prototyped and reviewed for correctness
 > and for performance (in JavaScriptCore and V8). See [Open questions](#open-questions).
@@ -264,18 +264,23 @@ and binds again when either is a different object. No version numbers, in record
 Rebase belongs to the lineage: graphs aren't passed in.
 
 1. The base entities and parent sets are updated as today, and so is the lineage's index.
-2. The base data of everything whose topology the download changed is marked stale: memos cleared,
-   version bumped, geometry recomputed (members first). That's the base parents of what arrived (a
-   relation whose members arrive in a later tile), and the existing children and members of what
-   arrived (a node a new way passes through; for a forced update, the old children and the new).
-   Every graph that doesn't override them sees the change at once.
+2. The base data of everything whose topology the download changed is marked stale: memos cleared
+   and geometry recomputed (members first). Geometry is recomputed for what arrived and the base's
+   ways and relations that contain it, recursively (a relation whose members arrive in a later
+   tile); memos are also cleared for the existing children and members of what arrived (a node a new
+   way passes through; for a forced update, the old children and the new). Every graph that doesn't
+   override them sees the change at once.
 3. Graphs whose own edits interact with what arrived (a new way through a node the user moved, an
    edited relation gaining members) are found through the slot table, in O(arrived × children)
-   whatever the history's length. Usually there are none. Such a graph updates its derived data by
-   running the commit closure for those IDs: stable and staging right away, and the other graphs
-   `EditSystem` keeps (the history, its checkpoints, the return edit) when undo, redo or a revert makes
-   them current. Their entities don't wait: the restores in item 4 reach them at once. A graph with
-   uncommitted writes keeps them pending.
+   whatever the history's length. Usually there are none. The lineage notes those IDs, with a count
+   of base changes (`baseChanged`, `changeCount`), and they join its `topologyChanged` set, since
+   answers about them can now differ between graphs. A graph catches up with `graph.syncWithBase()`:
+   it rebuilds the shapes it keeps near the noted IDs, and what contains them. `EditSystem` calls it
+   for stable and staging right after a merge, and for a graph from the history (or a checkpoint, or
+   the return edit) when undo, redo or a revert makes it current (`_replaceStaging`). Each graph
+   remembers the count it caught up to; a savepoint keeps it too, so a rollback catches up again.
+   Their entities don't wait: the restores in item 4 reach them at once. A graph with uncommitted
+   writes keeps them pending.
    - **No other graph is updated** (decided November 2026). Rebase and every validator call are
      synchronous, so a graph only lives through a rebase if it's held across an `await` or an idle
      callback. Validation doesn't hold one: each chunk of jobs reads `cache.graph` when it runs, and
@@ -283,15 +288,18 @@ Rebase belongs to the lineage: graphs aren't passed in.
      stable before the chunks after it run). The older stable it keeps (`_headQueuedGraph`) is only
      diffed, by entity. Today the one graph held across awaits is the uploader's remote graph, which
      reads entities only: it sees base's new entities, as today.
-   - So derived data from a graph that missed a rebase is never read, and dev builds assert that on
-     `graph.geometry()` and memo reads (each graph remembers the lineage's rebase count when it was
-     last brought up to date). `hasEntity` has no such check: reads stay as cheap as they are.
+   - So derived data from a graph that missed a rebase is never read. Dev builds could assert that on
+     `graph.geometry()` and memo reads, by comparing the graph's count with the lineage's; that waits
+     for a dev-build flag, which Rapid doesn't have yet. `hasEntity` has no such check: reads stay as
+     cheap as they are.
    - A validation worker, if validation moves to one, isn't affected: it can't share these objects, so
      it validates its own copy of a slightly older stable.
    - The earlier plan updated any other graph "on first use", which needed a check on every read.
 4. iD#2085: a node that a graph deleted comes back when a downloaded way uses it, unless that graph
    deleted the way too. This applies to every graph, redo graphs included. Restored IDs go into the
-   next emit and the session difference (section 8).
+   next emit and the session difference (section 8). A graph that isn't frozen journals the restore,
+   so its next commit rebuilds the shapes that contain the node; a frozen graph rebuilds them during
+   the rebase, once the base's shapes are current.
 
 Measured (prototype, an 11k-entity tile with 5 new ways through nodes the user moved): the rebase and
 staging's update take 16.5-19.2 ms, against 14.5-17.7 ms for today's rebase with a 12-graph history.
@@ -313,6 +321,13 @@ today's `_updateRebased` alone takes 57-74 ms per merge.
   holding records for one updates them the same way as for a rebase: stable and staging at once,
   the other graphs `EditSystem` keeps when they become current, and only on committed graphs.
 - `SchemaSystem`'s hack goes.
+- As built (step 8): `SchemaSystem.areaGeneration` changes when a JSON signature of the area keys, the
+  two area rulesets and the scope's variables changes, but not while a load is in progress; and once
+  more when a load finishes, since shapes built during it had no area keys. `EditSystem` listens to
+  `schemachange` and, when the area generation moved, runs `base.checkAreas()` (base ways that flipped,
+  and what contains them) and `syncWithBase()` on stable and staging, which also check their own
+  shapes for flips. A flip doesn't change an extent, so the indexes stay. Rapid datasets' graphs aren't
+  checked yet (step 10). In central Seattle (80k entities), a schema reload takes 164 ms in all.
 
 ### 7. Spatial indexes for any graph (finding 2)
 
@@ -698,10 +713,47 @@ records (now 6 and 7), 5 rebase (now 8), 6 spatial indexes (now 9), 7 backups (n
    - The lineage's set of IDs whose topology changed goes, and with it `graph.canShareAnswers()`. The
      set only grows during a session, so today more and more reads go unmemoized.
    - Measure first how many reads take the unmemoized path in a long session, to know what this buys.
+   - **Measured (November 2026), not built.** In Chrome, on 13,600 entities of Seattle:
+     - After 150 edits spread over the view (1,150 IDs in the set), 5-7% of the reads that depend on
+       a graph go unmemoized, in validation and in a redraw. Validation (470-490 ms) and a full APP
+       pass (113-119 ms) don't change measurably, even with every one of those reads unmemoized.
+     - But a drag frame asks about 22,500 point-or-vertex answers, 9,500 `isEndpoint` and 8,500
+       `isIntersection`: `PixiLayerOsm` classifies every visible node on every frame. Without these
+       memos a drag frame goes from 5.7-6.1 to 9.4-10 ms, so they stay.
+     - So this step would save about 5% of that 4 ms (0.2 ms a frame) after 150 edits, more in a
+       long session in one place, at the cost of a record for every node of a changed way and a rule
+       for rebases. The set starts over with each new base (after a save), which bounds it further.
+     - Left for later. Cheaper first, if long sessions show many unmemoized reads: have the renderer
+       classify a node only when it's dirty, instead of on every frame.
 8. **Rebase and schema changes.** The lineage rebases in both directions. Stable and staging update
    at once, and the other graphs `EditSystem` keeps when they become current (section 5). iD#2085
    restores reach every graph. `merge_remote_changes` goes through `editor.merge`. Geometry is
    recomputed only for line/area flips, and `SchemaSystem`'s hack goes.
+   - **Done** (November 2026). How it landed (sections 5 and 6 have the details):
+     - A rebase recomputes the base's shapes of what arrived and of what contains it, so a relation
+       whose members arrive later is whole. `rebase()` returns `{ restored, reshapedIDs }`, and
+       `EditSystem` gives the reshaped IDs new index boxes and puts them in its `merge` event.
+     - `graph.syncWithBase()` catches a graph up, with the lineage's `baseChanged` and `changeCount`;
+       `base.checkAreas()` does the same for schema changes, from `SchemaSystem.areaGeneration`.
+     - `UploaderSystem` merges a remote way's new nodes with `editor.merge` before
+       `actionMergeRemoteChanges` runs, which no longer rebases (that skipped the `merge` event,
+       the indexes and other graphs' restores).
+     - The model test checks shapes after rebases now, on every seed, catching up each graph before it
+       checks (as `EditSystem` does when a graph becomes current). It found three bugs older than
+       this step, all fixed: a frozen graph's iD#2085 restore didn't rebuild the shapes containing
+       the node; a graph's own copy that equals the base's (no change at commit) read its own unbuilt
+       shape, so `graph.geometry()` reads the base object's then; and a node arriving that a graph had
+       deleted left the way through it memoized for every graph, so IDs the lineage notes join
+       `topologyChanged` (before the base rebuilds, which memoizes). 3,000 seeds pass. Breaking each
+       part of this step on purpose fails the model test or a pinned test.
+     - The four step 8 `todo` tests pass. The one for merging remote changes moved to
+       `UploaderSystem.test.js`, which runs that flow.
+     - Merges cost the same: 10k entities over a 20k-entity history in 57-66 ms in V8 (54-76 before),
+       37-39 ms in Bun (32-42). Edits, drags and undo are unchanged.
+     - In the debug Chrome on Seattle (80k entities after panning, 272 relations), `verify()` finds no
+       stale shape in base, stable or staging (step 6 found 89 relations). After a schema reload all
+       4,895 buildings are still areas.
+     - Not done: dev-build asserts on reads from a graph that missed a rebase (no dev-build flag yet).
 9. **Spatial indexes for any graph.** One index per lineage, overlays for stable and staging, and the
    diff correction (no cache to start with). `spatialIDForGraph` goes, and `_validateEditsNearAsync`
    queries the stable overlay. This fixes finding 2 by construction.

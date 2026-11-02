@@ -51,7 +51,15 @@ Step 5 done Nov 2: backup items hold each edit's own changes (`_backupChangesFor
 Step 6 done Nov 2: shapes in records (`GraphRecord.geometry`), base shapes only from the lineage's
 `baseGraph`, `geoms`/`extent()`/`intersects()` throw on ways and relations, renderer rebinds by
 object identity (no `graph.version()`), no touches, savepoint keeps the records, `graph.verify()`.
-Known: 89 Seattle relations stale after later tiles (step 8). Next: step 7 (memos in records).
+Known: 89 Seattle relations stale after later tiles (step 8). Step 7 (memos in records) measured
+Nov 2 and not built: 5-7% of graph reads unmemoized after 150 edits, worth ~0.2 ms a drag frame;
+dropping graph memos instead costs ~4 ms a drag frame (patch kept out of the repo).
+Step 8 done Nov 2: rebase recomputes base containers of what arrived; lineage `baseChanged`/
+`changeCount`; `graph.syncWithBase()` (stable/staging after merge and schema change, a history graph
+in `_replaceStaging`); `base.checkAreas()` + `SchemaSystem.areaGeneration`; uploader merges remote
+way nodes via `editor.merge`. Model test verifies after rebases on every seed; it found 3 older bugs
+(frozen restores, equal-copy shapes, memos of ways through a node a graph deleted), fixed. Seattle:
+0 stale shapes (was 89). Next: step 9 (spatial indexes).
 Decided Oct 31: relation geometry references its members' parts (step 2), multipolygon ring structure
 cached and reused (follow-up); lazy build only as a stopgap. Backups: step 5 rewrites v4 in place
 (no v5); when it lands, delete the v4 sessions in the debug Chrome (the only ones that exist).

@@ -649,6 +649,17 @@ describe('Graph', () => {
       const other = new Rapid.Graph(new Rapid.Graph(context, [n1, n2])).remove(n2);   // another lineage
       assert.sameMembers([...g2.diffIDs(other)], ['n1', 'n2']);
     });
+
+    it('gives its own copy that equals the base\'s the base\'s shape', () => {
+      const n1 = new Rapid.OsmNode(context, { id: 'n1', loc: [0, 0] });
+      const n2 = new Rapid.OsmNode(context, { id: 'n2', loc: [1, 1] });
+      const w1 = new Rapid.OsmWay(context, { id: 'w1', nodes: ['n1', 'n2'] });
+      const base = new Rapid.Graph(context, [n1, n2, w1]);
+      const copy = new Rapid.OsmWay(context, { id: 'w1', nodes: ['n1', 'n2'] });   // equal by value, so no change
+      const head = new Rapid.Graph(base).load({ w1: copy });
+      assert.strictEqual(head.entity('w1'), copy);
+      assert.deepEqual(head.extent(copy).rectangle(), [0, 0, 1, 1]);
+    });
   });
 
 
@@ -709,7 +720,7 @@ describe('Graph', () => {
       head.freeze();
 
       const w1 = new Rapid.OsmWay(context, { id: 'w1', nodes: ['n1', 'n2'] });
-      const restored = base.rebase([n2, w1], [head]);
+      const { restored } = base.rebase([n2, w1], [head]);
       assert.strictEqual(head.hasEntity('n1'), n1);
       assert.sameMembers([...restored.get(head)], ['n1']);
     });
