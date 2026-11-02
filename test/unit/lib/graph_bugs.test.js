@@ -3,9 +3,9 @@ import { assert } from 'chai';
 import * as Rapid from '../../../modules/headless.js';
 
 
-// Bugs from design/graph-geometry.md ("Bugs found while measuring") that later rollout steps fix.
-// Each test is a `todo` until its step lands: bun runs them only with `--todo`, and they fail today.
-// When a step lands, drop `.todo` from its tests.
+// Bugs from design/graph-geometry.md ("Bugs found while measuring"), grouped by the rollout step that
+// fixed them. They were pinned as `todo` tests before their steps landed; now that every step has
+// landed, they guard against the bugs coming back.
 //
 // Readers move to `graph.geometry(entity)` / `graph.extent(entity)` in step 2, and step 6 makes
 // `entity.geoms` throw on ways and relations, so these helpers ask the graph when it can answer.
@@ -42,7 +42,7 @@ function indexBox(spatial, spatialID, id) {
 }
 
 
-describe('Graph bugs pinned for later steps', () => {
+describe('Graph bugs fixed by the graph-geometry rollout', () => {
 
   describe('step 1: change journal', () => {
     it('step 1: commit builds nested relations members first', () => {

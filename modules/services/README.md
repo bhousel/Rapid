@@ -76,6 +76,15 @@ await service.startAsync();  // Begin fetching data
 await service.resetAsync();  // Clear caches
 ```
 
+## Service Data
+
+Services keep the data they fetch (photos, notes, QA issues, datasets) in `SpatialSystem` caches. Data
+elements are immutable: to change one (more details arrive, a sequence gains images, the user picks a
+status), store a new one made with `update()` in the cache, instead of changing its `props` in place.
+The map layers redraw a feature when its data is a different object, and selections find the newest
+version by data ID. A loader that skips work once details are loaded should look at the cached copy,
+since the one it's given may be older.
+
 ## Accessing Services
 
 Services are accessed through the context, just like systems:

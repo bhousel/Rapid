@@ -90,7 +90,7 @@ export interface GraphCache {
 
 /**
  * A `Graph` is a special collection of OSM Entities.
- * Each graph contains a "base" state (uneditied) and "local" state (edited).
+ * Each graph contains a "base" state (unedited) and "local" state (edited).
  * The graph also contains all the caches and methods needed to manage OSM topology.
  *
  * The base is shared by every Graph derived from it (a "lineage"). Each Graph keeps what it says
@@ -102,16 +102,19 @@ export interface GraphCache {
  * Shapes follow the same rule: a commit stores the shapes of what it changed (and of the ways and
  * relations that contain it) in this Graph's records, and only the base Graph stores shapes on the
  * base objects. So every Graph answers `geometry()` for itself, and undo needs nothing recomputed.
+ * When a rebase (or a schema change) changes base shapes near what a Graph keeps of its own, that Graph
+ * catches up with `syncWithBase()`.
  *
  * In previous versions of the code, `Graph` was written in an immutable style,
  * so that calls to `replace`/`remove`/`revert` would return a new `Graph`.
  * This became a performance concern, so now `Graphs` are transactional.
- * You can call these methods anytme to make modifications to the `Graph`,
- * but then you must call `commit` to update any Entities that rely on the `Graph`.
+ * You can call these methods anytime to make modifications to the `Graph`,
+ * but then you must call `commit` to rebuild the shapes of what changed.
  *
  * Each Graph keeps a journal of the IDs it writes, so `commit` and `EditSystem` work from
  * what changed, not from everything the Graph has changed from base.
- * Graphs in the edit history are frozen: only a rebase's iD#2085 restores may change them.
+ * Graphs in the edit history are frozen: only a rebase's iD#2085 restores, and catching up with the
+ * base (`syncWithBase()`), may change them.
  * @see design/graph-geometry.md
  *
  * Properties available:
@@ -276,8 +279,10 @@ export class Graph {
   }
 
   /**
-   * Bump internal version number in place (typically, forcing a rerender)
-   * Note that this version number always increases and is shared by all data elements.
+   * Bump this Graph's version number in place, so its `key` changes. Graphs are transactional, so
+   * every write does this, and `EditSystem` compares keys to know whether to emit a change.
+   * (Data elements are immutable and have no `touch()`: a changed element is a new object.)
+   * Note that this version number always increases and is shared with data elements' versions.
    * We did it this way to avoid situations where you undo to a previous version
    *  you don't want it to increment it back to the same version and appear unchanged.
    * @see Rapid@9ac2776a
@@ -320,7 +325,8 @@ export class Graph {
    * Whether answers about an entity that depend on the Graph (its parents, its shape) are the same
    * in this Graph as in every other Graph of its lineage, so they may be memoized on the entity.
    * They aren't once any Graph has changed the entity's topology, or while this Graph has
-   * uncommitted writes. (Step 7 of the design stores them per Graph instead.)
+   * uncommitted writes, or once a rebase brings data near what a Graph changed.
+   * (Step 7 of the design would store them per Graph instead; it was measured and left for later.)
    * @param entityID - The entity's ID
    * @return `true` if answers about it may be memoized on the entity
    */

@@ -364,12 +364,11 @@ export class KartaviewService extends AbstractSystem {
   protected _gotTile(tile: Tile, page: number, response: any): void {
     const context = this.context;
     const gfx = context.systems.gfx;
-    const spatial = context.systems.spatial!;
 
     const data = response?.currentPageItems || [];
     if (!data.length) return;
 
-    const seenSequences = new Set<GeoJSONData>();
+    const imagesBySequence = new Map<string, KartaviewImage[]>();
 
     // Process and cache the images
     for (const d of data) {
@@ -389,23 +388,14 @@ export class KartaviewService extends AbstractSystem {
         sequenceIndex: parseInt(d.sequence_index, 10)
       });
 
-      // Update the sequence to include this image, create if needed..
-      const sequence = this._cacheSequence(image);
-      seenSequences.add(sequence);
+      const images = imagesBySequence.get(sequenceID) ?? [];
+      images.push(image);
+      imagesBySequence.set(sequenceID, images);
     }
 
-    // Rebuild the geometry for the the seen sequences.
-    // Update geometry in-place.. hope this is ok.
-    for (const sequence of seenSequences) {
-      const geojson = sequence.props.geojson as any;
-      const imageIDs = sequence.props.imageIDs as PhotoID[];
-
-      geojson.geometry.coordinates = imageIDs.map(imageID => {
-        const image = spatial.getItem<KartaviewImage>('kartaview-images', imageID);
-        return image?.loc;
-      }).filter(Boolean);
-      sequence.updateGeometry().touch();
-      spatial.replaceData('kartaview-sequences', sequence);
+    // Update the sequences to include these images, create if needed..
+    for (const images of imagesBySequence.values()) {
+      this._cacheSequence(images);
     }
 
     gfx?.deferredRedraw();
@@ -654,20 +644,7 @@ export class KartaviewService extends AbstractSystem {
         });
 
         // Update the sequence to include this image, create if needed..
-        const sequence = this._cacheSequence(image);
-
-        // Rebuild the geometry for the the seen sequence.
-        // Update geometry in-place.. hope this is ok.
-        const geojson = sequence.props.geojson as any;
-        const imageIDs = sequence.props.imageIDs as PhotoID[];
-
-        geojson.geometry.coordinates = imageIDs.map(imageID => {
-          const image = spatial.getItem<KartaviewImage>('kartaview-images', imageID);
-          return image?.loc;
-        }).filter(Boolean);
-
-        sequence.updateGeometry().touch();
-        spatial.replaceData('kartaview-sequences', sequence);
+        this._cacheSequence([image]);
         gfx?.deferredRedraw();
         return image;
       })
@@ -714,7 +691,7 @@ export class KartaviewService extends AbstractSystem {
 
     if (r > 180) r -= 360;
     if (r < -180) r += 360;
-    sequence.props.rotation = r;  // Update properties in-place.. hope this is ok.
+    spatial.replaceData('kartaview-sequences', sequence.update({ rotation: r }));  // a new sequence (data isn't changed in place)
 
     const $wrapper: D3Selection = context.container().select('.photoviewer .osc-wrapper');
 
@@ -794,91 +771,103 @@ export class KartaviewService extends AbstractSystem {
     const spatial = context.systems.spatial!;
     const imageID = source.id;
 
+    // Allow 0, but not things like NaN, null, Infinity
+    const caIsNumber = Number.isFinite(source.ca);
+    const indexIsNumber = Number.isFinite(source.sequenceIndex);
+
+    // Whatever additional props we were passed..
+    const changes: Partial<KartaviewImageProps> = {};
+    if (source.sequenceID)     changes.sequenceID     = source.sequenceID;
+    if (indexIsNumber)         changes.sequenceIndex  = source.sequenceIndex;
+    if (source.captured_at)    changes.captured_at    = source.captured_at;
+    if (source.captured_by)    changes.captured_by    = source.captured_by;
+    if (caIsNumber)            changes.ca             = source.ca;
+    if (source.isPano)         changes.isPano         = source.isPano;
+    if (source.imageLowUrl)    changes.imageLowUrl    = source.imageLowUrl;   // thumbnail
+    if (source.imageMedUrl)    changes.imageMedUrl    = source.imageMedUrl;   // large thumbnail
+    if (source.imageHighUrl)   changes.imageHighUrl   = source.imageHighUrl;  // full resolution
+
+    // Data isn't changed in place: an update makes a new image, so the layer draws it again.
     let image = spatial.getItem<KartaviewImage>('kartaview-images', imageID);
-    if (!image) {
+    if (image) {
+      image = image.update(changes);
+    } else {
       const loc = spatial.getFreeLoc('kartaview-images', source.loc);
       image = new MarkerData<KartaviewImageProps>(context, {
         type:       'photo',
         serviceID:  this.id as ServiceID,
         namespace:  'kartaview-images',
         id:         imageID,
-        loc:        loc
+        loc:        loc,
+        isPano:     false,
+        ...changes
       });
     }
 
-    // Allow 0, but not things like NaN, null, Infinity
-    const caIsNumber = Number.isFinite(source.ca);
-    const indexIsNumber = Number.isFinite(source.sequenceIndex);
-
-    // Update whatever additional props we were passed..
-    const props = image.props;
-    if (source.sequenceID)     props.sequenceID     = source.sequenceID;
-    if (indexIsNumber)         props.sequenceIndex  = source.sequenceIndex;
-    if (source.captured_at)    props.captured_at    = source.captured_at;
-    if (source.captured_by)    props.captured_by    = source.captured_by;
-    if (caIsNumber)            props.ca             = source.ca;
-    if (source.isPano)         props.isPano         = source.isPano;
-    if (source.imageLowUrl)    props.imageLowUrl    = source.imageLowUrl;   // thumbnail
-    if (source.imageMedUrl)    props.imageMedUrl    = source.imageMedUrl;   // large thumbnail
-    if (source.imageHighUrl)   props.imageHighUrl   = source.imageHighUrl;  // full resolution
-
-    if (!props.isPano)  props.isPano = false;
     spatial.replaceData('kartaview-images', image);
-
-    return image.touch();
+    return image;
   }
 
 
   /**
-   * Store the given sequence in the caches.
+   * Store the sequence of the given images in the caches, with them in it.
    * Sequence data is always derived from the image data.
-   * @param  image - the image that belongs to this sequence
+   * Data isn't changed in place: this makes a new sequence, so the layer draws it again.
+   * @param  images - images that belong to one sequence (already cached)
    * @return  The sequence
    */
-  protected _cacheSequence(image: KartaviewImage): KartaviewSequence {
+  protected _cacheSequence(images: KartaviewImage[]): KartaviewSequence {
     const context = this.context;
     const spatial = context.systems.spatial!;
-    const sequenceID = image.props.sequenceID;
-    const sequenceIndex = image.props.sequenceIndex ?? 0;
+    const sequenceID = images[0].props.sequenceID;
 
-    let sequence = spatial.getItem<KartaviewSequence>('kartaview-sequences', sequenceID);
-    if (!sequence) {
+    const existing = spatial.getItem<KartaviewSequence>('kartaview-sequences', sequenceID);
+    const props: Partial<KartaviewSequenceProps> = {
+      imageIDs:   [...(existing?.props.imageIDs ?? [])],
+      firstIndex: existing?.props.firstIndex ?? Infinity
+    };
+
+    for (const image of images) {
+      const sequenceIndex = image.props.sequenceIndex ?? 0;
+
+      // Insert image into sequence - note that `imageIDs` may be a sparse array.
+      props.imageIDs![sequenceIndex] = image.id;
+
+      // Set metadata for this sequence according to the earliest image.
+      if (sequenceIndex < (props.firstIndex ?? Infinity)) {
+        props.firstIndex  = sequenceIndex;
+        props.isPano      = image.props.isPano;
+        props.captured_at = image.props.captured_at;
+        props.captured_by = image.props.captured_by;
+      }
+    }
+
+    // The line goes through the images in order.
+    const coordinates = props.imageIDs!
+      .map(imageID => spatial.getItem<KartaviewImage>('kartaview-images', imageID)?.loc)
+      .filter(Boolean);
+    props.geojson = {
+      type: 'Feature',
+      properties: {},
+      geometry: { type: 'LineString', coordinates: coordinates }
+    } as GeoJSON.Feature;
+
+    let sequence: KartaviewSequence;
+    if (existing) {
+      sequence = existing.update(props);
+    } else {
       sequence = new GeoJSONData<KartaviewSequenceProps>(context, {
         id:         sequenceID,
         type:       'sequence',
         serviceID:  this.id as ServiceID,
         namespace:  'kartaview-sequences',
-        imageIDs:   [],
         rotation:   0,
-        firstIndex: Infinity,
-        geojson: {
-          type: 'Feature',
-          properties: {},
-          geometry: {
-            type: 'LineString',
-            coordinates: []
-          }
-        } as GeoJSON.Feature
+        ...props
       });
     }
 
-    // Update sequence properties as needed.
-    const props = sequence.props;
-
-    // Insert image into sequence - note that `imageIDs` may be a sparse array.
-    props.imageIDs![sequenceIndex] = image.id;
-
-    // Set metadata for this sequence according to the earliest image.
-    if (sequenceIndex < (props.firstIndex ?? Infinity)) {
-      props.firstIndex  = sequenceIndex;
-      props.isPano      = image.props.isPano;
-      props.captured_at = image.props.captured_at;
-      props.captured_by = image.props.captured_by;
-    }
-
     spatial.replaceData('kartaview-sequences', sequence);
-
-    return sequence.touch();
+    return sequence;
   }
 
 }

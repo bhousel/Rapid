@@ -2,6 +2,33 @@
 
 Non-obvious choices where "why did we do it this way?" isn't captured in the code.
 
+## Graph versions and derived data (graph-geometry rollout, Nov 2026)
+
+Details and measurements are in `design/graph-geometry.md`; these are the choices someone might undo by accident.
+- **Each graph keeps its own shapes; only the base graph writes shapes onto base objects.** Shapes on
+  objects that every graph shares made staging's drag change stable's geometry (validation finding 1).
+- **The renderer rebinds by object identity, not version numbers.** A changed entity is a new object and
+  a changed shape is a new `Geometry`, so identity already says what a `graph.version()` would. Numbers
+  would be one more thing to keep right through savepoints, rebases and restores.
+- **Data is never changed in place.** Services and editors store `update()`'d copies. `v` stays as a
+  stamp `update()` gives each copy, because `key` (`${id}v${v}`) feeds d3 joins and `FilterSystem`;
+  `touch()` and `AbstractPixiFeature.v` are gone.
+- **After a rebase, stable and staging catch up at once; other graphs when they become current.** No
+  per-read "update on first use" check. Safe because rebase and validators are synchronous, and the only
+  graph held across awaits (the uploader's remote graph) reads entities only.
+- **The OSM spatial indexes live in `EditSystem`, not the lineage or `SpatialSystem`.** `SpatialSystem`
+  stays data-agnostic, and only the editor's lineage should build indexes (since step 8 every rebase of
+  it goes through `EditSystem`). If another lineage ever needs versions and searches, pull the
+  base-plus-local-index logic into a helper its owner creates. (Bryan tried graphs in spatial caches in
+  Aug 2025 and backed it out.)
+- **"Local index", not "overlay".** In Rapid an overlay is an imagery layer. "Local" matches
+  `graph.isLocal()`: what a graph says differently from the base.
+- **No lineages for GeoJSON and markers.** A base-only lineage would hold what the spatial cache already
+  holds. Add one when some data needs versions.
+- **Step 7 (memos in records) deferred.** After 150 edits only 5–7% of graph-dependent memo reads skip
+  memoization (about 0.2 ms a drag frame), but dropping those memos entirely costs about 4 ms a drag
+  frame, because `PixiLayerOsm` classifies every node every frame. Backlog: classify only when dirty.
+
 ## Folder-specific agent rules live in nested `AGENTS.md`, not `.github/instructions/`
 
 `.github/instructions/*.instructions.md` with `applyTo:` globs only work in Copilot. Claude Code never loaded

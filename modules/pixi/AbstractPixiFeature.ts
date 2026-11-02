@@ -35,12 +35,12 @@ export type PixiFeatureProps = Record<string, unknown>;
  * - `geom`                - GeometryPart() class containing all the information about the geometry
  * - `style`               - Object containing style info
  * - `label`               - String containing the Feature's label (if any)
- * - `data`                - Data element bound to this Feature (like `__data__` from the D3.js days)
+ * - `data`                - Data element bound to this Feature (like `__data__` from the D3.js days).
+ *                           Data is immutable, so layers bind it again when it's a different object.
  * - `props`               - Properties object, can contain other arbitrary properties
  * - `visible`             - `true` if the Feature is visible (`false` if it is culled)
  * - `allowInteraction`    - `true` if the Feature is allowed to be interactive (emits Pixi events)
  * - `dirty`               - `true` if the Feature needs to be rebuilt
- * - `v`                   - Version of the Feature, can be used to detect changes
  * - `lod`                 - Level of detail for the Feature last time it was styled (0 = off, 1 = simplified, 2 = full)
  * - `halo`                - A PIXI.Container() that contains the graphics for the Feature's halo (if it has one)
  */
@@ -60,8 +60,6 @@ export class AbstractPixiFeature {
   public container: FeatureContainer;
   /** Properties object, can be used to attach arbitrary data to this Feature */
   public props: Partial<PixiFeatureProps>;
-  /** Version of the Feature, can be used to detect changes */
-  public v: number;
   /** Level of detail for the Feature last time it was styled (0 = off, 1 = simplified, 2 = full) */
   public lod: number;
   /** A PIXI.Container that contains the graphics for the Feature's halo (if it has one) */
@@ -112,7 +110,6 @@ export class AbstractPixiFeature {
     this._allowInteraction = true;
     container.eventMode = 'static';
 
-    this.v = -1;
     this.lod = 2;   // full detail
     this.halo = null;
 

@@ -2350,29 +2350,33 @@ export class OsmService extends AbstractSystem {
     const spatial = context.systems.spatial!;
     const noteID = source.id;
 
+    // Whatever additional props we were passed..
+    const changes: Partial<OsmNoteProps> = {};
+    if (source.url)           changes.url          = source.url;
+    if (source.comment_url)   changes.comment_url  = source.comment_url;
+    if (source.close_url)     changes.close_url    = source.close_url;
+    if (source.date_created)  changes.date_created = source.date_created;
+    if (source.status)        changes.status       = source.status;
+    if (source.comments)      changes.comments     = source.comments;
+
+    // Data isn't changed in place: an update makes a new note, so the layer draws it again.
     let note = spatial.getItem<OsmNote>('osm-notes', noteID);
-    if (!note) {
+    if (note) {
+      note = note.update(changes);
+    } else {
       const loc = spatial.getFreeLoc('osm-notes', source.loc);
       note = new MarkerData<OsmNoteProps>(this.context, {
         type:       'note',
         serviceID:  this.id,
         namespace:  'osm-notes',
         id:         noteID,
-        loc:        loc
+        loc:        loc,
+        ...changes
       });
     }
 
-    // Update whatever additional props we were passed..
-    const props = note.props;
-    if (source.url)           props.url          = source.url;
-    if (source.comment_url)   props.comment_url  = source.comment_url;
-    if (source.close_url)     props.close_url    = source.close_url;
-    if (source.date_created)  props.date_created = source.date_created;
-    if (source.status)        props.status       = source.status;
-    if (source.comments)      props.comments     = source.comments;
-
     spatial.replaceData('osm-notes', note);
-    return note.touch() as OsmNote;
+    return note;
   }
 
 

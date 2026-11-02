@@ -56,10 +56,11 @@ committed.
 - **Each graph keeps its own way and relation geometry** (since November 2026; before, it was kept on
   the entity objects that every graph shares, audit finding 1). Read it with `graph.geometry(entity)`
   or `graph.extent(entity)`: a way's or a relation's `geoms` and `extent()` throw.
-- The OSM spatial indexes (`editor_base`, `editor_stable`, `editor_staging`, and their `-segments`
-  indexes) are updated by `EditSystem` after an action finishes (`_emitChanges`), never during one.
-  `editor.waySegments(extent, graph)` picks the index by graph and falls back to staging for any
-  other graph, so inside an action it doesn't see the action's own changes.
+- **Spatial searches answer for the graph they're given** (since November 2026, graph-geometry step 9;
+  before, any graph other than base and stable got staging's index, audit finding 2).
+  `editor.entitiesInBox(box, graph)` and `editor.waySegments(extent, graph)` work for any graph of the
+  editor's lineage, including one inside an action: they commit its uncommitted writes and correct the
+  nearest index by what differs.
 
 ## The October 2026 audit
 
@@ -170,11 +171,11 @@ the code; the repros were kept outside the repo.
 ## Where this is heading
 
 What a validator needs, so it can be run on any graph (including one inside an action):
-1. **Spatial queries for the graph it's given.** An index that's current for that graph (e.g. the
+1. ✅ **Spatial queries for the graph it's given.** An index that's current for that graph (e.g. the
    staging index plus the changes in the graph since), or a slow search when there's none. Never the
-   staging index for some other graph.
-2. **Geometry from the graph.** Node `loc`s, or geometry kept per graph rather than on shared
-   entities. A validator never commits the graph it's checking.
+   staging index for some other graph. (Done in graph-geometry step 9.)
+2. ✅ **Geometry from the graph.** Node `loc`s, or geometry kept per graph rather than on shared
+   entities. (Done in graph-geometry step 6.) A validator never commits the graph it's checking.
 3. **Fixes that find their place again.** A fix records what it means (entity IDs and a location) and
    finds the edge or node again when it runs; if the graph doesn't fit anymore, it changes nothing.
 4. **A runner that applies one fix at a time**, like `attemptAutoconnect`'s `autofix()`, shared by

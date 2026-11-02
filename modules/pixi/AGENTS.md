@@ -103,6 +103,30 @@ import type { GeoJSONData } from '../data/GeoJSONData.ts';
 import type { MarkerData } from '../data/MarkerData.ts';
 ```
 
+## Binding Data to Features
+
+Data is never changed in place: a change is a new object (`d.update(...)`), with a new `Geometry`.
+So a layer binds a feature's data and geometry part whenever either is a different object, not only
+when it creates the feature. Style that depends only on the layer can stay in the creation block.
+
+```typescript
+if (!feature) {
+  feature = new PixiFeaturePoint(this, featureID);
+  feature.parentContainer = parentContainer;
+}
+
+if (feature.data !== d || feature.geometry !== part) {   // changed data is a new object
+  feature.geometry = part;
+  feature.data = d;
+}
+```
+
+- Don't compare version numbers (`v`): there is no `feature.v`, and nothing changes a datum's `v` in place.
+- OSM ways and relations: take the part from `graph.geometry(entity).parts[i]`, never `entity.geoms`
+  (it throws for them). See `PixiLayerOsm` and [`design/graph-geometry.md`](../../design/graph-geometry.md) section 4.
+- Setting `feature.data` marks the feature dirty, so it's restyled on the next `update()`. Changes
+  that don't make a new object (e.g. a vertex becoming shared) are marked with `scene.dirtyData()`.
+
 ## Filtering Data (MarkerData, GeoJSONData, etc.)
 
 When filtering `MarkerData` or `GeoJSONData` data, always access `.props` for filterable data (not `.properties`):

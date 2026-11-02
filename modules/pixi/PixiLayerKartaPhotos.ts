@@ -187,7 +187,6 @@ export class PixiLayerKartaPhotos extends AbstractPixiLayer {
     // render sequences
     for (const d of sequences) {
       const dataID = d.id;
-      const version = d.v || 0;
       const part = d.geoms.parts[0];
 
       // Check that this part has coordinates and is a LineString
@@ -204,8 +203,7 @@ export class PixiLayerKartaPhotos extends AbstractPixiLayer {
       }
 
       // If sequence data has changed, replace it.
-      if (feature.v !== version) {
-        feature.v = version;
+      if (feature.data !== d || feature.geometry !== part) {   // changed data is a new object
         feature.geometry = part;
         feature.data = d;
       }
@@ -229,6 +227,9 @@ export class PixiLayerKartaPhotos extends AbstractPixiLayer {
       if (!feature) {
         feature = new PixiFeaturePoint(this, featureID);
         feature.parentContainer = parentContainer;
+      }
+
+      if (feature.data !== d || feature.geometry !== part) {   // changed data is a new object
         feature.geometry = part;
         feature.data = d;
 

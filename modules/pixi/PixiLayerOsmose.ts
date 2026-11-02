@@ -93,6 +93,9 @@ export class PixiLayerOsmose extends AbstractPixiLayer {
         feature = new PixiFeaturePoint(this, featureID);
         feature.style = style;
         feature.parentContainer = parentContainer;
+      }
+
+      if (feature.data !== d || feature.geometry !== part) {   // changed data is a new object
         feature.geometry = part;
         feature.data = d;
       }

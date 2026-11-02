@@ -81,3 +81,11 @@ if (scheduler) {
 
 - `$`-prefix d3 selection variables and parameters (`$parent`, `$wrap`, `$selection`).
 - `$$`-prefix enter selections (`$$row`, `$$header`).
+
+## 6. Data the component shows
+
+- **Never change a datum's `props` in place** (a QA issue's status, a task's comment). Make a new one with
+  `this.datum.update({ ... })`, store it in the service's cache (`replaceItem`), and make it the
+  component's `datum`. The map layer redraws it, and a d3 join keyed on `d.key` sees the new version.
+- **After an async load, use what the load returns**, not the datum bound to an element before it:
+  the loaded details are on a new object.

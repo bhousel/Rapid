@@ -73,7 +73,6 @@ export class PixiLayerOsmNotes extends AbstractPixiLayer {
 
     for (const d of notes) {
       const dataID = d.id;
-      const version = d.v || 0;
       const part = d.geoms.parts[0];
       if (!part?.world || part?.type !== 'Point') continue;
 
@@ -86,9 +85,8 @@ export class PixiLayerOsmNotes extends AbstractPixiLayer {
         feature.parentContainer = parentContainer;
       }
 
-      // If data has changed, replace it..
-      if (feature.v !== version) {
-        feature.v = version;
+      // If data has changed, replace it.. (Changed data is a new object: data isn't changed in place.)
+      if (feature.data !== d || feature.geometry !== part) {
         feature.geometry = part;
         feature.data = d;
       }

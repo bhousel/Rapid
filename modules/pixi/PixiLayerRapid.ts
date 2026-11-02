@@ -409,15 +409,18 @@ export class PixiLayerRapid extends AbstractPixiLayer {
         const featureID = `${this.layerID}-${dataset.id}-${d.id}-${i}`;
         let feature = this.features.get(featureID);
 
-        if (!feature) {
-          if (!part.world) continue;  // invalid?
+        if (!part.world) continue;  // invalid?
 
+        if (!feature) {
           feature = new PixiFeaturePolygon(this, featureID);
+          feature.parentContainer = parentContainer;
+        }
+
+        // Changed data is a new object, with a new shape (a split way's survivor gains nodes)
+        if (feature.data !== d || feature.geometry !== part) {
           feature.geometry = part;
           const area = part.world.extent.area();
           feature.container.zIndex = -area;      // sort by area descending (small things above big things)
-
-          feature.parentContainer = parentContainer;
           feature.data = d;
         }
 
@@ -486,12 +489,16 @@ export class PixiLayerRapid extends AbstractPixiLayer {
         const featureID = `${this.layerID}-${dataset.id}-${d.id}-${i}`;
         let feature = this.features.get(featureID) as PixiFeatureLine | undefined;
 
-        if (!feature) {
-          if (!part.world) continue;  // invalid?
+        if (!part.world) continue;  // invalid?
 
+        if (!feature) {
           feature = new PixiFeatureLine(this, featureID);
-          feature.geometry = part;
           feature.parentContainer = parentContainer;
+        }
+
+        // Changed data is a new object, with a new shape (a split way's survivor gains nodes)
+        if (feature.data !== d || feature.geometry !== part) {
+          feature.geometry = part;
           feature.data = d;
         }
 
@@ -655,13 +662,16 @@ export class PixiLayerRapid extends AbstractPixiLayer {
       const featureID = `${this.layerID}-${dataset.id}-${d.id}`;
       let feature = this.features.get(featureID) as PixiFeaturePoint | undefined;
 
-      if (!feature) {
-        const part = this._geometry(dataset, d).parts[0];
-        if (!part.world) continue;  // invalid?
+      const part = this._geometry(dataset, d).parts[0];
+      if (!part?.world) continue;  // invalid?
 
+      if (!feature) {
         feature = new PixiFeaturePoint(this, featureID);
-        feature.geometry = part;
         feature.parentContainer = parentContainer;
+      }
+
+      if (feature.data !== d || feature.geometry !== part) {   // changed data is a new object
+        feature.geometry = part;
         feature.data = d;
       }
 
@@ -689,14 +699,17 @@ export class PixiLayerRapid extends AbstractPixiLayer {
       const featureID = `${this.layerID}-${d.id}`;
       let feature = this.features.get(featureID) as PixiFeaturePoint | undefined;
 
-      if (!feature) {
-        const part = this._geometry(dataset, d).parts[0];
-        if (!part.world) continue;  // invalid?
+      const part = this._geometry(dataset, d).parts[0];
+      if (!part?.world) continue;  // invalid?
 
+      if (!feature) {
         feature = new PixiFeaturePoint(this, featureID);
-        feature.geometry = part;
         feature.parentContainer = parentContainer;
         feature.allowInteraction = false;   // vertices in this layer don't actually need to be interactive
+      }
+
+      if (feature.data !== d || feature.geometry !== part) {   // changed data is a new object
+        feature.geometry = part;
         feature.data = d;
       }
 

@@ -230,7 +230,6 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
 
     for (const d of polygons) {
       const dataID = d.id;
-      const version = d.v || 0;
       const parts = d.geoms.parts;
 
       for (let i = 0; i < parts.length; ++i) {
@@ -254,8 +253,7 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
         }
 
         // If data has changed.. Replace it.
-        if (feature.v !== version) {
-          feature.v = version;
+        if (feature.data !== d || feature.geometry !== part) {   // changed data is a new object
           feature.label = l10n.displayName(d.properties as Record<string, string>);
           feature.geometry = part;
           feature.data = d;
@@ -287,7 +285,6 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
 
     for (const d of lines) {
       const dataID = d.id;
-      const version = d.v || 0;
       const parts = d.geoms.parts;
 
       for (let i = 0; i < parts.length; ++i) {
@@ -311,8 +308,7 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
         }
 
         // If data has changed.. Replace it.
-        if (feature.v !== version) {
-          feature.v = version;
+        if (feature.data !== d || feature.geometry !== part) {   // changed data is a new object
           feature.label = l10n.displayName(d.properties as Record<string, string>);
           feature.geometry = part;
           feature.data = d;
@@ -385,7 +381,6 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
 
     for (const d of points) {
       const dataID = d.id;
-      const version = d.v || 0;
       const parts = d.geoms.parts;
 
       for (let i = 0; i < parts.length; ++i) {
@@ -409,8 +404,7 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
         }
 
         // If data has changed.. Replace it.
-        if (feature.v !== version) {
-          feature.v = version;
+        if (feature.data !== d || feature.geometry !== part) {   // changed data is a new object
           feature.label = l10n.displayName(d.properties as Record<string, string>);
           feature.geometry = part;
           feature.data = d;

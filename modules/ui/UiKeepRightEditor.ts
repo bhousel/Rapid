@@ -256,8 +256,9 @@ export class UiKeepRightEditor extends EventEmitter {
       .on('click.close', (e: PointerEvent, d: KeepRightIssue) => {
         (e.currentTarget as HTMLElement).blur();    // avoid keeping focus on the button - iD#4641
         if (keepright) {
-          d.props.newStatus = 'ignore_t';   // ignore temporarily (item fixed)
-          keepright.postUpdate(d, (err: any, item: any) => this.emit('change', item));
+          this.datum = d.update({ newStatus: 'ignore_t' });   // ignore temporarily (item fixed)
+          keepright.replaceItem(this.datum);
+          keepright.postUpdate(this.datum, (err: any, item: any) => this.emit('change', item));
         }
       });
 
@@ -269,8 +270,9 @@ export class UiKeepRightEditor extends EventEmitter {
       .on('click.ignore', (e: PointerEvent, d: KeepRightIssue) => {
         (e.currentTarget as HTMLElement).blur();    // avoid keeping focus on the button - iD#4641
         if (keepright) {
-          d.props.newStatus = 'ignore';   // ignore permanently (false positive)
-          keepright.postUpdate(d, (err: any, item: any) => this.emit('change', item));
+          this.datum = d.update({ newStatus: 'ignore' });   // ignore permanently (false positive)
+          keepright.replaceItem(this.datum);
+          keepright.postUpdate(this.datum, (err: any, item: any) => this.emit('change', item));
         }
       });
   }

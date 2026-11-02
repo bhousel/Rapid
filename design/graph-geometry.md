@@ -7,7 +7,8 @@ of the change. This design fixes findings 1 (shared geometry) and 2 (the wrong s
 [validation audit](validation-system.md#the-october-2026-audit), the bugs listed below, and the cost of
 keeping versions. It gives Rapid one way to ask for anything's geometry: `graph.geometry(entity)`.
 
-> **Status:** In progress (October 2026): steps 0-6, 8 and 9 done; step 7 measured and left for later. After step 3 the rest was put in a new
+> **Status:** Done (November 2026): steps 0-6 and 8-10; step 7 measured and left for later, and the
+> follow-ups below are each to be measured on their own. After step 3 the rest was put in a new
 > order (November 2026): backups first, then derived data in records in two steps. Measured in two rounds: a survey of
 > today's costs and bugs, then three competing designs, each prototyped and reviewed for correctness
 > and for performance (in JavaScriptCore and V8). See [Open questions](#open-questions).
@@ -29,6 +30,13 @@ keeping versions. It gives Rapid one way to ask for anything's geometry: `graph.
 - **Record** (new): what one graph says differently from base about one ID.
 - **Closure**: everything a change can affect, which a commit recomputes (today's
   `Difference.complete()`).
+- **Catch up** (`graph.syncWithBase()`, step 8): rebuild the shapes a graph keeps of its own that a
+  rebase or a schema change made stale.
+- **Base index, local index** (step 9): the base index (`editor_base`) holds every base entity's box. A
+  local index (`editor_stable`, `editor_staging`) holds the boxes of what one graph has its own version
+  or shape of ("local" as in `graph.isLocal()`).
+- **Snapshot** (step 9): the graph a local index reflects, derived from stable or staging when the
+  index was last synced.
 
 ## The problem
 
@@ -400,6 +408,16 @@ today's `_updateRebased` alone takes 57-74 ms per merge.
   rebase updated objects instead.
 - Conflation: if Rapid features get versions of their own (accepted pieces, partial accepts, undo),
   their lineage gets records too, with nothing new to build.
+- As built (step 10): no new lineages. Each Rapid dataset already had its own `Graph` (a base-only
+  lineage) since step 2, and `_connectSplitWays` already made a new survivor with `update()`. For
+  GeoJSON and markers, a base-only lineage would hold exactly what the spatial cache holds (the current
+  object for each ID), and `graph.geometry(data)` would return `data.geoms`, so it would add a lookup and
+  nothing else. What mattered was the other half: services and editors stop changing data in place
+  and store an `update()`'d copy instead, so every layer can rebind by object, like `PixiLayerOsm`.
+  A lineage is worth adding when one of them needs versions (conflation pieces with undo, say), and
+  then its owner keeps it, not `SpatialSystem` (see the step 9 discussion).
+- `v` stays, as a stamp that `update()` gives each new object (`key` is `${id}v${v}`, which d3 joins
+  and `FilterSystem` use). What goes is changing it in place: `touch()` and `AbstractPixiFeature.v`.
 
 ## What it costs
 
@@ -470,7 +488,7 @@ write cached geometry outside `modules/data/`:
 - **Rendering keeps `GeometryPart` references.** Pixi features bind `entity.geoms.parts[i]` and rebind
   when `entity.v` changes; `PixiLayerLabels` reads them too. Since step 6, `PixiLayerOsm` binds
   `graph.geometry(entity).parts[i]` and rebinds when the entity or the part is a different object
-  (section 4). The other layers still rebind on `v` until step 10.
+  (section 4). Since step 10, every layer rebinds that way.
 
 ## Rollout
 
@@ -788,6 +806,25 @@ records (now 6 and 7), 5 rebase (now 8), 6 spatial indexes (now 9), 7 backups (n
 10. **Other data.** Rapid datasets, then GeoJSON and markers, as lineages; services stop changing data
     in place. Their layers then rebind by object, like `PixiLayerOsm`, and `touch()`, `v` and
     `AbstractPixiFeature.v` go.
+    - **Done** (November 2026), without new lineages (section 9 says why), and `v` stays as a stamp.
+      - `touch()` is gone: `update()` gives the copy its new `v`. Services make new objects where they
+        changed cached ones: Mapillary (images, detections, sequences that grow across tiles,
+        segmentations), Kartaview (images; a sequence is rebuilt once per batch of images, and its
+        rotation), Streetside (sequences assembled from copies of their bubble lists), vector tiles
+        (a merged survivor), MapRoulette (challenge details, task details), Osmose (issue details) and
+        OSM notes. Loaders that return early when details are loaded look up the cached object first.
+      - The QA editors (Osmose, KeepRight, MapRoulette and its menu) set their workflow state
+        (`newStatus`, `_status`, the comment) on a new object in the cache, which becomes their datum,
+        as KeepRight's comment already did. `MapRouletteTaskProps` gained those fields' types.
+        `UiOsmoseDetails` reads the details from the issue the loader returns (it read them from the
+        bound datum, which only worked because the old one was changed), which also fixes its feature
+        links, whose click centered on `undefined`.
+      - `AbstractPixiFeature.v` is gone. Every layer binds a feature's data and part when either is a
+        different object, including the seven that bound them only when they made the feature
+        (`PixiLayerRapid`, so a split way's survivor now redraws when it gains nodes).
+      - In the debug Chrome on Seattle, every drawn feature of the Mapillary (69k), Osmose and Rapid
+        layers is bound to the current cached object, and selecting an Osmose issue loads its details
+        into a new issue that the layer and the sidebar both show, with no errors.
 
 Then, each measured on its own:
 - **Slim nodes.** World coordinates live on the node; a full `Geometry` is built only when asked for,
@@ -800,19 +837,26 @@ Then, each measured on its own:
   1.0-1.1 µs.
 - **Multipolygon ring reuse** (section 3, "Relation geometry is built from its members'"): cache
   the ring structure and re-read only coordinates while they're the only thing that changed.
+- **Classify a node only when it's dirty** (from step 7's measurements): `PixiLayerOsm` asks every
+  visible node for point or vertex, `isEndpoint` and `isIntersection` on every frame. Keeping those
+  answers in the layer for staging, recomputed when `dirtyData` names the node, could let the graph
+  memos (and the lineage's `topologyChanged` set) go. In `.scratchpad/backlog.md`.
+- **Lineages for GeoJSON and markers**, only once one of them needs versions (section 9).
 
 ## Testing
 
 - **Property tests against a reference model** (`test/unit/lib/graph_model.test.js`, from step 4).
-  The model is today's semantics, with Maps copied per version. The tests run random replaces, removes, reverts, derives, commits, undos and redos,
-  `commitAppend`, rebases (forced too) and restores. They compare `hasEntity`, parent ways and
-  relations, and the `Difference`'s changes, `complete()` and `summary()`. The review of the prototype
-  ran 22 million `hasEntity` checks against such a model, and 12,000 random edits, commits and
-  unforced rebases against brute-force parent sets, geometry and memos. With forced rebases on, it
-  found stale memos.
-- **`graph.verify()`** recomputes all derived data from scratch (geometry, memoized answers, index
-  hits) and compares. It runs after every step of the property tests, on staging, stable, history
-  graphs and scratch graphs.
+  The model is plain Maps copied per version. The tests run random replaces, removes, reverts, loads,
+  derives, commits, savepoints, freezes and rebases (forced too, with iD#2085 restores) on a handful of
+  graphs. After every step they compare `hasEntity`, `isLocal`, parent ways and relations, child
+  nodes, `localEntities()`, `diffIDs()`, the `Difference`'s changes, and each graph's
+  `SessionDifference` (`changes` and `affects()`). Half the time they also catch a graph up
+  (`syncWithBase()`) and check its shapes with `graph.verify()`. The default run (25 seeds) takes about
+  2 s; `GRAPH_MODEL_SEEDS=3000` ran clean after step 8, and found three older bugs on the way.
+- **`graph.verify(ids?)`** rebuilds each way's and relation's shape from scratch and compares it with
+  the graph's, by world coordinates. (Memoized answers and index hits aren't part of it: the spatial
+  indexes are checked by `EditSystemJournal`'s random edits, which search for each entity's box.)
+- **`test/unit/lib/graph_bugs.test.js`** keeps a test for each bug the rollout fixed, grouped by step.
 - **The session difference** equals a fresh `Difference(base, stable)` after merges with restores and
   forced updates.
 - **Count operations, not milliseconds**: entries copied per derive, `Geometry`s built per merge, O(L)
@@ -832,7 +876,7 @@ Then, each measured on its own:
   1 MB each, as before step 6 (each new way object got its own shape). A `GeometryPart` takes about
   285 B per coordinate: storing coordinates as `Float64Array`s, and only the projections that are read,
   would cut both, and help slim nodes too.
-- **Which graphs to validate, after step 9:** once any graph is answered correctly, should validation
+- **Which graphs to validate, now that step 9 has landed:** since any graph is answered correctly, should validation
   check the graph captured when a round starts, instead of following the current stable? That graph
   would live through rebases, so step 8's rule (section 5) would need it brought up to date too, or
   handed to a worker as a copy.

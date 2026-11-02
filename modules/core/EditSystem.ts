@@ -289,6 +289,15 @@ interface EntityCopy {
  * Graphs in the history are frozen, and each keeps a journal of what it changed, so the events
  *  compare only the IDs that may have changed (see design/graph-geometry.md).
  *
+ * Merged data goes into the base graph (`rebase`). Stable and staging catch up with it at once
+ *  (`graph.syncWithBase()`), and so does any other graph from the history when it becomes current.
+ *  A schema change that changes what counts as an area is caught up with the same way.
+ *
+ * OSM spatial indexes: `editor_base` holds every base entity, and `editor_stable` / `editor_staging` are
+ *  local indexes of what those graphs have their own version or shape of. `entitiesInBox()` and
+ *  `segmentsInBox()` search them for any graph of the lineage. Each index is updated before the event
+ *  for its graph fires.
+ *
  * Events available:
  * - 'stagingchange' - Fires on every edit performed (i.e. when `staging` changes),
  *      Receives Difference between old `staging` Graph and new `staging` Graph.
@@ -300,7 +309,8 @@ interface EntityCopy {
  *      Receives `prevIndex` and `currIndex`
  * - 'returnview' - Fires when redo takes the user back to where they were before they started
  *      undoing (see `returnEdit`).  Receives the return Edit, with its `transform` and `selection`.
- * - 'merge'  - Fires when new base entities are merged into the base graph
+ * - 'merge'  - Fires when new base entities are merged into the base graph.
+ *      Receives the IDs on the merged tile, plus the IDs whose shape changed because of it.
  * - 'backupstatuschange' - Fires when backup status changes, receives `true` if ok, `false` if failed
  *
  * Backups (v4) save each edit's props and changed entities, and the OSM version that every base entity

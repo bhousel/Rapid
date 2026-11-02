@@ -38,8 +38,8 @@ Each data element has:
 - `id` - Identifier within its namespace (e.g., `n123` for node 123)
 - `dataID` - Identifier across all of Rapid, `${namespace}:${id}` (bare `id` for OSM). See [`design/data-ids.md`](../../design/data-ids.md).
 - `type` - What kind of element (e.g. `node`, `way`, `relation`)
-- `v` - Internal version for change detection
-- `geoms` - `Geometry` wrapper with original (WGS84) and projected (world) coordinates
+- `v` - Version stamp, new on every `update()`. It's part of `key` (`${id}v${v}`), which d3 joins and caches use.
+- `geoms` - `Geometry` wrapper with original (WGS84) and projected (world) coordinates. A node, GeoJSON feature or marker has its own. A way's or relation's shape depends on the graph, so `geoms` throws for them: read it with `graph.geometry(entity)` (see [`design/graph-geometry.md`](../../design/graph-geometry.md)).
 - `props` - Properties object (tags, members, etc.)
 
 ## Immutability Pattern
@@ -48,3 +48,7 @@ Each data element has:
 // Data elements are immutable - update() returns a new instance
 const updatedNode = node.update({ tags: { ...node.tags, name: 'New Name' } });
 ```
+
+Never change a data element's `props` in place. A service or editor that changes cached data stores the
+`update()`'d copy (e.g. `spatial.replaceData(...)`), and the renderers redraw a feature when its data is
+a different object.

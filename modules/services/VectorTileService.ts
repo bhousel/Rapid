@@ -847,12 +847,11 @@ export class VectorTileService extends AbstractSystem {
 
     } else if (parts.length === 1) {   // a single new part
       // In this case, the merge clearly succeeded.
-      // Update survivor in place with the new merged geometry.
-      survivor.props.geojson = parts[0];
-      survivor.updateGeometry().touch();
+      // The survivor gets the new merged geometry, as a new data element (data isn't changed in place).
+      const merged = survivor.update({ geojson: parts[0] } as Partial<GeoJSONProps>);
 
       toRemoveIDs = sourceIDs.filter(id => id !== survivor.id);
-      toReplace.push(survivor);
+      toReplace.push(merged);
 
     } else {    // multiple new parts
       // In this case, we're not sure whether anything happened.

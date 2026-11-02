@@ -126,8 +126,9 @@ query boxes and refine predicates.
 
 ### What it compares against
 
-OSM data comes from the **`editor_stable`** caches: the data index for points and areas, and
-`editor_stable-segments` for lines. Stable changes only when the user finishes an edit, so
+OSM data comes from the **stable** graph's spatial index, through `editor.segmentsInBox(box, stable)`
+for lines (and `entitiesInBox` for points and areas). Since graph-geometry step 9 that's the base index
+plus stable's local index of what the user changed. Stable changes only when the user finishes an edit, so
 conflation won't churn while the user is dragging a node. Accepting a feature is a finished edit, so
 it shows up in stable right away.
 
@@ -513,7 +514,7 @@ The selection and inspector code didn't need to change.
 **Line ends.** An end of a line that isn't next to an already-mapped stretch also gets a `JoinPoint`
 if it lies within a rule's `sameDist` of a target line that the rule allows (`target.geometry`,
 `target.props` and `sameKeys`), at any angle. This is how an accepted crossing connects to the
-sidewalks at its ends, including sidewalks accepted a moment ago, since those are in `editor_stable`
+sidewalks at its ends, including sidewalks accepted a moment ago, since those are in stable's index
 by then. **`sameKeys` applies to joining, not just matching:** a sidewalk rule with
 `sameKeys: ['highway']` only joins ways with the same `highway`, so a sidewalk that ends beside a
 stream doesn't join the stream (found on real data). The flip side: with `sameKeys` of
@@ -528,7 +529,7 @@ a whole source line that is a single run. `UiRapidInspector` passes that to
 **Bookkeeping.** The run's id goes into `acceptIDs` (as with any accepted feature); the source
 feature's own id goes in only when it is accepted whole. `RapidSystem` turns these into acted ranges,
 and conflation leaves those stretches out of the line, so the run disappears right away. After a run
-is accepted, the new OSM way is also in `editor_stable`, so the rest of the line is matched against it,
+is accepted, the new OSM way is also in stable's index, so the rest of the line is matched against it,
 and the run next to it joins it. Undo needs nothing special: undoing removes the way and the
 annotation, `stablechange` fires, and the run reappears. **Ignore** works on a run's data the same way.
 
@@ -761,5 +762,5 @@ Lines come first throughout. Points and polygons follow the same pipeline at a l
   Matching chains of consecutive edges with the same tags might be more robust.
 - **Debug dots for absorbed boxes.** The overlay shows each box's raw status, so a box absorbed into
   a matched run still shows yellow or red. Color it like its run, or mark it distinctly?
-- **Which graph.** `editor_stable` is proposed. Is there a case where conflation must reflect
-  edits still in progress (`editor_staging`)?
+- **Which graph.** Stable is used. Is there a case where conflation must reflect edits still in
+  progress (staging)? Since graph-geometry step 9, searching staging instead is a one-argument change.

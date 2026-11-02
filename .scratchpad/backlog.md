@@ -2,6 +2,11 @@
 
 Items planned but not yet started.
 
+## Editing a multiselection
+Designed in `design/multiselection.md` (proposed Oct 2026): a selection pane (the list plus commands)
+that slides to a command pane, like `UiInspector`; replace geometry first. It follows the data IDs work,
+which made any mix of data selectable. Bryan wants to land the current branch for testers first.
+
 ## Remappable keyboard shortcuts (KeyboardSystem phases 2 & 3)
 Phase 1 (the `KeyboardSystem` conversion + command scaffolding) is done — see
 [`design/keyboard-system.md`](../design/keyboard-system.md) and

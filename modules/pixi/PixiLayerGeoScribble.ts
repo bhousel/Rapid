@@ -158,7 +158,6 @@ export class PixiLayerGeoScribble extends AbstractPixiLayer {
     for (const d of lines) {
       const lineStyle = this.getLineStyle(d.properties);
       const dataID = d.id;
-      const version = d.v || 0;
       const parts = d.geoms.parts;
 
       for (let i = 0; i < parts.length; ++i) {
@@ -182,8 +181,7 @@ export class PixiLayerGeoScribble extends AbstractPixiLayer {
         }
 
         // If data has changed.. Replace it.
-        if (feature.v !== version) {
-          feature.v = version;
+        if (feature.data !== d || feature.geometry !== part) {   // changed data is a new object
           feature.label = (d.properties.text as string) || null;
           feature.geometry = part;
           feature.data = d;
@@ -214,7 +212,6 @@ export class PixiLayerGeoScribble extends AbstractPixiLayer {
 
     for (const d of points) {
       const dataID = d.id;
-      const version = d.v || 0;
       const parts = d.geoms.parts;
 
       for (let i = 0; i < parts.length; ++i) {
@@ -238,8 +235,7 @@ export class PixiLayerGeoScribble extends AbstractPixiLayer {
         }
 
         // If data has changed.. Replace it.
-        if (feature.v !== version) {
-          feature.v = version;
+        if (feature.data !== d || feature.geometry !== part) {   // changed data is a new object
           feature.label = (d.properties.text as string) || null;
           feature.geometry = part;
           feature.data = d;

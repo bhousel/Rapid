@@ -32,6 +32,14 @@ export interface MapRouletteTaskProps extends MarkerProps {
   mapRouletteApiKey?: string;
   /** Geographic coordinates of the task */
   point?: { lng: number; lat: number };
+  /** The status the user has picked in the editor, before it's submitted (`''` if none) */
+  _status?: number | '';
+  /** The comment the user is typing in the editor */
+  newComment?: string;
+  /** The task ID, as submitted */
+  taskId?: string;
+  /** The OSM user ID of the user submitting */
+  userId?: number;
 }
 
 /** A MapRoulette task MarkerData with typed props */
@@ -343,18 +351,18 @@ export class MapRouletteService extends AbstractSystem {
         challenge.description ??= '';
         this._challenges.set(challengeID, challenge);
 
-        // Update task details
+        // Update task details (as new tasks: data isn't changed in place)
         const toUpdate = [];
         const allTasks = spatial.getAllItems<MapRouletteTask>('maproulette');
         for (const task of allTasks) {
           if (task.props.parentId !== challengeID) continue;
           if (task.props.instruction !== undefined) continue;   // done already
 
-          task.props.isVisible = challenge.isVisible;
-          task.props.instruction = challenge.instruction;
-          task.props.description = challenge.description;
-          task.touch();
-          toUpdate.push(task);
+          toUpdate.push(task.update({
+            isVisible: challenge.isVisible,
+            instruction: challenge.instruction,
+            description: challenge.description
+          }));
         }
         spatial.replaceData('maproulette', toUpdate);
 
@@ -389,21 +397,24 @@ export class MapRouletteService extends AbstractSystem {
    * @return Promise resolved when we've fetched the task details
    */
   public loadTaskAsync(task: MapRouletteTask): Promise<MapRouletteTask> {
-    if (task.props.features !== undefined) return Promise.resolve(task);  // already done
-
     const context = this.context;
     const network = context.systems.network!;
     const spatial = context.systems.spatial!;
+
+    // The cached task may be newer than the one given (data isn't changed in place)
+    const cached = spatial.getItem<MapRouletteTask>('maproulette', task.id) ?? task;
+    if (cached.props.features !== undefined) return Promise.resolve(cached);  // already done
 
     const url = `${MAPROULETTE_API}/task/${task.id}`;
     const requestID = `maproulette-task-${task.id}`;
 
     return network.fetch<any>(url, { requestID })
       .then(data => {
-        task.props.features = data?.geometries?.features || [];
-        task.touch();
-        spatial.replaceData('maproulette', task);
-        return task;
+        // The task as it is now (the challenge may have updated it), with its details
+        const current = spatial.getItem<MapRouletteTask>('maproulette', task.id) ?? task;
+        const updated = current.update({ features: data?.geometries?.features || [] });
+        spatial.replaceData('maproulette', updated);
+        return updated;
       });
   }
 

@@ -241,28 +241,30 @@ export class UiMapRouletteMenu extends EventEmitter {
 
 
   protected _fixedIt(e: Event, d: MapRouletteTask): void {
-    d.props._status = 1;
-    this._submitTask(e, d);
+    this._submitTask(e, d, 1);
   }
 
   protected _cantComplete(e: Event, d: MapRouletteTask): void {
-    d.props._status = 6;
-    this._submitTask(e, d);
+    this._submitTask(e, d, 6);
   }
 
   protected _alreadyFixed(e: Event, d: MapRouletteTask): void {
-    d.props._status = 5;
-    this._submitTask(e, d);
+    this._submitTask(e, d, 5);
   }
 
   protected _notAnIssue(e: Event, d: MapRouletteTask): void {
-    d.props._status = 2;
-    this._submitTask(e, d);
+    this._submitTask(e, d, 2);
   }
 
 
-  /** Submits the task to MapRoulette with the updated status. */
-  protected _submitTask(e: Event, d: MapRouletteTask): void {
+  /**
+   * Submits the task to MapRoulette with the updated status.
+   * The task is submitted as a new task in the cache, with the status and comment (data isn't changed in place).
+   * @param e - the triggering event
+   * @param d - the task
+   * @param status - the status to submit
+   */
+  protected _submitTask(e: Event, d: MapRouletteTask, status: number): void {
     const context = this.context;
     const maproulette = context.services.maproulette!;
     const osm = context.services.osm!;
@@ -275,27 +277,28 @@ export class UiMapRouletteMenu extends EventEmitter {
     const userID = (osm as any)._userDetails.id;
 
     if (maproulette) {
-      const props = d.props as any;
-      props.taskStatus = props._status;
-      props.mapRouletteApiKey = this._mapRouletteApiKey;
-
       const $commentInput = select('.new-comment-input');
-      if ($commentInput.empty()) {
-        d.props.comment = '';
-      } else {
-        d.props.comment = ($commentInput.property('value') as string).trim();
-      }
+      const comment = $commentInput.empty() ? '' : ($commentInput.property('value') as string).trim();
 
-      d.props.taskId = d.props.id;
-      d.props.userId = userID;
-      maproulette.postUpdate(d, (err: any, item: any) => {
+      const task = d.update({
+        _status: status,
+        taskStatus: status,
+        mapRouletteApiKey: this._mapRouletteApiKey ?? undefined,
+        comment: comment,
+        taskId: d.props.id,
+        userId: userID
+      });
+      maproulette.replaceItem(task);
+      this.datum = task;
+
+      maproulette.postUpdate(task, (err: any, item: any) => {
         if (err) {
           console.error(err);  // eslint-disable-line no-console
           return;
         }
         this.emit('change', item);
         if (maproulette.nearbyTaskEnabled) {
-          maproulette.flyToNearbyTask(d);
+          maproulette.flyToNearbyTask(task);
         }
       });
     }

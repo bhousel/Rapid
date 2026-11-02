@@ -55,6 +55,8 @@ export class GeoJSONData<P extends GeoJSONProps = GeoJSONProps> extends Abstract
   /**
    * Forces a recomputation of the internal geometry data.
    * It stores a new `Geometry` and leaves the old one untouched, because a renderer may still hold its parts.
+   * The constructor calls it. To change a data element, make a new one with `update()` instead: data
+   * isn't changed in place.
    * @returns this same data element
    */
   public updateGeometry(): this {

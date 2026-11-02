@@ -63,7 +63,7 @@ This project has reusable agent skills in `.claude/skills/`: one folder per skil
 ## Working in the Rapid Codebase
 
 ### Design docs
-- [`design/`](design/README.md) holds design docs for the core systems: conflation, database, drag-and-drop, keyboard, network, Rapid datasets, scheduler, settings, spatial, style and UI. [`design/README.md`](design/README.md) lists each one with its status.
+- [`design/`](design/README.md) holds design docs for the core systems and cross-cutting designs (graphs and their geometry, data IDs, conflation, editing, validation, spatial indexes, settings, and more). [`design/README.md`](design/README.md) lists each one with its status.
 - **When you make a substantial change to a system that has no design doc yet, start one** (what it owns, the decisions behind it, where it's heading), and point to it from the class JSDoc. These docs are a running record of where each system is going.
 - **Before changing one of those systems, read its design doc.** The class JSDoc of each system points to it. If your change alters the design, update the doc in the same change.
 
@@ -128,6 +128,12 @@ This project has reusable agent skills in `.claude/skills/`: one folder per skil
 - The test for whether something should be on a system: "If I call this function right now, can I guarantee the data it depends on is ready?" If the answer requires knowing another system's startup sequence, the data belongs on that system.
 - **Truly constant data** that does not change at runtime is fine as a module-level `const` — there's no lifecycle to manage. But if the data is a list of domain-specific "magic strings" (like lifecycle prefixes), prefer expressing it as a ruleset in `osm_rulesets.json5` so it's configurable and scope-owned.
 - **Domain-specific logic** (like "is this tag interesting?" or "does this tag suggest an area?") belongs on the data class that represents the domain concept (e.g. `OsmEntity`), not as a free function reading a global. The instance method can access the system through `this.context` — making the dependency explicit and traceable.
+
+### Data and Graphs
+- **Data elements are immutable.** Never change a data element's `props` in place. Make a new one with `d.update(props)`, and store it where the old one was (e.g. `spatial.replaceData(...)`, or the editor's datum). Renderers redraw a feature when its data is a different object, and selections find the newest version by data ID.
+- **A way's or relation's shape belongs to a graph.** Read it with `graph.geometry(entity)` / `graph.extent(entity)`; `entity.geoms` and `entity.extent()` throw for them. A node's shape is its own.
+- **Search OSM data through `EditSystem`**, for the graph you mean: `editor.entitiesInBox(box, graph)`, `editor.waySegments(extent, graph)`, `editor.intersects(graph)`. They answer for any graph of the editor's lineage, including one inside an action.
+- See [`design/graph-geometry.md`](design/graph-geometry.md) for why, and `test/unit/lib/graph_model.test.js` (run it with `GRAPH_MODEL_SEEDS=3000`) after changing `Graph`.
 
 ## TypeScript Patterns
 

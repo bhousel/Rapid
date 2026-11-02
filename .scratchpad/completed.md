@@ -2,6 +2,12 @@
 
 Reverse-chronological one-liners. Details live in git history — these are just breadcrumbs.
 
+- **Graph versions and their geometry** (Oct 30 – Nov 2 2026, `design/graph-geometry.md` steps 0–10) — Fixed validation audit findings 1 (shared geometry) and 2 (wrong spatial index) by construction. Graphs share structure (`PersistentVector` records, O(1) derive, structural diffs), emit from a change journal, keep their own shapes, and catch up with rebases and schema changes (`syncWithBase()`). Backups hold each edit's own changes. One base spatial index plus local indexes for stable and staging, searchable for any graph (`editor.entitiesInBox`). No data changed in place: `touch()` gone, every layer rebinds by object. Reference model test in `test/unit/lib/graph_model.test.js`. Step 7 (memos in records) measured and left for later. See `decisions.md`.
+
+- **Validation audit** (Oct 29–30 2026, `design/validation-system.md`) — Autoconnect applies one fix at a time, a throwing validator no longer hides other issues, Autofix All and `curb_nodes` fixes repaired, no side effects while detecting, edits validated again when data loads near them, fixes look up the graph they run on. Findings 1 and 2 became the graph-geometry rollout.
+
+- **Data IDs and selecting any mix of data** (Oct 28–29 2026, `design/data-ids.md` steps 1–5) — `${namespace}:${localID}` data IDs, `spatial.getData()` with resolvers, deterministic IDs for file datasets, pieces, Esri and custom data, one `SelectMode` for any mix of data, and `id=` takes data IDs. Step 6 became `design/multiselection.md`.
+
 - **Agent tooling for Claude Code + Copilot** (Oct 2026) — Prompts → Agent Skills in `.claude/skills/` (agent-practices PR #1, then `/sync` to AGENTS.md v4). `.github/instructions/` → nested `modules/{ui,pixi}/AGENTS.md`. Corrected the AGENTS.md Testing section (`bun run test` = unit + browser only). See `decisions.md`.
 
 - **File-backed custom Rapid datasets** (Oct 2026, facebook/Rapid#1078) — `UiRapidAddDataset` file picker restored, plus a `priority: 1` `DragAndDropSystem` consumer. Files are stored through `DatabaseSystem` (`canStoreAsync` + `putFileAsync`) and referenced by `RapidDataset.sourceFileID`. The ID shows on `UiRapidDatasetSettings`, and the file is deleted with its dataset. The filename is the default dataset id/name. Also cleaned up `UiRestore` CSS and strings.

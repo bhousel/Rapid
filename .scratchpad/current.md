@@ -1,75 +1,10 @@
 # Current Work
 
-## Active: data IDs and selecting any mix of data
-Design: [`design/data-ids.md`](../design/data-ids.md), started Oct 28 with Bryan. A data ID is
-`${namespace}:${localID}` (bare = OSM); a namespace is a `SpatialSystem` cache ID; `.` suffixes name
-derived caches (`fbRoads.pieces`); the user's datasets start with `user-`, custom data's namespaces
-with `custom-`. Step 1 (committed Oct 28): `modules/data/dataID.ts`, `AbstractDataProps.namespace`,
-`spatial.getData()` + `registerResolver()`, data with no extent kept by ID, caches renamed.
-Step 2 (committed Oct 28): deterministic IDs for file datasets, pieces, Esri (as GeoJSON), custom
-data; accept/ignore records use `dataID`. Step 3 (Oct 28): modes keep
-`_selectedIDs: DataID[]` and `selectedData` looks them up; `SelectMode` takes `{ selection: DataID[] }`;
-every layer binds `d.dataID`; the scene owns classes by data ID; edit props' `selection` is
-`DataID[]` (old by-layer backups flattened); `_restoreSelection` uses `getData()`. Fixes a Step 2
-regression (Rapid select halo, walkthrough road check). Checked live: select a Rapid road, accept,
-undo (Rapid road selected again), OSM select, notes. Step 4 (committed Oct 29):
-`SelectOsmMode` merged into `SelectMode` (OSM-only parts work on `_osmIDs`; operations and arrow-key
-move/rotate only when all OSM); move/rotate take `DataID[]`; shift-click any data; mixed selections
-get `UiSelectionInspector`. Step 5 (committed Oct 29): `id=` takes data IDs, through
-`MapSystem._restoreSelection(selection, fromLink)`, which downloads missing OSM entities; `SelectMode`
-writes every data ID to `id=`. Checked live: typed, removed, downloaded (map moves), and a reload with
-a mixed `id=`. Step 6 moved to its own design, `design/multiselection.md` (proposed Oct 29): a
-selection pane (list + commands) that slides to a command pane, like `UiInspector`; replace geometry
-first. Bryan wants to land this branch for testers before starting it, to keep conflation in focus.
-Fixed (Oct 29, not yet committed): `attemptAutoconnect` (accept with `poweruser.autoConnect`) ran
-crossing-ways on the stale `way` after the almost-junction autofix merged its end node away
-(`n-2 not found`), and applied every fix found by one validation run, so a segment crossing two roads
-connected to only one. Now `autofix()` applies one fix, then looks the way up and validates again.
-`actionAddMidpoint` puts the node in the piece of a split edge that its loc lies on (a U-shaped road
-with both ends joining one road segment). Tests in `rapid_accept_feature.test.js`, `add_midpoint.test.js`.
-Audit of validators + `ValidationSystem` written up in `design/validation-system.md` (new); the
-rollout there is the plan. Biggest: way geometry lives on entity objects shared by all graphs.
-Oct 29–30: audit findings 3–8 committed. Findings 1 and 2 (shared geometry, wrong spatial index) are
-designed together in `design/graph-geometry.md` (not yet committed). Oct 30: two measurement rounds
-(survey, then three prototyped designs with critics) rewrote it: graphs share structure (lineage +
-slot table + persistent records), derived data per record with the base's on base objects, change
-journal first. Oct 30: committed. Oct 31: steps 0 and 1 done (uncommitted at first). Step 0: bug
-fixes (straighten data loss, copy/delete/paste, in-place writes, …) and `todo` tests for later-step
-bugs in `test/unit/lib/graph_bugs.test.js`. Step 1: graph journal, savepoint rollback, frozen history,
-emits from candidate IDs, `SessionDifference`; randomized emit test in
-`test/unit/core/EditSystemJournal.test.js`. Step 2 done Oct 31 (uncommitted at first): `entity.memo()`,
-schema generation, `graph.canShareAnswers()`, shared immutable `Geometry`, relations from member parts,
-readers on `graph.geometry()`/`graph.extent()`. Step 3 done Oct 31 (uncommitted at first):
-`PersistentVector`, `GraphRecord`s by slot, `graph.local` gone (`isLocal`, `localEntities`, `diffIDs`).
-Step 3 committed Nov 2 (`7c4bcb0f2`). Steps 4+ reordered Nov 2 (old numbers in the doc's Rollout):
-4 model test in the repo, 5 backups + incremental session difference, 6 geometry and versions in
-records, 7 memos in records, 8 rebase/schema, 9 spatial, 10 other data. Step 4 done Nov 2:
-`test/unit/lib/graph_model.test.js` (reference model, ~1 s; `GRAPH_MODEL_SEEDS=1000` for a long run).
-Step 5 done Nov 2: backup items hold each edit's own changes (`_backupChangesFor`, `reverted`),
-`SessionDifference.affects()` replaces `complete()` in ValidationSystem. Old v4 sessions still restore
-(cumulative items load the same), so deleting the debug Chrome's v4 sessions is optional now.
-Step 6 done Nov 2: shapes in records (`GraphRecord.geometry`), base shapes only from the lineage's
-`baseGraph`, `geoms`/`extent()`/`intersects()` throw on ways and relations, renderer rebinds by
-object identity (no `graph.version()`), no touches, savepoint keeps the records, `graph.verify()`.
-Known: 89 Seattle relations stale after later tiles (step 8). Step 7 (memos in records) measured
-Nov 2 and not built: 5-7% of graph reads unmemoized after 150 edits, worth ~0.2 ms a drag frame;
-dropping graph memos instead costs ~4 ms a drag frame (patch kept out of the repo).
-Step 8 done Nov 2: rebase recomputes base containers of what arrived; lineage `baseChanged`/
-`changeCount`; `graph.syncWithBase()` (stable/staging after merge and schema change, a history graph
-in `_replaceStaging`); `base.checkAreas()` + `SchemaSystem.areaGeneration`; uploader merges remote
-way nodes via `editor.merge`. Model test verifies after rebases on every seed; it found 3 older bugs
-(frozen restores, equal-copy shapes, memos of ways through a node a graph deleted), fixed. Seattle:
-0 stale shapes (was 89).
-Step 9 done Nov 2: `editor_base` is the one full index; `editor_stable`/`editor_staging` are local indexes
-of each graph's own entities/shapes, synced from snapshot diffs (`diffShapeIDs`). `entitiesInBox`/
-`segmentsInBox(box, graph)` answer for any graph of the lineage; `spatialIDForGraph` gone;
-`_validateEditsNearAsync` uses `stableEditsIn`. Fixed `replaceItems` double-inserting a repeated id.
-Merges 2x faster, heap -37% at 100k entities, frames unchanged. Next: step 10 (other data).
-Decided Oct 31: relation geometry references its members' parts (step 2), multipolygon ring structure
-cached and reused (follow-up); lazy build only as a stopgap. Backups: step 5 rewrites v4 in place
-(no v5); when it lands, delete the v4 sessions in the debug Chrome (the only ones that exist).
-Decided Nov 2: after a rebase only stable/staging update at once, other `EditSystem` graphs when they
-become current; no per-read "update on first use" (design section 5).
+## This branch (`conflation-system`)
+Data IDs (steps 1–5), the validation audit and the graph-geometry rollout have all landed (see
+`completed.md`). Bryan wants to land this branch for testers before starting the multiselection design
+(`backlog.md`), to keep conflation in focus. Still open from the validation audit: one runner for
+autoconnect and Autofix All (`design/validation-system.md`, rollout item 5).
 
 ## Active: what an edit records (`EditSystem`)
 Design: [`design/edit-system.md`](../design/edit-system.md), started Oct 26. Edits need to record more
@@ -198,14 +133,6 @@ to the part that exists.*
   runs about 1–2 m off OSM, so the default `sameDist` is 3 m.
 - The scoring formula should eventually match the server-side matching tools. That's being gathered and
   doesn't block the work.
-
-## Last session (Oct 2026): agent tooling for Claude Code
-- Reusable prompts became Agent Skills in `.claude/skills/` (via `rapideditor/agent-practices` PR #1 + `/sync`).
-  Both Claude Code and VS Code Copilot find them there.
-- `.github/instructions/*.instructions.md` became nested `modules/ui/AGENTS.md` and `modules/pixi/AGENTS.md`
-  (see `decisions.md` for the why). The folder READMEs link to them.
-- Docs refresh: AGENTS.md Testing section, module READMEs, DnD/Database design-doc status.
-- Fixed a stale Bun transpiler-cache entry that broke `extract.test.js` (see `quirks.md`).
 
 ## Next up (after conflation)
 - **Validator tests:** `crossing_ways` / `almost_junction` tests run again; one `it.skip` is left in

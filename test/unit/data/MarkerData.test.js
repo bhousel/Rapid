@@ -73,7 +73,6 @@ describe('MarkerData', () => {
       assert.isNull(geoms.world);
 
       a.props.loc = [0, 0];
-      a.touch();
       a.updateGeometry();
 
       geoms = a.geoms;
@@ -88,7 +87,6 @@ describe('MarkerData', () => {
       const oldPart = oldGeoms.parts[0];
 
       a.props.loc = [1, 1];
-      a.touch();
       a.updateGeometry();
 
       assert.notStrictEqual(a.geoms, oldGeoms);

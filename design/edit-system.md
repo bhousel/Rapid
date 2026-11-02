@@ -47,7 +47,11 @@ that an edit has to record more than changes to the OSM graph, and records where
 
 - The history, the stable index and the staging edit; `perform`, `commit`, `undo`, `redo`,
   checkpoints and transactions (see the class JSDoc for the API).
-- The `editor_base`, `editor_stable` and `editor_staging` spatial caches, kept in step with the graphs.
+- The OSM spatial indexes: `editor_base`, and the local indexes `editor_stable` and `editor_staging`,
+  kept in step with the graphs, and searches of them for any graph (`entitiesInBox`, `segmentsInBox`).
+  See [`graph-geometry.md`](graph-geometry.md) section 7.
+- Bringing graphs up to date after a merge or a schema change (`graph.syncWithBase()`): stable and
+  staging at once, a graph from the history when it becomes current.
 - Merging newly loaded OSM data into the base graph, and into every graph in the history.
 - Backing up the history to a session and restoring it.
 - The return view (`returnEdit`).
@@ -77,9 +81,12 @@ That assumption didn't hold up, and comments about it are scattered around the c
 - **Loaded data changes old graphs in place.** When more of the map loads, `merge()` adds the new
   entities to the base graph and to every graph in the history (`rebase`), and bumps relations
   whose members arrived (`touch()`) so multipolygons redraw. A graph's `key` doesn't change when
-  this happens.
+  this happens. (Since November 2026, [`graph-geometry.md`](graph-geometry.md) steps 6, 8 and 10:
+  a merge rebuilds those relations' shapes, nothing is touched, and the renderer redraws what's a
+  different object.)
 - **Three graphs, not one.** `base`, `stable` and `staging` each have a spatial cache, and the system
-  works hard to keep the right things redrawn after edits, undo, redo and merges.
+  works hard to keep the right things redrawn after edits, undo, redo and merges. (Since graph-geometry
+  step 9, one base index plus small local indexes for stable and staging, searchable for any graph.)
 - **Edits started to mean more than OSM changes.** Accepting and ignoring Rapid features had to be
   undoable, so their edits carry an object in `annotation` instead of a string:
   `{ type: 'rapid_accept_feature', acceptIDs, dataUsed }` or `{ type: 'rapid_ignore_feature', ignoreID }`.

@@ -20,7 +20,7 @@ export interface AbstractDataProps {
   namespace?: SpatialID;
   /** String describing what kind of data element this is (e.g. 'node', 'way', 'relation') */
   type?: string;
-  /** Internal version number, used to detect changes */
+  /** Version stamp, new on every `update()` (never changed in place), see `key` */
   v?: number;
   /** Extra properties are allowed */
   [key: string]: unknown;
@@ -40,7 +40,7 @@ export interface AbstractDataProps {
  * - `id`               - Identifier for this data element, unique within its namespace
  * - `dataID`           - Identifier unique across all of Rapid (see `design/data-ids.md`)
  * - `type`             - String describing what kind of data element this is (e.g. 'node', 'way', 'relation')
- * - `v`                - Internal version of the data element, can be used to detect changes
+ * - `v`                - Version stamp, new on every `update()` (a changed element is a new object)
  * - `geoms`            - Geometry object
  * - `props`            - Properties object
  *
@@ -103,12 +103,20 @@ export class AbstractData<P extends AbstractDataProps = AbstractDataProps> {
    * Data elements are intended to be immutable.  To modify a data element,
    *  pass in the properties to change, and you'll get a new data element.
    * The new data element will have an updated `v` internal version number.
+   * Note that this version number always increases and is shared by all data elements.
+   * We did it this way to avoid situations where you undo to a previous version
+   *  you don't want it to increment it back to the same version and appear unchanged.
+   * @see Rapid@9ac2776a
+   * (There is no way to change the version of a data element in place: renderers rebind a feature when
+   * its data is a different object, see `design/graph-geometry.md`.)
    * @param props - the updated properties
    * @returns a new data element
    */
   public update(props: Partial<P>): this {
     const Type = this.constructor as DataConstructor<this>;
-    return new Type(this, props).touch();
+    const copy = new Type(this, props);
+    copy.props.v = this.context.next('v');
+    return copy;
   }
 
   /**
@@ -155,19 +163,6 @@ export class AbstractData<P extends AbstractDataProps = AbstractDataProps> {
   }
 
   /**
-   * Bump internal version number in place (typically, forcing a rerender)
-   * Note that this version number always increases and is shared by all data elements.
-   * We did it this way to avoid situations where you undo to a previous version
-   *  you don't want it to increment it back to the same version and appear unchanged.
-   * @see Rapid@9ac2776a
-   * @returns this data element
-   */
-  public touch(): this {
-    this.props.v = this.context.next('v');
-    return this;
-  }
-
-  /**
    * The data element's geometry, containing its original and projected data.
    * OSM ways and relations don't have one of their own: their shape depends on the graph, so
    * read it through `graph.geometry(entity)` (see `OsmEntity`).
@@ -207,7 +202,8 @@ export class AbstractData<P extends AbstractDataProps = AbstractDataProps> {
   }
 
   /**
-   * Internal version of the data element, can be used to detect changes.
+   * Version stamp of the data element: `update()` gives each new element a newer one, and nothing
+   * changes it in place. Renderers compare objects instead (a changed element is a new object).
    * @return  Version counter
    * @readonly
    */

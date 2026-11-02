@@ -192,9 +192,8 @@ export class UiOsmoseEditor extends EventEmitter {
       .on('click', (e: PointerEvent, d: OsmoseIssue) => {
         (e.currentTarget as HTMLElement).blur();    // avoid keeping focus on the button - iD#4641
         if (osmose2) {
-          d.props.newStatus = 'done';
-          d.touch();
-          osmose2.postUpdate(d, (err: any, item: any) => this.emit('change', item));
+          const issue = this._updateIssue(d, { newStatus: 'done' });
+          osmose2.postUpdate(issue, (err: any, item: any) => this.emit('change', item));
         }
       });
 
@@ -203,10 +202,27 @@ export class UiOsmoseEditor extends EventEmitter {
       .on('click', (e: PointerEvent, d: OsmoseIssue) => {
         (e.currentTarget as HTMLElement).blur();    // avoid keeping focus on the button - iD#4641
         if (osmose2) {
-          d.props.newStatus = 'false';
-          d.touch();
-          osmose2.postUpdate(d, (err: any, item: any) => this.emit('change', item));
+          const issue = this._updateIssue(d, { newStatus: 'false' });
+          osmose2.postUpdate(issue, (err: any, item: any) => this.emit('change', item));
         }
       });
+  }
+
+
+  /**
+   * Sets props on the issue, as a new issue in the cache (data isn't changed in place), and makes it
+   * this editor's datum.
+   * @param issue - the issue to start from
+   * @param props - the props to set
+   * @return The new issue
+   */
+  protected _updateIssue(issue: OsmoseIssue, props: Record<string, unknown>): OsmoseIssue {
+    const context = this.context;
+    const osmose = context.services.osmose;
+
+    const updated = issue.update(props);
+    osmose?.replaceItem(updated);
+    this.datum = updated;
+    return updated;
   }
 }

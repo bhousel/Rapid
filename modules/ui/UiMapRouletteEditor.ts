@@ -8,7 +8,7 @@ import { utilNoAuto } from '../util/index.ts';
 
 import type { Context } from '../Context.ts';
 import type { D3EnterSelection, D3Selection } from 'd3-selection';
-import type { MapRouletteTask } from '../services/MapRouletteService.ts';
+import type { MapRouletteTask, MapRouletteTaskProps } from '../services/MapRouletteService.ts';
 
 
 /**
@@ -219,7 +219,6 @@ export class UiMapRouletteEditor extends EventEmitter {
   protected _commentSaveSection($selection: D3Selection): void {
     const context = this.context;
     const l10n = context.systems.l10n!;
-    const maproulette = context.services.maproulette!;
 
     const dataID = this.datum?.dataID;
     const isSelected = dataID && context.selectedIDs().includes(dataID);
@@ -231,11 +230,7 @@ export class UiMapRouletteEditor extends EventEmitter {
       const $input = select(e.currentTarget as HTMLTextAreaElement);
       const val = ($input.property('value') as string).trim() || undefined;
 
-      this.datum!.props.newComment = val;
-      this.datum!.touch();
-      if (maproulette) {
-        maproulette.replaceItem(this.datum!);  // update note cache
-      }
+      this._updateTask({ newComment: val });
 
       $commentSave
         .call(this._saveButtons);
@@ -573,7 +568,7 @@ export class UiMapRouletteEditor extends EventEmitter {
    */
   protected _fixedIt(e: PointerEvent, d: MapRouletteTask): void {
     (e.currentTarget as HTMLElement).blur();    // avoid keeping focus on the button - iD#4641
-    d.props._status = 1;
+    this._updateTask({ _status: 1 }, d);
     this._actionTaken = 'FIXED';
     this._setSaveButtonVisibility(true);
     this.render();
@@ -587,7 +582,7 @@ export class UiMapRouletteEditor extends EventEmitter {
    */
   protected _cantComplete(e: PointerEvent, d: MapRouletteTask): void {
     (e.currentTarget as HTMLElement).blur();    // avoid keeping focus on the button - iD#4641
-    d.props._status = 6;
+    this._updateTask({ _status: 6 }, d);
     this._actionTaken = `CAN'T COMPLETE`;
     this._setSaveButtonVisibility(true);
     this.render();
@@ -600,7 +595,7 @@ export class UiMapRouletteEditor extends EventEmitter {
    */
   protected _alreadyFixed(e: PointerEvent, d: MapRouletteTask): void {
     (e.currentTarget as HTMLElement).blur();    // avoid keeping focus on the button - iD#4641
-    d.props._status = 5;
+    this._updateTask({ _status: 5 }, d);
     this._actionTaken = 'ALREADY FIXED';
     this._setSaveButtonVisibility(true);
     this.render();
@@ -613,7 +608,7 @@ export class UiMapRouletteEditor extends EventEmitter {
    */
   protected _notAnIssue(e: PointerEvent, d: MapRouletteTask): void {
     (e.currentTarget as HTMLElement).blur();    // avoid keeping focus on the button - iD#4641
-    d.props._status = 2;
+    this._updateTask({ _status: 2 }, d);
     this._actionTaken = 'NOT AN ISSUE';
     this._setSaveButtonVisibility(true);
     this.render();
@@ -627,7 +622,7 @@ export class UiMapRouletteEditor extends EventEmitter {
   protected _clickCancel(e: PointerEvent, d: MapRouletteTask): void {
     (e.currentTarget as HTMLElement).blur();    // avoid keeping focus on the button - iD#4641
     this._actionTaken = '';
-    d.props._status = '';
+    this._updateTask({ _status: '' }, d);
     this._setSaveButtonVisibility(false);
     this.render();
   }
@@ -645,13 +640,14 @@ export class UiMapRouletteEditor extends EventEmitter {
     (e.currentTarget as HTMLElement).blur();    // avoid keeping focus on the button - iD#4641
     const userID = (osm as any)._userDetails.id;
 
-    const props = d.props as any;
-    props.taskStatus = props._status;
-    props.mapRouletteApiKey = this._apikey;
-    props.comment = select('.new-comment-input').property('value').trim();
-    props.taskId = d.id;
-    props.userId = userID;
-    maproulette.postUpdate(d, (err: string | null, item?: MapRouletteTask) => {
+    const task = this._updateTask({
+      taskStatus: d.props._status || undefined,
+      mapRouletteApiKey: this._apikey ?? undefined,
+      comment: select('.new-comment-input').property('value').trim(),
+      taskId: d.id,
+      userId: userID
+    }, d);
+    maproulette.postUpdate(task, (err: string | null, item?: MapRouletteTask) => {
       if (err) {
         console.error(err);  // eslint-disable-line no-console
         return;
@@ -659,8 +655,26 @@ export class UiMapRouletteEditor extends EventEmitter {
       this.emit('change', item);
       // Fly to a nearby task if the feature is enabled, after the update
       if (maproulette.nearbyTaskEnabled) {
-        maproulette.flyToNearbyTask(d);
+        maproulette.flyToNearbyTask(task);
       }
     });
+  }
+
+
+  /**
+   * Sets props on the task, as a new task in the cache (data isn't changed in place), and makes it
+   * this editor's datum.
+   * @param props - the props to set
+   * @param task - the task to start from (defaults to the datum)
+   * @return The new task
+   */
+  protected _updateTask(props: Partial<MapRouletteTaskProps>, task: MapRouletteTask = this.datum!): MapRouletteTask {
+    const context = this.context;
+    const maproulette = context.services.maproulette;
+
+    const updated = task.update(props);
+    maproulette?.replaceItem(updated);
+    this.datum = updated;
+    return updated;
   }
 }

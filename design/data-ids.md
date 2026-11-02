@@ -106,9 +106,10 @@ may only have letters, digits, `_` and `-` (so no `:` or `.`). Custom data's nam
 `custom-` (`CUSTOM_NAMESPACE_PREFIX` in `PixiLayerCustomData`), which is reserved the same way.
 
 **Two kinds of namespace need their own lookup** (a resolver registered with `SpatialSystem`):
-- **OSM.** The editable OSM data is special. It has three caches (`editor_base`, `editor_stable`,
-  `editor_staging`), holding different versions of the same entities, and its IDs are bare (no
-  `osm:`). Bare IDs resolve through `EditSystem`'s staging graph.
+- **OSM.** The editable OSM data is special. Its graphs hold different versions of the same entities
+  (indexed in `editor_base` plus the local indexes `editor_stable` and `editor_staging`, since
+  graph-geometry step 9), and its IDs are bare (no `osm:`). Bare IDs resolve through `EditSystem`'s
+  staging graph.
 - **Vector tiles** (Overture, or a vector tile URL as custom data). These have a cache per zoom
   (`${source}.z${zoom}`), because tiles hold different data at different zooms, often simplified
   at low zooms. The namespace is the source, and the resolver looks in the cache nearest the current
@@ -176,7 +177,7 @@ As found when this doc started. Step 1 renamed the caches and Step 2 fixed the I
 
 | Data | `datum.id` today | Deterministic? | Cache | Notes |
 |---|---|---|---|---|
-| OSM entities | `w123`, `n-1` (new) | Yes | `editor_base`, `_stable`, `_staging` | Already a valid data ID |
+| OSM entities | `w123`, `n-1` (new) | Yes | `editor_base`, plus local indexes `editor_stable`, `_staging` | Already a valid data ID |
 | Rapid file datasets | `fbRoads:abc:0` | Yes | `rapid-fbRoads-data` | Becomes `fbRoads:abc` (no part number for a single geometry) |
 | Pieces of lines | `fbRoads:abc:0@0.25-0.5` | Yes, until the run's ends move | None (`ConflationSystem`) | Becomes `fbRoads.pieces:abc@0.25-0.5` |
 | MapWithAI | `w-1000000000` (server IDs) | Yes | `mapwithai-fbRoads-data` | OSM-like, in a per-dataset `Graph`; also in `props.fbID` |

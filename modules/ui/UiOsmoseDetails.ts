@@ -148,22 +148,23 @@ export class UiOsmoseDetails {
     if (!osmose) return;
 
     osmose.loadIssueDetailAsync(this.datum!)
-      .then((d: any) => {
+      .then((issue: any) => {
         // Do nothing if the datum has changed by the time Promise resolves
-        if (this.datum!.id !== d.id) return;
+        if (this.datum!.id !== issue.id) return;
 
         // No details to add if there are no associated issue elements
-        if (!d.props.elems || d.props.elems.length === 0) return;
+        // (The issue with its details is a new one, not the datum bound above: data isn't changed in place.)
+        if (!issue.props.elems || issue.props.elems.length === 0) return;
 
         // Things like keys and values are dynamically added to a subtitle string
-        if (d.props.detail) {
+        if (issue.props.detail) {
           $$detailsDiv
             .append('h4')
             .text(l10n.t('text.detail', { n: 100 }));   // force plural, i.e. "Details"
 
           $$detailsDiv
             .append('p')
-            .html((d: any) => utilSanitizeHTML(d.props.detail))
+            .html(utilSanitizeHTML(issue.props.detail))
             .selectAll('a')
             .attr('rel', 'noopener')
             .attr('target', '_blank');
@@ -176,7 +177,7 @@ export class UiOsmoseDetails {
 
         $$elemsDiv
           .append('ul').selectAll('li')
-          .data(d.props.elems)
+          .data(issue.props.elems)
           .enter()
           .append('li')
           .append('a')
@@ -204,7 +205,7 @@ export class UiOsmoseDetails {
                 utilHighlightEntities(context, [entityID], false);
 
                 scene.enableLayers('osm');  // make sure osm layer is even on
-                map.centerZoom(d.loc, 20);
+                map.centerZoom(issue.loc, 20);
                 map.selectEntityID(entityID);
               });
 
@@ -224,7 +225,7 @@ export class UiOsmoseDetails {
           });
 
         // Don't hide entities related to this issue - iD#5880
-        filters.forceVisible(d.props.elems);
+        filters.forceVisible(issue.props.elems);
         gfx.immediateRedraw();
       })
       .catch((e: unknown) => console.error(e));  // eslint-disable-line

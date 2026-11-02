@@ -140,12 +140,13 @@ describe('AbstractData', () => {
     });
   });
 
-  describe('touch', () => {
-    it('updates v in place', () => {
+  describe('v', () => {
+    it('is newer on an updated copy, and the original keeps its own', () => {
       const a = new Rapid.AbstractData(context);
       const v1 = a.v;
-      a.touch();
-      assert.isAbove(a.v, v1);
+      const b = a.update({});
+      assert.isAbove(b.v, v1);
+      assert.strictEqual(a.v, v1);
     });
   });
 

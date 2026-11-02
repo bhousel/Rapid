@@ -259,13 +259,16 @@ export class OsmoseService extends AbstractSystem {
    * @return Promise resolved once the data has been fetched
    */
   public loadIssueDetailAsync(issue: MarkerData): Promise<MarkerData> {
-    // Issue details only need to be fetched once
-    if (issue.props.elems !== undefined) return Promise.resolve(issue);
-
     const context = this.context;
     const l10n = context.systems.l10n;
     const network = context.systems.network!;
+    const spatial = context.systems.spatial!;
     const localeCode = l10n?.localeCode || 'en-US';
+
+    // Issue details only need to be fetched once
+    // (The cached issue may be newer than the one given: data isn't changed in place.)
+    const cached = spatial.getItem<MarkerData>('osmose', issue.id) ?? issue;
+    if (cached.props.elems !== undefined) return Promise.resolve(cached);
 
     const url = `${OSMOSE_API}/issue/${issue.id}?langs=${localeCode}`;
     return network.fetch<any>(url)
@@ -276,11 +279,10 @@ export class OsmoseService extends AbstractSystem {
         // Some issues have instance specific detail in a subtitle
         const detail = data.subtitle ? marked.parse(data.subtitle.auto) as string : '';
 
-        issue.props.elems = elems;
-        issue.props.detail = detail;
-        issue.touch();
-        this.replaceItem(issue);
-        return issue;
+        const current = spatial.getItem<MarkerData>('osmose', issue.id) ?? cached;
+        const updated = current.update({ elems: elems, detail: detail });
+        this.replaceItem(updated);
+        return updated;
       });
   }
 

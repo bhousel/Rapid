@@ -61,6 +61,8 @@ export class MarkerData<P extends MarkerProps = MarkerProps> extends AbstractDat
   /**
    * Forces a recomputation of the internal geometry data.
    * It stores a new `Geometry` and leaves the old one untouched, because a renderer may still hold its parts.
+   * The constructor calls it. To change a marker, make a new one with `update()` instead: data isn't
+   * changed in place.
    * @returns this same Marker
    */
   public updateGeometry(): this {

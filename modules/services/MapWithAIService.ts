@@ -486,7 +486,7 @@ export class MapWithAIService extends AbstractSystem {
 
     // Check each way that shares this `origID`.
     // Pick one to be the "survivor" (it doesn't matter which one).
-    // Merge the nodes into the survivor (this will bump internal version `v`, so it gets redrawn)
+    // Merge the nodes into the survivor (with `update()`: a new way, so it gets redrawn)
     //
     // some implementation notes:
     // 1. Note that the "ways" here haven't been constructed as Entities yet, they are just props.

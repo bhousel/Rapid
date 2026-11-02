@@ -49,7 +49,8 @@ The unused `SpatialCache.graph` field is **removed**. `EditSystem` is the source
 > indexes for any graph"): `editor_base` is the one full index, and `editor_stable` / `editor_staging`
 > are small local indexes of what those graphs changed. `EditSystem.entitiesInBox(box, graph)` and
 > `segmentsInBox(box, graph)` answer for any graph of the lineage, and `spatialIDForGraph` is gone.
-> The rest of this section is kept as the record of the earlier design.
+> The rest of this section is kept as the record of the earlier design. Its update-timing invariant
+> still holds: each index is updated before the event for its graph fires.
 
 Rather than a single OSM index that lazily re-syncs to whatever graph a caller passes, `EditSystem` maintains **separate, explicitly-named caches** in `SpatialSystem`:
 

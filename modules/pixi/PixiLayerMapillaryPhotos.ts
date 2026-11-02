@@ -230,7 +230,6 @@ export class PixiLayerMapillaryPhotos extends AbstractPixiLayer {
     // render sequences
     for (const d of sequences) {
       const dataID = d.id;
-      const version = d.v || 0;
       const parts = d.geoms.parts;
 
       for (let i = 0; i < parts.length; ++i) {
@@ -249,8 +248,7 @@ export class PixiLayerMapillaryPhotos extends AbstractPixiLayer {
         }
 
         // If data has changed.. Replace it.
-        if (feature.v !== version) {
-          feature.v = version;
+        if (feature.data !== d || feature.geometry !== part) {   // changed data is a new object
           feature.geometry = part;
           feature.data = d;
         }
@@ -275,6 +273,9 @@ export class PixiLayerMapillaryPhotos extends AbstractPixiLayer {
       if (!feature) {
         feature = new PixiFeaturePoint(this, featureID);
         feature.parentContainer = parentContainer;
+      }
+
+      if (feature.data !== d || feature.geometry !== part) {   // changed data is a new object
         feature.geometry = part;
         feature.data = d;
 

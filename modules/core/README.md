@@ -106,7 +106,7 @@ collected, sorted by specificity, and their referenced styles are deep-merged.
 | `ConflationSystem.ts` | Matches Rapid dataset features against OSM and triages them (already mapped or new) |
 | `DatabaseSystem.ts` | Durable storage wrapping IndexedDB (`sessions` and `files` stores), with an in-memory fallback |
 | `DragAndDropSystem.ts` | Owns file drag-and-drop and routes dropped files to registered consumers |
-| `EditSystem.ts` | Manages edit history, undo/redo, and staging changes |
+| `EditSystem.ts` | Manages edit history, undo/redo, and staging changes; owns the OSM spatial indexes, and searches them for any graph (`entitiesInBox`, `segmentsInBox`) |
 | `FilterSystem.ts` | Controls visibility filtering of map features |
 | `GraphicsSystem.ts` | Manages Pixi.js rendering pipeline |
 | `ImagerySystem.ts` | Manages background imagery layers |
@@ -134,7 +134,7 @@ collected, sorted by specificity, and their referenced styles are deep-merged.
 | `index.worker.ts` | Barrel that collects core worker listeners for bundling into `worker.ts` |
 | `types.ts` | TypeScript type definitions for core systems |
 
-Design notes for several systems (database, drag-and-drop, keyboard, network, scheduler, settings, spatial, style, UI) are in [`design/`](../../design/).
+Design notes for most core systems are in [`design/`](../../design/); [`design/README.md`](../../design/README.md) lists them with their status.
 
 ## Accessing Systems
 
