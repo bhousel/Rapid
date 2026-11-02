@@ -3,6 +3,7 @@ import { actionDeleteRelation } from './delete_relation.ts';
 import type { Action } from './types.ts';
 import type { Graph } from '../lib/Graph.ts';
 import type { OsmNode } from '../data/OsmNode.ts';
+import type { OsmRelation } from '../data/OsmRelation.ts';
 import type { OsmWay } from '../data/OsmWay.ts';
 
 
@@ -21,7 +22,10 @@ export function actionDeleteWay(wayID: EntityID, doDeleteDegenerate: boolean = t
     let way = graph.entity(wayID) as OsmWay;
 
     // remove way from parent relations
-    for (let parent of graph.parentRelations(way)) {
+    // (look each one up again: deleting a degenerate parent can change or delete the others)
+    for (const parentID of graph.parentRelations(way).map(relation => relation.id)) {
+      let parent = graph.hasEntity(parentID) as OsmRelation | undefined;
+      if (!parent) continue;   // deleted by an earlier cascade
       parent = parent.removeMembersWithID(wayID);
       graph.replace(parent);
       if (doDeleteDegenerate && parent.isDegenerate()) {

@@ -189,8 +189,8 @@ describe('EditSystem journal', () => {
 
     const graph = editor.staging.graph;
     assert.strictEqual(emits, 0);
-    assert.isFalse(graph.local.entities.has('n1'));
-    assert.isFalse(graph.local.entities.has('n2'));
+    assert.isFalse(graph.isLocal('n1'));
+    assert.isFalse(graph.isLocal('n2'));
     assert.deepEqual(graph.entity('n2').loc, [0.001, 0]);
     assert.deepEqual(graph.parentWays(graph.entity('n1')).map(way => way.id), ['w1']);
     assert.deepEqual(w1.extent().rectangle(), extent);

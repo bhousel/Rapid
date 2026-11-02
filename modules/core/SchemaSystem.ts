@@ -435,7 +435,7 @@ if (editor) {
 
   const staging = editor.staging?.graph;
   if (staging) {
-    for (const [_, v] of staging.local.entities) {
+    for (const [_, v] of staging.localEntities()) {
       if (!v) continue;
       v.updateGeometry(staging);
     }
@@ -445,7 +445,7 @@ if (editor) {
   for (const edit of history) {
     const graph = edit.graph;
     if (graph) {
-      for (const [_, v] of graph.local.entities) {
+      for (const [_, v] of graph.localEntities()) {
         if (!v) continue;
         v.updateGeometry(graph);
       }

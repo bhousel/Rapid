@@ -242,7 +242,7 @@ describe('actionRapidAcceptFeature with autoconnect', () => {
     }
 
     // Every node is part of a way (no node left behind by a fix that no longer fit the graph)
-    for (const entity of graph.local.entities.values()) {
+    for (const entity of graph.localEntities().values()) {
       if (entity?.type === 'node') {
         assert.isNotEmpty(graph.parentWays(entity), `${entity.id} is in a way`);
       }

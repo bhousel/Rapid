@@ -7,7 +7,7 @@ of the change. This design fixes findings 1 (shared geometry) and 2 (the wrong s
 [validation audit](validation-system.md#the-october-2026-audit), the bugs listed below, and the cost of
 keeping versions. It gives Rapid one way to ask for anything's geometry: `graph.geometry(entity)`.
 
-> **Status:** In progress (October 2026): steps 0, 1 and 2 done. Measured in two rounds: a survey of
+> **Status:** In progress (October 2026): steps 0-3 done. Measured in two rounds: a survey of
 > today's costs and bugs, then three competing designs, each prototyped and reviewed for correctness
 > and for performance (in JavaScriptCore and V8). See [Open questions](#open-questions).
 
@@ -139,14 +139,21 @@ structure, like the persistent data structures of functional languages:
   `_updateRebased` goes.
 
 Rules that keep it correct:
-- Only the graph that owns a tree node may change it in place. Deriving, emitting or pushing a graph
-  into the history gives up ownership.
+- Only the graph that owns a tree node may change it in place. Deriving gives both graphs new owner
+  tokens, so neither changes what they share. (Emitting and pushing into the history don't need to:
+  a graph that's been emitted or pushed is either derived from right away or frozen.)
 - History graphs are frozen: `replace`, `remove`, `revert` and `load` throw on them. Only a rebase's
   fix-ups (section 5), iD#2085 restores included, may rewrite one.
-- Graphs that are never kept (validators' scratch graphs, `disabled()` checks) don't get slots: their
-  writes go in a small Map of their own until they're kept. In the prototype, merge-time validation
-  alone gave slots to a quarter of the synthetic base, which slows every lookup, mostly through writes
-  that changed nothing (`actionSyncCrossingTags` always replaces the parent way).
+- A record that says nothing different from base (after a revert) is cleared, not kept.
+- Slot pollution by graphs that are never kept (validators' scratch graphs, `disabled()` checks)
+  turned out small once writes that change nothing were skipped (step 0): validating a whole real
+  tile gave out 64 slots. In the prototype, merge-time validation alone gave slots to a quarter of
+  a synthetic base, mostly through such writes, so a small overflow Map for scratch graphs was
+  planned; it isn't needed.
+- A graph's first write of a way or relation costs its length, not O(1): each child's record lists
+  the graph's own parents (all of them, since base's record of that parent no longer counts).
+  Storing only the parents added and removed compared with base would make it O(1), but then a
+  forced rebase of a way a graph overrides would need fix-ups again.
 
 **Why a slot vector and not a hash trie keyed by ID.** JavaScript can't reach the engine's cached
 string hash, so a hash trie hashes the ID itself. In JavaScriptCore that made lookups 2.4-3.8× slower
@@ -534,6 +541,37 @@ Each step ships on its own and leaves the app working, with tests that pin what 
    - This makes derive O(1) and history memory O(changes). In the prototype, the heap after accepting
      200 roads went from 861 MB to 41 MB, 31 MB of which is the entities. It also removes the merge
      fix-ups and the throw after a forced update.
+   - **Done.** The benchmark first, in V8 (Node 22, the prototype's code): lookups of mostly-base IDs
+     62 vs 57 ns for today's Map at L=10k, and 95 vs 78 ns at L=100k; of edited IDs 27 vs 27 and 58
+     vs 44 ns. Derive 0.1-0.4 µs instead of 0.9-12 ms. A diff of one change 0.4-1.7 µs instead of
+     0.8-10 ms. The hash trie measured 2-4× slower, so the slot vector stayed. Then the real thing,
+     accepting 200 roads of 99 nodes (L=20k), with no validation or backup:
+
+     | | Bun, before → after | V8, before → after |
+     |---|---|---|
+     | MoveMode frame (revert, then perform) | 1.26 → 0.03 ms | 1.75 → 0.05 ms |
+     | Discrete edit (perform and commit) | 1.24 → 0.03 ms | 1.78 → 0.04 ms |
+     | Undo and redo | 2.16 → 0.05 ms | 3.46 → 0.07 ms |
+     | Heap of the history | 370 → 68 MB | 248 → 82 MB |
+
+     A DragNodeMode pointermove stays at 0.02-0.07 ms (step 1 made it flat).
+     How it landed:
+     - `modules/lib/PersistentVector.ts`: the 32-way trie with owner tokens. Deriving gives both
+       graphs new tokens, so neither changes what they share.
+     - `GraphRecord` per ID: `isLocal`, `entity`, and the graph's own `parentWays`/`parentRels` that
+       contain the ID. Once a graph has its own version of a way, base's record of that way's nodes
+       doesn't count for it, so its own list holds all of the way's nodes.
+     - `graph.local` is gone. `graph.isLocal(id)`, `graph.localEntities()` (O(edits), for backups
+       and the feature search) and `graph.diffIDs(other)` (structural) replace it; `Difference`
+       without candidates uses `diffIDs`. `graph.base` stays: the base cache is shared and mutable.
+     - Slots aren't polluted: validating a whole real tile (19.5k entities, every validator) gave
+       out 64 slots, so scratch graphs don't need an overflow Map.
+     - The cost (review, a real Tokyo tile with 300 edits): reading every ID from a graph with edits
+       is about 30% slower (an ID with a slot takes about 27 instead of 10 ns; the base graph pays
+       nothing). Whole passes come out even, since `parentWays` no longer copies a Set: a
+       render-like pass 1.55 vs 1.80 ms (Bun) and 2.33 vs 2.31 ms (V8); eight validators over the
+       tile 67 vs 73 ms (Bun) and 179 vs 168 ms (V8). `parentWays` keeps base's order, with a
+       graph's own version of a parent in its place (callers take `parents[0]`).
 4. **Derived data in records.**
    - Records get geometry, memoized answers and versions. Base data lives on base objects.
      `graph.version(entity)` arrives.

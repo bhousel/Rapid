@@ -150,7 +150,7 @@ describe('validateCurbNodes fix', () => {
 
     // Two curb nodes, each in the crossing and in the short piece that joins it to a sidewalk
     const result = editor.stable.graph;
-    const kerbs = [...result.local.entities.values()].filter(entity => entity?.type === 'node' && entity.tags.barrier === 'kerb');
+    const kerbs = [...result.localEntities().values()].filter(entity => entity?.type === 'node' && entity.tags.barrier === 'kerb');
     assert.lengthOf(kerbs, 2);
     for (const kerb of kerbs) {
       const parents = result.parentWays(kerb);

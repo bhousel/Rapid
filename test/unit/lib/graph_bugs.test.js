@@ -234,7 +234,7 @@ describe('Graph bugs pinned for later steps', () => {
 
 
   describe('step 3: graphs share structure', () => {
-    it.todo('step 3: parentWays works after a forced update of a way the user deleted', async () => {
+    it('step 3: parentWays works after a forced update of a way the user deleted', async () => {
       const { editor } = await makeEditor();
       const context = editor.context;
       editor.merge([

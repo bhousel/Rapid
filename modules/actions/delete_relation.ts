@@ -22,7 +22,10 @@ export function actionDeleteRelation(relationID: EntityID, doDeleteDegenerate: b
     let relation = graph.entity(relationID) as OsmRelation;
 
     // remove this relation from its parents
-    for (let parent of graph.parentRelations(relation)) {
+    // (look each one up again: deleting a degenerate parent can change or delete the others)
+    for (const parentID of graph.parentRelations(relation).map(parent => parent.id)) {
+      let parent = graph.hasEntity(parentID) as OsmRelation | undefined;
+      if (!parent) continue;   // deleted by an earlier cascade
       parent = parent.removeMembersWithID(relationID);
       graph.replace(parent);
 

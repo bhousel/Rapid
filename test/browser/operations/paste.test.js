@@ -58,7 +58,7 @@ describe('PasteOperation', () => {
     new Rapid.PasteOperation(context).run();
 
     // The pointer is at the center of the copied shape, so the copy lands where the original was.
-    const newWay = [..._graph.local.entities.values()].find(e => e?.type === 'way' && e.id !== 'w1');
+    const newWay = [..._graph.localEntities().values()].find(e => e?.type === 'way' && e.id !== 'w1');
     assert.isOk(newWay);
     const locs = newWay.nodes.map(nodeID => _graph.entity(nodeID).loc);
     assert.closeTo(locs[0][0], 0, 1e-6);

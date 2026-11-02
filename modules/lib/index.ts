@@ -14,6 +14,7 @@ export * from './ImagerySource.ts';
 export * from './intersection.ts';
 export * from './lanes.ts';
 export * from './multipolygon.ts';
+export * from './PersistentVector.ts';
 export * from './Preset.ts';
 export * from './PropMatcher.ts';
 export * from './RapidDataDictionary.ts';

@@ -1034,7 +1034,7 @@ export class EditSystem extends AbstractSystem {
     const stableGraph = this.stable.graph!;
     const overridden = new Set<EntityID>();
     for (const entity of entities) {
-      if (stableGraph.local.entities.has(entity.id)) {
+      if (stableGraph.isLocal(entity.id)) {
         overridden.add(entity.id);
       }
     }
@@ -1349,7 +1349,7 @@ export class EditSystem extends AbstractSystem {
     }
 
     // Replace base entities with head entities..
-    for (const [entityID, entity] of graph.local.entities) {
+    for (const [entityID, entity] of graph.localEntities()) {
       if (entity) {
         const copy = _copyEntity(entity);
         result.set(copy.id, copy);
@@ -1438,7 +1438,7 @@ export class EditSystem extends AbstractSystem {
       const deleted: EntityID[] = [];
 
       // watch out: for modified entities we index on "key" - e.g. "n1v1"
-      for (const [entityID, entity] of edit.graph!.local.entities) {
+      for (const [entityID, entity] of edit.graph!.localEntities()) {
         if (entity) {
           const key = entity.key;
           modifiedEntities.set(key, _copyEntity(entity));

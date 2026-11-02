@@ -472,14 +472,13 @@ export class UiFeatureList {
     // Gather affected ids
     const graph = editor.staging.graph;
     const base = graph.base.entities;
-    const local = graph.local.entities;
+    const local = graph.localEntities();
     const ids = new Set([...base.keys(), ...local.keys()]);
 
     let localResults: SearchResult[] = [];
     for (const id of ids) {
-      if (local.has(id) && local.get(id) === undefined) continue;  // deleted locally
       const entity = graph.hasEntity(id);
-      if (!entity) continue;
+      if (!entity) continue;   // deleted locally
 
       const name = l10n.displayName(entity.tags) || '';
       if (name.toLowerCase().indexOf(q) < 0) continue;

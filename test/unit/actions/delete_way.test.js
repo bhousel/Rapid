@@ -111,6 +111,26 @@ describe('actionDeleteWay', () => {
   });
 
 //  // This was moved to operationDelete.  We should test operations and move this test there.
+  it('deletes parent relations that become degenerate, whatever order the parents come in', () => {
+    // w1 is in r1 and r2, and r1 is a member of r2: deleting w1 empties r1, which empties r2.
+    const n1 = new Rapid.OsmNode(context, { id: 'n1' });
+    const n2 = new Rapid.OsmNode(context, { id: 'n2' });
+    const w1 = new Rapid.OsmWay(context, { id: 'w1', nodes: ['n1', 'n2'] });
+    const r1 = new Rapid.OsmRelation(context, { id: 'r1', members: [{ id: 'w1', type: 'way' }] });
+    const r2 = new Rapid.OsmRelation(context, { id: 'r2', members: [{ id: 'w1', type: 'way' }, { id: 'r1', type: 'relation' }] });
+    const base = new Rapid.Graph(context, [n1, n2, w1, r1, r2]);
+
+    for (const order of [['r1', 'r2'], ['r2', 'r1']]) {
+      const graph = new Rapid.Graph(base);
+      if (order[0] === 'r2') {   // editing r2's tags put it first in base, last in the graph before step 3
+        graph.replace(r1.update({ tags: { name: 'x' } }));
+      }
+      const result = Rapid.actionDeleteWay('w1')(graph);
+      assert.isUndefined(result.hasEntity('r1'), `order ${order}`);
+      assert.isUndefined(result.hasEntity('r2'), `order ${order}`);
+    }
+  });
+
 //  describe('disabled', () => {
 //    it('returns \'part_of_relation\' for members of route and boundary relations', () => {
 //      const w1 = new Rapid.OsmWay(context, {id: 'w1'});

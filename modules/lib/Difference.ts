@@ -98,11 +98,7 @@ export class Difference {
     if (candidates) {
       ids = candidates;
     } else {
-      let all = new Set<EntityID>(head.local.entities.keys());
-      if (base) {                               // Note:  Maps are "Set-like"
-        all = all.union(base.local.entities);   // keys() will be invoked automatially
-      }
-      ids = all;
+      ids = head.diffIDs(base);   // O(changes) for graphs that share structure
     }
 
     // Check each id to determine whether it has changed from base -> head..
