@@ -204,26 +204,29 @@ export class SpatialSystem extends AbstractSystem {
    * Add or replace items in the given spatial cache.
    * An item without a valid box replaces any existing item with its id, and can be found by id,
    * but it's left out of the spatial index, so box and coordinate searches won't return it.
+   * If `items` has more than one item with the same id, the last one wins.
    * @param spatialID - spatialID of the cache to insert into
    * @param items - items to insert or replace
    */
   public replaceItems(spatialID: SpatialID, items: OneOrMore<SpatialItem>): void {
     const cache = this.getCache(spatialID);
 
-    const toInsert: SpatialItem[] = [];
+    // (Items are inserted after the loop, so a repeated id would otherwise be inserted twice.)
+    const toInsert = new Map<BoxID, SpatialItem>();
     for (const item of utilIterable(items)) {
       if (!item) continue;
       this._removeItem(cache, item.id);
+      toInsert.delete(item.id);
       cache.items.set(item.id, item);
       if (this._hasValidBox(item)) {
-        toInsert.push(item);
+        toInsert.set(item.id, item);
       }
     }
 
-    if (toInsert.length > 1) {
-      cache.rbush.load(toInsert);
-    } else if (toInsert.length === 1) {
-      cache.rbush.insert(toInsert[0]);
+    if (toInsert.size > 1) {
+      cache.rbush.load([...toInsert.values()]);
+    } else if (toInsert.size === 1) {
+      cache.rbush.insert(toInsert.values().next().value!);
     }
   }
 

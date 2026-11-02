@@ -9,6 +9,7 @@ import { utilObjectOmit } from '@rapid-sdk/util';
 
 import type { Context } from '../Context.ts';
 import type { Action } from '../actions/types.ts';
+import type { BBox } from 'rbush';
 import type { DatabaseSystem } from './DatabaseSystem.ts';
 import type { EditProps, EditSources, LegacyEditSelection } from '../lib/Edit.ts';
 import type { OsmEntityProps, OsmNode, OsmTags, OsmWay, Segment } from '../data/types.ts';
@@ -31,6 +32,32 @@ const SESSION_LIVE_MS = 60000;
 const UPLOAD_PENDING_MS = 5 * 60 * 1000;
 /** How long (ms) startup waits for the OSM API to say whether an interrupted upload went through. */
 const UPLOAD_CHECK_MS = 10000;
+
+
+/**
+ * Whether two boxes overlap (touching counts), as RBush tests them.
+ * @param a - A box
+ * @param b - Another box
+ * @return `true` if they overlap
+ */
+function boxesIntersect(a: BBox, b: BBox): boolean {
+  return a.minX <= b.maxX && a.minY <= b.maxY && a.maxX >= b.minX && a.maxY >= b.minY;
+}
+
+/**
+ * Converts a WGS84 extent to a box in world coordinates (where y grows southward).
+ * @param extent - The extent (WGS84 lon/lat)
+ * @return The box
+ */
+function worldBox(extent: Extent): BBox {
+  const bb = extent.bbox();
+  const [ax, ay] = projWgs84ToWorld([bb.minX, bb.minY]);
+  const [bx, by] = projWgs84ToWorld([bb.maxX, bb.maxY]);
+  return {
+    minX: Math.min(ax, bx), minY: Math.min(ay, by),
+    maxX: Math.max(ax, bx), maxY: Math.max(ay, by)
+  };
+}
 
 
 /** Saved checkpoint state */
@@ -322,6 +349,8 @@ export class EditSystem extends AbstractSystem {
   protected _inTransaction: boolean;
   /** Per-cache tracking of which segment box ids belong to each way, so they can be removed later */
   protected _osmSegmentIDs: Map<SpatialID, Map<EntityID, EntityID[]>>;
+  /** What each local index reflects: a snapshot of stable or staging when it was last synced */
+  protected _localSnapshots: Map<SpatialID, Graph>;
 
   /** Whether the most recent backup write succeeded */
   protected _backupStatus: boolean;
@@ -374,6 +403,7 @@ export class EditSystem extends AbstractSystem {
     this._inTransition = false;
     this._inTransaction = false;
     this._osmSegmentIDs = new Map();
+    this._localSnapshots = new Map();
 
     this._backupStatus = true;
     this._backupChanges = new WeakMap<Edit, BackupChanges>();
@@ -420,7 +450,7 @@ export class EditSystem extends AbstractSystem {
         this._reset();
 
         // Bare data IDs are OSM entities, and their current version is in the staging graph.
-        // (The OSM spatial caches hold several versions, see `spatialIDForGraph`.)
+        // (The OSM spatial caches hold the base, and local indexes of what stable and staging changed, see `entitiesInBox`.)
         spatial.registerResolver('osm', entityID => this._staging.graph.hasEntity(entityID));
 
         // A schema change can change which ways are areas.
@@ -524,10 +554,14 @@ export class EditSystem extends AbstractSystem {
     this._hasWorkInProgress = false;
     this._returnEdit = null;
 
-    // Clear the spatial caches.
+    // Clear the spatial caches. The local indexes start out reflecting the (empty) base.
     const spatial = this.context.systems.spatial!;
     spatial.clearMatching(id => id.startsWith('editor_'));
     this._osmSegmentIDs = new Map();
+    this._localSnapshots = new Map([
+      ['editor_stable', new Graph(baseGraph)],
+      ['editor_staging', new Graph(baseGraph)]
+    ]);
 
     this._stableKey = baseGraph.key;
     this._emittedStable = { from: baseGraph, values: new Map() };
@@ -1085,21 +1119,12 @@ export class EditSystem extends AbstractSystem {
     const stableReshapedIDs = stableGraph.syncWithBase();
     const stagingReshapedIDs = stagingGraph.syncWithBase();
 
-    // Newly downloaded data should appear in every OSM cache (unless locally overridden),
-    // and what changed shape needs its new box.
-    const withReshaped = (graph: Graph, ...idSets: Set<EntityID>[]): OsmEntity[] => {
-      const result = new Map<EntityID, OsmEntity>(entities.map(entity => [entity.id, entity]));
-      for (const entityIDs of idSets) {
-        for (const entityID of entityIDs) {
-          const entity = graph.hasEntity(entityID);
-          if (entity) result.set(entityID, entity);
-        }
-      }
-      return [...result.values()];
-    };
-    this._mergeIntoCache('editor_base', baseGraph, withReshaped(baseGraph, reshapedIDs));
-    this._mergeIntoCache('editor_stable', stableGraph, withReshaped(stableGraph, reshapedIDs, stableReshapedIDs));
-    this._mergeIntoCache('editor_staging', stagingGraph, withReshaped(stagingGraph, reshapedIDs, stagingReshapedIDs));
+    // Newly downloaded data goes in the base index, and what changed shape needs its new box.
+    // The local indexes take what stable and staging rebuilt (and restored) of their own.
+    const reshaped = [...reshapedIDs].map(entityID => baseGraph.entity(entityID));
+    this._mergeIntoCache('editor_base', baseGraph, [...entities, ...reshaped]);
+    this._syncLocalIndex('editor_stable', stableGraph);
+    this._syncLocalIndex('editor_staging', stagingGraph);
 
     this.emit('merge', effectiveSeenIDs.union(reshapedIDs).union(stableReshapedIDs).union(stagingReshapedIDs));
 
@@ -1184,15 +1209,94 @@ export class EditSystem extends AbstractSystem {
 
 
   /**
-   * Returns the spatialID of the OSM spatial cache that corresponds to the given graph.
-   * Each OSM cache reflects exactly one graph and is kept current by `EditSystem`.
-   * @param graph - a graph (typically the base, stable, or staging graph)
-   * @return the matching spatialID; defaults to the staging cache if no match
+   * Returns the OSM entities whose boxes intersect a box, as they are in the given graph.
+   * Any graph of the editor's lineage can be searched: base, stable, staging, a graph from the
+   * history, or a scratch graph inside an action or a validator. See "Spatial indexes for any graph"
+   * in `design/graph-geometry.md`.
+   * @param box - the search box (world coordinates)
+   * @param graph - the graph to search (defaults to the staging graph); uncommitted writes are committed
+   * @return The entities, this graph's version of each
+   * @throws Will throw if the graph is from another lineage
    */
-  public spatialIDForGraph(graph: Graph): SpatialID {
-    if (graph === this.base.graph) return 'editor_base';
-    if (graph === this.stable.graph) return 'editor_stable';
-    return 'editor_staging';
+  public entitiesInBox(box: BBox, graph?: Graph): OsmEntity[] {
+    const spatial = this.context.systems.spatial!;
+    const useGraph = graph ?? this.staging.graph!;
+    const baseEntities = this.base.graph!.base.entities;
+    const { spatialID, snapshot, diffIDs } = this._localIndexFor(useGraph);
+
+    const results: OsmEntity[] = [];
+    for (const hit of spatial.getItemsAtBox('editor_base', box)) {
+      if (diffIDs.has(hit.id) || snapshot?.hasOwnShape(hit.id)) continue;
+      const entity = baseEntities.get(hit.id);
+      if (entity) results.push(entity);
+    }
+    if (spatialID && snapshot) {
+      for (const hit of spatial.getItemsAtBox(spatialID, box)) {
+        if (diffIDs.has(hit.id)) continue;
+        const entity = snapshot.hasEntity(hit.id);
+        if (entity) results.push(entity);
+      }
+    }
+    // What differs from the local index's snapshot is tested directly.
+    for (const entityID of diffIDs) {
+      const entity = useGraph.hasEntity(entityID);
+      const extent = entity && useGraph.geometry(entity).world?.extent;
+      if (extent && boxesIntersect(extent.bbox(), box)) {
+        results.push(entity);
+      }
+    }
+    return results;
+  }
+
+
+  /**
+   * Returns the way segments whose boxes intersect a box, as they are in the given graph.
+   * Like `entitiesInBox`, any graph of the editor's lineage can be searched.
+   * @param box - the search box (world coordinates)
+   * @param graph - the graph to search; uncommitted writes are committed
+   * @return The segments
+   * @throws Will throw if the graph is from another lineage
+   */
+  public segmentsInBox(box: BBox, graph: Graph): Segment[] {
+    const spatial = this.context.systems.spatial!;
+    const { spatialID, snapshot, diffIDs } = this._localIndexFor(graph);
+
+    const results: Segment[] = [];
+    for (const hit of spatial.getItemsAtBox('editor_base-segments', box)) {
+      const segment = hit.contents as Segment;
+      if (diffIDs.has(segment.wayID) || snapshot?.hasOwnShape(segment.wayID)) continue;
+      results.push(segment);
+    }
+    if (spatialID) {
+      for (const hit of spatial.getItemsAtBox(spatialID + '-segments', box)) {
+        const segment = hit.contents as Segment;
+        if (diffIDs.has(segment.wayID)) continue;
+        results.push(segment);
+      }
+    }
+    // The segments of ways that differ from the local index's snapshot are tested directly.
+    for (const entityID of diffIDs) {
+      const way = graph.hasEntity(entityID);
+      if (way?.type !== 'way') continue;
+      for (const item of this._segmentItems(way as OsmWay, graph)) {
+        if (boxesIntersect(item, box)) {
+          results.push(item.contents as Segment);
+        }
+      }
+    }
+    return results;
+  }
+
+
+  /**
+   * Returns the IDs of what stable has changed (its own version or shape) whose boxes intersect an
+   * extent. This searches only stable's local index, so it's quick however much is loaded.
+   * @param extent - the extent to search (WGS84 lon/lat)
+   * @return The entity IDs
+   */
+  public stableEditsIn(extent: Extent): EntityID[] {
+    const spatial = this.context.systems.spatial!;
+    return spatial.getItemsAtBox('editor_stable', worldBox(extent)).map(hit => hit.id);
   }
 
 
@@ -1203,16 +1307,8 @@ export class EditSystem extends AbstractSystem {
    * @return Entities visible in the current map view
    */
   public intersects(graph?: Graph): OsmEntity[] {
-    const spatial = this.context.systems.spatial!;
-    const useGraph = graph ?? this.staging.graph!;
-    const spatialID = this.spatialIDForGraph(useGraph);
-
-    const results: OsmEntity[] = [];
-    for (const hit of spatial.getVisibleItems(spatialID)) {
-      const entity = useGraph.hasEntity(hit.id);
-      if (entity) results.push(entity);
-    }
-    return results;
+    const box = this.context.viewport.visibleWorldExtent().bbox();
+    return this.entitiesInBox(box, graph);
   }
 
 
@@ -1224,47 +1320,82 @@ export class EditSystem extends AbstractSystem {
    * @return Array of way Segments intersecting the extent
    */
   public waySegments(extent: Extent, graph: Graph): Segment[] {
+    return this.segmentsInBox(worldBox(extent), graph);
+  }
+
+
+  /**
+   * Internal function, picks the local index to search for a graph, and what to correct it by.
+   * The base index holds every base entity. Each local index holds what its snapshot (of stable or
+   * staging) has of its own. A search takes the base hits that the snapshot doesn't have its own of,
+   * plus the local index's hits, except what differs between the snapshot and the graph searched
+   * (`diffIDs`, tested directly). For stable and staging that's usually nothing.
+   * @param graph - the graph to search
+   * @return The local index's spatialID and snapshot (none for the base graph), and the IDs that differ
+   * @throws Will throw if the graph is from another lineage
+   */
+  protected _localIndexFor(graph: Graph): { spatialID: SpatialID | null, snapshot: Graph | null, diffIDs: Set<EntityID> } {
+    const baseGraph = this.base.graph!;
+    if (graph === baseGraph) {
+      return { spatialID: null, snapshot: null, diffIDs: new Set<EntityID>() };
+    }
+    if (graph.base !== baseGraph.base) {
+      throw new Error(`Graph ${graph.id} isn't one of the editor's graphs`);
+    }
+    if (graph.hasPendingChanges) {
+      graph.commit();
+    }
+
+    // Try the local index that's likely nearest first: the diff is O(1) when nothing differs.
+    const order: SpatialID[] = (graph === this.stable.graph) ? ['editor_stable', 'editor_staging'] : ['editor_staging', 'editor_stable'];
+    let best: { spatialID: SpatialID, snapshot: Graph, diffIDs: Set<EntityID> } | null = null;
+    for (const spatialID of order) {
+      const snapshot = this._localSnapshots.get(spatialID)!;
+      const diffIDs = graph.diffShapeIDs(snapshot);
+      if (!best || diffIDs.size < best.diffIDs.size) {
+        best = { spatialID: spatialID, snapshot: snapshot, diffIDs: diffIDs };
+      }
+      if (!diffIDs.size) break;
+    }
+    return best!;
+  }
+
+
+  /**
+   * Internal function, brings a local index up to date with its graph (stable or staging): it
+   * takes a new snapshot of the graph, and updates what differs from the last one.
+   * @param spatialID - `'editor_stable'` or `'editor_staging'`
+   * @param graph - the graph the local index reflects
+   */
+  protected _syncLocalIndex(spatialID: SpatialID, graph: Graph): void {
     const spatial = this.context.systems.spatial;
-    if (!spatial) return [];
+    if (!spatial) return;
 
-    // Convert the WGS84 query extent to a world-coordinate box.
-    const bb = extent.bbox();
-    const [ax, ay] = projWgs84ToWorld([bb.minX, bb.minY]);
-    const [bx, by] = projWgs84ToWorld([bb.maxX, bb.maxY]);
-    const box = {
-      minX: Math.min(ax, bx), minY: Math.min(ay, by),
-      maxX: Math.max(ax, bx), maxY: Math.max(ay, by)
-    };
+    const previous = this._localSnapshots.get(spatialID)!;
+    const snapshot = new Graph(graph);   // O(1), and later writes to `graph` don't change it
+    this._localSnapshots.set(spatialID, snapshot);
 
-    // A graph that isn't base or stable is searched in staging's index, which may not match it.
-    // Keep the segments that the given graph still has. When a way's segment has changed in that
-    // graph (e.g. it was split earlier in the same action), take that way's segments from the graph.
-    const segSpatialID = this.spatialIDForGraph(graph) + '-segments';
-    const matched: Segment[] = [];
-    const staleWays = new Map<EntityID, OsmWay>();
-    for (const hit of spatial.getItemsAtBox(segSpatialID, box)) {
-      const segment = hit.contents as Segment;
-      const way = graph.hasEntity(segment.wayID) as OsmWay | undefined;
-      if (!way) continue;
-
-      const [nodeID0, nodeID1] = segment.edge;
-      if (way.nodes[segment.index] !== nodeID0 || way.nodes[segment.index + 1] !== nodeID1) {
-        staleWays.set(way.id, way);
-      } else if (graph.hasEntity(nodeID0) && graph.hasEntity(nodeID1)) {
-        matched.push(segment);
+    const toReplace: OsmEntity[] = [];
+    const toRemove: EntityID[] = [];
+    for (const entityID of snapshot.diffShapeIDs(previous)) {
+      const entity = snapshot.hasOwnShape(entityID) ? snapshot.hasEntity(entityID) : undefined;
+      if (entity) {
+        toReplace.push(entity);
+      } else {
+        toRemove.push(entityID);   // deleted, or as the base has it again
       }
     }
 
-    // A stale way's segments all come from the graph, so drop any of its hits that still matched.
-    const results = matched.filter(segment => !staleWays.has(segment.wayID));
-    for (const way of staleWays.values()) {
-      for (const current of way.segments(graph)) {
-        if (current.extent(graph)?.intersects(extent)) {
-          results.push(current);
-        }
+    spatial.removeItems(spatialID, toRemove);
+    spatial.replaceData(spatialID, toReplace, snapshot);
+    for (const entityID of toRemove) {
+      this._removeWaySegments(spatialID, entityID);  // safe even if it wasn't a way
+    }
+    for (const entity of toReplace) {
+      if (entity.type === 'way') {
+        this._updateWaySegments(spatialID, entity as OsmWay, snapshot);
       }
     }
-    return results;
   }
 
 
@@ -1732,10 +1863,8 @@ export class EditSystem extends AbstractSystem {
       const baseGraph = this.base.graph!;
       baseGraph.rebase(baseEntities, [baseGraph], true);   // force = true
 
-      // Seed every OSM cache with the restored base data.
+      // Seed the base index with the restored base data. (The local indexes get the edits when they're emitted.)
       this._mergeIntoCache('editor_base', baseGraph, baseEntities);
-      this._mergeIntoCache('editor_stable', this.stable.graph!, baseEntities);
-      this._mergeIntoCache('editor_staging', this.staging.graph!, baseEntities);
 
       // Reconstruct the edit history, each Graph derives from the previous one..
       // Start at i = 1, leaving base edit alone, the first edit will have nothing in it.
@@ -2854,51 +2983,11 @@ export class EditSystem extends AbstractSystem {
 
 
   /**
-   * Update an OSM spatial cache to reflect the changes in a `Difference`.
-   * Called immediately before emitting the corresponding change event, so that
-   *  listeners can rely on the spatial cache being current.
-   * @param spatialID - the OSM spatial cache to update (e.g. 'editor_staging' or 'editor_stable')
-   * @param graph - the head graph of the difference (staging or stable)
-   * @param diff - the difference to apply
-   */
-  protected _syncCacheFromDiff(spatialID: SpatialID, graph: Graph, diff: Difference): void {
-    const spatial = this.context.systems.spatial;
-    if (!spatial) return;
-
-    // `complete()` includes the changed entities plus their affected parents/children.
-    // A value of `undefined` means the entity no longer exists in the head graph.
-    const complete = diff.complete();
-
-    const toReplace: OsmEntity[] = [];
-    const toRemove: EntityID[] = [];
-    for (const [entityID, entity] of complete) {
-      if (entity) {
-        toReplace.push(entity);
-      } else {
-        toRemove.push(entityID);
-      }
-    }
-
-    spatial.removeItems(spatialID, toRemove);
-    spatial.replaceData(spatialID, toReplace, graph);
-
-    // Keep way segments in sync for any affected ways.
-    for (const entityID of toRemove) {
-      this._removeWaySegments(spatialID, entityID);  // safe even if it wasn't a way
-    }
-    for (const entity of toReplace) {
-      if (entity.type === 'way') {
-        this._updateWaySegments(spatialID, entity as OsmWay, graph);
-      }
-    }
-  }
-
-
-  /**
    * Merge newly-downloaded entities into an OSM cache that reflects the given graph.
    * New base data should appear in the cache unless the graph locally overrides or deletes it.
+   * (Only the base index is a full copy. The local indexes are synced from their graphs, `_syncLocalIndex`.)
    * @param spatialID - the OSM spatial cache to update
-   * @param graph - the graph this cache reflects (base, stable, or staging)
+   * @param graph - the graph this cache reflects (the base)
    * @param entities - the newly-merged entities
    */
   protected _mergeIntoCache(spatialID: SpatialID, graph: Graph, entities: OsmEntity[]): void {
@@ -3040,7 +3129,7 @@ export class EditSystem extends AbstractSystem {
       // Every graph keeps its own shapes, so a replaced staging graph (undo, redo, revert, …)
       // needs nothing recomputed. (Before step 6 of design/graph-geometry.md, shapes lived on the
       // objects that every graph shares, and the emit recomputed them here.)
-      this._syncCacheFromDiff('editor_staging', stagingGraph, stagingDifference);
+      this._syncLocalIndex('editor_staging', stagingGraph);
       this._stagingKey = stagingGraph.key;
       this._emittedStaging = {
         from: stableGraph,
@@ -3054,7 +3143,7 @@ export class EditSystem extends AbstractSystem {
       const emitted = this._emittedStable;
       this._fullDifference.update(stableGraph, this._stableCandidates);
       const stableDifference = new Difference(emitted.from, stableGraph, this._stableCandidates, emitted.values);
-      this._syncCacheFromDiff('editor_stable', stableGraph, stableDifference);
+      this._syncLocalIndex('editor_stable', stableGraph);
       this._stableKey = stableGraph.key;
       this._emittedStable = { from: stableGraph, values: new Map() };
       this._stableCandidates.clear();

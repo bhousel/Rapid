@@ -209,6 +209,20 @@ describe('SpatialSystem', () => {
         assert.strictEqual(results[0].contents, 'new');
       });
 
+      it('keeps the last of items with the same id in one call', () => {
+        const spatialID = 'test-replaceItems-dupes';
+        _spatial.replaceItems(spatialID, createItem('seg1', [10, 0], 'old'));
+        _spatial.replaceItems(spatialID, [
+          createItem('seg1', [10, 0], 'first'),
+          createItem('seg2', [10, 0], 'other'),
+          createItem('seg1', [10, 0], 'last')
+        ]);
+
+        const results = _spatial.getItemsAtBox(spatialID, worldBox([10, 0]));
+        assert.sameMembers(results.map(item => item.contents), ['last', 'other']);
+        assert.strictEqual(_spatial.getCache(spatialID).items.get('seg1').contents, 'last');
+      });
+
       it('inserts multiple items at once', () => {
         const spatialID = 'test-replaceItems-multi';
         _spatial.replaceItems(spatialID, [

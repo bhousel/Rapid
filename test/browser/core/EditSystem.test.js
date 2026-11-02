@@ -27,8 +27,9 @@ describe('EditSystem', () => {
         new Rapid.OsmNode(context, { id: 'n2', loc: [0.001, 0], version: 1 }),
         new Rapid.OsmWay(context, { id: 'w1', nodes: ['n1', 'n2'], version: 1 })
       ]);
+      // The box staging's searches use for w1: staging's own (its local index), else the base's
       const box = () => {
-        const item = spatial.getCache('editor_staging').items.get('w1');
+        const item = spatial.getCache('editor_staging').items.get('w1') ?? spatial.getCache('editor_base').items.get('w1');
         return [item.minX, item.minY, item.maxX, item.maxY];
       };
       const before = box();

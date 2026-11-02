@@ -73,6 +73,8 @@ function assertSessionDifference(editor, message) {
 
 function assertIndexMatchesGeometry(editor, spatial, message) {
   const graph = editor.staging.graph;
+
+  // Staging's local index holds staging's own shapes.
   const items = spatial.getCache('editor_staging').items;
   for (const [entityID, item] of items) {
     const entity = graph.hasEntity(entityID);
@@ -81,6 +83,19 @@ function assertIndexMatchesGeometry(editor, spatial, message) {
     const actual = [item.minX, item.minY, item.maxX, item.maxY].map(n => Math.round(n * 1000));
     const expected = [extent.min[0], extent.min[1], extent.max[0], extent.max[1]].map(n => Math.round(n * 1000));
     assert.deepEqual(actual, expected, `index box of ${entityID}: ${message}`);
+  }
+
+  // A search over each entity's own box finds it, as it is in staging, and nothing deleted.
+  const entityIDs = new Set([...graph.base.entities.keys(), ...graph.localEntities().keys()]);
+  for (const entityID of entityIDs) {
+    const entity = graph.hasEntity(entityID);
+    const extent = entity && graph.geometry(entity).world?.extent;
+    if (!extent) continue;
+    const found = editor.entitiesInBox(extent.bbox(), graph);
+    assert.include(found, entity, `search for ${entityID}: ${message}`);
+    for (const other of found) {
+      assert.strictEqual(graph.hasEntity(other.id), other, `search for ${entityID} found ${other.key}: ${message}`);
+    }
   }
 }
 
@@ -245,7 +260,7 @@ describe('EditSystem journal', () => {
   });
 
   it('restores a deleted node that downloaded data uses, everywhere (iD#2085)', async () => {
-    const { context, editor, spatial } = await makeEditor();
+    const { context, editor } = await makeEditor();
     editor.merge([new Rapid.OsmNode(context, { id: 'n1', loc: [0, 0], version: 1 })]);
     editor.perform(Rapid.actionDeleteNode('n1'));
     editor.commit({ stringID: 'delete' });
@@ -263,7 +278,9 @@ describe('EditSystem journal', () => {
     assert.isOk(editor.staging.graph.hasEntity('n1'));
     assert.include(emitted, 'n1');
     assert.isFalse(editor.difference().changes.has('n1'));
-    assert.isTrue(spatial.getCache('editor_staging').items.has('n1'));
-    assert.isTrue(spatial.getCache('editor_stable').items.has('n1'));
+    const box = editor.staging.graph.geometry(editor.staging.graph.entity('n1')).world.extent.bbox();
+    for (const graph of [editor.stable.graph, editor.staging.graph]) {
+      assert.include(editor.entitiesInBox(box, graph).map(entity => entity.id), 'n1');
+    }
   });
 });

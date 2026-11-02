@@ -593,12 +593,11 @@ describe('validateCrossingWays', () => {
     editor.commit({ stringID: 'named w1' });
     const older = editor.stable.graph;
 
-    // Insert a node into w2 after the older graph. Staging's index then has w2's new segments,
+    // Insert a node into w2 after the older graph. Staging's local index then has w2's new segments,
     // through a node that the older graph doesn't have.
     const n5 = new Rapid.OsmNode(context, { id: 'n-5', loc: [0.5, 0.5] });
     editor.perform(Rapid.actionAddEntity(n5), Rapid.actionAddVertex('w2', 'n-5', 1));
     editor.commit({ stringID: 'added n-5' });
-    assert.strictEqual(editor.spatialIDForGraph(older), 'editor_staging');
 
     const issues = validator(older.entity('w1'), older).issues;
     assert.lengthOf(issues, 1);

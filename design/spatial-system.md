@@ -45,6 +45,12 @@ The unused `SpatialCache.graph` field is **removed**. `EditSystem` is the source
 
 ### 2. Multiple named OSM caches instead of one mutable "current graph" (point 1, refined)
 
+> **Superseded in November 2026** by step 9 of [`graph-geometry.md`](./graph-geometry.md) ("Spatial
+> indexes for any graph"): `editor_base` is the one full index, and `editor_stable` / `editor_staging`
+> are small local indexes of what those graphs changed. `EditSystem.entitiesInBox(box, graph)` and
+> `segmentsInBox(box, graph)` answer for any graph of the lineage, and `spatialIDForGraph` is gone.
+> The rest of this section is kept as the record of the earlier design.
+
 Rather than a single OSM index that lazily re-syncs to whatever graph a caller passes, `EditSystem` maintains **separate, explicitly-named caches** in `SpatialSystem`:
 
 - `editor_base` — the unedited downloaded data (the base graph).
@@ -143,8 +149,14 @@ For lines this gives **partial matching for free** — each box is a spatial uni
   - All data lives in a cache. A cache that holds data names that data's namespace, so `getData(dataID)` splits `${namespace}:${localID}` and looks in that cache.
   - Namespaces whose data needs another lookup register a resolver with `registerResolver()`: `osm` (bare IDs, the staging graph, registered by `EditSystem`) and each vector tile source (its zoom caches).
   - An item without a valid box (e.g. a relation whose members aren't loaded) is kept in `items` but left out of the RBush, so it can be found by ID and replaces any older version. Before, `replaceData()` skipped it and left the older version, with its old box, in the cache.
+- **Spatial indexes for any graph** (November 2026, step 9 of [`graph-geometry.md`](./graph-geometry.md)): ✅ Done.
+  - `editor_base` (and `editor_base-segments`) is the only full OSM index. `editor_stable` and `editor_staging` (and their segments) are local indexes: the boxes of what each graph has its own version or shape of ("local" as in `graph.isLocal()`). Each reflects a snapshot of its graph (`new Graph(graph)`, O(1)), and syncs by the structural diff from the last snapshot (`graph.diffShapeIDs`), on every emit and merge.
+  - `EditSystem.entitiesInBox(box, graph)` / `segmentsInBox(box, graph)` take the base hits the local index's snapshot doesn't have its own of, plus the local index's hits, corrected by the diff between that snapshot and the graph searched (tested directly). `intersects` and `waySegments` call them; `stableEditsIn(extent)` searches stable's local index alone.
+  - `replaceItems` keeps the last of items with the same id in one call. Before, both were inserted in the RBush, and searches returned the item twice (seen with relations both in a tile and containing what arrived).
 
 ### Step 2 implementation notes
+
+(These notes describe step 2 as it landed. Since graph-geometry step 9, the local indexes and `entitiesInBox` above replace `spatialIDForGraph` and the three full caches.)
 
 - `EditSystem` exposes `intersects(extent, graph?)`, `waySegments(extent, graph)`, and `spatialIDForGraph(graph)`. The first two replace the old `Tree.intersects` / `Tree.waySegments`; callers were repointed.
 - `spatialIDForGraph` maps a graph to `editor_base` / `editor_stable` / `editor_staging` by identity (defaulting to staging). `intersects`/`waySegments` resolve hits through the *passed* graph, so a slight cache/graph mismatch degrades gracefully (missing entities are filtered out) rather than throwing.
@@ -154,7 +166,7 @@ For lines this gives **partial matching for free** — each box is a spatial uni
 ## Boundary Summary
 
 - **`SpatialSystem`** — owns *where* things are and answers spatial questions. Generic bbox indexing (named indexes via `replaceItems`/`removeItems`/`getItemsAtBox`/`getItemsAtBoxes`) + two-phase precise refine driven by a caller-supplied predicate. Finds any datum by its data ID (`getData`), through the cache named by its namespace or a registered resolver. No knowledge of OSM, segments, buffers, photos, or "match" semantics as concepts.
-- **`EditSystem`** — owns OSM topology/history. Translates graph `Difference`s into spatial updates, generates segments, owns the `editor_base`/`editor_stable`/`editor_staging` caches, and exposes the OSM spatial queries.
+- **`EditSystem`** — owns OSM topology/history. Keeps the OSM indexes in step with the graphs, generates segments, owns the `editor_base` index and the `editor_stable`/`editor_staging` local indexes, and exposes the OSM spatial queries for any graph.
 - **`GeometryPart`** — owns derived geometry (hull, centroid, poi, surround, **coverage/buffers**), computed lazily on first access (Step 3a) and re-computable for a given radius via `computeCoverage(r)`.
 - **`modules/geo`** — pure geometry helpers (e.g. `geomCoverageBoxes`, phase-2 predicates). May start here and migrate into `@rapid-sdk/math` later if generally useful.
 - **`Conflation` module** — owns the conflation *meaning*: thresholds, "already mapped" logic, per-type matching, partial-line suggestions. Wires `GeometryPart` coverage + `SpatialSystem` queries together. The `PixiLayerDebug` proof-of-concept graduates here.

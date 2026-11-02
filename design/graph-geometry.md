@@ -7,7 +7,7 @@ of the change. This design fixes findings 1 (shared geometry) and 2 (the wrong s
 [validation audit](validation-system.md#the-october-2026-audit), the bugs listed below, and the cost of
 keeping versions. It gives Rapid one way to ask for anything's geometry: `graph.geometry(entity)`.
 
-> **Status:** In progress (October 2026): steps 0-6 and 8 done; step 7 measured and left for later. After step 3 the rest was put in a new
+> **Status:** In progress (October 2026): steps 0-6, 8 and 9 done; step 7 measured and left for later. After step 3 the rest was put in a new
 > order (November 2026): backups first, then derived data in records in two steps. Measured in two rounds: a survey of
 > today's costs and bugs, then three competing designs, each prototyped and reviewed for correctness
 > and for performance (in JavaScriptCore and V8). See [Open questions](#open-questions).
@@ -334,21 +334,31 @@ today's `_updateRebased` alone takes 57-74 ms per merge.
 - One OSM index per lineage (and one for segments), built from the base data. The lineage updates it
   inside every rebase, so a rebase from anywhere (a merge, a restore, the uploader) is indexed. Items
   carry IDs, and hits are resolved through the graph being queried.
-- Small overlays for stable and staging hold the boxes and segments of what they changed, updated from
-  each emit's diff.
+- Small local indexes for stable and staging hold the boxes and segments of what they changed
+  ("local", as in `isLocal()`: what a graph says differently from the base), updated from each emit's
+  diff. (Called "overlays" in earlier drafts; renamed because an overlay is an imagery layer in Rapid.)
 - A query on stable or staging takes the base hits for IDs that have no entity or geometry record in
-  that graph, plus its overlay. For any other graph (an older stable, a graph inside an action, a
-  scratch graph), it takes the nearest overlay, corrected by the diff between that overlay's graph and
-  this one: drop what changed, and test the changed entities directly. Since step 3 that diff is
-  structural, so the correction starts without a cache; one keyed by graph, overlay version and
+  that graph, plus its local index. For any other graph (an older stable, a graph inside an action, a
+  scratch graph), it takes the nearest local index, corrected by the diff between that index's graph
+  and this one: drop what changed, and test the changed entities directly. Since step 3 that diff is
+  structural, so the correction starts without a cache; one keyed by graph, index version and
   rebase can come later if measurements ask for it. Queries need a committed graph.
 - `spatialIDForGraph` and its fallback to staging go. A graph from another lineage throws.
-- This isn't the old `Tree`: nothing flips to match the graph asked. Overlays update incrementally, and
-  another graph costs its distance from the nearest overlay (10-40 µs for 50 changes).
+- This isn't the old `Tree`: nothing flips to match the graph asked. Local indexes update
+  incrementally, and another graph costs its distance from the nearest local index (10-40 µs for 50
+  changes).
 - Measured (JavaScriptCore, synthetic): an 8.2k-hit query takes 0.21-0.27 ms, against 0.09 ms for a
-  full copy. A view of central Paris would pay about +0.3-0.5 ms per frame (estimate). An overlay
+  full copy. A view of central Paris would pay about +0.3-0.5 ms per frame (estimate). A local index
   builds in 1.4-6.5 ms, against 47-62 ms per full copy. Two of the three index copies go (117 MB for
   a synthetic 220k-entity base), and with them two thirds of the index work per merge.
+- As built (step 9): `EditSystem` keeps the base index, not the lineage. Every rebase of the editor's
+  lineage goes through it since step 8 (merges, `updateBase`, restores, the uploader), and other
+  lineages (Rapid datasets, a remote graph, tests) shouldn't make indexes. Each local index reflects a
+  snapshot of its graph (`new Graph(graph)`, O(1)) and syncs from the structural diff between its old
+  and new snapshot (`graph.diffShapeIDs`), so emits, catch-ups and restores all reach it the same
+  way. Staging changes in place inside an action, so a search of the live staging graph is corrected
+  by its diff from the snapshot, which is empty (and O(1)) when nothing changed. A search commits the
+  graph's uncommitted writes first.
 
 ### 8. EditSystem
 
@@ -361,7 +371,7 @@ today's `_updateRebased` alone takes 57-74 ms per merge.
   - `ValidationSystem`'s "did the user change this" check only needs membership, so it asks
     `affects(id)` (step 5) instead of building `complete()`.
   - `_validateEditsNearAsync` walks every edited ID on each merge. From step 9 that walk becomes a
-    query of the stable overlay over the merged area.
+    query of stable's local index over the merged area.
   - The summary count (`UiSaveTool`, `UrlHashSystem`, `UiSectionValidationStatus`) is still rebuilt
     when asked for after a change (see step 5 for why), and the save panel's list is computed when
     shown.
@@ -754,9 +764,27 @@ records (now 6 and 7), 5 rebase (now 8), 6 spatial indexes (now 9), 7 backups (n
        stale shape in base, stable or staging (step 6 found 89 relations). After a schema reload all
        4,895 buildings are still areas.
      - Not done: dev-build asserts on reads from a graph that missed a rebase (no dev-build flag yet).
-9. **Spatial indexes for any graph.** One index per lineage, overlays for stable and staging, and the
-   diff correction (no cache to start with). `spatialIDForGraph` goes, and `_validateEditsNearAsync`
-   queries the stable overlay. This fixes finding 2 by construction.
+9. **Spatial indexes for any graph.** One index per lineage, local indexes for stable and staging, and
+   the diff correction (no cache to start with). `spatialIDForGraph` goes, and `_validateEditsNearAsync`
+   queries stable's local index. This fixes finding 2 by construction.
+   - **Done** (November 2026). How it landed (section 7 has the details):
+     - `EditSystem.entitiesInBox(box, graph)` and `segmentsInBox(box, graph)` answer for any graph of
+       the lineage: base, stable, staging, a graph from the history, or a scratch graph inside an
+       action or a validator. `intersects` and `waySegments` use them. A graph from another lineage
+       throws. `Graph` gained `diffShapeIDs(other)` and `hasOwnShape(id)`.
+     - The callers of `spatialIDForGraph` moved: the lasso, the address field, `close_nodes`,
+       `ConflationSystem` (segments of stable), and `revalidateUnsquare`, which now lists the graph's
+       own entities instead of an index. `_validateEditsNearAsync` searches stable's local index
+       (`stableEditsIn`) instead of every change of the session.
+     - `SpatialSystem.replaceItems` no longer inserts an item twice when a call has its id twice.
+     - Searches match a brute-force scan exactly in the debug Chrome on Seattle (20.8k entities, 18.3k
+       segments): base, an older stable, stable, staging with work in progress, and a scratch graph
+       with uncommitted writes. `EditSystemJournal`'s random edits check that a search over each
+       entity's box finds staging's version.
+     - Merges take half the time: 10k entities over a 20k-entity history in 28-30 ms in V8 (53-58 ms
+       before). The heap after 100k entities is 161 MB, not 255. A drag frame (6.8-7.0 ms), a full APP
+       pass and validation are unchanged in Chrome, and `intersects()` over 16k entities takes
+       0.2-0.3 ms (0.1-0.2 before).
 10. **Other data.** Rapid datasets, then GeoJSON and markers, as lineages; services stop changing data
     in place. Their layers then rebind by object, like `PixiLayerOsm`, and `touch()`, `v` and
     `AbstractPixiFeature.v` go.

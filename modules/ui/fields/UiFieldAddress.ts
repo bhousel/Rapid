@@ -11,7 +11,6 @@ import type { Context } from '../../Context.ts';
 import type { D3Selection } from 'd3-selection';
 import type { Field } from '../../lib/index.ts';
 import type { OsmEntity } from '../../data/index.ts';
-import type { SpatialItem } from '../../core/SpatialSystem.ts';
 import type { TagChange, Tags } from './types.ts';
 import type { UiFieldOptions } from './AbstractUiField.ts';
 
@@ -151,16 +150,12 @@ export class UiFieldAddress extends AbstractUiField {
     const context = this.context;
     const editor = context.systems.editor!;
     const graph = editor.staging.graph;
-    const spatial = context.systems.spatial!;
 
     const loc = this.entityExtent!.center();
     const point = projWgs84ToWorld(loc);
     const box = this._queryBox(loc, 200);
 
-    const spatialID = editor.spatialIDForGraph(graph);
-    const streets = (spatial.getItemsAtBox(spatialID, box)
-      .map((hit: SpatialItem) => graph.hasEntity(hit.id))   // the version in this graph
-      .filter((entity): entity is OsmEntity => !!entity)
+    const streets = (editor.entitiesInBox(box, graph)   // the version in this graph
       .filter(isAddressableStreet)
       .map((way: OsmEntity) => {
         // Sort by distance to the addressable streets in the query box.
@@ -192,16 +187,12 @@ export class UiFieldAddress extends AbstractUiField {
     const context = this.context;
     const editor = context.systems.editor!;
     const graph = editor.staging.graph;
-    const spatial = context.systems.spatial!;
 
     const loc = this.entityExtent!.center();
     const point = projWgs84ToWorld(loc);
     const box = this._queryBox(loc, 200);
 
-    const spatialID = editor.spatialIDForGraph(graph);
-    const cities = (spatial.getItemsAtBox(spatialID, box)
-      .map((hit: SpatialItem) => graph.hasEntity(hit.id))   // the version in this graph
-      .filter((entity): entity is OsmEntity => !!entity)
+    const cities = (editor.entitiesInBox(box, graph)   // the version in this graph
       .filter(isAddressableCity)
       .map((d: OsmEntity) => {
         // Sort by distance to the center of the cities in the query box
@@ -242,17 +233,13 @@ export class UiFieldAddress extends AbstractUiField {
     const context = this.context;
     const editor = context.systems.editor!;
     const graph = editor.staging.graph;
-    const spatial = context.systems.spatial!;
     const entityIDs = this.entityIDs;
 
     const loc = this.entityExtent!.center();
     const point = projWgs84ToWorld(loc);
     const box = this._queryBox(loc, 200);
 
-    const spatialID = editor.spatialIDForGraph(graph);
-    const results = (spatial.getItemsAtBox(spatialID, box)
-      .map((hit: SpatialItem) => graph.hasEntity(hit.id))   // the version in this graph
-      .filter((entity): entity is OsmEntity => !!entity)
+    const results = (editor.entitiesInBox(box, graph)   // the version in this graph
       .filter(entityHasAddressTag)
       .map((d: OsmEntity) => {
         // Sort by distance to the center of the addressable OsmEntities in the query box

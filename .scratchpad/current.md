@@ -59,7 +59,12 @@ Step 8 done Nov 2: rebase recomputes base containers of what arrived; lineage `b
 in `_replaceStaging`); `base.checkAreas()` + `SchemaSystem.areaGeneration`; uploader merges remote
 way nodes via `editor.merge`. Model test verifies after rebases on every seed; it found 3 older bugs
 (frozen restores, equal-copy shapes, memos of ways through a node a graph deleted), fixed. Seattle:
-0 stale shapes (was 89). Next: step 9 (spatial indexes).
+0 stale shapes (was 89).
+Step 9 done Nov 2: `editor_base` is the one full index; `editor_stable`/`editor_staging` are local indexes
+of each graph's own entities/shapes, synced from snapshot diffs (`diffShapeIDs`). `entitiesInBox`/
+`segmentsInBox(box, graph)` answer for any graph of the lineage; `spatialIDForGraph` gone;
+`_validateEditsNearAsync` uses `stableEditsIn`. Fixed `replaceItems` double-inserting a repeated id.
+Merges 2x faster, heap -37% at 100k entities, frames unchanged. Next: step 10 (other data).
 Decided Oct 31: relation geometry references its members' parts (step 2), multipolygon ring structure
 cached and reused (follow-up); lazy build only as a stopgap. Backups: step 5 rewrites v4 in place
 (no v5); when it lands, delete the v4 sessions in the debug Chrome (the only ones that exist).

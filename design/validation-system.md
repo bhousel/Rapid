@@ -12,8 +12,9 @@ autoconnect (accepting a Rapid feature with `poweruser.autoConnect`) crashed wit
 > a throwing validator hiding other issues, Autofix All's transaction, fixes that assumed the graph
 > they were found on, `missing_tag`'s severity, side effects while detecting, the user's edits near
 > data that wasn't loaded, the smaller items, and shared geometry (each graph keeps its own shapes
-> since step 6 of [`graph-geometry.md`](graph-geometry.md), and after a rebase since its step 8).
-> Open: the wrong spatial index (see [Rollout](#rollout)).
+> since step 6 of [`graph-geometry.md`](graph-geometry.md), and after a rebase since its step 8), and
+> the wrong spatial index (searches answer for any graph since its step 9).
+> Open: one runner for autoconnect and Autofix All (see [Rollout](#rollout)).
 
 ## Words used here
 
@@ -87,7 +88,9 @@ the code; the repros were kept outside the repo.
    session) and rewrites geometry that staging sees.
    Now each graph keeps its own shapes in its records, so a snapshot's commit changes only the
    snapshot. Stable and staging catch up with a rebase at once (that design's step 8).
-2. **The wrong spatial index** (checked). Inside an action, `waySegments` returns the segments from
+2. ✅ **The wrong spatial index** (checked; fixed in step 9 of [`graph-geometry.md`](graph-geometry.md):
+   `editor.entitiesInBox` and `waySegments` answer for whatever graph they're given, and
+   `close_nodes` takes entities from the graph). Inside an action, `waySegments` returns the segments from
    before the action. In `ValidationSystem`, a queued job validates the graph that was stable when it
    was queued; once the user commits again, that graph gets the staging index, and `almost_junction`
    throws on a way that only exists in staging (`graph.entity(segmentInfo.wayID)`). `crossing_ways`
@@ -187,6 +190,7 @@ What a validator needs, so it can be run on any graph (including one inside an a
 3. ✅ The smaller items (finding 8) (Oct 2026).
 4. ✅ Fixes look up their entities in the graph they run on (the rest of finding 4) (Oct 2026).
 5. Validate with the right spatial index (finding 2), with one runner for autoconnect and Autofix All.
+   The spatial index part is done (graph-geometry step 9, Nov 2026); the one runner is open.
 6. ✅ Geometry per graph (finding 1). The biggest change: it's about `Graph` and the data classes, not
    only validation. Designed in [`graph-geometry.md`](graph-geometry.md), with finding 2; done in its
    step 6 (Nov 2026), and shapes after a rebase in its step 8.

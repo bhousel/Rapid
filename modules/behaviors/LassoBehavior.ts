@@ -208,17 +208,14 @@ export class LassoBehavior extends AbstractBehavior {
     const filters = context.systems.filters!;
     const graph = editor.staging.graph;
     const locations = context.systems.locations!;
-    const spatial = context.systems.spatial!;
     const entityIDs: EntityID[] = [];
 
     if (!this.context.editable() || !this._extent || !this._coords.length) return [];
 
     // Gather OsmNodes within the lasso.
-    const spatialID = editor.spatialIDForGraph(graph);
-    const hits = spatial.getItemsAtBox(spatialID, this._extent.bbox());
-    for (const hit of hits) {
-      const node = graph.hasEntity(hit.id) as OsmNode | undefined;   // the version in this graph
-      if (node?.type !== 'node') continue;
+    for (const entity of editor.entitiesInBox(this._extent.bbox(), graph)) {
+      if (entity.type !== 'node') continue;
+      const node = entity as OsmNode;
 
       const coord = graph.geometry(node).parts[0].world?.coords as Vec2;  // A node should have a single world coord
       if (!coord) continue;

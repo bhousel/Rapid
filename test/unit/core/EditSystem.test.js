@@ -307,7 +307,7 @@ describe('EditSystem', () => {
         assert.isTrue(wayIDs.has('w2'));   // w2 segments remain
       });
 
-      it('returns only segments that an older graph has, though it is searched in staging\'s index', () => {
+      it('returns only segments that an older graph has', () => {
         mergeCrossingWays();
         const n5 = new Rapid.OsmNode(context, { id: 'n-5', loc: [0.2, 1] });
         const n6 = new Rapid.OsmNode(context, { id: 'n-6', loc: [0.2, -1] });
@@ -322,7 +322,6 @@ describe('EditSystem', () => {
         _editor.commit({ stringID: 'added w-3' });
         _editor.perform(Rapid.actionReverse('w1'));
         _editor.commit({ stringID: 'reversed w1' });
-        assert.strictEqual(_editor.spatialIDForGraph(older), 'editor_staging');
 
         const extent = new Rapid.sdk.Extent([-0.5, -0.5], [0.5, 0.5]);
         const segments = _editor.waySegments(extent, older);
@@ -331,12 +330,12 @@ describe('EditSystem', () => {
           assert.deepEqual(segment.edge, way.nodes.slice(segment.index, segment.index + 2));
         }
         const wayIDs = segments.map(s => s.wayID);
-        assert.include(wayIDs, 'w1');   // its segment in staging's index is reversed, so it is rebuilt from `older`
+        assert.include(wayIDs, 'w1');   // its segment in staging's local index is reversed, so it comes from `older`
         assert.include(wayIDs, 'w2');
         assert.notInclude(wayIDs, 'w-3');
       });
 
-      it('returns each segment of a way once, when only some of its hits still match an older graph', () => {
+      it('returns each segment of a way once, in an older graph where it has fewer segments', () => {
         const p1 = new Rapid.OsmNode(context, { id: 'p1', loc: [-0.2, 0.1] });
         const p2 = new Rapid.OsmNode(context, { id: 'p2', loc: [0, 0.1] });
         const p3 = new Rapid.OsmNode(context, { id: 'p3', loc: [0.2, 0.1] });
@@ -347,12 +346,11 @@ describe('EditSystem', () => {
         _editor.commit({ stringID: 'tagged w5' });
         const older = _editor.stable.graph;
 
-        // Insert a node between p2 and p3 after the older graph. Staging's index then has
+        // Insert a node between p2 and p3 after the older graph. Staging's local index then has
         // p1-p2 (which still matches `older`), p2-p4 and p4-p3 (which don't).
         const p4 = new Rapid.OsmNode(context, { id: 'p-4', loc: [0.1, 0.2] });
         _editor.perform(Rapid.actionAddEntity(p4), Rapid.actionAddVertex('w5', 'p-4', 2));
         _editor.commit({ stringID: 'added p-4' });
-        assert.strictEqual(_editor.spatialIDForGraph(older), 'editor_staging');
 
         const extent = new Rapid.sdk.Extent([-0.5, -0.5], [0.5, 0.5]);
         const segments = _editor.waySegments(extent, older)
@@ -363,6 +361,84 @@ describe('EditSystem', () => {
           { index: 0, edge: ['p1', 'p2'] },
           { index: 1, edge: ['p2', 'p3'] }
         ]);
+      });
+
+      it('returns the segments of the graph inside an action, not from before it (finding 2)', () => {
+        mergeCrossingWays();
+        const extent = new Rapid.sdk.Extent([0.4, -0.1], [0.6, 0.1]);
+        let segments;
+        // Split w2 at a new node, then look for segments, inside one action
+        _editor.perform(graph => {
+          const n5 = new Rapid.OsmNode(context, { id: 'n-5', loc: [0.5, 0] });
+          graph.replace([n5, graph.entity('w2').addNode('n-5', 1)]);
+          segments = _editor.waySegments(extent, graph).map(s => s.edge.join('-'));
+          return graph;
+        });
+        assert.sameMembers(segments, ['n3-n-5', 'n-5-n4']);
+      });
+    });
+
+
+    describe('entitiesInBox', () => {
+      // n1 at the origin, n2 east of it, and a way between them
+      function mergeLine() {
+        const n1 = new Rapid.OsmNode(context, { id: 'n1', loc: [0, 0] });
+        const n2 = new Rapid.OsmNode(context, { id: 'n2', loc: [1, 0] });
+        const w1 = new Rapid.OsmWay(context, { id: 'w1', nodes: ['n1', 'n2'] });
+        _editor.merge([n1, n2, w1]);
+      }
+      const boxAt = (loc) => new Rapid.sdk.Extent(loc).padByMeters(10);
+      const worldBoxOf = (extent) => {
+        const [ax, ay] = Rapid.sdk.projWgs84ToWorld(extent.min);
+        const [bx, by] = Rapid.sdk.projWgs84ToWorld(extent.max);
+        return { minX: Math.min(ax, bx), minY: Math.min(ay, by), maxX: Math.max(ax, bx), maxY: Math.max(ay, by) };
+      };
+      const idsAt = (loc, graph) => _editor.entitiesInBox(worldBoxOf(boxAt(loc)), graph).map(e => e.id).sort();
+
+      it('finds each graph\'s version: base, stable, staging, and a graph from the history', () => {
+        mergeLine();
+        _editor.perform(Rapid.actionMoveNode('n2', [2, 0]));
+        _editor.commit({ stringID: 'moved n2' });
+        const older = _editor.stable.graph;
+        _editor.perform(Rapid.actionMoveNode('n2', [3, 0]));
+        _editor.commit({ stringID: 'moved n2 again' });
+        _editor.perform(Rapid.actionMoveNode('n2', [4, 0]));   // work in progress
+
+        assert.deepEqual(idsAt([1, 0], _editor.base.graph), ['n2', 'w1']);
+        assert.deepEqual(idsAt([1, 0], older), ['w1']);              // n2 moved away, w1 reaches past it
+        assert.deepEqual(idsAt([2, 0], older), ['n2', 'w1']);
+        assert.deepEqual(idsAt([3, 0], _editor.stable.graph), ['n2', 'w1']);
+        assert.deepEqual(idsAt([3, 0], older), []);
+        assert.deepEqual(idsAt([4, 0], _editor.staging.graph), ['n2', 'w1']);
+        assert.deepEqual(idsAt([4, 0], _editor.stable.graph), []);
+        const found = _editor.entitiesInBox(worldBoxOf(boxAt([4, 0])), _editor.staging.graph);
+        assert.include(found, _editor.staging.graph.entity('n2'));   // staging's own version
+      });
+
+      it('finds what an action has written, before it commits', () => {
+        mergeLine();
+        let ids;
+        _editor.perform(graph => {
+          graph.replace(graph.entity('n2').move([5, 0]));
+          graph.replace(new Rapid.OsmNode(context, { id: 'n-9', loc: [6, 0] }));
+          ids = { at1: idsAt([1, 0], graph), at5: idsAt([5, 0], graph), at6: idsAt([6, 0], graph) };
+          return graph;
+        });
+        assert.deepEqual(ids, { at1: ['w1'], at5: ['n2', 'w1'], at6: ['n-9'] });
+      });
+
+      it('throws for a graph from another lineage', () => {
+        mergeLine();
+        const other = new Rapid.Graph(context, [new Rapid.OsmNode(context, { id: 'n9', loc: [0, 0] })]);
+        assert.throws(() => _editor.entitiesInBox(worldBoxOf(boxAt([0, 0])), other), /isn't one of the editor's graphs/);
+      });
+
+      it('lists what stable has changed near an extent, with the ways of moved nodes', () => {
+        mergeLine();
+        _editor.perform(Rapid.actionMoveNode('n2', [1, 0.00005]));   // about 5 m
+        _editor.commit({ stringID: 'moved n2' });
+        assert.sameMembers(_editor.stableEditsIn(boxAt([1, 0])), ['n2', 'w1']);
+        assert.sameMembers(_editor.stableEditsIn(boxAt([5, 5])), []);
       });
     });
 

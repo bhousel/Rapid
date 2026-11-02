@@ -200,10 +200,10 @@ describe('ValidationSystem', () => {
       const editor = context.systems.editor;
       await _validator.validateAsync();
 
-      // A stand-in that records which graph and spatial index each entity was validated with
+      // A stand-in that records which graph each entity was validated with
       const validated = [];
       const recorder = (entity, graph) => {
-        validated.push([entity.id, graph === editor.stable.graph, editor.spatialIDForGraph(graph)]);
+        validated.push([entity.id, graph === editor.stable.graph]);
         return { issues: [] };
       };
       recorder.type = 'recorder';
@@ -222,8 +222,8 @@ describe('ValidationSystem', () => {
         await _validator.validateAsync();   // the round that catches up to the second commit
 
         assert.sameDeepMembers(validated, [
-          ['n-20', true, 'editor_stable'],
-          ['n-21', true, 'editor_stable']
+          ['n-20', true],
+          ['n-21', true]
         ]);
       } finally {
         _validator._validators.delete('recorder');

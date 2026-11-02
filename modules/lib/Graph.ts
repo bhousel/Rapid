@@ -399,6 +399,46 @@ export class Graph {
 
 
   /**
+   * Returns the IDs whose entity or shape may differ between this Graph and another of its lineage:
+   * like `diffIDs`, but also where either keeps a shape of its own that the other doesn't share.
+   * `EditSystem` uses it to keep spatial indexes in step with a graph. O(changes).
+   * @param   other - Another Graph of the same lineage
+   * @return  The IDs
+   * @throws  Will throw if the other Graph is from another lineage
+   */
+  public diffShapeIDs(other: Graph): Set<EntityID> {
+    if (other._lineage !== this._lineage) {
+      throw new Error(`Graph ${other.id} is from another lineage than ${this.id}`);
+    }
+    const result = new Set<EntityID>();
+    const slotIDs = this._lineage.slotIDs;
+    vectorDiff(other._records, this._records, (slot, a, b) => {
+      const isChanged = (a?.isLocal ?? false) !== (b?.isLocal ?? false) || a?.entity !== b?.entity ||
+        (a?.geometry ?? null) !== (b?.geometry ?? null);
+      if (isChanged) {
+        result.add(slotIDs[slot]);
+      }
+    });
+    return result;
+  }
+
+
+  /**
+   * Whether this Graph's box for an ID may differ from the base's: it has its own version of the
+   * entity (or deleted it), or a shape of its own for it. Other IDs are as the base has them.
+   * @param   entityID - The ID
+   * @return  `true` if this Graph has its own version or shape
+   */
+  public hasOwnShape(entityID: EntityID): boolean {
+    if (this._records.root === null) return false;
+    const slot = this._lineage.slots.get(entityID);
+    if (slot === undefined) return false;
+    const record = vectorGet(this._records, slot);
+    return !!record && (record.isLocal || !!record.geometry);
+  }
+
+
+  /**
    * Gets an OsmEntity: this Graph's own version if it has one, else the base's.
    * (same as `hasEntity` but throws if not found)
    * @param   entityID - The entityID to lookup

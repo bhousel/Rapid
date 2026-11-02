@@ -293,9 +293,6 @@ export class ValidationSystem extends AbstractSystem {
    * It reruns just the "unsquare_way" validation on all buildings.
    */
   public revalidateUnsquare(): void {
-    const editor = this.context.systems.editor!;
-    const spatial = this.context.systems.spatial!;
-
     const checkUnsquareWay = this._validators.get('unsquare_way');
     if (typeof checkUnsquareWay !== 'function') return;
 
@@ -305,13 +302,10 @@ export class ValidationSystem extends AbstractSystem {
 
       cache.uncacheIssuesOfType('unsquare_way');   // uncache existing
 
-      // rerun for all buildings
-      // (The head cache's graph can be behind stable, and then gets the staging index.
-      //  Use the index only to find the buildings, and check each one as it is in this graph.)
-      const spatialID = editor.spatialIDForGraph(graph);
-
-      const buildings = spatial.getAllItems<OsmEntity>(spatialID)
-        .map(item => graph.hasEntity(item.id))
+      // rerun for all buildings, as they are in this graph
+      const entityIDs = new Set<EntityID>([...graph.base.entities.keys(), ...graph.localEntities().keys()]);
+      const buildings = [...entityIDs]
+        .map(entityID => graph.hasEntity(entityID))
         .filter((entity): entity is OsmEntity => Boolean(entity?.type === 'way' && entity.tags.building && entity.tags.building !== 'no'));
 
       for (const entity of buildings) {
@@ -731,22 +725,14 @@ export class ValidationSystem extends AbstractSystem {
     if (!isFinite(merged.min[0])) return Promise.resolve();   // no nodes merged
     const nearby = merged.padByMeters(MERGE_PADDING_METERS);
 
-    // The user's edits there, and the ways of the edited nodes (a moved vertex changes its way)
+    // The user's edits there, from stable's local index. It holds the ways of the edited nodes too:
+    // a moved vertex gives its way a shape of its own. Each is checked as it is in the graph validated.
     const editedIDs = new Set<EntityID>();
-    const addIfNearby = (entity: OsmEntity | undefined): void => {
-      if (!entity) return;
-      const extent = graph.extent(entity);
-      if (extent && nearby.intersects(extent)) {
-        editedIDs.add(entity.id);
-      }
-    };
-    for (const entityID of editor.difference().changes.keys()) {
+    for (const entityID of editor.stableEditsIn(nearby)) {
       const entity = graph.hasEntity(entityID);
-      addIfNearby(entity);
-      if (entity?.type === 'node') {
-        for (const way of graph.parentWays(entity)) {
-          addIfNearby(way);
-        }
+      const extent = entity && graph.extent(entity);
+      if (extent && nearby.intersects(extent)) {
+        editedIDs.add(entityID);
       }
     }
     if (!editedIDs.size) return Promise.resolve();

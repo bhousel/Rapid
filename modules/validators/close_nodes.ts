@@ -25,7 +25,6 @@ export function validateCloseNodes(context: Context): ValidatorFunction {
   const editor = context.systems.editor!;
   const l10n = context.systems.l10n!;
   const schema = context.systems.schema;
-  const spatial = context.systems.spatial!;
 
   const pointThresholdMeters = 0.2;
 
@@ -230,15 +229,11 @@ export function validateCloseNodes(context: Context): ValidatorFunction {
       const issues: ValidationIssue[] = [];
 
       const box = queryBox(node.loc!, pointThresholdMeters);
-      const spatialID = editor.spatialIDForGraph(graph);
-      const hits = spatial.getItemsAtBox(spatialID, box);
+      const nearby = editor.entitiesInBox(box, graph);   // as they are in this graph
 
       const isNode1Stol = (node.tags['memorial:type'] === 'stolperstein' || node.tags['memorial'] === 'stolperstein');
 
-      for (const hit of hits) {
-        // The index can be for another graph, so look up each hit in this one.
-        const entity = graph.hasEntity(hit.id);
-        if (!entity) continue;
+      for (const entity of nearby) {
         if (entity.id === node.id) continue;  // skip self
         if (entity.type !== 'node' || entity.geometry(graph) !== 'point') continue;   // standalone points only
 

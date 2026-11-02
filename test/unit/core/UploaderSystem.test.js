@@ -234,11 +234,12 @@ describe('UploaderSystem', () => {
 
       const mergedIDs = new Set();
       _editor.on('merge', entityIDs => { for (const entityID of entityIDs) mergedIDs.add(entityID); });
-      let indexed;   // whether each OSM index has the new node, before the upload resets everything
+      let indexed;   // whether searches of each graph find the new node, before the upload resets everything
       _uploader.once('willAttemptUpload', () => {
-        const spatial = _context.systems.spatial;
-        const has = (spatialID) => spatial.getCache(spatialID).items.has('n3');
-        indexed = { base: has('editor_base'), stable: has('editor_stable'), staging: has('editor_staging') };
+        const n3 = _editor.base.graph.entity('n3');
+        const n3Box = _editor.base.graph.geometry(n3).world.extent.bbox();
+        const has = (graph) => _editor.entitiesInBox(n3Box, graph).some(entity => entity.id === 'n3');
+        indexed = { base: has(_editor.base.graph), stable: has(_editor.stable.graph), staging: has(_editor.staging.graph) };
       });
 
       const result = resultAsync();

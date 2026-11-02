@@ -12,7 +12,7 @@ import type { GeoJSONProps } from '../data/GeoJSONData.ts';
 import type { GeometryPart } from '../lib/GeometryPart.ts';
 import type { Graph } from '../lib/Graph.ts';
 import type { OsmNode } from '../data/OsmNode.ts';
-import type { OsmFeature, OsmWay, Segment } from '../data/OsmWay.ts';
+import type { OsmFeature, OsmWay } from '../data/OsmWay.ts';
 import type { PropMatcherProps } from '../lib/PropMatcher.ts';
 import type { RapidDataset } from '../lib/RapidDataset.ts';
 import type { Vec2 } from '@rapid-sdk/math';
@@ -284,7 +284,7 @@ export function conflationDefaults(): ConflationSettings {
  * measure them), **score**, **triage** (already mapped or new), and it prepares what the
  * **act** stage needs, such as the runs of a partly mapped line and where they join existing ways.
  *
- * It compares against the `editor_stable` spatial caches, so results only change when the user
+ * It compares against the stable graph's spatial index, so results only change when the user
  * finishes an edit. Results are computed lazily, cached per feature, and flushed on `stablechange`
  * and `merge`.
  *
@@ -557,7 +557,6 @@ export class ConflationSystem extends AbstractSystem {
 
     const dataID = datum.dataID;
     const graph = editor.stable.graph!;
-    const segSpatialID = editor.spatialIDForGraph(graph) + '-segments';
 
     // Rules whose source conditions this feature fails can't say "same" for it.
     const active = rules.filter(rule => PropMatcher.matchAll(this._propMatchers(rule.source), sourceTags));
@@ -624,10 +623,9 @@ export class ConflationSystem extends AbstractSystem {
         minX: coord[0] - queryR, minY: coord[1] - queryR,
         maxX: coord[0] + queryR, maxY: coord[1] + queryR
       };
-      const hits = active.length ? spatial.getItemsAtBox(segSpatialID, query) : [];
+      const segments = active.length ? editor.segmentsInBox(query, graph) : [];
 
-      for (const hit of hits) {
-        const seg = hit.contents as Segment;
+      for (const seg of segments) {
         const wayID = seg.wayID;
 
         const feature = featureOf(wayID);
@@ -724,8 +722,7 @@ export class ConflationSystem extends AbstractSystem {
 
       let bestWayID: EntityID | undefined;
       let bestDistance = Infinity;
-      for (const hit of spatial.getItemsAtBox(segSpatialID, query)) {
-        const seg = hit.contents as Segment;
+      for (const seg of editor.segmentsInBox(query, graph)) {
         const feature = featureOf(seg.wayID);
         if (feature?.geometry !== 'line') continue;
 
