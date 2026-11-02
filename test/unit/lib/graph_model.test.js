@@ -96,14 +96,17 @@ function runSeed(context, seed, steps, log) {
       return new Rapid.OsmWay(context, { id: id, nodes: nodes, tags: tags });
 
     } else {
+      // A multipolygon's shape is built from every node of its member ways, which real data always
+      // has and random histories don't, so multipolygons get only nodes and relations as members.
+      const tags = { type: pick(['boundary', 'route', 'multipolygon']) };
+      const memberIDs = (tags.type === 'multipolygon') ? [...NODE_IDS, ...REL_IDS] : ALL_IDS;
       const members = [];
       const length = Math.floor(random() * 5);
       for (let i = 0; i < length; i++) {
-        const memberID = (chance(0.15) && members.length) ? pick(members).id : pick(ALL_IDS);   // repeated members
+        const memberID = (chance(0.15) && members.length) ? pick(members).id : pick(memberIDs);   // repeated members
         const type = memberID[0] === 'n' ? 'node' : memberID[0] === 'w' ? 'way' : 'relation';
         members.push({ id: memberID, type: type, role: pick(['', 'outer', 'inner', 'stop']) });
       }
-      const tags = chance(0.4) ? { type: 'boundary' } : { type: 'route' };
       return new Rapid.OsmRelation(context, { id: id, members: members, tags: tags });
     }
   }
@@ -119,9 +122,11 @@ function runSeed(context, seed, steps, log) {
   let graphCount = 0;
 
   function derive(from) {
+    const graph = new Rapid.Graph(from.graph);
     const item = {
-      graph: new Rapid.Graph(from.graph),
+      graph: graph,
       model: new Model(baseModel, new Map(from.model.local)),
+      session: new Rapid.SessionDifference(baseGraph, graph),   // updated as the graph changes, like EditSystem's
       isBase: false,
       name: `G${++graphCount}`
     };
@@ -158,6 +163,24 @@ function runSeed(context, seed, steps, log) {
           const childNodes = graph.childNodes(expected);
           if (childNodes.some((node, i) => node !== model.get(expected.nodes[i]))) {
             assert.fail(`${where}: ${name}.childNodes(${id}) is [${childNodes.map(n => n.key)}]`);
+          }
+        }
+      }
+
+      // The session difference, updated in place, answers as one built from scratch.
+      if (!isBase) {
+        const session = items.find(item => item.graph === graph).session;
+        // Candidates: what differs from base now, and what did at the last update (since reverted).
+        const candidateIDs = chance(0.5) ? ALL_IDS : graph.diffIDs(baseGraph).union(new Set(session.changes.keys()));
+        session.update(graph, candidateIDs);
+        const fresh = new Rapid.Difference(baseGraph, graph);
+        const complete = fresh.complete();
+        if (!sameIDs([...session.changes.keys()], new Set(fresh.changes.keys()))) {
+          assert.fail(`${where}: ${name}'s session difference has [${[...session.changes.keys()]}], expected [${[...fresh.changes.keys()]}]`);
+        }
+        for (const id of ALL_IDS) {
+          if (session.affects(id) !== complete.has(id)) {
+            assert.fail(`${where}: ${name}'s session difference affects(${id}) is ${session.affects(id)}, expected ${complete.has(id)}`);
           }
         }
       }

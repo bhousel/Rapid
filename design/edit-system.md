@@ -289,20 +289,23 @@ the next undo, which actually leaves the newest edit, does.
 
 ### Backup format v4
 
-> **Changing:** step 5 of [`graph-geometry.md`](graph-geometry.md) rewrites v4 so each history item
-> stores only its own edit's changes, and a restore is O(changes). It keeps the number 4: this Rapid
-> hasn't been released, and the only v4 backups (in the shared debug Chrome) get deleted then. The
-> base versions, edit props and session metadata below stay.
-
 ```ts
 {
   version: 4,
   entities: [ … ],                         // copies of every entity the kept edits changed (by key, e.g. 'n1v1')
   baseVersions: { n1: 1, n2: 2, w1: 4 },   // the OSM version each base entity was edited from
-  stack: [ {}, { modified: ['n1v1'], deleted: ['n3'], props: { … } }, … ],
+  stack: [ {}, { modified: ['n1v1'], deleted: ['n3'], reverted: ['w2'], props: { … } }, … ],
   nextIDs: { … }, index: 1, timestamp: …
 }
 ```
+
+- **Each history item holds only its own edit's changes**, against the edit before it (step 5 of
+  [`graph-geometry.md`](graph-geometry.md), November 2026): what it changed (`modified`, by key),
+  deleted, and put back as it is in base (`reverted`). `EditSystem` computes each edit's item once
+  and keeps it, so a backup copies only the edits made since the last one. Restore applies each item
+  to the graph before it. Items written before that (v3, and v4 until November 2026) listed every
+  change since base, which loads the same way; they had no way to record a revert. The number stayed
+  4: this Rapid hasn't been released.
 
 - **Store base versions, not base entities.** The entities saved are the same as before (iD#4108):
   each entity the history touches, the child nodes of edited ways, the parent ways of edited entities,

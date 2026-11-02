@@ -10,6 +10,7 @@ import type { Context } from '../Context.ts';
 import type { OsmEntity } from '../data/OsmEntity.ts';
 import type { OsmNode } from '../data/OsmNode.ts';
 import type { Graph } from '../lib/Graph.ts';
+import type { SessionDifference } from '../lib/SessionDifference.ts';
 import type { ValidationIssue, ValidationSeverity } from '../lib/ValidationIssue.ts';
 import type { ValidatorFactory, ValidatorFunction, ValidatorResult } from '../validators/types.ts';
 
@@ -80,8 +81,8 @@ export class ValidationSystem extends AbstractSystem {
   protected _ignoredIssueIDs: Set<IssueID>;
   /** Resolved issue IDs */
   protected _resolvedIssueIDs: Set<IssueID>;
-  /** Complete diff base -> head of what the user changed */
-  protected _completeDiff: Map<EntityID, OsmEntity | undefined>;
+  /** What the user changed (base to stable), to tell which issues they're responsible for */
+  protected _userEdits: SessionDifference | null;
   /** Deferred `setTimeout` - Set<handles> */
   protected _deferredST: Set<ReturnType<typeof setTimeout>>;
   /** Override rules that force issues to be errors */
@@ -114,7 +115,7 @@ export class ValidationSystem extends AbstractSystem {
     this._disabledValidatorIDs = new Set<ValidatorID>();
     this._ignoredIssueIDs = new Set<IssueID>();
     this._resolvedIssueIDs = new Set<IssueID>();
-    this._completeDiff = new Map<EntityID, OsmEntity | undefined>();
+    this._userEdits = null;
     this._deferredST = new Set();
     this._errorOverrides = [];
     this._warningOverrides = [];
@@ -241,7 +242,7 @@ export class ValidationSystem extends AbstractSystem {
     this._head = new ValidationCache(this.context, 'head');
     this._headQueuedGraph = null;
     this._stableChangedIDs.clear();
-    this._completeDiff.clear();
+    this._userEdits = null;
 
     return Promise.resolve();
   }
@@ -381,7 +382,7 @@ export class ValidationSystem extends AbstractSystem {
         // In the head cache, only count features that the user is responsible for - iD#8632
         // For example, a user can undo some work and an issue will still present in the
         // head graph, but we don't want to credit the user for causing that issue.
-        const userModified = (issue.entityIds || []).some(entityID => this._completeDiff.has(entityID));
+        const userModified = (issue.entityIds || []).some(entityID => this._userEdits?.affects(entityID));
         if (opts.what === 'edited' && !userModified) continue;   // present in head but user didn't touch it
 
         if (!filter(issue)) continue;
@@ -606,7 +607,7 @@ export class ValidationSystem extends AbstractSystem {
   public validateAsync(): Promise<void> {
     const context = this.context;
     const editor = context.systems.editor!;
-    this._completeDiff = editor.difference().complete();
+    this._userEdits = editor.difference();
 
     if (editor.canRestoreBackup) return Promise.resolve();   // Wait to see if the user wants to restore their backup
 
@@ -850,7 +851,7 @@ export class ValidationSystem extends AbstractSystem {
         // Check if the user did something to one of the entities involved in this issue.
         // (This issue could involve multiple entities, e.g. disconnected routable features)
         const issue = this._base.issues.get(issueID);
-        const userModified = (issue?.entityIds || []).some(id => this._completeDiff.has(id));
+        const userModified = (issue?.entityIds || []).some(id => this._userEdits?.affects(id));
 
         if (userModified && !this._head.issues.has(issueID)) {  // issue seems fixed
           this._resolvedIssueIDs.add(issueID);

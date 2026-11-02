@@ -1378,6 +1378,78 @@ describe('EditSystem', () => {
           });
       });
 
+      it('saves in each item only what its edit changed against the edit before it', () => {
+        _editor.perform(actionAddNode('n-1'));
+        _editor.commit({ stringID: 'added n-1' });
+        _editor.perform(actionAddNode('n-2'));
+        _editor.commit({ stringID: 'added n-2' });
+        _editor.perform(Rapid.actionChangeTags('n-1', { natural: 'tree' }));
+        _editor.commit({ stringID: 'updated n-1' });
+
+        const graphs = _editor._history.map(edit => edit.graph);
+        const backup = _editor.toBackup();
+        assert.deepEqual(backup.stack[1].modified, [graphs[1].entity('n-1').key]);
+        assert.deepEqual(backup.stack[2].modified, [graphs[2].entity('n-2').key]);
+        assert.deepEqual(backup.stack[3].modified, [graphs[3].entity('n-1').key]);
+        assert.lengthOf(backup.entities, 3);
+      });
+
+      it('saves and restores an edit that puts an entity back as it is in base', () => {
+        const n1 = new Rapid.OsmNode(context, { id: 'n1', loc: [0, 0] });
+        _editor.merge([n1]);
+        _editor.perform(Rapid.actionChangeTags('n1', { natural: 'tree' }));
+        _editor.commit({ stringID: 'updated n1' });
+        _editor.perform(actionAddNode('n-1'));
+        _editor.commit({ stringID: 'added n-1' });
+        _editor.perform(Rapid.actionRevert('n1'));
+        _editor.commit({ stringID: 'reverted n1' });
+
+        const backup = _editor.toBackup();
+        assert.deepEqual(backup.stack[3].reverted, ['n1']);
+
+        const restored = new Rapid.EditSystem(context);
+        return restored.initAsync()
+          .then(() => restored.merge([n1]))
+          .then(() => restored.fromBackupAsync(backup))
+          .then(() => {
+            assert.isFalse(restored.stable.graph.isLocal('n1'));
+            assert.deepEqual(restored.stable.graph.entity('n1').tags, {});
+            assert.deepEqual([...restored.difference().changes.keys()], ['n-1']);
+            restored.undo();
+            assert.deepEqual(restored.stable.graph.entity('n1').tags, { natural: 'tree' });
+          });
+      });
+
+      it('copies each edit\'s entities once, however many backups are made', () => {
+        _editor.perform(actionAddNode('n-1'));
+        _editor.commit({ stringID: 'added n-1' });
+        const backup1 = _editor.toBackup();
+        _editor.perform(actionAddNode('n-2'));
+        _editor.commit({ stringID: 'added n-2' });
+        const backup2 = _editor.toBackup();
+
+        const copy1 = backup1.entities.find(e => e.id === 'n-1');
+        const copy2 = backup2.entities.find(e => e.id === 'n-1');
+        assert.strictEqual(copy2, copy1);
+      });
+
+      it('saves the edits again after a merge restores a node the user deleted (iD#2085)', () => {
+        _editor.merge([new Rapid.OsmNode(context, { id: 'n1', loc: [0, 0] })]);
+        _editor.perform(Rapid.actionDeleteNode('n1'));
+        _editor.commit({ stringID: 'deleted n1' });
+        _editor.perform(actionAddNode('n-1'));
+        _editor.commit({ stringID: 'added n-1' });
+        assert.deepEqual(_editor.toBackup().stack[1].deleted, ['n1']);
+
+        // A downloaded way uses n1, so it comes back in every edit
+        _editor.merge([
+          new Rapid.OsmNode(context, { id: 'n2', loc: [1, 0] }),
+          new Rapid.OsmWay(context, { id: 'w1', nodes: ['n1', 'n2'] })
+        ]);
+        assert.isOk(_editor.stable.graph.hasEntity('n1'));
+        assert.notProperty(_editor.toBackup().stack[1], 'deleted');
+      });
+
       it('fromBackupAsync throws on an unsupported backup version', () => {
         assert.throws(() => _editor.fromBackupAsync({ version: 2 }), /version 2 not supported/i);
       });

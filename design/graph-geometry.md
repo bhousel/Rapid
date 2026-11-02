@@ -7,7 +7,7 @@ of the change. This design fixes findings 1 (shared geometry) and 2 (the wrong s
 [validation audit](validation-system.md#the-october-2026-audit), the bugs listed below, and the cost of
 keeping versions. It gives Rapid one way to ask for anything's geometry: `graph.geometry(entity)`.
 
-> **Status:** In progress (October 2026): steps 0-4 done. After step 3 the rest was put in a new
+> **Status:** In progress (October 2026): steps 0-5 done. After step 3 the rest was put in a new
 > order (November 2026): backups first, then derived data in records in two steps. Measured in two rounds: a survey of
 > today's costs and bugs, then three competing designs, each prototyped and reviewed for correctness
 > and for performance (in JavaScriptCore and V8). See [Open questions](#open-questions).
@@ -344,17 +344,18 @@ today's `_updateRebased` alone takes 57-74 ms per merge.
 - **The session difference (base to stable) is kept up to date** from every change to stable's
   entities, including a merge's iD#2085 restores. A forced update rebuilds it, as `updateBase` does
   today. It keeps an iterable set of the edited IDs:
-  - `ValidationSystem`'s "did the user change this" check (`_completeDiff`) only calls `.has()`, so
-    that becomes a lookup.
+  - `ValidationSystem`'s "did the user change this" check only needs membership, so it asks
+    `affects(id)` (step 5) instead of building `complete()`.
   - `_validateEditsNearAsync` walks every edited ID on each merge. From step 9 that walk becomes a
     query of the stable overlay over the merged area.
-  - The summary count (`UiSaveTool`, `UrlHashSystem`, `UiSectionValidationStatus`) is kept
-    incrementally, and the save panel's list is computed when shown.
+  - The summary count (`UiSaveTool`, `UrlHashSystem`, `UiSectionValidationStatus`) is still rebuilt
+    when asked for after a change (see step 5 for why), and the save panel's list is computed when
+    shown.
 
   Before step 1 the difference, `complete()` and `summary()` were rebuilt on every stable change: 18 ms
   at L=10k and 107 ms at L=50k in V8. Since step 1 only `complete()` and `summary()` are rebuilt, when
-  asked for, and `validateAsync` asks for `complete()` on every stable change: 6.7 ms and 2.3 ms at
-  L=20k (Bun, after step 3). Step 5 makes them incremental.
+  asked for, and `validateAsync` asked for `complete()` on every stable change: 6.7 ms and 2.3 ms at
+  L=20k (Bun, after step 3). Since step 5 nothing asks for `complete()` there.
 - An edit's extent comes from the entity diff, not the record diff: moving a node on a country border
   mustn't zoom undo out to the whole country.
 - `editor.changes(action)` runs on a derived graph.
@@ -363,7 +364,7 @@ today's `_updateRebased` alone takes 57-74 ms per merge.
 - Backups (v4, rewritten in step 5) save each edit's own changes, taken from the entities in its
   records, never by recomputing geometry or memos. The result is cached on the edit, and dropped when
   a rebase changes that graph's entities (an iD#2085 restore, a forced update). Restore is
-  O(changes). v3 backups still restore.
+  O(changes). v3 backups still restore. Details in [`edit-system.md`](edit-system.md#backup-format-v4).
 
 ### 9. Other data
 
@@ -620,6 +621,40 @@ records (now 6 and 7), 5 rebase (now 8), 6 spatial indexes (now 9), 7 backups (n
    - Measured after step 3 (Bun, L=20k, 200 roads): `toBackup()` takes 1,105 ms, and `deferredBackup`
      runs it one second after every edit; `complete()` 6.7 ms (asked for by `validateAsync` on every
      stable change) and `summary()` 2.3 ms. An edit itself takes 0.04 ms.
+   - **Done.** At L=20k (200 roads, 223 edits):
+
+     | | Before | After |
+     |---|---|---|
+     | Backup after an edit, Bun / V8 | 1,105 / 1,728 ms | 2.2 / 3.2 ms |
+     | First backup of a session, V8 | 1,681 ms | 23 ms |
+     | Size of the backup as JSON | 28.4 MB | 1.2 MB |
+     | `structuredClone` of it (the IndexedDB write), V8 | 97 ms | 12 ms |
+     | "Did the user change this" on a stable change, Bun | 5.4 ms (`complete()`) | 0.06 ms for 1,003 `affects()` |
+
+     How it landed:
+     - Each history item lists what its edit changed against the one before (`modified`, `deleted`,
+       and new: `reverted`, for an entity put back as it is in base). `EditSystem._backupChangesFor`
+       computes it from `diffIDs` and keeps it per edit (a `WeakMap`); `_backupGeneration` is bumped
+       by a merge that restores entities (iD#2085) or forces an update, which makes them recompute.
+       The backup also shrank: every item used to list every change since base.
+     - Restore applies each item to the graph before it, so items from v3 backups and older v4 ones
+       (which list everything since base) load as before. Restoring an edit that reverted an entity
+       was wrong before: the cumulative lists had no way to say so.
+     - What's left O(L) per backup: putting the items together, the base versions of every edited
+       entity, and the write. Storing each edit as its own record would make those O(changes), if
+       sessions ever get that long.
+     - `SessionDifference.affects(id)` answers whether `complete()` would have the entity, exactly,
+       without building it: it keeps the nodes of changed ways and the counted members of changed
+       relations with how many changes count each (`changedChildIDs`, shared with `completeFrom`),
+       and checks ancestors downward, cached until the next update or merge. `ValidationSystem`
+       asks it instead of building `complete()` on every stable change.
+     - `summary()` is still rebuilt when asked for (1.9-2.3 ms at L=20k): whether a changed node
+       counts as a vertex, and which parent ways a moved vertex brings, depend on the graph around it,
+       so an incremental version needs the same care as `affects()` for a smaller cost.
+     - The model test (step 4) also keeps a session difference per graph, and checks its changes and
+       `affects()` against a fresh `Difference` after every step. Relations there are now multipolygons
+       too (with node and relation members only: building a multipolygon needs every node of its member
+       ways, which real data has and random histories don't).
 6. **Geometry and versions in records.**
    - Records get geometry and versions. Base data lives on base objects. `graph.version(entity)`
      arrives.

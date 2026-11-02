@@ -151,6 +151,27 @@ export interface SessionUpload {
   index: number;
 }
 
+/**
+ * What one edit changed against the edit before it, for backups. `toBackup` computes it once per
+ * edit and keeps it, so a backup doesn't copy the whole history again.
+ */
+interface BackupChanges {
+  /** The graph of the edit before, which these changes were computed against */
+  previous: Graph;
+  /** The value of `EditSystem._backupGeneration` when these were computed */
+  generation: number;
+  /** Keys of the entities the edit changed (e.g. 'n1v1') */
+  modified: string[];
+  /** Copies of those entities, in the same order */
+  copies: EntityCopy[];
+  /** IDs of the entities the edit deleted */
+  deleted: EntityID[];
+  /** IDs of the entities the edit put back as they are in base */
+  reverted: EntityID[];
+  /** Every ID above, and the child nodes of the ways the edit changed */
+  relatedIDs: EntityID[];
+}
+
 /** Entity copy - as bag of properties */
 interface EntityCopy {
   /** Unique identifier for this data element */
@@ -307,6 +328,10 @@ export class EditSystem extends AbstractSystem {
 
   /** Whether the most recent backup write succeeded */
   protected _backupStatus: boolean;
+  /** What each edit changed, kept for backups (see `BackupChanges`) */
+  protected _backupChanges: WeakMap<Edit, BackupChanges>;
+  /** Bumped when a merge changes edits that were already made, so their `BackupChanges` are computed again */
+  protected _backupGeneration: number;
   /** Cache key used to detect when `stable` has changed and a new backup is needed */
   protected _stableKey: string | null;
   /** What the last `stablechange` event compared against, see `EmitState` */
@@ -352,6 +377,8 @@ export class EditSystem extends AbstractSystem {
     this._osmSegmentIDs = new Map();
 
     this._backupStatus = true;
+    this._backupChanges = new WeakMap<Edit, BackupChanges>();
+    this._backupGeneration = 0;
     this._stableKey = null;
     this._emittedStable = null!;
     this._stableCandidates = new Set<EntityID>();
@@ -1029,6 +1056,12 @@ export class EditSystem extends AbstractSystem {
 
     const restored = baseGraph.rebase(entities, [...graphs], force);
 
+    // Restores change edits that were already made, and a forced update changes what they were made
+    // against, so what backups kept about them is out of date.
+    if (restored.size || force) {
+      this._backupGeneration++;
+    }
+
     // The new data can change `complete()` and `summary()`, and an edited entity that wasn't in
     // base before (e.g. restored from a backup before its tile loaded) isn't "created" any more.
     const stableGraph = this.stable.graph!;
@@ -1416,17 +1449,19 @@ export class EditSystem extends AbstractSystem {
 
   /**
    * Build the structured backup object representing the edit history.
-   * This is the expensive part of a backup (it walks and copies the whole history), so callers
-   * that persist to IndexedDB should store the returned object directly rather than re-stringifying.
+   * Each history item holds only what its edit changed against the edit before it. That's computed
+   * once per edit and kept (`_backupChangesFor`), so a backup copies only the edits made since the
+   * last one. Callers that persist to IndexedDB should store the returned object directly rather
+   * than re-stringifying.
    * @return The structured backup object, or `undefined` if nothing to save
    */
   public toBackup(): BackupJSON | undefined {
     if (!this.hasWork()) return;
 
-    const OSM_PRECISION = 7;
     const baseGraph = this.base.graph!;   // The initial unedited graph
     const modifiedEntities = new Map<string, EntityCopy>();  // Map<entityKey, EntityCopy>
     const baseEntities = new Map<EntityID, OsmEntity>();     // Map<entityID, OsmEntity>
+    const relatedIDs = new Set<EntityID>();
     const historyData: Record<string, unknown>[] = [];
 
     // Preserve the users history of edits..
@@ -1434,53 +1469,44 @@ export class EditSystem extends AbstractSystem {
     // they'd expect to get back when restoring a session.
     for (let i = 0; i <= this._index; i++) {
       const edit = this._history[i];
-      const modified: string[] = [];
-      const deleted: EntityID[] = [];
+      const item: Record<string, unknown> = {};
 
-      // watch out: for modified entities we index on "key" - e.g. "n1v1"
-      for (const [entityID, entity] of edit.graph!.localEntities()) {
-        if (entity) {
-          const key = entity.key;
-          modifiedEntities.set(key, _copyEntity(entity));
-          modified.push(key);
-        } else {
-          deleted.push(entityID);
+      if (i > 0) {
+        const changes = this._backupChangesFor(edit, this._history[i - 1].graph);
+
+        // watch out: for modified entities we index on "key" - e.g. "n1v1"
+        for (let j = 0; j < changes.modified.length; j++) {
+          modifiedEntities.set(changes.modified[j], changes.copies[j]);
+        }
+        for (const entityID of changes.relatedIDs) {
+          relatedIDs.add(entityID);
         }
 
-        // Collect the original versions of edited Entities.
-        const original = baseGraph.hasEntity(entityID);
-        if (original) {
-          baseEntities.set(entityID, original);
-        }
-
-        // For modified ways, collect originals of child nodes also. - iD#4108
-        // (This is needed for situations where we connect a way to an existing node)
-        if (entity && (entity as any).nodes) {
-          for (const childID of (entity as any).nodes) {
-            const child = baseGraph.hasEntity(childID);
-            if (child) {
-              baseEntities.set(child.id, child);
-            }
-          }
-        }
-
-        // Collect original parent ways also.
-        // (This is needed for situations where we reshape or move a way -
-        //  behind the scenes, only the nodes were really modified)
-        if (original) {
-          for (const parent of baseGraph.parentWays(original)) {
-            baseEntities.set(parent.id, parent);
-          }
-        }
+        if (changes.modified.length)  item.modified = changes.modified;
+        if (changes.deleted.length)   item.deleted = changes.deleted;
+        if (changes.reverted.length)  item.reverted = changes.reverted;
       }
 
       // The edit's props are plain JSON, saved as they are.
       // (Before October 2026, items had `annotation`, `selectedIDs`, `transform` and `*Used` instead)
-      const item: Record<string, unknown> = {};
-      if (modified.length)  item.modified = modified;
-      if (deleted.length)   item.deleted = deleted;
       if (Object.keys(edit.props).length)  item.props = edit.props;
       historyData.push(item);
+    }
+
+    for (const entityID of relatedIDs) {
+      // Collect the original versions of edited Entities.
+      // For modified ways, `relatedIDs` has their child nodes also. - iD#4108
+      // (This is needed for situations where we connect a way to an existing node)
+      const original = baseGraph.hasEntity(entityID);
+      if (!original) continue;
+      baseEntities.set(entityID, original);
+
+      // Collect original parent ways also.
+      // (This is needed for situations where we reshape or move a way -
+      //  behind the scenes, only the nodes were really modified)
+      for (const parent of baseGraph.parentWays(original)) {
+        baseEntities.set(parent.id, parent);
+      }
     }
 
     // Collect the child nodes of those original ways also, so restore can fetch everything at once.
@@ -1511,6 +1537,57 @@ export class EditSystem extends AbstractSystem {
       index: this._index,
       timestamp: (new Date()).getTime()
     };
+  }
+
+
+  /**
+   * Returns what an edit changed against the edit before it, for backups: the entities it changed
+   * or deleted, and the ones it put back as they are in base. It's computed once and kept, until the
+   * edit before is a different one or a merge changes the edits (`_backupGeneration`).
+   * @param edit - The edit
+   * @param previous - The graph of the edit before it
+   * @return What the edit changed
+   */
+  protected _backupChangesFor(edit: Edit, previous: Graph): BackupChanges {
+    const kept = this._backupChanges.get(edit);
+    if (kept?.previous === previous && kept.generation === this._backupGeneration) return kept;
+
+    const OSM_PRECISION = 7;
+    const graph = edit.graph;
+    const changes: BackupChanges = {
+      previous: previous,
+      generation: this._backupGeneration,
+      modified: [],
+      copies: [],
+      deleted: [],
+      reverted: [],
+      relatedIDs: []
+    };
+
+    // `diffIDs` can list more than what changed, so compare each one.
+    for (const entityID of graph.diffIDs(previous)) {
+      const entity = graph.hasEntity(entityID);
+      if (!graph.isLocal(entityID)) {
+        if (previous.isLocal(entityID)) {
+          changes.reverted.push(entityID);
+          changes.relatedIDs.push(entityID);
+        }
+        continue;
+      }
+      if (previous.isLocal(entityID) && previous.hasEntity(entityID) === entity) continue;
+
+      changes.relatedIDs.push(entityID);
+      if (entity) {
+        changes.modified.push(entity.key);
+        changes.copies.push(_copyEntity(entity));
+        changes.relatedIDs.push(...((entity as OsmWay).nodes ?? []));
+      } else {
+        changes.deleted.push(entityID);
+      }
+    }
+
+    this._backupChanges.set(edit, changes);
+    return changes;
 
 
     /**
@@ -1537,7 +1614,6 @@ export class EditSystem extends AbstractSystem {
       }
       return copy;
     }
-
   }
 
 
@@ -1657,6 +1733,8 @@ export class EditSystem extends AbstractSystem {
 
       // Reconstruct the edit history, each Graph derives from the previous one..
       // Start at i = 1, leaving base edit alone, the first edit will have nothing in it.
+      // An item holds what its edit changed against the one before. (Items in v3 backups, and in v4
+      // backups from before November 2026, hold everything changed since base, which loads the same way.)
       let prevGraph: Graph = baseGraph;
       for (let i = 1; i < backup.stack.length; i++) {
         const item = backup.stack[i] as Record<string, unknown>;
@@ -1669,7 +1747,12 @@ export class EditSystem extends AbstractSystem {
           entities[entityID] = undefined;
         }
 
-        const graph = new Graph(prevGraph).load(entities);
+        const graph = new Graph(prevGraph);
+        const reverted = (item.reverted ?? []) as EntityID[];
+        if (reverted.length) {
+          graph.revert(reverted);
+        }
+        graph.load(entities);
         graph.freeze();
 
         const props = this._upgradeEditProps((item.props ?? this._legacyEditProps(item)) as EditProps);

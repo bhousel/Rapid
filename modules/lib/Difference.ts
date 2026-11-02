@@ -315,24 +315,15 @@ export function completeFrom(
     result.set(entityID, h);
 
     if (entity.type === 'way') {
-      const headNodes = new Set<EntityID>((h as OsmWay | undefined)?.nodes);
-      const baseNodes = new Set<EntityID>((b as OsmWay | undefined)?.nodes);
-      for (const nodeID of headNodes.union(baseNodes)) {
+      for (const nodeID of changedChildIDs(change)) {
         result.set(nodeID, head.hasEntity(nodeID));
       }
 
     } else if (entity.type === 'relation') {
-      const hr = h as OsmRelation | undefined;
-      const br = b as OsmRelation | undefined;
-      const isMultipolygon = !!(hr?.isMultipolygon() || br?.isMultipolygon());
-      const takeAll = isMultipolygon || !hr || !br || !deepEqual(hr.tags, br.tags);
-
-      if (isMultipolygon || !forGeometry) {
-        for (const memberID of _changedMembers(br?.members ?? [], hr?.members ?? [], takeAll)) {
-          const member = head.hasEntity(memberID);
-          if (!member) continue;   // not downloaded
-          result.set(memberID, member);
-        }
+      for (const memberID of changedChildIDs(change, forGeometry)) {
+        const member = head.hasEntity(memberID);
+        if (!member) continue;   // not downloaded
+        result.set(memberID, member);
       }
     }
 
@@ -356,6 +347,38 @@ export function completeFrom(
       _gatherParents(head.parentRelations(parent));  // recurse up to parent relations
     }
   }
+}
+
+
+/**
+ * Returns the IDs of the children a change affects, as `completeFrom` counts them: the old and new
+ * nodes of a changed way, or the changed members of a changed relation (all of them, before and
+ * after, when its tags changed or it is or was a multipolygon).
+ * @param  change - The change
+ * @param  forGeometry - `true` to leave out the members of relations that aren't multipolygons
+ * @return The IDs of the children (none for a node)
+ */
+export function changedChildIDs(change: DifferenceChange, forGeometry: boolean = false): Set<EntityID> {
+  const h = change.head;
+  const b = change.base;
+  const entity = h ?? b;
+
+  if (entity?.type === 'way') {
+    const headNodes = new Set<EntityID>((h as OsmWay | undefined)?.nodes);
+    const baseNodes = new Set<EntityID>((b as OsmWay | undefined)?.nodes);
+    return headNodes.union(baseNodes);
+
+  } else if (entity?.type === 'relation') {
+    const hr = h as OsmRelation | undefined;
+    const br = b as OsmRelation | undefined;
+    const isMultipolygon = !!(hr?.isMultipolygon() || br?.isMultipolygon());
+    const takeAll = isMultipolygon || !hr || !br || !deepEqual(hr.tags, br.tags);
+    if (isMultipolygon || !forGeometry) {
+      return _changedMembers(br?.members ?? [], hr?.members ?? [], takeAll);
+    }
+  }
+
+  return new Set<EntityID>();
 }
 
 
