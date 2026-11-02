@@ -7,6 +7,8 @@ import { type OneOrMore, utilIterable } from '../util/iterable.ts';
 
 import type { BBox } from 'rbush';
 import type { Context } from '../Context.ts';
+import type { Graph } from '../lib/Graph.ts';
+import type { OsmEntity } from '../data/OsmEntity.ts';
 import type { Tile, Vec2 } from '@rapid-sdk/math';
 
 
@@ -234,13 +236,15 @@ export class SpatialSystem extends AbstractSystem {
    * found by id and replaces any older version, but box and coordinate searches won't return it.
    * @param spatialID - spatialID of the cache to add items.
    * @param data - data to insert or replace
+   * @param graph - for OSM data, the Graph it's in: a way's or a relation's shape depends on the Graph
    */
-  public replaceData(spatialID: SpatialID, data: OneOrMore<AbstractData>): void {
+  public replaceData(spatialID: SpatialID, data: OneOrMore<AbstractData>, graph?: Graph): void {
     const items: SpatialItem[] = [];
     for (const d of utilIterable(data)) {
       if (!d) continue;
 
-      const extent = d.geoms.world?.extent;
+      const geoms = graph ? graph.geometry(d as OsmEntity) : d.geoms;
+      const extent = geoms.world?.extent;
       const bbox = extent?.bbox() ?? { minX: NaN, minY: NaN, maxX: NaN, maxY: NaN };
       const item = Object.assign({ id: d.id, contents: d }, bbox) as SpatialItem;
       items.push(item);

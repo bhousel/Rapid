@@ -375,7 +375,7 @@ export class MapWithAIService extends AbstractSystem {
     // important: `graph.rebase` will call `.updateGeometry()`
     graph.rebase(entities, [graph], true);   // true = force replace entities
 
-    spatial.addData(ds.spatialID, entities);
+    spatial.addData(ds.spatialID, entities, graph);
     gfx?.deferredRedraw();
   }
 
@@ -406,7 +406,7 @@ export class MapWithAIService extends AbstractSystem {
     // important: `graph.rebase` will call `.updateGeometry()`
     ds.graph.rebase(entities);
 
-    spatial.addData(ds.spatialID, entities);
+    spatial.addData(ds.spatialID, entities, ds.graph);
   }
 
 

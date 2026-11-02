@@ -425,30 +425,25 @@ settings?.set('schema.presetRecents', this._recentIDs);
 // clear all entities cached transients
 const editor = context.systems.editor as any;
 if (editor) {
+  // Each graph recomputes its own shapes: the base's are on the objects, the others' in their records.
   const base = editor.base?.graph;
   if (base) {
     for (const [_, v] of base.base.entities) {
-      if (!v) continue;
-      v.updateGeometry(base);
+      v?.clearMemos();
     }
+    base.recomputeGeometry(base.base.entities.keys());
   }
 
   const staging = editor.staging?.graph;
   if (staging) {
-    for (const [_, v] of staging.localEntities()) {
-      if (!v) continue;
-      v.updateGeometry(staging);
-    }
+    staging.recomputeGeometry(staging.localEntities().keys());
   }
 
   const history = editor._history || [];
   for (const edit of history) {
     const graph = edit.graph;
     if (graph) {
-      for (const [_, v] of graph.localEntities()) {
-        if (!v) continue;
-        v.updateGeometry(graph);
-      }
+      graph.recomputeGeometry(graph.localEntities().keys());
     }
   }
 }

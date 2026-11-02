@@ -88,20 +88,61 @@ export class OsmEntity extends AbstractData<OsmEntityProps> {
   }
 
   /**
+   * The entity's own geometry: a node's. A way's or a relation's shape depends on the Graph, so for
+   * them this throws: read it through `graph.geometry(entity)`.
+   * @return  Its Geometry
+   * @throws  Error for a way or a relation
+   */
+  public get geoms(): Geometry {
+    if (this.type === 'way' || this.type === 'relation') {
+      throw new Error(`Read the geometry of ${this.type} ${this.id} through its graph: graph.geometry(entity)`);
+    }
+    return this._geoms;
+  }
+
+  /**
+   * Stores the entity's own geometry.
+   * @param val - The new Geometry (it's never changed once stored, so copies may share it)
+   */
+  public set geoms(val: Geometry) {
+    this._geoms = val;
+  }
+
+  /**
+   * The geometry stored on this object: a node's own, or for a way or a relation, the shape the base
+   * Graph of its lineage built (only that Graph writes it, at rebase). `graph.geometry(entity)`
+   * returns it for every Graph that doesn't have a shape of its own for the entity.
+   * A copy shares the original's, until a base Graph builds one for the copy.
+   * @return  The stored Geometry
+   */
+  public get baseGeometry(): Geometry {
+    return this._geoms;
+  }
+
+  /**
+   * Builds the entity's geometry as it is in a Graph, without storing it.
    * OSM geometry can be complicated.
    * Nodes are easy because they represent a single coordinate.
    * But the other data types require topology information from a Graph.
-   * This function allows the calling code to recompute the geometry after the Graph has been updated.
+   * @param graph - the Graph that holds the topology needed
+   * @return A new Geometry
+   */
+  public buildGeometry(graph?: Graph): Geometry {
+    const geoms = new Geometry(this.context);
+    geoms.setData(this.asGeoJSON(graph));
+    return geoms;
+  }
+
+  /**
+   * Rebuilds the geometry stored on this object (see `baseGeometry`): a node's own, or the base
+   * Graph's shape of a way or a relation. Other Graphs keep their shapes in their records.
    * It stores a new `Geometry` and leaves the old one untouched, because a renderer may still hold its parts.
    * @param graph - the Graph that holds the topology needed
    * @returns this same OsmEntity
    */
   public updateGeometry(graph?: Graph): this {
-    // this.touch();
     this.clearMemos();
-    const geoms = new Geometry(this.context);
-    geoms.setData(this.asGeoJSON(graph));
-    this.geoms = geoms;
+    this._geoms = this.buildGeometry(graph);
     return this;
   }
 

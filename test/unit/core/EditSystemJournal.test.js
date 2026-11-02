@@ -77,7 +77,7 @@ function assertIndexMatchesGeometry(editor, spatial, message) {
   for (const [entityID, item] of items) {
     const entity = graph.hasEntity(entityID);
     if (!entity || entity.type === 'node') continue;
-    const extent = entity.geoms.world.extent;
+    const extent = graph.geometry(entity).world.extent;
     const actual = [item.minX, item.minY, item.maxX, item.maxY].map(n => Math.round(n * 1000));
     const expected = [extent.min[0], extent.min[1], extent.max[0], extent.max[1]].map(n => Math.round(n * 1000));
     assert.deepEqual(actual, expected, `index box of ${entityID}: ${message}`);
@@ -174,7 +174,7 @@ describe('EditSystem journal', () => {
       new Rapid.OsmWay(context, { id: 'w1', nodes: ['n1', 'n2'], version: 1 })
     ]);
     const w1 = editor.staging.graph.entity('w1');
-    const extent = w1.extent().rectangle();
+    const extent = editor.staging.graph.extent(w1).rectangle();
 
     let emits = 0;
     editor.on('stagingchange', () => emits++);
@@ -193,7 +193,7 @@ describe('EditSystem journal', () => {
     assert.isFalse(graph.isLocal('n2'));
     assert.deepEqual(graph.entity('n2').loc, [0.001, 0]);
     assert.deepEqual(graph.parentWays(graph.entity('n1')).map(way => way.id), ['w1']);
-    assert.deepEqual(w1.extent().rectangle(), extent);
+    assert.deepEqual(graph.extent(w1).rectangle(), extent);
 
     // The next perform is clean.
     editor.perform(Rapid.actionMoveNode('n1', [0, 0.001]));

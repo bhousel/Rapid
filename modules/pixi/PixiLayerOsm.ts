@@ -335,7 +335,6 @@ export class PixiLayerOsm extends AbstractPixiLayer {
 
     const entities = data.polygons;
     for (const [entityID, entity] of entities) {
-      const version = entity.v || 0;
       const parts = graph.geometry(entity).parts;
 
       for (let i = 0; i < parts.length; ++i) {
@@ -357,8 +356,8 @@ export class PixiLayerOsm extends AbstractPixiLayer {
         }
 
         // If data has changed.. Replace data and parent-child links.
-        if (feature.v !== version) {
-          feature.v = version;
+        // (A changed shape is a new Geometry, so its parts are new objects too.)
+        if (feature.data !== entity || feature.geometry !== part) {
           feature.geometry = part;
           const area = part.world.extent.area();
           feature.container.zIndex = -area;      // sort by area descending (small things above big things)
@@ -415,8 +414,8 @@ export class PixiLayerOsm extends AbstractPixiLayer {
             poiFeature.parentContainer = pointsContainer;
           }
 
-          if (poiFeature.v !== version) {
-            poiFeature.v = version;
+          if (poiFeature.data !== entity || poiFeature.props.polygonPart !== part) {
+            poiFeature.props.polygonPart = part;   // the polygon part that the pin is placed in
 
             const poiGeometry = new GeometryPart(context);
             poiGeometry.setData({ type: 'Point', coordinates: projWorldToWgs84(part.world.poi!) });
@@ -494,7 +493,6 @@ export class PixiLayerOsm extends AbstractPixiLayer {
       const layer = way.layer();
       const levelContainer = _getLevelContainer(layer.toString());
       const zindex = getzIndex(way.tags);
-      const version = way.v || 0;
 
       const parts = graph.geometry(way).parts;
 
@@ -516,8 +514,8 @@ export class PixiLayerOsm extends AbstractPixiLayer {
         }
 
         // If data has changed.. Replace data and parent-child links.
-        if (feature.v !== version) {
-          feature.v = version;
+        // (A changed shape is a new Geometry, so its parts are new objects too.)
+        if (feature.data !== way || feature.geometry !== part) {
           feature.geometry = part;
           feature.parentContainer = levelContainer;    // Change layer stacking if necessary
           feature.container.zIndex = zindex;
@@ -626,7 +624,6 @@ export class PixiLayerOsm extends AbstractPixiLayer {
       if (!parentContainer) continue;   // this vertex isn't important enough to render
 
       const featureID = `${this.layerID}-${nodeID}`;
-      const version = node.v || 0;
       let feature = this.features.get(featureID) as PixiFeaturePoint | undefined;
 
       // If feature existed before as a different type, recreate it.
@@ -639,9 +636,8 @@ export class PixiLayerOsm extends AbstractPixiLayer {
         feature = new PixiFeaturePoint(this, featureID);
       }
 
-      // If data has changed, replace it.
-      if (feature.v !== version) {
-        feature.v = version;
+      // If data has changed, replace it. (A node's geometry is its own, so a new shape is a new node.)
+      if (feature.data !== node) {
         const part = graph.geometry(node).parts[0];
         feature.geometry = part;
         feature.data = node;
@@ -704,7 +700,6 @@ export class PixiLayerOsm extends AbstractPixiLayer {
     const nodes = data.points;
     for (const [nodeID, node] of nodes) {
       const featureID = `${this.layerID}-${nodeID}`;
-      const version = node.v || 0;
       let feature = this.features.get(featureID) as PixiFeaturePoint | undefined;
 
       // If feature existed before as a different type, recreate it.
@@ -718,9 +713,8 @@ export class PixiLayerOsm extends AbstractPixiLayer {
         feature.parentContainer = pointsContainer;
       }
 
-      // If data has changed, replace it.
-      if (feature.v !== version) {
-        feature.v = version;
+      // If data has changed, replace it. (A node's geometry is its own, so a new shape is a new node.)
+      if (feature.data !== node) {
         const part = graph.geometry(node).parts[0];
         feature.geometry = part;
         feature.data = node;

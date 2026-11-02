@@ -102,27 +102,25 @@ export class OsmRelation extends OsmEntity {
   }
 
   /**
-   * Recomputes this relation's geometry.
+   * Builds this relation's geometry, as it is in the given Graph.
    * A multipolygon joins its member ways into rings. Any other relation references its members'
    * geometry parts instead of copying them, so building it only gathers references.
    * Member ways and nodes must already be current in the graph (`Graph.recomputeGeometry` builds
    * ways first). Member relations are gathered down to their leaf members, so cycles and the order
    * relations are built in don't matter.
    * @param graph - the Graph that holds the topology needed
-   * @returns this same OsmRelation
+   * @return A new Geometry
    */
-  public updateGeometry(graph?: Graph): this {
+  public buildGeometry(graph?: Graph): Geometry {
     if (!graph || this.isMultipolygon()) {
-      return super.updateGeometry(graph);
+      return super.buildGeometry(graph);
     }
 
-    this.clearMemos();
     const parts = new Set<GeometryPart>();
     this._gatherMemberParts(graph, new Set<EntityID>(), parts);
     const geoms = new Geometry(this.context);
     geoms.setParts([...parts]);
-    this.geoms = geoms;
-    return this;
+    return geoms;
   }
 
   /**

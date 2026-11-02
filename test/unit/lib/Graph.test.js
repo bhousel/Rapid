@@ -527,7 +527,8 @@ describe('Graph', () => {
       const base = new Rapid.Graph(context, [n1, n2, w1]);
       const head = new Rapid.Graph(base).replace(n2.move([2, 0]));
       head.commit();
-      assert.deepEqual(w1.geoms.orig.extent.max, [2, 0]);
+      assert.deepEqual(head.extent(w1).max, [2, 0]);
+      assert.deepEqual(base.extent(w1).max, [1, 0]);   // the base's shape is its own
     });
 
     it('does not recompute anything for a write of an equal copy', () => {
@@ -536,9 +537,9 @@ describe('Graph', () => {
       const w1 = new Rapid.OsmWay(context, { id: 'w1', nodes: ['n1', 'n2'] });
       const base = new Rapid.Graph(context, [n1, n2, w1]);
       const head = new Rapid.Graph(base).replace(n2.update({}));
-      const geoms = w1.geoms;
+      const geoms = base.geometry(w1);
       head.commit();
-      assert.strictEqual(w1.geoms, geoms);
+      assert.strictEqual(head.geometry(w1), geoms);
     });
 
     it('recomputes the old and new nodes\' parent ways when a way changes', () => {
@@ -549,7 +550,7 @@ describe('Graph', () => {
       const base = new Rapid.Graph(context, [n1, n2, n3, w1]);
       const head = new Rapid.Graph(base).replace(w1.update({ nodes: ['n1', 'n3'] }));
       head.commit();
-      assert.deepEqual(head.entity('w1').geoms.orig.extent.max, [5, 5]);
+      assert.deepEqual(head.extent(head.entity('w1')).max, [5, 5]);
     });
 
     it('builds nested relations members first', () => {
@@ -565,8 +566,8 @@ describe('Graph', () => {
       head.replace(r1.update({ tags: { type: 'route_master', name: 'A' } }));
       head.replace(n2.move([3, 0]));
       head.commit();
-      assert.deepEqual(head.entity('r1').geoms.orig.extent.max, [3, 0]);
-      assert.deepEqual(r2.geoms.orig.extent.max, [3, 0]);
+      assert.deepEqual(head.extent(head.entity('r1')).max, [3, 0]);
+      assert.deepEqual(head.extent(r2).max, [3, 0]);
     });
 
     it('builds relations in a membership cycle from their leaf members', () => {
@@ -578,8 +579,8 @@ describe('Graph', () => {
       const base = new Rapid.Graph(context, [n1, n2, n3, r1, r2]);
       const head = new Rapid.Graph(base).replace(n3.move([0, 6]));
       head.commit();
-      assert.deepEqual(r1.geoms.orig.extent.max, [0, 6]);
-      assert.deepEqual(r2.geoms.orig.extent.max, [0, 6]);
+      assert.deepEqual(head.extent(r1).max, [0, 6]);
+      assert.deepEqual(head.extent(r2).max, [0, 6]);
     });
 
     it('builds a relation in a cycle with a multipolygon from the multipolygon\'s new shape', () => {
@@ -595,8 +596,8 @@ describe('Graph', () => {
       const base = new Rapid.Graph(context, [a, b, c, x, w, r3, r4]);
       const head = new Rapid.Graph(base).replace(c.move([5, 5]));
       head.commit();
-      assert.deepEqual(r3.geoms.orig.extent.max, [5, 5]);
-      assert.deepEqual(r4.geoms.orig.extent.max, [5, 5]);
+      assert.deepEqual(head.extent(r3).max, [5, 5]);
+      assert.deepEqual(head.extent(r4).max, [5, 5]);
     });
   });
 
@@ -674,7 +675,7 @@ describe('Graph', () => {
       const g2 = new Rapid.Graph(g1);
       assert.isTrue(g2.hasPendingChanges);
       g2.commit();
-      assert.deepEqual(w1.geoms.orig.extent.max, [2, 0]);
+      assert.deepEqual(g2.extent(w1).max, [2, 0]);
     });
   });
 
@@ -736,7 +737,7 @@ describe('Graph', () => {
       assert.isFalse(head.isLocal('w1'));
       assert.isFalse(head.isLocal('n1'));
       assert.deepEqual(head.parentWays(n3), []);
-      assert.deepEqual(w1.geoms.orig.extent.max, [1, 0]);
+      assert.deepEqual(head.extent(w1).max, [1, 0]);
       assert.isFalse(head.hasPendingChanges);
     });
 

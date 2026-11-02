@@ -191,6 +191,28 @@ describe('Graph bugs pinned for later steps', () => {
       assert.isTrue(b.isEndpoint(staging));
     });
 
+    it('step 2: isShared sees a second way that arrives in a later tile', async () => {
+      const { context, editor } = await makeEditor();
+      const node = (id, loc) => new Rapid.OsmNode(context, { id: id, loc: loc, version: '1' });
+      const way = (id, nodes) => new Rapid.OsmWay(context, { id: id, nodes: nodes, tags: { highway: 'residential' }, version: '1' });
+
+      // The first tile has `w1`, ending at `n2` on the tile's edge
+      editor.merge([node('n1', [0, 0]), node('n2', [1, 0]), way('w1', ['n1', 'n2'])]);
+      const n2 = editor.staging.graph.entity('n2');
+      assert.isFalse(n2.isShared(editor.staging.graph));   // memoized as `false`
+
+      // The next tile has `w2`, which starts at `n2` too
+      let mergedIDs = new Set();
+      editor.on('merge', entityIDs => { mergedIDs = entityIDs; });
+      editor.merge([node('n2', [1, 0]), node('n3', [2, 0]), way('w2', ['n2', 'n3'])]);
+
+      assert.strictEqual(editor.staging.graph.entity('n2'), n2);   // the same object, so the memo must be cleared
+      assert.isTrue(n2.isShared(editor.base.graph));
+      assert.isTrue(n2.isShared(editor.stable.graph));
+      assert.isTrue(n2.isShared(editor.staging.graph));
+      assert.isTrue(mergedIDs.has('n2'));   // so the renderer restyles its vertex
+    });
+
     it('step 2: presetMatch answers for the graph asked', () => {
       const context = new Rapid.MockContext();
       const schema = new Rapid.SchemaSystem(context);
@@ -329,8 +351,8 @@ describe('Graph bugs pinned for later steps', () => {
   });
 
 
-  describe('step 6: geometry and versions in records', () => {
-    it.todo('step 6: a way keeps its shape in base and stable while staging moves its node', () => {
+  describe('step 6: geometry in records', () => {
+    it('step 6: a way keeps its shape in base and stable while staging moves its node', () => {
       const context = new Rapid.MockContext();
       const a = new Rapid.OsmNode(context, { id: 'a', loc: [0, 0] });
       const b = new Rapid.OsmNode(context, { id: 'b', loc: [1, 0] });
@@ -347,7 +369,7 @@ describe('Graph bugs pinned for later steps', () => {
       assert.deepEqual(rounded(extentIn(base, base.entity('w'))), [0, 0, 1, 0]);
     });
 
-    it.todo('step 6: validators on stable see stable\'s shapes while the user drags in staging', async () => {
+    it('step 6: validators on stable see stable\'s shapes while the user drags in staging', async () => {
       const { editor } = await makeEditor();
       const context = editor.context;
       editor.merge([

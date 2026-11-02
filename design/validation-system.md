@@ -11,8 +11,9 @@ autoconnect (accepting a Rapid feature with `poweruser.autoConnect`) crashed wit
 > **Status:** Audit done. Fixed: the autoconnect crash, the split-edge problem in `actionAddMidpoint`,
 > a throwing validator hiding other issues, Autofix All's transaction, fixes that assumed the graph
 > they were found on, `missing_tag`'s severity, side effects while detecting, the user's edits near
-> data that wasn't loaded, and the smaller items. Open: shared geometry and the wrong spatial index
-> (see [Rollout](#rollout)).
+> data that wasn't loaded, the smaller items, and shared geometry (each graph keeps its own shapes
+> since step 6 of [`graph-geometry.md`](graph-geometry.md); shapes after a rebase are its step 8).
+> Open: the wrong spatial index (see [Rollout](#rollout)).
 
 ## Words used here
 
@@ -49,9 +50,11 @@ committed.
 - A node's geometry (`entity.geoms`, world coordinates) is always current: nodes are immutable, and
   each new node computes its geometry when it's constructed. Validators can rely on it.
 - Way and relation geometry depends on their child nodes (and their tags: a way can change from line
-  to area), so it's updated only by `graph.commit()`, for what changed since the last commit.
-- **Way and relation geometry is kept on the entity objects, and the graphs share those objects.** A
-  commit on one graph rewrites the geometry that base, stable and staging see (audit finding 1).
+  to area), so it's updated by `graph.commit()`, for what changed since the last commit.
+  `graph.geometry(entity)` commits first, so it's current even in the middle of an action.
+- **Each graph keeps its own way and relation geometry** (since November 2026; before, it was kept on
+  the entity objects that every graph shares, audit finding 1). Read it with `graph.geometry(entity)`
+  or `graph.extent(entity)`: a way's or a relation's `geoms` and `extent()` throw.
 - The OSM spatial indexes (`editor_base`, `editor_stable`, `editor_staging`, and their `-segments`
   indexes) are updated by `EditSystem` after an action finishes (`_emitChanges`), never during one.
   `editor.waySegments(extent, graph)` picks the index by graph and falls back to staging for any
@@ -74,13 +77,16 @@ the code; the repros were kept outside the repo.
   segment, or one segment crossing two roads.
 
 **Open, most severe first:**
-1. **Shared geometry** (checked). Geometry lives on entity objects that every graph shares (see above).
+1. ✅ **Shared geometry** (checked; fixed in step 6 of [`graph-geometry.md`](graph-geometry.md)).
+   Geometry lived on entity objects that every graph shares.
    Moving a node and undoing leaves the way's extent where the node was moved to. Validators that read
    geometry while detecting judge the wrong shape: `unsquare_way` (squareness), `close_nodes` (size),
    `outdated_tags` and `mismatched_geometry` (location), and `ValidationCache.withAllRelatedEntities`.
    `ambiguous_crossing_tags` commits a snapshot of the graph it's checking, which recomputes the
    geometry of every edited entity (so validating one way costs as much as all edits; quadratic over a
    session) and rewrites geometry that staging sees.
+   Now each graph keeps its own shapes in its records, so a snapshot's commit changes only the
+   snapshot. Shapes after a rebase are that design's step 8.
 2. **The wrong spatial index** (checked). Inside an action, `waySegments` returns the segments from
    before the action. In `ValidationSystem`, a queued job validates the graph that was stable when it
    was queued; once the user commits again, that graph gets the staging index, and `almost_junction`
@@ -181,7 +187,8 @@ What a validator needs, so it can be run on any graph (including one inside an a
 3. ✅ The smaller items (finding 8) (Oct 2026).
 4. ✅ Fixes look up their entities in the graph they run on (the rest of finding 4) (Oct 2026).
 5. Validate with the right spatial index (finding 2), with one runner for autoconnect and Autofix All.
-6. Geometry per graph (finding 1). The biggest change: it's about `Graph` and the data classes, not
-   only validation. Designed in [`graph-geometry.md`](graph-geometry.md), with finding 2.
+6. ✅ Geometry per graph (finding 1). The biggest change: it's about `Graph` and the data classes, not
+   only validation. Designed in [`graph-geometry.md`](graph-geometry.md), with finding 2; done in its
+   step 6 (Nov 2026), except shapes after a rebase (its step 8).
 7. ✅ Validate the user's edits again when data loads near them (finding 6), and no side effects while
    detecting (finding 7) (Oct 2026).

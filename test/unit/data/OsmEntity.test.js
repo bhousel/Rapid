@@ -160,19 +160,22 @@ describe('OsmEntity', () => {
       const n2 = new Rapid.OsmNode(context, { id: 'n2', loc: [1, 0] });
       const w1 = new Rapid.OsmWay(context, { id: 'w1', nodes: ['n1', 'n2'] });
       const base = new Rapid.Graph(context, [n1, n2, w1]);
-      w1.updateGeometry(base);
 
-      const oldGeoms = w1.geoms;
+      const oldGeoms = base.geometry(w1);
       const oldPart = oldGeoms.parts[0];   // e.g. held by a Pixi feature
       const oldWorld = oldPart.world;
 
+      // Another graph's shape goes in its own record: the base's stays as it was.
       const graph = new Rapid.Graph(base);
-      graph.replace(n2.move([5, 5]));
-      w1.updateGeometry(graph);
+      graph.replace(n2.move([5, 5])).commit();
+      assert.notStrictEqual(graph.geometry(w1), oldGeoms);
+      assert.deepEqual(graph.geometry(w1).parts[0].orig.coords, [[0, 0], [5, 5]]);
+      assert.strictEqual(base.geometry(w1), oldGeoms);
 
-      assert.notStrictEqual(w1.geoms, oldGeoms);
-      assert.notStrictEqual(w1.geoms.parts[0], oldPart);
-      assert.deepEqual(w1.geoms.parts[0].orig.coords, [[0, 0], [5, 5]]);
+      // A base graph rebuilding it stores a new Geometry on the object.
+      w1.updateGeometry(base);
+      assert.notStrictEqual(w1.baseGeometry, oldGeoms);
+      assert.notStrictEqual(w1.baseGeometry.parts[0], oldPart);
 
       assert.lengthOf(oldGeoms.parts, 1);
       assert.isObject(oldGeoms.world);

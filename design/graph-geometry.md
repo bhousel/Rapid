@@ -7,7 +7,7 @@ of the change. This design fixes findings 1 (shared geometry) and 2 (the wrong s
 [validation audit](validation-system.md#the-october-2026-audit), the bugs listed below, and the cost of
 keeping versions. It gives Rapid one way to ask for anything's geometry: `graph.geometry(entity)`.
 
-> **Status:** In progress (October 2026): steps 0-5 done. After step 3 the rest was put in a new
+> **Status:** In progress (October 2026): steps 0-6 done. After step 3 the rest was put in a new
 > order (November 2026): backups first, then derived data in records in two steps. Measured in two rounds: a survey of
 > today's costs and bugs, then three competing designs, each prototyped and reviewed for correctness
 > and for performance (in JavaScriptCore and V8). See [Open questions](#open-questions).
@@ -207,7 +207,7 @@ Each answer lives with what it depends on:
 | `presetMatch`, `vertexMatch` | tags, plus point or vertex, address line and location from the graph | on the object, keyed by those inputs and the schema generation (preset location sets only change when the schema merges) | same |
 | `isInteresting` | relation membership, tags | not memoized (0.17 µs; it guards deletions) | same |
 | Hull, centroid, POI, area, coverage | one part's shape | on the immutable `GeometryPart` | same |
-| Version ("rerender it") | all of the above | the object's `v` or the base's | in the record |
+| What to redraw | the entity and its geometry | (no version: the renderer compares objects, section 4) | same |
 
 - **The base's derived data lives on the base object.** A base object belongs to one lineage, which
   is the only writer of those fields (at rebase and schema changes). A separate base map would add a
@@ -244,15 +244,14 @@ Each answer lives with what it depends on:
   `graph.extent(entity)` replaces `entity.extent()`. For a node it's an `instanceof` check (free) and
   the node's own geometry: a node's shape depends only on the node, so it's never stored per graph.
 
-### 4. Rendering: `v` still means "rerender it", per graph
+### 4. Rendering: a feature rebinds when its entity or its shape is a different object
 
-`graph.version(entity)` is the record's version, else the base's, else `entity.v`. It changes whenever
-something meaningful about the entity changes in that graph: its props (a new object, as today), or
-its geometry or topology (a new record, at commit or rebase).
+(Decided in step 6, November 2026, in place of a `graph.version(entity)`.) A changed shape is always
+a new `Geometry` with new parts (geometry is never changed after it's stored), and a changed entity is
+a new object. So `PixiLayerOsm` binds each feature to its entity and `graph.geometry(entity).parts[i]`,
+and binds again when either is a different object. No version numbers, in records or on objects.
 
-- `PixiLayerOsm` keeps its `feature.v !== version` checks, with `graph.version(entity)`, and binds
-  `graph.geometry(entity).parts[i]`.
-- Undo works by construction: the older graph's records carry their own geometry and older versions.
+- Undo works by construction: the older graph's records carry their own geometry.
 - `stagingchange` carries the IDs whose records changed, and `merge` the downloaded IDs plus every ID
   whose base data changed. `MapSystem` marks them dirty and redraws. That covers changes in topology
   only (a vertex becoming shared, a new multipolygon member).
@@ -444,8 +443,9 @@ write cached geometry outside `modules/data/`:
   plus `utilTotalExtent` (16, all pass a graph) and `ValidationIssue.extent(graph)` (4).
   `SpatialSystem.replaceData` takes every index's boxes from `geoms.world.extent`.
 - **Rendering keeps `GeometryPart` references.** Pixi features bind `entity.geoms.parts[i]` and rebind
-  when `entity.v` changes; `PixiLayerLabels` reads them too. They'll bind
-  `graph.geometry(entity).parts[i]` and rebind when `graph.version(entity)` changes.
+  when `entity.v` changes; `PixiLayerLabels` reads them too. Since step 6, `PixiLayerOsm` binds
+  `graph.geometry(entity).parts[i]` and rebinds when the entity or the part is a different object
+  (section 4). The other layers still rebind on `v` until step 10.
 
 ## Rollout
 
@@ -655,9 +655,8 @@ records (now 6 and 7), 5 rebase (now 8), 6 spatial indexes (now 9), 7 backups (n
        `affects()` against a fresh `Difference` after every step. Relations there are now multipolygons
        too (with node and relation members only: building a multipolygon needs every node of its member
        ways, which real data has and random histories don't).
-6. **Geometry and versions in records.**
-   - Records get geometry and versions. Base data lives on base objects. `graph.version(entity)`
-     arrives.
+6. **Geometry in records.** (Planned as "geometry and versions": versions turned out unneeded, section 4.)
+   - Records get geometry. Base data lives on base objects.
    - `entity.geoms`, `extent()` and `intersects()` throw on ways and relations (nodes keep theirs), so a
      reader that didn't move fails loudly instead of reading another graph's shape.
    - `MapSystem` and `EditSystem` stop touching objects in place; `PixiLayerOsm` rebinds on
@@ -665,6 +664,35 @@ records (now 6 and 7), 5 rebase (now 8), 6 spatial indexes (now 9), 7 backups (n
    - `graph.verify()` (see Testing) arrives here, since this is where derived data can be stale in one
      graph and not another.
    - This fixes shared geometry (finding 1).
+   - **Done.** Speed is unchanged at L=20k: an edit 0.04 ms, a MoveMode frame 0.03-0.06 ms, undo and redo
+     0.05-0.06 ms, in Bun and V8; the history heap went from 68 to 72 MB (Bun). What changed, and what
+     was decided while landing it:
+     - `GraphRecord.geometry`: a commit stores the shapes of its closure there, and only the lineage's
+       base Graph (`GraphLineage.baseGraph`, which every rebase builds shapes with) stores them on base
+       objects, as `entity.baseGeometry`. `graph.geometry(entity)` is the record's shape, else the
+       base object's; a node's is its own. `OsmEntity.buildGeometry(graph)` builds one without storing it.
+     - `graph.geometry()` commits uncommitted writes first, so a graph read in the middle of a write
+       (`move`, `outdated_tags`, `orthogonalize.disabled`) answers with its current shapes.
+     - `geoms`, `extent()` and `intersects()` throw on ways and relations. What still read them directly
+       were tests, and `SpatialSystem.replaceData`, which now takes the Graph for OSM data
+       (`EditSystem`'s indexes and `MapWithAIService`'s).
+     - No `graph.version()` (section 4): `PixiLayerOsm` compares the bound entity and part. `MapSystem`
+       marks `complete()` dirty on `stagingchange` instead of touching it, and on `merge` clears the
+       filter cache of what's on the tile, which a touch of a relation gaining members used to do.
+       Nothing in `EditSystem` or `MapSystem` touches an object any more.
+     - `geometryWriter` and the emit's recompute are gone, and with them `EmitState.graph`.
+     - A savepoint keeps the records themselves, with a new owner token so later writes copy what they
+       change: a rollback restores entities, parent lists and shapes exactly, without recomputing.
+     - `graph.verify(ids?)` builds shapes from scratch and compares them. The model test (step 4) checks
+       every graph with it, in histories without rebases (shapes after a rebase are step 8), and fails at
+       once if shapes go back onto shared objects, a savepoint keeps the owner token, or a record drops
+       its shape on the next write.
+     - The two step 6 `todo` tests pass: a way keeps its shape in base and stable while staging moves
+       its node, and validators on stable see stable's shapes during a drag.
+     - In the debug Chrome on Seattle data, a drag changed only staging's shape; the drawn road was bound
+       to the current graph's shape after the drag, a commit, undo and redo. `verify()` over the 13.8k
+       entities in view found 89 relations whose members arrived in a later tile (the base never rebuilds
+       them, step 8), and nothing else.
 7. **Memoized answers in records.**
    - Topology answers for IDs a graph changed are stored in its records, on first read.
    - The lineage's set of IDs whose topology changed goes, and with it `graph.canShareAnswers()`. The
@@ -678,7 +706,8 @@ records (now 6 and 7), 5 rebase (now 8), 6 spatial indexes (now 9), 7 backups (n
    diff correction (no cache to start with). `spatialIDForGraph` goes, and `_validateEditsNearAsync`
    queries the stable overlay. This fixes finding 2 by construction.
 10. **Other data.** Rapid datasets, then GeoJSON and markers, as lineages; services stop changing data
-    in place.
+    in place. Their layers then rebind by object, like `PixiLayerOsm`, and `touch()`, `v` and
+    `AbstractPixiFeature.v` go.
 
 Then, each measured on its own:
 - **Slim nodes.** World coordinates live on the node; a full `Geometry` is built only when asked for,
@@ -718,6 +747,11 @@ Then, each measured on its own:
 
 - **Memory of big shapes in the history:** each version keeps the geometry of what it changed (0.4 MB
   per edit of a 2,010-node multipolygon). Drop it from versions far back, and recompute it on undo?
+  Measured after step 6 (V8): moving vertices of a 2,000-node way keeps about 0.6 MB per edit (28.5 MB
+  for 50; before step 6, 0.2 MB, because only the newest shape existed). Tag edits on it keep about
+  1 MB each, as before step 6 (each new way object got its own shape). A `GeometryPart` takes about
+  285 B per coordinate: storing coordinates as `Float64Array`s, and only the projections that are read,
+  would cut both, and help slim nodes too.
 - **Which graphs to validate, after step 9:** once any graph is answered correctly, should validation
   check the graph captured when a round starts, instead of following the current stable? That graph
   would live through rebases, so step 8's rule (section 5) would need it brought up to date too, or

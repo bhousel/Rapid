@@ -283,14 +283,17 @@ describe('MapSystem', () => {
 
 
   describe('stagingchange', () => {
-    it('clears the filter cache entries of the changed entities', async () => {
+    it('clears the filter cache entries of the changed entities, and marks them dirty without changing them', async () => {
       const ctx = new Rapid.MockContext();
       const editor = new Rapid.MockSystem(ctx);
       const filters = new Rapid.FilterSystem(ctx);
+      const gfx = new Rapid.MockGfxSystem(ctx);
+      const dirtied = [];
+      gfx.scene.dirtyData = (layerID, dataIDs) => dirtied.push(layerID, ...dataIDs);
       ctx.systems = {
         editor:  editor,
         filters: filters,
-        gfx:     new Rapid.MockGfxSystem(ctx)
+        gfx:     gfx
       };
 
       const n1 = new Rapid.OsmNode(ctx, { id: 'n1', loc: [0, 0], tags: { amenity: 'bench' } });
@@ -307,9 +310,9 @@ describe('MapSystem', () => {
       const difference = { complete: () => new Map([['n1', n1]]), didChange: {} };
       editor.emit('stagingchange', difference);
 
-      assert.notStrictEqual(n1.key, oldKey);
+      assert.strictEqual(n1.key, oldKey);   // other graphs share the object, so it isn't touched
       assert.notProperty(filters._cache, oldKey);
-      assert.notProperty(filters._cache, n1.key);
+      assert.deepEqual(dirtied, ['osm', 'n1']);
     });
   });
 

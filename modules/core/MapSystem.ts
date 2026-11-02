@@ -137,6 +137,14 @@ export class MapSystem extends AbstractSystem {
         editor
           .on('merge', (entityIDs: EntityID[]) => {
             if (entityIDs) {
+              // New data can change what was matched for what's on the tile (e.g. a relation gaining members).
+              const graph = editor.staging.graph!;
+              for (const entityID of entityIDs) {
+                const entity = graph.hasEntity(entityID);
+                if (entity) {
+                  filters?.clearEntity(entity);
+                }
+              }
               scene.dirtyData('osm', entityIDs);
             }
             // Do we need this here?  OsmService calls `deferredRedraw` as tiles are loaded.
@@ -145,13 +153,16 @@ export class MapSystem extends AbstractSystem {
           })
           .on('stagingchange', (difference: Difference) => {
             // `EditSystem` emits with staging's geometry already current, so there's nothing to recompute.
+            // The renderer binds each feature to its entity and its part of staging's geometry, and
+            // binds again when either is a different object. These are marked dirty to restyle them,
+            // since what changed may be only their topology (a vertex that's now shared).
             const complete = difference.complete();
             for (const entity of complete.values()) {
               if (entity) {      // may be undefined if entity was deleted
-                filters?.clearEntity(entity);  // clear feature filter cache (before touch, it's keyed on `entity.key`)
-                entity.touch();  // bump .v in place, rendering code will pick it up as dirty
+                filters?.clearEntity(entity);  // clear feature filter cache
               }
             }
+            scene.dirtyData('osm', [...complete.keys()]);
             gfx.immediateRedraw();
           })
           .on('historyjump', (prevIndex: number, currIndex: number) => {

@@ -19,8 +19,8 @@ type Before = OsmEntity | undefined | typeof NOT_LOCAL;
 
 /** What a base Graph and every Graph derived from it share */
 interface GraphLineage {
-  /** The Graph that recomputed geometry last */
-  geometryWriter: Graph | null;
+  /** The base Graph: the only one that writes the geometry stored on base objects */
+  baseGraph: Graph;
   /** IDs whose topology some Graph has changed, so answers about them can differ between Graphs */
   topologyChanged: Set<EntityID>;
   /** The slot of each ID that some Graph has a record for, given out on its first write */
@@ -42,6 +42,8 @@ interface GraphRecord {
   parentWays: EntityID[] | null;
   /** Relations that this Graph has its own version of, which have this ID as a member */
   parentRels: EntityID[] | null;
+  /** This Graph's shape of the way or relation, stored by its commits (else it's the base object's) */
+  geometry: Geometry | null;
 }
 
 
@@ -79,6 +81,10 @@ export interface GraphCache {
  * a Graph shares the vector (O(1)), a write copies only the path to its slot, and comparing two
  * Graphs skips what they share. A Graph's parent ways (and relations) of an ID are base's, except
  * those it has its own version of, plus its own that contain the ID.
+ *
+ * Shapes follow the same rule: a commit stores the shapes of what it changed (and of the ways and
+ * relations that contain it) in this Graph's records, and only the base Graph stores shapes on the
+ * base objects. So every Graph answers `geometry()` for itself, and undo needs nothing recomputed.
  *
  * In previous versions of the code, `Graph` was written in an immutable style,
  * so that calls to `replace`/`remove`/`revert` would return a new `Graph`.
@@ -118,8 +124,8 @@ export class Graph {
   protected _pending: Map<EntityID, Before>;
   /** IDs written since this Graph was derived */
   protected _journal: Set<EntityID>;
-  /** What each ID written since the savepoint began held before its first write, while one is active */
-  protected _savepoint: Map<EntityID, Before> | null;
+  /** The records when the savepoint began, while one is active */
+  protected _savepoint: PersistentVector<GraphRecord> | null;
   /** Whether this Graph is in the edit history, so it may no longer change */
   protected _frozen: boolean;
   /** Shared by a base Graph and every Graph derived from it */
@@ -160,7 +166,7 @@ export class Graph {
       this.isBaseGraph = true;
       this._pending = new Map<EntityID, Before>();
       this._lineage = {
-        geometryWriter: null,
+        baseGraph: this,
         topologyChanged: new Set<EntityID>(),
         slots: new Map<EntityID, number>(),
         slotIDs: []
@@ -284,20 +290,10 @@ export class Graph {
   }
 
   /**
-   * The Graph of this lineage that recomputed geometry last. Geometry still lives on the entity
-   * objects that every Graph shares, so their shapes are that Graph's (until step 4 of the design).
-   * @return  The Graph, or `null` if none has yet
-   * @readonly
-   */
-  public get geometryWriter(): Graph | null {
-    return this._lineage.geometryWriter;
-  }
-
-  /**
    * Whether answers about an entity that depend on the Graph (its parents, its shape) are the same
    * in this Graph as in every other Graph of its lineage, so they may be memoized on the entity.
    * They aren't once any Graph has changed the entity's topology, or while this Graph has
-   * uncommitted writes. (Step 4 of the design stores them per Graph instead.)
+   * uncommitted writes. (Step 7 of the design stores them per Graph instead.)
    * @param entityID - The entity's ID
    * @return `true` if answers about it may be memoized on the entity
    */
@@ -395,14 +391,19 @@ export class Graph {
    * Returns the geometry of an entity, as it is in this Graph.
    * Like `parentWays` and `childNodes`, it takes the entity, not its ID: callers with an ID use
    * `graph.geometry(graph.entity(id))`.
-   * For now it returns the geometry stored on the entity, which every Graph holding that object
-   * shares; step 4 of design/graph-geometry.md gives each Graph its own. Read geometry through this
-   * method, so that change won't need the callers to change.
-   * @param   entity - The entity to get the geometry of
+   * A node's geometry is its own. A way or a relation has this Graph's shape if one of its commits
+   * stored one (it changed the entity, or something in it), else the shape the base built.
+   * Uncommitted writes are committed first, so the answer is always current.
+   * @param   entity - The entity to get the geometry of (this Graph's version of it)
    * @return  Its Geometry
    */
   public geometry(entity: OsmEntity): Geometry {
-    return entity.geoms;
+    if (entity.type === 'node') return entity.geoms;
+
+    if (this._pending.size) {
+      this.commit();
+    }
+    return this._getRecord(entity.id)?.geometry ?? entity.baseGeometry;
   }
 
 
@@ -590,13 +591,18 @@ export class Graph {
       throw new Error(`Do not begin a savepoint on a graph with uncommitted writes`);
     }
     this._assertWritable('beginSavepoint');
-    this._savepoint = new Map<EntityID, Before>();
+
+    // Keep the records as they are. A new owner token makes the writes after this copy what they
+    // change, so nothing changes the kept records in place.
+    this._savepoint = this._records;
+    this._owner = {};
   }
 
 
   /**
-   * Returns the Graph to how it was when the savepoint began, and recomputes what that changes.
-   * Only the Graph's entities are restored; the IDs stay in the journal.
+   * Returns the Graph to how it was when the savepoint began: its entities, parent lists and
+   * shapes, all from the records kept then. The IDs stay in the journal.
+   * The savepoint stays active, at the Graph as it is now.
    * @throws  Will throw if no savepoint is active
    */
   public rollbackToSavepoint(): void {
@@ -605,25 +611,9 @@ export class Graph {
       throw new Error(`No savepoint to roll back to`);
     }
 
-    const changes = new Map<EntityID, DifferenceChange>();
-    for (const [entityID, before] of savepoint) {
-      const current = this.hasEntity(entityID);
-      if (before === NOT_LOCAL) {
-        this._setLocal(entityID, false, undefined, false);
-      } else {
-        this._setLocal(entityID, true, before, false);
-      }
-      const restored = this.hasEntity(entityID);
-      if (current === restored) continue;   // e.g. created and removed again
-
-      changes.set(entityID, { base: current, head: restored });
-    }
-
+    this._records = savepoint;
+    this._owner = {};
     this._pending.clear();
-    savepoint.clear();
-    const closureIDs = new Set<EntityID>(completeFrom(this, changes, true).keys());
-    this._markTopologyChanged(closureIDs);
-    this.recomputeGeometry(closureIDs);
     this.touch();
   }
 
@@ -751,7 +741,7 @@ export class Graph {
     }
 
     this._clearStaleAnswers(newIDs, replaced);
-    this.recomputeGeometry(newIDs);
+    this._lineage.baseGraph.recomputeGeometry(newIDs);   // shapes on base objects are the base's
     return restored;
   }
 
@@ -1000,9 +990,10 @@ export class Graph {
       entity: prev?.entity,
       parentWays: prev?.parentWays ?? null,
       parentRels: prev?.parentRels ?? null,
+      geometry: prev?.geometry ?? null,
       ...changes
     };
-    const isEmpty = !next.isLocal && !next.parentWays && !next.parentRels;   // says nothing different from base
+    const isEmpty = !next.isLocal && !next.parentWays && !next.parentRels && !next.geometry;   // says nothing different from base
     this._records = vectorSet(this._records, slot, isEmpty ? undefined : next, this._owner);
   }
 
@@ -1019,14 +1010,14 @@ export class Graph {
 
 
   /**
-   * Recomputes the geometry of the given ways and relations (nodes keep their own).
+   * Recomputes the geometry of the given ways and relations (nodes keep their own), as they are in
+   * this Graph: a base Graph stores it on the base objects, any other Graph in its own records.
    * Ways go first, then relations with their member relations before them,
    * so a relation is never built from a member's stale shape.
    * This needs to be called after all `_updateCaches` calls have finished.
    * @param entityIDs - IDs of the entities to recompute
    */
   public recomputeGeometry(entityIDs: Iterable<EntityID>): void {
-    this._lineage.geometryWriter = this;
     const relations = new Map<EntityID, OsmRelation>();
     for (const entityID of entityIDs) {
       const entity = this.hasEntity(entityID);
@@ -1035,7 +1026,7 @@ export class Graph {
       if (entity.type === 'relation') {
         relations.set(entityID, entity as OsmRelation);
       } else {
-        entity.updateGeometry(this);
+        this._storeGeometry(entity);
       }
     }
 
@@ -1047,7 +1038,7 @@ export class Graph {
     const done = new Set<EntityID>();
     for (const relation of relations.values()) {
       if (relation.isMultipolygon()) {
-        relation.updateGeometry(this);
+        this._storeGeometry(relation);
         done.add(relation.id);
       }
     }
@@ -1059,7 +1050,7 @@ export class Graph {
         const child = relations.get(member.id);
         if (child) visit(child);
       }
-      relation.updateGeometry(this);
+      this._storeGeometry(relation);
     };
 
     for (const relation of relations.values()) {
@@ -1069,19 +1060,53 @@ export class Graph {
 
 
   /**
+   * Internal function, builds an entity's geometry as it is in this Graph and stores it: on the
+   * object for a base Graph, in this Graph's record otherwise.
+   * @param entity - The way or relation
+   */
+  protected _storeGeometry(entity: OsmEntity): void {
+    if (this.isBaseGraph) {
+      entity.updateGeometry(this);
+    } else {
+      entity.clearMemos();
+      this._writeRecord(entity.id, { geometry: entity.buildGeometry(this) });
+    }
+  }
+
+
+  /**
+   * Checks this Graph's shapes against shapes built from scratch, for tests and debugging.
+   * Each way and relation that `ids` lists (by default every one this Graph or its base has) is built
+   * again, and compared with `geometry()` by its world coordinates.
+   * @param ids - The IDs to check, or all of them
+   * @return A description of each shape that differs (empty if they all match)
+   */
+  public verify(ids?: Iterable<EntityID>): string[] {
+    const problems: string[] = [];
+    const toCheck = ids ?? new Set<EntityID>([...this.base.entities.keys(), ...this.localEntities().keys()]);
+    for (const entityID of toCheck) {
+      const entity = this.hasEntity(entityID);
+      if (!entity || entity.type === 'node') continue;
+
+      const stored = JSON.stringify(this.geometry(entity).parts.map(part => part.world?.coords));
+      const built = JSON.stringify(entity.buildGeometry(this).parts.map(part => part.world?.coords));
+      if (stored !== built) {
+        problems.push(`${this.id}: ${entityID} has a stale shape`);
+      }
+    }
+    return problems;
+  }
+
+
+  /**
    * Internal function, records a write to an ID before it happens:
-   * what it held before, for the next commit and the savepoint, and the ID in the journal.
+   * what it held before, for the next commit, and the ID in the journal.
    * @param entityID - The ID about to be written
    */
   protected _noteWrite(entityID: EntityID): void {
-    const record = this._getRecord(entityID);
-    const before: Before = record?.isLocal ? record.entity : NOT_LOCAL;
-
     if (!this._pending.has(entityID)) {
-      this._pending.set(entityID, before);
-    }
-    if (this._savepoint && !this._savepoint.has(entityID)) {
-      this._savepoint.set(entityID, before);
+      const record = this._getRecord(entityID);
+      this._pending.set(entityID, record?.isLocal ? record.entity : NOT_LOCAL);
     }
     this._journal.add(entityID);
   }

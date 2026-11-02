@@ -1,5 +1,5 @@
 import { AbstractSystem } from './AbstractSystem.ts';
-import { completeFrom, Difference, Edit, Graph, SessionDifference } from '../lib/index.ts';
+import { Difference, Edit, Graph, SessionDifference } from '../lib/index.ts';
 import { easeLinear } from 'd3-ease';
 import { Extent, geoScaleToZoom, projWgs84ToWorld } from '@rapid-sdk/math';
 import { OsmEntity, createOsmEntity } from '../data/index.ts';
@@ -10,9 +10,8 @@ import { utilObjectOmit } from '@rapid-sdk/util';
 import type { Context } from '../Context.ts';
 import type { Action } from '../actions/types.ts';
 import type { DatabaseSystem } from './DatabaseSystem.ts';
-import type { DifferenceChange } from '../lib/Difference.ts';
 import type { EditProps, EditSources, LegacyEditSelection } from '../lib/Edit.ts';
-import type { OsmEntityProps, OsmNode, OsmRelation, OsmTags, OsmWay, Segment } from '../data/types.ts';
+import type { OsmEntityProps, OsmNode, OsmTags, OsmWay, Segment } from '../data/types.ts';
 import type { ParsedElement } from '../data/parsers/types.ts';
 import type { SpatialItem } from './SpatialSystem.ts';
 import type { TransformProps, Vec2 } from '@rapid-sdk/math';
@@ -48,8 +47,6 @@ interface Checkpoint {
  * The entity an ID had then is `values.get(id)` if `values` has it, else `from.hasEntity(id)`.
  */
 interface EmitState {
-  /** The graph that was emitted */
-  graph: Graph;
   /** A frozen graph that holds the emitted entities for every ID not in `values` */
   from: Graph;
   /** The emitted entities that `from` doesn't hold */
@@ -525,10 +522,10 @@ export class EditSystem extends AbstractSystem {
     this._osmSegmentIDs = new Map();
 
     this._stableKey = baseGraph.key;
-    this._emittedStable = { graph: baseGraph, from: baseGraph, values: new Map() };
+    this._emittedStable = { from: baseGraph, values: new Map() };
     this._stableCandidates.clear();
     this._stagingKey = currGraph.key;
-    this._emittedStaging = { graph: currGraph, from: baseGraph, values: new Map() };
+    this._emittedStaging = { from: baseGraph, values: new Map() };
     this._stagingCandidates.clear();
     this._fullDifference = new SessionDifference(baseGraph, baseGraph);
 
@@ -992,7 +989,6 @@ export class EditSystem extends AbstractSystem {
     const context = this.context;
     const baseGraph = this.base.graph!;
     const stagingGraph = this.staging.graph!;
-    const newIDs = new Set<EntityID>();
 
     // Collect the Entities, create if necessary...
     const entities: OsmEntity[] = [];
@@ -1004,11 +1000,6 @@ export class EditSystem extends AbstractSystem {
         entity = createOsmEntity(context, entityOrProps);
       }
       entities.push(entity);
-
-      // Which ones are really new (not in the Base Graph)?
-      if (!baseGraph.hasEntity(entity.id)) {
-        newIDs.add(entity.id);
-      }
     }
     if (!entities.length) return;  // nothing to do
 
@@ -1027,18 +1018,9 @@ export class EditSystem extends AbstractSystem {
       effectiveSeenIDs = new Set<EntityID>(entities.map(entity => entity.id));
     }
 
-    // If we are merging in new relation members, bump the relation's version.
-    for (const id of effectiveSeenIDs) {
-      const entity = stagingGraph.hasEntity(id);
-      if (entity?.type !== 'relation') continue;
-
-      const relation = entity as OsmRelation;
-      for (const member of relation.members) {
-        if (newIDs.has(member.id)) {
-          relation.touch();  // bump version in place
-        }
-      }
-    }
+    // (A relation whose members arrive is on the tile, so it's in `seenIDs`: listeners of 'merge'
+    // redraw it and drop what they cached about it. It used to be touched here, which changed the
+    // object that every graph shares.)
 
     // Every graph we may return to: the history, the histories saved in checkpoints,
     // the return edit, and staging. Staging isn't in the history yet, but it represents
@@ -2851,7 +2833,7 @@ export class EditSystem extends AbstractSystem {
     }
 
     spatial.removeItems(spatialID, toRemove);
-    spatial.replaceData(spatialID, toReplace);
+    spatial.replaceData(spatialID, toReplace, graph);
 
     // Keep way segments in sync for any affected ways.
     for (const entityID of toRemove) {
@@ -2887,7 +2869,7 @@ export class EditSystem extends AbstractSystem {
       }
     }
 
-    spatial.replaceData(spatialID, toReplace);
+    spatial.replaceData(spatialID, toReplace, graph);
 
     for (const entity of toReplace) {
       if (entity.type === 'way') {
@@ -3008,38 +2990,12 @@ export class EditSystem extends AbstractSystem {
         .union(stagingGraph.changedIDs);
       stagingDifference = new Difference(emitted.from, stagingGraph, candidates, emitted.values);
 
-      // A replaced staging graph (undo, redo, revert, commit, …) wasn't committed against,
-      // so the shared objects may hold another graph's shapes. Recompute everything written since
-      // the last emit, not only what differs from it: a commit in between (e.g. in a transaction
-      // that then undid it) may have left an intermediate version's shapes.
-      // When the last graph to recompute shapes is the one emitted last (a commit, undo, redo or
-      // revert after a perform), only what differs from that graph needs recomputing.
-      if (stagingGraph !== emitted.graph) {
-        const writer = stagingGraph.geometryWriter;
-        const shapesFrom = (writer === emitted.graph && !writer.hasPendingChanges) ? writer : null;
-        const written = new Map<EntityID, DifferenceChange>();
-        for (const entityID of candidates) {
-          const after = stagingGraph.hasEntity(entityID);
-          let before: OsmEntity | undefined;
-          if (shapesFrom) {
-            before = shapesFrom.hasEntity(entityID);
-            if (before === after) continue;
-          } else {
-            before = emitted.values.has(entityID) ? emitted.values.get(entityID) : emitted.from.hasEntity(entityID);
-          }
-          if (before || after) {
-            written.set(entityID, { base: before, head: after });
-          }
-        }
-        if (written.size) {
-          stagingGraph.recomputeGeometry(new Set<EntityID>(completeFrom(stagingGraph, written, true).keys()));
-        }
-      }
-
+      // Every graph keeps its own shapes, so a replaced staging graph (undo, redo, revert, …)
+      // needs nothing recomputed. (Before step 6 of design/graph-geometry.md, shapes lived on the
+      // objects that every graph shares, and the emit recomputed them here.)
       this._syncCacheFromDiff('editor_staging', stagingGraph, stagingDifference);
       this._stagingKey = stagingGraph.key;
       this._emittedStaging = {
-        graph: stagingGraph,
         from: stableGraph,
         values: new Map([...stagingGraph.changedIDs].map(entityID => [entityID, stagingGraph.hasEntity(entityID)]))
       };
@@ -3053,7 +3009,7 @@ export class EditSystem extends AbstractSystem {
       const stableDifference = new Difference(emitted.from, stableGraph, this._stableCandidates, emitted.values);
       this._syncCacheFromDiff('editor_stable', stableGraph, stableDifference);
       this._stableKey = stableGraph.key;
-      this._emittedStable = { graph: stableGraph, from: stableGraph, values: new Map() };
+      this._emittedStable = { from: stableGraph, values: new Map() };
       this._stableCandidates.clear();
       this.emit('stablechange', stableDifference);
       this.deferredBackup();

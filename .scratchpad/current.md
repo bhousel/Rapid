@@ -48,7 +48,10 @@ records, 7 memos in records, 8 rebase/schema, 9 spatial, 10 other data. Step 4 d
 Step 5 done Nov 2: backup items hold each edit's own changes (`_backupChangesFor`, `reverted`),
 `SessionDifference.affects()` replaces `complete()` in ValidationSystem. Old v4 sessions still restore
 (cumulative items load the same), so deleting the debug Chrome's v4 sessions is optional now.
-Next: step 6 (geometry and versions in records).
+Step 6 done Nov 2: shapes in records (`GraphRecord.geometry`), base shapes only from the lineage's
+`baseGraph`, `geoms`/`extent()`/`intersects()` throw on ways and relations, renderer rebinds by
+object identity (no `graph.version()`), no touches, savepoint keeps the records, `graph.verify()`.
+Known: 89 Seattle relations stale after later tiles (step 8). Next: step 7 (memos in records).
 Decided Oct 31: relation geometry references its members' parts (step 2), multipolygon ring structure
 cached and reused (follow-up); lazy build only as a stopgap. Backups: step 5 rewrites v4 in place
 (no v5); when it lands, delete the v4 sessions in the debug Chrome (the only ones that exist).

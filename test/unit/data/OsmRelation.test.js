@@ -11,7 +11,7 @@ describe('OsmRelation', () => {
       const a = new Rapid.OsmRelation(context);
       assert.instanceOf(a, Rapid.OsmRelation);
       assert.strictEqual(a.context, context);
-      assert.instanceOf(a.geoms, Rapid.Geometry);
+      assert.instanceOf(a.baseGeometry, Rapid.Geometry);
       assert.isObject(a.props);
     });
 
@@ -35,7 +35,7 @@ describe('OsmRelation', () => {
       const a = new Rapid.OsmRelation(context, orig);
       assert.instanceOf(a, Rapid.OsmRelation);
       assert.strictEqual(a.context, context);
-      assert.instanceOf(a.geoms, Rapid.Geometry);
+      assert.instanceOf(a.baseGeometry, Rapid.Geometry);
       assert.notStrictEqual(a.props, orig);  // cloned, not ===
     });
 
@@ -44,8 +44,8 @@ describe('OsmRelation', () => {
       const b = new Rapid.OsmRelation(a);
       assert.instanceOf(b, Rapid.OsmRelation);
       assert.strictEqual(b.context, context);
-      assert.instanceOf(b.geoms, Rapid.Geometry);
-      assert.strictEqual(b.geoms, a.geoms);  // shared, a Geometry is never changed in place
+      assert.instanceOf(b.baseGeometry, Rapid.Geometry);
+      assert.strictEqual(b.baseGeometry, a.baseGeometry);  // shared, a Geometry is never changed in place
       assert.notStrictEqual(b.props, a.props);  // cloned, not ===
       assert.isObject(b.props);
     });
@@ -57,8 +57,8 @@ describe('OsmRelation', () => {
       const b = new Rapid.OsmRelation(a, update);
       assert.instanceOf(b, Rapid.OsmRelation);
       assert.strictEqual(b.context, context);
-      assert.instanceOf(b.geoms, Rapid.Geometry);
-      assert.strictEqual(b.geoms, a.geoms);  // shared, a Geometry is never changed in place
+      assert.instanceOf(b.baseGeometry, Rapid.Geometry);
+      assert.strictEqual(b.baseGeometry, a.baseGeometry);  // shared, a Geometry is never changed in place
       assert.notStrictEqual(b.props, a.props);  // cloned, not ===
       assert.deepInclude(b.props, orig);
       assert.deepInclude(b.props, update);
@@ -173,7 +173,7 @@ describe('OsmRelation', () => {
       const b = new Rapid.OsmNode(context, { loc: [5, 10] });
       const r = new Rapid.OsmRelation(context, { members: [{ id: a.id }, { id: b.id }] });
       const graph = new Rapid.Graph(context, [a, b, r]);
-      assert.deepEqual(r.extent(graph), new Rapid.sdk.Extent([0, 0], [5, 10]));
+      assert.deepEqual(graph.extent(r), new Rapid.sdk.Extent([0, 0], [5, 10]));
     });
 
     it('returns the known extent of incomplete relations', () => {
@@ -181,14 +181,14 @@ describe('OsmRelation', () => {
       const b = new Rapid.OsmNode(context, { loc: [5, 10] });
       const r = new Rapid.OsmRelation(context, { members: [{ id: a.id }, { id: b.id }] });
       const graph = new Rapid.Graph(context, [a, r]);
-      assert.deepEqual(r.extent(graph), new Rapid.sdk.Extent([0, 0], [0, 0]));
+      assert.deepEqual(graph.extent(r), new Rapid.sdk.Extent([0, 0], [0, 0]));
     });
 
     it('does not error on self-referencing relations', () => {
       let r = new Rapid.OsmRelation(context);
       r = r.addMember({ id: r.id });
       const graph = new Rapid.Graph(context, [r]);
-      assert.isNotOk(r.extent(graph));
+      assert.isNotOk(graph.extent(r));
     });
   });
 
@@ -664,7 +664,7 @@ describe('OsmRelation', () => {
   });
 
 
-  describe('updateGeometry', () => {
+  describe('buildGeometry', () => {
     it('references its members\' geometry parts instead of copying them', () => {
       const a = new Rapid.OsmNode(context, { id: 'a', loc: [0, 0] });
       const b = new Rapid.OsmNode(context, { id: 'b', loc: [1, 0] });
@@ -676,11 +676,10 @@ describe('OsmRelation', () => {
       const r2 = new Rapid.OsmRelation(context, { id: 'r2', tags: { type: 'route_master' }, members: [{ id: 'r1', type: 'relation' }] });
       const graph = new Rapid.Graph(context, [a, b, c, w1, r1, r2]);
 
-      assert.sameMembers(r1.geoms.parts, [...w1.geoms.parts, ...c.geoms.parts]);
-      assert.sameMembers(r2.geoms.parts, r1.geoms.parts);
-      assert.deepEqual(r2.geoms.orig.extent.min, [0, 0]);
-      assert.deepEqual(r2.geoms.orig.extent.max, [2, 1]);
-      assert.isOk(graph);
+      assert.sameMembers(graph.geometry(r1).parts, [...graph.geometry(w1).parts, ...c.geoms.parts]);
+      assert.sameMembers(graph.geometry(r2).parts, graph.geometry(r1).parts);
+      assert.deepEqual(graph.geometry(r2).orig.extent.min, [0, 0]);
+      assert.deepEqual(graph.geometry(r2).orig.extent.max, [2, 1]);
     });
   });
 

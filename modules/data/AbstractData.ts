@@ -52,10 +52,10 @@ export class AbstractData<P extends AbstractDataProps = AbstractDataProps> {
   public id: string;
   /** Application context */
   public context: Context;
-  /** Geometry wrapper containing original and projected data */
-  public geoms: Geometry;
   /** Properties object */
   public props: Partial<P>;
+  /** The geometry stored on this object, see `geoms` */
+  protected _geoms: Geometry;
 
 
   /**
@@ -71,13 +71,13 @@ export class AbstractData<P extends AbstractDataProps = AbstractDataProps> {
       const other = otherOrContext;
       this.context = other.context;
       this.props = structuredClone(other.props) as Partial<P>;
-      this.geoms = other.geoms;   // shared: a recompute stores a new Geometry, it never changes this one
+      this._geoms = other._geoms;   // shared: a recompute stores a new Geometry, it never changes this one
 
     } else {
       const context = otherOrContext;
       this.context = context;
       this.props = {};
-      this.geoms = new Geometry(context);
+      this._geoms = new Geometry(context);
     }
 
     Object.assign(this.props, structuredClone(props));  // override with passed in props
@@ -93,7 +93,7 @@ export class AbstractData<P extends AbstractDataProps = AbstractDataProps> {
    * @abstract
    */
   public destroy(): void {
-    this.geoms = null!;   // not destroyed: copies of this data element (and relations) may share it
+    this._geoms = null!;   // not destroyed: copies of this data element (and relations) may share it
     this.props = null!;
     this.context = null!;
   }
@@ -165,6 +165,24 @@ export class AbstractData<P extends AbstractDataProps = AbstractDataProps> {
   public touch(): this {
     this.props.v = this.context.next('v');
     return this;
+  }
+
+  /**
+   * The data element's geometry, containing its original and projected data.
+   * OSM ways and relations don't have one of their own: their shape depends on the graph, so
+   * read it through `graph.geometry(entity)` (see `OsmEntity`).
+   * @return  Its Geometry
+   */
+  public get geoms(): Geometry {
+    return this._geoms;
+  }
+
+  /**
+   * Stores the data element's geometry.
+   * @param val - The new Geometry (it's never changed once stored, so copies may share it)
+   */
+  public set geoms(val: Geometry) {
+    this._geoms = val;
   }
 
   /**

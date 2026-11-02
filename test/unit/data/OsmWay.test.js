@@ -22,8 +22,15 @@ describe('OsmWay', () => {
       const a = new Rapid.OsmWay(context);
       assert.instanceOf(a, Rapid.OsmWay);
       assert.strictEqual(a.context, context);
-      assert.instanceOf(a.geoms, Rapid.Geometry);
+      assert.instanceOf(a.baseGeometry, Rapid.Geometry);
       assert.isObject(a.props);
+    });
+
+    it('throws when its geometry is read without a graph', () => {
+      const a = new Rapid.OsmWay(context, { id: 'w1' });
+      assert.throws(() => a.geoms, /graph\.geometry/);
+      assert.throws(() => a.extent(), /graph\.geometry/);
+      assert.throws(() => a.intersects(new Rapid.sdk.Extent([0, 0], [1, 1])), /graph\.geometry/);
     });
 
     it('generates an empty tags object, if unset', () => {
@@ -46,7 +53,7 @@ describe('OsmWay', () => {
       const a = new Rapid.OsmWay(context, orig);
       assert.instanceOf(a, Rapid.OsmWay);
       assert.strictEqual(a.context, context);
-      assert.instanceOf(a.geoms, Rapid.Geometry);
+      assert.instanceOf(a.baseGeometry, Rapid.Geometry);
       assert.notStrictEqual(a.props, orig);  // cloned, not ===
     });
 
@@ -55,8 +62,8 @@ describe('OsmWay', () => {
       const b = new Rapid.OsmWay(a);
       assert.instanceOf(b, Rapid.OsmWay);
       assert.strictEqual(b.context, context);
-      assert.instanceOf(b.geoms, Rapid.Geometry);
-      assert.strictEqual(b.geoms, a.geoms);  // shared, a Geometry is never changed in place
+      assert.instanceOf(b.baseGeometry, Rapid.Geometry);
+      assert.strictEqual(b.baseGeometry, a.baseGeometry);  // shared, a Geometry is never changed in place
       assert.notStrictEqual(b.props, a.props);  // cloned, not ===
       assert.isObject(b.props);
     });
@@ -68,8 +75,8 @@ describe('OsmWay', () => {
       const b = new Rapid.OsmWay(a, update);
       assert.instanceOf(b, Rapid.OsmWay);
       assert.strictEqual(b.context, context);
-      assert.instanceOf(b.geoms, Rapid.Geometry);
-      assert.strictEqual(b.geoms, a.geoms);  // shared, a Geometry is never changed in place
+      assert.instanceOf(b.baseGeometry, Rapid.Geometry);
+      assert.strictEqual(b.baseGeometry, a.baseGeometry);  // shared, a Geometry is never changed in place
       assert.notStrictEqual(b.props, a.props);  // cloned, not ===
       assert.deepInclude(b.props, orig);
       assert.deepInclude(b.props, update);
@@ -211,7 +218,7 @@ describe('OsmWay', () => {
       const node2 = new Rapid.OsmNode(context, { loc: [5, 10] });
       let way = new Rapid.OsmWay(context, { nodes: [node1.id, node2.id] });
       const graph = new Rapid.Graph(context, [node1, node2, way]);
-      const extent = way.extent(graph);
+      const extent = graph.extent(way);
       assert.isOk(extent.equals(new Rapid.sdk.Extent([0, 0], [5, 10])));
     });
   });
@@ -221,7 +228,7 @@ describe('OsmWay', () => {
       const node = new Rapid.OsmNode(context, {loc: [0, 0]});
       const way = new Rapid.OsmWay(context, {nodes: [node.id]});
       const graph = new Rapid.Graph(context, [node, way]);
-      const result = way.intersects(new Rapid.sdk.Extent([-5, -5], [5, 5]), graph);
+      const result = graph.extent(way).intersects(new Rapid.sdk.Extent([-5, -5], [5, 5]));
       assert.isTrue(result);
     });
 
@@ -229,7 +236,7 @@ describe('OsmWay', () => {
       const node = new Rapid.OsmNode(context, {loc: [6, 6]});
       const way = new Rapid.OsmWay(context, {nodes: [node.id]});
       const graph = new Rapid.Graph(context, [node, way]);
-      const result = way.intersects(new Rapid.sdk.Extent([-5, -5], [5, 5]), graph);
+      const result = graph.extent(way).intersects(new Rapid.sdk.Extent([-5, -5], [5, 5]));
       assert.isFalse(result);
     });
   });
