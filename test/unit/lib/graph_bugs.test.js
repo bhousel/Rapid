@@ -7,7 +7,7 @@ import * as Rapid from '../../../modules/headless.js';
 // Each test is a `todo` until its step lands: bun runs them only with `--todo`, and they fail today.
 // When a step lands, drop `.todo` from its tests.
 //
-// Readers move to `graph.geometry(entity)` / `graph.extent(entity)` in step 2, and step 4 makes
+// Readers move to `graph.geometry(entity)` / `graph.extent(entity)` in step 2, and step 6 makes
 // `entity.geoms` throw on ways and relations, so these helpers ask the graph when it can answer.
 
 function extentIn(graph, entity) {
@@ -329,8 +329,8 @@ describe('Graph bugs pinned for later steps', () => {
   });
 
 
-  describe('step 4: derived data in records', () => {
-    it.todo('step 4: a way keeps its shape in base and stable while staging moves its node', () => {
+  describe('step 6: geometry and versions in records', () => {
+    it.todo('step 6: a way keeps its shape in base and stable while staging moves its node', () => {
       const context = new Rapid.MockContext();
       const a = new Rapid.OsmNode(context, { id: 'a', loc: [0, 0] });
       const b = new Rapid.OsmNode(context, { id: 'b', loc: [1, 0] });
@@ -347,7 +347,7 @@ describe('Graph bugs pinned for later steps', () => {
       assert.deepEqual(rounded(extentIn(base, base.entity('w'))), [0, 0, 1, 0]);
     });
 
-    it.todo('step 4: validators on stable see stable\'s shapes while the user drags in staging', async () => {
+    it.todo('step 6: validators on stable see stable\'s shapes while the user drags in staging', async () => {
       const { editor } = await makeEditor();
       const context = editor.context;
       editor.merge([
@@ -366,8 +366,8 @@ describe('Graph bugs pinned for later steps', () => {
   });
 
 
-  describe('step 5: rebase and schema changes', () => {
-    it.todo('step 5: a multipolygon gets the members that arrive in a later tile', () => {
+  describe('step 8: rebase and schema changes', () => {
+    it.todo('step 8: a multipolygon gets the members that arrive in a later tile', () => {
       const context = new Rapid.MockContext();
       const base = new Rapid.Graph(context);
       // First tile: the relation and its first outer ring
@@ -399,7 +399,7 @@ describe('Graph bugs pinned for later steps', () => {
       }
     });
 
-    it.todo('step 5: a downloaded way through a node the user moved has the moved shape', async () => {
+    it.todo('step 8: a downloaded way through a node the user moved has the moved shape', async () => {
       const { editor } = await makeEditor();
       const context = editor.context;
       editor.merge([
@@ -424,7 +424,7 @@ describe('Graph bugs pinned for later steps', () => {
       assert.deepEqual(rounded(extentIn(base, base.entity('w2'))), [0.001, 0, 0.003, 0]);
     });
 
-    it.todo('step 5: a building is an area after the schema reloads', () => {
+    it.todo('step 8: a building is an area after the schema reloads', () => {
       const context = new Rapid.MockContext();
       const schema = new Rapid.SchemaSystem(context);
       context.systems.schema = schema;
@@ -454,7 +454,7 @@ describe('Graph bugs pinned for later steps', () => {
       assert.strictEqual(geometryIn(base, w).parts[0].type, 'Polygon');
     });
 
-    it.todo('step 5: merging remote changes into a way emits a merge for the nodes it pulls in', async () => {
+    it.todo('step 8: merging remote changes into a way emits a merge for the nodes it pulls in', async () => {
       const { editor, spatial } = await makeEditor();
       const context = editor.context;
       editor.merge([

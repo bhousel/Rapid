@@ -7,7 +7,8 @@ of the change. This design fixes findings 1 (shared geometry) and 2 (the wrong s
 [validation audit](validation-system.md#the-october-2026-audit), the bugs listed below, and the cost of
 keeping versions. It gives Rapid one way to ask for anything's geometry: `graph.geometry(entity)`.
 
-> **Status:** In progress (October 2026): steps 0-3 done. Measured in two rounds: a survey of
+> **Status:** In progress (October 2026): steps 0-3 done. After step 3 the rest was put in a new
+> order (November 2026): backups first, then derived data in records in two steps. Measured in two rounds: a survey of
 > today's costs and bugs, then three competing designs, each prototyped and reviewed for correctness
 > and for performance (in JavaScriptCore and V8). See [Open questions](#open-questions).
 
@@ -169,7 +170,7 @@ L=100k.
 
 - `EditSystem._perform` runs the actions, then commits staging (before step 1 it committed *before*
   them, and actions don't always commit at the end). `stagingchange` always arrives with staging's
-  derived data current, so `MapSystem` stops recomputing, and in step 4 stops touching.
+  derived data current, so `MapSystem` stops recomputing, and in step 6 stops touching.
 - If an action throws, `_perform` rolls staging back to how it was when the perform began (a savepoint
   in the journal; six actions commit partway through, so the last commit isn't enough) and rethrows.
   Before step 1 the half-done action stayed in staging, and the next perform committed it into the
@@ -271,10 +272,24 @@ Rebase belongs to the lineage: graphs aren't passed in.
    Every graph that doesn't override them sees the change at once.
 3. Graphs whose own edits interact with what arrived (a new way through a node the user moved, an
    edited relation gaining members) are found through the slot table, in O(arrived × children)
-   whatever the history's length. Usually there are none. Each such graph updates itself before it
-   answers its next read, by running the commit closure for those IDs. Stable and staging do this right
-   away; history graphs when undo or redo makes them current; other graphs on first use. A graph with
+   whatever the history's length. Usually there are none. Such a graph updates its derived data by
+   running the commit closure for those IDs: stable and staging right away, and the other graphs
+   `EditSystem` keeps (the history, its checkpoints, the return edit) when undo, redo or a revert makes
+   them current. Their entities don't wait: the restores in item 4 reach them at once. A graph with
    uncommitted writes keeps them pending.
+   - **No other graph is updated** (decided November 2026). Rebase and every validator call are
+     synchronous, so a graph only lives through a rebase if it's held across an `await` or an idle
+     callback. Validation doesn't hold one: each chunk of jobs reads `cache.graph` when it runs, and
+     `_head.graph` follows stable (`validateAsync` runs on every `stablechange`, and a merge rebases
+     stable before the chunks after it run). The older stable it keeps (`_headQueuedGraph`) is only
+     diffed, by entity. Today the one graph held across awaits is the uploader's remote graph, which
+     reads entities only: it sees base's new entities, as today.
+   - So derived data from a graph that missed a rebase is never read, and dev builds assert that on
+     `graph.geometry()` and memo reads (each graph remembers the lineage's rebase count when it was
+     last brought up to date). `hasEntity` has no such check: reads stay as cheap as they are.
+   - A validation worker, if validation moves to one, isn't affected: it can't share these objects, so
+     it validates its own copy of a slightly older stable.
+   - The earlier plan updated any other graph "on first use", which needed a check on every read.
 4. iD#2085: a node that a graph deleted comes back when a downloaded way uses it, unless that graph
    deleted the way too. This applies to every graph, redo graphs included. Restored IDs go into the
    next emit and the session difference (section 8).
@@ -297,7 +312,7 @@ today's `_updateRebased` alone takes 57-74 ms per merge.
   about 7 ms in JavaScriptCore and 15 ms in V8 for 31k ways.
 - A way that flips is recomputed, then its parent relations, transitively and members first. A graph
   holding records for one updates them the same way as for a rebase: stable and staging at once,
-  others on their next read, and only on committed graphs.
+  the other graphs `EditSystem` keeps when they become current, and only on committed graphs.
 - `SchemaSystem`'s hack goes.
 
 ### 7. Spatial indexes for any graph (finding 2)
@@ -310,8 +325,9 @@ today's `_updateRebased` alone takes 57-74 ms per merge.
 - A query on stable or staging takes the base hits for IDs that have no entity or geometry record in
   that graph, plus its overlay. For any other graph (an older stable, a graph inside an action, a
   scratch graph), it takes the nearest overlay, corrected by the diff between that overlay's graph and
-  this one: drop what changed, and test the changed entities directly. The correction is cached by
-  graph, overlay version and rebase. Queries need a committed graph.
+  this one: drop what changed, and test the changed entities directly. Since step 3 that diff is
+  structural, so the correction starts without a cache; one keyed by graph, overlay version and
+  rebase can come later if measurements ask for it. Queries need a committed graph.
 - `spatialIDForGraph` and its fallback to staging go. A graph from another lineage throws.
 - This isn't the old `Tree`: nothing flips to match the graph asked. Overlays update incrementally, and
   another graph costs its distance from the nearest overlay (10-40 µs for 50 changes).
@@ -330,20 +346,21 @@ today's `_updateRebased` alone takes 57-74 ms per merge.
   today. It keeps an iterable set of the edited IDs:
   - `ValidationSystem`'s "did the user change this" check (`_completeDiff`) only calls `.has()`, so
     that becomes a lookup.
-  - `_validateEditsNearAsync` walks every edited ID on each merge. From step 6 that walk becomes a
+  - `_validateEditsNearAsync` walks every edited ID on each merge. From step 9 that walk becomes a
     query of the stable overlay over the merged area.
   - The summary count (`UiSaveTool`, `UrlHashSystem`, `UiSectionValidationStatus`) is kept
     incrementally, and the save panel's list is computed when shown.
 
-  Today the difference, `complete()` and `summary()` are rebuilt on every stable change: 18 ms at
-  L=10k and 107 ms at L=50k in V8. Once the rest is done, that would be the biggest cost left in an
-  edit.
+  Before step 1 the difference, `complete()` and `summary()` were rebuilt on every stable change: 18 ms
+  at L=10k and 107 ms at L=50k in V8. Since step 1 only `complete()` and `summary()` are rebuilt, when
+  asked for, and `validateAsync` asks for `complete()` on every stable change: 6.7 ms and 2.3 ms at
+  L=20k (Bun, after step 3). Step 5 makes them incremental.
 - An edit's extent comes from the entity diff, not the record diff: moving a node on a country border
   mustn't zoom undo out to the whole country.
 - `editor.changes(action)` runs on a derived graph.
 - Validation runs on base and the current stable (`_head.graph` advances when stable changes during a
   round).
-- Backups (v4, rewritten in step 7) save each edit's own changes, taken from the entities in its
+- Backups (v4, rewritten in step 5) save each edit's own changes, taken from the entities in its
   records, never by recomputing geometry or memos. The result is cached on the edit, and dropped when
   a rebase changes that graph's entities (an iD#2085 restore, a forced update). Restore is
   O(changes). v3 backups still restore.
@@ -421,7 +438,7 @@ write cached geometry outside `modules/data/`:
   their dataset, not staging, next to GeoJSON and markers: `PixiLayerRapid`, `SelectMode.enter`,
   `UiSectionSelectionList`, `UiRapidInspector`. They move to their dataset's graph in step 2.
 - **GeoJSON and markers (49 sites)** have no graph: the photo, notes and QA layers, custom data,
-  `VectorTileService`, `ConflationSystem`. Step 8.
+  `VectorTileService`, `ConflationSystem`. Step 10.
 - **Indirect readers:** `AbstractData.extent()` (WGS84 `geoms.orig.extent`), with 19 direct callers,
   plus `utilTotalExtent` (16, all pass a graph) and `ValidationIssue.extent(graph)` (4).
   `SpatialSystem.replaceData` takes every index's boxes from `geoms.world.extent`.
@@ -495,7 +512,7 @@ Each step ships on its own and leaves the app working, with tests that pin what 
      graph inputs and the generation.
    - A set in the base cache lists the IDs whose topology any graph has changed: every commit adds its
      closure. Outside the set, the topology answer stored on the base object holds for every graph.
-     Inside it, answers are computed directly until step 4 stores them in records. Rebase clears the
+     Inside it, answers are computed directly until step 7 stores them in records. Rebase clears the
      answers of everything whose topology it changed (section 5).
    - `graph.geometry(entity)` and `graph.extent(entity)` arrive, returning what `entity.geoms` has for
      now. Readers move to them: validators and `ValidationSystem` first, then the index sync, actions,
@@ -518,13 +535,13 @@ Each step ships on its own and leaves the app working, with tests that pin what 
      - Scratch copies that commit (`outdated_tags`, `ambiguous_crossing_tags`, `actionJoin.disabled`)
        add their closures to the set for good, and become `geometryWriter`, which skips step 1's
        fast path on the next undo or redo. Measured on a Tokyo tile, validating everything marked
-       36 IDs, so it's left as is; step 4 makes both go away.
+       36 IDs, so it's left as is; `geometryWriter` goes in step 6, and the set in step 7.
      - Copies share their `Geometry` (a recompute stores a new one); a node copied at the same
        location keeps it. Destroying a data element doesn't destroy its `Geometry`, which copies and
        relations may share.
      - Readers moved, including Rapid features through `mapwithai.graph(datasetID)`. What still reads
-       `.geoms` directly is GeoJSON and markers (step 8) and `SpatialSystem.replaceData` (step 6).
-     - For step 4: `move`'s `removeDuplicateVertices` reads the geometry of a node it just removed,
+       `.geoms` directly is GeoJSON and markers (step 10) and `SpatialSystem.replaceData` (step 9).
+     - For step 6: `move`'s `removeDuplicateVertices` reads the geometry of a node it just removed,
        and `outdated_tags`, `orthogonalize.disabled` and `move` read geometry from graphs with
        uncommitted writes; records must cover those. `presetMatch` also depends on the entity's
        location (preset location sets), which isn't in its key: today `updateGeometry` clears it,
@@ -535,7 +552,7 @@ Each step ships on its own and leaves the app working, with tests that pin what 
      structural; parent ways use the formula; `_updateRebased` goes (its iD#2085 restores stay).
    - The readers of `graph.local` and `graph.base` move to methods: `UiFeatureList`, `toBackup`,
      `toIntroGraph`, `revert`, `merge_remote_changes`, `missing_tag`, `Difference`, and
-     `SchemaSystem.resetAll`'s hack until step 5 removes it.
+     `SchemaSystem.resetAll`'s hack until step 8 removes it.
    - Benchmark lookups, derive, diffs and memory in Chrome first: the prototype was mostly measured in
      JavaScriptCore.
    - This makes derive O(1) and history memory O(changes). In the prototype, the heap after accepting
@@ -572,26 +589,54 @@ Each step ships on its own and leaves the app working, with tests that pin what 
        render-like pass 1.55 vs 1.80 ms (Bun) and 2.33 vs 2.31 ms (V8); eight validators over the
        tile 67 vs 73 ms (Bun) and 179 vs 168 ms (V8). `parentWays` keeps base's order, with a
        graph's own version of a parent in its place (callers take `parents[0]`).
-4. **Derived data in records.**
-   - Records get geometry, memoized answers and versions. Base data lives on base objects.
-     `graph.version(entity)` arrives.
+**The order from here was revised after step 3** (November 2026). Steps 1-3 made an edit itself cheap
+(0.04 ms at L=20k), so what's left that a user feels is the backup after every edit, which needs
+none of the steps that were before it. Derived data in records was split in two, since each half
+pays off on its own and is easier to review and bisect. The old numbers were: 4 derived data in
+records (now 6 and 7), 5 rebase (now 8), 6 spatial indexes (now 9), 7 backups (now 5), 8 other data
+(now 10).
+
+4. **The reference model test, in the repo.** The model test that checked step 3 (random derives,
+   writes, rollbacks, freezes, commits, forced rebases and restores, against Maps copied per version)
+   ran from a scratch folder. It becomes a seeded unit test that runs in about a second, so steps 5-8
+   are checked against it as they land. Steps 6 and 8 extend it with derived data.
+5. **Backups and the session difference.**
+   - Backup v4, rewritten: each edit's own changes (`diffIDs` against the edit before it, structural
+     since step 3), cached on the edit, so a backup is O(changes since the last one) and restore is
+     O(changes). v3 still restores. The format keeps the number 4 (decided October 2026): this Rapid
+     hasn't been released, and the only v4 backups are in the shared debug Chrome, which get deleted
+     when this lands. Rapid 2.5.7 (rapideditor.org) writes v3, so v3 restore stays.
+   - The session difference keeps `complete()` and `summary()` up to date as stable changes (section 8),
+     instead of rebuilding them when asked.
+   - Needs nothing from the steps after it: rebases already reach every graph `EditSystem` keeps (step
+     1), so a restore can drop the cached backup of the edits it changed.
+   - Measured after step 3 (Bun, L=20k, 200 roads): `toBackup()` takes 1,105 ms, and `deferredBackup`
+     runs it one second after every edit; `complete()` 6.7 ms (asked for by `validateAsync` on every
+     stable change) and `summary()` 2.3 ms. An edit itself takes 0.04 ms.
+6. **Geometry and versions in records.**
+   - Records get geometry and versions. Base data lives on base objects. `graph.version(entity)`
+     arrives.
    - `entity.geoms`, `extent()` and `intersects()` throw on ways and relations (nodes keep theirs), so a
      reader that didn't move fails loudly instead of reading another graph's shape.
    - `MapSystem` and `EditSystem` stop touching objects in place; `PixiLayerOsm` rebinds on
-     `graph.version(entity)`.
+     `graph.version(entity)`. `geometryWriter` and the emit's recompute of what differs from it go.
+   - `graph.verify()` (see Testing) arrives here, since this is where derived data can be stale in one
+     graph and not another.
    - This fixes shared geometry (finding 1).
-5. **Rebase and schema changes.** The lineage rebases in both directions, and graphs update before
-   their next read. iD#2085 restores reach every graph. `merge_remote_changes` goes through
-   `editor.merge`. Geometry is recomputed only for line/area flips, and `SchemaSystem`'s hack goes.
-6. **Spatial indexes for any graph.** One index per lineage, overlays for stable and staging, and the
-   diff correction. `spatialIDForGraph` goes, and `_validateEditsNearAsync` queries the stable overlay.
-   This fixes finding 2 by construction.
-7. **Backup v4, rewritten.** Each edit's own changes, so restore is O(changes); v3 still restores.
-   This removes the 815 ms backup after 200 roads. The format keeps the number 4 (decided October
-   2026): this Rapid hasn't been released, and the only v4 backups are in the shared debug Chrome,
-   which get deleted when this lands. Rapid 2.5.7 (rapideditor.org) writes v3, so v3 restore stays.
-8. **Other data.** Rapid datasets, then GeoJSON and markers, as lineages; services stop changing data
-   in place.
+7. **Memoized answers in records.**
+   - Topology answers for IDs a graph changed are stored in its records, on first read.
+   - The lineage's set of IDs whose topology changed goes, and with it `graph.canShareAnswers()`. The
+     set only grows during a session, so today more and more reads go unmemoized.
+   - Measure first how many reads take the unmemoized path in a long session, to know what this buys.
+8. **Rebase and schema changes.** The lineage rebases in both directions. Stable and staging update
+   at once, and the other graphs `EditSystem` keeps when they become current (section 5). iD#2085
+   restores reach every graph. `merge_remote_changes` goes through `editor.merge`. Geometry is
+   recomputed only for line/area flips, and `SchemaSystem`'s hack goes.
+9. **Spatial indexes for any graph.** One index per lineage, overlays for stable and staging, and the
+   diff correction (no cache to start with). `spatialIDForGraph` goes, and `_validateEditsNearAsync`
+   queries the stable overlay. This fixes finding 2 by construction.
+10. **Other data.** Rapid datasets, then GeoJSON and markers, as lineages; services stop changing data
+    in place.
 
 Then, each measured on its own:
 - **Slim nodes.** World coordinates live on the node; a full `Geometry` is built only when asked for,
@@ -631,8 +676,10 @@ Then, each measured on its own:
 
 - **Memory of big shapes in the history:** each version keeps the geometry of what it changed (0.4 MB
   per edit of a 2,010-node multipolygon). Drop it from versions far back, and recompute it on undo?
-- **Which graphs to validate, after step 6:** once any graph is answered correctly, should validation
-  check the graph captured when a round starts, instead of following the current stable?
+- **Which graphs to validate, after step 9:** once any graph is answered correctly, should validation
+  check the graph captured when a round starts, instead of following the current stable? That graph
+  would live through rebases, so step 8's rule (section 5) would need it brought up to date too, or
+  handed to a worker as a copy.
 - **An entity's lineage:** an object stays in one lineage for its whole life. Accepting, pasting and
   the walkthrough all make new objects. Setting `entity.lineage` and its slot once would let
   `graph.geometry()` skip the slot lookup, and let dev builds assert that OSM and dataset objects never

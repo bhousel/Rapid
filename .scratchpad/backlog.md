@@ -77,6 +77,19 @@ especially, which are hard to check today.
 - Longer term: index generic features (`{ kind, tags, coords }`) rather than OSM ways, so conflation (and
   maybe validation) can work against non-OSM targets. See `design/conflation-system.md`.
 
+## Benchmark suite and plan
+Until late October 2026, performance work was manual profiling in Chrome. The graph work
+(`design/graph-geometry.md`) showed an agent can measure on its own and find regressions early, but
+its harnesses lived in a session's scratch folder and are gone. Make it a suite:
+- Scenarios worth keeping: an edit, a MoveMode frame and undo/redo at a large L (200 accepted roads),
+  the backup after an edit, a merge over edits, a validator pass over a real tile, a render-like pass.
+- Both engines: Bun (JavaScriptCore) directly, and V8 through a Bun bundle of `modules/headless.js`
+  run in Node (`bun build --target=node`; Node can't load the TS sources). Chrome over CDP for
+  rendering, which needs WebGL.
+- Count operations where we can (copies per derive, recomputes per merge, O(L) scans per event), and
+  keep wall-clock numbers for reports: timing limits in CI are flaky.
+- A baseline to compare a branch against, and a plan for which numbers each design doc tracks.
+
 ## Debugging loop: `bun run start:cdp`
 - ✅ `bun run start:chrome` (`scripts/chrome.ts`, using `chrome-launcher`) launches Chrome with remote
   debugging on port 9222 and its own profile in `.chrome-debug/` (gitignored; extensions persist), opened

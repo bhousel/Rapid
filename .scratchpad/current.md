@@ -41,10 +41,14 @@ emits from candidate IDs, `SessionDifference`; randomized emit test in
 schema generation, `graph.canShareAnswers()`, shared immutable `Geometry`, relations from member parts,
 readers on `graph.geometry()`/`graph.extent()`. Step 3 done Oct 31 (uncommitted at first):
 `PersistentVector`, `GraphRecord`s by slot, `graph.local` gone (`isLocal`, `localEntities`, `diffIDs`).
-Next: step 4 (derived data in records, `graph.version()`).
+Step 3 committed Nov 2 (`7c4bcb0f2`). Steps 4+ reordered Nov 2 (old numbers in the doc's Rollout):
+4 model test in the repo, 5 backups + incremental session difference, 6 geometry and versions in
+records, 7 memos in records, 8 rebase/schema, 9 spatial, 10 other data. Next: step 4.
 Decided Oct 31: relation geometry references its members' parts (step 2), multipolygon ring structure
-cached and reused (follow-up); lazy build only as a stopgap. Backups: step 7 rewrites v4 in place
+cached and reused (follow-up); lazy build only as a stopgap. Backups: step 5 rewrites v4 in place
 (no v5); when it lands, delete the v4 sessions in the debug Chrome (the only ones that exist).
+Decided Nov 2: after a rebase only stable/staging update at once, other `EditSystem` graphs when they
+become current; no per-read "update on first use" (design section 5).
 
 ## Active: what an edit records (`EditSystem`)
 Design: [`design/edit-system.md`](../design/edit-system.md), started Oct 26. Edits need to record more
