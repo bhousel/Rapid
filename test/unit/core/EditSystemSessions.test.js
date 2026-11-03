@@ -203,6 +203,71 @@ describe('EditSystem sessions (Phase 2)', () => {
   });
 
 
+  describe('sessions made on another OSM API', () => {
+    const LIVE = 'https://api.openstreetmap.org';
+    const DEV = 'https://master.apis.dev.openstreetmap.org';
+
+    beforeEach(() => {
+      context.services.osm = { apiroot: LIVE, initAsync: () => Promise.resolve() };
+    });
+
+    it('records the API the edits were made on', async () => {
+      context.services.osm.apiroot = DEV;
+      editor.perform(actionAddTaggedNode('n-1', [1, 2], { building: 'yes' }));
+      editor.commit({ stringID: 'building', selection: ['n-1'] });
+      await editor.immediateBackup();
+
+      const record = await database.get('sessions', editor._sessionID);
+      assert.strictEqual(record.apiURL, DEV);
+    });
+
+    it('offers only sessions made on the API we\'re connected to, and older ones that don\'t say', async () => {
+      await seedSession('s-live', { apiURL: LIVE });
+      await seedSession('s-dev', { apiURL: DEV });
+      await seedSession('s-old');
+
+      const list = await editor.listRestorableSessionsAsync();
+      assert.sameMembers(list.map(s => s.id), ['s-live', 's-old']);
+      const all = await editor.listRestorableSessionsAsync(true);
+      assert.sameMembers(all.map(s => s.id), ['s-live', 's-dev', 's-old']);
+    });
+
+    it('doesn\'t restore a session made on another API', async () => {
+      await seedSession('s-dev', { apiURL: DEV });
+
+      await editor.restoreSessionAsync('s-dev');
+      assert.isNull(editor._sessionID);
+      assert.isUndefined(editor.staging.graph.hasEntity('n-1'));
+      assert.isDefined(await database.get('sessions', 's-dev'));   // kept for when the user is on that API
+    });
+
+    it('decides at start, once a host\'s preauthenticated connection has switched the API', async () => {
+      const CUSTOM = 'https://osm.example.org';
+      await seedSession('s-custom', { apiURL: CUSTOM });
+
+      // Systems init on the default API, so the session counts there: backups wait for the user.
+      editor = new Rapid.EditSystem(context);
+      context.systems.editor = editor;
+      await editor.initAsync();
+      editor._canRestoreBackup = await editor._hasRestorableSessionsAsync(true);   // initAsync skips this in tests
+      assert.isTrue(editor.canRestoreBackup);
+
+      context.services.osm.apiroot = CUSTOM;   // the host's preauth switch
+      await editor.startAsync();
+      assert.isTrue(editor.canRestoreBackup);
+
+      // On live, the same session isn't offered.
+      context.services.osm.apiroot = LIVE;
+      editor = new Rapid.EditSystem(context);
+      context.systems.editor = editor;
+      await editor.initAsync();
+      editor._canRestoreBackup = await editor._hasRestorableSessionsAsync(true);
+      await editor.startAsync();
+      assert.isFalse(editor.canRestoreBackup);
+    });
+  });
+
+
   describe('#deleteSessionAsync', () => {
     it('removes an IndexedDB session', async () => {
       await seedSession('s-1');

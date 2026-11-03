@@ -22,11 +22,12 @@ actions, 45k entities loaded mid-run); backup round trips; `affects()` vs `compl
    skipping ways with no node any graph has written. Tests in `Graph.test.js` and
    `EditSystemJournal.test.js`; the model test now encodes the per-graph rule. The bug-hunt harness
    (600 seeds × 200 steps) is clean.
-2. **A dev-API session can be restored and uploaded against live OSM.** Session records don't store
-   the API; the source switch isn't remembered, so every load starts on live. v4 restore fetches
-   `baseVersions` from live (same IDs, unrelated features), and Save may overwrite live data without a
-   409. `EditSystem._saveSessionAsync` (:2371), `restoreSessionAsync`, `UiSourceSwitch.ts:26`.
-   *New; reading.* Fix: store `apiURL` on each session; filter or refuse a restore that doesn't match.
+2. ✅ **A dev-API session can be restored and uploaded against live OSM.** Fixed Nov 3: sessions
+   record `apiURL`; `listRestorableSessionsAsync` and `restoreSessionAsync` only take sessions made on
+   the connected API (older ones without `apiURL` still count everywhere). The init check counts every
+   API, because a host's preauth switches the API after systems init; `startAsync` decides. Follow-up,
+   not done: after switching to dev in the same tab, its dev sessions aren't offered (restore is only
+   offered at startup, which is always live).
 3. **MapRoulette: typing a comment replaces Cancel/Submit with the four action buttons.** `changeInput`
    calls `_saveButtons` (should be `_submitButtons`), and joins keyed by `d.key` now see a new datum.
    `UiMapRouletteEditor.ts:233`. *New; confirmed.* Fix: call `_submitButtons`; key single-datum joins

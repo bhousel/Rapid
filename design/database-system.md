@@ -327,6 +327,7 @@ structured history object plus metadata (as shipped in Phase 2):
 interface SessionRecord {
   id: SessionID;             // crypto.randomUUID (or the legacy backup key for a localStorage session)
   origin: string;            // window.location.origin (replaces the key-name scoping hack)
+  apiURL?: string;           // the OSM API the edits were made on (absent before November 2026)
   createdAt: number;
   updatedAt: number;         // 0 if unknown (legacy)
   heartbeatAt?: number;      // liveness: last time the owning tab proved this session is still open
@@ -350,6 +351,12 @@ interface SessionRecord {
   in the restore UI: restore one, delete one, or skip. This is the headline feature — moving from
   "one restorable backup" to "pick from a list" — and it fixes the unreliable single-slot/multi-tab
   prompt described above.
+- **Only sessions made on the OSM API we're connected to are offered** (`apiURL`). Entity IDs and
+  versions name different features on another API: a session made on the dev API and restored on
+  live fetched unrelated live entities as its base, and Save could upload the edits over them. Sessions
+  from before `apiURL` was recorded are offered on any API. The check at init counts every API,
+  because a host's preauthenticated connection switches the API after systems init; `startAsync`
+  decides with the API settled.
 - **Retention: keep sessions indefinitely; evict only on explicit user action.** No auto-cap or
   auto-expiry. A session is removed only when the user deletes it from the list (or `clearBackup()`
   on source-switch / after upload removes the *active* session).

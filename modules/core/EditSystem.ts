@@ -132,6 +132,12 @@ export interface SessionRecord {
   id: SessionID;
   /** The `window.location.origin` this session belongs to. */
   origin: string;
+  /**
+   * The OSM API the edits were made on (`osm.apiroot`). Only sessions made on the API we're connected
+   * to are offered: entity IDs and versions mean different features on another API (e.g. dev and live).
+   * Absent for sessions saved before November 2026, which are offered on any API.
+   */
+  apiURL?: string;
   /** When the session was first created (ms since epoch). */
   createdAt: number;
   /** When the session was last written (ms since epoch); `0` if unknown (legacy). */
@@ -484,7 +490,9 @@ export class EditSystem extends AbstractSystem {
         // Detect whether there are any restorable sessions from a previous visit.
         // (Multiple concurrent sessions are supported now — the restore UI lists them via
         //  `listRestorableSessionsAsync`. Here we just decide whether to offer a restore at all.)
-        this._canRestoreBackup = await this._hasRestorableSessionsAsync();
+        // Sessions on any OSM API count: a host's preauthenticated connection may switch the API after
+        // systems init. `startAsync` checks again with the API settled.
+        this._canRestoreBackup = await this._hasRestorableSessionsAsync(true);
       });
   }
 
@@ -2061,9 +2069,12 @@ export class EditSystem extends AbstractSystem {
    * List the restorable editing sessions for this origin, newest first.
    * Includes sessions stored in the `DatabaseSystem` (IndexedDB) plus, if present, a synthetic
    * record for a legacy localStorage backup (deduped if an IndexedDB record already supersedes it).
+   * Sessions made on another OSM API than the one we're connected to are left out (`_isOnThisAPI`).
+   * @param anyAPI - `true` to include sessions made on another OSM API (used during init, before a
+   *   host's preauthenticated connection has switched the API)
    * @return Promise resolving to the restorable sessions, sorted by `updatedAt` descending
    */
-  public async listRestorableSessionsAsync(): Promise<SessionRecord[]> {
+  public async listRestorableSessionsAsync(anyAPI: boolean = false): Promise<SessionRecord[]> {
     const context = this.context;
     const database = context.systems.database;   // optional
     const storage = context.systems.storage!;
@@ -2080,6 +2091,7 @@ export class EditSystem extends AbstractSystem {
           seen.add(record.id);
           if (this._isLiveElsewhere(record, now)) continue;   // open in another live tab — don't offer it
           if (this._pendingUploadIDs.has(record.id)) continue;   // the server may still be uploading it
+          if (!anyAPI && !this._isOnThisAPI(record)) continue;   // made on another OSM API
           out.push(record);
         }
       } catch {
@@ -2126,6 +2138,7 @@ export class EditSystem extends AbstractSystem {
         backup = undefined;
       }
     }
+    if (existingRecord && !this._isOnThisAPI(existingRecord)) return;   // made on another OSM API
 
     if (!backup && id === this._backupKey()) {
       const json = storage.getItem(this._backupKey());
@@ -2369,13 +2382,17 @@ export class EditSystem extends AbstractSystem {
    * @return Promise resolved when the write completes (or fails silently)
    */
   protected async _saveSessionAsync(database: DatabaseSystem, id: SessionID, backup: BackupJSON, upload?: SessionUpload): Promise<void> {
+    const osm = this.context.services.osm;   // optional
+
     const now = Date.now();
     try {
       const existing = await database.get<SessionRecord>('sessions', id);
       const meta = this._computeSessionMeta(backup);
+      const apiURL = osm?.apiroot ?? existing?.apiURL;
       const record: SessionRecord = {
         id,
         origin: this._origin(),
+        ...(apiURL && { apiURL }),
         createdAt: existing?.createdAt ?? now,
         updatedAt: now,
         heartbeatAt: now,   // a fresh backup also proves the session is live
@@ -2434,11 +2451,28 @@ export class EditSystem extends AbstractSystem {
    * Whether any *restorable* sessions exist for this origin — i.e. sessions not currently open in
    * another live tab. Delegates to `listRestorableSessionsAsync` so the liveness filter is applied
    * consistently with what the restore UI will show.
+   * @param anyAPI - `true` to count sessions made on another OSM API too (see `listRestorableSessionsAsync`)
    * @return Promise resolving to `true` if there is at least one restorable session
    */
-  protected async _hasRestorableSessionsAsync(): Promise<boolean> {
-    const list = await this.listRestorableSessionsAsync();
+  protected async _hasRestorableSessionsAsync(anyAPI: boolean = false): Promise<boolean> {
+    const list = await this.listRestorableSessionsAsync(anyAPI);
     return list.length > 0;
+  }
+
+
+  /**
+   * Whether a session's edits were made on the OSM API we're connected to now. Restoring them on
+   * another API (e.g. edits made on the dev API, restored on live) would fetch the base versions of
+   * unrelated features with the same IDs, and could upload the edits over them.
+   * A session saved before sessions recorded their API counts as made on this one.
+   * @param record - The session record
+   * @return `true` if the session can be restored here
+   */
+  protected _isOnThisAPI(record: SessionRecord): boolean {
+    const osm = this.context.services.osm;   // optional
+
+    if (!osm || !record.apiURL) return true;
+    return record.apiURL === osm.apiroot;
   }
 
 
