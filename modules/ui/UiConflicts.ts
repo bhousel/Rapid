@@ -158,7 +158,7 @@ export class UiConflicts extends EventEmitter {
 
     $$buttons
       .append('button')
-      .attr('disabled', this._conflictList!.length > 1)
+      .attr('disabled', this._conflictList!.length > 1 ? true : null)   // (`false` would still set the attribute)
       .attr('class', 'action conflicts-button col6')
       .text(l10n.t('text.save'))
       .on('click.try_again', this._tryAgain);
@@ -187,8 +187,9 @@ export class UiConflicts extends EventEmitter {
     const $parent = select(($selection.node() as HTMLElement).parentNode as HTMLElement);
 
     // enable save button if this is the last conflict being reviewed..
+    // (scheduler waits a moment, so the user sees the last conflict first; without it, do it now)
     if (index === this._conflictList!.length - 1) {
-      scheduler?.setTimeout('conflicts-enable-save', () => {
+      const enableSave = () => {
         $parent.select('.conflicts-button')
           .attr('disabled', null);
 
@@ -196,7 +197,12 @@ export class UiConflicts extends EventEmitter {
           .transition()
           .attr('opacity', 1)
           .style('display', 'block');
-      }, { ms: 250 });
+      };
+      if (scheduler) {
+        scheduler.setTimeout('conflicts-enable-save', enableSave, { ms: 250 });
+      } else {
+        enableSave();
+      }
     }
 
     const $conflict = $selection

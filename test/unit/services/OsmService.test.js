@@ -990,6 +990,54 @@ describe('OsmService', () => {
           .then(() => sendAsync())
           .then(({ err }) => assert.strictEqual(err.status, -6));
       });
+
+      it('doesn\'t reuse the changeset after it can\'t tell whether the upload went through', () => {
+        fetchMock.route(/changeset\/123\/upload/, { throws: new TypeError('Failed to fetch') }, { repeat: 1 });
+        fetchMock.route(/changeset\/123\.json/, { throws: new TypeError('Failed to fetch') });
+
+        return loginAsync()
+          .then(() => sendAsync())
+          .then(({ err }) => {
+            assert.strictEqual(err.status, -6);
+            return sendAsync();   // the user saves again
+          })
+          .then(() => {
+            const creates = fetchMock.callHistory.calls().filter(c => /changeset\/create/.test(c.url));
+            assert.lengthOf(creates, 2, 'a new changeset');
+          });
+      });
+
+      it('reuses the changeset after an upload that wasn\'t applied', () => {
+        fetchMock.route(/changeset\/123\/upload/, 409, { repeat: 1 });
+
+        return loginAsync()
+          .then(() => sendAsync())
+          .then(({ err }) => {
+            assert.strictEqual(err.status, 409);
+            return sendAsync();
+          })
+          .then(() => {
+            const creates = fetchMock.callHistory.calls().filter(c => /changeset\/create/.test(c.url));
+            assert.lengthOf(creates, 1, 'the same changeset');
+          });
+      });
+
+      it('reports status -6 if the connection was switched while the upload was out, even if it succeeded', () => {
+        let finishUpload;
+        fetchMock.route(/changeset\/123\/upload/, new Promise(resolve => { finishUpload = resolve; }).then(() => 200));
+
+        return loginAsync()
+          .then(() => {
+            const result = sendAsync();
+            return new Promise(resolve => { setTimeout(resolve, 10); })   // the upload is out
+              .then(() => {
+                _osm._connectionID++;   // what `resetAsync` and `switchAsync` do
+                finishUpload();         // the upload succeeds
+                return result;
+              });
+          })
+          .then(({ err }) => assert.strictEqual(err.status, -6));
+      });
     });
 
 

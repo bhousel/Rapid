@@ -54,7 +54,14 @@ screens, and `UiConflicts` the conflict screen.
 6. **Merges happen in `staging`**, as work in progress. If there are no conflicts, they're committed
    ("Merged changes from other mappers.") and uploaded. If there are, the conflict screen shows them;
    choosing a side performs that merge in `staging` too, Save commits everything and uploads, and Cancel
-   (or Escape, or leaving save mode) reverts `staging`, throwing the merges away.
+   (or Escape, or leaving save mode) reverts `staging`, throwing the merges away. Nothing outside
+   `staging` changes before the user saves (not even the base, see "Local deletions").
+   The choices of one conflict replace each other: the screen applies the default when it shows the
+   conflict, so before a choice applies, what the previous one changed is put back as the safe merges
+   left it (`_mergedGraph`). Otherwise "Keep mine" after the default "Use theirs" restored a deleted node
+   but left its parent way without it.
+   If what's left matches OSM (e.g. "Use theirs" for everything), there's nothing to upload
+   (`resultNoChanges`), and the session backup is removed, as after an upload.
 7. **Retry, but not forever.** Each 409 runs the check again, up to `MAX_CONFLICT_CHECKS` (3) times per
    save. It stops with an error ("OpenStreetMap still reports a conflict that Rapid couldn't resolve…",
    with the API's message) if the same entity is reported twice (the check didn't fix it), if the limit
@@ -66,12 +73,22 @@ screens, and `UiConflicts` the conflict screen.
 When the user deleted something another mapper changed:
 - **Both deleted it:** nothing to upload, so the merge takes the deletion back.
 - **"Leave Deleted"** (`force_local`): the deletion is uploaded against the base copy's version, which is
-  older than the server's. So before merging, the uploader replaces the base copy with the remote one,
-  along with child nodes the user didn't change (`EditSystem.updateBase`). The upload then deletes the
-  newest version. If a child node of the remote way couldn't be loaded, the base is left alone (a way
-  can't be drawn without its nodes), and the upload fails with the API's reason.
+  older than the server's. So once the user saves the conflict screen, the uploader replaces the base
+  copy with the remote one, along with child nodes the user didn't change (`EditSystem.updateBase`). The
+  upload then deletes the newest version. If a child node of the remote way couldn't be loaded, the base
+  is left alone (a way can't be drawn without its nodes), and the upload fails with the API's reason.
+  (Until November 3, 2026 the base was updated while detecting, so Cancel kept it, and the next Save
+  deleted the other mapper's version without asking.)
 - **"Restore"** (`force_remote`): `actionRevert` brings it back, with the child nodes and members that
-  were deleted along with it.
+  were deleted along with it. The base gets the remote version too, so the map shows it.
+
+### "Use theirs" for a way
+
+It takes the other mapper's way, and the nodes only that way uses (the way's shape). A node another way
+shares keeps the user's change, unless the other mapper changed that node too: the change is an edit
+of the other way as well, which isn't in conflict. (iD reverts every child node. Until November 3, 2026
+Rapid did too, so moving a junction and retagging one of its roads lost the move when the retag
+conflicted.)
 
 `Graph.rebase` used to restore a locally deleted node when newly loaded data showed a way using it
 (iD#2085). For a way the user deleted along with its nodes, that undid part of the deletion, so it no
@@ -86,6 +103,9 @@ nothing, so nothing was applied. With no answer (offline, the connection dropped
 changeset (`loadChangesetAsync`): if it has changes, the upload went through and the save succeeds;
 if not, the error says the changes weren't saved (status `-5`); if the API can't be reached either,
 the error says Rapid can't tell, and links to the changeset to check before uploading again (`-6`).
+It's `-6` too when the connection was switched while the upload was out: its answer is dropped, even
+a success (`_wrapcb`), and we can't ask the server that got it. (Until November 3, 2026 that was `-1`,
+which the uploader took as "the server answered, nothing applied", so it removed the upload mark.)
 
 The upload timeout is 5 minutes, not the `NetworkSystem` default of 30 s, because a large upload can
 take the server longer than that, and giving up early is what leaves us not knowing.
@@ -118,7 +138,9 @@ were uploaded twice. That made any save that didn't finish lose the edits instea
      Restoring it anyway removes the mark.
 
 The changeset's count can be trusted because Rapid only reuses an open changeset after an upload that
-failed, which applied nothing.
+failed, which applied nothing. After `-6` the changeset is forgotten, so the next save opens a new one.
+(Until November 3, 2026 it was reused: if that upload had landed, the next save's check would have
+counted its changes, and could have reported a later upload as done when it wasn't.)
 
 ## The October 2026 audit
 
@@ -161,7 +183,10 @@ Found along the way, not fixed:
   wants to see is what the other mapper did, and "Use theirs" shows it on the map. A user clicking
   through also doesn't overwrite another mapper's work. iD's PR #12814 switches to "Keep mine".
 - **A deletion the user keeps is uploaded against the remote version**, by updating the base copy
-  (`EditSystem.updateBase`), like iD's PR does with its rebaser.
+  (`EditSystem.updateBase`), like iD's PR does with its rebaser. The base is updated only once the user
+  saves the conflict screen (November 2026).
+- **"Use theirs" for a way leaves shared nodes alone** (unless the other mapper changed them), unlike
+  iD. (November 2026)
 
 ## Prior art
 

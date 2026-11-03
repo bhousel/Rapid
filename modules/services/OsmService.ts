@@ -1512,7 +1512,8 @@ export class OsmService extends AbstractSystem {
    * applied it anyway. Uploads are all or nothing, so this asks the API how many changes the
    * changeset has. Then the callback gets either success, or an error with status:
    * - `-5` if the changeset has no changes, so the upload wasn't applied
-   * - `-6` if the API couldn't be asked either, so we can't tell
+   * - `-6` if the API couldn't be asked either, or the connection was switched while the upload was
+   *   out, so we can't tell. The changeset isn't reused after that.
    * @param  changeset - the changeset to send
    * @param  changes - the entity changes to upload
    * @param  callback - errback-style callback called when the full send cycle completes
@@ -1541,17 +1542,25 @@ export class OsmService extends AbstractSystem {
       }
     };
 
+    // We can't tell whether the upload was applied. The changeset may have changes now, so it can't
+    // be reused: its change count is how the next save (or tab) tells whether an upload went through.
+    const cantTell = (message: string): void => {
+      this._changeset.openChangesetID = null;
+      callback({ message: message, status: -6 }, changeset);
+    };
+
     const upload = (): void => this.uploadChangeset(changeset, changes, (err: any, updated: OsmChangeset) => {
-      changeset = updated;
+      changeset = updated ?? changeset;
       if (!err) { return uploaded(); }
+
+      // The user switched connection while the upload was out, so its answer was dropped (even a
+      // success, see `_wrapcb`), and we can't ask the server that got it.
+      if (err.status === -1 || (typeof err.status !== 'number' && this._connectionID !== cid)) {
+        return cantTell('Connection Switched');
+      }
 
       // The server answered (or we never sent it), so we know the upload wasn't applied.
       if (typeof err.status === 'number') { return callback(err, changeset); }
-
-      // The user switched connection, so we can't ask the server that got the upload.
-      if (this._connectionID !== cid) {
-        return callback({ message: 'Connection Switched', status: -1 }, changeset);
-      }
 
       this.loadChangesetAsync(changeset.id)
         .then(result => {
@@ -1561,7 +1570,7 @@ export class OsmService extends AbstractSystem {
             callback({ message: err.message, status: -5 }, changeset);
           }
         })
-        .catch(() => callback({ message: err.message, status: -6 }, changeset));
+        .catch(() => cantTell(err.message));
     });
 
     this.createChangeset(changeset, (err: any, updated: OsmChangeset) => {

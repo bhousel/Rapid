@@ -173,6 +173,11 @@ export function actionMergeRemoteChanges(id: EntityID, options: MergeRemoteChang
       let target: OsmNode;
 
       if (strategy === 'force_remote' && remote && remote.visible) {
+        // A node another way uses keeps the user's change, unless the other mapper changed it too:
+        // "use theirs" is about this way, and the change is an edit of that other way as well.
+        const baseNode = graph.base.entities.get(nodeID);
+        const isShared = !!node && graph.parentWays(node).some(way => way.id !== targetWay.id);
+        if (isShared && baseNode && remote.version === baseNode.version) continue;
         updates.replacements.push(remote);
 
       } else if (strategy === 'force_local' && local) {

@@ -680,6 +680,44 @@ describe('actionMergeRemoteChanges', () => {
         assert.deepEqual(n.loc, remoteLoc);
       });
 
+      // "Use theirs" is about this way. A childNode another way shares is an edit of that way too,
+      // which isn't in conflict: the user's change to it stays, unless the other mapper changed it.
+      describe('a childNode another way shares (\'force_remote\')', () => {
+        const w50 = new Rapid.OsmWay(context, { id: 'w50', nodes: ['n10', 'n20'], version: '1' });   // shares n10
+        const remoteW10 = base.entity('w10').update({ tags: { foo: 'foo_remote', area: 'yes' }, version: '2' });
+
+        function mergeTheirs(localEntities, remoteEntities) {
+          const localGraph = makeGraph([...localEntities, w50]);
+          const remoteGraph = makeGraph([remoteW10, ...remoteEntities]);
+          const opts = { localGraph: localGraph, remoteGraph: remoteGraph, discardTags: discardTags, strategy: 'force_remote' };
+          return Rapid.actionMergeRemoteChanges('w10', opts)(localGraph);
+        }
+
+        it('keeps the user\'s change when only the user changed it', () => {
+          const localN10 = base.entity('n10').update({ loc: [12, 12] });   // moved by the user only
+          const result = mergeTheirs([localN10], []);
+
+          assert.deepEqual(result.entity('w10').tags, { foo: 'foo_remote', area: 'yes' });
+          assert.strictEqual(result.entity('n10'), localN10);
+        });
+
+        it('takes their version when they changed it too', () => {
+          const localN10 = base.entity('n10').update({ loc: [12, 12] });
+          const remoteN10 = base.entity('n10').update({ loc: [13, 13], version: '2' });
+          const result = mergeTheirs([localN10], [remoteN10]);
+
+          assert.deepEqual(result.entity('n10').loc, [13, 13]);
+          assert.strictEqual(result.entity('n10').version, '2');
+        });
+
+        it('still takes their version of a childNode only this way uses', () => {
+          const localN11 = base.entity('n11').update({ loc: [12, -12] });   // only in w10, moved by the user only
+          const result = mergeTheirs([localN11], []);
+
+          assert.deepEqual(result.entity('n11').loc, base.entity('n11').loc);
+        });
+      });
+
       it('keeps only important childNodes when merging', () => {
         const localNodes  = ['n10', 'n30', 'n31', 'n12', 'n13', 'n10'];  // changed n11 -> n30, n31
         const remoteNodes = ['n10', 'n32', 'n33', 'n12', 'n13', 'n10'];  // changed n11 -> n32, n33

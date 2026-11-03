@@ -219,6 +219,120 @@ describe('UploaderSystem', () => {
       assert.deepEqual(_editor.stable.graph.entity('n1').tags, { amenity: 'pub' });   // the other mapper's version
     });
 
+    it('leaves the base alone when the user cancels, so the next save asks again', async () => {
+      _editor.merge([ node('n1', 1, { amenity: 'cafe' }) ]);
+      _editor.perform(Rapid.actionDeleteNode('n1'));
+      _editor.commit({ stringID: 'deleted' });
+      serverNode('n1', 2, { amenity: 'pub' });   // another mapper changed it
+      _responses.push(mismatch('n1'));
+
+      let result = resultAsync();
+      _uploader.save();
+      let { name } = await result;
+      assert.strictEqual(name, 'resultConflicts');
+
+      _uploader.cancelConflictResolution();
+      assert.strictEqual(_editor.base.graph.entity('n1').version, 1, 'the base is as it was');
+
+      // Saving again doesn't delete their version unasked
+      _responses.push(mismatch('n1'));
+      result = resultAsync();
+      _uploader.save();
+      ({ name } = await result);
+      assert.strictEqual(name, 'resultConflicts');
+      assert.isUndefined(_uploads.find(changes => changes.deleted.some(entity => entity.version === 2)));
+    });
+
+    it('"Use theirs" for a way keeps the user\'s change to a node another way shares', async () => {
+      _editor.merge([
+        node('n1', 1, {}, [0, 0]), node('n2', 1, {}, [1, 0]), node('n3', 1, {}, [2, 0]),
+        new Rapid.OsmWay(_context, { id: 'w1', version: 1, nodes: ['n1', 'n2'], tags: { highway: 'path' } }),
+        new Rapid.OsmWay(_context, { id: 'w2', version: 1, nodes: ['n2', 'n3'], tags: { highway: 'path' } })
+      ]);
+      _editor.perform(Rapid.actionMoveNode('n2', [1, 1]));   // the junction, which w2 uses too
+      _editor.perform(Rapid.actionChangeTags('w1', { highway: 'footway' }));
+      _editor.commit({ stringID: 'edits' });
+      for (const [id, loc] of [['n1', [0, 0]], ['n2', [1, 0]], ['n3', [2, 0]]]) {
+        serverNode(id, 1, {}, loc);
+      }
+      _server.set('w1', { type: 'way', id: 'w1', version: 2, visible: true, nodes: ['n1', 'n2'], tags: { highway: 'cycleway' }, user: 'other' });
+      _responses.push(mismatch('w1'));
+
+      let result = resultAsync();
+      _uploader.save();
+      let { name, args } = await result;
+      assert.strictEqual(name, 'resultConflicts');
+      assert.deepEqual(args[1].map(c => c.id), ['w1']);
+      args[1][0].choices[1].action();   // "Use theirs", the default
+
+      result = resultAsync();
+      _uploader.processResolvedConflicts();
+      ({ name } = await result);
+
+      assert.strictEqual(name, 'resultSuccess');
+      const uploaded = _uploads.at(-1);
+      assert.deepEqual(uploaded.modified.map(entity => entity.id), ['n2']);
+      assert.deepEqual(uploaded.modified[0].loc, [1, 1]);
+      assert.deepEqual(_editor.stable.graph.entity('w1').tags, { highway: 'path' });   // not the user's change
+    });
+
+    it('"Use theirs" for a way drops the user\'s change to a node only that way uses', async () => {
+      _editor.merge([
+        node('n1', 1, {}, [0, 0]), node('n2', 1, {}, [1, 0]),
+        new Rapid.OsmWay(_context, { id: 'w1', version: 1, nodes: ['n1', 'n2'], tags: { highway: 'path' } })
+      ]);
+      _editor.perform(Rapid.actionMoveNode('n2', [1, 1]));
+      _editor.perform(Rapid.actionChangeTags('w1', { highway: 'footway' }));
+      _editor.commit({ stringID: 'edits' });
+      serverNode('n1', 1, {}, [0, 0]);
+      serverNode('n2', 1, {}, [1, 0]);
+      _server.set('w1', { type: 'way', id: 'w1', version: 2, visible: true, nodes: ['n1', 'n2'], tags: { highway: 'cycleway' }, user: 'other' });
+      _responses.push(mismatch('w1'));
+
+      let result = resultAsync();
+      _uploader.save();
+      let { args } = await result;
+      args[1][0].choices[1].action();   // "Use theirs"
+
+      result = resultAsync();
+      _uploader.processResolvedConflicts();
+      const { name } = await result;
+
+      assert.strictEqual(name, 'resultNoChanges');
+      assert.deepEqual(_editor.stable.graph.entity('n2').loc, [1, 0]);
+    });
+
+    it('a choice replaces the one applied before it (the default)', async () => {
+      _editor.merge([
+        node('n1', 1, {}, [0, 0]), node('n2', 1, {}, [1, 0]),
+        new Rapid.OsmWay(_context, { id: 'w1', version: 1, nodes: ['n1', 'n2'], tags: { highway: 'path' } })
+      ]);
+      _editor.perform(Rapid.actionMoveNode('n1', [0, 1]));
+      _editor.commit({ stringID: 'move' });
+      _server.set('n1', { type: 'node', id: 'n1', version: 2, visible: false, user: 'other' });   // they deleted it
+      _responses.push(mismatch('n1'));
+
+      let result = resultAsync();
+      _uploader.save();
+      let { name, args } = await result;
+      assert.strictEqual(name, 'resultConflicts');
+      const conflict = args[1][0];
+      conflict.choices[1].action();   // the screen applies the default, "Use theirs": delete n1 (and take it out of w1)
+      assert.deepEqual(_editor.staging.graph.entity('w1').nodes, ['n2']);
+      conflict.chosen = 'local';
+      conflict.choices[0].action();   // then the user picks "Keep mine"
+      assert.deepEqual(_editor.staging.graph.entity('w1').nodes, ['n1', 'n2'], 'w1 is as the merges left it');
+
+      result = resultAsync();
+      _uploader.processResolvedConflicts();
+      ({ name } = await result);
+
+      assert.strictEqual(name, 'resultSuccess');
+      const uploaded = _uploads.at(-1);
+      assert.deepEqual(uploaded.modified.map(entity => entity.id), ['n1']);
+      assert.deepEqual(uploaded.modified[0].loc, [0, 1]);
+    });
+
     it('merges a way that gained a node only the server has', async () => {
       _editor.merge([
         node('n1', 1, {}, [0, 0]),
@@ -357,6 +471,23 @@ describe('UploaderSystem', () => {
         await result;
 
         assert.deepEqual(_calls, [['mark', '1', 'https://api.example.com'], ['unmark']]);
+      });
+
+      it('is deleted when the conflicts leave nothing to upload', async () => {
+        serverNode('n1', 2, { name: 'C' });   // another mapper renamed it too
+        _responses.push(mismatch('n1'));
+
+        let result = resultAsync();
+        _uploader.save();
+        const { args } = await result;
+        args[1][0].choices[1].action();   // "Use theirs"
+
+        result = resultAsync();
+        _uploader.processResolvedConflicts();
+        const { name } = await result;
+
+        assert.strictEqual(name, 'resultNoChanges');
+        assert.deepEqual(_calls.at(-1), ['clear']);
       });
 
       it('stays marked when we can\'t tell whether the upload went through', async () => {

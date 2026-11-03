@@ -86,4 +86,26 @@ describe('UiConflicts', () => {
     assert.strictEqual($link.size(), 1);
     assert.strictEqual($link.attr('download'), 'changes.osc');
   });
+
+  // (This context has no scheduler, which delays enabling Save in the app.)
+  it('enables Save for a single conflict', () => {
+    const ui = new Rapid.UiConflicts(context)
+      .conflictList([makeConflict('n1')])
+      .origChanges({ modified: [], created: [], deleted: [] });
+
+    $container.call(ui.render);
+    assert.isFalse($container.select('.conflicts-button').node().disabled);
+  });
+
+  it('enables Save once the user has seen the last of several conflicts', () => {
+    const ui = new Rapid.UiConflicts(context)
+      .conflictList([makeConflict('n1'), makeConflict('n2')])
+      .origChanges({ modified: [], created: [], deleted: [] });
+
+    $container.call(ui.render);
+    assert.isTrue($container.select('.conflicts-button').node().disabled);
+
+    $container.selectAll('.conflict-nav-button').nodes()[1].click();   // next
+    assert.isFalse($container.select('.conflicts-button').node().disabled);
+  });
 });

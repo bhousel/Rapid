@@ -6,6 +6,7 @@ import { createOsmEntity } from '../data/index.ts';
 import { Graph } from '../lib/Graph.ts';
 import { utilArrayUnion, utilArrayUniq } from '@rapid-sdk/util';
 
+import type { Action } from '../actions/types.ts';
 import type { Context } from '../Context.ts';
 import type { OsmChangeset } from '../data/OsmChangeset.ts';
 import type { OsmEntity } from '../data/OsmEntity.ts';
@@ -125,6 +126,13 @@ export class UploaderSystem extends AbstractSystem {
   protected _mismatchIDs: Set<EntityID>;
   /** Conflicts discovered during the upload, each with choices for resolution */
   protected _conflicts: UploadConflict[];
+  /**
+   * The other mapper's versions of what the user deleted, by the conflict's entity ID, to put in the
+   * base once the user has resolved the conflicts (not before: Cancel must leave the base as it was)
+   */
+  protected _baseUpdates: Map<EntityID, OsmEntity[]>;
+  /** `staging` after the safe merges, before any conflict's choice: a choice puts back what the previous one changed */
+  protected _mergedGraph: Graph | null;
   /** Errors that occurred during the upload */
   protected _errors: UploadError[];
 
@@ -157,6 +165,8 @@ export class UploaderSystem extends AbstractSystem {
     this._conflictChecks = 0;
     this._mismatchIDs = new Set<EntityID>();
     this._conflicts = [];
+    this._baseUpdates = new Map<EntityID, OsmEntity[]>();
+    this._mergedGraph = null;
     this._errors = [];
 
     // Ensure methods used as callbacks always have `this` bound correctly.
@@ -281,6 +291,8 @@ export class UploaderSystem extends AbstractSystem {
     this._toCheckIDs = new Set<EntityID>();
     this._loadedIDs = new Set<EntityID>();
     this._conflicts = [];
+    this._baseUpdates = new Map<EntityID, OsmEntity[]>();
+    this._mergedGraph = null;
     this._errors = [];
 
     // Store original changes, in case user wants to download them as an .osc file
@@ -447,6 +459,8 @@ export class UploaderSystem extends AbstractSystem {
       // the remote version, so that version (with child nodes the user didn't change) replaces the base copy.
       // (If a child node of the remote way couldn't be loaded, leave the base alone: a way can't be
       // drawn without its nodes. Keeping the deletion then fails on upload, and the user sees why.)
+      // The base is updated once the user resolves the conflicts (`processResolvedConflicts`): if they
+      // cancel instead, the next save has to ask them again.
       if (!local && remote.visible) {
         const children: OsmEntity[] = [];
         let complete = true;
@@ -459,7 +473,7 @@ export class UploaderSystem extends AbstractSystem {
           }
         }
         if (complete) {
-          editor.updateBase([remote, ...children]);
+          this._baseUpdates.set(entityID, [remote, ...children]);
         }
       }
 
@@ -515,17 +529,21 @@ export class UploaderSystem extends AbstractSystem {
         keepTheirs = l10n.t('save.conflict.keep_remote');
       }
 
+      const choose = this._makeChooser();
       this._conflicts.push({
         id: entityID,
         name: entityName(original),
         details: mergeConflicts,
         chosen: 'remote',
         choices: [
-          { id: entityID, type: 'local', text: keepMine, action: () => editor.perform(actionForceLocal) },
-          { id: entityID, type: 'remote', text: keepTheirs, action: () => editor.perform(actionForceRemote) }
+          { id: entityID, type: 'local', text: keepMine, action: () => choose(actionForceLocal) },
+          { id: entityID, type: 'remote', text: keepTheirs, action: () => choose(actionForceRemote) }
         ]
       });
     }
+
+    // What the choices start from: `staging` with every safe merge, and no choice yet
+    this._mergedGraph = new Graph(editor.staging.graph!);
 
 
     /**
@@ -563,6 +581,43 @@ export class UploaderSystem extends AbstractSystem {
       }
       return true;
     }
+  }
+
+
+  /**
+   * Makes the function that applies one conflict's choices in `staging`.
+   * The choices replace each other: the conflict screen applies the default choice when it shows the
+   * conflict, and the user may pick the other one after. So before a choice applies, what the previous
+   * one changed (a deletion also changes the parent ways) is put back as the safe merges left it.
+   * @return A function that applies a choice's action
+   */
+  protected _makeChooser(): (action: Action) => void {
+    const editor = this.context.systems.editor!;
+    let changedIDs = new Set<EntityID>();
+
+    return (action: Action): void => {
+      const merged = this._mergedGraph;
+      const before = new Graph(editor.staging.graph!);
+
+      editor.perform((graph: Graph): Graph => {
+        if (merged) {
+          for (const entityID of changedIDs) {
+            const entity = merged.hasEntity(entityID);
+            const current = graph.hasEntity(entityID);
+            if (!merged.isLocal(entityID)) {
+              graph.revert(entityID);
+            } else if (entity) {
+              graph.replace(entity);
+            } else if (current) {
+              graph.remove(current);
+            }
+          }
+        }
+        return action(graph.commit());
+      });
+
+      changedIDs = editor.staging.graph!.diffIDs(before);
+    };
   }
 
 
@@ -714,6 +769,11 @@ export class UploaderSystem extends AbstractSystem {
    * Called when there were no changes to upload
    */
   protected _didResultInNoChanges(): void {
+    // Nothing differs from OSM any more (e.g. the user chose "Use theirs" for every conflict), so the
+    // session would bring back only what they gave up: remove it, as an upload does.
+    const editor = this.context.systems.editor!;
+    editor.clearBackup();
+
     this.emit('resultNoChanges');
     this._endSave();
   }
@@ -777,17 +837,30 @@ export class UploaderSystem extends AbstractSystem {
     const editor = this.context.systems.editor!;
 
     for (const conflict of this._conflicts) {
-      if (conflict.chosen === 'remote') {   // user chose "use theirs"
+      if (conflict.chosen !== 'remote') continue;   // user chose "use theirs"
+
+      const entity = editor.staging.graph!.hasEntity(conflict.id);
+      const childIDs = (entity?.type === 'way') ? utilArrayUniq((entity as OsmWay).nodes) as EntityID[] : [];
+      editor.perform(actionRevert(conflict.id));
+
+      // The way's shape goes back too: the nodes only it uses (and new nodes nothing uses now).
+      // A node another way uses keeps the user's change: it's an edit of that way too.
+      for (const childID of childIDs) {
         const graph = editor.staging.graph!;
-        const entity = graph.hasEntity(conflict.id) as any;
-        if (entity?.type === 'way') {
-          for (const child of utilArrayUniq(entity.nodes) as EntityID[]) {
-            editor.perform(actionRevert(child));
-          }
-        }
-        editor.perform(actionRevert(conflict.id));
+        const child = graph.hasEntity(childID);
+        if (!child || !graph.isLocal(childID)) continue;
+        if (graph.parentWays(child).some(way => way.id !== conflict.id)) continue;
+        editor.perform(actionRevert(childID));
       }
     }
+
+    // Now that the user chose, what they deleted and the other mapper changed gets the other mapper's
+    // version as its base: a kept deletion uploads against it, and a restored one shows it.
+    const baseUpdates = [...this._baseUpdates.values()].flat();
+    if (baseUpdates.length) {
+      editor.updateBase(baseUpdates);
+    }
+    this._baseUpdates.clear();
 
     // Commit the merges and the user's choices, so that they are what we upload.
     if (editor.hasWorkInProgress) {

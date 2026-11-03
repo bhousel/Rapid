@@ -35,9 +35,9 @@ actions, 45k entities loaded mid-run); backup round trips; `affects()` vs `compl
 4. ✅ **MapRoulette: action clicks write the editor's stale datum over the cached task.** Fixed Nov 3:
    the editor's `_updateTask` and the menu's `_submitTask` start from `maproulette.getTask(id)`.
    Tests: `test/browser/ui/UiMapRouletteEditor.test.js`. Guidance added to `modules/ui/AGENTS.md` §6.
-5. **Cancel on the conflict screen still keeps the user's deletion.** `updateBase` runs during detection,
-   so the next Save deletes the other mapper's v2 without asking. `UploaderSystem.ts:450`, `:766`.
-   *New; confirmed.* Fix: update the base only when "Leave Deleted" is actually chosen.
+5. ✅ **Cancel on the conflict screen still keeps the user's deletion.** Fixed Nov 3: detection keeps
+   the base updates pending (`_baseUpdates`), and `processResolvedConflicts` applies them once the user
+   saves the conflict screen. Done together with 8, 10, 25 and 36 (the save path).
 6. **A line that is one whole new run is accepted untrimmed.** No piece datum is made for a `[0,1]`
    run, so accept uses the source geometry; its ends spike ~1 m back across the sidewalk they join.
    `ConflationSystem.ts:833-852`, `rapid_accept_feature.ts:67-98`. *New; confirmed.* Fix: give a
@@ -46,17 +46,18 @@ actions, 45k entities loaded mid-run); backup round trips; `affects()` vs `compl
    line on top of the existing sidewalk and the accepted piece; Ignore hides the line's pending new
    pieces. `PixiLayerRapid.ts:592` (`run.datum ?? d`). *New; confirmed.* Fix: a non-actionable datum for
    matched runs, or refuse Add/Ignore for a line that has runs.
-8. **Conflicts that leave nothing to upload keep the session; it's offered for restore next time.**
-   `SaveMode.ts:348` (`_resultNoChanges`), then `_reset` nulls `_sessionID`. *New; confirmed.*
-   Fix: `editor.clearBackup()` in the no-changes path.
+8. ✅ **Conflicts that leave nothing to upload keep the session; it's offered for restore next time.**
+   Fixed Nov 3: `UploaderSystem._didResultInNoChanges` clears the backup.
 9. **Undoing a tag change on a new relation deletes the relation and loses the redo.** Undo re-enters
    select, and `SelectMode.exit()` cleans up the now-untagged relation with a new commit.
    `SelectMode.ts:232-252`. *Main too; confirmed.* Fix: skip the cleanup when the exit comes from a
    history jump (stable changed since the mode was entered).
 
 ### Medium
-10. **"Use theirs" on a way reverts the user's changes to all its nodes**, including ones that didn't
-    conflict and are shared with other ways. `UploaderSystem.ts:779-790`. *iD has it too; confirmed.*
+10. ✅ **"Use theirs" on a way reverts the user's changes to all its nodes**, including ones that didn't
+    conflict and are shared with other ways. Fixed Nov 3: a shared node keeps the user's change unless
+    the other mapper changed it too (`merge_remote_changes` `force_remote`, and `processResolvedConflicts`
+    reverts only nodes the way alone uses).
 11. **Counter-based data IDs (GeoScribble, vector tiles) go into `id=` and edit selections**, so after a
     reload or a shared link they name a different feature. `SelectMode.ts:187`, `GeoJSONData.ts:46`,
     `GeoScribbleService.ts:146`. *New; confirmed.* Fix: keep unstable IDs out of `id=` and recorded
@@ -70,9 +71,8 @@ actions, 45k entities loaded mid-run); backup round trips; `affects()` vs `compl
     `sameKeys: ['highway']`, or only join with rules that have target conditions.
 14. **Ctrl/⌘+↑↓ with a mixed selection selects parents/children and also pans the map.**
     `MapInteractionBehavior.ts:160` doesn't check `defaultPrevented`. *New; confirmed.*
-15. **After an upload ends with -6 ("can't tell"), the open changeset is reused**, so `changes_count` no
-    longer tells whether a later upload landed; a later save can delete a session whose newer edits
-    never uploaded. `OsmService.ts:1406`, `:1556`. *New; reading.* Fix: drop `openChangesetID` on -6.
+15. ✅ **After an upload ends with -6 ("can't tell"), the open changeset is reused**, so `changes_count` no
+    longer tells whether a later upload landed. Fixed Nov 3: `sendChangeset` forgets the changeset on -6.
 16. **Conflation results are cached by data ID**, so a new datum with the same ID gets the old runs.
     Latent until vector tile stitching returns, or a dataset reloads with changed geometry.
     `ConflationSystem.ts:385`. *New; confirmed.* Fix: key by datum object (WeakMap).
@@ -91,9 +91,10 @@ actions, 45k entities loaded mid-run); backup round trips; `affects()` vs `compl
     *Main too; confirmed.*
 23. Drag, draw and add-point edits record their working selection as `selectionBefore`
     (`DragNodeMode.ts:352`). *Main too.*
-24. A successful upload reported as -1 "Connection Switched" clears the upload mark (`OsmService.ts:2400`).
-    Very hard to trigger.
-25. "Keep mine" after the default "Use theirs" can leave the parent way edited (`merge_remote_changes.ts`).
+24. ✅ A successful upload reported as -1 "Connection Switched" clears the upload mark. Fixed Nov 3: a
+    switched connection during the upload is -6 (can't tell), both from `_wrapcb` and with no answer.
+25. ✅ "Keep mine" after the default "Use theirs" can leave the parent way edited. Fixed Nov 3: a choice
+    first puts back what the conflict's previous choice changed (`UploaderSystem._makeChooser`).
 26. ✅ Osmose editor's `_updateIssue` has the same stale-datum pattern as 4. Fixed Nov 3 (starts from
     `osmose.getError(id)`), with the `d.key` scan below.
 27. An iD#2085 restore of a frozen stable that's also `_headQueuedGraph` isn't validated again in the
@@ -118,7 +119,8 @@ actions, 45k entities loaded mid-run); backup round trips; `affects()` vs `compl
 33. Undo right after pressing "2" (before the first click) is silently swallowed (`DrawLineMode.ts:233`).
 34. `AbstractPixiLayer.bindData` wipes parent/child links on every rebind (`:220`).
 35. Restoring a backup can move counters backward, including `v`, `graph` and `changeset` (`EditSystem.ts:1833`).
-36. On the conflict screen, Save is only enabled through `scheduler?.setTimeout` (`UiConflicts.ts:191`).
+36. ✅ On the conflict screen, Save is only enabled through `scheduler?.setTimeout`. Fixed Nov 3, with a
+    fallback; also `.attr('disabled', false)` set the attribute (so it disabled Save for one conflict).
 
 Not a bug: a history graph that isn't current and hasn't caught up with the base gives stale searches,
 and its own `geometry()` is just as stale. That's the documented design, and nothing searches one.
