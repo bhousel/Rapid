@@ -777,10 +777,9 @@ export class Graph {
 //    }
 
     const base = this.base;
-    const head = stack.at(-1);
-    const restoreIDs = new Set<EntityID>();
     const newIDs = new Set<EntityID>();
     const replaced: OsmEntity[] = [];   // older copies a forced rebase replaced
+    const arrivedWays: OsmWay[] = [];
 
     const arr = [...utilIterable(entities)].sort(this._nodesFirst);
     for (const entity of arr) {
@@ -795,24 +794,32 @@ export class Graph {
       if (previous) {
         replaced.push(previous);
       }
-
-      // A weird thing we have to watch out for.. iD#2085
-      // Sometimes an edit can remove a node, then we download more information and realize that
-      // that Node was shared with another way.  If we detect this condition, restore the node.
-      // (A "delete" is stored as: setting that entity = `undefined`)
-      // This doesn't apply to a way the user deleted: its nodes were deleted along with it.
-      const wayDeleted = head?._isDeleted(entity.id);
-      if (head && entity.type === 'way' && !wayDeleted) {
-        for (const id of (entity as OsmWay).nodes) {
-          if (head._isDeleted(id)) {
-            restoreIDs.add(id);
-          }
-        }
+      if (entity.type === 'way') {
+        arrivedWays.push(entity as OsmWay);
       }
     }
 
+    // A weird thing we have to watch out for.. iD#2085
+    // Sometimes an edit can remove a node, then we download more information and realize that
+    // that Node was shared with another way.  If we detect this condition, restore the node.
+    // (A "delete" is stored as: setting that entity = `undefined`)
+    // This doesn't apply to a way the user deleted: its nodes were deleted along with it.
+    // Each graph of the stack decides for itself: an edit the user undid (or one kept in a
+    // checkpoint) may have deleted a node that staging still has.
+    // Only a node that some graph has written can be deleted in one, so most ways are skipped quickly.
+    const slots = this._lineage.slots;
+    const candidates = arrivedWays.filter(way => way.nodes.some(nodeID => slots.has(nodeID)));
     const restored = new Map<Graph, Set<EntityID>>();
     for (const graph of stack) {
+      const restoreIDs = new Set<EntityID>();
+      for (const way of candidates) {
+        if (graph._isDeleted(way.id)) continue;
+        for (const nodeID of way.nodes) {
+          if (graph._isDeleted(nodeID)) {
+            restoreIDs.add(nodeID);
+          }
+        }
+      }
       const ids = graph._updateRebased(restoreIDs);
       if (ids.size) {
         restored.set(graph, ids);

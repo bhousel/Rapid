@@ -17,11 +17,11 @@ parent lists and the session difference after every step; two live soaks on Ball
 actions, 45k entities loaded mid-run); backup round trips; `affects()` vs `complete()` over 1,500 seeds.
 
 ### High: fix before testers
-1. **iD#2085 restores miss redo edits and checkpoints.** `Graph.rebase` only checks `stack.at(-1)`
-   (staging) for deleted nodes. Delete a node, undo, load a tile with a way through it, redo:
-   `OsmEntity n2 not found` (render, delete way, multipolygon join). 4–9% of random histories.
-   `Graph.ts:804`. *Main too (wider now: checkpoints, return edit); confirmed.* Fix: gather restore IDs
-   from every graph in the stack that deleted the node (and didn't delete the way), not just the head.
+1. ✅ **iD#2085 restores miss redo edits and checkpoints.** Fixed Nov 3: `Graph.rebase` decides the
+   restores per graph of the stack (a node that graph deleted, under an arriving way it didn't delete),
+   skipping ways with no node any graph has written. Tests in `Graph.test.js` and
+   `EditSystemJournal.test.js`; the model test now encodes the per-graph rule. The bug-hunt harness
+   (600 seeds × 200 steps) is clean.
 2. **A dev-API session can be restored and uploaded against live OSM.** Session records don't store
    the API; the source switch isn't remembered, so every load starts on live. v4 restore fetches
    `baseVersions` from live (same IDs, unrelated features), and Save may overwrite live data without a

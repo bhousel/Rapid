@@ -984,6 +984,20 @@ describe('Graph', () => {
       assert.strictEqual(head.entity('n'), n);
     });
 
+    it('re-adds a deleted node in every graph that deleted it, not only the last of the stack', () => {
+      const n = new Rapid.OsmNode(context, { id: 'n' });
+      const w1 = new Rapid.OsmWay(context, { id: 'w1', nodes: ['n'] });
+      const w2 = new Rapid.OsmWay(context, { id: 'w2', nodes: ['n'] });
+      const base = new Rapid.Graph(context, [n, w1]);
+      const deleted = new Rapid.Graph(base).remove(n);   // e.g. an edit the user undid
+      deleted.freeze();
+      const head = new Rapid.Graph(base);                // didn't delete it
+      const { restored } = base.rebase([w2], [deleted, head]);
+      assert.strictEqual(deleted.entity('n'), n);
+      assert.sameMembers([...restored.keys()], [deleted]);
+      assert.deepEqual(deleted.verify(), []);
+    });
+
     it('doesn\'t re-add the nodes of a way that was deleted along with them', () => {
       const n = new Rapid.OsmNode(context, { id: 'n' });
       const w1 = new Rapid.OsmWay(context, { id: 'w1', nodes: ['n'] });

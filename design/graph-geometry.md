@@ -307,7 +307,9 @@ Rebase belongs to the lineage: graphs aren't passed in.
    deleted the way too. This applies to every graph, redo graphs included. Restored IDs go into the
    next emit and the session difference (section 8). A graph that isn't frozen journals the restore,
    so its next commit rebuilds the shapes that contain the node; a frozen graph rebuilds them during
-   the rebase, once the base's shapes are current.
+   the rebase, once the base's shapes are current. (Until November 3, 2026 the code decided from the
+   newest graph's deletions only, as iD did, so an undone edit or one kept in a checkpoint could come
+   back with a way through a deleted node.)
 
 Measured (prototype, an 11k-entity tile with 5 new ways through nodes the user moved): the rebase and
 staging's update take 16.5-19.2 ms, against 14.5-17.7 ms for today's rebase with a 12-graph history.

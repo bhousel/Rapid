@@ -283,4 +283,52 @@ describe('EditSystem journal', () => {
       assert.include(editor.entitiesInBox(box, graph).map(entity => entity.id), 'n1');
     }
   });
+
+
+  // A road through n2, and a way arriving later that also uses n2
+  async function makeRoad() {
+    const { context, editor } = await makeEditor();
+    editor.merge([
+      new Rapid.OsmNode(context, { id: 'n1', loc: [0, 0], version: 1 }),
+      new Rapid.OsmNode(context, { id: 'n2', loc: [0.001, 0], version: 1 }),
+      new Rapid.OsmNode(context, { id: 'n3', loc: [0.002, 0], version: 1 }),
+      new Rapid.OsmWay(context, { id: 'w1', nodes: ['n1', 'n2', 'n3'], version: 1 })
+    ]);
+    const arrive = () => editor.merge([
+      new Rapid.OsmNode(context, { id: 'n4', loc: [0.001, 0.001], version: 1 }),
+      new Rapid.OsmWay(context, { id: 'w2', nodes: ['n2', 'n4'], version: 1 })
+    ]);
+    return { editor, arrive };
+  }
+
+  it('restores a deleted node in an edit the user undid, so redoing it is complete (iD#2085)', async () => {
+    const { editor, arrive } = await makeRoad();
+    editor.perform(Rapid.actionDeleteNode('n2'));
+    editor.commit({ stringID: 'delete' });
+    editor.undo();
+    arrive();
+    editor.redo();
+
+    const graph = editor.stable.graph;
+    assert.isOk(graph.hasEntity('n2'));
+    assert.deepEqual(graph.childNodes(graph.entity('w2')).map(node => node.id), ['n2', 'n4']);
+    assert.deepEqual(graph.entity('w1').nodes, ['n1', 'n3']);   // the user's edit to w1 stays
+    assert.deepEqual(graph.verify(), []);
+  });
+
+  it('restores a deleted node in an edit kept in a checkpoint (iD#2085)', async () => {
+    const { editor, arrive } = await makeRoad();
+    editor.perform(Rapid.actionDeleteNode('n2'));
+    editor.commit({ stringID: 'delete' });
+    editor.setCheckpoint('kept');
+    editor.undo();
+    editor.perform(Rapid.actionNoop());
+    editor.commit({ stringID: 'other' });   // the deleting edit is now only in the checkpoint
+    arrive();
+    editor.restoreCheckpoint('kept');
+
+    const graph = editor.stable.graph;
+    assert.deepEqual(graph.childNodes(graph.entity('w2')).map(node => node.id), ['n2', 'n4']);
+    assert.deepEqual(graph.verify(), []);
+  });
 });

@@ -352,22 +352,24 @@ function runSeed(context, seed, steps, log) {
       const stack = writable.filter(() => chance(0.6));
       log.push(`B.rebase([${entities.map(e => e.key)}], [${stack.map(s => s.name)}], ${force})`);
 
-      // iD#2085: a node the head graph deleted comes back when a downloaded way uses it,
-      // unless the head graph deleted that way too. It comes back in every graph of the stack.
-      const head = stack.at(-1);
-      const restoreIDs = new Set();
+      const arrivedWays = [];
       for (const entity of entities) {
         if (!force && baseModel.has(entity.id)) continue;
         baseModel.set(entity.id, entity);
-        if (head && entity.type === 'way' && !head.model.isDeleted(entity.id)) {
-          for (const nodeID of entity.nodes) {
-            if (head.model.isDeleted(nodeID)) restoreIDs.add(nodeID);
+        if (entity.type === 'way') arrivedWays.push(entity);
+      }
+      // iD#2085: in each graph of the stack, a node that graph deleted comes back when a downloaded
+      // way uses it, unless that graph deleted the way too.
+      for (const s of stack) {
+        const restoreIDs = new Set();
+        for (const way of arrivedWays) {
+          if (s.model.isDeleted(way.id)) continue;
+          for (const nodeID of way.nodes) {
+            if (s.model.isDeleted(nodeID)) restoreIDs.add(nodeID);
           }
         }
-      }
-      for (const s of stack) {
         for (const id of restoreIDs) {
-          if (s.model.isDeleted(id)) s.model.local.delete(id);
+          s.model.local.delete(id);
         }
       }
       baseGraph.rebase(entities, stack.map(s => s.graph), force);
