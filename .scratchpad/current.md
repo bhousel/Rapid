@@ -94,7 +94,8 @@ actions, 45k entities loaded mid-run); backup round trips; `affects()` vs `compl
 24. A successful upload reported as -1 "Connection Switched" clears the upload mark (`OsmService.ts:2400`).
     Very hard to trigger.
 25. "Keep mine" after the default "Use theirs" can leave the parent way edited (`merge_remote_changes.ts`).
-26. Osmose editor's `_updateIssue` has the same stale-datum pattern as 4 (`UiOsmoseEditor.ts:223`).
+26. ✅ Osmose editor's `_updateIssue` has the same stale-datum pattern as 4. Fixed Nov 3 (starts from
+    `osmose.getError(id)`), with the `d.key` scan below.
 27. An iD#2085 restore of a frozen stable that's also `_headQueuedGraph` isn't validated again in the
     head cache (`validateAsync` sees "caught up").
 28. `graph.geometry()` for a new way passed to a graph that doesn't have it reads an undefined shape
@@ -103,7 +104,14 @@ actions, 45k entities loaded mid-run); backup round trips; `affects()` vs `compl
 ### Already in `main`
 29. After a new note is saved, the "new note" editor stays up (looks up the removed `-1`); a second Save
     could post a duplicate note. `SelectMode.ts:333-340`.
-30. Note and KeepRight Save clicks may be lost: the textarea's blur re-joins the buttons under the pointer.
+30. ✅ Note and KeepRight Save clicks may be lost: the textarea's blur re-joins the buttons under the pointer.
+    Confirmed Nov 3 in the debug Chrome with real mouse events (a new note's Cancel did nothing), fixed by
+    the `d.key` scan: the note, KeepRight and Osmose editors key their sections by `d.id`, and the note
+    editor updates from the cached note. Found on the way: adding a note opened no editor at all
+    (`AddNoteMode` made the note without `type: 'note'`, which `SelectMode` checks; main too), fixed.
+    Tests: `test/browser/ui/UiQaEditors.test.js`, `test/unit/modes/AddNoteMode.test.js`.
+    The scan: the only other `d.key` joins on data in `modules/ui` are display-only headers and details,
+    which are meant to rebuild for a new version; nothing else updates a datum in place of a newer cache.
 31. The walkthrough leaves a duplicate session (reset, then `fromJSONAsync`); restoring it later
     duplicates an upload. `UiIntro.ts:336`.
 32. "Duplicate tab" copies `sessionStorage`, so two tabs can share a session (`_isLiveElsewhere`).

@@ -92,6 +92,10 @@ if (scheduler) {
   `service.getTask(datum.id) ?? datum`, or the update drops what they loaded.
 - **Key a component's own sections by the datum's `id`, not its `key`.** `key` changes with every new
   version, so a join keyed on it removes the section and enters a new one: the user loses focus and
-  what they typed, and the section shows "Loading" again. Keyed by `id`, a new version updates it.
+  what they typed, the section shows "Loading" again, and a click is lost when a blur makes the new
+  version (pressing Save blurs the textarea, the buttons are replaced, and the click lands on nothing).
+  Keyed by `id`, a new version updates it, so anything that depends on the datum goes on the update
+  selection. Display-only sections that build their content on enter (headers, details) can stay keyed
+  by `key`, so a new version rebuilds them.
 - **After an async load, use what the load returns**, not the datum bound to an element before it:
   the loaded details are on a new object.

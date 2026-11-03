@@ -97,6 +97,12 @@ Things that went wrong once and shouldn't go wrong again.
   same edit session (a way stretched from lon 10 to lon 30). Reset the editor between such tests.
   And `validateAsync()` returns the validation already running, so await `_validationPromise` until it's
   `null` before reading issues.
+- **Check event-order bugs with real mouse events, in a real browser.** "Pressing Save blurs the
+  textarea, the blur replaces the buttons, the click is lost" can't be shown in happy-dom (its
+  `click()` fires no mousedown or blur). Playwright attached to the debug Chrome
+  (`chromium.connectOverCDP`, then `page.mouse.click`) showed it in one run. Pick a path that writes
+  nothing to OSM (a new note's Cancel). The restore prompt covers the map after a reload: "Skip for now"
+  keeps the sessions.
 - **Validation waits while a backup can be restored** (`editor.canRestoreBackup`). In the debug Chrome
   there usually is one, so live validation checks find no issues. Don't touch the backup: override
   the getter on the instance for the run, and undo the run's edits (a session undone back to nothing

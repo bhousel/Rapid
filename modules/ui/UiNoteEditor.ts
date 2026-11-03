@@ -161,9 +161,11 @@ export class UiNoteEditor extends EventEmitter {
     const l10n = context.systems.l10n!;
     const scheduler = context.systems.scheduler;  // optional
 
+    // Keyed by the note's ID, not its `key`: typing makes a new version of the note, which should
+    // update this section, not replace it while the user works in it (see `modules/ui/AGENTS.md`).
     const isSelected = (this.datum && this.datum.dataID === context.selectedIDs()[0]);
     let $noteSave: D3Selection = $selection.selectAll('.note-save')
-      .data((isSelected ? [this.datum] : []), (d: OsmNote) => d.key!);
+      .data((isSelected ? [this.datum] : []), (d: OsmNote) => d.id);
 
     // fast submit if user presses cmd+enter
     const keydown = (e: KeyboardEvent): void => {
@@ -201,9 +203,11 @@ export class UiNoteEditor extends EventEmitter {
       const val = ($input.property('value') as string).trim() || undefined;
 
       // store the unsaved comment with the note itself
-      this.datum = this.datum!.update({ newComment: val });
+      // (starting from the cached note, which may be newer: a reload of its tile stores a new one)
+      const osm = context.services.osm;
+      const current = osm?.getNote(this.datum!.id) ?? this.datum!;
+      this.datum = current.update({ newComment: val });
 
-      const osm = context.services.osm!;
       if (osm) {
         osm.replaceNote(this.datum!);  // update note cache
       }
@@ -366,8 +370,9 @@ export class UiNoteEditor extends EventEmitter {
       return (hasAuth && d.props.status === 'open' && d.props.newComment) ? null : true;
     };
 
+    // Keyed by ID: replacing the buttons when the textarea blurs would swallow the click that blurred it
     let $buttons: D3Selection = $selection.selectAll('.buttons')
-      .data((isSelected ? [this.datum] : []), (d: OsmNote) => d.key!);
+      .data((isSelected ? [this.datum] : []), (d: OsmNote) => d.id);
 
     // exit
     $buttons.exit()
