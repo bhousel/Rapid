@@ -18,6 +18,8 @@ import type { Vec2 } from '@rapid-sdk/math';
 export interface DragNodeModeOptions {
   /** If set, reselect these IDs when finished dragging */
   reselectIDs?: EntityID[];
+  /** What was selected when the drag started (undo goes back to it) */
+  selectionBefore?: DataID[];
   /** If set, drag the node for the given id */
   nodeID?: EntityID;
   /** If set, create a node from the given midpoint */
@@ -35,6 +37,8 @@ export class DragNodeMode extends AbstractMode {
 
   /** When finished dragging, restore the selected ids from before */
   protected _reselectIDs: EntityID[];
+  /** What was selected when the drag started */
+  protected _selectionBefore: DataID[];
   /** Used to set the correct edit label */
   protected _wasMidpoint: boolean;
   /** Difference between where the pin is, and where on the pin the user clicked */
@@ -51,6 +55,7 @@ export class DragNodeMode extends AbstractMode {
     this.dragNode = null;
 
     this._reselectIDs = [];
+    this._selectionBefore = [];
     this._wasMidpoint = false;
     this._dragOffset = [0, 0];
 
@@ -76,6 +81,7 @@ export class DragNodeMode extends AbstractMode {
     const ui = context.systems.ui!;
 
     this._reselectIDs = options.reselectIDs ?? [];
+    this._selectionBefore = options.selectionBefore ?? [];
     const midpoint = options.midpoint;
     const nodeID = options.nodeID;
 
@@ -153,6 +159,7 @@ export class DragNodeMode extends AbstractMode {
 
     this.dragNode = null;
     this._reselectIDs = [];
+    this._selectionBefore = [];
     this._wasMidpoint = false;
     this._dragOffset = [0, 0];
     this._selectedIDs = [];
@@ -168,6 +175,16 @@ export class DragNodeMode extends AbstractMode {
 
     context.behaviors.mapNudge!
       .off('nudge', this._nudge);
+  }
+
+
+  /**
+   * What was selected when the drag started (not the node being dragged).
+   * @return  Array of `DataID`s (a copy)
+   * @readonly
+   */
+  public get selectionBefore(): DataID[] {
+    return [...this._selectionBefore];
   }
 
 
@@ -348,7 +365,7 @@ export class DragNodeMode extends AbstractMode {
       label = this._moveLabel();
     }
 
-    editor.commit({ ...label, selection: [this.dragNode.id] });
+    editor.commit({ ...label, selection: [this.dragNode.id], selectionBefore: this._selectionBefore });
 
     // Choose next mode
     // (Note that if the drag node is gone, select mode will fallback to browse mode)

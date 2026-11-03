@@ -289,8 +289,12 @@ redo again (back at the other end).
 
 **Undo during a drag or draw** (work in progress) throws the work away and emits `historyjump` with the
 same index. The map doesn't move (nothing in the history changed), but `MapSystem` still enters a mode,
-which ends the drag. Draw modes handle `historyjump` themselves. It doesn't save the return view;
-the next undo, which actually leaves the newest edit, does.
+which ends the drag. It selects the mode's `selectionBefore`, what was selected before the work began
+(a drag records that when it starts, and commits it as the edit's `selectionBefore` too), not the
+newest edit's selection, which may be anywhere. Draw modes handle `historyjump` themselves: an undo or
+redo before the first click leaves draw mode and stays done, and only the edits made while drawing
+are rolled back when a drawing is cancelled. It doesn't save the return view; the next undo, which
+actually leaves the newest edit, does.
 
 **Restore** shows the extent of the last kept edit.
 

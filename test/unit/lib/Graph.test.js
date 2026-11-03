@@ -114,6 +114,19 @@ describe('Graph', () => {
     });
   });
 
+  describe('geometry', () => {
+    it('throws for a new way that the graph doesn\'t have', () => {
+      const n1 = new Rapid.OsmNode(context, { id: 'n1', loc: [0, 0] });
+      const n2 = new Rapid.OsmNode(context, { id: 'n2', loc: [1, 0] });
+      const graph = new Rapid.Graph(context, [n1, n2]);
+      const way = new Rapid.OsmWay(context, { id: 'w-1', nodes: ['n1', 'n2'] });
+      assert.throws(() => graph.geometry(way), /no shape/i);
+
+      const withWay = new Rapid.Graph(graph).replace(way).commit();
+      assert.isOk(withWay.geometry(way).parts[0]);   // a graph that has it has its shape
+    });
+  });
+
   describe('parentWays', () => {
     it('returns an array of ways that contain the given node id', () => {
       const n1 = new Rapid.OsmNode(context, { id: 'n1' });

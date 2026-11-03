@@ -18,6 +18,7 @@ import type { Context } from '../Context.ts';
  * -  `operations`       - Array of operations allowed on the right-click edit menu
  * -  `selectedIDs`      - The data IDs of the selected data (see `design/data-ids.md`)
  * -  `selectedData`     - `Map<DataID, AbstractData>` of the selected data, looked up by data ID
+ * -  `selectionBefore`  - The data IDs that were selected before the mode's work started
  */
 export class AbstractMode extends EventEmitter {
 
@@ -113,6 +114,18 @@ export class AbstractMode extends EventEmitter {
    */
   public get selectedIDs(): DataID[] {
     return [...this._selectedIDs];
+  }
+
+
+  /**
+   * What was selected before the work this mode is doing started. Undo while that work is in
+   * progress throws it away and selects this. Most modes work on what they have selected; a mode
+   * that selects something else while it works (dragging a node) overrides this.
+   * @return  Array of `DataID`s (a copy)
+   * @readonly
+   */
+  public get selectionBefore(): DataID[] {
+    return this.selectedIDs;
   }
 
 }

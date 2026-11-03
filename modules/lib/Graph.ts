@@ -470,6 +470,7 @@ export class Graph {
    * Uncommitted writes are committed first, so the answer is always current.
    * @param   entity - The entity to get the geometry of (this Graph's version of it)
    * @return  Its Geometry
+   * @throws  Error if this Graph has no shape for the entity (a new way or relation it doesn't have)
    */
   public geometry(entity: OsmEntity): Geometry {
     if (entity.type === 'node') return entity.geoms;
@@ -479,6 +480,11 @@ export class Graph {
     }
     const record = this._getRecord(entity.id);
     if (record?.geometry) return record.geometry;
+    if (!record?.isLocal && !this.base.entities.get(entity.id)) {
+      // Neither this Graph nor its base has it (a new way passed to a Graph without it): fail
+      // loudly, instead of handing back the object's own, never built, shape.
+      throw new Error(`Graph.geometry: ${entity.id} has no shape in this Graph`);
+    }
     const baseEntity = record?.isLocal ? this.base.entities.get(entity.id) : entity;
     return (baseEntity ?? entity).baseGeometry;
   }

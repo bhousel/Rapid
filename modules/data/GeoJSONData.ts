@@ -1,4 +1,5 @@
 import { AbstractData, AbstractDataProps } from './AbstractData.ts';
+import { GENERATED_ID_PREFIX } from './dataID.ts';
 import { Geometry } from '../lib/Geometry.ts';
 
 import type { Context } from '../Context.ts';
@@ -43,7 +44,7 @@ export class GeoJSONData<P extends GeoJSONProps = GeoJSONProps> extends Abstract
     super(otherOrContext, props);
 
     if (!this.props.id) {  // no ID provided - generate one
-      this.props.id = 'geojson-' + this.context.next('geojson');
+      this.props.id = GENERATED_ID_PREFIX + this.context.next('geojson');
     }
 
     // For consistency, offer a `this.id` property.

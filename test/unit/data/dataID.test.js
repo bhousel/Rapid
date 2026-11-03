@@ -42,6 +42,20 @@ describe('dataID', () => {
     });
   });
 
+  describe('isStableDataID', () => {
+    it('is false for a local ID that GeoJSONData made up from a counter', () => {
+      const context = new Rapid.MockContext();
+      const d = new Rapid.GeoJSONData(context, { namespace: 'overture-buildings', geojson: { type: 'Feature', properties: {}, geometry: { type: 'Point', coordinates: [0, 0] } } });
+      assert.isFalse(Rapid.isStableDataID(d.dataID));
+    });
+
+    it('is true for IDs that come from the data', () => {
+      assert.isTrue(Rapid.isStableDataID('w123'));
+      assert.isTrue(Rapid.isStableDataID('fbRoads:abc'));
+      assert.isTrue(Rapid.isStableDataID('osm-notes:123'));
+    });
+  });
+
   describe('AbstractData.dataID', () => {
     const context = new Rapid.MockContext();
 

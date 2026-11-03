@@ -96,6 +96,25 @@ describe('EditSystem sessions (Phase 2)', () => {
       assert.lengthOf(records, 2);
     });
 
+    it('a reset and a restore of the same edits (the walkthrough) continues their session', async () => {
+      editor.perform(actionAddTaggedNode('n-1', [1, 2], { building: 'yes' }));
+      editor.commit({ stringID:'building', selection: ['n-1'] });
+      await editor.immediateBackup();
+      const sessionID = editor.sessionID;
+      const json = editor.toJSON();
+
+      await editor.resetAsync();
+      await editor.fromJSONAsync(json);
+      await editor.immediateBackup();      // a backup that ran before the session was continued
+      editor.continueSession(sessionID);
+      await editor.immediateBackup();
+      await Bun.sleep(5);                  // let the best-effort delete land
+
+      assert.strictEqual(editor.sessionID, sessionID);
+      const records = await database.getAllFromIndex('sessions', 'by-origin', ORIGIN);
+      assert.deepEqual(records.map(r => r.id), [sessionID]);   // one session, not two
+    });
+
     it('removes the session when the user undoes all of its edits', async () => {
       editor.perform(actionAddTaggedNode('n-1', [1, 2], { building: 'yes' }));
       editor.commit({ stringID:'building', selection: ['n-1'] });
@@ -348,6 +367,26 @@ describe('EditSystem sessions (Phase 2)', () => {
 
       const list = await editor.listRestorableSessionsAsync();
       assert.include(list.map(s => s.id), 's-mine');
+    });
+
+    it('keeps the owned session after a reload, which marked the page as gone', async () => {
+      await seedSession('s-mine', { heartbeatAt: Date.now(), updatedAt: 5000 });
+      globalThis.sessionStorage.setItem(OWN_KEY, 's-mine');
+      editor._markPageHidden(true);    // `pagehide`, before the reload
+
+      editor._forgetCopiedSession();   // the new page starts
+      const list = await editor.listRestorableSessionsAsync();
+      assert.include(list.map(s => s.id), 's-mine');
+    });
+
+    it('a duplicated tab doesn\'t treat the session open in the original tab as its own', async () => {
+      await seedSession('s-theirs', { heartbeatAt: Date.now(), updatedAt: 5000 });
+      globalThis.sessionStorage.setItem(OWN_KEY, 's-theirs');   // copied from the tab, which is still open
+
+      editor._forgetCopiedSession();   // the duplicate starts
+      assert.isNull(globalThis.sessionStorage.getItem(OWN_KEY));
+      const list = await editor.listRestorableSessionsAsync();
+      assert.notInclude(list.map(s => s.id), 's-theirs');   // live in the other tab
     });
 
     it('records the owned session id in sessionStorage on backup', async () => {

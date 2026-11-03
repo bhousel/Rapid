@@ -2,6 +2,7 @@ import { beforeEach, describe, it } from 'bun:test';
 import { assert } from 'chai';
 import * as Rapid from '../../../modules/headless.js';
 import { SelectMode } from '../../../modules/modes/SelectMode.ts';
+import { UiNoteEditor } from '../../../modules/ui/UiNoteEditor.ts';
 
 
 describe('SelectMode', () => {
@@ -105,6 +106,15 @@ describe('SelectMode', () => {
   });
 
 
+  it('leaves a data ID that came from a counter out of `id=`', () => {
+    const d = new Rapid.GeoJSONData(context, { namespace: 'vt-test', geojson: { type: 'Feature', properties: {}, geometry: { type: 'Point', coordinates: [0, 0] } } });
+    context.systems.spatial.replaceData('vt-test', d);
+    mode.enter({ selection: ['w1', d.dataID] });
+    assert.deepEqual(mode.selectedIDs, ['w1', d.dataID]);   // still selected
+    assert.strictEqual(urlParams.id, 'w1');
+  });
+
+
   describe('exit', () => {
     it('clears the selection, the select class and `id=`', () => {
       mode.enter({ selection: ['w1', 'notes-test:1'] });
@@ -114,6 +124,40 @@ describe('SelectMode', () => {
       assert.strictEqual(selectClasses.size, 0);
       assert.isNull(urlParams.id);
       assert.deepEqual(mode.operations, []);
+    });
+  });
+
+
+  describe('note editor', () => {
+    it('selects a new note by its real id once it is saved', () => {
+      const noop = () => {};
+      context.systems.ui = { closeEditMenu: noop, Sidebar: { reset: noop, show: noop, hide: noop } };
+      context.systems.gfx.immediateRedraw = noop;
+      const entered = [];
+      context.enter = (modeID, options) => entered.push([modeID, options]);
+
+      let onChange;
+      const on = UiNoteEditor.prototype.on;
+      UiNoteEditor.prototype.on = function(eventName, fn) {
+        if (eventName === 'change') onChange = fn;
+        return on.call(this, eventName, fn);
+      };
+      try {
+        const props = { type: 'note', serviceID: 'osm', namespace: 'osm-notes', loc: [0, 0], isNew: true };
+        const newNote = new Rapid.MarkerData(context, { id: '-1', ...props });
+        context.systems.spatial.replaceData('osm-notes', newNote);
+        mode.enter({ selection: [newNote.dataID] });
+      } finally {
+        UiNoteEditor.prototype.on = on;
+      }
+
+      // Saving removes the new note and caches the saved one, then the editor emits it.
+      const saved = new Rapid.MarkerData(context, { id: '123', type: 'note', serviceID: 'osm', namespace: 'osm-notes', loc: [0, 0] });
+      context.systems.spatial.removeItems('osm-notes', '-1');
+      context.systems.spatial.replaceData('osm-notes', saved);
+      onChange(saved);
+
+      assert.deepEqual(entered, [['select', { selection: [saved.dataID] }]]);
     });
   });
 });

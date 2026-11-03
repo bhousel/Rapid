@@ -478,7 +478,14 @@ export class MapSystem extends AbstractSystem {
     const modeID = context.mode?.id ?? '';
     if (/^draw/.test(modeID)) return;
 
-    const selection = (isUndo ? edit.props.selectionBefore : edit.props.selection) ?? [];
+    // Same index: go back to what was selected before the work that was thrown away, not to the
+    // newest edit's selection (which may be anything, anywhere).
+    let selection: DataID[];
+    if (prevIndex === currIndex) {
+      selection = context.mode?.selectionBefore ?? [];
+    } else {
+      selection = (isUndo ? edit.props.selectionBefore : edit.props.selection) ?? [];
+    }
     this._restoreSelection(selection);
   }
 

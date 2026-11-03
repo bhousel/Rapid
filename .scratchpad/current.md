@@ -57,10 +57,11 @@ actions, 45k entities loaded mid-run); backup round trips; `affects()` vs `compl
     conflict and are shared with other ways. Fixed Nov 3: a shared node keeps the user's change unless
     the other mapper changed it too (`merge_remote_changes` `force_remote`, and `processResolvedConflicts`
     reverts only nodes the way alone uses).
-11. **Counter-based data IDs (GeoScribble, vector tiles) go into `id=` and edit selections**, so after a
-    reload or a shared link they name a different feature. `SelectMode.ts:187`, `GeoJSONData.ts:46`,
-    `GeoScribbleService.ts:146`. *New; confirmed.* Fix: keep unstable IDs out of `id=` and recorded
-    selections; give GeoScribble a deterministic key.
+11. ✅ **Counter-based data IDs (GeoScribble, vector tiles) go into `id=` and edit selections**, so after a
+    reload or a shared link they name a different feature. Fixed Nov 3: `isStableDataID()` (false for
+    `geojson-N`) keeps them out of `id=` and out of selections restored from a backup; GeoScribble keys
+    features by their own `id`. Still open: accept/ignore of Overture data records counter IDs
+    (`design/data-ids.md` open question 3; needs GERS-keyed vector tiles).
 12. **Backups saved by `main` recorded accepts without the dataset prefix** (`w-123`, not
     `fbRoads:w-123`). Restoring one shows accepted features again, and they can be added twice.
     `_upgradeEditProps`, `RapidSystem.ts:895`. *New; reading.* Fix: prefix in the upgrade from the edit's
@@ -87,24 +88,27 @@ actions, 45k entities loaded mid-run); backup round trips; `affects()` vs `compl
     it looks for the segment again, like a split edge).
 21. ✅ Pieces are cleared by `ds.id` but cached by `spatialID`; a dataset with `conflation` but no `rules`
     throws. Fixed Nov 3: `invalidate` clears by namespace; `RapidDataset` fills in missing settings.
-22. Undo during a drag/move selects the newest edit's `selection` (maybe offscreen), `MapSystem.ts:481`.
-    *Main too; confirmed.*
-23. Drag, draw and add-point edits record their working selection as `selectionBefore`
-    (`DragNodeMode.ts:352`). *Main too.*
+22. ✅ Undo during a drag/move selects the newest edit's `selection` (maybe offscreen). Fixed Nov 3:
+    same-index undo selects `mode.selectionBefore` (new on `AbstractMode`; `DragNodeMode` overrides it).
+23. ✅ Drag edits record their working selection as `selectionBefore`. Fixed Nov 3: `DragBehavior` passes
+    what was selected, and the drag commits it. Draw and add-point were fine: a draw edit's
+    `selectionBefore` is the line being drawn (gone on undo of its first edit, so browse), add-point's is `[]`.
 24. ✅ A successful upload reported as -1 "Connection Switched" clears the upload mark. Fixed Nov 3: a
     switched connection during the upload is -6 (can't tell), both from `_wrapcb` and with no answer.
 25. ✅ "Keep mine" after the default "Use theirs" can leave the parent way edited. Fixed Nov 3: a choice
     first puts back what the conflict's previous choice changed (`UploaderSystem._makeChooser`).
 26. ✅ Osmose editor's `_updateIssue` has the same stale-datum pattern as 4. Fixed Nov 3 (starts from
     `osmose.getError(id)`), with the `d.key` scan below.
-27. An iD#2085 restore of a frozen stable that's also `_headQueuedGraph` isn't validated again in the
-    head cache (`validateAsync` sees "caught up").
-28. `graph.geometry()` for a new way passed to a graph that doesn't have it reads an undefined shape
-    (falls back to the passed object's `baseGeometry`). No caller does this today.
+27. ✅ An iD#2085 restore of a frozen stable that's also `_headQueuedGraph` isn't validated again in the
+    head cache. Fixed Nov 3: when stable is the graph validated but `stablechange` named IDs, those are
+    validated (and a finished run goes again if more arrived).
+28. ✅ `graph.geometry()` for a new way passed to a graph that doesn't have it returned the object's empty,
+    never built shape. Fixed Nov 3: it throws (no record, and base doesn't have it).
 
 ### Already in `main`
-29. After a new note is saved, the "new note" editor stays up (looks up the removed `-1`); a second Save
-    could post a duplicate note. `SelectMode.ts:333-340`.
+29. ✅ After a new note is saved, the "new note" editor stays up (looks up the removed `-1`); a second Save
+    could post a duplicate note. Fixed Nov 3: the editor's `change` passes the saved note, and
+    `SelectMode` selects it by its real id.
 30. ✅ Note and KeepRight Save clicks may be lost: the textarea's blur re-joins the buttons under the pointer.
     Confirmed Nov 3 in the debug Chrome with real mouse events (a new note's Cancel did nothing), fixed by
     the `d.key` scan: the note, KeepRight and Osmose editors key their sections by `d.id`, and the note
@@ -113,12 +117,16 @@ actions, 45k entities loaded mid-run); backup round trips; `affects()` vs `compl
     Tests: `test/browser/ui/UiQaEditors.test.js`, `test/unit/modes/AddNoteMode.test.js`.
     The scan: the only other `d.key` joins on data in `modules/ui` are display-only headers and details,
     which are meant to rebuild for a new version; nothing else updates a datum in place of a newer cache.
-31. The walkthrough leaves a duplicate session (reset, then `fromJSONAsync`); restoring it later
-    duplicates an upload. `UiIntro.ts:336`.
-32. "Duplicate tab" copies `sessionStorage`, so two tabs can share a session (`_isLiveElsewhere`).
-33. Undo right after pressing "2" (before the first click) is silently swallowed (`DrawLineMode.ts:233`).
-34. `AbstractPixiLayer.bindData` wipes parent/child links on every rebind (`:220`).
-35. Restoring a backup can move counters backward, including `v`, `graph` and `changeset` (`EditSystem.ts:1833`).
+31. ✅ The walkthrough leaves a duplicate session (reset, then `fromJSONAsync`). Fixed Nov 3: it restores
+    the edits, then `editor.continueSession(id)` (deletes a session started in between).
+32. ✅ "Duplicate tab" copies `sessionStorage`, so two tabs can share a session. Fixed Nov 3: `pagehide`
+    marks the page gone; on startup a copy without the mark forgets the owned id (`_forgetCopiedSession`).
+33. ✅ Undo right after pressing "2" (before the first click) is silently swallowed. Fixed Nov 3 (line and
+    area): exit rolls back only when stable is one of the drawing's own edits (it has a snapshot);
+    the unused `beginDraw` checkpoint is gone. A redo there was swallowed too.
+34. ✅ `AbstractPixiLayer.bindData` wipes parent/child links on every rebind. Fixed Nov 3: binding the same
+    data again returns early.
+35. ✅ Restoring a backup can move counters backward. Fixed Nov 3: counters only move forward.
 36. ✅ On the conflict screen, Save is only enabled through `scheduler?.setTimeout`. Fixed Nov 3, with a
     fallback; also `.attr('disabled', false)` set the attribute (so it disabled Save for one conflict).
 

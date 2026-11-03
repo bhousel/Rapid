@@ -1365,6 +1365,7 @@ describe('EditSystem', () => {
           nextIDs: { node: 1, way: 2, relation: 3 },
           index: 1
         };
+        context.sequences = {};   // a new page
         return _editor.fromJSONAsync(JSON.stringify(json))
           .then(() => {
             assert.isUndefined(_editor.staging.graph.hasEntity('n1'));
@@ -1387,9 +1388,31 @@ describe('EditSystem', () => {
           nextIDs: { node: -2, way: -1, relation: -1 },
           index: 1
         };
+        context.sequences = {};   // a new page
         return _editor.fromJSONAsync(JSON.stringify(json))
           .then(() => {
             assert.deepInclude(context.sequences, { node: 2, way: 1, relation: 1 });
+          });
+      });
+
+      it('never moves a counter backward', () => {
+        const json = {
+          version: 3,
+          entities: [{ id: 'n-1', loc: [1, 2], v: 0 }],
+          baseEntities: [],
+          stack: [
+            { },
+            { modified: ['n-1v0'], annotation: 'Added a point.' }
+          ],
+          nextIDs: { node: 2, v: 5, graph: 3 },
+          index: 1
+        };
+        context.sequences = { node: 1, v: 900, graph: 40 };   // this page has counted further already
+        return _editor.fromJSONAsync(JSON.stringify(json))
+          .then(() => {
+            assert.strictEqual(context.sequences.node, 2);   // up to the restored entities
+            assert.isAtLeast(context.sequences.v, 900);
+            assert.isAtLeast(context.sequences.graph, 40);
           });
       });
     });
@@ -1630,6 +1653,26 @@ describe('EditSystem', () => {
             const props = _editor.stable.props;
             assert.deepEqual(props.selection, ['n1']);
             assert.sameMembers(props.selectionBefore, ['ds:d1', 'w1']);
+          });
+      });
+
+      it('drops data IDs that came from a counter, which name other data after a reload', () => {
+        const backup = {
+          version: 3,
+          entities: [],
+          baseEntities: [],
+          stack: [
+            { },
+            { props: { stringID: 'accepted a feature', selection: ['n1', 'overture-buildings:geojson-12'], selectionBefore: ['overture-buildings:geojson-12'] } }
+          ],
+          nextIDs: {},
+          index: 1
+        };
+        return _editor.fromBackupAsync(backup)
+          .then(() => {
+            const props = _editor.stable.props;
+            assert.deepEqual(props.selection, ['n1']);
+            assert.deepEqual(props.selectionBefore, []);
           });
       });
     });

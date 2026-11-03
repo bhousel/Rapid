@@ -297,6 +297,42 @@ describe('ValidationSystem', () => {
     }
 
 
+    it('validates a node that a merge restores in the stable graph already validated (iD#2085)', async () => {
+      const editor = context.systems.editor;
+      await resetAll();
+
+      const headChecks = [];
+      const records = (entity, graph) => {
+        if (graph === editor.stable.graph) headChecks.push(entity.id);
+        return { issues: [] };
+      };
+      records.type = 'records';
+      _validator._validators.set('records', records);
+
+      try {
+        editor.merge([new Rapid.OsmNode(context, { id: 'n301', loc: [40, 40], version: '1' })]);
+        editor.perform(Rapid.actionDeleteNode('n301'));
+        editor.commit({ stringID: 'deleted n301' });
+        await validated();
+        const stable = editor.stable.graph;
+
+        // A downloaded way uses n301, so the merge puts it back, in the same stable graph
+        headChecks.length = 0;
+        editor.merge([
+          new Rapid.OsmNode(context, { id: 'n302', loc: [40.001, 40], version: '1' }),
+          new Rapid.OsmWay(context, { id: 'w301', nodes: ['n301', 'n302'], version: '1' })
+        ]);
+        await validated();
+
+        assert.strictEqual(editor.stable.graph, stable);
+        assert.isOk(stable.hasEntity('n301'));
+        assert.include(headChecks, 'n301');
+      } finally {
+        _validator._validators.delete('records');
+      }
+    });
+
+
     it('autofixAction fixes the issues given, finding them again after each fix, but not ignored ones', async () => {
       const editor = context.systems.editor;
       await resetAll();

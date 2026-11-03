@@ -166,7 +166,8 @@ export class UiIntro {
       layersEnabled: new Set(),                            // Set<layerID>
       datasetsAdded: new Set(rapid.addedDatasetIDs),       // Set<datasetID>
       datasetsEnabled: new Set(rapid.enabledDatasetIDs),   // Set<datasetID>
-      edits: editor.toJSON()
+      edits: editor.toJSON(),
+      sessionID: editor.sessionID
     };
 
     // Remember which layers were enabled before, enable only certain ones in the walkthrough.
@@ -332,11 +333,14 @@ export class UiIntro {
     this._resume.mapwithai?.();
     this._resume.urlhash();
 
-    // Reset, then restore the user's edits, if any...
+    // Reset, then restore the user's edits, if any, and keep saving them in the session they were in.
+    // (Only once they're back: an empty history would delete the session at the next backup.)
+    const { edits, sessionID } = this._original;
     context.resetAsync()
       .then(() => {
-        if (this._original.edits) {
-          return editor.fromJSONAsync(this._original.edits);
+        if (edits) {
+          return editor.fromJSONAsync(edits)
+            .then(() => { if (sessionID) editor.continueSession(sessionID); });
         } else {
           return Promise.resolve();
         }

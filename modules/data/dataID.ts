@@ -8,6 +8,10 @@
 import { utilHash53, utilStableStringify } from '../util/string.ts';
 
 
+/** A local ID that `GeoJSONData` makes up for data that came without one starts with this. */
+export const GENERATED_ID_PREFIX = 'geojson-';
+
+
 /**
  * Builds a data ID from a namespace and a local ID.
  * OSM data IDs are bare: `osm` (or no namespace) returns the local ID as it is.
@@ -30,6 +34,19 @@ export function splitDataID(dataID: DataID): [SpatialID, string] {
   const i = dataID.indexOf(':');
   if (i === -1) return ['osm', dataID];
   return [dataID.slice(0, i), dataID.slice(i + 1)];
+}
+
+
+/**
+ * Whether a data ID still names the same data after a reload, or in another browser.
+ * A local ID that `GeoJSONData` made up (`geojson-12`) comes from a counter, so it names other data
+ * after a reload (vector tiles have these, until their features are keyed by their own IDs). Such IDs
+ * are kept out of the URL (`id=`) and out of the selections restored from a backup.
+ * @param dataID - The data ID
+ * @return `true` if the ID is stable
+ */
+export function isStableDataID(dataID: DataID): boolean {
+  return !splitDataID(dataID)[1].startsWith(GENERATED_ID_PREFIX);
 }
 
 

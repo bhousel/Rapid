@@ -143,7 +143,6 @@ export class DrawAreaMode extends AbstractMode {
 
     context.behaviors.mapInteraction!.doubleClickEnabled = false;
 
-    editor.setCheckpoint('beginDraw');
     this._editIndex = editor.index;
 
     return true;
@@ -189,21 +188,22 @@ export class DrawAreaMode extends AbstractMode {
     editor.revert();    // revert work-in-progress, i.e. the temporary drawing node
 
     // Confirm that the draw way exists and is valid..
-    // If any issues, revert back to how things were before we started.
+    // If any issues, undo the edits made while drawing, back to how things were before we started.
+    // Only if we're at one of them: an undo or redo that left the drawing (e.g. undo right after
+    // pressing "3", before the first click) is the user's, and stays done.
     const graph = editor.stable.graph;
     const drawWay = this.drawWayID ? graph.hasEntity(this.drawWayID) : undefined;
     if (!drawWay || drawWay.isDegenerate()) {
       if (DEBUG) {
         console.log('DrawAreaMode: draw way invalid, rolling back');  // eslint-disable-line no-console
       }
-      if (editor.index > this._editIndex!) {
-        while (editor.index !== this._editIndex) {
+      if (this._snapshots.has(graph)) {
+        while (editor.index > this._editIndex!) {
           editor.undo();
         }
-      } else if (editor.index < this._editIndex!) {
-        editor.restoreCheckpoint('beginDraw');
       }
     }
+    this._snapshots.clear();
 
     this.drawWayID = null;
     this.drawNodeID = null;

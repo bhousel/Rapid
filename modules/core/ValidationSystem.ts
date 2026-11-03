@@ -671,25 +671,28 @@ export class ValidationSystem extends AbstractSystem {
       return Promise.resolve();
     }
 
-    // We are caught up to the stable graph
+    let entityIDs: Set<EntityID>;
     if (stableGraph === previousGraph) {
+      // We are caught up to the stable graph, unless it changed in place: an iD#2085 restore puts
+      // deleted nodes back in graphs that were validated already, and `stablechange` named them.
+      // Comparing the graph with itself would find nothing, so validate what it named.
+      entityIDs = this._head.withAllRelatedEntities(this._stableChangedIDs);  // expand set
       this._stableChangedIDs.clear();
-      this.emit('validated');
-      return Promise.resolve();
+
+    } else {
+      // If we get here, stable !== previous, so it's time to validate the stable graph..
+      // Only the IDs that changed since the previously validated graph need comparing.
+      // Before any graph was validated, compare them all.
+      const candidates = this._headQueuedGraph ? new Set<EntityID>(this._stableChangedIDs) : undefined;
+      this._head.graph = stableGraph;   // take snapshot
+      this._headQueuedGraph = stableGraph;
+      this._stableChangedIDs.clear();
+      const incrementalDiff = new Difference(previousGraph, stableGraph, candidates);
+      const diffKeys = [ ...incrementalDiff.complete().keys() ];
+      entityIDs = this._head.withAllRelatedEntities(diffKeys);  // expand set
     }
 
-    // If we get here, stable !== previous, so it's time to validate the stable graph..
-    // Only the IDs that changed since the previously validated graph need comparing.
-    // Before any graph was validated, compare them all.
-    const candidates = this._headQueuedGraph ? new Set<EntityID>(this._stableChangedIDs) : undefined;
-    this._head.graph = stableGraph;   // take snapshot
-    this._headQueuedGraph = stableGraph;
-    this._stableChangedIDs.clear();
-    const incrementalDiff = new Difference(previousGraph, stableGraph, candidates);
-    const diffKeys = [ ...incrementalDiff.complete().keys() ];
-    const entityIDs = this._head.withAllRelatedEntities(diffKeys);  // expand set
-
-    if (!entityIDs.size) {    // nothing to do - committed a no-op edit?
+    if (!entityIDs.size) {    // nothing to do - committed a no-op edit, or caught up
       this.emit('validated');
       return Promise.resolve();
     }
@@ -701,10 +704,10 @@ export class ValidationSystem extends AbstractSystem {
       .then(() => {
         this._validationPromise = null;
 
-        // Check if `stable` has changed while we were validating, and run it again to catch up if needed...
+        // Check if `stable` has changed while we were validating (or in place), and run it again to catch up if needed...
         const stableGraph = editor.stable.graph;
         const previousGraph = this._headQueuedGraph;
-        if (stableGraph !== previousGraph) {
+        if (stableGraph !== previousGraph || this._stableChangedIDs.size) {
           this.validateAsync();  // recurse
         }
       });

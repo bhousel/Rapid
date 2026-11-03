@@ -221,12 +221,12 @@ export class DragBehavior extends AbstractBehavior {
 
         // Enter the correct mode
         if (isNode) {
-          context.enter('drag-node', { nodeID: data.id, reselectIDs: reselectIDs });
+          context.enter('drag-node', { nodeID: data.id, reselectIDs: reselectIDs, selectionBefore: selectedIDs });
         } else if (isNote) {
           context.enter('drag-note', { noteID: data.id });
         } else if (isMidpoint) {
           const midpoint = { loc: data.props.loc, edge: data.props.edge };
-          context.enter('drag-node', { midpoint: midpoint, reselectIDs: reselectIDs });
+          context.enter('drag-node', { midpoint: midpoint, reselectIDs: reselectIDs, selectionBefore: selectedIDs });
         }
 
         this.emit('start', down);

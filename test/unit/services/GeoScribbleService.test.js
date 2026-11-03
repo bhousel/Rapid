@@ -154,6 +154,16 @@ describe('GeoScribbleService', () => {
         assert.lengthOf(spyError.mock.calls, 0, 'console.error not called');
       });
 
+      it('keys each feature by its GeoScribble id, so its data ID is the same after a reload', async () => {
+        fetchMock.route(/geojson/, sample.data10, { delay: 1 });
+        _geoscribble.loadTiles();
+
+        await Bun.sleep(5);  // after all fetches have settled
+        const spatial = context.systems.spatial;
+        assert.isOk(spatial.getItem('geoscribble', '1'));
+        assert.isOk(spatial.getItem('geoscribble', '2'));
+      });
+
       it(`doesn't retry inflight tiles`, async () => {
         fetchMock.route(/geojson/, sample.data10, { delay: 1 });
         _geoscribble.loadTiles();

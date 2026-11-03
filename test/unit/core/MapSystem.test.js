@@ -317,6 +317,24 @@ describe('MapSystem', () => {
   });
 
 
+  describe('historyjump', () => {
+    it('undo while dragging goes back to what was selected before the drag, not the newest edit\'s selection', () => {
+      const ctx = new Rapid.MockContext();
+      const editor = new Rapid.MockSystem(ctx);
+      editor.history = [{ props: {} }, { props: { selection: ['w9'], selectionBefore: ['w8'] } }];
+      ctx.systems = { editor: editor, gfx: new Rapid.MockGfxSystem(ctx) };
+      ctx.mode = { id: 'drag-node', selectionBefore: ['w1'] };
+
+      const map = new Rapid.MapSystem(ctx);
+      const restored = [];
+      map._restoreSelection = selection => restored.push(selection);
+
+      map._historyJumped(1, 1);   // only the work in progress was thrown away
+      assert.deepEqual(restored, [['w1']]);
+    });
+  });
+
+
   describe('restoring a selection from a link', () => {
     let ctx, map, entities, onDraw, enabledLayers, loadedIDs, fitIDs, mode, selectedIDs;
 

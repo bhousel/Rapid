@@ -2,6 +2,7 @@ import { AbstractSystem } from './AbstractSystem.ts';
 import { Difference, Edit, Graph, SessionDifference } from '../lib/index.ts';
 import { easeLinear } from 'd3-ease';
 import { Extent, geoScaleToZoom, projWgs84ToWorld } from '@rapid-sdk/math';
+import { isStableDataID } from '../data/dataID.ts';
 import { OsmEntity, createOsmEntity } from '../data/index.ts';
 import { select } from 'd3-selection';
 import { UiLoading } from '../ui/UiLoading.ts';
@@ -485,6 +486,14 @@ export class EditSystem extends AbstractSystem {
             this.immediateBackup();
             return (e.returnValue = '');  // show browser prompt
           }
+        });
+
+        // A reload marks the page as gone on `pagehide`, so the next page knows that the session
+        // this tab owned is still its own (see `_forgetCopiedSession`).
+        this._forgetCopiedSession();
+        window.addEventListener('pagehide', () => this._markPageHidden(true));
+        window.addEventListener('pageshow', (e: PageTransitionEvent) => {
+          if (e.persisted) this._markPageHidden(false);   // back from the back/forward cache, still open
         });
 
         // Detect whether there are any restorable sessions from a previous visit.
@@ -1836,9 +1845,12 @@ export class EditSystem extends AbstractSystem {
     // Old: OsmEntity.id.next = backup.nextIDs;
     // New: We store sequences in the context, these will be positive numbers.
     // We might find negative numbers in old backup from before we started doing this.
+    // Counters only move forward: this page may have counted further already (versions of data,
+    // graphs, changesets), and a number used twice would name two different things.
+    const sequences = context.sequences as Record<string, number>;
     const nextIDs = backup.nextIDs || {};
     for (const [k, v] of Object.entries(nextIDs)) {
-      (context.sequences as Record<string, number>)[k] = Math.abs(v);
+      sequences[k] = Math.max(sequences[k] ?? 0, Math.abs(v));
     }
 
     // v4: Fetch the base entities at the versions the edits were made from..
@@ -2062,6 +2074,39 @@ export class EditSystem extends AbstractSystem {
    */
   public get canRestoreBackup(): boolean {
     return this._canRestoreBackup;
+  }
+
+
+  /**
+   * The id of the session that the edits are saved in, or `null` if they haven't been saved yet.
+   * @return The session id
+   * @readonly
+   */
+  public get sessionID(): SessionID | null {
+    return this._sessionID;
+  }
+
+
+  /**
+   * Save the edits in an existing session from now on, instead of in a new one.
+   * A reset forgets the session, so code that resets the editor and then gives the user's edits back
+   * (the walkthrough) calls this afterward. Otherwise the next backup would save the same edits in a
+   * new session, and restoring both could upload them twice.
+   * A session that was started in the meantime is deleted.
+   * @param id - The session to continue
+   */
+  public continueSession(id: SessionID): void {
+    const context = this.context;
+    const database = context.systems.database;   // optional
+
+    const prevID = this._sessionID;
+    if (prevID && prevID !== id) {
+      database?.delete('sessions', prevID).catch(() => { /* best effort */ });
+    }
+
+    this._sessionID = id;
+    this._activeSession = null;
+    this._setOwnedSessionID(id);
   }
 
 
@@ -2546,7 +2591,7 @@ export class EditSystem extends AbstractSystem {
 
   /**
    * The session id this tab owns, persisted in `sessionStorage` so it survives a page reload (but
-   * not a new/duplicate tab). Used to distinguish "my own session, just reloaded" from "a session
+   * not a new tab, and a duplicated tab forgets it, see `_forgetCopiedSession`). Used to distinguish "my own session, just reloaded" from "a session
    * open in another tab" when deciding what to offer for restore.
    * @return The owned session id, or `null` if none / `sessionStorage` is unavailable
    */
@@ -2584,6 +2629,47 @@ export class EditSystem extends AbstractSystem {
    */
   protected _ownSessionKey(): string {
     return `Rapid_${this._origin()}_active_session`;
+  }
+
+
+  /**
+   * Forget the owned session (`_ownedSessionID`) if this page didn't get it from a reload.
+   * "Duplicate tab" copies `sessionStorage` from a tab that's still open, owned session and all, and
+   * then both tabs would treat that session as their own. A reload marks the page as gone first
+   * (`_markPageHidden`), so a copy without the mark is the other tab's. (A tab that crashed has no
+   * mark either: its session is offered for restore once its heartbeat goes stale.)
+   */
+  protected _forgetCopiedSession(): void {
+    try {
+      const ss = globalThis.sessionStorage;
+      if (!ss) return;
+      const key = this._ownSessionKey();
+      const wasHidden = ss.getItem(`${key}_hidden`);
+      ss.removeItem(`${key}_hidden`);
+      if (!wasHidden) ss.removeItem(key);
+    } catch {
+      // ignore — sessionStorage may be unavailable (private mode / non-browser)
+    }
+  }
+
+
+  /**
+   * Mark (or unmark) this page as gone in `sessionStorage`, so a reload keeps the owned session.
+   * @param hidden - `true` on `pagehide`, `false` when the page comes back from the back/forward cache
+   */
+  protected _markPageHidden(hidden: boolean): void {
+    try {
+      const ss = globalThis.sessionStorage;
+      if (!ss) return;
+      const key = `${this._ownSessionKey()}_hidden`;
+      if (hidden) {
+        ss.setItem(key, '1');
+      } else {
+        ss.removeItem(key);
+      }
+    } catch {
+      // ignore — sessionStorage may be unavailable (private mode / non-browser)
+    }
   }
 
 
@@ -2852,6 +2938,7 @@ export class EditSystem extends AbstractSystem {
    * - edit props had `selectedIDs` (assumed OSM) instead of `selection`.
    * - `selection` and `selectionBefore` grouped the data IDs by layer (`{ osm: ['w1'] }`), they're a
    *   plain `DataID[]` now (see `design/data-ids.md`).
+   * Selections also drop the data IDs that named other data before the reload (`isStableDataID`).
    * @param props - The props from the backup
    * @return The props, upgraded
    */
@@ -2864,8 +2951,8 @@ export class EditSystem extends AbstractSystem {
     // Flatten a selection grouped by layer
     const flatten = (selection: unknown): DataID[] | undefined => {
       if (!selection) return undefined;
-      if (Array.isArray(selection)) return selection as DataID[];
-      return Object.values(selection as LegacyEditSelection).flat();
+      const dataIDs = Array.isArray(selection) ? selection as DataID[] : Object.values(selection as LegacyEditSelection).flat();
+      return dataIDs.filter(isStableDataID);
     };
     rest.selection = flatten(rest.selection);
     rest.selectionBefore = flatten(rest.selectionBefore);

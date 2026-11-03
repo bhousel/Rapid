@@ -218,6 +218,10 @@ export class AbstractPixiLayer {
    * @param dataID - dataID     (e.g. 'w-123')
    */
   public bindData(featureID: FeatureID, dataID: DataID): void {
+    // Already bound to this data: done. (Unbinding first would drop the data's parent and child
+    // links, when this is its only feature.)
+    if (this._featureHasData.get(featureID) === dataID) return;
+
     this.unbindData(featureID);
 
     let featureSet = this._dataHasFeature.get(dataID);

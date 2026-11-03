@@ -1,4 +1,5 @@
 import { AbstractSystem } from '../core/AbstractSystem.ts';
+import { featureKey } from '../data/dataID.ts';
 import { GeoJSONData } from '../data/GeoJSONData.ts';
 import { Tiler } from '@rapid-sdk/math';
 import { utilQsString } from '@rapid-sdk/util';
@@ -141,9 +142,12 @@ export class GeoScribbleService extends AbstractSystem {
       throw new Error('Invalid response');
     }
 
+    // Each feature is keyed by its GeoScribble `id` (or a hash, if it has none), so its data ID is the
+    // same after a reload, and a feature in two tiles' responses is one datum.
     const toLoad: GeoJSONData[] = [];
     for (const feature of response.features) {
-      toLoad.push(new GeoJSONData(context, { serviceID: this.id, namespace: 'geoscribble', geojson: feature }));
+      const id = featureKey(feature, 'id', new Set<string>());
+      toLoad.push(new GeoJSONData(context, { id: id, serviceID: this.id, namespace: 'geoscribble', geojson: feature }));
     }
 
     spatial.addData('geoscribble', toLoad);

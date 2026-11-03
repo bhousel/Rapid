@@ -252,7 +252,11 @@ Each step is its own commit, and leaves Rapid working with the tests passing.
   for local IDs. The layer draws what's visible in the cache, instead of all of it.
 - Vector tiles keep a feature's `id` property (Overture's GERS ID) as `props.stableID` (see
   [Vector tiles](#vector-tiles)). Until vector tile data has stable IDs, it can be selected but not
-  saved in a selection that's restored later.
+  saved in a selection that's restored later: `isStableDataID()` is false for a local ID that
+  `GeoJSONData` made up (`geojson-12`), and those are left out of `id=` and out of the selections
+  restored from a backup (Nov 2026). Accept and ignore still record them (open question 3).
+- GeoScribble keys its features by their own `id` (`featureKey(feature, 'id')`), so a feature
+  loaded again, or in two tiles' responses, has one data ID (Nov 2026; it used the counter before).
 - Left as is: `PixiLayerRapid._getTags()` only reads `@name` from GeoJSON data, so Esri features
   aren't labeled with their raw properties anymore (they rarely had a `name` field anyway).
 
@@ -331,6 +335,10 @@ extent), `rapid-system.md` (feature IDs), `conflation-system.md` (the pieces cac
 2. **One cache per vector tile source.** The GERS IDs are there, but only at z14 (see
    [Vector tiles](#vector-tiles)). Data from lower zooms has only the hashed `origID`, so one cache
    would have to key on the hash, or load buildings and roads only at z14.
+3. **Accepting and ignoring vector tile data** (the Overture datasets) records counter IDs like
+   `overture-buildings:geojson-12`. They're saved with the session, so after a restore a different
+   feature may be hidden as accepted, and the one that was accepted shows again. Keying vector tile
+   features by their GERS ID (question 2) fixes it.
 
 Settled:
 - Where namespaces are looked up: there's no table. A namespace is a `SpatialSystem` cache ID, plus

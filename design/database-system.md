@@ -385,9 +385,14 @@ session that another tab is actively editing, each session record carries a `hea
   "in use" by a live tab. Legacy localStorage snapshots have no heartbeat and are always offered.
 - **Reload vs. another tab.** A heartbeat alone can't distinguish "another live tab" from "my own tab
   just reloaded" — and we must not hide your own session when you reload. So the tab records the
-  session id it owns in **`sessionStorage`** (per-tab, survives reload, absent in a new/duplicate
-  tab). `_isLiveElsewhere` never excludes the tab's own current or just-reloaded session; a genuinely
+  session id it owns in **`sessionStorage`** (per-tab, survives reload, absent in a new tab).
+  `_isLiveElsewhere` never excludes the tab's own current or just-reloaded session; a genuinely
   different tab's fresh session is excluded.
+- **Duplicated tabs.** "Duplicate tab" copies `sessionStorage`, owned session id and all, from a tab
+  that's still open. A page marks itself as gone on `pagehide` (`_markPageHidden`), so on startup a
+  copy without that mark is the other tab's, and the duplicate forgets it (`_forgetCopiedSession`,
+  Nov 2026). A tab that crashed leaves no mark either; its session is offered once its heartbeat
+  goes stale.
 - Cleared on discard/delete of the active session. If a tab closes without clearing, its heartbeat
   simply goes stale after `SESSION_LIVE_MS` and the session becomes restorable again.
 

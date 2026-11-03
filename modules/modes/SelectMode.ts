@@ -4,7 +4,7 @@ import { actionDeleteRelation } from '../actions/delete_relation.ts';
 import { actionMove, actionRotate } from '../actions/index.ts';
 import { DEG2RAD, Extent, vecAdd, vecRotate, vecScale } from '@rapid-sdk/math';
 import { GeoJSONData, MarkerData, OsmEntity } from '../data/index.ts';
-import { osmEntityID } from '../data/dataID.ts';
+import { isStableDataID, osmEntityID } from '../data/dataID.ts';
 import { UiDataEditor } from '../ui/UiDataEditor.ts';
 import { UiDetectionInspector } from '../ui/UiDetectionInspector.ts';
 import { UiKeepRightEditor } from '../ui/UiKeepRightEditor.ts';
@@ -184,7 +184,8 @@ export class SelectMode extends AbstractMode {
       scene.setClass('select', dataID);
     }
 
-    urlhash.setParam('id', this._selectedIDs.join(',') || null);   // Put the data IDs into the url hash
+    // Put the data IDs into the url hash (only the ones that will name the same data after a reload)
+    urlhash.setParam('id', this._selectedIDs.filter(isStableDataID).join(',') || null);
     filters.forceVisible(osmIDs);                  // Exclude OSM entityIDs from being filtered
     this._setupOperations();                       // Determine available operations on the edit menu
 
@@ -331,8 +332,13 @@ export class SelectMode extends AbstractMode {
     if (datum instanceof MarkerData && serviceID === 'osm' && datum.type === 'note') {
       const noteEditor = new UiNoteEditor(context);
       noteEditor.datum = datum;
-      noteEditor.on('change', () => {
+      noteEditor.on('change', (saved?: MarkerData) => {
         gfx?.immediateRedraw();  // force a redraw (there is no history change that would otherwise do this)
+        // A new note gets its real id when it's saved (the new one is gone), so select the saved note.
+        if (saved instanceof MarkerData && saved.id !== datum.id) {
+          context.enter('select', { selection: [saved.dataID] });
+          return;
+        }
         const osm = context.services.osm;
         const d = osm?.getNote(datum.id);   // marker may contain stale data - get latest
         if (!(d instanceof MarkerData)) return;  // or - go to browse mode
