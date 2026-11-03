@@ -470,12 +470,13 @@ export class PixiLayerRapid extends AbstractPixiLayer {
     const showMatched = dataset.conflation.showMatched;
 
     for (const d of data.lines) {
-      // A line is drawn as its runs unless it's one run that covers all of it. That includes a line
-      // the user has acted on part of (what's left of it), or all of it (no runs, so nothing is drawn).
+      // A line is drawn as its runs unless its one run is the line itself (one with its own data:
+      // see `LineRun.datum`). That includes a line trimmed to where it joins, a line the user has acted
+      // on part of (what's left of it), or all of it (no runs, so nothing is drawn).
       const result = conflation?.getResult(dataset, d);
       const runs = result?.runs;
-      const isWhole = runs?.length === 1 && runs[0].range[0] === 0 && runs[0].range[1] === 1;
-      if (runs && !isWhole) {
+      const isSource = runs?.length === 1 && !runs[0].datum;
+      if (runs && !isSource) {
         this._renderRuns(parentContainer, dataset, d, runs, frame, viewport);
         continue;
       }
@@ -544,9 +545,10 @@ export class PixiLayerRapid extends AbstractPixiLayer {
 
 
   /**
-   * Draws a partly mapped (or partly accepted) line as its separate runs, one feature per run.
-   * A run that isn't already mapped is bound to its own data (`LineRun.datum`), so selecting it selects
-   * just that stretch, and accepting it adds just that stretch. Already-mapped runs are bound to the line.
+   * Draws a partly mapped (or partly accepted, or trimmed) line as its separate runs, one feature per run.
+   * Each run is bound to its own data (`LineRun.datum`), so selecting it selects just that stretch, and
+   * accepting or ignoring it acts on just that stretch. That includes an already-mapped run, which is
+   * drawn when the dataset shows them.
    * @param parentContainer - The Pixi container to draw the runs into
    * @param dataset - The Rapid dataset being drawn
    * @param d - The line's data
@@ -582,8 +584,7 @@ export class PixiLayerRapid extends AbstractPixiLayer {
       }
 
       // Results are recomputed after edits, so the run at this index may have changed.
-      // A run that isn't already mapped is bound to its own data, so it can be selected and accepted
-      // on its own. An already-mapped run is bound to the whole line.
+      // Each run is bound to its own data, so it can be selected, accepted and ignored on its own.
       if (this._drawnFrom.get(feature) !== run) {
         this._drawnFrom.set(feature, run);
         const part = new GeometryPart(context);

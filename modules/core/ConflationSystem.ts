@@ -1,7 +1,7 @@
 import { AbstractSystem } from './AbstractSystem.ts';
 import { GeoJSONData } from '../data/GeoJSONData.ts';
 import { geoMetersToWorld, geomHeadingAlong, geomLineDistances, geomPositionAlong } from '../geo/geom.ts';
-import { geomPathIntersections, projWgs84ToWorld, projWorldToWgs84, vecAngle, vecEqual, vecInterp, vecLength, vecProject } from '@rapid-sdk/math';
+import { geomPathIntersections, projWorldToWgs84, vecAngle, vecEqual, vecInterp, vecLength, vecProject } from '@rapid-sdk/math';
 import { makeDataID, splitDataID } from '../data/dataID.ts';
 import { PropMatcher } from '../lib/PropMatcher.ts';
 
@@ -11,7 +11,6 @@ import type { CoverageBox, LinePosition } from '../geo/geom.ts';
 import type { GeoJSONProps } from '../data/GeoJSONData.ts';
 import type { GeometryPart } from '../lib/GeometryPart.ts';
 import type { Graph } from '../lib/Graph.ts';
-import type { OsmNode } from '../data/OsmNode.ts';
 import type { OsmFeature, OsmWay } from '../data/OsmWay.ts';
 import type { PropMatcherProps } from '../lib/PropMatcher.ts';
 import type { RapidDataset } from '../lib/RapidDataset.ts';
@@ -125,11 +124,11 @@ export interface BoxMatch {
 export interface JoinPoint {
   /** The OSM way to connect to */
   wayID: EntityID;
-  /** The run's endpoint projected onto that way (WGS84) */
-  loc: Vec2;
-  /** An existing node within snapping distance of `loc`, if any (reuse it instead of adding one) */
+  /** The run's endpoint projected onto that way, in world coordinates */
+  coord: Vec2;
+  /** An existing node within snapping distance of `coord`, if any (reuse it instead of adding one) */
   nodeID?: EntityID;
-  /** When there is no `nodeID`: the segment of the way that `loc` is on (add a node there) */
+  /** When there is no `nodeID`: the segment of the way that `coord` is on (add a node there) */
   edge?: [EntityID, EntityID];
 }
 
@@ -167,8 +166,9 @@ export interface LineRun {
   /** Set when the end of this run meets an already-mapped stretch, or an allowed target line */
   endJoin?: JoinPoint;
   /**
-   * For runs that aren't already mapped, when the run isn't the whole line: a data element for just
-   * this stretch, so it can be drawn, selected, and accepted on its own. Its data ID is `pieceID(dataID, range)`.
+   * A data element for just this stretch, so it can be drawn, selected, accepted and ignored on its own.
+   * Its data ID is `pieceID(dataID, range)`. Every run has one, unless it is the source line itself
+   * (the whole line, with no joins, so not trimmed either).
    */
   datum?: GeoJSONData<ConflationRunProps>;
 }
@@ -231,13 +231,18 @@ const PIECES_SUFFIX = '.pieces';
  * local ID is the line's, with the range along the line that the piece covers, as fractions of the
  * line's length (like the linear referencing `between: [start, end]` that Overture uses).
  * For example, a piece of `fbRoads:abc` is `fbRoads.pieces:abc@0.85-1`. The fractions are rounded to
- * 4 decimals, about 10 cm on a 1 km line.
+ * about 10 cm along the line: 4 decimals for a line up to 1 km, more for a longer one, so a piece's
+ * range survives the round trip (`parsePieceID`), and what the rounding leaves over is shorter than
+ * any run.
  * @param dataID - The line's data ID
  * @param range - The piece's start and end, as fractions of the line's length
+ * @param lengthMeters - The line's length (default: up to 1 km)
  * @return The piece's data ID
  */
-export function pieceID(dataID: DataID, range: [number, number]): DataID {
-  const fmt = (n: number) => String(Math.round(n * 10000) / 10000);
+export function pieceID(dataID: DataID, range: [number, number], lengthMeters: number = 1000): DataID {
+  const decimals = Math.max(4, Math.ceil(Math.log10(lengthMeters * 10)));
+  const scale = 10 ** decimals;
+  const fmt = (n: number) => String(Math.round(n * scale) / scale);
   const [namespace, localID] = splitDataID(dataID);
   return makeDataID(namespace + PIECES_SUFFIX, `${localID}@${fmt(range[0])}-${fmt(range[1])}`);
 }
@@ -285,8 +290,8 @@ export function conflationDefaults(): ConflationSettings {
  * **act** stage needs, such as the runs of a partly mapped line and where they join existing ways.
  *
  * It compares against the stable graph's spatial index, so results only change when the user
- * finishes an edit. Results are computed lazily, cached per feature, and flushed on `stablechange`
- * and `merge`.
+ * finishes an edit. Results are computed lazily, cached per feature, and flushed on `stablechange`,
+ * `merge`, and a schema change that changes what counts as an area.
  *
  * Every source feature whose geometry some rule covers is tested. A rule says "same" when all of its
  * conditions hold, and any one rule saying "same" is enough.
@@ -300,10 +305,15 @@ export function conflationDefaults(): ConflationSettings {
  */
 export class ConflationSystem extends AbstractSystem {
 
-  /** Cached results, by datasetID then dataID. `null` means no rule covers that feature's geometry. */
-  protected _results: Map<DatasetID, Map<DataID, ConflationResult | null>>;
+  /**
+   * Cached results, by datasetID then dataID, with the datum each was computed for (a new version of a
+   * feature is a new object, with its own result). `null` means no rule covers that feature's geometry.
+   */
+  protected _results: Map<DatasetID, Map<DataID, { datum: AbstractData, result: ConflationResult | null }>>;
   /** Compiled property matchers, per rule side */
   protected _matchers: WeakMap<ConflationSide, PropMatcher[]>;
+  /** The schema's `areaGeneration` the results were computed with (what's an area decides what's a line) */
+  protected _areaGeneration: number;
 
 
   /**
@@ -313,9 +323,11 @@ export class ConflationSystem extends AbstractSystem {
     super(context);
     this.id = 'conflation';
     this.requiredDependencies = new Set<SystemID>(['editor', 'rapid', 'spatial']);
+    this.optionalDependencies = new Set<SystemID>(['schema']);
 
-    this._results = new Map<DatasetID, Map<DataID, ConflationResult | null>>();
+    this._results = new Map<DatasetID, Map<DataID, { datum: AbstractData, result: ConflationResult | null }>>();
     this._matchers = new WeakMap<ConflationSide, PropMatcher[]>();
+    this._areaGeneration = 0;
   }
 
 
@@ -328,6 +340,7 @@ export class ConflationSystem extends AbstractSystem {
 
     const context = this.context;
     const editor = context.systems.editor!;
+    const schema = context.systems.schema;   // optional
 
     return this._initPromise = super.initAsync()
       .then(() => editor.initAsync())
@@ -335,6 +348,13 @@ export class ConflationSystem extends AbstractSystem {
         editor
           .on('stablechange', () => this.invalidate())
           .on('merge', () => this.invalidate());
+
+        // A schema change can change what counts as an area, and so which OSM ways are lines to match.
+        schema?.on('schemachange', () => {
+          if (schema.areaGeneration === this._areaGeneration) return;
+          this._areaGeneration = schema.areaGeneration;
+          this.invalidate();
+        });
       });
   }
 
@@ -384,18 +404,21 @@ export class ConflationSystem extends AbstractSystem {
 
     let cache = this._results.get(ds.id);
     if (!cache) {
-      cache = new Map<DataID, ConflationResult | null>();
+      cache = new Map<DataID, { datum: AbstractData, result: ConflationResult | null }>();
       this._results.set(ds.id, cache);
     }
 
     const dataID = datum.dataID;
-    if (cache.has(dataID)) {
-      return cache.get(dataID) ?? undefined;
+    const cached = cache.get(dataID);
+    if (cached?.datum === datum) {   // (a new version of the feature, with the same ID, is computed again)
+      return cached.result ?? undefined;
     }
 
     const result = this._compute(ds, datum);
     if (result?.status !== 'unknown') {   // don't cache 'unknown', it should change when OSM data arrives
-      cache.set(dataID, result ?? null);
+      cache.set(dataID, { datum: datum, result: result ?? null });
+    } else {
+      cache.delete(dataID);
     }
     return result;
   }
@@ -403,22 +426,16 @@ export class ConflationSystem extends AbstractSystem {
 
   /**
    * Returns where the ends of a line should connect when it is accepted.
-   * - For the data element of one run of a partly mapped line, its own joins.
-   * - For a whole source line that is a single run (not already mapped), that run's joins.
+   * Only the data element of a run has joins (see `LineRun.datum`): a run with joins is trimmed to
+   * them, so it's never the source line itself.
    * @param ds - The dataset that the data belongs to
-   * @param datum - A source feature, or the data element of one run (see `LineRun.datum`)
+   * @param datum - A source feature, or the data element of one run
    * @return The joins, or `undefined` if there are none to make
    */
   public getJoins(ds: RapidDataset, datum: AbstractData): LineJoins | undefined {
     const props = datum.props as Partial<ConflationRunProps>;
-    if (props.sourceID) {
-      return { start: props.startJoin, end: props.endJoin };
-    }
-
-    const result = this.getResult(ds, datum);
-    const run = (result?.runs?.length === 1) ? result.runs[0] : undefined;
-    if (!run || run.datum || run.status === 'matched') return undefined;
-    return { start: run.startJoin, end: run.endJoin };
+    if (!props.sourceID || (!props.startJoin && !props.endJoin)) return undefined;
+    return { start: props.startJoin, end: props.endJoin };
   }
 
 
@@ -429,13 +446,15 @@ export class ConflationSystem extends AbstractSystem {
    */
   public invalidate(datasetID?: DatasetID): void {
     const context = this.context;
+    const rapid = context.systems.rapid!;
     const spatial = context.systems.spatial!;
 
     // The pieces of lines are made with the results, so they go with them.
-    // (A dataset's namespace is its datasetID.)
+    // (They're cached under the namespace of the dataset's data, its `spatialID`, which is usually its ID.)
     if (datasetID) {
+      const namespace = rapid.catalog.get(datasetID)?.spatialID ?? datasetID;
       this._results.delete(datasetID);
-      spatial.clearCache(datasetID + PIECES_SUFFIX);
+      spatial.clearCache(namespace + PIECES_SUFFIX);
     } else {
       this._results.clear();
       spatial.clearMatching(spatialID => spatialID.endsWith(PIECES_SUFFIX));
@@ -577,6 +596,12 @@ export class ConflationSystem extends AbstractSystem {
       return { dataID: dataID, status: 'unknown', score: 0, partial: false, candidates: [] };
     }
 
+    // A line with no length (its points are all in one place) has no stretches to cut it into.
+    // It's new, as a whole: accepting or ignoring it acts on the feature itself.
+    if (!(sourceMeters > 0)) {
+      return { dataID: dataID, status: 'unmatched', score: 0, partial: false, candidates: [] };
+    }
+
     const nodeCoords = new Map<EntityID, Vec2>();
     const features = new Map<EntityID, OsmFeature | null>();   // by wayID; `null` if the way is missing
     const allowed = new Map<string, boolean>();                // by `${ruleIndex}:${entityID}`
@@ -586,9 +611,9 @@ export class ConflationSystem extends AbstractSystem {
     const coordOf = (nodeID: EntityID): Vec2 | undefined => {
       let coord = nodeCoords.get(nodeID);
       if (!coord) {
-        const node = graph.hasEntity(nodeID) as OsmNode | undefined;
-        if (!node?.loc) return undefined;
-        coord = projWgs84ToWorld(node.loc);
+        const node = graph.hasEntity(nodeID);
+        coord = node && graph.geometry(node).parts[0]?.world?.coords as Vec2 | undefined;  // A node should have a single world coord
+        if (!coord) return undefined;
         nodeCoords.set(nodeID, coord);
       }
       return coord;
@@ -834,27 +859,29 @@ export class ConflationSystem extends AbstractSystem {
         // The extension above, or a join that snapped to a nearby node, can otherwise leave the run
         // reaching past where it connects (e.g. around a corner), which would add a hook on accept.
         if (run.endJoin) {
-          coords = trimEnd(coords, projWgs84ToWorld(run.endJoin.loc));
+          coords = trimEnd(coords, run.endJoin.coord);
         }
         if (run.startJoin) {
-          coords = trimStart(coords, projWgs84ToWorld(run.startJoin.loc));
+          coords = trimStart(coords, run.startJoin.coord);
         }
         run.coords = toWgs84(coords);
         runs.push(run);
       }
     });
 
-    // Each run that isn't already mapped and isn't the whole line gets its own data element,
-    // so it can be drawn, selected and accepted on its own. Its id is the line's id and the stretch
-    // the run covers (see `pieceID`), so it is the same each time it's computed from the same data,
-    // and accepting or ignoring it can be remembered across restarts.
+    // Each run gets its own data element, so it can be drawn, selected, accepted and ignored on its own,
+    // unless it's the source line itself (the whole line, with no joins to trim it to).
+    // - A run that's the whole line but trimmed to its joins is accepted as trimmed, not as the source.
+    // - An already-mapped run (drawn when the dataset shows them) acts on its own stretch, not the line.
+    // Its id is the line's id and the stretch the run covers (see `pieceID`), so it is the same each time
+    // it's computed from the same data, and accepting or ignoring it can be remembered across restarts.
     // The pieces go in their own cache, so they can be found by data ID like any other data.
-    const isWhole = runs.length === 1 && runs[0].range[0] === 0 && runs[0].range[1] === 1;
-    if (!isWhole) {
+    const isSource = runs.length === 1 && runs[0].range[0] === 0 && runs[0].range[1] === 1 &&
+      !runs[0].startJoin && !runs[0].endJoin;
+    if (!isSource) {
       const pieces: GeoJSONData<ConflationRunProps>[] = [];
       runs.forEach(run => {
-        if (run.status === 'matched') return;
-        const [namespace, localID] = splitDataID(pieceID(dataID, run.range));
+        const [namespace, localID] = splitDataID(pieceID(dataID, run.range, sourceMeters));
         run.datum = new GeoJSONData<ConflationRunProps>(context, {
           id: localID,
           namespace: namespace,
@@ -970,14 +997,14 @@ export class ConflationSystem extends AbstractSystem {
     const closest = vecProject(coord, points);
     if (!closest) return undefined;
 
-    const join: JoinPoint = { wayID: wayID, loc: projWorldToWgs84(closest.point) };
+    const join: JoinPoint = { wayID: wayID, coord: closest.point };
 
     // `closest.index` is the index of the end of the closest segment.
     for (const i of [closest.index - 1, closest.index]) {
       const nodeCoord = points[i];
       if (nodeCoord && vecLength(nodeCoord, closest.point) * metersPerWorld <= JOIN_SNAP_METERS) {
         join.nodeID = nodeIDs[i];
-        join.loc = projWorldToWgs84(nodeCoord);
+        join.coord = nodeCoord;
         break;
       }
     }

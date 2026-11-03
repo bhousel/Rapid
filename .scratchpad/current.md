@@ -38,14 +38,13 @@ actions, 45k entities loaded mid-run); backup round trips; `affects()` vs `compl
 5. ✅ **Cancel on the conflict screen still keeps the user's deletion.** Fixed Nov 3: detection keeps
    the base updates pending (`_baseUpdates`), and `processResolvedConflicts` applies them once the user
    saves the conflict screen. Done together with 8, 10, 25 and 36 (the save path).
-6. **A line that is one whole new run is accepted untrimmed.** No piece datum is made for a `[0,1]`
-   run, so accept uses the source geometry; its ends spike ~1 m back across the sidewalk they join.
-   `ConflationSystem.ts:833-852`, `rapid_accept_feature.ts:67-98`. *New; confirmed.* Fix: give a
-   whole-line run with joins a datum too (or have `getJoins` carry the trimmed coords).
-7. **With "show already mapped" on, a matched run is bound to the whole line.** Add puts in the full
-   line on top of the existing sidewalk and the accepted piece; Ignore hides the line's pending new
-   pieces. `PixiLayerRapid.ts:592` (`run.datum ?? d`). *New; confirmed.* Fix: a non-actionable datum for
-   matched runs, or refuse Add/Ignore for a line that has runs.
+6. ✅ **A line that is one whole new run is accepted untrimmed.** Fixed Nov 3 with 7 and 16–21 (the
+   conflation batch): every run has its own datum unless it is the source line itself (whole, no joins),
+   so a whole line trimmed to its joins is the piece `@0-1`, drawn, selected and accepted as trimmed.
+   `isAcceptedOrIgnored` counts pieces that cover a whole line. Checked live in Albany (a sidewalk
+   joined at both ends through the inspector, then undone).
+7. ✅ **With "show already mapped" on, a matched run is bound to the whole line.** Fixed Nov 3: a matched
+   run has its own datum (no joins), so Add and Ignore act on its stretch.
 8. ✅ **Conflicts that leave nothing to upload keep the session; it's offered for restore next time.**
    Fixed Nov 3: `UploaderSystem._didResultInNoChanges` clears the backup.
 9. **Undoing a tag change on a new relation deletes the relation and loses the redo.** Undo re-enters
@@ -73,20 +72,21 @@ actions, 45k entities loaded mid-run); backup round trips; `affects()` vs `compl
     `MapInteractionBehavior.ts:160` doesn't check `defaultPrevented`. *New; confirmed.*
 15. ✅ **After an upload ends with -6 ("can't tell"), the open changeset is reused**, so `changes_count` no
     longer tells whether a later upload landed. Fixed Nov 3: `sendChangeset` forgets the changeset on -6.
-16. **Conflation results are cached by data ID**, so a new datum with the same ID gets the old runs.
-    Latent until vector tile stitching returns, or a dataset reloads with changed geometry.
-    `ConflationSystem.ts:385`. *New; confirmed.* Fix: key by datum object (WeakMap).
-17. **Some piece IDs don't parse back:** zero-length lines (`@0-0`), and lines over ~20 km (4 decimals).
-    Ignore/Accept doesn't hide them. `ConflationSystem.ts:239`. *New; confirmed.*
-18. **Area-key schema changes don't flush conflation results** (building edges can stay "lines").
-    *New; reading.* Fix: `invalidate()` on `schemachange`.
+16. ✅ **Conflation results are cached by data ID**, so a new datum with the same ID gets the old runs.
+    Fixed Nov 3: each cached result keeps the datum it was computed for.
+17. ✅ **Some piece IDs don't parse back:** zero-length lines (`@0-0`), and lines over ~20 km. Fixed Nov 3:
+    a line with no length has no pieces; `pieceID` rounds to ~10 cm for the line's length (4 decimals
+    up to 1 km, so existing IDs don't change).
+18. ✅ **Area-key schema changes don't flush conflation results.** Fixed Nov 3: flushes when
+    `schema.areaGeneration` changes.
 
 ### Low
-19. Both ends of a run snap to the same node, so the accepted way is closed (`rapid_accept_feature.ts:121`).
-    *Confirmed; contrived.*
-20. A join to a segment that still exists doesn't check `loc` is still on it (`rapid_accept_feature.ts:130`).
-21. Pieces are cleared by `ds.id` but cached by `spatialID` (`ConflationSystem.ts:438` vs `:875`); a
-    dataset with `conflation` but no `rules` throws in `UiRapidDatasetSettings._checkConflation`.
+19. ✅ Both ends of a run snap to the same node, so the accepted way is closed. Fixed Nov 3: the second
+    end's join to that node is skipped.
+20. ✅ A join to a segment that still exists doesn't check `loc` is still on it. Fixed Nov 3 (0.5 m, else
+    it looks for the segment again, like a split edge).
+21. ✅ Pieces are cleared by `ds.id` but cached by `spatialID`; a dataset with `conflation` but no `rules`
+    throws. Fixed Nov 3: `invalidate` clears by namespace; `RapidDataset` fills in missing settings.
 22. Undo during a drag/move selects the newest edit's `selection` (maybe offscreen), `MapSystem.ts:481`.
     *Main too; confirmed.*
 23. Drag, draw and add-point edits record their working selection as `selectionBefore`

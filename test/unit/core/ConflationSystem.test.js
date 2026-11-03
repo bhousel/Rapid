@@ -21,6 +21,11 @@ function meters(a, b) {
   return Math.hypot(dx, dy);
 }
 
+// Where a join is, as a WGS84 loc (joins are kept in world coordinates).
+function joinLoc(join) {
+  return Rapid.sdk.projWorldToWgs84(join.coord);
+}
+
 const SIDEWALK = { highway: 'footway', footway: 'sidewalk' };
 const CROSSING = { highway: 'footway', footway: 'crossing' };
 const LIVING_STREET = { highway: 'living_street' };
@@ -91,6 +96,7 @@ describe('ConflationSystem', () => {
     acted = new Map();
     context.systems.rapid.actedRanges = (dataID) => acted.get(dataID) ?? [];
     ds = new Rapid.RapidDataset(context, { id: 'test', custom: true });
+    context.systems.rapid.catalog = new Map([[ds.id, ds]]);
 
     return conflation.initAsync()
       .then(() => editor.startAsync())
@@ -349,7 +355,7 @@ describe('ConflationSystem', () => {
       assert.isOk(run.startJoin);
       assert.strictEqual(run.startJoin.wayID, 'w1');
       assert.strictEqual(run.startJoin.nodeID, way.nodes.at(-1));   // reuses the existing end node
-      assert.isBelow(meters(run.startJoin.loc, loc(60, 0)), 0.01);
+      assert.isBelow(meters(joinLoc(run.startJoin), loc(60, 0)), 0.01);
 
       // The new run starts inside the matched stretch, so it overlaps it a little, and ends at the line's end.
       assert.isBelow(run.coords[0][0], loc(65, 0)[0]);
@@ -383,11 +389,11 @@ describe('ConflationSystem', () => {
       for (const join of [run.startJoin, run.endJoin]) {
         assert.strictEqual(join.wayID, 'w1');
         assert.isUndefined(join.nodeID);   // no node nearby, so a new one will be added to w1
-        assert.isBelow(Math.abs(join.loc[1] - ORIGIN[1]), 1e-7);   // on w1, at y = 0
+        assert.isBelow(Math.abs(joinLoc(join)[1] - ORIGIN[1]), 1e-7);   // on w1, at y = 0
       }
       // Beside the turn at x = 60. (Headings are measured over a window about one sample spacing long,
       // so near a sharp turn the boundary lands a little before the vertex.)
-      assert.isBelow(meters(run.startJoin.loc, loc(60, 0)), 0.5);
+      assert.isBelow(meters(joinLoc(run.startJoin), loc(60, 0)), 0.5);
     });
 
     it('a run is trimmed to its join, so it never reaches past where it connects', () => {
@@ -472,7 +478,6 @@ describe('ConflationSystem', () => {
 
       const result = conflation.getResult(ds, a);
       const [matchedRun, newRun] = result.runs;
-      assert.isUndefined(matchedRun.datum);
       assert.instanceOf(newRun.datum, Rapid.GeoJSONData);
       assert.strictEqual(newRun.datum.dataID, Rapid.pieceID('test:a', newRun.range));
       assert.strictEqual(newRun.datum.props.sourceID, 'test:a');
@@ -480,6 +485,35 @@ describe('ConflationSystem', () => {
       assert.strictEqual(newRun.datum.props.datasetID, 'test');
       assert.deepEqual(newRun.datum.properties, SIDEWALK);
       assert.deepEqual(conflation.getJoins(ds, newRun.datum), { start: newRun.startJoin, end: newRun.endJoin });
+
+      // The already-mapped run has its own data too, with no joins: when the dataset shows already-mapped
+      // stretches, selecting one and pressing Add or Ignore acts on that stretch, not the whole line.
+      assert.instanceOf(matchedRun.datum, Rapid.GeoJSONData);
+      assert.strictEqual(matchedRun.datum.dataID, Rapid.pieceID('test:a', matchedRun.range));
+      assert.isUndefined(conflation.getJoins(ds, matchedRun.datum));
+      assert.isUndefined(conflation.getJoins(ds, a), 'the source line has no joins of its own');
+    });
+
+    it('accepting or ignoring an already-mapped stretch acts on that stretch only', () => {
+      setupAccept();
+      enable([lineRule()]);
+      ds.conflation.showMatched = true;
+      osmWay(1, [[0, 0], [60, 0]], SIDEWALK);
+      const a = feature('a', [[0, 1.5], [150, 1.5]], SIDEWALK);
+      const [matchedRun, newRun] = conflation.getResult(ds, a).runs;
+
+      const way = accept(matchedRun.datum);
+      const coords = editor.stable.graph.childNodes(way).map(node => node.loc);
+      // (The stretch reaches a little past the existing sidewalk's end, within `sameDist` of it)
+      assert.isBelow(meters(coords.at(-1), loc(60, 1.5)), 3, 'just the already-mapped stretch, not to x = 150');
+
+      acted.set('test:a', [matchedRun.range]);   // what RapidSystem records for the accepted piece
+      conflation.invalidate();
+      const runs = conflation.getResult(ds, a).runs;
+      const stillNew = runs.find(run => run.status === 'unmatched');
+      assert.isOk(stillNew, 'the new stretch is still there to accept');
+      assert.strictEqual(stillNew.range[1], 1);
+      assert.isAbove(stillNew.range[0], newRun.range[0] - 0.01);
     });
 
     it('accepting the missing part of a sidewalk joins it to the part that exists', () => {
@@ -532,12 +566,65 @@ describe('ConflationSystem', () => {
       assert.strictEqual(result.runs[0].startJoin.wayID, 'w1');
       assert.strictEqual(result.runs[0].endJoin.wayID, 'w2');
 
-      const way = accept(x);   // the whole line, joins from `getJoins`
+      // The whole line, trimmed to its joins: its own data, which the layer draws and the user selects
+      const run = result.runs[0];
+      assert.instanceOf(run.datum, Rapid.GeoJSONData);
+      assert.strictEqual(run.datum.dataID, Rapid.pieceID('test:x', [0, 1]));
+      const way = accept(run.datum);
       const graph = editor.stable.graph;
       assert.include(graph.entity('w1').nodes, way.first());
       assert.include(graph.entity('w2').nodes, way.last());
       assert.isBelow(meters(graph.entity(way.first()).loc, loc(50, 0)), 0.01);
       assert.isBelow(meters(graph.entity(way.last()).loc, loc(50, 20)), 0.01);
+    });
+
+    it('a whole line is accepted as trimmed to its joins, without the bits that overshoot them', () => {
+      setupAccept();
+      enable([lineRule()]);
+      osmWay(1, [[0, 0], [100, 0]], SIDEWALK);
+      osmWay(2, [[0, 20], [100, 20]], SIDEWALK);
+      // Drawn curb to curb, past both sidewalks, with a vertex 1 m past each
+      const x = feature('x', [[50, -2.5], [50, -1], [50, 21], [50, 22.5]], CROSSING);
+
+      const run = conflation.getResult(ds, x).runs[0];
+      const way = accept(run.datum);
+      const ys = editor.stable.graph.childNodes(way).map(node => Rapid.sdk.geoLatToMeters(node.loc[1] - ORIGIN[1]));
+      assert.lengthOf(ys, 2, 'no vertices past the sidewalks');
+      assert.isBelow(Math.abs(ys[0]), 0.01);
+      assert.isBelow(Math.abs(ys[1] - 20), 0.01);
+    });
+
+    it('a run whose ends both join the same node isn\'t closed into a loop', () => {
+      setupAccept();
+      enable([lineRule()]);
+      osmWay(1, [[0, 0], [60.5, 0], [200, 0]], SIDEWALK);
+      // A narrow detour whose two legs are 1 m apart, either side of node n1-1
+      const a = feature('a', [[0, 1.5], [60, 1.5], [60, 15], [61, 15], [61, 1.5], [150, 1.5]], SIDEWALK);
+      const detour = conflation.getResult(ds, a).runs.find(run => run.status === 'unmatched');
+      assert.strictEqual(detour.startJoin?.nodeID, 'n1-1');
+      assert.strictEqual(detour.endJoin?.nodeID, 'n1-1');
+
+      const way = accept(detour.datum);
+      assert.isFalse(way.isClosed());
+      assert.include(way.nodes, 'n1-1');   // one end joins
+    });
+
+    it('a join whose segment moved since it was found doesn\'t add a node there', () => {
+      setupAccept();
+      enable([lineRule()]);
+      osmWay(1, [[0, 0], [200, 0]], SIDEWALK);   // nodes only at x = 0 and x = 200
+      const points = [[0, 1.5], [60, 1.5], [62, 20], [78, 20], [80, 1.5], [150, 1.5]];
+      const detour = conflation.getResult(ds, feature('a', points, SIDEWALK)).runs[1];   // held by the inspector
+      assert.isOk(detour.startJoin.edge);
+
+      // The sidewalk's far end moves, so the segment no longer passes where the join was found
+      editor.perform(Rapid.actionMoveNode('n1-1', loc(200, 60)));
+      editor.commit({ stringID: 'moved' });
+
+      const way = accept(detour.datum);
+      const existing = editor.stable.graph.entity('w1');
+      assert.deepEqual(existing.nodes, ['n1-0', 'n1-1'], 'no node added to the sidewalk');
+      assert.notInclude(existing.nodes, way.first());
     });
 
     it('line ends only join target lines that some rule allows', () => {
@@ -666,6 +753,58 @@ describe('ConflationSystem', () => {
       conflation.getResult(ds, a);
       assert.isOk(spatial.getData(pieceID));
     });
+
+    it('invalidate(datasetID) empties the pieces cache of a dataset whose data has another namespace', () => {
+      enable([lineRule()]);
+      ds.spatialID = 'other';   // an asset dataset may give its data a namespace of its own
+      osmWay(1, [[0, 0], [60, 0]], SIDEWALK);
+      const a = feature('a', [[0, 1.5], [150, 1.5]], SIDEWALK);
+      a.props.namespace = 'other';
+      const spatial = context.systems.spatial;
+
+      const pieceID = conflation.getResult(ds, a).runs[1].datum.dataID;
+      assert.match(pieceID, /^other\.pieces:/);
+      conflation.invalidate('test');
+      assert.isUndefined(spatial.getData(pieceID));
+    });
+
+    it('computes a new version of a feature again, though it has the same ID', () => {
+      enable([lineRule()]);
+      osmWay(1, [[0, 0], [60, 0]], SIDEWALK);
+      const a = feature('a', [[0, 1.5], [80, 1.5]], SIDEWALK);
+      const before = conflation.getResult(ds, a);
+
+      // The same feature, longer now (e.g. tiles of a line stitched together)
+      const longer = a.update({ geojson: { ...a.props.geojson, geometry: { type: 'LineString', coordinates: [loc(0, 1.5), loc(200, 1.5)] } } });
+      const after = conflation.getResult(ds, longer);
+      assert.notStrictEqual(after, before);
+      const newRun = after.runs.find(run => run.status === 'unmatched');
+      assert.isAbove(meters(newRun.coords.at(-1), loc(80, 1.5)), 100, 'the new run reaches the new end');
+    });
+
+    it('flushes results when what counts as an area changes, and not for other schema changes', async () => {
+      let onSchemaChange;
+      const schema = { areaGeneration: 0, on: (event, fn) => { onSchemaChange = fn; } };
+      context.systems.schema = schema;
+      const other = new Rapid.ConflationSystem(context);
+      await other.initAsync();
+      let flushes = 0;
+      other.on('conflationchange', () => flushes++);
+
+      onSchemaChange();   // e.g. presets loaded, same area keys
+      assert.strictEqual(flushes, 0);
+      schema.areaGeneration = 1;
+      onSchemaChange();
+      assert.strictEqual(flushes, 1);
+    });
+
+    it('a line with no length is a new feature as a whole, with no pieces', () => {
+      enable([lineRule()]);
+      const z = feature('z', [[10, 10], [10, 10]], SIDEWALK);
+      const result = conflation.getResult(ds, z);
+      assert.strictEqual(result.status, 'unmatched');
+      assert.isUndefined(result.runs);
+    });
   });
 
 
@@ -678,6 +817,16 @@ describe('ConflationSystem', () => {
       const part = Rapid.pieceID('test:k1:2', [0, 0.5]);   // a part of a Multi* feature
       assert.strictEqual(part, 'test.pieces:k1:2@0-0.5');
       assert.deepEqual(Rapid.parsePieceID(part), { dataID: 'test:k1:2', range: [0, 0.5] });
+    });
+
+    it('pieceID rounds to about 10 cm on a long line, so the range survives the round trip', () => {
+      const range = [0.50001, 0.50004];   // 3 m apart on a 100 km line
+      const id = Rapid.pieceID('test:k1', range, 100000);
+      const parsed = Rapid.parsePieceID(id);
+      assert.isOk(parsed);
+      assert.isBelow(Math.abs(parsed.range[0] - range[0]) * 100000, 0.1);
+      assert.isBelow(Math.abs(parsed.range[1] - range[1]) * 100000, 0.1);
+      assert.strictEqual(Rapid.pieceID('test:k1', [0.123456, 1], 800), 'test.pieces:k1@0.1235-1', 'up to 1 km: 4 decimals');
     });
 
     it('parsePieceID rejects ids that are not pieces, or have a range that makes no sense', () => {

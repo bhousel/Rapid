@@ -91,8 +91,8 @@ export class PixiLayerDebug extends AbstractPixiLayer {
         });
 
         result.runs?.forEach((run, i) => {
-          if (run.startJoin) this._renderMarker(`${prefix}-run${i}-start`, run.startJoin.loc, 'join', frame, viewport);
-          if (run.endJoin)   this._renderMarker(`${prefix}-run${i}-end`, run.endJoin.loc, 'join', frame, viewport);
+          if (run.startJoin) this._renderMarker(`${prefix}-run${i}-start`, projWorldToWgs84(run.startJoin.coord), 'join', frame, viewport);
+          if (run.endJoin)   this._renderMarker(`${prefix}-run${i}-end`, projWorldToWgs84(run.endJoin.coord), 'join', frame, viewport);
         });
       }
     }

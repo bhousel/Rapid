@@ -92,6 +92,12 @@ describe('RapidDataset', () => {
       assert.deepEqual(json.dictionary, { transforms: [{ order: 0, function: 'copy', source: 'a', target: 'a', isID: true }] });
     });
 
+    it('fills in conflation settings that a definition leaves out, like the rules', () => {
+      const ds = new Rapid.RapidDataset(context, { id: 'conflation-test', conflation: { showMatched: true } });
+      assert.isTrue(ds.conflation.showMatched);
+      assert.deepEqual(ds.conflation.rules, Rapid.conflationDefaults().rules);
+    });
+
     it('includes a copy of the conflation settings', () => {
       const ds = new Rapid.RapidDataset(context, { id: 'conflation-test' });
       ds.conflation.showMatched = true;

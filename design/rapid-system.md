@@ -116,9 +116,11 @@ feature's `id` is just the part after the first colon, and its `dataID` is the w
 - **A MapWithAI feature:** `${datasetID}:${entityID}`, with the server's entity IDs (`fbRoads:w-123`).
 - **A piece of a line:** `${datasetID}.pieces:${key}@${start}-${end}` (`pieceID` in
   `ConflationSystem`), where `start` and `end` are the stretch it covers as fractions of the line's
-  length, rounded to 4 decimals. This follows the linear referencing that Overture uses
-  (`between: [start, end]`). Pieces are the runs that conflation cuts a partly mapped line into, and
-  the user can accept or ignore each one. They're kept in their own `SpatialSystem` cache, which
+  length, rounded to about 10 cm along the line (4 decimals up to 1 km, more for a longer line, so a
+  range always survives the round trip). This follows the linear referencing that Overture uses
+  (`between: [start, end]`). Pieces are the runs that conflation cuts a line into (a partly mapped
+  line, or a whole line trimmed to its joins, `@0-1`), and the user can accept or ignore each one. A
+  line with no length has no pieces. They're kept in their own `SpatialSystem` cache, which
   conflation empties and fills again after each edit.
 - **Acted ranges.** `actedRanges(dataID)` reads the ranges back out of the accepted and ignored IDs
   (`parsePieceID`; a whole feature's ID covers `[0, 1]`) and merges them. Conflation leaves these

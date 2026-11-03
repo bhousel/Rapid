@@ -372,8 +372,9 @@ interface LineRun {
   coords: Vec2[];                     // WGS84 sub-line of the original geometry
   startJoin?: JoinPoint;              // set when this end meets a matched run, or an allowed target line
   endJoin?: JoinPoint;
-  datum?: GeoJSONData<ConflationRunProps>;   // runs that aren't matched, unless the run is the whole line:
-                                             // just this stretch, to draw, select and accept on its own
+  datum?: GeoJSONData<ConflationRunProps>;   // every run, unless it is the source line itself (the whole
+                                             // line, with no joins to trim it to): just this stretch, to
+                                             // draw, select, accept and ignore on its own
 }
 
 interface ConflationRunProps extends GeoJSONProps {   // plus id, datasetID, serviceID, geojson
@@ -384,9 +385,9 @@ interface ConflationRunProps extends GeoJSONProps {   // plus id, datasetID, ser
 
 interface JoinPoint {
   wayID: EntityID;                    // the OSM way to connect to
-  loc: Vec2;                          // the endpoint projected onto that way
+  coord: Vec2;                        // the endpoint projected onto that way, world coordinates
   nodeID?: EntityID;                  // an existing node within tolerance, if any (reuse it)
-  edge?: [EntityID, EntityID];        // otherwise, the segment that `loc` is on (add a node there)
+  edge?: [EntityID, EntityID];        // otherwise, the segment that `coord` is on (add a node there)
 }
 ```
 
@@ -441,12 +442,16 @@ Conflation has to work no matter what the dataset already went through:
 
 ### Caching and invalidation
 
-- Results are cached by `(datasetID, dataID)`. Coverage is cached on each `GeometryPart` (one slot per
-  sample spacing). Compiled property matchers are cached per rule side, and dropped by `invalidate()`,
-  so a rule edited in place is picked up.
+- Results are cached by `(datasetID, dataID)`, with the datum each was computed for: a new version of a
+  feature (a new object with the same ID) is computed again. Coverage is cached on each `GeometryPart`
+  (one slot per sample spacing). Compiled property matchers are cached per rule side, and dropped by
+  `invalidate()`, so a rule edited in place is picked up.
 - **`stablechange` and `merge`** from `EditSystem` flush results whose coverage overlaps the extent
   that changed. A first version can simply flush everything and rely on lazy recomputation.
-- **A rule change** flushes that dataset's results.
+- **A rule change** flushes that dataset's results, and its pieces (cached under its data's namespace,
+  `spatialID`, which is usually its ID).
+- **A schema change that changes what counts as an area** (`SchemaSystem.areaGeneration`) flushes
+  everything: whether an OSM way is a line to match or an area's edge depends on it.
 - **Compute lazily:** `getResult(ds, datum)` computes when first asked. The drawing code asks only for
   visible features. If `scheduler` is present, features just outside the viewport can be computed in
   idle time.
@@ -479,24 +484,30 @@ When conflation is on for a dataset:
 - `matched` features are skipped, or drawn if `showMatched` is on. (A muted style for them, 35%
   opacity and no casing, is turned off for now, so they look like any other feature.)
 - `unmatched` and `unknown` features are drawn as they are today.
-- A line is drawn as its `runs` unless it's one run over the whole line: one Pixi feature per run,
-  with IDs like `rapid-${datasetID}-${dataID}-run${i}`. That covers partly mapped lines, and lines
-  the user acted on part of; a line with no runs left isn't drawn. Each run is styled by its own
-  status. A run that isn't already mapped is bound to its own data (`LineRun.datum`), so it can be
-  selected and accepted on its own; already-mapped runs are bound to the line.
+- A line is drawn as its `runs` unless its one run is the source line itself: one Pixi feature per
+  run, with IDs like `rapid-${datasetID}-${dataID}-run${i}`. That covers partly mapped lines, lines
+  trimmed to their joins, and lines the user acted on part of; a line with no runs left isn't drawn.
+  Each run is styled by its own status, and bound to its own data (`LineRun.datum`), so it can be
+  selected, accepted and ignored on its own. That includes an already-mapped run (when `showMatched`
+  is on): until November 3, 2026 it was bound to the whole line, so Add put in the whole line on top of
+  what was mapped and accepted, and Ignore hid the line's new stretches too.
 - Already-mapped points and areas are hidden the same way, once their matchers exist (Step 8).
 
 The layer remembers, for each Pixi feature, which result (or run) it was last drawn from, and rebuilds
 the feature when that changes. It redraws on `conflationchange`. The `isAcceptedOrIgnored` filter
-still applies to features accepted or ignored as a whole; pieces are left out by conflation itself.
+still applies to features accepted or ignored as a whole, or in pieces that cover all of it (so a line
+accepted as trimmed doesn't come back with conflation off); other pieces are left out by conflation itself.
 
 Styles are constants in `PixiLayerRapid` for now, like the rest of the Rapid layer's styles. Moving
 them into style data is in the backlog, with the other external-data styling ideas.
 
 ### Accepting and joining
 
-**Selecting a run.** When a line has more than one run, each run that isn't already mapped carries
-its own `GeoJSONData` (`LineRun.datum`): the run's geometry, the source's properties, and its joins.
+**Selecting a run.** Each run carries its own `GeoJSONData` (`LineRun.datum`): the run's geometry,
+the source's properties, and its joins. Only a run that is the source line itself has none (the whole
+line, with no joins). A whole line with joins is trimmed to them (see `trimEnd`), so it has its own
+data too, and is accepted as trimmed: before November 3, 2026 the source was accepted, with the bits
+that overshoot each join (a crossing drawn curb to curb spiked back across both sidewalks).
 `PixiLayerRapid` binds the run's Pixi feature to that data, so clicking it selects just that stretch,
 the Rapid inspector shows it like any other feature, and **Add This Feature** adds just that stretch.
 The selection and inspector code didn't need to change.
@@ -505,11 +516,13 @@ The selection and inspector code didn't need to change.
 `JoinPoint`:
 - If `nodeID` is set, the new way uses that existing node as its endpoint (the end node it would have
   created is dropped).
-- Otherwise, the end node moves to `loc` and is inserted into the OSM way's segment (`edge`), using
+- Otherwise, the end node moves to `coord` and is inserted into the OSM way's segment (`edge`), using
   `actionAddMidpoint`. If that segment no longer exists, for example because the run's other end was
-  just inserted into the same segment, the segment that `loc` lies on now is used instead.
-- A join that no longer fits the graph (the way was deleted, or `loc` isn't on it anymore) is skipped,
-  and the line is still accepted.
+  just inserted into the same segment, the segment that `coord` lies on now is used instead.
+- A join that no longer fits the graph (the way was deleted, or `coord` isn't on it anymore, even on a
+  segment that still exists but moved) is skipped, and the line is still accepted.
+- If both ends would join the same node (a narrow detour by a corner), only the first does: the way
+  would otherwise be closed into a loop.
 
 **Line ends.** An end of a line that isn't next to an already-mapped stretch also gets a `JoinPoint`
 if it lies within a rule's `sameDist` of a target line that the rule allows (`target.geometry`,
@@ -522,8 +535,8 @@ stream doesn't join the stream (found on real data). The flip side: with `sameKe
 a second rule. It does for these datasets what the optional autoconnect step (a power-user setting) does
 only for exactly matching nodes and validator fixes; autoconnect still runs afterwards if enabled.
 
-**Plumbing.** `ConflationSystem.getJoins(ds, datum)` returns `{ start, end }` for a run's data, or for
-a whole source line that is a single run. `UiRapidInspector` passes that to
+**Plumbing.** `ConflationSystem.getJoins(ds, datum)` returns `{ start, end }` for a run's data (a
+source line has no joins of its own). `UiRapidInspector` passes that to
 `actionRapidAcceptFeature(datum, joins)`. Without `ConflationSystem`, features are accepted as before.
 
 **Bookkeeping.** The run's id goes into `acceptIDs` (as with any accepted feature); the source

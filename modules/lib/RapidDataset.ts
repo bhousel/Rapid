@@ -189,7 +189,7 @@ export class RapidDataset {
     this.hidden = props.hidden ?? false;
     this.conflated = props.conflated ?? false;
     this.custom = props.custom ?? false;
-    this.conflation = props.conflation ?? conflationDefaults();
+    this.conflation = { ...conflationDefaults(), ...props.conflation };   // a definition may leave settings out (even `rules`)
 
     this.labelStringID = props.labelStringID;
     this.descriptionStringID = props.descriptionStringID;

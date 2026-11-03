@@ -659,12 +659,18 @@ export class RapidSystem extends AbstractSystem {
   }
 
   /**
-   * Returns `true` if the given dataID is an accepted or ignored feature.
+   * Returns `true` if the given dataID is an accepted or ignored feature: the feature itself, or every
+   * piece of a line (e.g. a whole line accepted as trimmed to its joins is the piece `…@0-1`).
    * These features are hidden from the renderer.
+   * @param dataID - The feature's data ID
    * @return `true` if the given dataID is an accepted or ignored feature
    */
   public isAcceptedOrIgnored(dataID: DataID): boolean {
-    return this.acceptIDs.has(dataID) || this.ignoreIDs.has(dataID);
+    if (this.acceptIDs.has(dataID) || this.ignoreIDs.has(dataID)) return true;
+    if (!this._actedRanges.has(dataID)) return false;
+
+    const ranges = this.actedRanges(dataID);
+    return ranges.length === 1 && ranges[0][0] <= 0 && ranges[0][1] >= 1;
   }
 
   /**

@@ -3,7 +3,7 @@ import { actionAutofix } from './autofix.ts';
 import { GeoJSONData, OsmEntity, OsmNode, OsmRelation, OsmWay } from '../data/index.ts';
 import { geoMetersToWorld } from '../geo/geom.ts';
 import { Graph } from '../lib/Graph.ts';
-import { projWgs84ToWorld, vecProject } from '@rapid-sdk/math';
+import { projWorldToWgs84, vecProject } from '@rapid-sdk/math';
 import { validateAlmostJunction } from '../validators/almost_junction.ts';
 import { validateCrossingWays } from '../validators/crossing_ways.ts';
 
@@ -13,6 +13,9 @@ import type { JoinPoint, LineJoins } from '../core/ConflationSystem.ts';
 import type { EntityType, OsmRelationMember, OsmTags } from '../data/types.ts';
 import type { RapidDataDictionary } from '../lib/index.ts';
 import type { Vec2 } from '@rapid-sdk/math';
+
+/** How close a join's location must be to a segment of the target way to be inserted there, in meters */
+const ON_EDGE_METERS = 0.5;
 
 
 /**
@@ -119,41 +122,59 @@ export function actionRapidAcceptFeature(datum: OsmEntity | GeoJSONData, joins?:
       if (way.isClosed()) return;   // don't join the ends of a ring
 
       if (join.nodeID && target.nodes.includes(join.nodeID)) {
+        // The other end may have joined this same node already (both ends near one corner):
+        // joining this end there too would close the way, so this end stays where it is.
+        if (way.nodes.includes(join.nodeID)) return;
+
         // Reuse the existing node, and drop the end node we created for this end.
         graph.replace(way.replaceNode(endNodeID, join.nodeID));
         graph.remove(graph.entity(endNodeID));
 
       } else {
         // Move our end node onto the existing way's segment, and insert it there.
-        // The recorded edge may have been split already (e.g. by the other end's join),
-        // so fall back to the segment that `loc` lies on now.
-        const edge = (join.edge && target.isAdjacent(join.edge[0], join.edge[1])) ? join.edge : edgeAt(target, join.loc);
+        // The recorded edge may have been split already (e.g. by the other end's join), or its nodes
+        // moved since the join was found, so fall back to the segment that `coord` lies on now.
+        const isOnEdge = join.edge && target.isAdjacent(join.edge[0], join.edge[1]) && distanceToEdge(join.edge, join.coord) <= ON_EDGE_METERS;
+        const edge = isOnEdge ? join.edge : edgeAt(target, join.coord);
         if (!edge) return;
         const endNode = graph.entity(endNodeID) as OsmNode;
-        actionAddMidpoint({ loc: join.loc, edge: edge }, endNode)(graph);
+        actionAddMidpoint({ loc: projWorldToWgs84(join.coord), edge: edge }, endNode)(graph);
       }
     }
 
 
     /**
-     * Finds the segment of a way that a location lies on.
+     * Finds the segment of a way that a point lies on.
      * @param  way - The way to search
-     * @param  loc - The location (WGS84)
-     * @return The segment's node ids, or `undefined` if `loc` isn't on the way (within 0.5 m)
+     * @param  coord - The point, in world coordinates
+     * @return The segment's node ids, or `undefined` if `coord` isn't on the way (within `ON_EDGE_METERS`)
      */
-    function edgeAt(way: OsmWay, loc: Vec2): [EntityID, EntityID] | undefined {
-      const point = projWgs84ToWorld(loc);
-      const tolerance = geoMetersToWorld(0.5, loc[1]);
+    function edgeAt(way: OsmWay, coord: Vec2): [EntityID, EntityID] | undefined {
       for (let i = 0; i < way.nodes.length - 1; i++) {
-        const a = graph.hasEntity(way.nodes[i]) as OsmNode | undefined;
-        const b = graph.hasEntity(way.nodes[i + 1]) as OsmNode | undefined;
-        if (!a?.loc || !b?.loc) continue;
-        const closest = vecProject(point, [projWgs84ToWorld(a.loc), projWgs84ToWorld(b.loc)]);
-        if (closest && closest.distance <= tolerance) {
-          return [a.id, b.id];
+        const edge: [EntityID, EntityID] = [way.nodes[i], way.nodes[i + 1]];
+        if (distanceToEdge(edge, coord) <= ON_EDGE_METERS) {
+          return edge;
         }
       }
       return undefined;
+    }
+
+
+    /**
+     * Returns how far a point is from a segment, as the graph has it now.
+     * @param  edge - The segment's node ids
+     * @param  coord - The point, in world coordinates
+     * @return The distance in meters, or `Infinity` if a node of the segment is missing
+     */
+    function distanceToEdge(edge: [EntityID, EntityID], coord: Vec2): number {
+      const a = graph.hasEntity(edge[0]) as OsmNode | undefined;
+      const b = graph.hasEntity(edge[1]) as OsmNode | undefined;
+      if (!a?.loc || !b?.loc) return Infinity;
+      const coordA = graph.geometry(a).parts[0].world?.coords as Vec2 | undefined;  // A node should have a single world coord
+      const coordB = graph.geometry(b).parts[0].world?.coords as Vec2 | undefined;
+      if (!coordA || !coordB) return Infinity;
+      const closest = vecProject(coord, [coordA, coordB]);
+      return closest ? closest.distance / geoMetersToWorld(1, a.loc[1]) : Infinity;
     }
 
 

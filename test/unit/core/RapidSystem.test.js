@@ -416,6 +416,18 @@ describe('RapidSystem', () => {
         assert.deepEqual(_rapid.actedRanges('test:k1'), [[0, 1]]);
       });
 
+      it('a line whose pieces cover all of it counts as accepted or ignored', () => {
+        replay([
+          { type: 'rapid_accept_feature', acceptIDs: ['test.pieces:k1@0-1'] },   // trimmed to its joins
+          { type: 'rapid_accept_feature', acceptIDs: ['test.pieces:k2@0-0.5'] },
+          { type: 'rapid_ignore_feature', ignoreID: 'test.pieces:k2@0.5-1' },
+          { type: 'rapid_accept_feature', acceptIDs: ['test.pieces:k3@0-0.5'] }
+        ]);
+        assert.isTrue(_rapid.isAcceptedOrIgnored('test:k1'));
+        assert.isTrue(_rapid.isAcceptedOrIgnored('test:k2'));
+        assert.isFalse(_rapid.isAcceptedOrIgnored('test:k3'));
+      });
+
       it('resetAsync clears them', () => {
         replay([{ type: 'rapid_ignore_feature', ignoreID: 'test:k1' }]);
         return _rapid.resetAsync()
