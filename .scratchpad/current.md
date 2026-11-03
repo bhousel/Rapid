@@ -7,6 +7,115 @@ Data IDs (steps 1–5), the validation audit and the graph-geometry rollout have
 (accept with joins, autoconnect, undo/redo, Autofix All, panning while editing, QA and photo layers,
 backup restore, a faked upload conflict), then merge to main.
 
+## Bug hunt (Nov 3): open issues
+Found by `/bughunt` before handing the branch to testers. Status: *new* (this branch) or *main too*;
+*confirmed* (a repro) or *reading* (read in the code only). Repros were in the session scratch folder
+(`hunt-*/`), which doesn't last; each item says enough to repro again. Coverage that came back clean:
+~1,400 seeded random `EditSystem` histories (edits, commits, appends, transactions, undo/redo,
+checkpoints, tile merges, `updateBase`) checking emits, shapes, both indexes, segments, node memos,
+parent lists and the session difference after every step; two live soaks on Ballard data (~180 real
+actions, 45k entities loaded mid-run); backup round trips; `affects()` vs `complete()` over 1,500 seeds.
+
+### High: fix before testers
+1. **iD#2085 restores miss redo edits and checkpoints.** `Graph.rebase` only checks `stack.at(-1)`
+   (staging) for deleted nodes. Delete a node, undo, load a tile with a way through it, redo:
+   `OsmEntity n2 not found` (render, delete way, multipolygon join). 4–9% of random histories.
+   `Graph.ts:804`. *Main too (wider now: checkpoints, return edit); confirmed.* Fix: gather restore IDs
+   from every graph in the stack that deleted the node (and didn't delete the way), not just the head.
+2. **A dev-API session can be restored and uploaded against live OSM.** Session records don't store
+   the API; the source switch isn't remembered, so every load starts on live. v4 restore fetches
+   `baseVersions` from live (same IDs, unrelated features), and Save may overwrite live data without a
+   409. `EditSystem._saveSessionAsync` (:2371), `restoreSessionAsync`, `UiSourceSwitch.ts:26`.
+   *New; reading.* Fix: store `apiURL` on each session; filter or refuse a restore that doesn't match.
+3. **MapRoulette: typing a comment replaces Cancel/Submit with the four action buttons.** `changeInput`
+   calls `_saveButtons` (should be `_submitButtons`), and joins keyed by `d.key` now see a new datum.
+   `UiMapRouletteEditor.ts:233`. *New; confirmed.* Fix: call `_submitButtons`; key single-datum joins
+   by `d.id`.
+4. **MapRoulette: action clicks write the editor's stale datum over the cached task.** The details
+   reload and refetch on every click; if the task was selected before its challenge loaded,
+   `instruction`/`description`/`isVisible` are lost for good (details show the error text; after Cancel
+   the marker disappears). `UiMapRouletteEditor.ts:671`, `UiMapRouletteMenu.ts:283`. *New; confirmed.*
+   Fix: start from `maproulette.getTask(task.id) ?? task`.
+5. **Cancel on the conflict screen still keeps the user's deletion.** `updateBase` runs during detection,
+   so the next Save deletes the other mapper's v2 without asking. `UploaderSystem.ts:450`, `:766`.
+   *New; confirmed.* Fix: update the base only when "Leave Deleted" is actually chosen.
+6. **A line that is one whole new run is accepted untrimmed.** No piece datum is made for a `[0,1]`
+   run, so accept uses the source geometry; its ends spike ~1 m back across the sidewalk they join.
+   `ConflationSystem.ts:833-852`, `rapid_accept_feature.ts:67-98`. *New; confirmed.* Fix: give a
+   whole-line run with joins a datum too (or have `getJoins` carry the trimmed coords).
+7. **With "show already mapped" on, a matched run is bound to the whole line.** Add puts in the full
+   line on top of the existing sidewalk and the accepted piece; Ignore hides the line's pending new
+   pieces. `PixiLayerRapid.ts:592` (`run.datum ?? d`). *New; confirmed.* Fix: a non-actionable datum for
+   matched runs, or refuse Add/Ignore for a line that has runs.
+8. **Conflicts that leave nothing to upload keep the session; it's offered for restore next time.**
+   `SaveMode.ts:348` (`_resultNoChanges`), then `_reset` nulls `_sessionID`. *New; confirmed.*
+   Fix: `editor.clearBackup()` in the no-changes path.
+9. **Undoing a tag change on a new relation deletes the relation and loses the redo.** Undo re-enters
+   select, and `SelectMode.exit()` cleans up the now-untagged relation with a new commit.
+   `SelectMode.ts:232-252`. *Main too; confirmed.* Fix: skip the cleanup when the exit comes from a
+   history jump (stable changed since the mode was entered).
+
+### Medium
+10. **"Use theirs" on a way reverts the user's changes to all its nodes**, including ones that didn't
+    conflict and are shared with other ways. `UploaderSystem.ts:779-790`. *iD has it too; confirmed.*
+11. **Counter-based data IDs (GeoScribble, vector tiles) go into `id=` and edit selections**, so after a
+    reload or a shared link they name a different feature. `SelectMode.ts:187`, `GeoJSONData.ts:46`,
+    `GeoScribbleService.ts:146`. *New; confirmed.* Fix: keep unstable IDs out of `id=` and recorded
+    selections; give GeoScribble a deterministic key.
+12. **Backups saved by `main` recorded accepts without the dataset prefix** (`w-123`, not
+    `fbRoads:w-123`). Restoring one shows accepted features again, and they can be added twice.
+    `_upgradeEditProps`, `RapidSystem.ts:895`. *New; reading.* Fix: prefix in the upgrade from the edit's
+    `sources.data[0]`.
+13. **Default conflation rules join line ends to any line** (fences, streams, power lines, boundaries).
+    `ConflationSystem.ts:269`, `:717-741`. *Design choice, but makes bad edits.* Fix: default
+    `sameKeys: ['highway']`, or only join with rules that have target conditions.
+14. **Ctrl/⌘+↑↓ with a mixed selection selects parents/children and also pans the map.**
+    `MapInteractionBehavior.ts:160` doesn't check `defaultPrevented`. *New; confirmed.*
+15. **After an upload ends with -6 ("can't tell"), the open changeset is reused**, so `changes_count` no
+    longer tells whether a later upload landed; a later save can delete a session whose newer edits
+    never uploaded. `OsmService.ts:1406`, `:1556`. *New; reading.* Fix: drop `openChangesetID` on -6.
+16. **Conflation results are cached by data ID**, so a new datum with the same ID gets the old runs.
+    Latent until vector tile stitching returns, or a dataset reloads with changed geometry.
+    `ConflationSystem.ts:385`. *New; confirmed.* Fix: key by datum object (WeakMap).
+17. **Some piece IDs don't parse back:** zero-length lines (`@0-0`), and lines over ~20 km (4 decimals).
+    Ignore/Accept doesn't hide them. `ConflationSystem.ts:239`. *New; confirmed.*
+18. **Area-key schema changes don't flush conflation results** (building edges can stay "lines").
+    *New; reading.* Fix: `invalidate()` on `schemachange`.
+
+### Low
+19. Both ends of a run snap to the same node, so the accepted way is closed (`rapid_accept_feature.ts:121`).
+    *Confirmed; contrived.*
+20. A join to a segment that still exists doesn't check `loc` is still on it (`rapid_accept_feature.ts:130`).
+21. Pieces are cleared by `ds.id` but cached by `spatialID` (`ConflationSystem.ts:438` vs `:875`); a
+    dataset with `conflation` but no `rules` throws in `UiRapidDatasetSettings._checkConflation`.
+22. Undo during a drag/move selects the newest edit's `selection` (maybe offscreen), `MapSystem.ts:481`.
+    *Main too; confirmed.*
+23. Drag, draw and add-point edits record their working selection as `selectionBefore`
+    (`DragNodeMode.ts:352`). *Main too.*
+24. A successful upload reported as -1 "Connection Switched" clears the upload mark (`OsmService.ts:2400`).
+    Very hard to trigger.
+25. "Keep mine" after the default "Use theirs" can leave the parent way edited (`merge_remote_changes.ts`).
+26. Osmose editor's `_updateIssue` has the same stale-datum pattern as 4 (`UiOsmoseEditor.ts:223`).
+27. An iD#2085 restore of a frozen stable that's also `_headQueuedGraph` isn't validated again in the
+    head cache (`validateAsync` sees "caught up").
+28. `graph.geometry()` for a new way passed to a graph that doesn't have it reads an undefined shape
+    (falls back to the passed object's `baseGeometry`). No caller does this today.
+
+### Already in `main`
+29. After a new note is saved, the "new note" editor stays up (looks up the removed `-1`); a second Save
+    could post a duplicate note. `SelectMode.ts:333-340`.
+30. Note and KeepRight Save clicks may be lost: the textarea's blur re-joins the buttons under the pointer.
+31. The walkthrough leaves a duplicate session (reset, then `fromJSONAsync`); restoring it later
+    duplicates an upload. `UiIntro.ts:336`.
+32. "Duplicate tab" copies `sessionStorage`, so two tabs can share a session (`_isLiveElsewhere`).
+33. Undo right after pressing "2" (before the first click) is silently swallowed (`DrawLineMode.ts:233`).
+34. `AbstractPixiLayer.bindData` wipes parent/child links on every rebind (`:220`).
+35. Restoring a backup can move counters backward, including `v`, `graph` and `changeset` (`EditSystem.ts:1833`).
+36. On the conflict screen, Save is only enabled through `scheduler?.setTimeout` (`UiConflicts.ts:191`).
+
+Not a bug: a history graph that isn't current and hasn't caught up with the base gives stale searches,
+and its own `geometry()` is just as stale. That's the documented design, and nothing searches one.
+
 ## Active: what an edit records (`EditSystem`)
 Design: [`design/edit-system.md`](../design/edit-system.md), started Oct 26. Edits need to record more
 than OSM graph changes. Done: undone (redo) edits aren't saved, and a session undone back to nothing
