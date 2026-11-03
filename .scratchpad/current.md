@@ -28,15 +28,13 @@ actions, 45k entities loaded mid-run); backup round trips; `affects()` vs `compl
    API, because a host's preauth switches the API after systems init; `startAsync` decides. Follow-up,
    not done: after switching to dev in the same tab, its dev sessions aren't offered (restore is only
    offered at startup, which is always live).
-3. **MapRoulette: typing a comment replaces Cancel/Submit with the four action buttons.** `changeInput`
-   calls `_saveButtons` (should be `_submitButtons`), and joins keyed by `d.key` now see a new datum.
-   `UiMapRouletteEditor.ts:233`. *New; confirmed.* Fix: call `_submitButtons`; key single-datum joins
-   by `d.id`.
-4. **MapRoulette: action clicks write the editor's stale datum over the cached task.** The details
-   reload and refetch on every click; if the task was selected before its challenge loaded,
-   `instruction`/`description`/`isVisible` are lost for good (details show the error text; after Cancel
-   the marker disappears). `UiMapRouletteEditor.ts:671`, `UiMapRouletteMenu.ts:283`. *New; confirmed.*
-   Fix: start from `maproulette.getTask(task.id) ?? task`.
+3. ✅ **MapRoulette: typing a comment replaces Cancel/Submit with the four action buttons.** Fixed Nov 3:
+   `changeInput` calls `_submitButtons`, and the editor's sections and `UiMapRouletteDetails` key by
+   `d.id`. Also fixed (main had it too): the action buttons showed next to the comment while an action
+   was pending (when the floating menu is off).
+4. ✅ **MapRoulette: action clicks write the editor's stale datum over the cached task.** Fixed Nov 3:
+   the editor's `_updateTask` and the menu's `_submitTask` start from `maproulette.getTask(id)`.
+   Tests: `test/browser/ui/UiMapRouletteEditor.test.js`. Guidance added to `modules/ui/AGENTS.md` §6.
 5. **Cancel on the conflict screen still keeps the user's deletion.** `updateBase` runs during detection,
    so the next Save deletes the other mapper's v2 without asking. `UploaderSystem.ts:450`, `:766`.
    *New; confirmed.* Fix: update the base only when "Leave Deleted" is actually chosen.

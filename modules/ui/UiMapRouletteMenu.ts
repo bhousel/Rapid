@@ -280,7 +280,9 @@ export class UiMapRouletteMenu extends EventEmitter {
       const $commentInput = select('.new-comment-input');
       const comment = $commentInput.empty() ? '' : ($commentInput.property('value') as string).trim();
 
-      const task = d.update({
+      // The cached task may be newer: loading the challenge and the task details stores new tasks
+      const current = maproulette.getTask(d.id) ?? d;
+      const task = current.update({
         _status: status,
         taskStatus: status,
         mapRouletteApiKey: this._mapRouletteApiKey ?? undefined,

@@ -85,7 +85,13 @@ if (scheduler) {
 ## 6. Data the component shows
 
 - **Never change a datum's `props` in place** (a QA issue's status, a task's comment). Make a new one with
-  `this.datum.update({ ... })`, store it in the service's cache (`replaceItem`), and make it the
-  component's `datum`. The map layer redraws it, and a d3 join keyed on `d.key` sees the new version.
+  `update({ ... })`, store it in the service's cache (`replaceItem`), and make it the component's
+  `datum`. The map layer redraws it.
+- **Update from the cached copy, not the datum you were given.** The datum a component got when it was
+  selected goes stale as loaders store newer copies (challenge details, task geometry). Start from
+  `service.getTask(datum.id) ?? datum`, or the update drops what they loaded.
+- **Key a component's own sections by the datum's `id`, not its `key`.** `key` changes with every new
+  version, so a join keyed on it removes the section and enters a new one: the user loses focus and
+  what they typed, and the section shows "Loading" again. Keyed by `id`, a new version updates it.
 - **After an async load, use what the load returns**, not the datum bound to an element before it:
   the loaded details are on a new object.

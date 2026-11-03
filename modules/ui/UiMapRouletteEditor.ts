@@ -192,8 +192,10 @@ export class UiMapRouletteEditor extends EventEmitter {
     const isSelected = dataID && this.context.selectedIDs().includes(dataID);
     const isShown = (this.datum && isSelected);
 
+    // Keyed by the task's ID, not its `key`: a new version of the same task (a status, a comment)
+    // updates these sections, instead of replacing them while the user works in them.
     let $saveSection: D3Selection = $selection.selectAll('.mr-save')
-      .data(isShown ? [this.datum!] : [], (d: MapRouletteTask) => d.key!);
+      .data(isShown ? [this.datum!] : [], (d: MapRouletteTask) => d.id);
 
     // exit
     $saveSection.exit()
@@ -224,7 +226,7 @@ export class UiMapRouletteEditor extends EventEmitter {
     const isSelected = dataID && context.selectedIDs().includes(dataID);
 
     let $commentSave: D3Selection = $selection.selectAll('.note-save')
-      .data(isSelected && this._actionTaken ? [this.datum!] : [], (d: MapRouletteTask) => d.key!);
+      .data(isSelected && this._actionTaken ? [this.datum!] : [], (d: MapRouletteTask) => d.id);
 
     const changeInput = (e: Event): void => {
       const $input = select(e.currentTarget as HTMLTextAreaElement);
@@ -233,7 +235,7 @@ export class UiMapRouletteEditor extends EventEmitter {
       this._updateTask({ newComment: val });
 
       $commentSave
-        .call(this._saveButtons);
+        .call(this._submitButtons);
     };
 
     // exit
@@ -401,8 +403,8 @@ export class UiMapRouletteEditor extends EventEmitter {
         const dataID = this.datum?.dataID;
         const isSelected = dataID && context.selectedIDs().includes(dataID);
 
-        // Check if the MapRoulette menu is showing
-        if ((ui as any)?._showsMapRouletteMenu) {
+        // Check if the MapRoulette menu is showing, or the user chose an action and is writing the comment
+        if ((ui as any)?._showsMapRouletteMenu || this._actionTaken) {
           $selection.selectAll('.mr-save .buttons').style('display', 'none');
           return;
         } else {
@@ -414,7 +416,7 @@ export class UiMapRouletteEditor extends EventEmitter {
         };
 
         let $buttons: D3Selection = $selection.selectAll('.buttons')
-          .data(isSelected ? [this.datum!] : [], (d: MapRouletteTask) => d.key!);
+          .data(isSelected ? [this.datum!] : [], (d: MapRouletteTask) => d.id);
 
         // exit
         $buttons.exit()
@@ -527,7 +529,7 @@ export class UiMapRouletteEditor extends EventEmitter {
     const dataID = this.datum?.dataID;
     const isSelected = dataID && context.selectedIDs().includes(dataID);
     let $buttons: D3Selection = $selection.selectAll('.buttons')
-      .data(isSelected ? [this.datum!] : [], (d: MapRouletteTask) => d.key!);
+      .data(isSelected ? [this.datum!] : [], (d: MapRouletteTask) => d.id);
 
     // exit
     $buttons.exit()
@@ -664,6 +666,8 @@ export class UiMapRouletteEditor extends EventEmitter {
   /**
    * Sets props on the task, as a new task in the cache (data isn't changed in place), and makes it
    * this editor's datum.
+   * It starts from the cached task, which may be newer than the one given: loading the challenge and
+   * the task details stores new tasks with them.
    * @param props - the props to set
    * @param task - the task to start from (defaults to the datum)
    * @return The new task
@@ -672,7 +676,8 @@ export class UiMapRouletteEditor extends EventEmitter {
     const context = this.context;
     const maproulette = context.services.maproulette;
 
-    const updated = task.update(props);
+    const current = maproulette?.getTask(task.id) ?? task;
+    const updated = current.update(props);
     maproulette?.replaceItem(updated);
     this.datum = updated;
     return updated;
