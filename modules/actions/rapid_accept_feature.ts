@@ -1,4 +1,5 @@
 import { actionAddMidpoint } from './add_midpoint.ts';
+import { actionAutofix } from './autofix.ts';
 import { GeoJSONData, OsmEntity, OsmNode, OsmRelation, OsmWay } from '../data/index.ts';
 import { geoMetersToWorld } from '../geo/geom.ts';
 import { Graph } from '../lib/Graph.ts';
@@ -11,8 +12,6 @@ import type { Context } from '../Context.ts';
 import type { JoinPoint, LineJoins } from '../core/ConflationSystem.ts';
 import type { EntityType, OsmRelationMember, OsmTags } from '../data/types.ts';
 import type { RapidDataDictionary } from '../lib/index.ts';
-import type { ValidationIssue } from '../lib/ValidationIssue.ts';
-import type { ValidatorFunction } from '../validators/types.ts';
 import type { Vec2 } from '@rapid-sdk/math';
 
 
@@ -286,38 +285,12 @@ export function actionRapidAcceptFeature(datum: OsmEntity | GeoJSONData, joins?:
         }
       }
 
-      // 2. Run the validator for almost junction and autofix whatever it found.
-      autofix(way.id, validateAlmostJunction(context));
-
-      // 3. Run the validator for crossing ways and autofix whatever it found.
-      autofix(way.id, validateCrossingWays(context));
-
-
-      /**
-       * Applies a validator's autofixes to a way, one at a time.  A fix changes the graph (it may move,
-       * merge or remove nodes of the way, and splits segments), so the issues found before it may no
-       * longer fit.  After each fix, the way is looked up again and validated again.
-       * @param  wayID - The way to fix
-       * @param  validator - The validator to run on it
-       */
-      function autofix(wayID: EntityID, validator: ValidatorFunction): void {
-        const MAX_FIXES = 50;   // in case a fix doesn't make its issue go away
-        const tried = new Set<string>();
-
-        for (let i = 0; i < MAX_FIXES; i++) {
-          graph.commit();   // validators read geometry, which a fix leaves stale until a commit
-          const current = graph.hasEntity(wayID);
-          if (!(current instanceof OsmWay)) return;
-
-          // Issues are keyed by where they are too: crossings hash a rounded location, so two nearby share an id
-          const keyOf = (issue: ValidationIssue): string => `${issue.id}@${issue.loc}`;
-          const issue = validator(current, graph).issues.find(issue => issue.autoArgs && !tried.has(keyOf(issue)));
-          if (!issue) return;
-
-          tried.add(keyOf(issue));
-          graph = issue.autoArgs![0](graph);   // autoArgs = [action, label]
-        }
-      }
+      // 2. Run the validator for almost junction and autofix whatever it found,
+      // 3. then the validator for crossing ways, on the way as the first fixes left it.
+      actionAutofix([
+        { entityID: way.id, validator: validateAlmostJunction(context) },
+        { entityID: way.id, validator: validateCrossingWays(context) }
+      ])(graph);
     }
 
   }) as RapidAcceptAction;

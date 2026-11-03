@@ -2,6 +2,8 @@
 
 Reverse-chronological one-liners. Details live in git history — these are just breadcrumbs.
 
+- **One autofix runner** (Nov 2 2026, `design/validation-system.md` rollout item 5) — `actionAutofix` applies one fix at a time and validates again, for autoconnect and Autofix All (`ValidationSystem.autofixAction`, which finds the shown issues again by kind and entities, via `issue.foundOnID`). Closes the validation audit.
+
 - **Graph versions and their geometry** (Oct 30 – Nov 2 2026, `design/graph-geometry.md` steps 0–10) — Fixed validation audit findings 1 (shared geometry) and 2 (wrong spatial index) by construction. Graphs share structure (`PersistentVector` records, O(1) derive, structural diffs), emit from a change journal, keep their own shapes, and catch up with rebases and schema changes (`syncWithBase()`). Backups hold each edit's own changes. One base spatial index plus local indexes for stable and staging, searchable for any graph (`editor.entitiesInBox`). No data changed in place: `touch()` gone, every layer rebinds by object. Reference model test in `test/unit/lib/graph_model.test.js`. Step 7 (memos in records) measured and left for later. See `decisions.md`.
 
 - **Validation audit** (Oct 29–30 2026, `design/validation-system.md`) — Autoconnect applies one fix at a time, a throwing validator no longer hides other issues, Autofix All and `curb_nodes` fixes repaired, no side effects while detecting, edits validated again when data loads near them, fixes look up the graph they run on. Findings 1 and 2 became the graph-geometry rollout.

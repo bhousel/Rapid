@@ -1,11 +1,14 @@
 import * as Validators from '../validators/index.ts';
 import { AbstractSystem } from './AbstractSystem.ts';
+import { actionAutofix } from '../actions/autofix.ts';
 import { Difference } from '../lib/Difference.ts';
 import { Extent } from '@rapid-sdk/math';
 import { utilArrayChunk, utilArrayGroupBy } from '@rapid-sdk/util';
 import { utilExtractValues } from '../util/string.ts';
 import { ValidationCache } from '../lib/ValidationCache.ts';
 
+import type { Action } from '../actions/types.ts';
+import type { AutofixTarget } from '../actions/autofix.ts';
 import type { Context } from '../Context.ts';
 import type { OsmEntity } from '../data/OsmEntity.ts';
 import type { OsmNode } from '../data/OsmNode.ts';
@@ -311,6 +314,9 @@ export class ValidationSystem extends AbstractSystem {
       for (const entity of buildings) {
         const detected = checkUnsquareWay(entity, graph);
         if (!detected.issues.length) continue;
+        for (const issue of detected.issues) {
+          issue.foundOnID = entity.id;
+        }
         cache.cacheIssues(detected.issues);
       }
     };
@@ -592,6 +598,42 @@ export class ValidationSystem extends AbstractSystem {
 
 
   /**
+   * Returns an action that fixes the given issues, for the issues pane's "Autofix All".
+   * The issues were found on an older graph, and each fix changes the graph, so the action finds them
+   * again as it goes: it validates the entity each issue was found on, and applies one fix at a time
+   * (`actionAutofix`). It fixes only issues of the same kind, on the same entities, as the given ones:
+   * the IDs themselves can change (a fix that splits a segment changes the ID of a crossing on it).
+   * Ignored issues aren't fixed, unless a fix changed the ID of one that's the same kind of issue, on the
+   * same entities, as a given one (two crossings of the same two ways, one of them ignored).
+   * @param  issues - The issues to fix (ones without an autofix are skipped)
+   * @return An Action that fixes them
+   */
+  public autofixAction(issues: ValidationIssue[]): Action {
+    // An issue's ID without its `hash`: the kind of issue, and the entities it's about
+    const keyOf = (issue: ValidationIssue): string => [issue.type, issue.subtype ?? '', ...issue.entityIds.toSorted()].join(',');
+
+    const keys = new Set<string>();
+    const targetKeys = new Set<string>();
+    const targets: AutofixTarget[] = [];
+
+    for (const issue of issues) {
+      const entityID = issue.foundOnID ?? issue.entityIds[0];
+      const validator = this._validators.get(issue.type);
+      if (!issue.autoArgs || !entityID || !validator) continue;
+
+      keys.add(keyOf(issue));
+      const targetKey = `${issue.type},${entityID}`;
+      if (targetKeys.has(targetKey)) continue;
+      targetKeys.add(targetKey);
+      targets.push({ entityID: entityID, validator: validator });
+    }
+
+    const canFix = (issue: ValidationIssue): boolean => keys.has(keyOf(issue)) && !this._ignoredIssueIDs.has(issue.id);
+    return actionAutofix(targets, canFix);
+  }
+
+
+  /**
    * Validates anything that has changed in the head graph since the last time it was run.
    * (head graph contains user's edits)
    * Returns a Promise fulfilled when the validation has completed and then emits a `validated` event.
@@ -812,6 +854,9 @@ export class ValidationSystem extends AbstractSystem {
       }
 
       const filtered = detected.issues.filter(applySeverityOverrides);
+      for (const issue of filtered) {
+        issue.foundOnID = entity.id;
+      }
       result.issues = result.issues.concat(filtered);
     }
 

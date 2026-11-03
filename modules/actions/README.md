@@ -22,6 +22,7 @@ The `Action` type (in `types.ts`) is a function `(graph, t?) => Graph` with two 
 | `add_member.ts` | Add a member to a relation, choosing a sensible position for way members |
 | `add_midpoint.ts` | Add a node at the midpoint of a way segment |
 | `add_vertex.ts` | Add a node to a way at a given index |
+| `autofix.ts` | Apply validators' autofixes one at a time, validating again after each (autoconnect, Autofix All) |
 | `change_member.ts` | Replace a relation member at a given index |
 | `change_preset.ts` | Change the preset (feature type) of an entity |
 | `change_tags.ts` | Replace the tags on an entity |

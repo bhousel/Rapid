@@ -13,8 +13,9 @@ autoconnect (accepting a Rapid feature with `poweruser.autoConnect`) crashed wit
 > they were found on, `missing_tag`'s severity, side effects while detecting, the user's edits near
 > data that wasn't loaded, the smaller items, and shared geometry (each graph keeps its own shapes
 > since step 6 of [`graph-geometry.md`](graph-geometry.md), and after a rebase since its step 8), and
-> the wrong spatial index (searches answer for any graph since its step 9).
-> Open: one runner for autoconnect and Autofix All (see [Rollout](#rollout)).
+> the wrong spatial index (searches answer for any graph since its step 9), and Autofix All applying
+> fixes found on a graph that earlier fixes had changed (one runner, `actionAutofix`, for it and
+> autoconnect, November 2026).
 
 ## Words used here
 
@@ -24,7 +25,7 @@ autoconnect (accepting a Rapid feature with `poweruser.autoConnect`) crashed wit
   tells apart issues of the same kind on the same entities, and fixes.
 - **Fix** (`ValidationFix`): a button in the issues pane, run by the user.
 - **Autofix** (`issue.autoArgs`, `[action, label]`): an action that fixes the issue without asking.
-  The issues pane's "Autofix All" and autoconnect run these.
+  The issues pane's "Autofix All" and autoconnect run these, one at a time (`actionAutofix`).
 - **Caches**: `ValidationSystem` keeps one `ValidationCache` of issues for the base graph and one for
   the head (stable) graph, so it can tell which issues the user caused.
 
@@ -43,6 +44,22 @@ Validators also run outside `ValidationSystem`:
 
 So a validator can be handed a graph that's in the middle of an action: not base or stable, and not
 committed.
+
+Both apply fixes with `actionAutofix(targets, canFix?)` (`actions/autofix.ts`). A target is an
+entity and a validator to run on it. Each fix changes the graph the other issues were found on (it may
+move, merge or remove nodes, and splits segments), so the runner applies one fix, looks the entity up
+again, validates it again, and repeats until no autofixable issue is left. It tries each issue ID once,
+so a fix that doesn't make its issue go away isn't repeated.
+- Autoconnect's targets are the accepted way with `almost_junction`, then with `crossing_ways`. It fixes
+  everything they find.
+- Autofix All gets its action from `ValidationSystem.autofixAction(issues)`. Its targets are the
+  entities the issues were found on (`issue.foundOnID`, which `ValidationSystem` records:
+  `ambiguous_crossing` checks a way and lists its nodes, so it isn't always in `entityIds`). It fixes
+  only issues of the same kind, on the same entities, as the ones the user was shown, not by ID: a fix
+  that splits a segment changes the ID of every other crossing on it. Ignored issues aren't fixed,
+  unless a fix changed the ID of one that's the same kind on the same entities as a shown one.
+- The single "Autofix" button still runs the issue's own `autoArgs` action. It's found on the stable
+  graph, which is the graph the user sees when they click it.
 
 ## What a graph gives a validator, and what it doesn't
 
@@ -71,7 +88,8 @@ the code; the repros were kept outside the repo.
 - **Autoconnect validated a way that had changed.** `attemptAutoconnect` ran `crossing_ways` on the
   `way` it had before the `almost_junction` autofix merged its end node away, and threw. It also
   applied every autofix from one validation run, though each fix changes the graph the others were
-  found on. Now `autofix()` applies one fix, commits, looks the way up again, and validates again.
+  found on. Now it applies one fix, looks the way up again, and validates again (since November 2026,
+  with `actionAutofix`, which Autofix All shares).
 - **A stale edge left a node out of the way.** When the edge given to `actionAddMidpoint` had been
   split since it was found (by an earlier fix in the same action), the node was moved onto the road
   but inserted into no way: it looked connected and wasn't. Now the node goes into the piece of the
@@ -112,8 +130,11 @@ the code; the repros were kept outside the repo.
    - ✅ Autofix All ran inside `beginTransaction()` with no `finally`: if a fix threw, the editor stayed
      in the transaction and stopped sending change events. Now it skips an issue whose entities an
      earlier fix removed, and if a fix throws, it drops all the fixes (`editor.revert()`) and always
-     ends the transaction. It still applies the autofixes of one validation run in sequence (safer
-     since the `actionAddMidpoint` fix); a shared one-at-a-time runner is item 4 below.
+     ends the transaction. It still applied the autofixes of one validation run in sequence (safer
+     since the `actionAddMidpoint` fix), so a fix found before an earlier one merged a node away no
+     longer fit: a road that ended near one road and crossed another was connected at its end, but
+     not at the crossing. Since November 2026 it's one action that applies one fix at a time (`actionAutofix`), and
+     `perform` drops all of the fixes if one throws (no transaction needed).
    - ✅ Fix buttons that used the detection-time `way`, or the staging graph from when the fixes were
      shown. `perform` changes staging in place and `commit` starts a new one, so that graph misses
      every edit after the next one. `almost_junction`'s connect fix connected the end node as it was
@@ -178,8 +199,8 @@ What a validator needs, so it can be run on any graph (including one inside an a
    entities. (Done in graph-geometry step 6.) A validator never commits the graph it's checking.
 3. **Fixes that find their place again.** A fix records what it means (entity IDs and a location) and
    finds the edge or node again when it runs; if the graph doesn't fit anymore, it changes nothing.
-4. **A runner that applies one fix at a time**, like `attemptAutoconnect`'s `autofix()`, shared by
-   autoconnect and Autofix All.
+4. ✅ **A runner that applies one fix at a time**, shared by autoconnect and Autofix All
+   (`actionAutofix`, November 2026).
 5. **`ValidationSystem` contains failures**: a try/catch per job, and `queuedEntityIDs` released in a
    `finally`.
 
@@ -190,8 +211,8 @@ What a validator needs, so it can be run on any graph (including one inside an a
    `curb_nodes`' fix; `missing_tag`'s `canDelete` (finding 5) (Oct 2026).
 3. ✅ The smaller items (finding 8) (Oct 2026).
 4. ✅ Fixes look up their entities in the graph they run on (the rest of finding 4) (Oct 2026).
-5. Validate with the right spatial index (finding 2), with one runner for autoconnect and Autofix All.
-   The spatial index part is done (graph-geometry step 9, Nov 2026); the one runner is open.
+5. ✅ Validate with the right spatial index (finding 2), with one runner for autoconnect and Autofix All.
+   The spatial index in graph-geometry step 9; the runner, `actionAutofix` (Nov 2026).
 6. ✅ Geometry per graph (finding 1). The biggest change: it's about `Graph` and the data classes, not
    only validation. Designed in [`graph-geometry.md`](graph-geometry.md), with finding 2; done in its
    step 6 (Nov 2026), and shapes after a rebase in its step 8.

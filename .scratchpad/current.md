@@ -3,8 +3,9 @@
 ## This branch (`conflation-system`)
 Data IDs (steps 1–5), the validation audit and the graph-geometry rollout have all landed (see
 `completed.md`). Bryan wants to land this branch for testers before starting the multiselection design
-(`backlog.md`), to keep conflation in focus. Still open from the validation audit: one runner for
-autoconnect and Autofix All (`design/validation-system.md`, rollout item 5).
+(`backlog.md`), to keep conflation in focus. Next: a release check in the debug Chrome on real data
+(accept with joins, autoconnect, undo/redo, Autofix All, panning while editing, QA and photo layers,
+backup restore, a faked upload conflict), then merge to main.
 
 ## Active: what an edit records (`EditSystem`)
 Design: [`design/edit-system.md`](../design/edit-system.md), started Oct 26. Edits need to record more

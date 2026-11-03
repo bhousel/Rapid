@@ -91,6 +91,15 @@ Things that went wrong once and shouldn't go wrong again.
 - **happy-dom's `document.implementation.createDocument` returns an HTML document with an element
   already in it**, so `JXON.stringify` fails there. `test/browser/ui/UiConflicts.test.js` shims it with
   an empty XML document from `DOMParser`.
+- **Hand-picked negative IDs collide with the ones the editor makes.** Actions make new entities with
+  `n-1`, `n-2`, …, so a test that adds `n-10` itself can have it replaced by a later test's fix in the
+  same edit session (a way stretched from lon 10 to lon 30). Reset the editor between such tests.
+  And `validateAsync()` returns the validation already running, so await `_validationPromise` until it's
+  `null` before reading issues.
+- **Validation waits while a backup can be restored** (`editor.canRestoreBackup`). In the debug Chrome
+  there usually is one, so live validation checks find no issues. Don't touch the backup: override
+  the getter on the instance for the run, and undo the run's edits (a session undone back to nothing
+  is deleted).
 
 ## Network
 
@@ -153,7 +162,7 @@ Things that went wrong once and shouldn't go wrong again.
 - **Code can depend on data changed in place without saying so.** `UiOsmoseDetails` read an issue's details from the datum bound to its elements, which only had them because the loader changed that same object. When making data immutable, look for readers of the old object (d3-bound datums, `this.datum`), not only writers.
 - **A graph's own copy that equals the base's by value has no shape of its own.** `commit()` compares by value, so it sees no change and stores no geometry; `graph.geometry()` reads the base object's shape for it.
 - **`isArea()` needs the schema** — `tagSuggestingArea()` reads area keys from `SchemaSystem` rulesets. In unit tests without a schema, `building=yes` alone doesn't make a closed way an area; add `area=yes` to the fixture.
-- **Apply validator autofixes one at a time** — An issue's `autoArgs` action was built from the graph as it was when the validator ran (edges, end nodes). Once one fix changes the graph, the other issues from that run may name nodes that were merged away or edges that were split, and a stale edge makes `actionAddMidpoint` add a node to no way. Apply one fix, `commit()`, look the entity up again, and validate again (`attemptAutoconnect`'s `autofix()`). Test fixtures for merges need `version` on existing nodes: `actionConnect` keeps the node with a version, otherwise the last one.
+- **Apply validator autofixes one at a time** — An issue's `autoArgs` action was built from the graph as it was when the validator ran (edges, end nodes). Once one fix changes the graph, the other issues from that run may name nodes that were merged away or edges that were split, and a stale edge makes `actionAddMidpoint` add a node to no way. Apply one fix, look the entity up again, and validate again: `actionAutofix`, which autoconnect and Autofix All share. Find the issues again by kind and entities, not by ID: a fix that splits a segment changes the IDs of the other crossings on it. Test fixtures for merges need `version` on existing nodes: `actionConnect` keeps the node with a version, otherwise the last one.
 
 ## Pixi Rendering
 

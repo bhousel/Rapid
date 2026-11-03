@@ -279,6 +279,128 @@ describe('ValidationSystem', () => {
       }
     });
 
+
+    // Validates the stable graph, and waits for any validation already running to catch up too
+    async function validated() {
+      await _validator.validateAsync();
+      while (_validator._validationPromise) {
+        await _validator._validationPromise;
+      }
+    }
+
+    // Starts from an empty edit session, so that the IDs the editor makes for new entities
+    // don't land on the entities the tests above added with IDs of their own
+    async function resetAll() {
+      await validated();
+      await context.systems.editor.resetAsync();
+      await _validator.resetAsync();
+    }
+
+
+    it('autofixAction fixes the issues given, finding them again after each fix, but not ignored ones', async () => {
+      const editor = context.systems.editor;
+      await resetAll();
+      _validator._validators.set('crossing_ways', Rapid.validateCrossingWays(context));
+
+      try {
+        // Three roads running north, at lon 30, 30.0005 and 30.001
+        const residential = { highway: 'residential' };
+        editor.merge([
+          new Rapid.OsmNode(context, { id: 'n201', loc: [30, 29.999], version: '1' }),
+          new Rapid.OsmNode(context, { id: 'n202', loc: [30, 30.001], version: '1' }),
+          new Rapid.OsmWay(context, { id: 'w201', nodes: ['n201', 'n202'], tags: residential, version: '1' }),
+          new Rapid.OsmNode(context, { id: 'n203', loc: [30.0005, 29.999], version: '1' }),
+          new Rapid.OsmNode(context, { id: 'n204', loc: [30.0005, 30.001], version: '1' }),
+          new Rapid.OsmWay(context, { id: 'w202', nodes: ['n203', 'n204'], tags: residential, version: '1' }),
+          new Rapid.OsmNode(context, { id: 'n205', loc: [30.001, 29.999], version: '1' }),
+          new Rapid.OsmNode(context, { id: 'n206', loc: [30.001, 30.001], version: '1' }),
+          new Rapid.OsmWay(context, { id: 'w203', nodes: ['n205', 'n206'], tags: residential, version: '1' })
+        ]);
+
+        // The user draws a footway with one segment that crosses all three.
+        // Each fix splits that segment, which changes the IDs of the crossings left on it.
+        const a = new Rapid.OsmNode(context, { id: 'n-201', loc: [29.999, 30] });
+        const b = new Rapid.OsmNode(context, { id: 'n-202', loc: [30.0015, 30] });
+        const footway = new Rapid.OsmWay(context, { id: 'w-201', nodes: ['n-201', 'n-202'], tags: { highway: 'footway' } });
+        editor.perform(Rapid.actionAddEntity(a), Rapid.actionAddEntity(b), Rapid.actionAddEntity(footway));
+        editor.commit({ stringID: 'added w-201', selection: ['w-201'] });
+        await validated();
+
+        const crossings = () => _validator.getIssues({ what: 'edited', where: 'all' })
+          .filter(issue => issue.type === 'crossing_ways' && issue.entityIds.includes('w-201'));
+        assert.lengthOf(crossings(), 3);
+
+        // The user ignores the crossing with `w203`, then clicks "Autofix All"
+        _validator.ignoreIssue(crossings().find(issue => issue.entityIds.includes('w203')).id);
+        const shown = crossings();
+        assert.lengthOf(shown, 2);
+        editor.perform(_validator.autofixAction(shown));
+        editor.commit({ stringID: 'issues.fix_all.annotation' });
+
+        const graph = editor.staging.graph;
+        const way = graph.entity('w-201');
+        assert.lengthOf(way.nodes, 4);   // a crossing node on each of the two roads
+        for (const roadID of ['w201', 'w202', 'w203']) {
+          const road = graph.entity(roadID);
+          const shared = road.nodes.filter(nodeID => way.nodes.includes(nodeID));
+          assert.lengthOf(shared, roadID === 'w203' ? 0 : 1, `connected to ${roadID}`);
+        }
+      } finally {
+        _validator._validators.delete('crossing_ways');
+        _validator.resetIgnoredIssues();
+      }
+    });
+
+
+    it('autofixAction applies fixes that change what the other fixes were found on', async () => {
+      const editor = context.systems.editor;
+      await resetAll();
+      _validator._validators.set('almost_junction', Rapid.validateAlmostJunction(context));
+      _validator._validators.set('crossing_ways', Rapid.validateCrossingWays(context));
+
+      try {
+        // Two roads running north, at lon 40 and 40.001. The second has a node `n304`
+        // about 20 cm north of [40.001, 40] (a version, so it's the node kept when two are merged).
+        const residential = { highway: 'residential' };
+        editor.merge([
+          new Rapid.OsmNode(context, { id: 'n301', loc: [40, 39.999], version: '1' }),
+          new Rapid.OsmNode(context, { id: 'n302', loc: [40, 40.001], version: '1' }),
+          new Rapid.OsmWay(context, { id: 'w301', nodes: ['n301', 'n302'], tags: residential, version: '1' }),
+          new Rapid.OsmNode(context, { id: 'n303', loc: [40.001, 39.999], version: '1' }),
+          new Rapid.OsmNode(context, { id: 'n304', loc: [40.001, 40.000002], version: '1' }),
+          new Rapid.OsmNode(context, { id: 'n305', loc: [40.001, 40.001], version: '1' }),
+          new Rapid.OsmWay(context, { id: 'w302', nodes: ['n303', 'n304', 'n305'], tags: residential, version: '1' })
+        ]);
+
+        // The user draws a road that crosses the first, and ends about 1 m short of the second.
+        // Connecting the end merges its end node with `n304`, so the crossing's fix, found with that
+        // end node in the crossing segment, no longer fits.
+        const a = new Rapid.OsmNode(context, { id: 'n-301', loc: [39.999, 40] });
+        const b = new Rapid.OsmNode(context, { id: 'n-302', loc: [40.00099, 40] });
+        const road = new Rapid.OsmWay(context, { id: 'w-301', nodes: ['n-301', 'n-302'], tags: residential });
+        editor.perform(Rapid.actionAddEntity(a), Rapid.actionAddEntity(b), Rapid.actionAddEntity(road));
+        editor.commit({ stringID: 'added w-301', selection: ['w-301'] });
+        await validated();
+
+        const issues = _validator.getIssues({ what: 'edited', where: 'all' })
+          .filter(issue => issue.entityIds.includes('w-301'))
+          .sort((a, b) => a.type.localeCompare(b.type));   // almost_junction first
+        assert.deepEqual(issues.map(issue => issue.type), ['almost_junction', 'crossing_ways']);
+
+        editor.perform(_validator.autofixAction(issues));
+        editor.commit({ stringID: 'issues.fix_all.annotation' });
+
+        const graph = editor.staging.graph;
+        const way = graph.entity('w-301');
+        assert.strictEqual(way.last(), 'n304');
+        assert.lengthOf(way.nodes, 3);   // and a crossing node on the first road
+        assert.include(graph.entity('w301').nodes, way.nodes[1]);
+      } finally {
+        _validator._validators.delete('almost_junction');
+        _validator._validators.delete('crossing_ways');
+      }
+    });
+
   });
 
 });

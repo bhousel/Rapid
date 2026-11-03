@@ -1,18 +1,18 @@
 describe('UiSectionValidationIssues', () => {
 
-  // Autofix All, run with an editor that records what happens to it
-  function autofixAll(actions) {
+  // Autofix All, run with an editor that records what happens to it.
+  // (`ValidationSystem.autofixAction` is tested with the validation system.)
+  function autofixAll(action) {
     const calls = [];
     const editor = {
-      staging: { graph: { hasEntity: () => true } },
-      beginTransaction: () => calls.push('begin'),
-      endTransaction: () => calls.push('end'),
-      perform: action => { action(); calls.push('perform'); },
-      commit: () => calls.push('commit'),
-      revert: () => calls.push('revert')
+      perform: action => { action(); calls.push('perform'); },   // the real one leaves staging as it was if the action throws
+      commit: () => calls.push('commit')
     };
-    const context = { systems: { editor: editor } };
-    const issues = actions.map(action => ({ entityIds: ['w1'], autoArgs: [action, {}] }));
+    const validator = {
+      autofixAction: issues => { calls.push(`autofix ${issues.length}`); return action; }
+    };
+    const context = { systems: { editor: editor, validator: validator } };
+    const issues = [{ entityIds: ['w1'] }, { entityIds: ['w2'] }];
     const e = { preventDefault: () => {}, stopPropagation: () => {} };
 
     Rapid.UiSectionValidationIssues.prototype._clickAutoFixAll.call({ context: context }, e, issues);
@@ -22,16 +22,16 @@ describe('UiSectionValidationIssues', () => {
 
   describe('Autofix All', () => {
     it('applies every fix as one edit', () => {
-      const calls = autofixAll([() => {}, () => {}]);
-      assert.deepEqual(calls, ['begin', 'perform', 'perform', 'commit', 'end']);
+      const calls = autofixAll(() => {});
+      assert.deepEqual(calls, ['autofix 2', 'perform', 'commit']);
     });
 
-    it('drops all the fixes and ends the transaction if one fails', () => {
+    it('commits nothing if a fix fails', () => {
       const _error = console.error;
       console.error = () => {};
       try {
-        const calls = autofixAll([() => {}, () => { throw new Error('fix failed'); }, () => {}]);
-        assert.deepEqual(calls, ['begin', 'perform', 'revert', 'end']);
+        const calls = autofixAll(() => { throw new Error('fix failed'); });
+        assert.deepEqual(calls, ['autofix 2']);
       } finally {
         console.error = _error;
       }

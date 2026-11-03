@@ -13,6 +13,7 @@
 
 // Types
 export type { Action } from './types.ts';
+export type { AutofixTarget } from './autofix.ts';
 export type { CopyEntitiesAction } from './copy_entities.ts';
 export type { DisconnectAction, DisconnectConnection } from './disconnect.ts';
 export type { ExtractAction } from './extract.ts';
@@ -26,6 +27,7 @@ export { actionAddEntity } from './add_entity.ts';
 export { actionAddMember } from './add_member.ts';
 export { actionAddMidpoint } from './add_midpoint.ts';
 export { actionAddVertex } from './add_vertex.ts';
+export { actionAutofix } from './autofix.ts';
 export { actionChangeMember } from './change_member.ts';
 export { actionChangePreset } from './change_preset.ts';
 export { actionChangeTags } from './change_tags.ts';

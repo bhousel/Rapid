@@ -198,8 +198,8 @@ L=100k.
   Today `MapSystem`'s second recompute repairs nested relations that a commit built in the wrong order,
   so removing it needs this.
 - Inside an action, before its commit, way and relation geometry is as of the last commit (node
-  geometry is always current). Code that reads geometry after changing the graph commits first, as
-  autoconnect already does. Memoized answers are only read and stored on committed graphs. A graph
+  geometry is always current). `graph.geometry()` commits first when the graph has uncommitted writes,
+  so validators run between fixes (`actionAutofix`) see the fixes' changes. Memoized answers are only read and stored on committed graphs. A graph
   with uncommitted writes computes them directly.
 
 ### 3. Where derived data lives

@@ -251,35 +251,26 @@ export class UiSectionValidationIssues extends AbstractUiSection {
 
 
   /**
-   * User clicked "Autofix All": fixes all the autofixable issues in one transaction.
+   * User clicked "Autofix All": fixes all the autofixable issues as one edit.
+   * The validation system's action applies one fix at a time, finding the issues again as the graph changes.
    * @param e - the triggering click event
    * @param issues - the autofixable issues to fix
    */
   protected _clickAutoFixAll(e: PointerEvent, issues: ValidationIssue[]): void {
     const context = this.context;
     const editor = context.systems.editor!;
+    const validator = context.systems.validator!;
 
     e.preventDefault();
     e.stopPropagation();
 
-    editor.beginTransaction();
     try {
-      for (const issue of issues) {
-        // An earlier fix may have removed what this issue is about
-        if (!issue.entityIds.every(entityID => editor.staging.graph.hasEntity(entityID))) continue;
-
-        const action = issue.autoArgs![0];  // autoArgs = [action, label]
-        editor.perform(action);
-      }
+      editor.perform(validator.autofixAction(issues));
       editor.commit({ stringID: 'issues.fix_all.annotation' });
 
     } catch (err) {
-      // A fix that fails partway leaves the graph half changed, so drop all of the fixes
+      // A fix that fails partway drops all of the fixes (`perform` leaves staging as it was)
       console.error(err);  // eslint-disable-line no-console
-      editor.revert();
-
-    } finally {
-      editor.endTransaction();   // or the editor would stop sending change events
     }
   }
 

@@ -63,6 +63,11 @@ export class ValidationIssue {
   public severity: ValidationSeverity;
   /** Array of IDs of entities involved in the issue */
   public entityIds: EntityID[];
+  /**
+   * The entity the validator was checking when it found this issue (set by `ValidationSystem`).
+   * It's not always among `entityIds`: `ambiguous_crossing` checks a way and lists its nodes.
+   */
+  public foundOnID: EntityID | undefined;
   /** [lon, lat] to zoom in on to see the issue */
   public loc: Vec2 | undefined;
   /** Extra data for the fixes */
@@ -90,6 +95,7 @@ export class ValidationIssue {
     this.subtype = props.subtype;
     this.severity = props.severity ?? 'warning';
     this.entityIds = props.entityIds ?? [];
+    this.foundOnID = undefined;
     this.loc = props.loc;
     this.data = props.data;
     this.hash = props.hash;
