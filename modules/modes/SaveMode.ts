@@ -64,6 +64,7 @@ export class SaveMode extends AbstractMode {
     this._resultErrors = this._resultErrors.bind(this);
     this._resultNoChanges = this._resultNoChanges.bind(this);
     this._resultSuccess = this._resultSuccess.bind(this);
+    this._resultUnknown = this._resultUnknown.bind(this);
     this._saveEnded = this._saveEnded.bind(this);
     this._saveStarted = this._saveStarted.bind(this);
     this._showLoading = this._showLoading.bind(this);
@@ -122,6 +123,7 @@ export class SaveMode extends AbstractMode {
       .on('resultErrors', this._resultErrors)
       .on('resultNoChanges', this._resultNoChanges)
       .on('resultSuccess', this._resultSuccess)
+      .on('resultUnknown', this._resultUnknown)
       .on('saveEnded', this._saveEnded)
       .on('saveStarted', this._saveStarted)
       .on('willAttemptUpload', this._prepareForSuccess);
@@ -271,10 +273,32 @@ export class SaveMode extends AbstractMode {
    * @param  errors - Array of error objects with msg and details properties
    */
   protected _resultErrors(errors: any[]): void {
+    this._keybindingOn();
+    this._showErrors(errors);
+  }
+
+
+  /**
+   * Handler called when we can't tell whether the upload went through.
+   * The uploader has left the edits in their backup, for the next start to check with the API, so
+   * this tab starts over: it resets, returns to browse mode, and tells the user.
+   * @param  errors - Array of error objects with msg and details properties
+   */
+  protected _resultUnknown(errors: any[]): void {
+    const context = this.context;
+    context.resetAsync()
+      .then(() => context.enter('browse'))
+      .then(() => this._showErrors(errors));
+  }
+
+
+  /**
+   * Displays an error dialog to the user.
+   * @param  errors - Array of error objects with msg and details properties
+   */
+  protected _showErrors(errors: any[]): void {
     const context = this.context;
     const l10n = context.systems.l10n!;
-
-    this._keybindingOn();
 
     const confirm = new UiConfirm(context).show();
     confirm.$heading!

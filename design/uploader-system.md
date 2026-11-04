@@ -99,10 +99,19 @@ longer applies there.
 `OsmService.sendChangeset` creates a changeset, uploads to it, and closes it. Every failure reaches the
 uploader, so the save always ends. An HTTP error means the server answered, and an upload is all or
 nothing, so nothing was applied. With no answer (offline, the connection dropped, or the upload's
-5-minute timeout), the server may have applied it anyway. So `sendChangeset` asks the API for the
-changeset (`loadChangesetAsync`): if it has changes, the upload went through and the save succeeds;
-if not, the error says the changes weren't saved (status `-5`); if the API can't be reached either,
-the error says Rapid can't tell, and links to the changeset to check before uploading again (`-6`).
+5-minute timeout), the server may have applied it anyway, or may still be applying it. So
+`sendChangeset` first closes the changeset, then asks the API for it (`loadChangesetAsync`): if it has
+changes, the upload went through and the save succeeds; if it's closed with none, the error says the
+changes weren't saved (status `-5`), and the next save opens a new changeset; if the close or the
+question fails, Rapid can't tell (`-6`, see below).
+
+Closing first is what makes "no changes" an answer. The API (cgimap) locks the changeset row while it
+applies an upload (`SELECT ... FOR UPDATE NOWAIT`), and a close takes the same lock without waiting:
+while an upload is being applied, the close fails at once with 409 "locked by another process". So a
+close that succeeds means no upload is being applied, and none can land later (an upload to a closed
+changeset is rejected), so its count is final. (Until November 2026 the count was taken without
+closing, so a large upload still being applied read as `-5`, and the retry reused the changeset: if
+the first upload then landed, the edits were applied twice.)
 It's `-6` too when the connection was switched while the upload was out: its answer is dropped, even
 a success (`_wrapcb`), and we can't ask the server that got it. (Until November 3, 2026 that was `-1`,
 which the uploader took as "the server answered, nothing applied", so it removed the upload mark.)
@@ -119,16 +128,24 @@ were uploaded twice. That made any save that didn't finish lose the edits instea
 
 1. **Mark before uploading.** After the changeset is created, `sendChangeset` waits for its
    `beforeUpload` hook, where the uploader calls `editor.markUploadAsync`. That backs up the edits
-   (save mode skips ordinary backups) with `upload: { changesetID, apiURL, startedAt, index }`. A
+   (save mode skips ordinary backups) with `upload: { changesetID, apiURL, startedAt }`. A
    session without the mark was never uploaded.
 2. **In the same tab:** success deletes the session (`clearBackup`). An error where we know nothing
-   was applied (any HTTP error, or `-5`) removes the mark, so it's an ordinary backup again, and the
-   draft comment is kept. When we can't tell (`-6`), the mark stays, and later backups keep it.
+   was applied (any HTTP error, or `-5`) removes this changeset's mark, so it's an ordinary backup
+   again, and the draft comment is kept. (A save that fails before creating a changeset has no mark
+   to remove.) When we can't tell (`-6`), the tab lets go of the session (`releaseSessionAsync`): the
+   session keeps its mark and loses its heartbeat, the tab resets and returns to browse mode, and the
+   error asks the user to reload once OpenStreetMap is reachable. The reload settles it (step 3).
+   Letting the user keep editing edits that may already be on OSM made every later step uncertain:
+   a second save over an unsettled mark, or edits after the mark that the next tab had to tell apart.
+   With no durable storage (the database is unavailable, or the write fails), there's nothing to
+   reload, so the edits stay in the tab and the error says to check the changeset before uploading
+   again.
 3. **In the next tab:** a marked session that no live tab owns (the heartbeat covers a tab that's still
    uploading) is settled by `EditSystem.startAsync`, before the restore screen, by asking the API for
    the changeset (a public read, so no login needed). Uploads are all or nothing, so:
-   - **It has changes:** the upload went through, and the session is deleted quietly. If the user
-     edited more after the upload started (the history index moved), it's offered with a warning.
+   - **It has changes:** the upload went through, and the session is deleted quietly. Nothing edits a
+     marked session (the tab lets go of it), so it holds only the uploaded edits.
    - **It has none, and it's closed or the upload started over 5 minutes ago:** it never landed. The
      mark is removed and the session is offered as usual.
    - **It has none, it's open, and the upload is recent:** the server may still be working on it, so
@@ -137,8 +154,9 @@ were uploaded twice. That made any save that didn't finish lose the edits instea
      API): the restore screen warns that some edits may already be on OSM, with a link to the changeset.
      Restoring it anyway removes the mark.
 
-The changeset's count can be trusted because Rapid only reuses an open changeset after an upload that
-failed, which applied nothing. After `-6` the changeset is forgotten, so the next save opens a new one.
+The changeset's count can be trusted because Rapid only reuses an open changeset after an upload the
+server answered with an error, which applied nothing. After `-5` the changeset is closed, and after
+`-6` it's forgotten, so the next save opens a new one.
 (Until November 3, 2026 it was reused: if that upload had landed, the next save's check would have
 counted its changes, and could have reported a later upload as done when it wasn't.)
 

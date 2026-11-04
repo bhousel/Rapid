@@ -178,8 +178,6 @@ export interface SessionUpload {
   apiURL: string;
   /** When the upload started (ms since epoch) */
   startedAt: number;
-  /** The backup's history index when the upload started, to tell whether the user edited more after */
-  index: number;
 }
 
 /**
@@ -2309,7 +2307,7 @@ export class EditSystem extends AbstractSystem {
     if (!database || !backup) return Promise.resolve();
 
     this._sessionID ??= this._newSessionID();
-    const upload: SessionUpload = { changesetID, apiURL, startedAt: Date.now(), index: backup.index };
+    const upload: SessionUpload = { changesetID, apiURL, startedAt: Date.now() };
     return this._saveSessionAsync(database, this._sessionID, backup, upload);
   }
 
@@ -2317,14 +2315,17 @@ export class EditSystem extends AbstractSystem {
   /**
    * Remove the active session's upload mark, because we know the upload wasn't applied
    * (or the user chose to restore the session anyway).
+   * @param changesetID - Optional, remove the mark only if it's for this changeset, so that a
+   *   failure before uploading (e.g. creating the changeset) can't remove an earlier upload's mark
    * @return Promise resolved when the write completes (or fails silently)
    */
-  public async clearUploadMarkAsync(): Promise<void> {
+  public async clearUploadMarkAsync(changesetID?: string): Promise<void> {
     const context = this.context;
     const database = context.systems.database;   // optional
 
     const record = this._activeSession;
     if (!database || !record?.upload) return;
+    if (changesetID !== undefined && record.upload.changesetID !== changesetID) return;
 
     delete record.upload;
     try {
@@ -2336,10 +2337,49 @@ export class EditSystem extends AbstractSystem {
 
 
   /**
+   * Let go of the active session without removing it, so the next start settles it.
+   * The uploader calls this when it can't tell whether an upload went through: the session keeps its
+   * upload mark, and this tab starts over, so the edits can't be uploaded twice. The next start asks
+   * the API whether the upload landed: if it did, the session is deleted, and if not, it's offered for
+   * restore (see `_settleUploadsAsync`). Its heartbeat is cleared, so no tab takes it for one that's
+   * still open.
+   * @return Promise resolved with `true` if the marked session is in durable storage, or `false` if
+   *   it isn't (no database, or the write failed), so the edits would be lost if this tab started over
+   */
+  public async releaseSessionAsync(): Promise<boolean> {
+    const context = this.context;
+    const database = context.systems.database;     // optional
+    const scheduler = context.systems.scheduler;   // optional
+
+    const id = this._sessionID;
+    const record = this._activeSession;
+    if (!database?.isAvailable || !id || !record?.upload) return false;
+
+    // Let go first, so a heartbeat during the write can't mark it live again.
+    scheduler?.cancel('edit-backup');
+    this._sessionID = null;
+    this._activeSession = null;
+    this._setOwnedSessionID(null);
+
+    record.heartbeatAt = 0;
+    try {
+      await database.put('sessions', record);
+      return true;
+    } catch {
+      // Keep it, or the next backup would start a second session with the same edits, unmarked.
+      this._sessionID = id;
+      this._activeSession = record;
+      this._setOwnedSessionID(id);
+      return false;
+    }
+  }
+
+
+  /**
    * Settle the sessions whose upload was interrupted (their tab closed while uploading), by asking
    * the OSM API about the changeset. Uploads are all or nothing, so:
-   * - if the changeset has changes, the upload went through: the session is deleted quietly, unless
-   *   the user edited more after it started (then it keeps its mark, and the restore screen warns)
+   * - if the changeset has changes, the upload went through: the session is deleted quietly (nothing
+   *   edits a marked session, see `releaseSessionAsync`, so it holds just the uploaded edits)
    * - if it has none and it's closed, or the upload started long ago, it never landed: the mark is removed
    * - if it has none, is open, and the upload started recently, the server may still be working on it,
    *   so the session isn't offered this time
@@ -2366,9 +2406,7 @@ export class EditSystem extends AbstractSystem {
       const result = await this._checkUploadAsync(upload);
 
       if (result === 'uploaded') {
-        if (record.data.index === upload.index) {
-          await this.deleteSessionAsync(record.id);
-        }
+        await this.deleteSessionAsync(record.id);
       } else if (result === 'failed') {
         delete record.upload;
         try {

@@ -90,7 +90,7 @@ describe('UploaderSystem', () => {
     // Resolves with the next result event and its arguments
     function resultAsync() {
       return new Promise(resolve => {
-        for (const name of ['resultSuccess', 'resultErrors', 'resultConflicts', 'resultNoChanges']) {
+        for (const name of ['resultSuccess', 'resultErrors', 'resultConflicts', 'resultNoChanges', 'resultUnknown']) {
           _uploader.once(name, (...args) => resolve({ name, args }));
         }
       });
@@ -424,7 +424,7 @@ describe('UploaderSystem', () => {
       assert.lengthOf(_loads, 0);
     });
 
-    it('says when it can\'t tell whether a lost upload went through, with a link to the changeset', async () => {
+    it('keeps the edits when it can\'t tell whether a lost upload went through, and there\'s no backup to leave them in', async () => {
       _editor.merge([ node('n1', 1, { name: 'A' }) ]);
       _editor.perform(Rapid.actionChangeTags('n1', { name: 'B' }));
       _editor.commit({ stringID: 'changed the name' });
@@ -434,8 +434,8 @@ describe('UploaderSystem', () => {
       _uploader.save();
       const { name, args } = await result;
 
-      assert.strictEqual(name, 'resultErrors');
-      assert.strictEqual(args[0][0].msg, 'save.upload_unknown');
+      assert.strictEqual(name, 'resultErrors');   // no database in this test
+      assert.strictEqual(args[0][0].msg, 'save.upload_unknown_kept');
       assert.deepEqual(args[0][0].details, ['https://example.com/changeset/1', 'Failed to fetch']);
     });
 
@@ -446,8 +446,9 @@ describe('UploaderSystem', () => {
         _calls = [];
         _context.services.osm.apiroot = 'https://api.example.com';
         _editor.markUploadAsync = (changesetID, apiURL) => { _calls.push(['mark', changesetID, apiURL]); return Promise.resolve(); };
-        _editor.clearUploadMarkAsync = () => { _calls.push(['unmark']); return Promise.resolve(); };
+        _editor.clearUploadMarkAsync = (changesetID) => { _calls.push(['unmark', changesetID]); return Promise.resolve(); };
         _editor.clearBackup = () => { _calls.push(['clear']); };
+        _editor.releaseSessionAsync = () => { _calls.push(['release']); return Promise.resolve(true); };
 
         _editor.merge([ node('n1', 1, { name: 'A' }) ]);
         _editor.perform(Rapid.actionChangeTags('n1', { name: 'B' }));
@@ -470,7 +471,21 @@ describe('UploaderSystem', () => {
         _uploader.save();
         await result;
 
-        assert.deepEqual(_calls, [['mark', '1', 'https://api.example.com'], ['unmark']]);
+        assert.deepEqual(_calls, [['mark', '1', 'https://api.example.com'], ['unmark', '1']]);
+      });
+
+      it('isn\'t unmarked when the save fails before a changeset is created', async () => {
+        _uploader.changeset = { id: undefined };
+        _context.services.osm.sendChangeset = (changeset, changes, callback) => {
+          setTimeout(() => callback({ message: 'Failed to fetch' }, changeset), 0);   // offline at create
+        };
+
+        const result = resultAsync();
+        _uploader.save();
+        const { name } = await result;
+
+        assert.strictEqual(name, 'resultErrors');
+        assert.deepEqual(_calls, []);
       });
 
       it('is deleted when the conflicts leave nothing to upload', async () => {
@@ -490,14 +505,16 @@ describe('UploaderSystem', () => {
         assert.deepEqual(_calls.at(-1), ['clear']);
       });
 
-      it('stays marked when we can\'t tell whether the upload went through', async () => {
+      it('stays marked, and is left for the next start, when we can\'t tell whether the upload went through', async () => {
         _responses.push({ status: -6, message: 'Failed to fetch' });
 
         const result = resultAsync();
         _uploader.save();
-        await result;
+        const { name, args } = await result;
 
-        assert.deepEqual(_calls, [['mark', '1', 'https://api.example.com']]);
+        assert.strictEqual(name, 'resultUnknown');
+        assert.strictEqual(args[0][0].msg, 'save.upload_unknown');
+        assert.deepEqual(_calls, [['mark', '1', 'https://api.example.com'], ['release']]);
       });
     });
   });

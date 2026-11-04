@@ -973,13 +973,49 @@ describe('OsmService', () => {
           });
       });
 
-      it('reports status -5 if the upload got no answer, and the changeset has no changes', () => {
+      it('reports status -5 if the upload got no answer, and the changeset is closed with no changes', () => {
         fetchMock.route(/changeset\/123\/upload/, { throws: new TypeError('Failed to fetch') });
         fetchMock.route(/changeset\/123\.json/, changesetJSON(0));
 
         return loginAsync()
           .then(() => sendAsync())
-          .then(({ err }) => assert.strictEqual(err.status, -5));
+          .then(({ err }) => {
+            assert.strictEqual(err.status, -5);
+            const urls = fetchMock.callHistory.calls().map(c => c.url);
+            const closed = urls.findIndex(url => /changeset\/123\/close/.test(url));
+            const counted = urls.findIndex(url => /changeset\/123\.json/.test(url));
+            assert.isAbove(closed, -1, 'closed the changeset');
+            assert.isAbove(counted, closed, 'before counting its changes');
+          });
+      });
+
+      it('opens a new changeset after an upload that got no answer and wasn\'t applied', () => {
+        fetchMock.route(/changeset\/123\/upload/, { throws: new TypeError('Failed to fetch') }, { repeat: 1 });
+        fetchMock.route(/changeset\/123\.json/, changesetJSON(0));
+
+        return loginAsync()
+          .then(() => sendAsync())
+          .then(({ err }) => {
+            assert.strictEqual(err.status, -5);
+            return sendAsync();   // the user saves again
+          })
+          .then(() => {
+            const creates = fetchMock.callHistory.calls().filter(c => /changeset\/create/.test(c.url));
+            assert.lengthOf(creates, 2, 'a new changeset, since the old one is closed');
+          });
+      });
+
+      it('reports status -6 if the upload got no answer, and the changeset can\'t be closed yet', () => {
+        // The server may still be applying the upload: it holds the changeset, so a close fails
+        fetchMock.removeRoutes();
+        fetchMock.route(/changeset\/create/, { body: '123', headers: { 'Content-Type': 'text/plain' } });
+        fetchMock.route(/changeset\/123\/close/, { status: 409, body: 'Changeset 123 is currently locked by another process.' });
+        fetchMock.route(/changeset\/123\/upload/, { throws: new TypeError('Failed to fetch') });
+        fetchMock.route(/changeset\/123\.json/, changesetJSON(0));
+
+        return loginAsync()
+          .then(() => sendAsync())
+          .then(({ err }) => assert.strictEqual(err.status, -6));
       });
 
       it('reports status -6 if the upload got no answer, and the changeset can\'t be checked', () => {

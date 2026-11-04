@@ -31,13 +31,17 @@ sessions aren't offered for restore (restore is only offered at startup, which i
    (see "Other tabs and version bumps" in `design/database-system.md`); `UiApiStatus` now stacks
    messages and shows storage problems. No backport to `main` needed: this branch becomes `main`
    (v3.0.0-pre.4).
-2. **Saving again after a -6 ("can't tell") upload loses its upload mark.** If the retry fails before
+2. ✅ **Saving again after a -6 ("can't tell") upload loses its upload mark.** If the retry fails before
    uploading (offline at create), `_uploadCallback` clears mark 7 anyway; if it uploads, mark 8 replaces
    mark 7, and its 409 (exactly what happens if changeset 7 landed) clears it. The next tab then offers
    edits that already landed: a duplicate upload. `UploaderSystem.ts:674`, `EditSystem.markUploadAsync`.
    Fix: settle an existing -6 mark before a new upload; only clear a mark for this attempt's changeset.
    *New, confirmed.*
-3. **Settling an upload by history index deletes edits made after an undo.** Marked at index 2, -6,
+   **Fixed (2, 3 and 18 together):** on -6 the tab lets go of the marked session
+   (`releaseSessionAsync`), resets, and asks the user to reload; the reload settles it. So nothing
+   edits or re-uploads a marked session, and the mark's `index` is gone. A known failure clears only
+   its own changeset's mark. See "Keeping the edits during a save" in `design/uploader-system.md`.
+3. ✅ **Settling an upload by history index deletes edits made after an undo.** Marked at index 2, -6,
    then undo + a different edit (index 2 again), close the tab; changeset landed, so the next tab deletes
    the session with the unuploaded edit. `EditSystem.ts:2369` (`record.data.index === upload.index`).
    Fix: record which edit the mark was taken at, not the index. *New, confirmed.*
@@ -100,9 +104,12 @@ sessions aren't offered for restore (restore is only offered at startup, which i
     `replaceItem` puts the closed issue back on the map, and it posts again (`_closed` counts 2).
     `UiOsmoseEditor.ts:197`, `UiKeepRightEditor.ts:262`, `SelectMode.ts:361`. *Re-adding new, double post
     main too. Confirmed (Osmose).*
-18. **With no answer, the tab decides "not applied" (-5) right away and reuses the changeset,** while
+18. ✅ **With no answer, the tab decides "not applied" (-5) right away and reuses the changeset,** while
     `_checkUploadAsync` calls the same state (open, 0 changes, recent) "pending"; a late landing gives
     duplicates. `OsmService.ts:1565` vs `EditSystem.ts:2407`. *New, reading.*
+    **Fixed:** `sendChangeset` closes the changeset before counting (cgimap's close fails while an
+    upload holds the changeset lock), so -5 is final and the retry opens a new changeset; a failed
+    close is -6. `closeChangeset` now reports HTTP errors (`fetchRaw` doesn't reject on them).
 19. **"Deleted by both" brings back the way's nodes the user deleted,** and drops those deletions
     (`actionRevert` now restores deleted children). `merge_remote_changes.ts:324`. *New, confirmed.*
 20. **"Leave Deleted" on a way leaves the other mapper's new nodes as orphans** on OSM.

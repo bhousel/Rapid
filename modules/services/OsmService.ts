@@ -1497,8 +1497,16 @@ export class OsmService extends AbstractSystem {
     // Note that `changeset/#id/close` returns an empty document with `text/html` content type.
     // We use `fetchRaw` here because otherwise `utilFetchResponse` will try handling it,
     // and the xmldom parser will raise a "missing root element" error on the empty document.
+    // `fetchRaw` doesn't reject on an HTTP error, so check the status here. (A 409 says the changeset
+    // is already closed, or an upload to it is still being applied.)
     network.fetchRaw(resource, { requestID, method: 'PUT' })
-      .then((result: any) => errback(null, result))
+      .then((response: Response) => {
+        if (response.ok) {
+          errback(null, response);
+        } else {
+          errback({ message: `${response.status} ${response.statusText}`.trim(), status: response.status });
+        }
+      })
       .catch((err: any) => errback(err));
   }
 
@@ -1509,11 +1517,13 @@ export class OsmService extends AbstractSystem {
    * POST /api/0.6/changeset/#id/upload
    * PUT /api/0.6/changeset/#id/close
    * If the upload gets no answer (the connection was lost, or it timed out), the server may have
-   * applied it anyway. Uploads are all or nothing, so this asks the API how many changes the
-   * changeset has. Then the callback gets either success, or an error with status:
-   * - `-5` if the changeset has no changes, so the upload wasn't applied
-   * - `-6` if the API couldn't be asked either, or the connection was switched while the upload was
-   *   out, so we can't tell. The changeset isn't reused after that.
+   * applied it anyway, or may still be applying it. Uploads are all or nothing, so this closes the
+   * changeset (which fails while an upload is being applied) and asks the API how many changes it
+   * has. Then the callback gets either success, or an error with status:
+   * - `-5` if the changeset is closed with no changes, so the upload wasn't applied. The next save
+   *   opens a new changeset.
+   * - `-6` if the changeset couldn't be closed or asked about, or the connection was switched while
+   *   the upload was out, so we can't tell. The changeset isn't reused after that.
    * @param  changeset - the changeset to send
    * @param  changes - the entity changes to upload
    * @param  callback - errback-style callback called when the full send cycle completes
@@ -1527,7 +1537,7 @@ export class OsmService extends AbstractSystem {
   ): void {
     const cid = this._connectionID;
 
-    const uploaded = (): void => {
+    const uploaded = (isClosed = false): void => {
       // Upload was successful, it is safe to call the callback.
       // Add delay to allow for postgres replication iD#1646 iD#2678
       globalThis.setTimeout(() => {
@@ -1537,7 +1547,7 @@ export class OsmService extends AbstractSystem {
 
       // Closing the changeset is optional, and we won't get a result.
       // Only try to close the changeset if we're still talking to the same server.
-      if (this._connectionID === cid) {
+      if (!isClosed && this._connectionID === cid) {
         this.closeChangeset(changeset, () => {});
       }
     };
@@ -1562,15 +1572,23 @@ export class OsmService extends AbstractSystem {
       // The server answered (or we never sent it), so we know the upload wasn't applied.
       if (typeof err.status === 'number') { return callback(err, changeset); }
 
-      this.loadChangesetAsync(changeset.id)
-        .then(result => {
-          if (Number(result.changes_count) > 0) {
-            uploaded();
-          } else {
-            callback({ message: err.message, status: -5 }, changeset);
-          }
-        })
-        .catch(() => cantTell(err.message));
+      // No answer, so the server may have applied the upload, or may still be applying it. Close the
+      // changeset before counting its changes. The API locks a changeset while it applies an upload,
+      // and a close fails at once (409) rather than wait for the lock, so a close that succeeds means
+      // nothing more can land in it, and the count is final.
+      this.closeChangeset(changeset, (closeErr: any) => {
+        this.loadChangesetAsync(changeset.id)
+          .then(result => {
+            if (Number(result.changes_count) > 0) {
+              uploaded(!closeErr);
+            } else if (!closeErr) {
+              callback({ message: err.message, status: -5 }, changeset);
+            } else {
+              cantTell(err.message);
+            }
+          })
+          .catch(() => cantTell(err.message));
+      });
     });
 
     this.createChangeset(changeset, (err: any, updated: OsmChangeset) => {

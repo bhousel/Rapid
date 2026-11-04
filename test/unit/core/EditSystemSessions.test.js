@@ -416,7 +416,7 @@ describe('EditSystem sessions (Phase 2)', () => {
     let _changesets, _requests;
 
     function upload(overrides = {}) {
-      return { changesetID: '7', apiURL: API, startedAt: Date.now() - 1000, index: 1, ...overrides };
+      return { changesetID: '7', apiURL: API, startedAt: Date.now() - 1000, ...overrides };
     }
 
     // Start a new tab's editor, which settles the marked sessions before offering them
@@ -449,7 +449,7 @@ describe('EditSystem sessions (Phase 2)', () => {
       await editor.markUploadAsync('7', API);
 
       let record = await database.get('sessions', editor._sessionID);
-      assert.include(record.upload, { changesetID: '7', apiURL: API, index: 1 });
+      assert.include(record.upload, { changesetID: '7', apiURL: API });
       assert.strictEqual(record.data.index, 1);
 
       editor.perform(actionAddTaggedNode('n-2', [3, 4], { building: 'yes' }));
@@ -458,9 +458,70 @@ describe('EditSystem sessions (Phase 2)', () => {
       record = await database.get('sessions', editor._sessionID);
       assert.strictEqual(record.upload.changesetID, '7');
 
-      await editor.clearUploadMarkAsync();
+      await editor.clearUploadMarkAsync('8');   // another changeset's failure
+      record = await database.get('sessions', editor._sessionID);
+      assert.strictEqual(record.upload.changesetID, '7', 'kept');
+
+      await editor.clearUploadMarkAsync('7');
       record = await database.get('sessions', editor._sessionID);
       assert.isUndefined(record.upload);
+    });
+
+    it('lets go of a marked session for the next start to settle', async () => {
+      editor.perform(actionAddTaggedNode('n-1', [1, 2], { building: 'yes' }));
+      editor.commit({ stringID: 'building', selection: ['n-1'] });
+      await editor.markUploadAsync('7', API);
+      const sessionID = editor._sessionID;
+
+      assert.isTrue(await editor.releaseSessionAsync());
+
+      const record = await database.get('sessions', sessionID);
+      assert.strictEqual(record.upload.changesetID, '7', 'still marked');
+      assert.strictEqual(record.heartbeatAt, 0, 'no tab takes it for an open one');
+      assert.isNull(editor._sessionID);
+      assert.isNull(editor._ownedSessionID());
+
+      // Starting over, this tab's next edits go to a new session.
+      await editor.resetAsync();
+      editor.perform(actionAddTaggedNode('n-1', [5, 6], { building: 'yes' }));
+      editor.commit({ stringID: 'building', selection: ['n-1'] });
+      await editor.immediateBackup();
+      assert.notStrictEqual(editor._sessionID, sessionID);
+      assert.strictEqual((await database.get('sessions', sessionID)).data.entities.length, 1, 'untouched');
+    });
+
+    it('doesn\'t let go of a session that isn\'t marked', async () => {
+      editor.perform(actionAddTaggedNode('n-1', [1, 2], { building: 'yes' }));
+      editor.commit({ stringID: 'building', selection: ['n-1'] });
+      await editor.immediateBackup();
+      const sessionID = editor._sessionID;
+
+      assert.isFalse(await editor.releaseSessionAsync());
+      assert.strictEqual(editor._sessionID, sessionID);
+    });
+
+    it('settles a session it let go of: deleted if the upload went through, offered if not', async () => {
+      editor.perform(actionAddTaggedNode('n-1', [1, 2], { building: 'yes' }));
+      editor.commit({ stringID: 'building', selection: ['n-1'] });
+      await editor.markUploadAsync('7', API);
+      const landedID = editor._sessionID;
+      await editor.releaseSessionAsync();
+      await editor.resetAsync();
+
+      editor.perform(actionAddTaggedNode('n-1', [3, 4], { building: 'yes' }));
+      editor.commit({ stringID: 'building', selection: ['n-1'] });
+      await editor.markUploadAsync('8', API);
+      const lostID = editor._sessionID;
+      await editor.releaseSessionAsync();
+
+      _changesets.set('7', { id: 'c7', open: false, changes_count: 1 });
+      _changesets.set('8', { id: 'c8', open: false, changes_count: 0 });
+      await startNewTabAsync();   // e.g. the user reloads
+
+      assert.isUndefined(await database.get('sessions', landedID));
+      const list = await editor.listRestorableSessionsAsync();
+      assert.deepEqual(list.map(s => s.id), [lostID]);
+      assert.isUndefined(list[0].upload);
     });
 
     it('deletes the session quietly if the upload went through', async () => {
@@ -471,17 +532,6 @@ describe('EditSystem sessions (Phase 2)', () => {
 
       assert.isFalse(editor.canRestoreBackup);
       assert.isUndefined(await database.get('sessions', 's-up'));
-    });
-
-    it('warns if the upload went through, but the user edited more after it started', async () => {
-      await seedSession('s-more', { upload: upload({ index: 0 }) });
-      _changesets.set('7', { id: 'c7', open: false, changes_count: 3 });
-
-      await startNewTabAsync();
-
-      const list = await editor.listRestorableSessionsAsync();
-      assert.deepEqual(list.map(s => s.id), ['s-more']);
-      assert.isOk(list[0].upload);   // the restore screen warns
     });
 
     it('offers the session normally if the upload never landed', async () => {

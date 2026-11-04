@@ -84,6 +84,8 @@ export interface UploadChanges {
  * - 'resultErrors'      - upload failed due to errors
  * - 'resultConflicts'   - upload failed due to data conflicts
  * - 'resultSuccess'     - upload completed without errors
+ * - 'resultUnknown'     - can't tell whether the upload went through, so the edits were left in
+ *                         their backup for the next start to check, and the editor should start over
  *
  * See `design/uploader-system.md` for how conflicts are checked and resolved, and where this is heading.
  */
@@ -670,9 +672,26 @@ export class UploaderSystem extends AbstractSystem {
     }
 
     if (err) {
-      // Unless we can't tell (status -6), nothing was applied, so the backup is an ordinary one again
-      if (err.status !== -6) {
-        editor.clearUploadMarkAsync();
+      // We can't tell whether the upload went through, so the edits may already be on OSM.
+      // Leave them in their marked backup for the next start to settle, and start over.
+      if (err.status === -6) {
+        editor.releaseSessionAsync()
+          .then(released => {
+            this._errors.push(this._describeUploadError(err, released));
+            if (released) {
+              this._didResultInUnknown();
+            } else {
+              this._didResultInErrors();   // no durable backup, so keep the edits here
+            }
+          });
+        return;
+      }
+
+      // Nothing was applied, so the backup is an ordinary one again
+      // (No changeset id means it failed before uploading, so there's no mark for this attempt.)
+      const changesetID = this.changeset?.id;
+      if (changesetID) {
+        editor.clearUploadMarkAsync(changesetID);
       }
 
       if (err.status === 409) {  // 409 Conflict
@@ -698,9 +717,11 @@ export class UploaderSystem extends AbstractSystem {
    * `OsmService.sendChangeset` uses status `-5` when the upload got no answer and wasn't applied,
    * and `-6` when we can't tell whether it was.
    * @param err - The error from the upload
+   * @param released - Optional, for `-6`: `true` if the edits were left in their backup for the next
+   *   start to check, `false` if they're still here (there's no durable backup)
    * @return The error message, with details
    */
-  protected _describeUploadError(err: any): { msg: string, details: string[] } {
+  protected _describeUploadError(err: any, released = false): { msg: string, details: string[] } {
     const context = this.context;
     const l10n = context.systems.l10n!;
     const osm = context.services.osm;
@@ -711,7 +732,7 @@ export class UploaderSystem extends AbstractSystem {
     if (err.status === -6) {
       const changesetID = this.changeset?.id;
       return {
-        msg: l10n.t('save.upload_unknown'),
+        msg: l10n.t(released ? 'save.upload_unknown' : 'save.upload_unknown_kept'),
         details: [ changesetID && osm ? osm.changesetURL(changesetID) : '', err.message ].filter(Boolean)
       };
     }
@@ -787,6 +808,16 @@ export class UploaderSystem extends AbstractSystem {
     const editor = this.context.systems.editor!;
     editor.revert();
     this.emit('resultErrors', this._errors);
+    this._endSave();
+  }
+
+
+  /**
+   * Called when we can't tell whether the upload went through, after `releaseSessionAsync` left the
+   * edits in their marked backup. SaveMode starts over, and the next start asks the API about it.
+   */
+  protected _didResultInUnknown(): void {
+    this.emit('resultUnknown', this._errors);
     this._endSave();
   }
 
