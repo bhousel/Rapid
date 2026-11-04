@@ -428,6 +428,19 @@ describe('RapidSystem', () => {
         assert.isFalse(_rapid.isAcceptedOrIgnored('test:k3'));
       });
 
+      it('matches a bare ID from an older backup to a MapWithAI feature with that local ID', () => {
+        replay([
+          { type: 'rapid_accept_feature', acceptIDs: ['w-1000000000', 'n-1000000001'] },
+          { type: 'rapid_ignore_feature', ignoreID: 'w-1000000002' }
+        ]);
+        assert.isTrue(_rapid.isAcceptedOrIgnored('msBuildings:w-1000000000'));
+        assert.isTrue(_rapid.isAcceptedOrIgnored('msBuildings:n-1000000001'));
+        assert.isTrue(_rapid.isAcceptedOrIgnored('msBuildings:w-1000000002'));
+        assert.isFalse(_rapid.isAcceptedOrIgnored('msBuildings:w-1000000003'));
+        assert.isFalse(_rapid.isAcceptedOrIgnored('overture-places:w-1000000000'));   // not MapWithAI
+        assert.deepEqual(_rapid.actedRanges('w-1000000000'), []);
+      });
+
       it('resetAsync clears them', () => {
         replay([{ type: 'rapid_ignore_feature', ignoreID: 'test:k1' }]);
         return _rapid.resetAsync()

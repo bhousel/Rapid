@@ -2,6 +2,7 @@ import { AbstractSystem } from './AbstractSystem.ts';
 import { parsePieceID } from './ConflationSystem.ts';
 import { gpx } from '@tmcw/togeojson';
 import { Extent } from '@rapid-sdk/math';
+import { osmEntityID, splitDataID } from '../data/dataID.ts';
 import { RapidDataset, RapidDataDictionary, TreeStore } from '../lib/index.ts';
 import { utilExtractValues, utilWildcardDelete } from '../util/string.ts';
 import { utilIterable } from '../util/iterable.ts';
@@ -185,6 +186,11 @@ export class RapidSystem extends AbstractSystem {
   protected _datasetRecords: Map<DatasetID, DatasetRecord>;
   /** The ranges of each line that the user accepted or ignored, as fractions of its length (see `actedRanges`) */
   protected _actedRanges: Map<DataID, Array<[number, number]>>;
+  /**
+   * Bare IDs in accept and ignore records, from backups made before data IDs (Rapid 2.x). Those named a
+   * MapWithAI feature by its entity ID (`w-123`), without the dataset (see `isAcceptedOrIgnored`).
+   */
+  protected _legacyIDs: Set<EntityID>;
 
 
   /**
@@ -194,6 +200,7 @@ export class RapidSystem extends AbstractSystem {
     super(context);
     this.id = 'rapid';
     this._actedRanges = new Map<DataID, Array<[number, number]>>();
+    this._legacyIDs = new Set<EntityID>();
 
     this._defaultAssetIDs = new Set<AssetID>(['rapid_datasets']);
     this._loadedAssetIDs = new Map<AssetID, string>();
@@ -326,6 +333,7 @@ export class RapidSystem extends AbstractSystem {
     this.acceptIDs.clear();
     this.ignoreIDs.clear();
     this._actedRanges.clear();
+    this._legacyIDs.clear();
     return Promise.resolve();
   }
 
@@ -662,11 +670,17 @@ export class RapidSystem extends AbstractSystem {
    * Returns `true` if the given dataID is an accepted or ignored feature: the feature itself, or every
    * piece of a line (e.g. a whole line accepted as trimmed to its joins is the piece `…@0-1`).
    * These features are hidden from the renderer.
+   * Records from older backups name a MapWithAI feature without its dataset, so those match the
+   * feature's local ID in any MapWithAI dataset.
    * @param dataID - The feature's data ID
    * @return `true` if the given dataID is an accepted or ignored feature
    */
   public isAcceptedOrIgnored(dataID: DataID): boolean {
     if (this.acceptIDs.has(dataID) || this.ignoreIDs.has(dataID)) return true;
+    if (this._legacyIDs.size) {
+      const [namespace, localID] = splitDataID(dataID);
+      if (this._legacyIDs.has(localID) && this.catalog.get(namespace)?.serviceID === 'mapwithai') return true;
+    }
     if (!this._actedRanges.has(dataID)) return false;
 
     const ranges = this.actedRanges(dataID);
@@ -917,7 +931,13 @@ export class RapidSystem extends AbstractSystem {
     // Gather the ranges of lines that the user acted on: a piece's ID carries its range,
     // and a whole feature's ID covers all of it.
     this._actedRanges.clear();
+    this._legacyIDs.clear();
     for (const id of [...this.acceptIDs, ...this.ignoreIDs]) {
+      const entityID = osmEntityID(id);   // No OSM data is accepted, so a bare ID is from an older backup
+      if (entityID) {
+        this._legacyIDs.add(entityID);
+        continue;
+      }
       const piece = parsePieceID(id);
       const dataID = piece?.dataID ?? id;
       const ranges = this._actedRanges.get(dataID) ?? [];

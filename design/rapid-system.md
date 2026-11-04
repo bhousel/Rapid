@@ -25,6 +25,10 @@ became a collection that asset files can define, and records where it's heading 
   annotations, so undo, redo and restoring a session all keep them right. From them it also gathers
   the **acted ranges** of each line (`actedRanges(dataID)`): which stretches the user accepted or
   ignored, so conflation can leave those out (see "Feature IDs" below).
+  Backups from before data IDs (Rapid 2.x) record a MapWithAI feature by its bare entity ID
+  (`w-123`), with no dataset (an ignore record has no sources either), so a bare ID matches that
+  local ID in any MapWithAI dataset (`isAcceptedOrIgnored`). Esri's old IDs came from a counter
+  and can't be matched.
 - A few odds and ends: the task boundary (`setTaskExtentByGpxData`), and whether the user has had
   power-user mode on this session.
 

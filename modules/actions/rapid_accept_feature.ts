@@ -291,7 +291,7 @@ export function actionRapidAcceptFeature(datum: OsmEntity | GeoJSONData, joins?:
           const otherID = other.dataID;
           // TODO this should work for geojson-like data too
           if (other.type !== 'node') continue;
-          if (rapid.acceptIDs.has(otherID) || rapid.ignoreIDs.has(otherID) || acceptedIDs.has(otherID)) continue;
+          if (rapid.isAcceptedOrIgnored(otherID) || acceptedIDs.has(otherID)) continue;
 
           // Treat this node as accepted, but not actually accept it into the graph.
           // We only really want it for its tags.

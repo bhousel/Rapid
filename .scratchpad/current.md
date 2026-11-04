@@ -62,15 +62,18 @@ actions, 45k entities loaded mid-run); backup round trips; `affects()` vs `compl
     `geojson-N`) keeps them out of `id=` and out of selections restored from a backup; GeoScribble keys
     features by their own `id`. Still open: accept/ignore of Overture data records counter IDs
     (`design/data-ids.md` open question 3; needs GERS-keyed vector tiles).
-12. **Backups saved by `main` recorded accepts without the dataset prefix** (`w-123`, not
+12. ✅ **Backups saved by `main` recorded accepts without the dataset prefix** (`w-123`, not
     `fbRoads:w-123`). Restoring one shows accepted features again, and they can be added twice.
-    `_upgradeEditProps`, `RapidSystem.ts:895`. *New; reading.* Fix: prefix in the upgrade from the edit's
-    `sources.data[0]`.
+    Fixed Nov 3: `sources.data` is the credit line (`['mapwithai', 'Facebook Roads']`), and ignores have
+    no sources, so instead `RapidSystem` keeps bare IDs aside and matches them to the local ID in any
+    MapWithAI dataset (`isAcceptedOrIgnored`, which the accept action now uses too). Esri's old
+    counter IDs can't be matched.
 13. **Default conflation rules join line ends to any line** (fences, streams, power lines, boundaries).
     `ConflationSystem.ts:269`, `:717-741`. *Design choice, but makes bad edits.* Fix: default
     `sameKeys: ['highway']`, or only join with rules that have target conditions.
-14. **Ctrl/⌘+↑↓ with a mixed selection selects parents/children and also pans the map.**
-    `MapInteractionBehavior.ts:160` doesn't check `defaultPrevented`. *New; confirmed.*
+14. ✅ **Ctrl/⌘+↑↓ with a mixed selection selects parents/children and also pans the map.** Fixed Nov 3:
+    `MapInteractionBehavior` runs before the mode's handler (it's enabled first), so `defaultPrevented`
+    can't work; it now leaves modifier+↑↓ to select mode when anything selected is OSM.
 15. ✅ **After an upload ends with -6 ("can't tell"), the open changeset is reused**, so `changes_count` no
     longer tells whether a later upload landed. Fixed Nov 3: `sendChangeset` forgets the changeset on -6.
 16. ✅ **Conflation results are cached by data ID**, so a new datum with the same ID gets the old runs.
