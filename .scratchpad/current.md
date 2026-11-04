@@ -7,131 +7,163 @@ Data IDs (steps 1–5), the validation audit and the graph-geometry rollout have
 (accept with joins, autoconnect, undo/redo, Autofix All, panning while editing, QA and photo layers,
 backup restore, a faked upload conflict), then merge to main.
 
-## Bug hunt (Nov 3): open issues
-Found by `/bughunt` before handing the branch to testers. Status: *new* (this branch) or *main too*;
-*confirmed* (a repro) or *reading* (read in the code only). Repros were in the session scratch folder
-(`hunt-*/`), which doesn't last; each item says enough to repro again. Coverage that came back clean:
-~1,400 seeded random `EditSystem` histories (edits, commits, appends, transactions, undo/redo,
-checkpoints, tile merges, `updateBase`) checking emits, shapes, both indexes, segments, node memos,
-parent lists and the session difference after every step; two live soaks on Ballard data (~180 real
-actions, 45k entities loaded mid-run); backup round trips; `affects()` vs `complete()` over 1,500 seeds.
+## Bug hunt 2 (Nov 4): open issues
+The second `/bughunt` before handing the branch to testers. The first hunt's 36 findings are fixed
+(`completed.md`). Status: *new* (this branch) or *main too*; *confirmed* (a repro) or *reading* (read
+in the code only). Repros are in the session scratch folder (`hunt2/`), which doesn't last; each item
+says enough to repro again. Coverage that came back clean: 400 seeds × 250 steps of random `EditSystem`
+histories (emits, shapes, both indexes, segments, node memos, parent lists, session difference), with
+2,432 backup round trips compared edit by edit, 1,037 reset-and-restore cycles with editing after,
+checkpoint graph integrity and no new-ID reuse; the Graph model test at 3,000 seeds; two live soaks on
+Seattle data (280 commits, up to 100k entities, selection and validation checks). The first hunt's
+fixes held up, except 9, 10 and 11 (items 7, 22 and 26 below).
+
+Follow-up from the first hunt, not done: after switching to the dev API in the same tab, its dev
+sessions aren't offered for restore (restore is only offered at startup, which is always live).
 
 ### High: fix before testers
-1. ✅ **iD#2085 restores miss redo edits and checkpoints.** Fixed Nov 3: `Graph.rebase` decides the
-   restores per graph of the stack (a node that graph deleted, under an arriving way it didn't delete),
-   skipping ways with no node any graph has written. Tests in `Graph.test.js` and
-   `EditSystemJournal.test.js`; the model test now encodes the per-graph rule. The bug-hunt harness
-   (600 seeds × 200 steps) is clean.
-2. ✅ **A dev-API session can be restored and uploaded against live OSM.** Fixed Nov 3: sessions
-   record `apiURL`; `listRestorableSessionsAsync` and `restoreSessionAsync` only take sessions made on
-   the connected API (older ones without `apiURL` still count everywhere). The init check counts every
-   API, because a host's preauth switches the API after systems init; `startAsync` decides. Follow-up,
-   not done: after switching to dev in the same tab, its dev sessions aren't offered (restore is only
-   offered at startup, which is always live).
-3. ✅ **MapRoulette: typing a comment replaces Cancel/Submit with the four action buttons.** Fixed Nov 3:
-   `changeInput` calls `_submitButtons`, and the editor's sections and `UiMapRouletteDetails` key by
-   `d.id`. Also fixed (main had it too): the action buttons showed next to the comment while an action
-   was pending (when the floating menu is off).
-4. ✅ **MapRoulette: action clicks write the editor's stale datum over the cached task.** Fixed Nov 3:
-   the editor's `_updateTask` and the menu's `_submitTask` start from `maproulette.getTask(id)`.
-   Tests: `test/browser/ui/UiMapRouletteEditor.test.js`. Guidance added to `modules/ui/AGENTS.md` §6.
-5. ✅ **Cancel on the conflict screen still keeps the user's deletion.** Fixed Nov 3: detection keeps
-   the base updates pending (`_baseUpdates`), and `processResolvedConflicts` applies them once the user
-   saves the conflict screen. Done together with 8, 10, 25 and 36 (the save path).
-6. ✅ **A line that is one whole new run is accepted untrimmed.** Fixed Nov 3 with 7 and 16–21 (the
-   conflation batch): every run has its own datum unless it is the source line itself (whole, no joins),
-   so a whole line trimmed to its joins is the piece `@0-1`, drawn, selected and accepted as trimmed.
-   `isAcceptedOrIgnored` counts pieces that cover a whole line. Checked live in Albany (a sidewalk
-   joined at both ends through the inspector, then undone).
-7. ✅ **With "show already mapped" on, a matched run is bound to the whole line.** Fixed Nov 3: a matched
-   run has its own datum (no joins), so Add and Ignore act on its stretch.
-8. ✅ **Conflicts that leave nothing to upload keep the session; it's offered for restore next time.**
-   Fixed Nov 3: `UploaderSystem._didResultInNoChanges` clears the backup.
-9. ✅ **Undoing a tag change on a new relation deletes the relation and loses the redo.** Undo re-enters
-   select, and `SelectMode.exit()` cleans up the now-untagged relation with a new commit. *Main too.*
-   Fixed Nov 3: the cleanup runs only when there's nothing to redo. Bryan would rather drop it and
-   show empty relations (see "Render relations" in `backlog.md`).
+1. **The DB upgrade from v2 to v3 can stop Rapid from starting.** A tab running `main` on the same
+   origin holds the v2 database open, and `openDB` has no `blocked`/`blocking` handlers, so
+   `database.initAsync()` (and with it `EditSystem` and `RapidSystem` init) never settles. After the
+   upgrade, `main` builds on that origin get `VersionError` and fall back to memory (no backups).
+   `DatabaseSystem.ts:796`. *New (the bump), confirmed.*
+2. **Saving again after a -6 ("can't tell") upload loses its upload mark.** If the retry fails before
+   uploading (offline at create), `_uploadCallback` clears mark 7 anyway; if it uploads, mark 8 replaces
+   mark 7, and its 409 (exactly what happens if changeset 7 landed) clears it. The next tab then offers
+   edits that already landed: a duplicate upload. `UploaderSystem.ts:674`, `EditSystem.markUploadAsync`.
+   Fix: settle an existing -6 mark before a new upload; only clear a mark for this attempt's changeset.
+   *New, confirmed.*
+3. **Settling an upload by history index deletes edits made after an undo.** Marked at index 2, -6,
+   then undo + a different edit (index 2 again), close the tab; changeset landed, so the next tab deletes
+   the session with the unuploaded edit. `EditSystem.ts:2369` (`record.data.index === upload.index`).
+   Fix: record which edit the mark was taken at, not the index. *New, confirmed.*
+4. **"Use theirs" on a way overrides "Keep mine" on its node.** User moves n2 and retags w1; the other
+   mapper retags w1 and moves n2. Leave w1 on "Use theirs", pick "Keep mine" on n2: Save reverts w1's
+   nodes, so n2 goes back to base (neither version), nothing is left to upload and the session is
+   deleted. Related: a shared node's result depends on which conflict the screen showed last.
+   `UploaderSystem.ts:839` (`processResolvedConflicts`). *New in practice (main never opened the
+   screen), confirmed.*
+5. **A restore whose base version was redacted silently reverts another mapper's change.** The base
+   falls back to the current version (v2, with their `cuisine=pizza`), so after a 409 the safe merge sees
+   only the user's side and uploads without the tag, no conflict. `EditSystem.ts:1999`
+   (`_fetchBaseEntitiesAsync`), `merge_remote_changes` `mergeTags`. Fix: mark fallback bases and treat
+   differences against them as conflicts. *New, confirmed.*
+6. **Conflation: while part of a line is `unknown` (a tile not loaded), acted ranges are ignored.**
+   `getResult` returns early with no runs, so `PixiLayerRapid` draws the whole source line over the
+   accepted way, and Add creates it again (`acceptIDs` gets both the piece and `test:a`). Likely right
+   after restoring a session. `ConflationSystem.ts:595`, `PixiLayerRapid.ts:478`. *New, confirmed.*
+7. **Redo, and the extra redo that returns to where you were, delete an empty new relation.** The fix for
+   first-hunt item 9 only covers undo: at the newest edit there's nothing to redo, and the history jump
+   re-enters select, so `exit()` commits "Deleted a relation". Repro: membership "add to new relation"
+   (untagged, one member, no role), undo, redo, extra redo. Or: tag r-1, remove the tag, undo, redo.
+   `SelectMode.ts:240`. *Return view new; plain redo main too. Confirmed.*
 
 ### Medium
-10. ✅ **"Use theirs" on a way reverts the user's changes to all its nodes**, including ones that didn't
-    conflict and are shared with other ways. Fixed Nov 3: a shared node keeps the user's change unless
-    the other mapper changed it too (`merge_remote_changes` `force_remote`, and `processResolvedConflicts`
-    reverts only nodes the way alone uses).
-11. ✅ **Counter-based data IDs (GeoScribble, vector tiles) go into `id=` and edit selections**, so after a
-    reload or a shared link they name a different feature. Fixed Nov 3: `isStableDataID()` (false for
-    `geojson-N`) keeps them out of `id=` and out of selections restored from a backup; GeoScribble keys
-    features by their own `id`. Still open: accept/ignore of Overture data records counter IDs
-    (`design/data-ids.md` open question 3; needs GERS-keyed vector tiles).
-12. ✅ **Backups saved by `main` recorded accepts without the dataset prefix** (`w-123`, not
-    `fbRoads:w-123`). Restoring one shows accepted features again, and they can be added twice.
-    Fixed Nov 3: `sources.data` is the credit line (`['mapwithai', 'Facebook Roads']`), and ignores have
-    no sources, so instead `RapidSystem` keeps bare IDs aside and matches them to the local ID in any
-    MapWithAI dataset (`isAcceptedOrIgnored`, which the accept action now uses too). Esri's old
-    counter IDs can't be matched.
-14. ✅ **Ctrl/⌘+↑↓ with a mixed selection selects parents/children and also pans the map.** Fixed Nov 3:
-    `MapInteractionBehavior` runs before the mode's handler (it's enabled first), so `defaultPrevented`
-    can't work; it now leaves modifier+↑↓ to select mode when anything selected is OSM.
-15. ✅ **After an upload ends with -6 ("can't tell"), the open changeset is reused**, so `changes_count` no
-    longer tells whether a later upload landed. Fixed Nov 3: `sendChangeset` forgets the changeset on -6.
-16. ✅ **Conflation results are cached by data ID**, so a new datum with the same ID gets the old runs.
-    Fixed Nov 3: each cached result keeps the datum it was computed for.
-17. ✅ **Some piece IDs don't parse back:** zero-length lines (`@0-0`), and lines over ~20 km. Fixed Nov 3:
-    a line with no length has no pieces; `pieceID` rounds to ~10 cm for the line's length (4 decimals
-    up to 1 km, so existing IDs don't change).
-18. ✅ **Area-key schema changes don't flush conflation results.** Fixed Nov 3: flushes when
-    `schema.areaGeneration` changes.
+8. **Conflation: a run that leaves a node and comes back to it is trimmed to a stub.** `trimEnd` and
+   `trimStart` cut at the nearest point anywhere on the run: with legs at x=60.2 and x=61.0 around node
+   x=60.5, the 27 m detour becomes 0.43 m (a 2-node way). Symmetric legs (the #19 test) work.
+   `ConflationSystem.ts:1076`. *New, confirmed.*
+9. **Conflation: acting on every run can leave sliver gaps, so the line never counts as acted on.**
+   Slivers shorter than the sample spacing are dropped, and `isAcceptedOrIgnored` needs one range over
+   [0, 1]: e.g. accept `@0-0.7216`, the next run becomes `@0.7519-1`. 165 of 600 fuzzed lines, only with
+   "show already mapped" on. `ConflationSystem.ts:833`, `RapidSystem.ts:686`. *New, confirmed.*
+10. **Synced settings read once at startup ignore the value the startup sync pulls,** and the next
+    toggle writes the stale value back to the account (A disables `crossing_ways`; B starts, pulls it,
+    still shows it enabled; B turns off `almost_junction`, and the account loses A's choice). Validator
+    rules (`ValidationSystem.ts:193`), filters (`FilterSystem.ts:153`), imagery favorites
+    (`UiSectionBackgroundList.ts:90`); no `settingschange` listener. A `disable_features=` URL param is
+    written into the synced setting too. *New, confirmed.*
+11. **An empty value never syncs,** so re-enabling every rule (or filter) stays local and the account
+    keeps the old list. `SettingsSystem.ts:888`. *New, confirmed.*
+12. **Sync deletes account keys this build hasn't registered** (a newer build's paths, or `ui.*` and
+    `poweruser.*` when those components aren't built), so testers switching builds lose preferences.
+    `SettingsSystem.ts:854`. *New, reading.*
+13. **A failed user-details call resets the sync base,** so the next good sync lets the remote win over
+    a newer local change. `SettingsSystem.ts:835`. *New, confirmed.*
+14. **Undo out of a draw mode selects the newest edit's `selection`** (maybe offscreen), not what
+    `MapSystem` would (`selectionBefore`, or `mode.selectionBefore` for a same-index undo); non-OSM IDs
+    are always dropped. Same class as first-hunt item 22. `DrawLineMode.ts:866`, `DrawAreaMode.ts:825`.
+    *Pattern main too, confirmed.*
+15. **Redo restores what an operation committed with, not what it then selects:** drag vertex (the
+    vertex, not the way), split (the vertex, not the lines), multipolygon merge, extract, delete vertex,
+    add member. `DragNodeMode.ts:369`, `SplitOperation.ts:92` and others. *Main too, but `selection` now
+    means "after". Reading.*
+16. **`resetAsync()` with no edits re-selects the current selection instead of going to browse**
+    (`historyjump(0, 0)` reads as "work in progress thrown away"), possibly data whose cache was just
+    cleared. `EditSystem.ts:540`. *New, reading.*
+17. **Osmose/KeepRight: after an issue is closed, the editor stays up.** SelectMode's `change` handler
+    finds no cached issue and returns; a second "done" click falls back to the stale datum,
+    `replaceItem` puts the closed issue back on the map, and it posts again (`_closed` counts 2).
+    `UiOsmoseEditor.ts:197`, `UiKeepRightEditor.ts:262`, `SelectMode.ts:361`. *Re-adding new, double post
+    main too. Confirmed (Osmose).*
+18. **With no answer, the tab decides "not applied" (-5) right away and reuses the changeset,** while
+    `_checkUploadAsync` calls the same state (open, 0 changes, recent) "pending"; a late landing gives
+    duplicates. `OsmService.ts:1565` vs `EditSystem.ts:2407`. *New, reading.*
+19. **"Deleted by both" brings back the way's nodes the user deleted,** and drops those deletions
+    (`actionRevert` now restores deleted children). `merge_remote_changes.ts:324`. *New, confirmed.*
+20. **"Leave Deleted" on a way leaves the other mapper's new nodes as orphans** on OSM.
+    `UploaderSystem.ts:464`. *New, reading.*
+21. **A link with both `id=` and `note=` ends with only the note selected** (`selectNoteID` replaces the
+    multiselection, and zooms to z19). `MapSystem.ts:343`, `selectNoteID`. *New, confirmed.*
 
 ### Low
-19. ✅ Both ends of a run snap to the same node, so the accepted way is closed. Fixed Nov 3: the second
-    end's join to that node is skipped.
-20. ✅ A join to a segment that still exists doesn't check `loc` is still on it. Fixed Nov 3 (0.5 m, else
-    it looks for the segment again, like a split edge).
-21. ✅ Pieces are cleared by `ds.id` but cached by `spatialID`; a dataset with `conflation` but no `rules`
-    throws. Fixed Nov 3: `invalidate` clears by namespace; `RapidDataset` fills in missing settings.
-22. ✅ Undo during a drag/move selects the newest edit's `selection` (maybe offscreen). Fixed Nov 3:
-    same-index undo selects `mode.selectionBefore` (new on `AbstractMode`; `DragNodeMode` overrides it).
-23. ✅ Drag edits record their working selection as `selectionBefore`. Fixed Nov 3: `DragBehavior` passes
-    what was selected, and the drag commits it. Draw and add-point were fine: a draw edit's
-    `selectionBefore` is the line being drawn (gone on undo of its first edit, so browse), add-point's is `[]`.
-24. ✅ A successful upload reported as -1 "Connection Switched" clears the upload mark. Fixed Nov 3: a
-    switched connection during the upload is -6 (can't tell), both from `_wrapcb` and with no answer.
-25. ✅ "Keep mine" after the default "Use theirs" can leave the parent way edited. Fixed Nov 3: a choice
-    first puts back what the conflict's previous choice changed (`UploaderSystem._makeChooser`).
-26. ✅ Osmose editor's `_updateIssue` has the same stale-datum pattern as 4. Fixed Nov 3 (starts from
-    `osmose.getError(id)`), with the `d.key` scan below.
-27. ✅ An iD#2085 restore of a frozen stable that's also `_headQueuedGraph` isn't validated again in the
-    head cache. Fixed Nov 3: when stable is the graph validated but `stablechange` named IDs, those are
-    validated (and a finished run goes again if more arrived).
-28. ✅ `graph.geometry()` for a new way passed to a graph that doesn't have it returned the object's empty,
-    never built shape. Fixed Nov 3: it throws (no record, and base doesn't have it).
+22. **"Use theirs" uploads unchanged copies of shared nodes the other mapper changed** (`force_remote`
+    puts in the remote copy, and shared nodes aren't reverted). Side effect of first-hunt item 10.
+    `merge_remote_changes.ts:175`. *New, confirmed.*
+23. **The second join of a detour can go into the wrong segment:** `edgeAt` takes the first segment
+    within 0.5 m, not the closest (0.44 m off on a thin ring; 2 of 2,007 fuzzed accepts).
+    `rapid_accept_feature.ts:152`. *New, confirmed.*
+24. **A single matched sample at a line end makes a zero-length run `@0-0`,** which doesn't parse back.
+    Sibling of first-hunt item 17. `ConflationSystem.ts:801`. *New, confirmed.*
+25. **A join to an existing node doesn't check where the node is now** (first-hunt item 20 covered
+    segments only); hard to reach from the UI. `rapid_accept_feature.ts:124`. *New, confirmed.*
+26. **Custom-data IDs in `id=` can never be found from a link,** because `data=` is stripped from the
+    URL (`toOmit`). `UrlHashSystem.ts:260`. *New, reading.*
+27. **During the walkthrough, the user's session stops heartbeating,** so after 60 s another tab can
+    restore it, and both write it after `continueSession`. `UiIntro.ts`. *New, reading.*
+28. **Custom data: a slow URL load can overwrite a newer file,** and the newer one's namespaced cache is
+    never cleared. `PixiLayerCustomData.ts:509`. *Leak new, race main too. Reading.*
+29. **The history card shows "Note osm-notes:123"** (prints the data ID). `UiHistoryCard.ts:151`.
+    *New, reading.*
 
 ### Already in `main`
-29. ✅ After a new note is saved, the "new note" editor stays up (looks up the removed `-1`); a second Save
-    could post a duplicate note. Fixed Nov 3: the editor's `change` passes the saved note, and
-    `SelectMode` selects it by its real id.
-30. ✅ Note and KeepRight Save clicks may be lost: the textarea's blur re-joins the buttons under the pointer.
-    Confirmed Nov 3 in the debug Chrome with real mouse events (a new note's Cancel did nothing), fixed by
-    the `d.key` scan: the note, KeepRight and Osmose editors key their sections by `d.id`, and the note
-    editor updates from the cached note. Found on the way: adding a note opened no editor at all
-    (`AddNoteMode` made the note without `type: 'note'`, which `SelectMode` checks; main too), fixed.
-    Tests: `test/browser/ui/UiQaEditors.test.js`, `test/unit/modes/AddNoteMode.test.js`.
-    The scan: the only other `d.key` joins on data in `modules/ui` are display-only headers and details,
-    which are meant to rebuild for a new version; nothing else updates a datum in place of a newer cache.
-31. ✅ The walkthrough leaves a duplicate session (reset, then `fromJSONAsync`). Fixed Nov 3: it restores
-    the edits, then `editor.continueSession(id)` (deletes a session started in between).
-32. ✅ "Duplicate tab" copies `sessionStorage`, so two tabs can share a session. Fixed Nov 3: `pagehide`
-    marks the page gone; on startup a copy without the mark forgets the owned id (`_forgetCopiedSession`).
-33. ✅ Undo right after pressing "2" (before the first click) is silently swallowed. Fixed Nov 3 (line and
-    area): exit rolls back only when stable is one of the drawing's own edits (it has a snapshot);
-    the unused `beginDraw` checkpoint is gone. A redo there was swallowed too.
-34. ✅ `AbstractPixiLayer.bindData` wipes parent/child links on every rebind. Fixed Nov 3: binding the same
-    data again returns early.
-35. ✅ Restoring a backup can move counters backward. Fixed Nov 3: counters only move forward.
-36. ✅ On the conflict screen, Save is only enabled through `scheduler?.setTimeout`. Fixed Nov 3, with a
-    fallback; also `.attr('disabled', false)` set the attribute (so it disabled Save for one conflict).
+30. **The MapRoulette right-click menu can never submit:** `_getApiKey` calls `osm.loadMapRouletteKey`,
+    which doesn't exist, so every click throws. Also reads `osm._userDetails.id` unguarded. Fix: do what
+    the editor does (`getUserPreferencesAsync`, `maproulette_apikey_v2`). `UiMapRouletteMenu.ts:313`.
+    *Confirmed.*
+31. **Stopping an animated operation partway disables backups for the rest of the tab** (circularize,
+    orthogonalize, straighten, reflect, unsquare fix). Any other edit or undo within its 150 ms
+    interrupts it; the `'end interrupt'` handler only finishes inside a transaction, so `_inTransition`
+    stays set (`immediateBackup` returns early), the promise never settles, and the partial frame is
+    committed inside the other edit. `EditSystem.ts:749`. *Confirmed.*
+32. **Midpoints keep their old way ID after a merge or split:** they're reused by segment coordinates
+    and `feature.data` is set only on create, so dragging one throws (`OsmEntity w2 not found`) and
+    clicking one deselects. `PixiLayerOsm.ts:857`, `DragBehavior.ts:203`. *Confirmed (stale ID).*
+33. **`clearChildData` never removes children's links back to the parent:** it passes the live set,
+    which the first loop empties, and `removeChildData` deletes `childID` instead of `parentID`. Vertices
+    of other ways get drawn as related. `AbstractPixiLayer.ts:308`, `:324`. *Confirmed.*
+34. **MapRoulette can post the same comment twice** (Submit again after the comment POST, before the
+    PUT). `MapRouletteService.ts:437`. *Reading.*
+35. **For 2.5 s after a successful upload, Escape plus an edit (or closing the tab) makes a new session
+    of the uploaded edits,** offered for restore next time. `SaveMode.ts:375`. *Reading.*
+36. **`#walkthrough=true` with a stored session means no backups for the rest of the tab**
+    (`_canRestoreBackup` stays true). `UiSystem.ts:328`. *Reading.*
+37. **Arrow keys:** with a photo viewer open, plain arrows both nudge the selection and step the photo;
+    with a focused button, Ctrl/⌘+↑↓ does nothing (`SelectMode._keydown` requires BODY).
+    `SelectMode.ts`, `MapInteractionBehavior.ts`. *Reading.*
+38. **`y_shaped_connection` isn't revalidated when a road joins or leaves the neighboring node**
+    (related entities add parent ways, never sibling nodes). `y_shaped_connection.ts:214`,
+    `ValidationCache.ts:198`. *Confirmed.*
+39. **A road through a building can give two crossing issues:** with `oneOnly`, each side reports the
+    first crossing it finds, and the hash is the segments (4 of 16 orientations). `crossing_ways.ts:525`.
+    *Confirmed.*
+40. **On a crossing of about 2 m or less, the `curb_nodes` fix retags the crossing as sidewalk**
+    (`actionSplit` keeps the ID on the longest part). `curb_nodes.ts:240`. *Reading.*
 
-Not a bug: a history graph that isn't current and hasn't caught up with the base gives stale searches,
-and its own `geometry()` is just as stale. That's the documented design, and nothing searches one.
+Not bugs: undoing during an animated operation doesn't commit an empty edit (the promise never settles;
+the real problem is item 31). A huge `sameDist` (e.g. 100000) passes validation and makes conflation
+crawl. A history graph that isn't current and hasn't caught up with the base gives stale searches, and
+its own `geometry()` is just as stale; that's the documented design, and nothing searches one.
 
 ## Active: what an edit records (`EditSystem`)
 Design: [`design/edit-system.md`](../design/edit-system.md), started Oct 26. Edits need to record more
