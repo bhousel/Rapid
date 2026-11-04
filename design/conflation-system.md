@@ -750,7 +750,8 @@ Lines come first throughout. Points and polygons follow the same pipeline at a l
   result at all.
 - **No default tag condition.** Without one, a sidewalk rule matches roads, railways and waterways
   (seen on real data). Only the user can say which OSM features are "the same kind of thing", so the
-  default rules have no property conditions and the settings UI (Step 6) asks for them.
+  default rules have no property conditions and the settings UI (Step 6) asks for them. Reopened:
+  see "Default rules match and join any line" in Open Questions.
 - **Conflation runs even without a data mapping, for now.** Without a mapping, the new features' tags
   are their raw properties, and rules with no tag conditions match everything nearby. That makes the
   difference a mapping makes easy to show. Whether to require a mapping or only warn is open.
@@ -775,5 +776,15 @@ Lines come first throughout. Points and polygons follow the same pipeline at a l
   Matching chains of consecutive edges with the same tags might be more robust.
 - **Debug dots for absorbed boxes.** The overlay shows each box's raw status, so a box absorbed into
   a matched run still shows yellow or red. Color it like its run, or mark it distinctly?
+- **Default rules match and join any line.** With no tag conditions (`conflationDefaults()`), a line
+  is matched against, and its ends join, fences, streams, power lines and boundaries, which makes bad
+  edits (found in the November 2026 bug hunt). The quick fix is a default `sameKeys: ['highway']`. What
+  we probably want is for the default to require the same **defining** key: whichever "top level"
+  tag says what the feature *is* (`highway`, `railway`, `waterway`, `amenity`, `shop`, `leisure`,
+  `natural`, …), as opposed to an attribute like `surface=dirt` or `sport=soccer` that only describes
+  something else. OSM has no fixed list of these. The presets come closest: if a single `k=v` tag
+  matches a preset, `k` is a defining key. So the list would be owned by `SchemaSystem` and change
+  with the presets, and `sameKeys` would need a way to say "the defining key, whatever it is". This
+  revisits the "No default tag condition" decision above.
 - **Which graph.** Stable is used. Is there a case where conflation must reflect edits still in
   progress (staging)? Since graph-geometry step 9, searching staging instead is a one-argument change.

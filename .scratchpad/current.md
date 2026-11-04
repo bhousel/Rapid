@@ -68,9 +68,6 @@ actions, 45k entities loaded mid-run); backup round trips; `affects()` vs `compl
     no sources, so instead `RapidSystem` keeps bare IDs aside and matches them to the local ID in any
     MapWithAI dataset (`isAcceptedOrIgnored`, which the accept action now uses too). Esri's old
     counter IDs can't be matched.
-13. **Default conflation rules join line ends to any line** (fences, streams, power lines, boundaries).
-    `ConflationSystem.ts:269`, `:717-741`. *Design choice, but makes bad edits.* Fix: default
-    `sameKeys: ['highway']`, or only join with rules that have target conditions.
 14. ✅ **Ctrl/⌘+↑↓ with a mixed selection selects parents/children and also pans the map.** Fixed Nov 3:
     `MapInteractionBehavior` runs before the mode's handler (it's enabled first), so `defaultPrevented`
     can't work; it now leaves modifier+↑↓ to select mode when anything selected is OSM.
