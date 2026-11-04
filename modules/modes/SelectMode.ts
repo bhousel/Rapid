@@ -231,10 +231,14 @@ export class SelectMode extends AbstractMode {
     }
 
     // If the user added an empty relation, we should clean it up.
+    // Not when there are edits to redo: committing would throw them away. Undoing a new relation's
+    // tags leaves it empty and re-enters select mode, which exits this one.
+    // See "Render relations" in `.scratchpad/backlog.md`: this cleanup may go away.
     const graph = editor.staging.graph;
     const singularID = this._singularDatum?.id;
     const entity = singularID ? graph.hasEntity(singularID) : undefined;
-    if (entity?.type === 'relation') {
+    const canRedo = editor.index < editor.history.length - 1;
+    if (entity?.type === 'relation' && !canRedo) {
       const relation = entity as OsmRelation;
       const members = relation.members;
       if (

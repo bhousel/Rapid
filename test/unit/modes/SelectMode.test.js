@@ -29,7 +29,7 @@ describe('SelectMode', () => {
     const emitter = { on: noop, off: noop };
 
     context.systems = {
-      editor: { staging: { graph: graph }, ...emitter },
+      editor: { staging: { graph: graph }, index: 0, history: [{}], ...emitter },
       filters: { forceVisible: ids => visibleIDs = ids },
       gfx: {
         scene: {
@@ -124,6 +124,35 @@ describe('SelectMode', () => {
       assert.strictEqual(selectClasses.size, 0);
       assert.isNull(urlParams.id);
       assert.deepEqual(mode.operations, []);
+    });
+  });
+
+
+  describe('an empty new relation', () => {
+    let commits;
+
+    beforeEach(() => {
+      graph = new Rapid.Graph(context, [new Rapid.OsmRelation(context, { id: 'r-1', members: [] })]);
+      commits = [];
+      Object.assign(context.systems.editor, {
+        staging: { graph: graph },
+        perform: () => {},
+        commit: props => commits.push(props)
+      });
+    });
+
+    it('is deleted on exit, at the newest edit', () => {
+      mode.enter({ selection: ['r-1'] });
+      mode.exit();
+      assert.lengthOf(commits, 1);
+      assert.strictEqual(commits[0].stringID, 'operations.delete.annotation.relation');
+    });
+
+    it('is kept when there are edits to redo, so they aren\'t thrown away', () => {
+      context.systems.editor.history.push({});   // e.g. undid the relation's tags
+      mode.enter({ selection: ['r-1'] });
+      mode.exit();
+      assert.lengthOf(commits, 0);
     });
   });
 

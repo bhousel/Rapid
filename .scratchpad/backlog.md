@@ -41,6 +41,13 @@ especially, which are hard to check today.
   gaps in the route should show.
 - The geometry is already there: per `design/graph-geometry.md` section 3, a relation's geometry
   references its members' parts, so drawing it reuses them instead of building new shapes.
+- **Empty relations should be shown, not deleted.** `SelectMode.exit()` deletes a relation the user
+  just made if it has no tags and at most one member with no role (from iD 9d029a37, 2019). Bryan
+  sees that as a UI problem, not a data one: a mapper may want to make a relation and add members
+  later. Show relations that draw nothing (e.g. a legend beside the map, with a label and color
+  swatch), keep them, and let validation at save time say what's missing. Then drop the cleanup.
+  Until then it runs only when there's nothing to redo (Nov 2026: undoing a new relation's tags
+  re-entered select mode, and the cleanup's commit threw the redo away).
 
 ## Line marker placement (oneway arrows, sided markers)
 - Today `geomGetPositionsAlongLine` (moved from `pixi/helpers.ts` to `geo/geom.ts`) regenerates marker positions per-frame in the feature's update path, with an arbitrary 100-marker cap (`Rapid#544`, the `isLimited` param) to keep long lines from spawning thousands of sprites.

@@ -47,10 +47,10 @@ actions, 45k entities loaded mid-run); backup round trips; `affects()` vs `compl
    run has its own datum (no joins), so Add and Ignore act on its stretch.
 8. ✅ **Conflicts that leave nothing to upload keep the session; it's offered for restore next time.**
    Fixed Nov 3: `UploaderSystem._didResultInNoChanges` clears the backup.
-9. **Undoing a tag change on a new relation deletes the relation and loses the redo.** Undo re-enters
-   select, and `SelectMode.exit()` cleans up the now-untagged relation with a new commit.
-   `SelectMode.ts:232-252`. *Main too; confirmed.* Fix: skip the cleanup when the exit comes from a
-   history jump (stable changed since the mode was entered).
+9. ✅ **Undoing a tag change on a new relation deletes the relation and loses the redo.** Undo re-enters
+   select, and `SelectMode.exit()` cleans up the now-untagged relation with a new commit. *Main too.*
+   Fixed Nov 3: the cleanup runs only when there's nothing to redo. Bryan would rather drop it and
+   show empty relations (see "Render relations" in `backlog.md`).
 
 ### Medium
 10. ✅ **"Use theirs" on a way reverts the user's changes to all its nodes**, including ones that didn't
