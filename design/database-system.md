@@ -547,6 +547,37 @@ Behavior when unavailable:
 - Concrete example: a user drops a GeoJSON file **in incognito mode**. It loads and renders fine, but
   it won't reappear in a later normal-mode session — and we told them so up front.
 
+**What the user sees (Nov 2026).** `status` says whether storage works, and why not (`'ok'`,
+`'unavailable'`, `'blocked'`, `'closed'`), and `statuschange` fires when it changes. `UiApiStatus`
+shows a message in the red status bar for anything but `'ok'`, with a Dismiss link, stacked with any
+other problems (API offline, a failed backup write). EditSystem no longer writes the legacy
+localStorage backup, so "your work will not be backed up" is accurate.
+
+### Other tabs and version bumps
+
+Every Rapid tab on an origin shares the one database, and they may run different builds (a `main`
+tab next to a branch build). IndexedDB can't upgrade a database while any other connection holds it
+open, and an older build can't open a database at a newer version (`VersionError`). Before Nov 2026
+`openDB` had no handlers for either, so a v2 tab held up the v3 upgrade forever and Rapid never
+finished starting. Now:
+
+- **A newer tab needs to upgrade** (`blocking`): close our connection at once, switch to the
+  in-memory mock, and set status `'closed'`. The newer tab, the one the user just opened, gets
+  durable storage. What this tab backed up before the close is in the database, and reloading the
+  tab picks it up.
+- **An older tab holds up our upgrade** (`blocked`): an older build that closes when asked does so at
+  once. One that doesn't (any build from before this change) is waiting on the user, so after
+  `BLOCKED_WAIT_MS` (2 s) start on the mock with status `'blocked'`. If the old tab closes later, the
+  upgrade runs, the late connection is closed, and the next start uses the upgraded database.
+- **The database is newer than this build** (`VersionError`): open it at the version it has, and use
+  it if every store and index in the manifest is there; otherwise close it and fall back
+  (`'unavailable'`).
+- **The browser closes the connection** (`terminated`): same as `'closed'`.
+
+**Rule for version bumps: only add stores and indexes.** Never remove or change one that an earlier
+version uses, or tabs running that version can't open the database. If a store ever has to change
+shape, add a new store and migrate into it.
+
 This "work first, persist if we can, and be honest when we can't" stance is a **general Rapid
 principle**, not specific to this system. Other optional systems (`ui`, `locations`, `scheduler`)
 already follow the "capture-and-branch, always keep a working path" pattern; `DatabaseSystem` extends

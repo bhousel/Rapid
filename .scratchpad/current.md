@@ -22,11 +22,15 @@ Follow-up from the first hunt, not done: after switching to the dev API in the s
 sessions aren't offered for restore (restore is only offered at startup, which is always live).
 
 ### High: fix before testers
-1. **The DB upgrade from v2 to v3 can stop Rapid from starting.** A tab running `main` on the same
+1. ✅ **The DB upgrade from v2 to v3 can stop Rapid from starting.** A tab running `main` on the same
    origin holds the v2 database open, and `openDB` has no `blocked`/`blocking` handlers, so
    `database.initAsync()` (and with it `EditSystem` and `RapidSystem` init) never settles. After the
    upgrade, `main` builds on that origin get `VersionError` and fall back to memory (no backups).
    `DatabaseSystem.ts:796`. *New (the bump), confirmed.*
+   **Fixed:** handlers for `blocking`/`blocked`/`terminated`/`VersionError` and a `status` getter
+   (see "Other tabs and version bumps" in `design/database-system.md`); `UiApiStatus` now stacks
+   messages and shows storage problems. No backport to `main` needed: this branch becomes `main`
+   (v3.0.0-pre.4).
 2. **Saving again after a -6 ("can't tell") upload loses its upload mark.** If the retry fails before
    uploading (offline at create), `_uploadCallback` clears mark 7 anyway; if it uploads, mark 8 replaces
    mark 7, and its 409 (exactly what happens if changeset 7 landed) clears it. The next tab then offers

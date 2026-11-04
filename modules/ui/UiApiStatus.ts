@@ -1,13 +1,36 @@
-import { selection } from 'd3-selection';
+import { select, selection } from 'd3-selection';
 import { uiIcon } from './icon.ts';
 
 import type { Context } from '../Context.ts';
 import type { D3Selection } from 'd3-selection';
+import type { DatabaseStatus } from '../core/DatabaseSystem.ts';
+
+
+/** A message in the status bar. */
+interface StatusMessage {
+  /** Identifies the message, so it keeps its row while it stays up. */
+  id: string;
+  /** The message text. */
+  text: string;
+  /** An optional link after the text, such as "Dismiss" or "Retry". */
+  link?: StatusLink;
+}
+
+/** A link after a status message's text. */
+interface StatusLink {
+  /** The link text. */
+  text: string;
+  /** An optional icon before the link text, e.g. `'#rapid-icon-out-link'`. */
+  icon?: string;
+  /** Called when the user clicks the link. */
+  onClick: () => void;
+}
 
 
 /**
- * `UiApiStatus` displays a status message in a bar across the bottom of the map,
- * for example with the OSM API is unavailable.
+ * `UiApiStatus` displays status messages in a bar across the bottom of the map,
+ * for example when the OSM API is unavailable, or when edits can't be backed up.
+ * Each problem gets its own message, stacked one above the other.
  */
 export class UiApiStatus {
   public context: Context;
@@ -15,6 +38,8 @@ export class UiApiStatus {
   protected _apiStatus: string | null;
   protected _backupStatus: string | null;
   protected _gfxStatus: string | null;
+  /** The storage problem the user dismissed, so its message stays hidden until there's a new one. */
+  protected _dismissedDatabaseStatus: DatabaseStatus | null;
 
   // D3 selections
   public $parent: D3Selection | null;
@@ -25,6 +50,7 @@ export class UiApiStatus {
    */
   public constructor(context: Context) {
     this.context = context;
+    const database = context.systems.database;    // optional
     const editor = context.systems.editor!;
     const gfx = context.systems.gfx!;
     const scheduler = context.systems.scheduler;  // optional
@@ -32,6 +58,7 @@ export class UiApiStatus {
     this._apiStatus = null;
     this._backupStatus = null;
     this._gfxStatus = null;
+    this._dismissedDatabaseStatus = null;
 
     // D3 selections
     this.$parent = null;
@@ -41,9 +68,11 @@ export class UiApiStatus {
     this.render = this.render.bind(this);
     this._onApiStatusChange = this._onApiStatusChange.bind(this);
     this._onBackupStatusChange = this._onBackupStatusChange.bind(this);
+    this._onDatabaseStatusChange = this._onDatabaseStatusChange.bind(this);
     this._onGfxStatusChange = this._onGfxStatusChange.bind(this);
 
     // Setup event listeners
+    database?.on('statuschange', this._onDatabaseStatusChange);
     editor.on('backupstatuschange', this._onBackupStatusChange);
     gfx.on('statuschange', this._onGfxStatusChange);
 
@@ -79,13 +108,6 @@ export class UiApiStatus {
       return;   // no parent - called too early?
     }
 
-    const context = this.context;
-    const l10n = context.systems.l10n!;
-    const osm = context.services.osm;
-
-    // When the rate limit has expired, this will return `null`
-    const rateLimit = osm?.getRateLimit();
-
     // Create .api-status wrapper, if necessary
     let $apiStatus: D3Selection = $parent.selectAll('.api-status')
       .data([0]);
@@ -96,63 +118,151 @@ export class UiApiStatus {
       .attr('class', 'api-status')
       .merge($apiStatus);
 
-    // Empty out the DOM content and rebuild from scratch..
-    $apiStatus.html('');
+    // One row per message
+    let $messages: D3Selection = $apiStatus.selectAll('.api-status-message')
+      .data(this._getMessages(), (d: StatusMessage) => d.id);
+
+    // exit
+    $messages.exit()
+      .remove();
+
+    // enter/update
+    $messages = $messages.enter()
+      .append('div')
+      .attr('class', 'api-status-message')
+      .merge($messages);
+
+    // Empty out each row's content and rebuild it from scratch..
+    $messages.each((d: StatusMessage, i: number, nodes: HTMLElement[]) => {
+      const $message = select(nodes[i]);
+      $message.html('');
+
+      $message
+        .append('span')
+        .text(d.text);
+
+      const link = d.link;
+      if (link) {
+        const $link = $message
+          .append('a')
+          .attr('href', '#')
+          .on('click', (e: PointerEvent) => {
+            e.preventDefault();
+            link.onClick();
+          });
+
+        if (link.icon) {
+          $link.call(uiIcon(link.icon, 'inline'));
+        }
+
+        $link
+          .append('span')
+          .text(link.text);
+      }
+    });
+  }
+
+
+  /**
+   * Gathers the messages to show, one for each problem, most important first.
+   * @return The messages to show, or an empty array if everything is fine
+   */
+  protected _getMessages(): StatusMessage[] {
+    const context = this.context;
+    const database = context.systems.database;   // optional
+    const l10n = context.systems.l10n!;
+    const osm = context.services.osm;            // optional
+
+    const messages: StatusMessage[] = [];
 
     if (this._gfxStatus === 'contextlost') {
-      $apiStatus.text(l10n.t('status.message.contextlost') + ' ');
+      messages.push({
+        id: 'contextlost',
+        text: l10n.t('status.message.contextlost'),
+        link: {
+          text: l10n.t('status.dismiss'),
+          onClick: () => {
+            this._gfxStatus = null;
+            this.render();
+          }
+        }
+      });
+    }
 
-      $apiStatus
-        .append('a')
-        .attr('href', '#')
-        .text(l10n.t('status.dismiss'))
-        .on('click.dismiss', (e: PointerEvent) => {
-          e.preventDefault();
-          this._gfxStatus = null;
-          this.render();
-        });
+    // When the rate limit has expired, this will return `null`
+    const rateLimit = osm?.getRateLimit();
 
-    } else if (this._apiStatus === 'readonly') {
-      $apiStatus.text(l10n.t('status.message.readonly'));
+    if (this._apiStatus === 'readonly') {
+      messages.push({ id: 'readonly', text: l10n.t('status.message.readonly') });
 
     } else if (this._apiStatus === 'offline') {
-      $apiStatus.text(l10n.t('status.message.offline'));
+      messages.push({ id: 'offline', text: l10n.t('status.message.offline') });
 
     } else if (this._apiStatus === 'ratelimit' && rateLimit) {
-      $apiStatus.text(l10n.t('status.message.ratelimit', { seconds: rateLimit.remaining }));
+      const message: StatusMessage = {
+        id: 'ratelimit',
+        text: l10n.t('status.message.ratelimit', { seconds: rateLimit.remaining })
+      };
 
       if (osm && !osm.authenticated()) {   // Tell the user to log in..
-        $apiStatus
-          .append('a')
-          .attr('href', '#')
-          .attr('target', '_blank')
-          .call(uiIcon('#rapid-icon-out-link', 'inline'))
-          .append('span')
-          .text(l10n.t('login'))
-          .on('click.login', (e: PointerEvent) => {
-            e.preventDefault();
+        message.link = {
+          text: l10n.t('login'),
+          icon: '#rapid-icon-out-link',
+          onClick: () => {
             osm.authenticate();
             this._apiStatus = 'online';
-          });
+          }
+        };
       }
+      messages.push(message);
 
     } else if (this._apiStatus === 'error') {   // Some other problem, "check your network connection"..
-      $apiStatus.text(l10n.t('status.message.error') + ' ');
+      const message: StatusMessage = {
+        id: 'error',
+        text: l10n.t('status.message.error')
+      };
 
       if (osm) {   // Let the user manually retry their connection
-        $apiStatus
-          .append('a')
-          .attr('href', '#')
-          .text(l10n.t('status.retry'))
-          .on('click.retry', (e: PointerEvent) => {
-            e.preventDefault();
-            osm.deferredReloadApiStatus();
-          });
+        message.link = {
+          text: l10n.t('status.retry'),
+          onClick: () => osm.deferredReloadApiStatus()
+        };
       }
-
-    } else if (this._backupStatus === 'error') {  // API is fine, but backups are not..
-      $apiStatus.text(l10n.t('status.message.local_storage_full'));
+      messages.push(message);
     }
+
+    // Browser storage isn't working, so edits aren't backed up..
+    const databaseStatus = database?.status;
+    if (databaseStatus && databaseStatus !== 'ok' && databaseStatus !== this._dismissedDatabaseStatus) {
+      messages.push({
+        id: `storage_${databaseStatus}`,
+        text: l10n.t(`status.message.storage_${databaseStatus}`),
+        link: {
+          text: l10n.t('status.dismiss'),
+          onClick: () => {
+            this._dismissedDatabaseStatus = databaseStatus;
+            this.render();
+          }
+        }
+      });
+    }
+
+    // Storage is working, but a backup failed (e.g. it's full)..
+    if (this._backupStatus === 'error') {
+      messages.push({
+        id: 'backup_failed',
+        text: l10n.t('status.message.backup_failed'),
+        link: {
+          text: l10n.t('status.dismiss'),
+          onClick: () => {
+            this._backupStatus = null;
+            this.render();
+          }
+        }
+      });
+    }
+
+    return messages;
   }
 
 
@@ -172,6 +282,15 @@ export class UiApiStatus {
    */
   protected _onBackupStatusChange(wasSuccessful: boolean): void {
     this._backupStatus = wasSuccessful ? 'ok' : 'error';
+    this.render();
+  }
+
+
+  /**
+   * Callback function called when the DatabaseSystem's storage stops (or starts) working.
+   * The message reads the status from the DatabaseSystem, so this just redraws.
+   */
+  protected _onDatabaseStatusChange(): void {
     this.render();
   }
 

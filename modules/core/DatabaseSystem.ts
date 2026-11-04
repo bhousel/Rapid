@@ -18,6 +18,12 @@ const DATABASE_NAME = 'Rapid';
  * - v3: `datasets` store (custom datasets the user added, owned by `RapidSystem`)
  */
 const CURRENT_DB_VERSION = 3;
+/**
+ * How long to wait for an older Rapid tab to let go of the database before giving up on the
+ * upgrade. A tab that closes its connection when asked does so at once; past this, we're waiting
+ * for the user to close it, so start on the in-memory fallback instead.
+ */
+const BLOCKED_WAIT_MS = 2000;
 
 
 // ---------------------------------------------------------------------------
@@ -103,6 +109,18 @@ export interface DatabaseMigration {
     oldVersion: number
   ): void | Promise<void>;
 }
+
+/**
+ * Whether durable storage is working, and if not, why:
+ * - `'ok'` - IndexedDB is open
+ * - `'unavailable'` - no IndexedDB, or it couldn't be opened (private mode, a locked-down browser)
+ * - `'blocked'` - an older Rapid in another tab kept the database open, so it couldn't be upgraded
+ * - `'closed'` - the connection closed during the session (a newer Rapid in another tab is
+ *   upgrading the database, or the browser closed it)
+ *
+ * Anything but `'ok'` means the system is running on the in-memory mock.
+ */
+export type DatabaseStatus = 'ok' | 'unavailable' | 'blocked' | 'closed';
 
 /** The reason behind a `StorageViability` verdict. */
 export type StorageViabilityReason = 'ok' | 'insufficient' | 'unavailable';
@@ -253,6 +271,13 @@ function compareKeys(a: unknown, b: unknown): number {
  * Callers should treat it like any optional system: capture it at the top of a function, branch on
  * presence, and always keep a working path when it is absent.
  *
+ * Other Rapid tabs on the same origin share the database. This system closes its connection when a
+ * newer Rapid needs to upgrade the database, gives up on an upgrade that an older tab blocks, and
+ * opens a database that a newer Rapid already upgraded. `status` says which of these happened.
+ *
+ * Events available:
+ * - `statuschange` - Fires when `status` changes, receives the new `DatabaseStatus`
+ *
  * See `design/database-system.md` for the full design.
  */
 export class DatabaseSystem extends AbstractSystem {
@@ -261,6 +286,8 @@ export class DatabaseSystem extends AbstractSystem {
   protected _db: IDBPDatabase | null;
   /** In-memory fallback store used when IndexedDB is unavailable. */
   protected _mock: Map<StoreName, Map<IDBValidKey, unknown>> | null;
+  /** Whether durable storage is working, and if not, why. */
+  protected _status: DatabaseStatus;
 
 
   /**
@@ -272,6 +299,7 @@ export class DatabaseSystem extends AbstractSystem {
 
     this._db = null;
     this._mock = null;
+    this._status = 'unavailable';
   }
 
 
@@ -316,6 +344,16 @@ export class DatabaseSystem extends AbstractSystem {
    */
   public get isAvailable(): boolean {
     return !!this._db;
+  }
+
+
+  /**
+   * Whether durable storage is working, and if not, why. It's `'unavailable'` until `initAsync`
+   * finishes, and `'ok'` exactly when `isAvailable` is `true`.
+   * @readonly
+   */
+  public get status(): DatabaseStatus {
+    return this._status;
   }
 
 
@@ -793,16 +831,140 @@ export class DatabaseSystem extends AbstractSystem {
       if (!('indexedDB' in globalThis) || !globalThis.indexedDB) {
         throw new Error('IndexedDB not available');
       }
-      this._db = await openDB(DATABASE_NAME, CURRENT_DB_VERSION, {
-        upgrade: (db, oldVersion, newVersion, tx) => {
-          this._upgrade(db, oldVersion, newVersion ?? CURRENT_DB_VERSION, tx);
-        }
-      });
+      const db = await this._openCurrentAsync();
+      if (db) {
+        this._db = db;
+        this._setStatus('ok');
+      } else {
+        console.warn('DatabaseSystem: an older Rapid in another tab is blocking the upgrade, using in-memory fallback');  // eslint-disable-line no-console
+        this._useMock('blocked');
+      }
     } catch (e) {
       console.error('DatabaseSystem: IndexedDB unavailable, using in-memory fallback', e);  // eslint-disable-line no-console
-      this._db = null;
+      this._useMock('unavailable');
+    }
+  }
+
+
+  /**
+   * Opens the database at `CURRENT_DB_VERSION`, upgrading it if it's older. If it's newer (a newer
+   * Rapid already upgraded it), opens it at the version it has instead.
+   * @return The open database, or `null` if an older Rapid in another tab held up the upgrade for
+   *   longer than `BLOCKED_WAIT_MS`
+   */
+  protected _openCurrentAsync(): Promise<IDBPDatabase | null> {
+    return new Promise((resolve, reject) => {
+      let gaveUp = false;
+      let timer: ReturnType<typeof setTimeout> | undefined;
+
+      const onBlocked = () => {
+        timer ??= globalThis.setTimeout(() => {
+          gaveUp = true;
+          resolve(null);
+        }, BLOCKED_WAIT_MS);
+      };
+
+      this._connectAsync(CURRENT_DB_VERSION, onBlocked).then(db => {
+        globalThis.clearTimeout(timer);
+        if (gaveUp) {
+          db.close();   // the other tab closed after all and the upgrade ran; the next start uses it
+        } else {
+          resolve(db);
+        }
+      }, err => {
+        globalThis.clearTimeout(timer);
+        if (gaveUp) return;
+        if (err?.name === 'VersionError') {
+          resolve(this._openNewerAsync());
+        } else {
+          reject(err);
+        }
+      });
+    });
+  }
+
+
+  /**
+   * Opens a database that a newer Rapid already upgraded past `CURRENT_DB_VERSION`. Upgrades only
+   * add stores and indexes, so this version of Rapid can use it if every store and index in the
+   * manifest is there.
+   * @return The open database
+   * @throws Error if the database is missing a store or index from the manifest
+   */
+  protected async _openNewerAsync(): Promise<IDBPDatabase> {
+    const db = await this._connectAsync();
+
+    const missing = STORE_MANIFEST.flatMap(def => {
+      if (!db.objectStoreNames.contains(def.name)) return [def.name];
+      const indexNames = db.transaction(def.name).store.indexNames;
+      return (def.indexes ?? [])
+        .filter(idx => !indexNames.contains(idx.name))
+        .map(idx => `${def.name}.${idx.name}`);
+    });
+
+    if (missing.length) {
+      db.close();
+      throw new Error(`DatabaseSystem: database v${db.version} is missing ${missing.join(', ')}`);
+    }
+    return db;
+  }
+
+
+  /**
+   * Opens a connection to the database. The connection closes itself when a newer Rapid in another
+   * tab needs to upgrade the database, so that this tab never holds the upgrade up.
+   * @param version - The version to open, upgrading the database to it if it's older; omit it to
+   *   open the database at the version it has
+   * @param onBlocked - Called if an older Rapid in another tab keeps the database open, holding up
+   *   the upgrade
+   * @return The open database
+   */
+  protected async _connectAsync(version?: number, onBlocked?: () => void): Promise<IDBPDatabase> {
+    let db: IDBPDatabase | null = null;
+
+    const onClose = () => {
+      db?.close();
+      if (db && db === this._db) {
+        console.warn('DatabaseSystem: the database connection closed, using in-memory fallback');  // eslint-disable-line no-console
+        this._useMock('closed');
+      }
+    };
+
+    db = await openDB(DATABASE_NAME, version, {
+      upgrade: (db, oldVersion, newVersion, tx) => {
+        this._upgrade(db, oldVersion, newVersion ?? CURRENT_DB_VERSION, tx);
+      },
+      blocked: onBlocked,
+      blocking: onClose,
+      terminated: onClose
+    });
+    return db;
+  }
+
+
+  /**
+   * Switches to the in-memory mock, for a database that couldn't be opened or has closed.
+   * Writes from then on last only for this session.
+   * @param status - Why durable storage isn't working
+   */
+  protected _useMock(status: DatabaseStatus): void {
+    this._db = null;
+    if (!this._mock) {
       this._initMock();
     }
+    this._setStatus(status);
+  }
+
+
+  /**
+   * Updates `status`, and emits `statuschange` if it changed.
+   * @param status - The new status
+   */
+  protected _setStatus(status: DatabaseStatus): void {
+    if (status === this._status) return;
+
+    this._status = status;
+    this.emit('statuschange', status);
   }
 
 

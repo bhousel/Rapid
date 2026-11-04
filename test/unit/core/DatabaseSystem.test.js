@@ -1,6 +1,8 @@
 import 'fake-indexeddb/auto';
 import { afterEach, beforeEach, describe, it } from 'bun:test';
 import { assert } from 'chai';
+import { IDBFactory } from 'fake-indexeddb';
+import { openDB } from 'idb';
 import * as Rapid from '../../../modules/headless.js';
 
 
@@ -353,6 +355,130 @@ describe('DatabaseSystem', () => {
       assert.isFalse(result.ok);
       assert.strictEqual(result.reason, 'unavailable');
       assert.strictEqual(result.available, 0);
+    });
+
+    it('reports its status as unavailable', () => {
+      assert.strictEqual(mockDatabase.status, 'unavailable');
+    });
+  });
+
+
+  // Other Rapid tabs on the same origin, running older or newer versions of Rapid.
+  // Each test gets its own empty IndexedDB, standing in for one origin.
+  describe('other tabs', () => {
+    let savedIndexedDB;
+    let others;
+
+    beforeEach(() => {
+      savedIndexedDB = globalThis.indexedDB;
+      globalThis.indexedDB = new IDBFactory();
+      others = [];
+    });
+
+    afterEach(() => {
+      for (const db of others) db.close();
+      globalThis.indexedDB = savedIndexedDB;
+    });
+
+    // Opens the database the way another tab's Rapid would, with the stores that version had.
+    async function openOtherTab(version, storeNames, { closesWhenAsked = false } = {}) {
+      const db = await openDB('Rapid', version, {
+        upgrade(db) {
+          for (const name of storeNames) {
+            const store = db.createObjectStore(name, { keyPath: 'id' });
+            store.createIndex('by-updatedAt', 'updatedAt');
+            if (name === 'sessions') store.createIndex('by-origin', 'origin');
+            if (name === 'files') store.createIndex('by-name', 'name');
+          }
+        },
+        blocking: closesWhenAsked ? () => db.close() : undefined
+      });
+      others.push(db);
+      return db;
+    }
+
+    async function startDatabase() {
+      const ctx = new Rapid.MockContext();
+      ctx.version = '3.0.0-test';
+      const db = new Rapid.DatabaseSystem(ctx);
+      ctx.systems.database = db;
+      await db.initAsync();
+      return db;
+    }
+
+    it('reports ok when it opens IndexedDB', async () => {
+      const db = await startDatabase();
+      assert.strictEqual(db.status, 'ok');
+      assert.isTrue(db.isAvailable);
+    });
+
+    it('upgrades at once when an older tab closes its connection when asked', async () => {
+      await openOtherTab(2, ['sessions', 'files'], { closesWhenAsked: true });
+      const started = Date.now();
+      const db = await startDatabase();
+      assert.isBelow(Date.now() - started, 1000, 'did not wait for the other tab');
+      assert.strictEqual(db.status, 'ok');
+      await db.put('datasets', { id: 'd1', updatedAt: 1 });
+      assert.strictEqual((await db.get('datasets', 'd1')).id, 'd1', 'the v3 store exists');
+    });
+
+    it('starts on the in-memory fallback when an older tab holds up the upgrade', async () => {
+      const older = await openOtherTab(2, ['sessions', 'files']);
+      await older.put('sessions', makeSession('older'));
+
+      const db = await startDatabase();
+      assert.strictEqual(db.status, 'blocked');
+      assert.isFalse(db.isAvailable);
+      await db.put('sessions', makeSession('a'));
+      assert.deepEqual(await db.getAllKeys('sessions'), ['a'], 'works in memory');
+
+      // Once the older tab closes, the upgrade that was held up runs, and the next start uses it.
+      older.close();
+      await new Promise(resolve => { setTimeout(resolve, 50); });
+      const next = await startDatabase();
+      assert.strictEqual(next.status, 'ok');
+      assert.deepEqual(await next.getAllKeys('sessions'), ['older'], 'kept the older tab\'s data');
+    }, 10000);
+
+    it('closes its connection when a newer tab needs to upgrade', async () => {
+      const db = await startDatabase();
+      await db.put('sessions', makeSession('a'));
+      const statuses = [];
+      db.on('statuschange', status => statuses.push(status));
+
+      const newer = await openOtherTab(4, ['extra']);   // would hang if `db` held on
+      assert.deepEqual(statuses, ['closed']);
+      assert.strictEqual(db.status, 'closed');
+      assert.isFalse(db.isAvailable);
+      assert.include([...newer.objectStoreNames], 'sessions', 'the newer tab upgraded the same database');
+
+      await db.put('sessions', makeSession('b'));
+      assert.deepEqual(await db.getAllKeys('sessions'), ['b'], 'carries on in memory');
+    });
+
+    it('opens a database that a newer Rapid already upgraded', async () => {
+      const newer = await openOtherTab(4, ['sessions', 'files', 'datasets', 'extra']);
+      await newer.put('sessions', makeSession('newer'));
+      newer.close();
+
+      const db = await startDatabase();
+      assert.strictEqual(db.status, 'ok');
+      assert.deepEqual(await db.getAllKeys('sessions'), ['newer']);
+      const sorted = await db.getAllFromIndex('sessions', 'by-updatedAt');
+      assert.strictEqual(sorted.length, 1, 'the manifest\'s indexes work');
+    });
+
+    it('closes a newer database that is missing a store it uses', async () => {
+      const newer = await openOtherTab(4, ['sessions', 'files']);
+      newer.close();
+
+      const db = await startDatabase();
+      assert.strictEqual(db.status, 'unavailable');
+      assert.isFalse(db.isAvailable);
+
+      // Its connection is closed, so it doesn't hold up a later upgrade.
+      const later = await openOtherTab(5, ['datasets']);
+      assert.strictEqual(later.version, 5);
     });
   });
 });

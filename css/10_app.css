@@ -4494,7 +4494,6 @@ li.issue-fix-item button:not(.actionable) .fix-icon {
   flex: 0 0 0px;
 
   text-align: right;
-  padding: 1px 10px;
   color: #eee;
   background: rgba(170, 34, 34, 0.9);
   z-index: 101;
@@ -4506,7 +4505,16 @@ li.issue-fix-item button:not(.actionable) .fix-icon {
   display: none;
 }
 
+/* Each message gets its own row, stacked */
+.api-status-message {
+  padding: 1px 10px;
+}
+.api-status-message + .api-status-message {
+  border-top: 1px solid rgba(255, 255, 255, 0.25);
+}
+
 .api-status a {
+  margin-inline-start: 0.5em;
   text-decoration: underline;
   color: #ccc;
   pointer-events: all;
