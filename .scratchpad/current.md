@@ -99,11 +99,13 @@ sessions aren't offered for restore (restore is only offered at startup, which i
 16. **`resetAsync()` with no edits re-selects the current selection instead of going to browse**
     (`historyjump(0, 0)` reads as "work in progress thrown away"), possibly data whose cache was just
     cleared. `EditSystem.ts:540`. *New, reading.*
-17. **Osmose/KeepRight: after an issue is closed, the editor stays up.** SelectMode's `change` handler
+17. ✅ **Osmose/KeepRight: after an issue is closed, the editor stays up.** SelectMode's `change` handler
     finds no cached issue and returns; a second "done" click falls back to the stale datum,
     `replaceItem` puts the closed issue back on the map, and it posts again (`_closed` counts 2).
     `UiOsmoseEditor.ts:197`, `UiKeepRightEditor.ts:262`, `SelectMode.ts:361`. *Re-adding new, double post
     main too. Confirmed (Osmose).*
+    **Fixed:** SelectMode's `change` handlers (notes, KeepRight, Osmose, MapRoulette) return to browse
+    mode when the datum is gone from its service's cache, but only if it's still what's selected.
 18. ✅ **With no answer, the tab decides "not applied" (-5) right away and reuses the changeset,** while
     `_checkUploadAsync` calls the same state (open, 0 changes, recent) "pending"; a late landing gives
     duplicates. `OsmService.ts:1565` vs `EditSystem.ts:2407`. *New, reading.*

@@ -332,6 +332,15 @@ export class SelectMode extends AbstractMode {
     const datasetID = (datum.props?.datasetID ?? '') as DatasetID;
     const serviceID = (datum.props?.serviceID ?? '') as ServiceID;
 
+    // The datum is gone from its service's cache (e.g. an issue was closed), so stop showing it:
+    // left up, a second click would post it again. Only if it's still what's selected, since an
+    // answer can come back after the user moved on (or after the service left select mode itself).
+    const leaveIfSelected = (): void => {
+      if (this._active && this._selectedIDs.includes(datum.dataID)) {
+        context.enter('browse');
+      }
+    };
+
     // Selected a note...
     if (datum instanceof MarkerData && serviceID === 'osm' && datum.type === 'note') {
       const noteEditor = new UiNoteEditor(context);
@@ -345,7 +354,10 @@ export class SelectMode extends AbstractMode {
         }
         const osm = context.services.osm;
         const d = osm?.getNote(datum.id);   // marker may contain stale data - get latest
-        if (!(d instanceof MarkerData)) return;  // or - go to browse mode
+        if (!(d instanceof MarkerData)) {
+          leaveIfSelected();
+          return;
+        }
         noteEditor.datum = d;
         Sidebar?.show(noteEditor.render);
       });
@@ -358,7 +370,10 @@ export class SelectMode extends AbstractMode {
         gfx?.immediateRedraw();  // force a redraw (there is no history change that would otherwise do this)
         const keepright = context.services.keepright;
         const d = keepright?.getError(datum.id);  // marker may contain stale data - get latest
-        if (!(d instanceof MarkerData)) return;  // or - go to browse mode?
+        if (!(d instanceof MarkerData)) {
+          leaveIfSelected();
+          return;
+        }
         keepRightEditor.datum = d;
         Sidebar?.show(keepRightEditor.render);
       });
@@ -371,7 +386,10 @@ export class SelectMode extends AbstractMode {
         gfx?.immediateRedraw();  // force a redraw (there is no history change that would otherwise do this)
         const osmose = context.services.osmose;
         const d = osmose?.getError(datum.id);     // marker may contain stale data - get latest
-        if (!(d instanceof MarkerData)) return;  // or - go to browse mode?
+        if (!(d instanceof MarkerData)) {
+          leaveIfSelected();
+          return;
+        }
         osmoseEditor.datum = d;
         Sidebar?.show(osmoseEditor.render);
       });
@@ -386,7 +404,10 @@ export class SelectMode extends AbstractMode {
         gfx?.immediateRedraw();  // force a redraw (there is no history change that would otherwise do this)
         const maproulette = context.services.maproulette;
         const d = maproulette?.getTask(datum.id);  // marker may contain stale data - get latest
-        if (!(d instanceof MarkerData)) return;   // or - go to browse mode?
+        if (!(d instanceof MarkerData)) {
+          leaveIfSelected();
+          return;
+        }
         maprouletteEditor.datum = d;
         Sidebar?.show(maprouletteEditor.render);
       });

@@ -2,7 +2,9 @@ import { beforeEach, describe, it } from 'bun:test';
 import { assert } from 'chai';
 import * as Rapid from '../../../modules/headless.js';
 import { SelectMode } from '../../../modules/modes/SelectMode.ts';
+import { UiKeepRightEditor } from '../../../modules/ui/UiKeepRightEditor.ts';
 import { UiNoteEditor } from '../../../modules/ui/UiNoteEditor.ts';
+import { UiOsmoseEditor } from '../../../modules/ui/UiOsmoseEditor.ts';
 
 
 describe('SelectMode', () => {
@@ -187,6 +189,58 @@ describe('SelectMode', () => {
       onChange(saved);
 
       assert.deepEqual(entered, [['select', { selection: [saved.dataID] }]]);
+    });
+  });
+
+
+  describe('QA issue editors', () => {
+    // Selects an issue, closes it (which removes it from the cache), and returns the modes entered after.
+    // With `moveOn`, the user selects something else before the close comes back.
+    function closeIssue(serviceID, Editor, moveOn = false) {
+      const noop = () => {};
+      const spatial = context.systems.spatial;
+      context.systems.ui = { closeEditMenu: noop, Sidebar: { reset: noop, show: noop, hide: noop } };
+      context.systems.gfx.immediateRedraw = noop;
+      context.services[serviceID] = { getError: id => spatial.getItem(serviceID, id) };
+      const entered = [];
+      context.enter = (modeID, options) => entered.push([modeID, options]);
+
+      let onChange;
+      const on = Editor.prototype.on;
+      Editor.prototype.on = function(eventName, fn) {
+        if (eventName === 'change') onChange = fn;
+        return on.call(this, eventName, fn);
+      };
+      try {
+        const issue = new Rapid.MarkerData(context, { id: 'abc', serviceID: serviceID, namespace: serviceID, loc: [0, 0] });
+        spatial.replaceData(serviceID, issue);
+        mode.enter({ selection: [issue.dataID] });
+      } finally {
+        Editor.prototype.on = on;
+      }
+
+      if (moveOn) {
+        mode.exit();
+        mode.enter({ selection: ['notes-test:1'] });
+      }
+
+      // Closing the issue removes it from the cache, then the editor emits 'change'.
+      spatial.removeItems(serviceID, 'abc');
+      onChange();
+      return entered;
+    }
+
+    it('returns to browse mode once a KeepRight issue is closed, so it can\'t be posted again', () => {
+      assert.deepEqual(closeIssue('keepright', UiKeepRightEditor), [['browse', undefined]]);
+    });
+
+    it('returns to browse mode once an Osmose issue is closed, so it can\'t be posted again', () => {
+      assert.deepEqual(closeIssue('osmose', UiOsmoseEditor), [['browse', undefined]]);
+    });
+
+    it('stays on what the user selected since, when the close comes back', () => {
+      assert.deepEqual(closeIssue('osmose', UiOsmoseEditor, true), []);
+      assert.deepEqual(mode.selectedIDs, ['notes-test:1']);
     });
   });
 });
