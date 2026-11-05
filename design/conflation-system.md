@@ -788,3 +788,28 @@ Lines come first throughout. Points and polygons follow the same pipeline at a l
   revisits the "No default tag condition" decision above.
 - **Which graph.** Stable is used. Is there a case where conflation must reflect edits still in
   progress (staging)? Since graph-geometry step 9, searching staging instead is a one-argument change.
+
+## Known bugs
+
+Found in the second bug hunt (November 4, 2026), and left for when conflation work picks up again.
+Numbers are the hunt's, so they match its notes. Line numbers are from the time of the hunt.
+
+- **6. While part of a line is `unknown` (a tile not loaded), acted ranges are ignored.** `getResult`
+  returns early with no runs, so `PixiLayerRapid` draws the whole source line over the accepted way,
+  and Add creates it again (`acceptIDs` gets both the piece and `test:a`). Likely right after restoring
+  a session. `ConflationSystem.ts:595`, `PixiLayerRapid.ts:478`. *Confirmed.*
+- **8. A run that leaves a node and comes back to it is trimmed to a stub.** `trimEnd` and `trimStart`
+  cut at the nearest point anywhere on the run: with legs at x=60.2 and x=61.0 around a node at x=60.5,
+  the 27 m detour becomes 0.43 m (a 2-node way). Symmetric legs (the #19 test) work.
+  `ConflationSystem.ts:1076`. *Confirmed.*
+- **9. Acting on every run can leave sliver gaps, so the line never counts as acted on.** Slivers
+  shorter than the sample spacing are dropped, and `isAcceptedOrIgnored` needs one range over [0, 1]:
+  e.g. accept `@0-0.7216`, and the next run becomes `@0.7519-1`. 165 of 600 fuzzed lines, only with
+  "show already mapped" on. `ConflationSystem.ts:833`, `RapidSystem.ts:686`. *Confirmed.*
+- **23. The second join of a detour can go into the wrong segment:** `edgeAt` takes the first segment
+  within 0.5 m, not the closest (0.44 m off on a thin ring; 2 of 2,007 fuzzed accepts).
+  `rapid_accept_feature.ts:152`. *Confirmed.*
+- **24. A single matched sample at a line end makes a zero-length run `@0-0`,** which doesn't parse
+  back. A sibling of the first hunt's item 17. `ConflationSystem.ts:801`. *Confirmed.*
+- **25. A join to an existing node doesn't check where the node is now** (the first hunt's item 20
+  covered segments only); hard to reach from the UI. `rapid_accept_feature.ts:124`. *Confirmed.*

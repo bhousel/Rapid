@@ -501,41 +501,36 @@ describe('EditSystem', () => {
     });
 
 
-    describe('performAsync', () => {
+    describe('animateAndCommitAsync', () => {
       it('returns a rejected Promise when passed no args', () => {
-        const prom = _editor.performAsync();
+        const prom = _editor.animateAndCommitAsync();
         assert.instanceOf(prom, Promise);
         return prom
           .then(() => assert.fail('Promise was fulfilled but should have been rejected'))
           .catch(() => assert.isTrue(true));
       });
 
-      it('returns a resolved Promise when passed a non-transitionable action', () => {
+      it('performs and commits a non-transitionable action right away', () => {
         const action = actionAddNode('n-1');
-        const prom = _editor.performAsync(action);
+        const prom = _editor.animateAndCommitAsync(action, { stringID: 'added' });
         assert.instanceOf(prom, Promise);
-        return prom
-          .then(() => {
-            assert.isOk(_editor.staging.graph.hasEntity('n-1'));
-          });
+        assert.strictEqual(_editor.index, 1);   // committed before the promise settles
+        assert.strictEqual(_editor.stable.props.stringID, 'added');
+        assert.isOk(_editor.stable.graph.hasEntity('n-1'));
+        assert.isFalse(_editor.hasWorkInProgress);
+        return prom;
       });
 
-      it('resolves a transitionable action, emits stagingchange not stablechange', () => {
-        const onStagingChange = mock();
+      it('performs and commits a transitionable action right away when there\'s no DOM', () => {
         const onStableChange = mock();
-        _editor.on('stagingchange', onStagingChange);
         _editor.on('stablechange', onStableChange);
 
         const action = actionTransitionNoop();
-        const prom = _editor.performAsync(action);
-        assert.instanceOf(prom, Promise);
-        return prom
-          .then(() => {
-            // With no DOM (headless/unit), the action is applied immediately rather than animated,
-            // but it still emits stagingchange (work-in-progress) and never stablechange (uncommitted).
-            assert.isAtLeast(onStagingChange.mock.calls.length, 1);
-            assert.lengthOf(onStableChange.mock.calls, 0);
-          });
+        const prom = _editor.animateAndCommitAsync(action, { stringID: 'nothing' });
+        assert.strictEqual(_editor.index, 1);
+        assert.strictEqual(_editor.stable.props.stringID, 'nothing');
+        assert.lengthOf(onStableChange.mock.calls, 1);
+        return prom;
       });
     });
 

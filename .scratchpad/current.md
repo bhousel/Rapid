@@ -21,6 +21,10 @@ fixes held up, except 9, 10 and 11 (items 7, 22 and 26 below).
 Follow-up from the first hunt, not done: after switching to the dev API in the same tab, its dev
 sessions aren't offered for restore (restore is only offered at startup, which is always live).
 
+The conflation items (6, 8, 9, 23, 24, 25) moved to "Known bugs" in `design/conflation-system.md`:
+conflation is still a work in progress, and comes back after the core systems are stable. The
+numbers below keep the hunt's numbering.
+
 ### High: fix before testers
 1. ✅ **The DB upgrade from v2 to v3 can stop Rapid from starting.** A tab running `main` on the same
    origin holds the v2 database open, and `openDB` has no `blocked`/`blocking` handlers, so
@@ -58,10 +62,6 @@ sessions aren't offered for restore (restore is only offered at startup, which i
    Fixed: edits made to a redacted version are left out, both on restore (the entity stays at the
    current version, the restore screen says so) and at save (`_findRedactedAsync`: a conflict with
    "Use theirs" as the only choice). A fallback way's child nodes are fetched too.
-6. **Conflation: while part of a line is `unknown` (a tile not loaded), acted ranges are ignored.**
-   `getResult` returns early with no runs, so `PixiLayerRapid` draws the whole source line over the
-   accepted way, and Add creates it again (`acceptIDs` gets both the piece and `test:a`). Likely right
-   after restoring a session. `ConflationSystem.ts:595`, `PixiLayerRapid.ts:478`. *New, confirmed.*
 7. **Redo, and the extra redo that returns to where you were, delete an empty new relation.** The fix for
    first-hunt item 9 only covers undo: at the newest edit there's nothing to redo, and the history jump
    re-enters select, so `exit()` commits "Deleted a relation". Repro: membership "add to new relation"
@@ -69,14 +69,6 @@ sessions aren't offered for restore (restore is only offered at startup, which i
    `SelectMode.ts:240`. *Return view new; plain redo main too. Confirmed.*
 
 ### Medium
-8. **Conflation: a run that leaves a node and comes back to it is trimmed to a stub.** `trimEnd` and
-   `trimStart` cut at the nearest point anywhere on the run: with legs at x=60.2 and x=61.0 around node
-   x=60.5, the 27 m detour becomes 0.43 m (a 2-node way). Symmetric legs (the #19 test) work.
-   `ConflationSystem.ts:1076`. *New, confirmed.*
-9. **Conflation: acting on every run can leave sliver gaps, so the line never counts as acted on.**
-   Slivers shorter than the sample spacing are dropped, and `isAcceptedOrIgnored` needs one range over
-   [0, 1]: e.g. accept `@0-0.7216`, the next run becomes `@0.7519-1`. 165 of 600 fuzzed lines, only with
-   "show already mapped" on. `ConflationSystem.ts:833`, `RapidSystem.ts:686`. *New, confirmed.*
 10. **Synced settings read once at startup ignore the value the startup sync pulls,** and the next
     toggle writes the stale value back to the account (A disables `crossing_ways`; B starts, pulls it,
     still shows it enabled; B turns off `almost_junction`, and the account loses A's choice). Validator
@@ -125,13 +117,6 @@ sessions aren't offered for restore (restore is only offered at startup, which i
 22. **"Use theirs" uploads unchanged copies of shared nodes the other mapper changed** (`force_remote`
     puts in the remote copy, and shared nodes aren't reverted). Side effect of first-hunt item 10.
     `merge_remote_changes.ts:175`. *New, confirmed.*
-23. **The second join of a detour can go into the wrong segment:** `edgeAt` takes the first segment
-    within 0.5 m, not the closest (0.44 m off on a thin ring; 2 of 2,007 fuzzed accepts).
-    `rapid_accept_feature.ts:152`. *New, confirmed.*
-24. **A single matched sample at a line end makes a zero-length run `@0-0`,** which doesn't parse back.
-    Sibling of first-hunt item 17. `ConflationSystem.ts:801`. *New, confirmed.*
-25. **A join to an existing node doesn't check where the node is now** (first-hunt item 20 covered
-    segments only); hard to reach from the UI. `rapid_accept_feature.ts:124`. *New, confirmed.*
 26. **Custom-data IDs in `id=` can never be found from a link,** because `data=` is stripped from the
     URL (`toOmit`). `UrlHashSystem.ts:260`. *New, reading.*
 27. **During the walkthrough, the user's session stops heartbeating,** so after 60 s another tab can
@@ -151,6 +136,10 @@ sessions aren't offered for restore (restore is only offered at startup, which i
     interrupts it; the `'end interrupt'` handler only finishes inside a transaction, so `_inTransition`
     stays set (`immediateBackup` returns early), the promise never settles, and the partial frame is
     committed inside the other edit. `EditSystem.ts:749`. *Confirmed.*
+    ✅ **Fixed:** `performAsync` is now `animateAndCommitAsync(action, props)`. It commits the action
+    itself, at the end or when interrupted (`end`, `interrupt` or `cancel`), so it's always its own edit
+    before whatever interrupted it runs (a caller's `.then(commit)` ran after). No animation in a
+    transaction.
 32. **Midpoints keep their old way ID after a merge or split:** they're reused by segment coordinates
     and `feature.data` is set only on create, so dragging one throws (`OsmEntity w2 not found`) and
     clicking one deselects. `PixiLayerOsm.ts:857`, `DragBehavior.ts:203`. *Confirmed (stale ID).*

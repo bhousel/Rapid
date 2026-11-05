@@ -130,13 +130,11 @@ export function validateUnsquareWay(context: Context): ValidatorFunction {
               const entityID = this.issue.entityIds[0];
               // important to use the same `degreeThreshold` as for detection:
               const action = actionOrthogonalize(entityID, undefined, degreeThreshold);
-              editor
-                .performAsync(action)
-                .then(() => editor.commit({
-                  stringID: 'operations.orthogonalize.annotation.feature',
-                  stringParams: { n: 1 },
-                  selection: [entityID]
-                }));
+              editor.animateAndCommitAsync(action, {
+                stringID: 'operations.orthogonalize.annotation.feature',
+                stringParams: { n: 1 },
+                selection: [entityID]
+              });
             }
           }),
 /*

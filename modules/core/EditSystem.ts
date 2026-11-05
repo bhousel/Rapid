@@ -280,6 +280,8 @@ interface EntityCopy {
  *      Commit accepts the Edit's props, including a `stringID` (e.g. "Started a line") to say what the edit does.
  * - `commitAppend(options)` - This is just like `commit` but instead of
  *      adding `staging` after `stable`, `staging` replaces `stable`.
+ * - `animateAndCommitAsync(action, options)` - Performs one action as a short animation, then commits
+ *      it. Anything that changes the edits meanwhile commits it first, so it's always its own edit.
  * - `undo()` - Move the `stable` index back to the previous Edit (or `_index = 0`).
  * - `redo()` - Move the `stable` index forward to the next Edit (if any).
  *      Past the newest Edit, one more redo returns the user to where they were before undoing.
@@ -677,32 +679,40 @@ export class EditSystem extends AbstractSystem {
 
 
   /**
-   * Promisified version of `perform` that can support eased edits in a transition.
-   * This version of `perform` accepts a single Action function argument.
+   * Performs a single Action as an animation, then commits it as its own edit.
    * If the Action is marked as being "transitionable", run it multiple times with
    *   eased time parameter from 0..1 to create a smooth transition effect.
-   * If the Action is not marked as being "transitionable" just run it one time
-   *   with `time = 1` and return a resolved promise.
+   * If the Action is not marked as being "transitionable", or in a transaction (nobody sees it),
+   *   or without a DOM, just run it one time with `time = 1` and commit.
+   * Anything that changes the edits while it animates (`perform`, `commit`, `undo`, …) finishes it
+   *   first: the last frame is performed and committed before that runs, so the action is always its
+   *   own edit. That's why this commits, and the caller doesn't: a promise settles later, after
+   *   whatever interrupted it has already run.
    *
    * @param action - single Action function to perform
-   * @return Promise fulfilled when the transition is completed
+   * @param props - Props describing the Edit, as for `commit()`
+   * @return Promise fulfilled when the action is committed
+   * @throws Rejects if `action` isn't a function, or if a frame of it throws (nothing is committed then)
    */
-  public performAsync(action: Action): Promise<void> {
+  public animateAndCommitAsync<P extends EditProps = EditProps>(action: Action, props: P): Promise<void> {
     this._interruptTransition();    // complete any transition already in progress
 
     if (typeof action !== 'function') {
       return Promise.reject();
     }
 
-    if (!action.transitionable || !globalThis.document) {   // no animation when headless (no DOM)
-      this._perform([action], 1);
-      this._emitChanges();
+    // No animation when headless (no DOM), or in a transaction
+    if (!action.transitionable || this._inTransaction || !globalThis.document) {
+      this.perform(action);
+      this.commit(props);
       return Promise.resolve();
     }
 
     const DURATION = 150;
 
     return new Promise((resolve, reject) => {
+      let done = false;
+
       // Perform one frame. If the action throws, the transition is over: without this,
       // `_inTransition` would stay set (no more backups) and the promise would never settle.
       const performFrame = (t: number): boolean => {
@@ -712,6 +722,7 @@ export class EditSystem extends AbstractSystem {
           this._emitChanges();
           return true;
         } catch (err) {
+          done = true;
           this._inTransition = false;
           // Staging went back to `stable` before the action threw: emit that, so the indexes and
           // shapes don't stay at the previous frame.
@@ -725,31 +736,36 @@ export class EditSystem extends AbstractSystem {
         }
       };
 
+      // Perform the last frame and commit, once: at the end, or when something interrupts it.
+      // (An interrupt before the transition starts is a 'cancel'.)
+      const finish = (): void => {
+        if (done) return;
+        if (!performFrame(1)) return;
+        done = true;
+        this._inTransition = false;
+        this.commit(props);
+        resolve();
+      };
+
+      this._inTransition = true;
       select(document)
         .transition('editTransition')
         .duration(DURATION)
         .ease(easeLinear)
         .tween('edit.tween', () => {
           return (t: number) => {
-            if (!this._inTransition) return;   // a frame threw
-            if (!performFrame(t)) return;
-            if (t === 1) {  // mark as finished
-              this._inTransition = false;
-              resolve();
+            if (done) return;
+            if (t === 1) {
+              finish();
+            } else {
+              performFrame(t);
             }
           };
         })
         .on('start', () => {
-          this._inTransition = true;
-          performFrame(0);
+          if (!done) performFrame(0);
         })
-        .on('end interrupt', () => {
-          if (this._inTransaction && this._inTransition) {
-            if (!performFrame(1)) return;
-            this._inTransition = false;
-            resolve();
-          }
-        });
+        .on('end interrupt cancel', finish);
     });
   }
 
