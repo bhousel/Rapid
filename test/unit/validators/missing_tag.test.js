@@ -50,6 +50,15 @@ describe('validateMissingTag', () => {
     assert.deepInclude(issues[0], expected);
   });
 
+  it('flags a new relation with no tags as an error, so it isn\'t uploaded empty', () => {
+    const w = new Rapid.OsmWay(context, { id: 'w1', tags: { highway: 'primary' } });
+    const r = new Rapid.OsmRelation(context, { id: 'r-1', members: [{ id: 'w1', type: 'way', role: '' }] });
+    const g = new Rapid.Graph(context, [w, r]);
+    const issues = validator(r, g).issues;
+    assert.lengthOf(issues, 1);
+    assert.deepInclude(issues[0], { type: 'missing_tag', subtype: 'any', severity: 'error', entityIds: ['r-1'] });
+  });
+
   it('flags missing descriptive tags on a way', () => {
     const w = new Rapid.OsmWay(context, { tags: { name: 'Main Street', source: 'Bing' }});
     const g = new Rapid.Graph(context, [w]);

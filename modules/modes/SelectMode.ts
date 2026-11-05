@@ -1,6 +1,6 @@
 import * as Operations from '../operations/index.ts';
 import { AbstractMode } from './AbstractMode.ts';
-import { actionDeleteRelation } from '../actions/delete_relation.ts';
+// import { actionDeleteRelation } from '../actions/delete_relation.ts';
 import { actionMove, actionRotate } from '../actions/index.ts';
 import { DEG2RAD, Extent, vecAdd, vecRotate, vecScale } from '@rapid-sdk/math';
 import { GeoJSONData, MarkerData, OsmEntity } from '../data/index.ts';
@@ -20,7 +20,7 @@ import type { Action } from '../actions/types.ts';
 import type { Context } from '../Context.ts';
 import type { EventData } from '../behaviors/AbstractBehavior.ts';
 import type { KeyBindingScope } from '../core/KeyboardSystem.ts';
-import type { OsmNode, OsmRelation, OsmWay } from '../data/types.ts';
+import type { OsmNode, OsmWay } from '../data/types.ts';
 import type { Vec2 } from '@rapid-sdk/math';
 
 const DEBUG = false;
@@ -230,31 +230,54 @@ export class SelectMode extends AbstractMode {
       console.log('SelectMode: exiting');  // eslint-disable-line no-console
     }
 
-    // If the user added an empty relation, we should clean it up.
-    // Not when there are edits to redo: committing would throw them away. Undoing a new relation's
-    // tags leaves it empty and re-enters select mode, which exits this one.
-    // See "Render relations" in `.scratchpad/backlog.md`: this cleanup may go away.
-    const graph = editor.staging.graph;
-    const singularID = this._singularDatum?.id;
-    const entity = singularID ? graph.hasEntity(singularID) : undefined;
-    const canRedo = editor.index < editor.history.length - 1;
-    if (entity?.type === 'relation' && !canRedo) {
-      const relation = entity as OsmRelation;
-      const members = relation.members;
-      if (
-        Object.keys(relation.tags).length === 0 &&        // no tags
-        graph.parentRelations(relation).length === 0 &&   // no parent relations
-        // no members or one member with no role
-        (members.length === 0 || members.length === 1 && !members[0].role)
-      ) {
-        // The user added this relation but didn't edit it at all, so just delete it
-        editor.perform(actionDeleteRelation(entity.id, true, true));  // true = don't delete untagged members
-        editor.commit({
-          stringID: 'operations.delete.annotation.relation',
-          selection: [entity.id]
-        });
-      }
-    }
+// This code is commented out because it was found to cause issues with undo/redo (bug hunt, Nov 2026).
+//
+// What it did: when leaving select mode on a relation with no tags, no parent relations, and at
+// most one member with no role (what "New relation…" in the membership section makes), it committed
+// "Deleted a relation", so a relation the user started and didn't fill in wasn't left behind.
+//
+// Why it's off: `exit()` doesn't only run when the user moves on. Undo and redo re-select the edit's
+// selection with `context.enter('select', …)`, even when that's the relation already selected, and
+// that exits this mode. At the newest edit there's nothing to redo, so the cleanup ran in the middle
+// of a history jump (inside `redo()`'s `historyjump` emit) and made a new edit the user didn't ask for:
+//  - Make a relation with "New relation…", undo, redo, then the extra redo that returns to where
+//    you were: the relation is deleted, and the user lands in browse mode.
+//  - Make it, add a tag, remove the tag, undo, redo: the redo deletes it.
+// The `canRedo` check below only covered undo. Making it work would mean telling a history jump that
+// re-enters select apart from the user moving on.
+//
+// What covers it now: `missing_tag` flags an untagged relation (subtype `any`) as an error with a
+// delete fix, so an empty relation can't be uploaded by accident. But Rapid doesn't draw relations,
+// so the only way back to one is the issues list (or undo).
+// The plan: show relations, including empty ones, and let validation say what's missing, instead of
+// deleting them. See "Render relations" in `.scratchpad/backlog.md`. Then this can be removed.
+//
+//    // If the user added an empty relation, we should clean it up.
+//    // see https://github.com/openstreetmap/iD/issues/3812
+//    // Not when there are edits to redo: committing would throw them away. Undoing a new relation's
+//    // tags leaves it empty and re-enters select mode, which exits this one.
+//    // See "Render relations" in `.scratchpad/backlog.md`: this cleanup may go away.
+//    const graph = editor.staging.graph;
+//    const singularID = this._singularDatum?.id;
+//    const entity = singularID ? graph.hasEntity(singularID) : undefined;
+//    const canRedo = editor.index < editor.history.length - 1;
+//    if (entity?.type === 'relation' && !canRedo) {
+//      const relation = entity as OsmRelation;
+//      const members = relation.members;
+//      if (
+//        Object.keys(relation.tags).length === 0 &&        // no tags
+//        graph.parentRelations(relation).length === 0 &&   // no parent relations
+//        // no members or one member with no role
+//        (members.length === 0 || members.length === 1 && !members[0].role)
+//      ) {
+//        // The user added this relation but didn't edit it at all, so just delete it
+//        editor.perform(actionDeleteRelation(entity.id, true, true));  // true = don't delete untagged members
+//        editor.commit({
+//          stringID: 'operations.delete.annotation.relation',
+//          selection: [entity.id]
+//        });
+//      }
+//    }
 
     this.extent = null;
     this._newFeature = false;

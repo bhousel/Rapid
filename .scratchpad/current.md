@@ -67,6 +67,9 @@ numbers below keep the hunt's numbering.
    re-enters select, so `exit()` commits "Deleted a relation". Repro: membership "add to new relation"
    (untagged, one member, no role), undo, redo, extra redo. Or: tag r-1, remove the tag, undo, redo.
    `SelectMode.ts:240`. *Return view new; plain redo main too. Confirmed.*
+   ✅ **Fixed:** the cleanup is commented out (the comment says why, and what would bring it back);
+   `missing_tag` flags an empty relation as an error with a delete fix. See "Render relations" in
+   `backlog.md`.
 
 ### Medium
 10. **Synced settings read once at startup ignore the value the startup sync pulls,** and the next

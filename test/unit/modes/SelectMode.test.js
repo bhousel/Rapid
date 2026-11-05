@@ -143,14 +143,14 @@ describe('SelectMode', () => {
       });
     });
 
-    it('is deleted on exit, at the newest edit', () => {
+    // Exit used to delete it, which made a new edit when undo or redo re-entered select mode.
+    it('is kept on exit, at the newest edit', () => {
       mode.enter({ selection: ['r-1'] });
       mode.exit();
-      assert.lengthOf(commits, 1);
-      assert.strictEqual(commits[0].stringID, 'operations.delete.annotation.relation');
+      assert.lengthOf(commits, 0);
     });
 
-    it('is kept when there are edits to redo, so they aren\'t thrown away', () => {
+    it('is kept on exit when there are edits to redo', () => {
       context.systems.editor.history.push({});   // e.g. undid the relation's tags
       mode.enter({ selection: ['r-1'] });
       mode.exit();

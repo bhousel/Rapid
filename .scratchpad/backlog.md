@@ -45,9 +45,10 @@ especially, which are hard to check today.
   just made if it has no tags and at most one member with no role (from iD 9d029a37, 2019). Bryan
   sees that as a UI problem, not a data one: a mapper may want to make a relation and add members
   later. Show relations that draw nothing (e.g. a legend beside the map, with a label and color
-  swatch), keep them, and let validation at save time say what's missing. Then drop the cleanup.
-  Until then it runs only when there's nothing to redo (Nov 2026: undoing a new relation's tags
-  re-entered select mode, and the cleanup's commit threw the redo away).
+  swatch), keep them, and let validation at save time say what's missing. Then remove the cleanup.
+  It's commented out since Nov 2026 (bug hunt 2, item 7): undo and redo re-enter select mode, so it
+  committed a deletion in the middle of a history jump. `missing_tag` already flags an empty relation
+  as an error with a delete fix; what's missing is a way to see it on the map.
 
 ## Line marker placement (oneway arrows, sided markers)
 - Today `geomGetPositionsAlongLine` (moved from `pixi/helpers.ts` to `geo/geom.ts`) regenerates marker positions per-frame in the feature's update path, with an arbitrary 100-marker cap (`Rapid#544`, the `isLimited` param) to keep long lines from spawning thousands of sprites.
