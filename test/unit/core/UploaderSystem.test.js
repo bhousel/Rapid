@@ -72,7 +72,7 @@ describe('UploaderSystem', () => {
   // what it answers to each upload in turn (`null` for success).
   describe('saving', () => {
     let _context, _editor, _uploader;
-    let _server, _responses, _uploads, _loads;
+    let _server, _redacted, _responses, _uploads, _loads;
 
     function node(id, version, tags = {}, loc = [0, 0]) {
       return new Rapid.OsmNode(_context, { id, version, tags, loc });
@@ -107,6 +107,7 @@ describe('UploaderSystem', () => {
       };
 
       _server = new Map();
+      _redacted = new Set();   // versions like 'n1v1' that the API leaves out
       _responses = [];
       _uploads = [];
       _loads = [];
@@ -115,9 +116,14 @@ describe('UploaderSystem', () => {
         authenticate: (callback) => callback(),
         changesetURL: (changesetID) => `https://example.com/changeset/${changesetID}`,
         userURL: (user) => `https://example.com/user/${user}`,
+        // Answers with the current version, even for an old one (the tests only check what's left out)
         loadEntityVersionsAsync: (versions) => {
-          _loads.push([...versions.keys()]);
-          return Promise.resolve([...versions.keys()].map(id => _server.get(id)).filter(Boolean));
+          const requested = [...versions].map(([id, version]) => version ? `${id}v${version}` : id);
+          _loads.push(requested);
+          return Promise.resolve([...versions.keys()]
+            .filter((id, i) => !_redacted.has(requested[i]))
+            .map(id => _server.get(id))
+            .filter(Boolean));
         },
         sendChangeset: (changeset, changes, callback, beforeUpload) => {
           _uploads.push(changes);
@@ -333,6 +339,102 @@ describe('UploaderSystem', () => {
       assert.deepEqual(uploaded.modified[0].loc, [0, 1]);
     });
 
+    describe('when the version the edits were made from was redacted', () => {
+      it('leaves out the user\'s changes, even to the redacted tag', async () => {
+        _editor.merge([ node('n1', 1, { amenity: 'cafe', name: 'Copied' }) ]);
+        _editor.perform(Rapid.actionChangeTags('n1', { amenity: 'cafe', name: 'Copied Cafe' }));
+        _editor.commit({ stringID: 'changed the name' });
+        serverNode('n1', 2, { amenity: 'cafe', cuisine: 'pizza' });   // the redaction removed the name
+        _redacted.add('n1v1');
+        _responses.push(mismatch('n1'));
+
+        let result = resultAsync();
+        _uploader.save();
+        let { name, args } = await result;
+
+        assert.strictEqual(name, 'resultConflicts');
+        const conflicts = args[1];
+        assert.lengthOf(conflicts, 1);
+        assert.deepEqual(conflicts[0].details, ['save.conflict.redacted']);
+        assert.deepEqual(conflicts[0].choices.map(c => [c.type, c.text]), [['remote', 'save.conflict.keep_remote']]);
+        conflicts[0].choices[0].action();
+
+        result = resultAsync();
+        _uploader.processResolvedConflicts();
+        ({ name } = await result);
+
+        assert.strictEqual(name, 'resultNoChanges');
+        assert.lengthOf(_uploads, 1);   // only the first try, which got the 409
+        const n1 = _editor.stable.graph.entity('n1');
+        assert.strictEqual(n1.version, 2);
+        assert.deepEqual(n1.tags, { amenity: 'cafe', cuisine: 'pizza' });
+        assert.strictEqual(_editor.base.graph.entity('n1').version, 2, 'the base has the current version');
+      });
+
+      it('puts back a way the user deleted, with its nodes', async () => {
+        _editor.merge([
+          node('n1', 1, {}, [0, 0]), node('n2', 1, {}, [1, 0]),
+          new Rapid.OsmWay(_context, { id: 'w1', version: 1, nodes: ['n1', 'n2'], tags: { highway: 'path' } })
+        ]);
+        _editor.perform(Rapid.actionDeleteWay('w1'));   // deletes its untagged nodes too
+        _editor.commit({ stringID: 'deleted' });
+        serverNode('n1', 1, {}, [0, 0]);
+        serverNode('n2', 1, {}, [1, 0]);
+        _server.set('w1', { type: 'way', id: 'w1', version: 2, visible: true, nodes: ['n1', 'n2'], tags: { highway: 'footway' }, user: 'other' });
+        _redacted.add('w1v1');
+
+        let result = resultAsync();
+        _uploader.save(false, true);
+        let { name, args } = await result;
+
+        assert.strictEqual(name, 'resultConflicts');
+        assert.deepEqual(args[1].map(c => c.id), ['w1']);
+        assert.deepEqual(args[1][0].choices.map(c => [c.type, c.text]), [['remote', 'save.conflict.restore']]);
+        args[1][0].choices[0].action();
+
+        result = resultAsync();
+        _uploader.processResolvedConflicts();
+        ({ name } = await result);
+
+        assert.strictEqual(name, 'resultNoChanges');
+        const graph = _editor.stable.graph;
+        const w1 = graph.entity('w1');
+        assert.strictEqual(w1.version, 2);
+        assert.deepEqual(w1.tags, { highway: 'footway' });
+        assert.deepEqual(graph.childNodes(w1).map(n => n.id), ['n1', 'n2']);
+      });
+
+      it('isn\'t asked about when nothing changed remotely', async () => {
+        _editor.merge([ node('n1', 1, { name: 'A' }) ]);
+        _editor.perform(Rapid.actionChangeTags('n1', { name: 'B' }));
+        _editor.commit({ stringID: 'changed the name' });
+        serverNode('n1', 1, { name: 'A' });
+
+        const result = resultAsync();
+        _uploader.save(false, true);
+        const { name } = await result;
+
+        assert.strictEqual(name, 'resultSuccess');
+        assert.deepEqual(_loads, [['n1']]);
+      });
+
+      it('lets the safe merge decide when the version is still there', async () => {
+        _editor.merge([ node('n1', 1, { amenity: 'cafe', name: 'A' }) ]);
+        _editor.perform(Rapid.actionChangeTags('n1', { amenity: 'cafe', name: 'B' }));
+        _editor.commit({ stringID: 'changed the name' });
+        serverNode('n1', 2, { amenity: 'cafe', name: 'C' });
+
+        const result = resultAsync();
+        _uploader.save(false, true);
+        const { name, args } = await result;
+
+        assert.strictEqual(name, 'resultConflicts');
+        assert.deepEqual(_loads, [['n1'], ['n1v1']]);
+        assert.deepEqual(args[1][0].choices.map(c => c.type), ['local', 'remote']);
+      });
+    });
+
+
     it('merges a way that gained a node only the server has', async () => {
       _editor.merge([
         node('n1', 1, {}, [0, 0]),
@@ -361,7 +463,8 @@ describe('UploaderSystem', () => {
       const { name } = await result;
 
       assert.strictEqual(name, 'resultSuccess');
-      assert.deepEqual(_loads, [['w1', 'n1', 'n2'], ['n3']]);   // the remote way's new node, loaded after
+      // the remote way's new node, loaded after, then the version the edit was made from (still there)
+      assert.deepEqual(_loads, [['w1', 'n1', 'n2'], ['n3'], ['w1v1']]);
       // The new node went into the base like downloaded data: a merge, and in every index.
       assert.isTrue(mergedIDs.has('n3'));
       assert.deepEqual(indexed, { base: true, stable: true, staging: true });

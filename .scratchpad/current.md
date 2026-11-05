@@ -51,11 +51,13 @@ sessions aren't offered for restore (restore is only offered at startup, which i
    deleted. Related: a shared node's result depends on which conflict the screen showed last.
    `UploaderSystem.ts:839` (`processResolvedConflicts`). *New in practice (main never opened the
    screen), confirmed.*
-5. **A restore whose base version was redacted silently reverts another mapper's change.** The base
+5. ✅ **A restore whose base version was redacted silently reverts another mapper's change.** The base
    falls back to the current version (v2, with their `cuisine=pizza`), so after a 409 the safe merge sees
    only the user's side and uploads without the tag, no conflict. `EditSystem.ts:1999`
-   (`_fetchBaseEntitiesAsync`), `merge_remote_changes` `mergeTags`. Fix: mark fallback bases and treat
-   differences against them as conflicts. *New, confirmed.*
+   (`_fetchBaseEntitiesAsync`), `merge_remote_changes` `mergeTags`. *New, confirmed.*
+   Fixed: edits made to a redacted version are left out, both on restore (the entity stays at the
+   current version, the restore screen says so) and at save (`_findRedactedAsync`: a conflict with
+   "Use theirs" as the only choice). A fallback way's child nodes are fetched too.
 6. **Conflation: while part of a line is `unknown` (a tile not loaded), acted ranges are ignored.**
    `getResult` returns early with no runs, so `PixiLayerRapid` draws the whole source line over the
    accepted way, and Add creates it again (`acceptIDs` gets both the piece and `test:a`). Likely right

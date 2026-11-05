@@ -122,6 +122,8 @@ export class UploaderSystem extends AbstractSystem {
   protected _toCheckIDs: Set<EntityID>;
   /** Entity IDs that have been successfully fetched from the OSM API */
   protected _loadedIDs: Set<EntityID>;
+  /** Entity IDs whose version the user's edits were made from has been redacted on OSM */
+  protected _redactedIDs: Set<EntityID>;
   /** How many times this save has checked for conflicts on its own (see `MAX_CONFLICT_CHECKS`) */
   protected _conflictChecks: number;
   /** Entity IDs the API reported a version mismatch for, during this save */
@@ -164,6 +166,7 @@ export class UploaderSystem extends AbstractSystem {
     this._remoteGraph = null;
     this._toCheckIDs = new Set<EntityID>();
     this._loadedIDs = new Set<EntityID>();
+    this._redactedIDs = new Set<EntityID>();
     this._conflictChecks = 0;
     this._mismatchIDs = new Set<EntityID>();
     this._conflicts = [];
@@ -292,6 +295,7 @@ export class UploaderSystem extends AbstractSystem {
     this._remoteGraph = null;
     this._toCheckIDs = new Set<EntityID>();
     this._loadedIDs = new Set<EntityID>();
+    this._redactedIDs = new Set<EntityID>();
     this._conflicts = [];
     this._baseUpdates = new Map<EntityID, OsmEntity[]>();
     this._mergedGraph = null;
@@ -384,6 +388,9 @@ export class UploaderSystem extends AbstractSystem {
         if (attempt !== this._attempt) return;
       }
 
+      await this._findRedactedAsync();
+      if (attempt !== this._attempt) return;
+
     } catch (err: any) {
       if (attempt !== this._attempt) return;
       this._errors.push({
@@ -435,6 +442,45 @@ export class UploaderSystem extends AbstractSystem {
 
 
   /**
+   * Find what changed remotely since a version that has been redacted, and put it in `_redactedIDs`.
+   * OSM only redacts versions that aren't current, so only entities that changed remotely are asked about.
+   * Asking for a redacted version is like asking for a missing one: it's left out of the answer.
+   * @return Promise resolved when the check is done (usually without a request, when nothing changed)
+   * @throws Rejects if the OSM API can't be reached
+   */
+  protected async _findRedactedAsync(): Promise<void> {
+    const context = this.context;
+    const editor = context.systems.editor!;
+    const osm = context.services.osm!;
+
+    const baseGraph = editor.base.graph!;
+    const localGraph = this._localGraph!;
+    const remoteGraph = this._remoteGraph!;
+
+    const versions = new Map<EntityID, number>();
+    for (const entityID of this._toCheckIDs) {
+      if (!this._loadedIDs.has(entityID)) continue;
+      const original = localGraph.hasEntity(entityID) ?? baseGraph.hasEntity(entityID);   // the version the edits were made from
+      const remote = remoteGraph.entity(entityID);
+      if (original?.version && original.version !== remote.version) {
+        versions.set(entityID, original.version);
+      }
+    }
+    if (!versions.size) return;
+
+    const foundIDs = new Set<EntityID>();
+    for (const props of await osm.loadEntityVersionsAsync(versions)) {
+      foundIDs.add(props.id as EntityID);
+    }
+    for (const entityID of versions.keys()) {
+      if (!foundIDs.has(entityID)) {
+        this._redactedIDs.add(entityID);
+      }
+    }
+  }
+
+
+  /**
    * Test everything in `_toCheckIDs` for conflicts
    */
   protected _detectConflicts(): void {
@@ -457,13 +503,19 @@ export class UploaderSystem extends AbstractSystem {
 
       if (sameVersions(original, remote)) continue;
 
+      // The version the user's edits were made from has been redacted. The edits are left out: they were
+      // made to data that was removed from OSM, and may still hold it. The entity takes the remote version
+      // instead, as a restore does. The user sees this with the conflicts, with "Use theirs" as the only choice.
+      const redacted = this._redactedIDs.has(entityID);
+
       // Deleted locally but changed remotely.  To keep the deletion, it has to be uploaded against
       // the remote version, so that version (with child nodes the user didn't change) replaces the base copy.
+      // A redacted one gets the remote version in its base too, since the user's edits are left out.
       // (If a child node of the remote way couldn't be loaded, leave the base alone: a way can't be
       // drawn without its nodes. Keeping the deletion then fails on upload, and the user sees why.)
       // The base is updated once the user resolves the conflicts (`processResolvedConflicts`): if they
       // cancel instead, the next save has to ask them again.
-      if (!local && remote.visible) {
+      if ((!local || redacted) && remote.visible) {
         const children: OsmEntity[] = [];
         let complete = true;
         for (const childID of (remote as OsmWay).nodes ?? []) {
@@ -486,19 +538,24 @@ export class UploaderSystem extends AbstractSystem {
       }
 
       // Try a safe merge first
-      const actionSafe = actionMergeRemoteChanges(entityID, {
-        localGraph: localGraph,
-        remoteGraph: remoteGraph,
-        discardTags: this._discardTags,
-        formatUser: formatUser,
-        localize: l10n.t,
-        strategy: 'safe'
-      });
+      let mergeConflicts: string[];
+      if (redacted) {
+        mergeConflicts = [ l10n.t('save.conflict.redacted') ];
+      } else {
+        const actionSafe = actionMergeRemoteChanges(entityID, {
+          localGraph: localGraph,
+          remoteGraph: remoteGraph,
+          discardTags: this._discardTags,
+          formatUser: formatUser,
+          localize: l10n.t,
+          strategy: 'safe'
+        });
 
-      editor.perform(actionSafe);
+        editor.perform(actionSafe);
 
-      const mergeConflicts = actionSafe.conflicts();
-      if (!mergeConflicts.length) continue;  // merged safely
+        mergeConflicts = actionSafe.conflicts();
+        if (!mergeConflicts.length) continue;  // merged safely
+      }
 
       // present options for destructive merging
       const actionForceLocal = actionMergeRemoteChanges(entityID, {
@@ -532,15 +589,16 @@ export class UploaderSystem extends AbstractSystem {
       }
 
       const choose = this._makeChooser();
+      const choices: ConflictChoice[] = [
+        { id: entityID, type: 'local', text: keepMine, action: () => choose(actionForceLocal) },
+        { id: entityID, type: 'remote', text: keepTheirs, action: () => choose(actionForceRemote) }
+      ];
       this._conflicts.push({
         id: entityID,
         name: entityName(original),
         details: mergeConflicts,
         chosen: 'remote',
-        choices: [
-          { id: entityID, type: 'local', text: keepMine, action: () => choose(actionForceLocal) },
-          { id: entityID, type: 'remote', text: keepTheirs, action: () => choose(actionForceRemote) }
-        ]
+        choices: redacted ? choices.slice(1) : choices
       });
     }
 

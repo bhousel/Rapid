@@ -1796,9 +1796,10 @@ export class EditSystem extends AbstractSystem {
    *  that we are starting with a clean slate in regards to validation and rendering.
    *
    * @param json - Stringified JSON to parse
-   * @return Promise resolved when the restore process is complete
+   * @return Promise resolved when the restore process is complete, with the IDs of the entities
+   *   whose edits were left out (see `fromBackupAsync`)
    */
-  public fromJSONAsync(json: string): Promise<void> {
+  public fromJSONAsync(json: string): Promise<EntityID[]> {
     return this.fromBackupAsync(JSON.parse(json) as BackupJSON);
   }
 
@@ -1811,11 +1812,15 @@ export class EditSystem extends AbstractSystem {
    *  this function needs to be async, and should be chained after a `context.resetAsync()` to ensure
    *  that we are starting with a clean slate in regards to validation and rendering.
    *
+   * The edits to an entity whose version was redacted on OSM are left out, because they were made to
+   * data that was removed from OSM (see `design/edit-system.md`).
+   *
    * @param backup - The structured backup object to restore
-   * @return Promise resolved when the restore process is complete
+   * @return Promise resolved when the restore process is complete, with the IDs of the entities
+   *   whose edits were left out
    * @throws Error if the backup version is not supported
    */
-  public fromBackupAsync(backup: BackupJSON): Promise<void> {
+  public fromBackupAsync(backup: BackupJSON): Promise<EntityID[]> {
     const context = this.context;
     const gfx = context.systems.gfx;
 
@@ -1883,7 +1888,22 @@ export class EditSystem extends AbstractSystem {
 
     // Call _finish when we believe we have everything..
     // This merges the base entities, reconstructs history, and unblocks the other parts of the app.
-    const _finish = (): void => {
+    const _finish = (redactedIDs: Set<EntityID>): EntityID[] => {
+
+      // The edits to an entity whose version was redacted are left out: they were made to data that
+      // was removed from OSM, and may still hold it. The entity stays as fetched instead (the current
+      // version). A way needs its child nodes, so deleting those is left out too.
+      const leftOutIDs = new Set<EntityID>();
+      const neededIDs = new Set<EntityID>();
+      for (const entityID of redactedIDs) {
+        const entity = __baseEntities.get(entityID);
+        if (!entity) continue;   // nothing to keep instead
+        leftOutIDs.add(entityID);
+        for (const childID of (entity as OsmWay).nodes ?? []) {
+          neededIDs.add(childID);
+        }
+      }
+      const skippedIDs = new Set<EntityID>();
 
       // Merge base entities into base graph (force = true, as new nodes may affect their parentways extents in tree)
       const baseEntities = [...__baseEntities.values()];
@@ -1904,10 +1924,18 @@ export class EditSystem extends AbstractSystem {
         const entities: Record<string, OsmEntity | undefined> = {};
         for (const key of (item.modified ?? []) as string[]) {
           const entity = __modifiedEntities.get(key)!;
-          entities[entity.id] = entity;
+          if (leftOutIDs.has(entity.id)) {
+            skippedIDs.add(entity.id);
+          } else {
+            entities[entity.id] = entity;
+          }
         }
         for (const entityID of (item.deleted ?? []) as EntityID[]) {
-          entities[entityID] = undefined;
+          if (leftOutIDs.has(entityID) || neededIDs.has(entityID)) {
+            skippedIDs.add(entityID);
+          } else {
+            entities[entityID] = undefined;
+          }
         }
 
         const graph = new Graph(prevGraph);
@@ -1939,16 +1967,18 @@ export class EditSystem extends AbstractSystem {
       this.emit('merge', baseEntityIDs);
       this._emitChanges();
       this.emit('historyjump', 0, this._index);  // send 0 in prevIndex, we are replacing history completely
+
+      return [...skippedIDs];
     };
 
 
     // We have to keep the UI blocked while fetching, because restoring replaces the graphs and edits.
     return this._fetchBaseEntitiesAsync(__toFetch)
       .then(fetched => {
-        for (const entity of fetched) {
+        for (const entity of fetched.entities) {
           __baseEntities.set(entity.id, entity);
         }
-        _finish();
+        return _finish(fetched.redactedIDs);
 
       }, err => {
         // Without the base entities, the edits can't be restored. Leave the history empty (the caller
@@ -1962,20 +1992,23 @@ export class EditSystem extends AbstractSystem {
 
   /**
    * Fetch the base entities for a restore from the OSM API.
-   * Each entity is fetched at the version its edits were made from. If that version can't be found
-   * (redacted or missing), the current version is used instead, and if the entity has been deleted
-   * since, the version before it was deleted. Save-time conflict resolution sorts out any differences.
+   * Each entity is fetched at the version its edits were made from. If that version can't be found,
+   * it was redacted (OSM keeps every other version), and the current version is used instead, or if
+   * the entity has been deleted since, the version before it was deleted. The child nodes of ways
+   * fetched that way are fetched too, at their current version.
    * @param versions - the version to fetch for each entityID (`undefined` to fetch the current version)
-   * @return Promise resolved with the entities that were found
+   * @return Promise resolved with the entities that were found, and the IDs of those whose version was redacted
    * @throws Rejects if the OSM API can't be reached
    */
-  protected async _fetchBaseEntitiesAsync(versions: Map<EntityID, number | undefined>): Promise<OsmEntity[]> {
+  protected async _fetchBaseEntitiesAsync(versions: Map<EntityID, number | undefined>): Promise<{ entities: OsmEntity[], redactedIDs: Set<EntityID> }> {
     const context = this.context;
     const osm = context.services.osm;
 
     const found: OsmEntity[] = [];
-    if (!osm || !versions.size) return found;
+    const redactedIDs = new Set<EntityID>();
+    if (!osm || !versions.size) return { entities: found, redactedIDs: redactedIDs };
 
+    const requestedIDs = new Set<EntityID>(versions.keys());
     const triedCurrent = new Set<EntityID>();
     let toFetch = versions;
 
@@ -1995,8 +2028,18 @@ export class EditSystem extends AbstractSystem {
         const props = resultByID.get(entityID);
         const fetchedVersion = props?.version as number | undefined;
         if (props?.visible) {
-          found.push(createOsmEntity(context, props as OsmEntityProps));
-        } else if (!triedCurrent.has(entityID)) {   // that version can't be found, try the current one
+          const entity = createOsmEntity(context, props as OsmEntityProps);
+          found.push(entity);
+          for (const childID of (entity as OsmWay).nodes ?? []) {   // a way can't be drawn without its child nodes
+            if (!requestedIDs.has(childID)) {
+              requestedIDs.add(childID);
+              retry.set(childID, undefined);
+            }
+          }
+        } else if (!triedCurrent.has(entityID)) {   // that version was redacted, try the current one
+          if (!props && toFetch === versions) {
+            redactedIDs.add(entityID);
+          }
           retry.set(entityID, undefined);
         } else if (version === undefined && fetchedVersion && fetchedVersion > 1) {   // deleted since, try the version before
           retry.set(entityID, fetchedVersion - 1);
@@ -2005,7 +2048,7 @@ export class EditSystem extends AbstractSystem {
       toFetch = retry;
     }
 
-    return found;
+    return { entities: found, redactedIDs: redactedIDs };
   }
 
 
@@ -2159,9 +2202,10 @@ export class EditSystem extends AbstractSystem {
    * A legacy localStorage session is **upgraded**: it becomes a fresh IndexedDB session and the
    * legacy localStorage key is removed. An IndexedDB session is continued under its own id.
    * @param id - The session id to restore (from `listRestorableSessionsAsync`)
-   * @return Promise resolved when the restore (and any upgrade) completes
+   * @return Promise resolved when the restore (and any upgrade) completes, with the IDs of the
+   *   entities whose edits were left out (see `fromBackupAsync`)
    */
-  public async restoreSessionAsync(id: SessionID): Promise<void> {
+  public async restoreSessionAsync(id: SessionID): Promise<EntityID[]> {
     const context = this.context;
     const database = context.systems.database;   // optional
     const storage = context.systems.storage!;
@@ -2181,7 +2225,7 @@ export class EditSystem extends AbstractSystem {
         backup = undefined;
       }
     }
-    if (existingRecord && !this._isOnThisAPI(existingRecord)) return;   // made on another OSM API
+    if (existingRecord && !this._isOnThisAPI(existingRecord)) return [];   // made on another OSM API
 
     if (!backup && id === this._backupKey()) {
       const json = storage.getItem(this._backupKey());
@@ -2195,10 +2239,10 @@ export class EditSystem extends AbstractSystem {
       }
     }
 
-    if (!backup) return;
+    if (!backup) return [];
 
     await context.resetAsync();
-    await this.fromBackupAsync(backup);
+    const leftOutIDs = await this.fromBackupAsync(backup);
 
     if (isLegacy) {
       // Upgrade: this becomes a new IndexedDB session; retire the legacy localStorage key.
@@ -2215,6 +2259,7 @@ export class EditSystem extends AbstractSystem {
 
     this._setOwnedSessionID(this._sessionID);   // this tab now owns this session (survives reload)
     this._heartbeatNow();                       // immediately mark it live so other tabs back off
+    return leftOutIDs;
   }
 
 

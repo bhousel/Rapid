@@ -1749,7 +1749,8 @@ describe('EditSystem', () => {
           index: 1
         };
         return _editor.fromBackupAsync(backup)
-          .then(() => {
+          .then(leftOutIDs => {
+            assert.deepEqual(leftOutIDs, []);   // none of them were edited
             assert.deepEqual(_calls, [
               [['n1', 3], ['n2', 2], ['n3', 1]],
               [['n1', undefined], ['n2', undefined], ['n3', undefined]],
@@ -1760,6 +1761,63 @@ describe('EditSystem', () => {
             assert.strictEqual(base.entity('n2').version, 3);
             assert.isUndefined(base.hasEntity('n3'));
             assert.isOk(_editor.stable.graph.hasEntity('n-1'));
+          });
+      });
+
+      it('leaves out the edits to an entity whose version was redacted, and keeps the others', () => {
+        useOsm([
+          { type: 'node', id: 'n1', version: 2, visible: true, loc: [0, 0], tags: { amenity: 'cafe', cuisine: 'pizza' }, current: true },   // v1 is redacted
+          { type: 'node', id: 'n2', version: 1, visible: true, loc: [1, 0], tags: {}, current: true }
+        ]);
+        const backup = {
+          version: 4,
+          entities: [
+            { id: 'n1', version: 1, loc: [0, 0], tags: { amenity: 'cafe', name: 'Copied Cafe' }, v: 1 },
+            { id: 'n2', version: 1, loc: [1, 1], v: 1 }
+          ],
+          baseVersions: { n1: 1, n2: 1 },
+          stack: [ {}, { modified: ['n1v1'], props: { stringID: 'changed the name' } }, { modified: ['n2v1'], props: { stringID: 'moved a node' } } ],
+          nextIDs: {},
+          index: 2
+        };
+        return _editor.fromBackupAsync(backup)
+          .then(leftOutIDs => {
+            assert.deepEqual(leftOutIDs, ['n1']);
+            const graph = _editor.stable.graph;
+            assert.strictEqual(graph.entity('n1').version, 2);
+            assert.deepEqual(graph.entity('n1').tags, { amenity: 'cafe', cuisine: 'pizza' });
+            assert.deepEqual(graph.entity('n2').loc, [1, 1]);   // not redacted, so the move is kept
+            assert.lengthOf(_editor.history, 3);
+            assert.deepEqual(_editor.changes().modified.map(entity => entity.id), ['n2']);
+          });
+      });
+
+      it('puts back a way whose version was redacted, with the child nodes it has now', () => {
+        useOsm([
+          { type: 'node', id: 'n1', version: 1, visible: true, loc: [0, 0], tags: {}, current: true },
+          { type: 'node', id: 'n2', version: 1, visible: true, loc: [2, 0], tags: {}, current: true },
+          { type: 'node', id: 'n3', version: 1, visible: true, loc: [1, 0], tags: {}, current: true },   // added since
+          { type: 'way', id: 'w1', version: 2, visible: true, nodes: ['n1', 'n3', 'n2'], tags: { highway: 'path' }, current: true }   // v1 is redacted
+        ]);
+        const backup = {
+          version: 4,
+          entities: [],
+          baseVersions: { n1: 1, n2: 1, w1: 1 },
+          stack: [ {}, { deleted: ['w1', 'n1', 'n2'], props: { stringID: 'deleted a way' } } ],
+          nextIDs: {},
+          index: 1
+        };
+        return _editor.fromBackupAsync(backup)
+          .then(leftOutIDs => {
+            assert.sameMembers(leftOutIDs, ['w1', 'n1', 'n2']);
+            assert.deepEqual(_calls, [
+              [['n1', 1], ['n2', 1], ['w1', 1]],
+              [['w1', undefined]],
+              [['n3', undefined]]
+            ]);
+            const graph = _editor.stable.graph;
+            assert.deepEqual(graph.childNodes(graph.entity('w1')).map(n => n.id), ['n1', 'n3', 'n2']);
+            assert.isFalse(_editor.hasChanges());
           });
       });
 

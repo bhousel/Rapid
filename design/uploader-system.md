@@ -48,6 +48,8 @@ screens, and `UiConflicts` the conflict screen.
    versioned multi-fetch per type (`OsmService.loadEntityVersionsAsync`, the same call backup restore
    uses). Then the child nodes of the remote ways that we don't have yet, since merging a way needs
    them. Nothing more: relation members aren't loaded (merging a relation only compares member lists).
+   For whatever changed remotely, it then asks for the version the edits were made from, to find the
+   ones that were redacted (see "Redacted versions").
 5. **Compare and merge** (`_detectConflicts`): skip anything whose version (and, for ways, whose child
    nodes' versions) didn't change; otherwise run the safe merge. A merge sets the entity to the remote
    version, so it can be uploaded.
@@ -93,6 +95,28 @@ conflicted.)
 `Graph.rebase` used to restore a locally deleted node when newly loaded data showed a way using it
 (iD#2085). For a way the user deleted along with its nodes, that undid part of the deletion, so it no
 longer applies there.
+
+### Redacted versions
+
+The Data Working Group redacts versions that hold data which never should have been added (for
+licence or copyright reasons), and the API stops serving them. Only a version that isn't current can be
+redacted. If the version the user's edits were made from has been redacted, the edits are left out, as
+a restore leaves them out (see [`edit-system.md`](edit-system.md)): they were made to data that was
+removed, the user's copy may still hold it, and the real base can't be compared against any more. Without
+this, a three-way merge with the real base already drops redacted tags the user didn't touch, but a
+redacted tag the user changed was an ordinary conflict, and "Keep mine" uploaded it again.
+
+- **Finding them** (`_findRedactedAsync`): after loading the remote versions, the uploader asks for the
+  version each edit was made from, for the entities whose version changed remotely, in one more versioned
+  multi-fetch. The versions left out of the answer were redacted. Usually nothing changed remotely, so
+  there's no request.
+- **No merge:** a redacted entity skips the safe merge and is listed on the conflict screen with "The
+  version of this feature you edited has since been removed from OpenStreetMap…", and "Use theirs" (or
+  "Restore", or "Leave Deleted" when the other mapper deleted it) as its only choice. The base gets the
+  remote version, as for "Restore" of a local deletion, so the map shows what's on OSM now.
+- **Not quite the same as a restore:** for a way, "Use theirs" also takes back the user's changes to the
+  nodes only that way uses (see above), while a restore keeps them, since they're edits of the nodes,
+  whose versions weren't redacted. Both leave out everything that was the redacted entity's own.
 
 ### When an upload gets no answer
 

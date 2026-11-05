@@ -189,6 +189,11 @@ export class UiRestore {
         .on('click', () => {
           Modal.close();
           editor.restoreSessionAsync(session.id)
+            .then(leftOutIDs => {
+              if (leftOutIDs.length) {
+                ui?.Flash.show({ duration: 10000, label: l10n.t('restore.left_out') });
+              }
+            })
             .catch(err => {
               // Restoring needs the OSM API. The session is still saved, so it can be restored later.
               console.error(err);  // eslint-disable-line no-console

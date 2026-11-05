@@ -330,13 +330,23 @@ actually leaves the newest edit, does.
   touching the history: the session stays saved, and the user sees "Couldn't restore your edits…" with a
   suggestion to reload and try again. Finishing anyway isn't an option: a way whose child nodes are
   missing breaks drawing (`graph.childNodes()` throws).
-- **A version that can't be fetched** (redacted, or missing) is restored against the current version
-  of the entity instead, and save-time conflict resolution sorts out any differences (it was broken
-  until the uploader audit; see [`uploader-system.md`](uploader-system.md)). If the entity has
-  been deleted since, the version before the deletion is used. Anything still missing is left out.
-  The API answers 404 for a whole multi-fetch if any version in it can't be found (checked against the
-  live API; fetching a redacted version on its own is a 403), so the service splits a chunk that fails
-  that way in half and tries again, until only the versions that can't be found are left out.
+- **A version that can't be fetched was redacted.** OSM keeps every version of everything, so a
+  version only goes missing when the Data Working Group redacts it (for licence or copyright reasons;
+  the current version can't be redacted). The entity is restored at its current version instead, or,
+  if it has been deleted since, the version before the deletion, with the child nodes of a way fetched
+  that way. Anything still missing is left out. The API answers 404 for a whole multi-fetch if any
+  version in it can't be found (checked against the live API; fetching a redacted version on its own
+  is a 403), so the service splits a chunk that fails that way in half and tries again, until only the
+  versions that can't be found are left out.
+- **The user's edits to a redacted version are left out.** The redacted data never should have
+  existed, so the edits made to it can't survive either: the user's copy may still hold what was
+  removed, and with the real base gone there's no way to tell which of it is theirs. The entity
+  stays as fetched in every edit, and so do the child nodes a way like that still needs, even if the
+  user deleted them. The user's other edits are kept, including moves of that way's nodes, which are
+  edits of other entities. (A new node the user added to that way is left behind, untagged.) The
+  restore resolves with the IDs it left out, and the restore screen tells the user that some edits
+  weren't restored. Saving applies the same rule, for versions redacted after the edits were made or
+  restored (see [`uploader-system.md`](uploader-system.md)).
 - **The restore list's location** (the session's bbox) comes from the changed entities and each edit's
   `extent`, which also covers what was deleted, now that deleted entities aren't stored.
 - **Store each edit's `props` as they are,** next to what changed in its graph. Restore passes them
