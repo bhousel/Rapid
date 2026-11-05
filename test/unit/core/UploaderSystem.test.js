@@ -279,7 +279,10 @@ describe('UploaderSystem', () => {
       const uploaded = _uploads.at(-1);
       assert.deepEqual(uploaded.modified.map(entity => entity.id), ['n2']);
       assert.deepEqual(uploaded.modified[0].loc, [1, 1]);
-      assert.deepEqual(_editor.stable.graph.entity('w1').tags, { highway: 'path' });   // not the user's change
+      const w1 = _editor.stable.graph.entity('w1');
+      assert.deepEqual(w1.tags, { highway: 'cycleway' });   // their version, not the user's change
+      assert.strictEqual(w1.version, 2);
+      assert.isFalse(_editor.stable.graph.isLocal('w1'), 'their version is the base now, not an edit');
     });
 
     it('"Use theirs" for a way drops the user\'s change to a node only that way uses', async () => {
@@ -338,6 +341,161 @@ describe('UploaderSystem', () => {
       assert.deepEqual(uploaded.modified.map(entity => entity.id), ['n1']);
       assert.deepEqual(uploaded.modified[0].loc, [0, 1]);
     });
+
+    describe('a way\'s choice and its nodes', () => {
+      // n1 - n2 - n3, one way
+      function setup() {
+        _editor.merge([
+          node('n1', 1, {}, [0, 0]), node('n2', 1, {}, [1, 0]), node('n3', 1, {}, [2, 0]),
+          new Rapid.OsmWay(_context, { id: 'w1', version: 1, nodes: ['n1', 'n2', 'n3'], tags: { highway: 'path' } })
+        ]);
+        serverNode('n1', 1, {}, [0, 0]);
+        serverNode('n3', 1, {}, [2, 0]);
+      }
+
+      // The user moves n2 and retags w1; the other mapper does both too. The user keeps their n2 and takes
+      // the other mapper's w1, with the choices applied in either order.
+      async function keepMineOnNode(nodeFirst) {
+        setup();
+        _editor.perform(Rapid.actionMoveNode('n2', [1, 1]));
+        _editor.perform(Rapid.actionChangeTags('w1', { highway: 'footway' }));
+        _editor.commit({ stringID: 'edits' });
+        serverNode('n2', 2, {}, [1, -1]);   // they moved it too
+        _server.set('w1', { type: 'way', id: 'w1', version: 2, visible: true, nodes: ['n1', 'n2', 'n3'], tags: { highway: 'cycleway' }, user: 'other' });
+
+        let result = resultAsync();
+        _uploader.save(false, true);
+        let { name, args } = await result;
+        assert.strictEqual(name, 'resultConflicts');
+        const conflicts = args[1];
+        assert.sameMembers(conflicts.map(c => c.id), ['w1', 'n2']);
+        const w1 = conflicts.find(c => c.id === 'w1');
+        const n2 = conflicts.find(c => c.id === 'n2');
+
+        // The screen applies each default as it shows the conflict; the user picks "Keep mine" for n2
+        n2.chosen = 'local';
+        if (nodeFirst) {
+          n2.choices[0].action();
+          w1.choices[1].action();
+        } else {
+          w1.choices[1].action();
+          n2.choices[0].action();
+        }
+
+        result = resultAsync();
+        _uploader.processResolvedConflicts();
+        ({ name } = await result);
+
+        assert.strictEqual(name, 'resultSuccess');
+        const uploaded = _uploads.at(-1);
+        assert.deepEqual(uploaded.modified.map(entity => entity.id), ['n2']);
+        assert.deepEqual(uploaded.modified[0].loc, [1, 1]);
+        assert.strictEqual(uploaded.modified[0].version, 2);
+      }
+
+      it('"Keep mine" on a node beats "Use theirs" on its way (node chosen first)', () => keepMineOnNode(true));
+      it('"Keep mine" on a node beats "Use theirs" on its way (node chosen last)', () => keepMineOnNode(false));
+
+      it('takes the other mapper\'s move of a node under a way the user retagged, with no conflict and nothing extra uploaded', async () => {
+        setup();
+        _editor.perform(Rapid.actionChangeTags('w1', { highway: 'footway' }));
+        _editor.commit({ stringID: 'retagged' });
+        serverNode('n2', 2, {}, [1, -1]);   // they moved it, and didn't touch the way
+        _server.set('w1', { type: 'way', id: 'w1', version: 1, visible: true, nodes: ['n1', 'n2', 'n3'], tags: { highway: 'path' }, user: 'other' });
+
+        const result = resultAsync();
+        _uploader.save(false, true);
+        const { name } = await result;
+
+        assert.strictEqual(name, 'resultSuccess');
+        assert.deepEqual(_uploads[0].modified.map(entity => entity.id), ['w1']);
+        const n2 = _editor.stable.graph.entity('n2');
+        assert.deepEqual(n2.loc, [1, -1]);
+        assert.isFalse(_editor.stable.graph.isLocal('n2'), 'their version is the base now, not an edit');
+      });
+
+      it('"Use theirs" on a way doesn\'t upload copies of shared nodes the other mapper changed', async () => {
+        _editor.merge([
+          node('n1', 1, {}, [0, 0]), node('n2', 1, {}, [1, 0]), node('n3', 1, {}, [2, 0]),
+          new Rapid.OsmWay(_context, { id: 'w1', version: 1, nodes: ['n1', 'n2'], tags: { highway: 'path' } }),
+          new Rapid.OsmWay(_context, { id: 'w2', version: 1, nodes: ['n2', 'n3'], tags: { highway: 'path' } })
+        ]);
+        _editor.perform(Rapid.actionChangeTags('w1', { highway: 'footway' }));
+        _editor.commit({ stringID: 'retagged' });
+        serverNode('n1', 1, {}, [0, 0]);
+        serverNode('n2', 2, {}, [1, -1]);   // they moved the junction..
+        _server.set('w1', { type: 'way', id: 'w1', version: 2, visible: true, nodes: ['n1', 'n2'], tags: { highway: 'cycleway' }, user: 'other' });
+
+        let result = resultAsync();
+        _uploader.save(false, true);
+        let { name, args } = await result;
+        assert.strictEqual(name, 'resultConflicts');
+        assert.deepEqual(args[1].map(c => c.id), ['w1']);
+        args[1][0].choices[1].action();   // "Use theirs"
+
+        result = resultAsync();
+        _uploader.processResolvedConflicts();
+        ({ name } = await result);
+
+        assert.strictEqual(name, 'resultNoChanges');   // ..which isn't uploaded back to them
+        assert.lengthOf(_uploads, 0);
+        assert.deepEqual(_editor.stable.graph.entity('n2').loc, [1, -1]);
+      });
+    });
+
+
+    describe('deletions', () => {
+      function setup() {
+        _editor.merge([
+          node('n1', 1, {}, [0, 0]), node('n2', 1, {}, [1, 0]),
+          new Rapid.OsmWay(_context, { id: 'w1', version: 1, nodes: ['n1', 'n2'], tags: { highway: 'path' } })
+        ]);
+        _editor.perform(Rapid.actionDeleteWay('w1'));   // deletes its untagged nodes too
+        _editor.commit({ stringID: 'deleted' });
+      }
+
+      it('deleted by both: uploads only the deletions they didn\'t make', async () => {
+        setup();
+        _server.set('w1', { type: 'way', id: 'w1', version: 2, visible: false, user: 'other' });
+        _server.set('n1', { type: 'node', id: 'n1', version: 2, visible: false, user: 'other' });
+        serverNode('n2', 1, {}, [1, 0]);   // they left n2
+        _responses.push(mismatch('w1'));
+
+        const result = resultAsync();
+        _uploader.save();
+        const { name } = await result;
+
+        assert.strictEqual(name, 'resultSuccess');
+        assert.deepEqual(_uploads.at(-1).deleted.map(entity => entity.id), ['n2']);
+        assert.isUndefined(_editor.stable.graph.hasEntity('n2'));
+      });
+
+      it('"Leave Deleted" on a way also deletes the nodes the other mapper added to it', async () => {
+        setup();
+        serverNode('n1', 1, {}, [0, 0]);
+        serverNode('n2', 1, {}, [1, 0]);
+        serverNode('n9', 1, {}, [0.5, 0]);   // they added n9..
+        _server.set('w1', { type: 'way', id: 'w1', version: 2, visible: true, nodes: ['n1', 'n9', 'n2'], tags: { highway: 'path' }, user: 'other' });
+
+        let result = resultAsync();
+        _uploader.save(false, true);
+        let { name, args } = await result;
+        assert.strictEqual(name, 'resultConflicts');
+        const conflict = args[1][0];
+        conflict.chosen = 'local';
+        conflict.choices[0].action();   // "Leave Deleted"
+
+        result = resultAsync();
+        _uploader.processResolvedConflicts();
+        ({ name } = await result);
+
+        assert.strictEqual(name, 'resultSuccess');
+        const deleted = _uploads.at(-1).deleted;
+        assert.sameMembers(deleted.map(entity => entity.id), ['w1', 'n1', 'n2', 'n9']);   // ..so it isn't left on OSM, unused
+        assert.strictEqual(deleted.find(entity => entity.id === 'w1').version, 2);
+      });
+    });
+
 
     describe('when the version the edits were made from was redacted', () => {
       it('leaves out the user\'s changes, even to the redacted tag', async () => {

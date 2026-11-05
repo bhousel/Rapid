@@ -55,6 +55,10 @@ numbers below keep the hunt's numbering.
    deleted. Related: a shared node's result depends on which conflict the screen showed last.
    `UploaderSystem.ts:839` (`processResolvedConflicts`). *New in practice (main never opened the
    screen), confirmed.*
+   ✅ **Fixed (with 19, 20, 22 and "moved by both"):** a node with its own conflict follows its own
+   choice (`ownChoiceIDs`); saving the screen applies every choice again; what's left just as the other
+   mapper has it goes into the base (`_settleSameAsRemote`). See "Use theirs for a way" in
+   `design/uploader-system.md`.
 5. ✅ **A restore whose base version was redacted silently reverts another mapper's change.** The base
    falls back to the current version (v2, with their `cuisine=pizza`), so after a 409 the safe merge sees
    only the user's side and uploads without the tag, no conflict. `EditSystem.ts:1999`
@@ -116,8 +120,10 @@ numbers below keep the hunt's numbering.
     close is -6. `closeChangeset` now reports HTTP errors (`fetchRaw` doesn't reject on them).
 19. **"Deleted by both" brings back the way's nodes the user deleted,** and drops those deletions
     (`actionRevert` now restores deleted children). `merge_remote_changes.ts:324`. *New, confirmed.*
+    ✅ **Fixed:** the deletion stays, and the uploader leaves out what's deleted on both sides.
 20. **"Leave Deleted" on a way leaves the other mapper's new nodes as orphans** on OSM.
     `UploaderSystem.ts:464`. *New, reading.*
+    ✅ **Fixed:** `_deleteOrphanedNodes` (confirmed by a test first).
 21. **A link with both `id=` and `note=` ends with only the note selected** (`selectNoteID` replaces the
     multiselection, and zooms to z19). `MapSystem.ts:343`, `selectNoteID`. *New, confirmed.*
 
@@ -125,6 +131,7 @@ numbers below keep the hunt's numbering.
 22. **"Use theirs" uploads unchanged copies of shared nodes the other mapper changed** (`force_remote`
     puts in the remote copy, and shared nodes aren't reverted). Side effect of first-hunt item 10.
     `merge_remote_changes.ts:175`. *New, confirmed.*
+    ✅ **Fixed:** `_settleSameAsRemote` puts those copies in the base instead.
 26. **Custom-data IDs in `id=` can never be found from a link,** because `data=` is stripped from the
     URL (`toOmit`). `UrlHashSystem.ts:260`. *New, reading.*
 27. **During the walkthrough, the user's session stops heartbeating,** so after 60 s another tab can
@@ -216,7 +223,8 @@ upload with no answer checks the changeset's `changes_count` (`loadChangesetAsyn
 the session is kept until the upload succeeds, marked while uploading (`markUploadAsync`, via
 `sendChangeset`'s `beforeUpload`), and the next tab settles interrupted uploads in `EditSystem.startAsync`
 (`_settleUploadsAsync`). Default choice stays "Use theirs" (decided; reason in the design doc).
-Left from the audit: the "moved by both" false conflict; a new changeset when the old one was closed.
+Left from the audit: a new changeset when the old one was closed. (The "moved by both" false conflict
+was fixed with bug hunt 2's items 4, 19, 20 and 22.)
 Testing tip: a fake `sendChangeset` must call its `beforeUpload` argument, or the mark is never written.
 
 ## Active: matching third-party data against OSM (`ConflationSystem`)

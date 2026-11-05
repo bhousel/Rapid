@@ -19,6 +19,8 @@ export interface MergeRemoteChangesOptions {
   formatUser?: (user: string) => string;
   localize?: (key: string, params?: Record<string, string | number | undefined>) => string;
   strategy?: 'safe' | 'force_local' | 'force_remote';
+  /** Entities with a conflict of their own: a way's merge leaves its child nodes in here to their own choice */
+  ownChoiceIDs?: Set<EntityID>;
 }
 
 /** Updates to apply to child nodes */
@@ -51,26 +53,33 @@ export function actionMergeRemoteChanges(id: EntityID, options: MergeRemoteChang
   const formatUser = options.formatUser ?? ((d: string) => d);
   const localize = options.localize ?? ((d: string) => d);
   const strategy = options.strategy ?? 'safe';   // 'safe', 'force_local', 'force_remote'
+  const ownChoiceIDs = options.ownChoiceIDs ?? new Set<EntityID>();
 
   const _conflicts: string[] = [];
 
 
   /**
-   * Merges the node location from the remote version into the target.
+   * Three-way merges the node location from the remote version into the target.
    * With `'force_remote'` strategy the remote location always wins.
    * With `'force_local'` or when locations are equal the target is unchanged.
-   * Otherwise a conflict is recorded and the target is left as-is.
+   * Otherwise, a move on only one side is kept: the remote one if the user didn't move it,
+   * the user's if the other mapper didn't. If both moved it, a conflict is recorded and the
+   * target is left as-is.
+   * @param   base   - The common ancestor version of the node
    * @param   remote - The remote version of the node
    * @param   target - The local version of the node being built
    * @return  Updated target node
    */
-  function mergeLocation(remote: OsmNode, target: OsmNode): OsmNode {
+  function mergeLocation(base: OsmNode | undefined, remote: OsmNode, target: OsmNode): OsmNode {
     const EPSILON = 1e-6;
     if (strategy === 'force_local' || vecEqual(target.loc!, remote.loc!, EPSILON)) {
       return target;
     }
-    if (strategy === 'force_remote') {
+    if (strategy === 'force_remote' || (base && vecEqual(base.loc!, target.loc!, EPSILON))) {   // only moved remotely
       return target.update({ loc: remote.loc });
+    }
+    if (base && vecEqual(base.loc!, remote.loc!, EPSILON)) {   // only moved locally
+      return target;
     }
 
     _conflicts.push(
@@ -154,8 +163,6 @@ export function actionMergeRemoteChanges(id: EntityID, options: MergeRemoteChang
       return node.hasInterestingTags() || hasInterestingParent || graph.parentRelations(node).length > 0;
     }
 
-    const origLength = _conflicts.length;
-
     for (const nodeID of children) {
       const node = graph.hasEntity(nodeID) as OsmNode | null;
 
@@ -170,12 +177,15 @@ export function actionMergeRemoteChanges(id: EntityID, options: MergeRemoteChang
       // restore used childNodes..
       const local = localGraph.hasEntity(nodeID) as OsmNode | null;
       const remote = remoteGraph.hasEntity(nodeID) as OsmNode | null;
+      const baseNode = graph.base.entities.get(nodeID);
       let target: OsmNode;
+
+      // A node with its own conflict follows its own choice, whatever is chosen for the way.
+      if (ownChoiceIDs.has(nodeID)) continue;
 
       if (strategy === 'force_remote' && remote && remote.visible) {
         // A node another way uses keeps the user's change, unless the other mapper changed it too:
         // "use theirs" is about this way, and the change is an edit of that other way as well.
-        const baseNode = graph.base.entities.get(nodeID);
         const isShared = !!node && graph.parentWays(node).some(way => way.id !== targetWay.id);
         if (isShared && baseNode && remote.version === baseNode.version) continue;
         updates.replacements.push(remote);
@@ -188,17 +198,18 @@ export function actionMergeRemoteChanges(id: EntityID, options: MergeRemoteChang
         updates.replacements.push(target);
 
       } else if (strategy === 'safe' && local && remote && local.version !== remote.version) {
-        target = createOsmEntity(local, { version: remote.version }) as OsmNode;
+        // A node the user changed is checked on its own (everything modified is), so its own merge decides it.
+        if (local !== baseNode) continue;
+
+        // The user didn't change it, so it takes the other mapper's version, unless they deleted it
         if (remote.visible) {
-          target = mergeLocation(remote, target);
+          updates.replacements.push(remote);
         } else {
           _conflicts.push(
             localize('merge_remote_changes.conflict.deleted', { user: formatUser(remote.props.user ?? 'unknown') })
           );
+          break;
         }
-
-        if (_conflicts.length !== origLength) break;
-        updates.replacements.push(target);
       }
     }
 
@@ -321,8 +332,10 @@ export function actionMergeRemoteChanges(id: EntityID, options: MergeRemoteChang
 
     // deleted locally
     if (!local) {
-      if (!remote.visible) {    // deleted by both: nothing to upload, so take back our deletion
-        return actionRevert(id)(graph);
+      // Deleted by both: keep our deletion, and what was deleted along with it. (The uploader leaves
+      // out what's deleted on both sides. Taking back our deletion would bring back the way's nodes too.)
+      if (!remote.visible) {
+        return graph;
       }
       if (strategy === 'force_local') {    // keep our deletion
         // (It uploads against the base version, so the uploader replaces that with the remote version first)
@@ -362,7 +375,7 @@ export function actionMergeRemoteChanges(id: EntityID, options: MergeRemoteChang
 
     // merge
     if (target.type === 'node') {
-      target = mergeLocation(remote as OsmNode, target as OsmNode);
+      target = mergeLocation(base as OsmNode | undefined, remote as OsmNode, target as OsmNode);
 
     } else if (target.type === 'way') {
       // (Child nodes that aren't present locally were merged into the base before this runs.)

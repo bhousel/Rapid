@@ -73,7 +73,11 @@ screens, and `UiConflicts` the conflict screen.
 ### Local deletions
 
 When the user deleted something another mapper changed:
-- **Both deleted it:** nothing to upload, so the merge takes the deletion back.
+- **Both deleted it:** the local deletion stays, and the uploader leaves it out of the upload
+  (`_deletedRemotelyIDs`: everything the check found deleted on the server, for the rest of the save).
+  The nodes the user deleted along with a way still upload, unless they're deleted on the server too.
+  (Until November 2026 the merge took the deletion back, and since `actionRevert` restores what was
+  deleted along with a way, that brought back its nodes, and the user's deletion of them was lost.)
 - **"Leave Deleted"** (`force_local`): the deletion is uploaded against the base copy's version, which is
   older than the server's. So once the user saves the conflict screen, the uploader replaces the base
   copy with the remote one, along with child nodes the user didn't change (`EditSystem.updateBase`). The
@@ -81,6 +85,9 @@ When the user deleted something another mapper changed:
   is left alone (a way can't be drawn without its nodes), and the upload fails with the API's reason.
   (Until November 3, 2026 the base was updated while detecting, so Cancel kept it, and the next Save
   deleted the other mapper's version without asking.)
+  The remote way's untagged nodes that nothing else uses are deleted too (`_deleteOrphanedNodes`), as
+  deleting the way did with the nodes it had. Otherwise nodes the other mapper added would be left on
+  OSM, untagged and unused (until November 2026, they were).
 - **"Restore"** (`force_remote`): `actionRevert` brings it back, with the child nodes and members that
   were deleted along with it. The base gets the remote version too, so the map shows it.
 
@@ -91,6 +98,25 @@ shares keeps the user's change, unless the other mapper changed that node too: t
 of the other way as well, which isn't in conflict. (iD reverts every child node. Until November 3, 2026
 Rapid did too, so moving a junction and retagging one of its roads lost the move when the retag
 conflicted.)
+
+**A node with its own conflict follows its own choice,** whatever is chosen for its way: the forced
+merges skip the child nodes in `ownChoiceIDs` (the uploader's `_conflictIDs`). Until November 2026,
+"Use theirs" on a way overrode "Keep mine" on one of its nodes, so the node went back to its base
+position (neither version), and the result also depended on which conflict the screen showed last.
+Saving the conflict screen applies every conflict's choice once more, so they're all in, in any order.
+
+**What's left just as the other mapper has it isn't an edit** (`_settleSameAsRemote`, when the merges
+are committed and when the conflict screen is saved): an entity whose local copy has the same version,
+tags and shape as the remote one goes into the base, and its local copy is dropped. That covers "Use
+theirs" (the way, and its nodes), and the nodes the other mapper changed under a way the user changed.
+It shows their version on the map, instead of the base the user started from (as "Use theirs" used to),
+and nothing is uploaded for it (it used to upload copies of the shared nodes the other mapper changed:
+changes that changed nothing).
+
+**A child node the user didn't change takes the other mapper's version** in a safe merge of its way,
+location and tags. A child node the user changed is left to its own merge: everything the user
+modified is checked on its own. (Until November 2026, the way's merge rebuilt the node from the user's
+copy, which dropped the other mapper's tag changes on it, or reported "moved by both".)
 
 `Graph.rebase` used to restore a locally deleted node when newly loaded data showed a way using it
 (iD#2085). For a way the user deleted along with its nodes, that undid part of the deletion, so it no
@@ -206,11 +232,14 @@ conflict path had no tests, so each bug stayed hidden behind the one before it.
 | 9 | The session backup is deleted before uploading (iD#5200), and backups are skipped in save mode, so a reload during a stalled save or the conflict screen loses the edits (Rapid#1480). | Fixed: the session is kept, marked while uploading, and settled with the API by the next tab (see [Keeping the edits during a save](#keeping-the-edits-during-a-save)) |
 | 10 | Results of an earlier attempt that arrive late could change a newer attempt's state. | Fixed: each `save()` is a numbered attempt |
 
-Found along the way, not fixed:
-- **"Moved by both" when only the other mapper moved it.** `mergeLocation` compares local and remote but
+Found along the way, fixed in November 2026:
+- **"Moved by both" when only the other mapper moved it.** `mergeLocation` compared local and remote but
   not base, so a node the user retagged (or a child node of a way they changed) that someone else moved
-  is reported as moved by both. iD has the same.
-- **Updating a base node doesn't update its parent ways' cached extents** (`Graph.rebase` with `force`).
+  was reported as moved by both. iD has the same. It's a three-way merge now, like tags: a move on only
+  one side is kept.
+- **Updating a base node didn't update its parent ways' cached extents** (`Graph.rebase` with `force`).
+  The graph-geometry rollout fixed it: a forced rebase recomputes the shapes of what contains the
+  replaced entities.
 
 ## Decisions
 
@@ -259,4 +288,8 @@ Found along the way, not fixed:
    headless Chromium with every OSM write intercepted: a tab closed mid-upload, then a new tab, with
    the changeset answering "has changes" (deleted quietly), "no changes" (offered), and unreachable
    (offered with the warning).
-5. **Later:** the "moved by both" false conflict; a new changeset when the old one was closed.
+5. **Choices for ways and their nodes, and deletions** (bug hunt 2, November 2026): the "moved by both"
+   false conflict, a node's own choice over its way's, nothing uploaded that's just as the other mapper
+   has it, "deleted by both" keeping the nodes' deletions, and "Leave Deleted" taking the nodes the
+   other mapper added. ✅
+6. **Later:** a new changeset when the old one was closed.
