@@ -40,6 +40,24 @@ describe('Context', () => {
     });
   });
 
+  describe('resetAsync', () => {
+    it('returns to browse mode before the systems reset, so nothing stays selected', async () => {
+      const context = new Rapid.Context();
+      context.$container = d3.select(document.createElement('div'));
+      const fakeMode = (id) => ({ id: id, enter: () => true, exit: () => {} });
+      context.modes = { browse: fakeMode('browse'), select: fakeMode('select') };
+      const modeAtReset = [];
+      context.systems = {
+        editor: { resetAsync: () => { modeAtReset.push(context.mode.id); return Promise.resolve(); } }
+      };
+      context.services = {};
+
+      context.enter('select');
+      await context.resetAsync();
+      assert.deepEqual(modeAtReset, ['browse']);
+    });
+  });
+
   describe('next', () => {
     it('gets the next number in the given sequence', () => {
       const context = new Rapid.Context();

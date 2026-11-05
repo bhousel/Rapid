@@ -70,7 +70,7 @@ describe('EditSystem sessions (Phase 2)', () => {
   describe('multiple concurrent sessions', () => {
     it('mints a unique session id on first backup', async () => {
       editor.perform(actionAddTaggedNode('n-1', [1, 2], { building: 'yes' }));
-      editor.commit({ stringID:'add building', selection: ['n-1'] });
+      editor.commit({ stringID:'add building', selectionAfter: ['n-1'] });
       await editor.immediateBackup();
 
       assert.isString(editor._sessionID);
@@ -80,14 +80,14 @@ describe('EditSystem sessions (Phase 2)', () => {
     it('writes separate records for separate sessions', async () => {
       // First session
       editor.perform(actionAddTaggedNode('n-1', [1, 2], { building: 'yes' }));
-      editor.commit({ stringID:'building', selection: ['n-1'] });
+      editor.commit({ stringID:'building', selectionAfter: ['n-1'] });
       await editor.immediateBackup();
       const firstID = editor._sessionID;
 
       // Reset clears the session id; the next edit starts a fresh session
       await editor.resetAsync();
       editor.perform(actionAddTaggedNode('n-2', [3, 4], { highway: 'residential' }));
-      editor.commit({ stringID:'road', selection: ['n-2'] });
+      editor.commit({ stringID:'road', selectionAfter: ['n-2'] });
       await editor.immediateBackup();
       const secondID = editor._sessionID;
 
@@ -98,7 +98,7 @@ describe('EditSystem sessions (Phase 2)', () => {
 
     it('a reset and a restore of the same edits (the walkthrough) continues their session', async () => {
       editor.perform(actionAddTaggedNode('n-1', [1, 2], { building: 'yes' }));
-      editor.commit({ stringID:'building', selection: ['n-1'] });
+      editor.commit({ stringID:'building', selectionAfter: ['n-1'] });
       await editor.immediateBackup();
       const sessionID = editor.sessionID;
       const json = editor.toJSON();
@@ -117,7 +117,7 @@ describe('EditSystem sessions (Phase 2)', () => {
 
     it('removes the session when the user undoes all of its edits', async () => {
       editor.perform(actionAddTaggedNode('n-1', [1, 2], { building: 'yes' }));
-      editor.commit({ stringID:'building', selection: ['n-1'] });
+      editor.commit({ stringID:'building', selectionAfter: ['n-1'] });
       await editor.immediateBackup();
       const sessionID = editor._sessionID;
       assert.isOk(await database.get('sessions', sessionID));
@@ -132,7 +132,7 @@ describe('EditSystem sessions (Phase 2)', () => {
 
     it('no longer writes edits to localStorage', async () => {
       editor.perform(actionAddTaggedNode('n-1', [1, 2], { building: 'yes' }));
-      editor.commit({ stringID:'building', selection: ['n-1'] });
+      editor.commit({ stringID:'building', selectionAfter: ['n-1'] });
       await editor.immediateBackup();
 
       assert.isFalse(context.systems.storage.hasItem(LEGACY_KEY));
@@ -140,7 +140,7 @@ describe('EditSystem sessions (Phase 2)', () => {
 
     it('stores metadata (editCount, bbox, summary) on the record', async () => {
       editor.perform(actionAddTaggedNode('n-1', [1, 2], { building: 'yes' }));
-      editor.commit({ stringID:'building', selection: ['n-1'] });
+      editor.commit({ stringID:'building', selectionAfter: ['n-1'] });
       await editor.immediateBackup();
 
       const record = await database.get('sessions', editor._sessionID);
@@ -154,9 +154,9 @@ describe('EditSystem sessions (Phase 2)', () => {
     it('includes what was deleted in the bbox (from the edit\'s extent)', async () => {
       editor.merge([ new Rapid.OsmNode(context, { id: 'n1', version: 1, loc: [5, 6] }) ]);
       editor.perform(actionAddTaggedNode('n-1', [1, 2], { building: 'yes' }));
-      editor.commit({ stringID:'building', selection: ['n-1'] });
+      editor.commit({ stringID:'building', selectionAfter: ['n-1'] });
       editor.perform(Rapid.actionDeleteNode('n1'));
-      editor.commit({ stringID:'deleted', selection: [] });
+      editor.commit({ stringID:'deleted', selectionAfter: [] });
       await editor.immediateBackup();
 
       const record = await database.get('sessions', editor._sessionID);
@@ -233,7 +233,7 @@ describe('EditSystem sessions (Phase 2)', () => {
     it('records the API the edits were made on', async () => {
       context.services.osm.apiroot = DEV;
       editor.perform(actionAddTaggedNode('n-1', [1, 2], { building: 'yes' }));
-      editor.commit({ stringID: 'building', selection: ['n-1'] });
+      editor.commit({ stringID: 'building', selectionAfter: ['n-1'] });
       await editor.immediateBackup();
 
       const record = await database.get('sessions', editor._sessionID);
@@ -336,7 +336,7 @@ describe('EditSystem sessions (Phase 2)', () => {
 
     it('bumps heartbeatAt on the active session without clobbering its data', async () => {
       editor.perform(actionAddTaggedNode('n-1', [1, 2], { building: 'yes' }));
-      editor.commit({ stringID:'building', selection: ['n-1'] });
+      editor.commit({ stringID:'building', selectionAfter: ['n-1'] });
       await editor.immediateBackup();
 
       const before = (await database.get('sessions', editor._sessionID)).heartbeatAt;
@@ -391,7 +391,7 @@ describe('EditSystem sessions (Phase 2)', () => {
 
     it('records the owned session id in sessionStorage on backup', async () => {
       editor.perform(actionAddTaggedNode('n-1', [1, 2], { building: 'yes' }));
-      editor.commit({ stringID:'building', selection: ['n-1'] });
+      editor.commit({ stringID:'building', selectionAfter: ['n-1'] });
       await editor.immediateBackup();
 
       assert.strictEqual(globalThis.sessionStorage.getItem(OWN_KEY), editor._sessionID);
@@ -399,7 +399,7 @@ describe('EditSystem sessions (Phase 2)', () => {
 
     it('clears the owned session id when the active session is deleted', async () => {
       editor.perform(actionAddTaggedNode('n-1', [1, 2], { building: 'yes' }));
-      editor.commit({ stringID:'building', selection: ['n-1'] });
+      editor.commit({ stringID:'building', selectionAfter: ['n-1'] });
       await editor.immediateBackup();
       const id = editor._sessionID;
 
@@ -445,7 +445,7 @@ describe('EditSystem sessions (Phase 2)', () => {
 
     it('marks the session when uploading, and keeps the mark through later backups', async () => {
       editor.perform(actionAddTaggedNode('n-1', [1, 2], { building: 'yes' }));
-      editor.commit({ stringID: 'building', selection: ['n-1'] });
+      editor.commit({ stringID: 'building', selectionAfter: ['n-1'] });
       await editor.markUploadAsync('7', API);
 
       let record = await database.get('sessions', editor._sessionID);
@@ -453,7 +453,7 @@ describe('EditSystem sessions (Phase 2)', () => {
       assert.strictEqual(record.data.index, 1);
 
       editor.perform(actionAddTaggedNode('n-2', [3, 4], { building: 'yes' }));
-      editor.commit({ stringID: 'building', selection: ['n-2'] });
+      editor.commit({ stringID: 'building', selectionAfter: ['n-2'] });
       await editor.immediateBackup();
       record = await database.get('sessions', editor._sessionID);
       assert.strictEqual(record.upload.changesetID, '7');
@@ -469,7 +469,7 @@ describe('EditSystem sessions (Phase 2)', () => {
 
     it('lets go of a marked session for the next start to settle', async () => {
       editor.perform(actionAddTaggedNode('n-1', [1, 2], { building: 'yes' }));
-      editor.commit({ stringID: 'building', selection: ['n-1'] });
+      editor.commit({ stringID: 'building', selectionAfter: ['n-1'] });
       await editor.markUploadAsync('7', API);
       const sessionID = editor._sessionID;
 
@@ -484,7 +484,7 @@ describe('EditSystem sessions (Phase 2)', () => {
       // Starting over, this tab's next edits go to a new session.
       await editor.resetAsync();
       editor.perform(actionAddTaggedNode('n-1', [5, 6], { building: 'yes' }));
-      editor.commit({ stringID: 'building', selection: ['n-1'] });
+      editor.commit({ stringID: 'building', selectionAfter: ['n-1'] });
       await editor.immediateBackup();
       assert.notStrictEqual(editor._sessionID, sessionID);
       assert.strictEqual((await database.get('sessions', sessionID)).data.entities.length, 1, 'untouched');
@@ -492,7 +492,7 @@ describe('EditSystem sessions (Phase 2)', () => {
 
     it('doesn\'t let go of a session that isn\'t marked', async () => {
       editor.perform(actionAddTaggedNode('n-1', [1, 2], { building: 'yes' }));
-      editor.commit({ stringID: 'building', selection: ['n-1'] });
+      editor.commit({ stringID: 'building', selectionAfter: ['n-1'] });
       await editor.immediateBackup();
       const sessionID = editor._sessionID;
 
@@ -502,14 +502,14 @@ describe('EditSystem sessions (Phase 2)', () => {
 
     it('settles a session it let go of: deleted if the upload went through, offered if not', async () => {
       editor.perform(actionAddTaggedNode('n-1', [1, 2], { building: 'yes' }));
-      editor.commit({ stringID: 'building', selection: ['n-1'] });
+      editor.commit({ stringID: 'building', selectionAfter: ['n-1'] });
       await editor.markUploadAsync('7', API);
       const landedID = editor._sessionID;
       await editor.releaseSessionAsync();
       await editor.resetAsync();
 
       editor.perform(actionAddTaggedNode('n-1', [3, 4], { building: 'yes' }));
-      editor.commit({ stringID: 'building', selection: ['n-1'] });
+      editor.commit({ stringID: 'building', selectionAfter: ['n-1'] });
       await editor.markUploadAsync('8', API);
       const lostID = editor._sessionID;
       await editor.releaseSessionAsync();

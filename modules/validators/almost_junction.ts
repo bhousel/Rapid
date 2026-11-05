@@ -245,7 +245,7 @@ export function validateAlmostJunction(context: Context): ValidatorFunction {
           editor.perform(plan.action);
           editor.commit({
             stringID: 'issues.fix.connect_almost_junction.annotation',
-            selection: plan.selection
+            selectionAfter: plan.selection
           });
         }
       })];
@@ -266,7 +266,7 @@ export function validateAlmostJunction(context: Context): ValidatorFunction {
             editor.perform(actionChangeTags(nodeID, tags));
             editor.commit({
               stringID: 'issues.fix.tag_as_disconnected.annotation',
-              selection: [nodeID]
+              selectionAfter: [nodeID]
             });
           }
         }));

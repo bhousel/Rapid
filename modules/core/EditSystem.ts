@@ -315,7 +315,7 @@ interface EntityCopy {
  *      jump the user to a different part of the map and restore a different selection.
  *      Receives `prevIndex` and `currIndex`
  * - 'returnview' - Fires when redo takes the user back to where they were before they started
- *      undoing (see `returnEdit`).  Receives the return Edit, with its `transform` and `selection`.
+ *      undoing (see `returnEdit`).  Receives the return Edit, with its `transform` and `selectionAfter`.
  * - 'merge'  - Fires when new base entities are merged into the base graph.
  *      Receives the IDs on the merged tile, plus the IDs whose shape changed because of it.
  * - 'backupstatuschange' - Fires when backup status changes, receives `true` if ok, `false` if failed
@@ -2940,7 +2940,7 @@ export class EditSystem extends AbstractSystem {
 
     return new Edit(context, this.stable.graph, {
       stringID: 'redo.return_view',
-      selection: context.mode?.selectedIDs ?? [],
+      selectionAfter: context.mode?.selectedIDs ?? [],
       transform: context.viewport.transform.props
     });
   }
@@ -3012,7 +3012,7 @@ export class EditSystem extends AbstractSystem {
       if (typeof description === 'string') props.annotation = description;
     }
 
-    if (Array.isArray(item.selectedIDs))  props.selection = item.selectedIDs as EntityID[];
+    if (Array.isArray(item.selectedIDs))  props.selectionAfter = item.selectedIDs as EntityID[];
 
     const sources: EditSources = {};
     if (Array.isArray(item.imageryUsed))  sources.imagery = item.imageryUsed as string[];
@@ -3033,19 +3033,18 @@ export class EditSystem extends AbstractSystem {
 
 
   /**
-   * Upgrade the props of an edit backed up by an older Rapid. For a short time in October 2026:
-   * - edit props had `selectedIDs` (assumed OSM) instead of `selection`.
-   * - `selection` and `selectionBefore` grouped the data IDs by layer (`{ osm: ['w1'] }`), they're a
-   *   plain `DataID[]` now (see `design/data-ids.md`).
+   * Upgrade the props of an edit backed up by an older Rapid.
+   * - For a short time in October 2026, edit props had `selectedIDs` (assumed OSM) instead of `selection`,
+   *   and `selection` and `selectionBefore` grouped the data IDs by layer (`{ osm: ['w1'] }`). They're
+   *   a plain `DataID[]` now (see `design/data-ids.md`).
+   * - Until November 2026, `selectionAfter` was called `selection`.
    * Selections also drop the data IDs that named other data before the reload (`isStableDataID`).
    * @param props - The props from the backup
    * @return The props, upgraded
    */
-  protected _upgradeEditProps(props: EditProps & { selectedIDs?: EntityID[] }): EditProps {
-    const { selectedIDs, ...rest } = props;
-    if (Array.isArray(selectedIDs) && !rest.selection) {
-      rest.selection = selectedIDs;
-    }
+  protected _upgradeEditProps(props: EditProps & { selectedIDs?: EntityID[], selection?: unknown }): EditProps {
+    const { selectedIDs, selection, ...rest } = props;
+    rest.selectionAfter ??= (selection ?? selectedIDs) as DataID[] | undefined;
 
     // Flatten a selection grouped by layer
     const flatten = (selection: unknown): DataID[] | undefined => {
@@ -3053,9 +3052,9 @@ export class EditSystem extends AbstractSystem {
       const dataIDs = Array.isArray(selection) ? selection as DataID[] : Object.values(selection as LegacyEditSelection).flat();
       return dataIDs.filter(isStableDataID);
     };
-    rest.selection = flatten(rest.selection);
+    rest.selectionAfter = flatten(rest.selectionAfter);
     rest.selectionBefore = flatten(rest.selectionBefore);
-    if (!rest.selection) delete rest.selection;
+    if (!rest.selectionAfter) delete rest.selectionAfter;
     if (!rest.selectionBefore) delete rest.selectionBefore;
 
     return rest;

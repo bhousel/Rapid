@@ -45,7 +45,7 @@ describe('DragNodeMode', () => {
 
     mode._end({ coord: { world: [0, 0] } });
     assert.lengthOf(commits, 1);
-    assert.deepEqual(commits[0].selection, ['n1']);
+    assert.deepEqual(commits[0].selectionAfter, ['w1']);   // what it selects next, so redo selects it too
     assert.deepEqual(commits[0].selectionBefore, ['w1']);
     assert.deepEqual(entered, [['select', { selection: ['w1'] }]]);
   });

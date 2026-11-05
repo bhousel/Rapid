@@ -474,17 +474,37 @@ export class MapSystem extends AbstractSystem {
     }
 
     // Note: draw modes need to do a little extra work to survive this,
-    //  so they have their own `historyjump` listeners.
+    //  so they have their own `historyjump` listeners. When they leave, they call `restoreJumpSelection`.
     const modeID = context.mode?.id ?? '';
     if (/^draw/.test(modeID)) return;
 
-    // Same index: go back to what was selected before the work that was thrown away, not to the
-    // newest edit's selection (which may be anything, anywhere).
+    this.restoreJumpSelection(prevIndex, currIndex);
+  }
+
+
+  /**
+   * Select what an undo, redo or restore should show: what was selected before the edit it took
+   * back (undo), or after the edit it brought in (redo, restore). At the same index, only the work in
+   * progress was thrown away, so this goes back to what was selected before that work, not to the
+   * newest edit's selection (which may be anything, anywhere).
+   * Draw modes call this when a jump takes them out of the line or area they were drawing.
+   * @param  prevIndex - The history index before the jump
+   * @param  currIndex - The history index after the jump
+   */
+  public restoreJumpSelection(prevIndex: number, currIndex: number): void {
+    const context = this.context;
+    const editor = context.systems.editor!;
+
+    const history = editor.history;
+    const isUndo = (currIndex < prevIndex && !!history[prevIndex]);
+    const edit = isUndo ? history[prevIndex] : history[currIndex];
+    if (!edit) return;
+
     let selection: DataID[];
     if (prevIndex === currIndex) {
       selection = context.mode?.selectionBefore ?? [];
     } else {
-      selection = (isUndo ? edit.props.selectionBefore : edit.props.selection) ?? [];
+      selection = (isUndo ? edit.props.selectionBefore : edit.props.selectionAfter) ?? [];
     }
     this._restoreSelection(selection);
   }
@@ -493,7 +513,7 @@ export class MapSystem extends AbstractSystem {
   /**
    * Respond to the extra redo past the newest edit: go back to where the user was before they
    * started undoing, with what they had selected.
-   * @param  edit - The return Edit, with the `transform` and `selection` to go back to
+   * @param  edit - The return Edit, with the `transform` and `selectionAfter` to go back to
    */
   protected _returnViewed(edit: Edit): void {
     const context = this.context;
@@ -506,7 +526,7 @@ export class MapSystem extends AbstractSystem {
     const modeID = context.mode?.id ?? '';
     if (/^draw/.test(modeID)) return;
 
-    this._restoreSelection(edit.props.selection ?? []);
+    this._restoreSelection(edit.props.selectionAfter ?? []);
   }
 
 

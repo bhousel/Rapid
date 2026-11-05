@@ -358,9 +358,9 @@ describe('validateAlmostJunction', () => {
       // The user edits twice after the fixes were shown, the second time tagging the end node.
       // (The first edit still goes into the graph the fixes were shown for, the second doesn't.)
       editor.perform(Rapid.actionChangeTags('n2', { note: 'other end' }));
-      editor.commit({ stringID: 'tagged n2', selection: ['n2'] });
+      editor.commit({ stringID: 'tagged n2', selectionAfter: ['n2'] });
       editor.perform(Rapid.actionChangeTags('n1', { note: 'end of the road' }));
-      editor.commit({ stringID: 'tagged n1', selection: ['n1'] });
+      editor.commit({ stringID: 'tagged n1', selectionAfter: ['n1'] });
 
       connect.onClick();
       const graph = editor.staging.graph;
@@ -375,7 +375,7 @@ describe('validateAlmostJunction', () => {
 
       // The user drags the end of the road away
       editor.perform(Rapid.actionMoveNode('n1', [22.4236, 0.0005]));
-      editor.commit({ stringID: 'moved n1', selection: ['n1'] });
+      editor.commit({ stringID: 'moved n1', selectionAfter: ['n1'] });
       const moved = editor.staging.graph;
 
       connect.onClick();

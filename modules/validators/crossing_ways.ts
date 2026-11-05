@@ -832,7 +832,7 @@ export function validateCrossingWays(context: Context): ValidatorFunction {
         editor.perform(actionAddStructure);
         editor.commit({
           stringID: `issues.fix.${titleID}.annotation`,
-          selection: [selectedWayID]
+          selectionAfter: [selectedWayID]
         });
         context.enter('select', { selection: resultWayIDs });
       }
@@ -982,7 +982,7 @@ export function validateCrossingWays(context: Context): ValidatorFunction {
         editor.perform(actionChangeTags(entity.id, tags));
         editor.commit({
           stringID: 'operations.change_tags.annotation',
-          selection: [selectedID]
+          selectionAfter: [selectedID]
         });
       }
     });

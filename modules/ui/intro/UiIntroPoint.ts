@@ -335,7 +335,7 @@ export class UiIntroPoint extends AbstractIntroChapter {
       editor.perform(actionChangePreset(this._pointID!, preset, this._cafePreset));
       editor.commit({
         stringID: 'operations.change_tags.annotation',
-        selection: [this._pointID!]
+        selectionAfter: [this._pointID!]
       });
     }
 

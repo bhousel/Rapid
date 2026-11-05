@@ -257,7 +257,7 @@ const membersToUpdate = d.members.filter(function(member: IndexedMember) {
       editor.commit({
         stringID: 'operations.change_role.annotation',
         stringParams: { n: membersToUpdate.length },
-        selection: [d.relation.id]
+        selectionAfter: this._entityIDs   // the members stay selected
       });
     }
     this._inChange = false;
@@ -292,7 +292,7 @@ const membersToUpdate = d.members.filter(function(member: IndexedMember) {
       editor.commit({
         stringID: 'operations.add_member.annotation',
         stringParams: { n: entityIDs.length },
-        selection: [d.relation.id]
+        selectionAfter: entityIDs   // the members stay selected
       });
 
     } else {
@@ -303,7 +303,7 @@ const membersToUpdate = d.members.filter(function(member: IndexedMember) {
       );
       editor.commit({
         stringID: 'operations.add.annotation.relation',
-        selection: [relation.id]
+        selectionAfter: [relation.id]
       });
       context.enter('select', { selection: [relation.id], newFeature: true });
     }
@@ -333,7 +333,7 @@ const indexes = d.members.map(function(member: IndexedMember) {
     editor.commit({
       stringID: 'operations.delete_member.annotation',
       stringParams: { n: this._entityIDs.length },
-      selection: [d.relation.id]
+      selectionAfter: this._entityIDs   // the members stay selected
     });
   }
 

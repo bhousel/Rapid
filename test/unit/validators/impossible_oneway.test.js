@@ -79,7 +79,7 @@ describe('validateImpossibleOneway', () => {
     // The user draws the road further after the fixes were shown
     const node = new Rapid.OsmNode(context, { id: 'n-1', loc: [0, 0.001] });
     editor.perform(Rapid.actionAddEntity(node), Rapid.actionAddVertex('w1', 'n-1'));
-    editor.commit({ stringID: 'extended w1', selection: ['w1'] });
+    editor.commit({ stringID: 'extended w1', selectionAfter: ['w1'] });
 
     fix.onClick();
     assert.deepEqual(entered, []);

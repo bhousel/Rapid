@@ -599,7 +599,7 @@ export class SelectMode extends AbstractMode {
 
       // do it
       const label = operation.editLabel();
-      const props = { ...label, selection: selectedIDs };
+      const props = { ...label, selectionAfter: selectedIDs };
 
       editor.perform(action);
       if (isSameSelection && editor.getUndoEdit()?.isLabeled(label)) {

@@ -73,7 +73,7 @@ export class OrthogonalizeOperation extends AbstractOperation {
     combinedAction.transitionable = true;
 
     const label = this.editLabel();
-    editor.animateAndCommitAsync(combinedAction, { ...label, selection: this.selectedIDs });
+    editor.animateAndCommitAsync(combinedAction, { ...label, selectionAfter: this.selectedIDs });
   }
 
 

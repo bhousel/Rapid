@@ -50,7 +50,7 @@ export interface EditProps {
   /** A plain-text label, only for edits restored from a v3 backup (already translated) */
   annotation?: string;
   /** Data IDs of what's selected after this edit, e.g. `['w1', 'fbRoads:abc']`; redo restores it */
-  selection?: DataID[];
+  selectionAfter?: DataID[];
   /** Data IDs of what was selected before this edit; undo restores it. `EditSystem` fills it in at commit. */
   selectionBefore?: DataID[];
   /**

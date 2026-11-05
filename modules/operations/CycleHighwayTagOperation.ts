@@ -186,7 +186,7 @@ export class CycleHighwayTagOperation extends AbstractOperation {
       editor.perform(action);
     }
 
-    const props = { ...this._label, selection: this.selectedIDs };
+    const props = { ...this._label, selectionAfter: this.selectedIDs };
     if (this._isSameSelection && editor.getUndoEdit()?.isLabeled(this._label)) {
       editor.commitAppend(props);
     } else {

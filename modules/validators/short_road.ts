@@ -130,7 +130,7 @@ export function validateShortRoad(context: Context): ValidatorFunction {
           if (!way || graph.parentRelations(way).length) return;
 
           editor.perform(actionDeleteWay(wayID));
-          editor.commit({ stringID: 'operations.delete.annotation.line', selection: [wayID] });
+          editor.commit({ stringID: 'operations.delete.annotation.line', selectionAfter: [wayID] });
           context.enter('browse');
         }
       }));

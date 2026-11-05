@@ -89,13 +89,18 @@ numbers below keep the hunt's numbering.
     `MapSystem` would (`selectionBefore`, or `mode.selectionBefore` for a same-index undo); non-OSM IDs
     are always dropped. Same class as first-hunt item 22. `DrawLineMode.ts:866`, `DrawAreaMode.ts:825`.
     *Pattern main too, confirmed.*
+    ✅ **Fixed:** draw modes call `MapSystem.restoreJumpSelection(prevIndex, currIndex)`, the one rule.
 15. **Redo restores what an operation committed with, not what it then selects:** drag vertex (the
     vertex, not the way), split (the vertex, not the lines), multipolygon merge, extract, delete vertex,
     add member. `DragNodeMode.ts:369`, `SplitOperation.ts:92` and others. *Main too, but `selection` now
     means "after". Reading.*
+    ✅ **Fixed:** `selection` is renamed `selectionAfter` (old backups upgrade), and drag, split, extract,
+    merge, delete and the membership editor commit with what they select next
+    (`test/unit/operations/selection_after.test.js`). Checked live: split, undo, redo.
 16. **`resetAsync()` with no edits re-selects the current selection instead of going to browse**
     (`historyjump(0, 0)` reads as "work in progress thrown away"), possibly data whose cache was just
     cleared. `EditSystem.ts:540`. *New, reading.*
+    ✅ **Fixed:** `Context.resetAsync` enters browse mode before resetting the systems.
 17. ✅ **Osmose/KeepRight: after an issue is closed, the editor stays up.** SelectMode's `change` handler
     finds no cached issue and returns; a second "done" click falls back to the stale datum,
     `replaceItem` puts the closed issue back on the map, and it posts again (`_closed` counts 2).

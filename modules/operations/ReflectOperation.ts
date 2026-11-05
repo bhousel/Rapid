@@ -59,7 +59,7 @@ export class ReflectOperation extends AbstractOperation {
     const label = this.editLabel();
     const action = actionReflect(this.selectedIDs).useLongAxis(this._axis === 'long');
 
-    editor.animateAndCommitAsync(action, { ...label, selection: this.selectedIDs });
+    editor.animateAndCommitAsync(action, { ...label, selectionAfter: this.selectedIDs });
   }
 
 

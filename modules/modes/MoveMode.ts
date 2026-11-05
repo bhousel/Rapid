@@ -141,7 +141,7 @@ export class MoveMode extends AbstractMode {
 
       editor.commit({
         ...label,
-        selection: this._entityIDs
+        selectionAfter: this._entityIDs
       });
     }
   }

@@ -189,7 +189,7 @@ export class DisconnectOperation extends AbstractOperation {
     };
 
     editor.perform(combinedAction);
-    editor.commit({ ...this.editLabel(), selection: this.selectedIDs });
+    editor.commit({ ...this.editLabel(), selectionAfter: this.selectedIDs });
   }
 
 

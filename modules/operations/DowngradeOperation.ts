@@ -68,7 +68,7 @@ export class DowngradeOperation extends AbstractOperation {
 
     const label = this.editLabel();
     editor.perform(combinedAction);
-    editor.commit({ ...label, selection: this.selectedIDs });
+    editor.commit({ ...label, selectionAfter: this.selectedIDs });
 
     // refresh the select mode to enable the delete operation
     this.context.enter('select', { selection: this.selectedIDs });

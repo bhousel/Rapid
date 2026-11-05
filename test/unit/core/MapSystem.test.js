@@ -321,7 +321,7 @@ describe('MapSystem', () => {
     it('undo while dragging goes back to what was selected before the drag, not the newest edit\'s selection', () => {
       const ctx = new Rapid.MockContext();
       const editor = new Rapid.MockSystem(ctx);
-      editor.history = [{ props: {} }, { props: { selection: ['w9'], selectionBefore: ['w8'] } }];
+      editor.history = [{ props: {} }, { props: { selectionAfter: ['w9'], selectionBefore: ['w8'] } }];
       ctx.systems = { editor: editor, gfx: new Rapid.MockGfxSystem(ctx) };
       ctx.mode = { id: 'drag-node', selectionBefore: ['w1'] };
 
@@ -331,6 +331,37 @@ describe('MapSystem', () => {
 
       map._historyJumped(1, 1);   // only the work in progress was thrown away
       assert.deepEqual(restored, [['w1']]);
+    });
+
+    it('selects what was selected before an undone edit, and after a redone one, including data that isn\'t OSM', () => {
+      const ctx = new Rapid.MockContext();
+      const editor = new Rapid.MockSystem(ctx);
+      editor.history = [{ props: {} }, { props: { selectionAfter: ['n-1'], selectionBefore: ['fbRoads:abc'] } }];
+      ctx.systems = { editor: editor, gfx: new Rapid.MockGfxSystem(ctx) };
+      ctx.mode = { id: 'browse', selectionBefore: [] };
+
+      const map = new Rapid.MapSystem(ctx);
+      const restored = [];
+      map._restoreSelection = selection => restored.push(selection);
+
+      map.restoreJumpSelection(1, 0);   // undo
+      map.restoreJumpSelection(0, 1);   // redo
+      assert.deepEqual(restored, [['fbRoads:abc'], ['n-1']]);
+    });
+
+    it('leaves the selection to a draw mode, which calls `restoreJumpSelection` if it has to leave', () => {
+      const ctx = new Rapid.MockContext();
+      const editor = new Rapid.MockSystem(ctx);
+      editor.history = [{ props: {} }, { props: { selectionAfter: ['n-1'], selectionBefore: ['w1'] } }];
+      ctx.systems = { editor: editor, gfx: new Rapid.MockGfxSystem(ctx) };
+      ctx.mode = { id: 'draw-line', selectionBefore: [] };
+
+      const map = new Rapid.MapSystem(ctx);
+      const restored = [];
+      map._restoreSelection = selection => restored.push(selection);
+
+      map._historyJumped(1, 0);
+      assert.deepEqual(restored, []);
     });
   });
 

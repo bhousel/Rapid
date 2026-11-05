@@ -181,7 +181,7 @@ export function validateOutdatedTags(context: Context): ValidatorFunction {
               editor.perform(actionDoTagUpgrade);
               editor.commit({
                 stringID: 'issues.fix.upgrade_tags.annotation',
-                selection: [entity.id]
+                selectionAfter: [entity.id]
               });
             }
           })
@@ -196,7 +196,7 @@ export function validateOutdatedTags(context: Context): ValidatorFunction {
                 editor.perform(actionAddNotTag);
                 editor.commit({
                   stringID: 'issues.fix.tag_as_not.annotation',
-                  selection: [entity.id]
+                  selectionAfter: [entity.id]
                 });
               }
             })

@@ -137,7 +137,7 @@ export class RotateMode extends AbstractMode {
 
       editor.commit({
         ...label,
-        selection: this._entityIDs
+        selectionAfter: this._entityIDs
       });
     }
   }

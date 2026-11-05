@@ -388,10 +388,16 @@ export class Context extends EventEmitter {
 
   /**
    * Call after completing an edit session to reset any internal state.
+   * Returns to browse mode first: nothing selected or in progress outlives the session, and the
+   * systems are about to throw away what a mode may be showing.
    * @return  Promise resolved when Rapid is finished resetting
    */
   public resetAsync(): Promise<void> {
     if (this._resetPromise) return this._resetPromise;
+
+    if (this.modes.browse && this._currMode && this._currMode !== this.modes.browse) {
+      this.enter('browse');
+    }
 
     const allSystems = Object.values(this.systems).filter(s => !!s);
     const allServices = Object.values(this.services).filter(s => !!s);

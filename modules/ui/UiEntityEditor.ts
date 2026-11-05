@@ -359,7 +359,7 @@ export class UiEntityEditor extends EventEmitter {
       // If this is the same selection as before, and the previous edit was also a change_tags,
       // we can just replace the previous edit with this one.
       const label: EditLabel = { stringID: 'operations.change_tags.annotation' };
-      const props = { ...label, selection: this._entityIDs };
+      const props = { ...label, selectionAfter: this._entityIDs };
       if (isSameSelection && editor.getUndoEdit()?.isLabeled(label)) {
         editor.commitAppend(props);
       } else {
@@ -424,7 +424,7 @@ export class UiEntityEditor extends EventEmitter {
     // If this is the same selection as before, and the previous edit was also a change_tags,
     // we can just replace the previous edit with this one.
     const label: EditLabel = { stringID: 'operations.change_tags.annotation' };
-    const props = { ...label, selection: this._entityIDs };
+    const props = { ...label, selectionAfter: this._entityIDs };
     if (isSameSelection && editor.getUndoEdit()?.isLabeled(label)) {
       editor.commitAppend(props);
     } else {

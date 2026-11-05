@@ -88,7 +88,7 @@ export class ExtractOperation extends AbstractOperation {
     const label = this.editLabel();
     editor.beginTransaction();
     editor.perform(combinedAction);
-    editor.commit({ ...label, selection: this.selectedIDs });
+    editor.commit({ ...label, selectionAfter: extractedNodeIDs });
     editor.endTransaction();
 
     this.context.enter('select', { selection: extractedNodeIDs });

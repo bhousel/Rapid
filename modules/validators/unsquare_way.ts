@@ -133,7 +133,7 @@ export function validateUnsquareWay(context: Context): ValidatorFunction {
               editor.animateAndCommitAsync(action, {
                 stringID: 'operations.orthogonalize.annotation.feature',
                 stringParams: { n: 1 },
-                selection: [entityID]
+                selectionAfter: [entityID]
               });
             }
           }),

@@ -511,7 +511,7 @@ export class DrawAreaMode extends AbstractMode {
       // If the area has enough segments, commit the work in progress so we can undo/redo to it.
       const label = this._getLabel();
       if (label) {
-        editor.commit({ ...label, selection: [drawWay.id] });
+        editor.commit({ ...label, selectionAfter: [drawWay.id] });
         this._takeSnapshot(firstNode!.id, drawNode!.id);
       }
 
@@ -587,7 +587,7 @@ export class DrawAreaMode extends AbstractMode {
       // If the area has enough segments, commit the work in progress so we can undo/redo to it.
       const label = this._getLabel();
       if (label) {
-        editor.commit({ ...label, selection: [drawWay.id] });
+        editor.commit({ ...label, selectionAfter: [drawWay.id] });
         this._takeSnapshot(firstNode!.id, drawNode!.id);
       }
 
@@ -665,7 +665,7 @@ export class DrawAreaMode extends AbstractMode {
       // If the area has enough segments, commit the work in progress so we can undo/redo to it.
       const label = this._getLabel();
       if (label) {
-        editor.commit({ ...label, selection: [drawWay.id] });
+        editor.commit({ ...label, selectionAfter: [drawWay.id] });
         this._takeSnapshot(firstNode!.id, targetNode.id);
       }
 
@@ -805,10 +805,14 @@ export class DrawAreaMode extends AbstractMode {
    * Here we attempt to restore the drawing entityIDs from a snapshot.
    * If we ever find ourself in an edit where we can't retrieve this information, leave `DrawAreaMode`.
    * This means we've undo/redoed into an edit where the user wasn't drawing the same area.
+   * @param prevIndex - The history index before the jump
+   * @param currIndex - The history index after the jump
    */
-  protected _restoreSnapshot(): void {
+  protected _restoreSnapshot(prevIndex: number, currIndex: number): void {
     const context = this.context;
     const editor = context.systems.editor!;
+    const map = context.systems.map;   // optional
+
     const graph = editor.stable.graph;
     const snapshot = this._snapshots.get(graph);
 
@@ -820,14 +824,10 @@ export class DrawAreaMode extends AbstractMode {
       this.drawNodeID = null;   // will be recreated after the user moves the pointer
       this._refreshEntities();
 
-    } else {   // Otherwise, return to select or browse mode (MapSystem has similar code to this)
-      const checkIDs = editor.stable.props.selection ?? [];
-      const selectedIDs = checkIDs.filter(entityID => graph.hasEntity(entityID));
-      if (selectedIDs.length) {
-        context.enter('select', { selection: selectedIDs });
-      } else {
-        context.enter('browse');
-      }
+    } else if (map) {   // Otherwise, select what any other undo or redo would select
+      map.restoreJumpSelection(prevIndex, currIndex);
+    } else {
+      context.enter('browse');
     }
   }
 

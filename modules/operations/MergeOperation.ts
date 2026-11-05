@@ -47,7 +47,6 @@ export class MergeOperation extends AbstractOperation {
 
     const label = this.editLabel();
     editor.perform(this._action);
-    editor.commit({ ...label, selection: this.selectedIDs });
 
     const graph = editor.staging.graph;  // after edit
     let successorIDs = this.selectedIDs.filter(entityID => graph.hasEntity(entityID));
@@ -57,6 +56,8 @@ export class MergeOperation extends AbstractOperation {
         successorIDs = interestingIDs;
       }
     }
+
+    editor.commit({ ...label, selectionAfter: successorIDs });
     context.enter('select', { selection: successorIDs });
   }
 

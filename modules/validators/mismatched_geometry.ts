@@ -98,7 +98,7 @@ export function validateMismatchedGeometry(context: Context): ValidatorFunction 
           editor.perform(actionMergeNodes([way.nodes[0], way.nodes[way.nodes.length-1]], nodes[0].loc!));
           editor.commit({
             stringID: 'issues.fix.connect_endpoints.annotation',
-            selection: [way.id]
+            selectionAfter: [way.id]
           });
         };
       }
@@ -118,7 +118,7 @@ export function validateMismatchedGeometry(context: Context): ValidatorFunction 
         editor.perform(actionAddVertex(wayID, nodeID, index));
         editor.commit({
           stringID: 'issues.fix.connect_endpoints.annotation',
-          selection: [wayID]
+          selectionAfter: [wayID]
         });
       };
     }
@@ -174,7 +174,7 @@ export function validateMismatchedGeometry(context: Context): ValidatorFunction 
             editor.perform(actionChangeTags(entityID, tags));
             editor.commit({
               stringID: 'issues.fix.remove_tag.annotation',
-              selection: [entityID]
+              selectionAfter: [entityID]
             });
           }
         }));
@@ -386,7 +386,7 @@ export function validateMismatchedGeometry(context: Context): ValidatorFunction 
         editor.perform(actionChangeTags(entityID, tags));
         editor.commit({
           stringID: 'issues.fix.convert_to_line.annotation',
-          selection: [entityID]
+          selectionAfter: [entityID]
         });
       };
     }
@@ -417,7 +417,7 @@ export function validateMismatchedGeometry(context: Context): ValidatorFunction 
         editor.commit({
           stringID: 'operations.extract.annotation',
           stringParams: { n: 1 },
-          selection: [entityID]
+          selectionAfter: [entityID]
         });
         // re-enter mode to trigger updates
         context.enter('select', { selection: [ action.getExtractedNodeID() ] });

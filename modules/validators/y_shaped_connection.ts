@@ -98,7 +98,7 @@ export function validateYShapedConnection(context: Context): ValidatorFunction {
           if (!node || !isDeletable(node, graph)) return;
 
           editor.perform(actionDeleteNode(nodeID));
-          editor.commit({ stringID: 'operations.delete.annotation.vertex', selection: [nodeID] });
+          editor.commit({ stringID: 'operations.delete.annotation.vertex', selectionAfter: [nodeID] });
           context.enter('browse');
         }
       });

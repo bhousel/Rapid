@@ -146,7 +146,7 @@ export interface EditProps {
   stringID?: StringID;      // undo/redo label, translated when shown (replaces `annotation`)
   stringParams?: EditLabelParams;
   annotation?: string;      // plain-text label, only for edits restored from a v3 backup
-  selection?: DataID[];        // what's selected after the edit; redo restores it
+  selectionAfter?: DataID[];   // what's selected after the edit; redo restores it (was `selection`)
   selectionBefore?: DataID[];  // what was selected before; undo restores it (filled in at commit)
   extent?: Vec4;            // where the change is (computed at commit, or given by the committer)
   sources?: EditSources;
@@ -264,7 +264,9 @@ and still eases far moves (1000 ms).
 
 **Which edit and which selection:** undo shows the edit it took back and restores what was selected
 **before** it (`selectionBefore`, recorded at commit from the current mode). Redo and restore show the
-edit they brought in and restore what was selected **after** it (`selection`, given by the committer).
+edit they brought in and restore what was selected **after** it (`selectionAfter`, given by the
+committer, which must be what it selects next: until November 2026 it was called `selection`, and
+several operations passed what they started from instead).
 So undoing an accept selects the Rapid feature again, ready to accept or look at, and undoing a
 delete selects what was deleted. OSM IDs must be in the graph; other data is looked up on the layer
 that draws it, which can take a redraw or two after undo (the feature has to come back first), so
@@ -293,8 +295,16 @@ which ends the drag. It selects the mode's `selectionBefore`, what was selected 
 (a drag records that when it starts, and commits it as the edit's `selectionBefore` too), not the
 newest edit's selection, which may be anywhere. Draw modes handle `historyjump` themselves: an undo or
 redo before the first click leaves draw mode and stays done, and only the edits made while drawing
-are rolled back when a drawing is cancelled. It doesn't save the return view; the next undo, which
-actually leaves the newest edit, does.
+are rolled back when a drawing is cancelled. When a jump takes them out of what they were drawing,
+they call `MapSystem.restoreJumpSelection`, so they select what any other undo or redo would (until
+November 2026 they had their own copy of this, which selected the newest edit's selection and only
+OSM entities). It doesn't save the return view; the next undo, which actually leaves the newest edit,
+does.
+
+**A reset isn't a jump.** `Context.resetAsync` returns to browse mode before the systems reset, so
+nothing selected outlives the session. (Before November 2026, `EditSystem`'s reset emitted
+`historyjump(0, 0)` with no edits, which `MapSystem` read as "work in progress thrown away" and
+re-selected what was selected, while the systems were emptying their caches.)
 
 **Restore** shows the extent of the last kept edit.
 
@@ -360,7 +370,8 @@ actually leaves the newest edit, does.
   `type`, `acceptIDs`, `ignoreID`, `dataUsed` keep their names). A string annotation, or an object
   annotation's `description`, was already translated, so it can't follow the user's language; it's
   kept as the plain-text `annotation` prop, which `label` falls back to. `selectedIDs` (on old items,
-  or in props saved briefly before step 4) becomes `selection: { osm: selectedIDs }`.
+  or in props saved briefly before step 4) becomes `selectionAfter`, and so does `selection`, its
+  name until November 2026.
 
 ### Sessions during an upload
 

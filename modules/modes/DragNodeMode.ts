@@ -365,15 +365,11 @@ export class DragNodeMode extends AbstractMode {
       label = this._moveLabel();
     }
 
-    editor.commit({ ...label, selection: [this.dragNode.id], selectionBefore: this._selectionBefore });
-
     // Choose next mode
     // (Note that if the drag node is gone, select mode will fallback to browse mode)
-    if (this._reselectIDs.length) {
-      context.enter('select', { selection: this._reselectIDs });
-    } else {
-      context.enter('select', { selection: [this.dragNode.id] });
-    }
+    const selectionAfter = this._reselectIDs.length ? this._reselectIDs : [this.dragNode.id];
+    editor.commit({ ...label, selectionAfter: selectionAfter, selectionBefore: this._selectionBefore });
+    context.enter('select', { selection: selectionAfter });
   }
 
 

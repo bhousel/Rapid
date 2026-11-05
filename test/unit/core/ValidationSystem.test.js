@@ -112,7 +112,7 @@ describe('ValidationSystem', () => {
 
       const editor = context.systems.editor;
       editor.perform(Rapid.actionAddEntity(n_1));
-      editor.commit({ stringID:'added n-1', selection: ['n-1'] });
+      editor.commit({ stringID:'added n-1', selectionAfter: ['n-1'] });
 
       const prom = _validator.validateAsync();
       assert.instanceOf(prom, Promise);
@@ -141,7 +141,7 @@ describe('ValidationSystem', () => {
       const n_3 = new Rapid.OsmNode(context, { id: 'n-3', loc: [0, 0], tags: { building: 'house', phone: '555-1212' } });
       const editor = context.systems.editor;
       editor.perform(Rapid.actionAddEntity(n_2), Rapid.actionAddEntity(n_3));
-      editor.commit({ stringID:'added n-2 and n-3', selection: ['n-2', 'n-3'] });
+      editor.commit({ stringID:'added n-2 and n-3', selectionAfter: ['n-2', 'n-3'] });
 
       const _error = console.error;
       console.error = () => {};
@@ -178,11 +178,11 @@ describe('ValidationSystem', () => {
       };
 
       editor.perform(...square('w-1', 0));
-      editor.commit({ stringID: 'added w-1', selection: ['w-1'] });   // starts validating
+      editor.commit({ stringID: 'added w-1', selectionAfter: ['w-1'] });   // starts validating
 
       // Commit again while that validation runs, so the head cache is a graph behind stable
       editor.perform(Rapid.actionChangeTags('w-1', { building: 'house' }), ...square('w-2', 0.001));
-      editor.commit({ stringID: 'changed w-1, added w-2', selection: ['w-2'] });
+      editor.commit({ stringID: 'changed w-1, added w-2', selectionAfter: ['w-2'] });
 
       checked = [];
       try {
@@ -211,11 +211,11 @@ describe('ValidationSystem', () => {
 
       try {
         editor.perform(Rapid.actionAddEntity(new Rapid.OsmNode(context, { id: 'n-20', loc: [30, 30] })));
-        editor.commit({ stringID: 'added n-20', selection: ['n-20'] });   // starts validating
+        editor.commit({ stringID: 'added n-20', selectionAfter: ['n-20'] });   // starts validating
 
         // Commit again before the queued jobs run
         editor.perform(Rapid.actionAddEntity(new Rapid.OsmNode(context, { id: 'n-21', loc: [30.001, 30] })));
-        editor.commit({ stringID: 'added n-21', selection: ['n-21'] });
+        editor.commit({ stringID: 'added n-21', selectionAfter: ['n-21'] });
         assert.strictEqual(_validator._head.graph, editor.stable.graph);
 
         await _validator.validateAsync();
@@ -256,7 +256,7 @@ describe('ValidationSystem', () => {
         const b = new Rapid.OsmNode(context, { id: 'n-11', loc: [10.001, 10] });
         const way = new Rapid.OsmWay(context, { id: 'w-10', nodes: ['n-10', 'n-11'], tags: { highway: 'residential' } });
         editor.perform(Rapid.actionAddEntity(a), Rapid.actionAddEntity(b), Rapid.actionAddEntity(way));
-        editor.commit({ stringID: 'added w-10', selection: ['w-10'] });
+        editor.commit({ stringID: 'added w-10', selectionAfter: ['w-10'] });
         await _validator.validateAsync();
         const waitsFor = () => _validator.getIssues().filter(issue => issue.type === 'waits').map(issue => issue.entityIds[0]);
         assert.deepEqual(waitsFor(), []);
@@ -359,7 +359,7 @@ describe('ValidationSystem', () => {
         const b = new Rapid.OsmNode(context, { id: 'n-202', loc: [30.0015, 30] });
         const footway = new Rapid.OsmWay(context, { id: 'w-201', nodes: ['n-201', 'n-202'], tags: { highway: 'footway' } });
         editor.perform(Rapid.actionAddEntity(a), Rapid.actionAddEntity(b), Rapid.actionAddEntity(footway));
-        editor.commit({ stringID: 'added w-201', selection: ['w-201'] });
+        editor.commit({ stringID: 'added w-201', selectionAfter: ['w-201'] });
         await validated();
 
         const crossings = () => _validator.getIssues({ what: 'edited', where: 'all' })
@@ -415,7 +415,7 @@ describe('ValidationSystem', () => {
         const b = new Rapid.OsmNode(context, { id: 'n-302', loc: [40.00099, 40] });
         const road = new Rapid.OsmWay(context, { id: 'w-301', nodes: ['n-301', 'n-302'], tags: residential });
         editor.perform(Rapid.actionAddEntity(a), Rapid.actionAddEntity(b), Rapid.actionAddEntity(road));
-        editor.commit({ stringID: 'added w-301', selection: ['w-301'] });
+        editor.commit({ stringID: 'added w-301', selectionAfter: ['w-301'] });
         await validated();
 
         const issues = _validator.getIssues({ what: 'edited', where: 'all' })

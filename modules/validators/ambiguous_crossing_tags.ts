@@ -330,7 +330,7 @@ export function validateAmbiguousCrossingTags(context: Context): ValidatorFuncti
           editor.perform(action);
           editor.commit({
             stringID: 'issues.ambiguous_crossing.annotation.changed',
-            selection: [way.id]
+            selectionAfter: [way.id]
           });
         }
       });
