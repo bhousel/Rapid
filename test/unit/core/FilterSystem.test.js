@@ -936,4 +936,96 @@ describe('FilterSystem', () => {
 
   });
 
+
+  describe('settings', () => {
+    class MockUrlHashSystem extends Rapid.MockSystem {
+      constructor(context, params = {}) {
+        super(context);
+        this.id = 'urlhash';
+        this.params = new Map(Object.entries(params));
+      }
+      getParam(k) { return this.params.get(k); }
+      setParam(k, v) {
+        if (v === null) {
+          this.params.delete(k);
+        } else {
+          this.params.set(k, v);
+        }
+      }
+    }
+
+    // A FilterSystem started with real settings (holding `saved` as the disabled filters) and the given url params.
+    function startFilters(saved, params) {
+      const ctx = new Rapid.MockContext();
+      ctx.systems = {
+        editor:   new MockEditSystem(ctx),
+        settings: new Rapid.SettingsSystem(ctx),
+        storage:  new Rapid.StorageSystem(ctx),
+        urlhash:  new MockUrlHashSystem(ctx, params)
+      };
+      const filters = new Rapid.FilterSystem(ctx);
+      const settings = ctx.systems.settings;
+      return settings.initAsync()
+        .then(() => settings.set('filters.disabledFilters', saved))
+        .then(() => filters.initAsync())
+        .then(() => filters.startAsync())
+        .then(() => ({ filters, settings }));
+    }
+
+    function savedFilters(settings) {
+      return settings.get('filters.disabledFilters').split(',').filter(Boolean);
+    }
+
+    it('takes the disabled filters a sync brings, so the next toggle keeps them', () => {
+      let settings;
+      return startFilters('boundaries')
+        .then(result => {
+          const filters = result.filters;
+          settings = result.settings;
+
+          // Another browser hid `buildings`, and a sync brings it here
+          settings.set('filters.disabledFilters', 'boundaries,buildings');
+          assert.isFalse(filters.isEnabled('buildings'));
+
+          filters.toggle('points');
+          assert.sameMembers(savedFilters(settings), ['boundaries', 'buildings', 'points']);
+        })
+        .finally(() => settings?.unset('filters.disabledFilters'));
+    });
+
+    it('applies a link\'s disable_features without saving it', () => {
+      let settings;
+      return startFilters('boundaries', { disable_features: 'water' })
+        .then(result => {
+          const filters = result.filters;
+          settings = result.settings;
+
+          assert.isFalse(filters.isEnabled('water'));
+          assert.isTrue(filters.isEnabled('boundaries'));
+          assert.deepEqual(savedFilters(settings), ['boundaries']);
+
+          // The link wins over a sync for this session
+          settings.set('filters.disabledFilters', 'boundaries,rail');
+          assert.isTrue(filters.isEnabled('rail'));
+
+          // A change the user makes is saved, but only that change
+          filters.toggle('points');
+          assert.sameMembers(savedFilters(settings), ['boundaries', 'rail', 'points']);
+          assert.isTrue(filters.isEnabled('rail'));
+        })
+        .finally(() => settings?.unset('filters.disabledFilters'));
+    });
+
+    it('saves an empty list when the user shows every filter', () => {
+      let settings;
+      return startFilters('boundaries')
+        .then(result => {
+          settings = result.settings;
+          result.filters.enableAll();
+          assert.strictEqual(settings.get('filters.disabledFilters'), '');
+        })
+        .finally(() => settings?.unset('filters.disabledFilters'));
+    });
+  });
+
 });

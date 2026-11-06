@@ -76,19 +76,29 @@ numbers below keep the hunt's numbering.
    `backlog.md`.
 
 ### Medium
-10. **Synced settings read once at startup ignore the value the startup sync pulls,** and the next
+10. ✅ **Synced settings read once at startup ignore the value the startup sync pulls,** and the next
     toggle writes the stale value back to the account (A disables `crossing_ways`; B starts, pulls it,
     still shows it enabled; B turns off `almost_junction`, and the account loses A's choice). Validator
     rules (`ValidationSystem.ts:193`), filters (`FilterSystem.ts:153`), imagery favorites
     (`UiSectionBackgroundList.ts:90`); no `settingschange` listener. A `disable_features=` URL param is
     written into the synced setting too. *New, confirmed.*
-11. **An empty value never syncs,** so re-enabling every rule (or filter) stays local and the account
+    ✅ **Fixed:** the three re-read their list on `settingschange`. Filters: the url's
+    `disable_features` decides for the session and isn't saved; a user's change saves only the filters
+    they changed (a reload always has the url, so saving the whole screen would overwrite the account).
+    Area fill, opacity and raw tag editor view still show a pulled value only after a reload.
+11. ✅ **An empty value never syncs,** so re-enabling every rule (or filter) stays local and the account
     keeps the old list. `SettingsSystem.ts:888`. *New, confirmed.*
+    ✅ **Fixed:** an empty value travels as `""` (`toRemoteValue` / `fromRemoteValue`).
 12. **Sync deletes account keys this build hasn't registered** (a newer build's paths, or `ui.*` and
     `poweruser.*` when those components aren't built), so testers switching builds lose preferences.
     `SettingsSystem.ts:854`. *New, reading.*
-13. **A failed user-details call resets the sync base,** so the next good sync lets the remote win over
+    Plan (agreed Nov 5): delete only a fixed list of paths the old sync on `main` pushed that no longer
+    sync: `meta`, `imagery.custom`, `imagery.lastUsed`, `imagery.lastUsedToggle`, `rapid`,
+    `schema.presetRecents`, `poweruser.was`, `ui.customData`, `ui.disclosure`, `ui.entityIssues`,
+    `ui.inspector`, `ui.mouseWheelInteraction`, `ui.restrictions`, `ui.walkthrough`, `ui.width`.
+13. ✅ **A failed user-details call resets the sync base,** so the next good sync lets the remote win over
     a newer local change. `SettingsSystem.ts:835`. *New, confirmed.*
+    ✅ **Fixed:** the sync stops (`no-user` / `no-preferences`) before touching the base.
 14. **Undo out of a draw mode selects the newest edit's `selection`** (maybe offscreen), not what
     `MapSystem` would (`selectionBefore`, or `mode.selectionBefore` for a same-index undo); non-OSM IDs
     are always dropped. Same class as first-hunt item 22. `DrawLineMode.ts:866`, `DrawAreaMode.ts:825`.

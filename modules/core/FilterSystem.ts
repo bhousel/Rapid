@@ -71,6 +71,8 @@ export class FilterSystem extends AbstractSystem {
   protected _forceVisible: Set<EntityID>;
   /** Cache of entity.key to matched filterIDs */
   protected _cache: Record<string, EntityCache>;
+  /** Whether the url's `disable_features` decides the filters for this session, instead of settings */
+  protected _urlOverride: boolean;
 
 
   /**
@@ -86,10 +88,12 @@ export class FilterSystem extends AbstractSystem {
     this._hidden = new Set<FilterID>();
     this._forceVisible = new Set<EntityID>();
     this._cache = {};
+    this._urlOverride = false;
 
     // Ensure methods used as callbacks always have `this` bound correctly.
     this._hashChanged = this._hashChanged.bind(this);
     this._filterChanged = this._filterChanged.bind(this);
+    this._settingsChanged = this._settingsChanged.bind(this);
 
     // hardcode the filters for now
     this._filters.set('points',          new Filter(this._isPoint.bind(this)));
@@ -148,11 +152,12 @@ export class FilterSystem extends AbstractSystem {
     const settings = context.systems.settings;
     const urlhash = context.systems.urlhash;
 
-    // Take filter values from urlhash first, localstorage second,
-    // Default to having boundaries hidden
-    const toHide = urlhash?.getParam('disable_features') ?? settings?.get('filters.disabledFilters') ?? 'boundaries';
-    const filterIDs = utilExtractValues(toHide).filter(Boolean);
-    for (const filterID of filterIDs) {
+    // Take filter values from urlhash first, settings second.
+    // A link's filters are for this session only, so they aren't saved to settings.
+    const urlHidden = urlhash?.getParam('disable_features');
+    this._urlOverride = urlHidden !== undefined;
+    const toHide = urlHidden !== undefined ? utilExtractValues(urlHidden).filter(Boolean) : this._readDisabledFilters();
+    for (const filterID of toHide) {
       this._hidden.add(filterID);
       const filter = this._filters.get(filterID);
       if (filter) {
@@ -161,6 +166,8 @@ export class FilterSystem extends AbstractSystem {
     }
     this._filterChanged();
     this._started = true;
+
+    settings?.on('settingschange', this._settingsChanged);
 
     return this._startPromise = super.startAsync();
   }
@@ -214,7 +221,7 @@ export class FilterSystem extends AbstractSystem {
     const filter = this._filters.get(filterID);
     if (filter && !filter.enabled) {
       filter.enabled = true;
-      this._filterChanged();
+      this._filterChanged([filterID]);
     }
   }
 
@@ -231,7 +238,7 @@ export class FilterSystem extends AbstractSystem {
       }
     }
     if (didChange) {
-      this._filterChanged();
+      this._filterChanged([...this._filters.keys()]);
     }
   }
 
@@ -244,7 +251,7 @@ export class FilterSystem extends AbstractSystem {
     const filter = this._filters.get(filterID);
     if (filter?.enabled) {
       filter.enabled = false;
-      this._filterChanged();
+      this._filterChanged([filterID]);
     }
   }
 
@@ -261,7 +268,7 @@ export class FilterSystem extends AbstractSystem {
       }
     }
     if (didChange) {
-      this._filterChanged();
+      this._filterChanged([...this._filters.keys()]);
     }
   }
 
@@ -275,7 +282,7 @@ export class FilterSystem extends AbstractSystem {
     if (!filter) return;
 
     filter.enabled = !filter.enabled;
-    this._filterChanged();
+    this._filterChanged([filterID]);
   }
 
 
@@ -658,6 +665,7 @@ export class FilterSystem extends AbstractSystem {
       }
 
       if (didChange) {
+        this._urlOverride = true;
         this._filterChanged();
       }
     }
@@ -665,11 +673,48 @@ export class FilterSystem extends AbstractSystem {
 
 
   /**
-   * Called whenever the enabled/disabled filters change.
-   * Used to push changes in state to the urlhash and the localStorage,
-   *   then trigger a redraw, and emit a 'filterchange' event.
+   * Reads the disabled filterIDs from settings, which hide boundaries by default.
+   * @return Array of disabled filterIDs
    */
-  protected _filterChanged(): void {
+  protected _readDisabledFilters(): FilterID[] {
+    const settings = this.context.systems.settings;
+    const toHide = settings?.get('filters.disabledFilters') ?? 'boundaries';
+    return utilExtractValues(toHide).filter(Boolean);
+  }
+
+
+  /**
+   * Called when settings change. A sync may have brought the disabled filters from another
+   * browser; take them, so that the next toggle doesn't send this browser's old list back.
+   * While a link's `disable_features` decides the filters, it wins.
+   */
+  protected _settingsChanged(): void {
+    if (this._urlOverride) return;
+
+    const toHide = new Set<FilterID>(this._readDisabledFilters());
+    let didChange = false;
+    for (const [filterID, filter] of this._filters) {
+      const enabled = !toHide.has(filterID);
+      if (filter.enabled !== enabled) {
+        filter.enabled = enabled;
+        didChange = true;
+      }
+    }
+
+    if (didChange) {
+      this._filterChanged();
+    }
+  }
+
+
+  /**
+   * Called whenever the enabled/disabled filters change.
+   * Used to push changes in state to the urlhash and the settings,
+   *   then trigger a redraw, and emit a 'filterchange' event.
+   * @param changedIDs - The filters the user changed. Only these are saved to settings, so the
+   *   filters a link (or a reload's url) decides for this session don't replace the user's others.
+   */
+  protected _filterChanged(changedIDs: FilterID[] = []): void {
     const context = this.context;
     const gfx = context.systems.gfx;
     const settings = context.systems.settings;
@@ -688,7 +733,17 @@ export class FilterSystem extends AbstractSystem {
     urlhash?.setParam('disable_features', filterIDs.length ? filterIDs : null);
 
     // update settings
-    settings?.set('filters.disabledFilters', filterIDs);
+    if (changedIDs.length) {
+      const saved = new Set<FilterID>(this._readDisabledFilters());
+      for (const filterID of changedIDs) {
+        if (this._filters.get(filterID)?.enabled) {
+          saved.delete(filterID);
+        } else {
+          saved.add(filterID);
+        }
+      }
+      settings?.set('filters.disabledFilters', [...saved].join(','));
+    }
 
     gfx?.immediateRedraw();
     this.emit('filterchange');

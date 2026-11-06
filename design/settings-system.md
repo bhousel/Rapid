@@ -681,13 +681,23 @@ modeled on how VS Code documents its settings and extension points.
    - `syncRemote()` merges each one against the last synced copy (`meta.syncBase` in localStorage,
      scoped to the OSM site and user). If the remote changed, it wins; otherwise a local change is
      sent. Requests go one at a time, and only one sync runs at once.
+   - A sync that can't get the user's ID stops before changing anything. (Going on without it used to
+     throw the base away, so the next sync let the remote win over a newer local change.)
+   - The OSM API can't store an empty value, so an empty value is sent as `""` and read back as
+     empty. An empty list (all filters shown, no rules disabled) syncs like any other value.
    - Rapid syncs at startup when the user is already signed in, on every `authchange`, and after a
      change to a synced setting. Remote `rapid.settings.*` keys that aren't synced are removed.
    - Synced so far: imagery favorites and opacity; area fill; disabled filters; validator options;
      privacy and raw tag editor view; the "seen" flags; and the power-user flags. Device-specific
      settings (inspector width, mouse wheel) and collections stay local.
-   - Few systems listen for `settingschange` yet. A value pulled after startup shows up the next time
-     it's read (render time, or the next reload).
+   - The systems that keep a synced list (disabled validator rules, disabled filters, imagery
+     favorites) re-read it on `settingschange`. Otherwise a value pulled after startup would be
+     overwritten by the next toggle, which sends the whole list.
+   - Filters: the url's `disable_features`, when present, decides the filters for the session
+     instead of settings, and it isn't saved. A filter the user changes is saved on its own, so the
+     url's other filters don't replace the saved ones.
+   - Single values read once (area fill, imagery opacity, raw tag editor view) show a value pulled
+     after startup at the next reload. A change writes only that value, so nothing is lost.
    - `UiSystem.initAsync` now waits for `settings`, which fixes the six constructor reads.
 2. **Datasets as a collection.** ✅ Done. A `datasets` collection in asset files, and custom datasets
    in `DatabaseSystem`, with their conflation settings.

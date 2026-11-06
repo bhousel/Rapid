@@ -67,6 +67,7 @@ export class UiSectionBackgroundList extends AbstractUiSection {
     // (This is also necessary when using `d3-selection.call`)
     this._isNotOverlay = this._isNotOverlay.bind(this);
     this._renderIfVisible = this._renderIfVisible.bind(this);
+    this._settingsChanged = this._settingsChanged.bind(this);
     this._setTooltips = this._setTooltips.bind(this);
     this._sortSources = this._sortSources.bind(this);
     this._drawListItems = this._drawListItems.bind(this);
@@ -87,13 +88,11 @@ export class UiSectionBackgroundList extends AbstractUiSection {
     this.CustomBackgroundSettings = new UiSettingsCustomBackground(context);
     this.CustomBackgroundSettings.on('change', this._customChanged);
 
-    const stored: unknown = settings?.get('imagery.favorites') ?? [];
-    // note: older versions stored favorites as an object, but we only need the keys of this object
-    const vals = Array.isArray(stored) ? stored as string[] : Object.keys(stored as object);
-    this._favoriteIDs = new Set<string>(vals);
+    this._favoriteIDs = this._readFavorites();
 
     // Event listeners
     imagery.on('imagerychange', this._renderIfVisible);
+    settings?.on('settingschange', this._settingsChanged);
     gfx.on('draw', this._deferredOnMapDraw);
     l10n.on('localechange', this._setupKeybinding);
 
@@ -139,6 +138,33 @@ export class UiSectionBackgroundList extends AbstractUiSection {
     if (this._isVisible()) {
       this.renderInner();
     }
+  }
+
+
+  /**
+   * Reads the favorite imagery sourceIDs from settings.
+   * @return The set of favorite sourceIDs
+   */
+  protected _readFavorites(): Set<string> {
+    const settings = this.context.systems.settings;
+    const stored: unknown = settings?.get('imagery.favorites') ?? [];
+    // note: older versions stored favorites as an object, but we only need the keys of this object
+    const vals = Array.isArray(stored) ? stored as string[] : Object.keys(stored as object);
+    return new Set<string>(vals);
+  }
+
+
+  /**
+   * Called when settings change. A sync may have brought the favorites from another browser;
+   * take them, so that the next toggle doesn't send this browser's old list back.
+   */
+  protected _settingsChanged(): void {
+    const favoriteIDs = this._readFavorites();
+    const curr = this._favoriteIDs;
+    if (favoriteIDs.size === curr.size && [...favoriteIDs].every(sourceID => curr.has(sourceID))) return;
+
+    this._favoriteIDs = favoriteIDs;
+    this._renderIfVisible();
   }
 
 

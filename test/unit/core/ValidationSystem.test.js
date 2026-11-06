@@ -439,4 +439,29 @@ describe('ValidationSystem', () => {
 
   });
 
+
+  describe('settings', () => {
+    it('takes the disabled rules a sync brings, so the next toggle keeps them', () => {
+      const settings = new Rapid.SettingsSystem(context);
+      const validator = new Rapid.ValidationSystem(context);
+      context.systems.settings = settings;
+
+      return settings.initAsync()
+        .then(() => validator.initAsync())
+        .then(() => {
+          // Another browser disabled `crossing_ways`, and a sync brings it here
+          settings.set('validator.disabledRules', 'crossing_ways');
+          assert.isFalse(validator.isValidatorEnabled('crossing_ways'));
+
+          validator.toggleValidator('almost_junction');
+          const disabled = settings.get('validator.disabledRules').split(',');
+          assert.sameMembers(disabled, ['crossing_ways', 'almost_junction']);
+        })
+        .finally(() => {
+          settings.unset('validator.disabledRules');
+          delete context.systems.settings;
+        });
+    });
+  });
+
 });

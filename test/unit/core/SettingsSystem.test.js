@@ -330,12 +330,13 @@ describe('SettingsSystem', () => {
         preferences: { ...(opts.preferences || {}) },
         puts: [],
         deletes: [],
-        failPuts: new Set(opts.failPuts || [])
+        failPuts: new Set(opts.failPuts || []),
+        failUserDetails: false
       };
       return {
         wwwroot: 'https://www.openstreetmap.org',
         authenticated: () => state.authenticated,
-        getUserDetailsAsync: () => Promise.resolve({ id: state.userID }),
+        getUserDetailsAsync: () => state.failUserDetails ? Promise.reject(new Error('nope')) : Promise.resolve({ id: state.userID }),
         getUserPreferencesAsync: () => Promise.resolve({ ...state.preferences }),
         putUserPreferenceAsync: (key, value) => {
           if (state.failPuts.has(key)) return Promise.reject(new Error('nope'));
@@ -518,6 +519,67 @@ describe('SettingsSystem', () => {
           assert.isEmpty(osm._state.puts);
           assert.strictEqual(settings.get('ui.foo'), 'x'.repeat(256));
           assert.strictEqual(spyWarn.mock.calls.length, 1);
+        });
+    });
+
+    it('syncs an empty value, which the OSM API cannot store as-is', () => {
+      const osm = makeMockOsm({ preferences: { 'rapid.settings.ui.foo': 'one' } });
+      let settings;
+      return makeSettings(osm)
+        .then(s => { settings = s; return settings.syncRemote(); })
+        .then(() => {
+          settings.set('ui.foo', '');
+          return settings.syncRemote();
+        })
+        .then(result => {
+          assert.deepInclude(result, { ok: true, pushed: 1 });
+          assert.strictEqual(osm._state.preferences['rapid.settings.ui.foo'], '""');
+
+          // Another browser takes it as an empty value
+          const other = new Rapid.SettingsSystem(context);
+          other.registerSync(['ui.foo']);
+          storage.removeItem('rapid.settings.ui.foo');
+          storage.removeItem('rapid.settings.meta.syncBase');
+          return other.initAsync()
+            .then(() => other.syncRemote())
+            .then(result => {
+              assert.deepInclude(result, { ok: true, pulled: 1 });
+              assert.strictEqual(other.get('ui.foo'), '');
+            });
+        });
+    });
+
+    it('keeps a value that looks like an empty value local', () => {
+      const osm = makeMockOsm();
+      return makeSettings(osm, s => s.set('ui.foo', '""'))
+        .then(settings => settings.syncRemote())
+        .then(result => {
+          assert.isTrue(result.ok);
+          assert.isEmpty(osm._state.puts);
+          assert.strictEqual(spyWarn.mock.calls.length, 1);
+        });
+    });
+
+    it('changes nothing when it cannot get the user details', () => {
+      const osm = makeMockOsm({ preferences: { 'rapid.settings.ui.foo': 'one' } });
+      let settings;
+      return makeSettings(osm)
+        .then(s => { settings = s; return settings.syncRemote(); })
+        .then(() => {
+          osm._state.failUserDetails = true;
+          return settings.syncRemote();
+        })
+        .then(result => {
+          assert.isFalse(result.ok);
+          // A newer change here, then a good sync: the base must still say the remote hasn't changed.
+          osm._state.failUserDetails = false;
+          settings.set('ui.foo', 'two');
+          return settings.syncRemote();
+        })
+        .then(result => {
+          assert.deepInclude(result, { ok: true, pushed: 1, pulled: 0 });
+          assert.strictEqual(settings.get('ui.foo'), 'two');
+          assert.strictEqual(osm._state.preferences['rapid.settings.ui.foo'], 'two');
         });
     });
 

@@ -87,6 +87,8 @@ const SETTINGS_META_PREFIX = `${SETTINGS_PREFIX}.meta.`;
 const CURRENT_SETTINGS_VERSION = 1;
 /** How long to wait (ms) after a settings change before pushing to the remote store. */
 const SYNC_THROTTLE = 1000;
+/** Stands in for an empty value on the OSM account, which can't store one. */
+const EMPTY_REMOTE_VALUE = '""';
 
 
 // ---------------------------------------------------------------------------
@@ -135,6 +137,26 @@ function toFlatKey(key: string): string {
   // Strip the `rapid.settings` prefix (and its separating `.`) to recover the flat key.
   const flatKey = key.slice(SETTINGS_PREFIX.length);
   return flatKey.startsWith('.') ? flatKey.slice(1) : flatKey;
+}
+
+
+/**
+ * Converts a settings value to the value stored on the OSM account.
+ * @param value - A settings value
+ * @return The value to store, with an empty value replaced by `EMPTY_REMOTE_VALUE`
+ */
+function toRemoteValue(value: string): string {
+  return value === '' ? EMPTY_REMOTE_VALUE : value;
+}
+
+
+/**
+ * Converts a value stored on the OSM account to its settings value (the inverse of `toRemoteValue`).
+ * @param value - A value from the OSM account
+ * @return The settings value
+ */
+function fromRemoteValue(value: string): string {
+  return value === EMPTY_REMOTE_VALUE ? '' : value;
 }
 
 
@@ -819,8 +841,12 @@ export class SettingsSystem extends AbstractSystem {
    *
    * Remote `rapid.settings.*` keys that aren't synced settings (earlier versions synced
    * everything) are removed. Other applications' preferences are never touched.
-   * Requests are sent one at a time. A synced setting that the OSM API can't store
-   * (an empty value, or a key or value over 255 characters) stays local.
+   * Requests are sent one at a time. The OSM API can't store an empty value, so one is sent
+   * as `EMPTY_REMOTE_VALUE` instead. A synced setting that the OSM API can't store (a key or
+   * value over 255 characters, or a value that is `EMPTY_REMOTE_VALUE` itself) stays local.
+   *
+   * Without the user's ID there is no way to tell whose base applies, so a sync that can't
+   * get it stops before changing anything.
    * @return  Promise resolved with the sync result
    */
   protected async _syncRemoteAsync(): Promise<SyncResult> {
@@ -832,11 +858,13 @@ export class SettingsSystem extends AbstractSystem {
     const maxKey = context.maxCharsForTagKey || 255;
     const maxValue = context.maxCharsForTagValue || 255;
 
-    const user = await osm.getUserDetailsAsync().catch(() => null);
-    const prefs: Record<string, string> = (await osm.getUserPreferencesAsync()) ?? {};
+    const user = await osm.getUserDetailsAsync();
+    if (!user?.id) return { ok: false, reason: 'no-user' };
+    const prefs: Record<string, string> | undefined = await osm.getUserPreferencesAsync();
+    if (!prefs) return { ok: false, reason: 'no-preferences' };
 
     // A base from another OSM site or user says nothing about this remote, so start over.
-    const owner = `${osm.wwwroot}#${user?.id ?? ''}`;
+    const owner = `${osm.wwwroot}#${user.id}`;
     if (this._syncBase.owner !== owner) {
       this._syncBase = { owner, entries: new Map<string, string>() };
     }
@@ -849,7 +877,7 @@ export class SettingsSystem extends AbstractSystem {
       if (!isSettingsKey(key)) continue;   // not ours
       const flatKey = toFlatKey(key);
       if (this._isSynced(flatKey)) {
-        remote.set(flatKey, String(value));
+        remote.set(flatKey, fromRemoteValue(String(value)));
       } else {
         leftovers.push(key);
       }
@@ -886,7 +914,7 @@ export class SettingsSystem extends AbstractSystem {
 
       // Only the local changed, so send it, if the OSM API can store it.
       const unstorable = [...localEntries].find(([key, value]) =>
-        !value.length || value.length > maxValue || toStorageKey(key).length > maxKey
+        value === EMPTY_REMOTE_VALUE || toRemoteValue(value).length > maxValue || toStorageKey(key).length > maxKey
       );
       if (unstorable) {
         console.warn(`SettingsSystem: can't sync '${path}' to the OSM account, keeping it local: ${unstorable[0]}`);  // eslint-disable-line no-console
@@ -896,7 +924,7 @@ export class SettingsSystem extends AbstractSystem {
       for (const [key, value] of localEntries) {
         if (remoteEntries.get(key) === value) continue;
         try {
-          await osm.putUserPreferenceAsync(toStorageKey(key), value);
+          await osm.putUserPreferenceAsync(toStorageKey(key), toRemoteValue(value));
           base.set(key, value);
         } catch {
           failed++;

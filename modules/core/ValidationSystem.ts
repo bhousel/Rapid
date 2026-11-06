@@ -130,6 +130,7 @@ export class ValidationSystem extends AbstractSystem {
 
     // Ensure methods used as callbacks always have `this` bound correctly.
     this.validateAsync = this.validateAsync.bind(this);
+    this._settingsChanged = this._settingsChanged.bind(this);
   }
 
 
@@ -190,11 +191,11 @@ export class ValidationSystem extends AbstractSystem {
         this._warningOverrides = this._parseHashParam(hash.get('validationWarning'));
         this._disableOverrides = this._parseHashParam(hash.get('validationDisable'));
 
-        const disabledRules = settings?.get('validator.disabledRules') ?? '';
-        const validatorIDs = utilExtractValues(disabledRules).filter(Boolean);
-        this._disabledValidatorIDs = new Set<ValidatorID>(validatorIDs);
+        this._disabledValidatorIDs = this._readDisabledRules();
 
         // Setup event handlers..
+        settings?.on('settingschange', this._settingsChanged);
+
         // When to run validation:
         editor!
           .on('stablechange', (difference: Difference) => {
@@ -583,6 +584,32 @@ export class ValidationSystem extends AbstractSystem {
 
     const settings = this.context.systems.settings;
     settings?.set('validator.disabledRules', [...this._disabledValidatorIDs].join(','));
+    this.validateAsync();
+  }
+
+
+  /**
+   * Reads the disabled validatorIDs from settings.
+   * @return The set of disabled validatorIDs
+   */
+  protected _readDisabledRules(): Set<ValidatorID> {
+    const settings = this.context.systems.settings;
+    const disabledRules = settings?.get('validator.disabledRules') ?? '';
+    const validatorIDs = utilExtractValues(disabledRules).filter(Boolean);
+    return new Set<ValidatorID>(validatorIDs);
+  }
+
+
+  /**
+   * Called when settings change. A sync may have brought the disabled rules from another
+   * browser; take them, so that the next toggle doesn't send this browser's old list back.
+   */
+  protected _settingsChanged(): void {
+    const disabledIDs = this._readDisabledRules();
+    const curr = this._disabledValidatorIDs;
+    if (disabledIDs.size === curr.size && [...disabledIDs].every(validatorID => curr.has(validatorID))) return;
+
+    this._disabledValidatorIDs = disabledIDs;
     this.validateAsync();
   }
 
