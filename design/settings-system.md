@@ -702,15 +702,28 @@ modeled on how VS Code documents its settings and extension points.
      favorites) re-read it on `settingschange`. Otherwise a value pulled after startup would be
      overwritten by the next toggle, which sends the whole list.
    - URL parameters override the user's settings for the session; they're never where the state is
-     stored. (`poweruser=true` is the one exception: it's only ever for the session.)
-   - Filters: the url's `disable_features`, when present, decides the filters for the session
-     instead of settings, and it isn't saved. A filter the user changes is saved on its own, so the
-     url's other filters don't replace the saved ones.
-   - Layers work the same way: `GraphicsSystem` saves which data layers are shown in `layers.enabled`
-     (in this browser only), and the url's `layers=` decides them for the session instead. A layer
-     that's turned on or off is saved on its own (also when a link's `id=` turns on the layer that
-     draws what it selects), except while the url or settings are being applied, and in the
-     walkthrough. `note=`, `photo_overlay=` and `maproulette=true` are legacy params, read once.
+     stored. (`poweruser=true` is the one exception: it's only ever for the session.) The url is
+     mostly how other apps start Rapid a certain way. Agreed Nov 2026:
+     - Written as you go (where you are, what's selected): `map`, `id`, `photo`, `detection`.
+     - Overrides, read but never written: `layers`, `disable_features` (done); `background`,
+       `overlays`, `offset`, `dataset_ids`, `photo_dates`, `photo_username`, `maproulette`, `locale`,
+       `rtl` (still to do, one system at a time; `overlays` and `offset` need a settings home first).
+     - An override stays in the url as the link had it until the state no longer matches it, then
+       it's dropped. So it's in effect exactly while it's in the url (no separate flag), and a reload
+       before you change anything opens the link again. When it goes away, the state stays as it is.
+     - A change is saved on its own (only what changed), so the link's other choices don't replace
+       the user's saved ones. They stay on screen until the next reload, or a sync from another browser.
+     - Read the startup value from `urlhash.initialHashParams`. Url changes made before the url resumes
+       are lost, and the first 'hashchange' may still carry a param that was dropped while it was being
+       handled (e.g. a link's `id=` turned on another layer), so check `getParam()` before applying it.
+   - Filters: `disable_features` is an override. A system that also re-reads a synced setting
+     (`settingschange`) skips its own saves (`FilterSystem._knownSaved`): after the link's filters
+     leave the url, the map can still show some of them, which aren't saved.
+   - Layers: `GraphicsSystem` saves which data layers are shown in `layers.enabled` (in this browser
+     only), and `layers=` is an override. A layer that's turned on or off is saved on its own (also
+     when a link's `id=` turns on the layer that draws what it selects), except while the url or
+     settings are being applied, and in the walkthrough. `note=`, `photo_overlay=` and
+     `maproulette=true` are legacy params, read once.
    - Single values read once (area fill, imagery opacity, raw tag editor view) show a value pulled
      after startup at the next reload. A change writes only that value, so nothing is lost.
    - `UiSystem.initAsync` now waits for `settings`, which fixes the six constructor reads.

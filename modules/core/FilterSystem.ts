@@ -71,8 +71,8 @@ export class FilterSystem extends AbstractSystem {
   protected _forceVisible: Set<EntityID>;
   /** Cache of entity.key to matched filterIDs */
   protected _cache: Record<string, EntityCache>;
-  /** Whether the url's `disable_features` decides the filters for this session, instead of settings */
-  protected _urlOverride: boolean;
+  /** The saved disabled filters, as this system last read or saved them (to tell a sync from its own save) */
+  protected _knownSaved: string;
 
 
   /**
@@ -88,7 +88,7 @@ export class FilterSystem extends AbstractSystem {
     this._hidden = new Set<FilterID>();
     this._forceVisible = new Set<EntityID>();
     this._cache = {};
-    this._urlOverride = false;
+    this._knownSaved = '';
 
     // Ensure methods used as callbacks always have `this` bound correctly.
     this._hashChanged = this._hashChanged.bind(this);
@@ -153,9 +153,8 @@ export class FilterSystem extends AbstractSystem {
     const urlhash = context.systems.urlhash;
 
     // Take filter values from urlhash first, settings second.
-    // A link's filters are for this session only, so they aren't saved to settings.
-    const urlHidden = urlhash?.getParam('disable_features');
-    this._urlOverride = urlHidden !== undefined;
+    // A link's filters override the settings without being saved (see `_filterChanged`).
+    const urlHidden = urlhash?.initialHashParams.get('disable_features');
     const toHide = urlHidden !== undefined ? utilExtractValues(urlHidden).filter(Boolean) : this._readDisabledFilters();
     for (const filterID of toHide) {
       this._hidden.add(filterID);
@@ -641,15 +640,20 @@ export class FilterSystem extends AbstractSystem {
 
 
   /**
-   * Respond to any changes appearing in the url hash
+   * Respond to any changes appearing in the url hash.
+   * Filters the user puts in the url override the settings, without being saved.
+   * (When `disable_features` goes away, the filters stay as they are.)
    * @param currParams - The current hash parameters
    * @param prevParams - The previous hash parameters
    */
   protected _hashChanged(currParams: Map<string, string>, prevParams: Map<string, string>): void {
+    const urlhash = this.context.systems.urlhash;
+
     // disable_features
-    const newDisable = currParams.get('disable_features') || '';
-    const oldDisable = prevParams.get('disable_features') || '';
-    if (newDisable !== oldDisable) {
+    // (Not if it was dropped since, by a change made while the same url was being read)
+    const newDisable = currParams.get('disable_features');
+    const oldDisable = prevParams.get('disable_features');
+    if (newDisable !== undefined && newDisable !== oldDisable && urlhash?.getParam('disable_features') === newDisable) {
       const vals = utilExtractValues(newDisable).filter(Boolean);
       const toDisableIDs = new Set<FilterID>(vals);
 
@@ -665,7 +669,6 @@ export class FilterSystem extends AbstractSystem {
       }
 
       if (didChange) {
-        this._urlOverride = true;
         this._filterChanged();
       }
     }
@@ -679,6 +682,7 @@ export class FilterSystem extends AbstractSystem {
   protected _readDisabledFilters(): FilterID[] {
     const settings = this.context.systems.settings;
     const toHide = settings?.get('filters.disabledFilters') ?? 'boundaries';
+    this._knownSaved = toHide;
     return utilExtractValues(toHide).filter(Boolean);
   }
 
@@ -686,10 +690,15 @@ export class FilterSystem extends AbstractSystem {
   /**
    * Called when settings change. A sync may have brought the disabled filters from another
    * browser; take them, so that the next toggle doesn't send this browser's old list back.
-   * While a link's `disable_features` decides the filters, it wins.
+   * While a link's `disable_features` is in the url, it wins.  This system's own saves are skipped:
+   * after a link's filters leave the url, the map may still show some of them, which aren't saved.
    */
   protected _settingsChanged(): void {
-    if (this._urlOverride) return;
+    const settings = this.context.systems.settings;
+    const urlhash = this.context.systems.urlhash;
+
+    if (urlhash?.hasParam('disable_features')) return;
+    if ((settings?.get('filters.disabledFilters') ?? 'boundaries') === this._knownSaved) return;
 
     const toHide = new Set<FilterID>(this._readDisabledFilters());
     let didChange = false;
@@ -709,10 +718,11 @@ export class FilterSystem extends AbstractSystem {
 
   /**
    * Called whenever the enabled/disabled filters change.
-   * Used to push changes in state to the urlhash and the settings,
-   *   then trigger a redraw, and emit a 'filterchange' event.
+   * Used to push changes in state to the settings, then trigger a redraw, and emit a 'filterchange' event.
+   * The filters aren't written to the url: a link's `disable_features` stays there only until the
+   * filters no longer match it, and then it's dropped (see `API.md`).
    * @param changedIDs - The filters the user changed. Only these are saved to settings, so the
-   *   filters a link (or a reload's url) decides for this session don't replace the user's others.
+   *   filters a link decided for this session don't replace the user's others.
    */
   protected _filterChanged(changedIDs: FilterID[] = []): void {
     const context = this.context;
@@ -727,10 +737,15 @@ export class FilterSystem extends AbstractSystem {
         this._hidden.add(filterID);
       }
     }
-    const filterIDs = [...this._hidden].join(',');
 
-    // update url hash
-    urlhash?.setParam('disable_features', filterIDs.length ? filterIDs : null);
+    // drop the url's filters once they no longer match (filterIDs it names that don't exist are ignored)
+    const urlHidden = urlhash?.getParam('disable_features');
+    if (urlHidden !== undefined) {
+      const urlIDs = new Set<FilterID>(utilExtractValues(urlHidden).filter(filterID => this._filters.has(filterID)));
+      if (urlIDs.size !== this._hidden.size || [...urlIDs].some(filterID => !this._hidden.has(filterID))) {
+        urlhash?.setParam('disable_features', null);
+      }
+    }
 
     // update settings
     if (changedIDs.length) {
@@ -742,7 +757,8 @@ export class FilterSystem extends AbstractSystem {
           saved.add(filterID);
         }
       }
-      settings?.set('filters.disabledFilters', [...saved].join(','));
+      this._knownSaved = [...saved].join(',');
+      settings?.set('filters.disabledFilters', this._knownSaved);
     }
 
     gfx?.immediateRedraw();

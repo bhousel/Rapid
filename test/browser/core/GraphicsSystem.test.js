@@ -1,16 +1,20 @@
 describe('GraphicsSystem', () => {
 
-  // Which layers are shown: saved in settings, and written to the url, which wins for the session.
+  // Which layers are shown: saved in settings, and a link's `layers=` overrides that until they change.
   // A real scene needs WebGL (and the constructor a canvas), so these tests use a stand-in scene,
   // and a system made without its constructor, with just what the layer code uses.
   describe('layers', () => {
     let context, gfx, scene, saved, initialParams, urlParams;
 
+    // Starts with the given url, up to the first 'hashchange' (when the url resumes)
     function startGfx(urlLayers) {
       if (urlLayers !== undefined) initialParams.set('layers', urlLayers);
+      for (const [k, v] of initialParams) urlParams.set(k, v);
       gfx._startLayers();
       gfx._started = true;
-      gfx._hashChanged(new Map(initialParams));   // the first 'hashchange', when the url resumes
+    }
+    function firstHashChange() {
+      gfx._hashChanged(new Map(initialParams), new Map());
     }
     const shownIDs = () => [...scene.layers.values()].filter(layer => layer.enabled).map(layer => layer.id);
 
@@ -27,7 +31,7 @@ describe('GraphicsSystem', () => {
         urlhash: {
           initialHashParams: initialParams,
           getParam: k => urlParams.get(k),
-          setParam: (k, v) => urlParams.set(k, v)
+          setParam: (k, v) => (v === null ? urlParams.delete(k) : urlParams.set(k, v))
         }
       };
 
@@ -36,21 +40,22 @@ describe('GraphicsSystem', () => {
         _started: false,
         _shownLayerIDs: new Set(),
         _defaultLayerIDs: new Set(),
-        _layersParam: undefined,
         _applyingLayers: false
       });
 
       // The layers start with their own defaults: OSM and Rapid data are shown.
+      // KartaView isn't supported (as if its service wasn't there), so it can't be turned on.
       const setLayers = (layerIDs, enabled) => {
         for (const layerID of layerIDs) {
           const layer = scene.layers.get(layerID);
-          if (layer) layer.enabled = enabled;
+          if (layer) layer.enabled = enabled && layer.supported;
         }
         gfx._layersChanged();   // 'layerchange'
       };
       scene = {
-        layers: new Map(['osm', 'osm-notes', 'rapid', 'mapillary', 'background'].map(layerID => {
-          return [layerID, { id: layerID, enabled: ['osm', 'rapid', 'background'].includes(layerID) }];
+        layers: new Map(['osm', 'osm-notes', 'rapid', 'mapillary', 'kartaview', 'background'].map(layerID => {
+          const layer = { id: layerID, supported: layerID !== 'kartaview', enabled: ['osm', 'rapid', 'background'].includes(layerID) };
+          return [layerID, layer];
         })),
         enableLayers: layerIDs => setLayers(layerIDs, true),
         disableLayers: layerIDs => setLayers(layerIDs, false)
@@ -59,73 +64,94 @@ describe('GraphicsSystem', () => {
     });
 
 
-    it('shows the layers saved in settings, and writes them to the url', () => {
+    it('shows the layers saved in settings, without writing them to the url', () => {
       saved.set('layers.enabled', ['osm', 'osm-notes']);
       startGfx();
+      firstHashChange();
       assert.sameMembers(shownIDs(), ['osm', 'osm-notes', 'background']);   // the background isn't one of them
-      assert.strictEqual(urlParams.get('layers'), 'osm,osm-notes');
       assert.deepEqual(saved.get('layers.enabled'), ['osm', 'osm-notes']);
+      assert.isFalse(urlParams.has('layers'));
+
+      scene.enableLayers(['mapillary']);
+      assert.deepEqual(saved.get('layers.enabled'), ['osm', 'osm-notes', 'mapillary']);
+      assert.isFalse(urlParams.has('layers'));
     });
 
-    it('doesn\'t take layers written to the url before startup for the url\'s own', () => {
-      // A 'layerchange' before startup, while the url is paused
+    it('doesn\'t save or take a layer change from before startup', () => {
       saved.set('layers.enabled', ['osm', 'osm-notes']);
       scene.enableLayers(['mapillary']);
       startGfx();
+      firstHashChange();
       assert.sameMembers(shownIDs(), ['osm', 'osm-notes', 'background']);
-      assert.strictEqual(urlParams.get('layers'), 'osm,osm-notes');
       assert.deepEqual(saved.get('layers.enabled'), ['osm', 'osm-notes']);
     });
 
     it('shows the layers\' own defaults when nothing is saved, without saving them', () => {
       startGfx();
+      firstHashChange();
       assert.sameMembers(shownIDs(), ['osm', 'rapid', 'background']);
       assert.isFalse(saved.has('layers.enabled'));
     });
 
-    it('shows the url\'s layers instead, without saving them', () => {
+    it('shows a link\'s layers instead, without saving them, and leaves them in the url', () => {
       saved.set('layers.enabled', ['osm', 'rapid']);
-      startGfx('osm,mapillary');
+      startGfx('osm,mapillary,kartaview');   // KartaView can't be shown, so it doesn't count
+      firstHashChange();
       assert.sameMembers(shownIDs(), ['osm', 'mapillary', 'background']);
       assert.deepEqual(saved.get('layers.enabled'), ['osm', 'rapid']);
+      assert.strictEqual(urlParams.get('layers'), 'osm,mapillary,kartaview');
     });
 
-    it('saves only the layers the user changes, so the url\'s choices don\'t replace the others', () => {
+    it('drops a link\'s layers from the url once they change, and saves only that change', () => {
       saved.set('layers.enabled', ['osm', 'rapid']);
       startGfx('osm');                    // rapid hidden, for this session
+      firstHashChange();
       scene.enableLayers(['osm-notes']);
       assert.deepEqual(saved.get('layers.enabled'), ['osm', 'osm-notes', 'rapid']);
-      assert.strictEqual(urlParams.get('layers'), 'osm,osm-notes');
+      assert.isFalse(urlParams.has('layers'));
+      assert.sameMembers(shownIDs(), ['osm', 'osm-notes', 'background']);   // rapid stays hidden
 
       scene.disableLayers(['osm']);
       assert.deepEqual(saved.get('layers.enabled'), ['osm-notes', 'rapid']);
     });
 
+    it('doesn\'t apply a link\'s layers again after the same link\'s selection changed them', () => {
+      // e.g. the link's `id=` turned on the notes layer, while the url was being read
+      startGfx('osm');
+      scene.enableLayers(['osm-notes']);
+      firstHashChange();
+      assert.sameMembers(shownIDs(), ['osm', 'osm-notes', 'background']);
+      assert.isFalse(urlParams.has('layers'));
+    });
+
     it('follows layers the user puts in the url, without saving them', () => {
       saved.set('layers.enabled', ['osm', 'rapid']);
       startGfx();
-      gfx._hashChanged(new Map([['layers', 'mapillary']]));
+      firstHashChange();
+      urlParams.set('layers', 'mapillary');
+      gfx._hashChanged(new Map([['layers', 'mapillary']]), new Map());
       assert.sameMembers(shownIDs(), ['mapillary', 'background']);
       assert.deepEqual(saved.get('layers.enabled'), ['osm', 'rapid']);
+
+      // Changed, then put in the url again
+      scene.enableLayers(['osm']);
+      assert.isFalse(urlParams.has('layers'));
+      urlParams.set('layers', 'mapillary');
+      gfx._hashChanged(new Map([['layers', 'mapillary']]), new Map());
+      assert.sameMembers(shownIDs(), ['mapillary', 'background']);
     });
 
-    it('doesn\'t apply the url\'s layers again when it\'s read at startup', () => {
-      // e.g. a link's `id=` showed the notes layer before the first 'hashchange'
+    it('leaves the layers alone when the url\'s layers go away', () => {
       startGfx('osm');
-      scene.enableLayers(['osm-notes']);
-      gfx._hashChanged(new Map([['layers', 'osm']]));
-      assert.sameMembers(shownIDs(), ['osm', 'osm-notes', 'background']);
-    });
-
-    it('puts the layers back in the url if they\'re taken out of it', () => {
-      startGfx();
+      firstHashChange();
       urlParams.delete('layers');
-      gfx._hashChanged(new Map());
-      assert.strictEqual(urlParams.get('layers'), 'osm,rapid');
+      gfx._hashChanged(new Map(), new Map([['layers', 'osm']]));
+      assert.sameMembers(shownIDs(), ['osm', 'background']);
     });
 
     it('doesn\'t remember the walkthrough\'s layers', () => {
-      startGfx();
+      startGfx('osm,rapid');
+      firstHashChange();
       context.inIntro = true;
       scene.disableLayers(['osm', 'rapid']);
       assert.isFalse(saved.has('layers.enabled'));

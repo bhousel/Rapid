@@ -201,6 +201,17 @@ the real problem is item 31). A huge `sameDist` (e.g. 100000) passes validation 
 crawl. A history graph that isn't current and hasn't caught up with the base gives stale searches, and
 its own `geometry()` is just as stale; that's the documented design, and nothing searches one.
 
+## Active: the url hash holds overrides, not state
+Agreed Nov 9 (rule and groups in `design/settings-system.md`, Step 1 bullets): only `map`, `id`, `photo`,
+`detection` are written as you go; other params are overrides, left as the link had them until the state
+no longer matches, then dropped.
+- Step 1 ✅: `layers` and `disable_features` (`GraphicsSystem`, `FilterSystem`; `_urlOverride` and
+  `_layersParam` are gone). Not done: making `UrlHashSystem` keep url changes made before it resumes,
+  since `map`/`id` are written then and would overwrite a link's own.
+- Step 2: `background`/`overlays`/`offset` (`ImagerySystem`; overlays and offset need a settings home
+  first), `dataset_ids` (`RapidSystem`), `photo_dates`/`photo_username` (`PhotoSystem`, may just reset on
+  reload), `maproulette` challenge filter, `locale`/`rtl` (only tidy their own value today).
+
 ## Active: what an edit records (`EditSystem`)
 Design: [`design/edit-system.md`](../design/edit-system.md), started Oct 26. Edits need to record more
 than OSM graph changes. Done: undone (redo) edits aren't saved, and a session undone back to nothing

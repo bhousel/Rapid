@@ -18,7 +18,7 @@ const THROTTLE = 250;
 
 /**
  * The layers the user turns on and off.  Which of these are shown is saved in settings (in this
- * browser), and written to the url (`layers=`), which decides them instead for that session.
+ * browser), and a link's `layers=` overrides that until the layers change.
  * (Custom data isn't here: its layer turns on when its data loads.)
  */
 const REMEMBERED_LAYER_IDS: LayerID[] = [
@@ -111,8 +111,6 @@ export class GraphicsSystem extends AbstractSystem {
   protected _shownLayerIDs: Set<LayerID>;
   /** The remembered layers to show when settings have none saved (the layers' own defaults) */
   protected _defaultLayerIDs: Set<LayerID>;
-  /** The `layers` url param last read from the url, to tell when the user changes it there */
-  protected _layersParam: string | undefined;
   /** Whether the layers are being set from the url or settings, so the change isn't saved */
   protected _applyingLayers: boolean;
 
@@ -164,7 +162,6 @@ export class GraphicsSystem extends AbstractSystem {
     // Which layers are shown (see `REMEMBERED_LAYER_IDS`)
     this._shownLayerIDs = new Set<LayerID>();
     this._defaultLayerIDs = new Set<LayerID>();
-    this._layersParam = undefined;
     this._applyingLayers = false;
 
     // If we are using WebGL, watch for context loss - Rapid#1658
@@ -292,9 +289,7 @@ export class GraphicsSystem extends AbstractSystem {
 
     this._defaultLayerIDs = new Set<LayerID>(REMEMBERED_LAYER_IDS.filter(layerID => scene.layers.get(layerID)?.enabled));
 
-    // (The url Rapid started with: `getParam` would also return what was written since)
     const urlLayers = urlhash?.initialHashParams.get('layers');
-    this._layersParam = urlLayers;
     if (urlLayers !== undefined) {
       this._applyLayers(new Set<LayerID>(utilExtractValues(urlLayers).filter(Boolean)));
     } else {
@@ -334,63 +329,63 @@ export class GraphicsSystem extends AbstractSystem {
 
   /**
    * Respond to any changes appearing in the url hash.
-   * Layers the user puts in the url decide the layers from then on, without being saved to settings.
+   * Layers the user puts in the url override the settings, without being saved.
+   * (When `layers` goes away, the layers stay as they are.)
    * @param currParams - The current hash parameters
+   * @param prevParams - The previous hash parameters
    */
-  protected _hashChanged(currParams: Map<string, string>): void {
-    if (this.context.inIntro) return;
+  protected _hashChanged(currParams: Map<string, string>, prevParams: Map<string, string>): void {
+    const context = this.context;
+    const urlhash = context.systems.urlhash;
+    if (context.inIntro) return;
 
     // layers
+    // (Not if it was dropped since: e.g. the selection from the same link turned on another layer)
     const newLayers = currParams.get('layers');
-    if (newLayers === undefined) {
-      this._writeLayersParam();   // keep it in the url
-    } else if (newLayers !== this._layersParam) {
-      this._layersParam = newLayers;
+    if (newLayers !== undefined && newLayers !== prevParams.get('layers') && urlhash?.getParam('layers') === newLayers) {
       this._applyLayers(new Set<LayerID>(utilExtractValues(newLayers).filter(Boolean)));
     }
   }
 
 
   /**
-   * Called when layers are turned on or off.  Writes the remembered layers that are shown to the url,
-   * and saves the ones that changed to settings, unless the url or settings set them.
-   * Only the changed layers are saved, so the layers a link (or a reload's url) shows for this
-   * session don't replace the user's others.  (The walkthrough's layers aren't remembered.)
+   * Called when layers are turned on or off.  Saves the remembered layers that changed to settings,
+   * unless the url or settings set them.  Only the changed layers are saved, so the layers a link
+   * shows for this session don't replace the user's others.  (The walkthrough's layers aren't remembered.)
+   * The layers aren't written to the url: a link's `layers` stays there only until the layers no longer
+   * match it, and then it's dropped (see `API.md`).
    */
   protected _layersChanged(): void {
     const context = this.context;
     const scene = this.scene;
     const settings = context.systems.settings;
+    const urlhash = context.systems.urlhash;
     if (!scene || context.inIntro) return;
 
     const shown = new Set<LayerID>(REMEMBERED_LAYER_IDS.filter(layerID => scene.layers.get(layerID)?.enabled));
     const changedIDs = REMEMBERED_LAYER_IDS.filter(layerID => shown.has(layerID) !== this._shownLayerIDs.has(layerID));
     this._shownLayerIDs = shown;
-    if (!changedIDs.length || !this._started) return;   // the first 'hashchange' writes the url
+    if (!changedIDs.length || !this._started || this._applyingLayers) return;
 
-    if (!this._applyingLayers) {
-      const saved = this._readSavedLayers();
-      for (const layerID of changedIDs) {
-        if (shown.has(layerID)) {
-          saved.add(layerID);
-        } else {
-          saved.delete(layerID);
-        }
+    const saved = this._readSavedLayers();
+    for (const layerID of changedIDs) {
+      if (shown.has(layerID)) {
+        saved.add(layerID);
+      } else {
+        saved.delete(layerID);
       }
-      settings?.set('layers.enabled', REMEMBERED_LAYER_IDS.filter(layerID => saved.has(layerID)));
     }
+    settings?.set('layers.enabled', REMEMBERED_LAYER_IDS.filter(layerID => saved.has(layerID)));
 
-    this._writeLayersParam();
-  }
-
-
-  /**
-   * Writes the remembered layers that are shown to the url, as `layers=`.
-   */
-  protected _writeLayersParam(): void {
-    const urlhash = this.context.systems.urlhash;
-
-    urlhash?.setParam('layers', [...this._shownLayerIDs].join(','));
+    // drop the url's layers once they no longer match (layers it names that can't be shown are ignored)
+    const urlLayers = urlhash?.getParam('layers');
+    if (urlLayers !== undefined) {
+      const urlIDs = new Set<LayerID>(utilExtractValues(urlLayers)
+        .filter(layerID => REMEMBERED_LAYER_IDS.includes(layerID) && scene.layers.get(layerID)?.supported));
+      if (urlIDs.size !== shown.size || [...urlIDs].some(layerID => !shown.has(layerID))) {
+        urlhash?.setParam('layers', null);
+      }
+    }
   }
 
 

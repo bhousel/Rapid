@@ -25,6 +25,10 @@ a link can show different layers, and the user's own layers are back the next ti
 start Rapid without it.  (The layers and filters the user turns on or off while using the
 link are still saved.  `poweruser=true` is only ever for the session.)
 
+The URL is mostly for starting Rapid a certain way, and Rapid doesn't write the layers or filters
+you choose into it.  `layers` and `disable_features` stay in the URL as the link had them, until you
+change the layers or filters: then Rapid takes them out.
+
 ### Initial only (these params take effect at init time)
 * __`assets`__ - Custom asset overrides as `assetID|url` pairs separated by commas. These
   can be used to override the default assets loaded by Rapid (e.g. schema presets, imagery index).<br/>

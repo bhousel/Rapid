@@ -883,13 +883,23 @@ describe('FilterSystem', () => {
 
 
     describe('_hashChanged', () => {
+      // The url holds `curr` while it's being read
+      function hashChanged(curr, prev) {
+        context.systems.urlhash = { getParam: k => curr.get(k) };
+        try {
+          _filters._hashChanged(curr, prev);
+        } finally {
+          delete context.systems.urlhash;
+        }
+      }
+
       it('does nothing when disable_features param is unchanged', () => {
         _filters.enableAll();  // reset
         spyFilterChange.mockClear();
 
         const curr = new Map([['other', 'value']]);
         const prev = new Map([['other', 'value']]);
-        _filters._hashChanged(curr, prev);
+        hashChanged(curr, prev);
         assert.lengthOf(spyFilterChange.mock.calls, 0);   // No filterchange should occur
       });
 
@@ -900,7 +910,7 @@ describe('FilterSystem', () => {
         // 'water' and 'rail' added to the list
         const curr = new Map([['disable_features', 'water,rail']]);
         const prev = new Map();
-        _filters._hashChanged(curr, prev);
+        hashChanged(curr, prev);
         assert.isFalse(_filters.isEnabled('water'));
         assert.isFalse(_filters.isEnabled('rail'));
         assert.lengthOf(spyFilterChange.mock.calls, 1);   // filterchange emitted
@@ -914,23 +924,36 @@ describe('FilterSystem', () => {
         // 'water' and 'rail' removed from the list
         const curr = new Map([['disable_features', '']]);
         const prev = new Map([['disable_features', 'water,rail']]);
-        _filters._hashChanged(curr, prev);
+        hashChanged(curr, prev);
         assert.isTrue(_filters.isEnabled('water'));
         assert.isTrue(_filters.isEnabled('rail'));
         assert.lengthOf(spyFilterChange.mock.calls, 1);   // filterchange emitted
       });
 
-      it('handles disable_features param set to empty string', () => {
+      it('leaves the filters alone when the disable_features param goes away', () => {
+        _filters.enableAll();  // reset
         _filters.disable('water');
         spyFilterChange.mockClear();
 
-        // list cleared
         const curr = new Map();
-        const prev = new Map([['disable_features', 'water,rail']]);
-        _filters._hashChanged(curr, prev);
+        const prev = new Map([['disable_features', 'water']]);
+        hashChanged(curr, prev);
+        assert.isFalse(_filters.isEnabled('water'));
+        assert.lengthOf(spyFilterChange.mock.calls, 0);
+      });
+
+      it('doesn\'t apply a value that was dropped while the url was being read', () => {
+        _filters.enableAll();  // reset
+        spyFilterChange.mockClear();
+
+        context.systems.urlhash = { getParam: () => undefined };   // dropped already
+        try {
+          _filters._hashChanged(new Map([['disable_features', 'water']]), new Map());
+        } finally {
+          delete context.systems.urlhash;
+        }
         assert.isTrue(_filters.isEnabled('water'));
-        assert.isTrue(_filters.isEnabled('rail'));
-        assert.lengthOf(spyFilterChange.mock.calls, 1);   // filterchange emitted
+        assert.lengthOf(spyFilterChange.mock.calls, 0);
       });
     });
 
@@ -943,7 +966,9 @@ describe('FilterSystem', () => {
         super(context);
         this.id = 'urlhash';
         this.params = new Map(Object.entries(params));
+        this.initialHashParams = new Map(this.params);
       }
+      hasParam(k) { return this.params.has(k); }
       getParam(k) { return this.params.get(k); }
       setParam(k, v) {
         if (v === null) {
@@ -965,11 +990,12 @@ describe('FilterSystem', () => {
       };
       const filters = new Rapid.FilterSystem(ctx);
       const settings = ctx.systems.settings;
+      const urlhash = ctx.systems.urlhash;
       return settings.initAsync()
         .then(() => settings.set('filters.disabledFilters', saved))
         .then(() => filters.initAsync())
         .then(() => filters.startAsync())
-        .then(() => ({ filters, settings }));
+        .then(() => ({ filters, settings, urlhash }));
     }
 
     function savedFilters(settings) {
@@ -993,25 +1019,57 @@ describe('FilterSystem', () => {
         .finally(() => settings?.unset('filters.disabledFilters'));
     });
 
-    it('applies a link\'s disable_features without saving it', () => {
+    it('applies a link\'s disable_features without saving it, until the user changes a filter', () => {
       let settings;
       return startFilters('boundaries', { disable_features: 'water' })
         .then(result => {
           const filters = result.filters;
+          const urlhash = result.urlhash;
           settings = result.settings;
 
           assert.isFalse(filters.isEnabled('water'));
           assert.isTrue(filters.isEnabled('boundaries'));
           assert.deepEqual(savedFilters(settings), ['boundaries']);
+          assert.strictEqual(urlhash.getParam('disable_features'), 'water');   // left as the link had it
 
-          // The link wins over a sync for this session
+          // The link wins over a sync while it's in the url
           settings.set('filters.disabledFilters', 'boundaries,rail');
           assert.isTrue(filters.isEnabled('rail'));
 
-          // A change the user makes is saved, but only that change
+          // A change the user makes is saved, but only that change, and the link's filters leave the url
           filters.toggle('points');
           assert.sameMembers(savedFilters(settings), ['boundaries', 'rail', 'points']);
+          assert.isFalse(urlhash.hasParam('disable_features'));
+          assert.isFalse(filters.isEnabled('water'));   // still shown as the link had it
+
+          // Saving a filter again doesn't bring back the saved ones over the link's
+          filters.toggle('paths');
+          assert.isFalse(filters.isEnabled('water'));
+
+          // From then on, a sync is taken (another browser showed rail)
+          settings.set('filters.disabledFilters', 'boundaries,points,paths');
+          assert.isTrue(filters.isEnabled('water'));
           assert.isTrue(filters.isEnabled('rail'));
+        })
+        .finally(() => settings?.unset('filters.disabledFilters'));
+    });
+
+    it('doesn\'t write the filters to the url, and ignores filters in it that don\'t exist', () => {
+      let settings;
+      return startFilters('boundaries', { disable_features: 'water,bogus' })
+        .then(result => {
+          const filters = result.filters;
+          const urlhash = result.urlhash;
+          settings = result.settings;
+
+          filters.toggle('points');
+          filters.toggle('points');   // back as the link had it, but the link's filters left the url
+          assert.isFalse(urlhash.hasParam('disable_features'));
+          return startFilters('boundaries');
+        })
+        .then(result => {
+          result.filters.toggle('rail');
+          assert.isFalse(result.urlhash.hasParam('disable_features'));
         })
         .finally(() => settings?.unset('filters.disabledFilters'));
     });
