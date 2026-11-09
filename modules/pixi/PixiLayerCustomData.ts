@@ -1,7 +1,7 @@
 import { AbstractPixiLayer } from './AbstractPixiLayer.ts';
 import { DOMParser } from '@xmldom/xmldom';
 import { Extent } from '@rapid-sdk/math';
-import { featureKey } from '../data/dataID.ts';
+import { featureKey, splitDataID } from '../data/dataID.ts';
 import { GeoJSONData } from '../data/GeoJSONData.ts';
 import { geojsonFeatures } from '../util/util.ts';
 import { gpx, kml } from '@tmcw/togeojson';
@@ -102,6 +102,16 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
     super.reset();
     // note: we don't need to call this._clear() to remove custom data here.
     // Custom data can persist through a reset of the graphics system.
+  }
+
+
+  /**
+   * Whether this Layer draws the given data: custom data loaded from a file, a url or WKT.
+   * @param dataID - The data ID
+   * @return `true` if the data is in a custom data namespace
+   */
+  public drawsData(dataID: DataID): boolean {
+    return splitDataID(dataID)[0].startsWith(CUSTOM_NAMESPACE_PREFIX);
   }
 
 

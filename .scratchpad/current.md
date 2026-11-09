@@ -135,8 +135,14 @@ numbers below keep the hunt's numbering.
 20. ✅ **"Leave Deleted" on a way leaves the other mapper's new nodes as orphans** on OSM.
     `UploaderSystem.ts:464`. *New, reading.*
     ✅ **Fixed:** `_deleteOrphanedNodes` (confirmed by a test first).
-21. **A link with both `id=` and `note=` ends with only the note selected** (`selectNoteID` replaces the
+21. ✅ **A link with both `id=` and `note=` ends with only the note selected** (`selectNoteID` replaces the
     multiselection, and zooms to z19). `MapSystem.ts:343`, `selectNoteID`. *New, confirmed.*
+    ✅ **Fixed** by redoing the layer url params: `note=<id>` is read as part of `id=` (`osm-notes:<id>`);
+    a link's `id=` turns on the layers that draw what it selects (`drawsData`/`PixiScene.showData`) and
+    downloads notes; layer visibility is saved in settings (`layers.enabled`) with `layers=` as the
+    session override; `note=`, `photo_overlay=` and `maproulette=true` are legacy, read once. The
+    `notes` layer is now `osm-notes`. Also fixed: `MapRouletteService` listened for `hashChanged`
+    (never emitted), so `maproulette=` links never worked.
 
 ### Low
 22. ✅ **"Use theirs" uploads unchanged copies of shared nodes the other mapper changed** (`force_remote`
@@ -345,6 +351,10 @@ to the part that exists.*
   a real browser to confirm stacking, Esc, and close behavior.
 - **`CycleHighwayTagOperation`'s module-level `_lastSelectedIDs`.** The one remaining module-level
   mutable global in `operations/`. Consider moving it onto a system per the system-ownership rule.
+- **Mapillary traffic signs share the `mapillary-detections` namespace** with the other detections
+  (`MapillaryService.getData` splits them by `object_type`). So a link to a sign can't tell from its
+  namespace which layer to turn on, and turns on the detections layer. Store signs in their own
+  `mapillary-signs` namespace (removes the filter too); that changes signs' data IDs.
 
 ## Open questions
 - Delete the 2 dead quarantined `sections/*.jsx` React demo files + `section.ts`/`uiSection`?

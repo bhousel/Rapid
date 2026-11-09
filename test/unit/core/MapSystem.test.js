@@ -367,13 +367,13 @@ describe('MapSystem', () => {
 
 
   describe('restoring a selection from a link', () => {
-    let ctx, map, entities, onDraw, enabledLayers, loadedIDs, fitIDs, mode, selectedIDs;
+    let ctx, map, entities, onDraw, shownData, loadedIDs, fitExtent, mode, selectedIDs;
 
-    function node(id) {
-      return new Rapid.OsmNode(ctx, { id: id, loc: [0, 0] });
+    function node(id, loc = [0, 0]) {
+      return new Rapid.OsmNode(ctx, { id: id, loc: loc });
     }
-    function note(id) {
-      return new Rapid.MarkerData(ctx, { id: id, namespace: 'notes-test', loc: [0, 0] });
+    function note(id, namespace = 'notes-test') {
+      return new Rapid.MarkerData(ctx, { id: id, namespace: namespace, loc: [2, 2] });
     }
     const tick = () => new Promise(resolve => { setTimeout(resolve, 0); });
 
@@ -381,9 +381,9 @@ describe('MapSystem', () => {
       ctx = new Rapid.MockContext();
       entities = new Map();
       onDraw = new Set();
-      enabledLayers = [];
+      shownData = [];
       loadedIDs = [];
-      fitIDs = null;
+      fitExtent = null;
       mode = 'browse';
       selectedIDs = [];
 
@@ -391,7 +391,7 @@ describe('MapSystem', () => {
       ctx.systems = {
         editor: { stable: { graph: graph }, staging: { graph: graph } },
         gfx: {
-          scene: { enableLayers: layerID => enabledLayers.push(layerID) },
+          scene: { showData: dataIDs => shownData.push(...dataIDs) },
           on: (eventName, fn) => onDraw.add(fn),
           off: (eventName, fn) => onDraw.delete(fn)
         },
@@ -403,11 +403,20 @@ describe('MapSystem', () => {
         mode = modeID;
         selectedIDs = options?.selection ?? [];
       };
-      // The OSM API has `n2`, but not `n404`
+      // The OSM API has `n2` and note 7, but not `n404` or note 404
       ctx.loadEntityAsync = entityID => {
         loadedIDs.push(entityID);
-        if (entityID === 'n2') entities.set('n2', node('n2'));
+        if (entityID === 'n2') entities.set('n2', node('n2', [1, 1]));
         return Promise.resolve();
+      };
+      ctx.services.osm = {
+        loadNoteAsync: noteID => {
+          loadedIDs.push(`note ${noteID}`);
+          if (noteID !== '7') return Promise.reject(new Error('not found'));
+          const loaded = note('7', 'osm-notes');
+          ctx.systems.spatial.replaceData('osm-notes', loaded);
+          return Promise.resolve(loaded);
+        }
       };
 
       ctx.systems.spatial.registerResolver('osm', entityID => entities.get(entityID));
@@ -416,7 +425,7 @@ describe('MapSystem', () => {
 
       map = new Rapid.MapSystem(ctx);
       map.showsExtent = () => false;
-      map.fitEntities = fitEntities => fitIDs = fitEntities.map(entity => entity.id);
+      map.fitExtent = extent => fitExtent = extent;
     });
 
     it('downloads the OSM entities it doesn\'t have, and selects everything it finds', async () => {
@@ -427,8 +436,19 @@ describe('MapSystem', () => {
 
       await tick();
       assert.deepEqual(selectedIDs, ['n1', 'n2', 'notes-test:1']);
-      assert.include(enabledLayers, 'osm');
-      assert.deepEqual(fitIDs, ['n1', 'n2']);
+      assert.deepEqual(shownData, ['n1', 'n2', 'notes-test:1', 'n404', 'w-1']);
+      assert.deepEqual([fitExtent.min, fitExtent.max], [[0, 0], [2, 2]]);   // all of it, the note too
+    });
+
+    it('downloads the notes it doesn\'t have', async () => {
+      map._restoreSelection(['n1', 'osm-notes:7', 'osm-notes:404'], true);
+      assert.deepEqual(selectedIDs, ['n1']);
+      assert.sameMembers(loadedIDs, ['note 7', 'note 404']);
+
+      await tick();
+      assert.deepEqual(selectedIDs, ['n1', 'osm-notes:7']);
+      assert.deepEqual(shownData, ['n1', 'osm-notes:7', 'osm-notes:404']);
+      assert.deepEqual([fitExtent.min, fitExtent.max], [[0, 0], [2, 2]]);
     });
 
     it('selects other data when it loads', () => {
@@ -451,10 +471,60 @@ describe('MapSystem', () => {
     });
 
     it('doesn\'t download anything when restoring an edit\'s selection', () => {
-      map._restoreSelection(['n1', 'n2']);
+      map._restoreSelection(['n1', 'n2', 'osm-notes:7']);
       assert.deepEqual(selectedIDs, ['n1']);
       assert.deepEqual(loadedIDs, []);
+      assert.deepEqual(shownData, []);
+    });
+
+    it('selects a note from the feature list the way a link does', async () => {
+      map.selectNoteID(7);
+      await tick();
+      assert.deepEqual(selectedIDs, ['osm-notes:7']);
+      assert.deepEqual(shownData, ['osm-notes:7']);
+    });
+  });
+
+
+  describe('the legacy `note` url param', () => {
+    let ctx, map, restored, enabledLayers, params;
+
+    beforeEach(() => {
+      ctx = new Rapid.MockContext();
+      restored = [];
+      enabledLayers = [];
+      params = new Map();
+      ctx.systems = {
+        gfx: { scene: { enableLayers: layerID => enabledLayers.push(layerID) } },
+        urlhash: { setParam: (k, v) => params.set(k, v) }
+      };
+      Object.defineProperty(ctx, 'mode', { get: () => ({ id: 'browse' }) });
+
+      map = new Rapid.MapSystem(ctx);
+      map.setMapParams = () => {};
+      map._restoreSelection = (selection, fromLink) => restored.push({ selection, fromLink });
+    });
+
+    it('selects `note=<noteID>` along with `id`, and drops `note` from the url', () => {
+      map._hashChanged(new Map([['map', '18/0/0'], ['id', 'w1'], ['note', '123']]), new Map());
+      assert.deepEqual(restored, [{ selection: ['w1', 'osm-notes:123'], fromLink: true }]);
       assert.deepEqual(enabledLayers, []);
+      assert.isTrue(params.has('note'));
+      assert.isNull(params.get('note'));
+    });
+
+    it('turns on the notes layer for `note=true`', () => {
+      map._hashChanged(new Map([['map', '18/0/0'], ['note', 'true']]), new Map());
+      assert.deepEqual(restored, []);
+      assert.deepEqual(enabledLayers, ['osm-notes']);
+      assert.isNull(params.get('note'));
+    });
+
+    it('doesn\'t select again when only the legacy param went away', () => {
+      const prev = new Map([['map', '18/0/0'], ['note', '123']]);
+      const curr = new Map([['map', '18/0/0'], ['id', 'osm-notes:123']]);
+      map._hashChanged(curr, prev);
+      assert.deepEqual(restored, []);
     });
   });
 });

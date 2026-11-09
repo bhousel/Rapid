@@ -130,7 +130,7 @@ export class DragBehavior extends AbstractBehavior {
     if (!data) return;
 
     // What are we dragging?
-    const isNote = data.type === 'note' && target.layerID === 'notes' && data.props.isNew;
+    const isNote = data.type === 'note' && target.layerID === 'osm-notes' && data.props.isNew;
     const isNode = data.type === 'node' && target.layerID === 'osm';           // not 'rapid'
     const isMidpoint = data?.type === 'midpoint' && target.layerID === 'osm';  // not 'rapid'
     if (!(isNote || isNode || isMidpoint)) return;
@@ -190,7 +190,7 @@ export class DragBehavior extends AbstractBehavior {
         if (!data) return;
 
         // What are we dragging?
-        const isNote = data.type === 'note' && target.layerID === 'notes' && data.props.isNew;
+        const isNote = data.type === 'note' && target.layerID === 'osm-notes' && data.props.isNew;
         const isNode = data.type === 'node' && target.layerID === 'osm';           // not 'rapid'
         const isMidpoint = data?.type === 'midpoint' && target.layerID === 'osm';  // not 'rapid'
         if (!(isNote || isNode || isMidpoint)) return;

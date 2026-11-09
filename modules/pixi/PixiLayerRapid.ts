@@ -5,6 +5,8 @@ import { PixiFeaturePoint } from './PixiFeaturePoint.ts';
 import { PixiFeaturePolygon } from './PixiFeaturePolygon.ts';
 import { AbstractData, GeoJSONData, OsmEntity, OsmNode, OsmWay } from '../data/index.ts';
 import { GeometryPart } from '../lib/GeometryPart.ts';
+import { parsePieceID } from '../core/ConflationSystem.ts';
+import { splitDataID } from '../data/dataID.ts';
 
 import type { AbstractPixiFeature } from './AbstractPixiFeature.ts';
 import type { ConflationResult, ConflationStatus, LineRun } from '../core/ConflationSystem.ts';
@@ -182,6 +184,48 @@ export class PixiLayerRapid extends AbstractPixiLayer {
       Promise.all(services.map(service => service.startAsync()))
         .then(() => this.gfx.immediateRedraw());
     }
+  }
+
+
+  /**
+   * Whether this Layer draws the given data: a dataset's data, or a piece of one of its lines.
+   * @param dataID - The data ID, e.g. `fbRoads:w-1`
+   * @return `true` if the data is in a dataset's namespace
+   */
+  public drawsData(dataID: DataID): boolean {
+    return !!this._datasetFor(dataID);
+  }
+
+
+  /**
+   * Makes sure this Layer shows the given data: turns the Layer on, and turns on its dataset.
+   * @param dataID - The data ID
+   */
+  public showData(dataID: DataID): void {
+    const rapid = this.context.systems.rapid!;
+
+    this.enabled = true;
+    const ds = this._datasetFor(dataID);
+    if (ds && !rapid.enabledDatasetIDs.has(ds.id)) {
+      rapid.enableDatasets(ds.id);
+    }
+  }
+
+
+  /**
+   * Returns the dataset whose namespace holds the given data (a piece of a line is in the line's dataset).
+   * @param dataID - The data ID
+   * @return The dataset, or `undefined` if the data isn't a dataset's
+   */
+  protected _datasetFor(dataID: DataID): RapidDataset | undefined {
+    const rapid = this.context.systems.rapid;
+    if (!rapid) return undefined;
+
+    const [namespace] = splitDataID(parsePieceID(dataID)?.dataID ?? dataID);
+    for (const ds of rapid.catalog.values()) {
+      if (ds.spatialID === namespace) return ds;
+    }
+    return undefined;
   }
 
 

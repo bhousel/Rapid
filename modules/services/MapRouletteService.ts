@@ -149,7 +149,7 @@ export class MapRouletteService extends AbstractSystem {
 
         // Setup event handlers..
         gfx?.scene?.on('layerchange', this._mapRouletteChanged);
-        urlhash?.on('hashChanged', this._hashChanged);
+        urlhash?.on('hashchange', this._hashChanged);
       });
   }
 
@@ -647,9 +647,9 @@ export class MapRouletteService extends AbstractSystem {
     if (!scene) return;  // test environment?
 
     // maproulette
-    // Support opening maproulette layer with a URL parameter:
-    //  e.g. `maproulette=true`  -or-
-    //  e.g. `maproulette=<challengeIDs>`
+    // Shows only the tasks of the given challenges, e.g. `maproulette=<challengeIDs>`,
+    // and turns on the layer, since a filter on a layer you can't see does nothing.
+    // (`maproulette=true` is a legacy way to turn on the layer, like `layers=` does now, see API.md)
     const newVal = currParams.get('maproulette') || '';
     const oldVal = prevParams.get('maproulette') || '';
     if (newVal !== oldVal) {
@@ -670,10 +670,10 @@ export class MapRouletteService extends AbstractSystem {
         }
       }
 
-      if (isEnabled) {  // either of these will trigger 'layerchange'
+      if (isEnabled) {  // will trigger 'layerchange', which writes the challengeIDs (and not `true`) back
         scene.enableLayers('maproulette');
       } else {
-        scene.disableLayers('maproulette');
+        this._mapRouletteChanged();
       }
     }
   }
@@ -688,17 +688,10 @@ export class MapRouletteService extends AbstractSystem {
     const scene = context.systems.gfx?.scene;
     if (!urlhash || !scene) return;  // test environment?
 
-    // `maproulette=true` -or- `maproulette=<challengeIDs>`
+    // `maproulette=<challengeIDs>`, while the layer shows them
+    // (the layer itself is in `layers=`, written by the GraphicsSystem)
     const layer = scene.layers.get('maproulette');
-    if (layer?.enabled) {
-      const ids = this.challengeIDs;
-      if (ids) {
-        urlhash.setParam('maproulette', ids);
-      } else {
-        urlhash.setParam('maproulette', 'true');
-      }
-    } else {
-      urlhash.setParam('maproulette', null);
-    }
+    const ids = this.challengeIDs;
+    urlhash.setParam('maproulette', (layer?.enabled && ids) ? ids : null);
   }
 }

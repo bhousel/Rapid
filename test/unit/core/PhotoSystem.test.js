@@ -73,4 +73,23 @@ describe('PhotoSystem', () => {
     });
   });
 
+
+  describe('the legacy `photo_overlay` url param', () => {
+    it('turns on the photo layers it names, and drops it from the url', () => {
+      const ctx = new Rapid.MockContext();
+      const enabledLayers = [];
+      const urlParams = new Map();
+      ctx.systems = {
+        gfx: { scene: { enableLayers: layerIDs => enabledLayers.push(...layerIDs) } },
+        urlhash: { setParam: (k, v) => urlParams.set(k, v) }
+      };
+      const photos = new Rapid.PhotoSystem(ctx);
+
+      photos._hashChanged(new Map([['photo_overlay', 'mapillary,osm,streetside']]), new Map());
+      assert.sameMembers(enabledLayers, ['mapillary', 'streetside']);   // only photo layers
+      assert.isTrue(urlParams.has('photo_overlay'));
+      assert.isNull(urlParams.get('photo_overlay'));
+    });
+  });
+
 });

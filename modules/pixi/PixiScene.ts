@@ -247,6 +247,32 @@ export class PixiScene extends EventEmitter {
 
 
   /**
+   * Makes sure the given data is shown, e.g. when a link selects it: the first Layer that draws each
+   * datum turns on (and a Rapid dataset's data also turns its dataset on). Other layers are not affected.
+   * @param dataIDs - The data IDs, e.g. `['w1', 'osm-notes:123']`
+   */
+  public showData(dataIDs: OneOrMore<DataID>): void {
+    const wasEnabled = new Set<LayerID>([...this.layers.values()].filter(layer => layer.enabled).map(layer => layer.id));
+
+    for (const dataID of utilIterable(dataIDs)) {
+      for (const layer of this.layers.values()) {
+        if (layer.drawsData(dataID)) {
+          layer.showData(dataID);
+          break;
+        }
+      }
+    }
+
+    for (const layer of this.layers.values()) {
+      if (layer.enabled !== wasEnabled.has(layer.id)) {
+        this._layerChanged();
+        break;
+      }
+    }
+  }
+
+
+  /**
    * LayerIDs in the given list will be enabled, all others will be disabled
    * @param layerIDs - layerIDs to keep enabled
    */

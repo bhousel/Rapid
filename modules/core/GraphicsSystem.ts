@@ -5,6 +5,7 @@ import { PixiEvents } from '../pixi/PixiEvents.ts';
 import { PixiScene } from '../pixi/PixiScene.ts';
 import { PixiTextures } from '../pixi/PixiTextures.ts';
 import { TAU, WORLD_HALF, WORLD_ZOOM, Viewport, numWrap, vecEqual, vecLength, vecRotate, vecScale, vecSubtract } from '@rapid-sdk/math';
+import { utilExtractValues } from '../util/string.ts';
 import { utilSetTransform } from '../util/util.ts';
 
 import type { Context } from '../Context.ts';
@@ -14,6 +15,16 @@ import type { TransformProps, Vec2 } from '@rapid-sdk/math';
 
 /** Throttled rendering milliseconds (for now) */
 const THROTTLE = 250;
+
+/**
+ * The layers the user turns on and off.  Which of these are shown is saved in settings (in this
+ * browser), and written to the url (`layers=`), which decides them instead for that session.
+ * (Custom data isn't here: its layer turns on when its data loads.)
+ */
+const REMEMBERED_LAYER_IDS: LayerID[] = [
+  'osm', 'osm-notes', 'rapid', 'maproulette', 'keepright', 'osmose', 'geoscribble',
+  'mapillary', 'mapillary-detections', 'mapillary-signs', 'kartaview', 'streetside'
+];
 
 
 /** Data for animating a transform transition */
@@ -96,6 +107,14 @@ export class GraphicsSystem extends AbstractSystem {
   protected _isContextLost: boolean;
   /** Callback that resumes the GraphicsSystem after a WebGL context restore */
   protected _unpauseFn: (() => void) | null;
+  /** The remembered layers that were shown at the last 'layerchange', in `REMEMBERED_LAYER_IDS` order */
+  protected _shownLayerIDs: Set<LayerID>;
+  /** The remembered layers to show when settings have none saved (the layers' own defaults) */
+  protected _defaultLayerIDs: Set<LayerID>;
+  /** The `layers` url param last read from the url, to tell when the user changes it there */
+  protected _layersParam: string | undefined;
+  /** Whether the layers are being set from the url or settings, so the change isn't saved */
+  protected _applyingLayers: boolean;
 
 
   /**
@@ -106,7 +125,7 @@ export class GraphicsSystem extends AbstractSystem {
 
     this.id = 'gfx';
     this.requiredDependencies = new Set<SystemID>(['map', 'scheduler']);
-    this.optionalDependencies = new Set<SystemID>(['assets', 'ui', 'urlhash']);
+    this.optionalDependencies = new Set<SystemID>(['assets', 'settings', 'ui', 'urlhash']);
     this.highQuality = true;  // this can go false if we detect poor performance
 
     // Create these early
@@ -139,6 +158,14 @@ export class GraphicsSystem extends AbstractSystem {
     this.deferredRedraw = this.deferredRedraw.bind(this);
     this.immediateRedraw = this.immediateRedraw.bind(this);
     this._tick = this._tick.bind(this);
+    this._hashChanged = this._hashChanged.bind(this);
+    this._layersChanged = this._layersChanged.bind(this);
+
+    // Which layers are shown (see `REMEMBERED_LAYER_IDS`)
+    this._shownLayerIDs = new Set<LayerID>();
+    this._defaultLayerIDs = new Set<LayerID>();
+    this._layersParam = undefined;
+    this._applyingLayers = false;
 
     // If we are using WebGL, watch for context loss - Rapid#1658
     this._handleGLContextLost = this._handleGLContextLost.bind(this);
@@ -199,15 +226,21 @@ export class GraphicsSystem extends AbstractSystem {
     if (this._initPromise) return this._initPromise;
 
     const context = this.context;
+    const settings = context.systems.settings;
     const urlhash = context.systems.urlhash;
 
     return this._initPromise = super.initAsync()
       .then(() => {
-        const prerequisites = [ urlhash?.initAsync() ];
+        const prerequisites = [ settings?.initAsync(), urlhash?.initAsync() ];
         return Promise.all(prerequisites.filter(Boolean));
       })
       .then(() => this._initPixiAsync())
-      .then(() => this._afterPixiInit());
+      .then(() => this._afterPixiInit())
+      .then(() => {
+        // Setup event handlers..
+        urlhash?.on('hashchange', this._hashChanged);
+        this.scene?.on('layerchange', this._layersChanged);
+      });
   }
 
 
@@ -228,6 +261,7 @@ export class GraphicsSystem extends AbstractSystem {
         return Promise.all(prerequisites.filter(Boolean));
       })
       .then(() => {
+        this._startLayers();
         this._started = true;
         // Register our tick function with the scheduler's game loop.
         scheduler.addFrameCallback('gfx', this._tick);
@@ -243,6 +277,120 @@ export class GraphicsSystem extends AbstractSystem {
   public resetAsync(): Promise<void> {
     this.immediateRedraw();
     return Promise.resolve();
+  }
+
+
+  /**
+   * Shows the remembered layers that the url names (`layers=`), or else the ones saved in settings.
+   * A link's layers are for this session only, so they aren't saved to settings.
+   */
+  protected _startLayers(): void {
+    const context = this.context;
+    const scene = this.scene;
+    const urlhash = context.systems.urlhash;
+    if (!scene) return;
+
+    this._defaultLayerIDs = new Set<LayerID>(REMEMBERED_LAYER_IDS.filter(layerID => scene.layers.get(layerID)?.enabled));
+
+    // (The url Rapid started with: `getParam` would also return what was written since)
+    const urlLayers = urlhash?.initialHashParams.get('layers');
+    this._layersParam = urlLayers;
+    if (urlLayers !== undefined) {
+      this._applyLayers(new Set<LayerID>(utilExtractValues(urlLayers).filter(Boolean)));
+    } else {
+      this._applyLayers(this._readSavedLayers());
+    }
+  }
+
+
+  /**
+   * Shows the given remembered layers and hides the others, without saving that to settings.
+   * @param toShow - The layers to show
+   */
+  protected _applyLayers(toShow: Set<LayerID>): void {
+    const scene = this.scene;
+    if (!scene) return;
+
+    this._applyingLayers = true;
+    try {
+      scene.disableLayers(REMEMBERED_LAYER_IDS.filter(layerID => !toShow.has(layerID)));
+      scene.enableLayers(REMEMBERED_LAYER_IDS.filter(layerID => toShow.has(layerID)));
+    } finally {
+      this._applyingLayers = false;
+    }
+  }
+
+
+  /**
+   * Reads the remembered layers to show from settings, or the layers' own defaults if none are saved.
+   * @return The layers to show
+   */
+  protected _readSavedLayers(): Set<LayerID> {
+    const settings = this.context.systems.settings;
+    const saved = settings?.get<LayerID[]>('layers.enabled');
+    return new Set<LayerID>(Array.isArray(saved) ? saved : this._defaultLayerIDs);
+  }
+
+
+  /**
+   * Respond to any changes appearing in the url hash.
+   * Layers the user puts in the url decide the layers from then on, without being saved to settings.
+   * @param currParams - The current hash parameters
+   */
+  protected _hashChanged(currParams: Map<string, string>): void {
+    if (this.context.inIntro) return;
+
+    // layers
+    const newLayers = currParams.get('layers');
+    if (newLayers === undefined) {
+      this._writeLayersParam();   // keep it in the url
+    } else if (newLayers !== this._layersParam) {
+      this._layersParam = newLayers;
+      this._applyLayers(new Set<LayerID>(utilExtractValues(newLayers).filter(Boolean)));
+    }
+  }
+
+
+  /**
+   * Called when layers are turned on or off.  Writes the remembered layers that are shown to the url,
+   * and saves the ones that changed to settings, unless the url or settings set them.
+   * Only the changed layers are saved, so the layers a link (or a reload's url) shows for this
+   * session don't replace the user's others.  (The walkthrough's layers aren't remembered.)
+   */
+  protected _layersChanged(): void {
+    const context = this.context;
+    const scene = this.scene;
+    const settings = context.systems.settings;
+    if (!scene || context.inIntro) return;
+
+    const shown = new Set<LayerID>(REMEMBERED_LAYER_IDS.filter(layerID => scene.layers.get(layerID)?.enabled));
+    const changedIDs = REMEMBERED_LAYER_IDS.filter(layerID => shown.has(layerID) !== this._shownLayerIDs.has(layerID));
+    this._shownLayerIDs = shown;
+    if (!changedIDs.length || !this._started) return;   // the first 'hashchange' writes the url
+
+    if (!this._applyingLayers) {
+      const saved = this._readSavedLayers();
+      for (const layerID of changedIDs) {
+        if (shown.has(layerID)) {
+          saved.add(layerID);
+        } else {
+          saved.delete(layerID);
+        }
+      }
+      settings?.set('layers.enabled', REMEMBERED_LAYER_IDS.filter(layerID => saved.has(layerID)));
+    }
+
+    this._writeLayersParam();
+  }
+
+
+  /**
+   * Writes the remembered layers that are shown to the url, as `layers=`.
+   */
+  protected _writeLayersParam(): void {
+    const urlhash = this.context.systems.urlhash;
+
+    urlhash?.setParam('layers', [...this._shownLayerIDs].join(','));
   }
 
 

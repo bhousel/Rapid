@@ -540,7 +540,7 @@ Of the 40 paths in `SettingsSystem` today, only about 15 are settings. Sorted by
 | Kind | Paths today |
 |---|---|
 | **Settings** | `map.areaFill`, `imagery.opacity`, `imagery.favorites`, `filters.disabledFilters`, `validator.*`, `poweruser.*` (not `poweruser.was.*`), `ui.privacy.thirdPartyIcons`, `ui.mouseWheelInteraction` |
-| **State** | `ui.saw*`, `ui.walkthrough.*`, `ui.inspector.*`, `ui.disclosure.*`, `ui.entityIssues.*`, `ui.restrictions.*`, `ui.rawTagEditorView`, `ui.customData.url`, `imagery.lastUsed*`, `map.areaFillToggle`, `schema.presetRecents`, `rapid.addedDatasetIDs`, `rapid.enabledDatasetIDs`, `poweruser.was.*` |
+| **State** | `ui.saw*`, `ui.walkthrough.*`, `ui.inspector.*`, `ui.disclosure.*`, `ui.entityIssues.*`, `ui.restrictions.*`, `ui.rawTagEditorView`, `ui.customData.url`, `imagery.lastUsed*`, `map.areaFillToggle`, `schema.presetRecents`, `rapid.addedDatasetIDs`, `rapid.enabledDatasetIDs`, `layers.enabled`, `poweruser.was.*` |
 | **Collections** | `imagery.custom[0].template` (a user imagery source), and the `DatabaseSystem` `datasets` store (the user's own datasets, and their changes to other datasets; formerly `rapid.dataset.<id>`) |
 
 How it works:
@@ -701,9 +701,16 @@ modeled on how VS Code documents its settings and extension points.
    - The systems that keep a synced list (disabled validator rules, disabled filters, imagery
      favorites) re-read it on `settingschange`. Otherwise a value pulled after startup would be
      overwritten by the next toggle, which sends the whole list.
+   - URL parameters override the user's settings for the session; they're never where the state is
+     stored. (`poweruser=true` is the one exception: it's only ever for the session.)
    - Filters: the url's `disable_features`, when present, decides the filters for the session
      instead of settings, and it isn't saved. A filter the user changes is saved on its own, so the
      url's other filters don't replace the saved ones.
+   - Layers work the same way: `GraphicsSystem` saves which data layers are shown in `layers.enabled`
+     (in this browser only), and the url's `layers=` decides them for the session instead. A layer
+     that's turned on or off is saved on its own (also when a link's `id=` turns on the layer that
+     draws what it selects), except while the url or settings are being applied, and in the
+     walkthrough. `note=`, `photo_overlay=` and `maproulette=true` are legacy params, read once.
    - Single values read once (area fill, imagery opacity, raw tag editor view) show a value pulled
      after startup at the next reload. A change writes only that value, so nothing is lost.
    - `UiSystem.initAsync` now waits for `settings`, which fixes the six constructor reads.

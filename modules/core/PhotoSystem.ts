@@ -133,20 +133,17 @@ export class PhotoSystem extends AbstractSystem {
   protected _hashChanged(currParams: Map<string, string>, prevParams: Map<string, string>): void {
     const context = this.context;
     const gfx = context.systems.gfx;
+    const urlhash = context.systems.urlhash;
     const scene = gfx?.scene;
 
-    // photo_overlay
-    // support enabling photo layers by default via a URL parameter, e.g. `photo_overlay=kartaview;mapillary;streetside`
-    const newPhotoOverlay = currParams.get('photo_overlay') || '';
-    const oldPhotoOverlay = prevParams.get('photo_overlay') || '';
-    if (scene && newPhotoOverlay !== oldPhotoOverlay) {
-      const vals = utilExtractValues(newPhotoOverlay).filter(Boolean);
-      const toEnableIDs = new Set<LayerID>(vals);
-      for (const layerID of this.layerIDs) {
-        const layer = scene.layers.get(layerID);
-        if (!layer) continue;
-        layer.enabled = toEnableIDs.has(layer.id);
-      }
+    // photo_overlay (legacy)
+    // turns on photo layers, e.g. `photo_overlay=kartaview;mapillary;streetside`, like `layers=` does now.
+    // It's read once: the url doesn't keep `photo_overlay` (see API.md).
+    const photoOverlay = currParams.get('photo_overlay');
+    if (photoOverlay !== undefined) {
+      const vals = utilExtractValues(photoOverlay).filter(Boolean);
+      scene?.enableLayers(this.layerIDs.filter(layerID => vals.includes(layerID)));
+      urlhash?.setParam('photo_overlay', null);
     }
 
     // photo_dates
@@ -252,21 +249,8 @@ export class PhotoSystem extends AbstractSystem {
     const context = this.context;
     const gfx = context.systems.gfx;
     const urlhash = context.systems.urlhash;
-    const scene = gfx?.scene;
 
     if (urlhash) {
-      // photo_overlay
-      const enabledIDs: LayerID[] = [];
-      if (scene) {
-        for (const layerID of this.layerIDs) {
-          const layer = scene.layers.get(layerID);
-          if (layer && layer.supported && layer.enabled) {
-            enabledIDs.push(layerID);
-          }
-        }
-      }
-      urlhash.setParam('photo_overlay', enabledIDs.length ? enabledIDs.join(',') : null);
-
       // photo_dates
       let rangeString;
       if (this._filterFromDate || this._filterToDate) {

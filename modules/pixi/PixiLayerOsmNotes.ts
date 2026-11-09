@@ -18,7 +18,7 @@ export class PixiLayerOsmNotes extends AbstractPixiLayer {
    */
   public constructor(scene: PixiScene) {
     super(scene);
-    this.id = 'notes';
+    this.id = 'osm-notes';
   }
 
 

@@ -11,10 +11,12 @@ import type { AbstractPixiLayer } from '../../pixi/AbstractPixiLayer.ts';
 import type { PixiLayerCustomData } from '../../pixi/PixiLayerCustomData.ts';
 
 
-/** A base-layer item binding: id, optional layer reference, and keyboard-shortcut key path */
+/** A base-layer item binding: id, optional layer reference, strings, and keyboard-shortcut key path */
 interface BaseLayerItem {
   id: LayerID;
   layer: AbstractPixiLayer | undefined;
+  /** The item's key under `map_data.layers` in the strings (the notes layer's strings are `notes`) */
+  stringsID: string;
   key: string;
 }
 
@@ -116,7 +118,7 @@ export class UiSectionDataLayers extends AbstractUiSection {
     e?.preventDefault();
 
     const allLayerIDs = [
-      'osm', 'notes', 'rapid', 'maproulette', 'keepright', 'osmose', 'geoscribble',
+      'osm', 'osm-notes', 'rapid', 'maproulette', 'keepright', 'osmose', 'geoscribble',
       'custom-data', 'mapillary', 'streetside', 'kartaview'
     ];
 
@@ -176,7 +178,7 @@ export class UiSectionDataLayers extends AbstractUiSection {
       scene.enableLayers(layerID);
     } else {
       scene.disableLayers(layerID);
-      if (layerID === 'osm' || layerID === 'notes') {
+      if (layerID === 'osm' || layerID === 'osm-notes') {
         context.enter('browse');
       }
     }
@@ -233,15 +235,15 @@ export class UiSectionDataLayers extends AbstractUiSection {
     const items: BaseLayerItem[] = [];
     const osmLayer = scene.layers.get('osm');
     if (osmLayer?.supported) {
-      items.push({ id: 'osm', layer: osmLayer, key: 'shortcuts.command.toggle_osm_data.key' });
+      items.push({ id: 'osm', layer: osmLayer, stringsID: 'osm', key: 'shortcuts.command.toggle_osm_data.key' });
     }
-    const notesLayer = scene.layers.get('notes');
+    const notesLayer = scene.layers.get('osm-notes');
     if (notesLayer?.supported) {
-      items.push({ id: 'notes', layer: notesLayer, key: 'shortcuts.command.toggle_osm_notes.key' });
+      items.push({ id: 'osm-notes', layer: notesLayer, stringsID: 'notes', key: 'shortcuts.command.toggle_osm_notes.key' });
     }
     const rapidLayer = scene.layers.get('rapid');
     if (rapidLayer?.supported) {
-      items.push({ id: 'rapid', layer: rapidLayer, key: 'shortcuts.command.toggle_rapid_data.key' });
+      items.push({ id: 'rapid', layer: rapidLayer, stringsID: 'rapid', key: 'shortcuts.command.toggle_rapid_data.key' });
     }
 
     let $ul: D3Selection = $selection
@@ -268,7 +270,7 @@ export class UiSectionDataLayers extends AbstractUiSection {
       .each((d: BaseLayerItem, i, nodes) => {
         select(nodes[i])
           .call(new UiTooltip(context)
-            .title(l10n.t(`map_data.layers.${d.id}.tooltip`))
+            .title(l10n.t(`map_data.layers.${d.stringsID}.tooltip`))
             .shortcut(utilCmd('⇧' + l10n.t(d.key)))
             .placement('bottom')
             .attach
@@ -282,7 +284,7 @@ export class UiSectionDataLayers extends AbstractUiSection {
 
     $$label
       .append('span')
-      .text((d: BaseLayerItem) => l10n.t(`map_data.layers.${d.id}.title`));
+      .text((d: BaseLayerItem) => l10n.t(`map_data.layers.${d.stringsID}.title`));
 
     // Update
     $li
@@ -604,7 +606,7 @@ export class UiSectionDataLayers extends AbstractUiSection {
     keyboard.global
       .on(toggleAllKey, (e: Event) => this._toggleAllLayers(e))
       .on(toggleOsmKey, (e: Event) => this._toggleLayerKey(e, 'osm'))
-      .on(toggleNotesKey, (e: Event) => this._toggleLayerKey(e, 'notes'))
+      .on(toggleNotesKey, (e: Event) => this._toggleLayerKey(e, 'osm-notes'))
       .on(toggleRapidKey, (e: Event) => this._toggleLayerKey(e, 'rapid'))
       .on(toggleMapillaryKey, (e: Event) => this._toggleLayerKey(e, 'mapillary'))
       .on(toggleStreetsideKey, (e: Event) => this._toggleLayerKey(e, 'streetside'))

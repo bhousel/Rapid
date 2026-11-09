@@ -32,7 +32,10 @@ The renderer and the data are two separate sides of Rapid, and it helps to keep 
 - **Feature ID**: a renderable's ID, unique within its layer. It's built from the data ID plus a
   suffix (`${dataID}:fill`).
 - **Layer**: draws renderables for one or more namespaces. The `rapid` layer draws every enabled
-  dataset, and `labels` draws for everything.
+  dataset, and `labels` draws for everything. A layer that draws one namespace has the namespace's
+  name as its ID (`osm`, `osm-notes`, `keepright`, …), and `AbstractPixiLayer.drawsData()` says which
+  data a layer draws (`rapid` and `custom-data` override it). That's how a link that selects data turns
+  on the layer that draws it (`PixiScene.showData()`).
 
 `EventTarget` (in `AbstractBehavior.ts`) bridges the two sides: given the renderable the user
 pointed at, it says which datum that is.
@@ -342,7 +345,12 @@ extent), `rapid-system.md` (feature IDs), `conflation-system.md` (the pieces cac
 
 Settled:
 - Where namespaces are looked up: there's no table. A namespace is a `SpatialSystem` cache ID, plus
-  resolvers for OSM and vector tiles.
+  resolvers for OSM and vector tiles. Which layer draws a namespace is asked of the layers
+  (`drawsData()`), and most layers are named after their namespace (the notes layer was renamed
+  from `notes` to `osm-notes` for this). Mapillary's traffic signs are the exception: they share the
+  `mapillary-detections` namespace with the other detections, so a link to a sign turns on the
+  detections layer (see `.scratchpad/current.md`). The photo layers don't override `drawsData()`,
+  since photos are selected with `photo=`, not by data ID.
 - Reserved names: the user's datasets start with `user-`, which nothing Rapid ships may use.
 - A single geometry gets no part number. File datasets' current IDs (`fbRoads:abc:0`) haven't been
   in a release, so saved accept and ignore records don't need migrating.

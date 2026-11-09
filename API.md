@@ -19,6 +19,12 @@ URL-encoding is therefore optional but can be used to encode URL-unsafe characte
 - `thing=%23one%2C%23two`   (same as `#one,#two`)
 - `thing=val%7Chttp%3A%2F%2Fexample.com`  (same as `val|http://example.com`)
 
+Rapid remembers the user's choices (layers, filters, datasets, …) in its settings.
+A URL parameter overrides those settings for that session only, without replacing them:
+a link can show different layers, and the user's own layers are back the next time they
+start Rapid without it.  (The layers and filters the user turns on or off while using the
+link are still saved.  `poweruser=true` is only ever for the session.)
+
 ### Initial only (these params take effect at init time)
 * __`assets`__ - Custom asset overrides as `assetID|url` pairs separated by commas. These
   can be used to override the default assets loaded by Rapid (e.g. schema presets, imagery index).<br/>
@@ -59,11 +65,12 @@ URL-encoding is therefore optional but can be used to encode URL-unsafe characte
 #### Selecting Features
 * __`id`__ - A comma-separated list of what's selected.  An OSM node, way or relation is the character
   'n', 'w', or 'r', followed by its OSM ID.  Other data is `<namespace>:<id>`, e.g. a Rapid dataset's
-  feature or a note (`osm-notes:<id>`).  OSM entities that aren't loaded yet are downloaded, and the map
-  moves to show them if they aren't in view.  Other data is selected when it loads, so its layer
-  must be on (e.g. with `datasets`) and the data in view (with `map`).<br/>
+  feature or a note (`osm-notes:<id>`).  The layers that draw what's selected are turned on (and a
+  Rapid dataset's feature turns on its dataset).  OSM entities and notes that aren't loaded yet are
+  downloaded, and the map moves to show what's selected if it isn't in view.  Other data is selected
+  when it loads, so it must be in view (with `map`).<br/>
   _Example:_ `id=n1207480649`<br/>
-  _Example:_ `id=w123,fbRoads:abc`
+  _Example:_ `id=w123,fbRoads:abc,osm-notes:2`
 
 #### Map and Rendering
 * __`background`__ - The value of the `id` property of the source in Rapid's imagery list,
@@ -77,6 +84,12 @@ URL-encoding is therefore optional but can be used to encode URL-unsafe characte
   `points`, `traffic_roads`, `service_roads`, `paths`, `buildings`, `building_parts`,
   `indoor`, `landuse`, `boundaries`, `water`, `rail`, `pistes`, `aerialways`, `power`,
   `past_future`, `others`
+* __`layers`__ - A comma-separated list of the data layers to show.  The data layers not in the list are
+  hidden (an empty list hides them all).  Without it, Rapid shows the layers the user last chose.<br/>
+  _Example:_ `layers=osm,osm-notes,mapillary`<br/>
+  _Available layerIDs:_
+  `osm`, `osm-notes`, `rapid`, `maproulette`, `keepright`, `osmose`, `geoscribble`,
+  `mapillary`, `mapillary-detections`, `mapillary-signs`, `kartaview`, `streetside` (Microsoft Bing)
 * __`map`__ - A slash-separated `zoom/latitude/longitude/bearing`.  Bearing is optional and can be
    specified in degrees.  (The map bearing is the compass direction that is "up").<br/>
   _Example:_ `map=18.00/47.62051/-122.34930`, `map=18.00/39.95239/-75.16361/9.5`
@@ -91,9 +104,6 @@ URL-encoding is therefore optional but can be used to encode URL-unsafe characte
 * __`photo`__ - The layerID and photoID of the photo to show.<br/>
   _Example:_ `photo=mapillary|1157313301398079`<br/>
   _Available prefixes:_ `streetside`, `mapillary`, `kartaview`
-* __`photo_overlay`__ - The street-level photo overlay layerIDs to enable.<br/>
-  _Example:_ `photo_overlay=streetside,mapillary,kartaview`<br/>
-  _Available values:_ `streetside` (Microsoft Bing), `mapillary`, `mapillary-signs`, `mapillary-detections`, `kartaview`
 * __`photo_dates`__ - The range of capture dates by which to filter street-level photos.
   Dates are given in YYYY-MM-DD format and separated by `|`. One-sided ranges are supported.<br/>
   _Example:_ `photo_dates=2019-01-01|2020-12-31`<br/>
@@ -111,11 +121,17 @@ URL-encoding is therefore optional but can be used to encode URL-unsafe characte
 * __`dataset_ids`__ - A comma-separated list of datasetIDs to enable.
   (Before October 2026 this parameter was called `datasets`.)<br/>
   _Example:_ `dataset_ids=fbRoads,msBuildings,e75b56f13b404d7d8b47ef8be1c619ec`
-* __`maproulette`__ - Enable the MapRoulette task layer. Optionally provide a
-  comma-separated list of challenge IDs to filter the tasks shown.<br/>
-  _Example:_ `maproulette=true` -or- `maproulette=<challengeIDs>`
-* __`note`__ - Enable the Notes layer, optionally select a given note.<br/>
-  _Example:_ `note=true` -or- `note=<noteID>`
+* __`maproulette`__ - A comma-separated list of MapRoulette challenge IDs.  Only the tasks of
+  these challenges are shown, and the MapRoulette layer is turned on.<br/>
+  _Example:_ `maproulette=14763,23456`
+
+#### Legacy parameters
+Older links may still use these.  Rapid reads them, but doesn't keep them in the URL.
+* __`gpx`__ - The old name of `data`.
+* __`maproulette=true`__ - Turned on the MapRoulette layer.  Now: `layers=…,maproulette`.
+* __`note`__ - `note=true` turned on the notes layer, and `note=<noteID>` selected a note.
+  Now: `layers=…,osm-notes` and `id=osm-notes:<noteID>`.
+* __`photo_overlay`__ - Turned on the photo layers it listed.  Now: `layers=`.
 
 #### Localization
 Rapid will choose a default locale based on the values suggested by your web browser

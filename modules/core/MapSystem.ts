@@ -2,8 +2,7 @@ import { AbstractSystem } from './AbstractSystem.ts';
 import {
   DEG2RAD, RAD2DEG, TAU, Extent, numClamp, numWrap, projWgs84ToWorld,
   vecLength, vecRotate, vecSubtract, Viewport, WORLD_HALF, WORLD_SCALE } from '@rapid-sdk/math';
-import { MarkerData } from '../data/MarkerData.ts';
-import { osmEntityID } from '../data/dataID.ts';
+import { makeDataID, osmEntityID, splitDataID } from '../data/dataID.ts';
 import { selection } from 'd3-selection';
 import { utilArrayIdentical, utilArrayUniq } from '@rapid-sdk/util';
 import { utilTotalExtent } from '../util/util.ts';
@@ -305,6 +304,7 @@ export class MapSystem extends AbstractSystem {
   protected _hashChanged(currParams: Map<string, string>, prevParams: Map<string, string>): void {
     const context = this.context;
     const scene = context.systems.gfx!.scene!;  // exists after init
+    const urlhash = context.systems.urlhash;
 
     // map
     const newMap = currParams.get('map');
@@ -332,45 +332,30 @@ export class MapSystem extends AbstractSystem {
     }
 
     // id
-    const newIds = currParams.get('id');
-    const oldIds = prevParams.get('id');
-    if (newIds !== oldIds && context.mode?.id !== 'save') {
-      const ids = (newIds ?? '').split(',').map(s => s.trim()).filter(Boolean);
-      this._restoreSelection(ids, true);   // no ids: browse
+    // (`note=<noteID>` is a legacy way to select a note, read as `id=osm-notes:<noteID>`, see API.md)
+    const selectionOf = (params: Map<string, string>): DataID[] => {
+      const ids = (params.get('id') ?? '').split(',').map(s => s.trim()).filter(Boolean);
+      for (const val of (params.get('note') ?? '').split(',').map(s => s.trim())) {
+        if (/^[1-9]\d*$/.test(val)) {
+          ids.push(makeDataID('osm-notes', val));
+        }
+      }
+      return ids;
+    };
+    const newIds = selectionOf(currParams);
+    const oldIds = selectionOf(prevParams);
+    if (!utilArrayIdentical(newIds, oldIds) && context.mode?.id !== 'save') {
+      this._restoreSelection(newIds, true);   // no ids: browse
     }
 
-    // note
-    // Support opening notes layer with a URL parameter:
-    //  e.g. `note=true`  -or-
-    //  e.g. `note=<noteID>`
-    const newNote = currParams.get('note') || '';
-    const oldNote = prevParams.get('note') || '';
-    if (newNote !== oldNote) {
-      let isEnabled = false;
-      let noteID = null;
-
-      const vals = newNote.split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
-      for (const val of vals) {
-        if (val === 'true') {
-          isEnabled = true;
-          continue;
-        }
-        // Try the value as a number, but reject things like NaN, null, Infinity
-        const num = +val;
-        if (Number.isFinite(num)) {
-          isEnabled = true;
-          noteID = num;  // for now, just select the first one
-          break;
-        }
+    // note (legacy)
+    // `note=true` turns on the notes layer. It's read once: the url doesn't keep `note` (see API.md).
+    const note = currParams.get('note');
+    if (note !== undefined) {
+      if (note.split(',').map(s => s.trim().toLowerCase()).includes('true')) {
+        scene.enableLayers('osm-notes');
       }
-
-      if (noteID) {
-        this.selectNoteID(noteID);
-      } else if (isEnabled) {
-        scene.enableLayers('notes');
-      } else {
-        scene.disableLayers('notes');
-      }
+      urlhash?.setParam('note', null);
     }
   }
 
@@ -381,7 +366,6 @@ export class MapSystem extends AbstractSystem {
    */
   protected _updateHash(): void {
     const context = this.context;
-    const scene = context.systems.gfx!.scene!;
     const urlhash = context.systems.urlhash;
     const viewport = context.viewport;
     if (!urlhash) return;
@@ -406,26 +390,6 @@ export class MapSystem extends AbstractSystem {
     }
 
     urlhash.setParam('map', val);
-
-
-    // note
-    const layer = scene.layers.get('notes');
-    let noteID;
-    const [datum] = context.selectedData().values();  // get the first thing in the Map()
-    if (datum instanceof MarkerData && datum.serviceID === 'osm') {
-      noteID = datum.id;   // the note's own ID, not its data ID
-    }
-
-    // `note=true` -or- `note=<noteID>`
-    if (layer?.enabled) {
-      if (noteID) {
-        urlhash.setParam('note', noteID);
-      } else {
-        urlhash.setParam('note', 'true');
-      }
-    } else {
-      urlhash.setParam('note', null);
-    }
   }
 
 
@@ -536,9 +500,10 @@ export class MapSystem extends AbstractSystem {
    * (`SpatialSystem.getData`). Data that comes back on undo may not be there yet (a Rapid feature
    * that's loaded again, or a piece of a line that conflation makes when the line is drawn), so this
    * tries again after the next redraws, adding what it finds to the selection.
-   * A selection from a link (`id=` in the URL) also downloads the OSM entities that aren't loaded yet,
-   * turns on the OSM layer, and moves the map to them if they aren't in view.  Its other data is
-   * selected when it loads (for that, its layer must be on and the data in view), so it waits longer.
+   * A selection from a link (`id=` in the URL) also turns on the layers that draw it (see
+   * `PixiScene.showData`), downloads the OSM entities and notes that aren't loaded yet, and moves the
+   * map to what it finds if that isn't in view.  Its other data is selected when it loads (for that,
+   * the data must be in view), so it waits longer.
    * @param  selection - Data IDs, e.g. `['w1', 'fbRoads:abc']`
    * @param  fromLink - `true` if the selection is from a link
    */
@@ -546,6 +511,7 @@ export class MapSystem extends AbstractSystem {
     const context = this.context;
     const editor = context.systems.editor!;
     const gfx = context.systems.gfx!;
+    const osm = context.services.osm;
     const scene = gfx.scene!;
     const spatial = context.systems.spatial!;
 
@@ -555,10 +521,22 @@ export class MapSystem extends AbstractSystem {
       return osmEntityID(dataID) ? !!editor.stable.graph.hasEntity(dataID) : !!spatial.getData(dataID);
     };
 
+    // Selecting something from a link shows it, so turn on the layers that draw it.
+    if (fromLink && selection.length) {
+      scene.showData(selection);
+    }
+
     // OSM entities are in the graph or not, so only other data can arrive later,
-    // unless the selection is from a link, which downloads the OSM entities it doesn't have.
-    // (Only entities from the OSM API: new ones, like `w-1`, can't be downloaded.)
-    const toLoad = fromLink ? selection.filter(dataID => /^[nwr][1-9]\d*$/.test(dataID) && !isFound(dataID)) : [];
+    // unless the selection is from a link, which downloads the OSM entities and notes it doesn't have.
+    // (Only ones from the OSM API: new ones, like `w-1`, can't be downloaded.)
+    const canLoad = (dataID: DataID): boolean => {
+      return /^[nwr][1-9]\d*$/.test(dataID) || (!!osm && /^osm-notes:[1-9]\d*$/.test(dataID));
+    };
+    const loadAsync = (dataID: DataID): Promise<unknown> => {
+      const [namespace, localID] = splitDataID(dataID);
+      return namespace === 'osm-notes' ? osm!.loadNoteAsync(localID) : context.loadEntityAsync(localID);
+    };
+    const toLoad = fromLink ? selection.filter(dataID => canLoad(dataID) && !isFound(dataID)) : [];
     const waiting = new Set<DataID>(selection.filter(dataID => {
       return osmEntityID(dataID) ? toLoad.includes(dataID) : !isFound(dataID);
     }));
@@ -580,20 +558,20 @@ export class MapSystem extends AbstractSystem {
       if (nowFound.length <= found.length) return;
 
       found = nowFound;
-      const graph = editor.staging.graph;
-      const entities = found
-        .map(dataID => osmEntityID(dataID) ? graph.hasEntity(dataID) : undefined)
-        .filter((entity): entity is OsmEntity => !!entity);
-      if (fromLink && entities.length) {
-        scene.enableLayers('osm');
-      }
-
       context.enter('select', { selection: found });
 
-      if (fromLink && entities.length) {
-        const extent = utilTotalExtent(entities, graph);
-        if (!this.showsExtent(extent)) {
-          this.fitEntities(entities);
+      if (fromLink) {
+        const graph = editor.staging.graph;
+        const extent = new Extent();
+        for (const dataID of found) {
+          const entity = osmEntityID(dataID) ? graph.hasEntity(dataID) : undefined;
+          const other = entity ? graph.extent(entity) : spatial.getData(dataID)?.extent();
+          if (other) {
+            extent.extendSelf(other);
+          }
+        }
+        if (isFinite(extent.area()) && !this.showsExtent(extent)) {
+          this.fitExtent(extent);
         }
       }
     };
@@ -604,10 +582,10 @@ export class MapSystem extends AbstractSystem {
     }
 
     if (toLoad.length) {
-      Promise.allSettled(toLoad.map(entityID => context.loadEntityAsync(entityID)))
+      Promise.allSettled(toLoad.map(loadAsync))
         .then(() => {
-          for (const entityID of toLoad) {
-            waiting.delete(entityID);   // loaded, or not there to load
+          for (const dataID of toLoad) {
+            waiting.delete(dataID);   // loaded, or not there to load
           }
           if (isCurrent()) selectFound();
         });
@@ -1027,7 +1005,18 @@ export class MapSystem extends AbstractSystem {
     } else {
       extent = graph.extent(entities);
     }
-    if (!extent || !isFinite(extent.area())) return this;
+    return extent ? this.fitExtent(extent, duration) : this;
+  }
+
+
+  /**
+   * Adjust the map to fit to see the given extent
+   * @param  extent    Extent to fit in the map view, in WGS84 lon/lat
+   * @param  duration  Duration of the transition in milliseconds, defaults to 0ms (asap)
+   * @return this
+   */
+  public fitExtent(extent: Extent, duration: number = 0): this {
+    if (!isFinite(extent.area())) return this;
 
     const z2 = numClamp(this.trimmedExtentZoom(extent), 0, 20);
     return this.setMapParams(extent.center(), z2, undefined, duration);
@@ -1085,26 +1074,12 @@ export class MapSystem extends AbstractSystem {
 
 
   /**
-   * Selects a note by ID, loading it first if needed
+   * Selects a note by ID, the same way a link selects it: turns on the notes layer, loads the note
+   * first if needed, and moves the map to it.
    * @param  noteID  - noteID to select
    */
   public selectNoteID(noteID: number | string): void {
-    const context = this.context;
-    const osm = context.services.osm as any;
-    const scene = context.systems.gfx!.scene!;
-
-    if (!noteID || !osm) {
-      context.enter('browse');
-      return;
-    }
-
-    osm.loadNoteAsync(noteID)
-      .then((note: MarkerData) => {
-        if (!note.loc) return;
-        scene.enableLayers('notes');
-        context.enter('select', { selection: [note.dataID] });
-        this.centerZoomEase(note.loc, 19);
-      });
+    this._restoreSelection([makeDataID('osm-notes', String(noteID))], true);
   }
 
 

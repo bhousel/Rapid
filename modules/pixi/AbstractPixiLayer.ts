@@ -1,3 +1,4 @@
+import { splitDataID } from '../data/dataID.ts';
 import { type OneOrMore, utilIterable } from '../util/iterable.ts';
 
 import type { AbstractData } from '../data/AbstractData.ts';
@@ -121,6 +122,27 @@ export class AbstractPixiLayer {
     if (val === this._enabled) return;  // no change
     this._enabled = val;
     this.dirtyLayer();
+  }
+
+
+  /**
+   * Whether this Layer draws the given data, so that selecting it can turn this Layer on.
+   * A Layer draws the namespace with its own ID, unless it overrides this (see `design/data-ids.md`).
+   * @param dataID - The data ID, e.g. `osm-notes:123`
+   * @return `true` if this Layer draws the data
+   */
+  public drawsData(dataID: DataID): boolean {
+    return splitDataID(dataID)[0] === this.id;
+  }
+
+
+  /**
+   * Makes sure this Layer shows the given data, which it draws (see `drawsData`).
+   * Turns the Layer on; a Layer that also chooses what it draws overrides this.
+   * @param dataID - The data ID
+   */
+  public showData(dataID: DataID): void {
+    this.enabled = true;
   }
 
 

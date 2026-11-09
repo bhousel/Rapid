@@ -301,4 +301,62 @@ describe('MapRouletteService', () => {
     });
 
   });
+
+
+  describe('the `maproulette` url param', () => {
+    let ctx, maproulette, layer, urlParams, events;
+
+    beforeEach(async () => {
+      ctx = new Rapid.MockContext();
+      layer = { id: 'maproulette', enabled: false };
+      urlParams = new Map();
+      events = [];
+      const scene = {
+        layers: new Map([['maproulette', layer]]),
+        on: () => {},
+        enableLayers: () => {
+          layer.enabled = true;
+          maproulette._mapRouletteChanged();   // 'layerchange'
+        }
+      };
+      ctx.systems = {
+        gfx: { scene: scene },
+        network: new Rapid.NetworkSystem(ctx),
+        spatial: new Rapid.SpatialSystem(ctx),
+        urlhash: {
+          on: eventName => events.push(eventName),
+          setParam: (k, v) => urlParams.set(k, v)
+        }
+      };
+      maproulette = new Rapid.MapRouletteService(ctx);
+      await maproulette.initAsync();
+    });
+
+    it('listens for changes to the url', () => {
+      assert.include(events, 'hashchange');
+    });
+
+    it('shows only the tasks of the given challenges, and turns on the layer', () => {
+      maproulette._hashChanged(new Map([['maproulette', '100,200']]), new Map());
+      assert.isTrue(layer.enabled);
+      assert.strictEqual(maproulette.challengeIDs, '100,200');
+      assert.strictEqual(urlParams.get('maproulette'), '100,200');
+    });
+
+    it('turns on the layer for the legacy `maproulette=true`, and drops it from the url', () => {
+      maproulette._hashChanged(new Map([['maproulette', 'true']]), new Map());
+      assert.isTrue(layer.enabled);
+      assert.strictEqual(maproulette.challengeIDs, '');
+      assert.isTrue(urlParams.has('maproulette'));
+      assert.isNull(urlParams.get('maproulette'));
+    });
+
+    it('stops filtering when the param goes away, and leaves the layer on', () => {
+      maproulette._hashChanged(new Map([['maproulette', '100']]), new Map());
+      maproulette._hashChanged(new Map(), new Map([['maproulette', '100']]));
+      assert.isTrue(layer.enabled);
+      assert.strictEqual(maproulette.challengeIDs, '');
+      assert.isNull(urlParams.get('maproulette'));
+    });
+  });
 });
