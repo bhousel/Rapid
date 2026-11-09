@@ -583,22 +583,24 @@ describe('SettingsSystem', () => {
         });
     });
 
-    it('removes leftover remote settings that are not synced', () => {
+    it('leaves remote settings this build does not sync alone', () => {
       const osm = makeMockOsm({
         preferences: {
-          'rapid.settings.meta.updatedAt': '2026-01-01T00:00:00.000Z',
-          'rapid.settings.rapid.custom.mine.color': '#ff0000',
+          'rapid.settings.meta.updatedAt': '2026-01-01T00:00:00.000Z',   // left by the old sync
+          'rapid.settings.ui.newerBuild': 'keepme',                      // synced by another build
           'rapid.settings.ui.foo': 'one',
           'some.other.pref': 'keepme'
         }
       });
+      let settings;
       return makeSettings(osm)
-        .then(settings => settings.syncRemote())
+        .then(s => { settings = s; return settings.syncRemote(); })
         .then(result => {
-          assert.deepInclude(result, { ok: true, removed: 2 });
-          assert.sameMembers(osm._state.deletes, ['rapid.settings.meta.updatedAt', 'rapid.settings.rapid.custom.mine.color']);
-          assert.strictEqual(osm._state.preferences['rapid.settings.ui.foo'], 'one');
-          assert.strictEqual(osm._state.preferences['some.other.pref'], 'keepme');
+          assert.deepInclude(result, { ok: true, pulled: 1, pushed: 0 });
+          assert.isEmpty(osm._state.deletes);
+          assert.strictEqual(osm._state.preferences['rapid.settings.ui.newerBuild'], 'keepme');
+          assert.strictEqual(osm._state.preferences['rapid.settings.meta.updatedAt'], '2026-01-01T00:00:00.000Z');
+          assert.isUndefined(settings.get('ui.newerBuild'));
         });
     });
 
@@ -651,7 +653,7 @@ describe('SettingsSystem', () => {
         .then(s => { settings = s; return settings.syncRemote(); })
         .then(() => settings.clearAllAsync())
         .then(result => {
-          assert.deepEqual(result, { ok: true, reason: 'cleared', removed: 1 });   // `ui.foo`; the other was a leftover
+          assert.deepEqual(result, { ok: true, reason: 'cleared', removed: 2 });
           assert.deepEqual(settings.getAll(), {});
           assert.deepEqual(osm._state.preferences, { 'some.other.pref': 'keepme' });
           const stored = storage.keys().filter(k => k.startsWith('rapid.settings.') && !k.startsWith('rapid.settings.meta.'));

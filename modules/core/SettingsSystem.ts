@@ -58,7 +58,7 @@ interface SyncResult {
   pulled?: number;
   /** How many synced settings were sent to the remote */
   pushed?: number;
-  /** How many remote keys were removed because they aren't synced settings */
+  /** How many remote keys `clearAllAsync` removed */
   removed?: number;
 }
 
@@ -839,9 +839,10 @@ export class SettingsSystem extends AbstractSystem {
    * - A remote key is only deleted when the user removed that setting here, never just
    *   because this browser doesn't have it.
    *
-   * Remote `rapid.settings.*` keys that aren't synced settings (earlier versions synced
-   * everything) are removed. Other applications' preferences are never touched.
-   * Requests are sent one at a time. The OSM API can't store an empty value, so one is sent
+   * Remote `rapid.settings.*` keys that this build doesn't sync are left alone: they may be
+   * synced by another build (a newer one, or one with components this one lacks), or be copies
+   * left by earlier versions, which synced everything. Other applications' preferences are
+   * never touched. Requests are sent one at a time. The OSM API can't store an empty value, so one is sent
    * as `EMPTY_REMOTE_VALUE` instead. A synced setting that the OSM API can't store (a key or
    * value over 255 characters, or a value that is `EMPTY_REMOTE_VALUE` itself) stays local.
    *
@@ -870,23 +871,19 @@ export class SettingsSystem extends AbstractSystem {
     }
     const base = this._syncBase.entries;
 
-    // Sort the remote `rapid.settings.*` keys into synced settings and leftovers to remove.
+    // Gather the remote `rapid.settings.*` keys that belong to synced settings.
     const remote = new Map<string, string>();
-    const leftovers: string[] = [];
     for (const [key, value] of Object.entries(prefs)) {
       if (!isSettingsKey(key)) continue;   // not ours
       const flatKey = toFlatKey(key);
       if (this._isSynced(flatKey)) {
         remote.set(flatKey, fromRemoteValue(String(value)));
-      } else {
-        leftovers.push(key);
       }
     }
 
     const local = this._store.toFlat();
     let pulled = 0;
     let pushed = 0;
-    let removed = 0;
     let failed = 0;
 
     for (const path of this._syncPaths) {
@@ -942,15 +939,6 @@ export class SettingsSystem extends AbstractSystem {
       pushed++;
     }
 
-    for (const key of leftovers) {
-      try {
-        await osm.deleteUserPreferenceAsync(key);
-        removed++;
-      } catch {
-        failed++;
-      }
-    }
-
     if (pulled) {
       this._updatedAt = new Date().toISOString();
     }
@@ -959,11 +947,11 @@ export class SettingsSystem extends AbstractSystem {
       this.emit('settingschange');
     }
 
-    const counts = { pulled, pushed, removed };
+    const counts = { pulled, pushed };
     if (failed) {
       return { ok: false, reason: `partial-failure (${failed})`, ...counts };
     }
-    return { ok: true, reason: (pulled || pushed || removed) ? 'synced' : 'up-to-date', ...counts };
+    return { ok: true, reason: (pulled || pushed) ? 'synced' : 'up-to-date', ...counts };
   }
 
 

@@ -49,7 +49,7 @@ numbers below keep the hunt's numbering.
    then undo + a different edit (index 2 again), close the tab; changeset landed, so the next tab deletes
    the session with the unuploaded edit. `EditSystem.ts:2369` (`record.data.index === upload.index`).
    Fix: record which edit the mark was taken at, not the index. *New, confirmed.*
-4. **"Use theirs" on a way overrides "Keep mine" on its node.** User moves n2 and retags w1; the other
+4. ✅ **"Use theirs" on a way overrides "Keep mine" on its node.** User moves n2 and retags w1; the other
    mapper retags w1 and moves n2. Leave w1 on "Use theirs", pick "Keep mine" on n2: Save reverts w1's
    nodes, so n2 goes back to base (neither version), nothing is left to upload and the session is
    deleted. Related: a shared node's result depends on which conflict the screen showed last.
@@ -66,7 +66,7 @@ numbers below keep the hunt's numbering.
    Fixed: edits made to a redacted version are left out, both on restore (the entity stays at the
    current version, the restore screen says so) and at save (`_findRedactedAsync`: a conflict with
    "Use theirs" as the only choice). A fallback way's child nodes are fetched too.
-7. **Redo, and the extra redo that returns to where you were, delete an empty new relation.** The fix for
+7. ✅ **Redo, and the extra redo that returns to where you were, delete an empty new relation.** The fix for
    first-hunt item 9 only covers undo: at the newest edit there's nothing to redo, and the history jump
    re-enters select, so `exit()` commits "Deleted a relation". Repro: membership "add to new relation"
    (untagged, one member, no role), undo, redo, extra redo. Or: tag r-1, remove the tag, undo, redo.
@@ -89,29 +89,30 @@ numbers below keep the hunt's numbering.
 11. ✅ **An empty value never syncs,** so re-enabling every rule (or filter) stays local and the account
     keeps the old list. `SettingsSystem.ts:888`. *New, confirmed.*
     ✅ **Fixed:** an empty value travels as `""` (`toRemoteValue` / `fromRemoteValue`).
-12. **Sync deletes account keys this build hasn't registered** (a newer build's paths, or `ui.*` and
+12. ✅ **Sync deletes account keys this build hasn't registered** (a newer build's paths, or `ui.*` and
     `poweruser.*` when those components aren't built), so testers switching builds lose preferences.
     `SettingsSystem.ts:854`. *New, reading.*
-    Plan (agreed Nov 5): delete only a fixed list of paths the old sync on `main` pushed that no longer
-    sync: `meta`, `imagery.custom`, `imagery.lastUsed`, `imagery.lastUsedToggle`, `rapid`,
-    `schema.presetRecents`, `poweruser.was`, `ui.customData`, `ui.disclosure`, `ui.entityIssues`,
-    `ui.inspector`, `ui.mouseWheelInteraction`, `ui.restrictions`, `ui.walkthrough`, `ui.width`.
+    ✅ **Fixed (Nov 9):** the sync leaves keys it doesn't sync alone. Cleaning up the old sync's copies
+    is still open: see "Cleanup (open)" in `design/settings-system.md` (systems declaring their local
+    settings with a `registerLocal`, `meta` owned by `SettingsSystem`, dead paths in a migration).
+    Before that, decide whether `imagery.lastUsed` and `rapid.enabledDatasetIDs` should sync. Truly
+    dead now: `rapid.custom.*`, `rapid.dataset.*` (in `DatabaseSystem` now), `ui.restrictions`.
 13. ✅ **A failed user-details call resets the sync base,** so the next good sync lets the remote win over
     a newer local change. `SettingsSystem.ts:835`. *New, confirmed.*
     ✅ **Fixed:** the sync stops (`no-user` / `no-preferences`) before touching the base.
-14. **Undo out of a draw mode selects the newest edit's `selection`** (maybe offscreen), not what
+14. ✅ **Undo out of a draw mode selects the newest edit's `selection`** (maybe offscreen), not what
     `MapSystem` would (`selectionBefore`, or `mode.selectionBefore` for a same-index undo); non-OSM IDs
     are always dropped. Same class as first-hunt item 22. `DrawLineMode.ts:866`, `DrawAreaMode.ts:825`.
     *Pattern main too, confirmed.*
     ✅ **Fixed:** draw modes call `MapSystem.restoreJumpSelection(prevIndex, currIndex)`, the one rule.
-15. **Redo restores what an operation committed with, not what it then selects:** drag vertex (the
+15. ✅ **Redo restores what an operation committed with, not what it then selects:** drag vertex (the
     vertex, not the way), split (the vertex, not the lines), multipolygon merge, extract, delete vertex,
     add member. `DragNodeMode.ts:369`, `SplitOperation.ts:92` and others. *Main too, but `selection` now
     means "after". Reading.*
     ✅ **Fixed:** `selection` is renamed `selectionAfter` (old backups upgrade), and drag, split, extract,
     merge, delete and the membership editor commit with what they select next
     (`test/unit/operations/selection_after.test.js`). Checked live: split, undo, redo.
-16. **`resetAsync()` with no edits re-selects the current selection instead of going to browse**
+16. ✅ **`resetAsync()` with no edits re-selects the current selection instead of going to browse**
     (`historyjump(0, 0)` reads as "work in progress thrown away"), possibly data whose cache was just
     cleared. `EditSystem.ts:540`. *New, reading.*
     ✅ **Fixed:** `Context.resetAsync` enters browse mode before resetting the systems.
@@ -128,17 +129,17 @@ numbers below keep the hunt's numbering.
     **Fixed:** `sendChangeset` closes the changeset before counting (cgimap's close fails while an
     upload holds the changeset lock), so -5 is final and the retry opens a new changeset; a failed
     close is -6. `closeChangeset` now reports HTTP errors (`fetchRaw` doesn't reject on them).
-19. **"Deleted by both" brings back the way's nodes the user deleted,** and drops those deletions
+19. ✅ **"Deleted by both" brings back the way's nodes the user deleted,** and drops those deletions
     (`actionRevert` now restores deleted children). `merge_remote_changes.ts:324`. *New, confirmed.*
     ✅ **Fixed:** the deletion stays, and the uploader leaves out what's deleted on both sides.
-20. **"Leave Deleted" on a way leaves the other mapper's new nodes as orphans** on OSM.
+20. ✅ **"Leave Deleted" on a way leaves the other mapper's new nodes as orphans** on OSM.
     `UploaderSystem.ts:464`. *New, reading.*
     ✅ **Fixed:** `_deleteOrphanedNodes` (confirmed by a test first).
 21. **A link with both `id=` and `note=` ends with only the note selected** (`selectNoteID` replaces the
     multiselection, and zooms to z19). `MapSystem.ts:343`, `selectNoteID`. *New, confirmed.*
 
 ### Low
-22. **"Use theirs" uploads unchanged copies of shared nodes the other mapper changed** (`force_remote`
+22. ✅ **"Use theirs" uploads unchanged copies of shared nodes the other mapper changed** (`force_remote`
     puts in the remote copy, and shared nodes aren't reverted). Side effect of first-hunt item 10.
     `merge_remote_changes.ts:175`. *New, confirmed.*
     ✅ **Fixed:** `_settleSameAsRemote` puts those copies in the base instead.
@@ -156,7 +157,7 @@ numbers below keep the hunt's numbering.
     which doesn't exist, so every click throws. Also reads `osm._userDetails.id` unguarded. Fix: do what
     the editor does (`getUserPreferencesAsync`, `maproulette_apikey_v2`). `UiMapRouletteMenu.ts:313`.
     *Confirmed.*
-31. **Stopping an animated operation partway disables backups for the rest of the tab** (circularize,
+31. ✅ **Stopping an animated operation partway disables backups for the rest of the tab** (circularize,
     orthogonalize, straighten, reflect, unsquare fix). Any other edit or undo within its 150 ms
     interrupts it; the `'end interrupt'` handler only finishes inside a transaction, so `_inTransition`
     stays set (`immediateBackup` returns early), the promise never settles, and the partial frame is

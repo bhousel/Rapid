@@ -628,8 +628,12 @@ explicit list of small values, the way VS Code separates synced settings from ma
   - If only the local changed, push it.
   - Never delete a remote key just because the local side doesn't have it.
 - Collections (datasets, custom imagery) never sync this way.
-- Cleanup: once the allowlist is in place, delete the `rapid.settings.*` keys that v1 pushed but that
-  no longer sync.
+- Cleanup (open): the account still holds v1's copies of settings that now stay local. Nothing reads
+  them, but they can hold access tokens (custom imagery and dataset URLs), and a path that starts
+  syncing later would pull its stale v1 copy. Never delete a key just because this build doesn't
+  sync it. A system could declare the settings it keeps local (`registerLocal`, next to
+  `registerSync`), so that only those account copies are removed. `meta` (v1's bookkeeping) is
+  `SettingsSystem`'s own. Settings no longer used at all are for a migration.
 
 ### Export and import
 
@@ -686,7 +690,11 @@ modeled on how VS Code documents its settings and extension points.
    - The OSM API can't store an empty value, so an empty value is sent as `""` and read back as
      empty. An empty list (all filters shown, no rules disabled) syncs like any other value.
    - Rapid syncs at startup when the user is already signed in, on every `authchange`, and after a
-     change to a synced setting. Remote `rapid.settings.*` keys that aren't synced are removed.
+     change to a synced setting.
+   - Remote `rapid.settings.*` keys that this build doesn't sync are left alone. "Not synced here"
+     doesn't mean junk: another build may sync them (a newer one, or one whose components register
+     paths this one lacks, like `ui.*` in a build without `UiSystem`). Deleting them used to lose
+     preferences for testers switching builds.
    - Synced so far: imagery favorites and opacity; area fill; disabled filters; validator options;
      privacy and raw tag editor view; the "seen" flags; and the power-user flags. Device-specific
      settings (inspector width, mouse wheel) and collections stay local.
