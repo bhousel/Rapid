@@ -387,6 +387,21 @@ Rule and details in `design/settings-system.md`; these are the choices someone m
   custom `id=` finds it again. Custom data the user loads isn't written, so its `id=` can't be found
   from a link.
 
+## Settings declare how they're kept (Nov 2026)
+
+- **Settings sync across the user's browsers once they sign in, like Chrome or VS Code.** That's Bryan's
+  guiding principle for what syncs: preferences follow the user; state, and what depends on this
+  browser's data, screen or mouse, stays local.
+- **Only what code declares is ever deleted.** Registered (`registerSync`/`registerLocal`) means in use,
+  `unregister` means delete, anything else is ignored. Bryan's choice, over deleting what this build
+  doesn't recognize, which lost testers' preferences when they switched builds (bug-hunt item 12).
+- **Declaring a setting local also deletes its account copy**, so v1's copies of local settings (some
+  with access tokens) don't stay in the account forever.
+- **One `unregister`, not a local and a sync one.** v1 copied everything to the account, so a retired
+  setting may be in both places either way.
+- **Overlapping declarations throw.** A path inside one declared another way means one of them is
+  wrong, and it would delete or sync the wrong thing.
+
 ## Bug hunt 2 choices (Nov 2026)
 
 Fixes where Bryan picked the behavior, which someone might undo by accident.

@@ -617,8 +617,18 @@ The experience we want: sign in from another browser, and within a moment Rapid 
 way you left it (the background, panel sizes, power-user flags, and so on). That needs only a short,
 explicit list of small values, the way VS Code separates synced settings from machine-scoped ones.
 
-- **Systems declare which of their settings sync, and `SettingsSystem` enforces it.** For example, in
-  `ImagerySystem.initAsync`: `settings?.registerSync(['imagery.lastUsed', 'imagery.opacity'])`.
+- **Systems declare the settings they use, and `SettingsSystem` enforces it** (Nov 2026), in their
+  `initAsync`:
+  - `registerSync(paths)`: kept here and synced. For example, in `ImagerySystem`:
+    `settings?.registerSync(['imagery.favorites', 'imagery.lastUsed', 'imagery.opacity', 'imagery.overlays'])`.
+  - `registerLocal(paths)`: kept only in this browser. State, what depends on this screen or mouse,
+    and values that name data stored here (datasets) or may hold an access token (a custom imagery
+    template). A copy in the OSM account is deleted at the next sync.
+  - `unregister(paths)`: no longer used. Removed here when settings start, and from the account at
+    the next sync. The system that took over the data calls it, with a comment saying why.
+  - Anything else is kept here, and the account's copy is left alone: it may be another build's.
+    So only what code declares local or retired is ever deleted, never what's merely unknown.
+  - A path can't be at, under or above one declared another way; that throws.
   Later, the same registration can also declare defaults (the defaults layer).
 - **No async `get`.** Remote values arrive as an ordinary change (`settingschange`), and the systems
   that care already react to changes. Pull when Rapid starts with the user already signed in, and when
@@ -628,14 +638,13 @@ explicit list of small values, the way VS Code separates synced settings from ma
   - If only the local changed, push it.
   - Never delete a remote key just because the local side doesn't have it.
 - Collections (datasets, custom imagery) never sync this way.
-- Cleanup (open): the account still holds v1's copies of settings that now stay local. Nothing reads
-  them, but they can hold access tokens (custom imagery and dataset URLs), and a path that starts
-  syncing later would pull its stale v1 copy. Never delete a key just because this build doesn't
-  sync it. A system could declare the settings it keeps local (`registerLocal`, next to
-  `registerSync`), so that only those account copies are removed. `meta` (v1's bookkeeping) is
-  `SettingsSystem`'s own. Settings no longer used at all (`rapid.custom.*`, `rapid.dataset.*`,
-  `ui.restrictions`) are for a migration. Decide first whether `imagery.lastUsed`, `imagery.overlays`
-  and `rapid.enabledDatasetIDs` should sync.
+- **Cleaning up v1's copies** (done Nov 2026). v1 synced every setting, so the account held copies of
+  settings that now stay local, some with access tokens. The sync deletes the copies of local and
+  retired settings, and v1's bookkeeping (`meta`, which is `SettingsSystem`'s own). Retired so far:
+  `rapid.custom.*` and `rapid.dataset.*` (datasets live in `DatabaseSystem`), `ui.restrictions`.
+  `imagery.lastUsed` and `imagery.overlays` sync; the dataset lists stay local.
+- A path that starts syncing has no last-synced copy yet, so the remote wins once, even a stale
+  copy v1 left (`imagery.lastUsed`).
 
 ### Export and import
 

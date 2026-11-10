@@ -1,8 +1,10 @@
 import { AbstractSystem } from './AbstractSystem.ts';
 import { TreeStore } from '../lib/TreeStore.ts';
+import { utilIterable } from '../util/iterable.ts';
 
 import type { Context } from '../Context.ts';
 import type { KeyPathPart, TreeNode, TreeValue } from '../lib/TreeStore.ts';
+import type { OneOrMore } from '../util/iterable.ts';
 import type { StorageSystem } from './StorageSystem.ts';
 
 
@@ -58,7 +60,7 @@ interface SyncResult {
   pulled?: number;
   /** How many synced settings were sent to the remote */
   pushed?: number;
-  /** How many remote keys `clearAllAsync` removed */
+  /** How many remote keys were deleted (by `clearAllAsync`, or a sync removing local or retired settings) */
   removed?: number;
 }
 
@@ -341,8 +343,12 @@ const SETTINGS_MIGRATIONS: SettingsMigration[] = [
  * generic `TreeStore` (in `lib/`); this system only adds the settings-specific
  * `rapid.settings.*` namespace, engine metadata, and legacy-key migrations.
  *
- * Only the settings that their systems register with `registerSync()` are synced to the
- * user's OSM account. Everything else stays in this browser.
+ * Systems declare the settings they use, like Chrome or VS Code do:
+ * - `registerSync()`: kept here, and synced to the user's OSM account
+ * - `registerLocal()`: kept only in this browser; a copy in the OSM account is deleted
+ * - `unregister()`: no longer used; removed here and from the OSM account
+ * Anything else is kept in this browser, and the OSM account's copy is left alone (it may belong to
+ * another build of Rapid).
  *
  * Events available:
  * - `settingschange` - Fires after any change in the persisted settings
@@ -361,6 +367,10 @@ export class SettingsSystem extends AbstractSystem {
   protected _updatedAt: string;
   /** The settings paths that sync to the OSM account (see `registerSync`) */
   protected _syncPaths: Set<string>;
+  /** The settings paths kept only in this browser (see `registerLocal`) */
+  protected _localPaths: Set<string>;
+  /** The settings paths no longer used, removed here and from the OSM account (see `unregister`) */
+  protected _retiredPaths: Set<string>;
   /** What the remote held for the synced settings at the last sync */
   protected _syncBase: SyncBase;
   /** The sync in progress, if any */
@@ -383,6 +393,8 @@ export class SettingsSystem extends AbstractSystem {
     this._appVersion = context.version;
     this._updatedAt = new Date(0).toISOString();
     this._syncPaths = new Set<string>();
+    this._localPaths = new Set<string>();
+    this._retiredPaths = new Set<string>();
     this._syncBase = { owner: '', entries: new Map<string, string>() };
     this._syncing = null;
     this._syncAgain = false;
@@ -442,6 +454,9 @@ export class SettingsSystem extends AbstractSystem {
     const context = this.context;
     const osm = context.services?.osm;
 
+    // Systems have declared their settings by now (in their `initAsync`)
+    this._removeRetired(this._retiredPaths);
+
     osm?.on('authchange', this._deferredSyncRemote);
     this._deferredSyncRemote();
 
@@ -472,19 +487,98 @@ export class SettingsSystem extends AbstractSystem {
 
 
   /**
-   * Marks settings paths to sync to the user's OSM account. Each path syncs as a unit,
-   * including everything beneath it. Systems call this for the small preferences that
-   * should follow the user between browsers; register them before `startAsync`.
+   * Declares settings that sync to the user's OSM account, so they follow the user between
+   * browsers. Each path syncs as a unit, including everything beneath it. Systems call this in
+   * their `initAsync`, for small preferences.
    * ```ts
    * settings?.registerSync(['map.areaFill', 'map.areaFillToggle']);
    * ```
    * @param paths - Settings paths, e.g. `imagery.favorites`
-   * @throws Error if a path is malformed or targets the reserved `meta` namespace
+   * @throws Error if a path is malformed, targets the reserved `meta` namespace, or overlaps a path
+   *   declared another way
    */
-  public registerSync(paths: string[]): void {
-    for (const path of paths) {
+  public registerSync(paths: OneOrMore<string>): void {
+    this._register(paths, this._syncPaths);
+  }
+
+
+  /**
+   * Declares settings that are kept only in this browser: state, or values that don't make sense
+   * elsewhere (they name data stored here, or may hold an access token). Earlier versions synced
+   * every setting, so a copy in the OSM account is deleted at the next sync.
+   * Systems call this in their `initAsync`.
+   * ```ts
+   * settings?.registerLocal(['rapid.addedDatasetIDs', 'rapid.enabledDatasetIDs']);
+   * ```
+   * @param paths - Settings paths, e.g. `layers.enabled`
+   * @throws Error if a path is malformed, targets the reserved `meta` namespace, or overlaps a path
+   *   declared another way
+   */
+  public registerLocal(paths: OneOrMore<string>): void {
+    this._register(paths, this._localPaths);
+  }
+
+
+  /**
+   * Declares settings that are no longer used. They're removed from this browser when settings
+   * start (or now, if they already have), and from the OSM account at the next sync. Only these are
+   * ever deleted, so a setting that's simply unknown (maybe another build's) is left alone.
+   * The system that took over the data calls this, with a comment saying why.
+   * ```ts
+   * settings?.unregister(['rapid.custom', 'rapid.dataset']);   // datasets live in `DatabaseSystem` now
+   * ```
+   * @param paths - Settings paths, e.g. `ui.restrictions`
+   * @throws Error if a path is malformed, targets the reserved `meta` namespace, or overlaps a path
+   *   declared another way
+   */
+  public unregister(paths: OneOrMore<string>): void {
+    const added = this._register(paths, this._retiredPaths);
+    if (this._started) {
+      this._removeRetired(added);
+    }
+  }
+
+
+  /**
+   * Adds settings paths to one of the declarations (synced, local or retired).
+   * A path can't be at, under or above a path that's declared another way: one of them would be wrong.
+   * @param paths - The settings paths
+   * @param declared - The declaration to add them to
+   * @return The paths that were added
+   * @throws Error if a path is malformed, targets the reserved `meta` namespace, or overlaps a path
+   *   declared another way
+   */
+  protected _register(paths: OneOrMore<string>, declared: Set<string>): string[] {
+    const added: string[] = [];
+    for (const path of utilIterable(paths)) {
       this._assertNotReserved(TreeStore.parsePath(path));
-      this._syncPaths.add(path);
+
+      for (const others of [this._syncPaths, this._localPaths, this._retiredPaths]) {
+        if (others === declared) continue;
+        for (const other of others) {
+          if (TreeStore.isFlatKeyWithin(TreeStore.pathToFlatKey(path), other) ||
+            TreeStore.isFlatKeyWithin(TreeStore.pathToFlatKey(other), path)) {
+            throw new Error(`Settings path '${path}' overlaps '${other}', which is declared another way`);
+          }
+        }
+      }
+
+      declared.add(path);
+      added.push(path);
+    }
+    return added;
+  }
+
+
+  /**
+   * Removes retired settings from this browser (see `unregister`).
+   * @param paths - The retired paths to remove
+   */
+  protected _removeRetired(paths: Iterable<string>): void {
+    for (const path of paths) {
+      if (this._store.has(path)) {
+        this.unset(path);
+      }
     }
   }
 
@@ -798,8 +892,19 @@ export class SettingsSystem extends AbstractSystem {
    * @return `true` if the key is at or under a synced path
    */
   protected _isSynced(flatKey: string): boolean {
-    for (const syncPath of this._syncPaths) {
-      if (TreeStore.isFlatKeyWithin(flatKey, syncPath)) return true;
+    return this._isWithin(flatKey, this._syncPaths);
+  }
+
+
+  /**
+   * Tests whether a flat key is at or under any of the given paths.
+   * @param flatKey - A flat settings key
+   * @param paths - Settings paths
+   * @return `true` if the key is at or under one of them
+   */
+  protected _isWithin(flatKey: string, paths: Iterable<string>): boolean {
+    for (const path of paths) {
+      if (TreeStore.isFlatKeyWithin(flatKey, path)) return true;
     }
     return false;
   }
@@ -839,10 +944,11 @@ export class SettingsSystem extends AbstractSystem {
    * - A remote key is only deleted when the user removed that setting here, never just
    *   because this browser doesn't have it.
    *
-   * Remote `rapid.settings.*` keys that this build doesn't sync are left alone: they may be
-   * synced by another build (a newer one, or one with components this one lacks), or be copies
-   * left by earlier versions, which synced everything. Other applications' preferences are
-   * never touched. Requests are sent one at a time. The OSM API can't store an empty value, so one is sent
+   * Earlier versions synced every setting, so remote copies of settings declared local or retired
+   * (see `registerLocal` and `unregister`) are deleted, and so is v1's bookkeeping (`meta`).
+   * Other remote `rapid.settings.*` keys that this build doesn't sync are left alone: they may be
+   * synced by another build (a newer one, or one with components this one lacks). Other applications'
+   * preferences are never touched. Requests are sent one at a time. The OSM API can't store an empty value, so one is sent
    * as `EMPTY_REMOTE_VALUE` instead. A synced setting that the OSM API can't store (a key or
    * value over 255 characters, or a value that is `EMPTY_REMOTE_VALUE` itself) stays local.
    *
@@ -871,20 +977,38 @@ export class SettingsSystem extends AbstractSystem {
     }
     const base = this._syncBase.entries;
 
-    // Gather the remote `rapid.settings.*` keys that belong to synced settings.
+    // Gather the remote `rapid.settings.*` keys that belong to synced settings,
+    // and the ones the account shouldn't hold.
     const remote = new Map<string, string>();
+    const unwanted: string[] = [];
     for (const [key, value] of Object.entries(prefs)) {
       if (!isSettingsKey(key)) continue;   // not ours
+      if (isMetaKey(key)) {
+        unwanted.push(key);
+        continue;
+      }
       const flatKey = toFlatKey(key);
       if (this._isSynced(flatKey)) {
         remote.set(flatKey, fromRemoteValue(String(value)));
+      } else if (this._isWithin(flatKey, this._localPaths) || this._isWithin(flatKey, this._retiredPaths)) {
+        unwanted.push(key);
       }
     }
 
     const local = this._store.toFlat();
     let pulled = 0;
     let pushed = 0;
+    let removed = 0;
     let failed = 0;
+
+    for (const key of unwanted) {
+      try {
+        await osm.deleteUserPreferenceAsync(key);
+        removed++;
+      } catch {
+        failed++;
+      }
+    }
 
     for (const path of this._syncPaths) {
       const localEntries = TreeStore.flatEntriesWithin(local, path);
@@ -947,11 +1071,11 @@ export class SettingsSystem extends AbstractSystem {
       this.emit('settingschange');
     }
 
-    const counts = { pulled, pushed };
+    const counts = { pulled, pushed, removed };
     if (failed) {
       return { ok: false, reason: `partial-failure (${failed})`, ...counts };
     }
-    return { ok: true, reason: (pulled || pushed) ? 'synced' : 'up-to-date', ...counts };
+    return { ok: true, reason: (pulled || pushed || removed) ? 'synced' : 'up-to-date', ...counts };
   }
 
 

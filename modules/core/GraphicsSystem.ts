@@ -226,6 +226,8 @@ export class GraphicsSystem extends AbstractSystem {
     const settings = context.systems.settings;
     const urlhash = context.systems.urlhash;
 
+    settings?.registerLocal('layers.enabled');
+
     return this._initPromise = super.initAsync()
       .then(() => {
         const prerequisites = [ settings?.initAsync(), urlhash?.initAsync() ];

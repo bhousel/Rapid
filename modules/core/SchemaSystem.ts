@@ -273,6 +273,8 @@ export class SchemaSystem extends AbstractSystem {
     const settings = context.systems.settings;
     const urlhash = context.systems.urlhash;
 
+    settings?.registerLocal('schema.presetRecents');
+
     return this._initPromise = super.initAsync()
       .then(() => {
         const prerequisites = [

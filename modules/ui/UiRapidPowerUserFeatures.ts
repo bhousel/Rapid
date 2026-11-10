@@ -40,6 +40,7 @@ export class UiRapidPowerUserFeatures extends EventEmitter {
 
     // The flags follow the user to other browsers (but not the `poweruser.was.*` backups)
     settings?.registerSync(this._featureFlags.map(featureFlag => `poweruser.${featureFlag}`));
+    settings?.registerLocal('poweruser.was');
 
     // Child components
     this.Modal = null;

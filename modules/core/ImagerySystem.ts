@@ -183,7 +183,9 @@ export class ImagerySystem extends AbstractSystem {
     const urlhash = context.systems.urlhash;
 
     // Settings that follow the user to other browsers
-    settings?.registerSync(['imagery.favorites', 'imagery.opacity']);
+    settings?.registerSync(['imagery.favorites', 'imagery.lastUsed', 'imagery.opacity', 'imagery.overlays']);
+    // Settings kept in this browser (a custom template may hold an access token)
+    settings?.registerLocal(['imagery.custom', 'imagery.lastUsedToggle']);
 
     return this._initPromise = super.initAsync()
       .then(() => {

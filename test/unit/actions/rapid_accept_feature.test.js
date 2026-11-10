@@ -116,6 +116,9 @@ describe('actionRapidAcceptFeature with autoconnect', () => {
       return (k === 'poweruser.autoConnect') ? 'true' : undefined;
     }
     set() {}
+    registerLocal() {}
+    registerSync() {}
+    unregister() {}
   }
 
   const context = new Rapid.MockContext();

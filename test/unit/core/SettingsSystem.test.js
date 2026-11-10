@@ -583,7 +583,7 @@ describe('SettingsSystem', () => {
         });
     });
 
-    it('leaves remote settings this build does not sync alone', () => {
+    it('leaves remote settings this build does not declare alone, but deletes the old sync\'s bookkeeping', () => {
       const osm = makeMockOsm({
         preferences: {
           'rapid.settings.meta.updatedAt': '2026-01-01T00:00:00.000Z',   // left by the old sync
@@ -596,12 +596,81 @@ describe('SettingsSystem', () => {
       return makeSettings(osm)
         .then(s => { settings = s; return settings.syncRemote(); })
         .then(result => {
-          assert.deepInclude(result, { ok: true, pulled: 1, pushed: 0 });
-          assert.isEmpty(osm._state.deletes);
+          assert.deepInclude(result, { ok: true, pulled: 1, pushed: 0, removed: 1 });
+          assert.deepEqual(osm._state.deletes, ['rapid.settings.meta.updatedAt']);
           assert.strictEqual(osm._state.preferences['rapid.settings.ui.newerBuild'], 'keepme');
-          assert.strictEqual(osm._state.preferences['rapid.settings.meta.updatedAt'], '2026-01-01T00:00:00.000Z');
+          assert.strictEqual(osm._state.preferences['some.other.pref'], 'keepme');
           assert.isUndefined(settings.get('ui.newerBuild'));
         });
+    });
+
+    it('deletes the account\'s copies of settings kept in this browser, and keeps them here', () => {
+      const osm = makeMockOsm({
+        preferences: {
+          'rapid.settings.imagery.custom[0].template': 'https://tiles.example.com/{z}/{x}/{y}?key=secret',   // left by the old sync
+          'rapid.settings.ui.width': '400'
+        }
+      });
+      let settings;
+      return makeSettings(osm, s => {
+        s.registerLocal(['imagery.custom', 'ui.width']);
+        s.set('ui.width', '350');
+      })
+        .then(s => { settings = s; return settings.syncRemote(); })
+        .then(result => {
+          assert.deepInclude(result, { ok: true, removed: 2 });
+          assert.sameMembers(osm._state.deletes, ['rapid.settings.imagery.custom[0].template', 'rapid.settings.ui.width']);
+          assert.isEmpty(osm._state.puts);
+          assert.strictEqual(settings.get('ui.width'), '350');   // not the account's old copy
+        });
+    });
+
+    it('removes retired settings here when settings start, and from the account at the next sync', () => {
+      const osm = makeMockOsm({ preferences: { 'rapid.settings.ui.restrictions.maxDistance': '30' } });
+      let settings;
+      return makeSettings(osm, s => {
+        s.set('ui.restrictions.maxDistance', '30');
+        s.set('ui.foo', 'one');
+        s.unregister('ui.restrictions');
+      })
+        .then(s => {
+          settings = s;
+          assert.isTrue(settings.has('ui.restrictions'));   // systems may still be declaring theirs
+          context.services = {};                            // start without a sync
+          return settings.startAsync();
+        })
+        .then(() => {
+          assert.isFalse(settings.has('ui.restrictions'));
+          assert.strictEqual(settings.get('ui.foo'), 'one');
+          context.services = { osm };
+          return settings.syncRemote();
+        })
+        .then(result => {
+          assert.isTrue(result.ok);
+          assert.deepEqual(osm._state.deletes, ['rapid.settings.ui.restrictions.maxDistance']);
+        });
+    });
+
+    it('removes a setting retired after settings started right away', () => {
+      context.services = {};
+      const settings = new Rapid.SettingsSystem(context);
+      return settings.initAsync()
+        .then(() => settings.startAsync())
+        .then(() => {
+          settings.set('rapid.dataset.abc.color', '#ff0000');
+          settings.unregister(['rapid.dataset']);
+          assert.isFalse(settings.has('rapid.dataset'));
+        });
+    });
+
+    it('throws when a settings path is declared in two ways', () => {
+      const settings = new Rapid.SettingsSystem(context);
+      settings.registerSync('poweruser.autoConnect');
+      settings.registerSync('poweruser.autoConnect');   // the same way again is fine
+      assert.throws(() => settings.registerLocal('poweruser'), /overlaps/);
+      assert.throws(() => settings.unregister('poweruser.autoConnect.old'), /overlaps/);
+      settings.registerLocal('poweruser.was');          // a sibling is fine
+      assert.throws(() => settings.registerLocal('meta.foo'), /reserved/);
     });
 
     it('starts over when a different user signs in', () => {

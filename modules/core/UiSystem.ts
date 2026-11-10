@@ -189,6 +189,18 @@ export class UiSystem extends AbstractSystem {
       'ui.sawVersion',
       'ui.sawWhatsNewVersion'
     ]);
+    // Settings kept in this browser: the state of the UI, and what depends on this screen or mouse
+    settings?.registerLocal([
+      'ui.customData',
+      'ui.disclosure',
+      'ui.entityIssues',
+      'ui.inspector',
+      'ui.mouseWheelInteraction',
+      'ui.walkthrough',
+      'ui.width'
+    ]);
+    // The turn restriction editor no longer saves its options
+    settings?.unregister('ui.restrictions');
 
     // Many UI components require l10n and gfx (for scene/layers)
     // Some UI components read settings when they're constructed

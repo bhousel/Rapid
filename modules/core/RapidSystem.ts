@@ -254,6 +254,11 @@ export class RapidSystem extends AbstractSystem {
     const settings = context.systems.settings;
     const urlhash = context.systems.urlhash;
 
+    // The datasets are kept in this browser: custom ones live in the `DatabaseSystem`, so their IDs
+    // mean nothing elsewhere. (They used to be settings, `rapid.custom.*` and `rapid.dataset.*`.)
+    settings?.registerLocal(['rapid.addedDatasetIDs', 'rapid.enabledDatasetIDs']);
+    settings?.unregister(['rapid.custom', 'rapid.dataset']);
+
     return this._initPromise = super.initAsync()
       .then(() => {
         const prerequisites = [
