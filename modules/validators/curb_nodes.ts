@@ -1,5 +1,5 @@
 import { actionAddMidpoint, actionChangeTags, actionSplit} from '../actions/index.ts';
-import { geoLatToMeters, geoLonToMeters, geoMetersToLat, geoMetersToLon } from '@rapid-sdk/math';
+import { geoLatToMeters, geoLonToMeters, geoMetersToLat, geoMetersToLon, geoSphericalDistance } from '@rapid-sdk/math';
 import { OsmNode } from '../data/OsmNode.ts';
 import { ValidationIssue } from '../lib/ValidationIssue.ts';
 import { ValidationFix } from '../lib/ValidationFix.ts';
@@ -209,10 +209,12 @@ export function validateCurbNodes(context: Context): ValidatorFunction {
     const way = parents.find(parent => parent.id === wayID) ?? parents.find(parent => isCrossingWay(parent.tags));
     if (!way) return;
 
-    // Calculate the position for the new curb node
+    // Calculate the position for the new curb node: 1 m in from the end, but no more than a third of
+    // the way to the next node, so it stays between them and a short crossing keeps a middle part
     const nodeIndex = way.nodes.indexOf(node.id);
     const adjacentNode = graph.entity(way.nodes[nodeIndex + 1] || way.nodes[nodeIndex - 1]) as OsmNode;
-    const newNodePosition = calculateNewNodePosition(node, adjacentNode, 1);
+    const offsetMeters = Math.min(1, geoSphericalDistance(node.loc!, adjacentNode.loc!) / 3);
+    const newNodePosition = calculateNewNodePosition(node, adjacentNode, offsetMeters);
 
     // Find connected ways and select the appropriate tags
     const connectedWays = graph.parentWays(node);
@@ -242,8 +244,14 @@ export function validateCurbNodes(context: Context): ValidatorFunction {
 
     const newWayIDs = splitAction.getCreatedWayIDs();
     if (newWayIDs.length > 0) {
-      for (const wayID of newWayIDs) {
-        editor.perform(actionChangeTags(wayID, connectedWayTags));
+      // Tag the piece between the end and the curb like the way it joins.  Find it by its nodes:
+      // `actionSplit` keeps the crossing's ID on the longer piece, which may not be the crossing.
+      const splitGraph = editor.staging.graph;
+      const endPiece = [way.id, ...newWayIDs]
+        .map(pieceID => splitGraph.hasEntity(pieceID) as OsmWay | undefined)
+        .find(piece => piece?.nodes.includes(node.id));
+      if (endPiece) {
+        editor.perform(actionChangeTags(endPiece.id, connectedWayTags));
       }
     } else {
       console.error('No new ways created after split');  // eslint-disable-line no-console

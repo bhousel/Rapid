@@ -228,8 +228,11 @@ numbers below keep the hunt's numbering.
     ✅ **Fixed:** a building pair collects all its crossings and reports the one whose segments sort
     first (`crossingKey`, also the issue's hash), so either way finds the same one. Also fixed: the
     `break` skipped every other way on that segment, so a road segment crossing two buildings missed one.
-40. **On a crossing of about 2 m or less, the `curb_nodes` fix retags the crossing as sidewalk**
+40. ✅ **On a crossing of about 2 m or less, the `curb_nodes` fix retags the crossing as sidewalk**
     (`actionSplit` keeps the ID on the longest part). `curb_nodes.ts:240`. *Reading.*
+    ✅ **Fixed:** the curb goes 1 m in, but no more than a third of the way to the next node (so it
+    stays between them, and the end piece is always the shorter one), and the end piece is found by its
+    nodes, not by which piece is new.
 
 Not bugs: undoing during an animated operation doesn't commit an empty edit (the promise never settles;
 the real problem is item 31). A huge `sameDist` (e.g. 100000) passes validation and makes conflation
