@@ -68,7 +68,7 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
 
     // Ensure methods used as callbacks always have `this` bound correctly.
     this._hashChanged = this._hashChanged.bind(this);
-    this._updateHash = this._updateHash.bind(this);
+    this._layersChanged = this._layersChanged.bind(this);
     this._setFile = this._setFile.bind(this);
     this.setFileList = this.setFileList.bind(this);
 
@@ -86,12 +86,12 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
       }
     });
 
-    // hashchange - pick out the 'gpx' param
+    // hashchange - pick out the 'data' param
     this.context.systems.urlhash!
       .on('hashchange', this._hashChanged);
 
-    // layerchange - update the url hash
-    scene.on('layerchange', this._updateHash);
+    // layerchange - drop a link's custom data from the url once it no longer matches
+    scene.on('layerchange', this._layersChanged);
   }
 
 
@@ -485,8 +485,10 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
     const file = fileList[0];
     const extension = this._getExtension(file.name);
 
+    this._fileReader.abort();   // a file still being read is replaced by this one
     this._fileReader.onload = (e: ProgressEvent<FileReader>) => {
       this._fileReader.onload = null;
+      if (this._fileList !== fileList) return;   // other custom data was loaded since
       const text = e.target!.result as string;
       this._setFile(text, extension, text);
     };
@@ -516,6 +518,7 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
     if (extension) {   // Looks like a gpx, kml, geojson file.. load it!
       network.fetch<string | XmlDocument | GeoJSON.GeoJsonObject | null>(url)
         .then(data => {
+          if (this._url !== url) return;   // other custom data was loaded since
           this._setFile(data, extension, url);
           if (isTask) {
             this._dataUsed = null;    // A task boundary is not really a data source
@@ -603,6 +606,9 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
 
     if (Object.keys(geojson).length) {
       const namespace = CUSTOM_NAMESPACE_PREFIX + utilHash53(source);
+      if (this._namespace && this._namespace !== namespace) {
+        spatial.clearCache(this._namespace);
+      }
       this._dataUsed = `${extension} data file`;
       this._namespace = namespace;
       this._geoDataExtent = new Extent();
@@ -657,50 +663,62 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
 
 
   /**
-   * Respond to any changes appearing in the url hash
+   * Respond to any changes appearing in the url hash.
+   * Custom data that a link names is loaded, and stays in the url so that a data ID in `id=` can be
+   * found again.  (When `data` goes away, the custom data stays as it is.)
    * @param currParams - The current hash parameters
    * @param prevParams - The previous hash parameters
    */
   protected _hashChanged(currParams: Map<string, string>, prevParams: Map<string, string>): void {
-    // 'data' (or 'gpx', legacy)
+    const urlhash = this.context.systems.urlhash!;
+
+    // gpx (legacy)
+    // The old name of `data`.  The url keeps it as `data` instead (see API.md).
+    const gpx = currParams.get('gpx');
+    if (gpx !== undefined) {
+      urlhash.setParam('gpx', null);
+      if (currParams.get('data') === undefined) {
+        urlhash.setParam('data', gpx);
+      }
+    }
+
+    // data
+    // (Not if it was dropped since, by a change made while the same url was being read.)
     const newData = currParams.get('data') || currParams.get('gpx');
     const oldData = prevParams.get('data') || prevParams.get('gpx');
-    if (newData !== oldData) {
+    if (newData && newData !== oldData && urlhash.getParam('data') === newData) {
       this._clear();
-      if (typeof newData === 'string') {
-        // Attempt to parse the data string as a WKT.
-        // If it is, treat it as such. If not, treat it as a URL.
-        const geojson = this._parseAsWkt(newData);
-        if (geojson) {
-          this._wkt = newData.toUpperCase();  // convention is to use uppercase
-          this._setFile(geojson, '.geojson', this._wkt);
-          this._dataUsed = null;  // A wkt area of interest is not really a data source
-        } else {
-          this.setUrl(newData);
-        }
+      // Attempt to parse the data string as a WKT.
+      // If it is, treat it as such. If not, treat it as a URL.
+      const geojson = this._parseAsWkt(newData);
+      if (geojson) {
+        this._wkt = newData.toUpperCase();  // convention is to use uppercase
+        this._setFile(geojson, '.geojson', this._wkt);
+        this._dataUsed = null;  // A wkt area of interest is not really a data source
+      } else {
+        this.setUrl(newData);
       }
     }
   }
 
 
   /**
-   * Push changes in custom data url to the urlhash
+   * Called when layers are turned on or off.
+   * Custom data isn't written to the url: a link's `data` stays there only until the user turns this
+   * layer off or loads other custom data, and then it's dropped (see `API.md`).
    */
-  protected _updateHash(): void {
+  protected _layersChanged(): void {
     const urlhash = this.context.systems.urlhash!;
 
-    if (!this.enabled) return;
+    const urlData = urlhash.getParam('data');
+    if (urlData === undefined) return;
 
-    if (typeof this._wkt === 'string') {
-      urlhash.setParam('data', this._wkt);
-    } else if (typeof this._url === 'string') {
-      // 'gpx' is considered a "legacy" param..
-      // We'll only set it if the url really does seem to be for a gpx file
-      if (/gpx/i.test(this._url)) {
-        urlhash.setParam('gpx', this._url);
-      } else {
-        urlhash.setParam('data', this._url);
-      }
+    // (Nothing loaded yet isn't other data: a link's `id=` can turn this layer on before its data is read.)
+    const isTurnedOff = !this.enabled && this.hasData();
+    const isOtherFile = (this._fileList !== null);
+    const isOtherSource = (this._url !== null && urlData !== this._url) || (this._wkt !== null && urlData.toUpperCase() !== this._wkt);
+    if (isTurnedOff || isOtherFile || isOtherSource) {
+      urlhash.setParam('data', null);
     }
   }
 

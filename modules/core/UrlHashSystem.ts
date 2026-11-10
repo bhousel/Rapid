@@ -257,7 +257,7 @@ export class UrlHashSystem extends AbstractSystem {
     if (!this._started || this._paused) return;
 
     // Remove some of the initial-only params that only clutter up the hash
-    const toOmit = ['comment', 'source', 'hashtags', 'walkthrough', 'data', 'gpx'];
+    const toOmit = ['comment', 'source', 'hashtags', 'walkthrough'];
     const params = utilObjectOmit(Object.fromEntries(this._currParams), toOmit);
 
     const newHash = '#' + utilQsString(params, true);

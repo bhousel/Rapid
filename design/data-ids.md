@@ -122,8 +122,10 @@ may only have letters, digits, `_` and `-` (so no `:` or `.`). Custom data's nam
 **What used to be missing** (all fixed now):
 - ✅ **Custom data** from a file was held by the renderer (`PixiLayerCustomData._geoData`), not a
   cache (fixed in Step 2). Now it's in a cache whose namespace is `custom-` plus a hash of its URL,
-  its WKT, or the file's contents, rather than a random UUID: the URL is saved in `data=`, so a link
-  with both `data=` and `id=` needs the same namespace every time it loads.
+  its WKT, or the file's contents, rather than a random UUID: a link with both `data=` and `id=`
+  needs the same namespace every time it loads.  (A link's `data=` stays in the URL while its data
+  is shown, so a copied link or a reload finds the `id=` again.  Custom data the user loads isn't
+  written to the URL, so an `id=` in a file they dropped can't be found from a link.)
 - ✅ **Pieces of lines** were kept only in `ConflationSystem`'s results (fixed in Step 2). Now they
   also go in a `${datasetID}.pieces` cache, which conflation empties when it flushes its results
   (after every edit) and fills again as it computes them.

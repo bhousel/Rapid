@@ -167,7 +167,7 @@ export class UiIntro {
       datasetsAdded: new Set(rapid.addedDatasetIDs),       // Set<datasetID>
       datasetsEnabled: new Set(rapid.enabledDatasetIDs),   // Set<datasetID>
       edits: editor.toJSON(),
-      sessionID: editor.sessionID
+      sessionID: editor.holdSession()   // kept live while the walkthrough runs, so no other tab restores it
     };
 
     // Remember which layers were enabled before, enable only certain ones in the walkthrough.
@@ -342,11 +342,13 @@ export class UiIntro {
           return editor.fromJSONAsync(edits)
             .then(() => { if (sessionID) editor.continueSession(sessionID); });
         } else {
+          editor.releaseSession();
           return Promise.resolve();
         }
       })
       .catch(err => {
         // Restoring needs the OSM API. The user's session is still saved, so it can be restored later.
+        editor.releaseSession();
         console.error(err);  // eslint-disable-line no-console
         ui?.Flash.show({ duration: 10000, label: l10n.t('restore.failed') });
       });

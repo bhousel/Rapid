@@ -123,7 +123,9 @@ what Rapid picks automatically, so taking one of those out goes back to that.)
 #### Other Layers
 * __`data`__ - (or legacy name __`gpx`__) A custom data URL for loading a gpx track, vector data source,
   or URL-encoded [WKT](https://en.wikipedia.org/wiki/Well-known_text_representation_of_geometry)
-  POLYGON or MULTIPOLYGON text string to render as custom data.<br/>
+  POLYGON or MULTIPOLYGON text string to render as custom data.  It stays in the URL until the
+  custom data layer is turned off or other custom data is loaded, so a link can also select a
+  feature in it with `id=`.<br/>
   _Example:_ `data=https://tasks.hotosm.org/project/592/task/16.gpx`<br/>
   _Example:_ `data=POLYGON((-10%2010,%20-10%20-10,%2010%20-10,%2010%2010,%20-10%2010))`
 * __`dataset_ids`__ - A comma-separated list of datasetIDs to enable.
@@ -135,7 +137,7 @@ what Rapid picks automatically, so taking one of those out goes back to that.)
 
 #### Legacy parameters
 Older links may still use these.  Rapid reads them, but doesn't keep them in the URL.
-* __`gpx`__ - The old name of `data`.
+* __`gpx`__ - The old name of `data`.  The URL keeps it as `data`.
 * __`maproulette=true`__ - Turned on the MapRoulette layer.  Now: `layers=…,maproulette`.
 * __`note`__ - `note=true` turned on the notes layer, and `note=<noteID>` selected a note.
   Now: `layers=…,osm-notes` and `id=osm-notes:<noteID>`.

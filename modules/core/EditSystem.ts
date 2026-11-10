@@ -337,6 +337,10 @@ export class EditSystem extends AbstractSystem {
    * with `immediateBackup`.
    */
   protected _activeSession: SessionRecord | null;
+  /** The session kept live while the walkthrough resets the editor (see `holdSession`) */
+  protected _heldSessionID: SessionID | null;
+  /** The held session's record, which the liveness heartbeat re-writes while it's held */
+  protected _heldSession: SessionRecord | null;
   /** Whether the periodic liveness heartbeat has been started (idempotency guard) */
   protected _heartbeatStarted: boolean;
   /** Fallback interval handle when no `SchedulerSystem` is available */
@@ -406,6 +410,8 @@ export class EditSystem extends AbstractSystem {
     this._canRestoreBackup = false;
     this._sessionID = null;
     this._activeSession = null;
+    this._heldSessionID = null;
+    this._heldSession = null;
     this._heartbeatStarted = false;
     this._heartbeatHandle = null;
     this._pendingUploadIDs = new Set<SessionID>();
@@ -2145,11 +2151,52 @@ export class EditSystem extends AbstractSystem {
 
 
   /**
+   * Keep the active session marked in use while the editor is reset and then given the user's edits
+   * back (the walkthrough).  A reset forgets the session, and without its heartbeat another tab could
+   * restore it after a minute, and then both tabs would save it.
+   * Call `continueSession` or `releaseSession` afterward.
+   * @return The held session, or `null` if there is none
+   */
+  public holdSession(): SessionID | null {
+    const context = this.context;
+    const database = context.systems.database;   // optional
+
+    const id = this._sessionID;
+    this._heldSessionID = id;
+    this._heldSession = this._activeSession;
+
+    // Not backed up from this tab yet (e.g. just continued): read its record, to keep it live.
+    // (Nothing backs up while it's held, so the read can't race with a backup.)
+    if (id && !this._heldSession && database) {
+      database.get<SessionRecord>('sessions', id)
+        .then(record => {
+          if (record && this._heldSessionID === id && !this._heldSession) {
+            this._heldSession = record;
+          }
+        })
+        .catch(() => { /* best effort */ });
+    }
+    return id;
+  }
+
+
+  /**
+   * Stop keeping the held session live, when it isn't continued (see `holdSession`).
+   * Another tab can restore it once its heartbeat goes stale.
+   */
+  public releaseSession(): void {
+    this._heldSessionID = null;
+    this._heldSession = null;
+  }
+
+
+  /**
    * Save the edits in an existing session from now on, instead of in a new one.
    * A reset forgets the session, so code that resets the editor and then gives the user's edits back
    * (the walkthrough) calls this afterward. Otherwise the next backup would save the same edits in a
    * new session, and restoring both could upload them twice.
    * A session that was started in the meantime is deleted.
+   * A held session's record stays cached, so its heartbeat goes on until the next backup.
    * @param id - The session to continue
    */
   public continueSession(id: SessionID): void {
@@ -2162,8 +2209,9 @@ export class EditSystem extends AbstractSystem {
     }
 
     this._sessionID = id;
-    this._activeSession = null;
+    this._activeSession = (this._heldSession?.id === id) ? this._heldSession : null;
     this._setOwnedSessionID(id);
+    this.releaseSession();
   }
 
 
@@ -2531,6 +2579,10 @@ export class EditSystem extends AbstractSystem {
     const now = Date.now();
     try {
       const existing = await database.get<SessionRecord>('sessions', id);
+      // The editor moved on to another session while this was reading (e.g. `continueSession`, which
+      // deleted this one), so don't write it back.  The next backup saves the edits in the new session.
+      if (id !== this._sessionID) return;
+
       const meta = this._computeSessionMeta(backup);
       const apiURL = osm?.apiroot ?? existing?.apiURL;
       const record: SessionRecord = {
@@ -2551,6 +2603,8 @@ export class EditSystem extends AbstractSystem {
         record.upload = mark;
       }
       await database.put('sessions', record);
+      if (id !== this._sessionID) return;       // moved on while writing (see above)
+
       this._activeSession = record;             // cache for the liveness heartbeat (no re-read)
       this._setOwnedSessionID(id);              // this tab owns this session (survives reload)
       this._setBackupStatus(true);
@@ -2669,14 +2723,14 @@ export class EditSystem extends AbstractSystem {
 
 
   /**
-   * Re-write the active session record with a fresh `heartbeatAt`, proving to other tabs that this
-   * session is still open. Uses the cached `_activeSession` record (no read) so it cannot race with
-   * `immediateBackup`. Best-effort — errors are swallowed and do not flap the backup status.
+   * Re-write the active session record (or the held one, see `holdSession`) with a fresh `heartbeatAt`,
+   * proving to other tabs that this session is still open. Uses the cached record (no read) so it
+   * cannot race with `immediateBackup`. Best-effort — errors are swallowed and do not flap the backup status.
    * @return Promise resolved when the heartbeat write completes (or is skipped)
    */
   protected async _heartbeatAsync(): Promise<void> {
     const database = this.context.systems.database;   // optional
-    const record = this._activeSession;
+    const record = this._activeSession ?? this._heldSession;
     if (!database || !record) return;
 
     record.heartbeatAt = Date.now();

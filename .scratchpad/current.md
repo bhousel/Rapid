@@ -149,14 +149,24 @@ numbers below keep the hunt's numbering.
     puts in the remote copy, and shared nodes aren't reverted). Side effect of first-hunt item 10.
     `merge_remote_changes.ts:175`. *New, confirmed.*
     ✅ **Fixed:** `_settleSameAsRemote` puts those copies in the base instead.
-26. **Custom-data IDs in `id=` can never be found from a link,** because `data=` is stripped from the
+26. ✅ **Custom-data IDs in `id=` can never be found from a link,** because `data=` is stripped from the
     URL (`toOmit`). `UrlHashSystem.ts:260`. *New, reading.*
-27. **During the walkthrough, the user's session stops heartbeating,** so after 60 s another tab can
+    ✅ **Fixed:** `data` follows the url rule: a link's `data=` stays until the layer is turned off or
+    other custom data is loaded, and the layer never writes it (`gpx=` is kept as `data=`). Checked
+    live: a link with WKT `data=` and a custom `id=` reloads with the feature selected.
+27. ✅ **During the walkthrough, the user's session stops heartbeating,** so after 60 s another tab can
     restore it, and both write it after `continueSession`. `UiIntro.ts`. *New, reading.*
-28. **Custom data: a slow URL load can overwrite a newer file,** and the newer one's namespaced cache is
+    ✅ **Fixed:** `editor.holdSession()` keeps heartbeating it through the walkthrough, and
+    `continueSession` keeps its record cached so the heartbeat goes on until the next backup
+    (`releaseSession` if the edits can't be given back). Also found: a backup still being written
+    when the session was continued wrote the replaced session back; `_saveSessionAsync` now skips it.
+28. ✅ **Custom data: a slow URL load can overwrite a newer file,** and the newer one's namespaced cache is
     never cleared. `PixiLayerCustomData.ts:509`. *Leak new, race main too. Reading.*
-29. **The history card shows "Note osm-notes:123"** (prints the data ID). `UiHistoryCard.ts:151`.
+    ✅ **Fixed:** a url or file load that other custom data replaced is dropped, and `_setFile` clears
+    the cache it replaces.
+29. ✅ **The history card shows "Note osm-notes:123"** (prints the data ID). `UiHistoryCard.ts:151`.
     *New, reading.*
+    ✅ **Fixed:** it shows the note's own ID.
 
 ### Already in `main`
 30. **The MapRoulette right-click menu can never submit:** `_getApiKey` calls `osm.loadMapRouletteKey`,

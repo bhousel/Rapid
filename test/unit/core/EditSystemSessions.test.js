@@ -115,6 +115,25 @@ describe('EditSystem sessions (Phase 2)', () => {
       assert.deepEqual(records.map(r => r.id), [sessionID]);   // one session, not two
     });
 
+    it('a backup still being written when the session is continued doesn\'t bring back the session it replaced', async () => {
+      editor.perform(actionAddTaggedNode('n-1', [1, 2], { building: 'yes' }));
+      editor.commit({ stringID:'building', selectionAfter: ['n-1'] });
+      await editor.immediateBackup();
+      const sessionID = editor.sessionID;
+      const json = editor.toJSON();
+
+      await editor.resetAsync();
+      await editor.fromJSONAsync(json);
+      const pending = editor.immediateBackup();   // starts a new session, still writing
+      editor.continueSession(sessionID);
+      await pending;
+      await Bun.sleep(5);                         // let the best-effort delete land
+
+      assert.strictEqual(editor._activeSession?.id ?? sessionID, sessionID);
+      const records = await database.getAllFromIndex('sessions', 'by-origin', ORIGIN);
+      assert.deepEqual(records.map(r => r.id), [sessionID]);
+    });
+
     it('removes the session when the user undoes all of its edits', async () => {
       editor.perform(actionAddTaggedNode('n-1', [1, 2], { building: 'yes' }));
       editor.commit({ stringID:'building', selectionAfter: ['n-1'] });
@@ -359,6 +378,52 @@ describe('EditSystem sessions (Phase 2)', () => {
       await seedSession('s-stale', { heartbeatAt: Date.now() - 5 * 60 * 1000, updatedAt: 5000 });
       const list = await editor.listRestorableSessionsAsync();
       assert.include(list.map(s => s.id), 's-stale');
+    });
+
+    it('keeps a held session live while the walkthrough resets the editor, and after it continues', async () => {
+      editor.perform(actionAddTaggedNode('n-1', [1, 2], { building: 'yes' }));
+      editor.commit({ stringID:'building', selectionAfter: ['n-1'] });
+      await editor.immediateBackup();
+      const json = editor.toJSON();
+
+      const sessionID = editor.holdSession();
+      await editor.resetAsync();
+      const before = (await database.get('sessions', sessionID)).heartbeatAt;
+      await new Promise(r => { setTimeout(r, 5); });
+      await editor._heartbeatAsync();
+      const during = await database.get('sessions', sessionID);
+      assert.isAbove(during.heartbeatAt, before);
+      assert.include(during.summary, 'building');   // the user's session, not the walkthrough's
+
+      await editor.fromJSONAsync(json);
+      editor.continueSession(sessionID);
+      await new Promise(r => { setTimeout(r, 5); });
+      await editor._heartbeatAsync();               // before the next backup
+      const after = await database.get('sessions', sessionID);
+      assert.isAbove(after.heartbeatAt, during.heartbeatAt);
+    });
+
+    it('keeps a held session live that this tab hasn\'t backed up yet', async () => {
+      await seedSession('s-held', { heartbeatAt: 1000 });
+      editor.continueSession('s-held');   // e.g. a walkthrough that already ended once
+
+      editor.holdSession();
+      await editor.resetAsync();
+      await new Promise(r => { setTimeout(r, 5); });   // let it read the record
+      await editor._heartbeatAsync();
+      assert.isAbove((await database.get('sessions', 's-held')).heartbeatAt, 1000);
+    });
+
+    it('stops keeping a released session live', async () => {
+      await seedSession('s-held', { heartbeatAt: 1000 });
+      editor.continueSession('s-held');
+      editor.holdSession();
+      await editor.resetAsync();
+      await new Promise(r => { setTimeout(r, 5); });
+
+      editor.releaseSession();   // e.g. the walkthrough couldn't give the edits back
+      await editor._heartbeatAsync();
+      assert.strictEqual((await database.get('sessions', 's-held')).heartbeatAt, 1000);
     });
 
     it('still offers this tab\'s own session after a reload, despite a fresh heartbeat', async () => {
