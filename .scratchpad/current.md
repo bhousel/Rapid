@@ -215,9 +215,13 @@ numbers below keep the hunt's numbering.
     ✅ **Fixed:** the selection wins (Bryan's choice): the photo viewers leave the arrow keys to selected
     OSM features (`photos.arrowKeysMoveSelection()`), unless the Mapillary viewer has focus. `SelectMode`
     takes the same focus as the map (buttons, but not preset buttons). Checked live.
-38. **`y_shaped_connection` isn't revalidated when a road joins or leaves the neighboring node**
+38. ✅ **`y_shaped_connection` isn't revalidated when a road joins or leaves the neighboring node**
     (related entities add parent ways, never sibling nodes). `y_shaped_connection.ts:214`,
     `ValidationCache.ts:198`. *Confirmed.*
+    ✅ **Fixed:** `withAllRelatedEntities` also adds the nodes next to a connection, or to a changed node.
+    Checked live with the real `ValidationSystem`: the issue follows the connection as a road leaves and
+    rejoins (the old build kept it). Live checks need `editor.dismissRestore()` in the debug tab first:
+    it has an old session on offer, and validation (and backups) wait for an answer.
 39. **A road through a building can give two crossing issues:** with `oneOnly`, each side reports the
     first crossing it finds, and the hash is the segments (4 of 16 orientations). `crossing_ways.ts:525`.
     *Confirmed.*

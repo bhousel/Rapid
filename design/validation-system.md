@@ -33,7 +33,10 @@ autoconnect (accepting a Rapid feature with `poweruser.autoConnect`) crashed wit
 
 `ValidationSystem` validates the base and stable graphs, never staging, so nothing runs while the
 user drags. Entities to validate are queued in chunks of 50 and run in idle callbacks.
-- On `stablechange`, the head cache validates what the edit changed, and what's related to it.
+- On `stablechange`, the head cache validates what the edit changed, and what's related to it
+  (`ValidationCache.withAllRelatedEntities`): the entities in the same issues, the ways connected to
+  it, the nodes next to a connection or to a changed node (an issue on a node can depend on the
+  connection next to it, like `y_shaped_connection`), and nearby connectivity issues.
 - On `merge` (a tile loaded), the base cache validates everything on the tile, and the head cache
   validates the user's edits near it (finding 6).
 

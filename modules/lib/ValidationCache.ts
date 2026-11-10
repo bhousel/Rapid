@@ -172,6 +172,8 @@ export class ValidationCache {
    * Returns an expanded set of `entityIDs` that need to also be validated alongside the given `entityIDs`
    * - Entities involved in the same issues
    * - Entities connected to the given entities
+   * - The nodes next to a connection, or to a given node: an issue on a node can depend on the
+   *   connection next to it (`y_shaped_connection`), and a given node may have just joined or left a way
    * - Entities involved in nearby connectivity issues (impossible oneway, disconnected way)
    *
    * @param entityIDs - Array or Set containing entityIDs
@@ -209,8 +211,20 @@ export class ValidationCache {
           ? graph.childNodes(entity as OsmWay)
           : [entity as OsmNode];
         for (const node of checkNodes) {
-          for (const parentWay of graph.parentWays(node)) {
+          const parentWays = graph.parentWays(node);
+          for (const parentWay of parentWays) {
             results.add(parentWay.id);
+          }
+
+          // ..and the nodes next to a connection, or to a given node
+          if (node.id !== entityID && parentWays.length < 2) continue;
+          for (const parentWay of parentWays) {
+            const nodeIDs = parentWay.nodes;
+            for (let i = 0; i < nodeIDs.length; i++) {
+              if (nodeIDs[i] !== node.id) continue;
+              if (i > 0) results.add(nodeIDs[i - 1]);
+              if (i < nodeIDs.length - 1) results.add(nodeIDs[i + 1]);
+            }
           }
         }
       }
