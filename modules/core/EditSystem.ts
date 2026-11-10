@@ -329,6 +329,11 @@ export class EditSystem extends AbstractSystem {
 
   /** Whether there are restorable sessions and we are waiting on the user to decide */
   protected _canRestoreBackup: boolean;
+  /**
+   * Whether the history's backup was cleared because its edits were uploaded or thrown away (see
+   * `clearBackup`). Until the reset that follows, the history isn't work to keep, so it isn't backed up.
+   */
+  protected _isBackupCleared: boolean;
   /** The id of the active editing session, minted lazily on first backup (see `_saveSessionAsync`) */
   protected _sessionID: SessionID | null;
   /**
@@ -408,6 +413,7 @@ export class EditSystem extends AbstractSystem {
     this.optionalDependencies = new Set<SystemID>(['database', 'gfx', 'imagery', 'photos', 'scheduler', 'schema']);
 
     this._canRestoreBackup = false;
+    this._isBackupCleared = false;
     this._sessionID = null;
     this._activeSession = null;
     this._heldSessionID = null;
@@ -605,6 +611,7 @@ export class EditSystem extends AbstractSystem {
     this._fullDifference = new SessionDifference(baseGraph, baseGraph);
 
     this._backupStatus = true;
+    this._isBackupCleared = false;
     this._sessionID = null;
     this._activeSession = null;
     this._checkpoints.clear();
@@ -1496,9 +1503,12 @@ export class EditSystem extends AbstractSystem {
    * Whether the user has done work they would hate to lose: the graph changed, or a kept edit
    * has a `type` (e.g. ignoring a Rapid feature, which changes nothing in the graph).
    * This decides whether to back up the history. Unlike `hasChanges()`, it isn't about uploading.
+   * After `clearBackup` (the edits were uploaded or thrown away) it's `false` until the next reset,
+   * so closing the tab on the success screen doesn't warn about edits that are already on OSM.
    * @return `true` if there is work worth saving
    */
   public hasWork(): boolean {
+    if (this._isBackupCleared) return false;
     if (this.hasChanges()) return true;
 
     // Start at `1` - the `base` edit has no type..
@@ -2094,6 +2104,7 @@ export class EditSystem extends AbstractSystem {
     if (context.inIntro) return Promise.resolve();               // Don't backup edits made in the walkthrough
     if (context.mode?.id === 'save') return Promise.resolve();   // Edits made in save mode may be conflict resolutions
     if (this._canRestoreBackup) return Promise.resolve();        // Wait to see if the user wants to restore other edits
+    if (this._isBackupCleared) return Promise.resolve();         // The edits were uploaded or thrown away, until the reset
     if (this._inTransition) return Promise.resolve();            // Don't backup edits mid-transition
     if (this._inTransaction) return Promise.resolve();           // Don't backup edits mid-transaction
 
@@ -2373,6 +2384,7 @@ export class EditSystem extends AbstractSystem {
    * - The edits were uploaded, so restoring them would upload them twice
    *
    * Removes the active session from IndexedDB and clears the legacy localStorage key.
+   * Until the next reset (which every caller does next), the history isn't backed up again.
    */
   public clearBackup(): void {
     const context = this.context;
@@ -2382,6 +2394,7 @@ export class EditSystem extends AbstractSystem {
     const uploader = context.systems.uploader;
 
     this._canRestoreBackup = false;
+    this._isBackupCleared = true;
     scheduler?.cancel('edit-backup');
 
     const id = this._sessionID;

@@ -134,6 +134,27 @@ describe('EditSystem sessions (Phase 2)', () => {
       assert.deepEqual(records.map(r => r.id), [sessionID]);
     });
 
+    it('after an upload clears the backup, doesn\'t back up the uploaded edits again before the reset', async () => {
+      editor.perform(actionAddTaggedNode('n-1', [1, 2], { building: 'yes' }));
+      editor.commit({ stringID:'building', selectionAfter: ['n-1'] });
+      await editor.immediateBackup();
+
+      editor.clearBackup();                // the upload succeeded
+      assert.isFalse(editor.hasWork());    // no "Leave site?" prompt for edits already on OSM
+      editor.perform(actionAddTaggedNode('n-2', [3, 4], { building: 'yes' }));
+      editor.commit({ stringID:'building', selectionAfter: ['n-2'] });
+      await editor.immediateBackup();
+      await Bun.sleep(5);                  // let the best-effort delete land
+      assert.isEmpty(await database.getAllFromIndex('sessions', 'by-origin', ORIGIN));
+
+      await editor.resetAsync();           // the edits after the reset are work again
+      editor.perform(actionAddTaggedNode('n-3', [5, 6], { building: 'yes' }));
+      editor.commit({ stringID:'building', selectionAfter: ['n-3'] });
+      assert.isTrue(editor.hasWork());
+      await editor.immediateBackup();
+      assert.lengthOf(await database.getAllFromIndex('sessions', 'by-origin', ORIGIN), 1);
+    });
+
     it('removes the session when the user undoes all of its edits', async () => {
       editor.perform(actionAddTaggedNode('n-1', [1, 2], { building: 'yes' }));
       editor.commit({ stringID:'building', selectionAfter: ['n-1'] });

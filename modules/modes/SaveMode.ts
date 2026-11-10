@@ -378,7 +378,8 @@ export class SaveMode extends AbstractMode {
 
   /**
    * Handler called when upload succeeds.
-   * Shows the success screen and resets after a delay.
+   * Shows the success screen and resets after a delay.  Rapid stays in save mode until the reset,
+   * so nothing can be edited (see `_saveEnded`).
    * @param  changeset - The changeset object that was successfully uploaded
    */
   protected _resultSuccess(changeset: any): void {
@@ -420,8 +421,10 @@ export class SaveMode extends AbstractMode {
    * Note: This may occur after an error condition.
    */
   protected _saveEnded(): void {
-    // While the conflict screen is up, Escape belongs to it (its Cancel throws away the merges)
-    if (!this.Conflicts) {
+    // While the conflict screen is up, Escape belongs to it (its Cancel throws away the merges).
+    // After a successful save, the reset is the only way out: the history still holds the uploaded
+    // edits until then, and the reset would throw away anything edited after them.
+    if (!this.Conflicts && !this._wasSuccessfulSave) {
       this._keybindingOn();
     }
     this._hideLoading();

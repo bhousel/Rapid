@@ -164,6 +164,16 @@ OpenStreetMap ↔ OpenHistoricalMap bridge).
 - `DatabaseSystem` blob tests fail when that file runs alone (Blob through the in-memory clone),
   but pass in the full suite.
 
+## The upload flow as promises
+- The upload is callback code across `OsmService.sendChangeset`, `UploaderSystem._uploadCallback` and
+  `SaveMode`, with two 2.5 s waits for postgres replication (iD#1646 iD#2678): the service waits before
+  calling back, and the success screen waits before the reset. Hard to follow.
+- Bryan's idea (Nov 10 2026): a promise chain the uploader owns, e.g. `osm.sendChangeset(...)` → clear
+  the backup right away → wait → what `_uploadCallback` does now. Services shouldn't know about
+  `EditSystem`, so the clearing belongs in the uploader, not the service.
+- Bug-hunt item 35 closed the gap for now: Rapid stays in save mode until the reset, and
+  `clearBackup` stops backups until then.
+
 ## MapRoulette authentication
 - Rapid read the user's MapRoulette API key from the `maproulette_apikey_v2` OSM user preference.
   After a security incident (October 2026:

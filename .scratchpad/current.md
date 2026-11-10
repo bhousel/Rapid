@@ -200,8 +200,11 @@ numbers below keep the hunt's numbering.
     PUT). `MapRouletteService.ts:437`. *Reading.*
     ✅ **Fixed:** submitting does nothing while any of the task's requests are in flight, and a comment
     already posted for the task isn't posted again when the user retries after a failed status update.
-35. **For 2.5 s after a successful upload, Escape plus an edit (or closing the tab) makes a new session
+35. ✅ **For 2.5 s after a successful upload, Escape plus an edit (or closing the tab) makes a new session
     of the uploaded edits,** offered for restore next time. `SaveMode.ts:375`. *Reading.*
+    ✅ **Fixed:** after a successful save, Escape stays off, so the reset is the only way out of save mode.
+    And after `clearBackup` (an upload, or the source switcher) `hasWork()` is false until the reset:
+    no backup and no "Leave site?" prompt for edits already on OSM. Checked live with faked uploader events.
 36. **`#walkthrough=true` with a stored session means no backups for the rest of the tab**
     (`_canRestoreBackup` stays true). `UiSystem.ts:328`. *Reading.*
 37. **Arrow keys:** with a photo viewer open, plain arrows both nudge the selection and step the photo;
