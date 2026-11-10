@@ -2,6 +2,8 @@
 
 Reverse-chronological one-liners. Details live in git history — these are just breadcrumbs.
 
+- **A data ID's first part is its `spatialID`** (Nov 10 2026, `design/data-ids.md` Terms) — the data prop `namespace` is now `spatialID`, like the `SpatialID` type, `SpatialSystem`'s parameters and `RapidDataset.spatialID` (Bryan found "namespace" confusing: it's the spatial cache's ID, or a resolver's for OSM and vector tiles). Code, tests and docs; data IDs themselves didn't change.
+
 - **Mapillary traffic signs have their own cache** (Nov 10 2026, `design/data-ids.md`) — `mapillary-signs`, apart from the other detections. A sign's data ID starts with that cache ID, and the layer has the same ID, so a link to a sign turns on the signs layer, and nothing guesses the layer from `object_type`. Signs' data IDs changed (no shim, per the pre.4 plan).
 
 - **Switching the API offers that API's sessions** (Nov 10 2026, `design/database-system.md`) — startup is always on live, so dev sessions were never offered. `editor.findRestorableSessionsAsync()` (also used by startup) settles the API's interrupted uploads and finds its sessions; the source switcher shows the restore screen after switching. From the first bug hunt.

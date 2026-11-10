@@ -12,7 +12,7 @@ describe('AbstractMode', () => {
   const spatial = context.systems.spatial;
 
   function note(id, props = {}) {
-    return new Rapid.MarkerData(context, { id: id, namespace: 'notes-test', loc: [0, 0], ...props });
+    return new Rapid.MarkerData(context, { id: id, spatialID: 'notes-test', loc: [0, 0], ...props });
   }
 
 

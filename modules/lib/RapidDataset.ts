@@ -21,7 +21,7 @@ const RAPID_MAGENTA = '#da26d3';
 /**
  * The start of every datasetID the user adds. Nothing that Rapid ships (datasets, services, cache
  * IDs) may use it, so the user's datasets can't collide with Rapid's, now or in a later release.
- * A datasetID is also the namespace of the dataset's data (see `design/data-ids.md`).
+ * A datasetID is also the spatial ID of the dataset's data (see `design/data-ids.md`).
  */
 export const USER_DATASET_PREFIX = 'user-';
 
@@ -167,7 +167,7 @@ export class RapidDataset {
 
     this.id = props.id ?? '';
     this.serviceID = props.serviceID ?? '';
-    this.spatialID = props.spatialID ?? this.id;   // also the namespace of its data (see `design/data-ids.md`)
+    this.spatialID = props.spatialID ?? this.id;   // also the spatial ID of its data (see `design/data-ids.md`)
     this.assetID = props.assetID ?? '';
     this.categories = new Set<string>(props.categories ?? []);
     this.color = props.color ?? RAPID_MAGENTA;
@@ -522,7 +522,7 @@ export class RapidDataset {
 
         const props: GeoJSONProps = {
           id:         parts.length > 1 ? `${key}:${partIndex}` : key,
-          namespace:  this.spatialID,
+          spatialID:  this.spatialID,
           serviceID:  this.serviceID,
           datasetID:  this.id,
           geojson:    part

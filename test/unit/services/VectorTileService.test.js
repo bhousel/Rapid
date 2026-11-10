@@ -628,7 +628,7 @@ describe('VectorTileService', () => {
   });
 
   describe('finding data by data ID', () => {
-    it('finds data in the source\'s zoom caches, namespaced by the source', () => {
+    it('finds data in the source\'s zoom caches, by the source\'s spatial ID', () => {
       const { TL } = getGrid();
       feed(TL, [ subRect(TL, 0.4, 0.4, 0.6, 0.6, { leisure: 'park' }) ]);
 

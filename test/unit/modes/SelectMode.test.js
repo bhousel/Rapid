@@ -11,7 +11,7 @@ describe('SelectMode', () => {
   let context, graph, mode, selectClasses, urlParams, visibleIDs, blocked;
 
   function note(id) {
-    return new Rapid.MarkerData(context, { id: id, namespace: 'notes-test', loc: [0, 0] });
+    return new Rapid.MarkerData(context, { id: id, spatialID: 'notes-test', loc: [0, 0] });
   }
 
   beforeEach(() => {
@@ -109,7 +109,7 @@ describe('SelectMode', () => {
 
 
   it('leaves a data ID that came from a counter out of `id=`', () => {
-    const d = new Rapid.GeoJSONData(context, { namespace: 'vt-test', geojson: { type: 'Feature', properties: {}, geometry: { type: 'Point', coordinates: [0, 0] } } });
+    const d = new Rapid.GeoJSONData(context, { spatialID: 'vt-test', geojson: { type: 'Feature', properties: {}, geometry: { type: 'Point', coordinates: [0, 0] } } });
     context.systems.spatial.replaceData('vt-test', d);
     mode.enter({ selection: ['w1', d.dataID] });
     assert.deepEqual(mode.selectedIDs, ['w1', d.dataID]);   // still selected
@@ -174,7 +174,7 @@ describe('SelectMode', () => {
         return on.call(this, eventName, fn);
       };
       try {
-        const props = { type: 'note', serviceID: 'osm', namespace: 'osm-notes', loc: [0, 0], isNew: true };
+        const props = { type: 'note', serviceID: 'osm', spatialID: 'osm-notes', loc: [0, 0], isNew: true };
         const newNote = new Rapid.MarkerData(context, { id: '-1', ...props });
         context.systems.spatial.replaceData('osm-notes', newNote);
         mode.enter({ selection: [newNote.dataID] });
@@ -183,7 +183,7 @@ describe('SelectMode', () => {
       }
 
       // Saving removes the new note and caches the saved one, then the editor emits it.
-      const saved = new Rapid.MarkerData(context, { id: '123', type: 'note', serviceID: 'osm', namespace: 'osm-notes', loc: [0, 0] });
+      const saved = new Rapid.MarkerData(context, { id: '123', type: 'note', serviceID: 'osm', spatialID: 'osm-notes', loc: [0, 0] });
       context.systems.spatial.removeItems('osm-notes', '-1');
       context.systems.spatial.replaceData('osm-notes', saved);
       onChange(saved);
@@ -212,7 +212,7 @@ describe('SelectMode', () => {
         return on.call(this, eventName, fn);
       };
       try {
-        const issue = new Rapid.MarkerData(context, { id: 'abc', serviceID: serviceID, namespace: serviceID, loc: [0, 0] });
+        const issue = new Rapid.MarkerData(context, { id: 'abc', serviceID: serviceID, spatialID: serviceID, loc: [0, 0] });
         spatial.replaceData(serviceID, issue);
         mode.enter({ selection: [issue.dataID] });
       } finally {

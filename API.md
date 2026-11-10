@@ -71,13 +71,42 @@ what Rapid picks automatically, so taking one of those out goes back to that.)
 
 #### Selecting Features
 * __`id`__ - A comma-separated list of what's selected.  An OSM node, way or relation is the character
-  'n', 'w', or 'r', followed by its OSM ID.  Other data is `<namespace>:<id>`, e.g. a Rapid dataset's
-  feature or a note (`osm-notes:<id>`).  The layers that draw what's selected are turned on (and a
+  'n', 'w', or 'r', followed by its OSM ID.  Other data is `<source>:<id>`, e.g. a Rapid dataset's
+  feature (`fbRoads:<id>`) or a note (`osm-notes:<id>`).  The layers that draw what's selected are turned on (and a
   Rapid dataset's feature turns on its dataset).  OSM entities and notes that aren't loaded yet are
   downloaded, and the map moves to show what's selected if it isn't in view.  Other data is selected
   when it loads, so it must be in view (with `map`).<br/>
   _Example:_ `id=n1207480649`<br/>
-  _Example:_ `id=w123,fbRoads:abc,osm-notes:2`
+  _Example:_ `id=w123,fbRoads:abc,osm-notes:2`<br/>
+  Here are some of the sources.  The easiest way to get a feature's ID is to select it in Rapid and
+  copy `id=` from the URL.
+
+  | Source | `id=` | Selects |
+  |--------|-------|---------|
+  | OpenStreetMap | `n<id>`, `w<id>`, `r<id>` | A node, way, or relation |
+  | `osm-notes` | `osm-notes:<noteID>` | An OSM note |
+  | `maproulette` | `maproulette:<taskID>` | A MapRoulette task |
+  | `keepright` | `keepright:<errorID>` | A KeepRight issue |
+  | `osmose` | `osmose:<uuid>` | An Osmose issue |
+  | `geoscribble` | `geoscribble:<id>` | A GeoScribble drawing |
+  | `custom-<hash>` | `custom-<hash>:<id>` | A feature in the custom data from `data=` (the hash is of its URL or WKT) |
+
+  Each Rapid dataset is a source too, named by its datasetID (the same ID that `dataset_ids=` takes),
+  and selecting one of its features turns the dataset on.  Some of them:
+
+  | Dataset | `id=` |
+  |---------|-------|
+  | Facebook Roads | `fbRoads:<id>` |
+  | Microsoft Buildings | `msBuildings:<id>` |
+  | Overture Places | `overture-places:<id>` |
+  | Overture Buildings | `overture-buildings:<id>` |
+  | TomTom Roads (from Overture) | `overture-tomtom-roads:<id>` |
+  | United States Addresses (Esri, from the USDOT National Address Database) | `e75b56f13b404d7d8b47ef8be1c619ec:<layer>-<objectID>` |
+  | New Zealand Buildings (Esri, from LINZ) | `ef9136b079e24bbfb432be9bbdd246ff:<layer>-<objectID>` |
+
+  An Esri dataset's ID is its item ID on ArcGIS Online
+  (see [ArcGIS for OpenStreetMap](https://www.esriurl.com/ArcGIS4OSM)).
+  Photos aren't selected with `id=`; use `photo=` and `detection=`.
 
 #### Map and Rendering
 * __`background`__ - The value of the `id` property of the source in Rapid's imagery list,

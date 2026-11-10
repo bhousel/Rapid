@@ -640,7 +640,7 @@ export class MapRouletteService extends AbstractSystem {
     props.parentId = challengeID;    // force to string
     props.loc = spatial.getFreeLoc('maproulette', [props.point.lng, props.point.lat]);
     props.serviceID = this.id;
-    props.namespace = 'maproulette';
+    props.spatialID = 'maproulette';
 
     // Create a MarkerData for the task
     task = new MarkerData<MapRouletteTaskProps>(context, props as Partial<MapRouletteTaskProps>);

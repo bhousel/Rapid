@@ -208,7 +208,7 @@ describe('RapidDataset', () => {
       const ds = new Rapid.RapidDataset(context, { id: 'found' });
       const data = load(ds, [line(0, { name: 'a' })]);
       const d = data[0];
-      assert.strictEqual(d.props.namespace, 'found');
+      assert.strictEqual(d.props.spatialID, 'found');
       assert.strictEqual(context.systems.spatial.getData(d.dataID), d);
     });
 

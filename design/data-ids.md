@@ -16,13 +16,15 @@ The renderer and the data are two separate sides of Rapid, and it helps to keep 
 **The data side:**
 - **Datum**: one `AbstractData` (an `OsmEntity`, `GeoJSONData`, `MarkerData`, …). Services fetch
   data or read it from files, and keep it until `context.resetAsync()` clears it.
-- **Namespace**: a set of data whose IDs are unique within it. Each Rapid dataset is one
-  (`fbRoads`), OSM is one, and each kind of service data is one (OSM notes, KeepRight issues,
-  Mapillary images, …). A namespace's name is the ID of the `SpatialSystem` cache that holds its
-  data (see [Looking data up](#looking-data-up)).
-- **Local ID**: a datum's ID within its namespace, like `w123` or `abc`. It's what the namespace's
-  own code uses, like a `Graph` for its entity IDs and `way.nodes`. The type is `EntityID` for OSM.
-- **Data ID**: a datum's ID across all of Rapid, `${namespace}:${localID}`, like `fbRoads:abc`.
+- **Spatial ID**: the ID of the `SpatialSystem` cache that holds a set of data whose local IDs are
+  unique within it. Each Rapid dataset has one (`fbRoads`), OSM has one (`osm`), and each kind of
+  service data has one (OSM notes, KeepRight issues, Mapillary images, …). For OSM and vector tiles
+  it's the ID a resolver is registered under rather than a single cache (see
+  [Looking data up](#looking-data-up)). The type is `SpatialID`, and on `AbstractData` it's the
+  `spatialID` prop.
+- **Local ID**: a datum's ID within its cache, like `w123` or `abc`. It's what the code that owns
+  that data uses, like a `Graph` for its entity IDs and `way.nodes`. The type is `EntityID` for OSM.
+- **Data ID**: a datum's ID across all of Rapid, `${spatialID}:${localID}`, like `fbRoads:abc`.
   Selections, edits, the URL and the renderer's classes (`select`, `hover`) use it. The type is
   `DataID`, and on `AbstractData` it's the `dataID` property.
 
@@ -31,9 +33,9 @@ The renderer and the data are two separate sides of Rapid, and it helps to keep 
   several (a polygon's fill and its pin, a line's label), and they come and go as the map moves.
 - **Feature ID**: a renderable's ID, unique within its layer. It's built from the data ID plus a
   suffix (`${dataID}:fill`).
-- **Layer**: draws renderables for one or more namespaces. The `rapid` layer draws every enabled
-  dataset, and `labels` draws for everything. A layer that draws one namespace has the namespace's
-  name as its ID (`osm`, `osm-notes`, `keepright`, …), and `AbstractPixiLayer.drawsData()` says which
+- **Layer**: draws renderables for data with one or more spatial IDs. The `rapid` layer draws every
+  enabled dataset, and `labels` draws for everything. A layer that draws one spatial ID's data has
+  that spatial ID as its ID (`osm`, `osm-notes`, `keepright`, …), and `AbstractPixiLayer.drawsData()` says which
   data a layer draws (`rapid` and `custom-data` override it). That's how a link that selects data turns
   on the layer that draws it (`PixiScene.showData()`).
 
@@ -54,14 +56,15 @@ pointed at, it says which datum that is.
 
 ## Rules
 
-1. **A data ID is `${namespace}:${localID}`.**
-2. **Namespaces never contain a colon, so split on the first colon only.** Everything after it is the
-   local ID, and only the namespace's own code reads it. Local IDs may contain colons
+1. **A data ID is `${spatialID}:${localID}`.**
+2. **Spatial IDs never contain a colon, so split on the first colon only.** Everything after it is the
+   local ID, and only the code that owns that data reads it. Local IDs may contain colons
    (`fbRoads:abc:1`, the second part of a MultiPolygon).
-3. **A data ID with no colon is in the `osm` namespace.** So an OSM entity's data ID is its entity
+3. **A data ID with no colon has the spatial ID `osm`.** So an OSM entity's data ID is its entity
    ID (`w123`), and old code, backups and links that use bare OSM IDs keep working. `osm:w123`
    is read as `w123`, so the same entity never has two data IDs.
-4. **A namespace decides its own local IDs, but they must be deterministic** (same data, same ID).
+4. **The code that owns a spatial ID decides its local IDs, but they must be deterministic** (same
+   data, same ID).
    - OSM-like data (OSM itself, or an OSM-like service): the entity ID, e.g. `fbRoads:w-1000000000`.
    - Data that comes as GeoJSON: `key` is the publisher's ID if the data has one, else a hash of the
      feature (see `featureKey` in `modules/data/dataID.ts`). A publisher's ID has its colons replaced,
@@ -85,7 +88,7 @@ Wanted: one call that takes any data ID and returns the datum, `spatial.getData(
 **All data lives in a `SpatialSystem` cache. Not everything in a cache is data**, and that's fine:
 tiles, labels, way segments and validation results are cached there too.
 
-**A namespace is the ID of the cache that holds its data, and the cache is keyed by local ID.** So
+**A spatial ID is the ID of the cache that holds its data, and the cache is keyed by local ID.** So
 `mapillary-images:123` is `spatial.getItem('mapillary-images', '123')`, and `getData()` needs no
 table: split on the first colon and look in that cache. Services keep their own wrappers
 (`mapillary.getImage('123')`), but anything that has a data ID can find the datum without knowing
@@ -105,25 +108,25 @@ release could ship a dataset or a service cache with the same name. (Before this
 handled that clash at startup by deleting the user's saved dataset.) So every dataset the user
 adds gets an ID starting with `user-` (`USER_DATASET_PREFIX` in `RapidDataset.ts`), and nothing
 Rapid ships may start with `user-`. `UiRapidAddDataset` adds the prefix to what the user types, which
-may only have letters, digits, `_` and `-` (so no `:` or `.`). Custom data's namespaces start with
-`custom-` (`CUSTOM_NAMESPACE_PREFIX` in `PixiLayerCustomData`), which is reserved the same way.
+may only have letters, digits, `_` and `-` (so no `:` or `.`). Custom data's caches start with
+`custom-` (`CUSTOM_CACHE_PREFIX` in `PixiLayerCustomData`), which is reserved the same way.
 
-**Two kinds of namespace need their own lookup** (a resolver registered with `SpatialSystem`):
+**Two kinds of spatial ID need their own lookup** (a resolver registered with `SpatialSystem`):
 - **OSM.** The editable OSM data is special. Its graphs hold different versions of the same entities
   (indexed in `editor_base` plus the local indexes `editor_stable` and `editor_staging`, since
   graph-geometry step 9), and its IDs are bare (no `osm:`). Bare IDs resolve through `EditSystem`'s
   staging graph.
 - **Vector tiles** (Overture, or a vector tile URL as custom data). These have a cache per zoom
   (`${source}.z${zoom}`), because tiles hold different data at different zooms, often simplified
-  at low zooms. The namespace is the source, and the resolver looks in the cache nearest the current
+  at low zooms. The spatial ID is the source's ID, and the resolver looks in the cache nearest the current
   zoom. A data ID can't include the zoom, or the same building would have a different ID at z15
   and z16. See [Vector tiles](#vector-tiles) for a way to get back to one cache.
 
 **What used to be missing** (all fixed now):
 - ✅ **Custom data** from a file was held by the renderer (`PixiLayerCustomData._geoData`), not a
-  cache (fixed in Step 2). Now it's in a cache whose namespace is `custom-` plus a hash of its URL,
+  cache (fixed in Step 2). Now it's in a cache whose ID is `custom-` plus a hash of its URL,
   its WKT, or the file's contents, rather than a random UUID: a link with both `data=` and `id=`
-  needs the same namespace every time it loads.  (A link's `data=` stays in the URL while its data
+  needs the same spatial ID every time it loads.  (A link's `data=` stays in the URL while its data
   is shown, so a copied link or a reload finds the `id=` again.  Custom data the user loads isn't
   written to the URL, so an `id=` in a file they dropped can't be found from a link.)
 - ✅ **Pieces of lines** were kept only in `ConflationSystem`'s results (fixed in Step 2). Now they
@@ -208,7 +211,7 @@ Since bare IDs are OSM, every OSM entity ID is already a data ID, and code that 
 data IDs and calls `graph.hasEntity(id)` keeps working: it just doesn't find the non-OSM ones.
 What breaks is code that calls `graph.entity(id)`, which throws when an ID isn't in the graph. Those
 call sites need to take only the OSM IDs, through one helper (e.g. `osmEntityID(dataID)`, which
-returns the entity ID, or `undefined` for other namespaces).
+returns the entity ID, or `undefined` for data that isn't OSM).
 
 **`AbstractData.key` is taken.** It's `${id}v${v}`, a key that changes with the datum's version,
 used by d3 data joins. So the data ID is a separate property, `dataID`.
@@ -219,26 +222,26 @@ Each step is its own commit, and leaves Rapid working with the tests passing.
 
 **✅ Step 1: Data knows its data ID, and `SpatialSystem` can find it.** No change for OSM.
 - `modules/data/dataID.ts`: `makeDataID()`, `splitDataID()`, and `osmEntityID(dataID)` (the entity
-  ID, or `undefined` for other namespaces).
-- `AbstractDataProps.namespace`. The `dataID` getter returns `${namespace}:${id}`, or the bare `id`
-  when there's no namespace (OSM). Accepting an OSM-like feature removes `namespace` from the copy,
-  along with the other Rapid metadata.
-- `SpatialSystem.getData(dataID)`, and `registerResolver()` per namespace. `EditSystem` registers
+  ID, or `undefined` for data that isn't OSM).
+- `AbstractDataProps.spatialID` (called `namespace` until Nov 2026). The `dataID` getter returns
+  `${spatialID}:${id}`, or the bare `id` when there's no spatial ID (OSM). Accepting an OSM-like
+  feature removes `spatialID` from the copy, along with the other Rapid metadata.
+- `SpatialSystem.getData(dataID)`, and `registerResolver()` per spatial ID. `EditSystem` registers
   `osm` (the staging graph). `VectorTileService` registers each source, looking in its zoom caches
   nearest the current zoom first.
 - Caches keep data with no extent in `items` but out of the spatial index, and `replaceData()`
   replaces the older version instead of leaving it.
 - Caches renamed: `keepright`, `osmose`, `maproulette`, `geoscribble`; datasets use their datasetID
   (`fbRoads`, `msBuildings`, Esri item IDs, file datasets); vector tiles use `${source}.z${zoom}`.
-  Each service sets `namespace` on the data it makes. Services clear their own caches by name
+  Each service sets `spatialID` on the data it makes. Services clear their own caches by name
   rather than by prefix.
 - The user's datasets get the `user-` prefix (see Reserved names). Services don't need to list
-  their namespaces.
-- File datasets didn't set `namespace` yet, since their `id` was still the whole data ID
+  their spatial IDs.
+- File datasets didn't set `spatialID` yet, since their `id` was still the whole data ID
   (`fbRoads:abc:0`). Step 2 fixed that.
 
 **✅ Step 2: Deterministic IDs everywhere.**
-- File datasets: the local ID is `key`, with `:${part}` only for Multi* geometries, and `namespace`
+- File datasets: the local ID is `key`, with `:${part}` only for Multi* geometries, and `spatialID`
   is the datasetID. Keys taken from the publisher replace `:` and `,` (a comma would break `id=` in
   the URL). `featureKey` moved to `modules/data/dataID.ts`, since custom data uses it too.
 - Accept and ignore records, `isAcceptedOrIgnored()`, and conflation's results use data IDs
@@ -249,7 +252,7 @@ Each step is its own commit, and leaves Rapid working with the tests passing.
   `EventTarget.dataID` was still `datum.id`, so selections held local IDs that no longer matched
   what the layer bound.
 - Pieces of lines go in a `${datasetID}.pieces` cache: `pieceID()` puts them there, and
-  `parsePieceID()` only reads IDs in a `.pieces` namespace.
+  `parsePieceID()` only reads IDs whose spatial ID ends in `.pieces`.
 - Esri keeps its data as GeoJSON, keyed by `${layer}-${objectid}`. Its `Graph` and OSM-building code
   are gone, and accept converts it like a file dataset's data. Multi* geometries are still skipped,
   as before. Since Esri data is GeoJSON now, conflation could match it too.
@@ -335,7 +338,7 @@ extent), `rapid-system.md` (feature IDs), `conflation-system.md` (the pieces cac
 ## Open questions
 
 1. **More than one OSM-like source at once** (OSM against OpenHistoricalMap, or production against
-   the dev API). They'd be namespaces like `ohm:w123`, each with its own graph. Only `osm` can be
+   the dev API). They'd be spatial IDs like `ohm` (data IDs like `ohm:w123`), each with its own graph. Only `osm` can be
    edited for now, and only `osm` gets the bare form.
 2. **One cache per vector tile source.** The GERS IDs are there, but only at z14 (see
    [Vector tiles](#vector-tiles)). Data from lower zooms has only the hashed `origID`, so one cache
@@ -346,10 +349,10 @@ extent), `rapid-system.md` (feature IDs), `conflation-system.md` (the pieces cac
    features by their GERS ID (question 2) fixes it.
 
 Settled:
-- Where namespaces are looked up: there's no table. A namespace is a `SpatialSystem` cache ID, plus
-  resolvers for OSM and vector tiles. Which layer draws a namespace is asked of the layers
-  (`drawsData()`), and most layers are named after their namespace (the notes layer was renamed
-  from `notes` to `osm-notes` for this). Mapillary's traffic signs have their own namespace,
+- Where spatial IDs are looked up: there's no table. A spatial ID is a `SpatialSystem` cache ID, or
+  the ID of a resolver for OSM or vector tiles. Which layer draws a spatial ID's data is asked of the
+  layers (`drawsData()`), and most layers are named after the spatial ID they draw (the notes layer
+  was renamed from `notes` to `osm-notes` for this). Mapillary's traffic signs have their own cache,
   `mapillary-signs`, apart from the other detections in `mapillary-detections` (Nov 2026; before,
   they shared it, so a link to a sign turned on the detections layer). The photo layers don't
   override `drawsData()`, since photos are selected with `photo=`, not by data ID.

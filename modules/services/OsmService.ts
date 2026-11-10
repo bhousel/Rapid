@@ -2412,7 +2412,7 @@ export class OsmService extends AbstractSystem {
       note = new MarkerData<OsmNoteProps>(this.context, {
         type:       'note',
         serviceID:  this.id,
-        namespace:  'osm-notes',
+        spatialID:  'osm-notes',
         id:         noteID,
         loc:        loc,
         ...changes

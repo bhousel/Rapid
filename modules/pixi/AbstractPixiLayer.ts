@@ -127,7 +127,7 @@ export class AbstractPixiLayer {
 
   /**
    * Whether this Layer draws the given data, so that selecting it can turn this Layer on.
-   * A Layer draws the namespace with its own ID, unless it overrides this (see `design/data-ids.md`).
+   * A Layer draws the data whose spatial ID is its own ID, unless it overrides this (see `design/data-ids.md`).
    * @param dataID - The data ID, e.g. `osm-notes:123`
    * @return `true` if this Layer draws the data
    */

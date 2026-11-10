@@ -533,8 +533,8 @@ export class MapSystem extends AbstractSystem {
       return /^[nwr][1-9]\d*$/.test(dataID) || (!!osm && /^osm-notes:[1-9]\d*$/.test(dataID));
     };
     const loadAsync = (dataID: DataID): Promise<unknown> => {
-      const [namespace, localID] = splitDataID(dataID);
-      return namespace === 'osm-notes' ? osm!.loadNoteAsync(localID) : context.loadEntityAsync(localID);
+      const [spatialID, localID] = splitDataID(dataID);
+      return spatialID === 'osm-notes' ? osm!.loadNoteAsync(localID) : context.loadEntityAsync(localID);
     };
     const toLoad = fromLink ? selection.filter(dataID => canLoad(dataID) && !isFound(dataID)) : [];
     const waiting = new Set<DataID>(selection.filter(dataID => {

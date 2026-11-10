@@ -39,7 +39,7 @@ describe('PixiScene', () => {
 
     const enabledLayerIDs = () => [...scene.layers.values()].filter(layer => layer.enabled).map(layer => layer.id);
 
-    it('turns on the layer that draws each datum, whose ID is its namespace', () => {
+    it('turns on the layer that draws each datum, whose ID is its spatial ID', () => {
       PixiScene.prototype.showData.call(scene, ['w1', 'osm-notes:123', 'keepright:4']);
       assert.sameMembers(enabledLayerIDs(), ['osm', 'osm-notes', 'keepright']);
       assert.strictEqual(changes, 1);

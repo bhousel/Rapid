@@ -694,8 +694,8 @@ export class RapidSystem extends AbstractSystem {
   public isAcceptedOrIgnored(dataID: DataID): boolean {
     if (this.acceptIDs.has(dataID) || this.ignoreIDs.has(dataID)) return true;
     if (this._legacyIDs.size) {
-      const [namespace, localID] = splitDataID(dataID);
-      if (this._legacyIDs.has(localID) && this.catalog.get(namespace)?.serviceID === 'mapwithai') return true;
+      const [spatialID, localID] = splitDataID(dataID);
+      if (this._legacyIDs.has(localID) && this.catalog.get(spatialID)?.serviceID === 'mapwithai') return true;
     }
     if (!this._actedRanges.has(dataID)) return false;
 

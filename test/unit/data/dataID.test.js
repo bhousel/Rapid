@@ -5,12 +5,12 @@ import * as Rapid from '../../../modules/headless.js';
 
 describe('dataID', () => {
   describe('makeDataID', () => {
-    it('joins a namespace and a local ID with a colon', () => {
+    it('joins a spatial ID and a local ID with a colon', () => {
       assert.strictEqual(Rapid.makeDataID('osm-notes', '123'), 'osm-notes:123');
       assert.strictEqual(Rapid.makeDataID('fbRoads', 'abc:1'), 'fbRoads:abc:1');
     });
 
-    it('returns bare IDs for OSM, or no namespace', () => {
+    it('returns bare IDs for OSM, or no spatial ID', () => {
       assert.strictEqual(Rapid.makeDataID('osm', 'w123'), 'w123');
       assert.strictEqual(Rapid.makeDataID(undefined, 'w123'), 'w123');
       assert.strictEqual(Rapid.makeDataID('', 'w123'), 'w123');
@@ -36,7 +36,7 @@ describe('dataID', () => {
       assert.strictEqual(Rapid.osmEntityID('osm:n-1'), 'n-1');
     });
 
-    it('returns undefined for other namespaces', () => {
+    it('returns undefined for other spatial IDs', () => {
       assert.isUndefined(Rapid.osmEntityID('fbRoads:w-1000000000'));
       assert.isUndefined(Rapid.osmEntityID('osm-notes:123'));
     });
@@ -45,7 +45,7 @@ describe('dataID', () => {
   describe('isStableDataID', () => {
     it('is false for a local ID that GeoJSONData made up from a counter', () => {
       const context = new Rapid.MockContext();
-      const d = new Rapid.GeoJSONData(context, { namespace: 'overture-buildings', geojson: { type: 'Feature', properties: {}, geometry: { type: 'Point', coordinates: [0, 0] } } });
+      const d = new Rapid.GeoJSONData(context, { spatialID: 'overture-buildings', geojson: { type: 'Feature', properties: {}, geometry: { type: 'Point', coordinates: [0, 0] } } });
       assert.isFalse(Rapid.isStableDataID(d.dataID));
     });
 
@@ -59,13 +59,13 @@ describe('dataID', () => {
   describe('AbstractData.dataID', () => {
     const context = new Rapid.MockContext();
 
-    it('is the bare id when there is no namespace', () => {
+    it('is the bare id when there is no spatial ID', () => {
       const d = new Rapid.AbstractData(context, { id: 'w1' });
       assert.strictEqual(d.dataID, 'w1');
     });
 
-    it('includes the namespace, and keeps it through `update()`', () => {
-      const d = new Rapid.AbstractData(context, { id: '123', namespace: 'osm-notes' });
+    it('includes the spatial ID, and keeps it through `update()`', () => {
+      const d = new Rapid.AbstractData(context, { id: '123', spatialID: 'osm-notes' });
       assert.strictEqual(d.dataID, 'osm-notes:123');
       assert.strictEqual(d.update({}).dataID, 'osm-notes:123');
     });

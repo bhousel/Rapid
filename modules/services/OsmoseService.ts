@@ -232,7 +232,7 @@ export class OsmoseService extends AbstractSystem {
       const loc = spatial.getFreeLoc(spatialID, feature.geometry.coordinates);
       const props: Record<string, any> = {
         id:        id,
-        namespace: spatialID,
+        spatialID: spatialID,
         class:     cl,
         item:      item,
         type:      itemType,

@@ -40,9 +40,9 @@ interface SpatialCache {
 }
 
 /**
- * Finds a datum in a namespace whose data isn't simply in the cache of the same name
+ * Finds a datum for a spatial ID whose data isn't simply in the cache with that ID
  * (e.g. OSM, whose current version is in the staging graph).
- * @param localID - The datum's ID within its namespace
+ * @param localID - The datum's local ID (the part of its data ID after the spatial ID)
  * @return The datum, or `undefined` if not found
  */
 export type DataResolver = (localID: string) => AbstractData | undefined;
@@ -63,9 +63,9 @@ export type DataResolver = (localID: string) => AbstractData | undefined;
  * Each spatial cache must be identified by a unique `spatialID` string.
  * For example: 'osm-notes', 'fbRoads', 'fbRoads.pieces', etc.
  *
- * All data lives in a spatial cache, and a cache that holds data names that data's namespace.
- * So any datum can be found by its data ID (`${namespace}:${localID}`) with `getData()`.
- * Namespaces whose data needs another lookup (OSM, vector tiles) register a resolver.
+ * All data lives in a spatial cache, and a cache that holds data has the same ID as the start of that
+ * data's data IDs. So any datum can be found by its data ID (`${spatialID}:${localID}`) with `getData()`.
+ * Spatial IDs whose data needs another lookup (OSM, vector tiles) register a resolver.
  * See `design/data-ids.md`.
  *
  * Note that because the spatial system has no specialized knowledge about its contents, we don't
@@ -84,7 +84,7 @@ export class SpatialSystem extends AbstractSystem {
 
   /** Spatial caches that the SpatialSystem is managing */
   protected _caches: Map<SpatialID, SpatialCache>;
-  /** Lookups for namespaces whose data isn't simply in the cache of the same name */
+  /** Lookups for spatial IDs whose data isn't simply in the cache with that ID */
   protected _resolvers: Map<SpatialID, DataResolver>;
 
 
@@ -310,23 +310,23 @@ export class SpatialSystem extends AbstractSystem {
 
 
   /**
-   * Registers how to find the data in a namespace whose data isn't simply in the cache of the
-   * same name. For example, `EditSystem` registers `osm`, whose current data is in the staging graph.
-   * @param namespace - The namespace (`osm` for bare data IDs)
+   * Registers how to find the data for a spatial ID whose data isn't simply in the cache with that
+   * ID. For example, `EditSystem` registers `osm`, whose current data is in the staging graph.
+   * @param spatialID - The spatial ID that starts the data's data IDs (`osm` for bare data IDs)
    * @param resolver - Finds a datum by its local ID, or `null` to remove the resolver
    */
-  public registerResolver(namespace: SpatialID, resolver: DataResolver | null): void {
+  public registerResolver(spatialID: SpatialID, resolver: DataResolver | null): void {
     if (resolver) {
-      this._resolvers.set(namespace, resolver);
+      this._resolvers.set(spatialID, resolver);
     } else {
-      this._resolvers.delete(namespace);
+      this._resolvers.delete(spatialID);
     }
   }
 
 
   /**
-   * Finds any datum by its data ID (`${namespace}:${localID}`, or a bare OSM entity ID).
-   * Looks in the namespace's resolver if it has one, otherwise in the cache named by the namespace.
+   * Finds any datum by its data ID (`${spatialID}:${localID}`, or a bare OSM entity ID).
+   * Looks in the resolver for the spatial ID if it has one, otherwise in the cache with that ID.
    * See `design/data-ids.md`.
    * @param dataID - The data ID to look up
    * @return The datum, or `undefined` if it isn't loaded
@@ -334,13 +334,13 @@ export class SpatialSystem extends AbstractSystem {
   public getData<T extends AbstractData = AbstractData>(dataID: Nullable<DataID>): T | undefined {
     if (!dataID) return undefined;
 
-    const [namespace, localID] = splitDataID(dataID);
-    const resolver = this._resolvers.get(namespace);
+    const [spatialID, localID] = splitDataID(dataID);
+    const resolver = this._resolvers.get(spatialID);
     if (resolver) {
       return resolver(localID) as T | undefined;
     }
 
-    const contents = this._caches.get(namespace)?.items.get(localID)?.contents;
+    const contents = this._caches.get(spatialID)?.items.get(localID)?.contents;
     return (contents instanceof AbstractData) ? contents as T : undefined;
   }
 

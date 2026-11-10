@@ -40,7 +40,7 @@ interface VTZoomCache {
 /** Source for vector tile data */
 interface VTSource {
   /** Unique identifier for this source - will either use the caller-provided datasetID or a generated id.
-   *  It's also the namespace of the source's data (see `design/data-ids.md`). */
+   *  It's also the spatial ID of the source's data (see `design/data-ids.md`). */
   id: SpatialID;
   /** Optional caller-provided identifier for the source */
   datasetID?: DatasetID;
@@ -274,7 +274,7 @@ export class VectorTileService extends AbstractSystem {
       spatial.clearMatching(spatialID => spatialID.startsWith(prefix));
 
       // The source's data is spread over its zoom caches, so `SpatialSystem` can't find it by
-      // namespace alone. Look in the cache nearest the current zoom first.
+      // spatial ID alone. Look in the cache nearest the current zoom first.
       const vtSource = source;
       spatial.registerResolver(source.id, localID => {
         for (const cache of this._zoomCachesNearest(vtSource)) {
@@ -488,7 +488,7 @@ export class VectorTileService extends AbstractSystem {
           stableID:   stableID,
           tileID:     tile.id,
           serviceID:  this.id,
-          namespace:  source.id,
+          spatialID:  source.id,
           datasetID:  source.datasetID,
           geojson:    part
         };
@@ -867,7 +867,7 @@ export class VectorTileService extends AbstractSystem {
           origID:      survivor.props.origID,
           stableID:    survivor.props.stableID,
           serviceID:   this.id,
-          namespace:   survivor.props.namespace,
+          spatialID:   survivor.props.spatialID,
           datasetID:   survivor.props.datasetID,
           geojson:     part
         };

@@ -372,8 +372,8 @@ describe('MapSystem', () => {
     function node(id, loc = [0, 0]) {
       return new Rapid.OsmNode(ctx, { id: id, loc: loc });
     }
-    function note(id, namespace = 'notes-test') {
-      return new Rapid.MarkerData(ctx, { id: id, namespace: namespace, loc: [2, 2] });
+    function note(id, spatialID = 'notes-test') {
+      return new Rapid.MarkerData(ctx, { id: id, spatialID: spatialID, loc: [2, 2] });
     }
     const tick = () => new Promise(resolve => { setTimeout(resolve, 0); });
 

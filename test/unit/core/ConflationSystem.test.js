@@ -61,7 +61,7 @@ describe('ConflationSystem', () => {
       properties: properties,
       geometry: { type: 'LineString', coordinates: points.map(p => loc(...p)) }
     };
-    return new Rapid.GeoJSONData(context, { id: id, namespace: 'test', datasetID: 'test', geojson: geojson });
+    return new Rapid.GeoJSONData(context, { id: id, spatialID: 'test', datasetID: 'test', geojson: geojson });
   }
 
   // A line rule like a user might set up: "same" within 3 m / 30°.
@@ -754,12 +754,12 @@ describe('ConflationSystem', () => {
       assert.isOk(spatial.getData(pieceID));
     });
 
-    it('invalidate(datasetID) empties the pieces cache of a dataset whose data has another namespace', () => {
+    it('invalidate(datasetID) empties the pieces cache of a dataset whose data has another spatial ID', () => {
       enable([lineRule()]);
-      ds.spatialID = 'other';   // an asset dataset may give its data a namespace of its own
+      ds.spatialID = 'other';   // an asset dataset may give its data a spatial ID of its own
       osmWay(1, [[0, 0], [60, 0]], SIDEWALK);
       const a = feature('a', [[0, 1.5], [150, 1.5]], SIDEWALK);
-      a.props.namespace = 'other';
+      a.props.spatialID = 'other';
       const spatial = context.systems.spatial;
 
       const pieceID = conflation.getResult(ds, a).runs[1].datum.dataID;
@@ -809,7 +809,7 @@ describe('ConflationSystem', () => {
 
 
   describe('piece IDs', () => {
-    it('pieceID adds `.pieces` to the namespace and the range along the line, rounded to 4 decimals, and parsePieceID splits it again', () => {
+    it('pieceID adds `.pieces` to the spatial ID and the range along the line, rounded to 4 decimals, and parsePieceID splits it again', () => {
       const id = Rapid.pieceID('test:k1', [0.123456, 1]);
       assert.strictEqual(id, 'test.pieces:k1@0.1235-1');
       assert.deepEqual(Rapid.parsePieceID(id), { dataID: 'test:k1', range: [0.1235, 1] });
@@ -831,7 +831,7 @@ describe('ConflationSystem', () => {
 
     it('parsePieceID rejects ids that are not pieces, or have a range that makes no sense', () => {
       assert.isUndefined(Rapid.parsePieceID('test:k1'));
-      assert.isUndefined(Rapid.parsePieceID('test:k1@0-0.5'));   // not in a pieces namespace
+      assert.isUndefined(Rapid.parsePieceID('test:k1@0-0.5'));   // not in a pieces cache
       assert.isUndefined(Rapid.parsePieceID('test.pieces:k1@0.5-0.2'));
       assert.isUndefined(Rapid.parsePieceID('test.pieces:k1@0-1.5'));
       assert.isUndefined(Rapid.parsePieceID('test.pieces:k1@0.5-0.5'));

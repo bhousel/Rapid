@@ -448,8 +448,8 @@ Conflation has to work no matter what the dataset already went through:
   `invalidate()`, so a rule edited in place is picked up.
 - **`stablechange` and `merge`** from `EditSystem` flush results whose coverage overlaps the extent
   that changed. A first version can simply flush everything and rely on lazy recomputation.
-- **A rule change** flushes that dataset's results, and its pieces (cached under its data's namespace,
-  `spatialID`, which is usually its ID).
+- **A rule change** flushes that dataset's results, and its pieces (cached under the spatial ID of its
+  data, `spatialID`, which is usually its ID).
 - **A schema change that changes what counts as an area** (`SchemaSystem.areaGeneration`) flushes
   everything: whether an OSM way is a line to match or an area's edge depends on it.
 - **Compute lazily:** `getResult(ds, datum)` computes when first asked. The drawing code asks only for

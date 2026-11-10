@@ -11,7 +11,7 @@ All data classes extend `AbstractData` and are designed to be **immutable**. Whe
 | File | Description |
 |------|-------------|
 | `AbstractData.ts` | Base class for all data elements |
-| `dataID.ts` | Helpers for data IDs (`${namespace}:${localID}`): build, split, get the OSM entity ID, and make stable local IDs for GeoJSON features (`featureKey`) |
+| `dataID.ts` | Helpers for data IDs (`${spatialID}:${localID}`): build, split, get the OSM entity ID, and make stable local IDs for GeoJSON features (`featureKey`) |
 | `GeoJSONData.ts` | Wrapper for arbitrary GeoJSON data |
 | `MarkerData.ts` | Point markers from services (photos, notes, QA issues, etc.; formerly "QAItem") |
 | `OsmChangeset.ts` | Represents an OSM changeset |
@@ -35,8 +35,8 @@ See [`parsers/README.md`](parsers/README.md).
 ## Data Properties
 
 Each data element has:
-- `id` - Identifier within its namespace (e.g., `n123` for node 123)
-- `dataID` - Identifier across all of Rapid, `${namespace}:${id}` (bare `id` for OSM). See [`design/data-ids.md`](../../design/data-ids.md).
+- `id` - Identifier within its cache (e.g., `n123` for node 123)
+- `dataID` - Identifier across all of Rapid, `${spatialID}:${id}` (bare `id` for OSM), where `spatialID` is the ID of the `SpatialSystem` cache that holds it. See [`design/data-ids.md`](../../design/data-ids.md).
 - `type` - What kind of element (e.g. `node`, `way`, `relation`)
 - `v` - Version stamp, new on every `update()`. It's part of `key` (`${id}v${v}`), which d3 joins and caches use.
 - `geoms` - `Geometry` wrapper with original (WGS84) and projected (world) coordinates. A node, GeoJSON feature or marker has its own. A way's or relation's shape depends on the graph, so `geoms` throws for them: read it with `graph.geometry(entity)` (see [`design/graph-geometry.md`](../../design/graph-geometry.md)).

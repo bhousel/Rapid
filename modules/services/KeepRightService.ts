@@ -316,7 +316,7 @@ export class KeepRightService extends AbstractSystem {
 
       const props: Record<string, any> = {
         id:              id,
-        namespace:       spatialID,
+        spatialID:       spatialID,
         loc:             loc,
         itemType:        itemType,
         comment:         comment,

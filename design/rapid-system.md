@@ -101,7 +101,7 @@ external feature must get the same ID every time its data loads, or a restored s
 features the user already dealt with. The same IDs are used everywhere: in the spatial cache, the
 selection, the edit history, and conflation.
 
-These are data IDs (see [`data-ids.md`](data-ids.md)): the dataset's ID is the namespace, so the
+These are data IDs (see [`data-ids.md`](data-ids.md)): the dataset's ID is the spatial ID, so the
 feature's `id` is just the part after the first colon, and its `dataID` is the whole thing.
 
 - **A feature from a file:** `${datasetID}:${key}`, or `${datasetID}:${key}:${part}` for the parts of

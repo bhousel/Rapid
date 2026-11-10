@@ -35,7 +35,7 @@ describe('UiMapRouletteEditor', () => {
   // A task as the service caches it from a tile, before its challenge and details have loaded
   function makeTask() {
     const task = new Rapid.MarkerData(context, {
-      id: '7', namespace: 'maproulette', serviceID: 'maproulette', type: 'task', loc: [0, 0], parentId: '10'
+      id: '7', spatialID: 'maproulette', serviceID: 'maproulette', type: 'task', loc: [0, 0], parentId: '10'
     });
     spatial.replaceData('maproulette', task);
     context.selectedIDs = () => [task.dataID];

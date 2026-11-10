@@ -147,7 +147,7 @@ export class GeoScribbleService extends AbstractSystem {
     const toLoad: GeoJSONData[] = [];
     for (const feature of response.features) {
       const id = featureKey(feature, 'id', new Set<string>());
-      toLoad.push(new GeoJSONData(context, { id: id, serviceID: this.id, namespace: 'geoscribble', geojson: feature }));
+      toLoad.push(new GeoJSONData(context, { id: id, serviceID: this.id, spatialID: 'geoscribble', geojson: feature }));
     }
 
     spatial.addData('geoscribble', toLoad);

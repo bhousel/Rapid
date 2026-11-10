@@ -14,7 +14,7 @@ import type { SelectMode } from '../modes/SelectMode.ts';
 
 /**
  * Returns the data ID of a photo. Each photo service keeps its images in a `${layerID}-images`
- * cache, which is their namespace (see `design/data-ids.md`).
+ * cache, which is also the spatial ID in their data IDs (see `design/data-ids.md`).
  * @param layerID - The photo layer, e.g. 'mapillary'
  * @param photoID - The photo's ID in that service
  * @return The photo's data ID, e.g. 'mapillary-images:123'

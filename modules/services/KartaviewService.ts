@@ -798,7 +798,7 @@ export class KartaviewService extends AbstractSystem {
       image = new MarkerData<KartaviewImageProps>(context, {
         type:       'photo',
         serviceID:  this.id as ServiceID,
-        namespace:  'kartaview-images',
+        spatialID:  'kartaview-images',
         id:         imageID,
         loc:        loc,
         isPano:     false,
@@ -862,7 +862,7 @@ export class KartaviewService extends AbstractSystem {
         id:         sequenceID,
         type:       'sequence',
         serviceID:  this.id as ServiceID,
-        namespace:  'kartaview-sequences',
+        spatialID:  'kartaview-sequences',
         rotation:   0,
         ...props
       });

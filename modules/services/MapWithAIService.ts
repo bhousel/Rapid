@@ -208,7 +208,7 @@ export class MapWithAIService extends AbstractSystem {
     if (!ds) {
       ds = {
         id: datasetID,
-        spatialID: datasetID,   // also the namespace of its data (see `design/data-ids.md`)
+        spatialID: datasetID,   // also the spatial ID of its data (see `design/data-ids.md`)
         graph: new Graph(this.context),
         seen: new Set<EntityID>(),
         seenFirstNodeID: new Set<EntityID>(),
@@ -325,7 +325,7 @@ export class MapWithAIService extends AbstractSystem {
       const entityID = props.id as EntityID;
 
       // add some extra metadata properties
-      Object.assign(props, { fbID: entityID, serviceID: 'mapwithai', datasetID: ds.id, namespace: ds.spatialID });
+      Object.assign(props, { fbID: entityID, serviceID: 'mapwithai', datasetID: ds.id, spatialID: ds.spatialID });
 
       if (props.type === 'node') {
         if (ds.seen.has(entityID)) continue;   // can skip seen nodes

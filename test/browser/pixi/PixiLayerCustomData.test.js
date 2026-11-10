@@ -26,8 +26,8 @@ describe('PixiLayerCustomData', () => {
       map: { trimmedExtent: () => {} },
       network: { fetch: url => new Promise(resolve => { pending.set(url, resolve); }) },
       spatial: {
-        clearCache: namespace => caches.delete(namespace),
-        replaceData: (namespace, data) => caches.set(namespace, data)
+        clearCache: spatialID => caches.delete(spatialID),
+        replaceData: (spatialID, data) => caches.set(spatialID, data)
       },
       urlhash: {
         on: () => {},
@@ -122,13 +122,13 @@ describe('PixiLayerCustomData', () => {
       layer.setUrl('https://example.com/fast.geojson');
       pending.get('https://example.com/fast.geojson')(point('fast'));
       await tick();
-      const fastNamespace = layer._namespace;
+      const fastSpatialID = layer._spatialID;
 
       pending.get('https://example.com/slow.geojson')(point('slow'));
       await tick();
 
-      assert.strictEqual(layer._namespace, fastNamespace);
-      assert.deepEqual([...caches.keys()], [fastNamespace]);
+      assert.strictEqual(layer._spatialID, fastSpatialID);
+      assert.deepEqual([...caches.keys()], [fastSpatialID]);
     });
   });
 });

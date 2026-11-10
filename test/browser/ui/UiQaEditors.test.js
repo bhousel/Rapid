@@ -52,7 +52,7 @@ describe('QA editors keep their sections while the user types', () => {
   it('UiNoteEditor', () => {
     context.services = { osm: fakeOsm() };
     const note = new Rapid.MarkerData(context, {
-      id: '1', type: 'note', serviceID: 'osm', namespace: 'osm-notes', loc: [0, 0], status: 'open', comments: []
+      id: '1', type: 'note', serviceID: 'osm', spatialID: 'osm-notes', loc: [0, 0], status: 'open', comments: []
     });
     spatial.replaceData('osm-notes', note);
     context.selectedIDs = () => [note.dataID];
@@ -76,7 +76,7 @@ describe('QA editors keep their sections while the user types', () => {
   it('UiNoteEditor keeps what a reload of the note stored', () => {
     context.services = { osm: fakeOsm() };
     const note = new Rapid.MarkerData(context, {
-      id: '1', type: 'note', serviceID: 'osm', namespace: 'osm-notes', loc: [0, 0], status: 'open', comments: []
+      id: '1', type: 'note', serviceID: 'osm', spatialID: 'osm-notes', loc: [0, 0], status: 'open', comments: []
     });
     spatial.replaceData('osm-notes', note);
     context.selectedIDs = () => [note.dataID];
@@ -107,7 +107,7 @@ describe('QA editors keep their sections while the user types', () => {
     context.systems.gfx = { scene: {}, immediateRedraw: () => {} };
     context.systems.filters = { forceVisible: () => {} };
     const issue = new Rapid.MarkerData(context, {
-      id: '1', type: 'keepright', serviceID: 'keepright', namespace: 'keepright', loc: [0, 0]
+      id: '1', type: 'keepright', serviceID: 'keepright', spatialID: 'keepright', loc: [0, 0]
     });
     spatial.replaceData('keepright', issue);
     context.selectedIDs = () => [issue.dataID];
@@ -127,7 +127,7 @@ describe('QA editors keep their sections while the user types', () => {
   it('UiOsmoseEditor updates the cached issue, which has the details loaded after it was selected', () => {
     context.services = { osmose: { getError: (id) => spatial.getItem('osmose', id), replaceItem: (item) => spatial.replaceData('osmose', item) } };
     const issue = new Rapid.MarkerData(context, {
-      id: '1', type: 'osmose', serviceID: 'osmose', namespace: 'osmose', loc: [0, 0]
+      id: '1', type: 'osmose', serviceID: 'osmose', spatialID: 'osmose', loc: [0, 0]
     });
     spatial.replaceData('osmose', issue);
     spatial.replaceData('osmose', issue.update({ elems: ['n1'], detail: 'the details' }));   // the details load

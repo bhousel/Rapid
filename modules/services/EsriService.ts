@@ -465,7 +465,7 @@ export class EsriService extends AbstractSystem {
 
     return new GeoJSONData(context, {
       id: `${layer.id}-${objectIDString}`.replace(/[:,]/g, '_'),   // see `featureKey` in `RapidDataset`
-      namespace: ds.spatialID,
+      spatialID: ds.spatialID,
       serviceID: 'esri',
       datasetID: ds.id,
       geojson: {
@@ -556,7 +556,7 @@ export class EsriService extends AbstractSystem {
     if (this._datasets.has(ds.id)) return;  // we've seen it already
 
     this._datasets.set(ds.id, ds);
-    ds.spatialID = ds.id;   // also the namespace of its data (see `design/data-ids.md`)
+    ds.spatialID = ds.id;   // also the spatial ID of its data (see `design/data-ids.md`)
     ds.lastv = null;
     ds.layers = null;   // the schema info will live here
     ds._layersPromise = null;

@@ -222,12 +222,12 @@ interface FeatureTally {
 }
 
 
-/** Pieces of lines go in a cache named after their line's namespace, with this suffix (`fbRoads.pieces`). */
+/** Pieces of lines go in a cache named after their line's spatial ID, with this suffix (`fbRoads.pieces`). */
 const PIECES_SUFFIX = '.pieces';
 
 
 /**
- * Returns the data ID of a piece of a line. Its namespace is the line's, with `.pieces` added, and its
+ * Returns the data ID of a piece of a line. Its spatial ID is the line's, with `.pieces` added, and its
  * local ID is the line's, with the range along the line that the piece covers, as fractions of the
  * line's length (like the linear referencing `between: [start, end]` that Overture uses).
  * For example, a piece of `fbRoads:abc` is `fbRoads.pieces:abc@0.85-1`. The fractions are rounded to
@@ -243,8 +243,8 @@ export function pieceID(dataID: DataID, range: [number, number], lengthMeters: n
   const decimals = Math.max(4, Math.ceil(Math.log10(lengthMeters * 10)));
   const scale = 10 ** decimals;
   const fmt = (n: number) => String(Math.round(n * scale) / scale);
-  const [namespace, localID] = splitDataID(dataID);
-  return makeDataID(namespace + PIECES_SUFFIX, `${localID}@${fmt(range[0])}-${fmt(range[1])}`);
+  const [spatialID, localID] = splitDataID(dataID);
+  return makeDataID(spatialID + PIECES_SUFFIX, `${localID}@${fmt(range[0])}-${fmt(range[1])}`);
 }
 
 
@@ -254,15 +254,15 @@ export function pieceID(dataID: DataID, range: [number, number], lengthMeters: n
  * @return The line's data ID and the range, or `undefined` if `id` isn't a piece's ID
  */
 export function parsePieceID(id: DataID): { dataID: DataID; range: [number, number] } | undefined {
-  const [namespace, localID] = splitDataID(id);
-  if (!namespace.endsWith(PIECES_SUFFIX)) return undefined;
+  const [spatialID, localID] = splitDataID(id);
+  if (!spatialID.endsWith(PIECES_SUFFIX)) return undefined;
 
   const match = /^(.+)@(\d+(?:\.\d+)?)-(\d+(?:\.\d+)?)$/.exec(localID);
   if (!match) return undefined;
   const start = Number(match[2]);
   const end = Number(match[3]);
   if (!(start >= 0 && end <= 1 && start < end)) return undefined;
-  return { dataID: makeDataID(namespace.slice(0, -PIECES_SUFFIX.length), match[1]), range: [start, end] };
+  return { dataID: makeDataID(spatialID.slice(0, -PIECES_SUFFIX.length), match[1]), range: [start, end] };
 }
 
 
@@ -450,11 +450,11 @@ export class ConflationSystem extends AbstractSystem {
     const spatial = context.systems.spatial!;
 
     // The pieces of lines are made with the results, so they go with them.
-    // (They're cached under the namespace of the dataset's data, its `spatialID`, which is usually its ID.)
+    // (They're cached under the dataset's `spatialID`, the spatial ID of its data, which is usually its ID.)
     if (datasetID) {
-      const namespace = rapid.catalog.get(datasetID)?.spatialID ?? datasetID;
+      const spatialID = rapid.catalog.get(datasetID)?.spatialID ?? datasetID;
       this._results.delete(datasetID);
-      spatial.clearCache(namespace + PIECES_SUFFIX);
+      spatial.clearCache(spatialID + PIECES_SUFFIX);
     } else {
       this._results.clear();
       spatial.clearMatching(spatialID => spatialID.endsWith(PIECES_SUFFIX));
@@ -881,10 +881,10 @@ export class ConflationSystem extends AbstractSystem {
     if (!isSource) {
       const pieces: GeoJSONData<ConflationRunProps>[] = [];
       runs.forEach(run => {
-        const [namespace, localID] = splitDataID(pieceID(dataID, run.range, sourceMeters));
+        const [spatialID, localID] = splitDataID(pieceID(dataID, run.range, sourceMeters));
         run.datum = new GeoJSONData<ConflationRunProps>(context, {
           id: localID,
-          namespace: namespace,
+          spatialID: spatialID,
           datasetID: datum.props.datasetID,
           serviceID: datum.props.serviceID,
           sourceID: dataID,

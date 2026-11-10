@@ -190,7 +190,7 @@ export class PixiLayerRapid extends AbstractPixiLayer {
   /**
    * Whether this Layer draws the given data: a dataset's data, or a piece of one of its lines.
    * @param dataID - The data ID, e.g. `fbRoads:w-1`
-   * @return `true` if the data is in a dataset's namespace
+   * @return `true` if the data has a dataset's spatial ID
    */
   public drawsData(dataID: DataID): boolean {
     return !!this._datasetFor(dataID);
@@ -213,7 +213,7 @@ export class PixiLayerRapid extends AbstractPixiLayer {
 
 
   /**
-   * Returns the dataset whose namespace holds the given data (a piece of a line is in the line's dataset).
+   * Returns the dataset whose spatial ID the given data has (a piece of a line is in the line's dataset).
    * @param dataID - The data ID
    * @return The dataset, or `undefined` if the data isn't a dataset's
    */
@@ -221,9 +221,9 @@ export class PixiLayerRapid extends AbstractPixiLayer {
     const rapid = this.context.systems.rapid;
     if (!rapid) return undefined;
 
-    const [namespace] = splitDataID(parsePieceID(dataID)?.dataID ?? dataID);
+    const [spatialID] = splitDataID(parsePieceID(dataID)?.dataID ?? dataID);
     for (const ds of rapid.catalog.values()) {
-      if (ds.spatialID === namespace) return ds;
+      if (ds.spatialID === spatialID) return ds;
     }
     return undefined;
   }

@@ -24,7 +24,7 @@ export type CheckpointID = string;
 export type ClassID = string;
 /** Command ID - identifier for a remappable keyboard command (e.g. 'zoom-in', 'undo') */
 export type CommandID = string;
-/** Data ID - identifier for any AbstractData, unique across Rapid: `${namespace}:${localID}`, or a bare OSM entity ID (e.g. 'w123', 'osm-notes:123') */
+/** Data ID - identifier for any AbstractData, unique across Rapid: `${spatialID}:${localID}`, or a bare OSM entity ID (e.g. 'w123', 'osm-notes:123') */
 export type DataID = string;
 /** Dataset ID (e.g. 'fbRoads', 'msBuildings') */
 export type DatasetID = string;
@@ -88,7 +88,7 @@ export type SequenceID = string;
 export type ServiceID = string;
 /** Session ID - identifier for a stored editing session */
 export type SessionID = string;
-/** Spatial ID - identifier for a spatial index cache. A cache that holds data names that data's namespace (e.g. 'osm-notes', 'fbRoads') */
+/** Spatial ID - identifier for a spatial index cache. A cache that holds data has the same ID as the start of that data's data IDs (e.g. 'osm-notes', 'fbRoads') */
 export type SpatialID = string;
 /** String ID - identifier for a localized string (e.g. 'toolbar.undo', 'modes.add_area') */
 export type StringID = string;

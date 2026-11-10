@@ -115,7 +115,7 @@ export class UiSectionSelectionList extends AbstractUiSection {
     const spatial = context.systems.spatial!;
     const graph = editor.staging.graph;
 
-    // OSM entities are described by their preset; other data by its dataset, or its namespace.
+    // OSM entities are described by their preset; other data by its dataset, or its spatial ID.
     const isOsm = (d: AbstractData): boolean => (d instanceof OsmEntity && !!osmEntityID(d.dataID));
 
     const geometryOf = (d: AbstractData): string => {

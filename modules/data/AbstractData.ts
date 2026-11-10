@@ -13,11 +13,11 @@ import type { DataConstructor } from './types.ts';
  * Base properties shared by all data elements.
  */
 export interface AbstractDataProps {
-  /** Unique identifier for this data element, within its namespace */
+  /** Unique identifier for this data element, within its cache */
   id?: string;
-  /** The namespace this data element's ID is unique within: the ID of the `SpatialSystem` cache that
-   *  holds it. Not set for OSM data. See `design/data-ids.md`. */
-  namespace?: SpatialID;
+  /** The ID of the `SpatialSystem` cache that holds this data element, which its ID is unique within.
+   *  Not set for OSM data. See `design/data-ids.md`. */
+  spatialID?: SpatialID;
   /** String describing what kind of data element this is (e.g. 'node', 'way', 'relation') */
   type?: string;
   /** Version stamp, new on every `update()` (never changed in place), see `key` */
@@ -37,7 +37,7 @@ export interface AbstractDataProps {
  * (A lot of this was carried over from the previous `osmEntity` and similar classes.)
  *
  * Properties available:
- * - `id`               - Identifier for this data element, unique within its namespace
+ * - `id`               - Identifier for this data element, unique within its cache
  * - `dataID`           - Identifier unique across all of Rapid (see `design/data-ids.md`)
  * - `type`             - String describing what kind of data element this is (e.g. 'node', 'way', 'relation')
  * - `v`                - Version stamp, new on every `update()` (a changed element is a new object)
@@ -192,13 +192,13 @@ export class AbstractData<P extends AbstractDataProps = AbstractDataProps> {
   }
 
   /**
-   * Unique string to identify this data element across all of Rapid: `${namespace}:${id}`,
+   * Unique string to identify this data element across all of Rapid: `${spatialID}:${id}`,
    * or the bare `id` for OSM data (see `design/data-ids.md`).
    * @return  This data element's data ID
    * @readonly
    */
   public get dataID(): DataID {
-    return makeDataID((this.props as Partial<AbstractDataProps>).namespace, this.id);
+    return makeDataID((this.props as Partial<AbstractDataProps>).spatialID, this.id);
   }
 
   /**

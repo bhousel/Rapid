@@ -1,7 +1,8 @@
 /**
- * Helpers for data IDs, a datum's ID across all of Rapid: `${namespace}:${localID}`.
- * The namespace is the ID of the `SpatialSystem` cache that holds the data, and never contains a colon.
- * A data ID with no colon is in the `osm` namespace, so an OSM entity's data ID is its entity ID.
+ * Helpers for data IDs, a datum's ID across all of Rapid: `${spatialID}:${localID}`.
+ * The spatial ID is the ID of the `SpatialSystem` cache that holds the data (or of the resolver that
+ * finds it), and never contains a colon.
+ * A data ID with no colon has the spatial ID `osm`, so an OSM entity's data ID is its entity ID.
  * See `design/data-ids.md`.
  * @module
  */
@@ -13,22 +14,22 @@ export const GENERATED_ID_PREFIX = 'geojson-';
 
 
 /**
- * Builds a data ID from a namespace and a local ID.
- * OSM data IDs are bare: `osm` (or no namespace) returns the local ID as it is.
- * @param namespace - The namespace (a `SpatialSystem` cache ID), or `osm`
- * @param localID - The datum's ID within its namespace
+ * Builds a data ID from a spatial ID and a local ID.
+ * OSM data IDs are bare: `osm` (or no spatial ID) returns the local ID as it is.
+ * @param spatialID - The ID of the `SpatialSystem` cache that holds the data, or `osm`
+ * @param localID - The datum's ID within its cache
  * @return The data ID
  */
-export function makeDataID(namespace: Nullable<SpatialID>, localID: string): DataID {
-  return (!namespace || namespace === 'osm') ? localID : `${namespace}:${localID}`;
+export function makeDataID(spatialID: Nullable<SpatialID>, localID: string): DataID {
+  return (!spatialID || spatialID === 'osm') ? localID : `${spatialID}:${localID}`;
 }
 
 
 /**
- * Splits a data ID into its namespace and local ID, on the first colon only.
- * A data ID with no colon is in the `osm` namespace, and `osm:w123` is read as `w123`.
+ * Splits a data ID into its spatial ID and local ID, on the first colon only.
+ * A data ID with no colon has the spatial ID `osm`, and `osm:w123` is read as `w123`.
  * @param dataID - The data ID to split
- * @return The namespace and the local ID
+ * @return The spatial ID and the local ID
  */
 export function splitDataID(dataID: DataID): [SpatialID, string] {
   const i = dataID.indexOf(':');
@@ -53,16 +54,16 @@ export function isStableDataID(dataID: DataID): boolean {
 /**
  * Returns the OSM entity ID for a data ID, for code that only works with OSM entities.
  * @param dataID - The data ID
- * @return The entity ID, or `undefined` if the data ID is in another namespace
+ * @return The entity ID, or `undefined` if the data ID isn't OSM data
  */
 export function osmEntityID(dataID: DataID): EntityID | undefined {
-  const [namespace, localID] = splitDataID(dataID);
-  return namespace === 'osm' ? localID : undefined;
+  const [spatialID, localID] = splitDataID(dataID);
+  return spatialID === 'osm' ? localID : undefined;
 }
 
 
 /**
- * Returns a stable local ID for a GeoJSON feature in a namespace (see `design/data-ids.md`).
+ * Returns a stable local ID for a GeoJSON feature in a cache (see `design/data-ids.md`).
  * A Multi* feature that's split into parts adds a part number to it (`${key}:${part}`). Keys stay the
  * same when the same data is loaded again, in any order, so what the user accepted or ignored still
  * matches after a restart, and a data ID in a link still finds its data.
@@ -74,7 +75,7 @@ export function osmEntityID(dataID: DataID): EntityID | undefined {
  *   the later ones get the hash (and then a counter) added, so keys are never shared.
  * @param feature - The GeoJSON feature
  * @param idField - The property that identifies features, if the data names one
- * @param usedKeys - The keys given so far in this namespace (added to)
+ * @param usedKeys - The keys given so far in this cache (added to)
  * @return The key
  */
 export function featureKey(feature: GeoJSON.Feature, idField: string | undefined, usedKeys: Set<string>): string {

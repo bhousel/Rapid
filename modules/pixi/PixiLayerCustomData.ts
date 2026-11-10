@@ -19,18 +19,18 @@ import type { Viewport } from '@rapid-sdk/math';
 const CUSTOM_COLOR = 0x00ffff;
 
 /**
- * The start of the namespace of custom data loaded from a file, a url or WKT.
+ * The start of the ID of the cache that holds custom data loaded from a file, a url or WKT.
  * The rest is a hash of where it came from, so the same data gets the same data IDs each time it
  * loads, and a link with both `data=` and `id=` works (see `design/data-ids.md`).
  */
-const CUSTOM_NAMESPACE_PREFIX = 'custom-';
+const CUSTOM_CACHE_PREFIX = 'custom-';
 
 
 /**
  * This class renders "custom data" - reference traces that should be 'drawn over' the map.
  * This data comes from the 'load custom data' option in the map data sidebar,
  * or may be supplied via a url parameter.
- * Data loaded from a file, a url or WKT is kept in a `SpatialSystem` cache named by its namespace.
+ * Data loaded from a file, a url or WKT is kept in a `SpatialSystem` cache of its own (`custom-…`).
  */
 export class PixiLayerCustomData extends AbstractPixiLayer {
   /** Attribution string(s) for the currently loaded custom data */
@@ -45,8 +45,8 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
   protected _wkt: string | null;
   /** URL of an externally hosted GeoJSON or GPX file to fetch and display */
   protected _url: string | null;
-  /** Namespace of the loaded file data, also the ID of the cache that holds it */
-  protected _namespace: SpatialID | null;
+  /** ID of the cache that holds the loaded file data, also the spatial ID in its data IDs */
+  protected _spatialID: SpatialID | null;
   /** Bounding extent of all loaded custom data features */
   protected _geoDataExtent: Extent | null;
 
@@ -62,7 +62,7 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
     this._template = null;
     this._wkt = null;
     this._url = null;
-    this._namespace = null;
+    this._spatialID = null;
     this._geoDataExtent = null;
     this._fileReader = new FileReader();
 
@@ -108,10 +108,10 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
   /**
    * Whether this Layer draws the given data: custom data loaded from a file, a url or WKT.
    * @param dataID - The data ID
-   * @return `true` if the data is in a custom data namespace
+   * @return `true` if the data is in a custom data cache
    */
   public drawsData(dataID: DataID): boolean {
-    return splitDataID(dataID)[0].startsWith(CUSTOM_NAMESPACE_PREFIX);
+    return splitDataID(dataID)[0].startsWith(CUSTOM_CACHE_PREFIX);
   }
 
 
@@ -134,8 +134,8 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
         vtService.loadTiles(this._template);
       }
       geoData = vtService.getData(this._template);
-    } else if (this._namespace) {
-      geoData = spatial.getVisibleItems(this._namespace).map(hit => hit.contents as GeoJSONData);
+    } else if (this._spatialID) {
+      geoData = spatial.getVisibleItems(this._spatialID).map(hit => hit.contents as GeoJSONData);
     }
 
     // Determine which renderer(s) to use for each feature
@@ -433,7 +433,7 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
    * @return `true` if there is a vector tile template or file data to display
    */
   public hasData(): boolean {
-    return !!(this._template || this._namespace);
+    return !!(this._template || this._spatialID);
   }
 
   /**
@@ -579,7 +579,7 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
    * @param data - The file data
    * @param extension - The file extension
    * @param source - Where the data came from: the url, the WKT, or the file's text. Its hash names the
-   *   namespace, so the same data gets the same data IDs each time it loads.
+   *   cache, so the same data gets the same data IDs each time it loads.
    */
   protected _setFile(data: string | XmlDocument | GeoJSON.GeoJsonObject | null, extension: string | null | undefined, source: string): void {
     if (!data) return;
@@ -605,12 +605,12 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
     geojson = geojson || {} as GeoJSON.GeoJsonObject;
 
     if (Object.keys(geojson).length) {
-      const namespace = CUSTOM_NAMESPACE_PREFIX + utilHash53(source);
-      if (this._namespace && this._namespace !== namespace) {
-        spatial.clearCache(this._namespace);
+      const spatialID = CUSTOM_CACHE_PREFIX + utilHash53(source);
+      if (this._spatialID && this._spatialID !== spatialID) {
+        spatial.clearCache(this._spatialID);
       }
       this._dataUsed = `${extension} data file`;
-      this._namespace = namespace;
+      this._spatialID = spatialID;
       this._geoDataExtent = new Extent();
 
       // We may have a Feature or a FeatureCollection, coax it to an array of Features.
@@ -620,7 +620,7 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
       for (const feature of features) {
         const d = new GeoJSONData(context, {
           id: featureKey(feature, undefined, usedKeys),
-          namespace: namespace,
+          spatialID: spatialID,
           geojson: feature
         });
         data.push(d);
@@ -630,8 +630,8 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
         }
       }
 
-      spatial.clearCache(namespace);
-      spatial.replaceData(namespace, data);
+      spatial.clearCache(spatialID);
+      spatial.replaceData(spatialID, data);
 
       this.fitZoom();
       this.scene.enableLayers(this.layerID);  // emits 'layerchange', so UI gets updated
@@ -757,15 +757,15 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
     const context = this.context;
     const spatial = context.systems.spatial!;
 
-    if (this._namespace) {
-      spatial.clearCache(this._namespace);
+    if (this._spatialID) {
+      spatial.clearCache(this._spatialID);
     }
     this._dataUsed = null;
     this._fileList = null;
     this._template = null;
     this._wkt = null;
     this._url = null;
-    this._namespace = null;
+    this._spatialID = null;
     this._geoDataExtent = null;
   }
 

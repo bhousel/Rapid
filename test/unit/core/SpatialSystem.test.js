@@ -457,9 +457,9 @@ describe('SpatialSystem', () => {
 
 
     describe('getData', () => {
-      it('finds data by its data ID, in the cache named by its namespace', () => {
+      it('finds data by its data ID, in the cache with its spatial ID', () => {
         const data = createMockData('123', [10, 0]);
-        data.props.namespace = 'test-notes';
+        data.props.spatialID = 'test-notes';
         _spatial.replaceData('test-notes', data);
 
         assert.strictEqual(data.dataID, 'test-notes:123');
@@ -472,7 +472,7 @@ describe('SpatialSystem', () => {
         assert.strictEqual(_spatial.getData('test-dataset:abc:1'), data);
       });
 
-      it('uses a resolver registered for the namespace', () => {
+      it('uses a resolver registered for the spatial ID', () => {
         const data = createMockData('w1', [10, 0]);
         _spatial.registerResolver('osm', localID => (localID === 'w1' ? data : undefined));
 
@@ -489,7 +489,7 @@ describe('SpatialSystem', () => {
         assert.isUndefined(_spatial.getData('test-notdata:t1'));
       });
 
-      it('returns undefined for unknown namespaces and empty IDs', () => {
+      it('returns undefined for unknown spatial IDs and empty IDs', () => {
         assert.isUndefined(_spatial.getData('nope:1'));
         assert.isUndefined(_spatial.getData(''));
         assert.isUndefined(_spatial.getData(null));
