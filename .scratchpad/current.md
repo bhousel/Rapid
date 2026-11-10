@@ -222,9 +222,12 @@ numbers below keep the hunt's numbering.
     Checked live with the real `ValidationSystem`: the issue follows the connection as a road leaves and
     rejoins (the old build kept it). Live checks need `editor.dismissRestore()` in the debug tab first:
     it has an old session on offer, and validation (and backups) wait for an answer.
-39. **A road through a building can give two crossing issues:** with `oneOnly`, each side reports the
+39. ✅ **A road through a building can give two crossing issues:** with `oneOnly`, each side reports the
     first crossing it finds, and the hash is the segments (4 of 16 orientations). `crossing_ways.ts:525`.
     *Confirmed.*
+    ✅ **Fixed:** a building pair collects all its crossings and reports the one whose segments sort
+    first (`crossingKey`, also the issue's hash), so either way finds the same one. Also fixed: the
+    `break` skipped every other way on that segment, so a road segment crossing two buildings missed one.
 40. **On a crossing of about 2 m or less, the `curb_nodes` fix retags the crossing as sidewalk**
     (`actionSplit` keeps the ID on the longest part). `curb_nodes.ts:240`. *Reading.*
 

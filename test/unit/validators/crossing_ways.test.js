@@ -344,6 +344,68 @@ describe('validateCrossingWays', () => {
     verifySingleCrossingIssue(validate(), null);
   });
 
+  //
+  //  c4------c3      w1:  [r1, r2]  (or reversed)
+  //  |        |      b1:  [c1, c2, c3, c4, c1]  (starting at any corner, either direction)
+  //  r1--|--------|--r2
+  //  |        |
+  //  c1------c2
+  //
+  it('flags a road that goes in and out of a building once, the same crossing from either way, in any node order', async () => {
+    const corners = ['c1', 'c2', 'c3', 'c4'];
+    const issueIDs = new Set();
+    for (const roadReversed of [false, true]) {
+      for (const outlineReversed of [false, true]) {
+        for (let start = 0; start < 4; start++) {
+          let outline = [...corners.slice(start), ...corners.slice(0, start)];
+          if (outlineReversed) outline.reverse();
+          outline.push(outline[0]);   // closed
+
+          await context.systems.editor.resetAsync();   // merging doesn't replace what's loaded already
+          load([
+            new Rapid.OsmNode(context, { id: 'r1', loc: [-2, 0] }),
+            new Rapid.OsmNode(context, { id: 'r2', loc: [2, 0] }),
+            new Rapid.OsmNode(context, { id: 'c1', loc: [-1, -1] }),
+            new Rapid.OsmNode(context, { id: 'c2', loc: [1, -1] }),
+            new Rapid.OsmNode(context, { id: 'c3', loc: [1, 1] }),
+            new Rapid.OsmNode(context, { id: 'c4', loc: [-1, 1] }),
+            new Rapid.OsmWay(context, { id: 'w1', nodes: roadReversed ? ['r2', 'r1'] : ['r1', 'r2'], tags: { highway: 'residential' } }),
+            new Rapid.OsmWay(context, { id: 'b1', nodes: outline, tags: { building: 'yes' } })
+          ]);
+
+          const fromRoad = validator(graph.entity('w1'), graph).issues;
+          const fromBuilding = validator(graph.entity('b1'), graph).issues;
+          assert.lengthOf(fromRoad, 1);
+          assert.lengthOf(fromBuilding, 1);
+          assert.strictEqual(fromRoad[0].id, fromBuilding[0].id);
+          issueIDs.add(fromRoad[0].id);
+        }
+      }
+    }
+    assert.strictEqual(issueIDs.size, 1);   // the same crossing every time
+  });
+
+  it('flags each building that one road segment crosses', () => {
+    load([
+      new Rapid.OsmNode(context, { id: 'r1', loc: [-5, 0] }),
+      new Rapid.OsmNode(context, { id: 'r2', loc: [5, 0] }),
+      new Rapid.OsmWay(context, { id: 'w1', nodes: ['r1', 'r2'], tags: { highway: 'residential' } }),
+      new Rapid.OsmNode(context, { id: 'a1', loc: [-3, -1] }),
+      new Rapid.OsmNode(context, { id: 'a2', loc: [-1, -1] }),
+      new Rapid.OsmNode(context, { id: 'a3', loc: [-1, 1] }),
+      new Rapid.OsmNode(context, { id: 'a4', loc: [-3, 1] }),
+      new Rapid.OsmWay(context, { id: 'b1', nodes: ['a1', 'a2', 'a3', 'a4', 'a1'], tags: { building: 'yes' } }),
+      new Rapid.OsmNode(context, { id: 'd1', loc: [1, -1] }),
+      new Rapid.OsmNode(context, { id: 'd2', loc: [3, -1] }),
+      new Rapid.OsmNode(context, { id: 'd3', loc: [3, 1] }),
+      new Rapid.OsmNode(context, { id: 'd4', loc: [1, 1] }),
+      new Rapid.OsmWay(context, { id: 'b2', nodes: ['d1', 'd2', 'd3', 'd4', 'd1'], tags: { building: 'yes' } })
+    ]);
+
+    const issues = validator(graph.entity('w1'), graph).issues;
+    assert.sameMembers(issues.map(issue => issue.entityIds.toSorted().join(',')), ['b1,w1', 'b2,w1']);
+  });
+
   it('flags railway crossing railway', () => {
     createWaysWithOneCrossingPoint({ railway: 'rail' }, { railway: 'rail' });
     verifySingleCrossingIssue(validate(), {});

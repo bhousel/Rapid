@@ -371,9 +371,12 @@ export function validateCrossingWays(context: Context): ValidatorFunction {
     const type1 = getFeatureType(entity1, graph);
     if (type1 === null) return [];
 
-    const seenWayIDs = new Set<EntityID>();
     const crossings: CrossingInfo[] = [];
     const way1Nodes = graph.childNodes(way1);
+
+    // A building gets only one issue for each way that crosses it, however many times they cross.
+    // It's the crossing whose segments sort first, so validating either way reports the same one.
+    const firstCrossings = new Map<EntityID, { key: string, crossing: CrossingInfo }>();   // by way2 ID
 
     for (let i = 0; i < way1Nodes.length - 1; i++) {
       const n1 = way1Nodes[i];
@@ -389,9 +392,6 @@ export function validateCrossingWays(context: Context): ValidatorFunction {
       for (const segment of segments) {
         // Don't check for self-intersection in this validation
         if (segment.wayID === way1.id) continue;
-
-        // Skip if this way was already checked and only one issue is needed
-        if (seenWayIDs.has(segment.wayID)) continue;
 
         const way2 = graph.hasEntity(segment.wayID) as OsmWay | undefined;
         if (!way2) continue;
@@ -416,7 +416,7 @@ export function validateCrossingWays(context: Context): ValidatorFunction {
         const point = geomLineIntersection(line1, line2);
 
         if (point) {
-          crossings.push({
+          const crossing: CrossingInfo = {
             wayInfos: [
               {
                 way: way1,
@@ -429,19 +429,39 @@ export function validateCrossingWays(context: Context): ValidatorFunction {
               }
             ],
             crossPoint: point
-          });
+          };
 
           // create only one issue for building crossings
           const oneOnly = (type1 === 'building' || type2 === 'building');
           if (oneOnly) {
-            seenWayIDs.add(way2.id);
-            break;
+            const key = crossingKey([n1.id, n2.id], [nA.id, nB.id]);
+            const first = firstCrossings.get(way2.id);
+            if (!first || key < first.key) {
+              firstCrossings.set(way2.id, { key: key, crossing: crossing });
+            }
+          } else {
+            crossings.push(crossing);
           }
         }
       }
     }
 
+    for (const first of firstCrossings.values()) {
+      crossings.push(first.crossing);
+    }
     return crossings;
+  }
+
+
+  /**
+   * Returns a key for a crossing made from the two segments that cross, the same from either way.
+   * Two ways can cross several times, but two straight segments cross only once.
+   * @param edge1 - The segment of one way, as its two node IDs
+   * @param edge2 - The segment of the other way, as its two node IDs
+   * @returns The key, e.g. `'n1-n2,n3-n4'`
+   */
+  function crossingKey(edge1: [EntityID, EntityID], edge2: [EntityID, EntityID]): string {
+    return [edge1, edge2].map(edge => edge.toSorted().join('-')).sort().join(',');
   }
 
 
@@ -522,7 +542,7 @@ export function validateCrossingWays(context: Context): ValidatorFunction {
 
     // Differentiate based on the crossing segments, since two ways can cross multiple times.
     // (Two straight segments cross only once. Sorted so either way finds the same issue.)
-    const uniqueID = edges.map(edge => edge.toSorted().join('-')).sort().join(',');
+    const uniqueID = crossingKey(edges[0], edges[1]);
 
     // Support autofix for some kinds of connections
     let autoArgs: any = null;
