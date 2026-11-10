@@ -305,6 +305,40 @@ describe('MapRouletteService', () => {
             assert.notInclude(headerNames, 'apikey');
           }
         });
+
+        it('doesn\'t post the comment again when the user submits again while the status is still being sent', async () => {
+          context.enter ??= () => {};
+          fetchMock.route(/\/task\/1\/comment/, {});
+          fetchMock.route(/\/task\/1\/1$/, {}, { delay: 20 });   // the status update is slow
+          fetchMock.route(/\/task\/1\/release/, {});
+          const task = _maproulette.getTask('1').update({ taskStatus: 1, comment: 'fixed it' });
+
+          _maproulette.postUpdate(task);
+          await Bun.sleep(5);              // the comment has finished
+          _maproulette.postUpdate(task);   // Submit again
+          await Bun.sleep(40);
+
+          assert.lengthOf(fetchMock.callHistory.calls(/\/task\/1\/comment/), 1);
+          assert.lengthOf(fetchMock.callHistory.calls(/\/task\/1\/1$/), 1);
+        });
+
+        it('doesn\'t post the comment again when the user submits again after the status update failed', async () => {
+          context.enter ??= () => {};
+          fetchMock.route(/\/task\/1\/comment/, {});
+          fetchMock.route(/\/task\/1\/1$/, 500, { repeat: 1 });   // fails the first time
+          fetchMock.route(/\/task\/1\/1$/, {});
+          fetchMock.route(/\/task\/1\/release/, {});
+          const task = _maproulette.getTask('1').update({ taskStatus: 1, comment: 'fixed it' });
+
+          _maproulette.postUpdate(task);
+          await Bun.sleep(5);
+          _maproulette.postUpdate(task);   // try again
+          await Bun.sleep(5);
+
+          assert.lengthOf(fetchMock.callHistory.calls(/\/task\/1\/comment/), 1);
+          assert.lengthOf(fetchMock.callHistory.calls(/\/task\/1\/1$/), 2);
+          assert.lengthOf(fetchMock.callHistory.calls(/\/task\/1\/release/), 1);
+        });
       });
 
       describe('itemURL', () => {

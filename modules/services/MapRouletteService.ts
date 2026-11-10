@@ -108,6 +108,8 @@ export class MapRouletteService extends AbstractSystem {
   protected _challengeQueue: Set<string>;
   /** Tasks closed during this editing session */
   protected _closed: ClosedEntry[];
+  /** The comment posted for each task (by task ID) whose update hasn't finished, so it isn't posted twice */
+  protected _postedComments: Map<string, string>;
 
 
   /**
@@ -129,6 +131,7 @@ export class MapRouletteService extends AbstractSystem {
     this._challenges = new Map<string, ChallengeData>();
     this._challengeQueue = new Set<string>();
     this._closed = [];
+    this._postedComments = new Map<string, string>();
 
     // Ensure methods used as callbacks always have `this` bound correctly.
     this._hashChanged = this._hashChanged.bind(this);
@@ -182,6 +185,7 @@ export class MapRouletteService extends AbstractSystem {
     this._challenges.clear();
     this._challengeQueue.clear();
     this._closed = [];
+    this._postedComments.clear();
 
     return Promise.resolve();
   }
@@ -435,9 +439,20 @@ export class MapRouletteService extends AbstractSystem {
     const taskComment = task.props.comment;
     // const apikey = task.props.mapRouletteApiKey;   // MapRoulette auth is turned off (see `mapRouletteApiKey`)
 
-    // A comment is optional, but if we have one, POST it..
     const commentID = `maproulette-comment-${taskID}`;
-    if (taskComment && !network.isInflight(commentID)) {
+    const updateTaskUrl = `${MAPROULETTE_API}/task/${taskID}/${taskStatus}`;
+    const releaseTaskUrl = `${MAPROULETTE_API}/task/${taskID}/release`;
+    const updateKey = `maproulette-update-${taskID}`;
+    const releaseKey = `maproulette-release-${taskID}`;
+
+    // Submitting again while this task's update is still being sent does nothing.
+    // (The comment usually finishes first, and it would be posted again.)
+    if (network.isInflight(commentID) || network.isInflight(updateKey) || network.isInflight(releaseKey)) return;
+
+    // A comment is optional, but if we have one, POST it..
+    // (Not if it was posted already: the user submits again after the status update failed.)
+    if (taskComment && this._postedComments.get(taskID) !== taskComment) {
+      this._postedComments.set(taskID, taskComment);
       network.fetch<any>(`${MAPROULETTE_API}/task/${taskID}/comment`, {
         requestID: commentID,
         method: 'POST',
@@ -449,48 +464,43 @@ export class MapRouletteService extends AbstractSystem {
       })
       .catch(err => {
         if (err.name === 'AbortError') return;  // ok
+        this._postedComments.delete(taskID);   // not posted, so submitting again tries it again
         console.error(err);    // eslint-disable-line no-console
       });
     }
 
     // update the status and release the task
-    const updateTaskUrl = `${MAPROULETTE_API}/task/${taskID}/${taskStatus}`;
-    const releaseTaskUrl = `${MAPROULETTE_API}/task/${taskID}/release`;
-    const updateKey = `maproulette-update-${taskID}`;
-    const releaseKey = `maproulette-release-${taskID}`;
-
-    if (!network.isInflight(updateKey) && !network.isInflight(releaseKey)) {
-      network.fetch<any>(updateTaskUrl, {
-        requestID: updateKey,
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json'
-          // 'apiKey': apikey as string
-        }
-      })
-      .then(() => {
-        return network.fetch<any>(releaseTaskUrl, {
-          requestID: releaseKey
-          // headers: {
-          //   'apiKey': apikey as string
-          // }
-        });
-      })
-      .then(() => {
-        // All requests completed successfully
-        if (taskStatus === 1) {  // only counts if the use chose "I Fixed It".
-          this._closed.push({ taskID, challengeID });
-        }
-        this.removeItem(task);
-        this.context.enter('browse');
-        if (callback) callback(null, task);
-      })
-      .catch(err => {
-        if (err.name === 'AbortError') return;  // ok
-        console.error(err);    // eslint-disable-line no-console
-        if (callback) callback(err.message);
+    network.fetch<any>(updateTaskUrl, {
+      requestID: updateKey,
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json'
+        // 'apiKey': apikey as string
+      }
+    })
+    .then(() => {
+      return network.fetch<any>(releaseTaskUrl, {
+        requestID: releaseKey
+        // headers: {
+        //   'apiKey': apikey as string
+        // }
       });
-    }
+    })
+    .then(() => {
+      // All requests completed successfully
+      if (taskStatus === 1) {  // only counts if the use chose "I Fixed It".
+        this._closed.push({ taskID, challengeID });
+      }
+      this._postedComments.delete(taskID);
+      this.removeItem(task);
+      this.context.enter('browse');
+      if (callback) callback(null, task);
+    })
+    .catch(err => {
+      if (err.name === 'AbortError') return;  // ok
+      console.error(err);    // eslint-disable-line no-console
+      if (callback) callback(err.message);
+    });
   }
 
 

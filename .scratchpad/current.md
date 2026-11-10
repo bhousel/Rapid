@@ -196,8 +196,10 @@ numbers below keep the hunt's numbering.
     which the first loop empties, and `removeChildData` deletes `childID` instead of `parentID`. Vertices
     of other ways get drawn as related. `AbstractPixiLayer.ts:308`, `:324`. *Confirmed.*
     ✅ **Fixed:** both.
-34. **MapRoulette can post the same comment twice** (Submit again after the comment POST, before the
+34. ✅ **MapRoulette can post the same comment twice** (Submit again after the comment POST, before the
     PUT). `MapRouletteService.ts:437`. *Reading.*
+    ✅ **Fixed:** submitting does nothing while any of the task's requests are in flight, and a comment
+    already posted for the task isn't posted again when the user retries after a failed status update.
 35. **For 2.5 s after a successful upload, Escape plus an edit (or closing the tab) makes a new session
     of the uploaded edits,** offered for restore next time. `SaveMode.ts:375`. *Reading.*
 36. **`#walkthrough=true` with a stored session means no backups for the rest of the tab**
