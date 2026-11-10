@@ -37,6 +37,19 @@ const trafficSignTileUrl = `${baseTileUrl}/mly_map_feature_traffic_sign/2/{z}/{x
 /** Zoom level used by the Tiler for fetching Mapillary vector tiles */
 const TILEZOOM = 14;
 
+/** The caches for detections: traffic signs have their own */
+const DETECTION_CACHES: SpatialID[] = ['mapillary-detections', 'mapillary-signs'];
+
+/**
+ * Returns the cache for a detection. Its data ID starts with the cache ID, and the layer that
+ * draws it has the same ID.
+ * @param  objectType - the detection's `object_type`, 'point' or 'traffic_sign'
+ * @return `'mapillary-signs'` for a traffic sign, `'mapillary-detections'` for anything else
+ */
+function detectionCacheID(objectType: string): SpatialID {
+  return (objectType === 'traffic_sign') ? 'mapillary-signs' : 'mapillary-detections';
+}
+
 
 /** Valid dataset identifiers for Mapillary tile data */
 type MapillaryDatasetID = 'images' | 'signs' | 'detections';
@@ -376,7 +389,11 @@ export class MapillaryService extends AbstractSystem {
    */
   public getDetection(detectionID: DetectionID): MapillaryDetection | undefined {
     const spatial = this.context.systems.spatial!;
-    return spatial.getItem<MapillaryDetection>('mapillary-detections', detectionID);
+    for (const cacheID of DETECTION_CACHES) {   // a traffic sign or another detection
+      const detection = spatial.getItem<MapillaryDetection>(cacheID, detectionID);
+      if (detection) return detection;
+    }
+    return undefined;
   }
 
 
@@ -392,11 +409,10 @@ export class MapillaryService extends AbstractSystem {
       return spatial.getVisibleItems('mapillary-images')
         .map(hit => hit.contents) as MarkerData[];
 
-    } else {  // both signs and detections are currently stored in the `detections` cache
-      const type = (datasetID === 'signs') ? 'traffic_sign' : 'point';
-      return spatial.getVisibleItems('mapillary-detections')
-        .map(hit => (hit.contents as MarkerData))
-        .filter(d => d.props.object_type === type);
+    } else {   // traffic signs and the other detections each have their own cache
+      const cacheID = (datasetID === 'signs') ? 'mapillary-signs' : 'mapillary-detections';
+      return spatial.getVisibleItems(cacheID)
+        .map(hit => hit.contents) as MarkerData[];
     }
   }
 
@@ -987,10 +1003,9 @@ export class MapillaryService extends AbstractSystem {
     const context = this.context;
     const gfx = context.systems.gfx;
     const network = context.systems.network!;
-    const spatial = context.systems.spatial!;
 
     // Is data is cached already and includes the `images` Array?  If so, resolve immediately.
-    const detection = spatial.getItem<MapillaryDetection>('mapillary-detections', detectionID);
+    const detection = this.getDetection(detectionID);
     if (Array.isArray(detection?.props?.images)) {
       return Promise.resolve(detection);
     }
@@ -1136,8 +1151,8 @@ export class MapillaryService extends AbstractSystem {
         }
 
         // Cache them on a new detection (data isn't changed in place)
-        const current = spatial.getItem<MapillaryDetection>('mapillary-detections', detectionID) ?? detection;
-        spatial.replaceData('mapillary-detections', current.update({ segmentationIDs: segmentationIDs }));
+        const current = this.getDetection(detectionID) ?? detection;
+        spatial.replaceData(detectionCacheID(current.props.object_type), current.update({ segmentationIDs: segmentationIDs }));
 
         return segmentationIDs;
       })
@@ -1334,8 +1349,9 @@ export class MapillaryService extends AbstractSystem {
     const context = this.context;
     const spatial = context.systems.spatial!;
     const detectionID = source.id;
+    const cacheID = detectionCacheID(source.object_type);   // traffic signs have their own cache
 
-    const existing = spatial.getItem<MapillaryDetection>('mapillary-detections', detectionID);
+    const existing = spatial.getItem<MapillaryDetection>(cacheID, detectionID);
     const changes: Partial<MapillaryDetectionProps> = {};
 
     // If we haven't locked in the location yet, try here..
@@ -1343,7 +1359,7 @@ export class MapillaryService extends AbstractSystem {
     let loc = existing?.loc;
     if (!loc && source.loc) {
       // MarkerData `loc` should really have been set at construction time, but unfortunately we need to redo it
-      loc = spatial.getFreeLoc('mapillary-detections', source.loc);
+      loc = spatial.getFreeLoc(cacheID, source.loc);
       changes.loc = loc;
     }
 
@@ -1384,14 +1400,14 @@ export class MapillaryService extends AbstractSystem {
       detection = new MarkerData<MapillaryDetectionProps>(this.context, {
         type:         'detection',
         serviceID:    this.id as ServiceID,
-        namespace:    'mapillary-detections',
+        namespace:    cacheID,
         id:           detectionID,
         object_type:  source.object_type,   // 'point' or 'traffic_sign'
         ...changes
       });
     }
 
-    spatial.replaceData('mapillary-detections', detection);
+    spatial.replaceData(cacheID, detection);
     return detection;
   }
 

@@ -349,10 +349,10 @@ Settled:
 - Where namespaces are looked up: there's no table. A namespace is a `SpatialSystem` cache ID, plus
   resolvers for OSM and vector tiles. Which layer draws a namespace is asked of the layers
   (`drawsData()`), and most layers are named after their namespace (the notes layer was renamed
-  from `notes` to `osm-notes` for this). Mapillary's traffic signs are the exception: they share the
-  `mapillary-detections` namespace with the other detections, so a link to a sign turns on the
-  detections layer (see `.scratchpad/current.md`). The photo layers don't override `drawsData()`,
-  since photos are selected with `photo=`, not by data ID.
+  from `notes` to `osm-notes` for this). Mapillary's traffic signs have their own namespace,
+  `mapillary-signs`, apart from the other detections in `mapillary-detections` (Nov 2026; before,
+  they shared it, so a link to a sign turned on the detections layer). The photo layers don't
+  override `drawsData()`, since photos are selected with `photo=`, not by data ID.
 - Reserved names: the user's datasets start with `user-`, which nothing Rapid ships may use.
 - A single geometry gets no part number. File datasets' current IDs (`fbRoads:abc:0`) haven't been
   in a release, so saved accept and ignore records don't need migrating.

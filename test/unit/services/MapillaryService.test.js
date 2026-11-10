@@ -328,6 +328,42 @@ describe('MapillaryService', () => {
       });
     });
 
+
+    // Traffic signs and the other detections each have their own cache. A detection's data ID starts
+    // with its cache ID, and the layer that draws it has the same ID.
+    describe('detections', () => {
+      it('keeps traffic signs and the other detections in their own caches', () => {
+        _mapillary._cacheDetection({ id: 's1', loc: [10, 0], value: 'regulatory--stop--g1', object_type: 'traffic_sign' });
+        _mapillary._cacheDetection({ id: 'd1', loc: [10.0001, 0], value: 'object--fire-hydrant', object_type: 'point' });
+
+        assert.deepEqual(_mapillary.getData('signs').map(d => d.dataID), ['mapillary-signs:s1']);
+        assert.deepEqual(_mapillary.getData('detections').map(d => d.dataID), ['mapillary-detections:d1']);
+        assert.strictEqual(_mapillary.getDetection('s1').dataID, 'mapillary-signs:s1');
+        assert.strictEqual(_mapillary.getDetection('d1').dataID, 'mapillary-detections:d1');
+        assert.isUndefined(_mapillary.getDetection('nope'));
+      });
+
+      it('updates a detection in its own cache', () => {
+        _mapillary._cacheDetection({ id: 's1', loc: [10, 0], object_type: 'traffic_sign' });
+        _mapillary._cacheDetection({ id: 's1', value: 'regulatory--stop--g1', object_type: 'traffic_sign' });
+
+        assert.lengthOf(_mapillary.getData('signs'), 1);
+        assert.strictEqual(_mapillary.getDetection('s1').props.value, 'regulatory--stop--g1');
+        assert.isEmpty(_mapillary.getData('detections'));
+      });
+
+      it('loads a traffic sign by its ID into the signs cache', async () => {
+        fetchMock.route(/graph\.mapillary\.com\/\/?s2\?/, {
+          id: 's2', geometry: { type: 'Point', coordinates: [10, 0] }, object_type: 'trafficsign',
+          object_value: 'regulatory--stop--g1', images: { data: [] }
+        });
+
+        const detection = await _mapillary._loadDetectionAsync('s2');
+        assert.strictEqual(detection.dataID, 'mapillary-signs:s2');
+        assert.deepEqual(_mapillary.getData('signs').map(d => d.id), ['s2']);
+      });
+    });
+
   });
 
 });

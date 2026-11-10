@@ -4,7 +4,6 @@
 Data IDs (steps 1–5), the validation audit, the graph-geometry rollout and both bug hunts have landed
 (see `completed.md`). Bryan wants to land this branch for testers before starting the multiselection
 design (`backlog.md`), to keep conflation in focus. Before it becomes `main` (v3.0.0-pre.4):
-- **The `mapillary-signs` namespace** (under "Still-open future work" below).
 - **A release check** in the debug Chrome on real data (accept with joins, autoconnect, undo/redo,
   Autofix All, panning while editing, QA and photo layers, backup restore, a faked upload conflict),
   then merge to main.
@@ -159,10 +158,6 @@ to the part that exists.*
   a real browser to confirm stacking, Esc, and close behavior.
 - **`CycleHighwayTagOperation`'s module-level `_lastSelectedIDs`.** The one remaining module-level
   mutable global in `operations/`. Consider moving it onto a system per the system-ownership rule.
-- **Mapillary traffic signs share the `mapillary-detections` namespace** with the other detections
-  (`MapillaryService.getData` splits them by `object_type`). So a link to a sign can't tell from its
-  namespace which layer to turn on, and turns on the detections layer. Store signs in their own
-  `mapillary-signs` namespace (removes the filter too); that changes signs' data IDs.
 - **Imagery customizations, like the dataset ones.** The imagery offset is for the session only (Nov 9).
   Some sources always need the same offset, so Bryan could see saving an offset per source in a synced
   setting, the way `RapidSystem` keeps the user's changes to each dataset.

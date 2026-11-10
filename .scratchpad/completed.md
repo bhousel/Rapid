@@ -2,6 +2,8 @@
 
 Reverse-chronological one-liners. Details live in git history — these are just breadcrumbs.
 
+- **Mapillary traffic signs have their own cache** (Nov 10 2026, `design/data-ids.md`) — `mapillary-signs`, apart from the other detections. A sign's data ID starts with that cache ID, and the layer has the same ID, so a link to a sign turns on the signs layer, and nothing guesses the layer from `object_type`. Signs' data IDs changed (no shim, per the pre.4 plan).
+
 - **Switching the API offers that API's sessions** (Nov 10 2026, `design/database-system.md`) — startup is always on live, so dev sessions were never offered. `editor.findRestorableSessionsAsync()` (also used by startup) settles the API's interrupted uploads and finds its sessions; the source switcher shows the restore screen after switching. From the first bug hunt.
 
 - **A new changeset when OSM closed the open one** (Nov 10 2026, `design/uploader-system.md` "A closed changeset") — the service forgets a changeset the API says is closed (it used to keep it, so every save got the same 409 until a reload), and the uploader uploads again in a new changeset, once.

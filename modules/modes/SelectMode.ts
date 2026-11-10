@@ -4,7 +4,7 @@ import { AbstractMode } from './AbstractMode.ts';
 import { actionMove, actionRotate } from '../actions/index.ts';
 import { DEG2RAD, Extent, vecAdd, vecRotate, vecScale } from '@rapid-sdk/math';
 import { GeoJSONData, MarkerData, OsmEntity } from '../data/index.ts';
-import { isStableDataID, osmEntityID } from '../data/dataID.ts';
+import { isStableDataID, osmEntityID, splitDataID } from '../data/dataID.ts';
 import { UiDataEditor } from '../ui/UiDataEditor.ts';
 import { UiDetectionInspector } from '../ui/UiDetectionInspector.ts';
 import { UiKeepRightEditor } from '../ui/UiKeepRightEditor.ts';
@@ -450,9 +450,7 @@ export class SelectMode extends AbstractMode {
       const detectionInspector = new UiDetectionInspector(context);
       detectionInspector.datum = datum;
       sidebarContent = detectionInspector.render;
-      const serviceID = datum.serviceID;
-      const type = (datum.props.object_type === 'traffic_sign') ? 'signs' : 'detections';
-      const layerID = `${serviceID}-${type}`;    // e.g. 'mapillary-signs' or 'mapillary-detections'
+      const layerID = splitDataID(datum.dataID)[0];   // its cache, which is also its layer, e.g. 'mapillary-signs' or 'mapillary-detections'
       photos.selectDetection(layerID, datum.id);
 
     // Selected Overture feature...

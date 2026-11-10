@@ -504,7 +504,7 @@ export class PhotoSystem extends AbstractSystem {
 
       this._currLayerID = layerID;
       this._currDetectionID = detectionID;
-      scene?.setClass('selectdetection', makeDataID(`${photoLayerID}-detections`, detectionID));
+      scene?.setClass('selectdetection', makeDataID(layerID, detectionID));   // the layer has the same ID as the detection's cache
 
       // Try to highlight any photos that show this detection,
       // And try to select a photo in the viewer that shows it.

@@ -153,4 +153,28 @@ describe('PhotoSystem', () => {
     });
   });
 
+
+  describe('selectDetection', () => {
+    it('marks a traffic sign selected by its data ID in the signs cache', () => {
+      const ctx = new Rapid.MockContext();
+      const classes = [];
+      const signsLayer = { id: 'mapillary-signs', enabled: true };
+      ctx.systems = {
+        gfx: {
+          immediateRedraw: () => {},
+          scene: {
+            layers: new Map([['mapillary-signs', signsLayer]]),
+            clearClass: () => {},
+            setClass: (classID, dataID) => classes.push([classID, dataID])
+          }
+        }
+      };
+      ctx.services = { mapillary: { selectDetectionAsync: () => new Promise(() => {}) } };   // still loading
+      const photos = new Rapid.PhotoSystem(ctx);
+
+      photos.selectDetection('mapillary-signs', 's1');
+      assert.deepEqual(classes, [['selectdetection', 'mapillary-signs:s1']]);
+    });
+  });
+
 });
