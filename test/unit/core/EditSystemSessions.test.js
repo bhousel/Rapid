@@ -324,6 +324,42 @@ describe('EditSystem sessions (Phase 2)', () => {
       await editor.startAsync();
       assert.isFalse(editor.canRestoreBackup);
     });
+
+    it('finds the sessions made on the API the source switcher changed to', async () => {
+      await seedSession('s-dev', { apiURL: DEV });
+
+      // Startup is always on live, so the dev session isn't offered
+      editor._canRestoreBackup = await editor._hasRestorableSessionsAsync(true);
+      await editor.startAsync();
+      assert.isFalse(editor.canRestoreBackup);
+
+      context.services.osm.apiroot = DEV;   // switched to dev
+      assert.isTrue(await editor.findRestorableSessionsAsync());
+      assert.isTrue(editor.canRestoreBackup);
+      assert.deepEqual((await editor.listRestorableSessionsAsync()).map(s => s.id), ['s-dev']);
+
+      context.services.osm.apiroot = LIVE;  // and back
+      assert.isFalse(await editor.findRestorableSessionsAsync());
+    });
+
+    it('settles an interrupted upload made on the API it switched to', async () => {
+      const upload = { changesetID: '7', apiURL: DEV, startedAt: Date.now() - 1000 };
+      await seedSession('s-dev', { apiURL: DEV, upload: upload });
+      const requests = [];
+      context.services.osm.loadChangesetAsync = (id) => {
+        requests.push(id);
+        return Promise.resolve({ id: id, changes_count: 3, open: false });   // it went through
+      };
+
+      await editor.findRestorableSessionsAsync();   // on live: not this API's to settle
+      assert.deepEqual(requests, []);
+      assert.isDefined(await database.get('sessions', 's-dev'));
+
+      context.services.osm.apiroot = DEV;
+      assert.isFalse(await editor.findRestorableSessionsAsync());   // nothing left to offer
+      assert.deepEqual(requests, ['7']);
+      assert.isUndefined(await database.get('sessions', 's-dev'));
+    });
   });
 
 

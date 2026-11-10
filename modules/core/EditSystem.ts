@@ -525,21 +525,33 @@ export class EditSystem extends AbstractSystem {
   public startAsync(): Promise<void> {
     if (this._startPromise) return this._startPromise;
 
-    const context = this.context;
-    const osm = context.services.osm;   // optional
-
     this._startHeartbeat();
 
-    // Sessions whose upload was interrupted are settled with the OSM API before we offer them.
-    // (Services are initialized, but not started, when systems start.)
+    // Only look closer if there are sessions on any OSM API (see `initAsync`)
     return this._startPromise = super.startAsync()
       .then(() => {
         if (!this._canRestoreBackup) return;
-        return Promise.resolve(osm?.initAsync())
-          .then(() => this._settleUploadsAsync())
-          .then(() => this._hasRestorableSessionsAsync())
-          .then(canRestore => { this._canRestoreBackup = canRestore; });
+        return this.findRestorableSessionsAsync().then(() => {});
       });
+  }
+
+
+  /**
+   * Looks for sessions to offer for restore on the OSM API we're connected to now, and returns whether
+   * there are any (also `canRestoreBackup`). Interrupted uploads made on this API are settled first.
+   * Startup calls this, and so does the source switcher after changing the API: a session is only
+   * offered on the API it was made on, and startup is always on the live API.
+   * @return Promise resolved with `true` if there are sessions to offer
+   */
+  public async findRestorableSessionsAsync(): Promise<boolean> {
+    const context = this.context;
+    const osm = context.services.osm;   // optional
+
+    // (Services are initialized, but not started, when systems start.)
+    await osm?.initAsync();
+    await this._settleUploadsAsync();
+    this._canRestoreBackup = await this._hasRestorableSessionsAsync();
+    return this._canRestoreBackup;
   }
 
 

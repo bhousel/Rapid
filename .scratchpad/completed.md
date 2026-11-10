@@ -2,6 +2,8 @@
 
 Reverse-chronological one-liners. Details live in git history — these are just breadcrumbs.
 
+- **Switching the API offers that API's sessions** (Nov 10 2026, `design/database-system.md`) — startup is always on live, so dev sessions were never offered. `editor.findRestorableSessionsAsync()` (also used by startup) settles the API's interrupted uploads and finds its sessions; the source switcher shows the restore screen after switching. From the first bug hunt.
+
 - **A new changeset when OSM closed the open one** (Nov 10 2026, `design/uploader-system.md` "A closed changeset") — the service forgets a changeset the API says is closed (it used to keep it, so every save got the same 409 until a reload), and the uploader uploads again in a new changeset, once.
 
 - **Settings declare how they're kept** (Nov 10 2026, `design/settings-system.md` "What syncs") — `registerSync`, `registerLocal` and `unregister`, like Chrome or VS Code. The sync deletes the account's copies of local and retired settings and v1's `meta`; unknown keys are left alone. `imagery.lastUsed` and `imagery.overlays` sync; datasets stay local. See `decisions.md`.

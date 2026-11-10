@@ -4,8 +4,6 @@
 Data IDs (steps 1–5), the validation audit, the graph-geometry rollout and both bug hunts have landed
 (see `completed.md`). Bryan wants to land this branch for testers before starting the multiselection
 design (`backlog.md`), to keep conflation in focus. Before it becomes `main` (v3.0.0-pre.4):
-- **Dev API sessions aren't offered for restore** after switching to the dev API in the same tab:
-  restore is only offered at startup, which is always on the live API. (From the first bug hunt.)
 - **The `mapillary-signs` namespace** (under "Still-open future work" below).
 - **A release check** in the debug Chrome on real data (accept with joins, autoconnect, undo/redo,
   Autofix All, panning while editing, QA and photo layers, backup restore, a faked upload conflict),

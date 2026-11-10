@@ -1,4 +1,5 @@
 import { selection } from 'd3-selection';
+import { UiRestore } from './UiRestore.ts';
 
 import type { Context } from '../Context.ts';
 import type { D3Selection } from 'd3-selection';
@@ -80,7 +81,9 @@ export class UiSourceSwitch {
 
 
   /**
-   * Toggles between live and dev database
+   * Toggles between live and dev database.
+   * Then offers to restore the sessions made on the new one, as startup does for the live database:
+   * a session is only offered on the database it was made on.
    * @param [e] - the triggering event, if any
    */
   public toggle(e?: Event): void {
@@ -106,7 +109,13 @@ export class UiSourceSwitch {
 
     context.resetAsync()   // remove downloaded data
       .then(() => osm.switchAsync((this._isLive ? keys[0] : keys[1]) as any))
-      .then(() => this.render());
+      .then(() => this.render())
+      .then(() => editor.findRestorableSessionsAsync())
+      .then(canRestore => {
+        if (canRestore) {
+          new UiRestore(context).render();
+        }
+      });
   }
 
 }

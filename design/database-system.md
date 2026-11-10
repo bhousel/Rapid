@@ -357,6 +357,10 @@ interface SessionRecord {
   from before `apiURL` was recorded are offered on any API. The check at init counts every API,
   because a host's preauthenticated connection switches the API after systems init; `startAsync`
   decides with the API settled.
+- **Switching the API offers that API's sessions** (`findRestorableSessionsAsync`, Nov 2026). Startup is
+  always on the live API, so before this a session made on the dev API was never offered. After the
+  source switcher changes the API, it settles that API's interrupted uploads and shows the restore
+  screen if there are sessions, the same as startup.
 - **Retention: keep sessions indefinitely; evict only on explicit user action.** No auto-cap or
   auto-expiry. A session is removed only when the user deletes it from the list (or `clearBackup()`
   on source-switch / after upload removes the *active* session).
