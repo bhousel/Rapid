@@ -320,6 +320,16 @@ export class SelectMode extends AbstractMode {
 
 
   /**
+   * Whether the arrow keys move what's selected: everything selected is OSM, and it can be edited.
+   * The photo viewers leave the arrow keys to the selection then, unless they have focus.
+   * @return `true` if the arrow keys move the selection
+   */
+  public get movesWithArrowKeys(): boolean {
+    return this.context.editable() && this._isAllOsm();
+  }
+
+
+  /**
    * Shows what's selected in the sidebar.
    * - All OSM entities: the OSM inspector (which lists them if there are several).
    * - A single other datum: the editor or inspector for its kind of data.
@@ -485,8 +495,10 @@ export class SelectMode extends AbstractMode {
 
     // Only match these keys if the user doesn't have something
     // more important focused - like a input, textarea, menu, etc.
+    // (buttons are ok, but not preset buttons, the same as `MapInteractionBehavior`, which leaves these keys to us)
     const activeElement = document.activeElement?.tagName ?? 'BODY';
-    if (activeElement !== 'BODY') return;
+    if (!(['BODY', 'BUTTON'].includes(activeElement))) return;
+    if (document.activeElement?.classList?.contains('preset-list-button')) return;
     // Also exit if we have something selected at very low zoom
     if (!context.editable()) return;
 

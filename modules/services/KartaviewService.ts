@@ -727,6 +727,8 @@ export class KartaviewService extends AbstractSystem {
     // more important focused - like a input, textarea, menu, etc.
     const activeElement = document.activeElement?.tagName ?? 'BODY';
     if (activeElement !== 'BODY') return;
+    // Selected OSM features take the arrow keys
+    if (photos.arrowKeysMoveSelection()) return;
 
     if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') {
       this._step(-1);

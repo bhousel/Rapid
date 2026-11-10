@@ -822,6 +822,8 @@ export class MapillaryService extends AbstractSystem {
     const activeElement = document.activeElement?.tagName ?? 'BODY';
     const mapillaryViewerClass = document.activeElement?.className.startsWith('mapillary');
     if (activeElement !== 'BODY' && !mapillaryViewerClass) return;
+    // Selected OSM features take the arrow keys, unless the viewer has focus
+    if (!mapillaryViewerClass && photos.arrowKeysMoveSelection()) return;
 
     if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') {
       this.navigateBackward();

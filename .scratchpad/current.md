@@ -209,9 +209,12 @@ numbers below keep the hunt's numbering.
     (`_canRestoreBackup` stays true). `UiSystem.ts:328`. *Reading.*
     ✅ **Fixed:** starting the walkthrough calls `editor.dismissRestore()`. The sessions stay, and are
     offered the next time Rapid starts normally (Bryan: a `walkthrough=true` link is for a class of new users).
-37. **Arrow keys:** with a photo viewer open, plain arrows both nudge the selection and step the photo;
+37. ✅ **Arrow keys:** with a photo viewer open, plain arrows both nudge the selection and step the photo;
     with a focused button, Ctrl/⌘+↑↓ does nothing (`SelectMode._keydown` requires BODY).
     `SelectMode.ts`, `MapInteractionBehavior.ts`. *Reading.*
+    ✅ **Fixed:** the selection wins (Bryan's choice): the photo viewers leave the arrow keys to selected
+    OSM features (`photos.arrowKeysMoveSelection()`), unless the Mapillary viewer has focus. `SelectMode`
+    takes the same focus as the map (buttons, but not preset buttons). Checked live.
 38. **`y_shaped_connection` isn't revalidated when a road joins or leaves the neighboring node**
     (related entities add parent ways, never sibling nodes). `y_shaped_connection.ts:214`,
     `ValidationCache.ts:198`. *Confirmed.*

@@ -9,6 +9,7 @@ import type { Context } from '../Context.ts';
 import type { D3Selection } from 'd3-selection';
 import type { MarkerData } from '../data/MarkerData.ts';
 import type { OneOrMore } from '../util/iterable.ts';
+import type { SelectMode } from '../modes/SelectMode.ts';
 
 
 /**
@@ -709,6 +710,17 @@ export class PhotoSystem extends AbstractSystem {
     const context = this.context;
     const $viewer: D3Selection = context.container().selectAll('.photoviewer');
     return !!$viewer.size() && !$viewer.classed('hide');
+  }
+
+
+  /**
+   * Whether the arrow keys move the selected OSM features (see `SelectMode`), so the photo viewers
+   * shouldn't also step through photos with them, unless the viewer has focus.
+   * @return `true` if the arrow keys belong to the selection
+   */
+  public arrowKeysMoveSelection(): boolean {
+    const mode = this.context.mode;
+    return mode?.id === 'select' && (mode as SelectMode).movesWithArrowKeys;
   }
 
 
