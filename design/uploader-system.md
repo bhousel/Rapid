@@ -180,7 +180,9 @@ were uploaded twice. That made any save that didn't finish lose the edits instea
    `beforeUpload` hook, where the uploader calls `editor.markUploadAsync`. That backs up the edits
    (save mode skips ordinary backups) with `upload: { changesetID, apiURL, startedAt }`. A
    session without the mark was never uploaded.
-2. **In the same tab:** success deletes the session (`clearBackup`). An error where we know nothing
+2. **In the same tab:** success deletes the session (`clearBackup`). Until the reset that follows the
+   success screen, Rapid stays in save mode (Escape is off) and `hasWork()` is false, so the uploaded
+   edits can't be edited or backed up as a new session (Nov 2026). An error where we know nothing
    was applied (any HTTP error, or `-5`) removes this changeset's mark, so it's an ordinary backup
    again, and the draft comment is kept. (A save that fails before creating a changeset has no mark
    to remove.) When we can't tell (`-6`), the tab lets go of the session (`releaseSessionAsync`): the

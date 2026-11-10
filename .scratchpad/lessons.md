@@ -103,10 +103,18 @@ Things that went wrong once and shouldn't go wrong again.
   (`chromium.connectOverCDP`, then `page.mouse.click`) showed it in one run. Pick a path that writes
   nothing to OSM (a new note's Cancel). The restore prompt covers the map after a reload: "Skip for now"
   keeps the sessions.
-- **Validation waits while a backup can be restored** (`editor.canRestoreBackup`). In the debug Chrome
-  there usually is one, so live validation checks find no issues. Don't touch the backup: override
-  the getter on the instance for the run, and undo the run's edits (a session undone back to nothing
-  is deleted).
+- **Validation and backups wait while a backup can be restored** (`editor.canRestoreBackup`). In the
+  debug Chrome there usually is one, so live validation checks find no issues and live edits are never
+  backed up. Don't touch the stored session: call `editor.dismissRestore()` (it only affects that page,
+  and the session is offered again on reload), and undo the run's edits (a session undone back to
+  nothing is deleted).
+- **Run each new test against the old code** (`git stash push <the fixed files>`, run it, `git stash
+  pop`). Three of the bug-hunt tests passed on the old code at first; one because it reloaded data in a
+  loop, and `editor.merge` doesn't replace entities that are loaded already. Reset the editor between
+  variants. A test meant to show a refactor kept the behavior should pass on both.
+- **Put a time-sensitive live check in one `cdp eval` snippet.** Each `bun run cdp` call takes about a
+  second, so checking something within the 2.5 s after an upload across two calls finds the reset
+  already done.
 
 ## Network
 

@@ -633,7 +633,9 @@ explicit list of small values, the way VS Code separates synced settings from ma
   syncing later would pull its stale v1 copy. Never delete a key just because this build doesn't
   sync it. A system could declare the settings it keeps local (`registerLocal`, next to
   `registerSync`), so that only those account copies are removed. `meta` (v1's bookkeeping) is
-  `SettingsSystem`'s own. Settings no longer used at all are for a migration.
+  `SettingsSystem`'s own. Settings no longer used at all (`rapid.custom.*`, `rapid.dataset.*`,
+  `ui.restrictions`) are for a migration. Decide first whether `imagery.lastUsed`, `imagery.overlays`
+  and `rapid.enabledDatasetIDs` should sync.
 
 ### Export and import
 
@@ -705,7 +707,8 @@ modeled on how VS Code documents its settings and extension points.
      stored. The url is mostly how other apps start Rapid a certain way. Agreed Nov 2026:
      - Written as you go (where you are, what's selected): `map`, `id`, `photo`, `detection`.
      - Overrides, read but never written: `layers`, `disable_features`, `background`, `overlays`,
-       `offset`, `dataset_ids`, `photo_dates`, `photo_username`, `maproulette`, `map3d`, `locale`, `rtl`.
+       `offset`, `dataset_ids`, `photo_dates`, `photo_username`, `maproulette`, `map3d`, `locale`, `rtl`,
+       and custom `data` (so a link's custom `id=` can be found again; `gpx` is kept as `data`).
      - Only ever for the session, never saved: `poweruser=true`, the photo filters, the MapRoulette
        challenges, the 3D map, and the imagery offset. (An offset belongs to one imagery source in one
        area; saving offsets per source, in a synced setting like the dataset changes, is an idea for later.)

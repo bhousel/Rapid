@@ -223,7 +223,7 @@ than one, and a props bag with a `type` is how the rest of the library works.
 | Question | Method | Used by |
 |---|---|---|
 | Is there anything to upload? | `hasChanges()`: the graph differs from base (unchanged) | Save and Download buttons, upload |
-| Is there work the user would hate to lose? | `hasWork()`: the graph changed, or a kept edit has a `type` | Backups, the browser's "leave this page?" prompt, the source switcher's warning |
+| Is there work the user would hate to lose? | `hasWork()`: the graph changed, or a kept edit has a `type`. Not after `clearBackup` (the edits were uploaded or thrown away), until the next reset | Backups, the browser's "leave this page?" prompt, the source switcher's warning |
 | Did any data change since I last looked? | `dataVersion` (PR #5): changes on any edit, undo/redo, merge, restore or reset | Caches of derived data, in Rapid and in embedding apps |
 
 `hasChanges()` keeps its meaning: an add-then-delete that cancels out still isn't saved, and an
@@ -427,6 +427,8 @@ be working on it, and offered with a warning if we can't tell. Details are in
 - **A restore that can't reach the OSM API fails** rather than restoring part of the session (October
   2026). The session stays saved for another try. This applies to the walkthrough too, which saves the
   user's edits as a backup when it starts and restores them when it ends, so that now fetches as well.
+  The walkthrough resets the editor, which forgets the session, so it holds it (`holdSession`): the
+  session keeps its heartbeat, so no other tab restores it, and `continueSession` takes it back after.
 - **v4 backups save the child nodes of parent ways too**, so a restore is one fetch per type, with no
   second round for nodes that turn out to be missing.
 - **Undo and redo restore a non-OSM selection by finding the data on its layer** (`AbstractPixiLayer.getData`),

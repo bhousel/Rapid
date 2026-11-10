@@ -395,6 +395,10 @@ session that another tab is actively editing, each session record carries a `hea
   goes stale.
 - Cleared on discard/delete of the active session. If a tab closes without clearing, its heartbeat
   simply goes stale after `SESSION_LIVE_MS` and the session becomes restorable again.
+- **The walkthrough holds the session** (`EditSystem.holdSession`, Nov 2026). It resets the editor,
+  which forgets the active session, so the held record keeps its heartbeat until `continueSession`
+  (or `releaseSession`, if the edits can't be given back). A backup still being written when the
+  session changes is dropped, so it can't write the replaced session back.
 
 > Note: the heartbeat re-writes the full session record (including `data`) every 20s while a session
 > is open but idle. Fine for typical sessions; if very large sessions make this costly, a future

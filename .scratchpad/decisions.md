@@ -379,6 +379,29 @@ Rule and details in `design/settings-system.md`; these are the choices someone m
   only turned on where they can be seen, or they'd be credited in changesets elsewhere.
 - **`UrlHashSystem` still loses url changes made before it resumes.** Keeping them would let startup's
   `map=`/`id=` writes overwrite a link's own. Read startup values from `initialHashParams` instead.
+- **`_isApplyingUrl` tells a link's change from the user's, and only `_hashChanged` sets it.** Whether
+  a param is in the url can't tell them apart: it's still there at the moment the user changes the
+  state, which is exactly when it has to be dropped. Startup doesn't need the flag (`_started` or
+  `_settled` already stops saving then).
+- **Custom data's `data=` is an override too.** It stays while its data is shown, so a copied link's
+  custom `id=` finds it again. Custom data the user loads isn't written, so its `id=` can't be found
+  from a link.
+
+## Bug hunt 2 choices (Nov 2026)
+
+Fixes where Bryan picked the behavior, which someone might undo by accident.
+- **MapRoulette auth is commented out, not fixed.** MapRoulette expired the API keys Rapid read from
+  the OSM user preferences, and will offer a proper login later; until then Rapid submits without a
+  key. See "MapRoulette authentication" in `backlog.md`.
+- **From a successful upload until the reset, nothing can be edited.** Rapid stays in save mode (Escape
+  is off), and after `clearBackup` the history isn't work to keep (`hasWork()` is false), so the
+  uploaded edits are never backed up as a new session.
+- **A `walkthrough=true` start doesn't offer a restore.** The sessions are offered the next time Rapid
+  starts normally. These links are for classes of new users.
+- **With OSM features selected, the arrow keys move them, even with the photo viewer open.** The photos
+  step only when nothing OSM is selected, or the Mapillary viewer has focus.
+- **Empty new relations aren't deleted when leaving select mode.** `missing_tag` flags them instead
+  (see "Render relations" in `backlog.md`).
 
 ## Style Resolution
 
