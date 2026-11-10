@@ -853,11 +853,12 @@ export class PixiLayerOsm extends AbstractPixiLayer {
     for (const props of midpointData) {
       if (props.dist < minDistance) continue;  // skip if points are too close at this zoom
 
-      // Generate data element if needed
-      let midpoint = prevMidpoints.get(props.id);
-      if (!midpoint) {
-        midpoint = new MarkerData<MidpointProps>(context, props);
-      }
+      // Generate data element if needed.
+      // (Midpoints are found again by the segment's coordinates, so after a merge or split the same
+      // segment can belong to another way, or have other nodes: then it's a new midpoint.)
+      const prev = prevMidpoints.get(props.id);
+      const isSame = (prev?.props.wayID === props.wayID && prev?.props.edge[0] === props.edge[0] && prev?.props.edge[1] === props.edge[1]);
+      const midpoint = (prev && isSame) ? prev : new MarkerData<MidpointProps>(context, props);
       this._midpoints.set(props.id, midpoint);
 
       // Check that this part has coordinates and is a Point
@@ -873,10 +874,19 @@ export class PixiLayerOsm extends AbstractPixiLayer {
           marker: { color: 0xffffff, image: 'midpoint' }
         };
         feature.parentContainer = selectedContainer;
+      }
+
+      // If data has changed.. Replace data and the link to its way.
+      if (feature.data !== midpoint || feature.geometry !== part) {
+        const prevWayID = (feature.data as Midpoint | null)?.props.wayID;
+        if (prevWayID && prevWayID !== midpoint.props.wayID) {
+          this.removeChildData(prevWayID, midpoint.id);
+        }
         feature.geometry = part;
         feature.data = midpoint;
-        feature.addChildData(midpoint.props.wayID, midpoint.id);
       }
+      // (Every frame: the way's own redraw replaces its links to children)
+      feature.addChildData(midpoint.props.wayID, midpoint.id);
 
       this.syncFeatureClasses(feature);
       if (feature.dirty) {
@@ -886,6 +896,13 @@ export class PixiLayerOsm extends AbstractPixiLayer {
       }
       feature.update(viewport);
       this.retainFeature(feature, frame);
+    }
+
+    // Unlink the midpoints that aren't drawn anymore from their ways
+    for (const [midpointID, prev] of prevMidpoints) {
+      if (!this._midpoints.has(midpointID)) {
+        this.removeChildData(prev.props.wayID, midpointID);
+      }
     }
   }
 

@@ -20,6 +20,26 @@ describe('AbstractPixiLayer', () => {
     assert.sameMembers([...layer.getSelfAndAncestors('w1')], ['w1', 'r1']);
   });
 
+  it('clearing a parent\'s children removes their links back to it, and keeps their other parents', () => {
+    const layer = makeLayer();
+    layer.addChildData('w1', ['n1', 'n2']);
+    layer.addChildData('w2', ['n2']);
+
+    layer.clearChildData('w1');
+    assert.sameMembers([...layer.getSelfAndDescendants('w1')], ['w1']);
+    assert.sameMembers([...layer.getSelfAndAncestors('n1')], ['n1']);
+    assert.sameMembers([...layer.getSelfAndAncestors('n2')], ['n2', 'w2']);
+  });
+
+  it('removing a child removes only that parent\'s link', () => {
+    const layer = makeLayer();
+    layer.addChildData('w1', ['n1']);
+    layer.addChildData('w2', ['n1']);
+
+    layer.removeChildData('w1', 'n1');
+    assert.sameMembers([...layer.getSelfAndAncestors('n1')], ['n1', 'w2']);
+  });
+
   it('unbinding the last feature of some data drops its links', () => {
     const layer = makeLayer();
     layer.bindData('r1-feature', 'r1');

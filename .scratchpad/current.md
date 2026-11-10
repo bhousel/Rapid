@@ -186,12 +186,16 @@ numbers below keep the hunt's numbering.
     itself, at the end or when interrupted (`end`, `interrupt` or `cancel`), so it's always its own edit
     before whatever interrupted it runs (a caller's `.then(commit)` ran after). No animation in a
     transaction.
-32. **Midpoints keep their old way ID after a merge or split:** they're reused by segment coordinates
+32. ✅ **Midpoints keep their old way ID after a merge or split:** they're reused by segment coordinates
     and `feature.data` is set only on create, so dragging one throws (`OsmEntity w2 not found`) and
     clicking one deselects. `PixiLayerOsm.ts:857`, `DragBehavior.ts:203`. *Confirmed (stale ID).*
-33. **`clearChildData` never removes children's links back to the parent:** it passes the live set,
+    ✅ **Fixed:** a midpoint is reused only if its way and nodes are the same, the feature rebinds when
+    its data changes, and the link to its way is added every frame (a way's redraw replaces its links)
+    and removed when the midpoint isn't drawn. Checked live: split a way, every midpoint matches.
+33. ✅ **`clearChildData` never removes children's links back to the parent:** it passes the live set,
     which the first loop empties, and `removeChildData` deletes `childID` instead of `parentID`. Vertices
     of other ways get drawn as related. `AbstractPixiLayer.ts:308`, `:324`. *Confirmed.*
+    ✅ **Fixed:** both.
 34. **MapRoulette can post the same comment twice** (Submit again after the comment POST, before the
     PUT). `MapRouletteService.ts:437`. *Reading.*
 35. **For 2.5 s after a successful upload, Escape plus an edit (or closing the tab) makes a new session

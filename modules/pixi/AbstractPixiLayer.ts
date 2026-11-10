@@ -327,7 +327,7 @@ export class AbstractPixiLayer {
     for (const childID of utilIterable(childIDs)) {
       const parentSet = this._childHasParents.get(childID);
       if (parentSet) {
-        parentSet.delete(childID);
+        parentSet.delete(parentID);
         if (!parentSet.size) {
           this._childHasParents.delete(childID);
         }
@@ -343,7 +343,7 @@ export class AbstractPixiLayer {
   public clearChildData(parentID: DataID): void {
     const childSet = this._parentHasChildren.get(parentID);
     if (childSet) {
-      this.removeChildData(parentID, childSet);
+      this.removeChildData(parentID, [...childSet]);   // a copy: removing empties the set while it's read
     }
   }
 
