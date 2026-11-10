@@ -326,9 +326,10 @@ export class UiSystem extends AbstractSystem {
         const sawWhatsNewVersion = parseInt(settings?.get('ui.sawWhatsNewVersion') ?? '', 10) || 0;
 
         if (startWalkthrough) {
-          new UiIntro(context).start();     // Jump right into walkthrough..
+          editor.dismissRestore();           // If restorable changes exist, ignore them this time.
+          new UiIntro(context).start();      // Jump right into walkthrough.
         } else if (editor.canRestoreBackup) {
-          new UiRestore(context).render();   // Offer to restore backup edits..
+          new UiRestore(context).render();   // Offer to restore backed up sessions.
         } else if (sawPrivacyVersion !== context.privacyVersion) {
           new UiSplash(context).render();    // Show "Welcome to Rapid" / Privacy Policy
         } else if (sawWhatsNewVersion !== context.whatsNewVersion) {

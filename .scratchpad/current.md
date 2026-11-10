@@ -205,8 +205,10 @@ numbers below keep the hunt's numbering.
     ✅ **Fixed:** after a successful save, Escape stays off, so the reset is the only way out of save mode.
     And after `clearBackup` (an upload, or the source switcher) `hasWork()` is false until the reset:
     no backup and no "Leave site?" prompt for edits already on OSM. Checked live with faked uploader events.
-36. **`#walkthrough=true` with a stored session means no backups for the rest of the tab**
+36. ✅ **`#walkthrough=true` with a stored session means no backups for the rest of the tab**
     (`_canRestoreBackup` stays true). `UiSystem.ts:328`. *Reading.*
+    ✅ **Fixed:** starting the walkthrough calls `editor.dismissRestore()`. The sessions stay, and are
+    offered the next time Rapid starts normally (Bryan: a `walkthrough=true` link is for a class of new users).
 37. **Arrow keys:** with a photo viewer open, plain arrows both nudge the selection and step the photo;
     with a focused button, Ctrl/⌘+↑↓ does nothing (`SelectMode._keydown` requires BODY).
     `SelectMode.ts`, `MapInteractionBehavior.ts`. *Reading.*
