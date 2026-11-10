@@ -788,6 +788,43 @@ describe('OsmWay', () => {
   });
 
 
+  describe('adjacentNodeIDs', () => {
+    it('returns an empty set for a node not in the way', () => {
+      const way = new Rapid.OsmWay(context, { nodes: ['a', 'b', 'c'] });
+      assert.deepEqual(way.adjacentNodeIDs('z'), new Set());
+    });
+
+    it('returns the nodes before and after a node in the middle', () => {
+      const way = new Rapid.OsmWay(context, { nodes: ['a', 'b', 'c', 'd'] });
+      assert.deepEqual(way.adjacentNodeIDs('b'), new Set(['a', 'c']));
+    });
+
+    it('returns only the one neighbor of an end of an open way', () => {
+      const way = new Rapid.OsmWay(context, { nodes: ['a', 'b', 'c'] });
+      assert.deepEqual(way.adjacentNodeIDs('a'), new Set(['b']));
+      assert.deepEqual(way.adjacentNodeIDs('c'), new Set(['b']));
+    });
+
+    it('returns both neighbors of the first and last node of a closed way', () => {
+      const way = new Rapid.OsmWay(context, { nodes: ['a', 'b', 'c', 'a'] });
+      assert.deepEqual(way.adjacentNodeIDs('a'), new Set(['b', 'c']));
+    });
+
+    it('returns the neighbors of every place a node appears, each once', () => {
+      const way = new Rapid.OsmWay(context, { nodes: ['a', 'b', 'c', 'b', 'd'] });   // passes through b twice
+      assert.deepEqual(way.adjacentNodeIDs('b'), new Set(['a', 'c', 'd']));
+    });
+
+    it('returns only the nodes before or after, when asked', () => {
+      const way = new Rapid.OsmWay(context, { nodes: ['a', 'b', 'c', 'a'] });
+      assert.deepEqual(way.adjacentNodeIDs('b', 'before'), new Set(['a']));
+      assert.deepEqual(way.adjacentNodeIDs('b', 'after'), new Set(['c']));
+      assert.deepEqual(way.adjacentNodeIDs('a', 'before'), new Set(['c']));   // from its last place
+      assert.deepEqual(way.adjacentNodeIDs('a', 'after'), new Set(['b']));    // from its first place
+    });
+  });
+
+
   describe('isAdjacent', () => {
     it('returns false for nodes not in the way', () => {
       const way = new Rapid.OsmWay(context);

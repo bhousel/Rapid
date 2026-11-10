@@ -158,18 +158,11 @@ export function validateCloseNodes(context: Context): ValidatorFunction {
       for (const parentWay of parentWays) {
         if (!shouldCheckWay(parentWay)) continue;
 
-        const lastIndex = parentWay.nodes.length - 1;
-        for (let j = 0; j < parentWay.nodes.length; j++) {
-          if (j !== 0) {
-            if (parentWay.nodes[j-1] === node.id) {
-              checkForCloseness(node, graph.entity(parentWay.nodes[j]) as OsmNode, parentWay);
-            }
-          }
-          if (j !== lastIndex) {
-            if (parentWay.nodes[j+1] === node.id) {
-              checkForCloseness(graph.entity(parentWay.nodes[j]) as OsmNode, node, parentWay);
-            }
-          }
+        for (const nextID of parentWay.adjacentNodeIDs(node.id, 'after')) {
+          checkForCloseness(node, graph.entity(nextID) as OsmNode, parentWay);
+        }
+        for (const prevID of parentWay.adjacentNodeIDs(node.id, 'before')) {
+          checkForCloseness(graph.entity(prevID) as OsmNode, node, parentWay);
         }
       }
       return issues;

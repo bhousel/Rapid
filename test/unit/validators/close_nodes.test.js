@@ -79,6 +79,27 @@ describe('validateCloseNodes', () => {
   });
 
 
+  it('flags two vertices of a way closer than the threshold, the same issue from either one', () => {
+    // n2 and n3 are ~0.06m apart, in a road about 33m long
+    load([
+      new Rapid.OsmNode(context, { id: 'n1', loc: [0, 0] }),
+      new Rapid.OsmNode(context, { id: 'n2', loc: [0.0001, 0] }),
+      new Rapid.OsmNode(context, { id: 'n3', loc: [0.0001005, 0] }),
+      new Rapid.OsmNode(context, { id: 'n4', loc: [0.0003, 0] }),
+      new Rapid.OsmWay(context, { id: 'w1', nodes: ['n1', 'n2', 'n3', 'n4'], tags: { highway: 'residential' }})
+    ]);
+
+    const fromN2 = validator(graph.entity('n2'), graph).issues;   // n3 is the node after it
+    const fromN3 = validator(graph.entity('n3'), graph).issues;   // n2 is the node before it
+    assert.lengthOf(fromN2, 1);
+    assert.lengthOf(fromN3, 1);
+    assert.strictEqual(fromN2[0].subtype, 'vertices');
+    assert.deepEqual(fromN2[0].entityIds, ['w1', 'n2', 'n3']);
+    assert.strictEqual(fromN3[0].id, fromN2[0].id);
+    assert.lengthOf(validator(graph.entity('n1'), graph).issues, 0);
+  });
+
+
   it('ignores two detached points beyond the threshold', () => {
     // ~1.1m apart, outside the 0.2m threshold (and outside the spatial query box)
     load([

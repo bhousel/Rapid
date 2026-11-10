@@ -219,11 +219,8 @@ export class ValidationCache {
           // ..and the nodes next to a connection, or to a given node
           if (node.id !== entityID && parentWays.length < 2) continue;
           for (const parentWay of parentWays) {
-            const nodeIDs = parentWay.nodes;
-            for (let i = 0; i < nodeIDs.length; i++) {
-              if (nodeIDs[i] !== node.id) continue;
-              if (i > 0) results.add(nodeIDs[i - 1]);
-              if (i < nodeIDs.length - 1) results.add(nodeIDs[i + 1]);
+            for (const nodeID of parentWay.adjacentNodeIDs(node.id)) {
+              results.add(nodeID);
             }
           }
         }

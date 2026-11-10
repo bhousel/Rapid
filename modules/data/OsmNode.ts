@@ -224,15 +224,14 @@ export class OsmNode extends OsmEntity {
         if (parent.geometry(graph) !== 'line') continue;
         if (!(parent.tags.highway || parent.tags.railway || parent.tags.waterway || parent.tags.aeroway)) continue;  // not routable?
 
-        const nodes = parent.nodes;
-        for (let i = 0; i < nodes.length; i++) {
-          if (nodes[i] === this.id) {   // match current node
-            if (lookForward && i > 0) {
-              nodeIDs.add(nodes[i - 1]);  // look back to prev node
-            }
-            if (lookBackward && i < nodes.length - 1) {
-              nodeIDs.add(nodes[i + 1]);  // look ahead to next node
-            }
+        if (lookForward) {
+          for (const nodeID of parent.adjacentNodeIDs(this.id, 'before')) {
+            nodeIDs.add(nodeID);  // look back to prev node
+          }
+        }
+        if (lookBackward) {
+          for (const nodeID of parent.adjacentNodeIDs(this.id, 'after')) {
+            nodeIDs.add(nodeID);  // look ahead to next node
           }
         }
       }

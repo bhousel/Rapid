@@ -467,6 +467,25 @@ export class OsmWay extends OsmEntity {
   }
 
   /**
+   * Returns the IDs of the nodes next to the given node in this way: the node before and the node
+   * after each place it appears.  (A closed way's first and last node are the same node, so both of
+   * its neighbors are found.)
+   * @param nodeID - The node to find the neighbors of
+   * @param which - Optional, `'before'` or `'after'` for only the nodes on that side (default both)
+   * @return The neighbors' IDs, or an empty Set if the node isn't in this way
+   */
+  public adjacentNodeIDs(nodeID: EntityID, which: 'both' | 'before' | 'after' = 'both'): Set<EntityID> {
+    const nodes = this.nodes;
+    const results = new Set<EntityID>();
+    for (let i = 0; i < nodes.length; i++) {
+      if (nodes[i] !== nodeID) continue;
+      if (which !== 'after' && i > 0) results.add(nodes[i - 1]);
+      if (which !== 'before' && i < nodes.length - 1) results.add(nodes[i + 1]);
+    }
+    return results;
+  }
+
+  /**
    * Returns the map feature that this way represents.
    * Usually that's the way itself. But an untagged way in a multipolygon relation (an outer or
    * inner ring) is really part of that relation: an area, with the relation's tags.
