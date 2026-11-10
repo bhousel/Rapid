@@ -28,8 +28,11 @@ export interface MapRouletteTaskProps extends MarkerProps {
   taskStatus?: number;
   /** User comment submitted with the task update */
   comment?: string;
-  /** API key for authenticating MapRoulette API requests */
-  mapRouletteApiKey?: string;
+  // MapRoulette auth is turned off: MapRoulette stopped storing API keys in the OSM user preferences
+  // and expired the old ones, so Rapid submits without one for now (see "MapRoulette authentication"
+  // in `.scratchpad/backlog.md`, and https://community.openstreetmap.org/t/maproulette-security-incident-october-2026).
+  // /** API key for authenticating MapRoulette API requests */
+  // mapRouletteApiKey?: string;
   /** Geographic coordinates of the task */
   point?: { lng: number; lat: number };
   /** The status the user has picked in the editor, before it's submitted (`''` if none) */
@@ -430,7 +433,7 @@ export class MapRouletteService extends AbstractSystem {
     const challengeID = task.props.parentId;
     const taskStatus = task.props.taskStatus;
     const taskComment = task.props.comment;
-    const apikey = task.props.mapRouletteApiKey;
+    // const apikey = task.props.mapRouletteApiKey;   // MapRoulette auth is turned off (see `mapRouletteApiKey`)
 
     // A comment is optional, but if we have one, POST it..
     const commentID = `maproulette-comment-${taskID}`;
@@ -439,8 +442,8 @@ export class MapRouletteService extends AbstractSystem {
         requestID: commentID,
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          'apiKey': apikey as string
+          'Content-Type': 'application/json'
+          // 'apiKey': apikey as string
         },
         body: JSON.stringify({ actionId: 2, comment: taskComment })
       })
@@ -461,16 +464,16 @@ export class MapRouletteService extends AbstractSystem {
         requestID: updateKey,
         method: 'PUT',
         headers: {
-          'Content-Type': 'application/json',
-          'apiKey': apikey as string
+          'Content-Type': 'application/json'
+          // 'apiKey': apikey as string
         }
       })
       .then(() => {
         return network.fetch<any>(releaseTaskUrl, {
-          requestID: releaseKey,
-          headers: {
-            'apiKey': apikey as string
-          }
+          requestID: releaseKey
+          // headers: {
+          //   'apiKey': apikey as string
+          // }
         });
       })
       .then(() => {

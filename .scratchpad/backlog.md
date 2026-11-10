@@ -165,12 +165,18 @@ OpenStreetMap ↔ OpenHistoricalMap bridge).
   but pass in the full suite.
 
 ## MapRoulette authentication
-- `UiMapRouletteMenu` and `UiMapRouletteEditor` read the user's MapRoulette API key from the
-  `maproulette_apikey_v2` OSM user preference. MapRoulette is moving away from storing the key there
-  (security incident, October 2026:
-  https://community.openstreetmap.org/t/maproulette-security-incident-october-2026/148566).
-- Today, without the key, Rapid carries on unauthenticated, which is fine for now. Adopt whatever
-  MapRoulette moves to once it's settled. Auth should probably move from the UI into `MapRouletteService`.
+- Rapid read the user's MapRoulette API key from the `maproulette_apikey_v2` OSM user preference.
+  After a security incident (October 2026:
+  https://community.openstreetmap.org/t/maproulette-security-incident-october-2026)
+  MapRoulette stopped storing keys there and expired all the existing keys, so that can't work.
+- **All MapRoulette auth is commented out (Nov 10 2026)**, marked "MapRoulette auth is turned off":
+  the key fields and fetches in `UiMapRouletteEditor` and `UiMapRouletteMenu` (the menu's
+  `_getApiKey` never worked anyway: it called `osm.loadMapRouletteKey`, which doesn't exist), the
+  `mapRouletteApiKey` task prop, and the `apiKey` headers in `MapRouletteService.postUpdate`.
+  The editor's action buttons still need the user to be logged in to OSM.
+- Assumptions for now: MapRoulette works unauthenticated, and will soon give Rapid users a proper way
+  to log in. When it does, wire that in (auth should probably move from the UI into
+  `MapRouletteService`) and take out the commented-out code.
 
 ## Conflation: what JOSM users will ask for
 From reading JOSM's Conflation plugin (see "Prior art" in `design/conflation-system.md`). Roughly in

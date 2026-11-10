@@ -17,7 +17,6 @@ describe('UiMapRouletteEditor', () => {
     context.services = {
       maproulette: maproulette,
       osm: {
-        getUserPreferencesAsync: () => Promise.resolve({ maproulette_apikey_v2: 'key' }),
         getUserDetailsAsync: () => Promise.resolve({ display_name: 'me', id: 1 }),
         userURL: () => '',
         authenticate: () => {},

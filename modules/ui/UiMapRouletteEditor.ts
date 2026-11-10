@@ -49,7 +49,10 @@ export class UiMapRouletteEditor extends EventEmitter {
   public $parent: D3Selection | null;
 
   protected _actionTaken: string;
-  protected _apikey: string | null;
+  // MapRoulette auth is turned off: MapRoulette stopped storing API keys in the OSM user preferences
+  // and expired the old ones, so Rapid submits without one for now (see "MapRoulette authentication"
+  // in `.scratchpad/backlog.md`, and https://community.openstreetmap.org/t/maproulette-security-incident-october-2026).
+  // protected _apikey: string | null;
   protected _user: any;
 
 
@@ -61,7 +64,7 @@ export class UiMapRouletteEditor extends EventEmitter {
     this.context = context;
     this.datum = null;
     this._actionTaken = '';
-    this._apikey = null;
+    // this._apikey = null;   // MapRoulette auth is turned off (see `_apikey`)
     this._user = null;
 
     // Create child components
@@ -167,20 +170,21 @@ export class UiMapRouletteEditor extends EventEmitter {
   }
 
 
-  /** Fetch the user's MapRoulette API key from their OSM preferences. */
-  protected _getApiKeyAsync(): Promise<string | null> {
-    const osm = this.context.services.osm!;
-    return osm.getUserPreferencesAsync()
-      .then((prefs: any) => {
-        this._apikey = prefs.maproulette_apikey_v2;
-        return this._apikey;
-      })
-      .catch((err: unknown) => {
-        this._apikey = null;
-        console.error(err);  // eslint-disable-line no-console
-        return null;
-      });
-  }
+  // MapRoulette auth is turned off (see `_apikey`)
+  // /** Fetch the user's MapRoulette API key from their OSM preferences. */
+  // protected _getApiKeyAsync(): Promise<string | null> {
+  //   const osm = this.context.services.osm!;
+  //   return osm.getUserPreferencesAsync()
+  //     .then((prefs: any) => {
+  //       this._apikey = prefs.maproulette_apikey_v2;
+  //       return this._apikey;
+  //     })
+  //     .catch((err: unknown) => {
+  //       this._apikey = null;
+  //       console.error(err);  // eslint-disable-line no-console
+  //       return null;
+  //     });
+  // }
 
 
   /**
@@ -300,10 +304,10 @@ export class UiMapRouletteEditor extends EventEmitter {
       .data([0]);
 
     const updateAuthWarning = ($sel: D3Selection, messageKey: string): void => {
-      const isAuthenticated = (this._user && this._apikey);
+      const isAuthenticated = !!this._user;   // MapRoulette auth is turned off (see `_apikey`): `(this._user && this._apikey)`
 
       if (isAuthenticated) {
-        $sel.exit()
+        $detailSection.selectAll('.auth-warning')
           .transition()
           .duration(200)
           .style('opacity', 0)
@@ -322,27 +326,28 @@ export class UiMapRouletteEditor extends EventEmitter {
           .append('span')
           .text(l10n.t(messageKey));
 
-        if (messageKey === 'map_data.layers.maproulette.loginMaproulette') {
-          // If the message is for MapRoulette login, change the link destination
-          $$auth
-            .append('a')
-            .attr('target', '_blank')
-            .attr('href', 'https://maproulette.org/dashboard')
-            .call(uiIcon('#rapid-icon-out-link', 'inline'))
-            .append('span')
-            .text(l10n.t('login'));
-        } else {
-          $$auth
-            .append('a')
-            .attr('target', '_blank')
-            .call(uiIcon('#rapid-icon-out-link', 'inline'))
-            .append('span')
-            .text(l10n.t('login'))
-            .on('click', (e: PointerEvent) => {
-              e.preventDefault();
-              osm.authenticate();
-            });
-        }
+        // MapRoulette auth is turned off (see `_apikey`)
+        // if (messageKey === 'map_data.layers.maproulette.loginMaproulette') {
+        //   // If the message is for MapRoulette login, change the link destination
+        //   $$auth
+        //     .append('a')
+        //     .attr('target', '_blank')
+        //     .attr('href', 'https://maproulette.org/dashboard')
+        //     .call(uiIcon('#rapid-icon-out-link', 'inline'))
+        //     .append('span')
+        //     .text(l10n.t('login'));
+        // } else {
+        $$auth
+          .append('a')
+          .attr('target', '_blank')
+          .call(uiIcon('#rapid-icon-out-link', 'inline'))
+          .append('span')
+          .text(l10n.t('login'))
+          .on('click', (e: PointerEvent) => {
+            e.preventDefault();
+            osm.authenticate();
+          });
+        // }
 
         $$auth
           .transition()
@@ -353,14 +358,16 @@ export class UiMapRouletteEditor extends EventEmitter {
 
     updateAuthWarning($authWarning, 'map_data.layers.maproulette.login');
 
-    this._getApiKeyAsync()
-      .then(() => {
-        updateAuthWarning($authWarning, 'map_data.layers.maproulette.loginMaproulette');
-      });
+    // MapRoulette auth is turned off (see `_apikey`)
+    // this._getApiKeyAsync()
+    //   .then(() => {
+    //     updateAuthWarning($authWarning, 'map_data.layers.maproulette.loginMaproulette');
+    //   });
 
     osm.getUserDetailsAsync()
       .then((user: any) => {
         this._user = user;
+        updateAuthWarning($authWarning, 'map_data.layers.maproulette.login');
         const $userLink = select(document.createElement('div'));
 
         const href = user?.img?.href;
@@ -395,11 +402,16 @@ export class UiMapRouletteEditor extends EventEmitter {
     const context = this.context;
     const l10n = context.systems.l10n!;
     const maproulette = context.services.maproulette!;
+    const osm = context.services.osm!;
     const ui = context.systems.ui;
 
-    this._getApiKeyAsync()
+    // MapRoulette auth is turned off (see `_apikey`), so this only waits for the OSM user
+    // this._getApiKeyAsync()
+    osm.getUserDetailsAsync()
+      .then((user: any) => { this._user = user; })
+      .catch(() => { this._user = null; })
       .then(() => {
-        const hasAuth = (this._user && this._apikey);
+        const hasAuth = !!this._user;   // was `(this._user && this._apikey)`
         const dataID = this.datum?.dataID;
         const isSelected = dataID && context.selectedIDs().includes(dataID);
 
@@ -640,11 +652,11 @@ export class UiMapRouletteEditor extends EventEmitter {
     const osm = context.services.osm!;
 
     (e.currentTarget as HTMLElement).blur();    // avoid keeping focus on the button - iD#4641
-    const userID = (osm as any)._userDetails.id;
+    const userID = (osm as any)._userDetails?.id;
 
     const task = this._updateTask({
       taskStatus: d.props._status || undefined,
-      mapRouletteApiKey: this._apikey ?? undefined,
+      // mapRouletteApiKey: this._apikey ?? undefined,   // MapRoulette auth is turned off (see `_apikey`)
       comment: select('.new-comment-input').property('value').trim(),
       taskId: d.id,
       userId: userID

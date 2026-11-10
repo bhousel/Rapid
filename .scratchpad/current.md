@@ -169,10 +169,14 @@ numbers below keep the hunt's numbering.
     ✅ **Fixed:** it shows the note's own ID.
 
 ### Already in `main`
-30. **The MapRoulette right-click menu can never submit:** `_getApiKey` calls `osm.loadMapRouletteKey`,
+30. ✅ **The MapRoulette right-click menu can never submit:** `_getApiKey` calls `osm.loadMapRouletteKey`,
     which doesn't exist, so every click throws. Also reads `osm._userDetails.id` unguarded. Fix: do what
     the editor does (`getUserPreferencesAsync`, `maproulette_apikey_v2`). `UiMapRouletteMenu.ts:313`.
     *Confirmed.*
+    ✅ **Fixed differently:** MapRoulette expired the keys in the OSM preferences
+    (https://community.openstreetmap.org/t/maproulette-security-incident-october-2026), so all MapRoulette
+    auth is commented out and Rapid submits without a key (see "MapRoulette authentication" in
+    `backlog.md`). The menu submits directly, and `_userDetails` is read with `?.`.
 31. ✅ **Stopping an animated operation partway disables backups for the rest of the tab** (circularize,
     orthogonalize, straighten, reflect, unsquare fix). Any other edit or undo within its 150 ms
     interrupts it; the `'end interrupt'` handler only finishes inside a transaction, so `_inTransition`

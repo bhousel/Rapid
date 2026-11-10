@@ -290,6 +290,23 @@ describe('MapRouletteService', () => {
         });
       });
 
+      describe('postUpdate', () => {
+        it('submits without a MapRoulette API key (MapRoulette auth is turned off for now)', async () => {
+          context.enter ??= () => {};
+          fetchMock.route(/\/task\/1\//, {});
+          const task = _maproulette.getTask('1').update({ taskStatus: 1, comment: 'fixed it' });
+          _maproulette.postUpdate(task);
+          await Bun.sleep(5);
+
+          const calls = fetchMock.callHistory.calls(/\/task\/1\//);
+          assert.lengthOf(calls, 3);   // comment, status, release
+          for (const call of calls) {
+            const headerNames = Object.keys(call.options.headers ?? {}).map(k => k.toLowerCase());
+            assert.notInclude(headerNames, 'apikey');
+          }
+        });
+      });
+
       describe('itemURL', () => {
         it('returns a task url', () => {
           const task = _maproulette.getTask('1');
