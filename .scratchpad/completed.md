@@ -2,6 +2,8 @@
 
 Reverse-chronological one-liners. Details live in git history — these are just breadcrumbs.
 
+- **A new changeset when OSM closed the open one** (Nov 10 2026, `design/uploader-system.md` "A closed changeset") — the service forgets a changeset the API says is closed (it used to keep it, so every save got the same 409 until a reload), and the uploader uploads again in a new changeset, once.
+
 - **Settings declare how they're kept** (Nov 10 2026, `design/settings-system.md` "What syncs") — `registerSync`, `registerLocal` and `unregister`, like Chrome or VS Code. The sync deletes the account's copies of local and retired settings and v1's `meta`; unknown keys are left alone. `imagery.lastUsed` and `imagery.overlays` sync; datasets stay local. See `decisions.md`.
 
 - **Second bug hunt** (Nov 4–10 2026, `/bughunt`) — 40 findings before handing the branch to testers, all fixed except the conflation ones (now "Known bugs" in `design/conflation-system.md`): the database upgrade blocked by another tab, upload marks and "can't tell" uploads, conflict choices on shared nodes, redacted base versions, settings sync, the selection after undo and redo, custom-data links, walkthrough sessions, MapRoulette (auth turned off: MapRoulette expired the keys), layer parent-child links and midpoints, editing between an upload and the reset, arrow keys, validating the nodes next to a connection, building crossings, curbs on short crossings. Clean coverage: 400 seeds × 250 steps of random `EditSystem` histories with 2,432 backup round trips, and two live soaks on Seattle data. See `decisions.md`.

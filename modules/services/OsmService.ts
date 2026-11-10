@@ -1444,6 +1444,10 @@ export class OsmService extends AbstractSystem {
     const network = context.systems.network!;
 
     const uploadedChangeset = (err: any, /*result*/): void => {
+      // The API closed the changeset (see `isChangesetClosedError`), so the next save opens a new one
+      if (this.isChangesetClosedError(err)) {
+        this._changeset.openChangesetID = null;
+      }
       // we do get a changeset diff result, but we don't currently use it for anything
       callback(err, changeset);
     };
@@ -1462,6 +1466,19 @@ export class OsmService extends AbstractSystem {
     })
       .then((result: any) => errback(null, result))
       .catch((err: any) => errback(err));   // the save is waiting on us, so report every failure
+  }
+
+
+  /**
+   * Whether an error from the API says the changeset was closed. The API closes a changeset an hour
+   * after its last upload (e.g. while the user is on the conflict screen), 24 hours after it opened,
+   * or when the user closes it. It answers 409 Conflict, like a version conflict, with a message.
+   * @param  err - The error from an upload
+   * @return `true` if the changeset was closed
+   */
+  public isChangesetClosedError(err: any): boolean {
+    if (err?.status !== 409) return false;
+    return /changeset \d+ was closed/i.test(String(err.body || err.message || ''));
   }
 
 

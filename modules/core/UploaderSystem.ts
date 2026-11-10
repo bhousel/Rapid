@@ -149,6 +149,8 @@ export class UploaderSystem extends AbstractSystem {
   protected _redactedIDs: Set<EntityID>;
   /** How many times this save has checked for conflicts on its own (see `MAX_CONFLICT_CHECKS`) */
   protected _conflictChecks: number;
+  /** Whether this save opened a new changeset after the API closed the one we kept open */
+  protected _reopenedChangeset: boolean;
   /** Entity IDs the API reported a version mismatch for, during this save */
   protected _mismatchIDs: Set<EntityID>;
   /** Entity IDs found deleted on the server during this save: a local deletion of one isn't uploaded */
@@ -195,6 +197,7 @@ export class UploaderSystem extends AbstractSystem {
     this._loadedIDs = new Set<EntityID>();
     this._redactedIDs = new Set<EntityID>();
     this._conflictChecks = 0;
+    this._reopenedChangeset = false;
     this._mismatchIDs = new Set<EntityID>();
     this._deletedRemotelyIDs = new Set<EntityID>();
     this._conflicts = [];
@@ -314,6 +317,7 @@ export class UploaderSystem extends AbstractSystem {
     if (!this._isSaving) {
       this._isSaving = true;
       this._conflictChecks = 0;
+      this._reopenedChangeset = false;
       this._mismatchIDs = new Set<EntityID>();
       this._deletedRemotelyIDs = new Set<EntityID>();
       this.emit('saveStarted');
@@ -832,7 +836,9 @@ export class UploaderSystem extends AbstractSystem {
    * @param updatedChangeset - The changeset, which may have an id now
    */
   protected _uploadCallback(err: any, updatedChangeset?: any): void {
-    const editor = this.context.systems.editor!;
+    const context = this.context;
+    const editor = context.systems.editor!;
+    const osm = context.services.osm;
 
     if (updatedChangeset) {
       this.changeset = updatedChangeset;  // it may have a changeset id now
@@ -862,7 +868,12 @@ export class UploaderSystem extends AbstractSystem {
       }
 
       if (err.status === 409) {  // 409 Conflict
-        if (this._shouldCheckAgain(err)) {
+        // The API closed the changeset we kept open between tries (an hour without an upload, e.g. on
+        // the conflict screen). Nothing was applied, so upload again in a new changeset, once.
+        if (osm?.isChangesetClosedError(err) && !this._reopenedChangeset) {
+          this._reopenedChangeset = true;
+          this.save(true, false);   // tryAgain = true, checkConflicts = false
+        } else if (this._shouldCheckAgain(err)) {
           this.save(true, true);   // tryAgain = true, checkConflicts = true
         } else {
           this._didResultInErrors();
@@ -923,11 +934,15 @@ export class UploaderSystem extends AbstractSystem {
    * @return `true` to check for conflicts again
    */
   protected _shouldCheckAgain(err: any): boolean {
-    const l10n = this.context.systems.l10n!;
+    const context = this.context;
+    const l10n = context.systems.l10n!;
+    const osm = context.services.osm;
+
     const message = String(err.body || err.message || '');
 
     // A closed changeset is a 409 too, and no conflict check will reopen it
-    if (/changeset \d+ was closed/i.test(message)) {
+    // (A new changeset was tried already, see `_uploadCallback`.)
+    if (osm?.isChangesetClosedError(err)) {
       this._errors.push({ msg: message, details: [ l10n.t('save.status_code', { code: err.status }) ] });
       return false;
     }

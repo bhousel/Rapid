@@ -1058,6 +1058,30 @@ describe('OsmService', () => {
           });
       });
 
+      it('opens a new changeset after the API says the open one was closed', () => {
+        const closed = 'The changeset 123 was closed at 2026-10-27 12:00:00 UTC';
+        fetchMock.route(/changeset\/123\/upload/, { status: 409, body: closed }, { repeat: 1 });
+
+        return loginAsync()
+          .then(() => sendAsync())
+          .then(({ err }) => {
+            assert.strictEqual(err.status, 409);
+            assert.isTrue(_osm.isChangesetClosedError(err));
+            return sendAsync();   // the uploader saves again
+          })
+          .then(() => {
+            const creates = fetchMock.callHistory.calls().filter(c => /changeset\/create/.test(c.url));
+            assert.lengthOf(creates, 2, 'a new changeset');
+          });
+      });
+
+      it('tells a closed changeset from a version conflict', () => {
+        assert.isTrue(_osm.isChangesetClosedError({ status: 409, body: 'The changeset 123 was closed at 2026-10-27 12:00:00 UTC' }));
+        assert.isFalse(_osm.isChangesetClosedError({ status: 409, body: 'Version mismatch: Provided 1, server had: 2 of Node 1' }));
+        assert.isFalse(_osm.isChangesetClosedError({ status: 404, body: 'The changeset 123 was closed' }));
+        assert.isFalse(_osm.isChangesetClosedError(null));
+      });
+
       it('reports status -6 if the connection was switched while the upload was out, even if it succeeded', () => {
         let finishUpload;
         fetchMock.route(/changeset\/123\/upload/, new Promise(resolve => { finishUpload = resolve; }).then(() => 200));

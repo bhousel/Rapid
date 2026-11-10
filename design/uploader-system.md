@@ -212,6 +212,21 @@ server answered with an error, which applied nothing. After `-5` the changeset i
 (Until November 3, 2026 it was reused: if that upload had landed, the next save's check would have
 counted its changes, and could have reported a later upload as done when it wasn't.)
 
+### A closed changeset
+
+Rapid keeps one changeset open between tries of a save (after conflicts, or a failure we know wasn't
+applied), so a save doesn't leave an empty changeset on OSM for every try. The API closes a changeset
+on its own an hour after its last upload (for example while the user is on the conflict screen), 24
+hours after it opened, or when the user closes it, and then answers an upload with 409 "The changeset
+N was closed at …" (`OsmService.isChangesetClosedError`).
+
+- **The service forgets a changeset the API says is closed**, so the next save opens a new one.
+  (Before November 2026 it kept it, and every later save got the same 409 until a reload.)
+- **The uploader uploads again in a new changeset, once, without asking.** A 409 means nothing was
+  applied, so the same changes go again, with the same comment and tags. The old changeset's mark is
+  removed like any known failure's, and the new upload marks its own changeset. If the new changeset
+  is reported closed too, the save stops with the API's message.
+
 ## The October 2026 audit
 
 Prompted by iD#7199 ("Endless conflict check loop", open since 2020), Rapid#1361, #1366 and #1480, and
@@ -271,11 +286,6 @@ Found along the way, fixed in November 2026:
 - JOSM resolves conflicts per entity in its own dialog; users stuck in iD's loop download the osmChange
   file and finish there.
 
-## Open questions
-
-- **A closed changeset** stops the save with the API's message. Should it open a new changeset and
-  upload again instead?
-
 ## Rollout
 
 1. **This doc and the audit.** ✅
@@ -294,4 +304,4 @@ Found along the way, fixed in November 2026:
    false conflict, a node's own choice over its way's, nothing uploaded that's just as the other mapper
    has it, "deleted by both" keeping the nodes' deletions, and "Leave Deleted" taking the nodes the
    other mapper added. ✅
-6. **Later:** a new changeset when the old one was closed.
+6. **A new changeset when the old one was closed** (November 2026, see "A closed changeset"). ✅

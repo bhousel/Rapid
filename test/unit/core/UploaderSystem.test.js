@@ -72,7 +72,7 @@ describe('UploaderSystem', () => {
   // what it answers to each upload in turn (`null` for success).
   describe('saving', () => {
     let _context, _editor, _uploader;
-    let _server, _redacted, _responses, _uploads, _loads;
+    let _server, _redacted, _responses, _uploads, _loads, _openChangesetID;
 
     function node(id, version, tags = {}, loc = [0, 0]) {
       return new Rapid.OsmNode(_context, { id, version, tags, loc });
@@ -125,13 +125,20 @@ describe('UploaderSystem', () => {
             .map(id => _server.get(id))
             .filter(Boolean));
         },
+        isChangesetClosedError: (err) => err?.status === 409 && /changeset \d+ was closed/i.test(String(err.body || err.message || '')),
+        // Uploads into the open changeset; after the API says it was closed, the next save opens a new one
         sendChangeset: (changeset, changes, callback, beforeUpload) => {
           _uploads.push(changes);
           const err = _responses.shift() ?? null;
-          Promise.resolve(beforeUpload?.(changeset))
-            .then(() => setTimeout(() => callback(err, changeset), 0));
+          const sent = { ...changeset, id: _openChangesetID };
+          if (_context.services.osm.isChangesetClosedError(err)) {
+            _openChangesetID = String(Number(_openChangesetID) + 1);
+          }
+          Promise.resolve(beforeUpload?.(sent))
+            .then(() => setTimeout(() => callback(err, sent), 0));
         }
       };
+      _openChangesetID = '1';
 
       _uploader = new Rapid.UploaderSystem(_context);
       _uploader.changeset = { id: '1' };
@@ -668,11 +675,29 @@ describe('UploaderSystem', () => {
       assert.lengthOf(_uploads, 4);   // the first upload, then one after each of 3 checks
     });
 
-    it('stops when the changeset was closed', async () => {
+    it('uploads again in a new changeset when the API closed the one kept open', async () => {
       _editor.merge([ node('n1', 1, { name: 'A' }) ]);
       _editor.perform(Rapid.actionChangeTags('n1', { name: 'B' }));
       _editor.commit({ stringID: 'changed the name' });
-      const closed = 'The changeset 1 was closed at 2026-10-27 12:00:00 UTC';
+      _responses.push({ status: 409, message: '409 Conflict', body: 'The changeset 1 was closed at 2026-10-27 12:00:00 UTC' });
+
+      const result = resultAsync();
+      _uploader.save();
+      const { name, args } = await result;
+
+      assert.strictEqual(name, 'resultSuccess');
+      assert.strictEqual(args[0].id, '2');
+      assert.lengthOf(_uploads, 2);
+      assert.deepEqual(_uploads[1].modified.map(entity => entity.tags.name), ['B']);   // the same changes
+      assert.lengthOf(_loads, 0);    // no conflict check needed
+    });
+
+    it('stops when the new changeset is closed too', async () => {
+      _editor.merge([ node('n1', 1, { name: 'A' }) ]);
+      _editor.perform(Rapid.actionChangeTags('n1', { name: 'B' }));
+      _editor.commit({ stringID: 'changed the name' });
+      _responses.push({ status: 409, message: '409 Conflict', body: 'The changeset 1 was closed at 2026-10-27 12:00:00 UTC' });
+      const closed = 'The changeset 2 was closed at 2026-10-27 12:00:01 UTC';
       _responses.push({ status: 409, message: '409 Conflict', body: closed });
 
       const result = resultAsync();
@@ -681,7 +706,7 @@ describe('UploaderSystem', () => {
 
       assert.strictEqual(name, 'resultErrors');
       assert.strictEqual(args[0][0].msg, closed);
-      assert.lengthOf(_uploads, 1);
+      assert.lengthOf(_uploads, 2);
       assert.lengthOf(_loads, 0);
     });
 
@@ -733,6 +758,19 @@ describe('UploaderSystem', () => {
         await result;
 
         assert.deepEqual(_calls, [['mark', '1', 'https://api.example.com'], ['unmark', '1']]);
+      });
+
+      it('moves to the new changeset when the API closed the one kept open', async () => {
+        _responses.push({ status: 409, message: '409 Conflict', body: 'The changeset 1 was closed at 2026-10-27 12:00:00 UTC' });
+
+        const result = resultAsync();
+        _uploader.save();
+        await result;
+
+        assert.deepEqual(_calls, [
+          ['mark', '1', 'https://api.example.com'], ['unmark', '1'],
+          ['mark', '2', 'https://api.example.com'], ['clear']
+        ]);
       });
 
       it('isn\'t unmarked when the save fails before a changeset is created', async () => {
