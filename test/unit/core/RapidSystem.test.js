@@ -15,6 +15,7 @@ describe('RapidSystem', () => {
       super(context);
       this.id = 'urlhash';
     }
+    get initialHashParams() { return _currParams; }
     hasParam(k) { return _currParams.has(k); }
     getParam(k) { return _currParams.get(k); }
     setParam(k, v) {
@@ -643,6 +644,91 @@ describe('RapidSystem', () => {
           assert.hasAllKeys(rapid.enabledDatasetIDs, ['my-sidewalks']);
           assert.strictEqual(_currParams.get('dataset_ids'), 'my-sidewalks');
         });
+    });
+
+    // The datasets are saved in settings, and a link's `dataset_ids` overrides that until they change.
+    // The datasets are never written to the url.
+    describe('url and settings', () => {
+      const settings = context.systems.settings;
+      const twoDatasets = {
+        assetID: 'my_datasets',
+        scopes: [{
+          scope: '*',
+          datasets: {
+            'my-sidewalks': { label: 'My Sidewalks', sourceUrl: 'https://example.com/data/trees.geojson', extent: [[9, -1], [11, 1]] },
+            'my-trees': { label: 'My Trees', sourceUrl: 'https://example.com/data/trees.geojson', extent: [[9, -1], [11, 1]] }
+          }
+        }]
+      };
+
+      // Starts with the given url, without fetching the datasets' data
+      function startRapid(params = {}) {
+        context.systems.assets = makeMockAssets({ my_datasets: twoDatasets });
+        _currParams.set('datasets', 'my_datasets');
+        for (const [k, v] of Object.entries(params)) _currParams.set(k, v);
+
+        const rapid = makeRapid();
+        return rapid.initAsync()
+          .then(() => {
+            for (const ds of rapid.catalog.values()) {
+              ds.setupCustomDatasetAsync = mock(() => Promise.resolve());
+            }
+            return rapid.startAsync();
+          })
+          .then(() => rapid);
+      }
+      const settle = () => new Promise(resolve => { setTimeout(resolve, 0); });
+
+      beforeEach(() => {
+        settings.unset('rapid.addedDatasetIDs');
+        settings.unset('rapid.enabledDatasetIDs');
+      });
+
+      it('saves only the datasets the user changes, without writing them to the url', async () => {
+        const rapid = await startRapid();
+        assert.isEmpty(rapid.addedDatasetIDs);   // the defaults aren't in this catalog
+        assert.isUndefined(settings.get('rapid.addedDatasetIDs'));   // nothing saved at startup
+
+        rapid.enableDatasets('my-trees');
+        assert.deepEqual(settings.get('rapid.addedDatasetIDs'), ['fbRoads', 'overture-buildings', 'overture-places', 'my-trees']);
+        assert.deepEqual(settings.get('rapid.enabledDatasetIDs'), ['my-trees']);
+        assert.isFalse(_currParams.has('dataset_ids'));
+      });
+
+      it('shows a link\'s datasets instead, without saving them, and drops `dataset_ids` once they change', async () => {
+        settings.set('rapid.addedDatasetIDs', ['my-trees']);
+        settings.set('rapid.enabledDatasetIDs', ['my-trees']);
+        const rapid = await startRapid({ dataset_ids: 'my-sidewalks' });
+        assert.hasAllKeys(rapid.enabledDatasetIDs, ['my-sidewalks']);
+        assert.deepEqual(settings.get('rapid.enabledDatasetIDs'), ['my-trees']);
+        assert.strictEqual(_currParams.get('dataset_ids'), 'my-sidewalks');
+
+        rapid.disableDatasets('my-sidewalks');
+        assert.isFalse(_currParams.has('dataset_ids'));
+        assert.deepEqual(settings.get('rapid.addedDatasetIDs'), ['my-trees']);
+        assert.deepEqual(settings.get('rapid.enabledDatasetIDs'), ['my-trees']);
+        assert.isEmpty(rapid.enabledDatasetIDs);   // my-trees isn't brought back
+      });
+
+      it('ignores datasets in `dataset_ids` that aren\'t in the catalog', async () => {
+        const rapid = await startRapid({ dataset_ids: 'my-sidewalks,nope' });
+        rapid.addDatasets('my-trees');   // enabled datasets still match
+        assert.strictEqual(_currParams.get('dataset_ids'), 'my-sidewalks,nope');
+      });
+
+      it('follows datasets the user puts in the url, and leaves them alone when it goes away', async () => {
+        const rapid = await startRapid();
+        _currParams.set('dataset_ids', 'my-trees');
+        rapid._hashChanged(new Map(_currParams), new Map([['datasets', 'my_datasets']]));
+        await settle();
+        assert.hasAllKeys(rapid.enabledDatasetIDs, ['my-trees']);
+        assert.isUndefined(settings.get('rapid.enabledDatasetIDs'));
+
+        _currParams.delete('dataset_ids');
+        rapid._hashChanged(new Map(_currParams), new Map([['datasets', 'my_datasets'], ['dataset_ids', 'my-trees']]));
+        await settle();
+        assert.hasAllKeys(rapid.enabledDatasetIDs, ['my-trees']);
+      });
     });
 
     it('starts loading the data for an asset dataset only once it is added', () => {

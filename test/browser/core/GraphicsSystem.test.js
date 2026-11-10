@@ -40,7 +40,7 @@ describe('GraphicsSystem', () => {
         _started: false,
         _shownLayerIDs: new Set(),
         _defaultLayerIDs: new Set(),
-        _applyingLayers: false
+        _isApplyingUrl: false
       });
 
       // The layers start with their own defaults: OSM and Rapid data are shown.

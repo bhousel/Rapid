@@ -115,6 +115,17 @@ export class ImagerySystem extends AbstractSystem {
   /** Number of grid splits to apply when splitting tiles for alignment correction */
   protected _numGridSplits: number;
 
+  /** Whether the url has set up the imagery (again after an `imagery=` reload); nothing is saved before that */
+  protected _settled: boolean;
+  /** Whether `_hashChanged` is applying the url's imagery, so the change isn't the user's: it isn't saved, and the url keeps its params */
+  protected _isApplyingUrl: boolean;
+  /** The base imagery last seen, as the url names it, to find what the user changed */
+  protected _shownBackground: string;
+  /** The overlays last seen (not the locator overlay), to find what the user changed */
+  protected _shownOverlayIDs: Set<ImagerySourceID>;
+  /** The offset last seen, as the url names it, to find what the user changed */
+  protected _shownOffset: string;
+
 
   /**
    * @param context - Global shared application context
@@ -143,6 +154,12 @@ export class ImagerySystem extends AbstractSystem {
     this._saturation = 1;
     this._sharpness = 1;
     this._numGridSplits = 0; // No grid by default.
+
+    this._settled = false;
+    this._isApplyingUrl = false;
+    this._shownBackground = '';
+    this._shownOverlayIDs = new Set<ImagerySourceID>();
+    this._shownOffset = '';
 
     // Ensure methods used as callbacks always have `this` bound correctly.
     this._hashChanged = this._hashChanged.bind(this);
@@ -618,11 +635,12 @@ export class ImagerySystem extends AbstractSystem {
     const best = visible.find(s => s.props.best);
 
     // Consider previously used imagery, if visible, unless it was 'none'
+    // (The user's own choice wins over the 'best' imagery)
     const previousID = settings?.get('imagery.lastUsed') || 'none';
     const previous = (previousID !== 'none') && visible.find(s => s.id === previousID);
 
-    return best ||
-      previous ||
+    return previous ||
+      best ||
       first ||
       this.getSourceByID('Bing') ||  // fallback to Bing
       this.getSourceByID('none')!;   // maybe this is a custom Rapid that doesn't include Bing?
@@ -890,7 +908,10 @@ export class ImagerySystem extends AbstractSystem {
 
 
   /**
-   * Respond to any changes appearing in the url hash
+   * Respond to any changes appearing in the url hash.
+   * The first url sets up the imagery (see `_setupImagery`).  After that, imagery the user puts
+   * in the url overrides the settings, without being saved.
+   * (When `background`, `overlays` or `offset` goes away, the imagery stays as it is.)
    * @param currParams - The current hash parameters
    * @param prevParams - The previous hash parameters
    */
@@ -907,78 +928,258 @@ export class ImagerySystem extends AbstractSystem {
       } else {
         this.requestedAssetIDs = null;
       }
+      this._settled = false;   // the reload starts with no imagery, which isn't the user's choice
       loadPromise = this.loadImageryAssetsAsync();
     }
 
     // Handle any change in the imagery index first, then consider the other parameters.
     loadPromise.then(() => {
-      // background
-      const newBackground = currParams.get('background') || '';
-      const oldBackground = prevParams.get('background') || '';
-      if (!newBackground || newBackground !== oldBackground) {
-        const foundSource = this.getSourceByID(newBackground);
-        if (foundSource) {
-          this.setSourceByID(newBackground!);  // Calling `setSourceByID` handles Esri Wayback w/date
-        } else {
-          this.baseLayerSource(this.chooseDefaultSource());
+      if (!this._settled) {
+        this._setupImagery(currParams);
+        return;
+      }
+
+      const isNew = (k: string): boolean => currParams.get(k) !== prevParams.get(k);
+      this._isApplyingUrl = true;
+      try {
+        // background
+        const background = this._urlValue(currParams, 'background');
+        if (background !== undefined && isNew('background')) {
+          this._applyBackground(background);
         }
-      }
 
-      // overlays
-      const newOverlays = currParams.get('overlays') || '';
-      const oldOverlays = prevParams.get('overlays') || '';
-      if (newOverlays !== oldOverlays) {
-        const vals = utilExtractValues(newOverlays).filter(Boolean);
-        const toEnableIDs = new Set<ImagerySourceID>(vals);
-        this.enableOverlayLayers(toEnableIDs);
-      }
+        // overlays
+        const overlays = this._urlValue(currParams, 'overlays');
+        if (overlays !== undefined && isNew('overlays')) {
+          this.enableOverlayLayers(utilExtractValues(overlays).filter(Boolean));
+        }
 
-      // offset
-      const newOffset = currParams.get('offset') || '';
-      const oldOffset = prevParams.get('offset') || '';
-      if (newOffset !== oldOffset) {
-        let [x, y] = newOffset.split(/[;,]/).map(s => s.trim()).map(Number);
-        if (!Number.isFinite(x)) x = 0;
-        if (!Number.isFinite(y)) y = 0;
-        this.offset = geoMetersToOffset([x, y]) as Vec2;
+        // offset
+        const offset = this._urlValue(currParams, 'offset');
+        if (offset !== undefined && isNew('offset')) {
+          this.offset = geoMetersToOffset(this._parseOffset(offset)) as Vec2;
+        }
+      } finally {
+        this._isApplyingUrl = false;
       }
     });
   }
 
 
   /**
+   * Sets up the imagery from the url, at startup and after an `imagery=` reload:
+   * the imagery the url names, or else what the user saved, without saving any of it.
+   * (Saved overlays are only shown where they can be seen, so they aren't credited in changesets elsewhere.)
+   * @param params - The url's params
+   */
+  protected _setupImagery(params: Map<string, string>): void {
+    // background
+    const background = this._urlValue(params, 'background');
+    if (background === undefined || !this._applyBackground(background)) {
+      this.baseLayerSource(this.chooseDefaultSource());
+    }
+
+    // overlays
+    const overlays = this._urlValue(params, 'overlays');
+    if (overlays !== undefined) {
+      this.enableOverlayLayers(utilExtractValues(overlays).filter(Boolean));
+    } else {
+      const visibleIDs = new Set<ImagerySourceID>(this.visibleSources().map(source => source.id));
+      this.enableOverlayLayers(this._readSavedOverlays().filter(sourceID => visibleIDs.has(sourceID)));
+    }
+
+    // offset
+    const offset = this._urlValue(params, 'offset');
+    if (offset !== undefined) {
+      this.offset = geoMetersToOffset(this._parseOffset(offset)) as Vec2;
+    }
+
+    this._settled = true;
+  }
+
+
+  /**
+   * Returns a url param's value, unless it was dropped since, by a change made while the same url was being read.
+   * @param params - The url's params, as they were emitted
+   * @param k - The param to get
+   * @return The param's value, or `undefined` if it isn't in the url
+   */
+  protected _urlValue(params: Map<string, string>, k: string): string | undefined {
+    const urlhash = this.context.systems.urlhash;
+    const val = params.get(k);
+    return (val !== undefined && urlhash?.getParam(k) === val) ? val : undefined;
+  }
+
+
+  /**
+   * Shows the base imagery named by a url `background` value.
+   * It can be a sourceID (Esri Wayback can include a date), or `custom:<template>`.
+   * @param val - The url's value
+   * @return `true` if the imagery was found and shown
+   */
+  protected _applyBackground(val: string): boolean {
+    if (/^custom:/i.test(val)) {
+      const custom = this.getSourceByID('custom');
+      const template = val.slice(7);
+      if (!(custom instanceof ImagerySourceCustom) || !template) return false;
+      custom.template = template;
+      this.baseLayerSource(custom);
+      return true;
+    }
+
+    if (!this.getSourceByID(val)) return false;
+    this.setSourceByID(val);  // Calling `setSourceByID` handles Esri Wayback w/date
+    return true;
+  }
+
+
+  /**
+   * Returns the base imagery as a url `background` value names it.
+   * @return The value, or '' if there is no base imagery
+   */
+  protected _backgroundValue(): string {
+    const baseLayer = this._baseLayer;
+    if (!baseLayer) return '';
+
+    const baseLayerID = baseLayer.key;  // note: use `key` here - for Wayback it will include the date
+    return baseLayerID === 'custom' ? `custom:${baseLayer.template}` : baseLayerID;
+  }
+
+
+  /**
+   * Checks whether a url `background` value names the base imagery being shown.
+   * @param val - The url's value
+   * @return `true` if it does
+   */
+  protected _matchesBackground(val: string): boolean {
+    const baseLayer = this._baseLayer;
+    if (!baseLayer) return false;
+
+    if (/^custom:/i.test(val)) {
+      return this._backgroundValue() === `custom:${val.slice(7)}`;
+    }
+    if (this.getSourceByID(val) !== baseLayer) return false;
+
+    // A date for Esri Wayback has to match too (it shows the closest release to the date)
+    const date = val.match(/^EsriWayback_(.+)$/i)?.[1];
+    if (!date) return true;
+    const wayback = this.context.services.wayback;
+    return (wayback?.chooseClosestDate(date) ?? date) === (baseLayer as ImagerySourceEsriWayback).date;
+  }
+
+
+  /**
+   * Parses a url `offset` value, in meters, e.g. `offset=-10.5,20`
+   * @param val - The url's value
+   * @return The offset in meters, as [x, y]
+   */
+  protected _parseOffset(val: string): Vec2 {
+    let [x, y] = val.split(/[;,]/).map(s => s.trim()).map(Number);
+    if (!Number.isFinite(x)) x = 0;
+    if (!Number.isFinite(y)) y = 0;
+    return [x, y];
+  }
+
+
+  /**
+   * Returns an offset as a url `offset` value names it.
+   * @param meters - The offset in meters, as [x, y]
+   * @return The value, or '' for no offset
+   */
+  protected _offsetValue(meters: Vec2): string {
+    const EPSILON = 0.01;
+    const x = +meters[0].toFixed(2);
+    const y = +meters[1].toFixed(2);
+    return (Math.abs(x) > EPSILON || Math.abs(y) > EPSILON) ? `${x},${y}` : '';
+  }
+
+
+  /**
+   * Reads the overlays the user saved in settings.
+   * @return The saved overlay sourceIDs
+   */
+  protected _readSavedOverlays(): ImagerySourceID[] {
+    const settings = this.context.systems.settings;
+    const saved = settings?.get<ImagerySourceID[]>('imagery.overlays');
+    return Array.isArray(saved) ? saved : [];
+  }
+
+
+  /**
    * Called whenever the imagery changes.
-   * This will update the urlhash, trigger a redraw, and emit an 'imagerychange' event.
+   * This will save what the user changed, trigger a redraw, and emit an 'imagerychange' event.
+   * The user's base imagery is saved as `imagery.lastUsed`, and the overlays they turn on or off in
+   * `imagery.overlays` (only those, so overlays a link shows for this session don't replace the user's).
+   * Nothing is saved while the url or settings set the imagery, or in the walkthrough.  The offset isn't saved.
+   * The imagery isn't written to the url: a link's `background`, `overlays` and `offset` stay there only
+   * until the imagery no longer matches them, and then they're dropped (see `API.md`).
    */
   protected _imageryChanged(): void {
     const context = this.context;
     const gfx = context.systems.gfx;
+    const settings = context.systems.settings;
     const urlhash = context.systems.urlhash;
 
-    const baseLayer = this._baseLayer;
-    if (urlhash && baseLayer && !context.inIntro) {
-      // Gather info about enabled base imagery
-      let baseLayerID = baseLayer.key;  // note: use `key` here - for Wayback it will include the date
-      if (baseLayerID === 'custom') {
-        baseLayerID = `custom:${baseLayer.template}`;
+    // What changed since this was last called (ignore the locator overlay)
+    const background = this._backgroundValue();
+    const overlayIDs = new Set<ImagerySourceID>();
+    for (const overlay of this._overlayLayers.values()) {
+      if (overlay.isLocatorOverlay()) continue;
+      overlayIDs.add(overlay.id);
+    }
+    const offset = this._offsetValue(geoOffsetToMeters(this.offset));
+
+    const changedBackground = (background !== this._shownBackground);
+    const changedOverlayIDs = [...overlayIDs].filter(sourceID => !this._shownOverlayIDs.has(sourceID))
+      .concat([...this._shownOverlayIDs].filter(sourceID => !overlayIDs.has(sourceID)));
+    const changedOffset = (offset !== this._shownOffset);
+
+    this._shownBackground = background;
+    this._shownOverlayIDs = overlayIDs;
+    this._shownOffset = offset;
+
+    const changed = changedBackground || changedOverlayIDs.length > 0 || changedOffset;
+    if (changed && this._settled && !this._isApplyingUrl && !context.inIntro) {
+      if (changedBackground && this._baseLayer) {
+        settings?.set('imagery.lastUsed', this._baseLayer.id);
       }
 
-      // Gather info about enabled overlay imagery (ignore locator)
-      const overlayIDs: ImagerySourceID[] = [];
-      for (const overlay of this._overlayLayers.values()) {
-        if (overlay.isLocatorOverlay()) continue;
-        overlayIDs.push(overlay.id);
+      if (changedOverlayIDs.length) {
+        const saved = new Set<ImagerySourceID>(this._readSavedOverlays());
+        for (const sourceID of changedOverlayIDs) {
+          if (overlayIDs.has(sourceID)) {
+            saved.add(sourceID);
+          } else {
+            saved.delete(sourceID);
+          }
+        }
+        settings?.set('imagery.overlays', [...saved]);
       }
 
-      // Update hash params: 'background', 'overlays', 'offset'
-      urlhash.setParam('background', baseLayerID);
-      urlhash.setParam('overlays', overlayIDs.length ? overlayIDs.join(',') : null);
+      // drop the url's imagery once it no longer matches (overlays it names that don't exist are ignored)
+      const urlBackground = urlhash?.getParam('background');
+      if (urlBackground !== undefined && !this._matchesBackground(urlBackground)) {
+        urlhash?.setParam('background', null);
+      }
 
-      const meters = geoOffsetToMeters(baseLayer.offset);
-      const EPSILON = 0.01;
-      const x = +meters[0].toFixed(2);
-      const y = +meters[1].toFixed(2);
-      urlhash.setParam('offset', (Math.abs(x) > EPSILON || Math.abs(y) > EPSILON) ? `${x},${y}` : null);
+      const urlOverlays = urlhash?.getParam('overlays');
+      if (urlOverlays !== undefined) {
+        const urlIDs = new Set<ImagerySourceID>();
+        for (const val of utilExtractValues(urlOverlays)) {
+          const source = this.getSourceByID(val);
+          if (source && !source.isLocatorOverlay()) {
+            urlIDs.add(source.id);
+          }
+        }
+        if (urlIDs.size !== overlayIDs.size || [...urlIDs].some(sourceID => !overlayIDs.has(sourceID))) {
+          urlhash?.setParam('overlays', null);
+        }
+      }
+
+      const urlOffset = urlhash?.getParam('offset');
+      if (urlOffset !== undefined && this._offsetValue(this._parseOffset(urlOffset)) !== offset) {
+        urlhash?.setParam('offset', null);
+      }
     }
 
     gfx?.immediateRedraw();

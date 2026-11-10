@@ -180,6 +180,12 @@ export class RapidSystem extends AbstractSystem {
   protected _serviceDatasets: RapidDataset[];
   /** The `datasets` url parameter that the current dataset assets were loaded for */
   protected _datasetsParam: string | undefined;
+  /** Whether `_hashChanged` is applying the url's datasets, so the change isn't the user's: it isn't saved, and the url keeps its param */
+  protected _isApplyingUrl: boolean;
+  /** The datasets on the menu last seen, to find what the user changed */
+  protected _shownAddedIDs: Set<DatasetID>;
+  /** The datasets checked last seen, to find what the user changed */
+  protected _shownEnabledIDs: Set<DatasetID>;
   /** Datasets from asset files whose data has started loading */
   protected _setupDatasets: WeakSet<RapidDataset>;
   /** What the user saved about each dataset, as last read from or written to `DatabaseSystem` */
@@ -208,6 +214,9 @@ export class RapidSystem extends AbstractSystem {
     this._inputs = [];
     this._serviceDatasets = [];
     this._datasetsParam = undefined;
+    this._isApplyingUrl = false;
+    this._shownAddedIDs = new Set<DatasetID>();
+    this._shownEnabledIDs = new Set<DatasetID>();
     this._setupDatasets = new WeakSet<RapidDataset>();
     this._datasetRecords = new Map<DatasetID, DatasetRecord>();
 
@@ -289,6 +298,7 @@ export class RapidSystem extends AbstractSystem {
 
     // We wait until startAsync to create the dataset catalog because the services need to be initialized.
     const context = this.context;
+    const urlhash = context.systems.urlhash;
 
     const esri = context.services.esri;
     const mapwithai = context.services.mapwithai;
@@ -316,7 +326,8 @@ export class RapidSystem extends AbstractSystem {
         }
         this._rebuildCatalog();
 
-        this._setupDatasetLists();
+        // (The url isn't running yet, so read the link's `dataset_ids` from where it started)
+        this._setupDatasetLists(urlhash?.initialHashParams.get('dataset_ids'));
         this._loadDatasetSettings();
         this._datasetsChanged();
 
@@ -997,11 +1008,20 @@ export class RapidSystem extends AbstractSystem {
       loadPromise = this.loadDatasetAssetsAsync();
     }
 
-    // dataset_ids (optional) - if using, it overrides the user's stored dataset settings.
+    // dataset_ids (optional) - datasets the user puts in the url override the settings, without being saved.
+    // (Not if it was dropped since, by a change made while the same url was being read.
+    // When `dataset_ids` goes away, the datasets stay as they are.)
     loadPromise.then(() => {
-      if (currParams.has('dataset_ids')) {
-        this._setupDatasetLists();
-        this._datasetsChanged();
+      const urlhash = this.context.systems.urlhash;
+      const newIDs = currParams.get('dataset_ids');
+      if (newIDs !== undefined && newIDs !== prevParams.get('dataset_ids') && urlhash?.getParam('dataset_ids') === newIDs) {
+        this._isApplyingUrl = true;
+        try {
+          this._setupDatasetLists(newIDs);
+          this._datasetsChanged();
+        } finally {
+          this._isApplyingUrl = false;
+        }
       }
     });
   }
@@ -1009,34 +1029,36 @@ export class RapidSystem extends AbstractSystem {
 
   /**
    * Setup dataset lists - this runs on startup and anytime the urlhash 'dataset_ids' param changes.
-   * We'll check both `UrlHashSystem` and `SettingsSystem` to decide what appears on the menu.
-   * (The urlhash overrides the stored settings)
+   * The datasets in a link's `dataset_ids` are added and checked, or else the ones the user saved.
+   * @param urlIDs - The url's `dataset_ids`, if any
    */
-  protected _setupDatasetLists(): void {
-    const context = this.context;
-    const settings = context.systems.settings;
-    const urlhash = context.systems.urlhash;
-
-    const urlVals = utilExtractValues(urlhash?.getParam('dataset_ids') || '').filter(Boolean);
+  protected _setupDatasetLists(urlIDs?: string): void {
+    const urlVals = utilExtractValues(urlIDs ?? '').filter(Boolean);
+    const saved = this._readSavedDatasetIDs();
 
     // Added datasetIDs  (datasets that appear on the menu)
     // Take from `dataset_ids` url param if available, fallback to stored setting.
-    let addedVals = urlVals;
-    if (!addedVals.length) {
-      addedVals = settings?.get<DatasetID[]>('rapid.addedDatasetIDs') ?? ['fbRoads', 'overture-buildings', 'overture-places'];
-    }
-    this.addedDatasetIDs = new Set<DatasetID>(addedVals);
+    this.addedDatasetIDs = urlVals.length ? new Set<DatasetID>(urlVals) : saved.added;
 
     // Enabled datasetIDs  (datasets on the menu that are checked)
     // Take from `dataset_ids` url param if available, fallback to stored setting.
+    this.enabledDatasetIDs = urlVals.length ? new Set<DatasetID>(urlVals) : saved.enabled;
+  }
+
+
+  /**
+   * Reads the datasets the user saved in settings, on the menu and checked.
+   * @return The saved datasetIDs, or the defaults if none are saved
+   */
+  protected _readSavedDatasetIDs(): { added: Set<DatasetID>, enabled: Set<DatasetID> } {
+    const settings = this.context.systems.settings;
+
     // Note that we won't enable the default datasets anymore - this is a change from earlier
     // versions of Rapid which enabled Facebook Roads and Microsoft Buildings by default.
     // Going forward, we'll default them to disabled, until the user enables them.
-    let enabledVals = urlVals;
-    if (!enabledVals.length) {
-      enabledVals = settings?.get<DatasetID[]>('rapid.enabledDatasetIDs') ?? [];
-    }
-    this.enabledDatasetIDs = new Set<DatasetID>(enabledVals);
+    const added = settings?.get<DatasetID[]>('rapid.addedDatasetIDs') ?? ['fbRoads', 'overture-buildings', 'overture-places'];
+    const enabled = settings?.get<DatasetID[]>('rapid.enabledDatasetIDs') ?? [];
+    return { added: new Set<DatasetID>(added), enabled: new Set<DatasetID>(enabled) };
   }
 
 
@@ -1099,7 +1121,11 @@ export class RapidSystem extends AbstractSystem {
   /**
    * Called whenever the datasets change.
    * This will:
-   * - Update `UrlHashSystem`/`SettingsSystem` to persist the lists of datasets added/enabled.
+   * - Save the datasets the user added/enabled or removed/disabled to `SettingsSystem`.  Only those
+   *   are saved, so the datasets a link shows for this session don't replace the user's others.
+   *   (Nothing is saved at startup or while the url sets the datasets.)
+   * - Drop a link's `dataset_ids` from the url once the enabled datasets no longer match it (see `API.md`).
+   *   The datasets aren't written to the url.
    * - Try to setup a RapidDataDictionary for each added dataset.
    * - trigger a redraw.
    * - emit a 'datasetchange' event.
@@ -1134,12 +1160,50 @@ export class RapidSystem extends AbstractSystem {
         }
       }
 
-      // 'dataset_ids' (optional) - if using, it overrides the user's stored dataset settings.
-      if (urlhash?.hasParam('dataset_ids')) {
-        urlhash?.setParam('dataset_ids', enabledVals.length ? enabledVals.join(',') : null);
-      } else {
-        settings?.set('rapid.addedDatasetIDs', addedVals);
-        settings?.set('rapid.enabledDatasetIDs', enabledVals);
+      // What changed since this was last called
+      // (A dataset that left the catalog isn't a change: the user's saved lists keep it, its asset file
+      // may be loaded next time)
+      const added = new Set<DatasetID>(addedVals);
+      const enabled = new Set<DatasetID>(enabledVals);
+      const inCatalog = (datasetID: DatasetID): boolean => {
+        const ds = this.catalog.get(datasetID);
+        return !!ds && !ds.hidden;
+      };
+      const changesFrom = (curr: Set<DatasetID>, prev: Set<DatasetID>): DatasetID[] => [...curr]
+        .filter(datasetID => !prev.has(datasetID))
+        .concat([...prev].filter(datasetID => !curr.has(datasetID) && inCatalog(datasetID)));
+      const changedAdded = changesFrom(added, this._shownAddedIDs);
+      const changedEnabled = changesFrom(enabled, this._shownEnabledIDs);
+      this._shownAddedIDs = added;
+      this._shownEnabledIDs = enabled;
+
+      if ((changedAdded.length || changedEnabled.length) && this._started && !this._isApplyingUrl) {
+        const saved = this._readSavedDatasetIDs();
+        for (const datasetID of changedAdded) {
+          if (added.has(datasetID)) {
+            saved.added.add(datasetID);
+          } else {
+            saved.added.delete(datasetID);
+          }
+        }
+        for (const datasetID of changedEnabled) {
+          if (enabled.has(datasetID)) {
+            saved.enabled.add(datasetID);
+          } else {
+            saved.enabled.delete(datasetID);
+          }
+        }
+        settings?.set('rapid.addedDatasetIDs', [...saved.added]);
+        settings?.set('rapid.enabledDatasetIDs', [...saved.enabled]);
+
+        // drop the url's datasets once the enabled ones no longer match (datasets it names that don't exist are ignored)
+        const urlIDs = urlhash?.getParam('dataset_ids');
+        if (urlIDs !== undefined) {
+          const urlVals = new Set<DatasetID>(utilExtractValues(urlIDs).filter(inCatalog));
+          if (urlVals.size !== enabled.size || [...urlVals].some(datasetID => !enabled.has(datasetID))) {
+            urlhash?.setParam('dataset_ids', null);
+          }
+        }
       }
     }
 

@@ -111,8 +111,8 @@ export class GraphicsSystem extends AbstractSystem {
   protected _shownLayerIDs: Set<LayerID>;
   /** The remembered layers to show when settings have none saved (the layers' own defaults) */
   protected _defaultLayerIDs: Set<LayerID>;
-  /** Whether the layers are being set from the url or settings, so the change isn't saved */
-  protected _applyingLayers: boolean;
+  /** Whether `_hashChanged` is applying the url's layers, so the change isn't the user's: it isn't saved, and the url keeps its param */
+  protected _isApplyingUrl: boolean;
 
 
   /**
@@ -162,7 +162,7 @@ export class GraphicsSystem extends AbstractSystem {
     // Which layers are shown (see `REMEMBERED_LAYER_IDS`)
     this._shownLayerIDs = new Set<LayerID>();
     this._defaultLayerIDs = new Set<LayerID>();
-    this._applyingLayers = false;
+    this._isApplyingUrl = false;
 
     // If we are using WebGL, watch for context loss - Rapid#1658
     this._handleGLContextLost = this._handleGLContextLost.bind(this);
@@ -299,20 +299,16 @@ export class GraphicsSystem extends AbstractSystem {
 
 
   /**
-   * Shows the given remembered layers and hides the others, without saving that to settings.
+   * Shows the given remembered layers and hides the others.
+   * (Not saved to settings: at startup the system hasn't started yet, and `_hashChanged` sets `_isApplyingUrl`.)
    * @param toShow - The layers to show
    */
   protected _applyLayers(toShow: Set<LayerID>): void {
     const scene = this.scene;
     if (!scene) return;
 
-    this._applyingLayers = true;
-    try {
-      scene.disableLayers(REMEMBERED_LAYER_IDS.filter(layerID => !toShow.has(layerID)));
-      scene.enableLayers(REMEMBERED_LAYER_IDS.filter(layerID => toShow.has(layerID)));
-    } finally {
-      this._applyingLayers = false;
-    }
+    scene.disableLayers(REMEMBERED_LAYER_IDS.filter(layerID => !toShow.has(layerID)));
+    scene.enableLayers(REMEMBERED_LAYER_IDS.filter(layerID => toShow.has(layerID)));
   }
 
 
@@ -343,7 +339,12 @@ export class GraphicsSystem extends AbstractSystem {
     // (Not if it was dropped since: e.g. the selection from the same link turned on another layer)
     const newLayers = currParams.get('layers');
     if (newLayers !== undefined && newLayers !== prevParams.get('layers') && urlhash?.getParam('layers') === newLayers) {
-      this._applyLayers(new Set<LayerID>(utilExtractValues(newLayers).filter(Boolean)));
+      this._isApplyingUrl = true;
+      try {
+        this._applyLayers(new Set<LayerID>(utilExtractValues(newLayers).filter(Boolean)));
+      } finally {
+        this._isApplyingUrl = false;
+      }
     }
   }
 
@@ -365,7 +366,7 @@ export class GraphicsSystem extends AbstractSystem {
     const shown = new Set<LayerID>(REMEMBERED_LAYER_IDS.filter(layerID => scene.layers.get(layerID)?.enabled));
     const changedIDs = REMEMBERED_LAYER_IDS.filter(layerID => shown.has(layerID) !== this._shownLayerIDs.has(layerID));
     this._shownLayerIDs = shown;
-    if (!changedIDs.length || !this._started || this._applyingLayers) return;
+    if (!changedIDs.length || !this._started || this._isApplyingUrl) return;
 
     const saved = this._readSavedLayers();
     for (const layerID of changedIDs) {

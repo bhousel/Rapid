@@ -702,15 +702,18 @@ modeled on how VS Code documents its settings and extension points.
      favorites) re-read it on `settingschange`. Otherwise a value pulled after startup would be
      overwritten by the next toggle, which sends the whole list.
    - URL parameters override the user's settings for the session; they're never where the state is
-     stored. (`poweruser=true` is the one exception: it's only ever for the session.) The url is
-     mostly how other apps start Rapid a certain way. Agreed Nov 2026:
+     stored. The url is mostly how other apps start Rapid a certain way. Agreed Nov 2026:
      - Written as you go (where you are, what's selected): `map`, `id`, `photo`, `detection`.
-     - Overrides, read but never written: `layers`, `disable_features` (done); `background`,
-       `overlays`, `offset`, `dataset_ids`, `photo_dates`, `photo_username`, `maproulette`, `locale`,
-       `rtl` (still to do, one system at a time; `overlays` and `offset` need a settings home first).
+     - Overrides, read but never written: `layers`, `disable_features`, `background`, `overlays`,
+       `offset`, `dataset_ids`, `photo_dates`, `photo_username`, `maproulette`, `map3d`, `locale`, `rtl`.
+     - Only ever for the session, never saved: `poweruser=true`, the photo filters, the MapRoulette
+       challenges, the 3D map, and the imagery offset. (An offset belongs to one imagery source in one
+       area; saving offsets per source, in a synced setting like the dataset changes, is an idea for later.)
      - An override stays in the url as the link had it until the state no longer matches it, then
        it's dropped. So it's in effect exactly while it's in the url (no separate flag), and a reload
        before you change anything opens the link again. When it goes away, the state stays as it is.
+       (`locale` and `rtl` override what Rapid picks automatically, with no user setting behind them:
+       they're never dropped, and when one goes away Rapid goes back to its own pick.)
      - A change is saved on its own (only what changed), so the link's other choices don't replace
        the user's saved ones. They stay on screen until the next reload, or a sync from another browser.
      - Read the startup value from `urlhash.initialHashParams`. Url changes made before the url resumes
@@ -724,6 +727,16 @@ modeled on how VS Code documents its settings and extension points.
      when a link's `id=` turns on the layer that draws what it selects), except while the url or
      settings are being applied, and in the walkthrough. `note=`, `photo_overlay=` and
      `maproulette=true` are legacy params, read once.
+   - Imagery: `ImagerySystem` saves the base imagery in `imagery.lastUsed` (it was saved by the
+     background list, so imagery picked another way wasn't) and the overlays in `imagery.overlays`
+     (new), both in this browser only. The first url sets the imagery up, since the default choice
+     depends on where the map is: the link's imagery, or else the saved imagery. The user's last
+     imagery wins over the 'best' imagery, where it can be seen; saved overlays are only turned on
+     where they can be seen, so they aren't credited in changesets elsewhere. An `imagery=` reload
+     sets it up again. `background=custom:<template>` is read now (it was written but not read).
+   - Datasets: `RapidSystem` saves the datasets added and checked one change at a time, like layers.
+     A dataset that leaves the catalog isn't a change (an asset file may bring it back), and only the
+     checked datasets are compared with `dataset_ids`.
    - Single values read once (area fill, imagery opacity, raw tag editor view) show a value pulled
      after startup at the next reload. A change writes only that value, so nothing is lost.
    - `UiSystem.initAsync` now waits for `settings`, which fixes the six constructor reads.

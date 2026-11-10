@@ -1,4 +1,4 @@
-import { beforeAll, describe, it } from 'bun:test';
+import { beforeAll, beforeEach, describe, it } from 'bun:test';
 import { assert } from 'chai';
 import * as Rapid from '../../../modules/headless.js';
 
@@ -89,6 +89,67 @@ describe('PhotoSystem', () => {
       assert.sameMembers(enabledLayers, ['mapillary', 'streetside']);   // only photo layers
       assert.isTrue(urlParams.has('photo_overlay'));
       assert.isNull(urlParams.get('photo_overlay'));
+    });
+  });
+
+
+  // The photo filters are for this session only, and a link's `photo_dates` and `photo_username`
+  // stay in the url until the user changes those filters.  The filters aren't written to the url.
+  describe('photo filters in the url', () => {
+    let photos, urlParams;
+
+    function hashChange(curr, prev = []) {
+      photos._hashChanged(new Map(curr), new Map(prev));
+    }
+
+    beforeEach(() => {
+      const ctx = new Rapid.MockContext();
+      urlParams = new Map();
+      ctx.systems = {
+        urlhash: {
+          getParam: k => urlParams.get(k),
+          setParam: (k, v) => (v === null || v === undefined ? urlParams.delete(k) : urlParams.set(k, v))
+        }
+      };
+      photos = new Rapid.PhotoSystem(ctx);
+    });
+
+    it('applies a link\'s filters, and keeps them in the url until the user changes them', () => {
+      urlParams.set('photo_dates', '2019-01-01|2020-12-31');
+      urlParams.set('photo_username', 'alice,bob');
+      hashChange(urlParams);
+      assert.strictEqual(photos.fromDate, '2019-01-01');
+      assert.strictEqual(photos.toDate, '2020-12-31');
+      assert.deepEqual(photos.usernames, ['alice', 'bob']);
+      assert.strictEqual(urlParams.get('photo_dates'), '2019-01-01|2020-12-31');
+      assert.strictEqual(urlParams.get('photo_username'), 'alice,bob');
+
+      photos.setDateFilter('fromDate', '2018-01-01');
+      assert.isFalse(urlParams.has('photo_dates'));
+      assert.isTrue(urlParams.has('photo_username'));
+      assert.strictEqual(photos.toDate, '2020-12-31');
+
+      photos.setUsernameFilter(['carol']);
+      assert.isFalse(urlParams.has('photo_username'));
+    });
+
+    it('doesn\'t write the filters the user picks to the url', () => {
+      photos.setDateFilter('fromDate', '2018-01-01');
+      photos.setUsernameFilter(['carol']);
+      assert.strictEqual(urlParams.size, 0);
+    });
+
+    it('leaves the filters alone when their params go away', () => {
+      urlParams.set('photo_username', 'alice');
+      hashChange(urlParams);
+      urlParams.delete('photo_username');
+      hashChange([], [['photo_username', 'alice']]);
+      assert.deepEqual(photos.usernames, ['alice']);
+    });
+
+    it('doesn\'t apply a value that was dropped while the url was being read', () => {
+      hashChange([['photo_username', 'alice']]);   // in the emitted params, but not the url anymore
+      assert.isNull(photos.usernames);
     });
   });
 

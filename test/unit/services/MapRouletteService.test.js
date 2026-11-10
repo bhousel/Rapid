@@ -320,43 +320,73 @@ describe('MapRouletteService', () => {
         }
       };
       ctx.systems = {
-        gfx: { scene: scene },
+        gfx: { scene: scene, immediateRedraw: () => {} },
         network: new Rapid.NetworkSystem(ctx),
         spatial: new Rapid.SpatialSystem(ctx),
         urlhash: {
           on: eventName => events.push(eventName),
-          setParam: (k, v) => urlParams.set(k, v)
+          getParam: k => urlParams.get(k),
+          setParam: (k, v) => (v === null || v === undefined ? urlParams.delete(k) : urlParams.set(k, v))
         }
       };
       maproulette = new Rapid.MapRouletteService(ctx);
       await maproulette.initAsync();
     });
 
+    // The url as a link has it
+    function hashChange(val) {
+      urlParams.set('maproulette', val);
+      maproulette._hashChanged(new Map(urlParams), new Map());
+    }
+
     it('listens for changes to the url', () => {
       assert.include(events, 'hashchange');
     });
 
-    it('shows only the tasks of the given challenges, and turns on the layer', () => {
-      maproulette._hashChanged(new Map([['maproulette', '100,200']]), new Map());
+    it('shows only the tasks of the given challenges, turns on the layer, and leaves the param in the url', () => {
+      hashChange('100,200');
       assert.isTrue(layer.enabled);
       assert.strictEqual(maproulette.challengeIDs, '100,200');
       assert.strictEqual(urlParams.get('maproulette'), '100,200');
     });
 
     it('turns on the layer for the legacy `maproulette=true`, and drops it from the url', () => {
-      maproulette._hashChanged(new Map([['maproulette', 'true']]), new Map());
+      hashChange('true');
       assert.isTrue(layer.enabled);
       assert.strictEqual(maproulette.challengeIDs, '');
-      assert.isTrue(urlParams.has('maproulette'));
-      assert.isNull(urlParams.get('maproulette'));
+      assert.isFalse(urlParams.has('maproulette'));
     });
 
-    it('stops filtering when the param goes away, and leaves the layer on', () => {
-      maproulette._hashChanged(new Map([['maproulette', '100']]), new Map());
+    it('drops the param once the challenges shown change, and doesn\'t write the filter to the url', () => {
+      hashChange('100,200');
+      maproulette.challengeIDs = '200,100';   // the same challenges
+      assert.isTrue(urlParams.has('maproulette'));
+
+      maproulette.challengeIDs = '300';
+      assert.isFalse(urlParams.has('maproulette'));
+      assert.strictEqual(maproulette.challengeIDs, '300');
+    });
+
+    it('drops the param once the layer is turned off, and keeps the filter for the session', () => {
+      hashChange('100');
+      layer.enabled = false;
+      maproulette._mapRouletteChanged();   // 'layerchange'
+      assert.isFalse(urlParams.has('maproulette'));
+      assert.strictEqual(maproulette.challengeIDs, '100');
+    });
+
+    it('keeps filtering when the param goes away', () => {
+      hashChange('100');
+      urlParams.delete('maproulette');
       maproulette._hashChanged(new Map(), new Map([['maproulette', '100']]));
       assert.isTrue(layer.enabled);
+      assert.strictEqual(maproulette.challengeIDs, '100');
+    });
+
+    it('doesn\'t apply a value that was dropped while the url was being read', () => {
+      maproulette._hashChanged(new Map([['maproulette', '100']]), new Map());   // not in the url anymore
+      assert.isFalse(layer.enabled);
       assert.strictEqual(maproulette.challengeIDs, '');
-      assert.isNull(urlParams.get('maproulette'));
     });
   });
 });

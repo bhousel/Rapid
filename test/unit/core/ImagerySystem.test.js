@@ -738,6 +738,19 @@ describe('ImagerySystem', () => {
         assert.strictEqual(chosen.props.id, 'Bing');   // ignore 'none', fallback to 'Bing'
       });
 
+      it(`returns previously used source over the 'best' one, if visible`, () => {
+        context.systems.settings = {
+          get: (path) => {
+            if (path === 'imagery.lastUsed') return 'nj-2020';
+            return undefined;
+          }
+        };
+
+        setViewport([-74.75, 40.25], 10);   // New Jersey, where nj-2015 is 'best'
+        const chosen = _imagery.chooseDefaultSource();
+        assert.strictEqual(chosen.props.id, 'nj-2020');
+      });
+
       it('returns "none" source as last resort', () => {
         // Save and clear all scopes' sources except 'none'
         const osmScope = _imagery.getScope('osm');
@@ -758,6 +771,177 @@ describe('ImagerySystem', () => {
         if (custom) {
           commonScope.sources.set('custom', custom);
         }
+      });
+    });
+
+
+    // The imagery is saved in settings, and a link's `background`, `overlays` and `offset` override
+    // that until the imagery changes.  The imagery is never written to the url.
+    describe('url and settings', () => {
+      let origProps, saved, urlParams;
+
+      const settle = () => new Promise(resolve => { setTimeout(resolve, 0); });
+      function hashChange(curr, prev = new Map()) {
+        _imagery._hashChanged(new Map(curr), new Map(prev));
+        return settle();
+      }
+      function firstHashChange(params = {}) {
+        for (const [k, v] of Object.entries(params)) urlParams.set(k, v);
+        return hashChange(urlParams);
+      }
+      const overlayIDs = () => _imagery.overlayLayerSources().map(source => source.id);
+      const offsetMeters = () => Rapid.sdk.geoOffsetToMeters(_imagery.offset).map(n => +n.toFixed(2));
+
+      beforeAll(() => {
+        origProps = structuredClone(context.viewport.transform.props);
+        _imagery.merge({
+          assetID: 'url-test-imagery',
+          scopes: [{
+            scope: 'osm',
+            imagery: {
+              'nj-overlay': {
+                id: 'nj-overlay', name: 'NJ Overlay', type: 'tms', overlay: true,
+                template: 'https://example.com/nj-overlay/{zoom}/{x}/{y}.png',
+                feature: { type: 'Feature', properties: { id: 'nj-overlay' }, geometry: sample.njPolygon.geometry }
+              },
+              'ca-overlay': {
+                id: 'ca-overlay', name: 'CA Overlay', type: 'tms', overlay: true,
+                template: 'https://example.com/ca-overlay/{zoom}/{x}/{y}.png',
+                feature: { type: 'Feature', properties: { id: 'ca-overlay' }, geometry: sample.caPolygon.geometry }
+              }
+            }
+          }]
+        });
+      });
+
+      afterAll(() => {
+        context.viewport.transform.props = origProps;
+      });
+
+      beforeEach(() => {
+        saved = new Map();
+        urlParams = new Map();
+        context.systems.settings = {
+          get: k => saved.get(k),
+          set: (k, v) => saved.set(k, v)
+        };
+        context.systems.urlhash = {
+          getParam: k => urlParams.get(k),
+          setParam: (k, v) => (v === null || v === undefined ? urlParams.delete(k) : urlParams.set(k, v))
+        };
+        setViewport([-74.75, 40.25], 10);   // New Jersey, where nj-2015 is 'best'
+        _imagery._settled = false;
+      });
+
+      afterEach(() => {
+        context.inIntro = false;
+        _imagery.enableOverlayLayers([]);
+        _imagery.setSourceByID('none');
+        delete context.systems.settings;
+        delete context.systems.urlhash;
+      });
+
+
+      it('shows the saved imagery where it can be seen, without writing it to the url', async () => {
+        saved.set('imagery.lastUsed', 'nj-2020');
+        saved.set('imagery.overlays', ['test-overlay', 'ca-overlay']);
+        await firstHashChange();
+        assert.strictEqual(_imagery.baseLayerSource().id, 'nj-2020');   // over the 'best' nj-2015
+        assert.sameMembers(overlayIDs(), ['test-overlay']);              // ca-overlay can't be seen here
+        assert.strictEqual(urlParams.size, 0);
+        assert.deepEqual(saved.get('imagery.overlays'), ['test-overlay', 'ca-overlay']);
+
+        _imagery.setSourceByID('Bing');
+        assert.strictEqual(saved.get('imagery.lastUsed'), 'Bing');
+        assert.strictEqual(urlParams.size, 0);
+      });
+
+      it('shows a link\'s imagery instead, without saving it, and leaves it in the url', async () => {
+        saved.set('imagery.lastUsed', 'nj-2020');
+        await firstHashChange({ background: 'Bing', overlays: 'test-overlay', offset: '5,10' });
+        assert.strictEqual(_imagery.baseLayerSource().id, 'Bing');
+        assert.sameMembers(overlayIDs(), ['test-overlay']);
+        assert.deepEqual(offsetMeters(), [5, 10]);
+        assert.strictEqual(saved.get('imagery.lastUsed'), 'nj-2020');
+        assert.isFalse(saved.has('imagery.overlays'));
+        assert.deepEqual(Object.fromEntries(urlParams), { background: 'Bing', overlays: 'test-overlay', offset: '5,10' });
+      });
+
+      it('drops each of a link\'s params once the imagery no longer matches it, and saves only that change', async () => {
+        saved.set('imagery.overlays', ['ca-overlay']);
+        await firstHashChange({ background: 'Bing', overlays: 'test-overlay', offset: '5,10' });
+
+        _imagery.toggleOverlayLayer(_imagery.source('nj-overlay'));
+        assert.sameMembers(saved.get('imagery.overlays'), ['ca-overlay', 'nj-overlay']);   // not test-overlay
+        assert.isFalse(urlParams.has('overlays'));
+        assert.isTrue(urlParams.has('background'));
+        assert.isTrue(urlParams.has('offset'));
+
+        _imagery.nudge([1, 1]);   // the offset changes
+        assert.isFalse(urlParams.has('offset'));
+        assert.isTrue(urlParams.has('background'));
+        assert.isFalse(saved.has('imagery.lastUsed'));
+
+        _imagery.setSourceByID('nj-2015');
+        assert.strictEqual(saved.get('imagery.lastUsed'), 'nj-2015');
+        assert.isFalse(urlParams.has('background'));
+        assert.sameMembers(overlayIDs(), ['test-overlay', 'nj-overlay']);   // test-overlay stays on
+      });
+
+      it('follows imagery the user puts in the url, and leaves it alone when it goes away', async () => {
+        await firstHashChange();
+        urlParams.set('background', 'ca-imagery');
+        await hashChange([['background', 'ca-imagery']]);
+        assert.strictEqual(_imagery.baseLayerSource().id, 'ca-imagery');
+        assert.isFalse(saved.has('imagery.lastUsed'));
+
+        urlParams.delete('background');
+        await hashChange([], [['background', 'ca-imagery']]);
+        assert.strictEqual(_imagery.baseLayerSource().id, 'ca-imagery');
+
+        // Changed, then put in the url again
+        _imagery.setSourceByID('Bing');
+        urlParams.set('background', 'ca-imagery');
+        await hashChange([['background', 'ca-imagery']]);
+        assert.strictEqual(_imagery.baseLayerSource().id, 'ca-imagery');
+      });
+
+      it('doesn\'t apply a value that was dropped while the url was being read', async () => {
+        _imagery.setSourceByID('Bing');
+        await hashChange([['background', 'ca-imagery']]);   // in the emitted params, but not the url anymore
+        assert.strictEqual(_imagery.baseLayerSource().id, 'nj-2015');
+      });
+
+      it('shows a custom template from a link, without saving it', async () => {
+        const template = 'https://example.com/link/{zoom}/{x}/{y}.png';
+        await firstHashChange({ background: `custom:${template}` });
+        const base = _imagery.baseLayerSource();
+        assert.strictEqual(base.id, 'custom');
+        assert.strictEqual(base.template, template);
+        assert.isFalse(saved.has('imagery.lastUsed'));
+
+        _imagery.toggleOverlayLayer(_imagery.source('test-overlay'));
+        assert.strictEqual(urlParams.get('background'), `custom:${template}`);   // still matches
+      });
+
+      it('matches an Esri Wayback date in the url', async () => {
+        await firstHashChange({ background: 'EsriWayback_2020-01-01' });
+        _imagery.toggleOverlayLayer(_imagery.source('test-overlay'));
+        assert.isTrue(urlParams.has('background'));
+
+        // (Without the Wayback service, this sample source's date doesn't change its key, so an overlay change checks it)
+        _imagery.setSourceByID('EsriWayback_2021-01-01');
+        _imagery.toggleOverlayLayer(_imagery.source('test-overlay'));
+        assert.isFalse(urlParams.has('background'));
+      });
+
+      it('doesn\'t save the walkthrough\'s imagery', async () => {
+        await firstHashChange({ background: 'Bing' });
+        context.inIntro = true;
+        _imagery.setSourceByID('nj-2020');
+        _imagery.toggleOverlayLayer(_imagery.source('test-overlay'));
+        assert.strictEqual(saved.size, 0);
+        assert.strictEqual(urlParams.get('background'), 'Bing');
       });
     });
 
@@ -947,6 +1131,7 @@ describe('ImagerySystem', () => {
       });
 
       it('does nothing when schema param is unchanged', () => {
+        _imagery._settled = true;   // the url has already set up the imagery
         const curr = new Map([['other', 'value']]);
         const prev = new Map([['other', 'value']]);
         _imagery._hashChanged(curr, prev);
@@ -975,6 +1160,27 @@ describe('ImagerySystem', () => {
         _imagery._hashChanged(curr, prev);
         assert.deepEqual(_imagery.requestedAssetIDs, new Set(['editor_layer_index']));
         assert.isAtLeast(spyImageryChange.mock.calls.length, 1);  // imagerychange emitted by resetAll
+      });
+
+      it('doesn\'t save or drop anything while a reload sets up the imagery again', async () => {
+        const saved = new Map();
+        const urlParams = new Map([['background', 'Bing'], ['imagery', 'editor_layer_index']]);
+        context.systems.settings = { get: k => saved.get(k), set: (k, v) => saved.set(k, v) };
+        context.systems.urlhash = {
+          getParam: k => urlParams.get(k),
+          setParam: (k, v) => (v === null || v === undefined ? urlParams.delete(k) : urlParams.set(k, v))
+        };
+        _imagery._settled = true;
+
+        // The reload starts with no imagery, and then Bing isn't in the reloaded index
+        _imagery._hashChanged(new Map(urlParams), new Map([['background', 'Bing']]));
+        await new Promise(resolve => { setTimeout(resolve, 0); });
+        assert.isTrue(_imagery._settled);
+        assert.strictEqual(saved.size, 0);
+        assert.strictEqual(urlParams.get('background'), 'Bing');
+
+        delete context.systems.settings;
+        delete context.systems.urlhash;
       });
     });
 

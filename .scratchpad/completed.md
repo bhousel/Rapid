@@ -2,6 +2,8 @@
 
 Reverse-chronological one-liners. Details live in git history — these are just breadcrumbs.
 
+- **The url holds overrides, not state** (Nov 9 2026, `design/settings-system.md` Step 1 bullets) — Rapid only writes `map`, `id`, `photo` and `detection` as you go. Every other param (layers, filters, imagery, datasets, photo filters, MapRoulette challenges, `map3d`) is read, stays as the link had it until the state no longer matches, then is dropped; changes are saved one at a time. New `imagery.overlays` setting; the system saves `imagery.lastUsed`. Commit 63e055d65 plus step 2. See `decisions.md`.
+
 - **First bug hunt** (Nov 3 2026, `/bughunt`) — 36 findings before handing the branch to testers, all fixed: iD#2085 restores per graph, sessions per API, the conflict screen's choices and Cancel, conflation runs as their own data, QA editors that keep their state while typing, undo during drag and draw, stable IDs in links and backups. Commits 6d9310a7c through bf714e73b.
 
 - **One autofix runner** (Nov 2 2026, `design/validation-system.md` rollout item 5) — `actionAutofix` applies one fix at a time and validates again, for autoconnect and Autofix All (`ValidationSystem.autofixAction`, which finds the shown issues again by kind and entities, via `issue.foundOnID`). Closes the validation audit.

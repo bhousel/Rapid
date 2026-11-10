@@ -566,8 +566,7 @@ export class UiSectionBackgroundList extends AbstractUiSection {
     if (previousBackground instanceof ImagerySource) {
       settings?.set('imagery.lastUsedToggle', previousBackground.id);
     }
-    settings?.set('imagery.lastUsed', sourceID);
-    imagery.setSourceByID(sourceID);
+    imagery.setSourceByID(sourceID);   // the ImagerySystem saves it as `imagery.lastUsed`
   }
 
 

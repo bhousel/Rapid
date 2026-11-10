@@ -19,15 +19,18 @@ URL-encoding is therefore optional but can be used to encode URL-unsafe characte
 - `thing=%23one%2C%23two`   (same as `#one,#two`)
 - `thing=val%7Chttp%3A%2F%2Fexample.com`  (same as `val|http://example.com`)
 
-Rapid remembers the user's choices (layers, filters, datasets, …) in its settings.
+Rapid remembers the user's choices (layers, filters, imagery, datasets) in its settings.
 A URL parameter overrides those settings for that session only, without replacing them:
 a link can show different layers, and the user's own layers are back the next time they
-start Rapid without it.  (The layers and filters the user turns on or off while using the
-link are still saved.  `poweruser=true` is only ever for the session.)
+start Rapid without it.  (The choices the user makes while using the link are still saved.
+Some things are only ever for the session: `poweruser=true`, the photo filters, the MapRoulette
+challenges, and the 3D map.)
 
-The URL is mostly for starting Rapid a certain way, and Rapid doesn't write the layers or filters
-you choose into it.  `layers` and `disable_features` stay in the URL as the link had them, until you
-change the layers or filters: then Rapid takes them out.
+The URL is mostly for starting Rapid a certain way.  Rapid only writes `map`, `id`, `photo` and
+`detection` into it as you go.  The other parameters stay in the URL as the link had them, until what
+you see no longer matches them (you change the layers, the imagery, the filters, …): then Rapid takes
+them out.  Taking one out of the URL yourself leaves things as they are.  (`locale` and `rtl` override
+what Rapid picks automatically, so taking one of those out goes back to that.)
 
 ### Initial only (these params take effect at init time)
 * __`assets`__ - Custom asset overrides as `assetID|url` pairs separated by commas. These
@@ -97,6 +100,7 @@ change the layers or filters: then Rapid takes them out.
 * __`map`__ - A slash-separated `zoom/latitude/longitude/bearing`.  Bearing is optional and can be
    specified in degrees.  (The map bearing is the compass direction that is "up").<br/>
   _Example:_ `map=18.00/47.62051/-122.34930`, `map=18.00/39.95239/-75.16361/9.5`
+* __`map3d=true`__ - Shows the 3D map viewer.
 * __`offset`__ - Background imagery alignment offset in meters, formatted as `east,north`.<br/>
   _Example:_ `offset=-10,5`
 * __`overlays`__ - A comma-separated list of imagery sourceIDs to display as overlays

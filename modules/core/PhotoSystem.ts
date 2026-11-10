@@ -61,6 +61,8 @@ export class PhotoSystem extends AbstractSystem {
   protected _filterToDate: string | null = null;
   /** Usernames to include in the photo filter, or null to show all users */
   protected _filterUsernames: string[] | null = null;
+  /** Whether `_hashChanged` is applying the url's filters, so the change isn't the user's and the url keeps its params */
+  protected _isApplyingUrl: boolean;
 
 
   /**
@@ -72,6 +74,7 @@ export class PhotoSystem extends AbstractSystem {
     this.optionalDependencies = new Set<SystemID>(['gfx', 'map', 'urlhash', 'ui']);
 
     this._filterPhotoTypes = new Set<PhotoType>(this.photoTypes);
+    this._isApplyingUrl = false;
 
     // Ensure methods used as callbacks always have `this` bound correctly.
     this._hashChanged = this._hashChanged.bind(this);
@@ -146,27 +149,34 @@ export class PhotoSystem extends AbstractSystem {
       urlhash?.setParam('photo_overlay', null);
     }
 
-    // photo_dates
-    // support a from-to date range, like `photo_dates=2019-01-01|2020-12-31`
-    const newPhotoDates = currParams.get('photo_dates') || '';
-    const oldPhotoDates = prevParams.get('photo_dates') || '';
-    if (newPhotoDates !== oldPhotoDates) {
-      const [fromDateStr, toDateStr] = utilExtractValues(newPhotoDates);
-      if (fromDateStr || toDateStr) {
+    // The filters are for this session only: a link's filters are kept in the url until the user
+    // changes them, and the filters the user picks aren't written to it (see `setDateFilter`).
+    // (Not a value that was dropped since, by a change made while the same url was being read.
+    // When a filter's param goes away, the filter stays as it is.)
+    const newValue = (k: string): string | undefined => {
+      const val = currParams.get(k);
+      return (val !== undefined && val !== prevParams.get(k) && urlhash?.getParam(k) === val) ? val : undefined;
+    };
+
+    this._isApplyingUrl = true;
+    try {
+      // photo_dates
+      // support a from-to date range, like `photo_dates=2019-01-01|2020-12-31`
+      const newPhotoDates = newValue('photo_dates');
+      if (newPhotoDates !== undefined) {
+        const [fromDateStr, toDateStr] = utilExtractValues(newPhotoDates);
         this.setDateFilter('fromDate', fromDateStr);
         this.setDateFilter('toDate', toDateStr);
-      } else {
-        this._filterToDate = this._filterFromDate = null;
       }
-    }
 
-    // photo_username
-    // support delimited list of usernames, e.g. 'photo_usernames=quincylvania,chrisbeddow'
-    const newPhotoUsername = currParams.get('photo_username') || '';
-    const oldPhotoUsername = prevParams.get('photo_username') || '';
-    if (newPhotoUsername !== oldPhotoUsername) {
-      const usernames = utilExtractValues(newPhotoUsername).filter(Boolean);
-      this.setUsernameFilter(usernames);
+      // photo_username
+      // support delimited list of usernames, e.g. 'photo_usernames=quincylvania,chrisbeddow'
+      const newPhotoUsername = newValue('photo_username');
+      if (newPhotoUsername !== undefined) {
+        this.setUsernameFilter(utilExtractValues(newPhotoUsername).filter(Boolean));
+      }
+    } finally {
+      this._isApplyingUrl = false;
     }
 
     // photo
@@ -243,7 +253,7 @@ export class PhotoSystem extends AbstractSystem {
 
   /**
    * Called whenever the photo changes.
-   * This will update the urlhash, trigger a redraw, and emit a 'photochange' event.
+   * This will update the urlhash (the current photo and detection), trigger a redraw, and emit a 'photochange' event.
    */
   protected _photoChanged(): void {
     const context = this.context;
@@ -251,16 +261,6 @@ export class PhotoSystem extends AbstractSystem {
     const urlhash = context.systems.urlhash;
 
     if (urlhash) {
-      // photo_dates
-      let rangeString;
-      if (this._filterFromDate || this._filterToDate) {
-        rangeString = (this._filterFromDate || '') + '_' + (this._filterToDate || '');
-      }
-      urlhash.setParam('photo_dates', rangeString);
-
-      // photo_username
-      urlhash.setParam('photo_username', this._filterUsernames ? this._filterUsernames.join(',') : null);
-
       // current photo
       let photoString;
       if (this._currPhotoLayerID && this._currPhotoID) {
@@ -583,11 +583,18 @@ export class PhotoSystem extends AbstractSystem {
 
 
   /**
-   * Sets a date filter value
+   * Sets a date filter value, for this session.
+   * (It isn't written to the url, and a link's `photo_dates` is dropped from it.)
    * @param type - 'fromDate' or 'toDate'
    * @param val - the value to set it to, should be in YYYY-MM-DD format
    */
   public setDateFilter(type: DateFilter, val: Nullable<string>): void {
+    const urlhash = this.context.systems.urlhash;
+
+    if (!this._isApplyingUrl) {
+      urlhash?.setParam('photo_dates', null);
+    }
+
     const newValue = utilDateString(val) || null;
     const newDate = utilDate(val);
     let didChange = false;
@@ -619,10 +626,17 @@ export class PhotoSystem extends AbstractSystem {
 
 
   /**
-   * Sets a username filter value
+   * Sets a username filter value, for this session.
+   * (It isn't written to the url, and a link's `photo_username` is dropped from it.)
    * @param val - Username or Array or Set of usernames to filter by
    */
   public setUsernameFilter(val: OneOrMore<string>): void {
+    const urlhash = this.context.systems.urlhash;
+
+    if (!this._isApplyingUrl) {
+      urlhash?.setParam('photo_username', null);
+    }
+
     const usernames = [...utilIterable(val)];
     this._filterUsernames = usernames.length ? usernames : null;
     this._photoChanged();

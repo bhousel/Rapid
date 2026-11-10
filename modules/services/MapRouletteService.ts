@@ -643,44 +643,42 @@ export class MapRouletteService extends AbstractSystem {
    * @param prevParams - The previous hash parameters
    */
   protected _hashChanged(currParams: Map<string, string>, prevParams: Map<string, string>): void {
-    const scene = this.context.systems.gfx?.scene;
+    const context = this.context;
+    const gfx = context.systems.gfx;
+    const urlhash = context.systems.urlhash;
+    const scene = gfx?.scene;
     if (!scene) return;  // test environment?
 
     // maproulette
-    // Shows only the tasks of the given challenges, e.g. `maproulette=<challengeIDs>`,
+    // Shows only the tasks of the given challenges for this session, e.g. `maproulette=<challengeIDs>`,
     // and turns on the layer, since a filter on a layer you can't see does nothing.
+    // The url keeps it until the tasks shown no longer match it (see `_mapRouletteChanged`).
     // (`maproulette=true` is a legacy way to turn on the layer, like `layers=` does now, see API.md)
-    const newVal = currParams.get('maproulette') || '';
-    const oldVal = prevParams.get('maproulette') || '';
-    if (newVal !== oldVal) {
-      let isEnabled = false;
+    // (Not a value that was dropped since, by a change made while the same url was being read.
+    // When `maproulette` goes away, the filter stays as it is.)
+    const newVal = currParams.get('maproulette');
+    if (newVal === undefined || newVal === prevParams.get('maproulette') || urlhash?.getParam('maproulette') !== newVal) return;
 
-      this._challengeIDs.clear();
-      const vals = utilExtractValues(newVal).filter(Boolean);
-      for (const val of vals) {
-        if (val === 'true') {
-          isEnabled = true;
-          continue;
-        }
-        // Try the value as a number, but reject things like NaN, null, Infinity
-        const num = +val;
-        if (Number.isFinite(num)) {
-          isEnabled = true;
-          this._challengeIDs.add(val);  // keep the string
-        }
-      }
-
-      if (isEnabled) {  // will trigger 'layerchange', which writes the challengeIDs (and not `true`) back
-        scene.enableLayers('maproulette');
-      } else {
-        this._mapRouletteChanged();
-      }
+    const ids = this._parseChallengeIDs(newVal);
+    this._challengeIDs.clear();
+    for (const id of ids) {
+      this._challengeIDs.add(id);
     }
+    if (!ids.size) {   // the legacy `true`, or no challenges to show
+      urlhash?.setParam('maproulette', null);
+    }
+
+    if (ids.size || utilExtractValues(newVal).includes('true')) {
+      scene.enableLayers('maproulette');   // will trigger 'layerchange'
+    }
+    gfx?.immediateRedraw();
   }
 
 
   /**
-   * Push changes in MapRoulette state to the urlhash
+   * Called when the challenge filter or the layers change.
+   * The filter isn't written to the url: a link's `maproulette` stays there only until the tasks shown
+   * no longer match it (the layer is turned off, or the filter changes), and then it's dropped (see `API.md`).
    */
   protected _mapRouletteChanged(): void {
     const context = this.context;
@@ -688,10 +686,30 @@ export class MapRouletteService extends AbstractSystem {
     const scene = context.systems.gfx?.scene;
     if (!urlhash || !scene) return;  // test environment?
 
-    // `maproulette=<challengeIDs>`, while the layer shows them
-    // (the layer itself is in `layers=`, written by the GraphicsSystem)
+    const urlVal = urlhash.getParam('maproulette');
+    if (urlVal === undefined) return;
+
     const layer = scene.layers.get('maproulette');
-    const ids = this.challengeIDs;
-    urlhash.setParam('maproulette', (layer?.enabled && ids) ? ids : null);
+    const urlIDs = this._parseChallengeIDs(urlVal);
+    if (!layer?.enabled || urlIDs.size !== this._challengeIDs.size || [...urlIDs].some(id => !this._challengeIDs.has(id))) {
+      urlhash.setParam('maproulette', null);
+    }
+  }
+
+
+  /**
+   * Parses the challengeIDs in a url `maproulette` value.
+   * @param val - The url's value, e.g. `100,200`
+   * @return The challengeIDs (as strings), without values that aren't numbers (like the legacy `true`)
+   */
+  protected _parseChallengeIDs(val: string): Set<string> {
+    const ids = new Set<string>();
+    for (const s of utilExtractValues(val).filter(Boolean)) {
+      // Try the value as a number, but reject things like NaN, null, Infinity
+      if (Number.isFinite(+s)) {
+        ids.add(s);  // keep the string
+      }
+    }
+    return ids;
   }
 }

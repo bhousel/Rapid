@@ -361,6 +361,25 @@ Used when a class resolves references (`var()`, locale strings) in its props:
 - **`(this as any).resource = canvas`** — Type mismatch: `AtlasSource extends TextureSource<BufferSourceOptions>` where the generic expects a TypedArray resource, but the canvas renderer needs an `HTMLCanvasElement`. The `as any` cast is intentional — the canvas renderer inspects `resource` dynamically, not via generic type constraints.
 - **No clear-on-free** — Freed atlas regions aren't cleared on the backing canvas, matching the GL/GPU behavior (they overwrite freed space with `texSubImage2D` / `copyExternalImageToTexture` when it is reallocated).
 
+## The url holds overrides, not state (Nov 2026)
+
+Rule and details in `design/settings-system.md`; these are the choices someone might undo by accident.
+- **The url is for starting Rapid a certain way, not where the user's state lives.** Most of it is
+  invisible, and `map=` comes first because it's the part people see. Only where you are and what's
+  selected (`map`, `id`, `photo`, `detection`) is written as you go.
+- **An override is dropped once the state no longer matches it, not rewritten.** Then it's in effect
+  exactly while it's in the url (no `_urlOverride` flag), and a reload before any change opens the link
+  again. Taking one out of the url leaves things as they are.
+- **Changes are saved one at a time (deltas).** Saving the whole state would save the link's other
+  choices as the user's.
+- **Some state is for the session only:** photo filters, MapRoulette challenges, the 3D map, the imagery
+  offset. They were only ever kept by the url (a legacy choice few people relied on). An offset belongs
+  to one source in one area, so bringing it back elsewhere would misalign the imagery.
+- **The user's last imagery wins over 'best', but only where it can be seen.** Saved overlays are also
+  only turned on where they can be seen, or they'd be credited in changesets elsewhere.
+- **`UrlHashSystem` still loses url changes made before it resumes.** Keeping them would let startup's
+  `map=`/`id=` writes overwrite a link's own. Read startup values from `initialHashParams` instead.
+
 ## Style Resolution
 
 - **Fallback cascading is selective** — `fill.color` ← `base.color` or `stroke.color`; `marker.color` ← `base.color` only; etc. Not uniform `base.color` on everything.

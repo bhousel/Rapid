@@ -85,9 +85,18 @@ describe('Map3dSystem', () => {
         assert.isFalse(_map3d.visible);
       });
 
-      it('returns true when urlhash param is "true"', () => {
+      // (Showing the viewer would start MapLibre, so these start with it shown already)
+      it('drops a link\'s `map3d` from the url once the viewer is hidden', () => {
         const urlhash = context.systems.urlhash;
         urlhash.setParam('map3d', 'true');
+        _map3d._visible = true;
+        _map3d.visible = false;
+        assert.isUndefined(urlhash.getParam('map3d'));
+      });
+
+      it('leaves the viewer alone when `map3d` goes away', () => {
+        _map3d._visible = true;
+        _map3d._hashChanged(new Map(), new Map([['map3d', 'true']]));
         assert.isTrue(_map3d.visible);
       });
     });
