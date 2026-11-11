@@ -82,6 +82,7 @@ export class DrawLineMode extends AbstractMode {
   public constructor(context: Context) {
     super(context);
     this.id = 'draw-line';
+    this.interactiveSpatialIDs = new Set<SpatialID>(['osm']);   // only OSM can be drawn on
 
     this.defaultTags = {};
     this.drawWayID = null;

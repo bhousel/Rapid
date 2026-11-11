@@ -106,6 +106,8 @@ what Rapid picks automatically, so taking one of those out goes back to that.)
 
   An Esri dataset's ID is its item ID on ArcGIS Online
   (see [ArcGIS for OpenStreetMap](https://www.esriurl.com/ArcGIS4OSM)).
+  Overture features don't have stable IDs in Rapid yet (they're numbered as they load), so a link to
+  one won't find the same feature again.
   Photos aren't selected with `id=`; use `photo=` and `detection=`.
 
 #### Map and Rendering

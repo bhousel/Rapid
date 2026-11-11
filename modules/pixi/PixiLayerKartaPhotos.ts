@@ -177,7 +177,7 @@ export class PixiLayerKartaPhotos extends AbstractPixiLayer {
     const kartaview = this.context.services.kartaview;
     if (!kartaview?.started) return;
 
-    const parentContainer = this.scene.groups.get('streetview')!;
+    const parentContainer = this._spatialContainer('streetview', this.id);
     let markers = kartaview.getImages();
     let sequences = kartaview.getSequences();
 

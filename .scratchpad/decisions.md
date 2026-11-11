@@ -2,6 +2,22 @@
 
 Non-obvious choices where "why did we do it this way?" isn't captured in the code.
 
+## The scene (Nov 2026)
+
+The structure and the reasoning are in `design/scene.md`; these are the choices someone might undo.
+- **Interactivity is switched per spatial ID at the container level, not per feature or in the
+  behaviors.** Pixi skips a whole subtree with `eventMode: 'none'`, so the OSM line under a Rapid line
+  is hit directly and no behavior or mode changes. A per-feature flag would run per frame in every
+  layer; a fall-through hit test in the behaviors would re-test on every pointermove and still show
+  the hover halo on the wrong thing.
+- **The mode declares it (`interactiveSpatialIDs`), beside `enableBehaviors`.** The alternative, each
+  of 18 layers knowing which modes it's interactive in, spreads mode knowledge everywhere.
+- **Points sort by latitude only within their spatial ID.** A Rapid pin north of an OSM pin now draws
+  over it. Accepted: "external data above OSM" is the rule for every geometry, and the alternative is
+  the shared container we're replacing. Dense point datasets (NAD addresses) will show it.
+- **No reordering while drawing.** With the datasets non-interactive the OSM line is reachable anyway;
+  lifting OSM visually is a preference for a layer-order UI later (`zIndex` per container makes it cheap).
+
 ## Graph versions and derived data (graph-geometry rollout, Nov 2026)
 
 Details and measurements are in `design/graph-geometry.md`; these are the choices someone might undo by accident.

@@ -220,7 +220,7 @@ export class PixiLayerMapillaryPhotos extends AbstractPixiLayer {
     const mapillary = this.context.services.mapillary;
     if (!mapillary?.started) return;
 
-    const parentContainer = this.scene.groups.get('streetview')!;
+    const parentContainer = this._spatialContainer('streetview', this.id);
     let sequences = mapillary.getSequences();
     let markers = mapillary.getData('images');
 

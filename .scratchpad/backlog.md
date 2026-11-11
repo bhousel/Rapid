@@ -26,6 +26,9 @@ Phase 1 (the `KeyboardSystem` conversion + command scaffolding) is done — see
   physical-key fallback.
 
 ## Pixi rendering follow-ups
+- **Profiling pass** (see [`design/profiling.md`](../design/profiling.md)): baseline numbers for heap, GPU resources, the worker heap and listeners; a `scripts/profile.ts` that cycles load → edit → `resetAsync()` and reports what grows. Prompted by a 6 GB debug Chrome renderer with a 100 MB Rapid heap after a long driven session (Nov 2026); probably the browser, not measured yet.
+- **Batch line casings and strokes by material**: Spector shows casing/stroke/casing/stroke draw calls, one pair per line. Pixi 8.6+ `RenderLayer` can render casings and strokes grouped per level while they stay children of the feature container (hit-testing unchanged). Details in `design/profiling.md`.
+- **Scene follow-ups** (see [`design/scene.md`](../design/scene.md) section 3): reordering spatial IDs (lift OSM while drawing, or a layer-order UI), now that each spatial container has an explicit `zIndex`; and hit-testing by geometry instead of Pixi, which would make snapping independent of stroke width and z-order.
 - **Text rasterization without Pixi.Text**: move text drawing onto an `OffscreenCanvas` worker, or bypass `Pixi.Text` with main-thread canvas2D rasterization first. Main thread can feed the resulting `HTMLCanvasElement`, `ImageBitmap`, or `ImageData` to `PixiTextures.allocate('text', ...)`, avoiding both nested `renderer.generateTexture()` and `readPixels`. Worker font loading needs the same fonts; use `FontFace` API + transferable `ArrayBuffer`.
 - **Direct mesh generation for polygons / lines**: replace the `PIXI.GpuGraphicsContext` + `PIXI.buildContextBatches()` round-trip in `PixiFeaturePolygon.ts` with direct `earcut` tessellation, or consider a shared mesh-generator path for polygons and lines. Meshes are batchable, so this could reduce draw calls while avoiding renderer-internal geometry extraction.
 - **Tile padding off-thread if measurable**: `_fromEdgePaddedCanvas()` does two canvas draws per tile on the main thread. If profiles show it matters, build the edge-padded tile source on a worker `OffscreenCanvas` and transfer an `ImageBitmap` back; GPU upload still stays with the Pixi renderer unless the renderer itself moves off-thread.
@@ -228,3 +231,19 @@ the order people are likely to ask:
 
 ## Deferred test cleanup
 - Replace non-assertive smoke tests like `assert.isTrue(true)` / bare rejection catches with stronger state or error assertions where practical
+
+## From the pre.4 release check (Nov 2026)
+- **Startup can't survive a slow CDN.** An asset fetch that hits `NetworkSystem`'s 30 s timeout rejects
+  `l10n.initAsync()`, that rejects the rest of startup, and the user gets a blank grey page with no message
+  and no retry. Seen when the debug Chrome was worn out; a slow connection would do the same. This used to
+  happen with the big NSI files until their fetch was deferred. Known weakness, not fixing now; ideas: retry
+  the core asset fetches, show an error with a reload button when `startAsync()` rejects, keep startup going
+  without optional assets.
+- **Overture IDs aren't stable across loads** (`overture-places:geojson-3159` is numbered as it loads), so
+  accept/ignore records and `id=` links to Overture features don't survive a reload. Open question 3 in
+  `design/data-ids.md`; the GERS ID is already kept as `props.stableID`, so the local ID could be built
+  from it. `API.md` carries a caveat until then.
+- **Overture place viewer shows `names:[object Object]`** for nested values (e.g. Brand). Render nested
+  objects as their own rows, or JSON.
+- **Saved conflation rules still carry `nearDist`/`nearAngle`**, which nothing reads any more. Drop them on
+  load (and on save) so old settings stop carrying them around.

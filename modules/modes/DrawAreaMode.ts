@@ -57,6 +57,7 @@ export class DrawAreaMode extends AbstractMode {
   public constructor(context: Context) {
     super(context);
     this.id = 'draw-area';
+    this.interactiveSpatialIDs = new Set<SpatialID>(['osm']);   // only OSM can be drawn on
 
     this.defaultTags = {};
     this.drawWayID = null;    // The draw way just contains the way that we are drawing

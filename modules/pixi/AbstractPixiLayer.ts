@@ -1,3 +1,4 @@
+import * as PIXI from 'pixi.js';
 import { splitDataID } from '../data/dataID.ts';
 import { type OneOrMore, utilIterable } from '../util/iterable.ts';
 
@@ -53,6 +54,8 @@ export class AbstractPixiLayer {
   protected _parentHasChildren: Map<DataID, Set<DataID>>;
   /** Map of child dataID to Set of parent dataIDs */
   protected _childHasParents: Map<DataID, Set<DataID>>;
+  /** Spatial IDs this layer has containers for (see `_spatialContainer`) */
+  protected _spatialIDs: Set<SpatialID>;
 
 
   /**
@@ -75,6 +78,9 @@ export class AbstractPixiLayer {
     // These lookups capture which features are bound to which data.
     this._featureHasData = new Map<FeatureID, DataID>();
     this._dataHasFeature = new Map<DataID, Set<FeatureID>>();
+
+    // The spatial IDs this layer has asked the scene for containers for (released in `reset()`)
+    this._spatialIDs = new Set<SpatialID>();
 
     // Parent Data <-> Child Data
     // We establish a parent-child data hierarchy (like what the DOM used to do for us)
@@ -163,6 +169,45 @@ export class AbstractPixiLayer {
 
     this.features.clear();
     this.retained.clear();
+
+    for (const spatialID of this._spatialIDs) {
+      this.scene.releaseSpatialContainers(spatialID);
+    }
+    this._spatialIDs.clear();
+  }
+
+
+  /**
+   * Returns the container this layer draws the given spatial ID's data into, in the given group
+   * (see `PixiScene.getSpatialContainer` and `design/scene.md`). Features go in it, or in
+   * sub-containers made under it with `_childContainer`; `reset()` releases it again.
+   * @param groupID - The group, e.g. 'basemap' or 'points'
+   * @param spatialID - The spatial ID of the data, e.g. 'osm' or 'fbRoads'
+   * @return The container
+   */
+  protected _spatialContainer(groupID: GroupID, spatialID: SpatialID): PIXI.Container {
+    this._spatialIDs.add(spatialID);
+    return this.scene.getSpatialContainer(groupID, spatialID);
+  }
+
+
+  /**
+   * Returns the child container with the given label, making it if needed.
+   * @param parent - The container to look in
+   * @param label - The child's label, e.g. 'polygons'
+   * @param zIndex - The child's `zIndex` among its siblings, if it's made
+   * @return The child container, with `sortableChildren` on
+   */
+  protected _childContainer(parent: PIXI.Container, label: string, zIndex = 0): PIXI.Container {
+    let container = parent.getChildByLabel(label) as PIXI.Container | null;
+    if (!container) {
+      container = new PIXI.Container();
+      container.label = label;
+      container.sortableChildren = true;
+      container.zIndex = zIndex;
+      parent.addChild(container);
+    }
+    return container;
   }
 
 

@@ -29,6 +29,7 @@ export class AddPointMode extends AbstractMode {
   public constructor(context: Context) {
     super(context);
     this.id = 'add-point';
+    this.interactiveSpatialIDs = new Set<SpatialID>(['osm']);   // a point can only snap to OSM
 
     this.defaultTags = {};
 

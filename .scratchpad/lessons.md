@@ -115,6 +115,17 @@ Things that went wrong once and shouldn't go wrong again.
 - **Put a time-sensitive live check in one `cdp eval` snippet.** Each `bun run cdp` call takes about a
   second, so checking something within the 2.5 s after an upload across two calls finds the reset
   already done.
+- **Keep a signed-in live check write-free with a Playwright route, not just stubs.** A script that stays
+  attached and calls `context.route('**/*', …)` to abort anything but GET/HEAD/OPTIONS to a non-local
+  host also covers reloads and the startup settings sync, which in-page stubs (installed after start)
+  can't. Install it on the context before Rapid loads (launch Chrome on `about:blank` with the
+  `.chrome-debug` profile, route, then open Rapid).
+- **The debug Chrome wears out over long runs.** After hours of driving (and days up), its renderer sat
+  at 6 GB and 600% CPU while Rapid's heap was 100 MB: `connectOverCDP` timed out, and reloads failed
+  because a startup asset fetch hit NetworkSystem's 30 s timeout. Rapid started fine in a fresh Chrome.
+  Rule out the browser before blaming Rapid for a hang that only shows up late in a session.
+- **Matched Rapid features drawn with "show already mapped" sit exactly on OSM lines** and take the
+  pointer, so a live drawing check that clicks on OSM lines should confirm the hover target first.
 
 ## Network
 

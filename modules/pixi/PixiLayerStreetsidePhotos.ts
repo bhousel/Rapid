@@ -188,7 +188,7 @@ export class PixiLayerStreetsidePhotos extends AbstractPixiLayer {
     const streetside = this.context.services.streetside;
     if (!streetside?.started) return;
 
-    const parentContainer = this.scene.groups.get('streetview')!;
+    const parentContainer = this._spatialContainer('streetview', this.id);
     let markers = streetside.getImages();
     let sequences = streetside.getSequences();
 

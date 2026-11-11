@@ -19,6 +19,7 @@ import type { Context } from '../Context.ts';
  * -  `selectedIDs`      - The data IDs of the selected data (see `design/data-ids.md`)
  * -  `selectedData`     - `Map<DataID, AbstractData>` of the selected data, looked up by data ID
  * -  `selectionBefore`  - The data IDs that were selected before the mode's work started
+ * -  `interactiveSpatialIDs` - The spatial IDs the pointer can reach in this mode, `null` for all
  */
 export class AbstractMode extends EventEmitter {
 
@@ -28,6 +29,12 @@ export class AbstractMode extends EventEmitter {
   public context: Context;
   /** Operations allowed in this mode; shown in the right-click edit menu */
   public operations: AbstractOperation[];
+  /**
+   * The spatial IDs whose features the pointer can hover and click in this mode, or `null` for all
+   * of them. A mode that only works on OSM (drawing, dragging a node) says `['osm']`, so the scene
+   * skips the Rapid, photo and QA features drawn over the OSM ones (see `design/scene.md`).
+   */
+  public interactiveSpatialIDs: ReadonlySet<SpatialID> | null;
 
   /** Whether this mode is currently active */
   protected _active: boolean;
@@ -46,6 +53,7 @@ export class AbstractMode extends EventEmitter {
     this._active = false;
     this._selectedIDs = [];
     this.operations = [];
+    this.interactiveSpatialIDs = null;
   }
 
 

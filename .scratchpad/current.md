@@ -6,7 +6,13 @@ Data IDs (steps 1–5), the validation audit, the graph-geometry rollout and bot
 design (`backlog.md`), to keep conflation in focus. Before it becomes `main` (v3.0.0-pre.4):
 - **A release check** in the debug Chrome on real data (accept with joins, autoconnect, undo/redo,
   Autofix All, panning while editing, QA and photo layers, backup restore, a faked upload conflict),
-  then merge to main.
+  then merge to main. Ran Nov 10 in Albany OR (ODOT sidewalks/crossings): all of it passed, plus ~220
+  random UI steps with invariant checks. Found: with "Show features that are already mapped" on,
+  matched Rapid lines take the pointer in draw mode, so a line started or ended on the OSM sidewalk
+  under one doesn't connect. **Fixed Nov 11** (`design/scene.md`: containers per spatial ID, modes
+  say what the pointer can reach; see `completed.md`). The rest went to `backlog.md` ("From the pre.4
+  release check"): startup can't survive a slow CDN, Overture IDs aren't stable, `[object Object]` in
+  the Overture place viewer, `nearDist`/`nearAngle` in saved rules. Not tested: the QA and photo layers.
 
 ## Active: what an edit records (`EditSystem`)
 Design: [`design/edit-system.md`](../design/edit-system.md), started Oct 26. Edits need to record more

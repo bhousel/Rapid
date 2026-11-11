@@ -98,10 +98,12 @@ function hasWikidata(entity: OsmEntity): boolean {
  */
 export class PixiLayerOsm extends AbstractPixiLayer {
 
-  /** Container for area/polygon features */
-  public areaContainer: PIXI.Container | null;
-  /** Container for line features */
+  /** Container for polygon features (`basemap/osm/polygons`) */
+  public polygonContainer: PIXI.Container | null;
+  /** Container for line features (`basemap/osm/lines`, with a child per level) */
   public lineContainer: PIXI.Container | null;
+  /** Container for points, vertices and virtual POI pins (`points/osm`) */
+  public pointContainer: PIXI.Container | null;
 
   /** collection of calculated midpoints */
   protected _midpoints: Map<DataID, Midpoint>;
@@ -116,8 +118,9 @@ export class PixiLayerOsm extends AbstractPixiLayer {
     this.id = 'osm';
     this._enabled = true;   // OSM layers should be enabled by default
 
-    this.areaContainer = null;
+    this.polygonContainer = null;
     this.lineContainer = null;
+    this.pointContainer = null;
 
     this._midpoints = new Map<DataID, Midpoint>();
   }
@@ -168,28 +171,11 @@ export class PixiLayerOsm extends AbstractPixiLayer {
 
     this._midpoints.clear();
 
-    const groupContainer = this.scene.groups.get('basemap')!;
-
-    // Remove any existing containers
-    for (const child of groupContainer.children) {
-      if (child.label.startsWith(this.layerID + '-')) {   // 'osm-*'
-        groupContainer.removeChild(child);
-        child.destroy({ children: true });  // recursive
-      }
-    }
-
-    // Add containers
-    const areas = new PIXI.Container();
-    areas.label = `${this.layerID}-areas`;   // e.g. osm-areas
-    areas.sortableChildren = true;
-    this.areaContainer = areas;
-
-    const lines = new PIXI.Container();
-    lines.label = `${this.layerID}-lines`;   // e.g. osm-lines
-    lines.sortableChildren = true;
-    this.lineContainer = lines;
-
-    groupContainer.addChild(areas, lines);
+    // Add containers (`super.reset()` released the old ones), see `design/scene.md`
+    const basemap = this._spatialContainer('basemap', 'osm');
+    this.polygonContainer = this._childContainer(basemap, 'polygons', 0);
+    this.lineContainer = this._childContainer(basemap, 'lines', 1);
+    this.pointContainer = this._spatialContainer('points', 'osm');
   }
 
 
@@ -313,7 +299,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
     const schema = context.systems.schema!;
     const styles = context.systems.styles!;
 
-    const pointsContainer = this.scene.groups.get('points')!;
+    const pointsContainer = this.pointContainer!;
     const showPoints = filters.isEnabled('points');
 
     // For deciding if an unlabeled polygon feature is interesting enough to show a virtual pin.
@@ -352,7 +338,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
 
         if (!feature) {
           feature = new PixiFeaturePolygon(this, featureID);
-          feature.parentContainer = this.areaContainer;
+          feature.parentContainer = this.polygonContainer;
         }
 
         // If data has changed.. Replace data and parent-child links.
@@ -599,7 +585,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
     // Vertices related to the selection/hover should be drawn above everything
     const mapUiLayer = this.scene.layers.get('map-ui') as PixiLayerMapUI;
     const selectedContainer = mapUiLayer.selected;
-    const pointsContainer = this.scene.groups.get('points')!;
+    const pointsContainer = this.pointContainer!;
 
     const isInterestingVertex = (node: OsmNode): boolean => {
       return node.hasInterestingTags() || node.isEndpoint(graph) || node.isIntersection(graph);
@@ -695,7 +681,7 @@ export class PixiLayerOsm extends AbstractPixiLayer {
     const l10n = context.systems.l10n!;
     const schema = context.systems.schema!;
     const styles = context.systems.styles!;
-    const pointsContainer = this.scene.groups.get('points')!;
+    const pointsContainer = this.pointContainer!;
 
     const nodes = data.points;
     for (const [nodeID, node] of nodes) {

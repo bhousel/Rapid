@@ -99,7 +99,7 @@ export class PixiLayerMapillaryDetections extends AbstractPixiLayer {
     const mapillary = context.services.mapillary;
     if (!mapillary?.started) return;
 
-    const parentContainer = this.scene.groups.get('qa')!;
+    const parentContainer = this._spatialContainer('qa', this.id);
 
     let markers = mapillary.getData('detections');
     markers = this.filterMarkers(markers);

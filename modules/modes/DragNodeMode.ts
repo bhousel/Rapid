@@ -51,6 +51,7 @@ export class DragNodeMode extends AbstractMode {
   public constructor(context: Context) {
     super(context);
     this.id = 'drag-node';
+    this.interactiveSpatialIDs = new Set<SpatialID>(['osm']);   // a node can only snap to OSM
 
     this.dragNode = null;
 

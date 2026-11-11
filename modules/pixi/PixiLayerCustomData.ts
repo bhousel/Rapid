@@ -230,7 +230,7 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
    */
   public renderPolygons(frame: number, viewport: Viewport, polygons: GeoJSONData[]): void {
     const l10n = this.context.systems.l10n!;
-    const parentContainer = this.scene.groups.get('basemap')!;
+    const parentContainer = this._spatialContainer('basemap', this._spatialID ?? this.id);
 
     const polygonStyle = {
       fill: { color: CUSTOM_COLOR },
@@ -286,7 +286,7 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
    */
   public renderLines(frame: number, viewport: Viewport, lines: GeoJSONData[], styleOverride?: Partial<MatchedStyle>): void {
     const l10n = this.context.systems.l10n!;
-    const parentContainer = this.scene.groups.get('basemap')!;
+    const parentContainer = this._spatialContainer('basemap', this._spatialID ?? this.id);
 
     const lineStyle = styleOverride ?? {
       stroke: { color: CUSTOM_COLOR },
@@ -341,7 +341,7 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
 //   * @param lineStyle - The line style to use
 //   */
 //  renderGridLines(frame: number, viewport: Viewport, features: GeoJSON.Feature[], lineStyle: LineStyle): void {
-//    const parentContainer = this.scene.groups.get('basemap')!;
+//    const parentContainer = this._spatialContainer('basemap', this._spatialID ?? this.id);
 //
 //    for (const d of features) {
 //      const dataID = d.id as string;
@@ -381,7 +381,7 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
    */
   public renderPoints(frame: number, viewport: Viewport, points: GeoJSONData[]): void {
     const l10n = this.context.systems.l10n!;
-    const parentContainer = this.scene.groups.get('points')!;
+    const parentContainer = this._spatialContainer('points', this._spatialID ?? this.id);
 
     const pointStyle: Partial<MatchedStyle> = {
       marker: { color: CUSTOM_COLOR, image: 'largeCircle'  },

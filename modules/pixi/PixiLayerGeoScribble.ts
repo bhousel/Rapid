@@ -72,25 +72,9 @@ export class PixiLayerGeoScribble extends AbstractPixiLayer {
    * Every Layer should have a reset function to replace any Pixi objects and internal state.
    */
   public reset() {
-    super.reset();
+    super.reset();   // released the old container
 
-    const groupContainer = this.scene.groups.get('basemap')!;
-
-    // Remove any existing containers
-    for (const child of groupContainer.children) {
-      if (child.label.startsWith(this.layerID + '-')) {   // 'geoscribble-*'
-        groupContainer.removeChild(child);
-        child.destroy({ children: true });  // recursive
-      }
-    }
-
-    const geoscribbles = new PIXI.Container();
-    geoscribbles.label = `${this.layerID}-geoscribbles`;
-    geoscribbles.sortableChildren = false;
-    geoscribbles.interactiveChildren = true;
-    this.scribblesContainer = geoscribbles;
-
-    groupContainer.addChild(geoscribbles);
+    this.scribblesContainer = this._spatialContainer('basemap', this.id);
   }
 
 

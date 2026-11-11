@@ -233,19 +233,7 @@ export class PixiLayerRapid extends AbstractPixiLayer {
    * Every Layer should have a reset function to replace any Pixi objects and internal state.
    */
   public reset(): void {
-    super.reset();
-
-    const groupContainer = this.scene.groups.get('basemap')!;
-
-    // Remove any existing containers
-    for (const child of groupContainer.children) {
-      if (child.label.startsWith(this.layerID + '-')) {   // 'rapid-*'
-        groupContainer.removeChild(child);
-        child.destroy({ children: true });  // recursive
-      }
-    }
-
-    // We don't add area or line containers here - `renderDataset()` does it as needed
+    super.reset();   // releases each dataset's containers; `renderDataset()` makes them again as needed
   }
 
 
@@ -401,28 +389,13 @@ export class PixiLayerRapid extends AbstractPixiLayer {
       renderData.polygons = renderData.polygons.filter(d => !isMatched(d));
     }
 
-    const pointsContainer = this.scene.groups.get('points')!;
-    const basemapContainer = this.scene.groups.get('basemap')!;
-    const areasID = `${this.layerID}-${ds.id}-areas`;
-    const linesID = `${this.layerID}-${ds.id}-lines`;
+    // The dataset's containers, see `design/scene.md`
+    const basemapContainer = this._spatialContainer('basemap', ds.spatialID);
+    const polygonsContainer = this._childContainer(basemapContainer, 'polygons', 0);
+    const linesContainer = this._childContainer(basemapContainer, 'lines', 1);
+    const pointsContainer = this._spatialContainer('points', ds.spatialID);
 
-    let areasContainer = basemapContainer.getChildByLabel(areasID) as PIXI.Container | undefined;
-    if (!areasContainer) {
-      areasContainer = new PIXI.Container();
-      areasContainer.label = areasID;
-      areasContainer.sortableChildren = true;
-      basemapContainer.addChild(areasContainer);
-    }
-
-    let linesContainer = basemapContainer.getChildByLabel(linesID) as PIXI.Container | undefined;
-    if (!linesContainer) {
-      linesContainer = new PIXI.Container();
-      linesContainer.label = linesID;
-      linesContainer.sortableChildren = true;
-      basemapContainer.addChild(linesContainer);
-    }
-
-    this.renderPolygons(areasContainer, ds, renderData, frame, viewport);
+    this.renderPolygons(polygonsContainer, ds, renderData, frame, viewport);
     this.renderLines(linesContainer, ds, renderData, frame, viewport);
     this.renderPoints(pointsContainer, ds, renderData, frame, viewport);
   }
