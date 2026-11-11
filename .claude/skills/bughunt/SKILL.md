@@ -2,7 +2,7 @@
 name: bughunt
 description: Hunt for logic bugs in the current batch of work (a branch, or recent commits) before testers find them. Reports a numbered list of findings; makes no edits.
 disable-model-invocation: true
-argument-hint: optional scope or focus, for example: `since v2.1`, `the save path only`
+argument-hint: "optional scope or focus, for example: `since v2.1`, `the save path only`"
 ---
 
 Find the bugs in the current batch of work before anyone else does. You are looking for **logic bugs that break the code's own assumptions**: a state two parts of the code disagree about, an object read after it was replaced, a cache that outlives what it was computed from, an event that doesn't carry everything that changed, a path that works once but not after undo, reload, or a second try. Not style, naming, or missing docs.
