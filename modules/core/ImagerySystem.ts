@@ -102,7 +102,7 @@ export class ImagerySystem extends AbstractSystem {
   /** Whether the current base layer URL is valid (not blocked) */
   protected _isValid: boolean;  // todo, find a new way to check this, no d3 enter/update render anymore
   /** Spatial index for matching a lat/lon to imagery coverage polygons */
-  protected _whichPolygon: ReturnType<typeof whichPolygon> | null;
+  protected _whichPolygon: whichPolygon.Query<{ id: ImagerySourceID }> | null;
 
   /** CSS filter brightness value (0–2, default 1) */
   protected _brightness: number;
@@ -549,8 +549,8 @@ export class ImagerySystem extends AbstractSystem {
     const zoom = viewport.transform.zoom;
 
     const visible = new Set<ImagerySourceID>();
-    (this._whichPolygon(loc, true) || [])
-      .forEach((d: { id: ImagerySourceID }) => visible.add(d.id));
+    (this._whichPolygon(loc, true) ?? [])
+      .forEach(d => visible.add(d.id));
 
     const currSource = this._baseLayer;
     const sources = [...this.sources.values()];
@@ -898,7 +898,7 @@ export class ImagerySystem extends AbstractSystem {
     }
 
     // Reset and rebuild the whichPolygon index
-    const features = [...this.features.values()];
+    const features = [...this.features.values()] as GeoJSON.Feature<GeoJSON.Geometry, { id: ImagerySourceID }>[];
     this._whichPolygon = whichPolygon({ type: 'FeatureCollection', features: features });
 
     // Reset the blocklist check so it re-runs
