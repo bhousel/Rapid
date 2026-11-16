@@ -230,5 +230,21 @@ describe('actionRevert', () => {
       assert.deepEqual(result.parentRelations(n1), [r1], 'n1 has r1 as parent relation');
       assert.deepEqual(result.parentRelations(n2), [], 'n-2 has no parent relations');
     });
+
+    it('restores the child nodes and member ways deleted along with a relation', () => {
+      const n1 = new Rapid.OsmNode(context, { id: 'n1' });
+      const n2 = new Rapid.OsmNode(context, { id: 'n2' });
+      const n3 = new Rapid.OsmNode(context, { id: 'n3' });
+      const w1 = new Rapid.OsmWay(context, { id: 'w1', nodes: ['n1', 'n2', 'n3', 'n1'] });
+      const r1 = new Rapid.OsmRelation(context, { id: 'r1', members: [{ id: 'w1', role: 'outer' }], tags: { type: 'multipolygon' } });
+      const base = new Rapid.Graph(context, [n1, n2, n3, w1, r1]);
+      const graph = new Rapid.Graph(base).remove([r1, w1, n1, n2, n3]);
+
+      const result = Rapid.actionRevert('r1')(graph);
+
+      for (const entity of [r1, w1, n1, n2, n3]) {
+        assert.strictEqual(result.hasEntity(entity.id), entity, `${entity.id} restored`);
+      }
+    });
   });
 });

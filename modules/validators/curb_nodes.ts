@@ -1,5 +1,5 @@
 import { actionAddMidpoint, actionChangeTags, actionSplit} from '../actions/index.ts';
-import { geoLatToMeters, geoLonToMeters, geoMetersToLat, geoMetersToLon } from '@rapid-sdk/math';
+import { geoLatToMeters, geoLonToMeters, geoMetersToLat, geoMetersToLon, geoSphericalDistance } from '@rapid-sdk/math';
 import { OsmNode } from '../data/OsmNode.ts';
 import { ValidationIssue } from '../lib/ValidationIssue.ts';
 import { ValidationFix } from '../lib/ValidationFix.ts';
@@ -89,8 +89,8 @@ export function validateCurbNodes(context: Context): ValidatorFunction {
           onClick: () => {
             performCurbNodeFixes(wayID, tags);
             editor.commit({
-              annotation: l10n.t('issues.curb_nodes.fix.annotation'),
-              selectedIDs: [wayID]
+              stringID: 'issues.curb_nodes.fix.annotation',
+              selectionAfter: [wayID]
             });
           }
         });
@@ -156,6 +156,7 @@ export function validateCurbNodes(context: Context): ValidatorFunction {
   /**
    * Adds curb nodes at the endpoints of a crossing way, either by
    * converting existing endpoints or inserting new nodes.
+   * Inserting a curb node splits the crossing, so each end looks up the graph again.
    * @param wayID - The ID of the crossing way to modify
    * @param tags - The curb tags to assign to new/modified nodes
    */
@@ -176,16 +177,16 @@ export function validateCurbNodes(context: Context): ValidatorFunction {
 
     // Handle the first node
     if (!firstConnections.length || firstConnectsToRefugeIsland) {
-      updateNodeToCurb(firstNode, tags, graph);
+      updateNodeToCurb(firstNode.id, tags);
     } else {
-      insertCurbNode(firstNode, way, graph, tags);
+      insertCurbNode(firstNode.id, wayID, tags);
     }
 
     // Handle the last node
     if (!lastConnections.length || lastConnectsToRefugeIsland) {
-      updateNodeToCurb(lastNode, tags, graph);
+      updateNodeToCurb(lastNode.id, tags);
     } else {
-      insertCurbNode(lastNode, way, graph, tags);
+      insertCurbNode(lastNode.id, wayID, tags);
     }
   }
 
@@ -193,18 +194,27 @@ export function validateCurbNodes(context: Context): ValidatorFunction {
   /**
    * Inserts a curb node into a way by splitting at a position near an existing node.
    * Used when the endpoint is connected to other ways and shouldn't be converted directly.
-   * @param node - The existing node near where the curb should be added
-   * @param way - The way to modify
-   * @param graph - The current graph
+   * @param nodeID - The existing node near where the curb should be added
+   * @param wayID - The crossing way to modify
    * @param curbTags - The curb tags to assign to the new node
    */
-  function insertCurbNode(node: OsmNode, way: OsmWay, graph: Graph, curbTags: OsmTags): void {
-    if (hasCurbTag(node)) return;  // Exit if curb already exists
+  function insertCurbNode(nodeID: EntityID, wayID: EntityID, curbTags: OsmTags): void {
+    const graph = editor.staging.graph;
+    const node = graph.hasEntity(nodeID) as OsmNode | undefined;
+    if (!node || hasCurbTag(node)) return;  // Exit if curb already exists
 
-    // Calculate the position for the new curb node
+    // The part of the crossing that ends at this node.  If the other end was split off already,
+    // this may be the part that kept the crossing's ID or the new one, so look for either.
+    const parents = graph.parentWays(node);
+    const way = parents.find(parent => parent.id === wayID) ?? parents.find(parent => isCrossingWay(parent.tags));
+    if (!way) return;
+
+    // Calculate the position for the new curb node: 1 m in from the end, but no more than a third of
+    // the way to the next node, so it stays between them and a short crossing keeps a middle part
     const nodeIndex = way.nodes.indexOf(node.id);
     const adjacentNode = graph.entity(way.nodes[nodeIndex + 1] || way.nodes[nodeIndex - 1]) as OsmNode;
-    const newNodePosition = calculateNewNodePosition(node, adjacentNode, 1);
+    const offsetMeters = Math.min(1, geoSphericalDistance(node.loc!, adjacentNode.loc!) / 3);
+    const newNodePosition = calculateNewNodePosition(node, adjacentNode, offsetMeters);
 
     // Find connected ways and select the appropriate tags
     const connectedWays = graph.parentWays(node);
@@ -234,8 +244,14 @@ export function validateCurbNodes(context: Context): ValidatorFunction {
 
     const newWayIDs = splitAction.getCreatedWayIDs();
     if (newWayIDs.length > 0) {
-      for (const wayID of newWayIDs) {
-        editor.perform(actionChangeTags(wayID, connectedWayTags));
+      // Tag the piece between the end and the curb like the way it joins.  Find it by its nodes:
+      // `actionSplit` keeps the crossing's ID on the longer piece, which may not be the crossing.
+      const splitGraph = editor.staging.graph;
+      const endPiece = [way.id, ...newWayIDs]
+        .map(pieceID => splitGraph.hasEntity(pieceID) as OsmWay | undefined)
+        .find(piece => piece?.nodes.includes(node.id));
+      if (endPiece) {
+        editor.perform(actionChangeTags(endPiece.id, connectedWayTags));
       }
     } else {
       console.error('No new ways created after split');  // eslint-disable-line no-console
@@ -245,11 +261,13 @@ export function validateCurbNodes(context: Context): ValidatorFunction {
 
   /**
    * Converts an existing node into a curb node by adding kerb tags.
-   * @param node - The node to update
+   * @param nodeID - The node to update
    * @param tags - The curb tags to apply
-   * @param graph - The current graph
    */
-  function updateNodeToCurb(node: OsmNode, tags: OsmTags, graph: Graph): void {
+  function updateNodeToCurb(nodeID: EntityID, tags: OsmTags): void {
+    const node = editor.staging.graph.hasEntity(nodeID) as OsmNode | undefined;
+    if (!node) return;
+
     const newTags = { ...node.tags, barrier: 'kerb', kerb: tags.kerb };
     editor.perform(actionChangeTags(node.id, newTags));
   }

@@ -1,5 +1,7 @@
+import { conflationDefaults } from '../core/ConflationSystem.ts';
 import { DOMParser } from '@xmldom/xmldom';
 import { Extent } from '@rapid-sdk/math';
+import { featureKey } from '../data/dataID.ts';
 import { GeoJSONData } from '../data/GeoJSONData.ts';
 import { geojsonFeatures } from '../util/util.ts';
 import { gpx, kml } from '@tmcw/togeojson';
@@ -7,22 +9,21 @@ import { RapidDataDictionary } from './RapidDataDictionary.ts';
 import { TreeStore } from '../lib/TreeStore.ts';
 import { utilFetchResponse } from '../util/fetch_response.ts';
 
+import type { ConflationSettings } from '../core/ConflationSystem.ts';
 import type { Context } from '../Context.ts';
 import type { Document as XmlDocument } from '@xmldom/xmldom';
 import type { FileRecord } from '../core/DatabaseSystem.ts';
 import type { GeoJSONProps } from '../data/GeoJSONData.ts';
-import type { TreeValue } from './TreeStore.ts';
 import type { Vec2 } from '@rapid-sdk/math';
 
 const RAPID_MAGENTA = '#da26d3';
 
 /**
- * Prop keys whose values are booleans. The settings store is string-only, so these
- * are persisted as `'true'`/`'false'` strings by `toJSON()` and coerced back to real
- * booleans by `fromJSON()`. Add new boolean props here so they round-trip correctly.
+ * The start of every datasetID the user adds. Nothing that Rapid ships (datasets, services, cache
+ * IDs) may use it, so the user's datasets can't collide with Rapid's, now or in a later release.
+ * A datasetID is also the spatial ID of the dataset's data (see `design/data-ids.md`).
  */
-type RapidDatasetBooleanProp = 'beta' | 'conflated' | 'custom' | 'featured' | 'filtered' | 'hidden';
-const BOOLEAN_PROPS: RapidDatasetBooleanProp[] = ['beta', 'conflated', 'custom', 'featured', 'filtered', 'hidden'];
+export const USER_DATASET_PREFIX = 'user-';
 
 
 /**
@@ -35,6 +36,8 @@ export interface RapidDatasetProps {
   serviceID: ServiceID;
   /** Identifier for the spatial cache where the data is stored */
   spatialID: SpatialID;
+  /** The asset file that defined this dataset, if any (see `RapidSystem.merge`) */
+  assetID: AssetID;
 
   /** Categories this dataset belongs to (e.g. 'buildings', 'addresses') */
   categories: string[];
@@ -65,10 +68,12 @@ export interface RapidDatasetProps {
   filtered: boolean;
   /** Whether this dataset is hidden from the catalog (e.g. walkthrough data) */
   hidden: boolean;
-  /** Whether this dataset uses conflation */
+  /** Whether this dataset is matched against OpenStreetMap, using the rules in `conflation` */
   conflated: boolean;
-  /** Whether this dataset is a "custom" dataset (i.e. setup by the user) */
+  /** Whether this dataset is a "custom" dataset (i.e. setup by the user, who can edit or delete it) */
   custom: boolean;
+  /** Conflation settings: whether to match this dataset against OSM, and the matching rules */
+  conflation: ConflationSettings;
 
   /** Localization string ID for the label */
   labelStringID: StringID;
@@ -96,6 +101,8 @@ export class RapidDataset {
   public serviceID: ServiceID;
   /** Identifier for the spatial cache where the data is stored */
   public spatialID: SpatialID;
+  /** The asset file that defined this dataset, if any (see `RapidSystem.merge`) */
+  public assetID: AssetID;
   /** The data dictionary for this dataset, can be setup once the dataset is added to Rapid */
   public dictionary: RapidDataDictionary | null;
 
@@ -128,10 +135,12 @@ export class RapidDataset {
   public filtered: boolean;
   /** Whether this dataset is hidden from the catalog (e.g. internal walkthrough data) */
   public hidden: boolean;
-  /** Whether this dataset uses conflation when merging features into the OSM graph */
+  /** Whether this dataset is matched against OpenStreetMap, using the rules in `conflation` */
   public conflated: boolean;
   /** Whether this dataset is a "custom" dataset (i.e. setup by the user) */
   public custom: boolean;
+  /** Conflation settings: whether to match this dataset against OSM, and the matching rules */
+  public conflation: ConflationSettings;
 
   /** Localization string key for the dataset display name */
   public labelStringID: StringID | undefined;
@@ -158,7 +167,8 @@ export class RapidDataset {
 
     this.id = props.id ?? '';
     this.serviceID = props.serviceID ?? '';
-    this.spatialID = props.spatialID ?? `${this.serviceID ?? 'rapid'}-${this.id}-data`;
+    this.spatialID = props.spatialID ?? this.id;   // also the spatial ID of its data (see `design/data-ids.md`)
+    this.assetID = props.assetID ?? '';
     this.categories = new Set<string>(props.categories ?? []);
     this.color = props.color ?? RAPID_MAGENTA;
     this.dataUsed = props.dataUsed ?? [];
@@ -179,6 +189,7 @@ export class RapidDataset {
     this.hidden = props.hidden ?? false;
     this.conflated = props.conflated ?? false;
     this.custom = props.custom ?? false;
+    this.conflation = { ...conflationDefaults(), ...props.conflation };   // a definition may leave settings out (even `rules`)
 
     this.labelStringID = props.labelStringID;
     this.descriptionStringID = props.descriptionStringID;
@@ -221,6 +232,18 @@ export class RapidDataset {
     return rapid.enabledDatasetIDs.has(this.id);
   }
 
+  /**
+   * The source property that identifies features, if the data mapping names one (`isID`).
+   * Data IDs are built from it when the data is loaded (see `featureKey`), so if it changes,
+   * the data has to be loaded again.
+   * @return  The property name, or `undefined`
+   * @readonly
+   */
+  public get idField(): string | undefined {
+    const transform = this.dictionary?.transforms.find(t => t.isID && t.source && t.source !== '*');
+    return transform?.source;
+  }
+
 
   /**
    * Choose a default thumbnail if we weren't supplied one.
@@ -258,14 +281,16 @@ export class RapidDataset {
   }
 
   /**
-   * Returns a settings-safe JSON representation of this data element.
-   * Boolean flags are serialized as `'true'`/`'false'` strings because the settings
-   * store only holds string leaves. Use `fromJSON()` to reconstruct a `RapidDataset`.
-   * @return JSON representation of this data element
+   * Returns the definition of this dataset in plain JSON types, the same shape as a dataset in
+   * an asset file (see `data/schema/dataset.schema.json`), plus its `id`.
+   * Runtime state (`custom`, `filtered`, the loaded `extent`) is left out.
+   * Use `fromJSON()` to reconstruct a `RapidDataset`.
+   * @return JSON representation of this dataset
    */
-  public toJSON(): Record<string, TreeValue> {
-    const result: Record<string, TreeValue> = { id: this.id };
+  public toJSON(): Record<string, unknown> {
+    const result: Record<string, unknown> = { id: this.id };
 
+    if (this.serviceID)            result.serviceID = this.serviceID;
     if (this.categories.size)      result.categories = [...this.categories];
     if (this.dataUsed.length)      result.dataUsed = this.dataUsed.slice();
     if (this.color)                result.color = this.color;
@@ -277,10 +302,10 @@ export class RapidDataset {
     if (this.labelStringID)        result.labelStringID = this.labelStringID;
     if (this.descriptionStringID)  result.descriptionStringID = this.descriptionStringID;
 
-    // The settings store is string-only, so persist boolean flags as 'true'/'false' strings.
-    for (const key of BOOLEAN_PROPS) {
-      result[key] = String(this[key]);
-    }
+    result.beta = this.beta;
+    result.featured = this.featured;
+    result.hidden = this.hidden;
+    result.conflated = this.conflated;
 
     result.label = this.getLabel();
     result.description = this.getDescription();
@@ -292,31 +317,23 @@ export class RapidDataset {
       }
     }
 
+    result.conflation = structuredClone(this.conflation);
+
     return result;
   }
 
 
   /**
-   * Reconstructs a `RapidDataset` from its persisted JSON form (see `toJSON`).
-   * The settings store is string-only, so boolean flags arrive as `'true'`/`'false'`
-   * strings and are coerced back to real booleans here.
+   * Reconstructs a `RapidDataset` from its JSON form (see `toJSON`), or from a dataset definition
+   * in an asset file.
    * @param context - Global shared application context
-   * @param json - The persisted settings object
+   * @param json - The dataset definition, in plain JSON types (not modified)
    * @return A new `RapidDataset`
    */
-  public static fromJSON(context: Context, json: Record<string, TreeValue>): RapidDataset {
+  public static fromJSON(context: Context, json: Record<string, unknown>): RapidDataset {
     // Handle `dictionary` property separately from other props
-    const dictJSON = json.dictionary;
-    delete json.dictionary;
-
-    const props = { ...json } as Partial<RapidDatasetProps>;
-
-    for (const key of BOOLEAN_PROPS) {
-      const val = json[key];
-      if (typeof val === 'string') {
-        props[key] = (val === 'true');
-      }
-    }
+    const { dictionary: dictJSON, ...rest } = json;
+    const props = rest as Partial<RapidDatasetProps>;
 
     const ds = new RapidDataset(context, props);
 
@@ -340,7 +357,7 @@ export class RapidDataset {
    * @return  Promise resolved when this custom source is ready, or rejected if errors
    */
   public setupCustomDatasetAsync(): Promise<void> {
-    if (!this.custom) {
+    if (this.serviceID) {   // the service provides the data
       return Promise.reject(new Error('Not a custom source'));
     }
 
@@ -485,19 +502,27 @@ export class RapidDataset {
     const newFeatures = [];
     this.extent = new Extent();
 
+    // Each feature gets a stable id, so that what the user accepted or ignored still matches it
+    // after the data is loaded again (see `featureKey`).
+    const idField = this.idField;
+    const usedKeys = new Set<string>();
+
     // We may have a Feature or a FeatureCollection, coax it to an array of Features.
-    let counter = 0;
     const features = geojsonFeatures(geojson as GeoJSON.Feature | GeoJSON.FeatureCollection);
     for (const feature of features) {
+      const key = featureKey(feature, idField, usedKeys);
+
       // We may have a MultiPolygon/MultiLineString/MultiPoint..
       // For our purposes, we really want to work with them as single part features..
-      for (const part of this._toSingleFeatures(feature)) {
+      const parts = this._toSingleFeatures(feature);
+      for (let partIndex = 0; partIndex < parts.length; partIndex++) {
+        const part = parts[partIndex];
         const extent = this._calcExtent(part);   // sanity check
         if (!isFinite(extent.min[0])) continue;  // invalid - no coordinates?
 
-        const dataID = `${this.id}-${counter}`;
         const props: GeoJSONProps = {
-          id:         dataID,
+          id:         parts.length > 1 ? `${key}:${partIndex}` : key,
+          spatialID:  this.spatialID,
           serviceID:  this.serviceID,
           datasetID:  this.id,
           geojson:    part
@@ -506,7 +531,6 @@ export class RapidDataset {
         const d = new GeoJSONData(this.context, props);
         newFeatures.push(d);
         this.extent.extendSelf(extent);
-        counter++;
       }
     }
 

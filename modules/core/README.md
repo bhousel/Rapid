@@ -103,9 +103,10 @@ collected, sorted by specificity, and their referenced styles are deep-merged.
 |------|-------------|
 | `AbstractSystem.ts` | Base class for all systems with lifecycle management |
 | `AssetSystem.ts` | Manages loading and caching of assets (images, data files) |
+| `ConflationSystem.ts` | Matches Rapid dataset features against OSM and triages them (already mapped or new) |
 | `DatabaseSystem.ts` | Durable storage wrapping IndexedDB (`sessions` and `files` stores), with an in-memory fallback |
 | `DragAndDropSystem.ts` | Owns file drag-and-drop and routes dropped files to registered consumers |
-| `EditSystem.ts` | Manages edit history, undo/redo, and staging changes |
+| `EditSystem.ts` | Manages edit history, undo/redo, and staging changes; owns the OSM spatial indexes, and searches them for any graph (`entitiesInBox`, `segmentsInBox`) |
 | `FilterSystem.ts` | Controls visibility filtering of map features |
 | `GraphicsSystem.ts` | Manages Pixi.js rendering pipeline |
 | `ImagerySystem.ts` | Manages background imagery layers |
@@ -125,7 +126,7 @@ collected, sorted by specificity, and their referenced styles are deep-merged.
 | `StorageSystem.ts` | Small synchronous storage (localStorage wrapper) |
 | `StyleSystem.ts` | Manages feature styling, selectors, and variables |
 | `UiSystem.ts` | Manages the user interface components |
-| `UploaderSystem.ts` | Handles uploading changes to OSM |
+| `UploaderSystem.ts` | Handles uploading changes to OSM, and checking and resolving conflicts (see [`design/uploader-system.md`](../../design/uploader-system.md)) |
 | `UrlHashSystem.ts` | Manages URL hash state (bookmarkable URLs) |
 | `ValidationSystem.ts` | Runs validation checks on map data |
 | `WorkerSystem.ts` | Worker pool (lazy spawn, round-robin), task dispatch, and listener registry |
@@ -133,7 +134,7 @@ collected, sorted by specificity, and their referenced styles are deep-merged.
 | `index.worker.ts` | Barrel that collects core worker listeners for bundling into `worker.ts` |
 | `types.ts` | TypeScript type definitions for core systems |
 
-Design notes for several systems (database, drag-and-drop, keyboard, network, scheduler, settings, spatial, style, UI) are in [`design/`](../../design/).
+Design notes for most core systems are in [`design/`](../../design/); [`design/README.md`](../../design/README.md) lists them with their status.
 
 ## Accessing Systems
 

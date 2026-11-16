@@ -1,4 +1,5 @@
 import { AbstractSystem } from '../core/AbstractSystem.ts';
+import { featureKey } from '../data/dataID.ts';
 import { GeoJSONData } from '../data/GeoJSONData.ts';
 import { Tiler } from '@rapid-sdk/math';
 import { utilQsString } from '@rapid-sdk/util';
@@ -73,7 +74,7 @@ export class GeoScribbleService extends AbstractSystem {
     const spatial = context.systems.spatial!;
 
     network.clearMatching(id => id.startsWith('geoscribble-') || id.includes(GEOSCRIBBLE_API));
-    spatial.clearMatching(id => id.startsWith('geoscribble-'));
+    spatial.clearCache('geoscribble');
 
     this._lastv = null;
 
@@ -87,7 +88,7 @@ export class GeoScribbleService extends AbstractSystem {
    */
   public getData(): GeoJSONData[] {
     const spatial = this.context.systems.spatial!;
-    return spatial.getVisibleItems('geoscribble-data').map(hit => hit.contents as GeoJSONData);
+    return spatial.getVisibleItems('geoscribble').map(hit => hit.contents as GeoJSONData);
   }
 
 
@@ -141,12 +142,15 @@ export class GeoScribbleService extends AbstractSystem {
       throw new Error('Invalid response');
     }
 
+    // Each feature is keyed by its GeoScribble `id` (or a hash, if it has none), so its data ID is the
+    // same after a reload, and a feature in two tiles' responses is one datum.
     const toLoad: GeoJSONData[] = [];
     for (const feature of response.features) {
-      toLoad.push(new GeoJSONData(context, { serviceID: this.id, geojson: feature }));
+      const id = featureKey(feature, 'id', new Set<string>());
+      toLoad.push(new GeoJSONData(context, { id: id, serviceID: this.id, spatialID: 'geoscribble', geojson: feature }));
     }
 
-    spatial.addData('geoscribble-data', toLoad);
+    spatial.addData('geoscribble', toLoad);
     gfx?.deferredRedraw();
   }
 

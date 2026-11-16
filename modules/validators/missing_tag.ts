@@ -106,7 +106,7 @@ export function validateMissingTag(context: Context): ValidatorFunction {
     const referenceID = subtype === 'highway_classification' ? 'unknown_road' : 'missing_tag';
 
     // can always delete if the user created it in the first place..
-    const canDelete = (entity.version === undefined || entity.v !== undefined);
+    const canDelete = (entity.version === undefined || graph.base.entities.get(entity.id) !== entity);
     const severity = (canDelete && subtype !== 'highway_classification') ? 'error' : 'warning';
 
     result.issues = [new ValidationIssue(context, {

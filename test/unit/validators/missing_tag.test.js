@@ -50,6 +50,15 @@ describe('validateMissingTag', () => {
     assert.deepInclude(issues[0], expected);
   });
 
+  it('flags a new relation with no tags as an error, so it isn\'t uploaded empty', () => {
+    const w = new Rapid.OsmWay(context, { id: 'w1', tags: { highway: 'primary' } });
+    const r = new Rapid.OsmRelation(context, { id: 'r-1', members: [{ id: 'w1', type: 'way', role: '' }] });
+    const g = new Rapid.Graph(context, [w, r]);
+    const issues = validator(r, g).issues;
+    assert.lengthOf(issues, 1);
+    assert.deepInclude(issues[0], { type: 'missing_tag', subtype: 'any', severity: 'error', entityIds: ['r-1'] });
+  });
+
   it('flags missing descriptive tags on a way', () => {
     const w = new Rapid.OsmWay(context, { tags: { name: 'Main Street', source: 'Bing' }});
     const g = new Rapid.Graph(context, [w]);
@@ -111,6 +120,22 @@ describe('validateMissingTag', () => {
       entityIds: [w.id]
     };
     assert.deepInclude(issues[0], expected);
+  });
+
+  it('is an error on a feature the user created or changed, and a warning on one they didn\'t touch', () => {
+    const existing = new Rapid.OsmWay(context, { id: 'w1', version: '1', tags: { name: 'Main Street' }});
+    const base = new Rapid.Graph(context, [existing]);
+    const graph = new Rapid.Graph(base);
+    assert.strictEqual(validator(existing, graph).issues[0].severity, 'warning');
+
+    // Removing the tags from a feature that's already in OSM is the user's problem
+    const stripped = existing.update({ tags: {} });
+    graph.replace(stripped);
+    assert.strictEqual(validator(stripped, graph).issues[0].severity, 'error');
+
+    const created = new Rapid.OsmWay(context, { tags: { name: 'New Street' }});
+    graph.replace(created);
+    assert.strictEqual(validator(created, graph).issues[0].severity, 'error');
   });
 
 });

@@ -1,6 +1,7 @@
 import type { Vec2 } from '@rapid-sdk/math';
 
 import type { Context } from '../Context.ts';
+import type { EditLabel } from '../lib/Edit.ts';
 import type { KeyOperationBehavior } from '../behaviors/KeyOperationBehavior.ts';
 
 
@@ -92,11 +93,12 @@ export class AbstractOperation {
 
 
   /**
-   * Localized undo annotation for the edit the operation performs.
-   * @return The annotation text
+   * Label for the edit the operation performs, shown in the undo/redo menu.
+   * It's a string ID and parameters, translated when shown.
+   * @return The label, or `undefined` if the operation makes no edit
    */
-  public annotation(): string {
-    return '';
+  public editLabel(): EditLabel | undefined {
+    return undefined;
   }
 
 

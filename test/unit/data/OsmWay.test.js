@@ -22,8 +22,15 @@ describe('OsmWay', () => {
       const a = new Rapid.OsmWay(context);
       assert.instanceOf(a, Rapid.OsmWay);
       assert.strictEqual(a.context, context);
-      assert.instanceOf(a.geoms, Rapid.Geometry);
+      assert.instanceOf(a.baseGeometry, Rapid.Geometry);
       assert.isObject(a.props);
+    });
+
+    it('throws when its geometry is read without a graph', () => {
+      const a = new Rapid.OsmWay(context, { id: 'w1' });
+      assert.throws(() => a.geoms, /graph\.geometry/);
+      assert.throws(() => a.extent(), /graph\.geometry/);
+      assert.throws(() => a.intersects(new Rapid.sdk.Extent([0, 0], [1, 1])), /graph\.geometry/);
     });
 
     it('generates an empty tags object, if unset', () => {
@@ -46,7 +53,7 @@ describe('OsmWay', () => {
       const a = new Rapid.OsmWay(context, orig);
       assert.instanceOf(a, Rapid.OsmWay);
       assert.strictEqual(a.context, context);
-      assert.instanceOf(a.geoms, Rapid.Geometry);
+      assert.instanceOf(a.baseGeometry, Rapid.Geometry);
       assert.notStrictEqual(a.props, orig);  // cloned, not ===
     });
 
@@ -55,8 +62,8 @@ describe('OsmWay', () => {
       const b = new Rapid.OsmWay(a);
       assert.instanceOf(b, Rapid.OsmWay);
       assert.strictEqual(b.context, context);
-      assert.instanceOf(b.geoms, Rapid.Geometry);
-      assert.notStrictEqual(b.geoms, a.geoms);  // cloned, not ===
+      assert.instanceOf(b.baseGeometry, Rapid.Geometry);
+      assert.strictEqual(b.baseGeometry, a.baseGeometry);  // shared, a Geometry is never changed in place
       assert.notStrictEqual(b.props, a.props);  // cloned, not ===
       assert.isObject(b.props);
     });
@@ -68,8 +75,8 @@ describe('OsmWay', () => {
       const b = new Rapid.OsmWay(a, update);
       assert.instanceOf(b, Rapid.OsmWay);
       assert.strictEqual(b.context, context);
-      assert.instanceOf(b.geoms, Rapid.Geometry);
-      assert.notStrictEqual(b.geoms, a.geoms);  // cloned, not ===
+      assert.instanceOf(b.baseGeometry, Rapid.Geometry);
+      assert.strictEqual(b.baseGeometry, a.baseGeometry);  // shared, a Geometry is never changed in place
       assert.notStrictEqual(b.props, a.props);  // cloned, not ===
       assert.deepInclude(b.props, orig);
       assert.deepInclude(b.props, update);
@@ -211,7 +218,7 @@ describe('OsmWay', () => {
       const node2 = new Rapid.OsmNode(context, { loc: [5, 10] });
       let way = new Rapid.OsmWay(context, { nodes: [node1.id, node2.id] });
       const graph = new Rapid.Graph(context, [node1, node2, way]);
-      const extent = way.extent(graph);
+      const extent = graph.extent(way);
       assert.isOk(extent.equals(new Rapid.sdk.Extent([0, 0], [5, 10])));
     });
   });
@@ -221,7 +228,7 @@ describe('OsmWay', () => {
       const node = new Rapid.OsmNode(context, {loc: [0, 0]});
       const way = new Rapid.OsmWay(context, {nodes: [node.id]});
       const graph = new Rapid.Graph(context, [node, way]);
-      const result = way.intersects(new Rapid.sdk.Extent([-5, -5], [5, 5]), graph);
+      const result = graph.extent(way).intersects(new Rapid.sdk.Extent([-5, -5], [5, 5]));
       assert.isTrue(result);
     });
 
@@ -229,7 +236,7 @@ describe('OsmWay', () => {
       const node = new Rapid.OsmNode(context, {loc: [6, 6]});
       const way = new Rapid.OsmWay(context, {nodes: [node.id]});
       const graph = new Rapid.Graph(context, [node, way]);
-      const result = way.intersects(new Rapid.sdk.Extent([-5, -5], [5, 5]), graph);
+      const result = graph.extent(way).intersects(new Rapid.sdk.Extent([-5, -5], [5, 5]));
       assert.isFalse(result);
     });
   });
@@ -781,6 +788,43 @@ describe('OsmWay', () => {
   });
 
 
+  describe('adjacentNodeIDs', () => {
+    it('returns an empty set for a node not in the way', () => {
+      const way = new Rapid.OsmWay(context, { nodes: ['a', 'b', 'c'] });
+      assert.deepEqual(way.adjacentNodeIDs('z'), new Set());
+    });
+
+    it('returns the nodes before and after a node in the middle', () => {
+      const way = new Rapid.OsmWay(context, { nodes: ['a', 'b', 'c', 'd'] });
+      assert.deepEqual(way.adjacentNodeIDs('b'), new Set(['a', 'c']));
+    });
+
+    it('returns only the one neighbor of an end of an open way', () => {
+      const way = new Rapid.OsmWay(context, { nodes: ['a', 'b', 'c'] });
+      assert.deepEqual(way.adjacentNodeIDs('a'), new Set(['b']));
+      assert.deepEqual(way.adjacentNodeIDs('c'), new Set(['b']));
+    });
+
+    it('returns both neighbors of the first and last node of a closed way', () => {
+      const way = new Rapid.OsmWay(context, { nodes: ['a', 'b', 'c', 'a'] });
+      assert.deepEqual(way.adjacentNodeIDs('a'), new Set(['b', 'c']));
+    });
+
+    it('returns the neighbors of every place a node appears, each once', () => {
+      const way = new Rapid.OsmWay(context, { nodes: ['a', 'b', 'c', 'b', 'd'] });   // passes through b twice
+      assert.deepEqual(way.adjacentNodeIDs('b'), new Set(['a', 'c', 'd']));
+    });
+
+    it('returns only the nodes before or after, when asked', () => {
+      const way = new Rapid.OsmWay(context, { nodes: ['a', 'b', 'c', 'a'] });
+      assert.deepEqual(way.adjacentNodeIDs('b', 'before'), new Set(['a']));
+      assert.deepEqual(way.adjacentNodeIDs('b', 'after'), new Set(['c']));
+      assert.deepEqual(way.adjacentNodeIDs('a', 'before'), new Set(['c']));   // from its last place
+      assert.deepEqual(way.adjacentNodeIDs('a', 'after'), new Set(['b']));    // from its first place
+    });
+  });
+
+
   describe('isAdjacent', () => {
     it('returns false for nodes not in the way', () => {
       const way = new Rapid.OsmWay(context);
@@ -819,6 +863,61 @@ describe('OsmWay', () => {
       const graph = new Rapid.Graph(context);
       const way = new Rapid.OsmWay(context, { tags: { area: 'yes' } });
       assert.strictEqual(way.geometry(graph), 'area');
+    });
+  });
+
+
+  describe('asFeature', () => {
+    // A square ring a-b-c-d-a, which can be used as a standalone way or a multipolygon outer.
+    const nodes = [
+      new Rapid.OsmNode(context, { id: 'a', loc: [0, 0] }),
+      new Rapid.OsmNode(context, { id: 'b', loc: [0, 1] }),
+      new Rapid.OsmNode(context, { id: 'c', loc: [1, 1] }),
+      new Rapid.OsmNode(context, { id: 'd', loc: [1, 0] })
+    ];
+    const ring = ['a', 'b', 'c', 'd', 'a'];
+
+    it('returns the way itself for a tagged way', () => {
+      const way = new Rapid.OsmWay(context, { id: 'w1', nodes: ring, tags: { building: 'yes' } });
+      const graph = new Rapid.Graph(context, [...nodes, way]);
+      const feature = way.asFeature(graph);
+      assert.strictEqual(feature.entity, way);
+      assert.strictEqual(feature.geometry, 'area');
+      assert.deepEqual(feature.tags, { building: 'yes' });
+    });
+
+    it('returns the way itself for an untagged way with no multipolygon parent', () => {
+      const way = new Rapid.OsmWay(context, { id: 'w1', nodes: ring });
+      const route = new Rapid.OsmRelation(context, {
+        id: 'r1', tags: { type: 'route' }, members: [{ id: 'w1', type: 'way', role: '' }]
+      });
+      const graph = new Rapid.Graph(context, [...nodes, way, route]);
+      const feature = way.asFeature(graph);
+      assert.strictEqual(feature.entity, way);
+      assert.strictEqual(feature.geometry, 'line');
+    });
+
+    it('returns the parent multipolygon, as an area, for an untagged member way', () => {
+      const way = new Rapid.OsmWay(context, { id: 'w1', nodes: ring });
+      const mp = new Rapid.OsmRelation(context, {
+        id: 'r1', tags: { type: 'multipolygon', building: 'retail' }, members: [{ id: 'w1', type: 'way', role: 'outer' }]
+      });
+      const graph = new Rapid.Graph(context, [...nodes, way, mp]);
+      assert.strictEqual(way.geometry(graph), 'line');   // what the way says about itself
+
+      const feature = way.asFeature(graph);
+      assert.strictEqual(feature.entity, mp);
+      assert.strictEqual(feature.geometry, 'area');
+      assert.deepEqual(feature.tags, { type: 'multipolygon', building: 'retail' });
+    });
+
+    it('returns the way itself for a tagged member of a multipolygon', () => {
+      const way = new Rapid.OsmWay(context, { id: 'w1', nodes: ring, tags: { barrier: 'wall' } });
+      const mp = new Rapid.OsmRelation(context, {
+        id: 'r1', tags: { type: 'multipolygon', building: 'retail' }, members: [{ id: 'w1', type: 'way', role: 'outer' }]
+      });
+      const graph = new Rapid.Graph(context, [...nodes, way, mp]);
+      assert.strictEqual(way.asFeature(graph).entity, way);
     });
   });
 

@@ -12,7 +12,8 @@ core refactor [facebook/Rapid#961](https://github.com/facebook/Rapid/pull/961)).
 edit history).
 
 > **Status:** Phases 0–4 implemented (see Rollout Plan below): sessions store, multi-session
-> restore, `files` store, and the storage-check API. Still open: the stored-files management UI
+> restore, `files` store, and the storage-check API. Schema v3 adds the `datasets` store (custom
+> dataset definitions, owned by `RapidSystem`). Still open: the stored-files management UI
 > and Phase 5 (worker offload). The API sketches in this doc describe the shipped `DatabaseSystem`
 > interface plus proposed future additions.
 
@@ -326,6 +327,7 @@ structured history object plus metadata (as shipped in Phase 2):
 interface SessionRecord {
   id: SessionID;             // crypto.randomUUID (or the legacy backup key for a localStorage session)
   origin: string;            // window.location.origin (replaces the key-name scoping hack)
+  apiURL?: string;           // the OSM API the edits were made on (absent before November 2026)
   createdAt: number;
   updatedAt: number;         // 0 if unknown (legacy)
   heartbeatAt?: number;      // liveness: last time the owning tab proved this session is still open
@@ -349,6 +351,16 @@ interface SessionRecord {
   in the restore UI: restore one, delete one, or skip. This is the headline feature — moving from
   "one restorable backup" to "pick from a list" — and it fixes the unreliable single-slot/multi-tab
   prompt described above.
+- **Only sessions made on the OSM API we're connected to are offered** (`apiURL`). Entity IDs and
+  versions name different features on another API: a session made on the dev API and restored on
+  live fetched unrelated live entities as its base, and Save could upload the edits over them. Sessions
+  from before `apiURL` was recorded are offered on any API. The check at init counts every API,
+  because a host's preauthenticated connection switches the API after systems init; `startAsync`
+  decides with the API settled.
+- **Switching the API offers that API's sessions** (`findRestorableSessionsAsync`, Nov 2026). Startup is
+  always on the live API, so before this a session made on the dev API was never offered. After the
+  source switcher changes the API, it settles that API's interrupted uploads and shows the restore
+  screen if there are sessions, the same as startup.
 - **Retention: keep sessions indefinitely; evict only on explicit user action.** No auto-cap or
   auto-expiry. A session is removed only when the user deletes it from the list (or `clearBackup()`
   on source-switch / after upload removes the *active* session).
@@ -377,11 +389,20 @@ session that another tab is actively editing, each session record carries a `hea
   "in use" by a live tab. Legacy localStorage snapshots have no heartbeat and are always offered.
 - **Reload vs. another tab.** A heartbeat alone can't distinguish "another live tab" from "my own tab
   just reloaded" — and we must not hide your own session when you reload. So the tab records the
-  session id it owns in **`sessionStorage`** (per-tab, survives reload, absent in a new/duplicate
-  tab). `_isLiveElsewhere` never excludes the tab's own current or just-reloaded session; a genuinely
+  session id it owns in **`sessionStorage`** (per-tab, survives reload, absent in a new tab).
+  `_isLiveElsewhere` never excludes the tab's own current or just-reloaded session; a genuinely
   different tab's fresh session is excluded.
+- **Duplicated tabs.** "Duplicate tab" copies `sessionStorage`, owned session id and all, from a tab
+  that's still open. A page marks itself as gone on `pagehide` (`_markPageHidden`), so on startup a
+  copy without that mark is the other tab's, and the duplicate forgets it (`_forgetCopiedSession`,
+  Nov 2026). A tab that crashed leaves no mark either; its session is offered once its heartbeat
+  goes stale.
 - Cleared on discard/delete of the active session. If a tab closes without clearing, its heartbeat
   simply goes stale after `SESSION_LIVE_MS` and the session becomes restorable again.
+- **The walkthrough holds the session** (`EditSystem.holdSession`, Nov 2026). It resets the editor,
+  which forgets the active session, so the held record keeps its heartbeat until `continueSession`
+  (or `releaseSession`, if the edits can't be given back). A backup still being written when the
+  session changes is dropped, so it can't write the replaced session back.
 
 > Note: the heartbeat re-writes the full session record (including `data`) every 20s while a session
 > is open but idle. Fine for typical sessions; if very large sessions make this costly, a future
@@ -448,6 +469,18 @@ gains a working `files` store; and that a fresh DB opens at v2 with both stores.
 **Not done yet (deferred):** wiring drag-and-drop/file-input to actually populate the store, and a
 reload-on-startup flow. Those belong to a future input/data-file system that consumes this API.
 
+## Use Case 2b — Custom Dataset Definitions ✅ done (schema v3)
+
+A `datasets` store (`keyPath: 'id'`, index `by-updatedAt`, `sinceVersion: 3`) holds the custom
+datasets that the user added in the Rapid menu: one record per dataset,
+`{ id, updatedAt, dataset }`, where `dataset` is the definition from `RapidDataset.toJSON()` (with its
+data mapping and conflation settings, in plain JSON types). `RapidSystem` owns the record shape; see
+[`rapid-system.md`](rapid-system.md). These used to live in `SettingsSystem` as dozens of flat
+`rapid.custom.*` keys each. They weren't migrated (that code never shipped); users add them again.
+
+Also: `initAsync` is now memoized, so the systems that wait on it (`EditSystem`, `RapidSystem`) don't
+each start their own `openDB` before the first one finishes.
+
 ## Use Case 3 — Storage Management (first-class)
 
 Because sessions and files can consume real space, `DatabaseSystem` treats storage as something to
@@ -480,6 +513,7 @@ Boundary guidance:
 | One-off small key/value | `StorageSystem` |
 | Edit history / sessions (large, multi) | **`DatabaseSystem`** |
 | Dropped data files / blobs | **`DatabaseSystem`** |
+| Custom dataset definitions | **`DatabaseSystem`** |
 
 ## Lifecycle & Dependencies
 
@@ -520,6 +554,37 @@ Behavior when unavailable:
   this data won't be saved when you close Rapid."* We don't block the action.
 - Concrete example: a user drops a GeoJSON file **in incognito mode**. It loads and renders fine, but
   it won't reappear in a later normal-mode session — and we told them so up front.
+
+**What the user sees (Nov 2026).** `status` says whether storage works, and why not (`'ok'`,
+`'unavailable'`, `'blocked'`, `'closed'`), and `statuschange` fires when it changes. `UiApiStatus`
+shows a message in the red status bar for anything but `'ok'`, with a Dismiss link, stacked with any
+other problems (API offline, a failed backup write). EditSystem no longer writes the legacy
+localStorage backup, so "your work will not be backed up" is accurate.
+
+### Other tabs and version bumps
+
+Every Rapid tab on an origin shares the one database, and they may run different builds (a `main`
+tab next to a branch build). IndexedDB can't upgrade a database while any other connection holds it
+open, and an older build can't open a database at a newer version (`VersionError`). Before Nov 2026
+`openDB` had no handlers for either, so a v2 tab held up the v3 upgrade forever and Rapid never
+finished starting. Now:
+
+- **A newer tab needs to upgrade** (`blocking`): close our connection at once, switch to the
+  in-memory mock, and set status `'closed'`. The newer tab, the one the user just opened, gets
+  durable storage. What this tab backed up before the close is in the database, and reloading the
+  tab picks it up.
+- **An older tab holds up our upgrade** (`blocked`): an older build that closes when asked does so at
+  once. One that doesn't (any build from before this change) is waiting on the user, so after
+  `BLOCKED_WAIT_MS` (2 s) start on the mock with status `'blocked'`. If the old tab closes later, the
+  upgrade runs, the late connection is closed, and the next start uses the upgraded database.
+- **The database is newer than this build** (`VersionError`): open it at the version it has, and use
+  it if every store and index in the manifest is there; otherwise close it and fall back
+  (`'unavailable'`).
+- **The browser closes the connection** (`terminated`): same as `'closed'`.
+
+**Rule for version bumps: only add stores and indexes.** Never remove or change one that an earlier
+version uses, or tabs running that version can't open the database. If a store ever has to change
+shape, add a new store and migrate into it.
 
 This "work first, persist if we can, and be honest when we can't" stance is a **general Rapid
 principle**, not specific to this system. Other optional systems (`ui`, `locations`, `scheduler`)
@@ -661,8 +726,8 @@ no incremental tracking required.
 1. **Reload flow for persisted files:** once a drag-drop/data-file system exists, should it
    auto-reload persisted files on startup or prompt the user?
    *Partly answered (Oct 2026):* files that back a custom Rapid dataset reload **automatically**.
-   The dataset's settings (`rapid.custom.<id>`, including `sourceFileID`) persist through
-   `SettingsSystem`, and `RapidDataset.setupCustomDatasetAsync()` fetches the file with
+   The dataset's definition (including `sourceFileID`) persists in the `datasets` store,
+   and `RapidDataset.setupCustomDatasetAsync()` fetches the file with
    `getFileAsync()`. Deleting the dataset in `UiRapidDatasetSettings` also deletes its file. Still
    open: the stored-files management UI from Phase 4 (only `canStoreAsync` has a caller so far), and
    files that aren't tied to a dataset.

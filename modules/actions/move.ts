@@ -73,11 +73,12 @@ export function actionMove(moveIDs: EntityID[], tryDelta: Vec2, cache?: Partial<
    * Returns a node's position in the local coordinate frame (`world − _cache.origin`).
    * Prefers the pre-computed world coords from the node's geometry cache when available,
    * falling back to `projWgs84ToWorld(node.loc)`.
-   * @param node - the node to look up
+   * @param node  - the node to look up
+   * @param graph - the graph that holds this version of the node
    * @return local-space coordinate
    */
-  function nodeLocal(node: OsmNode): Vec2 {
-    const world = (node.geoms.parts[0]?.world?.coords as Vec2 | undefined)
+  function nodeLocal(node: OsmNode, graph: Graph): Vec2 {
+    const world = (graph.geometry(node).parts[0]?.world?.coords as Vec2 | undefined)
       ?? projWgs84ToWorld(node.loc!);
     return vecSubtract(world, _cache.origin);
   }
@@ -86,14 +87,15 @@ export function actionMove(moveIDs: EntityID[], tryDelta: Vec2, cache?: Partial<
   /**
    * Returns a node's ORIGINAL (pre-move) position in the local coordinate frame.
    * For nodes that are part of the move set, this is the cached start position.
-   * For all other nodes, this is identical to `nodeLocal(node)`.
+   * For all other nodes, this is identical to `nodeLocal(node, graph)`.
    * Use this when reasoning about the unmoved way's original shape — e.g. when
    * deciding whether a shape-preserving vertex needs to be inserted.
-   * @param node - the node to look up
+   * @param node  - the node to look up
+   * @param graph - the graph that holds this version of the node
    * @return original local-space coordinate
    */
-  function nodeOriginalLocal(node: OsmNode): Vec2 {
-    return _cache.startLocal[node.id] ?? nodeLocal(node);
+  function nodeOriginalLocal(node: OsmNode, graph: Graph): Vec2 {
+    return _cache.startLocal[node.id] ?? nodeLocal(node, graph);
   }
 
 
@@ -142,7 +144,7 @@ export function actionMove(moveIDs: EntityID[], tryDelta: Vec2, cache?: Partial<
 
         if (entity.type === 'node') {
           const node = entity as OsmNode;
-          const world = (node.geoms.parts[0]?.world?.coords as Vec2 | undefined)
+          const world = (graph.geometry(node).parts[0]?.world?.coords as Vec2 | undefined)
             ?? projWgs84ToWorld(node.loc!);
           if (!_cache.origin) _cache.origin = world;  // first node sets local frame
           _cache.nodes.push(id);
@@ -297,8 +299,8 @@ export function actionMove(moveIDs: EntityID[], tryDelta: Vec2, cache?: Partial<
     // one of those shared moving endpoints whose current position no longer
     // reflects the unmoved way's original geometry.
     const o = endLocal;
-    const aOrig = nodeOriginalLocal(prev);
-    const bOrig = nodeOriginalLocal(next);
+    const aOrig = nodeOriginalLocal(prev, graph);
+    const bOrig = nodeOriginalLocal(next, graph);
     const angle = Math.abs(vecAngle(o, aOrig) - vecAngle(o, bOrig)) * RAD2DEG;
 
     // Don't add orig vertex if it would just make a straight line..
@@ -308,9 +310,9 @@ export function actionMove(moveIDs: EntityID[], tryDelta: Vec2, cache?: Partial<
     // produces the shorter path through prev / moved / orig / next.
     // Use the current positions of prev/next here since this is about the
     // way's resulting geometry after insertion.
-    const a = nodeLocal(prev);
-    const b = nodeLocal(next);
-    const movedLocal = nodeLocal(moved);
+    const a = nodeLocal(prev, graph);
+    const b = nodeLocal(next, graph);
+    const movedLocal = nodeLocal(moved, graph);
     const p1: Vec2[] = [a, o, movedLocal, b];
     const p2: Vec2[] = [a, movedLocal, o, b];
     const d1 = geomPathLength(p1);
@@ -342,7 +344,7 @@ export function actionMove(moveIDs: EntityID[], tryDelta: Vec2, cache?: Partial<
     for (const nodeID of way.nodes) {
       curr = graph.entity(nodeID) as OsmNode;
 
-      if (prev && curr && vecEqual(nodeLocal(prev), nodeLocal(curr), epsilon)) {
+      if (prev && curr && vecEqual(nodeLocal(prev, graph), nodeLocal(curr, graph), epsilon)) {
         if (!prev.isInteresting(graph)) {
           way = way.removeNode(prev.id);
           graph.replace(way).remove(prev);
@@ -402,9 +404,9 @@ export function actionMove(moveIDs: EntityID[], tryDelta: Vec2, cache?: Partial<
     if (way1.isClosed() && way1.first() === vertex.id) nodes1.push(nodes1[0]);
     if (way2.isClosed() && way2.first() === vertex.id) nodes2.push(nodes2[0]);
 
-    const coords1: Vec2[] = nodes1.map(nodeLocal);
-    const coords2: Vec2[] = nodes2.map(nodeLocal);
-    const target: Vec2 = nodeLocal(vertex);
+    const coords1: Vec2[] = nodes1.map(n => nodeLocal(n, graph));
+    const coords2: Vec2[] = nodes2.map(n => nodeLocal(n, graph));
+    const target: Vec2 = nodeLocal(vertex, graph);
 
     let edge1: Closest | null = !isEP1 ? vecProject(target, coords1) : null;
     let edge2: Closest | null = !isEP2 ? vecProject(target, coords2) : null;
@@ -478,12 +480,12 @@ export function actionMove(moveIDs: EntityID[], tryDelta: Vec2, cache?: Partial<
 
       const node = graph.entity(obj.nodeID) as OsmNode;
       const delta = _delta;  // local copy so the closure below doesn't capture the outer `let`
-      const start = nodeLocal(node);
+      const start = nodeLocal(node, graph);
       const end = vecAdd(start, delta);
       const movedNodes = graph.childNodes(graph.entity(obj.movedID) as OsmWay);
-      const movedPath = movedNodes.map(n => vecAdd(nodeLocal(n), delta));
+      const movedPath = movedNodes.map(n => vecAdd(nodeLocal(n, graph), delta));
       const unmovedNodes = graph.childNodes(graph.entity(obj.unmovedID) as OsmWay);
-      const unmovedPath = unmovedNodes.map(nodeLocal);
+      const unmovedPath = unmovedNodes.map(n => nodeLocal(n, graph));
       const hits = geomPathIntersections(movedPath, unmovedPath);
 
       for (const hit of hits) {

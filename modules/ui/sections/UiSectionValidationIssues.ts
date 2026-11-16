@@ -245,33 +245,33 @@ export class UiSectionValidationIssues extends AbstractUiSection {
     }
 
     utilHighlightEntities(this.context, issue.entityIds, false);  // unhighlight
-    editor.perform(issue.autoArgs![0]);   // autoArgs = [action, annotation]
-    editor.commit({ annotation: issue.autoArgs![1] as any, selectedIDs: issue.entityIds });
+    editor.perform(issue.autoArgs![0]);   // autoArgs = [action, label]
+    editor.commit({ ...issue.autoArgs![1], selectionAfter: issue.entityIds });
   }
 
 
   /**
-   * User clicked "Autofix All": fixes all the autofixable issues in one transaction.
+   * User clicked "Autofix All": fixes all the autofixable issues as one edit.
+   * The validation system's action applies one fix at a time, finding the issues again as the graph changes.
    * @param e - the triggering click event
    * @param issues - the autofixable issues to fix
    */
   protected _clickAutoFixAll(e: PointerEvent, issues: ValidationIssue[]): void {
     const context = this.context;
     const editor = context.systems.editor!;
-    const l10n = context.systems.l10n!;
+    const validator = context.systems.validator!;
 
     e.preventDefault();
     e.stopPropagation();
 
-    editor.beginTransaction();
+    try {
+      editor.perform(validator.autofixAction(issues));
+      editor.commit({ stringID: 'issues.fix_all.annotation' });
 
-    for (const issue of issues) {
-      const action = issue.autoArgs![0];  // autoArgs = [action, annotation]
-      editor.perform(action);
+    } catch (err) {
+      // A fix that fails partway drops all of the fixes (`perform` leaves staging as it was)
+      console.error(err);  // eslint-disable-line no-console
     }
-
-    editor.commit({ annotation: l10n.t('issues.fix_all.annotation') });
-    editor.endTransaction();
   }
 
 

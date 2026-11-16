@@ -44,7 +44,7 @@ export function actionStraightenNodes(nodeIDs: EntityID[]): Action {
       const node = graph.hasEntity(nodeID) as OsmNode;
       if (!node) continue;
 
-      const coord = node.geoms.parts[0].world?.coords as Vec2;  // A node should have a single world coord
+      const coord = graph.geometry(node).parts[0].world?.coords as Vec2;  // A node should have a single world coord
       if (!coord) continue;
       if (!origin) origin = coord;
       nodes.push(node);
@@ -84,7 +84,7 @@ export function actionStraightenNodes(nodeIDs: EntityID[]): Action {
       const node = graph.hasEntity(nodeID) as OsmNode;
       if (!node) continue;
 
-      const coord = node.geoms.parts[0].world?.coords as Vec2;  // A node should have a single world coord
+      const coord = graph.geometry(node).parts[0].world?.coords as Vec2;  // A node should have a single world coord
       if (!coord)  continue;
       if (!origin) origin = coord;
       points.push(vecSubtract(coord, origin));  // world -> local

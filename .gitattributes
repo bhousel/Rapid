@@ -9,6 +9,8 @@
 *.md linguist-documentation
 *.svg linguist-detectable
 *.yaml linguist-detectable
+*.yml linguist-detectable
 
 docs/** linguist-documentation
 data/** linguist-vendored
+dist/** linguist-generated

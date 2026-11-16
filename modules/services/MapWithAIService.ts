@@ -110,9 +110,9 @@ export class MapWithAIService extends AbstractSystem {
     const urlRoot = customUrlRoot || MWAI_API;
 
     network.clearMatching(id => id.startsWith('mapwithai-') || id.includes(urlRoot));
-    spatial.clearMatching(id => id.startsWith('mapwithai-'));
 
     for (const ds of this._datasets.values()) {
+      spatial.clearCache(ds.spatialID);
       ds.graph = new Graph(context);
       ds.seen.clear();
       ds.seenFirstNodeID.clear();
@@ -138,7 +138,7 @@ export class MapWithAIService extends AbstractSystem {
     const fbRoads = new RapidDataset(context, {
       id: 'fbRoads',
       serviceID: 'mapwithai',
-      spatialID: 'mapwithai-fbRoads-data',
+      spatialID: 'fbRoads',
       categories: ['meta', 'roads', 'featured'],
       color: '#da26d3',  // rapid magenta
       dataUsed: ['mapwithai', 'Facebook Roads'],
@@ -152,7 +152,7 @@ export class MapWithAIService extends AbstractSystem {
     const msBuildings = new RapidDataset(context, {
       id: 'msBuildings',
       serviceID: 'mapwithai',
-      spatialID: 'mapwithai-msBuildings-data',
+      spatialID: 'msBuildings',
       categories: ['microsoft', 'buildings', 'featured'],
       color: '#da26d3',  // rapid magenta
       dataUsed: ['mapwithai', 'Microsoft Buildings'],
@@ -168,7 +168,7 @@ export class MapWithAIService extends AbstractSystem {
       hidden: true,
       conflated: false,
       serviceID: 'mapwithai',
-      spatialID: 'mapwithai-rapid_intro_graph-data',
+      spatialID: 'rapid_intro_graph',
       categories: ['meta', 'roads'],
       color: '#da26d3',  // rapid magenta
       dataUsed: [],
@@ -208,7 +208,7 @@ export class MapWithAIService extends AbstractSystem {
     if (!ds) {
       ds = {
         id: datasetID,
-        spatialID: `mapwithai-${datasetID}-data`,
+        spatialID: datasetID,   // also the spatial ID of its data (see `design/data-ids.md`)
         graph: new Graph(this.context),
         seen: new Set<EntityID>(),
         seenFirstNodeID: new Set<EntityID>(),
@@ -325,7 +325,7 @@ export class MapWithAIService extends AbstractSystem {
       const entityID = props.id as EntityID;
 
       // add some extra metadata properties
-      Object.assign(props, { fbID: entityID, serviceID: 'mapwithai', datasetID: ds.id });
+      Object.assign(props, { fbID: entityID, serviceID: 'mapwithai', datasetID: ds.id, spatialID: ds.spatialID });
 
       if (props.type === 'node') {
         if (ds.seen.has(entityID)) continue;   // can skip seen nodes
@@ -375,7 +375,7 @@ export class MapWithAIService extends AbstractSystem {
     // important: `graph.rebase` will call `.updateGeometry()`
     graph.rebase(entities, [graph], true);   // true = force replace entities
 
-    spatial.addData(ds.spatialID, entities);
+    spatial.addData(ds.spatialID, entities, graph);
     gfx?.deferredRedraw();
   }
 
@@ -406,7 +406,7 @@ export class MapWithAIService extends AbstractSystem {
     // important: `graph.rebase` will call `.updateGeometry()`
     ds.graph.rebase(entities);
 
-    spatial.addData(ds.spatialID, entities);
+    spatial.addData(ds.spatialID, entities, ds.graph);
   }
 
 
@@ -486,7 +486,7 @@ export class MapWithAIService extends AbstractSystem {
 
     // Check each way that shares this `origID`.
     // Pick one to be the "survivor" (it doesn't matter which one).
-    // Merge the nodes into the survivor (this will bump internal version `v`, so it gets redrawn)
+    // Merge the nodes into the survivor (with `update()`: a new way, so it gets redrawn)
     //
     // some implementation notes:
     // 1. Note that the "ways" here haven't been constructed as Entities yet, they are just props.
@@ -577,8 +577,7 @@ export class MapWithAIService extends AbstractSystem {
         }
 
         ways.delete(candidate);            // remove candidate
-        survivor.props.nodes = nodeIDs;    // update nodelist in-place, hope this is ok.
-        survivor.updateGeometry(graph).touch();
+        survivor = survivor.update({ nodes: nodeIDs });  // a new way, so the forced rebase updates parentWays
       }
 
       if (survivor) {

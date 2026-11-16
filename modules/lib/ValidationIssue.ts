@@ -5,6 +5,7 @@ import { ValidationFix } from './ValidationFix.ts';
 import type { Action } from '../actions/types.ts';
 import type { Context } from '../Context.ts';
 import type { D3Selection } from 'd3-selection';
+import type { EditLabel } from './Edit.ts';
 import type { Vec2 } from '@rapid-sdk/math';
 import type { Graph } from './Graph.ts';
 
@@ -31,8 +32,8 @@ export interface ValidationIssueProps {
   data: Record<string, unknown>;
   /** String to further differentiate the issue */
   hash: string;
-  /** If this issue can be autofixed, autoArgs will contain an [action, annotation] tuple. */
-  autoArgs?: [Action, unknown];
+  /** If this issue can be autofixed, autoArgs will contain an [action, label] tuple. */
+  autoArgs?: [Action, EditLabel];
   /** Function returning localized string for the issue message */
   message: () => string;
   /** Function to render reference information */
@@ -62,14 +63,19 @@ export class ValidationIssue {
   public severity: ValidationSeverity;
   /** Array of IDs of entities involved in the issue */
   public entityIds: EntityID[];
+  /**
+   * The entity the validator was checking when it found this issue (set by `ValidationSystem`).
+   * It's not always among `entityIds`: `ambiguous_crossing` checks a way and lists its nodes.
+   */
+  public foundOnID: EntityID | undefined;
   /** [lon, lat] to zoom in on to see the issue */
   public loc: Vec2 | undefined;
   /** Extra data for the fixes */
   public data: Record<string, unknown> | undefined;
   /** String to further differentiate the issue */
   public hash: string | undefined;
-  /** If this issue can be autofixed, autoArgs will contain an [action, annotation] tuple. */
-  public autoArgs: [Action, unknown] | undefined;
+  /** If this issue can be autofixed, autoArgs will contain an [action, label] tuple. */
+  public autoArgs: [Action, EditLabel] | undefined;
   /** Function returning localized string for the issue message */
   public message: () => string;
   /** Function to render reference information */
@@ -89,6 +95,7 @@ export class ValidationIssue {
     this.subtype = props.subtype;
     this.severity = props.severity ?? 'warning';
     this.entityIds = props.entityIds ?? [];
+    this.foundOnID = undefined;
     this.loc = props.loc;
     this.data = props.data;
     this.hash = props.hash;

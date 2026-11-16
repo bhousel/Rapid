@@ -1,4 +1,5 @@
 import { AbstractPixiLayer } from './AbstractPixiLayer.ts';
+import { makeDataID } from '../data/dataID.ts';
 import { PixiFeatureLine } from './PixiFeatureLine.ts';
 import { PixiFeaturePoint } from './PixiFeaturePoint.ts';
 import { scaleLinear, type ScaleLinear } from 'd3-scale';
@@ -187,7 +188,7 @@ export class PixiLayerStreetsidePhotos extends AbstractPixiLayer {
     const streetside = this.context.services.streetside;
     if (!streetside?.started) return;
 
-    const parentContainer = this.scene.groups.get('streetview')!;
+    const parentContainer = this._spatialContainer('streetview', this.id);
     let markers = streetside.getImages();
     let sequences = streetside.getSequences();
 
@@ -197,7 +198,6 @@ export class PixiLayerStreetsidePhotos extends AbstractPixiLayer {
     // render sequences
     for (const d of sequences) {
       const dataID = d.id;
-      const version = d.v || 0;
       const part = d.geoms.parts[0];
 
       // Check that this part has coordinates and is a LineString
@@ -214,12 +214,11 @@ export class PixiLayerStreetsidePhotos extends AbstractPixiLayer {
       }
 
       // If sequence has changed, update data and coordinates.
-      if (feature.v !== version) {
-        feature.v = version;
+      if (feature.data !== d || feature.geometry !== part) {   // changed data is a new object
         feature.geometry = part;
         feature.data = d;
-        feature.clearChildData(dataID);
-        feature.addChildData(dataID, d.props.bubbleIDs as string);
+        feature.clearChildData(d.dataID);
+        feature.addChildData(d.dataID, (d.props.bubbleIDs as PhotoID[]).map(bubbleID => makeDataID('streetside-images', bubbleID)));
       }
 
       this.syncFeatureClasses(feature);
@@ -241,6 +240,9 @@ export class PixiLayerStreetsidePhotos extends AbstractPixiLayer {
       if (!feature) {
         feature = new PixiFeaturePoint(this, featureID);
         feature.parentContainer = parentContainer;
+      }
+
+      if (feature.data !== d || feature.geometry !== part) {   // changed data is a new object
         feature.geometry = part;
         feature.data = d;
       }

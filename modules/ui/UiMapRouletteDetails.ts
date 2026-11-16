@@ -144,8 +144,10 @@ export class UiMapRouletteDetails {
     const l10n = context.systems.l10n!;
     const maproulette = context.services.maproulette!;
 
+    // Keyed by the task's ID: a new version of the same task (a status, a comment) keeps the details
+    // shown, instead of showing "Loading" again.
     let $details: D3Selection = $parent.selectAll('.sidebar-details')
-      .data(this.datum ? [this.datum] : [], (d: MapRouletteTask) => d.key!);
+      .data(this.datum ? [this.datum] : [], (d: MapRouletteTask) => d.id);
 
     $details.exit()
       .remove();
@@ -283,8 +285,8 @@ export class UiMapRouletteDetails {
   protected _highlightFeature(osmIdentifier: string): void {
     const idPart = osmIdentifier.split('@')[0]; // Retains the 'n' or 'w' prefix and removes the version
     // Pass the full ID including the prefix to the selection context
-    this.context.enter('select-osm', {
-      selection: { osm: [idPart] }
+    this.context.enter('select', {
+      selection: [idPart]
     });
   }
 }

@@ -1,4 +1,4 @@
-import { beforeEach, describe, it, mock } from 'bun:test';
+import { afterEach, beforeEach, describe, it, mock } from 'bun:test';
 import { assert } from 'chai';
 import * as Rapid from '../../../modules/headless.js';
 
@@ -80,8 +80,8 @@ describe('EditSystem', () => {
         return editor.initAsync()
           .then(() => editor.startAsync())
           .then(() => {
-            editor.commit({ annotation: 'one' });
-            editor.commit({ annotation: 'two' });
+            editor.commit({ stringID: 'one' });
+            editor.commit({ stringID: 'two' });
             editor.undo();
           })
           .then(() => editor.resetAsync())
@@ -148,13 +148,13 @@ describe('EditSystem', () => {
       _editor.merge([node1, node2, node3]);   // merge base entities
 
       _editor.perform(Rapid.actionAddEntity(node_1));
-      _editor.commit({ annotation: 'added n-1', selectedIDs: ['n-1'] });
+      _editor.commit({ stringID: 'added n-1', selectionAfter: ['n-1'] });
 
       _editor.perform(Rapid.actionChangeTags('n2', { natural: 'tree' } ));
-      _editor.commit({ annotation: 'updated n2', selectedIDs: ['n2'] });
+      _editor.commit({ stringID: 'updated n2', selectionAfter: ['n2'] });
 
       _editor.perform(Rapid.actionDeleteNode('n3'));
-      _editor.commit({ annotation: 'deleted n3', selectedIDs: [] });
+      _editor.commit({ stringID: 'deleted n3', selectionAfter: []});
     }
 
 
@@ -167,7 +167,7 @@ describe('EditSystem', () => {
 
     describe('stable', () => {
       it('returns the stable edit', () => {
-        _editor.commit({ annotation: 'one' });
+        _editor.commit({ stringID: 'one' });
         assert.instanceOf(_editor.stable, Rapid.Edit);
         assert.strictEqual(_editor.stable, _editor._history[1]);
       });
@@ -175,10 +175,25 @@ describe('EditSystem', () => {
 
     describe('staging', () => {
       it('returns the staging edit', () => {
-        _editor.commit({ annotation: 'one' });
+        _editor.commit({ stringID: 'one' });
         assert.instanceOf(_editor.staging, Rapid.Edit);
         assert.notStrictEqual(_editor.staging, _editor.stable);
         assert.notStrictEqual(_editor.staging, _editor.base);
+      });
+    });
+
+    describe('finding OSM data by data ID', () => {
+      it('finds the current version of an entity in the staging graph', () => {
+        const spatial = context.systems.spatial;
+        const node1 = new Rapid.OsmNode(context, { id: 'n1' });
+        _editor.merge([node1]);
+        assert.strictEqual(spatial.getData('n1'), node1);
+
+        _editor.perform(Rapid.actionChangeTags('n1', { natural: 'tree' }));
+        assert.deepEqual(spatial.getData('n1').tags, { natural: 'tree' });   // staging, not base
+
+        _editor.perform(Rapid.actionDeleteNode('n1'));
+        assert.isUndefined(spatial.getData('n1'));
       });
     });
 
@@ -222,6 +237,13 @@ describe('EditSystem', () => {
         assert.deepEqual(onMerge.mock.lastCall[0], new Set([n.id]));  // first argument
       });
 
+      it('doesn\'t replace entities already in the base graph', () => {
+        const n = new Rapid.OsmNode(context, { id: 'n1', version: 1 });
+        _editor.merge([n]);
+        _editor.merge([n.update({ version: 2 })]);
+        assert.strictEqual(_editor.base.graph.entity('n1'), n);
+      });
+
       it('keeps entities it already has, and merges only the new ones', () => {
         const n1 = new Rapid.OsmNode(context, { id: 'n1', loc: [0, 0] });
         _editor.merge([n1]);
@@ -247,6 +269,25 @@ describe('EditSystem', () => {
 
         assert.strictEqual(_editor.base.graph.entity('n1'), n1);
         assert.lengthOf(onMerge.mock.calls, 0);
+      });
+    });
+
+    describe('updateBase', () => {
+      it('replaces entities in the base graph, where the user didn\'t change them', () => {
+        const n1 = new Rapid.OsmNode(context, { id: 'n1', version: 1 });
+        const n2 = new Rapid.OsmNode(context, { id: 'n2', version: 1 });
+        _editor.merge([n1, n2]);
+        _editor.perform(Rapid.actionDeleteNode('n2'));
+        _editor.commit({ stringID: 'deleted n2' });
+
+        const n1v2 = n1.update({ version: 2 });
+        const n2v2 = n2.update({ version: 2 });
+        _editor.updateBase([n1v2, n2v2]);
+
+        assert.strictEqual(_editor.base.graph.entity('n1'), n1v2);
+        assert.strictEqual(_editor.stable.graph.entity('n1'), n1v2);
+        assert.isUndefined(_editor.stable.graph.hasEntity('n2'));      // still deleted
+        assert.strictEqual(_editor.difference().deleted()[0].version, 2);   // deleted against the newer version
       });
     });
 
@@ -285,12 +326,146 @@ describe('EditSystem', () => {
         assert.isNotEmpty(_editor.waySegments(extent, _editor.base.graph));
 
         _editor.perform(Rapid.actionDeleteWay('w1'));
-        _editor.commit({ annotation: 'deleted w1' });
+        _editor.commit({ stringID: 'deleted w1' });
 
         const segments = _editor.waySegments(extent, _editor.stable.graph);
         const wayIDs = new Set(segments.map(s => s.wayID));
         assert.isFalse(wayIDs.has('w1'));  // w1 segments gone
         assert.isTrue(wayIDs.has('w2'));   // w2 segments remain
+      });
+
+      it('returns only segments that an older graph has', () => {
+        mergeCrossingWays();
+        const n5 = new Rapid.OsmNode(context, { id: 'n-5', loc: [0.2, 1] });
+        const n6 = new Rapid.OsmNode(context, { id: 'n-6', loc: [0.2, -1] });
+        const w3 = new Rapid.OsmWay(context, { id: 'w-3', nodes: ['n-5', 'n-6'] });
+
+        _editor.perform(Rapid.actionChangeTags('w2', { highway: 'residential' }));
+        _editor.commit({ stringID: 'tagged w2' });
+        const older = _editor.stable.graph;
+
+        // Add a way, and change w1's nodes, after the older graph.
+        _editor.perform(Rapid.actionAddEntity(n5), Rapid.actionAddEntity(n6), Rapid.actionAddEntity(w3));
+        _editor.commit({ stringID: 'added w-3' });
+        _editor.perform(Rapid.actionReverse('w1'));
+        _editor.commit({ stringID: 'reversed w1' });
+
+        const extent = new Rapid.sdk.Extent([-0.5, -0.5], [0.5, 0.5]);
+        const segments = _editor.waySegments(extent, older);
+        for (const segment of segments) {
+          const way = older.entity(segment.wayID);   // throws if `older` doesn't have it
+          assert.deepEqual(segment.edge, way.nodes.slice(segment.index, segment.index + 2));
+        }
+        const wayIDs = segments.map(s => s.wayID);
+        assert.include(wayIDs, 'w1');   // its segment in staging's local index is reversed, so it comes from `older`
+        assert.include(wayIDs, 'w2');
+        assert.notInclude(wayIDs, 'w-3');
+      });
+
+      it('returns each segment of a way once, in an older graph where it has fewer segments', () => {
+        const p1 = new Rapid.OsmNode(context, { id: 'p1', loc: [-0.2, 0.1] });
+        const p2 = new Rapid.OsmNode(context, { id: 'p2', loc: [0, 0.1] });
+        const p3 = new Rapid.OsmNode(context, { id: 'p3', loc: [0.2, 0.1] });
+        const w5 = new Rapid.OsmWay(context, { id: 'w5', nodes: ['p1', 'p2', 'p3'] });
+        _editor.merge([p1, p2, p3, w5]);
+
+        _editor.perform(Rapid.actionChangeTags('w5', { highway: 'residential' }));
+        _editor.commit({ stringID: 'tagged w5' });
+        const older = _editor.stable.graph;
+
+        // Insert a node between p2 and p3 after the older graph. Staging's local index then has
+        // p1-p2 (which still matches `older`), p2-p4 and p4-p3 (which don't).
+        const p4 = new Rapid.OsmNode(context, { id: 'p-4', loc: [0.1, 0.2] });
+        _editor.perform(Rapid.actionAddEntity(p4), Rapid.actionAddVertex('w5', 'p-4', 2));
+        _editor.commit({ stringID: 'added p-4' });
+
+        const extent = new Rapid.sdk.Extent([-0.5, -0.5], [0.5, 0.5]);
+        const segments = _editor.waySegments(extent, older)
+          .filter(s => s.wayID === 'w5')
+          .map(s => ({ index: s.index, edge: s.edge }))
+          .sort((a, b) => a.index - b.index);
+        assert.deepEqual(segments, [
+          { index: 0, edge: ['p1', 'p2'] },
+          { index: 1, edge: ['p2', 'p3'] }
+        ]);
+      });
+
+      it('returns the segments of the graph inside an action, not from before it (finding 2)', () => {
+        mergeCrossingWays();
+        const extent = new Rapid.sdk.Extent([0.4, -0.1], [0.6, 0.1]);
+        let segments;
+        // Split w2 at a new node, then look for segments, inside one action
+        _editor.perform(graph => {
+          const n5 = new Rapid.OsmNode(context, { id: 'n-5', loc: [0.5, 0] });
+          graph.replace([n5, graph.entity('w2').addNode('n-5', 1)]);
+          segments = _editor.waySegments(extent, graph).map(s => s.edge.join('-'));
+          return graph;
+        });
+        assert.sameMembers(segments, ['n3-n-5', 'n-5-n4']);
+      });
+    });
+
+
+    describe('entitiesInBox', () => {
+      // n1 at the origin, n2 east of it, and a way between them
+      function mergeLine() {
+        const n1 = new Rapid.OsmNode(context, { id: 'n1', loc: [0, 0] });
+        const n2 = new Rapid.OsmNode(context, { id: 'n2', loc: [1, 0] });
+        const w1 = new Rapid.OsmWay(context, { id: 'w1', nodes: ['n1', 'n2'] });
+        _editor.merge([n1, n2, w1]);
+      }
+      const boxAt = (loc) => new Rapid.sdk.Extent(loc).padByMeters(10);
+      const worldBoxOf = (extent) => {
+        const [ax, ay] = Rapid.sdk.projWgs84ToWorld(extent.min);
+        const [bx, by] = Rapid.sdk.projWgs84ToWorld(extent.max);
+        return { minX: Math.min(ax, bx), minY: Math.min(ay, by), maxX: Math.max(ax, bx), maxY: Math.max(ay, by) };
+      };
+      const idsAt = (loc, graph) => _editor.entitiesInBox(worldBoxOf(boxAt(loc)), graph).map(e => e.id).sort();
+
+      it('finds each graph\'s version: base, stable, staging, and a graph from the history', () => {
+        mergeLine();
+        _editor.perform(Rapid.actionMoveNode('n2', [2, 0]));
+        _editor.commit({ stringID: 'moved n2' });
+        const older = _editor.stable.graph;
+        _editor.perform(Rapid.actionMoveNode('n2', [3, 0]));
+        _editor.commit({ stringID: 'moved n2 again' });
+        _editor.perform(Rapid.actionMoveNode('n2', [4, 0]));   // work in progress
+
+        assert.deepEqual(idsAt([1, 0], _editor.base.graph), ['n2', 'w1']);
+        assert.deepEqual(idsAt([1, 0], older), ['w1']);              // n2 moved away, w1 reaches past it
+        assert.deepEqual(idsAt([2, 0], older), ['n2', 'w1']);
+        assert.deepEqual(idsAt([3, 0], _editor.stable.graph), ['n2', 'w1']);
+        assert.deepEqual(idsAt([3, 0], older), []);
+        assert.deepEqual(idsAt([4, 0], _editor.staging.graph), ['n2', 'w1']);
+        assert.deepEqual(idsAt([4, 0], _editor.stable.graph), []);
+        const found = _editor.entitiesInBox(worldBoxOf(boxAt([4, 0])), _editor.staging.graph);
+        assert.include(found, _editor.staging.graph.entity('n2'));   // staging's own version
+      });
+
+      it('finds what an action has written, before it commits', () => {
+        mergeLine();
+        let ids;
+        _editor.perform(graph => {
+          graph.replace(graph.entity('n2').move([5, 0]));
+          graph.replace(new Rapid.OsmNode(context, { id: 'n-9', loc: [6, 0] }));
+          ids = { at1: idsAt([1, 0], graph), at5: idsAt([5, 0], graph), at6: idsAt([6, 0], graph) };
+          return graph;
+        });
+        assert.deepEqual(ids, { at1: ['w1'], at5: ['n2', 'w1'], at6: ['n-9'] });
+      });
+
+      it('throws for a graph from another lineage', () => {
+        mergeLine();
+        const other = new Rapid.Graph(context, [new Rapid.OsmNode(context, { id: 'n9', loc: [0, 0] })]);
+        assert.throws(() => _editor.entitiesInBox(worldBoxOf(boxAt([0, 0])), other), /isn't one of the editor's graphs/);
+      });
+
+      it('lists what stable has changed near an extent, with the ways of moved nodes', () => {
+        mergeLine();
+        _editor.perform(Rapid.actionMoveNode('n2', [1, 0.00005]));   // about 5 m
+        _editor.commit({ stringID: 'moved n2' });
+        assert.sameMembers(_editor.stableEditsIn(boxAt([1, 0])), ['n2', 'w1']);
+        assert.sameMembers(_editor.stableEditsIn(boxAt([5, 5])), []);
       });
     });
 
@@ -353,41 +528,36 @@ describe('EditSystem', () => {
     });
 
 
-    describe('performAsync', () => {
+    describe('animateAndCommitAsync', () => {
       it('returns a rejected Promise when passed no args', () => {
-        const prom = _editor.performAsync();
+        const prom = _editor.animateAndCommitAsync();
         assert.instanceOf(prom, Promise);
         return prom
           .then(() => assert.fail('Promise was fulfilled but should have been rejected'))
           .catch(() => assert.isTrue(true));
       });
 
-      it('returns a resolved Promise when passed a non-transitionable action', () => {
+      it('performs and commits a non-transitionable action right away', () => {
         const action = actionAddNode('n-1');
-        const prom = _editor.performAsync(action);
+        const prom = _editor.animateAndCommitAsync(action, { stringID: 'added' });
         assert.instanceOf(prom, Promise);
-        return prom
-          .then(() => {
-            assert.isOk(_editor.staging.graph.hasEntity('n-1'));
-          });
+        assert.strictEqual(_editor.index, 1);   // committed before the promise settles
+        assert.strictEqual(_editor.stable.props.stringID, 'added');
+        assert.isOk(_editor.stable.graph.hasEntity('n-1'));
+        assert.isFalse(_editor.hasWorkInProgress);
+        return prom;
       });
 
-      it('resolves a transitionable action, emits stagingchange not stablechange', () => {
-        const onStagingChange = mock();
+      it('performs and commits a transitionable action right away when there\'s no DOM', () => {
         const onStableChange = mock();
-        _editor.on('stagingchange', onStagingChange);
         _editor.on('stablechange', onStableChange);
 
         const action = actionTransitionNoop();
-        const prom = _editor.performAsync(action);
-        assert.instanceOf(prom, Promise);
-        return prom
-          .then(() => {
-            // With no DOM (headless/unit), the action is applied immediately rather than animated,
-            // but it still emits stagingchange (work-in-progress) and never stablechange (uncommitted).
-            assert.isAtLeast(onStagingChange.mock.calls.length, 1);
-            assert.lengthOf(onStableChange.mock.calls, 0);
-          });
+        const prom = _editor.animateAndCommitAsync(action, { stringID: 'nothing' });
+        assert.strictEqual(_editor.index, 1);
+        assert.strictEqual(_editor.stable.props.stringID, 'nothing');
+        assert.lengthOf(onStableChange.mock.calls, 1);
+        return prom;
       });
     });
 
@@ -448,7 +618,7 @@ describe('EditSystem', () => {
         assert.isUndefined(_editor.staging.graph.hasEntity('n-2'));
 
         _editor.perform(actionAddNode('n-1'));
-        _editor.commit({ annotation: 'added a node', selectedIDs: ['n-1'] });
+        _editor.commit({ stringID: 'added a node', selectionAfter: ['n-1'] });
 
         assert.lengthOf(_editor.history, 2);
         assert.strictEqual(_editor.index, 1);
@@ -456,7 +626,7 @@ describe('EditSystem', () => {
         assert.isUndefined(_editor.staging.graph.hasEntity('n-2'));
 
         _editor.perform(actionAddNode('n-2'));
-        _editor.commit({ annotation: 'added a node', selectedIDs: ['n-2'] });
+        _editor.commit({ stringID: 'added a node', selectionAfter: ['n-2'] });
 
         assert.lengthOf(_editor.history, 3);
         assert.strictEqual(_editor.index, 2);
@@ -474,7 +644,7 @@ describe('EditSystem', () => {
         assert.lengthOf(onStagingChange.mock.calls, 1);
         assert.lengthOf(onStableChange.mock.calls, 0);
 
-        _editor.commit({ annotation: 'added a node', selectedIDs: ['n-1'] });
+        _editor.commit({ stringID: 'added a node', selectionAfter: ['n-1'] });
         assert.lengthOf(onStagingChange.mock.calls, 2);
         assert.lengthOf(onStableChange.mock.calls, 1);
 
@@ -482,9 +652,85 @@ describe('EditSystem', () => {
         assert.lengthOf(onStagingChange.mock.calls, 3);
         assert.lengthOf(onStableChange.mock.calls, 1);
 
-        _editor.commit({ annotation: 'added a node', selectedIDs: ['n-2'] });
+        _editor.commit({ stringID: 'added a node', selectionAfter: ['n-2'] });
         assert.lengthOf(onStagingChange.mock.calls, 4);
         assert.lengthOf(onStableChange.mock.calls, 2);
+      });
+
+      it('keeps the props passed to it, including props of other systems', () => {
+        _editor.perform(actionAddNode('n-1'));
+        _editor.commit({
+          type: 'test_edit',
+          stringID: 'added a node',
+          stringParams: { n: 1 },
+          selectionAfter: ['n-1'],
+          testID: 'abc'
+        });
+
+        const props = _editor.stable.props;
+        assert.strictEqual(props.type, 'test_edit');
+        assert.strictEqual(props.stringID, 'added a node');
+        assert.deepEqual(props.stringParams, { n: 1 });
+        assert.deepEqual(props.selectionAfter, ['n-1']);
+        assert.strictEqual(props.testID, 'abc');
+        assert.isObject(props.transform);
+      });
+
+      it('keeps data sources passed to it', () => {
+        _editor.perform(actionAddNode('n-1'));
+        _editor.commit({ stringID: 'added a node', sources: { data: ['Some dataset'] } });
+
+        assert.deepEqual(_editor.stable.props.sources.data, ['Some dataset']);
+        assert.include(_editor.sourcesUsed().data, 'Some dataset');
+      });
+
+      it('copies the props, so later changes by the caller do not change the edit', () => {
+        const selection = ['n-1'];
+        _editor.perform(actionAddNode('n-1'));
+        _editor.commit({ stringID: 'added a node', selectionAfter: selection });
+        selection.push('n-2');
+
+        assert.deepEqual(_editor.stable.props.selectionAfter, ['n-1']);
+      });
+
+      it('records where the change is, from the nodes and ways that changed', () => {
+        const a = new Rapid.OsmNode(context, { id: 'n1', loc: [1, 1] });
+        const b = new Rapid.OsmNode(context, { id: 'n2', loc: [2, 3] });
+        const c = new Rapid.OsmNode(context, { id: 'n3', loc: [5, 5] });
+        const w = new Rapid.OsmWay(context, { id: 'w1', nodes: ['n1', 'n2'] });
+        _editor.merge([a, b, c, w]);
+
+        _editor.perform(Rapid.actionChangeTags('w1', { highway: 'footway' }));
+        _editor.commit({ stringID: 'changed tags' });
+        assert.deepEqual(_editor.stable.props.extent, [1, 1, 2, 3]);   // the way's nodes
+
+        _editor.perform(Rapid.actionDeleteNode('n3'));
+        _editor.commit({ stringID: 'deleted a node' });
+        assert.deepEqual(_editor.stable.props.extent, [5, 5, 5, 5]);   // where the deleted node was
+      });
+
+      it('keeps an extent passed to it, for edits that change no OSM data', () => {
+        _editor.perform(Rapid.actionNoop());
+        _editor.commit({ type: 'test_ignore', stringID: 'ignored a feature', extent: [1, 2, 3, 4] });
+        assert.deepEqual(_editor.stable.props.extent, [1, 2, 3, 4]);
+      });
+
+      it('has no extent when no located data changed', () => {
+        _editor.perform(Rapid.actionNoop());
+        _editor.commit({ stringID: 'did nothing' });
+        assert.notProperty(_editor.stable.props, 'extent');
+      });
+
+      it('records what was selected before the edit', () => {
+        context.mode = { selectedIDs: ['ds:d1'] };
+        try {
+          _editor.perform(actionAddNode('n-1'));
+          _editor.commit({ stringID: 'accepted a feature', selectionAfter: ['n-1'] });
+        } finally {
+          context.mode = undefined;
+        }
+        assert.deepEqual(_editor.stable.props.selectionBefore, ['ds:d1']);
+        assert.deepEqual(_editor.stable.props.selectionAfter, ['n-1']);
       });
     });
 
@@ -504,7 +750,7 @@ describe('EditSystem', () => {
         assert.isUndefined(_editor.staging.graph.hasEntity('n-2'));
 
         _editor.perform(actionAddNode('n-1'));
-        _editor.commit({ annotation: 'added a node', selectedIDs: ['n-1'] });
+        _editor.commit({ stringID: 'added a node', selectionAfter: ['n-1'] });
 
         assert.lengthOf(_editor.history, 2);
         assert.strictEqual(_editor.index, 1);
@@ -512,7 +758,7 @@ describe('EditSystem', () => {
         assert.isUndefined(_editor.staging.graph.hasEntity('n-2'));
 
         _editor.perform(actionAddNode('n-2'));
-        _editor.commitAppend({ annotation: 'added a node', selectedIDs: ['n-2'] });  // commitAppend
+        _editor.commitAppend({ stringID: 'added a node', selectionAfter: ['n-2'] });  // commitAppend
 
         assert.lengthOf(_editor.history, 2);   // still 2
         assert.strictEqual(_editor.index, 1);  // still 1
@@ -530,7 +776,7 @@ describe('EditSystem', () => {
         assert.lengthOf(onStagingChange.mock.calls, 1);
         assert.lengthOf(onStableChange.mock.calls, 0);
 
-        _editor.commit({ annotation: 'added a node', selectedIDs: ['n-1'] });
+        _editor.commit({ stringID: 'added a node', selectionAfter: ['n-1'] });
         assert.lengthOf(onStagingChange.mock.calls, 2);
         assert.lengthOf(onStableChange.mock.calls, 1);
 
@@ -538,7 +784,7 @@ describe('EditSystem', () => {
         assert.lengthOf(onStagingChange.mock.calls, 3);
         assert.lengthOf(onStableChange.mock.calls, 1);
 
-        _editor.commitAppend({ annotation: 'added a node', selectedIDs: ['n-2'] });  // commitAppend
+        _editor.commitAppend({ stringID: 'added a node', selectionAfter: ['n-2'] });  // commitAppend
         assert.lengthOf(onStagingChange.mock.calls, 4);
         assert.lengthOf(onStableChange.mock.calls, 2);
       });
@@ -548,26 +794,26 @@ describe('EditSystem', () => {
     describe('undo / #redo', () => {
       it('can undo and redo edits', () => {
         _editor.perform(actionAddNode('n-1'));
-        _editor.commit({ annotation: 'added n-1', selectedIDs: ['n-1'] });
+        _editor.commit({ stringID: 'added n-1', selectionAfter: ['n-1'] });
         _editor.perform(actionAddNode('n-2'));
-        _editor.commit({ annotation: 'added n-2', selectedIDs: ['n-2'] });
+        _editor.commit({ stringID: 'added n-2', selectionAfter: ['n-2'] });
         _editor.perform(actionAddNode('n-3'));
-        _editor.commit({ annotation: 'added n-3', selectedIDs: ['n-3'] });
+        _editor.commit({ stringID: 'added n-3', selectionAfter: ['n-3'] });
 
-        assert.strictEqual(_editor.getUndoAnnotation(), 'added n-3');
-        assert.isUndefined(_editor.getRedoAnnotation());
+        assert.strictEqual(_editor.getUndoEdit()?.props.stringID, 'added n-3');
+        assert.isUndefined(_editor.getRedoEdit()?.props.stringID);
         assert.isOk(_editor.stable.graph.hasEntity('n-3'));
 
         _editor.undo();
 
-        assert.strictEqual(_editor.getUndoAnnotation(), 'added n-2');
-        assert.strictEqual(_editor.getRedoAnnotation(), 'added n-3');
+        assert.strictEqual(_editor.getUndoEdit()?.props.stringID, 'added n-2');
+        assert.strictEqual(_editor.getRedoEdit()?.props.stringID, 'added n-3');
         assert.isUndefined(_editor.stable.graph.hasEntity('n-3'));
 
         _editor.redo();
 
-        assert.strictEqual(_editor.getUndoAnnotation(), 'added n-3');
-        assert.isUndefined(_editor.getRedoAnnotation());
+        assert.strictEqual(_editor.getUndoEdit()?.props.stringID, 'added n-3');
+        assert.strictEqual(_editor.getRedoEdit()?.props.stringID, 'redo.return_view');  // see 'return view' below
         assert.isOk(_editor.stable.graph.hasEntity('n-3'));
       });
 
@@ -584,7 +830,7 @@ describe('EditSystem', () => {
         assert.lengthOf(onStableChange.mock.calls, 0);
         assert.lengthOf(onHistoryJump.mock.calls, 0);
 
-        _editor.commit({ annotation: 'added n-1', selectedIDs: ['n-1'] });
+        _editor.commit({ stringID: 'added n-1', selectionAfter: ['n-1'] });
         assert.lengthOf(onStagingChange.mock.calls, 2);
         assert.lengthOf(onStableChange.mock.calls, 1);
         assert.lengthOf(onHistoryJump.mock.calls, 0);
@@ -594,7 +840,7 @@ describe('EditSystem', () => {
         assert.lengthOf(onStableChange.mock.calls, 1);
         assert.lengthOf(onHistoryJump.mock.calls, 0);
 
-        _editor.commit({ annotation: 'added n-2', selectedIDs: ['n-2'] });
+        _editor.commit({ stringID: 'added n-2', selectionAfter: ['n-2'] });
         assert.lengthOf(onStagingChange.mock.calls, 4);
         assert.lengthOf(onStableChange.mock.calls, 2);
         assert.lengthOf(onHistoryJump.mock.calls, 0);
@@ -604,7 +850,7 @@ describe('EditSystem', () => {
         assert.lengthOf(onStableChange.mock.calls, 2);
         assert.lengthOf(onHistoryJump.mock.calls, 0);
 
-        _editor.commit({ annotation: 'added n-3', selectedIDs: ['n-3'] });
+        _editor.commit({ stringID: 'added n-3', selectionAfter: ['n-3'] });
         assert.lengthOf(onStagingChange.mock.calls, 6);
         assert.lengthOf(onStableChange.mock.calls, 3);
         assert.lengthOf(onHistoryJump.mock.calls, 0);
@@ -650,22 +896,123 @@ describe('EditSystem', () => {
     });
 
 
+    describe('return view', () => {
+      function commitThree() {
+        _editor.perform(actionAddNode('n-1'));
+        _editor.commit({ stringID: 'added n-1', selectionAfter: ['n-1'] });
+        _editor.perform(actionAddNode('n-2'));
+        _editor.commit({ stringID: 'added n-2', selectionAfter: ['n-2'] });
+        _editor.perform(actionAddNode('n-3'));
+        _editor.commit({ stringID: 'added n-3', selectionAfter: ['n-3'] });
+      }
+
+      it('remembers where the user was when they first undo away from the newest edit', () => {
+        commitThree();
+        assert.isNull(_editor.returnEdit);
+
+        context.viewport.transform = { x: 10, y: 20, z: 17 };
+        context.mode = { selectedIDs: ['ds:d1'] };
+        try {
+          _editor.undo();
+        } finally {
+          context.mode = undefined;
+        }
+
+        const returnEdit = _editor.returnEdit;
+        assert.instanceOf(returnEdit, Rapid.Edit);
+        assert.strictEqual(returnEdit.props.stringID, 'redo.return_view');
+        assert.deepEqual(returnEdit.props.selectionAfter, ['ds:d1']);
+        assert.include(returnEdit.props.transform, { x: 10, y: 20, z: 17 });
+      });
+
+      it('keeps the first place the user left from, through more undos and redos', () => {
+        commitThree();
+        context.viewport.transform = { x: 10, y: 20, z: 17 };
+        _editor.undo();
+        context.viewport.transform = { x: 99, y: 99, z: 15 };
+        _editor.undo();
+        _editor.redo();
+        _editor.redo();
+        _editor.undo();   // leaves the newest edit again
+        assert.include(_editor.returnEdit.props.transform, { x: 10, y: 20, z: 17 });
+      });
+
+      it('is offered as one more redo past the newest edit, and emits returnview', () => {
+        const onReturnView = mock();
+        const onHistoryJump = mock();
+        _editor.on('returnview', onReturnView);
+        commitThree();
+        _editor.undo();
+        _editor.redo();
+        _editor.on('historyjump', onHistoryJump);
+
+        const returnEdit = _editor.returnEdit;
+        assert.strictEqual(_editor.getRedoEdit(), returnEdit);
+
+        _editor.redo();
+        assert.lengthOf(onReturnView.mock.calls, 1);
+        assert.strictEqual(onReturnView.mock.calls[0][0], returnEdit);
+        assert.lengthOf(onHistoryJump.mock.calls, 0);
+        assert.strictEqual(_editor.index, 3);       // the history didn't move
+        assert.isNull(_editor.returnEdit);          // used up
+        assert.isUndefined(_editor.getRedoEdit());
+      });
+
+      it('is not offered before redo reaches the newest edit', () => {
+        commitThree();
+        _editor.undo();
+        _editor.undo();
+        _editor.redo();
+        assert.strictEqual(_editor.getRedoEdit()?.props.stringID, 'added n-3');
+      });
+
+      it('is cleared by a new edit', () => {
+        commitThree();
+        _editor.undo();
+        _editor.perform(actionAddNode('n-4'));
+        _editor.commit({ stringID: 'added n-4' });
+        assert.isNull(_editor.returnEdit);
+      });
+
+      it('is cleared by clearReturnEdit and by reset', async () => {
+        commitThree();
+        _editor.undo();
+        _editor.clearReturnEdit();
+        assert.isNull(_editor.returnEdit);
+
+        _editor.redo();
+        _editor.undo();
+        assert.isOk(_editor.returnEdit);
+        await _editor.resetAsync();
+        assert.isNull(_editor.returnEdit);
+      });
+
+      it('is not backed up', () => {
+        commitThree();
+        _editor.undo();
+        _editor.redo();
+        const backup = _editor.toBackup();
+        assert.notInclude(JSON.stringify(backup), 'redo.return_view');
+      });
+    });
+
+
     describe('setCheckpoint / #restoreCheckpoint', () => {
       it('can set and restore checkpoints', () => {
         _editor.perform(actionAddNode('n-1'));
-        _editor.commit({ annotation: 'added n-1', selectedIDs: ['n-1'] });
+        _editor.commit({ stringID: 'added n-1', selectionAfter: ['n-1'] });
 
         _editor.setCheckpoint('checkpoint');
 
         _editor.perform(actionAddNode('n-2'));
-        _editor.commit({ annotation: 'added n-2', selectedIDs: ['n-2'] });
+        _editor.commit({ stringID: 'added n-2', selectionAfter: ['n-2'] });
         _editor.perform(actionAddNode('n-3'));
-        _editor.commit({ annotation: 'added n-3', selectedIDs: ['n-3'] });
+        _editor.commit({ stringID: 'added n-3', selectionAfter: ['n-3'] });
 
         _editor.restoreCheckpoint('checkpoint');
 
-        assert.strictEqual(_editor.getUndoAnnotation(), 'added n-1');
-        assert.isUndefined(_editor.getRedoAnnotation());
+        assert.strictEqual(_editor.getUndoEdit()?.props.stringID, 'added n-1');
+        assert.isUndefined(_editor.getRedoEdit()?.props.stringID);
         assert.isOk(_editor.stable.graph.hasEntity('n-1'));
         assert.isUndefined(_editor.stable.graph.hasEntity('n-2'));
         assert.isUndefined(_editor.stable.graph.hasEntity('n-3'));
@@ -684,7 +1031,7 @@ describe('EditSystem', () => {
         assert.lengthOf(onStableChange.mock.calls, 0);
         assert.lengthOf(onHistoryJump.mock.calls, 0);
 
-        _editor.commit({ annotation: 'added n-1', selectedIDs: ['n-1'] });
+        _editor.commit({ stringID: 'added n-1', selectionAfter: ['n-1'] });
         _editor.setCheckpoint('checkpoint');
         assert.lengthOf(onStagingChange.mock.calls, 2);
         assert.lengthOf(onStableChange.mock.calls, 1);
@@ -695,7 +1042,7 @@ describe('EditSystem', () => {
         assert.lengthOf(onStableChange.mock.calls, 1);
         assert.lengthOf(onHistoryJump.mock.calls, 0);
 
-        _editor.commit({ annotation: 'added n-2', selectedIDs: ['n-2'] });
+        _editor.commit({ stringID: 'added n-2', selectionAfter: ['n-2'] });
         assert.lengthOf(onStagingChange.mock.calls, 4);
         assert.lengthOf(onStableChange.mock.calls, 2);
         assert.lengthOf(onHistoryJump.mock.calls, 0);
@@ -705,7 +1052,7 @@ describe('EditSystem', () => {
         assert.lengthOf(onStableChange.mock.calls, 2);
         assert.lengthOf(onHistoryJump.mock.calls, 0);
 
-        _editor.commit({ annotation: 'added n-3', selectedIDs: ['n-3'] });
+        _editor.commit({ stringID: 'added n-3', selectionAfter: ['n-3'] });
         assert.lengthOf(onStagingChange.mock.calls, 6);
         assert.lengthOf(onStableChange.mock.calls, 3);
         assert.lengthOf(onHistoryJump.mock.calls, 0);
@@ -746,7 +1093,7 @@ describe('EditSystem', () => {
         assert.lengthOf(onStagingChange.mock.calls, 0);
         assert.lengthOf(onStableChange.mock.calls, 0);
 
-        _editor.commit({ annotation: 'added n-1', selectedIDs: ['n-1'] });
+        _editor.commit({ stringID: 'added n-1', selectionAfter: ['n-1'] });
         assert.lengthOf(onStagingChange.mock.calls, 0);
         assert.lengthOf(onStableChange.mock.calls, 0);
 
@@ -754,7 +1101,7 @@ describe('EditSystem', () => {
         assert.lengthOf(onStagingChange.mock.calls, 0);
         assert.lengthOf(onStableChange.mock.calls, 0);
 
-        _editor.commit({ annotation: 'added n-2', selectedIDs: ['n-2'] });
+        _editor.commit({ stringID: 'added n-2', selectionAfter: ['n-2'] });
         assert.lengthOf(onStagingChange.mock.calls, 0);
         assert.lengthOf(onStableChange.mock.calls, 0);
 
@@ -781,7 +1128,7 @@ describe('EditSystem', () => {
         assert.lengthOf(onStagingChange.mock.calls, 1);
         assert.lengthOf(onStableChange.mock.calls, 0);
 
-        _editor.commit({ annotation: 'added n-1', selectedIDs: ['n-1'] });
+        _editor.commit({ stringID: 'added n-1', selectionAfter: ['n-1'] });
         assert.lengthOf(onStagingChange.mock.calls, 2);
         assert.lengthOf(onStableChange.mock.calls, 1);
       });
@@ -798,7 +1145,7 @@ describe('EditSystem', () => {
         assert.lengthOf(onStagingChange.mock.calls, 0);
         assert.lengthOf(onStableChange.mock.calls, 0);
 
-        _editor.commit({ annotation: 'added n-1', selectedIDs: ['n-1'] });
+        _editor.commit({ stringID: 'added n-1', selectionAfter: ['n-1'] });
         assert.lengthOf(onStagingChange.mock.calls, 0);
         assert.lengthOf(onStableChange.mock.calls, 0);
 
@@ -809,7 +1156,7 @@ describe('EditSystem', () => {
         assert.lengthOf(onStagingChange.mock.calls, 0);
         assert.lengthOf(onStableChange.mock.calls, 0);
 
-        _editor.commit({ annotation: 'added n-2', selectedIDs: ['n-2'] });
+        _editor.commit({ stringID: 'added n-2', selectionAfter: ['n-2'] });
         assert.lengthOf(onStagingChange.mock.calls, 0);
         assert.lengthOf(onStableChange.mock.calls, 0);
 
@@ -847,20 +1194,81 @@ describe('EditSystem', () => {
         assert.strictEqual(detail.modified[0], stable.entity('n2'));
         assert.strictEqual(detail.deleted[0], base.entity('n3'));
       });
+
+      it('changes(action) leaves the stable graph as it was', () => {
+        prepareTestHistory();
+        const stable = _editor.stable.graph;
+        const n1 = stable.entity('n1');
+
+        const detail = _editor.changes(graph => graph.remove(graph.entity('n1')).commit());
+        assert.include(detail.deleted.map(e => e.id), 'n1');
+        assert.strictEqual(_editor.stable.graph, stable);
+        assert.strictEqual(stable.hasEntity('n1'), n1);
+        assert.notInclude(_editor.changes().deleted.map(e => e.id), 'n1');
+      });
+    });
+
+
+    describe('toIntroGraph', () => {
+      it('leaves the live node locs and relation members as they were', () => {
+        const n1 = new Rapid.OsmNode(context, { id: 'n1', loc: [0.123456789, 0.987654321] });
+        _editor.merge([n1]);
+        const n_1 = new Rapid.OsmNode(context, { id: 'n-1', loc: [1.123456789, 1.987654321] });
+        const r_1 = new Rapid.OsmRelation(context, { id: 'r-1', members: [{ id: 'n-1', type: 'node', role: '' }] });
+        _editor.perform(Rapid.actionAddEntity(n_1), Rapid.actionAddEntity(r_1));
+        _editor.commit({ stringID: 'added n-1 and r-1' });
+
+        const intro = JSON.parse(_editor.toIntroGraph()).dataIntroGraph;
+        const relation = Object.values(intro).find(e => Array.isArray(e.members));
+        assert.notStrictEqual(relation.members[0].id, 'n-1');   // renamed to a permanent ID in the output
+
+        const graph = _editor.stable.graph;
+        assert.deepEqual(graph.entity('n1').loc, [0.123456789, 0.987654321]);
+        assert.deepEqual(graph.entity('n-1').loc, [1.123456789, 1.987654321]);
+        assert.strictEqual(graph.entity('r-1').members[0].id, 'n-1');
+      });
+    });
+
+
+    describe('hasWork', () => {
+      it('is false when nothing was done', () => {
+        assert.isFalse(_editor.hasWork());
+      });
+
+      it('is true when the graph changed', () => {
+        _editor.perform(actionAddNode('n-1'));
+        _editor.commit({ stringID: 'added a node' });
+        assert.isTrue(_editor.hasChanges());
+        assert.isTrue(_editor.hasWork());
+      });
+
+      it('is true for a kept edit with a type, even if the graph did not change', () => {
+        _editor.perform(Rapid.actionNoop());
+        _editor.commit({ type: 'test_ignore', stringID: 'ignored a feature' });
+        assert.isFalse(_editor.hasChanges());
+        assert.isTrue(_editor.hasWork());
+      });
+
+      it('is false once that edit is undone', () => {
+        _editor.perform(Rapid.actionNoop());
+        _editor.commit({ type: 'test_ignore', stringID: 'ignored a feature' });
+        _editor.undo();
+        assert.isFalse(_editor.hasWork());
+      });
     });
 
 
     describe('toJSON', () => {
       it('doesn\'t generate unsaveable changes', () => {
         _editor.perform(actionAddNode('n-1'));
-        _editor.commit({ annotation: 'added n-1', selectedIDs: ['n-1'] });
+        _editor.commit({ stringID: 'added n-1', selectionAfter: ['n-1'] });
         _editor.perform(Rapid.actionDeleteNode('n-1'));
-        _editor.commit({ annotation: 'deleted n-1', selectedIDs: [] });
+        _editor.commit({ stringID: 'deleted n-1', selectionAfter: []});
 
         assert.isUndefined(_editor.toJSON());
       });
 
-      it('generates v3 JSON', () => {
+      it('generates v4 JSON', () => {
         prepareTestHistory();
 
         const node_1_json = { id: 'n-1' };  // without `visible: true`
@@ -871,14 +1279,9 @@ describe('EditSystem', () => {
         const node2upd_json = { id: 'n2', tags: { natural: 'tree' }, v: node2upd.v };
 
         const json = JSON.parse(_editor.toJSON());
-        assert.strictEqual(json.version, 3);
-
-        // base entities - before all edits
-        assert.notDeepInclude(json.baseEntities, node_1_json);    // n-1 was not in the base
-        assert.notDeepInclude(json.baseEntities, node1_json);     // n1 was never edited
-        assert.deepInclude(json.baseEntities, node2_json);        // n2 is in base and was edited
-        assert.deepInclude(json.baseEntities, node3_json);        // n3 is in base and was edited
-        assert.notDeepInclude(json.baseEntities, node2upd_json);
+        assert.strictEqual(json.version, 4);
+        assert.notProperty(json, 'baseEntities');
+        assert.deepEqual(json.baseVersions, {});   // these test nodes have no OSM versions
 
         // edited entities
         assert.deepInclude(json.entities, node_1_json);     // n-1 was added
@@ -886,6 +1289,35 @@ describe('EditSystem', () => {
         assert.notDeepInclude(json.entities, node1_json);   // n1 was never updated
         assert.notDeepInclude(json.entities, node2_json);   // n2 is in the base, not here
         assert.notDeepInclude(json.entities, node3_json);   // n3 is now deleted
+      });
+
+      it('saves the versions that edited entities, their child nodes and parent ways were edited from', () => {
+        // Base graph:  w1 [n1, n2],  w2 [n4, n5],  n3,  n6 (no version)
+        _editor.merge([
+          new Rapid.OsmNode(context, { id: 'n1', version: 1, loc: [0, 0] }),
+          new Rapid.OsmNode(context, { id: 'n2', version: 2, loc: [1, 0] }),
+          new Rapid.OsmNode(context, { id: 'n3', version: 3, loc: [2, 0] }),
+          new Rapid.OsmNode(context, { id: 'n4', version: 1, loc: [3, 0] }),
+          new Rapid.OsmNode(context, { id: 'n5', version: 1, loc: [4, 0] }),
+          new Rapid.OsmNode(context, { id: 'n6', loc: [5, 0] }),
+          new Rapid.OsmWay(context, { id: 'w1', version: 4, nodes: ['n1', 'n2'] }),
+          new Rapid.OsmWay(context, { id: 'w2', version: 1, nodes: ['n4', 'n5'] })
+        ]);
+
+        _editor.perform(Rapid.actionChangeTags('n2', { natural: 'tree' }));
+        _editor.commit({ stringID: 'updated n2' });
+        _editor.perform(Rapid.actionDeleteNode('n3'));
+        _editor.commit({ stringID: 'deleted n3' });
+        _editor.perform(Rapid.actionChangeTags('n6', { natural: 'tree' }));
+        _editor.commit({ stringID: 'updated n6' });
+        _editor.perform(actionAddNode('n-1'));
+        _editor.commit({ stringID: 'added n-1' });
+
+        const backup = _editor.toBackup();
+        // n2 and n3 were edited, w1 is n2's parent way, and n1 is w1's other child node.
+        // n6 has no version, n-1 is new, and w2, n4 and n5 weren't touched.
+        assert.deepEqual(backup.baseVersions, { n1: 1, n2: 2, n3: 3, w1: 4 });
+        assert.deepInclude(backup.entities, { id: 'n2', version: 2, loc: [1, 0], tags: { natural: 'tree' }, v: _editor.stable.graph.entity('n2').v });
       });
     });
 
@@ -910,7 +1342,7 @@ describe('EditSystem', () => {
             assert.strictEqual(restored.id, 'n-1');
             assert.deepEqual(restored.loc, [1, 2]);
             assert.strictEqual(restored.v, 0);
-            assert.strictEqual(_editor.getUndoAnnotation(), 'Added a point.');
+            assert.strictEqual(_editor.getUndoEdit().label, 'Added a point.');
             assert.include(_editor.sourcesUsed().imagery, 'Bing');
             assert.lengthOf(_editor.difference().created(), 1);
             assert.deepInclude(context.sequences, { node: 2, way: 1, relation: 1 });
@@ -936,7 +1368,7 @@ describe('EditSystem', () => {
             assert.strictEqual(restored.id, 'n1');
             assert.deepEqual(restored.loc, [2, 3]);
             assert.strictEqual(restored.v, 1);
-            assert.strictEqual(_editor.getUndoAnnotation(), 'Moved a point.');
+            assert.strictEqual(_editor.getUndoEdit().label, 'Moved a point.');
             assert.include(_editor.sourcesUsed().imagery, 'Bing');
             assert.lengthOf(_editor.difference().modified(), 1);
             assert.deepInclude(context.sequences, { node: 2, way: 1, relation: 1 });
@@ -955,10 +1387,11 @@ describe('EditSystem', () => {
           nextIDs: { node: 1, way: 2, relation: 3 },
           index: 1
         };
+        context.sequences = {};   // a new page
         return _editor.fromJSONAsync(JSON.stringify(json))
           .then(() => {
             assert.isUndefined(_editor.staging.graph.hasEntity('n1'));
-            assert.strictEqual(_editor.getUndoAnnotation(), 'Deleted a point.');
+            assert.strictEqual(_editor.getUndoEdit().label, 'Deleted a point.');
             assert.include(_editor.sourcesUsed().imagery, 'Bing');
             assert.lengthOf(_editor.difference().deleted(), 1);
             assert.deepInclude(context.sequences, { node: 1, way: 2, relation: 3 });
@@ -977,9 +1410,31 @@ describe('EditSystem', () => {
           nextIDs: { node: -2, way: -1, relation: -1 },
           index: 1
         };
+        context.sequences = {};   // a new page
         return _editor.fromJSONAsync(JSON.stringify(json))
           .then(() => {
             assert.deepInclude(context.sequences, { node: 2, way: 1, relation: 1 });
+          });
+      });
+
+      it('never moves a counter backward', () => {
+        const json = {
+          version: 3,
+          entities: [{ id: 'n-1', loc: [1, 2], v: 0 }],
+          baseEntities: [],
+          stack: [
+            { },
+            { modified: ['n-1v0'], annotation: 'Added a point.' }
+          ],
+          nextIDs: { node: 2, v: 5, graph: 3 },
+          index: 1
+        };
+        context.sequences = { node: 1, v: 900, graph: 40 };   // this page has counted further already
+        return _editor.fromJSONAsync(JSON.stringify(json))
+          .then(() => {
+            assert.strictEqual(context.sequences.node, 2);   // up to the restored entities
+            assert.isAtLeast(context.sequences.v, 900);
+            assert.isAtLeast(context.sequences.graph, 40);
           });
       });
     });
@@ -991,13 +1446,37 @@ describe('EditSystem', () => {
 
         const backup = _editor.toBackup();
         assert.isObject(backup);
-        assert.strictEqual(backup.version, 3);
+        assert.strictEqual(backup.version, 4);
         // The structured object must match the parsed JSON string exactly.
         assert.deepEqual(backup, JSON.parse(_editor.toJSON()));
       });
 
+      it('toBackup leaves the live node locs as they were', () => {
+        const node = new Rapid.OsmNode(context, { id: 'n-1', loc: [0.123456789012, 0.987654321098] });
+        _editor.perform(Rapid.actionAddEntity(node));
+        _editor.commit({ stringID: 'added n-1' });
+
+        const backup = _editor.toBackup();
+        assert.deepInclude(backup.entities.find(e => e.id === 'n-1'), { loc: [0.1234568, 0.9876543] });
+        assert.deepEqual(_editor.stable.graph.entity('n-1').loc, [0.123456789012, 0.987654321098]);
+      });
+
       it('toBackup returns undefined when there are no changes', () => {
         assert.isUndefined(_editor.toBackup());
+      });
+
+      it('toBackup leaves out the redo part of the history', () => {
+        _editor.perform(actionAddNode('n-1'));
+        _editor.commit({ stringID: 'added n-1', selectionAfter: ['n-1'] });
+        _editor.perform(actionAddNode('n-2'));
+        _editor.commit({ stringID: 'added n-2', selectionAfter: ['n-2'] });
+        _editor.undo();   // n-2 is only in the redo part now
+
+        const backup = _editor.toBackup();
+        assert.lengthOf(backup.stack, 2);   // the base edit, and adding n-1
+        assert.strictEqual(backup.index, 1);
+        assert.deepEqual(backup.stack.map(item => item.props?.stringID), [undefined, 'added n-1']);
+        assert.isFalse(backup.entities.some(entity => entity.id === 'n-2'));
       });
 
       it('fromBackupAsync restores directly from a structured object (no JSON string)', () => {
@@ -1020,8 +1499,409 @@ describe('EditSystem', () => {
           });
       });
 
+      it('saves in each item only what its edit changed against the edit before it', () => {
+        _editor.perform(actionAddNode('n-1'));
+        _editor.commit({ stringID: 'added n-1' });
+        _editor.perform(actionAddNode('n-2'));
+        _editor.commit({ stringID: 'added n-2' });
+        _editor.perform(Rapid.actionChangeTags('n-1', { natural: 'tree' }));
+        _editor.commit({ stringID: 'updated n-1' });
+
+        const graphs = _editor._history.map(edit => edit.graph);
+        const backup = _editor.toBackup();
+        assert.deepEqual(backup.stack[1].modified, [graphs[1].entity('n-1').key]);
+        assert.deepEqual(backup.stack[2].modified, [graphs[2].entity('n-2').key]);
+        assert.deepEqual(backup.stack[3].modified, [graphs[3].entity('n-1').key]);
+        assert.lengthOf(backup.entities, 3);
+      });
+
+      it('saves and restores an edit that puts an entity back as it is in base', () => {
+        const n1 = new Rapid.OsmNode(context, { id: 'n1', loc: [0, 0] });
+        _editor.merge([n1]);
+        _editor.perform(Rapid.actionChangeTags('n1', { natural: 'tree' }));
+        _editor.commit({ stringID: 'updated n1' });
+        _editor.perform(actionAddNode('n-1'));
+        _editor.commit({ stringID: 'added n-1' });
+        _editor.perform(Rapid.actionRevert('n1'));
+        _editor.commit({ stringID: 'reverted n1' });
+
+        const backup = _editor.toBackup();
+        assert.deepEqual(backup.stack[3].reverted, ['n1']);
+
+        const restored = new Rapid.EditSystem(context);
+        return restored.initAsync()
+          .then(() => restored.merge([n1]))
+          .then(() => restored.fromBackupAsync(backup))
+          .then(() => {
+            assert.isFalse(restored.stable.graph.isLocal('n1'));
+            assert.deepEqual(restored.stable.graph.entity('n1').tags, {});
+            assert.deepEqual([...restored.difference().changes.keys()], ['n-1']);
+            restored.undo();
+            assert.deepEqual(restored.stable.graph.entity('n1').tags, { natural: 'tree' });
+          });
+      });
+
+      it('copies each edit\'s entities once, however many backups are made', () => {
+        _editor.perform(actionAddNode('n-1'));
+        _editor.commit({ stringID: 'added n-1' });
+        const backup1 = _editor.toBackup();
+        _editor.perform(actionAddNode('n-2'));
+        _editor.commit({ stringID: 'added n-2' });
+        const backup2 = _editor.toBackup();
+
+        const copy1 = backup1.entities.find(e => e.id === 'n-1');
+        const copy2 = backup2.entities.find(e => e.id === 'n-1');
+        assert.strictEqual(copy2, copy1);
+      });
+
+      it('saves the edits again after a merge restores a node the user deleted (iD#2085)', () => {
+        _editor.merge([new Rapid.OsmNode(context, { id: 'n1', loc: [0, 0] })]);
+        _editor.perform(Rapid.actionDeleteNode('n1'));
+        _editor.commit({ stringID: 'deleted n1' });
+        _editor.perform(actionAddNode('n-1'));
+        _editor.commit({ stringID: 'added n-1' });
+        assert.deepEqual(_editor.toBackup().stack[1].deleted, ['n1']);
+
+        // A downloaded way uses n1, so it comes back in every edit
+        _editor.merge([
+          new Rapid.OsmNode(context, { id: 'n2', loc: [1, 0] }),
+          new Rapid.OsmWay(context, { id: 'w1', nodes: ['n1', 'n2'] })
+        ]);
+        assert.isOk(_editor.stable.graph.hasEntity('n1'));
+        assert.notProperty(_editor.toBackup().stack[1], 'deleted');
+      });
+
       it('fromBackupAsync throws on an unsupported backup version', () => {
         assert.throws(() => _editor.fromBackupAsync({ version: 2 }), /version 2 not supported/i);
+      });
+
+      it('backs up a session with only typed edits that change nothing in the graph', () => {
+        _editor.perform(Rapid.actionNoop());
+        _editor.commit({ type: 'test_ignore', stringID: 'ignored a feature', testID: 'abc' });
+
+        const backup = _editor.toBackup();
+        assert.isObject(backup);
+        assert.strictEqual(backup.stack[1].props.type, 'test_ignore');
+        assert.strictEqual(backup.stack[1].props.testID, 'abc');
+      });
+
+      it('saves each edit\'s props and restores them as they were', () => {
+        _editor.perform(actionAddNode('n-1'));
+        _editor.commit({
+          type: 'test_edit',
+          stringID: 'added a node',
+          stringParams: { n: 1 },
+          selectionAfter: ['n-1'],
+          sources: { data: ['Some dataset'] },
+          testID: 'abc'
+        });
+        const props = structuredClone(_editor.stable.props);
+        const backup = _editor.toBackup();
+
+        const restored = new Rapid.EditSystem(context);
+        return restored.initAsync()
+          .then(() => restored.fromBackupAsync(backup))
+          .then(() => {
+            assert.deepEqual(restored.stable.props, props);
+            assert.isTrue(restored.getUndoEdit().isLabeled({ stringID: 'added a node', stringParams: { n: 1 } }));
+            assert.isTrue(restored.hasWork());
+          });
+      });
+
+      it('restores a v3 object annotation (Rapid edits) as props', () => {
+        const backup = {
+          version: 3,
+          entities: [],
+          baseEntities: [],
+          stack: [
+            { },
+            {
+              annotation: { type: 'rapid_ignore_feature', description: 'Ignored a feature.', ignoreID: 'd1' },
+              selectedIDs: ['n1'],
+              dataUsed: ['Some dataset']
+            }
+          ],
+          nextIDs: {},
+          index: 1
+        };
+        return _editor.fromBackupAsync(backup)
+          .then(() => {
+            const props = _editor.stable.props;
+            assert.strictEqual(props.type, 'rapid_ignore_feature');
+            assert.strictEqual(props.ignoreID, 'd1');
+            assert.strictEqual(props.annotation, 'Ignored a feature.');
+            assert.notProperty(props, 'description');
+            assert.deepEqual(props.selectionAfter, ['n1']);
+            assert.deepEqual(props.sources.data, ['Some dataset']);
+            assert.strictEqual(_editor.getUndoEdit().label, 'Ignored a feature.');
+            assert.isTrue(_editor.hasWork());
+          });
+      });
+
+      it('restores edit props that have `selectedIDs` as a selection', () => {
+        const backup = {
+          version: 3,
+          entities: [],
+          baseEntities: [],
+          stack: [
+            { },
+            { props: { stringID: 'added a node', selectedIDs: ['n1'] } }
+          ],
+          nextIDs: {},
+          index: 1
+        };
+        return _editor.fromBackupAsync(backup)
+          .then(() => {
+            const props = _editor.stable.props;
+            assert.deepEqual(props.selectionAfter, ['n1']);
+            assert.notProperty(props, 'selectedIDs');
+          });
+      });
+
+      it('flattens a selection grouped by layer into data IDs', () => {
+        const backup = {
+          version: 3,
+          entities: [],
+          baseEntities: [],
+          stack: [
+            { },
+            { props: { stringID: 'accepted a feature', selection: { osm: ['n1'] }, selectionBefore: { rapid: ['ds:d1'], osm: ['w1'] } } }
+          ],
+          nextIDs: {},
+          index: 1
+        };
+        return _editor.fromBackupAsync(backup)
+          .then(() => {
+            const props = _editor.stable.props;
+            assert.deepEqual(props.selectionAfter, ['n1']);
+            assert.sameMembers(props.selectionBefore, ['ds:d1', 'w1']);
+          });
+      });
+
+      it('restores `selection` as `selectionAfter` (its name until November 2026)', () => {
+        const backup = {
+          version: 4,
+          entities: [],
+          baseVersions: {},
+          stack: [
+            { },
+            { props: { stringID: 'added a node', selection: ['n1'], selectionBefore: ['w1'] } }
+          ],
+          nextIDs: {},
+          index: 1
+        };
+        return _editor.fromBackupAsync(backup)
+          .then(() => {
+            const props = _editor.stable.props;
+            assert.deepEqual(props.selectionAfter, ['n1']);
+            assert.deepEqual(props.selectionBefore, ['w1']);
+            assert.notProperty(props, 'selection');
+          });
+      });
+
+      it('drops data IDs that came from a counter, which name other data after a reload', () => {
+        const backup = {
+          version: 3,
+          entities: [],
+          baseEntities: [],
+          stack: [
+            { },
+            { props: { stringID: 'accepted a feature', selection: ['n1', 'overture-buildings:geojson-12'], selectionBefore: ['overture-buildings:geojson-12'] } }
+          ],
+          nextIDs: {},
+          index: 1
+        };
+        return _editor.fromBackupAsync(backup)
+          .then(() => {
+            const props = _editor.stable.props;
+            assert.deepEqual(props.selectionAfter, ['n1']);
+            assert.deepEqual(props.selectionBefore, []);
+          });
+      });
+    });
+
+
+    describe('restoring base entities from the OSM API', () => {
+      // A fake OSM service. `elements` are what the API has, by id and version, with `current: true`
+      // on the current version. Like the real one, it leaves out versions it can't find.
+      let _calls;
+      function useOsm(elements, fail = false) {
+        _calls = [];
+        context.services.osm = {
+          loadEntityVersionsAsync: (versions) => {
+            _calls.push([...versions]);
+            if (fail) return Promise.reject(new Error('offline'));
+
+            const results = [];
+            for (const [entityID, version] of versions) {
+              const found = elements.find(e => e.id === entityID && (version === undefined ? e.current : e.version === version));
+              if (found) {
+                const props = { ...found };
+                delete props.current;
+                results.push(props);
+              }
+            }
+            return Promise.resolve(results);
+          }
+        };
+      }
+
+      afterEach(() => {
+        delete context.services.osm;
+      });
+
+      it('fetches the versions the edits were made from, all at once', () => {
+        useOsm([
+          { type: 'node', id: 'n1', version: 1, visible: true, loc: [0, 0], tags: {} },
+          { type: 'node', id: 'n2', version: 1, visible: true, loc: [1, 0], tags: {} },
+          { type: 'way', id: 'w1', version: 2, visible: true, nodes: ['n1', 'n2'], tags: { highway: 'path' } }
+        ]);
+        const backup = {
+          version: 4,
+          entities: [{ id: 'n1', version: 1, loc: [0, 1], v: 1 }],
+          baseVersions: { n1: 1, n2: 1, w1: 2 },
+          stack: [ {}, { modified: ['n1v1'], props: { stringID: 'moved a node' } } ],
+          nextIDs: {},
+          index: 1
+        };
+        return _editor.fromBackupAsync(backup)
+          .then(() => {
+            assert.deepEqual(_calls, [ [['n1', 1], ['n2', 1], ['w1', 2]] ]);
+            const base = _editor.base.graph;
+            assert.deepEqual(base.entity('n1').loc, [0, 0]);
+            assert.deepEqual(base.entity('w1').nodes, ['n1', 'n2']);
+            const graph = _editor.stable.graph;
+            assert.deepEqual(graph.entity('n1').loc, [0, 1]);
+            assert.deepEqual(graph.childNodes(graph.entity('w1')).map(n => n.id), ['n1', 'n2']);
+            assert.isTrue(_editor.hasChanges());
+          });
+      });
+
+      it('falls back to the current version, or to the version before it was deleted', () => {
+        useOsm([
+          { type: 'node', id: 'n1', version: 5, visible: true, loc: [0, 0], tags: {}, current: true },   // v3 is redacted
+          { type: 'node', id: 'n2', version: 4, visible: false, current: true },                     // deleted in v4
+          { type: 'node', id: 'n2', version: 3, visible: true, loc: [1, 0], tags: {} }
+        ]);                                                                                          // n3 can't be found at all
+        const backup = {
+          version: 4,
+          entities: [{ id: 'n-1', loc: [1, 2], v: 0 }],
+          baseVersions: { n1: 3, n2: 2, n3: 1 },
+          stack: [ {}, { modified: ['n-1v0'], props: { stringID: 'added a node' } } ],
+          nextIDs: {},
+          index: 1
+        };
+        return _editor.fromBackupAsync(backup)
+          .then(leftOutIDs => {
+            assert.deepEqual(leftOutIDs, []);   // none of them were edited
+            assert.deepEqual(_calls, [
+              [['n1', 3], ['n2', 2], ['n3', 1]],
+              [['n1', undefined], ['n2', undefined], ['n3', undefined]],
+              [['n2', 3]]
+            ]);
+            const base = _editor.base.graph;
+            assert.strictEqual(base.entity('n1').version, 5);
+            assert.strictEqual(base.entity('n2').version, 3);
+            assert.isUndefined(base.hasEntity('n3'));
+            assert.isOk(_editor.stable.graph.hasEntity('n-1'));
+          });
+      });
+
+      it('leaves out the edits to an entity whose version was redacted, and keeps the others', () => {
+        useOsm([
+          { type: 'node', id: 'n1', version: 2, visible: true, loc: [0, 0], tags: { amenity: 'cafe', cuisine: 'pizza' }, current: true },   // v1 is redacted
+          { type: 'node', id: 'n2', version: 1, visible: true, loc: [1, 0], tags: {}, current: true }
+        ]);
+        const backup = {
+          version: 4,
+          entities: [
+            { id: 'n1', version: 1, loc: [0, 0], tags: { amenity: 'cafe', name: 'Copied Cafe' }, v: 1 },
+            { id: 'n2', version: 1, loc: [1, 1], v: 1 }
+          ],
+          baseVersions: { n1: 1, n2: 1 },
+          stack: [ {}, { modified: ['n1v1'], props: { stringID: 'changed the name' } }, { modified: ['n2v1'], props: { stringID: 'moved a node' } } ],
+          nextIDs: {},
+          index: 2
+        };
+        return _editor.fromBackupAsync(backup)
+          .then(leftOutIDs => {
+            assert.deepEqual(leftOutIDs, ['n1']);
+            const graph = _editor.stable.graph;
+            assert.strictEqual(graph.entity('n1').version, 2);
+            assert.deepEqual(graph.entity('n1').tags, { amenity: 'cafe', cuisine: 'pizza' });
+            assert.deepEqual(graph.entity('n2').loc, [1, 1]);   // not redacted, so the move is kept
+            assert.lengthOf(_editor.history, 3);
+            assert.deepEqual(_editor.changes().modified.map(entity => entity.id), ['n2']);
+          });
+      });
+
+      it('puts back a way whose version was redacted, with the child nodes it has now', () => {
+        useOsm([
+          { type: 'node', id: 'n1', version: 1, visible: true, loc: [0, 0], tags: {}, current: true },
+          { type: 'node', id: 'n2', version: 1, visible: true, loc: [2, 0], tags: {}, current: true },
+          { type: 'node', id: 'n3', version: 1, visible: true, loc: [1, 0], tags: {}, current: true },   // added since
+          { type: 'way', id: 'w1', version: 2, visible: true, nodes: ['n1', 'n3', 'n2'], tags: { highway: 'path' }, current: true }   // v1 is redacted
+        ]);
+        const backup = {
+          version: 4,
+          entities: [],
+          baseVersions: { n1: 1, n2: 1, w1: 1 },
+          stack: [ {}, { deleted: ['w1', 'n1', 'n2'], props: { stringID: 'deleted a way' } } ],
+          nextIDs: {},
+          index: 1
+        };
+        return _editor.fromBackupAsync(backup)
+          .then(leftOutIDs => {
+            assert.sameMembers(leftOutIDs, ['w1', 'n1', 'n2']);
+            assert.deepEqual(_calls, [
+              [['n1', 1], ['n2', 1], ['w1', 1]],
+              [['w1', undefined]],
+              [['n3', undefined]]
+            ]);
+            const graph = _editor.stable.graph;
+            assert.deepEqual(graph.childNodes(graph.entity('w1')).map(n => n.id), ['n1', 'n3', 'n2']);
+            assert.isFalse(_editor.hasChanges());
+          });
+      });
+
+      it('rejects if the OSM API can\'t be reached, leaving the history empty', () => {
+        useOsm([], true);
+        const backup = {
+          version: 4,
+          entities: [{ id: 'n1', version: 1, loc: [0, 1], v: 1 }],
+          baseVersions: { n1: 1 },
+          stack: [ {}, { modified: ['n1v1'], props: { stringID: 'moved a node' } } ],
+          nextIDs: {},
+          index: 1
+        };
+        return _editor.fromBackupAsync(backup)
+          .then(() => assert.fail('Promise was fulfilled but should have been rejected'))
+          .catch(err => {
+            assert.match(err.message, /offline/);
+            assert.lengthOf(_editor.history, 1);
+            assert.strictEqual(_editor.index, 0);
+          });
+      });
+
+      it('fetches the child nodes a v3 backup is missing, at their current version', () => {
+        useOsm([
+          { type: 'node', id: 'n2', version: 7, visible: true, loc: [1, 0], tags: {}, current: true }
+        ]);
+        const backup = {
+          version: 3,
+          entities: [{ id: 'w1', nodes: ['n1', 'n2'], tags: { highway: 'path' }, v: 1 }],
+          baseEntities: [{ id: 'n1', loc: [0, 0] }, { id: 'w1', nodes: ['n1', 'n2'] }],
+          stack: [ {}, { modified: ['w1v1'], annotation: 'Changed the tags.' } ],
+          nextIDs: {},
+          index: 1
+        };
+        return _editor.fromBackupAsync(backup)
+          .then(() => {
+            assert.deepEqual(_calls, [ [['n2', undefined]] ]);
+            assert.strictEqual(_editor.base.graph.entity('n2').version, 7);
+            const graph = _editor.stable.graph;
+            assert.deepEqual(graph.childNodes(graph.entity('w1')).map(n => n.id), ['n1', 'n2']);
+          });
       });
     });
 

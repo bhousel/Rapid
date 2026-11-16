@@ -520,5 +520,71 @@ describe('Difference', () => {
       assert.strictEqual(complete.get('r2'), r2);
     });
 
+    it('includes the parent relations of a member, whatever order the changes come in', () => {
+      // A multipolygon's tags and a node of its member way change in the same edit.
+      // The member way w1 is also in a route r2, which must be included either way.
+      const n1 = new Rapid.OsmNode(context, { id: 'n1', loc: [0, 0] });
+      const n2 = new Rapid.OsmNode(context, { id: 'n2', loc: [1, 0] });
+      const n3 = new Rapid.OsmNode(context, { id: 'n3', loc: [1, 1] });
+      const w1 = new Rapid.OsmWay(context, { id: 'w1', nodes: ['n1', 'n2', 'n3', 'n1'] });
+      const r1 = new Rapid.OsmRelation(context, { id: 'r1', tags: { type: 'multipolygon' }, members: [{ id: 'w1', type: 'way', role: 'outer' }] });
+      const r2 = new Rapid.OsmRelation(context, { id: 'r2', tags: { type: 'route' }, members: [{ id: 'w1', type: 'way' }] });
+      const base = new Rapid.Graph(context, [n1, n2, n3, w1, r1, r2]);
+
+      for (const order of [['r1', 'n2'], ['n2', 'r1']]) {
+        const head = new Rapid.Graph(base);
+        for (const id of order) {
+          if (id === 'r1') head.replace(r1.update({ tags: { type: 'multipolygon', building: 'yes' } }));
+          if (id === 'n2') head.replace(n2.move([2, 0]));
+        }
+        const complete = new Rapid.Difference(base, head).complete();
+        assert.includeMembers([...complete.keys()], ['n2', 'w1', 'r1', 'r2'], `order ${order}`);
+      }
+    });
+
+    it('includes the added and removed members of a changed route', () => {
+      const n1 = new Rapid.OsmNode(context, { id: 'n1' });
+      const n2 = new Rapid.OsmNode(context, { id: 'n2' });
+      const n3 = new Rapid.OsmNode(context, { id: 'n3' });
+      const r1 = new Rapid.OsmRelation(context, { id: 'r1', tags: { type: 'route' }, members: [{ id: 'n1' }, { id: 'n2' }] });
+      const base = new Rapid.Graph(context, [n1, n2, n3, r1]);
+      const head = new Rapid.Graph(base).replace(r1.update({ members: [{ id: 'n1' }, { id: 'n3' }] }));
+      const complete = new Rapid.Difference(base, head).complete();
+      assert.hasAllKeys(complete, ['r1', 'n2', 'n3']);
+    });
+  });
+
+
+  describe('candidates', () => {
+    it('finds the same changes as a full scan, when given every changed ID', () => {
+      const n1 = new Rapid.OsmNode(context, { id: 'n1', loc: [0, 0] });
+      const n2 = new Rapid.OsmNode(context, { id: 'n2', loc: [1, 0] });
+      const w1 = new Rapid.OsmWay(context, { id: 'w1', nodes: ['n1', 'n2'] });
+      const base = new Rapid.Graph(context, [n1, n2, w1]);
+      const head = new Rapid.Graph(base);
+      head.replace(n2.move([2, 0]));
+      head.replace(n1.update({ tags: { a: 'b' } }));
+      head.replace(n1);    // written, but back to the base entity
+
+      const full = new Rapid.Difference(base, head);
+      const fromCandidates = new Rapid.Difference(base, head, new Set(['n1', 'n2', 'w1']));
+      assert.hasAllKeys(fromCandidates.changes, [...full.changes.keys()]);
+      assert.hasAllKeys(fromCandidates.changes, ['n2']);
+      assert.deepEqual(fromCandidates.didChange, full.didChange);
+      assert.hasAllKeys(fromCandidates.complete(), [...full.complete().keys()]);
+    });
+
+    it('compares against the `before` entities it is given', () => {
+      const n1 = new Rapid.OsmNode(context, { id: 'n1', loc: [0, 0] });
+      const base = new Rapid.Graph(context, [n1]);
+      const head = new Rapid.Graph(base);
+      const n1v2 = n1.move([1, 1]);
+      head.replace(n1v2);
+
+      const before = new Map([['n1', undefined]]);
+      const diff = new Rapid.Difference(head, head, ['n1'], before);
+      assert.deepEqual(diff.created(), [n1v2]);
+      assert.isTrue(diff.didChange.addition);
+    });
   });
 });

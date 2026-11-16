@@ -1,5 +1,6 @@
 import { AbstractSystem } from './AbstractSystem.ts';
 import { Extent } from '@rapid-sdk/math';
+import { makeDataID } from '../data/dataID.ts';
 import { utilDate, utilDateString } from '../util/date.ts';
 import { utilExtractValues } from '../util/string.ts';
 import { utilIterable } from '../util/iterable.ts';
@@ -8,6 +9,19 @@ import type { Context } from '../Context.ts';
 import type { D3Selection } from 'd3-selection';
 import type { MarkerData } from '../data/MarkerData.ts';
 import type { OneOrMore } from '../util/iterable.ts';
+import type { SelectMode } from '../modes/SelectMode.ts';
+
+
+/**
+ * Returns the data ID of a photo. Each photo service keeps its images in a `${layerID}-images`
+ * cache, which is also the spatial ID in their data IDs (see `design/data-ids.md`).
+ * @param layerID - The photo layer, e.g. 'mapillary'
+ * @param photoID - The photo's ID in that service
+ * @return The photo's data ID, e.g. 'mapillary-images:123'
+ */
+function photoDataID(layerID: PhotoLayerID, photoID: PhotoID): DataID {
+  return makeDataID(`${layerID}-images`, photoID);
+}
 
 
 /** Date filter types ('fromDate' or 'toDate') */
@@ -48,6 +62,8 @@ export class PhotoSystem extends AbstractSystem {
   protected _filterToDate: string | null = null;
   /** Usernames to include in the photo filter, or null to show all users */
   protected _filterUsernames: string[] | null = null;
+  /** Whether `_hashChanged` is applying the url's filters, so the change isn't the user's and the url keeps its params */
+  protected _isApplyingUrl: boolean;
 
 
   /**
@@ -59,6 +75,7 @@ export class PhotoSystem extends AbstractSystem {
     this.optionalDependencies = new Set<SystemID>(['gfx', 'map', 'urlhash', 'ui']);
 
     this._filterPhotoTypes = new Set<PhotoType>(this.photoTypes);
+    this._isApplyingUrl = false;
 
     // Ensure methods used as callbacks always have `this` bound correctly.
     this._hashChanged = this._hashChanged.bind(this);
@@ -120,43 +137,47 @@ export class PhotoSystem extends AbstractSystem {
   protected _hashChanged(currParams: Map<string, string>, prevParams: Map<string, string>): void {
     const context = this.context;
     const gfx = context.systems.gfx;
+    const urlhash = context.systems.urlhash;
     const scene = gfx?.scene;
 
-    // photo_overlay
-    // support enabling photo layers by default via a URL parameter, e.g. `photo_overlay=kartaview;mapillary;streetside`
-    const newPhotoOverlay = currParams.get('photo_overlay') || '';
-    const oldPhotoOverlay = prevParams.get('photo_overlay') || '';
-    if (scene && newPhotoOverlay !== oldPhotoOverlay) {
-      const vals = utilExtractValues(newPhotoOverlay).filter(Boolean);
-      const toEnableIDs = new Set<LayerID>(vals);
-      for (const layerID of this.layerIDs) {
-        const layer = scene.layers.get(layerID);
-        if (!layer) continue;
-        layer.enabled = toEnableIDs.has(layer.id);
-      }
+    // photo_overlay (legacy)
+    // turns on photo layers, e.g. `photo_overlay=kartaview;mapillary;streetside`, like `layers=` does now.
+    // It's read once: the url doesn't keep `photo_overlay` (see API.md).
+    const photoOverlay = currParams.get('photo_overlay');
+    if (photoOverlay !== undefined) {
+      const vals = utilExtractValues(photoOverlay).filter(Boolean);
+      scene?.enableLayers(this.layerIDs.filter(layerID => vals.includes(layerID)));
+      urlhash?.setParam('photo_overlay', null);
     }
 
-    // photo_dates
-    // support a from-to date range, like `photo_dates=2019-01-01|2020-12-31`
-    const newPhotoDates = currParams.get('photo_dates') || '';
-    const oldPhotoDates = prevParams.get('photo_dates') || '';
-    if (newPhotoDates !== oldPhotoDates) {
-      const [fromDateStr, toDateStr] = utilExtractValues(newPhotoDates);
-      if (fromDateStr || toDateStr) {
+    // The filters are for this session only: a link's filters are kept in the url until the user
+    // changes them, and the filters the user picks aren't written to it (see `setDateFilter`).
+    // (Not a value that was dropped since, by a change made while the same url was being read.
+    // When a filter's param goes away, the filter stays as it is.)
+    const newValue = (k: string): string | undefined => {
+      const val = currParams.get(k);
+      return (val !== undefined && val !== prevParams.get(k) && urlhash?.getParam(k) === val) ? val : undefined;
+    };
+
+    this._isApplyingUrl = true;
+    try {
+      // photo_dates
+      // support a from-to date range, like `photo_dates=2019-01-01|2020-12-31`
+      const newPhotoDates = newValue('photo_dates');
+      if (newPhotoDates !== undefined) {
+        const [fromDateStr, toDateStr] = utilExtractValues(newPhotoDates);
         this.setDateFilter('fromDate', fromDateStr);
         this.setDateFilter('toDate', toDateStr);
-      } else {
-        this._filterToDate = this._filterFromDate = null;
       }
-    }
 
-    // photo_username
-    // support delimited list of usernames, e.g. 'photo_usernames=quincylvania,chrisbeddow'
-    const newPhotoUsername = currParams.get('photo_username') || '';
-    const oldPhotoUsername = prevParams.get('photo_username') || '';
-    if (newPhotoUsername !== oldPhotoUsername) {
-      const usernames = utilExtractValues(newPhotoUsername).filter(Boolean);
-      this.setUsernameFilter(usernames);
+      // photo_username
+      // support delimited list of usernames, e.g. 'photo_usernames=quincylvania,chrisbeddow'
+      const newPhotoUsername = newValue('photo_username');
+      if (newPhotoUsername !== undefined) {
+        this.setUsernameFilter(utilExtractValues(newPhotoUsername).filter(Boolean));
+      }
+    } finally {
+      this._isApplyingUrl = false;
     }
 
     // photo
@@ -233,37 +254,14 @@ export class PhotoSystem extends AbstractSystem {
 
   /**
    * Called whenever the photo changes.
-   * This will update the urlhash, trigger a redraw, and emit a 'photochange' event.
+   * This will update the urlhash (the current photo and detection), trigger a redraw, and emit a 'photochange' event.
    */
   protected _photoChanged(): void {
     const context = this.context;
     const gfx = context.systems.gfx;
     const urlhash = context.systems.urlhash;
-    const scene = gfx?.scene;
 
     if (urlhash) {
-      // photo_overlay
-      const enabledIDs: LayerID[] = [];
-      if (scene) {
-        for (const layerID of this.layerIDs) {
-          const layer = scene.layers.get(layerID);
-          if (layer && layer.supported && layer.enabled) {
-            enabledIDs.push(layerID);
-          }
-        }
-      }
-      urlhash.setParam('photo_overlay', enabledIDs.length ? enabledIDs.join(',') : null);
-
-      // photo_dates
-      let rangeString;
-      if (this._filterFromDate || this._filterToDate) {
-        rangeString = (this._filterFromDate || '') + '_' + (this._filterToDate || '');
-      }
-      urlhash.setParam('photo_dates', rangeString);
-
-      // photo_username
-      urlhash.setParam('photo_username', this._filterUsernames ? this._filterUsernames.join(',') : null);
-
       // current photo
       let photoString;
       if (this._currPhotoLayerID && this._currPhotoID) {
@@ -455,7 +453,7 @@ export class PhotoSystem extends AbstractSystem {
 
       this._currPhotoLayerID = layerID;
       this._currPhotoID = photoID;
-      scene?.setClass('selectphoto', layerID, photoID);
+      scene?.setClass('selectphoto', photoDataID(layerID, photoID));
 
       // Try to show the viewer with the image selected..
       (service as any).selectImageAsync(photoID)
@@ -506,7 +504,7 @@ export class PhotoSystem extends AbstractSystem {
 
       this._currLayerID = layerID;
       this._currDetectionID = detectionID;
-      scene?.setClass('selectdetection', layerID, detectionID);
+      scene?.setClass('selectdetection', makeDataID(layerID, detectionID));   // the layer has the same ID as the detection's cache
 
       // Try to highlight any photos that show this detection,
       // And try to select a photo in the viewer that shows it.
@@ -518,9 +516,8 @@ export class PhotoSystem extends AbstractSystem {
           // Handle the situation where we want to select a detection,
           // but we haven't properly entered SelectMode yet.
           // This can happen if the detection arrived in the URL hash.
-          if (!context.selectedData().has(detection.id)) {
-            const selection = new Map<DetectionID, MarkerData>().set(detection.id, detection);
-            context.enter('select', { selection: selection });
+          if (!context.selectedIDs().includes(detection.dataID)) {
+            context.enter('select', { selection: [detection.dataID] });
             return;  // exit to avoid infinite loop - entering select mode will bring us right back in here.
           }
 
@@ -528,7 +525,7 @@ export class PhotoSystem extends AbstractSystem {
           const images = (detection.props.images ?? []) as { id: string }[];
           const highlightPhotoIDs = images.map(image => image.id);
           for (const photoID of highlightPhotoIDs) {
-            scene?.setClass('highlightphoto', photoLayerID, photoID);
+            scene?.setClass('highlightphoto', photoDataID(photoLayerID, photoID));
           }
 
           // Try to select a photo that shows this detection..
@@ -587,11 +584,18 @@ export class PhotoSystem extends AbstractSystem {
 
 
   /**
-   * Sets a date filter value
+   * Sets a date filter value, for this session.
+   * (It isn't written to the url, and a link's `photo_dates` is dropped from it.)
    * @param type - 'fromDate' or 'toDate'
    * @param val - the value to set it to, should be in YYYY-MM-DD format
    */
   public setDateFilter(type: DateFilter, val: Nullable<string>): void {
+    const urlhash = this.context.systems.urlhash;
+
+    if (!this._isApplyingUrl) {
+      urlhash?.setParam('photo_dates', null);
+    }
+
     const newValue = utilDateString(val) || null;
     const newDate = utilDate(val);
     let didChange = false;
@@ -623,10 +627,17 @@ export class PhotoSystem extends AbstractSystem {
 
 
   /**
-   * Sets a username filter value
+   * Sets a username filter value, for this session.
+   * (It isn't written to the url, and a link's `photo_username` is dropped from it.)
    * @param val - Username or Array or Set of usernames to filter by
    */
   public setUsernameFilter(val: OneOrMore<string>): void {
+    const urlhash = this.context.systems.urlhash;
+
+    if (!this._isApplyingUrl) {
+      urlhash?.setParam('photo_username', null);
+    }
+
     const usernames = [...utilIterable(val)];
     this._filterUsernames = usernames.length ? usernames : null;
     this._photoChanged();
@@ -699,6 +710,17 @@ export class PhotoSystem extends AbstractSystem {
     const context = this.context;
     const $viewer: D3Selection = context.container().selectAll('.photoviewer');
     return !!$viewer.size() && !$viewer.classed('hide');
+  }
+
+
+  /**
+   * Whether the arrow keys move the selected OSM features (see `SelectMode`), so the photo viewers
+   * shouldn't also step through photos with them, unless the viewer has focus.
+   * @return `true` if the arrow keys belong to the selection
+   */
+  public arrowKeysMoveSelection(): boolean {
+    const mode = this.context.mode;
+    return mode?.id === 'select' && (mode as SelectMode).movesWithArrowKeys;
   }
 
 

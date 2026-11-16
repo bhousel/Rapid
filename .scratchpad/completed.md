@@ -2,6 +2,62 @@
 
 Reverse-chronological one-liners. Details live in git history — these are just breadcrumbs.
 
+- **`conflation-system` branch ready for main as v3.0.0-pre.4** (Nov 16 2026) — data IDs, graph geometry,
+  the validation audit, both bug hunts, edit props and backup v4, the upload path, the scene, and
+  conflation Steps 1–6 (first version). Last fix before merging: an accept from a custom dataset
+  records the dataset ID in `data_used` (an empty `dataUsed` used to win over the fallback).
+
+- **pre.4 release check** (Nov 10 2026, agency sidewalk and crossing data) — accept with joins,
+  autoconnect, undo/redo, Autofix All, panning while editing, backup restore and a faked upload conflict
+  all passed, plus ~220 random UI steps with invariant checks. Its one bug (matched Rapid lines taking
+  the pointer in draw mode) became the scene work; the rest is in `backlog.md`.
+
+- **The scene stacks by spatial ID, and a mode says what the pointer can reach** (Nov 11 2026, `design/scene.md`) — every layer draws under `<group>/<spatialID>` (`basemap/osm/lines/<level>`, `points/<dataset>`, `qa/<layer>`), never straight into a group, and `AbstractMode.interactiveSpatialIDs` (`['osm']` for draw, add-point and drag-node) has the scene skip the other subtrees. Fixes drawing not connecting to the OSM line under an already-mapped Rapid line, a photo marker or a QA item (pre.4 release check). Checked live on agency sidewalk data: 22 of 22 OSM midpoints hit in draw mode (was 39 of 50), browse unchanged. See `decisions.md`.
+- **A data ID's first part is its `spatialID`** (Nov 10 2026, `design/data-ids.md` Terms) — the data prop `namespace` is now `spatialID`, like the `SpatialID` type, `SpatialSystem`'s parameters and `RapidDataset.spatialID` (Bryan found "namespace" confusing: it's the spatial cache's ID, or a resolver's for OSM and vector tiles). Code, tests and docs; data IDs themselves didn't change.
+
+- **Mapillary traffic signs have their own cache** (Nov 10 2026, `design/data-ids.md`) — `mapillary-signs`, apart from the other detections. A sign's data ID starts with that cache ID, and the layer has the same ID, so a link to a sign turns on the signs layer, and nothing guesses the layer from `object_type`. Signs' data IDs changed (no shim, per the pre.4 plan).
+
+- **Switching the API offers that API's sessions** (Nov 10 2026, `design/database-system.md`) — startup is always on live, so dev sessions were never offered. `editor.findRestorableSessionsAsync()` (also used by startup) settles the API's interrupted uploads and finds its sessions; the source switcher shows the restore screen after switching. From the first bug hunt.
+
+- **A new changeset when OSM closed the open one** (Nov 10 2026, `design/uploader-system.md` "A closed changeset") — the service forgets a changeset the API says is closed (it used to keep it, so every save got the same 409 until a reload), and the uploader uploads again in a new changeset, once.
+
+- **Settings declare how they're kept** (Nov 10 2026, `design/settings-system.md` "What syncs") — `registerSync`, `registerLocal` and `unregister`, like Chrome or VS Code. The sync deletes the account's copies of local and retired settings and v1's `meta`; unknown keys are left alone. `imagery.lastUsed` and `imagery.overlays` sync; datasets stay local. See `decisions.md`.
+
+- **Second bug hunt** (Nov 4–10 2026, `/bughunt`) — 40 findings before handing the branch to testers, all fixed except the conflation ones (now "Known bugs" in `design/conflation-system.md`): the database upgrade blocked by another tab, upload marks and "can't tell" uploads, conflict choices on shared nodes, redacted base versions, settings sync, the selection after undo and redo, custom-data links, walkthrough sessions, MapRoulette (auth turned off: MapRoulette expired the keys), layer parent-child links and midpoints, editing between an upload and the reset, arrow keys, validating the nodes next to a connection, building crossings, curbs on short crossings. Clean coverage: 400 seeds × 250 steps of random `EditSystem` histories with 2,432 backup round trips, and two live soaks on Seattle data. See `decisions.md`.
+
+- **The url holds overrides, not state** (Nov 9 2026, `design/settings-system.md` Step 1 bullets) — Rapid only writes `map`, `id`, `photo` and `detection` as you go. Every other param (layers, filters, imagery, datasets, photo filters, MapRoulette challenges, `map3d`) is read, stays as the link had it until the state no longer matches, then is dropped; changes are saved one at a time. New `imagery.overlays` setting; the system saves `imagery.lastUsed`. Commit 63e055d65 plus step 2. See `decisions.md`.
+
+- **First bug hunt** (Nov 3 2026, `/bughunt`) — 36 findings before handing the branch to testers, all fixed: iD#2085 restores per graph, sessions per API, the conflict screen's choices and Cancel, conflation runs as their own data, QA editors that keep their state while typing, undo during drag and draw, stable IDs in links and backups. Commits 6d9310a7c through bf714e73b.
+
+- **One autofix runner** (Nov 2 2026, `design/validation-system.md` rollout item 5) — `actionAutofix` applies one fix at a time and validates again, for autoconnect and Autofix All (`ValidationSystem.autofixAction`, which finds the shown issues again by kind and entities, via `issue.foundOnID`). Closes the validation audit.
+
+- **Graph versions and their geometry** (Oct 30 – Nov 2 2026, `design/graph-geometry.md` steps 0–10) — Fixed validation audit findings 1 (shared geometry) and 2 (wrong spatial index) by construction. Graphs share structure (`PersistentVector` records, O(1) derive, structural diffs), emit from a change journal, keep their own shapes, and catch up with rebases and schema changes (`syncWithBase()`). Backups hold each edit's own changes. One base spatial index plus local indexes for stable and staging, searchable for any graph (`editor.entitiesInBox`). No data changed in place: `touch()` gone, every layer rebinds by object. Reference model test in `test/unit/lib/graph_model.test.js`. Step 7 (memos in records) measured and left for later. See `decisions.md`.
+
+- **Validation audit** (Oct 29–30 2026, `design/validation-system.md`) — Autoconnect applies one fix at a time, a throwing validator no longer hides other issues, Autofix All and `curb_nodes` fixes repaired, no side effects while detecting, edits validated again when data loads near them, fixes look up the graph they run on. Findings 1 and 2 became the graph-geometry rollout.
+
+- **Data IDs and selecting any mix of data** (Oct 28–29 2026, `design/data-ids.md` steps 1–5) — `${namespace}:${localID}` data IDs, `spatial.getData()` with resolvers, deterministic IDs for file datasets, pieces, Esri and custom data, one `SelectMode` for any mix of data, and `id=` takes data IDs. Step 6 became `design/multiselection.md`.
+
+- **Upload path and conflicts** (Oct 27 2026, `design/uploader-system.md`) — the conflict path had been
+  broken for years, several bugs deep (iD#7199, Rapid#1361/#1366/#1480): checks use versioned
+  multi-fetch, merges reach the upload, 409 retries are limited, local deletions merge, the conflict
+  screen opens. Every upload failure ends the save; an upload with no answer checks the changeset;
+  the session is kept until the upload succeeds and the next tab settles interrupted uploads.
+
+- **What an edit records, steps 2–5** (Oct 26–27 2026, `design/edit-system.md`) — undone edits aren't
+  backed up; `Edit<P>` carries typed props with a `stringID` label; edits record extent and the
+  selection before and after, so undo/redo restore both and move the map only when needed; backups are
+  v4, saving base versions that restore fetches from the OSM API.
+
+- **Conflation Steps 1–6, first version** (Oct 2026, `design/conflation-system.md`) — coverage boxes,
+  `ConflationSystem` line matching with source/target rules, drawing matched/partial lines, accepting a
+  run with its joins (trimmed to them), even sampling with smoothed headings, stable feature and piece
+  IDs with acted ranges, and the Conflation Settings UI (switches and a rules table). The "near" band
+  and "needs review" were dropped after the first demo (Oct 26).
+
+- **Settings v2 Steps 1–2** (Oct 2026, `design/settings-system.md`, `design/rapid-system.md`) — only
+  registered settings sync to the OSM account; custom datasets and changes to shipped datasets are
+  kept in the `DatabaseSystem` `datasets` store.
+
 - **OSM features lost after a cancelled request** (Oct 2026) — Removed `skipSeen` and the parsers' seen cache (and the `osmService:reset` / `network:reset` listeners that cleared it); `EditSystem.merge` now skips entities already in the base graph instead. A tile request cancelled or timed out after the worker parsed it no longer hides its features until reload. See `decisions.md`.
 
 - **Agent tooling for Claude Code + Copilot** (Oct 2026) — Prompts → Agent Skills in `.claude/skills/` (agent-practices PR #1, then `/sync` to AGENTS.md v4). `.github/instructions/` → nested `modules/{ui,pixi}/AGENTS.md`. Corrected the AGENTS.md Testing section (`bun run test` = unit + browser only). See `decisions.md`.

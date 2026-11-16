@@ -1,4 +1,5 @@
 import { AbstractData, AbstractDataProps } from './AbstractData.ts';
+import { Geometry } from '../lib/Geometry.ts';
 import { utilArrayUnion, utilUnicodeCharsTruncated } from '@rapid-sdk/util';
 
 import type { Context } from '../Context.ts';
@@ -26,10 +27,6 @@ export interface OsmEntityProps extends AbstractDataProps {
 }
 
 
-/** Type for the transients cache - maps entity keys to their cached computed values */
-type TransientCache = Map<string, Map<string, unknown>>;
-
-
 /**
  * This class contains logic that is common to OSM data elements.
  * Aside from the `props`, OSM data elements all contain a special `tags` object.
@@ -44,8 +41,10 @@ type TransientCache = Map<string, Map<string, unknown>>;
  */
 export class OsmEntity extends AbstractData<OsmEntityProps> {
 
-  /** Cache for memoizing expensive calculations, shared between copies */
-  protected _transients: TransientCache;
+  /** Answers memoized on this object, see `memo()` (created when the first one is stored) */
+  protected _memos: Map<string, unknown> | null;
+  /** The schema generation that the memoized answers were computed with */
+  protected _memoGeneration: number;
 
 
   /**
@@ -57,19 +56,14 @@ export class OsmEntity extends AbstractData<OsmEntityProps> {
   public constructor(otherOrContext: OsmEntity | Context, props: Partial<OsmEntityProps> = {}) {
     super(otherOrContext, props);
 
-    // "transients" are a cache where we memoize expensive calculations.
+    // Memos are a cache where we memoize expensive calculations.
     // They previously lived in the Graph, however we churn through Graphs
     // pretty frequently, so they now live with the OsmEntities themselves.
-    // The transients cache is shared between entities that copy from other entities.
-    // For this to work, the Entity must be touched if there is a meaningful
-    // change in the Graph that will cause the computed property to change.
-    if (otherOrContext instanceof AbstractData) {  // copy other
-      const other = otherOrContext as OsmEntity;
-      this._transients = other._transients;
-
-    } else {
-      this._transients = new Map<string, Map<string, unknown>>() as TransientCache;
-    }
+    // Each object has its own: a copy is a new entity, and starts without any.
+    // Answers that depend on the Graph are only memoized while every Graph agrees on them,
+    // see `memo()` and `Graph.canShareAnswers()`.
+    this._memos = null;
+    this._memoGeneration = 0;
 
     // Idea: Store tags in a proto-less object to avoid collisions with
     //  reserved words in JavaScript objects, see iD#3044
@@ -90,21 +84,65 @@ export class OsmEntity extends AbstractData<OsmEntityProps> {
    */
   public destroy(): void {
     super.destroy();
-    this._transients = null!;
+    this._memos = null;
   }
 
   /**
+   * The entity's own geometry: a node's. A way's or a relation's shape depends on the Graph, so for
+   * them this throws: read it through `graph.geometry(entity)`.
+   * @return  Its Geometry
+   * @throws  Error for a way or a relation
+   */
+  public get geoms(): Geometry {
+    if (this.type === 'way' || this.type === 'relation') {
+      throw new Error(`Read the geometry of ${this.type} ${this.id} through its graph: graph.geometry(entity)`);
+    }
+    return this._geoms;
+  }
+
+  /**
+   * Stores the entity's own geometry.
+   * @param val - The new Geometry (it's never changed once stored, so copies may share it)
+   */
+  public set geoms(val: Geometry) {
+    this._geoms = val;
+  }
+
+  /**
+   * The geometry stored on this object: a node's own, or for a way or a relation, the shape the base
+   * Graph of its lineage built (only that Graph writes it, at rebase). `graph.geometry(entity)`
+   * returns it for every Graph that doesn't have a shape of its own for the entity.
+   * A copy shares the original's, until a base Graph builds one for the copy.
+   * @return  The stored Geometry
+   */
+  public get baseGeometry(): Geometry {
+    return this._geoms;
+  }
+
+  /**
+   * Builds the entity's geometry as it is in a Graph, without storing it.
    * OSM geometry can be complicated.
    * Nodes are easy because they represent a single coordinate.
    * But the other data types require topology information from a Graph.
-   * This function allows the calling code to recompute the geometry after the Graph has been updated.
+   * @param graph - the Graph that holds the topology needed
+   * @return A new Geometry
+   */
+  public buildGeometry(graph?: Graph): Geometry {
+    const geoms = new Geometry(this.context);
+    geoms.setData(this.asGeoJSON(graph));
+    return geoms;
+  }
+
+  /**
+   * Rebuilds the geometry stored on this object (see `baseGeometry`): a node's own, or the base
+   * Graph's shape of a way or a relation. Other Graphs keep their shapes in their records.
+   * It stores a new `Geometry` and leaves the old one untouched, because a renderer may still hold its parts.
    * @param graph - the Graph that holds the topology needed
    * @returns this same OsmEntity
    */
   public updateGeometry(graph?: Graph): this {
-    // this.touch();
-    this._transients.clear();
-    this.geoms.setData(this.asGeoJSON(graph));
+    this.clearMemos();
+    this._geoms = this.buildGeometry(graph);
     return this;
   }
 
@@ -172,26 +210,39 @@ export class OsmEntity extends AbstractData<OsmEntityProps> {
   }
 
   /**
-   * Stores a computed property for this Entity.
-   * We're essentially implementing "memoization" for the provided function.
-   * @param k - String cache key to lookup the computed value (e.g. 'extent')
+   * Memoizes a computed property for this Entity.
+   * Memos are dropped when the schema changes (its `generation`), since many answers read it.
+   * An answer that depends on a Graph (the entity's parents, its shape) is memoized only while every
+   * Graph of the lineage agrees on it (`graph.canShareAnswers()`); otherwise it's computed each time.
+   * @param graph - The Graph the answer depends on, or `null` if it depends only on this object
+   * @param k - String cache key to lookup the computed value (e.g. 'geometry')
    * @param fn - Function that performs the computation
    * @returns The result of the function call
    */
-  public transient<T>(k: string, fn: () => T): T {
-    const entityKey = this.key;
-    let cache = this._transients.get(entityKey);
-    if (!cache) {
-      cache = new Map<string, Map<string, unknown>>() as TransientCache;
-      this._transients.set(entityKey, cache);
+  public memo<T>(graph: Graph | null, k: string, fn: () => T): T {
+    if (graph && !graph.canShareAnswers(this.id)) return fn();
+
+    const generation = this.context.systems.schema?.generation ?? 0;
+    if (generation !== this._memoGeneration) {
+      this._memos?.clear();
+      this._memoGeneration = generation;
     }
 
-    let v = cache.get(k);
+    let v = this._memos?.get(k);
     if (v !== undefined) return v as T;  // return cached
 
     v = fn();   // compute value
-    cache.set(k, v);
+    this._memos ??= new Map<string, unknown>();
+    this._memos.set(k, v);
     return v as T;
+  }
+
+  /**
+   * Drops the answers memoized on this object.
+   * Used when something they were computed from changed, e.g. a rebase gave it new parents.
+   */
+  public clearMemos(): void {
+    this._memos?.clear();
   }
 
   /**

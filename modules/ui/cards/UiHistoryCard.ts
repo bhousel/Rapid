@@ -2,6 +2,7 @@ import { selection } from 'd3-selection';
 
 import { AbstractUiCard } from './AbstractUiCard.ts';
 import { MarkerData } from '../../data/MarkerData.ts';
+import { splitDataID } from '../../data/dataID.ts';
 import { uiIcon } from '../icon.ts';
 import { utilCmd } from '../../util/cmd.ts';
 
@@ -149,7 +150,7 @@ export class UiHistoryCard extends AbstractUiCard {
         $content
           .append('h4')
           .attr('class', 'history-heading')
-          .text(l10n.t('text.note') + ' ' + datumID);
+          .text(l10n.t('text.note') + ' ' + splitDataID(datumID)[1]);   // the note's own ID, not `osm-notes:123`
 
         $content
           .call(this.renderNote, datum);

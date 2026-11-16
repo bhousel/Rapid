@@ -9,7 +9,7 @@ describe('actionCircularize', () => {
 
   function isCircular(wayID, graph) {
     const way = graph.entity(wayID);
-    const local = way.geoms.parts[0].local;
+    const local = graph.geometry(way).parts[0].local;
     const points = local.coords;
     const centroid = local.centroid;
     const radius = Rapid.sdk.vecLength(centroid, points[0]);
@@ -41,7 +41,7 @@ describe('actionCircularize', () => {
 
   function area(wayID, graph) {
     const way = graph.entity(wayID);
-    return way.geoms.parts[0].local.area;
+    return graph.geometry(way).parts[0].local.area;
   }
 
 
@@ -128,8 +128,8 @@ describe('actionCircularize', () => {
     assert.isTrue(isCircular('-', result));
 
     const way = result.entity('-');
-    const points = way.geoms.parts[0].world.coords;
-    const centroid = way.geoms.parts[0].world.centroid;
+    const points = result.geometry(way).parts[0].world.coords;
+    const centroid = result.geometry(way).parts[0].world.centroid;
 
     for (let i = 0; i < points.length - 1; i++) {
       assert.isAtMost(angle(points.at(i), points.at(i+1), centroid), 20);
@@ -367,8 +367,8 @@ describe('actionCircularize', () => {
       ]);
 
       const graph = new Rapid.Graph(base);
-      const a0 = area('-', Rapid.actionCircularize('-')(base.snapshot(), 0));
-      const a1 = area('-', Rapid.actionCircularize('-')(base.snapshot(), 1));
+      const a0 = area('-', Rapid.actionCircularize('-')(new Rapid.Graph(base), 0));
+      const a1 = area('-', Rapid.actionCircularize('-')(new Rapid.Graph(base), 1));
       const result = Rapid.actionCircularize('-')(graph, 0.5);
       const aHalf = area('-', result);
       assert.isFalse(isCircular('-', result));          // not circular yet

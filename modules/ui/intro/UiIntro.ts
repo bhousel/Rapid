@@ -166,7 +166,8 @@ export class UiIntro {
       layersEnabled: new Set(),                            // Set<layerID>
       datasetsAdded: new Set(rapid.addedDatasetIDs),       // Set<datasetID>
       datasetsEnabled: new Set(rapid.enabledDatasetIDs),   // Set<datasetID>
-      edits: editor.toJSON()
+      edits: editor.toJSON(),
+      sessionID: editor.holdSession()   // kept live while the walkthrough runs, so no other tab restores it
     };
 
     // Remember which layers were enabled before, enable only certain ones in the walkthrough.
@@ -293,10 +294,12 @@ export class UiIntro {
     const context = this.context;
     const editor = context.systems.editor!;
     const imagery = context.systems.imagery!;
+    const l10n = context.systems.l10n!;
     const map = context.systems.map!;
     const rapid = context.systems.rapid!;
     const scene = context.systems.gfx!.scene!;
     const settings = context.systems.settings;
+    const ui = context.systems.ui;   // optional
 
     // Store if walkthrough is completed..
     const incomplete = utilArrayDifference(chapterFlow, this._progress);
@@ -330,14 +333,24 @@ export class UiIntro {
     this._resume.mapwithai?.();
     this._resume.urlhash();
 
-    // Reset, then restore the user's edits, if any...
+    // Reset, then restore the user's edits, if any, and keep saving them in the session they were in.
+    // (Only once they're back: an empty history would delete the session at the next backup.)
+    const { edits, sessionID } = this._original;
     context.resetAsync()
       .then(() => {
-        if (this._original.edits) {
-          return editor.fromJSONAsync(this._original.edits);
+        if (edits) {
+          return editor.fromJSONAsync(edits)
+            .then(() => { if (sessionID) editor.continueSession(sessionID); });
         } else {
+          editor.releaseSession();
           return Promise.resolve();
         }
+      })
+      .catch(err => {
+        // Restoring needs the OSM API. The user's session is still saved, so it can be restored later.
+        editor.releaseSession();
+        console.error(err);  // eslint-disable-line no-console
+        ui?.Flash.show({ duration: 10000, label: l10n.t('restore.failed') });
       });
   }
 }

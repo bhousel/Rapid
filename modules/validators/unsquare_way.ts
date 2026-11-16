@@ -7,6 +7,7 @@ import { ValidationFix } from '../lib/ValidationFix.ts';
 import type { Action } from '../actions/types.ts';
 import type { Context } from '../Context.ts';
 import type { D3Selection } from 'd3-selection';
+import type { EditLabel } from '../lib/Edit.ts';
 import type { Graph } from '../lib/Graph.ts';
 import type { OsmEntity, OsmWay } from '../data/types.ts';
 import type { ValidatorFunction, ValidatorResult } from './types.ts';
@@ -60,7 +61,7 @@ export function validateUnsquareWay(context: Context): ValidatorFunction {
     if (!isClosed) return result;   // this building has bigger problems
 
     // A way will have LineString or Polygon geometry. We can use 'outer' to get these points.
-    const points = way.geoms.parts[0]?.local?.outer as Vec2[];
+    const points = graph.geometry(way).parts[0]?.local?.outer as Vec2[];
     if (!points) return result;
 
     // don't flag ways with lots of nodes since they are likely detail-mapped
@@ -96,13 +97,13 @@ export function validateUnsquareWay(context: Context): ValidatorFunction {
 
     if (!geoOrthoCanOrthogonalize(points, isClosed, epsilon, degreeThreshold, true)) return result;
 
-    let autoArgs: [Action, string] | undefined;
+    let autoArgs: [Action, EditLabel] | undefined;
     // don't allow autosquaring features linked to wikidata
     if (!entity.tags.wikidata) {
       // important to use the same `degreeThreshold` as for detection:
       const action = actionOrthogonalize(entity.id, undefined, degreeThreshold);
-      const annotation = l10n.t('operations.orthogonalize.annotation.feature', { n: 1 });
-      autoArgs = [ action, annotation ];
+      const label = { stringID: 'operations.orthogonalize.annotation.feature', stringParams: { n: 1 } };
+      autoArgs = [ action, label ];
     }
 
     result.issues = [new ValidationIssue(context, {
@@ -129,11 +130,11 @@ export function validateUnsquareWay(context: Context): ValidatorFunction {
               const entityID = this.issue.entityIds[0];
               // important to use the same `degreeThreshold` as for detection:
               const action = actionOrthogonalize(entityID, undefined, degreeThreshold);
-              const annotation = l10n.t('operations.orthogonalize.annotation.feature', { n: 1 });
-
-              editor
-                .performAsync(action)
-                .then(() => editor.commit({ annotation: annotation, selectedIDs: [entityID] }));
+              editor.animateAndCommitAsync(action, {
+                stringID: 'operations.orthogonalize.annotation.feature',
+                stringParams: { n: 1 },
+                selectionAfter: [entityID]
+              });
             }
           }),
 /*
@@ -147,8 +148,8 @@ export function validateUnsquareWay(context: Context): ValidatorFunction {
               tags.nonsquare = 'yes';
               editor.perform(actionChangeTags(entityID, tags));
               editor.commit({
-                annotation: l10n.t('issues.fix.tag_as_unsquare.annotation'),
-                selectedIDs: [entityID]
+                stringID: 'issues.fix.tag_as_unsquare.annotation',
+                selection: [entityID]
               });
             }
           })

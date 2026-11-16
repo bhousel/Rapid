@@ -290,6 +290,57 @@ describe('MapRouletteService', () => {
         });
       });
 
+      describe('postUpdate', () => {
+        it('submits without a MapRoulette API key (MapRoulette auth is turned off for now)', async () => {
+          context.enter ??= () => {};
+          fetchMock.route(/\/task\/1\//, {});
+          const task = _maproulette.getTask('1').update({ taskStatus: 1, comment: 'fixed it' });
+          _maproulette.postUpdate(task);
+          await Bun.sleep(5);
+
+          const calls = fetchMock.callHistory.calls(/\/task\/1\//);
+          assert.lengthOf(calls, 3);   // comment, status, release
+          for (const call of calls) {
+            const headerNames = Object.keys(call.options.headers ?? {}).map(k => k.toLowerCase());
+            assert.notInclude(headerNames, 'apikey');
+          }
+        });
+
+        it('doesn\'t post the comment again when the user submits again while the status is still being sent', async () => {
+          context.enter ??= () => {};
+          fetchMock.route(/\/task\/1\/comment/, {});
+          fetchMock.route(/\/task\/1\/1$/, {}, { delay: 20 });   // the status update is slow
+          fetchMock.route(/\/task\/1\/release/, {});
+          const task = _maproulette.getTask('1').update({ taskStatus: 1, comment: 'fixed it' });
+
+          _maproulette.postUpdate(task);
+          await Bun.sleep(5);              // the comment has finished
+          _maproulette.postUpdate(task);   // Submit again
+          await Bun.sleep(40);
+
+          assert.lengthOf(fetchMock.callHistory.calls(/\/task\/1\/comment/), 1);
+          assert.lengthOf(fetchMock.callHistory.calls(/\/task\/1\/1$/), 1);
+        });
+
+        it('doesn\'t post the comment again when the user submits again after the status update failed', async () => {
+          context.enter ??= () => {};
+          fetchMock.route(/\/task\/1\/comment/, {});
+          fetchMock.route(/\/task\/1\/1$/, 500, { repeat: 1 });   // fails the first time
+          fetchMock.route(/\/task\/1\/1$/, {});
+          fetchMock.route(/\/task\/1\/release/, {});
+          const task = _maproulette.getTask('1').update({ taskStatus: 1, comment: 'fixed it' });
+
+          _maproulette.postUpdate(task);
+          await Bun.sleep(5);
+          _maproulette.postUpdate(task);   // try again
+          await Bun.sleep(5);
+
+          assert.lengthOf(fetchMock.callHistory.calls(/\/task\/1\/comment/), 1);
+          assert.lengthOf(fetchMock.callHistory.calls(/\/task\/1\/1$/), 2);
+          assert.lengthOf(fetchMock.callHistory.calls(/\/task\/1\/release/), 1);
+        });
+      });
+
       describe('itemURL', () => {
         it('returns a task url', () => {
           const task = _maproulette.getTask('1');
@@ -300,5 +351,93 @@ describe('MapRouletteService', () => {
 
     });
 
+  });
+
+
+  describe('the `maproulette` url param', () => {
+    let ctx, maproulette, layer, urlParams, events;
+
+    beforeEach(async () => {
+      ctx = new Rapid.MockContext();
+      layer = { id: 'maproulette', enabled: false };
+      urlParams = new Map();
+      events = [];
+      const scene = {
+        layers: new Map([['maproulette', layer]]),
+        on: () => {},
+        enableLayers: () => {
+          layer.enabled = true;
+          maproulette._mapRouletteChanged();   // 'layerchange'
+        }
+      };
+      ctx.systems = {
+        gfx: { scene: scene, immediateRedraw: () => {} },
+        network: new Rapid.NetworkSystem(ctx),
+        spatial: new Rapid.SpatialSystem(ctx),
+        urlhash: {
+          on: eventName => events.push(eventName),
+          getParam: k => urlParams.get(k),
+          setParam: (k, v) => (v === null || v === undefined ? urlParams.delete(k) : urlParams.set(k, v))
+        }
+      };
+      maproulette = new Rapid.MapRouletteService(ctx);
+      await maproulette.initAsync();
+    });
+
+    // The url as a link has it
+    function hashChange(val) {
+      urlParams.set('maproulette', val);
+      maproulette._hashChanged(new Map(urlParams), new Map());
+    }
+
+    it('listens for changes to the url', () => {
+      assert.include(events, 'hashchange');
+    });
+
+    it('shows only the tasks of the given challenges, turns on the layer, and leaves the param in the url', () => {
+      hashChange('100,200');
+      assert.isTrue(layer.enabled);
+      assert.strictEqual(maproulette.challengeIDs, '100,200');
+      assert.strictEqual(urlParams.get('maproulette'), '100,200');
+    });
+
+    it('turns on the layer for the legacy `maproulette=true`, and drops it from the url', () => {
+      hashChange('true');
+      assert.isTrue(layer.enabled);
+      assert.strictEqual(maproulette.challengeIDs, '');
+      assert.isFalse(urlParams.has('maproulette'));
+    });
+
+    it('drops the param once the challenges shown change, and doesn\'t write the filter to the url', () => {
+      hashChange('100,200');
+      maproulette.challengeIDs = '200,100';   // the same challenges
+      assert.isTrue(urlParams.has('maproulette'));
+
+      maproulette.challengeIDs = '300';
+      assert.isFalse(urlParams.has('maproulette'));
+      assert.strictEqual(maproulette.challengeIDs, '300');
+    });
+
+    it('drops the param once the layer is turned off, and keeps the filter for the session', () => {
+      hashChange('100');
+      layer.enabled = false;
+      maproulette._mapRouletteChanged();   // 'layerchange'
+      assert.isFalse(urlParams.has('maproulette'));
+      assert.strictEqual(maproulette.challengeIDs, '100');
+    });
+
+    it('keeps filtering when the param goes away', () => {
+      hashChange('100');
+      urlParams.delete('maproulette');
+      maproulette._hashChanged(new Map(), new Map([['maproulette', '100']]));
+      assert.isTrue(layer.enabled);
+      assert.strictEqual(maproulette.challengeIDs, '100');
+    });
+
+    it('doesn\'t apply a value that was dropped while the url was being read', () => {
+      maproulette._hashChanged(new Map([['maproulette', '100']]), new Map());   // not in the url anymore
+      assert.isFalse(layer.enabled);
+      assert.strictEqual(maproulette.challengeIDs, '');
+    });
   });
 });

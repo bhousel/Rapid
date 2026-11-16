@@ -373,4 +373,101 @@ describe('GeometryPart', () => {
     });
   });
 
+
+  describe('computeCoverage', () => {
+    const point = { type: 'Point', coordinates: [0, 0] };
+    const line = { type: 'LineString', coordinates: [[0, 0], [0.001, 0], [0.001, 0.001]] };
+    const square = {
+      type: 'Polygon',
+      coordinates: [[ [-0.001, -0.001], [0.001, -0.001], [0.001, 0.001], [-0.001, 0.001], [-0.001, -0.001] ]]
+    };
+
+    it('returns an empty array when there is no data', () => {
+      const part = new Rapid.GeometryPart(context);
+      assert.deepEqual(part.computeCoverage(2), []);
+    });
+
+    it('returns an empty array for a non-positive radius', () => {
+      const part = new Rapid.GeometryPart(context);
+      part.setData(line);
+      assert.deepEqual(part.computeCoverage(0), []);
+      assert.deepEqual(part.computeCoverage(-1), []);
+    });
+
+    it('covers a Point with one box centered on it, sized in meters', () => {
+      const part = new Rapid.GeometryPart(context);
+      part.setData(point);
+      const r = Rapid.geoMetersToWorld(2, 0);
+
+      const boxes = part.computeCoverage(2);
+      assert.lengthOf(boxes, 1);
+      assert.deepEqual(boxes[0].coord, part.world.coords);
+      assert.closeTo(boxes[0].maxX - boxes[0].minX, 2 * r, 1e-9);
+      assert.closeTo(boxes[0].maxY - boxes[0].minY, 2 * r, 1e-9);
+    });
+
+    it('covers a LineString with a chain of boxes from end to end', () => {
+      const part = new Rapid.GeometryPart(context);
+      part.setData(line);
+      const r = Rapid.geoMetersToWorld(2, part.orig.extent.center()[1]);
+
+      const boxes = part.computeCoverage(2);
+      assert.isAbove(boxes.length, 2);
+      assert.deepEqual(boxes[0].coord, part.world.outer[0]);
+      assert.deepEqual(boxes[boxes.length - 1].coord, part.world.outer[2]);
+      for (const box of boxes) {
+        assert.closeTo(box.maxX - box.minX, 2 * r, 1e-9);
+      }
+    });
+
+    it('covers a Polygon with its world extent grown by the radius', () => {
+      const part = new Rapid.GeometryPart(context);
+      part.setData(square);
+      const r = Rapid.geoMetersToWorld(3, 0);
+      const extent = part.world.extent;
+
+      const boxes = part.computeCoverage(3);
+      assert.lengthOf(boxes, 1);
+      assert.closeTo(boxes[0].minX, extent.min[0] - r, 1e-9);
+      assert.closeTo(boxes[0].minY, extent.min[1] - r, 1e-9);
+      assert.closeTo(boxes[0].maxX, extent.max[0] + r, 1e-9);
+      assert.closeTo(boxes[0].maxY, extent.max[1] + r, 1e-9);
+      assert.deepEqual(boxes[0].coord, extent.center());
+    });
+
+    it('grows the boxes at higher latitudes, where a meter spans more world units', () => {
+      const equator = new Rapid.GeometryPart(context);
+      equator.setData({ type: 'Point', coordinates: [0, 0] });
+      const north = new Rapid.GeometryPart(context);
+      north.setData({ type: 'Point', coordinates: [0, 60] });
+
+      const eqBox = equator.computeCoverage(2)[0];
+      const northBox = north.computeCoverage(2)[0];
+      assert.closeTo((northBox.maxX - northBox.minX) / (eqBox.maxX - eqBox.minX), 2, 1e-6);  // sec(60°) = 2
+    });
+
+    it('caches the result for the same radius and recomputes for a new one', () => {
+      const part = new Rapid.GeometryPart(context);
+      part.setData(line);
+
+      const first = part.computeCoverage(2);
+      assert.strictEqual(part.computeCoverage(2), first);
+
+      const wider = part.computeCoverage(4);
+      assert.notStrictEqual(wider, first);
+      assert.isBelow(wider.length, first.length);   // wider boxes are spaced further apart
+    });
+
+    it('drops the cached coverage when the data changes', () => {
+      const part = new Rapid.GeometryPart(context);
+      part.setData(line);
+      const first = part.computeCoverage(2);
+
+      part.setData(point);
+      const second = part.computeCoverage(2);
+      assert.notStrictEqual(second, first);
+      assert.lengthOf(second, 1);
+    });
+  });
+
 });

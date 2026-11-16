@@ -60,7 +60,7 @@ export class DragNoteMode extends AbstractMode {
 
     this._active = true;
     this.dragNote = note;
-    this._selectedData.set(this.dragNote.id, this.dragNote);
+    this._selectedIDs = [note.dataID];
 
     // Calculate dragOffset, to correct for where "on the pin" the user grabbed the target.
     const startCoord = note.geoms.parts[0]!.world!.coords as Vec2;  // A marker should have a single world coord
@@ -91,7 +91,7 @@ export class DragNoteMode extends AbstractMode {
 
     this.dragNote = null;
     this._dragOffset = [0, 0];
-    this._selectedData.clear();
+    this._selectedIDs = [];
 
     const context = this.context;
     context.behaviors.drag!
@@ -128,7 +128,6 @@ export class DragNoteMode extends AbstractMode {
 
     this.dragNote = this.dragNote.update({ loc: loc });
     osm?.replaceNote(this.dragNote);
-    this._selectedData.set(this.dragNote.id, this.dragNote);
 
     // Force a redraw - there is no event for notes that would tell the map to redraw.
     // (unlike with dragging osm features around, where editsystem emits `stagingchanged` events)
@@ -164,7 +163,6 @@ export class DragNoteMode extends AbstractMode {
 
     this.dragNote = this.dragNote.update({ loc: loc });
     osm.replaceNote(this.dragNote);
-    this._selectedData.set(this.dragNote.id, this.dragNote);
   }
 
 
@@ -174,8 +172,7 @@ export class DragNoteMode extends AbstractMode {
    */
   protected _end(): void {
     if (this.dragNote) {
-      const selection = new Map<DataID, MarkerData>().set(this.dragNote.id, this.dragNote);
-      this.context.enter('select', { selection: selection });
+      this.context.enter('select', { selection: [this.dragNote.dataID] });
     } else {
       this.context.enter('browse');
     }

@@ -30,6 +30,18 @@ export interface OsmWayProps extends OsmEntityProps {
 }
 
 /**
+ * The map feature that an OSM way represents (see `OsmWay.asFeature`).
+ */
+export interface OsmFeature {
+  /** The entity that carries the feature's tags: the way itself, or its parent multipolygon */
+  entity: OsmEntity;
+  /** The feature's geometry */
+  geometry: 'area' | 'line';
+  /** The feature's tags */
+  tags: OsmTags;
+}
+
+/**
  * Segment data for a way.
  */
 export interface Segment {
@@ -91,7 +103,7 @@ export class OsmWay extends OsmEntity {
    * @return GeoJSON representation of the OsmWay
    */
   public asGeoJSON(graph: Graph): GeoJSONObject {
-    return this.transient('geojson', () => {
+    return this.memo(graph, 'geojson', () => {
 
       let geometry: GeoJSON.Geometry | null = null;
       const coords: Vec2[] = [];
@@ -455,12 +467,50 @@ export class OsmWay extends OsmEntity {
   }
 
   /**
+   * Returns the IDs of the nodes next to the given node in this way: the node before and the node
+   * after each place it appears.  (A closed way's first and last node are the same node, so both of
+   * its neighbors are found.)
+   * @param nodeID - The node to find the neighbors of
+   * @param which - Optional, `'before'` or `'after'` for only the nodes on that side (default both)
+   * @return The neighbors' IDs, or an empty Set if the node isn't in this way
+   */
+  public adjacentNodeIDs(nodeID: EntityID, which: 'both' | 'before' | 'after' = 'both'): Set<EntityID> {
+    const nodes = this.nodes;
+    const results = new Set<EntityID>();
+    for (let i = 0; i < nodes.length; i++) {
+      if (nodes[i] !== nodeID) continue;
+      if (which !== 'after' && i > 0) results.add(nodes[i - 1]);
+      if (which !== 'before' && i < nodes.length - 1) results.add(nodes[i + 1]);
+    }
+    return results;
+  }
+
+  /**
+   * Returns the map feature that this way represents.
+   * Usually that's the way itself. But an untagged way in a multipolygon relation (an outer or
+   * inner ring) is really part of that relation: an area, with the relation's tags.
+   * If the way belongs to more than one multipolygon, the first one is used.
+   * Not cached: it depends on the graph's relations, not just on this way.
+   * @param graph - the Graph that holds the topology needed
+   * @return The feature: the entity that carries its tags, its geometry, and its tags
+   */
+  public asFeature(graph: Graph): OsmFeature {
+    if (!this.hasInterestingTags()) {
+      const parent = graph.parentRelations(this).find(relation => relation.isMultipolygon());
+      if (parent) {
+        return { entity: parent, geometry: 'area', tags: parent.tags };
+      }
+    }
+    return { entity: this, geometry: this.geometry(graph), tags: this.tags };
+  }
+
+  /**
    * Returns 'area' if this way is an area (polygon), or 'line' if it is a line.
    * @param graph - the Graph that holds the topology needed
    * @return 'area' or 'line'
    */
   public geometry(graph: Graph): 'area' | 'line' {
-    return this.transient('geometry', () => {
+    return this.memo(null, 'geometry', () => {
       return this.isArea() ? 'area' : 'line';
     });
   }
@@ -485,7 +535,7 @@ export class OsmWay extends OsmEntity {
       );
     }
 
-    return this.transient('segments', () => {
+    return this.memo(null, 'segments', () => {
       const segments: Segment[] = [];
       for (let i = 0; i < this.nodes.length - 1; i++) {
         segments.push({

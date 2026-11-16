@@ -130,7 +130,7 @@ export class DragBehavior extends AbstractBehavior {
     if (!data) return;
 
     // What are we dragging?
-    const isNote = data.type === 'note' && target.layerID === 'notes' && data.props.isNew;
+    const isNote = data.type === 'note' && target.layerID === 'osm-notes' && data.props.isNew;
     const isNode = data.type === 'node' && target.layerID === 'osm';           // not 'rapid'
     const isMidpoint = data?.type === 'midpoint' && target.layerID === 'osm';  // not 'rapid'
     if (!(isNote || isNode || isMidpoint)) return;
@@ -190,7 +190,7 @@ export class DragBehavior extends AbstractBehavior {
         if (!data) return;
 
         // What are we dragging?
-        const isNote = data.type === 'note' && target.layerID === 'notes' && data.props.isNew;
+        const isNote = data.type === 'note' && target.layerID === 'osm-notes' && data.props.isNew;
         const isNode = data.type === 'node' && target.layerID === 'osm';           // not 'rapid'
         const isMidpoint = data?.type === 'midpoint' && target.layerID === 'osm';  // not 'rapid'
         if (!(isNote || isNode || isMidpoint)) return;
@@ -221,12 +221,12 @@ export class DragBehavior extends AbstractBehavior {
 
         // Enter the correct mode
         if (isNode) {
-          context.enter('drag-node', { nodeID: data.id, reselectIDs: reselectIDs });
+          context.enter('drag-node', { nodeID: data.id, reselectIDs: reselectIDs, selectionBefore: selectedIDs });
         } else if (isNote) {
           context.enter('drag-note', { noteID: data.id });
         } else if (isMidpoint) {
           const midpoint = { loc: data.props.loc, edge: data.props.edge };
-          context.enter('drag-node', { midpoint: midpoint, reselectIDs: reselectIDs });
+          context.enter('drag-node', { midpoint: midpoint, reselectIDs: reselectIDs, selectionBefore: selectedIDs });
         }
 
         this.emit('start', down);

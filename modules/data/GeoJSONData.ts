@@ -1,4 +1,6 @@
 import { AbstractData, AbstractDataProps } from './AbstractData.ts';
+import { GENERATED_ID_PREFIX } from './dataID.ts';
+import { Geometry } from '../lib/Geometry.ts';
 
 import type { Context } from '../Context.ts';
 import type { GeoJSONObject } from '../lib/types.ts';
@@ -42,7 +44,7 @@ export class GeoJSONData<P extends GeoJSONProps = GeoJSONProps> extends Abstract
     super(otherOrContext, props);
 
     if (!this.props.id) {  // no ID provided - generate one
-      this.props.id = 'geojson-' + this.context.next('geojson');
+      this.props.id = GENERATED_ID_PREFIX + this.context.next('geojson');
     }
 
     // For consistency, offer a `this.id` property.
@@ -53,10 +55,15 @@ export class GeoJSONData<P extends GeoJSONProps = GeoJSONProps> extends Abstract
 
   /**
    * Forces a recomputation of the internal geometry data.
+   * It stores a new `Geometry` and leaves the old one untouched, because a renderer may still hold its parts.
+   * The constructor calls it. To change a data element, make a new one with `update()` instead: data
+   * isn't changed in place.
    * @returns this same data element
    */
   public updateGeometry(): this {
-    this.geoms.setData(this.asGeoJSON());
+    const geoms = new Geometry(this.context);
+    geoms.setData(this.asGeoJSON());
+    this.geoms = geoms;
     return this;
   }
 

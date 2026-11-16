@@ -171,6 +171,24 @@ describe('GeoJSONData', () => {
     });
   });
 
+  describe('updateGeometry', () => {
+    it('stores a new Geometry and leaves the old one and its parts untouched', () => {
+      const a = new Rapid.GeoJSONData(context, { geojson: sample.linestring });
+      const oldGeoms = a.geoms;
+      const oldPart = oldGeoms.parts[0];
+      const oldCoords = structuredClone(oldPart.orig.coords);
+
+      a.updateGeometry();
+
+      assert.notStrictEqual(a.geoms, oldGeoms);
+      assert.notStrictEqual(a.geoms.parts[0], oldPart);
+      assert.lengthOf(oldGeoms.parts, 1);
+      assert.isObject(oldGeoms.world);
+      assert.isObject(oldPart.world);
+      assert.deepEqual(oldPart.orig.coords, oldCoords);
+    });
+  });
+
   describe('asGeoJSON', () => {
     it('returns the originally cloned GeoJSONData data, stored in props', () => {
       const orig = { geojson: sample.point };

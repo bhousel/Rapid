@@ -47,7 +47,7 @@ export class LocationSystem extends AbstractSystem {
   /** A location-conflation resolver (owns the locationSet registry + spatial index) */
   protected _resolver: LocationConflation;
   /** A which-polygon index for blocked regions only */
-  protected _wpblocks: ReturnType<typeof whichPolygon>;
+  protected _wpblocks: whichPolygon.Query<{ id: LocationSetID }>;
 
 
   /**
@@ -69,12 +69,12 @@ export class LocationSystem extends AbstractSystem {
       url: 'https://wiki.openstreetmap.org/wiki/Russian%E2%80%93Ukrainian_war'
     }];
 
-    const blockedFeatures: GeoJSON.Feature[] = [];
+    const blockedFeatures: GeoJSON.Feature<GeoJSON.Geometry, { id: LocationSetID }>[] = [];
     for (const block of blocks) {
       const data = this._resolveBlock(block);
       if (!data) continue;
       this._blockFeatures.set(block.locationSetID!, data);
-      blockedFeatures.push(data.asGeoJSON() as GeoJSON.Feature);
+      blockedFeatures.push(data.asGeoJSON() as GeoJSON.Feature<GeoJSON.Geometry, { id: LocationSetID }>);
     }
     this._wpblocks = whichPolygon({ type: 'FeatureCollection', features: blockedFeatures });
   }

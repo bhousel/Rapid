@@ -1,5 +1,8 @@
+import * as PIXI from 'pixi.js';
+import { splitDataID } from '../data/dataID.ts';
 import { type OneOrMore, utilIterable } from '../util/iterable.ts';
 
+import type { AbstractData } from '../data/AbstractData.ts';
 import type { AbstractPixiFeature } from './AbstractPixiFeature.ts';
 import type { Context } from '../Context.ts';
 import type { GraphicsSystem } from '../core/GraphicsSystem.ts';
@@ -15,7 +18,7 @@ import type { Viewport } from '@rapid-sdk/math';
  * All identifiers should be strings, to avoid JavaScript comparison surprises (e.g. `'0' !== 0`)
  * - `layerID`   - A unique identifier for the layer, for example 'osm'
  * - `featureID` - A unique identifier for the feature, for example 'osm-w-123-fill'
- * - `dataID`    - A feature may have data bound to it, for example OSM identifier like 'w-123'
+ * - `dataID`    - A feature may have data bound to it, by its data ID, for example 'w-123' or 'fbRoads:abc'
  * - `classID`   - A pseudoclass identifier like 'hover' or 'select'
  *
  * Properties available:
@@ -51,10 +54,8 @@ export class AbstractPixiLayer {
   protected _parentHasChildren: Map<DataID, Set<DataID>>;
   /** Map of child dataID to Set of parent dataIDs */
   protected _childHasParents: Map<DataID, Set<DataID>>;
-  /** Map of dataID to Set of classIDs */
-  protected _dataHasClass: Map<DataID, Set<ClassID>>;
-  /** Map of classID to Set of dataIDs */
-  protected _classHasData: Map<ClassID, Set<DataID>>;
+  /** Spatial IDs this layer has containers for (see `_spatialContainer`) */
+  protected _spatialIDs: Set<SpatialID>;
 
 
   /**
@@ -78,6 +79,9 @@ export class AbstractPixiLayer {
     this._featureHasData = new Map<FeatureID, DataID>();
     this._dataHasFeature = new Map<DataID, Set<FeatureID>>();
 
+    // The spatial IDs this layer has asked the scene for containers for (released in `reset()`)
+    this._spatialIDs = new Set<SpatialID>();
+
     // Parent Data <-> Child Data
     // We establish a parent-child data hierarchy (like what the DOM used to do for us)
     // For example, we need this to know which ways make up a multipolygon relation.
@@ -85,11 +89,7 @@ export class AbstractPixiLayer {
     this._childHasParents = new Map<DataID, Set<DataID>>();
 
     // Data <-> Class
-    // Data classes are strings (like what CSS classes used to do for us)
-    // Counterintuitively, the Layer needs to be the source of truth for these data classes,
-    // because a Feature can be 'selected' or 'drawing' even before it has been created, or after destroyed
-    this._dataHasClass = new Map<DataID, Set<ClassID>>();
-    this._classHasData = new Map<ClassID, Set<DataID>>();
+    // The Scene holds these, by dataID (see `PixiScene.setClass`)
   }
 
 
@@ -132,6 +132,27 @@ export class AbstractPixiLayer {
 
 
   /**
+   * Whether this Layer draws the given data, so that selecting it can turn this Layer on.
+   * A Layer draws the data whose spatial ID is its own ID, unless it overrides this (see `design/data-ids.md`).
+   * @param dataID - The data ID, e.g. `osm-notes:123`
+   * @return `true` if this Layer draws the data
+   */
+  public drawsData(dataID: DataID): boolean {
+    return splitDataID(dataID)[0] === this.id;
+  }
+
+
+  /**
+   * Makes sure this Layer shows the given data, which it draws (see `drawsData`).
+   * Turns the Layer on; a Layer that also chooses what it draws overrides this.
+   * @param dataID - The data ID
+   */
+  public showData(dataID: DataID): void {
+    this.enabled = true;
+  }
+
+
+  /**
    * Every Layer should have a reset function to replace any Pixi objects and internal state.
    * Override in a subclass with needed logic.
    * @abstract
@@ -141,8 +162,6 @@ export class AbstractPixiLayer {
     this._dataHasFeature.clear();
     this._parentHasChildren.clear();  // maybe don't clear this (should pseudo dom survive a reset?)
     this._childHasParents.clear();    // maybe don't clear this (should pseudo dom survive a reset?)
-    this._dataHasClass.clear();       // maybe don't clear this (should pseudo css survive a reset?)
-    this._classHasData.clear();       // maybe don't clear this (should pseudo css survive a reset?)
 
     for (const feature of this.features.values()) {
       feature.destroy();
@@ -150,6 +169,45 @@ export class AbstractPixiLayer {
 
     this.features.clear();
     this.retained.clear();
+
+    for (const spatialID of this._spatialIDs) {
+      this.scene.releaseSpatialContainers(spatialID);
+    }
+    this._spatialIDs.clear();
+  }
+
+
+  /**
+   * Returns the container this layer draws the given spatial ID's data into, in the given group
+   * (see `PixiScene.getSpatialContainer` and `design/scene.md`). Features go in it, or in
+   * sub-containers made under it with `_childContainer`; `reset()` releases it again.
+   * @param groupID - The group, e.g. 'basemap' or 'points'
+   * @param spatialID - The spatial ID of the data, e.g. 'osm' or 'fbRoads'
+   * @return The container
+   */
+  protected _spatialContainer(groupID: GroupID, spatialID: SpatialID): PIXI.Container {
+    this._spatialIDs.add(spatialID);
+    return this.scene.getSpatialContainer(groupID, spatialID);
+  }
+
+
+  /**
+   * Returns the child container with the given label, making it if needed.
+   * @param parent - The container to look in
+   * @param label - The child's label, e.g. 'polygons'
+   * @param zIndex - The child's `zIndex` among its siblings, if it's made
+   * @return The child container, with `sortableChildren` on
+   */
+  protected _childContainer(parent: PIXI.Container, label: string, zIndex = 0): PIXI.Container {
+    let container = parent.getChildByLabel(label) as PIXI.Container | null;
+    if (!container) {
+      container = new PIXI.Container();
+      container.label = label;
+      container.sortableChildren = true;
+      container.zIndex = zIndex;
+      parent.addChild(container);
+    }
+    return container;
   }
 
 
@@ -227,6 +285,10 @@ export class AbstractPixiLayer {
    * @param dataID - dataID     (e.g. 'w-123')
    */
   public bindData(featureID: FeatureID, dataID: DataID): void {
+    // Already bound to this data: done. (Unbinding first would drop the data's parent and child
+    // links, when this is its only feature.)
+    if (this._featureHasData.get(featureID) === dataID) return;
+
     this.unbindData(featureID);
 
     let featureSet = this._dataHasFeature.get(dataID);
@@ -310,7 +372,7 @@ export class AbstractPixiLayer {
     for (const childID of utilIterable(childIDs)) {
       const parentSet = this._childHasParents.get(childID);
       if (parentSet) {
-        parentSet.delete(childID);
+        parentSet.delete(parentID);
         if (!parentSet.size) {
           this._childHasParents.delete(childID);
         }
@@ -326,7 +388,7 @@ export class AbstractPixiLayer {
   public clearChildData(parentID: DataID): void {
     const childSet = this._parentHasChildren.get(parentID);
     if (childSet) {
-      this.removeChildData(parentID, childSet);
+      this.removeChildData(parentID, [...childSet]);   // a copy: removing empties the set while it's read
     }
   }
 
@@ -405,78 +467,24 @@ export class AbstractPixiLayer {
 
 
   /**
-   * Sets a dataID as being classed a certain way (e.g. 'hover')
-   * @param classID - classID to set (e.g. 'hover')
-   * @param dataID - dataID (e.g. 'r123')
+   * Finds data drawn on this layer by its dataID, e.g. to select it again after undo.
+   * Only data that has been drawn can be found.
+   * @param dataID - dataID to look for
+   * @returns the data, or `undefined` if it isn't drawn on this layer
    */
-  public setClass(classID: ClassID, dataID: DataID): void {
-    let classIDs = this._dataHasClass.get(dataID);
-    if (!classIDs) {
-      classIDs = new Set<ClassID>();
-      this._dataHasClass.set(dataID, classIDs);
-    }
-    classIDs.add(classID);
-
-    let dataIDs = this._classHasData.get(classID);
-    if (!dataIDs) {
-      dataIDs = new Set<DataID>();
-      this._classHasData.set(classID, dataIDs);
-    }
-    dataIDs.add(dataID);
-  }
-
-
-  /**
-   * Unsets a dataID from being classed a certain way (e.g. 'hover')
-   * @param classID - classID to unset (e.g. 'hover')
-   * @param dataID - dataID (e.g. 'r123')
-   */
-  public unsetClass(classID: ClassID, dataID: DataID): void {
-    const classIDs = this._dataHasClass.get(dataID);
-    if (classIDs) {
-      classIDs.delete(classID);
-      if (!classIDs.size) {
-        this._dataHasClass.delete(dataID);
-      }
-    }
-
-    const dataIDs = this._classHasData.get(classID);
-    if (dataIDs) {
-      dataIDs.delete(dataID);
-      if (!dataIDs.size) {
-        this._classHasData.delete(classID);
-      }
+  public getData(dataID: DataID): AbstractData | undefined {
+    for (const featureID of this._dataHasFeature.get(dataID) ?? []) {
+      const data = this.features.get(featureID)?.data;
+      if (data) return data;
     }
   }
 
 
   /**
-   * Clear out all uses of the given classID.
-   * @param classID - classID to clear (e.g. 'hover')
-   */
-  public clearClass(classID: ClassID): void {
-    const dataIDs = this._classHasData.get(classID) ?? new Set<DataID>();
-    for (const dataID of dataIDs) {
-      this.unsetClass(classID, dataID);
-    }
-  }
-
-
-  /**
-   * Returns the dataIDs that are currently classed with the given classID
-   * @param classID - classID to check (e.g. 'hover')
-   * @returns dataIDs the dataIDs that currently have this classID set
-   */
-  public getDataWithClass(classID: ClassID): Set<DataID> {
-    const dataIDs = this._classHasData.get(classID) ?? new Set<DataID>();
-    return new Set<DataID>(dataIDs);  // copy
-  }
-
-
-  /**
-   * This updates the feature's classes (e.g. 'select', 'hover', etc.) to match the Layer classes.
+   * This updates the feature's classes (e.g. 'select', 'hover', etc.) to match the Scene's classes
+   * for the data bound to it.
    *
-   * Counterintuitively, the Layer needs to be the source of truth for these classes,
+   * Counterintuitively, the Scene needs to be the source of truth for these classes,
    * because a Feature can be 'selected' or 'drawing' even before it has been created, or after destroyed.
    *
    * Syncing these classes will dirty the feature if the it causes a change.
@@ -489,7 +497,7 @@ export class AbstractPixiLayer {
     const dataID = this._featureHasData.get(featureID);
     if (!dataID) return;
 
-    const layerClasses = this._dataHasClass.get(dataID) ?? new Set<ClassID>();
+    const layerClasses = this.scene.getClasses(dataID);
     const featureClasses = feature.classes;
 
     for (const classID of featureClasses) {

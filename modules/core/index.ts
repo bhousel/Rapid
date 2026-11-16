@@ -5,6 +5,7 @@
  */
 import { AbstractSystem } from './AbstractSystem.ts';
 import { AssetSystem } from './AssetSystem.ts';
+import { ConflationSystem } from './ConflationSystem.ts';
 import { DatabaseSystem } from './DatabaseSystem.ts';
 import { DragAndDropSystem } from './DragAndDropSystem.ts';
 import { EditSystem } from './EditSystem.ts';
@@ -34,6 +35,7 @@ import { WorkerSystem } from './WorkerSystem.ts';
 export {
   AbstractSystem,
   AssetSystem,
+  ConflationSystem,
   DatabaseSystem,
   DragAndDropSystem,
   EditSystem,
@@ -84,6 +86,7 @@ export const systems: SystemRegistry = {
 };
 
 systems.available.set('assets', AssetSystem);
+systems.available.set('conflation', ConflationSystem);
 systems.available.set('database', DatabaseSystem);
 systems.available.set('dragdrop', DragAndDropSystem);
 systems.available.set('editor', EditSystem);

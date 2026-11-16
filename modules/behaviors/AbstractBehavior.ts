@@ -23,7 +23,7 @@ export interface EventTarget {
   layerID: LayerID | null;
   /** The data associated with the feature */
   data: AbstractData | null;
-  /** The data ID, or null */
+  /** The data's data ID (`data.dataID`, e.g. 'w1' or 'osm-notes:123'), or null */
   dataID: DataID | null;
 }
 
@@ -187,7 +187,7 @@ export class AbstractBehavior extends EventEmitter {
           layer: feature.layer,
           layerID: feature.layer.id,
           data: feature.data,
-          dataID: feature.data?.id ?? null
+          dataID: feature.data?.dataID ?? null
         };
         return result;
 

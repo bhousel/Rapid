@@ -416,6 +416,36 @@ describe('ValidationCache', () => {
       assert.isTrue(result.has('w2'));  // connected via shared node n2
     });
 
+    // An issue on a node can depend on the connection next to it (`y_shaped_connection`)
+    it('includes the nodes next to a given node, which may have just joined or left a way', () => {
+      cache.graph = new Rapid.Graph(context, [
+        new Rapid.OsmNode(context, { id: 'n1', loc: [0, 0] }),
+        new Rapid.OsmNode(context, { id: 'n2', loc: [1, 0] }),
+        new Rapid.OsmNode(context, { id: 'n3', loc: [2, 0] }),
+        new Rapid.OsmNode(context, { id: 'n4', loc: [3, 0] }),
+        new Rapid.OsmWay(context, { id: 'w1', nodes: ['n1', 'n2', 'n3', 'n4'] })
+      ]);
+
+      const result = cache.withAllRelatedEntities(['n2']);
+      assert.sameMembers([...result], ['n2', 'w1', 'n1', 'n3']);
+    });
+
+    it('includes the nodes next to a connection on a given way, in every way at the connection', () => {
+      cache.graph = new Rapid.Graph(context, [
+        new Rapid.OsmNode(context, { id: 'n1', loc: [0, 0] }),
+        new Rapid.OsmNode(context, { id: 'n2', loc: [1, 0] }),   // the connection
+        new Rapid.OsmNode(context, { id: 'n3', loc: [2, 0] }),
+        new Rapid.OsmNode(context, { id: 'n4', loc: [1, 1] }),
+        new Rapid.OsmNode(context, { id: 'n5', loc: [1, 2] }),
+        new Rapid.OsmNode(context, { id: 'n6', loc: [3, 0] }),
+        new Rapid.OsmWay(context, { id: 'w1', nodes: ['n1', 'n2', 'n3', 'n6'] }),
+        new Rapid.OsmWay(context, { id: 'w2', nodes: ['n2', 'n4', 'n5'] })   // e.g. a road that joined at n2
+      ]);
+
+      const result = cache.withAllRelatedEntities(['w2']);
+      assert.sameMembers([...result], ['w2', 'w1', 'n1', 'n3', 'n4']);   // not n5 or n6, which aren't next to n2
+    });
+
     it('skips entities not in graph', () => {
       cache.graph = new Rapid.Graph(context);  // empty graph
 

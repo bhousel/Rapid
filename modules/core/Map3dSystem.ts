@@ -36,6 +36,8 @@ export class Map3dSystem extends AbstractSystem {
   protected _loadPromise: Promise<void> | null = null;
   /** Keyboard shortcut strings (populated during startAsync) */
   protected _keys: string[] | null = null;
+  /** Whether the 3D map viewer is shown (for this session only) */
+  protected _visible: boolean;
 
   // The 3d Map will stay close to the main map, but with an offset zoom and rotation
   /** Zoom offset: 3D map zoom = main map zoom − `_zDiff` */
@@ -55,6 +57,7 @@ export class Map3dSystem extends AbstractSystem {
     this.autoStart = false;
     this.requiredDependencies = new Set<SystemID>(['editor', 'gfx', 'map', 'ui']);
     this.optionalDependencies = new Set<SystemID>(['l10n', 'styles', 'urlhash', 'scheduler']);
+    this._visible = false;
 
     // Ensure methods used as callbacks always have `this` bound correctly.
     this._hashChanged = this._hashChanged.bind(this);
@@ -195,25 +198,29 @@ export class Map3dSystem extends AbstractSystem {
 
 
   /**
-   * For now, just store this state in the url hash
-   * set/get whether the 3d viewer is visible
+   * set/get whether the 3d viewer is visible, for this session
    * @return  `true` if the 3D map viewer is currently visible
    */
   public get visible(): boolean {
-    const urlhash = this.context.systems.urlhash;
-    return !!urlhash?.getParam('map3d');
+    return this._visible;
   }
 
-  /** Shows or hides the 3D map viewer and updates the URL hash accordingly.
+  /** Shows or hides the 3D map viewer.
+   * It isn't written to the url: a link's `map3d=true` stays there only until the viewer is hidden,
+   * and then it's dropped (see `API.md`).
    * @param val - `true` to show the viewer, `false` to hide it
    */
   public set visible(val: boolean) {
     const context = this.context;
     const urlhash = context.systems.urlhash;
 
-    if (val) {   // show it
-      urlhash?.setParam('map3d', 'true');
+    this._visible = val;
+    const urlMap3d = urlhash?.getParam('map3d');
+    if (urlMap3d !== undefined && (urlMap3d === 'true') !== val) {
+      urlhash?.setParam('map3d', null);
+    }
 
+    if (val) {   // show it
       this.startAsync()  // start it up, if we haven't already
         .then(() => {
           context.container().select(`#${this.containerID}`)
@@ -225,8 +232,6 @@ export class Map3dSystem extends AbstractSystem {
         });
 
     } else {   // hide it
-      urlhash?.setParam('map3d', null);
-
       // Expect the MapLibre container to exist already, it's created by `UiMap3dViewer.js`
       // If it doesn't exist, this will return a null selection, and that's ok too.
       const $mlcontainer = context.container().select(`#${this.containerID}`);
@@ -375,15 +380,16 @@ export class Map3dSystem extends AbstractSystem {
    * @param prevParams - The previous hash parameters
    */
   protected _hashChanged(currParams: Map<string, string>, prevParams: Map<string, string>): void {
+    const urlhash = this.context.systems.urlhash;
+
     // map3d
+    // `map3d=true` shows the viewer (`map3d=false` hides it)
+    // (Not if it was dropped since, by a change made while the same url was being read.
+    // When `map3d` goes away, the viewer stays as it is.)
     const newMap3d = currParams.get('map3d');
-    const oldMap3d = prevParams.get('map3d');
-    if (!newMap3d || newMap3d !== oldMap3d) {
-      // eventually, support a proper hash param?
-      if (newMap3d === 'true') {
-        this.visible = true;
-      } else {
-        this.visible = false;
+    if (newMap3d !== undefined && newMap3d !== prevParams.get('map3d') && urlhash?.getParam('map3d') === newMap3d) {
+      if (this._visible !== (newMap3d === 'true')) {
+        this.visible = (newMap3d === 'true');
       }
     }
   }

@@ -1,5 +1,6 @@
 import { Extent } from '@rapid-sdk/math';
 import { Geometry } from '../lib/Geometry.ts';
+import { makeDataID } from './dataID.ts';
 
 import type { Context } from '../Context.ts';
 import type { GeoJSONObject } from '../lib/types.ts';
@@ -12,11 +13,14 @@ import type { DataConstructor } from './types.ts';
  * Base properties shared by all data elements.
  */
 export interface AbstractDataProps {
-  /** Unique identifier for this data element */
+  /** Unique identifier for this data element, within its cache */
   id?: string;
+  /** The ID of the `SpatialSystem` cache that holds this data element, which its ID is unique within.
+   *  Not set for OSM data. See `design/data-ids.md`. */
+  spatialID?: SpatialID;
   /** String describing what kind of data element this is (e.g. 'node', 'way', 'relation') */
   type?: string;
-  /** Internal version number, used to detect changes */
+  /** Version stamp, new on every `update()` (never changed in place), see `key` */
   v?: number;
   /** Extra properties are allowed */
   [key: string]: unknown;
@@ -33,9 +37,10 @@ export interface AbstractDataProps {
  * (A lot of this was carried over from the previous `osmEntity` and similar classes.)
  *
  * Properties available:
- * - `id` (or `dataID`) - Identifier this data element - should be unique system-wide.
+ * - `id`               - Identifier for this data element, unique within its cache
+ * - `dataID`           - Identifier unique across all of Rapid (see `design/data-ids.md`)
  * - `type`             - String describing what kind of data element this is (e.g. 'node', 'way', 'relation')
- * - `v`                - Internal version of the data element, can be used to detect changes
+ * - `v`                - Version stamp, new on every `update()` (a changed element is a new object)
  * - `geoms`            - Geometry object
  * - `props`            - Properties object
  *
@@ -47,10 +52,10 @@ export class AbstractData<P extends AbstractDataProps = AbstractDataProps> {
   public id: string;
   /** Application context */
   public context: Context;
-  /** Geometry wrapper containing original and projected data */
-  public geoms: Geometry;
   /** Properties object */
   public props: Partial<P>;
+  /** The geometry stored on this object, see `geoms` */
+  protected _geoms: Geometry;
 
 
   /**
@@ -66,13 +71,13 @@ export class AbstractData<P extends AbstractDataProps = AbstractDataProps> {
       const other = otherOrContext;
       this.context = other.context;
       this.props = structuredClone(other.props) as Partial<P>;
-      this.geoms = other.geoms.clone();
+      this._geoms = other._geoms;   // shared: a recompute stores a new Geometry, it never changes this one
 
     } else {
       const context = otherOrContext;
       this.context = context;
       this.props = {};
-      this.geoms = new Geometry(context);
+      this._geoms = new Geometry(context);
     }
 
     Object.assign(this.props, structuredClone(props));  // override with passed in props
@@ -88,8 +93,7 @@ export class AbstractData<P extends AbstractDataProps = AbstractDataProps> {
    * @abstract
    */
   public destroy(): void {
-    this.geoms.destroy();
-    this.geoms = null!;
+    this._geoms = null!;   // not destroyed: copies of this data element (and relations) may share it
     this.props = null!;
     this.context = null!;
   }
@@ -99,12 +103,20 @@ export class AbstractData<P extends AbstractDataProps = AbstractDataProps> {
    * Data elements are intended to be immutable.  To modify a data element,
    *  pass in the properties to change, and you'll get a new data element.
    * The new data element will have an updated `v` internal version number.
+   * Note that this version number always increases and is shared by all data elements.
+   * We did it this way to avoid situations where you undo to a previous version
+   *  you don't want it to increment it back to the same version and appear unchanged.
+   * @see Rapid@9ac2776a
+   * (There is no way to change the version of a data element in place: renderers rebind a feature when
+   * its data is a different object, see `design/graph-geometry.md`.)
    * @param props - the updated properties
    * @returns a new data element
    */
   public update(props: Partial<P>): this {
     const Type = this.constructor as DataConstructor<this>;
-    return new Type(this, props).touch();
+    const copy = new Type(this, props);
+    copy.props.v = this.context.next('v');
+    return copy;
   }
 
   /**
@@ -151,16 +163,21 @@ export class AbstractData<P extends AbstractDataProps = AbstractDataProps> {
   }
 
   /**
-   * Bump internal version number in place (typically, forcing a rerender)
-   * Note that this version number always increases and is shared by all data elements.
-   * We did it this way to avoid situations where you undo to a previous version
-   *  you don't want it to increment it back to the same version and appear unchanged.
-   * @see Rapid@9ac2776a
-   * @returns this data element
+   * The data element's geometry, containing its original and projected data.
+   * OSM ways and relations don't have one of their own: their shape depends on the graph, so
+   * read it through `graph.geometry(entity)` (see `OsmEntity`).
+   * @return  Its Geometry
    */
-  public touch(): this {
-    this.props.v = this.context.next('v');
-    return this;
+  public get geoms(): Geometry {
+    return this._geoms;
+  }
+
+  /**
+   * Stores the data element's geometry.
+   * @param val - The new Geometry (it's never changed once stored, so copies may share it)
+   */
+  public set geoms(val: Geometry) {
+    this._geoms = val;
   }
 
   /**
@@ -175,16 +192,18 @@ export class AbstractData<P extends AbstractDataProps = AbstractDataProps> {
   }
 
   /**
-   * Unique string to identify this data element
-   * @return  This data element's unique ID
+   * Unique string to identify this data element across all of Rapid: `${spatialID}:${id}`,
+   * or the bare `id` for OSM data (see `design/data-ids.md`).
+   * @return  This data element's data ID
    * @readonly
    */
-  public get dataID(): string {
-    return this.id;
+  public get dataID(): DataID {
+    return makeDataID((this.props as Partial<AbstractDataProps>).spatialID, this.id);
   }
 
   /**
-   * Internal version of the data element, can be used to detect changes.
+   * Version stamp of the data element: `update()` gives each new element a newer one, and nothing
+   * changes it in place. Renderers compare objects instead (a changed element is a new object).
    * @return  Version counter
    * @readonly
    */

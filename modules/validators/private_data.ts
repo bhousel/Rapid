@@ -73,8 +73,8 @@ export function validatePrivateData(context: Context): ValidatorFunction {
             onClick: () => {
               editor.perform(doUpgrade);
               editor.commit({
-                annotation: l10n.t('issues.fix.upgrade_tags.annotation'),
-                selectedIDs: [entity.id]
+                stringID: 'issues.fix.upgrade_tags.annotation',
+                selectionAfter: [entity.id]
               });
             }
           })

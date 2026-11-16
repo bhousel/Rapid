@@ -72,6 +72,7 @@ export class KeyOperationBehavior extends AbstractBehavior {
    */
   protected _keydown(e: KeyboardEvent): void {
     const context = this.context;
+    const l10n = context.systems.l10n!;
     const operation = this._operation;
     const ui = context.systems.ui!;
 
@@ -90,11 +91,12 @@ export class KeyOperationBehavior extends AbstractBehavior {
       });
 
     } else {
+      const editLabel = operation.editLabel();
       ui.Flash.show({
         duration: 2000,
         iconName: `#rapid-operation-${operation.id}`,
         iconClass: 'operation',
-        label: operation.annotation() || operation.title
+        label: editLabel ? l10n.t(editLabel.stringID, editLabel.stringParams) : operation.title
       });
 
       operation.point(null);  // copy-paste detail 😕

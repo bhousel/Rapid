@@ -87,6 +87,7 @@ The root components (sidebar, toolbar, footer, over-map container, etc.) are cre
 | `UiRapidInspector.ts` | Rapid feature inspector (accept / ignore) |
 | `UiOvertureInspector.ts` | Overture feature inspector |
 | `UiDetectionInspector.ts` | Mapillary detection inspector |
+| `UiSelectionInspector.ts` | List of what's selected, when several features aren't all OSM entities |
 | `UiTagReference.ts` | Tag documentation from the OSM Wiki / Wikidata |
 | `UiPresetIcon.ts` | Icon for a preset, category, or features |
 | `UiViewOn.ts` | "View on OSM" (or other service) link at the bottom of an inspector |

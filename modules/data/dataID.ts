@@ -1,0 +1,99 @@
+/**
+ * Helpers for data IDs, a datum's ID across all of Rapid: `${spatialID}:${localID}`.
+ * The spatial ID is the ID of the `SpatialSystem` cache that holds the data (or of the resolver that
+ * finds it), and never contains a colon.
+ * A data ID with no colon has the spatial ID `osm`, so an OSM entity's data ID is its entity ID.
+ * See `design/data-ids.md`.
+ * @module
+ */
+import { utilHash53, utilStableStringify } from '../util/string.ts';
+
+
+/** A local ID that `GeoJSONData` makes up for data that came without one starts with this. */
+export const GENERATED_ID_PREFIX = 'geojson-';
+
+
+/**
+ * Builds a data ID from a spatial ID and a local ID.
+ * OSM data IDs are bare: `osm` (or no spatial ID) returns the local ID as it is.
+ * @param spatialID - The ID of the `SpatialSystem` cache that holds the data, or `osm`
+ * @param localID - The datum's ID within its cache
+ * @return The data ID
+ */
+export function makeDataID(spatialID: Nullable<SpatialID>, localID: string): DataID {
+  return (!spatialID || spatialID === 'osm') ? localID : `${spatialID}:${localID}`;
+}
+
+
+/**
+ * Splits a data ID into its spatial ID and local ID, on the first colon only.
+ * A data ID with no colon has the spatial ID `osm`, and `osm:w123` is read as `w123`.
+ * @param dataID - The data ID to split
+ * @return The spatial ID and the local ID
+ */
+export function splitDataID(dataID: DataID): [SpatialID, string] {
+  const i = dataID.indexOf(':');
+  if (i === -1) return ['osm', dataID];
+  return [dataID.slice(0, i), dataID.slice(i + 1)];
+}
+
+
+/**
+ * Whether a data ID still names the same data after a reload, or in another browser.
+ * A local ID that `GeoJSONData` made up (`geojson-12`) comes from a counter, so it names other data
+ * after a reload (vector tiles have these, until their features are keyed by their own IDs). Such IDs
+ * are kept out of the URL (`id=`) and out of the selections restored from a backup.
+ * @param dataID - The data ID
+ * @return `true` if the ID is stable
+ */
+export function isStableDataID(dataID: DataID): boolean {
+  return !splitDataID(dataID)[1].startsWith(GENERATED_ID_PREFIX);
+}
+
+
+/**
+ * Returns the OSM entity ID for a data ID, for code that only works with OSM entities.
+ * @param dataID - The data ID
+ * @return The entity ID, or `undefined` if the data ID isn't OSM data
+ */
+export function osmEntityID(dataID: DataID): EntityID | undefined {
+  const [spatialID, localID] = splitDataID(dataID);
+  return spatialID === 'osm' ? localID : undefined;
+}
+
+
+/**
+ * Returns a stable local ID for a GeoJSON feature in a cache (see `design/data-ids.md`).
+ * A Multi* feature that's split into parts adds a part number to it (`${key}:${part}`). Keys stay the
+ * same when the same data is loaded again, in any order, so what the user accepted or ignored still
+ * matches after a restart, and a data ID in a link still finds its data.
+ * - If the data names an ID field (e.g. a dataset's `isID` mapping), the key is that field's value,
+ *   with `:` and `,` replaced by `_` (a `:` would look like a part number, and `,` separates data
+ *   IDs in the URL).
+ * - Otherwise, the key is a hash of the feature's geometry and properties.
+ * - If two features would get the same key (a repeated ID value, or identical features),
+ *   the later ones get the hash (and then a counter) added, so keys are never shared.
+ * @param feature - The GeoJSON feature
+ * @param idField - The property that identifies features, if the data names one
+ * @param usedKeys - The keys given so far in this cache (added to)
+ * @return The key
+ */
+export function featureKey(feature: GeoJSON.Feature, idField: string | undefined, usedKeys: Set<string>): string {
+  const properties = feature.properties ?? {};
+  const hash = utilHash53(utilStableStringify({ geometry: feature.geometry, properties: properties }));
+
+  const idVal = idField ? properties[idField] : undefined;
+  const hasID = (idVal !== undefined && idVal !== null && idVal !== '');
+  let key = hasID ? String(idVal).replace(/[:,]/g, '_') : hash;
+
+  if (usedKeys.has(key) && hasID) {
+    key = `${key}.${hash}`;
+  }
+  const base = key;
+  for (let n = 1; usedKeys.has(key); n++) {
+    key = `${base}.${n}`;
+  }
+
+  usedKeys.add(key);
+  return key;
+}

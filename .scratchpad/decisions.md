@@ -2,6 +2,49 @@
 
 Non-obvious choices where "why did we do it this way?" isn't captured in the code.
 
+## The scene (Nov 2026)
+
+The structure and the reasoning are in `design/scene.md`; these are the choices someone might undo.
+- **Interactivity is switched per spatial ID at the container level, not per feature or in the
+  behaviors.** Pixi skips a whole subtree with `eventMode: 'none'`, so the OSM line under a Rapid line
+  is hit directly and no behavior or mode changes. A per-feature flag would run per frame in every
+  layer; a fall-through hit test in the behaviors would re-test on every pointermove and still show
+  the hover halo on the wrong thing.
+- **The mode declares it (`interactiveSpatialIDs`), beside `enableBehaviors`.** The alternative, each
+  of 18 layers knowing which modes it's interactive in, spreads mode knowledge everywhere.
+- **Points sort by latitude only within their spatial ID.** A Rapid pin north of an OSM pin now draws
+  over it. Accepted: "external data above OSM" is the rule for every geometry, and the alternative is
+  the shared container we're replacing. Dense point datasets (NAD addresses) will show it.
+- **No reordering while drawing.** With the datasets non-interactive the OSM line is reachable anyway;
+  lifting OSM visually is a preference for a layer-order UI later (`zIndex` per container makes it cheap).
+
+## Graph versions and derived data (graph-geometry rollout, Nov 2026)
+
+Details and measurements are in `design/graph-geometry.md`; these are the choices someone might undo by accident.
+- **Each graph keeps its own shapes; only the base graph writes shapes onto base objects.** Shapes on
+  objects that every graph shares made staging's drag change stable's geometry (validation finding 1).
+- **The renderer rebinds by object identity, not version numbers.** A changed entity is a new object and
+  a changed shape is a new `Geometry`, so identity already says what a `graph.version()` would. Numbers
+  would be one more thing to keep right through savepoints, rebases and restores.
+- **Data is never changed in place.** Services and editors store `update()`'d copies. `v` stays as a
+  stamp `update()` gives each copy, because `key` (`${id}v${v}`) feeds d3 joins and `FilterSystem`;
+  `touch()` and `AbstractPixiFeature.v` are gone.
+- **After a rebase, stable and staging catch up at once; other graphs when they become current.** No
+  per-read "update on first use" check. Safe because rebase and validators are synchronous, and the only
+  graph held across awaits (the uploader's remote graph) reads entities only.
+- **The OSM spatial indexes live in `EditSystem`, not the lineage or `SpatialSystem`.** `SpatialSystem`
+  stays data-agnostic, and only the editor's lineage should build indexes (since step 8 every rebase of
+  it goes through `EditSystem`). If another lineage ever needs versions and searches, pull the
+  base-plus-local-index logic into a helper its owner creates. (Bryan tried graphs in spatial caches in
+  Aug 2025 and backed it out.)
+- **"Local index", not "overlay".** In Rapid an overlay is an imagery layer. "Local" matches
+  `graph.isLocal()`: what a graph says differently from the base.
+- **No lineages for GeoJSON and markers.** A base-only lineage would hold what the spatial cache already
+  holds. Add one when some data needs versions.
+- **Step 7 (memos in records) deferred.** After 150 edits only 5–7% of graph-dependent memo reads skip
+  memoization (about 0.2 ms a drag frame), but dropping those memos entirely costs about 4 ms a drag
+  frame, because `PixiLayerOsm` classifies every node every frame. Backlog: classify only when dirty.
+
 ## OSM parsers keep no "seen" state; `EditSystem.merge` skips entities it already has
 
 The parsers used to remember every ID they parsed and leave it out of later results (`skipSeen`). That
@@ -13,7 +56,8 @@ them to the spatial caches (where the extra time went). Benchmarked on 6×6 over
 data: about the same total as `skipSeen` (~170 ms), against ~228 ms for parsing everything without the
 merge change. With nothing skipped, the separate `seenIDs` set in parser results was redundant, so it's
 gone too: `merge` emits the IDs of everything it was given, because features already loaded may need
-to re-render when new ones arrive (see the note in `EditSystem.merge`).
+to re-render when new ones arrive (see the note in `EditSystem.merge`). The skip is for `merge`
+only: `updateBase` (a forced rebase) still replaces what's there.
 
 ## Folder-specific agent rules live in nested `AGENTS.md`, not `.github/instructions/`
 
@@ -346,6 +390,63 @@ Used when a class resolves references (`var()`, locale strings) in its props:
 - **Canvas overhead only when needed** — The `useCanvas` option is only set to `true` when `RendererType.CANVAS` is detected. GL/GPU paths don't create backing canvases, avoiding the extra ~16MB per 2048×2048 slab.
 - **`(this as any).resource = canvas`** — Type mismatch: `AtlasSource extends TextureSource<BufferSourceOptions>` where the generic expects a TypedArray resource, but the canvas renderer needs an `HTMLCanvasElement`. The `as any` cast is intentional — the canvas renderer inspects `resource` dynamically, not via generic type constraints.
 - **No clear-on-free** — Freed atlas regions aren't cleared on the backing canvas, matching the GL/GPU behavior (they overwrite freed space with `texSubImage2D` / `copyExternalImageToTexture` when it is reallocated).
+
+## The url holds overrides, not state (Nov 2026)
+
+Rule and details in `design/settings-system.md`; these are the choices someone might undo by accident.
+- **The url is for starting Rapid a certain way, not where the user's state lives.** Most of it is
+  invisible, and `map=` comes first because it's the part people see. Only where you are and what's
+  selected (`map`, `id`, `photo`, `detection`) is written as you go.
+- **An override is dropped once the state no longer matches it, not rewritten.** Then it's in effect
+  exactly while it's in the url (no `_urlOverride` flag), and a reload before any change opens the link
+  again. Taking one out of the url leaves things as they are.
+- **Changes are saved one at a time (deltas).** Saving the whole state would save the link's other
+  choices as the user's.
+- **Some state is for the session only:** photo filters, MapRoulette challenges, the 3D map, the imagery
+  offset. They were only ever kept by the url (a legacy choice few people relied on). An offset belongs
+  to one source in one area, so bringing it back elsewhere would misalign the imagery.
+- **The user's last imagery wins over 'best', but only where it can be seen.** Saved overlays are also
+  only turned on where they can be seen, or they'd be credited in changesets elsewhere.
+- **`UrlHashSystem` still loses url changes made before it resumes.** Keeping them would let startup's
+  `map=`/`id=` writes overwrite a link's own. Read startup values from `initialHashParams` instead.
+- **`_isApplyingUrl` tells a link's change from the user's, and only `_hashChanged` sets it.** Whether
+  a param is in the url can't tell them apart: it's still there at the moment the user changes the
+  state, which is exactly when it has to be dropped. Startup doesn't need the flag (`_started` or
+  `_settled` already stops saving then).
+- **Custom data's `data=` is an override too.** It stays while its data is shown, so a copied link's
+  custom `id=` finds it again. Custom data the user loads isn't written, so its `id=` can't be found
+  from a link.
+
+## Settings declare how they're kept (Nov 2026)
+
+- **Settings sync across the user's browsers once they sign in, like Chrome or VS Code.** That's Bryan's
+  guiding principle for what syncs: preferences follow the user; state, and what depends on this
+  browser's data, screen or mouse, stays local.
+- **Only what code declares is ever deleted.** Registered (`registerSync`/`registerLocal`) means in use,
+  `unregister` means delete, anything else is ignored. Bryan's choice, over deleting what this build
+  doesn't recognize, which lost testers' preferences when they switched builds (bug-hunt item 12).
+- **Declaring a setting local also deletes its account copy**, so v1's copies of local settings (some
+  with access tokens) don't stay in the account forever.
+- **One `unregister`, not a local and a sync one.** v1 copied everything to the account, so a retired
+  setting may be in both places either way.
+- **Overlapping declarations throw.** A path inside one declared another way means one of them is
+  wrong, and it would delete or sync the wrong thing.
+
+## Bug hunt 2 choices (Nov 2026)
+
+Fixes where Bryan picked the behavior, which someone might undo by accident.
+- **MapRoulette auth is commented out, not fixed.** MapRoulette expired the API keys Rapid read from
+  the OSM user preferences, and will offer a proper login later; until then Rapid submits without a
+  key. See "MapRoulette authentication" in `backlog.md`.
+- **From a successful upload until the reset, nothing can be edited.** Rapid stays in save mode (Escape
+  is off), and after `clearBackup` the history isn't work to keep (`hasWork()` is false), so the
+  uploaded edits are never backed up as a new session.
+- **A `walkthrough=true` start doesn't offer a restore.** The sessions are offered the next time Rapid
+  starts normally. These links are for classes of new users.
+- **With OSM features selected, the arrow keys move them, even with the photo viewer open.** The photos
+  step only when nothing OSM is selected, or the Mapillary viewer has focus.
+- **Empty new relations aren't deleted when leaving select mode.** `missing_tag` flags them instead
+  (see "Render relations" in `backlog.md`).
 
 ## Style Resolution
 

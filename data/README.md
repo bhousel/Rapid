@@ -16,6 +16,8 @@ presets, imagery definitions, translations, and validation rules.
   (e.g. surface types, highway classifications, lifecycle prefixes)
 - **`phone_formats.json`** - International phone number formats
 - **`qa_data.json5`** - Quality assurance data (error types, icons, localization mappings) for KeepRight and Osmose
+- **`rapid_datasets.json5`** - Rapid dataset definitions, applied on top of the datasets provided by
+  services (empty for now)
 - **`rapid_imagery.json5`** - Rapid-specific imagery source definitions, applied after `editor_layer_index.json`
 - **`rapid_schema.json5`** - Rapid-specific schema customizations (presets, fields, categories),
   applied after the default [id-tagging-schema](https://github.com/openstreetmap/id-tagging-schema)
@@ -51,7 +53,7 @@ Rapid treats them all equally, but note that classic JSON will load slightly qui
 
 ### JSON Schemas
 
-Rapid's imagery, schema, rulesets, and styling data files may be validated against
+Rapid's imagery, schema, rulesets, styling, and dataset data files may be validated against
 [JSON Schema](http://json-schema.org/draft-07/schema#) definitions located
 in the `data/schema/` directory.  The schemas are organized into a "main"
 datafile schema and component schemas for each domain type:
@@ -59,6 +61,7 @@ datafile schema and component schemas for each domain type:
 | Schema file | Description |
 |-------------|-------------|
 | `main.schema.json` | Main data file: `assetID`, `assetVersion`, `scopes[]` |
+| `dataset.schema.json` | Rapid dataset definitions, with their data dictionary and conflation settings |
 | `imagery.schema.json` | Imagery source definitions |
 | `style.schema.json` | Style declarations (`fill`, `casing`, `stroke`, `marker`, `icon`, `label`, etc.) |
 | `selector.schema.json` | Selector rules mapping tag patterns to styles |
@@ -76,8 +79,8 @@ The schemas use `$ref` to reference each other — for example, `main.schema.jso
 `imagery.schema.json` for each imagery entry, and `selector.schema.json` references
 `matcher.schema.json` for tag match rules.
 
-To validate the data files (`editor_layer_index.json`, `osm_rulesets.json5`, `rapid_imagery.json5`,
-`rapid_schema.json5`, and `rapid_style.json5`):
+To validate the data files (`editor_layer_index.json`, `osm_rulesets.json5`, `rapid_datasets.json5`,
+`rapid_imagery.json5`, `rapid_schema.json5`, and `rapid_style.json5`):
 ```bash
 bun run check:json
 ```

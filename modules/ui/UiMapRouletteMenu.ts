@@ -37,7 +37,10 @@ export class UiMapRouletteMenu extends EventEmitter {
   protected _menuTop: boolean;
   protected _menuHeight: number;
   protected _menuWidth: number;
-  protected _mapRouletteApiKey: string | null;
+  // MapRoulette auth is turned off: MapRoulette stopped storing API keys in the OSM user preferences
+  // and expired the old ones, so Rapid submits without one for now (see "MapRoulette authentication"
+  // in `.scratchpad/backlog.md`, and https://community.openstreetmap.org/t/maproulette-security-incident-october-2026).
+  // protected _mapRouletteApiKey: string | null;
 
 
   /**
@@ -58,7 +61,7 @@ export class UiMapRouletteMenu extends EventEmitter {
     this._menuTop = false;
     this._menuHeight = 0;
     this._menuWidth = 0;
-    this._mapRouletteApiKey = null;
+    // this._mapRouletteApiKey = null;   // MapRoulette auth is turned off (see `_mapRouletteApiKey`)
 
     // Ensure methods used as callbacks always have `this` bound correctly.
     this.render = this.render.bind(this);
@@ -122,18 +125,19 @@ export class UiMapRouletteMenu extends EventEmitter {
       .attr('class', (d: string) => `maproulette-menu-item maproulette-menu-item-${d}`)
       .style('height', `${buttonHeight}px`)
       .on('click', (e: PointerEvent, actionId: string) => {
-        if (!this._mapRouletteApiKey) {
-          this._getApiKey((err: any, apiKey?: string) => {
-            if (err) {
-              console.error('Error retrieving MapRoulette API key:', err); // eslint-disable-line no-console
-              return;
-            }
-            this._mapRouletteApiKey = apiKey ?? null;
-            this._executeAction(actionId, e);
-          });
-        } else {
-          this._executeAction(actionId, e);
-        }
+        // MapRoulette auth is turned off (see `_mapRouletteApiKey`)
+        // if (!this._mapRouletteApiKey) {
+        //   this._getApiKey((err: any, apiKey?: string) => {
+        //     if (err) {
+        //       console.error('Error retrieving MapRoulette API key:', err); // eslint-disable-line no-console
+        //       return;
+        //     }
+        //     this._mapRouletteApiKey = apiKey ?? null;
+        //     this._executeAction(actionId, e);
+        //   });
+        // } else {
+        this._executeAction(actionId, e);
+        // }
         this.close();
       });
 
@@ -241,28 +245,30 @@ export class UiMapRouletteMenu extends EventEmitter {
 
 
   protected _fixedIt(e: Event, d: MapRouletteTask): void {
-    d.props._status = 1;
-    this._submitTask(e, d);
+    this._submitTask(e, d, 1);
   }
 
   protected _cantComplete(e: Event, d: MapRouletteTask): void {
-    d.props._status = 6;
-    this._submitTask(e, d);
+    this._submitTask(e, d, 6);
   }
 
   protected _alreadyFixed(e: Event, d: MapRouletteTask): void {
-    d.props._status = 5;
-    this._submitTask(e, d);
+    this._submitTask(e, d, 5);
   }
 
   protected _notAnIssue(e: Event, d: MapRouletteTask): void {
-    d.props._status = 2;
-    this._submitTask(e, d);
+    this._submitTask(e, d, 2);
   }
 
 
-  /** Submits the task to MapRoulette with the updated status. */
-  protected _submitTask(e: Event, d: MapRouletteTask): void {
+  /**
+   * Submits the task to MapRoulette with the updated status.
+   * The task is submitted as a new task in the cache, with the status and comment (data isn't changed in place).
+   * @param e - the triggering event
+   * @param d - the task
+   * @param status - the status to submit
+   */
+  protected _submitTask(e: Event, d: MapRouletteTask, status: number): void {
     const context = this.context;
     const maproulette = context.services.maproulette!;
     const osm = context.services.osm!;
@@ -272,49 +278,54 @@ export class UiMapRouletteMenu extends EventEmitter {
       return;
     }
 
-    const userID = (osm as any)._userDetails.id;
+    const userID = (osm as any)._userDetails?.id;
 
     if (maproulette) {
-      const props = d.props as any;
-      props.taskStatus = props._status;
-      props.mapRouletteApiKey = this._mapRouletteApiKey;
-
       const $commentInput = select('.new-comment-input');
-      if ($commentInput.empty()) {
-        d.props.comment = '';
-      } else {
-        d.props.comment = ($commentInput.property('value') as string).trim();
-      }
+      const comment = $commentInput.empty() ? '' : ($commentInput.property('value') as string).trim();
 
-      d.props.taskId = d.props.id;
-      d.props.userId = userID;
-      maproulette.postUpdate(d, (err: any, item: any) => {
+      // The cached task may be newer: loading the challenge and the task details stores new tasks
+      const current = maproulette.getTask(d.id) ?? d;
+      const task = current.update({
+        _status: status,
+        taskStatus: status,
+        // mapRouletteApiKey: this._mapRouletteApiKey ?? undefined,   // MapRoulette auth is turned off (see `_mapRouletteApiKey`)
+        comment: comment,
+        taskId: d.props.id,
+        userId: userID
+      });
+      maproulette.replaceItem(task);
+      this.datum = task;
+
+      maproulette.postUpdate(task, (err: any, item: any) => {
         if (err) {
           console.error(err);  // eslint-disable-line no-console
           return;
         }
         this.emit('change', item);
         if (maproulette.nearbyTaskEnabled) {
-          maproulette.flyToNearbyTask(d);
+          maproulette.flyToNearbyTask(task);
         }
       });
     }
   }
 
 
-  /** Retrieves the MapRoulette API key from the user's preferences. */
-  protected _getApiKey(callback: (err: unknown, apiKey?: string) => void): void {
-    const osm = this.context.services.osm!;
-    (osm as any).loadMapRouletteKey((err: any, preferences: any) => {
-      if (typeof callback === 'function') {
-        if (err) {
-          callback(err);
-        } else {
-          callback(null, preferences.maproulette_apikey_v2);
-        }
-      }
-    });
-  }
+  // MapRoulette auth is turned off (see `_mapRouletteApiKey`).
+  // (This never worked: `loadMapRouletteKey` doesn't exist on `OsmService`.)
+  // /** Retrieves the MapRoulette API key from the user's preferences. */
+  // protected _getApiKey(callback: (err: unknown, apiKey?: string) => void): void {
+  //   const osm = this.context.services.osm!;
+  //   (osm as any).loadMapRouletteKey((err: any, preferences: any) => {
+  //     if (typeof callback === 'function') {
+  //       if (err) {
+  //         callback(err);
+  //       } else {
+  //         callback(null, preferences.maproulette_apikey_v2);
+  //       }
+  //     }
+  //   });
+  // }
 
 
   /** Closes the MapRoulette menu and cleans up event listeners. */

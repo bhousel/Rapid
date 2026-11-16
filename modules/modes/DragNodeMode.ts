@@ -7,6 +7,7 @@ import { projWorldToWgs84, vecAdd, vecProject, vecRotate, vecSubtract, WORLD_ZOO
 import { utilArrayIntersection } from '@rapid-sdk/util';
 
 import type { Context } from '../Context.ts';
+import type { EditLabel } from '../lib/Edit.ts';
 import type { EventData } from '../behaviors/AbstractBehavior.ts';
 import type { Midpoint } from '../actions/add_midpoint.ts';
 import type { OsmEntity, OsmWay } from '../data/types.ts';
@@ -17,6 +18,8 @@ import type { Vec2 } from '@rapid-sdk/math';
 export interface DragNodeModeOptions {
   /** If set, reselect these IDs when finished dragging */
   reselectIDs?: EntityID[];
+  /** What was selected when the drag started (undo goes back to it) */
+  selectionBefore?: DataID[];
   /** If set, drag the node for the given id */
   nodeID?: EntityID;
   /** If set, create a node from the given midpoint */
@@ -34,7 +37,9 @@ export class DragNodeMode extends AbstractMode {
 
   /** When finished dragging, restore the selected ids from before */
   protected _reselectIDs: EntityID[];
-  /** Used to set the correct edit annotation */
+  /** What was selected when the drag started */
+  protected _selectionBefore: DataID[];
+  /** Used to set the correct edit label */
   protected _wasMidpoint: boolean;
   /** Difference between where the pin is, and where on the pin the user clicked */
   protected _dragOffset: Vec2;
@@ -46,10 +51,12 @@ export class DragNodeMode extends AbstractMode {
   public constructor(context: Context) {
     super(context);
     this.id = 'drag-node';
+    this.interactiveSpatialIDs = new Set<SpatialID>(['osm']);   // a node can only snap to OSM
 
     this.dragNode = null;
 
     this._reselectIDs = [];
+    this._selectionBefore = [];
     this._wasMidpoint = false;
     this._dragOffset = [0, 0];
 
@@ -75,6 +82,7 @@ export class DragNodeMode extends AbstractMode {
     const ui = context.systems.ui!;
 
     this._reselectIDs = options.reselectIDs ?? [];
+    this._selectionBefore = options.selectionBefore ?? [];
     const midpoint = options.midpoint;
     const nodeID = options.nodeID;
 
@@ -116,17 +124,16 @@ export class DragNodeMode extends AbstractMode {
 
     this._active = true;
     this.dragNode = node;
-    this._selectedData.set(node.id, node);
+    this._selectedIDs = [node.id];
 
     // Calculate dragOffset, to correct for where "on the pin" the user grabbed the target.
-    const startCoord = node.geoms.parts[0]!.world!.coords as Vec2;  // A node should have a single world coord
+    const startCoord = graph.geometry(node).parts[0]!.world!.coords as Vec2;  // A node should have a single world coord
     const clickCoord = context.behaviors.drag!.lastDown!.coord.world;
     this._dragOffset = vecSubtract(startCoord, clickCoord);
 
-    const layer = scene!.layers.get('osm')!;
-    layer.setClass('drawing', this.dragNode.id);
+    scene!.setClass('drawing', this.dragNode.id);
     for (const parent of graph.parentWays(this.dragNode)) {
-      layer.setClass('drawing', parent.id);
+      scene!.setClass('drawing', parent.id);
     }
 
     context.enableBehaviors(['hover', 'drag', 'mapNudge']);
@@ -153,14 +160,14 @@ export class DragNodeMode extends AbstractMode {
 
     this.dragNode = null;
     this._reselectIDs = [];
+    this._selectionBefore = [];
     this._wasMidpoint = false;
     this._dragOffset = [0, 0];
-    this._selectedData.clear();
+    this._selectedIDs = [];
 
     const context = this.context;
     const scene = context.systems.gfx!.scene!;
-    const layer = scene.layers.get('osm')!;
-    layer.clearClass('drawing');
+    scene.clearClass('drawing');
 
     context.behaviors.drag!
       .off('move', this._move)
@@ -173,15 +180,25 @@ export class DragNodeMode extends AbstractMode {
 
 
   /**
+   * What was selected when the drag started (not the node being dragged).
+   * @return  Array of `DataID`s (a copy)
+   * @readonly
+   */
+  public get selectionBefore(): DataID[] {
+    return [...this._selectionBefore];
+  }
+
+
+  /**
    *  Gets the latest version the drag node from the graph after any modifications.
-   *  Updates `selectedData` collection to include the dragging node
+   *  Updates `selectedIDs` to include the dragging node
    */
   protected _refreshEntities(): void {
     const context = this.context;
     const editor = context.systems.editor!;
     const graph = editor.staging.graph;
 
-    this._selectedData.clear();
+    this._selectedIDs = [];
     this.dragNode = this.dragNode && (graph.hasEntity(this.dragNode.id) as OsmNode | undefined) || null;
 
     // Bail out if drag node has gone missing
@@ -190,7 +207,7 @@ export class DragNodeMode extends AbstractMode {
       return;
     }
 
-    this._selectedData.set(this.dragNode.id, this.dragNode);
+    this._selectedIDs = [this.dragNode.id];
   }
 
 
@@ -222,7 +239,7 @@ export class DragNodeMode extends AbstractMode {
     } else if (target?.type === 'way') {
       const way = target as OsmWay;
       // A way will have LineString or Polygon geometry. We can use 'outer' to get these points.
-      const line = way.geoms.parts[0]!.world!.outer as Vec2[];
+      const line = graph.geometry(way).parts[0]!.world!.outer as Vec2[];
 
       // If the dragNode belongs to the way, exclude snapping to adjacent segments.
       const skipSegments = new Set<number>();
@@ -300,7 +317,6 @@ export class DragNodeMode extends AbstractMode {
 
     const context = this.context;
     const editor = context.systems.editor!;
-    const l10n = context.systems.l10n!;
     const viewport = context.viewport;
     const point = eventData.coord!.world;
     const graph = editor.staging.graph;
@@ -308,18 +324,18 @@ export class DragNodeMode extends AbstractMode {
     // Allow snapping only for OSM Entities in the actual graph (i.e. not Rapid features)
     const dataID = eventData?.target?.dataID;
     const target = dataID ? graph.hasEntity(dataID) : undefined;
-    let annotation: string | undefined;
+    let label: EditLabel | undefined;
 
     // Snap to a Node
     if (target?.type === 'node' && this._canSnapToNode(target)) {
       editor.perform(actionConnect([ target.id, this.dragNode.id ]));
-      annotation = this._connectAnnotation(target);
+      label = this._connectLabel(target);
 
     // Snap to a Way
     } else if (target?.type === 'way') {
       const way = target as OsmWay;
       // A way will have LineString or Polygon geometry. We can use 'outer' to get these points.
-      const line = way.geoms.parts[0]!.world!.outer as Vec2[];
+      const line = graph.geometry(way).parts[0]!.world!.outer as Vec2[];
 
       // If the dragNode belongs to the way, exclude snapping to adjacent segments.
       const skipSegments = new Set<number>();
@@ -338,60 +354,54 @@ export class DragNodeMode extends AbstractMode {
         const edge: [EntityID, EntityID] = [ way.nodes[choice.index - 1], way.nodes[choice.index] ];
         const loc = projWorldToWgs84(choice.point);
         editor.perform(actionAddMidpoint({ loc, edge }, this.dragNode));
-        annotation = this._connectAnnotation(way);
+        label = this._connectLabel(way);
       } else {
-        annotation = this._moveAnnotation();
+        label = this._moveLabel();
       }
 
     } else if (this._wasMidpoint) {
-      annotation = l10n.t('operations.add.annotation.vertex');
+      label = { stringID: 'operations.add.annotation.vertex' };
 
     } else {
-      annotation = this._moveAnnotation();
+      label = this._moveLabel();
     }
-
-    editor.commit({ annotation: annotation!, selectedIDs: [this.dragNode.id] });
 
     // Choose next mode
     // (Note that if the drag node is gone, select mode will fallback to browse mode)
-    if (this._reselectIDs.length) {
-      context.enter('select-osm', { selection: { osm: this._reselectIDs }} );
-    } else {
-      context.enter('select-osm', { selection: { osm: [this.dragNode.id] }} );
-    }
+    const selectionAfter = this._reselectIDs.length ? this._reselectIDs : [this.dragNode.id];
+    editor.commit({ ...label, selectionAfter: selectionAfter, selectionBefore: this._selectionBefore });
+    context.enter('select', { selection: selectionAfter });
   }
 
 
   /**
-   * Generate the annotation text for a move operation.
-   * @return The localized annotation string, or undefined if dragNode is missing
+   * Generate the edit label for a move operation.
+   * @return The label, or undefined if dragNode is missing
    */
-  protected _moveAnnotation(): string | undefined {
+  protected _moveLabel(): EditLabel | undefined {
     if (!this.dragNode) return undefined;
 
     const context = this.context;
     const editor = context.systems.editor!;
     const graph = editor.staging.graph;
-    const l10n = context.systems.l10n!;
 
     const geometry = this.dragNode.geometry(graph);
-    return l10n.t(`operations.move.annotation.${geometry}`);
+    return { stringID: `operations.move.annotation.${geometry}` };
   }
 
 
   /**
-   * Generate the annotation text for a connect operation.
-   * The annotation varies based on the geometries involved (vertex, point, line, etc.)
+   * Generate the edit label for a connect operation.
+   * The label varies based on the geometries involved (vertex, point, line, etc.)
    * @param  target - The entity we are connecting the dragNode to
-   * @return The localized annotation string, or undefined if dragNode/target is missing
+   * @return The label, or undefined if dragNode/target is missing
    */
-  protected _connectAnnotation(target: OsmEntity): string | undefined {
+  protected _connectLabel(target: OsmEntity): EditLabel | undefined {
     if (!this.dragNode || !target) return undefined;
 
     const context = this.context;
     const editor = context.systems.editor!;
     const graph = editor.staging.graph;
-    const l10n = context.systems.l10n!;
 
     const nodeGeometry = this.dragNode.geometry(graph);
     const targetGeometry = target.geometry(graph);
@@ -404,12 +414,12 @@ export class DragNodeMode extends AbstractMode {
       if (sharedParentWays.length !== 0) {
         // if the nodes are next to each other, they are merged
         if (sharedParentWays[0].isAdjacent(this.dragNode.id, target.id)) {
-          return l10n.t('operations.connect.annotation.from_vertex.to_adjacent_vertex');
+          return { stringID: 'operations.connect.annotation.from_vertex.to_adjacent_vertex' };
         }
-        return l10n.t('operations.connect.annotation.from_vertex.to_sibling_vertex');
+        return { stringID: 'operations.connect.annotation.from_vertex.to_sibling_vertex' };
       }
     }
-    return l10n.t(`operations.connect.annotation.from_${nodeGeometry}.to_${targetGeometry}`);
+    return { stringID: `operations.connect.annotation.from_${nodeGeometry}.to_${targetGeometry}` };
   }
 
 

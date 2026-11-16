@@ -8,6 +8,7 @@ import type { Context } from '../Context.ts';
 
 import type { AbstractSystem } from './AbstractSystem.ts';
 import type { AssetSystem } from './AssetSystem.ts';
+import type { ConflationSystem } from './ConflationSystem.ts';
 import type { DatabaseSystem } from './DatabaseSystem.ts';
 import type { DragAndDropSystem } from './DragAndDropSystem.ts';
 import type { EditSystem } from './EditSystem.ts';
@@ -49,6 +50,7 @@ export interface Systems {
   [key: SystemID]: AbstractSystem | undefined;
 
   assets?: AssetSystem;
+  conflation?: ConflationSystem;
   database?: DatabaseSystem;
   dragdrop?: DragAndDropSystem;
   editor?: EditSystem;

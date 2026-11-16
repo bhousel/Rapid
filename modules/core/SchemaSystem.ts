@@ -203,6 +203,15 @@ export class SchemaSystem extends AbstractSystem {
   /** Locale code used when the current search index was built (null means not yet built) */
   protected _currLocaleCode: LocaleCode | null;
 
+  /** Bumped on every schema change, so answers memoized from the schema know they're stale */
+  protected _generation: number;
+  /** Bumped when what counts as an area changes, see `areaGeneration` */
+  protected _areaGeneration: number;
+  /** What decided `areaGeneration` last: the area keys, rulesets and variables, as JSON */
+  protected _areaSignature: string;
+  /** How many schema loads are in progress (what counts as an area isn't settled until they finish) */
+  protected _loadingCount: number;
+
 
   /**
    * @param context - Global shared application context
@@ -238,6 +247,10 @@ export class SchemaSystem extends AbstractSystem {
     this._requestedAssetIDs = null;
     this._recentIDs = null;
     this._currLocaleCode = null;
+    this._generation = 0;
+    this._areaGeneration = 0;
+    this._areaSignature = '';
+    this._loadingCount = 0;
 
     // Ensure methods used as callbacks always have `this` bound correctly.
     this._hashChanged = this._hashChanged.bind(this);
@@ -259,6 +272,8 @@ export class SchemaSystem extends AbstractSystem {
     const locations = context.systems.locations;
     const settings = context.systems.settings;
     const urlhash = context.systems.urlhash;
+
+    settings?.registerLocal('schema.presetRecents');
 
     return this._initPromise = super.initAsync()
       .then(() => {
@@ -326,6 +341,10 @@ export class SchemaSystem extends AbstractSystem {
     const gfx = context.systems.gfx;
 
     // Clear out whatever was loaded before.
+    // (While the assets load, what counts as an area isn't settled, see `areaGeneration`.)
+    if (assets) {
+      this._loadingCount++;
+    }
     this.resetAll();
 
     // If AssetSystem is not available, we can't load schema files.
@@ -396,6 +415,12 @@ export class SchemaSystem extends AbstractSystem {
       }
     })
     .finally(() => {
+      // Shapes may have been built while the schema had no area keys, so check them all again.
+      this._loadingCount--;
+      if (!this._loadingCount) {
+        this._updateAreaGeneration(true);
+        this.emit('schemachange');
+      }
       unpause?.();  // resume rendering
     });
   }
@@ -418,36 +443,6 @@ const settings = context.systems.settings;
 this._recentIDs = [];
 settings?.set('schema.presetRecents', this._recentIDs);
 
-// clear all entities cached transients
-const editor = context.systems.editor as any;
-if (editor) {
-  const base = editor.base?.graph;
-  if (base) {
-    for (const [_, v] of base.base.entities) {
-      if (!v) continue;
-      v.updateGeometry(base);
-    }
-  }
-
-  const staging = editor.staging?.graph;
-  if (staging) {
-    for (const [_, v] of staging.local.entities) {
-      if (!v) continue;
-      v.updateGeometry(staging);
-    }
-  }
-
-  const history = editor._history || [];
-  for (const edit of history) {
-    const graph = edit.graph;
-    if (graph) {
-      for (const [_, v] of graph.local.entities) {
-        if (!v) continue;
-        v.updateGeometry(graph);
-      }
-    }
-  }
-}
 const gfx = context.systems.gfx as any;
 gfx?.scene?.reset();  // throw it all away
 
@@ -484,6 +479,29 @@ gfx?.scene?.reset();  // throw it all away
    */
   public get defaultAssetIDs(): Set<AssetID> {
     return this._defaultAssetIDs;
+  }
+
+  /**
+   * A number that changes on every schema change (every `schemachange` event).
+   * Answers memoized from the schema (preset matches, line or area) compare it to know they're stale.
+   * @return  The schema generation
+   * @readonly
+   */
+  public get generation(): number {
+    return this._generation;
+  }
+
+  /**
+   * A number that changes when what counts as an area may have changed: the area keys, the area
+   * rulesets, or the variables they read. It changes only once the schema is settled, not while a
+   * load is in progress (that would turn every area into a line and back), and once more after each
+   * load, since shapes built during it had no area keys. `EditSystem` rebuilds the shapes of the
+   * ways that flipped between line and area when it changes.
+   * @return  The area generation
+   * @readonly
+   */
+  public get areaGeneration(): number {
+    return this._areaGeneration;
   }
 
   /**
@@ -896,21 +914,27 @@ gfx?.scene?.reset();  // throw it all away
 
   /**
    * Find the best matching Preset for the given entity.
-   * Results are cached as a transient on the entity.
+   * The geometry (point or vertex, line or area) comes from the graph; the match for each geometry
+   * is memoized on the entity, so it answers for whichever graph asks.
    * @param   entity  - the Entity to test
    * @param   graph   - the Graph containing this Entity
    * @return  Preset that best matches
    */
   public match(entity: OsmEntity, graph: Graph): Preset | null {
-    return entity.transient('presetMatch', () => {
-      let geometry = entity.geometry(graph) as GeometryType;
-      // Treat entities on addr:interpolation lines as points, not vertices - iD#3241
-      if (geometry === 'vertex' && (entity as OsmNode).isOnAddressLine?.(graph)) {
-        geometry = 'point';
-      }
-      const entityExtent = entity.extent();
-      return this.matchTags(entity.tags, geometry, entityExtent?.center());
-    });
+    let geometry = entity.geometry(graph) as GeometryType;
+    // Treat entities on addr:interpolation lines as points, not vertices - iD#3241
+    if (geometry === 'vertex' && (entity as OsmNode).isOnAddressLine?.(graph)) {
+      geometry = 'point';
+    }
+
+    const matches = entity.memo(null, 'presetMatch', () => new Map<GeometryType, Preset | null>());
+    let preset = matches.get(geometry);
+    if (preset === undefined) {
+      const entityExtent = graph.extent(entity);
+      preset = this.matchTags(entity.tags, geometry, entityExtent?.center());
+      matches.set(geometry, preset);
+    }
+    return preset;
   }
 
 
@@ -991,10 +1015,10 @@ gfx?.scene?.reset();  // throw it all away
     if (entity.type !== 'node') return false;
     if (Object.keys(entity.tags).length === 0) return true;
 
-    return entity.transient('vertexMatch', () => {
-      // address lines allow vertices to act as standalone points
-      if ((entity as OsmNode).isOnAddressLine(graph)) return true;
+    // address lines allow vertices to act as standalone points
+    if ((entity as OsmNode).isOnAddressLine(graph)) return true;
 
+    return entity.memo(null, 'vertexMatch', () => {
       const vertexMatch = this.matchTags(entity.tags, 'vertex');
       if (vertexMatch && !vertexMatch.isFallback()) return true;
       const pointMatch = this.matchTags(entity.tags, 'point');
@@ -1450,6 +1474,8 @@ gfx?.scene?.reset();  // throw it all away
     const context = this.context;
     const gfx = context.systems.gfx;
 
+    this._generation++;
+
     // Reset and rebuild per-scope derived data
     for (const scope of this._scopes.values()) {
       // Reset the Category, Preset, Field cached data
@@ -1527,8 +1553,32 @@ gfx?.scene?.reset();  // throw it all away
       scope.deprecatedValues = dvbk;
     }
 
+    if (!this._loadingCount) {
+      this._updateAreaGeneration(false);
+    }
+
     gfx?.immediateRedraw();
     this.emit('schemachange');
+  }
+
+
+  /**
+   * Bumps `areaGeneration` if what counts as an area changed since it was last bumped.
+   * @param force - `true` to bump it anyway (after a load)
+   */
+  protected _updateAreaGeneration(force: boolean): void {
+    const scope = this._scopes.get('osm');
+    const signature = JSON.stringify([
+      scope?.areaKeys ?? {},
+      scope?.rulesets.get('areakeys_force_true')?.props ?? null,
+      scope?.rulesets.get('areakeys_force_false')?.props ?? null,
+      [...(scope?.variables.values() ?? [])].map(variable => variable.props)
+    ]);
+
+    if (force || signature !== this._areaSignature) {
+      this._areaSignature = signature;
+      this._areaGeneration++;
+    }
   }
 
 }

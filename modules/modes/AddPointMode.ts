@@ -29,6 +29,7 @@ export class AddPointMode extends AbstractMode {
   public constructor(context: Context) {
     super(context);
     this.id = 'add-point';
+    this.interactiveSpatialIDs = new Set<SpatialID>(['osm']);   // a point can only snap to OSM
 
     this.defaultTags = {};
 
@@ -117,7 +118,7 @@ export class AddPointMode extends AbstractMode {
     if (target && target.type === 'way') {
       const way = target as OsmWay;
       // A way will have LineString or Polygon geometry. We can use 'outer' to get these points.
-      const line = way.geoms.parts[0]!.world!.outer as Vec2[];
+      const line = graph.geometry(way).parts[0]!.world!.outer as Vec2[];
 
       const choice = vecProject(point, line);
       const localScale = 2 ** (WORLD_ZOOM - viewport.transform.zoom);
@@ -141,13 +142,12 @@ export class AddPointMode extends AbstractMode {
   protected _clickNothing(loc: Vec2): void {
     const context = this.context;
     const editor = context.systems.editor!;
-    const l10n = context.systems.l10n!;
 
     const node = new OsmNode(context, { loc: loc, tags: this.defaultTags });
 
     editor.perform(actionAddEntity(node));
-    editor.commit({ annotation: l10n.t('operations.add.annotation.point'), selectedIDs: [node.id] });
-    context.enter('select-osm', { selection: { osm: [node.id] }, newFeature: true });
+    editor.commit({ stringID: 'operations.add.annotation.point', selectionAfter: [node.id] });
+    context.enter('select', { selection: [node.id], newFeature: true });
   }
 
 
@@ -159,12 +159,11 @@ export class AddPointMode extends AbstractMode {
   protected _clickWay(loc: Vec2, edge: [EntityID, EntityID]): void {
     const context = this.context;
     const editor = context.systems.editor!;
-    const l10n = context.systems.l10n!;
 
     const node = new OsmNode(context, { tags: this.defaultTags });
     editor.perform(actionAddMidpoint({ loc, edge } as Midpoint, node));
-    editor.commit({ annotation: l10n.t('operations.add.annotation.vertex'), selectedIDs: [node.id] });
-    context.enter('select-osm', { selection: { osm: [node.id] }, newFeature: true });
+    editor.commit({ stringID: 'operations.add.annotation.vertex', selectionAfter: [node.id] });
+    context.enter('select', { selection: [node.id], newFeature: true });
   }
 
 
@@ -176,10 +175,9 @@ export class AddPointMode extends AbstractMode {
   protected _clickNode(_loc: Vec2, node: OsmNode): void {
     const context = this.context;
     const editor = context.systems.editor!;
-    const l10n = context.systems.l10n!;
 
     if (Object.keys(this.defaultTags).length === 0) {
-      context.enter('select-osm', { selection: { osm: [node.id] }, newFeature: false });
+      context.enter('select', { selection: [node.id], newFeature: false });
       return;
     }
 
@@ -189,8 +187,8 @@ export class AddPointMode extends AbstractMode {
     }
 
     editor.perform(actionChangeTags(node.id, tags));
-    editor.commit({ annotation: l10n.t('operations.add.annotation.point'), selectedIDs: [node.id] });
-    context.enter('select-osm', { selection: { osm: [node.id] }, newFeature: false });
+    editor.commit({ stringID: 'operations.add.annotation.point', selectionAfter: [node.id] });
+    context.enter('select', { selection: [node.id], newFeature: false });
   }
 
 

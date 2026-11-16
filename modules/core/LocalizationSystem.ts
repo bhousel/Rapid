@@ -392,7 +392,7 @@ export class LocalizationSystem extends AbstractSystem {
     const urlLocale = urlhash?.getParam('locale');
     let urlLocaleCodes: LocaleCode[] = [];
     if (typeof urlLocale === 'string') {
-      urlLocaleCodes = urlLocale.split(',').map(s => s.trim()).filter(Boolean);
+      urlLocaleCodes = utilExtractValues(urlLocale).filter(Boolean);
     }
 
     // Choose the preferred locales in this order:
@@ -470,32 +470,17 @@ export class LocalizationSystem extends AbstractSystem {
    * @param prevParams - The previous hash parameters
    */
   protected _hashChanged(currParams: Map<string, string>, prevParams: Map<string, string>): void {
-    const context = this.context;
-    const urlhash = context.systems.urlhash;
+    // `locale` and `rtl` override the locale and text direction picked automatically.
+    // They're read from the url as they are (see `selectLocaleAsync`, `_localeChanged`), never written.
+    // When one goes away, Rapid goes back to what it picks automatically.
 
     // rtl
-    const newRTL = currParams.get('rtl');
-    const oldRTL = prevParams.get('rtl');
-    if (newRTL !== oldRTL) {
-      let cleaned = null;
-      if (typeof newRTL === 'string') {
-        cleaned = newRTL.trim().toLowerCase();
-        if (cleaned !== 'true' && cleaned !== 'false') cleaned = null;
-      }
-      urlhash?.setParam('rtl', cleaned);
+    if (currParams.get('rtl') !== prevParams.get('rtl')) {
       this._localeChanged();
     }
 
     // locale
-    const newLocale = currParams.get('locale') || '';
-    const oldLocale = prevParams.get('locale') || '';
-    if (newLocale !== oldLocale) {
-      const vals = utilExtractValues(newLocale).filter(Boolean);
-      let cleaned: LocaleCode[] = [];
-      if (vals.length) {
-        cleaned = this._getSupportedLocales(vals);
-      }
-      urlhash?.setParam('locale', cleaned.length ? cleaned.join(',') : null);
+    if ((currParams.get('locale') || '') !== (prevParams.get('locale') || '')) {
       this.selectLocaleAsync();
     }
   }
@@ -1206,7 +1191,7 @@ export class LocalizationSystem extends AbstractSystem {
 
     // Determine text direction
     // If an `rtl` param is present in the urlhash, use that instead
-    const urlRTL = urlhash?.getParam('rtl');
+    const urlRTL = urlhash?.getParam('rtl')?.trim().toLowerCase();
     if (urlRTL === 'true') {
       this._currTextDirection = 'rtl';
     } else if (urlRTL === 'false') {

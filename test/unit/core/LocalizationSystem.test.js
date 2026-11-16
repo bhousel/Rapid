@@ -339,4 +339,28 @@ describe('LocalizationSystem', () => {
     });
   });
 
+
+  // `locale` and `rtl` override what Rapid picks automatically, and aren't rewritten.
+  describe('`rtl` in the url', () => {
+    it('overrides the text direction without rewriting the url, until it goes away', () => {
+      const urlParams = new Map([['rtl', ' TRUE ']]);
+      const ctx = new Rapid.MockContext();
+      ctx.systems = {
+        urlhash: {
+          getParam: k => urlParams.get(k),
+          setParam: () => assert.fail('the url was written')
+        }
+      };
+      const l10n = new Rapid.LocalizationSystem(ctx);
+      l10n._currLocaleCode = 'en-US';
+
+      l10n._hashChanged(new Map(urlParams), new Map());
+      assert.strictEqual(l10n.textDirection, 'rtl');
+
+      urlParams.delete('rtl');
+      l10n._hashChanged(new Map(), new Map([['rtl', ' TRUE ']]));
+      assert.strictEqual(l10n.textDirection, 'ltr');
+    });
+  });
+
 });

@@ -11,7 +11,7 @@ import type { EntityType } from '../data/types.ts';
 import type { FetchEnvelope } from '../util/fetch_response.ts';
 import type { MarkerProps } from '../data/MarkerData.ts';
 import type { OsmChangeset, OsmChanges } from '../data/OsmChangeset.ts';
-import type { ParserDataType, ParserOptions, ParserResult, ParsedApi, ParsedData, ParsedPolicy } from '../data/parsers/types.ts';
+import type { ParserDataType, ParserOptions, ParserResult, ParsedApi, ParsedChangeset, ParsedData, ParsedPolicy } from '../data/parsers/types.ts';
 import type { Tile, Vec2, Vec3 } from '@rapid-sdk/math';
 
 
@@ -35,12 +35,19 @@ function encodePreferenceKey(key: string): string {
 
 /**
  * Inverse of `encodePreferenceKey`: maps a stored `~` back to `.`.
+ * Only Rapid's own keys are decoded; other applications' keys may contain a `~` of their own.
  * @param key - the stored key
  * @return  the caller-facing (dotted) key
  */
 function decodePreferenceKey(key: string): string {
-  return key.replace(/~/g, '.');
+  return key.startsWith('rapid~settings') ? key.replace(/~/g, '.') : key;
 }
+
+/**
+ * How long (ms) to wait for a changeset upload. A large upload can take the server longer than
+ * NetworkSystem's default 30 s, and giving up early leaves us not knowing whether it went through.
+ */
+const UPLOAD_TIMEOUT = 5 * 60 * 1000;
 
 
 /** Properties specific to OSM note markers */
@@ -384,7 +391,9 @@ export class OsmService extends AbstractSystem {
    * @return  Promise resolved when this component has completed startup
    */
   public startAsync(): Promise<void> {
-    return super.startAsync()
+    if (this._startPromise) return this._startPromise;
+
+    return this._startPromise = super.startAsync()
       .then(() => this.reloadApiStatus());  /* good time to check on the API */
   }
 
@@ -456,6 +465,13 @@ export class OsmService extends AbstractSystem {
    */
   public get connectionID(): number {
     return this._connectionID;
+  }
+
+  /** The base URL of the OSM API
+   * @return  Base URL string (e.g. `'https://api.openstreetmap.org'`)
+   */
+  public get apiroot(): string {
+    return this._apiroot;
   }
 
   /** The base URL of the OSM website
@@ -800,6 +816,66 @@ export class OsmService extends AbstractSystem {
 
 
   /**
+   * Load multiple elements at the given versions, in chunks.
+   * Like `loadMultipleAsync`, child nodes and members are not fetched automatically.
+   * The API answers 404 for a whole request if any version in it is missing or redacted, so a
+   * chunk that fails that way is split in half and tried again, until only those are left out.
+   * GET /api/0.6/[nodes|ways|relations]?#parameters   (e.g. `nodes=123v4,456v2,789`)
+   * @param   versions - the version to load for each entityID (`undefined` or `null` loads the current version)
+   * @return  Promise resolved with an Array of entity details (versions that can't be found are left out)
+   * @throws  Rejects if a request fails for any other reason, e.g. the API can't be reached
+   */
+  public loadEntityVersionsAsync(versions: Map<EntityID, Nullable<number>>): Promise<ParsedData[]> {
+    const loaded: ParsedData[] = [];
+    const toLoad = {} as Record<EntityType, string[]>;
+
+    // Group into lists by type, of the OSM ids with their versions, e.g. '123v4'
+    for (const [entityID, version] of versions) {
+      const k = OsmEntity.type(entityID) as EntityType;
+      if (!k) continue;
+      const osmID = OsmEntity.toOSM(entityID);
+      toLoad[k] ??= [];
+      toLoad[k].push(version ? `${osmID}v${version}` : osmID);
+    }
+
+    const _loadAsync = (k: 'node' | 'way' | 'relation', ids: string[]): Promise<void> => {
+      return new Promise<void>((resolve, reject) => {
+        const errback = (err: any, results?: ParserResult): void => {
+          if (!err) {
+            loaded.push(...(results?.data ?? []));
+            resolve();
+          } else if (err.status === 404 && ids.length > 1) {   // something in here can't be found, split and retry
+            const mid = Math.ceil(ids.length / 2);
+            Promise.all([_loadAsync(k, ids.slice(0, mid)), _loadAsync(k, ids.slice(mid))])
+              .then(() => resolve())
+              .catch(reject);
+          } else if (err.status === 404) {   // this one can't be found, leave it out
+            resolve();
+          } else {
+            reject(err);
+          }
+        };
+
+        const type = k + 's';   // nodes, ways, relations
+        const options = { filter: new Set<ParserDataType>([k]) };
+        const json = (this.preferJSON ? '.json' : '');
+        this.loadFromAPI(`/api/0.6/${type}${json}?${type}=` + ids.join(), errback, options);
+      });
+    };
+
+    const promises: Promise<void>[] = [];
+    for (const k of ['node', 'way', 'relation'] as const) {
+      for (const chunk of utilArrayChunk(toLoad[k] ?? [], 150)) {
+        promises.push(_loadAsync(k, chunk));
+      }
+    }
+
+    return Promise.all(promises)
+      .then(() => loaded);
+  }
+
+
+  /**
    * Load a given user by id.
    * Note that this call requires an auth connection and will return a cached result if unauth.
    * GET /api/0.6/user/#id
@@ -1009,6 +1085,9 @@ export class OsmService extends AbstractSystem {
           const parsed: any = results!.data[0];
           const raw: Record<string, unknown> = parsed?.preferences ?? {};
           for (const [rawk, v] of Object.entries(raw)) {
+            // Skip Rapid settings keys stored with real dots (written by early development code).
+            // The single-key routes can't address them, so they can't be updated or deleted.
+            if (rawk.startsWith('rapid.settings')) continue;
             const k = decodePreferenceKey(rawk);
             this._userPreferences[k] = String(v);
           }
@@ -1332,13 +1411,7 @@ export class OsmService extends AbstractSystem {
       mainThread: true
     })
       .then((result: any) => errback(null, result))
-      .catch((err: any) => {
-        if (err.name === 'AbortError') return;  // ok
-        if (err.name === 'FetchError') {
-          errback(err);
-          return;
-        }
-      });
+      .catch((err: any) => errback(err));   // the save is waiting on us, so report every failure
   }
 
 
@@ -1360,10 +1433,13 @@ export class OsmService extends AbstractSystem {
     }
 
     const context = this.context;
-    const editor = context.systems.editor;
     const network = context.systems.network!;
 
     const uploadedChangeset = (err: any, /*result*/): void => {
+      // The API closed the changeset (see `isChangesetClosedError`), so the next save opens a new one
+      if (this.isChangesetClosedError(err)) {
+        this._changeset.openChangesetID = null;
+      }
       // we do get a changeset diff result, but we don't currently use it for anything
       callback(err, changeset);
     };
@@ -1372,26 +1448,29 @@ export class OsmService extends AbstractSystem {
     const requestID = `osm-changeset-upload-${changeset.id}` as RequestID;
     const resource = this._apiroot + `/api/0.6/changeset/${changeset.id}/upload`;
 
-    // Attempt to prevent user from creating duplicate changes - see iD#5200
-    // Some users will refresh their tab as soon as the changeset is inflight.
-    // We don't want to offer to restore these same changes when their browser refreshes.
-    editor?.clearBackup();
-
     network.fetch<any>(resource, {
       requestID,
       method: 'POST',
       headers: { 'Content-Type': 'text/xml' },
       body: JXON.stringify(changeset.osmChangeJXON(changes)),
-      mainThread: true
+      mainThread: true,
+      timeout: UPLOAD_TIMEOUT
     })
       .then((result: any) => errback(null, result))
-      .catch((err: any) => {
-        if (err.name === 'AbortError') return;  // ok
-        if (err.name === 'FetchError') {
-          errback(err);
-          return;
-        }
-      });
+      .catch((err: any) => errback(err));   // the save is waiting on us, so report every failure
+  }
+
+
+  /**
+   * Whether an error from the API says the changeset was closed. The API closes a changeset an hour
+   * after its last upload (e.g. while the user is on the conflict screen), 24 hours after it opened,
+   * or when the user closes it. It answers 409 Conflict, like a version conflict, with a message.
+   * @param  err - The error from an upload
+   * @return `true` if the changeset was closed
+   */
+  public isChangesetClosedError(err: any): boolean {
+    if (err?.status !== 409) return false;
+    return /changeset \d+ was closed/i.test(String(err.body || err.message || ''));
   }
 
 
@@ -1427,15 +1506,17 @@ export class OsmService extends AbstractSystem {
     // Note that `changeset/#id/close` returns an empty document with `text/html` content type.
     // We use `fetchRaw` here because otherwise `utilFetchResponse` will try handling it,
     // and the xmldom parser will raise a "missing root element" error on the empty document.
+    // `fetchRaw` doesn't reject on an HTTP error, so check the status here. (A 409 says the changeset
+    // is already closed, or an upload to it is still being applied.)
     network.fetchRaw(resource, { requestID, method: 'PUT' })
-      .then((result: any) => errback(null, result))
-      .catch((err: any) => {
-        if (err.name === 'AbortError') return;  // ok
-        if (err.name === 'FetchError') {
-          errback(err);
-          return;
+      .then((response: Response) => {
+        if (response.ok) {
+          errback(null, response);
+        } else {
+          errback({ message: `${response.status} ${response.statusText}`.trim(), status: response.status });
         }
-      });
+      })
+      .catch((err: any) => errback(err));
   }
 
 
@@ -1444,34 +1525,114 @@ export class OsmService extends AbstractSystem {
    * PUT /api/0.6/changeset/create
    * POST /api/0.6/changeset/#id/upload
    * PUT /api/0.6/changeset/#id/close
+   * If the upload gets no answer (the connection was lost, or it timed out), the server may have
+   * applied it anyway, or may still be applying it. Uploads are all or nothing, so this closes the
+   * changeset (which fails while an upload is being applied) and asks the API how many changes it
+   * has. Then the callback gets either success, or an error with status:
+   * - `-5` if the changeset is closed with no changes, so the upload wasn't applied. The next save
+   *   opens a new changeset.
+   * - `-6` if the changeset couldn't be closed or asked about, or the connection was switched while
+   *   the upload was out, so we can't tell. The changeset isn't reused after that.
    * @param  changeset - the changeset to send
    * @param  changes - the entity changes to upload
    * @param  callback - errback-style callback called when the full send cycle completes
+   * @param  beforeUpload - optional, called with the created changeset; the upload waits for its promise
    */
-  public sendChangeset(changeset: OsmChangeset, changes: OsmChanges, callback: Errback): void {
+  public sendChangeset(
+    changeset: OsmChangeset,
+    changes: OsmChanges,
+    callback: Errback,
+    beforeUpload?: (changeset: OsmChangeset) => Promise<unknown>
+  ): void {
     const cid = this._connectionID;
+
+    const uploaded = (isClosed = false): void => {
+      // Upload was successful, it is safe to call the callback.
+      // Add delay to allow for postgres replication iD#1646 iD#2678
+      globalThis.setTimeout(() => {
+        this._changeset.openChangesetID = null;
+        callback(null, changeset);
+      }, 2500);
+
+      // Closing the changeset is optional, and we won't get a result.
+      // Only try to close the changeset if we're still talking to the same server.
+      if (!isClosed && this._connectionID === cid) {
+        this.closeChangeset(changeset, () => {});
+      }
+    };
+
+    // We can't tell whether the upload was applied. The changeset may have changes now, so it can't
+    // be reused: its change count is how the next save (or tab) tells whether an upload went through.
+    const cantTell = (message: string): void => {
+      this._changeset.openChangesetID = null;
+      callback({ message: message, status: -6 }, changeset);
+    };
+
+    const upload = (): void => this.uploadChangeset(changeset, changes, (err: any, updated: OsmChangeset) => {
+      changeset = updated ?? changeset;
+      if (!err) { return uploaded(); }
+
+      // The user switched connection while the upload was out, so its answer was dropped (even a
+      // success, see `_wrapcb`), and we can't ask the server that got it.
+      if (err.status === -1 || (typeof err.status !== 'number' && this._connectionID !== cid)) {
+        return cantTell('Connection Switched');
+      }
+
+      // The server answered (or we never sent it), so we know the upload wasn't applied.
+      if (typeof err.status === 'number') { return callback(err, changeset); }
+
+      // No answer, so the server may have applied the upload, or may still be applying it. Close the
+      // changeset before counting its changes. The API locks a changeset while it applies an upload,
+      // and a close fails at once (409) rather than wait for the lock, so a close that succeeds means
+      // nothing more can land in it, and the count is final.
+      this.closeChangeset(changeset, (closeErr: any) => {
+        this.loadChangesetAsync(changeset.id)
+          .then(result => {
+            if (Number(result.changes_count) > 0) {
+              uploaded(!closeErr);
+            } else if (!closeErr) {
+              callback({ message: err.message, status: -5 }, changeset);
+            } else {
+              cantTell(err.message);
+            }
+          })
+          .catch(() => cantTell(err.message));
+      });
+    });
 
     this.createChangeset(changeset, (err: any, updated: OsmChangeset) => {
       changeset = updated;
       if (err) { return callback(err, changeset); }
 
-      this.uploadChangeset(changeset, changes, (err: any, updated: OsmChangeset) => {
-        changeset = updated;
-        if (err) { return callback(err, changeset); }
+      if (beforeUpload) {
+        beforeUpload(changeset).catch(() => {}).then(upload);   // upload even if it failed
+      } else {
+        upload();
+      }
+    });
+  }
 
-        // Upload was successful, it is safe to call the callback.
-        // Add delay to allow for postgres replication iD#1646 iD#2678
-        globalThis.setTimeout(() => {
-          this._changeset.openChangesetID = null;
-          callback(null, changeset);
-        }, 2500);
 
-        // Closing the changeset is optional, and we won't get a result.
-        // Only try to close the changeset if we're still talking to the same server.
-        if (this._connectionID === cid) {
-          this.closeChangeset(changeset, () => {});
+  /**
+   * Load a changeset's metadata, e.g. to see how many changes it has.
+   * GET /api/0.6/changeset/#id
+   * @param  changesetID - the changeset to load
+   * @return Promise resolved with the parsed changeset
+   */
+  public loadChangesetAsync(changesetID: string): Promise<ParsedChangeset> {
+    return new Promise((resolve, reject) => {
+      const errback = (err: any, results?: ParserResult): void => {
+        const changeset = results?.data.find(d => d.type === 'changeset') as ParsedChangeset | undefined;
+        if (changeset) {
+          resolve(changeset);
+        } else {
+          reject(err ?? new Error(`Changeset ${changesetID} not found`));
         }
-      });
+      };
+
+      const options = { filter: new Set<ParserDataType>(['changeset']) };
+      const json = (this.preferJSON ? '.json' : '');
+      this.loadFromAPI(`/api/0.6/changeset/${changesetID}${json}`, errback, options);
     });
   }
 
@@ -2224,28 +2385,33 @@ export class OsmService extends AbstractSystem {
     const spatial = context.systems.spatial!;
     const noteID = source.id;
 
+    // Whatever additional props we were passed..
+    const changes: Partial<OsmNoteProps> = {};
+    if (source.url)           changes.url          = source.url;
+    if (source.comment_url)   changes.comment_url  = source.comment_url;
+    if (source.close_url)     changes.close_url    = source.close_url;
+    if (source.date_created)  changes.date_created = source.date_created;
+    if (source.status)        changes.status       = source.status;
+    if (source.comments)      changes.comments     = source.comments;
+
+    // Data isn't changed in place: an update makes a new note, so the layer draws it again.
     let note = spatial.getItem<OsmNote>('osm-notes', noteID);
-    if (!note) {
+    if (note) {
+      note = note.update(changes);
+    } else {
       const loc = spatial.getFreeLoc('osm-notes', source.loc);
       note = new MarkerData<OsmNoteProps>(this.context, {
         type:       'note',
         serviceID:  this.id,
+        spatialID:  'osm-notes',
         id:         noteID,
-        loc:        loc
+        loc:        loc,
+        ...changes
       });
     }
 
-    // Update whatever additional props we were passed..
-    const props = note.props;
-    if (source.url)           props.url          = source.url;
-    if (source.comment_url)   props.comment_url  = source.comment_url;
-    if (source.close_url)     props.close_url    = source.close_url;
-    if (source.date_created)  props.date_created = source.date_created;
-    if (source.status)        props.status       = source.status;
-    if (source.comments)      props.comments     = source.comments;
-
     spatial.replaceData('osm-notes', note);
-    return note.touch() as OsmNote;
+    return note;
   }
 
 

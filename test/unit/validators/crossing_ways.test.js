@@ -344,6 +344,68 @@ describe('validateCrossingWays', () => {
     verifySingleCrossingIssue(validate(), null);
   });
 
+  //
+  //  c4------c3      w1:  [r1, r2]  (or reversed)
+  //  |        |      b1:  [c1, c2, c3, c4, c1]  (starting at any corner, either direction)
+  //  r1--|--------|--r2
+  //  |        |
+  //  c1------c2
+  //
+  it('flags a road that goes in and out of a building once, the same crossing from either way, in any node order', async () => {
+    const corners = ['c1', 'c2', 'c3', 'c4'];
+    const issueIDs = new Set();
+    for (const roadReversed of [false, true]) {
+      for (const outlineReversed of [false, true]) {
+        for (let start = 0; start < 4; start++) {
+          let outline = [...corners.slice(start), ...corners.slice(0, start)];
+          if (outlineReversed) outline.reverse();
+          outline.push(outline[0]);   // closed
+
+          await context.systems.editor.resetAsync();   // merging doesn't replace what's loaded already
+          load([
+            new Rapid.OsmNode(context, { id: 'r1', loc: [-2, 0] }),
+            new Rapid.OsmNode(context, { id: 'r2', loc: [2, 0] }),
+            new Rapid.OsmNode(context, { id: 'c1', loc: [-1, -1] }),
+            new Rapid.OsmNode(context, { id: 'c2', loc: [1, -1] }),
+            new Rapid.OsmNode(context, { id: 'c3', loc: [1, 1] }),
+            new Rapid.OsmNode(context, { id: 'c4', loc: [-1, 1] }),
+            new Rapid.OsmWay(context, { id: 'w1', nodes: roadReversed ? ['r2', 'r1'] : ['r1', 'r2'], tags: { highway: 'residential' } }),
+            new Rapid.OsmWay(context, { id: 'b1', nodes: outline, tags: { building: 'yes' } })
+          ]);
+
+          const fromRoad = validator(graph.entity('w1'), graph).issues;
+          const fromBuilding = validator(graph.entity('b1'), graph).issues;
+          assert.lengthOf(fromRoad, 1);
+          assert.lengthOf(fromBuilding, 1);
+          assert.strictEqual(fromRoad[0].id, fromBuilding[0].id);
+          issueIDs.add(fromRoad[0].id);
+        }
+      }
+    }
+    assert.strictEqual(issueIDs.size, 1);   // the same crossing every time
+  });
+
+  it('flags each building that one road segment crosses', () => {
+    load([
+      new Rapid.OsmNode(context, { id: 'r1', loc: [-5, 0] }),
+      new Rapid.OsmNode(context, { id: 'r2', loc: [5, 0] }),
+      new Rapid.OsmWay(context, { id: 'w1', nodes: ['r1', 'r2'], tags: { highway: 'residential' } }),
+      new Rapid.OsmNode(context, { id: 'a1', loc: [-3, -1] }),
+      new Rapid.OsmNode(context, { id: 'a2', loc: [-1, -1] }),
+      new Rapid.OsmNode(context, { id: 'a3', loc: [-1, 1] }),
+      new Rapid.OsmNode(context, { id: 'a4', loc: [-3, 1] }),
+      new Rapid.OsmWay(context, { id: 'b1', nodes: ['a1', 'a2', 'a3', 'a4', 'a1'], tags: { building: 'yes' } }),
+      new Rapid.OsmNode(context, { id: 'd1', loc: [1, -1] }),
+      new Rapid.OsmNode(context, { id: 'd2', loc: [3, -1] }),
+      new Rapid.OsmNode(context, { id: 'd3', loc: [3, 1] }),
+      new Rapid.OsmNode(context, { id: 'd4', loc: [1, 1] }),
+      new Rapid.OsmWay(context, { id: 'b2', nodes: ['d1', 'd2', 'd3', 'd4', 'd1'], tags: { building: 'yes' } })
+    ]);
+
+    const issues = validator(graph.entity('w1'), graph).issues;
+    assert.sameMembers(issues.map(issue => issue.entityIds.toSorted().join(',')), ['b1,w1', 'b2,w1']);
+  });
+
   it('flags railway crossing railway', () => {
     createWaysWithOneCrossingPoint({ railway: 'rail' }, { railway: 'rail' });
     verifySingleCrossingIssue(validate(), {});
@@ -558,6 +620,72 @@ describe('validateCrossingWays', () => {
   it('flags waterway line crossing footway multipolygon relation', () => {
     createWayAndRelationWithOneCrossingPoint({ waterway: 'stream' }, { highway: 'footway', type: 'multipolygon' });
     verifySingleCrossingIssue(validate(), {});
+  });
+
+  //
+  //       n4  n5         w1:  [n1, n2]
+  //       |   |          w2:  [n3, n4, n5, n6]
+  //  n1---|---|---n2
+  //       |   |          (the crossings are about 2 m apart)
+  //       n3  n6
+  //
+  it('flags two crossings of the same ways a few meters apart as two issues', () => {
+    const road = { highway: 'residential' };
+    load([
+      new Rapid.OsmNode(context, { id: 'n1', loc: [-0.001, 0] }),
+      new Rapid.OsmNode(context, { id: 'n2', loc: [ 0.001, 0] }),
+      new Rapid.OsmWay(context, { id: 'w1', nodes: ['n1', 'n2'], tags: road }),
+      new Rapid.OsmNode(context, { id: 'n3', loc: [0, -0.0005] }),
+      new Rapid.OsmNode(context, { id: 'n4', loc: [0,  0.0005] }),
+      new Rapid.OsmNode(context, { id: 'n5', loc: [0.00002,  0.0005] }),
+      new Rapid.OsmNode(context, { id: 'n6', loc: [0.00002, -0.0005] }),
+      new Rapid.OsmWay(context, { id: 'w2', nodes: ['n3', 'n4', 'n5', 'n6'], tags: road })
+    ]);
+
+    const issues = validate();
+    assert.lengthOf(issues, 4);   // each crossing, found from each way
+    const issueIDs = new Set(issues.map(issue => issue.id));
+    assert.strictEqual(issueIDs.size, 2);
+  });
+
+  it('finds a crossing in an older graph, when the crossing way was changed after it', () => {
+    const editor = context.systems.editor;
+    createWaysWithOneCrossingPoint({ highway: 'residential' }, { highway: 'residential' });
+    editor.perform(Rapid.actionChangeTags('w1', { highway: 'residential', name: 'Main Street' }));
+    editor.commit({ stringID: 'named w1' });
+    const older = editor.stable.graph;
+
+    // Insert a node into w2 after the older graph. Staging's local index then has w2's new segments,
+    // through a node that the older graph doesn't have.
+    const n5 = new Rapid.OsmNode(context, { id: 'n-5', loc: [0.5, 0.5] });
+    editor.perform(Rapid.actionAddEntity(n5), Rapid.actionAddVertex('w2', 'n-5', 1));
+    editor.commit({ stringID: 'added n-5' });
+
+    const issues = validator(older.entity('w1'), older).issues;
+    assert.lengthOf(issues, 1);
+    assert.strictEqual(issues[0].type, 'crossing_ways');
+    assert.sameMembers(issues[0].entityIds, ['w1', 'w2']);
+    assert.deepEqual(issues[0].loc, [0, 0]);
+  });
+
+  // Regression guard for the `hasEntity` checks in crossing_ways (from before step 0).
+  it('skips way segments that are in the spatial index but not in the graph being validated', () => {
+    const editor = context.systems.editor;
+    createWaysWithOneCrossingPoint({ highway: 'residential' }, { highway: 'residential' });
+
+    // The index also returns a road (and nodes) that only another graph has
+    const waySegments = editor.waySegments;
+    editor.waySegments = (extent, g) => [
+      { wayID: 'w-10', edge: ['n-10', 'n-11'], index: 0 },
+      { wayID: 'w2', edge: ['n-12', 'n-13'], index: 0 },
+      ...waySegments.call(editor, extent, g)
+    ];
+
+    try {
+      verifySingleCrossingIssue(validate(), {});
+    } finally {
+      editor.waySegments = waySegments;
+    }
   });
 
 });

@@ -5,7 +5,6 @@ import { actionAddMidpoint } from '../actions/add_midpoint.ts';
 import { projWorldToWgs84, vecLength, vecProject } from '@rapid-sdk/math';
 import { utilDetect } from '../util/detect.ts';
 
-import type { AbstractData } from '../data/AbstractData.ts';
 import type { Context } from '../Context.ts';
 import type { EventData } from './AbstractBehavior.ts';
 import type { FederatedPointerEvent } from 'pixi.js';
@@ -354,9 +353,7 @@ export class SelectBehavior extends AbstractBehavior {
     // Determine what we clicked on and switch modes..
     const target = eventData.target;
     let data = target?.data;
-    let dataID = target?.dataID;
     const layerID = target?.layerID || null;
-    const serviceID = (data?.props?.serviceID || '') as ServiceID;
 
     // If we're clicking on something real, we want to pause doubleclick zooms
     if (data) {
@@ -370,7 +367,6 @@ export class SelectBehavior extends AbstractBehavior {
     if (data?.type === 'midpoint') {
       const wayID = data.props.wayID as EntityID;
       data = graph.hasEntity(wayID);
-      dataID = data?.id;
     }
 
     // Clicked on nothing, or an edit block polygon..
@@ -382,39 +378,35 @@ export class SelectBehavior extends AbstractBehavior {
 
     // Clicked on a photo..
     } else if (photos && data.type === 'photo') {
-      photos.selectPhoto(layerID, dataID);
+      photos.selectPhoto(layerID, data.id);   // the photo's own ID, not its data ID
       return;
 
-    // Clicked a selectable non-OSM feature..
-    } else if (
-      ['mapwithai', 'esri', 'overture'].includes(serviceID) ||    // Clicked Rapid data..
-      data instanceof GeoJSONData ||  // Clicked Custom Data (e.g. gpx track)..
-      data instanceof MarkerData      // Clicked a MarkerData (OSM Note, KeepRight, Osmose, Maproulette)..
-    ) {
-      const selection = new Map<DataID, AbstractData>().set(dataID!, data);
-      context.enter('select', { selection: selection });
-      return;
-
-    // Clicked an OSM feature..
-    } else if (data instanceof OsmEntity) {
+    // Clicked a selectable feature..
+    // OSM or Rapid data, Custom Data (e.g. gpx track), or a MarkerData (OSM Note, KeepRight, Osmose, Maproulette)..
+    } else if (data instanceof OsmEntity || data instanceof GeoJSONData || data instanceof MarkerData) {
+      const clickedID = data.dataID;
       let selectedIDs = context.selectedIDs();
 
       if (!isMultiselect) {
-        if (!this._showsMenu || selectedIDs.length <= 1 || !selectedIDs.includes(dataID!)) {
+        if (!this._showsMenu || selectedIDs.length <= 1 || !selectedIDs.includes(clickedID)) {
           // Always re-enter select mode even if the entity is already
           // selected since listeners may expect `context.enter` events,
           // e.g. in the walkthrough
-          context.enter('select-osm', { selection: { osm: [dataID!] }} );
+          context.enter('select', { selection: [clickedID] });
         }
       } else {
-        if (selectedIDs.includes(dataID!)) {   // already in the selectedIDs..
+        if (selectedIDs.includes(clickedID)) {   // already in the selectedIDs..
           if (!this._showsMenu) {
-            selectedIDs = selectedIDs.filter(id => id !== dataID);      // deselect it..
-            context.enter('select-osm', { selection: { osm: selectedIDs }} );
+            selectedIDs = selectedIDs.filter(id => id !== clickedID);      // deselect it..
+            if (selectedIDs.length) {
+              context.enter('select', { selection: selectedIDs });
+            } else {
+              context.enter('browse');
+            }
           }
-        } else {                        // not already in selectedIDs...
-          selectedIDs.push(dataID!);    // select it..
-          context.enter('select-osm', { selection: { osm: selectedIDs }} );
+        } else {                          // not already in selectedIDs...
+          selectedIDs.push(clickedID);    // select it..
+          context.enter('select', { selection: selectedIDs });
         }
       }
       return;
@@ -460,7 +452,7 @@ export class SelectBehavior extends AbstractBehavior {
 
     const context = this.context;
     const editor = context.systems.editor!;
-    const l10n = context.systems.l10n;
+    const graph = editor.staging.graph;
 
     const point = this.lastUp.coord.world;
     const data: any = this.lastUp.target?.data;
@@ -472,11 +464,11 @@ export class SelectBehavior extends AbstractBehavior {
     let edge: [EntityID, EntityID] | undefined;
 
     if (isOSMWay) {
-      const way = data as OsmWay;
+      const way = graph.hasEntity(data.id) as OsmWay | undefined;   // the version in this graph
       // A way will have LineString or Polygon geometry. We can use 'outer' to get these points.
-      const line = way.geoms.parts[0]!.world!.outer as Vec2[];
-      const choice = vecProject(point, line);
-      if (choice) {
+      const line = way && graph.geometry(way).parts[0]?.world?.outer as Vec2[] | undefined;
+      const choice = line && vecProject(point, line);
+      if (way && choice) {
         loc = projWorldToWgs84(choice.point);
         edge = [ way.nodes[choice.index - 1], way.nodes[choice.index] ];
       }
@@ -489,8 +481,8 @@ export class SelectBehavior extends AbstractBehavior {
     if (loc && edge) {
       editor.perform(actionAddMidpoint({ loc, edge } as Midpoint, new OsmNode(context)));
       editor.commit({
-        annotation: l10n!.t('operations.add.annotation.vertex'),
-        selectedIDs: context.selectedIDs()   // keep the parent way selected
+        stringID: 'operations.add.annotation.vertex',
+        selectionAfter: context.selectedIDs()   // keep the parent way selected
       });
     }
 

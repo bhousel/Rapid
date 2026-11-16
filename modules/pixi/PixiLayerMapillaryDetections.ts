@@ -99,7 +99,7 @@ export class PixiLayerMapillaryDetections extends AbstractPixiLayer {
     const mapillary = context.services.mapillary;
     if (!mapillary?.started) return;
 
-    const parentContainer = this.scene.groups.get('qa')!;
+    const parentContainer = this._spatialContainer('qa', this.id);
 
     let markers = mapillary.getData('detections');
     markers = this.filterMarkers(markers);
@@ -117,6 +117,9 @@ export class PixiLayerMapillaryDetections extends AbstractPixiLayer {
       if (!feature) {
         feature = new PixiFeaturePoint(this, featureID);
         feature.parentContainer = parentContainer;
+      }
+
+      if (feature.data !== d || feature.geometry !== part) {   // changed data is a new object
         feature.geometry = part;
         feature.data = d;
       }

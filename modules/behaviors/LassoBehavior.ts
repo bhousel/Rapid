@@ -174,7 +174,7 @@ export class LassoBehavior extends AbstractBehavior {
     this._coords = [];
 
     if (ids.length) {
-      this.context.enter('select-osm', { selection: { osm: ids }} );
+      this.context.enter('select', { selection: ids });
     }
   }
 
@@ -208,19 +208,16 @@ export class LassoBehavior extends AbstractBehavior {
     const filters = context.systems.filters!;
     const graph = editor.staging.graph;
     const locations = context.systems.locations!;
-    const spatial = context.systems.spatial!;
     const entityIDs: EntityID[] = [];
 
     if (!this.context.editable() || !this._extent || !this._coords.length) return [];
 
     // Gather OsmNodes within the lasso.
-    const spatialID = editor.spatialIDForGraph(graph);
-    const hits = spatial.getItemsAtBox(spatialID, this._extent.bbox());
-    for (const hit of hits) {
-      const node = hit.contents as OsmNode;
-      if (node.type !== 'node') continue;
+    for (const entity of editor.entitiesInBox(this._extent.bbox(), graph)) {
+      if (entity.type !== 'node') continue;
+      const node = entity as OsmNode;
 
-      const coord = node.geoms.parts[0].world?.coords as Vec2;  // A node should have a single world coord
+      const coord = graph.geometry(node).parts[0].world?.coords as Vec2;  // A node should have a single world coord
       if (!coord) continue;
 
       if (!geomPointInPolygon(coord, this._coords)) continue;

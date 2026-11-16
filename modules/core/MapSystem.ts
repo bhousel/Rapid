@@ -1,14 +1,16 @@
 import { AbstractSystem } from './AbstractSystem.ts';
 import {
   DEG2RAD, RAD2DEG, TAU, Extent, numClamp, numWrap, projWgs84ToWorld,
-  vecRotate, vecSubtract, WORLD_HALF, WORLD_SCALE } from '@rapid-sdk/math';
-import { MarkerData } from '../data/MarkerData.ts';
+  vecLength, vecRotate, vecSubtract, Viewport, WORLD_HALF, WORLD_SCALE } from '@rapid-sdk/math';
+import { makeDataID, osmEntityID, splitDataID } from '../data/dataID.ts';
 import { selection } from 'd3-selection';
+import { utilArrayIdentical, utilArrayUniq } from '@rapid-sdk/util';
 import { utilTotalExtent } from '../util/util.ts';
 
 import type { Context } from '../Context.ts';
 import type { D3EnterSelection, D3Selection } from 'd3-selection';
 import type { Difference } from '../lib/Difference.ts';
+import type { Edit } from '../lib/Edit.ts';
 import type { OsmEntity } from '../data/OsmEntity.ts';
 import type { TransformProps, Vec2 } from '@rapid-sdk/math';
 
@@ -16,6 +18,11 @@ type AreaFillMode = 'wireframe' | 'partial' | 'full';
 
 const MIN_Z = 2;
 const MAX_Z = 24;
+/**
+ * When showing a change: at this zoom or closer, a change counts as visible.
+ * And don't zoom out past this (or past where the user already is) just to fit all of a large change.
+ */
+const SHOW_MIN_Z = 16;
 
 
 /**
@@ -42,6 +49,8 @@ export class MapSystem extends AbstractSystem {
   protected _toggleFillMode: AreaFillMode;
   /** Keyboard shortcut strings for map operations (populated during startAsync) */
   protected _keys: string[] | null;
+  /** Counts selections restored after undo/redo, so a late one for an older jump gives up */
+  protected _selectCount: number;
 
   /** D3 selection of the parent container element that holds the map canvas */
   public $parent: D3Selection | null;
@@ -63,6 +72,7 @@ export class MapSystem extends AbstractSystem {
     this._toggleFillMode = 'partial';  // the previous *non-wireframe* fill mode
 
     this._keys = null;
+    this._selectCount = 0;
 
     // D3 selections
     this.$parent = null;
@@ -92,6 +102,9 @@ export class MapSystem extends AbstractSystem {
     const schema = context.systems.schema;
     const settings = context.systems.settings;
     const urlhash = context.systems.urlhash;
+
+    // Settings that follow the user to other browsers
+    settings?.registerSync(['map.areaFill', 'map.areaFillToggle']);
 
     return this._initPromise = super.initAsync()
       .then(() => {
@@ -123,6 +136,14 @@ export class MapSystem extends AbstractSystem {
         editor
           .on('merge', (entityIDs: EntityID[]) => {
             if (entityIDs) {
+              // New data can change what was matched for what's on the tile (e.g. a relation gaining members).
+              const graph = editor.staging.graph!;
+              for (const entityID of entityIDs) {
+                const entity = graph.hasEntity(entityID);
+                if (entity) {
+                  filters?.clearEntity(entity);
+                }
+              }
               scene.dirtyData('osm', entityIDs);
             }
             // Do we need this here?  OsmService calls `deferredRedraw` as tiles are loaded.
@@ -130,53 +151,24 @@ export class MapSystem extends AbstractSystem {
             gfx.deferredRedraw();
           })
           .on('stagingchange', (difference: Difference) => {
+            // `EditSystem` emits with staging's geometry already current, so there's nothing to recompute.
+            // The renderer binds each feature to its entity and its part of staging's geometry, and
+            // binds again when either is a different object. These are marked dirty to restyle them,
+            // since what changed may be only their topology (a vertex that's now shared).
             const complete = difference.complete();
-            const graph = editor.staging.graph;
             for (const entity of complete.values()) {
               if (entity) {      // may be undefined if entity was deleted
-                entity.touch();  // bump .v in place, rendering code will pick it up as dirty
                 filters?.clearEntity(entity);  // clear feature filter cache
-                if (difference.didChange.geometry) {
-                  entity.updateGeometry(graph);
-                }
               }
             }
+            scene.dirtyData('osm', [...complete.keys()]);
             gfx.immediateRedraw();
           })
           .on('historyjump', (prevIndex: number, currIndex: number) => {
-            // This code occurs when jumping to a different edit because of a undo/redo/restore, etc.
-            const prevEdit = editor.history[prevIndex];
-            const currEdit = editor.history[currIndex];
-
-            // Counterintuitively, when undoing, we might want the metadata from the _next_ edit (located at prevIndex).
-            // If that edit exists (it might not if we are restoring) use that one, otherwise just use the current edit
-            const didUndo = (currIndex === prevIndex - 1);
-            const edit = (didUndo && prevEdit) ?? currEdit;
-            if (!edit) return;
-
-            // Reposition the map if we've jumped to a different place.
-            const t0 = context.viewport.transform.props;
-            const t1 = edit.transform;
-            if (t1 && (t0.x !== t1.x || t0.y !== t1.y || t0.z !== t1.z || t0.r !== t1.r)) {
-              this.transformEase(t1);
-            }
-
-            // Switch to select mode if the edit contains selected ids.
-            // Note: draw modes need to do a little extra work to survive this,
-            //  so they have their own `historyjump` listeners.
-            const modeID = context.mode?.id ?? '';
-            if (/^draw/.test(modeID)) return;
-
-            // For now these IDs are assumed to be OSM ids.
-            // Check that they are actually in the stable graph.
-            const graph = edit.graph;
-            const checkIDs = edit.selectedIDs ?? [];
-            const selectedIDs = checkIDs.filter((entityID: EntityID) => graph.hasEntity(entityID));
-            if (selectedIDs.length) {
-              context.enter('select-osm', { selection: { osm: selectedIDs }} );
-            } else {
-              context.enter('browse');
-            }
+            this._historyJumped(prevIndex, currIndex);
+          })
+          .on('returnview', (edit: Edit) => {
+            this._returnViewed(edit);
           });
 
         filters?.on('filterchange', () => {
@@ -312,6 +304,7 @@ export class MapSystem extends AbstractSystem {
   protected _hashChanged(currParams: Map<string, string>, prevParams: Map<string, string>): void {
     const context = this.context;
     const scene = context.systems.gfx!.scene!;  // exists after init
+    const urlhash = context.systems.urlhash;
 
     // map
     const newMap = currParams.get('map');
@@ -339,50 +332,30 @@ export class MapSystem extends AbstractSystem {
     }
 
     // id
-    const newIds = currParams.get('id');
-    const oldIds = prevParams.get('id');
-    if (newIds !== oldIds) {
-      if (typeof newIds === 'string') {
-        const ids = newIds.split(',').map(s => s.trim()).filter(Boolean);
-        const modeID = context.mode?.id;
-        if (ids.length && modeID !== 'save') {
-          this.selectEntityID(ids[0]);  // for now, just the select first one
+    // (`note=<noteID>` is a legacy way to select a note, read as `id=osm-notes:<noteID>`, see API.md)
+    const selectionOf = (params: Map<string, string>): DataID[] => {
+      const ids = (params.get('id') ?? '').split(',').map(s => s.trim()).filter(Boolean);
+      for (const val of (params.get('note') ?? '').split(',').map(s => s.trim())) {
+        if (/^[1-9]\d*$/.test(val)) {
+          ids.push(makeDataID('osm-notes', val));
         }
       }
+      return ids;
+    };
+    const newIds = selectionOf(currParams);
+    const oldIds = selectionOf(prevParams);
+    if (!utilArrayIdentical(newIds, oldIds) && context.mode?.id !== 'save') {
+      this._restoreSelection(newIds, true);   // no ids: browse
     }
 
-    // note
-    // Support opening notes layer with a URL parameter:
-    //  e.g. `note=true`  -or-
-    //  e.g. `note=<noteID>`
-    const newNote = currParams.get('note') || '';
-    const oldNote = prevParams.get('note') || '';
-    if (newNote !== oldNote) {
-      let isEnabled = false;
-      let noteID = null;
-
-      const vals = newNote.split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
-      for (const val of vals) {
-        if (val === 'true') {
-          isEnabled = true;
-          continue;
-        }
-        // Try the value as a number, but reject things like NaN, null, Infinity
-        const num = +val;
-        if (Number.isFinite(num)) {
-          isEnabled = true;
-          noteID = num;  // for now, just select the first one
-          break;
-        }
+    // note (legacy)
+    // `note=true` turns on the notes layer. It's read once: the url doesn't keep `note` (see API.md).
+    const note = currParams.get('note');
+    if (note !== undefined) {
+      if (note.split(',').map(s => s.trim().toLowerCase()).includes('true')) {
+        scene.enableLayers('osm-notes');
       }
-
-      if (noteID) {
-        this.selectNoteID(noteID);
-      } else if (isEnabled) {
-        scene.enableLayers('notes');
-      } else {
-        scene.disableLayers('notes');
-      }
+      urlhash?.setParam('note', null);
     }
   }
 
@@ -393,7 +366,6 @@ export class MapSystem extends AbstractSystem {
    */
   protected _updateHash(): void {
     const context = this.context;
-    const scene = context.systems.gfx!.scene!;
     const urlhash = context.systems.urlhash;
     const viewport = context.viewport;
     if (!urlhash) return;
@@ -418,27 +390,403 @@ export class MapSystem extends AbstractSystem {
     }
 
     urlhash.setParam('map', val);
+  }
 
 
-    // note
-    const layer = scene.layers.get('notes');
-    let noteID;
-    const [pair] = context.selectedData();  // get the first thing in the Map()
-    const [datumID, datum] = pair || [];
-    if (datum instanceof MarkerData && datum.serviceID === 'osm') {
-      noteID = datumID;
-    }
+  /**
+   * Respond to undo, redo and restore: show where the change is, and restore the selection.
+   * Undo shows the edit it took back and what was selected before it; redo (or restore) shows the
+   * edit it brought back and what was selected after it.
+   * See "Showing what changed (viewport)" in `design/edit-system.md`.
+   * @param  prevIndex - The history index before the jump
+   * @param  currIndex - The history index after the jump
+   */
+  protected _historyJumped(prevIndex: number, currIndex: number): void {
+    const context = this.context;
+    const editor = context.systems.editor!;
 
-    // `note=true` -or- `note=<noteID>`
-    if (layer?.enabled) {
-      if (noteID) {
-        urlhash.setParam('note', noteID);
-      } else {
-        urlhash.setParam('note', 'true');
+    const history = editor.history;
+    const isUndo = (currIndex < prevIndex && !!history[prevIndex]);
+    const edit = isUndo ? history[prevIndex] : history[currIndex];
+    if (!edit) return;
+
+    // Same index: only the work in progress was thrown away (e.g. undo while dragging),
+    // so there's nothing to show.  Entering a mode below still ends the drag.
+    if (prevIndex !== currIndex) {
+      const props = edit.props;
+      const extent = props.extent && new Extent([props.extent[0], props.extent[1]], [props.extent[2], props.extent[3]]);
+      let t2: TransformProps | null = null;
+      if (extent) {
+        t2 = this.viewForExtent(extent, props.transform);
+      } else if (props.transform) {   // e.g. an edit from an older backup
+        t2 = props.transform;
       }
-    } else {
-      urlhash.setParam('note', null);
+      if (t2) {
+        this._easeTo(t2);
+      }
+
+      // Redo back to the newest edit: if that leaves the map where the user was before they started
+      // undoing, the extra redo to take them back isn't needed.
+      const returnEdit = editor.returnEdit;
+      const returnTransform = returnEdit?.props.transform;
+      if (!isUndo && currIndex === history.length - 1 && returnTransform) {
+        const t = t2 ?? context.viewport.transform.props;
+        if (this._isSameView(t, returnTransform)) {
+          editor.clearReturnEdit();
+        }
+      }
     }
+
+    // Note: draw modes need to do a little extra work to survive this,
+    //  so they have their own `historyjump` listeners. When they leave, they call `restoreJumpSelection`.
+    const modeID = context.mode?.id ?? '';
+    if (/^draw/.test(modeID)) return;
+
+    this.restoreJumpSelection(prevIndex, currIndex);
+  }
+
+
+  /**
+   * Select what an undo, redo or restore should show: what was selected before the edit it took
+   * back (undo), or after the edit it brought in (redo, restore). At the same index, only the work in
+   * progress was thrown away, so this goes back to what was selected before that work, not to the
+   * newest edit's selection (which may be anything, anywhere).
+   * Draw modes call this when a jump takes them out of the line or area they were drawing.
+   * @param  prevIndex - The history index before the jump
+   * @param  currIndex - The history index after the jump
+   */
+  public restoreJumpSelection(prevIndex: number, currIndex: number): void {
+    const context = this.context;
+    const editor = context.systems.editor!;
+
+    const history = editor.history;
+    const isUndo = (currIndex < prevIndex && !!history[prevIndex]);
+    const edit = isUndo ? history[prevIndex] : history[currIndex];
+    if (!edit) return;
+
+    let selection: DataID[];
+    if (prevIndex === currIndex) {
+      selection = context.mode?.selectionBefore ?? [];
+    } else {
+      selection = (isUndo ? edit.props.selectionBefore : edit.props.selectionAfter) ?? [];
+    }
+    this._restoreSelection(selection);
+  }
+
+
+  /**
+   * Respond to the extra redo past the newest edit: go back to where the user was before they
+   * started undoing, with what they had selected.
+   * @param  edit - The return Edit, with the `transform` and `selectionAfter` to go back to
+   */
+  protected _returnViewed(edit: Edit): void {
+    const context = this.context;
+
+    const t2 = edit.props.transform;
+    if (t2) {
+      this._easeTo(t2);
+    }
+
+    const modeID = context.mode?.id ?? '';
+    if (/^draw/.test(modeID)) return;
+
+    this._restoreSelection(edit.props.selectionAfter ?? []);
+  }
+
+
+  /**
+   * Select what's in the given selection, or go to browse mode if none of it can be found.
+   * OSM entities must be in the stable graph.  Other data is found by its data ID
+   * (`SpatialSystem.getData`). Data that comes back on undo may not be there yet (a Rapid feature
+   * that's loaded again, or a piece of a line that conflation makes when the line is drawn), so this
+   * tries again after the next redraws, adding what it finds to the selection.
+   * A selection from a link (`id=` in the URL) also turns on the layers that draw it (see
+   * `PixiScene.showData`), downloads the OSM entities and notes that aren't loaded yet, and moves the
+   * map to what it finds if that isn't in view.  Its other data is selected when it loads (for that,
+   * the data must be in view), so it waits longer.
+   * @param  selection - Data IDs, e.g. `['w1', 'fbRoads:abc']`
+   * @param  fromLink - `true` if the selection is from a link
+   */
+  protected _restoreSelection(selection: DataID[], fromLink: boolean = false): void {
+    const context = this.context;
+    const editor = context.systems.editor!;
+    const gfx = context.systems.gfx!;
+    const osm = context.services.osm;
+    const scene = gfx.scene!;
+    const spatial = context.systems.spatial!;
+
+    const count = ++this._selectCount;
+    selection = utilArrayUniq(selection.map(dataID => osmEntityID(dataID) ?? dataID));   // `osm:w1` is `w1`
+    const isFound = (dataID: DataID): boolean => {
+      return osmEntityID(dataID) ? !!editor.stable.graph.hasEntity(dataID) : !!spatial.getData(dataID);
+    };
+
+    // Selecting something from a link shows it, so turn on the layers that draw it.
+    if (fromLink && selection.length) {
+      scene.showData(selection);
+    }
+
+    // OSM entities are in the graph or not, so only other data can arrive later,
+    // unless the selection is from a link, which downloads the OSM entities and notes it doesn't have.
+    // (Only ones from the OSM API: new ones, like `w-1`, can't be downloaded.)
+    const canLoad = (dataID: DataID): boolean => {
+      return /^[nwr][1-9]\d*$/.test(dataID) || (!!osm && /^osm-notes:[1-9]\d*$/.test(dataID));
+    };
+    const loadAsync = (dataID: DataID): Promise<unknown> => {
+      const [spatialID, localID] = splitDataID(dataID);
+      return spatialID === 'osm-notes' ? osm!.loadNoteAsync(localID) : context.loadEntityAsync(localID);
+    };
+    const toLoad = fromLink ? selection.filter(dataID => canLoad(dataID) && !isFound(dataID)) : [];
+    const waiting = new Set<DataID>(selection.filter(dataID => {
+      return osmEntityID(dataID) ? toLoad.includes(dataID) : !isFound(dataID);
+    }));
+
+    // Whether this is still what's selected (nothing else was selected since, and the user didn't move on)
+    let found: DataID[] = [];
+    const isCurrent = (): boolean => {
+      if (count !== this._selectCount) return false;
+      const modeID = found.length ? 'select' : 'browse';
+      return context.mode?.id === modeID && utilArrayIdentical(context.selectedIDs(), found);
+    };
+
+    // Select what's found, if that's more than before
+    const selectFound = (): void => {
+      const nowFound = selection.filter(isFound);
+      for (const dataID of nowFound) {
+        waiting.delete(dataID);
+      }
+      if (nowFound.length <= found.length) return;
+
+      found = nowFound;
+      context.enter('select', { selection: found });
+
+      if (fromLink) {
+        const graph = editor.staging.graph;
+        const extent = new Extent();
+        for (const dataID of found) {
+          const entity = osmEntityID(dataID) ? graph.hasEntity(dataID) : undefined;
+          const other = entity ? graph.extent(entity) : spatial.getData(dataID)?.extent();
+          if (other) {
+            extent.extendSelf(other);
+          }
+        }
+        if (isFinite(extent.area()) && !this.showsExtent(extent)) {
+          this.fitExtent(extent);
+        }
+      }
+    };
+
+    selectFound();
+    if (!found.length) {
+      context.enter('browse');
+    }
+
+    if (toLoad.length) {
+      Promise.allSettled(toLoad.map(loadAsync))
+        .then(() => {
+          for (const dataID of toLoad) {
+            waiting.delete(dataID);   // loaded, or not there to load
+          }
+          if (isCurrent()) selectFound();
+        });
+    }
+
+    if (!waiting.size) return;
+
+    const MAX_TRIES = 5;          // on undo, the data is in its cache already, or made when it's drawn
+    const MAX_WAIT_MS = 30000;    // from a link, the data may still be downloading
+    const giveUpAt = performance.now() + MAX_WAIT_MS;
+    let tries = 0;
+    const trySelect = (): boolean => {
+      // Give up if another selection was restored since, or the user moved on to something else
+      if (!isCurrent()) return true;
+
+      selectFound();
+      if (!waiting.size) return true;
+      return fromLink ? (performance.now() > giveUpAt) : (++tries >= MAX_TRIES);
+    };
+
+    const onDraw = () => {
+      if (trySelect()) gfx.off('draw', onDraw);
+    };
+    gfx.on('draw', onDraw);
+  }
+
+
+  /**
+   * Whether the given view shows the given extent well enough that we don't need to move the map:
+   * most of it is in the part of the map not covered by the header and footer, and the map isn't
+   * zoomed so far out that it's hard to see.  An extent too big to fit counts if any of it is in view.
+   * @param  extent - Extent to check, in WGS84 lon/lat
+   * @param  t - The view to check (defaults to the current view)
+   * @return `true` if the view shows the extent well enough
+   */
+  public showsExtent(extent: Extent, t?: TransformProps): boolean {
+    const viewport = this.context.viewport;
+    const view = t ? new Viewport(t, viewport.dimensions) : viewport;
+
+    const z = view.transform.zoom;
+    const best = this._bestZoom(extent);
+    if (z < this._minShowZoom(extent)) return false;   // too far out to see it
+
+    const visible = this._trimmedExtentOf(view);
+    if (z <= best) {
+      return extent.percentContainedIn(visible) >= 0.8;
+    } else {
+      return extent.intersects(visible);   // too big to fit: any of it in view counts
+    }
+  }
+
+
+  /**
+   * Decide where the map should go to show the given extent, moving only when needed.
+   * - If the current view shows the extent well enough, don't move.
+   * - Otherwise, if the given transform (e.g. where the user was when they made the edit) shows it, go there.
+   * - Otherwise, center on it, keeping the current zoom where possible: zoom out only to fit it
+   *   (but not past `SHOW_MIN_Z`), and zoom in only as far as needed to see it.
+   * @param  extent - Extent to show, in WGS84 lon/lat
+   * @param  transform - A view to prefer, if it shows the extent
+   * @return The transform to go to, or `null` if the map doesn't need to move
+   */
+  public viewForExtent(extent: Extent, transform?: TransformProps): TransformProps | null {
+    const viewport = this.context.viewport;
+
+    if (this.showsExtent(extent)) return null;
+    if (transform && this.showsExtent(extent, transform)) return transform;
+
+    const t1 = viewport.transform;
+    const best = this._bestZoom(extent);
+    let z = t1.zoom;
+    if (z > best) z = best;                                       // too far in to fit it
+    z = Math.max(z, Math.min(t1.zoom, SHOW_MIN_Z));               // but don't zoom way out for it
+    z = Math.max(z, this._minShowZoom(extent));                   // too far out to see it
+
+    return this._transformFor(extent.center(), z, t1.r);
+  }
+
+
+  /**
+   * Show the given extent, moving the map only when needed (see `viewForExtent`).
+   * Nearby moves ease; far moves jump, since a long ease across the map is just a blur.
+   * @param  extent - Extent to show, in WGS84 lon/lat
+   * @param  transform - A view to prefer, if it shows the extent
+   * @return Promise that resolves `true` if the map moved, `false` if not
+   */
+  public showExtentAsync(extent: Extent, transform?: TransformProps): Promise<boolean> {
+    const t2 = this.viewForExtent(extent, transform);
+    if (!t2) return Promise.resolve(false);
+    return this._easeTo(t2).then(() => true);
+  }
+
+
+  /**
+   * How long to take moving the map to the given location and zoom, by how far it is in screens
+   * (measured at the lower of the two zooms) and how much the zoom changes.
+   * @param  loc2 - Target center as `[lon, lat]`
+   * @param  z2 - Target zoom (defaults to the current zoom)
+   * @return Milliseconds: 0 if nothing changes, 250 within about a screen, 500 within a few, 1000 beyond
+   */
+  public easeDuration(loc2: Vec2, z2?: number): number {
+    const viewport = this.context.viewport;
+    const z1 = viewport.transform.zoom;
+    z2 ??= z1;
+
+    const screens = this._screensBetween(viewport.centerLoc(), loc2, Math.min(z1, z2));
+    const dz = Math.abs(z2 - z1);
+
+    if (screens < 0.01 && dz < 0.01) {
+      return 0;
+    } else if (screens <= 1 && dz <= 1) {
+      return 250;
+    } else if (screens <= 4 && dz <= 2) {
+      return 500;
+    } else {
+      return 1000;
+    }
+  }
+
+
+  /**
+   * Move the map to the given transform: ease if it's nearby, jump if it's far.
+   * @param  t2 - Transform to go to
+   * @return Promise that resolves when the map has finished moving
+   */
+  protected _easeTo(t2: TransformProps): Promise<TransformProps> {
+    const viewport = this.context.viewport;
+    const loc2 = new Viewport(t2, viewport.dimensions).centerLoc();
+    const ms = this.easeDuration(loc2, t2.z);
+    return this.setTransformAsync({ ...t2 }, (ms >= 1000) ? 0 : ms);
+  }
+
+
+  /**
+   * Whether two views are about the same: centers within a quarter screen, and zooms within one level.
+   * @param  t1 - A transform
+   * @param  t2 - Another transform
+   * @return `true` if the views are about the same
+   */
+  protected _isSameView(t1: TransformProps, t2: TransformProps): boolean {
+    const viewport = this.context.viewport;
+    const loc1 = new Viewport(t1, viewport.dimensions).centerLoc();
+    const loc2 = new Viewport(t2, viewport.dimensions).centerLoc();
+    return Math.abs(t1.z - t2.z) < 1 && this._screensBetween(loc1, loc2, Math.min(t1.z, t2.z)) < 0.25;
+  }
+
+
+  /**
+   * How many screens apart two locations are at the given zoom.
+   * @param  loc1 - A location as `[lon, lat]`
+   * @param  loc2 - Another location as `[lon, lat]`
+   * @param  z - The zoom to measure at
+   * @return The distance, in screens (the smaller of the viewport's width and height)
+   */
+  protected _screensBetween(loc1: Vec2, loc2: Vec2, z: number): number {
+    const viewport = this.context.viewport;
+    const [w, h] = viewport.dimensions;
+    const screen = Math.max(1, Math.min(w, h));
+    const scale = 2 ** (z - viewport.transform.zoom);   // pixels at `z` per pixel now
+    const pixels = vecLength(viewport.project(loc1), viewport.project(loc2)) * scale;
+    return pixels / screen;
+  }
+
+
+  /**
+   * The zoom that best shows the given extent: fitting it in the trimmed view, but no closer than z20.
+   * @param  extent - Extent to show
+   * @return The zoom
+   */
+  protected _bestZoom(extent: Extent): number {
+    return numClamp(this.trimmedExtentZoom(extent), MIN_Z, 20);
+  }
+
+
+  /**
+   * The zoom below which the given extent is too small to see: 2 levels out from the best zoom,
+   * but any change counts as visible at `SHOW_MIN_Z` or closer.
+   * @param  extent - Extent to show
+   * @return The zoom
+   */
+  protected _minShowZoom(extent: Extent): number {
+    return Math.min(this._bestZoom(extent) - 2, SHOW_MIN_Z);
+  }
+
+
+  /**
+   * The transform that centers the map on the given location at the given zoom and rotation.
+   * @param  loc - Center as `[lon, lat]`
+   * @param  z - Zoom
+   * @param  r - Rotation, in radians
+   * @return The transform
+   */
+  protected _transformFor(loc: Vec2, z: number, r: number): TransformProps {
+    const center = this.context.viewport.center();
+    // worldToScreen formula: screen = (world - WORLD_HALF) * 2^(z - WORLD_ZOOM) + [tx, ty]
+    // For center to land on `world`: tx = center - (world - WORLD_HALF) * k / 2^WORLD_ZOOM
+    const world = projWgs84ToWorld(loc);
+    const k = 2 ** z;
+    const x = -((world[0] - WORLD_HALF) * k / WORLD_SCALE) + center[0];
+    const y = -((world[1] - WORLD_HALF) * k / WORLD_SCALE) + center[1];
+    return { x: x, y: y, z: z, r: r };
   }
 
 
@@ -540,7 +888,6 @@ export class MapSystem extends AbstractSystem {
   public setMapParams(loc2?: Vec2, z2?: number, r2?: number, duration: number = 0): this {
     const context = this.context;
     const view = context.viewport;
-    const center = view.center();
     const loc1 = view.centerLoc();
     const t1 = view.transform;
     const z1 = t1.zoom;
@@ -560,15 +907,7 @@ export class MapSystem extends AbstractSystem {
       return this;
     }
 
-    // convert that coordinate back to screen coordinate at z2
-    // worldToScreen formula: screen = (world - WORLD_HALF) * 2^(z - WORLD_ZOOM) + [tx, ty]
-    // For center to land on `world`: tx = center - (world - WORLD_HALF) * k2 / 2^WORLD_ZOOM
-    const world = projWgs84ToWorld(loc2);
-    const k2 = 2 ** z2;
-    const x2 = -((world[0] - WORLD_HALF) * k2 / WORLD_SCALE) + center[0];
-    const y2 = -((world[1] - WORLD_HALF) * k2 / WORLD_SCALE) + center[1];
-
-    return this.transform({ x: x2, y: y2, z: z2, r: r2 }, duration) as this;
+    return this.transform(this._transformFor(loc2, z2, r2), duration) as this;
   }
 
 
@@ -583,7 +922,6 @@ export class MapSystem extends AbstractSystem {
   public setMapParamsAsync(loc2?: Vec2, z2?: number, r2?: number, duration: number = 0): Promise<TransformProps> {
     const context = this.context;
     const view = context.viewport;
-    const center = view.center();
     const loc1 = view.centerLoc();
     const t1 = view.transform;
     const z1 = t1.zoom;
@@ -603,15 +941,7 @@ export class MapSystem extends AbstractSystem {
       return Promise.resolve(t1);
     }
 
-    // convert that coordinate back to screen coordinate at z2
-    // worldToScreen formula: screen = (world - WORLD_HALF) * 2^(z - WORLD_ZOOM) + [tx, ty]
-    // For center to land on `world`: tx = center - (world - WORLD_HALF) * k2 / 2^WORLD_ZOOM
-    const world = projWgs84ToWorld(loc2);
-    const k2 = 2 ** z2;
-    const x2 = -((world[0] - WORLD_HALF) * k2 / WORLD_SCALE) + center[0];
-    const y2 = -((world[1] - WORLD_HALF) * k2 / WORLD_SCALE) + center[1];
-
-    return this.setTransformAsync({ x: x2, y: y2, z: z2, r: r2 }, duration);
+    return this.setTransformAsync(this._transformFor(loc2, z2, r2), duration);
   }
 
 
@@ -673,9 +1003,20 @@ export class MapSystem extends AbstractSystem {
     if (Array.isArray(entities)) {
       extent = utilTotalExtent(entities, graph);
     } else {
-      extent = entities.extent();
+      extent = graph.extent(entities);
     }
-    if (!extent || !isFinite(extent.area())) return this;
+    return extent ? this.fitExtent(extent, duration) : this;
+  }
+
+
+  /**
+   * Adjust the map to fit to see the given extent
+   * @param  extent    Extent to fit in the map view, in WGS84 lon/lat
+   * @param  duration  Duration of the transition in milliseconds, defaults to 0ms (asap)
+   * @return this
+   */
+  public fitExtent(extent: Extent, duration: number = 0): this {
+    if (!isFinite(extent.area())) return this;
 
     const z2 = numClamp(this.trimmedExtentZoom(extent), 0, 20);
     return this.setMapParams(extent.center(), z2, undefined, duration);
@@ -690,6 +1031,7 @@ export class MapSystem extends AbstractSystem {
   public selectEntityID(entityID: EntityID, fitEntity: boolean = false): void {
     const context = this.context;
     const editor = context.systems.editor!;
+    const graph = editor.staging.graph;
     const scene = context.systems.gfx!.scene!;
     const viewport = context.viewport;
 
@@ -700,12 +1042,12 @@ export class MapSystem extends AbstractSystem {
 
     const gotEntity = (entity: OsmEntity) => {
       const selectedIDs = context.selectedIDs();
-      if (context.mode?.id !== 'select-osm' || !selectedIDs.includes(entityID)) {
+      if (context.mode?.id !== 'select' || !selectedIDs.includes(entityID)) {
         scene.enableLayers('osm');
-        context.enter('select-osm', { selection: { osm: [entity.id] }} );
+        context.enter('select', { selection: [entity.id] });
       }
 
-      const entityExtent = entity.extent();
+      const entityExtent = graph.extent(entity);
       if (!entityExtent) return;
       const entityZoom = Math.min(this.trimmedExtentZoom(entityExtent), 20);  // the zoom that best shows the entity
       const isOffscreen = (entityExtent.percentContainedIn(viewport.visibleExtent()) < 0.8);
@@ -717,14 +1059,13 @@ export class MapSystem extends AbstractSystem {
       }
     };
 
-    const currGraph = editor.staging.graph;
-    let entity = currGraph.hasEntity(entityID);
+    let entity = graph.hasEntity(entityID);
     if (entity) {   // have it already
       gotEntity(entity);
     } else {   // need to load it first
       context.loadEntityAsync(entityID)
         .then(() => {  // At this point we expect it to be merged..
-          entity = currGraph.hasEntity(entityID);
+          entity = graph.hasEntity(entityID);
           if (!entity) return;  // give up
           gotEntity(entity);
         });
@@ -733,27 +1074,12 @@ export class MapSystem extends AbstractSystem {
 
 
   /**
-   * Selects a note by ID, loading it first if needed
+   * Selects a note by ID, the same way a link selects it: turns on the notes layer, loads the note
+   * first if needed, and moves the map to it.
    * @param  noteID  - noteID to select
    */
   public selectNoteID(noteID: number | string): void {
-    const context = this.context;
-    const osm = context.services.osm as any;
-    const scene = context.systems.gfx!.scene!;
-
-    if (!noteID || !osm) {
-      context.enter('browse');
-      return;
-    }
-
-    osm.loadNoteAsync(noteID)
-      .then((note: MarkerData) => {
-        if (!note.loc) return;
-        scene.enableLayers('notes');
-        const selection = new Map<DataID, MarkerData>().set(note.id, note);
-        context.enter('select', { selection: selection });
-        this.centerZoomEase(note.loc, 19);
-      });
+    this._restoreSelection([makeDataID('osm-notes', String(noteID))], true);
   }
 
 
@@ -888,22 +1214,31 @@ export class MapSystem extends AbstractSystem {
    */
   public trimmedExtent(extent?: Extent): Extent | this {
     if (extent === undefined) {
-      const headerY = 72;
-      const footerY = 30;
-// Add 50px overscan experiment, see UISystem.js
-// Maybe find a nicer way to include overscan and view padding into places like this.
-      // const pad = 10;
-      const pad = 70;
-      const viewport = this.context.viewport;
-      const [w, h] = viewport.dimensions;
-
-      return new Extent(
-        viewport.unproject([pad, h - footerY - pad]),  // bottom-left
-        viewport.unproject([w - pad, headerY + pad])   // top-right
-      );
+      return this._trimmedExtentOf(this.context.viewport);
     } else {
       return this.setMapParams(extent.center(), this.trimmedExtentZoom(extent));
     }
+  }
+
+
+  /**
+   * The extent that the given view shows, with padding for header, footer, etc.
+   * @param  view - The viewport to measure
+   * @return The trimmed extent
+   */
+  protected _trimmedExtentOf(view: Viewport): Extent {
+    const headerY = 72;
+    const footerY = 30;
+// Add 50px overscan experiment, see UISystem.js
+// Maybe find a nicer way to include overscan and view padding into places like this.
+    // const pad = 10;
+    const pad = 70;
+    const [w, h] = view.dimensions;
+
+    return new Extent(
+      view.unproject([pad, h - footerY - pad]),  // bottom-left
+      view.unproject([w - pad, headerY + pad])   // top-right
+    );
   }
 
 

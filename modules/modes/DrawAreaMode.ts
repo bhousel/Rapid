@@ -8,6 +8,7 @@ import { OsmNode, OsmWay } from '../data/index.ts';
 
 import type { Action } from '../actions/types.ts';
 import type { Context } from '../Context.ts';
+import type { EditLabel } from '../lib/Edit.ts';
 import type { EventData } from '../behaviors/AbstractBehavior.ts';
 import type { Graph } from '../lib/Graph.ts';
 import type { Midpoint } from '../actions/add_midpoint.ts';
@@ -56,6 +57,7 @@ export class DrawAreaMode extends AbstractMode {
   public constructor(context: Context) {
     super(context);
     this.id = 'draw-area';
+    this.interactiveSpatialIDs = new Set<SpatialID>(['osm']);   // only OSM can be drawn on
 
     this.defaultTags = {};
     this.drawWayID = null;    // The draw way just contains the way that we are drawing
@@ -119,7 +121,7 @@ export class DrawAreaMode extends AbstractMode {
     this.lastNodeID = null;
     this.firstNodeID = null;
     this._lastScreen = null;
-    this._selectedData.clear();
+    this._selectedIDs = [];
 
     eventManager.setCursor('crosshair');
 
@@ -142,7 +144,6 @@ export class DrawAreaMode extends AbstractMode {
 
     context.behaviors.mapInteraction!.doubleClickEnabled = false;
 
-    editor.setCheckpoint('beginDraw');
     this._editIndex = editor.index;
 
     return true;
@@ -164,8 +165,8 @@ export class DrawAreaMode extends AbstractMode {
     const context = this.context;
     const editor = context.systems.editor!;
     const gfx = context.systems.gfx!;
-    const layer = gfx.scene!.layers.get('osm')!;
     const eventManager = gfx.eventManager!;
+    const scene = gfx.scene!;
 
     eventManager.setCursor('grab');
 
@@ -188,21 +189,22 @@ export class DrawAreaMode extends AbstractMode {
     editor.revert();    // revert work-in-progress, i.e. the temporary drawing node
 
     // Confirm that the draw way exists and is valid..
-    // If any issues, revert back to how things were before we started.
+    // If any issues, undo the edits made while drawing, back to how things were before we started.
+    // Only if we're at one of them: an undo or redo that left the drawing (e.g. undo right after
+    // pressing "3", before the first click) is the user's, and stays done.
     const graph = editor.stable.graph;
     const drawWay = this.drawWayID ? graph.hasEntity(this.drawWayID) : undefined;
     if (!drawWay || drawWay.isDegenerate()) {
       if (DEBUG) {
         console.log('DrawAreaMode: draw way invalid, rolling back');  // eslint-disable-line no-console
       }
-      if (editor.index > this._editIndex!) {
-        while (editor.index !== this._editIndex) {
+      if (this._snapshots.has(graph)) {
+        while (editor.index > this._editIndex!) {
           editor.undo();
         }
-      } else if (editor.index < this._editIndex!) {
-        editor.restoreCheckpoint('beginDraw');
       }
     }
+    this._snapshots.clear();
 
     this.drawWayID = null;
     this.drawNodeID = null;
@@ -211,9 +213,9 @@ export class DrawAreaMode extends AbstractMode {
     this._editIndex = null;
     this._lastScreen = null;
 
-    this._selectedData.clear();
+    this._selectedIDs = [];
 
-    layer.clearClass('drawing');
+    scene.clearClass('drawing');
 
     globalThis.setTimeout(() => {
       context.behaviors.mapInteraction!.doubleClickEnabled = true;
@@ -225,17 +227,17 @@ export class DrawAreaMode extends AbstractMode {
 
   /**
    * Confirms that the drawing entities all exist in the graph after any modifications.
-   * Updates `selectedData` collection to include the draw way
+   * Updates `selectedIDs` to include the draw way
    * Updates `drawing` class for items that need it
    */
   protected _refreshEntities(): void {
     const context = this.context;
     const editor = context.systems.editor!;
     const gfx = context.systems.gfx!;
-    const layer = gfx.scene!.layers.get('osm')!;
+    const scene = gfx.scene!;
 
-    layer.clearClass('drawing');
-    this._selectedData.clear();
+    scene.clearClass('drawing');
+    this._selectedIDs = [];
 
     const graph = editor.staging.graph;
     const drawWay = this.drawWayID ? graph.hasEntity(this.drawWayID) : undefined;
@@ -251,25 +253,24 @@ export class DrawAreaMode extends AbstractMode {
 
     // `drawNode` may or may not exist, it will be recreated after the user moves the pointer.
     if (drawNode) {
-      layer.setClass('drawing', drawNode.id);
+      scene.setClass('drawing', drawNode.id);
 
       // Nudging at the edge of the map is allowed after the drawNode exists.
       context.behaviors.mapNudge!.allow();
     }
 
-    layer.setClass('drawing', drawWay.id);
-    this._selectedData.set(drawWay.id, drawWay);
+    scene.setClass('drawing', drawWay.id);
+    this._selectedIDs = [drawWay.id];
   }
 
 
   /**
-   * An annotation is a text associated with the edit, such as "Started an area".
-   * @return String such as "Started an area", or undefined if the drawWay is incomplete
+   * The label for the edit, such as "Started an area".
+   * @return Label such as "Started an area", or undefined if the drawWay is incomplete
    */
-  protected _getAnnotation(): string | undefined {
+  protected _getLabel(): EditLabel | undefined {
     const context = this.context;
     const editor = context.systems.editor!;
-    const l10n = context.systems.l10n!;
 
     const graph = editor.staging.graph;
     const drawWay = this.drawWayID ? graph.hasEntity(this.drawWayID) as OsmWay | undefined : undefined;
@@ -277,7 +278,7 @@ export class DrawAreaMode extends AbstractMode {
     if (length < 4) return undefined;
 
     const which = length > 4 ? 'continue' : 'start';
-    return l10n.t(`operations.${which}.annotation.area`);
+    return { stringID: `operations.${which}.annotation.area` };
   }
 
 
@@ -334,7 +335,7 @@ export class DrawAreaMode extends AbstractMode {
     } else if (target?.type === 'way') {
       const way = target as OsmWay;
       // A way will have LineString or Polygon geometry. We can use 'outer' to get these points.
-      const line = way.geoms.parts[0]!.world!.outer as Vec2[];
+      const line = graph.geometry(way).parts[0]!.world!.outer as Vec2[];
 
       // Exclude snapping to segments adjacent to the drawNode itself.
       const skipSegments = new Set<number>();
@@ -445,7 +446,7 @@ export class DrawAreaMode extends AbstractMode {
     } else if (target?.type === 'way') {
       const way = target as OsmWay;
       // A way will have LineString or Polygon geometry. We can use 'outer' to get these points.
-      const line = way.geoms.parts[0]!.world!.outer as Vec2[];
+      const line = graph.geometry(way).parts[0]!.world!.outer as Vec2[];
 
       // Exclude snapping to segments adjacent to the drawNode itself.
       const skipSegments = new Set<number>();
@@ -509,9 +510,9 @@ export class DrawAreaMode extends AbstractMode {
       }
 
       // If the area has enough segments, commit the work in progress so we can undo/redo to it.
-      const annotation = this._getAnnotation();
-      if (annotation) {
-        editor.commit({ annotation: annotation, selectedIDs: [drawWay.id] });
+      const label = this._getLabel();
+      if (label) {
+        editor.commit({ ...label, selectionAfter: [drawWay.id] });
         this._takeSnapshot(firstNode!.id, drawNode!.id);
       }
 
@@ -585,9 +586,9 @@ export class DrawAreaMode extends AbstractMode {
       );
 
       // If the area has enough segments, commit the work in progress so we can undo/redo to it.
-      const annotation = this._getAnnotation();
-      if (annotation) {
-        editor.commit({ annotation: annotation, selectedIDs: [drawWay.id] });
+      const label = this._getLabel();
+      if (label) {
+        editor.commit({ ...label, selectionAfter: [drawWay.id] });
         this._takeSnapshot(firstNode!.id, drawNode!.id);
       }
 
@@ -663,9 +664,9 @@ export class DrawAreaMode extends AbstractMode {
       );
 
       // If the area has enough segments, commit the work in progress so we can undo/redo to it.
-      const annotation = this._getAnnotation();
-      if (annotation) {
-        editor.commit({ annotation: annotation, selectedIDs: [drawWay.id] });
+      const label = this._getLabel();
+      if (label) {
+        editor.commit({ ...label, selectionAfter: [drawWay.id] });
         this._takeSnapshot(firstNode!.id, targetNode.id);
       }
 
@@ -756,7 +757,7 @@ export class DrawAreaMode extends AbstractMode {
       if (DEBUG) {
         console.log(`DrawAreaMode: _finish, drawWay.id = ${drawWay.id}`);  // eslint-disable-line no-console
       }
-      context.enter('select-osm', { selection: { osm: [drawWay.id] }, newFeature: true });
+      context.enter('select', { selection: [drawWay.id], newFeature: true });
     } else {
       context.enter('browse');
     }
@@ -805,10 +806,14 @@ export class DrawAreaMode extends AbstractMode {
    * Here we attempt to restore the drawing entityIDs from a snapshot.
    * If we ever find ourself in an edit where we can't retrieve this information, leave `DrawAreaMode`.
    * This means we've undo/redoed into an edit where the user wasn't drawing the same area.
+   * @param prevIndex - The history index before the jump
+   * @param currIndex - The history index after the jump
    */
-  protected _restoreSnapshot(): void {
+  protected _restoreSnapshot(prevIndex: number, currIndex: number): void {
     const context = this.context;
     const editor = context.systems.editor!;
+    const map = context.systems.map;   // optional
+
     const graph = editor.stable.graph;
     const snapshot = this._snapshots.get(graph);
 
@@ -820,14 +825,10 @@ export class DrawAreaMode extends AbstractMode {
       this.drawNodeID = null;   // will be recreated after the user moves the pointer
       this._refreshEntities();
 
-    } else {   // Otherwise, return to select or browse mode (MapSystem has similar code to this)
-      const checkIDs = editor.stable.selectedIDs ?? [];
-      const selectedIDs = checkIDs.filter(entityID => graph.hasEntity(entityID));
-      if (selectedIDs.length) {
-        context.enter('select-osm', { selection: { osm: selectedIDs }} );
-      } else {
-        context.enter('browse');
-      }
+    } else if (map) {   // Otherwise, select what any other undo or redo would select
+      map.restoreJumpSelection(prevIndex, currIndex);
+    } else {
+      context.enter('browse');
     }
   }
 

@@ -1,4 +1,5 @@
 import { AbstractPixiLayer } from './AbstractPixiLayer.ts';
+import { makeDataID } from '../data/dataID.ts';
 import { PixiFeatureLine } from './PixiFeatureLine.ts';
 import { PixiFeaturePoint } from './PixiFeaturePoint.ts';
 
@@ -176,7 +177,7 @@ export class PixiLayerKartaPhotos extends AbstractPixiLayer {
     const kartaview = this.context.services.kartaview;
     if (!kartaview?.started) return;
 
-    const parentContainer = this.scene.groups.get('streetview')!;
+    const parentContainer = this._spatialContainer('streetview', this.id);
     let markers = kartaview.getImages();
     let sequences = kartaview.getSequences();
 
@@ -186,7 +187,6 @@ export class PixiLayerKartaPhotos extends AbstractPixiLayer {
     // render sequences
     for (const d of sequences) {
       const dataID = d.id;
-      const version = d.v || 0;
       const part = d.geoms.parts[0];
 
       // Check that this part has coordinates and is a LineString
@@ -203,8 +203,7 @@ export class PixiLayerKartaPhotos extends AbstractPixiLayer {
       }
 
       // If sequence data has changed, replace it.
-      if (feature.v !== version) {
-        feature.v = version;
+      if (feature.data !== d || feature.geometry !== part) {   // changed data is a new object
         feature.geometry = part;
         feature.data = d;
       }
@@ -228,11 +227,14 @@ export class PixiLayerKartaPhotos extends AbstractPixiLayer {
       if (!feature) {
         feature = new PixiFeaturePoint(this, featureID);
         feature.parentContainer = parentContainer;
+      }
+
+      if (feature.data !== d || feature.geometry !== part) {   // changed data is a new object
         feature.geometry = part;
         feature.data = d;
 
         if (d.props.sequenceID) {
-          feature.addChildData(d.props.sequenceID as string, dataID);
+          feature.addChildData(makeDataID('kartaview-sequences', d.props.sequenceID as string), d.dataID);
         }
       }
 

@@ -142,6 +142,42 @@ describe('EsriService', () => {
       });
     });
 
+    describe('loaded data', () => {
+      const datasetID = '660457fac76344b195c555e0dff386ff';
+
+      // A layer the way `_loadDatasetLayersAsync` sets it up.
+      function layer(id) {
+        return { id: id, objectIdField: 'OBJECTID', fields: [], _cache: { seenIDs: new Set(), nextPage: new Map() } };
+      }
+
+      function building(objectID, x) {
+        const ring = [[x, 0], [x + 0.0001, 0], [x + 0.0001, 0.0001], [x, 0.0001], [x, 0]];
+        return { type: 'Feature', properties: { OBJECTID: objectID }, geometry: { type: 'Polygon', coordinates: [ring] } };
+      }
+
+      it('keeps features as GeoJSON, with data IDs from the layer and object ID', () => {
+        const ds = _esri._datasets.get(datasetID);
+        _esri._gotTile(ds, layer(0), { type: 'FeatureCollection', features: [building(7, 0), building(7, 0)] });
+        _esri._gotTile(ds, layer(2), { type: 'FeatureCollection', features: [building(7, 1)] });
+
+        const spatial = context.systems.spatial;
+        const a = spatial.getData(`${datasetID}:0-7`);
+        const b = spatial.getData(`${datasetID}:2-7`);
+        assert.instanceOf(a, Rapid.GeoJSONData);
+        assert.instanceOf(b, Rapid.GeoJSONData);
+        assert.strictEqual(a.props.datasetID, datasetID);
+        assert.strictEqual(a.properties.source, 'esri/Google_Africa_Buildings');
+        assert.lengthOf(spatial.getAllItems(datasetID), 2);   // the repeated feature is skipped
+      });
+
+      it('resetAsync clears the data', () => {
+        const ds = _esri._datasets.get(datasetID);
+        _esri._gotTile(ds, layer(0), { type: 'FeatureCollection', features: [building(7, 0)] });
+        return _esri.resetAsync()
+          .then(() => assert.isUndefined(context.systems.spatial.getData(`${datasetID}:0-7`)));
+      });
+    });
+
   });
 
 });

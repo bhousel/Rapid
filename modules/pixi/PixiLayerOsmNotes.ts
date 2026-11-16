@@ -18,7 +18,7 @@ export class PixiLayerOsmNotes extends AbstractPixiLayer {
    */
   public constructor(scene: PixiScene) {
     super(scene);
-    this.id = 'notes';
+    this.id = 'osm-notes';
   }
 
 
@@ -68,12 +68,11 @@ export class PixiLayerOsmNotes extends AbstractPixiLayer {
     const osm = this.context.services.osm;
     if (!osm?.started) return;
 
-    const parentContainer = this.scene.groups.get('qa')!;
+    const parentContainer = this._spatialContainer('qa', this.id);
     const notes = osm.getNotes();
 
     for (const d of notes) {
       const dataID = d.id;
-      const version = d.v || 0;
       const part = d.geoms.parts[0];
       if (!part?.world || part?.type !== 'Point') continue;
 
@@ -86,9 +85,8 @@ export class PixiLayerOsmNotes extends AbstractPixiLayer {
         feature.parentContainer = parentContainer;
       }
 
-      // If data has changed, replace it..
-      if (feature.v !== version) {
-        feature.v = version;
+      // If data has changed, replace it.. (Changed data is a new object: data isn't changed in place.)
+      if (feature.data !== d || feature.geometry !== part) {
         feature.geometry = part;
         feature.data = d;
       }

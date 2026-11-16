@@ -73,7 +73,7 @@ export class PixiLayerOsmose extends AbstractPixiLayer {
     osmose.loadTiles();
 
     // Render the data that we have..
-    const parentContainer = this.scene.groups.get('qa')!;
+    const parentContainer = this._spatialContainer('qa', this.id);
     const items = osmose.getData();
 
     for (const d of items) {
@@ -93,6 +93,9 @@ export class PixiLayerOsmose extends AbstractPixiLayer {
         feature = new PixiFeaturePoint(this, featureID);
         feature.style = style;
         feature.parentContainer = parentContainer;
+      }
+
+      if (feature.data !== d || feature.geometry !== part) {   // changed data is a new object
         feature.geometry = part;
         feature.data = d;
       }

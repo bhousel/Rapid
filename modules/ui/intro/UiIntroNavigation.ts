@@ -2,7 +2,7 @@ import { DEG2RAD, Extent, vecEqual } from '@rapid-sdk/math';
 import { select } from 'd3-selection';
 import { AbstractIntroChapter } from './AbstractIntroChapter.ts';
 import { uiIcon } from '../icon.ts';
-import { delayAsync, eventCancel, helpHtml, icon, transitionTime } from './helper.ts';
+import { delayAsync, eventCancel, helpHtml, icon } from './helper.ts';
 
 import type { Context } from '../../Context.ts';
 import type { IntroStep } from './AbstractIntroChapter.ts';
@@ -55,7 +55,7 @@ export class UiIntroNavigation extends AbstractIntroChapter {
     const editor = context.systems.editor!;
     const graph = editor.staging.graph;
     if (!graph.hasEntity(this._townHallID)) return false;
-    if (context.mode?.id !== 'select-osm') return false;
+    if (context.mode?.id !== 'select') return false;
     const ids = context.selectedIDs();
     return ids.length === 1 && ids[0] === this._townHallID;
   }
@@ -73,7 +73,7 @@ export class UiIntroNavigation extends AbstractIntroChapter {
     const editor = context.systems.editor!;
     const graph = editor.staging.graph;
     if (!graph.hasEntity(this._springStreetID)) return false;
-    if (context.mode?.id !== 'select-osm') return false;
+    if (context.mode?.id !== 'select') return false;
     const ids = context.selectedIDs();
     return ids.length === 1 && ids[0] === this._springStreetID;
   }
@@ -92,7 +92,7 @@ export class UiIntroNavigation extends AbstractIntroChapter {
     editor.restoreCheckpoint('initial');
 
     const loc = this._townHallExtent.center();
-    const msec = transitionTime(loc, map.center() as Vec2);
+    const msec = map.easeDuration(loc, 19);
     if (msec > 0) curtain.hide();
 
     await map.setMapParamsAsync(loc, 19, 0, msec);
@@ -369,7 +369,7 @@ export class UiIntroNavigation extends AbstractIntroChapter {
     editor.restoreCheckpoint('initial');
 
     const loc = this._townHallExtent.center();
-    const msec = transitionTime(loc, map.center() as Vec2);
+    const msec = map.easeDuration(loc, 19);
     if (msec > 0) curtain.hide();
 
     await map.setMapParamsAsync(loc, 19, undefined, msec);
@@ -572,7 +572,7 @@ export class UiIntroNavigation extends AbstractIntroChapter {
     editor.restoreCheckpoint('initial');  // ensure spring street exists
 
     const loc = this._springStreetExtent.center();
-    const msec = transitionTime(loc, map.center() as Vec2);
+    const msec = map.easeDuration(loc, 19);
     if (msec > 0) curtain.hide();
 
     await map.setMapParamsAsync(loc, 19, 0, msec);

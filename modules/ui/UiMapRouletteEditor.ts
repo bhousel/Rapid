@@ -8,7 +8,7 @@ import { utilNoAuto } from '../util/index.ts';
 
 import type { Context } from '../Context.ts';
 import type { D3EnterSelection, D3Selection } from 'd3-selection';
-import type { MapRouletteTask } from '../services/MapRouletteService.ts';
+import type { MapRouletteTask, MapRouletteTaskProps } from '../services/MapRouletteService.ts';
 
 
 /**
@@ -49,7 +49,10 @@ export class UiMapRouletteEditor extends EventEmitter {
   public $parent: D3Selection | null;
 
   protected _actionTaken: string;
-  protected _apikey: string | null;
+  // MapRoulette auth is turned off: MapRoulette stopped storing API keys in the OSM user preferences
+  // and expired the old ones, so Rapid submits without one for now (see "MapRoulette authentication"
+  // in `.scratchpad/backlog.md`, and https://community.openstreetmap.org/t/maproulette-security-incident-october-2026).
+  // protected _apikey: string | null;
   protected _user: any;
 
 
@@ -61,7 +64,7 @@ export class UiMapRouletteEditor extends EventEmitter {
     this.context = context;
     this.datum = null;
     this._actionTaken = '';
-    this._apikey = null;
+    // this._apikey = null;   // MapRoulette auth is turned off (see `_apikey`)
     this._user = null;
 
     // Create child components
@@ -167,20 +170,21 @@ export class UiMapRouletteEditor extends EventEmitter {
   }
 
 
-  /** Fetch the user's MapRoulette API key from their OSM preferences. */
-  protected _getApiKeyAsync(): Promise<string | null> {
-    const osm = this.context.services.osm!;
-    return osm.getUserPreferencesAsync()
-      .then((prefs: any) => {
-        this._apikey = prefs.maproulette_apikey_v2;
-        return this._apikey;
-      })
-      .catch((err: unknown) => {
-        this._apikey = null;
-        console.error(err);  // eslint-disable-line no-console
-        return null;
-      });
-  }
+  // MapRoulette auth is turned off (see `_apikey`)
+  // /** Fetch the user's MapRoulette API key from their OSM preferences. */
+  // protected _getApiKeyAsync(): Promise<string | null> {
+  //   const osm = this.context.services.osm!;
+  //   return osm.getUserPreferencesAsync()
+  //     .then((prefs: any) => {
+  //       this._apikey = prefs.maproulette_apikey_v2;
+  //       return this._apikey;
+  //     })
+  //     .catch((err: unknown) => {
+  //       this._apikey = null;
+  //       console.error(err);  // eslint-disable-line no-console
+  //       return null;
+  //     });
+  // }
 
 
   /**
@@ -188,12 +192,14 @@ export class UiMapRouletteEditor extends EventEmitter {
    * @param $selection - A d3-selection to the HTMLElement this section renders into
    */
   protected _saveSection($selection: D3Selection): void {
-    const errID = this.datum?.id;
-    const isSelected = errID && this.context.selectedData().has(errID);
+    const dataID = this.datum?.dataID;
+    const isSelected = dataID && this.context.selectedIDs().includes(dataID);
     const isShown = (this.datum && isSelected);
 
+    // Keyed by the task's ID, not its `key`: a new version of the same task (a status, a comment)
+    // updates these sections, instead of replacing them while the user works in them.
     let $saveSection: D3Selection = $selection.selectAll('.mr-save')
-      .data(isShown ? [this.datum!] : [], (d: MapRouletteTask) => d.key!);
+      .data(isShown ? [this.datum!] : [], (d: MapRouletteTask) => d.id);
 
     // exit
     $saveSection.exit()
@@ -219,26 +225,21 @@ export class UiMapRouletteEditor extends EventEmitter {
   protected _commentSaveSection($selection: D3Selection): void {
     const context = this.context;
     const l10n = context.systems.l10n!;
-    const maproulette = context.services.maproulette!;
 
-    const errID = this.datum?.id;
-    const isSelected = errID && context.selectedData().has(errID);
+    const dataID = this.datum?.dataID;
+    const isSelected = dataID && context.selectedIDs().includes(dataID);
 
     let $commentSave: D3Selection = $selection.selectAll('.note-save')
-      .data(isSelected && this._actionTaken ? [this.datum!] : [], (d: MapRouletteTask) => d.key!);
+      .data(isSelected && this._actionTaken ? [this.datum!] : [], (d: MapRouletteTask) => d.id);
 
     const changeInput = (e: Event): void => {
       const $input = select(e.currentTarget as HTMLTextAreaElement);
       const val = ($input.property('value') as string).trim() || undefined;
 
-      this.datum!.props.newComment = val;
-      this.datum!.touch();
-      if (maproulette) {
-        maproulette.replaceItem(this.datum!);  // update note cache
-      }
+      this._updateTask({ newComment: val });
 
       $commentSave
-        .call(this._saveButtons);
+        .call(this._submitButtons);
     };
 
     // exit
@@ -303,10 +304,10 @@ export class UiMapRouletteEditor extends EventEmitter {
       .data([0]);
 
     const updateAuthWarning = ($sel: D3Selection, messageKey: string): void => {
-      const isAuthenticated = (this._user && this._apikey);
+      const isAuthenticated = !!this._user;   // MapRoulette auth is turned off (see `_apikey`): `(this._user && this._apikey)`
 
       if (isAuthenticated) {
-        $sel.exit()
+        $detailSection.selectAll('.auth-warning')
           .transition()
           .duration(200)
           .style('opacity', 0)
@@ -325,27 +326,28 @@ export class UiMapRouletteEditor extends EventEmitter {
           .append('span')
           .text(l10n.t(messageKey));
 
-        if (messageKey === 'map_data.layers.maproulette.loginMaproulette') {
-          // If the message is for MapRoulette login, change the link destination
-          $$auth
-            .append('a')
-            .attr('target', '_blank')
-            .attr('href', 'https://maproulette.org/dashboard')
-            .call(uiIcon('#rapid-icon-out-link', 'inline'))
-            .append('span')
-            .text(l10n.t('login'));
-        } else {
-          $$auth
-            .append('a')
-            .attr('target', '_blank')
-            .call(uiIcon('#rapid-icon-out-link', 'inline'))
-            .append('span')
-            .text(l10n.t('login'))
-            .on('click', (e: PointerEvent) => {
-              e.preventDefault();
-              osm.authenticate();
-            });
-        }
+        // MapRoulette auth is turned off (see `_apikey`)
+        // if (messageKey === 'map_data.layers.maproulette.loginMaproulette') {
+        //   // If the message is for MapRoulette login, change the link destination
+        //   $$auth
+        //     .append('a')
+        //     .attr('target', '_blank')
+        //     .attr('href', 'https://maproulette.org/dashboard')
+        //     .call(uiIcon('#rapid-icon-out-link', 'inline'))
+        //     .append('span')
+        //     .text(l10n.t('login'));
+        // } else {
+        $$auth
+          .append('a')
+          .attr('target', '_blank')
+          .call(uiIcon('#rapid-icon-out-link', 'inline'))
+          .append('span')
+          .text(l10n.t('login'))
+          .on('click', (e: PointerEvent) => {
+            e.preventDefault();
+            osm.authenticate();
+          });
+        // }
 
         $$auth
           .transition()
@@ -356,14 +358,16 @@ export class UiMapRouletteEditor extends EventEmitter {
 
     updateAuthWarning($authWarning, 'map_data.layers.maproulette.login');
 
-    this._getApiKeyAsync()
-      .then(() => {
-        updateAuthWarning($authWarning, 'map_data.layers.maproulette.loginMaproulette');
-      });
+    // MapRoulette auth is turned off (see `_apikey`)
+    // this._getApiKeyAsync()
+    //   .then(() => {
+    //     updateAuthWarning($authWarning, 'map_data.layers.maproulette.loginMaproulette');
+    //   });
 
     osm.getUserDetailsAsync()
       .then((user: any) => {
         this._user = user;
+        updateAuthWarning($authWarning, 'map_data.layers.maproulette.login');
         const $userLink = select(document.createElement('div'));
 
         const href = user?.img?.href;
@@ -398,16 +402,21 @@ export class UiMapRouletteEditor extends EventEmitter {
     const context = this.context;
     const l10n = context.systems.l10n!;
     const maproulette = context.services.maproulette!;
+    const osm = context.services.osm!;
     const ui = context.systems.ui;
 
-    this._getApiKeyAsync()
+    // MapRoulette auth is turned off (see `_apikey`), so this only waits for the OSM user
+    // this._getApiKeyAsync()
+    osm.getUserDetailsAsync()
+      .then((user: any) => { this._user = user; })
+      .catch(() => { this._user = null; })
       .then(() => {
-        const hasAuth = (this._user && this._apikey);
-        const errID = this.datum?.id;
-        const isSelected = errID && context.selectedData().has(errID);
+        const hasAuth = !!this._user;   // was `(this._user && this._apikey)`
+        const dataID = this.datum?.dataID;
+        const isSelected = dataID && context.selectedIDs().includes(dataID);
 
-        // Check if the MapRoulette menu is showing
-        if ((ui as any)?._showsMapRouletteMenu) {
+        // Check if the MapRoulette menu is showing, or the user chose an action and is writing the comment
+        if ((ui as any)?._showsMapRouletteMenu || this._actionTaken) {
           $selection.selectAll('.mr-save .buttons').style('display', 'none');
           return;
         } else {
@@ -419,7 +428,7 @@ export class UiMapRouletteEditor extends EventEmitter {
         };
 
         let $buttons: D3Selection = $selection.selectAll('.buttons')
-          .data(isSelected ? [this.datum!] : [], (d: MapRouletteTask) => d.key!);
+          .data(isSelected ? [this.datum!] : [], (d: MapRouletteTask) => d.id);
 
         // exit
         $buttons.exit()
@@ -529,10 +538,10 @@ export class UiMapRouletteEditor extends EventEmitter {
     const context = this.context;
     const l10n = context.systems.l10n!;
 
-    const errID = this.datum?.id;
-    const isSelected = errID && context.selectedData().has(errID);
+    const dataID = this.datum?.dataID;
+    const isSelected = dataID && context.selectedIDs().includes(dataID);
     let $buttons: D3Selection = $selection.selectAll('.buttons')
-      .data(isSelected ? [this.datum!] : [], (d: MapRouletteTask) => d.key!);
+      .data(isSelected ? [this.datum!] : [], (d: MapRouletteTask) => d.id);
 
     // exit
     $buttons.exit()
@@ -573,7 +582,7 @@ export class UiMapRouletteEditor extends EventEmitter {
    */
   protected _fixedIt(e: PointerEvent, d: MapRouletteTask): void {
     (e.currentTarget as HTMLElement).blur();    // avoid keeping focus on the button - iD#4641
-    d.props._status = 1;
+    this._updateTask({ _status: 1 }, d);
     this._actionTaken = 'FIXED';
     this._setSaveButtonVisibility(true);
     this.render();
@@ -587,7 +596,7 @@ export class UiMapRouletteEditor extends EventEmitter {
    */
   protected _cantComplete(e: PointerEvent, d: MapRouletteTask): void {
     (e.currentTarget as HTMLElement).blur();    // avoid keeping focus on the button - iD#4641
-    d.props._status = 6;
+    this._updateTask({ _status: 6 }, d);
     this._actionTaken = `CAN'T COMPLETE`;
     this._setSaveButtonVisibility(true);
     this.render();
@@ -600,7 +609,7 @@ export class UiMapRouletteEditor extends EventEmitter {
    */
   protected _alreadyFixed(e: PointerEvent, d: MapRouletteTask): void {
     (e.currentTarget as HTMLElement).blur();    // avoid keeping focus on the button - iD#4641
-    d.props._status = 5;
+    this._updateTask({ _status: 5 }, d);
     this._actionTaken = 'ALREADY FIXED';
     this._setSaveButtonVisibility(true);
     this.render();
@@ -613,7 +622,7 @@ export class UiMapRouletteEditor extends EventEmitter {
    */
   protected _notAnIssue(e: PointerEvent, d: MapRouletteTask): void {
     (e.currentTarget as HTMLElement).blur();    // avoid keeping focus on the button - iD#4641
-    d.props._status = 2;
+    this._updateTask({ _status: 2 }, d);
     this._actionTaken = 'NOT AN ISSUE';
     this._setSaveButtonVisibility(true);
     this.render();
@@ -627,7 +636,7 @@ export class UiMapRouletteEditor extends EventEmitter {
   protected _clickCancel(e: PointerEvent, d: MapRouletteTask): void {
     (e.currentTarget as HTMLElement).blur();    // avoid keeping focus on the button - iD#4641
     this._actionTaken = '';
-    d.props._status = '';
+    this._updateTask({ _status: '' }, d);
     this._setSaveButtonVisibility(false);
     this.render();
   }
@@ -643,15 +652,16 @@ export class UiMapRouletteEditor extends EventEmitter {
     const osm = context.services.osm!;
 
     (e.currentTarget as HTMLElement).blur();    // avoid keeping focus on the button - iD#4641
-    const userID = (osm as any)._userDetails.id;
+    const userID = (osm as any)._userDetails?.id;
 
-    const props = d.props as any;
-    props.taskStatus = props._status;
-    props.mapRouletteApiKey = this._apikey;
-    props.comment = select('.new-comment-input').property('value').trim();
-    props.taskId = d.id;
-    props.userId = userID;
-    maproulette.postUpdate(d, (err: string | null, item?: MapRouletteTask) => {
+    const task = this._updateTask({
+      taskStatus: d.props._status || undefined,
+      // mapRouletteApiKey: this._apikey ?? undefined,   // MapRoulette auth is turned off (see `_apikey`)
+      comment: select('.new-comment-input').property('value').trim(),
+      taskId: d.id,
+      userId: userID
+    }, d);
+    maproulette.postUpdate(task, (err: string | null, item?: MapRouletteTask) => {
       if (err) {
         console.error(err);  // eslint-disable-line no-console
         return;
@@ -659,8 +669,29 @@ export class UiMapRouletteEditor extends EventEmitter {
       this.emit('change', item);
       // Fly to a nearby task if the feature is enabled, after the update
       if (maproulette.nearbyTaskEnabled) {
-        maproulette.flyToNearbyTask(d);
+        maproulette.flyToNearbyTask(task);
       }
     });
+  }
+
+
+  /**
+   * Sets props on the task, as a new task in the cache (data isn't changed in place), and makes it
+   * this editor's datum.
+   * It starts from the cached task, which may be newer than the one given: loading the challenge and
+   * the task details stores new tasks with them.
+   * @param props - the props to set
+   * @param task - the task to start from (defaults to the datum)
+   * @return The new task
+   */
+  protected _updateTask(props: Partial<MapRouletteTaskProps>, task: MapRouletteTask = this.datum!): MapRouletteTask {
+    const context = this.context;
+    const maproulette = context.services.maproulette;
+
+    const current = maproulette?.getTask(task.id) ?? task;
+    const updated = current.update(props);
+    maproulette?.replaceItem(updated);
+    this.datum = updated;
+    return updated;
   }
 }

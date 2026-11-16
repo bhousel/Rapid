@@ -25,7 +25,6 @@ export function validateCloseNodes(context: Context): ValidatorFunction {
   const editor = context.systems.editor!;
   const l10n = context.systems.l10n!;
   const schema = context.systems.schema;
-  const spatial = context.systems.spatial!;
 
   const pointThresholdMeters = 0.2;
 
@@ -103,7 +102,7 @@ export function validateCloseNodes(context: Context): ValidatorFunction {
       if (way.nodes.length <= 2 || (way.isClosed() && way.nodes.length <= 4)) return false;
 
       // don't flag close nodes in very small ways
-      const bbox = way.extent()!.bbox();
+      const bbox = graph.extent(way)!.bbox();
       const hypotenuseMeters = geoSphericalDistance([bbox.minX, bbox.minY], [bbox.maxX, bbox.maxY]);
       if (hypotenuseMeters < 1.5) return false;
 
@@ -159,18 +158,11 @@ export function validateCloseNodes(context: Context): ValidatorFunction {
       for (const parentWay of parentWays) {
         if (!shouldCheckWay(parentWay)) continue;
 
-        const lastIndex = parentWay.nodes.length - 1;
-        for (let j = 0; j < parentWay.nodes.length; j++) {
-          if (j !== 0) {
-            if (parentWay.nodes[j-1] === node.id) {
-              checkForCloseness(node, graph.entity(parentWay.nodes[j]) as OsmNode, parentWay);
-            }
-          }
-          if (j !== lastIndex) {
-            if (parentWay.nodes[j+1] === node.id) {
-              checkForCloseness(graph.entity(parentWay.nodes[j]) as OsmNode, node, parentWay);
-            }
-          }
+        for (const nextID of parentWay.adjacentNodeIDs(node.id, 'after')) {
+          checkForCloseness(node, graph.entity(nextID) as OsmNode, parentWay);
+        }
+        for (const prevID of parentWay.adjacentNodeIDs(node.id, 'before')) {
+          checkForCloseness(graph.entity(prevID) as OsmNode, node, parentWay);
         }
       }
       return issues;
@@ -230,15 +222,15 @@ export function validateCloseNodes(context: Context): ValidatorFunction {
       const issues: ValidationIssue[] = [];
 
       const box = queryBox(node.loc!, pointThresholdMeters);
-      const spatialID = editor.spatialIDForGraph(graph);
-      const hits = spatial.getItemsAtBox(spatialID, box);
+      const nearby = editor.entitiesInBox(box, graph);   // as they are in this graph
 
       const isNode1Stol = (node.tags['memorial:type'] === 'stolperstein' || node.tags['memorial'] === 'stolperstein');
 
-      for (const hit of hits) {
-        const other = hit.contents as OsmNode;
-        if (other.id === node.id) continue;  // skip self
-        if (other.type !== 'node' || other.geometry(graph) !== 'point') continue;   // standalone points only
+      for (const entity of nearby) {
+        if (entity.id === node.id) continue;  // skip self
+        if (entity.type !== 'node' || entity.geometry(graph) !== 'point') continue;   // standalone points only
+
+        const other = entity as OsmNode;
 
         // Ignore stolperstein (https://wiki.openstreetmap.org/wiki/DE:Stolpersteine), they are expected to be close.
         const isNode2Stol = (other.tags['memorial:type'] === 'stolperstein' || other.tags['memorial'] === 'stolperstein');
@@ -357,7 +349,7 @@ export function validateCloseNodes(context: Context): ValidatorFunction {
         loc: node1.loc,
         autoArgs: [
           actionTryMergeNodes([node1.id, node2.id]),
-          l10n.t('issues.fix.merge_close_vertices.annotation')
+          { stringID: 'issues.fix.merge_close_vertices.annotation' }
         ],
         dynamicFixes: function(this: any) {
           return [
@@ -368,8 +360,8 @@ export function validateCloseNodes(context: Context): ValidatorFunction {
                 const entityIds = this.issue.entityIds;
                 editor.perform(actionMergeNodes([entityIds[1], entityIds[2]]));
                 editor.commit({
-                  annotation: l10n.t('issues.fix.merge_close_vertices.annotation'),
-                  selectedIDs: [ entityIds[1], entityIds[2] ]
+                  stringID: 'issues.fix.merge_close_vertices.annotation',
+                  selectionAfter: [ entityIds[1], entityIds[2] ]
                 });
               }
             }),

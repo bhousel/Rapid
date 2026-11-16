@@ -1,12 +1,11 @@
 import { Extent } from '@rapid-sdk/math';
 import { select } from 'd3-selection';
 import { AbstractIntroChapter } from './AbstractIntroChapter.ts';
-import { delayAsync, eventCancel, helpHtml, icon, transitionTime } from './helper.ts';
+import { delayAsync, eventCancel, helpHtml, icon } from './helper.ts';
 
 import type { Context } from '../../Context.ts';
 import type { IntroStep } from './AbstractIntroChapter.ts';
 import type { UiCurtain } from './UiCurtain.ts';
-import type { Vec2 } from '@rapid-sdk/math';
 
 
 const tulipLaneExtent = new Extent([-85.62991, 41.95568], [-85.62700, 41.95638]);
@@ -17,7 +16,8 @@ const tulipLaneExtent = new Extent([-85.62991, 41.95568], [-85.62700, 41.95638])
  * showing/hiding the AI roads, accepting a road, reviewing the resulting issue, and ignoring a road.
  */
 export class UiIntroRapid extends AbstractIntroChapter {
-  protected _tulipLaneID: string;
+  protected _tulipLaneID: EntityID;
+  protected _tulipLaneDataID: DataID;
 
 
   /**
@@ -27,7 +27,8 @@ export class UiIntroRapid extends AbstractIntroChapter {
   public constructor(context: Context, curtain: UiCurtain) {
     super(context, curtain);
     this.title = 'intro.rapid.title';
-    this._tulipLaneID = 'w-516';
+    this._tulipLaneID = 'w-516';                          // once accepted into OSM
+    this._tulipLaneDataID = 'rapid_intro_graph:w-516';    // the AI-assisted road, before that
   }
 
 
@@ -68,9 +69,9 @@ export class UiIntroRapid extends AbstractIntroChapter {
   /** @return `true` if the tutorial road is the single selected feature */
   protected _isTulipLaneSelected(): boolean {
     const context = this.context;
-    if (!['select', 'select-osm'].includes(context.mode?.id ?? '')) return false;
+    if (context.mode?.id !== 'select') return false;
     const ids = context.selectedIDs();
-    return ids.length === 1 && ids[0] === this._tulipLaneID;
+    return ids.length === 1 && (ids[0] === this._tulipLaneID || ids[0] === this._tulipLaneDataID);
   }
 
   /** @return `true` if the tutorial road currently exists in the working graph */
@@ -100,7 +101,7 @@ export class UiIntroRapid extends AbstractIntroChapter {
     rapid.enableDatasets('rapid_intro_graph');
 
     const loc = tulipLaneExtent.center();
-    const msec = transitionTime(loc, map.center() as Vec2);
+    const msec = map.easeDuration(loc, 18.5);
     if (msec > 0) curtain.hide();
 
     await map.setMapParamsAsync(loc, 18.5, 0, msec);
@@ -202,8 +203,8 @@ export class UiIntroRapid extends AbstractIntroChapter {
         });
       });
 
-      // check undo annotation to see what the user did
-      if ((editor.getUndoAnnotation() as any)?.type === 'rapid_accept_feature') {
+      // check the undo edit to see what the user did
+      if (editor.getUndoEdit()?.props.type === 'rapid_accept_feature') {
         return this._roadAcceptedAsync;
       } else {
         return this._selectRoadAsync;
@@ -227,7 +228,7 @@ export class UiIntroRapid extends AbstractIntroChapter {
       return await new Promise<IntroStep>((resolve, reject) => {
         this._rejectStep = reject;
         if (!this._isTulipLaneAccepted()) { resolve(this._selectRoadAsync); return; }
-        if (!this._isTulipLaneSelected()) context.enter('select-osm', { selection: { osm: [this._tulipLaneID] }});
+        if (!this._isTulipLaneSelected()) context.enter('select', { selection: [this._tulipLaneID] });
 
         this._onModeChange = reject;   // disallow mode change
 
@@ -254,7 +255,7 @@ export class UiIntroRapid extends AbstractIntroChapter {
     const curtain = this._curtain;
 
     if (!this._isTulipLaneAccepted()) return this._selectRoadAsync;
-    if (!this._isTulipLaneSelected()) context.enter('select-osm', { selection: { osm: [this._tulipLaneID] }});
+    if (!this._isTulipLaneSelected()) context.enter('select', { selection: [this._tulipLaneID] });
 
     const issuesButton = select('div.map-control.issues-control > button');
 
@@ -288,7 +289,7 @@ export class UiIntroRapid extends AbstractIntroChapter {
     return new Promise<IntroStep>((resolve, reject) => {
       this._rejectStep = reject;
       if (!this._isTulipLaneAccepted()) { resolve(this._selectRoadAsync); return; }
-      if (!this._isTulipLaneSelected()) context.enter('select-osm', { selection: { osm: [this._tulipLaneID] }});
+      if (!this._isTulipLaneSelected()) context.enter('select', { selection: [this._tulipLaneID] });
 
       const label = select('li.issue.severity-warning');
       curtain.reveal({
@@ -309,7 +310,7 @@ export class UiIntroRapid extends AbstractIntroChapter {
     const curtain = this._curtain;
 
     if (!this._isTulipLaneAccepted()) return this._selectRoadAsync;
-    if (!this._isTulipLaneSelected()) context.enter('select-osm', { selection: { osm: [this._tulipLaneID] }});
+    if (!this._isTulipLaneSelected()) context.enter('select', { selection: [this._tulipLaneID] });
 
     const undoButton = select('.map-toolbar button.undo-button');
 
@@ -370,7 +371,7 @@ export class UiIntroRapid extends AbstractIntroChapter {
     rapid.enableDatasets('rapid_intro_graph');
 
     const loc = tulipLaneExtent.center();
-    const msec = transitionTime(loc, map.center() as Vec2);
+    const msec = map.easeDuration(loc, 18.5);
     if (msec > 0) curtain.hide();
 
     await map.setMapParamsAsync(loc, 18.5, 0, msec);
@@ -380,7 +381,7 @@ export class UiIntroRapid extends AbstractIntroChapter {
         this._rejectStep = reject;
 
         this._onModeChange = () => {
-          if (!context.selectedIDs().includes(this._tulipLaneID)) return;
+          if (!context.selectedIDs().includes(this._tulipLaneDataID)) return;
           resolve(this._ignoreRoadAsync);
         };
 
@@ -417,8 +418,8 @@ export class UiIntroRapid extends AbstractIntroChapter {
         });
       });
 
-      // check undo annotation to see what the user did
-      if ((editor.getUndoAnnotation() as any)?.type === 'rapid_ignore_feature') {
+      // check the undo edit to see what the user did
+      if (editor.getUndoEdit()?.props.type === 'rapid_ignore_feature') {
         return this._playAsync;
       } else {
         return this._selectRoadAgainAsync;

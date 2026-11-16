@@ -70,6 +70,65 @@ describe('validateOutdatedTags', () => {
     assert.deepInclude(issues[0], expected);
   });
 
+  it('upgrade fix changes the deprecated tags', () => {
+    const w = new Rapid.OsmWay(context, { tags: { highway: 'ford' }});
+    const g = new Rapid.Graph(context, [w]);
+    const issues = validator(w, g).issues;
+    const [action] = issues[0].autoArgs;
+
+    const result = action(new Rapid.Graph(g));
+    assert.deepEqual(result.entity(w.id).tags, { ford: 'yes' });
+  });
+
+  it('upgrade fix leaves the entity untouched when the tags are already upgraded', () => {
+    const w = new Rapid.OsmWay(context, { tags: { highway: 'ford' }});
+    const g = new Rapid.Graph(context, [w]);
+    const issues = validator(w, g).issues;
+    const [action] = issues[0].autoArgs;
+
+    const upgraded = w.update({ tags: { ford: 'yes' } });
+    const graph = new Rapid.Graph(new Rapid.Graph(context, [upgraded]));
+
+    const result = action(graph);
+    assert.strictEqual(result.hasEntity(w.id), upgraded);
+  });
+
+  it('tag-as-not fix leaves the entity untouched when it is already tagged as not that brand', () => {
+    // A name-suggestion-index match for the brand that the node is already tagged as not
+    const matched = { mainTag: 'brand:wikidata', tags: { 'brand:wikidata': 'Q1' }, displayName: 'Brand' };
+    const nsi = {
+      status: 'ok',
+      upgradeTags: tags => ({ newTags: { ...tags, brand: 'Brand', 'brand:wikidata': 'Q1' }, matched: matched })
+    };
+    let performed;
+    const editor = { perform: action => { performed = action; }, commit: () => {} };
+
+    const prevEditor = context.systems.editor;
+    context.systems.editor = editor;
+    context.services.nsi = nsi;
+    try {
+      const nsiValidator = Rapid.validateOutdatedTags(context);
+      const n = new Rapid.OsmNode(context, {
+        loc: [0, 0],
+        tags: { amenity: 'cafe', name: 'Brand', 'not:brand:wikidata': 'Q1' }
+      });
+      const g = new Rapid.Graph(context, [n]);
+      const issues = nsiValidator(n, g).issues;
+      assert.lengthOf(issues, 1);
+
+      const fixes = issues[0].dynamicFixes();
+      assert.lengthOf(fixes, 2);
+      fixes[1].onClick();   // "tag as not Brand"
+
+      const graph = new Rapid.Graph(g);
+      const result = performed(graph);
+      assert.strictEqual(result.hasEntity(n.id), n);
+    } finally {
+      context.systems.editor = prevEditor;
+      delete context.services.nsi;
+    }
+  });
+
   it('ignores multipolygon tagged on the relation', () => {
     const w = new Rapid.OsmWay(context);
     const r = new Rapid.OsmRelation(context, {

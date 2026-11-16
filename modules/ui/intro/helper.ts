@@ -1,4 +1,4 @@
-import { geoSphericalDistance, vecNormalizedDot } from '@rapid-sdk/math';
+import { vecNormalizedDot } from '@rapid-sdk/math';
 import { utilCmd } from '../../util/cmd.ts';
 
 import type { Context } from '../../Context.ts';
@@ -276,24 +276,6 @@ export function isMostlySquare(points: Vec2[]): boolean {
   }
 
   return true;
-}
-
-
-/**
- * Take a bit more time if the locations are further apart
- * @param   loc1  `Array` [lon,lat]
- * @param   loc2  `Array` [lon,lat]
- * @return  milliseconds to ease from `loc1` to `loc2`
- */
-export function transitionTime(loc1: Vec2, loc2: Vec2): number {
-  const dist = geoSphericalDistance(loc1, loc2);
-  if (dist < 1e-4) {
-    return 0;
-  } else if (dist < 200) {   // meters
-    return 500;
-  } else {
-    return 1000;
-  }
 }
 
 

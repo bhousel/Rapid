@@ -8,7 +8,7 @@ Operations wrap one or more actions and provide:
 - Availability checks (can this operation be performed on the selection?)
 - Keyboard shortcut bindings
 - User-facing labels and tooltips
-- Undo annotations
+- Undo/redo labels for the edits they make
 
 Every operation is a class that extends [`AbstractOperation`](AbstractOperation.ts). An operation is
 constructed against a specific selection, computes whatever derived state it needs up front, and
@@ -53,7 +53,7 @@ operation.id;             // Operation identifier
 operation.keys;           // Keyboard shortcuts
 operation.title;          // Display title
 operation.tooltip();      // Tooltip text (explains why, if disabled)
-operation.annotation();   // Undo annotation text
+operation.editLabel();    // Undo/redo label: a string ID and params, translated when shown
 operation.behavior;       // KeyOperationBehavior that binds the shortcuts (if any)
 ```
 

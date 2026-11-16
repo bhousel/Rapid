@@ -8,6 +8,7 @@ import { utilTotalExtent } from '../util/util.ts';
 import type { Extent, Vec2 } from '@rapid-sdk/math';
 import type { Action } from '../actions/types.ts';
 import type { Context } from '../Context.ts';
+import type { EditLabel } from '../lib/Edit.ts';
 import type { OsmEntity, OsmNode, OsmWay } from '../data/types.ts';
 import type { Graph } from '../lib/Graph.ts';
 
@@ -69,10 +70,8 @@ export class CircularizeOperation extends AbstractOperation {
     };
     combinedAction.transitionable = true;
 
-    const annotation = this.annotation();
-    editor
-      .performAsync(combinedAction)
-      .then(() => editor.commit({ annotation: annotation, selectedIDs: this.selectedIDs }));
+    const label = this.editLabel();
+    editor.animateAndCommitAsync(combinedAction, { ...label, selectionAfter: this.selectedIDs });
   }
 
 
@@ -143,9 +142,8 @@ export class CircularizeOperation extends AbstractOperation {
   }
 
 
-  public annotation(): string {
-    const l10n = this.context.systems.l10n!;
-    return l10n.t('operations.circularize.annotation.feature', { n: this._actions.length });
+  public editLabel(): EditLabel {
+    return { stringID: 'operations.circularize.annotation.feature', stringParams: { n: this._actions.length } };
   }
 
 

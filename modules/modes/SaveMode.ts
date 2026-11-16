@@ -8,6 +8,8 @@ import { UiSuccess } from '../ui/UiSuccess.ts';
 
 import type { Context } from '../Context.ts';
 import type { D3Selection, D3EnterSelection } from 'd3-selection';
+import type { OsmChangeset } from '../data/OsmChangeset.ts';
+import type { UploadChanges, UploadConflict } from '../core/UploaderSystem.ts';
 
 const DEBUG = false;
 
@@ -21,6 +23,8 @@ export class SaveMode extends AbstractMode {
   protected _location: string | null;
   /** Whether the save was successful */
   protected _wasSuccessfulSave: boolean;
+  /** The sidebar component holding the conflict screen, while it is shown */
+  protected _$conflicts: D3Selection | null;
 
   /** UI component for conflicts */
   public Conflicts: UiConflicts | null;
@@ -41,6 +45,7 @@ export class SaveMode extends AbstractMode {
 
     this._location = null;
     this._wasSuccessfulSave = false;
+    this._$conflicts = null;
 
     // Child Components
     this.Conflicts = null;
@@ -59,6 +64,7 @@ export class SaveMode extends AbstractMode {
     this._resultErrors = this._resultErrors.bind(this);
     this._resultNoChanges = this._resultNoChanges.bind(this);
     this._resultSuccess = this._resultSuccess.bind(this);
+    this._resultUnknown = this._resultUnknown.bind(this);
     this._saveEnded = this._saveEnded.bind(this);
     this._saveStarted = this._saveStarted.bind(this);
     this._showLoading = this._showLoading.bind(this);
@@ -117,6 +123,7 @@ export class SaveMode extends AbstractMode {
       .on('resultErrors', this._resultErrors)
       .on('resultNoChanges', this._resultNoChanges)
       .on('resultSuccess', this._resultSuccess)
+      .on('resultUnknown', this._resultUnknown)
       .on('saveEnded', this._saveEnded)
       .on('saveStarted', this._saveStarted)
       .on('willAttemptUpload', this._prepareForSuccess);
@@ -142,8 +149,11 @@ export class SaveMode extends AbstractMode {
     const uploader = context.systems.uploader!;
     const Sidebar = ui.Sidebar;
 
-    this.Conflicts?.removeAllListeners();
-    this.Conflicts = null;
+    // Leaving with the conflict screen up throws away its merges, like its Cancel button
+    if (this.Conflicts) {
+      this._closeConflicts();
+      uploader.cancelConflictResolution();
+    }
 
     this.Commit?.removeAllListeners();
     this.Commit = null;
@@ -200,10 +210,13 @@ export class SaveMode extends AbstractMode {
   /**
    * Handler called when upload results in conflicts with server data.
    * Displays the conflicts UI so the user can resolve them.
+   * (The arguments match what `UploaderSystem` emits; before October 2026 this skipped `changeset`,
+   *  so the conflict screen got the changeset as its conflict list and never opened.)
+   * @param  changeset - The changeset being uploaded
    * @param  conflicts - Array of conflict objects describing the conflicts
-   * @param  origChanges - The original changeset that caused the conflicts
+   * @param  origChanges - The original changes, offered for download as an osmChange file
    */
-  protected _resultConflicts(conflicts: any[], origChanges: any): void {
+  protected _resultConflicts(changeset: OsmChangeset, conflicts: UploadConflict[], origChanges: UploadChanges): void {
     const context = this.context;
     const uploader = context.systems.uploader!;
 
@@ -217,27 +230,40 @@ export class SaveMode extends AbstractMode {
       .classed('active', true)
       .classed('inactive', false);
 
+    this._$conflicts = $selection;
     this.Conflicts = new UiConflicts(context);
     this.Conflicts
       .conflictList(conflicts)
       .origChanges(origChanges)
       .on('cancel', () => {
-        $mainContent
-          .classed('active', false)
-          .classed('inactive', true);
-        $selection.remove();
+        this._closeConflicts();
         this._keybindingOn();
         uploader.cancelConflictResolution();
       })
       .on('save', () => {
-        $mainContent
-          .classed('active', false)
-          .classed('inactive', true);
-        $selection.remove();
+        this._closeConflicts();
         uploader.processResolvedConflicts();
       });
 
     $selection.call(this.Conflicts.render);
+  }
+
+
+  /**
+   * Removes the conflict screen (but leaves its merges alone, the caller decides what happens to them).
+   */
+  protected _closeConflicts(): void {
+    const context = this.context;
+
+    context.container().selectAll('.main-content')
+      .classed('active', false)
+      .classed('inactive', true);
+
+    this._$conflicts?.remove();
+    this._$conflicts = null;
+    this.Conflicts?.close();
+    this.Conflicts?.removeAllListeners();
+    this.Conflicts = null;
   }
 
 
@@ -247,10 +273,32 @@ export class SaveMode extends AbstractMode {
    * @param  errors - Array of error objects with msg and details properties
    */
   protected _resultErrors(errors: any[]): void {
+    this._keybindingOn();
+    this._showErrors(errors);
+  }
+
+
+  /**
+   * Handler called when we can't tell whether the upload went through.
+   * The uploader has left the edits in their backup, for the next start to check with the API, so
+   * this tab starts over: it resets, returns to browse mode, and tells the user.
+   * @param  errors - Array of error objects with msg and details properties
+   */
+  protected _resultUnknown(errors: any[]): void {
+    const context = this.context;
+    context.resetAsync()
+      .then(() => context.enter('browse'))
+      .then(() => this._showErrors(errors));
+  }
+
+
+  /**
+   * Displays an error dialog to the user.
+   * @param  errors - Array of error objects with msg and details properties
+   */
+  protected _showErrors(errors: any[]): void {
     const context = this.context;
     const l10n = context.systems.l10n!;
-
-    this._keybindingOn();
 
     const confirm = new UiConfirm(context).show();
     confirm.$heading!
@@ -330,7 +378,8 @@ export class SaveMode extends AbstractMode {
 
   /**
    * Handler called when upload succeeds.
-   * Shows the success screen and resets after a delay.
+   * Shows the success screen and resets after a delay.  Rapid stays in save mode until the reset,
+   * so nothing can be edited (see `_saveEnded`).
    * @param  changeset - The changeset object that was successfully uploaded
    */
   protected _resultSuccess(changeset: any): void {
@@ -372,7 +421,12 @@ export class SaveMode extends AbstractMode {
    * Note: This may occur after an error condition.
    */
   protected _saveEnded(): void {
-    this._keybindingOn();
+    // While the conflict screen is up, Escape belongs to it (its Cancel throws away the merges).
+    // After a successful save, the reset is the only way out: the history still holds the uploaded
+    // edits until then, and the reset would throw away anything edited after them.
+    if (!this.Conflicts && !this._wasSuccessfulSave) {
+      this._keybindingOn();
+    }
     this._hideLoading();
   }
 

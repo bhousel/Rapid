@@ -19,6 +19,19 @@ URL-encoding is therefore optional but can be used to encode URL-unsafe characte
 - `thing=%23one%2C%23two`   (same as `#one,#two`)
 - `thing=val%7Chttp%3A%2F%2Fexample.com`  (same as `val|http://example.com`)
 
+Rapid remembers the user's choices (layers, filters, imagery, datasets) in its settings.
+A URL parameter overrides those settings for that session only, without replacing them:
+a link can show different layers, and the user's own layers are back the next time they
+start Rapid without it.  (The choices the user makes while using the link are still saved.
+Some things are only ever for the session: `poweruser=true`, the photo filters, the MapRoulette
+challenges, and the 3D map.)
+
+The URL is mostly for starting Rapid a certain way.  Rapid only writes `map`, `id`, `photo` and
+`detection` into it as you go.  The other parameters stay in the URL as the link had them, until what
+you see no longer matches them (you change the layers, the imagery, the filters, …): then Rapid takes
+them out.  Taking one out of the URL yourself leaves things as they are.  (`locale` and `rtl` override
+what Rapid picks automatically, so taking one of those out goes back to that.)
+
 ### Initial only (these params take effect at init time)
 * __`assets`__ - Custom asset overrides as `assetID|url` pairs separated by commas. These
   can be used to override the default assets loaded by Rapid (e.g. schema presets, imagery index).<br/>
@@ -57,9 +70,45 @@ URL-encoding is therefore optional but can be used to encode URL-unsafe characte
 ### Responsive (you can change these anytime and Rapid will respond to the change)
 
 #### Selecting Features
-* __`id`__ - The character 'n', 'w', or 'r', followed by the OSM ID of a node, way or relation, respectively.
-  Selects the specified entity, and, unless a `map` parameter is also provided, centers the map on it.<br/>
-  _Example:_ `id=n1207480649`
+* __`id`__ - A comma-separated list of what's selected.  An OSM node, way or relation is the character
+  'n', 'w', or 'r', followed by its OSM ID.  Other data is `<source>:<id>`, e.g. a Rapid dataset's
+  feature (`fbRoads:<id>`) or a note (`osm-notes:<id>`).  The layers that draw what's selected are turned on (and a
+  Rapid dataset's feature turns on its dataset).  OSM entities and notes that aren't loaded yet are
+  downloaded, and the map moves to show what's selected if it isn't in view.  Other data is selected
+  when it loads, so it must be in view (with `map`).<br/>
+  _Example:_ `id=n1207480649`<br/>
+  _Example:_ `id=w123,fbRoads:abc,osm-notes:2`<br/>
+  Here are some of the sources.  The easiest way to get a feature's ID is to select it in Rapid and
+  copy `id=` from the URL.
+
+  | Source | `id=` | Selects |
+  |--------|-------|---------|
+  | OpenStreetMap | `n<id>`, `w<id>`, `r<id>` | A node, way, or relation |
+  | `osm-notes` | `osm-notes:<noteID>` | An OSM note |
+  | `maproulette` | `maproulette:<taskID>` | A MapRoulette task |
+  | `keepright` | `keepright:<errorID>` | A KeepRight issue |
+  | `osmose` | `osmose:<uuid>` | An Osmose issue |
+  | `geoscribble` | `geoscribble:<id>` | A GeoScribble drawing |
+  | `custom-<hash>` | `custom-<hash>:<id>` | A feature in the custom data from `data=` (the hash is of its URL or WKT) |
+
+  Each Rapid dataset is a source too, named by its datasetID (the same ID that `dataset_ids=` takes),
+  and selecting one of its features turns the dataset on.  Some of them:
+
+  | Dataset | `id=` |
+  |---------|-------|
+  | Facebook Roads | `fbRoads:<id>` |
+  | Microsoft Buildings | `msBuildings:<id>` |
+  | Overture Places | `overture-places:<id>` |
+  | Overture Buildings | `overture-buildings:<id>` |
+  | TomTom Roads (from Overture) | `overture-tomtom-roads:<id>` |
+  | United States Addresses (Esri, from the USDOT National Address Database) | `e75b56f13b404d7d8b47ef8be1c619ec:<layer>-<objectID>` |
+  | New Zealand Buildings (Esri, from LINZ) | `ef9136b079e24bbfb432be9bbdd246ff:<layer>-<objectID>` |
+
+  An Esri dataset's ID is its item ID on ArcGIS Online
+  (see [ArcGIS for OpenStreetMap](https://www.esriurl.com/ArcGIS4OSM)).
+  Overture features don't have stable IDs in Rapid yet (they're numbered as they load), so a link to
+  one won't find the same feature again.
+  Photos aren't selected with `id=`; use `photo=` and `detection=`.
 
 #### Map and Rendering
 * __`background`__ - The value of the `id` property of the source in Rapid's imagery list,
@@ -73,9 +122,16 @@ URL-encoding is therefore optional but can be used to encode URL-unsafe characte
   `points`, `traffic_roads`, `service_roads`, `paths`, `buildings`, `building_parts`,
   `indoor`, `landuse`, `boundaries`, `water`, `rail`, `pistes`, `aerialways`, `power`,
   `past_future`, `others`
+* __`layers`__ - A comma-separated list of the data layers to show.  The data layers not in the list are
+  hidden (an empty list hides them all).  Without it, Rapid shows the layers the user last chose.<br/>
+  _Example:_ `layers=osm,osm-notes,mapillary`<br/>
+  _Available layerIDs:_
+  `osm`, `osm-notes`, `rapid`, `maproulette`, `keepright`, `osmose`, `geoscribble`,
+  `mapillary`, `mapillary-detections`, `mapillary-signs`, `kartaview`, `streetside` (Microsoft Bing)
 * __`map`__ - A slash-separated `zoom/latitude/longitude/bearing`.  Bearing is optional and can be
    specified in degrees.  (The map bearing is the compass direction that is "up").<br/>
   _Example:_ `map=18.00/47.62051/-122.34930`, `map=18.00/39.95239/-75.16361/9.5`
+* __`map3d=true`__ - Shows the 3D map viewer.
 * __`offset`__ - Background imagery alignment offset in meters, formatted as `east,north`.<br/>
   _Example:_ `offset=-10,5`
 * __`overlays`__ - A comma-separated list of imagery sourceIDs to display as overlays
@@ -87,9 +143,6 @@ URL-encoding is therefore optional but can be used to encode URL-unsafe characte
 * __`photo`__ - The layerID and photoID of the photo to show.<br/>
   _Example:_ `photo=mapillary|1157313301398079`<br/>
   _Available prefixes:_ `streetside`, `mapillary`, `kartaview`
-* __`photo_overlay`__ - The street-level photo overlay layerIDs to enable.<br/>
-  _Example:_ `photo_overlay=streetside,mapillary,kartaview`<br/>
-  _Available values:_ `streetside` (Microsoft Bing), `mapillary`, `mapillary-signs`, `mapillary-detections`, `kartaview`
 * __`photo_dates`__ - The range of capture dates by which to filter street-level photos.
   Dates are given in YYYY-MM-DD format and separated by `|`. One-sided ranges are supported.<br/>
   _Example:_ `photo_dates=2019-01-01|2020-12-31`<br/>
@@ -101,16 +154,25 @@ URL-encoding is therefore optional but can be used to encode URL-unsafe characte
 #### Other Layers
 * __`data`__ - (or legacy name __`gpx`__) A custom data URL for loading a gpx track, vector data source,
   or URL-encoded [WKT](https://en.wikipedia.org/wiki/Well-known_text_representation_of_geometry)
-  POLYGON or MULTIPOLYGON text string to render as custom data.<br/>
+  POLYGON or MULTIPOLYGON text string to render as custom data.  It stays in the URL until the
+  custom data layer is turned off or other custom data is loaded, so a link can also select a
+  feature in it with `id=`.<br/>
   _Example:_ `data=https://tasks.hotosm.org/project/592/task/16.gpx`<br/>
   _Example:_ `data=POLYGON((-10%2010,%20-10%20-10,%2010%20-10,%2010%2010,%20-10%2010))`
-* __`datasets`__ - A comma-separated list of datasetIDs to enable.<br/>
-  _Example:_ `datasets=fbRoads,msBuildings,e75b56f13b404d7d8b47ef8be1c619ec`
-* __`maproulette`__ - Enable the MapRoulette task layer. Optionally provide a
-  comma-separated list of challenge IDs to filter the tasks shown.<br/>
-  _Example:_ `maproulette=true` -or- `maproulette=<challengeIDs>`
-* __`note`__ - Enable the Notes layer, optionally select a given note.<br/>
-  _Example:_ `note=true` -or- `note=<noteID>`
+* __`dataset_ids`__ - A comma-separated list of datasetIDs to enable.
+  (Before October 2026 this parameter was called `datasets`.)<br/>
+  _Example:_ `dataset_ids=fbRoads,msBuildings,e75b56f13b404d7d8b47ef8be1c619ec`
+* __`maproulette`__ - A comma-separated list of MapRoulette challenge IDs.  Only the tasks of
+  these challenges are shown, and the MapRoulette layer is turned on.<br/>
+  _Example:_ `maproulette=14763,23456`
+
+#### Legacy parameters
+Older links may still use these.  Rapid reads them, but doesn't keep them in the URL.
+* __`gpx`__ - The old name of `data`.  The URL keeps it as `data`.
+* __`maproulette=true`__ - Turned on the MapRoulette layer.  Now: `layers=…,maproulette`.
+* __`note`__ - `note=true` turned on the notes layer, and `note=<noteID>` selected a note.
+  Now: `layers=…,osm-notes` and `id=osm-notes:<noteID>`.
+* __`photo_overlay`__ - Turned on the photo layers it listed.  Now: `layers=`.
 
 #### Localization
 Rapid will choose a default locale based on the values suggested by your web browser
@@ -125,6 +187,9 @@ These parameters allow you to override Rapid's default behavior.
 If any asset files were specified in the `assets=` parameter, you can refer to them here.
 Files will be applied in the order that they are listed.  The keyword `default`
 means to apply the default assets in that position.
+* __`datasets`__ - A comma-separated list of assetIDs to load Rapid datasets from.
+  AssetIDs that can't be loaded are skipped.<br/>
+  _Example:_ `datasets=default,my_datasets`
 * __`imagery`__ - A comma-separated list of assetIDs to load imagery from.<br/>
   _Example:_ `imagery=default,my_imagery`
 * __`schema`__ - A comma-separated list of assetIDs to load schema (presets) from.<br/>
@@ -158,7 +223,7 @@ The startup process is split into three phases:
 
 2. **`initAsync()`** — Initializes all systems and services (loads default assets, sets up
    event listeners, establishes dependency graphs).  Implicitly calls `prepareAsync()` first.
-   After this resolves, you can call `merge()` on systems to customize schema, styles, or imagery.
+   After this resolves, you can call `merge()` on systems to customize schema, styles, imagery, or datasets.
 
 3. **`startAsync()`** — Starts all auto-start systems and services (begins network fetches,
    rendering, event dispatching).  Implicitly calls `initAsync()` first.
@@ -213,6 +278,10 @@ When you call `merge()`, you provide data grouped under scope identifiers.  The 
 creates scopes on demand, so you can introduce your own (e.g. `'my_custom_scope'`).
 Public-facing getters aggregate all scopes together into a single view.
 
+The `RapidSystem` reads its dataset definitions from asset files of the same shape, so one file
+can carry imagery, styles, and datasets together.  (Datasets aren't specific to a scope yet;
+use the `'*'` scope for them.)
+
 Each asset data file has this general shape:
 ```javascript
 {
@@ -228,7 +297,7 @@ Each asset data file has this general shape:
 
 ### Merge Semantics
 
-All three systems follow the same merge rules:
+All of these systems follow the same merge rules:
 * **Replace** — New items replace existing items that have the same ID.
 * **Delete** — Setting a value to `null` deletes that item.
 * **Wildcard delete** — `*` and `?` wildcards are allowed in the ID when deleting.
@@ -495,9 +564,98 @@ in a selector must match (AND semantics).  A rule can specify:
 Values can reference variables using `var()` syntax, e.g. `value: "var(paved_surfaces)"`.
 
 
+### Rapid Datasets
+
+Rapid's datasets (third party data that the user can review and add to OpenStreetMap)
+are managed by the `RapidSystem`.
+
+The catalog of datasets is built in layers:
+1. The datasets provided by services (MapWithAI, Esri, Overture).
+2. The datasets defined in asset files, in the order they're loaded or merged.
+   These can add datasets, or replace or delete the ones from services.
+3. The custom datasets that the user added themselves.
+
+At init time, Rapid loads the default dataset asset (`rapid_datasets`, currently empty).
+You can override which assets are loaded using the `datasets=` URL parameter, or customize
+them by calling `RapidSystem.merge(…)`.  The `dataset_ids=` URL parameter then chooses which
+datasets are enabled.
+
+A dataset without a `serviceID` is loaded by Rapid from its `sourceUrl`, once the user adds it
+to the Rapid menu.  The user can change its color, but not its definition.
+
+#### Dataset data format
+
+```javascript
+{
+  assetID: 'my_datasets',
+  assetVersion: '2026-10-20',
+
+  scopes: [{
+    scope: '*',
+
+    // Dataset definitions appear in a `datasets` block, keyed by datasetID
+    datasets: {
+      "my_sidewalks": {          // add or update a dataset
+        label: 'City Sidewalks',
+        description: 'Sidewalks and crossings published by the city',
+        categories: ['footways'],
+        color: '#ff8c00',
+        sourceUrl: 'https://example.com/data/sidewalks.geojson',
+        licenseUrl: 'https://example.com/license',
+        dataUsed: ['City Open Data'],
+
+        // How the source attributes become OSM tags
+        dictionary: {
+          transforms: [
+            { order: 0, function: 'ignore', source: 'OBJECTID', isID: true },
+            { order: 1, function: 'copy', source: 'highway', target: 'highway' },
+            { order: 2, function: 'copy', source: 'footway', target: 'footway' }
+          ]
+        },
+
+        // Matching against OSM: features that are already mapped are hidden
+        conflated: true,           // the on/off switch; the user can turn it off to see the raw data
+        conflation: {
+          showMatched: false,
+          rules: [{
+            source: { geometry: 'line' },
+            target: { geometry: 'line', props: [{ key: 'highway', value: 'footway' }] },
+            sameKeys: ['highway'],
+            sameDist: 3,
+            sameAngle: 30
+          }]
+        }
+      },
+      "fbRoads": null            // delete a dataset (wildcards are allowed)
+    }
+  }]
+}
+```
+
+#### Dataset properties
+
+These are still changing along with the conflation work.  The full list, with descriptions,
+is in `data/schema/dataset.schema.json`.
+
+* `label`, `description` — Display name and description
+  (or `labelStringID`, `descriptionStringID` to localize them)
+* `serviceID` — The service that provides the data.  Omit it for data that Rapid loads itself.
+* `sourceUrl` — URL for the data (currently `.geojson`, `.json`, `.gpx`, or `.kml`)
+* `categories` — Keywords for filtering the catalog (e.g. `buildings`, `footways`, `featured`, `preview`)
+* `color` — Display color, as a CSS hex color
+* `dataUsed` — Source attribution, added to the changeset
+* `extent` — Bounding extent, as `[[minLon, minLat], [maxLon, maxLat]]`
+* `itemUrl`, `licenseUrl`, `thumbnailUrl` — Links for more information, the license, and a thumbnail
+* `beta`, `featured`, `hidden` — Catalog flags
+* `conflated` — Whether to match the data against OSM using the `conflation` rules (the user can
+  turn this off to see the raw data)
+* `dictionary` — How the source attributes become OSM tags (`ignore`, `copy`, or `constant`)
+* `conflation` — Settings for matching the data against OSM (see `design/conflation-system.md`)
+
+
 ### JSON Schemas
 
-Rapid's imagery, schema, and styling data files may be validated against
+Rapid's imagery, schema, styling, and dataset data files may be validated against
 [JSON Schema](http://json-schema.org/draft-07/schema#) definitions located
 in the `data/schema/` directory.  The schemas are organized into a "main"
 datafile schema and component schemas for each domain type:
@@ -505,6 +663,7 @@ datafile schema and component schemas for each domain type:
 | Schema file | Description |
 |-------------|-------------|
 | `main.schema.json` | Main data file: `assetID`, `assetVersion`, `scopes[]` |
+| `dataset.schema.json` | Rapid dataset definitions, with their data dictionary and conflation settings |
 | `imagery.schema.json` | Imagery source definitions |
 | `style.schema.json` | Style declarations (`fill`, `casing`, `stroke`, `marker`, `icon`, `label`, etc.) |
 | `selector.schema.json` | Selector rules mapping tag patterns to styles |
@@ -524,7 +683,7 @@ The schemas use `$ref` to reference each other — for example, `main.schema.jso
 
 To validate all data files against the schemas:
 ```bash
-bun run validate:json
+bun run check:json
 ```
 
 #### Compatibility

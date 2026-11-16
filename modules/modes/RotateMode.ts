@@ -1,16 +1,18 @@
 import { AbstractMode } from './AbstractMode.ts';
 import { actionRotate } from '../actions/rotate.ts';
 import { DEG2RAD, vecAdd, vecScale, vecSubtract } from '@rapid-sdk/math';
+import { osmEntityID } from '../data/dataID.ts';
 
 import type { Context } from '../Context.ts';
-import type { OsmEntity, OsmNode } from '../data/types.ts';
+import type { EditLabel } from '../lib/Edit.ts';
+import type { OsmNode } from '../data/types.ts';
 import type { Vec2 } from '@rapid-sdk/math';
 
 
 /** Options for entering `RotateMode` */
 export interface RotateModeOptions {
-  /** Selection object where keys are layerIDs and values are arrays of dataIDs */
-  selection?: Record<string, EntityID[]>;
+  /** Data IDs of the data to rotate (only OSM entities can be rotated) */
+  selection?: DataID[];
 }
 
 
@@ -59,14 +61,13 @@ export class RotateMode extends AbstractMode {
     const locations = context.systems.locations;
     const eventManager = context.systems.gfx!.eventManager!;
 
-    const selection = options.selection ?? {};
-    const entityIDs = selection.osm ?? [];
-
     // Gather valid entities and entityIDs from selection.
     // For this mode, keep only the OSM data.
-    this._selectedData = new Map<EntityID, OsmEntity>();
+    const keepIDs: EntityID[] = [];
 
-    for (const entityID of entityIDs) {
+    for (const dataID of options.selection ?? []) {
+      const entityID = osmEntityID(dataID);
+      if (!entityID) continue;   // not OSM
       const entity = graph.hasEntity(entityID);
       if (!entity) continue;   // not in the osm graph
       if (entity.type === 'node') {
@@ -74,12 +75,13 @@ export class RotateMode extends AbstractMode {
         if (loc && locations?.isBlockedAt(loc)) continue;  // editing is blocked
       }
 
-      this._selectedData.set(entityID, entity);
+      keepIDs.push(entityID);
     }
 
-    if (!this._selectedData.size) return false;  // nothing to select
+    if (!keepIDs.length) return false;  // nothing to select
 
-    this._entityIDs = [...this._selectedData.keys()];  // the ones we ended up keeping
+    this._entityIDs = keepIDs;  // the ones we ended up keeping
+    this._selectedIDs = [...keepIDs];
     this._active = true;
 
     filters.forceVisible(this._entityIDs);
@@ -109,7 +111,6 @@ export class RotateMode extends AbstractMode {
     const context = this.context;
     const editor = context.systems.editor!;
     const filters = context.systems.filters!;
-    const l10n = context.systems.l10n!;
     const eventManager = context.systems.gfx!.eventManager!;
 
     this._lastPoint = null;
@@ -125,18 +126,18 @@ export class RotateMode extends AbstractMode {
 
     // If there is work in progress, finalize it.
     if (editor.hasWorkInProgress) {
-      let annotation: string;
+      let label: EditLabel;
       if (this._entityIDs.length === 1) {
         const graph = editor.staging.graph;
         const entity = graph.entity(this._entityIDs[0]);
-        annotation = l10n.t('operations.rotate.annotation.' + entity.geometry(graph));
+        label = { stringID: 'operations.rotate.annotation.' + entity.geometry(graph) };
       } else {
-        annotation = l10n.t('operations.rotate.annotation.feature', { n: this._entityIDs.length });
+        label = { stringID: 'operations.rotate.annotation.feature', stringParams: { n: this._entityIDs.length } };
       }
 
       editor.commit({
-        annotation: annotation,
-        selectedIDs: this._entityIDs
+        ...label,
+        selectionAfter: this._entityIDs
       });
     }
   }
@@ -157,7 +158,7 @@ export class RotateMode extends AbstractMode {
 
     } else if (['m', 'M'].includes(e.key)) {
       e.preventDefault();
-      this.context.enter('move', { selection: { osm: this._entityIDs }} );
+      this.context.enter('move', { selection: this._entityIDs });
     }
   }
 
@@ -214,14 +215,6 @@ export class RotateMode extends AbstractMode {
     //   editor.perform(actionRotate(entityIDs, this._pivotWorld, angle));
     // }
     // this._lastAngle = currAngle;
-
-
-    // Update selected/active collections to contain the current moved entities
-    this._selectedData.clear();
-    const currGraph = editor.staging.graph;
-    for (const entityID of this._entityIDs) {
-      this._selectedData.set(entityID, currGraph.entity(entityID));
-    }
   }
 
 
@@ -240,7 +233,7 @@ export class RotateMode extends AbstractMode {
     for (const entityID of this._entityIDs) {
       const entity = graph.hasEntity(entityID);
       if (!entity) continue;
-      for (const part of entity.geoms.parts || []) {
+      for (const part of graph.geometry(entity).parts || []) {
         const centroid = part.world?.centroid;
         if (centroid) {
           sum = vecAdd(sum, centroid);
@@ -257,7 +250,7 @@ export class RotateMode extends AbstractMode {
    * Return to select mode - `exit()` will finalize the work in progress.
    */
   protected _finish(): void {
-    this.context.enter('select-osm', { selection: { osm: this._entityIDs }} );
+    this.context.enter('select', { selection: this._entityIDs });
   }
 
 
@@ -269,7 +262,7 @@ export class RotateMode extends AbstractMode {
     const editor = context.systems.editor!;
 
     editor.revert();
-    context.enter('select-osm', { selection: { osm: this._entityIDs }} );
+    context.enter('select', { selection: this._entityIDs });
   }
 
 }

@@ -1,18 +1,27 @@
 import * as Validators from '../validators/index.ts';
 import { AbstractSystem } from './AbstractSystem.ts';
+import { actionAutofix } from '../actions/autofix.ts';
 import { Difference } from '../lib/Difference.ts';
+import { Extent } from '@rapid-sdk/math';
 import { utilArrayChunk, utilArrayGroupBy } from '@rapid-sdk/util';
 import { utilExtractValues } from '../util/string.ts';
 import { ValidationCache } from '../lib/ValidationCache.ts';
 
+import type { Action } from '../actions/types.ts';
+import type { AutofixTarget } from '../actions/autofix.ts';
 import type { Context } from '../Context.ts';
 import type { OsmEntity } from '../data/OsmEntity.ts';
+import type { OsmNode } from '../data/OsmNode.ts';
 import type { Graph } from '../lib/Graph.ts';
+import type { SessionDifference } from '../lib/SessionDifference.ts';
 import type { ValidationIssue, ValidationSeverity } from '../lib/ValidationIssue.ts';
 import type { ValidatorFactory, ValidatorFunction, ValidatorResult } from '../validators/types.ts';
 
 /** Wait 5 sec before revalidating provisional entities */
 const RETRY = 5000;
+
+/** How far past newly loaded data to look for the user's edits (validators look a few meters around a feature) */
+const MERGE_PADDING_METERS = 10;
 
 /** Override for adjusting issue severity */
 interface SeverityOverride {
@@ -54,6 +63,9 @@ export interface IssuesBySeverity {
  * It would be even better to do this in a worker process, but workers don't
  * have easy access to things like the Graph or Edits/History.
  *
+ * See `design/validation-system.md` for what validators can rely on, the October 2026 audit,
+ * and where this is heading.
+ *
  * Events available:
  * - `validated`    - Fires after some validation has occurred
  * - `focusedIssue` - Fires after an issue has received focus, receives the issue
@@ -72,8 +84,8 @@ export class ValidationSystem extends AbstractSystem {
   protected _ignoredIssueIDs: Set<IssueID>;
   /** Resolved issue IDs */
   protected _resolvedIssueIDs: Set<IssueID>;
-  /** Complete diff base -> head of what the user changed */
-  protected _completeDiff: Map<EntityID, OsmEntity | undefined>;
+  /** What the user changed (base to stable), to tell which issues they're responsible for */
+  protected _userEdits: SessionDifference | null;
   /** Deferred `setTimeout` - Set<handles> */
   protected _deferredST: Set<ReturnType<typeof setTimeout>>;
   /** Override rules that force issues to be errors */
@@ -84,6 +96,10 @@ export class ValidationSystem extends AbstractSystem {
   protected _disableOverrides: SeverityOverride[];
   /** Promise fulfilled when validation caught up to `stable` snapshot */
   protected _validationPromise: Promise<void> | null;
+  /** The stable graph whose changes the head cache has queued (`_head.graph` can be newer) */
+  protected _headQueuedGraph: Graph | null;
+  /** IDs that changed in `stable` since `_headQueuedGraph`, gathered from `stablechange` events */
+  protected _stableChangedIDs: Set<EntityID>;
 
 
   /**
@@ -102,16 +118,19 @@ export class ValidationSystem extends AbstractSystem {
     this._disabledValidatorIDs = new Set<ValidatorID>();
     this._ignoredIssueIDs = new Set<IssueID>();
     this._resolvedIssueIDs = new Set<IssueID>();
-    this._completeDiff = new Map<EntityID, OsmEntity | undefined>();
+    this._userEdits = null;
     this._deferredST = new Set();
     this._errorOverrides = [];
     this._warningOverrides = [];
     this._disableOverrides = [];
 
     this._validationPromise = null;
+    this._headQueuedGraph = null;
+    this._stableChangedIDs = new Set<EntityID>();
 
     // Ensure methods used as callbacks always have `this` bound correctly.
     this.validateAsync = this.validateAsync.bind(this);
+    this._settingsChanged = this._settingsChanged.bind(this);
   }
 
 
@@ -143,6 +162,9 @@ export class ValidationSystem extends AbstractSystem {
     const settings = context.systems.settings;
     const urlhash = context.systems.urlhash;
 
+    // Settings that follow the user to other browsers
+    settings?.registerSync(['validator.disabledRules', 'validator.squareDegrees', 'validator.what', 'validator.where']);
+
     return this._initPromise = super.initAsync()
       .then(() => {
         const prerequisites = [
@@ -169,15 +191,23 @@ export class ValidationSystem extends AbstractSystem {
         this._warningOverrides = this._parseHashParam(hash.get('validationWarning'));
         this._disableOverrides = this._parseHashParam(hash.get('validationDisable'));
 
-        const disabledRules = settings?.get('validator.disabledRules') ?? '';
-        const validatorIDs = utilExtractValues(disabledRules).filter(Boolean);
-        this._disabledValidatorIDs = new Set<ValidatorID>(validatorIDs);
+        this._disabledValidatorIDs = this._readDisabledRules();
 
         // Setup event handlers..
+        settings?.on('settingschange', this._settingsChanged);
+
         // When to run validation:
         editor!
-          .on('stablechange', () => this.validateAsync())
-          .on('merge', (entityIDs: EntityID[]) => this._validateBaseEntitiesAsync(entityIDs));
+          .on('stablechange', (difference: Difference) => {
+            for (const entityID of difference.changes.keys()) {
+              this._stableChangedIDs.add(entityID);
+            }
+            this.validateAsync();
+          })
+          .on('merge', (entityIDs: EntityID[]) => {
+            this._validateBaseEntitiesAsync(entityIDs);
+            this._validateEditsNearAsync(entityIDs);
+          });
       });
   }
 
@@ -214,7 +244,9 @@ export class ValidationSystem extends AbstractSystem {
     this._resolvedIssueIDs.clear();
     this._base = new ValidationCache(this.context, 'base');
     this._head = new ValidationCache(this.context, 'head');
-    this._completeDiff.clear();
+    this._headQueuedGraph = null;
+    this._stableChangedIDs.clear();
+    this._userEdits = null;
 
     return Promise.resolve();
   }
@@ -269,21 +301,23 @@ export class ValidationSystem extends AbstractSystem {
     if (typeof checkUnsquareWay !== 'function') return;
 
     const revalidate = (cache: ValidationCache): void => {
-      if (!cache.graph) return;
+      const graph = cache.graph;
+      if (!graph) return;
 
       cache.uncacheIssuesOfType('unsquare_way');   // uncache existing
 
-      // rerun for all buildings
-      const editor = this.context.systems.editor!;
-      const spatial = this.context.systems.spatial!;
-      const spatialID = editor.spatialIDForGraph(cache.graph);
-
-      const buildings = spatial.getAllItems<OsmEntity>(spatialID)
-        .filter(entity => (entity.type === 'way' && entity.tags.building && entity.tags.building !== 'no'));
+      // rerun for all buildings, as they are in this graph
+      const entityIDs = new Set<EntityID>([...graph.base.entities.keys(), ...graph.localEntities().keys()]);
+      const buildings = [...entityIDs]
+        .map(entityID => graph.hasEntity(entityID))
+        .filter((entity): entity is OsmEntity => Boolean(entity?.type === 'way' && entity.tags.building && entity.tags.building !== 'no'));
 
       for (const entity of buildings) {
-        const detected = checkUnsquareWay(entity, cache.graph);
+        const detected = checkUnsquareWay(entity, graph);
         if (!detected.issues.length) continue;
+        for (const issue of detected.issues) {
+          issue.foundOnID = entity.id;
+        }
         cache.cacheIssues(detected.issues);
       }
     };
@@ -349,7 +383,7 @@ export class ValidationSystem extends AbstractSystem {
         // In the head cache, only count features that the user is responsible for - iD#8632
         // For example, a user can undo some work and an issue will still present in the
         // head graph, but we don't want to credit the user for causing that issue.
-        const userModified = (issue.entityIds || []).some(entityID => this._completeDiff.has(entityID));
+        const userModified = (issue.entityIds || []).some(entityID => this._userEdits?.affects(entityID));
         if (opts.what === 'edited' && !userModified) continue;   // present in head but user didn't touch it
 
         if (!filter(issue)) continue;
@@ -406,7 +440,7 @@ export class ValidationSystem extends AbstractSystem {
 
     // Select the first entity in the issue.
     globalThis.setTimeout(() => {
-      context.enter('select-osm', { selection: { osm: [selectID] }} );
+      context.enter('select', { selection: [selectID] });
       this.emit('focusedIssue', issue);
     }, 250);  // after ease
   }
@@ -555,12 +589,74 @@ export class ValidationSystem extends AbstractSystem {
 
 
   /**
+   * Reads the disabled validatorIDs from settings.
+   * @return The set of disabled validatorIDs
+   */
+  protected _readDisabledRules(): Set<ValidatorID> {
+    const settings = this.context.systems.settings;
+    const disabledRules = settings?.get('validator.disabledRules') ?? '';
+    const validatorIDs = utilExtractValues(disabledRules).filter(Boolean);
+    return new Set<ValidatorID>(validatorIDs);
+  }
+
+
+  /**
+   * Called when settings change. A sync may have brought the disabled rules from another
+   * browser; take them, so that the next toggle doesn't send this browser's old list back.
+   */
+  protected _settingsChanged(): void {
+    const disabledIDs = this._readDisabledRules();
+    const curr = this._disabledValidatorIDs;
+    if (disabledIDs.size === curr.size && [...disabledIDs].every(validatorID => curr.has(validatorID))) return;
+
+    this._disabledValidatorIDs = disabledIDs;
+    this.validateAsync();
+  }
+
+
+  /**
    * Don't show the given issue in lists
    * @param issueID - The issueID to ignore
    */
   public ignoreIssue(issueID: IssueID): void {
     this._ignoredIssueIDs.add(issueID);
     this.emit('validated');   // emit an event to redraw various UI things
+  }
+
+
+  /**
+   * Returns an action that fixes the given issues, for the issues pane's "Autofix All".
+   * The issues were found on an older graph, and each fix changes the graph, so the action finds them
+   * again as it goes: it validates the entity each issue was found on, and applies one fix at a time
+   * (`actionAutofix`). It fixes only issues of the same kind, on the same entities, as the given ones:
+   * the IDs themselves can change (a fix that splits a segment changes the ID of a crossing on it).
+   * Ignored issues aren't fixed, unless a fix changed the ID of one that's the same kind of issue, on the
+   * same entities, as a given one (two crossings of the same two ways, one of them ignored).
+   * @param  issues - The issues to fix (ones without an autofix are skipped)
+   * @return An Action that fixes them
+   */
+  public autofixAction(issues: ValidationIssue[]): Action {
+    // An issue's ID without its `hash`: the kind of issue, and the entities it's about
+    const keyOf = (issue: ValidationIssue): string => [issue.type, issue.subtype ?? '', ...issue.entityIds.toSorted()].join(',');
+
+    const keys = new Set<string>();
+    const targetKeys = new Set<string>();
+    const targets: AutofixTarget[] = [];
+
+    for (const issue of issues) {
+      const entityID = issue.foundOnID ?? issue.entityIds[0];
+      const validator = this._validators.get(issue.type);
+      if (!issue.autoArgs || !entityID || !validator) continue;
+
+      keys.add(keyOf(issue));
+      const targetKey = `${issue.type},${entityID}`;
+      if (targetKeys.has(targetKey)) continue;
+      targetKeys.add(targetKey);
+      targets.push({ entityID: entityID, validator: validator });
+    }
+
+    const canFix = (issue: ValidationIssue): boolean => keys.has(keyOf(issue)) && !this._ignoredIssueIDs.has(issue.id);
+    return actionAutofix(targets, canFix);
   }
 
 
@@ -574,37 +670,56 @@ export class ValidationSystem extends AbstractSystem {
   public validateAsync(): Promise<void> {
     const context = this.context;
     const editor = context.systems.editor!;
-    this._completeDiff = editor.difference().complete();
+    this._userEdits = editor.difference();
 
     if (editor.canRestoreBackup) return Promise.resolve();   // Wait to see if the user wants to restore their backup
-    if (this._validationPromise) return this._validationPromise;   // Validation already in progress
 
     const baseGraph = editor.base.graph!;
     const stableGraph = editor.stable.graph!;
-    const previousGraph = this._head.graph ?? baseGraph;   // the previously validated graph
+
+    // Validation already in progress.
+    // If `stable` changed, the jobs still queued run on the current stable graph: an older one would
+    // get the staging spatial index. When this round finishes, what changed since it started is validated.
+    if (this._validationPromise) {
+      this._head.graph = stableGraph;
+      return this._validationPromise;
+    }
+
+    const previousGraph = this._headQueuedGraph ?? baseGraph;   // the previously validated graph
 
     // User has not edited, or undone back to the base state, reset head cache
     if (stableGraph === baseGraph) {
       this._head = new ValidationCache(context, 'head');
       this._head.graph = stableGraph;
+      this._headQueuedGraph = stableGraph;
+      this._stableChangedIDs.clear();
       this._resolvedIssueIDs.clear();
       this.emit('validated');
       return Promise.resolve();
     }
 
-    // We are caught up to the stable graph
+    let entityIDs: Set<EntityID>;
     if (stableGraph === previousGraph) {
-      this.emit('validated');
-      return Promise.resolve();
+      // We are caught up to the stable graph, unless it changed in place: an iD#2085 restore puts
+      // deleted nodes back in graphs that were validated already, and `stablechange` named them.
+      // Comparing the graph with itself would find nothing, so validate what it named.
+      entityIDs = this._head.withAllRelatedEntities(this._stableChangedIDs);  // expand set
+      this._stableChangedIDs.clear();
+
+    } else {
+      // If we get here, stable !== previous, so it's time to validate the stable graph..
+      // Only the IDs that changed since the previously validated graph need comparing.
+      // Before any graph was validated, compare them all.
+      const candidates = this._headQueuedGraph ? new Set<EntityID>(this._stableChangedIDs) : undefined;
+      this._head.graph = stableGraph;   // take snapshot
+      this._headQueuedGraph = stableGraph;
+      this._stableChangedIDs.clear();
+      const incrementalDiff = new Difference(previousGraph, stableGraph, candidates);
+      const diffKeys = [ ...incrementalDiff.complete().keys() ];
+      entityIDs = this._head.withAllRelatedEntities(diffKeys);  // expand set
     }
 
-    // If we get here, stable !== previous, so it's time to validate the stable graph..
-    this._head.graph = stableGraph;   // take snapshot
-    const incrementalDiff = new Difference(previousGraph, stableGraph!);
-    const diffKeys = [ ...incrementalDiff.complete().keys() ];
-    const entityIDs = this._head.withAllRelatedEntities(diffKeys);  // expand set
-
-    if (!entityIDs.size) {    // nothing to do - committed a no-op edit?
+    if (!entityIDs.size) {    // nothing to do - committed a no-op edit, or caught up
       this.emit('validated');
       return Promise.resolve();
     }
@@ -616,10 +731,10 @@ export class ValidationSystem extends AbstractSystem {
       .then(() => {
         this._validationPromise = null;
 
-        // Check if `stable` has changed while we were validating, and run it again to catch up if needed...
+        // Check if `stable` has changed while we were validating (or in place), and run it again to catch up if needed...
         const stableGraph = editor.stable.graph;
-        const previousGraph = this._head.graph;
-        if (stableGraph !== previousGraph) {
+        const previousGraph = this._headQueuedGraph;
+        if (stableGraph !== previousGraph || this._stableChangedIDs.size) {
           this.validateAsync();  // recurse
         }
       });
@@ -649,6 +764,54 @@ export class ValidationSystem extends AbstractSystem {
     const expandedEntityIDs = this._base.withAllRelatedEntities(entityIDs);  // expand set
 
     return this._validateEntitiesAsync(this._base, expandedEntityIDs)
+      .then(() => this._updateResolvedIssues(expandedEntityIDs))
+      .then(() => { this.emit('validated'); })
+      .catch((e: Error) => console.error(e));  // eslint-disable-line
+  }
+
+
+  /**
+   * Validates the user's edits near entities being merged into the base graph.
+   * Validators skip what they can't judge where the map isn't loaded yet (e.g. `almost_junction` at
+   * the end of a road), and a road the user drew or accepted can reach past the loaded map.
+   * Merging doesn't change the user's edits, so `validateAsync` wouldn't check them again.
+   * @param entityIDs - The entityIDs on the merged tile (including previously seen ones)
+   * @return Promise fulfilled when validation is completed.
+   */
+  protected _validateEditsNearAsync(entityIDs: Iterable<EntityID>): Promise<void> {
+    const context = this.context;
+    const editor = context.systems.editor!;
+
+    const graph = this._head.graph;
+    if (!graph || graph === editor.base.graph) return Promise.resolve();   // no edits validated yet
+    if (editor.canRestoreBackup) return Promise.resolve();   // Wait to see if the user wants to restore their backup
+
+    // Where the merged data is
+    const merged = new Extent();
+    for (const entityID of entityIDs) {
+      const entity = graph.hasEntity(entityID);
+      if (entity?.type === 'node') {
+        merged.extendSelf((entity as OsmNode).loc!);
+      }
+    }
+    if (!isFinite(merged.min[0])) return Promise.resolve();   // no nodes merged
+    const nearby = merged.padByMeters(MERGE_PADDING_METERS);
+
+    // The user's edits there, from stable's local index. It holds the ways of the edited nodes too:
+    // a moved vertex gives its way a shape of its own. Each is checked as it is in the graph validated.
+    const editedIDs = new Set<EntityID>();
+    for (const entityID of editor.stableEditsIn(nearby)) {
+      const entity = graph.hasEntity(entityID);
+      const extent = entity && graph.extent(entity);
+      if (extent && nearby.intersects(extent)) {
+        editedIDs.add(entityID);
+      }
+    }
+    if (!editedIDs.size) return Promise.resolve();
+
+    const expandedEntityIDs = this._head.withAllRelatedEntities(editedIDs);  // expand set
+
+    return this._validateEntitiesAsync(this._head, expandedEntityIDs)
       .then(() => this._updateResolvedIssues(expandedEntityIDs))
       .then(() => { this.emit('validated'); })
       .catch((e: Error) => console.error(e));  // eslint-disable-line
@@ -707,12 +870,23 @@ export class ValidationSystem extends AbstractSystem {
         console.error(`ValidationSystem: no such validatorID = ${validatorID}`);  // eslint-disable-line no-console
         continue;
       }
-      const detected = validator(entity, graph);
+      // One validator failing shouldn't lose the issues the others find.
+      // (Not provisional: a validator that always fails on this entity would be retried forever.)
+      let detected: ValidatorResult;
+      try {
+        detected = validator(entity, graph);
+      } catch (err) {
+        console.error(`ValidationSystem: validator '${validatorID}' failed on ${entity.id}`, err);  // eslint-disable-line no-console
+        continue;
+      }
       if (detected.provisional) {   // this validation should be run again later
         result.provisional = true;
       }
 
       const filtered = detected.issues.filter(applySeverityOverrides);
+      for (const issue of filtered) {
+        issue.foundOnID = entity.id;
+      }
       result.issues = result.issues.concat(filtered);
     }
 
@@ -738,7 +912,7 @@ export class ValidationSystem extends AbstractSystem {
         // Check if the user did something to one of the entities involved in this issue.
         // (This issue could involve multiple entities, e.g. disconnected routable features)
         const issue = this._base.issues.get(issueID);
-        const userModified = (issue?.entityIds || []).some(id => this._completeDiff.has(id));
+        const userModified = (issue?.entityIds || []).some(id => this._userEdits?.affects(id));
 
         if (userModified && !this._head.issues.has(issueID)) {  // issue seems fixed
           this._resolvedIssueIDs.add(issueID);
@@ -837,7 +1011,14 @@ export class ValidationSystem extends AbstractSystem {
 
     return scheduler.scheduleIdleTask(() => {
         // const t0 = performance.now();
-        chunk.forEach(job => job());
+        // A job that throws mustn't stop the rest: their issues were uncached when they were queued.
+        for (const job of chunk) {
+          try {
+            job();
+          } catch (err) {
+            console.error(err);  // eslint-disable-line no-console
+          }
+        }
         // const t1 = performance.now();
         // console.log('chunk processed in ' + (t1 - t0) + ' ms');
       })

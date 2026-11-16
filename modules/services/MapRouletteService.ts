@@ -28,10 +28,21 @@ export interface MapRouletteTaskProps extends MarkerProps {
   taskStatus?: number;
   /** User comment submitted with the task update */
   comment?: string;
-  /** API key for authenticating MapRoulette API requests */
-  mapRouletteApiKey?: string;
+  // MapRoulette auth is turned off: MapRoulette stopped storing API keys in the OSM user preferences
+  // and expired the old ones, so Rapid submits without one for now (see "MapRoulette authentication"
+  // in `.scratchpad/backlog.md`, and https://community.openstreetmap.org/t/maproulette-security-incident-october-2026).
+  // /** API key for authenticating MapRoulette API requests */
+  // mapRouletteApiKey?: string;
   /** Geographic coordinates of the task */
   point?: { lng: number; lat: number };
+  /** The status the user has picked in the editor, before it's submitted (`''` if none) */
+  _status?: number | '';
+  /** The comment the user is typing in the editor */
+  newComment?: string;
+  /** The task ID, as submitted */
+  taskId?: string;
+  /** The OSM user ID of the user submitting */
+  userId?: number;
 }
 
 /** A MapRoulette task MarkerData with typed props */
@@ -97,6 +108,8 @@ export class MapRouletteService extends AbstractSystem {
   protected _challengeQueue: Set<string>;
   /** Tasks closed during this editing session */
   protected _closed: ClosedEntry[];
+  /** The comment posted for each task (by task ID) whose update hasn't finished, so it isn't posted twice */
+  protected _postedComments: Map<string, string>;
 
 
   /**
@@ -118,6 +131,7 @@ export class MapRouletteService extends AbstractSystem {
     this._challenges = new Map<string, ChallengeData>();
     this._challengeQueue = new Set<string>();
     this._closed = [];
+    this._postedComments = new Map<string, string>();
 
     // Ensure methods used as callbacks always have `this` bound correctly.
     this._hashChanged = this._hashChanged.bind(this);
@@ -141,7 +155,7 @@ export class MapRouletteService extends AbstractSystem {
 
         // Setup event handlers..
         gfx?.scene?.on('layerchange', this._mapRouletteChanged);
-        urlhash?.on('hashChanged', this._hashChanged);
+        urlhash?.on('hashchange', this._hashChanged);
       });
   }
 
@@ -165,12 +179,13 @@ export class MapRouletteService extends AbstractSystem {
     const spatial = context.systems.spatial!;
 
     network.clearMatching(id => id.startsWith('maproulette-') || id.includes(MAPROULETTE_API));
-    spatial.clearMatching(id => id.startsWith('maproulette-'));
+    spatial.clearCache('maproulette');
 
     this._lastv = null;
     this._challenges.clear();
     this._challengeQueue.clear();
     this._closed = [];
+    this._postedComments.clear();
 
     return Promise.resolve();
   }
@@ -212,7 +227,7 @@ export class MapRouletteService extends AbstractSystem {
   public getData(): MapRouletteTask[] {
     const spatial = this.context.systems.spatial!;
 
-    return (spatial.getVisibleItems('maproulette-data')
+    return (spatial.getVisibleItems('maproulette')
       .map(hit => hit.contents) as MapRouletteTask[])
       .filter(task => {
         if (this._challengeIDs.size) {
@@ -231,7 +246,7 @@ export class MapRouletteService extends AbstractSystem {
    */
   public getTask(dataID: DataID): MapRouletteTask | undefined {
     const spatial = this.context.systems.spatial!;
-    return spatial.getItem<MapRouletteTask>('maproulette-data', dataID);
+    return spatial.getItem<MapRouletteTask>('maproulette', dataID);
   }
 
 
@@ -343,20 +358,20 @@ export class MapRouletteService extends AbstractSystem {
         challenge.description ??= '';
         this._challenges.set(challengeID, challenge);
 
-        // Update task details
+        // Update task details (as new tasks: data isn't changed in place)
         const toUpdate = [];
-        const allTasks = spatial.getAllItems<MapRouletteTask>('maproulette-data');
+        const allTasks = spatial.getAllItems<MapRouletteTask>('maproulette');
         for (const task of allTasks) {
           if (task.props.parentId !== challengeID) continue;
           if (task.props.instruction !== undefined) continue;   // done already
 
-          task.props.isVisible = challenge.isVisible;
-          task.props.instruction = challenge.instruction;
-          task.props.description = challenge.description;
-          task.touch();
-          toUpdate.push(task);
+          toUpdate.push(task.update({
+            isVisible: challenge.isVisible,
+            instruction: challenge.instruction,
+            description: challenge.description
+          }));
         }
-        spatial.replaceData('maproulette-data', toUpdate);
+        spatial.replaceData('maproulette', toUpdate);
 
         return challenge;
       })
@@ -389,21 +404,24 @@ export class MapRouletteService extends AbstractSystem {
    * @return Promise resolved when we've fetched the task details
    */
   public loadTaskAsync(task: MapRouletteTask): Promise<MapRouletteTask> {
-    if (task.props.features !== undefined) return Promise.resolve(task);  // already done
-
     const context = this.context;
     const network = context.systems.network!;
     const spatial = context.systems.spatial!;
+
+    // The cached task may be newer than the one given (data isn't changed in place)
+    const cached = spatial.getItem<MapRouletteTask>('maproulette', task.id) ?? task;
+    if (cached.props.features !== undefined) return Promise.resolve(cached);  // already done
 
     const url = `${MAPROULETTE_API}/task/${task.id}`;
     const requestID = `maproulette-task-${task.id}`;
 
     return network.fetch<any>(url, { requestID })
       .then(data => {
-        task.props.features = data?.geometries?.features || [];
-        task.touch();
-        spatial.replaceData('maproulette-data', task);
-        return task;
+        // The task as it is now (the challenge may have updated it), with its details
+        const current = spatial.getItem<MapRouletteTask>('maproulette', task.id) ?? task;
+        const updated = current.update({ features: data?.geometries?.features || [] });
+        spatial.replaceData('maproulette', updated);
+        return updated;
       });
   }
 
@@ -419,64 +437,70 @@ export class MapRouletteService extends AbstractSystem {
     const challengeID = task.props.parentId;
     const taskStatus = task.props.taskStatus;
     const taskComment = task.props.comment;
-    const apikey = task.props.mapRouletteApiKey;
+    // const apikey = task.props.mapRouletteApiKey;   // MapRoulette auth is turned off (see `mapRouletteApiKey`)
 
-    // A comment is optional, but if we have one, POST it..
     const commentID = `maproulette-comment-${taskID}`;
-    if (taskComment && !network.isInflight(commentID)) {
-      network.fetch<any>(`${MAPROULETTE_API}/task/${taskID}/comment`, {
-        requestID: commentID,
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'apiKey': apikey as string
-        },
-        body: JSON.stringify({ actionId: 2, comment: taskComment })
-      })
-      .catch(err => {
-        if (err.name === 'AbortError') return;  // ok
-        console.error(err);    // eslint-disable-line no-console
-      });
-    }
-
-    // update the status and release the task
     const updateTaskUrl = `${MAPROULETTE_API}/task/${taskID}/${taskStatus}`;
     const releaseTaskUrl = `${MAPROULETTE_API}/task/${taskID}/release`;
     const updateKey = `maproulette-update-${taskID}`;
     const releaseKey = `maproulette-release-${taskID}`;
 
-    if (!network.isInflight(updateKey) && !network.isInflight(releaseKey)) {
-      network.fetch<any>(updateTaskUrl, {
-        requestID: updateKey,
-        method: 'PUT',
+    // Submitting again while this task's update is still being sent does nothing.
+    // (The comment usually finishes first, and it would be posted again.)
+    if (network.isInflight(commentID) || network.isInflight(updateKey) || network.isInflight(releaseKey)) return;
+
+    // A comment is optional, but if we have one, POST it..
+    // (Not if it was posted already: the user submits again after the status update failed.)
+    if (taskComment && this._postedComments.get(taskID) !== taskComment) {
+      this._postedComments.set(taskID, taskComment);
+      network.fetch<any>(`${MAPROULETTE_API}/task/${taskID}/comment`, {
+        requestID: commentID,
+        method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          'apiKey': apikey as string
-        }
-      })
-      .then(() => {
-        return network.fetch<any>(releaseTaskUrl, {
-          requestID: releaseKey,
-          headers: {
-            'apiKey': apikey as string
-          }
-        });
-      })
-      .then(() => {
-        // All requests completed successfully
-        if (taskStatus === 1) {  // only counts if the use chose "I Fixed It".
-          this._closed.push({ taskID, challengeID });
-        }
-        this.removeItem(task);
-        this.context.enter('browse');
-        if (callback) callback(null, task);
+          'Content-Type': 'application/json'
+          // 'apiKey': apikey as string
+        },
+        body: JSON.stringify({ actionId: 2, comment: taskComment })
       })
       .catch(err => {
         if (err.name === 'AbortError') return;  // ok
+        this._postedComments.delete(taskID);   // not posted, so submitting again tries it again
         console.error(err);    // eslint-disable-line no-console
-        if (callback) callback(err.message);
       });
     }
+
+    // update the status and release the task
+    network.fetch<any>(updateTaskUrl, {
+      requestID: updateKey,
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json'
+        // 'apiKey': apikey as string
+      }
+    })
+    .then(() => {
+      return network.fetch<any>(releaseTaskUrl, {
+        requestID: releaseKey
+        // headers: {
+        //   'apiKey': apikey as string
+        // }
+      });
+    })
+    .then(() => {
+      // All requests completed successfully
+      if (taskStatus === 1) {  // only counts if the use chose "I Fixed It".
+        this._closed.push({ taskID, challengeID });
+      }
+      this._postedComments.delete(taskID);
+      this.removeItem(task);
+      this.context.enter('browse');
+      if (callback) callback(null, task);
+    })
+    .catch(err => {
+      if (err.name === 'AbortError') return;  // ok
+      console.error(err);    // eslint-disable-line no-console
+      if (callback) callback(err.message);
+    });
   }
 
 
@@ -489,7 +513,7 @@ export class MapRouletteService extends AbstractSystem {
     if (!(item instanceof MarkerData) || !item.id) return null;
 
     const spatial = this.context.systems.spatial!;
-    spatial.replaceData('maproulette-data', item);
+    spatial.replaceData('maproulette', item);
     return item;
   }
 
@@ -502,7 +526,7 @@ export class MapRouletteService extends AbstractSystem {
     if (!(item instanceof MarkerData) || !item.id) return;
 
     const spatial = this.context.systems.spatial!;
-    spatial.removeItems('maproulette-data', item.id);
+    spatial.removeItems('maproulette', item.id);
   }
 
 
@@ -542,7 +566,7 @@ export class MapRouletteService extends AbstractSystem {
       maxY: Math.max(ay, by)
     };
 
-    const hits = spatial.getItemsAtBox('maproulette-data', search)
+    const hits = spatial.getItemsAtBox('maproulette', search)
       .map(hit => hit.contents as MarkerData<MapRouletteTaskProps>);
 
     const nearby = [];
@@ -571,8 +595,7 @@ export class MapRouletteService extends AbstractSystem {
     }
 
     this.currentTask = other;
-    const selection = new Map<string, MarkerData>().set(other.id, other);
-    context.enter('select', { selection });
+    context.enter('select', { selection: [other.dataID] });
   }
 
 
@@ -599,7 +622,7 @@ export class MapRouletteService extends AbstractSystem {
     const taskID = props.id.toString();
     const challengeID = props.parentId.toString();
 
-    let task = spatial.getItem<MapRouletteTask>('maproulette-data', taskID);
+    let task = spatial.getItem<MapRouletteTask>('maproulette', taskID);
     if (task) return task;  // seen it already
 
     // Have we seen this challenge before?
@@ -615,12 +638,13 @@ export class MapRouletteService extends AbstractSystem {
 
     props.id = taskID;               // force to string
     props.parentId = challengeID;    // force to string
-    props.loc = spatial.getFreeLoc('maproulette-data', [props.point.lng, props.point.lat]);
+    props.loc = spatial.getFreeLoc('maproulette', [props.point.lng, props.point.lat]);
     props.serviceID = this.id;
+    props.spatialID = 'maproulette';
 
     // Create a MarkerData for the task
     task = new MarkerData<MapRouletteTaskProps>(context, props as Partial<MapRouletteTaskProps>);
-    spatial.addData('maproulette-data', task);
+    spatial.addData('maproulette', task);
 
     return task;
   }
@@ -632,44 +656,42 @@ export class MapRouletteService extends AbstractSystem {
    * @param prevParams - The previous hash parameters
    */
   protected _hashChanged(currParams: Map<string, string>, prevParams: Map<string, string>): void {
-    const scene = this.context.systems.gfx?.scene;
+    const context = this.context;
+    const gfx = context.systems.gfx;
+    const urlhash = context.systems.urlhash;
+    const scene = gfx?.scene;
     if (!scene) return;  // test environment?
 
     // maproulette
-    // Support opening maproulette layer with a URL parameter:
-    //  e.g. `maproulette=true`  -or-
-    //  e.g. `maproulette=<challengeIDs>`
-    const newVal = currParams.get('maproulette') || '';
-    const oldVal = prevParams.get('maproulette') || '';
-    if (newVal !== oldVal) {
-      let isEnabled = false;
+    // Shows only the tasks of the given challenges for this session, e.g. `maproulette=<challengeIDs>`,
+    // and turns on the layer, since a filter on a layer you can't see does nothing.
+    // The url keeps it until the tasks shown no longer match it (see `_mapRouletteChanged`).
+    // (`maproulette=true` is a legacy way to turn on the layer, like `layers=` does now, see API.md)
+    // (Not a value that was dropped since, by a change made while the same url was being read.
+    // When `maproulette` goes away, the filter stays as it is.)
+    const newVal = currParams.get('maproulette');
+    if (newVal === undefined || newVal === prevParams.get('maproulette') || urlhash?.getParam('maproulette') !== newVal) return;
 
-      this._challengeIDs.clear();
-      const vals = utilExtractValues(newVal).filter(Boolean);
-      for (const val of vals) {
-        if (val === 'true') {
-          isEnabled = true;
-          continue;
-        }
-        // Try the value as a number, but reject things like NaN, null, Infinity
-        const num = +val;
-        if (Number.isFinite(num)) {
-          isEnabled = true;
-          this._challengeIDs.add(val);  // keep the string
-        }
-      }
-
-      if (isEnabled) {  // either of these will trigger 'layerchange'
-        scene.enableLayers('maproulette');
-      } else {
-        scene.disableLayers('maproulette');
-      }
+    const ids = this._parseChallengeIDs(newVal);
+    this._challengeIDs.clear();
+    for (const id of ids) {
+      this._challengeIDs.add(id);
     }
+    if (!ids.size) {   // the legacy `true`, or no challenges to show
+      urlhash?.setParam('maproulette', null);
+    }
+
+    if (ids.size || utilExtractValues(newVal).includes('true')) {
+      scene.enableLayers('maproulette');   // will trigger 'layerchange'
+    }
+    gfx?.immediateRedraw();
   }
 
 
   /**
-   * Push changes in MapRoulette state to the urlhash
+   * Called when the challenge filter or the layers change.
+   * The filter isn't written to the url: a link's `maproulette` stays there only until the tasks shown
+   * no longer match it (the layer is turned off, or the filter changes), and then it's dropped (see `API.md`).
    */
   protected _mapRouletteChanged(): void {
     const context = this.context;
@@ -677,17 +699,30 @@ export class MapRouletteService extends AbstractSystem {
     const scene = context.systems.gfx?.scene;
     if (!urlhash || !scene) return;  // test environment?
 
-    // `maproulette=true` -or- `maproulette=<challengeIDs>`
+    const urlVal = urlhash.getParam('maproulette');
+    if (urlVal === undefined) return;
+
     const layer = scene.layers.get('maproulette');
-    if (layer?.enabled) {
-      const ids = this.challengeIDs;
-      if (ids) {
-        urlhash.setParam('maproulette', ids);
-      } else {
-        urlhash.setParam('maproulette', 'true');
-      }
-    } else {
+    const urlIDs = this._parseChallengeIDs(urlVal);
+    if (!layer?.enabled || urlIDs.size !== this._challengeIDs.size || [...urlIDs].some(id => !this._challengeIDs.has(id))) {
       urlhash.setParam('maproulette', null);
     }
+  }
+
+
+  /**
+   * Parses the challengeIDs in a url `maproulette` value.
+   * @param val - The url's value, e.g. `100,200`
+   * @return The challengeIDs (as strings), without values that aren't numbers (like the legacy `true`)
+   */
+  protected _parseChallengeIDs(val: string): Set<string> {
+    const ids = new Set<string>();
+    for (const s of utilExtractValues(val).filter(Boolean)) {
+      // Try the value as a number, but reject things like NaN, null, Infinity
+      if (Number.isFinite(+s)) {
+        ids.add(s);  // keep the string
+      }
+    }
+    return ids;
   }
 }

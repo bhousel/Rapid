@@ -1,13 +1,21 @@
+import { actionAddMidpoint } from './add_midpoint.ts';
+import { actionAutofix } from './autofix.ts';
 import { GeoJSONData, OsmEntity, OsmNode, OsmRelation, OsmWay } from '../data/index.ts';
+import { geoMetersToWorld } from '../geo/geom.ts';
 import { Graph } from '../lib/Graph.ts';
+import { projWorldToWgs84, vecProject } from '@rapid-sdk/math';
 import { validateAlmostJunction } from '../validators/almost_junction.ts';
 import { validateCrossingWays } from '../validators/crossing_ways.ts';
 
 import type { Action } from './types.ts';
 import type { Context } from '../Context.ts';
+import type { JoinPoint, LineJoins } from '../core/ConflationSystem.ts';
 import type { EntityType, OsmRelationMember, OsmTags } from '../data/types.ts';
 import type { RapidDataDictionary } from '../lib/index.ts';
 import type { Vec2 } from '@rapid-sdk/math';
+
+/** How close a join's location must be to a segment of the target way to be inserted there, in meters */
+const ON_EDGE_METERS = 0.5;
 
 
 /**
@@ -25,9 +33,11 @@ export interface RapidAcceptAction extends Action {
  * Accepts a Rapid feature from an external dataset into the main graph.
  * Handles nodes, ways, and relations, including connection points to existing ways.
  * @param   datum  - Data to accept - should be OSMEntity-like or GeoJSONData-like.
+ * @param   joins  - Optional: where the ends of an accepted line should connect to existing ways
+ *                   (see `ConflationSystem.getJoins`). A join that no longer fits the graph is skipped.
  * @return  An Action function that adds the given Rapid feature to the main graph
  */
-export function actionRapidAcceptFeature(datum: OsmEntity | GeoJSONData): RapidAcceptAction {
+export function actionRapidAcceptFeature(datum: OsmEntity | GeoJSONData, joins?: LineJoins): RapidAcceptAction {
 
   // Mapping of oldid -> newid.  Not all old ids will be in here!
   // (e.g. In the case of a GeoJSON line, we will create a lot of new OsmNodes for the coordinates.)
@@ -86,10 +96,86 @@ export function actionRapidAcceptFeature(datum: OsmEntity | GeoJSONData): RapidA
     newID = newEntity?.id;
 
     if (newEntity instanceof OsmWay) {
-      attemptAutoconnect(newEntity, graph);
+      if (joins?.start) applyJoin(newEntity.id, 'start', joins.start);
+      if (joins?.end) applyJoin(newEntity.id, 'end', joins.end);
+      attemptAutoconnect(graph.entity(newEntity.id) as OsmWay, graph);
     }
 
     return graph.commit();
+
+
+    /**
+     * Connects one end of the newly accepted way to an existing way.
+     * Either the end reuses an existing node of that way, or the end node moves onto the way's
+     * segment and is inserted there. If the graph no longer matches the join (the way or node is
+     * gone, or the segment was changed), the join is skipped and the end stays where it is.
+     * @param  wayID - The newly accepted way
+     * @param  which - Which end of it to connect
+     * @param  join  - Where to connect it
+     */
+    function applyJoin(wayID: EntityID, which: 'start' | 'end', join: JoinPoint): void {
+      const way = graph.entity(wayID) as OsmWay;
+      const target = graph.hasEntity(join.wayID) as OsmWay | undefined;
+      if (!target) return;
+
+      const endNodeID = (which === 'start' ? way.first() : way.last())!;
+      if (way.isClosed()) return;   // don't join the ends of a ring
+
+      if (join.nodeID && target.nodes.includes(join.nodeID)) {
+        // The other end may have joined this same node already (both ends near one corner):
+        // joining this end there too would close the way, so this end stays where it is.
+        if (way.nodes.includes(join.nodeID)) return;
+
+        // Reuse the existing node, and drop the end node we created for this end.
+        graph.replace(way.replaceNode(endNodeID, join.nodeID));
+        graph.remove(graph.entity(endNodeID));
+
+      } else {
+        // Move our end node onto the existing way's segment, and insert it there.
+        // The recorded edge may have been split already (e.g. by the other end's join), or its nodes
+        // moved since the join was found, so fall back to the segment that `coord` lies on now.
+        const isOnEdge = join.edge && target.isAdjacent(join.edge[0], join.edge[1]) && distanceToEdge(join.edge, join.coord) <= ON_EDGE_METERS;
+        const edge = isOnEdge ? join.edge : edgeAt(target, join.coord);
+        if (!edge) return;
+        const endNode = graph.entity(endNodeID) as OsmNode;
+        actionAddMidpoint({ loc: projWorldToWgs84(join.coord), edge: edge }, endNode)(graph);
+      }
+    }
+
+
+    /**
+     * Finds the segment of a way that a point lies on.
+     * @param  way - The way to search
+     * @param  coord - The point, in world coordinates
+     * @return The segment's node ids, or `undefined` if `coord` isn't on the way (within `ON_EDGE_METERS`)
+     */
+    function edgeAt(way: OsmWay, coord: Vec2): [EntityID, EntityID] | undefined {
+      for (let i = 0; i < way.nodes.length - 1; i++) {
+        const edge: [EntityID, EntityID] = [way.nodes[i], way.nodes[i + 1]];
+        if (distanceToEdge(edge, coord) <= ON_EDGE_METERS) {
+          return edge;
+        }
+      }
+      return undefined;
+    }
+
+
+    /**
+     * Returns how far a point is from a segment, as the graph has it now.
+     * @param  edge - The segment's node ids
+     * @param  coord - The point, in world coordinates
+     * @return The distance in meters, or `Infinity` if a node of the segment is missing
+     */
+    function distanceToEdge(edge: [EntityID, EntityID], coord: Vec2): number {
+      const a = graph.hasEntity(edge[0]) as OsmNode | undefined;
+      const b = graph.hasEntity(edge[1]) as OsmNode | undefined;
+      if (!a?.loc || !b?.loc) return Infinity;
+      const coordA = graph.geometry(a).parts[0].world?.coords as Vec2 | undefined;  // A node should have a single world coord
+      const coordB = graph.geometry(b).parts[0].world?.coords as Vec2 | undefined;
+      if (!coordA || !coordB) return Infinity;
+      const closest = vecProject(coord, [coordA, coordB]);
+      return closest ? closest.distance / geoMetersToWorld(1, a.loc[1]) : Infinity;
+    }
 
 
     /**
@@ -99,7 +185,7 @@ export function actionRapidAcceptFeature(datum: OsmEntity | GeoJSONData): RapidA
      * @return  Array containing the newly-created node
      */
     function acceptNode(extNode: OsmNode, extGraph: Graph): OsmEntity[] {
-      acceptedIDs.add(extNode.id);
+      acceptedIDs.add(extNode.dataID);
       const n = new OsmNode(extNode, { id: undefined });   // copy external node, generate new ID
       old2new.set(extNode.id, n.id);
       n.props.tags = dictionary!.applyTransforms(extNode.tags);
@@ -115,7 +201,7 @@ export function actionRapidAcceptFeature(datum: OsmEntity | GeoJSONData): RapidA
      * @return  Array containing newly-created nodes and ways
      */
     function acceptWay(extWay: OsmWay, extGraph: Graph): OsmEntity[] {
-      acceptedIDs.add(extWay.id);
+      acceptedIDs.add(extWay.dataID);
       const w = new OsmWay(extWay, { id: undefined });   // copy external way, generate new ID
       old2new.set(extWay.id, w.id);
       w.props.tags = dictionary!.applyTransforms(extWay.tags);
@@ -144,7 +230,7 @@ export function actionRapidAcceptFeature(datum: OsmEntity | GeoJSONData): RapidA
     function acceptRelation(extRelation: OsmRelation, extGraph: Graph): OsmEntity[] {
       if (old2new.has(extRelation.id)) return [];   // done already, avoid recursion
 
-      acceptedIDs.add(extRelation.id);
+      acceptedIDs.add(extRelation.dataID);
       const r = new OsmRelation(extRelation, { id: undefined });  // copy external relation, generate new ID
       old2new.set(extRelation.id, r.id);
       r.props.tags = dictionary!.applyTransforms(extRelation.tags);
@@ -196,49 +282,36 @@ export function actionRapidAcceptFeature(datum: OsmEntity | GeoJSONData): RapidA
       // 1. If there are unaccepted nodes in the external dataset at the same location as
       // the node that we just added, mark them accepted also and import their tags.
       for (const nodeID of way.nodes) {
-        const node = graph.entity(nodeID) as OsmNode;
-        const coord = node.geoms.parts[0].world?.coords as Vec2;  // A node should have a single world coord
+        const coord = graph.geometry(graph.entity(nodeID)).parts[0].world?.coords as Vec2;  // A node should have a single world coord
         if (!coord) continue;
 
         const extHits = spatial.getItemsAtCoord(spatialID!, coord);
         for (const hit of extHits) {
           const other = hit.contents as OsmEntity | GeoJSONData;
-          const otherID = other.id;
+          const otherID = other.dataID;
           // TODO this should work for geojson-like data too
           if (other.type !== 'node') continue;
-          if (rapid.acceptIDs.has(otherID) || rapid.ignoreIDs.has(otherID) || acceptedIDs.has(otherID)) continue;
+          if (rapid.isAcceptedOrIgnored(otherID) || acceptedIDs.has(otherID)) continue;
 
           // Treat this node as accepted, but not actually accept it into the graph.
           // We only really want it for its tags.
           const extNode = other as OsmNode;
-          acceptedIDs.add(extNode.id);
+          acceptedIDs.add(extNode.dataID);
           const copy = new OsmNode(extNode);
           copy.props.tags = dictionary!.applyTransforms(extNode.tags);
           removeMetadata(copy);
-          // merge the external node's tags into the existing node
-          for (const [k, v] of Object.entries(copy.props.tags ?? {})) {
-            node.props.tags![k] = v;
-          }
-          node.touch();
-          graph.replace(node);
+          // merge the external node's tags into the existing node (a new node, entities aren't changed in place)
+          const node = graph.entity(nodeID) as OsmNode;
+          graph.replace(node.update({ tags: { ...node.tags, ...copy.tags } }));
         }
       }
 
-      // 2. Run the validator for almost junction and autofix whatever it found.
-      const checkAlmostJunction = validateAlmostJunction(context);
-      for (const issue of checkAlmostJunction(way, graph).issues) {
-        if (issue.autoArgs) {
-          graph = issue.autoArgs[0](graph);   // autoArgs = [action, annotation]
-        }
-      }
-
-      // 3. Run the validator for crossing ways and autofix whatever it found.
-      const checkCrossingWays = validateCrossingWays(context);
-      for (const issue of checkCrossingWays(way, graph).issues) {
-        if (issue.autoArgs) {
-          graph = issue.autoArgs[0](graph);   // autoArgs = [action, annotation]
-        }
-      }
+      // 2. Run the validator for almost junction and autofix whatever it found,
+      // 3. then the validator for crossing ways, on the way as the first fixes left it.
+      actionAutofix([
+        { entityID: way.id, validator: validateAlmostJunction(context) },
+        { entityID: way.id, validator: validateCrossingWays(context) }
+      ])(graph);
     }
 
   }) as RapidAcceptAction;
@@ -273,6 +346,7 @@ export function actionRapidAcceptFeature(datum: OsmEntity | GeoJSONData): RapidA
     delete props.fbID;
     delete props.serviceID;
     delete props.datasetID;
+    delete props.spatialID;   // the accepted entity is OSM data now
     delete tags.conn;
     delete tags.orig_id;
     delete tags.debug_way_id;
@@ -299,7 +373,7 @@ export function actionRapidAcceptFeature(datum: OsmEntity | GeoJSONData): RapidA
     const nodemap = new Map<string, OsmNode>();
 
     // Accept the original id
-    acceptedIDs.add(data.id);
+    acceptedIDs.add(data.dataID);
 
     // Convert source properties to target tags
     const tags = dictionary.applyTransforms(data.properties ?? {});

@@ -1,6 +1,6 @@
 import { Extent, geoSphericalDistance } from '@rapid-sdk/math';
 
-import { DeleteOperation } from '../operations/DeleteOperation.ts';
+import { actionDeleteWay } from '../actions/delete_way.ts';
 import { ValidationIssue } from '../lib/ValidationIssue.ts';
 import { ValidationFix } from '../lib/ValidationFix.ts';
 
@@ -49,19 +49,25 @@ export function validateShortRoad(context: Context): ValidatorFunction {
   /**
    * Activates draw-line mode to continue drawing from the given vertex.
    * Also attempts to pas the map if the vertex is not visible.
-   * @param way
-   * @param vertex
-   * @param context
+   * Does nothing if the vertex isn't at an end of the way anymore.
+   * @param wayID - The way to continue
+   * @param vertexID - The end node to continue it from
    */
-  function continueDrawing(way: OsmWay, vertex: OsmNode, context: Context): void {
+  function continueDrawing(wayID: EntityID, vertexID: EntityID): void {
     if (!context.editable()) return;
 
+    const graph = editor.staging.graph;
+    const way = graph.hasEntity(wayID) as OsmWay | undefined;
+    const vertex = graph.hasEntity(vertexID) as OsmNode | undefined;
+    if (!way || !vertex || way.isClosed()) return;
+    if (way.first() !== vertexID && way.last() !== vertexID) return;
+
     // make sure the vertex is actually visible and editable
-    if (!(map?.trimmedExtent() as Extent).contains(new Extent(vertex.loc!))) {
-      map?.fitEntitiesEase(vertex);
+    if (map && !(map.trimmedExtent() as Extent).contains(new Extent(vertex.loc!))) {
+      map.fitEntitiesEase(vertex);
     }
 
-    context.enter('draw-line', { continueWayID: way.id, continueNodeID: vertex.id });
+    context.enter('draw-line', { continueWayID: wayID, continueNodeID: vertexID });
   }
 
 
@@ -95,9 +101,7 @@ export function validateShortRoad(context: Context): ValidatorFunction {
         title: l10n.t('issues.fix.continue_from_start.title'),
         entityIds: [way.first()!],
         onClick: function(this: any) {
-          const graph = editor.staging.graph;
-          const vertex = graph.entity(way.first()!) as OsmNode;
-          continueDrawing(way, vertex, context);
+          continueDrawing(this.issue.entityIds[0], this.entityIds[0]);
         }
       }));
     }
@@ -108,24 +112,26 @@ export function validateShortRoad(context: Context): ValidatorFunction {
         title: l10n.t('issues.fix.continue_from_end.title'),
         entityIds: [way.last()!],
         onClick: function(this: any) {
-          const graph = editor.staging.graph;
-          const vertex = graph.entity(way.last()!) as OsmNode;
-          continueDrawing(way, vertex, context);
+          continueDrawing(this.issue.entityIds[0], this.entityIds[0]);
         }
       }));
     }
 
-    if (!new DeleteOperation(context, [way.id]).disabled()) {
+    // Deleting a way that's in a relation (e.g. a route) would change the relation too
+    if (!graph.parentRelations(way).length) {
       fixes.push(new ValidationFix({
         icon: 'rapid-operation-delete',
         title: l10n.t('issues.fix.delete_feature.title'),
         entityIds: [way.id],
         onClick: function(this: any) {
-          const id = this.issue.entityIds[0];
-          const operation = new DeleteOperation(context, [id]);
-          if (!operation.disabled()) {
-            operation.run();
-          }
+          const graph = editor.staging.graph;
+          const wayID = this.issue.entityIds[0];
+          const way = graph.hasEntity(wayID);
+          if (!way || graph.parentRelations(way).length) return;
+
+          editor.perform(actionDeleteWay(wayID));
+          editor.commit({ stringID: 'operations.delete.annotation.line', selectionAfter: [wayID] });
+          context.enter('browse');
         }
       }));
     }

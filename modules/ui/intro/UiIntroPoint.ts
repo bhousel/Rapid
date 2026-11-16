@@ -3,12 +3,11 @@ import { select } from 'd3-selection';
 
 import { AbstractIntroChapter } from './AbstractIntroChapter.ts';
 import { actionChangePreset } from '../../actions/change_preset.ts';
-import { delayAsync, eventCancel, helpHtml, icon, transitionTime } from './helper.ts';
+import { delayAsync, eventCancel, helpHtml, icon } from './helper.ts';
 
 import type { Context } from '../../Context.ts';
 import type { IntroStep } from './AbstractIntroChapter.ts';
 import type { UiCurtain } from './UiCurtain.ts';
-import type { Vec2 } from '@rapid-sdk/math';
 
 
 const buildingExtent = new Extent([-85.63261, 41.94391], [-85.63222, 41.94419]);
@@ -53,7 +52,7 @@ export class UiIntroPoint extends AbstractIntroChapter {
   /** @return `true` if the tutorial point is the single selected feature */
   protected _isPointSelected(): boolean {
     const context = this.context;
-    if (context.mode?.id !== 'select-osm') return false;
+    if (context.mode?.id !== 'select') return false;
     const ids = context.selectedIDs();
     return ids.length === 1 && ids[0] === this._pointID;
   }
@@ -72,7 +71,7 @@ export class UiIntroPoint extends AbstractIntroChapter {
     this._pointID = null;
 
     const loc = buildingExtent.center();
-    const msec = transitionTime(loc, map.center() as Vec2);
+    const msec = map.easeDuration(loc, 20);
     if (msec > 0) curtain.hide();
 
     // bug: too hard to place a point in the building at z19 because of snapping to fill #719
@@ -150,7 +149,7 @@ export class UiIntroPoint extends AbstractIntroChapter {
       return await new Promise<IntroStep>((resolve, reject) => {
         this._rejectStep = reject;
         if (!this._doesPointExist()) { resolve(this._addPointAsync); return; }
-        if (!this._isPointSelected()) context.enter('select-osm', { selection: { osm: [this._pointID] }});
+        if (!this._isPointSelected()) context.enter('select', { selection: [this._pointID] });
 
         this._onModeChange = reject;  // disallow mode change
         this._onStableChange = (difference: any) => {
@@ -216,7 +215,7 @@ export class UiIntroPoint extends AbstractIntroChapter {
       return await new Promise<IntroStep>((resolve, reject) => {
         this._rejectStep = reject;
         if (!this._doesPointExist()) { resolve(this._addPointAsync); return; }
-        if (!this._isPointSelected()) context.enter('select-osm', { selection: { osm: [this._pointID] }});
+        if (!this._isPointSelected()) context.enter('select', { selection: [this._pointID] });
 
         // If user leaves select mode here, just continue with the tutorial.
         this._onModeChange = () => resolve(this._addNameAsync);
@@ -252,7 +251,7 @@ export class UiIntroPoint extends AbstractIntroChapter {
       return await new Promise<IntroStep>((resolve, reject) => {
         this._rejectStep = reject;
         if (!this._doesPointExist()) { resolve(this._addPointAsync); return; }
-        if (!this._isPointSelected()) context.enter('select-osm', { selection: { osm: [this._pointID] }});
+        if (!this._isPointSelected()) context.enter('select', { selection: [this._pointID] });
 
         // If user leaves select mode here, just continue with the tutorial.
         this._onModeChange = () => resolve(this._hasPointAsync);
@@ -297,7 +296,7 @@ export class UiIntroPoint extends AbstractIntroChapter {
     const curtain = this._curtain;
 
     if (!this._doesPointExist()) return this._addPointAsync;
-    if (!this._isPointSelected()) context.enter('select-osm', { selection: { osm: [this._pointID] }});
+    if (!this._isPointSelected()) context.enter('select', { selection: [this._pointID] });
 
     try {
       return await new Promise<IntroStep>((resolve, reject) => {
@@ -324,7 +323,6 @@ export class UiIntroPoint extends AbstractIntroChapter {
   protected async _hasPointAsync(): Promise<IntroStep | void> {
     const context = this.context;
     const editor = context.systems.editor!;
-    const l10n = context.systems.l10n!;
     const schema = context.systems.schema!;
 
     if (!this._doesPointExist()) return this._addPointAsync;
@@ -336,8 +334,8 @@ export class UiIntroPoint extends AbstractIntroChapter {
     if (preset !== this._cafePreset) {
       editor.perform(actionChangePreset(this._pointID!, preset, this._cafePreset));
       editor.commit({
-        annotation: l10n.t('operations.change_tags.annotation'),
-        selectedIDs: [this._pointID!]
+        stringID: 'operations.change_tags.annotation',
+        selectionAfter: [this._pointID!]
       });
     }
 
@@ -358,7 +356,7 @@ export class UiIntroPoint extends AbstractIntroChapter {
     editor.restoreCheckpoint('hasPoint');
 
     const loc = buildingExtent.center();
-    const msec = transitionTime(loc, map.center() as Vec2);
+    const msec = map.easeDuration(loc, 20);
     if (msec > 0) curtain.hide();
 
     // bug: too hard to place a point in the building at z19 because of snapping to fill #719
@@ -448,7 +446,7 @@ export class UiIntroPoint extends AbstractIntroChapter {
     const curtain = this._curtain;
 
     if (!this._doesPointExist()) return this._reselectPointAsync;
-    if (!['browse', 'select-osm'].includes(context.mode?.id ?? '')) context.enter('browse');
+    if (!['browse', 'select'].includes(context.mode?.id ?? '')) context.enter('browse');
 
     let onToggled: ((open: boolean) => void) | undefined;
     try {

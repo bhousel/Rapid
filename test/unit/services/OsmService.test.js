@@ -1,6 +1,7 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, it, mock } from 'bun:test';
 import { promisify } from 'bun:util';
 import { assert } from 'chai';
+import { DOMImplementation, XMLSerializer } from '@xmldom/xmldom';
 import fetchMock from 'fetch-mock';
 import * as Rapid from '../../../modules/headless.js';
 import * as sample from './OsmService.sample.js';
@@ -580,6 +581,52 @@ describe('OsmService', () => {
     });
 
 
+    describe('loadEntityVersionsAsync', () => {
+      // Answers like the OSM API: 404 for the whole request if any version in it can't be found.
+      // (Here, that's node 2 version 9.)  Without a version, the current version is 5.
+      function nodesResponse(callLog) {
+        const ids = new URL(callLog.url).searchParams.get('nodes').split(',');
+        if (ids.includes('2v9')) return 404;
+        const elements = ids.map(s => {
+          const [id, version] = s.split('v');
+          return { type: 'node', id: +id, lat: 0, lon: 0, version: +(version ?? 5), visible: true };
+        });
+        return { version: '0.6', elements: elements };
+      }
+
+      it('loads entities at the given versions, or the current version', () => {
+        fetchMock.route(/nodes\.json\?nodes=/, nodesResponse);
+
+        const prom = _osm.loadEntityVersionsAsync(new Map([['n1', 3], ['n3', undefined]]));
+        assert.instanceOf(prom, Promise);
+
+        return prom
+          .then(data => {
+            assert.sameDeepMembers(data.map(d => [d.id, d.version]), [['n1', 3], ['n3', 5]]);
+            assert.lengthOf(fetchMock.callHistory.calls(), 1);   // in one request
+            assert.include(fetchMock.callHistory.lastCall().url, 'nodes=1v3,3');
+          });
+      });
+
+      it('leaves out versions that can\'t be found', () => {
+        fetchMock.route(/nodes\.json\?nodes=/, nodesResponse);
+
+        return _osm.loadEntityVersionsAsync(new Map([['n1', 3], ['n2', 9], ['n3', 1]]))
+          .then(data => {
+            assert.sameDeepMembers(data.map(d => [d.id, d.version]), [['n1', 3], ['n3', 1]]);
+          });
+      });
+
+      it('rejects if a request fails for another reason', () => {
+        fetchMock.route(/nodes\.json\?nodes=/, 500);
+
+        return _osm.loadEntityVersionsAsync(new Map([['n1', 3]]))
+          .then(() => assert.fail('Promise was fulfilled but should have been rejected'))
+          .catch(err => assert.strictEqual(err.status, 500));
+      });
+    });
+
+
     describe('getUserDetailsAsync', () => {
       it('rejects if not logged in', () => {
         const prom = _osm.getUserDetailsAsync();
@@ -624,6 +671,23 @@ describe('OsmService', () => {
           .then(result => {
             assert.strictEqual(result['rapid.settings.areaFill'], 'partial');
             assert.isUndefined(result['rapid~settings~areaFill']);
+          });
+      });
+
+      it('leaves other applications\' keys with `~` alone', () => {
+        return loginAsync()
+          .then(() => _osm.getUserPreferencesAsync())
+          .then(result => {
+            assert.strictEqual(result['other~app'], 'tilde');
+            assert.isUndefined(result['other.app']);
+          });
+      });
+
+      it('skips Rapid settings keys stored with dots, which the single-key API cannot address', () => {
+        return loginAsync()
+          .then(() => _osm.getUserPreferencesAsync())
+          .then(result => {
+            assert.isUndefined(result['rapid.settings.meta.updatedAt']);
           });
       });
     });
@@ -826,6 +890,213 @@ describe('OsmService', () => {
             assert.strictEqual(results[0].type, 'changeset');
             assert.strictEqual(results[0].id, 'c1');
           });
+      });
+    });
+
+
+    describe('sendChangeset', () => {
+      const changes = { created: [], modified: [], deleted: [] };
+      const sendAsync = () => new Promise(resolve => {
+        const changeset = new Rapid.OsmChangeset(context, { tags: { comment: 'test' } });
+        _osm.sendChangeset(changeset, changes, (err, updated) => resolve({ err, updated }));
+      });
+      const changesetJSON = (count) => ({ version: '0.6', changeset: { id: 123, open: true, changes_count: count, tags: {} } });
+
+      // Unit tests have no DOM, and JXON needs one to write the changeset XML.
+      let _document, _XMLSerializer;
+      beforeAll(() => {
+        _document = globalThis.document;
+        _XMLSerializer = globalThis.XMLSerializer;
+        globalThis.document = { implementation: new DOMImplementation() };
+        globalThis.XMLSerializer = XMLSerializer;
+      });
+      afterAll(() => {
+        globalThis.document = _document;
+        globalThis.XMLSerializer = _XMLSerializer;
+      });
+
+      beforeEach(() => {
+        fetchMock.route(/changeset\/create/, { body: '123', headers: { 'Content-Type': 'text/plain' } });
+        fetchMock.route(/changeset\/123\/close/, 200);
+      });
+
+      it('reports an error the server answers with', () => {
+        fetchMock.route(/changeset\/123\/upload/, 409);
+
+        return loginAsync()
+          .then(() => sendAsync())
+          .then(({ err }) => {
+            assert.strictEqual(err.status, 409);
+            const checks = fetchMock.callHistory.calls().filter(c => /changeset\/123\.json/.test(c.url));
+            assert.lengthOf(checks, 0);   // no need to ask whether it went through
+          });
+      });
+
+      it('waits for `beforeUpload` before uploading, and uploads even if it fails', () => {
+        fetchMock.route(/changeset\/123\/upload/, 409);
+        const seen = [];
+        const beforeUpload = (changeset) => {
+          const uploads = fetchMock.callHistory.calls().filter(c => /upload/.test(c.url));
+          seen.push([changeset.id, uploads.length]);
+          return new Promise((_, reject) => { setTimeout(() => reject(new Error('no database')), 10); });
+        };
+
+        return loginAsync()
+          .then(() => new Promise(resolve => {
+            const changeset = new Rapid.OsmChangeset(context, { tags: { comment: 'test' } });
+            _osm.sendChangeset(changeset, changes, (err) => resolve(err), beforeUpload);
+          }))
+          .then(err => {
+            assert.deepEqual(seen, [['123', 0]]);
+            assert.strictEqual(err.status, 409);   // it still uploaded
+          });
+      });
+
+      it('reports a lost connection while creating the changeset', () => {
+        fetchMock.removeRoutes();
+        fetchMock.route(/changeset\/create/, { throws: new TypeError('Failed to fetch') });
+
+        return loginAsync()
+          .then(() => sendAsync())
+          .then(({ err }) => assert.strictEqual(err.message, 'Failed to fetch'));
+      });
+
+      it('succeeds if the upload got no answer, but the changeset has the changes', () => {
+        fetchMock.route(/changeset\/123\/upload/, { throws: new TypeError('Failed to fetch') });
+        fetchMock.route(/changeset\/123\.json/, changesetJSON(2));
+
+        return loginAsync()
+          .then(() => sendAsync())
+          .then(({ err, updated }) => {
+            assert.isNull(err);
+            assert.strictEqual(updated.id, '123');
+          });
+      });
+
+      it('reports status -5 if the upload got no answer, and the changeset is closed with no changes', () => {
+        fetchMock.route(/changeset\/123\/upload/, { throws: new TypeError('Failed to fetch') });
+        fetchMock.route(/changeset\/123\.json/, changesetJSON(0));
+
+        return loginAsync()
+          .then(() => sendAsync())
+          .then(({ err }) => {
+            assert.strictEqual(err.status, -5);
+            const urls = fetchMock.callHistory.calls().map(c => c.url);
+            const closed = urls.findIndex(url => /changeset\/123\/close/.test(url));
+            const counted = urls.findIndex(url => /changeset\/123\.json/.test(url));
+            assert.isAbove(closed, -1, 'closed the changeset');
+            assert.isAbove(counted, closed, 'before counting its changes');
+          });
+      });
+
+      it('opens a new changeset after an upload that got no answer and wasn\'t applied', () => {
+        fetchMock.route(/changeset\/123\/upload/, { throws: new TypeError('Failed to fetch') }, { repeat: 1 });
+        fetchMock.route(/changeset\/123\.json/, changesetJSON(0));
+
+        return loginAsync()
+          .then(() => sendAsync())
+          .then(({ err }) => {
+            assert.strictEqual(err.status, -5);
+            return sendAsync();   // the user saves again
+          })
+          .then(() => {
+            const creates = fetchMock.callHistory.calls().filter(c => /changeset\/create/.test(c.url));
+            assert.lengthOf(creates, 2, 'a new changeset, since the old one is closed');
+          });
+      });
+
+      it('reports status -6 if the upload got no answer, and the changeset can\'t be closed yet', () => {
+        // The server may still be applying the upload: it holds the changeset, so a close fails
+        fetchMock.removeRoutes();
+        fetchMock.route(/changeset\/create/, { body: '123', headers: { 'Content-Type': 'text/plain' } });
+        fetchMock.route(/changeset\/123\/close/, { status: 409, body: 'Changeset 123 is currently locked by another process.' });
+        fetchMock.route(/changeset\/123\/upload/, { throws: new TypeError('Failed to fetch') });
+        fetchMock.route(/changeset\/123\.json/, changesetJSON(0));
+
+        return loginAsync()
+          .then(() => sendAsync())
+          .then(({ err }) => assert.strictEqual(err.status, -6));
+      });
+
+      it('reports status -6 if the upload got no answer, and the changeset can\'t be checked', () => {
+        fetchMock.route(/changeset\/123\/upload/, { throws: new TypeError('Failed to fetch') });
+        fetchMock.route(/changeset\/123\.json/, { throws: new TypeError('Failed to fetch') });
+
+        return loginAsync()
+          .then(() => sendAsync())
+          .then(({ err }) => assert.strictEqual(err.status, -6));
+      });
+
+      it('doesn\'t reuse the changeset after it can\'t tell whether the upload went through', () => {
+        fetchMock.route(/changeset\/123\/upload/, { throws: new TypeError('Failed to fetch') }, { repeat: 1 });
+        fetchMock.route(/changeset\/123\.json/, { throws: new TypeError('Failed to fetch') });
+
+        return loginAsync()
+          .then(() => sendAsync())
+          .then(({ err }) => {
+            assert.strictEqual(err.status, -6);
+            return sendAsync();   // the user saves again
+          })
+          .then(() => {
+            const creates = fetchMock.callHistory.calls().filter(c => /changeset\/create/.test(c.url));
+            assert.lengthOf(creates, 2, 'a new changeset');
+          });
+      });
+
+      it('reuses the changeset after an upload that wasn\'t applied', () => {
+        fetchMock.route(/changeset\/123\/upload/, 409, { repeat: 1 });
+
+        return loginAsync()
+          .then(() => sendAsync())
+          .then(({ err }) => {
+            assert.strictEqual(err.status, 409);
+            return sendAsync();
+          })
+          .then(() => {
+            const creates = fetchMock.callHistory.calls().filter(c => /changeset\/create/.test(c.url));
+            assert.lengthOf(creates, 1, 'the same changeset');
+          });
+      });
+
+      it('opens a new changeset after the API says the open one was closed', () => {
+        const closed = 'The changeset 123 was closed at 2026-10-27 12:00:00 UTC';
+        fetchMock.route(/changeset\/123\/upload/, { status: 409, body: closed }, { repeat: 1 });
+
+        return loginAsync()
+          .then(() => sendAsync())
+          .then(({ err }) => {
+            assert.strictEqual(err.status, 409);
+            assert.isTrue(_osm.isChangesetClosedError(err));
+            return sendAsync();   // the uploader saves again
+          })
+          .then(() => {
+            const creates = fetchMock.callHistory.calls().filter(c => /changeset\/create/.test(c.url));
+            assert.lengthOf(creates, 2, 'a new changeset');
+          });
+      });
+
+      it('tells a closed changeset from a version conflict', () => {
+        assert.isTrue(_osm.isChangesetClosedError({ status: 409, body: 'The changeset 123 was closed at 2026-10-27 12:00:00 UTC' }));
+        assert.isFalse(_osm.isChangesetClosedError({ status: 409, body: 'Version mismatch: Provided 1, server had: 2 of Node 1' }));
+        assert.isFalse(_osm.isChangesetClosedError({ status: 404, body: 'The changeset 123 was closed' }));
+        assert.isFalse(_osm.isChangesetClosedError(null));
+      });
+
+      it('reports status -6 if the connection was switched while the upload was out, even if it succeeded', () => {
+        let finishUpload;
+        fetchMock.route(/changeset\/123\/upload/, new Promise(resolve => { finishUpload = resolve; }).then(() => 200));
+
+        return loginAsync()
+          .then(() => {
+            const result = sendAsync();
+            return new Promise(resolve => { setTimeout(resolve, 10); })   // the upload is out
+              .then(() => {
+                _osm._connectionID++;   // what `resetAsync` and `switchAsync` do
+                finishUpload();         // the upload succeeds
+                return result;
+              });
+          })
+          .then(({ err }) => assert.strictEqual(err.status, -6));
       });
     });
 

@@ -16,21 +16,30 @@ import type { Context } from '../Context.ts';
  * -  `id` (or `modeID`) - String identifier for the mode (e.g. 'browse')
  * -  `active`           - `true` if the mode is active, `false` if not.
  * -  `operations`       - Array of operations allowed on the right-click edit menu
- * -  `selectedData`     - `Map<DataID, AbstractData>` containing selected data
+ * -  `selectedIDs`      - The data IDs of the selected data (see `design/data-ids.md`)
+ * -  `selectedData`     - `Map<DataID, AbstractData>` of the selected data, looked up by data ID
+ * -  `selectionBefore`  - The data IDs that were selected before the mode's work started
+ * -  `interactiveSpatialIDs` - The spatial IDs the pointer can reach in this mode, `null` for all
  */
 export class AbstractMode extends EventEmitter {
 
-  /** Unique string identifier for this mode (e.g. 'browse', 'select-osm') */
+  /** Unique string identifier for this mode (e.g. 'browse', 'select') */
   public id: ModeID;
   /** Global shared application context */
   public context: Context;
   /** Operations allowed in this mode; shown in the right-click edit menu */
   public operations: AbstractOperation[];
+  /**
+   * The spatial IDs whose features the pointer can hover and click in this mode, or `null` for all
+   * of them. A mode that only works on OSM (drawing, dragging a node) says `['osm']`, so the scene
+   * skips the Rapid, photo and QA features drawn over the OSM ones (see `design/scene.md`).
+   */
+  public interactiveSpatialIDs: ReadonlySet<SpatialID> | null;
 
   /** Whether this mode is currently active */
   protected _active: boolean;
-  /** Currently selected data items keyed by their DataID */
-  protected _selectedData: Map<DataID, AbstractData>;
+  /** Data IDs of the currently selected data */
+  protected _selectedIDs: DataID[];
 
 
   /**
@@ -42,8 +51,9 @@ export class AbstractMode extends EventEmitter {
     this.context = context;
 
     this._active = false;
-    this._selectedData = new Map<DataID, AbstractData>();
+    this._selectedIDs = [];
     this.operations = [];
+    this.interactiveSpatialIDs = null;
   }
 
 
@@ -87,22 +97,43 @@ export class AbstractMode extends EventEmitter {
 
 
   /**
-   * Map of currently selected data elements, keyed by their `DataID`
+   * Map of currently selected data elements, keyed by their `DataID`.
+   * Each one is looked up by its data ID (`SpatialSystem.getData`), so it's always the current
+   * version. Data that can't be found right now is left out.
    * @return  Map of selected data
    * @readonly
    */
   public get selectedData(): Map<DataID, AbstractData> {
-    return this._selectedData;
+    const spatial = this.context.systems.spatial!;
+
+    const result = new Map<DataID, AbstractData>();
+    for (const dataID of this._selectedIDs) {
+      const datum = spatial.getData(dataID);
+      if (datum) result.set(dataID, datum);
+    }
+    return result;
   }
 
 
   /**
    * Array of currently selected data IDs
-   * @return  Array of selected `DataID`s
+   * @return  Array of selected `DataID`s (a copy)
    * @readonly
    */
   public get selectedIDs(): DataID[] {
-    return Array.from(this._selectedData.keys());
+    return [...this._selectedIDs];
+  }
+
+
+  /**
+   * What was selected before the work this mode is doing started. Undo while that work is in
+   * progress throws it away and selects this. Most modes work on what they have selected; a mode
+   * that selects something else while it works (dragging a node) overrides this.
+   * @return  Array of `DataID`s (a copy)
+   * @readonly
+   */
+  public get selectionBefore(): DataID[] {
+    return this.selectedIDs;
   }
 
 }

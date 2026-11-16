@@ -1,6 +1,6 @@
 import { Extent, geoSphericalDistance } from '@rapid-sdk/math';
 import { AbstractIntroChapter } from './AbstractIntroChapter.ts';
-import { delayAsync, eventCancel, helpHtml, icon, transitionTime } from './helper.ts';
+import { delayAsync, eventCancel, helpHtml, icon } from './helper.ts';
 
 import type { Context } from '../../Context.ts';
 import type { IntroStep } from './AbstractIntroChapter.ts';
@@ -91,7 +91,7 @@ export class UiIntroLine extends AbstractIntroChapter {
   /** @return `true` if the tutorial line is the single selected feature */
   protected _isLineSelected(): boolean {
     const context = this.context;
-    if (context.mode?.id !== 'select-osm') return false;
+    if (context.mode?.id !== 'select') return false;
     const ids = context.selectedIDs();
     return ids.length === 1 && ids[0] === this._lineID;
   }
@@ -120,7 +120,7 @@ export class UiIntroLine extends AbstractIntroChapter {
   /** @return `true` if Wood Street is the single selected feature */
   protected _isWoodStreetSelected(): boolean {
     const context = this.context;
-    if (context.mode?.id !== 'select-osm') return false;
+    if (context.mode?.id !== 'select') return false;
     const ids = context.selectedIDs();
     return ids.length === 1 && ids[0] === this._woodStreetID;
   }
@@ -142,7 +142,7 @@ export class UiIntroLine extends AbstractIntroChapter {
   /** @return `true` if the 11th Avenue endpoint is the single selected feature */
   protected _is11thAveEndSelected(): boolean {
     const context = this.context;
-    if (context.mode?.id !== 'select-osm') return false;
+    if (context.mode?.id !== 'select') return false;
     const ids = context.selectedIDs();
     return ids.length === 1 && ids[0] === this._eleventhAvenueEndID;
   }
@@ -163,7 +163,7 @@ export class UiIntroLine extends AbstractIntroChapter {
     this._lineID = null;
 
     const loc = this._tulipRoadStartExtent.center();
-    const msec = transitionTime(loc, map.center() as Vec2);
+    const msec = map.easeDuration(loc, 18.5);
     if (msec > 0) curtain.hide();
 
     await map.setMapParamsAsync(loc, 18.5, 0, msec);
@@ -237,7 +237,7 @@ export class UiIntroLine extends AbstractIntroChapter {
     const curtain = this._curtain;
 
     const loc = this._tulipRoadMidExtent.center();
-    const msec = transitionTime(loc, map.center() as Vec2);
+    const msec = map.easeDuration(loc, 18.5);
 
     await map.setMapParamsAsync(loc, 18.5, 0, msec);
 
@@ -291,7 +291,7 @@ export class UiIntroLine extends AbstractIntroChapter {
     const curtain = this._curtain;
 
     const loc = this._tulipRoadMidExtent.center();
-    const msec = transitionTime(loc, map.center() as Vec2);
+    const msec = map.easeDuration(loc, 18.5);
 
     await map.setMapParamsAsync(loc, 18.5, 0, msec);
 
@@ -332,7 +332,7 @@ export class UiIntroLine extends AbstractIntroChapter {
       return await new Promise<IntroStep>((resolve, reject) => {
         this._rejectStep = reject;
         if (!this._doesLineExist()) { resolve(this._addLineAsync); return; }
-        if (!this._isLineSelected()) context.enter('select-osm', { selection: { osm: [this._lineID] }} );
+        if (!this._isLineSelected()) context.enter('select', { selection: [this._lineID] });
 
         this._onModeChange = reject;   // disallow mode change
 
@@ -380,7 +380,7 @@ export class UiIntroLine extends AbstractIntroChapter {
       return await new Promise<IntroStep>((resolve, reject) => {
         this._rejectStep = reject;
         if (!this._doesLineExist()) { resolve(this._addLineAsync); return; }
-        if (!this._isLineSelected()) context.enter('select-osm', { selection: { osm: [this._lineID] }} );
+        if (!this._isLineSelected()) context.enter('select', { selection: [this._lineID] });
 
         // ui.Sidebar.showPresetList(); // calling this again causes issue
         container.select('.inspector-wrap').on('wheel.intro', eventCancel);   // prevent scrolling
@@ -446,7 +446,7 @@ export class UiIntroLine extends AbstractIntroChapter {
       return await new Promise<IntroStep>((resolve, reject) => {
         this._rejectStep = reject;
         if (!this._doesLineExist()) { resolve(this._addLineAsync); return; }
-        if (!this._isLineSelected()) context.enter('select-osm', { selection: { osm: [this._lineID] }} );
+        if (!this._isLineSelected()) context.enter('select', { selection: [this._lineID] });
 
         ui.Sidebar.showPresetList();
         container.select('.inspector-wrap').on('wheel.intro', eventCancel);   // prevent scrolling
@@ -507,7 +507,7 @@ export class UiIntroLine extends AbstractIntroChapter {
       return await new Promise<IntroStep>((resolve, reject) => {
         this._rejectStep = reject;
         if (!this._doesLineExist()) { resolve(this._addLineAsync); return; }
-        if (!this._isLineSelected()) context.enter('select-osm', { selection: { osm: [this._lineID] }} );
+        if (!this._isLineSelected()) context.enter('select', { selection: [this._lineID] });
 
         this._onModeChange = () => resolve(this._didNameRoadAsync);
 
@@ -567,7 +567,7 @@ export class UiIntroLine extends AbstractIntroChapter {
     if (!this._hasWoodStreetParts()) editor.restoreCheckpoint('initial');
 
     const loc = this._woodStreetExtent.center();
-    const msec = transitionTime(loc, map.center() as Vec2);
+    const msec = map.easeDuration(loc, 19);
     if (msec > 0) curtain.hide();
 
     await map.setMapParamsAsync(loc, 19, 0, msec);
@@ -599,7 +599,7 @@ export class UiIntroLine extends AbstractIntroChapter {
         this._rejectStep = reject;
 
         this._onModeChange = (mode: any) => {
-          if (!['browse', 'select-osm'].includes(mode.id)) reject();
+          if (!['browse', 'select'].includes(mode.id)) reject();
         };
         this._onStagingChange = (difference: any) => {
           if (difference && difference.created().length === 1) {   // expect to create 1 node
@@ -720,7 +720,7 @@ export class UiIntroLine extends AbstractIntroChapter {
     const curtain = this._curtain;
 
     if (!this._hasWoodStreetParts()) return this._updateLineAsync;
-    if (!this._isWoodStreetSelected()) context.enter('select-osm', { selection: { osm: [this._woodStreetID] }} );
+    if (!this._isWoodStreetSelected()) context.enter('select', { selection: [this._woodStreetID] });
 
     try {
       return await new Promise<IntroStep>((resolve, reject) => {
@@ -790,7 +790,7 @@ export class UiIntroLine extends AbstractIntroChapter {
     if (!this._has12thAvenueParts()) editor.restoreCheckpoint('initial');
 
     const loc = this._deleteLinesExtent.center();
-    const msec = transitionTime(loc, map.center() as Vec2);
+    const msec = map.easeDuration(loc, 18);
     if (msec > 0) curtain.hide();
 
     await map.setMapParamsAsync(loc, 18, 0, msec);
@@ -875,7 +875,7 @@ export class UiIntroLine extends AbstractIntroChapter {
       await new Promise<void>((resolve, reject) => {
         this._rejectStep = reject;
         if (!this._has12thAvenueParts()) { resolve(); return; }
-        if (!this._is11thAveEndSelected()) context.enter('select-osm', { selection: { osm: [this._eleventhAvenueEndID] }} );
+        if (!this._is11thAveEndSelected()) context.enter('select', { selection: [this._eleventhAvenueEndID] });
 
         const revealEditMenu = (duration = 0): void => {
           const menuNode = container.select('.edit-menu').node();
@@ -910,8 +910,9 @@ export class UiIntroLine extends AbstractIntroChapter {
 
       await delayAsync();   // wait for any transtion to complete
 
-      // then check undo annotation to see what the user did
-      if (editor.getUndoAnnotation() === l10n.t('operations.split.annotation.line', { n: 1 })) {
+      // then check the undo edit to see what the user did
+      const label = { stringID: 'operations.split.annotation.line', stringParams: { n: 1 } };
+      if (editor.getUndoEdit()?.isLabeled(label)) {
         return this._didSplitAsync;
       } else {
         return this._retrySplitAsync;

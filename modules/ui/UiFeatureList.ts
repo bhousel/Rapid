@@ -472,21 +472,20 @@ export class UiFeatureList {
     // Gather affected ids
     const graph = editor.staging.graph;
     const base = graph.base.entities;
-    const local = graph.local.entities;
+    const local = graph.localEntities();
     const ids = new Set([...base.keys(), ...local.keys()]);
 
     let localResults: SearchResult[] = [];
     for (const id of ids) {
-      if (local.has(id) && local.get(id) === undefined) continue;  // deleted locally
       const entity = graph.hasEntity(id);
-      if (!entity) continue;
+      if (!entity) continue;   // deleted locally
 
       const name = l10n.displayName(entity.tags) || '';
       if (name.toLowerCase().indexOf(q) < 0) continue;
 
       const matched = schema.match(entity, graph);
       const type = (matched && matched.name) || l10n.displayType(entity.id);
-      const extent = (entity as any).extent(graph);   // extent(graph) not typed on the OSM class hierarchy
+      const extent = graph.extent(entity);
       const distance = extent ? geoSphericalDistance(centerLoc, extent.center()) : 0;
 
       localResults.push({

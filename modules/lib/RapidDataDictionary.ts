@@ -1,7 +1,6 @@
 import { TreeStore } from '../lib/TreeStore.ts';
 
 import type { Context } from '../Context.ts';
-import type { TreeValue } from './TreeStore.ts';
 
 
 /**
@@ -66,22 +65,22 @@ export class RapidDataDictionary {
 
 
   /**
-   * Returns a settings-safe JSON representation of this `RapidDataDictionary`.
+   * Returns a JSON representation of this `RapidDataDictionary`, in plain JSON types.
    * @return JSON representation of this data element
    */
-  public toJSON(): Record<string, TreeValue> {
-    const result: Record<string, TreeValue> = {};
+  public toJSON(): Record<string, unknown> {
+    const result: Record<string, unknown> = {};
 
     if (this.transforms.length > 0) {
       result.transforms = this.transforms.map((t: RapidDataTransform) => {
-        const item: TreeValue = {
-          order: t.order.toString(),
+        const item: Partial<RapidDataTransform> = {
+          order: t.order,
           function: t.function
         };
         if (t.source)  item.source = t.source;
         if (t.target)  item.target = t.target;
         if (t.params)  item.params = t.params;
-        if (t.isID)    item.isID = 'true';
+        if (t.isID)    item.isID = true;
 
         return item;
       });
@@ -92,29 +91,32 @@ export class RapidDataDictionary {
 
 
   /**
-   * Reconstructs a `RapidDataDictionary` from its persisted JSON form (see `toJSON`).
-   * The settings store is string-only, so non-string data is restored here.
+   * Reconstructs a `RapidDataDictionary` from its JSON form (see `toJSON`), or from a
+   * data dictionary in an asset file.
    * @param context - Global shared application context
-   * @param json - The persisted settings object
+   * @param json - The data dictionary, in plain JSON types
    * @return A new `RapidDataDictionary`
    */
-  public static fromJSON(context: Context, json: Record<string, TreeValue>): RapidDataDictionary {
+  public static fromJSON(context: Context, json: Record<string, unknown>): RapidDataDictionary {
     const dict = new RapidDataDictionary(context);
 
     if (Array.isArray(json.transforms)) {
       for (const t of json.transforms) {
         if (!TreeStore.isPlainObject(t)) continue;
         if (typeof t.function !== 'string') continue;
-        if (typeof t.order !== 'string') continue;
 
+        const order: unknown = t.order;
+        if (typeof order !== 'number' || !Number.isFinite(order)) continue;
+
+        const isID: unknown = t.isID;
         const item: RapidDataTransform = {
           function:  t.function,
-          order:     parseInt(t.order, 10),
+          order:     order,
         };
         if (typeof t.source === 'string')  item.source = t.source;
         if (typeof t.target === 'string')  item.target = t.target;
         if (typeof t.params === 'string')  item.params = t.params;
-        if (typeof t.isID === 'string')    item.isID   = (t.isID === 'true');
+        if (typeof isID === 'boolean')     item.isID   = isID;
 
         dict.transforms.push(item);
       }

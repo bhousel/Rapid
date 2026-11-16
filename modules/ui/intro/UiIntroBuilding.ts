@@ -1,12 +1,11 @@
 import { Extent } from '@rapid-sdk/math';
 import { AbstractIntroChapter } from './AbstractIntroChapter.ts';
 import { actionChangePreset } from '../../actions/change_preset.ts';
-import { delayAsync, eventCancel, helpHtml, isMostlySquare, transitionTime } from './helper.ts';
+import { delayAsync, eventCancel, helpHtml, isMostlySquare } from './helper.ts';
 
 import type { Context } from '../../Context.ts';
 import type { IntroStep } from './AbstractIntroChapter.ts';
 import type { UiCurtain } from './UiCurtain.ts';
-import type { Vec2 } from '@rapid-sdk/math';
 
 
 /**
@@ -61,7 +60,7 @@ export class UiIntroBuilding extends AbstractIntroChapter {
   /** @return `true` if the tutorial house is the single selected feature */
   protected _isHouseSelected(): boolean {
     const context = this.context;
-    if (context.mode?.id !== 'select-osm') return false;
+    if (context.mode?.id !== 'select') return false;
     const ids = context.selectedIDs();
     return ids.length === 1 && ids[0] === this._houseID;
   }
@@ -76,7 +75,7 @@ export class UiIntroBuilding extends AbstractIntroChapter {
   /** @return `true` if the tutorial tank is the single selected feature */
   protected _isTankSelected(): boolean {
     const context = this.context;
-    if (context.mode?.id !== 'select-osm') return false;
+    if (context.mode?.id !== 'select') return false;
     const ids = context.selectedIDs();
     return ids.length === 1 && ids[0] === this._tankID;
   }
@@ -95,7 +94,7 @@ export class UiIntroBuilding extends AbstractIntroChapter {
     this._houseID = null;
 
     const loc = this._houseExtent.center();
-    const msec = transitionTime(loc, map.center() as Vec2);
+    const msec = map.easeDuration(loc, 19);
     if (msec > 0) curtain.hide();
 
     await map.setMapParamsAsync(loc, 19, 0, msec);
@@ -179,10 +178,10 @@ export class UiIntroBuilding extends AbstractIntroChapter {
         this._onModeChange = () => {
           if (this._doesHouseExist() && this._isHouseSelected()) {
             const graph = editor.staging.graph;
-            const way = graph.entity(this._houseID!) as any;
+            const way = graph.entity(this._houseID!);
 
             // A way will have LineString or Polygon geometry. We can use 'outer' to get these points.
-            const points = way.geoms.parts[0]?.local?.outer;
+            const points = graph.geometry(way).parts[0]?.local?.outer;
 
             if (points && isMostlySquare(points)) {
               resolve(this._chooseCategoryBuildingAsync);
@@ -246,7 +245,7 @@ export class UiIntroBuilding extends AbstractIntroChapter {
         this._rejectStep = reject;
 
         if (!this._doesHouseExist()) { resolve(this._addHouseAsync); return; }
-        if (!this._isHouseSelected()) context.enter('select-osm', { selection: { osm: [this._houseID] }});
+        if (!this._isHouseSelected()) context.enter('select', { selection: [this._houseID] });
 
         this._onModeChange = reject;   // disallow mode change
 
@@ -289,7 +288,7 @@ export class UiIntroBuilding extends AbstractIntroChapter {
         this._rejectStep = reject;
 
         if (!this._doesHouseExist()) { resolve(this._addHouseAsync); return; }
-        if (!this._isHouseSelected()) context.enter('select-osm', { selection: { osm: [this._houseID] }});
+        if (!this._isHouseSelected()) context.enter('select', { selection: [this._houseID] });
 
         this._onModeChange = reject;   // disallow mode change
         this._onStableChange = (difference: any) => {
@@ -329,7 +328,6 @@ export class UiIntroBuilding extends AbstractIntroChapter {
   protected async _hasHouseAsync(): Promise<IntroStep | void> {
     const context = this.context;
     const editor = context.systems.editor!;
-    const l10n = context.systems.l10n!;
     const schema = context.systems.schema!;
 
     if (!this._doesHouseExist()) return this._addHouseAsync;
@@ -341,8 +339,8 @@ export class UiIntroBuilding extends AbstractIntroChapter {
     if (preset !== this._housePreset) {
       editor.perform(actionChangePreset(this._houseID!, preset, this._housePreset));
       editor.commit({
-        annotation: l10n.t('operations.change_tags.annotation'),
-        selectedIDs: [this._houseID!]
+        stringID: 'operations.change_tags.annotation',
+        selectionAfter: [this._houseID!]
       });
     }
 
@@ -361,7 +359,7 @@ export class UiIntroBuilding extends AbstractIntroChapter {
     const EditMenu = ui.EditMenu;
     const curtain = this._curtain;
 
-    if (!['browse', 'select-osm'].includes(context.mode?.id ?? '')) context.enter('browse');
+    if (!['browse', 'select'].includes(context.mode?.id ?? '')) context.enter('browse');
     editor.restoreCheckpoint('hasHouse');
 
     // make sure user is zoomed in enough to actually see orthagonalize do something
@@ -400,7 +398,6 @@ export class UiIntroBuilding extends AbstractIntroChapter {
     const context = this.context;
     const container = context.container();
     const editor = context.systems.editor!;
-    const l10n = context.systems.l10n!;
     const curtain = this._curtain;
 
     const buttonNode = container.select('.edit-menu-item-orthogonalize').node();
@@ -441,8 +438,9 @@ export class UiIntroBuilding extends AbstractIntroChapter {
 
       await delayAsync();   // wait for orthogonalize transtion to complete
 
-      // then check undo annotation to see what the user did
-      if (editor.getUndoAnnotation() === l10n.t('operations.orthogonalize.annotation.feature', { n: 1 })) {
+      // then check the undo edit to see what the user did
+      const label = { stringID: 'operations.orthogonalize.annotation.feature', stringParams: { n: 1 } };
+      if (editor.getUndoEdit()?.isLabeled(label)) {
         return this._doneSquareAsync;
       } else {
         return this._retryClickSquareAsync;
@@ -511,7 +509,7 @@ export class UiIntroBuilding extends AbstractIntroChapter {
     this._tankID = null;
 
     const loc = this._tankExtent.center();
-    const msec = transitionTime(loc, map.center() as Vec2);
+    const msec = map.easeDuration(loc, 19.5);
     if (msec > 0) curtain.hide();
 
     await map.setMapParamsAsync(loc, 19.5, 0, msec);
@@ -622,7 +620,7 @@ export class UiIntroBuilding extends AbstractIntroChapter {
       return await new Promise<IntroStep>((resolve, reject) => {
         this._rejectStep = reject;
         if (!this._doesTankExist()) { resolve(this._addTankAsync); return; }
-        if (!this._isTankSelected()) context.enter('select-osm', { selection: { osm: [this._tankID] }});
+        if (!this._isTankSelected()) context.enter('select', { selection: [this._tankID] });
 
         this._onModeChange = reject;   // disallow mode change
         this._onStableChange = (difference: any) => {
@@ -680,7 +678,6 @@ export class UiIntroBuilding extends AbstractIntroChapter {
   protected async _hasTankAsync(): Promise<IntroStep | void> {
     const context = this.context;
     const editor = context.systems.editor!;
-    const l10n = context.systems.l10n!;
     const schema = context.systems.schema!;
 
     if (!this._doesTankExist()) return this._addTankAsync;
@@ -692,8 +689,8 @@ export class UiIntroBuilding extends AbstractIntroChapter {
     if (preset !== this._tankPreset) {
       editor.perform(actionChangePreset(this._tankID!, preset, this._tankPreset));
       editor.commit({
-        annotation: l10n.t('operations.change_tags.annotation'),
-        selectedIDs: [this._tankID!]
+        stringID: 'operations.change_tags.annotation',
+        selectionAfter: [this._tankID!]
       });
     }
 
@@ -711,7 +708,7 @@ export class UiIntroBuilding extends AbstractIntroChapter {
     const EditMenu = ui.EditMenu;
     const curtain = this._curtain;
 
-    if (!['browse', 'select-osm'].includes(context.mode?.id ?? '')) context.enter('browse');
+    if (!['browse', 'select'].includes(context.mode?.id ?? '')) context.enter('browse');
     editor.restoreCheckpoint('hasTank');
 
     let onToggled: ((open: boolean) => void) | undefined;
@@ -744,7 +741,6 @@ export class UiIntroBuilding extends AbstractIntroChapter {
     const context = this.context;
     const container = context.container();
     const editor = context.systems.editor!;
-    const l10n = context.systems.l10n!;
     const curtain = this._curtain;
 
     const buttonNode = container.select('.edit-menu-item-circularize').node();
@@ -786,8 +782,9 @@ export class UiIntroBuilding extends AbstractIntroChapter {
 
       await delayAsync();   // wait for circularize transtion to complete
 
-      // then check undo annotation to see what the user did
-      if (editor.getUndoAnnotation() === l10n.t('operations.circularize.annotation.feature', { n: 1 })) {
+      // then check the undo edit to see what the user did
+      const label = { stringID: 'operations.circularize.annotation.feature', stringParams: { n: 1 } };
+      if (editor.getUndoEdit()?.isLabeled(label)) {
         return this._playAsync;
       } else {
         return this._retryClickCircleAsync;

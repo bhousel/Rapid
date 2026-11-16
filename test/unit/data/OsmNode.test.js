@@ -44,6 +44,16 @@ describe('OsmNode', () => {
       assert.deepInclude(a.props, orig);
     });
 
+    it('shares the geometry of a node it copies at the same location, and builds new geometry when moved', () => {
+      const a = new Rapid.OsmNode(context, { loc: [1, 2] });
+      const b = a.update({ tags: { amenity: 'cafe' } });
+      assert.strictEqual(b.geoms, a.geoms);
+      const c = a.move([3, 4]);
+      assert.notStrictEqual(c.geoms, a.geoms);
+      assert.deepEqual(c.geoms.orig.extent.min, [3, 4]);
+      assert.deepEqual(a.geoms.orig.extent.min, [1, 2]);
+    });
+
     it('constructs an OsmNode from another OsmNode', () => {
       const a = new Rapid.OsmNode(context);
       const b = new Rapid.OsmNode(a);
@@ -329,6 +339,19 @@ describe('OsmNode', () => {
       const n1 = new Rapid.OsmNode(context, { id: 'n1', tags: { amenity: 'cafe' } });
       const graph = new Rapid.Graph(context, [n1]);
       assert.isTrue(n1.isInteresting(graph));
+    });
+
+    it('answers for the graph it is given, not the graph that asked first', () => {
+      const n1 = new Rapid.OsmNode(context, { id: 'n1' });
+      const r1 = new Rapid.OsmRelation(context, { id: 'r1', members: [] });
+      const base = new Rapid.Graph(context, [n1, r1]);
+      assert.isFalse(n1.isInteresting(base));
+
+      const graph = new Rapid.Graph(base);
+      graph.replace(r1.addMember({ id: 'n1', type: 'node', role: 'stop' }));
+      assert.strictEqual(graph.entity('n1'), n1);   // same node object in both graphs
+      assert.isTrue(n1.isInteresting(graph));
+      assert.isFalse(n1.isInteresting(base));
     });
   });
 

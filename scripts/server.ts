@@ -1,4 +1,5 @@
 import { styleText } from 'node:util';
+import { stopListenerAsync } from './stop_listener.ts';
 
 const project = '@rapideditor/rapid';
 const hostname = '127.0.0.1';
@@ -29,6 +30,9 @@ function replacer(match: string, p1: string, p2: string, p3: string): string {
   return p1 + p3;
 }
 
+
+// If this server is already running (e.g. started in the background by a coding agent), replace it.
+await stopListenerAsync(port, /scripts\/server\.ts/);
 
 // Start the server!
 const server = Bun.serve({

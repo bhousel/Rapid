@@ -37,6 +37,19 @@ const trafficSignTileUrl = `${baseTileUrl}/mly_map_feature_traffic_sign/2/{z}/{x
 /** Zoom level used by the Tiler for fetching Mapillary vector tiles */
 const TILEZOOM = 14;
 
+/** The caches for detections: traffic signs have their own */
+const DETECTION_CACHES: SpatialID[] = ['mapillary-detections', 'mapillary-signs'];
+
+/**
+ * Returns the cache for a detection. Its data ID starts with the cache ID, and the layer that
+ * draws it has the same ID.
+ * @param  objectType - the detection's `object_type`, 'point' or 'traffic_sign'
+ * @return `'mapillary-signs'` for a traffic sign, `'mapillary-detections'` for anything else
+ */
+function detectionCacheID(objectType: string): SpatialID {
+  return (objectType === 'traffic_sign') ? 'mapillary-signs' : 'mapillary-detections';
+}
+
 
 /** Valid dataset identifiers for Mapillary tile data */
 type MapillaryDatasetID = 'images' | 'signs' | 'detections';
@@ -376,7 +389,11 @@ export class MapillaryService extends AbstractSystem {
    */
   public getDetection(detectionID: DetectionID): MapillaryDetection | undefined {
     const spatial = this.context.systems.spatial!;
-    return spatial.getItem<MapillaryDetection>('mapillary-detections', detectionID);
+    for (const cacheID of DETECTION_CACHES) {   // a traffic sign or another detection
+      const detection = spatial.getItem<MapillaryDetection>(cacheID, detectionID);
+      if (detection) return detection;
+    }
+    return undefined;
   }
 
 
@@ -392,11 +409,10 @@ export class MapillaryService extends AbstractSystem {
       return spatial.getVisibleItems('mapillary-images')
         .map(hit => hit.contents) as MarkerData[];
 
-    } else {  // both signs and detections are currently stored in the `detections` cache
-      const type = (datasetID === 'signs') ? 'traffic_sign' : 'point';
-      return spatial.getVisibleItems('mapillary-detections')
-        .map(hit => (hit.contents as MarkerData))
-        .filter(d => d.props.object_type === type);
+    } else {   // traffic signs and the other detections each have their own cache
+      const cacheID = (datasetID === 'signs') ? 'mapillary-signs' : 'mapillary-detections';
+      return spatial.getVisibleItems(cacheID)
+        .map(hit => hit.contents) as MarkerData[];
     }
   }
 
@@ -569,21 +585,23 @@ export class MapillaryService extends AbstractSystem {
 
       } else if (layerID === 'sequence') {
         const sequenceID = feature.properties!.id.toString();
-        let sequence = spatial.getItem<GeoJSONData>('mapillary-sequences', sequenceID);
-        if (!sequence) {
+        const existing = spatial.getItem<GeoJSONData>('mapillary-sequences', sequenceID);
+        // A sequence's pieces arrive in different tiles. Each one makes a new sequence, so the layer draws it again.
+        const features = (existing?.props.geojson as GeoJSON.FeatureCollection | undefined)?.features ?? [];
+        const geojson = { type: 'FeatureCollection', features: [...features, feature] };
+        let sequence: GeoJSONData;
+        if (existing) {
+          sequence = existing.update({ geojson: geojson } as Partial<GeoJSONProps>);
+        } else {
           const props = {
             id: sequenceID,
             serviceID: this.id as ServiceID,
+            spatialID: 'mapillary-sequences',
             type: 'sequence',
-            geojson: {
-              type: 'FeatureCollection',
-              features: []
-            }
+            geojson: geojson
           };
           sequence = new GeoJSONData(context, props as Partial<GeoJSONProps>);
         }
-        (sequence.props.geojson as GeoJSON.FeatureCollection).features.push(feature);  // updating it in-place, hope this is ok.
-        sequence.updateGeometry().touch();
         spatial.replaceData('mapillary-sequences', sequence);
 
       } else if (layerID === 'point' || layerID === 'traffic_sign') {
@@ -820,6 +838,8 @@ export class MapillaryService extends AbstractSystem {
     const activeElement = document.activeElement?.tagName ?? 'BODY';
     const mapillaryViewerClass = document.activeElement?.className.startsWith('mapillary');
     if (activeElement !== 'BODY' && !mapillaryViewerClass) return;
+    // Selected OSM features take the arrow keys, unless the viewer has focus
+    if (!mapillaryViewerClass && photos.arrowKeysMoveSelection()) return;
 
     if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') {
       this.navigateBackward();
@@ -983,10 +1003,9 @@ export class MapillaryService extends AbstractSystem {
     const context = this.context;
     const gfx = context.systems.gfx;
     const network = context.systems.network!;
-    const spatial = context.systems.spatial!;
 
     // Is data is cached already and includes the `images` Array?  If so, resolve immediately.
-    const detection = spatial.getItem<MapillaryDetection>('mapillary-detections', detectionID);
+    const detection = this.getDetection(detectionID);
     if (Array.isArray(detection?.props?.images)) {
       return Promise.resolve(detection);
     }
@@ -1048,6 +1067,7 @@ export class MapillaryService extends AbstractSystem {
     const requestID = `mapillary-segmentations-for-${imageID}`;
 
     const network = this.context.systems.network!;
+    const spatial = this.context.systems.spatial!;
     return network.fetch<any>(url, { requestID })
       .then(response => {
         if (!response) {
@@ -1070,10 +1090,11 @@ export class MapillaryService extends AbstractSystem {
           if (segmentation) {
             segmentationIDs.add(segmentationID);
           }
-
-          (image.props as Partial<MapillaryImageProps>).segmentationIDs = segmentationIDs;
-          image.touch();
         }
+
+        // Cache them on a new image (data isn't changed in place)
+        const current = spatial.getItem<MapillaryImage>('mapillary-images', imageID) ?? image;
+        spatial.replaceData('mapillary-images', current.update({ segmentationIDs: segmentationIDs }));
 
         return segmentationIDs;
       })
@@ -1104,6 +1125,7 @@ export class MapillaryService extends AbstractSystem {
     const requestID = `mapillary-detection-${detectionID}`;
 
     const network = this.context.systems.network!;
+    const spatial = this.context.systems.spatial!;
     return network.fetch<any>(url, { requestID })
       .then(response => {
         if (!response) {
@@ -1128,8 +1150,9 @@ export class MapillaryService extends AbstractSystem {
           }
         }
 
-        (detection.props as Partial<MapillaryDetectionProps>).segmentationIDs = segmentationIDs;
-        detection.touch();
+        // Cache them on a new detection (data isn't changed in place)
+        const current = this.getDetection(detectionID) ?? detection;
+        spatial.replaceData(detectionCacheID(current.props.object_type), current.update({ segmentationIDs: segmentationIDs }));
 
         return segmentationIDs;
       })
@@ -1284,32 +1307,36 @@ export class MapillaryService extends AbstractSystem {
     const spatial = context.systems.spatial!;
     const imageID = source.id;
 
-    let image = spatial.getItem<MapillaryImage>('mapillary-images', imageID);
-    if (!image) {
-      const loc = spatial.getFreeLoc('mapillary-images', source.loc);
-      image = new MarkerData(this.context, {
-        type:       'photo',
-        serviceID:  this.id as ServiceID,
-        id:         imageID,
-        loc:        loc
-      });
-    }
-
     // Allow 0, but not things like NaN, null, Infinity
     const caIsNumber = Number.isFinite(source.ca);
 
-    // Update whatever additional props we were passed..
-    const props = image.props;
-    if (source.sequenceID)   props.sequenceID  = source.sequenceID;
-    if (source.captured_at)  props.captured_at = source.captured_at;
-    if (source.captured_by)  props.captured_by = source.captured_by;
-    if (caIsNumber)          props.ca          = source.ca;
-    if (source.isPano)       props.isPano      = source.isPano;
+    // Whatever additional props we were passed..
+    const changes: Partial<MapillaryImageProps> = {};
+    if (source.sequenceID)   changes.sequenceID  = source.sequenceID;
+    if (source.captured_at)  changes.captured_at = source.captured_at;
+    if (source.captured_by)  changes.captured_by = source.captured_by;
+    if (caIsNumber)          changes.ca          = source.ca;
+    if (source.isPano)       changes.isPano      = source.isPano;
 
-    if (!props.isPano)  props.isPano = false;
+    // Data isn't changed in place: an update makes a new image, so the layer draws it again.
+    let image = spatial.getItem<MapillaryImage>('mapillary-images', imageID);
+    if (image) {
+      image = image.update(changes);
+    } else {
+      const loc = spatial.getFreeLoc('mapillary-images', source.loc);
+      image = new MarkerData<MapillaryImageProps>(this.context, {
+        type:       'photo',
+        serviceID:  this.id as ServiceID,
+        spatialID:  'mapillary-images',
+        id:         imageID,
+        loc:        loc,
+        isPano:     false,
+        ...changes
+      });
+    }
+
     spatial.replaceData('mapillary-images', image);
-
-    return image.touch();
+    return image;
   }
 
 
@@ -1322,58 +1349,66 @@ export class MapillaryService extends AbstractSystem {
     const context = this.context;
     const spatial = context.systems.spatial!;
     const detectionID = source.id;
+    const cacheID = detectionCacheID(source.object_type);   // traffic signs have their own cache
 
-    let detection = spatial.getItem<MapillaryDetection>('mapillary-detections', detectionID);
-    if (!detection) {
-      detection = new MarkerData<MapillaryDetectionProps>(this.context, {
-        type:         'detection',
-        serviceID:    this.id as ServiceID,
-        id:           detectionID,
-        object_type:  source.object_type   // 'point' or 'traffic_sign'
-      });
-    }
+    const existing = spatial.getItem<MapillaryDetection>(cacheID, detectionID);
+    const changes: Partial<MapillaryDetectionProps> = {};
 
     // If we haven't locked in the location yet, try here..
     // (see Rapid#1557 - sometimes we don't have this!)
-    if (!detection.loc && source.loc) {
+    let loc = existing?.loc;
+    if (!loc && source.loc) {
       // MarkerData `loc` should really have been set at construction time, but unfortunately we need to redo it
-      const loc = spatial.getFreeLoc('mapillary-detections', source.loc);
-      detection.props.loc = loc;
-      detection.updateGeometry();
+      loc = spatial.getFreeLoc(cacheID, source.loc);
+      changes.loc = loc;
     }
 
-    // Update whatever additional props we were passed..
+    // Whatever additional props we were passed..
     // Allow 0, but not things like NaN, null, Infinity
     const dirIsNumber = Number.isFinite(source.aligned_direction);
 
-    const props = detection.props;
-    if (source.images)         props.images             = source.images;
-    if (source.first_seen_at)  props.first_seen_at      = source.first_seen_at;
-    if (source.last_seen_at)   props.last_seen_at       = source.last_seen_at;
-    if (source.value)          props.value              = source.value;
-    if (dirIsNumber)           props.aligned_direction  = source.aligned_direction;
+    if (source.images)         changes.images             = source.images;
+    if (source.first_seen_at)  changes.first_seen_at      = source.first_seen_at;
+    if (source.last_seen_at)   changes.last_seen_at       = source.last_seen_at;
+    if (source.value)          changes.value              = source.value;
+    if (dirIsNumber)           changes.aligned_direction  = source.aligned_direction;
 
     // If we haven't locked in the bestImageID yet, try here..
     // This requires a location and an Array of images..
-    const nearImages = props.images || source.images;
-    if (!props.bestImageID && detection.loc && Array.isArray(nearImages)) {
+    const nearImages = source.images || existing?.props.images;
+    if (!existing?.props.bestImageID && loc && Array.isArray(nearImages)) {
       let minDist = Infinity;
       let bestImageID = null;
 
       for (const image of nearImages) {
-        const dist = geoSphericalDistance(detection.loc, image.geometry.coordinates);
+        const dist = geoSphericalDistance(loc, image.geometry.coordinates);
         if (dist < minDist) {
           minDist = dist;
           bestImageID = image.id;
         }
       }
       if (bestImageID) {
-        props.bestImageID = bestImageID;
+        changes.bestImageID = bestImageID;
       }
     }
 
-    spatial.replaceData('mapillary-detections', detection);
-    return detection.touch();
+    // Data isn't changed in place: an update makes a new detection, so the layer draws it again.
+    let detection: MapillaryDetection;
+    if (existing) {
+      detection = existing.update(changes);
+    } else {
+      detection = new MarkerData<MapillaryDetectionProps>(this.context, {
+        type:         'detection',
+        serviceID:    this.id as ServiceID,
+        spatialID:    cacheID,
+        id:           detectionID,
+        object_type:  source.object_type,   // 'point' or 'traffic_sign'
+        ...changes
+      });
+    }
+
+    spatial.replaceData(cacheID, detection);
+    return detection;
   }
 
 

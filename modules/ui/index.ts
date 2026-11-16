@@ -75,6 +75,7 @@ export { UiRapidInspector } from './UiRapidInspector.ts';
 export { UiRapidPowerUserFeatures } from './UiRapidPowerUserFeatures.ts';
 export { UiRestore } from './UiRestore.ts';
 export { UiScale } from './UiScale.ts';
+export { UiSelectionInspector } from './UiSelectionInspector.ts';
 export { UiShortcuts } from './UiShortcuts.ts';
 export { UiSidebar } from './UiSidebar.ts';
 export { UiSourceSwitch } from './UiSourceSwitch.ts';

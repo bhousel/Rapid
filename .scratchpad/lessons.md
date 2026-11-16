@@ -45,9 +45,17 @@ Things that went wrong once and shouldn't go wrong again.
 ## Testing
 
 - **MockContext has no services by default** — Guard clauses needed when testing service-dependent features.
+- **A fake `sendChangeset` must call its `beforeUpload` argument,** or the upload mark (`markUploadAsync`) is never written and the "settle interrupted uploads" path can't be tested.
+- **A reference model encodes the design's rule, not the code's.** The graph model test copied `rebase`'s head-only iD#2085 rule, so it agreed with the bug for weeks while `graph-geometry.md` said "every graph, redo graphs included". When writing a model, take each rule from the design doc (or the user-visible contract), and flag any place where the code disagrees.
+- **Give `bun test` folders, not `**` globs, in package.json scripts** — `bun run test` (`--sequential 'test:*'`) ran `test:browser`'s `./test/browser/**/*.js` through a shell without globstar, so it matched one folder level only, and 8 files (Context, `ui/fields`, `ui/sections`) never ran: 90 tests instead of 134. Running `bun run test:browser` alone ran them all, which hid it. Fixed Oct 29 by passing `./test/browser`. If a test count looks low, compare the "across N files" line.
+- **Pixi layers can be checked in a real browser, WebGL included** — Headless Chromium through Playwright renders the map with SwiftShader (`--use-angle=swiftshader --enable-unsafe-swiftshader`). The project's Playwright may expect a newer browser build than the one in `~/Library/Caches/ms-playwright`; pass `executablePath` to the installed `chrome-headless-shell` rather than downloading. To debug what the developer sees, attach to their Chrome with `chromium.connectOverCDP('http://127.0.0.1:9222')` (started with `--remote-debugging-port=9222 --user-data-dir=…`) and query `globalThis.rapidContext`. Querying state beats reading screenshots.
 - **DOMParser in unit tests** — Use `import { DOMParser } from '@xmldom/xmldom'`, not the browser global. Tests run without happy-dom unless using browser preload.
 - **Test sample data** — `*.sample.js` files alongside the test. Import as `import * as SAMPLE from './Foo.sample.js'`.
 - **FilterSystem cache keyed by `entity.key`** (includes version), not `entity.id`.
+- **Run unit test files the way `test:unit` does: no preload.** `bun test --preload ./test/test_setup.js test/unit/...` gives them happy-dom, and `MapillaryService`'s `startAsync` test then tries to load mapillary-js from a CDN and fails. Use `bun test test/unit/...` for unit files.
+- **A full APP pass hides per-frame costs: also time a drag frame** (`editor.perform(actionMoveNode(...))` + `gfx._app()`). A full pass is mostly restyling, and stayed at ~115 ms with every graph memo removed, while a drag frame went from 6 to 10 ms.
+- **When a check starts covering more cases, expect older bugs.** Turning on shape checks after rebases in `graph_model.test.js` found three bugs from earlier steps (a frozen graph's restores, an equal-by-value copy's shape, a memo shared after a node arrived). Run thousands of seeds (`GRAPH_MODEL_SEEDS=3000`) after changing `Graph`.
+- **Check that new code is covered by breaking it.** In a scratch worktree, break each new piece and run the tests; two of ten pieces weren't covered until tests were added. And compare caches and searches with a brute-force scan on real data in the debug Chrome: that's how duplicate RBush items were found.
 - **`_isWater` vs `_isPoint`** — When testing filterScene water counts, use way entities. Point nodes with waterway tags match `_isPoint` first.
 - **Validator tests: create after schema init** — Validators hoist schema prerequisites at construction time. Create the validator inside `beforeAll` after `schema.merge()`.
 - **Inline schema init pattern for tests** — Import `osm_rulesets.json5` directly (Bun native JSON5 import), create real `SchemaSystem`, init + merge in `beforeAll`. Single source of truth.
@@ -73,6 +81,52 @@ Things that went wrong once and shouldn't go wrong again.
   in-memory mock using `structuredClone` also works. This is NOT universally true for all test runtimes
   and all browsers — especially private-browsing/locked-down contexts — so the graceful-degradation
   path matters. Verified experimentally before relying on it in production code.
+- **An untested path rots one layer at a time.** The upload conflict path had no tests, and broke
+  several times over years (a handler signature in 2023, a return shape in 2025, a staging/stable split
+  in between). Each bug hid the next: fixing one would only have shown the one behind it. Drive the
+  whole flow end to end (fake the service, not the system) before calling it fixed.
+- **Run flows that may throw in your own headless browser, not the developer's Chrome.** A page error
+  in the debug Chrome froze its tab (it stopped answering CDP entirely), probably DevTools pausing on
+  the exception. Playwright's headless Chromium reports `pageerror`s with stacks instead.
+- **Escape in a test snippet can trigger the mode's own Escape.** Pressing Escape to close a dialog in
+  save mode left save mode, which made later steps misleading.
+- **happy-dom's `document.implementation.createDocument` returns an HTML document with an element
+  already in it**, so `JXON.stringify` fails there. `test/browser/ui/UiConflicts.test.js` shims it with
+  an empty XML document from `DOMParser`.
+- **Hand-picked negative IDs collide with the ones the editor makes.** Actions make new entities with
+  `n-1`, `n-2`, …, so a test that adds `n-10` itself can have it replaced by a later test's fix in the
+  same edit session (a way stretched from lon 10 to lon 30). Reset the editor between such tests.
+  And `validateAsync()` returns the validation already running, so await `_validationPromise` until it's
+  `null` before reading issues.
+- **Check event-order bugs with real mouse events, in a real browser.** "Pressing Save blurs the
+  textarea, the blur replaces the buttons, the click is lost" can't be shown in happy-dom (its
+  `click()` fires no mousedown or blur). Playwright attached to the debug Chrome
+  (`chromium.connectOverCDP`, then `page.mouse.click`) showed it in one run. Pick a path that writes
+  nothing to OSM (a new note's Cancel). The restore prompt covers the map after a reload: "Skip for now"
+  keeps the sessions.
+- **Validation and backups wait while a backup can be restored** (`editor.canRestoreBackup`). In the
+  debug Chrome there usually is one, so live validation checks find no issues and live edits are never
+  backed up. Don't touch the stored session: call `editor.dismissRestore()` (it only affects that page,
+  and the session is offered again on reload), and undo the run's edits (a session undone back to
+  nothing is deleted).
+- **Run each new test against the old code** (`git stash push <the fixed files>`, run it, `git stash
+  pop`). Three of the bug-hunt tests passed on the old code at first; one because it reloaded data in a
+  loop, and `editor.merge` doesn't replace entities that are loaded already. Reset the editor between
+  variants. A test meant to show a refactor kept the behavior should pass on both.
+- **Put a time-sensitive live check in one `cdp eval` snippet.** Each `bun run cdp` call takes about a
+  second, so checking something within the 2.5 s after an upload across two calls finds the reset
+  already done.
+- **Keep a signed-in live check write-free with a Playwright route, not just stubs.** A script that stays
+  attached and calls `context.route('**/*', …)` to abort anything but GET/HEAD/OPTIONS to a non-local
+  host also covers reloads and the startup settings sync, which in-page stubs (installed after start)
+  can't. Install it on the context before Rapid loads (launch Chrome on `about:blank` with the
+  `.chrome-debug` profile, route, then open Rapid).
+- **The debug Chrome wears out over long runs.** After hours of driving (and days up), its renderer sat
+  at 6 GB and 600% CPU while Rapid's heap was 100 MB: `connectOverCDP` timed out, and reloads failed
+  because a startup asset fetch hit NetworkSystem's 30 s timeout. Rapid started fine in a fresh Chrome.
+  Rule out the browser before blaming Rapid for a hang that only shows up late in a session.
+- **Matched Rapid features drawn with "show already mapped" sit exactly on OSM lines** and take the
+  pointer, so a live drawing check that clicks on OSM lines should confirm the hover target first.
 
 ## Network
 
@@ -128,6 +182,14 @@ Things that went wrong once and shouldn't go wrong again.
 - **PIXI color formats** — CSS hex `"#FF6600"` and numeric `0xFF6600` work. String `"0xFF6600"` may also work (unverified).
 - **TaginfoService `_clean()` strips `debounce` from params** — When migrating `doRequest = params.debounce ? debouncedVersion : directVersion`, capture `shouldDebounce` BEFORE calling `_clean()`. The same pattern applies to OsmWikibaseService.
 - **`scheduler?.debounce()` silently drops calls** — Optional chaining on the scheduler means the debounced function never fires if scheduler is absent. Fix: `if (shouldDebounce && scheduler) { scheduler.debounce(...) } else { request() }`. Only matters for service request paths; UI render deferrals are safe to no-op.
+
+## OSM Data Model
+
+- **An untagged way in a multipolygon is really the relation** — Multipolygon outer and inner ways usually carry no tags; the tags (e.g. `building=retail`) sit on the relation. Such a way is closed, but `way.geometry(graph)` returns `'line'` because `isArea()` finds no area-suggesting tag. Anything that asks "is this an area?" or "what is this?" about a way must check parent multipolygons, or it will treat building outlines as lines. A building can even be several closed outers in one relation. Several places handle this separately today (see `backlog.md`, `OsmWay.asFeature`).
+- **Code can depend on data changed in place without saying so.** `UiOsmoseDetails` read an issue's details from the datum bound to its elements, which only had them because the loader changed that same object. When making data immutable, look for readers of the old object (d3-bound datums, `this.datum`), not only writers.
+- **A graph's own copy that equals the base's by value has no shape of its own.** `commit()` compares by value, so it sees no change and stores no geometry; `graph.geometry()` reads the base object's shape for it.
+- **`isArea()` needs the schema** — `tagSuggestingArea()` reads area keys from `SchemaSystem` rulesets. In unit tests without a schema, `building=yes` alone doesn't make a closed way an area; add `area=yes` to the fixture.
+- **Apply validator autofixes one at a time** — An issue's `autoArgs` action was built from the graph as it was when the validator ran (edges, end nodes). Once one fix changes the graph, the other issues from that run may name nodes that were merged away or edges that were split, and a stale edge makes `actionAddMidpoint` add a node to no way. Apply one fix, look the entity up again, and validate again: `actionAutofix`, which autoconnect and Autofix All share. Find the issues again by kind and entities, not by ID: a fix that splits a segment changes the IDs of the other crossings on it. Test fixtures for merges need `version` on existing nodes: `actionConnect` keeps the node with a version, otherwise the last one.
 
 ## Pixi Rendering
 

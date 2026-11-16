@@ -136,12 +136,14 @@ export class UiKeepRightEditor extends EventEmitter {
     const l10n = context.systems.l10n!;
     const keepright = context.services.keepright;
 
-    const errID = this.datum?.id;
-    const isSelected = errID && context.selectedData().has(errID);
+    const dataID = this.datum?.dataID;
+    const isSelected = dataID && context.selectedIDs().includes(dataID);
     const isShown = (this.datum && (isSelected || this.datum.props.newComment || this.datum.props.comment));
 
+    // Keyed by the issue's ID, not its `key`: typing makes a new version of the issue, which should
+    // update this section, not replace it while the user works in it (see `modules/ui/AGENTS.md`).
     let $saveSection: D3Selection = $selection.selectAll('.qa-save')
-      .data(isShown ? [this.datum!] : [], (d: KeepRightIssue) => d.key!);
+      .data(isShown ? [this.datum!] : [], (d: KeepRightIssue) => d.id);
 
     const changeInput = (e: Event): void => {
       const $input = select(e.currentTarget as HTMLTextAreaElement);
@@ -208,10 +210,11 @@ export class UiKeepRightEditor extends EventEmitter {
     const l10n = context.systems.l10n!;
     const keepright = context.services.keepright;
 
-    const errID = this.datum?.id;
-    const isSelected = errID && context.selectedData().has(errID);
+    const dataID = this.datum?.dataID;
+    const isSelected = dataID && context.selectedIDs().includes(dataID);
+    // Keyed by ID: replacing the buttons when the textarea blurs would swallow the click that blurred it
     let $buttons: D3Selection = $selection.selectAll('.buttons')
-      .data(isSelected ? [this.datum] : [], (d: KeepRightIssue) => d.key!);
+      .data(isSelected ? [this.datum] : [], (d: KeepRightIssue) => d.id);
 
     // exit
     $buttons.exit()
@@ -256,8 +259,9 @@ export class UiKeepRightEditor extends EventEmitter {
       .on('click.close', (e: PointerEvent, d: KeepRightIssue) => {
         (e.currentTarget as HTMLElement).blur();    // avoid keeping focus on the button - iD#4641
         if (keepright) {
-          d.props.newStatus = 'ignore_t';   // ignore temporarily (item fixed)
-          keepright.postUpdate(d, (err: any, item: any) => this.emit('change', item));
+          this.datum = d.update({ newStatus: 'ignore_t' });   // ignore temporarily (item fixed)
+          keepright.replaceItem(this.datum);
+          keepright.postUpdate(this.datum, (err: any, item: any) => this.emit('change', item));
         }
       });
 
@@ -269,8 +273,9 @@ export class UiKeepRightEditor extends EventEmitter {
       .on('click.ignore', (e: PointerEvent, d: KeepRightIssue) => {
         (e.currentTarget as HTMLElement).blur();    // avoid keeping focus on the button - iD#4641
         if (keepright) {
-          d.props.newStatus = 'ignore';   // ignore permanently (false positive)
-          keepright.postUpdate(d, (err: any, item: any) => this.emit('change', item));
+          this.datum = d.update({ newStatus: 'ignore' });   // ignore permanently (false positive)
+          keepright.replaceItem(this.datum);
+          keepright.postUpdate(this.datum, (err: any, item: any) => this.emit('change', item));
         }
       });
   }

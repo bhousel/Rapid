@@ -18,7 +18,6 @@ import type { MoveMode } from './MoveMode.ts';
 import type { RotateMode } from './RotateMode.ts';
 import type { SaveMode } from './SaveMode.ts';
 import type { SelectMode } from './SelectMode.ts';
-import type { SelectOsmMode } from './SelectOsmMode.ts';
 
 /** A Mode class constructor */
 export type ModeConstructor = new (context: Context) => AbstractMode;
@@ -44,5 +43,4 @@ export interface Modes {
   'rotate'?: RotateMode;
   'save'?: SaveMode;
   'select'?: SelectMode;
-  'select-osm'?: SelectOsmMode;
 }

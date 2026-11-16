@@ -226,6 +226,7 @@ export class UiEditMenu extends EventEmitter {
    */
   protected _click(e: PointerEvent, operation: AbstractOperation): void {
     const context = this.context;
+    const l10n = context.systems.l10n!;
     const ui = context.systems.ui;
 
     e.stopPropagation();
@@ -244,11 +245,12 @@ export class UiEditMenu extends EventEmitter {
       }
     } else {
       if (this._lastPointerUpType === 'touch' || this._lastPointerUpType === 'pen') {
+        const editLabel = operation.editLabel();
         ui?.Flash.show({
           duration: 2000,
           iconName: `#rapid-operation-${operation.id}`,
           iconClass: 'operation',
-          label: operation.annotation() || operation.title
+          label: editLabel ? l10n.t(editLabel.stringID, editLabel.stringParams) : operation.title
         });
       }
 

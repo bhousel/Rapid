@@ -1,6 +1,6 @@
 import { EventEmitter } from 'tseep/lib/ee-safe';
 import { marked } from 'marked';
-import { RapidDataset } from '../lib/RapidDataset.ts';
+import { RapidDataset, USER_DATASET_PREFIX } from '../lib/RapidDataset.ts';
 import { UiCombobox } from './UiCombobox.ts';
 import { uiIcon } from './icon.ts';
 import { UiModal } from './UiModal.ts';
@@ -717,14 +717,16 @@ export class UiRapidAddDataset extends EventEmitter {
     if (idNode && !idVal && filename) {
       idNode.value = idVal = filename.replace(/[^\w\-]+/g, '_');  // fallback to slugified filename, if we have one
     }
-    if (idVal && this._seenIDs.has(idVal.toLowerCase())) {
+    // The user's datasets get their own prefix, so they never collide with what Rapid ships.
+    const datasetID = USER_DATASET_PREFIX + idVal;
+    if (idVal && this._seenIDs.has(datasetID.toLowerCase())) {
       idErrors.push(l10n.t('rapid_add_dataset.identifier.taken'));
     }
     if (idVal && !/^[\w\-]+$/.test(idVal)) {
       idErrors.push(l10n.t('rapid_add_dataset.identifier.invalid'));
     }
     if (idVal && !idErrors.length) {
-      result.datasetID = idVal;
+      result.datasetID = datasetID;
     }
 
     // Check Dataset Name

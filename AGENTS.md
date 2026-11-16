@@ -63,7 +63,8 @@ This project has reusable agent skills in `.claude/skills/`: one folder per skil
 ## Working in the Rapid Codebase
 
 ### Design docs
-- [`design/`](design/README.md) holds design docs for the core systems: database, drag-and-drop, keyboard, network, scheduler, settings, spatial, style and UI. [`design/README.md`](design/README.md) lists each one with its status.
+- [`design/`](design/README.md) holds design docs for the core systems and cross-cutting designs (graphs and their geometry, data IDs, conflation, editing, validation, spatial indexes, settings, and more). [`design/README.md`](design/README.md) lists each one with its status.
+- **When you make a substantial change to a system that has no design doc yet, start one** (what it owns, the decisions behind it, where it's heading), and point to it from the class JSDoc. These docs are a running record of where each system is going.
 - **Before changing one of those systems, read its design doc.** The class JSDoc of each system points to it. If your change alters the design, update the doc in the same change.
 
 ### Folder-specific instructions
@@ -128,6 +129,12 @@ This project has reusable agent skills in `.claude/skills/`: one folder per skil
 - **Truly constant data** that does not change at runtime is fine as a module-level `const` — there's no lifecycle to manage. But if the data is a list of domain-specific "magic strings" (like lifecycle prefixes), prefer expressing it as a ruleset in `osm_rulesets.json5` so it's configurable and scope-owned.
 - **Domain-specific logic** (like "is this tag interesting?" or "does this tag suggest an area?") belongs on the data class that represents the domain concept (e.g. `OsmEntity`), not as a free function reading a global. The instance method can access the system through `this.context` — making the dependency explicit and traceable.
 
+### Data and Graphs
+- **Data elements are immutable.** Never change a data element's `props` in place. Make a new one with `d.update(props)`, and store it where the old one was (e.g. `spatial.replaceData(...)`, or the editor's datum). Renderers redraw a feature when its data is a different object, and selections find the newest version by data ID.
+- **A way's or relation's shape belongs to a graph.** Read it with `graph.geometry(entity)` / `graph.extent(entity)`; `entity.geoms` and `entity.extent()` throw for them. A node's shape is its own.
+- **Search OSM data through `EditSystem`**, for the graph you mean: `editor.entitiesInBox(box, graph)`, `editor.waySegments(extent, graph)`, `editor.intersects(graph)`. They answer for any graph of the editor's lineage, including one inside an action.
+- See [`design/graph-geometry.md`](design/graph-geometry.md) for why, and `test/unit/lib/graph_model.test.js` (run it with `GRAPH_MODEL_SEEDS=3000`) after changing `Graph`.
+
 ## TypeScript Patterns
 
 ### Class Member Visibility Conventions
@@ -163,6 +170,23 @@ This project has reusable agent skills in `.claude/skills/`: one folder per skil
     }
   }
   ```
+
+### Lifecycle Methods Run Once (`initAsync` / `startAsync`)
+- Many callers await the same system's `initAsync()` / `startAsync()` (e.g. 7+ systems wait on `settings.initAsync()`), so each must do its work **once** and return the same promise every time.
+- `AbstractSystem` provides `_initPromise` / `_startPromise`, but it can't enforce this: **an override that does any work must start with the guard and assign the chained promise.** Without it, every caller re-runs the work (re-reading storage, re-opening a database, re-sending requests).
+  ```typescript
+  public initAsync(): Promise<void> {
+    if (this._initPromise) return this._initPromise;
+
+    const context = this.context;
+    const storage = context.systems.storage!;
+
+    return this._initPromise = super.initAsync()
+      .then(() => storage.initAsync())
+      .then(() => { /* the work */ });
+  }
+  ```
+- Overrides that only `return super.initAsync()` or `return Promise.resolve()` don't need the guard.
 
 ### Props Interfaces
 - Define `FooProps` interface in the same file as the `Foo` class (not in a shared `types.ts`)
@@ -550,6 +574,38 @@ After making changes:
 - `bun run all` — `clean` + `check` + `build` (no tests)
 - **Do NOT use bare `bun test`** — it skips the `--preload ./test/test_setup.js` that provides happy-dom globals. Browser tests will fail with misleading errors about missing DOM APIs.
 - If a test fails at line 1 with `describe is not defined`, suspect Bun's transpiler cache before the test (see `.scratchpad/quirks.md`).
+
+### Testing in a Real Browser
+Unit tests can't cover rendering (Pixi needs WebGL) or most UI behavior. **You can run Rapid in a real
+Chrome and drive it yourself.** Do this to check rendering, UI, or behavior on real data, and to see
+what the developer is seeing when they report a problem.
+
+1. Start the server: `bun run start` (builds, then serves `dist/` on `http://127.0.0.1:8080`).
+2. Start Chrome with remote debugging: `bun run start:chrome`. It opens the dev build, using its own
+   profile in `.chrome-debug/` (gitignored). The developer may already have this running.
+   Both start commands replace a copy of themselves that's already running (whoever starts it last
+   wins), so it's fine to start them in the background; the developer can restart them from a terminal.
+3. Drive the Rapid tab with `bun run cdp`. It attaches to the running Chrome (port 9222), so it sees
+   exactly what the developer sees:
+   - `bun run cdp shot <out.png>`: screenshot the tab, then read the image
+   - `bun run cdp eval -e "<code>"` or `bun run cdp eval <file.js>`: run a snippet in the page; `return`
+     a value to get it back as JSON (the snippet is an async function body, so it can `await`)
+   - `bun run cdp reload [setup.js]`: reload, wait for Rapid to start, then run an optional setup snippet
+   - `bun run cdp press <key>`: press a key (e.g. `Escape` closes the welcome screen after a reload)
+
+Tips:
+- **Query state rather than squinting at screenshots.** Rapid's context is `globalThis.rapidContext`
+  (systems under `rapidContext.systems`, the dev build also exposes `globalThis.Rapid`). A query like
+  "which features matched, and what are their tags?" settles more than any screenshot.
+- **Rebuild what you changed.** `build:js` doesn't rebuild CSS (`build:css`) or strings from
+  `data/core.yaml` (`build:data`). After a CSS-only change, you can swap the stylesheet in place
+  instead of reloading: set a new `?v=` on the `rapid.css` `<link>`.
+- **Ask before reloading the developer's tab.** A reload picks up a new build but loses state that isn't
+  saved, such as console-applied settings. Put that setup in a snippet and pass it to `reload`.
+- **Keep snippets, screenshots, and any data from the session out of the repo.** Use your scratch area.
+- **No Chrome attached?** Launch headless with Playwright instead (`chromium.launch()` from
+  `@playwright/test`, with `--use-angle=swiftshader --enable-unsafe-swiftshader` so WebGL works). If it
+  wants a browser build that isn't downloaded, pass `executablePath` to one in `~/Library/Caches/ms-playwright`.
 
 ### JSON Schemas
 - Data files in `data/` are validated by JSON Schema definitions in `data/schema/`

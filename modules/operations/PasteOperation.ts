@@ -6,6 +6,8 @@ import { AbstractOperation } from './AbstractOperation.ts';
 import { utilCmd } from '../util/cmd.ts';
 
 import type { Context } from '../Context.ts';
+import type { EditLabel } from '../lib/Edit.ts';
+import type { OsmNode } from '../data/OsmNode.ts';
 
 
 /**
@@ -33,7 +35,6 @@ export class PasteOperation extends AbstractOperation {
     const context = this.context;
     const editor = context.systems.editor!;
     const gfx = context.systems.gfx!;
-    const l10n = context.systems.l10n!;
     const map = context.systems.map!;
 
     // Note: nearly the same code appears in both PasteBehavior and PasteOperation
@@ -62,9 +63,10 @@ export class PasteOperation extends AbstractOperation {
     for (const [entityID, newEntity] of Object.entries(copies)) {
       const oldEntity = copyGraph.entity(entityID);
 
-      const oldExtent = oldEntity.extent();
-      if (oldExtent) {
-        extent = extent.extend(oldExtent);
+      // Anchor on the copied nodes' locations. A way's `extent()` reads its shared geometry,
+      // which may have changed since the copy.
+      if (oldEntity.type === 'node') {
+        extent = extent.extend(new Extent((oldEntity as OsmNode).loc));
       }
 
       // Exclude child nodes from newIDs if their parent way was also copied.
@@ -81,14 +83,16 @@ export class PasteOperation extends AbstractOperation {
     const copyLoc = context.copyLoc;
     const copyWorld = projWgs84ToWorld(copyLoc ?? extent.center());
     const delta = vecSubtract(map.mouseWorld(), copyWorld);
-    const annotation = l10n.t('operations.paste.annotation', { n: newIDs.length });
-
     editor.perform(actionMove(newIDs, delta));
-    editor.commit({ annotation: annotation, selectedIDs: newIDs });
+    editor.commit({
+      stringID: 'operations.paste.annotation',
+      stringParams: { n: newIDs.length },
+      selectionAfter: newIDs
+    });
     editor.endTransaction();
 
     // Put the user in move mode so they can place the pasted features
-    context.enter('move', { selection: { osm: newIDs }} );
+    context.enter('move', { selection: newIDs });
   }
 
 
@@ -117,9 +121,8 @@ export class PasteOperation extends AbstractOperation {
   }
 
 
-  public annotation(): string {
-    const l10n = this.context.systems.l10n!;
+  public editLabel(): EditLabel {
     const ids = this.context.copyIDs;
-    return l10n.t('operations.paste.annotation', { n: ids.length });
+    return { stringID: 'operations.paste.annotation', stringParams: { n: ids.length } };
   }
 }

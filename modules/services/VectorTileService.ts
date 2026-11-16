@@ -29,7 +29,7 @@ type HashString = string;
 
 /** Per-zoom cache for vector tile features */
 interface VTZoomCache {
-  /** SpatialSystem cache id for this zoomcache, will look like: `vt-${source.id}-z${zoom}` */
+  /** SpatialSystem cache id for this zoomcache, will look like: `${source.id}.z${zoom}` */
   spatialID: SpatialID;
   /** Merge candidates - when data that touches a tile edge, search additional boxes for merge candidates */
   toMerge: Map<DataID, BBox[]>;
@@ -39,8 +39,9 @@ interface VTZoomCache {
 
 /** Source for vector tile data */
 interface VTSource {
-  /** Unique identifier for this source - will either use the caller-provided datasetID or a generated id */
-  id: string;
+  /** Unique identifier for this source - will either use the caller-provided datasetID or a generated id.
+   *  It's also the spatial ID of the source's data (see `design/data-ids.md`). */
+  id: SpatialID;
   /** Optional caller-provided identifier for the source */
   datasetID?: DatasetID;
   /** Human-readable name for this source (hostname or filename) */
@@ -128,12 +129,16 @@ export class VectorTileService extends AbstractSystem {
     const network = this.context.systems.network!;
     const spatial = this.context.systems.spatial!;
     network.clearMatching(id => id.startsWith('vt-'));
-    spatial.clearMatching(id => id.startsWith('vt-'));
 
     for (const source of this._sources.values()) {
       for (const controller of source.inflightPMTiles.values()) {
         controller.abort();
       }
+
+      for (const cache of source.zoomCache.values()) {
+        spatial.clearCache(cache.spatialID);
+      }
+      spatial.registerResolver(source.id, null);
 
       // free memory
       source.inflightPMTiles.clear();
@@ -157,30 +162,33 @@ export class VectorTileService extends AbstractSystem {
     const source = this._sources.get(template);
     if (!source) return [];
 
-    const context = this.context;
-    const spatial = context.systems.spatial!;
-    const viewport = context.viewport;
+    const spatial = this.context.systems.spatial!;
+
+    const cache = this._zoomCachesNearest(source)[0];
+    if (!cache) return [];
+    return spatial.getVisibleItems(cache.spatialID).map(hit => hit.contents as GeoJSONData);
+  }
+
+
+  /**
+   * Returns the source's zoom caches, nearest to the current map zoom first.
+   * Because vector tiled data can be different at different zooms,
+   * the caches and indexes need to be setup "per-zoom".
+   * We use the cache at the zoom we are at first, then try other zooms.
+   * @param  source - The vector tile source
+   * @return The zoom caches, nearest first (at the same distance, the higher zoom first)
+   */
+  protected _zoomCachesNearest(source: VTSource): VTZoomCache[] {
+    const viewport = this.context.viewport;
 
     // Note that because vector tiles are 512px, they are offset by -1 zoom level
     // from the main map zoom, which follows 256px and OSM convention.
     const z = viewport.transform.zoom - 1;
     const zoom = Math.round(Math.max(z, 0));
 
-    // Because vector tiled data can be different at different zooms,
-    // the caches and indexes need to be setup "per-zoom".
-    // Look for a cache at the zoom we are at first, then try other zooms.
-    let cache;
-    for (let diff = 0; diff < 12; diff++) {
-      cache = source.zoomCache.get(zoom + diff);
-      if (cache) {
-        return spatial.getVisibleItems(cache.spatialID).map(hit => hit.contents as GeoJSONData);
-      }
-      cache = source.zoomCache.get(zoom - diff);
-      if (cache) {
-        return spatial.getVisibleItems(cache.spatialID).map(hit => hit.contents as GeoJSONData);
-      }
-    }
-    return [];
+    return [...source.zoomCache.entries()]
+      .sort(([a], [b]) => (Math.abs(a - zoom) - Math.abs(b - zoom)) || (b - a))
+      .map(([, cache]) => cache);
   }
 
 
@@ -239,6 +247,7 @@ export class VectorTileService extends AbstractSystem {
   protected _getSourceAsync(template: string, datasetID?: DatasetID): Promise<VTSource> {
     if (!template) return Promise.reject(new Error('No template'));
 
+    const spatial = this.context.systems.spatial!;
     let source = this._sources.get(template);
 
     if (!source) {  // create it
@@ -259,6 +268,21 @@ export class VectorTileService extends AbstractSystem {
       };
 
       this._sources.set(template, source);
+
+      // A new source starts with no zoom caches, so clear any left over from before.
+      const prefix = `${source.id}.`;
+      spatial.clearMatching(spatialID => spatialID.startsWith(prefix));
+
+      // The source's data is spread over its zoom caches, so `SpatialSystem` can't find it by
+      // spatial ID alone. Look in the cache nearest the current zoom first.
+      const vtSource = source;
+      spatial.registerResolver(source.id, localID => {
+        for (const cache of this._zoomCachesNearest(vtSource)) {
+          const d = spatial.getItem<GeoJSONData>(cache.spatialID, localID);
+          if (d) return d;
+        }
+        return undefined;
+      });
 
       // Special handling for PMTiles sources
       // Create a PMTiles instance and fetch the header so we know more about the source.
@@ -291,7 +315,7 @@ export class VectorTileService extends AbstractSystem {
 
     if (!cache) {
       cache = {
-        spatialID: `vt-${source.id}-z${zoom}`,
+        spatialID: `${source.id}.z${zoom}`,
         toMerge: new Map<DataID, BBox[]>(),
         mergeCount: new Map<EdgeID, number>()
       };
@@ -440,6 +464,11 @@ export class VectorTileService extends AbstractSystem {
       // When neighbor features have the same properties, we'll consider them mergeable.
       const prophash = utilHashcode(JSON.stringify(sorted)).toString();
 
+      // Keep the feature's own `id` property, if it has one. Overture's is its GERS ID, which
+      // doesn't depend on the tile or zoom (but is only in z14 tiles). The pieces cut by tile edges
+      // share it, so it can't be the local ID until they're merged on it (see `design/data-ids.md`).
+      const stableID = sorted.id;
+
       // It's common for a vector tile to return 'Multi' GeoJSON features..
       // e.g. All the roads together in one `MultiLineString`.
       // For our purposes, we really want to work with them as single part features..
@@ -448,6 +477,7 @@ export class VectorTileService extends AbstractSystem {
         if (!isFinite(extent.min[0])) continue;  // invalid - no coordinates?
 
         // If it already has an ID, remove it.  We'll generate a unique one.
+        // (The `id` property is kept as `stableID`, so it doesn't become a tag.)
         delete part.id;
         delete part.properties?.id;
 
@@ -455,8 +485,10 @@ export class VectorTileService extends AbstractSystem {
           prophash:   prophash,
           layerID:    layerID,
           origID:     origID,
+          stableID:   stableID,
           tileID:     tile.id,
           serviceID:  this.id,
+          spatialID:  source.id,
           datasetID:  source.datasetID,
           geojson:    part
         };
@@ -815,12 +847,11 @@ export class VectorTileService extends AbstractSystem {
 
     } else if (parts.length === 1) {   // a single new part
       // In this case, the merge clearly succeeded.
-      // Update survivor in place with the new merged geometry.
-      survivor.props.geojson = parts[0];
-      survivor.updateGeometry().touch();
+      // The survivor gets the new merged geometry, as a new data element (data isn't changed in place).
+      const merged = survivor.update({ geojson: parts[0] } as Partial<GeoJSONProps>);
 
       toRemoveIDs = sourceIDs.filter(id => id !== survivor.id);
-      toReplace.push(survivor);
+      toReplace.push(merged);
 
     } else {    // multiple new parts
       // In this case, we're not sure whether anything happened.
@@ -834,7 +865,9 @@ export class VectorTileService extends AbstractSystem {
           prophash:    survivor.props.prophash,
           layerID:     survivor.props.layerID,
           origID:      survivor.props.origID,
+          stableID:    survivor.props.stableID,
           serviceID:   this.id,
+          spatialID:   survivor.props.spatialID,
           datasetID:   survivor.props.datasetID,
           geojson:     part
         };

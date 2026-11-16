@@ -101,8 +101,9 @@ export function validateMissingRole(context: Context): ValidatorFunction {
               const parentID = this.issue.entityIds[0];
               editor.perform(actionDeleteMember(parentID, this.issue.data.member.index));
               editor.commit({
-                annotation: l10n.t('operations.delete_member.annotation', { n: 1 }),
-                selectedIDs: [parentID]
+                stringID: 'operations.delete_member.annotation',
+                stringParams: { n: 1 },
+                selectionAfter: [parentID]
               });
             }
           })
@@ -139,8 +140,9 @@ export function validateMissingRole(context: Context): ValidatorFunction {
         const member = { id: this.issue.entityIds[1], type: oldMember.type, role: role };
         editor.perform(actionChangeMember(this.issue.entityIds[0], member, oldMember.index));
         editor.commit({
-          annotation: l10n.t('operations.change_role.annotation', { n: 1 }),
-          selectedIDs: [member.id]
+          stringID: 'operations.change_role.annotation',
+          stringParams: { n: 1 },
+          selectionAfter: [member.id]
         });
       }
     });

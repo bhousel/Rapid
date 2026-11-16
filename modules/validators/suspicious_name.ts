@@ -117,8 +117,8 @@ export function validateSuspiciousName(context: Context): ValidatorFunction {
               delete tags[nameKey];
               editor.perform(actionChangeTags(entityID, tags));
               editor.commit({
-                annotation: l10n.t('issues.fix.remove_generic_name.annotation'),
-                selectedIDs: [entityID]
+                stringID: 'issues.fix.remove_generic_name.annotation',
+                selectionAfter: [entityID]
               });
             }
           })
@@ -179,8 +179,8 @@ export function validateSuspiciousName(context: Context): ValidatorFunction {
               delete tags[nameKey];
               editor.perform(actionChangeTags(entityID, tags));
               editor.commit({
-                annotation: l10n.t('issues.fix.remove_mistaken_name.annotation'),
-                selectedIDs: [entityID]
+                stringID: 'issues.fix.remove_mistaken_name.annotation',
+                selectionAfter: [entityID]
               });
             }
           })

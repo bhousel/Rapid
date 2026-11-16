@@ -157,3 +157,48 @@ export function utilExtractValues(s: string, separator?: string | RegExp): strin
   return s.split(separator).map(s => s.trim());
 }
 
+
+/**
+ * Returns a 53-bit hash of a string, in base 36 (up to 11 characters).
+ * This is "cyrb53" (public domain, by bryc). It's fast and well distributed, and a 53-bit hash
+ * has far fewer collisions than a 32-bit one when hashing many thousands of things.
+ * Not for security.
+ * @param str - The string to hash
+ * @param seed - Optional seed, to get a different hash of the same string
+ * @return The hash, in base 36
+ */
+export function utilHash53(str: string, seed: number = 0): string {
+  let h1 = 0xdeadbeef ^ seed;
+  let h2 = 0x41c6ce57 ^ seed;
+  for (let i = 0; i < str.length; i++) {
+    const ch = str.charCodeAt(i);
+    h1 = Math.imul(h1 ^ ch, 2654435761);
+    h2 = Math.imul(h2 ^ ch, 1597334677);
+  }
+  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507);
+  h1 ^= Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507);
+  h2 ^= Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+  return (4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(36);
+}
+
+
+/**
+ * Returns a JSON string of a value, with the keys of every object sorted, so that equal values
+ * always give the same string (and the same hash), whatever order their keys were written in.
+ * @param value - The value
+ * @return The JSON string
+ */
+export function utilStableStringify(value: unknown): string {
+  return JSON.stringify(value, (_key, val: unknown) => {
+    if (val && typeof val === 'object' && !Array.isArray(val)) {
+      const sorted: Record<string, unknown> = {};
+      for (const k of Object.keys(val).sort()) {
+        sorted[k] = (val as Record<string, unknown>)[k];
+      }
+      return sorted;
+    }
+    return val;
+  });
+}
+

@@ -574,9 +574,10 @@ export class PixiLayerLabels extends AbstractPixiLayer {
     if (selectedContainer) {
       avoidContainers.push(selectedContainer);
     }
+    // The points of every spatial ID (`points/osm`, `points/<dataset>`, …), see `design/scene.md`
     const pointsContainer = this.scene.groups.get('points')!;
     if (pointsContainer) {
-      avoidContainers.push(pointsContainer);
+      avoidContainers.push(...pointsContainer.children as PIXI.Container[]);
     }
 
     // For each container, gather the things to avoid.

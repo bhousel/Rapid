@@ -1,12 +1,12 @@
 import { actionDeleteRelation } from './delete_relation.ts';
 import { actionDeleteWay } from './delete_way.ts';
 import { geomPathIntersections } from '@rapid-sdk/math';
+import { Graph } from '../lib/Graph.ts';
 import { osmJoinWays } from '../lib/multipolygon.ts';
 import { utilArrayGroupBy, utilArrayIdentical, utilArrayIntersection } from '@rapid-sdk/util';
 
 import type { Action } from './types.ts';
 import type { EntityType, OsmNode, OsmRelation, OsmTags, OsmWay } from '../data/types.ts';
-import type { Graph } from '../lib/Graph.ts';
 import type { JoinedWaysResult } from '../lib/multipolygon.ts';
 import type { Vec2 } from '@rapid-sdk/math';
 
@@ -203,7 +203,7 @@ export function actionJoin(ids: EntityID[], options: JoinOptions = {}): JoinActi
     // We might need to reverse some of these ways before joining them.  iD#4688
     // `joined.actions` property will contain any actions we need to apply.
     // Make copy of the graph to avoid affecting the caller's graph.
-    graph = graph.snapshot();
+    graph = new Graph(graph);
     for (const fn of sequences.actions) {
       graph = fn(graph);
     }

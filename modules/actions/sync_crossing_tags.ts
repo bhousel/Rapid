@@ -1,3 +1,5 @@
+import deepEqual from 'fast-deep-equal';
+
 import type { Action } from './types.ts';
 import type { Graph } from '../lib/Graph.ts';
 import type { OsmNode, OsmTags, OsmWay } from '../data/types.ts';
@@ -129,8 +131,10 @@ export function actionSyncCrossingTags(entityID: EntityID): Action {
         delete parentTags[k];
       }
     }
-    parent = parent.update({ tags: parentTags });
-    graph.replace(parent);
+    if (!deepEqual(parent.tags, parentTags)) {
+      parent = parent.update({ tags: parentTags });
+      graph.replace(parent);
+    }
 
     // Exit if one of these isn't true.
     if (!(isCrossingWay || isNotCrossable)) return;
@@ -214,7 +218,9 @@ export function actionSyncCrossingTags(entityID: EntityID): Action {
         delete childTags.highway;
       }
 
-      graph.replace(child.update({ tags: childTags }));
+      if (!deepEqual(child.tags, childTags)) {
+        graph.replace(child.update({ tags: childTags }));
+      }
     }
   }
 
@@ -243,8 +249,10 @@ export function actionSyncCrossingTags(entityID: EntityID): Action {
       }
     }
 
-    child = child.update({ tags: childTags });
-    graph.replace(child);
+    if (!deepEqual(child.tags, childTags)) {
+      child = child.update({ tags: childTags });
+      graph.replace(child);
+    }
 
     // Exit if not a crossing (maybe curb ramp or barrier or some other thing - nothing to sync to parent)
     if (!isCrossingNode) return;
@@ -277,8 +285,10 @@ export function actionSyncCrossingTags(entityID: EntityID): Action {
 
       // Unlike in `syncParentToChildren` - we won't adjust the `footway=crossing` tag of the parent way here.
       // The parent way might be a sidewalk that just stretches all the way across the intersection.
-      parent = parent.update({ tags: parentTags });
-      graph.replace(parent);
+      if (!deepEqual(parent.tags, parentTags)) {
+        parent = parent.update({ tags: parentTags });
+        graph.replace(parent);
+      }
 
       // We should sync these tags to any other sibling crossing nodes along the same parent.
       if (isCrossingNode) {

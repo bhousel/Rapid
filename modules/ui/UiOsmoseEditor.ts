@@ -129,12 +129,14 @@ export class UiOsmoseEditor extends EventEmitter {
    * @param $selection - A d3-selection to render the save section into
    */
   protected _saveSection($selection: D3Selection): void {
-    const errID = this.datum?.id;
-    const isSelected = errID && this.context.selectedData().has(errID);
+    const dataID = this.datum?.dataID;
+    const isSelected = dataID && this.context.selectedIDs().includes(dataID);
     const isShown = (this.datum && isSelected);
 
+    // Keyed by the issue's ID, not its `key`: a new version of the issue updates this section
+    // (see `modules/ui/AGENTS.md`).
     let $saveSection: D3Selection = $selection.selectAll('.qa-save')
-      .data(isShown ? [this.datum] : [], (d: OsmoseIssue) => d.key!);
+      .data(isShown ? [this.datum] : [], (d: OsmoseIssue) => d.id);
 
     // exit
     $saveSection.exit()
@@ -161,10 +163,10 @@ export class UiOsmoseEditor extends EventEmitter {
     const l10n = context.systems.l10n!;
     const osmose2 = context.services.osmose!;
 
-    const errID = this.datum?.id;
-    const isSelected = errID && context.selectedData().has(errID);
+    const dataID = this.datum?.dataID;
+    const isSelected = dataID && context.selectedIDs().includes(dataID);
     let $buttons: D3Selection = $selection.selectAll('.buttons')
-      .data(isSelected ? [this.datum] : [], (d: OsmoseIssue) => d.key!);
+      .data(isSelected ? [this.datum] : [], (d: OsmoseIssue) => d.id);
 
     // exit
     $buttons.exit()
@@ -192,9 +194,8 @@ export class UiOsmoseEditor extends EventEmitter {
       .on('click', (e: PointerEvent, d: OsmoseIssue) => {
         (e.currentTarget as HTMLElement).blur();    // avoid keeping focus on the button - iD#4641
         if (osmose2) {
-          d.props.newStatus = 'done';
-          d.touch();
-          osmose2.postUpdate(d, (err: any, item: any) => this.emit('change', item));
+          const issue = this._updateIssue(d, { newStatus: 'done' });
+          osmose2.postUpdate(issue, (err: any, item: any) => this.emit('change', item));
         }
       });
 
@@ -203,10 +204,30 @@ export class UiOsmoseEditor extends EventEmitter {
       .on('click', (e: PointerEvent, d: OsmoseIssue) => {
         (e.currentTarget as HTMLElement).blur();    // avoid keeping focus on the button - iD#4641
         if (osmose2) {
-          d.props.newStatus = 'false';
-          d.touch();
-          osmose2.postUpdate(d, (err: any, item: any) => this.emit('change', item));
+          const issue = this._updateIssue(d, { newStatus: 'false' });
+          osmose2.postUpdate(issue, (err: any, item: any) => this.emit('change', item));
         }
       });
+  }
+
+
+  /**
+   * Sets props on the issue, as a new issue in the cache (data isn't changed in place), and makes it
+   * this editor's datum.
+   * It starts from the cached issue, which may be newer than the one given: loading the issue's
+   * details stores a new issue with them.
+   * @param issue - the issue to start from
+   * @param props - the props to set
+   * @return The new issue
+   */
+  protected _updateIssue(issue: OsmoseIssue, props: Record<string, unknown>): OsmoseIssue {
+    const context = this.context;
+    const osmose = context.services.osmose;
+
+    const current = osmose?.getError(issue.id) ?? issue;
+    const updated = current.update(props);
+    osmose?.replaceItem(updated);
+    this.datum = updated;
+    return updated;
   }
 }

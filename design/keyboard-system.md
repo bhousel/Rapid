@@ -79,7 +79,7 @@ Five components create their own namespaced instance and manage its `document` b
 | Component | Namespace | Lifecycle | Notes |
 |-----------|-----------|-----------|-------|
 | [`UiSystem`](../modules/core/UiSystem.ts) | `modal` | bound once in `initAsync` | Esc/Backspace → close top modal |
-| [`SelectOsmMode`](../modules/modes/SelectOsmMode.ts) | `select` | bound on `enter`, unbound on `exit` | vertex nav (`[`, `]`, `{`, `}`, `\`) |
+| [`SelectMode`](../modules/modes/SelectMode.ts) | `select` | bound on `enter`, unbound on `exit` | vertex nav (`[`, `]`, `{`, `}`, `\`) |
 | [`SaveMode`](../modules/modes/SaveMode.ts) | `SaveMode` | toggled on/off during save flow | Esc (capture) to cancel |
 | [`UiRapidInspector`](../modules/ui/UiRapidInspector.ts) | `UiRapidInspector` | bound in constructor, re-registered on `localechange` | accept/ignore/move/rotate — keys deliberately isolated from the global set |
 | [`UiConflicts`](../modules/ui/UiConflicts.ts) | `conflicts` | toggled on/off | Esc (capture) to cancel |

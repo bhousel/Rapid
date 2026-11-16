@@ -72,25 +72,9 @@ export class PixiLayerGeoScribble extends AbstractPixiLayer {
    * Every Layer should have a reset function to replace any Pixi objects and internal state.
    */
   public reset() {
-    super.reset();
+    super.reset();   // released the old container
 
-    const groupContainer = this.scene.groups.get('basemap')!;
-
-    // Remove any existing containers
-    for (const child of groupContainer.children) {
-      if (child.label.startsWith(this.layerID + '-')) {   // 'geoscribble-*'
-        groupContainer.removeChild(child);
-        child.destroy({ children: true });  // recursive
-      }
-    }
-
-    const geoscribbles = new PIXI.Container();
-    geoscribbles.label = `${this.layerID}-geoscribbles`;
-    geoscribbles.sortableChildren = false;
-    geoscribbles.interactiveChildren = true;
-    this.scribblesContainer = geoscribbles;
-
-    groupContainer.addChild(geoscribbles);
+    this.scribblesContainer = this._spatialContainer('basemap', this.id);
   }
 
 
@@ -158,7 +142,6 @@ export class PixiLayerGeoScribble extends AbstractPixiLayer {
     for (const d of lines) {
       const lineStyle = this.getLineStyle(d.properties);
       const dataID = d.id;
-      const version = d.v || 0;
       const parts = d.geoms.parts;
 
       for (let i = 0; i < parts.length; ++i) {
@@ -182,8 +165,7 @@ export class PixiLayerGeoScribble extends AbstractPixiLayer {
         }
 
         // If data has changed.. Replace it.
-        if (feature.v !== version) {
-          feature.v = version;
+        if (feature.data !== d || feature.geometry !== part) {   // changed data is a new object
           feature.label = (d.properties.text as string) || null;
           feature.geometry = part;
           feature.data = d;
@@ -214,7 +196,6 @@ export class PixiLayerGeoScribble extends AbstractPixiLayer {
 
     for (const d of points) {
       const dataID = d.id;
-      const version = d.v || 0;
       const parts = d.geoms.parts;
 
       for (let i = 0; i < parts.length; ++i) {
@@ -238,8 +219,7 @@ export class PixiLayerGeoScribble extends AbstractPixiLayer {
         }
 
         // If data has changed.. Replace it.
-        if (feature.v !== version) {
-          feature.v = version;
+        if (feature.data !== d || feature.geometry !== part) {   // changed data is a new object
           feature.label = (d.properties.text as string) || null;
           feature.geometry = part;
           feature.data = d;

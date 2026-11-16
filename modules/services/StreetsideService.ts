@@ -431,6 +431,7 @@ export class StreetsideService extends AbstractSystem {
       const props = {
         type: 'photo',
         serviceID: this.id,
+        spatialID: spatialID,
         loc: loc,
         id: bubbleID,
         ca: bubble.he,
@@ -795,6 +796,8 @@ export class StreetsideService extends AbstractSystem {
     // more important focused - like a input, textarea, menu, etc.
     const activeElement = document.activeElement?.tagName ?? 'BODY';
     if (activeElement !== 'BODY') return;
+    // Selected OSM features take the arrow keys
+    if (photos.arrowKeysMoveSelection()) return;
 
     if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') {
       this._step(-1);
@@ -900,6 +903,18 @@ export class StreetsideService extends AbstractSystem {
     const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
     const toAttach = Array.from(unattachedBubbles).sort(collator.compare);
 
+    // Sequences grow as bubbles attach. This works on copies of their bubble lists, and stores a new
+    // sequence for each one it changed at the end (data isn't changed in place).
+    const bubbleIDsFor = new Map<SequenceID, PhotoID[]>();
+    const bubbleIDsOf = (sequence: StreetsideSequence): PhotoID[] => {
+      let bubbleIDs = bubbleIDsFor.get(sequence.id);
+      if (!bubbleIDs) {
+        bubbleIDs = [...sequence.props.bubbleIDs];
+        bubbleIDsFor.set(sequence.id, bubbleIDs);
+      }
+      return bubbleIDs;
+    };
+
     const _updateCaches = (sequence: any, bubble: any): void => {
       const sequenceID = sequence.id;
       const bubbleID = bubble.id;
@@ -939,7 +954,7 @@ export class StreetsideService extends AbstractSystem {
         for (const sequenceID of trySequenceIDs) {
           const sequence = spatial.getItem<StreetsideSequence>('streetside-sequences', sequenceID);
           if (!sequence) continue;
-          const bubbleIDs = sequence.props.bubbleIDs;  // we will update bubbleIDs in-place
+          const bubbleIDs = bubbleIDsOf(sequence);
           const beginID = bubbleIDs.at(0);
           const endID = bubbleIDs.at(-1);
           if (prevBubbleID === endID) {
@@ -962,7 +977,7 @@ export class StreetsideService extends AbstractSystem {
         for (const sequenceID of trySequenceIDs) {
           const sequence = spatial.getItem<StreetsideSequence>('streetside-sequences', sequenceID);
           if (!sequence) continue;
-          const bubbleIDs = sequence.props.bubbleIDs;  // we will update bubbleIDs in-place
+          const bubbleIDs = bubbleIDsOf(sequence);
           const beginID = bubbleIDs.at(0);
           const endID = bubbleIDs.at(-1);
           if (nextBubbleID === beginID) {
@@ -986,6 +1001,7 @@ export class StreetsideService extends AbstractSystem {
           id:         sequenceID,
           type:       'sequence',
           serviceID:  this.id,
+          spatialID:  'streetside-sequences',
           bubbleIDs:  [],
           isPano:     true,
           geojson: {
@@ -1001,7 +1017,7 @@ export class StreetsideService extends AbstractSystem {
         const sequence: StreetsideSequence = new GeoJSONData(this.context, props as Partial<StreetsideSequenceProps>);
         spatial.addData('streetside-sequences', sequence);
 
-        const bubbleIDs = sequence.props.bubbleIDs;  // we will update bubbleIDs in-place
+        const bubbleIDs = bubbleIDsOf(sequence);
         bubbleIDs.push(currBubbleID);
         _updateCaches(sequence, currBubble);
 
@@ -1017,21 +1033,25 @@ export class StreetsideService extends AbstractSystem {
       }
     }
 
-    // Any sequences that we touched, bump version number and recompute the coordinate array
+    // Any sequences that we touched get a new sequence, with their bubbles and coordinate array
     for (const sequenceID of touchedSequenceIDs) {
       const sequence = spatial.getItem<StreetsideSequence>('streetside-sequences', sequenceID);
       if (!sequence) continue;
-      const bubbles = sequence.props.bubbleIDs
+      const bubbleIDs = bubbleIDsOf(sequence);
+      const bubbles = bubbleIDs
         .map((bubbleID: PhotoID) => spatial.getItem<StreetsideBubble>('streetside-images', bubbleID));
 
-      // We will update the properties in-place.. hope this is ok.
-      sequence.props.captured_at = bubbles[0]?.props.captured_at;
-      sequence.props.captured_by = bubbles[0]?.props.captured_by;
       const feature = sequence.props.geojson as GeoJSON.Feature;
-      feature.geometry = { type: 'LineString', coordinates: bubbles.map(bubble => bubble?.loc ?? [0, 0]) };
-
-      sequence.updateGeometry().touch();
-      spatial.replaceData('streetside-sequences', sequence);
+      const updated = sequence.update({
+        bubbleIDs:    bubbleIDs,
+        captured_at:  bubbles[0]?.props.captured_at,
+        captured_by:  bubbles[0]?.props.captured_by,
+        geojson: {
+          ...feature,
+          geometry: { type: 'LineString', coordinates: bubbles.map(bubble => bubble?.loc ?? [0, 0]) }
+        }
+      } as Partial<StreetsideSequenceProps>);
+      spatial.replaceData('streetside-sequences', updated);
     }
   }
 

@@ -25,8 +25,7 @@ Modes use a registry pattern: `index.ts` holds a `modes.available` Map of mode I
 | `MoveMode.ts` | Moving selected features |
 | `RotateMode.ts` | Rotating selected features |
 | `SaveMode.ts` | Saving/uploading changes to OSM |
-| `SelectMode.ts` | Non-OSM features are selected |
-| `SelectOsmMode.ts` | OSM features are selected |
+| `SelectMode.ts` | Features are selected, from any source (OSM, Rapid, notes, custom data, …) |
 
 ## Properties
 
@@ -34,14 +33,16 @@ Each mode has:
 - `id` - Unique identifier (e.g., `browse`, `select`)
 - `active` - Whether the mode is currently active
 - `operations` - Array of operations available in this mode
-- `selectedData` - Map of currently selected data elements
+- `selectedIDs` - The data IDs of the selected data, e.g. `['w1', 'fbRoads:abc']` (what edits record, so undo/redo can restore it; see [`design/data-ids.md`](../../design/data-ids.md))
+- `selectedData` - Map of the selected data, each looked up by its data ID (`SpatialSystem.getData`), so it's always the current version
 
 ## Mode Transitions
 
 The application context manages mode transitions:
 
 ```typescript
-context.enter('select-osm', { selection: { osm: selectedIDs } });
+context.enter('select', { selection: ['w1', 'fbRoads:abc'] });   // data IDs
+context.enter('move', { selection: selectedIDs });
 context.enter('browse');
 context.mode;   // returns BrowseMode
 ```

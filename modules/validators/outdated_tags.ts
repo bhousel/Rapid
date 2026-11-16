@@ -1,4 +1,5 @@
 import { utilHashcode, utilTagDiff } from '@rapid-sdk/util';
+import deepEqual from 'fast-deep-equal';
 
 import { actionChangePreset } from '../actions/change_preset.ts';
 import { actionChangeTags } from '../actions/change_tags.ts';
@@ -8,6 +9,7 @@ import { Graph, ValidationIssue, ValidationFix } from '../lib/index.ts';
 import type { Action } from '../actions/types.ts';
 import type { Context } from '../Context.ts';
 import type { D3Selection } from 'd3-selection';
+import type { EditLabel } from '../lib/Edit.ts';
 import type { NsiUpgradeResult } from '../services/NsiService.ts';
 import type { OsmEntity, OsmNode, OsmTags } from '../data/types.ts';
 import type { TagDiff } from '@rapid-sdk/util';
@@ -130,7 +132,7 @@ export function validateOutdatedTags(context: Context): ValidatorFunction {
     if (nsi) {
       isWaitingForNsi = (nsi.status === 'loading');
       if (!isWaitingForNsi) {
-        const loc = entity.extent()!.center();
+        const loc = graph.extent(entity)!.center();
         nsiResult = nsi.upgradeTags(newTags, loc);
         if (nsiResult) {
           newTags = nsiResult.newTags;
@@ -157,9 +159,9 @@ export function validateOutdatedTags(context: Context): ValidatorFunction {
 
     // Allow autofix for simple upgrades..
     // `noncanonical_brand` upgrades may have false positives, so they should be reviewed manually.
-    let autoArgs: [Action, string] | undefined;
+    let autoArgs: [Action, EditLabel] | undefined;
     if (subtype !== 'noncanonical_brand') {
-      autoArgs = [actionDoTagUpgrade, l10n.t('issues.fix.upgrade_tags.annotation')];
+      autoArgs = [actionDoTagUpgrade, { stringID: 'issues.fix.upgrade_tags.annotation' }];
     }
 
     result.issues.push(new ValidationIssue(context, {
@@ -178,8 +180,8 @@ export function validateOutdatedTags(context: Context): ValidatorFunction {
             onClick: () => {
               editor.perform(actionDoTagUpgrade);
               editor.commit({
-                annotation: l10n.t('issues.fix.upgrade_tags.annotation'),
-                selectedIDs: [entity.id]
+                stringID: 'issues.fix.upgrade_tags.annotation',
+                selectionAfter: [entity.id]
               });
             }
           })
@@ -193,8 +195,8 @@ export function validateOutdatedTags(context: Context): ValidatorFunction {
               onClick: () => {
                 editor.perform(actionAddNotTag);
                 editor.commit({
-                  annotation: l10n.t('issues.fix.tag_as_not.annotation'),
-                  selectedIDs: [entity.id]
+                  stringID: 'issues.fix.tag_as_not.annotation',
+                  selectionAfter: [entity.id]
                 });
               }
             })
@@ -226,6 +228,7 @@ export function validateOutdatedTags(context: Context): ValidatorFunction {
         }
       }
 
+      if (deepEqual(currEntity.tags, newTags)) return graph;
       return actionChangeTags(currEntity.id, newTags)(graph);
     }
 
@@ -255,6 +258,7 @@ export function validateOutdatedTags(context: Context): ValidatorFunction {
         delete newTags[wp];        // remove `brand:wikipedia`
       }
 
+      if (deepEqual(currEntity.tags, newTags)) return graph;
       return actionChangeTags(currEntity.id, newTags)(graph);
     }
 

@@ -302,4 +302,112 @@ describe('validateAlmostJunction', () => {
     };
     assert.deepInclude(issues[0], expected);
   });
+
+
+  it('skips way segments that are in the spatial index but not in the graph being validated', () => {
+    const editor = context.systems.editor;
+    load([
+      new Rapid.OsmNode(context, { id: 'n1', loc: [22.42357, 0] }),
+      new Rapid.OsmNode(context, { id: 'n2', loc: [22.42367, 0] }),
+      new Rapid.OsmWay(context, { id: 'w1', nodes: ['n1', 'n2'], tags: { highway: 'residential' }}),
+      new Rapid.OsmNode(context, { id: 'n3', loc: [22.42356, 0.001] }),
+      new Rapid.OsmNode(context, { id: 'n4', loc: [22.42356, -0.001] }),
+      new Rapid.OsmWay(context, { id: 'w2', nodes: ['n3', 'n4'], tags: { highway: 'residential' }})
+    ]);
+
+    // The index also returns a road (and nodes) that only another graph has
+    const waySegments = editor.waySegments;
+    editor.waySegments = (extent, g) => [
+      { wayID: 'w-10', edge: ['n-10', 'n-11'], index: 0 },
+      { wayID: 'w2', edge: ['n-12', 'n-13'], index: 0 },
+      ...waySegments.call(editor, extent, g)
+    ];
+
+    try {
+      const issues = validator(graph.entity('w1'), graph).issues;
+      assert.lengthOf(issues, 1);
+      assert.strictEqual(issues[0].type, 'almost_junction');
+      assert.deepEqual(issues[0].entityIds, ['w1', 'n1', 'w2']);
+    } finally {
+      editor.waySegments = waySegments;
+    }
+  });
+
+
+  describe('fixes', () => {
+    // `w1` ends about 1 m east of the vertical road `w2`
+    function loadNearlyJoined() {
+      load([
+        new Rapid.OsmNode(context, { id: 'n1', loc: [22.42357, 0] }),
+        new Rapid.OsmNode(context, { id: 'n2', loc: [22.42367, 0] }),
+        new Rapid.OsmWay(context, { id: 'w1', nodes: ['n1', 'n2'], tags: { highway: 'residential' }}),
+        new Rapid.OsmNode(context, { id: 'n3', loc: [22.42356, 0.001] }),
+        new Rapid.OsmNode(context, { id: 'n4', loc: [22.42356, -0.001] }),
+        new Rapid.OsmWay(context, { id: 'w2', nodes: ['n3', 'n4'], tags: { highway: 'residential' }})
+      ]);
+      const issues = validate();
+      assert.lengthOf(issues, 1);
+      return issues[0];
+    }
+
+    it('connects the road as it is when the fix is clicked', () => {
+      const editor = context.systems.editor;
+      const issue = loadNearlyJoined();
+      const connect = issue.fixes().find(fix => fix.icon === 'rapid-icon-abutment');
+
+      // The user edits twice after the fixes were shown, the second time tagging the end node.
+      // (The first edit still goes into the graph the fixes were shown for, the second doesn't.)
+      editor.perform(Rapid.actionChangeTags('n2', { note: 'other end' }));
+      editor.commit({ stringID: 'tagged n2', selectionAfter: ['n2'] });
+      editor.perform(Rapid.actionChangeTags('n1', { note: 'end of the road' }));
+      editor.commit({ stringID: 'tagged n1', selectionAfter: ['n1'] });
+
+      connect.onClick();
+      const graph = editor.staging.graph;
+      assert.deepEqual(graph.entity('n1').tags, { note: 'end of the road' });
+      assert.deepEqual(graph.entity('w2').nodes, ['n3', 'n1', 'n4']);
+    });
+
+    it('changes nothing once the end node has moved', () => {
+      const editor = context.systems.editor;
+      const issue = loadNearlyJoined();
+      const connect = issue.fixes().find(fix => fix.icon === 'rapid-icon-abutment');
+
+      // The user drags the end of the road away
+      editor.perform(Rapid.actionMoveNode('n1', [22.4236, 0.0005]));
+      editor.commit({ stringID: 'moved n1', selectionAfter: ['n1'] });
+      const moved = editor.staging.graph;
+
+      connect.onClick();
+      assert.strictEqual(editor.staging.graph, moved);
+
+      // Same for the autofix (e.g. Autofix All applying it after an earlier fix)
+      const [action] = issue.autoArgs;
+      const graph = action(new Rapid.Graph(moved));
+      assert.deepEqual(graph.entity('n1').loc, [22.4236, 0.0005]);
+      assert.deepEqual(graph.entity('w2').nodes, ['n3', 'n4']);
+    });
+
+    it('joins close endpoints', () => {
+      load([
+        // Vertical path
+        new Rapid.OsmNode(context, { id: 'n1', loc: [0.0003247, 22.4423866] }),
+        new Rapid.OsmNode(context, { id: 'n2', loc: [0.0003060, 22.4432671] }),
+        new Rapid.OsmWay(context, { id: 'w1', nodes: ['n1', 'n2'], tags: { highway: 'path' }}),
+        // Angled path with end node within 4.25m and change of angle <9°
+        new Rapid.OsmNode(context, { id: 'n3', loc: [0.0003379, 22.4423861] }),
+        new Rapid.OsmNode(context, { id: 'n4', loc: [0.0004354, 22.4421312] }),
+        new Rapid.OsmWay(context, { id: 'w2', nodes: ['n3', 'n4'], tags: { highway: 'path' }})
+      ]);
+      const issues = validate();
+      assert.lengthOf(issues, 1);
+
+      const [action] = issues[0].autoArgs;
+      const result = action(new Rapid.Graph(graph));
+      const w1 = result.entity('w1');
+      const w2 = result.entity('w2');
+      assert.strictEqual(w1.first(), w2.first());   // merged, not a new vertex on `w1`
+      assert.lengthOf(w1.nodes, 2);
+    });
+  });
 });

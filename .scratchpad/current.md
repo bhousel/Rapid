@@ -1,34 +1,25 @@
 # Current Work
 
-No active in-progress task.
+## This branch (`conflation-system`)
+Ready to become `main` as v3.0.0-pre.4 (Nov 16), for testers, before the multiselection design
+(`backlog.md`). What landed is in `completed.md`; follow-ups from the release check are in `backlog.md`.
 
-## Last session (Oct 2026): agent tooling for Claude Code
-- Reusable prompts became Agent Skills in `.claude/skills/` (via `rapideditor/agent-practices` PR #1 + `/sync`).
-  Both Claude Code and VS Code Copilot find them there.
-- `.github/instructions/*.instructions.md` became nested `modules/ui/AGENTS.md` and `modules/pixi/AGENTS.md`
-  (see `decisions.md` for the why). The folder READMEs link to them.
-- Docs refresh: AGENTS.md Testing section, module READMEs, DnD/Database design-doc status.
-- Fixed a stale Bun transpiler-cache entry that broke `extract.test.js` (see `quirks.md`).
+## Active: matching third-party data against OSM (`ConflationSystem`)
+Top priority. Design: [`design/conflation-system.md`](../design/conflation-system.md) (Steps 1–6 first
+version done; the doc awaits Bryan's final review). Guiding use case: *accept the part of the sidewalk
+that is missing, and join it to the part that exists.*
+- **Step 6, Conflation Settings UI, still to do:** per-side `props` editing, live counts, live tuning
+  (see "Rapid dataset UI: live tuning" in `backlog.md`), and even column widths in the rules table.
+- **Known bugs:** six from the second bug hunt (items 6, 8, 9, 23, 24, 25), listed under "Known bugs" in
+  the design doc.
+- **Open questions** (in the doc): require a data mapping or only warn; default rules that match any
+  line; lock `isID` once the user has acted on a dataset (`design/rapid-system.md`).
+- Stable IDs and acted ranges haven't been tried in the browser yet.
+- A real short stub next to a matching sidewalk now counts as already mapped (side effect of Step 5b).
+- More demo feedback expected as people use it; likely requests are in `backlog.md` ("Conflation: what
+  JOSM users will ask for").
 
-## Next up
-- **Stored-files management UI** (`DatabaseSystem` Phase 4 design): list stored files with sizes so users
-  can free space when `canStoreAsync()` says no. Only `UiRapidAddDataset` calls `canStoreAsync` today.
-- **Custom-data consumer ownership**: move the `DragAndDropSystem` consumer registration out of
-  `PixiLayerCustomData` (rendering layer, mild smell) into a proper system.
-- **Stretch: images → EXIF → photo markers** (future local-photos consumer, wires into `PhotoSystem`).
-- **KeyboardSystem phases 2 & 3** (remappable shortcuts).
-- Open questions in `design/database-system.md` (DB name/scoping, graceful-degradation doc).
-- **agent-practices:** consider adding the "folder-specific `AGENTS.md`" convention to the shared template.
-- **Report upstream to Bun:** the transpiler cache key ignores whether a file was compiled as a test (see `quirks.md`).
-
-## Still-open future work
-- **Automated testing of `UiSystem` + `UiWhatever` components.** The modal stack + Esc/Backspace
-  routing (and `KeyboardSystem` document listeners) can't be unit-tested under bun without a browser.
-  Figure out a headless-browser or testable-seam approach.
-- **Manual smoke-test** the nested Rapid dataset modals (catalog / add-custom-data / colorpicker) in
-  a real browser to confirm stacking, Esc, and close behavior.
-- **`CycleHighwayTagOperation`'s module-level `_lastSelectedIDs`.** The one remaining module-level
-  mutable global in `operations/`. Consider moving it onto a system per the system-ownership rule.
-
-## Open questions
-- Delete the 2 dead quarantined `sections/*.jsx` React demo files + `section.ts`/`uiSection`?
+## Active: what an edit records (`EditSystem`)
+Design: [`design/edit-system.md`](../design/edit-system.md). Steps 2–5 done. Next: step 6 (edits that use
+external data on OSM features), when Bryan picks it up. PR #5's `EditSystem.dataVersion` fits here
+(the "did data change?" question); not landed.

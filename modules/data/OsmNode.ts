@@ -46,7 +46,13 @@ export class OsmNode extends OsmEntity {
     // For consistency, offer a `this.id` property.
     this.id = this.props.id;
 
-    this.updateGeometry();
+    // A copy at the same location keeps the other node's geometry (it's never changed in place).
+    const otherLoc = (otherOrContext instanceof OsmNode) ? otherOrContext.loc : undefined;
+    const loc = this.loc;
+    const sameLoc = !!otherLoc && !!loc && otherLoc[0] === loc[0] && otherLoc[1] === loc[1];
+    if (!sameLoc) {
+      this.updateGeometry();
+    }
   }
 
 
@@ -115,7 +121,7 @@ export class OsmNode extends OsmEntity {
    * @returns 'point' or 'vertex'
    */
   public geometry(graph: Graph): 'point' | 'vertex' {
-    return this.transient('geometry', () => {
+    return this.memo(graph, 'geometry', () => {
       const parents = graph.parentWays(this);
       return parents.length === 0 ? 'point' : 'vertex';
     });
@@ -218,15 +224,14 @@ export class OsmNode extends OsmEntity {
         if (parent.geometry(graph) !== 'line') continue;
         if (!(parent.tags.highway || parent.tags.railway || parent.tags.waterway || parent.tags.aeroway)) continue;  // not routable?
 
-        const nodes = parent.nodes;
-        for (let i = 0; i < nodes.length; i++) {
-          if (nodes[i] === this.id) {   // match current node
-            if (lookForward && i > 0) {
-              nodeIDs.add(nodes[i - 1]);  // look back to prev node
-            }
-            if (lookBackward && i < nodes.length - 1) {
-              nodeIDs.add(nodes[i + 1]);  // look ahead to next node
-            }
+        if (lookForward) {
+          for (const nodeID of parent.adjacentNodeIDs(this.id, 'before')) {
+            nodeIDs.add(nodeID);  // look back to prev node
+          }
+        }
+        if (lookBackward) {
+          for (const nodeID of parent.adjacentNodeIDs(this.id, 'after')) {
+            nodeIDs.add(nodeID);  // look ahead to next node
           }
         }
       }
@@ -249,7 +254,7 @@ export class OsmNode extends OsmEntity {
    * @returns `true` if this node is an endpoint on a parent way, `false` if not
    */
   public isEndpoint(graph: Graph): boolean {
-    return this.transient('isEndpoint', () => {
+    return this.memo(graph, 'isEndpoint', () => {
       const id = this.id;
       return graph.parentWays(this).filter(parent => {
         return !parent.isClosed() && !!parent.affix(id);
@@ -263,7 +268,7 @@ export class OsmNode extends OsmEntity {
    * @returns `true` if this node is connected to multiple parent ways, `false` if not
    */
   public isConnected(graph: Graph): boolean {
-    return this.transient('isConnected', () => {
+    return this.memo(graph, 'isConnected', () => {
       const parents = graph.parentWays(this);
 
       if (parents.length > 1) {  // vertex is connected to multiple parent ways
@@ -293,7 +298,7 @@ export class OsmNode extends OsmEntity {
    * @returns `true` if this node has multiple connections
    */
   public isShared(graph: Graph): boolean {
-    return this.transient('isShared', () => {
+    return this.memo(graph, 'isShared', () => {
       const parents = graph.parentWays(this);
 
       if (parents.length === 0) return false;  // no parents
@@ -322,11 +327,9 @@ export class OsmNode extends OsmEntity {
    * @returns `true` if this Node is interesting
    */
   public isInteresting(graph: Graph): boolean {
-    return this.transient('isInteresting', () => {
-      return graph.parentWays(this).length > 1 ||
-        graph.parentRelations(this).length > 0 ||
-        this.hasInterestingTags();
-    });
+    return graph.parentWays(this).length > 1 ||
+      graph.parentRelations(this).length > 0 ||
+      this.hasInterestingTags();
   }
 
   /**
@@ -336,7 +339,7 @@ export class OsmNode extends OsmEntity {
    * @returns parent ways that intersect at this node.
    */
   public parentIntersectionWays(graph: Graph): unknown[] {
-    return this.transient('parentIntersectionWays', () => {
+    return this.memo(graph, 'parentIntersectionWays', () => {
       return graph.parentWays(this).filter(parent => {
         return (parent.tags.highway ||
           parent.tags.waterway ||
@@ -363,7 +366,7 @@ export class OsmNode extends OsmEntity {
    */
   public isHighwayIntersection(graph?: Graph): boolean {
     if (!graph) return false;
-    return this.transient('isHighwayIntersection', () => {
+    return this.memo(graph, 'isHighwayIntersection', () => {
       return graph.parentWays(this).filter(parent => {
         return parent.tags.highway && parent.geometry(graph) === 'line';
       }).length > 1;
@@ -376,7 +379,7 @@ export class OsmNode extends OsmEntity {
    * @returns `true` if this node is along an address interpolation line, `false` if not
    */
   public isOnAddressLine(graph: Graph): boolean {
-    return this.transient('isOnAddressLine', () => {
+    return this.memo(graph, 'isOnAddressLine', () => {
       return graph.parentWays(this).filter(parent => {
         return parent.tags.hasOwnProperty('addr:interpolation') && parent.geometry(graph) === 'line';
       }).length > 0;

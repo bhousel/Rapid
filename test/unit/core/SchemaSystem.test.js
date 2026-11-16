@@ -1089,6 +1089,38 @@ describe('SchemaSystem', () => {
       });
     });
 
+    describe('areaGeneration', () => {
+      it('changes when what counts as an area changes, and not for other schema changes', () => {
+        _schema.resetAll();
+        const before = _schema.areaGeneration;
+        _schema.merge({ assetID: 'a1', scopes: [{ scope: 'osm', presets: {
+          building: { tags: { building: '*' }, geometry: ['area'], name: 'Building' }
+        }}]});
+        const after = _schema.areaGeneration;
+        assert.isAbove(after, before);
+
+        _schema.merge({ assetID: 'a2', scopes: [{ scope: 'osm', presets: {
+          cafe: { tags: { amenity: 'cafe' }, geometry: ['point'], name: 'Cafe' }
+        }}]});
+        assert.strictEqual(_schema.areaGeneration, after);
+      });
+
+      it('changes once a load finishes, and not while it loads', () => {
+        const seen = [];
+        const onChange = () => seen.push(_schema.areaGeneration);
+        const before = _schema.areaGeneration;
+        _schema.on('schemachange', onChange);
+        return _schema.loadSchemaAssetsAsync()
+          .then(() => {
+            assert.strictEqual(_schema.areaGeneration, before + 1);
+            assert.isAbove(seen.length, 1);
+            assert.isTrue(seen.slice(0, -1).every(generation => generation === before));
+            assert.strictEqual(seen.at(-1), before + 1);
+          })
+          .finally(() => _schema.off('schemachange', onChange));
+      });
+    });
+
 
     describe('_localeChanged', () => {
       let field, preset, category;

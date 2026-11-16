@@ -1,0 +1,11 @@
+{
+  // This file contains the Rapid dataset definitions that get applied on top of the
+  // datasets provided by services (MapWithAI, Esri, Overture). It's empty for now.
+  // See the "Rapid Datasets" section of API.md for the format.
+  "assetID": "rapid_datasets",
+
+  "scopes": [{
+    "scope": "*",
+    "datasets": {}
+  }]
+}

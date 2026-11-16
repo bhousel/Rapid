@@ -211,7 +211,7 @@ export class UiDrawModesTool {
    */
   public notesEnabled() {
     const layers = this.context.systems.gfx!.scene!.layers;
-    return layers.get('notes')?.enabled;
+    return layers.get('osm-notes')?.enabled;
   }
 
   /**

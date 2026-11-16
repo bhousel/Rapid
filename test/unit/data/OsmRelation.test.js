@@ -11,7 +11,7 @@ describe('OsmRelation', () => {
       const a = new Rapid.OsmRelation(context);
       assert.instanceOf(a, Rapid.OsmRelation);
       assert.strictEqual(a.context, context);
-      assert.instanceOf(a.geoms, Rapid.Geometry);
+      assert.instanceOf(a.baseGeometry, Rapid.Geometry);
       assert.isObject(a.props);
     });
 
@@ -35,7 +35,7 @@ describe('OsmRelation', () => {
       const a = new Rapid.OsmRelation(context, orig);
       assert.instanceOf(a, Rapid.OsmRelation);
       assert.strictEqual(a.context, context);
-      assert.instanceOf(a.geoms, Rapid.Geometry);
+      assert.instanceOf(a.baseGeometry, Rapid.Geometry);
       assert.notStrictEqual(a.props, orig);  // cloned, not ===
     });
 
@@ -44,8 +44,8 @@ describe('OsmRelation', () => {
       const b = new Rapid.OsmRelation(a);
       assert.instanceOf(b, Rapid.OsmRelation);
       assert.strictEqual(b.context, context);
-      assert.instanceOf(b.geoms, Rapid.Geometry);
-      assert.notStrictEqual(b.geoms, a.geoms);  // cloned, not ===
+      assert.instanceOf(b.baseGeometry, Rapid.Geometry);
+      assert.strictEqual(b.baseGeometry, a.baseGeometry);  // shared, a Geometry is never changed in place
       assert.notStrictEqual(b.props, a.props);  // cloned, not ===
       assert.isObject(b.props);
     });
@@ -57,8 +57,8 @@ describe('OsmRelation', () => {
       const b = new Rapid.OsmRelation(a, update);
       assert.instanceOf(b, Rapid.OsmRelation);
       assert.strictEqual(b.context, context);
-      assert.instanceOf(b.geoms, Rapid.Geometry);
-      assert.notStrictEqual(b.geoms, a.geoms);  // cloned, not ===
+      assert.instanceOf(b.baseGeometry, Rapid.Geometry);
+      assert.strictEqual(b.baseGeometry, a.baseGeometry);  // shared, a Geometry is never changed in place
       assert.notStrictEqual(b.props, a.props);  // cloned, not ===
       assert.deepInclude(b.props, orig);
       assert.deepInclude(b.props, update);
@@ -173,7 +173,7 @@ describe('OsmRelation', () => {
       const b = new Rapid.OsmNode(context, { loc: [5, 10] });
       const r = new Rapid.OsmRelation(context, { members: [{ id: a.id }, { id: b.id }] });
       const graph = new Rapid.Graph(context, [a, b, r]);
-      assert.deepEqual(r.extent(graph), new Rapid.sdk.Extent([0, 0], [5, 10]));
+      assert.deepEqual(graph.extent(r), new Rapid.sdk.Extent([0, 0], [5, 10]));
     });
 
     it('returns the known extent of incomplete relations', () => {
@@ -181,14 +181,14 @@ describe('OsmRelation', () => {
       const b = new Rapid.OsmNode(context, { loc: [5, 10] });
       const r = new Rapid.OsmRelation(context, { members: [{ id: a.id }, { id: b.id }] });
       const graph = new Rapid.Graph(context, [a, r]);
-      assert.deepEqual(r.extent(graph), new Rapid.sdk.Extent([0, 0], [0, 0]));
+      assert.deepEqual(graph.extent(r), new Rapid.sdk.Extent([0, 0], [0, 0]));
     });
 
     it('does not error on self-referencing relations', () => {
       let r = new Rapid.OsmRelation(context);
       r = r.addMember({ id: r.id });
       const graph = new Rapid.Graph(context, [r]);
-      assert.isNotOk(r.extent(graph));
+      assert.isNotOk(graph.extent(r));
     });
   });
 
@@ -664,6 +664,25 @@ describe('OsmRelation', () => {
   });
 
 
+  describe('buildGeometry', () => {
+    it('references its members\' geometry parts instead of copying them', () => {
+      const a = new Rapid.OsmNode(context, { id: 'a', loc: [0, 0] });
+      const b = new Rapid.OsmNode(context, { id: 'b', loc: [1, 0] });
+      const c = new Rapid.OsmNode(context, { id: 'c', loc: [2, 1] });
+      const w1 = new Rapid.OsmWay(context, { id: 'w1', nodes: ['a', 'b'] });
+      const r1 = new Rapid.OsmRelation(context, { id: 'r1', tags: { type: 'route' }, members: [
+        { id: 'w1', type: 'way' }, { id: 'c', type: 'node', role: 'stop' }
+      ]});
+      const r2 = new Rapid.OsmRelation(context, { id: 'r2', tags: { type: 'route_master' }, members: [{ id: 'r1', type: 'relation' }] });
+      const graph = new Rapid.Graph(context, [a, b, c, w1, r1, r2]);
+
+      assert.sameMembers(graph.geometry(r1).parts, [...graph.geometry(w1).parts, ...c.geoms.parts]);
+      assert.sameMembers(graph.geometry(r2).parts, graph.geometry(r1).parts);
+      assert.deepEqual(graph.geometry(r2).orig.extent.min, [0, 0]);
+      assert.deepEqual(graph.geometry(r2).orig.extent.max, [2, 1]);
+    });
+  });
+
   describe('asGeoJSON', () => {
     //
     //  3
@@ -791,6 +810,24 @@ describe('OsmRelation', () => {
       assert.deepEqual(result, expected);
     });
 
+    it('does not write the role onto the member\'s own GeoJSON', () => {
+      const n1 = new Rapid.OsmNode(context, { id: 'n1', loc: [0, 0] });
+      const n2 = new Rapid.OsmNode(context, { id: 'n2', loc: [1, 1] });
+      const w1 = new Rapid.OsmWay(context, { id: 'w1', nodes: ['n1', 'n2'] });
+      const r1 = new Rapid.OsmRelation(context, {
+        id: 'r1',
+        tags: { type: 'route' },
+        members: [{ id: 'w1', type: 'way', role: 'forward' }]
+      });
+      const graph = new Rapid.Graph(context, [n1, n2, w1, r1]);
+      const way = w1.asGeoJSON(graph);   // memoized on w1
+      const result = r1.asGeoJSON(graph);
+
+      assert.strictEqual(result.features[0].role, 'forward');
+      assert.notProperty(way, 'role');
+      assert.notProperty(w1.asGeoJSON(graph), 'role');
+    });
+
     it('does not error on incomplete relations', () => {
       const r1 = new Rapid.OsmRelation(context, {
         id: 'r1',
@@ -841,7 +878,6 @@ describe('OsmRelation', () => {
       const expected = {
         type: 'FeatureCollection',
         id: 'r1',
-        role: 'other',
         properties: { type: 'foo' },
         features: [{
           type: 'FeatureCollection',

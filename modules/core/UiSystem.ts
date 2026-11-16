@@ -177,9 +177,33 @@ export class UiSystem extends AbstractSystem {
     const gfx = context.systems.gfx!;
     const l10n = context.systems.l10n!;
     const network = context.systems.network!;
+    const settings = context.systems.settings;  // optional
     const urlhash = context.systems.urlhash!;
 
+    // Settings that follow the user to other browsers
+    settings?.registerSync([
+      'ui.privacy.thirdPartyIcons',
+      'ui.rawTagEditorView',
+      'ui.sawPrivacyVersion',
+      'ui.sawRapidSplash',
+      'ui.sawVersion',
+      'ui.sawWhatsNewVersion'
+    ]);
+    // Settings kept in this browser: the state of the UI, and what depends on this screen or mouse
+    settings?.registerLocal([
+      'ui.customData',
+      'ui.disclosure',
+      'ui.entityIssues',
+      'ui.inspector',
+      'ui.mouseWheelInteraction',
+      'ui.walkthrough',
+      'ui.width'
+    ]);
+    // The turn restriction editor no longer saves its options
+    settings?.unregister('ui.restrictions');
+
     // Many UI components require l10n and gfx (for scene/layers)
+    // Some UI components read settings when they're constructed
 
     return this._initPromise = super.initAsync()
       .then(() => {
@@ -188,6 +212,7 @@ export class UiSystem extends AbstractSystem {
           gfx.initAsync(),
           l10n.initAsync(),
           network.initAsync(),
+          settings?.initAsync(),
           urlhash.initAsync()
         ];
         return Promise.all(prerequisites.filter(Boolean));
@@ -313,9 +338,10 @@ export class UiSystem extends AbstractSystem {
         const sawWhatsNewVersion = parseInt(settings?.get('ui.sawWhatsNewVersion') ?? '', 10) || 0;
 
         if (startWalkthrough) {
-          new UiIntro(context).start();     // Jump right into walkthrough..
+          editor.dismissRestore();           // If restorable changes exist, ignore them this time.
+          new UiIntro(context).start();      // Jump right into walkthrough.
         } else if (editor.canRestoreBackup) {
-          new UiRestore(context).render();   // Offer to restore backup edits..
+          new UiRestore(context).render();   // Offer to restore backed up sessions.
         } else if (sawPrivacyVersion !== context.privacyVersion) {
           new UiSplash(context).render();    // Show "Welcome to Rapid" / Privacy Policy
         } else if (sawWhatsNewVersion !== context.whatsNewVersion) {

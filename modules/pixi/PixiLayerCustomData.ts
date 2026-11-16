@@ -1,6 +1,7 @@
 import { AbstractPixiLayer } from './AbstractPixiLayer.ts';
 import { DOMParser } from '@xmldom/xmldom';
 import { Extent } from '@rapid-sdk/math';
+import { featureKey, splitDataID } from '../data/dataID.ts';
 import { GeoJSONData } from '../data/GeoJSONData.ts';
 import { geojsonFeatures } from '../util/util.ts';
 import { gpx, kml } from '@tmcw/togeojson';
@@ -8,6 +9,7 @@ import { parse as wktParse } from 'wkt';
 import { PixiFeatureLine } from './PixiFeatureLine.ts';
 import { PixiFeaturePoint } from './PixiFeaturePoint.ts';
 import { PixiFeaturePolygon } from './PixiFeaturePolygon.ts';
+import { utilHash53 } from '../util/string.ts';
 
 import type { Document as XmlDocument } from '@xmldom/xmldom';
 import type { MatchedStyle } from '../core/StyleSystem.ts';
@@ -16,11 +18,19 @@ import type { Viewport } from '@rapid-sdk/math';
 
 const CUSTOM_COLOR = 0x00ffff;
 
+/**
+ * The start of the ID of the cache that holds custom data loaded from a file, a url or WKT.
+ * The rest is a hash of where it came from, so the same data gets the same data IDs each time it
+ * loads, and a link with both `data=` and `id=` works (see `design/data-ids.md`).
+ */
+const CUSTOM_CACHE_PREFIX = 'custom-';
+
 
 /**
  * This class renders "custom data" - reference traces that should be 'drawn over' the map.
  * This data comes from the 'load custom data' option in the map data sidebar,
  * or may be supplied via a url parameter.
+ * Data loaded from a file, a url or WKT is kept in a `SpatialSystem` cache of its own (`custom-…`).
  */
 export class PixiLayerCustomData extends AbstractPixiLayer {
   /** Attribution string(s) for the currently loaded custom data */
@@ -35,8 +45,8 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
   protected _wkt: string | null;
   /** URL of an externally hosted GeoJSON or GPX file to fetch and display */
   protected _url: string | null;
-  /** Parsed custom data features ready to render */
-  protected _geoData: GeoJSONData[] | null;
+  /** ID of the cache that holds the loaded file data, also the spatial ID in its data IDs */
+  protected _spatialID: SpatialID | null;
   /** Bounding extent of all loaded custom data features */
   protected _geoDataExtent: Extent | null;
 
@@ -52,13 +62,13 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
     this._template = null;
     this._wkt = null;
     this._url = null;
-    this._geoData = null;
+    this._spatialID = null;
     this._geoDataExtent = null;
     this._fileReader = new FileReader();
 
     // Ensure methods used as callbacks always have `this` bound correctly.
     this._hashChanged = this._hashChanged.bind(this);
-    this._updateHash = this._updateHash.bind(this);
+    this._layersChanged = this._layersChanged.bind(this);
     this._setFile = this._setFile.bind(this);
     this.setFileList = this.setFileList.bind(this);
 
@@ -76,12 +86,12 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
       }
     });
 
-    // hashchange - pick out the 'gpx' param
+    // hashchange - pick out the 'data' param
     this.context.systems.urlhash!
       .on('hashchange', this._hashChanged);
 
-    // layerchange - update the url hash
-    scene.on('layerchange', this._updateHash);
+    // layerchange - drop a link's custom data from the url once it no longer matches
+    scene.on('layerchange', this._layersChanged);
   }
 
 
@@ -96,6 +106,16 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
 
 
   /**
+   * Whether this Layer draws the given data: custom data loaded from a file, a url or WKT.
+   * @param dataID - The data ID
+   * @return `true` if the data is in a custom data cache
+   */
+  public drawsData(dataID: DataID): boolean {
+    return splitDataID(dataID)[0].startsWith(CUSTOM_CACHE_PREFIX);
+  }
+
+
+  /**
    * Render the GeoJSONData custom data
    * @param frame - Integer frame being rendered
    * @param viewport - Pixi viewport to use for rendering
@@ -103,17 +123,19 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
   public render(frame: number, viewport: Viewport): void {
     if (!this.enabled || !(this.hasData())) return;
 
-    const vtService = this.context.services.vectortile;
+    const context = this.context;
+    const spatial = context.systems.spatial!;
+    const vtService = context.services.vectortile;
     const viewZoom = viewport.transform.zoom;
 
-    let geoData: GeoJSONData[];
+    let geoData: GeoJSONData[] = [];
     if (this._template && vtService) {   // fetch data from vector tile service
       if (viewZoom >= 13) {  // avoid firing off too many API requests
         vtService.loadTiles(this._template);
       }
       geoData = vtService.getData(this._template);
-    } else {
-      geoData = this._geoData ?? [];  //geojsonFeatures(this._geojson);
+    } else if (this._spatialID) {
+      geoData = spatial.getVisibleItems(this._spatialID).map(hit => hit.contents as GeoJSONData);
     }
 
     // Determine which renderer(s) to use for each feature
@@ -208,7 +230,7 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
    */
   public renderPolygons(frame: number, viewport: Viewport, polygons: GeoJSONData[]): void {
     const l10n = this.context.systems.l10n!;
-    const parentContainer = this.scene.groups.get('basemap')!;
+    const parentContainer = this._spatialContainer('basemap', this._spatialID ?? this.id);
 
     const polygonStyle = {
       fill: { color: CUSTOM_COLOR },
@@ -218,7 +240,6 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
 
     for (const d of polygons) {
       const dataID = d.id;
-      const version = d.v || 0;
       const parts = d.geoms.parts;
 
       for (let i = 0; i < parts.length; ++i) {
@@ -242,8 +263,7 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
         }
 
         // If data has changed.. Replace it.
-        if (feature.v !== version) {
-          feature.v = version;
+        if (feature.data !== d || feature.geometry !== part) {   // changed data is a new object
           feature.label = l10n.displayName(d.properties as Record<string, string>);
           feature.geometry = part;
           feature.data = d;
@@ -266,7 +286,7 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
    */
   public renderLines(frame: number, viewport: Viewport, lines: GeoJSONData[], styleOverride?: Partial<MatchedStyle>): void {
     const l10n = this.context.systems.l10n!;
-    const parentContainer = this.scene.groups.get('basemap')!;
+    const parentContainer = this._spatialContainer('basemap', this._spatialID ?? this.id);
 
     const lineStyle = styleOverride ?? {
       stroke: { color: CUSTOM_COLOR },
@@ -275,7 +295,6 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
 
     for (const d of lines) {
       const dataID = d.id;
-      const version = d.v || 0;
       const parts = d.geoms.parts;
 
       for (let i = 0; i < parts.length; ++i) {
@@ -299,8 +318,7 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
         }
 
         // If data has changed.. Replace it.
-        if (feature.v !== version) {
-          feature.v = version;
+        if (feature.data !== d || feature.geometry !== part) {   // changed data is a new object
           feature.label = l10n.displayName(d.properties as Record<string, string>);
           feature.geometry = part;
           feature.data = d;
@@ -323,7 +341,7 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
 //   * @param lineStyle - The line style to use
 //   */
 //  renderGridLines(frame: number, viewport: Viewport, features: GeoJSON.Feature[], lineStyle: LineStyle): void {
-//    const parentContainer = this.scene.groups.get('basemap')!;
+//    const parentContainer = this._spatialContainer('basemap', this._spatialID ?? this.id);
 //
 //    for (const d of features) {
 //      const dataID = d.id as string;
@@ -363,7 +381,7 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
    */
   public renderPoints(frame: number, viewport: Viewport, points: GeoJSONData[]): void {
     const l10n = this.context.systems.l10n!;
-    const parentContainer = this.scene.groups.get('points')!;
+    const parentContainer = this._spatialContainer('points', this._spatialID ?? this.id);
 
     const pointStyle: Partial<MatchedStyle> = {
       marker: { color: CUSTOM_COLOR, image: 'largeCircle'  },
@@ -373,7 +391,6 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
 
     for (const d of points) {
       const dataID = d.id;
-      const version = d.v || 0;
       const parts = d.geoms.parts;
 
       for (let i = 0; i < parts.length; ++i) {
@@ -397,8 +414,7 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
         }
 
         // If data has changed.. Replace it.
-        if (feature.v !== version) {
-          feature.v = version;
+        if (feature.data !== d || feature.geometry !== part) {   // changed data is a new object
           feature.label = l10n.displayName(d.properties as Record<string, string>);
           feature.geometry = part;
           feature.data = d;
@@ -417,7 +433,7 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
    * @return `true` if there is a vector tile template or file data to display
    */
   public hasData(): boolean {
-    return !!(this._template || Array.isArray(this._geoData));
+    return !!(this._template || this._spatialID);
   }
 
   /**
@@ -469,9 +485,12 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
     const file = fileList[0];
     const extension = this._getExtension(file.name);
 
+    this._fileReader.abort();   // a file still being read is replaced by this one
     this._fileReader.onload = (e: ProgressEvent<FileReader>) => {
       this._fileReader.onload = null;
-      this._setFile(e.target!.result as string, extension);
+      if (this._fileList !== fileList) return;   // other custom data was loaded since
+      const text = e.target!.result as string;
+      this._setFile(text, extension, text);
     };
     this._fileReader.readAsText(file);
   }
@@ -499,7 +518,8 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
     if (extension) {   // Looks like a gpx, kml, geojson file.. load it!
       network.fetch<string | XmlDocument | GeoJSON.GeoJsonObject | null>(url)
         .then(data => {
-          this._setFile(data, extension);
+          if (this._url !== url) return;   // other custom data was loaded since
+          this._setFile(data, extension, url);
           if (isTask) {
             this._dataUsed = null;    // A task boundary is not really a data source
             this.context.systems.rapid?.setTaskExtentByGpxData(data as any);
@@ -558,9 +578,14 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
    * All files get converted to GeoJSON.
    * @param data - The file data
    * @param extension - The file extension
+   * @param source - Where the data came from: the url, the WKT, or the file's text. Its hash names the
+   *   cache, so the same data gets the same data IDs each time it loads.
    */
-  protected _setFile(data: string | XmlDocument | GeoJSON.GeoJsonObject | null, extension: string | null | undefined): void {
+  protected _setFile(data: string | XmlDocument | GeoJSON.GeoJsonObject | null, extension: string | null | undefined, source: string): void {
     if (!data) return;
+
+    const context = this.context;
+    const spatial = context.systems.spatial!;
 
     const isString = (typeof data === 'string');
     let geojson: GeoJSON.GeoJsonObject | undefined;
@@ -580,20 +605,33 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
     geojson = geojson || {} as GeoJSON.GeoJsonObject;
 
     if (Object.keys(geojson).length) {
+      const spatialID = CUSTOM_CACHE_PREFIX + utilHash53(source);
+      if (this._spatialID && this._spatialID !== spatialID) {
+        spatial.clearCache(this._spatialID);
+      }
       this._dataUsed = `${extension} data file`;
-      this._geoData = [];
+      this._spatialID = spatialID;
       this._geoDataExtent = new Extent();
 
       // We may have a Feature or a FeatureCollection, coax it to an array of Features.
       const features = geojsonFeatures(geojson as GeoJSON.Feature | GeoJSON.FeatureCollection);
+      const usedKeys = new Set<string>();
+      const data: GeoJSONData[] = [];
       for (const feature of features) {
-        const d = new GeoJSONData(this.context, { geojson: feature });
-        this._geoData.push(d);
+        const d = new GeoJSONData(context, {
+          id: featureKey(feature, undefined, usedKeys),
+          spatialID: spatialID,
+          geojson: feature
+        });
+        data.push(d);
         const extent = d.extent();
         if (extent) {
           this._geoDataExtent.extendSelf(extent);
         }
       }
+
+      spatial.clearCache(spatialID);
+      spatial.replaceData(spatialID, data);
 
       this.fitZoom();
       this.scene.enableLayers(this.layerID);  // emits 'layerchange', so UI gets updated
@@ -625,50 +663,62 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
 
 
   /**
-   * Respond to any changes appearing in the url hash
+   * Respond to any changes appearing in the url hash.
+   * Custom data that a link names is loaded, and stays in the url so that a data ID in `id=` can be
+   * found again.  (When `data` goes away, the custom data stays as it is.)
    * @param currParams - The current hash parameters
    * @param prevParams - The previous hash parameters
    */
   protected _hashChanged(currParams: Map<string, string>, prevParams: Map<string, string>): void {
-    // 'data' (or 'gpx', legacy)
+    const urlhash = this.context.systems.urlhash!;
+
+    // gpx (legacy)
+    // The old name of `data`.  The url keeps it as `data` instead (see API.md).
+    const gpx = currParams.get('gpx');
+    if (gpx !== undefined) {
+      urlhash.setParam('gpx', null);
+      if (currParams.get('data') === undefined) {
+        urlhash.setParam('data', gpx);
+      }
+    }
+
+    // data
+    // (Not if it was dropped since, by a change made while the same url was being read.)
     const newData = currParams.get('data') || currParams.get('gpx');
     const oldData = prevParams.get('data') || prevParams.get('gpx');
-    if (newData !== oldData) {
+    if (newData && newData !== oldData && urlhash.getParam('data') === newData) {
       this._clear();
-      if (typeof newData === 'string') {
-        // Attempt to parse the data string as a WKT.
-        // If it is, treat it as such. If not, treat it as a URL.
-        const geojson = this._parseAsWkt(newData);
-        if (geojson) {
-          this._wkt = newData.toUpperCase();  // convention is to use uppercase
-          this._setFile(geojson, '.geojson');
-          this._dataUsed = null;  // A wkt area of interest is not really a data source
-        } else {
-          this.setUrl(newData);
-        }
+      // Attempt to parse the data string as a WKT.
+      // If it is, treat it as such. If not, treat it as a URL.
+      const geojson = this._parseAsWkt(newData);
+      if (geojson) {
+        this._wkt = newData.toUpperCase();  // convention is to use uppercase
+        this._setFile(geojson, '.geojson', this._wkt);
+        this._dataUsed = null;  // A wkt area of interest is not really a data source
+      } else {
+        this.setUrl(newData);
       }
     }
   }
 
 
   /**
-   * Push changes in custom data url to the urlhash
+   * Called when layers are turned on or off.
+   * Custom data isn't written to the url: a link's `data` stays there only until the user turns this
+   * layer off or loads other custom data, and then it's dropped (see `API.md`).
    */
-  protected _updateHash(): void {
+  protected _layersChanged(): void {
     const urlhash = this.context.systems.urlhash!;
 
-    if (!this.enabled) return;
+    const urlData = urlhash.getParam('data');
+    if (urlData === undefined) return;
 
-    if (typeof this._wkt === 'string') {
-      urlhash.setParam('data', this._wkt);
-    } else if (typeof this._url === 'string') {
-      // 'gpx' is considered a "legacy" param..
-      // We'll only set it if the url really does seem to be for a gpx file
-      if (/gpx/i.test(this._url)) {
-        urlhash.setParam('gpx', this._url);
-      } else {
-        urlhash.setParam('data', this._url);
-      }
+    // (Nothing loaded yet isn't other data: a link's `id=` can turn this layer on before its data is read.)
+    const isTurnedOff = !this.enabled && this.hasData();
+    const isOtherFile = (this._fileList !== null);
+    const isOtherSource = (this._url !== null && urlData !== this._url) || (this._wkt !== null && urlData.toUpperCase() !== this._wkt);
+    if (isTurnedOff || isOtherFile || isOtherSource) {
+      urlhash.setParam('data', null);
     }
   }
 
@@ -704,12 +754,18 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
    * Clear state to prepare for new custom data
    */
   protected _clear(): void {
+    const context = this.context;
+    const spatial = context.systems.spatial!;
+
+    if (this._spatialID) {
+      spatial.clearCache(this._spatialID);
+    }
     this._dataUsed = null;
     this._fileList = null;
     this._template = null;
     this._wkt = null;
     this._url = null;
-    this._geoData = null;
+    this._spatialID = null;
     this._geoDataExtent = null;
   }
 

@@ -1,16 +1,20 @@
 import { AbstractSystem } from './AbstractSystem.ts';
-import { Difference, Edit, Graph } from '../lib/index.ts';
+import { Difference, Edit, Graph, SessionDifference } from '../lib/index.ts';
 import { easeLinear } from 'd3-ease';
 import { Extent, geoScaleToZoom, projWgs84ToWorld } from '@rapid-sdk/math';
+import { isStableDataID } from '../data/dataID.ts';
 import { OsmEntity, createOsmEntity } from '../data/index.ts';
 import { select } from 'd3-selection';
 import { UiLoading } from '../ui/UiLoading.ts';
-import { utilArrayGroupBy, utilObjectOmit } from '@rapid-sdk/util';
+import { utilObjectOmit } from '@rapid-sdk/util';
 
 import type { Context } from '../Context.ts';
 import type { Action } from '../actions/types.ts';
+import type { BBox } from 'rbush';
 import type { DatabaseSystem } from './DatabaseSystem.ts';
-import type { OsmEntityProps, OsmNode, OsmRelation, OsmTags, OsmWay, Segment } from '../data/types.ts';
+import type { EditProps, EditSources, LegacyEditSelection } from '../lib/Edit.ts';
+import type { OsmEntityProps, OsmNode, OsmTags, OsmWay, Segment } from '../data/types.ts';
+import type { ParsedElement } from '../data/parsers/types.ts';
 import type { SpatialItem } from './SpatialSystem.ts';
 import type { TransformProps, Vec2 } from '@rapid-sdk/math';
 
@@ -22,27 +26,40 @@ const SESSION_HEARTBEAT_MS = 20000;
  * A few times the heartbeat interval, so a single missed beat doesn't flag a session as free.
  */
 const SESSION_LIVE_MS = 60000;
+/**
+ * How long (ms) after an upload started the server may still be working on it.
+ * Matches `OsmService`'s upload timeout.
+ */
+const UPLOAD_PENDING_MS = 5 * 60 * 1000;
+/** How long (ms) startup waits for the OSM API to say whether an interrupted upload went through. */
+const UPLOAD_CHECK_MS = 10000;
 
 
-/** Options for commit/commitAppend */
-export interface CommitOptions {
-  /** Annotation describing the edit */
-  annotation?: string | Record<string, unknown>;
-  /** IDs of selected entities */
-  selectedIDs?: EntityID[];
+/**
+ * Whether two boxes overlap (touching counts), as RBush tests them.
+ * @param a - A box
+ * @param b - Another box
+ * @return `true` if they overlap
+ */
+function boxesIntersect(a: BBox, b: BBox): boolean {
+  return a.minX <= b.maxX && a.minY <= b.maxY && a.maxX >= b.minX && a.maxY >= b.minY;
 }
 
-/** Sources used during editing */
-export interface EditSources {
-  /** Imagery sources used */
-  imagery?: string[];
-  /** Photo sources used */
-  photos?: string[];
-  /** Data sources used */
-  data?: string[];
-  /** Index signature for compatibility with Record<string, unknown> */
-  [key: string]: unknown;
+/**
+ * Converts a WGS84 extent to a box in world coordinates (where y grows southward).
+ * @param extent - The extent (WGS84 lon/lat)
+ * @return The box
+ */
+function worldBox(extent: Extent): BBox {
+  const bb = extent.bbox();
+  const [ax, ay] = projWgs84ToWorld([bb.minX, bb.minY]);
+  const [bx, by] = projWgs84ToWorld([bb.maxX, bb.maxY]);
+  return {
+    minX: Math.min(ax, bx), minY: Math.min(ay, by),
+    maxX: Math.max(ax, bx), maxY: Math.max(ay, by)
+  };
 }
+
 
 /** Saved checkpoint state */
 interface Checkpoint {
@@ -50,6 +67,18 @@ interface Checkpoint {
   history: Edit[];
   /** Index at checkpoint time */
   index: number;
+}
+
+/**
+ * What a change event last compared against, so the next one can compare from there
+ * without keeping a copy of the graph.
+ * The entity an ID had then is `values.get(id)` if `values` has it, else `from.hasEntity(id)`.
+ */
+interface EmitState {
+  /** A frozen graph that holds the emitted entities for every ID not in `values` */
+  from: Graph;
+  /** The emitted entities that `from` doesn't hold */
+  values: Map<EntityID, OsmEntity | undefined>;
 }
 
 /** Changes summary returned by changes() */
@@ -66,7 +95,10 @@ export interface ChangesSummary {
 interface BackupJSON {
   version: number;
   entities: unknown[];
-  baseEntities: unknown[];
+  /** v4: the OSM version each edited entity (and its child nodes and parent ways) was edited from */
+  baseVersions?: Record<EntityID, number>;
+  /** v3: copies of those entities as they were before any edits */
+  baseEntities?: unknown[];
   stack: unknown[];
   nextIDs: Record<string, number>;
   index: number;
@@ -101,6 +133,12 @@ export interface SessionRecord {
   id: SessionID;
   /** The `window.location.origin` this session belongs to. */
   origin: string;
+  /**
+   * The OSM API the edits were made on (`osm.apiroot`). Only sessions made on the API we're connected
+   * to are offered: entity IDs and versions mean different features on another API (e.g. dev and live).
+   * Absent for sessions saved before November 2026, which are offered on any API.
+   */
+  apiURL?: string;
   /** When the session was first created (ms since epoch). */
   createdAt: number;
   /** When the session was last written (ms since epoch); `0` if unknown (legacy). */
@@ -118,12 +156,49 @@ export interface SessionRecord {
   bbox?: SessionBBox;
   /** A short list of the most common feature tag keys, for the restore UI. */
   summary: string[];
-  /** The backup schema version of `data` (currently 3). */
+  /** The backup schema version of `data` (currently 4). */
   backupVersion: number;
   /** `true` for a synthetic record backed by the legacy localStorage key (not yet upgraded to IDB). */
   legacy?: boolean;
   /** The structured backup object. */
   data: BackupJSON;
+  /**
+   * Set while the session's edits are being uploaded. If the tab closes before the upload finishes,
+   * the next tab asks the OSM API whether it went through, instead of offering edits that may already
+   * be on OSM (iD#5200). See `design/uploader-system.md`.
+   */
+  upload?: SessionUpload;
+}
+
+/** An upload of a session's edits (see `SessionRecord.upload`). */
+export interface SessionUpload {
+  /** The changeset the edits are uploaded to */
+  changesetID: string;
+  /** The OSM API they are uploaded to */
+  apiURL: string;
+  /** When the upload started (ms since epoch) */
+  startedAt: number;
+}
+
+/**
+ * What one edit changed against the edit before it, for backups. `toBackup` computes it once per
+ * edit and keeps it, so a backup doesn't copy the whole history again.
+ */
+interface BackupChanges {
+  /** The graph of the edit before, which these changes were computed against */
+  previous: Graph;
+  /** The value of `EditSystem._backupGeneration` when these were computed */
+  generation: number;
+  /** Keys of the entities the edit changed (e.g. 'n1v1') */
+  modified: string[];
+  /** Copies of those entities, in the same order */
+  copies: EntityCopy[];
+  /** IDs of the entities the edit deleted */
+  deleted: EntityID[];
+  /** IDs of the entities the edit put back as they are in base */
+  reverted: EntityID[];
+  /** Every ID above, and the child nodes of the ways the edit changed */
+  relatedIDs: EntityID[];
 }
 
 /** Entity copy - as bag of properties */
@@ -167,12 +242,17 @@ interface EntityCopy {
  *   and what they look like before any edits have occurred.
  * As more map is loaded, more map features get merged into the Base Graph.
  *
- * Each entry in the history stack is an `Edit`.  An Edit may contain:
- *  - `annotation`  - undo/redo annotation, a String saying what the Edit did. e.g. "Started a Line".
- *  - `graph`       - Graph at the time of the Edit
- *  - `selectedIDs` - ids that the user had selected at the time (assumed to be OSM)
- *  - `sources`     - sources being used to make the Edit (imagery, photos, data)
- *  - `transform`   - map transform at the time of the Edit
+ * Each entry in the history stack is an `Edit`.  An Edit contains:
+ *  - `graph` - Graph at the time of the Edit
+ *  - `props` - plain JSON describing the Edit (see `EditProps`), which may include:
+ *    - `type`        - what kind of edit it is, for edits that aren't classic OSM edits
+ *    - `stringID`    - undo/redo label, translated when shown. e.g. "Started a Line".
+ *    - `selection`   - what's selected after the Edit, by layer (redo restores it)
+ *    - `selectionBefore` - what was selected before the Edit, by layer (undo restores it)
+ *    - `extent`      - where the change is (undo and redo show it)
+ *    - `sources`     - sources being used to make the Edit (imagery, photos, data)
+ *    - `transform`   - map transform at the time of the Edit
+ *    - other props of the system that made the Edit (e.g. which feature the user ignored)
  *
  * Special named Edits:
  *  - `base` - The initial Edit, `history[0]`.
@@ -197,11 +277,14 @@ interface EntityCopy {
  * - `revert()` - This reverts all work in progress by replacing `staging` with a fresh copy of `stable`.
  * - `commit(options)` - This accepts the `staging` work-in-progress edit by adding
  *      it to the end of the history (removing any forward redo history, if any)
- *      Commit accepts an `annotation` (e.g. "Started a line") to say what the edit does.
+ *      Commit accepts the Edit's props, including a `stringID` (e.g. "Started a line") to say what the edit does.
  * - `commitAppend(options)` - This is just like `commit` but instead of
  *      adding `staging` after `stable`, `staging` replaces `stable`.
+ * - `animateAndCommitAsync(action, options)` - Performs one action as a short animation, then commits
+ *      it. Anything that changes the edits meanwhile commits it first, so it's always its own edit.
  * - `undo()` - Move the `stable` index back to the previous Edit (or `_index = 0`).
- * - `redo()` - Move the `stable` index forward to the next Edit (if any)
+ * - `redo()` - Move the `stable` index forward to the next Edit (if any).
+ *      Past the newest Edit, one more redo returns the user to where they were before undoing.
  * - `setCheckpoint(checkpointID)` - Save `history` and `index` as a checkpoint to return to later.
  * - `restoreCheckpoint(checkpointID)` - Restore `history` and `index` identified by checkpointID.
  *
@@ -210,21 +293,47 @@ interface EntityCopy {
  * - `endTransaction()` - Marks transaction as complete.  Any `stagingchange` and `stablechange`
  *      events will be emitted that cover the difference from the beginning -> end of the transaction.
  *
+ * Graphs in the history are frozen, and each keeps a journal of what it changed, so the events
+ *  compare only the IDs that may have changed (see design/graph-geometry.md).
+ *
+ * Merged data goes into the base graph (`rebase`). Stable and staging catch up with it at once
+ *  (`graph.syncWithBase()`), and so does any other graph from the history when it becomes current.
+ *  A schema change that changes what counts as an area is caught up with the same way.
+ *
+ * OSM spatial indexes: `editor_base` holds every base entity, and `editor_stable` / `editor_staging` are
+ *  local indexes of what those graphs have their own version or shape of. `entitiesInBox()` and
+ *  `segmentsInBox()` search them for any graph of the lineage. Each index is updated before the event
+ *  for its graph fires.
+ *
  * Events available:
  * - 'stagingchange' - Fires on every edit performed (i.e. when `staging` changes),
  *      Receives Difference between old `staging` Graph and new `staging` Graph.
+ *      Staging's geometry is current when it fires.
  * - 'stablechange' - Fires only when the history actually changes (i.e. when `stable` changes)
  *      Receives Difference between old `stable` Graph and new `stable` Graph.
  * - 'historyjump' - Fires on undo/redo/restore.  This is for situations when we may need to
  *      jump the user to a different part of the map and restore a different selection.
  *      Receives `prevIndex` and `currIndex`
- * - 'merge'  - Fires when new base entities are merged into the base graph
+ * - 'returnview' - Fires when redo takes the user back to where they were before they started
+ *      undoing (see `returnEdit`).  Receives the return Edit, with its `transform` and `selectionAfter`.
+ * - 'merge'  - Fires when new base entities are merged into the base graph.
+ *      Receives the IDs on the merged tile, plus the IDs whose shape changed because of it.
  * - 'backupstatuschange' - Fires when backup status changes, receives `true` if ok, `false` if failed
+ *
+ * Backups (v4) save each edit's props and changed entities, and the OSM version that every base entity
+ * was edited from. Restoring fetches those versions from the OSM API, so it needs a network.
+ *
+ * See `design/edit-system.md` for the design behind this system and where it's heading.
  */
 export class EditSystem extends AbstractSystem {
 
   /** Whether there are restorable sessions and we are waiting on the user to decide */
   protected _canRestoreBackup: boolean;
+  /**
+   * Whether the history's backup was cleared because its edits were uploaded or thrown away (see
+   * `clearBackup`). Until the reset that follows, the history isn't work to keep, so it isn't backed up.
+   */
+  protected _isBackupCleared: boolean;
   /** The id of the active editing session, minted lazily on first backup (see `_saveSessionAsync`) */
   protected _sessionID: SessionID | null;
   /**
@@ -233,10 +342,16 @@ export class EditSystem extends AbstractSystem {
    * with `immediateBackup`.
    */
   protected _activeSession: SessionRecord | null;
+  /** The session kept live while the walkthrough resets the editor (see `holdSession`) */
+  protected _heldSessionID: SessionID | null;
+  /** The held session's record, which the liveness heartbeat re-writes while it's held */
+  protected _heldSession: SessionRecord | null;
   /** Whether the periodic liveness heartbeat has been started (idempotency guard) */
   protected _heartbeatStarted: boolean;
   /** Fallback interval handle when no `SchedulerSystem` is available */
   protected _heartbeatHandle: ReturnType<typeof globalThis.setInterval> | null;
+  /** Sessions whose upload the server may still be working on, so they aren't offered yet */
+  protected _pendingUploadIDs: Set<SessionID>;
   /** Whether there are unsaved edits relative to the last stable state */
   protected _hasWorkInProgress: boolean;
 
@@ -246,6 +361,11 @@ export class EditSystem extends AbstractSystem {
   protected _index: number;
   /** The work-in-progress Edit that accumulates changes before they are committed */
   protected _staging: Edit;
+  /**
+   * Where the user was when they first undid away from the newest edit, offered as one more redo.
+   * It's never in the history: it isn't backed up and can't discard the redo stack.
+   */
+  protected _returnEdit: Edit | null;
 
   /** Named snapshots of `_history` and `_index` that can be restored */
   protected _checkpoints: Map<CheckpointID, Checkpoint>;
@@ -255,19 +375,31 @@ export class EditSystem extends AbstractSystem {
   protected _inTransaction: boolean;
   /** Per-cache tracking of which segment box ids belong to each way, so they can be removed later */
   protected _osmSegmentIDs: Map<SpatialID, Map<EntityID, EntityID[]>>;
+  /** What each local index reflects: a snapshot of stable or staging when it was last synced */
+  protected _localSnapshots: Map<SpatialID, Graph>;
 
   /** Whether the most recent backup write succeeded */
   protected _backupStatus: boolean;
+  /** What each edit changed, kept for backups (see `BackupChanges`) */
+  protected _backupChanges: WeakMap<Edit, BackupChanges>;
+  /** Bumped when a merge changes edits that were already made, so their `BackupChanges` are computed again */
+  protected _backupGeneration: number;
   /** Cache key used to detect when `stable` has changed and a new backup is needed */
   protected _stableKey: string | null;
-  /** Snapshot of the stable Graph captured at the last `stablechange` event */
-  protected _stableSnapshot: Graph | null;
+  /** What the last `stablechange` event compared against, see `EmitState` */
+  protected _emittedStable: EmitState;
+  /** IDs that may differ between the last emitted stable state and `stable` */
+  protected _stableCandidates: Set<EntityID>;
   /** Cache key used to detect when `staging` has changed */
   protected _stagingKey: string | null;
-  /** Snapshot of the staging Graph captured at the last `stagingchange` event */
-  protected _stagingSnapshot: Graph | null;
-  /** Accumulated Difference across the entire open transaction (if any) */
-  protected _fullDifference: Difference;
+  /** What the last `stagingchange` event compared against, see `EmitState` */
+  protected _emittedStaging: EmitState;
+  /** IDs that may differ between the last emitted staging state and `staging` */
+  protected _stagingCandidates: Set<EntityID>;
+  /** The difference from `base` to `stable`: all of the user's edits */
+  protected _fullDifference: SessionDifference;
+  /** The schema's `areaGeneration` that the shapes were last checked against */
+  protected _areaGeneration: number;
 
 
   /**
@@ -278,34 +410,46 @@ export class EditSystem extends AbstractSystem {
 
     this.id = 'editor';     // was 'history'
     this.requiredDependencies = new Set<SystemID>(['spatial', 'storage']);
-    this.optionalDependencies = new Set<SystemID>(['database', 'gfx', 'imagery', 'photos', 'scheduler']);
+    this.optionalDependencies = new Set<SystemID>(['database', 'gfx', 'imagery', 'photos', 'scheduler', 'schema']);
 
     this._canRestoreBackup = false;
+    this._isBackupCleared = false;
     this._sessionID = null;
     this._activeSession = null;
+    this._heldSessionID = null;
+    this._heldSession = null;
     this._heartbeatStarted = false;
     this._heartbeatHandle = null;
+    this._pendingUploadIDs = new Set<SessionID>();
     this._hasWorkInProgress = false;
 
     this._history = [];
     this._index = 0;
     this._staging = null!;
+    this._returnEdit = null;
 
     this._checkpoints = new Map<CheckpointID, Checkpoint>();
     this._inTransition = false;
     this._inTransaction = false;
     this._osmSegmentIDs = new Map();
+    this._localSnapshots = new Map();
 
     this._backupStatus = true;
+    this._backupChanges = new WeakMap<Edit, BackupChanges>();
+    this._backupGeneration = 0;
     this._stableKey = null;
-    this._stableSnapshot = null;
+    this._emittedStable = null!;
+    this._stableCandidates = new Set<EntityID>();
     this._stagingKey = null;
-    this._stagingSnapshot = null;
+    this._emittedStaging = null!;
+    this._stagingCandidates = new Set<EntityID>();
     this._fullDifference = null!;
+    this._areaGeneration = 0;
 
     // Make sure the event handlers have `this` bound correctly
     this.immediateBackup = this.immediateBackup.bind(this);
     this.deferredBackup = this.deferredBackup.bind(this);
+    this._checkAreas = this._checkAreas.bind(this);
   }
 
 
@@ -318,6 +462,7 @@ export class EditSystem extends AbstractSystem {
 
     const context = this.context;
     const database = context.systems.database;   // optional
+    const schema = context.systems.schema;       // optional
     const spatial = context.systems.spatial!;
     const storage = context.systems.storage!;
 
@@ -333,6 +478,13 @@ export class EditSystem extends AbstractSystem {
       .then(async () => {
         this._reset();
 
+        // Bare data IDs are OSM entities, and their current version is in the staging graph.
+        // (The OSM spatial caches hold the base, and local indexes of what stable and staging changed, see `entitiesInBox`.)
+        spatial.registerResolver('osm', entityID => this._staging.graph.hasEntity(entityID));
+
+        // A schema change can change which ways are areas.
+        schema?.on('schemachange', this._checkAreas);
+
         const isTestEnvironment = (!('window' in globalThis)) || ('assert' in globalThis) || ('expect' in globalThis);
         if (isTestEnvironment) return;
 
@@ -341,17 +493,27 @@ export class EditSystem extends AbstractSystem {
         // (IndexedDB writes are async and may not complete during unload, but the debounced
         //  writes during editing mean the last write is usually already persisted.)
         window.addEventListener('beforeunload', (e: BeforeUnloadEvent) => {
-          if (this._history.length > 1) {  // user did something
+          if (this.hasWork()) {  // user did something worth keeping
             e.preventDefault();
             this.immediateBackup();
             return (e.returnValue = '');  // show browser prompt
           }
         });
 
+        // A reload marks the page as gone on `pagehide`, so the next page knows that the session
+        // this tab owned is still its own (see `_forgetCopiedSession`).
+        this._forgetCopiedSession();
+        window.addEventListener('pagehide', () => this._markPageHidden(true));
+        window.addEventListener('pageshow', (e: PageTransitionEvent) => {
+          if (e.persisted) this._markPageHidden(false);   // back from the back/forward cache, still open
+        });
+
         // Detect whether there are any restorable sessions from a previous visit.
         // (Multiple concurrent sessions are supported now — the restore UI lists them via
         //  `listRestorableSessionsAsync`. Here we just decide whether to offer a restore at all.)
-        this._canRestoreBackup = await this._hasRestorableSessionsAsync();
+        // Sessions on any OSM API count: a host's preauthenticated connection may switch the API after
+        // systems init. `startAsync` checks again with the API settled.
+        this._canRestoreBackup = await this._hasRestorableSessionsAsync(true);
       });
   }
 
@@ -361,8 +523,35 @@ export class EditSystem extends AbstractSystem {
    * @return Promise resolved when this component has completed startup
    */
   public startAsync(): Promise<void> {
+    if (this._startPromise) return this._startPromise;
+
     this._startHeartbeat();
-    return super.startAsync();
+
+    // Only look closer if there are sessions on any OSM API (see `initAsync`)
+    return this._startPromise = super.startAsync()
+      .then(() => {
+        if (!this._canRestoreBackup) return;
+        return this.findRestorableSessionsAsync().then(() => {});
+      });
+  }
+
+
+  /**
+   * Looks for sessions to offer for restore on the OSM API we're connected to now, and returns whether
+   * there are any (also `canRestoreBackup`). Interrupted uploads made on this API are settled first.
+   * Startup calls this, and so does the source switcher after changing the API: a session is only
+   * offered on the API it was made on, and startup is always on the live API.
+   * @return Promise resolved with `true` if there are sessions to offer
+   */
+  public async findRestorableSessionsAsync(): Promise<boolean> {
+    const context = this.context;
+    const osm = context.services.osm;   // optional
+
+    // (Services are initialized, but not started, when systems start.)
+    await osm?.initAsync();
+    await this._settleUploadsAsync();
+    this._canRestoreBackup = await this._hasRestorableSessionsAsync();
+    return this._canRestoreBackup;
   }
 
 
@@ -405,28 +594,36 @@ export class EditSystem extends AbstractSystem {
 
     // Create a new Base Graph / Base Edit.
     const baseGraph = new Graph(this.context);
-    const base = new Edit({ graph: baseGraph });
+    const base = new Edit(this.context, baseGraph);
     this._history = [ base ];
     this._index = 0;
 
     // Create a work-in-progress Edit derived from the base edit.
     const currGraph = new Graph(baseGraph);
-    const staging = new Edit({ graph: currGraph });
+    const staging = new Edit(this.context, currGraph);
     this._staging = staging;
     this._hasWorkInProgress = false;
+    this._returnEdit = null;
 
-    // Clear the spatial caches.
+    // Clear the spatial caches. The local indexes start out reflecting the (empty) base.
     const spatial = this.context.systems.spatial!;
     spatial.clearMatching(id => id.startsWith('editor_'));
     this._osmSegmentIDs = new Map();
+    this._localSnapshots = new Map([
+      ['editor_stable', new Graph(baseGraph)],
+      ['editor_staging', new Graph(baseGraph)]
+    ]);
 
     this._stableKey = baseGraph.key;
-    this._stableSnapshot = baseGraph.snapshot();
+    this._emittedStable = { from: baseGraph, values: new Map() };
+    this._stableCandidates.clear();
     this._stagingKey = currGraph.key;
-    this._stagingSnapshot = currGraph.snapshot();
-    this._fullDifference = new Difference(baseGraph, baseGraph);
+    this._emittedStaging = { from: baseGraph, values: new Map() };
+    this._stagingCandidates.clear();
+    this._fullDifference = new SessionDifference(baseGraph, baseGraph);
 
     this._backupStatus = true;
+    this._isBackupCleared = false;
     this._sessionID = null;
     this._activeSession = null;
     this._checkpoints.clear();
@@ -437,7 +634,7 @@ export class EditSystem extends AbstractSystem {
 
   /**
    * The `base` edit is the initial edit in the history.  It contains the Base Graph.
-   * It will not contain any actual user edits, sources, annotation.
+   * It will not contain any actual user edits, sources, label.
    * @return The initial Edit containing the Base Graph
    */
   public get base(): Edit {
@@ -507,62 +704,93 @@ export class EditSystem extends AbstractSystem {
 
 
   /**
-   * Promisified version of `perform` that can support eased edits in a transition.
-   * This version of `perform` accepts a single Action function argument.
+   * Performs a single Action as an animation, then commits it as its own edit.
    * If the Action is marked as being "transitionable", run it multiple times with
    *   eased time parameter from 0..1 to create a smooth transition effect.
-   * If the Action is not marked as being "transitionable" just run it one time
-   *   with `time = 1` and return a resolved promise.
+   * If the Action is not marked as being "transitionable", or in a transaction (nobody sees it),
+   *   or without a DOM, just run it one time with `time = 1` and commit.
+   * Anything that changes the edits while it animates (`perform`, `commit`, `undo`, …) finishes it
+   *   first: the last frame is performed and committed before that runs, so the action is always its
+   *   own edit. That's why this commits, and the caller doesn't: a promise settles later, after
+   *   whatever interrupted it has already run.
    *
    * @param action - single Action function to perform
-   * @return Promise fulfilled when the transition is completed
+   * @param props - Props describing the Edit, as for `commit()`
+   * @return Promise fulfilled when the action is committed
+   * @throws Rejects if `action` isn't a function, or if a frame of it throws (nothing is committed then)
    */
-  public performAsync(action: Action): Promise<void> {
+  public animateAndCommitAsync<P extends EditProps = EditProps>(action: Action, props: P): Promise<void> {
     this._interruptTransition();    // complete any transition already in progress
 
     if (typeof action !== 'function') {
       return Promise.reject();
     }
 
-    if (!action.transitionable || !globalThis.document) {   // no animation when headless (no DOM)
-      this._perform([action], 1);
-      this._emitChanges();
+    // No animation when headless (no DOM), or in a transaction
+    if (!action.transitionable || this._inTransaction || !globalThis.document) {
+      this.perform(action);
+      this.commit(props);
       return Promise.resolve();
     }
 
     const DURATION = 150;
 
-    return new Promise(resolve => {
+    return new Promise((resolve, reject) => {
+      let done = false;
+
+      // Perform one frame. If the action throws, the transition is over: without this,
+      // `_inTransition` would stay set (no more backups) and the promise would never settle.
+      const performFrame = (t: number): boolean => {
+        try {
+          this._replaceStaging();
+          this._perform([action], t);
+          this._emitChanges();
+          return true;
+        } catch (err) {
+          done = true;
+          this._inTransition = false;
+          // Staging went back to `stable` before the action threw: emit that, so the indexes and
+          // shapes don't stay at the previous frame.
+          try {
+            this._emitChanges();
+          } catch (emitErr) {
+            console.error(emitErr);  // eslint-disable-line no-console
+          }
+          reject(err);
+          return false;
+        }
+      };
+
+      // Perform the last frame and commit, once: at the end, or when something interrupts it.
+      // (An interrupt before the transition starts is a 'cancel'.)
+      const finish = (): void => {
+        if (done) return;
+        if (!performFrame(1)) return;
+        done = true;
+        this._inTransition = false;
+        this.commit(props);
+        resolve();
+      };
+
+      this._inTransition = true;
       select(document)
         .transition('editTransition')
         .duration(DURATION)
         .ease(easeLinear)
         .tween('edit.tween', () => {
           return (t: number) => {
-            this._replaceStaging();
-            this._perform([action], t);
-            this._emitChanges();
-            if (t === 1) {  // mark as finished
-              this._inTransition = false;
-              resolve();
+            if (done) return;
+            if (t === 1) {
+              finish();
+            } else {
+              performFrame(t);
             }
           };
         })
         .on('start', () => {
-          this._inTransition = true;
-          this._replaceStaging();
-          this._perform([action], 0);
-          this._emitChanges();
+          if (!done) performFrame(0);
         })
-        .on('end interrupt', () => {
-          if (this._inTransaction) {
-            this._replaceStaging();
-            this._perform([action], 1);
-            this._emitChanges();
-            this._inTransition = false;
-            resolve();
-          }
-        });
+        .on('end interrupt cancel', finish);
     });
   }
 
@@ -584,7 +812,7 @@ export class EditSystem extends AbstractSystem {
   /**
    * This finalizes the `staging` work-in-progress edit.
    * (It's somewhat like what `git commit` does.)
-   *  - Set annotation, sources, and other edit metadata properties
+   *  - Set the label, sources, and other edit props
    *  - Add the `staging` edit to the end of the history (at this point `staging` becomes `stable`)
    *  - Finally, create a new empty `staging` work-in-progress Edit
    *
@@ -604,26 +832,19 @@ export class EditSystem extends AbstractSystem {
    *                                            \-->  EditN1
    *                                                 `staging` (WIP after EditN0)
    * ```
-   * @param options - Optional `Object` of options passed
-   * @param options.annotation - A String saying what the Edit did. e.g. "Started a Line".
-   *   Note that Rapid edits pass an Object as the annotation including more info about the edit.
-   * @param options.selectedIDs - Array of selectedIDs
+   * @param props - Props describing the Edit, e.g. its `stringID` saying what it did ("Started a Line"),
+   *   and `selection`. Edits that aren't classic OSM edits also pass a `type` and their own props.
    */
-  public commit(options: CommitOptions = {}): void {
+  public commit<P extends EditProps = EditProps>(props?: P): void {
     this._interruptTransition();    // complete any transition already in progress
 
-    const context = this.context;
-    const staging = this.staging;
-
-    const annotation = options.annotation ?? '';
-    staging.annotation  = annotation as string;
-    staging.selectedIDs = options.selectedIDs ?? [];
-    staging.sources     = this._gatherSources(annotation);
-    staging.transform   = context.viewport.transform.props;
+    const edit = this._finishStaging(props, this.stable);
 
     // Discard forward/redo history if any, and add `staging` after `stable`
-    this._history.splice(this._index + 1, Infinity, staging);
+    this._history.splice(this._index + 1, Infinity, edit);
     this._index++;
+    this._returnEdit = null;
+    this._addStableCandidates(edit.graph.changedIDs);
     // (At this point `stable` === `staging`)
 
     this._replaceStaging();
@@ -635,7 +856,7 @@ export class EditSystem extends AbstractSystem {
    * This is like `commit`, but instead of adding `staging` after stable,
    *   it replaces `stable` with `staging` and does not advance the history.
    * (It's somewhat like what `git commit --append` does.)
-   *  - Set annotation, sources, and other edit metadata properties
+   *  - Set the label, sources, and other edit props
    *  - Replace the `stable` edit with the `staging` edit (at this point `staging` becomes `stable`)
    *  - Finally, create a new empty `staging` work-in-progress Edit
    *
@@ -657,30 +878,23 @@ export class EditSystem extends AbstractSystem {
    *                                  \-->  EditN1
    *                                       `staging` (WIP after EditN0)
    * ```
-   * @param options - Optional `Object` of options passed
-   * @param options.annotation - A String saying what the Edit did. e.g. "Started a Line".
-   *   Note that Rapid edits pass an Object as the annotation including more info about the edit.
-   * @param options.selectedIDs - Array of selectedIDs
+   * @param props - Props describing the Edit, as for `commit()`
    * @throws Will throw if you try to append to the `base` edit
    */
-  public commitAppend(options: CommitOptions = {}): void {
+  public commitAppend<P extends EditProps = EditProps>(props?: P): void {
     this._interruptTransition();    // complete any transition already in progress
-
-    const context = this.context;
-    const staging = this.staging;
 
     if (this._index === 0) {
       throw new Error(`Can not commitAppend to the base edit!`);
     }
 
-    const annotation = options.annotation ?? '';
-    staging.annotation  = annotation as string;
-    staging.selectedIDs = options.selectedIDs ?? [];
-    staging.sources     = this._gatherSources(annotation);
-    staging.transform   = context.viewport.transform.props;
+    // The new edit covers the replaced one too, so it starts from the edit before it.
+    const edit = this._finishStaging(props, this._history[this._index - 1], this.stable);
 
     // Discard forward/redo history if any, and replace `stable` with `staging`.
-    this._history.splice(this._index, Infinity, staging);
+    this._history.splice(this._index, Infinity, edit);
+    this._returnEdit = null;
+    this._addStableCandidates(edit.graph.changedIDs);   // it holds the replaced edit's changes too
     // (At this point `stable` === `staging`)
 
     this._replaceStaging();
@@ -722,10 +936,16 @@ export class EditSystem extends AbstractSystem {
     }
 
     if (this._index > 0) {
+      // Leaving the newest edit: remember where the user is, so one more redo can bring them back.
+      // Further undos and redos keep the first place they left from.
+      if (this._index === this._history.length - 1 && !this._returnEdit) {
+        this._returnEdit = this._makeReturnEdit();
+      }
       this._index--;
     }
 
     if (this._index !== prevIndex) {
+      this._addHistoryPathCandidates(this._history, prevIndex);
       this._replaceStaging();
       this._emitChanges();
       this.emit('historyjump', prevIndex, this._index);
@@ -735,6 +955,8 @@ export class EditSystem extends AbstractSystem {
 
   /**
    * Move the `stable` index forward to the next Edit (if any)
+   * Past the newest Edit, if the user undid away from it, emit `returnview` to take them back
+   * to where they were (see `returnEdit`).
    * Note that all work-in-progress in the `staging` Edit is lost when calling `redo()`.
    *
    * Before calling `redo()`:
@@ -760,9 +982,17 @@ export class EditSystem extends AbstractSystem {
     const prevIndex = this._index;
     if (this._index < this._history.length - 1) {
       this._index++;
+
+    // Past the newest edit, one more redo takes the user back to where they were
+    } else if (this._returnEdit && !this._hasWorkInProgress) {
+      const edit = this._returnEdit;
+      this._returnEdit = null;
+      this.emit('returnview', edit);
+      return;
     }
 
     if (this._index !== prevIndex) {
+      this._addHistoryPathCandidates(this._history, prevIndex);
       this._replaceStaging();
       this._emitChanges();
       this.emit('historyjump', prevIndex, this._index);
@@ -800,8 +1030,11 @@ export class EditSystem extends AbstractSystem {
     const checkpoint = this._checkpoints.get(checkpointID);
 
     if (checkpoint) {
+      const prevHistory = this._history;
       this._history = checkpoint.history.slice();   // shallow copy
       this._index = checkpoint.index;
+      this._returnEdit = null;
+      this._addHistoryPathCandidates(prevHistory, prevIndex);
 
       this._replaceStaging();
       this._emitChanges();
@@ -833,6 +1066,32 @@ export class EditSystem extends AbstractSystem {
    *  @param toMerge - Entities (or props) to merge into base graph (ones already there are skipped)
    */
   public merge(toMerge: (OsmEntity | OsmEntityProps)[]): void {
+    this._mergeEntities(toMerge, false);
+  }
+
+
+  /**
+   * Replace entities in the Base Graph with newer copies, from the OSM API.
+   * Unlike `merge`, this replaces entities that are already there. Every graph in the history sees
+   * the newer copy, except where the user changed or deleted that entity.
+   * The uploader uses this when the user keeps their deletion of something another user changed:
+   * the deletion has to be uploaded against the server's newest version.
+   * @param entities - The newer copies of the entities
+   */
+  public updateBase(entities: OsmEntity[]): void {
+    this._mergeEntities(entities, true);
+
+    // The full difference holds base copies of what changed, so it needs the newer ones.
+    this._fullDifference = new SessionDifference(this.base.graph!, this.stable.graph!);
+  }
+
+
+  /**
+   * Merge entities into the Base Graph (shared by `merge` and `updateBase`).
+   * @param toMerge - Entities (or props) to merge into base graph
+   * @param force - If `true`, replace entities already in the base graph
+   */
+  protected _mergeEntities(toMerge: (OsmEntity | OsmEntityProps)[], force: boolean): void {
     const context = this.context;
     const baseGraph = this.base.graph!;
     const stagingGraph = this.staging.graph!;
@@ -849,11 +1108,13 @@ export class EditSystem extends AbstractSystem {
     // Collect the Entities that are really new (not in the Base Graph), create if necessary...
     // Responses often repeat entities we already have (e.g. ones spanning several tiles).
     // `rebase` would skip them anyway, so skip them here before building or indexing them.
+    // (A forced update replaces what's there, so it keeps them.)
     const entities: OsmEntity[] = [];
     for (const entityOrProps of toMerge) {
       const id = entityOrProps.id;
       if (id) mergedIDs.add(id);
-      if (id && (baseGraph.hasEntity(id) || newIDs.has(id))) continue;
+      if (id && newIDs.has(id)) continue;
+      if (id && !force && baseGraph.hasEntity(id)) continue;
 
       let entity: OsmEntity;
       if (entityOrProps instanceof OsmEntity) {
@@ -867,32 +1128,78 @@ export class EditSystem extends AbstractSystem {
     }
     if (!entities.length) return;  // nothing to do
 
-    // If we are merging in new relation members, bump the relation's version.
-    for (const id of mergedIDs) {
-      const entity = stagingGraph.hasEntity(id);
-      if (entity?.type !== 'relation') continue;
+    // (A relation whose members arrive is on the tile, so it's in `mergedIDs`: listeners of 'merge'
+    // redraw it and drop what they cached about it. It used to be touched here, which changed the
+    // object that every graph shares.)
 
-      const relation = entity as OsmRelation;
-      for (const member of relation.members) {
-        if (newIDs.has(member.id)) {
-          relation.touch();  // bump version in place
-        }
+    // Every graph we may return to: the history, the histories saved in checkpoints,
+    // the return edit, and staging. Staging isn't in the history yet, but it represents
+    // the current state of things.
+    const graphs = new Set<Graph>(this._history.map(edit => edit.graph));
+    for (const checkpoint of this._checkpoints.values()) {
+      for (const edit of checkpoint.history) {
+        graphs.add(edit.graph);
       }
     }
+    if (this._returnEdit) {
+      graphs.add(this._returnEdit.graph);
+    }
+    graphs.add(stagingGraph);
 
-    // Append staging graph..
-    // It's not in the history yet, but it represents the current state of things.
-    const graphs = this._history.map(state => state.graph!);
-    graphs.push(stagingGraph);
+    const { restored, reshapedIDs } = baseGraph.rebase(entities, [...graphs], force);
 
-    baseGraph.rebase(entities, graphs, false);  // force = false
+    // Restores change edits that were already made, and a forced update changes what they were made
+    // against, so what backups kept about them is out of date.
+    if (restored.size || force) {
+      this._backupGeneration++;
+    }
 
-    // Newly downloaded data should appear in every OSM cache (unless locally overridden).
-    this._mergeIntoCache('editor_base', baseGraph, entities);
-    this._mergeIntoCache('editor_stable', this.stable.graph!, entities);
-    this._mergeIntoCache('editor_staging', this.staging.graph!, entities);
+    // The new data can change `complete()` and `summary()`, and an edited entity that wasn't in
+    // base before (e.g. restored from a backup before its tile loaded) isn't "created" any more.
+    const stableGraph = this.stable.graph!;
+    const overridden = new Set<EntityID>();
+    for (const entity of entities) {
+      if (stableGraph.isLocal(entity.id)) {
+        overridden.add(entity.id);
+      }
+    }
+    this._fullDifference.update(stableGraph, overridden);
 
-    this.emit('merge', mergedIDs);
+    // iD#2085 restores change graphs that were already emitted, so the next emits must include them.
+    // What the emits compared against held the deleted node: keep that, unless they hold it already.
+    for (const [graph, restoredIDs] of restored) {
+      for (const entityID of restoredIDs) {
+        for (const emitted of [this._emittedStable, this._emittedStaging]) {
+          if (emitted.from === graph && !emitted.values.has(entityID)) {
+            emitted.values.set(entityID, undefined);
+          }
+        }
+        this._stableCandidates.add(entityID);
+        this._stagingCandidates.add(entityID);
+      }
+    }
+    if (restored.has(stagingGraph)) {
+      stagingGraph.commit();   // its geometry, for the parent ways of the restored nodes
+    }
+
+    // Stable and staging catch up with base shapes that their own edits change (e.g. a downloaded
+    // way through a node the user moved). The other graphs catch up when they become current.
+    const stableReshapedIDs = stableGraph.syncWithBase();
+    const stagingReshapedIDs = stagingGraph.syncWithBase();
+
+    // Newly downloaded data goes in the base index, and what changed shape needs its new box.
+    // The local indexes take what stable and staging rebuilt (and restored) of their own.
+    const reshaped = [...reshapedIDs].map(entityID => baseGraph.entity(entityID));
+    this._mergeIntoCache('editor_base', baseGraph, [...entities, ...reshaped]);
+    this._syncLocalIndex('editor_stable', stableGraph);
+    this._syncLocalIndex('editor_staging', stagingGraph);
+
+    this.emit('merge', mergedIDs.union(reshapedIDs).union(stableReshapedIDs).union(stagingReshapedIDs));
+
+    // A restore changed stable and staging, so tell the listeners now (indexes included).
+    if (restored.size) {
+      this._emitChanges();
+    }
   }
 
 
@@ -919,43 +1226,145 @@ export class EditSystem extends AbstractSystem {
 
 
   /**
-   * Finds the annotation describing the edit that would be undone next.
-   * @return The previous undo annotation, or `undefined` if none
+   * Finds the edit that would be undone next, the latest kept edit with a label.
+   * @return The edit, or `undefined` if none
    */
-  public getUndoAnnotation(): string | undefined {
+  public getUndoEdit(): Edit | undefined {
     let i = this._index;
     while (i >= 0) {
       const edit = this._history[i];
-      if (edit.annotation) return edit.annotation;
+      if (edit.hasLabel) return edit;
       i--;
     }
   }
 
 
   /**
-   * Finds the annotation describing the edit that would be redone next.
-   * @return The next redo annotation, or `undefined` if none
+   * Finds the edit that would be redone next, the first edit after `stable` with a label.
+   * Past the newest edit, this is the `returnEdit`, if there is one.
+   * @return The edit, or `undefined` if none
    */
-  public getRedoAnnotation(): string | undefined {
+  public getRedoEdit(): Edit | undefined {
     let i = this._index + 1;
     while (i <= this._history.length - 1) {
       const edit = this._history[i];
-      if (edit.annotation) return edit.annotation;
+      if (edit.hasLabel) return edit;
       i++;
+    }
+    if (this._index === this._history.length - 1 && !this._hasWorkInProgress) {
+      return this._returnEdit ?? undefined;
     }
   }
 
 
   /**
-   * Returns the spatialID of the OSM spatial cache that corresponds to the given graph.
-   * Each OSM cache reflects exactly one graph and is kept current by `EditSystem`.
-   * @param graph - a graph (typically the base, stable, or staging graph)
-   * @return the matching spatialID; defaults to the staging cache if no match
+   * Where the user was when they first undid away from the newest edit, with what they had selected.
+   * Once they redo back to the newest edit, one more redo returns them there.
+   * It's not part of the history, so it isn't backed up, and any new edit clears it.
+   * @return The return Edit, or `null` if there is none
    */
-  public spatialIDForGraph(graph: Graph): SpatialID {
-    if (graph === this.base.graph) return 'editor_base';
-    if (graph === this.stable.graph) return 'editor_stable';
-    return 'editor_staging';
+  public get returnEdit(): Edit | null {
+    return this._returnEdit;
+  }
+
+
+  /**
+   * Forget the return Edit, e.g. because the map is already where it would return to.
+   */
+  public clearReturnEdit(): void {
+    this._returnEdit = null;
+  }
+
+
+  /**
+   * Returns the OSM entities whose boxes intersect a box, as they are in the given graph.
+   * Any graph of the editor's lineage can be searched: base, stable, staging, a graph from the
+   * history, or a scratch graph inside an action or a validator. See "Spatial indexes for any graph"
+   * in `design/graph-geometry.md`.
+   * @param box - the search box (world coordinates)
+   * @param graph - the graph to search (defaults to the staging graph); uncommitted writes are committed
+   * @return The entities, this graph's version of each
+   * @throws Will throw if the graph is from another lineage
+   */
+  public entitiesInBox(box: BBox, graph?: Graph): OsmEntity[] {
+    const spatial = this.context.systems.spatial!;
+    const useGraph = graph ?? this.staging.graph!;
+    const baseEntities = this.base.graph!.base.entities;
+    const { spatialID, snapshot, diffIDs } = this._localIndexFor(useGraph);
+
+    const results: OsmEntity[] = [];
+    for (const hit of spatial.getItemsAtBox('editor_base', box)) {
+      if (diffIDs.has(hit.id) || snapshot?.hasOwnShape(hit.id)) continue;
+      const entity = baseEntities.get(hit.id);
+      if (entity) results.push(entity);
+    }
+    if (spatialID && snapshot) {
+      for (const hit of spatial.getItemsAtBox(spatialID, box)) {
+        if (diffIDs.has(hit.id)) continue;
+        const entity = snapshot.hasEntity(hit.id);
+        if (entity) results.push(entity);
+      }
+    }
+    // What differs from the local index's snapshot is tested directly.
+    for (const entityID of diffIDs) {
+      const entity = useGraph.hasEntity(entityID);
+      const extent = entity && useGraph.geometry(entity).world?.extent;
+      if (extent && boxesIntersect(extent.bbox(), box)) {
+        results.push(entity);
+      }
+    }
+    return results;
+  }
+
+
+  /**
+   * Returns the way segments whose boxes intersect a box, as they are in the given graph.
+   * Like `entitiesInBox`, any graph of the editor's lineage can be searched.
+   * @param box - the search box (world coordinates)
+   * @param graph - the graph to search; uncommitted writes are committed
+   * @return The segments
+   * @throws Will throw if the graph is from another lineage
+   */
+  public segmentsInBox(box: BBox, graph: Graph): Segment[] {
+    const spatial = this.context.systems.spatial!;
+    const { spatialID, snapshot, diffIDs } = this._localIndexFor(graph);
+
+    const results: Segment[] = [];
+    for (const hit of spatial.getItemsAtBox('editor_base-segments', box)) {
+      const segment = hit.contents as Segment;
+      if (diffIDs.has(segment.wayID) || snapshot?.hasOwnShape(segment.wayID)) continue;
+      results.push(segment);
+    }
+    if (spatialID) {
+      for (const hit of spatial.getItemsAtBox(spatialID + '-segments', box)) {
+        const segment = hit.contents as Segment;
+        if (diffIDs.has(segment.wayID)) continue;
+        results.push(segment);
+      }
+    }
+    // The segments of ways that differ from the local index's snapshot are tested directly.
+    for (const entityID of diffIDs) {
+      const way = graph.hasEntity(entityID);
+      if (way?.type !== 'way') continue;
+      for (const item of this._segmentItems(way as OsmWay, graph)) {
+        if (boxesIntersect(item, box)) {
+          results.push(item.contents as Segment);
+        }
+      }
+    }
+    return results;
+  }
+
+
+  /**
+   * Returns the IDs of what stable has changed (its own version or shape) whose boxes intersect an
+   * extent. This searches only stable's local index, so it's quick however much is loaded.
+   * @param extent - the extent to search (WGS84 lon/lat)
+   * @return The entity IDs
+   */
+  public stableEditsIn(extent: Extent): EntityID[] {
+    const spatial = this.context.systems.spatial!;
+    return spatial.getItemsAtBox('editor_stable', worldBox(extent)).map(hit => hit.id);
   }
 
 
@@ -966,16 +1375,8 @@ export class EditSystem extends AbstractSystem {
    * @return Entities visible in the current map view
    */
   public intersects(graph?: Graph): OsmEntity[] {
-    const spatial = this.context.systems.spatial!;
-    const useGraph = graph ?? this.staging.graph!;
-    const spatialID = this.spatialIDForGraph(useGraph);
-
-    const results: OsmEntity[] = [];
-    for (const hit of spatial.getVisibleItems(spatialID)) {
-      const entity = useGraph.hasEntity(hit.id);
-      if (entity) results.push(entity);
-    }
-    return results;
+    const box = this.context.viewport.visibleWorldExtent().bbox();
+    return this.entitiesInBox(box, graph);
   }
 
 
@@ -987,47 +1388,111 @@ export class EditSystem extends AbstractSystem {
    * @return Array of way Segments intersecting the extent
    */
   public waySegments(extent: Extent, graph: Graph): Segment[] {
+    return this.segmentsInBox(worldBox(extent), graph);
+  }
+
+
+  /**
+   * Internal function, picks the local index to search for a graph, and what to correct it by.
+   * The base index holds every base entity. Each local index holds what its snapshot (of stable or
+   * staging) has of its own. A search takes the base hits that the snapshot doesn't have its own of,
+   * plus the local index's hits, except what differs between the snapshot and the graph searched
+   * (`diffIDs`, tested directly). For stable and staging that's usually nothing.
+   * @param graph - the graph to search
+   * @return The local index's spatialID and snapshot (none for the base graph), and the IDs that differ
+   * @throws Will throw if the graph is from another lineage
+   */
+  protected _localIndexFor(graph: Graph): { spatialID: SpatialID | null, snapshot: Graph | null, diffIDs: Set<EntityID> } {
+    const baseGraph = this.base.graph!;
+    if (graph === baseGraph) {
+      return { spatialID: null, snapshot: null, diffIDs: new Set<EntityID>() };
+    }
+    if (graph.base !== baseGraph.base) {
+      throw new Error(`Graph ${graph.id} isn't one of the editor's graphs`);
+    }
+    if (graph.hasPendingChanges) {
+      graph.commit();
+    }
+
+    // Try the local index that's likely nearest first: the diff is O(1) when nothing differs.
+    const order: SpatialID[] = (graph === this.stable.graph) ? ['editor_stable', 'editor_staging'] : ['editor_staging', 'editor_stable'];
+    let best: { spatialID: SpatialID, snapshot: Graph, diffIDs: Set<EntityID> } | null = null;
+    for (const spatialID of order) {
+      const snapshot = this._localSnapshots.get(spatialID)!;
+      const diffIDs = graph.diffShapeIDs(snapshot);
+      if (!best || diffIDs.size < best.diffIDs.size) {
+        best = { spatialID: spatialID, snapshot: snapshot, diffIDs: diffIDs };
+      }
+      if (!diffIDs.size) break;
+    }
+    return best!;
+  }
+
+
+  /**
+   * Internal function, brings a local index up to date with its graph (stable or staging): it
+   * takes a new snapshot of the graph, and updates what differs from the last one.
+   * @param spatialID - `'editor_stable'` or `'editor_staging'`
+   * @param graph - the graph the local index reflects
+   */
+  protected _syncLocalIndex(spatialID: SpatialID, graph: Graph): void {
     const spatial = this.context.systems.spatial;
-    if (!spatial) return [];
+    if (!spatial) return;
 
-    // Convert the WGS84 query extent to a world-coordinate box.
-    const bb = extent.bbox();
-    const [ax, ay] = projWgs84ToWorld([bb.minX, bb.minY]);
-    const [bx, by] = projWgs84ToWorld([bb.maxX, bb.maxY]);
-    const box = {
-      minX: Math.min(ax, bx), minY: Math.min(ay, by),
-      maxX: Math.max(ax, bx), maxY: Math.max(ay, by)
-    };
+    const previous = this._localSnapshots.get(spatialID)!;
+    const snapshot = new Graph(graph);   // O(1), and later writes to `graph` don't change it
+    this._localSnapshots.set(spatialID, snapshot);
 
-    const segSpatialID = this.spatialIDForGraph(graph) + '-segments';
-    return spatial.getItemsAtBox(segSpatialID, box).map(hit => hit.contents as Segment);
+    const toReplace: OsmEntity[] = [];
+    const toRemove: EntityID[] = [];
+    for (const entityID of snapshot.diffShapeIDs(previous)) {
+      const entity = snapshot.hasOwnShape(entityID) ? snapshot.hasEntity(entityID) : undefined;
+      if (entity) {
+        toReplace.push(entity);
+      } else {
+        toRemove.push(entityID);   // deleted, or as the base has it again
+      }
+    }
+
+    spatial.removeItems(spatialID, toRemove);
+    spatial.replaceData(spatialID, toReplace, snapshot);
+    for (const entityID of toRemove) {
+      this._removeWaySegments(spatialID, entityID);  // safe even if it wasn't a way
+    }
+    for (const entity of toReplace) {
+      if (entity.type === 'way') {
+        this._updateWaySegments(spatialID, entity as OsmWay, snapshot);
+      }
+    }
   }
 
 
   /**
    * Returns a `Difference` containing all edits from `base` -> `stable`
-   * We use this pretty frequently, so it's cached in `this._fullDifference`
-   *  and recomputed by the `_emitChanges` function only when `stable` changes.
+   * We use this pretty frequently, so it's kept in `this._fullDifference`
+   *  and updated by the `_emitChanges` function when `stable` changes.
+   * It's the same object across changes, updated in place.
    * @return The total changes made by the user during their edit session
    */
-  public difference(): Difference {
+  public difference(): SessionDifference {
     return this._fullDifference;
   }
 
 
   /**
    * This returns a summery of all changes made from `base` -> `stable`
-   * Optionally includes a given action function to apply to the `stable` graph.
-   * @param action - Optional action to apply to the `stable` graph
+   * Optionally includes a given action function to apply to a copy of the `stable` graph.
+   * @param action - Optional action to apply to a copy of the `stable` graph
    * @return Object containing `modified`, `created`, `deleted` summary of changes
    */
   public changes(action?: Action): ChangesSummary {
-    let difference = this._fullDifference;
+    let difference: Difference = this._fullDifference;
 
     if (action) {
       const base = this.base.graph!;
-      const head = action(this.stable.graph!);
-      difference = new Difference(base, head);
+      const head = action(new Graph(this.stable.graph!));
+      const candidates = new Set<EntityID>(difference.changes.keys()).union(head.changedIDs);
+      difference = new Difference(base, head, candidates);
     }
 
     return {
@@ -1049,6 +1514,27 @@ export class EditSystem extends AbstractSystem {
 
 
   /**
+   * Whether the user has done work they would hate to lose: the graph changed, or a kept edit
+   * has a `type` (e.g. ignoring a Rapid feature, which changes nothing in the graph).
+   * This decides whether to back up the history. Unlike `hasChanges()`, it isn't about uploading.
+   * After `clearBackup` (the edits were uploaded or thrown away) it's `false` until the next reset,
+   * so closing the tab on the success screen doesn't warn about edits that are already on OSM.
+   * @return `true` if there is work worth saving
+   */
+  public hasWork(): boolean {
+    if (this._isBackupCleared) return false;
+    if (this.hasChanges()) return true;
+
+    // Start at `1` - the `base` edit has no type..
+    // End at `_index` - don't continue into the redo part of the history..
+    for (let i = 1; i <= this._index; i++) {
+      if (this._history[i].props.type) return true;
+    }
+    return false;
+  }
+
+
+  /**
    * This prepares the list of all sources used during the user's editing session.
    * This is called by `commit.js` when preparing the changeset before uploading.
    * @return Object of all sources used during the user's editing session
@@ -1065,7 +1551,7 @@ export class EditSystem extends AbstractSystem {
     for (let i = 1; i <= this._index; i++) {
       const edit = this._history[i];
       for (const which of ['imagery', 'photos', 'data'] as const) {
-        for (const val of (edit.sources as EditSources)[which] ?? []) {
+        for (const val of edit.props.sources?.[which] ?? []) {
           result[which].add(val);
         }
       }
@@ -1104,7 +1590,7 @@ export class EditSystem extends AbstractSystem {
     }
 
     // Replace base entities with head entities..
-    for (const [entityID, entity] of graph.local.entities) {
+    for (const [entityID, entity] of graph.localEntities()) {
       if (entity) {
         const copy = _copyEntity(entity);
         result.set(copy.id, copy);
@@ -1122,8 +1608,7 @@ export class EditSystem extends AbstractSystem {
       }
       if (Array.isArray(entity.members)) {
         entity.members = entity.members.map(member => {
-          member.id = permIDs[member.id] ?? member.id;
-          return member;
+          return { ...member, id: permIDs[member.id] ?? member.id };
         });
       }
     }
@@ -1149,9 +1634,9 @@ export class EditSystem extends AbstractSystem {
         delete copy.tags;
       }
 
+      // `asJSON` is a shallow copy, so make a new `loc` rather than rounding the live one.
       if (Array.isArray(copy.loc)) {
-        copy.loc[0] = +copy.loc[0].toFixed(6);
-        copy.loc[1] = +copy.loc[1].toFixed(6);
+        copy.loc = [+copy.loc[0].toFixed(6), +copy.loc[1].toFixed(6)];
       }
 
       const match = entity.id.match(/([nrw])-\d*/);  // temporary id
@@ -1172,86 +1657,145 @@ export class EditSystem extends AbstractSystem {
 
   /**
    * Build the structured backup object representing the edit history.
-   * This is the expensive part of a backup (it walks and copies the whole history), so callers
-   * that persist to IndexedDB should store the returned object directly rather than re-stringifying.
+   * Each history item holds only what its edit changed against the edit before it. That's computed
+   * once per edit and kept (`_backupChangesFor`), so a backup copies only the edits made since the
+   * last one. Callers that persist to IndexedDB should store the returned object directly rather
+   * than re-stringifying.
    * @return The structured backup object, or `undefined` if nothing to save
    */
   public toBackup(): BackupJSON | undefined {
-    if (!this.hasChanges()) return;
+    if (!this.hasWork()) return;
 
-    const OSM_PRECISION = 7;
     const baseGraph = this.base.graph!;   // The initial unedited graph
     const modifiedEntities = new Map<string, EntityCopy>();  // Map<entityKey, EntityCopy>
-    const baseEntities = new Map<EntityID, EntityCopy>();    // Map<entityID, EntityCopy>
+    const baseEntities = new Map<EntityID, OsmEntity>();     // Map<entityID, OsmEntity>
+    const relatedIDs = new Set<EntityID>();
     const historyData: Record<string, unknown>[] = [];
 
     // Preserve the users history of edits..
-    for (const edit of this._history) {
-      const modified: string[] = [];
-      const deleted: EntityID[] = [];
+    // End at `_index` - don't save the redo part of the history. Edits the user undid aren't work
+    // they'd expect to get back when restoring a session.
+    for (let i = 0; i <= this._index; i++) {
+      const edit = this._history[i];
+      const item: Record<string, unknown> = {};
 
-      // watch out: for modified entities we index on "key" - e.g. "n1v1"
-      for (const [entityID, entity] of edit.graph!.local.entities) {
-        if (entity) {
-          const key = entity.key;
-          modifiedEntities.set(key, _copyEntity(entity));
-          modified.push(key);
-        } else {
-          deleted.push(entityID);
+      if (i > 0) {
+        const changes = this._backupChangesFor(edit, this._history[i - 1].graph);
+
+        // watch out: for modified entities we index on "key" - e.g. "n1v1"
+        for (let j = 0; j < changes.modified.length; j++) {
+          modifiedEntities.set(changes.modified[j], changes.copies[j]);
+        }
+        for (const entityID of changes.relatedIDs) {
+          relatedIDs.add(entityID);
         }
 
-        // Collect the original versions of edited Entities.
-        const original = baseGraph.hasEntity(entityID);
-        if (original && !baseEntities.has(entityID)) {
-          baseEntities.set(entityID, _copyEntity(original));
-        }
-
-        // For modified ways, collect originals of child nodes also. - iD#4108
-        // (This is needed for situations where we connect a way to an existing node)
-        if (entity && (entity as any).nodes) {
-          for (const childID of (entity as any).nodes) {
-            const child = baseGraph.hasEntity(childID);
-            if (child && !baseEntities.has(child.id)) {
-              baseEntities.set(child.id, _copyEntity(child));
-            }
-          }
-        }
-
-        // Collect original parent ways also.
-        // (This is needed for situations where we reshape or move a way -
-        //  behind the scenes, only the nodes were really modified)
-        if (original) {
-          for (const parent of baseGraph.parentWays(original)) {
-            if (!baseEntities.has(parent.id)) {
-              baseEntities.set(parent.id, _copyEntity(parent));
-            }
-          }
-        }
+        if (changes.modified.length)  item.modified = changes.modified;
+        if (changes.deleted.length)   item.deleted = changes.deleted;
+        if (changes.reverted.length)  item.reverted = changes.reverted;
       }
 
-      const sources = (edit.sources ?? {}) as EditSources;
-
-      const item: Record<string, unknown> = {};
-      if (modified.length)   item.modified = modified;
-      if (deleted.length)    item.deleted = deleted;
-      if (edit.annotation)   item.annotation = edit.annotation;
-      if (edit.selectedIDs)  item.selectedIDs = edit.selectedIDs;
-      if (edit.transform)    item.transform = edit.transform;
-      if (sources.imagery)   item.imageryUsed = sources.imagery;
-      if (sources.photos)    item.photosUsed = sources.photos;
-      if (sources.data)      item.dataUsed = sources.data;
+      // The edit's props are plain JSON, saved as they are.
+      // (Before October 2026, items had `annotation`, `selectedIDs`, `transform` and `*Used` instead)
+      if (Object.keys(edit.props).length)  item.props = edit.props;
       historyData.push(item);
     }
 
+    for (const entityID of relatedIDs) {
+      // Collect the original versions of edited Entities.
+      // For modified ways, `relatedIDs` has their child nodes also. - iD#4108
+      // (This is needed for situations where we connect a way to an existing node)
+      const original = baseGraph.hasEntity(entityID);
+      if (!original) continue;
+      baseEntities.set(entityID, original);
+
+      // Collect original parent ways also.
+      // (This is needed for situations where we reshape or move a way -
+      //  behind the scenes, only the nodes were really modified)
+      for (const parent of baseGraph.parentWays(original)) {
+        baseEntities.set(parent.id, parent);
+      }
+    }
+
+    // Collect the child nodes of those original ways also, so restore can fetch everything at once.
+    for (const entity of [...baseEntities.values()]) {
+      for (const childID of (entity as OsmWay).nodes ?? []) {
+        const child = baseGraph.hasEntity(childID);
+        if (child) {
+          baseEntities.set(child.id, child);
+        }
+      }
+    }
+
+    // Save the versions they were edited from, not copies of them. Restore fetches those versions
+    // from the OSM API. (Entities without a version didn't come from OSM, and can't be fetched.)
+    const baseVersions: Record<EntityID, number> = {};
+    for (const [entityID, entity] of baseEntities) {
+      if (entity.version) {
+        baseVersions[entityID] = entity.version;
+      }
+    }
+
     return {
-      version: 3,
+      version: 4,
       entities: [...modifiedEntities.values()],
-      baseEntities: [...baseEntities.values()],
+      baseVersions: baseVersions,
       stack: historyData,
       nextIDs: this.context.sequences,
       index: this._index,
       timestamp: (new Date()).getTime()
     };
+  }
+
+
+  /**
+   * Returns what an edit changed against the edit before it, for backups: the entities it changed
+   * or deleted, and the ones it put back as they are in base. It's computed once and kept, until the
+   * edit before is a different one or a merge changes the edits (`_backupGeneration`).
+   * @param edit - The edit
+   * @param previous - The graph of the edit before it
+   * @return What the edit changed
+   */
+  protected _backupChangesFor(edit: Edit, previous: Graph): BackupChanges {
+    const kept = this._backupChanges.get(edit);
+    if (kept?.previous === previous && kept.generation === this._backupGeneration) return kept;
+
+    const OSM_PRECISION = 7;
+    const graph = edit.graph;
+    const changes: BackupChanges = {
+      previous: previous,
+      generation: this._backupGeneration,
+      modified: [],
+      copies: [],
+      deleted: [],
+      reverted: [],
+      relatedIDs: []
+    };
+
+    // `diffIDs` can list more than what changed, so compare each one.
+    for (const entityID of graph.diffIDs(previous)) {
+      const entity = graph.hasEntity(entityID);
+      if (!graph.isLocal(entityID)) {
+        if (previous.isLocal(entityID)) {
+          changes.reverted.push(entityID);
+          changes.relatedIDs.push(entityID);
+        }
+        continue;
+      }
+      if (previous.isLocal(entityID) && previous.hasEntity(entityID) === entity) continue;
+
+      changes.relatedIDs.push(entityID);
+      if (entity) {
+        changes.modified.push(entity.key);
+        changes.copies.push(_copyEntity(entity));
+        changes.relatedIDs.push(...((entity as OsmWay).nodes ?? []));
+      } else {
+        changes.deleted.push(entityID);
+      }
+    }
+
+    this._backupChanges.set(edit, changes);
+    return changes;
 
 
     /**
@@ -1272,13 +1816,12 @@ export class EditSystem extends AbstractSystem {
         if (entity.isDegenerate()) {
           delete copy.loc;
         } else {
-          copy.loc[0] = +copy.loc[0].toFixed(OSM_PRECISION);
-          copy.loc[1] = +copy.loc[1].toFixed(OSM_PRECISION);
+          // `asJSON` is a shallow copy, so make a new `loc` rather than rounding the live one.
+          copy.loc = [+copy.loc[0].toFixed(OSM_PRECISION), +copy.loc[1].toFixed(OSM_PRECISION)];
         }
       }
       return copy;
     }
-
   }
 
 
@@ -1299,9 +1842,10 @@ export class EditSystem extends AbstractSystem {
    *  that we are starting with a clean slate in regards to validation and rendering.
    *
    * @param json - Stringified JSON to parse
-   * @return Promise resolved when the restore process is complete
+   * @return Promise resolved when the restore process is complete, with the IDs of the entities
+   *   whose edits were left out (see `fromBackupAsync`)
    */
-  public fromJSONAsync(json: string): Promise<void> {
+  public fromJSONAsync(json: string): Promise<EntityID[]> {
     return this.fromBackupAsync(JSON.parse(json) as BackupJSON);
   }
 
@@ -1314,16 +1858,19 @@ export class EditSystem extends AbstractSystem {
    *  this function needs to be async, and should be chained after a `context.resetAsync()` to ensure
    *  that we are starting with a clean slate in regards to validation and rendering.
    *
+   * The edits to an entity whose version was redacted on OSM are left out, because they were made to
+   * data that was removed from OSM (see `design/edit-system.md`).
+   *
    * @param backup - The structured backup object to restore
-   * @return Promise resolved when the restore process is complete
+   * @return Promise resolved when the restore process is complete, with the IDs of the entities
+   *   whose edits were left out
    * @throws Error if the backup version is not supported
    */
-  public fromBackupAsync(backup: BackupJSON): Promise<void> {
+  public fromBackupAsync(backup: BackupJSON): Promise<EntityID[]> {
     const context = this.context;
     const gfx = context.systems.gfx;
-    const osm = context.services.osm as any;
 
-    if (backup.version !== 3) {
+    if (backup.version !== 3 && backup.version !== 4) {
       throw new Error(`Backup version ${backup.version} not supported.`);
     }
 
@@ -1341,29 +1888,39 @@ export class EditSystem extends AbstractSystem {
 
     const __baseEntities = new Map<EntityID, OsmEntity>();        // Map<entityID, Entity>
     const __modifiedEntities = new Map<string, OsmEntity>();      // Map<Entity.key, Entity>  (watch out: entity.key - e.g. 'n1v1')
-    const __missingEntityIDs = new Set<EntityID>();               // Set<entityID>
+    const __toFetch = new Map<EntityID, number | undefined>();    // Map<entityID, version>  (`undefined` for the current version)
 
     // Restore the nextIDs..
     // Old: OsmEntity.id.next = backup.nextIDs;
     // New: We store sequences in the context, these will be positive numbers.
     // We might find negative numbers in old backup from before we started doing this.
+    // Counters only move forward: this page may have counted further already (versions of data,
+    // graphs, changesets), and a number used twice would name two different things.
+    const sequences = context.sequences as Record<string, number>;
     const nextIDs = backup.nextIDs || {};
     for (const [k, v] of Object.entries(nextIDs)) {
-      (context.sequences as Record<string, number>)[k] = Math.abs(v);
+      sequences[k] = Math.max(sequences[k] ?? 0, Math.abs(v));
     }
 
-    // Reconstruct base entities..
-    for (const props of backup.baseEntities) {
+    // v4: Fetch the base entities at the versions the edits were made from..
+    for (const [entityID, version] of Object.entries(backup.baseVersions ?? {})) {
+      __toFetch.set(entityID, version);
+    }
+
+    // v3: Reconstruct base entities..
+    for (const props of backup.baseEntities ?? []) {
       const entity = createOsmEntity(context, props as OsmEntityProps);
       __baseEntities.set(entity.id, entity);
     }
 
-    // Determine if any nodes are missing and need to be loaded separately..
+    // v3: Determine if any nodes are missing and need to be loaded separately..
+    // When we restore ways, we also need to fetch any missing childNodes
+    //  that would normally have been downloaded with those ways.. see iD#2142
     for (const entity of __baseEntities.values()) {
       if (!Array.isArray((entity as any).nodes)) continue;  // consider ways only
       for (const nodeID of (entity as any).nodes) {
         if (!__baseEntities.has(nodeID)) {
-          __missingEntityIDs.add(nodeID);
+          __toFetch.set(nodeID, undefined);
         }
       }
     }
@@ -1374,71 +1931,25 @@ export class EditSystem extends AbstractSystem {
       __modifiedEntities.set(entity.key, entity);
     }
 
-    // Load missing entities from the OSM API
-    // When we restore ways, we also need to fetch any missing childNodes
-    //  that would normally have been downloaded with those ways.. see iD#2142
-    // As added challenges:
-    //  - We have to keep the UI blocked while this is happening, because it's destructive to the graphs/edits.
-    //  - Callback can be called multiple times, so we have to keep track of how many of the missing nodes we got.
-    //  - The child nodes may have been deleted, so we may have to fetch older non-deleted copies
-    //
-    // A thought I'm having is - if we need to do all this anyway, it might make more sense to just store the
-    // base version numbers rather than base entities, then use `loadEntityVersionAsync` to fetch exactly what we need.
-    // new: the OSM API now supports a "multi-fetch with version numbers" option.
-    const _loadMissingEntitiesAsync = (): Promise<void> => {
-      return new Promise((resolve, reject) => {
-
-        if (osm && __missingEntityIDs.size) {
-          // Watch out: this callback may be called multiple times..
-          // Since switching the osm service methods to async we shouldn't get errors anymore
-          //  it will always resolve to whatever was fetched.
-          // But: another potential problem is that we'll never actually fetch "redacted" entities
-          //  so potential infinite recursion scenerio.
-          const _missingEntitiesLoaded = (err: Error | null, result: { data: Array<{ id: string; version: number; visible: boolean }> }) => {
-            if (err) {
-              reject(err);
-
-            } else {
-              const visibleGroups = utilArrayGroupBy(result.data, 'visible');
-              const visibles = (visibleGroups as any).true ?? [];      // alive nodes
-              const invisibles = (visibleGroups as any).false ?? [];   // deleted nodes
-
-              // Visible (not deleted) are no longer missing and will be merged as base entities..
-              for (const props of visibles) {
-                const entity = createOsmEntity(context, props);
-                __missingEntityIDs.delete(entity.id);
-                __baseEntities.set(entity.id, entity);
-              }
-
-              // Recurse to load invisible (deleted) entities, need to go back a version to find them..
-              for (const props of invisibles) {
-                osm.loadEntityVersionAsync(props.id, +props.version - 1)
-                  .then((results: { data: Array<{ id: string; version: number; visible: boolean }> }) => _missingEntitiesLoaded(null, results))
-                  .catch((err: Error) => reject(err));
-              }
-            }
-
-            if (!__missingEntityIDs.size) {  // are we done?
-              resolve();
-            }
-          };
-
-          // continue loading missing entities until we have them all
-          osm.loadMultipleAsync(__missingEntityIDs)
-            .then((results: { data: Array<{ id: string; version: number; visible: boolean }> }) => _missingEntitiesLoaded(null, results))
-            .catch((err: Error) => reject(err));
-
-        } else {  // nothing to do
-          resolve();
-        }
-
-      });
-    };
-
 
     // Call _finish when we believe we have everything..
     // This merges the base entities, reconstructs history, and unblocks the other parts of the app.
-    const _finish = (): void => {
+    const _finish = (redactedIDs: Set<EntityID>): EntityID[] => {
+
+      // The edits to an entity whose version was redacted are left out: they were made to data that
+      // was removed from OSM, and may still hold it. The entity stays as fetched instead (the current
+      // version). A way needs its child nodes, so deleting those is left out too.
+      const leftOutIDs = new Set<EntityID>();
+      const neededIDs = new Set<EntityID>();
+      for (const entityID of redactedIDs) {
+        const entity = __baseEntities.get(entityID);
+        if (!entity) continue;   // nothing to keep instead
+        leftOutIDs.add(entityID);
+        for (const childID of (entity as OsmWay).nodes ?? []) {
+          neededIDs.add(childID);
+        }
+      }
+      const skippedIDs = new Set<EntityID>();
 
       // Merge base entities into base graph (force = true, as new nodes may affect their parentways extents in tree)
       const baseEntities = [...__baseEntities.values()];
@@ -1446,50 +1957,53 @@ export class EditSystem extends AbstractSystem {
       const baseGraph = this.base.graph!;
       baseGraph.rebase(baseEntities, [baseGraph], true);   // force = true
 
-      // Seed every OSM cache with the restored base data.
+      // Seed the base index with the restored base data. (The local indexes get the edits when they're emitted.)
       this._mergeIntoCache('editor_base', baseGraph, baseEntities);
-      this._mergeIntoCache('editor_stable', this.stable.graph!, baseEntities);
-      this._mergeIntoCache('editor_staging', this.staging.graph!, baseEntities);
 
       // Reconstruct the edit history, each Graph derives from the previous one..
       // Start at i = 1, leaving base edit alone, the first edit will have nothing in it.
+      // An item holds what its edit changed against the one before. (Items in v3 backups, and in v4
+      // backups from before November 2026, hold everything changed since base, which loads the same way.)
       let prevGraph: Graph = baseGraph;
       for (let i = 1; i < backup.stack.length; i++) {
         const item = backup.stack[i] as Record<string, unknown>;
         const entities: Record<string, OsmEntity | undefined> = {};
         for (const key of (item.modified ?? []) as string[]) {
           const entity = __modifiedEntities.get(key)!;
-          entities[entity.id] = entity;
+          if (leftOutIDs.has(entity.id)) {
+            skippedIDs.add(entity.id);
+          } else {
+            entities[entity.id] = entity;
+          }
         }
         for (const entityID of (item.deleted ?? []) as EntityID[]) {
-          entities[entityID] = undefined;
+          if (leftOutIDs.has(entityID) || neededIDs.has(entityID)) {
+            skippedIDs.add(entityID);
+          } else {
+            entities[entityID] = undefined;
+          }
         }
 
-        const graph = new Graph(prevGraph).load(entities);
+        const graph = new Graph(prevGraph);
+        const reverted = (item.reverted ?? []) as EntityID[];
+        if (reverted.length) {
+          graph.revert(reverted);
+        }
+        graph.load(entities);
+        graph.freeze();
+
+        const props = this._upgradeEditProps((item.props ?? this._legacyEditProps(item)) as EditProps);
+        // Edits backed up before they had an extent get one from their graph
+        if (!props.extent) {
+          const extent = this._changeExtent(prevGraph, graph, graph.changedIDs);
+          if (extent) props.extent = extent.rectangle();
+        }
+        this._history.push(new Edit(context, graph, props));
         prevGraph = graph;
-
-        const sources: EditSources = {};
-        if (Array.isArray(item.imageryUsed))  sources.imagery = item.imageryUsed as string[];
-        if (Array.isArray(item.photosUsed))   sources.photos = item.photosUsed as string[];
-        if (Array.isArray(item.dataUsed))     sources.data = item.dataUsed as string[];
-
-        // Handle legacy transform scale parameter, if found
-        const transform = item.transform as (TransformProps & { k?: number });
-        if (transform?.k) {
-          transform.z = geoScaleToZoom(transform.k);
-          delete transform.k;
-        }
-
-        this._history.push(new Edit({
-          annotation:  item.annotation as string,
-          graph:       graph,
-          selectedIDs: item.selectedIDs as string[],
-          sources:     sources,
-          transform:   transform
-        }));
       }
 
       this._index = backup.index;
+      this._addHistoryPathCandidates([this._history[0]], 0);
       this._replaceStaging();
 
       unpause?.();        // unblock rendering, events will start firing now
@@ -1499,11 +2013,88 @@ export class EditSystem extends AbstractSystem {
       this.emit('merge', baseEntityIDs);
       this._emitChanges();
       this.emit('historyjump', 0, this._index);  // send 0 in prevIndex, we are replacing history completely
+
+      return [...skippedIDs];
     };
 
 
-    return _loadMissingEntitiesAsync()
-      .finally(() => _finish());
+    // We have to keep the UI blocked while fetching, because restoring replaces the graphs and edits.
+    return this._fetchBaseEntitiesAsync(__toFetch)
+      .then(fetched => {
+        for (const entity of fetched.entities) {
+          __baseEntities.set(entity.id, entity);
+        }
+        return _finish(fetched.redactedIDs);
+
+      }, err => {
+        // Without the base entities, the edits can't be restored. Leave the history empty (the caller
+        // reset it) and the session where it was, so it can be restored later.
+        unpause?.();
+        loading?.close();
+        throw err;
+      });
+  }
+
+
+  /**
+   * Fetch the base entities for a restore from the OSM API.
+   * Each entity is fetched at the version its edits were made from. If that version can't be found,
+   * it was redacted (OSM keeps every other version), and the current version is used instead, or if
+   * the entity has been deleted since, the version before it was deleted. The child nodes of ways
+   * fetched that way are fetched too, at their current version.
+   * @param versions - the version to fetch for each entityID (`undefined` to fetch the current version)
+   * @return Promise resolved with the entities that were found, and the IDs of those whose version was redacted
+   * @throws Rejects if the OSM API can't be reached
+   */
+  protected async _fetchBaseEntitiesAsync(versions: Map<EntityID, number | undefined>): Promise<{ entities: OsmEntity[], redactedIDs: Set<EntityID> }> {
+    const context = this.context;
+    const osm = context.services.osm;
+
+    const found: OsmEntity[] = [];
+    const redactedIDs = new Set<EntityID>();
+    if (!osm || !versions.size) return { entities: found, redactedIDs: redactedIDs };
+
+    const requestedIDs = new Set<EntityID>(versions.keys());
+    const triedCurrent = new Set<EntityID>();
+    let toFetch = versions;
+
+    while (toFetch.size) {
+      const results = await osm.loadEntityVersionsAsync(toFetch);
+      const resultByID = new Map<EntityID, ParsedElement>();
+      for (const props of results) {
+        resultByID.set(props.id as EntityID, props as ParsedElement);
+      }
+
+      const retry = new Map<EntityID, number | undefined>();
+      for (const [entityID, version] of toFetch) {
+        if (version === undefined) {
+          triedCurrent.add(entityID);
+        }
+
+        const props = resultByID.get(entityID);
+        const fetchedVersion = props?.version as number | undefined;
+        if (props?.visible) {
+          const entity = createOsmEntity(context, props as OsmEntityProps);
+          found.push(entity);
+          for (const childID of (entity as OsmWay).nodes ?? []) {   // a way can't be drawn without its child nodes
+            if (!requestedIDs.has(childID)) {
+              requestedIDs.add(childID);
+              retry.set(childID, undefined);
+            }
+          }
+        } else if (!triedCurrent.has(entityID)) {   // that version was redacted, try the current one
+          if (!props && toFetch === versions) {
+            redactedIDs.add(entityID);
+          }
+          retry.set(entityID, undefined);
+        } else if (version === undefined && fetchedVersion && fetchedVersion > 1) {   // deleted since, try the version before
+          retry.set(entityID, fetchedVersion - 1);
+        }
+      }
+      toFetch = retry;
+    }
+
+    return { entities: found, redactedIDs: redactedIDs };
   }
 
 
@@ -1527,12 +2118,18 @@ export class EditSystem extends AbstractSystem {
     if (context.inIntro) return Promise.resolve();               // Don't backup edits made in the walkthrough
     if (context.mode?.id === 'save') return Promise.resolve();   // Edits made in save mode may be conflict resolutions
     if (this._canRestoreBackup) return Promise.resolve();        // Wait to see if the user wants to restore other edits
+    if (this._isBackupCleared) return Promise.resolve();         // The edits were uploaded or thrown away, until the reset
     if (this._inTransition) return Promise.resolve();            // Don't backup edits mid-transition
     if (this._inTransaction) return Promise.resolve();           // Don't backup edits mid-transaction
 
     // Build the (expensive) structured backup object once.
     const backup = this.toBackup();
-    if (!backup) return Promise.resolve();
+
+    // Nothing to save, e.g. the user undid all their edits. Remove what this session saved before,
+    // or it would be offered for restore later with the edits they undid.
+    if (!backup) {
+      return this._sessionID ? this.deleteSessionAsync(this._sessionID) : Promise.resolve();
+    }
 
     if (database) {
       this._sessionID ??= this._newSessionID();   // mint a session id on first write
@@ -1569,12 +2166,90 @@ export class EditSystem extends AbstractSystem {
 
 
   /**
+   * The id of the session that the edits are saved in, or `null` if they haven't been saved yet.
+   * @return The session id
+   * @readonly
+   */
+  public get sessionID(): SessionID | null {
+    return this._sessionID;
+  }
+
+
+  /**
+   * Keep the active session marked in use while the editor is reset and then given the user's edits
+   * back (the walkthrough).  A reset forgets the session, and without its heartbeat another tab could
+   * restore it after a minute, and then both tabs would save it.
+   * Call `continueSession` or `releaseSession` afterward.
+   * @return The held session, or `null` if there is none
+   */
+  public holdSession(): SessionID | null {
+    const context = this.context;
+    const database = context.systems.database;   // optional
+
+    const id = this._sessionID;
+    this._heldSessionID = id;
+    this._heldSession = this._activeSession;
+
+    // Not backed up from this tab yet (e.g. just continued): read its record, to keep it live.
+    // (Nothing backs up while it's held, so the read can't race with a backup.)
+    if (id && !this._heldSession && database) {
+      database.get<SessionRecord>('sessions', id)
+        .then(record => {
+          if (record && this._heldSessionID === id && !this._heldSession) {
+            this._heldSession = record;
+          }
+        })
+        .catch(() => { /* best effort */ });
+    }
+    return id;
+  }
+
+
+  /**
+   * Stop keeping the held session live, when it isn't continued (see `holdSession`).
+   * Another tab can restore it once its heartbeat goes stale.
+   */
+  public releaseSession(): void {
+    this._heldSessionID = null;
+    this._heldSession = null;
+  }
+
+
+  /**
+   * Save the edits in an existing session from now on, instead of in a new one.
+   * A reset forgets the session, so code that resets the editor and then gives the user's edits back
+   * (the walkthrough) calls this afterward. Otherwise the next backup would save the same edits in a
+   * new session, and restoring both could upload them twice.
+   * A session that was started in the meantime is deleted.
+   * A held session's record stays cached, so its heartbeat goes on until the next backup.
+   * @param id - The session to continue
+   */
+  public continueSession(id: SessionID): void {
+    const context = this.context;
+    const database = context.systems.database;   // optional
+
+    const prevID = this._sessionID;
+    if (prevID && prevID !== id) {
+      database?.delete('sessions', prevID).catch(() => { /* best effort */ });
+    }
+
+    this._sessionID = id;
+    this._activeSession = (this._heldSession?.id === id) ? this._heldSession : null;
+    this._setOwnedSessionID(id);
+    this.releaseSession();
+  }
+
+
+  /**
    * List the restorable editing sessions for this origin, newest first.
    * Includes sessions stored in the `DatabaseSystem` (IndexedDB) plus, if present, a synthetic
    * record for a legacy localStorage backup (deduped if an IndexedDB record already supersedes it).
+   * Sessions made on another OSM API than the one we're connected to are left out (`_isOnThisAPI`).
+   * @param anyAPI - `true` to include sessions made on another OSM API (used during init, before a
+   *   host's preauthenticated connection has switched the API)
    * @return Promise resolving to the restorable sessions, sorted by `updatedAt` descending
    */
-  public async listRestorableSessionsAsync(): Promise<SessionRecord[]> {
+  public async listRestorableSessionsAsync(anyAPI: boolean = false): Promise<SessionRecord[]> {
     const context = this.context;
     const database = context.systems.database;   // optional
     const storage = context.systems.storage!;
@@ -1590,6 +2265,8 @@ export class EditSystem extends AbstractSystem {
         for (const record of records) {
           seen.add(record.id);
           if (this._isLiveElsewhere(record, now)) continue;   // open in another live tab — don't offer it
+          if (this._pendingUploadIDs.has(record.id)) continue;   // the server may still be uploading it
+          if (!anyAPI && !this._isOnThisAPI(record)) continue;   // made on another OSM API
           out.push(record);
         }
       } catch {
@@ -1614,9 +2291,10 @@ export class EditSystem extends AbstractSystem {
    * A legacy localStorage session is **upgraded**: it becomes a fresh IndexedDB session and the
    * legacy localStorage key is removed. An IndexedDB session is continued under its own id.
    * @param id - The session id to restore (from `listRestorableSessionsAsync`)
-   * @return Promise resolved when the restore (and any upgrade) completes
+   * @return Promise resolved when the restore (and any upgrade) completes, with the IDs of the
+   *   entities whose edits were left out (see `fromBackupAsync`)
    */
-  public async restoreSessionAsync(id: SessionID): Promise<void> {
+  public async restoreSessionAsync(id: SessionID): Promise<EntityID[]> {
     const context = this.context;
     const database = context.systems.database;   // optional
     const storage = context.systems.storage!;
@@ -1636,6 +2314,7 @@ export class EditSystem extends AbstractSystem {
         backup = undefined;
       }
     }
+    if (existingRecord && !this._isOnThisAPI(existingRecord)) return [];   // made on another OSM API
 
     if (!backup && id === this._backupKey()) {
       const json = storage.getItem(this._backupKey());
@@ -1649,10 +2328,10 @@ export class EditSystem extends AbstractSystem {
       }
     }
 
-    if (!backup) return;
+    if (!backup) return [];
 
     await context.resetAsync();
-    await this.fromBackupAsync(backup);
+    const leftOutIDs = await this.fromBackupAsync(backup);
 
     if (isLegacy) {
       // Upgrade: this becomes a new IndexedDB session; retire the legacy localStorage key.
@@ -1664,10 +2343,12 @@ export class EditSystem extends AbstractSystem {
     } else {
       this._sessionID = id;                 // continue the existing IndexedDB session
       this._activeSession = existingRecord ?? null;   // cache for the liveness heartbeat
+      await this.clearUploadMarkAsync();    // the user chose to restore it, despite the warning
     }
 
     this._setOwnedSessionID(this._sessionID);   // this tab now owns this session (survives reload)
     this._heartbeatNow();                       // immediately mark it live so other tabs back off
+    return leftOutIDs;
   }
 
 
@@ -1714,9 +2395,10 @@ export class EditSystem extends AbstractSystem {
    * Remove the active editing session's backup.
    * This happens when:
    * - The user switches sources with the source switcher
-   * - A changeset is inflight, we remove it to prevent the user from restoring duplicate edits
+   * - The edits were uploaded, so restoring them would upload them twice
    *
    * Removes the active session from IndexedDB and clears the legacy localStorage key.
+   * Until the next reset (which every caller does next), the history isn't backed up again.
    */
   public clearBackup(): void {
     const context = this.context;
@@ -1726,6 +2408,7 @@ export class EditSystem extends AbstractSystem {
     const uploader = context.systems.uploader;
 
     this._canRestoreBackup = false;
+    this._isBackupCleared = true;
     scheduler?.cancel('edit-backup');
 
     const id = this._sessionID;
@@ -1744,22 +2427,195 @@ export class EditSystem extends AbstractSystem {
 
 
   /**
+   * Back up the edits and mark the session as being uploaded to a changeset.
+   * The uploader calls this after creating the changeset and before uploading, and waits for it:
+   * if the tab closes during the upload, the next tab can ask the OSM API whether it went through.
+   * This writes even in save mode, where backups are otherwise skipped.
+   * @param changesetID - The changeset the edits are uploaded to
+   * @param apiURL - The OSM API they are uploaded to
+   * @return Promise resolved when the write completes (or fails silently)
+   */
+  public markUploadAsync(changesetID: string, apiURL: string): Promise<void> {
+    const context = this.context;
+    const database = context.systems.database;   // optional
+
+    const backup = this.toBackup();
+    if (!database || !backup) return Promise.resolve();
+
+    this._sessionID ??= this._newSessionID();
+    const upload: SessionUpload = { changesetID, apiURL, startedAt: Date.now() };
+    return this._saveSessionAsync(database, this._sessionID, backup, upload);
+  }
+
+
+  /**
+   * Remove the active session's upload mark, because we know the upload wasn't applied
+   * (or the user chose to restore the session anyway).
+   * @param changesetID - Optional, remove the mark only if it's for this changeset, so that a
+   *   failure before uploading (e.g. creating the changeset) can't remove an earlier upload's mark
+   * @return Promise resolved when the write completes (or fails silently)
+   */
+  public async clearUploadMarkAsync(changesetID?: string): Promise<void> {
+    const context = this.context;
+    const database = context.systems.database;   // optional
+
+    const record = this._activeSession;
+    if (!database || !record?.upload) return;
+    if (changesetID !== undefined && record.upload.changesetID !== changesetID) return;
+
+    delete record.upload;
+    try {
+      await database.put('sessions', record);
+    } catch {
+      // best effort
+    }
+  }
+
+
+  /**
+   * Let go of the active session without removing it, so the next start settles it.
+   * The uploader calls this when it can't tell whether an upload went through: the session keeps its
+   * upload mark, and this tab starts over, so the edits can't be uploaded twice. The next start asks
+   * the API whether the upload landed: if it did, the session is deleted, and if not, it's offered for
+   * restore (see `_settleUploadsAsync`). Its heartbeat is cleared, so no tab takes it for one that's
+   * still open.
+   * @return Promise resolved with `true` if the marked session is in durable storage, or `false` if
+   *   it isn't (no database, or the write failed), so the edits would be lost if this tab started over
+   */
+  public async releaseSessionAsync(): Promise<boolean> {
+    const context = this.context;
+    const database = context.systems.database;     // optional
+    const scheduler = context.systems.scheduler;   // optional
+
+    const id = this._sessionID;
+    const record = this._activeSession;
+    if (!database?.isAvailable || !id || !record?.upload) return false;
+
+    // Let go first, so a heartbeat during the write can't mark it live again.
+    scheduler?.cancel('edit-backup');
+    this._sessionID = null;
+    this._activeSession = null;
+    this._setOwnedSessionID(null);
+
+    record.heartbeatAt = 0;
+    try {
+      await database.put('sessions', record);
+      return true;
+    } catch {
+      // Keep it, or the next backup would start a second session with the same edits, unmarked.
+      this._sessionID = id;
+      this._activeSession = record;
+      this._setOwnedSessionID(id);
+      return false;
+    }
+  }
+
+
+  /**
+   * Settle the sessions whose upload was interrupted (their tab closed while uploading), by asking
+   * the OSM API about the changeset. Uploads are all or nothing, so:
+   * - if the changeset has changes, the upload went through: the session is deleted quietly (nothing
+   *   edits a marked session, see `releaseSessionAsync`, so it holds just the uploaded edits)
+   * - if it has none and it's closed, or the upload started long ago, it never landed: the mark is removed
+   * - if it has none, is open, and the upload started recently, the server may still be working on it,
+   *   so the session isn't offered this time
+   * - if the API can't be asked, the session keeps its mark, and the restore screen warns
+   * @return Promise resolved when all marked sessions are settled
+   */
+  protected async _settleUploadsAsync(): Promise<void> {
+    const context = this.context;
+    const database = context.systems.database;   // optional
+    if (!database) return;
+
+    let records: SessionRecord[];
+    try {
+      records = await database.getAllFromIndex<SessionRecord>('sessions', 'by-origin', this._origin());
+    } catch {
+      return;
+    }
+
+    const now = Date.now();
+    const toSettle = records.filter(record => record.upload && !this._isLiveElsewhere(record, now));
+
+    await Promise.all(toSettle.map(async record => {
+      const upload = record.upload!;
+      const result = await this._checkUploadAsync(upload);
+
+      if (result === 'uploaded') {
+        await this.deleteSessionAsync(record.id);
+      } else if (result === 'failed') {
+        delete record.upload;
+        try {
+          await database.put('sessions', record);
+        } catch {
+          // best effort
+        }
+      } else if (result === 'pending') {
+        this._pendingUploadIDs.add(record.id);
+      }
+    }));
+  }
+
+
+  /**
+   * Ask the OSM API whether an upload went through.
+   * @param upload - The session's upload mark
+   * @return `'uploaded'`, `'failed'`, `'pending'` (the server may still be working on it),
+   *   or `'unknown'` (the API couldn't be asked or didn't answer in time, or it's not the API we're connected to)
+   */
+  protected async _checkUploadAsync(upload: SessionUpload): Promise<'uploaded' | 'failed' | 'pending' | 'unknown'> {
+    const context = this.context;
+    const osm = context.services.osm;   // optional
+
+    if (!osm || osm.apiroot !== upload.apiURL) return 'unknown';
+
+    let handle: ReturnType<typeof globalThis.setTimeout> | undefined;
+    try {
+      const timeout = new Promise<never>((_, reject) => {
+        handle = globalThis.setTimeout(() => reject(new Error('Timed out')), UPLOAD_CHECK_MS);
+      });
+      const changeset = await Promise.race([osm.loadChangesetAsync(upload.changesetID), timeout]);
+      if (Number(changeset.changes_count) > 0) return 'uploaded';
+
+      const isOpen = String(changeset.open) === 'true';   // a boolean in JSON, a string in XML
+      if (isOpen && Date.now() - upload.startedAt < UPLOAD_PENDING_MS) return 'pending';
+      return 'failed';
+    } catch {
+      return 'unknown';
+    } finally {
+      globalThis.clearTimeout(handle);
+    }
+  }
+
+
+  /**
    * Persist an editing session to the `DatabaseSystem` 'sessions' store.
    * Stores the structured backup object directly (no `JSON.stringify`), along with lightweight
    * metadata (timestamps, edit count, bbox, tag summary) for the restore UI. Best-effort.
+   * An upload mark is kept until `clearUploadMarkAsync` removes it, so if we can't tell whether an
+   * upload went through, later backups don't hide that.
    * @param database - The database system to write to
    * @param id - The session id to write under
    * @param backup - The structured backup object to store
+   * @param upload - Optional, marks the session as being uploaded
    * @return Promise resolved when the write completes (or fails silently)
    */
-  protected async _saveSessionAsync(database: DatabaseSystem, id: SessionID, backup: BackupJSON): Promise<void> {
+  protected async _saveSessionAsync(database: DatabaseSystem, id: SessionID, backup: BackupJSON, upload?: SessionUpload): Promise<void> {
+    const osm = this.context.services.osm;   // optional
+
     const now = Date.now();
     try {
       const existing = await database.get<SessionRecord>('sessions', id);
+      // The editor moved on to another session while this was reading (e.g. `continueSession`, which
+      // deleted this one), so don't write it back.  The next backup saves the edits in the new session.
+      if (id !== this._sessionID) return;
+
       const meta = this._computeSessionMeta(backup);
+      const apiURL = osm?.apiroot ?? existing?.apiURL;
       const record: SessionRecord = {
         id,
         origin: this._origin(),
+        ...(apiURL && { apiURL }),
         createdAt: existing?.createdAt ?? now,
         updatedAt: now,
         heartbeatAt: now,   // a fresh backup also proves the session is live
@@ -1769,7 +2625,13 @@ export class EditSystem extends AbstractSystem {
         backupVersion: backup.version,
         data: backup
       };
+      const mark = upload ?? existing?.upload;
+      if (mark) {
+        record.upload = mark;
+      }
       await database.put('sessions', record);
+      if (id !== this._sessionID) return;       // moved on while writing (see above)
+
       this._activeSession = record;             // cache for the liveness heartbeat (no re-read)
       this._setOwnedSessionID(id);              // this tab owns this session (survives reload)
       this._setBackupStatus(true);
@@ -1814,11 +2676,28 @@ export class EditSystem extends AbstractSystem {
    * Whether any *restorable* sessions exist for this origin — i.e. sessions not currently open in
    * another live tab. Delegates to `listRestorableSessionsAsync` so the liveness filter is applied
    * consistently with what the restore UI will show.
+   * @param anyAPI - `true` to count sessions made on another OSM API too (see `listRestorableSessionsAsync`)
    * @return Promise resolving to `true` if there is at least one restorable session
    */
-  protected async _hasRestorableSessionsAsync(): Promise<boolean> {
-    const list = await this.listRestorableSessionsAsync();
+  protected async _hasRestorableSessionsAsync(anyAPI: boolean = false): Promise<boolean> {
+    const list = await this.listRestorableSessionsAsync(anyAPI);
     return list.length > 0;
+  }
+
+
+  /**
+   * Whether a session's edits were made on the OSM API we're connected to now. Restoring them on
+   * another API (e.g. edits made on the dev API, restored on live) would fetch the base versions of
+   * unrelated features with the same IDs, and could upload the edits over them.
+   * A session saved before sessions recorded their API counts as made on this one.
+   * @param record - The session record
+   * @return `true` if the session can be restored here
+   */
+  protected _isOnThisAPI(record: SessionRecord): boolean {
+    const osm = this.context.services.osm;   // optional
+
+    if (!osm || !record.apiURL) return true;
+    return record.apiURL === osm.apiroot;
   }
 
 
@@ -1871,14 +2750,14 @@ export class EditSystem extends AbstractSystem {
 
 
   /**
-   * Re-write the active session record with a fresh `heartbeatAt`, proving to other tabs that this
-   * session is still open. Uses the cached `_activeSession` record (no read) so it cannot race with
-   * `immediateBackup`. Best-effort — errors are swallowed and do not flap the backup status.
+   * Re-write the active session record (or the held one, see `holdSession`) with a fresh `heartbeatAt`,
+   * proving to other tabs that this session is still open. Uses the cached record (no read) so it
+   * cannot race with `immediateBackup`. Best-effort — errors are swallowed and do not flap the backup status.
    * @return Promise resolved when the heartbeat write completes (or is skipped)
    */
   protected async _heartbeatAsync(): Promise<void> {
     const database = this.context.systems.database;   // optional
-    const record = this._activeSession;
+    const record = this._activeSession ?? this._heldSession;
     if (!database || !record) return;
 
     record.heartbeatAt = Date.now();
@@ -1892,7 +2771,7 @@ export class EditSystem extends AbstractSystem {
 
   /**
    * The session id this tab owns, persisted in `sessionStorage` so it survives a page reload (but
-   * not a new/duplicate tab). Used to distinguish "my own session, just reloaded" from "a session
+   * not a new tab, and a duplicated tab forgets it, see `_forgetCopiedSession`). Used to distinguish "my own session, just reloaded" from "a session
    * open in another tab" when deciding what to offer for restore.
    * @return The owned session id, or `null` if none / `sessionStorage` is unavailable
    */
@@ -1934,6 +2813,47 @@ export class EditSystem extends AbstractSystem {
 
 
   /**
+   * Forget the owned session (`_ownedSessionID`) if this page didn't get it from a reload.
+   * "Duplicate tab" copies `sessionStorage` from a tab that's still open, owned session and all, and
+   * then both tabs would treat that session as their own. A reload marks the page as gone first
+   * (`_markPageHidden`), so a copy without the mark is the other tab's. (A tab that crashed has no
+   * mark either: its session is offered for restore once its heartbeat goes stale.)
+   */
+  protected _forgetCopiedSession(): void {
+    try {
+      const ss = globalThis.sessionStorage;
+      if (!ss) return;
+      const key = this._ownSessionKey();
+      const wasHidden = ss.getItem(`${key}_hidden`);
+      ss.removeItem(`${key}_hidden`);
+      if (!wasHidden) ss.removeItem(key);
+    } catch {
+      // ignore — sessionStorage may be unavailable (private mode / non-browser)
+    }
+  }
+
+
+  /**
+   * Mark (or unmark) this page as gone in `sessionStorage`, so a reload keeps the owned session.
+   * @param hidden - `true` on `pagehide`, `false` when the page comes back from the back/forward cache
+   */
+  protected _markPageHidden(hidden: boolean): void {
+    try {
+      const ss = globalThis.sessionStorage;
+      if (!ss) return;
+      const key = `${this._ownSessionKey()}_hidden`;
+      if (hidden) {
+        ss.setItem(key, '1');
+      } else {
+        ss.removeItem(key);
+      }
+    } catch {
+      // ignore — sessionStorage may be unavailable (private mode / non-browser)
+    }
+  }
+
+
+  /**
    * Compute lightweight metadata describing a backup, for the restore UI.
    * @param backup - The structured backup object
    * @return The computed session metadata
@@ -1969,6 +2889,14 @@ export class EditSystem extends AbstractSystem {
 
     scan(backup.entities);
     scan(backup.baseEntities);
+
+    // Each edit's extent also covers what it deleted (v4 backups don't store deleted entities)
+    for (const item of backup.stack ?? []) {
+      const extent = (item as { props?: EditProps })?.props?.extent;
+      if (Array.isArray(extent) && extent.length === 4) {
+        scan([{ loc: [extent[0], extent[1]] }, { loc: [extent[2], extent[3]] }]);
+      }
+    }
 
     if (minX === Infinity) return undefined;
     return { minX, minY, maxX, maxY };
@@ -2052,11 +2980,174 @@ export class EditSystem extends AbstractSystem {
 
 
   /**
+   * Finish the `staging` edit, so it can go into the history.
+   * Fills in what was selected before it and where the change is, unless the committer gave them.
+   * @param props - Props describing the Edit, from the code that commits it
+   * @param prev - The edit this one follows
+   * @param replaced - The edit this one replaces, for `commitAppend()`
+   * @return A new Edit with the staging graph and the full props
+   */
+  protected _finishStaging<P extends EditProps>(props: P | undefined, prev: Edit, replaced?: Edit): Edit<P> {
+    const context = this.context;
+    const graph = this._staging.graph;
+
+    // The graph goes into the history, so it may no longer change.
+    // Its journal covers what changed since `prev`, including the replaced edit's changes.
+    if (replaced) {
+      graph.absorbJournal(replaced.graph);
+    }
+    graph.freeze();
+
+    const selectionBefore = props?.selectionBefore ?? replaced?.props.selectionBefore ?? context.mode?.selectedIDs;
+    const extent = props?.extent ?? this._changeExtent(prev.graph, graph, graph.changedIDs)?.rectangle();
+
+    return new Edit<P>(context, graph, {
+      ...props,
+      ...(selectionBefore && { selectionBefore }),
+      ...(extent && { extent }),
+      sources: this._gatherSources(props?.sources),
+      transform: context.viewport.transform.props
+    } as Partial<P>);
+  }
+
+
+  /**
+   * Make the return Edit, to take the user back to where they are now: what they're looking at,
+   * and what they have selected.
+   * @return The return Edit
+   */
+  protected _makeReturnEdit(): Edit {
+    const context = this.context;
+
+    return new Edit(context, this.stable.graph, {
+      stringID: 'redo.return_view',
+      selectionAfter: context.mode?.selectedIDs ?? [],
+      transform: context.viewport.transform.props
+    });
+  }
+
+
+  /**
+   * Find where the OSM data changed between two graphs: the nodes, and the nodes of the ways,
+   * that were created, modified or deleted. Relations changed on their own use their own extent.
+   * @param before - The graph before the change
+   * @param after - The graph after the change
+   * @param candidateIDs - Every ID that may differ between the two graphs
+   * @return The Extent of the change, or `undefined` if no located OSM data changed
+   */
+  protected _changeExtent(before: Graph, after: Graph, candidateIDs: ReadonlySet<EntityID>): Extent | undefined {
+    if (before === after) return;
+
+    const extent = new Extent();
+    let found = false;
+
+    const extendWith = (entity: OsmEntity, graph: Graph) => {
+      if (entity.type === 'node') {
+        const loc = (entity as OsmNode).loc;
+        if (loc) {
+          extent.extendSelf(loc);
+          found = true;
+        }
+      } else if (entity.type === 'way') {
+        for (const nodeID of (entity as OsmWay).nodes) {
+          const loc = (graph.hasEntity(nodeID) as OsmNode | undefined)?.loc;
+          if (loc) {
+            extent.extendSelf(loc);
+            found = true;
+          }
+        }
+      } else {
+        const other = graph.extent(entity);
+        if (other) {
+          extent.extendSelf(other);
+          found = true;
+        }
+      }
+    };
+
+    const difference = new Difference(before, after, candidateIDs);
+    for (const entity of difference.created())   extendWith(entity, after);
+    for (const entity of difference.modified())  extendWith(entity, after);
+    for (const entity of difference.deleted())   extendWith(entity, before);
+
+    return found ? extent : undefined;
+  }
+
+
+  /**
+   * Convert a history item from a backup made before edits had props (before October 2026).
+   * Rapid edits stored an object annotation, its `type` and other keys become props.
+   * A label was already translated, so it's kept as the plain-text `annotation` prop.
+   * @param item - The history item from the backup
+   * @return Props for the Edit
+   */
+  protected _legacyEditProps(item: Record<string, unknown>): EditProps {
+    const props: EditProps & Record<string, unknown> = {};
+
+    const annotation = item.annotation;
+    if (typeof annotation === 'string') {
+      props.annotation = annotation;
+    } else if (annotation && typeof annotation === 'object') {
+      const { description, ...rest } = annotation as Record<string, unknown>;
+      Object.assign(props, rest);
+      if (typeof description === 'string') props.annotation = description;
+    }
+
+    if (Array.isArray(item.selectedIDs))  props.selectionAfter = item.selectedIDs as EntityID[];
+
+    const sources: EditSources = {};
+    if (Array.isArray(item.imageryUsed))  sources.imagery = item.imageryUsed as string[];
+    if (Array.isArray(item.photosUsed))   sources.photos = item.photosUsed as string[];
+    if (Array.isArray(item.dataUsed))     sources.data = item.dataUsed as string[];
+    props.sources = sources;
+
+    // Handle legacy transform scale parameter, if found
+    const transform = item.transform as (TransformProps & { k?: number }) | undefined;
+    if (transform?.k) {
+      transform.z = geoScaleToZoom(transform.k);
+      delete transform.k;
+    }
+    if (transform)  props.transform = transform;
+
+    return props;
+  }
+
+
+  /**
+   * Upgrade the props of an edit backed up by an older Rapid.
+   * - For a short time in October 2026, edit props had `selectedIDs` (assumed OSM) instead of `selection`,
+   *   and `selection` and `selectionBefore` grouped the data IDs by layer (`{ osm: ['w1'] }`). They're
+   *   a plain `DataID[]` now (see `design/data-ids.md`).
+   * - Until November 2026, `selectionAfter` was called `selection`.
+   * Selections also drop the data IDs that named other data before the reload (`isStableDataID`).
+   * @param props - The props from the backup
+   * @return The props, upgraded
+   */
+  protected _upgradeEditProps(props: EditProps & { selectedIDs?: EntityID[], selection?: unknown }): EditProps {
+    const { selectedIDs, selection, ...rest } = props;
+    rest.selectionAfter ??= (selection ?? selectedIDs) as DataID[] | undefined;
+
+    // Flatten a selection grouped by layer
+    const flatten = (selection: unknown): DataID[] | undefined => {
+      if (!selection) return undefined;
+      const dataIDs = Array.isArray(selection) ? selection as DataID[] : Object.values(selection as LegacyEditSelection).flat();
+      return dataIDs.filter(isStableDataID);
+    };
+    rest.selectionAfter = flatten(rest.selectionAfter);
+    rest.selectionBefore = flatten(rest.selectionBefore);
+    if (!rest.selectionAfter) delete rest.selectionAfter;
+    if (!rest.selectionBefore) delete rest.selectionBefore;
+
+    return rest;
+  }
+
+
+  /**
    * Get the sources used to make the `staging` edit.
-   * @param annotation - Rapid edits may optionally use an annotation that includes the data source used
+   * @param given - Sources passed by the code that commits the edit, e.g. the dataset of an accepted Rapid feature
    * @return sources Object containing `imagery`, `photos`, `data` properties
    */
-  protected _gatherSources(annotation: string | Record<string, unknown>): EditSources {
+  protected _gatherSources(given?: EditSources): EditSources {
     const context = this.context;
     const gfx = context.systems.gfx;
     const imagery = context.systems.imagery;
@@ -2078,14 +3169,13 @@ export class EditSystem extends AbstractSystem {
       }
     }
 
+    const dataUsed = [...(given?.data ?? [])];
     if (gfx?.scene) {
       const customLayer = gfx.scene.layers.get('custom-data') as any;
-      const customDataUsed = customLayer?.dataUsed() ?? [];
-      const rapidDataUsed = (annotation as Record<string, unknown>)?.dataUsed as string[] ?? [];
-      const dataUsed = [...rapidDataUsed, ...customDataUsed];
-      if (dataUsed.length) {
-        sources.data = dataUsed;
-      }
+      dataUsed.push(...(customLayer?.dataUsed() ?? []));
+    }
+    if (dataUsed.length) {
+      sources.data = dataUsed;
     }
 
     return sources;
@@ -2099,16 +3189,47 @@ export class EditSystem extends AbstractSystem {
    * @param t - Eased time, should be in the range [0..1]
    */
   protected _perform(actions: Action[], t: number = 1): void {
-    // for now, call commit() before performing work.
-    let graph = this._staging.graph!.commit();
-    for (const fn of actions) {
-      if (typeof fn === 'function') {
-        graph = fn(graph, t);
+    const graph = this._staging.graph!;
+    graph.commit();   // writes made to staging outside of a perform (e.g. a merge's restores)
+
+    // The actions run inside a savepoint: if one throws, staging goes back to how it was,
+    // even if an action committed partway through.
+    graph.beginSavepoint();
+    let result = graph;
+    try {
+      for (const fn of actions) {
+        if (typeof fn === 'function') {
+          result = fn(result, t);
+        }
       }
+      result.commit();   // so `stagingchange` always arrives with staging's geometry current
+    } catch (err) {
+      graph.rollbackToSavepoint();
+      throw err;
+    } finally {
+      graph.endSavepoint();
     }
 
-    this._staging.graph = graph;
+    this._staging.graph = result;
     this._hasWorkInProgress = true;
+  }
+
+
+  /**
+   * Responds to a schema change: if what counts as an area changed, the base rebuilds the shapes of
+   * the ways that flipped between line and area (and the relations that contain them), and stable
+   * and staging check their own. The other graphs check theirs when they become current.
+   * A flip doesn't change a shape's extent, so the indexes stay as they are.
+   */
+  protected _checkAreas(): void {
+    const context = this.context;
+    const schema = context.systems.schema;
+    if (!schema || schema.areaGeneration === this._areaGeneration) return;
+
+    this._areaGeneration = schema.areaGeneration;
+    this.base.graph!.checkAreas();
+    this.stable.graph!.syncWithBase();
+    this.staging.graph!.syncWithBase();
   }
 
 
@@ -2117,48 +3238,56 @@ export class EditSystem extends AbstractSystem {
    * Rolls back the edits and emits no events.
    */
   protected _replaceStaging(): void {
-    this._staging = new Edit({ graph: new Graph(this.stable.graph!) });
+    // What the old staging graph wrote may differ in the new one.
+    const oldGraph = this._staging?.graph;
+    if (oldGraph) {
+      this._stagingCandidates = this._stagingCandidates.union(oldGraph.changedIDs);
+    }
+
+    // A graph from the history may have missed changes to the base while it wasn't current.
+    // (The shapes it rebuilds differ from what the indexes hold only where its edits differ from the
+    // graph before, and the next emit's `complete()` includes what contains those.)
+    const stableGraph = this.stable.graph!;
+    stableGraph.syncWithBase();
+    this._staging = new Edit(this.context, new Graph(stableGraph));
     this._hasWorkInProgress = false;
   }
 
 
   /**
-   * Update an OSM spatial cache to reflect the changes in a `Difference`.
-   * Called immediately before emitting the corresponding change event, so that
-   *  listeners can rely on the spatial cache being current.
-   * @param spatialID - the OSM spatial cache to update (e.g. 'editor_staging' or 'editor_stable')
-   * @param graph - the head graph of the difference (staging or stable)
-   * @param diff - the difference to apply
+   * Adds IDs that may have changed in `stable` (and so in `staging`) since the last emit.
+   * Called whenever `stable` moves: commit, undo, redo, checkpoints, restore.
+   * @param entityIDs - The IDs that may have changed
    */
-  protected _syncCacheFromDiff(spatialID: SpatialID, graph: Graph, diff: Difference): void {
-    const spatial = this.context.systems.spatial;
-    if (!spatial) return;
-
-    // `complete()` includes the changed entities plus their affected parents/children.
-    // A value of `undefined` means the entity no longer exists in the head graph.
-    const complete = diff.complete();
-
-    const toReplace: OsmEntity[] = [];
-    const toRemove: EntityID[] = [];
-    for (const [entityID, entity] of complete) {
-      if (entity) {
-        toReplace.push(entity);
-      } else {
-        toRemove.push(entityID);
-      }
+  protected _addStableCandidates(entityIDs: ReadonlySet<EntityID>): void {
+    for (const entityID of entityIDs) {
+      this._stableCandidates.add(entityID);
+      this._stagingCandidates.add(entityID);
     }
+  }
 
-    spatial.removeItems(spatialID, toRemove);
-    spatial.replaceData(spatialID, toReplace);
 
-    // Keep way segments in sync for any affected ways.
-    for (const entityID of toRemove) {
-      this._removeWaySegments(spatialID, entityID);  // safe even if it wasn't a way
+  /**
+   * Adds the IDs that may differ between two places in the history, as candidates.
+   * Each graph's journal lists what it changed from the graph before it, so the IDs
+   * are the journals of the graphs after the place where the two histories split.
+   * @param oldHistory - The history before the move
+   * @param oldIndex - The index before the move
+   */
+  protected _addHistoryPathCandidates(oldHistory: Edit[], oldIndex: number): void {
+    const newHistory = this._history;
+    const newIndex = this._index;
+
+    let split = 0;   // the last index both histories share
+    const max = Math.min(oldIndex, newIndex);
+    while (split < max && oldHistory[split + 1] === newHistory[split + 1]) {
+      split++;
     }
-    for (const entity of toReplace) {
-      if (entity.type === 'way') {
-        this._updateWaySegments(spatialID, entity as OsmWay, graph);
-      }
+    for (let i = split + 1; i <= oldIndex; i++) {
+      this._addStableCandidates(oldHistory[i].graph.changedIDs);
+    }
+    for (let i = split + 1; i <= newIndex; i++) {
+      this._addStableCandidates(newHistory[i].graph.changedIDs);
     }
   }
 
@@ -2166,8 +3295,9 @@ export class EditSystem extends AbstractSystem {
   /**
    * Merge newly-downloaded entities into an OSM cache that reflects the given graph.
    * New base data should appear in the cache unless the graph locally overrides or deletes it.
+   * (Only the base index is a full copy. The local indexes are synced from their graphs, `_syncLocalIndex`.)
    * @param spatialID - the OSM spatial cache to update
-   * @param graph - the graph this cache reflects (base, stable, or staging)
+   * @param graph - the graph this cache reflects (the base)
    * @param entities - the newly-merged entities
    */
   protected _mergeIntoCache(spatialID: SpatialID, graph: Graph, entities: OsmEntity[]): void {
@@ -2185,7 +3315,7 @@ export class EditSystem extends AbstractSystem {
       }
     }
 
-    spatial.replaceData(spatialID, toReplace);
+    spatial.replaceData(spatialID, toReplace, graph);
 
     for (const entity of toReplace) {
       if (entity.type === 'way') {
@@ -2292,7 +3422,6 @@ export class EditSystem extends AbstractSystem {
   protected _emitChanges(): Difference | undefined {
     if (this._inTransaction) return;
 
-    const baseGraph = this.base.graph!;
     const stableGraph = this.stable.graph!;
     const stagingGraph = this.staging.graph!;
     let stagingDifference: Difference | undefined;
@@ -2301,19 +3430,33 @@ export class EditSystem extends AbstractSystem {
     // won't actually change - for example an Action that exits early or "performs" a no-op.
     // We still want to generate an empty Difference and emit 'stagingchange' in these situations.
     if (this._stagingKey !== stagingGraph.key || this._hasWorkInProgress) {
-      stagingDifference = new Difference(this._stagingSnapshot!, stagingGraph);
-      this._syncCacheFromDiff('editor_staging', stagingGraph, stagingDifference);
+      const emitted = this._emittedStaging;
+      const candidates = new Set<EntityID>(this._stagingCandidates)
+        .union(emitted.values)
+        .union(stagingGraph.changedIDs);
+      stagingDifference = new Difference(emitted.from, stagingGraph, candidates, emitted.values);
+
+      // Every graph keeps its own shapes, so a replaced staging graph (undo, redo, revert, …)
+      // needs nothing recomputed. (Before step 6 of design/graph-geometry.md, shapes lived on the
+      // objects that every graph shares, and the emit recomputed them here.)
+      this._syncLocalIndex('editor_staging', stagingGraph);
       this._stagingKey = stagingGraph.key;
-      this._stagingSnapshot = stagingGraph.snapshot();
+      this._emittedStaging = {
+        from: stableGraph,
+        values: new Map([...stagingGraph.changedIDs].map(entityID => [entityID, stagingGraph.hasEntity(entityID)]))
+      };
+      this._stagingCandidates.clear();
       this.emit('stagingchange', stagingDifference);
     }
 
     if (this._stableKey !== stableGraph.key) {
-      this._fullDifference = new Difference(baseGraph, stableGraph);
-      const stableDifference = new Difference(this._stableSnapshot!, stableGraph);
-      this._syncCacheFromDiff('editor_stable', stableGraph, stableDifference);
+      const emitted = this._emittedStable;
+      this._fullDifference.update(stableGraph, this._stableCandidates);
+      const stableDifference = new Difference(emitted.from, stableGraph, this._stableCandidates, emitted.values);
+      this._syncLocalIndex('editor_stable', stableGraph);
       this._stableKey = stableGraph.key;
-      this._stableSnapshot = stableGraph.snapshot();
+      this._emittedStable = { from: stableGraph, values: new Map() };
+      this._stableCandidates.clear();
       this.emit('stablechange', stableDifference);
       this.deferredBackup();
     }

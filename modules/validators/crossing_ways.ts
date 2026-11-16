@@ -11,6 +11,7 @@ import { ValidationFix } from '../lib/ValidationFix.ts';
 import type { Action } from '../actions/types.ts';
 import type { Context } from '../Context.ts';
 import type { D3Selection } from 'd3-selection';
+import type { EditLabel } from '../lib/Edit.ts';
 import type { Graph } from '../lib/Graph.ts';
 import type { Midpoint } from '../actions/add_midpoint.ts';
 import type { OsmEntity, OsmRelation, OsmTags, OsmWay } from '../data/types.ts';
@@ -370,9 +371,12 @@ export function validateCrossingWays(context: Context): ValidatorFunction {
     const type1 = getFeatureType(entity1, graph);
     if (type1 === null) return [];
 
-    const seenWayIDs = new Set<EntityID>();
     const crossings: CrossingInfo[] = [];
     const way1Nodes = graph.childNodes(way1);
+
+    // A building gets only one issue for each way that crosses it, however many times they cross.
+    // It's the crossing whose segments sort first, so validating either way reports the same one.
+    const firstCrossings = new Map<EntityID, { key: string, crossing: CrossingInfo }>();   // by way2 ID
 
     for (let i = 0; i < way1Nodes.length - 1; i++) {
       const n1 = way1Nodes[i];
@@ -388,9 +392,6 @@ export function validateCrossingWays(context: Context): ValidatorFunction {
       for (const segment of segments) {
         // Don't check for self-intersection in this validation
         if (segment.wayID === way1.id) continue;
-
-        // Skip if this way was already checked and only one issue is needed
-        if (seenWayIDs.has(segment.wayID)) continue;
 
         const way2 = graph.hasEntity(segment.wayID) as OsmWay | undefined;
         if (!way2) continue;
@@ -415,7 +416,7 @@ export function validateCrossingWays(context: Context): ValidatorFunction {
         const point = geomLineIntersection(line1, line2);
 
         if (point) {
-          crossings.push({
+          const crossing: CrossingInfo = {
             wayInfos: [
               {
                 way: way1,
@@ -428,19 +429,39 @@ export function validateCrossingWays(context: Context): ValidatorFunction {
               }
             ],
             crossPoint: point
-          });
+          };
 
           // create only one issue for building crossings
           const oneOnly = (type1 === 'building' || type2 === 'building');
           if (oneOnly) {
-            seenWayIDs.add(way2.id);
-            break;
+            const key = crossingKey([n1.id, n2.id], [nA.id, nB.id]);
+            const first = firstCrossings.get(way2.id);
+            if (!first || key < first.key) {
+              firstCrossings.set(way2.id, { key: key, crossing: crossing });
+            }
+          } else {
+            crossings.push(crossing);
           }
         }
       }
     }
 
+    for (const first of firstCrossings.values()) {
+      crossings.push(first.crossing);
+    }
     return crossings;
+  }
+
+
+  /**
+   * Returns a key for a crossing made from the two segments that cross, the same from either way.
+   * Two ways can cross several times, but two straight segments cross only once.
+   * @param edge1 - The segment of one way, as its two node IDs
+   * @param edge2 - The segment of the other way, as its two node IDs
+   * @returns The key, e.g. `'n1-n2,n3-n4'`
+   */
+  function crossingKey(edge1: [EntityID, EntityID], edge2: [EntityID, EntityID]): string {
+    return [edge1, edge2].map(edge => edge.toSorted().join('-')).sort().join(',');
   }
 
 
@@ -519,8 +540,9 @@ export function validateCrossingWays(context: Context): ValidatorFunction {
       crossingTypeID += '_connectable';
     }
 
-    // Differentiate based on the loc rounded to 4 digits, since two ways can cross multiple times.
-    const uniqueID = '' + crossing.crossPoint[0].toFixed(4) + ',' + crossing.crossPoint[1].toFixed(4);
+    // Differentiate based on the crossing segments, since two ways can cross multiple times.
+    // (Two straight segments cross only once. Sorted so either way finds the same issue.)
+    const uniqueID = crossingKey(edges[0], edges[1]);
 
     // Support autofix for some kinds of connections
     let autoArgs: any = null;
@@ -556,7 +578,7 @@ export function validateCrossingWays(context: Context): ValidatorFunction {
       autoArgs: autoArgs,
       dynamicFixes: function(this: any) {
         const selectedIDs = context.selectedIDs();
-        if (context.mode?.id !== 'select-osm' || selectedIDs.length !== 1) return [];
+        if (context.mode?.id !== 'select' || selectedIDs.length !== 1) return [];
 
         const selectedIndex = this.entityIds[0] === selectedIDs[0] ? 0 : 1;
         const selectedType = this.data.featureTypes[selectedIndex];
@@ -632,7 +654,7 @@ export function validateCrossingWays(context: Context): ValidatorFunction {
       icon: iconName,
       title: l10n.t(`issues.fix.${titleID}.title`),
       onClick: function(this: any) {
-        if (context.mode?.id !== 'select-osm') return;
+        if (context.mode?.id !== 'select') return;
 
         const selectedIDs = context.selectedIDs();
         if (selectedIDs.length !== 1) return;
@@ -667,10 +689,10 @@ export function validateCrossingWays(context: Context): ValidatorFunction {
           if (!edgeNode0 || !edgeNode1 || !crossedNode0 || !crossedNode1 || !crossedWay) return graph;
 
           // World coordinates of the nodes involved.
-          const edge0 = edgeNode0.geoms.parts[0].world?.coords as Vec2;
-          const edge1 = edgeNode1.geoms.parts[0].world?.coords as Vec2;
-          const crossed0 = crossedNode0.geoms.parts[0].world?.coords as Vec2;
-          const crossed1 = crossedNode1.geoms.parts[0].world?.coords as Vec2;
+          const edge0 = graph.geometry(edgeNode0).parts[0].world?.coords as Vec2;
+          const edge1 = graph.geometry(edgeNode1).parts[0].world?.coords as Vec2;
+          const crossed0 = graph.geometry(crossedNode0).parts[0].world?.coords as Vec2;
+          const crossed1 = graph.geometry(crossedNode1).parts[0].world?.coords as Vec2;
           if (!edge0 || !edge1 || !crossed0 || !crossed1) return graph;
 
 
@@ -829,10 +851,10 @@ export function validateCrossingWays(context: Context): ValidatorFunction {
 
         editor.perform(actionAddStructure);
         editor.commit({
-          annotation: l10n.t(`issues.fix.${titleID}.annotation`),
-          selectedIDs: [selectedWayID]
+          stringID: `issues.fix.${titleID}.annotation`,
+          selectionAfter: [selectedWayID]
         });
-        context.enter('select-osm', { selection: { osm: resultWayIDs }} );
+        context.enter('select', { selection: resultWayIDs });
       }
     });
   }
@@ -845,14 +867,14 @@ export function validateCrossingWays(context: Context): ValidatorFunction {
    * @param edges - Edge pairs that participate in the connection
    * @param crossingWayID - Optionally, a way whose crossing tags should be synced
    * @param tags - Tags to assign to the new connection node
-   * @returns A `[action, annotation]` tuple
+   * @returns A `[action, label]` tuple
    */
   function getConnectWaysAction(
     loc: Vec2,
     edges: [EntityID, EntityID][],
     crossingWayID: EntityID | null,
     tags: OsmTags
-  ): [Action, string] {
+  ): [Action, EditLabel] {
 
     const actionConnectCrossingWays = (graph: Graph): Graph => {
       // Create a new candidate junction node which will be inserted at the connection location..
@@ -899,7 +921,7 @@ export function validateCrossingWays(context: Context): ValidatorFunction {
       return graph;
     };
 
-    return [actionConnectCrossingWays, l10n.t('issues.fix.connect_crossing_features.annotation')];
+    return [actionConnectCrossingWays, { stringID: 'issues.fix.connect_crossing_features.annotation' }];
   }
 
 
@@ -926,13 +948,13 @@ export function validateCrossingWays(context: Context): ValidatorFunction {
         const loc = this.issue.loc;
         const edges = this.issue.data.edges;
         const crossingWayID = this.issue.data.crossingWayID;
-        const [action, annotation] = getConnectWaysAction(loc, edges, crossingWayID, connectionTags);
+        const [action, label] = getConnectWaysAction(loc, edges, crossingWayID, connectionTags);
 
-        // result contains [function, annotation]
+        // result contains [function, label]
         editor.perform(action);
         editor.commit({
-          annotation: annotation,
-          selectedIDs: this.issue.entityIds
+          ...label,
+          selection: this.issue.entityIds
         });
       }
     });
@@ -949,7 +971,7 @@ export function validateCrossingWays(context: Context): ValidatorFunction {
       icon: 'rapid-icon-' + (higherOrLower === 'higher' ? 'up' : 'down'),
       title: l10n.t(`issues.fix.tag_this_as_${higherOrLower}.title`),
       onClick: function(this: any) {
-        if (context.mode?.id !== 'select-osm') return;
+        if (context.mode?.id !== 'select') return;
 
         const selectedIDs = context.selectedIDs();
         if (selectedIDs.length !== 1) return;
@@ -979,8 +1001,8 @@ export function validateCrossingWays(context: Context): ValidatorFunction {
         tags.layer = layer.toString();
         editor.perform(actionChangeTags(entity.id, tags));
         editor.commit({
-          annotation: l10n.t('operations.change_tags.annotation'),
-          selectedIDs: [selectedID]
+          stringID: 'operations.change_tags.annotation',
+          selectionAfter: [selectedID]
         });
       }
     });

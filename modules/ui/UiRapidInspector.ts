@@ -8,6 +8,7 @@ import { UiTooltip } from './UiTooltip.ts';
 import type { Context } from '../Context.ts';
 import type { D3EnterSelection, D3Selection } from 'd3-selection';
 import type { KeyBindingScope } from '../core/KeyboardSystem.ts';
+import type { RapidAcceptEditProps, RapidIgnoreEditProps } from '../core/RapidSystem.ts';
 
 const ACCEPT_FEATURES_LIMIT = 50;
 
@@ -541,6 +542,7 @@ export class UiRapidInspector {
     if (!datum) return;
 
     const context = this.context;
+    const conflation = context.systems.conflation;   // optional
     const editor = context.systems.editor!;
     const l10n = context.systems.l10n!;
     const rapid = context.systems.rapid!;
@@ -561,25 +563,22 @@ export class UiRapidInspector {
       return;
     }
 
-    const action = actionRapidAcceptFeature(datum);
+    // If conflation found where this line meets existing ways, connect it there.
+    // (Without conflation, the feature is accepted as-is.)
+    const joins = (conflation && dataset) ? conflation.getJoins(dataset, datum) : undefined;
+    const action = actionRapidAcceptFeature(datum, joins);
     editor.perform(action);
     const acceptIDs = [...action.getAcceptedIDs()];
     const newID = action.getNewID();
 
-    // In place of a string annotation, this introduces an "object-style"
-    // annotation, where "type" and "description" are standard keys,
-    // and there may be additional properties. Note that this will be
-    // serialized to JSON while saving undo/redo state in editor.save().
-    const annotation = {
+    // The edit's `type` and `acceptIDs` record what the user accepted, `RapidSystem` reads them
+    // back from the history. These props are saved as JSON in backups.
+    editor.commit<RapidAcceptEditProps>({
       type: 'rapid_accept_feature',
-      description: l10n.t('rapid_inspector.option_accept.annotation'),
+      stringID: 'rapid_inspector.option_accept.annotation',
       acceptIDs: acceptIDs,
-      dataUsed: dataset?.dataUsed || [datasetID]
-    };
-
-    editor.commit({
-      annotation: annotation,
-      selectedIDs: newID ? [newID] : undefined
+      selectionAfter: newID ? [newID] : undefined,
+      sources: { data: dataset?.dataUsed.length ? dataset.dataUsed : [datasetID] }
     });
 
     // What next
@@ -587,12 +586,12 @@ export class UiRapidInspector {
     // - Or, if we are passed a `nextMode` do that.
     // - Or, if the feature was hovered, keep it hovered
     const currMode = context.mode?.id || '';
-    if (!nextMode && /^select/.test(currMode)) {   // if it is selected, stay selected
-      nextMode = 'select-osm';
+    if (!nextMode && currMode === 'select') {   // if it is selected, stay selected
+      nextMode = 'select';
     }
 
-    if (nextMode) {   // should be one of 'select-osm', 'move', or 'rotate'
-      context.enter(nextMode, { selection: { osm: [newID] } });
+    if (nextMode) {   // should be one of 'select', 'move', or 'rotate'
+      context.enter(nextMode, { selection: newID ? [newID] : [] });
 
     } else {  // if it was hovered, hover the newly added item (this is hacky):
       // 1. get the `lastMove` event, and make it appear to target the new entity on the 'osm' layer
@@ -642,15 +641,20 @@ export class UiRapidInspector {
 
     const context = this.context;
     const editor = context.systems.editor!;
-    const l10n = context.systems.l10n!;
+    const mapwithai = context.services.mapwithai;
 
-    const annotation = {
-      type: 'rapid_ignore_feature',
-      description: l10n.t('rapid_inspector.option_ignore.annotation'),
-      ignoreID: datum.id
-    };
+    // An OSM-like Rapid feature lives in its dataset's graph, not in staging.
+    const datasetID = datum.props.datasetID as DatasetID;
+    const extent = (datum instanceof OsmEntity && mapwithai) ? mapwithai.graph(datasetID).extent(datum) : datum.extent();
+
+    // An ignore changes nothing in the graph, so it gives its own extent for undo and redo to show.
     editor.perform(actionNoop());
-    editor.commit({ annotation: annotation });
+    editor.commit<RapidIgnoreEditProps>({
+      type: 'rapid_ignore_feature',
+      stringID: 'rapid_inspector.option_ignore.annotation',
+      ignoreID: datum.dataID,
+      extent: extent?.rectangle()
+    });
     context.enter('browse');
     this.datum = null;
   }

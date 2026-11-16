@@ -45,6 +45,13 @@ The unused `SpatialCache.graph` field is **removed**. `EditSystem` is the source
 
 ### 2. Multiple named OSM caches instead of one mutable "current graph" (point 1, refined)
 
+> **Superseded in November 2026** by step 9 of [`graph-geometry.md`](./graph-geometry.md) ("Spatial
+> indexes for any graph"): `editor_base` is the one full index, and `editor_stable` / `editor_staging`
+> are small local indexes of what those graphs changed. `EditSystem.entitiesInBox(box, graph)` and
+> `segmentsInBox(box, graph)` answer for any graph of the lineage, and `spatialIDForGraph` is gone.
+> The rest of this section is kept as the record of the earlier design. Its update-timing invariant
+> still holds: each index is updated before the event for its graph fires.
+
 Rather than a single OSM index that lazily re-syncs to whatever graph a caller passes, `EditSystem` maintains **separate, explicitly-named caches** in `SpatialSystem`:
 
 - `editor_base` — the unedited downloaded data (the base graph).
@@ -134,13 +141,23 @@ For lines this gives **partial matching for free** — each box is a spatial uni
 - **Step 2:** Delete `Tree`. Move diff/sync into `EditSystem` (driven off the `Difference` it already computes), updating each cache immediately before emitting `merge`/`stablechange`/`stagingchange`. Establish the `editor_base`/`editor_staging`/`editor_stable` caches. Add the `segments` index and repoint the validators (`crossing_ways`, `almost_junction`, `close_nodes`, `ValidationSystem`). Lock in "validators read stable, general code reads staging." ✅ Done.
   - **Follow-up:** The `crossing_ways` / `almost_junction` unit test suites (`test/unit/validators/*.test.js`) are still `describe.todo` and use a `Rapid.Tree`-based mock harness. They need converting to a real `EditSystem` (populate via `editor.merge`, query via `editor.waySegments`) and re-enabling. The spatial mechanism they depend on is covered by new `EditSystem` `waySegments` tests in the meantime.
 - **Step 3:** Coverage/buffers + two-phase querying for conflation. Broken into:
-  - **3a — Lazy `GeometryPart`:** move derived products (`hull`, `centroid`, `poi`, `area`, `winding`, `surround`, `flat`) behind lazy memoized getters. Memory win, no behavior change, fully testable. Sets up `coverage` as one more lazy product.
-  - **3b — Coverage helper:** a pure `geomCoverageBoxes(coords, r, step)` in `modules/geo` + `GeometryPart.computeCoverage(r)` (radius is a recompute parameter). Coverage representation is per type (point → one box, line → boxes along the line, polygon → grown extent box). Unit-test coverage for each type.
-  - **3c — Query plumbing:** ✅ Done. `SpatialSystem.getItemsAtBoxes(spatialID, boxes)` (phase-1 prefilter over many boxes, deduped by `boxID`) + `refineItems(candidates, predicate)` (phase-2 precise refine with a caller-supplied predicate). Phase-2 uses existing `geom*` primitives in the *calling* code. The `buffers` index is a normal flat spatialID. After implementing 3c we simplified storage further: `SpatialSystem` is now flat (`Map<spatialID, RBush>`), and legacy `(spatialID, indexID)` overloads were removed. Callers use flat IDs like `editor_staging-segments` directly.
-  - **3d — Conflation module:** replace the `PixiLayerDebug` hack with a real per-type conflation pass (POI dedup, building filter, partial-sidewalk suggestion). Owns the match semantics.
+  - **3a — Lazy `GeometryPart`:** move derived products (`hull`, `centroid`, `poi`, `area`, `winding`, `surround`, `flat`) behind lazy memoized getters. Memory win, no behavior change, fully testable. Sets up `coverage` as one more lazy product. ✅ Done.
+  - **3b — Coverage helper:** a pure `geomCoverageBoxes(coords, r, step)` in `modules/geo` + `GeometryPart.computeCoverage(r)` (radius is a recompute parameter, in meters, converted with `geoMetersToWorld`). Coverage representation is per type (point → one box, line → boxes along the line, polygon → grown extent box). Unit-test coverage for each type. ✅ Done. `computeCoverage` is an explicit method with a cache for the most recent radius, not a lazy getter, because it takes a parameter.
+  - **3c — Query plumbing:** ✅ Done. `SpatialSystem.getItemsAtBoxes(spatialID, boxes)` (phase-1 prefilter over many boxes, deduped by `boxID`). Phase-2, the precise refine, is a plain filter in the *calling* code using existing `geom*` / `vec*` primitives. (A `refineItems(candidates, predicate)` wrapper existed briefly, and was removed in `38ff948b9` because it added nothing over `Array.filter`.) The `buffers` index is a normal flat spatialID. After implementing 3c we simplified storage further: `SpatialSystem` is now flat (`Map<spatialID, RBush>`), and legacy `(spatialID, indexID)` overloads were removed. Callers use flat IDs like `editor_staging-segments` directly.
+  - **3d — Conflation module:** replace the `PixiLayerDebug` hack with a real per-type conflation pass (POI dedup, building filter, partial-sidewalk suggestion). Owns the match semantics. Designed in [`conflation-system.md`](./conflation-system.md) as a `ConflationSystem`.
 - **Step 4:** Build richer cross-layer conflation/styling queries on top (incl. reverse "which OSM features overlap third-party data").
+- **Finding data by ID** (October 2026, from [`data-ids.md`](./data-ids.md)): ✅ Done.
+  - All data lives in a cache. A cache that holds data has the same ID as the start of that data's data IDs (its `spatialID`), so `getData(dataID)` splits `${spatialID}:${localID}` and looks in that cache.
+  - Spatial IDs whose data needs another lookup register a resolver with `registerResolver()`: `osm` (bare IDs, the staging graph, registered by `EditSystem`) and each vector tile source (its zoom caches).
+  - An item without a valid box (e.g. a relation whose members aren't loaded) is kept in `items` but left out of the RBush, so it can be found by ID and replaces any older version. Before, `replaceData()` skipped it and left the older version, with its old box, in the cache.
+- **Spatial indexes for any graph** (November 2026, step 9 of [`graph-geometry.md`](./graph-geometry.md)): ✅ Done.
+  - `editor_base` (and `editor_base-segments`) is the only full OSM index. `editor_stable` and `editor_staging` (and their segments) are local indexes: the boxes of what each graph has its own version or shape of ("local" as in `graph.isLocal()`). Each reflects a snapshot of its graph (`new Graph(graph)`, O(1)), and syncs by the structural diff from the last snapshot (`graph.diffShapeIDs`), on every emit and merge.
+  - `EditSystem.entitiesInBox(box, graph)` / `segmentsInBox(box, graph)` take the base hits the local index's snapshot doesn't have its own of, plus the local index's hits, corrected by the diff between that snapshot and the graph searched (tested directly). `intersects` and `waySegments` call them; `stableEditsIn(extent)` searches stable's local index alone.
+  - `replaceItems` keeps the last of items with the same id in one call. Before, both were inserted in the RBush, and searches returned the item twice (seen with relations both in a tile and containing what arrived).
 
 ### Step 2 implementation notes
+
+(These notes describe step 2 as it landed. Since graph-geometry step 9, the local indexes and `entitiesInBox` above replace `spatialIDForGraph` and the three full caches.)
 
 - `EditSystem` exposes `intersects(extent, graph?)`, `waySegments(extent, graph)`, and `spatialIDForGraph(graph)`. The first two replace the old `Tree.intersects` / `Tree.waySegments`; callers were repointed.
 - `spatialIDForGraph` maps a graph to `editor_base` / `editor_stable` / `editor_staging` by identity (defaulting to staging). `intersects`/`waySegments` resolve hits through the *passed* graph, so a slight cache/graph mismatch degrades gracefully (missing entities are filtered out) rather than throwing.
@@ -149,8 +166,8 @@ For lines this gives **partial matching for free** — each box is a spatial uni
 
 ## Boundary Summary
 
-- **`SpatialSystem`** — owns *where* things are and answers spatial questions. Generic bbox indexing (named indexes via `replaceItems`/`removeItems`/`getItemsAtBox`/`getItemsAtBoxes`) + two-phase precise refine driven by a caller-supplied predicate. No knowledge of OSM, segments, buffers, photos, or "match" semantics as concepts.
-- **`EditSystem`** — owns OSM topology/history. Translates graph `Difference`s into spatial updates, generates segments, owns the `editor_base`/`editor_stable`/`editor_staging` caches, and exposes the OSM spatial queries.
+- **`SpatialSystem`** — owns *where* things are and answers spatial questions. Generic bbox indexing (named indexes via `replaceItems`/`removeItems`/`getItemsAtBox`/`getItemsAtBoxes`) + two-phase precise refine driven by a caller-supplied predicate. Finds any datum by its data ID (`getData`), through the cache with its spatial ID or a registered resolver. No knowledge of OSM, segments, buffers, photos, or "match" semantics as concepts.
+- **`EditSystem`** — owns OSM topology/history. Keeps the OSM indexes in step with the graphs, generates segments, owns the `editor_base` index and the `editor_stable`/`editor_staging` local indexes, and exposes the OSM spatial queries for any graph.
 - **`GeometryPart`** — owns derived geometry (hull, centroid, poi, surround, **coverage/buffers**), computed lazily on first access (Step 3a) and re-computable for a given radius via `computeCoverage(r)`.
 - **`modules/geo`** — pure geometry helpers (e.g. `geomCoverageBoxes`, phase-2 predicates). May start here and migrate into `@rapid-sdk/math` later if generally useful.
 - **`Conflation` module** — owns the conflation *meaning*: thresholds, "already mapped" logic, per-type matching, partial-line suggestions. Wires `GeometryPart` coverage + `SpatialSystem` queries together. The `PixiLayerDebug` proof-of-concept graduates here.

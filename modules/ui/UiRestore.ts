@@ -103,6 +103,8 @@ export class UiRestore {
     const context = this.context;
     const editor = context.systems.editor!;
     const l10n = context.systems.l10n!;
+    const osm = context.services.osm;   // optional service
+    const ui = context.systems.ui;   // optional
 
     $section.selectAll('*').remove();
 
@@ -147,10 +149,33 @@ export class UiRestore {
       if (session.summary.length) {
         parts.push(`(${session.summary.join(', ')})`);
       }
-      $row
+      const $summary = $row
         .append('td')
-        .attr('class', 'restore-summary')
+        .attr('class', 'restore-summary');
+
+      $summary
+        .append('div')
         .text(parts.join('  '));
+
+      // Rapid closed while uploading, and we couldn't tell whether the upload went through
+      if (session.upload) {
+        const changesetID = session.upload.changesetID;
+        const $warning = $summary
+          .append('div')
+          .attr('class', 'restore-warning');
+
+        $warning
+          .append('span')
+          .text(l10n.t('restore.uploading'));
+
+        if (osm) {
+          $warning
+            .append('a')
+            .attr('href', osm.changesetURL(changesetID))
+            .attr('target', '_blank')
+            .text(l10n.t('restore.view_changeset', { id: changesetID }));
+        }
+      }
 
       // Actions
       const $rowActions = $row
@@ -163,7 +188,17 @@ export class UiRestore {
         .text(l10n.t('restore.restore_session'))
         .on('click', () => {
           Modal.close();
-          editor.restoreSessionAsync(session.id);
+          editor.restoreSessionAsync(session.id)
+            .then(leftOutIDs => {
+              if (leftOutIDs.length) {
+                ui?.Flash.show({ duration: 10000, label: l10n.t('restore.left_out') });
+              }
+            })
+            .catch(err => {
+              // Restoring needs the OSM API. The session is still saved, so it can be restored later.
+              console.error(err);  // eslint-disable-line no-console
+              ui?.Flash.show({ duration: 10000, label: l10n.t('restore.failed') });
+            });
         });
 
       $rowActions

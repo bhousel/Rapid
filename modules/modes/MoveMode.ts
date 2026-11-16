@@ -1,17 +1,19 @@
 import { AbstractMode } from './AbstractMode.ts';
 import { actionMove } from '../actions/move.ts';
+import { osmEntityID } from '../data/dataID.ts';
 import { projWgs84ToWorld, vecSubtract } from '@rapid-sdk/math';
 
 import type { Context } from '../Context.ts';
+import type { EditLabel } from '../lib/Edit.ts';
 import type { MoveCache } from '../actions/move.ts';
-import type { OsmEntity, OsmNode } from '../data/types.ts';
+import type { OsmNode } from '../data/types.ts';
 import type { Vec2 } from '@rapid-sdk/math';
 
 
 /** Options for entering `MoveMode` */
 export interface MoveModeOptions {
-  /** Selection object where keys are layerIDs and values are arrays of dataIDs */
-  selection?: Record<string, EntityID[]>;
+  /** Data IDs of the data to move (only OSM entities can be moved) */
+  selection?: DataID[];
 }
 
 
@@ -62,14 +64,13 @@ export class MoveMode extends AbstractMode {
     const map = context.systems.map!;
     const eventManager = gfx.eventManager;
 
-    const selection = options.selection ?? {};
-    const entityIDs = selection.osm ?? [];
-
     // Gather valid entities and entityIDs from selection.
     // For this mode, keep only the OSM data.
-    this._selectedData = new Map<EntityID, OsmEntity>();
+    const keepIDs: EntityID[] = [];
 
-    for (const entityID of entityIDs) {
+    for (const dataID of options.selection ?? []) {
+      const entityID = osmEntityID(dataID);
+      if (!entityID) continue;   // not OSM
       const entity = graph.hasEntity(entityID);
       if (!entity) continue;   // not in the osm graph
       if (entity.type === 'node') {
@@ -77,12 +78,13 @@ export class MoveMode extends AbstractMode {
         if (loc && locations?.isBlockedAt(loc)) continue;  // editing is blocked
       }
 
-      this._selectedData.set(entityID, entity);
+      keepIDs.push(entityID);
     }
 
-    if (!this._selectedData.size) return false;  // nothing to select
+    if (!keepIDs.length) return false;  // nothing to select
 
-    this._entityIDs = [...this._selectedData.keys()];  // the ones we ended up keeping
+    this._entityIDs = keepIDs;  // the ones we ended up keeping
+    this._selectedIDs = [...keepIDs];
     this._active = true;
 
     filters.forceVisible(this._entityIDs);
@@ -116,7 +118,6 @@ export class MoveMode extends AbstractMode {
     const context = this.context;
     const editor = context.systems.editor!;
     const filters = context.systems.filters!;
-    const l10n = context.systems.l10n!;
     const eventManager = context.systems.gfx!.eventManager!;
 
     filters.forceVisible([]);
@@ -129,18 +130,18 @@ export class MoveMode extends AbstractMode {
 
     // If there is work in progress, finalize it.
     if (editor.hasWorkInProgress) {
-      let annotation: string;
+      let label: EditLabel;
       if (this._entityIDs.length === 1) {
         const graph = editor.staging.graph;
         const entity = graph.entity(this._entityIDs[0]);
-        annotation = l10n.t('operations.move.annotation.' + entity.geometry(graph));
+        label = { stringID: 'operations.move.annotation.' + entity.geometry(graph) };
       } else {
-        annotation = l10n.t('operations.move.annotation.feature', { n: this._entityIDs.length });
+        label = { stringID: 'operations.move.annotation.feature', stringParams: { n: this._entityIDs.length } };
       }
 
       editor.commit({
-        annotation: annotation,
-        selectedIDs: this._entityIDs
+        ...label,
+        selectionAfter: this._entityIDs
       });
     }
   }
@@ -162,7 +163,7 @@ export class MoveMode extends AbstractMode {
 
     } else if (['r', 'R'].includes(e.key)) {
       e.preventDefault();
-      this.context.enter('rotate', { selection: { osm: this._entityIDs }} );
+      this.context.enter('rotate', { selection: this._entityIDs });
     }
   }
 
@@ -189,13 +190,6 @@ export class MoveMode extends AbstractMode {
 
     editor.revert();  // moves are relative to the start location, so revert before applying movement
     editor.perform(actionMove(this._entityIDs, delta, this._movementCache!));
-    const graph = editor.staging.graph;  // after move
-
-    // Update selected/active collections to contain the moved entities
-    this._selectedData.clear();
-    for (const entityID of this._entityIDs) {
-      this._selectedData.set(entityID, graph.entity(entityID));
-    }
   }
 
 
@@ -203,7 +197,7 @@ export class MoveMode extends AbstractMode {
    * Return to select mode - `exit()` will finalize the work in progress.
    */
   protected _finish(): void {
-    this.context.enter('select-osm', { selection: { osm: this._entityIDs }} );
+    this.context.enter('select', { selection: this._entityIDs });
   }
 
 
@@ -215,7 +209,7 @@ export class MoveMode extends AbstractMode {
     const editor = context.systems.editor!;
 
     editor.revert();
-    context.enter('select-osm', { selection: { osm: this._entityIDs }} );
+    context.enter('select', { selection: this._entityIDs });
   }
 
 }

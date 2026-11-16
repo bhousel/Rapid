@@ -1,4 +1,5 @@
 import { AbstractPixiLayer } from './AbstractPixiLayer.ts';
+import { makeDataID } from '../data/dataID.ts';
 import { PixiFeatureLine } from './PixiFeatureLine.ts';
 import { PixiFeaturePoint } from './PixiFeaturePoint.ts';
 import { scaleLinear, type ScaleLinear } from 'd3-scale';
@@ -219,7 +220,7 @@ export class PixiLayerMapillaryPhotos extends AbstractPixiLayer {
     const mapillary = this.context.services.mapillary;
     if (!mapillary?.started) return;
 
-    const parentContainer = this.scene.groups.get('streetview')!;
+    const parentContainer = this._spatialContainer('streetview', this.id);
     let sequences = mapillary.getSequences();
     let markers = mapillary.getData('images');
 
@@ -229,7 +230,6 @@ export class PixiLayerMapillaryPhotos extends AbstractPixiLayer {
     // render sequences
     for (const d of sequences) {
       const dataID = d.id;
-      const version = d.v || 0;
       const parts = d.geoms.parts;
 
       for (let i = 0; i < parts.length; ++i) {
@@ -248,8 +248,7 @@ export class PixiLayerMapillaryPhotos extends AbstractPixiLayer {
         }
 
         // If data has changed.. Replace it.
-        if (feature.v !== version) {
-          feature.v = version;
+        if (feature.data !== d || feature.geometry !== part) {   // changed data is a new object
           feature.geometry = part;
           feature.data = d;
         }
@@ -274,11 +273,14 @@ export class PixiLayerMapillaryPhotos extends AbstractPixiLayer {
       if (!feature) {
         feature = new PixiFeaturePoint(this, featureID);
         feature.parentContainer = parentContainer;
+      }
+
+      if (feature.data !== d || feature.geometry !== part) {   // changed data is a new object
         feature.geometry = part;
         feature.data = d;
 
         if (d.props.sequenceID) {
-          feature.addChildData(d.props.sequenceID as string, dataID);
+          feature.addChildData(makeDataID('mapillary-sequences', d.props.sequenceID as string), d.dataID);
         }
       }
 

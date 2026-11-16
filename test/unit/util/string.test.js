@@ -191,3 +191,38 @@ describe('utilExtractValues', () => {
     assert.deepEqual(Rapid.utilExtractValues(input, /[,;|]/), expected);
   });
 });
+
+
+describe('utilHash53', () => {
+  it('returns the same base-36 hash for the same string', () => {
+    const a = Rapid.utilHash53('hello world');
+    assert.match(a, /^[0-9a-z]{1,11}$/);
+    assert.strictEqual(Rapid.utilHash53('hello world'), a);
+  });
+
+  it('returns different hashes for different strings or seeds', () => {
+    assert.notStrictEqual(Rapid.utilHash53('hello world'), Rapid.utilHash53('hello world!'));
+    assert.notStrictEqual(Rapid.utilHash53('hello world', 1), Rapid.utilHash53('hello world'));
+  });
+
+  it('has no collisions over many similar strings', () => {
+    const seen = new Set();
+    for (let i = 0; i < 50000; i++) {
+      seen.add(Rapid.utilHash53(`feature-${i}`));
+    }
+    assert.strictEqual(seen.size, 50000);
+  });
+});
+
+
+describe('utilStableStringify', () => {
+  it('gives the same string whatever order the keys were written in', () => {
+    const a = { b: 1, a: { d: [1, { y: 2, x: 1 }], c: 'x' } };
+    const b = { a: { c: 'x', d: [1, { x: 1, y: 2 }] }, b: 1 };
+    assert.strictEqual(Rapid.utilStableStringify(a), Rapid.utilStableStringify(b));
+  });
+
+  it('keeps the order of arrays', () => {
+    assert.notStrictEqual(Rapid.utilStableStringify([1, 2]), Rapid.utilStableStringify([2, 1]));
+  });
+});

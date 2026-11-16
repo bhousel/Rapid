@@ -230,6 +230,35 @@ describe('actionMergeRemoteChanges', () => {
         assert.deepEqual(n.tags, mergedTags);
         assert.deepEqual(n.loc, [2, 2]);
       });
+
+      it('keeps the other mapper\'s move of a node the user only retagged', () => {
+        const local = base.entity('n1').update({ tags: { foo: 'foo_local' } });
+        const remote = base.entity('n1').update({ loc: [3, 3], version: '2' });
+        const localGraph = makeGraph([local]);
+        const remoteGraph = makeGraph([remote]);
+        const action = Rapid.actionMergeRemoteChanges('n1', { localGraph, remoteGraph, discardTags });
+        const result = action(localGraph);
+
+        assert.deepEqual(action.conflicts(), []);
+        const n = result.entity('n1');
+        assert.deepEqual(n.loc, [3, 3]);
+        assert.deepEqual(n.tags, { foo: 'foo_local' });
+        assert.strictEqual(n.version, '2');
+      });
+
+      it('keeps the user\'s move of a node the other mapper only retagged', () => {
+        const local = base.entity('n1').update({ loc: [2, 2] });
+        const remote = base.entity('n1').update({ tags: { foo: 'foo_remote' }, version: '2' });
+        const localGraph = makeGraph([local]);
+        const remoteGraph = makeGraph([remote]);
+        const action = Rapid.actionMergeRemoteChanges('n1', { localGraph, remoteGraph, discardTags });
+        const result = action(localGraph);
+
+        assert.deepEqual(action.conflicts(), []);
+        const n = result.entity('n1');
+        assert.deepEqual(n.loc, [2, 2]);
+        assert.deepEqual(n.tags, { foo: 'foo_remote' });
+      });
     });
 
     describe('ways', () => {
@@ -265,6 +294,7 @@ describe('actionMergeRemoteChanges', () => {
         const remote = base.entity('w10').update({ tags: remoteTags, nodes: remoteNodes, version: '2' });
         const localGraph = makeGraph([local]);
         const remoteGraph = makeGraph([remote, n31, n32]);
+        base.rebase(remoteGraph.childNodes(remote));   // the remote way's nodes, merged first (as the uploader does)
         const opts = {
           localGraph: localGraph,
           remoteGraph: remoteGraph,
@@ -318,6 +348,7 @@ describe('actionMergeRemoteChanges', () => {
         const remote = base.entity('w10').update({ tags: remoteTags, nodes: remoteNodes, version: '2' });
         const localGraph = makeGraph([local, n30, n31]);
         const remoteGraph = makeGraph([remote, n32, n33]);
+        base.rebase(remoteGraph.childNodes(remote));   // the remote way's nodes, merged first (as the uploader does)
         const opts = {
           localGraph: localGraph,
           remoteGraph: remoteGraph,
@@ -354,42 +385,47 @@ describe('actionMergeRemoteChanges', () => {
         assert.strictEqual(result, localGraph);
       });
 
-      it('merges ways if childNode location is same', () => {
-        const localLoc = [12, 12];     // moved node
-        const remoteLoc = [12, 12];    // moved node
-        const local = base.entity('n10').update({ loc: localLoc });
-        const remote = base.entity('n10').update({ loc: remoteLoc, version: '2' });
+      it('takes the other mapper\'s version of a child node the user didn\'t change', () => {
+        const local = base.entity('w10').update({ tags: { foo: 'foo_local', area: 'yes' } });
+        const remote = base.entity('n10').update({ loc: [12, 12], tags: { barrier: 'gate' }, version: '2' });
         const localGraph = makeGraph([local]);
         const remoteGraph = makeGraph([remote]);
-        const opts = {
-          localGraph: localGraph,
-          remoteGraph: remoteGraph,
-          discardTags: discardTags
-        };
-        const action = Rapid.actionMergeRemoteChanges('w10', opts);
+        const action = Rapid.actionMergeRemoteChanges('w10', { localGraph, remoteGraph, discardTags });
         const result = action(localGraph);
-        assert.instanceOf(result, Rapid.Graph);
 
-        const n = result.entity('n10');
-        assert.strictEqual(n.version, '2');
-        assert.deepEqual(n.loc, remoteLoc);
+        assert.deepEqual(action.conflicts(), []);
+        assert.strictEqual(result.entity('n10'), remote);   // moved and tagged, both kept
       });
 
-      it('doesn\'t merge ways if childNode location is different', () => {
-        const localLoc = [12, 12];     // moved node
-        const remoteLoc = [13, 13];    // moved node
-        const local = base.entity('n10').update({ loc: localLoc });
-        const remote = base.entity('n10').update({ loc: remoteLoc, version: '2' });
-        const localGraph = makeGraph([local]);
-        const remoteGraph = makeGraph([remote]);
-        const opts = {
-          localGraph: localGraph,
-          remoteGraph: remoteGraph,
-          discardTags: discardTags
-        };
-        const action = Rapid.actionMergeRemoteChanges('w10', opts);
-        const result = action(localGraph);
-        assert.strictEqual(result, localGraph);
+      it('leaves a child node the user changed to its own merge', () => {
+        const localNode = base.entity('n10').update({ loc: [12, 12] });     // moved by both..
+        const remoteNode = base.entity('n10').update({ loc: [13, 13], version: '2' });
+        const localGraph = makeGraph([localNode]);
+        const remoteGraph = makeGraph([remoteNode]);
+        const wayAction = Rapid.actionMergeRemoteChanges('w10', { localGraph, remoteGraph, discardTags });
+        const result = wayAction(localGraph);
+
+        assert.deepEqual(wayAction.conflicts(), []);           // ..but that's n10's conflict, not w10's
+        assert.strictEqual(result.entity('n10'), localNode);
+
+        const nodeAction = Rapid.actionMergeRemoteChanges('n10', { localGraph, remoteGraph, discardTags });
+        nodeAction(localGraph);
+        assert.lengthOf(nodeAction.conflicts(), 1);
+      });
+
+      it('leaves a child node with its own conflict to its own choice, when forced', () => {
+        const localNode = base.entity('n10').update({ loc: [12, 12] });
+        const remoteNode = base.entity('n10').update({ loc: [13, 13], version: '2' });
+        const remoteWay = base.entity('w10').update({ tags: { foo: 'foo_remote', area: 'yes' }, version: '2' });
+        const localGraph = makeGraph([localNode]);
+        const remoteGraph = makeGraph([remoteNode, remoteWay]);
+        for (const strategy of ['force_remote', 'force_local']) {
+          const action = Rapid.actionMergeRemoteChanges('w10', {
+            localGraph, remoteGraph, discardTags, strategy, ownChoiceIDs: new Set(['n10'])
+          });
+          const result = action(localGraph);
+          assert.strictEqual(result.entity('n10'), localNode, strategy);
+        }
       });
     });
 
@@ -442,8 +478,9 @@ describe('actionMergeRemoteChanges', () => {
       it('returns conflict details', () => {
         const localTags = { foo: 'foo_local' };                 // changed foo
         const remoteTags = { foo: 'foo', bar: 'bar_remote' };   // same foo, added bar
-        const remoteLoc = [2, 2];                               // moved node
-        const local = base.entity('n1').update({ tags: localTags });
+        const localLoc = [3, 3];                                // moved by both
+        const remoteLoc = [2, 2];
+        const local = base.entity('n1').update({ tags: localTags, loc: localLoc });
         const remote = base.entity('n1').update({ tags: remoteTags, loc: remoteLoc, version: '2' });
         const localGraph = makeGraph([local]);
         const remoteGraph = makeGraph([remote]);
@@ -460,6 +497,70 @@ describe('actionMergeRemoteChanges', () => {
         assert.ok(conflicts instanceof Array);
         assert.ok(conflicts.length > 0);
       });
+    });
+  });
+
+
+  describe('local deletions', () => {
+    // The user deleted w10 (and its nodes); `remote` is what the server has now.
+    const deleted = ['w10', 'n10', 'n11', 'n12', 'n13'];
+    function deletedGraph() {
+      const graph = new Rapid.Graph(base);
+      return graph.remove(deleted.map(id => base.entity(id))).commit();
+    }
+
+    it('reports a conflict when another user changed it (safe)', () => {
+      const localGraph = deletedGraph();
+      const remote = base.entity('w10').update({ tags: { foo: 'foo_remote' }, version: '2' });
+      const remoteGraph = makeGraph([remote]);
+      const action = Rapid.actionMergeRemoteChanges('w10', { localGraph, remoteGraph, discardTags, localize: (s) => s });
+      const result = action(localGraph);
+
+      assert.strictEqual(result, localGraph);
+      assert.deepEqual(action.conflicts(), ['merge_remote_changes.conflict.deleted_locally']);
+      assert.isUndefined(result.hasEntity('w10'));
+    });
+
+    it('keeps the deletion, and its nodes\' deletions, when another user deleted it too', () => {
+      const localGraph = deletedGraph();
+      const remote = base.entity('w10').update({ visible: false, version: '2' });
+      const remoteGraph = makeGraph([remote]);
+      const action = Rapid.actionMergeRemoteChanges('w10', { localGraph, remoteGraph, discardTags });
+      const result = action(localGraph);
+
+      assert.deepEqual(action.conflicts(), []);
+      for (const entityID of deleted) {
+        assert.isUndefined(result.hasEntity(entityID), `${entityID} stays deleted`);
+      }
+    });
+
+    it('restores it and its nodes when keeping theirs (force_remote)', () => {
+      const localGraph = deletedGraph();
+      const remote = base.entity('w10').update({ tags: { foo: 'foo_remote' }, version: '2' });
+      const remoteGraph = makeGraph([remote]);
+      const action = Rapid.actionMergeRemoteChanges('w10', { localGraph, remoteGraph, discardTags, strategy: 'force_remote' });
+      const result = action(localGraph);
+
+      assert.deepEqual(action.conflicts(), []);
+      for (const entityID of deleted) {
+        assert.strictEqual(result.hasEntity(entityID), base.entity(entityID), `${entityID} restored`);
+      }
+    });
+
+    it('keeps it deleted when keeping mine (force_local), even after it was restored', () => {
+      const localGraph = deletedGraph();
+      const remote = base.entity('w10').update({ tags: { foo: 'foo_remote' }, version: '2' });
+      const remoteGraph = makeGraph([remote]);
+      const keepTheirs = Rapid.actionMergeRemoteChanges('w10', { localGraph, remoteGraph, discardTags, strategy: 'force_remote' });
+      const keepMine = Rapid.actionMergeRemoteChanges('w10', { localGraph, remoteGraph, discardTags, strategy: 'force_local' });
+
+      assert.strictEqual(keepMine(localGraph), localGraph);   // still deleted, nothing to do
+
+      const result = keepMine(keepTheirs(new Rapid.Graph(localGraph)));   // the user changed their mind
+      assert.deepEqual(keepMine.conflicts(), []);
+      for (const entityID of deleted) {
+        assert.isUndefined(result.hasEntity(entityID), `${entityID} deleted`);
+      }
     });
   });
 
@@ -612,6 +713,44 @@ describe('actionMergeRemoteChanges', () => {
         const n = result.entity('n10');
         assert.strictEqual(n.version, '2');
         assert.deepEqual(n.loc, remoteLoc);
+      });
+
+      // "Use theirs" is about this way. A childNode another way shares is an edit of that way too,
+      // which isn't in conflict: the user's change to it stays, unless the other mapper changed it.
+      describe('a childNode another way shares (\'force_remote\')', () => {
+        const w50 = new Rapid.OsmWay(context, { id: 'w50', nodes: ['n10', 'n20'], version: '1' });   // shares n10
+        const remoteW10 = base.entity('w10').update({ tags: { foo: 'foo_remote', area: 'yes' }, version: '2' });
+
+        function mergeTheirs(localEntities, remoteEntities) {
+          const localGraph = makeGraph([...localEntities, w50]);
+          const remoteGraph = makeGraph([remoteW10, ...remoteEntities]);
+          const opts = { localGraph: localGraph, remoteGraph: remoteGraph, discardTags: discardTags, strategy: 'force_remote' };
+          return Rapid.actionMergeRemoteChanges('w10', opts)(localGraph);
+        }
+
+        it('keeps the user\'s change when only the user changed it', () => {
+          const localN10 = base.entity('n10').update({ loc: [12, 12] });   // moved by the user only
+          const result = mergeTheirs([localN10], []);
+
+          assert.deepEqual(result.entity('w10').tags, { foo: 'foo_remote', area: 'yes' });
+          assert.strictEqual(result.entity('n10'), localN10);
+        });
+
+        it('takes their version when they changed it too', () => {
+          const localN10 = base.entity('n10').update({ loc: [12, 12] });
+          const remoteN10 = base.entity('n10').update({ loc: [13, 13], version: '2' });
+          const result = mergeTheirs([localN10], [remoteN10]);
+
+          assert.deepEqual(result.entity('n10').loc, [13, 13]);
+          assert.strictEqual(result.entity('n10').version, '2');
+        });
+
+        it('still takes their version of a childNode only this way uses', () => {
+          const localN11 = base.entity('n11').update({ loc: [12, -12] });   // only in w10, moved by the user only
+          const result = mergeTheirs([localN11], []);
+
+          assert.deepEqual(result.entity('n11').loc, base.entity('n11').loc);
+        });
       });
 
       it('keeps only important childNodes when merging', () => {

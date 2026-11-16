@@ -830,7 +830,8 @@
     "redo": {
       "title": "Redo",
       "tooltip": "Redo: {action}",
-      "nothing": "Nothing to redo."
+      "nothing": "Nothing to redo.",
+      "return_view": "Return to where you were."
     },
     "tooltip_keyhint": "Key:",
     "translate": {
@@ -859,8 +860,11 @@
         "offline": "The OpenStreetMap API is offline. Your edits are safe locally. Please come back later.",
         "readonly": "The OpenStreetMap API is currently read-only. You can continue editing, but must wait to save your changes.",
         "ratelimit": "You have downloaded too much data from OpenStreetMap. Please try again in {seconds} seconds or switch accounts.",
-        "local_storage_full": "You have made too many edits to back up. Consider saving your changes now.",
-        "contextlost": "The graphics system has encountered a problem.  Rapid will try to continue with reduced quality."
+        "backup_failed": "Rapid couldn't back up your recent edits. Your browser's storage may be full. Consider saving your changes now.",
+        "storage_unavailable": "Browser storage unavailable. Your work in this session will not be backed up.",
+        "storage_blocked": "An older version of Rapid is running in another tab. Please close all tabs and start Rapid again to upgrade.",
+        "storage_closed": "A newer version of Rapid is running in another tab. Your work in this tab will not be backed up until you reload it.",
+        "contextlost": "The graphics system has encountered a problem. Rapid will try to continue with reduced quality."
       },
       "dismiss": "Dismiss",
       "retry": "Retry"
@@ -1375,7 +1379,11 @@
       "edits": "{n} edits",
       "unknown_date": "Unknown date",
       "unknown_location": "Unknown location",
-      "no_storage": "Heads up — permanent storage isn't available right now (for example in a private window). You can keep working, but your edits won't be saved when you close Rapid."
+      "no_storage": "Heads up — permanent storage isn't available right now (for example in a private window). You can keep working, but your edits won't be saved when you close Rapid.",
+      "failed": "Couldn't restore your edits, because OpenStreetMap couldn't be reached. They're still saved, so you can try again after reloading Rapid.",
+      "left_out": "Some of your edits weren't restored, because the map data they changed has been removed from OpenStreetMap.",
+      "uploading": "Rapid couldn't tell whether these edits were uploaded, so some of them may already be on OpenStreetMap. Check the changeset before restoring, so they aren't uploaded twice.",
+      "view_changeset": "View changeset {id}"
     },
     "save": {
       "help": "Review your changes and upload them to OpenStreetMap, making them visible to other users.",
@@ -1383,6 +1391,9 @@
       "error": "Errors occurred while trying to save",
       "status_code": "Server returned status code {code}",
       "unknown_error_details": "Please ensure you are connected to the internet.",
+      "upload_failed": "The connection to OpenStreetMap was lost while uploading, and your changes weren't saved there. They're still here, so you can try again.",
+      "upload_unknown": "The connection to OpenStreetMap was lost while uploading, and Rapid can't tell whether your changes were saved there. Your changes are backed up. Reload Rapid once OpenStreetMap is reachable again: Rapid will check, and offer to restore them if they weren't saved.",
+      "upload_unknown_kept": "The connection to OpenStreetMap was lost while uploading, and Rapid can't tell whether your changes were saved there. Check your changeset on OpenStreetMap before uploading again, so your changes aren't uploaded twice.",
       "uploading": "Uploading changes to OpenStreetMap...",
       "conflict_progress": "Checking for conflicts: {num} of {total}",
       "unsaved_changes": "You have unsaved changes",
@@ -1395,6 +1406,9 @@
         "delete": "Leave Deleted",
         "download_changes": "Or download osmChange file",
         "done": "All conflicts resolved!",
+        "annotation": "Merged changes from other mappers.",
+        "redacted": "The version of this feature you edited has since been removed from OpenStreetMap, so your changes to it can't be uploaded.",
+        "unresolved": "OpenStreetMap still reports a conflict that Rapid couldn't resolve. Your changes are still here, and you can download them as an osmChange file from the list of changes.",
         "help": "Another user changed some of the same map features you changed. Click on each feature below for more details about the conflict, and choose whether to keep your changes or the other user's changes."
       }
     },
@@ -1405,6 +1419,7 @@
     "merge_remote_changes": {
       "conflict": {
         "deleted": "This feature has been deleted by {user}.",
+        "deleted_locally": "{user} changed this feature, but you deleted it.",
         "location": "This feature was moved by both you and {user}.",
         "nodelist": "Nodes were changed by both you and {user}.",
         "memberlist": "Relation members were changed by both you and {user}.",
@@ -1662,9 +1677,34 @@
       },
       "conflation": {
         "heading": "Conflation Settings",
-        "instruction": "This section controls how new data is merged or filtered where it overlaps existing data.",
-        "conflation": {
-          "label": "Conflation?"
+        "instruction": "\"Conflation\" compares this dataset with the current map to decide what's new and what exists already.",
+        "conflated": {
+          "label": "Enable Conflation"
+        },
+        "showmatched": {
+          "label": "Show features that are already mapped"
+        },
+        "rules_instruction": "The rules below decide when a new feature is the same as an existing feature.",
+        "no_rules": "There are no rules, so nothing will be matched (all data will be considered new).",
+        "add_rule": "Add Rule",
+        "restore_defaults": "Restore Defaults",
+        "fields": {
+          "source": {
+            "label": "Source"
+          },
+          "target": {
+            "label": "Target"
+          },
+          "samekeys": {
+            "label": "Same Tags",
+            "placeholder": "e.g. highway"
+          },
+          "samedist": {
+            "label": "Same Distance (m)"
+          },
+          "sameangle": {
+            "label": "Same Angle (°)"
+          }
         }
       },
       "dictionary": {

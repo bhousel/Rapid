@@ -177,5 +177,354 @@ describe('MapSystem', () => {
       });
     });
 
+
+    // Showing a change on undo/redo.  The map is 1000×800 at z17, centered on [0, 0].
+    describe('showing changes', () => {
+      const D = 360 / (256 * 2 ** 17);   // degrees per pixel at z17 (near the equator)
+      const box = (x, y, halfPx) => new Rapid.sdk.Extent([(x - halfPx) * D, (y - halfPx) * D], [(x + halfPx) * D, (y + halfPx) * D]);
+      const point = (x, y) => new Rapid.sdk.Extent([x * D, y * D]);
+
+      beforeEach(() => {
+        context.viewport.dimensions = [1000, 800];
+        _map.centerZoom([0, 0], 17);
+      });
+
+      describe('easeDuration', () => {
+        it('is 0 when nothing changes', () => {
+          assert.strictEqual(_map.easeDuration([0, 0], 17), 0);
+        });
+
+        it('is short within about a screen, longer within a few, longest beyond', () => {
+          assert.strictEqual(_map.easeDuration([200 * D, 0]), 250);
+          assert.strictEqual(_map.easeDuration([2000 * D, 0]), 500);
+          assert.strictEqual(_map.easeDuration([1, 0]), 1000);
+        });
+
+        it('counts zoom changes', () => {
+          assert.strictEqual(_map.easeDuration([0, 0], 17.5), 250);
+          assert.strictEqual(_map.easeDuration([0, 0], 20), 1000);
+        });
+      });
+
+      describe('showsExtent', () => {
+        it('shows a change near the center', () => {
+          assert.isTrue(_map.showsExtent(box(0, 0, 50)));
+        });
+
+        it('does not show a change off screen', () => {
+          assert.isFalse(_map.showsExtent(box(2000, 0, 50)));
+        });
+
+        it('does not show a small change when zoomed far out', () => {
+          _map.zoom(14);
+          assert.isFalse(_map.showsExtent(point(0, 0)));
+          _map.zoom(16);
+          assert.isTrue(_map.showsExtent(point(0, 0)));
+        });
+
+        it('shows a change bigger than the screen if any of it is in view', () => {
+          assert.isTrue(_map.showsExtent(box(2000, 0, 2500)));
+        });
+
+        it('checks a given view instead of the current one', () => {
+          const here = { ..._map.transform() };
+          _map.center([2000 * D, 0]);
+          const there = { ..._map.transform() };
+          _map.center([0, 0]);
+          assert.isFalse(_map.showsExtent(box(2000, 0, 50), here));
+          assert.isTrue(_map.showsExtent(box(2000, 0, 50), there));
+        });
+      });
+
+      describe('viewForExtent', () => {
+        it('returns null when the change is already in view', () => {
+          assert.isNull(_map.viewForExtent(box(0, 0, 50)));
+        });
+
+        it('centers on a change off screen, keeping the zoom', () => {
+          const t = _map.viewForExtent(box(2000, 0, 50));
+          assert.isObject(t);
+          assert.closeTo(t.z, 17, 1e-6);
+          _map.transform(t);
+          const [lon, lat] = _map.center();
+          assert.closeTo(lon, 2000 * D, 1e-6);
+          assert.closeTo(lat, 0, 1e-6);
+        });
+
+        it('prefers the given transform if it shows the change', () => {
+          _map.center([2010 * D, 0]);
+          const preferred = { ..._map.transform() };
+          _map.center([0, 0]);
+          assert.deepEqual(_map.viewForExtent(box(2000, 0, 50), preferred), preferred);
+        });
+
+        it('does not zoom out past z16 for a big change', () => {
+          const t = _map.viewForExtent(new Rapid.sdk.Extent([4, 4], [6, 6]));
+          assert.closeTo(t.z, 16, 1e-6);
+        });
+
+        it('zooms in to z16 for a small change seen from far out', () => {
+          _map.zoom(12);
+          const t = _map.viewForExtent(point(0, 0));
+          assert.closeTo(t.z, 16, 1e-6);
+        });
+      });
+
+      describe('showExtentAsync', () => {
+        it('moves the map only when needed', async () => {
+          assert.isFalse(await _map.showExtentAsync(box(0, 0, 50)));
+          assert.isTrue(await _map.showExtentAsync(box(2000, 0, 50)));
+          assert.closeTo(_map.center()[0], 2000 * D, 1e-6);
+        });
+      });
+    });
+
+  });
+
+
+  describe('stagingchange', () => {
+    it('clears the filter cache entries of the changed entities, and marks them dirty without changing them', async () => {
+      const ctx = new Rapid.MockContext();
+      const editor = new Rapid.MockSystem(ctx);
+      const filters = new Rapid.FilterSystem(ctx);
+      const gfx = new Rapid.MockGfxSystem(ctx);
+      const dirtied = [];
+      gfx.scene.dirtyData = (layerID, dataIDs) => dirtied.push(layerID, ...dataIDs);
+      ctx.systems = {
+        editor:  editor,
+        filters: filters,
+        gfx:     gfx
+      };
+
+      const n1 = new Rapid.OsmNode(ctx, { id: 'n1', loc: [0, 0], tags: { amenity: 'bench' } });
+      const graph = new Rapid.Graph(ctx, [n1]);
+      editor.staging = { graph: graph };
+
+      const map = new Rapid.MapSystem(ctx);
+      await map.initAsync();
+
+      filters.getMatches(n1, graph, 'point');
+      const oldKey = n1.key;
+      assert.property(filters._cache, oldKey);
+
+      const difference = { complete: () => new Map([['n1', n1]]), didChange: {} };
+      editor.emit('stagingchange', difference);
+
+      assert.strictEqual(n1.key, oldKey);   // other graphs share the object, so it isn't touched
+      assert.notProperty(filters._cache, oldKey);
+      assert.deepEqual(dirtied, ['osm', 'n1']);
+    });
+  });
+
+
+  describe('historyjump', () => {
+    it('undo while dragging goes back to what was selected before the drag, not the newest edit\'s selection', () => {
+      const ctx = new Rapid.MockContext();
+      const editor = new Rapid.MockSystem(ctx);
+      editor.history = [{ props: {} }, { props: { selectionAfter: ['w9'], selectionBefore: ['w8'] } }];
+      ctx.systems = { editor: editor, gfx: new Rapid.MockGfxSystem(ctx) };
+      ctx.mode = { id: 'drag-node', selectionBefore: ['w1'] };
+
+      const map = new Rapid.MapSystem(ctx);
+      const restored = [];
+      map._restoreSelection = selection => restored.push(selection);
+
+      map._historyJumped(1, 1);   // only the work in progress was thrown away
+      assert.deepEqual(restored, [['w1']]);
+    });
+
+    it('selects what was selected before an undone edit, and after a redone one, including data that isn\'t OSM', () => {
+      const ctx = new Rapid.MockContext();
+      const editor = new Rapid.MockSystem(ctx);
+      editor.history = [{ props: {} }, { props: { selectionAfter: ['n-1'], selectionBefore: ['fbRoads:abc'] } }];
+      ctx.systems = { editor: editor, gfx: new Rapid.MockGfxSystem(ctx) };
+      ctx.mode = { id: 'browse', selectionBefore: [] };
+
+      const map = new Rapid.MapSystem(ctx);
+      const restored = [];
+      map._restoreSelection = selection => restored.push(selection);
+
+      map.restoreJumpSelection(1, 0);   // undo
+      map.restoreJumpSelection(0, 1);   // redo
+      assert.deepEqual(restored, [['fbRoads:abc'], ['n-1']]);
+    });
+
+    it('leaves the selection to a draw mode, which calls `restoreJumpSelection` if it has to leave', () => {
+      const ctx = new Rapid.MockContext();
+      const editor = new Rapid.MockSystem(ctx);
+      editor.history = [{ props: {} }, { props: { selectionAfter: ['n-1'], selectionBefore: ['w1'] } }];
+      ctx.systems = { editor: editor, gfx: new Rapid.MockGfxSystem(ctx) };
+      ctx.mode = { id: 'draw-line', selectionBefore: [] };
+
+      const map = new Rapid.MapSystem(ctx);
+      const restored = [];
+      map._restoreSelection = selection => restored.push(selection);
+
+      map._historyJumped(1, 0);
+      assert.deepEqual(restored, []);
+    });
+  });
+
+
+  describe('restoring a selection from a link', () => {
+    let ctx, map, entities, onDraw, shownData, loadedIDs, fitExtent, mode, selectedIDs;
+
+    function node(id, loc = [0, 0]) {
+      return new Rapid.OsmNode(ctx, { id: id, loc: loc });
+    }
+    function note(id, spatialID = 'notes-test') {
+      return new Rapid.MarkerData(ctx, { id: id, spatialID: spatialID, loc: [2, 2] });
+    }
+    const tick = () => new Promise(resolve => { setTimeout(resolve, 0); });
+
+    beforeEach(() => {
+      ctx = new Rapid.MockContext();
+      entities = new Map();
+      onDraw = new Set();
+      shownData = [];
+      loadedIDs = [];
+      fitExtent = null;
+      mode = 'browse';
+      selectedIDs = [];
+
+      const graph = { hasEntity: id => entities.get(id), extent: entity => entity.extent() };
+      ctx.systems = {
+        editor: { stable: { graph: graph }, staging: { graph: graph } },
+        gfx: {
+          scene: { showData: dataIDs => shownData.push(...dataIDs) },
+          on: (eventName, fn) => onDraw.add(fn),
+          off: (eventName, fn) => onDraw.delete(fn)
+        },
+        spatial: new Rapid.SpatialSystem(ctx)
+      };
+      Object.defineProperty(ctx, 'mode', { get: () => ({ id: mode }) });
+      ctx.selectedIDs = () => selectedIDs;
+      ctx.enter = (modeID, options) => {
+        mode = modeID;
+        selectedIDs = options?.selection ?? [];
+      };
+      // The OSM API has `n2` and note 7, but not `n404` or note 404
+      ctx.loadEntityAsync = entityID => {
+        loadedIDs.push(entityID);
+        if (entityID === 'n2') entities.set('n2', node('n2', [1, 1]));
+        return Promise.resolve();
+      };
+      ctx.services.osm = {
+        loadNoteAsync: noteID => {
+          loadedIDs.push(`note ${noteID}`);
+          if (noteID !== '7') return Promise.reject(new Error('not found'));
+          const loaded = note('7', 'osm-notes');
+          ctx.systems.spatial.replaceData('osm-notes', loaded);
+          return Promise.resolve(loaded);
+        }
+      };
+
+      ctx.systems.spatial.registerResolver('osm', entityID => entities.get(entityID));
+      entities.set('n1', node('n1'));
+      ctx.systems.spatial.replaceData('notes-test', note('1'));
+
+      map = new Rapid.MapSystem(ctx);
+      map.showsExtent = () => false;
+      map.fitExtent = extent => fitExtent = extent;
+    });
+
+    it('downloads the OSM entities it doesn\'t have, and selects everything it finds', async () => {
+      map._restoreSelection(['n1', 'n2', 'osm:n1', 'notes-test:1', 'n404', 'w-1'], true);
+      assert.strictEqual(mode, 'select');
+      assert.deepEqual(selectedIDs, ['n1', 'notes-test:1']);
+      assert.sameMembers(loadedIDs, ['n2', 'n404']);   // not `w-1`, a new entity
+
+      await tick();
+      assert.deepEqual(selectedIDs, ['n1', 'n2', 'notes-test:1']);
+      assert.deepEqual(shownData, ['n1', 'n2', 'notes-test:1', 'n404', 'w-1']);
+      assert.deepEqual([fitExtent.min, fitExtent.max], [[0, 0], [2, 2]]);   // all of it, the note too
+    });
+
+    it('downloads the notes it doesn\'t have', async () => {
+      map._restoreSelection(['n1', 'osm-notes:7', 'osm-notes:404'], true);
+      assert.deepEqual(selectedIDs, ['n1']);
+      assert.sameMembers(loadedIDs, ['note 7', 'note 404']);
+
+      await tick();
+      assert.deepEqual(selectedIDs, ['n1', 'osm-notes:7']);
+      assert.deepEqual(shownData, ['n1', 'osm-notes:7', 'osm-notes:404']);
+      assert.deepEqual([fitExtent.min, fitExtent.max], [[0, 0], [2, 2]]);
+    });
+
+    it('selects other data when it loads', () => {
+      map._restoreSelection(['notes-test:2'], true);
+      assert.strictEqual(mode, 'browse');
+
+      ctx.systems.spatial.replaceData('notes-test', note('2'));
+      for (const fn of onDraw) fn();
+      assert.strictEqual(mode, 'select');
+      assert.deepEqual(selectedIDs, ['notes-test:2']);
+      assert.strictEqual(onDraw.size, 0);
+    });
+
+    it('keeps what the user selected while it was downloading', async () => {
+      map._restoreSelection(['n2'], true);
+      ctx.enter('select', { selection: ['n1'] });
+
+      await tick();
+      assert.deepEqual(selectedIDs, ['n1']);
+    });
+
+    it('doesn\'t download anything when restoring an edit\'s selection', () => {
+      map._restoreSelection(['n1', 'n2', 'osm-notes:7']);
+      assert.deepEqual(selectedIDs, ['n1']);
+      assert.deepEqual(loadedIDs, []);
+      assert.deepEqual(shownData, []);
+    });
+
+    it('selects a note from the feature list the way a link does', async () => {
+      map.selectNoteID(7);
+      await tick();
+      assert.deepEqual(selectedIDs, ['osm-notes:7']);
+      assert.deepEqual(shownData, ['osm-notes:7']);
+    });
+  });
+
+
+  describe('the legacy `note` url param', () => {
+    let ctx, map, restored, enabledLayers, params;
+
+    beforeEach(() => {
+      ctx = new Rapid.MockContext();
+      restored = [];
+      enabledLayers = [];
+      params = new Map();
+      ctx.systems = {
+        gfx: { scene: { enableLayers: layerID => enabledLayers.push(layerID) } },
+        urlhash: { setParam: (k, v) => params.set(k, v) }
+      };
+      Object.defineProperty(ctx, 'mode', { get: () => ({ id: 'browse' }) });
+
+      map = new Rapid.MapSystem(ctx);
+      map.setMapParams = () => {};
+      map._restoreSelection = (selection, fromLink) => restored.push({ selection, fromLink });
+    });
+
+    it('selects `note=<noteID>` along with `id`, and drops `note` from the url', () => {
+      map._hashChanged(new Map([['map', '18/0/0'], ['id', 'w1'], ['note', '123']]), new Map());
+      assert.deepEqual(restored, [{ selection: ['w1', 'osm-notes:123'], fromLink: true }]);
+      assert.deepEqual(enabledLayers, []);
+      assert.isTrue(params.has('note'));
+      assert.isNull(params.get('note'));
+    });
+
+    it('turns on the notes layer for `note=true`', () => {
+      map._hashChanged(new Map([['map', '18/0/0'], ['note', 'true']]), new Map());
+      assert.deepEqual(restored, []);
+      assert.deepEqual(enabledLayers, ['osm-notes']);
+      assert.isNull(params.get('note'));
+    });
+
+    it('doesn\'t select again when only the legacy param went away', () => {
+      const prev = new Map([['map', '18/0/0'], ['note', '123']]);
+      const curr = new Map([['map', '18/0/0'], ['id', 'osm-notes:123']]);
+      map._hashChanged(curr, prev);
+      assert.deepEqual(restored, []);
+    });
   });
 });

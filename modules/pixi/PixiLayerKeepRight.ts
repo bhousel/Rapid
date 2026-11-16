@@ -72,7 +72,7 @@ export class PixiLayerKeepRight extends AbstractPixiLayer {
 
     keepRight.loadTiles();
 
-    const parentContainer = this.scene.groups.get('qa')!;
+    const parentContainer = this._spatialContainer('qa', this.id);
     const data = keepRight.getData();
 
     for (const d of data) {
@@ -92,6 +92,9 @@ export class PixiLayerKeepRight extends AbstractPixiLayer {
         feature = new PixiFeaturePoint(this, featureID);
         feature.style = style;
         feature.parentContainer = parentContainer;
+      }
+
+      if (feature.data !== d || feature.geometry !== part) {   // changed data is a new object
         feature.geometry = part;
         feature.data = d;
       }

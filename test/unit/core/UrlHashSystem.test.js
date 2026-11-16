@@ -300,6 +300,21 @@ describe('UrlHashSystem', () => {
       });
     });
 
+    describe('the hash', () => {
+      it('keeps a link\'s custom `data`, so an `id=` in it can be found again, and leaves out the startup-only params', () => {
+        const urlhash = new Rapid.UrlHashSystem(context);
+        return urlhash.initAsync()
+          .then(() => urlhash.startAsync())
+          .then(() => {
+            urlhash.setParam('data', 'https://example.com/a.geojson');
+            urlhash.setParam('comment', 'fixing roads');
+            urlhash._updateHash();
+            assert.include(urlhash._currHash, 'data=https');
+            assert.notInclude(urlhash._currHash, 'comment=');
+          });
+      });
+    });
+
     describe('doUpdateTitle', () => {
       it('can disable title updates', () => {
         const originalValue = _urlhash.doUpdateTitle;
