@@ -160,8 +160,8 @@ the code; the repros were kept outside the repo.
 6. ✅ **The user's edits near data that wasn't loaded were never checked again** (checked; fixed).
    `almost_junction`, `impossible_oneway`, `disconnected_way`, `unsquare_way`, `missing_tag` and
    `outdated_tags` give up where the map isn't loaded (`osm.isDataLoaded`) and return no issues.
-   - For data nobody edited, that's fine: a merge emits every entity on the tile (`seenIDs`, including
-     ones seen before), and the base cache validates them and the ways connected to them again. A way
+   - For data nobody edited, that's fine: a merge emits every entity on the tile (including
+     ones it already had), and the base cache validates them and the ways connected to them again. A way
      that reaches into a tile is in that tile's API response.
    - For the user's edits it wasn't: the head cache was only validated on `stablechange`, for what
      the edit changed. A merge rebases the stable graph in place, so the head cache looked caught up,

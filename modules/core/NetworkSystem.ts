@@ -214,16 +214,8 @@ export class NetworkSystem extends AbstractSystem {
    * @return Promise resolved when this component has completed resetting
    */
   public resetAsync(): Promise<void> {
-    const worker = this.context.systems.worker;
-
     this.clearAll();
-
-    if (worker?.workerURL) {
-      return worker.dispatch<void>('network:reset');
-    } else {
-      networkListeners['network:reset'](undefined, new AbortController().signal);
-      return Promise.resolve();
-    }
+    return Promise.resolve();
   }
 
 

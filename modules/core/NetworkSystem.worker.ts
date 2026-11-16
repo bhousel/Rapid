@@ -135,25 +135,10 @@ export async function fetchAndParseMVT(data: unknown, signal: AbortSignal): Prom
     async response => decodeMVT(await utilFetchResponse(response), x, y, z));
 };
 
-/**
- * Resets the long-lived parsers.
- * (They have internal "seen" state).
- * Called when the main thread resets its session.
- * @param _data
- * @param _signal
- * @listens `network:reset`
- */
-export function reset(_data: unknown, _signal: AbortSignal): void {
-  osmJsonParser.reset();
-  osmXmlParser.reset();
-};
-
-
 /** Listeners provided by this file */
 export const networkListeners: ListenerRegistry = {
   'network:fetchAndParse':         fetchAndParse,
   'network:fetchAndParseMVT':      fetchAndParseMVT,
   'network:fetchAndParseOsmJson':  fetchAndParseOsmJson,
-  'network:fetchAndParseOsmXml':   fetchAndParseOsmXml,
-  'network:reset':                 reset
+  'network:fetchAndParseOsmXml':   fetchAndParseOsmXml
 };

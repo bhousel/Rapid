@@ -15,7 +15,6 @@ export interface OsmFetchOptions {
 
 
 // Long-lived parser instances — separate from the ones in NetworkSystem.worker.ts.
-// OsmService has its own "seen" state that is reset independently.
 const osmJsonParser = new OsmJSONParser();
 const osmXmlParser = new OsmXMLParser();
 
@@ -43,20 +42,7 @@ export async function fetchAndParse(data: unknown, signal: AbortSignal): Promise
 }
 
 
-/**
- * Resets the long-lived parser instances.
- * @param _data
- * @param _signal
- * @listens `osmService:reset`
- */
-export function reset(_data: unknown, _signal: AbortSignal): void {
-  osmJsonParser.reset();
-  osmXmlParser.reset();
-}
-
-
 /** Listeners provided by this file */
 export const osmServiceListeners: ListenerRegistry = {
-  'osmService:fetchAndParse': fetchAndParse,
-  'osmService:reset':         reset,
+  'osmService:fetchAndParse': fetchAndParse
 };

@@ -11,8 +11,6 @@ export type ParserDataType =
 
 /** Options for parsing OSM content */
 export interface ParserOptions {
-  /** Whether to skip results that have been seen before (default: true) */
-  skipSeen: boolean;
   /** Filter to include only these types in the results */
   filter: Set<ParserDataType> | ParserDataType[];
 }
@@ -24,8 +22,6 @@ export interface ParserResult {
   osm: Record<string, unknown>;
   /** Array of parsed data objects */
   data: ParsedData[];
-  /** Set of entity IDs seen during parsing */
-  seenIDs: Set<string>;
 }
 
 

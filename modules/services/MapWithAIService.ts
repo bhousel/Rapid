@@ -295,7 +295,7 @@ export class MapWithAIService extends AbstractSystem {
     network.fetch<ParserResult>(url, {
       requestID,
       listenerID: 'network:fetchAndParseOsmXml',
-      listenerData: { parserOptions: { skipSeen: false, filter: ['node', 'way'] } },
+      listenerData: { parserOptions: { filter: ['node', 'way'] } },
     })
       .then(results => this._gotTile(ds, results))
       .catch(e => {
