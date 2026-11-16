@@ -232,7 +232,31 @@ the order people are likely to ask:
 ## Deferred test cleanup
 - Replace non-assertive smoke tests like `assert.isTrue(true)` / bare rejection catches with stronger state or error assertions where practical
 
+## Smaller follow-ups (moved from `current.md`, Nov 2026)
+- **Validator tests:** one `it.skip` is left in `almost_junction.test.js` ("horizontal and tilted road").
+  See `design/validation-system.md` for the rest.
+- **Stored-files management UI** (`DatabaseSystem` Phase 4 design): list stored files with sizes so users
+  can free space when `canStoreAsync()` says no. Only `UiRapidAddDataset` calls `canStoreAsync` today.
+- **Custom-data consumer ownership**: move the `DragAndDropSystem` consumer registration out of
+  `PixiLayerCustomData` (rendering layer, mild smell) into a proper system.
+- **Stretch: images → EXIF → photo markers** (future local-photos consumer, wires into `PhotoSystem`).
+- Open questions in `design/database-system.md` (DB name/scoping, graceful-degradation doc).
+- **agent-practices:** consider adding the "folder-specific `AGENTS.md`" convention to the shared template.
+- **Report upstream to Bun:** the transpiler cache key ignores whether a file was compiled as a test (see `quirks.md`).
+- **Automated testing of `UiSystem` + `UiWhatever` components.** The modal stack + Esc/Backspace
+  routing (and `KeyboardSystem` document listeners) can't be unit-tested under bun without a browser.
+  Now that `bun run cdp` and headless Playwright work, a browser-driven test suite is within reach.
+- **Manual smoke-test** the nested Rapid dataset modals (catalog / add-custom-data / colorpicker) in
+  a real browser to confirm stacking, Esc, and close behavior.
+- **`CycleHighwayTagOperation`'s module-level `_lastSelectedIDs`.** The one remaining module-level
+  mutable global in `operations/`. Consider moving it onto a system per the system-ownership rule.
+- **Imagery customizations, like the dataset ones.** The imagery offset is for the session only (Nov 9).
+  Some sources always need the same offset, so Bryan could see saving an offset per source in a synced
+  setting, the way `RapidSystem` keeps the user's changes to each dataset.
+- **Open question:** delete the quarantined `sections/*.jsx` React demo files + `section.ts`/`uiSection`?
+
 ## From the pre.4 release check (Nov 2026)
+Not covered by the check: the QA and photo layers.
 - **Startup can't survive a slow CDN.** An asset fetch that hits `NetworkSystem`'s 30 s timeout rejects
   `l10n.initAsync()`, that rejects the rest of startup, and the user gets a blank grey page with no message
   and no retry. Seen when the debug Chrome was worn out; a slow connection would do the same. This used to

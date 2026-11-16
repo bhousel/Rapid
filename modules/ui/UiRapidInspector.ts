@@ -578,7 +578,7 @@ export class UiRapidInspector {
       stringID: 'rapid_inspector.option_accept.annotation',
       acceptIDs: acceptIDs,
       selectionAfter: newID ? [newID] : undefined,
-      sources: { data: dataset?.dataUsed ?? [datasetID] }
+      sources: { data: dataset?.dataUsed.length ? dataset.dataUsed : [datasetID] }
     });
 
     // What next

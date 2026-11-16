@@ -1,7 +1,7 @@
 # The scene: how features are stacked, and what the pointer can reach
 
-**Status:** In progress (Nov 2026). Step 1 (containers per spatial ID, interactivity by mode) being
-built on the `conflation-system` branch. Steps 2 and 3 are ideas with nothing built.
+**Status:** In progress (Nov 2026). Step 1 (containers per spatial ID, interactivity by mode) is
+done (Nov 11). Steps 2 and 3 are ideas with nothing built.
 
 `PixiScene` owns the Pixi display tree under `GraphicsSystem.origin`. Every layer
 (`AbstractPixiLayer`) adds its features to that tree, and two things depend on *where* it adds them:

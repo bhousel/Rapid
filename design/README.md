@@ -7,7 +7,7 @@ They record the "why" that the code alone doesn't show.
 
 | Doc | Covers | Status |
 |-----|--------|--------|
-| [`conflation-system.md`](conflation-system.md) | `ConflationSystem`: client-side matching of third-party data against OSM, partial-line accept | In progress: Steps 1–5 done (line matching, drawing, partial accept with joins) |
+| [`conflation-system.md`](conflation-system.md) | `ConflationSystem`: client-side matching of third-party data against OSM, partial-line accept | In progress: Steps 1–5 done (line matching, drawing, partial accept with joins); Step 6 (settings UI) first version |
 | [`data-ids.md`](data-ids.md) | How data is named across sources: data IDs that start with their cache's spatial ID, looking data up, selecting any mix of data | Steps 1–5 done: `SpatialSystem.getData()`, caches renamed to be the start of data IDs, deterministic IDs (file datasets, pieces, Esri, custom data), selections and scene classes by `DataID`, one `SelectMode` for any mix of data, `id=` takes data IDs. Step 6 moved to `multiselection.md` |
 | [`database-system.md`](database-system.md) | `DatabaseSystem`: IndexedDB wrapper with `sessions` and `files` stores | Phases 0–4 done; files-management UI + worker offload open |
 | [`draganddrop-system.md`](draganddrop-system.md) | `DragAndDropSystem`: claim-based router for dropped files | Implemented |
@@ -18,7 +18,7 @@ They record the "why" that the code alone doesn't show.
 | [`network-system.md`](network-system.md) | `NetworkSystem`: fetch lifecycle, dedup, timeouts, worker fetches | Implemented |
 | [`profiling.md`](profiling.md) | Performance and memory profiling: what to measure (heaps, GPU resources, the worker, draw calls), how to drive it over CDP, suspects, and the line-batching idea (`RenderLayer`) | Proposed (Nov 2026); nothing built yet |
 | [`rapid-system.md`](rapid-system.md) | `RapidSystem`: the dataset catalog, its layers (services, asset files, the user), accepted and ignored features | Dataset assets, the user's datasets in `DatabaseSystem`, and stable feature IDs done; export/import next |
-| [`scene.md`](scene.md) | `PixiScene`: the display tree (containers per spatial ID under each group), draw order, and which spatial IDs the pointer can reach in each mode | In progress (Nov 2026): step 1 (containers per spatial ID, interactivity by mode) being built; reordering and batching are ideas |
+| [`scene.md`](scene.md) | `PixiScene`: the display tree (containers per spatial ID under each group), draw order, and which spatial IDs the pointer can reach in each mode | In progress (Nov 2026): step 1 (containers per spatial ID, interactivity by mode) done; reordering and batching are ideas |
 | [`scheduler-system.md`](scheduler-system.md) | `SchedulerSystem`: frame-budgeted task queue, timers, backpressure | Implemented |
 | [`settings-system.md`](settings-system.md) | `SettingsSystem`: typed, versioned settings with optional OSM sync | Phases 0–3 and v2 Steps 1–2 done (safe sync; datasets as a collection); next: a VS Code-style `settings.json` |
 | [`spatial-system.md`](spatial-system.md) | `SpatialSystem`: one home for all spatial indexes (`Tree` retired) | Steps 1–3c done; 3d continues in `conflation-system.md`; OSM indexes are one base index plus local indexes since graph-geometry step 9 |

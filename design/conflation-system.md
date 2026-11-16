@@ -10,8 +10,8 @@ doc is that module's design.
 
 > **Status:** In progress. Steps 1–5 are done: `ConflationSystem` matches LineStrings from
 > GeoJSON-backed datasets, with measures, scoring, triage, runs and join points; `PixiLayerRapid`
-> draws the results; and the missing part of a line can be accepted and joined to what exists
-> (see [Rollout Plan](#rollout-plan)).
+> draws the results; and the missing part of a line can be accepted and joined to what exists.
+> Step 6 (the Conflation Settings UI) has a first version (see [Rollout Plan](#rollout-plan)).
 > It builds on `SpatialSystem` box queries, the `editor_*` caches with their `segments` index, and
 > `GeometryPart.computeCoverage(radius)`. The scoring model is provisional until it is aligned with
 > the external matching tools (see [Scoring](#scoring)).
@@ -674,7 +674,9 @@ Lines come first throughout. Points and polygons follow the same pipeline at a l
 5. **Accepting and joining.** Accept with a run, plus joins for partial runs and for line ends. Test
    the guiding use case from start to finish on the synthetic street-grid fixture. ✅ Done.
 6. **Settings UI.** In the Conflation Settings section, add the stage-word definition and replace the
-   `conflated` checkbox with the rule fields.
+   `conflated` checkbox with the rule fields. First version ✅ done: the definition, the "Match against
+   OpenStreetMap" and "Show features that are already mapped" switches, and a rules table. Still to do:
+   editing each side's `props`, live counts, and live tuning.
 7. ~~**Review queue.**~~ Dropped after the first demo (see Resolved Decisions).
 8. **Points and polygons.** Matchers for the other geometry types.
 9. **Pre-scored input, and measuring.** Use external scores. Profile a city-sized dataset, then decide
