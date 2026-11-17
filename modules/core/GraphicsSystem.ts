@@ -920,7 +920,7 @@ export class GraphicsSystem extends AbstractSystem {
     }
 
     // Enable debugging tools
-    if ((window.Rapid as any).isDebug) {
+    if ((globalThis as any).Rapid?.isDebug) {
       // Register Pixi with the pixi-inspector extension if it is installed
       // https://github.com/bfanger/pixi-inspector
       (globalThis as any).__PIXI_APP__ = this.pixi;

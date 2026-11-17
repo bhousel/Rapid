@@ -2,6 +2,10 @@
 
 Reverse-chronological one-liners. Details live in git history — these are just breadcrumbs.
 
+- **TypeScript 7** (Nov 17 2026) — `tsc --noEmit` ~4× faster. One fix: `window.Rapid` only typed because
+  TS 6 inferred a global from the `globalThis.Rapid = …` assignment in `main_dev.js`. JS tests stay
+  untype-checked for now (226 files, not worth the churn).
+
 - **ESLint → oxlint** (Nov 17 2026) — same rules and warnings, lint ~10× faster, 160 fewer packages.
   The protected-`_` and no-`private` conventions live in a local plugin (`scripts/oxlint_plugin.js`).
   `prefer-const`/`no-var`/`prefer-rest-params`/`prefer-spread` now cover JS tests too. Clears the way
