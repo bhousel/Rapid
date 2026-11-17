@@ -360,10 +360,12 @@ export class AssetSystem extends AbstractSystem {
           return { partID, data };
         })
         .catch(err => {
-          const info = { assetID, partID, url };
-          const message = `AssetSystem: ${err.message}\n`;
-          console.error(message, JSON.stringify(info));  // eslint-disable-line no-console
-          throw new Error(err);
+          if (err?.name !== 'AbortError') {   // a cancelled request isn't worth logging
+            const info = { assetID, partID, url };
+            const message = `AssetSystem: ${err.message}\n`;
+            console.error(message, JSON.stringify(info));  // eslint-disable-line no-console
+          }
+          throw err;   // rethrow as is, so callers can still tell an abort from a failure
         });
     });
 
@@ -380,7 +382,10 @@ export class AssetSystem extends AbstractSystem {
           combined[partID] = data;
         }
 
-        this._loaded[assetID] = combined;
+        // Cache only a complete bundle, so a part that failed (or was aborted) is retried next time
+        if (fulfilledValues.length === results.length) {
+          this._loaded[assetID] = combined;
+        }
         return combined;
       });
   }

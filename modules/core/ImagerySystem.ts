@@ -274,7 +274,8 @@ export class ImagerySystem extends AbstractSystem {
       }
 
       const rejectedReasons = results.filter(isRejected).map(p => p.reason);
-      for (const reason of rejectedReasons as string[]) {
+      for (const reason of rejectedReasons) {
+        if (reason?.name === 'AbortError') continue;   // expected cancellation
         console.error(reason);   // eslint-disable-line no-console
       }
 

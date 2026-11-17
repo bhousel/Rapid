@@ -505,6 +505,37 @@ describe('AssetSystem', () => {
           });
       });
 
+      it('does not log a part whose request is aborted', () => {
+        delete _assets._loaded.my_bundle;
+
+        const abort = new DOMException('The operation was aborted.', 'AbortError');
+        fetchMock
+          .mockGlobal()
+          .route(/\/data\/categories\.json/i, {
+            body: JSON.stringify({ good_category: {} }),
+            status: 200,
+            headers: { 'Content-Type': 'application/json' }
+          })
+          .route(/\/data\/presets\.json/i, { throws: abort })
+          .route(/\/data\/fields\.json/i, {
+            body: JSON.stringify({ good_field: {} }),
+            status: 200,
+            headers: { 'Content-Type': 'application/json' }
+          });
+
+        return _assets.loadBundleAssetAsync('my_bundle')
+          .then(data => {
+            assert.deepEqual(data.categories, { good_category: {} });
+            assert.isUndefined(data.presets);
+            assert.lengthOf(spyError.mock.calls, 0);   // console.error not called
+            assert.isUndefined(_assets._loaded.my_bundle);   // incomplete, so not cached
+          })
+          .finally(() => {
+            delete _assets._loaded.my_bundle;
+            fetchMock.hardReset();
+          });
+      });
+
       it('uses origin fallback when preferred is not specified', () => {
         // Register a bundle without 'preferred', only 'latest' and 'local'
         _assets.registerBundleAsset('origin_bundle', {

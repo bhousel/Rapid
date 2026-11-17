@@ -88,7 +88,10 @@ export class UiDefs {
         network.fetchRaw(url, { requestID: `spritesheet-${d}` })
           .then(response => utilFetchResponse(response, new window.DOMParser() as any))
           .then(svg => $group.call(this._spritesheetLoaded, d, svg))
-          .catch(e => console.error(e));  // eslint-disable-line
+          .catch(e => {
+            if (e?.name === 'AbortError') return;  // ok
+            console.error(e);  // eslint-disable-line no-console
+          });
       });
   }
 

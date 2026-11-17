@@ -65,7 +65,10 @@ export class UiFieldText extends AbstractUiField {
           this._phoneFormats = d.phoneFormats;
           this._updatePhonePlaceholder();
         })
-        .catch((e: unknown) => console.error(e));  // eslint-disable-line
+        .catch(e => {
+          if (e?.name === 'AbortError') return;  // ok
+          console.error(e);  // eslint-disable-line no-console
+        });
     }
   }
 

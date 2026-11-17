@@ -82,7 +82,10 @@ export class UiFieldAddress extends AbstractUiField {
         this._addressFormats = d.addressFormats as AddressFormat[];
         this.renderContent();  // rerender
       })
-      .catch((e: unknown) => console.error(e));  // eslint-disable-line
+      .catch(e => {
+        if (e?.name === 'AbortError') return;  // ok
+        console.error(e);  // eslint-disable-line no-console
+      });
   }
 
 

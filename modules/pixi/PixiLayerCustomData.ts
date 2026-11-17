@@ -525,7 +525,10 @@ export class PixiLayerCustomData extends AbstractPixiLayer {
             this.context.systems.rapid?.setTaskExtentByGpxData(data as any);
           }
         })
-        .catch(e => console.error(e));  // eslint-disable-line
+        .catch(e => {
+          if (e?.name === 'AbortError') return;  // ok
+          console.error(e);  // eslint-disable-line no-console
+        });
 
     } else {   // Looks like a vector tile url template
       this._setUrlTemplate(url);

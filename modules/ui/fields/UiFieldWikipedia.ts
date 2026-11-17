@@ -60,7 +60,10 @@ export class UiFieldWikipedia extends AbstractUiField {
         this._dataWikipedia = d;
         if (this.$langInput && !this.$langInput.empty()) this._updateForTags(this._tags);
       })
-      .catch((e: unknown) => console.error(e));  // eslint-disable-line
+      .catch(e => {
+        if (e?.name === 'AbortError') return;  // ok
+        console.error(e);  // eslint-disable-line no-console
+      });
 
     this._langCombo = new UiCombobox(context, 'wikipedia-lang')
       .fetcher((value, callback) => {

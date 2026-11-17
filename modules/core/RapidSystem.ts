@@ -543,7 +543,7 @@ export class RapidSystem extends AbstractSystem {
           } catch (err) {
             console.error(err);   // eslint-disable-line no-console
           }
-        } else {
+        } else if (result.reason?.name !== 'AbortError') {   // a cancelled request isn't worth logging
           console.warn(`RapidSystem: skipping dataset asset '${assetIDs[i]}':`, result.reason);  // eslint-disable-line no-console
         }
       });
