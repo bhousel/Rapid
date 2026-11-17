@@ -316,10 +316,12 @@ export class AssetSystem extends AbstractSystem {
         return data;
       })
       .catch(err => {
-        const info = { assetID, url };
-        const message = `AssetSystem: ${err.message}\n`;
-        console.error(message, JSON.stringify(info));  // eslint-disable-line no-console
-        throw new Error(err);
+        if (err?.name !== 'AbortError') {   // a cancelled request isn't worth logging
+          const info = { assetID, url };
+          const message = `AssetSystem: ${err.message}\n`;
+          console.error(message, JSON.stringify(info));  // eslint-disable-line no-console
+        }
+        throw err;   // rethrow as is, so callers can still tell an abort from a failure
       });
   }
 

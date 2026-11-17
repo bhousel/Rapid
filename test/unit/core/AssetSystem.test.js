@@ -276,6 +276,21 @@ describe('AssetSystem', () => {
           .finally(() => fetchMock.hardReset());
       });
 
+      it('rejects with the original error, without logging it, if the request is aborted', () => {
+        const abort = new DOMException('The operation was aborted.', 'AbortError');
+        fetchMock
+          .mockGlobal()
+          .route(/\/data\/intro_graph\.min\.json/i, { throws: abort });
+
+        return _assets.loadAssetAsync('intro_graph')
+          .then(data => assert.fail(`We were not supposed to get data but did: ${data}`))
+          .catch(err => {
+            assert.strictEqual(err, abort);
+            assert.lengthOf(spyError.mock.calls, 0);   // console.error not called
+          })
+          .finally(() => fetchMock.hardReset());
+      });
+
       it('returns a promise to fetch data if we do not already have the data', () => {
         fetchMock
           .mockGlobal()
