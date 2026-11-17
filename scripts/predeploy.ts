@@ -49,5 +49,3 @@ content = updateContentSecurityPolicy(content, { allowUnsafeEval: true });
 
 // Write the file back
 await Bun.write(file, content);
-
-export {};

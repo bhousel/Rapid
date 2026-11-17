@@ -23,10 +23,6 @@ jobs:
       url:  ${{ steps.target.outputs.url }}
 
     steps:
-    - run: |
-        echo "::remove-matcher owner=eslint-compact::"
-        echo "::remove-matcher owner=eslint-stylish::"
-
     - name: 📥  Checkout
       uses: actions/checkout@v4
 

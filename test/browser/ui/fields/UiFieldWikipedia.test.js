@@ -73,7 +73,7 @@ describe('UiFieldWikipedia', () => {
 
 
   function changeTags(changed) {
-    let tags = JSON.parse(JSON.stringify(entity.tags));   // deep copy
+    const tags = JSON.parse(JSON.stringify(entity.tags));   // deep copy
     for (const [k, v] of Object.entries(changed)) {
       tags[k] = v;
     }

@@ -734,7 +734,7 @@ export class UiRapidDatasetSettings extends EventEmitter {
       .append('button')
       .attr('class', 'minor conflation-add-rule')
       .on('click', (e: PointerEvent) => {
-        (e?.currentTarget as HTMLElement).blur();    // avoid keeping focus on the button - iD#4641
+        (e?.currentTarget as HTMLElement | undefined)?.blur();    // avoid keeping focus on the button - iD#4641
         const rule: ConflationRule = { source: { geometry: 'line' }, target: { geometry: 'line' }, sameDist: 3 };
         this._conflationRows!.push(this._rowFromRule(rule));
         this.render();
@@ -744,7 +744,7 @@ export class UiRapidDatasetSettings extends EventEmitter {
       .append('button')
       .attr('class', 'minor conflation-restore-defaults')
       .on('click', (e: PointerEvent) => {
-        (e?.currentTarget as HTMLElement).blur();    // avoid keeping focus on the button - iD#4641
+        (e?.currentTarget as HTMLElement | undefined)?.blur();    // avoid keeping focus on the button - iD#4641
         this._conflationRows = conflationDefaults().rules.map(rule => this._rowFromRule(rule));
         this.render();
       });
@@ -1010,7 +1010,7 @@ export class UiRapidDatasetSettings extends EventEmitter {
         .append('button')
         .attr('class', 'minor dict-add-more')
         .on('click', (e: PointerEvent) => {
-          (e?.currentTarget as HTMLElement).blur();    // avoid keeping focus on the button - iD#4641
+          (e?.currentTarget as HTMLElement | undefined)?.blur();    // avoid keeping focus on the button - iD#4641
           this._transforms!.push({ order: 9999 } as PartialDataTransform);
           this.render();
         });
@@ -1019,7 +1019,7 @@ export class UiRapidDatasetSettings extends EventEmitter {
         .append('button')
         .attr('class', 'minor dict-remove-all')
         .on('click', (e: PointerEvent) => {
-          (e?.currentTarget as HTMLElement).blur();    // avoid keeping focus on the button - iD#4641
+          (e?.currentTarget as HTMLElement | undefined)?.blur();    // avoid keeping focus on the button - iD#4641
           this._transforms = [];
           this.render();
         });

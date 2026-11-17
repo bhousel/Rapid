@@ -4,8 +4,6 @@ import { resolve } from 'node:path';
 import { styleText } from 'node:util';
 import SVGSpriter from 'svg-sprite';
 
-export {};
-
 await buildSVG();
 
 async function buildSVG(): Promise<void> {

@@ -307,7 +307,7 @@ describe('UploaderSystem', () => {
 
       let result = resultAsync();
       _uploader.save();
-      let { args } = await result;
+      const { args } = await result;
       args[1][0].choices[1].action();   // "Use theirs"
 
       result = resultAsync();

@@ -533,7 +533,7 @@ export class UiRapidCatalog extends EventEmitter {
    * @param  d - bound datum (the dataset in this case)
    */
   public toggleDataset(e: Event, d: RapidDataset) {
-    (e?.currentTarget as HTMLElement).blur();    // avoid keeping focus on the button - iD#4641
+    (e?.currentTarget as HTMLElement | undefined)?.blur();    // avoid keeping focus on the button - iD#4641
 
     const context = this.context;
     const rapid = context.systems.rapid!;

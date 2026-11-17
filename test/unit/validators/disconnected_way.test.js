@@ -39,7 +39,7 @@ describe('validateDisconnectedWay', () => {
   function validate() {
     const entities = [ ...graph.base.entities.values() ];
 
-    let issues = [];
+    const issues = [];
     for (const entity of entities) {
       issues.push(...validator(entity, graph).issues);
     }

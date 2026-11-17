@@ -49,7 +49,7 @@ describe('validateCrossingWays', () => {
     const entities = [ ...graph.base.entities.values() ]
       .sort((a, b) => a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
 
-    let issues = [];
+    const issues = [];
     for (const entity of entities) {
       issues.push(...validator(entity, graph).issues);
     }
@@ -357,7 +357,7 @@ describe('validateCrossingWays', () => {
     for (const roadReversed of [false, true]) {
       for (const outlineReversed of [false, true]) {
         for (let start = 0; start < 4; start++) {
-          let outline = [...corners.slice(start), ...corners.slice(0, start)];
+          const outline = [...corners.slice(start), ...corners.slice(0, start)];
           if (outlineReversed) outline.reverse();
           outline.push(outline[0]);   // closed
 

@@ -216,7 +216,7 @@ describe('OsmWay', () => {
     it('returns the minimal Extent containing all member nodes', () => {
       const node1 = new Rapid.OsmNode(context, { loc: [0, 0] });
       const node2 = new Rapid.OsmNode(context, { loc: [5, 10] });
-      let way = new Rapid.OsmWay(context, { nodes: [node1.id, node2.id] });
+      const way = new Rapid.OsmWay(context, { nodes: [node1.id, node2.id] });
       const graph = new Rapid.Graph(context, [node1, node2, way]);
       const extent = graph.extent(way);
       assert.isOk(extent.equals(new Rapid.sdk.Extent([0, 0], [5, 10])));
@@ -837,14 +837,14 @@ describe('OsmWay', () => {
     });
 
     it('returns true for adjacent nodes in the way (forward)', () => {
-      let way = new Rapid.OsmWay(context, { nodes: ['a', 'b', 'c', 'd'] });
+      const way = new Rapid.OsmWay(context, { nodes: ['a', 'b', 'c', 'd'] });
       assert.isTrue(way.isAdjacent('a', 'b'));
       assert.isTrue(way.isAdjacent('b', 'c'));
       assert.isTrue(way.isAdjacent('c', 'd'));
     });
 
     it('returns true for adjacent nodes in the way (reverse)', () => {
-      let way = new Rapid.OsmWay(context, { nodes: ['a', 'b', 'c', 'd'] });
+      const way = new Rapid.OsmWay(context, { nodes: ['a', 'b', 'c', 'd'] });
       assert.isTrue(way.isAdjacent('b', 'a'));
       assert.isTrue(way.isAdjacent('c', 'b'));
       assert.isTrue(way.isAdjacent('d', 'c'));

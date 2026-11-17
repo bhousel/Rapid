@@ -2,6 +2,11 @@
 
 Reverse-chronological one-liners. Details live in git history — these are just breadcrumbs.
 
+- **ESLint → oxlint** (Nov 17 2026) — same rules and warnings, lint ~10× faster, 160 fewer packages.
+  The protected-`_` and no-`private` conventions live in a local plugin (`scripts/oxlint_plugin.js`).
+  `prefer-const`/`no-var`/`prefer-rest-params`/`prefer-spread` now cover JS tests too. Clears the way
+  for TypeScript 7.
+
 - **`conflation-system` branch ready for main as v3.0.0-pre.4** (Nov 16 2026) — data IDs, graph geometry,
   the validation audit, both bug hunts, edit props and backup v4, the upload path, the scene, and
   conflation Steps 1–6 (first version). Last fix before merging: an accept from a custom dataset

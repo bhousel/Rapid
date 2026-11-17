@@ -1,6 +1,5 @@
 import { styleText } from 'node:util';
 
-export {};
 const outdir = './dist/js';
 
 await buildJS();

@@ -59,7 +59,7 @@ describe('validateMismatchedGeometry', () => {
   function validate() {
     const entities = [ ..._graph.base.entities.values() ];
 
-    let issues = [];
+    const issues = [];
     for (const entity of entities) {
       issues.push(...validator(entity, _graph).issues);
     }

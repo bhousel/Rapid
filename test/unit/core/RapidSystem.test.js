@@ -8,7 +8,7 @@ import * as sample from './RapidSystem.sample.js';
 
 describe('RapidSystem', () => {
 
-  let _currParams = new Map();
+  const _currParams = new Map();
 
   class MockUrlHashSystem extends Rapid.MockSystem {
     constructor(context) {

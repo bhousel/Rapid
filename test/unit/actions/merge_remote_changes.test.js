@@ -91,7 +91,7 @@ describe('actionMergeRemoteChanges', () => {
       });
 
       it('doesn\'t merge tags if conflict (local change, remote delete)', () => {
-        var localTags = { foo: 'foo_local' };     // changed foo
+        const localTags = { foo: 'foo_local' };     // changed foo
         const remoteTags = {};                    // deleted foo
         const local = base.entity('n1').update({ tags: localTags });
         const remote = base.entity('n1').update({ tags: remoteTags, version: '2' });

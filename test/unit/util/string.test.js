@@ -80,6 +80,7 @@ describe('utilWildcard', () => {
   });
 
   it('escapes special regex characters', () => {
+    // oxlint-disable-next-line no-template-curly-in-string
     const result = Rapid.utilWildcard('hello .+^${}()|[]\\ *');
     assert.instanceOf(result, RegExp);
     assert.strictEqual(result.toString(), '/^hello \\.\\+\\^\\$\\{\\}\\(\\)\\|\\[\\]\\\\ .*$/');

@@ -566,7 +566,7 @@ Start the Tutorial, and the Rapid-splash "skip to Rapid" path).
   `disclosure`, `loading`, `combobox`, `tooltip`, `modal`, `confirm` — are now TS classes.
   `toggle`/`popover` were deleted; `form_fields` became `UiFormFields`; `section`/`uiSection` is dead
   code (only referenced by the quarantined `react_container.jsx`).
-- **`$`-prefixed selection properties must be `public`.** The eslint `naming-convention` rule
+- **`$`-prefixed selection properties must be `public`.** The `rapid/protected-underscore` lint rule
   requires `protected` members to be `_`-prefixed, which conflicts with the `$var` selection
   convention. Declare selection state as `public $foo: D3Selection` (matches `UiInspector`,
   `AbstractUiSection`). Non-selection protected state stays `_`-prefixed.
