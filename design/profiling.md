@@ -78,7 +78,7 @@ scene graph while keeping its parent for transforms and hit-testing. That fits: 
 stay children of the feature container (so `AbstractBehavior._getEventData` still walks up to the
 feature), but a per-level `casings` layer and `strokes` layer render them grouped. Measure the draw
 call count before and after on the same view. Related backlog items: direct mesh generation for
-polygons and lines, and the scene reorganization by `spatialID` (see `.scratchpad/backlog.md`).
+polygons and lines, and the scene reorganization by `spatialID` (see `knowledge/backlog.md`).
 
 ## Out of scope for now
 

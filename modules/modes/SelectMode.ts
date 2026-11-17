@@ -250,13 +250,13 @@ export class SelectMode extends AbstractMode {
 // delete fix, so an empty relation can't be uploaded by accident. But Rapid doesn't draw relations,
 // so the only way back to one is the issues list (or undo).
 // The plan: show relations, including empty ones, and let validation say what's missing, instead of
-// deleting them. See "Render relations" in `.scratchpad/backlog.md`. Then this can be removed.
+// deleting them. See "Render relations" in `knowledge/backlog.md`. Then this can be removed.
 //
 //    // If the user added an empty relation, we should clean it up.
 //    // see https://github.com/openstreetmap/iD/issues/3812
 //    // Not when there are edits to redo: committing would throw them away. Undoing a new relation's
 //    // tags leaves it empty and re-enters select mode, which exits this one.
-//    // See "Render relations" in `.scratchpad/backlog.md`: this cleanup may go away.
+//    // See "Render relations" in `knowledge/backlog.md`: this cleanup may go away.
 //    const graph = editor.staging.graph;
 //    const singularID = this._singularDatum?.id;
 //    const entity = singularID ? graph.hasEntity(singularID) : undefined;

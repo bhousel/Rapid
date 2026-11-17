@@ -267,7 +267,7 @@ These are truly-constant platform/browser data, so per `AGENTS.md` they're fine 
 ## Stretch Goal: Remappable, Persisted Shortcuts
 
 Delivered in phases; only **phase 1 (scaffolding)** is in scope for the initial PR. Phases 2 and 3
-are recorded in [`.scratchpad/backlog.md`](../.scratchpad/backlog.md).
+are recorded in [`knowledge/backlog.md`](../knowledge/backlog.md).
 
 ### Phase 1 — command scaffolding (this effort, behind the scenes)
 

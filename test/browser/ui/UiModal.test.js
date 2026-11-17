@@ -16,7 +16,7 @@ describe('UiModal', () => {
   });
 
   // Note: Esc/Backspace dismissal is routed through `UiSystem`'s modal stack, so it
-  // can't be exercised here without a running `UiSystem`.  See `.scratchpad/current.md`.
+  // can't be exercised here without a running `UiSystem`.  See `knowledge/current.md`.
 
   it('can be instantiated and shown', () => {
     const modal = new Rapid.UiModal(context).show();

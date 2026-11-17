@@ -30,7 +30,7 @@ export interface MapRouletteTaskProps extends MarkerProps {
   comment?: string;
   // MapRoulette auth is turned off: MapRoulette stopped storing API keys in the OSM user preferences
   // and expired the old ones, so Rapid submits without one for now (see "MapRoulette authentication"
-  // in `.scratchpad/backlog.md`, and https://community.openstreetmap.org/t/maproulette-security-incident-october-2026).
+  // in `knowledge/backlog.md`, and https://community.openstreetmap.org/t/maproulette-security-incident-october-2026).
   // /** API key for authenticating MapRoulette API requests */
   // mapRouletteApiKey?: string;
   /** Geographic coordinates of the task */

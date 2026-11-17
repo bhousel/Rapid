@@ -842,7 +842,7 @@ Then, each measured on its own:
 - **Classify a node only when it's dirty** (from step 7's measurements): `PixiLayerOsm` asks every
   visible node for point or vertex, `isEndpoint` and `isIntersection` on every frame. Keeping those
   answers in the layer for staging, recomputed when `dirtyData` names the node, could let the graph
-  memos (and the lineage's `topologyChanged` set) go. In `.scratchpad/backlog.md`.
+  memos (and the lineage's `topologyChanged` set) go. In `knowledge/backlog.md`.
 - **Lineages for GeoJSON and markers**, only once one of them needs versions (section 9).
 
 ## Testing
