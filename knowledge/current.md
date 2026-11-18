@@ -13,7 +13,7 @@ the e2e tests. Careful with `cloc`: its real versions end in `-cloc`, so `bun up
 Still to do, in about this order:
 - **CI:** `build` and `e2e` run on pushes and PRs to `main`. `deploy` and `pages` are disabled by hand in
   the Actions UI; `deploy.yml` still has Bun 1.3.6, a plain `bun install`, and Facebook's AWS role and S3
-  bucket.
+  bucket. Left as is on purpose (Bryan, Nov 18): it won't work, and that's fine for now.
 - **Bryan's own packages, all ESM-only now:** country-coder 6, location-conflation 4, osm-community-index 7
   (needs location-conflation 4), node-diff3 4 (`===` comparison, stricter `MergeRegion` type in
   `merge_remote_changes.ts`), osm-auth 4 (plan in `backlog.md`; also `err.responseText` in `UploaderSystem.ts`
@@ -31,10 +31,10 @@ Still to do, in about this order:
 - **Left in `bun audit`:** postcss 5 via `postcss-selector-prepend`; picomatch via `esbuild-visualizer`
   (both build-only).
   Dependabot alerts are off for the repo.
-- **Minor, later:** `README.md` still links facebook/Rapid (the build badge, the issue tracker, the
-  examples); `package.json`'s `repository`/`bugs` point at bhousel/Rapid since Nov 18. Stale local branches
-  (now also the merged `conflation-system`, `e2e_testing` and `fix-osm-tile-bounds`) and ~70 old remote
-  branches.
+- **Old branches (Nov 18):** local branches and worktrees cleared, and ~67 old branches deleted from the
+  fork (merged, Dependabot, or identical on facebook/Rapid). Left to look at: `overture_sidebar` (Dec 2024,
+  unmerged), `release` (2.5.x) and `upstream` (Jul 2025).
+- **`RELEASE.md`** still describes Facebook's release flow (`deploy.yml`, facebook/Rapid links).
 
 ## Active: matching third-party data against OSM (`ConflationSystem`)
 Top priority. Design: [`design/conflation-system.md`](../design/conflation-system.md) (Steps 1–6 first

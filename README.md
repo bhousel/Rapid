@@ -1,4 +1,4 @@
-[![build](https://github.com/facebook/Rapid/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/facebook/Rapid/actions/workflows/build.yml)
+[![build](https://github.com/bhousel/Rapid/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/bhousel/Rapid/actions/workflows/build.yml)
 [![npm version](https://badge.fury.io/js/%40rapideditor%2Frapid.svg)](https://badge.fury.io/js/%40rapideditor%2Frapid)
 
 
@@ -15,7 +15,7 @@ Rapid is a modern web-based editor for [OpenStreetMap](https://www.openstreetmap
 
 ## Participate!
 
-* See [open issues in the issue tracker](https://github.com/facebook/Rapid/issues?state=open) if you're looking to help on issues.
+* See [open issues in the issue tracker](https://github.com/bhousel/Rapid/issues?state=open) if you're looking to help on issues.
 * To help with translating, see the [Translations](CONTRIBUTING.md#translations) section of the Contributing Guide.
 * Test a prerelease version of Rapid:
   * The current build of the `main` branch is available here: https://rapideditor.org/canary
@@ -29,7 +29,7 @@ We're available to chat!  Ping us on the `#rapid_feedback` channel on either:
 ## For developers
 
 Folders under `dist/examples/` contain example code to help you learn how to integrate Rapid editor into your project.
-* https://github.com/facebook/Rapid/tree/main/dist/examples
+* https://github.com/bhousel/Rapid/tree/main/dist/examples
 
 Design docs for Rapid's core systems (database, network, scheduler, settings, and more) are in [`design/`](design/README.md).
 
