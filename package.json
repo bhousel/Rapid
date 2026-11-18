@@ -1,10 +1,10 @@
 {
   "name": "@rapideditor/rapid",
-  "version": "3.0.0-pre.3",
+  "version": "3.0.0-pre.4",
   "description": "An AI-enhanced editor for OpenStreetMap",
-  "repository": "github:facebook/Rapid",
+  "repository": "github:bhousel/Rapid",
   "homepage": "https://rapideditor.org",
-  "bugs": "https://github.com/facebook/Rapid/issues",
+  "bugs": "https://github.com/bhousel/Rapid/issues",
   "keywords": [
     "editor",
     "openstreetmap"
