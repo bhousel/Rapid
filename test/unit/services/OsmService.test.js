@@ -374,6 +374,16 @@ describe('OsmService', () => {
         assert.lengthOf(spyRedraw.mock.calls, 1, 'redraw called once');
       });
 
+      it('returns only the entities, not the response bounds', async () => {
+        fetchMock.route(/map\.json/, sample.mapJSON, { delay: 1 });
+        const types = [];
+        _osm.loadTiles((err, results) => types.push(...(results?.data ?? []).map(d => d.type)));
+
+        await Bun.sleep(5);  // after all fetches have settled
+        assert.isNotEmpty(types);
+        assert.sameMembers([...new Set(types)], ['node', 'way', 'relation']);
+      });
+
       it(`doesn't retry inflight tiles`, async () => {
         fetchMock.route(/map\.json/, sample.mapJSON, { delay: 1 });
         _osm.loadTiles();
