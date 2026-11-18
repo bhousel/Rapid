@@ -14,6 +14,17 @@ Non-obvious choices where "why did we do it this way?" isn't captured in the cod
   one command (`E2E_RECORD=1`). The CDN stays live: its assets are many MB and are what users load anyway.
   Unknown hosts are blocked, so a test can never reach a live service by accident.
 
+## CDN versions come from `package.json` (Nov 2026)
+
+- **The files Rapid loads from the CDN are pinned to the versions in `package.json`**, through
+  `utilCDNPath()` in `modules/util/dependencies.ts`. Hand-written pins had drifted from what was installed
+  and tested (MapLibre 5.15 at runtime, 5.24 installed). `@latest` was rejected: a new major release
+  would reach users before anyone tested it.
+- **The exact version is the range's lower bound** (`^6.18.0` → `6.18.0`). `bun update` rewrites the lower
+  bound to the installed version, so they stay equal as long as upgrades go through `bun update`.
+- **Importing `package.json` puts its `dependencies` in the bundle** (`devDependencies` get tree-shaken
+  out). A small cost, accepted for one source of truth.
+
 ## The scene (Nov 2026)
 
 The structure and the reasoning are in `design/scene.md`; these are the choices someone might undo.
@@ -83,49 +94,22 @@ The two files were moved with `git mv` (history preserved) and their `applyTo` f
 
 ## `DatabaseSystem` owns the generic file API (but not the `sessions` domain logic)
 
-`DatabaseSystem` (wraps IndexedDB) gained a typed file API — `putFileAsync` / `getFileAsync` /
-`listFilesAsync` / `deleteFileAsync` over a generic `files` store — storing `File`/`Blob` **natively**
-via structured clone (no base64/ArrayBuffer). This *seems* to break the "domain-agnostic engine,
-consumers own their stores" rule that `sessions` follows (owned by `EditSystem`), but the asymmetry
-is deliberate:
-
-- **Sessions encode domain knowledge** (backup schema v3, graph entities, edit history) → owned by
-  the domain system (`EditSystem`).
-- **A file is generic** (a `Blob` + name/type/size) → storage infrastructure. `DatabaseSystem`
-  already owns storage *management* (quota/usage/cleanup — "how much space"), so generic file
-  put/get/list/delete is a natural extension, not a domain leak.
-- Mental model (bhousel): *`DatabaseSystem` is the persistent store for anything more complicated
-  than localStorage.* The browser offers no other general mechanism to stash a user's files for
-  later, so the methods belong here.
-- A future drag-drop / data-file system will own the **domain** semantics (which dataset a file
-  belongs to, reload-on-startup policy, parsing) **on top of** these generic primitives. The
-  drag-drop handler currently lives in `PixiLayerCustomData` and is the natural thing to lift out.
-
-Related: adding the `files` store bumped the DB schema v1→v2. That is *not* a data migration — a new
-IndexedDB object store simply requires a versionchange transaction, and the manifest-driven `_upgrade`
-creates it with zero migration code. `estimateBytes` was fixed to sum real blob bytes so
-`usageByStoreAsync` reports true file sizes rather than a short `blob:<size>` placeholder.
+`DatabaseSystem` has a generic file API (`putFileAsync` / `getFileAsync` / `listFilesAsync` /
+`deleteFileAsync`, Blobs stored natively), although `sessions` is owned by `EditSystem`. The asymmetry is
+deliberate: sessions encode domain knowledge (backups, entities, history), while a file is just a Blob
+with a name. Bryan's mental model: *`DatabaseSystem` is the persistent store for anything more
+complicated than localStorage.* What a file means (which dataset, when to reload it) belongs to its
+consumer, on top of these primitives.
 
 ## Operations are classes named `ThingOperation` (not factory functions like actions)
 
-Operations were factory functions returning an augmented callable (like `actions`), but were
-converted to `AbstractOperation` **classes** named `ThingOperation` (e.g. `CircularizeOperation`,
-`DeleteOperation`). This follows the same naming convention as `ThingMode`, `ThingBehavior`,
-`ThingSystem`, and `ThingService`. Rationale for classes: they sit alongside `AbstractMode`/
-`AbstractBehavior` in the interaction layer (each op already spins up a `KeyOperationBehavior`), and
-the expando idiom scales badly for their ~10 bolted-on props + real derived state (e.g.
-`DisconnectOperation`'s `_wayIDs`/`_actions`). The base class is **not** an `EventEmitter` —
-operations are one-shot commands and emit nothing, unlike modes/behaviors. The shared shape is a
-superset base class with optional hooks (`relatedEntityIds`/`availableForKeypress`/`point`/
-`mouseOnly`) rather than per-op sub-interfaces, because operations are consumed polymorphically
-through one `AbstractOperation[]` menu array. The old callable `operation()` became `operation.run()`.
-
-Classes did **not** by themselves fix non-idempotency: the per-op derived fields are recomputed on
-every menu setup, so they were never the issue. The genuinely persistent state is
-`CycleHighwayTagOperation`'s module-level `_lastSelectedIDs` — a per-click class instance can't
-remember the *previous* cycle's selection, so it stays module-scoped (with a comment). The "correct"
-fix per the system-ownership rule would move it onto a system; deferred as out-of-scope for the
-conversion.
+Operations sit beside modes and behaviors (each one already makes a `KeyOperationBehavior`), and the
+callable-with-expandos idiom scaled badly for their ~10 props and derived state. So they're
+`AbstractOperation` classes, named like `ThingMode` and `ThingSystem`, and called with `run()`. The base
+is **not** an `EventEmitter` (operations are one-shot and emit nothing), and it's one superset class with
+optional hooks rather than per-op interfaces, because the menu uses them through one array.
+`CycleHighwayTagOperation`'s module-level `_lastSelectedIDs` stays (a per-click instance can't remember
+the previous cycle); moving it onto a system is in `backlog.md`.
 
 ## UI fields: inheritance over composition
 
@@ -151,54 +135,27 @@ emits `change` on itself.
 
 ## UI events: EventEmitter over d3_dispatch/utilRebind
 
-All UI class components that emit events extend `EventEmitter` from `tseep/lib/ee-safe` — the same
-library used by `AbstractSystem`, `AbstractMode`, `AbstractBehavior`, and `Context`. This gives a
-single, consistent event API across the whole codebase (`.on` / `.off` / `.emit`) and removes the
-d3-dispatch + `utilRebind` + `public on!` boilerplate that every emitting class had to repeat.
+UI classes that emit events extend `EventEmitter` from `tseep/lib/ee-safe`, like systems, modes,
+behaviors and `Context`: one event API everywhere, without the d3-dispatch + `utilRebind` boilerplate
+(both retired). One wrinkle: `UiCombobox`'s consumers re-register `accept`/`cancel` on every render and
+relied on d3-dispatch replacing the listener, so its constructor wraps `on` to remove the old one first
+(tseep's `on` is a class field, so it can't be overridden as a method).
 
-`combobox` and `disclosure` (the last two `d3_dispatch`/`utilRebind` holdouts) are now the
-`UiCombobox`/`UiDisclosure` classes, so **`d3_dispatch` and `utilRebind` are fully retired** —
-`modules/util/rebind.ts` and its test were deleted. `UiCombobox` needed one wrinkle: its consumers
-re-register `accept`/`cancel` on every render and relied on d3-dispatch's one-listener-per-type
-replacement, so its constructor wraps `on` to `removeAllListeners(event)` before adding (tseep types
-`on` as a class field, so it can't be overridden as a method — the wrapper is assigned in the ctor).
+## UI primitives are classes when they're owned over time
 
-`UiFieldRestrictions` was the only disabled/stub class; it still extends `EventEmitter` even though
-its `render()` is a placeholder, because the field registry (`uiFields`) instantiates it just like
-any other field type.
-
-## UI primitives `tooltip`/`modal`/`confirm` → classes (reversing the earlier "keep as functions")
-
-An earlier pass kept `icon`, `tooltip`, `popover`, `modal`, `confirm`, `combobox`, `disclosure`,
-`section` as typed **factory functions** ("one-shot builders"). That heuristic was wrong for
-components that are actually **owned and re-rendered over time** — the real test is ownership +
-lifecycle, not construction ergonomics. `combobox`/`disclosure`/`loading` were already converted;
-`tooltip`/`modal`/`confirm` are next. (`icon` stays a stateless function; `section`/`uiSection` is
-dead except the quarantined React demo; `popover` is folded into tooltip.)
-
-- **`tooltip` is genuinely owned state.** ~20 components hold `public Tooltip: any` and reconfigure +
-  relocalize it on every render (e.g. `UiZoomControl` sets `.title()/.placement()/.shortcut()` then
-  `.updateContent()`), plus ~40 inline `.call(uiTooltip(ctx)…)` sites. A `UiTooltip` class (extending
-  `EventEmitter` for family consistency) kills the `any`s and gives owners a typed, holdable handle.
-  Attach idiom `sel.call(tooltip)` → `sel.call(tooltip.attach)`.
+An earlier pass kept `tooltip`, `modal`, `confirm`, `combobox` and `disclosure` as factory functions
+("one-shot builders"). The real test is ownership and lifecycle: ~20 components held a
+`public Tooltip: any` and reconfigured it every render. So they're classes now (attach with
+`sel.call(tooltip.attach)`). `icon` stays a stateless function.
 
 ## Modal stack is owned by `UiSystem`
 
-The single-modal limitation in `uiModal` (global `document` keybinding + "replace the one existing
-modal" logic) forces ugly hacks whenever a second modal must sit on top of a first — see
-`UiRapidCatalog`/`UiRapidAddDataset`, which monkeypatch `$parentModal.close` and hand-rebuild
-`utilKeybinding`. The fix is a **modal stack owned by `UiSystem`** (`context.systems.ui`):
+Each `UiModal` owns its own `.shaded` backdrop; `UiSystem` keeps the stack, and one document handler
+sends Esc/Backspace to the top modal only. That's what lets modals nest (the Rapid catalog over the
+dataset modal) without the old hacks that patched the parent's `close` and rebuilt its keybindings. On a
+system because it's runtime state, and a CLI build without `ui` has no modals.
 
-- Each `UiModal` instance owns its own `.shaded` backdrop layer; `show()` pushes onto the stack,
-  `close()` pops. Only the **top** modal receives Esc/Backspace (one document handler routes to the
-  top), which is what makes nesting work without clobbering the parent's keybindings.
-- Owning the stack on `UiSystem` follows the "runtime state lives on a system" rule (a future CLI
-  build simply has no `ui` system, so modals no-op) and matches the reality that there is exactly one
-  active/top modal at a time.
-- `UiConfirm extends UiModal` (thin: header + message + `okButton()`), converted **after** `UiModal`.
-- `UiRapidCatalog`/`UiRapidAddDataset` hacks delete entirely once nesting is native.
-- **Sequencing:** `tooltip` first (independent, no unknowns), then `modal` + `confirm` together once
-  the `UiSystem`-owned stack is in place.
+## HTML sanitizing and the CSP (Jul 2026)
 
 - **Use explicit strict sanitization only at known trust boundaries.** External QA content, notes, remote metadata, Markdown, and reusable HTML widgets pass through Rapid's detached-document allowlist. The sanitizer rejects foreign namespaces and unsafe URL schemes, hardens new-window links, and reparses until serialization is stable. It fails closed to escaped text when DOM parsing is unavailable.
 - **Do not install a document-wide Trusted Types default policy.** Rapid's registries and embedding model let extensions own their rendering. A global policy rewrites those extension sinks, and DOMPurify's assumptions did not hold in live Chrome. Keep sanitization local to the core trust boundaries instead.
@@ -216,22 +173,15 @@ modal" logic) forces ugly hacks whenever a second modal must sit on top of a fir
 - **Hit areas are in container-local space** — `container.hitArea = new PIXI.Polygon(...)` coordinates must be in the container's local frame. For world-path features the local frame is world-local (origin-relative). `lineToPoly()` is called with world-local points and a world-local buffer width. Pixi composes the container transform when doing hit testing, so no extra projection is needed.
 - **DashLine halos: `scale` only, no per-caller workaround** — DashLine's `scale` option multiplies `width` and each `dash[i]` to convert drawing-coord units to screen pixels. Line/Polygon halo containers have `scale=1` (drawing in world units), so they pass `scale: 2^(WORLD_ZOOM - zoom)` (a.k.a. `localScale`) to keep dashes at fixed screen-pixel sizes. Point halo containers have a counter-scale (`1/worldScale`) that puts halo-local units in CSS pixels, so `scale=1` (default) is correct. DashLine itself uses `textureSpace: 'global'` (normalizes UV by texture pixel dimensions, no per-segment stretch), keeps pow2 padding for WebGL1 REPEAT-wrap, and compensates in the per-segment matrix using `texW`/`texH` instance fields so one full cycle covers exactly `dashSize * userScale` local units. Matrix composed scale-then-rotate for non-uniform scale correctness.
 - **`viewZoom` vs `styleZoom` naming convention** — Throughout the Pixi layer and feature files: `viewZoom = viewport.transform.zoom` is used for scale chain math (world↔screen scale factors, `worldScale = 2^(viewZoom - WORLD_ZOOM)`). `styleZoom = map?.effectiveZoom() ?? viewZoom` is the latitude-adjusted zoom used only for LOD thresholds (`< 16`, `< 17`) and styling decisions. The two are explicitly named at the top of each method that needs both. `PixiFeaturePolygon` has no LOD thresholds so it only has `viewZoom` — intentional.
-- **`MapSystem.effectiveZoom()` formula** — `z + (-log2(cos(lat * DEG2RAD)))`. The old implementation used two `geoMetersToLon(1, lat)` / `geoMetersToLon(1, 0)` calls whose ratio is exactly `1/cos(lat)`, i.e. `sec(lat)`. The direct formula is equivalent but avoids the detour through longitude-scale math.
-- **Dual-path migration pattern**: `_geom !== null` → world path; else legacy screen path. Branch on `if (this._geom)` in feature `update()`. Legacy `geom` (PixiGeometryPart) is kept alive until all callers migrate. Final cleanup (Step 5) removes `geom`, `PixiGeometryPart`, all `setCoords` calls, and merges both paths.
 
-## World Coordinate System (render_worldcoord)
+## World coordinates and their numerics
 
-- **Use SDK-native z16 world coordinates as the canonical world space** — We removed Rapid's temporary `worldScaled` bridge and now rely on `@rapid-sdk/math` world coordinates directly (`WORLD_ZOOM = 16`, world range `0..16,777,216`). This avoids duplicate geometry caches and keeps rendering/spatial math aligned with SDK primitives.
-- **Keep world-coordinate grouping in PixiScene** — Feature groups continue using a single zoom-dependent group transform (`scale = 2^(zoom - WORLD_ZOOM)`) so features can stay in world-coordinate local geometry without per-vertex reprojection each frame.
-
-## World Coordinate Numerics
-
-- **World coordinates are safe for affine transforms, risky for shoelace-style derived metrics** — Rotation, translation, scaling in world space work correctly. But d3-polygon's centroid/area formulas involve cross-products (x₀*y₁ - x₁*y₀) where the products are ~1e13 and their differences are ~1e7, leading to catastrophic cancellation when accumulating ~1e14-magnitude terms. The final centroid can land far outside the polygon's hull.
-- **Compute d3-polygon metrics in a local translated frame** — For centroid and area, translate all points by subtracting the extent center (world.origin), compute the metric locally, then translate the result back. This keeps intermediate values small (~1e-6) and preserves precision. Example: centroid in world space landed outside the hull; same computation on translated points (offset by `world.origin`) placed centroid correctly inside.
-- **GeometryPart caches `.local` coordinates for numerical stability** — Each GeometryPart now stores three coordinate frames: (1) `.orig` in WGS84, (2) `.world` in z16 world coordinates, (3) `.local` relative to world origin. All d3-polygon computations (hull, centroid, area, ssr) happen on `.local` coordinates, then results are translated back to world space. This eliminates the need for the `stablePolygonCentroid()` workaround and enables future Pixi rendering optimization: local arrays can be rendered directly with Pixi container transforms (position at origin, no per-vertex reprojection).
-- **Hull and geometric tests are robust** — `polygonHull()` and orientation tests (like `cross(a,b,c)`) work correctly on large coordinates because they compare point membership (combinatorial) rather than accumulating cancelling terms.
-- **Area drifts less than centroid** — In a test case (0.00456% drift for area vs. >100% for centroid), but both use local frame for consistency and to avoid future surprises.
-- **References:** See [modules/lib/GeometryPart.ts](modules/lib/GeometryPart.ts) local frame computation and [test/unit/lib/GeometryPart.test.js](test/unit/lib/GeometryPart.test.js) tests for local/world coordinate correctness.
+- **SDK-native z16 world coordinates are the one world space** (`@rapid-sdk/math`, `WORLD_ZOOM = 16`,
+  `0..16,777,216`); the temporary `worldScaled` bridge is gone.
+- **Safe for affine transforms, not for shoelace-style metrics.** d3-polygon's centroid and area
+  cross-multiply ~1e7 coordinates; the cancellation put a centroid far outside its hull. So
+  `GeometryPart` keeps `.local` coordinates (relative to the extent center) and computes hull, centroid,
+  area and the rest there. Hull and orientation tests are combinatorial, so they're fine either way.
 
 ## Spatial System — buffers / conflation (Step 3)
 
@@ -262,9 +212,11 @@ modal" logic) forces ugly hacks whenever a second modal must sit on top of a fir
 
 Call sites pass a **world-space delta** (a `Vec2` difference of two `projWgs84ToWorld()` results), not a screen/viewport delta. This removes the `viewport` parameter that was previously required.
 
-- **`NsiTreeProperties` removed from imports** — NSI v7 exports this type but we use `NsiTreesJSON['trees']` directly for the `trees` cache property, making the standalone type import unused.
-- **`tags.wikipedia` qids lookup was dead code** — NSI used to cache both `wikidata QID → canonical QID` and `wikipedia URL → wikidata QID` in the replacements data. When we upgraded to NSI v7, which dropped wikipedia tracking, we removed the wp-caching loop in `_loadNsiDataAsync`. This made `this._nsi.qids?.get(tags.wikipedia)` in `upgradeTags` always return `undefined`. Removed the dead branch; `delete newTags.wikipedia` further down remains valid (strips bare `wikipedia=*` when a wikidata match is found).
-- **Local `NsiItem` extends upstream `NsiItem`** — NSI v7's `NsiItem` type doesn't include runtime-populated fields `tkv` (tree/key/value path) and `mainTag` (e.g. `brand:wikidata`). We extend it locally to type those fields without casting everywhere.
+## `NsiService` and NSI v7
+
+- **No wikipedia replacements.** NSI v7 stopped tracking `wikipedia` in `replacements.json`, so that
+  lookup is gone; `upgradeTags` still drops a bare `wikipedia=*` when a wikidata match is found.
+- **Local `NsiItem` extends NSI's** with the fields Rapid fills in at runtime (`tkv`, `mainTag`).
 
 ## StyleSystem / StyleSelector
 
@@ -272,66 +224,39 @@ Call sites pass a **world-space delta** (a `Vec2` difference of two `projWgs84To
 - **Default weight is 1** — Existing selectors with no `weight` all get weight=1, meaning equal-weight selectors preserve insertion order (stable sort). This keeps current behavior for the vast majority of selectors that don't need explicit ordering.
 - **Sort ascending, iterate forward** — `findAll()` returns selectors sorted by weight ascending. `styleMatch()` iterates forward with `deepMerge`, so the last (highest-weight) selector wins. This is simpler than the old pattern of sorting descending then iterating in reverse.
 
-## NetworkSystem
+## Network and workers
 
-- **`RequestID` as a typed string ID** — Follows the established pattern in `ids.ts` (like `EntityID`, `TileID`). Used throughout `NetworkFetchOptions`, `InflightRequest`, `QueuedFetch`, and all public API methods. Default requestID is `'${METHOD} ${url}'` (e.g. `'GET https://example.com/data'`). Services pass domain-specific IDs like `'keepright-tile-0,0,14'`.
-- **Regex `.test()` for `abortMatching` predicates** — All predicates use `/^prefix-/.test(requestID)` instead of `requestID.startsWith('prefix-')`. ~10% faster per jsbench, and consistent across all services. Domain dots escaped (e.g. `/nominatim\.openstreetmap\.org/`).
-- **Worker offloading is transparent** — `network.fetch<T>()` automatically routes through `dispatch('fetchAndParse', ...)` when WorkerSystem is available and no custom `fetchFn` is provided. Callers don't know or care whether the fetch ran on main thread or worker. `fetchRaw()` always runs on main thread (returns `Response` object, not serializable).
-- **Listener registry for domain-specific worker functions** — `WorkerSystem` has a `registerListener(listenerID, listener)` / `getListener(listenerID)` API. Systems register their `*.worker.ts` listeners at init time. Callers pass `listenerID` + `listenerData` in `NetworkFetchOptions`. If a `listenerID` is provided but not registered, the promise rejects — never silently falls through to generic fetch+parse.
-- **Concurrency limiting with FIFO queue** — When `numActive >= maxInflight`, new requests queue. Queued requests are abortable for free (no network request started). Default `maxInflight: 100`.
-- **`hasMatching()` checks `_inflight` only, not `_queue` separately** — All requests (both active and queued) are registered in `_inflight` at the bottom of `_trackAndDispatch`. The queue is a *subset* of inflight.
-- **Note tile request IDs use `osm-note-tile-` prefix** — Avoids collision with `osm-note-post-create-*` / `osm-note-post-update-*`, so `abortMatching` can simply test `/^osm-note-tile-/`.
-- **OsmService request ID prefix conventions** — `osm-data-tile-${tileID}` (map data tiles), `osm-note-tile-${tileID}` (note tiles), `osm-note-post-create-${noteID}`, `osm-note-post-update-${noteID}`, `osm-changeset-create` / `osm-changeset-upload-${id}` / `osm-changeset-close-${id}`.
-- **WaybackService metadata cache key is NOT a requestID** — `getMetadataAsync()` has `const key = \`${tile.id}_${releaseDate}\`` which is a local cache lookup key. Only the property passed to `network.fetch()` uses the `requestID` name.
-
-## NetworkSystem — FetchEnvelope and outcome tracking
-
-- **`FetchEnvelope<T>` as the worker-boundary transport type** — Workers can't post `Response` objects, and thrown errors lose `.status` when flattened to string by `worker.postMessage`. `FetchEnvelope` carries the real HTTP status in all cases. All worker listeners return envelopes; the main-thread fetch path produces one too via `fetchEnvelope()` in `util/fetch_response.ts`. The bespoke `OsmFetchResult` is gone — replaced by the generic envelope.
-- **AbortError never wrapped in an envelope** — It remains a rejected promise from all paths. This is what allows aborted requests to remain unrecorded (retryable). Never record an abort — the "pan away, pan back reloads the tile" behaviour depends on this invariant.
-- **Three public fetch methods for different caller needs** — `fetch<T>()` unwraps the envelope and throws `FetchError` on HTTP error (90% case). `fetchEnvelope<T>()` returns the envelope, letting callers branch on status without try/catch (OsmService auth/rate-limit logic). `fetchRaw()` returns the raw `Response` — always main-thread, always `ok:true` from the envelope's perspective (caller inspects `response.status` itself).
-- **`_completed: Map<RequestID, number>` is protected** — NetworkSystem is the single writer. Services use the public API: `isCompleted`, `getStatus`, `markCompleted`, `forget`. `completed.add(id)` was the old pattern that leaked across services; now there's no public write path.
-- **Only explicit `requestID` options are recorded** — Auto-computed IDs (`'GET https://...'`) are NOT tracked. `_trackAndDispatch` takes a `trackCompleted: boolean` param; `_getOrDispatch` and `fetchRaw` compute `track = (options?.requestID !== undefined)`. Keeps the map lean and scoped to callers that care about dedup/retry.
-- **`STATUS_SKIPPED = -1` for non-HTTP completions** — Tiles that cover a blocked region call `network.markCompleted(requestID)` (status = `STATUS_SKIPPED`). `STATUS_ERROR = 0` is the sentinel for transport failures / worker-flattened errors where no real HTTP status is available.
-- **Retry intent is per-service, expressed via `forget()`** — Default is "don't retry" (NetworkSystem auto-records the error status). Do-retry services (Streetside, MapWithAI, OsmService tiles) call `network.forget(requestID)` in their catch handler to un-record the error and allow another attempt on the next `loadTiles()` call.
-- **`FetchError` extended to construct from envelope fields** — `new FetchError(Response | FetchErrorInit)`. `FetchErrorInit` carries `{ status, statusText, message?, body? }`. Allows HTTP error details to be reconstructed on the main thread from an error envelope that crossed the worker boundary.
-
-## 3-System Split: SchedulerSystem / WorkerSystem / NetworkSystem
-
-- **WorkerSystem owns "where to run"** — Worker pool (lazy spawn, round-robin, workerURL config, maxWorkers, terminateWorkers) + listener registry (registerListener, unregisterListener, getListener). Extracted from SchedulerSystem (pool) and NetworkSystem (listener registry) to avoid a 1000+ line monolith and give worker management a clear home.
-- **SchedulerSystem owns "when to run"** — Game loop (rAF), priority queues (urgent/normal/idle), timers (debounce/throttle/setTimeout/setInterval), frame callbacks, backpressure. No worker knowledge.
-- **NetworkSystem owns network I/O** — Fetch lifecycle, inflight tracking, dedup, abort, concurrency limiting, timeout. Dispatches to WorkerSystem when available (`worker` is an optional dependency). Falls back to main-thread listener via `worker.getListener()`.
-- **`workerURL` auto-detected in WorkerSystem constructor** — `Context.scriptURL` (captured from `document.currentScript.src` at bundle eval time) is used to derive the worker URL (same directory, matching `.min.` status). Detection happens at construction time (during `prepareAsync`'s system construction loop), so host apps can override or set `null` at any time before workers are first spawned.
-
-## Request Interceptor API
-
-- **Interceptors run on the main thread before dispatch** — They produce a serializable `RequestInit` that can be sent to a web worker. Auth headers are added on the main thread (where the token is available), then the modified init crosses the worker boundary as plain data.
-- **Registration order matters** — Interceptors run in registration order, each receiving the output of the previous.
-- **OsmService `_authInterceptor`** — Uses `oauth.getAccessToken()` from osm-auth v3.2.0. Adds `Authorization: Bearer <token>` to any request targeting `this._apiroot`.
-- **Interceptors replace `fetchFn` for auth** — OsmService no longer passes `fetchFn: this._oauth.fetch`. `fetchFn` remains in the API as an escape hatch.
-- **Write operations stay `mainThread: true`** — Changeset create/upload/close and note post operations are infrequent and don't benefit from worker offloading.
-
-## Worker Architecture Vision
-
-- **Deferred result resolution via `resultPriority`** — `WorkerSystem.dispatch()` accepts an optional `{ resultPriority: 'urgent' | 'normal' | 'idle' }`. When set, the promise returned by `dispatch()` is resolved through `SchedulerSystem.schedule()` instead of immediately in the worker's `onmessage` handler. Prevents heavy `.then()` chains from blowing frame budgets. OsmService's `loadFromAPI` uses `resultPriority: 'normal'`.
-- **Named operation registry** — Workers support multiple named listeners. Each `*.worker.ts` companion file exports a `ListenerRegistry`. Can't send closures across `postMessage`.
-- **All worker listeners return `FetchEnvelope<T>`** — This is the protocol. A listener that throws on HTTP error would have its error flattened to a string by `worker.postMessage`. The envelope is how status survives the boundary.
-
-## Relative URL Resolution in Workers
-
-- **Workers resolve relative URLs against their own script path** — A worker at `js/rapid-worker.js` resolves `data/foo.json` as `js/data/foo.json`, not from the page root.
-- **Fix in `NetworkSystem._dispatchFetch`** — When `useWorker` is true, relative URLs are resolved to absolute via `new URL(url, globalThis.location?.href)` before being sent. `_resolveURL` is a private helper.
+How it works is in `design/network-system.md` and `design/scheduler-system.md`; these are the rules
+someone might break by accident.
+- **Three systems:** `SchedulerSystem` decides when to run (frame loop, queues, timers, backpressure),
+  `WorkerSystem` where (the pool and the listener registry), `NetworkSystem` handles fetches. The split
+  kept one system from passing 1,000 lines.
+- **Never record an abort.** An `AbortError` is always a rejection, never an envelope, so an aborted
+  request stays retryable: "pan away, pan back reloads the tile" depends on it.
+- **Every worker listener returns a `FetchEnvelope<T>`.** A thrown error loses its `.status` crossing
+  `postMessage`; the envelope is how the status survives.
+- **Only explicit `requestID`s are recorded** in `_completed`, and only `NetworkSystem` writes it. Retry
+  is a service's choice: `network.forget(id)` in its catch handler (OSM tiles, Streetside, MapWithAI).
+- **An unregistered `listenerID` rejects**; it never falls back to the generic fetch and parse.
+- **Auth goes through request interceptors**, on the main thread, so the token never needs to reach a
+  worker and the request crosses as plain data. Writes (changesets, notes) stay `mainThread: true`.
+- **Workers resolve relative URLs against their own script**, so `NetworkSystem` makes them absolute
+  before dispatching.
+- **`resultPriority`** resolves a worker's result through the scheduler, so heavy `.then()` chains don't
+  blow a frame budget (OSM tile loads use `'normal'`).
 
 ## Worker Companion Convention (`*.worker.ts`)
 
-- **Co-located companion files** — Worker-side listeners live in `Foo.worker.ts` next to the main-thread `Foo.ts`. Each exports individual named listeners plus a `listeners: ListenerRegistry`.
-- **Dual registration** — The same listener functions are registered in two places: (1) the worker imports them via `index.worker.ts` barrel → `worker.ts`, and (2) the service imports them and calls `worker.registerListener()` at init time. Each execution context gets its own module-scope state.
-- **Folder-level `index.worker.ts` barrels** — Each module folder with worker companions has an `index.worker.ts` that re-exports them alongside the main-thread `index.ts` barrel.
-- **Worker-safe by construction** — `.worker.ts` files must only import worker-safe code (parsers, utilities). They cannot import `Context`, systems, or anything DOM-dependent.
-- **`Listener` and `ListenerRegistry` types** in `global.d.ts` — `Listener = (data: unknown, signal: AbortSignal) => unknown | Promise<unknown>`. Declared globally for convenience since they're used across bundle boundaries (worker entry point, companion files, main-thread systems). Avoids cross-bundle import concerns. `ListenerRegistry = Record<ListenerID, Listener>` is the barrel export type for `index.worker.ts` files.
-- **Long-lived instances** — Companion files may instantiate stateful objects (e.g. `OsmXMLParser`) at module scope. These persist for the lifetime of their execution context (worker or main thread). Keep them stateless between calls (the OSM parsers no longer cache seen IDs, so there's nothing to reset).
-- **NetworkSystem owns inflight tracking** — Services pass `task` + `taskData` in `NetworkFetchOptions`. NetworkSystem routes to worker or calls the registered listener directly. No local `inflight` Map needed in services — `isInflight()`, `abortMatching()`, and `hasMatching()` all work transparently.
-- **Structured-clone constraint** — Worker task results must be structured-clone safe: plain objects, arrays, Sets, Maps, typed arrays. No DOM nodes, no prototype methods. Parse XML in the worker, return `ParserResult` (not `Document`).
-- **`resetAsync` does not terminate workers** — Workers are long-lived and persist across resets. If a system ever needs worker-side state cleared, it should dispatch its own reset message to its listener functions. Terminating workers on reset would race with those messages and is expensive (script re-parse + re-compile on respawn). Workers only terminate on explicit `terminateWorkers()` calls or system destruction.
+- **`Foo.worker.ts` sits next to `Foo.ts`** and exports its listeners plus a `listeners: ListenerRegistry`;
+  each folder's `index.worker.ts` re-exports them. The same functions are registered twice: in the worker
+  (through the barrels) and by the service with `worker.registerListener()`, for when there's no worker.
+- **Worker-safe by construction:** a `.worker.ts` imports only parsers and utilities, never `Context`,
+  systems or the DOM. Results must survive structured clone (return a `ParserResult`, not a `Document`).
+- **`Listener` and `ListenerRegistry` are global types** (`global.d.ts`), because they cross bundle
+  boundaries.
+- **Workers live across `resetAsync`.** Terminating them would race with reset messages and re-parse the
+  script; a system that needs worker state cleared sends its own message. Module-level objects in a
+  companion file (the OSM parsers) must keep no state between calls.
 
 ## Architecture
 
@@ -351,21 +276,15 @@ Call sites pass a **world-space delta** (a `Vec2` difference of two `projWgs84To
 - **`match()` and excludes subtlety** — `match({k: v})` only sees the key/value pairs you pass. When excludes reference different keys than includes, pass the full tag object.
 - **Actions access schema via `graph.context.systems.schema`** — `Graph.context` is always set. This is fine and explicit.
 
-## MVT Protobuf Parsing on Worker
+## Vector tiles: MVT on a worker, PMTiles not
 
-- **`network:fetchAndParseMVT` as a standard listener** — Generic enough for any MVT tile source. Accepts `{ url, init, tileXYZ }`, fetches URL via `fetchAndParse` (reusing the existing generic listener internally), decodes with `VectorTile`/`Protobuf`, converts each feature to GeoJSON, returns `MVTFeatureResult[]` with `layerID`, `origID`, and `feature`. The caller decides what to do with each layer.
-- **Both services converge** — VectorTileService (standard MVT path) and MapillaryService both use the same listener. Layer-specific logic (caching images vs. creating GeoJSONData with merge queues) stays on the main thread where it needs `Context`.
-- **VectorTileService split: `_parseTileBuffer` vs `_processVTResults`** — PMTiles path still decodes on the main thread via `_parseTileBuffer` (which builds `MVTFeatureResult[]` from a raw buffer), then delegates to `_processVTResults`. Standard MVT path receives pre-parsed `MVTFeatureResult[]` directly from the worker. Both paths share `_processVTResults` for property stringification, prophash computation, multi→single splitting, GeoJSONData creation, caching, and merge queue logic.
-- **No buffer-accepting variant (yet)** — The listener only accepts a URL, not a pre-fetched `ArrayBuffer`. The PMTiles path would need this (PMTiles owns its own fetch, then hands us a buffer to decode). Deferred until we think through PMTiles lifecycle on the worker.
-
-## PMTiles Fetching Bypasses NetworkSystem
-
-- **PMTiles library owns its own fetch** — `PMTiles.getZxy()` delegates to `Source.getBytes(offset, length, signal)` internally. The default `FetchSource` issues HTTP Range requests with `globalThis.fetch`. These requests bypass NetworkSystem entirely, so `inflightPMTiles: Map<string, AbortController>` tracks them separately on VTSource.
-- **Future unification** — A custom PMTiles `Source` adapter could delegate `getBytes()` to `network.fetchRaw()` with Range headers. This would eliminate `inflightPMTiles` and let NetworkSystem be the single source of truth for all inflight traffic. Low priority for now.
-
-## Generic Type Parameters Over Element Casts
-
-- **Annotate the container, not elements** — `new Set<RequestID>(...)` over `new Set(... as RequestID)`. One annotation vs. repeated casts. Already the pattern for `SystemID`; now applied consistently to `RequestID` and other ID types in Set/Map constructors.
+- **`network:fetchAndParseMVT` is shared** by `VectorTileService` and `MapillaryService`: the worker
+  fetches and decodes, and returns GeoJSON per layer; what to do with each layer stays on the main thread,
+  where `Context` is.
+- **PMTiles does its own fetching** (HTTP Range requests from the library), so it bypasses
+  `NetworkSystem` and still decodes on the main thread; `VTSource.inflightPMTiles` tracks its requests.
+  A PMTiles `Source` that calls `network.fetchRaw()`, and a listener that takes a buffer, would unify
+  them. Low priority.
 
 ## Dual-Props Pattern
 
@@ -375,11 +294,6 @@ Used when a class resolves references (`var()`, locale strings) in its props:
 - Getter returns `resolved ?? raw` (zero overhead when no vars)
 - `reset()` = null out the resolved copy
 - Applied to: `Style`, `PropMatcher`. NOT needed for `Preset`/`Field` (localization cached in `_strings` Map).
-
-## Scheduler Fallback Pattern
-
-- **Services must fall through when scheduler is absent** — `scheduler?.debounce('id', request, opts)` silently drops the `request()` when scheduler is undefined. For services where the wrapped function MUST execute (API calls, data fetches), use: `if (shouldDebounce && scheduler) { scheduler.debounce(...) } else { request() }`. UI render deferrals (`redraws`, `renders`) are safe as no-ops — missing one is harmless.
-- **`scheduler` is an optional dependency** — Services that use it add `'scheduler'` to `optionalDependencies`. This keeps services testable without SchedulerSystem and supports future CLI contexts.
 
 ## Context Lifecycle
 
@@ -395,13 +309,11 @@ Used when a class resolves references (`var()`, locale strings) in its props:
 
 ## Canvas Renderer Atlas Support
 
-- **Canvas renderer bypasses the upload pipeline** — Pixi's canvas renderer has no `_uploads` map. It reads `TextureSource.resource` directly via `canvasUtils.getCanvasSource()` at draw time. If `resource` is falsy, it returns `null` and nothing draws.
-- **Canvas-backed `AtlasSource` as the fix** — When `useCanvas: true`, `AtlasSource` creates an `HTMLCanvasElement` matching the slab size and sets it as `this.resource`. The canvas renderer's `getCanvasSource()` returns this directly — zero copies, zero conversions (not PMA, no resize needed).
-- **Blit direct sources at allocation time, not upload time** — Because there's no upload hook for canvas, `_blitItemToCanvas()` is called in `AtlasAllocator.allocate()` right after the item is added. It uses `putImageData()` for `ImageData` and `drawImage()` for canvas/image/bitmap sources, with the same padded-vs-inner offset used by GL/GPU.
-- **No JS padded-pixel buffer** — The old `_getItemPixels()` loop is gone. Edge replication happens only when `PixiTextures` builds a padded tile canvas; other atlas entries upload directly and leave their reserved ring transparent.
-- **Canvas overhead only when needed** — The `useCanvas` option is only set to `true` when `RendererType.CANVAS` is detected. GL/GPU paths don't create backing canvases, avoiding the extra ~16MB per 2048×2048 slab.
-- **`(this as any).resource = canvas`** — Type mismatch: `AtlasSource extends TextureSource<BufferSourceOptions>` where the generic expects a TypedArray resource, but the canvas renderer needs an `HTMLCanvasElement`. The `as any` cast is intentional — the canvas renderer inspects `resource` dynamically, not via generic type constraints.
-- **No clear-on-free** — Freed atlas regions aren't cleared on the backing canvas, matching the GL/GPU behavior (they overwrite freed space with `texSubImage2D` / `copyExternalImageToTexture` when it is reallocated).
+- **Pixi's canvas renderer has no upload pipeline**: it draws `TextureSource.resource` directly. So with
+  `useCanvas: true` (only when `RendererType.CANVAS` is detected, saving ~16 MB per slab otherwise),
+  `AtlasSource` keeps a backing canvas as its `resource`, and `AtlasAllocator.allocate()` blits each item
+  into it. The `(this as any).resource = canvas` cast is intentional: the generic expects a typed array.
+- **Freed regions aren't cleared**, as on GL/GPU: they're overwritten when reallocated.
 
 ## The url holds overrides, not state (Nov 2026)
 

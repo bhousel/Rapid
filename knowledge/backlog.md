@@ -176,6 +176,19 @@ OpenStreetMap ↔ OpenHistoricalMap bridge).
 - Lesson from the dropped `rapid.custom.*` migration: never delete the source data unless the
   destination is durable (`database.isAvailable`).
 
+## More end-to-end tests
+`test/e2e` landed Nov 18 with six tests (`test/e2e/README.md`). Next, each its own PR:
+- **Saving**, with the upload stubbed (tests never log in to OSM).
+- **The issues panel** showing a validation warning for an edit.
+- **Startup with the OSM API unreachable.** Rapid can't start today (see "Startup can't survive a slow
+  CDN" below); a test would show it, then confirm the fix.
+- **The modal stack and Esc/Backspace routing** (`UiSystem`, `KeyboardSystem` document listeners), which
+  happy-dom can't cover: the nested Rapid dataset modals (catalog, add custom data, color picker).
+- **The QA and photo layers**, which the pre.4 release check didn't cover either.
+- **CI speed, if it starts to matter:** the e2e job builds Rapid again after `build.yml` did (inside its
+  95 s test step; not measured apart). Caching Playwright's Chromium would save only 10–15 s, and Playwright advises
+  against it.
+
 ## Flaky tests
 - `EditSystem` › `toBackup returns the structured object that toJSON stringifies`: builds two backups
   and expects them to be identical, so it fails when the clock ticks between the two calls.
@@ -258,17 +271,15 @@ the order people are likely to ask:
 - Open questions in `design/database-system.md` (DB name/scoping, graceful-degradation doc).
 - **agent-practices:** consider adding the "folder-specific `AGENTS.md`" convention to the shared template.
 - **Report upstream to Bun:** the transpiler cache key ignores whether a file was compiled as a test (see `quirks.md`).
-- **Automated testing of `UiSystem` + `UiWhatever` components.** The modal stack + Esc/Backspace
-  routing (and `KeyboardSystem` document listeners) can't be unit-tested under bun without a browser.
-  Now that `bun run cdp` and headless Playwright work, a browser-driven test suite is within reach.
-- **Manual smoke-test** the nested Rapid dataset modals (catalog / add-custom-data / colorpicker) in
-  a real browser to confirm stacking, Esc, and close behavior.
 - **`CycleHighwayTagOperation`'s module-level `_lastSelectedIDs`.** The one remaining module-level
   mutable global in `operations/`. Consider moving it onto a system per the system-ownership rule.
 - **Imagery customizations, like the dataset ones.** The imagery offset is for the session only (Nov 9).
   Some sources always need the same offset, so Bryan could see saving an offset per source in a synced
   setting, the way `RapidSystem` keeps the user's changes to each dataset.
 - **Open question:** delete the quarantined `sections/*.jsx` React demo files + `section.ts`/`uiSection`?
+- **`design/network-system.md` has its original pre-implementation design appended** after "Implementation
+  Status" (a second "Problem", "Goals", "Design", about half the 38 KB), some of it stale (`fetchFn` for
+  OAuth, where interceptors are used now). Fold what's still true into the first half and delete the rest.
 
 ## From the pre.4 release check (Nov 2026)
 Not covered by the check: the QA and photo layers.

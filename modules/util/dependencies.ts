@@ -15,12 +15,12 @@ const CDN_BASE = 'https://cdn.jsdelivr.net/npm';
  * so this is the version that Rapid was built and tested with.
  *
  * @param name - The package name, e.g. `'maplibre-gl'`
- * @return The exact version, e.g. `'5.24.1'` for a `'^5.24.1'` range, or `undefined` if the package
+ * @return The exact version, e.g. `'6.18.0'` for a `'^6.18.0'` range, or `undefined` if the package
  *   isn't a dependency or its specifier isn't a plain version (e.g. a `github:` dependency)
  *
  * @example
  * ```ts
- * utilDependencyVersion('maplibre-gl');   // '5.24.1'
+ * utilDependencyVersion('maplibre-gl');   // '6.18.0'
  * ```
  */
 export function utilDependencyVersion(name: DependencyName): string | undefined {
@@ -38,13 +38,13 @@ export function utilDependencyVersion(name: DependencyName): string | undefined 
  * This keeps the files that Rapid loads at runtime in step with the package versions it was built with.
  *
  * @param name - The package name, e.g. `'maplibre-gl'`
- * @param asset - Optional path within the package, e.g. `'dist'` or `'dist/maplibre-gl.min.css'`
- * @return The CDN URL, e.g. `'https://cdn.jsdelivr.net/npm/maplibre-gl@5.24.1/dist'`
+ * @param asset - Optional path within the package, e.g. `'dist'` or `'dist/maplibre-gl.css'`
+ * @return The CDN URL, e.g. `'https://cdn.jsdelivr.net/npm/maplibre-gl@6.18.0/dist'`
  * @throws Error if the package has no exact version in `package.json` (see `utilDependencyVersion`)
  *
  * @example
  * ```ts
- * utilCDNPath('maplibre-gl', 'dist');   // 'https://cdn.jsdelivr.net/npm/maplibre-gl@5.24.1/dist'
+ * utilCDNPath('maplibre-gl', 'dist');   // 'https://cdn.jsdelivr.net/npm/maplibre-gl@6.18.0/dist'
  * ```
  */
 export function utilCDNPath(name: DependencyName, asset: string = ''): string {

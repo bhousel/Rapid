@@ -42,7 +42,7 @@ describe('utilCDNPath', () => {
 
   it('appends the asset path', () => {
     assert.strictEqual(Rapid.utilCDNPath('maplibre-gl', 'dist'), `https://cdn.jsdelivr.net/npm/maplibre-gl@${version}/dist`);
-    assert.strictEqual(Rapid.utilCDNPath('maplibre-gl', '/dist/maplibre-gl.min.css'), `https://cdn.jsdelivr.net/npm/maplibre-gl@${version}/dist/maplibre-gl.min.css`);
+    assert.strictEqual(Rapid.utilCDNPath('maplibre-gl', '/dist/maplibre-gl.css'), `https://cdn.jsdelivr.net/npm/maplibre-gl@${version}/dist/maplibre-gl.css`);
   });
 
   it('handles scoped package names', () => {

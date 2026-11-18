@@ -147,6 +147,11 @@ Fetch the raw files with `curl -fsSL` (or `gh api`), so you get the exact text. 
 - **Search OSM data through `EditSystem`**, for the graph you mean: `editor.entitiesInBox(box, graph)`, `editor.waySegments(extent, graph)`, `editor.intersects(graph)`. They answer for any graph of the editor's lineage, including one inside an action.
 - See [`design/graph-geometry.md`](design/graph-geometry.md) for why, and `test/unit/lib/graph_model.test.js` (run it with `GRAPH_MODEL_SEEDS=3000`) after changing `Graph`.
 
+### Dependencies Loaded at Runtime
+- Rapid loads some of its dependencies' files from the CDN at runtime (MapLibre, the tagging schema, NSI, the community index, the photo viewers). **Build those URLs with `utilCDNPath(name, asset)`** from `modules/util/dependencies.ts`, which pins them to the version in `package.json`. Never hardcode a version or use `@latest`.
+- **Only `modules/util/dependencies.ts` imports `package.json`.** Code that needs a dependency's version calls `utilDependencyVersion(name)`.
+- **When a major upgrade moves files in a package, update the paths** passed to `utilCDNPath` in the same change (osm-community-index 5.10 moved its JSON to `dist/json/`; maplibre-gl 6 dropped its `.min.js` files). A wrong path only fails at runtime: check it in the browser, or with the e2e tests.
+
 ## TypeScript Patterns
 
 ### Class Member Visibility Conventions

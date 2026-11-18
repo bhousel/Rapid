@@ -48,8 +48,7 @@ Things that went wrong once and shouldn't go wrong again.
 - **A fake `sendChangeset` must call its `beforeUpload` argument,** or the upload mark (`markUploadAsync`) is never written and the "settle interrupted uploads" path can't be tested.
 - **A reference model encodes the design's rule, not the code's.** The graph model test copied `rebase`'s head-only iD#2085 rule, so it agreed with the bug for weeks while `graph-geometry.md` said "every graph, redo graphs included". When writing a model, take each rule from the design doc (or the user-visible contract), and flag any place where the code disagrees.
 - **Give `bun test` folders, not `**` globs, in package.json scripts** — `bun run test` ran the DOM tests' `./test/browser/**/*.js` (now `test/dom`) through a shell without globstar, so it matched one folder level only, and 8 files (Context, `ui/fields`, `ui/sections`) never ran: 90 tests instead of 134. Running that script alone ran them all, which hid it. Fixed Oct 29 by passing the folder. If a test count looks low, compare the "across N files" line.
-- **Pixi layers can be checked in a real browser, WebGL included** — Headless Chromium through Playwright renders the map with SwiftShader (`--use-angle=swiftshader --enable-unsafe-swiftshader`). The project's Playwright may expect a newer browser build than the one in `~/Library/Caches/ms-playwright`; pass `executablePath` to the installed `chrome-headless-shell` rather than downloading. To debug what the developer sees, attach to their Chrome with `chromium.connectOverCDP('http://127.0.0.1:9222')` (started with `--remote-debugging-port=9222 --user-data-dir=…`) and query `globalThis.rapidContext`. Querying state beats reading screenshots.
-- **DOMParser in unit tests** — Use `import { DOMParser } from '@xmldom/xmldom'`, not the browser global. Tests run without happy-dom unless using browser preload.
+- **DOMParser in unit tests** — Use `import { DOMParser } from '@xmldom/xmldom'`, not the browser global. Unit tests run without happy-dom (only `test:dom` has the preload).
 - **Test sample data** — `*.sample.js` files alongside the test. Import as `import * as SAMPLE from './Foo.sample.js'`.
 - **FilterSystem cache keyed by `entity.key`** (includes version), not `entity.id`.
 - **Run unit test files the way `test:unit` does: no preload.** `bun test --preload ./test/test_setup.js test/unit/...` gives them happy-dom, and `MapillaryService`'s `startAsync` test then tries to load mapillary-js from a CDN and fails. Use `bun test test/unit/...` for unit files.
@@ -59,28 +58,18 @@ Things that went wrong once and shouldn't go wrong again.
 - **`_isWater` vs `_isPoint`** — When testing filterScene water counts, use way entities. Point nodes with waterway tags match `_isPoint` first.
 - **Validator tests: create after schema init** — Validators hoist schema prerequisites at construction time. Create the validator inside `beforeAll` after `schema.merge()`.
 - **Inline schema init pattern for tests** — Import `osm_rulesets.json5` directly (Bun native JSON5 import), create real `SchemaSystem`, init + merge in `beforeAll`. Single source of truth.
-- **A removed dependency can silently break unrelated tests via a global side effect.** EditSystem's
-  unit tests only passed under bare Bun because constructing `utilSessionMutex('lock')` had a side
-  effect of **polyfilling a global `document`**. `EditSystem` calls `select(document).interrupt(...)`
-  in ~10 hot paths (perform/commit/undo/redo/checkpoint/reset); once the mutex was retired in the
-  DatabaseSystem Phase 2 work, every one of those threw `document is not defined`. Fix: guard DOM
-  access (`if (globalThis.document)` / a `_interruptTransition()` helper) — which is the right thing
-  for a future headless/CLI build anyway. Lesson: when removing code, watch for *incidental* global
-  side effects it was providing; a green test suite may be leaning on one.
+- **A removed dependency can silently break unrelated tests via a global side effect.** `EditSystem`'s
+  unit tests only passed because constructing `utilSessionMutex` polyfilled a global `document`; once
+  it was retired, every `select(document).interrupt(...)` threw. Guarding DOM access was the right fix
+  for a CLI build anyway. When removing code, watch for global side effects a green suite leans on.
 - **Fire-and-forget async is hard to assert.** `immediateBackup()` kicked off an un-awaited IndexedDB
   write, so tests that read the record immediately raced it. Making the method **return its write
   promise** (callers still ignore it) makes the async work awaitable without changing behavior.
-- **`fake-indexeddb` must be imported with `'fake-indexeddb/auto'`** (not just `'fake-indexeddb'`) to
-  polyfill the global `indexedDB`/`IDBKeyRange`/etc. that the `idb` library looks up at runtime.
-  Import this at the top of any unit test file that exercises IndexedDB code — it installs into
-  `globalThis` as a side effect. Each `openDB` call gets its own in-memory database; use a fixed
-  database name + explicit `clear()` calls in `beforeEach`/`afterEach` to prevent state leaking
-  between tests.
-- **Verify Blob round-trips before building on them.** `structuredClone(blob)` preserves `size` and
-  `type`; `fake-indexeddb` round-trips a `File`/`Blob` including its `text()` content; and the
-  in-memory mock using `structuredClone` also works. This is NOT universally true for all test runtimes
-  and all browsers — especially private-browsing/locked-down contexts — so the graceful-degradation
-  path matters. Verified experimentally before relying on it in production code.
+- **Import `'fake-indexeddb/auto'`** (not `'fake-indexeddb'`) at the top of a test that uses IndexedDB:
+  it installs the globals `idb` looks up. Use a fixed database name and `clear()` it between tests.
+- **Verify Blob round-trips before building on them.** `structuredClone`, `fake-indexeddb` and the
+  in-memory mock all keep a Blob's content, but not every browser context does (private browsing), so the
+  graceful-degradation path matters.
 - **An untested path rots one layer at a time.** The upload conflict path had no tests, and broke
   several times over years (a handler signature in 2023, a return shape in 2025, a staging/stable split
   in between). Each bug hid the next: fixing one would only have shown the one behind it. Drive the
@@ -130,9 +119,7 @@ Things that went wrong once and shouldn't go wrong again.
 
 ## Network
 
-- **Worker results resolve as uninterruptible microtask chains** — `worker.onmessage` → `pending.resolve(result)` triggers `.then()` callbacks synchronously as microtasks. The browser event loop can't yield between microtasks. When multiple tile results arrive in one frame, the entire chain (entity construction + `graph.rebase` + `tree.rebase` ~11ms per tile) runs non-preemptibly: 6 tiles = 66ms+ frame drop. Fix: defer resolution through SchedulerSystem with `resultPriority` option on `WorkerSystem.dispatch()`. Each result gets its own scheduler slot, so the frame can yield between tiles.
-- **Not all `key` variables in services are requestIDs** — During the `key` → `requestID` rename, WaybackService had `const key = \`${tile.id}_${releaseDate}\`` used as a metadata cache lookup key. This local variable was intentionally NOT renamed — only the option property passed to `network.fetch()` became `requestID`. When doing bulk renames, check whether the variable represents the network request identity or an unrelated domain concept.
-- **`multi_replace_string_in_file` can silently break code** — When `oldString` includes text that spans a structural boundary (like `}\n    this._cache = {`), the replacement must include ALL the matched text. A partial replacement dropped the closing brace and object assignment in WaybackService. Always verify structural edits immediately.
+- **Worker results resolve as uninterruptible microtask chains** — `worker.onmessage` → `pending.resolve(result)` triggers `.then()` callbacks synchronously as microtasks. The browser event loop can't yield between microtasks. When multiple tile results arrive in one frame, the entire chain (entity construction + `graph.rebase` + `tree.rebase` ~11ms per tile) runs non-preemptibly: 6 tiles = 66ms+ frame drop. Fix: defer resolution through SchedulerSystem with `resultPriority` option on `WorkerSystem.dispatch()`. Each result gets its own scheduler slot, so the frame can yield between tiles.- **`multi_replace_string_in_file` can silently break code** — When `oldString` includes text that spans a structural boundary (like `}\n    this._cache = {`), the replacement must include ALL the matched text. A partial replacement dropped the closing brace and object assignment in WaybackService. Always verify structural edits immediately.
 - **Copy-paste bugs in catch handlers** — OsmService's `postNoteCreate`/`postNoteUpdate` catch handlers had `this._changeset.inflight = null` — clearly copy-pasted from changeset methods. When removing manual inflight tracking, check ALL catch/finally blocks for mismatched cleanup that was hiding a bug.
 - **Request ID prefix collisions cause complex abort predicates** — Original `osm-note-${tileID}` collided with `osm-note-post-*`, requiring negative lookahead in `abortMatching`. Fix: choose non-overlapping prefixes (e.g. `osm-note-tile-` vs `osm-note-post-`). Design request ID schemes so each category can be selected with a simple prefix regex.
 - **Dead code in interfaces** — `_tileCache.seen: Set<string>` was declared in the interface, initialized in `_initCache()`, but never read anywhere. When auditing inflight caches, also check for other dead properties in the same interfaces.

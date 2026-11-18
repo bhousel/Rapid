@@ -1,25 +1,19 @@
 # Current Work
 
-## This branch (`conflation-system`)
-Ready to become `main` as v3.0.0-pre.4 (Nov 16), for testers, before the multiselection design
-(`backlog.md`). What landed is in `completed.md`; follow-ups from the release check are in `backlog.md`.
+## `main`
+`conflation-system` merged into `main` (PR #7, Nov 16), for testers, before the multiselection design
+(`backlog.md`). The version is 3.0.0-pre.4 (Nov 18, `package.json` and `Context.ts`); no tag yet.
+Follow-ups from the release check are in `backlog.md`.
 
 ## Active: dependency upgrades (from the Nov 18 checkup)
-Done in the first batch (Nov 18): removed `@pixi/jsdoc-template` (+ `webdoc.conf.json`) and
-`@mapbox/geojson-area` (nothing imported it); happy-dom 21, geojson-vt 5 (a class now: `new GeoJSONVT()` in the
-test sample generators), cssnano 9, @transifex/api 8, geojson-rewind 0.6, in-range updates (maplibre-gl 5.24.1,
-d3 7.9.2, …), and current Actions pins in `pages.yml` / `deploy.yml`. Careful with `cloc`: its real versions end in
-`-cloc`, so `bun update` "upgrades" `2.6.0-cloc` to a 2022 `2.11.0`.
+Landed on Nov 18 (see `completed.md`): the first batch, CDN pins from `package.json`, maplibre-gl 6, and
+the e2e tests. Careful with `cloc`: its real versions end in `-cloc`, so `bun update` "upgrades"
+`2.12.0-cloc` to a 2022 `2.11.0`.
 
 Still to do, in about this order:
-- **CI:** workflows enabled on the fork (Nov 18); `deploy` and `pages` disabled by hand in the Actions UI.
-  `deploy.yml` still has Bun 1.3.6, a plain `bun install`, and Facebook's AWS role and S3 bucket.
-- **CDN pins come from `package.json` now** (Nov 18): `utilCDNPath(name, asset)` and `utilDependencyVersion(name)`
-  in `modules/util/dependencies.ts`, the only place that imports `package.json`. The exact version is the range's
-  lower bound, which `bun update` keeps equal to the installed version. This moved the runtime to maplibre-gl
-  5.24.1 (was 5.15.0), id-tagging-schema 6.19.2 (was 6.6.0), osm-community-index 6.2.1 (was 5.9.3; its JSON moved
-  to `dist/json/`), and exact pannellum, mapillary-js and wmf-sitematrix versions. **When a major bump moves files
-  in a package, the CDN paths have to change with it.**
+- **CI:** `build` and `e2e` run on pushes and PRs to `main`. `deploy` and `pages` are disabled by hand in
+  the Actions UI; `deploy.yml` still has Bun 1.3.6, a plain `bun install`, and Facebook's AWS role and S3
+  bucket.
 - **Bryan's own packages, all ESM-only now:** country-coder 6, location-conflation 4, osm-community-index 7
   (needs location-conflation 4), node-diff3 4 (`===` comparison, stricter `MergeRegion` type in
   `merge_remote_changes.ts`), osm-auth 4 (plan in `backlog.md`; also `err.responseText` in `UploaderSystem.ts`
@@ -33,28 +27,14 @@ Still to do, in about this order:
 - **pixi.js 8.20 → 8.23, as its own batch.** Skip 8.21/8.22 (filter regression on renderer resize, hits our
   Glow/Adjustment/Convolution filters). 8.23 restores Text/Graphics after context loss, fixes GPU leaks, and adds
   `DashLineShader` / `SmoothGraphics` (maybe replaces `modules/pixi/lib/DashLine.ts`).
-- **maplibre-gl 6: done (Nov 18), on 6.18.0** (6.19 was inside the 3-day window). `Map3dSystem` imports
-  `dist/maplibre-gl.mjs` with `import()` and gives MapLibre its worker as a blob (see `quirks.md`, CSP
-  `'strict-dynamic'`). Checked in the debug Chrome: buildings and roads render, no errors.
-- **Testing layout (branch `e2e_testing`, Nov 18).** Three kinds (`test/README.md`): `test/unit` (Bun),
-  `test/dom` (Bun + happy-dom; was `test/browser`, which needed a DOM, not a browser), and `test/e2e`
-  (Playwright Test against the dev build). Mocha and `test/index.html` are gone. E2E tests: startup with no
-  console errors, OSM data drawn, the 3D map (fails with the MapLibre worker bug, checked), click-select a road
-  and see the inspector, draw a line and undo it node by node, a Rapid dataset shows and a feature is added.
-  The network is live (dev server, CDN), recorded (`test/e2e/data/recorded.har`, ~600 KB; each test records a
-  part, `recording.js` merges them), stubbed, or blocked, by host (`test/e2e/fixtures.js`).
-  CI: `.github/workflows/e2e.yml`.
-- **Found by the startup test:** `OsmService.loadTile` parsed the map response's `bounds` too, and
-  `EditSystem.merge` made it a base `OsmEntity` with an empty ID, so `crossing_ways` and `missing_tag` threw on
-  every tile load (since the `skipSeen` removal, Oct 19). Fixed with the entity filter the other loaders use,
-  plus a unit test.
 - **Hold:** cldr 49 (drops 109 locales, e.g. `dv`, `nv`, `pap`, `skr` lose native names in `languages.json`).
 - **Left in `bun audit`:** postcss 5 via `postcss-selector-prepend`; picomatch via `esbuild-visualizer`
   (both build-only).
   Dependabot alerts are off for the repo.
-- **Minor, later:** this file's branch section is stale; `decisions.md`, `completed.md` and `lessons.md` are over
-  the 40 KB budget (`/reflect`); `package.json` `repository`/`bugs` point at facebook/Rapid; 6 stale local
-  branches and ~70 old remote branches.
+- **Minor, later:** `README.md` still links facebook/Rapid (the build badge, the issue tracker, the
+  examples); `package.json`'s `repository`/`bugs` point at bhousel/Rapid since Nov 18. Stale local branches
+  (now also the merged `conflation-system`, `e2e_testing` and `fix-osm-tile-bounds`) and ~70 old remote
+  branches.
 
 ## Active: matching third-party data against OSM (`ConflationSystem`)
 Top priority. Design: [`design/conflation-system.md`](../design/conflation-system.md) (Steps 1–6 first
