@@ -1,5 +1,5 @@
 // Sample data for NetworkSystem tests
-import geojsonvt from 'geojson-vt';
+import GeoJSONVT from 'geojson-vt';
 import vtpbf from 'vt-pbf';
 
 import { n1 as jsonN1, n2 as jsonN2 } from '../data/parsers/OsmJSONParser.sample.js';
@@ -26,7 +26,7 @@ const pointGeoJSON = {
     geometry: { type: 'Point', coordinates: [10.001, 0] }
   }]
 };
-const tileIndex = geojsonvt(pointGeoJSON);
+const tileIndex = new GeoJSONVT(pointGeoJSON);
 const tile = tileIndex.getTile(tileXYZ[2], tileXYZ[0], tileXYZ[1]);
 
 export const singlePbf = vtpbf.fromGeojsonVt({ test: tile });
@@ -52,6 +52,6 @@ const sequences = {
 };
 
 export const multiPbf = vtpbf.fromGeojsonVt({
-  image:    geojsonvt(images).getTile(tileXYZ[2], tileXYZ[0], tileXYZ[1]),
-  sequence: geojsonvt(sequences).getTile(tileXYZ[2], tileXYZ[0], tileXYZ[1])
+  image:    new GeoJSONVT(images).getTile(tileXYZ[2], tileXYZ[0], tileXYZ[1]),
+  sequence: new GeoJSONVT(sequences).getTile(tileXYZ[2], tileXYZ[0], tileXYZ[1])
 });

@@ -13,7 +13,6 @@ This folder contains:
 | File | Description |
 |------|-------------|
 | `ids.ts` | String ID types, exported for external consumers and declared globally for internal use |
-| `geojson-area.d.ts` | Types for `@mapbox/geojson-area` (area of GeoJSON geometries) |
 | `geojson-rewind.d.ts` | Types for `@mapbox/geojson-rewind` (fix polygon winding order) |
 | `polylabel.d.ts` | Types for `@mapbox/polylabel` (pole of inaccessibility) |
 | `postcss-selector-prepend.d.ts` | Types for the `postcss-selector-prepend` plugin (used by `scripts/build_css.ts`) |

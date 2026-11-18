@@ -21,8 +21,9 @@ import type { OsmTags } from '../data/types.ts';
 /** Minimum zoom level where Rapid data is rendered */
 const MINZOOM = 12;
 
-/** Opacity of already-mapped features, when the dataset shows them */
-const MATCHED_OPACITY = 0.35;
+// Opacity of already-mapped features, when the dataset shows them.
+// Unused while the muted style in `_lineStyle` is commented out.
+// const MATCHED_OPACITY = 0.35;
 
 /** Collected data from services, sorted by geometry type */
 interface RenderData {

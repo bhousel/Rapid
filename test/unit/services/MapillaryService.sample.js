@@ -1,4 +1,4 @@
-import geojsonvt from 'geojson-vt';
+import GeoJSONVT from 'geojson-vt';
 import vtpbf from 'vt-pbf';
 
 // images and sequences near [10°, 0°]
@@ -65,6 +65,6 @@ const sequences10 = {
 };
 
 export const pbf10 = vtpbf.fromGeojsonVt({
-  image:    geojsonvt(images10).getTile(14, 8647, 8192),    // z,x,y
-  sequence: geojsonvt(sequences10).getTile(14, 8647, 8192)  // z,x,y
+  image:    new GeoJSONVT(images10).getTile(14, 8647, 8192),    // z,x,y
+  sequence: new GeoJSONVT(sequences10).getTile(14, 8647, 8192)  // z,x,y
 });

@@ -1,4 +1,4 @@
-import { RapidDataset, RapidDataDictionary } from '../lib/index.ts';
+import { RapidDataset } from '../lib/index.ts';
 import { utilFetchResponse } from '../util/fetch_response.ts';
 import { VectorTileService } from './VectorTileService.ts';
 
