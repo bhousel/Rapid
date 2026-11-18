@@ -24,9 +24,15 @@ Still to do, in about this order:
   **Not with pinhead 16:** schema 7.3 uses 4 icons pinhead 16 renamed (`bagel_seeded`,
   `person_running_after_person`, `person_squatting_and_person_reaching_up`,
   `person_wearing_martial_arts_belt_front_kicking`), and `build_data.ts` drops missing icons silently.
-- **pixi.js 8.20 → 8.23, as its own batch.** Skip 8.21/8.22 (filter regression on renderer resize, hits our
-  Glow/Adjustment/Convolution filters). 8.23 restores Text/Graphics after context loss, fixes GPU leaks, and adds
-  `DashLineShader` / `SmoothGraphics` (maybe replaces `modules/pixi/lib/DashLine.ts`).
+- **pixi.js 8.23 (branch `pixi-8.23`, Nov 18).** Bumped; the only change needed was turning off Pixi's
+  accessibility layer, which 8.22+ turns on when Tab is pressed (then walks the scene every frame). Checked
+  glow and imagery filters across renderer resizes (the 8.21/8.22 regression). Next: `DashLineShader` /
+  `SmoothGraphics` (maybe replaces `modules/pixi/lib/DashLine.ts`).
+- **Regression from the CDN pins: road fields missing.** At runtime the tagging schema went from 6.6 to
+  6.19.2, where `sidewalk`, `cycleway`, `parking/side/parking` and `parking/side/orientation` have type
+  `directionalCombo`, which Rapid doesn't support (iD's rename and generalization of the `cycleway` field;
+  Rapid's `UiFieldCycleway` is the old one). `SchemaSystem` drops them, with an "Unable to resolve
+  referenced fieldID" warning. Also unsupported in 6.19: `date` (5 fields) and `colour` (3). Later.
 - **Hold:** cldr 49 (drops 109 locales, e.g. `dv`, `nv`, `pap`, `skr` lose native names in `languages.json`).
 - **Left in `bun audit`:** postcss 5 via `postcss-selector-prepend`; picomatch via `esbuild-visualizer`
   (both build-only).

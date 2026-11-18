@@ -876,6 +876,9 @@ export class GraphicsSystem extends AbstractSystem {
     }
 
     const options = {
+      // Pixi 8.22+ turns on its accessibility layer when Tab is pressed, and then walks the scene every
+      // frame. Rapid's scene has no accessible objects, and Tab is for moving between the UI's fields.
+      accessibilityOptions: { activateOnTab: false },
       antialias: this.highQuality,
       autoDensity: this.highQuality,
       autoStart: false,     // Avoid the ticker
