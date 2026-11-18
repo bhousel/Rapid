@@ -1,0 +1,10 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": { "id": 1, "highway": "footway", "footway": "sidewalk" },
+      "geometry": { "type": "LineString", "coordinates": [[-85.632849, 41.948896], [-85.632421, 41.948896]] }
+    }
+  ]
+}

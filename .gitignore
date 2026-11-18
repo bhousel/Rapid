@@ -30,6 +30,11 @@ Thumbs.db
 # Debugging browser profile (`bun run start:chrome`)
 .chrome-debug/
 
+# Playwright output (`bun run test:e2e`)
+test/e2e/results/
+test/e2e/report/
+test/e2e/.recording/
+
 # Editor
 coverage/
 .vscode/

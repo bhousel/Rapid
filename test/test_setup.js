@@ -2,7 +2,7 @@
 import { GlobalRegistrator } from '@happy-dom/global-registrator';
 GlobalRegistrator.register();
 
-// Note that Bun uses Jest-style hooks, but our index.html uses Mocha.
+// Note that Bun uses Jest-style hooks, but the DOM tests were written for Mocha (`before`/`after`).
 // Only a few small differences - define as functions that forward to Bun's hooks
 // (can't assign directly because Bun injects beforeAll/afterAll after preload runs)
 window.before = (...args) => beforeAll(...args);  // eslint-disable-line no-undef

@@ -36,13 +36,21 @@ Still to do, in about this order:
 - **maplibre-gl 6: done (Nov 18), on 6.18.0** (6.19 was inside the 3-day window). `Map3dSystem` imports
   `dist/maplibre-gl.mjs` with `import()` and gives MapLibre its worker as a blob (see `quirks.md`, CSP
   `'strict-dynamic'`). Checked in the debug Chrome: buildings and roads render, no errors.
-- **Browser tests in a real browser.** Intent: `test/unit/**` runs under Bun, `test/browser/**` is what needs a
-  browser. Today `test/browser` runs under Bun with happy-dom, and `test/index.html` (mocha) lists only 18 of its
-  38 files by hand; `core/EditSystem.test.js` and `behaviors/MapInteractionBehavior.test.js` import `bun:test`.
-  Bryan is open to moving these to Playwright and dropping mocha entirely.
+- **Testing layout (branch `e2e_testing`, Nov 18).** Three kinds (`test/README.md`): `test/unit` (Bun),
+  `test/dom` (Bun + happy-dom; was `test/browser`, which needed a DOM, not a browser), and `test/e2e`
+  (Playwright Test against the dev build). Mocha and `test/index.html` are gone. E2E tests: startup with no
+  console errors, OSM data drawn, the 3D map (fails with the MapLibre worker bug, checked), click-select a road
+  and see the inspector, draw a line and undo it node by node, a Rapid dataset shows and a feature is added.
+  The network is live (dev server, CDN), recorded (`test/e2e/data/recorded.har`, ~600 KB; each test records a
+  part, `recording.js` merges them), stubbed, or blocked, by host (`test/e2e/fixtures.js`).
+  CI: `.github/workflows/e2e.yml`.
+- **Found by the startup test:** `OsmService.loadTile` parsed the map response's `bounds` too, and
+  `EditSystem.merge` made it a base `OsmEntity` with an empty ID, so `crossing_ways` and `missing_tag` threw on
+  every tile load (since the `skipSeen` removal, Oct 19). Fixed with the entity filter the other loaders use,
+  plus a unit test.
 - **Hold:** cldr 49 (drops 109 locales, e.g. `dv`, `nv`, `pap`, `skr` lose native names in `languages.json`).
-- **Left in `bun audit`:** mocha's diff, glob, minimatch, serialize-javascript (mocha 12 clears some);
-  postcss 5 via `postcss-selector-prepend`; picomatch via `esbuild-visualizer` (all dev/build only).
+- **Left in `bun audit`:** postcss 5 via `postcss-selector-prepend`; picomatch via `esbuild-visualizer`
+  (both build-only).
   Dependabot alerts are off for the repo.
 - **Minor, later:** this file's branch section is stale; `decisions.md`, `completed.md` and `lessons.md` are over
   the 40 KB budget (`/reflect`); `package.json` `repository`/`bugs` point at facebook/Rapid; 6 stale local

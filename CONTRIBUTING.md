@@ -22,8 +22,12 @@ If you want to contribute to Rapid, you'll probably need to:
 As you change things, you'll want to `bun run all` to ensure that things are working.
 (This command runs `clean`, `check`, and `build`.)
 
-To run the unit and browser tests:
+To run the unit and DOM tests:
 - `bun run test`
+
+To run the end-to-end tests in a real browser (see [`test/e2e/README.md`](test/e2e/README.md)):
+- `bunx playwright install chromium` (once)
+- `bun run test:e2e`
 
 You can also type-check the project without emitting files:
 - `bun run check:ts` — runs `tsc --noEmit` across the source, scripts, and test files.
