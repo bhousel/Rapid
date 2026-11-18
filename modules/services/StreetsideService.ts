@@ -7,6 +7,7 @@ import {
 import { MarkerData, GeoJSONData } from '../data/index.ts';
 import { uiIcon } from '../ui/icon.ts';
 import { utilQsString } from '@rapid-sdk/util';
+import { utilCDNPath } from '../util/dependencies.ts';
 
 import type { Context } from '../Context.ts';
 import type { D3EnterSelection, D3Selection } from 'd3-selection';
@@ -690,7 +691,7 @@ export class StreetsideService extends AbstractSystem {
     const assets = this.context.systems.assets!;
 
     // Tell the AssetSystem what to load..
-    const latestPath = 'https://cdn.jsdelivr.net/npm/pannellum@2/build';
+    const latestPath = utilCDNPath('pannellum', 'build');
     const localPath = 'data/modules/pannellum';
 
     assets.registerAsset('pannellum_css', {

@@ -1,4 +1,5 @@
 import { AbstractSystem } from './AbstractSystem.ts';
+import { utilCDNPath } from '../util/dependencies.ts';
 import { utilExtractValues } from '../util/string.ts';
 
 import type { Context } from '../Context.ts';
@@ -129,19 +130,19 @@ export class AssetSystem extends AbstractSystem {
       'territory_languages':  { preferred: 'data/territory_languages.min.json' },
 
       'oci_defaults': {
-        latest: 'https://cdn.jsdelivr.net/npm/osm-community-index@5.9/dist/defaults.min.json',
+        latest: utilCDNPath('osm-community-index', 'dist/json/defaults.min.json'),
         local:  'data/modules/osm-community-index/defaults.min.json'
       },
       'oci_features': {
-        latest: 'https://cdn.jsdelivr.net/npm/osm-community-index@5.9/dist/featureCollection.min.json',
+        latest: utilCDNPath('osm-community-index', 'dist/json/featureCollection.min.json'),
         local:  'data/modules/osm-community-index/featureCollection.min.json'
       },
       'oci_resources': {
-        latest: 'https://cdn.jsdelivr.net/npm/osm-community-index@5.9/dist/resources.min.json',
+        latest: utilCDNPath('osm-community-index', 'dist/json/resources.min.json'),
         local:  'data/modules/osm-community-index/resources.min.json'
       },
       'wmf_sitematrix': {
-        latest: 'https://cdn.jsdelivr.net/npm/wmf-sitematrix@0.2/data/wikipedia.min.json',
+        latest: utilCDNPath('wmf-sitematrix', 'data/wikipedia.min.json'),
         local:  'data/modules/wmf-sitematrix/wikipedia.min.json'
       }
     };

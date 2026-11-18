@@ -6,6 +6,7 @@
 export * from './cmd.ts';
 export * from './date.ts';
 export * from './deep_merge.ts';
+export * from './dependencies.ts';
 export * from './detect.ts';
 export * from './dimensions.ts';
 export * from './fetch_response.ts';

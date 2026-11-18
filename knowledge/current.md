@@ -12,15 +12,14 @@ d3 7.9.2, …), and current Actions pins in `pages.yml` / `deploy.yml`. Careful 
 `-cloc`, so `bun update` "upgrades" `2.6.0-cloc` to a 2022 `2.11.0`.
 
 Still to do, in about this order:
-- **CI has never run on the fork.** Enable workflows in the Actions tab. Before that, decide about `deploy.yml`
-  (Bun 1.3.6 while `engines` says ≥1.4, plain `bun install`, Facebook's AWS role and S3 bucket, so it fails on
-  every push) and `pages.yml` (deploys `docs/`).
-- **CDN pins drift from `package.json`.** Users load these, not the npm packages: `maplibre-gl@5.15` (5.15.0, has
-  the GHSA-jrc7 XSS) in `Map3dSystem.ts`, `id-tagging-schema@6.6` (6.6.0; the build uses 6.19.2 for icons and
-  strings) in `SchemaSystem.ts`, `osm-community-index@5.9` (5.9.3; bundled `resolveStrings` is 6.2) in
-  `AssetSystem.ts`, `name-suggestion-index@7.1` in `NsiService.ts`. Idea: derive them from `package.json` (see the
-  Nov 18 conversation: one helper that strips `^`/`~` from the dependency range, which `bun update` keeps equal
-  to the installed version).
+- **CI:** workflows enabled on the fork (Nov 18); `deploy` and `pages` disabled by hand in the Actions UI.
+  `deploy.yml` still has Bun 1.3.6, a plain `bun install`, and Facebook's AWS role and S3 bucket.
+- **CDN pins come from `package.json` now** (Nov 18): `utilCDNPath(name, asset)` and `utilDependencyVersion(name)`
+  in `modules/util/dependencies.ts`, the only place that imports `package.json`. The exact version is the range's
+  lower bound, which `bun update` keeps equal to the installed version. This moved the runtime to maplibre-gl
+  5.24.1 (was 5.15.0), id-tagging-schema 6.19.2 (was 6.6.0), osm-community-index 6.2.1 (was 5.9.3; its JSON moved
+  to `dist/json/`), and exact pannellum, mapillary-js and wmf-sitematrix versions. **When a major bump moves files
+  in a package, the CDN paths have to change with it.**
 - **Bryan's own packages, all ESM-only now:** country-coder 6, location-conflation 4, osm-community-index 7
   (needs location-conflation 4), node-diff3 4 (`===` comparison, stricter `MergeRegion` type in
   `merge_remote_changes.ts`), osm-auth 4 (plan in `backlog.md`; also `err.responseText` in `UploaderSystem.ts`
@@ -37,8 +36,10 @@ Still to do, in about this order:
 - **maplibre-gl 6, last.** ESM-only, no `.min.js`/`.min.css`, no `maplibregl` global type. `_loadMapLibreAsync`
   needs a dynamic `import()` of `dist/maplibre-gl.mjs` (worker is a blob, CSP already allows it). Other v6 breaks
   don't touch our usage. `bun audit` keeps flagging 5.24.1 until the advisory notes that 5.24.1 has the fix.
-- **Browser tests in a real browser:** keep mocha, but `test/index.html` lists only 18 of 38 test files by hand
-  (and 2 import `bun:test`). Discuss a better runner (generated list, debug Chrome or headless Playwright).
+- **Browser tests in a real browser.** Intent: `test/unit/**` runs under Bun, `test/browser/**` is what needs a
+  browser. Today `test/browser` runs under Bun with happy-dom, and `test/index.html` (mocha) lists only 18 of its
+  38 files by hand; `core/EditSystem.test.js` and `behaviors/MapInteractionBehavior.test.js` import `bun:test`.
+  Bryan is open to moving these to Playwright and dropping mocha entirely.
 - **Hold:** cldr 49 (drops 109 locales, e.g. `dv`, `nv`, `pap`, `skr` lose native names in `languages.json`).
 - **Left in `bun audit`:** mocha's diff, glob, minimatch, serialize-javascript (mocha 12 clears some);
   postcss 5 via `postcss-selector-prepend`; picomatch via `esbuild-visualizer` (all dev/build only).

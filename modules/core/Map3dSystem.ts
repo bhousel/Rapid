@@ -2,6 +2,7 @@ import { AbstractSystem } from './AbstractSystem.ts';
 import { Color } from 'pixi.js';
 import { RAD2DEG, numWrap, geomPolygonContainsPolygon, vecEqual } from '@rapid-sdk/math';
 import { select } from 'd3-selection';
+import { utilCDNPath } from '../util/dependencies.ts';
 import { utilCmd } from '../util/cmd.ts';
 
 import type { Vec2 } from '@rapid-sdk/math';
@@ -280,7 +281,7 @@ export class Map3dSystem extends AbstractSystem {
 
     // Tell the AssetSystem what to load..
     const assets = this.context.systems.assets!;
-    const latestPath = 'https://cdn.jsdelivr.net/npm/maplibre-gl@5.15/dist';
+    const latestPath = utilCDNPath('maplibre-gl', 'dist');
     const localPath = 'data/modules/maplibre-gl';
 
     assets.registerAsset('maplibre_css', {

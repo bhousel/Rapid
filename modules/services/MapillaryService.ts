@@ -4,6 +4,7 @@ import { PbfReader } from 'pbf';
 import { MarkerData, GeoJSONData } from '../data/index.ts';
 import { Tiler, geoSphericalDistance } from '@rapid-sdk/math';
 import { VectorTile } from '@mapbox/vector-tile';
+import { utilCDNPath } from '../util/dependencies.ts';
 
 import type { Context } from '../Context.ts';
 import type { D3EnterSelection, D3Selection } from 'd3-selection';
@@ -1172,7 +1173,7 @@ export class MapillaryService extends AbstractSystem {
     const assets = this.context.systems.assets!;
 
     // Tell the AssetSystem what to load..
-    const latestPath = 'https://cdn.jsdelivr.net/npm/mapillary-js@4/dist';
+    const latestPath = utilCDNPath('mapillary-js', 'dist');
     const localPath = 'data/modules/mapillary-js';
 
     assets.registerAsset('mapillary_css', {

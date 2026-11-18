@@ -2,6 +2,7 @@ import { AbstractSystem } from './AbstractSystem.ts';
 import { Category, Field, Preset, Ruleset, Variable } from '../lib/index.ts';
 import MiniSearch from 'minisearch';
 import { utilArrayUniq } from '@rapid-sdk/util';
+import { utilCDNPath, utilDependencyVersion } from '../util/dependencies.ts';
 import { utilIterable } from '../util/iterable.ts';
 import { utilExtractValues, utilWildcardDelete } from '../util/string.ts';
 
@@ -17,10 +18,6 @@ import type { RulesetProps } from '../lib/Ruleset.ts';
 import type { VariableProps, VariableValue } from '../lib/Variable.ts';
 import type { Vec2 } from '@rapid-sdk/math';
 
-
-// Make very sure this resolves to Rapid's `package.json`
-// If you mess up the `../`s, the resolver may import another random package.json from somewhere else.
-import { dependencies as rapidDependencies } from '../../package.json' with { type: 'json' };
 
 const VERBOSE = true;        // warn about 'id-tagging-schema' features we don't support currently
 const MAXRECENTS = 30;       // how many recents to store in localstorage
@@ -368,15 +365,9 @@ export class SchemaSystem extends AbstractSystem {
     )
     .then(results => {
       // Determine a version for id-tagging-schema...
-      // This might not be exact because the CDN can return a newer semver patch.
-      // But it's close enough, and this version string is informational only.
-      let idSchemaVersion = 'unknown';
-      for (const [k, semver] of Object.entries(rapidDependencies)) {
-        if (/id-tagging-schema$/.test(k)) {
-          idSchemaVersion = semver;
-          break;
-        }
-      }
+      // This is the version the CDN path is pinned to (see `_registerDefaultAssets`).
+      // This version string is informational only.
+      const idSchemaVersion = utilDependencyVersion('@openstreetmap/id-tagging-schema') ?? 'unknown';
 
       // Process the loaded data
       const fulfilledValues = results.filter(isFulfilled).map(p => p.value);
@@ -1315,7 +1306,7 @@ gfx?.scene?.reset();  // throw it all away
     const assets = this.context.systems.assets!;
 
     // Tell the AssetSystem what to load..
-    const latestPath = 'https://cdn.jsdelivr.net/npm/@openstreetmap/id-tagging-schema@6.6/dist';
+    const latestPath = utilCDNPath('@openstreetmap/id-tagging-schema', 'dist');
     const localPath = 'data/modules/id-tagging-schema';
 
     // Register id_schema as a bundle - multiple files fetched together

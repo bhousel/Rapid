@@ -1,5 +1,6 @@
 import { AbstractSystem } from '../core/AbstractSystem.ts';
 import { Matcher, buildIDPresets } from 'name-suggestion-index';
+import { utilCDNPath, utilDependencyVersion } from '../util/dependencies.ts';
 
 import type { Context } from '../Context.ts';
 import type { PresetProps } from '../lib/Preset.ts';
@@ -166,7 +167,7 @@ export class NsiService extends AbstractSystem {
       .then(() => {
         // Tell the AssetSystem what to load..
         // NSI v7 ships JSON data under `dist/json/` and Wikidata logos under `dist/wikidata/`.
-        const latestPath = 'https://cdn.jsdelivr.net/npm/name-suggestion-index@7.1/dist';
+        const latestPath = utilCDNPath('name-suggestion-index', 'dist');
         const localPath = 'data/modules/name-suggestion-index/dist';
 
         assets.registerAsset('nsi_data', {
@@ -537,8 +538,9 @@ export class NsiService extends AbstractSystem {
         }
 
         // The version we tag the schema with is the NSI library/data version we built against.
+        // (The data's `_meta` may not survive loading, but the CDN path is pinned to the package version.)
         const nsiMeta = (this._nsi.data as unknown as { _meta?: { version?: string } })._meta;
-        const nsiVersion = nsiMeta?.version ?? 'unknown';
+        const nsiVersion = nsiMeta?.version ?? utilDependencyVersion('name-suggestion-index') ?? 'unknown';
 
         // Merge the generated name-suggestion-index presets into the schema.
         // `merge()` accepts `Partial<PresetProps>`, and SchemaSystem fills in defaults

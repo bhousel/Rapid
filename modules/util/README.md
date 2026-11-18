@@ -15,6 +15,7 @@ Keyboard shortcut handling used to live here as `keybinding`; it is now the `Key
 | `cmd.ts` | Convert MacOS-style key combos for the current platform (⌘ on Mac, ⌃ elsewhere) |
 | `date.ts` | Date formatting and parsing utilities |
 | `deep_merge.ts` | Recursive object merge (used by the style system in place of `lodash.merge`) |
+| `dependencies.ts` | Versions of Rapid's dependencies from `package.json`, and CDN URLs pinned to them (`utilCDNPath`) |
 | `detect.ts` | Browser and platform detection |
 | `dimensions.ts` | Get/set cached dimensions of a D3 selection |
 | `fetch_response.ts` | Fetch API response handling utilities (`utilFetchResponse`, `fetchEnvelope`, `FetchError`) |
