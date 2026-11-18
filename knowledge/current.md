@@ -33,9 +33,9 @@ Still to do, in about this order:
 - **pixi.js 8.20 → 8.23, as its own batch.** Skip 8.21/8.22 (filter regression on renderer resize, hits our
   Glow/Adjustment/Convolution filters). 8.23 restores Text/Graphics after context loss, fixes GPU leaks, and adds
   `DashLineShader` / `SmoothGraphics` (maybe replaces `modules/pixi/lib/DashLine.ts`).
-- **maplibre-gl 6, last.** ESM-only, no `.min.js`/`.min.css`, no `maplibregl` global type. `_loadMapLibreAsync`
-  needs a dynamic `import()` of `dist/maplibre-gl.mjs` (worker is a blob, CSP already allows it). Other v6 breaks
-  don't touch our usage. `bun audit` keeps flagging 5.24.1 until the advisory notes that 5.24.1 has the fix.
+- **maplibre-gl 6: done (Nov 18), on 6.18.0** (6.19 was inside the 3-day window). `Map3dSystem` imports
+  `dist/maplibre-gl.mjs` with `import()` and gives MapLibre its worker as a blob (see `quirks.md`, CSP
+  `'strict-dynamic'`). Checked in the debug Chrome: buildings and roads render, no errors.
 - **Browser tests in a real browser.** Intent: `test/unit/**` runs under Bun, `test/browser/**` is what needs a
   browser. Today `test/browser` runs under Bun with happy-dom, and `test/index.html` (mocha) lists only 18 of its
   38 files by hand; `core/EditSystem.test.js` and `behaviors/MapInteractionBehavior.test.js` import `bun:test`.

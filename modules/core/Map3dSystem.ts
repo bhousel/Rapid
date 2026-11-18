@@ -14,6 +14,10 @@ import type {
   LayerSpecification,
   DataDrivenPropertyValueSpecification
 } from 'maplibre-gl';
+import type * as MapLibreGL from 'maplibre-gl';
+
+/** The MapLibre library module, loaded at runtime */
+type MapLibreModule = typeof MapLibreGL;
 
 
 const SELECTION_COLOR = '#01d4fa';
@@ -34,7 +38,7 @@ export class Map3dSystem extends AbstractSystem {
   public readonly containerID: string = 'map3d_container';
 
   /** Memoized promise for loading the MapLibre library */
-  protected _loadPromise: Promise<void> | null = null;
+  protected _loadPromise: Promise<MapLibreModule> | null = null;
   /** Keyboard shortcut strings (populated during startAsync) */
   protected _keys: string[] | null = null;
   /** Whether the 3D map viewer is shown (for this session only) */
@@ -56,7 +60,7 @@ export class Map3dSystem extends AbstractSystem {
     super(context);
     this.id = 'map3d';
     this.autoStart = false;
-    this.requiredDependencies = new Set<SystemID>(['editor', 'gfx', 'map', 'ui']);
+    this.requiredDependencies = new Set<SystemID>(['assets', 'editor', 'gfx', 'map', 'network', 'ui']);
     this.optionalDependencies = new Set<SystemID>(['l10n', 'styles', 'urlhash', 'scheduler']);
     this._visible = false;
 
@@ -122,10 +126,7 @@ export class Map3dSystem extends AbstractSystem {
     ]);
 
     return this._startPromise = prerequisites
-      .then((): Promise<void> => {
-        const maplibregl = globalThis?.maplibregl;
-        if (!maplibregl) throw new Error('maplibre-gl not loaded');
-
+      .then(([, maplibregl]): Promise<void> => {
         const maplibre = this.maplibre = new maplibregl.Map({
           container: this.containerID,
           minZoom: 12,
@@ -273,35 +274,41 @@ export class Map3dSystem extends AbstractSystem {
 
 
   /**
-   * Load the MapLibre JS and CSS files into the document head
-   * @return  Promise resolved when both files have been loaded
+   * Load the MapLibre CSS file into the document head, and import the MapLibre JS module
+   * @return  Promise resolved with the MapLibre module when both files have been loaded
    */
-  protected _loadMapLibreAsync(): Promise<void> {
+  protected _loadMapLibreAsync(): Promise<MapLibreModule> {
     if (this._loadPromise) return this._loadPromise;
 
+    const context = this.context;
+    const assets = context.systems.assets!;
+    const network = context.systems.network!;
+
     // Tell the AssetSystem what to load..
-    const assets = this.context.systems.assets!;
+    // MapLibre v6 is published as an ES module only, and its worker is a separate module.
     const latestPath = utilCDNPath('maplibre-gl', 'dist');
     const localPath = 'data/modules/maplibre-gl';
 
     assets.registerAsset('maplibre_css', {
-      latest: `${latestPath}/maplibre-gl.min.css`,
-      local:  `${localPath}/maplibre-gl.css`  // note no .min
+      latest: `${latestPath}/maplibre-gl.css`,
+      local:  `${localPath}/maplibre-gl.css`
     });
     assets.registerAsset('maplibre_js', {
-      latest: `${latestPath}/maplibre-gl.min.js`,
-      local:  `${localPath}/maplibre-gl.js`  // note no .min
+      latest: `${latestPath}/maplibre-gl.mjs`,
+      local:  `${localPath}/maplibre-gl.mjs`
+    });
+    assets.registerAsset('maplibre_worker', {
+      latest: `${latestPath}/maplibre-gl-worker.mjs`,
+      local:  `${localPath}/maplibre-gl-worker.mjs`
     });
 
-    return this._loadPromise = new Promise((resolve, reject) => {
-      let count = 0;
-      const loaded = () => {
-        if (++count === 2) resolve();
-      };
+    // `import()` resolves a relative path against this script, not the page, so make the URLs absolute.
+    const baseURI = globalThis.document?.baseURI;
+    const jsURL = new URL(assets.getAssetURL('maplibre_js'), baseURI).href;
+    const workerURL = new URL(assets.getAssetURL('maplibre_worker'), baseURI).href;
 
-      const $head = select('head');
-
-      $head.selectAll('#rapideditor-maplibre-css')
+    const loadCSS = new Promise<void>((resolve, reject) => {
+      select('head').selectAll('#rapideditor-maplibre-css')
         .data([0])
         .enter()
         .append('link')
@@ -309,19 +316,27 @@ export class Map3dSystem extends AbstractSystem {
         .attr('rel', 'stylesheet')
         .attr('crossorigin', 'anonymous')
         .attr('href', assets.getAssetURL('maplibre_css'))
-        .on('load', loaded)
-        .on('error', reject);
-
-      $head.selectAll('#rapideditor-maplibre-js')
-        .data([0])
-        .enter()
-        .append('script')
-        .attr('id', 'rapideditor-maplibre-js')
-        .attr('crossorigin', 'anonymous')
-        .attr('src', assets.getAssetURL('maplibre_js'))
-        .on('load', loaded)
+        .on('load', () => resolve())
         .on('error', reject);
     });
+
+    const loadJS = import(jsURL) as Promise<MapLibreModule>;
+
+    // MapLibre would start its worker from a blob that statically imports `maplibre-gl-worker.mjs`,
+    // but our CSP has 'strict-dynamic', which blocks static imports in a worker started from a blob.
+    // So fetch the worker ourselves, and give MapLibre a blob of its code (the worker imports nothing).
+    const loadWorker = network.fetchRaw(workerURL)
+      .then(response => {
+        if (!response.ok) throw new Error(`MapLibre worker: ${response.status} ${response.statusText}`);
+        return response.text();
+      })
+      .then(code => URL.createObjectURL(new Blob([code], { type: 'text/javascript' })));
+
+    return this._loadPromise = Promise.all([loadCSS, loadJS, loadWorker])
+      .then(([, maplibregl, workerBlobURL]) => {
+        maplibregl.setWorkerUrl(workerBlobURL);
+        return maplibregl;
+      });
   }
 
 

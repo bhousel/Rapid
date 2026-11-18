@@ -63,7 +63,7 @@
     "idb": "^8.0.4",
     "json5": "^2.2.3",
     "mapillary-js": "^4.1.2",
-    "maplibre-gl": "^5.24.1",
+    "maplibre-gl": "^6.18.0",
     "marked": "^18.2.0",
     "minisearch": "^7.2.0",
     "name-suggestion-index": "~7.1.20260507",
