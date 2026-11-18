@@ -42,6 +42,7 @@ interface TransformEase {
  * `GraphicsSystem` owns the Pixi environment.
  * This system hooks into the `SchedulerSystem`, which implements the game loop.
  * (formerly named PixiRenderer)
+ * See `design/graphics-system.md` for how a frame is made, what it costs, and where this is heading.
  *
  * Properties available:
  * - `supersurface`   - The parent `div` for temporary transforms between redraws

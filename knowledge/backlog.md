@@ -42,10 +42,9 @@ Phase 1 (the `KeyboardSystem` conversion + command scaffolding) is done — see
 
 ## Pixi rendering follow-ups
 - **Profiling pass** (see [`design/profiling.md`](../design/profiling.md)): baseline numbers for heap, GPU resources, the worker heap and listeners; a `scripts/profile.ts` that cycles load → edit → `resetAsync()` and reports what grows. Prompted by a 6 GB debug Chrome renderer with a 100 MB Rapid heap after a long driven session (Nov 2026); probably the browser, not measured yet.
-- **Batch line casings and strokes by material**: Spector shows casing/stroke/casing/stroke draw calls, one pair per line. Pixi 8.6+ `RenderLayer` can render casings and strokes grouped per level while they stay children of the feature container (hit-testing unchanged). Details in `design/profiling.md`.
+- **Rendering cost** has its own design and plan: [`design/graphics-system.md`](../design/graphics-system.md) (frame stats, partial fills without stencil masks, our own line builder, dashed lines, GPU time, and batching casings and strokes with `RenderLayer`).
 - **Scene follow-ups** (see [`design/scene.md`](../design/scene.md) section 3): reordering spatial IDs (lift OSM while drawing, or a layer-order UI), now that each spatial container has an explicit `zIndex`; and hit-testing by geometry instead of Pixi, which would make snapping independent of stroke width and z-order.
 - **Text rasterization without Pixi.Text**: move text drawing onto an `OffscreenCanvas` worker, or bypass `Pixi.Text` with main-thread canvas2D rasterization first. Main thread can feed the resulting `HTMLCanvasElement`, `ImageBitmap`, or `ImageData` to `PixiTextures.allocate('text', ...)`, avoiding both nested `renderer.generateTexture()` and `readPixels`. Worker font loading needs the same fonts; use `FontFace` API + transferable `ArrayBuffer`.
-- **Direct mesh generation for polygons / lines**: replace the `PIXI.GpuGraphicsContext` + `PIXI.buildContextBatches()` round-trip in `PixiFeaturePolygon.ts` with direct `earcut` tessellation, or consider a shared mesh-generator path for polygons and lines. Meshes are batchable, so this could reduce draw calls while avoiding renderer-internal geometry extraction.
 - **Tile padding off-thread if measurable**: `_fromEdgePaddedCanvas()` does two canvas draws per tile on the main thread. If profiles show it matters, build the edge-padded tile source on a worker `OffscreenCanvas` and transfer an `ImageBitmap` back; GPU upload still stays with the Pixi renderer unless the renderer itself moves off-thread.
 
 ## Render relations (at least the selected one)
@@ -233,12 +232,12 @@ the order people are likely to ask:
   a `sameKeys` disagreement (same place and direction, different tags).
 
 ## Conflation / buffers follow-ups (beyond Step 3)
-- **Internalize / replace `lineToPoly` offset-curve generation** — `lineToPoly` (used for halos) repurposes `PIXI.buildLine`, coupling halo generation to Pixi internals and a fragile triangle-walk. If we ever need *precise* buffer polygons (not just coverage boxes), internalizing the offset-curve math would unify halos + buffers and drop the Pixi coupling. Left alone for now; coverage boxes cover the conflation use case.
+- **Replacing `lineToPoly`** with a line builder of our own is now planned for rendering (`design/graphics-system.md` section 4); the same builder could give conflation precise buffers.
 - **Precise buffer polygons** — only if a consumer needs the actual buffer polygon rather than coverage boxes + a distance/overlap predicate. Likely unnecessary given the two-phase query.
 
 ## Performer-inspired statistics display
-- HUD overlay showing frame timing (APP/DRAW split), scene complexity, draw calls, texture usage, queue depth
-- Data sources: `scheduler.metrics`, GraphicsSystem performance marks (already in place, commented out), Pixi renderer stats, `scheduler.numPending`
+- Now frame stats and a rendering info card in [`design/graphics-system.md`](../design/graphics-system.md) (sections 3 and 7).
+- Also worth showing: `scheduler.metrics` and `scheduler.numPending` (queue depth), texture usage.
 - Inspiration: SGI Performer's `pfStats`/`pfFrameStats` system (Chapter 23 of Performer Programmer's Guide)
 
 ## Validator class lifecycle

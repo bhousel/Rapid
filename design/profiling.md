@@ -68,6 +68,10 @@ Reading, not measurement, so treat these as the first places to look, not findin
 
 ## Rendering: draw calls
 
+Rendering cost now has its own doc, [`graphics-system.md`](graphics-system.md), with measurements
+(Nov 2026: most draw calls come from the partial-fill masks) and a plan. This section stays as the
+background for its `RenderLayer` step.
+
 Spector shows alternating casing, stroke, casing, stroke draw calls for lines, one pair per feature,
 instead of all casings then all strokes. Each `PixiFeatureLine` owns a container with a casing
 `Graphics` and a stroke `Graphics`, and they render in scene order, so Pixi can only batch consecutive

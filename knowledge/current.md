@@ -33,8 +33,10 @@ Still to do, in about this order:
   It also supports only one dash and one gap (our boundaries and barriers use four values) and advises
   against round caps. Fine for halos (few), not for styled dashes; `DashLine.ts` stays.
   **The real draw-call cost is the partial area fills:** each is masked with a stencil, so 177 masked fills
-  made 707 of the 771 draw calls (64 without masks). GPU time was ~9 ms a frame in all three cases, so
-  draw calls aren't where the GPU time goes either; worth its own look (canvas size × MSAA, `multiView`).
+  made 707 of the 771 draw calls (64 without masks). GPU time was ~9 ms a frame in all three cases.
+  **Next: [`design/graphics-system.md`](../design/graphics-system.md)** (Nov 18), the measurements and the
+  plan: frame stats first, a set of difficult places to measure on, then our own line builder for
+  partial-fill bands, hit areas and dashes.
 - **Regression from the CDN pins: road fields missing.** At runtime the tagging schema went from 6.6 to
   6.19.2, where `sidewalk`, `cycleway`, `parking/side/parking` and `parking/side/orientation` have type
   `directionalCombo`, which Rapid doesn't support (iD's rename and generalization of the `cycleway` field;
