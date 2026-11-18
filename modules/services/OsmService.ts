@@ -1787,10 +1787,12 @@ export class OsmService extends AbstractSystem {
       }
     };
 
+    // Only the entities: the response also has its `bounds`, which isn't an entity.
+    const options = { filter: new Set<ParserDataType>(['node', 'way', 'relation']) };
     const json = (this.preferJSON ? '.json' : '');
     const path = `/api/0.6/map${json}?bbox=` + tile.wgs84Extent.toParam();
 
-    this.loadFromAPI(path, done, {}, requestID);
+    this.loadFromAPI(path, done, options, requestID);
   }
 
 
