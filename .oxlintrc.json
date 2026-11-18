@@ -120,7 +120,7 @@
       "files": ["scripts/**", "test/unit/**"],
       "globals": { "Bun": "readonly" }
     }, {
-      "files": ["test/test_setup.js", "test/browser/**"],
+      "files": ["test/test_setup.js", "test/dom/**"],
       "env": { "browser": true, "mocha": true },   // describe, it, beforeEach, afterEach, etc.
       "globals": {
         "Rapid": "readonly",

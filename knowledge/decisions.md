@@ -2,6 +2,18 @@
 
 Non-obvious choices where "why did we do it this way?" isn't captured in the code.
 
+## Testing: happy-dom for components, Playwright for the real app (Nov 2026)
+
+- **Component tests stay on Bun + happy-dom (`test/dom`), not in a real browser.** They need a DOM, not
+  a browser, and run 200 tests in about 2 s. Runners that put them in a real browser (Vitest browser mode,
+  Web Test Runner) mean a new toolchain and slower tests, to fix a few happy-dom gaps. Rejected: keeping
+  the mocha page (`test/index.html`), which had drifted to 18 of 38 files and wasn't run.
+- **E2E tests use Playwright Test directly** against the dev build, because what they catch only exists
+  in a real browser: WebGL, workers, the CSP. The MapLibre 6 worker bug passed all 4,149 unit and DOM tests.
+- **E2E network: record and replay with a HAR, not hand-written fixtures.** Real responses, refreshed with
+  one command (`E2E_RECORD=1`). The CDN stays live: its assets are many MB and are what users load anyway.
+  Unknown hosts are blocked, so a test can never reach a live service by accident.
+
 ## The scene (Nov 2026)
 
 The structure and the reasoning are in `design/scene.md`; these are the choices someone might undo.

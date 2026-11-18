@@ -574,17 +574,20 @@ After making changes:
 1. Run `bun run check:ts` to check types
 2. Run `bun run check:lint` to perform linting
 3. Run `bun run build:js` to verify build
-4. Run `bun run test` to run the unit and browser tests (or the sub-commands below for faster iteration)
+4. Run `bun run test` to run the unit and DOM tests (or the sub-commands below for faster iteration)
 5. Run `bun run check:json` to validate data files against JSON schemas
+6. If the change touches rendering, workers, assets loaded at runtime, or how systems start, run `bun run test:e2e` too
 
 ### Test Commands
-- `bun run test` — unit + browser tests (`test:unit` and `test:browser`). It does **not** lint or type-check.
+- `bun run test` — unit + DOM tests (`test:unit` and `test:dom`). It does **not** lint, type-check, or run the e2e tests.
 - `bun run test:unit` — unit tests only (`test/unit/`)
-- `bun run test:browser` — browser tests with happy-dom preload (`test/browser/`)
+- `bun run test:dom` — DOM tests with the happy-dom preload (`test/dom/`)
+- `bun run test:e2e` — end-to-end tests of the real app in Playwright's Chromium (`test/e2e/`). Builds and serves
+  Rapid first, unless a server is already running on port 8080. Needs `bunx playwright install chromium` once.
 - `bun run check` — all static checks: `check:csp`, `check:json`, `check:lint`, `check:ts`
 - `bun run check:ts` — type-check via `tsc --noEmit`
 - `bun run all` — `clean` + `check` + `build` (no tests)
-- **Do NOT use bare `bun test`** — it skips the `--preload ./test/test_setup.js` that provides happy-dom globals. Browser tests will fail with misleading errors about missing DOM APIs.
+- **Do NOT use bare `bun test`** — it skips the `--preload ./test/test_setup.js` that provides happy-dom globals. DOM tests will fail with misleading errors about missing DOM APIs.
 - If a test fails at line 1 with `describe is not defined`, suspect Bun's transpiler cache before the test (see `knowledge/quirks.md`).
 
 ### Testing in a Real Browser
@@ -618,6 +621,26 @@ Tips:
 - **No Chrome attached?** Launch headless with Playwright instead (`chromium.launch()` from
   `@playwright/test`, with `--use-angle=swiftshader --enable-unsafe-swiftshader` so WebGL works). If it
   wants a browser build that isn't downloaded, pass `executablePath` to one in `~/Library/Caches/ms-playwright`.
+- **Turn what you checked into an e2e test** when it's worth keeping: a bug you found in the browser, or
+  behavior only a real browser shows. A `cdp eval` snippet becomes a `page.evaluate()` almost as is.
+
+### End-to-End Tests (`test/e2e/`)
+How they work, and how to run and record them, is in [`test/e2e/README.md`](test/e2e/README.md). Rules:
+- **Import `test` and `expect` from `test/e2e/fixtures.js`**, not from `@playwright/test`. The fixture
+  sorts network requests (live, recorded, stubbed, blocked) and collects `consoleErrors`.
+- **Never let a test reach a live service** other than the CDN. When `consoleErrors` shows a failed request
+  to a new host, add the host to `RECORDED` (and record again) or to `STUBBED` in `fixtures.js`.
+- **Wait for conditions, never for time.** Use `page.waitForFunction()` or `expect.poll()`, not
+  `page.waitForTimeout()`. Rapid loads data and draws over several frames. Call `waitForIdle()` before
+  clicking on the map (a click before the features are drawn hits nothing) and before checking
+  `consoleErrors` (validation and other scheduled work run after the data loads).
+- **Click the map where a feature is, not at fixed pixels.** Get a location from the data and turn it into
+  page coordinates with `locToPage()`.
+- **Ask `rapidContext` for state** with `page.evaluate()`, the same way as with `bun run cdp`. Use locators
+  (`page.getByRole(…)`) when the test is about what a user sees or clicks.
+- **Check `consoleErrors` at the end** of a test that exercises a feature, so new errors fail it.
+- **Look at the diff of `test/e2e/data/recorded.har` before committing a new recording.** It holds real
+  responses from those services; it must not hold credentials (tests never log in).
 
 ### JSON Schemas
 - Data files in `data/` are validated by JSON Schema definitions in `data/schema/`

@@ -402,7 +402,7 @@ Start the Tutorial, and the Rapid-splash "skip to Rapid" path).
 1. `bun tsc --noEmit` (or `bun run check:ts`) — types clean.
 2. `bun run check:lint` — no new warnings; **do not** suppress `todo`/`fixme`.
 3. `bun run build:js` — build succeeds.
-4. `bun run test:unit` and `bun run test:browser` — green (note any pre-existing failures).
+4. `bun run test:unit` and `bun run test:dom` — green (note any pre-existing failures).
 5. Spot-check in the running app for the touched cluster (sidebar, panes, intro, etc.).
 
 ## Risks & Mitigations
@@ -656,7 +656,7 @@ Start the Tutorial, and the Rapid-splash "skip to Rapid" path).
   (`new UiEditMenu/UiSplash/UiRestore/UiWhatsNew`, `.call(this.EditMenu.render)`);
   `SaveMode.ts` (`new UiCommit/UiConflicts/UiSuccess`, `.on()` on a separate line, `Sidebar.show(x.render)` /
   `$sel.call(x.render)`); `UiRapidDatasetToggle.ts` (`new UiRapidColorpicker`);
-  `test/browser/ui/commit_warnings.test.js` (`new Rapid.UiCommitWarnings(context).render`).
+  `test/dom/ui/UiCommitWarnings.test.js` (`new Rapid.UiCommitWarnings(context).render`).
 - **Key insight:** components passed to `Sidebar.show(fn)` or `$sel.call(fn)` must now pass the bound
   `.render` method (not the instance). Verified tsc/eslint/build clean, browser 133 / unit 3290 / 0 fail.
 
