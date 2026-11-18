@@ -26,8 +26,15 @@ Still to do, in about this order:
   `person_wearing_martial_arts_belt_front_kicking`), and `build_data.ts` drops missing icons silently.
 - **pixi.js 8.23 (branch `pixi-8.23`, Nov 18).** Bumped; the only change needed was turning off Pixi's
   accessibility layer, which 8.22+ turns on when Tab is pressed (then walks the scene every frame). Checked
-  glow and imagery filters across renderer resizes (the 8.21/8.22 regression). Next: `DashLineShader` /
-  `SmoothGraphics` (maybe replaces `modules/pixi/lib/DashLine.ts`).
+  glow and imagery filters across renderer resizes (the 8.21/8.22 regression).
+  **`DashLineShader` measured (Nov 18, downtown Seattle z17.5, 2,921 features, 814 dashed footways, M4):**
+  swapping those strokes for `SmoothGraphics` + `DashLineShader` took draw calls per frame from 771 to
+  2,368 and the DRAW pass's CPU time from 0.8 to 3.0 ms, with no visible difference at that zoom (MSAA on).
+  It also supports only one dash and one gap (our boundaries and barriers use four values) and advises
+  against round caps. Fine for halos (few), not for styled dashes; `DashLine.ts` stays.
+  **The real draw-call cost is the partial area fills:** each is masked with a stencil, so 177 masked fills
+  made 707 of the 771 draw calls (64 without masks). GPU time was ~9 ms a frame in all three cases, so
+  draw calls aren't where the GPU time goes either; worth its own look (canvas size × MSAA, `multiView`).
 - **Regression from the CDN pins: road fields missing.** At runtime the tagging schema went from 6.6 to
   6.19.2, where `sidewalk`, `cycleway`, `parking/side/parking` and `parking/side/orientation` have type
   `directionalCombo`, which Rapid doesn't support (iD's rename and generalization of the `cycleway` field;

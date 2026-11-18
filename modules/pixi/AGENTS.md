@@ -3,6 +3,36 @@
 Guidelines for working with the `modules/pixi/` folder.
 (For an overview of what's in this folder, see [`README.md`](README.md).)
 
+## Pixi's reference skill, and where Rapid differs
+
+Pixi ships an agent skill with the version we have installed: `node_modules/pixi.js/skills/pixijs/SKILL.md`.
+Before you write or change Pixi API code, read `SKILL.md` and the topic files it routes you to (e.g.
+`references/scene-graphics.md`). It knows the v8 API, its silent pitfalls and its performance traps
+better than memory does, and it matches the installed version.
+
+The skill is written for a typical Pixi app. Rapid departs from that on purpose in a few places. Where the
+skill and Rapid disagree, follow Rapid, and don't "fix" these:
+- **No Pixi ticker.** `GraphicsSystem` destroys the `Application` ticker; `SchedulerSystem` runs the frame
+  loop, and Rapid renders only when something changed. Don't add `app.ticker` callbacks or call
+  `app.render()` from a layer or feature: mark it dirty and let the next frame draw it.
+- **Nothing renders inside `render()`.** `renderer.generateTexture()` calls `renderer.render()`, which
+  corrupts a render already in progress, so texture work is queued through the scheduler (see
+  `PixiLayerLabels`).
+- **Textures come from `PixiTextures`**, which packs icons, symbols and tiles into its own atlas. Don't
+  use `Texture.from()` or `Assets.load()` for them (only area patterns use an `Assets` bundle).
+- **Features draw in z16 world coordinates**, under the `origin` and `world` containers, positioned at
+  their extent's center. Line widths and dash lengths are in world units (`localScale`), and points
+  counter-scale to stay screen-sized. The skill's screen-pixel examples need converting. See
+  "Pixi World-Coord Rendering" in [`knowledge/decisions.md`](../../knowledge/decisions.md).
+- **Dashed lines use Rapid's `lib/DashLine.ts`** (texture-based, works with plain `Graphics`). Pixi's
+  `DashLineShader` needs `SmoothGraphics`, and a context with it is never batched.
+- **Pointer events go through `PixiEvents` and Rapid's behaviors.** Pixi's `move` and `globalMove`
+  events are off, and the mode decides which subtrees can be hit (`interactiveSpatialIDs`, see
+  [`design/scene.md`](../../design/scene.md)). Don't add pointer listeners to features.
+- **Pixi's accessibility layer is off** (`activateOnTab: false`): Tab moves between the UI's fields.
+- **The `Application` options live in `GraphicsSystem._initPixi()`**, with reasons (`multiView` for the
+  minimap, `autoStart: false`, the renderer choice from the url).
+
 ## Working with Services
 
 All services are now TypeScript. Access them via `context.services` with proper types:
